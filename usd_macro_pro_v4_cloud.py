@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-🦅 USD Macro Pro — V5.8 QUALIDADE MACRO
+🦅 USD Macro Pro — V5.8.1 DIFERENCIAL DE JUROS
 ================================
 - Interface em português
 - Corrige unidades de inflação e PIB no ranking global
@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "5.8 — QUALIDADE MACRO"
+APP_VERSION = "5.8.1 — DIFERENCIAL DE JUROS"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V5.8 Português",
+    page_title="USD Macro Pro — V5.8.1 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1123,7 +1123,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V5.8 Português")
+st.title("🦅 USD Macro Pro — V5.8.1 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -1472,17 +1472,70 @@ def _score_tendencias_eua() -> dict:
 
 
 def _diferencial_taxas_macro(base: str, cotada: str, ranking_df: pd.DataFrame) -> dict:
-    """Usa diferencial de taxa disponível no ranking; é proxy macro, não substitui yield 2Y estrangeiro."""
-    try:
-        rb = ranking_df.loc[ranking_df["Código"] == base].iloc[0]
-        rq = ranking_df.loc[ranking_df["Código"] == cotada].iloc[0]
-        taxa_b = float(rb["Juros %"])
-        taxa_q = float(rq["Juros %"])
-        dif = taxa_b - taxa_q
-        direcao = 1 if dif > 0.25 else -1 if dif < -0.25 else 0
-        return {"base": taxa_b, "cotada": taxa_q, "dif": dif, "direcao": direcao}
-    except Exception:
-        return {"base": None, "cotada": None, "dif": 0.0, "direcao": 0}
+    """
+    Diferencial de juros nominais entre moeda base e cotada.
+    Procura automaticamente os nomes reais das colunas do ranking.
+    Para USD, usa diretamente o Fed Funds carregado no painel EUA quando necessário.
+    """
+    def achar_coluna(candidatas):
+        normalizadas = {str(c).strip().lower(): c for c in ranking_df.columns}
+        for nome in candidatas:
+            if nome.lower() in normalizadas:
+                return normalizadas[nome.lower()]
+        # busca parcial
+        for c in ranking_df.columns:
+            lc = str(c).strip().lower()
+            if any(nome.lower() in lc for nome in candidatas):
+                return c
+        return None
+
+    col_codigo = achar_coluna(["Código", "Codigo", "Moeda", "Currency", "Code"])
+    col_juros = achar_coluna(["Juros %", "Juros", "Taxa de Juros", "Taxa", "Policy Rate", "Rate"])
+
+    def taxa_moeda(codigo):
+        if codigo == "USD":
+            try:
+                return float(macro_eua["Juros do Fed"])
+            except Exception:
+                pass
+
+        if col_codigo is None or col_juros is None:
+            return None
+
+        try:
+            codigos = ranking_df[col_codigo].astype(str).str.upper().str.strip()
+            linha = ranking_df.loc[codigos == str(codigo).upper().strip()]
+            if linha.empty:
+                return None
+            valor = pd.to_numeric(linha.iloc[0][col_juros], errors="coerce")
+            return float(valor) if pd.notna(valor) else None
+        except Exception:
+            return None
+
+    taxa_b = taxa_moeda(base)
+    taxa_q = taxa_moeda(cotada)
+
+    if taxa_b is None or taxa_q is None:
+        return {
+            "base": taxa_b, "cotada": taxa_q, "dif": 0.0, "direcao": 0,
+            "vantagem": "Indisponível",
+            "col_codigo": str(col_codigo) if col_codigo is not None else "não encontrada",
+            "col_juros": str(col_juros) if col_juros is not None else "não encontrada",
+        }
+
+    dif = float(taxa_b - taxa_q)
+    direcao = 1 if dif > 0.25 else -1 if dif < -0.25 else 0
+    vantagem = base if direcao > 0 else cotada if direcao < 0 else "Equilibrado"
+
+    return {
+        "base": taxa_b,
+        "cotada": taxa_q,
+        "dif": dif,
+        "direcao": direcao,
+        "vantagem": vantagem,
+        "col_codigo": str(col_codigo),
+        "col_juros": str(col_juros),
+    }
 
 
 def calcular_confluencia_v58(base: str, cotada: str, diferenca: float,
@@ -1549,7 +1602,7 @@ def calcular_confluencia_v58(base: str, cotada: str, diferenca: float,
 # ABA 3 — PARES
 # =========================================================
 with abas[2]:
-    st.subheader("💱 Painel de Decisão — V5.8")
+    st.subheader("💱 Painel de Decisão — V5.8.1")
 
     usd_base = float(usd_detalhado["score"])
     usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
@@ -1613,14 +1666,19 @@ with abas[2]:
 
         dt = confl["diferencial_taxas"]
         tend = confl["tendencias"]
-        st.markdown("#### 📐 Qualidade macro da V5.8")
+        st.markdown("#### 📐 Qualidade macro da V5.8.1")
         q1, q2, q3 = st.columns(3)
         with q1:
-            if dt["base"] is not None:
+            if dt["base"] is not None and dt["cotada"] is not None:
                 st.metric("Diferencial de juros", f"{dt['dif']:+.2f} p.p.")
                 st.caption(f"{base}: {dt['base']:.2f}% | {cotada}: {dt['cotada']:.2f}%")
+                if dt["vantagem"] == "Equilibrado":
+                    st.caption("⚪ Vantagem de juros: equilibrada")
+                else:
+                    st.caption(f"🟢 Vantagem de juros: {dt['vantagem']}")
             else:
                 st.metric("Diferencial de juros", "—")
+                st.caption(f"Diagnóstico: moeda={dt.get('col_codigo')} | juros={dt.get('col_juros')}")
         with q2:
             st.metric("Tendência macro EUA", f"{tend['score']:.0f}/100")
         with q3:
@@ -1637,7 +1695,7 @@ with abas[2]:
                     "Variação média": round(x["delta"], 4),
                 })
             st.dataframe(pd.DataFrame(trend_rows), use_container_width=True, hide_index=True)
-            st.caption("A V5.8 usa direção/tendência em vez de assumir que um nível fixo do Treasury 2Y é automaticamente positivo ou negativo para o USD.")
+            st.caption("A V5.8.1 usa diferencial de juros entre as moedas e tendência macro, em vez de assumir que um nível fixo do Treasury 2Y é automaticamente positivo ou negativo para o USD.")
 
         # Substitui a confiança antiga pela confiança de confluência.
         if "SEM VANTAGEM" in acao:
