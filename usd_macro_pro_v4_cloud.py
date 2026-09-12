@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "6.2 — EXPLICADOR INTELIGENTE"
+APP_VERSION = "6.2.1 — EXPLICADOR INTELIGENTE"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V6.2 Português",
+    page_title="USD Macro Pro — V6.2.1 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1966,7 +1966,7 @@ def _mostrar_explicador_v62(par: str, base: str, cotada: str, diferenca: float,
 # ABA 3 — PARES
 # =========================================================
 with abas[2]:
-    st.subheader("💱 Painel de Decisão — V6.2")
+    st.subheader("💱 Painel de Decisão — V6.2.1")
 
     usd_base = float(usd_detalhado["score"])
     usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
@@ -2038,7 +2038,7 @@ with abas[2]:
         dt = confl["diferencial_taxas"]
         mercado3m = confl["mercado_3m"]
         tend = confl["tendencias"]
-        st.markdown("#### 📐 Qualidade macro da V6.2")
+        st.markdown("#### 📐 Qualidade macro da V6.2.1")
         q1, q2, q3 = st.columns(3)
         with q1:
             if dt["base"] is not None and dt["cotada"] is not None:
@@ -2133,7 +2133,7 @@ with abas[2]:
         score_final = confl["score_confluencia"]
         qualidade_final = confl["qualidade_confluencia"]
 
-        st.markdown("### 🧭 Decisão V6.2")
+        st.markdown("### 🧭 Decisão V6.2.1")
         if "SEM VANTAGEM" in acao or score_final < 58 or qualidade_final < 50:
             st.info(
                 f"⚪ **NEUTRO / AGUARDAR** — Score {score_final:.0f}/100 | "
@@ -2161,7 +2161,7 @@ with abas[2]:
         )
 
         _mostrar_explicador_v62(
-            par, base, cotada, diferenca, confl,
+            par_escolhido, base, cotada, diferenca, confl,
             float(score_base), float(score_cotada)
         )
 
@@ -2177,7 +2177,7 @@ with abas[2]:
             st.success("✅ Sinal registrado!")
 
     st.markdown("---")
-    st.markdown("### 🏆 Matriz Inteligente — V6.2")
+    st.markdown("### 🏆 Matriz Inteligente — V6.2.1")
     st.caption(
         "Todos os pares abaixo passam pelo mesmo motor de confluência, qualidade e frescor "
         "usado na análise individual."
