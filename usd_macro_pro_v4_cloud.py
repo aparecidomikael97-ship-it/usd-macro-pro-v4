@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "6.6.2 — EXPECTATIVA INTEGRADA AO PAR"
+APP_VERSION = "6.7 — CONSENSO DIRETO NO PAR"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V6.6.2 Português",
+    page_title="USD Macro Pro — V6.7 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1018,7 +1018,7 @@ def _resumo_expectativa_v66(linhas: list[dict]) -> dict:
 
 
 def _mostrar_expectativa_v66():
-    st.subheader("🔮 Expectativa do Mercado — V6.6.2")
+    st.subheader("🔮 Expectativa do Mercado — V6.7")
     st.caption(
         "Antes da divulgação: compara PREVISÃO/CONSENSO com o ANTERIOR. "
         "Depois da divulgação, a seção de Surpresa Econômica compara REAL com PREVISÃO."
@@ -1305,7 +1305,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V6.6.2 Português")
+st.title("🦅 USD Macro Pro — V6.7 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2306,7 +2306,7 @@ def _avaliar_risco_calendario_v65(confl: dict, diferenca: float, evento: dict) -
 
 
 def _mostrar_risco_timing_v65(confl: dict, diferenca: float):
-    st.markdown("### 📅 Calendário + Risco e Timing — V6.6.2")
+    st.markdown("### 📅 Calendário + Risco e Timing — V6.7")
     st.caption(
         "Calendário combinado: FRED (CPI, Payroll, PIB e PCE) + Federal Reserve (FOMC) "
         "+ ISM (Industrial e Serviços)."
@@ -2652,70 +2652,171 @@ def _mostrar_risco_timing_v63(confl: dict, diferenca: float):
 
 
 
-def _mostrar_expectativa_no_par_v662(base: str, cotada: str):
+def _mostrar_expectativa_no_par_v67(base: str, cotada: str):
     """
-    Exibe no painel do par a expectativa pré-release já calculada no Painel EUA.
-    Não soma o consenso ao score macro e evita dupla contagem.
+    V6.7: permite preencher o consenso diretamente no painel do par.
+    Reutiliza as mesmas session_state keys do Painel EUA, mas NÃO cria widgets
+    com aquelas keys aqui; usa keys v67 exclusivas e sincroniza os valores.
     """
-    st.markdown("### 🔮 Expectativa do Mercado — Pré-release")
-
-    exp_score = float(st.session_state.get("v66_expectativa_score", 50.0))
-    exp_leitura = str(
-        st.session_state.get(
-            "v66_expectativa_leitura",
-            "⚪ Sem consensos preenchidos"
-        )
-    )
-
-    tem_consenso = any(
-        bool(st.session_state.get(f"v66_consenso_{nome}", False))
-        for nome in [
-            "IPC anual", "IPC Núcleo anual", "PCE anual", "PCE Núcleo anual",
-            "Payroll", "Desemprego", "ISM Industrial", "ISM Serviços"
-        ]
-    )
-
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Expectativa USD", f"{exp_score:.0f}/100" if tem_consenso else "—")
-    c2.metric("Estado", "Preenchida" if tem_consenso else "Sem consenso")
-    c3.metric("Uso no score", "Informativo")
-
-    if not tem_consenso:
-        st.info(
-            "Nenhum consenso pré-release foi preenchido. "
-            "Preencha a seção 🔮 Expectativa do Mercado no Painel EUA."
-        )
-    else:
-        if exp_score >= 60:
-            st.success(f"**{exp_leitura}**")
-        elif exp_score <= 40:
-            st.error(f"**{exp_leitura}**")
-        else:
-            st.info(f"**{exp_leitura}**")
-
-        # Traduz expectativa USD para o sentido do par sem transformá-la em sinal.
-        if base == "USD":
-            if exp_score >= 60:
-                leitura_par = f"Expectativa do USD tende a confirmar **COMPRA {base}/{cotada}**."
-            elif exp_score <= 40:
-                leitura_par = f"Expectativa do USD tende a contrariar **COMPRA {base}/{cotada}**."
-            else:
-                leitura_par = "Expectativa pré-release está neutra/mista para o USD."
-        elif cotada == "USD":
-            if exp_score >= 60:
-                leitura_par = f"Expectativa do USD tende a confirmar **VENDA {base}/{cotada}**."
-            elif exp_score <= 40:
-                leitura_par = f"Expectativa do USD tende a contrariar **VENDA {base}/{cotada}**."
-            else:
-                leitura_par = "Expectativa pré-release está neutra/mista para o USD."
-        else:
-            leitura_par = "Este resumo de expectativa é específico para o USD."
-
-        st.write(leitura_par)
-
+    st.markdown("### 🔮 Expectativa do Mercado — V6.7")
     st.caption(
-        "Pré-release = consenso × anterior. É contexto, não surpresa realizada. "
-        "Por isso NÃO é somado novamente ao score macro nem à confluência."
+        "Preencha o consenso diretamente aqui. O painel compara CONSENSO × ANTERIOR "
+        "antes do release. Isso continua informativo e não é contado duas vezes no score."
+    )
+
+    prox = _proximo_evento_macro_v65()
+    evento = prox.get("evento", "") if prox.get("disponivel") else ""
+
+    # Mapeia o próximo evento para o indicador econômico compatível.
+    nome_ind = None
+    maior_favorece = True
+    if "PCE" in evento and ("Núcleo" in evento or "Core" in evento):
+        nome_ind = "PCE Núcleo anual"
+    elif "PCE" in evento:
+        nome_ind = "PCE anual"
+    elif "CPI" in evento and ("Core" in evento or "Núcleo" in evento):
+        nome_ind = "IPC Núcleo anual"
+    elif "CPI" in evento or "IPC" in evento:
+        nome_ind = "IPC anual"
+    elif "Payroll" in evento or "Emprego" in evento:
+        nome_ind = "Payroll"
+    elif "ISM Industrial" in evento:
+        nome_ind = "ISM Industrial"
+    elif "ISM Serviços" in evento:
+        nome_ind = "ISM Serviços"
+
+    # FOMC precisa de lógica própria: taxa atual × taxa esperada.
+    if "FOMC" in evento:
+        st.info(
+            f"Próximo evento: **{evento}** em **{prox.get('data_txt','—')}**. "
+            "Para FOMC usamos taxa atual × taxa esperada, não a lógica de CPI/Payroll."
+        )
+        atual_default = float(st.session_state.get("v67_fomc_atual", 3.63))
+        esperada_default = float(st.session_state.get("v67_fomc_esperada", atual_default))
+
+        c1, c2 = st.columns(2)
+        with c1:
+            taxa_atual = st.number_input(
+                "Taxa atual do Fed (%)", min_value=0.0, max_value=20.0,
+                value=atual_default, step=0.25, key="v67_fomc_atual"
+            )
+        with c2:
+            taxa_esperada = st.number_input(
+                "Taxa esperada após o FOMC (%)", min_value=0.0, max_value=20.0,
+                value=esperada_default, step=0.25, key="v67_fomc_esperada"
+            )
+
+        delta = float(taxa_esperada) - float(taxa_atual)
+        if delta > 0.001:
+            score = 70.0
+            leitura = "🟢 Mercado espera ALTA de juros — expectativa tende a favorecer USD"
+        elif delta < -0.001:
+            score = 30.0
+            leitura = "🔴 Mercado espera CORTE de juros — expectativa tende a desfavorecer USD"
+        else:
+            score = 50.0
+            leitura = "⚪ Mercado espera MANUTENÇÃO — decisão tende a depender do comunicado e Powell"
+
+        st.metric("Expectativa FOMC / USD", f"{score:.0f}/100")
+        if score >= 60:
+            st.success(f"**{leitura}**")
+        elif score <= 40:
+            st.error(f"**{leitura}**")
+        else:
+            st.info(f"**{leitura}**")
+
+        if base == "USD" and score >= 60:
+            st.write(f"Leitura pré-release tende a apoiar **COMPRA {base}/{cotada}**.")
+        elif cotada == "USD" and score >= 60:
+            st.write(f"Leitura pré-release tende a apoiar **VENDA {base}/{cotada}**.")
+        elif base == "USD" and score <= 40:
+            st.write(f"Leitura pré-release tende a contrariar **COMPRA {base}/{cotada}**.")
+        elif cotada == "USD" and score <= 40:
+            st.write(f"Leitura pré-release tende a contrariar **VENDA {base}/{cotada}**.")
+
+        st.session_state["v66_expectativa_score"] = score
+        st.session_state["v66_expectativa_leitura"] = leitura
+        st.session_state["v67_expectativa_tem_dado"] = True
+        st.caption(
+            "A taxa esperada é manual. Manutenção não significa USD neutro após a decisão: "
+            "comunicado, projeções e coletiva podem mudar a reação."
+        )
+        return
+
+    if nome_ind is None:
+        st.info(
+            "O próximo evento do calendário não possui um campo direto de consenso neste módulo. "
+            "Use o Painel EUA para os indicadores disponíveis."
+        )
+        return
+
+    if nome_ind == "Desemprego":
+        maior_favorece = False
+
+    st.info(
+        f"Próximo indicador compatível: **{nome_ind}** · "
+        f"Evento: **{evento}** · Data: **{prox.get('data_txt','—')}**"
+    )
+
+    # Defaults vindos do painel EUA, mas widgets usam keys EXCLUSIVAS V6.7.
+    pkey = f"previsao_{nome_ind}"
+    akey = f"anterior_{nome_ind}"
+    prev_default = float(st.session_state.get(pkey, 0.0))
+    ant_default = float(st.session_state.get(akey, 0.0))
+    step = 1.0 if nome_ind == "Payroll" else 0.1
+
+    c0, c1, c2 = st.columns([0.7, 1.2, 1.2])
+    with c0:
+        usar = st.checkbox("Usar", value=False, key=f"v67_usar_{nome_ind}")
+    with c1:
+        previsao = st.number_input(
+            f"{nome_ind} — Consenso",
+            value=prev_default, step=step, key=f"v67_previsao_{nome_ind}"
+        )
+    with c2:
+        anterior = st.number_input(
+            f"{nome_ind} — Anterior",
+            value=ant_default, step=step, key=f"v67_anterior_{nome_ind}"
+        )
+
+    if not usar:
+        st.info("Marque **Usar** quando tiver preenchido o consenso.")
+        return
+
+    # Sincroniza valores para o motor pós-release, sem duplicar widget keys.
+    st.session_state[pkey] = float(previsao)
+    st.session_state[akey] = float(anterior)
+    st.session_state[f"v66_consenso_{nome_ind}"] = True
+
+    r = _expectativa_indicador_v66(
+        nome_ind, float(previsao), float(anterior), maior_favorece
+    )
+    score = float(r["score"])
+    st.metric("Expectativa USD", f"{score:.0f}/100")
+    if score >= 60:
+        st.success(f"**{r['leitura']}**")
+    elif score <= 40:
+        st.error(f"**{r['leitura']}**")
+    else:
+        st.info(f"**{r['leitura']}**")
+
+    if base == "USD":
+        if score >= 60:
+            st.write(f"Pré-release tende a apoiar **COMPRA {base}/{cotada}**.")
+        elif score <= 40:
+            st.write(f"Pré-release tende a contrariar **COMPRA {base}/{cotada}**.")
+    elif cotada == "USD":
+        if score >= 60:
+            st.write(f"Pré-release tende a apoiar **VENDA {base}/{cotada}**.")
+        elif score <= 40:
+            st.write(f"Pré-release tende a contrariar **VENDA {base}/{cotada}**.")
+
+    st.session_state["v66_expectativa_score"] = score
+    st.session_state["v66_expectativa_leitura"] = r["leitura"]
+    st.session_state["v67_expectativa_tem_dado"] = True
+    st.caption(
+        "Consenso × anterior = expectativa pré-release. "
+        "Real × consenso continua sendo a surpresa econômica após a divulgação."
     )
 
 
@@ -2723,7 +2824,7 @@ def _mostrar_expectativa_no_par_v662(base: str, cotada: str):
 # ABA 3 — PARES
 # =========================================================
 with abas[2]:
-    st.subheader("💱 Painel de Decisão — V6.6.2")
+    st.subheader("💱 Painel de Decisão — V6.7")
 
     usd_base = float(usd_detalhado["score"])
     usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
@@ -2795,7 +2896,7 @@ with abas[2]:
         dt = confl["diferencial_taxas"]
         mercado3m = confl["mercado_3m"]
         tend = confl["tendencias"]
-        st.markdown("#### 📐 Qualidade macro da V6.6.2")
+        st.markdown("#### 📐 Qualidade macro da V6.7")
         q1, q2, q3 = st.columns(3)
         with q1:
             if dt["base"] is not None and dt["cotada"] is not None:
@@ -2848,7 +2949,7 @@ with abas[2]:
             if idade_max > 120:
                 st.warning(
                     "🟡 O spread de mercado usa pelo menos uma série antiga. "
-                    "A V6.6.2 reduz automaticamente o peso desse componente até a FRED atualizar."
+                    "A V6.7 reduz automaticamente o peso desse componente até a FRED atualizar."
                 )
         else:
             st.warning(
@@ -2857,7 +2958,7 @@ with abas[2]:
             )
 
         st.caption(
-            "Na V6.6.2, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
+            "Na V6.7, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
             "da FRED/OECD. Mantivemos o Treasury 2Y como tendência dos EUA, mas não "
             "misturamos 2Y americano com uma maturidade estrangeira diferente."
         )
@@ -2872,7 +2973,7 @@ with abas[2]:
                     "Variação média": round(x["delta"], 4),
                 })
             st.dataframe(pd.DataFrame(trend_rows), use_container_width=True, hide_index=True)
-            st.caption("A V6.6.2 combina diferencial de juros oficiais, spread de mercado e direção do spread com pesos ajustados pelo frescor dos dados. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
+            st.caption("A V6.7 combina diferencial de juros oficiais, spread de mercado e direção do spread com pesos ajustados pelo frescor dos dados. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
 
         # Substitui a confiança antiga pela confiança de confluência.
         if "SEM VANTAGEM" in acao:
@@ -2890,7 +2991,7 @@ with abas[2]:
         score_final = confl["score_confluencia"]
         qualidade_final = confl["qualidade_confluencia"]
 
-        st.markdown("### 🧭 Decisão V6.6.2")
+        st.markdown("### 🧭 Decisão V6.7")
         if "SEM VANTAGEM" in acao or score_final < 58 or qualidade_final < 50:
             st.info(
                 f"⚪ **NEUTRO / AGUARDAR** — Score {score_final:.0f}/100 | "
@@ -2922,7 +3023,7 @@ with abas[2]:
             float(score_base), float(score_cotada)
         )
 
-        _mostrar_expectativa_no_par_v662(base, cotada)
+        _mostrar_expectativa_no_par_v67(base, cotada)
 
         _mostrar_risco_timing_v65(confl, diferenca)
 
@@ -2938,7 +3039,7 @@ with abas[2]:
             st.success("✅ Sinal registrado!")
 
     st.markdown("---")
-    st.markdown("### 🏆 Matriz Inteligente — V6.6.2")
+    st.markdown("### 🏆 Matriz Inteligente — V6.7")
     st.caption(
         "Todos os pares abaixo passam pelo mesmo motor de confluência, qualidade e frescor "
         "usado na análise individual."
