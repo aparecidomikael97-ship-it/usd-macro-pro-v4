@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "6.8 — CENÁRIOS PROBABILÍSTICOS FOMC"
+APP_VERSION = "6.9 — FOMC SURPRISE ENGINE"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V6.8 Português",
+    page_title="USD Macro Pro — V6.9 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1018,7 +1018,7 @@ def _resumo_expectativa_v66(linhas: list[dict]) -> dict:
 
 
 def _mostrar_expectativa_v66():
-    st.subheader("🔮 Expectativa do Mercado — V6.8")
+    st.subheader("🔮 Expectativa do Mercado — V6.9")
     st.caption(
         "Antes da divulgação: compara PREVISÃO/CONSENSO com o ANTERIOR. "
         "Depois da divulgação, a seção de Surpresa Econômica compara REAL com PREVISÃO."
@@ -1305,7 +1305,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V6.8 Português")
+st.title("🦅 USD Macro Pro — V6.9 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2306,7 +2306,7 @@ def _avaliar_risco_calendario_v65(confl: dict, diferenca: float, evento: dict) -
 
 
 def _mostrar_risco_timing_v65(confl: dict, diferenca: float):
-    st.markdown("### 📅 Calendário + Risco e Timing — V6.8")
+    st.markdown("### 📅 Calendário + Risco e Timing — V6.9")
     st.caption(
         "Calendário combinado: FRED (CPI, Payroll, PIB e PCE) + Federal Reserve (FOMC) "
         "+ ISM (Industrial e Serviços)."
@@ -2658,7 +2658,7 @@ def _mostrar_expectativa_no_par_v68(base: str, cotada: str):
     Reutiliza as mesmas session_state keys do Painel EUA, mas NÃO cria widgets
     com aquelas keys aqui; usa keys v67 exclusivas e sincroniza os valores.
     """
-    st.markdown("### 🔮 Expectativa do Mercado — V6.8")
+    st.markdown("### 🔮 Expectativa do Mercado — V6.9")
     st.caption(
         "Preencha o consenso diretamente aqui. O painel compara CONSENSO × ANTERIOR "
         "antes do release. Isso continua informativo e não é contado duas vezes no score."
@@ -2882,11 +2882,180 @@ def _mostrar_expectativa_no_par_v68(base: str, cotada: str):
     )
 
 
+
+def _fomc_surprise_engine_v69(p_corte: float, p_manut: float, p_alta: float,
+                              decisao_real: str, tom: str) -> dict:
+    """
+    Compara a decisão REAL com a distribuição pré-FOMC.
+    O score mede surpresa direcional para o USD; não é probabilidade de lucro.
+    """
+    probs = {
+        "Corte 25 pb": float(p_corte),
+        "Manutenção": float(p_manut),
+        "Alta 25 pb": float(p_alta),
+    }
+    soma = sum(probs.values())
+    if abs(soma - 100.0) > 0.01:
+        return {"valido": False, "erro": f"Probabilidades somam {soma:.1f}%."}
+
+    movimentos = {"Corte 25 pb": -25.0, "Manutenção": 0.0, "Alta 25 pb": 25.0}
+    esperado_pb = sum(probs[k] * movimentos[k] for k in probs) / 100.0
+    real_pb = movimentos[decisao_real]
+    surpresa_pb = real_pb - esperado_pb
+
+    # Surpresa da decisão: +/-25 pb inesperados levam o score até aprox. 25/75.
+    score_decisao = float(np.clip(50.0 + surpresa_pb, 0.0, 100.0))
+
+    # Tom comunicado/Powell funciona como camada separada e limitada.
+    ajuste_tom = {
+        "Muito dovish": -15.0,
+        "Dovish": -8.0,
+        "Neutro": 0.0,
+        "Hawkish": 8.0,
+        "Muito hawkish": 15.0,
+    }[tom]
+
+    score_final = float(np.clip(score_decisao + ajuste_tom, 0.0, 100.0))
+
+    if score_final >= 62:
+        leitura = "🟢 Surpresa FOMC favorece o USD"
+    elif score_final <= 38:
+        leitura = "🔴 Surpresa FOMC desfavorece o USD"
+    else:
+        leitura = "⚪ Resultado FOMC neutro/misto para o USD"
+
+    prob_real = probs[decisao_real]
+    if prob_real >= 70:
+        grau = "BAIXA surpresa"
+    elif prob_real >= 40:
+        grau = "SURPRESA MODERADA"
+    else:
+        grau = "ALTA surpresa"
+
+    return {
+        "valido": True,
+        "esperado_pb": esperado_pb,
+        "real_pb": real_pb,
+        "surpresa_pb": surpresa_pb,
+        "prob_real": prob_real,
+        "grau": grau,
+        "score_decisao": score_decisao,
+        "ajuste_tom": ajuste_tom,
+        "score_final": score_final,
+        "leitura": leitura,
+    }
+
+
+def _mostrar_fomc_surprise_v69(base: str, cotada: str):
+    prox = _proximo_evento_macro_v65()
+    evento = prox.get("evento", "") if prox.get("disponivel") else ""
+
+    st.markdown("### ⚡ FOMC Surprise Engine — V6.9")
+    st.caption(
+        "Use esta área APÓS a decisão. Ela compara o que o mercado precificava "
+        "com o que o Fed realmente fez e adiciona uma leitura separada do comunicado/Powell."
+    )
+
+    # Recupera as probabilidades pré-FOMC da V6.8.
+    p_corte = float(st.session_state.get("v68_p_corte", 0.0))
+    p_manut = float(st.session_state.get("v68_p_manut", 100.0))
+    p_alta = float(st.session_state.get("v68_p_alta", 0.0))
+    soma = p_corte + p_manut + p_alta
+
+    st.write(
+        f"**Precificação salva:** Corte {p_corte:.0f}% · "
+        f"Manutenção {p_manut:.0f}% · Alta {p_alta:.0f}%"
+    )
+
+    ativar = st.checkbox(
+        "A decisão do FOMC já saiu — ativar análise pós-release",
+        key="v69_fomc_pos_release"
+    )
+    if not ativar:
+        st.info(
+            "Enquanto a decisão não sair, mantenha esta área desativada. "
+            "A análise pré-FOMC da V6.8 continua sendo a referência."
+        )
+        return
+
+    if abs(soma - 100.0) > 0.01:
+        st.error(
+            f"As probabilidades pré-FOMC somam {soma:.1f}%. "
+            "Corrija os cenários na seção de expectativa antes de calcular a surpresa."
+        )
+        return
+
+    c1, c2 = st.columns(2)
+    with c1:
+        decisao = st.selectbox(
+            "Decisão real do Fed",
+            ["Corte 25 pb", "Manutenção", "Alta 25 pb"],
+            key="v69_decisao_real"
+        )
+    with c2:
+        tom = st.selectbox(
+            "Tom do comunicado / Powell",
+            ["Muito dovish", "Dovish", "Neutro", "Hawkish", "Muito hawkish"],
+            index=2, key="v69_tom_fomc"
+        )
+
+    r = _fomc_surprise_engine_v69(p_corte, p_manut, p_alta, decisao, tom)
+    if not r["valido"]:
+        st.error(r["erro"])
+        return
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Movimento esperado", f"{r['esperado_pb']:+.1f} pb")
+    m2.metric("Decisão real", f"{r['real_pb']:+.0f} pb")
+    m3.metric("Surpresa", f"{r['surpresa_pb']:+.1f} pb")
+    m4.metric("Prob. do resultado", f"{r['prob_real']:.0f}%")
+
+    q1, q2, q3 = st.columns(3)
+    q1.metric("Grau", r["grau"])
+    q2.metric("Ajuste comunicado", f"{r['ajuste_tom']:+.0f} pts")
+    q3.metric("FOMC / USD", f"{r['score_final']:.0f}/100")
+
+    if r["score_final"] >= 62:
+        st.success(f"**{r['leitura']}**")
+    elif r["score_final"] <= 38:
+        st.error(f"**{r['leitura']}**")
+    else:
+        st.info(f"**{r['leitura']}**")
+
+    if base == "USD":
+        if r["score_final"] >= 62:
+            st.write(f"Pós-FOMC tende a apoiar **COMPRA {base}/{cotada}**.")
+        elif r["score_final"] <= 38:
+            st.write(f"Pós-FOMC tende a pressionar **{base}/{cotada} para baixo**.")
+        else:
+            st.write(f"Pós-FOMC está misto para **{base}/{cotada}**.")
+    elif cotada == "USD":
+        if r["score_final"] >= 62:
+            st.write(f"Pós-FOMC tende a apoiar **VENDA {base}/{cotada}**.")
+        elif r["score_final"] <= 38:
+            st.write(f"Pós-FOMC tende a apoiar **COMPRA {base}/{cotada}**.")
+        else:
+            st.write(f"Pós-FOMC está misto para **{base}/{cotada}**.")
+
+    # Mantém separado do score macro principal para não contar o FOMC duas vezes.
+    st.session_state["v69_fomc_surprise_score"] = float(r["score_final"])
+    st.session_state["v69_fomc_surprise_ativo"] = True
+
+    st.warning(
+        "Este score mede surpresa direcional interna do FOMC, não probabilidade de lucro. "
+        "O tom do comunicado/Powell é informado manualmente e deve ser confirmado pela fonte oficial."
+    )
+    st.caption(
+        "A V6.9 NÃO soma automaticamente este resultado ao score macro principal, "
+        "evitando dupla contagem com o componente Fed já existente."
+    )
+
+
 # =========================================================
 # ABA 3 — PARES
 # =========================================================
 with abas[2]:
-    st.subheader("💱 Painel de Decisão — V6.8")
+    st.subheader("💱 Painel de Decisão — V6.9")
 
     usd_base = float(usd_detalhado["score"])
     usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
@@ -2958,7 +3127,7 @@ with abas[2]:
         dt = confl["diferencial_taxas"]
         mercado3m = confl["mercado_3m"]
         tend = confl["tendencias"]
-        st.markdown("#### 📐 Qualidade macro da V6.8")
+        st.markdown("#### 📐 Qualidade macro da V6.9")
         q1, q2, q3 = st.columns(3)
         with q1:
             if dt["base"] is not None and dt["cotada"] is not None:
@@ -3011,7 +3180,7 @@ with abas[2]:
             if idade_max > 120:
                 st.warning(
                     "🟡 O spread de mercado usa pelo menos uma série antiga. "
-                    "A V6.8 reduz automaticamente o peso desse componente até a FRED atualizar."
+                    "A V6.9 reduz automaticamente o peso desse componente até a FRED atualizar."
                 )
         else:
             st.warning(
@@ -3020,7 +3189,7 @@ with abas[2]:
             )
 
         st.caption(
-            "Na V6.8, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
+            "Na V6.9, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
             "da FRED/OECD. Mantivemos o Treasury 2Y como tendência dos EUA, mas não "
             "misturamos 2Y americano com uma maturidade estrangeira diferente."
         )
@@ -3035,7 +3204,7 @@ with abas[2]:
                     "Variação média": round(x["delta"], 4),
                 })
             st.dataframe(pd.DataFrame(trend_rows), use_container_width=True, hide_index=True)
-            st.caption("A V6.8 combina diferencial de juros oficiais, spread de mercado e direção do spread com pesos ajustados pelo frescor dos dados. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
+            st.caption("A V6.9 combina diferencial de juros oficiais, spread de mercado e direção do spread com pesos ajustados pelo frescor dos dados. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
 
         # Substitui a confiança antiga pela confiança de confluência.
         if "SEM VANTAGEM" in acao:
@@ -3053,7 +3222,7 @@ with abas[2]:
         score_final = confl["score_confluencia"]
         qualidade_final = confl["qualidade_confluencia"]
 
-        st.markdown("### 🧭 Decisão V6.8")
+        st.markdown("### 🧭 Decisão V6.9")
         if "SEM VANTAGEM" in acao or score_final < 58 or qualidade_final < 50:
             st.info(
                 f"⚪ **NEUTRO / AGUARDAR** — Score {score_final:.0f}/100 | "
@@ -3087,6 +3256,8 @@ with abas[2]:
 
         _mostrar_expectativa_no_par_v68(base, cotada)
 
+        _mostrar_fomc_surprise_v69(base, cotada)
+
         _mostrar_risco_timing_v65(confl, diferenca)
 
         st.write(f"Motivo: {base} está em **{score_base:.1f}** e {cotada} em **{score_cotada:.1f}**. O USD, quando presente, já inclui o ajuste das surpresas econômicas.")
@@ -3101,7 +3272,7 @@ with abas[2]:
             st.success("✅ Sinal registrado!")
 
     st.markdown("---")
-    st.markdown("### 🏆 Matriz Inteligente — V6.8")
+    st.markdown("### 🏆 Matriz Inteligente — V6.9")
     st.caption(
         "Todos os pares abaixo passam pelo mesmo motor de confluência, qualidade e frescor "
         "usado na análise individual."
