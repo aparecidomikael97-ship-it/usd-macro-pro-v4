@@ -28,12 +28,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "8.7.1 — MULTIPARES ATÔMICO"
+APP_VERSION = "8.7.2 — MULTIPARES ATÔMICO CORRIGIDO"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V8.7.1 Português",
+    page_title="USD Macro Pro — V8.7.2 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1606,7 +1606,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V8.7.1 Português")
+st.title("🦅 USD Macro Pro — V8.7.2 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2529,9 +2529,11 @@ def _salvar_sinais_v82(df):
         df["par"] = df["par"].astype(str).str.upper().str.strip()
         _datas = pd.to_datetime(df["data_preco"], errors="coerce")
         df["_data_fred_v871"] = _datas.dt.strftime("%Y-%m-%d")
+        # Históricos antigos podem misturar Timestamp e texto em "timestamp".
+        # Não precisamos ordenar aqui: a ordem atual já mantém os registros antigos
+        # antes dos novos; keep="first" preserva a primeira fotografia.
         df = (
-            df.sort_values("timestamp", kind="stable")
-              .drop_duplicates(subset=["par", "_data_fred_v871"], keep="first")
+            df.drop_duplicates(subset=["par", "_data_fred_v871"], keep="first")
               .drop(columns=["_data_fred_v871"])
               .reset_index(drop=True)
         )
@@ -2707,7 +2709,7 @@ def _avaliar_sinais_v82():
     return df, atualizados
 
 def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca, confl):
-    st.markdown("## 🧪 Validação Histórica — V8.7.1")
+    st.markdown("## 🧪 Validação Histórica — V8.7.2")
     st.caption(
         "Este módulo registra o sinal AGORA, evita duplicatas e mede depois. "
         "Ele não reconstrói o passado usando dados futuros."
@@ -2732,7 +2734,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 
     if serie_atual:
         st.info(
-            f"Fonte de preço V8.7.1: FRED {serie_atual}, série diária oficial H.10 para {par}. "
+            f"Fonte de preço V8.7.2: FRED {serie_atual}, série diária oficial H.10 para {par}. "
             "A validação mede direção entre observações diárias — não 1h/4h."
         )
     else:
@@ -2811,7 +2813,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     pendentes = df[df["avaliado"] != True].copy()
     avaliados_total = df[df["avaliado"] == True].copy()
 
-    st.markdown("### 💾 Persistência do histórico — V8.7.1")
+    st.markdown("### 💾 Persistência do histórico — V8.7.2")
     _v84_token, _v84_repo, _v84_branch = _github_cfg_v84()
     if _v84_token:
         st.success(
@@ -5288,7 +5290,7 @@ with abas[2]:
             st.success("✅ Sinal registrado!")
 
     st.markdown("---")
-    st.markdown("### 🏆 Matriz Inteligente — V8.7.1")
+    st.markdown("### 🏆 Matriz Inteligente — V8.7.2")
     st.caption(
         "Todos os pares abaixo passam pelo mesmo motor de confluência, qualidade e frescor "
         "usado na análise individual."
@@ -5474,7 +5476,7 @@ with abas[2]:
         _salvar_sinais_v82(_df_v871)
 
     st.caption(
-        "🤖 V8.7.1 multipares: coleta atômica dos 7 pares usando exatamente a decisão final "
+        "🤖 V8.7.2 multipares: coleta atômica dos 7 pares usando exatamente a decisão final "
         "da Matriz. Regra anti-duplicata: 1 par + 1 data FRED = no máximo 1 registro."
     )
 
