@@ -28,12 +28,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "8.6 — AUTOMAÇÃO AGENDADA"
+APP_VERSION = "8.7 — VALIDAÇÃO MULTIPARES"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V8.6 Português",
+    page_title="USD Macro Pro — V8.7 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1606,7 +1606,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V8.6 Português")
+st.title("🦅 USD Macro Pro — V8.7 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2532,27 +2532,42 @@ def _salvar_sinais_v82(df):
     ok_git, _ = _github_salvar_csv_v84(df)
     return bool(ok_local or ok_git)
 
-def _fred_preco_eurusd_v82():
+def _fred_preco_par_v87(par):
     """
-    DEXUSEU = dólares por 1 euro, frequência diária.
-    Serve para EUR/USD diário, não intraday.
+    V8.7 — preço diário oficial FRED/H.10 para os 7 pares.
+    As séries abaixo já estão na mesma orientação do par exibido.
     """
+    series = {
+        "EUR/USD": ("DEXUSEU", "USD por 1 EUR"),
+        "GBP/USD": ("DEXUSUK", "USD por 1 GBP"),
+        "AUD/USD": ("DEXUSAL", "USD por 1 AUD"),
+        "NZD/USD": ("DEXUSNZ", "USD por 1 NZD"),
+        "USD/JPY": ("DEXJPUS", "JPY por 1 USD"),
+        "USD/CHF": ("DEXSZUS", "CHF por 1 USD"),
+        "USD/CAD": ("DEXCAUS", "CAD por 1 USD"),
+    }
+    sid_info = series.get(str(par).upper())
+    if not sid_info:
+        return None, None, None
+    sid, unidade = sid_info
     try:
-        obs = _fred_obs_v71("DEXUSEU", 20)
+        obs = _fred_obs_v71(sid, 20)
         if not obs:
-            return None, None
-        return float(obs[0][1]), obs[0][0]
+            return None, None, sid
+        return float(obs[0][1]), obs[0][0], sid
     except Exception:
-        return None, None
+        return None, None, sid
+
+def _fred_preco_eurusd_v82():
+    """Compatibilidade com versões anteriores."""
+    preco, data, _ = _fred_preco_par_v87("EUR/USD")
+    return preco, data
 
 def _registrar_sinal_v82(par, direcao, score_mestre, qualidade,
                          score_base, score_cotada, diferenca):
-    if par != "EUR/USD":
-        return False, "V8.2 inicial valida automaticamente apenas EUR/USD com FRED DEXUSEU."
-
-    preco, dt_preco = _fred_preco_eurusd_v82()
+    preco, dt_preco, serie_fred = _fred_preco_par_v87(par)
     if preco is None:
-        return False, "Preço oficial EUR/USD indisponível na FRED nesta execução."
+        return False, f"Preço oficial diário de {par} indisponível na FRED nesta execução."
 
     evento = _proximo_evento_macro_v65()
     evento_nome, dias, impacto = "—", None, "—"
@@ -2618,42 +2633,51 @@ def _registrar_sinal_v82(par, direcao, score_mestre, qualidade,
     }
     df = pd.concat([df, pd.DataFrame([linha])], ignore_index=True)
     ok = _salvar_sinais_v82(df)
-    return ok, f"Sinal registrado em {preco:.5f} (FRED DEXUSEU, {dt_preco})."
+    return ok, f"Sinal registrado em {preco:.5f} (FRED {serie_fred}, {dt_preco})."
 
 def _avaliar_sinais_v82():
     """
-    Avaliação conservadora diária:
-    usa o último preço diário disponível depois do registro.
-    Não promete 1h/4h porque DEXUSEU é diário.
+    V8.7 — avaliação diária multipares.
+    Cada linha é avaliada com a série FRED correspondente ao próprio par.
+    Só usa observação diária posterior à data de entrada.
     """
     df = _carregar_sinais_v82()
     if df.empty:
         return df, 0
 
-    preco_atual, dt_atual = _fred_preco_eurusd_v82()
-    if preco_atual is None:
-        return df, 0
-
+    cache_precos = {}
     atualizados = 0
+
     for i, r in df.iterrows():
         if bool(r.get("avaliado", False)):
             continue
+
+        par_linha = str(r.get("par", "")).upper().strip()
+        if par_linha not in cache_precos:
+            cache_precos[par_linha] = _fred_preco_par_v87(par_linha)
+
+        preco_atual, dt_atual, _sid = cache_precos[par_linha]
+        if preco_atual is None or dt_atual is None:
+            continue
+
         try:
             dt_entrada = pd.Timestamp(r["data_preco"])
         except Exception:
             continue
 
-        # Só avalia quando existe uma observação diária posterior.
         if pd.Timestamp(dt_atual) <= dt_entrada:
             continue
 
-        entrada = float(r["preco_entrada"])
-        retorno = (float(preco_atual) / entrada - 1.0) * 100.0
-        direcao = str(r["direcao"]).upper()
+        try:
+            entrada = float(r["preco_entrada"])
+            retorno = (float(preco_atual) / entrada - 1.0) * 100.0
+        except Exception:
+            continue
 
-        if direcao == "SELL":
+        direcao = str(r.get("direcao", "")).upper()
+        if direcao in ("SELL", "VENDA", "VENDER"):
             acertou = retorno < 0
-        elif direcao == "BUY":
+        elif direcao in ("BUY", "COMPRA", "COMPRAR"):
             acertou = retorno > 0
         else:
             acertou = None
@@ -2670,7 +2694,7 @@ def _avaliar_sinais_v82():
     return df, atualizados
 
 def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca, confl):
-    st.markdown("## 🧪 Validação Histórica — V8.6")
+    st.markdown("## 🧪 Validação Histórica — V8.7")
     st.caption(
         "Este módulo registra o sinal AGORA, evita duplicatas e mede depois. "
         "Ele não reconstrói o passado usando dados futuros."
@@ -2686,17 +2710,17 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     else:
         direcao = "WAIT"
 
-    p_atual, dt_atual = _fred_preco_eurusd_v82()
+    p_atual, dt_atual, serie_atual = _fred_preco_par_v87(par)
     a,b,c,d = st.columns(4)
     a.metric("Par", par)
     b.metric("Sinal atual", direcao)
     c.metric("Score", f"{score:.0f}/100")
     d.metric("Preço diário FRED", f"{p_atual:.5f}" if p_atual else "—")
 
-    if par == "EUR/USD":
+    if serie_atual:
         st.info(
-            "Fonte de preço da V8.6: FRED DEXUSEU, cotação diária em dólares por 1 euro. "
-            "Por ser diária, esta primeira validação mede direção entre dias — não 1h/4h."
+            f"Fonte de preço V8.7: FRED {serie_atual}, série diária oficial H.10 para {par}. "
+            "A validação mede direção entre observações diárias — não 1h/4h."
         )
     else:
         st.warning(
@@ -2774,7 +2798,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     pendentes = df[df["avaliado"] != True].copy()
     avaliados_total = df[df["avaliado"] == True].copy()
 
-    st.markdown("### 💾 Persistência do histórico — V8.6")
+    st.markdown("### 💾 Persistência do histórico — V8.7")
     _v84_token, _v84_repo, _v84_branch = _github_cfg_v84()
     if _v84_token:
         st.success(
@@ -5318,6 +5342,54 @@ with abas[2]:
     ).reset_index(drop=True)
 
     matriz_v61.insert(0, "Ranking", range(1, len(matriz_v61) + 1))
+
+    # =====================================================
+    # V8.7 — COLETA HISTÓRICA AUTOMÁTICA DOS 7 PARES
+    # Roda tanto no Streamlit quanto no GitHub Actions.
+    # Registra somente BUY/SELL e a proteção de duplicidade
+    # impede repetir o mesmo par/direção/data FRED.
+    # =====================================================
+    _v87_resultados_coleta = []
+    for _par_v87 in pares_matriz:
+        _b87, _q87 = _par_v87.split("/")
+        _sb87 = usd_ajustado if _b87 == "USD" else float(scores_ranking.get(_b87, 50.0))
+        _sq87 = usd_ajustado if _q87 == "USD" else float(scores_ranking.get(_q87, 50.0))
+        _dif87 = float(_sb87 - _sq87)
+
+        if _dif87 >= 6:
+            _dir87 = "BUY"
+        elif _dif87 <= -6:
+            _dir87 = "SELL"
+        else:
+            _dir87 = "WAIT"
+
+        if _dir87 == "WAIT":
+            _v87_resultados_coleta.append((_par_v87, "WAIT", False, "Sem vantagem macro clara"))
+            continue
+
+        _conf87 = calcular_confluencia_v60(
+            _b87, _q87, _dif87, usd_ajustado, ajuste,
+            fed.get("tom", "Neutro"), ranking
+        )
+        _score87 = float(_conf87["score_confluencia"])
+        _qual87 = float(_conf87["qualidade_confluencia"])
+
+        # Mesma trava conservadora da matriz: não cria registro
+        # quando a cobertura/qualidade é insuficiente.
+        if _score87 < 58 or _qual87 < 50:
+            _v87_resultados_coleta.append((_par_v87, _dir87, False, "Qualidade/confluência insuficiente"))
+            continue
+
+        _ok87, _msg87 = _registrar_sinal_v82(
+            _par_v87, _dir87, _score87, _qual87,
+            _sb87, _sq87, _dif87
+        )
+        _v87_resultados_coleta.append((_par_v87, _dir87, _ok87, _msg87))
+
+    st.caption(
+        "🤖 V8.7 multipares: EUR/USD, GBP/USD, AUD/USD, NZD/USD, "
+        "USD/JPY, USD/CHF e USD/CAD são verificados automaticamente a cada execução."
+    )
 
     st.dataframe(
         matriz_v61,
