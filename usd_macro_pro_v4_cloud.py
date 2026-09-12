@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-🦅 USD Macro Pro — V6.4 CALENDÁRIO AUTOMÁTICO
+🦅 USD Macro Pro — V6.5 CALENDÁRIO MACRO COMPLETO
 ================================
 - Interface em português
 - Corrige unidades de inflação e PIB no ranking global
@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "6.4 — CALENDÁRIO AUTOMÁTICO"
+APP_VERSION = "6.5 — CALENDÁRIO MACRO COMPLETO"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V6.4 Português",
+    page_title="USD Macro Pro — V6.5 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1964,6 +1964,231 @@ def _mostrar_explicador_v62(par: str, base: str, cotada: str, diferenca: float,
 
 
 
+
+# =========================================================
+# V6.5 — CALENDÁRIO MACRO COMPLETO
+# FRED + FOMC oficial + ISM oficial
+# =========================================================
+
+# Datas de decisão (segundo dia da reunião) publicadas pelo Federal Reserve.
+FOMC_DECISOES = {
+    2026: [
+        "2026-01-28", "2026-03-18", "2026-04-29", "2026-06-17",
+        "2026-07-29", "2026-09-16", "2026-10-28", "2026-12-09",
+    ],
+    2027: [
+        "2027-01-27", "2027-03-17", "2027-04-28", "2027-06-09",
+        "2027-07-28", "2027-09-15", "2027-10-27", "2027-12-08",
+    ],
+}
+
+# Calendário 2026 publicado pelo Institute for Supply Management.
+ISM_2026 = {
+    "ISM Industrial": [
+        "2026-01-05","2026-02-02","2026-03-02","2026-04-01",
+        "2026-05-01","2026-06-01","2026-07-01","2026-08-03",
+        "2026-09-01","2026-10-01","2026-11-02","2026-12-01",
+    ],
+    "ISM Serviços": [
+        "2026-01-07","2026-02-04","2026-03-04","2026-04-06",
+        "2026-05-05","2026-06-03","2026-07-06","2026-08-05",
+        "2026-09-03","2026-10-05","2026-11-04","2026-12-03",
+    ],
+}
+
+def _eventos_macro_v65() -> pd.DataFrame:
+    """Une releases FRED, decisões FOMC e calendário ISM."""
+    hoje = pd.Timestamp.now(tz=None).normalize()
+    eventos = []
+
+    # 1) FRED: CPI, Payroll, GDP, PCE.
+    cal = carregar_calendario_fred()
+    if cal is not None and not cal.empty:
+        for _, row in cal.iterrows():
+            data_txt = str(row.get("Próxima data de release", "—"))
+            if data_txt == "—":
+                continue
+            try:
+                dt = pd.to_datetime(data_txt, dayfirst=True).normalize()
+            except Exception:
+                continue
+            if dt >= hoje:
+                eventos.append({
+                    "Evento": str(row.get("Evento", "Evento FRED")),
+                    "Data": dt,
+                    "Impacto": "ALTO",
+                    "Fonte": str(row.get("Fonte", "FRED")),
+                    "Tipo": "Dados",
+                })
+
+    # 2) FOMC: prioridade máxima.
+    for ano, datas in FOMC_DECISOES.items():
+        for d in datas:
+            dt = pd.Timestamp(d).normalize()
+            if dt >= hoje:
+                eventos.append({
+                    "Evento": "FOMC — Decisão de juros",
+                    "Data": dt,
+                    "Impacto": "MÁXIMO",
+                    "Fonte": "Federal Reserve",
+                    "Tipo": "Banco Central",
+                })
+
+    # 3) ISM.
+    for nome, datas in ISM_2026.items():
+        for d in datas:
+            dt = pd.Timestamp(d).normalize()
+            if dt >= hoje:
+                eventos.append({
+                    "Evento": nome,
+                    "Data": dt,
+                    "Impacto": "ALTO",
+                    "Fonte": "ISM",
+                    "Tipo": "Atividade",
+                })
+
+    if not eventos:
+        return pd.DataFrame(columns=["Evento","Data","Impacto","Fonte","Tipo","Dias"])
+
+    df = pd.DataFrame(eventos).drop_duplicates(subset=["Evento","Data"])
+    df["Dias"] = (df["Data"] - hoje).dt.days.astype(int)
+    prioridade = {"MÁXIMO": 0, "ALTO": 1, "MÉDIO": 2}
+    df["_prioridade"] = df["Impacto"].map(prioridade).fillna(9)
+    return df.sort_values(["Data","_prioridade","Evento"]).drop(columns="_prioridade").reset_index(drop=True)
+
+
+def _proximo_evento_macro_v65() -> dict:
+    df = _eventos_macro_v65()
+    if df.empty:
+        return {"disponivel": False}
+    r = df.iloc[0]
+    return {
+        "disponivel": True,
+        "evento": str(r["Evento"]),
+        "data": r["Data"],
+        "data_txt": r["Data"].strftime("%d/%m/%Y"),
+        "dias": int(r["Dias"]),
+        "impacto": str(r["Impacto"]),
+        "fonte": str(r["Fonte"]),
+        "tipo": str(r["Tipo"]),
+    }
+
+
+def _avaliar_risco_calendario_v65(confl: dict, diferenca: float, evento: dict) -> dict:
+    score = float(confl.get("score_confluencia", 50))
+    qualidade = float(confl.get("qualidade_confluencia", 0))
+    nivel = str(confl.get("nivel", "BAIXA"))
+
+    timing = 50.0 + (score - 50.0) * 0.35 + (qualidade - 50.0) * 0.20
+    if nivel == "ALTA":
+        timing += 8
+    elif nivel == "BAIXA":
+        timing -= 8
+
+    risco, penalidade = "NORMAL", 0.0
+    dias = None
+
+    if evento.get("disponivel"):
+        dias = int(evento["dias"])
+        maximo = evento.get("impacto") == "MÁXIMO"
+
+        if dias == 0:
+            risco, penalidade = ("MUITO ALTO", 40 if maximo else 35)
+        elif dias == 1:
+            risco, penalidade = ("ALTO", 30 if maximo else 25)
+        elif dias <= 3:
+            risco, penalidade = ("ELEVADO", 20 if maximo else 15)
+        elif dias <= 7:
+            risco, penalidade = ("ATENÇÃO", 10 if maximo else 7)
+
+    timing = float(np.clip(timing - penalidade, 0, 100))
+
+    if abs(diferenca) < 6 or qualidade < 50:
+        status = "⚪ AGUARDAR"
+    elif risco in ("MUITO ALTO", "ALTO"):
+        status = "🔴 RISCO DE EVENTO — AGUARDAR / CONFIRMAR HORÁRIO"
+    elif risco == "ELEVADO":
+        status = "🟡 EVENTO PRÓXIMO — REDUZIR CONFIANÇA NO TIMING"
+    elif timing >= 72:
+        status = "🟢 CENÁRIO FAVORÁVEL — PROCURAR CONFIRMAÇÃO NO PREÇO"
+    elif timing >= 58:
+        status = "🟡 CENÁRIO ACEITÁVEL — AGUARDAR CONFIRMAÇÃO"
+    else:
+        status = "⚪ AGUARDAR"
+
+    return {"timing": timing, "risco": risco, "penalidade": penalidade,
+            "status": status, "dias": dias}
+
+
+def _mostrar_risco_timing_v65(confl: dict, diferenca: float):
+    st.markdown("### 📅 Calendário + Risco e Timing — V6.5")
+    st.caption(
+        "Calendário combinado: FRED (CPI, Payroll, PIB e PCE) + Federal Reserve (FOMC) "
+        "+ ISM (Industrial e Serviços)."
+    )
+
+    prox = _proximo_evento_macro_v65()
+    rt = _avaliar_risco_calendario_v65(confl, diferenca, prox)
+
+    if prox.get("disponivel"):
+        a,b,c,d = st.columns(4)
+        a.metric("Próximo evento", prox["evento"])
+        b.metric("Data", prox["data_txt"])
+        c.metric("Faltam", "Hoje" if prox["dias"] == 0 else f"{prox['dias']} dia(s)")
+        d.metric("Impacto", prox["impacto"])
+        st.caption(f"Fonte do calendário: {prox['fonte']} · Categoria: {prox['tipo']}")
+    else:
+        st.warning("Nenhum próximo evento macro foi localizado.")
+
+    r1,r2,r3 = st.columns(3)
+    r1.metric("Timing macro", f"{rt['timing']:.0f}/100")
+    r2.metric("Risco de calendário", rt["risco"])
+    r3.metric("Penalidade", f"-{rt['penalidade']:.0f} pts")
+
+    if rt["status"].startswith("🟢"):
+        st.success(f"**{rt['status']}**")
+    elif rt["status"].startswith("🔴"):
+        st.error(f"**{rt['status']}**")
+    elif rt["status"].startswith("🟡"):
+        st.warning(f"**{rt['status']}**")
+    else:
+        st.info(f"**{rt['status']}**")
+
+    with st.expander("📆 Ver próximos eventos macro"):
+        agenda = _eventos_macro_v65().head(12).copy()
+        if not agenda.empty:
+            agenda["Data"] = agenda["Data"].dt.strftime("%d/%m/%Y")
+            st.dataframe(
+                agenda[["Data","Evento","Impacto","Fonte","Dias"]],
+                use_container_width=True, hide_index=True
+            )
+
+    with st.expander("⏱️ Ajuste manual opcional do horário"):
+        st.caption("Use se você já conferiu o horário exato da divulgação.")
+        usar = st.checkbox("Informar horas até o próximo evento", key="v65_usar_horas")
+        if usar:
+            horas = st.number_input(
+                "Horas até o evento", min_value=0.0, max_value=168.0,
+                value=4.0, step=0.5, key="v65_horas"
+            )
+            manual = _avaliar_risco_timing_v63(
+                confl, diferenca, float(horas), "Alto impacto"
+            )
+            st.metric("Timing com horário informado", f"{manual['timing']:.0f}/100")
+            if manual["status"].startswith("🔴"):
+                st.error(f"**{manual['status']}**")
+            elif manual["status"].startswith("🟡"):
+                st.warning(f"**{manual['status']}**")
+            else:
+                st.info(f"**{manual['status']}**")
+
+    st.caption(
+        "A FRED fornece datas de release; o FOMC e o ISM usam calendários oficiais. "
+        "Consenso/forecast continua separado porque essas fontes não fornecem consenso de mercado."
+    )
+    st.markdown("**Fluxo:** Macro → próximo evento → risco → timing → preço/estrutura → gestão.")
+
+
 def _proximo_evento_fred_v64() -> dict:
     """
     Obtém o próximo release do calendário FRED já usado pelo app.
@@ -2245,7 +2470,7 @@ def _mostrar_risco_timing_v63(confl: dict, diferenca: float):
 # ABA 3 — PARES
 # =========================================================
 with abas[2]:
-    st.subheader("💱 Painel de Decisão — V6.4")
+    st.subheader("💱 Painel de Decisão — V6.5")
 
     usd_base = float(usd_detalhado["score"])
     usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
@@ -2317,7 +2542,7 @@ with abas[2]:
         dt = confl["diferencial_taxas"]
         mercado3m = confl["mercado_3m"]
         tend = confl["tendencias"]
-        st.markdown("#### 📐 Qualidade macro da V6.4")
+        st.markdown("#### 📐 Qualidade macro da V6.5")
         q1, q2, q3 = st.columns(3)
         with q1:
             if dt["base"] is not None and dt["cotada"] is not None:
@@ -2370,7 +2595,7 @@ with abas[2]:
             if idade_max > 120:
                 st.warning(
                     "🟡 O spread de mercado usa pelo menos uma série antiga. "
-                    "A V6.4 reduz automaticamente o peso desse componente até a FRED atualizar."
+                    "A V6.5 reduz automaticamente o peso desse componente até a FRED atualizar."
                 )
         else:
             st.warning(
@@ -2379,7 +2604,7 @@ with abas[2]:
             )
 
         st.caption(
-            "Na V6.4, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
+            "Na V6.5, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
             "da FRED/OECD. Mantivemos o Treasury 2Y como tendência dos EUA, mas não "
             "misturamos 2Y americano com uma maturidade estrangeira diferente."
         )
@@ -2394,7 +2619,7 @@ with abas[2]:
                     "Variação média": round(x["delta"], 4),
                 })
             st.dataframe(pd.DataFrame(trend_rows), use_container_width=True, hide_index=True)
-            st.caption("A V6.4 combina diferencial de juros oficiais, spread de mercado e direção do spread com pesos ajustados pelo frescor dos dados. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
+            st.caption("A V6.5 combina diferencial de juros oficiais, spread de mercado e direção do spread com pesos ajustados pelo frescor dos dados. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
 
         # Substitui a confiança antiga pela confiança de confluência.
         if "SEM VANTAGEM" in acao:
@@ -2412,7 +2637,7 @@ with abas[2]:
         score_final = confl["score_confluencia"]
         qualidade_final = confl["qualidade_confluencia"]
 
-        st.markdown("### 🧭 Decisão V6.4")
+        st.markdown("### 🧭 Decisão V6.5")
         if "SEM VANTAGEM" in acao or score_final < 58 or qualidade_final < 50:
             st.info(
                 f"⚪ **NEUTRO / AGUARDAR** — Score {score_final:.0f}/100 | "
@@ -2444,7 +2669,7 @@ with abas[2]:
             float(score_base), float(score_cotada)
         )
 
-        _mostrar_risco_timing_v64(confl, diferenca)
+        _mostrar_risco_timing_v65(confl, diferenca)
 
         st.write(f"Motivo: {base} está em **{score_base:.1f}** e {cotada} em **{score_cotada:.1f}**. O USD, quando presente, já inclui o ajuste das surpresas econômicas.")
         st.warning("⚠️ O viés macro não é gatilho de entrada nem probabilidade de lucro. Confirme preço, estrutura, liquidez, sessão e risco.")
@@ -2458,7 +2683,7 @@ with abas[2]:
             st.success("✅ Sinal registrado!")
 
     st.markdown("---")
-    st.markdown("### 🏆 Matriz Inteligente — V6.4")
+    st.markdown("### 🏆 Matriz Inteligente — V6.5")
     st.caption(
         "Todos os pares abaixo passam pelo mesmo motor de confluência, qualidade e frescor "
         "usado na análise individual."
