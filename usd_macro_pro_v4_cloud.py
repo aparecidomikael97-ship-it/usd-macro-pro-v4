@@ -28,12 +28,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "8.4 — HISTÓRICO PERSISTENTE"
+APP_VERSION = "8.4.1 — SINCRONIZAÇÃO DO HISTÓRICO"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V8.4 Português",
+    page_title="USD Macro Pro — V8.4.1 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1606,7 +1606,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V8.4 Português")
+st.title("🦅 USD Macro Pro — V8.4.1 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2670,7 +2670,7 @@ def _avaliar_sinais_v82():
     return df, atualizados
 
 def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca, confl):
-    st.markdown("## 🧪 Validação Histórica — V8.4")
+    st.markdown("## 🧪 Validação Histórica — V8.4.1")
     st.caption(
         "Este módulo registra o sinal AGORA, evita duplicatas e mede depois. "
         "Ele não reconstrói o passado usando dados futuros."
@@ -2695,7 +2695,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 
     if par == "EUR/USD":
         st.info(
-            "Fonte de preço da V8.4: FRED DEXUSEU, cotação diária em dólares por 1 euro. "
+            "Fonte de preço da V8.4.1: FRED DEXUSEU, cotação diária em dólares por 1 euro. "
             "Por ser diária, esta primeira validação mede direção entre dias — não 1h/4h."
         )
     else:
@@ -2736,6 +2736,31 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
             f"✅ Histórico persistente configurado: {_v84_repo} · branch {_v84_branch}. "
             "Os novos registros serão salvos no repositório."
         )
+
+        # V8.4.1 — migra o histórico local que existia antes do token.
+        if st.button("☁️ Sincronizar histórico com GitHub", key="v841_sync_github"):
+            _hist_local_v841 = None
+            try:
+                _p_v841 = Path(ARQ_SINAIS_V82)
+                if _p_v841.exists():
+                    _hist_local_v841 = pd.read_parquet(_p_v841)
+            except Exception:
+                _hist_local_v841 = None
+
+            if not isinstance(_hist_local_v841, pd.DataFrame) or _hist_local_v841.empty:
+                _hist_local_v841 = _carregar_sinais_v82()
+
+            if isinstance(_hist_local_v841, pd.DataFrame) and not _hist_local_v841.empty:
+                _ok_v841, _msg_v841 = _github_salvar_csv_v84(_hist_local_v841)
+                if _ok_v841:
+                    st.success(
+                        f"☁️ Sincronização concluída: {len(_hist_local_v841)} "
+                        "sinal(is) enviado(s) para dados/sinais_v84.csv."
+                    )
+                else:
+                    st.error(f"Não foi possível sincronizar. {_msg_v841}")
+            else:
+                st.info("Não há histórico local para sincronizar.")
     else:
         st.warning(
             "⚠️ Histórico ainda está apenas no armazenamento temporário do Streamlit. "
