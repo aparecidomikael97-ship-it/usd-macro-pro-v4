@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-🦅 USD Macro Pro — V5.2 PAINEL MACRO
+🦅 USD Macro Pro — V5.3 VALIDAÇÃO DE DADOS
 ================================
 - Interface em português
 - Corrige unidades de inflação e PIB no ranking global
@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "5.2 — SCORE MACRO FOREX"
+APP_VERSION = "5.3 — VALIDAÇÃO DE DADOS"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V5.2 Português",
+    page_title="USD Macro Pro — V5.3 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -152,6 +152,54 @@ def _fred_ultimo(series_id: str, idade_max_dias: int | None = None) -> float | N
         if idade > idade_max_dias:
             return None
     return float(ultima["value"])
+
+
+def _fred_ultimo_com_meta(series_id: str, limite: int = 24, unidades: str | None = None) -> dict:
+    """Retorna valor, data e idade da observação mais recente válida da FRED."""
+    df = _fred_observacoes(series_id, limite, unidades=unidades)
+    if df.empty:
+        return {"valor": None, "data": None, "idade_dias": None, "serie": series_id}
+    ultima = df.iloc[-1]
+    data = pd.Timestamp(ultima["date"]).normalize()
+    hoje = pd.Timestamp.now(tz=None).normalize()
+    idade = int((hoje - data).days)
+    return {
+        "valor": float(ultima["value"]),
+        "data": data.strftime("%d/%m/%Y"),
+        "idade_dias": idade,
+        "serie": series_id,
+    }
+
+
+def _fred_variacao_mensal_com_meta(series_id: str) -> dict:
+    df = _fred_observacoes(series_id, 8)
+    if len(df) < 2:
+        return {"valor": None, "data": None, "idade_dias": None, "serie": series_id}
+    ultima = df.iloc[-1]
+    anterior = df.iloc[-2]
+    data = pd.Timestamp(ultima["date"]).normalize()
+    hoje = pd.Timestamp.now(tz=None).normalize()
+    return {
+        "valor": float(ultima["value"] - anterior["value"]),
+        "data": data.strftime("%d/%m/%Y"),
+        "idade_dias": int((hoje - data).days),
+        "serie": series_id,
+    }
+
+
+def _fred_variacao_anual_com_meta(series_id: str) -> dict:
+    """Variação percentual anual calculada pela própria FRED (units=pc1) + data."""
+    return _fred_ultimo_com_meta(series_id, limite=12, unidades="pc1")
+
+
+def _status_frescura(idade_dias: int | None, limite_dias: int) -> tuple[str, str]:
+    if idade_dias is None:
+        return "⚠️", "Sem data"
+    if idade_dias <= limite_dias:
+        return "🟢", "Atual"
+    if idade_dias <= limite_dias * 2:
+        return "🟡", "Atenção"
+    return "🔴", "Desatualizado"
 
 
 def _fred_variacao_mensal_nivel(series_id: str) -> float | None:
@@ -455,7 +503,7 @@ SERIES_EUA = {
 }
 
 
-@st.cache_data(ttl=3600, show_spinner="Carregando dados macroeconômicos dos EUA...")
+@st.cache_data(ttl=900, show_spinner="Carregando e validando dados macroeconômicos dos EUA...")
 def carregar_macro_eua() -> dict:
     fallback = {
         "Juros do Fed": 4.25,
@@ -471,40 +519,58 @@ def carregar_macro_eua() -> dict:
         "Índice amplo do dólar": 120.0,
     }
 
-    bruto = {
-        "Juros do Fed": _fred_ultimo(SERIES_EUA["Juros do Fed"], 120),
-        "IPC anual": _fred_variacao_anual_percentual(SERIES_EUA["IPC"], 120),
-        "IPC Núcleo anual": _fred_variacao_anual_percentual(SERIES_EUA["IPC Núcleo"], 120),
-        "PCE anual": _fred_variacao_anual_percentual(SERIES_EUA["PCE"], 120),
-        "PCE Núcleo anual": _fred_variacao_anual_percentual(SERIES_EUA["PCE Núcleo"], 120),
-        "Payroll variação mensal (mil)": _fred_variacao_mensal_nivel(SERIES_EUA["Payroll"]),
-        "Desemprego": _fred_ultimo(SERIES_EUA["Desemprego"], 120),
-        "PIB": _fred_ultimo(SERIES_EUA["PIB"], 240),
-        "Treasury 2 anos": _fred_ultimo(SERIES_EUA["Treasury 2 anos"], 14),
-        "Treasury 10 anos": _fred_ultimo(SERIES_EUA["Treasury 10 anos"], 14),
-        "Índice amplo do dólar": _fred_ultimo(SERIES_EUA["Índice amplo do dólar"], 14),
+    metas = {
+        "Juros do Fed": _fred_ultimo_com_meta(SERIES_EUA["Juros do Fed"], 12),
+        "IPC anual": _fred_variacao_anual_com_meta(SERIES_EUA["IPC"]),
+        "IPC Núcleo anual": _fred_variacao_anual_com_meta(SERIES_EUA["IPC Núcleo"]),
+        "PCE anual": _fred_variacao_anual_com_meta(SERIES_EUA["PCE"]),
+        "PCE Núcleo anual": _fred_variacao_anual_com_meta(SERIES_EUA["PCE Núcleo"]),
+        "Payroll variação mensal (mil)": _fred_variacao_mensal_com_meta(SERIES_EUA["Payroll"]),
+        "Desemprego": _fred_ultimo_com_meta(SERIES_EUA["Desemprego"], 12),
+        "PIB": _fred_ultimo_com_meta(SERIES_EUA["PIB"], 12),
+        "Treasury 2 anos": _fred_ultimo_com_meta(SERIES_EUA["Treasury 2 anos"], 20),
+        "Treasury 10 anos": _fred_ultimo_com_meta(SERIES_EUA["Treasury 10 anos"], 20),
+        "Índice amplo do dólar": _fred_ultimo_com_meta(SERIES_EUA["Índice amplo do dólar"], 20),
     }
 
     limites = {
-        "Juros do Fed": (-1, 25),
-        "IPC anual": (-5, 25),
-        "IPC Núcleo anual": (-5, 25),
-        "PCE anual": (-5, 25),
-        "PCE Núcleo anual": (-5, 25),
-        "Payroll variação mensal (mil)": (-3000, 3000),
-        "Desemprego": (0, 30),
-        "PIB": (-20, 20),
-        "Treasury 2 anos": (-2, 20),
-        "Treasury 10 anos": (-2, 20),
+        "Juros do Fed": (-1, 25), "IPC anual": (-5, 25), "IPC Núcleo anual": (-5, 25),
+        "PCE anual": (-5, 25), "PCE Núcleo anual": (-5, 25),
+        "Payroll variação mensal (mil)": (-3000, 3000), "Desemprego": (0, 30),
+        "PIB": (-20, 20), "Treasury 2 anos": (-2, 20), "Treasury 10 anos": (-2, 20),
         "Índice amplo do dólar": (50, 200),
     }
 
-    dados = {
-        chave: _usar_ou_fallback(bruto[chave], fallback[chave], *limites[chave])
-        for chave in fallback
+    frescura = {
+        "Juros do Fed": 45, "IPC anual": 50, "IPC Núcleo anual": 50,
+        "PCE anual": 50, "PCE Núcleo anual": 50, "Payroll variação mensal (mil)": 50,
+        "Desemprego": 50, "PIB": 130, "Treasury 2 anos": 5,
+        "Treasury 10 anos": 5, "Índice amplo do dólar": 10,
     }
 
-    STATUS_FONTE["EUA"] = "✅ FRED + validação" if CHAVE_FRED else "⚠️ Valores de segurança"
+    dados, auditoria = {}, []
+    for chave, fallback_val in fallback.items():
+        meta = metas[chave]
+        bruto = meta.get("valor")
+        valido = _valor_valido(bruto, *limites[chave])
+        valor_final = float(bruto) if valido else float(fallback_val)
+        fonte = f"FRED · {meta.get('serie')}" if valido else "Valor de segurança"
+        idade = meta.get("idade_dias") if valido else None
+        icone, status = _status_frescura(idade, frescura[chave])
+        dados[chave] = valor_final
+        auditoria.append({
+            "Indicador": chave.replace("Payroll variação mensal (mil)", "Payroll — variação mensal"),
+            "Valor": round(valor_final, 3),
+            "Última observação": meta.get("data") if valido else "—",
+            "Idade (dias)": idade if idade is not None else "—",
+            "Status": f"{icone} {status}" if valido else "⚠️ Fallback",
+            "Fonte": fonte,
+        })
+
+    dados["_auditoria"] = auditoria
+    dados["_metadados"] = metas
+    dados["_fallbacks"] = sum(1 for x in auditoria if x["Fonte"] == "Valor de segurança")
+    STATUS_FONTE["EUA"] = "✅ FRED + validação + datas" if CHAVE_FRED else "⚠️ Valores de segurança"
     return dados
 
 # =========================================================
@@ -880,7 +946,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V5.2 Português")
+st.title("🦅 USD Macro Pro — V5.3 Português")
 st.caption("Dados econômicos → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -962,6 +1028,11 @@ with abas[1]:
 
     st.markdown("---")
     st.subheader("Indicadores Econômicos dos Estados Unidos")
+    col_titulo, col_atualizar = st.columns([4, 1])
+    with col_atualizar:
+        if st.button("🔄 Atualizar FRED", help="Limpa o cache e busca novamente as observações mais recentes."):
+            st.cache_data.clear()
+            st.rerun()
     c1, c2, c3, c4 = st.columns(4)
 
     with c1:
@@ -981,6 +1052,21 @@ with abas[1]:
         st.metric("Índice amplo do dólar", f"{macro_eua['Índice amplo do dólar']:.1f}")
 
     st.info("ℹ️ O Índice amplo do dólar da FRED não é o DXY/ICE. Ele serve como medida ampla da força do dólar.")
+
+    st.markdown("#### 🔎 Auditoria dos dados")
+    st.caption("Data da última observação, série usada e status de atualização de cada indicador.")
+    auditoria_df = pd.DataFrame(macro_eua.get("_auditoria", []))
+    if not auditoria_df.empty:
+        st.dataframe(auditoria_df, use_container_width=True, hide_index=True)
+        atrasados = auditoria_df[auditoria_df["Status"].astype(str).str.contains("🔴|Fallback", regex=True)]
+        atencao = auditoria_df[auditoria_df["Status"].astype(str).str.contains("🟡", regex=True)]
+        if len(atrasados):
+            st.error(f"⚠️ {len(atrasados)} indicador(es) precisam de atenção: dado muito antigo ou fallback.")
+        elif len(atencao):
+            st.warning(f"🟡 {len(atencao)} indicador(es) estão mais antigos que o ideal para a frequência da série.")
+        else:
+            st.success("✅ Todos os indicadores principais passaram na validação de data e faixa.")
+    st.caption("Treasuries usam janela curta de frescura. CPI/PCE/Payroll são mensais; PIB é trimestral. A data exibida é a data da observação da FRED.")
 
     st.markdown("---")
     st.subheader("🎯 Surpresa Econômica — Real × Previsão")
