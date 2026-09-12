@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-🦅 USD Macro Pro — V6.0 CONFIANÇA DINÂMICA
+🦅 USD Macro Pro — V6.1 MATRIZ INTELIGENTE
 ================================
 - Interface em português
 - Corrige unidades de inflação e PIB no ranking global
@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "6.0 — CONFIANÇA DINÂMICA"
+APP_VERSION = "6.1 — MATRIZ INTELIGENTE"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V6.0 Português",
+    page_title="USD Macro Pro — V6.1 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1123,7 +1123,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V6.0 Português")
+st.title("🦅 USD Macro Pro — V6.1 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -1841,7 +1841,7 @@ def calcular_confluencia_v60(base: str, cotada: str, diferenca: float,
 # ABA 3 — PARES
 # =========================================================
 with abas[2]:
-    st.subheader("💱 Painel de Decisão — V6.0")
+    st.subheader("💱 Painel de Decisão — V6.1")
 
     usd_base = float(usd_detalhado["score"])
     usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
@@ -1913,7 +1913,7 @@ with abas[2]:
         dt = confl["diferencial_taxas"]
         mercado3m = confl["mercado_3m"]
         tend = confl["tendencias"]
-        st.markdown("#### 📐 Qualidade macro da V6.0")
+        st.markdown("#### 📐 Qualidade macro da V6.1")
         q1, q2, q3 = st.columns(3)
         with q1:
             if dt["base"] is not None and dt["cotada"] is not None:
@@ -1966,7 +1966,7 @@ with abas[2]:
             if idade_max > 120:
                 st.warning(
                     "🟡 O spread de mercado usa pelo menos uma série antiga. "
-                    "A V6.0 reduz automaticamente o peso desse componente até a FRED atualizar."
+                    "A V6.1 reduz automaticamente o peso desse componente até a FRED atualizar."
                 )
         else:
             st.warning(
@@ -1975,7 +1975,7 @@ with abas[2]:
             )
 
         st.caption(
-            "Na V6.0, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
+            "Na V6.1, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
             "da FRED/OECD. Mantivemos o Treasury 2Y como tendência dos EUA, mas não "
             "misturamos 2Y americano com uma maturidade estrangeira diferente."
         )
@@ -1990,7 +1990,7 @@ with abas[2]:
                     "Variação média": round(x["delta"], 4),
                 })
             st.dataframe(pd.DataFrame(trend_rows), use_container_width=True, hide_index=True)
-            st.caption("A V6.0 combina diferencial de juros oficiais, spread de mercado e direção do spread com pesos ajustados pelo frescor dos dados. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
+            st.caption("A V6.1 combina diferencial de juros oficiais, spread de mercado e direção do spread com pesos ajustados pelo frescor dos dados. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
 
         # Substitui a confiança antiga pela confiança de confluência.
         if "SEM VANTAGEM" in acao:
@@ -2008,7 +2008,7 @@ with abas[2]:
         score_final = confl["score_confluencia"]
         qualidade_final = confl["qualidade_confluencia"]
 
-        st.markdown("### 🧭 Decisão V6.0")
+        st.markdown("### 🧭 Decisão V6.1")
         if "SEM VANTAGEM" in acao or score_final < 58 or qualidade_final < 50:
             st.info(
                 f"⚪ **NEUTRO / AGUARDAR** — Score {score_final:.0f}/100 | "
@@ -2047,26 +2047,111 @@ with abas[2]:
             st.success("✅ Sinal registrado!")
 
     st.markdown("---")
-    st.markdown("### 🏆 Matriz dos principais pares")
-    pares = ["EUR/USD","GBP/USD","AUD/USD","NZD/USD","USD/JPY","USD/CHF","USD/CAD"]
-    rows=[]
-    scores=dict(zip(ranking["Código"],ranking["Pontuação_Final"]))
-    for par in pares:
-        b,q=par.split("/")
-        sb=usd_ajustado if b=="USD" else float(scores.get(b,50))
-        sq=usd_ajustado if q=="USD" else float(scores.get(q,50))
-        d=sb-sq
-        if abs(d)<6: ac="⚪ NEUTRO"; cf="BAIXA"
-        elif d>0: ac=f"🟢 COMPRA {par}"; cf="ALTA" if abs(d)>=20 else "MODERADA"
-        else: ac=f"🔴 VENDA {par}"; cf="ALTA" if abs(d)>=20 else "MODERADA"
-        rows.append({"Par":par,"Score base":round(sb,1),"Score cotada":round(sq,1),"Diferença":round(d,1),"Leitura":ac,"Confiança":cf})
-    matriz=pd.DataFrame(rows).sort_values("Diferença", key=lambda s:s.abs(), ascending=False)
-    st.dataframe(matriz,use_container_width=True,hide_index=True)
-    top=matriz[matriz["Leitura"]!="⚪ NEUTRO"].head(3)
-    if not top.empty:
-        st.markdown("#### ⭐ Maiores diferenças macro")
-        for _,r in top.iterrows():
-            st.write(f"**{r['Leitura']}** — diferença {r['Diferença']:+.1f} | confiança {r['Confiança']}")
+    st.markdown("### 🏆 Matriz Inteligente — V6.1")
+    st.caption(
+        "Todos os pares abaixo passam pelo mesmo motor de confluência, qualidade e frescor "
+        "usado na análise individual."
+    )
+
+    pares_matriz = ["EUR/USD","GBP/USD","AUD/USD","NZD/USD","USD/JPY","USD/CHF","USD/CAD"]
+    scores_ranking = dict(zip(ranking["Código"], ranking["Pontuação_Final"]))
+    linhas_matriz = []
+
+    for par_m in pares_matriz:
+        b, q = par_m.split("/")
+        sb = usd_ajustado if b == "USD" else float(scores_ranking.get(b, 50.0))
+        sq = usd_ajustado if q == "USD" else float(scores_ranking.get(q, 50.0))
+        dif_m = float(sb - sq)
+
+        if abs(dif_m) < 6:
+            direcao_m = "⚪ NEUTRO"
+        elif dif_m > 0:
+            direcao_m = f"🟢 COMPRA {par_m}"
+        else:
+            direcao_m = f"🔴 VENDA {par_m}"
+
+        conf_m = calcular_confluencia_v60(
+            b, q, dif_m, usd_ajustado, ajuste,
+            fed.get("tom", "Neutro"), ranking
+        )
+
+        score_m = float(conf_m["score_confluencia"])
+        qualidade_m = float(conf_m["qualidade_confluencia"])
+        nivel_m = str(conf_m["nivel"])
+
+        # Regra operacional conservadora: sem direção ou baixa cobertura => aguardar.
+        if abs(dif_m) < 6 or score_m < 58 or qualidade_m < 50:
+            decisao_m = "⚪ AGUARDAR"
+            nivel_exibido = "BAIXA"
+        elif nivel_m == "ALTA":
+            decisao_m = direcao_m
+            nivel_exibido = "ALTA"
+        elif nivel_m == "MODERADA":
+            decisao_m = direcao_m
+            nivel_exibido = "MODERADA"
+        else:
+            decisao_m = "⚪ AGUARDAR CONFIRMAÇÃO"
+            nivel_exibido = "BAIXA"
+
+        # Ranking composto: premia confluência + qualidade, sem chamar de probabilidade.
+        indice_rank = float(np.clip(
+            score_m * 0.60 + qualidade_m * 0.40, 0, 100
+        ))
+
+        linhas_matriz.append({
+            "Par": par_m,
+            "Direção": decisao_m,
+            "Dif. macro": round(dif_m, 1),
+            "Score final": round(score_m, 0),
+            "Qualidade": round(qualidade_m, 0),
+            "Confluência": nivel_exibido,
+            "Índice ranking": round(indice_rank, 1),
+        })
+
+    matriz_v61 = pd.DataFrame(linhas_matriz).sort_values(
+        ["Índice ranking", "Qualidade", "Score final"],
+        ascending=False
+    ).reset_index(drop=True)
+
+    matriz_v61.insert(0, "Ranking", range(1, len(matriz_v61) + 1))
+
+    st.dataframe(
+        matriz_v61,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Score final": st.column_config.NumberColumn(format="%.0f/100"),
+            "Qualidade": st.column_config.NumberColumn(format="%.0f%%"),
+            "Índice ranking": st.column_config.NumberColumn(format="%.1f"),
+        }
+    )
+
+    st.markdown("#### ⭐ Melhores oportunidades macro")
+    oportunidades = matriz_v61[
+        ~matriz_v61["Direção"].str.contains("AGUARDAR|NEUTRO", regex=True)
+    ].head(3)
+
+    if oportunidades.empty:
+        st.info("⚪ Nenhum dos 7 pares tem confluência e qualidade suficientes neste momento.")
+    else:
+        for _, r in oportunidades.iterrows():
+            if "COMPRA" in r["Direção"]:
+                st.success(
+                    f"#{int(r['Ranking'])} **{r['Direção']}** — "
+                    f"Score {r['Score final']:.0f}/100 | Qualidade {r['Qualidade']:.0f}% | "
+                    f"Confluência {r['Confluência']}"
+                )
+            else:
+                st.error(
+                    f"#{int(r['Ranking'])} **{r['Direção']}** — "
+                    f"Score {r['Score final']:.0f}/100 | Qualidade {r['Qualidade']:.0f}% | "
+                    f"Confluência {r['Confluência']}"
+                )
+
+    st.caption(
+        "Índice ranking = 60% do score de confluência + 40% da qualidade/cobertura. "
+        "É uma pontuação interna para ordenar pares, não uma probabilidade de ganho."
+    )
 
 # =========================================================
 # ABA 4 — FED E NOTÍCIAS
