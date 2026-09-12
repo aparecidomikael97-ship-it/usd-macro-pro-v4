@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "7.8.1 — EXPLICADOR DO SINAL CORRIGIDO"
+APP_VERSION = "7.8.2 — EXPLICADOR ORDEM CORRIGIDA"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V7.8.1 Português",
+    page_title="USD Macro Pro — V7.8.2 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1605,7 +1605,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V7.8.1 Português")
+st.title("🦅 USD Macro Pro — V7.8.2 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -1767,6 +1767,227 @@ def _painel_hibrido_v74():
     st.caption(
         "Regra de segurança: o app nunca cria um consenso. Se não houver API gratuita confiável, "
         "esse único campo permanece manual."
+    )
+
+
+
+# =========================================================
+# V7.8 — EXPLICADOR DO SINAL
+# =========================================================
+
+def _classificar_forca_v78(score):
+    try:
+        s = float(score)
+    except Exception:
+        return "indisponível"
+    if s >= 70:
+        return "forte"
+    if s >= 58:
+        return "moderada"
+    if s <= 30:
+        return "fraca"
+    if s <= 42:
+        return "moderadamente fraca"
+    return "neutra"
+
+def _direcao_par_v78(par, diferenca):
+    """
+    diferenca esperada = força base - força cotada.
+    >0 favorece BUY do par; <0 favorece SELL.
+    """
+    try:
+        d = float(diferenca)
+    except Exception:
+        return "WAIT"
+    if d >= 8:
+        return "BUY"
+    if d <= -8:
+        return "SELL"
+    return "WAIT"
+
+def _explicar_sinal_v78(par, moeda_base, moeda_cotada, score_base, score_cotada,
+                        diferenca, confluencia=None, qualidade=None, timing=None,
+                        score_mestre=None, risco_calendario=None):
+    direcao = _direcao_par_v78(par, diferenca)
+
+    fatores_favor = []
+    fatores_contra = []
+    observacoes = []
+
+    # Força relativa
+    try:
+        sb = float(score_base)
+        sc = float(score_cotada)
+        df = float(diferenca)
+        if df >= 8:
+            fatores_favor.append(
+                f"{moeda_base} está mais forte que {moeda_cotada} ({sb:.1f} vs {sc:.1f})"
+            )
+        elif df <= -8:
+            fatores_favor.append(
+                f"{moeda_cotada} está mais forte que {moeda_base} ({sc:.1f} vs {sb:.1f})"
+            )
+        else:
+            observacoes.append(
+                f"Força relativa ainda próxima ({sb:.1f} vs {sc:.1f})"
+            )
+    except Exception:
+        pass
+
+    # FOMC integrado
+    if st.session_state.get("v77_fomc_integrado", False):
+        fomc_score = float(st.session_state.get("v76_fomc_usd_score", 50.0))
+        peso = float(st.session_state.get("v77_peso_fomc", 0.0)) * 100.0
+        if "USD" in (moeda_base, moeda_cotada):
+            if fomc_score >= 55:
+                texto = f"FOMC está levemente hawkish para o USD ({fomc_score:.0f}/100, peso {peso:.0f}%)"
+                if (direcao == "BUY" and moeda_base == "USD") or (direcao == "SELL" and moeda_cotada == "USD"):
+                    fatores_favor.append(texto)
+                else:
+                    fatores_contra.append(texto)
+            elif fomc_score <= 45:
+                texto = f"FOMC está levemente dovish para o USD ({fomc_score:.0f}/100, peso {peso:.0f}%)"
+                if (direcao == "SELL" and moeda_base == "USD") or (direcao == "BUY" and moeda_cotada == "USD"):
+                    fatores_favor.append(texto)
+                else:
+                    fatores_contra.append(texto)
+            else:
+                observacoes.append(f"FOMC está neutro para o USD ({fomc_score:.0f}/100)")
+
+    # Qualidade
+    try:
+        q = float(qualidade)
+        if q >= 80:
+            fatores_favor.append(f"Qualidade dos dados está alta ({q:.0f}%)")
+        elif q < 60:
+            fatores_contra.append(f"Qualidade dos dados está baixa ({q:.0f}%)")
+        else:
+            observacoes.append(f"Qualidade dos dados está moderada ({q:.0f}%)")
+    except Exception:
+        pass
+
+    # Timing
+    try:
+        t = float(timing)
+        if t >= 70:
+            fatores_favor.append(f"Timing está favorável ({t:.0f}/100)")
+        elif t < 50:
+            fatores_contra.append(f"Timing está fraco ({t:.0f}/100)")
+        else:
+            observacoes.append(f"Timing ainda está intermediário ({t:.0f}/100)")
+    except Exception:
+        pass
+
+    # Risco calendário
+    if risco_calendario:
+        rc = str(risco_calendario).upper()
+        if any(x in rc for x in ("MÁXIMO", "MAXIMO", "ALTO", "ATENÇÃO", "ATENCAO")):
+            fatores_contra.append(f"Risco de calendário elevado: {risco_calendario}")
+        elif "BAIX" in rc:
+            fatores_favor.append("Risco de calendário está baixo")
+
+    # Score mestre
+    try:
+        sm = float(score_mestre)
+        if sm >= 80:
+            observacoes.append(f"Score Mestre forte ({sm:.0f}/100)")
+        elif sm >= 65:
+            observacoes.append(f"Score Mestre moderado ({sm:.0f}/100)")
+        else:
+            fatores_contra.append(f"Score Mestre ainda fraco ({sm:.0f}/100)")
+    except Exception:
+        pass
+
+    # Conclusão textual
+    if direcao == "WAIT":
+        conclusao = (
+            f"⏸️ **WAIT em {par}** — ainda não há diferença suficiente entre as moedas "
+            "para justificar uma direção clara."
+        )
+    elif direcao == "BUY":
+        conclusao = (
+            f"🟢 **BUY {par}** — o conjunto atual favorece {moeda_base} sobre {moeda_cotada}."
+        )
+    else:
+        conclusao = (
+            f"🔴 **SELL {par}** — o conjunto atual favorece {moeda_cotada} sobre {moeda_base}."
+        )
+
+    return {
+        "direcao": direcao,
+        "favor": fatores_favor,
+        "contra": fatores_contra,
+        "observacoes": observacoes,
+        "conclusao": conclusao,
+    }
+
+def _painel_explicador_v78(par, moeda_base, moeda_cotada, score_base, score_cotada,
+                           diferenca, confluencia=None, qualidade=None, timing=None,
+                           score_mestre=None, risco_calendario=None):
+    st.markdown("## 🧠 Por que o sistema está dando esse sinal? — V7.8.2")
+
+    exp = _explicar_sinal_v78(
+        par=par,
+        moeda_base=moeda_base,
+        moeda_cotada=moeda_cotada,
+        score_base=score_base,
+        score_cotada=score_cotada,
+        diferenca=diferenca,
+        confluencia=confluencia,
+        qualidade=qualidade,
+        timing=timing,
+        score_mestre=score_mestre,
+        risco_calendario=risco_calendario,
+    )
+
+    st.markdown(exp["conclusao"])
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("### ✅ O que ajuda o sinal")
+        if exp["favor"]:
+            for item in exp["favor"]:
+                st.write(f"• {item}")
+        else:
+            st.write("• Nenhum fator forte adicional identificado.")
+
+    with c2:
+        st.markdown("### ⚠️ O que atrapalha o sinal")
+        if exp["contra"]:
+            for item in exp["contra"]:
+                st.write(f"• {item}")
+        else:
+            st.write("• Nenhum fator contrário forte identificado.")
+
+    if exp["observacoes"]:
+        st.markdown("### ℹ️ Pontos de atenção")
+        for item in exp["observacoes"]:
+            st.write(f"• {item}")
+
+    # O que faria o sinal mudar
+    st.markdown("### 🔄 O que faria o sinal mudar?")
+    if exp["direcao"] == "SELL":
+        st.write(
+            f"• {moeda_base} precisaria ganhar força ou {moeda_cotada} perder força.\n"
+            f"• O FOMC/Fed poderia ficar menos favorável à moeda atualmente dominante.\n"
+            f"• O timing e a qualidade precisariam deteriorar para enfraquecer a venda."
+        )
+    elif exp["direcao"] == "BUY":
+        st.write(
+            f"• {moeda_base} precisaria perder força ou {moeda_cotada} ganhar força.\n"
+            f"• O FOMC/Fed poderia ficar menos favorável à moeda atualmente dominante.\n"
+            f"• O timing e a qualidade precisariam deteriorar para enfraquecer a compra."
+        )
+    else:
+        st.write(
+            "• Uma das moedas precisa abrir vantagem clara de força.\n"
+            "• Confluência, timing e qualidade precisam sair da zona neutra.\n"
+            "• Um evento macro importante pode ser o gatilho dessa mudança."
+        )
+
+    st.caption(
+        "V7.8 explica o sinal usando apenas os dados e scores já existentes no aplicativo. "
+        "Ele não cria uma nova probabilidade de lucro e não substitui confirmação técnica."
     )
 
 
@@ -4641,226 +4862,6 @@ def _painel_fomc_calibrado_v76():
     if _v77_anterior is None or abs(float(_v77_anterior) - _v77_atual) > 0.05:
         st.session_state["v77_ultimo_fomc_sincronizado"] = _v77_atual
         st.rerun()
-
-
-# =========================================================
-# V7.8 — EXPLICADOR DO SINAL
-# =========================================================
-
-def _classificar_forca_v78(score):
-    try:
-        s = float(score)
-    except Exception:
-        return "indisponível"
-    if s >= 70:
-        return "forte"
-    if s >= 58:
-        return "moderada"
-    if s <= 30:
-        return "fraca"
-    if s <= 42:
-        return "moderadamente fraca"
-    return "neutra"
-
-def _direcao_par_v78(par, diferenca):
-    """
-    diferenca esperada = força base - força cotada.
-    >0 favorece BUY do par; <0 favorece SELL.
-    """
-    try:
-        d = float(diferenca)
-    except Exception:
-        return "WAIT"
-    if d >= 8:
-        return "BUY"
-    if d <= -8:
-        return "SELL"
-    return "WAIT"
-
-def _explicar_sinal_v78(par, moeda_base, moeda_cotada, score_base, score_cotada,
-                        diferenca, confluencia=None, qualidade=None, timing=None,
-                        score_mestre=None, risco_calendario=None):
-    direcao = _direcao_par_v78(par, diferenca)
-
-    fatores_favor = []
-    fatores_contra = []
-    observacoes = []
-
-    # Força relativa
-    try:
-        sb = float(score_base)
-        sc = float(score_cotada)
-        df = float(diferenca)
-        if df >= 8:
-            fatores_favor.append(
-                f"{moeda_base} está mais forte que {moeda_cotada} ({sb:.1f} vs {sc:.1f})"
-            )
-        elif df <= -8:
-            fatores_favor.append(
-                f"{moeda_cotada} está mais forte que {moeda_base} ({sc:.1f} vs {sb:.1f})"
-            )
-        else:
-            observacoes.append(
-                f"Força relativa ainda próxima ({sb:.1f} vs {sc:.1f})"
-            )
-    except Exception:
-        pass
-
-    # FOMC integrado
-    if st.session_state.get("v77_fomc_integrado", False):
-        fomc_score = float(st.session_state.get("v76_fomc_usd_score", 50.0))
-        peso = float(st.session_state.get("v77_peso_fomc", 0.0)) * 100.0
-        if "USD" in (moeda_base, moeda_cotada):
-            if fomc_score >= 55:
-                texto = f"FOMC está levemente hawkish para o USD ({fomc_score:.0f}/100, peso {peso:.0f}%)"
-                if (direcao == "BUY" and moeda_base == "USD") or (direcao == "SELL" and moeda_cotada == "USD"):
-                    fatores_favor.append(texto)
-                else:
-                    fatores_contra.append(texto)
-            elif fomc_score <= 45:
-                texto = f"FOMC está levemente dovish para o USD ({fomc_score:.0f}/100, peso {peso:.0f}%)"
-                if (direcao == "SELL" and moeda_base == "USD") or (direcao == "BUY" and moeda_cotada == "USD"):
-                    fatores_favor.append(texto)
-                else:
-                    fatores_contra.append(texto)
-            else:
-                observacoes.append(f"FOMC está neutro para o USD ({fomc_score:.0f}/100)")
-
-    # Qualidade
-    try:
-        q = float(qualidade)
-        if q >= 80:
-            fatores_favor.append(f"Qualidade dos dados está alta ({q:.0f}%)")
-        elif q < 60:
-            fatores_contra.append(f"Qualidade dos dados está baixa ({q:.0f}%)")
-        else:
-            observacoes.append(f"Qualidade dos dados está moderada ({q:.0f}%)")
-    except Exception:
-        pass
-
-    # Timing
-    try:
-        t = float(timing)
-        if t >= 70:
-            fatores_favor.append(f"Timing está favorável ({t:.0f}/100)")
-        elif t < 50:
-            fatores_contra.append(f"Timing está fraco ({t:.0f}/100)")
-        else:
-            observacoes.append(f"Timing ainda está intermediário ({t:.0f}/100)")
-    except Exception:
-        pass
-
-    # Risco calendário
-    if risco_calendario:
-        rc = str(risco_calendario).upper()
-        if any(x in rc for x in ("MÁXIMO", "MAXIMO", "ALTO", "ATENÇÃO", "ATENCAO")):
-            fatores_contra.append(f"Risco de calendário elevado: {risco_calendario}")
-        elif "BAIX" in rc:
-            fatores_favor.append("Risco de calendário está baixo")
-
-    # Score mestre
-    try:
-        sm = float(score_mestre)
-        if sm >= 80:
-            observacoes.append(f"Score Mestre forte ({sm:.0f}/100)")
-        elif sm >= 65:
-            observacoes.append(f"Score Mestre moderado ({sm:.0f}/100)")
-        else:
-            fatores_contra.append(f"Score Mestre ainda fraco ({sm:.0f}/100)")
-    except Exception:
-        pass
-
-    # Conclusão textual
-    if direcao == "WAIT":
-        conclusao = (
-            f"⏸️ **WAIT em {par}** — ainda não há diferença suficiente entre as moedas "
-            "para justificar uma direção clara."
-        )
-    elif direcao == "BUY":
-        conclusao = (
-            f"🟢 **BUY {par}** — o conjunto atual favorece {moeda_base} sobre {moeda_cotada}."
-        )
-    else:
-        conclusao = (
-            f"🔴 **SELL {par}** — o conjunto atual favorece {moeda_cotada} sobre {moeda_base}."
-        )
-
-    return {
-        "direcao": direcao,
-        "favor": fatores_favor,
-        "contra": fatores_contra,
-        "observacoes": observacoes,
-        "conclusao": conclusao,
-    }
-
-def _painel_explicador_v78(par, moeda_base, moeda_cotada, score_base, score_cotada,
-                           diferenca, confluencia=None, qualidade=None, timing=None,
-                           score_mestre=None, risco_calendario=None):
-    st.markdown("## 🧠 Por que o sistema está dando esse sinal? — V7.8.1")
-
-    exp = _explicar_sinal_v78(
-        par=par,
-        moeda_base=moeda_base,
-        moeda_cotada=moeda_cotada,
-        score_base=score_base,
-        score_cotada=score_cotada,
-        diferenca=diferenca,
-        confluencia=confluencia,
-        qualidade=qualidade,
-        timing=timing,
-        score_mestre=score_mestre,
-        risco_calendario=risco_calendario,
-    )
-
-    st.markdown(exp["conclusao"])
-
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown("### ✅ O que ajuda o sinal")
-        if exp["favor"]:
-            for item in exp["favor"]:
-                st.write(f"• {item}")
-        else:
-            st.write("• Nenhum fator forte adicional identificado.")
-
-    with c2:
-        st.markdown("### ⚠️ O que atrapalha o sinal")
-        if exp["contra"]:
-            for item in exp["contra"]:
-                st.write(f"• {item}")
-        else:
-            st.write("• Nenhum fator contrário forte identificado.")
-
-    if exp["observacoes"]:
-        st.markdown("### ℹ️ Pontos de atenção")
-        for item in exp["observacoes"]:
-            st.write(f"• {item}")
-
-    # O que faria o sinal mudar
-    st.markdown("### 🔄 O que faria o sinal mudar?")
-    if exp["direcao"] == "SELL":
-        st.write(
-            f"• {moeda_base} precisaria ganhar força ou {moeda_cotada} perder força.\n"
-            f"• O FOMC/Fed poderia ficar menos favorável à moeda atualmente dominante.\n"
-            f"• O timing e a qualidade precisariam deteriorar para enfraquecer a venda."
-        )
-    elif exp["direcao"] == "BUY":
-        st.write(
-            f"• {moeda_base} precisaria perder força ou {moeda_cotada} ganhar força.\n"
-            f"• O FOMC/Fed poderia ficar menos favorável à moeda atualmente dominante.\n"
-            f"• O timing e a qualidade precisariam deteriorar para enfraquecer a compra."
-        )
-    else:
-        st.write(
-            "• Uma das moedas precisa abrir vantagem clara de força.\n"
-            "• Confluência, timing e qualidade precisam sair da zona neutra.\n"
-            "• Um evento macro importante pode ser o gatilho dessa mudança."
-        )
-
-    st.caption(
-        "V7.8 explica o sinal usando apenas os dados e scores já existentes no aplicativo. "
-        "Ele não cria uma nova probabilidade de lucro e não substitui confirmação técnica."
-    )
 
 
 # =========================================================
