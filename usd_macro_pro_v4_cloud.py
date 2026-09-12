@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "7.8 — EXPLICADOR DO SINAL"
+APP_VERSION = "7.8.1 — EXPLICADOR DO SINAL CORRIGIDO"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V7.8 Português",
+    page_title="USD Macro Pro — V7.8.1 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1605,7 +1605,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V7.8 Português")
+st.title("🦅 USD Macro Pro — V7.8.1 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -4053,6 +4053,22 @@ with abas[2]:
 
         _mostrar_risco_timing_v65(confl, diferenca)
 
+        # V7.8.1 — explicador executado no mesmo escopo do par,
+        # usando diretamente as variáveis reais já calculadas.
+        _painel_explicador_v78(
+            par=par_escolhido,
+            moeda_base=base,
+            moeda_cotada=cotada,
+            score_base=float(score_base),
+            score_cotada=float(score_cotada),
+            diferenca=float(diferenca),
+            confluencia=float(confl["score_confluencia"]),
+            qualidade=float(confl["qualidade_confluencia"]),
+            timing=None,
+            score_mestre=float(confl["score_confluencia"]),
+            risco_calendario=None,
+        )
+
         st.write(f"Motivo: {base} está em **{score_base:.1f}** e {cotada} em **{score_cotada:.1f}**. O USD, quando presente, já inclui o ajuste das surpresas econômicas.")
         st.warning("⚠️ O viés macro não é gatilho de entrada nem probabilidade de lucro. Confirme preço, estrutura, liquidez, sessão e risco.")
 
@@ -4780,7 +4796,7 @@ def _explicar_sinal_v78(par, moeda_base, moeda_cotada, score_base, score_cotada,
 def _painel_explicador_v78(par, moeda_base, moeda_cotada, score_base, score_cotada,
                            diferenca, confluencia=None, qualidade=None, timing=None,
                            score_mestre=None, risco_calendario=None):
-    st.markdown("## 🧠 Por que o sistema está dando esse sinal? — V7.8")
+    st.markdown("## 🧠 Por que o sistema está dando esse sinal? — V7.8.1")
 
     exp = _explicar_sinal_v78(
         par=par,
@@ -4853,75 +4869,3 @@ def _painel_explicador_v78(par, moeda_base, moeda_cotada, score_base, score_cota
 with abas[1]:
     _painel_hibrido_v74()
     _painel_fomc_calibrado_v76()
-
-
-
-# =========================================================
-# V7.8 — RENDERIZAÇÃO DO EXPLICADOR NA ABA DE PARES
-# =========================================================
-with abas[2]:
-    try:
-        _v78_par = par_escolhido
-        _v78_base, _v78_cotada = _v78_par.split("/")
-
-        # Recupera força das moedas da estrutura já usada na matriz.
-        _v78_score_base = float(forcas_moedas.get(_v78_base, 50.0))
-        _v78_score_cotada = float(forcas_moedas.get(_v78_cotada, 50.0))
-        _v78_diff = _v78_score_base - _v78_score_cotada
-
-        # Recupera métricas existentes quando disponíveis.
-        _v78_conf = None
-        _v78_qual = None
-        _v78_timing = None
-        _v78_mestre = None
-        _v78_risco = None
-
-        for _k in ("score_confluencia", "confluencia_score", "score_final"):
-            _v = locals().get(_k)
-            if isinstance(_v, (int, float)):
-                _v78_conf = float(_v)
-                break
-
-        for _k in ("qualidade", "qualidade_score", "qualidade_final"):
-            _v = locals().get(_k)
-            if isinstance(_v, (int, float)):
-                _v78_qual = float(_v)
-                break
-
-        for _k in ("timing_score", "score_timing", "timing"):
-            _v = locals().get(_k)
-            if isinstance(_v, (int, float)):
-                _v78_timing = float(_v)
-                break
-
-        for _k in ("score_mestre", "score_mestre_final", "mestre_score"):
-            _v = locals().get(_k)
-            if isinstance(_v, (int, float)):
-                _v78_mestre = float(_v)
-                break
-
-        for _k in ("risco_calendario", "nivel_risco", "risco_evento"):
-            _v = locals().get(_k)
-            if _v is not None:
-                _v78_risco = _v
-                break
-
-        _painel_explicador_v78(
-            par=_v78_par,
-            moeda_base=_v78_base,
-            moeda_cotada=_v78_cotada,
-            score_base=_v78_score_base,
-            score_cotada=_v78_score_cotada,
-            diferenca=_v78_diff,
-            confluencia=_v78_conf,
-            qualidade=_v78_qual,
-            timing=_v78_timing,
-            score_mestre=_v78_mestre,
-            risco_calendario=_v78_risco,
-        )
-    except Exception as _e_v78:
-        st.info(
-            "🧠 V7.8: o explicador será exibido assim que o par selecionado "
-            "e os scores da matriz estiverem disponíveis nesta execução."
-        )
-
