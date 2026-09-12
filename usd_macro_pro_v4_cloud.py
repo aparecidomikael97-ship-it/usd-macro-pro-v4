@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "7.4 — HÍBRIDO INTELIGENTE"
+APP_VERSION = "7.4.1 — HÍBRIDO INTELIGENTE"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V7.4 Português",
+    page_title="USD Macro Pro — V7.4.1 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1605,11 +1605,152 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V7.4 Português")
+st.title("🦅 USD Macro Pro — V7.4.1 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
 st.info(f"Fed: {icone_tom} **{fed['tom']}** | Intensidade: {fed['forca']:+.2f}")
+
+# =========================================================
+# V7.4 — MODO HÍBRIDO INTELIGENTE
+# =========================================================
+
+def _mapear_evento_para_indicador_v74(evento):
+    if not evento:
+        return None
+    nome = _normalizar_texto_v73(evento.get("evento", "") if isinstance(evento, dict) else str(evento))
+    regras = [
+        (["core pce", "pce nucleo"], "PCE Núcleo anual"),
+        (["pce"], "PCE anual"),
+        (["core cpi", "ipc nucleo"], "IPC Núcleo anual"),
+        (["cpi", "ipc"], "IPC anual"),
+        (["payroll", "employment situation", "nfp"], "Payroll"),
+        (["ism manufacturing", "ism industrial"], "ISM Industrial"),
+        (["ism services", "ism servicos"], "ISM Serviços"),
+    ]
+    for termos, indicador in regras:
+        if any(t in nome for t in termos):
+            return indicador
+    return None
+
+def _ultimo_real_oficial_v74(indicador):
+    """Valor realizado mais recente/compatível usando FRED quando disponível."""
+    sid = AUTO_SERIES_V71.get(indicador)
+    obs = _fred_obs_v71(sid, 15) if sid else []
+    if not obs:
+        return None, None
+
+    if indicador in ("IPC anual","IPC Núcleo anual","PCE anual","PCE Núcleo anual"):
+        if len(obs) < 13:
+            return None, None
+        # observações vêm desc; cálculo YoY do ponto mais recente
+        atual = obs[0][1] / obs[12][1] * 100.0 - 100.0
+        return float(atual), obs[0][0]
+
+    if indicador == "Payroll":
+        if len(obs) < 2:
+            return None, None
+        return float(obs[0][1] - obs[1][1]), obs[0][0]
+
+    return float(obs[0][1]), obs[0][0]
+
+def _painel_hibrido_v74():
+    st.markdown("## 🤖 Modo Híbrido Inteligente — V7.4")
+    st.caption(
+        "O app busca automaticamente o que existe em fonte oficial. "
+        "Você só informa o consenso quando ele não estiver disponível gratuitamente."
+    )
+
+    evento = _proximo_evento_macro_v65()
+    indicador = _mapear_evento_para_indicador_v74(evento)
+
+    if not evento:
+        st.info("Nenhum evento macro principal localizado no calendário atual.")
+        return
+
+    nome_evento = evento.get("evento", "Evento macro")
+    data_evento = evento.get("data")
+    dias = evento.get("dias", None)
+
+    c1,c2,c3 = st.columns(3)
+    c1.metric("Próximo evento", nome_evento)
+    c2.metric("Data", data_evento.strftime("%d/%m/%Y") if hasattr(data_evento, "strftime") else str(data_evento))
+    c3.metric("Faltam", f"{dias} dia(s)" if dias is not None else "—")
+
+    if indicador is None:
+        if "fomc" in _normalizar_texto_v73(nome_evento):
+            st.info(
+                "Próximo evento é FOMC. A expectativa continua no módulo probabilístico "
+                "Corte / Manutenção / Alta; o calendário e Fed Funds são automáticos."
+            )
+        else:
+            st.info("Evento identificado, mas ainda não há mapeamento para consenso híbrido.")
+        return
+
+    anterior, data_ant = _auto_anterior_v71(indicador)
+    real, data_real = _ultimo_real_oficial_v74(indicador)
+
+    key_cons = f"v74_consenso_{indicador}"
+    if key_cons not in st.session_state:
+        # reaproveita consenso já digitado em outros módulos, se existir
+        st.session_state[key_cons] = float(
+            st.session_state.get(f"v66_previsao_{indicador}",
+            st.session_state.get(f"previsao_{indicador}", 0.0))
+        )
+
+    st.markdown(f"### 📌 {indicador}")
+    a,b,c = st.columns(3)
+    a.metric("Anterior 🤖", f"{anterior:.2f}" if anterior is not None else "—")
+    with b:
+        consenso = st.number_input(
+            "Consenso ✍️",
+            key=key_cons,
+            step=1.0 if indicador == "Payroll" else 0.1,
+            help="Este é o único número que pode precisar ser digitado manualmente."
+        )
+    c.metric("Último real oficial 🤖", f"{real:.2f}" if real is not None else "—")
+
+    if anterior is not None:
+        st.caption(f"Anterior automático — referência FRED: {data_ant.strftime('%d/%m/%Y') if data_ant is not None else '—'}")
+    if real is not None:
+        st.caption(f"Último valor oficial disponível: {data_real.strftime('%d/%m/%Y') if data_real is not None else '—'}")
+
+    # Sincroniza consenso para os motores existentes, sem mexer em widgets já instanciados.
+    st.session_state["v74_indicador_ativo"] = indicador
+    st.session_state["v74_consenso_ativo"] = float(consenso)
+    st.session_state["v74_tem_consenso"] = abs(float(consenso)) > 1e-12
+
+    if not st.session_state["v74_tem_consenso"]:
+        st.warning("Preencha somente o CONSENSO. O restante permanece automático.")
+        return
+
+    # Pré-release: consenso x anterior
+    maior_favorece = indicador != "Desemprego"
+    if anterior is not None:
+        pre = _expectativa_indicador_v66(indicador, float(consenso), float(anterior), maior_favorece)
+        st.write(f"**Leitura pré-release:** {pre['leitura']}")
+
+    # Detecta automaticamente se o 'real' oficial é posterior ao anterior e permite cálculo.
+    if real is not None and data_real is not None and data_ant is not None and data_real > data_ant:
+        delta = float(real) - float(consenso)
+        if not maior_favorece:
+            delta = -delta
+        if delta > 0:
+            leitura = "🟢 Real acima do consenso → favorece USD"
+        elif delta < 0:
+            leitura = "🔴 Real abaixo do consenso → desfavorece USD"
+        else:
+            leitura = "⚪ Real em linha com o consenso"
+        st.success(f"**Pós-release automático:** {leitura} · surpresa ajustada = {delta:+.2f}")
+    else:
+        st.info("Aguardando a próxima divulgação oficial. Após a atualização da FRED, o Real será atualizado automaticamente.")
+
+    st.caption(
+        "Regra de segurança: o app nunca cria um consenso. Se não houver API gratuita confiável, "
+        "esse único campo permanece manual."
+    )
+
+
 
 abas = st.tabs([
     "🏆 Classificação",
@@ -1662,6 +1803,7 @@ with abas[1]:
     st.subheader("🇺🇸 Painel de Força Macro do USD")
 
     _painel_hibrido_v74()
+
     rotulo_usd, icone_usd = faixa_forca(usd_detalhado["score"])
     d1, d2, d3 = st.columns(3)
     with d1:
@@ -3465,7 +3607,7 @@ def _score_mestre_v70(base: str, cotada: str, diferenca: float, confl: dict) -> 
 
 
 def _mostrar_score_mestre_v70(base: str, cotada: str, diferenca: float, confl: dict):
-    st.markdown("## 🦅 Score Mestre — V7.4")
+    st.markdown("## 🦅 Score Mestre — V7.4.1")
     st.caption(
         "Resumo final do motor. Direção, qualidade dos dados e timing ficam separados "
         "para não confundir score interno com probabilidade de lucro."
@@ -3578,7 +3720,7 @@ def _auto_anterior_v71(nome: str):
     return float(obs[1][1]), obs[1][0]
 
 def _status_automacao_v71():
-    st.markdown("### 🤖 Automação dos Dados — V7.4")
+    st.markdown("### 🤖 Automação dos Dados — V7.4.1")
     st.caption(
         "O app preenche automaticamente tudo que possui fonte oficial disponível. "
         "Consenso de mercado e probabilidades FOMC não são inventados."
@@ -3626,152 +3768,12 @@ _sincronizar_anteriores_v711()
 
 
 # =========================================================
-# V7.4 — MODO HÍBRIDO INTELIGENTE
-# =========================================================
-
-def _mapear_evento_para_indicador_v74(evento):
-    if not evento:
-        return None
-    nome = _normalizar_texto_v73(evento.get("evento", "") if isinstance(evento, dict) else str(evento))
-    regras = [
-        (["core pce", "pce nucleo"], "PCE Núcleo anual"),
-        (["pce"], "PCE anual"),
-        (["core cpi", "ipc nucleo"], "IPC Núcleo anual"),
-        (["cpi", "ipc"], "IPC anual"),
-        (["payroll", "employment situation", "nfp"], "Payroll"),
-        (["ism manufacturing", "ism industrial"], "ISM Industrial"),
-        (["ism services", "ism servicos"], "ISM Serviços"),
-    ]
-    for termos, indicador in regras:
-        if any(t in nome for t in termos):
-            return indicador
-    return None
-
-def _ultimo_real_oficial_v74(indicador):
-    """Valor realizado mais recente/compatível usando FRED quando disponível."""
-    sid = AUTO_SERIES_V71.get(indicador)
-    obs = _fred_obs_v71(sid, 15) if sid else []
-    if not obs:
-        return None, None
-
-    if indicador in ("IPC anual","IPC Núcleo anual","PCE anual","PCE Núcleo anual"):
-        if len(obs) < 13:
-            return None, None
-        # observações vêm desc; cálculo YoY do ponto mais recente
-        atual = obs[0][1] / obs[12][1] * 100.0 - 100.0
-        return float(atual), obs[0][0]
-
-    if indicador == "Payroll":
-        if len(obs) < 2:
-            return None, None
-        return float(obs[0][1] - obs[1][1]), obs[0][0]
-
-    return float(obs[0][1]), obs[0][0]
-
-def _painel_hibrido_v74():
-    st.markdown("## 🤖 Modo Híbrido Inteligente — V7.4")
-    st.caption(
-        "O app busca automaticamente o que existe em fonte oficial. "
-        "Você só informa o consenso quando ele não estiver disponível gratuitamente."
-    )
-
-    evento = _proximo_evento_macro_v65()
-    indicador = _mapear_evento_para_indicador_v74(evento)
-
-    if not evento:
-        st.info("Nenhum evento macro principal localizado no calendário atual.")
-        return
-
-    nome_evento = evento.get("evento", "Evento macro")
-    data_evento = evento.get("data")
-    dias = evento.get("dias", None)
-
-    c1,c2,c3 = st.columns(3)
-    c1.metric("Próximo evento", nome_evento)
-    c2.metric("Data", data_evento.strftime("%d/%m/%Y") if hasattr(data_evento, "strftime") else str(data_evento))
-    c3.metric("Faltam", f"{dias} dia(s)" if dias is not None else "—")
-
-    if indicador is None:
-        if "fomc" in _normalizar_texto_v73(nome_evento):
-            st.info(
-                "Próximo evento é FOMC. A expectativa continua no módulo probabilístico "
-                "Corte / Manutenção / Alta; o calendário e Fed Funds são automáticos."
-            )
-        else:
-            st.info("Evento identificado, mas ainda não há mapeamento para consenso híbrido.")
-        return
-
-    anterior, data_ant = _auto_anterior_v71(indicador)
-    real, data_real = _ultimo_real_oficial_v74(indicador)
-
-    key_cons = f"v74_consenso_{indicador}"
-    if key_cons not in st.session_state:
-        # reaproveita consenso já digitado em outros módulos, se existir
-        st.session_state[key_cons] = float(
-            st.session_state.get(f"v66_previsao_{indicador}",
-            st.session_state.get(f"previsao_{indicador}", 0.0))
-        )
-
-    st.markdown(f"### 📌 {indicador}")
-    a,b,c = st.columns(3)
-    a.metric("Anterior 🤖", f"{anterior:.2f}" if anterior is not None else "—")
-    with b:
-        consenso = st.number_input(
-            "Consenso ✍️",
-            key=key_cons,
-            step=1.0 if indicador == "Payroll" else 0.1,
-            help="Este é o único número que pode precisar ser digitado manualmente."
-        )
-    c.metric("Último real oficial 🤖", f"{real:.2f}" if real is not None else "—")
-
-    if anterior is not None:
-        st.caption(f"Anterior automático — referência FRED: {data_ant.strftime('%d/%m/%Y') if data_ant is not None else '—'}")
-    if real is not None:
-        st.caption(f"Último valor oficial disponível: {data_real.strftime('%d/%m/%Y') if data_real is not None else '—'}")
-
-    # Sincroniza consenso para os motores existentes, sem mexer em widgets já instanciados.
-    st.session_state["v74_indicador_ativo"] = indicador
-    st.session_state["v74_consenso_ativo"] = float(consenso)
-    st.session_state["v74_tem_consenso"] = abs(float(consenso)) > 1e-12
-
-    if not st.session_state["v74_tem_consenso"]:
-        st.warning("Preencha somente o CONSENSO. O restante permanece automático.")
-        return
-
-    # Pré-release: consenso x anterior
-    maior_favorece = indicador != "Desemprego"
-    if anterior is not None:
-        pre = _expectativa_indicador_v66(indicador, float(consenso), float(anterior), maior_favorece)
-        st.write(f"**Leitura pré-release:** {pre['leitura']}")
-
-    # Detecta automaticamente se o 'real' oficial é posterior ao anterior e permite cálculo.
-    if real is not None and data_real is not None and data_ant is not None and data_real > data_ant:
-        delta = float(real) - float(consenso)
-        if not maior_favorece:
-            delta = -delta
-        if delta > 0:
-            leitura = "🟢 Real acima do consenso → favorece USD"
-        elif delta < 0:
-            leitura = "🔴 Real abaixo do consenso → desfavorece USD"
-        else:
-            leitura = "⚪ Real em linha com o consenso"
-        st.success(f"**Pós-release automático:** {leitura} · surpresa ajustada = {delta:+.2f}")
-    else:
-        st.info("Aguardando a próxima divulgação oficial. Após a atualização da FRED, o Real será atualizado automaticamente.")
-
-    st.caption(
-        "Regra de segurança: o app nunca cria um consenso. Se não houver API gratuita confiável, "
-        "esse único campo permanece manual."
-    )
-
-
-# =========================================================
 # ABA 3 — PARES
 # =========================================================
 with abas[2]:
     _status_automacao_v71()
 
-    st.subheader("💱 Painel de Decisão — V7.4")
+    st.subheader("💱 Painel de Decisão — V7.4.1")
 
     usd_base = float(usd_detalhado["score"])
     usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
