@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-🦅 USD Macro Pro — V5.4 CALENDÁRIO MACRO
+🦅 USD Macro Pro — V5.5 SURPRESA ECONÔMICA
 ================================
 - Interface em português
 - Corrige unidades de inflação e PIB no ranking global
@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "5.4 — CALENDÁRIO MACRO"
+APP_VERSION = "5.5 — SURPRESA ECONÔMICA"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V5.4 Português",
+    page_title="USD Macro Pro — V5.5 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -931,19 +931,104 @@ def confianca_modelo(score_base: float, score_cotada: float):
 # SURPRESA ECONÔMICA
 # =========================================================
 
-def classificar_surpresa(real, previsao, maior_favorece_usd=True, tolerancia=0.0):
-    if previsao is None or not np.isfinite(previsao):
-        return {"Surpresa": np.nan, "Pontuação": 0.0, "Classe": "Sem previsão"}
+SURPRESA_ESCALAS = {
+    # Unidade aproximada usada para transformar a surpresa em intensidade comparável.
+    # Não é desvio-padrão estatístico; é uma escala operacional transparente.
+    "IPC anual": 0.20,
+    "IPC Núcleo anual": 0.20,
+    "PCE anual": 0.20,
+    "PCE Núcleo anual": 0.20,
+    "Payroll": 50.0,
+    "Desemprego": 0.10,
+    "ISM Industrial": 1.0,
+    "ISM Serviços": 1.0,
+}
 
-    surpresa = real - previsao
+SURPRESA_PESOS = {
+    "IPC anual": 1.15,
+    "IPC Núcleo anual": 1.35,
+    "PCE anual": 1.20,
+    "PCE Núcleo anual": 1.45,
+    "Payroll": 1.35,
+    "Desemprego": 1.25,
+    "ISM Industrial": 0.90,
+    "ISM Serviços": 1.00,
+}
+
+def classificar_surpresa(real, previsao, maior_favorece_usd=True, tolerancia=0.0,
+                         nome_indicador=None):
+    if previsao is None or not np.isfinite(previsao):
+        return {
+            "Surpresa": np.nan, "Pontuação": 0.0, "Classe": "Sem previsão",
+            "Intensidade": 0.0, "Score impacto": 50.0
+        }
+
+    surpresa = float(real) - float(previsao)
+    escala = float(SURPRESA_ESCALAS.get(nome_indicador, 1.0))
+    peso = float(SURPRESA_PESOS.get(nome_indicador, 1.0))
+
     if abs(surpresa) <= tolerancia:
-        classe, pontos = "Neutro", 0.0
+        classe, pontos, intensidade = "Neutro", 0.0, 0.0
     else:
         positivo = surpresa > 0 if maior_favorece_usd else surpresa < 0
+        # Intensidade limitada evita que um outlier domine todo o modelo.
+        intensidade = float(np.clip(abs(surpresa) / max(escala, 1e-9), 0, 3))
+        sinal = 1.0 if positivo else -1.0
+        pontos = sinal * intensidade * peso
         classe = "Favorável ao USD" if positivo else "Desfavorável ao USD"
-        pontos = 1.0 if positivo else -1.0
 
-    return {"Surpresa": surpresa, "Pontuação": pontos, "Classe": classe}
+    score_impacto = float(np.clip(50 + pontos * 10, 0, 100))
+    return {
+        "Surpresa": surpresa,
+        "Pontuação": float(pontos),
+        "Classe": classe,
+        "Intensidade": float(intensidade),
+        "Score impacto": score_impacto,
+    }
+
+
+def interpretar_conjunto_surpresas(df: pd.DataFrame, score_base_usd: float) -> dict:
+    if df.empty:
+        return {"ajuste": 0.0, "score_ajustado": score_base_usd, "confirmação": "Sem dados"}
+
+    validos = df[pd.to_numeric(df["Previsão"], errors="coerce").fillna(0).abs() > 0].copy()
+    if validos.empty:
+        return {"ajuste": 0.0, "score_ajustado": score_base_usd, "confirmação": "Sem previsões preenchidas"}
+
+    total = float(pd.to_numeric(validos["Pontuação"], errors="coerce").fillna(0).sum())
+    # Ajuste controlado: no máximo ±15 pontos no score macro principal.
+    ajuste = float(np.clip(total * 2.0, -15, 15))
+    score_ajustado = float(np.clip(score_base_usd + ajuste, 0, 100))
+
+    positivos = int((pd.to_numeric(validos["Pontuação"], errors="coerce") > 0).sum())
+    negativos = int((pd.to_numeric(validos["Pontuação"], errors="coerce") < 0).sum())
+
+    # Conflitos importantes: emprego forte com desemprego pior, ou inflação vs atividade em sentidos opostos.
+    mapa = {r["Indicador"]: float(r["Pontuação"]) for _, r in validos.iterrows()}
+    conflitos = []
+    if mapa.get("Payroll", 0) * mapa.get("Desemprego", 0) < 0:
+        conflitos.append("Payroll e desemprego estão em conflito")
+    infl = sum(mapa.get(k, 0) for k in ["IPC anual", "IPC Núcleo anual", "PCE anual", "PCE Núcleo anual"])
+    ativ = sum(mapa.get(k, 0) for k in ["ISM Industrial", "ISM Serviços"])
+    if infl * ativ < 0 and abs(infl) > 0.5 and abs(ativ) > 0.5:
+        conflitos.append("Inflação e atividade apontam direções diferentes")
+
+    if conflitos:
+        confirmacao = "⚠️ Sinais mistos — " + "; ".join(conflitos)
+    elif positivos >= 2 and negativos == 0:
+        confirmacao = "✅ Dados confirmam força do USD"
+    elif negativos >= 2 and positivos == 0:
+        confirmacao = "🔴 Dados confirmam fraqueza do USD"
+    else:
+        confirmacao = "⚪ Leitura mista / parcial"
+
+    return {
+        "ajuste": ajuste,
+        "score_ajustado": score_ajustado,
+        "confirmação": confirmacao,
+        "positivos": positivos,
+        "negativos": negativos,
+    }
 
 # =========================================================
 # HISTÓRICO E TESTE HISTÓRICO
@@ -1038,7 +1123,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V5.4 Português")
+st.title("🦅 USD Macro Pro — V5.5 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -1169,22 +1254,30 @@ with abas[1]:
         st.dataframe(cal, use_container_width=True, hide_index=True)
     st.info("ℹ️ A FRED fornece dados realizados e datas de releases, mas não fornece o consenso/forecast do mercado. Por segurança, a previsão continua manual.")
 
-    st.subheader("🎯 Surpresa Econômica — Real × Previsão")
-    st.caption("Digite o valor divulgado, a previsão do mercado e o valor anterior. O modelo estima a direção do impacto no USD.")
+    st.subheader("🎯 Surpresa Econômica Automática — Real × Previsão")
+    st.caption("A FRED preenche Real e Anterior quando disponível. Você informa apenas a Previsão/consenso. O modelo mede direção e intensidade da surpresa.")
 
-    st.markdown("#### 🤖 Real e Anterior automáticos — FRED")
-    auto_rows = []
+    autom = {}
     for _ind in ["IPC anual", "IPC Núcleo anual", "PCE anual", "PCE Núcleo anual", "Payroll", "Desemprego"]:
-        _real, _ant = _automatico_real_anterior(_ind)
+        autom[_ind] = _automatico_real_anterior(_ind)
+
+    st.markdown("#### 🤖 Dados automáticos disponíveis")
+    auto_rows = []
+    for _ind, (_real, _ant) in autom.items():
         auto_rows.append({
             "Indicador": _ind,
-            "Real automático": round(_real, 3) if _real is not None else "—",
-            "Anterior automático": round(_ant, 3) if _ant is not None else "—",
-            "Previsão": "Manual / consenso externo",
+            "Real FRED": round(_real, 3) if _real is not None else "—",
+            "Anterior FRED": round(_ant, 3) if _ant is not None else "—",
         })
     st.dataframe(pd.DataFrame(auto_rows), use_container_width=True, hide_index=True)
-    st.caption("ISM Industrial e ISM Serviços permanecem manuais nesta versão. A previsão/consenso deve vir de uma fonte de calendário econômico, não da FRED.")
 
+    if st.button("⚡ Preencher Real e Anterior com FRED", type="primary"):
+        for _ind, (_real, _ant) in autom.items():
+            if _real is not None:
+                st.session_state[f"real_{_ind}"] = float(_real)
+            if _ant is not None:
+                st.session_state[f"anterior_{_ind}"] = float(_ant)
+        st.rerun()
 
     indicadores = [
         ("IPC anual", True),
@@ -1199,39 +1292,89 @@ with abas[1]:
 
     linhas = []
     for nome, maior_favorece in indicadores:
+        # Inicializa automáticos apenas na primeira carga da sessão.
+        auto_real, auto_ant = autom.get(nome, (None, None))
+        if f"real_{nome}" not in st.session_state:
+            st.session_state[f"real_{nome}"] = float(auto_real) if auto_real is not None else 0.0
+        if f"anterior_{nome}" not in st.session_state:
+            st.session_state[f"anterior_{nome}"] = float(auto_ant) if auto_ant is not None else 0.0
+        if f"previsao_{nome}" not in st.session_state:
+            st.session_state[f"previsao_{nome}"] = 0.0
+
         c_real, c_prev, c_ant = st.columns(3)
         with c_real:
-            real = st.number_input(f"{nome} — Real", value=0.0, step=0.1, key=f"real_{nome}")
+            step = 1.0 if nome == "Payroll" else 0.1
+            real = st.number_input(
+                f"{nome} — Real",
+                step=step,
+                key=f"real_{nome}",
+            )
         with c_prev:
-            previsao = st.number_input(f"{nome} — Previsão", value=0.0, step=0.1, key=f"previsao_{nome}")
+            previsao = st.number_input(
+                f"{nome} — Previsão",
+                step=step,
+                key=f"previsao_{nome}",
+                help="Digite o consenso/forecast publicado pelo seu calendário econômico."
+            )
         with c_ant:
-            anterior = st.number_input(f"{nome} — Anterior", value=0.0, step=0.1, key=f"anterior_{nome}")
+            anterior = st.number_input(
+                f"{nome} — Anterior",
+                step=step,
+                key=f"anterior_{nome}",
+            )
 
-        resultado = classificar_surpresa(real, previsao, maior_favorece)
+        tem_previsao = abs(float(previsao)) > 1e-12
+        resultado = classificar_surpresa(
+            real,
+            previsao if tem_previsao else None,
+            maior_favorece_usd=maior_favorece,
+            nome_indicador=nome,
+        )
+
+        classe = resultado["Classe"]
+        if classe == "Favorável ao USD":
+            impacto = "🟢 Favorável ao USD"
+        elif classe == "Desfavorável ao USD":
+            impacto = "🔴 Desfavorável ao USD"
+        elif classe == "Sem previsão":
+            impacto = "⚪ Aguardando previsão"
+        else:
+            impacto = "⚪ Neutro"
+
         linhas.append({
             "Indicador": nome,
-            "Real": real,
-            "Previsão": previsao,
-            "Anterior": anterior,
-            "Surpresa vs Previsão": resultado["Surpresa"],
-            "Impacto no USD": resultado["Classe"],
-            "Pontuação": resultado["Pontuação"],
+            "Real": float(real),
+            "Previsão": float(previsao),
+            "Anterior": float(anterior),
+            "Surpresa": round(resultado["Surpresa"], 3) if np.isfinite(resultado["Surpresa"]) else "—",
+            "Intensidade": round(resultado["Intensidade"], 2),
+            "Impacto no USD": impacto,
+            "Pontuação": round(resultado["Pontuação"], 2),
         })
 
     df_surpresa = pd.DataFrame(linhas)
     st.dataframe(df_surpresa, use_container_width=True, hide_index=True)
-    total = float(df_surpresa["Pontuação"].sum())
 
-    if total >= 3:
-        st.success("📈 Conjunto de dados fortemente favorável ao USD")
-    elif total >= 1:
-        st.success("📈 Conjunto de dados levemente favorável ao USD")
-    elif total <= -3:
-        st.error("📉 Conjunto de dados fortemente desfavorável ao USD")
-    elif total <= -1:
-        st.error("📉 Conjunto de dados levemente desfavorável ao USD")
+    leitura_surpresa = interpretar_conjunto_surpresas(df_surpresa, usd_detalhe["score"])
+
+    st.markdown("#### 🧭 Efeito das surpresas sobre o score do USD")
+    ca, cb, cc = st.columns(3)
+    with ca:
+        st.metric("USD macro antes", f"{usd_detalhe['score']:.0f}/100")
+    with cb:
+        delta = leitura_surpresa["ajuste"]
+        st.metric("Ajuste das surpresas", f"{delta:+.1f} pontos")
+    with cc:
+        st.metric("USD ajustado", f"{leitura_surpresa['score_ajustado']:.0f}/100")
+
+    if leitura_surpresa["score_ajustado"] >= 58:
+        st.success(f"🟢 Viés ajustado favorável ao USD — {leitura_surpresa['confirmação']}")
+    elif leitura_surpresa["score_ajustado"] <= 42:
+        st.error(f"🔴 Viés ajustado desfavorável ao USD — {leitura_surpresa['confirmação']}")
     else:
-        st.info("⚪ Surpresas equilibradas")
+        st.info(f"⚪ USD em zona neutra — {leitura_surpresa['confirmação']}")
+
+    st.caption("O ajuste por surpresa é limitado a ±15 pontos para impedir que uma única divulgação domine todo o modelo. Isso é uma regra operacional, não uma probabilidade estatística.")
 
 # =========================================================
 # ABA 3 — PARES
