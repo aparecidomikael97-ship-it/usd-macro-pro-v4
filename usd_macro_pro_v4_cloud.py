@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-🦅 USD Macro Pro — V5 PORTUGUÊS
+🦅 USD Macro Pro — V5.1 PORTUGUÊS
 ================================
 - Interface em português
 - Corrige unidades de inflação e PIB no ranking global
@@ -22,18 +22,17 @@ import pandas as pd
 import requests
 import streamlit as st
 import re
-from deep_translator import GoogleTranslator
 
 # =========================================================
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "5.0 — PORTUGUÊS"
+APP_VERSION = "5.1 — FED INTELIGENTE"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V5 Português",
+    page_title="USD Macro Pro — V5.1 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -197,15 +196,33 @@ def _usar_ou_fallback(valor, fallback, minimo, maximo):
 # =========================================================
 
 PALAVRAS_RESTRITIVAS = (
-    "higher for longer", "inflation remains elevated", "rate hike", "hike",
-    "tightening", "restrictive", "not ready to cut", "strong economy"
+    "higher for longer", "inflation remains elevated", "rate hike", "rate hikes",
+    "hike rates", "hiking rates", "tightening", "restrictive", "hawkish",
+    "not ready to cut", "strong economy", "inflation heats up", "inflation hot",
+    "sticky inflation", "stubborn inflation", "rates stay high", "rates higher"
 )
 PALAVRAS_FLEXIVEIS = (
-    "rate cut", "easing", "disinflation", "inflation cooling",
-    "weaker labor", "growth slowing", "lower rates"
+    "rate cut", "rate cuts", "cut rates", "cutting rates", "easing", "dovish",
+    "disinflation", "inflation cooling", "inflation cools", "weaker labor",
+    "labor market weakens", "growth slowing", "lower rates", "recession risk"
 )
 POSITIVAS = ("strong", "growth", "beat", "surge", "rise", "gain", "alta", "avanço")
 NEGATIVAS = ("weak", "recession", "drop", "fall", "selloff", "queda", "crise")
+
+# Termos usados para separar notícias realmente úteis para política monetária/Forex.
+TERMOS_ALTA_RELEVANCIA = (
+    "fomc", "federal reserve", "fed rate", "interest rate", "rate hike", "rate cut",
+    "inflation", "cpi", "pce", "payroll", "nonfarm", "unemployment", "jobs report",
+    "treasury yields", "dot plot", "monetary policy", "fed decision", "fed meeting"
+)
+TERMOS_MEDIA_RELEVANCIA = (
+    "powell", "warsh", "bowman", "fed chair", "fed governor", "fed official",
+    "labor market", "economic growth", "gdp", "wages", "employment"
+)
+TERMOS_IRRELEVANTES = (
+    "mansion", "real estate", "realtor", "house sale", "sells home", "sells mansion",
+    "meet the directors", "biography", "personal life", "wedding", "sports", "celebrity"
+)
 
 
 def _rss_titulos(consulta: str, idioma="en-US", pais="US", ceid="US:en") -> list[str]:
@@ -216,47 +233,138 @@ def _rss_titulos(consulta: str, idioma="en-US", pais="US", ceid="US:en") -> list
         return []
     try:
         raiz = ET.fromstring(resposta.content)
-        return [
-            item.findtext("title", "").strip()
-            for item in raiz.iter("item")
-            if item.findtext("title", "")
-        ]
+        titulos = []
+        vistos = set()
+        for item in raiz.iter("item"):
+            titulo = (item.findtext("title", "") or "").strip()
+            chave = titulo.lower()
+            if titulo and chave not in vistos:
+                vistos.add(chave)
+                titulos.append(titulo)
+        return titulos
     except Exception:
         return []
 
 
+def _separar_fonte(titulo: str) -> tuple[str, str]:
+    """Separa 'manchete - Fonte' sem quebrar hífens internos."""
+    if " - " in titulo:
+        corpo, fonte = titulo.rsplit(" - ", 1)
+        return corpo.strip(), fonte.strip()
+    return titulo.strip(), "Fonte não identificada"
+
+
+def _relevancia_manchete(titulo: str) -> tuple[int, str]:
+    t = titulo.lower()
+    if any(x in t for x in TERMOS_IRRELEVANTES):
+        return 0, "Baixa"
+    alta = sum(1 for x in TERMOS_ALTA_RELEVANCIA if x in t)
+    media = sum(1 for x in TERMOS_MEDIA_RELEVANCIA if x in t)
+    pontos = alta * 3 + media
+    if pontos >= 4:
+        return pontos, "Alta"
+    if pontos >= 2:
+        return pontos, "Média"
+    return pontos, "Baixa"
+
+
+def _impacto_usd_manchete(titulo: str) -> tuple[float, str, str]:
+    """Retorna score [-1,+1], direção e explicação curta."""
+    t = titulo.lower()
+    hawk = sum(1 for x in PALAVRAS_RESTRITIVAS if x in t)
+    dove = sum(1 for x in PALAVRAS_FLEXIVEIS if x in t)
+    if hawk > dove:
+        score = min(1.0, 0.35 + 0.2 * (hawk - dove))
+        return score, "🟢 Favorável ao USD", "Sinal mais restritivo: juros altos por mais tempo tendem a apoiar o dólar."
+    if dove > hawk:
+        score = -min(1.0, 0.35 + 0.2 * (dove - hawk))
+        return score, "🔴 Desfavorável ao USD", "Sinal mais flexível: maior chance de cortes tende a pressionar o dólar."
+    return 0.0, "⚪ Neutro/indefinido", "A manchete não traz sinal claro de alta ou corte de juros."
+
+
+# Fallback local: não tenta "inventar" tradução completa; converte termos macro essenciais.
 TRADUCOES_MANCHETES = {
-    "rate hike": "alta de juros", "rate hikes": "altas de juros",
-    "rate cut": "corte de juros", "rate cuts": "cortes de juros",
+    "rate hikes": "altas de juros", "rate hike": "alta de juros",
+    "rate cuts": "cortes de juros", "rate cut": "corte de juros",
     "interest rates": "taxas de juros", "inflation": "inflação",
-    "Federal Reserve": "Federal Reserve", "Fed": "Fed",
-    "economy": "economia", "markets": "mercados", "market": "mercado",
-    "growth": "crescimento", "jobs": "empregos", "labor": "trabalho",
-    "dollar": "dólar", "bonds": "títulos", "decision": "decisão",
-    "September": "setembro", "higher": "mais alta", "lower": "mais baixa",
+    "Federal Reserve": "Federal Reserve", "economy": "economia",
+    "markets": "mercados", "market": "mercado", "growth": "crescimento",
+    "jobs": "empregos", "labor": "trabalho", "dollar": "dólar",
+    "bonds": "títulos", "decision": "decisão", "September": "setembro",
+    "higher": "mais altos", "lower": "mais baixos",
     "hold rates steady": "manter os juros estáveis",
     "all eyes on": "todas as atenções voltadas para",
+    "stubborn": "persistente", "cool": "esfriar", "heats up": "acelera",
+    "week ahead": "semana à frente", "economists say": "dizem economistas",
+    "pressure": "pressão", "raises prospect": "aumenta a possibilidade de",
+    "faces new pressure": "enfrenta nova pressão", "to hike rates": "para elevar os juros",
 }
 
+
 def _traduzir_fallback_local(titulo: str) -> str:
-    """Fallback simples caso o tradutor online esteja indisponível."""
     texto = titulo
     for origem, destino in sorted(TRADUCOES_MANCHETES.items(), key=lambda x: len(x[0]), reverse=True):
         texto = re.sub(re.escape(origem), destino, texto, flags=re.IGNORECASE)
     return texto
 
+
+def _traducao_parece_erro(texto: str) -> bool:
+    t = (texto or "").lower()
+    marcadores = ("error 500", "server error", "that's an error", "that’s an error", "please try again later", "<!doctype html", "<html")
+    return not texto or any(m in t for m in marcadores)
+
+
 @st.cache_data(ttl=86400, show_spinner=False)
-def _traduzir_manchete(titulo: str) -> str:
-    """Traduz manchetes do inglês para português; se falhar, usa fallback local."""
-    if not titulo or not titulo.strip():
-        return titulo
+def _traduzir_google_endpoint(texto: str) -> str | None:
+    """Tentativa 1: endpoint público de tradução do Google, com timeout curto."""
     try:
-        traduzido = GoogleTranslator(source="auto", target="pt").translate(titulo)
-        if traduzido and traduzido.strip():
-            return traduzido.strip()
+        url = "https://translate.googleapis.com/translate_a/single"
+        params = {"client": "gtx", "sl": "en", "tl": "pt", "dt": "t", "q": texto}
+        r = requests.get(url, params=params, timeout=8, headers={"User-Agent": "Mozilla/5.0"})
+        if r.ok:
+            data = r.json()
+            trad = "".join(parte[0] for parte in data[0] if parte and parte[0])
+            if not _traducao_parece_erro(trad):
+                return trad.strip()
     except Exception:
         pass
-    return _traduzir_fallback_local(titulo)
+    return None
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def _traduzir_mymemory(texto: str) -> str | None:
+    """Tentativa 2: MyMemory. É fallback e pode ter limite de uso."""
+    try:
+        r = requests.get(
+            "https://api.mymemory.translated.net/get",
+            params={"q": texto, "langpair": "en|pt-BR"},
+            timeout=8,
+            headers={"User-Agent": "USD-Macro-Pro/5.1"},
+        )
+        if r.ok:
+            data = r.json()
+            trad = (data.get("responseData") or {}).get("translatedText", "")
+            if not _traducao_parece_erro(trad):
+                return trad.strip()
+    except Exception:
+        pass
+    return None
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def _traduzir_manchete(titulo: str) -> tuple[str, str]:
+    """Tradução robusta com dois provedores + fallback local. Nunca exibe HTML/erro técnico."""
+    if not titulo or not titulo.strip():
+        return titulo, "sem tradução"
+    corpo, _ = _separar_fonte(titulo)
+    trad = _traduzir_google_endpoint(corpo)
+    if trad:
+        return trad, "Google"
+    trad = _traduzir_mymemory(corpo)
+    if trad:
+        return trad, "MyMemory"
+    local = _traduzir_fallback_local(corpo)
+    return local, "modo local"
 
 
 def _score_palavras(titulos: list[str], positivas, negativas) -> float:
@@ -271,11 +379,39 @@ def _score_palavras(titulos: list[str], positivas, negativas) -> float:
 
 @st.cache_data(ttl=1800, show_spinner="Lendo a narrativa do Fed...")
 def carregar_narrativa_fed() -> dict:
-    titulos = _rss_titulos("Federal Reserve OR FOMC OR Powell when:7d")
-    forca = _score_palavras(titulos, PALAVRAS_RESTRITIVAS, PALAVRAS_FLEXIVEIS)
+    # Consulta focada em política monetária para evitar manchetes pessoais/irrelevantes.
+    brutas = _rss_titulos('(Federal Reserve OR FOMC OR "Fed rate" OR "Fed Chair") when:7d')
+    analisadas = []
+    for titulo in brutas:
+        pontos, nivel = _relevancia_manchete(titulo)
+        if nivel == "Baixa":
+            continue
+        impacto, direcao, explicacao = _impacto_usd_manchete(titulo)
+        corpo, fonte = _separar_fonte(titulo)
+        analisadas.append({
+            "titulo": titulo,
+            "corpo": corpo,
+            "fonte": fonte,
+            "relevancia_pontos": pontos,
+            "relevancia": nivel,
+            "impacto": impacto,
+            "direcao": direcao,
+            "explicacao": explicacao,
+        })
+
+    analisadas.sort(key=lambda x: (x["relevancia_pontos"], abs(x["impacto"])), reverse=True)
+    analisadas = analisadas[:12]
+
+    if analisadas:
+        pesos = np.array([max(1, x["relevancia_pontos"]) for x in analisadas], dtype=float)
+        impactos = np.array([x["impacto"] for x in analisadas], dtype=float)
+        forca = float(np.clip(np.average(impactos, weights=pesos), -1, 1))
+    else:
+        forca = 0.0
+
     tom = "Restritivo" if forca > 0.15 else "Flexível" if forca < -0.15 else "Neutro"
-    STATUS_FONTE["Fed"] = "✅ Notícias RSS" if titulos else "⚠️ Sem manchetes"
-    return {"tom": tom, "forca": forca, "titulos": titulos[:12]}
+    STATUS_FONTE["Fed"] = f"✅ {len(analisadas)} manchetes relevantes" if analisadas else "⚠️ Sem manchetes relevantes"
+    return {"tom": tom, "forca": forca, "titulos": [x["titulo"] for x in analisadas], "analisadas": analisadas}
 
 
 @st.cache_data(ttl=1800, show_spinner="Analisando sentimento das notícias...")
@@ -820,24 +956,50 @@ with abas[2]:
 # ABA 4 — FED E NOTÍCIAS
 # =========================================================
 with abas[3]:
-    st.subheader("Leitura do Federal Reserve")
-    st.metric("Tom do Fed", fed["tom"])
-    st.metric("Intensidade da leitura", f"{fed['forca']:+.2f}")
+    st.subheader("🏦 Federal Reserve e impacto no USD")
 
-    st.markdown("### Manchetes analisadas — tradução completa + original")
-    if fed["titulos"]:
-        for titulo in fed["titulos"]:
-            traducao = _traduzir_manchete(titulo)
-            st.markdown(f"**🇧🇷 Português:** {traducao}")
-            st.caption(f"Original: {titulo}")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric("Tom do Fed", fed["tom"])
+    with c2:
+        st.metric("Intensidade da leitura", f"{fed['forca']:+.2f}")
+    with c3:
+        impacto_geral = "🟢 Favorável ao USD" if fed["forca"] > 0.15 else "🔴 Desfavorável ao USD" if fed["forca"] < -0.15 else "⚪ Neutro"
+        st.metric("Impacto provável", impacto_geral)
+
+    st.caption(
+        "O sistema filtra manchetes de baixa relevância e dá mais peso a juros, inflação, FOMC, emprego e comunicação do Fed. "
+        "Isso reduz ruído de notícias pessoais ou sem impacto macroeconômico."
+    )
+
+    st.markdown("### 📰 Notícias relevantes — português + original")
+    analisadas = fed.get("analisadas", [])
+    if analisadas:
+        for item in analisadas:
+            traducao, provedor = _traduzir_manchete(item["titulo"])
+            selo_rel = "🔥 Alta" if item["relevancia"] == "Alta" else "🟡 Média"
+            st.markdown(f"#### 🇧🇷 {traducao}")
+            st.markdown(
+                f"**Impacto no USD:** {item['direcao']}  \n"
+                f"**Relevância:** {selo_rel}  \n"
+                f"**Fonte:** {item['fonte']}"
+            )
+            st.caption(item["explicacao"])
+            with st.expander("🌐 Ver manchete original"):
+                st.write(item["corpo"])
+                st.caption(f"Tradução: {provedor}")
+            st.markdown("---")
     else:
-        st.info("Nenhuma manchete encontrada nesta atualização.")
+        st.info("Nenhuma manchete macroeconômica relevante encontrada nesta atualização.")
 
-    st.markdown("---")
+    st.markdown("### 🧭 Como interpretar")
     st.markdown(
-        "**🔴 Restritivo** → inflação/economia fortes → juros altos por mais tempo → tende a favorecer o USD  \n"
-        "**🟢 Flexível** → inflação cedendo/economia fraca → maior chance de cortes → tende a pressionar o USD  \n"
-        "⚠️ Esta leitura de manchetes é auxiliar. Confirme sempre com comunicado, ata e discursos oficiais do Fed."
+        "**🔴 Fed restritivo (hawkish)** → maior chance de juros altos/alta de juros → normalmente favorece o USD.  \n"
+        "**🟢 Fed flexível (dovish)** → maior chance de cortes de juros → normalmente pressiona o USD.  \n"
+        "**⚪ Neutro** → sinal misto ou insuficiente; dê mais peso aos dados macro e aos rendimentos dos Treasuries."
+    )
+    st.warning(
+        "A análise de manchetes é auxiliar e não substitui o comunicado oficial do FOMC, a coletiva, a ata, o Dot Plot e os dados econômicos."
     )
 
 # =========================================================
