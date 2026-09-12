@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "7.2 — CONSENSO AUTOMÁTICO"
+APP_VERSION = "7.3 — EODHD AUTOMÁTICO"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V7.2 Português",
+    page_title="USD Macro Pro — V7.3 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -58,7 +58,7 @@ SENSIBILIDADE_FED_PADRAO = {
 
 CHAVE_FRED = st.secrets.get("CHAVE_FRED", os.getenv("CHAVE_FRED", ""))
 CHAVE_NEWSAPI = st.secrets.get("CHAVE_NEWSAPI", os.getenv("CHAVE_NEWSAPI", ""))
-CHAVE_TRADING_ECONOMICS = st.secrets.get("CHAVE_TRADING_ECONOMICS", os.getenv("CHAVE_TRADING_ECONOMICS", ""))
+CHAVE_EODHD = st.secrets.get("CHAVE_EODHD", os.getenv("CHAVE_EODHD", ""))
 
 IMPACTO_MAX_FED = 18.0
 STATUS_FONTE = {}
@@ -102,10 +102,10 @@ st.sidebar.caption("Modelo FX: prioriza juros reais, Treasury 2Y e Fed para o US
 st.sidebar.caption(f"🕒 Atualizado: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
 if not CHAVE_FRED:
     st.sidebar.warning("FRED sem chave: alguns dados usarão valores de segurança.")
-if CHAVE_TRADING_ECONOMICS:
-    st.sidebar.success("Trading Economics conectado: consenso automático ativo.")
+if CHAVE_EODHD:
+    st.sidebar.success("EODHD configurado: consenso automático tentará usar Economic Events.")
 else:
-    st.sidebar.info("Trading Economics não conectado: consenso permanece manual.")
+    st.sidebar.info("EODHD sem token: consenso permanece manual.")
 
 # =========================================================
 # CONEXÃO E FRED
@@ -1024,37 +1024,53 @@ def _resumo_expectativa_v66(linhas: list[dict]) -> dict:
 
 
 # =========================================================
-# V7.2 — TRADING ECONOMICS / CONSENSO AUTOMÁTICO
+# V7.3 — EODHD / CONSENSO AUTOMÁTICO
 # =========================================================
 
-TE_ALIASES_V72 = {
-    "IPC anual": [
-        "inflation rate yoy", "cpi yoy", "consumer price index cpi yoy",
-    ],
-    "IPC Núcleo anual": [
-        "core inflation rate yoy", "core cpi yoy", "core consumer prices yoy",
-    ],
-    "PCE anual": [
-        "pce price index yoy", "pce prices yoy", "personal consumption expenditures price index yoy",
-    ],
-    "PCE Núcleo anual": [
-        "core pce price index yoy", "core pce prices yoy",
-    ],
-    "Payroll": [
-        "non farm payrolls", "nonfarm payrolls", "non farm payroll",
-    ],
-    "Desemprego": [
-        "unemployment rate",
-    ],
-    "ISM Industrial": [
-        "ism manufacturing pmi", "ism manufacturing",
-    ],
-    "ISM Serviços": [
-        "ism services pmi", "ism non manufacturing pmi", "ism non-manufacturing pmi",
-    ],
+EOD_ALIASES_V73 = {
+    "IPC anual": {
+        "aliases": ["inflation rate", "consumer price index", "cpi"],
+        "comparison": "yoy",
+        "exclude": ["core"],
+    },
+    "IPC Núcleo anual": {
+        "aliases": ["core inflation rate", "core consumer price index", "core cpi"],
+        "comparison": "yoy",
+        "exclude": [],
+    },
+    "PCE anual": {
+        "aliases": ["pce price index", "pce prices", "personal consumption expenditures price index"],
+        "comparison": "yoy",
+        "exclude": ["core"],
+    },
+    "PCE Núcleo anual": {
+        "aliases": ["core pce price index", "core pce prices", "core personal consumption expenditures"],
+        "comparison": "yoy",
+        "exclude": [],
+    },
+    "Payroll": {
+        "aliases": ["nonfarm payrolls", "non farm payrolls", "nonfarm payroll"],
+        "comparison": None,
+        "exclude": [],
+    },
+    "Desemprego": {
+        "aliases": ["unemployment rate"],
+        "comparison": None,
+        "exclude": [],
+    },
+    "ISM Industrial": {
+        "aliases": ["ism manufacturing pmi", "ism manufacturing"],
+        "comparison": None,
+        "exclude": [],
+    },
+    "ISM Serviços": {
+        "aliases": ["ism services pmi", "ism non manufacturing pmi", "ism non-manufacturing pmi", "ism services"],
+        "comparison": None,
+        "exclude": [],
+    },
 }
 
-def _normalizar_texto_v72(s):
+def _normalizar_texto_v73(s):
     import unicodedata
     s = "" if s is None else str(s)
     s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
@@ -1062,85 +1078,115 @@ def _normalizar_texto_v72(s):
     s = re.sub(r"\s+", " ", s).strip()
     return s
 
-def _numero_te_v72(valor):
-    """Converte 3.2%, 187K, 1.2M etc. para float nas unidades usadas pelo app."""
+def _numero_eod_v73(valor):
     if valor is None:
         return None
-    s = str(valor).strip().replace(",", "")
-    if not s or s.lower() in {"nan", "none", "null", "-"}:
-        return None
-    s = s.replace("%", "").strip()
-    mult = 1.0
-    if s[-1:].upper() == "K":
-        # Payroll no app é expresso em milhares: 187K -> 187.
-        mult = 1.0
-        s = s[:-1]
-    elif s[-1:].upper() == "M":
-        mult = 1000.0
-        s = s[:-1]
-    elif s[-1:].upper() == "B":
-        mult = 1_000_000.0
-        s = s[:-1]
     try:
-        return float(s) * mult
+        return float(valor)
     except Exception:
-        return None
+        try:
+            s = str(valor).strip().replace(",", "").replace("%", "")
+            return float(s)
+        except Exception:
+            return None
 
-@st.cache_data(ttl=300, show_spinner=False)
-def _te_calendario_eua_v72(chave: str, inicio_txt: str, fim_txt: str):
-    if not chave:
-        return []
-    url = (
-        "https://api.tradingeconomics.com/calendar/country/"
-        f"united%20states/{inicio_txt}/{fim_txt}"
-    )
+@st.cache_data(ttl=1800, show_spinner=False)
+def _eodhd_eventos_eua_v73(token: str, inicio_txt: str, fim_txt: str):
+    """
+    Uma única chamada por janela de cache.
+    Retorna diagnóstico junto com os dados para o app não esconder falhas da API.
+    """
+    if not token:
+        return {"ok": False, "status": None, "erro": "Token EODHD não configurado.", "dados": []}
+
+    url = "https://eodhd.com/api/economic-events"
+    params = {
+        "api_token": token,
+        "from": inicio_txt,
+        "to": fim_txt,
+        "country": "US",
+        "limit": 1000,
+        "offset": 0,
+        "fmt": "json",
+    }
     try:
-        r = requests.get(
-            url,
-            params={"c": chave, "f": "json"},
-            timeout=20
-        )
-        r.raise_for_status()
-        dados = r.json()
-        return dados if isinstance(dados, list) else []
-    except Exception:
-        return []
+        r = requests.get(url, params=params, timeout=20)
+        status = int(r.status_code)
+        if not r.ok:
+            detalhe = r.text[:300] if r.text else f"HTTP {status}"
+            return {
+                "ok": False,
+                "status": status,
+                "erro": f"EODHD respondeu HTTP {status}: {detalhe}",
+                "dados": [],
+            }
 
-def _te_eventos_v72():
+        payload = r.json()
+        if isinstance(payload, dict):
+            # Alguns erros de API chegam como JSON mesmo com HTTP 200.
+            msg = payload.get("message") or payload.get("error") or payload.get("errors")
+            if msg:
+                return {"ok": False, "status": status, "erro": str(msg), "dados": []}
+            payload = payload.get("data", [])
+
+        if not isinstance(payload, list):
+            return {
+                "ok": False,
+                "status": status,
+                "erro": "Formato inesperado retornado pelo EODHD.",
+                "dados": [],
+            }
+        return {"ok": True, "status": status, "erro": "", "dados": payload}
+    except Exception as e:
+        return {"ok": False, "status": None, "erro": f"Falha de conexão EODHD: {e}", "dados": []}
+
+def _eodhd_janela_v73():
     hoje = datetime.now().date()
-    inicio = (hoje - timedelta(days=10)).strftime("%Y-%m-%d")
-    fim = (hoje + timedelta(days=30)).strftime("%Y-%m-%d")
-    return _te_calendario_eua_v72(CHAVE_TRADING_ECONOMICS, inicio, fim)
+    inicio = (hoje - timedelta(days=14)).strftime("%Y-%m-%d")
+    fim = (hoje + timedelta(days=45)).strftime("%Y-%m-%d")
+    return _eodhd_eventos_eua_v73(CHAVE_EODHD, inicio, fim)
 
-def _te_dado_indicador_v72(nome: str):
-    aliases = [_normalizar_texto_v72(x) for x in TE_ALIASES_V72.get(nome, [])]
-    if not aliases:
+def _eodhd_dado_indicador_v73(nome: str, diagnostico: dict):
+    cfg = EOD_ALIASES_V73.get(nome)
+    if not cfg or not diagnostico.get("ok"):
         return None
+
+    aliases = [_normalizar_texto_v73(x) for x in cfg["aliases"]]
+    excludes = [_normalizar_texto_v73(x) for x in cfg["exclude"]]
+    comp_desejada = cfg.get("comparison")
 
     candidatos = []
-    hoje = datetime.now()
-    for item in _te_eventos_v72():
-        combinado = _normalizar_texto_v72(
-            f"{item.get('Event','')} {item.get('Category','')} "
-            f"{item.get('OEvent','')} {item.get('OCategory','')}"
-        )
-        if not any(a in combinado for a in aliases):
+    agora = datetime.now()
+
+    for item in diagnostico.get("dados", []):
+        tipo = _normalizar_texto_v73(item.get("type", ""))
+        if not tipo:
             continue
+        if not any(a in tipo for a in aliases):
+            continue
+        if any(x in tipo for x in excludes):
+            continue
+
+        comp = _normalizar_texto_v73(item.get("comparison", ""))
+        if comp_desejada and comp != comp_desejada:
+            continue
+
         try:
-            dt = pd.Timestamp(item.get("Date"))
+            dt = pd.Timestamp(item.get("date"))
             if dt.tzinfo is not None:
                 dt = dt.tz_convert(None)
         except Exception:
             continue
 
-        forecast = _numero_te_v72(item.get("Forecast"))
-        previous = _numero_te_v72(item.get("Previous"))
-        actual = _numero_te_v72(item.get("Actual"))
+        estimate = _numero_eod_v73(item.get("estimate"))
+        previous = _numero_eod_v73(item.get("previous"))
+        actual = _numero_eod_v73(item.get("actual"))
 
-        # Preferir release futuro mais próximo com consenso; depois release recente.
-        delta_h = (dt.to_pydatetime() - hoje).total_seconds() / 3600.0
-        futuro = delta_h >= -6
-        tem_consenso = forecast is not None
+        delta_h = (dt.to_pydatetime() - agora).total_seconds() / 3600.0
+        futuro = delta_h >= -4
+        tem_consenso = estimate is not None
+
+        # Preferência: próximo release futuro com estimate.
         prioridade = (
             0 if (futuro and tem_consenso) else
             1 if futuro else
@@ -1151,48 +1197,49 @@ def _te_dado_indicador_v72(nome: str):
             abs(delta_h),
             {
                 "nome": nome,
-                "evento": item.get("Event") or item.get("Category") or nome,
+                "evento": item.get("type") or nome,
+                "comparison": item.get("comparison"),
+                "periodo": item.get("period"),
                 "data": dt,
-                "consenso": forecast,
+                "consenso": estimate,
                 "anterior": previous,
                 "real": actual,
-                "importance": item.get("Importance"),
-                "source": item.get("Source") or "Trading Economics",
-                "calendar_id": str(item.get("CalendarId", "")),
-                "last_update": str(item.get("LastUpdate", "")),
-                "unit": str(item.get("Unit", "")),
+                "source": "EODHD Economic Events",
             }
         ))
 
     if not candidatos:
         return None
+
     candidatos.sort(key=lambda x: (x[0], x[1]))
     return candidatos[0][2]
 
-def _sincronizar_te_v72():
+def _sincronizar_eodhd_v73():
     """
-    Preenche os campos ANTES da criação dos widgets.
-    Atualiza quando o evento/consenso muda na fonte. Não inventa valores.
+    Sincroniza antes dos widgets da Aba EUA.
+    Não inventa consenso e não faz chamada extra por indicador.
     """
-    if not CHAVE_TRADING_ECONOMICS:
-        return {}
-
+    diagnostico = _eodhd_janela_v73()
     resultado = {}
-    for nome in TE_ALIASES_V72:
-        d = _te_dado_indicador_v72(nome)
+
+    if not diagnostico.get("ok"):
+        return diagnostico, resultado
+
+    for nome in EOD_ALIASES_V73:
+        d = _eodhd_dado_indicador_v73(nome, diagnostico)
         if not d:
             continue
         resultado[nome] = d
 
         assinatura = (
-            f"{d.get('calendar_id')}|{d.get('last_update')}|"
-            f"{d.get('consenso')}|{d.get('anterior')}|{d.get('real')}"
+            f"{d.get('evento')}|{d.get('data')}|{d.get('consenso')}|"
+            f"{d.get('anterior')}|{d.get('real')}"
         )
-        sig_key = f"v72_te_sig_{nome}"
+        sig_key = f"v73_eod_sig_{nome}"
         mudou = st.session_state.get(sig_key) != assinatura
 
         if mudou:
-            # Painel pré-release V66
+            # Expectativa pré-release
             if d.get("consenso") is not None:
                 st.session_state[f"v66_previsao_{nome}"] = float(d["consenso"])
                 st.session_state[f"v66_consenso_{nome}"] = True
@@ -1216,54 +1263,73 @@ def _sincronizar_te_v72():
 
             st.session_state[sig_key] = assinatura
 
-    return resultado
+    return diagnostico, resultado
 
-def _painel_te_v72(dados_te):
-    st.markdown("#### 🌐 Consenso automático — Trading Economics")
-    if not CHAVE_TRADING_ECONOMICS:
+def _painel_eodhd_v73(diagnostico, dados):
+    st.markdown("#### 🌐 Consenso automático — EODHD")
+
+    if not CHAVE_EODHD:
         st.warning(
-            "Chave da Trading Economics ainda não configurada. "
-            "O app continua funcionando, mas o consenso fica manual."
+            "Token EODHD não configurado. O app continua funcionando em modo manual."
         )
         return
-    if not dados_te:
+
+    if not diagnostico.get("ok"):
+        status = diagnostico.get("status")
+        erro = diagnostico.get("erro", "Falha desconhecida.")
         st.warning(
-            "Trading Economics conectado, mas nenhum indicador compatível foi localizado "
-            "nesta janela. Os campos continuam disponíveis manualmente."
+            "O token foi encontrado, mas o endpoint Economic Events não respondeu com dados. "
+            "Isso pode acontecer por limite diário, permissão do plano ou indisponibilidade temporária."
+        )
+        st.code(f"Status: {status if status is not None else '—'}\nDetalhe: {erro}")
+        st.info(
+            "Nenhum número é inventado: enquanto a API não liberar o evento, "
+            "o consenso permanece manual."
+        )
+        return
+
+    st.success(
+        f"✅ EODHD conectado. Eventos recebidos na janela: {len(diagnostico.get('dados', []))}"
+    )
+
+    if not dados:
+        st.warning(
+            "A API respondeu, mas nenhum dos indicadores principais foi localizado "
+            "na janela atual. O modo manual continua disponível."
         )
         return
 
     rows = []
-    for nome, d in dados_te.items():
+    for nome, d in dados.items():
         rows.append({
             "Indicador": nome,
-            "Evento": d.get("evento", "—"),
+            "Evento EODHD": d.get("evento", "—"),
+            "Comparação": d.get("comparison") or "—",
+            "Período": d.get("periodo") or "—",
             "Data": d["data"].strftime("%d/%m/%Y %H:%M") if d.get("data") is not None else "—",
             "Consenso": d.get("consenso") if d.get("consenso") is not None else "—",
             "Anterior": d.get("anterior") if d.get("anterior") is not None else "—",
             "Real": d.get("real") if d.get("real") is not None else "—",
-            "Fonte": "Trading Economics",
         })
     st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
     st.caption(
-        "Consenso vem da pesquisa de mercado da Trading Economics. "
-        "Real e histórico oficial do motor principal continuam priorizando FRED/BLS/BEA."
+        "EODHD fornece estimate/previous/actual. FRED/BLS/BEA continuam sendo "
+        "as fontes principais do histórico oficial do motor."
     )
-
 
 def _mostrar_expectativa_v66():
-    st.subheader("🔮 Expectativa do Mercado — V7.2")
+    st.subheader("🔮 Expectativa do Mercado — V7.3")
     st.caption(
         "Antes da divulgação: CONSENSO × ANTERIOR. "
-        "Com Trading Economics conectado, o consenso é preenchido automaticamente."
+        "Com EODHD Economic Events disponível, o consenso é preenchido automaticamente."
     )
 
-    if CHAVE_TRADING_ECONOMICS:
-        st.success("🤖 Modo automático ativo: consenso/forecast conectado.")
+    if CHAVE_EODHD:
+        st.success("🤖 Token EODHD configurado: o app tenta preencher estimate/forecast automaticamente.")
     else:
         st.info(
-            "Modo manual de segurança: adicione CHAVE_TRADING_ECONOMICS aos Secrets "
-            "para preencher o consenso automaticamente."
+            "Modo manual de segurança: adicione CHAVE_EODHD aos Secrets "
+            "para tentar preencher o consenso automaticamente."
         )
 
     indicadores = [
@@ -1301,7 +1367,7 @@ def _mostrar_expectativa_v66():
             previsao = st.number_input(
                 f"{nome} — Consenso",
                 step=step, key=prev_key,
-                help="Preenchido automaticamente pela Trading Economics quando conectado."
+                help="Preenchido automaticamente pelo EODHD quando o endpoint Economic Events estiver disponível."
             )
         with c2:
             anterior = st.number_input(
@@ -1545,7 +1611,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V7.2 Português")
+st.title("🦅 USD Macro Pro — V7.3 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -1598,7 +1664,7 @@ with abas[0]:
 # ABA 2 — EUA
 # =========================================================
 with abas[1]:
-    dados_te_v72 = _sincronizar_te_v72()
+    diagnostico_eod_v73, dados_eod_v73 = _sincronizar_eodhd_v73()
     st.subheader("🇺🇸 Painel de Força Macro do USD")
     rotulo_usd, icone_usd = faixa_forca(usd_detalhado["score"])
     d1, d2, d3 = st.columns(3)
@@ -1675,9 +1741,9 @@ with abas[1]:
     cal = carregar_calendario_fred()
     if not cal.empty:
         st.dataframe(cal, use_container_width=True, hide_index=True)
-    st.info("ℹ️ A FRED fornece dados realizados e datas de releases, mas não fornece o consenso/forecast do mercado. Por segurança, a previsão continua manual.")
+    st.info("ℹ️ A FRED fornece dados realizados e datas de releases. O consenso/forecast é tentado via EODHD; se indisponível, permanece manual.")
 
-    _painel_te_v72(dados_te_v72)
+    _painel_eodhd_v73(diagnostico_eod_v73, dados_eod_v73)
 
     _mostrar_expectativa_v66()
 
@@ -2549,7 +2615,7 @@ def _avaliar_risco_calendario_v65(confl: dict, diferenca: float, evento: dict) -
 
 
 def _mostrar_risco_timing_v65(confl: dict, diferenca: float):
-    st.markdown("### 📅 Calendário + Risco e Timing — V7.2")
+    st.markdown("### 📅 Calendário + Risco e Timing — V7.3")
     st.caption(
         "Calendário combinado: FRED (CPI, Payroll, PIB e PCE) + Federal Reserve (FOMC) "
         "+ ISM (Industrial e Serviços)."
@@ -2612,7 +2678,7 @@ def _mostrar_risco_timing_v65(confl: dict, diferenca: float):
 
     st.caption(
         "A FRED fornece datas de release; o FOMC e o ISM usam calendários oficiais. "
-        "Consenso/forecast é automático quando Trading Economics está conectado; sem a chave, permanece manual."
+        "Consenso/forecast é automático quando EODHD está conectado; sem a chave, permanece manual."
     )
     st.markdown("**Fluxo:** Macro → próximo evento → risco → timing → preço/estrutura → gestão.")
 
@@ -2901,7 +2967,7 @@ def _mostrar_expectativa_no_par_v68(base: str, cotada: str):
     Reutiliza as mesmas session_state keys do Painel EUA, mas NÃO cria widgets
     com aquelas keys aqui; usa keys v67 exclusivas e sincroniza os valores.
     """
-    st.markdown("### 🔮 Expectativa do Mercado — V7.2")
+    st.markdown("### 🔮 Expectativa do Mercado — V7.3")
     st.caption(
         "Preencha o consenso diretamente aqui. O painel compara CONSENSO × ANTERIOR "
         "antes do release. Isso continua informativo e não é contado duas vezes no score."
@@ -3196,7 +3262,7 @@ def _mostrar_fomc_surprise_v69(base: str, cotada: str):
     prox = _proximo_evento_macro_v65()
     evento = prox.get("evento", "") if prox.get("disponivel") else ""
 
-    st.markdown("### ⚡ FOMC Surprise Engine — V7.2")
+    st.markdown("### ⚡ FOMC Surprise Engine — V7.3")
     st.caption(
         "Use esta área APÓS a decisão. Ela compara o que o mercado precificava "
         "com o que o Fed realmente fez e adiciona uma leitura separada do comunicado/Powell."
@@ -3405,7 +3471,7 @@ def _score_mestre_v70(base: str, cotada: str, diferenca: float, confl: dict) -> 
 
 
 def _mostrar_score_mestre_v70(base: str, cotada: str, diferenca: float, confl: dict):
-    st.markdown("## 🦅 Score Mestre — V7.2")
+    st.markdown("## 🦅 Score Mestre — V7.3")
     st.caption(
         "Resumo final do motor. Direção, qualidade dos dados e timing ficam separados "
         "para não confundir score interno com probabilidade de lucro."
@@ -3518,7 +3584,7 @@ def _auto_anterior_v71(nome: str):
     return float(obs[1][1]), obs[1][0]
 
 def _status_automacao_v71():
-    st.markdown("### 🤖 Automação dos Dados — V7.2")
+    st.markdown("### 🤖 Automação dos Dados — V7.3")
     st.caption(
         "O app preenche automaticamente tudo que possui fonte oficial disponível. "
         "Consenso de mercado e probabilidades FOMC não são inventados."
@@ -3542,14 +3608,14 @@ def _status_automacao_v71():
         "Você NÃO precisa digitar CPI, PCE, Payroll, desemprego, Fed Funds, "
         "Treasuries ou índice amplo do USD quando a FRED estiver disponível."
     )
-    if CHAVE_TRADING_ECONOMICS:
+    if CHAVE_EODHD:
         st.success(
-            "CONSENSO/FORECAST: automático via Trading Economics. "
-            "Probabilidades de corte/manutenção/alta do FOMC continuam em módulo separado."
+            "CONSENSO/FORECAST: tentativa automática via EODHD Economic Events. "
+            "Se o plano/token não liberar esse endpoint, o fallback manual permanece ativo."
         )
     else:
         st.warning(
-            "CONSENSO/FORECAST: manual até configurar CHAVE_TRADING_ECONOMICS. "
+            "CONSENSO/FORECAST: manual até configurar CHAVE_EODHD. "
             "O app nunca inventa consenso quando a fonte está indisponível."
         )
 
@@ -3576,7 +3642,7 @@ _sincronizar_anteriores_v711()
 with abas[2]:
     _status_automacao_v71()
 
-    st.subheader("💱 Painel de Decisão — V7.2")
+    st.subheader("💱 Painel de Decisão — V7.3")
 
     usd_base = float(usd_detalhado["score"])
     usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
