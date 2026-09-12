@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-🦅 USD Macro Pro — V6.3 RISCO E TIMING MACRO
+🦅 USD Macro Pro — V6.4 CALENDÁRIO AUTOMÁTICO
 ================================
 - Interface em português
 - Corrige unidades de inflação e PIB no ranking global
@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "6.3 — RISCO E TIMING MACRO"
+APP_VERSION = "6.4 — CALENDÁRIO AUTOMÁTICO"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V6.3 Português",
+    page_title="USD Macro Pro — V6.4 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1963,6 +1963,167 @@ def _mostrar_explicador_v62(par: str, base: str, cotada: str, diferenca: float,
 
 
 
+
+def _proximo_evento_fred_v64() -> dict:
+    """
+    Obtém o próximo release do calendário FRED já usado pelo app.
+    A FRED informa a DATA, não o horário exato. Por isso a V6.4 usa risco por dia.
+    """
+    cal = carregar_calendario_fred()
+    hoje = pd.Timestamp.now(tz=None).normalize()
+    candidatos = []
+
+    if cal is None or cal.empty:
+        return {"disponivel": False}
+
+    for _, row in cal.iterrows():
+        nome = str(row.get("Evento", "Evento"))
+        data_txt = str(row.get("Próxima data de release", "—"))
+        if data_txt == "—":
+            continue
+        try:
+            dt = pd.to_datetime(data_txt, dayfirst=True).normalize()
+        except Exception:
+            continue
+        dias = int((dt - hoje).days)
+        if dias < 0:
+            continue
+
+        # Os releases atualmente cadastrados (CPI, Payroll, PIB, PCE) são tratados
+        # como alto impacto para o USD no controle de risco.
+        candidatos.append({
+            "evento": nome,
+            "data": dt,
+            "data_txt": dt.strftime("%d/%m/%Y"),
+            "dias": dias,
+            "impacto": "Alto impacto",
+        })
+
+    if not candidatos:
+        return {"disponivel": False}
+
+    candidatos.sort(key=lambda x: (x["dias"], x["evento"]))
+    prox = candidatos[0]
+    prox["disponivel"] = True
+    return prox
+
+
+def _avaliar_risco_calendario_v64(confl: dict, diferenca: float, evento_auto: dict) -> dict:
+    """
+    Timing automático por proximidade em DIAS.
+    Como a FRED não fornece horário exato, não fingimos precisão intradiária.
+    """
+    score = float(confl.get("score_confluencia", 50))
+    qualidade = float(confl.get("qualidade_confluencia", 0))
+    nivel = str(confl.get("nivel", "BAIXA"))
+
+    timing = 50.0 + (score - 50.0) * 0.35 + (qualidade - 50.0) * 0.20
+    if nivel == "ALTA":
+        timing += 8
+    elif nivel == "BAIXA":
+        timing -= 8
+
+    risco = "NORMAL"
+    penalidade = 0.0
+    dias = None
+
+    if evento_auto.get("disponivel"):
+        dias = int(evento_auto["dias"])
+        if dias == 0:
+            risco, penalidade = "MUITO ALTO", 35
+        elif dias == 1:
+            risco, penalidade = "ALTO", 25
+        elif dias <= 3:
+            risco, penalidade = "ELEVADO", 15
+        elif dias <= 7:
+            risco, penalidade = "ATENÇÃO", 7
+
+    timing = float(np.clip(timing - penalidade, 0, 100))
+
+    if abs(diferenca) < 6 or qualidade < 50:
+        status = "⚪ AGUARDAR"
+    elif risco in ("MUITO ALTO", "ALTO"):
+        status = "🔴 EVITAR ENTRADA SEM SABER O HORÁRIO EXATO DA NOTÍCIA"
+    elif timing >= 72:
+        status = "🟢 CENÁRIO FAVORÁVEL — PROCURAR CONFIRMAÇÃO NO PREÇO"
+    elif timing >= 58:
+        status = "🟡 CENÁRIO ACEITÁVEL — AGUARDAR CONFIRMAÇÃO"
+    else:
+        status = "⚪ AGUARDAR"
+
+    return {
+        "timing": timing, "risco": risco, "penalidade": penalidade,
+        "status": status, "dias": dias,
+    }
+
+
+def _mostrar_risco_timing_v64(confl: dict, diferenca: float):
+    st.markdown("### 📅 Risco e Timing Automático — V6.4")
+    st.caption(
+        "O app lê automaticamente a próxima DATA de release cadastrada na FRED. "
+        "Como a FRED não fornece aqui o horário exato, o controle é conservador."
+    )
+
+    prox = _proximo_evento_fred_v64()
+    rt = _avaliar_risco_calendario_v64(confl, diferenca, prox)
+
+    if prox.get("disponivel"):
+        e1, e2, e3 = st.columns(3)
+        e1.metric("Próximo evento", prox["evento"])
+        e2.metric("Data", prox["data_txt"])
+        e3.metric("Faltam", "Hoje" if prox["dias"] == 0 else f"{prox['dias']} dia(s)")
+    else:
+        st.warning("Não foi possível obter uma próxima data de release da FRED.")
+
+    r1, r2, r3 = st.columns(3)
+    r1.metric("Timing macro", f"{rt['timing']:.0f}/100")
+    r2.metric("Risco de calendário", rt["risco"])
+    r3.metric("Penalidade", f"-{rt['penalidade']:.0f} pts")
+
+    if rt["status"].startswith("🟢"):
+        st.success(f"**{rt['status']}**")
+    elif rt["status"].startswith("🔴"):
+        st.error(f"**{rt['status']}**")
+    elif rt["status"].startswith("🟡"):
+        st.warning(f"**{rt['status']}**")
+    else:
+        st.info(f"**{rt['status']}**")
+
+    if prox.get("disponivel") and prox["dias"] <= 1:
+        st.warning(
+            "⚠️ A data está muito próxima. Consulte um calendário econômico com horário "
+            "e consenso antes de operar; a FRED usada aqui não garante o horário exato."
+        )
+
+    with st.expander("Ajuste manual opcional do horário"):
+        st.caption(
+            "Use somente se você já conferiu o horário em um calendário econômico confiável."
+        )
+        usar_manual = st.checkbox("Informar horas até o evento", key="v64_usar_horas")
+        if usar_manual:
+            horas = st.number_input(
+                "Horas até o evento",
+                min_value=0.0, max_value=168.0, value=4.0, step=0.5,
+                key="v64_horas"
+            )
+            manual = _avaliar_risco_timing_v63(
+                confl, diferenca, float(horas), "Alto impacto"
+            )
+            st.metric("Timing com horário informado", f"{manual['timing']:.0f}/100")
+            if manual["status"].startswith("🔴"):
+                st.error(f"**{manual['status']}**")
+            elif manual["status"].startswith("🟡"):
+                st.warning(f"**{manual['status']}**")
+            else:
+                st.info(f"**{manual['status']}**")
+
+    st.markdown(
+        "**Fluxo:** Macro → calendário automático → risco → confirmação no preço → gestão."
+    )
+    st.caption(
+        "O timing não é probabilidade de ganho e não é gatilho automático de entrada."
+    )
+
 def _avaliar_risco_timing_v63(confl: dict, diferenca: float,
                               horas_ate_evento: float | None,
                               impacto_evento: str = "Sem evento informado") -> dict:
@@ -2084,7 +2245,7 @@ def _mostrar_risco_timing_v63(confl: dict, diferenca: float):
 # ABA 3 — PARES
 # =========================================================
 with abas[2]:
-    st.subheader("💱 Painel de Decisão — V6.3")
+    st.subheader("💱 Painel de Decisão — V6.4")
 
     usd_base = float(usd_detalhado["score"])
     usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
@@ -2156,7 +2317,7 @@ with abas[2]:
         dt = confl["diferencial_taxas"]
         mercado3m = confl["mercado_3m"]
         tend = confl["tendencias"]
-        st.markdown("#### 📐 Qualidade macro da V6.3")
+        st.markdown("#### 📐 Qualidade macro da V6.4")
         q1, q2, q3 = st.columns(3)
         with q1:
             if dt["base"] is not None and dt["cotada"] is not None:
@@ -2209,7 +2370,7 @@ with abas[2]:
             if idade_max > 120:
                 st.warning(
                     "🟡 O spread de mercado usa pelo menos uma série antiga. "
-                    "A V6.3 reduz automaticamente o peso desse componente até a FRED atualizar."
+                    "A V6.4 reduz automaticamente o peso desse componente até a FRED atualizar."
                 )
         else:
             st.warning(
@@ -2218,7 +2379,7 @@ with abas[2]:
             )
 
         st.caption(
-            "Na V6.3, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
+            "Na V6.4, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
             "da FRED/OECD. Mantivemos o Treasury 2Y como tendência dos EUA, mas não "
             "misturamos 2Y americano com uma maturidade estrangeira diferente."
         )
@@ -2233,7 +2394,7 @@ with abas[2]:
                     "Variação média": round(x["delta"], 4),
                 })
             st.dataframe(pd.DataFrame(trend_rows), use_container_width=True, hide_index=True)
-            st.caption("A V6.3 combina diferencial de juros oficiais, spread de mercado e direção do spread com pesos ajustados pelo frescor dos dados. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
+            st.caption("A V6.4 combina diferencial de juros oficiais, spread de mercado e direção do spread com pesos ajustados pelo frescor dos dados. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
 
         # Substitui a confiança antiga pela confiança de confluência.
         if "SEM VANTAGEM" in acao:
@@ -2251,7 +2412,7 @@ with abas[2]:
         score_final = confl["score_confluencia"]
         qualidade_final = confl["qualidade_confluencia"]
 
-        st.markdown("### 🧭 Decisão V6.3")
+        st.markdown("### 🧭 Decisão V6.4")
         if "SEM VANTAGEM" in acao or score_final < 58 or qualidade_final < 50:
             st.info(
                 f"⚪ **NEUTRO / AGUARDAR** — Score {score_final:.0f}/100 | "
@@ -2283,7 +2444,7 @@ with abas[2]:
             float(score_base), float(score_cotada)
         )
 
-        _mostrar_risco_timing_v63(confl, diferenca)
+        _mostrar_risco_timing_v64(confl, diferenca)
 
         st.write(f"Motivo: {base} está em **{score_base:.1f}** e {cotada} em **{score_cotada:.1f}**. O USD, quando presente, já inclui o ajuste das surpresas econômicas.")
         st.warning("⚠️ O viés macro não é gatilho de entrada nem probabilidade de lucro. Confirme preço, estrutura, liquidez, sessão e risco.")
@@ -2297,7 +2458,7 @@ with abas[2]:
             st.success("✅ Sinal registrado!")
 
     st.markdown("---")
-    st.markdown("### 🏆 Matriz Inteligente — V6.3")
+    st.markdown("### 🏆 Matriz Inteligente — V6.4")
     st.caption(
         "Todos os pares abaixo passam pelo mesmo motor de confluência, qualidade e frescor "
         "usado na análise individual."
