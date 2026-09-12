@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-🦅 USD Macro Pro — V6.5 CALENDÁRIO MACRO COMPLETO
+🦅 USD Macro Pro — V6.6 EXPECTATIVA DO MERCADO
 ================================
 - Interface em português
 - Corrige unidades de inflação e PIB no ranking global
@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "6.5 — CALENDÁRIO MACRO COMPLETO"
+APP_VERSION = "6.6 — EXPECTATIVA DO MERCADO"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V6.5 Português",
+    page_title="USD Macro Pro — V6.6 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -927,6 +927,188 @@ def confianca_modelo(score_base: float, score_cotada: float):
         status = "🔴 Forte vantagem da moeda cotada"
     return p, diferenca, status
 
+
+# =========================================================
+# V6.6 — EXPECTATIVA DO MERCADO (PRÉ-RELEASE)
+# =========================================================
+
+EXPECTATIVA_ESCALAS = {
+    "IPC anual": 0.20,
+    "IPC Núcleo anual": 0.20,
+    "PCE anual": 0.20,
+    "PCE Núcleo anual": 0.20,
+    "Payroll": 50.0,
+    "Desemprego": 0.10,
+    "ISM Industrial": 1.0,
+    "ISM Serviços": 1.0,
+}
+
+EXPECTATIVA_PESOS = {
+    "IPC anual": 1.15,
+    "IPC Núcleo anual": 1.35,
+    "PCE anual": 1.20,
+    "PCE Núcleo anual": 1.45,
+    "Payroll": 1.35,
+    "Desemprego": 1.25,
+    "ISM Industrial": 0.90,
+    "ISM Serviços": 1.00,
+}
+
+def _expectativa_indicador_v66(nome: str, previsao: float, anterior: float,
+                               maior_favorece_usd: bool) -> dict:
+    """
+    Compara CONSENSO vs ANTERIOR antes do release.
+    Isso mede a expectativa embutida no calendário, não a surpresa futura.
+    """
+    if previsao is None or anterior is None:
+        return {"delta": np.nan, "pontos": 0.0, "leitura": "Sem consenso", "score": 50.0}
+
+    if not np.isfinite(previsao) or not np.isfinite(anterior):
+        return {"delta": np.nan, "pontos": 0.0, "leitura": "Sem consenso", "score": 50.0}
+
+    delta = float(previsao) - float(anterior)
+    escala = float(EXPECTATIVA_ESCALAS.get(nome, 1.0))
+    peso = float(EXPECTATIVA_PESOS.get(nome, 1.0))
+
+    # Zero pode ser valor válido em alguns indicadores, portanto a existência
+    # do consenso é controlada separadamente no painel.
+    intensidade = float(np.clip(abs(delta) / max(escala, 1e-9), 0, 2.0))
+    if abs(delta) < 1e-12:
+        pontos = 0.0
+        leitura = "⚪ Consenso estável"
+    else:
+        favoravel = delta > 0 if maior_favorece_usd else delta < 0
+        pontos = (1.0 if favoravel else -1.0) * intensidade * peso
+        leitura = "🟢 Expectativa favorece USD" if favoravel else "🔴 Expectativa desfavorece USD"
+
+    return {
+        "delta": delta,
+        "pontos": float(pontos),
+        "leitura": leitura,
+        "score": float(np.clip(50 + pontos * 10, 0, 100)),
+    }
+
+
+def _resumo_expectativa_v66(linhas: list[dict]) -> dict:
+    validas = [x for x in linhas if x.get("tem_consenso")]
+    if not validas:
+        return {
+            "score": 50.0, "saldo": 0.0, "leitura": "⚪ Sem consensos preenchidos",
+            "favoraveis": 0, "desfavoraveis": 0, "neutras": 0
+        }
+
+    saldo = float(sum(float(x["Pontos"]) for x in validas))
+    # Pré-release deve ter influência informativa, sem alterar o score macro realizado.
+    score = float(np.clip(50 + saldo * 7.5, 0, 100))
+    fav = sum(float(x["Pontos"]) > 0 for x in validas)
+    des = sum(float(x["Pontos"]) < 0 for x in validas)
+    neu = sum(abs(float(x["Pontos"])) < 1e-12 for x in validas)
+
+    if score >= 60:
+        leitura = "🟢 Consenso agregado favorece o USD"
+    elif score <= 40:
+        leitura = "🔴 Consenso agregado desfavorece o USD"
+    else:
+        leitura = "⚪ Consenso agregado neutro/misto"
+
+    return {
+        "score": score, "saldo": saldo, "leitura": leitura,
+        "favoraveis": int(fav), "desfavoraveis": int(des), "neutras": int(neu)
+    }
+
+
+def _mostrar_expectativa_v66():
+    st.subheader("🔮 Expectativa do Mercado — V6.6")
+    st.caption(
+        "Antes da divulgação: compara PREVISÃO/CONSENSO com o ANTERIOR. "
+        "Depois da divulgação, a seção de Surpresa Econômica compara REAL com PREVISÃO."
+    )
+    st.info(
+        "A previsão continua manual: digite o consenso do seu calendário econômico. "
+        "O painel não inventa forecast quando a fonte oficial não fornece consenso."
+    )
+
+    indicadores = [
+        ("IPC anual", True),
+        ("IPC Núcleo anual", True),
+        ("PCE anual", True),
+        ("PCE Núcleo anual", True),
+        ("Payroll", True),
+        ("Desemprego", False),
+        ("ISM Industrial", True),
+        ("ISM Serviços", True),
+    ]
+
+    linhas = []
+    for nome, maior_favorece in indicadores:
+        # Reutiliza exatamente os mesmos campos da seção de surpresa.
+        prev_key = f"previsao_{nome}"
+        ant_key = f"anterior_{nome}"
+        flag_key = f"v66_consenso_{nome}"
+
+        if prev_key not in st.session_state:
+            st.session_state[prev_key] = 0.0
+        if ant_key not in st.session_state:
+            st.session_state[ant_key] = 0.0
+        if flag_key not in st.session_state:
+            st.session_state[flag_key] = False
+
+        c0, c1, c2 = st.columns([0.9, 1.2, 1.2])
+        with c0:
+            tem = st.checkbox("Usar", key=flag_key, help=f"Marque quando tiver o consenso de {nome}.")
+        step = 1.0 if nome == "Payroll" else 0.1
+        with c1:
+            previsao = st.number_input(
+                f"{nome} — Consenso",
+                step=step, key=prev_key,
+                help="Consenso/forecast publicado por uma fonte de calendário econômico."
+            )
+        with c2:
+            anterior = st.number_input(
+                f"{nome} — Anterior",
+                step=step, key=ant_key
+            )
+
+        r = _expectativa_indicador_v66(
+            nome, float(previsao), float(anterior), maior_favorece
+        ) if tem else {"delta": np.nan, "pontos": 0.0, "leitura": "⚪ Não utilizado", "score": 50.0}
+
+        linhas.append({
+            "Indicador": nome,
+            "Consenso": float(previsao),
+            "Anterior": float(anterior),
+            "Δ esperado": round(r["delta"], 3) if np.isfinite(r["delta"]) else "—",
+            "Leitura pré-release": r["leitura"],
+            "Pontos": round(r["pontos"], 2),
+            "tem_consenso": bool(tem),
+        })
+
+    resumo = _resumo_expectativa_v66(linhas)
+    tabela = pd.DataFrame(linhas).drop(columns=["tem_consenso"])
+    st.dataframe(tabela, use_container_width=True, hide_index=True)
+
+    a,b,c,d = st.columns(4)
+    a.metric("Expectativa USD", f"{resumo['score']:.0f}/100")
+    b.metric("Favorecem USD", resumo["favoraveis"])
+    c.metric("Desfavorecem USD", resumo["desfavoraveis"])
+    d.metric("Neutras", resumo["neutras"])
+
+    if resumo["score"] >= 60:
+        st.success(f"**{resumo['leitura']}**")
+    elif resumo["score"] <= 40:
+        st.error(f"**{resumo['leitura']}**")
+    else:
+        st.info(f"**{resumo['leitura']}**")
+
+    st.session_state["v66_expectativa_score"] = float(resumo["score"])
+    st.session_state["v66_expectativa_leitura"] = resumo["leitura"]
+
+    st.caption(
+        "Importante: expectativa não altera o score macro realizado. "
+        "Ela mostra o que o mercado espera antes do dado; o REAL × CONSENSO é que gera surpresa após o release."
+    )
+
+
 # =========================================================
 # SURPRESA ECONÔMICA
 # =========================================================
@@ -1254,6 +1436,9 @@ with abas[1]:
         st.dataframe(cal, use_container_width=True, hide_index=True)
     st.info("ℹ️ A FRED fornece dados realizados e datas de releases, mas não fornece o consenso/forecast do mercado. Por segurança, a previsão continua manual.")
 
+    _mostrar_expectativa_v66()
+
+    st.markdown("---")
     st.subheader("🎯 Surpresa Econômica Automática — Real × Previsão")
     st.caption("A FRED preenche Real e Anterior quando disponível. Você informa apenas a Previsão/consenso. O modelo mede direção e intensidade da surpresa.")
 
@@ -2470,7 +2655,7 @@ def _mostrar_risco_timing_v63(confl: dict, diferenca: float):
 # ABA 3 — PARES
 # =========================================================
 with abas[2]:
-    st.subheader("💱 Painel de Decisão — V6.5")
+    st.subheader("💱 Painel de Decisão — V6.6")
 
     usd_base = float(usd_detalhado["score"])
     usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
@@ -2542,7 +2727,7 @@ with abas[2]:
         dt = confl["diferencial_taxas"]
         mercado3m = confl["mercado_3m"]
         tend = confl["tendencias"]
-        st.markdown("#### 📐 Qualidade macro da V6.5")
+        st.markdown("#### 📐 Qualidade macro da V6.6")
         q1, q2, q3 = st.columns(3)
         with q1:
             if dt["base"] is not None and dt["cotada"] is not None:
@@ -2595,7 +2780,7 @@ with abas[2]:
             if idade_max > 120:
                 st.warning(
                     "🟡 O spread de mercado usa pelo menos uma série antiga. "
-                    "A V6.5 reduz automaticamente o peso desse componente até a FRED atualizar."
+                    "A V6.6 reduz automaticamente o peso desse componente até a FRED atualizar."
                 )
         else:
             st.warning(
@@ -2604,7 +2789,7 @@ with abas[2]:
             )
 
         st.caption(
-            "Na V6.5, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
+            "Na V6.6, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
             "da FRED/OECD. Mantivemos o Treasury 2Y como tendência dos EUA, mas não "
             "misturamos 2Y americano com uma maturidade estrangeira diferente."
         )
@@ -2619,7 +2804,7 @@ with abas[2]:
                     "Variação média": round(x["delta"], 4),
                 })
             st.dataframe(pd.DataFrame(trend_rows), use_container_width=True, hide_index=True)
-            st.caption("A V6.5 combina diferencial de juros oficiais, spread de mercado e direção do spread com pesos ajustados pelo frescor dos dados. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
+            st.caption("A V6.6 combina diferencial de juros oficiais, spread de mercado e direção do spread com pesos ajustados pelo frescor dos dados. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
 
         # Substitui a confiança antiga pela confiança de confluência.
         if "SEM VANTAGEM" in acao:
@@ -2637,7 +2822,7 @@ with abas[2]:
         score_final = confl["score_confluencia"]
         qualidade_final = confl["qualidade_confluencia"]
 
-        st.markdown("### 🧭 Decisão V6.5")
+        st.markdown("### 🧭 Decisão V6.6")
         if "SEM VANTAGEM" in acao or score_final < 58 or qualidade_final < 50:
             st.info(
                 f"⚪ **NEUTRO / AGUARDAR** — Score {score_final:.0f}/100 | "
@@ -2683,7 +2868,7 @@ with abas[2]:
             st.success("✅ Sinal registrado!")
 
     st.markdown("---")
-    st.markdown("### 🏆 Matriz Inteligente — V6.5")
+    st.markdown("### 🏆 Matriz Inteligente — V6.6")
     st.caption(
         "Todos os pares abaixo passam pelo mesmo motor de confluência, qualidade e frescor "
         "usado na análise individual."
