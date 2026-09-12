@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "7.1.1 — AUTOMAÇÃO MÁXIMA"
+APP_VERSION = "7.2 — CONSENSO AUTOMÁTICO"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V7.1.1 Português",
+    page_title="USD Macro Pro — V7.2 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -58,6 +58,7 @@ SENSIBILIDADE_FED_PADRAO = {
 
 CHAVE_FRED = st.secrets.get("CHAVE_FRED", os.getenv("CHAVE_FRED", ""))
 CHAVE_NEWSAPI = st.secrets.get("CHAVE_NEWSAPI", os.getenv("CHAVE_NEWSAPI", ""))
+CHAVE_TRADING_ECONOMICS = st.secrets.get("CHAVE_TRADING_ECONOMICS", os.getenv("CHAVE_TRADING_ECONOMICS", ""))
 
 IMPACTO_MAX_FED = 18.0
 STATUS_FONTE = {}
@@ -101,6 +102,10 @@ st.sidebar.caption("Modelo FX: prioriza juros reais, Treasury 2Y e Fed para o US
 st.sidebar.caption(f"🕒 Atualizado: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
 if not CHAVE_FRED:
     st.sidebar.warning("FRED sem chave: alguns dados usarão valores de segurança.")
+if CHAVE_TRADING_ECONOMICS:
+    st.sidebar.success("Trading Economics conectado: consenso automático ativo.")
+else:
+    st.sidebar.info("Trading Economics não conectado: consenso permanece manual.")
 
 # =========================================================
 # CONEXÃO E FRED
@@ -1017,16 +1022,249 @@ def _resumo_expectativa_v66(linhas: list[dict]) -> dict:
     }
 
 
-def _mostrar_expectativa_v66():
-    st.subheader("🔮 Expectativa do Mercado — V7.1")
+
+# =========================================================
+# V7.2 — TRADING ECONOMICS / CONSENSO AUTOMÁTICO
+# =========================================================
+
+TE_ALIASES_V72 = {
+    "IPC anual": [
+        "inflation rate yoy", "cpi yoy", "consumer price index cpi yoy",
+    ],
+    "IPC Núcleo anual": [
+        "core inflation rate yoy", "core cpi yoy", "core consumer prices yoy",
+    ],
+    "PCE anual": [
+        "pce price index yoy", "pce prices yoy", "personal consumption expenditures price index yoy",
+    ],
+    "PCE Núcleo anual": [
+        "core pce price index yoy", "core pce prices yoy",
+    ],
+    "Payroll": [
+        "non farm payrolls", "nonfarm payrolls", "non farm payroll",
+    ],
+    "Desemprego": [
+        "unemployment rate",
+    ],
+    "ISM Industrial": [
+        "ism manufacturing pmi", "ism manufacturing",
+    ],
+    "ISM Serviços": [
+        "ism services pmi", "ism non manufacturing pmi", "ism non-manufacturing pmi",
+    ],
+}
+
+def _normalizar_texto_v72(s):
+    import unicodedata
+    s = "" if s is None else str(s)
+    s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
+    s = s.lower().replace("-", " ")
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+def _numero_te_v72(valor):
+    """Converte 3.2%, 187K, 1.2M etc. para float nas unidades usadas pelo app."""
+    if valor is None:
+        return None
+    s = str(valor).strip().replace(",", "")
+    if not s or s.lower() in {"nan", "none", "null", "-"}:
+        return None
+    s = s.replace("%", "").strip()
+    mult = 1.0
+    if s[-1:].upper() == "K":
+        # Payroll no app é expresso em milhares: 187K -> 187.
+        mult = 1.0
+        s = s[:-1]
+    elif s[-1:].upper() == "M":
+        mult = 1000.0
+        s = s[:-1]
+    elif s[-1:].upper() == "B":
+        mult = 1_000_000.0
+        s = s[:-1]
+    try:
+        return float(s) * mult
+    except Exception:
+        return None
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _te_calendario_eua_v72(chave: str, inicio_txt: str, fim_txt: str):
+    if not chave:
+        return []
+    url = (
+        "https://api.tradingeconomics.com/calendar/country/"
+        f"united%20states/{inicio_txt}/{fim_txt}"
+    )
+    try:
+        r = requests.get(
+            url,
+            params={"c": chave, "f": "json"},
+            timeout=20
+        )
+        r.raise_for_status()
+        dados = r.json()
+        return dados if isinstance(dados, list) else []
+    except Exception:
+        return []
+
+def _te_eventos_v72():
+    hoje = datetime.now().date()
+    inicio = (hoje - timedelta(days=10)).strftime("%Y-%m-%d")
+    fim = (hoje + timedelta(days=30)).strftime("%Y-%m-%d")
+    return _te_calendario_eua_v72(CHAVE_TRADING_ECONOMICS, inicio, fim)
+
+def _te_dado_indicador_v72(nome: str):
+    aliases = [_normalizar_texto_v72(x) for x in TE_ALIASES_V72.get(nome, [])]
+    if not aliases:
+        return None
+
+    candidatos = []
+    hoje = datetime.now()
+    for item in _te_eventos_v72():
+        combinado = _normalizar_texto_v72(
+            f"{item.get('Event','')} {item.get('Category','')} "
+            f"{item.get('OEvent','')} {item.get('OCategory','')}"
+        )
+        if not any(a in combinado for a in aliases):
+            continue
+        try:
+            dt = pd.Timestamp(item.get("Date"))
+            if dt.tzinfo is not None:
+                dt = dt.tz_convert(None)
+        except Exception:
+            continue
+
+        forecast = _numero_te_v72(item.get("Forecast"))
+        previous = _numero_te_v72(item.get("Previous"))
+        actual = _numero_te_v72(item.get("Actual"))
+
+        # Preferir release futuro mais próximo com consenso; depois release recente.
+        delta_h = (dt.to_pydatetime() - hoje).total_seconds() / 3600.0
+        futuro = delta_h >= -6
+        tem_consenso = forecast is not None
+        prioridade = (
+            0 if (futuro and tem_consenso) else
+            1 if futuro else
+            2 if tem_consenso else 3
+        )
+        candidatos.append((
+            prioridade,
+            abs(delta_h),
+            {
+                "nome": nome,
+                "evento": item.get("Event") or item.get("Category") or nome,
+                "data": dt,
+                "consenso": forecast,
+                "anterior": previous,
+                "real": actual,
+                "importance": item.get("Importance"),
+                "source": item.get("Source") or "Trading Economics",
+                "calendar_id": str(item.get("CalendarId", "")),
+                "last_update": str(item.get("LastUpdate", "")),
+                "unit": str(item.get("Unit", "")),
+            }
+        ))
+
+    if not candidatos:
+        return None
+    candidatos.sort(key=lambda x: (x[0], x[1]))
+    return candidatos[0][2]
+
+def _sincronizar_te_v72():
+    """
+    Preenche os campos ANTES da criação dos widgets.
+    Atualiza quando o evento/consenso muda na fonte. Não inventa valores.
+    """
+    if not CHAVE_TRADING_ECONOMICS:
+        return {}
+
+    resultado = {}
+    for nome in TE_ALIASES_V72:
+        d = _te_dado_indicador_v72(nome)
+        if not d:
+            continue
+        resultado[nome] = d
+
+        assinatura = (
+            f"{d.get('calendar_id')}|{d.get('last_update')}|"
+            f"{d.get('consenso')}|{d.get('anterior')}|{d.get('real')}"
+        )
+        sig_key = f"v72_te_sig_{nome}"
+        mudou = st.session_state.get(sig_key) != assinatura
+
+        if mudou:
+            # Painel pré-release V66
+            if d.get("consenso") is not None:
+                st.session_state[f"v66_previsao_{nome}"] = float(d["consenso"])
+                st.session_state[f"v66_consenso_{nome}"] = True
+            if d.get("anterior") is not None:
+                st.session_state[f"v66_anterior_{nome}"] = float(d["anterior"])
+
+            # Surprise Engine
+            if d.get("consenso") is not None:
+                st.session_state[f"previsao_{nome}"] = float(d["consenso"])
+            if d.get("anterior") is not None:
+                st.session_state[f"anterior_{nome}"] = float(d["anterior"])
+            if d.get("real") is not None:
+                st.session_state[f"real_{nome}"] = float(d["real"])
+
+            # Painel do par
+            if d.get("consenso") is not None:
+                st.session_state[f"v67_previsao_{nome}"] = float(d["consenso"])
+                st.session_state[f"v67_usar_{nome}"] = True
+            if d.get("anterior") is not None:
+                st.session_state[f"v67_anterior_{nome}"] = float(d["anterior"])
+
+            st.session_state[sig_key] = assinatura
+
+    return resultado
+
+def _painel_te_v72(dados_te):
+    st.markdown("#### 🌐 Consenso automático — Trading Economics")
+    if not CHAVE_TRADING_ECONOMICS:
+        st.warning(
+            "Chave da Trading Economics ainda não configurada. "
+            "O app continua funcionando, mas o consenso fica manual."
+        )
+        return
+    if not dados_te:
+        st.warning(
+            "Trading Economics conectado, mas nenhum indicador compatível foi localizado "
+            "nesta janela. Os campos continuam disponíveis manualmente."
+        )
+        return
+
+    rows = []
+    for nome, d in dados_te.items():
+        rows.append({
+            "Indicador": nome,
+            "Evento": d.get("evento", "—"),
+            "Data": d["data"].strftime("%d/%m/%Y %H:%M") if d.get("data") is not None else "—",
+            "Consenso": d.get("consenso") if d.get("consenso") is not None else "—",
+            "Anterior": d.get("anterior") if d.get("anterior") is not None else "—",
+            "Real": d.get("real") if d.get("real") is not None else "—",
+            "Fonte": "Trading Economics",
+        })
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
     st.caption(
-        "Antes da divulgação: compara PREVISÃO/CONSENSO com o ANTERIOR. "
-        "Depois da divulgação, a seção de Surpresa Econômica compara REAL com PREVISÃO."
+        "Consenso vem da pesquisa de mercado da Trading Economics. "
+        "Real e histórico oficial do motor principal continuam priorizando FRED/BLS/BEA."
     )
-    st.info(
-        "A previsão continua manual: digite o consenso do seu calendário econômico. "
-        "O painel não inventa forecast quando a fonte oficial não fornece consenso."
+
+
+def _mostrar_expectativa_v66():
+    st.subheader("🔮 Expectativa do Mercado — V7.2")
+    st.caption(
+        "Antes da divulgação: CONSENSO × ANTERIOR. "
+        "Com Trading Economics conectado, o consenso é preenchido automaticamente."
     )
+
+    if CHAVE_TRADING_ECONOMICS:
+        st.success("🤖 Modo automático ativo: consenso/forecast conectado.")
+    else:
+        st.info(
+            "Modo manual de segurança: adicione CHAVE_TRADING_ECONOMICS aos Secrets "
+            "para preencher o consenso automaticamente."
+        )
 
     indicadores = [
         ("IPC anual", True),
@@ -1041,7 +1279,6 @@ def _mostrar_expectativa_v66():
 
     linhas = []
     for nome, maior_favorece in indicadores:
-        # Reutiliza exatamente os mesmos campos da seção de surpresa.
         prev_key = f"v66_previsao_{nome}"
         ant_key = f"v66_anterior_{nome}"
         flag_key = f"v66_consenso_{nome}"
@@ -1055,13 +1292,16 @@ def _mostrar_expectativa_v66():
 
         c0, c1, c2 = st.columns([0.9, 1.2, 1.2])
         with c0:
-            tem = st.checkbox("Usar", key=flag_key, help=f"Marque quando tiver o consenso de {nome}.")
+            tem = st.checkbox(
+                "Usar", key=flag_key,
+                help=f"Automático quando houver consenso disponível; pode ser desmarcado manualmente."
+            )
         step = 1.0 if nome == "Payroll" else 0.1
         with c1:
             previsao = st.number_input(
                 f"{nome} — Consenso",
                 step=step, key=prev_key,
-                help="Consenso/forecast publicado por uma fonte de calendário econômico."
+                help="Preenchido automaticamente pela Trading Economics quando conectado."
             )
         with c2:
             anterior = st.number_input(
@@ -1104,8 +1344,8 @@ def _mostrar_expectativa_v66():
     st.session_state["v66_expectativa_leitura"] = resumo["leitura"]
 
     st.caption(
-        "Importante: expectativa não altera o score macro realizado. "
-        "Ela mostra o que o mercado espera antes do dado; o REAL × CONSENSO é que gera surpresa após o release."
+        "Expectativa não altera diretamente o macro realizado. "
+        "Após o release, REAL × CONSENSO alimenta o Surprise Engine."
     )
 
 
@@ -1305,7 +1545,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V7.1.1 Português")
+st.title("🦅 USD Macro Pro — V7.2 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -1358,6 +1598,7 @@ with abas[0]:
 # ABA 2 — EUA
 # =========================================================
 with abas[1]:
+    dados_te_v72 = _sincronizar_te_v72()
     st.subheader("🇺🇸 Painel de Força Macro do USD")
     rotulo_usd, icone_usd = faixa_forca(usd_detalhado["score"])
     d1, d2, d3 = st.columns(3)
@@ -1435,6 +1676,8 @@ with abas[1]:
     if not cal.empty:
         st.dataframe(cal, use_container_width=True, hide_index=True)
     st.info("ℹ️ A FRED fornece dados realizados e datas de releases, mas não fornece o consenso/forecast do mercado. Por segurança, a previsão continua manual.")
+
+    _painel_te_v72(dados_te_v72)
 
     _mostrar_expectativa_v66()
 
@@ -2306,7 +2549,7 @@ def _avaliar_risco_calendario_v65(confl: dict, diferenca: float, evento: dict) -
 
 
 def _mostrar_risco_timing_v65(confl: dict, diferenca: float):
-    st.markdown("### 📅 Calendário + Risco e Timing — V7.1")
+    st.markdown("### 📅 Calendário + Risco e Timing — V7.2")
     st.caption(
         "Calendário combinado: FRED (CPI, Payroll, PIB e PCE) + Federal Reserve (FOMC) "
         "+ ISM (Industrial e Serviços)."
@@ -2369,7 +2612,7 @@ def _mostrar_risco_timing_v65(confl: dict, diferenca: float):
 
     st.caption(
         "A FRED fornece datas de release; o FOMC e o ISM usam calendários oficiais. "
-        "Consenso/forecast continua separado porque essas fontes não fornecem consenso de mercado."
+        "Consenso/forecast é automático quando Trading Economics está conectado; sem a chave, permanece manual."
     )
     st.markdown("**Fluxo:** Macro → próximo evento → risco → timing → preço/estrutura → gestão.")
 
@@ -2658,7 +2901,7 @@ def _mostrar_expectativa_no_par_v68(base: str, cotada: str):
     Reutiliza as mesmas session_state keys do Painel EUA, mas NÃO cria widgets
     com aquelas keys aqui; usa keys v67 exclusivas e sincroniza os valores.
     """
-    st.markdown("### 🔮 Expectativa do Mercado — V7.1")
+    st.markdown("### 🔮 Expectativa do Mercado — V7.2")
     st.caption(
         "Preencha o consenso diretamente aqui. O painel compara CONSENSO × ANTERIOR "
         "antes do release. Isso continua informativo e não é contado duas vezes no score."
@@ -2953,7 +3196,7 @@ def _mostrar_fomc_surprise_v69(base: str, cotada: str):
     prox = _proximo_evento_macro_v65()
     evento = prox.get("evento", "") if prox.get("disponivel") else ""
 
-    st.markdown("### ⚡ FOMC Surprise Engine — V7.1")
+    st.markdown("### ⚡ FOMC Surprise Engine — V7.2")
     st.caption(
         "Use esta área APÓS a decisão. Ela compara o que o mercado precificava "
         "com o que o Fed realmente fez e adiciona uma leitura separada do comunicado/Powell."
@@ -3162,7 +3405,7 @@ def _score_mestre_v70(base: str, cotada: str, diferenca: float, confl: dict) -> 
 
 
 def _mostrar_score_mestre_v70(base: str, cotada: str, diferenca: float, confl: dict):
-    st.markdown("## 🦅 Score Mestre — V7.1.1")
+    st.markdown("## 🦅 Score Mestre — V7.2")
     st.caption(
         "Resumo final do motor. Direção, qualidade dos dados e timing ficam separados "
         "para não confundir score interno com probabilidade de lucro."
@@ -3275,7 +3518,7 @@ def _auto_anterior_v71(nome: str):
     return float(obs[1][1]), obs[1][0]
 
 def _status_automacao_v71():
-    st.markdown("### 🤖 Automação dos Dados — V7.1.1")
+    st.markdown("### 🤖 Automação dos Dados — V7.2")
     st.caption(
         "O app preenche automaticamente tudo que possui fonte oficial disponível. "
         "Consenso de mercado e probabilidades FOMC não são inventados."
@@ -3299,11 +3542,16 @@ def _status_automacao_v71():
         "Você NÃO precisa digitar CPI, PCE, Payroll, desemprego, Fed Funds, "
         "Treasuries ou índice amplo do USD quando a FRED estiver disponível."
     )
-    st.warning(
-        "Ainda precisam de uma fonte externa de mercado: CONSENSO/FORECAST e "
-        "probabilidades de corte/manutenção/alta do FOMC. Enquanto essa fonte não "
-        "estiver conectada, o app deixa esses campos explícitos como manuais."
-    )
+    if CHAVE_TRADING_ECONOMICS:
+        st.success(
+            "CONSENSO/FORECAST: automático via Trading Economics. "
+            "Probabilidades de corte/manutenção/alta do FOMC continuam em módulo separado."
+        )
+    else:
+        st.warning(
+            "CONSENSO/FORECAST: manual até configurar CHAVE_TRADING_ECONOMICS. "
+            "O app nunca inventa consenso quando a fonte está indisponível."
+        )
 
 def _sincronizar_anteriores_v711():
     """
@@ -3328,7 +3576,7 @@ _sincronizar_anteriores_v711()
 with abas[2]:
     _status_automacao_v71()
 
-    st.subheader("💱 Painel de Decisão — V7.1.1")
+    st.subheader("💱 Painel de Decisão — V7.2")
 
     usd_base = float(usd_detalhado["score"])
     usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
