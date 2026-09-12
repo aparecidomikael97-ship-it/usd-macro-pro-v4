@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "7.5 — FOMC AUTOMÁTICO"
+APP_VERSION = "7.6 — FOMC PROBABILÍSTICO CALIBRADO"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V7.5 Português",
+    page_title="USD Macro Pro — V7.6 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1605,7 +1605,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V7.5 Português")
+st.title("🦅 USD Macro Pro — V7.6 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -3606,7 +3606,7 @@ def _score_mestre_v70(base: str, cotada: str, diferenca: float, confl: dict) -> 
 
 
 def _mostrar_score_mestre_v70(base: str, cotada: str, diferenca: float, confl: dict):
-    st.markdown("## 🦅 Score Mestre — V7.5")
+    st.markdown("## 🦅 Score Mestre — V7.6")
     st.caption(
         "Resumo final do motor. Direção, qualidade dos dados e timing ficam separados "
         "para não confundir score interno com probabilidade de lucro."
@@ -3719,7 +3719,7 @@ def _auto_anterior_v71(nome: str):
     return float(obs[1][1]), obs[1][0]
 
 def _status_automacao_v71():
-    st.markdown("### 🤖 Automação dos Dados — V7.5")
+    st.markdown("### 🤖 Automação dos Dados — V7.6")
     st.caption(
         "O app preenche automaticamente tudo que possui fonte oficial disponível. "
         "Consenso de mercado e probabilidades FOMC não são inventados."
@@ -3772,7 +3772,7 @@ _sincronizar_anteriores_v711()
 with abas[2]:
     _status_automacao_v71()
 
-    st.subheader("💱 Painel de Decisão — V7.5")
+    st.subheader("💱 Painel de Decisão — V7.6")
 
     usd_base = float(usd_detalhado["score"])
     usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
@@ -4359,10 +4359,175 @@ def _painel_fomc_auto_v75():
         "não substitui contratos Fed Funds Futures."
     )
 
+
 # =========================================================
-# V7.5 — RENDERIZAÇÃO SEGURA
+# V7.6 — FOMC PROBABILÍSTICO CALIBRADO
+# Separa PRESSÃO monetária de PROBABILIDADE da próxima decisão.
+# NÃO É CME FEDWATCH.
+# =========================================================
+
+def _sigmoid_v76(x):
+    try:
+        return 1.0 / (1.0 + math.exp(-float(x)))
+    except Exception:
+        return 0.5
+
+def _score_macro_fomc_v76():
+    """
+    Contexto macro 0-100 para o FOMC.
+    50 = neutro; >50 = mais hawkish; <50 = mais dovish.
+    Reaproveita o score USD existente apenas como contexto e comprime sua influência.
+    """
+    score = 50.0
+    for k in ("score_usd_final", "usd_score_final", "score_usd", "forca_usd"):
+        v = st.session_state.get(k)
+        if isinstance(v, (int, float)):
+            score = float(v)
+            break
+    return max(25.0, min(75.0, score))
+
+def _modelo_fomc_calibrado_v76():
+    effr, dt_effr = _ultimo_valor_v75("DFF")
+    y3m, dt_3m = _ultimo_valor_v75("DGS3MO")
+    y2, dt_y2 = _ultimo_valor_v75("DGS2")
+
+    tr3m = _tendencia_v75("DGS3MO", 5)
+    tr2y = _tendencia_v75("DGS2", 5)
+    macro = _score_macro_fomc_v76()
+
+    if effr is None or y3m is None or y2 is None:
+        return {"ok": False, "motivo": "Faltam DFF, Treasury 3M ou Treasury 2Y na FRED."}
+
+    # 1) PRESSÃO HAWKISH/DOVISH (0-100)
+    # 3M recebe mais peso que 2Y por estar mais perto da política corrente.
+    spread3m = y3m - effr
+    spread2y = y2 - effr
+
+    pressao_raw = (
+        50.0
+        + max(-18.0, min(18.0, spread3m * 24.0))
+        + max(-8.0, min(8.0, spread2y * 7.0))
+        + max(-7.0, min(7.0, tr3m * 28.0))
+        + max(-5.0, min(5.0, tr2y * 12.0))
+        + max(-7.0, min(7.0, (macro - 50.0) * 0.28))
+    )
+    pressao = max(0.0, min(100.0, pressao_raw))
+
+    # 2) PROBABILIDADES CALIBRADAS
+    # A curva Treasury é proxy, não Fed Funds Futures.
+    # Portanto impomos forte prior de manutenção e limitamos extremos.
+    z = (pressao - 50.0) / 12.0
+    p_hike_signal = _sigmoid_v76(z)
+    p_cut_signal = _sigmoid_v76(-z)
+
+    intensidade = min(1.0, abs(pressao - 50.0) / 35.0)
+
+    # massa máxima fora de "manutenção": 55%.
+    # perto do neutro fica muito menor, evitando falsa precisão.
+    massa_decisao = 0.18 + 0.37 * intensidade
+    direcional = 0.50 + 0.42 * (2.0 * p_hike_signal - 1.0)
+    direcional = max(0.08, min(0.92, direcional))
+
+    alta = 100.0 * massa_decisao * direcional
+    corte = 100.0 * massa_decisao * (1.0 - direcional)
+    manut = 100.0 - alta - corte
+
+    # arredondamento só na apresentação; cálculos continuam contínuos.
+    esperado_pb = (-25.0*corte + 25.0*alta) / 100.0
+
+    # Score FOMC/USD mais conservador: ±25 pb esperado -> aproximadamente 25/75.
+    score_fomc = max(25.0, min(75.0, 50.0 + esperado_pb))
+
+    if pressao >= 62:
+        regime = "HAWKISH"
+    elif pressao <= 38:
+        regime = "DOVISH"
+    else:
+        regime = "NEUTRO / MISTO"
+
+    confianca = min(85.0, 45.0 + abs(pressao - 50.0) * 0.9)
+
+    return {
+        "ok": True,
+        "effr": effr, "dt_effr": dt_effr,
+        "y3m": y3m, "dt_3m": dt_3m,
+        "y2": y2, "dt_y2": dt_y2,
+        "spread3m": spread3m, "spread2y": spread2y,
+        "tr3m": tr3m, "tr2y": tr2y, "macro": macro,
+        "pressao": pressao, "regime": regime, "confianca": confianca,
+        "corte": corte, "manut": manut, "alta": alta,
+        "esperado_pb": esperado_pb, "score_fomc": score_fomc,
+    }
+
+def _painel_fomc_calibrado_v76():
+    evento = _proximo_evento_macro_v65()
+    if not evento or not evento.get("disponivel", True):
+        return
+    if "fomc" not in _normalizar_texto_v73(evento.get("evento", "")):
+        return
+
+    st.markdown("## 🏦 FOMC Probabilístico Calibrado — V7.6")
+    st.warning(
+        "⚠️ MODELO PRÓPRIO — NÃO É CME FEDWATCH. "
+        "A curva Treasury é usada como proxy. As porcentagens são estimativas internas, "
+        "não probabilidades negociadas em Fed Funds Futures."
+    )
+
+    r = _modelo_fomc_calibrado_v76()
+    if not r["ok"]:
+        st.error(r["motivo"])
+        return
+
+    st.markdown("### 1️⃣ Pressão monetária")
+    a,b,c = st.columns(3)
+    a.metric("Pressão Hawkish", f"{r['pressao']:.0f}/100")
+    b.metric("Regime", r["regime"])
+    c.metric("Confiança do modelo", f"{r['confianca']:.0f}%")
+    st.progress(int(round(r["pressao"])))
+
+    st.markdown("### 2️⃣ Estimativa da próxima decisão")
+    c1,c2,c3 = st.columns(3)
+    c1.metric("✂️ Corte 25 pb", f"{r['corte']:.1f}%")
+    c2.metric("⏸️ Manutenção", f"{r['manut']:.1f}%")
+    c3.metric("⬆️ Alta 25 pb", f"{r['alta']:.1f}%")
+
+    st.markdown("### 3️⃣ O que está puxando o modelo")
+    d1,d2,d3,d4 = st.columns(4)
+    d1.metric("Fed Funds efetivo", f"{r['effr']:.2f}%")
+    d2.metric("Treasury 3M", f"{r['y3m']:.2f}%")
+    d3.metric("Treasury 2Y", f"{r['y2']:.2f}%")
+    d4.metric("Mov. esperado", f"{r['esperado_pb']:+.1f} pb")
+
+    e1,e2,e3 = st.columns(3)
+    e1.metric("3M − Fed Funds", f"{r['spread3m']:+.2f} p.p.")
+    e2.metric("2Y − Fed Funds", f"{r['spread2y']:+.2f} p.p.")
+    e3.metric("Score FOMC/USD", f"{r['score_fomc']:.0f}/100")
+
+    if r["regime"] == "HAWKISH":
+        st.info("🟢 **Pressão hawkish:** juros de mercado e contexto macro estão inclinados para política mais restritiva. Isso pode favorecer o USD.")
+    elif r["regime"] == "DOVISH":
+        st.info("🔴 **Pressão dovish:** juros de mercado e contexto macro estão inclinados para política menos restritiva. Isso pode pressionar o USD.")
+    else:
+        st.info("🟡 **Cenário misto:** não há pressão suficientemente forte para transformar o sinal em uma decisão extrema.")
+
+    st.caption(
+        "Calibração V7.6: Treasury 3M tem peso maior; Treasury 2Y virou confirmação. "
+        "A manutenção recebe um prior forte porque DGS3MO/DGS2 não são contratos Fed Funds Futures."
+    )
+
+    # Nova fonte interna. Não sobrescreve widgets antigos.
+    st.session_state["v76_fomc_auto_ativo"] = True
+    st.session_state["v76_pressao_hawkish"] = float(r["pressao"])
+    st.session_state["v76_prob_corte"] = float(r["corte"])
+    st.session_state["v76_prob_manut"] = float(r["manut"])
+    st.session_state["v76_prob_alta"] = float(r["alta"])
+    st.session_state["v76_esperado_pb"] = float(r["esperado_pb"])
+    st.session_state["v76_fomc_usd_score"] = float(r["score_fomc"])
+
+# =========================================================
+# V7.6 — RENDERIZAÇÃO SEGURA
 # =========================================================
 with abas[1]:
     _painel_hibrido_v74()
-    _painel_fomc_auto_v75()
+    _painel_fomc_calibrado_v76()
 
