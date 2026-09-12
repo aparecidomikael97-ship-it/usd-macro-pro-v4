@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-🦅 USD Macro Pro — V6.2 EXPLICADOR INTELIGENTE
+🦅 USD Macro Pro — V6.3 RISCO E TIMING MACRO
 ================================
 - Interface em português
 - Corrige unidades de inflação e PIB no ranking global
@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "6.2.1 — EXPLICADOR INTELIGENTE"
+APP_VERSION = "6.3 — RISCO E TIMING MACRO"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V6.2.1 Português",
+    page_title="USD Macro Pro — V6.3 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1962,11 +1962,129 @@ def _mostrar_explicador_v62(par: str, base: str, cotada: str, diferenca: float,
     )
 
 
+
+def _avaliar_risco_timing_v63(confl: dict, diferenca: float,
+                              horas_ate_evento: float | None,
+                              impacto_evento: str = "Sem evento informado") -> dict:
+    """
+    Separa direção macro de timing. Não cria gatilho técnico.
+    Risco aumenta perto de evento de alto impacto.
+    """
+    score = float(confl.get("score_confluencia", 50))
+    qualidade = float(confl.get("qualidade_confluencia", 0))
+    nivel = str(confl.get("nivel", "BAIXA"))
+
+    # Base do timing vem da robustez macro, não do preço.
+    timing = 50.0
+    timing += (score - 50.0) * 0.35
+    timing += (qualidade - 50.0) * 0.20
+    if nivel == "ALTA":
+        timing += 8
+    elif nivel == "BAIXA":
+        timing -= 8
+
+    risco = "NORMAL"
+    penalidade = 0.0
+    if horas_ate_evento is not None:
+        h = max(float(horas_ate_evento), 0.0)
+        alto = impacto_evento == "Alto impacto"
+        medio = impacto_evento == "Médio impacto"
+
+        if alto and h <= 1:
+            risco, penalidade = "MUITO ALTO", 35
+        elif alto and h <= 4:
+            risco, penalidade = "ALTO", 25
+        elif alto and h <= 12:
+            risco, penalidade = "ELEVADO", 15
+        elif medio and h <= 2:
+            risco, penalidade = "ALTO", 18
+        elif medio and h <= 8:
+            risco, penalidade = "ELEVADO", 10
+
+    timing = float(np.clip(timing - penalidade, 0, 100))
+
+    if abs(diferenca) < 6 or qualidade < 50:
+        status = "⚪ AGUARDAR"
+    elif risco in ("MUITO ALTO", "ALTO"):
+        status = "🔴 EVITAR ENTRADA PRÓXIMA À NOTÍCIA"
+    elif timing >= 72:
+        status = "🟢 CENÁRIO FAVORÁVEL — PROCURAR CONFIRMAÇÃO NO PREÇO"
+    elif timing >= 58:
+        status = "🟡 CENÁRIO ACEITÁVEL — AGUARDAR CONFIRMAÇÃO"
+    else:
+        status = "⚪ AGUARDAR"
+
+    return {
+        "timing": timing,
+        "risco": risco,
+        "status": status,
+        "penalidade": penalidade,
+    }
+
+
+def _mostrar_risco_timing_v63(confl: dict, diferenca: float):
+    st.markdown("### ⏱️ Risco e Timing Macro — V6.3")
+    st.caption(
+        "Direção macro escolhe o lado; esta área controla o risco de timing. "
+        "Ela não substitui confirmação técnica no preço."
+    )
+
+    c1, c2 = st.columns(2)
+    with c1:
+        evento = st.selectbox(
+            "Próximo evento relevante",
+            ["Sem evento informado", "Alto impacto", "Médio impacto"],
+            key="v63_evento_impacto"
+        )
+    with c2:
+        horas = st.number_input(
+            "Horas até o evento",
+            min_value=0.0, max_value=168.0, value=24.0, step=0.5,
+            disabled=(evento == "Sem evento informado"),
+            key="v63_horas_evento"
+        )
+
+    horas_usadas = None if evento == "Sem evento informado" else float(horas)
+    rt = _avaliar_risco_timing_v63(confl, diferenca, horas_usadas, evento)
+
+    r1, r2, r3 = st.columns(3)
+    r1.metric("Timing macro", f"{rt['timing']:.0f}/100")
+    r2.metric("Risco de notícia", rt["risco"])
+    r3.metric("Penalidade de timing", f"-{rt['penalidade']:.0f} pts")
+
+    if rt["status"].startswith("🟢"):
+        st.success(f"**{rt['status']}**")
+    elif rt["status"].startswith("🔴"):
+        st.error(f"**{rt['status']}**")
+    elif rt["status"].startswith("🟡"):
+        st.warning(f"**{rt['status']}**")
+    else:
+        st.info(f"**{rt['status']}**")
+
+    if evento != "Sem evento informado":
+        st.write(
+            f"Evento informado: **{evento}**, faltando aproximadamente **{horas:.1f} h**. "
+            "Quanto mais perto de uma divulgação importante, menor o timing do modelo."
+        )
+    else:
+        st.info(
+            "Nenhum evento foi informado nesta avaliação. O timing não recebeu penalidade de calendário."
+        )
+
+    st.markdown(
+        "**Fluxo recomendado pelo painel:** Macro → risco de notícia → estrutura/preço → gestão de risco."
+    )
+    st.caption(
+        "Timing macro não significa 'entrar agora'. O sistema não observa aqui spread da corretora, "
+        "liquidez instantânea, slippage ou estrutura técnica do gráfico."
+    )
+
+
 # =========================================================
 # ABA 3 — PARES
 # =========================================================
 with abas[2]:
-    st.subheader("💱 Painel de Decisão — V6.2.1")
+    st.subheader("💱 Painel de Decisão — V6.3")
 
     usd_base = float(usd_detalhado["score"])
     usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
@@ -2038,7 +2156,7 @@ with abas[2]:
         dt = confl["diferencial_taxas"]
         mercado3m = confl["mercado_3m"]
         tend = confl["tendencias"]
-        st.markdown("#### 📐 Qualidade macro da V6.2.1")
+        st.markdown("#### 📐 Qualidade macro da V6.3")
         q1, q2, q3 = st.columns(3)
         with q1:
             if dt["base"] is not None and dt["cotada"] is not None:
@@ -2091,7 +2209,7 @@ with abas[2]:
             if idade_max > 120:
                 st.warning(
                     "🟡 O spread de mercado usa pelo menos uma série antiga. "
-                    "A V6.2 reduz automaticamente o peso desse componente até a FRED atualizar."
+                    "A V6.3 reduz automaticamente o peso desse componente até a FRED atualizar."
                 )
         else:
             st.warning(
@@ -2100,7 +2218,7 @@ with abas[2]:
             )
 
         st.caption(
-            "Na V6.2, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
+            "Na V6.3, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
             "da FRED/OECD. Mantivemos o Treasury 2Y como tendência dos EUA, mas não "
             "misturamos 2Y americano com uma maturidade estrangeira diferente."
         )
@@ -2115,7 +2233,7 @@ with abas[2]:
                     "Variação média": round(x["delta"], 4),
                 })
             st.dataframe(pd.DataFrame(trend_rows), use_container_width=True, hide_index=True)
-            st.caption("A V6.2 combina diferencial de juros oficiais, spread de mercado e direção do spread com pesos ajustados pelo frescor dos dados. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
+            st.caption("A V6.3 combina diferencial de juros oficiais, spread de mercado e direção do spread com pesos ajustados pelo frescor dos dados. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
 
         # Substitui a confiança antiga pela confiança de confluência.
         if "SEM VANTAGEM" in acao:
@@ -2133,7 +2251,7 @@ with abas[2]:
         score_final = confl["score_confluencia"]
         qualidade_final = confl["qualidade_confluencia"]
 
-        st.markdown("### 🧭 Decisão V6.2.1")
+        st.markdown("### 🧭 Decisão V6.3")
         if "SEM VANTAGEM" in acao or score_final < 58 or qualidade_final < 50:
             st.info(
                 f"⚪ **NEUTRO / AGUARDAR** — Score {score_final:.0f}/100 | "
@@ -2165,6 +2283,8 @@ with abas[2]:
             float(score_base), float(score_cotada)
         )
 
+        _mostrar_risco_timing_v63(confl, diferenca)
+
         st.write(f"Motivo: {base} está em **{score_base:.1f}** e {cotada} em **{score_cotada:.1f}**. O USD, quando presente, já inclui o ajuste das surpresas econômicas.")
         st.warning("⚠️ O viés macro não é gatilho de entrada nem probabilidade de lucro. Confirme preço, estrutura, liquidez, sessão e risco.")
 
@@ -2177,7 +2297,7 @@ with abas[2]:
             st.success("✅ Sinal registrado!")
 
     st.markdown("---")
-    st.markdown("### 🏆 Matriz Inteligente — V6.2.1")
+    st.markdown("### 🏆 Matriz Inteligente — V6.3")
     st.caption(
         "Todos os pares abaixo passam pelo mesmo motor de confluência, qualidade e frescor "
         "usado na análise individual."
