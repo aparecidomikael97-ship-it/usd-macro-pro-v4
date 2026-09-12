@@ -1355,12 +1355,12 @@ with abas[1]:
     df_surpresa = pd.DataFrame(linhas)
     st.dataframe(df_surpresa, use_container_width=True, hide_index=True)
 
-    leitura_surpresa = interpretar_conjunto_surpresas(df_surpresa, usd_detalhe["score"])
+    leitura_surpresa = interpretar_conjunto_surpresas(df_surpresa, usd_detalhado["score"])
 
     st.markdown("#### 🧭 Efeito das surpresas sobre o score do USD")
     ca, cb, cc = st.columns(3)
     with ca:
-        st.metric("USD macro antes", f"{usd_detalhe['score']:.0f}/100")
+        st.metric("USD macro antes", f"{usd_detalhado['score']:.0f}/100")
     with cb:
         delta = leitura_surpresa["ajuste"]
         st.metric("Ajuste das surpresas", f"{delta:+.1f} pontos")
