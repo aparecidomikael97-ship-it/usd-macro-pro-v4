@@ -552,7 +552,14 @@ with tabs[2]:
         st.warning("Probabilidade do modelo ≠ probabilidade estatística comprovada. Use o backtest para calibrar.")
 
         st.markdown("#### 📝 Registrar Sinal para Backtest")
-        preco = st.number_input("Preço de Entrada", 0.00001, 1.00000, 1.10000, 0.0001, "%.5f")
+       preco = st.number_input(
+    "Preço de Entrada",
+    min_value=0.00001,
+    max_value=1000.0,
+    value=1.10000,
+    step=0.00001,
+    format="%.5f",
+)
         h = st.selectbox("Horizonte (horas)", [1,4,8,24,48,72], 3)
         if st.button("Registrar Sinal"):
             registrar_sinal(f"{base}/{cotada}", p, sb, sc, preco, h)
