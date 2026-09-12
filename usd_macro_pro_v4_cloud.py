@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "8.1 — CENTRAL DE DECISÃO REFINADA"
+APP_VERSION = "8.2 — VALIDAÇÃO HISTÓRICA"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V8.1 Português",
+    page_title="USD Macro Pro — V8.2 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1605,7 +1605,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V8.1 Português")
+st.title("🦅 USD Macro Pro — V8.2 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2400,6 +2400,295 @@ def _central_decisao_v81(par, base, cotada, score_base, score_cotada, diferenca,
     st.caption(
         "Score Mestre mede alinhamento interno; Qualidade/cobertura mede a confiança nos dados disponíveis. "
         "Nenhum deles representa probabilidade de lucro."
+    )
+
+
+
+# =========================================================
+# V8.2 — VALIDAÇÃO HISTÓRICA / TESTE DE SINAIS
+# Registra sinais no momento em que acontecem e avalia depois
+# usando preço diário oficial do FRED (DEXUSEU) para EUR/USD.
+# Não reconstrói sinais antigos com dados de hoje.
+# =========================================================
+
+ARQ_SINAIS_V82 = "dados/sinais_v82.parquet"
+
+def _garantir_pasta_v82():
+    try:
+        Path("dados").mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+
+def _carregar_sinais_v82():
+    _garantir_pasta_v82()
+    p = Path(ARQ_SINAIS_V82)
+    if p.exists():
+        try:
+            return pd.read_parquet(p)
+        except Exception:
+            pass
+    cols = [
+        "timestamp","par","direcao","score_mestre","qualidade",
+        "score_base","score_cotada","diferenca","fomc_score",
+        "fomc_peso","evento","dias_evento","impacto","timing",
+        "preco_entrada","data_preco","avaliado","preco_saida",
+        "data_saida","retorno_pct","acertou"
+    ]
+    return pd.DataFrame(columns=cols)
+
+def _salvar_sinais_v82(df):
+    _garantir_pasta_v82()
+    try:
+        df.to_parquet(ARQ_SINAIS_V82, index=False)
+        return True
+    except Exception:
+        return False
+
+def _fred_preco_eurusd_v82():
+    """
+    DEXUSEU = dólares por 1 euro, frequência diária.
+    Serve para EUR/USD diário, não intraday.
+    """
+    try:
+        obs = _fred_obs_v71("DEXUSEU", 20)
+        if not obs:
+            return None, None
+        return float(obs[0][1]), obs[0][0]
+    except Exception:
+        return None, None
+
+def _registrar_sinal_v82(par, direcao, score_mestre, qualidade,
+                         score_base, score_cotada, diferenca):
+    if par != "EUR/USD":
+        return False, "V8.2 inicial valida automaticamente apenas EUR/USD com FRED DEXUSEU."
+
+    preco, dt_preco = _fred_preco_eurusd_v82()
+    if preco is None:
+        return False, "Preço oficial EUR/USD indisponível na FRED nesta execução."
+
+    evento = _proximo_evento_macro_v65()
+    evento_nome, dias, impacto = "—", None, "—"
+    if isinstance(evento, dict) and evento.get("disponivel", False):
+        evento_nome = str(evento.get("evento","—"))
+        dias = evento.get("dias")
+        impacto = str(evento.get("impacto","—"))
+
+    fomc_score = None
+    fomc_peso = None
+    if st.session_state.get("v77_fomc_integrado", False):
+        fomc_score = float(st.session_state.get("v76_fomc_usd_score", 50.0))
+        fomc_peso = float(st.session_state.get("v77_peso_fomc", 0.0))*100.0
+
+    alto = impacto.upper() in ("MÁXIMO","MAXIMO","ALTO")
+    if dias is not None and dias <= 2 and alto:
+        timing = "AGUARDAR"
+    elif dias is not None and dias <= 7 and alto:
+        timing = "ATENÇÃO"
+    else:
+        timing = "NORMAL"
+
+    df = _carregar_sinais_v82()
+
+    # Evita duplicação excessiva: 1 registro por par/dia/direção.
+    hoje_str = pd.Timestamp.now().strftime("%Y-%m-%d")
+    if not df.empty:
+        ts = pd.to_datetime(df["timestamp"], errors="coerce")
+        dup = (
+            (df["par"] == par) &
+            (df["direcao"] == direcao) &
+            (ts.dt.strftime("%Y-%m-%d") == hoje_str)
+        )
+        if dup.any():
+            return False, "Já existe um registro deste par/direção hoje."
+
+    linha = {
+        "timestamp": pd.Timestamp.now(),
+        "par": par,
+        "direcao": direcao,
+        "score_mestre": float(score_mestre),
+        "qualidade": float(qualidade),
+        "score_base": float(score_base),
+        "score_cotada": float(score_cotada),
+        "diferenca": float(diferenca),
+        "fomc_score": fomc_score,
+        "fomc_peso": fomc_peso,
+        "evento": evento_nome,
+        "dias_evento": dias,
+        "impacto": impacto,
+        "timing": timing,
+        "preco_entrada": float(preco),
+        "data_preco": pd.Timestamp(dt_preco),
+        "avaliado": False,
+        "preco_saida": None,
+        "data_saida": None,
+        "retorno_pct": None,
+        "acertou": None,
+    }
+    df = pd.concat([df, pd.DataFrame([linha])], ignore_index=True)
+    ok = _salvar_sinais_v82(df)
+    return ok, f"Sinal registrado em {preco:.5f} (FRED DEXUSEU, {dt_preco})."
+
+def _avaliar_sinais_v82():
+    """
+    Avaliação conservadora diária:
+    usa o último preço diário disponível depois do registro.
+    Não promete 1h/4h porque DEXUSEU é diário.
+    """
+    df = _carregar_sinais_v82()
+    if df.empty:
+        return df, 0
+
+    preco_atual, dt_atual = _fred_preco_eurusd_v82()
+    if preco_atual is None:
+        return df, 0
+
+    atualizados = 0
+    for i, r in df.iterrows():
+        if bool(r.get("avaliado", False)):
+            continue
+        try:
+            dt_entrada = pd.Timestamp(r["data_preco"])
+        except Exception:
+            continue
+
+        # Só avalia quando existe uma observação diária posterior.
+        if pd.Timestamp(dt_atual) <= dt_entrada:
+            continue
+
+        entrada = float(r["preco_entrada"])
+        retorno = (float(preco_atual) / entrada - 1.0) * 100.0
+        direcao = str(r["direcao"]).upper()
+
+        if direcao == "SELL":
+            acertou = retorno < 0
+        elif direcao == "BUY":
+            acertou = retorno > 0
+        else:
+            acertou = None
+
+        df.at[i, "avaliado"] = True
+        df.at[i, "preco_saida"] = float(preco_atual)
+        df.at[i, "data_saida"] = pd.Timestamp(dt_atual)
+        df.at[i, "retorno_pct"] = float(retorno)
+        df.at[i, "acertou"] = acertou
+        atualizados += 1
+
+    if atualizados:
+        _salvar_sinais_v82(df)
+    return df, atualizados
+
+def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca, confl):
+    st.markdown("## 🧪 Validação Histórica — V8.2")
+    st.caption(
+        "Este módulo registra o sinal AGORA e mede depois. "
+        "Ele não reconstrói o passado usando dados futuros."
+    )
+
+    score = float(confl.get("score_confluencia", 50.0))
+    qualidade = float(confl.get("qualidade_confluencia", 0.0))
+
+    if diferenca >= 6:
+        direcao = "BUY"
+    elif diferenca <= -6:
+        direcao = "SELL"
+    else:
+        direcao = "WAIT"
+
+    p_atual, dt_atual = _fred_preco_eurusd_v82()
+    a,b,c,d = st.columns(4)
+    a.metric("Par", par)
+    b.metric("Sinal atual", direcao)
+    c.metric("Score", f"{score:.0f}/100")
+    d.metric("Preço diário FRED", f"{p_atual:.5f}" if p_atual else "—")
+
+    if par == "EUR/USD":
+        st.info(
+            "Fonte de preço da V8.2: FRED DEXUSEU, cotação diária em dólares por 1 euro. "
+            "Por ser diária, esta primeira validação mede direção entre dias — não 1h/4h."
+        )
+    else:
+        st.warning(
+            "Nesta primeira versão, a avaliação automática está habilitada somente para EUR/USD."
+        )
+
+    if st.button("📌 Registrar sinal atual para validação", key="v82_registrar"):
+        ok, msg = _registrar_sinal_v82(
+            par, direcao, score, qualidade,
+            score_base, score_cotada, diferenca
+        )
+        if ok:
+            st.success(msg)
+        else:
+            st.warning(msg)
+
+    if st.button("🔄 Avaliar sinais pendentes", key="v82_avaliar"):
+        df, n = _avaliar_sinais_v82()
+        if n:
+            st.success(f"{n} sinal(is) atualizado(s) com preço diário posterior.")
+        else:
+            st.info("Nenhum sinal pendente tinha um novo preço diário posterior disponível.")
+
+    df = _carregar_sinais_v82()
+    if df.empty:
+        st.info("Ainda não há sinais registrados na V8.2.")
+        return
+
+    st.markdown("### 📚 Histórico registrado")
+    exibir = df.copy()
+    for col in ["timestamp","data_preco","data_saida"]:
+        if col in exibir.columns:
+            exibir[col] = pd.to_datetime(exibir[col], errors="coerce").dt.strftime("%d/%m/%Y")
+    st.dataframe(
+        exibir.tail(50).sort_values("timestamp", ascending=False),
+        use_container_width=True,
+        hide_index=True
+    )
+
+    avaliados = df[df["avaliado"] == True].copy()
+    if avaliados.empty:
+        st.info("Ainda não há sinais avaliados. O sistema precisa de um preço diário posterior.")
+        return
+
+    validos = avaliados[avaliados["acertou"].notna()].copy()
+    if validos.empty:
+        return
+
+    taxa = 100.0 * validos["acertou"].astype(bool).mean()
+    n = len(validos)
+    ret_medio = pd.to_numeric(validos["retorno_pct"], errors="coerce").mean()
+
+    st.markdown("### 📈 Resultado observado")
+    r1,r2,r3 = st.columns(3)
+    r1.metric("Sinais avaliados", n)
+    r2.metric("Acerto direcional", f"{taxa:.1f}%")
+    r3.metric("Retorno médio do EUR/USD", f"{ret_medio:+.3f}%")
+
+    # Segmentação simples por Score Mestre.
+    faixas = []
+    for nome, lo, hi in [
+        ("Score < 70", -1, 70),
+        ("70–79", 70, 80),
+        ("80–89", 80, 90),
+        ("90+", 90, 101),
+    ]:
+        sub = validos[
+            (pd.to_numeric(validos["score_mestre"], errors="coerce") >= lo) &
+            (pd.to_numeric(validos["score_mestre"], errors="coerce") < hi)
+        ]
+        if len(sub):
+            faixas.append({
+                "Faixa": nome,
+                "N": len(sub),
+                "Acerto direcional": f"{100*sub['acertou'].astype(bool).mean():.1f}%",
+                "Qualidade média": f"{pd.to_numeric(sub['qualidade'], errors='coerce').mean():.1f}%"
+            })
+    if faixas:
+        st.markdown("### 🎯 Resultado por faixa de Score Mestre")
+        st.dataframe(pd.DataFrame(faixas), use_container_width=True, hide_index=True)
+
+    st.warning(
+        "Amostra pequena não prova vantagem estatística. "
+        "Use muitos sinais e diferentes regimes de mercado antes de alterar pesos do modelo."
     )
 
 
@@ -4687,6 +4976,16 @@ with abas[2]:
 
         # V8.0 — Central Mestre, usando os mesmos dados reais do par.
         _central_decisao_v81(
+            par=par_escolhido,
+            base=base,
+            cotada=cotada,
+            score_base=float(score_base),
+            score_cotada=float(score_cotada),
+            diferenca=float(diferenca),
+            confl=confl,
+        )
+
+        _painel_validacao_v82(
             par=par_escolhido,
             base=base,
             cotada=cotada,
