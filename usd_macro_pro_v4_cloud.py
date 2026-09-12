@@ -27,7 +27,7 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "7.6 — FOMC PROBABILÍSTICO CALIBRADO"
+APP_VERSION = "7.6.1 — FOMC CALIBRADO + FALLBACK"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
@@ -4395,22 +4395,34 @@ def _modelo_fomc_calibrado_v76():
     tr2y = _tendencia_v75("DGS2", 5)
     macro = _score_macro_fomc_v76()
 
-    if effr is None or y3m is None or y2 is None:
-        return {"ok": False, "motivo": "Faltam DFF, Treasury 3M ou Treasury 2Y na FRED."}
+    if effr is None or y2 is None:
+        return {"ok": False, "motivo": "Faltam Fed Funds efetivo (DFF) ou Treasury 2Y (DGS2) na FRED."}
 
     # 1) PRESSÃO HAWKISH/DOVISH (0-100)
-    # 3M recebe mais peso que 2Y por estar mais perto da política corrente.
-    spread3m = y3m - effr
+    # Treasury 3M melhora o modelo, mas NÃO é obrigatório.
+    # Se DGS3MO estiver indisponível, usa DFF + DGS2 + tendência 2Y + macro.
     spread2y = y2 - effr
+    tem_3m = y3m is not None
 
-    pressao_raw = (
-        50.0
-        + max(-18.0, min(18.0, spread3m * 24.0))
-        + max(-8.0, min(8.0, spread2y * 7.0))
-        + max(-7.0, min(7.0, tr3m * 28.0))
-        + max(-5.0, min(5.0, tr2y * 12.0))
-        + max(-7.0, min(7.0, (macro - 50.0) * 0.28))
-    )
+    if tem_3m:
+        spread3m = y3m - effr
+        pressao_raw = (
+            50.0
+            + max(-18.0, min(18.0, spread3m * 24.0))
+            + max(-8.0, min(8.0, spread2y * 7.0))
+            + max(-7.0, min(7.0, tr3m * 28.0))
+            + max(-5.0, min(5.0, tr2y * 12.0))
+            + max(-7.0, min(7.0, (macro - 50.0) * 0.28))
+        )
+    else:
+        spread3m = None
+        # Fallback conservador: reduz a força do proxy 2Y para não exagerar.
+        pressao_raw = (
+            50.0
+            + max(-15.0, min(15.0, spread2y * 12.0))
+            + max(-7.0, min(7.0, tr2y * 14.0))
+            + max(-8.0, min(8.0, (macro - 50.0) * 0.32))
+        )
     pressao = max(0.0, min(100.0, pressao_raw))
 
     # 2) PROBABILIDADES CALIBRADAS
@@ -4453,7 +4465,7 @@ def _modelo_fomc_calibrado_v76():
         "y3m": y3m, "dt_3m": dt_3m,
         "y2": y2, "dt_y2": dt_y2,
         "spread3m": spread3m, "spread2y": spread2y,
-        "tr3m": tr3m, "tr2y": tr2y, "macro": macro,
+        "tr3m": tr3m, "tr2y": tr2y, "macro": macro, "tem_3m": tem_3m,
         "pressao": pressao, "regime": regime, "confianca": confianca,
         "corte": corte, "manut": manut, "alta": alta,
         "esperado_pb": esperado_pb, "score_fomc": score_fomc,
@@ -4466,7 +4478,7 @@ def _painel_fomc_calibrado_v76():
     if "fomc" not in _normalizar_texto_v73(evento.get("evento", "")):
         return
 
-    st.markdown("## 🏦 FOMC Probabilístico Calibrado — V7.6")
+    st.markdown("## 🏦 FOMC Probabilístico Calibrado — V7.6.1")
     st.warning(
         "⚠️ MODELO PRÓPRIO — NÃO É CME FEDWATCH. "
         "A curva Treasury é usada como proxy. As porcentagens são estimativas internas, "
@@ -4477,6 +4489,13 @@ def _painel_fomc_calibrado_v76():
     if not r["ok"]:
         st.error(r["motivo"])
         return
+
+    if not r.get("tem_3m", False):
+        st.warning(
+            "Treasury 3M não veio da FRED nesta execução. "
+            "O V7.6.1 ativou o fallback conservador usando Fed Funds + Treasury 2Y + contexto macro. "
+            "O cálculo continua funcionando sem inventar o dado de 3 meses."
+        )
 
     st.markdown("### 1️⃣ Pressão monetária")
     a,b,c = st.columns(3)
@@ -4494,12 +4513,12 @@ def _painel_fomc_calibrado_v76():
     st.markdown("### 3️⃣ O que está puxando o modelo")
     d1,d2,d3,d4 = st.columns(4)
     d1.metric("Fed Funds efetivo", f"{r['effr']:.2f}%")
-    d2.metric("Treasury 3M", f"{r['y3m']:.2f}%")
+    d2.metric("Treasury 3M", f"{r['y3m']:.2f}%" if r["y3m"] is not None else "Indisponível")
     d3.metric("Treasury 2Y", f"{r['y2']:.2f}%")
     d4.metric("Mov. esperado", f"{r['esperado_pb']:+.1f} pb")
 
     e1,e2,e3 = st.columns(3)
-    e1.metric("3M − Fed Funds", f"{r['spread3m']:+.2f} p.p.")
+    e1.metric("3M − Fed Funds", f"{r['spread3m']:+.2f} p.p." if r["spread3m"] is not None else "Fallback ativo")
     e2.metric("2Y − Fed Funds", f"{r['spread2y']:+.2f} p.p.")
     e3.metric("Score FOMC/USD", f"{r['score_fomc']:.0f}/100")
 
@@ -4511,8 +4530,9 @@ def _painel_fomc_calibrado_v76():
         st.info("🟡 **Cenário misto:** não há pressão suficientemente forte para transformar o sinal em uma decisão extrema.")
 
     st.caption(
-        "Calibração V7.6: Treasury 3M tem peso maior; Treasury 2Y virou confirmação. "
-        "A manutenção recebe um prior forte porque DGS3MO/DGS2 não são contratos Fed Funds Futures."
+        "Calibração V7.6.1: Treasury 3M tem peso maior quando disponível. "
+        "Se ele faltar, entra um fallback conservador com DFF + DGS2. "
+        "A manutenção recebe um prior forte porque Treasuries não são contratos Fed Funds Futures."
     )
 
     # Nova fonte interna. Não sobrescreve widgets antigos.
@@ -4525,7 +4545,7 @@ def _painel_fomc_calibrado_v76():
     st.session_state["v76_fomc_usd_score"] = float(r["score_fomc"])
 
 # =========================================================
-# V7.6 — RENDERIZAÇÃO SEGURA
+# V7.6.1 — RENDERIZAÇÃO SEGURA
 # =========================================================
 with abas[1]:
     _painel_hibrido_v74()
