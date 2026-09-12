@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-🦅 USD Macro Pro — V5.9 SPREAD DE JUROS DE MERCADO
+🦅 USD Macro Pro — V6.0 CONFIANÇA DINÂMICA
 ================================
 - Interface em português
 - Corrige unidades de inflação e PIB no ranking global
@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "5.9 — SPREAD DE JUROS DE MERCADO"
+APP_VERSION = "6.0 — CONFIANÇA DINÂMICA"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V5.9 Português",
+    page_title="USD Macro Pro — V6.0 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1123,7 +1123,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V5.9 Português")
+st.title("🦅 USD Macro Pro — V6.0 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -1643,7 +1643,85 @@ def _sinal_spread_direcao(spread_info: dict, direcao_par: int) -> int:
     mov_dir = 1 if delta > 0 else -1
     return 1 if mov_dir == direcao_par else -1
 
-def calcular_confluencia_v59(base: str, cotada: str, diferenca: float,
+
+def _fator_frescor_dias(idade: int | None, tipo: str = "mensal") -> float:
+    """Peso por frescor. 1.0 = atual; cai gradualmente conforme o dado envelhece."""
+    if idade is None:
+        return 0.0
+    idade = max(int(idade), 0)
+    limites = {
+        "diario": [(7,1.0),(21,0.85),(45,0.60),(90,0.35)],
+        "mensal": [(45,1.0),(75,0.85),(120,0.60),(180,0.35)],
+        "trimestral": [(120,1.0),(180,0.80),(270,0.55),(365,0.30)],
+    }
+    for limite, fator in limites.get(tipo, limites["mensal"]):
+        if idade <= limite:
+            return fator
+    return 0.15
+
+
+def _frescor_spread_3m(info: dict) -> float:
+    if not info.get("disponivel"):
+        return 0.0
+    ib = info.get("base", {}).get("idade")
+    iq = info.get("cotada", {}).get("idade")
+    # O componente só é tão atual quanto o lado mais antigo da comparação.
+    fb = _fator_frescor_dias(ib, "mensal")
+    fq = _fator_frescor_dias(iq, "mensal")
+    return min(fb, fq)
+
+
+def _confluencia_dinamica(sinais_base: list, fatores: dict) -> dict:
+    """
+    Rebaixa pesos por frescor/qualidade e redistribui apenas a parcela confiável.
+    Não transforma o resultado em probabilidade de lucro.
+    """
+    linhas = []
+    peso_efetivo_total = 0.0
+    favor_bruto = 0.0
+    contra_bruto = 0.0
+
+    for nome, estado, peso in sinais_base:
+        fator = float(np.clip(fatores.get(nome, 1.0), 0.0, 1.0))
+        peso_eff = float(peso) * fator
+        peso_efetivo_total += peso_eff
+        if estado > 0:
+            favor_bruto += peso_eff
+        elif estado < 0:
+            contra_bruto += peso_eff
+        linhas.append((nome, estado, peso, fator, peso_eff))
+
+    if peso_efetivo_total <= 0:
+        return {
+            "favor": 0.0, "contra": 0.0, "neutro": 100.0,
+            "qualidade": 0.0, "score": 50.0, "nivel": "BAIXA",
+            "linhas": linhas,
+        }
+
+    favor = 100.0 * favor_bruto / peso_efetivo_total
+    contra = 100.0 * contra_bruto / peso_efetivo_total
+    neutro = max(0.0, 100.0 - favor - contra)
+    qualidade = float(np.clip(peso_efetivo_total, 0, 100))
+
+    # Score direcional centralizado em 50.
+    score = float(np.clip(50 + (favor - contra) / 2, 0, 100))
+
+    # Confiança exige confluência E cobertura de dados.
+    if qualidade >= 75 and favor >= 70 and contra <= 15:
+        nivel = "ALTA"
+    elif qualidade >= 55 and favor >= 55 and favor >= contra + 20:
+        nivel = "MODERADA"
+    else:
+        nivel = "BAIXA"
+
+    return {
+        "favor": favor, "contra": contra, "neutro": neutro,
+        "qualidade": qualidade, "score": score, "nivel": nivel,
+        "linhas": linhas,
+    }
+
+
+def calcular_confluencia_v60(base: str, cotada: str, diferenca: float,
                              usd_score: float, ajuste_surpresas: float,
                              tom_fed: str, ranking_df: pd.DataFrame) -> dict:
     """
@@ -1727,23 +1805,32 @@ def calcular_confluencia_v59(base: str, cotada: str, diferenca: float,
     )
     sinais.append(("Tendência macro EUA", s_trend, 5))
 
-    favor = sum(p for _, s, p in sinais if s > 0)
-    contra = sum(p for _, s, p in sinais if s < 0)
-    neutro = 100 - favor - contra
+    # V6.0 — pesos dinâmicos conforme frescor/qualidade.
+    frescor_mercado = _frescor_spread_3m(mercado)
 
-    if favor >= 70 and contra <= 15:
-        nivel = "ALTA"
-    elif favor >= 50 and favor >= contra + 20:
-        nivel = "MODERADA"
-    else:
-        nivel = "BAIXA"
+    fatores = {
+        "Força relativa": 1.00,
+        "Juros oficiais": 0.95 if dif_oficial.get("base") is not None and dif_oficial.get("cotada") is not None else 0.0,
+        "Spread mercado 3M": frescor_mercado,
+        "Direção do spread": frescor_mercado,
+        "Score USD": 1.00,
+        "Surpresas": 1.00 if abs(ajuste_surpresas) > 0.01 else 0.70,
+        "Federal Reserve": 1.00 if str(tom_fed).lower() not in ("", "neutro", "neutral") else 0.70,
+        "Tendência macro EUA": 0.90,
+    }
+
+    dinamica = _confluencia_dinamica(sinais, fatores)
 
     return {
-        "favor": favor,
-        "contra": contra,
-        "neutro": neutro,
-        "nivel": nivel,
+        "favor": dinamica["favor"],
+        "contra": dinamica["contra"],
+        "neutro": dinamica["neutro"],
+        "nivel": dinamica["nivel"],
+        "score_confluencia": dinamica["score"],
+        "qualidade_confluencia": dinamica["qualidade"],
         "sinais": sinais,
+        "linhas_dinamicas": dinamica["linhas"],
+        "fatores_qualidade": fatores,
         "diferencial_taxas": dif_oficial,
         "mercado_3m": mercado,
         "tendencias": tendencias,
@@ -1754,7 +1841,7 @@ def calcular_confluencia_v59(base: str, cotada: str, diferenca: float,
 # ABA 3 — PARES
 # =========================================================
 with abas[2]:
-    st.subheader("💱 Painel de Decisão — V5.9")
+    st.subheader("💱 Painel de Decisão — V6.0")
 
     usd_base = float(usd_detalhado["score"])
     usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
@@ -1799,27 +1886,34 @@ with abas[2]:
         x3.metric(cotada, f"{score_cotada:.1f}/100")
 
         # V5.7: confiança passa a exigir confluência, não apenas distância entre scores.
-        confl = calcular_confluencia_v59(
+        confl = calcular_confluencia_v60(
             base, cotada, diferenca, usd_ajustado, ajuste,
             fed.get("tom", "Neutro"), ranking
         )
 
         st.markdown("### 🧩 Confluência do sinal")
-        cf1, cf2, cf3 = st.columns(3)
-        cf1.metric("A favor", f"{confl['favor']}%")
-        cf2.metric("Contra", f"{confl['contra']}%")
-        cf3.metric("Confluência", confl["nivel"])
+        cf1, cf2, cf3, cf4 = st.columns(4)
+        cf1.metric("A favor", f"{confl['favor']:.0f}%")
+        cf2.metric("Contra", f"{confl['contra']:.0f}%")
+        cf3.metric("Score final", f"{confl['score_confluencia']:.0f}/100")
+        cf4.metric("Qualidade", f"{confl['qualidade_confluencia']:.0f}%")
 
         detalhes = []
-        for nome_sinal, estado, peso in confl["sinais"]:
+        for nome_sinal, estado, peso, fator, peso_eff in confl["linhas_dinamicas"]:
             icon = "🟢" if estado > 0 else "🔴" if estado < 0 else "⚪"
-            detalhes.append({"Componente": nome_sinal, "Leitura": icon, "Peso": f"{peso}%"})
+            detalhes.append({
+                "Componente": nome_sinal,
+                "Leitura": icon,
+                "Peso nominal": f"{peso:.0f}%",
+                "Qualidade/frescor": f"{fator*100:.0f}%",
+                "Peso efetivo": f"{peso_eff:.1f}%",
+            })
         st.dataframe(pd.DataFrame(detalhes), use_container_width=True, hide_index=True)
 
         dt = confl["diferencial_taxas"]
         mercado3m = confl["mercado_3m"]
         tend = confl["tendencias"]
-        st.markdown("#### 📐 Qualidade macro da V5.9")
+        st.markdown("#### 📐 Qualidade macro da V6.0")
         q1, q2, q3 = st.columns(3)
         with q1:
             if dt["base"] is not None and dt["cotada"] is not None:
@@ -1872,7 +1966,7 @@ with abas[2]:
             if idade_max > 120:
                 st.warning(
                     "🟡 O spread de mercado usa pelo menos uma série antiga. "
-                    "Considere esse componente com peso menor até a FRED atualizar."
+                    "A V6.0 reduz automaticamente o peso desse componente até a FRED atualizar."
                 )
         else:
             st.warning(
@@ -1881,7 +1975,7 @@ with abas[2]:
             )
 
         st.caption(
-            "Na V5.9, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
+            "Na V6.0, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
             "da FRED/OECD. Mantivemos o Treasury 2Y como tendência dos EUA, mas não "
             "misturamos 2Y americano com uma maturidade estrangeira diferente."
         )
@@ -1896,7 +1990,7 @@ with abas[2]:
                     "Variação média": round(x["delta"], 4),
                 })
             st.dataframe(pd.DataFrame(trend_rows), use_container_width=True, hide_index=True)
-            st.caption("A V5.9 combina diferencial de juros oficiais, spread de mercado de 3 meses e direção do spread. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
+            st.caption("A V6.0 combina diferencial de juros oficiais, spread de mercado e direção do spread com pesos ajustados pelo frescor dos dados. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
 
         # Substitui a confiança antiga pela confiança de confluência.
         if "SEM VANTAGEM" in acao:
@@ -1910,6 +2004,36 @@ with abas[2]:
             st.warning(f"🟡 Sinal macro com confluência: {nivel_final}")
         else:
             st.info("⚪ Confluência baixa — evitar tratar a diferença de scores como sinal forte.")
+
+        score_final = confl["score_confluencia"]
+        qualidade_final = confl["qualidade_confluencia"]
+
+        st.markdown("### 🧭 Decisão V6.0")
+        if "SEM VANTAGEM" in acao or score_final < 58 or qualidade_final < 50:
+            st.info(
+                f"⚪ **NEUTRO / AGUARDAR** — Score {score_final:.0f}/100 | "
+                f"Qualidade {qualidade_final:.0f}%"
+            )
+        elif nivel_final == "ALTA":
+            st.success(
+                f"✅ **{acao}** — Confluência ALTA | Score {score_final:.0f}/100 | "
+                f"Qualidade {qualidade_final:.0f}%"
+            )
+        elif nivel_final == "MODERADA":
+            st.warning(
+                f"🟡 **{acao}** — Confluência MODERADA | Score {score_final:.0f}/100 | "
+                f"Qualidade {qualidade_final:.0f}%"
+            )
+        else:
+            st.info(
+                f"⚪ **AGUARDAR CONFIRMAÇÃO** — direção macro: {acao} | "
+                f"Score {score_final:.0f}/100 | Qualidade {qualidade_final:.0f}%"
+            )
+
+        st.caption(
+            "Score final = confluência direcional ajustada pela qualidade/frescor dos dados. "
+            "Não representa probabilidade de lucro ou taxa de acerto."
+        )
 
         st.write(f"Motivo: {base} está em **{score_base:.1f}** e {cotada} em **{score_cotada:.1f}**. O USD, quando presente, já inclui o ajuste das surpresas econômicas.")
         st.warning("⚠️ O viés macro não é gatilho de entrada nem probabilidade de lucro. Confirme preço, estrutura, liquidez, sessão e risco.")
