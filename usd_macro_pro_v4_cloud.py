@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-🦅 USD Macro Pro — V5.5 SURPRESA ECONÔMICA
+🦅 USD Macro Pro — V5.6 PARES MACRO INTEGRADOS
 ================================
 - Interface em português
 - Corrige unidades de inflação e PIB no ranking global
@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "5.5 — SURPRESA ECONÔMICA"
+APP_VERSION = "5.6 — PARES MACRO INTEGRADOS"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V5.5 Português",
+    page_title="USD Macro Pro — V5.6 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1123,7 +1123,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V5.5 Português")
+st.title("🦅 USD Macro Pro — V5.6 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -1356,6 +1356,9 @@ with abas[1]:
     st.dataframe(df_surpresa, use_container_width=True, hide_index=True)
 
     leitura_surpresa = interpretar_conjunto_surpresas(df_surpresa, usd_detalhado["score"])
+    st.session_state["usd_score_ajustado_surpresas"] = float(leitura_surpresa["score_ajustado"])
+    st.session_state["usd_ajuste_surpresas"] = float(leitura_surpresa["ajuste"])
+    st.session_state["usd_confirmacao_surpresas"] = leitura_surpresa["confirmação"]
 
     st.markdown("#### 🧭 Efeito das surpresas sobre o score do USD")
     ca, cb, cc = st.columns(3)
@@ -1380,65 +1383,87 @@ with abas[1]:
 # ABA 3 — PARES
 # =========================================================
 with abas[2]:
-    st.subheader("Análise de Par de Moedas")
+    st.subheader("💱 Pares e Confiança — V5.6")
+
+    usd_base = float(usd_detalhado["score"])
+    usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
+    ajuste = float(st.session_state.get("usd_ajuste_surpresas", 0.0))
+    confirmacao = st.session_state.get("usd_confirmacao_surpresas", "Sem previsões preenchidas")
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("USD macro base", f"{usd_base:.0f}/100")
+    c2.metric("Ajuste das surpresas", f"{ajuste:+.1f}")
+    c3.metric("USD usado nos pares", f"{usd_ajustado:.0f}/100")
+    st.caption(f"Leitura das surpresas: {confirmacao}")
+
+    # Mantém o seletor original e integra o USD ajustado.
     moedas = ranking["Código"].tolist()
-    c1, c2 = st.columns(2)
-    with c1:
+    ca, cb = st.columns(2)
+    with ca:
         base = st.selectbox("Moeda base", moedas, index=moedas.index("EUR") if "EUR" in moedas else 0)
-    with c2:
+    with cb:
         cotada = st.selectbox("Moeda cotada", moedas, index=moedas.index("USD") if "USD" in moedas else 1)
 
     if base == cotada:
         st.warning("Escolha duas moedas diferentes.")
     else:
-        score_base = float(ranking.loc[ranking["Código"] == base, "Pontuação_Final"].iloc[0])
-        score_cotada = float(ranking.loc[ranking["Código"] == cotada, "Pontuação_Final"].iloc[0])
-        confianca, diferenca, status = confianca_modelo(score_base, score_cotada)
+        score_base = usd_ajustado if base == "USD" else float(ranking.loc[ranking["Código"] == base, "Pontuação_Final"].iloc[0])
+        score_cotada = usd_ajustado if cotada == "USD" else float(ranking.loc[ranking["Código"] == cotada, "Pontuação_Final"].iloc[0])
+        diferenca = score_base - score_cotada
+        ad = abs(diferenca)
 
-        col1, col2, col3 = st.columns([1, 1.5, 1])
-        with col1:
-            st.metric(base, f"{score_base:.1f}")
-        with col2:
-            st.subheader(f"{base}/{cotada}")
-            st.markdown(f"### {status}")
-            st.progress(float(np.clip(confianca, 0, 1)))
-            st.markdown(
-                f"**Confiança relativa** — {base}: {confianca*100:.0f}% · "
-                f"{cotada}: {(1-confianca)*100:.0f}%"
-            )
-        with col3:
-            st.metric(cotada, f"{score_cotada:.1f}")
-
-        st.caption(f"Diferença de força: {diferenca:+.1f} pontos | Sensibilidade: {ESCALA_CONFIANCA:.1f}")
-
-        leitura_par = classificar_par(score_base, score_cotada, base, cotada)
-        st.markdown("### 🎯 Conclusão do par")
-        if leitura_par["icone"] == "🟢":
-            st.success(f"{leitura_par['icone']} **{leitura_par['vies']}** | Confiança macro: **{leitura_par['confianca']}**")
-        elif leitura_par["icone"] == "🔴":
-            st.error(f"{leitura_par['icone']} **{leitura_par['vies']}** | Confiança macro: **{leitura_par['confianca']}**")
+        if ad < 6:
+            acao, nivel, icone = f"SEM VANTAGEM MACRO CLARA EM {base}/{cotada}", "BAIXA", "⚪"
+        elif diferenca > 0:
+            acao, icone = f"COMPRA {base}/{cotada}", "🟢"
+            nivel = "ALTA" if ad >= 20 else "MODERADA"
         else:
-            st.info(f"{leitura_par['icone']} **{leitura_par['vies']}** | Confiança macro: **{leitura_par['confianca']}**")
-        st.write(
-            f"Motivo: {base} está com score **{score_base:.1f}** e {cotada} com **{score_cotada:.1f}**, "
-            f"uma diferença de **{leitura_par['diferenca']:+.1f} pontos**."
-        )
-        st.warning("A confiança é uma classificação do modelo, não uma probabilidade estatística comprovada. Valide no teste histórico.")
+            acao, icone = f"VENDA {base}/{cotada}", "🔴"
+            nivel = "ALTA" if ad >= 20 else "MODERADA"
+
+        st.markdown("### 🎯 Conclusão integrada")
+        msg = f"{icone} **{acao}** | Confiança macro: **{nivel}**"
+        if icone == "🟢": st.success(msg)
+        elif icone == "🔴": st.error(msg)
+        else: st.info(msg)
+
+        x1,x2,x3=st.columns(3)
+        x1.metric(base, f"{score_base:.1f}/100")
+        x2.metric("Diferença macro", f"{diferenca:+.1f}")
+        x3.metric(cotada, f"{score_cotada:.1f}/100")
+
+        st.write(f"Motivo: {base} está em **{score_base:.1f}** e {cotada} em **{score_cotada:.1f}**. O USD, quando presente, já inclui o ajuste das surpresas econômicas.")
+        st.warning("⚠️ O viés macro não é gatilho de entrada nem probabilidade de lucro. Confirme preço, estrutura, liquidez, sessão e risco.")
 
         st.markdown("#### 📝 Registrar sinal para teste histórico")
-        preco = st.number_input(
-            "Preço de entrada",
-            min_value=0.00001,
-            max_value=1000.0,
-            value=1.10000,
-            step=0.00001,
-            format="%.5f",
-        )
-        horizonte = st.selectbox("Tempo para avaliar (horas)", [1, 4, 8, 24, 48, 72], 3)
-
+        preco = st.number_input("Preço de entrada", min_value=0.00001, max_value=1000.0, value=1.10000, step=0.00001, format="%.5f")
+        horizonte = st.selectbox("Tempo para avaliar (horas)", [1,4,8,24,48,72], 3)
         if st.button("Registrar sinal"):
-            registrar_sinal(f"{base}/{cotada}", confianca, score_base, score_cotada, preco, horizonte)
+            conf_reg = float(np.clip(0.5 + diferenca/100, 0.01, 0.99))
+            registrar_sinal(f"{base}/{cotada}", conf_reg, score_base, score_cotada, preco, horizonte)
             st.success("✅ Sinal registrado!")
+
+    st.markdown("---")
+    st.markdown("### 🏆 Matriz dos principais pares")
+    pares = ["EUR/USD","GBP/USD","AUD/USD","NZD/USD","USD/JPY","USD/CHF","USD/CAD"]
+    rows=[]
+    scores=dict(zip(ranking["Código"],ranking["Pontuação_Final"]))
+    for par in pares:
+        b,q=par.split("/")
+        sb=usd_ajustado if b=="USD" else float(scores.get(b,50))
+        sq=usd_ajustado if q=="USD" else float(scores.get(q,50))
+        d=sb-sq
+        if abs(d)<6: ac="⚪ NEUTRO"; cf="BAIXA"
+        elif d>0: ac=f"🟢 COMPRA {par}"; cf="ALTA" if abs(d)>=20 else "MODERADA"
+        else: ac=f"🔴 VENDA {par}"; cf="ALTA" if abs(d)>=20 else "MODERADA"
+        rows.append({"Par":par,"Score base":round(sb,1),"Score cotada":round(sq,1),"Diferença":round(d,1),"Leitura":ac,"Confiança":cf})
+    matriz=pd.DataFrame(rows).sort_values("Diferença", key=lambda s:s.abs(), ascending=False)
+    st.dataframe(matriz,use_container_width=True,hide_index=True)
+    top=matriz[matriz["Leitura"]!="⚪ NEUTRO"].head(3)
+    if not top.empty:
+        st.markdown("#### ⭐ Maiores diferenças macro")
+        for _,r in top.iterrows():
+            st.write(f"**{r['Leitura']}** — diferença {r['Diferença']:+.1f} | confiança {r['Confiança']}")
 
 # =========================================================
 # ABA 4 — FED E NOTÍCIAS
