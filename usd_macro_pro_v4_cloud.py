@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "6.6 — EXPECTATIVA DO MERCADO"
+APP_VERSION = "6.6.1 — CORREÇÃO DE WIDGET KEYS"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V6.6 Português",
+    page_title="USD Macro Pro — V6.6.1 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1018,7 +1018,7 @@ def _resumo_expectativa_v66(linhas: list[dict]) -> dict:
 
 
 def _mostrar_expectativa_v66():
-    st.subheader("🔮 Expectativa do Mercado — V6.6")
+    st.subheader("🔮 Expectativa do Mercado — V6.6.1")
     st.caption(
         "Antes da divulgação: compara PREVISÃO/CONSENSO com o ANTERIOR. "
         "Depois da divulgação, a seção de Surpresa Econômica compara REAL com PREVISÃO."
@@ -1042,8 +1042,8 @@ def _mostrar_expectativa_v66():
     linhas = []
     for nome, maior_favorece in indicadores:
         # Reutiliza exatamente os mesmos campos da seção de surpresa.
-        prev_key = f"previsao_{nome}"
-        ant_key = f"anterior_{nome}"
+        prev_key = f"v66_previsao_{nome}"
+        ant_key = f"v66_anterior_{nome}"
         flag_key = f"v66_consenso_{nome}"
 
         if prev_key not in st.session_state:
