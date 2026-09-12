@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "6.9 — FOMC SURPRISE ENGINE"
+APP_VERSION = "7.0 — SCORE MESTRE"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V6.9 Português",
+    page_title="USD Macro Pro — V7.0 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1018,7 +1018,7 @@ def _resumo_expectativa_v66(linhas: list[dict]) -> dict:
 
 
 def _mostrar_expectativa_v66():
-    st.subheader("🔮 Expectativa do Mercado — V6.9")
+    st.subheader("🔮 Expectativa do Mercado — V7.0")
     st.caption(
         "Antes da divulgação: compara PREVISÃO/CONSENSO com o ANTERIOR. "
         "Depois da divulgação, a seção de Surpresa Econômica compara REAL com PREVISÃO."
@@ -1305,7 +1305,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V6.9 Português")
+st.title("🦅 USD Macro Pro — V7.0 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2306,7 +2306,7 @@ def _avaliar_risco_calendario_v65(confl: dict, diferenca: float, evento: dict) -
 
 
 def _mostrar_risco_timing_v65(confl: dict, diferenca: float):
-    st.markdown("### 📅 Calendário + Risco e Timing — V6.9")
+    st.markdown("### 📅 Calendário + Risco e Timing — V7.0")
     st.caption(
         "Calendário combinado: FRED (CPI, Payroll, PIB e PCE) + Federal Reserve (FOMC) "
         "+ ISM (Industrial e Serviços)."
@@ -2658,7 +2658,7 @@ def _mostrar_expectativa_no_par_v68(base: str, cotada: str):
     Reutiliza as mesmas session_state keys do Painel EUA, mas NÃO cria widgets
     com aquelas keys aqui; usa keys v67 exclusivas e sincroniza os valores.
     """
-    st.markdown("### 🔮 Expectativa do Mercado — V6.9")
+    st.markdown("### 🔮 Expectativa do Mercado — V7.0")
     st.caption(
         "Preencha o consenso diretamente aqui. O painel compara CONSENSO × ANTERIOR "
         "antes do release. Isso continua informativo e não é contado duas vezes no score."
@@ -2950,7 +2950,7 @@ def _mostrar_fomc_surprise_v69(base: str, cotada: str):
     prox = _proximo_evento_macro_v65()
     evento = prox.get("evento", "") if prox.get("disponivel") else ""
 
-    st.markdown("### ⚡ FOMC Surprise Engine — V6.9")
+    st.markdown("### ⚡ FOMC Surprise Engine — V7.0")
     st.caption(
         "Use esta área APÓS a decisão. Ela compara o que o mercado precificava "
         "com o que o Fed realmente fez e adiciona uma leitura separada do comunicado/Powell."
@@ -2972,9 +2972,10 @@ def _mostrar_fomc_surprise_v69(base: str, cotada: str):
         key="v69_fomc_pos_release"
     )
     if not ativar:
+        st.session_state["v69_fomc_surprise_ativo"] = False
         st.info(
             "Enquanto a decisão não sair, mantenha esta área desativada. "
-            "A análise pré-FOMC da V6.8 continua sendo a referência."
+            "A análise pré-FOMC continua sendo a referência."
         )
         return
 
@@ -3051,11 +3052,167 @@ def _mostrar_fomc_surprise_v69(base: str, cotada: str):
     )
 
 
+
+def _score_mestre_v70(base: str, cotada: str, diferenca: float, confl: dict) -> dict:
+    """
+    V7.0 — consolida o estado do sistema sem transformar score em probabilidade.
+    Mantém Direção, Qualidade e Timing separados.
+
+    Importante:
+    - confluência já contém macro/Fed/juros; não repetimos esses componentes;
+    - expectativa pré-release é contexto e recebe peso pequeno;
+    - surpresa FOMC só entra se o módulo pós-release estiver explicitamente ativado;
+    - calendário afeta TIMING, não a direção estrutural.
+    """
+    conf_score = float(confl.get("score_confluencia", 50.0))
+    qualidade = float(confl.get("qualidade_confluencia", 0.0))
+
+    # Direção do par: diferença macro já está no sentido base - cotada.
+    if diferenca >= 0:
+        direcao = f"COMPRA {base}/{cotada}"
+        sinal = 1.0
+    else:
+        direcao = f"VENDA {base}/{cotada}"
+        sinal = -1.0
+
+    # Núcleo direcional = motor de confluência já deduplicado.
+    componentes = [{
+        "Componente": "Confluência macro",
+        "Score": conf_score,
+        "Peso": 0.80,
+        "Ativo": True,
+        "Observação": "Macro + juros + Fed + frescor já consolidados"
+    }]
+
+    # Expectativa pré-release: só entra se houve dado explícito.
+    exp_ativo = bool(st.session_state.get("v67_expectativa_tem_dado", False))
+    exp_usd = float(st.session_state.get("v66_expectativa_score", 50.0))
+    if "USD" in (base, cotada) and exp_ativo:
+        # Converte USD-score para o sentido da direção atual do par.
+        usd_favorece_compra = base == "USD"
+        exp_par = exp_usd if usd_favorece_compra else 100.0 - exp_usd
+        # Se a direção estrutural é venda, inverter novamente para medir confirmação.
+        exp_confirm = exp_par if sinal > 0 else 100.0 - exp_par
+        componentes.append({
+            "Componente": "Expectativa pré-release",
+            "Score": exp_confirm,
+            "Peso": 0.08,
+            "Ativo": True,
+            "Observação": "Consenso × anterior / cenários FOMC"
+        })
+
+    # Surpresa FOMC pós-release: entra somente quando ativada.
+    fomc_ativo = bool(st.session_state.get("v69_fomc_surprise_ativo", False))
+    fomc_usd = float(st.session_state.get("v69_fomc_surprise_score", 50.0))
+    if "USD" in (base, cotada) and fomc_ativo:
+        usd_favorece_compra = base == "USD"
+        fomc_par = fomc_usd if usd_favorece_compra else 100.0 - fomc_usd
+        fomc_confirm = fomc_par if sinal > 0 else 100.0 - fomc_par
+        componentes.append({
+            "Componente": "Surpresa FOMC pós-release",
+            "Score": fomc_confirm,
+            "Peso": 0.12,
+            "Ativo": True,
+            "Observação": "Decisão real × precificação + comunicação"
+        })
+
+    # Normaliza apenas pesos ativos para não punir ausência de módulos opcionais.
+    peso_total = sum(c["Peso"] for c in componentes if c["Ativo"])
+    score_mestre = sum(c["Score"] * c["Peso"] for c in componentes if c["Ativo"]) / max(peso_total, 1e-9)
+
+    # Timing vem do calendário, separado da direção.
+    prox = _proximo_evento_macro_v65()
+    rt = _avaliar_risco_calendario_v65(confl, diferenca, prox)
+    timing = float(rt["timing"])
+    risco = str(rt["risco"])
+
+    # Classificação do alinhamento direcional.
+    if score_mestre >= 78:
+        nivel = "FORTE"
+    elif score_mestre >= 62:
+        nivel = "MODERADO"
+    else:
+        nivel = "FRACO / MISTO"
+
+    # Estado operacional: não é ordem de entrada.
+    if qualidade < 55 or score_mestre < 58:
+        estado = "⚪ AGUARDAR — vantagem insuficiente"
+    elif risco in ("MUITO ALTO", "ALTO"):
+        estado = "🔴 DIREÇÃO EXISTE, MAS RISCO DE EVENTO É ALTO"
+    elif timing >= 72 and score_mestre >= 70:
+        estado = "🟢 CENÁRIO MACRO ALINHADO — PROCURAR CONFIRMAÇÃO NO PREÇO"
+    elif timing >= 58:
+        estado = "🟡 DIREÇÃO VÁLIDA — AGUARDAR CONFIRMAÇÃO"
+    else:
+        estado = "⚪ AGUARDAR MELHOR TIMING"
+
+    return {
+        "direcao": direcao,
+        "score": float(np.clip(score_mestre, 0, 100)),
+        "qualidade": qualidade,
+        "timing": timing,
+        "risco": risco,
+        "nivel": nivel,
+        "estado": estado,
+        "componentes": componentes,
+    }
+
+
+def _mostrar_score_mestre_v70(base: str, cotada: str, diferenca: float, confl: dict):
+    st.markdown("## 🦅 Score Mestre — V7.0")
+    st.caption(
+        "Resumo final do motor. Direção, qualidade dos dados e timing ficam separados "
+        "para não confundir score interno com probabilidade de lucro."
+    )
+
+    m = _score_mestre_v70(base, cotada, diferenca, confl)
+
+    a,b,c,d = st.columns(4)
+    a.metric("Direção", m["direcao"])
+    b.metric("Score Mestre", f"{m['score']:.0f}/100")
+    c.metric("Qualidade", f"{m['qualidade']:.0f}%")
+    d.metric("Timing", f"{m['timing']:.0f}/100")
+
+    st.write(f"**Alinhamento:** {m['nivel']} · **Risco de calendário:** {m['risco']}")
+
+    if m["estado"].startswith("🟢"):
+        st.success(f"**{m['estado']}**")
+    elif m["estado"].startswith("🔴"):
+        st.error(f"**{m['estado']}**")
+    elif m["estado"].startswith("🟡"):
+        st.warning(f"**{m['estado']}**")
+    else:
+        st.info(f"**{m['estado']}**")
+
+    with st.expander("🔎 Como o Score Mestre foi formado"):
+        rows = []
+        peso_ativo = sum(x["Peso"] for x in m["componentes"] if x["Ativo"])
+        for x in m["componentes"]:
+            rows.append({
+                "Componente": x["Componente"],
+                "Score de confirmação": round(float(x["Score"]), 1),
+                "Peso nominal": f"{x['Peso']*100:.0f}%",
+                "Peso normalizado": f"{(x['Peso']/peso_ativo)*100:.1f}%" if peso_ativo else "—",
+                "Observação": x["Observação"],
+            })
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+    st.warning(
+        "Score Mestre 80/100 NÃO significa 80% de chance de lucro. "
+        "É uma medida interna de alinhamento dos componentes macro disponíveis."
+    )
+    st.caption(
+        "Calendário e timing não invertem automaticamente a direção macro; eles controlam "
+        "quando vale procurar confirmação técnica. Spread, liquidez, slippage e estrutura "
+        "do gráfico continuam fora deste score."
+    )
+
+
 # =========================================================
 # ABA 3 — PARES
 # =========================================================
 with abas[2]:
-    st.subheader("💱 Painel de Decisão — V6.9")
+    st.subheader("💱 Painel de Decisão — V7.0")
 
     usd_base = float(usd_detalhado["score"])
     usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
@@ -3127,7 +3284,7 @@ with abas[2]:
         dt = confl["diferencial_taxas"]
         mercado3m = confl["mercado_3m"]
         tend = confl["tendencias"]
-        st.markdown("#### 📐 Qualidade macro da V6.9")
+        st.markdown("#### 📐 Qualidade macro da V7.0")
         q1, q2, q3 = st.columns(3)
         with q1:
             if dt["base"] is not None and dt["cotada"] is not None:
@@ -3180,7 +3337,7 @@ with abas[2]:
             if idade_max > 120:
                 st.warning(
                     "🟡 O spread de mercado usa pelo menos uma série antiga. "
-                    "A V6.9 reduz automaticamente o peso desse componente até a FRED atualizar."
+                    "A V7.0 reduz automaticamente o peso desse componente até a FRED atualizar."
                 )
         else:
             st.warning(
@@ -3189,7 +3346,7 @@ with abas[2]:
             )
 
         st.caption(
-            "Na V6.9, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
+            "Na V7.0, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
             "da FRED/OECD. Mantivemos o Treasury 2Y como tendência dos EUA, mas não "
             "misturamos 2Y americano com uma maturidade estrangeira diferente."
         )
@@ -3204,7 +3361,7 @@ with abas[2]:
                     "Variação média": round(x["delta"], 4),
                 })
             st.dataframe(pd.DataFrame(trend_rows), use_container_width=True, hide_index=True)
-            st.caption("A V6.9 combina diferencial de juros oficiais, spread de mercado e direção do spread com pesos ajustados pelo frescor dos dados. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
+            st.caption("A V7.0 combina diferencial de juros oficiais, spread de mercado e direção do spread com pesos ajustados pelo frescor dos dados. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
 
         # Substitui a confiança antiga pela confiança de confluência.
         if "SEM VANTAGEM" in acao:
@@ -3222,7 +3379,7 @@ with abas[2]:
         score_final = confl["score_confluencia"]
         qualidade_final = confl["qualidade_confluencia"]
 
-        st.markdown("### 🧭 Decisão V6.9")
+        st.markdown("### 🧭 Decisão V7.0")
         if "SEM VANTAGEM" in acao or score_final < 58 or qualidade_final < 50:
             st.info(
                 f"⚪ **NEUTRO / AGUARDAR** — Score {score_final:.0f}/100 | "
@@ -3258,6 +3415,8 @@ with abas[2]:
 
         _mostrar_fomc_surprise_v69(base, cotada)
 
+        _mostrar_score_mestre_v70(base, cotada, diferenca, confl)
+
         _mostrar_risco_timing_v65(confl, diferenca)
 
         st.write(f"Motivo: {base} está em **{score_base:.1f}** e {cotada} em **{score_cotada:.1f}**. O USD, quando presente, já inclui o ajuste das surpresas econômicas.")
@@ -3272,7 +3431,7 @@ with abas[2]:
             st.success("✅ Sinal registrado!")
 
     st.markdown("---")
-    st.markdown("### 🏆 Matriz Inteligente — V6.9")
+    st.markdown("### 🏆 Matriz Inteligente — V7.0")
     st.caption(
         "Todos os pares abaixo passam pelo mesmo motor de confluência, qualidade e frescor "
         "usado na análise individual."
