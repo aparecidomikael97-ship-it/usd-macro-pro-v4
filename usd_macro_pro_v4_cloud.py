@@ -28,12 +28,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "8.7.2 — MULTIPARES ATÔMICO CORRIGIDO"
+APP_VERSION = "8.7.3 — 1 PAR POR DIA + LEGADO SEPARADO"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V8.7.2 Português",
+    page_title="USD Macro Pro — V8.7.3 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1606,7 +1606,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V8.7.2 Português")
+st.title("🦅 USD Macro Pro — V8.7.3 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2414,6 +2414,13 @@ def _central_decisao_v81(par, base, cotada, score_base, score_cotada, diferenca,
 
 ARQ_SINAIS_V82 = "dados/sinais_v82.parquet"
 
+def _dia_coleta_v873():
+    """Dia civil da coleta no fuso de Cuiabá."""
+    try:
+        return pd.Timestamp.now(tz="America/Cuiaba").strftime("%Y-%m-%d")
+    except Exception:
+        return pd.Timestamp.now().strftime("%Y-%m-%d")
+
 def _garantir_pasta_v82():
     try:
         Path("dados").mkdir(parents=True, exist_ok=True)
@@ -2421,27 +2428,42 @@ def _garantir_pasta_v82():
         pass
 
 def _carregar_sinais_v82():
+    """
+    V8.7.3 — carrega histórico persistente e separa registros antigos.
+    Tudo que não tiver versão explícita passa a ser LEGADO.
+    """
     _garantir_pasta_v82()
 
-    # V8.4 — primeiro tenta a cópia persistente.
+    def _normalizar_v873(df):
+        df = df.copy()
+        if "versao_coleta" not in df.columns:
+            df["versao_coleta"] = "LEGADO"
+        else:
+            df["versao_coleta"] = df["versao_coleta"].fillna("LEGADO").replace("", "LEGADO")
+        if "dia_coleta" not in df.columns:
+            df["dia_coleta"] = ""
+        else:
+            df["dia_coleta"] = df["dia_coleta"].fillna("").astype(str)
+        return df
+
     if "_github_ler_csv_v84" in globals():
         remoto = _github_ler_csv_v84()
         if isinstance(remoto, pd.DataFrame) and not remoto.empty:
-            return remoto
+            return _normalizar_v873(remoto)
 
-    # Fallback local do Streamlit.
     p = Path(ARQ_SINAIS_V82)
     if p.exists():
         try:
-            return pd.read_parquet(p)
+            return _normalizar_v873(pd.read_parquet(p))
         except Exception:
             pass
+
     cols = [
         "timestamp","par","direcao","score_mestre","qualidade",
         "score_base","score_cotada","diferenca","fomc_score",
         "fomc_peso","evento","dias_evento","impacto","timing",
         "preco_entrada","data_preco","avaliado","preco_saida",
-        "data_saida","retorno_pct","acertou"
+        "data_saida","retorno_pct","acertou","versao_coleta","dia_coleta"
     ]
     return pd.DataFrame(columns=cols)
 
@@ -2518,25 +2540,32 @@ def _github_salvar_csv_v84(df):
 
 def _salvar_sinais_v82(df):
     """
-    V8.7.1: salva localmente e no GitHub com deduplicação forte.
-    Regra histórica: um par + uma data de observação FRED = no máximo uma linha.
-    Se houver duplicatas antigas, preserva a primeira fotografia registrada.
+    V8.7.3 — persistência segura:
+    - LEGADO permanece guardado, mas separado;
+    - V8.7.3: 1 par + 1 dia de coleta = no máximo 1 fotografia.
     """
     _garantir_pasta_v82()
-
     df = df.copy()
-    if not df.empty and "par" in df.columns and "data_preco" in df.columns:
-        df["par"] = df["par"].astype(str).str.upper().str.strip()
-        _datas = pd.to_datetime(df["data_preco"], errors="coerce")
-        df["_data_fred_v871"] = _datas.dt.strftime("%Y-%m-%d")
-        # Históricos antigos podem misturar Timestamp e texto em "timestamp".
-        # Não precisamos ordenar aqui: a ordem atual já mantém os registros antigos
-        # antes dos novos; keep="first" preserva a primeira fotografia.
-        df = (
-            df.drop_duplicates(subset=["par", "_data_fred_v871"], keep="first")
-              .drop(columns=["_data_fred_v871"])
-              .reset_index(drop=True)
-        )
+
+    if "versao_coleta" not in df.columns:
+        df["versao_coleta"] = "LEGADO"
+    df["versao_coleta"] = df["versao_coleta"].fillna("LEGADO").replace("", "LEGADO")
+
+    if "dia_coleta" not in df.columns:
+        df["dia_coleta"] = ""
+    df["dia_coleta"] = df["dia_coleta"].fillna("").astype(str)
+
+    if not df.empty:
+        legados = df[df["versao_coleta"].astype(str) != "V8.7.3"].copy()
+        novos = df[df["versao_coleta"].astype(str) == "V8.7.3"].copy()
+
+        if not novos.empty:
+            novos["par"] = novos["par"].astype(str).str.upper().str.strip()
+            novos = novos.drop_duplicates(
+                subset=["par", "dia_coleta"], keep="first"
+            )
+
+        df = pd.concat([legados, novos], ignore_index=True)
 
     ok_local = False
     try:
@@ -2607,20 +2636,18 @@ def _registrar_sinal_v82(par, direcao, score_mestre, qualidade,
         timing = "NORMAL"
 
     df = _carregar_sinais_v82()
+    dia_coleta = _dia_coleta_v873()
 
-    # V8.3 — evita duplicar a mesma fotografia de mercado.
-    # Enquanto a FRED ainda estiver na mesma data/preço e a direção for a mesma,
-    # não cria outro registro.
     if not df.empty:
-        datas_preco = pd.to_datetime(df["data_preco"], errors="coerce")
         dup = (
             (df["par"].astype(str).str.upper().str.strip() == str(par).upper().strip()) &
-            (datas_preco.dt.strftime("%Y-%m-%d") == pd.Timestamp(dt_preco).strftime("%Y-%m-%d"))
+            (df["versao_coleta"].astype(str) == "V8.7.3") &
+            (df["dia_coleta"].astype(str) == dia_coleta)
         )
         if dup.any():
             return False, (
-                f"Este cenário já foi registrado usando o preço FRED de {dt_preco}. "
-                "Aguarde uma nova observação diária antes de registrar novamente."
+                f"{par} já possui uma fotografia V8.7.3 em {dia_coleta}. "
+                "A próxima coleta será liberada no próximo dia."
             )
 
     linha = {
@@ -2645,6 +2672,8 @@ def _registrar_sinal_v82(par, direcao, score_mestre, qualidade,
         "data_saida": None,
         "retorno_pct": None,
         "acertou": None,
+        "versao_coleta": "V8.7.3",
+        "dia_coleta": dia_coleta,
     }
     df = pd.concat([df, pd.DataFrame([linha])], ignore_index=True)
     ok = _salvar_sinais_v82(df)
@@ -2709,7 +2738,7 @@ def _avaliar_sinais_v82():
     return df, atualizados
 
 def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca, confl):
-    st.markdown("## 🧪 Validação Histórica — V8.7.2")
+    st.markdown("## 🧪 Validação Histórica — V8.7.3")
     st.caption(
         "Este módulo registra o sinal AGORA, evita duplicatas e mede depois. "
         "Ele não reconstrói o passado usando dados futuros."
@@ -2734,7 +2763,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 
     if serie_atual:
         st.info(
-            f"Fonte de preço V8.7.2: FRED {serie_atual}, série diária oficial H.10 para {par}. "
+            f"Fonte de preço V8.7.3: FRED {serie_atual}, série diária oficial H.10 para {par}. "
             "A validação mede direção entre observações diárias — não 1h/4h."
         )
     else:
@@ -2813,7 +2842,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     pendentes = df[df["avaliado"] != True].copy()
     avaliados_total = df[df["avaliado"] == True].copy()
 
-    st.markdown("### 💾 Persistência do histórico — V8.7.2")
+    st.markdown("### 💾 Persistência do histórico — V8.7.3")
     _v84_token, _v84_repo, _v84_branch = _github_cfg_v84()
     if _v84_token:
         st.success(
@@ -2866,6 +2895,13 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
         st.success("✅ Todos os sinais registrados já possuem avaliação posterior.")
 
     st.markdown("### 📚 Histórico registrado")
+    if "versao_coleta" in df.columns:
+        _n_legado_v873 = int((df["versao_coleta"].astype(str) != "V8.7.3").sum())
+        if _n_legado_v873:
+            st.info(
+                f"ℹ️ {_n_legado_v873} registro(s) anterior(es) estão marcados como LEGADO. "
+                "Eles permanecem visíveis, mas não entram nas estatísticas oficiais da V8.7.3."
+            )
     exibir = df.copy()
     for col in ["timestamp","data_preco","data_saida"]:
         if col in exibir.columns:
@@ -2882,7 +2918,10 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
         return
 
     validos = avaliados[avaliados["acertou"].notna()].copy()
+    if "versao_coleta" in validos.columns:
+        validos = validos[validos["versao_coleta"].astype(str) == "V8.7.3"].copy()
     if validos.empty:
+        st.info("Ainda não há sinais V8.7.3 avaliados suficientes para estatística oficial.")
         return
 
     taxa = 100.0 * validos["acertou"].astype(bool).mean()
@@ -2893,7 +2932,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     r1,r2,r3 = st.columns(3)
     r1.metric("Sinais avaliados", n)
     r2.metric("Acerto direcional", f"{taxa:.1f}%")
-    r3.metric("Retorno médio do EUR/USD", f"{ret_medio:+.3f}%")
+    r3.metric("Retorno médio", f"{ret_medio:+.3f}%")
 
     # Segmentação simples por Score Mestre.
     faixas = []
@@ -5290,7 +5329,7 @@ with abas[2]:
             st.success("✅ Sinal registrado!")
 
     st.markdown("---")
-    st.markdown("### 🏆 Matriz Inteligente — V8.7.2")
+    st.markdown("### 🏆 Matriz Inteligente — V8.7.3")
     st.caption(
         "Todos os pares abaixo passam pelo mesmo motor de confluência, qualidade e frescor "
         "usado na análise individual."
@@ -5359,125 +5398,117 @@ with abas[2]:
     matriz_v61.insert(0, "Ranking", range(1, len(matriz_v61) + 1))
 
     # =====================================================
-    # V8.7.1 — COLETA HISTÓRICA MULTIPARES ATÔMICA
-    # Usa EXATAMENTE a decisão final exibida na Matriz.
-    # Carrega o histórico uma vez, adiciona todos os pares elegíveis
-    # e salva uma única vez. Isso evita conflitos/duplicatas no GitHub.
+    # V8.7.3 — COLETA HISTÓRICA MULTIPARES ATÔMICA
+    # Regra: 1 par + 1 DIA DE COLETA = no máximo 1 fotografia.
+    # Registros anteriores ficam como LEGADO e não contaminam a estatística nova.
     # =====================================================
-    _df_v871 = _carregar_sinais_v82()
-    _novas_v871 = []
-    _status_v871 = []
+    _df_v873 = _carregar_sinais_v82()
+    _novas_v873 = []
+    _dia_lote_v873 = _dia_coleta_v873()
 
-    # Metadados de evento/FOMC calculados uma vez para toda a fotografia.
-    _evento_v871 = _proximo_evento_macro_v65()
-    _evento_nome_v871, _dias_v871, _impacto_v871 = "—", None, "—"
-    if isinstance(_evento_v871, dict) and _evento_v871.get("disponivel", False):
-        _evento_nome_v871 = str(_evento_v871.get("evento", "—"))
-        _dias_v871 = _evento_v871.get("dias")
-        _impacto_v871 = str(_evento_v871.get("impacto", "—"))
+    _evento_v873 = _proximo_evento_macro_v65()
+    _evento_nome_v873, _dias_v873, _impacto_v873 = "—", None, "—"
+    if isinstance(_evento_v873, dict) and _evento_v873.get("disponivel", False):
+        _evento_nome_v873 = str(_evento_v873.get("evento", "—"))
+        _dias_v873 = _evento_v873.get("dias")
+        _impacto_v873 = str(_evento_v873.get("impacto", "—"))
 
-    _fomc_score_v871 = None
-    _fomc_peso_v871 = None
+    _fomc_score_v873 = None
+    _fomc_peso_v873 = None
     if st.session_state.get("v77_fomc_integrado", False):
-        _fomc_score_v871 = float(st.session_state.get("v76_fomc_usd_score", 50.0))
-        _fomc_peso_v871 = float(st.session_state.get("v77_peso_fomc", 0.0)) * 100.0
+        _fomc_score_v873 = float(st.session_state.get("v76_fomc_usd_score", 50.0))
+        _fomc_peso_v873 = float(st.session_state.get("v77_peso_fomc", 0.0)) * 100.0
 
-    _alto_v871 = str(_impacto_v871).upper() in ("MÁXIMO", "MAXIMO", "ALTO")
-    if _dias_v871 is not None and _dias_v871 <= 2 and _alto_v871:
-        _timing_v871 = "AGUARDAR"
-    elif _dias_v871 is not None and _dias_v871 <= 7 and _alto_v871:
-        _timing_v871 = "ATENÇÃO"
+    _alto_v873 = str(_impacto_v873).upper() in ("MÁXIMO", "MAXIMO", "ALTO")
+    if _dias_v873 is not None and _dias_v873 <= 2 and _alto_v873:
+        _timing_v873 = "AGUARDAR"
+    elif _dias_v873 is not None and _dias_v873 <= 7 and _alto_v873:
+        _timing_v873 = "ATENÇÃO"
     else:
-        _timing_v871 = "NORMAL"
+        _timing_v873 = "NORMAL"
 
-    # Índice rápido com a decisão FINAL da própria matriz.
-    _matriz_por_par_v871 = {str(r["Par"]): r for r in linhas_matriz}
+    _matriz_por_par_v873 = {str(r["Par"]): r for r in linhas_matriz}
 
-    for _par_v871 in pares_matriz:
-        _r871 = _matriz_por_par_v871[_par_v871]
-        _dec871 = str(_r871["Direção"]).upper()
+    for _par_v873 in pares_matriz:
+        _r873 = _matriz_por_par_v873[_par_v873]
+        _dec873 = str(_r873["Direção"]).upper()
 
-        # Só registra quando a Matriz realmente mostra COMPRA ou VENDA.
-        # AGUARDAR / AGUARDAR CONFIRMAÇÃO / NEUTRO ficam fora.
-        if "AGUARDAR" in _dec871 or "NEUTRO" in _dec871:
-            _status_v871.append((_par_v871, "WAIT", "Decisão final da matriz: aguardar"))
+        # A decisão final da Matriz manda.
+        if "AGUARDAR" in _dec873 or "NEUTRO" in _dec873:
             continue
-        if "COMPRA" in _dec871:
-            _dir_v871 = "BUY"
-        elif "VENDA" in _dec871:
-            _dir_v871 = "SELL"
+        if "COMPRA" in _dec873:
+            _dir873 = "BUY"
+        elif "VENDA" in _dec873:
+            _dir873 = "SELL"
         else:
-            _status_v871.append((_par_v871, "WAIT", "Sem direção final reconhecida"))
             continue
 
-        _preco_v871, _dt_v871, _serie_v871 = _fred_preco_par_v87(_par_v871)
-        if _preco_v871 is None or _dt_v871 is None:
-            _status_v871.append((_par_v871, _dir_v871, f"FRED {_serie_v871}: preço indisponível"))
-            continue
+        # Já existe fotografia NOVA deste par hoje?
+        _ja873 = False
+        if isinstance(_df_v873, pd.DataFrame) and not _df_v873.empty:
+            _ja873 = (
+                (_df_v873["par"].astype(str).str.upper().str.strip() == _par_v873) &
+                (_df_v873["versao_coleta"].astype(str) == "V8.7.3") &
+                (_df_v873["dia_coleta"].astype(str) == _dia_lote_v873)
+            ).any()
 
-        _data_key_v871 = pd.Timestamp(_dt_v871).strftime("%Y-%m-%d")
-
-        # Trava forte: par + data FRED, independentemente de direção ou rerun.
-        _ja_v871 = False
-        if isinstance(_df_v871, pd.DataFrame) and not _df_v871.empty:
-            _p871 = _df_v871["par"].astype(str).str.upper().str.strip()
-            _d871 = pd.to_datetime(_df_v871["data_preco"], errors="coerce").dt.strftime("%Y-%m-%d")
-            _ja_v871 = ((_p871 == _par_v871) & (_d871 == _data_key_v871)).any()
-
-        # Também trava contra duplicação dentro do próprio lote atual.
-        if not _ja_v871 and _novas_v871:
-            _ja_v871 = any(
-                x["par"] == _par_v871 and
-                pd.Timestamp(x["data_preco"]).strftime("%Y-%m-%d") == _data_key_v871
-                for x in _novas_v871
+        if not _ja873 and _novas_v873:
+            _ja873 = any(
+                x["par"] == _par_v873 and x["dia_coleta"] == _dia_lote_v873
+                for x in _novas_v873
             )
 
-        if _ja_v871:
-            _status_v871.append((_par_v871, _dir_v871, f"Já registrado em {_data_key_v871}"))
+        if _ja873:
             continue
 
-        _b871, _q871 = _par_v871.split("/")
-        _sb871 = usd_ajustado if _b871 == "USD" else float(scores_ranking.get(_b871, 50.0))
-        _sq871 = usd_ajustado if _q871 == "USD" else float(scores_ranking.get(_q871, 50.0))
-        _dif871 = float(_sb871 - _sq871)
+        _preco873, _dt873, _serie873 = _fred_preco_par_v87(_par_v873)
+        if _preco873 is None or _dt873 is None:
+            continue
 
-        _conf871 = calcular_confluencia_v60(
-            _b871, _q871, _dif871, usd_ajustado, ajuste,
+        _b873, _q873 = _par_v873.split("/")
+        _sb873 = usd_ajustado if _b873 == "USD" else float(scores_ranking.get(_b873, 50.0))
+        _sq873 = usd_ajustado if _q873 == "USD" else float(scores_ranking.get(_q873, 50.0))
+        _dif873 = float(_sb873 - _sq873)
+
+        _conf873 = calcular_confluencia_v60(
+            _b873, _q873, _dif873, usd_ajustado, ajuste,
             fed.get("tom", "Neutro"), ranking
         )
 
-        _novas_v871.append({
+        _novas_v873.append({
             "timestamp": pd.Timestamp.now(),
-            "par": _par_v871,
-            "direcao": _dir_v871,
-            "score_mestre": float(_conf871["score_confluencia"]),
-            "qualidade": float(_conf871["qualidade_confluencia"]),
-            "score_base": float(_sb871),
-            "score_cotada": float(_sq871),
-            "diferenca": float(_dif871),
-            "fomc_score": _fomc_score_v871,
-            "fomc_peso": _fomc_peso_v871,
-            "evento": _evento_nome_v871,
-            "dias_evento": _dias_v871,
-            "impacto": _impacto_v871,
-            "timing": _timing_v871,
-            "preco_entrada": float(_preco_v871),
-            "data_preco": pd.Timestamp(_dt_v871),
+            "par": _par_v873,
+            "direcao": _dir873,
+            "score_mestre": float(_conf873["score_confluencia"]),
+            "qualidade": float(_conf873["qualidade_confluencia"]),
+            "score_base": float(_sb873),
+            "score_cotada": float(_sq873),
+            "diferenca": float(_dif873),
+            "fomc_score": _fomc_score_v873,
+            "fomc_peso": _fomc_peso_v873,
+            "evento": _evento_nome_v873,
+            "dias_evento": _dias_v873,
+            "impacto": _impacto_v873,
+            "timing": _timing_v873,
+            "preco_entrada": float(_preco873),
+            "data_preco": pd.Timestamp(_dt873),
             "avaliado": False,
             "preco_saida": None,
             "data_saida": None,
             "retorno_pct": None,
             "acertou": None,
+            "versao_coleta": "V8.7.3",
+            "dia_coleta": _dia_lote_v873,
         })
-        _status_v871.append((_par_v871, _dir_v871, f"Novo: FRED {_serie_v871} {_data_key_v871}"))
 
-    if _novas_v871:
-        _df_v871 = pd.concat([_df_v871, pd.DataFrame(_novas_v871)], ignore_index=True)
-        _salvar_sinais_v82(_df_v871)
+    if _novas_v873:
+        _df_v873 = pd.concat([_df_v873, pd.DataFrame(_novas_v873)], ignore_index=True)
+        _salvar_sinais_v82(_df_v873)
 
     st.caption(
-        "🤖 V8.7.2 multipares: coleta atômica dos 7 pares usando exatamente a decisão final "
-        "da Matriz. Regra anti-duplicata: 1 par + 1 data FRED = no máximo 1 registro."
+        "🤖 V8.7.3 multipares: usa exatamente a decisão final da Matriz. "
+        "Regra anti-duplicata: 1 par + 1 dia de coleta = no máximo 1 registro. "
+        "Registros anteriores ficam como LEGADO."
     )
 
     st.dataframe(
