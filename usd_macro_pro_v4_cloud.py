@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "7.7 — FOMC INTEGRADO AO SCORE MESTRE"
+APP_VERSION = "7.7.1 — FOMC INTEGRADO AO SCORE MESTRE"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V7.6 Português",
+    page_title="USD Macro Pro — V7.7 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1605,11 +1605,30 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V7.6 Português")
+st.title("🦅 USD Macro Pro — V7.7 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
-st.info(f"Fed: {icone_tom} **{fed['tom']}** | Intensidade: {fed['forca']:+.2f}")
+st.info(
+    f"Fed narrativo: {icone_tom} **{fed['tom']}** | "
+    f"Intensidade: {fed['forca']:+.2f}"
+)
+
+if st.session_state.get("v77_fomc_integrado", False):
+    _v77_top_score = float(st.session_state.get("v76_fomc_usd_score", 50.0))
+    _v77_top_peso = float(st.session_state.get("v77_peso_fomc", 0.0)) * 100.0
+    _v77_top_usd = float(st.session_state.get("v77_usd_pos_fomc", 50.0))
+    st.success(
+        f"🔗 **FOMC V7.7 integrado ao USD:** "
+        f"Score FOMC {_v77_top_score:.0f}/100 | "
+        f"Peso {_v77_top_peso:.0f}% | "
+        f"USD integrado {_v77_top_usd:.1f}/100"
+    )
+else:
+    st.caption(
+        "🔗 V7.7: o FOMC calibrado será conectado automaticamente ao USD "
+        "quando o próximo evento relevante for uma reunião do FOMC."
+    )
 
 # =========================================================
 # V7.4 — MODO HÍBRIDO INTELIGENTE
