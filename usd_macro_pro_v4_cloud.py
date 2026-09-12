@@ -28,12 +28,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "8.2.1 — VALIDAÇÃO HISTÓRICA CORRIGIDA"
+APP_VERSION = "8.3 — VALIDAÇÃO AUTOMÁTICA E REGIMES"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V8.2.1 Português",
+    page_title="USD Macro Pro — V8.3 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1606,7 +1606,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V8.2.1 Português")
+st.title("🦅 USD Macro Pro — V8.3 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2490,17 +2490,21 @@ def _registrar_sinal_v82(par, direcao, score_mestre, qualidade,
 
     df = _carregar_sinais_v82()
 
-    # Evita duplicação excessiva: 1 registro por par/dia/direção.
-    hoje_str = pd.Timestamp.now().strftime("%Y-%m-%d")
+    # V8.3 — evita duplicar a mesma fotografia de mercado.
+    # Enquanto a FRED ainda estiver na mesma data/preço e a direção for a mesma,
+    # não cria outro registro.
     if not df.empty:
-        ts = pd.to_datetime(df["timestamp"], errors="coerce")
+        datas_preco = pd.to_datetime(df["data_preco"], errors="coerce")
         dup = (
             (df["par"] == par) &
             (df["direcao"] == direcao) &
-            (ts.dt.strftime("%Y-%m-%d") == hoje_str)
+            (datas_preco == pd.Timestamp(dt_preco))
         )
         if dup.any():
-            return False, "Já existe um registro deste par/direção hoje."
+            return False, (
+                f"Este cenário já foi registrado usando o preço FRED de {dt_preco}. "
+                "Aguarde uma nova observação diária antes de registrar novamente."
+            )
 
     linha = {
         "timestamp": pd.Timestamp.now(),
@@ -2579,9 +2583,9 @@ def _avaliar_sinais_v82():
     return df, atualizados
 
 def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca, confl):
-    st.markdown("## 🧪 Validação Histórica — V8.2.1")
+    st.markdown("## 🧪 Validação Histórica — V8.3")
     st.caption(
-        "Este módulo registra o sinal AGORA e mede depois. "
+        "Este módulo registra o sinal AGORA, evita duplicatas e mede depois. "
         "Ele não reconstrói o passado usando dados futuros."
     )
 
@@ -2604,7 +2608,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 
     if par == "EUR/USD":
         st.info(
-            "Fonte de preço da V8.2: FRED DEXUSEU, cotação diária em dólares por 1 euro. "
+            "Fonte de preço da V8.3: FRED DEXUSEU, cotação diária em dólares por 1 euro. "
             "Por ser diária, esta primeira validação mede direção entre dias — não 1h/4h."
         )
     else:
@@ -2629,10 +2633,28 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
         else:
             st.info("Nenhum sinal pendente tinha um novo preço diário posterior disponível.")
 
-    df = _carregar_sinais_v82()
+    # V8.3 — tenta avaliar automaticamente toda vez que o painel abre.
+    df, _v83_auto_n = _avaliar_sinais_v82()
     if df.empty:
-        st.info("Ainda não há sinais registrados na V8.2.")
+        st.info("Ainda não há sinais registrados na V8.3.")
         return
+
+    pendentes = df[df["avaliado"] != True].copy()
+    avaliados_total = df[df["avaliado"] == True].copy()
+
+    st.markdown("### 🧭 Status da validação")
+    s1, s2, s3 = st.columns(3)
+    s1.metric("Registrados", len(df))
+    s2.metric("Pendentes", len(pendentes))
+    s3.metric("Avaliados", len(avaliados_total))
+
+    if len(pendentes):
+        st.warning(
+            f"⏳ {len(pendentes)} sinal(is) pendente(s). "
+            "O sistema verificará automaticamente quando a FRED trouxer uma observação diária posterior."
+        )
+    elif len(df):
+        st.success("✅ Todos os sinais registrados já possuem avaliação posterior.")
 
     st.markdown("### 📚 Histórico registrado")
     exibir = df.copy()
@@ -2686,6 +2708,31 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     if faixas:
         st.markdown("### 🎯 Resultado por faixa de Score Mestre")
         st.dataframe(pd.DataFrame(faixas), use_container_width=True, hide_index=True)
+
+    # V8.3 — separa sinais perto/longe de eventos de impacto máximo.
+    st.markdown("### 🏦 Resultado por risco de evento")
+    regimes = []
+    _dias = pd.to_numeric(validos["dias_evento"], errors="coerce")
+    _impacto = validos["impacto"].astype(str).str.upper()
+    _perto = (_dias <= 7) & _impacto.isin(["MÁXIMO", "MAXIMO", "ALTO"])
+
+    for nome_regime, mascara in [
+        ("Evento alto impacto ≤ 7 dias", _perto),
+        ("Fora da janela crítica", ~_perto),
+    ]:
+        sub = validos[mascara]
+        if len(sub):
+            regimes.append({
+                "Regime": nome_regime,
+                "N": len(sub),
+                "Acerto direcional": f"{100*sub['acertou'].astype(bool).mean():.1f}%",
+                "Score médio": f"{pd.to_numeric(sub['score_mestre'], errors='coerce').mean():.1f}",
+                "Qualidade média": f"{pd.to_numeric(sub['qualidade'], errors='coerce').mean():.1f}%"
+            })
+    if regimes:
+        st.dataframe(pd.DataFrame(regimes), use_container_width=True, hide_index=True)
+    else:
+        st.caption("Ainda não há sinais avaliados suficientes para comparar regimes de evento.")
 
     st.warning(
         "Amostra pequena não prova vantagem estatística. "
