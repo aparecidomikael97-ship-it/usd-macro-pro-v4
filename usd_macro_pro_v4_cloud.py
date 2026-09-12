@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "7.4.2 — HÍBRIDO INTELIGENTE"
+APP_VERSION = "7.5 — FOMC AUTOMÁTICO"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V7.4.2 Português",
+    page_title="USD Macro Pro — V7.5 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1605,7 +1605,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V7.4.2 Português")
+st.title("🦅 USD Macro Pro — V7.5 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -3606,7 +3606,7 @@ def _score_mestre_v70(base: str, cotada: str, diferenca: float, confl: dict) -> 
 
 
 def _mostrar_score_mestre_v70(base: str, cotada: str, diferenca: float, confl: dict):
-    st.markdown("## 🦅 Score Mestre — V7.4.2")
+    st.markdown("## 🦅 Score Mestre — V7.5")
     st.caption(
         "Resumo final do motor. Direção, qualidade dos dados e timing ficam separados "
         "para não confundir score interno com probabilidade de lucro."
@@ -3719,7 +3719,7 @@ def _auto_anterior_v71(nome: str):
     return float(obs[1][1]), obs[1][0]
 
 def _status_automacao_v71():
-    st.markdown("### 🤖 Automação dos Dados — V7.4.2")
+    st.markdown("### 🤖 Automação dos Dados — V7.5")
     st.caption(
         "O app preenche automaticamente tudo que possui fonte oficial disponível. "
         "Consenso de mercado e probabilidades FOMC não são inventados."
@@ -3772,7 +3772,7 @@ _sincronizar_anteriores_v711()
 with abas[2]:
     _status_automacao_v71()
 
-    st.subheader("💱 Painel de Decisão — V7.4.2")
+    st.subheader("💱 Painel de Decisão — V7.5")
 
     usd_base = float(usd_detalhado["score"])
     usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
@@ -4212,9 +4212,157 @@ st.caption(
 
 
 # =========================================================
-# V7.4.2 — RENDERIZAÇÃO SEGURA DO PAINEL HÍBRIDO
-# Executa somente depois que todas as funções auxiliares foram definidas.
+# V7.5 — MODELO FOMC AUTOMÁTICO (ESTIMATIVA PRÓPRIA)
+# NÃO É CME FEDWATCH
+# =========================================================
+
+def _fred_ultimos_v75(series_id, n=30):
+    try:
+        obs = _fred_obs_v71(series_id, n)
+        return obs if obs else []
+    except Exception:
+        return []
+
+def _ultimo_valor_v75(series_id):
+    obs = _fred_ultimos_v75(series_id, 10)
+    return (float(obs[0][1]), obs[0][0]) if obs else (None, None)
+
+def _tendencia_v75(series_id, janela=5):
+    obs = _fred_ultimos_v75(series_id, max(10, janela + 2))
+    vals = [float(x[1]) for x in obs[:janela] if x[1] is not None]
+    if len(vals) < 2:
+        return 0.0
+    # obs desc: mais recente - mais antigo da janela
+    return vals[0] - vals[-1]
+
+def _modelo_fomc_v75():
+    """
+    Heurística transparente:
+    - EFFR mostra a taxa overnight efetiva atual.
+    - Treasury 2Y incorpora expectativas de juros/crescimento/inflação, mas NÃO é Fed Funds futures.
+    - Score macro USD já existente adiciona contexto.
+    Resultado = probabilidades INTERNAS do modelo, não probabilidades negociadas no CME.
+    """
+    effr, dt_effr = _ultimo_valor_v75("DFF")
+    y2, dt_y2 = _ultimo_valor_v75("DGS2")
+    y2_trend = _tendencia_v75("DGS2", 5)
+
+    # Usa o score macro já calculado pelo app quando disponível.
+    usd_score = None
+    for k in ("score_usd_final", "usd_score_final", "score_usd", "forca_usd"):
+        try:
+            v = st.session_state.get(k)
+            if isinstance(v, (int, float)):
+                usd_score = float(v)
+                break
+        except Exception:
+            pass
+    if usd_score is None:
+        usd_score = 50.0
+
+    if effr is None or y2 is None:
+        return {
+            "ok": False, "effr": effr, "y2": y2, "dt_effr": dt_effr, "dt_y2": dt_y2,
+            "motivo": "Faltam dados oficiais de juros para calcular a estimativa."
+        }
+
+    spread = y2 - effr
+
+    # Índice hawkish/dovish. Positivo = mais hawkish; negativo = mais dovish.
+    # O spread 2Y-EFFR recebe maior peso; tendência recente do 2Y e macro são confirmação.
+    hawk = 0.0
+    hawk += max(-35.0, min(35.0, spread * 28.0))
+    hawk += max(-15.0, min(15.0, y2_trend * 35.0))
+    hawk += max(-15.0, min(15.0, (usd_score - 50.0) * 0.55))
+    hawk = max(-50.0, min(50.0, hawk))
+
+    # Converte índice em distribuição suave de 3 cenários.
+    # Manutenção domina perto de zero; extremos deslocam massa para corte/alta.
+    manut = max(15.0, 70.0 - abs(hawk) * 1.05)
+    restante = 100.0 - manut
+    viés = max(-1.0, min(1.0, hawk / 45.0))
+    alta = restante * (0.5 + 0.5 * viés)
+    corte = restante - alta
+
+    corte = max(0.0, corte)
+    alta = max(0.0, alta)
+    total = corte + manut + alta
+    corte, manut, alta = [100.0*x/total for x in (corte, manut, alta)]
+
+    esperado_pb = (-25.0*corte + 25.0*alta) / 100.0
+    score_usd_fomc = max(0.0, min(100.0, 50.0 + esperado_pb))
+
+    return {
+        "ok": True,
+        "effr": effr, "dt_effr": dt_effr,
+        "y2": y2, "dt_y2": dt_y2,
+        "spread": spread, "trend2y": y2_trend, "usd_score": usd_score,
+        "hawk": hawk,
+        "corte": corte, "manut": manut, "alta": alta,
+        "esperado_pb": esperado_pb,
+        "score_usd_fomc": score_usd_fomc,
+    }
+
+def _painel_fomc_auto_v75():
+    evento = _proximo_evento_macro_v65()
+    if not evento or not evento.get("disponivel", True):
+        return
+    nome = _normalizar_texto_v73(evento.get("evento", ""))
+    if "fomc" not in nome:
+        return
+
+    st.markdown("## 🏦 FOMC Automático — V7.5")
+    st.warning(
+        "⚠️ ESTIMATIVA DO MODELO — NÃO É CME FEDWATCH. "
+        "As probabilidades abaixo são calculadas pelo próprio app e não representam "
+        "probabilidades negociadas nos futuros de Fed Funds."
+    )
+
+    r = _modelo_fomc_v75()
+    if not r["ok"]:
+        st.error(r["motivo"])
+        return
+
+    c1,c2,c3 = st.columns(3)
+    c1.metric("✂️ Corte 25 pb", f"{r['corte']:.1f}%")
+    c2.metric("⏸️ Manutenção", f"{r['manut']:.1f}%")
+    c3.metric("⬆️ Alta 25 pb", f"{r['alta']:.1f}%")
+
+    d1,d2,d3,d4 = st.columns(4)
+    d1.metric("Fed Funds efetivo", f"{r['effr']:.2f}%")
+    d2.metric("Treasury 2Y", f"{r['y2']:.2f}%")
+    d3.metric("2Y − Fed Funds", f"{r['spread']:+.2f} p.p.")
+    d4.metric("Movimento esperado", f"{r['esperado_pb']:+.1f} pb")
+
+    if r["hawk"] >= 12:
+        leitura = "🟢 HAWKISH — modelo favorece juros mais altos / USD"
+    elif r["hawk"] <= -12:
+        leitura = "🔴 DOVISH — modelo favorece juros mais baixos / pressão no USD"
+    else:
+        leitura = "🟡 NEUTRO / MISTO — manutenção continua relevante"
+
+    st.info(f"**Leitura automática:** {leitura}")
+    st.progress(int(round(r["score_usd_fomc"])))
+    st.caption(f"Score FOMC/USD do modelo: {r['score_usd_fomc']:.0f}/100")
+
+    # Fonte única para outros módulos futuros, sem sobrescrever widgets existentes.
+    st.session_state["v75_fomc_auto_ativo"] = True
+    st.session_state["v75_prob_corte"] = float(r["corte"])
+    st.session_state["v75_prob_manut"] = float(r["manut"])
+    st.session_state["v75_prob_alta"] = float(r["alta"])
+    st.session_state["v75_esperado_pb"] = float(r["esperado_pb"])
+    st.session_state["v75_fomc_usd_score"] = float(r["score_usd_fomc"])
+
+    st.caption(
+        "Entradas automáticas: Effective Federal Funds Rate (DFF), Treasury 2Y (DGS2) "
+        "e contexto do score macro já existente. O Treasury 2Y é um proxy de expectativas, "
+        "não substitui contratos Fed Funds Futures."
+    )
+
+# =========================================================
+# V7.5 — RENDERIZAÇÃO SEGURA
 # =========================================================
 with abas[1]:
     _painel_hibrido_v74()
+    _painel_fomc_auto_v75()
 
