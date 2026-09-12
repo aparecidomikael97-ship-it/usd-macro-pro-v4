@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-🦅 USD Macro Pro — V6.1 MATRIZ INTELIGENTE
+🦅 USD Macro Pro — V6.2 EXPLICADOR INTELIGENTE
 ================================
 - Interface em português
 - Corrige unidades de inflação e PIB no ranking global
@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "6.1 — MATRIZ INTELIGENTE"
+APP_VERSION = "6.2 — EXPLICADOR INTELIGENTE"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V6.1 Português",
+    page_title="USD Macro Pro — V6.2 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1123,7 +1123,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V6.1 Português")
+st.title("🦅 USD Macro Pro — V6.2 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -1837,11 +1837,136 @@ def calcular_confluencia_v60(base: str, cotada: str, diferenca: float,
     }
 
 
+
+def _explicar_confluencia_v62(par: str, base: str, cotada: str, diferenca: float,
+                              confl: dict, score_base: float, score_cotada: float) -> dict:
+    """Gera explicação determinística a partir dos componentes reais da confluência."""
+    linhas = confl.get("linhas_dinamicas", [])
+    mapa = {nome: {"estado": estado, "peso": peso, "fator": fator, "efetivo": efetivo}
+            for nome, estado, peso, fator, efetivo in linhas}
+
+    favoraveis, contrarios, neutros = [], [], []
+    rotulos = {
+        "Força relativa": "força macro relativa",
+        "Juros oficiais": "diferencial de juros oficiais",
+        "Spread mercado 3M": "spread de juros de mercado 3M",
+        "Direção do spread": "movimento recente do spread",
+        "Score USD": "score macro do USD",
+        "Surpresas": "surpresas econômicas",
+        "Federal Reserve": "tom do Federal Reserve",
+        "Tendência macro EUA": "tendência macro dos EUA",
+    }
+
+    for nome, d in mapa.items():
+        item = f"{rotulos.get(nome, nome)} ({d['efetivo']:.1f}% efetivo)"
+        if d["estado"] > 0:
+            favoraveis.append((d["efetivo"], item))
+        elif d["estado"] < 0:
+            contrarios.append((d["efetivo"], item))
+        else:
+            neutros.append((d["efetivo"], item))
+
+    favoraveis.sort(reverse=True)
+    contrarios.sort(reverse=True)
+
+    direcao = "COMPRA" if diferenca > 0 else "VENDA" if diferenca < 0 else "NEUTRO"
+    forte = base if diferenca > 0 else cotada if diferenca < 0 else "—"
+    fraca = cotada if diferenca > 0 else base if diferenca < 0 else "—"
+
+    motivos = [x[1] for x in favoraveis[:4]]
+    riscos = [x[1] for x in contrarios[:3]]
+
+    # Invalidações são condicionais e derivadas do que hoje sustenta o sinal.
+    invalidacoes = []
+    nomes_favor = {nome for nome, d in mapa.items() if d["estado"] > 0}
+    if "Juros oficiais" in nomes_favor:
+        invalidacoes.append("redução ou reversão do diferencial de juros que hoje favorece a direção do par")
+    if "Spread mercado 3M" in nomes_favor or "Direção do spread" in nomes_favor:
+        invalidacoes.append("fechamento/reversão do spread de juros de mercado")
+    if "Federal Reserve" in nomes_favor:
+        invalidacoes.append("mudança relevante no tom do Fed contra a leitura atual")
+    if "Score USD" in nomes_favor or "Tendência macro EUA" in nomes_favor:
+        invalidacoes.append("deterioração dos dados dos EUA suficiente para inverter o score macro")
+    if "Surpresas" in nomes_favor:
+        invalidacoes.append("novas surpresas econômicas relevantes em sentido contrário")
+    if not invalidacoes:
+        invalidacoes.append("inversão da força relativa e surgimento de componentes contrários relevantes")
+
+    return {
+        "direcao": direcao,
+        "forte": forte,
+        "fraca": fraca,
+        "motivos": motivos,
+        "riscos": riscos,
+        "neutros": [x[1] for x in neutros[:3]],
+        "invalidacoes": invalidacoes[:4],
+        "score": float(confl.get("score_confluencia", 50)),
+        "qualidade": float(confl.get("qualidade_confluencia", 0)),
+        "nivel": str(confl.get("nivel", "BAIXA")),
+        "score_base": score_base,
+        "score_cotada": score_cotada,
+    }
+
+
+def _mostrar_explicador_v62(par: str, base: str, cotada: str, diferenca: float,
+                            confl: dict, score_base: float, score_cotada: float):
+    exp = _explicar_confluencia_v62(
+        par, base, cotada, diferenca, confl, score_base, score_cotada
+    )
+
+    st.markdown("### 🧠 Por que o modelo chegou a essa conclusão?")
+    if exp["direcao"] == "NEUTRO":
+        st.info(
+            f"⚪ **{par}: sem vantagem macro clara** — "
+            f"Score {exp['score']:.0f}/100 | Qualidade {exp['qualidade']:.0f}%"
+        )
+    else:
+        icone = "🟢" if exp["direcao"] == "COMPRA" else "🔴"
+        st.markdown(
+            f"{icone} **{exp['direcao']} {par}** — Score **{exp['score']:.0f}/100** | "
+            f"Qualidade **{exp['qualidade']:.0f}%** | Confluência **{exp['nivel']}**"
+        )
+        st.write(
+            f"**Força relativa:** {base} {exp['score_base']:.1f}/100 × "
+            f"{cotada} {exp['score_cotada']:.1f}/100. "
+            f"No cenário atual, **{exp['forte']}** está mais forte e **{exp['fraca']}** mais fraca."
+        )
+
+    if exp["motivos"]:
+        st.markdown("**Principais confirmações do sinal:**")
+        for m in exp["motivos"]:
+            st.write(f"• 🟢 {m}")
+
+    if exp["riscos"]:
+        st.markdown("**Componentes que estão contra o sinal:**")
+        for r in exp["riscos"]:
+            st.write(f"• 🔴 {r}")
+    elif exp["neutros"]:
+        st.markdown("**Componentes que ainda não confirmam:**")
+        for n in exp["neutros"]:
+            st.write(f"• ⚪ {n}")
+
+    st.markdown("**O que pode enfraquecer ou invalidar essa leitura macro:**")
+    for inv in exp["invalidacoes"]:
+        st.write(f"• ⚠️ {inv}")
+
+    if exp["qualidade"] < 75:
+        st.warning(
+            "A qualidade/cobertura ainda não é máxima. Dados antigos ou ausentes reduzem "
+            "automaticamente o peso dos componentes afetados."
+        )
+
+    st.caption(
+        "Este explicador descreve os componentes que o próprio motor utilizou. "
+        "Não é gatilho de entrada nem previsão garantida de movimento do preço."
+    )
+
+
 # =========================================================
 # ABA 3 — PARES
 # =========================================================
 with abas[2]:
-    st.subheader("💱 Painel de Decisão — V6.1")
+    st.subheader("💱 Painel de Decisão — V6.2")
 
     usd_base = float(usd_detalhado["score"])
     usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
@@ -1913,7 +2038,7 @@ with abas[2]:
         dt = confl["diferencial_taxas"]
         mercado3m = confl["mercado_3m"]
         tend = confl["tendencias"]
-        st.markdown("#### 📐 Qualidade macro da V6.1")
+        st.markdown("#### 📐 Qualidade macro da V6.2")
         q1, q2, q3 = st.columns(3)
         with q1:
             if dt["base"] is not None and dt["cotada"] is not None:
@@ -1966,7 +2091,7 @@ with abas[2]:
             if idade_max > 120:
                 st.warning(
                     "🟡 O spread de mercado usa pelo menos uma série antiga. "
-                    "A V6.1 reduz automaticamente o peso desse componente até a FRED atualizar."
+                    "A V6.2 reduz automaticamente o peso desse componente até a FRED atualizar."
                 )
         else:
             st.warning(
@@ -1975,7 +2100,7 @@ with abas[2]:
             )
 
         st.caption(
-            "Na V6.1, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
+            "Na V6.2, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
             "da FRED/OECD. Mantivemos o Treasury 2Y como tendência dos EUA, mas não "
             "misturamos 2Y americano com uma maturidade estrangeira diferente."
         )
@@ -1990,7 +2115,7 @@ with abas[2]:
                     "Variação média": round(x["delta"], 4),
                 })
             st.dataframe(pd.DataFrame(trend_rows), use_container_width=True, hide_index=True)
-            st.caption("A V6.1 combina diferencial de juros oficiais, spread de mercado e direção do spread com pesos ajustados pelo frescor dos dados. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
+            st.caption("A V6.2 combina diferencial de juros oficiais, spread de mercado e direção do spread com pesos ajustados pelo frescor dos dados. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
 
         # Substitui a confiança antiga pela confiança de confluência.
         if "SEM VANTAGEM" in acao:
@@ -2008,7 +2133,7 @@ with abas[2]:
         score_final = confl["score_confluencia"]
         qualidade_final = confl["qualidade_confluencia"]
 
-        st.markdown("### 🧭 Decisão V6.1")
+        st.markdown("### 🧭 Decisão V6.2")
         if "SEM VANTAGEM" in acao or score_final < 58 or qualidade_final < 50:
             st.info(
                 f"⚪ **NEUTRO / AGUARDAR** — Score {score_final:.0f}/100 | "
@@ -2035,6 +2160,11 @@ with abas[2]:
             "Não representa probabilidade de lucro ou taxa de acerto."
         )
 
+        _mostrar_explicador_v62(
+            par, base, cotada, diferenca, confl,
+            float(score_base), float(score_cotada)
+        )
+
         st.write(f"Motivo: {base} está em **{score_base:.1f}** e {cotada} em **{score_cotada:.1f}**. O USD, quando presente, já inclui o ajuste das surpresas econômicas.")
         st.warning("⚠️ O viés macro não é gatilho de entrada nem probabilidade de lucro. Confirme preço, estrutura, liquidez, sessão e risco.")
 
@@ -2047,7 +2177,7 @@ with abas[2]:
             st.success("✅ Sinal registrado!")
 
     st.markdown("---")
-    st.markdown("### 🏆 Matriz Inteligente — V6.1")
+    st.markdown("### 🏆 Matriz Inteligente — V6.2")
     st.caption(
         "Todos os pares abaixo passam pelo mesmo motor de confluência, qualidade e frescor "
         "usado na análise individual."
