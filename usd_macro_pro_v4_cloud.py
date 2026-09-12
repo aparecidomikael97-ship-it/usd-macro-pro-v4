@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-🦅 USD Macro Pro — V5.3 VALIDAÇÃO DE DADOS
+🦅 USD Macro Pro — V5.4 CALENDÁRIO MACRO
 ================================
 - Interface em português
 - Corrige unidades de inflação e PIB no ranking global
@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "5.3 — VALIDAÇÃO DE DADOS"
+APP_VERSION = "5.4 — CALENDÁRIO MACRO"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V5.3 Português",
+    page_title="USD Macro Pro — V5.4 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -573,6 +573,98 @@ def carregar_macro_eua() -> dict:
     STATUS_FONTE["EUA"] = "✅ FRED + validação + datas" if CHAVE_FRED else "⚠️ Valores de segurança"
     return dados
 
+
+# =========================================================
+# CALENDÁRIO MACRO AUTOMÁTICO — FRED
+# =========================================================
+RELEASES_FRED = {
+    "IPC / CPI": 10,
+    "Emprego / Payroll": 50,
+    "PIB / GDP": 53,
+    "PCE / Renda e Gastos": 54,
+}
+
+def _fred_get(endpoint: str, params: dict) -> dict:
+    if not CHAVE_FRED:
+        return {}
+    p = dict(params)
+    p["api_key"] = CHAVE_FRED
+    p["file_type"] = "json"
+    try:
+        r = requests.get(f"https://api.stlouisfed.org/fred/{endpoint}", params=p, timeout=15)
+        r.raise_for_status()
+        return r.json()
+    except Exception:
+        return {}
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _fred_datas_release(release_id: int) -> list[str]:
+    hoje = pd.Timestamp.now(tz=None).normalize()
+    inicio = (hoje - pd.Timedelta(days=120)).strftime("%Y-%m-%d")
+    fim = (hoje + pd.Timedelta(days=120)).strftime("%Y-%m-%d")
+    js = _fred_get("release/dates", {
+        "release_id": release_id,
+        "realtime_start": inicio,
+        "realtime_end": fim,
+        "include_release_dates_with_no_data": "true",
+        "sort_order": "asc",
+        "limit": 1000,
+    })
+    return [x.get("date") for x in js.get("release_dates", []) if x.get("date")]
+
+def _data_release(datas: list[str], futura: bool) -> str | None:
+    hoje = pd.Timestamp.now(tz=None).normalize()
+    validas = []
+    for d in datas:
+        try:
+            dt = pd.Timestamp(d).normalize()
+            if (futura and dt >= hoje) or ((not futura) and dt <= hoje):
+                validas.append(dt)
+        except Exception:
+            pass
+    if not validas:
+        return None
+    dt = min(validas) if futura else max(validas)
+    return dt.strftime("%d/%m/%Y")
+
+@st.cache_data(ttl=1800, show_spinner="Carregando calendário econômico...")
+def carregar_calendario_fred() -> pd.DataFrame:
+    linhas = []
+    for nome, rid in RELEASES_FRED.items():
+        datas = _fred_datas_release(rid)
+        linhas.append({
+            "Evento": nome,
+            "Última data de release": _data_release(datas, False) or "—",
+            "Próxima data de release": _data_release(datas, True) or "—",
+            "Fonte": f"FRED release {rid}",
+        })
+    return pd.DataFrame(linhas)
+
+def _obs_ultimas(series_id: str, unidades: str | None = None, limite: int = 3) -> list[float]:
+    df = _fred_observacoes(series_id, max(limite + 2, 6), unidades=unidades)
+    if df.empty:
+        return []
+    vals = pd.to_numeric(df["value"], errors="coerce").dropna().tolist()
+    return [float(x) for x in vals[-limite:]]
+
+def _automatico_real_anterior(indicador: str) -> tuple[float | None, float | None]:
+    mapa = {
+        "IPC anual": ("CPIAUCSL", "pc1"),
+        "IPC Núcleo anual": ("CPILFESL", "pc1"),
+        "PCE anual": ("PCEPI", "pc1"),
+        "PCE Núcleo anual": ("PCEPILFE", "pc1"),
+        "Desemprego": ("UNRATE", None),
+    }
+    if indicador == "Payroll":
+        vals = _obs_ultimas("PAYEMS", None, 3)
+        return (vals[-1] - vals[-2], vals[-2] - vals[-3]) if len(vals) >= 3 else (None, None)
+    cfg = mapa.get(indicador)
+    if not cfg:
+        return None, None
+    vals = _obs_ultimas(cfg[0], cfg[1], 2)
+    return (vals[-1], vals[-2]) if len(vals) >= 2 else (None, None)
+
+
 # =========================================================
 # RANKING GLOBAL — SÉRIES E TRANSFORMAÇÕES CORRETAS
 # =========================================================
@@ -946,8 +1038,8 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V5.3 Português")
-st.caption("Dados econômicos → Inflação → Fed → Força das moedas → Pares → Teste histórico")
+st.title("🦅 USD Macro Pro — V5.4 Português")
+st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
 st.info(f"Fed: {icone_tom} **{fed['tom']}** | Intensidade: {fed['forca']:+.2f}")
@@ -1069,8 +1161,30 @@ with abas[1]:
     st.caption("Treasuries usam janela curta de frescura. CPI/PCE/Payroll são mensais; PIB é trimestral. A data exibida é a data da observação da FRED.")
 
     st.markdown("---")
+    st.markdown("---")
+    st.subheader("📅 Calendário Econômico Automático")
+    st.caption("Datas de releases obtidas da FRED. A data do release não garante o horário exato em que o dado ficará disponível na API.")
+    cal = carregar_calendario_fred()
+    if not cal.empty:
+        st.dataframe(cal, use_container_width=True, hide_index=True)
+    st.info("ℹ️ A FRED fornece dados realizados e datas de releases, mas não fornece o consenso/forecast do mercado. Por segurança, a previsão continua manual.")
+
     st.subheader("🎯 Surpresa Econômica — Real × Previsão")
     st.caption("Digite o valor divulgado, a previsão do mercado e o valor anterior. O modelo estima a direção do impacto no USD.")
+
+    st.markdown("#### 🤖 Real e Anterior automáticos — FRED")
+    auto_rows = []
+    for _ind in ["IPC anual", "IPC Núcleo anual", "PCE anual", "PCE Núcleo anual", "Payroll", "Desemprego"]:
+        _real, _ant = _automatico_real_anterior(_ind)
+        auto_rows.append({
+            "Indicador": _ind,
+            "Real automático": round(_real, 3) if _real is not None else "—",
+            "Anterior automático": round(_ant, 3) if _ant is not None else "—",
+            "Previsão": "Manual / consenso externo",
+        })
+    st.dataframe(pd.DataFrame(auto_rows), use_container_width=True, hide_index=True)
+    st.caption("ISM Industrial e ISM Serviços permanecem manuais nesta versão. A previsão/consenso deve vir de uma fonte de calendário econômico, não da FRED.")
+
 
     indicadores = [
         ("IPC anual", True),
