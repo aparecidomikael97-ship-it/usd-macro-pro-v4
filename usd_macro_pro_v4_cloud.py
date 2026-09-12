@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "7.1 — AUTOMAÇÃO MÁXIMA"
+APP_VERSION = "7.1.1 — AUTOMAÇÃO MÁXIMA"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V7.1 Português",
+    page_title="USD Macro Pro — V7.1.1 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1305,7 +1305,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V7.1 Português")
+st.title("🦅 USD Macro Pro — V7.1.1 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -3162,7 +3162,7 @@ def _score_mestre_v70(base: str, cotada: str, diferenca: float, confl: dict) -> 
 
 
 def _mostrar_score_mestre_v70(base: str, cotada: str, diferenca: float, confl: dict):
-    st.markdown("## 🦅 Score Mestre — V7.1")
+    st.markdown("## 🦅 Score Mestre — V7.1.1")
     st.caption(
         "Resumo final do motor. Direção, qualidade dos dados e timing ficam separados "
         "para não confundir score interno com probabilidade de lucro."
@@ -3275,7 +3275,7 @@ def _auto_anterior_v71(nome: str):
     return float(obs[1][1]), obs[1][0]
 
 def _status_automacao_v71():
-    st.markdown("### 🤖 Automação dos Dados — V7.1")
+    st.markdown("### 🤖 Automação dos Dados — V7.1.1")
     st.caption(
         "O app preenche automaticamente tudo que possui fonte oficial disponível. "
         "Consenso de mercado e probabilidades FOMC não são inventados."
@@ -3305,20 +3305,22 @@ def _status_automacao_v71():
         "estiver conectada, o app deixa esses campos explícitos como manuais."
     )
 
-def _sincronizar_anteriores_v71():
-    """Alimenta campos de anterior sem sobrescrever consenso digitado pelo usuário."""
+def _sincronizar_anteriores_v711():
+    """
+    V7.1.1 — prepara somente as keys do painel de consenso que AINDA não
+    foram instanciadas. As keys anterior_* pertencem a number_inputs já
+    criados no Painel EUA e não podem ser alteradas depois da criação.
+    """
     for nome in ["IPC anual","IPC Núcleo anual","PCE anual","PCE Núcleo anual",
                  "Payroll","Desemprego"]:
         val, _ = _auto_anterior_v71(nome)
         if val is not None:
-            st.session_state[f"anterior_{nome}"] = float(val)
-            # também alimenta default exclusivo do painel V6.7/V7.1
             k = f"v67_anterior_{nome}"
             if k not in st.session_state:
                 st.session_state[k] = float(val)
 
 
-_sincronizar_anteriores_v71()
+_sincronizar_anteriores_v711()
 
 # =========================================================
 # ABA 3 — PARES
@@ -3326,7 +3328,7 @@ _sincronizar_anteriores_v71()
 with abas[2]:
     _status_automacao_v71()
 
-    st.subheader("💱 Painel de Decisão — V7.1")
+    st.subheader("💱 Painel de Decisão — V7.1.1")
 
     usd_base = float(usd_detalhado["score"])
     usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
@@ -3451,7 +3453,7 @@ with abas[2]:
             if idade_max > 120:
                 st.warning(
                     "🟡 O spread de mercado usa pelo menos uma série antiga. "
-                    "A V7.1 reduz automaticamente o peso desse componente até a FRED atualizar."
+                    "A V7.1.1 reduz automaticamente o peso desse componente até a FRED atualizar."
                 )
         else:
             st.warning(
@@ -3460,7 +3462,7 @@ with abas[2]:
             )
 
         st.caption(
-            "Na V7.1, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
+            "Na V7.1.1, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
             "da FRED/OECD. Mantivemos o Treasury 2Y como tendência dos EUA, mas não "
             "misturamos 2Y americano com uma maturidade estrangeira diferente."
         )
@@ -3475,7 +3477,7 @@ with abas[2]:
                     "Variação média": round(x["delta"], 4),
                 })
             st.dataframe(pd.DataFrame(trend_rows), use_container_width=True, hide_index=True)
-            st.caption("A V7.1 combina diferencial de juros oficiais, spread de mercado e direção do spread com pesos ajustados pelo frescor dos dados. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
+            st.caption("A V7.1.1 combina diferencial de juros oficiais, spread de mercado e direção do spread com pesos ajustados pelo frescor dos dados. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
 
         # Substitui a confiança antiga pela confiança de confluência.
         if "SEM VANTAGEM" in acao:
