@@ -27,7 +27,7 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "7.6.1 — FOMC CALIBRADO + FALLBACK"
+APP_VERSION = "7.7 — FOMC INTEGRADO AO SCORE MESTRE"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
@@ -3606,7 +3606,7 @@ def _score_mestre_v70(base: str, cotada: str, diferenca: float, confl: dict) -> 
 
 
 def _mostrar_score_mestre_v70(base: str, cotada: str, diferenca: float, confl: dict):
-    st.markdown("## 🦅 Score Mestre — V7.6")
+    st.markdown("## 🦅 Score Mestre — V7.7")
     st.caption(
         "Resumo final do motor. Direção, qualidade dos dados e timing ficam separados "
         "para não confundir score interno com probabilidade de lucro."
@@ -3772,18 +3772,73 @@ _sincronizar_anteriores_v711()
 with abas[2]:
     _status_automacao_v71()
 
-    st.subheader("💱 Painel de Decisão — V7.6")
+    st.subheader("💱 Painel de Decisão — V7.7")
 
     usd_base = float(usd_detalhado["score"])
     usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
     ajuste = float(st.session_state.get("usd_ajuste_surpresas", 0.0))
     confirmacao = st.session_state.get("usd_confirmacao_surpresas", "Sem previsões preenchidas")
 
-    c1, c2, c3 = st.columns(3)
+    # =====================================================
+    # V7.7 — CONECTOR FOMC -> USD -> PARES
+    # O FOMC pré-release NÃO substitui o macro principal.
+    # Ele faz um blend conservador e crescente conforme a reunião se aproxima.
+    # Se o FOMC pós-release V6.9 estiver ativo, o pré-release é desligado
+    # para evitar dupla contagem.
+    # =====================================================
+    usd_antes_fomc_v77 = float(usd_ajustado)
+    fomc_score_v77 = float(st.session_state.get("v76_fomc_usd_score", 50.0))
+    fomc_ativo_v77 = bool(st.session_state.get("v76_fomc_auto_ativo", False))
+    fomc_pos_release_v77 = bool(st.session_state.get("v69_fomc_surprise_ativo", False))
+    peso_fomc_v77 = 0.0
+    evento_v77 = _proximo_evento_macro_v65()
+
+    if (
+        fomc_ativo_v77
+        and not fomc_pos_release_v77
+        and isinstance(evento_v77, dict)
+        and evento_v77.get("disponivel", False)
+        and "fomc" in _normalizar_texto_v73(evento_v77.get("evento", ""))
+    ):
+        dias_v77 = int(evento_v77.get("dias", 999))
+        if dias_v77 <= 2:
+            peso_fomc_v77 = 0.25
+        elif dias_v77 <= 7:
+            peso_fomc_v77 = 0.20
+        elif dias_v77 <= 14:
+            peso_fomc_v77 = 0.12
+        else:
+            peso_fomc_v77 = 0.06
+
+        usd_ajustado = (
+            (1.0 - peso_fomc_v77) * usd_ajustado
+            + peso_fomc_v77 * fomc_score_v77
+        )
+
+    st.session_state["v77_usd_antes_fomc"] = float(usd_antes_fomc_v77)
+    st.session_state["v77_usd_pos_fomc"] = float(usd_ajustado)
+    st.session_state["v77_peso_fomc"] = float(peso_fomc_v77)
+    st.session_state["v77_fomc_integrado"] = bool(peso_fomc_v77 > 0)
+
+    c1, c2, c3, c4 = st.columns(4)
     c1.metric("USD macro base", f"{usd_base:.0f}/100")
     c2.metric("Ajuste das surpresas", f"{ajuste:+.1f}")
-    c3.metric("USD usado nos pares", f"{usd_ajustado:.0f}/100")
+    c3.metric("FOMC/USD", f"{fomc_score_v77:.0f}/100" if fomc_ativo_v77 else "—")
+    c4.metric("USD usado nos pares", f"{usd_ajustado:.1f}/100")
     st.caption(f"Leitura das surpresas: {confirmacao}")
+
+    if peso_fomc_v77 > 0:
+        st.info(
+            f"🔗 **V7.7 integrado:** FOMC {fomc_score_v77:.0f}/100 recebeu peso de "
+            f"{peso_fomc_v77*100:.0f}% por proximidade da reunião. "
+            f"USD: {usd_antes_fomc_v77:.1f} → {usd_ajustado:.1f}. "
+            "Esse USD atualizado alimenta automaticamente todos os pares, a matriz e o Score Mestre."
+        )
+    elif fomc_pos_release_v77:
+        st.info(
+            "🔗 O FOMC pré-release foi desligado porque o módulo pós-release está ativo. "
+            "Isso evita contar o mesmo evento duas vezes."
+        )
 
     # Mantém o seletor original e integra o USD ajustado.
     pares_convencionais = ["EUR/USD", "GBP/USD", "AUD/USD", "NZD/USD", "USD/JPY", "USD/CHF", "USD/CAD"]
@@ -4543,6 +4598,14 @@ def _painel_fomc_calibrado_v76():
     st.session_state["v76_prob_alta"] = float(r["alta"])
     st.session_state["v76_esperado_pb"] = float(r["esperado_pb"])
     st.session_state["v76_fomc_usd_score"] = float(r["score_fomc"])
+
+    # V7.7 — sincroniza o novo valor com a aba de pares.
+    # Só reinicia quando o score realmente mudou, evitando loop.
+    _v77_anterior = st.session_state.get("v77_ultimo_fomc_sincronizado")
+    _v77_atual = float(r["score_fomc"])
+    if _v77_anterior is None or abs(float(_v77_anterior) - _v77_atual) > 0.05:
+        st.session_state["v77_ultimo_fomc_sincronizado"] = _v77_atual
+        st.rerun()
 
 # =========================================================
 # V7.6.1 — RENDERIZAÇÃO SEGURA
