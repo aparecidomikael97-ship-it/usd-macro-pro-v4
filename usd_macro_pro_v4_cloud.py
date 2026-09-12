@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "7.4.1 — HÍBRIDO INTELIGENTE"
+APP_VERSION = "7.4.2 — HÍBRIDO INTELIGENTE"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V7.4.1 Português",
+    page_title="USD Macro Pro — V7.4.2 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1605,7 +1605,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V7.4.1 Português")
+st.title("🦅 USD Macro Pro — V7.4.2 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -1802,7 +1802,6 @@ with abas[1]:
     diagnostico_eod_v73, dados_eod_v73 = ({"ok": False, "status": 403, "erro": "Economic Events não incluído no plano gratuito.", "dados": []}, {})
     st.subheader("🇺🇸 Painel de Força Macro do USD")
 
-    _painel_hibrido_v74()
 
     rotulo_usd, icone_usd = faixa_forca(usd_detalhado["score"])
     d1, d2, d3 = st.columns(3)
@@ -3607,7 +3606,7 @@ def _score_mestre_v70(base: str, cotada: str, diferenca: float, confl: dict) -> 
 
 
 def _mostrar_score_mestre_v70(base: str, cotada: str, diferenca: float, confl: dict):
-    st.markdown("## 🦅 Score Mestre — V7.4.1")
+    st.markdown("## 🦅 Score Mestre — V7.4.2")
     st.caption(
         "Resumo final do motor. Direção, qualidade dos dados e timing ficam separados "
         "para não confundir score interno com probabilidade de lucro."
@@ -3720,7 +3719,7 @@ def _auto_anterior_v71(nome: str):
     return float(obs[1][1]), obs[1][0]
 
 def _status_automacao_v71():
-    st.markdown("### 🤖 Automação dos Dados — V7.4.1")
+    st.markdown("### 🤖 Automação dos Dados — V7.4.2")
     st.caption(
         "O app preenche automaticamente tudo que possui fonte oficial disponível. "
         "Consenso de mercado e probabilidades FOMC não são inventados."
@@ -3773,7 +3772,7 @@ _sincronizar_anteriores_v711()
 with abas[2]:
     _status_automacao_v71()
 
-    st.subheader("💱 Painel de Decisão — V7.4.1")
+    st.subheader("💱 Painel de Decisão — V7.4.2")
 
     usd_base = float(usd_detalhado["score"])
     usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
@@ -4210,3 +4209,12 @@ st.caption(
     f"Fontes/estado: {', '.join(f'{k}: {v}' for k, v in STATUS_FONTE.items())} | "
     "Uso educacional. Não constitui recomendação de investimento."
 )
+
+
+# =========================================================
+# V7.4.2 — RENDERIZAÇÃO SEGURA DO PAINEL HÍBRIDO
+# Executa somente depois que todas as funções auxiliares foram definidas.
+# =========================================================
+with abas[1]:
+    _painel_hibrido_v74()
+
