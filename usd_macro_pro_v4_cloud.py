@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-🦅 USD Macro Pro — V5.1 PORTUGUÊS
+🦅 USD Macro Pro — V5.2 PAINEL MACRO
 ================================
 - Interface em português
 - Corrige unidades de inflação e PIB no ranking global
@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "5.1 — FED INTELIGENTE"
+APP_VERSION = "5.2 — SCORE MACRO FOREX"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V5.1 Português",
+    page_title="USD Macro Pro — V5.2 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -97,6 +97,7 @@ SENSIBILIDADE_FED = {
 }
 
 st.sidebar.divider()
+st.sidebar.caption("Modelo FX: prioriza juros reais, Treasury 2Y e Fed para o USD.")
 st.sidebar.caption(f"🕒 Atualizado: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
 if not CHAVE_FRED:
     st.sidebar.warning("FRED sem chave: alguns dados usarão valores de segurança.")
@@ -606,16 +607,100 @@ def score_inflacao_usd(macro: dict) -> float:
     return float(np.clip(50 + (media - 2.0) * 12, 0, 100))
 
 
-def score_atividade_usd(_: dict) -> float:
-    # Neutro até o usuário preencher ISM/PMI na área de surpresa econômica.
-    return 50.0
+def score_atividade_usd(macro: dict) -> float:
+    """Score simples de atividade usando PIB real; ISM/PMI manual entra na leitura de surpresa."""
+    pib = float(macro.get("PIB", 0.0))
+    return float(np.clip(50 + (pib - 2.0) * 10, 0, 100))
+
+
+def score_juros_usd(macro: dict) -> float:
+    """Juros de curto prazo têm grande peso no câmbio; combina Fed Funds e Treasury 2Y."""
+    fed = float(macro.get("Juros do Fed", 0.0))
+    y2 = float(macro.get("Treasury 2 anos", 0.0))
+    # âncoras deliberadamente moderadas; não representa probabilidade de mercado
+    s_fed = np.clip(50 + (fed - 3.0) * 10, 0, 100)
+    s_y2 = np.clip(50 + (y2 - 3.0) * 12, 0, 100)
+    return float(0.4 * s_fed + 0.6 * s_y2)
+
+
+def score_dolar_amplo_usd(macro: dict) -> float:
+    """Nível do índice amplo FRED usado apenas como confirmação, não como DXY ICE."""
+    indice = float(macro.get("Índice amplo do dólar", 120.0))
+    return float(np.clip(50 + (indice - 120.0) * 2.0, 0, 100))
+
+
+def score_fed_usd(fed: dict) -> float:
+    return float(np.clip(50 + float(fed.get("forca", 0.0)) * 50, 0, 100))
+
+
+def score_usd_detalhado(macro: dict, fed: dict) -> dict:
+    componentes = {
+        "Inflação": score_inflacao_usd(macro),
+        "Emprego": score_emprego_usd(macro),
+        "Atividade": score_atividade_usd(macro),
+        "Juros / Treasury 2Y": score_juros_usd(macro),
+        "Federal Reserve": score_fed_usd(fed),
+        "Índice amplo USD": score_dolar_amplo_usd(macro),
+    }
+    pesos = {
+        "Inflação": 0.18,
+        "Emprego": 0.18,
+        "Atividade": 0.12,
+        "Juros / Treasury 2Y": 0.24,
+        "Federal Reserve": 0.20,
+        "Índice amplo USD": 0.08,
+    }
+    total = float(sum(componentes[k] * pesos[k] for k in componentes))
+    return {"score": float(np.clip(total, 0, 100)), "componentes": componentes, "pesos": pesos}
+
+
+def faixa_forca(score: float) -> tuple[str, str]:
+    if score >= 70:
+        return "FORTE", "🟢"
+    if score >= 58:
+        return "MODERADAMENTE FORTE", "🟢"
+    if score > 42:
+        return "NEUTRO", "⚪"
+    if score > 30:
+        return "MODERADAMENTE FRACO", "🟠"
+    return "FRACO", "🔴"
+
+
+def qualidade_dados_usd() -> tuple[int, str]:
+    # FRED abastece a maior parte do painel; sem chave a qualidade cai porque entram fallbacks.
+    pontos = 90 if CHAVE_FRED else 45
+    rotulo = "ALTA" if pontos >= 80 else ("MÉDIA" if pontos >= 60 else "BAIXA")
+    return pontos, rotulo
+
+
+def classificar_par(score_base: float, score_cotada: float, base: str, cotada: str) -> dict:
+    diff = float(score_base - score_cotada)
+    ad = abs(diff)
+    if ad >= 25:
+        conf = "ALTA"
+    elif ad >= 12:
+        conf = "MÉDIA"
+    else:
+        conf = "BAIXA"
+    if diff >= 8:
+        vies = f"COMPRA {base}/{cotada}"
+        direcao = "🟢"
+    elif diff <= -8:
+        vies = f"VENDA {base}/{cotada}"
+        direcao = "🔴"
+    else:
+        vies = "SEM VANTAGEM MACRO CLARA"
+        direcao = "⚪"
+    return {"diferenca": diff, "confianca": conf, "vies": vies, "icone": direcao}
 
 
 def calcular_ranking(dados: dict, macro_us: dict, fed: dict) -> pd.DataFrame:
     df = pd.DataFrame(dados).T.reset_index().rename(columns={"index": "Código"})
     df["Moeda"] = df["Código"].map(MOEDAS)
 
-    df["n_juros"] = normalizar(df["juros"])
+    # Para câmbio, diferencial de juros REAIS tende a ser mais informativo que juros nominais isolados.
+    df["juros_reais"] = pd.to_numeric(df["juros"], errors="coerce") - pd.to_numeric(df["inflacao"], errors="coerce")
+    df["n_juros"] = normalizar(df["juros_reais"])
     df["n_inflacao"] = normalizar(df["inflacao"])
     df["n_pib"] = normalizar(df["pib"])
     df["n_sentimento"] = normalizar(df["sentimento"])
@@ -628,6 +713,8 @@ def calcular_ranking(dados: dict, macro_us: dict, fed: dict) -> pd.DataFrame:
         df.loc[i, "n_inflacao"] = score_inflacao_usd(macro_us)
         df.loc[i, "n_emprego"] = score_emprego_usd(macro_us)
         df.loc[i, "n_atividade"] = score_atividade_usd(macro_us)
+        # Treasury 2Y é incorporado no componente de juros do USD.
+        df.loc[i, "n_juros"] = score_juros_usd(macro_us)
 
     df["Pontuação_Macro"] = (
         PESOS["juros"] * df["n_juros"]
@@ -643,10 +730,25 @@ def calcular_ranking(dados: dict, macro_us: dict, fed: dict) -> pd.DataFrame:
         * fed["forca"] * IMPACTO_MAX_FED
     )
     df["Pontuação_Final"] = (df["Pontuação_Macro"] + df["Influência_Fed"]).clip(0, 100)
+
+    # O USD usa um score dedicado com inflação, emprego, atividade, juros/Treasury, Fed e índice amplo.
+    idx_usd2 = df.index[df["Código"] == "USD"]
+    if len(idx_usd2):
+        iu = idx_usd2[0]
+        usd_det = score_usd_detalhado(macro_us, fed)
+        df.loc[iu, "Pontuação_Final"] = usd_det["score"]
+        df.loc[iu, "Pontuação_Macro"] = (
+            usd_det["componentes"]["Inflação"] * 0.25
+            + usd_det["componentes"]["Emprego"] * 0.25
+            + usd_det["componentes"]["Atividade"] * 0.15
+            + usd_det["componentes"]["Juros / Treasury 2Y"] * 0.35
+        )
+        df.loc[iu, "Influência_Fed"] = usd_det["componentes"]["Federal Reserve"] - 50
+
     df = df.sort_values("Pontuação_Final", ascending=False).reset_index(drop=True)
     df["Posição"] = df.index + 1
 
-    for coluna in ["juros", "inflacao", "pib", "sentimento", "Pontuação_Macro", "Influência_Fed", "Pontuação_Final"]:
+    for coluna in ["juros", "inflacao", "pib", "juros_reais", "sentimento", "Pontuação_Macro", "Influência_Fed", "Pontuação_Final"]:
         df[coluna] = pd.to_numeric(df[coluna], errors="coerce").round(1)
 
     return df
@@ -775,8 +877,10 @@ macro_eua = carregar_macro_eua()
 fed = carregar_narrativa_fed()
 dados_moedas = carregar_dados_moedas()
 ranking = calcular_ranking(dados_moedas, macro_eua, fed)
+usd_detalhado = score_usd_detalhado(macro_eua, fed)
+qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V5 Português")
+st.title("🦅 USD Macro Pro — V5.2 Português")
 st.caption("Dados econômicos → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -800,11 +904,11 @@ with abas[0]:
 
     tabela = ranking[[
         "Posição", "Código", "Moeda", "Pontuação_Macro", "Influência_Fed",
-        "Pontuação_Final", "juros", "inflacao", "pib", "sentimento", "fonte"
+        "Pontuação_Final", "juros", "juros_reais", "inflacao", "pib", "sentimento", "fonte"
     ]].copy()
     tabela.columns = [
         "#", "Código", "Moeda", "Pontuação Macro", "Fed", "Pontuação Final",
-        "Juros %", "Inflação anual %", "PIB real anual %",
+        "Juros %", "Juros reais aprox. %", "Inflação anual %", "PIB real anual %",
         "Sentimento das notícias", "Fonte"
     ]
     st.dataframe(tabela, use_container_width=True, hide_index=True)
@@ -817,7 +921,7 @@ with abas[0]:
     with st.expander("🔎 Verificação da qualidade dos dados"):
         st.write("O sistema rejeita automaticamente valores fora de faixas plausíveis e usa um valor de segurança quando a série está ausente, antiga ou em unidade incompatível.")
         st.dataframe(
-            tabela[["Código", "Juros %", "Inflação anual %", "PIB real anual %", "Fonte"]],
+            tabela[["Código", "Juros %", "Juros reais aprox. %", "Inflação anual %", "PIB real anual %", "Fonte"]],
             use_container_width=True,
             hide_index=True,
         )
@@ -829,6 +933,34 @@ with abas[0]:
 # ABA 2 — EUA
 # =========================================================
 with abas[1]:
+    st.subheader("🇺🇸 Painel de Força Macro do USD")
+    rotulo_usd, icone_usd = faixa_forca(usd_detalhado["score"])
+    d1, d2, d3 = st.columns(3)
+    with d1:
+        st.metric("Score macro do USD", f"{usd_detalhado['score']:.0f}/100")
+        st.caption(f"{icone_usd} {rotulo_usd}")
+    with d2:
+        st.metric("Qualidade dos dados", f"{qualidade_usd}%")
+        st.caption(f"Confiança dos dados: {qualidade_rotulo}")
+    with d3:
+        if usd_detalhado["score"] >= 58:
+            st.metric("Conclusão macro", "Viés favorável ao USD")
+            st.caption("🟢 O conjunto atual favorece o dólar")
+        elif usd_detalhado["score"] <= 42:
+            st.metric("Conclusão macro", "Viés desfavorável ao USD")
+            st.caption("🔴 O conjunto atual pressiona o dólar")
+        else:
+            st.metric("Conclusão macro", "Neutro")
+            st.caption("⚪ Sem vantagem macro clara")
+
+    comp_df = pd.DataFrame([
+        {"Componente": nome, "Score 0–100": round(valor, 1), "Peso %": int(usd_detalhado["pesos"][nome] * 100)}
+        for nome, valor in usd_detalhado["componentes"].items()
+    ])
+    st.dataframe(comp_df, use_container_width=True, hide_index=True)
+    st.caption("O score é uma leitura macro relativa, não uma promessa de taxa de acerto nem uma probabilidade estatística.")
+
+    st.markdown("---")
     st.subheader("Indicadores Econômicos dos Estados Unidos")
     c1, c2, c3, c4 = st.columns(4)
 
@@ -935,7 +1067,20 @@ with abas[2]:
             st.metric(cotada, f"{score_cotada:.1f}")
 
         st.caption(f"Diferença de força: {diferenca:+.1f} pontos | Sensibilidade: {ESCALA_CONFIANCA:.1f}")
-        st.warning("A confiança é uma pontuação do modelo, não uma probabilidade estatística comprovada. Valide no teste histórico.")
+
+        leitura_par = classificar_par(score_base, score_cotada, base, cotada)
+        st.markdown("### 🎯 Conclusão do par")
+        if leitura_par["icone"] == "🟢":
+            st.success(f"{leitura_par['icone']} **{leitura_par['vies']}** | Confiança macro: **{leitura_par['confianca']}**")
+        elif leitura_par["icone"] == "🔴":
+            st.error(f"{leitura_par['icone']} **{leitura_par['vies']}** | Confiança macro: **{leitura_par['confianca']}**")
+        else:
+            st.info(f"{leitura_par['icone']} **{leitura_par['vies']}** | Confiança macro: **{leitura_par['confianca']}**")
+        st.write(
+            f"Motivo: {base} está com score **{score_base:.1f}** e {cotada} com **{score_cotada:.1f}**, "
+            f"uma diferença de **{leitura_par['diferenca']:+.1f} pontos**."
+        )
+        st.warning("A confiança é uma classificação do modelo, não uma probabilidade estatística comprovada. Valide no teste histórico.")
 
         st.markdown("#### 📝 Registrar sinal para teste histórico")
         preco = st.number_input(
