@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-🦅 USD Macro Pro — V5.7 PAINEL DE DECISÃO
+🦅 USD Macro Pro — V5.8 QUALIDADE MACRO
 ================================
 - Interface em português
 - Corrige unidades de inflação e PIB no ranking global
@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "5.7 — PAINEL DE DECISÃO"
+APP_VERSION = "5.8 — QUALIDADE MACRO"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V5.7 Português",
+    page_title="USD Macro Pro — V5.8 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1123,7 +1123,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V5.7 Português")
+st.title("🦅 USD Macro Pro — V5.8 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -1430,11 +1430,126 @@ def calcular_confluencia_v57(base: str, cotada: str, diferenca: float,
     }
 
 
+
+def _tendencia_serie(series_id: str, unidades: str | None = None, n: int = 4) -> dict:
+    """Compara média recente com média anterior para reduzir ruído de uma única observação."""
+    df = _fred_observacoes(series_id, max(n * 2 + 2, 10), unidades=unidades)
+    if len(df) < 4:
+        return {"direcao": 0, "delta": 0.0, "texto": "Sem histórico suficiente"}
+    vals = pd.to_numeric(df["value"], errors="coerce").dropna().tail(n * 2)
+    metade = max(2, len(vals) // 2)
+    antiga = vals.iloc[:metade].mean()
+    recente = vals.iloc[metade:].mean()
+    delta = float(recente - antiga)
+    eps = max(abs(float(antiga)) * 0.0025, 0.02)
+    direcao = 1 if delta > eps else -1 if delta < -eps else 0
+    texto = "Subindo" if direcao > 0 else "Caindo" if direcao < 0 else "Estável"
+    return {"direcao": direcao, "delta": delta, "texto": texto}
+
+
+def _score_tendencias_eua() -> dict:
+    """Tendências dos principais blocos dos EUA. Direção positiva = mais suporte relativo ao USD."""
+    cpi = _tendencia_serie("CPIAUCSL", "pc1", 3)
+    core = _tendencia_serie("CPILFESL", "pc1", 3)
+    desemp = _tendencia_serie("UNRATE", None, 3)
+    t2 = _tendencia_serie("DGS2", None, 5)
+    broad = _tendencia_serie("DTWEXBGS", None, 5)
+
+    # Inflação persistente e yields subindo podem sustentar expectativa de juros;
+    # desemprego subindo tende a enfraquecer o bloco de atividade/emprego.
+    bruto = (
+        cpi["direcao"] * 0.20 +
+        core["direcao"] * 0.25 +
+        (-desemp["direcao"]) * 0.20 +
+        t2["direcao"] * 0.25 +
+        broad["direcao"] * 0.10
+    )
+    return {
+        "score": float(np.clip(50 + bruto * 30, 20, 80)),
+        "CPI": cpi, "Core CPI": core, "Desemprego": desemp,
+        "Treasury 2Y": t2, "Broad USD": broad,
+    }
+
+
+def _diferencial_taxas_macro(base: str, cotada: str, ranking_df: pd.DataFrame) -> dict:
+    """Usa diferencial de taxa disponível no ranking; é proxy macro, não substitui yield 2Y estrangeiro."""
+    try:
+        rb = ranking_df.loc[ranking_df["Código"] == base].iloc[0]
+        rq = ranking_df.loc[ranking_df["Código"] == cotada].iloc[0]
+        taxa_b = float(rb["Juros %"])
+        taxa_q = float(rq["Juros %"])
+        dif = taxa_b - taxa_q
+        direcao = 1 if dif > 0.25 else -1 if dif < -0.25 else 0
+        return {"base": taxa_b, "cotada": taxa_q, "dif": dif, "direcao": direcao}
+    except Exception:
+        return {"base": None, "cotada": None, "dif": 0.0, "direcao": 0}
+
+
+def calcular_confluencia_v58(base: str, cotada: str, diferenca: float,
+                             usd_score: float, ajuste_surpresas: float,
+                             tom_fed: str, ranking_df: pd.DataFrame) -> dict:
+    """Confluência V5.8: força relativa + diferencial de taxas + tendência, sem regra fixa de yield."""
+    direcao_par = 1 if diferenca > 0 else -1 if diferenca < 0 else 0
+    usd_no_par = 1 if base == "USD" else -1 if cotada == "USD" else 0
+    esperado_usd = direcao_par * usd_no_par if usd_no_par else 0
+
+    sinais = []
+
+    # Força relativa
+    s_forca = 1 if abs(diferenca) >= 6 else 0
+    sinais.append(("Força relativa", s_forca, 25))
+
+    # Diferencial de taxa da moeda base contra cotada
+    dif_taxas = _diferencial_taxas_macro(base, cotada, ranking_df)
+    s_taxa = 1 if dif_taxas["direcao"] == direcao_par else -1 if dif_taxas["direcao"] == -direcao_par else 0
+    sinais.append(("Diferencial de juros", s_taxa, 20))
+
+    # Score USD
+    usd_dir = 1 if usd_score >= 58 else -1 if usd_score <= 42 else 0
+    s_usd = 1 if esperado_usd and usd_dir == esperado_usd else -1 if esperado_usd and usd_dir == -esperado_usd else 0
+    sinais.append(("Score USD", s_usd, 15))
+
+    # Surpresas
+    sp_dir = 1 if ajuste_surpresas > 1 else -1 if ajuste_surpresas < -1 else 0
+    s_sp = 1 if esperado_usd and sp_dir == esperado_usd else -1 if esperado_usd and sp_dir == -esperado_usd else 0
+    sinais.append(("Surpresas", s_sp, 15))
+
+    # Fed
+    tf = str(tom_fed).lower()
+    fed_dir = 1 if ("restritivo" in tf or "hawk" in tf) else -1 if ("dovish" in tf or "expans" in tf) else 0
+    s_fed = 1 if esperado_usd and fed_dir == esperado_usd else -1 if esperado_usd and fed_dir == -esperado_usd else 0
+    sinais.append(("Federal Reserve", s_fed, 15))
+
+    # Tendência conjunta dos EUA, substituindo a regra fixa Treasury > 4%
+    tendencias = _score_tendencias_eua()
+    trend_dir = 1 if tendencias["score"] >= 57 else -1 if tendencias["score"] <= 43 else 0
+    s_trend = 1 if esperado_usd and trend_dir == esperado_usd else -1 if esperado_usd and trend_dir == -esperado_usd else 0
+    sinais.append(("Tendência macro EUA", s_trend, 10))
+
+    favor = sum(p for _, s, p in sinais if s > 0)
+    contra = sum(p for _, s, p in sinais if s < 0)
+    neutro = 100 - favor - contra
+
+    if favor >= 70 and contra <= 15:
+        nivel = "ALTA"
+    elif favor >= 50 and favor >= contra + 20:
+        nivel = "MODERADA"
+    else:
+        nivel = "BAIXA"
+
+    return {
+        "favor": favor, "contra": contra, "neutro": neutro,
+        "nivel": nivel, "sinais": sinais,
+        "diferencial_taxas": dif_taxas,
+        "tendencias": tendencias,
+    }
+
+
 # =========================================================
 # ABA 3 — PARES
 # =========================================================
 with abas[2]:
-    st.subheader("💱 Painel de Decisão — V5.7")
+    st.subheader("💱 Painel de Decisão — V5.8")
 
     usd_base = float(usd_detalhado["score"])
     usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
@@ -1479,9 +1594,9 @@ with abas[2]:
         x3.metric(cotada, f"{score_cotada:.1f}/100")
 
         # V5.7: confiança passa a exigir confluência, não apenas distância entre scores.
-        confl = calcular_confluencia_v57(
+        confl = calcular_confluencia_v58(
             base, cotada, diferenca, usd_ajustado, ajuste,
-            fed.get("tom", "Neutro"), float(fed.get("forca", 0.0)), float(macro_eua["Treasury 2 anos"])
+            fed.get("tom", "Neutro"), ranking
         )
 
         st.markdown("### 🧩 Confluência do sinal")
@@ -1495,6 +1610,34 @@ with abas[2]:
             icon = "🟢" if estado > 0 else "🔴" if estado < 0 else "⚪"
             detalhes.append({"Componente": nome_sinal, "Leitura": icon, "Peso": f"{peso}%"})
         st.dataframe(pd.DataFrame(detalhes), use_container_width=True, hide_index=True)
+
+        dt = confl["diferencial_taxas"]
+        tend = confl["tendencias"]
+        st.markdown("#### 📐 Qualidade macro da V5.8")
+        q1, q2, q3 = st.columns(3)
+        with q1:
+            if dt["base"] is not None:
+                st.metric("Diferencial de juros", f"{dt['dif']:+.2f} p.p.")
+                st.caption(f"{base}: {dt['base']:.2f}% | {cotada}: {dt['cotada']:.2f}%")
+            else:
+                st.metric("Diferencial de juros", "—")
+        with q2:
+            st.metric("Tendência macro EUA", f"{tend['score']:.0f}/100")
+        with q3:
+            st.metric("Treasury 2Y — tendência", tend["Treasury 2Y"]["texto"])
+            st.caption(f"Δ médio: {tend['Treasury 2Y']['delta']:+.3f}")
+
+        with st.expander("Ver tendências usadas no modelo"):
+            trend_rows = []
+            for nome_t in ["CPI", "Core CPI", "Desemprego", "Treasury 2Y", "Broad USD"]:
+                x = tend[nome_t]
+                trend_rows.append({
+                    "Indicador": nome_t,
+                    "Tendência": x["texto"],
+                    "Variação média": round(x["delta"], 4),
+                })
+            st.dataframe(pd.DataFrame(trend_rows), use_container_width=True, hide_index=True)
+            st.caption("A V5.8 usa direção/tendência em vez de assumir que um nível fixo do Treasury 2Y é automaticamente positivo ou negativo para o USD.")
 
         # Substitui a confiança antiga pela confiança de confluência.
         if "SEM VANTAGEM" in acao:
