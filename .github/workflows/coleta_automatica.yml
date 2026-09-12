@@ -1,0 +1,64 @@
+name: USD Macro Pro - Coleta Automatica
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 18 * * 1-5"
+      timezone: "America/Cuiaba"
+
+permissions:
+  contents: write
+
+jobs:
+  coletar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Baixar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Criar Secrets temporarios do Streamlit
+        shell: bash
+        env:
+          CHAVE_FRED: ${{ secrets.CHAVE_FRED }}
+          CHAVE_NEWSAPI: ${{ secrets.CHAVE_NEWSAPI }}
+          CHAVE_EODHD: ${{ secrets.CHAVE_EODHD }}
+          GH_TOKEN_APP: ${{ github.token }}
+        run: |
+          mkdir -p .streamlit
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          def toml_string(v):
+              v = (v or "").replace("\\", "\\\\").replace('"', '\\"')
+              return f'"{v}"'
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          data = "\n".join([
+              "CHAVE_FRED = " + toml_string(os.getenv("CHAVE_FRED")),
+              "CHAVE_NEWSAPI = " + toml_string(os.getenv("CHAVE_NEWSAPI")),
+              "CHAVE_EODHD = " + toml_string(os.getenv("CHAVE_EODHD")),
+              "GITHUB_TOKEN_HISTORICO = " + toml_string(os.getenv("GH_TOKEN_APP")),
+              "GITHUB_REPO_HISTORICO = " + toml_string(repo),
+              'GITHUB_BRANCH_HISTORICO = "main"',
+              "",
+          ])
+          Path(".streamlit/secrets.toml").write_text(data, encoding="utf-8")
+          PY
+
+      - name: Executar coleta automatica
+        run: python coleta_automatica_v86.py
+
+      - name: Remover Secrets temporarios
+        if: always()
+        run: rm -f .streamlit/secrets.toml
