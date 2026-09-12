@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "7.0 — SCORE MESTRE"
+APP_VERSION = "7.1 — AUTOMAÇÃO MÁXIMA"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V7.0 Português",
+    page_title="USD Macro Pro — V7.1 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1018,7 +1018,7 @@ def _resumo_expectativa_v66(linhas: list[dict]) -> dict:
 
 
 def _mostrar_expectativa_v66():
-    st.subheader("🔮 Expectativa do Mercado — V7.0")
+    st.subheader("🔮 Expectativa do Mercado — V7.1")
     st.caption(
         "Antes da divulgação: compara PREVISÃO/CONSENSO com o ANTERIOR. "
         "Depois da divulgação, a seção de Surpresa Econômica compara REAL com PREVISÃO."
@@ -1305,7 +1305,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V7.0 Português")
+st.title("🦅 USD Macro Pro — V7.1 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2306,7 +2306,7 @@ def _avaliar_risco_calendario_v65(confl: dict, diferenca: float, evento: dict) -
 
 
 def _mostrar_risco_timing_v65(confl: dict, diferenca: float):
-    st.markdown("### 📅 Calendário + Risco e Timing — V7.0")
+    st.markdown("### 📅 Calendário + Risco e Timing — V7.1")
     st.caption(
         "Calendário combinado: FRED (CPI, Payroll, PIB e PCE) + Federal Reserve (FOMC) "
         "+ ISM (Industrial e Serviços)."
@@ -2658,7 +2658,7 @@ def _mostrar_expectativa_no_par_v68(base: str, cotada: str):
     Reutiliza as mesmas session_state keys do Painel EUA, mas NÃO cria widgets
     com aquelas keys aqui; usa keys v67 exclusivas e sincroniza os valores.
     """
-    st.markdown("### 🔮 Expectativa do Mercado — V7.0")
+    st.markdown("### 🔮 Expectativa do Mercado — V7.1")
     st.caption(
         "Preencha o consenso diretamente aqui. O painel compara CONSENSO × ANTERIOR "
         "antes do release. Isso continua informativo e não é contado duas vezes no score."
@@ -2693,7 +2693,10 @@ def _mostrar_expectativa_no_par_v68(base: str, cotada: str):
         )
 
         # Fed Funds efetivo é referência observada; não é tratado como a faixa-alvo.
-        effr_default = float(st.session_state.get("v68_effr", 3.63))
+        _effr_auto, _effr_dt = _auto_anterior_v71("Fed Funds efetivo")
+        effr_default = float(st.session_state.get(
+            "v68_effr", _effr_auto if _effr_auto is not None else 3.63
+        ))
         st.number_input(
             "Fed Funds efetivo — referência (%)",
             min_value=0.0, max_value=20.0, value=effr_default,
@@ -2950,7 +2953,7 @@ def _mostrar_fomc_surprise_v69(base: str, cotada: str):
     prox = _proximo_evento_macro_v65()
     evento = prox.get("evento", "") if prox.get("disponivel") else ""
 
-    st.markdown("### ⚡ FOMC Surprise Engine — V7.0")
+    st.markdown("### ⚡ FOMC Surprise Engine — V7.1")
     st.caption(
         "Use esta área APÓS a decisão. Ela compara o que o mercado precificava "
         "com o que o Fed realmente fez e adiciona uma leitura separada do comunicado/Powell."
@@ -3159,7 +3162,7 @@ def _score_mestre_v70(base: str, cotada: str, diferenca: float, confl: dict) -> 
 
 
 def _mostrar_score_mestre_v70(base: str, cotada: str, diferenca: float, confl: dict):
-    st.markdown("## 🦅 Score Mestre — V7.0")
+    st.markdown("## 🦅 Score Mestre — V7.1")
     st.caption(
         "Resumo final do motor. Direção, qualidade dos dados e timing ficam separados "
         "para não confundir score interno com probabilidade de lucro."
@@ -3208,11 +3211,122 @@ def _mostrar_score_mestre_v70(base: str, cotada: str, diferenca: float, confl: d
     )
 
 
+
+# =========================================================
+# V7.1 — AUTOMAÇÃO MÁXIMA
+# =========================================================
+AUTO_SERIES_V71 = {
+    "IPC anual": "CPIAUCSL",
+    "IPC Núcleo anual": "CPILFESL",
+    "PCE anual": "PCEPI",
+    "PCE Núcleo anual": "PCEPILFE",
+    "Payroll": "PAYEMS",
+    "Desemprego": "UNRATE",
+    "Fed Funds efetivo": "FEDFUNDS",
+    "Treasury 2Y": "DGS2",
+    "Treasury 10Y": "DGS10",
+    "USD amplo": "DTWEXBGS",
+}
+
+def _fred_obs_v71(series_id: str, limit: int = 6):
+    """Busca observações recentes usando a mesma CHAVE_FRED do app."""
+    if not CHAVE_FRED:
+        return []
+    url = "https://api.stlouisfed.org/fred/series/observations"
+    params = {
+        "series_id": series_id, "api_key": CHAVE_FRED, "file_type": "json",
+        "sort_order": "desc", "limit": max(limit, 3)
+    }
+    try:
+        r = requests.get(url, params=params, timeout=15)
+        r.raise_for_status()
+        obs = r.json().get("observations", [])
+        out = []
+        for x in obs:
+            try:
+                if x.get("value") not in (None, ".", ""):
+                    out.append((pd.Timestamp(x["date"]), float(x["value"])))
+            except Exception:
+                pass
+        return out
+    except Exception:
+        return []
+
+def _auto_anterior_v71(nome: str):
+    """Retorna valor anterior compatível com a forma usada pelo painel."""
+    sid = AUTO_SERIES_V71.get(nome)
+    obs = _fred_obs_v71(sid, 15) if sid else []
+    if len(obs) < 2:
+        return None, None
+
+    # Inflação: converte índice para variação anual (%).
+    if nome in ("IPC anual", "IPC Núcleo anual", "PCE anual", "PCE Núcleo anual"):
+        if len(obs) < 13:
+            return None, None
+        vals = list(reversed(obs[:13]))
+        prev = vals[-2][1] / vals[-13][1] * 100.0 - 100.0
+        return float(prev), vals[-2][0]
+
+    # Payroll: diferença mensal em milhares.
+    if nome == "Payroll":
+        return float(obs[1][1] - obs[2][1]), obs[1][0]
+
+    # Taxas/níveis.
+    return float(obs[1][1]), obs[1][0]
+
+def _status_automacao_v71():
+    st.markdown("### 🤖 Automação dos Dados — V7.1")
+    st.caption(
+        "O app preenche automaticamente tudo que possui fonte oficial disponível. "
+        "Consenso de mercado e probabilidades FOMC não são inventados."
+    )
+
+    rows = []
+    for nome in ["IPC anual","IPC Núcleo anual","PCE anual","PCE Núcleo anual",
+                 "Payroll","Desemprego","Fed Funds efetivo","Treasury 2Y",
+                 "Treasury 10Y","USD amplo"]:
+        val, dt = _auto_anterior_v71(nome)
+        rows.append({
+            "Dado": nome,
+            "Automático": "✅" if val is not None else "⚠️",
+            "Último/Anterior": round(val, 3) if val is not None else "—",
+            "Data": dt.strftime("%d/%m/%Y") if dt is not None else "—",
+            "Fonte": "FRED",
+        })
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+    st.info(
+        "Você NÃO precisa digitar CPI, PCE, Payroll, desemprego, Fed Funds, "
+        "Treasuries ou índice amplo do USD quando a FRED estiver disponível."
+    )
+    st.warning(
+        "Ainda precisam de uma fonte externa de mercado: CONSENSO/FORECAST e "
+        "probabilidades de corte/manutenção/alta do FOMC. Enquanto essa fonte não "
+        "estiver conectada, o app deixa esses campos explícitos como manuais."
+    )
+
+def _sincronizar_anteriores_v71():
+    """Alimenta campos de anterior sem sobrescrever consenso digitado pelo usuário."""
+    for nome in ["IPC anual","IPC Núcleo anual","PCE anual","PCE Núcleo anual",
+                 "Payroll","Desemprego"]:
+        val, _ = _auto_anterior_v71(nome)
+        if val is not None:
+            st.session_state[f"anterior_{nome}"] = float(val)
+            # também alimenta default exclusivo do painel V6.7/V7.1
+            k = f"v67_anterior_{nome}"
+            if k not in st.session_state:
+                st.session_state[k] = float(val)
+
+
+_sincronizar_anteriores_v71()
+
 # =========================================================
 # ABA 3 — PARES
 # =========================================================
 with abas[2]:
-    st.subheader("💱 Painel de Decisão — V7.0")
+    _status_automacao_v71()
+
+    st.subheader("💱 Painel de Decisão — V7.1")
 
     usd_base = float(usd_detalhado["score"])
     usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
@@ -3284,7 +3398,7 @@ with abas[2]:
         dt = confl["diferencial_taxas"]
         mercado3m = confl["mercado_3m"]
         tend = confl["tendencias"]
-        st.markdown("#### 📐 Qualidade macro da V7.0")
+        st.markdown("#### 📐 Qualidade macro da V7.1")
         q1, q2, q3 = st.columns(3)
         with q1:
             if dt["base"] is not None and dt["cotada"] is not None:
@@ -3337,7 +3451,7 @@ with abas[2]:
             if idade_max > 120:
                 st.warning(
                     "🟡 O spread de mercado usa pelo menos uma série antiga. "
-                    "A V7.0 reduz automaticamente o peso desse componente até a FRED atualizar."
+                    "A V7.1 reduz automaticamente o peso desse componente até a FRED atualizar."
                 )
         else:
             st.warning(
@@ -3346,7 +3460,7 @@ with abas[2]:
             )
 
         st.caption(
-            "Na V7.0, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
+            "Na V7.1, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
             "da FRED/OECD. Mantivemos o Treasury 2Y como tendência dos EUA, mas não "
             "misturamos 2Y americano com uma maturidade estrangeira diferente."
         )
@@ -3361,7 +3475,7 @@ with abas[2]:
                     "Variação média": round(x["delta"], 4),
                 })
             st.dataframe(pd.DataFrame(trend_rows), use_container_width=True, hide_index=True)
-            st.caption("A V7.0 combina diferencial de juros oficiais, spread de mercado e direção do spread com pesos ajustados pelo frescor dos dados. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
+            st.caption("A V7.1 combina diferencial de juros oficiais, spread de mercado e direção do spread com pesos ajustados pelo frescor dos dados. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
 
         # Substitui a confiança antiga pela confiança de confluência.
         if "SEM VANTAGEM" in acao:
@@ -3379,7 +3493,7 @@ with abas[2]:
         score_final = confl["score_confluencia"]
         qualidade_final = confl["qualidade_confluencia"]
 
-        st.markdown("### 🧭 Decisão V7.0")
+        st.markdown("### 🧭 Decisão V7.1")
         if "SEM VANTAGEM" in acao or score_final < 58 or qualidade_final < 50:
             st.info(
                 f"⚪ **NEUTRO / AGUARDAR** — Score {score_final:.0f}/100 | "
@@ -3431,7 +3545,7 @@ with abas[2]:
             st.success("✅ Sinal registrado!")
 
     st.markdown("---")
-    st.markdown("### 🏆 Matriz Inteligente — V7.0")
+    st.markdown("### 🏆 Matriz Inteligente — V7.1")
     st.caption(
         "Todos os pares abaixo passam pelo mesmo motor de confluência, qualidade e frescor "
         "usado na análise individual."
