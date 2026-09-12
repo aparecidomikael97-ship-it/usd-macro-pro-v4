@@ -28,12 +28,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "8.4.1 — SINCRONIZAÇÃO DO HISTÓRICO"
+APP_VERSION = "8.5 — COLETA AUTOMÁTICA DIÁRIA"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V8.4.1 Português",
+    page_title="USD Macro Pro — V8.5 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1606,7 +1606,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V8.4.1 Português")
+st.title("🦅 USD Macro Pro — V8.5 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2670,7 +2670,7 @@ def _avaliar_sinais_v82():
     return df, atualizados
 
 def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca, confl):
-    st.markdown("## 🧪 Validação Histórica — V8.4.1")
+    st.markdown("## 🧪 Validação Histórica — V8.5")
     st.caption(
         "Este módulo registra o sinal AGORA, evita duplicatas e mede depois. "
         "Ele não reconstrói o passado usando dados futuros."
@@ -2695,13 +2695,75 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 
     if par == "EUR/USD":
         st.info(
-            "Fonte de preço da V8.4.1: FRED DEXUSEU, cotação diária em dólares por 1 euro. "
+            "Fonte de preço da V8.5: FRED DEXUSEU, cotação diária em dólares por 1 euro. "
             "Por ser diária, esta primeira validação mede direção entre dias — não 1h/4h."
         )
     else:
         st.warning(
             "Nesta primeira versão, a avaliação automática está habilitada somente para EUR/USD."
         )
+
+    # V8.5 — Coleta Automática Diária
+    # Registra no máximo uma nova fotografia por data de observação FRED/par/direção.
+    # WAIT não é registrado como operação direcional.
+    _auto_v85_ativo = st.toggle(
+        "🤖 Coleta automática diária",
+        value=True,
+        key="v85_coleta_auto",
+        help="Quando houver uma nova observação diária FRED, registra automaticamente o cenário atual sem duplicar a mesma data."
+    )
+
+    if _auto_v85_ativo and par == "EUR/USD" and direcao_atual in ("BUY", "SELL"):
+        try:
+            _df_auto_v85 = _carregar_sinais_v82()
+            _datas_auto_v85 = (
+                pd.to_datetime(_df_auto_v85["data_preco"], errors="coerce")
+                if isinstance(_df_auto_v85, pd.DataFrame) and "data_preco" in _df_auto_v85.columns
+                else pd.Series(dtype="datetime64[ns]")
+            )
+            _dup_auto_v85 = False
+            if isinstance(_df_auto_v85, pd.DataFrame) and not _df_auto_v85.empty:
+                _dup_auto_v85 = (
+                    (_df_auto_v85["par"].astype(str) == str(par)) &
+                    (_df_auto_v85["direcao"].astype(str) == str(direcao_atual)) &
+                    (_datas_auto_v85 == pd.Timestamp(dt_preco))
+                ).any()
+
+            if not _dup_auto_v85:
+                _ok_auto_v85, _msg_auto_v85 = _registrar_sinal_v82(
+                    par=par,
+                    direcao=direcao_atual,
+                    score_mestre=score_mestre,
+                    qualidade=qualidade,
+                    score_base=score_base,
+                    score_cotada=score_cotada,
+                    diferenca=diferenca,
+                    fomc_score=fomc_score,
+                    fomc_peso=fomc_peso,
+                    evento=evento,
+                    dias_evento=dias_evento,
+                    impacto=impacto,
+                    timing=timing,
+                    preco_entrada=preco_atual,
+                    data_preco=dt_preco,
+                )
+                if _ok_auto_v85:
+                    st.success(
+                        f"🤖 V8.5 registrou automaticamente {par} {direcao_atual} "
+                        f"com a observação FRED de {dt_preco}."
+                    )
+                else:
+                    st.caption(f"🤖 Coleta automática: {_msg_auto_v85}")
+            else:
+                st.caption(
+                    f"🤖 Coleta automática ativa — a observação FRED de {dt_preco} "
+                    "já está registrada para este cenário."
+                )
+        except Exception as _e_auto_v85:
+            st.warning(
+                "A coleta automática não conseguiu registrar neste ciclo. "
+                "O botão manual continua disponível."
+            )
 
     if st.button("📌 Registrar sinal atual para validação", key="v82_registrar"):
         ok, msg = _registrar_sinal_v82(
@@ -2729,7 +2791,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     pendentes = df[df["avaliado"] != True].copy()
     avaliados_total = df[df["avaliado"] == True].copy()
 
-    st.markdown("### 💾 Persistência do histórico — V8.4")
+    st.markdown("### 💾 Persistência do histórico — V8.5")
     _v84_token, _v84_repo, _v84_branch = _github_cfg_v84()
     if _v84_token:
         st.success(
