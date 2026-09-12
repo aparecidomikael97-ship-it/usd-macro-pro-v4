@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-🦅 USD Macro Pro — V5.6 PARES MACRO INTEGRADOS
+🦅 USD Macro Pro — V5.7 PAINEL DE DECISÃO
 ================================
 - Interface em português
 - Corrige unidades de inflação e PIB no ranking global
@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "5.6 — PARES MACRO INTEGRADOS"
+APP_VERSION = "5.7 — PAINEL DE DECISÃO"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V5.6 Português",
+    page_title="USD Macro Pro — V5.7 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1123,7 +1123,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V5.6 Português")
+st.title("🦅 USD Macro Pro — V5.7 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -1379,11 +1379,62 @@ with abas[1]:
 
     st.caption("O ajuste por surpresa é limitado a ±15 pontos para impedir que uma única divulgação domine todo o modelo. Isso é uma regra operacional, não uma probabilidade estatística.")
 
+
+def calcular_confluencia_v57(base: str, cotada: str, diferenca: float,
+                             usd_score: float, ajuste_surpresas: float,
+                             tom_fed: str, intensidade_fed: float,
+                             treasury2: float) -> dict:
+    """Confluência interna. Não é probabilidade estatística."""
+    # direção desejada do USD no par: +1 favorece USD, -1 desfavorece USD
+    usd_no_par = 1 if base == "USD" else -1 if cotada == "USD" else 0
+    direcao_par = 1 if diferenca > 0 else -1 if diferenca < 0 else 0
+
+    sinais = []
+
+    # 1. Força relativa
+    sinais.append(("Força relativa", 1 if diferenca * direcao_par > 0 and abs(diferenca) >= 6 else 0, 30))
+
+    # 2. Score USD
+    usd_dir = 1 if usd_score >= 58 else -1 if usd_score <= 42 else 0
+    esperado = direcao_par * usd_no_par if usd_no_par else 0
+    sinais.append(("Score USD", 1 if esperado != 0 and usd_dir == esperado else -1 if esperado != 0 and usd_dir == -esperado else 0, 20))
+
+    # 3. Surpresa
+    surpresa_dir = 1 if ajuste_surpresas > 1 else -1 if ajuste_surpresas < -1 else 0
+    sinais.append(("Surpresas", 1 if esperado != 0 and surpresa_dir == esperado else -1 if esperado != 0 and surpresa_dir == -esperado else 0, 20))
+
+    # 4. Fed
+    tf = str(tom_fed).lower()
+    fed_dir = 1 if ("restritivo" in tf or "hawk" in tf) else -1 if ("dovish" in tf or "expans" in tf) else 0
+    sinais.append(("Federal Reserve", 1 if esperado != 0 and fed_dir == esperado else -1 if esperado != 0 and fed_dir == -esperado else 0, 20))
+
+    # 5. Treasury 2Y — confirmação simples de regime, sem fingir previsão
+    t_dir = 1 if treasury2 >= 4.0 else -1 if treasury2 <= 3.0 else 0
+    sinais.append(("Treasury 2Y", 1 if esperado != 0 and t_dir == esperado else -1 if esperado != 0 and t_dir == -esperado else 0, 10))
+
+    favor = sum(p for _, s, p in sinais if s > 0)
+    contra = sum(p for _, s, p in sinais if s < 0)
+    neutro = 100 - favor - contra
+    saldo = favor - contra
+
+    if favor >= 70 and contra <= 20:
+        nivel = "ALTA"
+    elif favor >= 50 and favor > contra:
+        nivel = "MODERADA"
+    else:
+        nivel = "BAIXA"
+
+    return {
+        "favor": favor, "contra": contra, "neutro": neutro,
+        "saldo": saldo, "nivel": nivel, "sinais": sinais
+    }
+
+
 # =========================================================
 # ABA 3 — PARES
 # =========================================================
 with abas[2]:
-    st.subheader("💱 Pares e Confiança — V5.6")
+    st.subheader("💱 Painel de Decisão — V5.7")
 
     usd_base = float(usd_detalhado["score"])
     usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
@@ -1397,16 +1448,11 @@ with abas[2]:
     st.caption(f"Leitura das surpresas: {confirmacao}")
 
     # Mantém o seletor original e integra o USD ajustado.
-    moedas = ranking["Código"].tolist()
-    ca, cb = st.columns(2)
-    with ca:
-        base = st.selectbox("Moeda base", moedas, index=moedas.index("EUR") if "EUR" in moedas else 0)
-    with cb:
-        cotada = st.selectbox("Moeda cotada", moedas, index=moedas.index("USD") if "USD" in moedas else 1)
+    pares_convencionais = ["EUR/USD", "GBP/USD", "AUD/USD", "NZD/USD", "USD/JPY", "USD/CHF", "USD/CAD"]
+    par_escolhido = st.selectbox("Par Forex", pares_convencionais, index=0)
+    base, cotada = par_escolhido.split("/")
 
-    if base == cotada:
-        st.warning("Escolha duas moedas diferentes.")
-    else:
+    if base != cotada:
         score_base = usd_ajustado if base == "USD" else float(ranking.loc[ranking["Código"] == base, "Pontuação_Final"].iloc[0])
         score_cotada = usd_ajustado if cotada == "USD" else float(ranking.loc[ranking["Código"] == cotada, "Pontuação_Final"].iloc[0])
         diferenca = score_base - score_cotada
@@ -1422,7 +1468,7 @@ with abas[2]:
             nivel = "ALTA" if ad >= 20 else "MODERADA"
 
         st.markdown("### 🎯 Conclusão integrada")
-        msg = f"{icone} **{acao}** | Confiança macro: **{nivel}**"
+        msg = f"{icone} **{acao}** | Força relativa inicial: **{nivel}**"
         if icone == "🟢": st.success(msg)
         elif icone == "🔴": st.error(msg)
         else: st.info(msg)
@@ -1431,6 +1477,37 @@ with abas[2]:
         x1.metric(base, f"{score_base:.1f}/100")
         x2.metric("Diferença macro", f"{diferenca:+.1f}")
         x3.metric(cotada, f"{score_cotada:.1f}/100")
+
+        # V5.7: confiança passa a exigir confluência, não apenas distância entre scores.
+        confl = calcular_confluencia_v57(
+            base, cotada, diferenca, usd_ajustado, ajuste,
+            TOM_FED, INTENSIDADE_FED, float(macro_eua["Treasury 2 anos"])
+        )
+
+        st.markdown("### 🧩 Confluência do sinal")
+        cf1, cf2, cf3 = st.columns(3)
+        cf1.metric("A favor", f"{confl['favor']}%")
+        cf2.metric("Contra", f"{confl['contra']}%")
+        cf3.metric("Confluência", confl["nivel"])
+
+        detalhes = []
+        for nome_sinal, estado, peso in confl["sinais"]:
+            icon = "🟢" if estado > 0 else "🔴" if estado < 0 else "⚪"
+            detalhes.append({"Componente": nome_sinal, "Leitura": icon, "Peso": f"{peso}%"})
+        st.dataframe(pd.DataFrame(detalhes), use_container_width=True, hide_index=True)
+
+        # Substitui a confiança antiga pela confiança de confluência.
+        if "SEM VANTAGEM" in acao:
+            nivel_final = "BAIXA"
+        else:
+            nivel_final = confl["nivel"]
+
+        if nivel_final == "ALTA":
+            st.success(f"✅ Sinal macro confirmado por confluência: {nivel_final}")
+        elif nivel_final == "MODERADA":
+            st.warning(f"🟡 Sinal macro com confluência: {nivel_final}")
+        else:
+            st.info("⚪ Confluência baixa — evitar tratar a diferença de scores como sinal forte.")
 
         st.write(f"Motivo: {base} está em **{score_base:.1f}** e {cotada} em **{score_cotada:.1f}**. O USD, quando presente, já inclui o ajuste das surpresas econômicas.")
         st.warning("⚠️ O viés macro não é gatilho de entrada nem probabilidade de lucro. Confirme preço, estrutura, liquidez, sessão e risco.")
