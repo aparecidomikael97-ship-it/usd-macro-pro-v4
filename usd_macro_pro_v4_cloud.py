@@ -1481,7 +1481,7 @@ with abas[2]:
         # V5.7: confiança passa a exigir confluência, não apenas distância entre scores.
         confl = calcular_confluencia_v57(
             base, cotada, diferenca, usd_ajustado, ajuste,
-            TOM_FED, INTENSIDADE_FED, float(macro_eua["Treasury 2 anos"])
+            tom_fed, intensidade_fed, float(macro_eua["Treasury 2 anos"])
         )
 
         st.markdown("### 🧩 Confluência do sinal")
