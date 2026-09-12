@@ -28,12 +28,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "8.7 — VALIDAÇÃO MULTIPARES"
+APP_VERSION = "8.7.1 — MULTIPARES ATÔMICO"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V8.7 Português",
+    page_title="USD Macro Pro — V8.7.1 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1606,7 +1606,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V8.7 Português")
+st.title("🦅 USD Macro Pro — V8.7.1 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2518,10 +2518,24 @@ def _github_salvar_csv_v84(df):
 
 def _salvar_sinais_v82(df):
     """
-    V8.4: salva localmente e, se configurado, também no GitHub.
-    O GitHub é a cópia persistente; o parquet local continua como fallback.
+    V8.7.1: salva localmente e no GitHub com deduplicação forte.
+    Regra histórica: um par + uma data de observação FRED = no máximo uma linha.
+    Se houver duplicatas antigas, preserva a primeira fotografia registrada.
     """
     _garantir_pasta_v82()
+
+    df = df.copy()
+    if not df.empty and "par" in df.columns and "data_preco" in df.columns:
+        df["par"] = df["par"].astype(str).str.upper().str.strip()
+        _datas = pd.to_datetime(df["data_preco"], errors="coerce")
+        df["_data_fred_v871"] = _datas.dt.strftime("%Y-%m-%d")
+        df = (
+            df.sort_values("timestamp", kind="stable")
+              .drop_duplicates(subset=["par", "_data_fred_v871"], keep="first")
+              .drop(columns=["_data_fred_v871"])
+              .reset_index(drop=True)
+        )
+
     ok_local = False
     try:
         df.to_parquet(ARQ_SINAIS_V82, index=False)
@@ -2598,9 +2612,8 @@ def _registrar_sinal_v82(par, direcao, score_mestre, qualidade,
     if not df.empty:
         datas_preco = pd.to_datetime(df["data_preco"], errors="coerce")
         dup = (
-            (df["par"] == par) &
-            (df["direcao"] == direcao) &
-            (datas_preco == pd.Timestamp(dt_preco))
+            (df["par"].astype(str).str.upper().str.strip() == str(par).upper().strip()) &
+            (datas_preco.dt.strftime("%Y-%m-%d") == pd.Timestamp(dt_preco).strftime("%Y-%m-%d"))
         )
         if dup.any():
             return False, (
@@ -2694,7 +2707,7 @@ def _avaliar_sinais_v82():
     return df, atualizados
 
 def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca, confl):
-    st.markdown("## 🧪 Validação Histórica — V8.7")
+    st.markdown("## 🧪 Validação Histórica — V8.7.1")
     st.caption(
         "Este módulo registra o sinal AGORA, evita duplicatas e mede depois. "
         "Ele não reconstrói o passado usando dados futuros."
@@ -2719,7 +2732,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 
     if serie_atual:
         st.info(
-            f"Fonte de preço V8.7: FRED {serie_atual}, série diária oficial H.10 para {par}. "
+            f"Fonte de preço V8.7.1: FRED {serie_atual}, série diária oficial H.10 para {par}. "
             "A validação mede direção entre observações diárias — não 1h/4h."
         )
     else:
@@ -2798,7 +2811,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     pendentes = df[df["avaliado"] != True].copy()
     avaliados_total = df[df["avaliado"] == True].copy()
 
-    st.markdown("### 💾 Persistência do histórico — V8.7")
+    st.markdown("### 💾 Persistência do histórico — V8.7.1")
     _v84_token, _v84_repo, _v84_branch = _github_cfg_v84()
     if _v84_token:
         st.success(
@@ -5275,7 +5288,7 @@ with abas[2]:
             st.success("✅ Sinal registrado!")
 
     st.markdown("---")
-    st.markdown("### 🏆 Matriz Inteligente — V7.1")
+    st.markdown("### 🏆 Matriz Inteligente — V8.7.1")
     st.caption(
         "Todos os pares abaixo passam pelo mesmo motor de confluência, qualidade e frescor "
         "usado na análise individual."
@@ -5344,51 +5357,125 @@ with abas[2]:
     matriz_v61.insert(0, "Ranking", range(1, len(matriz_v61) + 1))
 
     # =====================================================
-    # V8.7 — COLETA HISTÓRICA AUTOMÁTICA DOS 7 PARES
-    # Roda tanto no Streamlit quanto no GitHub Actions.
-    # Registra somente BUY/SELL e a proteção de duplicidade
-    # impede repetir o mesmo par/direção/data FRED.
+    # V8.7.1 — COLETA HISTÓRICA MULTIPARES ATÔMICA
+    # Usa EXATAMENTE a decisão final exibida na Matriz.
+    # Carrega o histórico uma vez, adiciona todos os pares elegíveis
+    # e salva uma única vez. Isso evita conflitos/duplicatas no GitHub.
     # =====================================================
-    _v87_resultados_coleta = []
-    for _par_v87 in pares_matriz:
-        _b87, _q87 = _par_v87.split("/")
-        _sb87 = usd_ajustado if _b87 == "USD" else float(scores_ranking.get(_b87, 50.0))
-        _sq87 = usd_ajustado if _q87 == "USD" else float(scores_ranking.get(_q87, 50.0))
-        _dif87 = float(_sb87 - _sq87)
+    _df_v871 = _carregar_sinais_v82()
+    _novas_v871 = []
+    _status_v871 = []
 
-        if _dif87 >= 6:
-            _dir87 = "BUY"
-        elif _dif87 <= -6:
-            _dir87 = "SELL"
+    # Metadados de evento/FOMC calculados uma vez para toda a fotografia.
+    _evento_v871 = _proximo_evento_macro_v65()
+    _evento_nome_v871, _dias_v871, _impacto_v871 = "—", None, "—"
+    if isinstance(_evento_v871, dict) and _evento_v871.get("disponivel", False):
+        _evento_nome_v871 = str(_evento_v871.get("evento", "—"))
+        _dias_v871 = _evento_v871.get("dias")
+        _impacto_v871 = str(_evento_v871.get("impacto", "—"))
+
+    _fomc_score_v871 = None
+    _fomc_peso_v871 = None
+    if st.session_state.get("v77_fomc_integrado", False):
+        _fomc_score_v871 = float(st.session_state.get("v76_fomc_usd_score", 50.0))
+        _fomc_peso_v871 = float(st.session_state.get("v77_peso_fomc", 0.0)) * 100.0
+
+    _alto_v871 = str(_impacto_v871).upper() in ("MÁXIMO", "MAXIMO", "ALTO")
+    if _dias_v871 is not None and _dias_v871 <= 2 and _alto_v871:
+        _timing_v871 = "AGUARDAR"
+    elif _dias_v871 is not None and _dias_v871 <= 7 and _alto_v871:
+        _timing_v871 = "ATENÇÃO"
+    else:
+        _timing_v871 = "NORMAL"
+
+    # Índice rápido com a decisão FINAL da própria matriz.
+    _matriz_por_par_v871 = {str(r["Par"]): r for r in linhas_matriz}
+
+    for _par_v871 in pares_matriz:
+        _r871 = _matriz_por_par_v871[_par_v871]
+        _dec871 = str(_r871["Direção"]).upper()
+
+        # Só registra quando a Matriz realmente mostra COMPRA ou VENDA.
+        # AGUARDAR / AGUARDAR CONFIRMAÇÃO / NEUTRO ficam fora.
+        if "AGUARDAR" in _dec871 or "NEUTRO" in _dec871:
+            _status_v871.append((_par_v871, "WAIT", "Decisão final da matriz: aguardar"))
+            continue
+        if "COMPRA" in _dec871:
+            _dir_v871 = "BUY"
+        elif "VENDA" in _dec871:
+            _dir_v871 = "SELL"
         else:
-            _dir87 = "WAIT"
-
-        if _dir87 == "WAIT":
-            _v87_resultados_coleta.append((_par_v87, "WAIT", False, "Sem vantagem macro clara"))
+            _status_v871.append((_par_v871, "WAIT", "Sem direção final reconhecida"))
             continue
 
-        _conf87 = calcular_confluencia_v60(
-            _b87, _q87, _dif87, usd_ajustado, ajuste,
+        _preco_v871, _dt_v871, _serie_v871 = _fred_preco_par_v87(_par_v871)
+        if _preco_v871 is None or _dt_v871 is None:
+            _status_v871.append((_par_v871, _dir_v871, f"FRED {_serie_v871}: preço indisponível"))
+            continue
+
+        _data_key_v871 = pd.Timestamp(_dt_v871).strftime("%Y-%m-%d")
+
+        # Trava forte: par + data FRED, independentemente de direção ou rerun.
+        _ja_v871 = False
+        if isinstance(_df_v871, pd.DataFrame) and not _df_v871.empty:
+            _p871 = _df_v871["par"].astype(str).str.upper().str.strip()
+            _d871 = pd.to_datetime(_df_v871["data_preco"], errors="coerce").dt.strftime("%Y-%m-%d")
+            _ja_v871 = ((_p871 == _par_v871) & (_d871 == _data_key_v871)).any()
+
+        # Também trava contra duplicação dentro do próprio lote atual.
+        if not _ja_v871 and _novas_v871:
+            _ja_v871 = any(
+                x["par"] == _par_v871 and
+                pd.Timestamp(x["data_preco"]).strftime("%Y-%m-%d") == _data_key_v871
+                for x in _novas_v871
+            )
+
+        if _ja_v871:
+            _status_v871.append((_par_v871, _dir_v871, f"Já registrado em {_data_key_v871}"))
+            continue
+
+        _b871, _q871 = _par_v871.split("/")
+        _sb871 = usd_ajustado if _b871 == "USD" else float(scores_ranking.get(_b871, 50.0))
+        _sq871 = usd_ajustado if _q871 == "USD" else float(scores_ranking.get(_q871, 50.0))
+        _dif871 = float(_sb871 - _sq871)
+
+        _conf871 = calcular_confluencia_v60(
+            _b871, _q871, _dif871, usd_ajustado, ajuste,
             fed.get("tom", "Neutro"), ranking
         )
-        _score87 = float(_conf87["score_confluencia"])
-        _qual87 = float(_conf87["qualidade_confluencia"])
 
-        # Mesma trava conservadora da matriz: não cria registro
-        # quando a cobertura/qualidade é insuficiente.
-        if _score87 < 58 or _qual87 < 50:
-            _v87_resultados_coleta.append((_par_v87, _dir87, False, "Qualidade/confluência insuficiente"))
-            continue
+        _novas_v871.append({
+            "timestamp": pd.Timestamp.now(),
+            "par": _par_v871,
+            "direcao": _dir_v871,
+            "score_mestre": float(_conf871["score_confluencia"]),
+            "qualidade": float(_conf871["qualidade_confluencia"]),
+            "score_base": float(_sb871),
+            "score_cotada": float(_sq871),
+            "diferenca": float(_dif871),
+            "fomc_score": _fomc_score_v871,
+            "fomc_peso": _fomc_peso_v871,
+            "evento": _evento_nome_v871,
+            "dias_evento": _dias_v871,
+            "impacto": _impacto_v871,
+            "timing": _timing_v871,
+            "preco_entrada": float(_preco_v871),
+            "data_preco": pd.Timestamp(_dt_v871),
+            "avaliado": False,
+            "preco_saida": None,
+            "data_saida": None,
+            "retorno_pct": None,
+            "acertou": None,
+        })
+        _status_v871.append((_par_v871, _dir_v871, f"Novo: FRED {_serie_v871} {_data_key_v871}"))
 
-        _ok87, _msg87 = _registrar_sinal_v82(
-            _par_v87, _dir87, _score87, _qual87,
-            _sb87, _sq87, _dif87
-        )
-        _v87_resultados_coleta.append((_par_v87, _dir87, _ok87, _msg87))
+    if _novas_v871:
+        _df_v871 = pd.concat([_df_v871, pd.DataFrame(_novas_v871)], ignore_index=True)
+        _salvar_sinais_v82(_df_v871)
 
     st.caption(
-        "🤖 V8.7 multipares: EUR/USD, GBP/USD, AUD/USD, NZD/USD, "
-        "USD/JPY, USD/CHF e USD/CAD são verificados automaticamente a cada execução."
+        "🤖 V8.7.1 multipares: coleta atômica dos 7 pares usando exatamente a decisão final "
+        "da Matriz. Regra anti-duplicata: 1 par + 1 data FRED = no máximo 1 registro."
     )
 
     st.dataframe(
