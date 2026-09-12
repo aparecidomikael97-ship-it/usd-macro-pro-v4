@@ -28,12 +28,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "8.5 — COLETA AUTOMÁTICA DIÁRIA"
+APP_VERSION = "8.5.1 — COLETA AUTOMÁTICA CORRIGIDA"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V8.5 Português",
+    page_title="USD Macro Pro — V8.5.1 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1606,7 +1606,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V8.5 Português")
+st.title("🦅 USD Macro Pro — V8.5.1 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2670,7 +2670,7 @@ def _avaliar_sinais_v82():
     return df, atualizados
 
 def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca, confl):
-    st.markdown("## 🧪 Validação Histórica — V8.5")
+    st.markdown("## 🧪 Validação Histórica — V8.5.1")
     st.caption(
         "Este módulo registra o sinal AGORA, evita duplicatas e mede depois. "
         "Ele não reconstrói o passado usando dados futuros."
@@ -2695,7 +2695,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 
     if par == "EUR/USD":
         st.info(
-            "Fonte de preço da V8.5: FRED DEXUSEU, cotação diária em dólares por 1 euro. "
+            "Fonte de preço da V8.5.1: FRED DEXUSEU, cotação diária em dólares por 1 euro. "
             "Por ser diária, esta primeira validação mede direção entre dias — não 1h/4h."
         )
     else:
@@ -2713,7 +2713,13 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
         help="Quando houver uma nova observação diária FRED, registra automaticamente o cenário atual sem duplicar a mesma data."
     )
 
-    if _auto_v85_ativo and par == "EUR/USD" and direcao_atual in ("BUY", "SELL"):
+    _direcao_auto_v851 = str(sinal).upper().strip()
+    if _direcao_auto_v851 in ("COMPRA", "COMPRAR"):
+        _direcao_auto_v851 = "BUY"
+    elif _direcao_auto_v851 in ("VENDA", "VENDER"):
+        _direcao_auto_v851 = "SELL"
+
+    if _auto_v85_ativo and par == "EUR/USD" and _direcao_auto_v851 in ("BUY", "SELL"):
         try:
             _df_auto_v85 = _carregar_sinais_v82()
             _datas_auto_v85 = (
@@ -2725,14 +2731,14 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
             if isinstance(_df_auto_v85, pd.DataFrame) and not _df_auto_v85.empty:
                 _dup_auto_v85 = (
                     (_df_auto_v85["par"].astype(str) == str(par)) &
-                    (_df_auto_v85["direcao"].astype(str) == str(direcao_atual)) &
+                    (_df_auto_v85["direcao"].astype(str).str.upper().replace({"VENDER":"SELL","VENDA":"SELL","COMPRAR":"BUY","COMPRA":"BUY"}) == _direcao_auto_v851) &
                     (_datas_auto_v85 == pd.Timestamp(dt_preco))
                 ).any()
 
             if not _dup_auto_v85:
                 _ok_auto_v85, _msg_auto_v85 = _registrar_sinal_v82(
                     par=par,
-                    direcao=direcao_atual,
+                    direcao=_direcao_auto_v851,
                     score_mestre=score_mestre,
                     qualidade=qualidade,
                     score_base=score_base,
@@ -2749,7 +2755,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
                 )
                 if _ok_auto_v85:
                     st.success(
-                        f"🤖 V8.5 registrou automaticamente {par} {direcao_atual} "
+                        f"🤖 V8.5.1 registrou automaticamente {par} {_direcao_auto_v851} "
                         f"com a observação FRED de {dt_preco}."
                     )
                 else:
@@ -2791,7 +2797,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     pendentes = df[df["avaliado"] != True].copy()
     avaliados_total = df[df["avaliado"] == True].copy()
 
-    st.markdown("### 💾 Persistência do histórico — V8.5")
+    st.markdown("### 💾 Persistência do histórico — V8.5.1")
     _v84_token, _v84_repo, _v84_branch = _github_cfg_v84()
     if _v84_token:
         st.success(
