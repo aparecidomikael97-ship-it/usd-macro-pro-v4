@@ -21,6 +21,8 @@ import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
+import re
+from deep_translator import GoogleTranslator
 
 # =========================================================
 # CONFIGURAÇÕES GERAIS
@@ -221,6 +223,40 @@ def _rss_titulos(consulta: str, idioma="en-US", pais="US", ceid="US:en") -> list
         ]
     except Exception:
         return []
+
+
+TRADUCOES_MANCHETES = {
+    "rate hike": "alta de juros", "rate hikes": "altas de juros",
+    "rate cut": "corte de juros", "rate cuts": "cortes de juros",
+    "interest rates": "taxas de juros", "inflation": "inflação",
+    "Federal Reserve": "Federal Reserve", "Fed": "Fed",
+    "economy": "economia", "markets": "mercados", "market": "mercado",
+    "growth": "crescimento", "jobs": "empregos", "labor": "trabalho",
+    "dollar": "dólar", "bonds": "títulos", "decision": "decisão",
+    "September": "setembro", "higher": "mais alta", "lower": "mais baixa",
+    "hold rates steady": "manter os juros estáveis",
+    "all eyes on": "todas as atenções voltadas para",
+}
+
+def _traduzir_fallback_local(titulo: str) -> str:
+    """Fallback simples caso o tradutor online esteja indisponível."""
+    texto = titulo
+    for origem, destino in sorted(TRADUCOES_MANCHETES.items(), key=lambda x: len(x[0]), reverse=True):
+        texto = re.sub(re.escape(origem), destino, texto, flags=re.IGNORECASE)
+    return texto
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def _traduzir_manchete(titulo: str) -> str:
+    """Traduz manchetes do inglês para português; se falhar, usa fallback local."""
+    if not titulo or not titulo.strip():
+        return titulo
+    try:
+        traduzido = GoogleTranslator(source="auto", target="pt").translate(titulo)
+        if traduzido and traduzido.strip():
+            return traduzido.strip()
+    except Exception:
+        pass
+    return _traduzir_fallback_local(titulo)
 
 
 def _score_palavras(titulos: list[str], positivas, negativas) -> float:
@@ -788,10 +824,12 @@ with abas[3]:
     st.metric("Tom do Fed", fed["tom"])
     st.metric("Intensidade da leitura", f"{fed['forca']:+.2f}")
 
-    st.markdown("### Manchetes analisadas")
+    st.markdown("### Manchetes analisadas — tradução completa + original")
     if fed["titulos"]:
         for titulo in fed["titulos"]:
-            st.write("•", titulo)
+            traducao = _traduzir_manchete(titulo)
+            st.markdown(f"**🇧🇷 Português:** {traducao}")
+            st.caption(f"Original: {titulo}")
     else:
         st.info("Nenhuma manchete encontrada nesta atualização.")
 
