@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "7.7.1 — FOMC INTEGRADO AO SCORE MESTRE"
+APP_VERSION = "7.8 — EXPLICADOR DO SINAL"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V7.7 Português",
+    page_title="USD Macro Pro — V7.8 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1605,7 +1605,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V7.7 Português")
+st.title("🦅 USD Macro Pro — V7.8 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -3625,7 +3625,7 @@ def _score_mestre_v70(base: str, cotada: str, diferenca: float, confl: dict) -> 
 
 
 def _mostrar_score_mestre_v70(base: str, cotada: str, diferenca: float, confl: dict):
-    st.markdown("## 🦅 Score Mestre — V7.7")
+    st.markdown("## 🦅 Score Mestre — V7.8")
     st.caption(
         "Resumo final do motor. Direção, qualidade dos dados e timing ficam separados "
         "para não confundir score interno com probabilidade de lucro."
@@ -3791,7 +3791,7 @@ _sincronizar_anteriores_v711()
 with abas[2]:
     _status_automacao_v71()
 
-    st.subheader("💱 Painel de Decisão — V7.7")
+    st.subheader("💱 Painel de Decisão — V7.8")
 
     usd_base = float(usd_detalhado["score"])
     usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
@@ -4626,10 +4626,302 @@ def _painel_fomc_calibrado_v76():
         st.session_state["v77_ultimo_fomc_sincronizado"] = _v77_atual
         st.rerun()
 
+
+# =========================================================
+# V7.8 — EXPLICADOR DO SINAL
+# =========================================================
+
+def _classificar_forca_v78(score):
+    try:
+        s = float(score)
+    except Exception:
+        return "indisponível"
+    if s >= 70:
+        return "forte"
+    if s >= 58:
+        return "moderada"
+    if s <= 30:
+        return "fraca"
+    if s <= 42:
+        return "moderadamente fraca"
+    return "neutra"
+
+def _direcao_par_v78(par, diferenca):
+    """
+    diferenca esperada = força base - força cotada.
+    >0 favorece BUY do par; <0 favorece SELL.
+    """
+    try:
+        d = float(diferenca)
+    except Exception:
+        return "WAIT"
+    if d >= 8:
+        return "BUY"
+    if d <= -8:
+        return "SELL"
+    return "WAIT"
+
+def _explicar_sinal_v78(par, moeda_base, moeda_cotada, score_base, score_cotada,
+                        diferenca, confluencia=None, qualidade=None, timing=None,
+                        score_mestre=None, risco_calendario=None):
+    direcao = _direcao_par_v78(par, diferenca)
+
+    fatores_favor = []
+    fatores_contra = []
+    observacoes = []
+
+    # Força relativa
+    try:
+        sb = float(score_base)
+        sc = float(score_cotada)
+        df = float(diferenca)
+        if df >= 8:
+            fatores_favor.append(
+                f"{moeda_base} está mais forte que {moeda_cotada} ({sb:.1f} vs {sc:.1f})"
+            )
+        elif df <= -8:
+            fatores_favor.append(
+                f"{moeda_cotada} está mais forte que {moeda_base} ({sc:.1f} vs {sb:.1f})"
+            )
+        else:
+            observacoes.append(
+                f"Força relativa ainda próxima ({sb:.1f} vs {sc:.1f})"
+            )
+    except Exception:
+        pass
+
+    # FOMC integrado
+    if st.session_state.get("v77_fomc_integrado", False):
+        fomc_score = float(st.session_state.get("v76_fomc_usd_score", 50.0))
+        peso = float(st.session_state.get("v77_peso_fomc", 0.0)) * 100.0
+        if "USD" in (moeda_base, moeda_cotada):
+            if fomc_score >= 55:
+                texto = f"FOMC está levemente hawkish para o USD ({fomc_score:.0f}/100, peso {peso:.0f}%)"
+                if (direcao == "BUY" and moeda_base == "USD") or (direcao == "SELL" and moeda_cotada == "USD"):
+                    fatores_favor.append(texto)
+                else:
+                    fatores_contra.append(texto)
+            elif fomc_score <= 45:
+                texto = f"FOMC está levemente dovish para o USD ({fomc_score:.0f}/100, peso {peso:.0f}%)"
+                if (direcao == "SELL" and moeda_base == "USD") or (direcao == "BUY" and moeda_cotada == "USD"):
+                    fatores_favor.append(texto)
+                else:
+                    fatores_contra.append(texto)
+            else:
+                observacoes.append(f"FOMC está neutro para o USD ({fomc_score:.0f}/100)")
+
+    # Qualidade
+    try:
+        q = float(qualidade)
+        if q >= 80:
+            fatores_favor.append(f"Qualidade dos dados está alta ({q:.0f}%)")
+        elif q < 60:
+            fatores_contra.append(f"Qualidade dos dados está baixa ({q:.0f}%)")
+        else:
+            observacoes.append(f"Qualidade dos dados está moderada ({q:.0f}%)")
+    except Exception:
+        pass
+
+    # Timing
+    try:
+        t = float(timing)
+        if t >= 70:
+            fatores_favor.append(f"Timing está favorável ({t:.0f}/100)")
+        elif t < 50:
+            fatores_contra.append(f"Timing está fraco ({t:.0f}/100)")
+        else:
+            observacoes.append(f"Timing ainda está intermediário ({t:.0f}/100)")
+    except Exception:
+        pass
+
+    # Risco calendário
+    if risco_calendario:
+        rc = str(risco_calendario).upper()
+        if any(x in rc for x in ("MÁXIMO", "MAXIMO", "ALTO", "ATENÇÃO", "ATENCAO")):
+            fatores_contra.append(f"Risco de calendário elevado: {risco_calendario}")
+        elif "BAIX" in rc:
+            fatores_favor.append("Risco de calendário está baixo")
+
+    # Score mestre
+    try:
+        sm = float(score_mestre)
+        if sm >= 80:
+            observacoes.append(f"Score Mestre forte ({sm:.0f}/100)")
+        elif sm >= 65:
+            observacoes.append(f"Score Mestre moderado ({sm:.0f}/100)")
+        else:
+            fatores_contra.append(f"Score Mestre ainda fraco ({sm:.0f}/100)")
+    except Exception:
+        pass
+
+    # Conclusão textual
+    if direcao == "WAIT":
+        conclusao = (
+            f"⏸️ **WAIT em {par}** — ainda não há diferença suficiente entre as moedas "
+            "para justificar uma direção clara."
+        )
+    elif direcao == "BUY":
+        conclusao = (
+            f"🟢 **BUY {par}** — o conjunto atual favorece {moeda_base} sobre {moeda_cotada}."
+        )
+    else:
+        conclusao = (
+            f"🔴 **SELL {par}** — o conjunto atual favorece {moeda_cotada} sobre {moeda_base}."
+        )
+
+    return {
+        "direcao": direcao,
+        "favor": fatores_favor,
+        "contra": fatores_contra,
+        "observacoes": observacoes,
+        "conclusao": conclusao,
+    }
+
+def _painel_explicador_v78(par, moeda_base, moeda_cotada, score_base, score_cotada,
+                           diferenca, confluencia=None, qualidade=None, timing=None,
+                           score_mestre=None, risco_calendario=None):
+    st.markdown("## 🧠 Por que o sistema está dando esse sinal? — V7.8")
+
+    exp = _explicar_sinal_v78(
+        par=par,
+        moeda_base=moeda_base,
+        moeda_cotada=moeda_cotada,
+        score_base=score_base,
+        score_cotada=score_cotada,
+        diferenca=diferenca,
+        confluencia=confluencia,
+        qualidade=qualidade,
+        timing=timing,
+        score_mestre=score_mestre,
+        risco_calendario=risco_calendario,
+    )
+
+    st.markdown(exp["conclusao"])
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("### ✅ O que ajuda o sinal")
+        if exp["favor"]:
+            for item in exp["favor"]:
+                st.write(f"• {item}")
+        else:
+            st.write("• Nenhum fator forte adicional identificado.")
+
+    with c2:
+        st.markdown("### ⚠️ O que atrapalha o sinal")
+        if exp["contra"]:
+            for item in exp["contra"]:
+                st.write(f"• {item}")
+        else:
+            st.write("• Nenhum fator contrário forte identificado.")
+
+    if exp["observacoes"]:
+        st.markdown("### ℹ️ Pontos de atenção")
+        for item in exp["observacoes"]:
+            st.write(f"• {item}")
+
+    # O que faria o sinal mudar
+    st.markdown("### 🔄 O que faria o sinal mudar?")
+    if exp["direcao"] == "SELL":
+        st.write(
+            f"• {moeda_base} precisaria ganhar força ou {moeda_cotada} perder força.\n"
+            f"• O FOMC/Fed poderia ficar menos favorável à moeda atualmente dominante.\n"
+            f"• O timing e a qualidade precisariam deteriorar para enfraquecer a venda."
+        )
+    elif exp["direcao"] == "BUY":
+        st.write(
+            f"• {moeda_base} precisaria perder força ou {moeda_cotada} ganhar força.\n"
+            f"• O FOMC/Fed poderia ficar menos favorável à moeda atualmente dominante.\n"
+            f"• O timing e a qualidade precisariam deteriorar para enfraquecer a compra."
+        )
+    else:
+        st.write(
+            "• Uma das moedas precisa abrir vantagem clara de força.\n"
+            "• Confluência, timing e qualidade precisam sair da zona neutra.\n"
+            "• Um evento macro importante pode ser o gatilho dessa mudança."
+        )
+
+    st.caption(
+        "V7.8 explica o sinal usando apenas os dados e scores já existentes no aplicativo. "
+        "Ele não cria uma nova probabilidade de lucro e não substitui confirmação técnica."
+    )
+
+
 # =========================================================
 # V7.6.1 — RENDERIZAÇÃO SEGURA
 # =========================================================
 with abas[1]:
     _painel_hibrido_v74()
     _painel_fomc_calibrado_v76()
+
+
+
+# =========================================================
+# V7.8 — RENDERIZAÇÃO DO EXPLICADOR NA ABA DE PARES
+# =========================================================
+with abas[2]:
+    try:
+        _v78_par = par_escolhido
+        _v78_base, _v78_cotada = _v78_par.split("/")
+
+        # Recupera força das moedas da estrutura já usada na matriz.
+        _v78_score_base = float(forcas_moedas.get(_v78_base, 50.0))
+        _v78_score_cotada = float(forcas_moedas.get(_v78_cotada, 50.0))
+        _v78_diff = _v78_score_base - _v78_score_cotada
+
+        # Recupera métricas existentes quando disponíveis.
+        _v78_conf = None
+        _v78_qual = None
+        _v78_timing = None
+        _v78_mestre = None
+        _v78_risco = None
+
+        for _k in ("score_confluencia", "confluencia_score", "score_final"):
+            _v = locals().get(_k)
+            if isinstance(_v, (int, float)):
+                _v78_conf = float(_v)
+                break
+
+        for _k in ("qualidade", "qualidade_score", "qualidade_final"):
+            _v = locals().get(_k)
+            if isinstance(_v, (int, float)):
+                _v78_qual = float(_v)
+                break
+
+        for _k in ("timing_score", "score_timing", "timing"):
+            _v = locals().get(_k)
+            if isinstance(_v, (int, float)):
+                _v78_timing = float(_v)
+                break
+
+        for _k in ("score_mestre", "score_mestre_final", "mestre_score"):
+            _v = locals().get(_k)
+            if isinstance(_v, (int, float)):
+                _v78_mestre = float(_v)
+                break
+
+        for _k in ("risco_calendario", "nivel_risco", "risco_evento"):
+            _v = locals().get(_k)
+            if _v is not None:
+                _v78_risco = _v
+                break
+
+        _painel_explicador_v78(
+            par=_v78_par,
+            moeda_base=_v78_base,
+            moeda_cotada=_v78_cotada,
+            score_base=_v78_score_base,
+            score_cotada=_v78_score_cotada,
+            diferenca=_v78_diff,
+            confluencia=_v78_conf,
+            qualidade=_v78_qual,
+            timing=_v78_timing,
+            score_mestre=_v78_mestre,
+            risco_calendario=_v78_risco,
+        )
+    except Exception as _e_v78:
+        st.info(
+            "🧠 V7.8: o explicador será exibido assim que o par selecionado "
+            "e os scores da matriz estiverem disponíveis nesta execução."
+        )
 
