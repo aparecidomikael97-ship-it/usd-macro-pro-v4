@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "6.7 — CONSENSO DIRETO NO PAR"
+APP_VERSION = "6.8 — CENÁRIOS PROBABILÍSTICOS FOMC"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V6.7 Português",
+    page_title="USD Macro Pro — V6.8 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1018,7 +1018,7 @@ def _resumo_expectativa_v66(linhas: list[dict]) -> dict:
 
 
 def _mostrar_expectativa_v66():
-    st.subheader("🔮 Expectativa do Mercado — V6.7")
+    st.subheader("🔮 Expectativa do Mercado — V6.8")
     st.caption(
         "Antes da divulgação: compara PREVISÃO/CONSENSO com o ANTERIOR. "
         "Depois da divulgação, a seção de Surpresa Econômica compara REAL com PREVISÃO."
@@ -1305,7 +1305,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V6.7 Português")
+st.title("🦅 USD Macro Pro — V6.8 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2306,7 +2306,7 @@ def _avaliar_risco_calendario_v65(confl: dict, diferenca: float, evento: dict) -
 
 
 def _mostrar_risco_timing_v65(confl: dict, diferenca: float):
-    st.markdown("### 📅 Calendário + Risco e Timing — V6.7")
+    st.markdown("### 📅 Calendário + Risco e Timing — V6.8")
     st.caption(
         "Calendário combinado: FRED (CPI, Payroll, PIB e PCE) + Federal Reserve (FOMC) "
         "+ ISM (Industrial e Serviços)."
@@ -2652,13 +2652,13 @@ def _mostrar_risco_timing_v63(confl: dict, diferenca: float):
 
 
 
-def _mostrar_expectativa_no_par_v67(base: str, cotada: str):
+def _mostrar_expectativa_no_par_v68(base: str, cotada: str):
     """
     V6.7: permite preencher o consenso diretamente no painel do par.
     Reutiliza as mesmas session_state keys do Painel EUA, mas NÃO cria widgets
     com aquelas keys aqui; usa keys v67 exclusivas e sincroniza os valores.
     """
-    st.markdown("### 🔮 Expectativa do Mercado — V6.7")
+    st.markdown("### 🔮 Expectativa do Mercado — V6.8")
     st.caption(
         "Preencha o consenso diretamente aqui. O painel compara CONSENSO × ANTERIOR "
         "antes do release. Isso continua informativo e não é contado duas vezes no score."
@@ -2689,35 +2689,85 @@ def _mostrar_expectativa_no_par_v67(base: str, cotada: str):
     if "FOMC" in evento:
         st.info(
             f"Próximo evento: **{evento}** em **{prox.get('data_txt','—')}**. "
-            "Para FOMC usamos taxa atual × taxa esperada, não a lógica de CPI/Payroll."
+            "A V6.8 separa Fed Funds efetivo de cenários esperados para a decisão."
         )
-        atual_default = float(st.session_state.get("v67_fomc_atual", 3.63))
-        esperada_default = float(st.session_state.get("v67_fomc_esperada", atual_default))
 
-        c1, c2 = st.columns(2)
-        with c1:
-            taxa_atual = st.number_input(
-                "Taxa atual do Fed (%)", min_value=0.0, max_value=20.0,
-                value=atual_default, step=0.25, key="v67_fomc_atual"
+        # Fed Funds efetivo é referência observada; não é tratado como a faixa-alvo.
+        effr_default = float(st.session_state.get("v68_effr", 3.63))
+        st.number_input(
+            "Fed Funds efetivo — referência (%)",
+            min_value=0.0, max_value=20.0, value=effr_default,
+            step=0.01, key="v68_effr",
+            help="Referência observada. Não representa, por si só, a faixa-alvo anunciada pelo FOMC."
+        )
+
+        st.markdown("#### 🎲 Cenários esperados para o FOMC")
+        st.caption(
+            "Informe probabilidades de mercado para CORTE, MANUTENÇÃO e ALTA. "
+            "A soma deve ser 100%. Estes valores são manuais nesta versão."
+        )
+
+        p1, p2, p3 = st.columns(3)
+        with p1:
+            p_corte = st.number_input(
+                "Corte de 25 pb (%)", min_value=0.0, max_value=100.0,
+                value=float(st.session_state.get("v68_p_corte", 0.0)),
+                step=1.0, key="v68_p_corte"
             )
-        with c2:
-            taxa_esperada = st.number_input(
-                "Taxa esperada após o FOMC (%)", min_value=0.0, max_value=20.0,
-                value=esperada_default, step=0.25, key="v67_fomc_esperada"
+        with p2:
+            p_manut = st.number_input(
+                "Manutenção (%)", min_value=0.0, max_value=100.0,
+                value=float(st.session_state.get("v68_p_manut", 100.0)),
+                step=1.0, key="v68_p_manut"
+            )
+        with p3:
+            p_alta = st.number_input(
+                "Alta de 25 pb (%)", min_value=0.0, max_value=100.0,
+                value=float(st.session_state.get("v68_p_alta", 0.0)),
+                step=1.0, key="v68_p_alta"
             )
 
-        delta = float(taxa_esperada) - float(taxa_atual)
-        if delta > 0.001:
-            score = 70.0
-            leitura = "🟢 Mercado espera ALTA de juros — expectativa tende a favorecer USD"
-        elif delta < -0.001:
-            score = 30.0
-            leitura = "🔴 Mercado espera CORTE de juros — expectativa tende a desfavorecer USD"
+        soma = float(p_corte + p_manut + p_alta)
+        if abs(soma - 100.0) > 0.01:
+            st.error(
+                f"As probabilidades somam **{soma:.1f}%**. "
+                "Ajuste os três cenários para totalizar **100%**."
+            )
+            st.session_state["v66_expectativa_score"] = 50.0
+            st.session_state["v66_expectativa_leitura"] = "⚪ Probabilidades FOMC inválidas"
+            st.session_state["v67_expectativa_tem_dado"] = False
+            return
+
+        # Valor esperado da mudança em pontos-base.
+        # Corte = -25 pb; manutenção = 0; alta = +25 pb.
+        mudanca_esperada_pb = (-25.0 * p_corte + 25.0 * p_alta) / 100.0
+
+        # Score interno pré-release: 50 é neutro; ±25 pb de valor esperado
+        # corresponde a uma faixa de 25–75. Não é probabilidade de lucro.
+        score = float(np.clip(50.0 + mudanca_esperada_pb, 0.0, 100.0))
+
+        cenarios = {
+            "CORTE 25 pb": float(p_corte),
+            "MANUTENÇÃO": float(p_manut),
+            "ALTA 25 pb": float(p_alta),
+        }
+        dominante = max(cenarios, key=cenarios.get)
+        prob_dom = cenarios[dominante]
+
+        if mudanca_esperada_pb >= 5:
+            leitura = "🟢 Distribuição de cenários tende a favorecer o USD"
+        elif mudanca_esperada_pb <= -5:
+            leitura = "🔴 Distribuição de cenários tende a desfavorecer o USD"
         else:
-            score = 50.0
-            leitura = "⚪ Mercado espera MANUTENÇÃO — decisão tende a depender do comunicado e Powell"
+            leitura = "⚪ Distribuição de cenários está próxima do neutro"
+
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Cenário dominante", dominante)
+        m2.metric("Prob. dominante", f"{prob_dom:.0f}%")
+        m3.metric("Mudança esperada", f"{mudanca_esperada_pb:+.1f} pb")
 
         st.metric("Expectativa FOMC / USD", f"{score:.0f}/100")
+
         if score >= 60:
             st.success(f"**{leitura}**")
         elif score <= 40:
@@ -2725,21 +2775,33 @@ def _mostrar_expectativa_no_par_v67(base: str, cotada: str):
         else:
             st.info(f"**{leitura}**")
 
-        if base == "USD" and score >= 60:
-            st.write(f"Leitura pré-release tende a apoiar **COMPRA {base}/{cotada}**.")
-        elif cotada == "USD" and score >= 60:
-            st.write(f"Leitura pré-release tende a apoiar **VENDA {base}/{cotada}**.")
-        elif base == "USD" and score <= 40:
-            st.write(f"Leitura pré-release tende a contrariar **COMPRA {base}/{cotada}**.")
-        elif cotada == "USD" and score <= 40:
-            st.write(f"Leitura pré-release tende a contrariar **VENDA {base}/{cotada}**.")
+        # Traduz para o par, sem transformar em gatilho.
+        if base == "USD":
+            if score >= 60:
+                st.write(f"Pré-FOMC tende a apoiar **COMPRA {base}/{cotada}**.")
+            elif score <= 40:
+                st.write(f"Pré-FOMC tende a contrariar **COMPRA {base}/{cotada}**.")
+            else:
+                st.write(f"Pré-FOMC está **neutro/misto** para {base}/{cotada}.")
+        elif cotada == "USD":
+            if score >= 60:
+                st.write(f"Pré-FOMC tende a apoiar **VENDA {base}/{cotada}**.")
+            elif score <= 40:
+                st.write(f"Pré-FOMC tende a contrariar **VENDA {base}/{cotada}**.")
+            else:
+                st.write(f"Pré-FOMC está **neutro/misto** para {base}/{cotada}.")
 
         st.session_state["v66_expectativa_score"] = score
         st.session_state["v66_expectativa_leitura"] = leitura
         st.session_state["v67_expectativa_tem_dado"] = True
+
+        st.warning(
+            "Probabilidade do cenário FOMC ≠ probabilidade de lucro no Forex. "
+            "Mesmo com manutenção esperada, comunicado, projeções e Powell podem provocar forte reação."
+        )
         st.caption(
-            "A taxa esperada é manual. Manutenção não significa USD neutro após a decisão: "
-            "comunicado, projeções e coletiva podem mudar a reação."
+            "V6.8 usa probabilidades inseridas manualmente. Não rotula esses números como CME FedWatch "
+            "nem como dados ao vivo sem uma fonte de mercado conectada."
         )
         return
 
@@ -2824,7 +2886,7 @@ def _mostrar_expectativa_no_par_v67(base: str, cotada: str):
 # ABA 3 — PARES
 # =========================================================
 with abas[2]:
-    st.subheader("💱 Painel de Decisão — V6.7")
+    st.subheader("💱 Painel de Decisão — V6.8")
 
     usd_base = float(usd_detalhado["score"])
     usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
@@ -2896,7 +2958,7 @@ with abas[2]:
         dt = confl["diferencial_taxas"]
         mercado3m = confl["mercado_3m"]
         tend = confl["tendencias"]
-        st.markdown("#### 📐 Qualidade macro da V6.7")
+        st.markdown("#### 📐 Qualidade macro da V6.8")
         q1, q2, q3 = st.columns(3)
         with q1:
             if dt["base"] is not None and dt["cotada"] is not None:
@@ -2949,7 +3011,7 @@ with abas[2]:
             if idade_max > 120:
                 st.warning(
                     "🟡 O spread de mercado usa pelo menos uma série antiga. "
-                    "A V6.7 reduz automaticamente o peso desse componente até a FRED atualizar."
+                    "A V6.8 reduz automaticamente o peso desse componente até a FRED atualizar."
                 )
         else:
             st.warning(
@@ -2958,7 +3020,7 @@ with abas[2]:
             )
 
         st.caption(
-            "Na V6.7, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
+            "Na V6.8, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
             "da FRED/OECD. Mantivemos o Treasury 2Y como tendência dos EUA, mas não "
             "misturamos 2Y americano com uma maturidade estrangeira diferente."
         )
@@ -2973,7 +3035,7 @@ with abas[2]:
                     "Variação média": round(x["delta"], 4),
                 })
             st.dataframe(pd.DataFrame(trend_rows), use_container_width=True, hide_index=True)
-            st.caption("A V6.7 combina diferencial de juros oficiais, spread de mercado e direção do spread com pesos ajustados pelo frescor dos dados. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
+            st.caption("A V6.8 combina diferencial de juros oficiais, spread de mercado e direção do spread com pesos ajustados pelo frescor dos dados. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
 
         # Substitui a confiança antiga pela confiança de confluência.
         if "SEM VANTAGEM" in acao:
@@ -2991,7 +3053,7 @@ with abas[2]:
         score_final = confl["score_confluencia"]
         qualidade_final = confl["qualidade_confluencia"]
 
-        st.markdown("### 🧭 Decisão V6.7")
+        st.markdown("### 🧭 Decisão V6.8")
         if "SEM VANTAGEM" in acao or score_final < 58 or qualidade_final < 50:
             st.info(
                 f"⚪ **NEUTRO / AGUARDAR** — Score {score_final:.0f}/100 | "
@@ -3023,7 +3085,7 @@ with abas[2]:
             float(score_base), float(score_cotada)
         )
 
-        _mostrar_expectativa_no_par_v67(base, cotada)
+        _mostrar_expectativa_no_par_v68(base, cotada)
 
         _mostrar_risco_timing_v65(confl, diferenca)
 
@@ -3039,7 +3101,7 @@ with abas[2]:
             st.success("✅ Sinal registrado!")
 
     st.markdown("---")
-    st.markdown("### 🏆 Matriz Inteligente — V6.7")
+    st.markdown("### 🏆 Matriz Inteligente — V6.8")
     st.caption(
         "Todos os pares abaixo passam pelo mesmo motor de confluência, qualidade e frescor "
         "usado na análise individual."
