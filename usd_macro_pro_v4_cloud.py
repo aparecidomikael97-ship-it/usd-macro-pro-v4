@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-🦅 USD Macro Pro — V5.8.1 DIFERENCIAL DE JUROS
+🦅 USD Macro Pro — V5.9 SPREAD DE JUROS DE MERCADO
 ================================
 - Interface em português
 - Corrige unidades de inflação e PIB no ranking global
@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "5.8.1 — DIFERENCIAL DE JUROS"
+APP_VERSION = "5.9 — SPREAD DE JUROS DE MERCADO"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V5.8.1 Português",
+    page_title="USD Macro Pro — V5.9 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1123,7 +1123,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V5.8.1 Português")
+st.title("🦅 USD Macro Pro — V5.9 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -1538,46 +1538,194 @@ def _diferencial_taxas_macro(base: str, cotada: str, ranking_df: pd.DataFrame) -
     }
 
 
-def calcular_confluencia_v58(base: str, cotada: str, diferenca: float,
+
+# =========================================================
+# V5.9 — JUROS DE MERCADO DE CURTO PRAZO (3M/90D)
+# =========================================================
+# Usamos séries de 3 meses/90 dias da FRED/OECD para comparar
+# maturidades semelhantes entre países. Isso é mais consistente
+# do que misturar Treasury 2Y dos EUA com séries estrangeiras
+# de outra maturidade.
+SERIES_MERCADO_3M = {
+    "USD": "IR3TIB01USM156N",
+    "EUR": "IR3TIB01EZM156N",
+    "GBP": "IR3TIB01GBM156N",
+    "JPY": "IR3TIB01JPM156N",
+    "CAD": "IR3TIB01CAM156N",
+    "CHF": "IR3TIB01CHM156N",
+    "AUD": "IR3TIB01AUM156N",
+    "NZD": "IR3TIB01NZM156N",  # se indisponível, o app faz fallback sem quebrar
+}
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _mercado_3m_moeda(codigo: str) -> dict:
+    sid = SERIES_MERCADO_3M.get(codigo)
+    if not sid:
+        return {"valor": None, "anterior": None, "data": None, "idade": None, "serie": None}
+
+    df = _fred_observacoes(sid, 12)
+    if df.empty:
+        return {"valor": None, "anterior": None, "data": None, "idade": None, "serie": sid}
+
+    df = df.copy()
+    df["value"] = pd.to_numeric(df["value"], errors="coerce")
+    df = df.dropna(subset=["value"])
+    if df.empty:
+        return {"valor": None, "anterior": None, "data": None, "idade": None, "serie": sid}
+
+    ult = df.iloc[-1]
+    ant = df.iloc[-2] if len(df) >= 2 else None
+    data = pd.Timestamp(ult["date"]).normalize()
+    hoje = pd.Timestamp.now(tz=None).normalize()
+
+    return {
+        "valor": float(ult["value"]),
+        "anterior": float(ant["value"]) if ant is not None else None,
+        "data": data.strftime("%d/%m/%Y"),
+        "idade": int((hoje - data).days),
+        "serie": sid,
+    }
+
+
+def _spread_mercado_3m(base: str, cotada: str) -> dict:
+    b = _mercado_3m_moeda(base)
+    q = _mercado_3m_moeda(cotada)
+
+    if b["valor"] is None or q["valor"] is None:
+        return {
+            "disponivel": False,
+            "base": b, "cotada": q,
+            "spread": 0.0, "spread_anterior": None,
+            "delta_spread": 0.0, "direcao": 0,
+            "vantagem": "Indisponível",
+            "movimento": "Sem dados suficientes",
+        }
+
+    spread = float(b["valor"] - q["valor"])
+
+    spread_ant = None
+    delta = 0.0
+    if b["anterior"] is not None and q["anterior"] is not None:
+        spread_ant = float(b["anterior"] - q["anterior"])
+        delta = float(spread - spread_ant)
+
+    # Direção do nível do spread: positivo favorece moeda base, negativo favorece cotada.
+    direcao = 1 if spread > 0.20 else -1 if spread < -0.20 else 0
+    vantagem = base if direcao > 0 else cotada if direcao < 0 else "Equilibrado"
+
+    # Movimento do spread: abertura/fechamento.
+    if delta > 0.05:
+        movimento = f"Abrindo a favor de {base}"
+    elif delta < -0.05:
+        movimento = f"Abrindo a favor de {cotada}"
+    else:
+        movimento = "Estável"
+
+    return {
+        "disponivel": True,
+        "base": b, "cotada": q,
+        "spread": spread,
+        "spread_anterior": spread_ant,
+        "delta_spread": delta,
+        "direcao": direcao,
+        "vantagem": vantagem,
+        "movimento": movimento,
+    }
+
+
+def _sinal_spread_direcao(spread_info: dict, direcao_par: int) -> int:
+    """Confirma se a mudança do spread está alinhada com compra/venda do par."""
+    if not spread_info.get("disponivel"):
+        return 0
+    delta = float(spread_info.get("delta_spread", 0.0))
+    if abs(delta) <= 0.05:
+        return 0
+    mov_dir = 1 if delta > 0 else -1
+    return 1 if mov_dir == direcao_par else -1
+
+def calcular_confluencia_v59(base: str, cotada: str, diferenca: float,
                              usd_score: float, ajuste_surpresas: float,
                              tom_fed: str, ranking_df: pd.DataFrame) -> dict:
-    """Confluência V5.8: força relativa + diferencial de taxas + tendência, sem regra fixa de yield."""
+    """
+    V5.9:
+    - força relativa
+    - diferencial de taxa oficial
+    - spread de mercado 3M/90D
+    - direção do spread
+    - score USD
+    - surpresas
+    - Fed
+    - tendência macro EUA
+    """
     direcao_par = 1 if diferenca > 0 else -1 if diferenca < 0 else 0
     usd_no_par = 1 if base == "USD" else -1 if cotada == "USD" else 0
     esperado_usd = direcao_par * usd_no_par if usd_no_par else 0
 
     sinais = []
 
-    # Força relativa
+    # 1) Força relativa
     s_forca = 1 if abs(diferenca) >= 6 else 0
-    sinais.append(("Força relativa", s_forca, 25))
+    sinais.append(("Força relativa", s_forca, 20))
 
-    # Diferencial de taxa da moeda base contra cotada
-    dif_taxas = _diferencial_taxas_macro(base, cotada, ranking_df)
-    s_taxa = 1 if dif_taxas["direcao"] == direcao_par else -1 if dif_taxas["direcao"] == -direcao_par else 0
-    sinais.append(("Diferencial de juros", s_taxa, 20))
+    # 2) Diferencial de política monetária
+    dif_oficial = _diferencial_taxas_macro(base, cotada, ranking_df)
+    s_oficial = (
+        1 if dif_oficial["direcao"] == direcao_par
+        else -1 if dif_oficial["direcao"] == -direcao_par
+        else 0
+    )
+    sinais.append(("Juros oficiais", s_oficial, 15))
 
-    # Score USD
+    # 3) Mercado 3M
+    mercado = _spread_mercado_3m(base, cotada)
+    s_mercado = (
+        1 if mercado.get("direcao", 0) == direcao_par
+        else -1 if mercado.get("direcao", 0) == -direcao_par
+        else 0
+    )
+    sinais.append(("Spread mercado 3M", s_mercado, 20))
+
+    # 4) Direção do spread
+    s_mov = _sinal_spread_direcao(mercado, direcao_par)
+    sinais.append(("Direção do spread", s_mov, 10))
+
+    # 5) Score USD
     usd_dir = 1 if usd_score >= 58 else -1 if usd_score <= 42 else 0
-    s_usd = 1 if esperado_usd and usd_dir == esperado_usd else -1 if esperado_usd and usd_dir == -esperado_usd else 0
-    sinais.append(("Score USD", s_usd, 15))
+    s_usd = (
+        1 if esperado_usd and usd_dir == esperado_usd
+        else -1 if esperado_usd and usd_dir == -esperado_usd
+        else 0
+    )
+    sinais.append(("Score USD", s_usd, 10))
 
-    # Surpresas
+    # 6) Surpresas
     sp_dir = 1 if ajuste_surpresas > 1 else -1 if ajuste_surpresas < -1 else 0
-    s_sp = 1 if esperado_usd and sp_dir == esperado_usd else -1 if esperado_usd and sp_dir == -esperado_usd else 0
-    sinais.append(("Surpresas", s_sp, 15))
+    s_sp = (
+        1 if esperado_usd and sp_dir == esperado_usd
+        else -1 if esperado_usd and sp_dir == -esperado_usd
+        else 0
+    )
+    sinais.append(("Surpresas", s_sp, 10))
 
-    # Fed
+    # 7) Fed
     tf = str(tom_fed).lower()
     fed_dir = 1 if ("restritivo" in tf or "hawk" in tf) else -1 if ("dovish" in tf or "expans" in tf) else 0
-    s_fed = 1 if esperado_usd and fed_dir == esperado_usd else -1 if esperado_usd and fed_dir == -esperado_usd else 0
-    sinais.append(("Federal Reserve", s_fed, 15))
+    s_fed = (
+        1 if esperado_usd and fed_dir == esperado_usd
+        else -1 if esperado_usd and fed_dir == -esperado_usd
+        else 0
+    )
+    sinais.append(("Federal Reserve", s_fed, 10))
 
-    # Tendência conjunta dos EUA, substituindo a regra fixa Treasury > 4%
+    # 8) Tendência macro EUA
     tendencias = _score_tendencias_eua()
     trend_dir = 1 if tendencias["score"] >= 57 else -1 if tendencias["score"] <= 43 else 0
-    s_trend = 1 if esperado_usd and trend_dir == esperado_usd else -1 if esperado_usd and trend_dir == -esperado_usd else 0
-    sinais.append(("Tendência macro EUA", s_trend, 10))
+    s_trend = (
+        1 if esperado_usd and trend_dir == esperado_usd
+        else -1 if esperado_usd and trend_dir == -esperado_usd
+        else 0
+    )
+    sinais.append(("Tendência macro EUA", s_trend, 5))
 
     favor = sum(p for _, s, p in sinais if s > 0)
     contra = sum(p for _, s, p in sinais if s < 0)
@@ -1591,9 +1739,13 @@ def calcular_confluencia_v58(base: str, cotada: str, diferenca: float,
         nivel = "BAIXA"
 
     return {
-        "favor": favor, "contra": contra, "neutro": neutro,
-        "nivel": nivel, "sinais": sinais,
-        "diferencial_taxas": dif_taxas,
+        "favor": favor,
+        "contra": contra,
+        "neutro": neutro,
+        "nivel": nivel,
+        "sinais": sinais,
+        "diferencial_taxas": dif_oficial,
+        "mercado_3m": mercado,
         "tendencias": tendencias,
     }
 
@@ -1602,7 +1754,7 @@ def calcular_confluencia_v58(base: str, cotada: str, diferenca: float,
 # ABA 3 — PARES
 # =========================================================
 with abas[2]:
-    st.subheader("💱 Painel de Decisão — V5.8.1")
+    st.subheader("💱 Painel de Decisão — V5.9")
 
     usd_base = float(usd_detalhado["score"])
     usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
@@ -1647,7 +1799,7 @@ with abas[2]:
         x3.metric(cotada, f"{score_cotada:.1f}/100")
 
         # V5.7: confiança passa a exigir confluência, não apenas distância entre scores.
-        confl = calcular_confluencia_v58(
+        confl = calcular_confluencia_v59(
             base, cotada, diferenca, usd_ajustado, ajuste,
             fed.get("tom", "Neutro"), ranking
         )
@@ -1665,8 +1817,9 @@ with abas[2]:
         st.dataframe(pd.DataFrame(detalhes), use_container_width=True, hide_index=True)
 
         dt = confl["diferencial_taxas"]
+        mercado3m = confl["mercado_3m"]
         tend = confl["tendencias"]
-        st.markdown("#### 📐 Qualidade macro da V5.8.1")
+        st.markdown("#### 📐 Qualidade macro da V5.9")
         q1, q2, q3 = st.columns(3)
         with q1:
             if dt["base"] is not None and dt["cotada"] is not None:
@@ -1685,6 +1838,54 @@ with abas[2]:
             st.metric("Treasury 2Y — tendência", tend["Treasury 2Y"]["texto"])
             st.caption(f"Δ médio: {tend['Treasury 2Y']['delta']:+.3f}")
 
+        st.markdown("#### 💹 Spread de juros de mercado — 3 meses")
+        if mercado3m["disponivel"]:
+            m1, m2, m3 = st.columns(3)
+            with m1:
+                st.metric(
+                    f"{base} mercado 3M",
+                    f"{mercado3m['base']['valor']:.2f}%"
+                )
+                st.caption(
+                    f"FRED {mercado3m['base']['serie']} · {mercado3m['base']['data']}"
+                )
+            with m2:
+                st.metric(
+                    f"{cotada} mercado 3M",
+                    f"{mercado3m['cotada']['valor']:.2f}%"
+                )
+                st.caption(
+                    f"FRED {mercado3m['cotada']['serie']} · {mercado3m['cotada']['data']}"
+                )
+            with m3:
+                st.metric(
+                    "Spread de mercado",
+                    f"{mercado3m['spread']:+.2f} p.p.",
+                    delta=f"{mercado3m['delta_spread']:+.2f} p.p. vs período anterior"
+                )
+                st.caption(f"Vantagem: {mercado3m['vantagem']} · {mercado3m['movimento']}")
+
+            idade_max = max(
+                mercado3m["base"]["idade"] or 9999,
+                mercado3m["cotada"]["idade"] or 9999
+            )
+            if idade_max > 120:
+                st.warning(
+                    "🟡 O spread de mercado usa pelo menos uma série antiga. "
+                    "Considere esse componente com peso menor até a FRED atualizar."
+                )
+        else:
+            st.warning(
+                "⚠️ Spread de mercado 3M indisponível para este par. "
+                "A confluência continua usando juros oficiais e os demais componentes."
+            )
+
+        st.caption(
+            "Na V5.9, 'mercado 3M' é uma comparação de taxas de 3 meses/90 dias "
+            "da FRED/OECD. Mantivemos o Treasury 2Y como tendência dos EUA, mas não "
+            "misturamos 2Y americano com uma maturidade estrangeira diferente."
+        )
+
         with st.expander("Ver tendências usadas no modelo"):
             trend_rows = []
             for nome_t in ["CPI", "Core CPI", "Desemprego", "Treasury 2Y", "Broad USD"]:
@@ -1695,7 +1896,7 @@ with abas[2]:
                     "Variação média": round(x["delta"], 4),
                 })
             st.dataframe(pd.DataFrame(trend_rows), use_container_width=True, hide_index=True)
-            st.caption("A V5.8.1 usa diferencial de juros entre as moedas e tendência macro, em vez de assumir que um nível fixo do Treasury 2Y é automaticamente positivo ou negativo para o USD.")
+            st.caption("A V5.9 combina diferencial de juros oficiais, spread de mercado de 3 meses e direção do spread. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
 
         # Substitui a confiança antiga pela confiança de confluência.
         if "SEM VANTAGEM" in acao:
