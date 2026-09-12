@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "8.0 — CENTRAL DE DECISÃO FOREX"
+APP_VERSION = "8.1 — CENTRAL DE DECISÃO REFINADA"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V8.0 Português",
+    page_title="USD Macro Pro — V8.1 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1605,7 +1605,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V8.0 Português")
+st.title("🦅 USD Macro Pro — V8.1 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2256,6 +2256,150 @@ def _central_decisao_v80(par, base, cotada, score_base, score_cotada, diferenca,
     st.caption(
         "Score Mestre é uma pontuação interna de alinhamento, não probabilidade de lucro. "
         "A Central V8.0 não envia ordem e não substitui confirmação técnica."
+    )
+
+
+
+# =========================================================
+# V8.1 — ACABAMENTO DA CENTRAL DE DECISÃO
+# =========================================================
+
+def _central_decisao_v81(par, base, cotada, score_base, score_cotada, diferenca, confl):
+    score = float(confl.get("score_confluencia", 50.0))
+    qualidade = float(confl.get("qualidade_confluencia", 0.0))
+
+    if diferenca >= 6:
+        direcao = "BUY"
+        dominante = base
+    elif diferenca <= -6:
+        direcao = "SELL"
+        dominante = cotada
+    else:
+        direcao = "WAIT"
+        dominante = "—"
+
+    # Confluência visual coerente com score + cobertura.
+    if score >= 80 and qualidade >= 80:
+        alinhamento = "FORTE"
+    elif score >= 70 and qualidade >= 60:
+        alinhamento = "FORTE / QUALIDADE MODERADA"
+    elif score >= 58 and qualidade >= 50:
+        alinhamento = "MODERADO"
+    else:
+        alinhamento = "FRACO"
+
+    evento = _proximo_evento_macro_v65()
+    evento_nome, dias, impacto = "—", None, "—"
+    if isinstance(evento, dict) and evento.get("disponivel", False):
+        evento_nome = str(evento.get("evento", "—"))
+        dias = evento.get("dias")
+        impacto = str(evento.get("impacto", "—"))
+
+    fomc_score = None
+    fomc_peso = 0.0
+    if st.session_state.get("v77_fomc_integrado", False) and "USD" in (base, cotada):
+        fomc_score = float(st.session_state.get("v76_fomc_usd_score", 50.0))
+        fomc_peso = float(st.session_state.get("v77_peso_fomc", 0.0)) * 100.0
+
+    alto = impacto.upper() in ("MÁXIMO", "MAXIMO", "ALTO")
+    if dias is not None and dias <= 2 and alto:
+        timing = "AGUARDAR"
+        timing_score = 35
+    elif dias is not None and dias <= 7 and alto:
+        timing = "ATENÇÃO"
+        timing_score = 58
+    else:
+        timing = "NORMAL"
+        timing_score = 75
+
+    if direcao == "WAIT" or score < 58 or qualidade < 50:
+        decisao = "AGUARDAR"
+        cor = "info"
+    elif timing_score < 50:
+        decisao = f"{direcao} MACRO — AGUARDAR EVENTO"
+        cor = "warning"
+    elif timing_score < 65:
+        decisao = f"{direcao} MACRO — AGUARDAR CONFIRMAÇÃO"
+        cor = "warning"
+    else:
+        decisao = f"{direcao} MACRO — BUSCAR GATILHO TÉCNICO"
+        cor = "success"
+
+    ativos = [
+        (nome, estado, float(peso_eff))
+        for nome, estado, peso, fator, peso_eff in confl.get("linhas_dinamicas", [])
+        if estado != 0
+    ]
+    principal = max(ativos, key=lambda x: abs(x[2])) if ativos else None
+
+    st.markdown("## 🎛️ Central de Decisão Forex — V8.1")
+
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("Par", par)
+    c2.metric("Direção macro", direcao)
+    c3.metric("Score Mestre", f"{score:.0f}/100")
+    c4.metric("Qualidade / cobertura", f"{qualidade:.0f}%")
+
+    d1,d2,d3,d4 = st.columns(4)
+    d1.metric(base, f"{score_base:.1f}/100")
+    d2.metric(cotada, f"{score_cotada:.1f}/100")
+    d3.metric("Diferença", f"{diferenca:+.1f}")
+    d4.metric("Alinhamento", alinhamento)
+
+    st.markdown("### 🏦 Catalisador e risco")
+    e1,e2,e3 = st.columns(3)
+    e1.metric("FOMC/USD", f"{fomc_score:.0f}/100" if fomc_score is not None else "—")
+    e2.metric("Peso FOMC", f"{fomc_peso:.0f}%" if fomc_score is not None else "—")
+    e3.metric("Timing", timing)
+
+    # Evento em linha própria para evitar truncamento.
+    if dias is not None:
+        st.info(
+            f"📅 **Próximo evento:** {evento_nome}  |  "
+            f"**Faltam:** {dias} dia(s)  |  **Impacto:** {impacto}"
+        )
+    else:
+        st.info(f"📅 **Próximo evento:** {evento_nome}")
+
+    if principal:
+        nome_p, estado_p, peso_p = principal
+        sentido = "A FAVOR" if estado_p > 0 else "CONTRA"
+        st.caption(
+            f"Principal motor: {nome_p} · {sentido} · peso efetivo {peso_p:.1f}%."
+        )
+
+    st.markdown("### 🎯 Decisão final")
+    resumo = (
+        f"{dominante} é a moeda dominante no modelo."
+        if dominante != "—" else
+        "Nenhuma moeda possui vantagem suficiente."
+    )
+    mensagem = (
+        f"**{decisao}**\n\n"
+        f"{resumo}  |  Score {score:.0f}/100  |  "
+        f"Qualidade {qualidade:.0f}%  |  Timing {timing}."
+    )
+    if cor == "success":
+        st.success(mensagem)
+    elif cor == "warning":
+        st.warning(mensagem)
+    else:
+        st.info(mensagem)
+
+    # Semáforo final bem simples.
+    st.markdown("### 🚦 Leitura rápida")
+    s1,s2,s3 = st.columns(3)
+    s1.metric("DIREÇÃO", direcao)
+    s2.metric("TIMING", timing)
+    if timing_score >= 65 and direcao != "WAIT":
+        acao_curta = "BUSCAR GATILHO"
+    else:
+        acao_curta = "AGUARDAR"
+    s3.metric("AÇÃO", acao_curta)
+
+    st.caption(
+        "Score Mestre mede alinhamento interno; Qualidade/cobertura mede a confiança nos dados disponíveis. "
+        "Nenhum deles representa probabilidade de lucro."
     )
 
 
@@ -4542,7 +4686,7 @@ with abas[2]:
         _mostrar_risco_timing_v65(confl, diferenca)
 
         # V8.0 — Central Mestre, usando os mesmos dados reais do par.
-        _central_decisao_v80(
+        _central_decisao_v81(
             par=par_escolhido,
             base=base,
             cotada=cotada,
