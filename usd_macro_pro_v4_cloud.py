@@ -27,12 +27,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "7.8.2 — EXPLICADOR ORDEM CORRIGIDA"
+APP_VERSION = "7.9 — RAIO-X COMPLETO DO SINAL"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V7.8.2 Português",
+    page_title="USD Macro Pro — V7.9 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1605,7 +1605,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V7.8.2 Português")
+st.title("🦅 USD Macro Pro — V7.9 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -1990,6 +1990,144 @@ def _painel_explicador_v78(par, moeda_base, moeda_cotada, score_base, score_cota
         "Ele não cria uma nova probabilidade de lucro e não substitui confirmação técnica."
     )
 
+
+
+
+# =========================================================
+# V7.9 — RAIO-X COMPLETO DO SINAL
+# =========================================================
+
+def _raiox_v79(par, base, cotada, score_base, score_cotada, diferenca, confl):
+    st.markdown("## 🔬 Raio-X completo do sinal — V7.9")
+
+    direcao = "WAIT"
+    if diferenca >= 6:
+        direcao = "BUY"
+    elif diferenca <= -6:
+        direcao = "SELL"
+
+    linhas = []
+    for nome, estado, peso, fator, peso_eff in confl.get("linhas_dinamicas", []):
+        if estado > 0:
+            leitura = "🟢 A favor"
+        elif estado < 0:
+            leitura = "🔴 Contra"
+        else:
+            leitura = "⚪ Neutro"
+        linhas.append({
+            "Componente": nome,
+            "Leitura": leitura,
+            "Peso nominal": f"{peso:.0f}%",
+            "Qualidade": f"{fator*100:.0f}%",
+            "Peso efetivo": f"{peso_eff:.1f}%"
+        })
+
+    if linhas:
+        st.dataframe(pd.DataFrame(linhas), use_container_width=True, hide_index=True)
+
+    # Bloco juros
+    dt = confl.get("diferencial_taxas", {})
+    m3 = confl.get("mercado_3m", {})
+    tend = confl.get("tendencias", {})
+
+    st.markdown("### 🏦 Juros e política monetária")
+    a,b,c = st.columns(3)
+    if dt.get("base") is not None and dt.get("cotada") is not None:
+        a.metric("Diferencial oficial", f"{dt.get('dif',0):+.2f} p.p.")
+        a.caption(f"Vantagem: {dt.get('vantagem','—')}")
+    else:
+        a.metric("Diferencial oficial", "—")
+
+    if m3.get("disponivel"):
+        b.metric("Spread mercado 3M", f"{m3.get('spread',0):+.2f} p.p.")
+        b.caption(f"{m3.get('vantagem','—')} · {m3.get('movimento','—')}")
+    else:
+        b.metric("Spread mercado 3M", "—")
+
+    if st.session_state.get("v77_fomc_integrado", False) and "USD" in (base, cotada):
+        fs = float(st.session_state.get("v76_fomc_usd_score", 50))
+        fp = float(st.session_state.get("v77_peso_fomc", 0))*100
+        c.metric("FOMC/USD", f"{fs:.0f}/100")
+        c.caption(f"Peso integrado: {fp:.0f}%")
+    else:
+        c.metric("FOMC/USD", "—")
+
+    # Tendência macro
+    st.markdown("### 📊 Tendência macro")
+    rows = []
+    for nome in ["CPI","Core CPI","Desemprego","Treasury 2Y","Broad USD"]:
+        x = tend.get(nome)
+        if isinstance(x, dict):
+            rows.append({
+                "Indicador": nome,
+                "Tendência": x.get("texto","—"),
+                "Variação média": round(float(x.get("delta",0)),4)
+            })
+    if rows:
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+    score = float(confl.get("score_confluencia", 50))
+    qualidade = float(confl.get("qualidade_confluencia", 0))
+    nivel = str(confl.get("nivel","BAIXA"))
+
+    # Próximo evento / risco
+    evento = _proximo_evento_macro_v65()
+    nome_evento = "—"
+    dias = None
+    impacto = "—"
+    if isinstance(evento, dict) and evento.get("disponivel", False):
+        nome_evento = str(evento.get("evento","—"))
+        dias = evento.get("dias")
+        impacto = str(evento.get("impacto","—"))
+
+    st.markdown("### 📅 Risco e timing")
+    r1,r2,r3 = st.columns(3)
+    r1.metric("Próximo evento", nome_evento)
+    r2.metric("Faltam", f"{dias} dia(s)" if dias is not None else "—")
+    r3.metric("Impacto", impacto)
+
+    # Conclusão operacional, sem chamar score de probabilidade.
+    if direcao == "WAIT" or score < 58 or qualidade < 50:
+        acao = "⏸️ AGUARDAR"
+        motivo = "a vantagem macro/confluência ainda não é suficiente."
+    elif direcao == "BUY":
+        acao = f"🟢 BUY {par}"
+        motivo = f"{base} possui vantagem macro sobre {cotada}."
+    else:
+        acao = f"🔴 SELL {par}"
+        motivo = f"{cotada} possui vantagem macro sobre {base}."
+
+    if dias is not None and dias <= 2 and impacto.upper() in ("MÁXIMO","MAXIMO","ALTO"):
+        timing_txt = "⚠️ Evento de alto impacto muito próximo — aguardar confirmação de preço/estrutura."
+    elif dias is not None and dias <= 7 and impacto.upper() in ("MÁXIMO","MAXIMO","ALTO"):
+        timing_txt = "🟡 Direção macro válida, mas há evento importante próximo."
+    else:
+        timing_txt = "🟢 Calendário não bloqueia a leitura macro neste momento."
+
+    st.markdown("### 🎯 Conclusão operacional")
+    st.info(
+        f"**{acao}** — {motivo}\n\n"
+        f"**Confluência:** {nivel} · Score {score:.0f}/100 · Qualidade {qualidade:.0f}%\n\n"
+        f"**Timing:** {timing_txt}"
+    )
+
+    # Principal motor: maior peso efetivo não-neutro
+    ativos = [
+        (nome, estado, peso_eff)
+        for nome, estado, peso, fator, peso_eff in confl.get("linhas_dinamicas", [])
+        if estado != 0
+    ]
+    if ativos:
+        principal = max(ativos, key=lambda x: abs(float(x[2])))
+        st.caption(
+            f"Principal componente ativo: {principal[0]} "
+            f"(peso efetivo {float(principal[2]):.1f}%)."
+        )
+
+    st.warning(
+        "O Raio-X é uma leitura macro e de confluência. "
+        "Não é previsão garantida nem gatilho de entrada. Confirme preço, estrutura, liquidez e gestão de risco."
+    )
 
 
 abas = st.tabs([
@@ -4288,6 +4426,16 @@ with abas[2]:
             timing=None,
             score_mestre=float(confl["score_confluencia"]),
             risco_calendario=None,
+        )
+
+        _raiox_v79(
+            par=par_escolhido,
+            base=base,
+            cotada=cotada,
+            score_base=float(score_base),
+            score_cotada=float(score_cotada),
+            diferenca=float(diferenca),
+            confl=confl,
         )
 
         st.write(f"Motivo: {base} está em **{score_base:.1f}** e {cotada} em **{score_cotada:.1f}**. O USD, quando presente, já inclui o ajuste das surpresas econômicas.")
