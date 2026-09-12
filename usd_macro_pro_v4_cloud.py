@@ -28,12 +28,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "8.5.2 — COLETA AUTOMÁTICA CORRIGIDA"
+APP_VERSION = "8.6 — AUTOMAÇÃO AGENDADA"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V8.5.2 Português",
+    page_title="USD Macro Pro — V8.6 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1606,7 +1606,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V8.5.2 Português")
+st.title("🦅 USD Macro Pro — V8.6 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2670,7 +2670,7 @@ def _avaliar_sinais_v82():
     return df, atualizados
 
 def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca, confl):
-    st.markdown("## 🧪 Validação Histórica — V8.5.2")
+    st.markdown("## 🧪 Validação Histórica — V8.6")
     st.caption(
         "Este módulo registra o sinal AGORA, evita duplicatas e mede depois. "
         "Ele não reconstrói o passado usando dados futuros."
@@ -2695,7 +2695,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 
     if par == "EUR/USD":
         st.info(
-            "Fonte de preço da V8.5.2: FRED DEXUSEU, cotação diária em dólares por 1 euro. "
+            "Fonte de preço da V8.6: FRED DEXUSEU, cotação diária em dólares por 1 euro. "
             "Por ser diária, esta primeira validação mede direção entre dias — não 1h/4h."
         )
     else:
@@ -2774,7 +2774,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     pendentes = df[df["avaliado"] != True].copy()
     avaliados_total = df[df["avaliado"] == True].copy()
 
-    st.markdown("### 💾 Persistência do histórico — V8.5.2")
+    st.markdown("### 💾 Persistência do histórico — V8.6")
     _v84_token, _v84_repo, _v84_branch = _github_cfg_v84()
     if _v84_token:
         st.success(
