@@ -28,12 +28,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "8.3 — VALIDAÇÃO AUTOMÁTICA E REGIMES"
+APP_VERSION = "8.4 — HISTÓRICO PERSISTENTE"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V8.3 Português",
+    page_title="USD Macro Pro — V8.4 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1606,7 +1606,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V8.3 Português")
+st.title("🦅 USD Macro Pro — V8.4 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2422,6 +2422,14 @@ def _garantir_pasta_v82():
 
 def _carregar_sinais_v82():
     _garantir_pasta_v82()
+
+    # V8.4 — primeiro tenta a cópia persistente.
+    if "_github_ler_csv_v84" in globals():
+        remoto = _github_ler_csv_v84()
+        if isinstance(remoto, pd.DataFrame) and not remoto.empty:
+            return remoto
+
+    # Fallback local do Streamlit.
     p = Path(ARQ_SINAIS_V82)
     if p.exists():
         try:
@@ -2437,13 +2445,92 @@ def _carregar_sinais_v82():
     ]
     return pd.DataFrame(columns=cols)
 
+def _github_cfg_v84():
+    """Configuração opcional para persistência do histórico no GitHub."""
+    try:
+        token = st.secrets.get("GITHUB_TOKEN_HISTORICO", "")
+        repo = st.secrets.get("GITHUB_REPO_HISTORICO", "aparecidomikael97-ship-it/usd-macro-pro-v4")
+        branch = st.secrets.get("GITHUB_BRANCH_HISTORICO", "main")
+    except Exception:
+        token, repo, branch = "", "aparecidomikael97-ship-it/usd-macro-pro-v4", "main"
+    return str(token).strip(), str(repo).strip(), str(branch).strip()
+
+def _github_ler_csv_v84():
+    """Lê dados/sinais_v84.csv do GitHub. Retorna None se não configurado/indisponível."""
+    token, repo, branch = _github_cfg_v84()
+    if not token or not repo:
+        return None
+    try:
+        import base64, io
+        url = f"https://api.github.com/repos/{repo}/contents/dados/sinais_v84.csv"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        r = requests.get(url, headers=headers, params={"ref": branch}, timeout=15)
+        if r.status_code == 404:
+            return pd.DataFrame()
+        r.raise_for_status()
+        payload = r.json()
+        raw = base64.b64decode(payload["content"])
+        df = pd.read_csv(io.BytesIO(raw))
+        return df
+    except Exception:
+        return None
+
+def _github_salvar_csv_v84(df):
+    """Cria/atualiza o CSV persistente no GitHub. Retorna (ok, mensagem)."""
+    token, repo, branch = _github_cfg_v84()
+    if not token or not repo:
+        return False, "GitHub persistente não configurado"
+    try:
+        import base64
+        url = f"https://api.github.com/repos/{repo}/contents/dados/sinais_v84.csv"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+
+        # Descobre SHA atual para atualização segura.
+        atual = requests.get(url, headers=headers, params={"ref": branch}, timeout=15)
+        sha = None
+        if atual.status_code == 200:
+            sha = atual.json().get("sha")
+        elif atual.status_code != 404:
+            atual.raise_for_status()
+
+        csv_bytes = df.to_csv(index=False).encode("utf-8")
+        body = {
+            "message": "V8.4: atualizar histórico de validação",
+            "content": base64.b64encode(csv_bytes).decode("ascii"),
+            "branch": branch,
+        }
+        if sha:
+            body["sha"] = sha
+
+        resp = requests.put(url, headers=headers, json=body, timeout=20)
+        resp.raise_for_status()
+        return True, "Histórico salvo no GitHub"
+    except Exception as e:
+        return False, f"Falha ao salvar no GitHub: {type(e).__name__}"
+
 def _salvar_sinais_v82(df):
+    """
+    V8.4: salva localmente e, se configurado, também no GitHub.
+    O GitHub é a cópia persistente; o parquet local continua como fallback.
+    """
     _garantir_pasta_v82()
+    ok_local = False
     try:
         df.to_parquet(ARQ_SINAIS_V82, index=False)
-        return True
+        ok_local = True
     except Exception:
-        return False
+        pass
+
+    ok_git, _ = _github_salvar_csv_v84(df)
+    return bool(ok_local or ok_git)
 
 def _fred_preco_eurusd_v82():
     """
@@ -2583,7 +2670,7 @@ def _avaliar_sinais_v82():
     return df, atualizados
 
 def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca, confl):
-    st.markdown("## 🧪 Validação Histórica — V8.3")
+    st.markdown("## 🧪 Validação Histórica — V8.4")
     st.caption(
         "Este módulo registra o sinal AGORA, evita duplicatas e mede depois. "
         "Ele não reconstrói o passado usando dados futuros."
@@ -2608,7 +2695,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 
     if par == "EUR/USD":
         st.info(
-            "Fonte de preço da V8.3: FRED DEXUSEU, cotação diária em dólares por 1 euro. "
+            "Fonte de preço da V8.4: FRED DEXUSEU, cotação diária em dólares por 1 euro. "
             "Por ser diária, esta primeira validação mede direção entre dias — não 1h/4h."
         )
     else:
@@ -2641,6 +2728,19 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 
     pendentes = df[df["avaliado"] != True].copy()
     avaliados_total = df[df["avaliado"] == True].copy()
+
+    st.markdown("### 💾 Persistência do histórico — V8.4")
+    _v84_token, _v84_repo, _v84_branch = _github_cfg_v84()
+    if _v84_token:
+        st.success(
+            f"✅ Histórico persistente configurado: {_v84_repo} · branch {_v84_branch}. "
+            "Os novos registros serão salvos no repositório."
+        )
+    else:
+        st.warning(
+            "⚠️ Histórico ainda está apenas no armazenamento temporário do Streamlit. "
+            "Adicione GITHUB_TOKEN_HISTORICO aos Secrets para ativar a persistência."
+        )
 
     st.markdown("### 🧭 Status da validação")
     s1, s2, s3 = st.columns(3)
