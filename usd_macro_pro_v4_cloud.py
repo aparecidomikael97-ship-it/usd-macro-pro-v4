@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-🦅 USD Macro Pro — V4 CLOUD
-=====================================
-✅ Preparada para Streamlit Cloud e uso local
-✅ Ranking + EUA + Actual/Forecast/Previous + Pares + Fed + Histórico + Backtest
-✅ Fallback automático se APIs falharem
-✅ Sem dependência obrigatória do matplotlib
-✅ RSS News + NewsAPI como reserva
+🦅 USD Macro Pro — V5 PORTUGUÊS
+================================
+- Interface em português
+- Corrige unidades de inflação e PIB no ranking global
+- Corrige Payroll para variação mensal
+- Valida dados absurdos e usa fallback quando necessário
+- Corrige limites de preço para pares como USD/JPY
+- Mantém painel EUA, surpresa econômica, pares, Fed, histórico e teste histórico
 """
 
 import math
@@ -22,47 +23,54 @@ import requests
 import streamlit as st
 
 # =========================================================
-# CONFIGURAÇÕES GLOBAIS
+# CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "4.0 — CLOUD"
-HIST_SCORES = "historico_scores_v3.parquet"
-HIST_SINAIS = "historico_sinais_v3.parquet"
+APP_VERSION = "5.0 — PORTUGUÊS"
+HIST_SCORES = "historico_scores_v5.parquet"
+HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V4 Cloud",
+    page_title="USD Macro Pro — V5 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 MOEDAS = {
-    "USD": "Dólar Americano", "EUR": "Euro", "GBP": "Libra Esterlina",
-    "JPY": "Iene Japonês", "CHF": "Franco Suíço", "CAD": "Dólar Canadense",
-    "AUD": "Dólar Australiano", "NZD": "Dólar Neozelandês", "BRL": "Real Brasileiro",
+    "USD": "Dólar Americano",
+    "EUR": "Euro",
+    "GBP": "Libra Esterlina",
+    "JPY": "Iene Japonês",
+    "CHF": "Franco Suíço",
+    "CAD": "Dólar Canadense",
+    "AUD": "Dólar Australiano",
+    "NZD": "Dólar Neozelandês",
+    "BRL": "Real Brasileiro",
 }
 
-FED_SENS_PADRAO = {
-    "USD": +1.00, "JPY": +0.25, "CHF": +0.20, "EUR": -0.10, "GBP": -0.05,
-    "CAD": -0.30, "AUD": -0.45, "NZD": -0.45, "BRL": -0.60,
+SENSIBILIDADE_FED_PADRAO = {
+    "USD": +1.00, "JPY": +0.25, "CHF": +0.20, "EUR": -0.10,
+    "GBP": -0.05, "CAD": -0.30, "AUD": -0.45, "NZD": -0.45,
+    "BRL": -0.60,
 }
 
-# 🔑 Chaves — funciona no Streamlit Cloud (secrets) E localmente (env ou padrão)
 CHAVE_FRED = st.secrets.get("CHAVE_FRED", os.getenv("CHAVE_FRED", ""))
 CHAVE_NEWSAPI = st.secrets.get("CHAVE_NEWSAPI", os.getenv("CHAVE_NEWSAPI", ""))
 
-FED_IMPACTO_MAX = 18.0
+IMPACTO_MAX_FED = 18.0
+STATUS_FONTE = {}
 
 # =========================================================
-# BARRA LATERAL — PARÂMETROS AJUSTÁVEIS
+# BARRA LATERAL
 # =========================================================
 
 st.sidebar.title("🦅 USD Macro Pro")
 st.sidebar.caption(f"Versão {APP_VERSION}")
 
-ESCALA_PROB = st.sidebar.slider(
-    "Escala do modelo", 2.0, 30.0, 10.0, 0.5,
-    help="Diferença de pontos para ~73% de probabilidade."
+ESCALA_CONFIANCA = st.sidebar.slider(
+    "Sensibilidade da comparação", 2.0, 30.0, 10.0, 0.5,
+    help="Quanto a diferença de força entre duas moedas altera a confiança relativa do modelo."
 )
 
 PESOS = {
@@ -77,120 +85,169 @@ PESOS = {
 peso_total = sum(PESOS.values())
 st.sidebar.caption(f"Soma dos pesos: {peso_total:.2f}")
 if abs(peso_total - 1.0) > 0.01:
-    st.sidebar.warning("⚠️ A soma ideal dos pesos é 1,00.")
+    st.sidebar.warning("⚠️ O ideal é a soma dos pesos ficar em 1,00.")
 
-st.sidebar.subheader("Sensibilidade ao Fed")
-FED_SENSIBILIDADE = {
-    m: st.sidebar.slider(m, -1.0, 1.0, float(FED_SENS_PADRAO[m]), 0.05)
-    for m in MOEDAS
+st.sidebar.subheader("Sensibilidade ao Federal Reserve")
+SENSIBILIDADE_FED = {
+    moeda: st.sidebar.slider(
+        moeda, -1.0, 1.0, float(SENSIBILIDADE_FED_PADRAO[moeda]), 0.05
+    )
+    for moeda in MOEDAS
 }
 
 st.sidebar.divider()
 st.sidebar.caption(f"🕒 Atualizado: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
 if not CHAVE_FRED:
-    st.sidebar.warning("FRED sem chave: alguns dados usarão fallback. Configure CHAVE_FRED em Secrets.")
-
-STATUS_FONTE = {}
+    st.sidebar.warning("FRED sem chave: alguns dados usarão valores de segurança.")
 
 # =========================================================
-# FUNÇÕES DE CONEXÃO COM APIs
+# CONEXÃO E FRED
 # =========================================================
 
 def _get(url: str, timeout: int = 15):
     try:
-        r = requests.get(url, timeout=timeout)
-        r.raise_for_status()
-        return r
+        resposta = requests.get(url, timeout=timeout)
+        resposta.raise_for_status()
+        return resposta
     except Exception:
         return None
 
-def _fred_observacoes(series_id: str, limite: int = 24) -> pd.DataFrame:
+
+def _fred_observacoes(series_id: str, limite: int = 24, unidades: str | None = None) -> pd.DataFrame:
     if not CHAVE_FRED:
         return pd.DataFrame(columns=["date", "value"])
+
     url = (
-        f"https://api.stlouisfed.org/fred/series/observations?series_id={series_id}"
-        f"&api_key={CHAVE_FRED}&file_type=json&sort_order=desc&limit={limite}"
+        "https://api.stlouisfed.org/fred/series/observations"
+        f"?series_id={series_id}&api_key={CHAVE_FRED}&file_type=json"
+        f"&sort_order=desc&limit={limite}"
     )
-    r = _get(url)
-    if r is None:
+    if unidades:
+        url += f"&units={unidades}"
+
+    resposta = _get(url)
+    if resposta is None:
         return pd.DataFrame(columns=["date", "value"])
+
     try:
-        df = pd.DataFrame(r.json().get("observations", []))
-        if df.empty: return df
+        df = pd.DataFrame(resposta.json().get("observations", []))
+        if df.empty:
+            return pd.DataFrame(columns=["date", "value"])
         df["date"] = pd.to_datetime(df["date"], errors="coerce")
         df["value"] = pd.to_numeric(df["value"], errors="coerce")
-        return df.dropna().sort_values("date")
+        return df.dropna(subset=["date", "value"]).sort_values("date")
     except Exception:
         return pd.DataFrame(columns=["date", "value"])
 
-def _fred_ultimo(series_id: str) -> float | None:
-    df = _fred_observacoes(series_id, 6)
-    return float(df.iloc[-1]["value"]) if not df.empty else None
+
+def _fred_ultimo(series_id: str, idade_max_dias: int | None = None) -> float | None:
+    df = _fred_observacoes(series_id, 12)
+    if df.empty:
+        return None
+    ultima = df.iloc[-1]
+    if idade_max_dias is not None:
+        idade = (pd.Timestamp.now(tz=None).normalize() - ultima["date"].normalize()).days
+        if idade > idade_max_dias:
+            return None
+    return float(ultima["value"])
 
 
-def _fred_variacao_ultimo_periodo(series_id: str) -> float | None:
-    """Retorna a diferença entre as duas observações mais recentes."""
+def _fred_variacao_mensal_nivel(series_id: str) -> float | None:
     df = _fred_observacoes(series_id, 6)
     if len(df) < 2:
         return None
     return float(df.iloc[-1]["value"] - df.iloc[-2]["value"])
 
-def _pct_change_12m(series_id: str) -> float | None:
-    df = _fred_observacoes(series_id, 20)
-    if len(df) < 13: return None
-    return (float(df.iloc[-1]["value"]) / float(df.iloc[-13]["value"]) - 1) * 100
+
+def _fred_variacao_anual_percentual(series_id: str, idade_max_dias: int = 180) -> float | None:
+    """Pede ao próprio FRED a variação % em relação ao mesmo período do ano anterior."""
+    df = _fred_observacoes(series_id, 8, unidades="pc1")
+    if df.empty:
+        return None
+    ultima = df.iloc[-1]
+    idade = (pd.Timestamp.now(tz=None).normalize() - ultima["date"].normalize()).days
+    if idade > idade_max_dias:
+        return None
+    return float(ultima["value"])
+
 
 def _bcb_ultimo(codigo_sgs: int) -> float | None:
-    r = _get(f"https://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo_sgs}/dados/ultimos/1?formato=json")
-    if r is None: return None
+    resposta = _get(
+        f"https://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo_sgs}/dados/ultimos/1?formato=json"
+    )
+    if resposta is None:
+        return None
     try:
-        return float(r.json()[0]["valor"].replace(",", "."))
+        return float(resposta.json()[0]["valor"].replace(",", "."))
     except Exception:
         return None
 
+
+def _valor_valido(valor, minimo, maximo) -> bool:
+    return valor is not None and np.isfinite(valor) and minimo <= float(valor) <= maximo
+
+
+def _usar_ou_fallback(valor, fallback, minimo, maximo):
+    return float(valor) if _valor_valido(valor, minimo, maximo) else float(fallback)
+
 # =========================================================
-# SENTIMENTO E NARRATIVA — RSS + NEWSAPI (FALLBACK)
+# NOTÍCIAS E FED
 # =========================================================
 
-HAWKISH = ("higher for longer", "inflation remains elevated", "rate hike",
-           "hike", "tightening", "restrictive", "not ready to cut", "strong economy")
-DOVISH = ("rate cut", "easing", "disinflation", "inflation cooling",
-          "weaker labor", "growth slowing", "lower rates")
+PALAVRAS_RESTRITIVAS = (
+    "higher for longer", "inflation remains elevated", "rate hike", "hike",
+    "tightening", "restrictive", "not ready to cut", "strong economy"
+)
+PALAVRAS_FLEXIVEIS = (
+    "rate cut", "easing", "disinflation", "inflation cooling",
+    "weaker labor", "growth slowing", "lower rates"
+)
 POSITIVAS = ("strong", "growth", "beat", "surge", "rise", "gain", "alta", "avanço")
 NEGATIVAS = ("weak", "recession", "drop", "fall", "selloff", "queda", "crise")
 
-def _rss_titulos(query: str, idioma="en-US", pais="US", ceid="US:en") -> list[str]:
-    q = urllib.parse.quote(query)
+
+def _rss_titulos(consulta: str, idioma="en-US", pais="US", ceid="US:en") -> list[str]:
+    q = urllib.parse.quote(consulta)
     url = f"https://news.google.com/rss/search?q={q}&hl={idioma}&gl={pais}&ceid={ceid}"
-    r = _get(url)
-    if r is None: return []
+    resposta = _get(url)
+    if resposta is None:
+        return []
     try:
-        root = ET.fromstring(r.content)
-        return [i.findtext("title", "").strip() for i in root.iter("item") if i.findtext("title", "")]
+        raiz = ET.fromstring(resposta.content)
+        return [
+            item.findtext("title", "").strip()
+            for item in raiz.iter("item")
+            if item.findtext("title", "")
+        ]
     except Exception:
         return []
 
+
 def _score_palavras(titulos: list[str], positivas, negativas) -> float:
-    if not titulos: return 0.0
+    if not titulos:
+        return 0.0
     pos = neg = 0
-    for t in [x.lower() for x in titulos]:
-        pos += sum(1 for w in positivas if w in t)
-        neg += sum(1 for w in negativas if w in t)
+    for titulo in [x.lower() for x in titulos]:
+        pos += sum(1 for palavra in positivas if palavra in titulo)
+        neg += sum(1 for palavra in negativas if palavra in titulo)
     return float(np.clip((pos - neg) / max(pos + neg, 1), -1, 1))
 
-@st.cache_data(ttl=1800, show_spinner="Lendo narrativa do Fed...")
+
+@st.cache_data(ttl=1800, show_spinner="Lendo a narrativa do Fed...")
 def carregar_narrativa_fed() -> dict:
     titulos = _rss_titulos("Federal Reserve OR FOMC OR Powell when:7d")
-    forca = _score_palavras(titulos, HAWKISH, DOVISH)
-    tom = "Hawkish" if forca > 0.15 else "Dovish" if forca < -0.15 else "Neutro"
-    STATUS_FONTE["FED"] = "✅ RSS" if titulos else "⚠️ Sem manchetes"
+    forca = _score_palavras(titulos, PALAVRAS_RESTRITIVAS, PALAVRAS_FLEXIVEIS)
+    tom = "Restritivo" if forca > 0.15 else "Flexível" if forca < -0.15 else "Neutro"
+    STATUS_FONTE["Fed"] = "✅ Notícias RSS" if titulos else "⚠️ Sem manchetes"
     return {"tom": tom, "forca": forca, "titulos": titulos[:12]}
 
-@st.cache_data(ttl=1800, show_spinner="Analisando sentimento...")
+
+@st.cache_data(ttl=1800, show_spinner="Analisando sentimento das notícias...")
 def sentimento_noticias(nome_moeda: str) -> float:
     titulos = _rss_titulos(f"{nome_moeda} currency when:7d", "pt-BR", "BR", "BR:pt-419")
     if titulos:
         return float(np.clip(50 + 50 * _score_palavras(titulos, POSITIVAS, NEGATIVAS), 0, 100))
+
     if CHAVE_NEWSAPI:
         try:
             url = (
@@ -198,123 +255,200 @@ def sentimento_noticias(nome_moeda: str) -> float:
                 f"&language=pt&from={(datetime.now()-timedelta(days=7)).strftime('%Y-%m-%d')}"
                 f"&sortBy=publishedAt&apiKey={CHAVE_NEWSAPI}"
             )
-            r = _get(url)
-            if r:
-                titulos = [a["title"] for a in r.json().get("articles", []) if a.get("title")]
+            resposta = _get(url)
+            if resposta:
+                titulos = [a["title"] for a in resposta.json().get("articles", []) if a.get("title")]
                 return float(np.clip(50 + 50 * _score_palavras(titulos, POSITIVAS, NEGATIVAS), 0, 100))
         except Exception:
             pass
     return 50.0
 
 # =========================================================
-# DADOS MACRO — EUA E GLOBAIS
+# PAINEL EUA
 # =========================================================
 
-US_FRED = {
-    "Fed Funds": "FEDFUNDS", "CPI": "CPIAUCSL", "Core CPI": "CPILFESL",
-    "PCE": "PCEPI", "Core PCE": "PCEPILFE", "Payroll": "PAYEMS",
-    "Desemprego": "UNRATE", "PIB": "A191RL1Q225SBEA", "Treasury 2Y": "DGS2",
-    "Treasury 10Y": "DGS10", "Broad USD Index": "DTWEXBGS",
+SERIES_EUA = {
+    "Juros do Fed": "FEDFUNDS",
+    "IPC": "CPIAUCSL",
+    "IPC Núcleo": "CPILFESL",
+    "PCE": "PCEPI",
+    "PCE Núcleo": "PCEPILFE",
+    "Payroll": "PAYEMS",
+    "Desemprego": "UNRATE",
+    "PIB": "A191RL1Q225SBEA",
+    "Treasury 2 anos": "DGS2",
+    "Treasury 10 anos": "DGS10",
+    "Índice amplo do dólar": "DTWEXBGS",
 }
 
-@st.cache_data(ttl=3600, show_spinner="Carregando macro dos EUA...")
+
+@st.cache_data(ttl=3600, show_spinner="Carregando dados macroeconômicos dos EUA...")
 def carregar_macro_eua() -> dict:
     fallback = {
-        "Fed Funds": 4.25, "CPI YoY": 2.9, "Core CPI YoY": 3.2, "PCE YoY": 2.6,
-        "Core PCE YoY": 2.8, "Payroll var. mil": 150.0, "Desemprego": 4.2,
-        "PIB": 2.2, "Treasury 2Y": 4.1, "Treasury 10Y": 4.3, "Broad USD Index": 120.0,
+        "Juros do Fed": 4.25,
+        "IPC anual": 2.9,
+        "IPC Núcleo anual": 3.2,
+        "PCE anual": 2.6,
+        "PCE Núcleo anual": 2.8,
+        "Payroll variação mensal (mil)": 150.0,
+        "Desemprego": 4.2,
+        "PIB": 2.2,
+        "Treasury 2 anos": 4.1,
+        "Treasury 10 anos": 4.3,
+        "Índice amplo do dólar": 120.0,
     }
-    m = {
-        "Fed Funds": _fred_ultimo(US_FRED["Fed Funds"]),
-        "CPI YoY": _pct_change_12m(US_FRED["CPI"]),
-        "Core CPI YoY": _pct_change_12m(US_FRED["Core CPI"]),
-        "PCE YoY": _pct_change_12m(US_FRED["PCE"]),
-        "Core PCE YoY": _pct_change_12m(US_FRED["Core PCE"]),
-        "Payroll var. mil": _fred_variacao_ultimo_periodo(US_FRED["Payroll"]),
-        "Desemprego": _fred_ultimo(US_FRED["Desemprego"]),
-        "PIB": _fred_ultimo(US_FRED["PIB"]),
-        "Treasury 2Y": _fred_ultimo(US_FRED["Treasury 2Y"]),
-        "Treasury 10Y": _fred_ultimo(US_FRED["Treasury 10Y"]),
-        "Broad USD Index": _fred_ultimo(US_FRED["Broad USD Index"]),
-    }
-    for k, v in fallback.items():
-        if m.get(k) is None or not np.isfinite(m.get(k)):
-            m[k] = v
-    STATUS_FONTE["US"] = "✅ FRED" if CHAVE_FRED else "⚠️ Fallback"
-    return m
 
-FRED_MAP = {
-    "USD": ("FEDFUNDS", "CPIAUCSL", "A191RO1Q156NBEA"),
-    "EUR": ("ECBDFR", "CP0000EZ19M086NEST", "CLVMNACSCAB1GQEA19"),
-    "GBP": ("BOERUKM", "CPALTT01GBM661S", "CLVMNACSCAB1GQUK"),
-    "JPY": ("IR3TIB01JPM156N", "CPALTT01JPM661S", "CLVMNACSCAB1GQJP"),
-    "CHF": ("IR3TIB01CHM156N", "CPALTT01CHM661S", "CLVMNACSCAB1GQCH"),
-    "CAD": ("IR3TIB01CAM156N", "CPALTT01CAM661S", "CLVMNACSCAB1GQCA"),
-    "AUD": ("IR3TIB01AUM156N", "CPALTT01AUM661S", "CLVMNACSCAB1GQAU"),
-    "NZD": ("IR3TIB01NZM156N", "CPALTT01NZM661S", "CLVMNACSCAB1GQNZ"),
+    bruto = {
+        "Juros do Fed": _fred_ultimo(SERIES_EUA["Juros do Fed"], 120),
+        "IPC anual": _fred_variacao_anual_percentual(SERIES_EUA["IPC"], 120),
+        "IPC Núcleo anual": _fred_variacao_anual_percentual(SERIES_EUA["IPC Núcleo"], 120),
+        "PCE anual": _fred_variacao_anual_percentual(SERIES_EUA["PCE"], 120),
+        "PCE Núcleo anual": _fred_variacao_anual_percentual(SERIES_EUA["PCE Núcleo"], 120),
+        "Payroll variação mensal (mil)": _fred_variacao_mensal_nivel(SERIES_EUA["Payroll"]),
+        "Desemprego": _fred_ultimo(SERIES_EUA["Desemprego"], 120),
+        "PIB": _fred_ultimo(SERIES_EUA["PIB"], 240),
+        "Treasury 2 anos": _fred_ultimo(SERIES_EUA["Treasury 2 anos"], 14),
+        "Treasury 10 anos": _fred_ultimo(SERIES_EUA["Treasury 10 anos"], 14),
+        "Índice amplo do dólar": _fred_ultimo(SERIES_EUA["Índice amplo do dólar"], 14),
+    }
+
+    limites = {
+        "Juros do Fed": (-1, 25),
+        "IPC anual": (-5, 25),
+        "IPC Núcleo anual": (-5, 25),
+        "PCE anual": (-5, 25),
+        "PCE Núcleo anual": (-5, 25),
+        "Payroll variação mensal (mil)": (-3000, 3000),
+        "Desemprego": (0, 30),
+        "PIB": (-20, 20),
+        "Treasury 2 anos": (-2, 20),
+        "Treasury 10 anos": (-2, 20),
+        "Índice amplo do dólar": (50, 200),
+    }
+
+    dados = {
+        chave: _usar_ou_fallback(bruto[chave], fallback[chave], *limites[chave])
+        for chave in fallback
+    }
+
+    STATUS_FONTE["EUA"] = "✅ FRED + validação" if CHAVE_FRED else "⚠️ Valores de segurança"
+    return dados
+
+# =========================================================
+# RANKING GLOBAL — SÉRIES E TRANSFORMAÇÕES CORRETAS
+# =========================================================
+
+# inflação e PIB são séries em NÍVEL; por isso são convertidas para variação % anual.
+# Isso evita mostrar, por exemplo, 103 como "inflação 103%" ou 2.900.000 como "PIB %".
+SERIES_GLOBAIS = {
+    "USD": {"juros": "FEDFUNDS", "inflacao": "CPIAUCSL", "pib": "GDPC1"},
+    "EUR": {"juros": "ECBDFR", "inflacao": "CP0000EZ19M086NEST", "pib": "CLVMNACSCAB1GQEA"},
+    "GBP": {"juros": "BOERUKM", "inflacao": "CPALTT01GBM661S", "pib": "CLVMNACSCAB1GQUK"},
+    "JPY": {"juros": "IR3TIB01JPM156N", "inflacao": "CPALTT01JPM661S", "pib": "JPNRGDPEXP"},
+    "CHF": {"juros": "IR3TIB01CHM156N", "inflacao": "CPALTT01CHM661S", "pib": "CLVMNACSAB1GQCH"},
+    "CAD": {"juros": "IR3TIB01CAM156N", "inflacao": "CPALTT01CAM661S", "pib": "NGDPRSAXDCCAQ"},
+    "AUD": {"juros": "IR3TIB01AUM156N", "inflacao": "CPALTT01AUM661S", "pib": "NGDPRSAXDCAUQ"},
+    "NZD": {"juros": "IR3TIB01NZM156N", "inflacao": "CPALTT01NZM661S", "pib": "CLVMNACSCAB1GQNZ"},
 }
 
-@st.cache_data(ttl=3600, show_spinner="Carregando dados globais...")
+VALORES_SEGURANCA = {
+    "USD": {"juros": 4.25, "inflacao": 2.9, "pib": 2.1},
+    "EUR": {"juros": 2.15, "inflacao": 2.1, "pib": 1.4},
+    "GBP": {"juros": 4.00, "inflacao": 3.2, "pib": 1.1},
+    "JPY": {"juros": 0.25, "inflacao": 2.8, "pib": 0.8},
+    "CHF": {"juros": 0.00, "inflacao": 1.2, "pib": 1.5},
+    "CAD": {"juros": 3.75, "inflacao": 2.3, "pib": 1.8},
+    "AUD": {"juros": 3.35, "inflacao": 2.7, "pib": 1.9},
+    "NZD": {"juros": 3.25, "inflacao": 2.5, "pib": 1.6},
+    "BRL": {"juros": 10.75, "inflacao": 4.5, "pib": 2.4},
+}
+
+
+@st.cache_data(ttl=3600, show_spinner="Carregando dados macroeconômicos globais...")
 def carregar_dados_moedas() -> dict:
-    demo = {
-        "USD": {"juros": 4.25, "inflacao": 2.9, "pib": 2.1},
-        "EUR": {"juros": 2.15, "inflacao": 2.1, "pib": 1.4},
-        "GBP": {"juros": 4.00, "inflacao": 3.2, "pib": 1.1},
-        "JPY": {"juros": 0.25, "inflacao": 2.8, "pib": 0.8},
-        "CHF": {"juros": 0.00, "inflacao": 1.2, "pib": 1.5},
-        "CAD": {"juros": 3.75, "inflacao": 2.3, "pib": 1.8},
-        "AUD": {"juros": 3.35, "inflacao": 2.7, "pib": 1.9},
-        "NZD": {"juros": 3.25, "inflacao": 2.5, "pib": 1.6},
-        "BRL": {"juros": 10.75, "inflacao": 4.5, "pib": 2.4},
-    }
-    res = {}
-    for m, base in demo.items():
-        j = i = p = None
-        if m == "BRL":
-            j, i, p = _bcb_ultimo(432), _bcb_ultimo(13522), _bcb_ultimo(4380)
-        elif m in FRED_MAP and CHAVE_FRED:
-            sj, si, sp = FRED_MAP[m]
-            j, i, p = _fred_ultimo(sj), _fred_ultimo(si), _fred_ultimo(sp)
-        res[m] = {
-            "juros": j if j is not None else base["juros"],
-            "inflacao": i if i is not None else base["inflacao"],
-            "pib": p if p is not None else base["pib"],
-            "sentimento": sentimento_noticias(MOEDAS[m]),
+    resultado = {}
+
+    for moeda, fallback in VALORES_SEGURANCA.items():
+        juros = inflacao = pib = None
+        fonte = "Valores de segurança"
+
+        if moeda == "BRL":
+            # BCB/SGS. Qualquer valor fora de faixa é rejeitado para evitar unidade errada.
+            juros = _bcb_ultimo(432)
+            inflacao = _bcb_ultimo(13522)
+            pib = _bcb_ultimo(4380)
+            fonte = "BCB + validação"
+
+        elif CHAVE_FRED and moeda in SERIES_GLOBAIS:
+            ids = SERIES_GLOBAIS[moeda]
+            juros = _fred_ultimo(ids["juros"], 180)
+            inflacao = _fred_variacao_anual_percentual(ids["inflacao"], 180)
+            pib = _fred_variacao_anual_percentual(ids["pib"], 300)
+            fonte = "FRED + transformação anual"
+
+        juros_final = _usar_ou_fallback(juros, fallback["juros"], -2, 30)
+        inflacao_final = _usar_ou_fallback(inflacao, fallback["inflacao"], -5, 30)
+        pib_final = _usar_ou_fallback(pib, fallback["pib"], -15, 20)
+
+        usou_fallback = (
+            not _valor_valido(juros, -2, 30)
+            or not _valor_valido(inflacao, -5, 30)
+            or not _valor_valido(pib, -15, 20)
+        )
+
+        resultado[moeda] = {
+            "juros": juros_final,
+            "inflacao": inflacao_final,
+            "pib": pib_final,
+            "sentimento": sentimento_noticias(MOEDAS[moeda]),
+            "fonte": f"{fonte}{' + fallback parcial' if usou_fallback else ''}",
         }
-        STATUS_FONTE[m] = "✅" if j else "⚠️ Demo"
-    return res
+        STATUS_FONTE[moeda] = "⚠️ Fallback parcial" if usou_fallback else "✅ Dados válidos"
+
+    return resultado
 
 # =========================================================
-# MOTOR DE CÁLCULO — SCORE, PROBABILIDADE, SURPRESA
+# MOTOR DE CÁLCULO
 # =========================================================
 
-def normalizar(s: pd.Series, inverter: bool = False) -> pd.Series:
-    s = pd.to_numeric(s, errors="coerce").fillna(0.0)
-    res = pd.Series(50.0, index=s.index) if s.max() == s.min() else (s - s.min()) / (s.max() - s.min()) * 100
-    return 100 - res if inverter else res
+def normalizar(serie: pd.Series, inverter: bool = False) -> pd.Series:
+    serie = pd.to_numeric(serie, errors="coerce").fillna(0.0)
+    if serie.max() == serie.min():
+        normalizada = pd.Series(50.0, index=serie.index)
+    else:
+        normalizada = (serie - serie.min()) / (serie.max() - serie.min()) * 100
+    return 100 - normalizada if inverter else normalizada
 
-def score_emprego_usd(m: dict) -> float:
-    s_pay = np.clip(50 + (m["Payroll var. mil"] - 100) * 0.15, 0, 100)
-    s_des = np.clip(50 - (m["Desemprego"] - 4.2) * 15, 0, 100)
-    return float((s_pay + s_des) / 2)
 
-def score_inflacao_usd(m: dict) -> float:
-    media = np.mean([m["CPI YoY"], m["Core CPI YoY"], m["PCE YoY"], m["Core PCE YoY"]])
+def score_emprego_usd(macro: dict) -> float:
+    s_payroll = np.clip(50 + (macro["Payroll variação mensal (mil)"] - 100) * 0.15, 0, 100)
+    s_desemprego = np.clip(50 - (macro["Desemprego"] - 4.2) * 15, 0, 100)
+    return float((s_payroll + s_desemprego) / 2)
+
+
+def score_inflacao_usd(macro: dict) -> float:
+    media = np.mean([
+        macro["IPC anual"], macro["IPC Núcleo anual"],
+        macro["PCE anual"], macro["PCE Núcleo anual"]
+    ])
     return float(np.clip(50 + (media - 2.0) * 12, 0, 100))
 
 
-def score_atividade_usd(m: dict) -> float:
-    """Baseline neutro. A atividade é refinada pela seção Actual x Forecast."""
+def score_atividade_usd(_: dict) -> float:
+    # Neutro até o usuário preencher ISM/PMI na área de surpresa econômica.
     return 50.0
+
 
 def calcular_ranking(dados: dict, macro_us: dict, fed: dict) -> pd.DataFrame:
     df = pd.DataFrame(dados).T.reset_index().rename(columns={"index": "Código"})
     df["Moeda"] = df["Código"].map(MOEDAS)
+
     df["n_juros"] = normalizar(df["juros"])
     df["n_inflacao"] = normalizar(df["inflacao"])
     df["n_pib"] = normalizar(df["pib"])
     df["n_sentimento"] = normalizar(df["sentimento"])
-    df["n_emprego"] = df["n_atividade"] = 50.0
+    df["n_emprego"] = 50.0
+    df["n_atividade"] = 50.0
 
     idx_usd = df.index[df["Código"] == "USD"]
     if len(idx_usd):
@@ -323,311 +457,410 @@ def calcular_ranking(dados: dict, macro_us: dict, fed: dict) -> pd.DataFrame:
         df.loc[i, "n_emprego"] = score_emprego_usd(macro_us)
         df.loc[i, "n_atividade"] = score_atividade_usd(macro_us)
 
-    df["Macro_Score"] = (
-        PESOS["juros"] * df["n_juros"] + PESOS["inflacao"] * df["n_inflacao"] +
-        PESOS["pib"] * df["n_pib"] + PESOS["emprego"] * df["n_emprego"] +
-        PESOS["atividade"] * df["n_atividade"] + PESOS["sentimento"] * df["n_sentimento"]
+    df["Pontuação_Macro"] = (
+        PESOS["juros"] * df["n_juros"]
+        + PESOS["inflacao"] * df["n_inflacao"]
+        + PESOS["pib"] * df["n_pib"]
+        + PESOS["emprego"] * df["n_emprego"]
+        + PESOS["atividade"] * df["n_atividade"]
+        + PESOS["sentimento"] * df["n_sentimento"]
     )
-    df["Influência_Fed"] = df["Código"].map(FED_SENSIBILIDADE).fillna(0.0) * fed["forca"] * FED_IMPACTO_MAX
-    df["Score_Final"] = (df["Macro_Score"] + df["Influência_Fed"]).clip(0, 100).round(1)
-    df = df.sort_values("Score_Final", ascending=False).reset_index(drop=True)
-    df["Posição"] = df.index + 1
-    return df.round(1)
 
-def probabilidade_modelo(s_base: float, s_cotada: float):
-    diff = s_base - s_cotada
-    p = 1 / (1 + math.exp(-diff / (ESCALA_PROB / 2)))
-    if p >= 0.65: status = "🟢 Forte vantagem da base"
-    elif p >= 0.55: status = "🟡 Leve vantagem da base"
-    elif p >= 0.45: status = "⚪ Equilíbrio"
-    elif p >= 0.35: status = "🟡 Leve vantagem da cotada"
-    else: status = "🔴 Forte vantagem da cotada"
-    return p, diff, status
+    df["Influência_Fed"] = (
+        df["Código"].map(SENSIBILIDADE_FED).fillna(0.0)
+        * fed["forca"] * IMPACTO_MAX_FED
+    )
+    df["Pontuação_Final"] = (df["Pontuação_Macro"] + df["Influência_Fed"]).clip(0, 100)
+    df = df.sort_values("Pontuação_Final", ascending=False).reset_index(drop=True)
+    df["Posição"] = df.index + 1
+
+    for coluna in ["juros", "inflacao", "pib", "sentimento", "Pontuação_Macro", "Influência_Fed", "Pontuação_Final"]:
+        df[coluna] = pd.to_numeric(df[coluna], errors="coerce").round(1)
+
+    return df
+
+
+def confianca_modelo(score_base: float, score_cotada: float):
+    diferenca = score_base - score_cotada
+    p = 1 / (1 + math.exp(-diferenca / (ESCALA_CONFIANCA / 2)))
+    if p >= 0.65:
+        status = "🟢 Forte vantagem da moeda base"
+    elif p >= 0.55:
+        status = "🟡 Leve vantagem da moeda base"
+    elif p >= 0.45:
+        status = "⚪ Equilíbrio"
+    elif p >= 0.35:
+        status = "🟡 Leve vantagem da moeda cotada"
+    else:
+        status = "🔴 Forte vantagem da moeda cotada"
+    return p, diferenca, status
 
 # =========================================================
 # SURPRESA ECONÔMICA
 # =========================================================
 
-def classificar_surpresa(atual, prev, sentido_pos_alto=True, tol=0.0):
-    if prev is None or not np.isfinite(prev):
-        return {"Surpresa": np.nan, "Score": 0.0, "Classe": "Sem previsão"}
-    surp = atual - prev
-    if abs(surp) <= tol:
-        classe, score = "Neutro", 0.0
+def classificar_surpresa(real, previsao, maior_favorece_usd=True, tolerancia=0.0):
+    if previsao is None or not np.isfinite(previsao):
+        return {"Surpresa": np.nan, "Pontuação": 0.0, "Classe": "Sem previsão"}
+
+    surpresa = real - previsao
+    if abs(surpresa) <= tolerancia:
+        classe, pontos = "Neutro", 0.0
     else:
-        pos = surp > 0 if sentido_pos_alto else surp < 0
-        classe = "USD Favorável" if pos else "USD Desfavorável"
-        score = 1.0 if pos else -1.0
-    return {"Surpresa": surp, "Score": score, "Classe": classe}
+        positivo = surpresa > 0 if maior_favorece_usd else surpresa < 0
+        classe = "Favorável ao USD" if positivo else "Desfavorável ao USD"
+        pontos = 1.0 if positivo else -1.0
+
+    return {"Surpresa": surpresa, "Pontuação": pontos, "Classe": classe}
 
 # =========================================================
-# HISTÓRICO E BACKTEST
+# HISTÓRICO E TESTE HISTÓRICO
 # =========================================================
 
 def salvar_snapshot(df):
     hoje = pd.Timestamp(datetime.now().date())
-    snap = df[["Código", "Macro_Score", "Influência_Fed", "Score_Final"]].copy()
+    snap = df[["Código", "Pontuação_Macro", "Influência_Fed", "Pontuação_Final"]].copy()
     snap["data"] = hoje
     try:
         hist = pd.read_parquet(HIST_SCORES)
         if (pd.to_datetime(hist["data"]).dt.date == hoje.date()).any():
-            return "⚠️ Já existe snapshot de hoje."
+            return "⚠️ Já existe um registro de hoje."
         hist = pd.concat([hist, snap], ignore_index=True)
-    except:
+    except Exception:
         hist = snap
     hist.to_parquet(HIST_SCORES, index=False)
-    return "✅ Snapshot salvo."
+    return "✅ Registro salvo."
+
 
 def carregar_snapshots():
-    try: return pd.read_parquet(HIST_SCORES)
-    except: return pd.DataFrame()
+    try:
+        return pd.read_parquet(HIST_SCORES)
+    except Exception:
+        return pd.DataFrame()
 
-def registrar_sinal(par, prob, s_base, s_cotada, preco, horas):
+
+def registrar_sinal(par, confianca, s_base, s_cotada, preco, horas):
     linha = pd.DataFrame([{
         "id": datetime.now().strftime("%Y%m%d%H%M%S%f"),
-        "data": pd.Timestamp.now(), "par": par, "prob_base": float(prob),
-        "score_base": float(s_base), "score_cotada": float(s_cotada),
-        "preco_entrada": float(preco), "horizonte": int(horas),
-        "preco_saida": np.nan, "resultado": np.nan,
+        "data": pd.Timestamp.now(),
+        "par": par,
+        "confianca_base": float(confianca),
+        "score_base": float(s_base),
+        "score_cotada": float(s_cotada),
+        "preco_entrada": float(preco),
+        "horizonte": int(horas),
+        "preco_saida": np.nan,
+        "resultado": np.nan,
     }])
-    try: hist = pd.concat([pd.read_parquet(HIST_SINAIS), linha], ignore_index=True)
-    except: hist = linha
+    try:
+        hist = pd.concat([pd.read_parquet(HIST_SINAIS), linha], ignore_index=True)
+    except Exception:
+        hist = linha
     hist.to_parquet(HIST_SINAIS, index=False)
 
+
 def carregar_sinais():
-    try: return pd.read_parquet(HIST_SINAIS)
-    except: return pd.DataFrame()
+    try:
+        return pd.read_parquet(HIST_SINAIS)
+    except Exception:
+        return pd.DataFrame()
+
 
 def atualizar_resultado(id_sinal, saida):
     hist = carregar_sinais()
     if hist.empty or id_sinal not in hist["id"].astype(str).values:
         return "Sinal não encontrado."
-    m = hist["id"].astype(str) == id_sinal
-    entrada = float(hist.loc[m, "preco_entrada"].iloc[0])
-    prob = float(hist.loc[m, "prob_base"].iloc[0])
-    previsto_alta = prob >= 0.5
+
+    mascara = hist["id"].astype(str) == id_sinal
+    entrada = float(hist.loc[mascara, "preco_entrada"].iloc[0])
+    confianca = float(hist.loc[mascara, "confianca_base"].iloc[0])
+    previsto_alta = confianca >= 0.5
     realizado_alta = saida > entrada
-    hist.loc[m, "preco_saida"] = saida
-    hist.loc[m, "resultado"] = 1.0 if previsto_alta == realizado_alta else 0.0
+    hist.loc[mascara, "preco_saida"] = saida
+    hist.loc[mascara, "resultado"] = 1.0 if previsto_alta == realizado_alta else 0.0
     hist.to_parquet(HIST_SINAIS, index=False)
     return "✅ Resultado atualizado."
 
+
 def metricas_backtest(hist):
-    val = hist.dropna(subset=["resultado", "prob_base"])
-    if val.empty: return None
-    acuracia = float(val["resultado"].astype(float).mean())
-    p = np.where(val["prob_base"] >= 0.5, val["prob_base"], 1 - val["prob_base"])
-    brier = float(np.mean((p - val["resultado"].astype(float)) ** 2))
-    return {"n": len(val), "acuracia": acuracia, "brier": brier}
+    validos = hist.dropna(subset=["resultado", "confianca_base"])
+    if validos.empty:
+        return None
+    acuracia = float(validos["resultado"].astype(float).mean())
+    p = np.where(
+        validos["confianca_base"] >= 0.5,
+        validos["confianca_base"],
+        1 - validos["confianca_base"],
+    )
+    brier = float(np.mean((p - validos["resultado"].astype(float)) ** 2))
+    return {"n": len(validos), "acuracia": acuracia, "brier": brier}
 
 # =========================================================
 # EXECUÇÃO PRINCIPAL
 # =========================================================
 
-macro_us = carregar_macro_eua()
+macro_eua = carregar_macro_eua()
 fed = carregar_narrativa_fed()
 dados_moedas = carregar_dados_moedas()
-ranking = calcular_ranking(dados_moedas, macro_us, fed)
+ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 
-st.title("🦅 USD Macro Pro — V4 Cloud")
-st.caption("Modelo profissional: Dados Econômicos → Inflação → Fed → Força de Moedas → Pares → Backtest")
+st.title("🦅 USD Macro Pro — V5 Português")
+st.caption("Dados econômicos → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
-tom_icon = {"Hawkish":"🔴", "Dovish":"🟢", "Neutro":"⚪"}.get(fed["tom"], "⚪")
-st.info(f"Fed: {tom_icon} **{fed['tom']}** | Força: {fed['forca']:+.2f}")
+icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
+st.info(f"Fed: {icone_tom} **{fed['tom']}** | Intensidade: {fed['forca']:+.2f}")
 
-tabs = st.tabs([
-    "🏆 Ranking", "🇺🇸 Painel EUA", "💶 Pares & Probabilidade",
-    "🏦 Fed & Notícias", "🧾 Histórico", "📈 Backtest"
+abas = st.tabs([
+    "🏆 Classificação",
+    "🇺🇸 Painel EUA",
+    "💱 Pares e Confiança",
+    "🏦 Fed e Notícias",
+    "🧾 Histórico",
+    "📈 Teste Histórico",
 ])
 
-# ═══════════════════════════════════════════════════════════
-# ABA 1 — RANKING
-# ═══════════════════════════════════════════════════════════
-with tabs[0]:
-    st.subheader("Força Macro das Moedas")
+# =========================================================
+# ABA 1 — CLASSIFICAÇÃO
+# =========================================================
+with abas[0]:
+    st.subheader("Força Macroeconômica das Moedas")
+    st.caption("Inflação e PIB são exibidos como variação percentual anual, não como nível do índice.")
+
     tabela = ranking[[
-        "Posição", "Código", "Moeda", "Macro_Score", "Influência_Fed",
-        "Score_Final", "juros", "inflacao", "pib", "sentimento"
+        "Posição", "Código", "Moeda", "Pontuação_Macro", "Influência_Fed",
+        "Pontuação_Final", "juros", "inflacao", "pib", "sentimento", "fonte"
     ]].copy()
     tabela.columns = [
-        "#", "Código", "Moeda", "Macro Score", "Fed", "Score Final",
-        "Juros %", "Inflação %", "PIB %", "Sentimento"
+        "#", "Código", "Moeda", "Pontuação Macro", "Fed", "Pontuação Final",
+        "Juros %", "Inflação anual %", "PIB real anual %",
+        "Sentimento das notícias", "Fonte"
     ]
     st.dataframe(tabela, use_container_width=True, hide_index=True)
 
     top3 = ranking.head(3)["Código"].tolist()
-    bot3 = ranking.tail(3)["Código"].tolist()
-    st.success(f"🏆 Mais Fortes: {', '.join(top3)}")
-    st.error(f"📉 Mais Fracas: {', '.join(bot3)}")
+    ultimas3 = ranking.tail(3)["Código"].tolist()
+    st.success(f"🏆 Mais fortes: {', '.join(top3)}")
+    st.error(f"📉 Mais fracas: {', '.join(ultimas3)}")
 
-    if st.button("💾 Salvar Snapshot"):
+    with st.expander("🔎 Verificação da qualidade dos dados"):
+        st.write("O sistema rejeita automaticamente valores fora de faixas plausíveis e usa um valor de segurança quando a série está ausente, antiga ou em unidade incompatível.")
+        st.dataframe(
+            tabela[["Código", "Juros %", "Inflação anual %", "PIB real anual %", "Fonte"]],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    if st.button("💾 Salvar registro da classificação"):
         st.toast(salvar_snapshot(ranking))
 
-# ═══════════════════════════════════════════════════════════
-# ABA 2 — PAINEL EUA + SURPRESA
-# ═══════════════════════════════════════════════════════════
-with tabs[1]:
-    st.subheader("Indicadores dos Estados Unidos")
+# =========================================================
+# ABA 2 — EUA
+# =========================================================
+with abas[1]:
+    st.subheader("Indicadores Econômicos dos Estados Unidos")
     c1, c2, c3, c4 = st.columns(4)
+
     with c1:
-        st.metric("Fed Funds", f"{macro_us['Fed Funds']:.2f}%")
-        st.metric("CPI YoY", f"{macro_us['CPI YoY']:.2f}%")
-        st.metric("Core CPI YoY", f"{macro_us['Core CPI YoY']:.2f}%")
+        st.metric("Juros do Fed", f"{macro_eua['Juros do Fed']:.2f}%")
+        st.metric("IPC anual", f"{macro_eua['IPC anual']:.2f}%")
+        st.metric("IPC Núcleo anual", f"{macro_eua['IPC Núcleo anual']:.2f}%")
     with c2:
-        st.metric("PCE YoY", f"{macro_us['PCE YoY']:.2f}%")
-        st.metric("Core PCE YoY", f"{macro_us['Core PCE YoY']:.2f}%")
-        st.metric("Payroll Δ mensal", f"{macro_us['Payroll var. mil']:.0f} mil")
+        st.metric("PCE anual", f"{macro_eua['PCE anual']:.2f}%")
+        st.metric("PCE Núcleo anual", f"{macro_eua['PCE Núcleo anual']:.2f}%")
+        st.metric("Payroll — variação mensal", f"{macro_eua['Payroll variação mensal (mil)']:.0f} mil")
     with c3:
-        st.metric("Desemprego", f"{macro_us['Desemprego']:.2f}%")
-        st.metric("PIB", f"{macro_us['PIB']:.2f}%")
-        st.metric("Treasury 2Y", f"{macro_us['Treasury 2Y']:.2f}%")
+        st.metric("Desemprego", f"{macro_eua['Desemprego']:.2f}%")
+        st.metric("PIB real", f"{macro_eua['PIB']:.2f}%")
+        st.metric("Treasury 2 anos", f"{macro_eua['Treasury 2 anos']:.2f}%")
     with c4:
-        st.metric("Treasury 10Y", f"{macro_us['Treasury 10Y']:.2f}%")
-        st.metric("Broad USD Index", f"{macro_us['Broad USD Index']:.1f}")
+        st.metric("Treasury 10 anos", f"{macro_eua['Treasury 10 anos']:.2f}%")
+        st.metric("Índice amplo do dólar", f"{macro_eua['Índice amplo do dólar']:.1f}")
+
+    st.info("ℹ️ O Índice amplo do dólar da FRED não é o DXY/ICE. Ele serve como medida ampla da força do dólar.")
 
     st.markdown("---")
-    st.subheader("🎯 Surpresa Econômica — Actual × Previsão")
-    st.caption("Digite os valores reais e esperados. O modelo calcula o impacto no USD.")
+    st.subheader("🎯 Surpresa Econômica — Real × Previsão")
+    st.caption("Digite o valor divulgado, a previsão do mercado e o valor anterior. O modelo estima a direção do impacto no USD.")
 
     indicadores = [
-        ("CPI YoY", True), ("Core CPI YoY", True), ("PCE YoY", True),
-        ("Core PCE YoY", True), ("Payroll", True), ("Desemprego", False),
-        ("ISM Manuf.", True), ("ISM Serviços", True),
+        ("IPC anual", True),
+        ("IPC Núcleo anual", True),
+        ("PCE anual", True),
+        ("PCE Núcleo anual", True),
+        ("Payroll", True),
+        ("Desemprego", False),
+        ("ISM Industrial", True),
+        ("ISM Serviços", True),
     ]
+
     linhas = []
-    for nome, sentido in indicadores:
-        cA, cF, cP = st.columns(3)
-        with cA:
-            actual = st.number_input(f"{nome} — Actual", value=0.0, step=0.1, key=f"act_{nome}")
-        with cF:
-            forecast = st.number_input(f"{nome} — Forecast", value=0.0, step=0.1, key=f"for_{nome}")
-        with cP:
-            previous = st.number_input(f"{nome} — Previous", value=0.0, step=0.1, key=f"prev_{nome}")
-        r = classificar_surpresa(actual, forecast, sentido)
+    for nome, maior_favorece in indicadores:
+        c_real, c_prev, c_ant = st.columns(3)
+        with c_real:
+            real = st.number_input(f"{nome} — Real", value=0.0, step=0.1, key=f"real_{nome}")
+        with c_prev:
+            previsao = st.number_input(f"{nome} — Previsão", value=0.0, step=0.1, key=f"previsao_{nome}")
+        with c_ant:
+            anterior = st.number_input(f"{nome} — Anterior", value=0.0, step=0.1, key=f"anterior_{nome}")
+
+        resultado = classificar_surpresa(real, previsao, maior_favorece)
         linhas.append({
             "Indicador": nome,
-            "Actual": actual,
-            "Forecast": forecast,
-            "Previous": previous,
-            "Surpresa vs Forecast": r["Surpresa"],
-            "Impacto USD": r["Classe"],
-            "Score": r["Score"],
+            "Real": real,
+            "Previsão": previsao,
+            "Anterior": anterior,
+            "Surpresa vs Previsão": resultado["Surpresa"],
+            "Impacto no USD": resultado["Classe"],
+            "Pontuação": resultado["Pontuação"],
         })
 
-    df_surp = pd.DataFrame(linhas)
-    st.dataframe(df_surp, use_container_width=True, hide_index=True)
-    total = float(df_surp["Score"].sum())
+    df_surpresa = pd.DataFrame(linhas)
+    st.dataframe(df_surpresa, use_container_width=True, hide_index=True)
+    total = float(df_surpresa["Pontuação"].sum())
 
-    if total >= 3: st.success("📈 Fortemente favorável ao USD")
-    elif total >= 1: st.success("📈 Levemente favorável ao USD")
-    elif total <= -3: st.error("📉 Fortemente desfavorável ao USD")
-    elif total <= -1: st.error("📉 Levemente desfavorável ao USD")
-    else: st.info("⚪ Surpresas equilibradas")
+    if total >= 3:
+        st.success("📈 Conjunto de dados fortemente favorável ao USD")
+    elif total >= 1:
+        st.success("📈 Conjunto de dados levemente favorável ao USD")
+    elif total <= -3:
+        st.error("📉 Conjunto de dados fortemente desfavorável ao USD")
+    elif total <= -1:
+        st.error("📉 Conjunto de dados levemente desfavorável ao USD")
+    else:
+        st.info("⚪ Surpresas equilibradas")
 
-# ═══════════════════════════════════════════════════════════
-# ABA 3 — PARES E PROBABILIDADE
-# ═══════════════════════════════════════════════════════════
-with tabs[2]:
-    st.subheader("Análise de Par Cambial")
+# =========================================================
+# ABA 3 — PARES
+# =========================================================
+with abas[2]:
+    st.subheader("Análise de Par de Moedas")
     moedas = ranking["Código"].tolist()
     c1, c2 = st.columns(2)
-    with c1: base = st.selectbox("Moeda Base", moedas, index=moedas.index("EUR") if "EUR" in moedas else 0)
-    with c2: cotada = st.selectbox("Moeda Cotada", moedas, index=moedas.index("USD") if "USD" in moedas else 1)
+    with c1:
+        base = st.selectbox("Moeda base", moedas, index=moedas.index("EUR") if "EUR" in moedas else 0)
+    with c2:
+        cotada = st.selectbox("Moeda cotada", moedas, index=moedas.index("USD") if "USD" in moedas else 1)
 
-    if base != cotada:
-        sb = float(ranking.loc[ranking["Código"]==base, "Score_Final"].iloc[0])
-        sc = float(ranking.loc[ranking["Código"]==cotada, "Score_Final"].iloc[0])
-        p, diff, status = probabilidade_modelo(sb, sc)
+    if base == cotada:
+        st.warning("Escolha duas moedas diferentes.")
+    else:
+        score_base = float(ranking.loc[ranking["Código"] == base, "Pontuação_Final"].iloc[0])
+        score_cotada = float(ranking.loc[ranking["Código"] == cotada, "Pontuação_Final"].iloc[0])
+        confianca, diferenca, status = confianca_modelo(score_base, score_cotada)
 
         col1, col2, col3 = st.columns([1, 1.5, 1])
-        with col1: st.metric(base, f"{sb:.1f}")
+        with col1:
+            st.metric(base, f"{score_base:.1f}")
         with col2:
             st.subheader(f"{base}/{cotada}")
             st.markdown(f"### {status}")
-            st.progress(float(np.clip(p, 0, 1)))
-            st.markdown(f"**{base}**: {p*100:.0f}% · **{cotada}**: {(1-p)*100:.0f}%")
-        with col3: st.metric(cotada, f"{sc:.1f}")
+            st.progress(float(np.clip(confianca, 0, 1)))
+            st.markdown(
+                f"**Confiança relativa** — {base}: {confianca*100:.0f}% · "
+                f"{cotada}: {(1-confianca)*100:.0f}%"
+            )
+        with col3:
+            st.metric(cotada, f"{score_cotada:.1f}")
 
-        st.caption(f"Diferença: {diff:+.1f} pontos | Escala: {ESCALA_PROB:.1f}")
-        st.warning("Probabilidade do modelo ≠ probabilidade estatística comprovada. Use o backtest para calibrar.")
+        st.caption(f"Diferença de força: {diferenca:+.1f} pontos | Sensibilidade: {ESCALA_CONFIANCA:.1f}")
+        st.warning("A confiança é uma pontuação do modelo, não uma probabilidade estatística comprovada. Valide no teste histórico.")
 
-    st.markdown("#### 📝 Registrar Sinal para Backtest")
+        st.markdown("#### 📝 Registrar sinal para teste histórico")
+        preco = st.number_input(
+            "Preço de entrada",
+            min_value=0.00001,
+            max_value=1000.0,
+            value=1.10000,
+            step=0.00001,
+            format="%.5f",
+        )
+        horizonte = st.selectbox("Tempo para avaliar (horas)", [1, 4, 8, 24, 48, 72], 3)
 
-    preco = st.number_input(
-        "Preço de Entrada",
-        min_value=0.00001,
-        max_value=1000.0,
-        value=1.10000,
-        step=0.00001,
-        format="%.5f",
-    )
+        if st.button("Registrar sinal"):
+            registrar_sinal(f"{base}/{cotada}", confianca, score_base, score_cotada, preco, horizonte)
+            st.success("✅ Sinal registrado!")
 
-    h = st.selectbox("Horizonte (horas)", [1, 4, 8, 24, 48, 72], 3)
-
-    if st.button("Registrar Sinal"):
-        registrar_sinal(f"{base}/{cotada}", p, sb, sc, preco, h)
-        st.success("✅ Sinal registrado!")
-
-# ═══════════════════════════════════════════════════════════
+# =========================================================
 # ABA 4 — FED E NOTÍCIAS
-# ═══════════════════════════════════════════════════════════
-with tabs[3]:
-    st.subheader("Narrativa do Federal Reserve")
+# =========================================================
+with abas[3]:
+    st.subheader("Leitura do Federal Reserve")
     st.metric("Tom do Fed", fed["tom"])
-    st.metric("Força da Narrativa", f"{fed['forca']:+.2f}")
-    st.markdown("### Manchetes Analisadas")
+    st.metric("Intensidade da leitura", f"{fed['forca']:+.2f}")
+
+    st.markdown("### Manchetes analisadas")
     if fed["titulos"]:
-        for t in fed["titulos"]: st.write("•", t)
+        for titulo in fed["titulos"]:
+            st.write("•", titulo)
     else:
         st.info("Nenhuma manchete encontrada nesta atualização.")
+
     st.markdown("---")
-    st.markdown("""
-    **🔴 Hawkish** → Inflação alta / economia forte → juros altos por mais tempo → USD sobe
-    **🟢 Dovish** → Inflação cedendo / economia fraca → cortes de juros → USD cai
-    ⚠️ Leitura auxiliar — confira sempre atas e comunicado oficial do FOMC.
-    """)
+    st.markdown(
+        "**🔴 Restritivo** → inflação/economia fortes → juros altos por mais tempo → tende a favorecer o USD  \n"
+        "**🟢 Flexível** → inflação cedendo/economia fraca → maior chance de cortes → tende a pressionar o USD  \n"
+        "⚠️ Esta leitura de manchetes é auxiliar. Confirme sempre com comunicado, ata e discursos oficiais do Fed."
+    )
 
-# ═══════════════════════════════════════════════════════════
+# =========================================================
 # ABA 5 — HISTÓRICO
-# ═══════════════════════════════════════════════════════════
-with tabs[4]:
-    st.subheader("Histórico de Rankings")
-    st.caption("No Streamlit Community Cloud, arquivos locais podem ser apagados em reinicializações/deploys. Para histórico permanente, use um banco externo.")
-    hist = carregar_snapshots()
-    if hist.empty:
-        st.info("Ainda sem histórico. Salve snapshots na aba 🏆 Ranking.")
+# =========================================================
+with abas[4]:
+    st.subheader("Histórico das classificações")
+    st.caption("No Streamlit Community Cloud, arquivos locais podem desaparecer após reinicialização ou novo deploy. Para histórico permanente, use um banco externo.")
+    historico = carregar_snapshots()
+    if historico.empty:
+        st.info("Ainda não há histórico. Salve um registro na aba 🏆 Classificação.")
     else:
-        st.dataframe(hist.sort_values("data", ascending=False), use_container_width=True)
+        st.dataframe(historico.sort_values("data", ascending=False), use_container_width=True)
 
-# ═══════════════════════════════════════════════════════════
-# ABA 6 — BACKTEST
-# ═══════════════════════════════════════════════════════════
-with tabs[5]:
-    st.subheader("📈 Backtest — Validação do Modelo")
+# =========================================================
+# ABA 6 — TESTE HISTÓRICO
+# =========================================================
+with abas[5]:
+    st.subheader("📈 Teste Histórico — Validação do Modelo")
     sinais = carregar_sinais()
+
     if sinais.empty:
-        st.info("Nenhum sinal registrado. Registre sinais na aba 💶 Pares.")
+        st.info("Nenhum sinal registrado. Registre sinais na aba 💱 Pares e Confiança.")
     else:
         st.dataframe(sinais.sort_values("data", ascending=False), use_container_width=True)
 
         abertos = sinais[sinais["resultado"].isna()]
         if not abertos.empty:
-            st.markdown("### ✅ Fechar Sinal — Informar Resultado")
-            id_sel = st.selectbox("Sinal", abertos["id"].astype(str).tolist())
-            saida = st.number_input("Preço de Saída", 0.00001, 1.50000, 1.10000, 0.0001, "%.5f")
-            if st.button("Salvar Resultado"):
-                st.toast(atualizar_resultado(id_sel, saida))
+            st.markdown("### ✅ Fechar sinal e informar o resultado")
+            id_selecionado = st.selectbox("Sinal", abertos["id"].astype(str).tolist())
+            saida = st.number_input(
+                "Preço de saída",
+                min_value=0.00001,
+                max_value=1000.0,
+                value=1.10000,
+                step=0.00001,
+                format="%.5f",
+            )
+            if st.button("Salvar resultado"):
+                st.toast(atualizar_resultado(id_selecionado, saida))
                 st.rerun()
 
-        met = metricas_backtest(sinais)
-        if met:
+        metricas = metricas_backtest(sinais)
+        if metricas:
             c1, c2, c3 = st.columns(3)
-            with c1: st.metric("Trades", met["n"])
-            with c2: st.metric("Acurácia", f"{met['acuracia']*100:.1f}%")
-            with c3: st.metric("Brier Score", f"{met['brier']:.3f}")
-            if met["brier"] < 0.12: st.success("✅ Excelente — Brier < 0.12")
-            elif met["brier"] <= 0.20: st.warning("⚠️ Razoável — Brier entre 0.12 e 0.20")
-            else: st.error("🔴 Recalibre pesos e escala — Brier alto")
+            with c1:
+                st.metric("Operações", metricas["n"])
+            with c2:
+                st.metric("Acurácia", f"{metricas['acuracia']*100:.1f}%")
+            with c3:
+                st.metric("Índice de Brier", f"{metricas['brier']:.3f}")
+
+            if metricas["brier"] < 0.12:
+                st.success("✅ Excelente — Índice de Brier abaixo de 0,12")
+            elif metricas["brier"] <= 0.20:
+                st.warning("⚠️ Razoável — Índice de Brier entre 0,12 e 0,20")
+            else:
+                st.error("🔴 Índice de Brier alto — recalibre pesos e sensibilidade")
 
 st.divider()
-st.caption(f"Fontes: {', '.join(f'{k}:{v}' for k,v in STATUS_FONTE.items())} | Uso educacional. Não é recomendação de investimento.")
+st.caption(
+    f"Fontes/estado: {', '.join(f'{k}: {v}' for k, v in STATUS_FONTE.items())} | "
+    "Uso educacional. Não constitui recomendação de investimento."
+)
