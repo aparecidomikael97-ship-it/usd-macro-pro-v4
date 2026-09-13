@@ -1,6 +1,8 @@
 # ============================================================
-# USD MACRO PRO V9.0 — MODO OPERADOR
-# Base V8.9. Interface simplificada; motor preservado.
+# USD MACRO PRO V9.1 — CENTRAL DE DECISÃO AUTOMÁTICA
+# Base V9.0. Consolida Força + Macro EUA + Fed + Calendário
+# + Matriz + Score/Qualidade + Raio-X em uma única aba.
+# Não altera os pesos do motor nem inventa sinal técnico.
 # ============================================================
 
 #!/usr/bin/env python3
@@ -33,12 +35,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "9.0 — MODO OPERADOR"
+APP_VERSION = "9.1 — CENTRAL DE DECISÃO AUTOMÁTICA"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V9.0 Modo Operador",
+    page_title="USD Macro Pro — V9.1 Central de Decisão",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1611,7 +1613,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V9.0 Modo Operador")
+st.title("🦅 USD Macro Pro — V9.1 Central de Decisão")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2803,7 +2805,7 @@ def _avaliar_sinais_v82():
 
 
 def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca, confl):
-    st.markdown("## 🧪 Validação Automática Multipares — V9.0")
+    st.markdown("## 🧪 Validação Automática Multipares — V9.1")
     st.caption(
         "A V8.8 registra a fotografia do sinal e avalia automaticamente os 7 pares na "
         "primeira observação diária FRED posterior. Não reconstrói sinais passados."
@@ -2828,7 +2830,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 
     if serie_atual:
         st.info(
-            f"Fonte de preço V9.0: FRED {serie_atual}, série diária oficial H.10 para {par}. "
+            f"Fonte de preço V9.1: FRED {serie_atual}, série diária oficial H.10 para {par}. "
             "A validação mede direção entre observações diárias — não 1h/4h."
         )
     else:
@@ -2907,7 +2909,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     pendentes = df[df["avaliado"] != True].copy()
     avaliados_total = df[df["avaliado"] == True].copy()
 
-    st.markdown("### 💾 Persistência do histórico — V9.0")
+    st.markdown("### 💾 Persistência do histórico — V9.1")
     _v84_token, _v84_repo, _v84_branch = _github_cfg_v84()
     if _v84_token:
         st.success(
@@ -3083,7 +3085,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     # V8.9 — PAINEL DE PERFORMANCE
     # Somente leitura/estatística: NÃO altera sinal, pesos ou decisão da Matriz.
     # =====================================================
-    st.markdown("## 📊 Painel de Performance — V9.0")
+    st.markdown("## 📊 Painel de Performance — V9.1")
 
     _perf89 = validos.copy()
     _perf89["score_num"] = pd.to_numeric(_perf89["score_mestre"], errors="coerce")
@@ -3264,7 +3266,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 # V9.0 — CENTRAL DO OPERADOR
 # Somente interface/orientação; não altera o motor do modelo.
 # ============================================================
-st.markdown("## 🎛️ Central do Operador — V9.0")
+st.markdown("## 🎛️ Central do Operador — V9.1")
 st.caption("O APP define o viés macro; o gráfico confirma a entrada.")
 
 with st.container(border=True):
@@ -3314,6 +3316,7 @@ abas = st.tabs([
     "🏦 Fed e Notícias",
     "🧾 Histórico",
     "📈 Teste Histórico",
+    "🎯 Decisão Automática",
 ])
 
 # =========================================================
@@ -5648,7 +5651,7 @@ with abas[2]:
             st.success("✅ Sinal registrado!")
 
     st.markdown("---")
-    st.markdown("### 🏆 Matriz Inteligente — V9.0")
+    st.markdown("### 🏆 Matriz Inteligente — V9.1")
     st.caption(
         "Todos os pares abaixo passam pelo mesmo motor de confluência, qualidade e frescor "
         "usado na análise individual."
@@ -6330,3 +6333,232 @@ def _painel_fomc_calibrado_v76():
 with abas[1]:
     _painel_hibrido_v74()
     _painel_fomc_calibrado_v76()
+
+
+
+# =========================================================
+# V9.1 — CENTRAL DE DECISÃO AUTOMÁTICA
+# Consolida os dados já calculados pelo APP.
+# NÃO cria sinal técnico H4/H1/M15 porque esses candles
+# ainda não são alimentados automaticamente pelo sistema.
+# =========================================================
+with abas[6]:
+    st.subheader("🎯 Central de Decisão Automática — V9.1")
+    st.caption(
+        "Resumo automático dos dados que já existem no APP. "
+        "O resultado abaixo é um viés macro/operacional educacional, não uma ordem de mercado."
+    )
+
+    if "matriz_v61" not in globals() or matriz_v61 is None or matriz_v61.empty:
+        st.warning("A Matriz ainda não está disponível nesta execução.")
+    else:
+        # -----------------------------
+        # Melhor par atual da matriz
+        # -----------------------------
+        _top91 = matriz_v61.iloc[0]
+        _par91 = str(_top91["Par"])
+        _dir91 = str(_top91["Direção"])
+        _score91 = float(_top91["Score final"])
+        _qual91 = float(_top91["Qualidade"])
+        _conf91 = str(_top91["Confluência"])
+        _dif91 = float(_top91["Dif. macro"])
+        _base91, _cot91 = _par91.split("/")
+
+        # Scores individuais das moedas
+        _sb91 = usd_ajustado if _base91 == "USD" else float(scores_ranking.get(_base91, 50.0))
+        _sc91 = usd_ajustado if _cot91 == "USD" else float(scores_ranking.get(_cot91, 50.0))
+
+        # Evento e timing
+        _evt91 = _proximo_evento_macro_v65()
+        _evt_nome91, _dias91, _impacto91 = "Nenhum evento crítico identificado", None, "—"
+        if isinstance(_evt91, dict) and _evt91.get("disponivel", False):
+            _evt_nome91 = str(_evt91.get("evento", "—"))
+            _dias91 = _evt91.get("dias")
+            _impacto91 = str(_evt91.get("impacto", "—"))
+
+        _alto91 = str(_impacto91).upper() in ("MÁXIMO", "MAXIMO", "ALTO")
+        if _dias91 is not None and _dias91 <= 2 and _alto91:
+            _timing91 = "🔴 AGUARDAR"
+            _timing_text91 = "Evento de alto impacto muito próximo."
+        elif _dias91 is not None and _dias91 <= 7 and _alto91:
+            _timing91 = "🟡 ATENÇÃO"
+            _timing_text91 = "Evento de alto impacto próximo; reduzir agressividade e exigir confirmação."
+        else:
+            _timing91 = "🟢 NORMAL"
+            _timing_text91 = "Sem bloqueio forte do calendário neste momento."
+
+        # Recalcula Raio-X para o melhor par usando o mesmo motor da matriz
+        _conf_obj91 = calcular_confluencia_v60(
+            _base91, _cot91, _dif91, usd_ajustado, ajuste,
+            fed.get("tom", "Neutro"), ranking
+        )
+
+        _fav91, _neu91, _contra91 = 0, 0, 0
+        _xrows91 = []
+        for _nome91, _estado91, _peso91, _fator91, _peff91 in _conf_obj91.get("linhas_dinamicas", []):
+            if _estado91 > 0:
+                _leit91 = "🟢 A favor"
+                _fav91 += 1
+            elif _estado91 < 0:
+                _leit91 = "🔴 Contra"
+                _contra91 += 1
+            else:
+                _leit91 = "⚪ Neutro"
+                _neu91 += 1
+            _xrows91.append({
+                "Componente": _nome91,
+                "Leitura": _leit91,
+                "Qualidade": f"{_fator91*100:.0f}%",
+                "Peso efetivo": f"{_peff91:.1f}%"
+            })
+
+        # -----------------------------
+        # Resultado automático
+        # -----------------------------
+        _tem_direcao91 = ("COMPRA" in _dir91.upper()) or ("VENDA" in _dir91.upper())
+        if not _tem_direcao91:
+            _resultado91 = "⚪ SEM OPERAÇÃO MACRO CLARA"
+            _acao91 = "Aguardar melhora da confluência."
+        elif _timing91.startswith("🔴"):
+            _resultado91 = "🔴 AGUARDAR"
+            _acao91 = (
+                f"O viés continua {_dir91}, mas o calendário bloqueia uma entrada agressiva agora."
+            )
+        elif _score91 >= 85 and _qual91 >= 75 and _contra91 == 0:
+            if _timing91.startswith("🟡"):
+                _resultado91 = "🟡 VIÉS FORTE, MAS COM RISCO DE EVENTO"
+                _acao91 = (
+                    f"Prioridade macro: {_dir91}. "
+                    "Esperar confirmação no H4/H1 e gatilho no M15 antes de considerar execução."
+                )
+            else:
+                _resultado91 = "🟢 CENÁRIO MACRO FORTE"
+                _acao91 = (
+                    f"Prioridade macro: {_dir91}. "
+                    "Confirmar estrutura H4/H1 e usar M15 apenas para o gatilho."
+                )
+        elif _score91 >= 70 and _qual91 >= 60:
+            _resultado91 = "🟡 CENÁRIO MODERADO"
+            _acao91 = (
+                f"Viés: {_dir91}. Exigir confirmação técnica mais forte antes de considerar entrada."
+            )
+        else:
+            _resultado91 = "⚪ AGUARDAR MELHOR CENÁRIO"
+            _acao91 = "Confluência/qualidade insuficientes para priorizar o par."
+
+        # -----------------------------
+        # Cartão principal
+        # -----------------------------
+        st.markdown("### 🧭 Resultado automático")
+        _c1, _c2, _c3, _c4 = st.columns(4)
+        _c1.metric("Melhor par", _par91)
+        _c2.metric("Direção macro", _dir91.replace("🟢 ","").replace("🔴 ",""))
+        _c3.metric("Score Mestre", f"{_score91:.0f}/100")
+        _c4.metric("Qualidade", f"{_qual91:.0f}%")
+
+        if _resultado91.startswith("🟢"):
+            st.success(f"**{_resultado91}** — {_acao91}")
+        elif _resultado91.startswith("🔴"):
+            st.error(f"**{_resultado91}** — {_acao91}")
+        elif _resultado91.startswith("🟡"):
+            st.warning(f"**{_resultado91}** — {_acao91}")
+        else:
+            st.info(f"**{_resultado91}** — {_acao91}")
+
+        # -----------------------------
+        # 1. Força das moedas
+        # -----------------------------
+        st.markdown("### 1️⃣ Força relativa")
+        _f1, _f2, _f3 = st.columns(3)
+        _f1.metric(_base91, f"{_sb91:.1f}/100")
+        _f2.metric(_cot91, f"{_sc91:.1f}/100")
+        _f3.metric("Diferença macro", f"{_dif91:+.1f}")
+        st.caption(
+            f"O melhor par atual coloca {_base91} contra {_cot91}. "
+            f"A diferença de força é {_dif91:+.1f} pontos."
+        )
+
+        # -----------------------------
+        # 2. Macro USD
+        # -----------------------------
+        st.markdown("### 2️⃣ Macro dos Estados Unidos")
+        _u1, _u2, _u3 = st.columns(3)
+        _u1.metric("Score macro USD", f"{usd_detalhado['score']:.0f}/100")
+        _u2.metric("Qualidade macro USD", f"{qualidade_usd}%")
+        _u3.metric(
+            "Fed narrativo",
+            str(fed.get("tom", "Neutro"))
+        )
+
+        _macro_show91 = pd.DataFrame([
+            {"Indicador": "Fed Funds", "Valor": f"{macro_eua['Juros do Fed']:.2f}%"},
+            {"Indicador": "CPI/IPC anual", "Valor": f"{macro_eua['IPC anual']:.2f}%"},
+            {"Indicador": "Core CPI", "Valor": f"{macro_eua['IPC Núcleo anual']:.2f}%"},
+            {"Indicador": "PCE anual", "Valor": f"{macro_eua['PCE anual']:.2f}%"},
+            {"Indicador": "Core PCE", "Valor": f"{macro_eua['PCE Núcleo anual']:.2f}%"},
+            {"Indicador": "Desemprego", "Valor": f"{macro_eua['Desemprego']:.2f}%"},
+            {"Indicador": "Payroll", "Valor": f"{macro_eua['Payroll variação mensal (mil)']:.0f} mil"},
+            {"Indicador": "PIB real", "Valor": f"{macro_eua['PIB']:.2f}%"},
+            {"Indicador": "Treasury 2Y", "Valor": f"{macro_eua['Treasury 2 anos']:.2f}%"},
+            {"Indicador": "Treasury 10Y", "Valor": f"{macro_eua['Treasury 10 anos']:.2f}%"},
+            {"Indicador": "Índice amplo USD", "Valor": f"{macro_eua['Índice amplo do dólar']:.1f}"},
+        ])
+        st.dataframe(_macro_show91, use_container_width=True, hide_index=True)
+
+        # -----------------------------
+        # 3. Calendário
+        # -----------------------------
+        st.markdown("### 3️⃣ Calendário / risco")
+        _e1, _e2, _e3 = st.columns(3)
+        _e1.metric("Próximo evento", _evt_nome91)
+        _e2.metric("Dias", "—" if _dias91 is None else str(_dias91))
+        _e3.metric("Timing", _timing91)
+        st.caption(f"Impacto: {_impacto91}. {_timing_text91}")
+
+        # -----------------------------
+        # 4. Raio-X consolidado
+        # -----------------------------
+        st.markdown("### 4️⃣ Raio-X do melhor sinal")
+        _r1, _r2, _r3 = st.columns(3)
+        _r1.metric("A favor", _fav91)
+        _r2.metric("Neutros", _neu91)
+        _r3.metric("Contra", _contra91)
+        if _xrows91:
+            st.dataframe(pd.DataFrame(_xrows91), use_container_width=True, hide_index=True)
+
+        # -----------------------------
+        # 5. O que ainda falta: gráfico
+        # -----------------------------
+        st.markdown("### 5️⃣ Confirmação técnica")
+        st.info(
+            "📊 O APP ainda NÃO lê automaticamente a estrutura H4/H1/M15 do TradingView. "
+            "Por isso, a parte técnica continua sendo a última confirmação: "
+            "H4 = direção/estrutura, H1 = região/pullback, M15 = gatilho."
+        )
+
+        _tech91 = pd.DataFrame([
+            {"Timeframe": "H4", "Função": "Confirmar direção e estrutura", "Status automático": "⏳ Verificar no gráfico"},
+            {"Timeframe": "H1", "Função": "Esperar pullback/região", "Status automático": "⏳ Verificar no gráfico"},
+            {"Timeframe": "M15", "Função": "Procurar gatilho de entrada", "Status automático": "⏳ Verificar no gráfico"},
+        ])
+        st.dataframe(_tech91, use_container_width=True, hide_index=True)
+
+        st.markdown("### ✅ Checklist final")
+        st.markdown(
+            f"""
+- **Melhor par:** {_par91}
+- **Viés macro:** {_dir91}
+- **Score Mestre:** {_score91:.0f}/100
+- **Qualidade:** {_qual91:.0f}%
+- **Confluência:** {_conf91}
+- **Raio-X:** {_fav91} a favor / {_neu91} neutro(s) / {_contra91} contra
+- **Calendário:** {_timing91}
+- **Próxima ação:** {_acao91}
+            """
+        )
+
+        st.caption(
+            "A Central V9.1 consolida dados já existentes no aplicativo. "
+            "Ela não transforma Score Mestre em probabilidade de lucro e não substitui gestão de risco."
+        )
+
