@@ -1,5 +1,5 @@
 # ============================================================
-# USD MACRO PRO V9.3.5.5 — SALVAMENTO DE FALHA + CACHE LIMPO
+# USD MACRO PRO V9.3.5.6 — DIAGNÓSTICO PROFUNDO TWELVE DATA
 # Exibe o motivo persistido de falhas por par/timeframe sem
 # gastar novas chamadas. Persistência e validação preservadas.
 # ============================================================
@@ -35,12 +35,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "9.3.5.5 — FALHA PERSISTENTE + CACHE LIMPO"
+APP_VERSION = "9.3.5.6 — DIAGNÓSTICO PROFUNDO TWELVE DATA"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V9.3.5.5 Falha Persistente",
+    page_title="USD Macro Pro — V9.3.5.6 Diagnóstico Profundo",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1619,7 +1619,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V9.3.5.5 Falha Persistente")
+st.title("🦅 USD Macro Pro — V9.3.5.6 Diagnóstico Profundo")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -6983,7 +6983,7 @@ with abas[6]:
                     if _par933 in _resultados933 and _resultado_tecnico_valido_v935(_resultados933[_par933]):
                         continue
 
-                    # V9.3.5.5: o par incompleto precisa de UMA tentativa realmente nova.
+                    # V9.3.5.6: o par incompleto precisa de UMA tentativa realmente nova.
                     # Limpa somente o cache da função técnica antes desta tentativa.
                     # Os 6 pares válidos continuam preservados no JSON e não são consultados.
                     try:
