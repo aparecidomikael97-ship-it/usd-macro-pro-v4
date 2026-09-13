@@ -1,8 +1,8 @@
 # ============================================================
-# USD MACRO PRO V9.3 — SCANNER TÉCNICO DOS 7 PARES
-# Base V9.2.
-# Mantém o motor macro e adiciona scanner H4/H1/M15 para os
-# sete pares da Matriz, com ranking operacional separado.
+# USD MACRO PRO V9.3.1 — SCANNER TÉCNICO RESILIENTE
+# Base V9.3.
+# Reduz consumo da API, preserva cache, mostra scanner parcial
+# com transparência e nunca trata dado indisponível como sinal ruim.
 # ============================================================
 
 #!/usr/bin/env python3
@@ -35,12 +35,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "9.3 — SCANNER TÉCNICO DOS 7 PARES"
+APP_VERSION = "9.3.1 — SCANNER TÉCNICO RESILIENTE"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V9.3 Scanner Técnico 7 Pares",
+    page_title="USD Macro Pro — V9.3.1 Scanner Técnico Resiliente",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1619,7 +1619,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V9.3 Scanner Técnico 7 Pares")
+st.title("🦅 USD Macro Pro — V9.3.1 Scanner Técnico Resiliente")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2811,7 +2811,7 @@ def _avaliar_sinais_v82():
 
 
 def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca, confl):
-    st.markdown("## 🧪 Validação Automática Multipares — V9.3")
+    st.markdown("## 🧪 Validação Automática Multipares — V9.3.1")
     st.caption(
         "A V8.8 registra a fotografia do sinal e avalia automaticamente os 7 pares na "
         "primeira observação diária FRED posterior. Não reconstrói sinais passados."
@@ -2836,7 +2836,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 
     if serie_atual:
         st.info(
-            f"Fonte de preço V9.3: FRED {serie_atual}, série diária oficial H.10 para {par}. "
+            f"Fonte de preço V9.3.1: FRED {serie_atual}, série diária oficial H.10 para {par}. "
             "A validação mede direção entre observações diárias — não 1h/4h."
         )
     else:
@@ -2915,7 +2915,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     pendentes = df[df["avaliado"] != True].copy()
     avaliados_total = df[df["avaliado"] == True].copy()
 
-    st.markdown("### 💾 Persistência do histórico — V9.3")
+    st.markdown("### 💾 Persistência do histórico — V9.3.1")
     _v84_token, _v84_repo, _v84_branch = _github_cfg_v84()
     if _v84_token:
         st.success(
@@ -3091,7 +3091,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     # V8.9 — PAINEL DE PERFORMANCE
     # Somente leitura/estatística: NÃO altera sinal, pesos ou decisão da Matriz.
     # =====================================================
-    st.markdown("## 📊 Painel de Performance — V9.3")
+    st.markdown("## 📊 Painel de Performance — V9.3.1")
 
     _perf89 = validos.copy()
     _perf89["score_num"] = pd.to_numeric(_perf89["score_mestre"], errors="coerce")
@@ -3272,7 +3272,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 # V9.0 — CENTRAL DO OPERADOR
 # Somente interface/orientação; não altera o motor do modelo.
 # ============================================================
-st.markdown("## 🎛️ Central do Operador — V9.3")
+st.markdown("## 🎛️ Central do Operador — V9.3.1")
 st.caption("O APP define o viés macro; o gráfico confirma a entrada.")
 
 with st.container(border=True):
@@ -5657,7 +5657,7 @@ with abas[2]:
             st.success("✅ Sinal registrado!")
 
     st.markdown("---")
-    st.markdown("### 🏆 Matriz Inteligente — V9.3")
+    st.markdown("### 🏆 Matriz Inteligente — V9.3.1")
     st.caption(
         "Todos os pares abaixo passam pelo mesmo motor de confluência, qualidade e frescor "
         "usado na análise individual."
@@ -6349,10 +6349,19 @@ with abas[1]:
 # O motor técnico usa regras explícitas e reproduzíveis.
 # =========================================================
 
-@st.cache_data(ttl=600, show_spinner=False)
-def _td_time_series_v92(par: str, interval: str, outputsize: int = 220) -> pd.DataFrame:
+@st.cache_data(ttl=1800, show_spinner=False)
+def _td_time_series_v92(par: str, interval: str, outputsize: int = 140) -> pd.DataFrame:
+    """
+    V9.3.1: consulta resiliente.
+    - cache de 30 min para reduzir consumo;
+    - menos candles por chamada;
+    - 1 retry leve em erro transitório;
+    - diagnóstico preservado em df.attrs.
+    """
     if not CHAVE_TWELVE_DATA:
-        return pd.DataFrame()
+        df = pd.DataFrame()
+        df.attrs["erro_td"] = "CHAVE_TWELVE_DATA não configurada."
+        return df
 
     url = "https://api.twelvedata.com/time_series"
     params = {
@@ -6364,27 +6373,43 @@ def _td_time_series_v92(par: str, interval: str, outputsize: int = 220) -> pd.Da
         "order": "ASC",
         "timezone": "UTC",
     }
-    try:
-        r = requests.get(url, params=params, timeout=20)
-        r.raise_for_status()
-        j = r.json()
-        if j.get("status") == "error" or "values" not in j:
-            return pd.DataFrame()
-        df = pd.DataFrame(j["values"])
-        if df.empty:
-            return pd.DataFrame()
-        df["datetime"] = pd.to_datetime(df["datetime"], errors="coerce", utc=True)
-        for c in ["open", "high", "low", "close"]:
-            df[c] = pd.to_numeric(df[c], errors="coerce")
-        df = (
-            df.dropna(subset=["datetime", "open", "high", "low", "close"])
-              .sort_values("datetime")
-              .drop_duplicates("datetime")
-              .reset_index(drop=True)
-        )
-        return df
-    except Exception:
-        return pd.DataFrame()
+
+    ultimo_erro = ""
+    for tentativa in range(2):
+        try:
+            r = requests.get(url, params=params, timeout=20)
+            j = r.json()
+
+            if r.status_code != 200 or j.get("status") == "error" or "values" not in j:
+                ultimo_erro = str(j.get("message") or j.get("code") or f"HTTP {r.status_code}")
+                # Não faz retry agressivo quando a API informa limite/crédito.
+                low = ultimo_erro.lower()
+                if any(x in low for x in ["credit", "limit", "rate", "quota"]):
+                    break
+                continue
+
+            df = pd.DataFrame(j["values"])
+            if df.empty:
+                ultimo_erro = "Resposta sem candles."
+                continue
+
+            df["datetime"] = pd.to_datetime(df["datetime"], errors="coerce", utc=True)
+            for c in ["open", "high", "low", "close"]:
+                df[c] = pd.to_numeric(df[c], errors="coerce")
+            df = (
+                df.dropna(subset=["datetime", "open", "high", "low", "close"])
+                  .sort_values("datetime")
+                  .drop_duplicates("datetime")
+                  .reset_index(drop=True)
+            )
+            df.attrs["erro_td"] = ""
+            return df
+        except Exception as e:
+            ultimo_erro = f"{type(e).__name__}: {e}"
+
+    df = pd.DataFrame()
+    df.attrs["erro_td"] = ultimo_erro or "Falha ao consultar candles."
+    return df
 
 
 def _indicadores_tecnicos_v92(df: pd.DataFrame) -> pd.DataFrame:
@@ -6505,14 +6530,18 @@ def _pacote_tecnico_v92(par: str, direcao: str) -> dict:
             "m15": {"status": "⚪ AGUARDANDO", "score": 0, "texto": "Configure a chave."},
         }
 
-    h4 = _td_time_series_v92(par, "4h", 220)
-    h1 = _td_time_series_v92(par, "1h", 220)
-    m15 = _td_time_series_v92(par, "15min", 220)
+    h4 = _td_time_series_v92(par, "4h", 100)
+    h1 = _td_time_series_v92(par, "1h", 100)
+    m15 = _td_time_series_v92(par, "15min", 100)
 
     if h4.empty or h1.empty or m15.empty:
+        erros = []
+        for nome_tf, dfx in [("H4", h4), ("H1", h1), ("M15", m15)]:
+            if dfx.empty:
+                erros.append(f"{nome_tf}: {dfx.attrs.get('erro_td', 'sem dados')}")
         return {
             "disponivel": False,
-            "motivo": "A fonte técnica não retornou candles suficientes para H4/H1/M15.",
+            "motivo": " | ".join(erros) if erros else "Candles insuficientes.",
             "h4": {"status": "⚪ INDISPONÍVEL", "score": 0, "texto": "Sem dados."},
             "h1": {"status": "⚪ INDISPONÍVEL", "score": 0, "texto": "Sem dados."},
             "m15": {"status": "⚪ INDISPONÍVEL", "score": 0, "texto": "Sem dados."},
@@ -6570,7 +6599,7 @@ def _decisao_tecnica_final_v92(tecnico: dict, timing: str, direcao: str) -> tupl
 # ainda não são alimentados automaticamente pelo sistema.
 # =========================================================
 with abas[6]:
-    st.subheader("🎯 Central de Decisão Automática — V9.3")
+    st.subheader("🎯 Central de Decisão Automática — V9.3.1")
     st.caption(
         "Resumo automático dos dados que já existem no APP. "
         "O resultado abaixo é um viés macro/operacional educacional, não uma ordem de mercado."
@@ -6760,7 +6789,7 @@ with abas[6]:
         st.caption(
             "Fonte técnica: Twelve Data. H4 = direção/estrutura; "
             "H1 = alinhamento/pullback; M15 = gatilho curto. "
-            "Os candles ficam em cache por ~10 minutos para respeitar limites da API."
+            "Os candles ficam em cache por ~30 minutos para respeitar limites da API."
         )
 
         if st.button("🔄 Atualizar técnica agora", key="v92_refresh_tecnico"):
@@ -6826,19 +6855,22 @@ with abas[6]:
         # -----------------------------------------------------
         # V9.3 — Scanner técnico automático dos 7 pares
         # -----------------------------------------------------
-        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3")
+        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3.1")
         st.caption(
             "A Matriz continua escolhendo o viés macro de cada par. "
             "O scanner consulta H4, H1 e M15 e procura qual par está mais perto "
             "de uma confirmação técnica completa."
         )
 
-        if st.button("🔄 Atualizar scanner dos 7 pares", key="v93_refresh_scanner"):
-            try:
-                _td_time_series_v92.clear()
-            except Exception:
-                pass
-            st.rerun()
+        _sc1, _sc2 = st.columns([1, 3])
+        with _sc1:
+            if st.button("🔄 Recalcular scanner", key="v931_recalc_scanner"):
+                st.rerun()
+        with _sc2:
+            st.caption(
+                "O scanner reutiliza candles em cache por ~30 minutos. "
+                "Isso evita gastar novamente chamadas da API a cada atualização da página."
+            )
 
         _scanner93 = []
         _mat93 = matriz_v61.copy().head(7)
@@ -6894,6 +6926,16 @@ with abas[6]:
                 "Verifique a CHAVE_TWELVE_DATA e o limite de chamadas da conta."
             )
         else:
+            _n_ok93 = int(_scan_df93["_disponivel"].sum())
+            _n_total93 = int(len(_scan_df93))
+            if _n_ok93 < _n_total93:
+                st.warning(
+                    f"⚠️ Scanner PARCIAL: {_n_ok93}/{_n_total93} pares têm H4/H1/M15 completos. "
+                    "Pares indisponíveis NÃO são considerados piores; apenas faltam dados técnicos. "
+                    "O ranking abaixo é provisório até a fonte completar a amostra."
+                )
+            else:
+                st.success("✅ Scanner COMPLETO: os 7 pares têm H4/H1/M15 disponíveis.")
             _scan_show93 = (
                 _scan_df93.drop(columns=["_disponivel", "_texto"])
                           .sort_values(
@@ -6935,6 +6977,16 @@ with abas[6]:
                 "Ele serve apenas para ordenar os 7 pares pela combinação Macro + Qualidade + Técnica."
             )
 
+            _falt93 = _scan_df93[~_scan_df93["_disponivel"]][["Par", "_texto"]].copy()
+            if not _falt93.empty:
+                _falt93.columns = ["Par", "Motivo técnico"]
+                with st.expander("🔎 Diagnóstico dos pares indisponíveis", expanded=False):
+                    st.dataframe(_falt93, use_container_width=True, hide_index=True)
+                    st.caption(
+                        "Se aparecer limite/crédito/quota, aguarde a renovação da cota da API. "
+                        "Não é sinal contra o par."
+                    )
+
 
         st.markdown("### ✅ Checklist final")
         st.markdown(
@@ -6955,7 +7007,7 @@ with abas[6]:
         )
 
         st.caption(
-            "A Central V9.3 consolida macro + técnica e também escaneia automaticamente os 7 pares quando a Twelve Data está configurada. "
+            "A Central V9.3.1 consolida macro + técnica e escaneia os 7 pares com cache resiliente e diagnóstico de disponibilidade. "
             "Ela não transforma Score Mestre em probabilidade de lucro e não substitui gestão de risco."
         )
 
