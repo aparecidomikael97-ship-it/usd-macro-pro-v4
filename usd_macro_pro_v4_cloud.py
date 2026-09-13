@@ -1,8 +1,7 @@
 # ============================================================
-# USD MACRO PRO V9.3.5.2 — TIMER PERSISTENTE
-# O timer continua baseado em ultimo_processamento_ts salvo no
-# GitHub. Novo botão "Verificar liberação" atualiza a tela sem
-# chamar Twelve Data e sem reiniciar/gastar créditos da API.
+# USD MACRO PRO V9.3.5.3 — DIAGNÓSTICO TÉCNICO
+# Exibe o motivo persistido de falhas por par/timeframe sem
+# gastar novas chamadas. Persistência e validação preservadas.
 # ============================================================
 
 #!/usr/bin/env python3
@@ -36,12 +35,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "9.3.5.2 — TIMER PERSISTENTE DO SCANNER"
+APP_VERSION = "9.3.5.3 — DIAGNÓSTICO TÉCNICO DA API"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V9.3.5.2 Timer Persistente",
+    page_title="USD Macro Pro — V9.3.5.3 Diagnóstico Técnico",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1620,7 +1619,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V9.3.5.2 Timer Persistente")
+st.title("🦅 USD Macro Pro — V9.3.5.3 Diagnóstico Técnico")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -6667,6 +6666,8 @@ def _tec_to_json_v934(tec):
         "m15": dict(tec.get("m15", {})),
         "preco_m15": float(tec.get("preco_m15", 0.0) or 0.0),
         "ultima_atualizacao": str(tec.get("ultima_atualizacao", "")),
+        "erro": str(tec.get("erro", "")),
+        "diagnostico": str(tec.get("diagnostico", "")),
     }
 
 
@@ -6934,7 +6935,7 @@ with abas[6]:
         # -----------------------------------------------------
         # V9.3 — Scanner técnico automático dos 7 pares
         # -----------------------------------------------------
-        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3.5.2")
+        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3.5.3")
         st.caption(
             "A Matriz continua escolhendo o viés macro de cada par. "
             "O scanner consulta H4, H1 e M15 e procura qual par está mais perto "
@@ -7121,7 +7122,16 @@ with abas[6]:
             _dec93 = str(_saved933["decisao"])
             _txt93 = str(_saved933["texto"])
             if not _resultado_tecnico_valido_v935(_saved933):
-                _txt93 = "Resultado persistido incompleto. Reprocesse somente o lote deste par."
+                _mot_saved9353 = str(
+                    _tec93.get("motivo", "")
+                    or _tec93.get("erro", "")
+                    or _tec93.get("diagnostico", "")
+                ).strip()
+                _txt93 = (
+                    f"Resultado persistido incompleto: {_mot_saved9353}"
+                    if _mot_saved9353
+                    else "Resultado persistido incompleto. Consulte o diagnóstico abaixo."
+                )
 
             _tech_score93 = (
                 float(_tec93["h4"].get("score", 0)) * 0.35 +
@@ -7181,6 +7191,46 @@ with abas[6]:
             )
             _scan_show93.insert(0, "Prioridade", range(1, len(_scan_show93) + 1))
             st.dataframe(_scan_show93, use_container_width=True, hide_index=True)
+
+            # V9.3.5.3 — diagnóstico persistente, sem nova chamada à Twelve Data.
+            _diag_rows9353 = []
+            for _par_diag9353, _res_diag9353 in _resultados933.items():
+                if _resultado_tecnico_valido_v935(_res_diag9353):
+                    continue
+                _tec_diag9353 = _res_diag9353.get("tecnico", {}) if isinstance(_res_diag9353, dict) else {}
+                _det9353 = []
+                for _tf9353 in ("h4", "h1", "m15"):
+                    _bl9353 = _tec_diag9353.get(_tf9353, {}) or {}
+                    _st9353 = str(_bl9353.get("status", "INDISPONÍVEL"))
+                    _why9353 = str(
+                        _bl9353.get("motivo", "")
+                        or _bl9353.get("erro", "")
+                        or _bl9353.get("message", "")
+                    ).strip()
+                    _det9353.append(
+                        f"{_tf9353.upper()}: {_st9353}" +
+                        (f" — {_why9353}" if _why9353 else "")
+                    )
+                _geral9353 = str(
+                    _tec_diag9353.get("motivo", "")
+                    or _tec_diag9353.get("erro", "")
+                    or _tec_diag9353.get("diagnostico", "")
+                    or _res_diag9353.get("texto", "")
+                    or "A fonte não informou um motivo detalhado."
+                ).strip()
+                _diag_rows9353.append({
+                    "Par": _par_diag9353,
+                    "Motivo da última tentativa": _geral9353,
+                    "H4 / H1 / M15": " | ".join(_det9353),
+                })
+
+            if _diag_rows9353:
+                with st.expander("🔎 Diagnóstico dos pares incompletos", expanded=True):
+                    st.warning("Não reprocesse repetidamente. Veja o motivo salvo da última tentativa.")
+                    st.dataframe(pd.DataFrame(_diag_rows9353), use_container_width=True, hide_index=True)
+                    st.caption(
+                        "Este painel lê o diagnóstico já persistido e não consome créditos da Twelve Data."
+                    )
 
             _valid93 = _scan_df93[_scan_df93["_disponivel"]].copy()
             _valid93 = _valid93.sort_values(
