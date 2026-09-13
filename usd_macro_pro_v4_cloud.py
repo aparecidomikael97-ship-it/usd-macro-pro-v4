@@ -1,3 +1,8 @@
+# ============================================================
+# USD MACRO PRO V9.0 — MODO OPERADOR
+# Base V8.9. Interface simplificada; motor preservado.
+# ============================================================
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -28,12 +33,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "8.9 — PAINEL DE PERFORMANCE MULTIPARES"
+APP_VERSION = "9.0 — MODO OPERADOR"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V8.9 Português",
+    page_title="USD Macro Pro — V9.0 Modo Operador",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1606,7 +1611,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V8.9 Português")
+st.title("🦅 USD Macro Pro — V9.0 Modo Operador")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2798,7 +2803,7 @@ def _avaliar_sinais_v82():
 
 
 def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca, confl):
-    st.markdown("## 🧪 Validação Automática Multipares — V8.9")
+    st.markdown("## 🧪 Validação Automática Multipares — V9.0")
     st.caption(
         "A V8.8 registra a fotografia do sinal e avalia automaticamente os 7 pares na "
         "primeira observação diária FRED posterior. Não reconstrói sinais passados."
@@ -2823,7 +2828,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 
     if serie_atual:
         st.info(
-            f"Fonte de preço V8.9: FRED {serie_atual}, série diária oficial H.10 para {par}. "
+            f"Fonte de preço V9.0: FRED {serie_atual}, série diária oficial H.10 para {par}. "
             "A validação mede direção entre observações diárias — não 1h/4h."
         )
     else:
@@ -2902,7 +2907,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     pendentes = df[df["avaliado"] != True].copy()
     avaliados_total = df[df["avaliado"] == True].copy()
 
-    st.markdown("### 💾 Persistência do histórico — V8.9")
+    st.markdown("### 💾 Persistência do histórico — V9.0")
     _v84_token, _v84_repo, _v84_branch = _github_cfg_v84()
     if _v84_token:
         st.success(
@@ -3078,7 +3083,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     # V8.9 — PAINEL DE PERFORMANCE
     # Somente leitura/estatística: NÃO altera sinal, pesos ou decisão da Matriz.
     # =====================================================
-    st.markdown("## 📊 Painel de Performance — V8.9")
+    st.markdown("## 📊 Painel de Performance — V9.0")
 
     _perf89 = validos.copy()
     _perf89["score_num"] = pd.to_numeric(_perf89["score_mestre"], errors="coerce")
@@ -3253,6 +3258,54 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
         "Use muitos sinais e diferentes regimes de mercado antes de alterar pesos do modelo."
     )
 
+
+
+# ============================================================
+# V9.0 — CENTRAL DO OPERADOR
+# Somente interface/orientação; não altera o motor do modelo.
+# ============================================================
+st.markdown("## 🎛️ Central do Operador — V9.0")
+st.caption("O APP define o viés macro; o gráfico confirma a entrada.")
+
+with st.container(border=True):
+    _op1, _op2, _op3 = st.columns(3)
+    _op1.markdown("**1️⃣ CENÁRIO**")
+    _op1.caption("Força das moedas + Macro EUA + Fed")
+    _op2.markdown("**2️⃣ DECISÃO**")
+    _op2.caption("Calendário + Matriz + Score + Qualidade")
+    _op3.markdown("**3️⃣ EXECUÇÃO**")
+    _op3.caption("Raio-X → gráfico → gatilho → risco")
+    st.markdown(
+        "**Fluxo diário:** FORÇA → MACRO → FED → CALENDÁRIO → MATRIZ "
+        "→ SCORE/QUALIDADE → GRÁFICO → ENTRADA → RISCO"
+    )
+
+with st.expander("✍️ Preciso preencher algum dado manual?", expanded=True):
+    st.success(
+        "🟢 No uso normal, você NÃO precisa digitar manualmente CPI, PCE, Payroll, "
+        "desemprego, Fed Funds, Treasuries ou preços dos pares."
+    )
+    st.warning(
+        "🟡 CONSENSO / FORECAST pode continuar manual quando não houver uma fonte "
+        "automática disponível. Preencha somente quando o módulo solicitar."
+    )
+    st.info(
+        "🔵 Controles antigos de simulação, FOMC pós-reunião, preço manual ou timing "
+        "são opcionais e não precisam ser preenchidos para consultar a Matriz automática."
+    )
+
+with st.expander("🧭 Como tomar a decisão no APP", expanded=False):
+    st.markdown("""
+**1 — Força:** procure moeda forte contra moeda fraca.  
+**2 — Macro/Fed:** confirme se o cenário sustenta a diferença.  
+**3 — Calendário:** verifique eventos críticos antes de operar.  
+**4 — Matriz:** priorize COMPRA/VENDA com boa confluência e qualidade.  
+**5 — Raio-X:** confira os fatores a favor e contra.  
+**6 — Gráfico:** espere estrutura e gatilho técnico.  
+**7 — Risco:** defina stop e tamanho da posição antes da execução.
+
+**Regra:** APP escolhe o lado → gráfico escolhe a entrada → gestão controla a perda.
+""")
 
 abas = st.tabs([
     "🏆 Classificação",
@@ -5595,7 +5648,7 @@ with abas[2]:
             st.success("✅ Sinal registrado!")
 
     st.markdown("---")
-    st.markdown("### 🏆 Matriz Inteligente — V8.9")
+    st.markdown("### 🏆 Matriz Inteligente — V9.0")
     st.caption(
         "Todos os pares abaixo passam pelo mesmo motor de confluência, qualidade e frescor "
         "usado na análise individual."
