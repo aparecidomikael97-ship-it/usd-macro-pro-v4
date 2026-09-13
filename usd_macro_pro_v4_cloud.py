@@ -1,5 +1,5 @@
 # ============================================================
-# USD MACRO PRO V9.3.8 — VALIDAÇÃO AUTOMÁTICA 1H / 4H / 24H
+# USD MACRO PRO V9.3.9 — PAINEL DE PERFORMANCE REAL
 # Exibe o motivo persistido de falhas por par/timeframe sem
 # gastar novas chamadas. Persistência e validação preservadas.
 # ============================================================
