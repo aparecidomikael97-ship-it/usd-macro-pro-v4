@@ -6351,66 +6351,60 @@ with abas[1]:
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def _td_time_series_v92(par: str, interval: str, outputsize: int = 140) -> pd.DataFrame:
-    """
-    V9.3.1: consulta resiliente.
-    - cache de 30 min para reduzir consumo;
-    - menos candles por chamada;
-    - 1 retry leve em erro transitório;
-    - diagnóstico preservado em df.attrs.
-    """
+    """V9.3.5.6: captura diagnóstico seguro da Twelve Data sem salvar/exibir API key."""
+    def vazio(msg="", http=None, api_status="", api_code="", values_count=0, valid_count=0):
+        d = pd.DataFrame()
+        d.attrs["erro_td"] = str(msg or "")
+        d.attrs["td_diag"] = {
+            "symbol": str(par), "interval": str(interval), "outputsize": int(outputsize),
+            "http_status": http, "api_status": str(api_status or ""),
+            "api_code": str(api_code or ""), "api_message": str(msg or ""),
+            "values_count": int(values_count or 0), "candles_validos": int(valid_count or 0),
+        }
+        return d
+
     if not CHAVE_TWELVE_DATA:
-        df = pd.DataFrame()
-        df.attrs["erro_td"] = "CHAVE_TWELVE_DATA não configurada."
-        return df
+        return vazio("CHAVE_TWELVE_DATA não configurada.")
 
     url = "https://api.twelvedata.com/time_series"
-    params = {
-        "symbol": par,
-        "interval": interval,
-        "outputsize": int(outputsize),
-        "apikey": CHAVE_TWELVE_DATA,
-        "format": "JSON",
-        "order": "ASC",
-        "timezone": "UTC",
-    }
-
-    ultimo_erro = ""
+    params = {"symbol":par,"interval":interval,"outputsize":int(outputsize),
+              "apikey":CHAVE_TWELVE_DATA,"format":"JSON","order":"ASC","timezone":"UTC"}
+    ultimo = {}
     for tentativa in range(2):
         try:
-            r = requests.get(url, params=params, timeout=20)
-            j = r.json()
-
-            if r.status_code != 200 or j.get("status") == "error" or "values" not in j:
-                ultimo_erro = str(j.get("message") or j.get("code") or f"HTTP {r.status_code}")
-                # Não faz retry agressivo quando a API informa limite/crédito.
-                low = ultimo_erro.lower()
-                if any(x in low for x in ["credit", "limit", "rate", "quota"]):
-                    break
+            r=requests.get(url,params=params,timeout=20)
+            http=int(r.status_code)
+            try:
+                j=r.json()
+            except Exception as e:
+                return vazio(f"Resposta não-JSON: {type(e).__name__}", http=http)
+            status=j.get("status",""); code=j.get("code",""); msg=j.get("message","")
+            vals=j.get("values",[])
+            nvals=len(vals) if isinstance(vals,list) else 0
+            ultimo={"http":http,"status":status,"code":code,"msg":msg,"nvals":nvals}
+            if http != 200 or status=="error" or "values" not in j:
+                erro=str(msg or code or f"HTTP {http}")
+                if tentativa==1 or any(x in erro.lower() for x in ["credit","limit","rate","quota"]):
+                    return vazio(erro,http,status,code,nvals,0)
                 continue
-
-            df = pd.DataFrame(j["values"])
+            df=pd.DataFrame(vals)
             if df.empty:
-                ultimo_erro = "Resposta sem candles."
-                continue
-
-            df["datetime"] = pd.to_datetime(df["datetime"], errors="coerce", utc=True)
-            for c in ["open", "high", "low", "close"]:
-                df[c] = pd.to_numeric(df[c], errors="coerce")
-            df = (
-                df.dropna(subset=["datetime", "open", "high", "low", "close"])
-                  .sort_values("datetime")
-                  .drop_duplicates("datetime")
-                  .reset_index(drop=True)
-            )
-            df.attrs["erro_td"] = ""
+                return vazio("Resposta sem candles.",http,status,code,0,0)
+            df["datetime"]=pd.to_datetime(df["datetime"],errors="coerce",utc=True)
+            for c in ["open","high","low","close"]:
+                df[c]=pd.to_numeric(df[c],errors="coerce")
+            df=(df.dropna(subset=["datetime","open","high","low","close"])
+                  .sort_values("datetime").drop_duplicates("datetime").reset_index(drop=True))
+            df.attrs["erro_td"]=""
+            df.attrs["td_diag"]={
+                "symbol":str(par),"interval":str(interval),"outputsize":int(outputsize),
+                "http_status":http,"api_status":str(status or ""),"api_code":str(code or ""),
+                "api_message":str(msg or ""),"values_count":nvals,"candles_validos":int(len(df))}
             return df
         except Exception as e:
-            ultimo_erro = f"{type(e).__name__}: {e}"
-
-    df = pd.DataFrame()
-    df.attrs["erro_td"] = ultimo_erro or "Falha ao consultar candles."
-    return df
-
+            ultimo={"http":None,"status":"","code":"","msg":f"{type(e).__name__}: {e}","nvals":0}
+    return vazio(ultimo.get("msg","Falha ao consultar candles."),ultimo.get("http"),
+                 ultimo.get("status",""),ultimo.get("code",""),ultimo.get("nvals",0),0)
 
 def _indicadores_tecnicos_v92(df: pd.DataFrame) -> pd.DataFrame:
     d = df.copy()
@@ -6520,86 +6514,39 @@ def _analise_m15_v92(df: pd.DataFrame, lado: str) -> dict:
 
 
 def _pacote_tecnico_v92(par: str, direcao: str) -> dict:
-    """
-    V9.3.5.5:
-    além do pacote técnico, preserva o erro REAL retornado pela Twelve Data
-    separadamente em H4/H1/M15. Nenhuma chave/API secret é persistida.
-    """
-    lado = _lado_macro_v92(direcao)
+    """V9.3.5.6: pacote técnico com diagnóstico profundo seguro por timeframe."""
+    lado=_lado_macro_v92(direcao)
     if not CHAVE_TWELVE_DATA:
-        motivo = "CHAVE_TWELVE_DATA não configurada."
-        return {
-            "disponivel": False,
-            "motivo": motivo,
-            "erro": motivo,
-            "diagnostico": motivo,
-            "h4": {"status": "⚪ AGUARDANDO", "score": 0, "texto": "Configure a chave.", "motivo": motivo},
-            "h1": {"status": "⚪ AGUARDANDO", "score": 0, "texto": "Configure a chave.", "motivo": motivo},
-            "m15": {"status": "⚪ AGUARDANDO", "score": 0, "texto": "Configure a chave.", "motivo": motivo},
-        }
-
-    h4 = _td_time_series_v92(par, "4h", 100)
-    h1 = _td_time_series_v92(par, "1h", 100)
-    m15 = _td_time_series_v92(par, "15min", 100)
-
-    erros_tf = {}
-    for nome_tf, dfx in [("H4", h4), ("H1", h1), ("M15", m15)]:
-        if dfx.empty:
-            erros_tf[nome_tf] = str(dfx.attrs.get("erro_td", "") or "Resposta sem candles.")
-
-    if erros_tf:
+        motivo="CHAVE_TWELVE_DATA não configurada."
+        base={"status":"⚪ AGUARDANDO","score":0,"texto":"Configure a chave.","motivo":motivo}
+        return {"disponivel":False,"motivo":motivo,"erro":motivo,"diagnostico":motivo,
+                "h4":dict(base),"h1":dict(base),"m15":dict(base)}
+    h4=_td_time_series_v92(par,"4h",100)
+    h1=_td_time_series_v92(par,"1h",100)
+    m15=_td_time_series_v92(par,"15min",100)
+    dfs={"H4":h4,"H1":h1,"M15":m15}
+    diags={tf:dict(df.attrs.get("td_diag",{}) or {}) for tf,df in dfs.items()}
+    erros={tf:str(df.attrs.get("erro_td","") or "Resposta sem candles.")
+           for tf,df in dfs.items() if df.empty}
+    if erros:
         def bloco(tf):
-            err = erros_tf.get(tf, "")
+            err=erros.get(tf,"")
             if err:
-                return {
-                    "status": "⚪ INDISPONÍVEL",
-                    "score": 0,
-                    "texto": err,
-                    "motivo": err,
-                    "erro": err,
-                }
-            return {
-                "status": "⚪ NÃO AVALIADO",
-                "score": 0,
-                "texto": "Outro timeframe falhou; pacote técnico não foi concluído.",
-                "motivo": "",
-                "erro": "",
-            }
-
-        motivo = " | ".join(f"{tf}: {err}" for tf, err in erros_tf.items())
-        return {
-            "disponivel": False,
-            "motivo": motivo,
-            "erro": motivo,
-            "diagnostico": motivo,
-            "h4": bloco("H4"),
-            "h1": bloco("H1"),
-            "m15": bloco("M15"),
-        }
-
-    a4 = _analise_h4_v92(h4, lado)
-    a1 = _analise_h1_v92(h1, lado)
-    a15 = _analise_m15_v92(m15, lado)
-
-    last_times = [
-        h4["datetime"].iloc[-1],
-        h1["datetime"].iloc[-1],
-        m15["datetime"].iloc[-1],
-    ]
-    ultima = max(last_times)
-
-    return {
-        "disponivel": True,
-        "motivo": "",
-        "erro": "",
-        "diagnostico": "",
-        "h4": a4,
-        "h1": a1,
-        "m15": a15,
-        "ultima_atualizacao": ultima,
-        "preco_m15": float(m15["close"].iloc[-1]),
-    }
-
+                return {"status":"⚪ INDISPONÍVEL","score":0,"texto":err,"motivo":err,
+                        "erro":err,"td_diag":diags.get(tf,{})}
+            return {"status":"⚪ NÃO AVALIADO","score":0,
+                    "texto":"Outro timeframe falhou; pacote não concluído.",
+                    "motivo":"","erro":"","td_diag":diags.get(tf,{})}
+        motivo=" | ".join(f"{tf}: {err}" for tf,err in erros.items())
+        return {"disponivel":False,"motivo":motivo,"erro":motivo,"diagnostico":motivo,
+                "h4":bloco("H4"),"h1":bloco("H1"),"m15":bloco("M15")}
+    a4=_analise_h4_v92(h4,lado); a4["td_diag"]=diags["H4"]
+    a1=_analise_h1_v92(h1,lado); a1["td_diag"]=diags["H1"]
+    a15=_analise_m15_v92(m15,lado); a15["td_diag"]=diags["M15"]
+    ultima=max(h4["datetime"].iloc[-1],h1["datetime"].iloc[-1],m15["datetime"].iloc[-1])
+    return {"disponivel":True,"motivo":"","erro":"","diagnostico":"",
+            "h4":a4,"h1":a1,"m15":a15,"ultima_atualizacao":ultima,
+            "preco_m15":float(m15["close"].iloc[-1])}
 
 def _decisao_tecnica_final_v92(tecnico: dict, timing: str, direcao: str) -> tuple[str, str]:
     if not tecnico.get("disponivel", False):
@@ -6967,7 +6914,7 @@ with abas[6]:
         # -----------------------------------------------------
         # V9.3 — Scanner técnico automático dos 7 pares
         # -----------------------------------------------------
-        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3.5.5")
+        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3.5.6")
         st.caption(
             "A Matriz continua escolhendo o viés macro de cada par. "
             "O scanner consulta H4, H1 e M15 e procura qual par está mais perto "
@@ -7058,7 +7005,7 @@ with abas[6]:
                         "texto": _txt933,
                         "processado_em": _tentativa_ts9355,
                         "tentativa_v9355": True,
-                        "versao_tentativa": "V9.3.5.5",
+                        "versao_tentativa": "V9.3.5.6",
                     }
 
                 _estado934["resultados"] = _resultados933
@@ -7276,9 +7223,32 @@ with abas[6]:
                 with st.expander("🔎 Diagnóstico real da Twelve Data", expanded=True):
                     st.warning(
                         "Registros antigos podem mostrar apenas a mensagem genérica. "
-                        "A V9.3.5.5 identifica a nova tentativa e salva a falha mesmo quando o pacote técnico for inválido."
+                        "A V9.3.5.6 salva HTTP, código/mensagem da API e quantidade de candles por timeframe, sem expor a chave."
                     )
                     st.dataframe(pd.DataFrame(_diag_rows9353), use_container_width=True, hide_index=True)
+                    _deep9356=[]
+                    for _p9356,_r9356 in _resultados933.items():
+                        if _resultado_tecnico_valido_v935(_r9356):
+                            continue
+                        _t9356=_r9356.get("tecnico",{}) if isinstance(_r9356,dict) else {}
+                        for _k9356,_n9356 in [("h4","H4"),("h1","H1"),("m15","M15")]:
+                            _d9356=(_t9356.get(_k9356,{}) or {}).get("td_diag",{}) or {}
+                            if _d9356:
+                                _deep9356.append({
+                                    "Par":_p9356,"TF":_n9356,
+                                    "Símbolo":_d9356.get("symbol",""),
+                                    "Intervalo":_d9356.get("interval",""),
+                                    "HTTP":_d9356.get("http_status",""),
+                                    "Status API":_d9356.get("api_status",""),
+                                    "Código":_d9356.get("api_code",""),
+                                    "Mensagem API":_d9356.get("api_message",""),
+                                    "Valores":_d9356.get("values_count",0),
+                                    "Candles válidos":_d9356.get("candles_validos",0),
+                                })
+                    if _deep9356:
+                        st.markdown("**🧪 Diagnóstico profundo V9.3.5.6**")
+                        st.dataframe(pd.DataFrame(_deep9356),use_container_width=True,hide_index=True)
+                        st.caption("A chave da Twelve Data não é exibida nem persistida.")
                     st.caption(
                         "Este painel lê o diagnóstico já persistido e não consome créditos da Twelve Data."
                     )
