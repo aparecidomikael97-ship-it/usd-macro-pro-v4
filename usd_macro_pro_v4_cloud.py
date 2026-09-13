@@ -1,5 +1,5 @@
 # ============================================================
-# USD MACRO PRO V9.3.6.4 — DIAGNÓSTICO PROFUNDO TWELVE DATA
+# USD MACRO PRO V9.3.7 — REGISTRO AUTOMÁTICO DE CONFIGURAÇÕES COMPLETAS
 # Exibe o motivo persistido de falhas por par/timeframe sem
 # gastar novas chamadas. Persistência e validação preservadas.
 # ============================================================
@@ -35,12 +35,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "9.3.5.6 — DIAGNÓSTICO PROFUNDO TWELVE DATA"
+APP_VERSION = "9.3.7 — REGISTRO AUTOMÁTICO DE CONFIGURAÇÕES COMPLETAS"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V9.3.6.4 Dados × Direção",
+    page_title="USD Macro Pro — V9.3.7 Configurações Completas",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1619,7 +1619,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V9.3.6.4 Dados × Direção")
+st.title("🦅 USD Macro Pro — V9.3.7 Configurações Completas")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -6606,6 +6606,144 @@ def _decisao_tecnica_final_v92(tecnico: dict, timing: str, direcao: str) -> tupl
 
 
 
+
+# =========================================================
+# V9.3.7 — REGISTRO AUTOMÁTICO DE CONFIGURAÇÕES COMPLETAS
+# Macro + H4 + H1 + M15 alinhados.
+# Anti-duplicação: par + direção + candle M15.
+# Base pronta para validação futura em 1h / 4h / 24h.
+# =========================================================
+_CONFIG_GH_PATH_V937 = "dados/configuracoes_completas_v937.csv"
+
+def _config_cols_v937():
+    return [
+        "id_config", "registrado_em", "par", "direcao", "score_mestre",
+        "qualidade", "indice_operacional", "h4", "h1", "m15",
+        "candle_m15", "preco_entrada", "fonte_preco", "versao",
+        "status_validacao",
+        "preco_1h", "retorno_1h_pct", "acertou_1h",
+        "preco_4h", "retorno_4h_pct", "acertou_4h",
+        "preco_24h", "retorno_24h_pct", "acertou_24h",
+    ]
+
+def _config_ler_v937():
+    token, repo, branch = _gh_cfg_v934()
+    cols = _config_cols_v937()
+    if not token or not repo:
+        return pd.DataFrame(columns=cols), "GitHub persistente não configurado."
+    url = f"https://api.github.com/repos/{repo}/contents/{_CONFIG_GH_PATH_V937}"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    try:
+        r = requests.get(url, headers=headers, params={"ref": branch}, timeout=20)
+        if r.status_code == 404:
+            return pd.DataFrame(columns=cols), ""
+        r.raise_for_status()
+        import io
+        raw = base64.b64decode(r.json()["content"])
+        df = pd.read_csv(io.BytesIO(raw))
+        for c in cols:
+            if c not in df.columns:
+                df[c] = None
+        return df[cols], ""
+    except Exception as e:
+        return pd.DataFrame(columns=cols), f"{type(e).__name__}: {e}"
+
+def _config_salvar_v937(df):
+    token, repo, branch = _gh_cfg_v934()
+    if not token or not repo:
+        return False, "GitHub persistente não configurado."
+    url = f"https://api.github.com/repos/{repo}/contents/{_CONFIG_GH_PATH_V937}"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    try:
+        atual = requests.get(url, headers=headers, params={"ref": branch}, timeout=20)
+        sha = atual.json().get("sha", "") if atual.status_code == 200 else ""
+        if atual.status_code not in (200, 404):
+            atual.raise_for_status()
+        payload = {
+            "message": "V9.3.7: registra configuração completa",
+            "content": base64.b64encode(df.to_csv(index=False).encode("utf-8")).decode("ascii"),
+            "branch": branch,
+        }
+        if sha:
+            payload["sha"] = sha
+        r = requests.put(url, headers=headers, json=payload, timeout=25)
+        r.raise_for_status()
+        return True, ""
+    except Exception as e:
+        return False, f"{type(e).__name__}: {e}"
+
+def _registrar_config_completa_v937(
+    par, direcao, score, qualidade, indice, h4, h1, m15,
+    candle_m15="", preco_entrada=None
+):
+    par, direcao = str(par), str(direcao)
+    candle = str(candle_m15 or "")
+    chave = f"{par}|{direcao}|{candle}"
+    df, erro = _config_ler_v937()
+    if erro and df.empty:
+        return False, erro, False
+    if not df.empty:
+        chaves = (
+            df["par"].astype(str) + "|" +
+            df["direcao"].astype(str) + "|" +
+            df["candle_m15"].fillna("").astype(str)
+        )
+        if chave in set(chaves):
+            return True, "Configuração já registrada para este candle M15.", False
+
+    novo = {c: None for c in _config_cols_v937()}
+    novo.update({
+        "id_config": f"{par.replace('/','')}_{pd.Timestamp.utcnow().strftime('%Y%m%dT%H%M%S%fZ')}",
+        "registrado_em": pd.Timestamp.utcnow().isoformat(),
+        "par": par,
+        "direcao": direcao,
+        "score_mestre": float(score),
+        "qualidade": str(qualidade),
+        "indice_operacional": float(indice),
+        "h4": str(h4), "h1": str(h1), "m15": str(m15),
+        "candle_m15": candle,
+        "preco_entrada": float(preco_entrada) if preco_entrada is not None else None,
+        "fonte_preco": "Twelve Data M15",
+        "versao": "V9.3.7",
+        "status_validacao": "PENDENTE",
+    })
+    df = pd.concat([df, pd.DataFrame([novo])], ignore_index=True)
+    ok, msg = _config_salvar_v937(df)
+    return ok, msg or ("Configuração registrada." if ok else "Falha ao registrar."), bool(ok)
+
+def _painel_configuracoes_v937():
+    st.markdown("#### 🗂️ Configurações completas registradas — V9.3.7")
+    df, erro = _config_ler_v937()
+    if erro and df.empty:
+        st.info(f"Histórico ainda indisponível: {erro}")
+        return
+    if df.empty:
+        st.info("Ainda não há configuração completa registrada.")
+        return
+    total = len(df)
+    pend = int((df["status_validacao"].astype(str) == "PENDENTE").sum())
+    c1, c2 = st.columns(2)
+    c1.metric("Configurações registradas", total)
+    c2.metric("Aguardando validação", pend)
+    cols_show = [
+        "registrado_em", "par", "direcao", "score_mestre", "qualidade",
+        "indice_operacional", "candle_m15", "preco_entrada", "status_validacao"
+    ]
+    st.dataframe(df[cols_show].tail(30).iloc[::-1], use_container_width=True, hide_index=True)
+    st.caption(
+        "A V9.3.7 registra a fotografia da configuração completa. "
+        "Os campos de 1h, 4h e 24h já ficam preparados para a próxima etapa de validação."
+    )
+
+
 # =========================================================
 # V9.3.4 — PERSISTÊNCIA DO SCANNER NO GITHUB
 # Arquivo: dados/scanner_tecnico_v934.json
@@ -7274,6 +7412,23 @@ with abas[6]:
                         f"🟢 CONFIGURAÇÃO COMPLETA — {_par958}: {_dir958}. "
                         "H4 + H1 + M15 estão alinhados. Confira calendário/risco e gestão antes de qualquer execução."
                     )
+
+                    _tec_best937 = _scan_results934.get(_par958, {}) if "_scan_results934" in locals() else {}
+                    _m15_best937 = (_tec_best937.get("m15") or {})
+                    _candle_best937 = str(
+                        _m15_best937.get("datetime", "")
+                        or _m15_best937.get("candle", "")
+                        or _m15_best937.get("data", "")
+                    )
+                    _px_best937 = _tec_best937.get("preco_m15")
+                    _okb937, _msgb937, _novob937 = _registrar_config_completa_v937(
+                        _par958, _dir958, _score958, _qual958, _idx958,
+                        _h4958, _h1958, _m15958,
+                        candle_m15=_candle_best937,
+                        preco_entrada=_px_best937,
+                    )
+                    if _okb937 and _novob937:
+                        st.success("💾 V9.3.7: configuração completa registrada automaticamente no histórico.")
                 elif "AGUARDAR GATILHO M15" in _sem958:
                     st.warning(
                         f"🟡 {_par958} é a prioridade atual, mas ainda NÃO há configuração completa. "
@@ -7544,6 +7699,17 @@ with abas[6]:
                             "não é garantia de lucro nem ordem automática de mercado."
                         )
 
+                        _ok937, _msg937, _novo937 = _registrar_config_completa_v937(
+                            _par958, _dir958, _score958, _qual958, _idx958,
+                            _h4958, _h1958, str(_mon962.get("status", _m15958)),
+                            candle_m15=_dt_final964,
+                            preco_entrada=_px_final964,
+                        )
+                        if _ok937 and _novo937:
+                            st.success("💾 V9.3.7: configuração completa registrada automaticamente no histórico.")
+                        elif not _ok937:
+                            st.warning(f"⚠️ Registro V9.3.7 não foi salvo: {_msg937}")
+
                     if _mon962.get("par") == _par958 and _mon962.get("verificacao_realizada"):
                         st.markdown("##### 🧾 Resultado da última verificação M15")
 
@@ -7678,6 +7844,8 @@ with abas[6]:
             )
             _best93 = _valid93.iloc[0]
 
+            _painel_configuracoes_v937()
+
             st.markdown("#### 🏆 Melhor oportunidade técnica do scanner")
             _b1, _b2, _b3, _b4 = st.columns(4)
             _b1.metric("Par", str(_best93["Par"]))
@@ -7735,4 +7903,3 @@ with abas[6]:
             "A Central V9.3.5 mantém a persistência no GitHub e só considera um par completo quando H4, H1 e M15 estão realmente válidos. "
             "Ela não transforma Score Mestre em probabilidade de lucro e não substitui gestão de risco."
         )
-
