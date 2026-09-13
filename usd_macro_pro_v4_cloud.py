@@ -1,8 +1,8 @@
 # ============================================================
-# USD MACRO PRO V9.3.2 — SCANNER EM FILA
-# Base V9.3.1.
-# Processa até 2 pares por janela (~6 créditos), mantém cache
-# e evita exceder o limite gratuito de 8 créditos/minuto.
+# USD MACRO PRO V9.3.3 — SCANNER INCREMENTAL POR LOTES
+# Base V9.3.2.
+# Cada lote consulta SOMENTE seus pares, salva o resultado no
+# session_state e não reconsulta lotes anteriores.
 # ============================================================
 
 #!/usr/bin/env python3
@@ -36,12 +36,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "9.3.2 — SCANNER EM FILA"
+APP_VERSION = "9.3.3 — SCANNER INCREMENTAL POR LOTES"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V9.3.2 Scanner em Fila",
+    page_title="USD Macro Pro — V9.3.3 Scanner Incremental",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1620,7 +1620,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V9.3.2 Scanner em Fila")
+st.title("🦅 USD Macro Pro — V9.3.3 Scanner Incremental")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2812,7 +2812,7 @@ def _avaliar_sinais_v82():
 
 
 def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca, confl):
-    st.markdown("## 🧪 Validação Automática Multipares — V9.3.2")
+    st.markdown("## 🧪 Validação Automática Multipares — V9.3.3")
     st.caption(
         "A V8.8 registra a fotografia do sinal e avalia automaticamente os 7 pares na "
         "primeira observação diária FRED posterior. Não reconstrói sinais passados."
@@ -2837,7 +2837,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 
     if serie_atual:
         st.info(
-            f"Fonte de preço V9.3.2: FRED {serie_atual}, série diária oficial H.10 para {par}. "
+            f"Fonte de preço V9.3.3: FRED {serie_atual}, série diária oficial H.10 para {par}. "
             "A validação mede direção entre observações diárias — não 1h/4h."
         )
     else:
@@ -2916,7 +2916,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     pendentes = df[df["avaliado"] != True].copy()
     avaliados_total = df[df["avaliado"] == True].copy()
 
-    st.markdown("### 💾 Persistência do histórico — V9.3.2")
+    st.markdown("### 💾 Persistência do histórico — V9.3.3")
     _v84_token, _v84_repo, _v84_branch = _github_cfg_v84()
     if _v84_token:
         st.success(
@@ -3092,7 +3092,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     # V8.9 — PAINEL DE PERFORMANCE
     # Somente leitura/estatística: NÃO altera sinal, pesos ou decisão da Matriz.
     # =====================================================
-    st.markdown("## 📊 Painel de Performance — V9.3.2")
+    st.markdown("## 📊 Painel de Performance — V9.3.3")
 
     _perf89 = validos.copy()
     _perf89["score_num"] = pd.to_numeric(_perf89["score_mestre"], errors="coerce")
@@ -3273,7 +3273,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 # V9.0 — CENTRAL DO OPERADOR
 # Somente interface/orientação; não altera o motor do modelo.
 # ============================================================
-st.markdown("## 🎛️ Central do Operador — V9.3.2")
+st.markdown("## 🎛️ Central do Operador — V9.3.3")
 st.caption("O APP define o viés macro; o gráfico confirma a entrada.")
 
 with st.container(border=True):
@@ -5658,7 +5658,7 @@ with abas[2]:
             st.success("✅ Sinal registrado!")
 
     st.markdown("---")
-    st.markdown("### 🏆 Matriz Inteligente — V9.3.2")
+    st.markdown("### 🏆 Matriz Inteligente — V9.3.3")
     st.caption(
         "Todos os pares abaixo passam pelo mesmo motor de confluência, qualidade e frescor "
         "usado na análise individual."
@@ -6600,7 +6600,7 @@ def _decisao_tecnica_final_v92(tecnico: dict, timing: str, direcao: str) -> tupl
 # ainda não são alimentados automaticamente pelo sistema.
 # =========================================================
 with abas[6]:
-    st.subheader("🎯 Central de Decisão Automática — V9.3.2")
+    st.subheader("🎯 Central de Decisão Automática — V9.3.3")
     st.caption(
         "Resumo automático dos dados que já existem no APP. "
         "O resultado abaixo é um viés macro/operacional educacional, não uma ordem de mercado."
@@ -6855,20 +6855,9 @@ with abas[6]:
 
 
         # -----------------------------------------------------
-        # V9.3.2 — controle de fila da API (8 créditos/minuto)
-        # Cada par usa 3 séries: H4, H1, M15.
-        # Processamos no máximo 2 pares por lote (= 6 créditos).
-        # O usuário avança o próximo lote após a janela da API.
-        # -----------------------------------------------------
-        if "v932_lote" not in st.session_state:
-            st.session_state["v932_lote"] = 0
-        if "v932_ultimo_lote_ts" not in st.session_state:
-            st.session_state["v932_ultimo_lote_ts"] = 0.0
-
-        # -----------------------------------------------------
         # V9.3 — Scanner técnico automático dos 7 pares
         # -----------------------------------------------------
-        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3.2")
+        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3.3")
         st.caption(
             "A Matriz continua escolhendo o viés macro de cada par. "
             "O scanner consulta H4, H1 e M15 e procura qual par está mais perto "
@@ -6876,56 +6865,130 @@ with abas[6]:
         )
 
         st.caption(
-            "Modo fila: no máximo 2 pares por lote (6 séries), respeitando o limite de 8 créditos/minuto. "
-            "Os candles continuam em cache por ~30 minutos."
+            "Modo incremental: cada lote consulta SOMENTE os pares novos e salva o resultado na sessão. "
+            "Lotes anteriores não são consultados novamente. Máximo de 2 pares (6 séries) por janela."
         )
 
         _scanner93 = []
         _mat93 = matriz_v61.copy().head(7).reset_index(drop=True)
 
-        # Divide 7 pares em lotes seguros: 2 + 2 + 2 + 1.
-        _lotes932 = [
+        # V9.3.3: resultados persistem na sessão e cada lote consulta só seus pares.
+        if "v933_resultados" not in st.session_state:
+            st.session_state["v933_resultados"] = {}
+        if "v933_lote" not in st.session_state:
+            st.session_state["v933_lote"] = 0
+        if "v933_ultimo_processamento_ts" not in st.session_state:
+            st.session_state["v933_ultimo_processamento_ts"] = 0.0
+
+        _lotes933 = [
             list(range(i, min(i + 2, len(_mat93))))
             for i in range(0, len(_mat93), 2)
         ]
-        _lote_idx932 = int(st.session_state.get("v932_lote", 0))
-        _lote_idx932 = max(0, min(_lote_idx932, len(_lotes932) - 1))
-        _indices_ate_agora932 = [
-            idx for lote in _lotes932[:_lote_idx932 + 1] for idx in lote
-        ]
-
-        _agora932 = time.time()
-        _ultimo932 = float(st.session_state.get("v932_ultimo_lote_ts", 0.0))
-        _restante932 = max(0, int(61 - (_agora932 - _ultimo932))) if _ultimo932 else 0
-
-        _q1, _q2, _q3 = st.columns([1.2, 1.2, 3])
-        with _q1:
-            if st.button("▶️ Processar lote atual", key="v932_processar_lote"):
-                st.session_state["v932_ultimo_lote_ts"] = time.time()
-                st.rerun()
-        with _q2:
-            _pode_avancar932 = (_restante932 <= 0)
-            if st.button(
-                "⏭️ Próximo lote",
-                key="v932_proximo_lote",
-                disabled=(not _pode_avancar932 or _lote_idx932 >= len(_lotes932)-1)
-            ):
-                st.session_state["v932_lote"] = min(_lote_idx932 + 1, len(_lotes932)-1)
-                st.session_state["v932_ultimo_lote_ts"] = time.time()
-                st.rerun()
-        with _q3:
-            st.caption(
-                f"Lote {_lote_idx932 + 1}/{len(_lotes932)}. "
-                + (f"Aguarde ~{_restante932}s para avançar com segurança." if _restante932 > 0
-                   else "Janela pronta para o próximo lote.")
-            )
-
-        st.progress(
-            min(1.0, len(_indices_ate_agora932) / max(1, len(_mat93))),
-            text=f"Fila técnica: {len(_indices_ate_agora932)}/{len(_mat93)} pares liberados para consulta/cache"
+        _lote_idx933 = max(
+            0,
+            min(int(st.session_state.get("v933_lote", 0)), len(_lotes933) - 1)
         )
 
-        # Só consulta os lotes já liberados. Pares futuros aparecem como NA FILA.
+        _agora933 = time.time()
+        _ultimo933 = float(st.session_state.get("v933_ultimo_processamento_ts", 0.0))
+        _restante933 = max(0, int(61 - (_agora933 - _ultimo933))) if _ultimo933 else 0
+        _resultados933 = st.session_state["v933_resultados"]
+
+        _a933, _b933, _c933 = st.columns([1.25, 1.15, 3.2])
+
+        with _a933:
+            _pode_processar933 = (_restante933 <= 0)
+            if st.button(
+                "▶️ Processar lote atual",
+                key="v933_processar_lote",
+                disabled=not _pode_processar933
+            ):
+                # IMPORTANTE: consulta SOMENTE os pares do lote atual.
+                for _idx933 in _lotes933[_lote_idx933]:
+                    _row933 = _mat93.iloc[_idx933]
+                    _par933 = str(_row933["Par"])
+                    _dir933 = str(_row933["Direção"])
+
+                    # Se já existe resultado válido deste par, não gasta API novamente.
+                    if _par933 in _resultados933 and bool(_resultados933[_par933].get("disponivel", False)):
+                        continue
+
+                    _tec933 = _pacote_tecnico_v92(_par933, _dir933)
+                    _dec933, _txt933 = _decisao_tecnica_final_v92(
+                        _tec933, _timing91, _dir933
+                    )
+                    _resultados933[_par933] = {
+                        "tecnico": _tec933,
+                        "decisao": _dec933,
+                        "texto": _txt933,
+                        "processado_em": time.time(),
+                    }
+
+                st.session_state["v933_resultados"] = _resultados933
+                st.session_state["v933_ultimo_processamento_ts"] = time.time()
+                st.rerun()
+
+        with _b933:
+            # Só permite avançar quando TODOS os pares do lote atual estão completos.
+            _pares_lote933 = [
+                str(_mat93.iloc[i]["Par"]) for i in _lotes933[_lote_idx933]
+            ]
+            _lote_completo933 = all(
+                p in _resultados933 and bool(
+                    _resultados933[p].get("tecnico", {}).get("disponivel", False)
+                )
+                for p in _pares_lote933
+            )
+            if st.button(
+                "⏭️ Próximo lote",
+                key="v933_proximo_lote",
+                disabled=(
+                    (not _lote_completo933) or
+                    (_restante933 > 0) or
+                    (_lote_idx933 >= len(_lotes933) - 1)
+                )
+            ):
+                st.session_state["v933_lote"] = min(
+                    _lote_idx933 + 1, len(_lotes933) - 1
+                )
+                st.rerun()
+
+        with _c933:
+            _pares_txt933 = " + ".join(_pares_lote933)
+            if _lote_completo933:
+                if _lote_idx933 < len(_lotes933) - 1:
+                    if _restante933 > 0:
+                        st.caption(
+                            f"Lote {_lote_idx933+1}/{len(_lotes933)} completo ({_pares_txt933}). "
+                            f"Aguarde ~{_restante933}s para liberar o próximo lote."
+                        )
+                    else:
+                        st.caption(
+                            f"Lote {_lote_idx933+1}/{len(_lotes933)} completo ({_pares_txt933}). "
+                            "Próximo lote liberado."
+                        )
+                else:
+                    st.caption("Último lote completo.")
+            else:
+                st.caption(
+                    f"Lote {_lote_idx933+1}/{len(_lotes933)}: {_pares_txt933}. "
+                    + (
+                        f"Aguarde ~{_restante933}s antes de processar."
+                        if _restante933 > 0
+                        else "Pronto para processar."
+                    )
+                )
+
+        _n_salvos933 = sum(
+            1 for p, r in _resultados933.items()
+            if bool(r.get("tecnico", {}).get("disponivel", False))
+        )
+        st.progress(
+            min(1.0, _n_salvos933 / max(1, len(_mat93))),
+            text=f"Resultados técnicos salvos na sessão: {_n_salvos933}/{len(_mat93)} pares"
+        )
+
+        # Monta a tabela SEM fazer novas chamadas.
         for _rank93, _row_idx93 in enumerate(range(len(_mat93)), start=1):
             _row93 = _mat93.iloc[_row_idx93]
             _p93 = str(_row93["Par"])
@@ -6934,7 +6997,9 @@ with abas[6]:
             _q93 = float(_row93["Qualidade"])
             _c93 = str(_row93["Confluência"])
 
-            if _row_idx93 not in _indices_ate_agora932:
+            _saved933 = _resultados933.get(_p93)
+
+            if not _saved933:
                 _scanner93.append({
                     "Ranking macro": _rank93,
                     "Par": _p93,
@@ -6948,12 +7013,13 @@ with abas[6]:
                     "Semáforo": "⏳ AGUARDANDO LOTE",
                     "Índice operacional": 0.0,
                     "_disponivel": False,
-                    "_texto": "Ainda não liberado pela fila V9.3.2.",
+                    "_texto": "Ainda não processado pela fila V9.3.3.",
                 })
                 continue
 
-            _tec93 = _pacote_tecnico_v92(_p93, _d93)
-            _dec93, _txt93 = _decisao_tecnica_final_v92(_tec93, _timing91, _d93)
+            _tec93 = _saved933["tecnico"]
+            _dec93 = str(_saved933["decisao"])
+            _txt93 = str(_saved933["texto"])
 
             _tech_score93 = (
                 float(_tec93["h4"].get("score", 0)) * 0.35 +
@@ -6996,9 +7062,9 @@ with abas[6]:
             _n_total93 = int(len(_scan_df93))
             if _n_ok93 < _n_total93:
                 st.warning(
-                    f"⚠️ Scanner PARCIAL: {_n_ok93}/{_n_total93} pares têm H4/H1/M15 completos. "
-                    "Os demais podem estar NA FILA ou temporariamente indisponíveis. "
-                    "Eles NÃO são considerados piores. O ranking é provisório até completar os 7."
+                    f"⚠️ Scanner PARCIAL: {_n_ok93}/{_n_total93} pares estão salvos com H4/H1/M15 completos. "
+                    "Os demais continuam NA FILA ou precisam repetir somente o lote atual. "
+                    "O ranking é provisório até chegar a 7/7."
                 )
             else:
                 st.success("✅ Scanner COMPLETO: os 7 pares têm H4/H1/M15 disponíveis.")
@@ -7045,7 +7111,7 @@ with abas[6]:
 
             _falt93 = _scan_df93[
                 (~_scan_df93["_disponivel"]) &
-                (~_scan_df93["_texto"].astype(str).str.contains("Ainda não liberado pela fila", na=False))
+                (~_scan_df93["_texto"].astype(str).str.contains("Ainda não processado pela fila", na=False))
             ][["Par", "_texto"]].copy()
             if not _falt93.empty:
                 _falt93.columns = ["Par", "Motivo técnico"]
@@ -7076,7 +7142,7 @@ with abas[6]:
         )
 
         st.caption(
-            "A Central V9.3.2 consolida macro + técnica e libera os 7 pares em lotes seguros para respeitar a cota da API. "
+            "A Central V9.3.3 processa somente o lote atual, salva os resultados na sessão e nunca reconsulta lotes anteriores durante a montagem do scanner. "
             "Ela não transforma Score Mestre em probabilidade de lucro e não substitui gestão de risco."
         )
 
