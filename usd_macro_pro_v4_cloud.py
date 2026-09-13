@@ -1,8 +1,8 @@
 # ============================================================
-# USD MACRO PRO V9.3.1 — SCANNER TÉCNICO RESILIENTE
-# Base V9.3.
-# Reduz consumo da API, preserva cache, mostra scanner parcial
-# com transparência e nunca trata dado indisponível como sinal ruim.
+# USD MACRO PRO V9.3.2 — SCANNER EM FILA
+# Base V9.3.1.
+# Processa até 2 pares por janela (~6 créditos), mantém cache
+# e evita exceder o limite gratuito de 8 créditos/minuto.
 # ============================================================
 
 #!/usr/bin/env python3
@@ -20,6 +20,7 @@
 
 import math
 import os
+import time
 from pathlib import Path
 from datetime import datetime, timedelta
 import urllib.parse
@@ -35,12 +36,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "9.3.1 — SCANNER TÉCNICO RESILIENTE"
+APP_VERSION = "9.3.2 — SCANNER EM FILA"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V9.3.1 Scanner Técnico Resiliente",
+    page_title="USD Macro Pro — V9.3.2 Scanner em Fila",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1619,7 +1620,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V9.3.1 Scanner Técnico Resiliente")
+st.title("🦅 USD Macro Pro — V9.3.2 Scanner em Fila")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2811,7 +2812,7 @@ def _avaliar_sinais_v82():
 
 
 def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca, confl):
-    st.markdown("## 🧪 Validação Automática Multipares — V9.3.1")
+    st.markdown("## 🧪 Validação Automática Multipares — V9.3.2")
     st.caption(
         "A V8.8 registra a fotografia do sinal e avalia automaticamente os 7 pares na "
         "primeira observação diária FRED posterior. Não reconstrói sinais passados."
@@ -2836,7 +2837,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 
     if serie_atual:
         st.info(
-            f"Fonte de preço V9.3.1: FRED {serie_atual}, série diária oficial H.10 para {par}. "
+            f"Fonte de preço V9.3.2: FRED {serie_atual}, série diária oficial H.10 para {par}. "
             "A validação mede direção entre observações diárias — não 1h/4h."
         )
     else:
@@ -2915,7 +2916,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     pendentes = df[df["avaliado"] != True].copy()
     avaliados_total = df[df["avaliado"] == True].copy()
 
-    st.markdown("### 💾 Persistência do histórico — V9.3.1")
+    st.markdown("### 💾 Persistência do histórico — V9.3.2")
     _v84_token, _v84_repo, _v84_branch = _github_cfg_v84()
     if _v84_token:
         st.success(
@@ -3091,7 +3092,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     # V8.9 — PAINEL DE PERFORMANCE
     # Somente leitura/estatística: NÃO altera sinal, pesos ou decisão da Matriz.
     # =====================================================
-    st.markdown("## 📊 Painel de Performance — V9.3.1")
+    st.markdown("## 📊 Painel de Performance — V9.3.2")
 
     _perf89 = validos.copy()
     _perf89["score_num"] = pd.to_numeric(_perf89["score_mestre"], errors="coerce")
@@ -3272,7 +3273,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 # V9.0 — CENTRAL DO OPERADOR
 # Somente interface/orientação; não altera o motor do modelo.
 # ============================================================
-st.markdown("## 🎛️ Central do Operador — V9.3.1")
+st.markdown("## 🎛️ Central do Operador — V9.3.2")
 st.caption("O APP define o viés macro; o gráfico confirma a entrada.")
 
 with st.container(border=True):
@@ -5657,7 +5658,7 @@ with abas[2]:
             st.success("✅ Sinal registrado!")
 
     st.markdown("---")
-    st.markdown("### 🏆 Matriz Inteligente — V9.3.1")
+    st.markdown("### 🏆 Matriz Inteligente — V9.3.2")
     st.caption(
         "Todos os pares abaixo passam pelo mesmo motor de confluência, qualidade e frescor "
         "usado na análise individual."
@@ -6599,7 +6600,7 @@ def _decisao_tecnica_final_v92(tecnico: dict, timing: str, direcao: str) -> tupl
 # ainda não são alimentados automaticamente pelo sistema.
 # =========================================================
 with abas[6]:
-    st.subheader("🎯 Central de Decisão Automática — V9.3.1")
+    st.subheader("🎯 Central de Decisão Automática — V9.3.2")
     st.caption(
         "Resumo automático dos dados que já existem no APP. "
         "O resultado abaixo é um viés macro/operacional educacional, não uma ordem de mercado."
@@ -6852,49 +6853,114 @@ with abas[6]:
             st.warning(f"**{_dec_tec92}** — {_dec_tec_txt92}")
 
 
+
+        # -----------------------------------------------------
+        # V9.3.2 — controle de fila da API (8 créditos/minuto)
+        # Cada par usa 3 séries: H4, H1, M15.
+        # Processamos no máximo 2 pares por lote (= 6 créditos).
+        # O usuário avança o próximo lote após a janela da API.
+        # -----------------------------------------------------
+        if "v932_lote" not in st.session_state:
+            st.session_state["v932_lote"] = 0
+        if "v932_ultimo_lote_ts" not in st.session_state:
+            st.session_state["v932_ultimo_lote_ts"] = 0.0
+
         # -----------------------------------------------------
         # V9.3 — Scanner técnico automático dos 7 pares
         # -----------------------------------------------------
-        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3.1")
+        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3.2")
         st.caption(
             "A Matriz continua escolhendo o viés macro de cada par. "
             "O scanner consulta H4, H1 e M15 e procura qual par está mais perto "
             "de uma confirmação técnica completa."
         )
 
-        _sc1, _sc2 = st.columns([1, 3])
-        with _sc1:
-            if st.button("🔄 Recalcular scanner", key="v931_recalc_scanner"):
-                st.rerun()
-        with _sc2:
-            st.caption(
-                "O scanner reutiliza candles em cache por ~30 minutos. "
-                "Isso evita gastar novamente chamadas da API a cada atualização da página."
-            )
+        st.caption(
+            "Modo fila: no máximo 2 pares por lote (6 séries), respeitando o limite de 8 créditos/minuto. "
+            "Os candles continuam em cache por ~30 minutos."
+        )
 
         _scanner93 = []
-        _mat93 = matriz_v61.copy().head(7)
+        _mat93 = matriz_v61.copy().head(7).reset_index(drop=True)
 
-        for _rank93, (_, _row93) in enumerate(_mat93.iterrows(), start=1):
+        # Divide 7 pares em lotes seguros: 2 + 2 + 2 + 1.
+        _lotes932 = [
+            list(range(i, min(i + 2, len(_mat93))))
+            for i in range(0, len(_mat93), 2)
+        ]
+        _lote_idx932 = int(st.session_state.get("v932_lote", 0))
+        _lote_idx932 = max(0, min(_lote_idx932, len(_lotes932) - 1))
+        _indices_ate_agora932 = [
+            idx for lote in _lotes932[:_lote_idx932 + 1] for idx in lote
+        ]
+
+        _agora932 = time.time()
+        _ultimo932 = float(st.session_state.get("v932_ultimo_lote_ts", 0.0))
+        _restante932 = max(0, int(61 - (_agora932 - _ultimo932))) if _ultimo932 else 0
+
+        _q1, _q2, _q3 = st.columns([1.2, 1.2, 3])
+        with _q1:
+            if st.button("▶️ Processar lote atual", key="v932_processar_lote"):
+                st.session_state["v932_ultimo_lote_ts"] = time.time()
+                st.rerun()
+        with _q2:
+            _pode_avancar932 = (_restante932 <= 0)
+            if st.button(
+                "⏭️ Próximo lote",
+                key="v932_proximo_lote",
+                disabled=(not _pode_avancar932 or _lote_idx932 >= len(_lotes932)-1)
+            ):
+                st.session_state["v932_lote"] = min(_lote_idx932 + 1, len(_lotes932)-1)
+                st.session_state["v932_ultimo_lote_ts"] = time.time()
+                st.rerun()
+        with _q3:
+            st.caption(
+                f"Lote {_lote_idx932 + 1}/{len(_lotes932)}. "
+                + (f"Aguarde ~{_restante932}s para avançar com segurança." if _restante932 > 0
+                   else "Janela pronta para o próximo lote.")
+            )
+
+        st.progress(
+            min(1.0, len(_indices_ate_agora932) / max(1, len(_mat93))),
+            text=f"Fila técnica: {len(_indices_ate_agora932)}/{len(_mat93)} pares liberados para consulta/cache"
+        )
+
+        # Só consulta os lotes já liberados. Pares futuros aparecem como NA FILA.
+        for _rank93, _row_idx93 in enumerate(range(len(_mat93)), start=1):
+            _row93 = _mat93.iloc[_row_idx93]
             _p93 = str(_row93["Par"])
             _d93 = str(_row93["Direção"])
             _s93 = float(_row93["Score final"])
             _q93 = float(_row93["Qualidade"])
             _c93 = str(_row93["Confluência"])
 
+            if _row_idx93 not in _indices_ate_agora932:
+                _scanner93.append({
+                    "Ranking macro": _rank93,
+                    "Par": _p93,
+                    "Direção": _d93.replace("🟢 ", "").replace("🔴 ", ""),
+                    "Score": round(_s93),
+                    "Qualidade": f"{_q93:.0f}%",
+                    "Confluência": _c93,
+                    "H4": "⏳ NA FILA",
+                    "H1": "⏳ NA FILA",
+                    "M15": "⏳ NA FILA",
+                    "Semáforo": "⏳ AGUARDANDO LOTE",
+                    "Índice operacional": 0.0,
+                    "_disponivel": False,
+                    "_texto": "Ainda não liberado pela fila V9.3.2.",
+                })
+                continue
+
             _tec93 = _pacote_tecnico_v92(_p93, _d93)
             _dec93, _txt93 = _decisao_tecnica_final_v92(_tec93, _timing91, _d93)
 
-            # Nota técnica somente para ordenação do scanner.
             _tech_score93 = (
                 float(_tec93["h4"].get("score", 0)) * 0.35 +
                 float(_tec93["h1"].get("score", 0)) * 0.35 +
                 float(_tec93["m15"].get("score", 0)) * 0.30
             )
-            # Índice operacional: mantém macro/qualidade relevantes e adiciona técnica.
             _op93 = 0.40 * _s93 + 0.20 * _q93 + 0.40 * _tech_score93
-
-            # Eventos de alto impacto próximos reduzem prioridade, sem apagar o viés.
             if str(_timing91).startswith("🔴"):
                 _op93 -= 25
             elif str(_timing91).startswith("🟡"):
@@ -6931,8 +6997,8 @@ with abas[6]:
             if _n_ok93 < _n_total93:
                 st.warning(
                     f"⚠️ Scanner PARCIAL: {_n_ok93}/{_n_total93} pares têm H4/H1/M15 completos. "
-                    "Pares indisponíveis NÃO são considerados piores; apenas faltam dados técnicos. "
-                    "O ranking abaixo é provisório até a fonte completar a amostra."
+                    "Os demais podem estar NA FILA ou temporariamente indisponíveis. "
+                    "Eles NÃO são considerados piores. O ranking é provisório até completar os 7."
                 )
             else:
                 st.success("✅ Scanner COMPLETO: os 7 pares têm H4/H1/M15 disponíveis.")
@@ -6977,7 +7043,10 @@ with abas[6]:
                 "Ele serve apenas para ordenar os 7 pares pela combinação Macro + Qualidade + Técnica."
             )
 
-            _falt93 = _scan_df93[~_scan_df93["_disponivel"]][["Par", "_texto"]].copy()
+            _falt93 = _scan_df93[
+                (~_scan_df93["_disponivel"]) &
+                (~_scan_df93["_texto"].astype(str).str.contains("Ainda não liberado pela fila", na=False))
+            ][["Par", "_texto"]].copy()
             if not _falt93.empty:
                 _falt93.columns = ["Par", "Motivo técnico"]
                 with st.expander("🔎 Diagnóstico dos pares indisponíveis", expanded=False):
@@ -7007,7 +7076,7 @@ with abas[6]:
         )
 
         st.caption(
-            "A Central V9.3.1 consolida macro + técnica e escaneia os 7 pares com cache resiliente e diagnóstico de disponibilidade. "
+            "A Central V9.3.2 consolida macro + técnica e libera os 7 pares em lotes seguros para respeitar a cota da API. "
             "Ela não transforma Score Mestre em probabilidade de lucro e não substitui gestão de risco."
         )
 
