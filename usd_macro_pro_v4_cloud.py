@@ -1,8 +1,7 @@
 # ============================================================
-# USD MACRO PRO V9.3.5 — VALIDAÇÃO TÉCNICA ESTRITA
-# Base V9.3.4.
-# Só conta um par como completo se H4, H1 e M15 estiverem
-# realmente válidos. Persistência GitHub preservada.
+# USD MACRO PRO V9.3.5.1 — HOTFIX
+# Corrige NameError da validação técnica: a função agora é
+# definida antes do primeiro uso. Persistência preservada.
 # ============================================================
 
 #!/usr/bin/env python3
@@ -36,12 +35,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "9.3.5 — VALIDAÇÃO TÉCNICA ESTRITA"
+APP_VERSION = "9.3.5.1 — HOTFIX VALIDAÇÃO TÉCNICA"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V9.3.5 Validação Técnica Estrita",
+    page_title="USD Macro Pro — V9.3.5.1 Hotfix",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1620,7 +1619,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V9.3.5 Validação Técnica Estrita")
+st.title("🦅 USD Macro Pro — V9.3.5.1 Hotfix")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -6934,7 +6933,7 @@ with abas[6]:
         # -----------------------------------------------------
         # V9.3 — Scanner técnico automático dos 7 pares
         # -----------------------------------------------------
-        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3.5")
+        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3.5.1")
         st.caption(
             "A Matriz continua escolhendo o viés macro de cada par. "
             "O scanner consulta H4, H1 e M15 e procura qual par está mais perto "
@@ -6973,6 +6972,17 @@ with abas[6]:
         _restante933 = max(0, int(61 - (_agora933 - _ultimo933))) if _ultimo933 else 0
         _resultados933 = _resultados934
 
+        def _resultado_tecnico_valido_v935(r):
+            tec = r.get("tecnico", {}) if isinstance(r, dict) else {}
+            if not bool(tec.get("disponivel", False)):
+                return False
+            for tf in ("h4", "h1", "m15"):
+                bloco = tec.get(tf, {})
+                status = str(bloco.get("status", "")).upper()
+                if (not bloco) or ("INDISPON" in status) or ("NA FILA" in status):
+                    return False
+            return True
+
         _a933, _b933, _c933 = st.columns([1.25, 1.15, 3.2])
 
         with _a933:
@@ -6989,7 +6999,7 @@ with abas[6]:
                     _dir933 = str(_row933["Direção"])
 
                     # Se já existe resultado válido deste par, não gasta API novamente.
-                    if _par933 in _resultados933 and bool(_resultados933[_par933].get("disponivel", False)):
+                    if _par933 in _resultados933 and _resultado_tecnico_valido_v935(_resultados933[_par933]):
                         continue
 
                     _tec933 = _pacote_tecnico_v92(_par933, _dir933)
@@ -7061,17 +7071,6 @@ with abas[6]:
                         else "Pronto para processar."
                     )
                 )
-
-        def _resultado_tecnico_valido_v935(r):
-            tec = r.get("tecnico", {}) if isinstance(r, dict) else {}
-            if not bool(tec.get("disponivel", False)):
-                return False
-            for tf in ("h4", "h1", "m15"):
-                bloco = tec.get(tf, {})
-                status = str(bloco.get("status", "")).upper()
-                if (not bloco) or ("INDISPON" in status) or ("NA FILA" in status):
-                    return False
-            return True
 
         _n_salvos933 = sum(
             1 for p, r in _resultados933.items()
