@@ -28,12 +28,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "8.8 — VALIDAÇÃO AUTOMÁTICA MULTIPARES"
+APP_VERSION = "8.9 — PAINEL DE PERFORMANCE MULTIPARES"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V8.8 Português",
+    page_title="USD Macro Pro — V8.9 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1606,7 +1606,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V8.8 Português")
+st.title("🦅 USD Macro Pro — V8.9 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2798,7 +2798,7 @@ def _avaliar_sinais_v82():
 
 
 def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca, confl):
-    st.markdown("## 🧪 Validação Automática Multipares — V8.8")
+    st.markdown("## 🧪 Validação Automática Multipares — V8.9")
     st.caption(
         "A V8.8 registra a fotografia do sinal e avalia automaticamente os 7 pares na "
         "primeira observação diária FRED posterior. Não reconstrói sinais passados."
@@ -2823,7 +2823,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 
     if serie_atual:
         st.info(
-            f"Fonte de preço V8.8: FRED {serie_atual}, série diária oficial H.10 para {par}. "
+            f"Fonte de preço V8.9: FRED {serie_atual}, série diária oficial H.10 para {par}. "
             "A validação mede direção entre observações diárias — não 1h/4h."
         )
     else:
@@ -2902,7 +2902,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     pendentes = df[df["avaliado"] != True].copy()
     avaliados_total = df[df["avaliado"] == True].copy()
 
-    st.markdown("### 💾 Persistência do histórico — V8.8")
+    st.markdown("### 💾 Persistência do histórico — V8.9")
     _v84_token, _v84_repo, _v84_branch = _github_cfg_v84()
     if _v84_token:
         st.success(
@@ -3073,6 +3073,155 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
             })
     if faixas_q88:
         st.dataframe(pd.DataFrame(faixas_q88), use_container_width=True, hide_index=True)
+
+    # =====================================================
+    # V8.9 — PAINEL DE PERFORMANCE
+    # Somente leitura/estatística: NÃO altera sinal, pesos ou decisão da Matriz.
+    # =====================================================
+    st.markdown("## 📊 Painel de Performance — V8.9")
+
+    _perf89 = validos.copy()
+    _perf89["score_num"] = pd.to_numeric(_perf89["score_mestre"], errors="coerce")
+    _perf89["qual_num"] = pd.to_numeric(_perf89["qualidade"], errors="coerce")
+    _perf89["acerto_num"] = _perf89["acertou"].astype(bool).astype(int)
+
+    _ret89 = (
+        "retorno_direcional_pct"
+        if "retorno_direcional_pct" in _perf89.columns
+        else "retorno_pct"
+    )
+    _perf89["ret_dir_num"] = pd.to_numeric(_perf89[_ret89], errors="coerce")
+
+    _n89 = len(_perf89)
+    _acertos89 = int(_perf89["acerto_num"].sum())
+    _taxa89 = 100.0 * _perf89["acerto_num"].mean() if _n89 else 0.0
+    _retmedio89 = _perf89["ret_dir_num"].mean()
+
+    _m1, _m2, _m3, _m4 = st.columns(4)
+    _m1.metric("Amostra oficial", f"{_n89}")
+    _m2.metric("Acertos", f"{_acertos89}")
+    _m3.metric("Taxa de acerto", f"{_taxa89:.1f}%")
+    _m4.metric(
+        "Retorno direcional médio",
+        "—" if pd.isna(_retmedio89) else f"{_retmedio89:+.3f}%"
+    )
+
+    if _n89 < 30:
+        st.warning(
+            f"⚠️ Amostra ainda pequena: {_n89} sinal(is) avaliado(s). "
+            "Use este painel para acompanhamento, não para concluir que o modelo está validado. "
+            "Uma leitura mais útil começa quando houver dezenas de sinais."
+        )
+
+    # Ranking real por par
+    _rank89 = (
+        _perf89.groupby("par", dropna=False)
+        .agg(
+            Sinais=("acerto_num", "size"),
+            Acertos=("acerto_num", "sum"),
+            Taxa_acerto=("acerto_num", "mean"),
+            Score_medio=("score_num", "mean"),
+            Qualidade_media=("qual_num", "mean"),
+            Retorno_direcional_medio=("ret_dir_num", "mean"),
+        )
+        .reset_index()
+    )
+    _rank89["Taxa_acerto"] = _rank89["Taxa_acerto"] * 100.0
+    _rank89 = _rank89.sort_values(
+        ["Taxa_acerto", "Sinais", "Retorno_direcional_medio"],
+        ascending=[False, False, False]
+    )
+
+    st.markdown("### 🏆 Ranking real dos pares")
+    _rank_show89 = _rank89.rename(columns={
+        "par": "Par",
+        "Taxa_acerto": "Taxa de acerto (%)",
+        "Score_medio": "Score médio",
+        "Qualidade_media": "Qualidade média (%)",
+        "Retorno_direcional_medio": "Retorno direcional médio (%)",
+    })
+    st.dataframe(
+        _rank_show89.round({
+            "Taxa de acerto (%)": 1,
+            "Score médio": 1,
+            "Qualidade média (%)": 1,
+            "Retorno direcional médio (%)": 3,
+        }),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    if not _rank89.empty:
+        _chart89 = _rank89.set_index("par")[["Taxa_acerto"]].rename(
+            columns={"Taxa_acerto": "Taxa de acerto (%)"}
+        )
+        st.bar_chart(_chart89)
+
+    # Score Mestre x resultado
+    st.markdown("### 🎯 Score Mestre × desempenho")
+    _perf89["Faixa Score"] = pd.cut(
+        _perf89["score_num"],
+        bins=[-float("inf"), 70, 80, 90, float("inf")],
+        labels=["<70", "70–79", "80–89", "90+"],
+        right=False,
+    )
+    _score89 = (
+        _perf89.dropna(subset=["Faixa Score"])
+        .groupby("Faixa Score", observed=False)
+        .agg(
+            Sinais=("acerto_num", "size"),
+            Taxa_acerto=("acerto_num", "mean"),
+            Retorno_medio=("ret_dir_num", "mean"),
+        )
+        .reset_index()
+    )
+    _score89 = _score89[_score89["Sinais"] > 0]
+    if not _score89.empty:
+        _score89["Taxa_acerto"] *= 100.0
+        _score_show89 = _score89.rename(columns={
+            "Taxa_acerto": "Taxa de acerto (%)",
+            "Retorno_medio": "Retorno direcional médio (%)",
+        })
+        st.dataframe(
+            _score_show89.round({
+                "Taxa de acerto (%)": 1,
+                "Retorno direcional médio (%)": 3,
+            }),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    # Evolução acumulada dos resultados
+    st.markdown("### 📈 Evolução da amostra")
+    _evo89 = _perf89.copy()
+    _evo89["data_resultado"] = pd.to_datetime(
+        _evo89.get("data_saida"), errors="coerce"
+    )
+    _evo89 = _evo89.sort_values(["data_resultado", "timestamp"])
+    _evo89["Sinais avaliados"] = range(1, len(_evo89) + 1)
+    _evo89["Taxa de acerto acumulada (%)"] = (
+        _evo89["acerto_num"].expanding().mean() * 100.0
+    )
+    _evo89["Retorno direcional acumulado (%)"] = (
+        _evo89["ret_dir_num"].fillna(0.0).cumsum()
+    )
+
+    if len(_evo89):
+        st.line_chart(
+            _evo89.set_index("Sinais avaliados")[
+                ["Taxa de acerto acumulada (%)"]
+            ]
+        )
+        st.line_chart(
+            _evo89.set_index("Sinais avaliados")[
+                ["Retorno direcional acumulado (%)"]
+            ]
+        )
+
+    st.caption(
+        "ℹ️ V8.9 é um painel estatístico. Ele não muda pesos, sinais ou decisões. "
+        "Taxa de acerto histórica não é garantia de resultado futuro."
+    )
 
     # V8.3 — separa sinais perto/longe de eventos de impacto máximo.
     st.markdown("### 🏦 Resultado por risco de evento")
@@ -5446,7 +5595,7 @@ with abas[2]:
             st.success("✅ Sinal registrado!")
 
     st.markdown("---")
-    st.markdown("### 🏆 Matriz Inteligente — V8.8")
+    st.markdown("### 🏆 Matriz Inteligente — V8.9")
     st.caption(
         "Todos os pares abaixo passam pelo mesmo motor de confluência, qualidade e frescor "
         "usado na análise individual."
