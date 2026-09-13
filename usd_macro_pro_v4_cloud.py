@@ -1,8 +1,8 @@
 # ============================================================
-# USD MACRO PRO V9.3.4 — SCANNER PERSISTENTE POR LOTES
-# Base V9.3.3.
-# Salva fila/resultados em dados/scanner_tecnico_v934.json no
-# GitHub. F5 e nova sessão não apagam o progresso.
+# USD MACRO PRO V9.3.5 — VALIDAÇÃO TÉCNICA ESTRITA
+# Base V9.3.4.
+# Só conta um par como completo se H4, H1 e M15 estiverem
+# realmente válidos. Persistência GitHub preservada.
 # ============================================================
 
 #!/usr/bin/env python3
@@ -36,12 +36,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "9.3.4 — SCANNER PERSISTENTE POR LOTES"
+APP_VERSION = "9.3.5 — VALIDAÇÃO TÉCNICA ESTRITA"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V9.3.4 Scanner Persistente",
+    page_title="USD Macro Pro — V9.3.5 Validação Técnica Estrita",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1620,7 +1620,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V9.3.4 Scanner Persistente")
+st.title("🦅 USD Macro Pro — V9.3.5 Validação Técnica Estrita")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2812,7 +2812,7 @@ def _avaliar_sinais_v82():
 
 
 def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca, confl):
-    st.markdown("## 🧪 Validação Automática Multipares — V9.3.4")
+    st.markdown("## 🧪 Validação Automática Multipares — V9.3.5")
     st.caption(
         "A V8.8 registra a fotografia do sinal e avalia automaticamente os 7 pares na "
         "primeira observação diária FRED posterior. Não reconstrói sinais passados."
@@ -2837,7 +2837,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 
     if serie_atual:
         st.info(
-            f"Fonte de preço V9.3.4: FRED {serie_atual}, série diária oficial H.10 para {par}. "
+            f"Fonte de preço V9.3.5: FRED {serie_atual}, série diária oficial H.10 para {par}. "
             "A validação mede direção entre observações diárias — não 1h/4h."
         )
     else:
@@ -2916,7 +2916,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     pendentes = df[df["avaliado"] != True].copy()
     avaliados_total = df[df["avaliado"] == True].copy()
 
-    st.markdown("### 💾 Persistência do histórico — V9.3.4")
+    st.markdown("### 💾 Persistência do histórico — V9.3.5")
     _v84_token, _v84_repo, _v84_branch = _github_cfg_v84()
     if _v84_token:
         st.success(
@@ -3092,7 +3092,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     # V8.9 — PAINEL DE PERFORMANCE
     # Somente leitura/estatística: NÃO altera sinal, pesos ou decisão da Matriz.
     # =====================================================
-    st.markdown("## 📊 Painel de Performance — V9.3.4")
+    st.markdown("## 📊 Painel de Performance — V9.3.5")
 
     _perf89 = validos.copy()
     _perf89["score_num"] = pd.to_numeric(_perf89["score_mestre"], errors="coerce")
@@ -3273,7 +3273,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 # V9.0 — CENTRAL DO OPERADOR
 # Somente interface/orientação; não altera o motor do modelo.
 # ============================================================
-st.markdown("## 🎛️ Central do Operador — V9.3.4")
+st.markdown("## 🎛️ Central do Operador — V9.3.5")
 st.caption("O APP define o viés macro; o gráfico confirma a entrada.")
 
 with st.container(border=True):
@@ -5658,7 +5658,7 @@ with abas[2]:
             st.success("✅ Sinal registrado!")
 
     st.markdown("---")
-    st.markdown("### 🏆 Matriz Inteligente — V9.3.4")
+    st.markdown("### 🏆 Matriz Inteligente — V9.3.5")
     st.caption(
         "Todos os pares abaixo passam pelo mesmo motor de confluência, qualidade e frescor "
         "usado na análise individual."
@@ -6612,7 +6612,7 @@ def _gh_cfg_v934():
 
 def _scanner_load_v934():
     token, repo, branch = _gh_cfg_v934()
-    vazio = {"versao": "V9.3.4", "lote": 0, "ultimo_processamento_ts": 0.0, "resultados": {}}
+    vazio = {"versao": "V9.3.5", "lote": 0, "ultimo_processamento_ts": 0.0, "resultados": {}}
     if not token or not repo:
         vazio["_erro"] = "Persistência GitHub não configurada."
         return vazio
@@ -6677,7 +6677,7 @@ def _tec_to_json_v934(tec):
 # ainda não são alimentados automaticamente pelo sistema.
 # =========================================================
 with abas[6]:
-    st.subheader("🎯 Central de Decisão Automática — V9.3.4")
+    st.subheader("🎯 Central de Decisão Automática — V9.3.5")
     st.caption(
         "Resumo automático dos dados que já existem no APP. "
         "O resultado abaixo é um viés macro/operacional educacional, não uma ordem de mercado."
@@ -6934,7 +6934,7 @@ with abas[6]:
         # -----------------------------------------------------
         # V9.3 — Scanner técnico automático dos 7 pares
         # -----------------------------------------------------
-        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3.4")
+        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3.5")
         st.caption(
             "A Matriz continua escolhendo o viés macro de cada par. "
             "O scanner consulta H4, H1 e M15 e procura qual par está mais perto "
@@ -7017,9 +7017,7 @@ with abas[6]:
                 str(_mat93.iloc[i]["Par"]) for i in _lotes933[_lote_idx933]
             ]
             _lote_completo933 = all(
-                p in _resultados933 and bool(
-                    _resultados933[p].get("tecnico", {}).get("disponivel", False)
-                )
+                p in _resultados933 and _resultado_tecnico_valido_v935(_resultados933[p])
                 for p in _pares_lote933
             )
             if st.button(
@@ -7064,9 +7062,20 @@ with abas[6]:
                     )
                 )
 
+        def _resultado_tecnico_valido_v935(r):
+            tec = r.get("tecnico", {}) if isinstance(r, dict) else {}
+            if not bool(tec.get("disponivel", False)):
+                return False
+            for tf in ("h4", "h1", "m15"):
+                bloco = tec.get(tf, {})
+                status = str(bloco.get("status", "")).upper()
+                if (not bloco) or ("INDISPON" in status) or ("NA FILA" in status):
+                    return False
+            return True
+
         _n_salvos933 = sum(
             1 for p, r in _resultados933.items()
-            if bool(r.get("tecnico", {}).get("disponivel", False))
+            if _resultado_tecnico_valido_v935(r)
         )
         st.progress(
             min(1.0, _n_salvos933 / max(1, len(_mat93))),
@@ -7105,6 +7114,8 @@ with abas[6]:
             _tec93 = _saved933["tecnico"]
             _dec93 = str(_saved933["decisao"])
             _txt93 = str(_saved933["texto"])
+            if not _resultado_tecnico_valido_v935(_saved933):
+                _txt93 = "Resultado persistido incompleto. Reprocesse somente o lote deste par."
 
             _tech_score93 = (
                 float(_tec93["h4"].get("score", 0)) * 0.35 +
@@ -7129,7 +7140,7 @@ with abas[6]:
                 "M15": _tec93["m15"]["status"],
                 "Semáforo": _dec93,
                 "Índice operacional": round(max(0, min(100, _op93)), 1),
-                "_disponivel": bool(_tec93.get("disponivel", False)),
+                "_disponivel": _resultado_tecnico_valido_v935(_saved933),
                 "_texto": _txt93,
             })
 
@@ -7152,7 +7163,7 @@ with abas[6]:
                     "O ranking é provisório até chegar a 7/7."
                 )
             else:
-                st.success("✅ Scanner COMPLETO: os 7 pares têm H4/H1/M15 disponíveis.")
+                st.success("✅ Scanner COMPLETO: 7/7 pares realmente têm H4/H1/M15 válidos.")
             _scan_show93 = (
                 _scan_df93.drop(columns=["_disponivel", "_texto"])
                           .sort_values(
@@ -7227,7 +7238,7 @@ with abas[6]:
         )
 
         st.caption(
-            "A Central V9.3.4 processa somente o lote atual e salva o progresso no GitHub, sobrevivendo a F5, fechamento do navegador e nova sessão. "
+            "A Central V9.3.5 mantém a persistência no GitHub e só considera um par completo quando H4, H1 e M15 estão realmente válidos. "
             "Ela não transforma Score Mestre em probabilidade de lucro e não substitui gestão de risco."
         )
 
