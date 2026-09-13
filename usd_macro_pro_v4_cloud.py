@@ -28,12 +28,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "8.7.3 — 1 PAR POR DIA + LEGADO SEPARADO"
+APP_VERSION = "8.8 — VALIDAÇÃO AUTOMÁTICA MULTIPARES"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V8.7.3 Português",
+    page_title="USD Macro Pro — V8.8 Português",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1606,7 +1606,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V8.7.3 Português")
+st.title("🦅 USD Macro Pro — V8.8 Português")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2463,7 +2463,8 @@ def _carregar_sinais_v82():
         "score_base","score_cotada","diferenca","fomc_score",
         "fomc_peso","evento","dias_evento","impacto","timing",
         "preco_entrada","data_preco","avaliado","preco_saida",
-        "data_saida","retorno_pct","acertou","versao_coleta","dia_coleta"
+        "data_saida","retorno_pct","acertou","versao_coleta","dia_coleta",
+        "horizonte_validacao","retorno_direcional_pct","serie_saida"
     ]
     return pd.DataFrame(columns=cols)
 
@@ -2603,6 +2604,45 @@ def _fred_preco_par_v87(par):
     except Exception:
         return None, None, sid
 
+def _fred_primeira_observacao_posterior_v88(par, data_entrada):
+    """
+    Retorna a primeira observação diária FRED estritamente posterior à entrada.
+    Isso fixa o horizonte da V8.8 como 'próxima observação diária disponível',
+    em vez de usar simplesmente o preço mais recente.
+    """
+    series = {
+        "EUR/USD": "DEXUSEU",
+        "GBP/USD": "DEXUSUK",
+        "AUD/USD": "DEXUSAL",
+        "NZD/USD": "DEXUSNZ",
+        "USD/JPY": "DEXJPUS",
+        "USD/CHF": "DEXSZUS",
+        "USD/CAD": "DEXCAUS",
+    }
+    sid = series.get(str(par).upper().strip())
+    if not sid:
+        return None, None, None
+
+    try:
+        entrada = pd.Timestamp(data_entrada).normalize()
+        obs = _fred_obs_v71(sid, 120)
+        candidatos = []
+        for dt, valor in obs or []:
+            try:
+                d = pd.Timestamp(dt).normalize()
+                v = float(valor)
+                if d > entrada:
+                    candidatos.append((d, v))
+            except Exception:
+                continue
+        if not candidatos:
+            return None, None, sid
+        candidatos.sort(key=lambda x: x[0])
+        d, v = candidatos[0]
+        return float(v), d, sid
+    except Exception:
+        return None, None, sid
+
 def _fred_preco_eurusd_v82():
     """Compatibilidade com versões anteriores."""
     preco, data, _ = _fred_preco_par_v87("EUR/USD")
@@ -2681,15 +2721,28 @@ def _registrar_sinal_v82(par, direcao, score_mestre, qualidade,
 
 def _avaliar_sinais_v82():
     """
-    V8.7 — avaliação diária multipares.
-    Cada linha é avaliada com a série FRED correspondente ao próprio par.
-    Só usa observação diária posterior à data de entrada.
+    V8.8 — Validação Automática Multipares.
+
+    Horizonte oficial desta etapa:
+    primeira observação diária FRED estritamente posterior à data_preco de entrada.
+
+    O retorno_pct permanece como movimento bruto do PAR.
+    retorno_direcional_pct converte esse movimento para o lado do sinal:
+    BUY -> retorno do par; SELL -> retorno invertido.
     """
     df = _carregar_sinais_v82()
     if df.empty:
         return df, 0
 
-    cache_precos = {}
+    for col, default in [
+        ("horizonte_validacao", ""),
+        ("retorno_direcional_pct", None),
+        ("serie_saida", ""),
+    ]:
+        if col not in df.columns:
+            df[col] = default
+
+    cache = {}
     atualizados = 0
 
     for i, r in df.iterrows():
@@ -2697,51 +2750,58 @@ def _avaliar_sinais_v82():
             continue
 
         par_linha = str(r.get("par", "")).upper().strip()
-        if par_linha not in cache_precos:
-            cache_precos[par_linha] = _fred_preco_par_v87(par_linha)
-
-        preco_atual, dt_atual, _sid = cache_precos[par_linha]
-        if preco_atual is None or dt_atual is None:
-            continue
-
         try:
             dt_entrada = pd.Timestamp(r["data_preco"])
+            entrada = float(r["preco_entrada"])
         except Exception:
             continue
 
-        if pd.Timestamp(dt_atual) <= dt_entrada:
+        chave = (par_linha, dt_entrada.strftime("%Y-%m-%d"))
+        if chave not in cache:
+            cache[chave] = _fred_primeira_observacao_posterior_v88(
+                par_linha, dt_entrada
+            )
+
+        preco_saida, dt_saida, sid = cache[chave]
+        if preco_saida is None or dt_saida is None:
             continue
 
         try:
-            entrada = float(r["preco_entrada"])
-            retorno = (float(preco_atual) / entrada - 1.0) * 100.0
+            retorno_par = (float(preco_saida) / entrada - 1.0) * 100.0
         except Exception:
             continue
 
-        direcao = str(r.get("direcao", "")).upper()
+        direcao = str(r.get("direcao", "")).upper().strip()
         if direcao in ("SELL", "VENDA", "VENDER"):
-            acertou = retorno < 0
+            retorno_dir = -retorno_par
         elif direcao in ("BUY", "COMPRA", "COMPRAR"):
-            acertou = retorno > 0
+            retorno_dir = retorno_par
         else:
-            acertou = None
+            continue
+
+        # Zero exato não conta como acerto.
+        acertou = bool(retorno_dir > 0.0)
 
         df.at[i, "avaliado"] = True
-        df.at[i, "preco_saida"] = float(preco_atual)
-        df.at[i, "data_saida"] = pd.Timestamp(dt_atual)
-        df.at[i, "retorno_pct"] = float(retorno)
+        df.at[i, "preco_saida"] = float(preco_saida)
+        df.at[i, "data_saida"] = pd.Timestamp(dt_saida)
+        df.at[i, "retorno_pct"] = float(retorno_par)
+        df.at[i, "retorno_direcional_pct"] = float(retorno_dir)
         df.at[i, "acertou"] = acertou
+        df.at[i, "horizonte_validacao"] = "Próxima observação diária FRED"
+        df.at[i, "serie_saida"] = sid or ""
         atualizados += 1
 
     if atualizados:
         _salvar_sinais_v82(df)
     return df, atualizados
 
+
 def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca, confl):
-    st.markdown("## 🧪 Validação Histórica — V8.7.3")
+    st.markdown("## 🧪 Validação Automática Multipares — V8.8")
     st.caption(
-        "Este módulo registra o sinal AGORA, evita duplicatas e mede depois. "
-        "Ele não reconstrói o passado usando dados futuros."
+        "A V8.8 registra a fotografia do sinal e avalia automaticamente os 7 pares na "
+        "primeira observação diária FRED posterior. Não reconstrói sinais passados."
     )
 
     score = float(confl.get("score_confluencia", 50.0))
@@ -2763,12 +2823,12 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 
     if serie_atual:
         st.info(
-            f"Fonte de preço V8.7.3: FRED {serie_atual}, série diária oficial H.10 para {par}. "
+            f"Fonte de preço V8.8: FRED {serie_atual}, série diária oficial H.10 para {par}. "
             "A validação mede direção entre observações diárias — não 1h/4h."
         )
     else:
         st.warning(
-            "Nesta primeira versão, a avaliação automática está habilitada somente para EUR/USD."
+            "A série diária FRED deste par não está disponível nesta execução."
         )
 
     # V8.5.2 — Coleta Automática Diária corrigida
@@ -2842,7 +2902,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     pendentes = df[df["avaliado"] != True].copy()
     avaliados_total = df[df["avaliado"] == True].copy()
 
-    st.markdown("### 💾 Persistência do histórico — V8.7.3")
+    st.markdown("### 💾 Persistência do histórico — V8.8")
     _v84_token, _v84_repo, _v84_branch = _github_cfg_v84()
     if _v84_token:
         st.success(
@@ -2900,7 +2960,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
         if _n_legado_v873:
             st.info(
                 f"ℹ️ {_n_legado_v873} registro(s) anterior(es) estão marcados como LEGADO. "
-                "Eles permanecem visíveis, mas não entram nas estatísticas oficiais da V8.7.3."
+                "Eles permanecem visíveis, mas não entram nas estatísticas oficiais da V8.8."
             )
     exibir = df.copy()
     for col in ["timestamp","data_preco","data_saida"]:
@@ -2919,20 +2979,30 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 
     validos = avaliados[avaliados["acertou"].notna()].copy()
     if "versao_coleta" in validos.columns:
-        validos = validos[validos["versao_coleta"].astype(str) == "V8.7.3"].copy()
+        validos = validos[
+            validos["versao_coleta"].astype(str).isin(["V8.7.3", "V8.8"])
+        ].copy()
     if validos.empty:
-        st.info("Ainda não há sinais V8.7.3 avaliados suficientes para estatística oficial.")
+        st.info(
+            "Ainda não há sinais da base limpa (V8.7.3+) avaliados "
+            "para a estatística oficial V8.8."
+        )
         return
 
     taxa = 100.0 * validos["acertou"].astype(bool).mean()
     n = len(validos)
-    ret_medio = pd.to_numeric(validos["retorno_pct"], errors="coerce").mean()
+    _ret_col_v88 = (
+        "retorno_direcional_pct"
+        if "retorno_direcional_pct" in validos.columns
+        else "retorno_pct"
+    )
+    ret_medio = pd.to_numeric(validos[_ret_col_v88], errors="coerce").mean()
 
     st.markdown("### 📈 Resultado observado")
     r1,r2,r3 = st.columns(3)
     r1.metric("Sinais avaliados", n)
     r2.metric("Acerto direcional", f"{taxa:.1f}%")
-    r3.metric("Retorno médio", f"{ret_medio:+.3f}%")
+    r3.metric("Retorno direcional médio", f"{ret_medio:+.3f}%")
 
     # Segmentação simples por Score Mestre.
     faixas = []
@@ -2956,6 +3026,53 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     if faixas:
         st.markdown("### 🎯 Resultado por faixa de Score Mestre")
         st.dataframe(pd.DataFrame(faixas), use_container_width=True, hide_index=True)
+
+    # V8.8 — desempenho por par.
+    st.markdown("### 💱 Resultado por par")
+    por_par = []
+    for _par88, _sub88 in validos.groupby(validos["par"].astype(str)):
+        _retcol88 = (
+            "retorno_direcional_pct"
+            if "retorno_direcional_pct" in _sub88.columns
+            else "retorno_pct"
+        )
+        por_par.append({
+            "Par": _par88,
+            "N": len(_sub88),
+            "Acertos": int(_sub88["acertou"].astype(bool).sum()),
+            "Taxa de acerto": f"{100*_sub88['acertou'].astype(bool).mean():.1f}%",
+            "Score médio": f"{pd.to_numeric(_sub88['score_mestre'], errors='coerce').mean():.1f}",
+            "Qualidade média": f"{pd.to_numeric(_sub88['qualidade'], errors='coerce').mean():.1f}%",
+            "Retorno direcional médio": (
+                f"{pd.to_numeric(_sub88[_retcol88], errors='coerce').mean():+.3f}%"
+            ),
+        })
+    if por_par:
+        st.dataframe(
+            pd.DataFrame(por_par).sort_values(["N", "Par"], ascending=[False, True]),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    # V8.8 — desempenho por faixa de qualidade.
+    st.markdown("### 🧪 Resultado por qualidade")
+    _q88 = pd.to_numeric(validos["qualidade"], errors="coerce")
+    faixas_q88 = []
+    for _nome88, _lo88, _hi88 in [
+        ("Qualidade < 60%", -1, 60),
+        ("60–74%", 60, 75),
+        ("75%+", 75, 101),
+    ]:
+        _sub88 = validos[(_q88 >= _lo88) & (_q88 < _hi88)]
+        if len(_sub88):
+            faixas_q88.append({
+                "Faixa": _nome88,
+                "N": len(_sub88),
+                "Acerto direcional": f"{100*_sub88['acertou'].astype(bool).mean():.1f}%",
+                "Score médio": f"{pd.to_numeric(_sub88['score_mestre'], errors='coerce').mean():.1f}",
+            })
+    if faixas_q88:
+        st.dataframe(pd.DataFrame(faixas_q88), use_container_width=True, hide_index=True)
 
     # V8.3 — separa sinais perto/longe de eventos de impacto máximo.
     st.markdown("### 🏦 Resultado por risco de evento")
@@ -5329,7 +5446,7 @@ with abas[2]:
             st.success("✅ Sinal registrado!")
 
     st.markdown("---")
-    st.markdown("### 🏆 Matriz Inteligente — V8.7.3")
+    st.markdown("### 🏆 Matriz Inteligente — V8.8")
     st.caption(
         "Todos os pares abaixo passam pelo mesmo motor de confluência, qualidade e frescor "
         "usado na análise individual."
