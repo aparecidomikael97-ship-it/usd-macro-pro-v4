@@ -1,5 +1,5 @@
 # ============================================================
-# USD MACRO PRO V9.3.7 — REGISTRO AUTOMÁTICO DE CONFIGURAÇÕES COMPLETAS
+# USD MACRO PRO V9.3.8 — VALIDAÇÃO AUTOMÁTICA 1H / 4H / 24H
 # Exibe o motivo persistido de falhas por par/timeframe sem
 # gastar novas chamadas. Persistência e validação preservadas.
 # ============================================================
@@ -35,12 +35,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "9.3.7 — REGISTRO AUTOMÁTICO DE CONFIGURAÇÕES COMPLETAS"
+APP_VERSION = "9.3.8 — VALIDAÇÃO AUTOMÁTICA 1H / 4H / 24H"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V9.3.7 Configurações Completas",
+    page_title="USD Macro Pro — V9.3.8 Validação 1H · 4H · 24H",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1619,7 +1619,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V9.3.7 Configurações Completas")
+st.title("🦅 USD Macro Pro — V9.3.8 Validação 1H · 4H · 24H")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -6608,7 +6608,7 @@ def _decisao_tecnica_final_v92(tecnico: dict, timing: str, direcao: str) -> tupl
 
 
 # =========================================================
-# V9.3.7 — REGISTRO AUTOMÁTICO DE CONFIGURAÇÕES COMPLETAS
+# V9.3.8 — VALIDAÇÃO AUTOMÁTICA 1H / 4H / 24H
 # Macro + H4 + H1 + M15 alinhados.
 # Anti-duplicação: par + direção + candle M15.
 # Base pronta para validação futura em 1h / 4h / 24h.
@@ -6719,28 +6719,186 @@ def _registrar_config_completa_v937(
     ok, msg = _config_salvar_v937(df)
     return ok, msg or ("Configuração registrada." if ok else "Falha ao registrar."), bool(ok)
 
-def _painel_configuracoes_v937():
-    st.markdown("#### 🗂️ Configurações completas registradas — V9.3.7")
+
+def _retorno_direcional_v938(direcao, entrada, saida):
+    entrada, saida = float(entrada), float(saida)
+    if entrada == 0:
+        return None
+    bruto = (saida / entrada - 1.0) * 100.0
+    return -bruto if "VENDA" in str(direcao).upper() else bruto
+
+def _td_preco_historico_v938(par, alvo_utc):
+    """Busca candles M15 e devolve o primeiro fechamento em/apos o horário-alvo."""
+    chave = st.secrets.get("CHAVE_TWELVE_DATA", "")
+    if not chave:
+        return None, None, "CHAVE_TWELVE_DATA ausente."
+    try:
+        alvo = pd.to_datetime(alvo_utc, utc=True)
+        params = {
+            "symbol": str(par),
+            "interval": "15min",
+            "outputsize": 500,
+            "apikey": chave,
+            "timezone": "UTC",
+            "format": "JSON",
+        }
+        r = requests.get("https://api.twelvedata.com/time_series", params=params, timeout=20)
+        if r.status_code != 200:
+            return None, None, f"HTTP {r.status_code}"
+        js = r.json()
+        vals = js.get("values") or []
+        candidatos = []
+        for v in vals:
+            try:
+                dt = pd.to_datetime(v.get("datetime"), utc=True)
+                close = float(v.get("close"))
+                if dt >= alvo:
+                    candidatos.append((dt, close))
+            except Exception:
+                pass
+        if not candidatos:
+            return None, None, "Ainda não há candle posterior ao horizonte."
+        dt, close = sorted(candidatos, key=lambda x: x[0])[0]
+        return close, dt.isoformat(), ""
+    except Exception as e:
+        return None, None, f"{type(e).__name__}: {e}"
+
+def _validar_configuracoes_v938():
+    """
+    Preenche 1h/4h/24h somente quando cada horizonte já venceu.
+    Usa o primeiro fechamento M15 disponível em/apos o horário-alvo.
+    """
     df, erro = _config_ler_v937()
+    if erro and df.empty:
+        return df, False, erro
+    if df.empty:
+        return df, False, ""
+
+    agora = pd.Timestamp.now(tz="UTC")
+    mudou = False
+    horizontes = [(1, "1h"), (4, "4h"), (24, "24h")]
+
+    for i, row in df.iterrows():
+        try:
+            entrada = float(row.get("preco_entrada"))
+            base_txt = row.get("candle_m15") or row.get("registrado_em")
+            base = pd.to_datetime(base_txt, utc=True)
+            direcao = str(row.get("direcao", ""))
+            par = str(row.get("par", ""))
+        except Exception:
+            continue
+
+        for horas, suf in horizontes:
+            col_preco = f"preco_{suf}"
+            col_ret = f"retorno_{suf}_pct"
+            col_hit = f"acertou_{suf}"
+            ja = row.get(col_preco)
+            if pd.notna(ja) and str(ja).strip() not in ("", "None", "nan"):
+                continue
+
+            alvo = base + pd.Timedelta(hours=horas)
+            if agora < alvo:
+                continue
+
+            preco, dt_saida, err = _td_preco_historico_v938(par, alvo)
+            if preco is None:
+                continue
+
+            ret = _retorno_direcional_v938(direcao, entrada, preco)
+            df.at[i, col_preco] = float(preco)
+            df.at[i, col_ret] = float(ret) if ret is not None else None
+            df.at[i, col_hit] = bool(ret > 0) if ret is not None else None
+            # Colunas auxiliares são adicionadas sem quebrar arquivos antigos.
+            col_dt = f"data_{suf}"
+            if col_dt not in df.columns:
+                df[col_dt] = None
+            df.at[i, col_dt] = dt_saida
+            mudou = True
+
+        feitos = []
+        for _, suf in horizontes:
+            v = df.at[i, f"preco_{suf}"] if f"preco_{suf}" in df.columns else None
+            if pd.notna(v) and str(v).strip() not in ("", "None", "nan"):
+                feitos.append(suf)
+        if len(feitos) == 3:
+            df.at[i, "status_validacao"] = "VALIDADO 1H/4H/24H"
+        elif feitos:
+            df.at[i, "status_validacao"] = "PARCIAL " + "/".join(x.upper() for x in feitos)
+        else:
+            df.at[i, "status_validacao"] = "PENDENTE"
+
+    if mudou:
+        ok, msg = _config_salvar_v937(df)
+        if not ok:
+            return df, False, msg
+    return df, mudou, ""
+
+def _fmt_resultado_v938(ret, hit):
+    if pd.isna(ret):
+        return "⏳ PENDENTE"
+    try:
+        return f"{'✅' if bool(hit) else '❌'} {float(ret):+.3f}%"
+    except Exception:
+        return "—"
+
+
+def _painel_configuracoes_v937():
+    st.markdown("#### 🧪 Validação automática das configurações — V9.3.8")
+    df, mudou, erro = _validar_configuracoes_v938()
     if erro and df.empty:
         st.info(f"Histórico ainda indisponível: {erro}")
         return
     if df.empty:
         st.info("Ainda não há configuração completa registrada.")
         return
+
+    if mudou:
+        st.success("🔄 V9.3.8 atualizou automaticamente os horizontes que já estavam disponíveis.")
+
     total = len(df)
-    pend = int((df["status_validacao"].astype(str) == "PENDENTE").sum())
-    c1, c2 = st.columns(2)
-    c1.metric("Configurações registradas", total)
-    c2.metric("Aguardando validação", pend)
+    completos = int((df["status_validacao"].astype(str) == "VALIDADO 1H/4H/24H").sum())
+    pend = total - completos
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Configurações", total)
+    c2.metric("Totalmente validadas", completos)
+    c3.metric("Em acompanhamento", pend)
+
+    vis = df.copy()
+    for suf in ("1h", "4h", "24h"):
+        vis[f"Resultado {suf.upper()}"] = [
+            _fmt_resultado_v938(r, h)
+            for r, h in zip(vis[f"retorno_{suf}_pct"], vis[f"acertou_{suf}"])
+        ]
+
     cols_show = [
         "registrado_em", "par", "direcao", "score_mestre", "qualidade",
-        "indice_operacional", "candle_m15", "preco_entrada", "status_validacao"
+        "indice_operacional", "preco_entrada",
+        "Resultado 1H", "Resultado 4H", "Resultado 24H", "status_validacao"
     ]
-    st.dataframe(df[cols_show].tail(30).iloc[::-1], use_container_width=True, hide_index=True)
+    st.dataframe(vis[cols_show].tail(30).iloc[::-1], use_container_width=True, hide_index=True)
+
+    avaliados = {}
+    for suf in ("1h", "4h", "24h"):
+        mask = pd.to_numeric(df[f"retorno_{suf}_pct"], errors="coerce").notna()
+        n = int(mask.sum())
+        if n:
+            hits = df.loc[mask, f"acertou_{suf}"].astype(str).str.lower().isin(["true", "1"]).sum()
+            avaliados[suf] = (n, 100.0 * hits / n)
+
+    if avaliados:
+        st.markdown("##### 📊 Desempenho observado")
+        cols = st.columns(3)
+        for j, suf in enumerate(("1h", "4h", "24h")):
+            if suf in avaliados:
+                n, taxa = avaliados[suf]
+                cols[j].metric(f"Acerto {suf.upper()}", f"{taxa:.1f}%", f"{n} sinal(is)")
+            else:
+                cols[j].metric(f"Acerto {suf.upper()}", "—", "sem amostra")
+
     st.caption(
-        "A V9.3.7 registra a fotografia da configuração completa. "
-        "Os campos de 1h, 4h e 24h já ficam preparados para a próxima etapa de validação."
+        "Retorno direcional: COMPRA é positiva quando o preço sobe; VENDA é positiva quando o preço cai. "
+        "A avaliação usa o primeiro fechamento M15 disponível em/apos 1h, 4h e 24h do candle de entrada. "
+        "Amostras pequenas não validam o modelo."
     )
 
 
