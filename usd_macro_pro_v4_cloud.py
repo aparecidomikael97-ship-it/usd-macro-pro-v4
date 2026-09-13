@@ -1,5 +1,5 @@
 # ============================================================
-# USD MACRO PRO V9.3.5.6 — DIAGNÓSTICO PROFUNDO TWELVE DATA
+# USD MACRO PRO V9.3.5.7 — DIAGNÓSTICO PROFUNDO TWELVE DATA
 # Exibe o motivo persistido de falhas por par/timeframe sem
 # gastar novas chamadas. Persistência e validação preservadas.
 # ============================================================
@@ -40,7 +40,7 @@ HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V9.3.5.6 Diagnóstico Profundo",
+    page_title="USD Macro Pro — V9.3.5.7 Dados × Direção",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1619,7 +1619,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V9.3.5.6 Diagnóstico Profundo")
+st.title("🦅 USD Macro Pro — V9.3.5.7 Dados × Direção")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -6351,7 +6351,7 @@ with abas[1]:
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def _td_time_series_v92(par: str, interval: str, outputsize: int = 140) -> pd.DataFrame:
-    """V9.3.5.6: captura diagnóstico seguro da Twelve Data sem salvar/exibir API key."""
+    """V9.3.5.7: captura diagnóstico seguro da Twelve Data sem salvar/exibir API key."""
     def vazio(msg="", http=None, api_status="", api_code="", values_count=0, valid_count=0):
         d = pd.DataFrame()
         d.attrs["erro_td"] = str(msg or "")
@@ -6514,13 +6514,19 @@ def _analise_m15_v92(df: pd.DataFrame, lado: str) -> dict:
 
 
 def _pacote_tecnico_v92(par: str, direcao: str) -> dict:
-    """V9.3.5.6: pacote técnico com diagnóstico profundo seguro por timeframe."""
+    """
+    V9.3.5.7:
+    - separa disponibilidade de dados de alinhamento macro/técnico;
+    - se o macro estiver AGUARDAR, candles válidos NÃO viram 'dados insuficientes';
+    - preserva diagnóstico seguro da Twelve Data.
+    """
     lado=_lado_macro_v92(direcao)
     if not CHAVE_TWELVE_DATA:
         motivo="CHAVE_TWELVE_DATA não configurada."
-        base={"status":"⚪ AGUARDANDO","score":0,"texto":"Configure a chave.","motivo":motivo}
-        return {"disponivel":False,"motivo":motivo,"erro":motivo,"diagnostico":motivo,
-                "h4":dict(base),"h1":dict(base),"m15":dict(base)}
+        base={"status":"⚪ INDISPONÍVEL","score":0,"texto":motivo,"motivo":motivo}
+        return {"disponivel":False,"dados_disponiveis":False,"motivo":motivo,"erro":motivo,
+                "diagnostico":motivo,"h4":dict(base),"h1":dict(base),"m15":dict(base)}
+
     h4=_td_time_series_v92(par,"4h",100)
     h1=_td_time_series_v92(par,"1h",100)
     m15=_td_time_series_v92(par,"15min",100)
@@ -6528,8 +6534,10 @@ def _pacote_tecnico_v92(par: str, direcao: str) -> dict:
     diags={tf:dict(df.attrs.get("td_diag",{}) or {}) for tf,df in dfs.items()}
     erros={tf:str(df.attrs.get("erro_td","") or "Resposta sem candles.")
            for tf,df in dfs.items() if df.empty}
+
+    # Falha REAL de dados/API.
     if erros:
-        def bloco(tf):
+        def bloco_erro(tf):
             err=erros.get(tf,"")
             if err:
                 return {"status":"⚪ INDISPONÍVEL","score":0,"texto":err,"motivo":err,
@@ -6538,13 +6546,39 @@ def _pacote_tecnico_v92(par: str, direcao: str) -> dict:
                     "texto":"Outro timeframe falhou; pacote não concluído.",
                     "motivo":"","erro":"","td_diag":diags.get(tf,{})}
         motivo=" | ".join(f"{tf}: {err}" for tf,err in erros.items())
-        return {"disponivel":False,"motivo":motivo,"erro":motivo,"diagnostico":motivo,
-                "h4":bloco("H4"),"h1":bloco("H1"),"m15":bloco("M15")}
+        return {"disponivel":False,"dados_disponiveis":False,"motivo":motivo,"erro":motivo,
+                "diagnostico":motivo,"h4":bloco_erro("H4"),"h1":bloco_erro("H1"),
+                "m15":bloco_erro("M15")}
+
+    # Candles existem, mas a Matriz não escolheu BUY/SELL.
+    # Isso é estado macro neutro/aguardar — NÃO indisponibilidade técnica.
+    if lado == "WAIT":
+        def bloco_wait(tf, texto):
+            return {"status":"⚪ MACRO AGUARDAR","score":50,"texto":texto,
+                    "motivo":"Dados disponíveis; direção macro ainda não definida.",
+                    "td_diag":diags.get(tf,{})}
+        ultima=max(h4["datetime"].iloc[-1],h1["datetime"].iloc[-1],m15["datetime"].iloc[-1])
+        return {
+            "disponivel":True,
+            "dados_disponiveis":True,
+            "macro_definido":False,
+            "motivo":"Candles válidos. A Matriz está em AGUARDAR CONFIRMAÇÃO; não existe lado BUY/SELL para comparar a técnica.",
+            "erro":"",
+            "diagnostico":"Dados técnicos completos; aguardando definição do viés macro.",
+            "h4":bloco_wait("H4","H4 disponível; aguardando direção macro."),
+            "h1":bloco_wait("H1","H1 disponível; aguardando direção macro."),
+            "m15":bloco_wait("M15","M15 disponível; aguardando direção macro."),
+            "ultima_atualizacao":ultima,
+            "preco_m15":float(m15["close"].iloc[-1]),
+        }
+
+    # BUY/SELL definido: análise normal.
     a4=_analise_h4_v92(h4,lado); a4["td_diag"]=diags["H4"]
     a1=_analise_h1_v92(h1,lado); a1["td_diag"]=diags["H1"]
     a15=_analise_m15_v92(m15,lado); a15["td_diag"]=diags["M15"]
     ultima=max(h4["datetime"].iloc[-1],h1["datetime"].iloc[-1],m15["datetime"].iloc[-1])
-    return {"disponivel":True,"motivo":"","erro":"","diagnostico":"",
+    return {"disponivel":True,"dados_disponiveis":True,"macro_definido":True,
+            "motivo":"","erro":"","diagnostico":"",
             "h4":a4,"h1":a1,"m15":a15,"ultima_atualizacao":ultima,
             "preco_m15":float(m15["close"].iloc[-1])}
 
@@ -6914,7 +6948,7 @@ with abas[6]:
         # -----------------------------------------------------
         # V9.3 — Scanner técnico automático dos 7 pares
         # -----------------------------------------------------
-        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3.5.6")
+        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3.5.7")
         st.caption(
             "A Matriz continua escolhendo o viés macro de cada par. "
             "O scanner consulta H4, H1 e M15 e procura qual par está mais perto "
@@ -6983,7 +7017,7 @@ with abas[6]:
                     if _par933 in _resultados933 and _resultado_tecnico_valido_v935(_resultados933[_par933]):
                         continue
 
-                    # V9.3.5.6: o par incompleto precisa de UMA tentativa realmente nova.
+                    # V9.3.5.7: o par incompleto precisa de UMA tentativa realmente nova.
                     # Limpa somente o cache da função técnica antes desta tentativa.
                     # Os 6 pares válidos continuam preservados no JSON e não são consultados.
                     try:
@@ -7005,7 +7039,7 @@ with abas[6]:
                         "texto": _txt933,
                         "processado_em": _tentativa_ts9355,
                         "tentativa_v9355": True,
-                        "versao_tentativa": "V9.3.5.6",
+                        "versao_tentativa": "V9.3.5.7",
                     }
 
                 _estado934["resultados"] = _resultados933
@@ -7223,7 +7257,7 @@ with abas[6]:
                 with st.expander("🔎 Diagnóstico real da Twelve Data", expanded=True):
                     st.warning(
                         "Registros antigos podem mostrar apenas a mensagem genérica. "
-                        "A V9.3.5.6 salva HTTP, código/mensagem da API e quantidade de candles por timeframe, sem expor a chave."
+                        "A V9.3.5.7 salva HTTP, código/mensagem da API e quantidade de candles por timeframe, sem expor a chave."
                     )
                     st.dataframe(pd.DataFrame(_diag_rows9353), use_container_width=True, hide_index=True)
                     _deep9356=[]
@@ -7246,7 +7280,7 @@ with abas[6]:
                                     "Candles válidos":_d9356.get("candles_validos",0),
                                 })
                     if _deep9356:
-                        st.markdown("**🧪 Diagnóstico profundo V9.3.5.6**")
+                        st.markdown("**🧪 Diagnóstico profundo V9.3.5.7**")
                         st.dataframe(pd.DataFrame(_deep9356),use_container_width=True,hide_index=True)
                         st.caption("A chave da Twelve Data não é exibida nem persistida.")
                     st.caption(
