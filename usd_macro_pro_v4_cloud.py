@@ -1,5 +1,5 @@
 # ============================================================
-# USD MACRO PRO V9.3.5.4 — DIAGNÓSTICO REAL TWELVE DATA
+# USD MACRO PRO V9.3.5.5 — SALVAMENTO DE FALHA + CACHE LIMPO
 # Exibe o motivo persistido de falhas por par/timeframe sem
 # gastar novas chamadas. Persistência e validação preservadas.
 # ============================================================
@@ -35,12 +35,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "9.3.5.4 — DIAGNÓSTICO REAL TWELVE DATA"
+APP_VERSION = "9.3.5.5 — FALHA PERSISTENTE + CACHE LIMPO"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V9.3.5.4 Diagnóstico Real",
+    page_title="USD Macro Pro — V9.3.5.5 Falha Persistente",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1619,7 +1619,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V9.3.5.4 Diagnóstico Real")
+st.title("🦅 USD Macro Pro — V9.3.5.5 Falha Persistente")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -6521,7 +6521,7 @@ def _analise_m15_v92(df: pd.DataFrame, lado: str) -> dict:
 
 def _pacote_tecnico_v92(par: str, direcao: str) -> dict:
     """
-    V9.3.5.4:
+    V9.3.5.5:
     além do pacote técnico, preserva o erro REAL retornado pela Twelve Data
     separadamente em H4/H1/M15. Nenhuma chave/API secret é persistida.
     """
@@ -6967,7 +6967,7 @@ with abas[6]:
         # -----------------------------------------------------
         # V9.3 — Scanner técnico automático dos 7 pares
         # -----------------------------------------------------
-        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3.5.4")
+        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3.5.5")
         st.caption(
             "A Matriz continua escolhendo o viés macro de cada par. "
             "O scanner consulta H4, H1 e M15 e procura qual par está mais perto "
@@ -7036,15 +7036,29 @@ with abas[6]:
                     if _par933 in _resultados933 and _resultado_tecnico_valido_v935(_resultados933[_par933]):
                         continue
 
+                    # V9.3.5.5: o par incompleto precisa de UMA tentativa realmente nova.
+                    # Limpa somente o cache da função técnica antes desta tentativa.
+                    # Os 6 pares válidos continuam preservados no JSON e não são consultados.
+                    try:
+                        _td_time_series_v92.clear()
+                    except Exception:
+                        pass
+
+                    _tentativa_ts9355 = time.time()
                     _tec933 = _pacote_tecnico_v92(_par933, _dir933)
                     _dec933, _txt933 = _decisao_tecnica_final_v92(
                         _tec933, _timing91, _dir933
                     )
+
+                    # Persiste SEMPRE a tentativa, inclusive quando a API falhar.
+                    # Isso evita manter silenciosamente o diagnóstico antigo.
                     _resultados933[_par933] = {
                         "tecnico": _tec_to_json_v934(_tec933),
                         "decisao": _dec933,
                         "texto": _txt933,
-                        "processado_em": time.time(),
+                        "processado_em": _tentativa_ts9355,
+                        "tentativa_v9355": True,
+                        "versao_tentativa": "V9.3.5.5",
                     }
 
                 _estado934["resultados"] = _resultados933
@@ -7253,6 +7267,7 @@ with abas[6]:
                 ).strip()
                 _diag_rows9353.append({
                     "Par": _par_diag9353,
+                    "Tentativa": str(_res_diag9353.get("versao_tentativa", "REGISTRO ANTIGO")),
                     "Motivo da última tentativa": _geral9353,
                     "H4 / H1 / M15": " | ".join(_det9353),
                 })
@@ -7261,7 +7276,7 @@ with abas[6]:
                 with st.expander("🔎 Diagnóstico real da Twelve Data", expanded=True):
                     st.warning(
                         "Registros antigos podem mostrar apenas a mensagem genérica. "
-                        "Na próxima tentativa do par incompleto, a V9.3.5.4 salvará a resposta real da API por timeframe."
+                        "A V9.3.5.5 identifica a nova tentativa e salva a falha mesmo quando o pacote técnico for inválido."
                     )
                     st.dataframe(pd.DataFrame(_diag_rows9353), use_container_width=True, hide_index=True)
                     st.caption(
