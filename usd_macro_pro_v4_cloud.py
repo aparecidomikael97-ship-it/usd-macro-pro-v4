@@ -1,5 +1,5 @@
 # ============================================================
-# USD MACRO PRO V9.3.6.2 — DIAGNÓSTICO PROFUNDO TWELVE DATA
+# USD MACRO PRO V9.3.6.3 — DIAGNÓSTICO PROFUNDO TWELVE DATA
 # Exibe o motivo persistido de falhas por par/timeframe sem
 # gastar novas chamadas. Persistência e validação preservadas.
 # ============================================================
@@ -40,7 +40,7 @@ HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V9.3.6.2 Dados × Direção",
+    page_title="USD Macro Pro — V9.3.6.3 Dados × Direção",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1619,7 +1619,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V9.3.6.2 Dados × Direção")
+st.title("🦅 USD Macro Pro — V9.3.6.3 Dados × Direção")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -6351,7 +6351,7 @@ with abas[1]:
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def _td_time_series_v92(par: str, interval: str, outputsize: int = 140) -> pd.DataFrame:
-    """V9.3.6.2: captura diagnóstico seguro da Twelve Data sem salvar/exibir API key."""
+    """V9.3.6.3: captura diagnóstico seguro da Twelve Data sem salvar/exibir API key."""
     def vazio(msg="", http=None, api_status="", api_code="", values_count=0, valid_count=0):
         d = pd.DataFrame()
         d.attrs["erro_td"] = str(msg or "")
@@ -6515,7 +6515,7 @@ def _analise_m15_v92(df: pd.DataFrame, lado: str) -> dict:
 
 def _pacote_tecnico_v92(par: str, direcao: str) -> dict:
     """
-    V9.3.6.2:
+    V9.3.6.3:
     - separa disponibilidade de dados de alinhamento macro/técnico;
     - se o macro estiver AGUARDAR, candles válidos NÃO viram 'dados insuficientes';
     - preserva diagnóstico seguro da Twelve Data.
@@ -6948,7 +6948,7 @@ with abas[6]:
         # -----------------------------------------------------
         # V9.3 — Scanner técnico automático dos 7 pares
         # -----------------------------------------------------
-        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3.6.2")
+        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3.6.3")
         st.caption(
             "A Matriz continua escolhendo o viés macro de cada par. "
             "O scanner consulta H4, H1 e M15 e procura qual par está mais perto "
@@ -7017,7 +7017,7 @@ with abas[6]:
                     if _par933 in _resultados933 and _resultado_tecnico_valido_v935(_resultados933[_par933]):
                         continue
 
-                    # V9.3.6.2: o par incompleto precisa de UMA tentativa realmente nova.
+                    # V9.3.6.3: o par incompleto precisa de UMA tentativa realmente nova.
                     # Limpa somente o cache da função técnica antes desta tentativa.
                     # Os 6 pares válidos continuam preservados no JSON e não são consultados.
                     try:
@@ -7039,7 +7039,7 @@ with abas[6]:
                         "texto": _txt933,
                         "processado_em": _tentativa_ts9355,
                         "tentativa_v9355": True,
-                        "versao_tentativa": "V9.3.6.2",
+                        "versao_tentativa": "V9.3.6.3",
                     }
 
                 _estado934["resultados"] = _resultados933
@@ -7220,7 +7220,7 @@ with abas[6]:
             st.dataframe(_scan_show93, use_container_width=True, hide_index=True)
 
             # =========================================================
-            # V9.3.6.2 — MELHOR OPORTUNIDADE AGORA
+            # V9.3.6.3 — MELHOR OPORTUNIDADE AGORA
             # Apenas resume o scanner existente; NÃO altera sinais/pesos.
             # =========================================================
             st.markdown("### 🏆 Melhor oportunidade agora")
@@ -7294,7 +7294,7 @@ with abas[6]:
                 )
 
                 # =========================================================
-                # V9.3.6.2 — MONITOR DO GATILHO M15
+                # V9.3.6.3 — MONITOR DO GATILHO M15
                 # Reconsulta SOMENTE o par prioritário e SOMENTE o M15.
                 # Não altera macro, pesos, Score Mestre ou ranking.
                 # =========================================================
@@ -7310,6 +7310,133 @@ with abas[6]:
                 )
 
                 if _m15_wait962:
+                    # =====================================================
+                    # V9.3.6.3 — AUTO MONITOR M15
+                    # Funciona enquanto o app estiver aberto/ativo.
+                    # Verifica a cada 5 minutos e só recalcula se o candle
+                    # M15 realmente mudou.
+                    # =====================================================
+                    if "v9363_auto_m15" not in st.session_state:
+                        st.session_state["v9363_auto_m15"] = True
+
+                    _auto_col1, _auto_col2 = st.columns([1, 3])
+                    with _auto_col1:
+                        _auto_enabled963 = st.toggle(
+                            "🤖 Monitor automático",
+                            value=bool(st.session_state.get("v9363_auto_m15", True)),
+                            key="v9363_auto_toggle",
+                        )
+                        st.session_state["v9363_auto_m15"] = _auto_enabled963
+                    with _auto_col2:
+                        st.caption(
+                            "Quando ligado, o APP verifica somente o M15 do par prioritário a cada ~5 minutos. "
+                            "Se o candle não mudou, mantém a decisão; se mudou, recalcula o gatilho."
+                        )
+
+                    @st.fragment(run_every="5m")
+                    def _auto_monitor_m15_v963(par_auto: str, dir_auto: str):
+                        if not bool(st.session_state.get("v9363_auto_m15", True)):
+                            st.caption("⏸️ Monitor automático pausado.")
+                            return
+
+                        lado_auto = _lado_macro_v92(dir_auto)
+
+                        # Busca uma leitura realmente nova do M15.
+                        try:
+                            _td_time_series_v92.clear()
+                        except Exception:
+                            pass
+
+                        df_auto = _td_time_series_v92(par_auto, "15min", 100)
+                        anterior_auto = st.session_state.get("v9362_m15_monitor", {})
+                        dt_ant_auto = (
+                            str(anterior_auto.get("datetime_atual", ""))
+                            if anterior_auto.get("par") == par_auto else ""
+                        )
+
+                        registro_auto = {
+                            "par": par_auto,
+                            "verificacao_realizada": True,
+                            "verificado_em": pd.Timestamp.utcnow().isoformat(),
+                            "datetime_anterior": dt_ant_auto or "Primeira verificação",
+                            "datetime_atual": "",
+                            "preco": None,
+                            "novo_candle": False,
+                            "status": "",
+                            "texto": "",
+                            "consulta_status": "AUTO_INICIADA",
+                            "erro": "",
+                            "http_status": "",
+                            "api_message": "",
+                            "candles_validos": 0,
+                            "modo": "AUTOMÁTICO",
+                        }
+
+                        diag_auto = dict(df_auto.attrs.get("td_diag", {}) or {})
+                        registro_auto["http_status"] = diag_auto.get("http_status", "")
+                        registro_auto["api_message"] = str(diag_auto.get("api_message", "") or "")
+                        registro_auto["candles_validos"] = int(
+                            diag_auto.get("candles_validos", len(df_auto)) or 0
+                        )
+
+                        if df_auto.empty:
+                            erro_auto = str(
+                                df_auto.attrs.get("erro_td", "")
+                                or registro_auto["api_message"]
+                                or "A Twelve Data não retornou candles M15."
+                            )
+                            registro_auto["consulta_status"] = "AUTO_ERRO"
+                            registro_auto["erro"] = erro_auto
+                            registro_auto["texto"] = erro_auto
+                            st.session_state["v9362_m15_monitor"] = registro_auto
+                            st.error(f"🤖 M15 automático: {erro_auto}")
+                            return
+
+                        dt_auto = str(df_auto["datetime"].iloc[-1])
+                        px_auto = float(df_auto["close"].iloc[-1])
+                        registro_auto["datetime_atual"] = dt_auto
+                        registro_auto["preco"] = px_auto
+
+                        if lado_auto not in ("BUY", "SELL"):
+                            registro_auto["consulta_status"] = "AUTO_MACRO_SEM_DIRECAO"
+                            registro_auto["status"] = "⚪ MACRO AGUARDAR"
+                            registro_auto["texto"] = "M15 disponível, mas o macro ainda não definiu BUY/SELL."
+                        elif dt_ant_auto and dt_auto == dt_ant_auto:
+                            registro_auto["consulta_status"] = "AUTO_MESMO_CANDLE"
+                            registro_auto["status"] = str(anterior_auto.get("status", ""))
+                            registro_auto["texto"] = str(
+                                anterior_auto.get("texto", "Decisão anterior mantida.")
+                            )
+                        else:
+                            analise_auto = _analise_m15_v92(df_auto, lado_auto)
+                            registro_auto["consulta_status"] = (
+                                "AUTO_PRIMEIRA_LEITURA" if not dt_ant_auto else "AUTO_NOVO_CANDLE"
+                            )
+                            registro_auto["novo_candle"] = bool(dt_ant_auto)
+                            registro_auto["status"] = str(analise_auto.get("status", ""))
+                            registro_auto["texto"] = str(analise_auto.get("texto", ""))
+
+                        st.session_state["v9362_m15_monitor"] = registro_auto
+
+                        if registro_auto["status"].startswith("🟢"):
+                            st.success(
+                                f"🤖 🟢 GATILHO M15 CONFIRMADO automaticamente em {par_auto}."
+                            )
+                        elif registro_auto["consulta_status"] == "AUTO_MESMO_CANDLE":
+                            st.caption(
+                                f"🤖 Mesmo candle M15 ({dt_auto}); decisão mantida."
+                            )
+                        elif registro_auto["status"].startswith("🔴"):
+                            st.warning(
+                                f"🤖 M15 novo, mas ainda sem confirmação: {registro_auto['status']}."
+                            )
+                        else:
+                            st.caption(
+                                f"🤖 Monitor automático ativo · último M15: {dt_auto} · {registro_auto['status'] or 'sem mudança'}"
+                            )
+
+                    _auto_monitor_m15_v963(_par958, _dir958)
+
                     _mon962 = st.session_state.get("v9362_m15_monitor", {})
 
                     if st.button(
@@ -7340,6 +7467,7 @@ with abas[6]:
                             "http_status": "",
                             "api_message": "",
                             "candles_validos": 0,
+                            "modo": "MANUAL",
                         }
 
                         _df15962 = _td_time_series_v92(_par958, "15min", 100)
@@ -7412,6 +7540,7 @@ with abas[6]:
                         _d962.metric("Novo candle?", _novo_txt962)
 
                         st.caption(
+                            f"Modo: {_mon962.get('modo', 'MANUAL')} · "
                             f"Consulta: {_cs962 or '—'} · "
                             f"HTTP: {_mon962.get('http_status', '—')} · "
                             f"Candles válidos: {_mon962.get('candles_validos', 0)} · "
@@ -7486,7 +7615,7 @@ with abas[6]:
                 with st.expander("🔎 Diagnóstico real da Twelve Data", expanded=True):
                     st.warning(
                         "Registros antigos podem mostrar apenas a mensagem genérica. "
-                        "A V9.3.6.2 salva HTTP, código/mensagem da API e quantidade de candles por timeframe, sem expor a chave."
+                        "A V9.3.6.3 salva HTTP, código/mensagem da API e quantidade de candles por timeframe, sem expor a chave."
                     )
                     st.dataframe(pd.DataFrame(_diag_rows9353), use_container_width=True, hide_index=True)
                     _deep9356=[]
@@ -7509,7 +7638,7 @@ with abas[6]:
                                     "Candles válidos":_d9356.get("candles_validos",0),
                                 })
                     if _deep9356:
-                        st.markdown("**🧪 Diagnóstico profundo V9.3.6.2**")
+                        st.markdown("**🧪 Diagnóstico profundo V9.3.6.3**")
                         st.dataframe(pd.DataFrame(_deep9356),use_container_width=True,hide_index=True)
                         st.caption("A chave da Twelve Data não é exibida nem persistida.")
                     st.caption(
