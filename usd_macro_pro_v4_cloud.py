@@ -35,12 +35,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "9.3.8 — VALIDAÇÃO AUTOMÁTICA 1H / 4H / 24H"
+APP_VERSION = "9.3.9 — PAINEL DE PERFORMANCE REAL"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V9.3.8 Validação 1H · 4H · 24H",
+    page_title="USD Macro Pro — V9.3.9 Performance Real",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1619,7 +1619,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V9.3.8 Validação 1H · 4H · 24H")
+st.title("🦅 USD Macro Pro — V9.3.9 Performance Real")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -6842,6 +6842,181 @@ def _fmt_resultado_v938(ret, hit):
         return "—"
 
 
+
+def _faixa_score_v939(v):
+    try:
+        x = float(v)
+    except Exception:
+        return "Sem score"
+    if x >= 90:
+        return "90+"
+    if x >= 80:
+        return "80–89"
+    if x >= 70:
+        return "70–79"
+    return "<70"
+
+def _faixa_qualidade_v939(v):
+    try:
+        s = str(v).replace("%", "").replace(",", ".").strip()
+        x = float(s)
+    except Exception:
+        return "Sem qualidade"
+    if x >= 75:
+        return "75%+"
+    if x >= 60:
+        return "60–74%"
+    return "<60%"
+
+def _estat_horizonte_v939(df, suf):
+    ret = pd.to_numeric(df.get(f"retorno_{suf}_pct"), errors="coerce")
+    mask = ret.notna()
+    n = int(mask.sum())
+    if n == 0:
+        return {"n": 0, "acertos": 0, "taxa": None, "ret_medio": None}
+    acertos = int((ret[mask] > 0).sum())
+    return {
+        "n": n,
+        "acertos": acertos,
+        "taxa": 100.0 * acertos / n,
+        "ret_medio": float(ret[mask].mean()),
+    }
+
+def _tabela_grupo_v939(df, coluna, suf):
+    retcol = f"retorno_{suf}_pct"
+    tmp = df.copy()
+    tmp[retcol] = pd.to_numeric(tmp.get(retcol), errors="coerce")
+    tmp = tmp[tmp[retcol].notna()].copy()
+    if tmp.empty:
+        return pd.DataFrame()
+    linhas = []
+    for grupo, g in tmp.groupby(coluna, dropna=False):
+        n = len(g)
+        acertos = int((g[retcol] > 0).sum())
+        linhas.append({
+            coluna: grupo,
+            "Amostra": n,
+            "Acertos": acertos,
+            "Taxa de acerto": f"{100.0 * acertos / n:.1f}%",
+            "Retorno direcional médio": f"{g[retcol].mean():+.3f}%",
+        })
+    return pd.DataFrame(linhas)
+
+def _painel_performance_v939(df):
+    st.markdown("### 📈 Painel de Performance Real — V9.3.9")
+    st.caption(
+        "Este painel usa somente configurações realmente registradas e os resultados "
+        "1H/4H/24H já disponíveis. O Score Mestre e o índice operacional não são "
+        "probabilidades de lucro."
+    )
+
+    if df is None or df.empty:
+        st.info("Ainda não há configurações registradas para medir performance.")
+        return
+
+    stats = {s: _estat_horizonte_v939(df, s) for s in ("1h", "4h", "24h")}
+    total_avaliacoes = sum(v["n"] for v in stats.values())
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Configurações registradas", len(df))
+    c2.metric("Avaliações disponíveis", total_avaliacoes)
+    c3.metric("Com 24H concluído", stats["24h"]["n"])
+    completos = 0
+    if "status_validacao" in df.columns:
+        completos = int(
+            (df["status_validacao"].astype(str) == "VALIDADO 1H/4H/24H").sum()
+        )
+    c4.metric("Totalmente validadas", completos)
+
+    st.markdown("#### 🎯 Resultado por horizonte")
+    cols = st.columns(3)
+    for j, suf in enumerate(("1h", "4h", "24h")):
+        s = stats[suf]
+        if s["n"]:
+            cols[j].metric(
+                f"{suf.upper()} · taxa de acerto",
+                f'{s["taxa"]:.1f}%',
+                f'{s["n"]} avaliação(ões)'
+            )
+            cols[j].caption(
+                f'Retorno direcional médio: {s["ret_medio"]:+.3f}%'
+            )
+        else:
+            cols[j].metric(f"{suf.upper()} · taxa de acerto", "—")
+            cols[j].caption("Aguardando amostra.")
+
+    if total_avaliacoes == 0:
+        st.warning(
+            "Ainda não existe resultado vencido para calcular performance. "
+            "O painel começará a preencher automaticamente quando 1H, 4H e 24H forem validados."
+        )
+        return
+
+    horizonte = st.selectbox(
+        "Horizonte para análise detalhada",
+        ["1H", "4H", "24H"],
+        key="v939_horizonte_performance"
+    )
+    suf = horizonte.lower()
+
+    base = df.copy()
+    base["Faixa Score"] = base["score_mestre"].apply(_faixa_score_v939)
+    base["Faixa Qualidade"] = base["qualidade"].apply(_faixa_qualidade_v939)
+
+    st.markdown(f"#### 💱 Performance por par — {horizonte}")
+    tab_par = _tabela_grupo_v939(base, "par", suf)
+    if tab_par.empty:
+        st.info(f"Ainda não há avaliações {horizonte}.")
+    else:
+        st.dataframe(tab_par, use_container_width=True, hide_index=True)
+
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.markdown(f"#### 🧠 Por Score Mestre — {horizonte}")
+        tab_score = _tabela_grupo_v939(base, "Faixa Score", suf)
+        if not tab_score.empty:
+            st.dataframe(tab_score, use_container_width=True, hide_index=True)
+        else:
+            st.info("Sem amostra.")
+
+    with col_b:
+        st.markdown(f"#### 🛡️ Por qualidade — {horizonte}")
+        tab_q = _tabela_grupo_v939(base, "Faixa Qualidade", suf)
+        if not tab_q.empty:
+            st.dataframe(tab_q, use_container_width=True, hide_index=True)
+        else:
+            st.info("Sem amostra.")
+
+    # Evolução acumulada simples do retorno direcional.
+    retcol = f"retorno_{suf}_pct"
+    evo = base.copy()
+    evo[retcol] = pd.to_numeric(evo.get(retcol), errors="coerce")
+    evo = evo[evo[retcol].notna()].copy()
+    if not evo.empty:
+        evo["registrado_em_dt"] = pd.to_datetime(
+            evo["registrado_em"], errors="coerce", utc=True
+        )
+        evo = evo.sort_values("registrado_em_dt")
+        evo["Retorno direcional acumulado (%)"] = evo[retcol].cumsum()
+        st.markdown(f"#### 📊 Evolução acumulada — {horizonte}")
+        st.line_chart(
+            evo.set_index("registrado_em_dt")[["Retorno direcional acumulado (%)"]]
+        )
+
+    menor_n = min([v["n"] for v in stats.values() if v["n"] > 0], default=0)
+    if menor_n < 30:
+        st.warning(
+            "⚠️ AMOSTRA PEQUENA: estes números ainda não validam o modelo. "
+            "Não altere pesos ou regras com base em poucos sinais. "
+            "Primeiro acumule dezenas de configurações independentes."
+        )
+    else:
+        st.info(
+            "A amostra já começou a ficar mais útil, mas ainda deve ser analisada "
+            "junto com período de mercado, eventos macro e estabilidade ao longo do tempo."
+        )
+
+
 def _painel_configuracoes_v937():
     st.markdown("#### 🧪 Validação automática das configurações — V9.3.8")
     df, mudou, erro = _validar_configuracoes_v938()
@@ -6900,6 +7075,9 @@ def _painel_configuracoes_v937():
         "A avaliação usa o primeiro fechamento M15 disponível em/apos 1h, 4h e 24h do candle de entrada. "
         "Amostras pequenas não validam o modelo."
     )
+
+    st.divider()
+    _painel_performance_v939(df)
 
 
 # =========================================================
