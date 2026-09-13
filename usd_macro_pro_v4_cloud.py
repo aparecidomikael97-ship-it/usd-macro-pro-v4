@@ -1,5 +1,5 @@
 # ============================================================
-# USD MACRO PRO V9.3.5.3 — DIAGNÓSTICO TÉCNICO
+# USD MACRO PRO V9.3.5.4 — DIAGNÓSTICO REAL TWELVE DATA
 # Exibe o motivo persistido de falhas por par/timeframe sem
 # gastar novas chamadas. Persistência e validação preservadas.
 # ============================================================
@@ -35,12 +35,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "9.3.5.3 — DIAGNÓSTICO TÉCNICO DA API"
+APP_VERSION = "9.3.5.4 — DIAGNÓSTICO REAL TWELVE DATA"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V9.3.5.3 Diagnóstico Técnico",
+    page_title="USD Macro Pro — V9.3.5.4 Diagnóstico Real",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1619,7 +1619,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V9.3.5.3 Diagnóstico Técnico")
+st.title("🦅 USD Macro Pro — V9.3.5.4 Diagnóstico Real")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -6520,31 +6520,61 @@ def _analise_m15_v92(df: pd.DataFrame, lado: str) -> dict:
 
 
 def _pacote_tecnico_v92(par: str, direcao: str) -> dict:
+    """
+    V9.3.5.4:
+    além do pacote técnico, preserva o erro REAL retornado pela Twelve Data
+    separadamente em H4/H1/M15. Nenhuma chave/API secret é persistida.
+    """
     lado = _lado_macro_v92(direcao)
     if not CHAVE_TWELVE_DATA:
+        motivo = "CHAVE_TWELVE_DATA não configurada."
         return {
             "disponivel": False,
-            "motivo": "CHAVE_TWELVE_DATA não configurada.",
-            "h4": {"status": "⚪ AGUARDANDO", "score": 0, "texto": "Configure a chave."},
-            "h1": {"status": "⚪ AGUARDANDO", "score": 0, "texto": "Configure a chave."},
-            "m15": {"status": "⚪ AGUARDANDO", "score": 0, "texto": "Configure a chave."},
+            "motivo": motivo,
+            "erro": motivo,
+            "diagnostico": motivo,
+            "h4": {"status": "⚪ AGUARDANDO", "score": 0, "texto": "Configure a chave.", "motivo": motivo},
+            "h1": {"status": "⚪ AGUARDANDO", "score": 0, "texto": "Configure a chave.", "motivo": motivo},
+            "m15": {"status": "⚪ AGUARDANDO", "score": 0, "texto": "Configure a chave.", "motivo": motivo},
         }
 
     h4 = _td_time_series_v92(par, "4h", 100)
     h1 = _td_time_series_v92(par, "1h", 100)
     m15 = _td_time_series_v92(par, "15min", 100)
 
-    if h4.empty or h1.empty or m15.empty:
-        erros = []
-        for nome_tf, dfx in [("H4", h4), ("H1", h1), ("M15", m15)]:
-            if dfx.empty:
-                erros.append(f"{nome_tf}: {dfx.attrs.get('erro_td', 'sem dados')}")
+    erros_tf = {}
+    for nome_tf, dfx in [("H4", h4), ("H1", h1), ("M15", m15)]:
+        if dfx.empty:
+            erros_tf[nome_tf] = str(dfx.attrs.get("erro_td", "") or "Resposta sem candles.")
+
+    if erros_tf:
+        def bloco(tf):
+            err = erros_tf.get(tf, "")
+            if err:
+                return {
+                    "status": "⚪ INDISPONÍVEL",
+                    "score": 0,
+                    "texto": err,
+                    "motivo": err,
+                    "erro": err,
+                }
+            return {
+                "status": "⚪ NÃO AVALIADO",
+                "score": 0,
+                "texto": "Outro timeframe falhou; pacote técnico não foi concluído.",
+                "motivo": "",
+                "erro": "",
+            }
+
+        motivo = " | ".join(f"{tf}: {err}" for tf, err in erros_tf.items())
         return {
             "disponivel": False,
-            "motivo": " | ".join(erros) if erros else "Candles insuficientes.",
-            "h4": {"status": "⚪ INDISPONÍVEL", "score": 0, "texto": "Sem dados."},
-            "h1": {"status": "⚪ INDISPONÍVEL", "score": 0, "texto": "Sem dados."},
-            "m15": {"status": "⚪ INDISPONÍVEL", "score": 0, "texto": "Sem dados."},
+            "motivo": motivo,
+            "erro": motivo,
+            "diagnostico": motivo,
+            "h4": bloco("H4"),
+            "h1": bloco("H1"),
+            "m15": bloco("M15"),
         }
 
     a4 = _analise_h4_v92(h4, lado)
@@ -6561,6 +6591,8 @@ def _pacote_tecnico_v92(par: str, direcao: str) -> dict:
     return {
         "disponivel": True,
         "motivo": "",
+        "erro": "",
+        "diagnostico": "",
         "h4": a4,
         "h1": a1,
         "m15": a15,
@@ -6935,7 +6967,7 @@ with abas[6]:
         # -----------------------------------------------------
         # V9.3 — Scanner técnico automático dos 7 pares
         # -----------------------------------------------------
-        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3.5.3")
+        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3.5.4")
         st.caption(
             "A Matriz continua escolhendo o viés macro de cada par. "
             "O scanner consulta H4, H1 e M15 e procura qual par está mais perto "
@@ -7206,6 +7238,7 @@ with abas[6]:
                         _bl9353.get("motivo", "")
                         or _bl9353.get("erro", "")
                         or _bl9353.get("message", "")
+                        or _bl9353.get("texto", "")
                     ).strip()
                     _det9353.append(
                         f"{_tf9353.upper()}: {_st9353}" +
@@ -7225,8 +7258,11 @@ with abas[6]:
                 })
 
             if _diag_rows9353:
-                with st.expander("🔎 Diagnóstico dos pares incompletos", expanded=True):
-                    st.warning("Não reprocesse repetidamente. Veja o motivo salvo da última tentativa.")
+                with st.expander("🔎 Diagnóstico real da Twelve Data", expanded=True):
+                    st.warning(
+                        "Registros antigos podem mostrar apenas a mensagem genérica. "
+                        "Na próxima tentativa do par incompleto, a V9.3.5.4 salvará a resposta real da API por timeframe."
+                    )
                     st.dataframe(pd.DataFrame(_diag_rows9353), use_container_width=True, hide_index=True)
                     st.caption(
                         "Este painel lê o diagnóstico já persistido e não consome créditos da Twelve Data."
