@@ -1,9 +1,8 @@
 # ============================================================
-# USD MACRO PRO V9.2 — CONFIRMAÇÃO TÉCNICA AUTOMÁTICA
-# Base V9.1.
-# Adiciona candles H4/H1/M15 via Twelve Data para o melhor par
-# da Matriz, com regras técnicas explícitas e sem alterar o
-# motor macro, pesos, histórico ou validação multipares.
+# USD MACRO PRO V9.3 — SCANNER TÉCNICO DOS 7 PARES
+# Base V9.2.
+# Mantém o motor macro e adiciona scanner H4/H1/M15 para os
+# sete pares da Matriz, com ranking operacional separado.
 # ============================================================
 
 #!/usr/bin/env python3
@@ -36,12 +35,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "9.2 — CONFIRMAÇÃO TÉCNICA AUTOMÁTICA"
+APP_VERSION = "9.3 — SCANNER TÉCNICO DOS 7 PARES"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V9.2 Confirmação Técnica",
+    page_title="USD Macro Pro — V9.3 Scanner Técnico 7 Pares",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1620,7 +1619,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V9.2 Confirmação Técnica")
+st.title("🦅 USD Macro Pro — V9.3 Scanner Técnico 7 Pares")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2812,7 +2811,7 @@ def _avaliar_sinais_v82():
 
 
 def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca, confl):
-    st.markdown("## 🧪 Validação Automática Multipares — V9.2")
+    st.markdown("## 🧪 Validação Automática Multipares — V9.3")
     st.caption(
         "A V8.8 registra a fotografia do sinal e avalia automaticamente os 7 pares na "
         "primeira observação diária FRED posterior. Não reconstrói sinais passados."
@@ -2837,7 +2836,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 
     if serie_atual:
         st.info(
-            f"Fonte de preço V9.2: FRED {serie_atual}, série diária oficial H.10 para {par}. "
+            f"Fonte de preço V9.3: FRED {serie_atual}, série diária oficial H.10 para {par}. "
             "A validação mede direção entre observações diárias — não 1h/4h."
         )
     else:
@@ -2916,7 +2915,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     pendentes = df[df["avaliado"] != True].copy()
     avaliados_total = df[df["avaliado"] == True].copy()
 
-    st.markdown("### 💾 Persistência do histórico — V9.2")
+    st.markdown("### 💾 Persistência do histórico — V9.3")
     _v84_token, _v84_repo, _v84_branch = _github_cfg_v84()
     if _v84_token:
         st.success(
@@ -3092,7 +3091,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     # V8.9 — PAINEL DE PERFORMANCE
     # Somente leitura/estatística: NÃO altera sinal, pesos ou decisão da Matriz.
     # =====================================================
-    st.markdown("## 📊 Painel de Performance — V9.2")
+    st.markdown("## 📊 Painel de Performance — V9.3")
 
     _perf89 = validos.copy()
     _perf89["score_num"] = pd.to_numeric(_perf89["score_mestre"], errors="coerce")
@@ -3273,7 +3272,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 # V9.0 — CENTRAL DO OPERADOR
 # Somente interface/orientação; não altera o motor do modelo.
 # ============================================================
-st.markdown("## 🎛️ Central do Operador — V9.2")
+st.markdown("## 🎛️ Central do Operador — V9.3")
 st.caption("O APP define o viés macro; o gráfico confirma a entrada.")
 
 with st.container(border=True):
@@ -5658,7 +5657,7 @@ with abas[2]:
             st.success("✅ Sinal registrado!")
 
     st.markdown("---")
-    st.markdown("### 🏆 Matriz Inteligente — V9.2")
+    st.markdown("### 🏆 Matriz Inteligente — V9.3")
     st.caption(
         "Todos os pares abaixo passam pelo mesmo motor de confluência, qualidade e frescor "
         "usado na análise individual."
@@ -6571,7 +6570,7 @@ def _decisao_tecnica_final_v92(tecnico: dict, timing: str, direcao: str) -> tupl
 # ainda não são alimentados automaticamente pelo sistema.
 # =========================================================
 with abas[6]:
-    st.subheader("🎯 Central de Decisão Automática — V9.2")
+    st.subheader("🎯 Central de Decisão Automática — V9.3")
     st.caption(
         "Resumo automático dos dados que já existem no APP. "
         "O resultado abaixo é um viés macro/operacional educacional, não uma ordem de mercado."
@@ -6823,6 +6822,120 @@ with abas[6]:
         else:
             st.warning(f"**{_dec_tec92}** — {_dec_tec_txt92}")
 
+
+        # -----------------------------------------------------
+        # V9.3 — Scanner técnico automático dos 7 pares
+        # -----------------------------------------------------
+        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3")
+        st.caption(
+            "A Matriz continua escolhendo o viés macro de cada par. "
+            "O scanner consulta H4, H1 e M15 e procura qual par está mais perto "
+            "de uma confirmação técnica completa."
+        )
+
+        if st.button("🔄 Atualizar scanner dos 7 pares", key="v93_refresh_scanner"):
+            try:
+                _td_time_series_v92.clear()
+            except Exception:
+                pass
+            st.rerun()
+
+        _scanner93 = []
+        _mat93 = matriz_v61.copy().head(7)
+
+        for _rank93, (_, _row93) in enumerate(_mat93.iterrows(), start=1):
+            _p93 = str(_row93["Par"])
+            _d93 = str(_row93["Direção"])
+            _s93 = float(_row93["Score final"])
+            _q93 = float(_row93["Qualidade"])
+            _c93 = str(_row93["Confluência"])
+
+            _tec93 = _pacote_tecnico_v92(_p93, _d93)
+            _dec93, _txt93 = _decisao_tecnica_final_v92(_tec93, _timing91, _d93)
+
+            # Nota técnica somente para ordenação do scanner.
+            _tech_score93 = (
+                float(_tec93["h4"].get("score", 0)) * 0.35 +
+                float(_tec93["h1"].get("score", 0)) * 0.35 +
+                float(_tec93["m15"].get("score", 0)) * 0.30
+            )
+            # Índice operacional: mantém macro/qualidade relevantes e adiciona técnica.
+            _op93 = 0.40 * _s93 + 0.20 * _q93 + 0.40 * _tech_score93
+
+            # Eventos de alto impacto próximos reduzem prioridade, sem apagar o viés.
+            if str(_timing91).startswith("🔴"):
+                _op93 -= 25
+            elif str(_timing91).startswith("🟡"):
+                _op93 -= 10
+
+            _scanner93.append({
+                "Ranking macro": _rank93,
+                "Par": _p93,
+                "Direção": _d93.replace("🟢 ", "").replace("🔴 ", ""),
+                "Score": round(_s93),
+                "Qualidade": f"{_q93:.0f}%",
+                "Confluência": _c93,
+                "H4": _tec93["h4"]["status"],
+                "H1": _tec93["h1"]["status"],
+                "M15": _tec93["m15"]["status"],
+                "Semáforo": _dec93,
+                "Índice operacional": round(max(0, min(100, _op93)), 1),
+                "_disponivel": bool(_tec93.get("disponivel", False)),
+                "_texto": _txt93,
+            })
+
+        _scan_df93 = pd.DataFrame(_scanner93)
+
+        if _scan_df93.empty:
+            st.warning("Scanner sem resultados nesta execução.")
+        elif not bool(_scan_df93["_disponivel"].any()):
+            st.warning(
+                "A fonte técnica não retornou dados suficientes para os pares. "
+                "Verifique a CHAVE_TWELVE_DATA e o limite de chamadas da conta."
+            )
+        else:
+            _scan_show93 = (
+                _scan_df93.drop(columns=["_disponivel", "_texto"])
+                          .sort_values(
+                              ["Índice operacional", "Score", "Ranking macro"],
+                              ascending=[False, False, True],
+                              kind="stable"
+                          )
+                          .reset_index(drop=True)
+            )
+            _scan_show93.insert(0, "Prioridade", range(1, len(_scan_show93) + 1))
+            st.dataframe(_scan_show93, use_container_width=True, hide_index=True)
+
+            _valid93 = _scan_df93[_scan_df93["_disponivel"]].copy()
+            _valid93 = _valid93.sort_values(
+                ["Índice operacional", "Score", "Ranking macro"],
+                ascending=[False, False, True],
+                kind="stable"
+            )
+            _best93 = _valid93.iloc[0]
+
+            st.markdown("#### 🏆 Melhor oportunidade técnica do scanner")
+            _b1, _b2, _b3, _b4 = st.columns(4)
+            _b1.metric("Par", str(_best93["Par"]))
+            _b2.metric("Direção", str(_best93["Direção"]))
+            _b3.metric("Score macro", f'{float(_best93["Score"]):.0f}/100')
+            _b4.metric("Índice operacional", f'{float(_best93["Índice operacional"]):.1f}/100')
+
+            _sem93 = str(_best93["Semáforo"])
+            _msg93 = str(_best93["_texto"])
+            if _sem93.startswith("🟢"):
+                st.success(f"**{_sem93}** — {_msg93}")
+            elif _sem93.startswith("🔴"):
+                st.error(f"**{_sem93}** — {_msg93}")
+            else:
+                st.warning(f"**{_sem93}** — {_msg93}")
+
+            st.info(
+                "O scanner NÃO transforma o índice operacional em probabilidade de lucro. "
+                "Ele serve apenas para ordenar os 7 pares pela combinação Macro + Qualidade + Técnica."
+            )
+
+
         st.markdown("### ✅ Checklist final")
         st.markdown(
             f"""
@@ -6842,7 +6955,7 @@ with abas[6]:
         )
 
         st.caption(
-            "A Central V9.2 consolida macro + técnica automática quando a Twelve Data está configurada. "
+            "A Central V9.3 consolida macro + técnica e também escaneia automaticamente os 7 pares quando a Twelve Data está configurada. "
             "Ela não transforma Score Mestre em probabilidade de lucro e não substitui gestão de risco."
         )
 
