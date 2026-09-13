@@ -1,7 +1,7 @@
 {
   "versao": "V9.3.4",
   "lote": 3,
-  "ultimo_processamento_ts": 1789275174.6570656,
+  "ultimo_processamento_ts": 1789275512.4739602,
   "resultados": {
     "USD/CHF": {
       "tecnico": {
@@ -162,11 +162,12 @@
     "AUD/USD": {
       "tecnico": {
         "disponivel": true,
-        "motivo": "",
+        "motivo": "Candles válidos. A Matriz está em AGUARDAR CONFIRMAÇÃO; não existe lado BUY/SELL para comparar a técnica.",
         "h4": {
-          "status": "⚪ INDISPONÍVEL",
-          "score": 0,
-          "texto": "Dados insuficientes.",
+          "status": "⚪ MACRO AGUARDAR",
+          "score": 50,
+          "texto": "H4 disponível; aguardando direção macro.",
+          "motivo": "Dados disponíveis; direção macro ainda não definida.",
           "td_diag": {
             "symbol": "AUD/USD",
             "interval": "4h",
@@ -180,9 +181,10 @@
           }
         },
         "h1": {
-          "status": "⚪ INDISPONÍVEL",
-          "score": 0,
-          "texto": "Dados insuficientes.",
+          "status": "⚪ MACRO AGUARDAR",
+          "score": 50,
+          "texto": "H1 disponível; aguardando direção macro.",
+          "motivo": "Dados disponíveis; direção macro ainda não definida.",
           "td_diag": {
             "symbol": "AUD/USD",
             "interval": "1h",
@@ -196,9 +198,10 @@
           }
         },
         "m15": {
-          "status": "⚪ INDISPONÍVEL",
-          "score": 0,
-          "texto": "Dados insuficientes.",
+          "status": "⚪ MACRO AGUARDAR",
+          "score": 50,
+          "texto": "M15 disponível; aguardando direção macro.",
+          "motivo": "Dados disponíveis; direção macro ainda não definida.",
           "td_diag": {
             "symbol": "AUD/USD",
             "interval": "15min",
@@ -211,16 +214,16 @@
             "candles_validos": 100
           }
         },
-        "preco_m15": 0.71711,
+        "preco_m15": 0.71709,
         "ultima_atualizacao": "2026-09-13 04:45:00+00:00",
         "erro": "",
-        "diagnostico": ""
+        "diagnostico": "Dados técnicos completos; aguardando definição do viés macro."
       },
       "decisao": "🟡 AGUARDAR CONFIRMAÇÃO",
       "texto": "A técnica ainda não está totalmente alinhada.",
-      "processado_em": 1789275174.1300697,
+      "processado_em": 1789275512.0082073,
       "tentativa_v9355": true,
-      "versao_tentativa": "V9.3.5.6"
+      "versao_tentativa": "V9.3.5.7"
     }
   }
 }
