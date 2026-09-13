@@ -1,8 +1,9 @@
 # ============================================================
-# USD MACRO PRO V9.1 — CENTRAL DE DECISÃO AUTOMÁTICA
-# Base V9.0. Consolida Força + Macro EUA + Fed + Calendário
-# + Matriz + Score/Qualidade + Raio-X em uma única aba.
-# Não altera os pesos do motor nem inventa sinal técnico.
+# USD MACRO PRO V9.2 — CONFIRMAÇÃO TÉCNICA AUTOMÁTICA
+# Base V9.1.
+# Adiciona candles H4/H1/M15 via Twelve Data para o melhor par
+# da Matriz, com regras técnicas explícitas e sem alterar o
+# motor macro, pesos, histórico ou validação multipares.
 # ============================================================
 
 #!/usr/bin/env python3
@@ -35,12 +36,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "9.1 — CENTRAL DE DECISÃO AUTOMÁTICA"
+APP_VERSION = "9.2 — CONFIRMAÇÃO TÉCNICA AUTOMÁTICA"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V9.1 Central de Decisão",
+    page_title="USD Macro Pro — V9.2 Confirmação Técnica",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -67,6 +68,7 @@ SENSIBILIDADE_FED_PADRAO = {
 CHAVE_FRED = st.secrets.get("CHAVE_FRED", os.getenv("CHAVE_FRED", ""))
 CHAVE_NEWSAPI = st.secrets.get("CHAVE_NEWSAPI", os.getenv("CHAVE_NEWSAPI", ""))
 CHAVE_EODHD = st.secrets.get("CHAVE_EODHD", os.getenv("CHAVE_EODHD", ""))
+CHAVE_TWELVE_DATA = st.secrets.get("CHAVE_TWELVE_DATA", os.getenv("CHAVE_TWELVE_DATA", ""))
 
 IMPACTO_MAX_FED = 18.0
 STATUS_FONTE = {}
@@ -114,6 +116,11 @@ if CHAVE_EODHD:
     st.sidebar.success("EODHD configurado: consenso automático tentará usar Economic Events.")
 else:
     st.sidebar.info("EODHD sem token: consenso permanece manual.")
+
+if CHAVE_TWELVE_DATA:
+    st.sidebar.success("Twelve Data configurado: H4/H1/M15 automáticos ativos.")
+else:
+    st.sidebar.info("Twelve Data sem chave: análise técnica automática ficará aguardando configuração.")
 
 # =========================================================
 # CONEXÃO E FRED
@@ -1613,7 +1620,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V9.1 Central de Decisão")
+st.title("🦅 USD Macro Pro — V9.2 Confirmação Técnica")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2805,7 +2812,7 @@ def _avaliar_sinais_v82():
 
 
 def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca, confl):
-    st.markdown("## 🧪 Validação Automática Multipares — V9.1")
+    st.markdown("## 🧪 Validação Automática Multipares — V9.2")
     st.caption(
         "A V8.8 registra a fotografia do sinal e avalia automaticamente os 7 pares na "
         "primeira observação diária FRED posterior. Não reconstrói sinais passados."
@@ -2830,7 +2837,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 
     if serie_atual:
         st.info(
-            f"Fonte de preço V9.1: FRED {serie_atual}, série diária oficial H.10 para {par}. "
+            f"Fonte de preço V9.2: FRED {serie_atual}, série diária oficial H.10 para {par}. "
             "A validação mede direção entre observações diárias — não 1h/4h."
         )
     else:
@@ -2909,7 +2916,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     pendentes = df[df["avaliado"] != True].copy()
     avaliados_total = df[df["avaliado"] == True].copy()
 
-    st.markdown("### 💾 Persistência do histórico — V9.1")
+    st.markdown("### 💾 Persistência do histórico — V9.2")
     _v84_token, _v84_repo, _v84_branch = _github_cfg_v84()
     if _v84_token:
         st.success(
@@ -3085,7 +3092,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     # V8.9 — PAINEL DE PERFORMANCE
     # Somente leitura/estatística: NÃO altera sinal, pesos ou decisão da Matriz.
     # =====================================================
-    st.markdown("## 📊 Painel de Performance — V9.1")
+    st.markdown("## 📊 Painel de Performance — V9.2")
 
     _perf89 = validos.copy()
     _perf89["score_num"] = pd.to_numeric(_perf89["score_mestre"], errors="coerce")
@@ -3266,7 +3273,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 # V9.0 — CENTRAL DO OPERADOR
 # Somente interface/orientação; não altera o motor do modelo.
 # ============================================================
-st.markdown("## 🎛️ Central do Operador — V9.1")
+st.markdown("## 🎛️ Central do Operador — V9.2")
 st.caption("O APP define o viés macro; o gráfico confirma a entrada.")
 
 with st.container(border=True):
@@ -5651,7 +5658,7 @@ with abas[2]:
             st.success("✅ Sinal registrado!")
 
     st.markdown("---")
-    st.markdown("### 🏆 Matriz Inteligente — V9.1")
+    st.markdown("### 🏆 Matriz Inteligente — V9.2")
     st.caption(
         "Todos os pares abaixo passam pelo mesmo motor de confluência, qualidade e frescor "
         "usado na análise individual."
@@ -6336,6 +6343,227 @@ with abas[1]:
 
 
 
+
+# =========================================================
+# V9.2 — DADOS E LEITURA TÉCNICA AUTOMÁTICA
+# Fonte: Twelve Data (quando CHAVE_TWELVE_DATA estiver configurada).
+# O motor técnico usa regras explícitas e reproduzíveis.
+# =========================================================
+
+@st.cache_data(ttl=600, show_spinner=False)
+def _td_time_series_v92(par: str, interval: str, outputsize: int = 220) -> pd.DataFrame:
+    if not CHAVE_TWELVE_DATA:
+        return pd.DataFrame()
+
+    url = "https://api.twelvedata.com/time_series"
+    params = {
+        "symbol": par,
+        "interval": interval,
+        "outputsize": int(outputsize),
+        "apikey": CHAVE_TWELVE_DATA,
+        "format": "JSON",
+        "order": "ASC",
+        "timezone": "UTC",
+    }
+    try:
+        r = requests.get(url, params=params, timeout=20)
+        r.raise_for_status()
+        j = r.json()
+        if j.get("status") == "error" or "values" not in j:
+            return pd.DataFrame()
+        df = pd.DataFrame(j["values"])
+        if df.empty:
+            return pd.DataFrame()
+        df["datetime"] = pd.to_datetime(df["datetime"], errors="coerce", utc=True)
+        for c in ["open", "high", "low", "close"]:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+        df = (
+            df.dropna(subset=["datetime", "open", "high", "low", "close"])
+              .sort_values("datetime")
+              .drop_duplicates("datetime")
+              .reset_index(drop=True)
+        )
+        return df
+    except Exception:
+        return pd.DataFrame()
+
+
+def _indicadores_tecnicos_v92(df: pd.DataFrame) -> pd.DataFrame:
+    d = df.copy()
+    if d.empty:
+        return d
+
+    d["ema9"] = d["close"].ewm(span=9, adjust=False).mean()
+    d["ema20"] = d["close"].ewm(span=20, adjust=False).mean()
+    d["ema21"] = d["close"].ewm(span=21, adjust=False).mean()
+    d["ema50"] = d["close"].ewm(span=50, adjust=False).mean()
+
+    prev_close = d["close"].shift(1)
+    tr = pd.concat([
+        d["high"] - d["low"],
+        (d["high"] - prev_close).abs(),
+        (d["low"] - prev_close).abs()
+    ], axis=1).max(axis=1)
+    d["atr14"] = tr.rolling(14, min_periods=5).mean()
+    return d
+
+
+def _lado_macro_v92(direcao: str) -> str:
+    u = str(direcao).upper()
+    if "COMPRA" in u:
+        return "BUY"
+    if "VENDA" in u:
+        return "SELL"
+    return "WAIT"
+
+
+def _analise_h4_v92(df: pd.DataFrame, lado: str) -> dict:
+    d = _indicadores_tecnicos_v92(df)
+    if len(d) < 60 or lado not in ("BUY", "SELL"):
+        return {"status": "⚪ INDISPONÍVEL", "score": 0, "texto": "Dados insuficientes."}
+
+    x = d.iloc[-1]
+    slope = float(d["ema20"].iloc[-1] - d["ema20"].iloc[-6])
+    if lado == "BUY":
+        checks = [
+            x["ema20"] > x["ema50"],
+            slope > 0,
+            x["close"] > x["ema20"],
+        ]
+    else:
+        checks = [
+            x["ema20"] < x["ema50"],
+            slope < 0,
+            x["close"] < x["ema20"],
+        ]
+    n = int(sum(bool(v) for v in checks))
+    if n == 3:
+        return {"status": "🟢 CONFIRMA", "score": 100, "texto": "Tendência/estrutura H4 alinhada ao macro."}
+    if n == 2:
+        return {"status": "🟡 PARCIAL", "score": 65, "texto": "H4 parcialmente alinhado; exigir confirmação."}
+    return {"status": "🔴 CONTRA", "score": 20, "texto": "H4 não confirma a direção macro."}
+
+
+def _analise_h1_v92(df: pd.DataFrame, lado: str) -> dict:
+    d = _indicadores_tecnicos_v92(df)
+    if len(d) < 60 or lado not in ("BUY", "SELL"):
+        return {"status": "⚪ INDISPONÍVEL", "score": 0, "texto": "Dados insuficientes."}
+
+    x = d.iloc[-1]
+    atr = float(x["atr14"]) if pd.notna(x["atr14"]) and x["atr14"] > 0 else max(float(x["close"]) * 0.001, 1e-8)
+    recent = d.tail(8)
+    dist = abs(float(x["close"] - x["ema20"])) / atr
+
+    if lado == "BUY":
+        trend = bool(x["ema20"] > x["ema50"] and x["close"] > x["ema50"])
+        touch = bool((recent["low"] <= recent["ema20"] + 0.25 * recent["atr14"].fillna(atr)).any())
+        recovered = bool(x["close"] > x["ema20"])
+    else:
+        trend = bool(x["ema20"] < x["ema50"] and x["close"] < x["ema50"])
+        touch = bool((recent["high"] >= recent["ema20"] - 0.25 * recent["atr14"].fillna(atr)).any())
+        recovered = bool(x["close"] < x["ema20"])
+
+    if trend and touch and recovered:
+        return {"status": "🟢 PULLBACK OK", "score": 100, "texto": "H1 alinhado e com retorno/reação perto da EMA20."}
+    if trend and dist > 1.20:
+        return {"status": "🟡 ESTICADO", "score": 55, "texto": "H1 segue alinhado, mas o preço está distante da média; esperar pullback."}
+    if trend:
+        return {"status": "🟡 ALINHADO", "score": 70, "texto": "H1 favorece o macro, porém o pullback ainda não está confirmado."}
+    return {"status": "🔴 CONTRA", "score": 20, "texto": "H1 não confirma a direção macro."}
+
+
+def _analise_m15_v92(df: pd.DataFrame, lado: str) -> dict:
+    d = _indicadores_tecnicos_v92(df)
+    if len(d) < 30 or lado not in ("BUY", "SELL"):
+        return {"status": "⚪ INDISPONÍVEL", "score": 0, "texto": "Dados insuficientes."}
+
+    x = d.iloc[-1]
+    prev_high = float(d["high"].shift(1).rolling(3).max().iloc[-1])
+    prev_low = float(d["low"].shift(1).rolling(3).min().iloc[-1])
+
+    if lado == "BUY":
+        momentum = bool(x["ema9"] > x["ema21"] and x["close"] > x["ema9"])
+        bos = bool(x["close"] > prev_high)
+    else:
+        momentum = bool(x["ema9"] < x["ema21"] and x["close"] < x["ema9"])
+        bos = bool(x["close"] < prev_low)
+
+    if momentum and bos:
+        return {"status": "🟢 GATILHO", "score": 100, "texto": "Momentum + rompimento curto no M15 confirmam o lado macro."}
+    if momentum:
+        return {"status": "🟡 AGUARDAR GATILHO", "score": 65, "texto": "Momentum está alinhado, mas falta rompimento/confirmacão curta."}
+    return {"status": "🔴 SEM GATILHO", "score": 25, "texto": "M15 ainda não confirma a execução."}
+
+
+def _pacote_tecnico_v92(par: str, direcao: str) -> dict:
+    lado = _lado_macro_v92(direcao)
+    if not CHAVE_TWELVE_DATA:
+        return {
+            "disponivel": False,
+            "motivo": "CHAVE_TWELVE_DATA não configurada.",
+            "h4": {"status": "⚪ AGUARDANDO", "score": 0, "texto": "Configure a chave."},
+            "h1": {"status": "⚪ AGUARDANDO", "score": 0, "texto": "Configure a chave."},
+            "m15": {"status": "⚪ AGUARDANDO", "score": 0, "texto": "Configure a chave."},
+        }
+
+    h4 = _td_time_series_v92(par, "4h", 220)
+    h1 = _td_time_series_v92(par, "1h", 220)
+    m15 = _td_time_series_v92(par, "15min", 220)
+
+    if h4.empty or h1.empty or m15.empty:
+        return {
+            "disponivel": False,
+            "motivo": "A fonte técnica não retornou candles suficientes para H4/H1/M15.",
+            "h4": {"status": "⚪ INDISPONÍVEL", "score": 0, "texto": "Sem dados."},
+            "h1": {"status": "⚪ INDISPONÍVEL", "score": 0, "texto": "Sem dados."},
+            "m15": {"status": "⚪ INDISPONÍVEL", "score": 0, "texto": "Sem dados."},
+        }
+
+    a4 = _analise_h4_v92(h4, lado)
+    a1 = _analise_h1_v92(h1, lado)
+    a15 = _analise_m15_v92(m15, lado)
+
+    last_times = [
+        h4["datetime"].iloc[-1],
+        h1["datetime"].iloc[-1],
+        m15["datetime"].iloc[-1],
+    ]
+    ultima = max(last_times)
+
+    return {
+        "disponivel": True,
+        "motivo": "",
+        "h4": a4,
+        "h1": a1,
+        "m15": a15,
+        "ultima_atualizacao": ultima,
+        "preco_m15": float(m15["close"].iloc[-1]),
+    }
+
+
+def _decisao_tecnica_final_v92(tecnico: dict, timing: str, direcao: str) -> tuple[str, str]:
+    if not tecnico.get("disponivel", False):
+        return "⚪ TÉCNICA INDISPONÍVEL", tecnico.get("motivo", "Sem dados técnicos.")
+
+    h4 = tecnico["h4"]["status"]
+    h1 = tecnico["h1"]["status"]
+    m15 = tecnico["m15"]["status"]
+
+    if h4.startswith("🔴") or h1.startswith("🔴"):
+        return "🔴 EVITAR ENTRADA AGORA", "H4/H1 não confirmam o viés macro."
+    if str(timing).startswith("🔴"):
+        return "🔴 AGUARDAR EVENTO", "O calendário bloqueia uma entrada agressiva."
+    if "ESTICADO" in h1:
+        return "🟡 ESPERAR PULLBACK", "Macro e tendência podem estar alinhados, mas o H1 está esticado."
+    if h4.startswith("🟢") and h1.startswith("🟢") and m15.startswith("🟢"):
+        if str(timing).startswith("🟡"):
+            return "🟡 TÉCNICA CONFIRMADA, EVENTO PRÓXIMO", f"{direcao} tecnicamente alinhada, mas com risco de calendário."
+        return "🟢 CENÁRIO COMPLETO CONFIRMADO", f"{direcao} com H4 + H1 + M15 alinhados."
+    if h4.startswith(("🟢", "🟡")) and h1.startswith(("🟢", "🟡")) and "AGUARDAR GATILHO" in m15:
+        return "🟡 AGUARDAR GATILHO M15", "Direção e contexto estão alinhados; falta o gatilho curto."
+    return "🟡 AGUARDAR CONFIRMAÇÃO", "A técnica ainda não está totalmente alinhada."
+
+
 # =========================================================
 # V9.1 — CENTRAL DE DECISÃO AUTOMÁTICA
 # Consolida os dados já calculados pelo APP.
@@ -6343,7 +6571,7 @@ with abas[1]:
 # ainda não são alimentados automaticamente pelo sistema.
 # =========================================================
 with abas[6]:
-    st.subheader("🎯 Central de Decisão Automática — V9.1")
+    st.subheader("🎯 Central de Decisão Automática — V9.2")
     st.caption(
         "Resumo automático dos dados que já existem no APP. "
         "O resultado abaixo é um viés macro/operacional educacional, não uma ordem de mercado."
@@ -6527,21 +6755,73 @@ with abas[6]:
             st.dataframe(pd.DataFrame(_xrows91), use_container_width=True, hide_index=True)
 
         # -----------------------------
-        # 5. O que ainda falta: gráfico
+        # 5. Técnica automática V9.2
         # -----------------------------
-        st.markdown("### 5️⃣ Confirmação técnica")
-        st.info(
-            "📊 O APP ainda NÃO lê automaticamente a estrutura H4/H1/M15 do TradingView. "
-            "Por isso, a parte técnica continua sendo a última confirmação: "
-            "H4 = direção/estrutura, H1 = região/pullback, M15 = gatilho."
+        st.markdown("### 5️⃣ Confirmação técnica automática — V9.2")
+        st.caption(
+            "Fonte técnica: Twelve Data. H4 = direção/estrutura; "
+            "H1 = alinhamento/pullback; M15 = gatilho curto. "
+            "Os candles ficam em cache por ~10 minutos para respeitar limites da API."
         )
 
-        _tech91 = pd.DataFrame([
-            {"Timeframe": "H4", "Função": "Confirmar direção e estrutura", "Status automático": "⏳ Verificar no gráfico"},
-            {"Timeframe": "H1", "Função": "Esperar pullback/região", "Status automático": "⏳ Verificar no gráfico"},
-            {"Timeframe": "M15", "Função": "Procurar gatilho de entrada", "Status automático": "⏳ Verificar no gráfico"},
-        ])
-        st.dataframe(_tech91, use_container_width=True, hide_index=True)
+        if st.button("🔄 Atualizar técnica agora", key="v92_refresh_tecnico"):
+            try:
+                _td_time_series_v92.clear()
+            except Exception:
+                pass
+            st.rerun()
+
+        _tec92 = _pacote_tecnico_v92(_par91, _dir91)
+        _dec_tec92, _dec_tec_txt92 = _decisao_tecnica_final_v92(_tec92, _timing91, _dir91)
+
+        if not _tec92.get("disponivel", False):
+            st.warning(
+                "⚠️ Técnica automática ainda não disponível. "
+                + str(_tec92.get("motivo", ""))
+            )
+            if not CHAVE_TWELVE_DATA:
+                st.info(
+                    "Adicione CHAVE_TWELVE_DATA aos Secrets do Streamlit para ativar H4/H1/M15 automáticos."
+                )
+        else:
+            _t1, _t2, _t3, _t4 = st.columns(4)
+            _t1.metric("Preço técnico", f"{_tec92['preco_m15']:.5f}")
+            _t2.metric("H4", _tec92["h4"]["status"])
+            _t3.metric("H1", _tec92["h1"]["status"])
+            _t4.metric("M15", _tec92["m15"]["status"])
+
+            _tech92_df = pd.DataFrame([
+                {
+                    "Timeframe": "H4",
+                    "Função": "Direção / estrutura",
+                    "Status": _tec92["h4"]["status"],
+                    "Leitura": _tec92["h4"]["texto"],
+                },
+                {
+                    "Timeframe": "H1",
+                    "Função": "Pullback / localização",
+                    "Status": _tec92["h1"]["status"],
+                    "Leitura": _tec92["h1"]["texto"],
+                },
+                {
+                    "Timeframe": "M15",
+                    "Função": "Gatilho",
+                    "Status": _tec92["m15"]["status"],
+                    "Leitura": _tec92["m15"]["texto"],
+                },
+            ])
+            st.dataframe(_tech92_df, use_container_width=True, hide_index=True)
+            st.caption(
+                f"Último candle recebido: {_tec92['ultima_atualizacao'].strftime('%d/%m/%Y %H:%M UTC')}"
+            )
+
+        st.markdown("### 🚦 Semáforo Operacional")
+        if _dec_tec92.startswith("🟢"):
+            st.success(f"**{_dec_tec92}** — {_dec_tec_txt92}")
+        elif _dec_tec92.startswith("🔴"):
+            st.error(f"**{_dec_tec92}** — {_dec_tec_txt92}")
+        else:
+            st.warning(f"**{_dec_tec92}** — {_dec_tec_txt92}")
 
         st.markdown("### ✅ Checklist final")
         st.markdown(
@@ -6553,12 +6833,16 @@ with abas[6]:
 - **Confluência:** {_conf91}
 - **Raio-X:** {_fav91} a favor / {_neu91} neutro(s) / {_contra91} contra
 - **Calendário:** {_timing91}
-- **Próxima ação:** {_acao91}
+- **H4:** {_tec92["h4"]["status"]}
+- **H1:** {_tec92["h1"]["status"]}
+- **M15:** {_tec92["m15"]["status"]}
+- **Semáforo técnico:** {_dec_tec92}
+- **Próxima ação macro:** {_acao91}
             """
         )
 
         st.caption(
-            "A Central V9.1 consolida dados já existentes no aplicativo. "
+            "A Central V9.2 consolida macro + técnica automática quando a Twelve Data está configurada. "
             "Ela não transforma Score Mestre em probabilidade de lucro e não substitui gestão de risco."
         )
 
