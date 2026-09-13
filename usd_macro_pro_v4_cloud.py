@@ -1,7 +1,8 @@
 # ============================================================
-# USD MACRO PRO V9.3.5.1 — HOTFIX
-# Corrige NameError da validação técnica: a função agora é
-# definida antes do primeiro uso. Persistência preservada.
+# USD MACRO PRO V9.3.5.2 — TIMER PERSISTENTE
+# O timer continua baseado em ultimo_processamento_ts salvo no
+# GitHub. Novo botão "Verificar liberação" atualiza a tela sem
+# chamar Twelve Data e sem reiniciar/gastar créditos da API.
 # ============================================================
 
 #!/usr/bin/env python3
@@ -35,12 +36,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "9.3.5.1 — HOTFIX VALIDAÇÃO TÉCNICA"
+APP_VERSION = "9.3.5.2 — TIMER PERSISTENTE DO SCANNER"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V9.3.5.1 Hotfix",
+    page_title="USD Macro Pro — V9.3.5.2 Timer Persistente",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1619,7 +1620,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V9.3.5.1 Hotfix")
+st.title("🦅 USD Macro Pro — V9.3.5.2 Timer Persistente")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -6933,7 +6934,7 @@ with abas[6]:
         # -----------------------------------------------------
         # V9.3 — Scanner técnico automático dos 7 pares
         # -----------------------------------------------------
-        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3.5.1")
+        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3.5.2")
         st.caption(
             "A Matriz continua escolhendo o viés macro de cada par. "
             "O scanner consulta H4, H1 e M15 e procura qual par está mais perto "
@@ -6983,7 +6984,7 @@ with abas[6]:
                     return False
             return True
 
-        _a933, _b933, _c933 = st.columns([1.25, 1.15, 3.2])
+        _a933, _b933, _refresh9352, _c933 = st.columns([1.25, 1.15, 1.35, 2.5])
 
         with _a933:
             _pode_processar933 = (_restante933 <= 0)
@@ -7021,6 +7022,12 @@ with abas[6]:
                 else:
                     st.rerun()
 
+        with _refresh9352:
+            if st.button("🔄 Verificar liberação", key="v9352_verificar_timer"):
+                # Apenas rerun: não chama Twelve Data, não muda o timestamp
+                # e não gasta créditos da API.
+                st.rerun()
+
         with _b933:
             # Só permite avançar quando TODOS os pares do lote atual estão completos.
             _pares_lote933 = [
@@ -7053,7 +7060,7 @@ with abas[6]:
                     if _restante933 > 0:
                         st.caption(
                             f"Lote {_lote_idx933+1}/{len(_lotes933)} completo ({_pares_txt933}). "
-                            f"Aguarde ~{_restante933}s para liberar o próximo lote."
+                            f"Aguarde ~{_restante933}s e clique em 🔄 Verificar liberação."
                         )
                     else:
                         st.caption(
@@ -7066,7 +7073,7 @@ with abas[6]:
                 st.caption(
                     f"Lote {_lote_idx933+1}/{len(_lotes933)}: {_pares_txt933}. "
                     + (
-                        f"Aguarde ~{_restante933}s antes de processar."
+                        f"Aguarde ~{_restante933}s. Depois clique em 🔄 Verificar liberação."
                         if _restante933 > 0
                         else "Pronto para processar."
                     )
