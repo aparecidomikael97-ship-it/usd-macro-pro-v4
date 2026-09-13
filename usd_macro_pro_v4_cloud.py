@@ -1,8 +1,8 @@
 # ============================================================
-# USD MACRO PRO V9.3.3 — SCANNER INCREMENTAL POR LOTES
-# Base V9.3.2.
-# Cada lote consulta SOMENTE seus pares, salva o resultado no
-# session_state e não reconsulta lotes anteriores.
+# USD MACRO PRO V9.3.4 — SCANNER PERSISTENTE POR LOTES
+# Base V9.3.3.
+# Salva fila/resultados em dados/scanner_tecnico_v934.json no
+# GitHub. F5 e nova sessão não apagam o progresso.
 # ============================================================
 
 #!/usr/bin/env python3
@@ -36,12 +36,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "9.3.3 — SCANNER INCREMENTAL POR LOTES"
+APP_VERSION = "9.3.4 — SCANNER PERSISTENTE POR LOTES"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V9.3.3 Scanner Incremental",
+    page_title="USD Macro Pro — V9.3.4 Scanner Persistente",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1620,7 +1620,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V9.3.3 Scanner Incremental")
+st.title("🦅 USD Macro Pro — V9.3.4 Scanner Persistente")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2812,7 +2812,7 @@ def _avaliar_sinais_v82():
 
 
 def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca, confl):
-    st.markdown("## 🧪 Validação Automática Multipares — V9.3.3")
+    st.markdown("## 🧪 Validação Automática Multipares — V9.3.4")
     st.caption(
         "A V8.8 registra a fotografia do sinal e avalia automaticamente os 7 pares na "
         "primeira observação diária FRED posterior. Não reconstrói sinais passados."
@@ -2837,7 +2837,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 
     if serie_atual:
         st.info(
-            f"Fonte de preço V9.3.3: FRED {serie_atual}, série diária oficial H.10 para {par}. "
+            f"Fonte de preço V9.3.4: FRED {serie_atual}, série diária oficial H.10 para {par}. "
             "A validação mede direção entre observações diárias — não 1h/4h."
         )
     else:
@@ -2916,7 +2916,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     pendentes = df[df["avaliado"] != True].copy()
     avaliados_total = df[df["avaliado"] == True].copy()
 
-    st.markdown("### 💾 Persistência do histórico — V9.3.3")
+    st.markdown("### 💾 Persistência do histórico — V9.3.4")
     _v84_token, _v84_repo, _v84_branch = _github_cfg_v84()
     if _v84_token:
         st.success(
@@ -3092,7 +3092,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     # V8.9 — PAINEL DE PERFORMANCE
     # Somente leitura/estatística: NÃO altera sinal, pesos ou decisão da Matriz.
     # =====================================================
-    st.markdown("## 📊 Painel de Performance — V9.3.3")
+    st.markdown("## 📊 Painel de Performance — V9.3.4")
 
     _perf89 = validos.copy()
     _perf89["score_num"] = pd.to_numeric(_perf89["score_mestre"], errors="coerce")
@@ -3273,7 +3273,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 # V9.0 — CENTRAL DO OPERADOR
 # Somente interface/orientação; não altera o motor do modelo.
 # ============================================================
-st.markdown("## 🎛️ Central do Operador — V9.3.3")
+st.markdown("## 🎛️ Central do Operador — V9.3.4")
 st.caption("O APP define o viés macro; o gráfico confirma a entrada.")
 
 with st.container(border=True):
@@ -5658,7 +5658,7 @@ with abas[2]:
             st.success("✅ Sinal registrado!")
 
     st.markdown("---")
-    st.markdown("### 🏆 Matriz Inteligente — V9.3.3")
+    st.markdown("### 🏆 Matriz Inteligente — V9.3.4")
     st.caption(
         "Todos os pares abaixo passam pelo mesmo motor de confluência, qualidade e frescor "
         "usado na análise individual."
@@ -6593,6 +6593,83 @@ def _decisao_tecnica_final_v92(tecnico: dict, timing: str, direcao: str) -> tupl
     return "🟡 AGUARDAR CONFIRMAÇÃO", "A técnica ainda não está totalmente alinhada."
 
 
+
+# =========================================================
+# V9.3.4 — PERSISTÊNCIA DO SCANNER NO GITHUB
+# Arquivo: dados/scanner_tecnico_v934.json
+# Não salva API keys; apenas resultados técnicos/estado da fila.
+# =========================================================
+import base64
+import json
+
+_SCANNER_GH_PATH_V934 = "dados/scanner_tecnico_v934.json"
+
+def _gh_cfg_v934():
+    token = st.secrets.get("GITHUB_TOKEN_HISTORICO", os.getenv("GITHUB_TOKEN_HISTORICO", ""))
+    repo = st.secrets.get("GITHUB_REPO_HISTORICO", os.getenv("GITHUB_REPO_HISTORICO", ""))
+    branch = st.secrets.get("GITHUB_BRANCH_HISTORICO", os.getenv("GITHUB_BRANCH_HISTORICO", "main"))
+    return str(token), str(repo), str(branch)
+
+def _scanner_load_v934():
+    token, repo, branch = _gh_cfg_v934()
+    vazio = {"versao": "V9.3.4", "lote": 0, "ultimo_processamento_ts": 0.0, "resultados": {}}
+    if not token or not repo:
+        vazio["_erro"] = "Persistência GitHub não configurada."
+        return vazio
+    url = f"https://api.github.com/repos/{repo}/contents/{_SCANNER_GH_PATH_V934}"
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
+    try:
+        r = requests.get(url, headers=headers, params={"ref": branch}, timeout=20)
+        if r.status_code == 404:
+            return vazio
+        r.raise_for_status()
+        j = r.json()
+        raw = base64.b64decode(j["content"]).decode("utf-8")
+        data = json.loads(raw)
+        data["_sha"] = j.get("sha", "")
+        return data
+    except Exception as e:
+        vazio["_erro"] = f"{type(e).__name__}: {e}"
+        return vazio
+
+def _scanner_save_v934(data):
+    token, repo, branch = _gh_cfg_v934()
+    if not token or not repo:
+        return False, "Persistência GitHub não configurada."
+    url = f"https://api.github.com/repos/{repo}/contents/{_SCANNER_GH_PATH_V934}"
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
+    try:
+        current = requests.get(url, headers=headers, params={"ref": branch}, timeout=20)
+        sha = current.json().get("sha", "") if current.status_code == 200 else ""
+        clean = {k:v for k,v in data.items() if not str(k).startswith("_")}
+        payload = {
+            "message": "Atualiza scanner técnico V9.3.4",
+            "content": base64.b64encode(
+                json.dumps(clean, ensure_ascii=False, indent=2).encode("utf-8")
+            ).decode("ascii"),
+            "branch": branch,
+        }
+        if sha:
+            payload["sha"] = sha
+        r = requests.put(url, headers=headers, json=payload, timeout=25)
+        r.raise_for_status()
+        return True, ""
+    except Exception as e:
+        return False, f"{type(e).__name__}: {e}"
+
+def _tec_to_json_v934(tec):
+    """Converte somente o resumo técnico necessário; DataFrames nunca são persistidos."""
+    return {
+        "disponivel": bool(tec.get("disponivel", False)),
+        "motivo": str(tec.get("motivo", "")),
+        "h4": dict(tec.get("h4", {})),
+        "h1": dict(tec.get("h1", {})),
+        "m15": dict(tec.get("m15", {})),
+        "preco_m15": float(tec.get("preco_m15", 0.0) or 0.0),
+        "ultima_atualizacao": str(tec.get("ultima_atualizacao", "")),
+    }
+
+
 # =========================================================
 # V9.1 — CENTRAL DE DECISÃO AUTOMÁTICA
 # Consolida os dados já calculados pelo APP.
@@ -6600,7 +6677,7 @@ def _decisao_tecnica_final_v92(tecnico: dict, timing: str, direcao: str) -> tupl
 # ainda não são alimentados automaticamente pelo sistema.
 # =========================================================
 with abas[6]:
-    st.subheader("🎯 Central de Decisão Automática — V9.3.3")
+    st.subheader("🎯 Central de Decisão Automática — V9.3.4")
     st.caption(
         "Resumo automático dos dados que já existem no APP. "
         "O resultado abaixo é um viés macro/operacional educacional, não uma ordem de mercado."
@@ -6857,7 +6934,7 @@ with abas[6]:
         # -----------------------------------------------------
         # V9.3 — Scanner técnico automático dos 7 pares
         # -----------------------------------------------------
-        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3.3")
+        st.markdown("### 🌐 Scanner Automático dos 7 Pares — V9.3.4")
         st.caption(
             "A Matriz continua escolhendo o viés macro de cada par. "
             "O scanner consulta H4, H1 e M15 e procura qual par está mais perto "
@@ -6872,13 +6949,15 @@ with abas[6]:
         _scanner93 = []
         _mat93 = matriz_v61.copy().head(7).reset_index(drop=True)
 
-        # V9.3.3: resultados persistem na sessão e cada lote consulta só seus pares.
-        if "v933_resultados" not in st.session_state:
-            st.session_state["v933_resultados"] = {}
-        if "v933_lote" not in st.session_state:
-            st.session_state["v933_lote"] = 0
-        if "v933_ultimo_processamento_ts" not in st.session_state:
-            st.session_state["v933_ultimo_processamento_ts"] = 0.0
+        _tok934, _repo934, _branch934 = _gh_cfg_v934()
+        if not _tok934 or not _repo934:
+            st.error("❌ Persistência do scanner não configurada. Verifique os Secrets GitHub já usados pelo histórico.")
+        else:
+            st.success(f"💾 Fila persistente ativa: {_repo934} · {_SCANNER_GH_PATH_V934}")
+
+        # V9.3.4: estado vem do GitHub; F5/fechar navegador não apaga progresso.
+        _estado934 = _scanner_load_v934()
+        _resultados934 = dict(_estado934.get("resultados", {}))
 
         _lotes933 = [
             list(range(i, min(i + 2, len(_mat93))))
@@ -6886,13 +6965,13 @@ with abas[6]:
         ]
         _lote_idx933 = max(
             0,
-            min(int(st.session_state.get("v933_lote", 0)), len(_lotes933) - 1)
+            min(int(_estado934.get("lote", 0)), len(_lotes933) - 1)
         )
 
         _agora933 = time.time()
-        _ultimo933 = float(st.session_state.get("v933_ultimo_processamento_ts", 0.0))
+        _ultimo933 = float(_estado934.get("ultimo_processamento_ts", 0.0))
         _restante933 = max(0, int(61 - (_agora933 - _ultimo933))) if _ultimo933 else 0
-        _resultados933 = st.session_state["v933_resultados"]
+        _resultados933 = _resultados934
 
         _a933, _b933, _c933 = st.columns([1.25, 1.15, 3.2])
 
@@ -6918,15 +6997,19 @@ with abas[6]:
                         _tec933, _timing91, _dir933
                     )
                     _resultados933[_par933] = {
-                        "tecnico": _tec933,
+                        "tecnico": _tec_to_json_v934(_tec933),
                         "decisao": _dec933,
                         "texto": _txt933,
                         "processado_em": time.time(),
                     }
 
-                st.session_state["v933_resultados"] = _resultados933
-                st.session_state["v933_ultimo_processamento_ts"] = time.time()
-                st.rerun()
+                _estado934["resultados"] = _resultados933
+                _estado934["ultimo_processamento_ts"] = time.time()
+                _ok934, _err934 = _scanner_save_v934(_estado934)
+                if not _ok934:
+                    st.error(f"Falha ao salvar progresso do scanner no GitHub: {_err934}")
+                else:
+                    st.rerun()
 
         with _b933:
             # Só permite avançar quando TODOS os pares do lote atual estão completos.
@@ -6948,10 +7031,12 @@ with abas[6]:
                     (_lote_idx933 >= len(_lotes933) - 1)
                 )
             ):
-                st.session_state["v933_lote"] = min(
-                    _lote_idx933 + 1, len(_lotes933) - 1
-                )
-                st.rerun()
+                _estado934["lote"] = min(_lote_idx933 + 1, len(_lotes933) - 1)
+                _ok934, _err934 = _scanner_save_v934(_estado934)
+                if not _ok934:
+                    st.error(f"Falha ao salvar avanço da fila no GitHub: {_err934}")
+                else:
+                    st.rerun()
 
         with _c933:
             _pares_txt933 = " + ".join(_pares_lote933)
@@ -6985,7 +7070,7 @@ with abas[6]:
         )
         st.progress(
             min(1.0, _n_salvos933 / max(1, len(_mat93))),
-            text=f"Resultados técnicos salvos na sessão: {_n_salvos933}/{len(_mat93)} pares"
+            text=f"Resultados técnicos persistentes: {_n_salvos933}/{len(_mat93)} pares"
         )
 
         # Monta a tabela SEM fazer novas chamadas.
@@ -7142,7 +7227,7 @@ with abas[6]:
         )
 
         st.caption(
-            "A Central V9.3.3 processa somente o lote atual, salva os resultados na sessão e nunca reconsulta lotes anteriores durante a montagem do scanner. "
+            "A Central V9.3.4 processa somente o lote atual e salva o progresso no GitHub, sobrevivendo a F5, fechamento do navegador e nova sessão. "
             "Ela não transforma Score Mestre em probabilidade de lucro e não substitui gestão de risco."
         )
 
