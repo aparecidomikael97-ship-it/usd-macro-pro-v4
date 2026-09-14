@@ -19,7 +19,7 @@ jobs:
       - name: Install test dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install streamlit pandas numpy requests
+          pip install streamlit pandas numpy requests altair
       - name: Run quality suite
         run: |
           python -m unittest -q \
@@ -27,4 +27,5 @@ jobs:
             test_calendar.py \
             test_market_map_v10.py \
             test_master_panel_v102.py \
-            test_experience_v103.py
+            test_experience_v103.py \
+            test_product_v104.py
