@@ -1,4 +1,4 @@
-"""Streamlit UI + data access for USD Macro Pro V10 Market Map.
+"""Streamlit UI + data access for USD Macro Pro V10.1 Professional Macro Market Map.
 
 The module is additive/observational: it reads the existing macro matrix and
 adds W1/D1 context, liquidity, Quarterly Theory time scaffolding and ICT-style
@@ -19,6 +19,8 @@ from market_map_core_v10 import (
     NY_TZ,
     aggregate_ohlc,
     alignment_summary,
+    macro_regime_summary,
+    setup_readiness,
     completed_daily,
     equal_liquidity_levels,
     killzone_state,
@@ -147,15 +149,15 @@ def _save_snapshot(snapshot: dict) -> tuple[bool, str, bool]:
         return False, f"Falha ao salvar snapshot: {type(exc).__name__}: {exc}", False
 
 
-def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str) -> None:
-    st.subheader("🧭 Macro Market Map — V10")
+def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str, macro_context: dict | None = None) -> None:
+    st.subheader("🧭 Professional Macro Market Map — V10.1")
     st.caption(
-        "Camada observacional: Macro → W1 → D1 → Quarterly → Liquidez → Killzones → H4/H1/M15. "
-        "Não altera o Score Mestre nem o histórico oficial da V9.3.9.2."
+        "Macro semanal → Macro do dia → W1 → D1 → Quarterly → Liquidez → Killzones → H4/H1/M15. "
+        "Camada de seleção e contexto: não altera o Score Mestre nem o histórico oficial da V9.3.9.2."
     )
     st.info(
-        "🎯 Objetivo: transformar o viés macro em uma narrativa top-down. "
-        "O mapa organiza contexto e timing; não é probabilidade de lucro."
+        "🎯 A V10.1 ficou mais seletiva: ela procura confluência e também procura motivos para NÃO entrar. "
+        "O Índice de Prontidão é um filtro operacional, não uma probabilidade de lucro."
     )
 
     if matrix is None or matrix.empty:
@@ -163,24 +165,24 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str)
         return
 
     pairs = [str(x) for x in matrix["Par"].tolist()]
-    pair = st.selectbox("Par para leitura profissional", pairs, index=0, key="v10_market_map_pair")
+    pair = st.selectbox("Par para leitura profissional", pairs, index=0, key="v101_market_map_pair")
 
     ctrl1, ctrl2, ctrl3 = st.columns([1.1, 1.2, 1.2])
     user_tz = ctrl1.selectbox(
         "Fuso de exibição",
         ["America/Cuiaba", "America/Sao_Paulo", "America/New_York", "UTC"],
         index=0,
-        key="v10_market_map_tz",
+        key="v101_market_map_tz",
     )
     anchor_label = ctrl2.selectbox(
         "Âncora Quarterly",
         ["00:00 NY", "18:00 NY"],
         index=0,
-        key="v10_quarter_anchor",
-        help="Há variações públicas da Quarterly Theory. O app deixa a âncora explícita em vez de escondê-la.",
+        key="v101_quarter_anchor",
+        help="Há variações públicas da Quarterly Theory. A âncora fica explícita para evitar regra escondida.",
     )
     anchor_hour = 0 if anchor_label.startswith("00") else 18
-    if ctrl3.button("🔄 Atualizar Market Map", use_container_width=True, key="v10_market_map_refresh"):
+    if ctrl3.button("🔄 Atualizar Market Map", use_container_width=True, key="v101_market_map_refresh"):
         _td_series.clear()
         st.rerun()
 
@@ -189,6 +191,7 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str)
     macro_score = _safe_float(row.get("Score final", row.get("Score", 0)))
     quality = _safe_float(row.get("Qualidade", 0))
     rank_index = _safe_float(row.get("Índice ranking", row.get("Índice operacional", 0)))
+    macro_context = dict(macro_context or {})
 
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Direcional macro", macro_direction.replace("🟢 ", "").replace("🔴 ", "").replace("⚪ ", ""))
@@ -196,11 +199,40 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str)
     m3.metric("Qualidade", f"{quality:.0f}%")
     m4.metric("Índice base", f"{rank_index:.1f}/100")
 
+    # -----------------------------------------------------
+    # 0 — MACRO REGIME: usa apenas informações do motor base
+    # -----------------------------------------------------
+    regime = macro_regime_summary(pair, macro_direction, macro_score, quality, macro_context)
+    st.markdown("### 0️⃣ Leitura Macro Semanal & do Dia")
+    r1, r2, r3, r4 = st.columns(4)
+    r1.metric("Regime macro semanal", regime["weekly_label"])
+    r2.metric("Consistência com o viés", f"{regime['consistency']:.0f}/100")
+    r3.metric("Impulso macro recente", regime["recent_label"])
+    r4.metric("Risco de evento", regime["event_risk"]["level"])
+    st.caption("Consistência mede concordância entre os blocos do próprio sistema; não é taxa de acerto nem probabilidade estatística.")
+
+    if regime["components"]:
+        macro_rows = []
+        for item in regime["components"]:
+            status = "🟢 CONFIRMA" if item["ok"] is True else "🔴 CONTRA" if item["ok"] is False else "⚪ NEUTRO"
+            macro_rows.append({
+                "Bloco": item["name"],
+                "Leitura": item["detail"],
+                "Relação com o viés": status,
+                "Peso explicativo": f"{item['weight']:.0f}%",
+            })
+        st.dataframe(pd.DataFrame(macro_rows), hide_index=True, use_container_width=True)
+    risk_level = regime["event_risk"]["level"]
+    if risk_level in {"ALTO", "ELEVADO"}:
+        st.warning("📅 " + regime["event_risk"]["text"])
+    else:
+        st.info("📅 " + regime["event_risk"]["text"])
+
     if not api_key:
-        st.warning("CHAVE_TWELVE_DATA ausente: o mapa macro aparece, mas W1/D1/liquidez ficam indisponíveis.")
+        st.warning("CHAVE_TWELVE_DATA ausente: a leitura macro funciona, mas W1/D1/liquidez ficam indisponíveis.")
         return
 
-    with st.spinner(f"Montando leitura W1/D1 e mapa de liquidez de {pair}..."):
+    with st.spinner(f"Montando W1/D1 e mapa de liquidez de {pair}..."):
         daily, err_d = _td_series(pair, "1day", 320, api_key)
         m15, err_m = _td_series(pair, "15min", 500, api_key)
 
@@ -219,14 +251,18 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str)
     weekly_ctx = trend_context(weekly)
     daily_ctx = trend_context(d_closed)
     current_price = float(m15.iloc[-1]["close"])
+    last_m15 = pd.Timestamp(m15.iloc[-1]["datetime"])
 
     st.markdown("### 1️⃣ Direcional semanal e diário")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("W1", f"{_icon_bias(weekly_ctx['bias'])} {weekly_ctx['bias']}", f"Contexto {weekly_ctx['score']:.0f}/100")
-    c2.metric("Estrutura W1", f"{weekly_ctx['structure']['high_state']} / {weekly_ctx['structure']['low_state']}")
+    c2.metric("Estrutura W1", f"{weekly_ctx['structure']['high_state']} / {weekly_ctx['structure']['low_state']}", weekly_ctx['structure'].get('regime','—'))
     c3.metric("D1", f"{_icon_bias(daily_ctx['bias'])} {daily_ctx['bias']}", f"Contexto {daily_ctx['score']:.0f}/100")
-    c4.metric("Estrutura D1", f"{daily_ctx['structure']['high_state']} / {daily_ctx['structure']['low_state']}")
-    st.caption(f"W1: {weekly_ctx['reason']} · D1: {daily_ctx['reason']}")
+    c4.metric("Estrutura D1", f"{daily_ctx['structure']['high_state']} / {daily_ctx['structure']['low_state']}", daily_ctx['structure'].get('regime','—'))
+    st.caption(
+        f"W1: {weekly_ctx['reason']} · confirmação {weekly_ctx.get('confirmation','—')}\n\n"
+        f"D1: {daily_ctx['reason']} · confirmação {daily_ctx.get('confirmation','—')}"
+    )
 
     levels = prior_period_levels(daily, today_ny)
     levels.update(equal_liquidity_levels(d_closed))
@@ -238,17 +274,26 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str)
     if midnight is not None:
         levels["NY Midnight Open"] = midnight
 
-    st.markdown("### 2️⃣ Mapa de liquidez")
+    st.markdown("### 2️⃣ Mapa de liquidez semântico")
     pwh, pwl = levels.get("PWH"), levels.get("PWL")
     pd_loc = premium_discount(current_price, pwl, pwh)
-    above, below = nearest_liquidity(current_price, levels)
+    bsl, ssl = nearest_liquidity(current_price, levels)
     liq = liquidity_rows(current_price, levels, pair)
 
+    if pd_loc["position"] is None:
+        loc_delta = "Sem PWH/PWL"
+    elif pd_loc["zone"] == "ACIMA DO RANGE":
+        loc_delta = f"Expansão +{pd_loc['expansion_pct']:.1f}%"
+    elif pd_loc["zone"] == "ABAIXO DO RANGE":
+        loc_delta = f"Expansão -{pd_loc['expansion_pct']:.1f}%"
+    else:
+        loc_delta = f"{pd_loc['position']:.0f}% do range"
+
     l1, l2, l3, l4 = st.columns(4)
-    l1.metric("Preço M15", _fmt_price(current_price, pair))
-    l2.metric("Localização semanal", pd_loc["zone"], f"{pd_loc['position']:.0f}% do range" if pd_loc["position"] is not None else "Sem PWH/PWL")
-    l3.metric("BSL mais próxima", f"{above[0]} · {_fmt_price(above[1], pair)}" if above else "—")
-    l4.metric("SSL mais próxima", f"{below[0]} · {_fmt_price(below[1], pair)}" if below else "—")
+    l1.metric("Preço M15", _fmt_price(current_price, pair), f"Candle {last_m15.strftime('%d/%m %H:%M UTC')}")
+    l2.metric("Localização semanal", pd_loc["zone"], loc_delta)
+    l3.metric("BSL disponível", f"{bsl[0]} · {_fmt_price(bsl[1], pair)}" if bsl else "—")
+    l4.metric("SSL disponível", f"{ssl[0]} · {_fmt_price(ssl[1], pair)}" if ssl else "—")
 
     if liq:
         df_liq = pd.DataFrame(liq)
@@ -265,7 +310,7 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str)
         )
         latest_sweep = str(latest["type"])
     else:
-        st.info("💧 Nenhum sweep simples dos níveis mapeados foi confirmado nos últimos 16 candles M15.")
+        st.info("💧 Nenhum sweep semântico confirmado nos últimos 16 candles M15.")
         latest_sweep = ""
 
     st.markdown("### 3️⃣ Quarterly Theory · mapa temporal")
@@ -278,7 +323,7 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str)
     st.caption(
         f"Q{quarter['quarter']}: {quarter['quarter_start'].strftime('%H:%M')}–{quarter['quarter_end'].strftime('%H:%M')} NY · "
         f"q{quarter['micro']}: {quarter['micro_start'].strftime('%H:%M')}–{quarter['micro_end'].strftime('%H:%M')} NY. "
-        "Os nomes das fases são uma expectativa heurística; preço não é obrigado a seguir a sequência."
+        "Quarterly é uma moldura temporal heurística; não obriga o preço a seguir uma sequência."
     )
 
     st.markdown("### 4️⃣ ICT Killzones")
@@ -286,16 +331,11 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str)
     active = kz.get("active")
     nxt = kz.get("next")
     if active:
-        st.success(
-            f"⏰ **ATIVA: {active['name']}** · {active['start'].strftime('%H:%M')}–{active['end'].strftime('%H:%M')} New York"
-        )
+        st.success(f"⏰ **ATIVA: {active['name']}** · {active['start'].strftime('%H:%M')}–{active['end'].strftime('%H:%M')} New York")
     elif nxt:
         minutes = max(0, int((nxt["start"] - kz["now_ny"]).total_seconds() // 60))
-        st.info(
-            f"Próxima janela: **{nxt['name']}** · {nxt['start'].strftime('%H:%M')}–{nxt['end'].strftime('%H:%M')} NY · em ~{minutes} min"
-        )
+        st.info(f"Próxima janela: **{nxt['name']}** · {nxt['start'].strftime('%H:%M')}–{nxt['end'].strftime('%H:%M')} NY · em ~{minutes} min")
 
-    # Display conversion for the user's selected zone, DST-safe via ZoneInfo.
     zone = ZoneInfo(user_tz)
     kz_rows = []
     for w in kz["windows"]:
@@ -310,71 +350,83 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str)
     if kz_rows:
         st.dataframe(pd.DataFrame(kz_rows), hide_index=True, use_container_width=True)
 
-    st.markdown("### 5️⃣ Leitura integrada · narrativa profissional")
+    # -----------------------------------------------------
+    # 5 — STRICT READINESS GATE
+    # -----------------------------------------------------
+    st.markdown("### 5️⃣ Gate de Alta Seletividade")
+    readiness = setup_readiness(
+        macro_direction, macro_score, quality,
+        weekly_ctx, daily_ctx,
+        pd_loc["zone"], latest_sweep, bool(active),
+        regime["event_risk"]["level"],
+    )
+    g1, g2, g3 = st.columns(3)
+    g1.metric("Índice de Prontidão", f"{readiness['score']:.0f}/100")
+    g2.metric("Classe", readiness["grade"])
+    g3.metric("Ação", readiness["action"])
+    st.caption("⚠️ Prontidão = seletividade do checklist atual. Não é probabilidade de gain e não foi calibrada como taxa de acerto.")
+
+    gate_rows = []
+    for item in readiness["checks"]:
+        status = "🟢 PASSA" if item["ok"] is True else "🔴 FALHA" if item["ok"] is False else "⚪ SEM DADO"
+        gate_rows.append({"Filtro": item["name"], "Status": status, "Detalhe": item["detail"], "Peso": f"{item['weight']:.0f}%"})
+    st.dataframe(pd.DataFrame(gate_rows), hide_index=True, use_container_width=True)
+
+    st.markdown("### 6️⃣ Leitura integrada · narrativa profissional")
     align = alignment_summary(
-        macro_direction,
-        weekly_ctx["bias"],
-        daily_ctx["bias"],
-        pd_zone=pd_loc["zone"],
-        latest_sweep=latest_sweep,
-        killzone_active=bool(active),
+        macro_direction, weekly_ctx["bias"], daily_ctx["bias"],
+        pd_zone=pd_loc["zone"], latest_sweep=latest_sweep, killzone_active=bool(active),
     )
     a1, a2, a3 = st.columns(3)
     a1.metric("Alinhamento contextual", align["label"])
-    a2.metric("Checklist disponível", f"{align['passed']}/{align['total']}")
+    a2.metric("Checklist contextual", f"{align['passed']}/{align['total']}")
     a3.metric("Lado macro", macro_side(macro_direction))
-    st.caption("Checklist contextual, não probabilidade estatística e não substitui o Score Mestre.")
-
-    check_rows = []
-    for name, ok in align["checks"]:
-        status = "🟢 SIM" if ok is True else "🔴 NÃO" if ok is False else "⚪ SEM DADO"
-        check_rows.append({"Confluência": name, "Status": status})
-    st.dataframe(pd.DataFrame(check_rows), hide_index=True, use_container_width=True)
 
     macro_bias = macro_side(macro_direction)
     weekly_match = weekly_ctx["bias"] == macro_bias and macro_bias != "NEUTRO"
     daily_match = daily_ctx["bias"] == macro_bias and macro_bias != "NEUTRO"
-    target = above if macro_bias == "ALTISTA" else below if macro_bias == "BAIXISTA" else None
-    opposing = below if macro_bias == "ALTISTA" else above if macro_bias == "BAIXISTA" else None
+    target = bsl if macro_bias == "ALTISTA" else ssl if macro_bias == "BAIXISTA" else None
+    opposing = ssl if macro_bias == "ALTISTA" else bsl if macro_bias == "BAIXISTA" else None
 
     st.markdown("#### 🧠 Narrativa do mercado")
-    narrative = []
-    narrative.append(f"**Macro:** {macro_direction} · Score {macro_score:.0f}/100 · Qualidade {quality:.0f}%.")
-    narrative.append(
-        f"**Top-down:** W1 {_icon_bias(weekly_ctx['bias'])} {weekly_ctx['bias']} e D1 {_icon_bias(daily_ctx['bias'])} {daily_ctx['bias']}. "
-        + ("Os dois confirmam o lado macro." if weekly_match and daily_match else "Ainda não existe alinhamento completo W1 + D1 com a macro.")
-    )
-    narrative.append(
-        f"**Localização:** preço em {pd_loc['zone']} dentro do range da semana anterior."
-        if pd_loc["zone"] != "INDEFINIDO" else "**Localização:** range semanal anterior ainda não disponível."
-    )
+    narrative = [
+        f"**Macro semanal:** {macro_direction} · Score {macro_score:.0f}/100 · Qualidade {quality:.0f}% · regime {regime['weekly_label']} ({regime['consistency']:.0f}/100 de consistência).",
+        f"**Macro do dia:** impulso recente {regime['recent_label']} · risco de evento {regime['event_risk']['level']}. {regime['event_risk']['text']}",
+        f"**Top-down:** W1 {_icon_bias(weekly_ctx['bias'])} {weekly_ctx['bias']} ({weekly_ctx['structure'].get('regime','—')}) e D1 {_icon_bias(daily_ctx['bias'])} {daily_ctx['bias']} ({daily_ctx['structure'].get('regime','—')}). " + ("Os dois confirmam o lado macro." if weekly_match and daily_match else "Ainda não há confirmação limpa de W1 + D1 com a macro."),
+    ]
+    if pd_loc["zone"] in {"ACIMA DO RANGE", "ABAIXO DO RANGE"}:
+        narrative.append(f"**Localização:** {pd_loc['zone']} da semana anterior · expansão {pd_loc['expansion_pct']:.1f}%. Evitar tratar isso como simples premium/discount.")
+    elif pd_loc["zone"] != "INDEFINIDO":
+        narrative.append(f"**Localização:** {pd_loc['zone']} · posição {pd_loc['position']:.0f}% dentro do range da semana anterior.")
+    else:
+        narrative.append("**Localização:** range semanal anterior ainda não disponível.")
     if target:
-        narrative.append(f"**Draw on liquidity:** referência no lado do viés = {target[0]} em {_fmt_price(target[1], pair)}.")
+        narrative.append(f"**Draw on liquidity:** {target[0]} em {_fmt_price(target[1], pair)} é a liquidez disponível no lado do viés.")
+    else:
+        narrative.append("**Draw on liquidity:** não há pool semântico disponível à frente no lado do viés neste snapshot.")
     if opposing:
-        narrative.append(f"**Liquidez oposta:** {opposing[0]} em {_fmt_price(opposing[1], pair)} pode funcionar como zona de sweep/invalidação contextual.")
-    narrative.append(
-        f"**Tempo:** {quarter['phase']} · micro q{quarter['micro']} · "
-        + (f"{active['name']} ativa." if active else "fora de killzone neste momento.")
-    )
+        narrative.append(f"**Liquidez oposta:** {opposing[0]} em {_fmt_price(opposing[1], pair)} é referência do lado contrário.")
+    if latest_sweep:
+        narrative.append(f"**Sweep:** {latest_sweep} detectado; coerência depende do lado macro.")
+    narrative.append(f"**Tempo:** {quarter['phase']} · micro q{quarter['micro']} · " + (f"{active['name']} ativa." if active else "fora de killzone."))
+    narrative.append(f"**Gate:** classe {readiness['grade']} · {readiness['score']:.0f}/100 de prontidão · {readiness['action']}.")
     for item in narrative:
         st.markdown(f"- {item}")
 
-    if macro_bias == "NEUTRO":
-        st.warning("📌 Plano: Macro sem lado definido. Não forçar BUY/SELL; esperar a Matriz escolher direção.")
-    elif not weekly_match:
-        st.warning("📌 Plano: W1 está contra/neutral. Tratar operações no lado macro como antecipação e exigir confirmação mais forte.")
-    elif not daily_match:
-        st.warning("📌 Plano: W1 apoia a macro, mas D1 ainda não. Esperar correção/sweep + mudança de estrutura antes do M15.")
-    elif not active:
-        st.info("📌 Plano: Macro + W1 + D1 alinhados. Não perseguir preço fora da janela; esperar liquidez e a próxima killzone.")
+    if readiness["grade"] == "A+":
+        st.success("📌 Plano: contexto muito seletivo. Ainda assim, H4/H1 devem localizar o pullback e o M15 precisa confirmar o gatilho final antes da execução.")
+    elif readiness["grade"] == "A":
+        st.success("📌 Plano: contexto forte, mas não completo. Não antecipar: exigir H4/H1 + confirmação M15.")
+    elif readiness["grade"] == "B":
+        st.warning("📌 Plano: há confluência parcial. Esperar melhora de localização, sweep, killzone ou estrutura antes de considerar execução.")
     else:
-        st.success("📌 Plano: Macro + W1 + D1 alinhados e janela ativa. Agora H4/H1 localizam o pullback e o M15 continua sendo o gatilho final.")
+        st.error("📌 Plano: NÃO FORÇAR ENTRADA. O objetivo do Gate é filtrar operações quando o contexto não está suficientemente limpo.")
 
     st.divider()
-    st.markdown("### 🧪 Registro observacional V10")
+    st.markdown("### 🧪 Registro observacional V10.1")
     st.caption(
-        "Salva este contexto em um CSV separado. Isso permite provar depois se W1/D1 + liquidez + timing realmente melhoram os resultados, "
-        "sem contaminar o histórico oficial do motor base."
+        "O contexto é salvo em CSV separado para medir depois se Macro Semanal/Dia + W1/D1 + liquidez + timing + Gate realmente melhoram os resultados. "
+        "O histórico oficial do motor base continua separado."
     )
     m15_candle = pd.Timestamp(m15.iloc[-1]["datetime"])
     snapshot = {
@@ -386,24 +438,32 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str)
         "macro_direcao": macro_direction,
         "macro_score": macro_score,
         "qualidade": quality,
+        "macro_regime_semanal": regime["weekly_label"],
+        "macro_consistencia": regime["consistency"],
+        "macro_impulso_recente": regime["recent_label"],
+        "risco_evento": regime["event_risk"]["level"],
         "w1_bias": weekly_ctx["bias"],
         "w1_score": weekly_ctx["score"],
+        "w1_estrutura": weekly_ctx["structure"].get("regime", ""),
         "d1_bias": daily_ctx["bias"],
         "d1_score": daily_ctx["score"],
+        "d1_estrutura": daily_ctx["structure"].get("regime", ""),
         "quarter": f"Q{quarter['quarter']}",
         "micro_quarter": f"q{quarter['micro']}",
         "quarter_anchor_ny": anchor_hour,
         "killzone": active["name"] if active else "FORA",
         "premium_discount": pd_loc["zone"],
-        "nearest_bsl": above[0] if above else "",
-        "nearest_ssl": below[0] if below else "",
+        "nearest_bsl": bsl[0] if bsl else "",
+        "nearest_ssl": ssl[0] if ssl else "",
         "latest_sweep": latest_sweep,
         "alinhamento": align["label"],
         "alinhamento_passou": align["passed"],
         "alinhamento_total": align["total"],
-        "versao": "V10.0 Market Map observacional",
+        "readiness_score": readiness["score"],
+        "readiness_grade": readiness["grade"],
+        "versao": "V10.1 Professional Macro Market Map",
     }
-    if st.button("💾 Registrar leitura atual do Market Map", key="v10_save_snapshot", use_container_width=True):
+    if st.button("💾 Registrar leitura atual do Market Map", key="v101_save_snapshot", use_container_width=True):
         ok, msg, created = _save_snapshot(snapshot)
         if ok and created:
             st.success(msg)
@@ -412,14 +472,19 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str)
         else:
             st.error(msg)
 
-    with st.expander("ℹ️ Regras e limites desta camada"):
+    with st.expander("ℹ️ Regras, tecnologia e limites desta camada"):
         st.markdown(
             """
-- **W1/D1:** contexto por EMA20/EMA50 + swings HH/HL/LH/LL; não é previsão isolada.
-- **Liquidez:** PDH/PDL, PWH/PWL, PMH/PML, equal highs/lows, Asian Range e NY Midnight Open quando disponíveis.
-- **Sweep:** regra objetiva simples: rompe o nível e fecha de volta do outro lado.
-- **Quarterly:** divisão temporal em quatro blocos de 6h + micro-blocos de 90 min, com âncora explícita e editável.
-- **Killzones:** ancoradas em **America/New_York**, então o horário de verão é convertido automaticamente.
-- **Motor base:** nenhum item desta aba altera pesos, Score Mestre, COMPRA/VENDA ou validação 1H/4H/24H da V9.3.9.2.
+- **Macro semanal/do dia:** reaproveita somente dados já calculados pelo motor base (USD, Fed, tendência macro, surpresas, FOMC e próximo evento). Não cria dado que a fonte não forneceu.
+- **W1/D1:** EMA20/EMA50 + inclinação + swings. `HH/LL` é tratado como expansão mista; `LH/HL` como compressão — não como tendência limpa.
+- **Liquidez semântica:** máximas (PDH/PWH/PMH/EQH/Asia High) permanecem BSL; mínimas permanecem SSL, mesmo se o preço já tiver cruzado o nível.
+- **Liquidez consumida:** um pool que ficou atrás do preço não é reaproveitado como alvo do lado oposto.
+- **Premium/Discount:** acima de 100% vira **ACIMA DO RANGE** e abaixo de 0% vira **ABAIXO DO RANGE**, evitando rótulos enganosos.
+- **Sweep:** BSL só é varrida por excesso acima + fechamento de volta; SSL só por excesso abaixo + fechamento de volta.
+- **Quarterly:** moldura temporal heurística com âncora explícita; não é previsão determinística.
+- **Killzones:** ancoradas em `America/New_York`, com horário de verão convertido automaticamente.
+- **Gate de Alta Seletividade:** combina qualidade, macro, W1/D1, estrutura, localização, sweep, killzone e risco de evento. É um filtro de prontidão, **não probabilidade de lucro**.
+- **Execução:** H4/H1/M15 continuam sendo necessários. A V10.1 não transforma contexto em ordem automática.
+- **Motor base:** Score Mestre, direção oficial e histórico 1H/4H/24H permanecem intactos.
             """
         )

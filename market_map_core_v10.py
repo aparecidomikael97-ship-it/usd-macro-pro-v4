@@ -1,4 +1,4 @@
-"""Pure market-map rules for USD Macro Pro V10.
+"""Pure market-map rules for USD Macro Pro V10.1 Professional.
 
 This module intentionally contains no Streamlit or network calls.  It turns
 OHLC data into higher-timeframe context, liquidity references, ICT-style time
@@ -142,10 +142,26 @@ def _compare_levels(a: float, b: float, tolerance: float, higher_code: str, lowe
     return higher_code if a > b else lower_code
 
 
+def structure_regime(high_state: str, low_state: str) -> dict[str, str]:
+    """Classify swing geometry without forcing a trend when highs/lows conflict."""
+    hs, ls = str(high_state), str(low_state)
+    if hs == "HH" and ls == "HL":
+        return {"bias": "ALTISTA", "regime": "TENDÊNCIA ALTISTA", "quality": "CONFIRMADA"}
+    if hs == "LH" and ls == "LL":
+        return {"bias": "BAIXISTA", "regime": "TENDÊNCIA BAIXISTA", "quality": "CONFIRMADA"}
+    if hs == "HH" and ls == "LL":
+        return {"bias": "NEUTRO", "regime": "EXPANSÃO DOS DOIS LADOS", "quality": "MISTA"}
+    if hs == "LH" and ls == "HL":
+        return {"bias": "NEUTRO", "regime": "COMPRESSÃO", "quality": "MISTA"}
+    if "EQ" in hs or "EQ" in ls:
+        return {"bias": "NEUTRO", "regime": "EQUILÍBRIO / LIQUIDEZ", "quality": "MISTA"}
+    return {"bias": "NEUTRO", "regime": "ESTRUTURA INCOMPLETA", "quality": "INCOMPLETA"}
+
+
 def market_structure(frame: pd.DataFrame, wing: int = 2) -> dict[str, Any]:
     d = normalize_ohlc(frame)
     if d.empty:
-        return {"bias": "NEUTRO", "high_state": "—", "low_state": "—", "highs": [], "lows": []}
+        return {"bias": "NEUTRO", "high_state": "—", "low_state": "—", "regime": "SEM DADOS", "quality": "INCOMPLETA", "highs": [], "lows": []}
     highs, lows = swing_points(d, wing=wing)
     atr = _atr(d) or max(float(d.iloc[-1]["close"]) * 0.001, 1e-9)
     tol = atr * 0.08
@@ -155,22 +171,13 @@ def market_structure(frame: pd.DataFrame, wing: int = 2) -> dict[str, Any]:
         high_state = _compare_levels(highs[-1][1], highs[-2][1], tol, "HH", "LH", "EQH")
     if len(lows) >= 2:
         low_state = _compare_levels(lows[-1][1], lows[-2][1], tol, "HL", "LL", "EQL")
-
-    if high_state in ("HH", "EQH") and low_state == "HL":
-        bias = "ALTISTA"
-    elif high_state == "HH" and low_state in ("HL", "EQL"):
-        bias = "ALTISTA"
-    elif high_state in ("LH", "EQH") and low_state == "LL":
-        bias = "BAIXISTA"
-    elif high_state == "LH" and low_state in ("LL", "EQL"):
-        bias = "BAIXISTA"
-    else:
-        bias = "NEUTRO"
-
+    reg = structure_regime(high_state, low_state)
     return {
-        "bias": bias,
+        "bias": reg["bias"],
         "high_state": high_state,
         "low_state": low_state,
+        "regime": reg["regime"],
+        "quality": reg["quality"],
         "highs": highs,
         "lows": lows,
         "atr": atr,
@@ -178,12 +185,13 @@ def market_structure(frame: pd.DataFrame, wing: int = 2) -> dict[str, Any]:
 
 
 def trend_context(frame: pd.DataFrame) -> dict[str, Any]:
-    """Directional context from structure + EMA regime, not a trade signal."""
+    """Top-down context from EMA regime plus explicit swing-structure confirmation."""
     d = normalize_ohlc(frame)
     if len(d) < 15:
         return {
             "bias": "NEUTRO", "score": 50.0, "ema20": None, "ema50": None,
             "structure": market_structure(d), "reason": "Histórico insuficiente.",
+            "ema_bias": "NEUTRO", "confirmation": "INCOMPLETA",
         }
 
     close = d["close"].astype(float)
@@ -196,24 +204,39 @@ def trend_context(frame: pd.DataFrame) -> dict[str, Any]:
     slope = float(ema20_s.iloc[-1] - ema20_s.iloc[-1 - slope_n]) if slope_n > 0 else 0.0
     struct = market_structure(d)
 
-    points = 0.0
-    points += 1.0 if last > ema20 else -1.0 if last < ema20 else 0.0
-    points += 1.0 if ema20 > ema50 else -1.0 if ema20 < ema50 else 0.0
-    points += 1.0 if slope > 0 else -1.0 if slope < 0 else 0.0
-    points += 2.0 if struct["bias"] == "ALTISTA" else -2.0 if struct["bias"] == "BAIXISTA" else 0.0
-    score = float(np.clip(50.0 + points * 10.0, 0.0, 100.0))
+    ema_points = 0.0
+    ema_points += 1.0 if last > ema20 else -1.0 if last < ema20 else 0.0
+    ema_points += 1.0 if ema20 > ema50 else -1.0 if ema20 < ema50 else 0.0
+    ema_points += 1.0 if slope > 0 else -1.0 if slope < 0 else 0.0
+    ema_bias = "ALTISTA" if ema_points >= 2 else "BAIXISTA" if ema_points <= -2 else "NEUTRO"
+
+    struct_points = 2.0 if struct["bias"] == "ALTISTA" else -2.0 if struct["bias"] == "BAIXISTA" else 0.0
+    score = float(np.clip(50.0 + (ema_points + struct_points) * 10.0, 0.0, 100.0))
     bias = "ALTISTA" if score >= 65 else "BAIXISTA" if score <= 35 else "NEUTRO"
 
-    reasons = []
-    reasons.append("preço acima da EMA20" if last > ema20 else "preço abaixo da EMA20")
-    reasons.append("EMA20 acima da EMA50" if ema20 > ema50 else "EMA20 abaixo da EMA50")
-    reasons.append(f"estrutura {struct['high_state']}/{struct['low_state']}")
+    if struct["bias"] == bias and bias != "NEUTRO":
+        confirmation = "CONFIRMADA"
+    elif struct["bias"] == "NEUTRO" and bias != "NEUTRO":
+        confirmation = "PARCIAL · MÉDIAS SEM ESTRUTURA LIMPA"
+    elif struct["bias"] != "NEUTRO" and bias != "NEUTRO":
+        confirmation = "CONFLITO"
+    else:
+        confirmation = "NEUTRA"
+
+    reasons = [
+        "preço acima da EMA20" if last > ema20 else "preço abaixo da EMA20",
+        "EMA20 acima da EMA50" if ema20 > ema50 else "EMA20 abaixo da EMA50",
+        "EMA20 inclinando para cima" if slope > 0 else "EMA20 inclinando para baixo" if slope < 0 else "EMA20 lateral",
+        f"estrutura {struct['high_state']}/{struct['low_state']} · {struct['regime']}",
+    ]
     return {
         "bias": bias,
         "score": score,
         "ema20": ema20,
         "ema50": ema50,
         "last": last,
+        "ema_bias": ema_bias,
+        "confirmation": confirmation,
         "structure": struct,
         "reason": " · ".join(reasons),
     }
@@ -285,6 +308,18 @@ def pip_size(pair: str) -> float:
     return 0.01 if "JPY" in str(pair).upper() else 0.0001
 
 
+def liquidity_kind(name: str) -> str:
+    """Return the semantic pool type. High-side pools are BSL; low-side pools are SSL."""
+    n = str(name).strip().upper()
+    bsl_exact = {"PDH", "PWH", "PMH", "EQH", "ASIA HIGH"}
+    ssl_exact = {"PDL", "PWL", "PML", "EQL", "ASIA LOW"}
+    if n in bsl_exact or n.endswith(" HIGH") or "SWING HIGH" in n:
+        return "BSL"
+    if n in ssl_exact or n.endswith(" LOW") or "SWING LOW" in n:
+        return "SSL"
+    return "REFERÊNCIA"
+
+
 def liquidity_rows(current_price: float, levels: Mapping[str, Any], pair: str) -> list[dict[str, Any]]:
     p = float(current_price)
     pip = pip_size(pair)
@@ -296,39 +331,71 @@ def liquidity_rows(current_price: float, levels: Mapping[str, Any], pair: str) -
             continue
         if not math.isfinite(level) or level <= 0:
             continue
-        side = "BSL · acima" if level > p else "SSL · abaixo" if level < p else "No preço"
+        kind = liquidity_kind(str(name))
         distance = abs(level - p) / pip
-        rows.append({"Nível": str(name), "Preço": level, "Lado": side, "Distância (pips)": distance})
-    return sorted(rows, key=lambda r: r["Distância (pips)"])
+        if kind == "BSL":
+            status = "🟢 DISPONÍVEL ACIMA" if level > p else "⚪ JÁ NEGOCIADA / ATRÁS DO PREÇO"
+        elif kind == "SSL":
+            status = "🟢 DISPONÍVEL ABAIXO" if level < p else "⚪ JÁ NEGOCIADA / ATRÁS DO PREÇO"
+        else:
+            status = "🔵 REFERÊNCIA" 
+        rows.append({
+            "Nível": str(name), "Preço": level, "Tipo": kind,
+            "Status": status, "Distância (pips)": distance,
+        })
+    priority = {"BSL": 0, "SSL": 1, "REFERÊNCIA": 2}
+    return sorted(rows, key=lambda r: (priority.get(r["Tipo"], 9), r["Distância (pips)"]))
 
 
 def nearest_liquidity(current_price: float, levels: Mapping[str, Any]) -> tuple[tuple[str, float] | None, tuple[str, float] | None]:
+    """Nearest *available* semantic BSL above and SSL below.
+
+    A PDH never becomes SSL simply because price traded above it.  Once behind
+    price, it is considered consumed/negotiated and is not a forward target.
+    """
     p = float(current_price)
-    above: list[tuple[str, float]] = []
-    below: list[tuple[str, float]] = []
+    bsl: list[tuple[str, float]] = []
+    ssl: list[tuple[str, float]] = []
     for name, raw in levels.items():
         try:
             value = float(raw)
         except (TypeError, ValueError):
             continue
-        if value > p:
-            above.append((str(name), value))
-        elif value < p:
-            below.append((str(name), value))
-    return (min(above, key=lambda x: x[1] - p) if above else None,
-            min(below, key=lambda x: p - x[1]) if below else None)
+        kind = liquidity_kind(str(name))
+        if kind == "BSL" and value > p:
+            bsl.append((str(name), value))
+        elif kind == "SSL" and value < p:
+            ssl.append((str(name), value))
+    return (
+        min(bsl, key=lambda x: x[1] - p) if bsl else None,
+        min(ssl, key=lambda x: p - x[1]) if ssl else None,
+    )
 
 
 def premium_discount(current_price: float, low: float | None, high: float | None) -> dict[str, Any]:
     try:
         p, lo, hi = float(current_price), float(low), float(high)
     except (TypeError, ValueError):
-        return {"zone": "INDEFINIDO", "position": None, "equilibrium": None}
+        return {"zone": "INDEFINIDO", "position": None, "equilibrium": None, "inside_range": None, "expansion_pct": None}
     if not (math.isfinite(p) and math.isfinite(lo) and math.isfinite(hi)) or hi <= lo:
-        return {"zone": "INDEFINIDO", "position": None, "equilibrium": None}
+        return {"zone": "INDEFINIDO", "position": None, "equilibrium": None, "inside_range": None, "expansion_pct": None}
     position = (p - lo) / (hi - lo) * 100.0
-    zone = "DESCONTO" if position < 45 else "PRÊMIO" if position > 55 else "EQUILÍBRIO"
-    return {"zone": zone, "position": float(position), "equilibrium": (hi + lo) / 2.0}
+    if position > 100:
+        zone = "ACIMA DO RANGE"
+        expansion = position - 100.0
+        inside = False
+    elif position < 0:
+        zone = "ABAIXO DO RANGE"
+        expansion = abs(position)
+        inside = False
+    else:
+        zone = "DESCONTO" if position < 45 else "PRÊMIO" if position > 55 else "EQUILÍBRIO"
+        expansion = 0.0
+        inside = True
+    return {
+        "zone": zone, "position": float(position), "equilibrium": (hi + lo) / 2.0,
+        "inside_range": inside, "expansion_pct": float(expansion),
+    }
 
 
 def _combine_local(day: date, t: time) -> datetime:
@@ -487,7 +554,7 @@ def ny_midnight_open(frame: pd.DataFrame, now: Any = None) -> float | None:
 
 
 def recent_sweeps(frame: pd.DataFrame, levels: Mapping[str, Any], bars: int = 12) -> list[dict[str, Any]]:
-    """Detect simple liquidity sweeps: breach a level and close back across it."""
+    """Detect semantic liquidity sweeps only on levels that are actual BSL/SSL pools."""
     d = normalize_ohlc(frame).tail(max(1, int(bars)))
     out: list[dict[str, Any]] = []
     if d.empty:
@@ -499,11 +566,11 @@ def recent_sweeps(frame: pd.DataFrame, levels: Mapping[str, Any], bars: int = 12
                 lv = float(raw)
             except (TypeError, ValueError):
                 continue
-            if h > lv and c < lv:
+            kind = liquidity_kind(str(name))
+            if kind == "BSL" and h > lv and c < lv:
                 out.append({"level": str(name), "type": "SWEEP BSL", "datetime": row["datetime"], "price": lv})
-            elif l < lv and c > lv:
+            elif kind == "SSL" and l < lv and c > lv:
                 out.append({"level": str(name), "type": "SWEEP SSL", "datetime": row["datetime"], "price": lv})
-    # de-duplicate, keeping the most recent hit per level/type
     dedup: dict[tuple[str, str], dict[str, Any]] = {}
     for item in out:
         dedup[(item["level"], item["type"])] = item
@@ -527,7 +594,7 @@ def alignment_summary(
     latest_sweep: str = "",
     killzone_active: bool = False,
 ) -> dict[str, Any]:
-    """Observational 0..5 checklist; deliberately not a probability."""
+    """Observational checklist; deliberately not a win probability."""
     side = macro_side(macro_direction)
     checks: list[tuple[str, bool | None]] = []
     checks.append(("Macro x W1", None if side == "NEUTRO" else weekly_bias == side))
@@ -542,9 +609,9 @@ def alignment_summary(
     sweep_ok = None
     if latest_sweep:
         if side == "ALTISTA":
-            sweep_ok = "SSL" in latest_sweep
+            sweep_ok = latest_sweep == "SWEEP SSL"
         elif side == "BAIXISTA":
-            sweep_ok = "BSL" in latest_sweep
+            sweep_ok = latest_sweep == "SWEEP BSL"
     checks.append(("Sweep coerente", sweep_ok))
     checks.append(("Killzone ativa", bool(killzone_active)))
 
@@ -554,3 +621,187 @@ def alignment_summary(
     ratio = passed / total if total else 0.0
     label = "ALTO" if total >= 3 and ratio >= 0.75 else "MÉDIO" if total >= 2 and ratio >= 0.5 else "BAIXO"
     return {"label": label, "passed": passed, "total": total, "checks": checks, "ratio": ratio}
+
+
+def _direction_sign(side: str) -> int:
+    return 1 if side == "ALTISTA" else -1 if side == "BAIXISTA" else 0
+
+
+def event_risk(event: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Conservative event gate when only date/impact are known, not exact release time."""
+    if not isinstance(event, Mapping) or not event:
+        return {"level": "NORMAL", "score": 1.0, "text": "Sem evento principal identificado na janela atual."}
+    days = event.get("dias")
+    impact = str(event.get("impacto", "")).upper()
+    name = str(event.get("evento", "Evento macro"))
+    high = impact in {"MÁXIMO", "MAXIMO", "ALTO", "HIGH", "MAXIMUM"}
+    try:
+        d = int(days) if days is not None else None
+    except Exception:
+        d = None
+    if high and d == 0:
+        return {"level": "ALTO", "score": 0.20, "text": f"{name} é hoje; conferir o horário antes de nova entrada."}
+    if high and d == 1:
+        return {"level": "ELEVADO", "score": 0.55, "text": f"{name} é amanhã; reduzir agressividade e evitar carregar risco sem plano."}
+    if high and d is not None and d <= 3:
+        return {"level": "ATENÇÃO", "score": 0.75, "text": f"{name} em {d} dias; narrativa pode mudar rapidamente."}
+    return {"level": "NORMAL", "score": 1.0, "text": f"{name}: sem bloqueio temporal forte pela regra atual."}
+
+
+def macro_regime_summary(pair: str, macro_direction: str, macro_score: float, quality: float,
+                         macro_context: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """Explain weekly/recent macro consistency using data already produced by the base engine.
+
+    This is a consistency/readiness layer, not a second directional model and not
+    a statistical probability.
+    """
+    ctx = dict(macro_context or {})
+    side = macro_side(macro_direction)
+    side_sign = _direction_sign(side)
+    base, quote = (str(pair).split("/") + [""])[:2]
+    usd_pair_sign = 1 if base == "USD" else -1 if quote == "USD" else 0
+
+    components: list[dict[str, Any]] = []
+    def add(name: str, raw_sign: int | None, detail: str, weight: float):
+        if raw_sign is None or side_sign == 0:
+            state = None
+        else:
+            pair_sign = raw_sign * usd_pair_sign if usd_pair_sign else raw_sign
+            state = pair_sign == side_sign if pair_sign != 0 else None
+        components.append({"name": name, "ok": state, "detail": detail, "weight": float(weight)})
+
+    usd_score = ctx.get("usd_score")
+    if usd_score is not None and usd_pair_sign:
+        us = float(usd_score)
+        sign = 1 if us >= 58 else -1 if us <= 42 else 0
+        add("Regime macro USD", sign, f"USD {us:.0f}/100", 25)
+
+    fed_tone = str(ctx.get("fed_tone", ""))
+    if fed_tone and usd_pair_sign:
+        ft = fed_tone.lower()
+        sign = 1 if ("restr" in ft or "hawk" in ft) else -1 if ("flex" in ft or "dov" in ft or "expans" in ft) else 0
+        add("Federal Reserve", sign, fed_tone, 20)
+
+    trend = ctx.get("trend") if isinstance(ctx.get("trend"), Mapping) else {}
+    trend_score = trend.get("score") if isinstance(trend, Mapping) else None
+    if trend_score is not None and usd_pair_sign:
+        ts = float(trend_score)
+        sign = 1 if ts >= 57 else -1 if ts <= 43 else 0
+        add("Tendência macro recente", sign, f"{ts:.0f}/100", 20)
+
+    surprise = float(ctx.get("surprise_adjustment", 0.0) or 0.0)
+    if usd_pair_sign:
+        sign = 1 if surprise > 1 else -1 if surprise < -1 else 0
+        add("Surpresas econômicas", sign, f"ajuste {surprise:+.1f}", 15)
+
+    fomc_score = ctx.get("fomc_score")
+    if fomc_score is not None and usd_pair_sign:
+        fs = float(fomc_score)
+        sign = 1 if fs >= 55 else -1 if fs <= 45 else 0
+        weight = max(5.0, min(20.0, float(ctx.get("fomc_weight", 0.0) or 0.0)))
+        add("FOMC", sign, f"{fs:.0f}/100", weight)
+
+    available = [x for x in components if x["ok"] is not None]
+    weight_total = sum(x["weight"] for x in available)
+    weight_ok = sum(x["weight"] for x in available if x["ok"] is True)
+    consistency = (100.0 * weight_ok / weight_total) if weight_total else 50.0
+    if side == "NEUTRO":
+        weekly_label = "SEM LADO"
+    elif consistency >= 75 and float(quality) >= 70:
+        weekly_label = "FORTE"
+    elif consistency >= 55:
+        weekly_label = "MODERADO"
+    else:
+        weekly_label = "FRÁGIL / CONFLITANTE"
+
+    risk = event_risk(ctx.get("event"))
+    # Recent impulse emphasizes fast-changing proxies already computed by the base engine.
+    recent_vals = [x for x in components if x["name"] in {"Tendência macro recente", "Surpresas econômicas", "FOMC"} and x["ok"] is not None]
+    if not recent_vals:
+        recent_label = "NEUTRO / SEM DADO"
+    else:
+        recent_ratio = sum(x["weight"] for x in recent_vals if x["ok"] is True) / max(1e-9, sum(x["weight"] for x in recent_vals))
+        recent_label = "CONFIRMA" if recent_ratio >= 0.67 else "MISTO" if recent_ratio >= 0.34 else "CONTRA"
+
+    return {
+        "side": side,
+        "weekly_label": weekly_label,
+        "consistency": float(consistency),
+        "recent_label": recent_label,
+        "event_risk": risk,
+        "components": components,
+        "macro_score": float(macro_score),
+        "quality": float(quality),
+    }
+
+
+def setup_readiness(macro_direction: str, macro_score: float, quality: float,
+                    weekly_ctx: Mapping[str, Any], daily_ctx: Mapping[str, Any],
+                    pd_zone: str, latest_sweep: str, killzone_active: bool,
+                    event_risk_level: str = "NORMAL") -> dict[str, Any]:
+    """Strict selectivity gate. Score = readiness, never a win probability."""
+    side = macro_side(macro_direction)
+    checks: list[dict[str, Any]] = []
+    def add(name: str, ok: bool | None, weight: float, detail: str):
+        checks.append({"name": name, "ok": ok, "weight": float(weight), "detail": detail})
+
+    add("Macro forte", None if side == "NEUTRO" else float(macro_score) >= 70, 15, f"Score {float(macro_score):.0f}/100")
+    add("Qualidade dos dados", float(quality) >= 75, 15, f"{float(quality):.0f}%")
+    add("W1 alinhado", None if side == "NEUTRO" else weekly_ctx.get("bias") == side, 15, str(weekly_ctx.get("confirmation", "—")))
+    add("D1 alinhado", None if side == "NEUTRO" else daily_ctx.get("bias") == side, 15, str(daily_ctx.get("confirmation", "—")))
+
+    struct_ok = None if side == "NEUTRO" else (
+        weekly_ctx.get("structure", {}).get("bias") == side and daily_ctx.get("structure", {}).get("bias") == side
+    )
+    add("Estrutura W1+D1 limpa", struct_ok, 10, f"W1 {weekly_ctx.get('structure',{}).get('regime','—')} · D1 {daily_ctx.get('structure',{}).get('regime','—')}")
+
+    loc_ok = None
+    if side == "ALTISTA": loc_ok = pd_zone in {"DESCONTO", "EQUILÍBRIO"}
+    elif side == "BAIXISTA": loc_ok = pd_zone in {"PRÊMIO", "EQUILÍBRIO"}
+    add("Localização eficiente", loc_ok, 10, pd_zone)
+
+    sweep_ok = None if side == "NEUTRO" else False
+    if side == "ALTISTA" and latest_sweep: sweep_ok = latest_sweep == "SWEEP SSL"
+    elif side == "BAIXISTA" and latest_sweep: sweep_ok = latest_sweep == "SWEEP BSL"
+    add("Sweep coerente", sweep_ok, 8, latest_sweep or "Sem sweep recente")
+    add("Killzone ativa", bool(killzone_active), 7, "Ativa" if killzone_active else "Fora da janela")
+
+    risk = str(event_risk_level).upper()
+    event_ok = risk not in {"ALTO", "ELEVADO"}
+    add("Risco de evento", event_ok, 5, risk)
+
+    available = [x for x in checks if x["ok"] is not None]
+    denom = sum(x["weight"] for x in available)
+    points = sum(x["weight"] for x in available if x["ok"] is True)
+    score = 100.0 * points / denom if denom else 0.0
+
+    hard_conflict = (
+        side == "NEUTRO"
+        or weekly_ctx.get("bias") != side
+        or daily_ctx.get("bias") != side
+        or risk == "ALTO"
+    )
+    if hard_conflict:
+        score = min(score, 69.0)
+    elif risk == "ELEVADO":
+        score = min(score, 77.0)
+    if float(macro_score) < 70 or float(quality) < 75:
+        score = min(score, 77.0)
+    if struct_ok is not True:
+        score = min(score, 87.0)
+    if loc_ok is not True:
+        score = min(score, 77.0)
+    if sweep_ok is not True or not bool(killzone_active):
+        score = min(score, 87.0)
+
+    if score >= 88 and not hard_conflict:
+        grade, action = "A+", "🟢 CONTEXTO DE ALTA SELETIVIDADE"
+    elif score >= 78 and not hard_conflict:
+        grade, action = "A", "🟢 CONTEXTO FORTE · EXIGIR H4/H1/M15"
+    elif score >= 65:
+        grade, action = "B", "🟡 AGUARDAR MELHOR TIMING / CONFIRMAÇÃO"
+    else:
+        grade, action = "WAIT", "🔴 NÃO FORÇAR ENTRADA"
+    return {"score": float(score), "grade": grade, "action": action, "checks": checks, "hard_conflict": hard_conflict}
+
+
