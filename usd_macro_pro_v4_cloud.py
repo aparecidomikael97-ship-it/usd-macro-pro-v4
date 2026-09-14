@@ -47,16 +47,25 @@ except Exception as _master_exc:
     render_master_panel = None
     _MASTER_V102_IMPORT_ERROR = f"{type(_master_exc).__name__}: {_master_exc}"
 
+
+try:
+    from experience_v103 import render_experience_controls, render_experience_hub
+    _UX_V103_IMPORT_ERROR = ""
+except Exception as _ux_exc:
+    render_experience_controls = None
+    render_experience_hub = None
+    _UX_V103_IMPORT_ERROR = f"{type(_ux_exc).__name__}: {_ux_exc}"
+
 # =========================================================
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "10.2.2 — PAINEL MESTRE + MARKET MAP PROFISSIONAL · MOTOR BASE V9.3.9.2"
+APP_VERSION = "10.3.0 — UX PROFISSIONAL + EDUCAÇÃO + PERSONALIZAÇÃO · MOTOR BASE V9.3.9.2"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro V10.2.2 — Painel Mestre de Oportunidades",
+    page_title="USD Macro Pro V10.3 — Painel Profissional",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -91,6 +100,15 @@ STATUS_FONTE = {}
 # =========================================================
 # BARRA LATERAL
 # =========================================================
+
+if render_experience_controls is not None:
+    try:
+        _UX_PREFS_V103 = render_experience_controls()
+    except Exception as _ux_ctrl_exc:
+        _UX_PREFS_V103 = {}
+        st.caption(f"UX V10.3 em modo compatível: {type(_ux_ctrl_exc).__name__}")
+else:
+    _UX_PREFS_V103 = {}
 
 st.sidebar.title("🦅 USD Macro Pro")
 st.sidebar.caption(f"Versão {APP_VERSION}")
@@ -1635,7 +1653,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro V10.2.2 — Painel Mestre de Oportunidades")
+st.title("🦅 USD Macro Pro V10.3 — Painel Profissional")
 st.caption("Macro semanal → Macro do dia → W1/D1 → Quarterly → Liquidez → Killzones → H4/H1/M15 → Performance real")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -3288,7 +3306,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 # V9.0 — CENTRAL DO OPERADOR
 # Somente interface/orientação; não altera o motor do modelo.
 # ============================================================
-st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V10.2.2")
+st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V10.3")
 st.caption("O APP define o viés macro; o gráfico confirma a entrada.")
 
 with st.container(border=True):
@@ -3332,7 +3350,7 @@ with st.expander("🧭 Como tomar a decisão no APP", expanded=False):
 """)
 
 abas = st.tabs([
-    "🧠 PAINEL MESTRE V10.2.2",
+    "🧠 PAINEL MESTRE V10.3",
     "🏆 Classificação",
     "🇺🇸 Painel EUA",
     "💱 Pares e Confiança",
@@ -3340,7 +3358,8 @@ abas = st.tabs([
     "🧾 Histórico",
     "📈 Teste Histórico",
     "🎯 Decisão Automática",
-    "🧭 Macro Market Map V10.2.2",
+    "🧭 Macro Market Map V10.3",
+    "✨ Aprenda & Personalize",
 ])
 
 # =========================================================
@@ -8441,3 +8460,38 @@ with abas[0]:
                 "O Painel Mestre encontrou um erro, mas o motor base continua preservado."
             )
             st.code(f"{type(_master_render_exc).__name__}: {_master_render_exc}")
+
+# =========================================================
+# ABA 10 — V10.3 EXPERIÊNCIA, EDUCAÇÃO E PERSONALIZAÇÃO
+# Não altera o motor de decisão.
+# =========================================================
+with abas[9]:
+    if render_experience_hub is None:
+        st.error("A camada de experiência V10.3 não pôde ser carregada.")
+        if _UX_V103_IMPORT_ERROR:
+            st.caption(f"Diagnóstico: {_UX_V103_IMPORT_ERROR}")
+    else:
+        try:
+            _macro_context_ux_v103 = {
+                "usd_score": float(usd_detalhado.get("score", 50.0)),
+                "usd_quality": float(qualidade_usd),
+                "fed_tone": str(fed.get("tom", "Neutro")),
+                "fed_strength": float(fed.get("forca", 0.0)),
+                "surprise_adjustment": float(st.session_state.get("usd_ajuste_surpresas", 0.0)),
+                "event": _proximo_evento_macro_v65(),
+                "fomc_score": (
+                    float(st.session_state.get("v76_fomc_usd_score", 50.0))
+                    if st.session_state.get("v77_fomc_integrado", False) else None
+                ),
+            }
+            render_experience_hub(
+                ranking,
+                matriz_v61,
+                macro_context=_macro_context_ux_v103,
+                source_status=STATUS_FONTE,
+                app_version=APP_VERSION,
+            )
+        except Exception as _ux_render_exc:
+            st.error("A aba de experiência encontrou um erro, mas o motor operacional continua preservado.")
+            st.code(f"{type(_ux_render_exc).__name__}: {_ux_render_exc}")
+

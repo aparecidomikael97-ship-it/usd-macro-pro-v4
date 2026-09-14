@@ -1,4 +1,4 @@
-"""Painel Mestre de Oportunidades — USD Macro Pro V10.2.
+"""Painel Mestre de Oportunidades — USD Macro Pro V10.3.
 
 Combina, sem alterar o motor base:
 - Matriz/Decisão Automática (macro, score, qualidade)
@@ -441,7 +441,7 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
                         scanner_state: Mapping[str, Any] | None = None,
                         scanner_refresh_cb: Callable[[], tuple[bool, str]] | None = None,
                         scanner_refresh_remaining: int = 0) -> None:
-    st.subheader("🧠 Painel Mestre de Oportunidades — V10.2.2")
+    st.subheader("🧠 Painel Mestre de Oportunidades — V10.3")
     st.caption(
         "Decisão Automática + Macro Market Map + H4/H1/M15 + ADR14 em uma única visão dos 7 pares. "
         "O painel serve para priorização; não transforma índice em probabilidade de lucro."
@@ -580,12 +580,18 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
 
     best = df.iloc[0]
     st.markdown("### 🏆 Melhor contexto consolidado agora")
-    b1, b2, b3, b4, b5 = st.columns(5)
-    b1.metric("Par", str(best["Par"]))
-    b2.metric("Viés", str(best["Viés"]))
-    b3.metric("Estado", str(best["Estado"]))
-    b4.metric("Índice integrado", f"{float(best['Índice Integrado']):.1f}/100")
-    b5.metric("Gate", str(best["Gate"]))
+    with st.container(border=True):
+        b1, b2, b3 = st.columns(3)
+        b1.metric("Par", str(best["Par"]))
+        b2.metric("Viés", str(best["Viés"]))
+        b3.metric("Estado", str(best["Estado"]))
+        b4, b5 = st.columns(2)
+        b4.metric("Índice integrado", f"{float(best['Índice Integrado']):.1f}/100")
+        b5.metric("Gate", str(best["Gate"]))
+        st.caption(
+            f"Leitura completa: {best['Par']} · {best['Viés']} · {best['Estado']} · "
+            f"Índice {float(best['Índice Integrado']):.1f}/100 · Gate {best['Gate']}"
+        )
     best_reason = str(best["Motivo"])
     if str(best["Estado"]).startswith("🟢"):
         st.success(best_reason)
@@ -595,6 +601,23 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
         st.error(best_reason)
     else:
         st.info(best_reason)
+
+    with st.expander("ℹ️ Entenda os campos do Painel Mestre", expanded=False):
+        h1, h2 = st.columns(2)
+        with h1:
+            st.markdown(
+                "**Score:** força do motor macro.\n\n"
+                "**Qualidade:** disponibilidade e confiabilidade das fontes usadas.\n\n"
+                "**W1 / D1:** estrutura semanal e diária.\n\n"
+                "**Gate:** filtro de seletividade A+ / A / B / WAIT."
+            )
+        with h2:
+            st.markdown(
+                "**ADR14:** quanto do range diário médio já foi usado.\n\n"
+                "**Liquidez alvo:** BSL/SSL ainda relevante no lado do viés.\n\n"
+                "**H4/H1/M15:** confirmação técnica top-down.\n\n"
+                "**Índice Integrado:** ranking operacional; NÃO é probabilidade de gain."
+            )
 
     st.markdown("### 🌐 Ranking dos 7 pares")
     show = df[[

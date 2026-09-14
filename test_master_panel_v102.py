@@ -12,7 +12,7 @@ except Exception:
     st.secrets = {}
     sys.modules['streamlit'] = st
 
-from master_panel_v102 import build_master_rows, _technical_score, _integrated_state
+from master_panel_v102 import build_master_rows, _technical_score, _integrated_state, _scanner_for_pair
 
 
 class MasterPanelTests(unittest.TestCase):
@@ -63,6 +63,24 @@ class MasterPanelTests(unittest.TestCase):
     def test_technical_score_is_bounded(self):
         self.assertEqual(_technical_score({'h4':'🟢 CONFIRMA','h1':'🟢 CONFIRMA','m15':'🟢 CONFIRMA'}), 100.0)
         self.assertGreaterEqual(_technical_score({'h4':'—','h1':'—','m15':'—'}), 0.0)
+
+    def test_scanner_freshness_is_explicit(self):
+        now = pd.Timestamp.now(tz='UTC')
+        scanner = {'resultados': {
+            'USD/CHF': {
+                'processado_em': (now - pd.Timedelta(minutes=10)).isoformat(),
+                'tecnico': {
+                    'disponivel': True,
+                    'h4': {'status':'🟢 CONFIRMA'},
+                    'h1': {'status':'🟢 PULLBACK OK'},
+                    'm15': {'status':'🟡 AGUARDAR GATILHO'},
+                }
+            }
+        }}
+        info = _scanner_for_pair(scanner, 'USD/CHF')
+        self.assertTrue(info['available'])
+        self.assertTrue(info['fresh'])
+        self.assertLess(info['age_minutes'], 45)
 
 
 if __name__ == '__main__':
