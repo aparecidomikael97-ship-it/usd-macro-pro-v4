@@ -37,7 +37,7 @@ def _age_min(value):
     except Exception: return None
 
 def render_autopilot_v107():
-    st.subheader("🤖 Autopilot Total — V10.7.5")
+    st.subheader("🤖 Autopilot Total — V10.7.6")
     st.caption(
         "Macro/FRED → Matriz → Notícias 8 moedas → Scanner H4/H1/M15 → Market Map "
         "→ snapshots → validação 1H/4H/24H. Rodando em background pelo GitHub Actions."
@@ -51,6 +51,7 @@ def render_autopilot_v107():
     age=_age_min(status.get("last_run"))
     healthy=bool(status.get("healthy",False))
     errors = status.get("errors", []) or []
+    daily_blocked = bool(status.get("twelve_daily_blocked", False))
     has_429 = any("HTTP 429" in str(x) for x in errors)
     headless_bad = not bool(status.get("app_headless_ok", False))
 
@@ -58,6 +59,8 @@ def render_autopilot_v107():
         st.success("🟢 AUTOPILOT SAUDÁVEL")
     elif headless_bad:
         st.error("🔴 AUTOPILOT: APP HEADLESS NÃO ATUALIZOU A MATRIZ")
+    elif daily_blocked:
+        st.warning("🟠 TWELVE DATA: COTA DIÁRIA ESGOTADA — scanner volta após renovação da cota")
     elif has_429:
         st.warning("🟠 AUTOPILOT: TWELVE DATA LIMITOU CONSULTAS (HTTP 429)")
     else:

@@ -1,4 +1,4 @@
-"""USD Macro Pro V10.7.5 — Headless Secrets + API Budget Autopilot.
+"""USD Macro Pro V10.7.6 — AppTest Secrets Injection + API Circuit Breaker.
 
 Executado pelo GitHub Actions a cada 30 minutos.
 
@@ -90,6 +90,11 @@ AUTOPILOT_DAILY_CALL_BUDGET = 480
 TD_SAFE_CALLS_PER_WINDOW = 6
 TD_SAFE_WINDOW_SECONDS = 62.0
 _TD_CALL_TIMES: list[float] = []
+
+# V10.7.6 — abre circuito após o primeiro 429 diário.
+_TD_DAILY_BLOCKED = False
+_TD_DAILY_BLOCK_REASON = ""
+
 
 def _td_rate_gate() -> None:
     """Throttle Twelve Data calls conservatively across the whole runner."""
@@ -207,14 +212,30 @@ def forex_market_likely_open(now: pd.Timestamp | None = None) -> bool:
     return True
 
 def run_headless_app() -> tuple[bool, str]:
-    """Runs the entire Streamlit app headlessly.
-
-    The app itself persists INPUT_PATH only when USD_MACRO_AUTOPILOT=1.
-    """
+    """Executa o app via AppTest com secrets injetados diretamente."""
     try:
         from streamlit.testing.v1 import AppTest
+
         at = AppTest.from_file("usd_macro_pro_v4_cloud.py", default_timeout=180)
+
+        secret_keys = [
+            "CHAVE_FRED",
+            "CHAVE_TWELVE_DATA",
+            "CHAVE_NEWSAPI",
+            "CHAVE_EODHD",
+            "GITHUB_TOKEN_HISTORICO",
+            "GITHUB_REPO_HISTORICO",
+            "GITHUB_BRANCH_HISTORICO",
+        ]
+        injected = 0
+        for key in secret_keys:
+            value = os.getenv(key, "")
+            if value:
+                at.secrets[key] = value
+                injected += 1
+
         at.run(timeout=180)
+
         if at.exception:
             msgs = []
             for exc in at.exception:
@@ -223,9 +244,12 @@ def run_headless_app() -> tuple[bool, str]:
                 except Exception:
                     msgs.append(str(exc))
             return False, " | ".join(msgs[:3])
-        return True, "App headless executado."
+
+        return True, f"App headless executado; {injected} secret(s) injetado(s) no AppTest."
     except Exception as exc:
         return False, f"{type(exc).__name__}: {exc}"
+
+
 
 def _td_message(resp: requests.Response) -> str:
     try:
@@ -241,8 +265,13 @@ def _td_message(resp: requests.Response) -> str:
 
 
 def td_fetch(pair: str, interval: str, outputsize: int) -> tuple[pd.DataFrame, str]:
+    global _TD_DAILY_BLOCKED, _TD_DAILY_BLOCK_REASON
+
     if not TD_KEY:
         return pd.DataFrame(), "CHAVE_TWELVE_DATA ausente."
+
+    if _TD_DAILY_BLOCKED:
+        return pd.DataFrame(), f"API_COTA_DIARIA_BLOQUEADA: {_TD_DAILY_BLOCK_REASON}"
 
     _td_rate_gate()
 
@@ -264,16 +293,27 @@ def td_fetch(pair: str, interval: str, outputsize: int) -> tuple[pd.DataFrame, s
     try:
         r = _request_once()
 
-        # V10.7.5 — uma única retentativa quando a própria mensagem indicar
-        # limite por minuto. Se for limite diário, não desperdiça chamadas.
         if r.status_code == 429:
             msg = _td_message(r)
             low = msg.lower()
+
+            daily_markers = (
+                "run out of api credits for the day",
+                "daily limit",
+                "for the day",
+                "current limit being",
+            )
+            if any(m in low for m in daily_markers):
+                _TD_DAILY_BLOCKED = True
+                _TD_DAILY_BLOCK_REASON = msg or "cota diária esgotada"
+                return pd.DataFrame(), f"HTTP 429 DAILY: {_TD_DAILY_BLOCK_REASON}"
+
             if "minute" in low or "per minute" in low:
                 print(f"[429-minute] {pair} {interval}: aguardando 66s")
                 time.sleep(66)
                 _td_rate_gate()
                 r = _request_once()
+
             if r.status_code == 429:
                 return pd.DataFrame(), f"HTTP 429: {_td_message(r) or 'limite de API'}"
 
@@ -282,7 +322,13 @@ def td_fetch(pair: str, interval: str, outputsize: int) -> tuple[pd.DataFrame, s
 
         js = r.json()
         if isinstance(js, dict) and js.get("status") == "error":
-            return pd.DataFrame(), str(js.get("message", "Twelve Data error"))
+            msg = str(js.get("message", "Twelve Data error"))
+            low = msg.lower()
+            if "run out of api credits for the day" in low or "daily limit" in low:
+                _TD_DAILY_BLOCKED = True
+                _TD_DAILY_BLOCK_REASON = msg
+            return pd.DataFrame(), msg
+
         vals = js.get("values", []) if isinstance(js, dict) else []
         df = normalize_ohlc(vals)
         if df.empty:
