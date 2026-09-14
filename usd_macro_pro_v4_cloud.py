@@ -51,12 +51,12 @@ except Exception as _master_exc:
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "10.2.0 — PAINEL MESTRE + MARKET MAP PROFISSIONAL · MOTOR BASE V9.3.9.2"
+APP_VERSION = "10.2.2 — PAINEL MESTRE + MARKET MAP PROFISSIONAL · MOTOR BASE V9.3.9.2"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro V10.2.1 — Painel Mestre de Oportunidades",
+    page_title="USD Macro Pro V10.2.2 — Painel Mestre de Oportunidades",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1635,7 +1635,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro V10.2.1 — Painel Mestre de Oportunidades")
+st.title("🦅 USD Macro Pro V10.2.2 — Painel Mestre de Oportunidades")
 st.caption("Macro semanal → Macro do dia → W1/D1 → Quarterly → Liquidez → Killzones → H4/H1/M15 → Performance real")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -3288,7 +3288,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 # V9.0 — CENTRAL DO OPERADOR
 # Somente interface/orientação; não altera o motor do modelo.
 # ============================================================
-st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V10.2")
+st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V10.2.2")
 st.caption("O APP define o viés macro; o gráfico confirma a entrada.")
 
 with st.container(border=True):
@@ -3332,7 +3332,7 @@ with st.expander("🧭 Como tomar a decisão no APP", expanded=False):
 """)
 
 abas = st.tabs([
-    "🧠 PAINEL MESTRE V10.2",
+    "🧠 PAINEL MESTRE V10.2.2",
     "🏆 Classificação",
     "🇺🇸 Painel EUA",
     "💱 Pares e Confiança",
@@ -3340,7 +3340,7 @@ abas = st.tabs([
     "🧾 Histórico",
     "📈 Teste Histórico",
     "🎯 Decisão Automática",
-    "🧭 Macro Market Map V10.2",
+    "🧭 Macro Market Map V10.2.2",
 ])
 
 # =========================================================
@@ -8302,7 +8302,7 @@ with abas[8]:
 
 
 # =========================================================
-# ABA 1 — V10.2 PAINEL MESTRE DE OPORTUNIDADES
+# ABA 1 — V10.2.2 PAINEL MESTRE DE OPORTUNIDADES
 # Consolida Macro + Market Map + Scanner técnico + ADR.
 # Não altera Score Mestre nem históricos oficiais.
 # =========================================================
@@ -8332,9 +8332,109 @@ with abas[0]:
                 "fomc_weight": float(st.session_state.get("v77_peso_fomc", 0.0)) * 100.0,
             }
             _scanner_state_master_v102 = _scanner_load_v934()
+
+            # -------------------------------------------------
+            # V10.2.2 — Atualização técnica direta pelo Painel
+            # Mestre. Atualiza no máximo 2 pares por clique.
+            # -------------------------------------------------
+            def _master_refresh_scanner_batch_v1022():
+                if not CHAVE_TWELVE_DATA:
+                    return False, "CHAVE_TWELVE_DATA ausente."
+
+                _state1022 = _scanner_load_v934()
+                _results1022 = dict(_state1022.get("resultados", {}) or {})
+                _last1022 = float(_state1022.get("ultimo_processamento_ts", 0.0) or 0.0)
+                _wait1022 = max(0, int(61 - (time.time() - _last1022))) if _last1022 else 0
+                if _wait1022 > 0:
+                    return False, f"Aguarde ~{_wait1022}s antes de nova atualização técnica."
+
+                def _age_result1022(_raw):
+                    try:
+                        _stamp = _raw.get("processado_em")
+                        if _stamp in (None, ""):
+                            return 10**9
+                        if isinstance(_stamp, (int, float)):
+                            return max(0.0, (time.time() - float(_stamp)) / 60.0)
+                        _ts = pd.Timestamp(_stamp)
+                        if _ts.tzinfo is None:
+                            _ts = _ts.tz_localize("UTC")
+                        else:
+                            _ts = _ts.tz_convert("UTC")
+                        return max(0.0, (pd.Timestamp.now(tz="UTC") - _ts).total_seconds() / 60.0)
+                    except Exception:
+                        return 10**9
+
+                _candidates1022 = []
+                for _, _row1022 in matriz_v61.head(7).iterrows():
+                    _pair1022 = str(_row1022["Par"])
+                    _raw1022 = _results1022.get(_pair1022, {})
+                    _tec1022 = _raw1022.get("tecnico", {}) if isinstance(_raw1022, dict) else {}
+                    _available1022 = bool(_tec1022.get("disponivel", False))
+                    _age1022 = _age_result1022(_raw1022 if isinstance(_raw1022, dict) else {})
+                    if (not _available1022) or _age1022 > 45.0:
+                        _candidates1022.append((_age1022, _pair1022, str(_row1022["Direção"])))
+
+                if not _candidates1022:
+                    return True, "Os 7 pares já possuem técnica atual (≤45 min)."
+
+                # Mais antigos/ausentes primeiro.
+                _candidates1022.sort(key=lambda x: x[0], reverse=True)
+                _batch1022 = _candidates1022[:2]
+                _updated1022 = []
+                _errors1022 = []
+
+                for _, _pair1022, _dir1022 in _batch1022:
+                    try:
+                        _td_time_series_v92.clear()
+                    except Exception:
+                        pass
+
+                    try:
+                        _tec1022 = _pacote_tecnico_v92(_pair1022, _dir1022)
+                        _timing1022 = globals().get("_timing91", "🟡 ATENÇÃO")
+                        _dec1022, _txt1022 = _decisao_tecnica_final_v92(
+                            _tec1022, _timing1022, _dir1022
+                        )
+                        _results1022[_pair1022] = {
+                            "tecnico": _tec_to_json_v934(_tec1022),
+                            "decisao": _dec1022,
+                            "texto": _txt1022,
+                            "processado_em": time.time(),
+                            "tentativa_v1022": True,
+                            "versao_tentativa": "V10.2.2",
+                        }
+                        _updated1022.append(_pair1022)
+                    except Exception as _exc1022:
+                        _errors1022.append(f"{_pair1022}: {type(_exc1022).__name__}")
+
+                _state1022["resultados"] = _results1022
+                _state1022["ultimo_processamento_ts"] = time.time()
+                _ok1022, _err1022 = _scanner_save_v934(_state1022)
+                if not _ok1022:
+                    return False, f"Falha ao salvar scanner: {_err1022}"
+
+                _msg1022 = (
+                    "Scanner atualizado para: " + ", ".join(_updated1022)
+                    if _updated1022 else
+                    "Nenhum par pôde ser atualizado."
+                )
+                if _errors1022:
+                    _msg1022 += " | Falhas: " + " ; ".join(_errors1022)
+                return bool(_updated1022), _msg1022
+
+            _last_scan_ts_master_v1022 = float(
+                _scanner_state_master_v102.get("ultimo_processamento_ts", 0.0) or 0.0
+            )
+            _scan_wait_master_v1022 = (
+                max(0, int(61 - (time.time() - _last_scan_ts_master_v1022)))
+                if _last_scan_ts_master_v1022 else 0
+            )
+
             render_master_panel(
                 matriz_v61, ranking, CHAVE_TWELVE_DATA,
-                _macro_context_master_v102, _scanner_state_master_v102
+                _macro_context_master_v102, _scanner_state_master_v102,
+                scanner_refresh_cb=_master_refresh_scanner_batch_v1022,
+                scanner_refresh_remaining=_scan_wait_master_v1022,
             )
         except Exception as _master_render_exc:
             st.error(

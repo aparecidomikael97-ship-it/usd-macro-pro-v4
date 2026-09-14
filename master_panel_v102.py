@@ -15,7 +15,7 @@ import json
 import time as _time
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from typing import Any, Mapping
+from typing import Any, Mapping, Callable
 
 import numpy as np
 import pandas as pd
@@ -438,8 +438,10 @@ def build_master_rows(matrix: pd.DataFrame, contexts: Mapping[str, Any], scanner
 
 def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str,
                         macro_context: Mapping[str, Any] | None = None,
-                        scanner_state: Mapping[str, Any] | None = None) -> None:
-    st.subheader("🧠 Painel Mestre de Oportunidades — V10.2")
+                        scanner_state: Mapping[str, Any] | None = None,
+                        scanner_refresh_cb: Callable[[], tuple[bool, str]] | None = None,
+                        scanner_refresh_remaining: int = 0) -> None:
+    st.subheader("🧠 Painel Mestre de Oportunidades — V10.2.2")
     st.caption(
         "Decisão Automática + Macro Market Map + H4/H1/M15 + ADR14 em uma única visão dos 7 pares. "
         "O painel serve para priorização; não transforma índice em probabilidade de lucro."
@@ -461,7 +463,14 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
     top1, top2, top3, top4 = st.columns(4)
     top1.metric("Pares", len(pairs))
     top2.metric("Market Map processado", f"{processed}/{len(pairs)}")
-    top3.metric("Scanner técnico", f"{sum(bool(_scanner_for_pair(scanner_state,p).get('available')) for p in pairs)}/{len(pairs)}")
+    _scanner_infos_v1022 = {p: _scanner_for_pair(scanner_state, p) for p in pairs}
+    _scanner_available_v1022 = sum(bool(v.get("available")) for v in _scanner_infos_v1022.values())
+    _scanner_fresh_v1022 = sum(bool(v.get("available")) and bool(v.get("fresh")) for v in _scanner_infos_v1022.values())
+    top3.metric(
+        "Scanner técnico atual",
+        f"{_scanner_fresh_v1022}/{len(pairs)}",
+        delta=(f"{_scanner_available_v1022}/{len(pairs)} com dados" if _scanner_available_v1022 != _scanner_fresh_v1022 else None),
+    )
     top4.metric("Modo", "SELETIVO")
 
     now_ts = _time.time()
@@ -506,6 +515,62 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
             st.warning("CHAVE_TWELVE_DATA ausente: atualização W1/D1/liquidez/ADR indisponível.")
         else:
             st.caption("Cada lote usa até 4 consultas (D1 + M15 para 2 pares), abaixo do limite conservador usado no app.")
+
+    # ---------------------------------------------------------
+    # V10.2.2 — Scanner técnico direto no Painel Mestre.
+    # Atualiza somente 2 pares por clique para respeitar o
+    # orçamento conservador da Twelve Data.
+    # ---------------------------------------------------------
+    st.markdown("#### 🔄 Atualização técnica sem sair do Painel Mestre")
+    _cooldown_v1022 = max(int(scanner_refresh_remaining or 0), int(remaining or 0))
+    _s1_v1022, _s2_v1022, _s3_v1022 = st.columns([1.55, 1.25, 2.2])
+
+    with _s1_v1022:
+        if st.button(
+            "🔄 Atualizar scanner técnico (2 pares)",
+            key="v1022_master_refresh_scanner",
+            disabled=(scanner_refresh_cb is None or _cooldown_v1022 > 0 or not bool(api_key)),
+            use_container_width=True,
+        ):
+            try:
+                _ok_v1022, _msg_v1022 = scanner_refresh_cb()
+            except Exception as _exc_v1022:
+                _ok_v1022, _msg_v1022 = False, f"{type(_exc_v1022).__name__}: {_exc_v1022}"
+
+            if _ok_v1022:
+                st.session_state["v1022_scanner_feedback"] = ("success", _msg_v1022)
+            else:
+                st.session_state["v1022_scanner_feedback"] = ("warning", _msg_v1022)
+            st.rerun()
+
+    with _s2_v1022:
+        if st.button(
+            "🔁 Atualizar leitura",
+            key="v1022_master_refresh_view",
+            use_container_width=True,
+        ):
+            st.rerun()
+
+    with _s3_v1022:
+        if _cooldown_v1022 > 0:
+            st.warning(
+                f"Aguarde ~{_cooldown_v1022}s antes de nova consulta para proteger o limite da Twelve Data."
+            )
+        elif scanner_refresh_cb is None:
+            st.caption("Atualização técnica direta indisponível nesta execução.")
+        else:
+            st.caption(
+                "O botão atualiza primeiro os pares ausentes ou com técnica >45 min. "
+                "Cada clique consulta no máximo 2 pares (H4 + H1 + M15)."
+            )
+
+    _fb_v1022 = st.session_state.pop("v1022_scanner_feedback", None)
+    if _fb_v1022:
+        _kind_v1022, _txt_v1022 = _fb_v1022
+        if _kind_v1022 == "success":
+            st.success(_txt_v1022)
+        else:
+            st.warning(_txt_v1022)
 
     rows = build_master_rows(matrix, contexts, scanner_state)
     if not rows:
