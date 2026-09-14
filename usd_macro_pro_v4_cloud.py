@@ -56,16 +56,24 @@ except Exception as _ux_exc:
     render_experience_hub = None
     _UX_V103_IMPORT_ERROR = f"{type(_ux_exc).__name__}: {_ux_exc}"
 
+
+try:
+    from product_v104 import render_v104_hub
+    _PRODUCT_V104_IMPORT_ERROR = ""
+except Exception as _product_exc:
+    render_v104_hub = None
+    _PRODUCT_V104_IMPORT_ERROR = f"{type(_product_exc).__name__}: {_product_exc}"
+
 # =========================================================
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "10.3.0 — UX PROFISSIONAL + EDUCAÇÃO + PERSONALIZAÇÃO · MOTOR BASE V9.3.9.2"
+APP_VERSION = "10.4.0 — PRODUTO, NAVEGAÇÃO, GRÁFICOS & FEEDBACK · MOTOR BASE V9.3.9.2"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro V10.3 — Painel Profissional",
+    page_title="USD Macro Pro V10.4 — Painel Profissional",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -168,6 +176,7 @@ def _get(url: str, timeout: int = 15):
         return None
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
 def _fred_observacoes(series_id: str, limite: int = 24, unidades: str | None = None) -> pd.DataFrame:
     if not CHAVE_FRED:
         return pd.DataFrame(columns=["date", "value"])
@@ -1653,7 +1662,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro V10.3 — Painel Profissional")
+st.title("🦅 USD Macro Pro V10.4 — Painel Profissional")
 st.caption("Macro semanal → Macro do dia → W1/D1 → Quarterly → Liquidez → Killzones → H4/H1/M15 → Performance real")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -3306,7 +3315,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 # V9.0 — CENTRAL DO OPERADOR
 # Somente interface/orientação; não altera o motor do modelo.
 # ============================================================
-st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V10.3")
+st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V10.4")
 st.caption("O APP define o viés macro; o gráfico confirma a entrada.")
 
 with st.container(border=True):
@@ -3349,8 +3358,89 @@ with st.expander("🧭 Como tomar a decisão no APP", expanded=False):
 **Regra:** APP escolhe o lado → gráfico escolhe a entrada → gestão controla a perda.
 """)
 
+
+# =========================================================
+# V10.4 — FEEDBACK PERSISTENTE
+# =========================================================
+def _github_put_bytes_v104(path_repo: str, raw: bytes, message: str) -> tuple[bool, str]:
+    token, repo, branch = _github_cfg_v84()
+    if not token or not repo:
+        return False, "GitHub persistente não configurado."
+    try:
+        import base64
+        path_repo = str(path_repo).lstrip("/")
+        url = f"https://api.github.com/repos/{repo}/contents/{path_repo}"
+        headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
+                   "X-GitHub-Api-Version": "2022-11-28"}
+        old = requests.get(url, headers=headers, params={"ref": branch}, timeout=15)
+        sha = old.json().get("sha") if old.status_code == 200 else None
+        if old.status_code not in (200, 404):
+            old.raise_for_status()
+        body = {"message": message, "content": base64.b64encode(raw).decode("ascii"), "branch": branch}
+        if sha: body["sha"] = sha
+        r = requests.put(url, headers=headers, json=body, timeout=25)
+        r.raise_for_status()
+        return True, ""
+    except Exception as exc:
+        return False, f"{type(exc).__name__}: {exc}"
+
+def _salvar_feedback_v104(payload: dict, attachment: bytes | None, attachment_name: str | None) -> tuple[bool, str]:
+    token, repo, branch = _github_cfg_v84()
+    if not token or not repo:
+        return False, "Configure GITHUB_TOKEN_HISTORICO para salvar feedback."
+    try:
+        import base64, io, uuid as _uuid
+        path = "dados/feedback_v104.csv"
+        url = f"https://api.github.com/repos/{repo}/contents/{path}"
+        headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
+                   "X-GitHub-Api-Version": "2022-11-28"}
+        current = requests.get(url, headers=headers, params={"ref": branch}, timeout=15)
+        sha = None
+        if current.status_code == 200:
+            body = current.json()
+            sha = body.get("sha")
+            raw = base64.b64decode(body.get("content", ""))
+            df = pd.read_csv(io.BytesIO(raw)) if raw else pd.DataFrame()
+        elif current.status_code == 404:
+            df = pd.DataFrame()
+        else:
+            current.raise_for_status()
+
+        row = dict(payload)
+        attach_path = ""
+        if attachment:
+            safe_ext = ".png"
+            if attachment_name and "." in attachment_name:
+                ext = "." + attachment_name.rsplit(".", 1)[-1].lower()
+                if ext in (".png", ".jpg", ".jpeg", ".webp"): safe_ext = ext
+            stamp = pd.Timestamp.now(tz="UTC").strftime("%Y%m%dT%H%M%SZ")
+            attach_path = f"dados/feedback_anexos/{stamp}_{_uuid.uuid4().hex[:8]}{safe_ext}"
+            ok_att, err_att = _github_put_bytes_v104(attach_path, attachment, "V10.4: adicionar print de feedback")
+            if not ok_att:
+                return False, f"Feedback não salvo: falha no anexo ({err_att})."
+
+        row["attachment_path"] = attach_path
+        new_df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+        csv_bytes = new_df.to_csv(index=False).encode("utf-8")
+        body = {"message": "V10.4: registrar feedback de usuário",
+                "content": base64.b64encode(csv_bytes).decode("ascii"), "branch": branch}
+        if sha: body["sha"] = sha
+        r = requests.put(url, headers=headers, json=body, timeout=25)
+        r.raise_for_status()
+        return True, "Feedback enviado e salvo com sucesso."
+    except Exception as exc:
+        return False, f"Falha ao salvar feedback: {type(exc).__name__}"
+
+def _refresh_central_v104() -> tuple[bool, str]:
+    try:
+        _fred_observacoes.clear()
+    except Exception:
+        pass
+    return True, "Cache histórico liberado; a próxima leitura buscará dados novos."
+
+
 abas = st.tabs([
-    "🧠 PAINEL MESTRE V10.3",
+    "🧠 PAINEL MESTRE V10.4",
     "🏆 Classificação",
     "🇺🇸 Painel EUA",
     "💱 Pares e Confiança",
@@ -3358,8 +3448,9 @@ abas = st.tabs([
     "🧾 Histórico",
     "📈 Teste Histórico",
     "🎯 Decisão Automática",
-    "🧭 Macro Market Map V10.3",
+    "🧭 Macro Market Map V10.4",
     "✨ Aprenda & Personalize",
+    "🚀 Produto V10.4",
 ])
 
 # =========================================================
@@ -8494,4 +8585,24 @@ with abas[9]:
         except Exception as _ux_render_exc:
             st.error("A aba de experiência encontrou um erro, mas o motor operacional continua preservado.")
             st.code(f"{type(_ux_render_exc).__name__}: {_ux_render_exc}")
+
+# =========================================================
+# ABA 11 — V10.4 PRODUTO, NAVEGAÇÃO, GRÁFICOS E FEEDBACK
+# =========================================================
+with abas[10]:
+    if render_v104_hub is None:
+        st.error("A camada de produto V10.4 não pôde ser carregada.")
+        if _PRODUCT_V104_IMPORT_ERROR:
+            st.caption(f"Diagnóstico: {_PRODUCT_V104_IMPORT_ERROR}")
+    else:
+        try:
+            render_v104_hub(
+                history_fetcher=_fred_observacoes,
+                feedback_saver=_salvar_feedback_v104,
+                refresh_callback=_refresh_central_v104,
+                app_version=APP_VERSION,
+            )
+        except Exception as _prod_render_exc:
+            st.error("A aba Produto V10.4 encontrou um erro, mas o motor operacional continua preservado.")
+            st.code(f"{type(_prod_render_exc).__name__}: {_prod_render_exc}")
 
