@@ -1,5 +1,5 @@
 # ============================================================
-# USD MACRO PRO V10.2 — PAINEL MESTRE DE OPORTUNIDADES · MOTOR BASE V9.3.9.2
+# USD MACRO PRO V10.2.1 — ESTABILIDADE VISUAL · PAINEL MESTRE V10.2 · MOTOR BASE V9.3.9.2
 # Exibe o motivo persistido de falhas por par/timeframe sem
 # gastar novas chamadas. Persistência e validação preservadas.
 # ============================================================
@@ -56,7 +56,7 @@ HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro V10.2 — Painel Mestre de Oportunidades",
+    page_title="USD Macro Pro V10.2.1 — Painel Mestre de Oportunidades",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1635,7 +1635,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro V10.2 — Painel Mestre de Oportunidades")
+st.title("🦅 USD Macro Pro V10.2.1 — Painel Mestre de Oportunidades")
 st.caption("Macro semanal → Macro do dia → W1/D1 → Quarterly → Liquidez → Killzones → H4/H1/M15 → Performance real")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -7834,126 +7834,121 @@ with abas[7]:
                     # Verifica a cada 5 minutos e só recalcula se o candle
                     # M15 realmente mudou.
                     # =====================================================
-                    if "v9363_auto_m15" not in st.session_state:
-                        st.session_state["v9363_auto_m15"] = True
+                    # =====================================================
+                    # V10.2.1 — MONITOR M15 EM MODO ESTÁVEL
+                    # Remove o fragmento temporizado do Streamlit, que podia
+                    # disputar a árvore visual com um rerun completo e causar
+                    # NotFoundError/removeChild no navegador.
+                    #
+                    # A revalidação automática continua ocorrendo de forma
+                    # segura em reruns completos da página, no máximo 1 vez
+                    # a cada 5 minutos. O botão manual abaixo continua ativo.
+                    # =====================================================
+                    _safe_now1021 = pd.Timestamp.utcnow()
+                    _safe_last_raw1021 = st.session_state.get("v1021_last_safe_m15_check", "")
+                    try:
+                        _safe_last1021 = pd.Timestamp(_safe_last_raw1021) if _safe_last_raw1021 else None
+                        if _safe_last1021 is not None:
+                            if _safe_last1021.tzinfo is None:
+                                _safe_last1021 = _safe_last1021.tz_localize("UTC")
+                            else:
+                                _safe_last1021 = _safe_last1021.tz_convert("UTC")
+                    except Exception:
+                        _safe_last1021 = None
 
-                    _auto_col1, _auto_col2 = st.columns([1, 3])
-                    with _auto_col1:
-                        _auto_enabled963 = st.toggle(
-                            "🤖 Monitor automático",
-                            value=bool(st.session_state.get("v9363_auto_m15", True)),
-                            key="v9363_auto_toggle",
-                        )
-                        st.session_state["v9363_auto_m15"] = _auto_enabled963
-                    with _auto_col2:
-                        st.caption(
-                            "Quando ligado, o APP verifica somente o M15 do par prioritário a cada ~5 minutos. "
-                            "Se o candle não mudou, mantém a decisão; se mudou, recalcula o gatilho."
-                        )
+                    _safe_due1021 = (
+                        _safe_last1021 is None
+                        or (_safe_now1021 - _safe_last1021) >= pd.Timedelta(minutes=5)
+                    )
 
-                    @st.fragment(run_every="5m")
-                    def _auto_monitor_m15_v963(par_auto: str, dir_auto: str):
-                        if not bool(st.session_state.get("v9363_auto_m15", True)):
-                            st.caption("⏸️ Monitor automático pausado.")
-                            return
+                    if _safe_due1021:
+                        st.session_state["v1021_last_safe_m15_check"] = _safe_now1021.isoformat()
+                        _safe_lado1021 = _lado_macro_v92(_dir958)
 
-                        lado_auto = _lado_macro_v92(dir_auto)
-
-                        # Busca uma leitura realmente nova do M15.
                         try:
                             _td_time_series_v92.clear()
                         except Exception:
                             pass
 
-                        df_auto = _td_time_series_v92(par_auto, "15min", 100)
-                        anterior_auto = st.session_state.get("v9362_m15_monitor", {})
-                        dt_ant_auto = (
-                            str(anterior_auto.get("datetime_atual", ""))
-                            if anterior_auto.get("par") == par_auto else ""
+                        _safe_df1021 = _td_time_series_v92(_par958, "15min", 100)
+                        _safe_prev1021 = st.session_state.get("v9362_m15_monitor", {})
+                        _safe_prev_dt1021 = (
+                            str(_safe_prev1021.get("datetime_atual", ""))
+                            if _safe_prev1021.get("par") == _par958 else ""
                         )
 
-                        registro_auto = {
-                            "par": par_auto,
+                        _safe_reg1021 = {
+                            "par": _par958,
                             "verificacao_realizada": True,
-                            "verificado_em": pd.Timestamp.utcnow().isoformat(),
-                            "datetime_anterior": dt_ant_auto or "Primeira verificação",
+                            "verificado_em": _safe_now1021.isoformat(),
+                            "datetime_anterior": _safe_prev_dt1021 or "Primeira verificação",
                             "datetime_atual": "",
                             "preco": None,
                             "novo_candle": False,
                             "status": "",
                             "texto": "",
-                            "consulta_status": "AUTO_INICIADA",
+                            "consulta_status": "SAFE_INICIADA",
                             "erro": "",
                             "http_status": "",
                             "api_message": "",
                             "candles_validos": 0,
-                            "modo": "AUTOMÁTICO",
+                            "modo": "AUTOMÁTICO_SEGURO",
                         }
 
-                        diag_auto = dict(df_auto.attrs.get("td_diag", {}) or {})
-                        registro_auto["http_status"] = diag_auto.get("http_status", "")
-                        registro_auto["api_message"] = str(diag_auto.get("api_message", "") or "")
-                        registro_auto["candles_validos"] = int(
-                            diag_auto.get("candles_validos", len(df_auto)) or 0
+                        _safe_diag1021 = dict(_safe_df1021.attrs.get("td_diag", {}) or {})
+                        _safe_reg1021["http_status"] = _safe_diag1021.get("http_status", "")
+                        _safe_reg1021["api_message"] = str(_safe_diag1021.get("api_message", "") or "")
+                        _safe_reg1021["candles_validos"] = int(
+                            _safe_diag1021.get("candles_validos", len(_safe_df1021)) or 0
                         )
 
-                        if df_auto.empty:
-                            erro_auto = str(
-                                df_auto.attrs.get("erro_td", "")
-                                or registro_auto["api_message"]
+                        if _safe_df1021.empty:
+                            _safe_err1021 = str(
+                                _safe_df1021.attrs.get("erro_td", "")
+                                or _safe_reg1021["api_message"]
                                 or "A Twelve Data não retornou candles M15."
                             )
-                            registro_auto["consulta_status"] = "AUTO_ERRO"
-                            registro_auto["erro"] = erro_auto
-                            registro_auto["texto"] = erro_auto
-                            st.session_state["v9362_m15_monitor"] = registro_auto
-                            st.error(f"🤖 M15 automático: {erro_auto}")
-                            return
-
-                        dt_auto = str(df_auto["datetime"].iloc[-1])
-                        px_auto = float(df_auto["close"].iloc[-1])
-                        registro_auto["datetime_atual"] = dt_auto
-                        registro_auto["preco"] = px_auto
-
-                        if lado_auto not in ("BUY", "SELL"):
-                            registro_auto["consulta_status"] = "AUTO_MACRO_SEM_DIRECAO"
-                            registro_auto["status"] = "⚪ MACRO AGUARDAR"
-                            registro_auto["texto"] = "M15 disponível, mas o macro ainda não definiu BUY/SELL."
-                        elif dt_ant_auto and dt_auto == dt_ant_auto:
-                            registro_auto["consulta_status"] = "AUTO_MESMO_CANDLE"
-                            registro_auto["status"] = str(anterior_auto.get("status", ""))
-                            registro_auto["texto"] = str(
-                                anterior_auto.get("texto", "Decisão anterior mantida.")
-                            )
+                            _safe_reg1021["consulta_status"] = "SAFE_ERRO"
+                            _safe_reg1021["erro"] = _safe_err1021
+                            _safe_reg1021["texto"] = _safe_err1021
                         else:
-                            analise_auto = _analise_m15_v92(df_auto, lado_auto)
-                            registro_auto["consulta_status"] = (
-                                "AUTO_PRIMEIRA_LEITURA" if not dt_ant_auto else "AUTO_NOVO_CANDLE"
-                            )
-                            registro_auto["novo_candle"] = bool(dt_ant_auto)
-                            registro_auto["status"] = str(analise_auto.get("status", ""))
-                            registro_auto["texto"] = str(analise_auto.get("texto", ""))
+                            _safe_dt1021 = str(_safe_df1021["datetime"].iloc[-1])
+                            _safe_px1021 = float(_safe_df1021["close"].iloc[-1])
+                            _safe_reg1021["datetime_atual"] = _safe_dt1021
+                            _safe_reg1021["preco"] = _safe_px1021
 
-                        st.session_state["v9362_m15_monitor"] = registro_auto
+                            if _safe_lado1021 not in ("BUY", "SELL"):
+                                _safe_reg1021["consulta_status"] = "SAFE_MACRO_SEM_DIRECAO"
+                                _safe_reg1021["status"] = "⚪ MACRO AGUARDAR"
+                                _safe_reg1021["texto"] = (
+                                    "M15 disponível, mas o macro ainda não definiu BUY/SELL."
+                                )
+                            elif _safe_prev_dt1021 and _safe_dt1021 == _safe_prev_dt1021:
+                                _safe_reg1021["consulta_status"] = "SAFE_MESMO_CANDLE"
+                                _safe_reg1021["status"] = str(_safe_prev1021.get("status", ""))
+                                _safe_reg1021["texto"] = str(
+                                    _safe_prev1021.get("texto", "Decisão anterior mantida.")
+                                )
+                            else:
+                                _safe_analise1021 = _analise_m15_v92(_safe_df1021, _safe_lado1021)
+                                _safe_reg1021["consulta_status"] = (
+                                    "SAFE_PRIMEIRA_LEITURA"
+                                    if not _safe_prev_dt1021 else "SAFE_NOVO_CANDLE"
+                                )
+                                _safe_reg1021["novo_candle"] = bool(_safe_prev_dt1021)
+                                _safe_reg1021["status"] = str(_safe_analise1021.get("status", ""))
+                                _safe_reg1021["texto"] = str(_safe_analise1021.get("texto", ""))
 
-                        if registro_auto["status"].startswith("🟢"):
-                            st.success(
-                                f"🤖 🟢 GATILHO M15 CONFIRMADO automaticamente em {par_auto}."
-                            )
-                        elif registro_auto["consulta_status"] == "AUTO_MESMO_CANDLE":
-                            st.caption(
-                                f"🤖 Mesmo candle M15 ({dt_auto}); decisão mantida."
-                            )
-                        elif registro_auto["status"].startswith("🔴"):
-                            st.warning(
-                                f"🤖 M15 novo, mas ainda sem confirmação: {registro_auto['status']}."
-                            )
-                        else:
-                            st.caption(
-                                f"🤖 Monitor automático ativo · último M15: {dt_auto} · {registro_auto['status'] or 'sem mudança'}"
-                            )
+                        st.session_state["v9362_m15_monitor"] = _safe_reg1021
 
-                    _auto_monitor_m15_v963(_par958, _dir958)
+                    _safe_mon1021 = st.session_state.get("v9362_m15_monitor", {})
+                    _safe_last_text1021 = str(_safe_mon1021.get("datetime_atual", "") or "—")
+                    st.caption(
+                        "🛡️ Monitor M15 em modo estável V10.2.1 · "
+                        "revalida em reruns completos a cada ≥5 min, sem fragmento temporizado. "
+                        f"Último candle: {_safe_last_text1021}. "
+                        "O botão manual abaixo força uma consulta quando necessário."
+                    )
 
                     _mon962 = st.session_state.get("v9362_m15_monitor", {})
 
