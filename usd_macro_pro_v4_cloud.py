@@ -17,6 +17,8 @@
 - Mantém painel EUA, surpresa econômica, pares, Fed, histórico e teste histórico
 """
 
+import base64
+import json
 import math
 import os
 import time
@@ -74,22 +76,30 @@ except Exception as _evolution_exc:
 
 
 try:
-    from currency_news_v1062 import render_currency_news_panel
+    from currency_news_v107 import render_currency_news_panel
     _CURRENCY_NEWS_V106_IMPORT_ERROR = ""
 except Exception as _currency_news_exc:
     render_currency_news_panel = None
     _CURRENCY_NEWS_V106_IMPORT_ERROR = f"{type(_currency_news_exc).__name__}: {_currency_news_exc}"
 
+
+try:
+    from autopilot_panel_v107 import render_autopilot_v107
+    _AUTOPILOT_V107_IMPORT_ERROR = ""
+except Exception as _autopilot_exc:
+    render_autopilot_v107 = None
+    _AUTOPILOT_V107_IMPORT_ERROR = f"{type(_autopilot_exc).__name__}: {_autopilot_exc}"
+
 # =========================================================
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "10.6.2 — FRESH-PRICE SNAPSHOT RECOVERY · MOTOR BASE V9.3.9.2"
+APP_VERSION = "10.7.0 — FULL BACKGROUND AUTOPILOT · MOTOR BASE V9.3.9.2"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro V10.6.2 — Fresh-Price Snapshot Recovery",
+    page_title="USD Macro Pro V10.7 — Full Background Autopilot",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1678,7 +1688,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro V10.6.2 — Fresh-Price Snapshot Recovery")
+st.title("🦅 USD Macro Pro V10.7 — Full Background Autopilot")
 st.caption("Macro semanal → Macro do dia → W1/D1 → Quarterly → Liquidez → Killzones → H4/H1/M15 → Performance real")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -3331,7 +3341,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 # V9.0 — CENTRAL DO OPERADOR
 # Somente interface/orientação; não altera o motor do modelo.
 # ============================================================
-st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V10.6.2")
+st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V10.7")
 st.caption("O APP define o viés macro; o gráfico confirma a entrada.")
 
 with st.container(border=True):
@@ -3455,8 +3465,79 @@ def _refresh_central_v104() -> tuple[bool, str]:
     return True, "Cache histórico liberado; a próxima leitura buscará dados novos."
 
 
+
+# =========================================================
+# V10.7 — HEADLESS INPUT SNAPSHOT FOR BACKGROUND AUTOPILOT
+# =========================================================
+def _autopilot_save_inputs_v107():
+    if os.getenv("USD_MACRO_AUTOPILOT", "") != "1":
+        return True, "Modo interativo: snapshot automático não necessário."
+    try:
+        if "matriz_v61" not in globals() or matriz_v61 is None or matriz_v61.empty:
+            return False, "Matriz V6.1 indisponível no run headless."
+
+        token = st.secrets.get("GITHUB_TOKEN_HISTORICO", os.getenv("GITHUB_TOKEN_HISTORICO", ""))
+        repo = st.secrets.get("GITHUB_REPO_HISTORICO", os.getenv("GITHUB_REPO_HISTORICO", ""))
+        branch = st.secrets.get("GITHUB_BRANCH_HISTORICO", os.getenv("GITHUB_BRANCH_HISTORICO", "main"))
+        if not token or not repo:
+            return False, "GitHub persistente ausente."
+
+        cols = [c for c in [
+            "Par","Direção","Score final","Qualidade","Confluência","Dif. macro",
+            "Índice ranking","Índice operacional"
+        ] if c in matriz_v61.columns]
+        pairs = matriz_v61[cols].head(7).to_dict("records")
+
+        _macro = {
+            "usd_score": float(usd_detalhado.get("score", 50.0)) if "usd_detalhado" in globals() else 50.0,
+            "usd_quality": float(qualidade_usd) if "qualidade_usd" in globals() else 0.0,
+            "fed_tone": str(fed.get("tom", "Neutro")) if "fed" in globals() else "Neutro",
+            "fed_strength": float(fed.get("forca", 0.0)) if "fed" in globals() else 0.0,
+        }
+        try:
+            _macro["trend"] = _score_tendencias_eua()
+        except Exception:
+            _macro["trend"] = {}
+        try:
+            _macro["event"] = _proximo_evento_macro_v65()
+        except Exception:
+            _macro["event"] = {}
+
+        obj = {
+            "version": "V10.7",
+            "generated_at": pd.Timestamp.now(tz="UTC").isoformat(),
+            "app_version": APP_VERSION,
+            "pairs": pairs,
+            "macro_context": _macro,
+        }
+
+        path = "dados/autopilot_inputs_v107.json"
+        url = f"https://api.github.com/repos/{repo}/contents/{path}"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        cur = requests.get(url, headers=headers, params={"ref": branch}, timeout=15)
+        sha = cur.json().get("sha", "") if cur.status_code == 200 else ""
+        payload = {
+            "message": "V10.7 Autopilot: snapshot da matriz",
+            "content": base64.b64encode(
+                json.dumps(obj, ensure_ascii=False, indent=2, default=str).encode("utf-8")
+            ).decode("ascii"),
+            "branch": branch,
+        }
+        if sha:
+            payload["sha"] = sha
+        r = requests.put(url, headers=headers, json=payload, timeout=25)
+        r.raise_for_status()
+        return True, ""
+    except Exception as exc:
+        return False, f"{type(exc).__name__}: {exc}"
+
+
 abas = st.tabs([
-    "🧠 PAINEL MESTRE V10.6.2",
+    "🧠 PAINEL MESTRE V10.7",
     "🏆 Classificação",
     "🇺🇸 Painel EUA",
     "💱 Pares e Confiança",
@@ -3464,11 +3545,12 @@ abas = st.tabs([
     "🧾 Histórico",
     "📈 Teste Histórico",
     "🎯 Decisão Automática",
-    "🧭 Macro Market Map V10.6.2",
+    "🧭 Macro Market Map V10.7",
     "✨ Aprenda & Personalize",
-    "🚀 Produto V10.6.2",
-    "🧭 Melhorias V10.6.2",
-    "🌍 Notícias Globais V10.6.2",
+    "🚀 Produto V10.7",
+    "🧭 Melhorias V10.7",
+    "🌍 Notícias Globais V10.7",
+    "🤖 AUTOPILOT V10.7",
 ])
 
 # =========================================================
@@ -8664,4 +8746,21 @@ with abas[12]:
                 "mas o motor operacional continua preservado."
             )
             st.code(f"{type(_v106_render_exc).__name__}: {_v106_render_exc}")
+
+# =========================================================
+# ABA 14 — V10.7 FULL BACKGROUND AUTOPILOT
+# =========================================================
+with abas[13]:
+    if render_autopilot_v107 is None:
+        st.error("O painel Autopilot V10.7 não pôde ser carregado.")
+        if _AUTOPILOT_V107_IMPORT_ERROR:
+            st.caption(f"Diagnóstico: {_AUTOPILOT_V107_IMPORT_ERROR}")
+    else:
+        render_autopilot_v107()
+
+# No modo GitHub Actions/AppTest, persiste a Matriz atual para o runner background.
+if os.getenv("USD_MACRO_AUTOPILOT", "") == "1":
+    _ok_auto107, _msg_auto107 = _autopilot_save_inputs_v107()
+    if not _ok_auto107:
+        print("AUTOPILOT_INPUT_WARNING:", _msg_auto107)
 
