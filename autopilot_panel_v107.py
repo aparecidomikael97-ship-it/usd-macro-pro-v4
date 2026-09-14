@@ -37,7 +37,7 @@ def _age_min(value):
     except Exception: return None
 
 def render_autopilot_v107():
-    st.subheader("🤖 Autopilot Total — V10.7.1")
+    st.subheader("🤖 Autopilot Total — V10.7.5")
     st.caption(
         "Macro/FRED → Matriz → Notícias 8 moedas → Scanner H4/H1/M15 → Market Map "
         "→ snapshots → validação 1H/4H/24H. Rodando em background pelo GitHub Actions."
@@ -50,7 +50,18 @@ def render_autopilot_v107():
 
     age=_age_min(status.get("last_run"))
     healthy=bool(status.get("healthy",False))
-    st.success("🟢 AUTOPILOT SAUDÁVEL" if healthy else "🟡 AUTOPILOT COM ATENÇÃO")
+    errors = status.get("errors", []) or []
+    has_429 = any("HTTP 429" in str(x) for x in errors)
+    headless_bad = not bool(status.get("app_headless_ok", False))
+
+    if healthy:
+        st.success("🟢 AUTOPILOT SAUDÁVEL")
+    elif headless_bad:
+        st.error("🔴 AUTOPILOT: APP HEADLESS NÃO ATUALIZOU A MATRIZ")
+    elif has_429:
+        st.warning("🟠 AUTOPILOT: TWELVE DATA LIMITOU CONSULTAS (HTTP 429)")
+    else:
+        st.warning("🟡 AUTOPILOT COM ATENÇÃO")
     if age is not None:
         st.caption(f"Última execução há {age:.0f} min · {status.get('last_run','')}")
 

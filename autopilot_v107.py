@@ -1,4 +1,4 @@
-"""USD Macro Pro V10.7.1 — Rate-Safe Full Background Autopilot.
+"""USD Macro Pro V10.7.5 — Headless Secrets + API Budget Autopilot.
 
 Executado pelo GitHub Actions a cada 30 minutos.
 
@@ -70,10 +70,19 @@ DAILY_CACHE_PATH = "dados/autopilot_daily_cache_v107.json"
 NEWS_CURRENT_PATH = "dados/currency_news_current_v107.json"
 NEWS_VALIDATION_PATH = "dados/currency_news_validation_v1061.csv"
 
-M15_EVERY_MIN = 25
-H1_EVERY_MIN = 55
-H4_EVERY_MIN = 230
+M15_EVERY_MIN = 55
+H1_EVERY_MIN = 115
+H4_EVERY_MIN = 235
 NEWS_EVERY_MIN = 50
+
+# V10.7.5 — prioridade + orçamento conservador.
+# Top 3 pares direcionais podem atualizar M15 mais rápido.
+PRIORITY_M15_EVERY_MIN = 25
+PRIORITY_H1_EVERY_MIN = 55
+
+# Reserva parte do plano diário para uso manual do app.
+AUTOPILOT_DAILY_CALL_BUDGET = 480
+
 
 # V10.7.1 — rate-safe Twelve Data gate.
 # Keeps calls well below a bursty per-minute pattern so the first run
@@ -218,12 +227,27 @@ def run_headless_app() -> tuple[bool, str]:
     except Exception as exc:
         return False, f"{type(exc).__name__}: {exc}"
 
+def _td_message(resp: requests.Response) -> str:
+    try:
+        js = resp.json()
+        if isinstance(js, dict):
+            return str(js.get("message") or js.get("status") or js)
+    except Exception:
+        pass
+    try:
+        return str(resp.text)[:300]
+    except Exception:
+        return ""
+
+
 def td_fetch(pair: str, interval: str, outputsize: int) -> tuple[pd.DataFrame, str]:
     if not TD_KEY:
         return pd.DataFrame(), "CHAVE_TWELVE_DATA ausente."
+
     _td_rate_gate()
-    try:
-        r = requests.get(
+
+    def _request_once():
+        return requests.get(
             "https://api.twelvedata.com/time_series",
             params={
                 "symbol": pair,
@@ -236,8 +260,26 @@ def td_fetch(pair: str, interval: str, outputsize: int) -> tuple[pd.DataFrame, s
             },
             timeout=25,
         )
+
+    try:
+        r = _request_once()
+
+        # V10.7.5 — uma única retentativa quando a própria mensagem indicar
+        # limite por minuto. Se for limite diário, não desperdiça chamadas.
+        if r.status_code == 429:
+            msg = _td_message(r)
+            low = msg.lower()
+            if "minute" in low or "per minute" in low:
+                print(f"[429-minute] {pair} {interval}: aguardando 66s")
+                time.sleep(66)
+                _td_rate_gate()
+                r = _request_once()
+            if r.status_code == 429:
+                return pd.DataFrame(), f"HTTP 429: {_td_message(r) or 'limite de API'}"
+
         if r.status_code != 200:
-            return pd.DataFrame(), f"HTTP {r.status_code}"
+            return pd.DataFrame(), f"HTTP {r.status_code}: {_td_message(r)}"
+
         js = r.json()
         if isinstance(js, dict) and js.get("status") == "error":
             return pd.DataFrame(), str(js.get("message", "Twelve Data error"))
@@ -248,6 +290,8 @@ def td_fetch(pair: str, interval: str, outputsize: int) -> tuple[pd.DataFrame, s
         return df, ""
     except Exception as exc:
         return pd.DataFrame(), f"{type(exc).__name__}: {exc}"
+
+
 
 def technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
     d = df.copy()
@@ -344,6 +388,29 @@ def pair_input_map(inputs: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
             out[str(row["Par"])] = dict(row)
     return out
 
+
+def _daily_budget_meta(state: Mapping[str, Any]) -> tuple[str, int]:
+    today = utcnow().strftime("%Y-%m-%d")
+    auto = dict((state or {}).get("autopilot_v107", {}) or {})
+    budget = dict(auto.get("daily_budget", {}) or {})
+    if str(budget.get("day", "")) != today:
+        return today, 0
+    return today, int(budget.get("calls", 0) or 0)
+
+
+def _is_priority_pair_v1075(pair: str, pmap: Mapping[str, Mapping[str, Any]]) -> bool:
+    directional = []
+    for p, row in pmap.items():
+        direction = str(row.get("Direção", row.get("Direcao", "")))
+        if macro_side(direction) not in ("BUY", "SELL"):
+            continue
+        score = float(row.get("Índice ranking", row.get("Índice operacional", row.get("Score final", 0))) or 0)
+        directional.append((score, p))
+    directional.sort(reverse=True)
+    top = {p for _, p in directional[:3]}
+    return pair in top
+
+
 def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, pd.DataFrame], list[str], int]:
     state, _ = gh_get_json(SCANNER_PATH, {"versao":"V10.7","resultados":{}})
     if not isinstance(state, dict):
@@ -358,6 +425,7 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
 
     auto_meta = dict(state.get("autopilot_v107", {}) or {})
     fetches = dict(auto_meta.get("last_fetches", {}) or {})
+    budget_day, budget_calls = _daily_budget_meta(state)
 
     if not market_open:
         auto_meta["last_run"] = now.isoformat()
@@ -375,9 +443,22 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
         pair_fetch = dict(fetches.get(pair, {}) or {})
 
         direction_changed = bool(old_dir and old_dir != direction)
-        due_m15 = direction_changed or (minutes_since(pair_fetch.get("m15")) is None or minutes_since(pair_fetch.get("m15")) >= M15_EVERY_MIN)
-        due_h1 = direction_changed or (minutes_since(pair_fetch.get("h1")) is None or minutes_since(pair_fetch.get("h1")) >= H1_EVERY_MIN)
-        due_h4 = direction_changed or (minutes_since(pair_fetch.get("h4")) is None or minutes_since(pair_fetch.get("h4")) >= H4_EVERY_MIN)
+        priority = _is_priority_pair_v1075(pair, pmap)
+        m15_every = PRIORITY_M15_EVERY_MIN if priority else M15_EVERY_MIN
+        h1_every = PRIORITY_H1_EVERY_MIN if priority else H1_EVERY_MIN
+
+        due_m15 = direction_changed or (
+            minutes_since(pair_fetch.get("m15")) is None
+            or minutes_since(pair_fetch.get("m15")) >= m15_every
+        )
+        due_h1 = direction_changed or (
+            minutes_since(pair_fetch.get("h1")) is None
+            or minutes_since(pair_fetch.get("h1")) >= h1_every
+        )
+        due_h4 = direction_changed or (
+            minutes_since(pair_fetch.get("h4")) is None
+            or minutes_since(pair_fetch.get("h4")) >= H4_EVERY_MIN
+        )
 
         tec = {
             "disponivel": bool(old_tec.get("disponivel", False)),
@@ -400,8 +481,16 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
         ok_any = False
         fetched_at = now.isoformat()
         for key, interval, outputsize in interval_specs:
+            if budget_calls >= AUTOPILOT_DAILY_CALL_BUDGET:
+                errors.append(
+                    f"API_BUDGET: limite interno diário {AUTOPILOT_DAILY_CALL_BUDGET} atingido; "
+                    f"{pair} {interval} adiado."
+                )
+                continue
+
             frame, err = td_fetch(pair, interval, outputsize)
             calls += 1
+            budget_calls += 1
             if err or frame.empty:
                 errors.append(f"{pair} {interval}: {err or 'sem dados'}")
                 continue
@@ -459,6 +548,11 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
         "market_open": True,
         "last_fetches": fetches,
         "twelve_calls_last_run": calls,
+        "daily_budget": {
+            "day": budget_day,
+            "calls": budget_calls,
+            "limit": AUTOPILOT_DAILY_CALL_BUDGET,
+        },
     })
     state["autopilot_v107"] = auto_meta
     return state, m15_frames, errors, calls
@@ -827,6 +921,7 @@ def status_summary(
         "snapshot_stats":dict(snap_stats),
         "twelve_calls_this_run":calls,
         "twelve_rate_safe":True,
+        "twelve_api_budget_limit":AUTOPILOT_DAILY_CALL_BUDGET,
         "twelve_safe_calls_per_window":TD_SAFE_CALLS_PER_WINDOW,
         "twelve_safe_window_seconds":TD_SAFE_WINDOW_SECONDS,
         "forex_market_open":forex_market_likely_open(now),
