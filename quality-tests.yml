@@ -8,9 +8,11 @@ on:
       - "calendar_panel.py"
       - "market_map_core_v10.py"
       - "market_map_v10.py"
+      - "master_panel_v102.py"
       - "test_engine.py"
       - "test_calendar.py"
       - "test_market_map_v10.py"
+      - "test_master_panel_v102.py"
       - "usd_macro_pro_v4_cloud.py"
       - ".github/workflows/quality-tests.yml"
   pull_request:
@@ -20,9 +22,11 @@ on:
       - "calendar_panel.py"
       - "market_map_core_v10.py"
       - "market_map_v10.py"
+      - "master_panel_v102.py"
       - "test_engine.py"
       - "test_calendar.py"
       - "test_market_map_v10.py"
+      - "test_master_panel_v102.py"
       - "usd_macro_pro_v4_cloud.py"
       - ".github/workflows/quality-tests.yml"
   workflow_dispatch:
@@ -47,9 +51,9 @@ jobs:
         run: >-
           python -m py_compile
           engine.py calendar_core.py calendar_panel.py
-          market_map_core_v10.py market_map_v10.py
-          test_engine.py test_calendar.py test_market_map_v10.py
+          market_map_core_v10.py market_map_v10.py master_panel_v102.py
+          test_engine.py test_calendar.py test_market_map_v10.py test_master_panel_v102.py
           usd_macro_pro_v4_cloud.py
 
       - name: Unit tests
-        run: python -m unittest -v test_engine.py test_calendar.py test_market_map_v10.py
+        run: python -m unittest -v test_engine.py test_calendar.py test_market_map_v10.py test_master_panel_v102.py
