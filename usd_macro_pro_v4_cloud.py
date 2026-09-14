@@ -72,16 +72,24 @@ except Exception as _evolution_exc:
     render_v105_center = None
     _EVOLUTION_V105_IMPORT_ERROR = f"{type(_evolution_exc).__name__}: {_evolution_exc}"
 
+
+try:
+    from currency_news_v106 import render_currency_news_panel
+    _CURRENCY_NEWS_V106_IMPORT_ERROR = ""
+except Exception as _currency_news_exc:
+    render_currency_news_panel = None
+    _CURRENCY_NEWS_V106_IMPORT_ERROR = f"{type(_currency_news_exc).__name__}: {_currency_news_exc}"
+
 # =========================================================
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "10.5.0 — CENTRO DE MELHORIAS, COMPARAÇÃO & ALERTAS · MOTOR BASE V9.3.9.2"
+APP_VERSION = "10.6.0 — GLOBAL CURRENCY NEWS INTELLIGENCE · MOTOR BASE V9.3.9.2"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro V10.5 — Painel Profissional",
+    page_title="USD Macro Pro V10.6 — Global Currency Intelligence",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1670,7 +1678,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro V10.5 — Painel Profissional")
+st.title("🦅 USD Macro Pro V10.6 — Global Currency Intelligence")
 st.caption("Macro semanal → Macro do dia → W1/D1 → Quarterly → Liquidez → Killzones → H4/H1/M15 → Performance real")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -3323,7 +3331,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 # V9.0 — CENTRAL DO OPERADOR
 # Somente interface/orientação; não altera o motor do modelo.
 # ============================================================
-st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V10.5")
+st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V10.6")
 st.caption("O APP define o viés macro; o gráfico confirma a entrada.")
 
 with st.container(border=True):
@@ -3448,7 +3456,7 @@ def _refresh_central_v104() -> tuple[bool, str]:
 
 
 abas = st.tabs([
-    "🧠 PAINEL MESTRE V10.5",
+    "🧠 PAINEL MESTRE V10.6",
     "🏆 Classificação",
     "🇺🇸 Painel EUA",
     "💱 Pares e Confiança",
@@ -3456,10 +3464,11 @@ abas = st.tabs([
     "🧾 Histórico",
     "📈 Teste Histórico",
     "🎯 Decisão Automática",
-    "🧭 Macro Market Map V10.5",
+    "🧭 Macro Market Map V10.6",
     "✨ Aprenda & Personalize",
-    "🚀 Produto V10.5",
-    "🧭 Melhorias V10.5",
+    "🚀 Produto V10.6",
+    "🧭 Melhorias V10.6",
+    "🌍 Notícias Globais V10.6",
 ])
 
 # =========================================================
@@ -8633,4 +8642,26 @@ with abas[11]:
         except Exception as _v105_render_exc:
             st.error("A aba Melhorias V10.5 encontrou um erro, mas o motor operacional continua preservado.")
             st.code(f"{type(_v105_render_exc).__name__}: {_v105_render_exc}")
+
+# =========================================================
+# ABA 13 — V10.6 GLOBAL CURRENCY NEWS INTELLIGENCE
+# =========================================================
+with abas[12]:
+    if render_currency_news_panel is None:
+        st.error("A inteligência global de notícias V10.6 não pôde ser carregada.")
+        if _CURRENCY_NEWS_V106_IMPORT_ERROR:
+            st.caption(f"Diagnóstico: {_CURRENCY_NEWS_V106_IMPORT_ERROR}")
+    else:
+        try:
+            render_currency_news_panel(
+                matrix=matriz_v61,
+                ranking=ranking,
+                newsapi_key=CHAVE_NEWSAPI,
+            )
+        except Exception as _v106_render_exc:
+            st.error(
+                "A aba Notícias Globais V10.6 encontrou um erro, "
+                "mas o motor operacional continua preservado."
+            )
+            st.code(f"{type(_v106_render_exc).__name__}: {_v106_render_exc}")
 
