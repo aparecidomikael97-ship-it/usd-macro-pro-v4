@@ -1,5 +1,5 @@
 # ============================================================
-# USD MACRO PRO V9.3.9 — PAINEL DE PERFORMANCE REAL
+# USD MACRO PRO V10.0 — MACRO MARKET MAP · MOTOR BASE V9.3.9.2
 # Exibe o motivo persistido de falhas por par/timeframe sem
 # gastar novas chamadas. Persistência e validação preservadas.
 # ============================================================
@@ -31,16 +31,25 @@ import requests
 import streamlit as st
 import re
 
+# V10 — camada observacional profissional. O try/except evita derrubar
+# o motor base caso o arquivo adicional ainda não tenha sido enviado.
+try:
+    from market_map_v10 import render_market_map
+    _MARKET_MAP_V10_IMPORT_ERROR = ""
+except Exception as _mm_exc:
+    render_market_map = None
+    _MARKET_MAP_V10_IMPORT_ERROR = f"{type(_mm_exc).__name__}: {_mm_exc}"
+
 # =========================================================
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "9.3.9.1 — CORREÇÃO DTYPE DA VALIDAÇÃO"
+APP_VERSION = "10.0.0 — MACRO MARKET MAP · MOTOR BASE V9.3.9.2"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V9.3.9.1 Performance Real",
+    page_title="USD Macro Pro V10 — Macro Market Map",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1619,8 +1628,8 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V9.3.9.1 Performance Real")
-st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
+st.title("🦅 USD Macro Pro V10 — Macro Market Map")
+st.caption("Macro → W1/D1 → Quarterly → Liquidez → Killzones → H4/H1/M15 → Performance real")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
 st.info(
@@ -3323,6 +3332,7 @@ abas = st.tabs([
     "🧾 Histórico",
     "📈 Teste Histórico",
     "🎯 Decisão Automática",
+    "🧭 Macro Market Map",
 ])
 
 # =========================================================
@@ -8248,3 +8258,26 @@ with abas[6]:
             "A Central V9.3.5 mantém a persistência no GitHub e só considera um par completo quando H4, H1 e M15 estão realmente válidos. "
             "Ela não transforma Score Mestre em probabilidade de lucro e não substitui gestão de risco."
         )
+
+# =========================================================
+# ABA 8 — V10 MACRO MARKET MAP (CAMADA OBSERVACIONAL)
+# Não altera o motor base, Score Mestre ou histórico oficial.
+# =========================================================
+with abas[7]:
+    if render_market_map is None:
+        st.error(
+            "A camada Market Map V10 não pôde ser carregada. "
+            "Confirme que market_map_v10.py e market_map_core_v10.py estão na raiz do repositório."
+        )
+        if _MARKET_MAP_V10_IMPORT_ERROR:
+            st.caption(f"Diagnóstico: {_MARKET_MAP_V10_IMPORT_ERROR}")
+    else:
+        try:
+            render_market_map(matriz_v61, ranking, CHAVE_TWELVE_DATA)
+        except Exception as _mm_render_exc:
+            st.error(
+                "O Market Map encontrou um erro, mas o motor base continua preservado. "
+                "Envie esta mensagem para diagnóstico."
+            )
+            st.code(f"{type(_mm_render_exc).__name__}: {_mm_render_exc}")
+
