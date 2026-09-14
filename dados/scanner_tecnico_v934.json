@@ -1,7 +1,7 @@
 {
   "versao": "V9.3.4",
   "lote": 3,
-  "ultimo_processamento_ts": 1789404530.9622202,
+  "ultimo_processamento_ts": 1789404705.2330165,
   "resultados": {
     "USD/CHF": {
       "tecnico": {
@@ -131,14 +131,12 @@
     },
     "NZD/USD": {
       "tecnico": {
-        "disponivel": false,
-        "motivo": "M15: You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing",
+        "disponivel": true,
+        "motivo": "",
         "h4": {
-          "status": "⚪ NÃO AVALIADO",
-          "score": 0,
-          "texto": "Outro timeframe falhou; pacote não concluído.",
-          "motivo": "",
-          "erro": "",
+          "status": "🟢 CONFIRMA",
+          "score": 100,
+          "texto": "Tendência/estrutura H4 alinhada ao macro.",
           "td_diag": {
             "symbol": "NZD/USD",
             "interval": "4h",
@@ -152,11 +150,9 @@
           }
         },
         "h1": {
-          "status": "⚪ NÃO AVALIADO",
-          "score": 0,
-          "texto": "Outro timeframe falhou; pacote não concluído.",
-          "motivo": "",
-          "erro": "",
+          "status": "🟡 ALINHADO",
+          "score": 70,
+          "texto": "H1 favorece o macro, porém o pullback ainda não está confirmado.",
           "td_diag": {
             "symbol": "NZD/USD",
             "interval": "1h",
@@ -170,31 +166,29 @@
           }
         },
         "m15": {
-          "status": "⚪ INDISPONÍVEL",
-          "score": 0,
-          "texto": "You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing",
-          "motivo": "You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing",
-          "erro": "You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing",
+          "status": "🔴 SEM GATILHO",
+          "score": 25,
+          "texto": "M15 ainda não confirma a execução.",
           "td_diag": {
             "symbol": "NZD/USD",
             "interval": "15min",
             "outputsize": 100,
-            "http_status": 429,
-            "api_status": "error",
-            "api_code": "429",
-            "api_message": "You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing",
-            "values_count": 0,
-            "candles_validos": 0
+            "http_status": 200,
+            "api_status": "ok",
+            "api_code": "",
+            "api_message": "",
+            "values_count": 100,
+            "candles_validos": 100
           }
         },
-        "preco_m15": 0.0,
-        "ultima_atualizacao": "",
-        "erro": "M15: You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing",
-        "diagnostico": "M15: You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing"
+        "preco_m15": 0.57877,
+        "ultima_atualizacao": "2026-09-14 16:45:00+00:00",
+        "erro": "",
+        "diagnostico": ""
       },
-      "decisao": "⚪ TÉCNICA INDISPONÍVEL",
-      "texto": "M15: You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing",
-      "processado_em": 1789404343.1512418,
+      "decisao": "🔴 AGUARDAR EVENTO",
+      "texto": "O calendário bloqueia uma entrada agressiva.",
+      "processado_em": 1789404704.6761112,
       "tentativa_v1022": true,
       "versao_tentativa": "V10.2.2"
     },
@@ -264,7 +258,7 @@
     "EUR/USD": {
       "tecnico": {
         "disponivel": false,
-        "motivo": "H1: You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing | M15: You have run out of API credits for the current minute. 10 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing",
+        "motivo": "M15: You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing",
         "h4": {
           "status": "⚪ NÃO AVALIADO",
           "score": 0,
@@ -284,6 +278,24 @@
           }
         },
         "h1": {
+          "status": "⚪ NÃO AVALIADO",
+          "score": 0,
+          "texto": "Outro timeframe falhou; pacote não concluído.",
+          "motivo": "",
+          "erro": "",
+          "td_diag": {
+            "symbol": "EUR/USD",
+            "interval": "1h",
+            "outputsize": 100,
+            "http_status": 200,
+            "api_status": "ok",
+            "api_code": "",
+            "api_message": "",
+            "values_count": 100,
+            "candles_validos": 100
+          }
+        },
+        "m15": {
           "status": "⚪ INDISPONÍVEL",
           "score": 0,
           "texto": "You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing",
@@ -291,7 +303,7 @@
           "erro": "You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing",
           "td_diag": {
             "symbol": "EUR/USD",
-            "interval": "1h",
+            "interval": "15min",
             "outputsize": 100,
             "http_status": 429,
             "api_status": "error",
@@ -301,32 +313,14 @@
             "candles_validos": 0
           }
         },
-        "m15": {
-          "status": "⚪ INDISPONÍVEL",
-          "score": 0,
-          "texto": "You have run out of API credits for the current minute. 10 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing",
-          "motivo": "You have run out of API credits for the current minute. 10 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing",
-          "erro": "You have run out of API credits for the current minute. 10 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing",
-          "td_diag": {
-            "symbol": "EUR/USD",
-            "interval": "15min",
-            "outputsize": 100,
-            "http_status": 429,
-            "api_status": "error",
-            "api_code": "429",
-            "api_message": "You have run out of API credits for the current minute. 10 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing",
-            "values_count": 0,
-            "candles_validos": 0
-          }
-        },
         "preco_m15": 0.0,
         "ultima_atualizacao": "",
-        "erro": "H1: You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing | M15: You have run out of API credits for the current minute. 10 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing",
-        "diagnostico": "H1: You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing | M15: You have run out of API credits for the current minute. 10 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing"
+        "erro": "M15: You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing",
+        "diagnostico": "M15: You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing"
       },
       "decisao": "⚪ TÉCNICA INDISPONÍVEL",
-      "texto": "H1: You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing | M15: You have run out of API credits for the current minute. 10 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing",
-      "processado_em": 1789404530.9622097,
+      "texto": "M15: You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing",
+      "processado_em": 1789404705.2329986,
       "tentativa_v1022": true,
       "versao_tentativa": "V10.2.2"
     },
