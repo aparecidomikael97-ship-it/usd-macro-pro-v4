@@ -1,7 +1,7 @@
 {
   "versao": "V9.3.4",
   "lote": 3,
-  "ultimo_processamento_ts": 1789366310.835333,
+  "ultimo_processamento_ts": 1789366419.3315399,
   "resultados": {
     "USD/CHF": {
       "tecnico": {
@@ -68,14 +68,12 @@
     },
     "USD/CAD": {
       "tecnico": {
-        "disponivel": false,
-        "motivo": "M15: You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing",
+        "disponivel": true,
+        "motivo": "",
         "h4": {
-          "status": "⚪ NÃO AVALIADO",
-          "score": 0,
-          "texto": "Outro timeframe falhou; pacote não concluído.",
-          "motivo": "",
-          "erro": "",
+          "status": "🟢 CONFIRMA",
+          "score": 100,
+          "texto": "Tendência/estrutura H4 alinhada ao macro.",
           "td_diag": {
             "symbol": "USD/CAD",
             "interval": "4h",
@@ -89,11 +87,9 @@
           }
         },
         "h1": {
-          "status": "⚪ NÃO AVALIADO",
-          "score": 0,
-          "texto": "Outro timeframe falhou; pacote não concluído.",
-          "motivo": "",
-          "erro": "",
+          "status": "🟢 PULLBACK OK",
+          "score": 100,
+          "texto": "H1 alinhado e com retorno/reação perto da EMA20.",
           "td_diag": {
             "symbol": "USD/CAD",
             "interval": "1h",
@@ -107,31 +103,29 @@
           }
         },
         "m15": {
-          "status": "⚪ INDISPONÍVEL",
-          "score": 0,
-          "texto": "You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing",
-          "motivo": "You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing",
-          "erro": "You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing",
+          "status": "🟡 AGUARDAR GATILHO",
+          "score": 65,
+          "texto": "Momentum está alinhado, mas falta rompimento/confirmacão curta.",
           "td_diag": {
             "symbol": "USD/CAD",
             "interval": "15min",
             "outputsize": 100,
-            "http_status": 429,
-            "api_status": "error",
-            "api_code": "429",
-            "api_message": "You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing",
-            "values_count": 0,
-            "candles_validos": 0
+            "http_status": 200,
+            "api_status": "ok",
+            "api_code": "",
+            "api_message": "",
+            "values_count": 100,
+            "candles_validos": 100
           }
         },
-        "preco_m15": 0.0,
-        "ultima_atualizacao": "",
-        "erro": "M15: You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing",
-        "diagnostico": "M15: You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing"
+        "preco_m15": 1.38756,
+        "ultima_atualizacao": "2026-09-14 06:00:00+00:00",
+        "erro": "",
+        "diagnostico": ""
       },
-      "decisao": "⚪ TÉCNICA INDISPONÍVEL",
-      "texto": "M15: You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier plan at https://twelvedata.com/pricing",
-      "processado_em": 1789365033.422604,
+      "decisao": "🔴 AGUARDAR EVENTO",
+      "texto": "O calendário bloqueia uma entrada agressiva.",
+      "processado_em": 1789366419.3315258,
       "tentativa_v1022": true,
       "versao_tentativa": "V10.2.2"
     },
@@ -454,14 +448,14 @@
             "candles_validos": 100
           }
         },
-        "preco_m15": 0.71491,
-        "ultima_atualizacao": "2026-09-14 05:15:00+00:00",
+        "preco_m15": 0.71431,
+        "ultima_atualizacao": "2026-09-14 06:00:00+00:00",
         "erro": "",
         "diagnostico": "Dados técnicos completos; aguardando definição do viés macro."
       },
       "decisao": "🔴 AGUARDAR EVENTO",
       "texto": "O calendário bloqueia uma entrada agressiva.",
-      "processado_em": 1789363035.4436653,
+      "processado_em": 1789366418.8526611,
       "tentativa_v1022": true,
       "versao_tentativa": "V10.2.2"
     }
