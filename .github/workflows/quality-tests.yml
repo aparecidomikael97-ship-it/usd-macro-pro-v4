@@ -1,42 +1,37 @@
 name: Quality tests
 
 on:
-  push:
-    paths:
-      - "engine.py"
-      - "calendar_core.py"
-      - "calendar_panel.py"
-      - "test_engine.py"
-      - "test_calendar.py"
-      - ".github/workflows/quality-tests.yml"
-  pull_request:
-    paths:
-      - "engine.py"
-      - "calendar_core.py"
-      - "calendar_panel.py"
-      - "test_engine.py"
-      - "test_calendar.py"
-      - ".github/workflows/quality-tests.yml"
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "*.py"
+      - ".github/workflows/quality-tests.yml"
+      - ".github/workflows/autopilot-v107.yml"
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Python 3.12
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
-
       - name: Install test dependencies
-        run: python -m pip install --upgrade pip pandas
-
-      - name: Syntax check
-        run: python -m py_compile engine.py calendar_core.py calendar_panel.py test_engine.py test_calendar.py
-
-      - name: Unit tests
-        run: python -m unittest -v test_engine.py test_calendar.py
+        run: |
+          python -m pip install --upgrade pip
+          pip install streamlit pandas numpy requests altair pyarrow
+      - name: Run quality suite
+        run: |
+          python -m unittest -q \
+            test_engine.py \
+            test_calendar.py \
+            test_market_map_v10.py \
+            test_master_panel_v102.py \
+            test_experience_v103.py \
+            test_product_v104.py \
+            test_evolution_v105.py \
+            test_currency_news_v106.py \
+            test_currency_news_v1061.py \
+            test_currency_news_v1062.py \
+            test_autopilot_v107.py

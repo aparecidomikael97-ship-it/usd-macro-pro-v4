@@ -1,0 +1,42 @@
+name: USD Macro Pro - Autopilot V10.7
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "7,37 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: usd-macro-autopilot-v107
+  cancel-in-progress: false
+
+jobs:
+  autopilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      USD_MACRO_AUTOPILOT: "1"
+      GITHUB_TOKEN_HISTORICO: ${{ github.token }}
+      GITHUB_REPO_HISTORICO: ${{ github.repository }}
+      GITHUB_BRANCH_HISTORICO: "main"
+      CHAVE_FRED: ${{ secrets.CHAVE_FRED }}
+      CHAVE_TWELVE_DATA: ${{ secrets.CHAVE_TWELVE_DATA }}
+      CHAVE_NEWSAPI: ${{ secrets.CHAVE_NEWSAPI }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install streamlit pandas numpy requests pyarrow altair
+
+      - name: Run full background autopilot
+        run: python autopilot_v107.py
