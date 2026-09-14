@@ -1,7 +1,7 @@
 {
   "versao": "V9.3.4",
   "lote": 3,
-  "ultimo_processamento_ts": 1789361931.1100938,
+  "ultimo_processamento_ts": 1789362434.8628864,
   "resultados": {
     "USD/CHF": {
       "tecnico": {
@@ -136,24 +136,61 @@
         "h4": {
           "status": "🟢 CONFIRMA",
           "score": 100,
-          "texto": "Tendência/estrutura H4 alinhada ao macro."
+          "texto": "Tendência/estrutura H4 alinhada ao macro.",
+          "td_diag": {
+            "symbol": "NZD/USD",
+            "interval": "4h",
+            "outputsize": 100,
+            "http_status": 200,
+            "api_status": "ok",
+            "api_code": "",
+            "api_message": "",
+            "values_count": 100,
+            "candles_validos": 100
+          }
         },
         "h1": {
           "status": "🟢 PULLBACK OK",
           "score": 100,
-          "texto": "H1 alinhado e com retorno/reação perto da EMA20."
+          "texto": "H1 alinhado e com retorno/reação perto da EMA20.",
+          "td_diag": {
+            "symbol": "NZD/USD",
+            "interval": "1h",
+            "outputsize": 100,
+            "http_status": 200,
+            "api_status": "ok",
+            "api_code": "",
+            "api_message": "",
+            "values_count": 100,
+            "candles_validos": 100
+          }
         },
         "m15": {
-          "status": "🔴 SEM GATILHO",
-          "score": 25,
-          "texto": "M15 ainda não confirma a execução."
+          "status": "🟡 AGUARDAR GATILHO",
+          "score": 65,
+          "texto": "Momentum está alinhado, mas falta rompimento/confirmacão curta.",
+          "td_diag": {
+            "symbol": "NZD/USD",
+            "interval": "15min",
+            "outputsize": 100,
+            "http_status": 200,
+            "api_status": "ok",
+            "api_code": "",
+            "api_message": "",
+            "values_count": 100,
+            "candles_validos": 100
+          }
         },
-        "preco_m15": 0.58135,
-        "ultima_atualizacao": "2026-09-13 03:30:00+00:00"
+        "preco_m15": 0.5784,
+        "ultima_atualizacao": "2026-09-14 05:00:00+00:00",
+        "erro": "",
+        "diagnostico": ""
       },
-      "decisao": "🟡 AGUARDAR CONFIRMAÇÃO",
-      "texto": "A técnica ainda não está totalmente alinhada.",
-      "processado_em": 1789271125.4190626
+      "decisao": "🔴 AGUARDAR EVENTO",
+      "texto": "O calendário bloqueia uma entrada agressiva.",
+      "processado_em": 1789362434.3719451,
+      "tentativa_v1022": true,
+      "versao_tentativa": "V10.2.2"
     },
     "USD/JPY": {
       "tecnico": {
@@ -162,24 +199,61 @@
         "h4": {
           "status": "🔴 CONTRA",
           "score": 20,
-          "texto": "H4 não confirma a direção macro."
+          "texto": "H4 não confirma a direção macro.",
+          "td_diag": {
+            "symbol": "USD/JPY",
+            "interval": "4h",
+            "outputsize": 100,
+            "http_status": 200,
+            "api_status": "ok",
+            "api_code": "",
+            "api_message": "",
+            "values_count": 100,
+            "candles_validos": 100
+          }
         },
         "h1": {
-          "status": "🔴 CONTRA",
-          "score": 20,
-          "texto": "H1 não confirma a direção macro."
+          "status": "🟢 PULLBACK OK",
+          "score": 100,
+          "texto": "H1 alinhado e com retorno/reação perto da EMA20.",
+          "td_diag": {
+            "symbol": "USD/JPY",
+            "interval": "1h",
+            "outputsize": 100,
+            "http_status": 200,
+            "api_status": "ok",
+            "api_code": "",
+            "api_message": "",
+            "values_count": 100,
+            "candles_validos": 100
+          }
         },
         "m15": {
-          "status": "🟡 AGUARDAR GATILHO",
-          "score": 65,
-          "texto": "Momentum está alinhado, mas falta rompimento/confirmacão curta."
+          "status": "🔴 SEM GATILHO",
+          "score": 25,
+          "texto": "M15 ainda não confirma a execução.",
+          "td_diag": {
+            "symbol": "USD/JPY",
+            "interval": "15min",
+            "outputsize": 100,
+            "http_status": 200,
+            "api_status": "ok",
+            "api_code": "",
+            "api_message": "",
+            "values_count": 100,
+            "candles_validos": 100
+          }
         },
-        "preco_m15": 153.57142,
-        "ultima_atualizacao": "2026-09-13 03:30:00+00:00"
+        "preco_m15": 153.99957,
+        "ultima_atualizacao": "2026-09-14 05:00:00+00:00",
+        "erro": "",
+        "diagnostico": ""
       },
       "decisao": "🔴 EVITAR ENTRADA AGORA",
       "texto": "H4/H1 não confirmam o viés macro.",
-      "processado_em": 1789271125.8906791
+      "processado_em": 1789362434.8628743,
+      "tentativa_v1022": true,
+      "versao_tentativa": "V10.2.2"
     },
     "EUR/USD": {
       "tecnico": {
