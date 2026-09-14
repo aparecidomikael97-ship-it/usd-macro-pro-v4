@@ -290,21 +290,42 @@ def _context_fresh(context: Mapping[str, Any] | None, current_direction: str, ma
 
 
 def _scanner_for_pair(scanner_state: Mapping[str, Any] | None, pair: str) -> dict[str, Any]:
+    """
+    V10.7.4 — sincroniza o conceito de "scanner fresco" com o Autopilot.
+
+    Antes, o Painel Mestre usava `processado_em` + limite de 45 min,
+    enquanto o Autopilot usa `m15_fetched_at` + limite de 60 min.
+    Isso fazia o app mostrar 0/7 mesmo quando o M15 do Autopilot estava fresco.
+
+    Agora:
+    - usa m15_fetched_at quando existir;
+    - faz fallback para processado_em em registros antigos;
+    - usa o mesmo limite de 60 min do Autopilot.
+    """
     results = dict((scanner_state or {}).get("resultados", {}) or {})
     raw = results.get(pair, {}) if isinstance(results, dict) else {}
     tec = raw.get("tecnico", {}) if isinstance(raw, dict) else {}
-    age = _minutes_since(raw.get("processado_em"))
-    fresh = True if age is None else age <= 45.0
+
+    fresh_ts = raw.get("m15_fetched_at", raw.get("processado_em"))
+    age = _minutes_since(fresh_ts)
+
+    # Compatibilidade com registros antigos: o Painel Mestre original tratava
+    # timestamp ausente como "não comprovadamente velho". Mantemos isso apenas
+    # para legado; quando m15_fetched_at existe, a regra real é <=60 min.
+    available = bool(tec.get("disponivel", False))
+    fresh = available and (True if age is None else age <= 60.0)
+
     return {
-        "available": bool(tec.get("disponivel", False)),
+        "available": available,
         "h4": str((tec.get("h4", {}) or {}).get("status", "—")),
         "h1": str((tec.get("h1", {}) or {}).get("status", "—")),
         "m15": str((tec.get("m15", {}) or {}).get("status", "—")),
         "decision": str(raw.get("decisao", "")),
         "text": str(raw.get("texto", "")),
-        "updated_at": str(raw.get("processado_em", "")),
+        "updated_at": str(fresh_ts or ""),
         "age_minutes": age,
         "fresh": fresh,
+        "freshness_source": "m15_fetched_at" if raw.get("m15_fetched_at") else "processado_em",
     }
 
 
@@ -441,7 +462,7 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
                         scanner_state: Mapping[str, Any] | None = None,
                         scanner_refresh_cb: Callable[[], tuple[bool, str]] | None = None,
                         scanner_refresh_remaining: int = 0) -> None:
-    st.subheader("🧠 Painel Mestre de Oportunidades — V10.3")
+    st.subheader("🧠 Painel Mestre de Oportunidades — V10.7.4")
     st.caption(
         "Decisão Automática + Macro Market Map + H4/H1/M15 + ADR14 em uma única visão dos 7 pares. "
         "O painel serve para priorização; não transforma índice em probabilidade de lucro."

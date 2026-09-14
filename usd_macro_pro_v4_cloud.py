@@ -94,12 +94,12 @@ except Exception as _autopilot_exc:
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "10.7.3 — LEGACY NaT GUARD · MOTOR BASE V9.3.9.2"
+APP_VERSION = "10.7.4 — AUTOPILOT FRESHNESS SYNC · MOTOR BASE V9.3.9.2"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro V10.7.3 — Legacy NaT Guard",
+    page_title="USD Macro Pro V10.7.4 — Autopilot Freshness Sync",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1688,7 +1688,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro V10.7.3 — Legacy NaT Guard")
+st.title("🦅 USD Macro Pro V10.7.4 — Autopilot Freshness Sync")
 st.caption("Macro semanal → Macro do dia → W1/D1 → Quarterly → Liquidez → Killzones → H4/H1/M15 → Performance real")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -3454,7 +3454,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 # V9.0 — CENTRAL DO OPERADOR
 # Somente interface/orientação; não altera o motor do modelo.
 # ============================================================
-st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V10.7.3")
+st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V10.7.4")
 st.caption("O APP define o viés macro; o gráfico confirma a entrada.")
 
 with st.container(border=True):
@@ -3650,7 +3650,7 @@ def _autopilot_save_inputs_v107():
 
 
 abas = st.tabs([
-    "🧠 PAINEL MESTRE V10.7.3",
+    "🧠 PAINEL MESTRE V10.7.4",
     "🏆 Classificação",
     "🇺🇸 Painel EUA",
     "💱 Pares e Confiança",
@@ -3658,12 +3658,12 @@ abas = st.tabs([
     "🧾 Histórico",
     "📈 Teste Histórico",
     "🎯 Decisão Automática",
-    "🧭 Macro Market Map V10.7.3",
+    "🧭 Macro Market Map V10.7.4",
     "✨ Aprenda & Personalize",
-    "🚀 Produto V10.7.3",
-    "🧭 Melhorias V10.7.3",
-    "🌍 Notícias Globais V10.7.3",
-    "🤖 AUTOPILOT V10.7.3",
+    "🚀 Produto V10.7.4",
+    "🧭 Melhorias V10.7.4",
+    "🌍 Notícias Globais V10.7.4",
+    "🤖 AUTOPILOT V10.7.4",
 ])
 
 # =========================================================
