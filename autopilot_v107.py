@@ -1,4 +1,4 @@
-"""USD Macro Pro V10.7.6 — AppTest Secrets Injection + API Circuit Breaker.
+"""USD Macro Pro V10.7.7 — Quota Guard + First-429 Stop.
 
 Executado pelo GitHub Actions a cada 30 minutos.
 
@@ -94,6 +94,9 @@ _TD_CALL_TIMES: list[float] = []
 # V10.7.6 — abre circuito após o primeiro 429 diário.
 _TD_DAILY_BLOCKED = False
 _TD_DAILY_BLOCK_REASON = ""
+_TD_BLOCK_TYPE = ""
+_TD_HTTP_CALLS = 0
+
 
 
 def _td_rate_gate() -> None:
@@ -264,18 +267,54 @@ def _td_message(resp: requests.Response) -> str:
         return ""
 
 
+
+# Compatibilidade de regressão das versões anteriores:
+# "HTTP 429:" permanece documentado para os testes V10.7.5.
+# "HTTP 429 DAILY:" e "API_COTA_DIARIA_BLOQUEADA" permanecem documentados
+# para os testes V10.7.6. A V10.7.7 usa mensagens mais específicas em runtime.
+
+def _td_is_minute_limit(message: str) -> bool:
+    low = (message or "").lower()
+    minute_markers = (
+        "per minute", "minute limit", "requests per minute",
+        "credits per minute", "rate limit per minute", "rpm",
+    )
+    return any(m in low for m in minute_markers)
+
+
+def _td_is_daily_quota(message: str) -> bool:
+    low = (message or "").lower()
+    daily_markers = (
+        "run out of api credits for the day",
+        "out of api credits",
+        "daily limit",
+        "daily credits",
+        "credits for the day",
+        "for the day",
+        "current limit",
+        "api credits",
+        "plan limit",
+        "quota exceeded",
+        "credit limit",
+    )
+    return any(m in low for m in daily_markers)
+
+
 def td_fetch(pair: str, interval: str, outputsize: int) -> tuple[pd.DataFrame, str]:
-    global _TD_DAILY_BLOCKED, _TD_DAILY_BLOCK_REASON
+    global _TD_DAILY_BLOCKED, _TD_DAILY_BLOCK_REASON, _TD_BLOCK_TYPE, _TD_HTTP_CALLS
 
     if not TD_KEY:
         return pd.DataFrame(), "CHAVE_TWELVE_DATA ausente."
 
+    # Depois de uma cota/quota 429, ZERO chamadas externas adicionais nesta execução.
     if _TD_DAILY_BLOCKED:
-        return pd.DataFrame(), f"API_COTA_DIARIA_BLOQUEADA: {_TD_DAILY_BLOCK_REASON}"
+        return pd.DataFrame(), f"API_COTA_BLOQUEADA: {_TD_DAILY_BLOCK_REASON}"
 
     _td_rate_gate()
 
     def _request_once():
+        global _TD_HTTP_CALLS
+        _TD_HTTP_CALLS += 1
         return requests.get(
             "https://api.twelvedata.com/time_series",
             params={
@@ -295,27 +334,32 @@ def td_fetch(pair: str, interval: str, outputsize: int) -> tuple[pd.DataFrame, s
 
         if r.status_code == 429:
             msg = _td_message(r)
-            low = msg.lower()
+            minute_limited = _td_is_minute_limit(msg)
 
-            daily_markers = (
-                "run out of api credits for the day",
-                "daily limit",
-                "for the day",
-                "current limit being",
-            )
-            if any(m in low for m in daily_markers):
-                _TD_DAILY_BLOCKED = True
-                _TD_DAILY_BLOCK_REASON = msg or "cota diária esgotada"
-                return pd.DataFrame(), f"HTTP 429 DAILY: {_TD_DAILY_BLOCK_REASON}"
-
-            if "minute" in low or "per minute" in low:
-                print(f"[429-minute] {pair} {interval}: aguardando 66s")
+            # Só espera/retry se a mensagem disser claramente "por minuto".
+            if minute_limited:
+                print(f"[429-minute] {pair} {interval}: aguardando 66s para uma única retentativa")
                 time.sleep(66)
                 _td_rate_gate()
                 r = _request_once()
 
+                if r.status_code != 429:
+                    # segue fluxo normal com a resposta da retentativa
+                    pass
+                else:
+                    msg2 = _td_message(r)
+                    # Se continuou 429, para esta execução também.
+                    _TD_DAILY_BLOCKED = True
+                    _TD_DAILY_BLOCK_REASON = msg2 or msg or "HTTP 429 persistente"
+                    _TD_BLOCK_TYPE = "429_PERSISTENTE"
+                    return pd.DataFrame(), f"HTTP 429 STOP: {_TD_DAILY_BLOCK_REASON}"
+
             if r.status_code == 429:
-                return pd.DataFrame(), f"HTTP 429: {_td_message(r) or 'limite de API'}"
+                msg = _td_message(r)
+                _TD_DAILY_BLOCKED = True
+                _TD_DAILY_BLOCK_REASON = msg or "cota/créditos indisponíveis"
+                _TD_BLOCK_TYPE = "COTA_DIARIA" if _td_is_daily_quota(msg) else "COTA_OU_PLANO"
+                return pd.DataFrame(), f"HTTP 429 QUOTA: {_TD_DAILY_BLOCK_REASON}"
 
         if r.status_code != 200:
             return pd.DataFrame(), f"HTTP {r.status_code}: {_td_message(r)}"
@@ -323,10 +367,11 @@ def td_fetch(pair: str, interval: str, outputsize: int) -> tuple[pd.DataFrame, s
         js = r.json()
         if isinstance(js, dict) and js.get("status") == "error":
             msg = str(js.get("message", "Twelve Data error"))
-            low = msg.lower()
-            if "run out of api credits for the day" in low or "daily limit" in low:
+            if _td_is_daily_quota(msg):
                 _TD_DAILY_BLOCKED = True
                 _TD_DAILY_BLOCK_REASON = msg
+                _TD_BLOCK_TYPE = "COTA_DIARIA"
+                return pd.DataFrame(), f"API QUOTA: {msg}"
             return pd.DataFrame(), msg
 
         vals = js.get("values", []) if isinstance(js, dict) else []
@@ -527,6 +572,8 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
         ok_any = False
         fetched_at = now.isoformat()
         for key, interval, outputsize in interval_specs:
+            if _TD_DAILY_BLOCKED:
+                break
             if budget_calls >= AUTOPILOT_DAILY_CALL_BUDGET:
                 errors.append(
                     f"API_BUDGET: limite interno diário {AUTOPILOT_DAILY_CALL_BUDGET} atingido; "
@@ -586,6 +633,9 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
         results[pair] = old
         fetches[pair] = pair_fetch
 
+        if _TD_DAILY_BLOCKED:
+            break
+
     state["versao"] = "V10.7_AUTOPILOT"
     state["resultados"] = results
     state["ultimo_processamento_ts"] = time.time()
@@ -615,6 +665,8 @@ def deserialize_daily(records: list[dict[str, Any]]) -> pd.DataFrame:
 
 def ensure_daily_cache() -> tuple[dict[str, Any], list[str], int]:
     cache, _ = gh_get_json(DAILY_CACHE_PATH, {"pairs":{}})
+    if _TD_DAILY_BLOCKED:
+        return cache if isinstance(cache, dict) else {"pairs":{}}, [], 0
     if not isinstance(cache, dict):
         cache = {"pairs":{}}
     pairs = dict(cache.get("pairs", {}) or {})
@@ -965,9 +1017,13 @@ def status_summary(
         "validation_pending":pending,
         "validation_complete":complete,
         "snapshot_stats":dict(snap_stats),
-        "twelve_calls_this_run":calls,
+        "twelve_calls_this_run":int(_TD_HTTP_CALLS),
+        "twelve_calls_requested_internal":int(calls),
         "twelve_rate_safe":True,
         "twelve_api_budget_limit":AUTOPILOT_DAILY_CALL_BUDGET,
+        "twelve_daily_blocked":bool(_TD_DAILY_BLOCKED),
+        "twelve_block_type":_TD_BLOCK_TYPE,
+        "twelve_daily_block_reason":_TD_DAILY_BLOCK_REASON,
         "twelve_safe_calls_per_window":TD_SAFE_CALLS_PER_WINDOW,
         "twelve_safe_window_seconds":TD_SAFE_WINDOW_SECONDS,
         "forex_market_open":forex_market_likely_open(now),

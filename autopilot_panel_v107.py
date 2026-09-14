@@ -37,7 +37,7 @@ def _age_min(value):
     except Exception: return None
 
 def render_autopilot_v107():
-    st.subheader("🤖 Autopilot Total — V10.7.6")
+    st.subheader("🤖 Autopilot Total — V10.7.7")
     st.caption(
         "Macro/FRED → Matriz → Notícias 8 moedas → Scanner H4/H1/M15 → Market Map "
         "→ snapshots → validação 1H/4H/24H. Rodando em background pelo GitHub Actions."
@@ -60,7 +60,11 @@ def render_autopilot_v107():
     elif headless_bad:
         st.error("🔴 AUTOPILOT: APP HEADLESS NÃO ATUALIZOU A MATRIZ")
     elif daily_blocked:
-        st.warning("🟠 TWELVE DATA: COTA DIÁRIA ESGOTADA — scanner volta após renovação da cota")
+        block_type = str(status.get("twelve_block_type", "") or "")
+        if block_type == "COTA_DIARIA":
+            st.warning("🟠 TWELVE DATA: COTA DIÁRIA/CRÉDITOS ESGOTADOS — o Autopilot parou novas consultas nesta rodada")
+        else:
+            st.warning("🟠 TWELVE DATA: COTA/PLANO BLOQUEOU CONSULTAS — o Autopilot parou após o primeiro 429")
     elif has_429:
         st.warning("🟠 AUTOPILOT: TWELVE DATA LIMITOU CONSULTAS (HTTP 429)")
     else:
@@ -77,7 +81,7 @@ def render_autopilot_v107():
     e,f,g,h=st.columns(4)
     e.metric("Histórias únicas",int(status.get("news_unique_stories",0) or 0))
     f.metric("Snapshots",int(status.get("validation_rows",0)))
-    g.metric("Calls Twelve/run",int(status.get("twelve_calls_this_run",0)), "rate-safe")
+    g.metric("Calls Twelve/run",int(status.get("twelve_calls_this_run",0)), "externas reais")
     h.metric("Mercado FX", "ABERTO" if status.get("forex_market_open") else "FECHADO")
 
     st.markdown("### ⚙️ O que ficou automático")
@@ -95,6 +99,14 @@ def render_autopilot_v107():
         "Os botões manuais continuam no app apenas como contingência. "
         "O fluxo normal da V10.7 não depende deles."
     )
+
+    if daily_blocked:
+        with st.expander("🧯 Motivo do bloqueio Twelve Data"):
+            st.write(status.get("twelve_daily_block_reason", "HTTP 429"))
+            st.caption(
+                "V10.7.7: após identificar cota/quota bloqueada, nenhuma nova chamada externa "
+                "é feita nesta execução."
+            )
 
     stats=status.get("snapshot_stats",{}) or {}
     st.markdown("### 🧪 Última rodada")
