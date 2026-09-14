@@ -74,7 +74,7 @@ except Exception as _evolution_exc:
 
 
 try:
-    from currency_news_v106 import render_currency_news_panel
+    from currency_news_v1061 import render_currency_news_panel
     _CURRENCY_NEWS_V106_IMPORT_ERROR = ""
 except Exception as _currency_news_exc:
     render_currency_news_panel = None
@@ -84,12 +84,12 @@ except Exception as _currency_news_exc:
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "10.6.0 — GLOBAL CURRENCY NEWS INTELLIGENCE · MOTOR BASE V9.3.9.2"
+APP_VERSION = "10.6.1 — NEWS CALIBRATION & VALIDATION · MOTOR BASE V9.3.9.2"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro V10.6 — Global Currency Intelligence",
+    page_title="USD Macro Pro V10.6.1 — News Calibration & Validation",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1678,7 +1678,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro V10.6 — Global Currency Intelligence")
+st.title("🦅 USD Macro Pro V10.6.1 — News Calibration & Validation")
 st.caption("Macro semanal → Macro do dia → W1/D1 → Quarterly → Liquidez → Killzones → H4/H1/M15 → Performance real")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -3331,7 +3331,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 # V9.0 — CENTRAL DO OPERADOR
 # Somente interface/orientação; não altera o motor do modelo.
 # ============================================================
-st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V10.6")
+st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V10.6.1")
 st.caption("O APP define o viés macro; o gráfico confirma a entrada.")
 
 with st.container(border=True):
@@ -3456,7 +3456,7 @@ def _refresh_central_v104() -> tuple[bool, str]:
 
 
 abas = st.tabs([
-    "🧠 PAINEL MESTRE V10.6",
+    "🧠 PAINEL MESTRE V10.6.1",
     "🏆 Classificação",
     "🇺🇸 Painel EUA",
     "💱 Pares e Confiança",
@@ -3464,11 +3464,11 @@ abas = st.tabs([
     "🧾 Histórico",
     "📈 Teste Histórico",
     "🎯 Decisão Automática",
-    "🧭 Macro Market Map V10.6",
+    "🧭 Macro Market Map V10.6.1",
     "✨ Aprenda & Personalize",
-    "🚀 Produto V10.6",
-    "🧭 Melhorias V10.6",
-    "🌍 Notícias Globais V10.6",
+    "🚀 Produto V10.6.1",
+    "🧭 Melhorias V10.6.1",
+    "🌍 Notícias Globais V10.6.1",
 ])
 
 # =========================================================
@@ -8644,7 +8644,7 @@ with abas[11]:
             st.code(f"{type(_v105_render_exc).__name__}: {_v105_render_exc}")
 
 # =========================================================
-# ABA 13 — V10.6 GLOBAL CURRENCY NEWS INTELLIGENCE
+# ABA 13 — V10.6.1 NEWS CALIBRATION & VALIDATION
 # =========================================================
 with abas[12]:
     if render_currency_news_panel is None:
