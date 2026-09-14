@@ -64,16 +64,24 @@ except Exception as _product_exc:
     render_v104_hub = None
     _PRODUCT_V104_IMPORT_ERROR = f"{type(_product_exc).__name__}: {_product_exc}"
 
+
+try:
+    from evolution_v105 import render_v105_center
+    _EVOLUTION_V105_IMPORT_ERROR = ""
+except Exception as _evolution_exc:
+    render_v105_center = None
+    _EVOLUTION_V105_IMPORT_ERROR = f"{type(_evolution_exc).__name__}: {_evolution_exc}"
+
 # =========================================================
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "10.4.0 — PRODUTO, NAVEGAÇÃO, GRÁFICOS & FEEDBACK · MOTOR BASE V9.3.9.2"
+APP_VERSION = "10.5.0 — CENTRO DE MELHORIAS, COMPARAÇÃO & ALERTAS · MOTOR BASE V9.3.9.2"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro V10.4 — Painel Profissional",
+    page_title="USD Macro Pro V10.5 — Painel Profissional",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1662,7 +1670,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro V10.4 — Painel Profissional")
+st.title("🦅 USD Macro Pro V10.5 — Painel Profissional")
 st.caption("Macro semanal → Macro do dia → W1/D1 → Quarterly → Liquidez → Killzones → H4/H1/M15 → Performance real")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -3315,7 +3323,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 # V9.0 — CENTRAL DO OPERADOR
 # Somente interface/orientação; não altera o motor do modelo.
 # ============================================================
-st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V10.4")
+st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V10.5")
 st.caption("O APP define o viés macro; o gráfico confirma a entrada.")
 
 with st.container(border=True):
@@ -3440,7 +3448,7 @@ def _refresh_central_v104() -> tuple[bool, str]:
 
 
 abas = st.tabs([
-    "🧠 PAINEL MESTRE V10.4",
+    "🧠 PAINEL MESTRE V10.5",
     "🏆 Classificação",
     "🇺🇸 Painel EUA",
     "💱 Pares e Confiança",
@@ -3448,9 +3456,10 @@ abas = st.tabs([
     "🧾 Histórico",
     "📈 Teste Histórico",
     "🎯 Decisão Automática",
-    "🧭 Macro Market Map V10.4",
+    "🧭 Macro Market Map V10.5",
     "✨ Aprenda & Personalize",
-    "🚀 Produto V10.4",
+    "🚀 Produto V10.5",
+    "🧭 Melhorias V10.5",
 ])
 
 # =========================================================
@@ -8605,4 +8614,23 @@ with abas[10]:
         except Exception as _prod_render_exc:
             st.error("A aba Produto V10.4 encontrou um erro, mas o motor operacional continua preservado.")
             st.code(f"{type(_prod_render_exc).__name__}: {_prod_render_exc}")
+
+# =========================================================
+# ABA 12 — V10.5 CENTRO DE MELHORIAS
+# =========================================================
+with abas[11]:
+    if render_v105_center is None:
+        st.error("O Centro de Melhorias V10.5 não pôde ser carregado.")
+        if _EVOLUTION_V105_IMPORT_ERROR:
+            st.caption(f"Diagnóstico: {_EVOLUTION_V105_IMPORT_ERROR}")
+    else:
+        try:
+            render_v105_center(
+                history_fetcher=_fred_observacoes,
+                refresh_callback=_refresh_central_v104,
+                app_version=APP_VERSION,
+            )
+        except Exception as _v105_render_exc:
+            st.error("A aba Melhorias V10.5 encontrou um erro, mas o motor operacional continua preservado.")
+            st.code(f"{type(_v105_render_exc).__name__}: {_v105_render_exc}")
 
