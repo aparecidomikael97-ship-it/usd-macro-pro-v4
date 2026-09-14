@@ -94,12 +94,12 @@ except Exception as _autopilot_exc:
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "10.7.2 — PANDAS COMPATIBILITY FIX · MOTOR BASE V9.3.9.2"
+APP_VERSION = "10.7.3 — LEGACY NaT GUARD · MOTOR BASE V9.3.9.2"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro V10.7.2 — Pandas Compatibility Fix",
+    page_title="USD Macro Pro V10.7.3 — Legacy NaT Guard",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1688,7 +1688,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro V10.7.2 — Pandas Compatibility Fix")
+st.title("🦅 USD Macro Pro V10.7.3 — Legacy NaT Guard")
 st.caption("Macro semanal → Macro do dia → W1/D1 → Quarterly → Liquidez → Killzones → H4/H1/M15 → Performance real")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2868,6 +2868,36 @@ def _registrar_sinal_v82(par, direcao, score_mestre, qualidade,
     ok = _salvar_sinais_v82(df)
     return ok, f"Sinal registrado em {preco:.5f} (FRED {serie_fred}, {dt_preco})."
 
+
+def _entrada_legada_segura_v1073(r):
+    """
+    V10.7.3 — protege a validação histórica contra linhas antigas/incompletas.
+
+    pd.Timestamp(pd.NaT) não lança erro, mas NaT.strftime() lança ValueError.
+    Por isso a data precisa ser testada explicitamente antes de qualquer uso.
+    """
+    par = str(r.get("par", "") or "").upper().strip()
+
+    dt = pd.to_datetime(r.get("data_preco"), errors="coerce", utc=True)
+    if pd.isna(dt):
+        return None, None, None, "data_preco ausente/inválida"
+
+    entrada = pd.to_numeric(
+        pd.Series([r.get("preco_entrada")]), errors="coerce"
+    ).iloc[0]
+    if pd.isna(entrada) or not np.isfinite(float(entrada)) or float(entrada) <= 0:
+        return None, None, None, "preco_entrada ausente/inválido"
+
+    pares_validos = {
+        "EUR/USD", "GBP/USD", "AUD/USD", "NZD/USD",
+        "USD/JPY", "USD/CHF", "USD/CAD"
+    }
+    if par not in pares_validos:
+        return None, None, None, "par ausente/inválido"
+
+    return par, pd.Timestamp(dt), float(entrada), ""
+
+
 def _avaliar_sinais_v82():
     """
     V8.8 — Validação Automática Multipares.
@@ -2896,18 +2926,18 @@ def _avaliar_sinais_v82():
 
     cache = {}
     atualizados = 0
+    _ignorados_legado_v1073 = 0
 
     for i, r in df.iterrows():
         if bool(r.get("avaliado", False)):
             continue
 
-        par_linha = str(r.get("par", "")).upper().strip()
-        try:
-            dt_entrada = pd.Timestamp(r["data_preco"])
-            entrada = float(r["preco_entrada"])
-        except Exception:
+        par_linha, dt_entrada, entrada, _motivo_v1073 = _entrada_legada_segura_v1073(r)
+        if _motivo_v1073:
+            _ignorados_legado_v1073 += 1
             continue
 
+        # V10.7.3 — dt_entrada já foi validado como Timestamp real, nunca NaT.
         chave = (par_linha, dt_entrada.strftime("%Y-%m-%d"))
         if chave not in cache:
             cache[chave] = _fred_primeira_observacao_posterior_v88(
@@ -2946,6 +2976,9 @@ def _avaliar_sinais_v82():
 
     if atualizados:
         _salvar_sinais_v82(df)
+
+    # Apenas diagnóstico de interface; não altera a classificação histórica.
+    st.session_state["v1073_linhas_legadas_ignoradas"] = int(_ignorados_legado_v1073)
     return df, atualizados
 
 
@@ -2997,7 +3030,9 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
             _dup_auto_v852 = False
 
             if isinstance(_df_auto_v852, pd.DataFrame) and not _df_auto_v852.empty and "data_preco" in _df_auto_v852.columns:
-                _datas_auto_v852 = pd.to_datetime(_df_auto_v852["data_preco"], errors="coerce")
+                _datas_auto_v852 = pd.to_datetime(
+                    _df_auto_v852["data_preco"], errors="coerce", utc=True
+                )
                 _dirs_auto_v852 = (
                     _df_auto_v852["direcao"].astype(str).str.upper()
                     .replace({"VENDER":"SELL","VENDA":"SELL","COMPRAR":"BUY","COMPRA":"BUY"})
@@ -3005,7 +3040,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
                 _dup_auto_v852 = (
                     (_df_auto_v852["par"].astype(str) == str(par)) &
                     (_dirs_auto_v852 == direcao) &
-                    (_datas_auto_v852 == pd.Timestamp(dt_atual))
+                    (_datas_auto_v852 == pd.to_datetime(dt_atual, utc=True))
                 ).any()
 
             if not _dup_auto_v852:
@@ -3047,6 +3082,14 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 
     # V8.3 — tenta avaliar automaticamente toda vez que o painel abre.
     df, _v83_auto_n = _avaliar_sinais_v82()
+
+    _legadas_v1073 = int(st.session_state.get("v1073_linhas_legadas_ignoradas", 0) or 0)
+    if _legadas_v1073:
+        st.caption(
+            f"ℹ️ V10.7.3 ignorou {_legadas_v1073} registro(s) legado(s) com data/preço/par "
+            "incompleto. Eles não entram nas estatísticas e não derrubam mais o app."
+        )
+
     if df.empty:
         st.info("Ainda não há sinais registrados na V8.3.")
         return
@@ -3411,7 +3454,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 # V9.0 — CENTRAL DO OPERADOR
 # Somente interface/orientação; não altera o motor do modelo.
 # ============================================================
-st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V10.7.2")
+st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V10.7.3")
 st.caption("O APP define o viés macro; o gráfico confirma a entrada.")
 
 with st.container(border=True):
@@ -3607,7 +3650,7 @@ def _autopilot_save_inputs_v107():
 
 
 abas = st.tabs([
-    "🧠 PAINEL MESTRE V10.7.2",
+    "🧠 PAINEL MESTRE V10.7.3",
     "🏆 Classificação",
     "🇺🇸 Painel EUA",
     "💱 Pares e Confiança",
@@ -3615,12 +3658,12 @@ abas = st.tabs([
     "🧾 Histórico",
     "📈 Teste Histórico",
     "🎯 Decisão Automática",
-    "🧭 Macro Market Map V10.7.2",
+    "🧭 Macro Market Map V10.7.3",
     "✨ Aprenda & Personalize",
-    "🚀 Produto V10.7.2",
-    "🧭 Melhorias V10.7.2",
-    "🌍 Notícias Globais V10.7.2",
-    "🤖 AUTOPILOT V10.7.2",
+    "🚀 Produto V10.7.3",
+    "🧭 Melhorias V10.7.3",
+    "🌍 Notícias Globais V10.7.3",
+    "🤖 AUTOPILOT V10.7.3",
 ])
 
 # =========================================================
