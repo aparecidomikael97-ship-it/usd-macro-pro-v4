@@ -1,5 +1,5 @@
 # ============================================================
-# USD MACRO PRO V10.1 — PROFESSIONAL MACRO MARKET MAP · MOTOR BASE V9.3.9.2
+# USD MACRO PRO V10.2 — PAINEL MESTRE DE OPORTUNIDADES · MOTOR BASE V9.3.9.2
 # Exibe o motivo persistido de falhas por par/timeframe sem
 # gastar novas chamadas. Persistência e validação preservadas.
 # ============================================================
@@ -40,16 +40,23 @@ except Exception as _mm_exc:
     render_market_map = None
     _MARKET_MAP_V10_IMPORT_ERROR = f"{type(_mm_exc).__name__}: {_mm_exc}"
 
+try:
+    from master_panel_v102 import render_master_panel
+    _MASTER_V102_IMPORT_ERROR = ""
+except Exception as _master_exc:
+    render_master_panel = None
+    _MASTER_V102_IMPORT_ERROR = f"{type(_master_exc).__name__}: {_master_exc}"
+
 # =========================================================
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "10.1.0 — PROFESSIONAL MACRO MARKET MAP · MOTOR BASE V9.3.9.2"
+APP_VERSION = "10.2.0 — PAINEL MESTRE + MARKET MAP PROFISSIONAL · MOTOR BASE V9.3.9.2"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro V10.1 — Professional Macro Market Map",
+    page_title="USD Macro Pro V10.2 — Painel Mestre de Oportunidades",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1628,7 +1635,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro V10.1 — Professional Macro Market Map")
+st.title("🦅 USD Macro Pro V10.2 — Painel Mestre de Oportunidades")
 st.caption("Macro semanal → Macro do dia → W1/D1 → Quarterly → Liquidez → Killzones → H4/H1/M15 → Performance real")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -3281,7 +3288,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 # V9.0 — CENTRAL DO OPERADOR
 # Somente interface/orientação; não altera o motor do modelo.
 # ============================================================
-st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V10.1")
+st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V10.2")
 st.caption("O APP define o viés macro; o gráfico confirma a entrada.")
 
 with st.container(border=True):
@@ -3325,6 +3332,7 @@ with st.expander("🧭 Como tomar a decisão no APP", expanded=False):
 """)
 
 abas = st.tabs([
+    "🧠 PAINEL MESTRE V10.2",
     "🏆 Classificação",
     "🇺🇸 Painel EUA",
     "💱 Pares e Confiança",
@@ -3332,13 +3340,13 @@ abas = st.tabs([
     "🧾 Histórico",
     "📈 Teste Histórico",
     "🎯 Decisão Automática",
-    "🧭 Macro Market Map V10.1",
+    "🧭 Macro Market Map V10.2",
 ])
 
 # =========================================================
-# ABA 1 — CLASSIFICAÇÃO
+# ABA 2 — CLASSIFICAÇÃO
 # =========================================================
-with abas[0]:
+with abas[1]:
     st.subheader("Força Macroeconômica das Moedas")
     st.caption("Inflação e PIB são exibidos como variação percentual anual, não como nível do índice.")
 
@@ -3370,9 +3378,9 @@ with abas[0]:
         st.toast(salvar_snapshot(ranking))
 
 # =========================================================
-# ABA 2 — EUA
+# ABA 3 — EUA
 # =========================================================
-with abas[1]:
+with abas[2]:
     diagnostico_eod_v73, dados_eod_v73 = ({"ok": False, "status": 403, "erro": "Economic Events não incluído no plano gratuito.", "dados": []}, {})
     st.subheader("🇺🇸 Painel de Força Macro do USD")
 
@@ -5343,7 +5351,7 @@ _sincronizar_anteriores_v711()
 # =========================================================
 # ABA 3 — PARES
 # =========================================================
-with abas[2]:
+with abas[3]:
     _status_automacao_v71()
 
     st.subheader("💱 Painel de Decisão — V7.8")
@@ -5890,7 +5898,7 @@ with abas[2]:
 # =========================================================
 # ABA 4 — FED E NOTÍCIAS
 # =========================================================
-with abas[3]:
+with abas[4]:
     st.subheader("🏦 Federal Reserve e impacto no USD")
 
     c1, c2, c3 = st.columns(3)
@@ -5940,7 +5948,7 @@ with abas[3]:
 # =========================================================
 # ABA 5 — HISTÓRICO
 # =========================================================
-with abas[4]:
+with abas[5]:
     st.subheader("Histórico das classificações")
     st.caption("No Streamlit Community Cloud, arquivos locais podem desaparecer após reinicialização ou novo deploy. Para histórico permanente, use um banco externo.")
     historico = carregar_snapshots()
@@ -5952,7 +5960,7 @@ with abas[4]:
 # =========================================================
 # ABA 6 — TESTE HISTÓRICO
 # =========================================================
-with abas[5]:
+with abas[6]:
     st.subheader("📈 Teste Histórico — Validação do Modelo")
     sinais = carregar_sinais()
 
@@ -6346,7 +6354,7 @@ def _painel_fomc_calibrado_v76():
 # =========================================================
 # V7.6.1 — RENDERIZAÇÃO SEGURA
 # =========================================================
-with abas[1]:
+with abas[2]:
     _painel_hibrido_v74()
     _painel_fomc_calibrado_v76()
 
@@ -7183,7 +7191,7 @@ def _tec_to_json_v934(tec):
 # NÃO cria sinal técnico H4/H1/M15 porque esses candles
 # ainda não são alimentados automaticamente pelo sistema.
 # =========================================================
-with abas[6]:
+with abas[7]:
     st.subheader("🎯 Central de Decisão Automática — V9.3.5")
     st.caption(
         "Resumo automático dos dados que já existem no APP. "
@@ -8255,25 +8263,25 @@ with abas[6]:
         )
 
         st.caption(
-            "A Central de Decisão V10.1 mantém a persistência no GitHub e só considera um par completo quando H4, H1 e M15 estão realmente válidos. "
+            "A Central de Decisão V10.2 mantém a persistência no GitHub e só considera um par completo quando H4, H1 e M15 estão realmente válidos. "
             "Ela não transforma Score Mestre em probabilidade de lucro e não substitui gestão de risco."
         )
 
 # =========================================================
-# ABA 8 — V10.1 PROFESSIONAL MACRO MARKET MAP (CAMADA OBSERVACIONAL)
+# ABA 9 — V10.2 PROFESSIONAL MACRO MARKET MAP (CAMADA OBSERVACIONAL)
 # Não altera o motor base, Score Mestre ou histórico oficial.
 # =========================================================
-with abas[7]:
+with abas[8]:
     if render_market_map is None:
         st.error(
-            "A camada Professional Market Map V10.1 não pôde ser carregada. "
+            "A camada Professional Market Map V10.2 não pôde ser carregada. "
             "Confirme que market_map_v10.py e market_map_core_v10.py estão na raiz do repositório."
         )
         if _MARKET_MAP_V10_IMPORT_ERROR:
             st.caption(f"Diagnóstico: {_MARKET_MAP_V10_IMPORT_ERROR}")
     else:
         try:
-            _macro_context_v101 = {
+            _macro_context_v102 = {
                 "usd_score": float(usd_detalhado.get("score", 50.0)),
                 "usd_components": dict(usd_detalhado.get("componentes", {})),
                 "usd_quality": float(qualidade_usd),
@@ -8288,7 +8296,7 @@ with abas[7]:
                 ),
                 "fomc_weight": float(st.session_state.get("v77_peso_fomc", 0.0)) * 100.0,
             }
-            render_market_map(matriz_v61, ranking, CHAVE_TWELVE_DATA, _macro_context_v101)
+            render_market_map(matriz_v61, ranking, CHAVE_TWELVE_DATA, _macro_context_v102)
         except Exception as _mm_render_exc:
             st.error(
                 "O Market Map encontrou um erro, mas o motor base continua preservado. "
@@ -8296,3 +8304,45 @@ with abas[7]:
             )
             st.code(f"{type(_mm_render_exc).__name__}: {_mm_render_exc}")
 
+
+
+# =========================================================
+# ABA 1 — V10.2 PAINEL MESTRE DE OPORTUNIDADES
+# Consolida Macro + Market Map + Scanner técnico + ADR.
+# Não altera Score Mestre nem históricos oficiais.
+# =========================================================
+with abas[0]:
+    if render_master_panel is None:
+        st.error(
+            "O Painel Mestre V10.2 não pôde ser carregado. "
+            "Confirme que master_panel_v102.py está na raiz do repositório."
+        )
+        if _MASTER_V102_IMPORT_ERROR:
+            st.caption(f"Diagnóstico: {_MASTER_V102_IMPORT_ERROR}")
+    else:
+        try:
+            _macro_context_master_v102 = {
+                "usd_score": float(usd_detalhado.get("score", 50.0)),
+                "usd_components": dict(usd_detalhado.get("componentes", {})),
+                "usd_quality": float(qualidade_usd),
+                "fed_tone": str(fed.get("tom", "Neutro")),
+                "fed_strength": float(fed.get("forca", 0.0)),
+                "trend": _score_tendencias_eua(),
+                "surprise_adjustment": float(st.session_state.get("usd_ajuste_surpresas", 0.0)),
+                "event": _proximo_evento_macro_v65(),
+                "fomc_score": (
+                    float(st.session_state.get("v76_fomc_usd_score", 50.0))
+                    if st.session_state.get("v77_fomc_integrado", False) else None
+                ),
+                "fomc_weight": float(st.session_state.get("v77_peso_fomc", 0.0)) * 100.0,
+            }
+            _scanner_state_master_v102 = _scanner_load_v934()
+            render_master_panel(
+                matriz_v61, ranking, CHAVE_TWELVE_DATA,
+                _macro_context_master_v102, _scanner_state_master_v102
+            )
+        except Exception as _master_render_exc:
+            st.error(
+                "O Painel Mestre encontrou um erro, mas o motor base continua preservado."
+            )
+            st.code(f"{type(_master_render_exc).__name__}: {_master_render_exc}")

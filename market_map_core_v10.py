@@ -1,4 +1,4 @@
-"""Pure market-map rules for USD Macro Pro V10.1 Professional.
+"""Pure market-map rules for USD Macro Pro V10.2 Professional.
 
 This module intentionally contains no Streamlit or network calls.  It turns
 OHLC data into higher-timeframe context, liquidity references, ICT-style time
@@ -553,6 +553,92 @@ def ny_midnight_open(frame: pd.DataFrame, now: Any = None) -> float | None:
     return float(part.iloc[0]["open"])
 
 
+def adr_context(daily_frame: pd.DataFrame, intraday_frame: pd.DataFrame, now: Any = None, length: int = 14) -> dict[str, Any]:
+    """Average Daily Range context using completed daily bars + current NY-day intraday range.
+
+    This is a volatility/exhaustion filter, not a directional indicator.  It helps
+    avoid chasing a move after the market has already consumed most of its recent
+    average daily range.
+    """
+    if now is None:
+        now_ny = datetime.now(NY_TZ)
+    else:
+        ts = pd.Timestamp(now)
+        if ts.tzinfo is None:
+            ts = ts.tz_localize(NY_TZ)
+        else:
+            ts = ts.tz_convert(NY_TZ)
+        now_ny = ts.to_pydatetime()
+
+    d = completed_daily(daily_frame, now_ny.date())
+    i = normalize_ohlc(intraday_frame)
+    if d.empty or i.empty:
+        return {"available": False, "adr": None, "today_range": None, "used_pct": None, "state": "SEM DADOS"}
+
+    daily_ranges = (d["high"] - d["low"]).tail(max(3, int(length)))
+    if daily_ranges.empty:
+        return {"available": False, "adr": None, "today_range": None, "used_pct": None, "state": "SEM DADOS"}
+    adr = float(daily_ranges.mean())
+    if not math.isfinite(adr) or adr <= 0:
+        return {"available": False, "adr": None, "today_range": None, "used_pct": None, "state": "SEM DADOS"}
+
+    local = i.copy()
+    local["datetime_ny"] = local["datetime"].dt.tz_convert(NY_TZ)
+    part = local[local["datetime_ny"].dt.date == now_ny.date()]
+    if part.empty:
+        return {"available": False, "adr": adr, "today_range": None, "used_pct": None, "state": "SEM RANGE HOJE"}
+
+    today_range = float(part["high"].max() - part["low"].min())
+    used = 100.0 * today_range / adr if adr > 0 else None
+    if used is None or not math.isfinite(used):
+        state = "SEM DADOS"
+    elif used < 60:
+        state = "🟢 ESPAÇO DISPONÍVEL"
+    elif used < 90:
+        state = "🟡 RANGE MODERADO"
+    elif used < 120:
+        state = "🟠 DIA ESTICADO"
+    else:
+        state = "🔴 RANGE EXTREMO"
+    return {
+        "available": True, "adr": adr, "today_range": today_range,
+        "used_pct": float(used), "state": state, "length": int(length),
+    }
+
+
+def intraday_open_context(intraday_frame: pd.DataFrame, now: Any = None) -> dict[str, Any]:
+    """Return current price versus NY midnight open and current week opening bar."""
+    d = normalize_ohlc(intraday_frame)
+    if d.empty:
+        return {"available": False}
+    if now is None:
+        now_ny = datetime.now(NY_TZ)
+    else:
+        ts = pd.Timestamp(now)
+        if ts.tzinfo is None:
+            ts = ts.tz_localize(NY_TZ)
+        else:
+            ts = ts.tz_convert(NY_TZ)
+        now_ny = ts.to_pydatetime()
+    local = d.copy()
+    local["datetime_ny"] = local["datetime"].dt.tz_convert(NY_TZ)
+    current = float(local.iloc[-1]["close"])
+
+    day_part = local[local["datetime_ny"].dt.date == now_ny.date()]
+    day_open = float(day_part.iloc[0]["open"]) if not day_part.empty else None
+
+    monday = now_ny.date() - timedelta(days=now_ny.weekday())
+    week_start = _combine_local(monday, time(0, 0))
+    week_part = local[local["datetime_ny"] >= week_start]
+    week_open = float(week_part.iloc[0]["open"]) if not week_part.empty else None
+
+    return {
+        "available": True, "current": current, "day_open": day_open, "week_open": week_open,
+        "above_day_open": None if day_open is None else current >= day_open,
+        "above_week_open": None if week_open is None else current >= week_open,
+    }
+
+
 def recent_sweeps(frame: pd.DataFrame, levels: Mapping[str, Any], bars: int = 12) -> list[dict[str, Any]]:
     """Detect semantic liquidity sweeps only on levels that are actual BSL/SSL pools."""
     d = normalize_ohlc(frame).tail(max(1, int(bars)))
@@ -568,9 +654,17 @@ def recent_sweeps(frame: pd.DataFrame, levels: Mapping[str, Any], bars: int = 12
                 continue
             kind = liquidity_kind(str(name))
             if kind == "BSL" and h > lv and c < lv:
-                out.append({"level": str(name), "type": "SWEEP BSL", "datetime": row["datetime"], "price": lv})
+                out.append({
+                    "level": str(name), "type": "SWEEP BSL", "datetime": row["datetime"],
+                    "price": lv, "high": h, "low": l, "close": c,
+                    "excess_abs": float(h - lv), "rejection": "fechou de volta abaixo do nível",
+                })
             elif kind == "SSL" and l < lv and c > lv:
-                out.append({"level": str(name), "type": "SWEEP SSL", "datetime": row["datetime"], "price": lv})
+                out.append({
+                    "level": str(name), "type": "SWEEP SSL", "datetime": row["datetime"],
+                    "price": lv, "high": h, "low": l, "close": c,
+                    "excess_abs": float(lv - l), "rejection": "fechou de volta acima do nível",
+                })
     dedup: dict[tuple[str, str], dict[str, Any]] = {}
     for item in out:
         dedup[(item["level"], item["type"])] = item

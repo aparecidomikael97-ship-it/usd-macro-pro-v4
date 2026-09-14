@@ -1,0 +1,595 @@
+"""Painel Mestre de Oportunidades — USD Macro Pro V10.2.
+
+Combina, sem alterar o motor base:
+- Matriz/Decisão Automática (macro, score, qualidade)
+- Professional Macro Market Map (W1/D1, liquidez, evento, Gate)
+- Scanner técnico persistente H4/H1/M15
+- Filtro de volatilidade ADR14 / range diário consumido
+
+O Índice Integrado é apenas um ranking operacional. Não é probabilidade de lucro.
+"""
+from __future__ import annotations
+
+import base64
+import json
+import time as _time
+from datetime import datetime
+from zoneinfo import ZoneInfo
+from typing import Any, Mapping
+
+import numpy as np
+import pandas as pd
+import requests
+import streamlit as st
+
+from market_map_core_v10 import (
+    NY_TZ,
+    adr_context,
+    aggregate_ohlc,
+    completed_daily,
+    equal_liquidity_levels,
+    intraday_open_context,
+    killzone_state,
+    macro_regime_summary,
+    macro_side,
+    nearest_liquidity,
+    normalize_ohlc,
+    premium_discount,
+    prior_period_levels,
+    recent_sweeps,
+    session_range,
+    setup_readiness,
+    trend_context,
+)
+
+MASTER_PATH = "dados/master_market_map_v102.json"
+PAIR_ORDER = ("EUR/USD", "GBP/USD", "AUD/USD", "NZD/USD", "USD/JPY", "USD/CHF", "USD/CAD")
+
+
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    try:
+        out = float(value)
+        return out if np.isfinite(out) else float(default)
+    except Exception:
+        return float(default)
+
+
+def _fmt_price(value: Any, pair: str) -> str:
+    try:
+        n = float(value)
+    except Exception:
+        return "—"
+    return f"{n:.3f}" if "JPY" in pair else f"{n:.5f}"
+
+
+def _gh_config() -> tuple[str, str, str]:
+    token = st.secrets.get("GITHUB_TOKEN_HISTORICO", "")
+    repo = st.secrets.get("GITHUB_REPO_HISTORICO", "")
+    branch = st.secrets.get("GITHUB_BRANCH_HISTORICO", "main")
+    return str(token), str(repo), str(branch or "main")
+
+
+def _empty_state() -> dict[str, Any]:
+    return {
+        "version": "V10.2",
+        "cursor": 0,
+        "last_batch_ts": 0.0,
+        "contexts": {},
+    }
+
+
+def _load_state() -> dict[str, Any]:
+    token, repo, branch = _gh_config()
+    state = _empty_state()
+    if not token or not repo:
+        state["_error"] = "Persistência GitHub não configurada."
+        return state
+    url = f"https://api.github.com/repos/{repo}/contents/{MASTER_PATH}"
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
+    try:
+        r = requests.get(url, headers=headers, params={"ref": branch}, timeout=20)
+        if r.status_code == 404:
+            return state
+        r.raise_for_status()
+        j = r.json()
+        raw = base64.b64decode(j.get("content", "")).decode("utf-8")
+        loaded = json.loads(raw) if raw else {}
+        if isinstance(loaded, dict):
+            state.update(loaded)
+        state["_sha"] = j.get("sha", "")
+        state.setdefault("contexts", {})
+        return state
+    except Exception as exc:
+        state["_error"] = f"{type(exc).__name__}: {exc}"
+        return state
+
+
+def _save_state(state: Mapping[str, Any]) -> tuple[bool, str]:
+    token, repo, branch = _gh_config()
+    if not token or not repo:
+        return False, "Persistência GitHub não configurada."
+    url = f"https://api.github.com/repos/{repo}/contents/{MASTER_PATH}"
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
+    try:
+        current = requests.get(url, headers=headers, params={"ref": branch}, timeout=20)
+        sha = current.json().get("sha", "") if current.status_code == 200 else ""
+        clean = {k: v for k, v in dict(state).items() if not str(k).startswith("_")}
+        payload = {
+            "message": "V10.2: atualiza Painel Mestre de Oportunidades",
+            "content": base64.b64encode(json.dumps(clean, ensure_ascii=False, indent=2).encode("utf-8")).decode("ascii"),
+            "branch": branch,
+        }
+        if sha:
+            payload["sha"] = sha
+        r = requests.put(url, headers=headers, json=payload, timeout=25)
+        r.raise_for_status()
+        return True, ""
+    except Exception as exc:
+        return False, f"{type(exc).__name__}: {exc}"
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def _td_series(symbol: str, interval: str, outputsize: int, _api_key: str) -> tuple[pd.DataFrame, str]:
+    if not _api_key:
+        return pd.DataFrame(), "CHAVE_TWELVE_DATA ausente."
+    try:
+        r = requests.get(
+            "https://api.twelvedata.com/time_series",
+            params={
+                "symbol": symbol,
+                "interval": interval,
+                "outputsize": int(outputsize),
+                "apikey": _api_key,
+                "timezone": "UTC",
+                "format": "JSON",
+                "order": "ASC",
+            },
+            timeout=20,
+        )
+        if r.status_code != 200:
+            return pd.DataFrame(), f"Twelve Data HTTP {r.status_code}."
+        js = r.json()
+        if isinstance(js, dict) and js.get("status") == "error":
+            return pd.DataFrame(), str(js.get("message") or "Erro da Twelve Data.")
+        df = normalize_ohlc(js.get("values", []) if isinstance(js, dict) else [])
+        if df.empty:
+            return df, "Sem candles OHLC válidos."
+        return df, ""
+    except Exception as exc:
+        return pd.DataFrame(), f"Falha Twelve Data: {type(exc).__name__}."
+
+
+def _matrix_row(matrix: pd.DataFrame, pair: str) -> dict[str, Any]:
+    if matrix is None or matrix.empty:
+        return {}
+    found = matrix[matrix["Par"].astype(str) == str(pair)]
+    return found.iloc[0].to_dict() if not found.empty else {}
+
+
+def _build_pair_context(pair: str, row: Mapping[str, Any], api_key: str, macro_context: Mapping[str, Any]) -> tuple[dict[str, Any] | None, str]:
+    direction = str(row.get("Direção", "⚪ AGUARDAR"))
+    macro_score = _safe_float(row.get("Score final", row.get("Score", 0)))
+    quality = _safe_float(row.get("Qualidade", 0))
+    rank_index = _safe_float(row.get("Índice ranking", row.get("Índice operacional", 0)))
+
+    daily, err_d = _td_series(pair, "1day", 320, api_key)
+    m15, err_m = _td_series(pair, "15min", 500, api_key)
+    if err_d or err_m or daily.empty or m15.empty:
+        return None, " | ".join(x for x in (err_d, err_m) if x) or "Dados insuficientes."
+
+    now_ny = datetime.now(NY_TZ)
+    d_closed = completed_daily(daily, now_ny.date())
+    weekly = aggregate_ohlc(d_closed, "W-FRI")
+    w1 = trend_context(weekly)
+    d1 = trend_context(d_closed)
+    price = float(m15.iloc[-1]["close"])
+    candle = pd.Timestamp(m15.iloc[-1]["datetime"])
+
+    levels = prior_period_levels(daily, now_ny.date())
+    levels.update(equal_liquidity_levels(d_closed))
+    asia = session_range(m15, now_ny)
+    if asia.get("available"):
+        levels["Asia High"] = float(asia["high"])
+        levels["Asia Low"] = float(asia["low"])
+
+    pd_loc = premium_discount(price, levels.get("PWL"), levels.get("PWH"))
+    bsl, ssl = nearest_liquidity(price, levels)
+    sweeps = recent_sweeps(m15, levels, bars=16)
+    latest = sweeps[0] if sweeps else None
+    latest_type = str(latest.get("type", "")) if latest else ""
+
+    kz = killzone_state(now_ny)
+    active = kz.get("active")
+    regime = macro_regime_summary(pair, direction, macro_score, quality, dict(macro_context or {}))
+    readiness = setup_readiness(
+        direction, macro_score, quality, w1, d1,
+        pd_loc.get("zone", "INDEFINIDO"), latest_type, bool(active),
+        regime.get("event_risk", {}).get("level", "NORMAL"),
+    )
+    adr = adr_context(daily, m15, now_ny, length=14)
+    opens = intraday_open_context(m15, now_ny)
+
+    return {
+        "pair": pair,
+        "updated_at": pd.Timestamp.utcnow().isoformat(),
+        "candle_m15": candle.isoformat(),
+        "price": price,
+        "macro_direction": direction,
+        "macro_score": macro_score,
+        "quality": quality,
+        "rank_index": rank_index,
+        "macro_regime": str(regime.get("weekly_label", "—")),
+        "macro_consistency": _safe_float(regime.get("consistency", 0)),
+        "event_risk": str(regime.get("event_risk", {}).get("level", "NORMAL")),
+        "w1_bias": str(w1.get("bias", "NEUTRO")),
+        "w1_regime": str(w1.get("structure", {}).get("regime", "—")),
+        "w1_confirmation": str(w1.get("confirmation", "—")),
+        "d1_bias": str(d1.get("bias", "NEUTRO")),
+        "d1_regime": str(d1.get("structure", {}).get("regime", "—")),
+        "d1_confirmation": str(d1.get("confirmation", "—")),
+        "location": str(pd_loc.get("zone", "INDEFINIDO")),
+        "location_position": pd_loc.get("position"),
+        "bsl_name": bsl[0] if bsl else "",
+        "bsl_price": bsl[1] if bsl else None,
+        "ssl_name": ssl[0] if ssl else "",
+        "ssl_price": ssl[1] if ssl else None,
+        "latest_sweep": latest_type,
+        "latest_sweep_level": str(latest.get("level", "")) if latest else "",
+        "latest_sweep_price": latest.get("price") if latest else None,
+        "latest_sweep_time": pd.Timestamp(latest["datetime"]).isoformat() if latest else "",
+        "latest_sweep_rejection": str(latest.get("rejection", "")) if latest else "",
+        "killzone": str(active.get("name", "FORA")) if active else "FORA",
+        "readiness_score": _safe_float(readiness.get("score", 0)),
+        "readiness_grade": str(readiness.get("grade", "WAIT")),
+        "readiness_action": str(readiness.get("action", "")),
+        "adr14": adr.get("adr"),
+        "adr_used_pct": adr.get("used_pct"),
+        "adr_state": str(adr.get("state", "SEM DADOS")),
+        "day_open": opens.get("day_open") if opens.get("available") else None,
+        "week_open": opens.get("week_open") if opens.get("available") else None,
+        "above_day_open": opens.get("above_day_open") if opens.get("available") else None,
+        "above_week_open": opens.get("above_week_open") if opens.get("available") else None,
+    }, ""
+
+
+def _status_kind(status: Any) -> str:
+    s = str(status or "").upper()
+    if "🟢" in s or "CONFIRMA" in s or "PULLBACK OK" in s:
+        return "GREEN"
+    if "🔴" in s or "CONTRA" in s or "SEM GATILHO" in s:
+        return "RED"
+    if "🟡" in s or "AGUARDAR" in s or "BASE" in s:
+        return "YELLOW"
+    return "UNKNOWN"
+
+
+def _minutes_since(value: Any) -> float | None:
+    if value in (None, "", 0, 0.0):
+        return None
+    try:
+        if isinstance(value, (int, float)) or (isinstance(value, str) and value.replace('.', '', 1).isdigit()):
+            ts = pd.Timestamp(float(value), unit="s", tz="UTC")
+        else:
+            ts = pd.Timestamp(value)
+            ts = ts.tz_localize("UTC") if ts.tzinfo is None else ts.tz_convert("UTC")
+        return max(0.0, (pd.Timestamp.now(tz="UTC") - ts).total_seconds() / 60.0)
+    except Exception:
+        return None
+
+
+def _context_fresh(context: Mapping[str, Any] | None, current_direction: str, max_minutes: float = 45.0) -> tuple[bool, str]:
+    if not context:
+        return False, "Market Map ainda não processado."
+    saved_dir = str(context.get("macro_direction", ""))
+    if saved_dir and saved_dir != str(current_direction):
+        return False, "O viés macro mudou desde o último Market Map."
+    age = _minutes_since(context.get("updated_at"))
+    if age is not None and age > max_minutes:
+        return False, f"Market Map com {age:.0f} min; atualizar antes de executar."
+    return True, ""
+
+
+def _scanner_for_pair(scanner_state: Mapping[str, Any] | None, pair: str) -> dict[str, Any]:
+    results = dict((scanner_state or {}).get("resultados", {}) or {})
+    raw = results.get(pair, {}) if isinstance(results, dict) else {}
+    tec = raw.get("tecnico", {}) if isinstance(raw, dict) else {}
+    age = _minutes_since(raw.get("processado_em"))
+    fresh = True if age is None else age <= 45.0
+    return {
+        "available": bool(tec.get("disponivel", False)),
+        "h4": str((tec.get("h4", {}) or {}).get("status", "—")),
+        "h1": str((tec.get("h1", {}) or {}).get("status", "—")),
+        "m15": str((tec.get("m15", {}) or {}).get("status", "—")),
+        "decision": str(raw.get("decisao", "")),
+        "text": str(raw.get("texto", "")),
+        "updated_at": str(raw.get("processado_em", "")),
+        "age_minutes": age,
+        "fresh": fresh,
+    }
+
+
+def _technical_score(tech: Mapping[str, Any]) -> float:
+    weights = {"h4": 35.0, "h1": 35.0, "m15": 30.0}
+    total = 0.0
+    for key, weight in weights.items():
+        kind = _status_kind(tech.get(key))
+        if kind == "GREEN":
+            total += weight
+        elif kind == "YELLOW":
+            total += weight * 0.45
+        elif kind == "UNKNOWN":
+            total += weight * 0.15
+    return float(total)
+
+
+def _integrated_state(direction: str, context: Mapping[str, Any] | None, tech: Mapping[str, Any]) -> tuple[str, str]:
+    if "COMPRA" not in str(direction).upper() and "VENDA" not in str(direction).upper():
+        return "⚪ SEM VIÉS", "Motor macro ainda não escolheu compra/venda."
+    fresh_ctx, fresh_reason = _context_fresh(context, direction)
+    if not fresh_ctx:
+        return "⚪ MAPA DESATUALIZADO", fresh_reason
+    if not tech.get("available"):
+        return "⚪ DADOS PARCIAIS", "Scanner H4/H1/M15 ainda não está completo."
+    if tech.get("fresh") is False:
+        age = tech.get("age_minutes")
+        txt = f"Scanner técnico com {float(age):.0f} min; atualizar M15/scanner." if age is not None else "Scanner técnico desatualizado."
+        return "⚪ TÉCNICA DESATUALIZADA", txt
+
+    risk = str(context.get("event_risk", "NORMAL")).upper()
+    grade = str(context.get("readiness_grade", "WAIT")).upper()
+    adr_used = context.get("adr_used_pct")
+    adr_exhausted = False
+    try:
+        adr_exhausted = float(adr_used) >= 110.0
+    except Exception:
+        pass
+
+    h4, h1, m15 = (_status_kind(tech.get(x)) for x in ("h4", "h1", "m15"))
+    if risk == "ALTO":
+        return "🟠 BLOQUEADO EVENTO", "Evento principal muito próximo; preserve o viés, mas não force execução."
+    if h4 == "RED" or h1 == "RED":
+        return "🔴 CONFLITO", "H4 ou H1 está contra o viés macro."
+    if adr_exhausted:
+        return "🟡 ESTICADO", "O range diário já consumiu cerca de 110%+ do ADR14; evitar perseguir preço."
+    if grade in {"A+", "A"} and h4 == "GREEN" and h1 == "GREEN" and m15 == "GREEN":
+        return "🟢 EXECUTÁVEL", "Macro + Market Map + H4/H1 + M15 estão alinhados."
+    if grade in {"A+", "A", "B"} and h4 == "GREEN" and h1 == "GREEN" and m15 in {"YELLOW", "UNKNOWN", "RED"}:
+        return "🟡 QUASE PRONTO", "Contexto e H4/H1 estão alinhados; falta confirmação M15 limpa."
+    return "⚪ AGUARDAR", "Confluência ainda não é suficiente para execução seletiva."
+
+
+def _state_rank(state: str) -> int:
+    if state.startswith("🟢"):
+        return 5
+    if "QUASE" in state:
+        return 4
+    if "ESTICADO" in state:
+        return 3
+    if state.startswith("⚪"):
+        return 2
+    if state.startswith("🟠"):
+        return 1
+    return 0
+
+
+def _age_text(iso: str) -> str:
+    if not iso:
+        return "—"
+    try:
+        ts = pd.Timestamp(iso)
+        if ts.tzinfo is None:
+            ts = ts.tz_localize("UTC")
+        now = pd.Timestamp.now(tz="UTC")
+        mins = max(0, int((now - ts).total_seconds() // 60))
+        if mins < 60:
+            return f"{mins} min"
+        return f"{mins/60:.1f} h"
+    except Exception:
+        return "—"
+
+
+def build_master_rows(matrix: pd.DataFrame, contexts: Mapping[str, Any], scanner_state: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+    """Pure-ish table assembler, exported for unit tests."""
+    rows: list[dict[str, Any]] = []
+    if matrix is None or matrix.empty:
+        return rows
+    for _, mr in matrix.head(7).iterrows():
+        pair = str(mr.get("Par", ""))
+        direction = str(mr.get("Direção", "⚪ AGUARDAR"))
+        macro_score = _safe_float(mr.get("Score final", mr.get("Score", 0)))
+        quality = _safe_float(mr.get("Qualidade", 0))
+        ctx = dict((contexts or {}).get(pair, {}) or {})
+        tech = _scanner_for_pair(scanner_state, pair)
+        state, reason = _integrated_state(direction, ctx if ctx else None, tech)
+        ready = _safe_float(ctx.get("readiness_score", 0)) if ctx else 0.0
+        tech_score = _technical_score(tech) if tech.get("available") else 0.0
+        integrated = 0.45 * macro_score + 0.35 * ready + 0.20 * tech_score
+        if not ctx:
+            integrated *= 0.72
+        if not tech.get("available"):
+            integrated *= 0.80
+        rows.append({
+            "Par": pair,
+            "Viés": direction.replace("🟢 ", "").replace("🔴 ", "").replace("⚪ ", ""),
+            "Score": macro_score,
+            "Qualidade": quality,
+            "W1": ctx.get("w1_bias", "—") if ctx else "—",
+            "D1": ctx.get("d1_bias", "—") if ctx else "—",
+            "Gate": ctx.get("readiness_grade", "—") if ctx else "—",
+            "Prontidão": ready if ctx else None,
+            "ADR usado %": ctx.get("adr_used_pct") if ctx else None,
+            "ADR estado": ctx.get("adr_state", "—") if ctx else "—",
+            "Liquidez alvo": (
+                ctx.get("bsl_name", "") if macro_side(direction) == "ALTISTA" else
+                ctx.get("ssl_name", "") if macro_side(direction) == "BAIXISTA" else ""
+            ) if ctx else "",
+            "H4": tech.get("h4", "—"),
+            "H1": tech.get("h1", "—"),
+            "M15": tech.get("m15", "—"),
+            "Técnica atualizada": "—" if tech.get("age_minutes") is None else f"{float(tech.get('age_minutes')):.0f} min",
+            "Estado": state,
+            "Motivo": reason,
+            "Índice Integrado": round(float(np.clip(integrated, 0, 100)), 1),
+            "Market Map atualizado": _age_text(str(ctx.get("updated_at", ""))) if ctx else "—",
+            "_rank": _state_rank(state),
+        })
+    return rows
+
+
+def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str,
+                        macro_context: Mapping[str, Any] | None = None,
+                        scanner_state: Mapping[str, Any] | None = None) -> None:
+    st.subheader("🧠 Painel Mestre de Oportunidades — V10.2")
+    st.caption(
+        "Decisão Automática + Macro Market Map + H4/H1/M15 + ADR14 em uma única visão dos 7 pares. "
+        "O painel serve para priorização; não transforma índice em probabilidade de lucro."
+    )
+    st.info(
+        "🎯 Novo filtro de volatilidade: ADR14 mede quanto do range diário médio já foi consumido. "
+        "Ele ajuda a evitar perseguir movimentos já muito esticados."
+    )
+
+    if matrix is None or matrix.empty:
+        st.warning("A matriz macro ainda não está disponível nesta execução.")
+        return
+
+    state = _load_state()
+    contexts = dict(state.get("contexts", {}) or {})
+    pairs = [str(x) for x in matrix.head(7)["Par"].tolist()]
+    processed = sum(1 for p in pairs if p in contexts)
+
+    top1, top2, top3, top4 = st.columns(4)
+    top1.metric("Pares", len(pairs))
+    top2.metric("Market Map processado", f"{processed}/{len(pairs)}")
+    top3.metric("Scanner técnico", f"{sum(bool(_scanner_for_pair(scanner_state,p).get('available')) for p in pairs)}/{len(pairs)}")
+    top4.metric("Modo", "SELETIVO")
+
+    now_ts = _time.time()
+    last_batch = _safe_float(state.get("last_batch_ts", 0.0))
+    remaining = max(0, int(61 - (now_ts - last_batch))) if last_batch else 0
+    cursor = int(state.get("cursor", 0) or 0)
+
+    c1, c2, c3 = st.columns([1.35, 1.2, 2.45])
+    with c1:
+        if st.button("▶️ Atualizar próximo lote (2 pares)", key="v102_master_batch", disabled=(remaining > 0 or not bool(api_key)), use_container_width=True):
+            candidates = []
+            for offset in range(len(pairs)):
+                p = pairs[(cursor + offset) % len(pairs)]
+                candidates.append(p)
+                if len(candidates) == 2:
+                    break
+            errors = []
+            for p in candidates:
+                row = _matrix_row(matrix, p)
+                ctx, err = _build_pair_context(p, row, api_key, dict(macro_context or {}))
+                if ctx:
+                    contexts[p] = ctx
+                else:
+                    errors.append(f"{p}: {err}")
+            state["contexts"] = contexts
+            state["cursor"] = (cursor + len(candidates)) % max(1, len(pairs))
+            state["last_batch_ts"] = _time.time()
+            ok, save_err = _save_state(state)
+            if errors:
+                st.warning(" | ".join(errors))
+            if not ok:
+                st.error("Não foi possível persistir a fila: " + save_err)
+            else:
+                st.rerun()
+    with c2:
+        if st.button("🔄 Recarregar painel", key="v102_master_reload", use_container_width=True):
+            st.rerun()
+    with c3:
+        if remaining > 0:
+            st.warning(f"Aguarde ~{remaining}s antes de outro lote para proteger o limite da Twelve Data.")
+        elif not api_key:
+            st.warning("CHAVE_TWELVE_DATA ausente: atualização W1/D1/liquidez/ADR indisponível.")
+        else:
+            st.caption("Cada lote usa até 4 consultas (D1 + M15 para 2 pares), abaixo do limite conservador usado no app.")
+
+    rows = build_master_rows(matrix, contexts, scanner_state)
+    if not rows:
+        st.warning("Ainda não há linhas para consolidar.")
+        return
+    df = pd.DataFrame(rows).sort_values(["_rank", "Índice Integrado", "Score"], ascending=[False, False, False], kind="stable")
+
+    best = df.iloc[0]
+    st.markdown("### 🏆 Melhor contexto consolidado agora")
+    b1, b2, b3, b4, b5 = st.columns(5)
+    b1.metric("Par", str(best["Par"]))
+    b2.metric("Viés", str(best["Viés"]))
+    b3.metric("Estado", str(best["Estado"]))
+    b4.metric("Índice integrado", f"{float(best['Índice Integrado']):.1f}/100")
+    b5.metric("Gate", str(best["Gate"]))
+    best_reason = str(best["Motivo"])
+    if str(best["Estado"]).startswith("🟢"):
+        st.success(best_reason)
+    elif "QUASE" in str(best["Estado"]) or "ESTICADO" in str(best["Estado"]):
+        st.warning(best_reason)
+    elif str(best["Estado"]).startswith("🔴") or str(best["Estado"]).startswith("🟠"):
+        st.error(best_reason)
+    else:
+        st.info(best_reason)
+
+    st.markdown("### 🌐 Ranking dos 7 pares")
+    show = df[[
+        "Par", "Viés", "Score", "Qualidade", "W1", "D1", "Gate",
+        "ADR usado %", "Liquidez alvo", "H4", "H1", "M15", "Técnica atualizada", "Estado", "Índice Integrado", "Market Map atualizado"
+    ]].copy()
+    show["Score"] = pd.to_numeric(show["Score"], errors="coerce").round(0)
+    show["Qualidade"] = pd.to_numeric(show["Qualidade"], errors="coerce").round(0)
+    show["ADR usado %"] = pd.to_numeric(show["ADR usado %"], errors="coerce").round(1)
+    st.dataframe(show, hide_index=True, use_container_width=True)
+
+    st.caption(
+        "Índice Integrado = ranking operacional de Macro + Gate + Técnica. Não é probabilidade de gain. "
+        "A ação final continua condicionada a evento, localização, volatilidade e confirmação M15."
+    )
+
+    chosen = st.selectbox("🔎 Abrir diagnóstico consolidado do par", df["Par"].tolist(), key="v102_master_pair_detail")
+    detail = df[df["Par"] == chosen].iloc[0]
+    ctx = dict(contexts.get(chosen, {}) or {})
+    tech = _scanner_for_pair(scanner_state, chosen)
+    d1, d2, d3, d4 = st.columns(4)
+    d1.metric("Direção preferencial", str(detail["Viés"]))
+    d2.metric("Market Map", f"{ctx.get('readiness_grade','—')} · {_safe_float(ctx.get('readiness_score',0)):.0f}/100" if ctx else "—")
+    d3.metric("ADR14 usado", f"{_safe_float(ctx.get('adr_used_pct',0)):.1f}%" if ctx.get("adr_used_pct") is not None else "—")
+    d4.metric("Risco de evento", str(ctx.get("event_risk", "—")) if ctx else "—")
+
+    if ctx:
+        st.markdown(
+            f"**Top-down:** W1 {ctx.get('w1_bias','—')} ({ctx.get('w1_regime','—')}) · "
+            f"D1 {ctx.get('d1_bias','—')} ({ctx.get('d1_regime','—')}) · "
+            f"Localização {ctx.get('location','—')} · Killzone {ctx.get('killzone','—')}."
+        )
+        if ctx.get("latest_sweep"):
+            try:
+                ny_time = pd.Timestamp(ctx.get("latest_sweep_time")).tz_convert(NY_TZ).strftime("%d/%m %H:%M NY")
+            except Exception:
+                ny_time = "horário indisponível"
+            st.markdown(
+                f"**Sweep:** {ctx.get('latest_sweep')} em {ctx.get('latest_sweep_level') or 'nível'} "
+                f"({_fmt_price(ctx.get('latest_sweep_price'), chosen)}) · {ny_time} · {ctx.get('latest_sweep_rejection','')}."
+            )
+        st.markdown(
+            f"**Volatilidade:** {ctx.get('adr_state','—')} · ADR14 consumido {_safe_float(ctx.get('adr_used_pct',0)):.1f}%."
+        )
+    st.markdown(
+        f"**Técnica:** H4 {tech.get('h4','—')} · H1 {tech.get('h1','—')} · M15 {tech.get('m15','—')}."
+    )
+
+    side = macro_side(str(detail["Viés"]))
+    if side == "ALTISTA":
+        alt = "Cenário alternativo vendedor só ganha prioridade se W1/D1 perderem a estrutura de alta e o motor macro também deixar de favorecer compra."
+    elif side == "BAIXISTA":
+        alt = "Cenário alternativo comprador só ganha prioridade se W1/D1 perderem a estrutura de baixa e o motor macro também deixar de favorecer venda."
+    else:
+        alt = "Sem cenário alternativo operacional enquanto o motor macro não definir um lado."
+    st.info("🔁 " + alt)
+
+    with st.expander("ℹ️ Por que ADR/ATR entrou e RSI/MACD não entrou no Gate"):
+        st.markdown(
+            "O app já usa estrutura, EMAs, macro, liquidez e timing. RSI/MACD acrescentariam sinais muito correlacionados ao preço e poderiam aumentar ruído/overfitting. "
+            "O **ADR14** responde a outra pergunta: *o movimento de hoje já gastou grande parte do range que normalmente percorre?* "
+            "Por isso ele funciona melhor aqui como filtro contra perseguição de preço, sem mudar o Score Mestre."
+        )

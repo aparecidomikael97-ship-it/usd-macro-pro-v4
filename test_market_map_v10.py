@@ -7,6 +7,7 @@ from market_map_core_v10 import (
     prior_period_levels, liquidity_rows, liquidity_kind, nearest_liquidity,
     premium_discount, killzone_state, quarterly_clock, session_range, recent_sweeps,
     alignment_summary, structure_regime, event_risk, macro_regime_summary, setup_readiness,
+    adr_context, intraday_open_context,
 )
 
 
@@ -174,6 +175,35 @@ class MarketMapTests(unittest.TestCase):
         out = setup_readiness('COMPRA USD/CHF',95,90,clean,clean,'DESCONTO','SWEEP SSL',True,'ELEVADO')
         self.assertLessEqual(out['score'], 77)
         self.assertNotIn(out['grade'], {'A','A+'})
+
+    def test_adr_context_detects_exhaustion(self):
+        daily = bars(start='2026-08-01', n=40, step=.001)
+        idx = pd.date_range('2026-09-14 04:00Z', periods=20, freq='15min')
+        intraday = pd.DataFrame({
+            'datetime': idx, 'open': 1.0, 'high': 1.03, 'low': .97, 'close': 1.0
+        })
+        out = adr_context(daily, intraday, '2026-09-14 04:30:00-04:00', length=14)
+        self.assertTrue(out['available'])
+        self.assertGreater(out['used_pct'], 100)
+        self.assertIn('RANGE', out['state'])
+
+    def test_intraday_open_context(self):
+        idx = pd.date_range('2026-09-14 04:00Z', periods=8, freq='15min')
+        intraday = pd.DataFrame({
+            'datetime': idx, 'open': [1.0]*8, 'high': [1.02]*8, 'low': [.99]*8, 'close': [1.01]*8
+        })
+        out = intraday_open_context(intraday, '2026-09-14 01:30:00-04:00')
+        self.assertTrue(out['available'])
+        self.assertAlmostEqual(out['day_open'], 1.0)
+        self.assertTrue(out['above_day_open'])
+
+    def test_sweep_contains_rejection_metadata(self):
+        df = pd.DataFrame([{
+            'datetime':'2026-09-14 12:00Z','open':1.0,'high':1.11,'low':.99,'close':1.09
+        }])
+        item = recent_sweeps(df, {'PDH':1.10})[0]
+        self.assertGreater(item['excess_abs'], 0)
+        self.assertIn('abaixo', item['rejection'])
 
 if __name__ == '__main__':
     unittest.main()

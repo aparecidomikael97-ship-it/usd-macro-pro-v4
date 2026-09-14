@@ -1,8 +1,8 @@
-"""Streamlit UI + data access for USD Macro Pro V10.1 Professional Macro Market Map.
+"""Streamlit UI + data access for USD Macro Pro V10.2 Professional Macro Market Map.
 
 The module is additive/observational: it reads the existing macro matrix and
-adds W1/D1 context, liquidity, Quarterly Theory time scaffolding and ICT-style
-killzones.  It does not mutate Score Mestre or the existing signal history.
+adds W1/D1 context, liquidity, Quarterly Theory time scaffolding, ICT-style
+killzones and an ADR14 exhaustion filter.  It does not mutate Score Mestre or the existing signal history.
 """
 from __future__ import annotations
 
@@ -17,12 +17,14 @@ import streamlit as st
 
 from market_map_core_v10 import (
     NY_TZ,
+    adr_context,
     aggregate_ohlc,
     alignment_summary,
     macro_regime_summary,
     setup_readiness,
     completed_daily,
     equal_liquidity_levels,
+    intraday_open_context,
     killzone_state,
     liquidity_rows,
     macro_side,
@@ -150,13 +152,13 @@ def _save_snapshot(snapshot: dict) -> tuple[bool, str, bool]:
 
 
 def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str, macro_context: dict | None = None) -> None:
-    st.subheader("🧭 Professional Macro Market Map — V10.1")
+    st.subheader("🧭 Professional Macro Market Map — V10.2")
     st.caption(
         "Macro semanal → Macro do dia → W1 → D1 → Quarterly → Liquidez → Killzones → H4/H1/M15. "
         "Camada de seleção e contexto: não altera o Score Mestre nem o histórico oficial da V9.3.9.2."
     )
     st.info(
-        "🎯 A V10.1 ficou mais seletiva: ela procura confluência e também procura motivos para NÃO entrar. "
+        "🎯 A V10.2 ficou mais seletiva: ela procura confluência e também procura motivos para NÃO entrar. "
         "O Índice de Prontidão é um filtro operacional, não uma probabilidade de lucro."
     )
 
@@ -165,24 +167,24 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str,
         return
 
     pairs = [str(x) for x in matrix["Par"].tolist()]
-    pair = st.selectbox("Par para leitura profissional", pairs, index=0, key="v101_market_map_pair")
+    pair = st.selectbox("Par para leitura profissional", pairs, index=0, key="v102_market_map_pair")
 
     ctrl1, ctrl2, ctrl3 = st.columns([1.1, 1.2, 1.2])
     user_tz = ctrl1.selectbox(
         "Fuso de exibição",
         ["America/Cuiaba", "America/Sao_Paulo", "America/New_York", "UTC"],
         index=0,
-        key="v101_market_map_tz",
+        key="v102_market_map_tz",
     )
     anchor_label = ctrl2.selectbox(
         "Âncora Quarterly",
         ["00:00 NY", "18:00 NY"],
         index=0,
-        key="v101_quarter_anchor",
+        key="v102_quarter_anchor",
         help="Há variações públicas da Quarterly Theory. A âncora fica explícita para evitar regra escondida.",
     )
     anchor_hour = 0 if anchor_label.startswith("00") else 18
-    if ctrl3.button("🔄 Atualizar Market Map", use_container_width=True, key="v101_market_map_refresh"):
+    if ctrl3.button("🔄 Atualizar Market Map", use_container_width=True, key="v102_market_map_refresh"):
         _td_series.clear()
         st.rerun()
 
@@ -252,6 +254,8 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str,
     daily_ctx = trend_context(d_closed)
     current_price = float(m15.iloc[-1]["close"])
     last_m15 = pd.Timestamp(m15.iloc[-1]["datetime"])
+    adr = adr_context(daily, m15, now_ny, length=14)
+    opens = intraday_open_context(m15, now_ny)
 
     st.markdown("### 1️⃣ Direcional semanal e diário")
     c1, c2, c3, c4 = st.columns(4)
@@ -295,6 +299,13 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str,
     l3.metric("BSL disponível", f"{bsl[0]} · {_fmt_price(bsl[1], pair)}" if bsl else "—")
     l4.metric("SSL disponível", f"{ssl[0]} · {_fmt_price(ssl[1], pair)}" if ssl else "—")
 
+    v1, v2, v3, v4 = st.columns(4)
+    v1.metric("ADR14", _fmt_price(adr.get("adr"), pair) if adr.get("adr") is not None else "—")
+    v2.metric("Range diário consumido", f"{float(adr['used_pct']):.1f}%" if adr.get("used_pct") is not None else "—", adr.get("state", "SEM DADOS"))
+    v3.metric("NY Day Open", _fmt_price(opens.get("day_open"), pair) if opens.get("day_open") is not None else "—")
+    v4.metric("Week Open", _fmt_price(opens.get("week_open"), pair) if opens.get("week_open") is not None else "—")
+    st.caption("ADR14 é um filtro de volatilidade/exaustão. Ele não define direção e não altera o Score Mestre.")
+
     if liq:
         df_liq = pd.DataFrame(liq)
         df_liq["Preço"] = df_liq["Preço"].map(lambda x: _fmt_price(x, pair))
@@ -304,9 +315,14 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str,
     sweeps = recent_sweeps(m15, levels, bars=16)
     if sweeps:
         latest = sweeps[0]
+        _sweep_ts = pd.Timestamp(latest["datetime"])
+        _sweep_ny = _sweep_ts.tz_convert(NY_TZ).strftime("%d/%m %H:%M NY")
+        _pip = 0.01 if "JPY" in pair else 0.0001
+        _excess_pips = float(latest.get("excess_abs", 0.0) or 0.0) / _pip
         st.warning(
             f"💧 Sweep recente: **{latest['type']} em {latest['level']}** · "
-            f"nível {_fmt_price(latest['price'], pair)} · candle {pd.Timestamp(latest['datetime']).strftime('%d/%m %H:%M UTC')}"
+            f"nível {_fmt_price(latest['price'], pair)} · {_sweep_ny} · "
+            f"excesso {_excess_pips:.1f} pips · {latest.get('rejection','fechamento de volta')}"
         )
         latest_sweep = str(latest["type"])
     else:
@@ -407,7 +423,12 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str,
     if opposing:
         narrative.append(f"**Liquidez oposta:** {opposing[0]} em {_fmt_price(opposing[1], pair)} é referência do lado contrário.")
     if latest_sweep:
-        narrative.append(f"**Sweep:** {latest_sweep} detectado; coerência depende do lado macro.")
+        _nys = pd.Timestamp(latest["datetime"]).tz_convert(NY_TZ).strftime("%H:%M NY") if sweeps else "—"
+        narrative.append(
+            f"**Sweep:** {latest_sweep} em {latest.get('level','—')} ({_fmt_price(latest.get('price'), pair)}) · {_nys} · {latest.get('rejection','rejeição confirmada')}."
+        )
+    if adr.get("used_pct") is not None:
+        narrative.append(f"**Volatilidade:** {adr.get('state','—')} · o dia consumiu {float(adr['used_pct']):.1f}% do ADR14.")
     narrative.append(f"**Tempo:** {quarter['phase']} · micro q{quarter['micro']} · " + (f"{active['name']} ativa." if active else "fora de killzone."))
     narrative.append(f"**Gate:** classe {readiness['grade']} · {readiness['score']:.0f}/100 de prontidão · {readiness['action']}.")
     for item in narrative:
@@ -423,7 +444,7 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str,
         st.error("📌 Plano: NÃO FORÇAR ENTRADA. O objetivo do Gate é filtrar operações quando o contexto não está suficientemente limpo.")
 
     st.divider()
-    st.markdown("### 🧪 Registro observacional V10.1")
+    st.markdown("### 🧪 Registro observacional V10.2")
     st.caption(
         "O contexto é salvo em CSV separado para medir depois se Macro Semanal/Dia + W1/D1 + liquidez + timing + Gate realmente melhoram os resultados. "
         "O histórico oficial do motor base continua separado."
@@ -456,14 +477,21 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str,
         "nearest_bsl": bsl[0] if bsl else "",
         "nearest_ssl": ssl[0] if ssl else "",
         "latest_sweep": latest_sweep,
+        "latest_sweep_level": latest.get("level", "") if sweeps else "",
+        "latest_sweep_time": pd.Timestamp(latest["datetime"]).isoformat() if sweeps else "",
+        "adr14": adr.get("adr"),
+        "adr_used_pct": adr.get("used_pct"),
+        "adr_state": adr.get("state", ""),
+        "day_open": opens.get("day_open") if opens.get("available") else None,
+        "week_open": opens.get("week_open") if opens.get("available") else None,
         "alinhamento": align["label"],
         "alinhamento_passou": align["passed"],
         "alinhamento_total": align["total"],
         "readiness_score": readiness["score"],
         "readiness_grade": readiness["grade"],
-        "versao": "V10.1 Professional Macro Market Map",
+        "versao": "V10.2 Professional Macro Market Map",
     }
-    if st.button("💾 Registrar leitura atual do Market Map", key="v101_save_snapshot", use_container_width=True):
+    if st.button("💾 Registrar leitura atual do Market Map", key="v102_save_snapshot", use_container_width=True):
         ok, msg, created = _save_snapshot(snapshot)
         if ok and created:
             st.success(msg)
@@ -484,7 +512,7 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str,
 - **Quarterly:** moldura temporal heurística com âncora explícita; não é previsão determinística.
 - **Killzones:** ancoradas em `America/New_York`, com horário de verão convertido automaticamente.
 - **Gate de Alta Seletividade:** combina qualidade, macro, W1/D1, estrutura, localização, sweep, killzone e risco de evento. É um filtro de prontidão, **não probabilidade de lucro**.
-- **Execução:** H4/H1/M15 continuam sendo necessários. A V10.1 não transforma contexto em ordem automática.
+- **Execução:** H4/H1/M15 continuam sendo necessários. A V10.2 não transforma contexto em ordem automática.
 - **Motor base:** Score Mestre, direção oficial e histórico 1H/4H/24H permanecem intactos.
             """
         )
