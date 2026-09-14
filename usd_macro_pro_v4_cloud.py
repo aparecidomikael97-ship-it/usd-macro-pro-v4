@@ -94,12 +94,12 @@ except Exception as _autopilot_exc:
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "10.7.1 — RATE-SAFE FULL AUTOPILOT · MOTOR BASE V9.3.9.2"
+APP_VERSION = "10.7.2 — PANDAS COMPATIBILITY FIX · MOTOR BASE V9.3.9.2"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro V10.7.1 — Rate-Safe Full Autopilot",
+    page_title="USD Macro Pro V10.7.2 — Pandas Compatibility Fix",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1688,7 +1688,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro V10.7.1 — Rate-Safe Full Autopilot")
+st.title("🦅 USD Macro Pro V10.7.2 — Pandas Compatibility Fix")
 st.caption("Macro semanal → Macro do dia → W1/D1 → Quarterly → Liquidez → Killzones → H4/H1/M15 → Performance real")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -2509,6 +2509,73 @@ def _garantir_pasta_v82():
     except Exception:
         pass
 
+
+def _normalizar_tipos_sinais_v1072(df):
+    """
+    V10.7.2 — compatibilidade robusta com pandas 2.x.
+
+    O CSV histórico pode chegar com colunas vazias inferidas como float64.
+    Isso quebra quando o app tenta gravar Timestamp/boolean nessas colunas.
+    Aqui os tipos são normalizados antes de qualquer atualização.
+    """
+    df = df.copy()
+
+    # Datas: sempre UTC, inclusive quando a origem veio como string/float vazia.
+    for col in ("timestamp", "data_preco", "data_saida"):
+        if col not in df.columns:
+            df[col] = pd.NaT
+        df[col] = pd.to_datetime(df[col], errors="coerce", utc=True)
+
+    # Numéricos: força float seguro.
+    for col in (
+        "score_mestre", "qualidade", "score_base", "score_cotada",
+        "diferenca", "fomc_score", "fomc_peso", "dias_evento",
+        "preco_entrada", "preco_saida", "retorno_pct",
+        "retorno_direcional_pct"
+    ):
+        if col not in df.columns:
+            df[col] = np.nan
+        df[col] = pd.to_numeric(df[col], errors="coerce").astype("float64")
+
+    # avaliado: ausência deve significar False, nunca bool(np.nan)==True.
+    if "avaliado" not in df.columns:
+        df["avaliado"] = False
+    _av = df["avaliado"]
+    df["avaliado"] = _av.map(
+        lambda x: (
+            True if str(x).strip().lower() in ("true", "1", "sim", "yes")
+            else False
+        )
+    ).astype(bool)
+
+    # acertou: preserva ausente como None e aceita bases antigas em texto/número.
+    if "acertou" not in df.columns:
+        df["acertou"] = None
+
+    def _bool_ou_none_v1072(x):
+        if pd.isna(x) or str(x).strip().lower() in ("", "none", "nan", "nat"):
+            return None
+        s = str(x).strip().lower()
+        if s in ("true", "1", "sim", "yes"):
+            return True
+        if s in ("false", "0", "nao", "não", "no"):
+            return False
+        return None
+
+    df["acertou"] = df["acertou"].map(_bool_ou_none_v1072).astype("object")
+
+    # Texto: evita NaN quebrando comparações e exibição.
+    for col in (
+        "par", "direcao", "evento", "impacto", "timing",
+        "versao_coleta", "dia_coleta", "horizonte_validacao", "serie_saida"
+    ):
+        if col not in df.columns:
+            df[col] = ""
+        df[col] = df[col].fillna("").astype(str)
+
+    return df
+
+
 def _carregar_sinais_v82():
     """
     V8.7.3 — carrega histórico persistente e separa registros antigos.
@@ -2526,7 +2593,7 @@ def _carregar_sinais_v82():
             df["dia_coleta"] = ""
         else:
             df["dia_coleta"] = df["dia_coleta"].fillna("").astype(str)
-        return df
+        return _normalizar_tipos_sinais_v1072(df)
 
     if "_github_ler_csv_v84" in globals():
         remoto = _github_ler_csv_v84()
@@ -2824,6 +2891,9 @@ def _avaliar_sinais_v82():
         if col not in df.columns:
             df[col] = default
 
+    # V10.7.2 — impede incompatibilidade de dtype ao escrever Timestamp/bool/float.
+    df = _normalizar_tipos_sinais_v1072(df)
+
     cache = {}
     atualizados = 0
 
@@ -2866,7 +2936,7 @@ def _avaliar_sinais_v82():
 
         df.at[i, "avaliado"] = True
         df.at[i, "preco_saida"] = float(preco_saida)
-        df.at[i, "data_saida"] = pd.Timestamp(dt_saida)
+        df.at[i, "data_saida"] = pd.to_datetime(dt_saida, utc=True)
         df.at[i, "retorno_pct"] = float(retorno_par)
         df.at[i, "retorno_direcional_pct"] = float(retorno_dir)
         df.at[i, "acertou"] = acertou
@@ -3341,7 +3411,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 # V9.0 — CENTRAL DO OPERADOR
 # Somente interface/orientação; não altera o motor do modelo.
 # ============================================================
-st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V10.7.1")
+st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V10.7.2")
 st.caption("O APP define o viés macro; o gráfico confirma a entrada.")
 
 with st.container(border=True):
@@ -3537,7 +3607,7 @@ def _autopilot_save_inputs_v107():
 
 
 abas = st.tabs([
-    "🧠 PAINEL MESTRE V10.7.1",
+    "🧠 PAINEL MESTRE V10.7.2",
     "🏆 Classificação",
     "🇺🇸 Painel EUA",
     "💱 Pares e Confiança",
@@ -3545,12 +3615,12 @@ abas = st.tabs([
     "🧾 Histórico",
     "📈 Teste Histórico",
     "🎯 Decisão Automática",
-    "🧭 Macro Market Map V10.7.1",
+    "🧭 Macro Market Map V10.7.2",
     "✨ Aprenda & Personalize",
-    "🚀 Produto V10.7.1",
-    "🧭 Melhorias V10.7.1",
-    "🌍 Notícias Globais V10.7.1",
-    "🤖 AUTOPILOT V10.7.1",
+    "🚀 Produto V10.7.2",
+    "🧭 Melhorias V10.7.2",
+    "🌍 Notícias Globais V10.7.2",
+    "🤖 AUTOPILOT V10.7.2",
 ])
 
 # =========================================================
