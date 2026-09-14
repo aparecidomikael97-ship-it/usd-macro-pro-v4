@@ -37,7 +37,7 @@ def _age_min(value):
     except Exception: return None
 
 def render_autopilot_v107():
-    st.subheader("🤖 Autopilot Total — V10.7")
+    st.subheader("🤖 Autopilot Total — V10.7.1")
     st.caption(
         "Macro/FRED → Matriz → Notícias 8 moedas → Scanner H4/H1/M15 → Market Map "
         "→ snapshots → validação 1H/4H/24H. Rodando em background pelo GitHub Actions."
@@ -63,14 +63,14 @@ def render_autopilot_v107():
     e,f,g,h=st.columns(4)
     e.metric("Histórias únicas",int(status.get("news_unique_stories",0) or 0))
     f.metric("Snapshots",int(status.get("validation_rows",0)))
-    g.metric("Calls Twelve/run",int(status.get("twelve_calls_this_run",0)))
+    g.metric("Calls Twelve/run",int(status.get("twelve_calls_this_run",0)), "rate-safe")
     h.metric("Mercado FX", "ABERTO" if status.get("forex_market_open") else "FECHADO")
 
     st.markdown("### ⚙️ O que ficou automático")
     st.markdown(
         "- ✅ execução headless do app para atualizar macro/FRED e Matriz\n"
         "- ✅ notícias globais USD/EUR/GBP/JPY/CHF/CAD/AUD/NZD\n"
-        "- ✅ scanner M15 ~30min, H1 ~1h e H4 ~4h\n"
+        "- ✅ scanner M15 ~30min, H1 ~1h e H4 ~4h\n- ✅ limitador automático distribui as consultas Twelve Data no tempo\n"
         "- ✅ W1/D1/liquidez/ADR/Market Map em background\n"
         "- ✅ 1 snapshot por par/dia sem duplicidade\n"
         "- ✅ Timing Integrity: entry_time = momento real do congelamento\n"

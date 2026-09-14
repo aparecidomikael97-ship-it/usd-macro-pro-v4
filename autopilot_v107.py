@@ -1,4 +1,4 @@
-"""USD Macro Pro V10.7 — Full Background Autopilot.
+"""USD Macro Pro V10.7.1 — Rate-Safe Full Background Autopilot.
 
 Executado pelo GitHub Actions a cada 30 minutos.
 
@@ -74,6 +74,33 @@ M15_EVERY_MIN = 25
 H1_EVERY_MIN = 55
 H4_EVERY_MIN = 230
 NEWS_EVERY_MIN = 50
+
+# V10.7.1 — rate-safe Twelve Data gate.
+# Keeps calls well below a bursty per-minute pattern so the first run
+# can safely complete H4/H1/M15 + D1 instead of partially failing.
+TD_SAFE_CALLS_PER_WINDOW = 6
+TD_SAFE_WINDOW_SECONDS = 62.0
+_TD_CALL_TIMES: list[float] = []
+
+def _td_rate_gate() -> None:
+    """Throttle Twelve Data calls conservatively across the whole runner."""
+    global _TD_CALL_TIMES
+    while True:
+        now = time.monotonic()
+        _TD_CALL_TIMES = [
+            t for t in _TD_CALL_TIMES
+            if (now - t) < TD_SAFE_WINDOW_SECONDS
+        ]
+        if len(_TD_CALL_TIMES) < TD_SAFE_CALLS_PER_WINDOW:
+            _TD_CALL_TIMES.append(now)
+            return
+        wait_for = TD_SAFE_WINDOW_SECONDS - (now - _TD_CALL_TIMES[0]) + 0.25
+        if wait_for > 0:
+            print(f"[rate-safe] aguardando {wait_for:.1f}s antes da próxima consulta Twelve Data")
+            time.sleep(wait_for)
+        else:
+            _TD_CALL_TIMES = []
+
 
 def utcnow() -> pd.Timestamp:
     return pd.Timestamp.now(tz="UTC")
@@ -194,6 +221,7 @@ def run_headless_app() -> tuple[bool, str]:
 def td_fetch(pair: str, interval: str, outputsize: int) -> tuple[pd.DataFrame, str]:
     if not TD_KEY:
         return pd.DataFrame(), "CHAVE_TWELVE_DATA ausente."
+    _td_rate_gate()
     try:
         r = requests.get(
             "https://api.twelvedata.com/time_series",
@@ -798,6 +826,9 @@ def status_summary(
         "validation_complete":complete,
         "snapshot_stats":dict(snap_stats),
         "twelve_calls_this_run":calls,
+        "twelve_rate_safe":True,
+        "twelve_safe_calls_per_window":TD_SAFE_CALLS_PER_WINDOW,
+        "twelve_safe_window_seconds":TD_SAFE_WINDOW_SECONDS,
         "forex_market_open":forex_market_likely_open(now),
         "errors":errors[:20],
         "healthy": bool(app_ok and scanner_fresh >= (5 if forex_market_likely_open(now) else 0) and len(errors)<8),
