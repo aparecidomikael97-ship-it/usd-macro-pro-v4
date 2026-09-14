@@ -35,12 +35,12 @@ import re
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "9.3.9 — PAINEL DE PERFORMANCE REAL"
+APP_VERSION = "9.3.9.1 — CORREÇÃO DTYPE DA VALIDAÇÃO"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro — V9.3.9 Performance Real",
+    page_title="USD Macro Pro — V9.3.9.1 Performance Real",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1619,7 +1619,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro — V9.3.9 Performance Real")
+st.title("🦅 USD Macro Pro — V9.3.9.1 Performance Real")
 st.caption("Dados econômicos → Calendário → Inflação → Fed → Força das moedas → Pares → Teste histórico")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -6648,6 +6648,15 @@ def _config_ler_v937():
         for c in cols:
             if c not in df.columns:
                 df[c] = None
+
+        # Pandas 2.x pode inferir as colunas "acertou_*" como float64
+        # quando o CSV ainda contém apenas valores vazios/NaN. Depois, ao
+        # gravar True/False, isso gera TypeError. Mantemos essas colunas como
+        # object para aceitar bool + valores vazios sem conflito de dtype.
+        for c in ("acertou_1h", "acertou_4h", "acertou_24h"):
+            if c in df.columns:
+                df[c] = df[c].astype("object")
+
         return df[cols], ""
     except Exception as e:
         return pd.DataFrame(columns=cols), f"{type(e).__name__}: {e}"
