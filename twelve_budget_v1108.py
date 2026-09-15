@@ -35,6 +35,7 @@ def next_day(now):
 
 def classify_limit(message):
     text = str(message).lower()
+    # Explicit minute wording must win over generic "API credits" wording.
     if any(x in text for x in ('current minute','per minute','next minute','minute limit','rpm')):
         return 'LIMITE_MINUTO'
     if any(x in text for x in ('for the day','daily limit','daily credits','next day')):
@@ -119,6 +120,7 @@ class Budget:
                 'reset_at':next_day(now).isoformat(), 'pace_ceiling':min(DAILY_LIMIT,28+now.hour*20)}
 
     def bootstrap(self, old_status, scanner, now=None):
+        """Carry today's old count/block forward instead of resetting at install."""
         def seed(s,n):
             before=deepcopy(s)
             old=(scanner.get('autopilot_v107',{}) or {}).get('daily_budget',{}) or {}
