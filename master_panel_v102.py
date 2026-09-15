@@ -21,6 +21,7 @@ import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
+from twelve_cache_v1108 import cached_series, clear_shared_cache
 
 from market_map_core_v10 import (
     NY_TZ,
@@ -128,35 +129,9 @@ def _save_state(state: Mapping[str, Any]) -> tuple[bool, str]:
         return False, f"{type(exc).__name__}: {exc}"
 
 
-@st.cache_data(ttl=900, show_spinner=False)
-def _td_series(symbol: str, interval: str, outputsize: int, _api_key: str) -> tuple[pd.DataFrame, str]:
-    if not _api_key:
-        return pd.DataFrame(), "CHAVE_TWELVE_DATA ausente."
-    try:
-        r = requests.get(
-            "https://api.twelvedata.com/time_series",
-            params={
-                "symbol": symbol,
-                "interval": interval,
-                "outputsize": int(outputsize),
-                "apikey": _api_key,
-                "timezone": "UTC",
-                "format": "JSON",
-                "order": "ASC",
-            },
-            timeout=20,
-        )
-        if r.status_code != 200:
-            return pd.DataFrame(), f"Twelve Data HTTP {r.status_code}."
-        js = r.json()
-        if isinstance(js, dict) and js.get("status") == "error":
-            return pd.DataFrame(), str(js.get("message") or "Erro da Twelve Data.")
-        df = normalize_ohlc(js.get("values", []) if isinstance(js, dict) else [])
-        if df.empty:
-            return df, "Sem candles OHLC válidos."
-        return df, ""
-    except Exception as exc:
-        return pd.DataFrame(), f"Falha Twelve Data: {type(exc).__name__}."
+def _td_series(symbol: str, interval: str, outputsize: int, _api_key: str):
+    return cached_series(symbol,interval,outputsize)
+_td_series.clear = clear_shared_cache
 
 
 def _matrix_row(matrix: pd.DataFrame, pair: str) -> dict[str, Any]:
@@ -211,7 +186,7 @@ def _build_pair_context(pair: str, row: Mapping[str, Any], api_key: str, macro_c
 
     return {
         "pair": pair,
-        "updated_at": pd.Timestamp.utcnow().isoformat(),
+        "updated_at": m15.attrs.get('source_fetched_at',pd.Timestamp.utcnow().isoformat()),
         "candle_m15": candle.isoformat(),
         "price": price,
         "macro_direction": direction,
