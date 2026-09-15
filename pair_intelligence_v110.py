@@ -19,6 +19,7 @@ import requests
 import streamlit as st
 
 from decision_integrity_v110 import evaluate_decision_integrity
+from data_readiness_v1101 import assess_pair_data_readiness, display_component_status, premium_discount_operational
 
 try:
     from currency_news_v107 import pair_news_table
@@ -196,7 +197,8 @@ def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro"):
     h4=str((tec.get("h4",{}) or {}).get("status","—")); h1=str((tec.get("h1",{}) or {}).get("status","—")); m15=str((tec.get("m15",{}) or {}).get("status","—"))
     ict=dict(tec.get("ict",{}) or {}); ict_read=_safe(ict.get("readiness",0)); ict_label=str(ict.get("label","⏳ aguardando ICT"))
     inst=dict(tec.get("institutional",{}) or {}); inst_read=_safe(inst.get("readiness",0)); inst_label=str(inst.get("label","⏳ aguardando motor institucional"))
-    age=_age_minutes(raw_sc.get("m15_fetched_at",raw_sc.get("processado_em")))
+    data_ready=assess_pair_data_readiness(raw_sc,mapctx)
+    age=(data_ready.get("timeframes",{}).get("m15",{}) or {}).get("age_minutes")
 
     mc=_map_normalize(mapctx,pair)
     w1,d1=mc["w1"],mc["d1"]
@@ -245,6 +247,8 @@ def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro"):
         side=side,score=score,quality=quality,rank_index=idx,h4=h4,h1=h1,m15=m15,
         ict_readiness=ict_read,institutional_readiness=inst_read,gate=gate,gate_score=gate_score,
         adr_used_pct=adr,event_risk=event,technical_age_min=age,news_alignment=news_align,
+        data_sufficient=bool(data_ready.get("sufficient",False)),
+        data_readiness_score=_safe(data_ready.get("score",0)),
     )
     state=decision["state"]
 
@@ -268,7 +272,7 @@ def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro"):
         "ict":ict,"ict_read":ict_read,"ict_label":ict_label,"inst":inst,"inst_read":inst_read,"inst_label":inst_label,
         "up":up,"down":down,"reason":reason,"next_action":decision["next_action"],"target":target,
         "hard_blocks":decision["hard_blocks"],"soft_blocks":decision["soft_blocks"],"positives":decision["positives"],
-        "executable":decision["executable"],"technical_age":age,
+        "executable":decision["executable"],"technical_age":age,"data_ready":data_ready,
     }
 
 
@@ -324,7 +328,7 @@ def _stack_rows(p:Mapping[str,Any])->pd.DataFrame:
 
 def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:Mapping[str,Any]|None=None,macro_context:Mapping[str,Any]|None=None):
     _css()
-    st.markdown("""<div class="v110-hero"><h2>🏛️ Central Institucional dos 7 Pares — V11.0</h2><p>Macro → notícias → W1/D1 → liquidez → SMT → displacement → MSS → CRT/AMD/OTE/FVG → H4/H1/M15 → ADR/evento → decisão final.</p><span class="v110-badge">1 tela</span><span class="v110-badge">sem novas chamadas de API</span><span class="v110-badge">hard gates</span><span class="v110-badge">auditável</span></div>""",unsafe_allow_html=True)
+    st.markdown("""<div class="v110-hero"><h2>🏛️ Central Institucional dos 7 Pares — V11.0.1</h2><p>Macro → notícias → W1/D1 → liquidez → SMT → displacement → MSS → CRT/AMD/OTE/FVG → H4/H1/M15 → ADR/evento → decisão final.</p><span class="v110-badge">1 tela</span><span class="v110-badge">sem novas chamadas de API</span><span class="v110-badge">hard gates</span><span class="v110-badge">auditável</span></div>""",unsafe_allow_html=True)
     st.caption("Objetivo: reproduzir um processo disciplinado de decisão multi-camada. Não representa fluxo real de instituições. Prioridade/readiness não é probabilidade de lucro.")
     if matrix is None or matrix.empty:
         st.warning("A Matriz ainda não está disponível nesta execução."); return
@@ -342,15 +346,27 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
 
     best=next((p for p in packs if p["side"]!="WAIT" and not p["state"].startswith("🔴")),packs[0])
     strongest,weakest=_major_extremes(ranking)
+    process_age=_age_minutes(auto.get("last_run"))
+    process_ok=bool(auto.get("app_headless_ok",False))
+    process_label=("🟢 PROCESSO OK" if process_ok and (process_age is None or process_age<=90) else "🟡 SEM RODADA RECENTE" if process_ok else "🔴 FALHA HEADLESS")
+    data_ok=sum(1 for x in packs if bool((x.get("data_ready",{}) or {}).get("sufficient",False)))
+    twelve_label="🟠 COTA/PLANO BLOQUEADO" if auto.get("twelve_daily_blocked") else "🟢 SEM BLOQUEIO REGISTRADO"
     c1,c2,c3,c4,c5=st.columns(5)
     c1.metric("Melhor contexto",best["pair"]); c2.metric("Prioridade",f"{best['priority']:.1f}/100"); c3.metric("Mais forte (G8)",strongest); c4.metric("Mais fraca (G8)",weakest); c5.metric("Estado",best["state"])
+    st.markdown("### 🩺 Saúde do processo x prontidão dos dados")
+    h1,h2,h3,h4=st.columns(4)
+    h1.metric("Autopilot / Headless",process_label)
+    h2.metric("Dados técnicos suficientes",f"{data_ok}/7")
+    h3.metric("Twelve Data",twelve_label)
+    h4.metric("Decisão operacional",best["state"])
     if auto.get("twelve_daily_blocked"):
-        st.warning("🟠 Twelve Data com cota/plano bloqueado. A Central usa a última leitura persistida sem novas consultas.")
+        st.warning("🟠 O processo do Autopilot pode estar saudável mesmo com a fonte técnica bloqueada. A Central separa processo, fonte e frescor para evitar falso 'OK'.")
 
     st.markdown("### 🏁 Mesa de decisão — 7 pares")
     executive=pd.DataFrame([{
         "Par":p["pair"],"Decisão final":p["state"],"Direção":p["direction"],"Prioridade":p["priority"],"Score Mestre":p["score"],"Qualidade %":p["quality"],
-        "ICT":round(p["ict_read"],0),"Institucional":round(p["inst_read"],0),"H4":p["h4"],"H1":p["h1"],"M15":p["m15"],"Gate":p["gate"],"ADR %":round(p["adr"],0) if p["adr"] else None,"Evento":p["event"],"Motivo":p["reason"]
+        "Dados?":"SIM" if (p.get("data_ready",{}) or {}).get("sufficient") else "NÃO","Data Score":round(_safe((p.get("data_ready",{}) or {}).get("score",0)),0),
+        "ICT":round(p["ict_read"],0),"Institucional":round(p["inst_read"],0) if (p.get("data_ready",{}) or {}).get("institutional_data_ready") else "N/D","H4":p["h4"],"H1":p["h1"],"M15":p["m15"],"Gate":p["gate"],"ADR %":round(p["adr"],0) if p["adr"] else None,"Evento":p["event"],"Motivo":p["reason"]
     } for p in packs])
     st.dataframe(executive,use_container_width=True,hide_index=True,height=330)
     st.bar_chart(executive[["Par","Prioridade"]].set_index("Par"),horizontal=True,height=250)
@@ -361,15 +377,30 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
         for j,p in enumerate(packs[i:i+2]):
             with cols[j]:
                 st.markdown(f"#### {p['pair']} · {p['state']}")
-                a,b,c=st.columns(3); a.metric("Prioridade",f"{p['priority']:.0f}/100"); b.metric("ICT",f"{p['ict_read']:.0f}"); c.metric("Institucional",f"{p['inst_read']:.0f}")
+                a,b,c,d=st.columns(4); a.metric("Prioridade",f"{p['priority']:.0f}/100"); b.metric("Dados",f"{_safe((p.get('data_ready',{}) or {}).get('score',0)):.0f}/100"); c.metric("ICT",f"{p['ict_read']:.0f}"); d.metric("Institucional",f"{p['inst_read']:.0f}" if (p.get("data_ready",{}) or {}).get("institutional_data_ready") else "N/D")
                 st.markdown(f"**Por quê:** {p['reason']}")
-                st.caption(f"H4 {p['h4']} · H1 {p['h1']} · M15 {p['m15']} · Gate {p['gate']} · ADR {p['adr']:.0f}%")
+                _dr=p.get("data_ready",{}) or {}; _tf=_dr.get("timeframes",{}) or {}
+                st.caption(f"H4 {p['h4']} ({(_tf.get('h4',{}) or {}).get('state','—')}) · H1 {p['h1']} ({(_tf.get('h1',{}) or {}).get('state','—')}) · M15 {p['m15']} ({(_tf.get('m15',{}) or {}).get('state','—')}) · Gate {p['gate']} · ADR {p['adr']:.0f}%")
                 st.caption(f"Alvo de liquidez: {p['target']} · Próximo passo: {p['next_action']}")
 
     st.divider(); st.markdown("## 🔬 Raio-X institucional")
     pair=st.selectbox("Escolha o par",[p["pair"] for p in packs],key="v110_pair_deep")
     p=next(x for x in packs if x["pair"]==pair)
-    a,b,c,d,e=st.columns(5); a.metric("Decisão",p["state"]); b.metric("Prioridade",f"{p['priority']:.1f}/100"); c.metric("Score Mestre",f"{p['score']:.0f}/100"); d.metric("ICT",f"{p['ict_read']:.0f}/100"); e.metric("Institucional",f"{p['inst_read']:.0f}/100")
+    _dr=p.get("data_ready",{}) or {}
+    a,b,c,d,e,f=st.columns(6); a.metric("Decisão",p["state"]); b.metric("Prioridade",f"{p['priority']:.1f}/100"); c.metric("Score Mestre",f"{p['score']:.0f}/100"); d.metric("Dados",f"{_safe(_dr.get('score',0)):.0f}/100"); e.metric("ICT",f"{p['ict_read']:.0f}/100"); f.metric("Institucional",f"{p['inst_read']:.0f}/100" if _dr.get("institutional_data_ready") else "N/D")
+    st.markdown("### 📡 Data Readiness — dados suficientes para decisão?")
+    if _dr.get("sufficient"):
+        st.success(f"✅ SIM — {_dr.get('label','')} · {_safe(_dr.get('score',0)):.0f}/100")
+    else:
+        st.error(f"❌ NÃO — {_dr.get('label','')} · {_safe(_dr.get('score',0)):.0f}/100")
+        if _dr.get("missing"):
+            st.caption("Faltando: " + " · ".join(_dr.get("missing",[])[:6]))
+    _tf=_dr.get("timeframes",{}) or {}
+    tfc=st.columns(3)
+    for _col,_name in zip(tfc,("h4","h1","m15")):
+        _x=_tf.get(_name,{}) or {}; _age=_x.get("age_minutes")
+        _col.metric(_name.upper(),_x.get("state","—"),"sem timestamp" if _age is None else f"{_age:.0f} min")
+    st.caption(f"Cache institucional: H1 {_dr.get('cache_h1_bars',0)} candles · M15 {_dr.get('cache_m15_bars',0)} candles")
 
     if p["hard_blocks"]:
         st.error("**Bloqueios duros:** " + " · ".join(p["hard_blocks"]))
@@ -397,7 +428,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     for i in range(0,len(cards),4):
         cols=st.columns(min(4,len(cards)-i))
         for col,(title,key) in zip(cols,cards[i:i+4]):
-            comp=_component(inst,key); col.metric(title,str(comp.get("status","—"))); col.caption(str(comp.get("text","")))
+            comp=_component(inst,key); _status,_text=display_component_status(comp,key,_dr); col.metric(title,_status); col.caption(_text)
     if inst:
         st.progress(min(1,max(0,p["inst_read"]/100)),text=f"Prontidão institucional: {p['inst_read']:.0f}/100 — {p['inst_label']}")
     else:
@@ -412,7 +443,9 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     if ict: st.progress(min(1,max(0,p["ict_read"]/100)),text=f"Prontidão ICT: {p['ict_read']:.0f}/100 — {p['ict_label']}")
 
     st.markdown("### 💧 Liquidez e contexto")
-    x1,x2,x3,x4,x5=st.columns(5); x1.metric("W1",p["w1"]); x2.metric("D1",p["d1"]); x3.metric("Premium/Discount",p["pd_zone"]); x4.metric("Sweep",p["sweep_type"] or "—"); x5.metric("Evento",p["event"])
+    _pdop=premium_discount_operational(p.get("side","WAIT"),_component(inst,"dealing_range"),_dr)
+    x1,x2,x3,x4,x5=st.columns(5); x1.metric("W1",p["w1"]); x2.metric("D1",p["d1"]); x3.metric("Premium/Discount",_pdop.get("status","—")); x4.metric("Sweep",p["sweep_type"] or "—"); x5.metric("Evento",p["event"])
+    st.caption("Premium/Discount: " + _pdop.get("text",""))
     if p["sweep_type"]:
         st.info(f"💧 {p['sweep_type']} em **{p['sweep_level'] or 'nível'}** ({_fmt_price(p['sweep_price'],pair)}). {p['sweep_rejection']}")
     levels=p.get("levels",{}) or {}
@@ -429,7 +462,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     elif p["state"].startswith("🔴"): st.error(msg)
     else: st.warning(msg)
 
-    with st.expander("📚 Como ler o V11.0"):
+    with st.expander("📚 Como ler o V11.0.1"):
         st.markdown("""
 - **Macro** escolhe o lado; execução nunca inverte o lado macro sozinha.
 - **SMT** procura divergência entre EUR/USD↔GBP/USD, AUD/USD↔NZD/USD e USD/CHF↔USD/JPY.
@@ -438,6 +471,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
 - **Judas/Sessão** procura sweep/rejeição do range asiático durante Londres/NY.
 - **Breaker/Mitigation** é uma heurística de zona de origem do displacement; não é ordem institucional observável.
 - **CRT/OTE/AMD/FVG** continuam como camada ICT de timing/localização.
+- **Data Readiness** separa processo saudável de dado operacional utilizável; sem H4/H1/M15 frescos e cache mínimo, a execução fica bloqueada.
 - **Hard gates** impedem que um par apareça “executável” quando evento, ADR, H4/H1, qualidade ou frescor não permitem.
         """)
     with st.expander("🛡️ Limites do algoritmo"):

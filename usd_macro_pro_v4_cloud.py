@@ -101,12 +101,12 @@ except Exception as _autopilot_exc:
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "11.0.0 — INSTITUTIONAL DECISION ENGINE · MOTOR BASE V9.3.9.2"
+APP_VERSION = "11.0.1 — DATA READINESS & INSTITUTIONAL INTEGRITY · MOTOR BASE V9.3.9.2"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro V11.0 — Central Institucional dos 7 Pares",
+    page_title="USD Macro Pro V11.0.1 — Data Readiness & Institutional Integrity",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1695,7 +1695,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro V11.0 — Institutional Decision Engine")
+st.title("🦅 USD Macro Pro V11.0.1 — Data Readiness & Institutional Integrity")
 st.caption("Macro semanal → Macro do dia → W1/D1 → Quarterly → Liquidez → Killzones → H4/H1/M15 → Performance real")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -3461,7 +3461,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 # V9.0 — CENTRAL DO OPERADOR
 # Somente interface/orientação; não altera o motor do modelo.
 # ============================================================
-st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V11.0")
+st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V11.0.1")
 st.caption("O APP define o viés macro; o gráfico confirma a entrada.")
 
 with st.container(border=True):
@@ -3657,8 +3657,8 @@ def _autopilot_save_inputs_v107():
 
 
 abas = st.tabs([
-    "🏛️ CENTRAL INSTITUCIONAL V11.0",
-    "🧠 PAINEL MESTRE V11.0",
+    "🏛️ CENTRAL INSTITUCIONAL V11.0.1",
+    "🧠 PAINEL MESTRE V11.0.1",
     "🏆 Classificação",
     "🇺🇸 Painel EUA",
     "💱 Pares e Confiança",
@@ -3666,12 +3666,12 @@ abas = st.tabs([
     "🧾 Histórico",
     "📈 Teste Histórico",
     "🎯 Decisão Automática",
-    "🧭 Macro Market Map V11.0",
+    "🧭 Macro Market Map V11.0.1",
     "✨ Aprenda & Personalize",
-    "🚀 Produto V11.0",
-    "🧭 Melhorias V11.0",
-    "🌍 Notícias Globais V11.0",
-    "🤖 AUTOPILOT V11.0",
+    "🚀 Produto V11.0.1",
+    "🧭 Melhorias V11.0.1",
+    "🌍 Notícias Globais V11.0.1",
+    "🤖 AUTOPILOT V11.0.1",
 ])
 
 # =========================================================
@@ -8886,12 +8886,12 @@ if os.getenv("USD_MACRO_AUTOPILOT", "") == "1":
         print("AUTOPILOT_INPUT_WARNING:", _msg_auto107)
 
 # =========================================================
-# ABA 1 — CENTRAL INSTITUCIONAL DOS 7 PARES V11.0
+# ABA 1 — CENTRAL INSTITUCIONAL DOS 7 PARES V11.0.1
 # Renderizada ao final para reutilizar a Matriz oficial já calculada.
 # =========================================================
 with abas[0]:
     if render_pair_intelligence_v110 is None:
-        st.error("A Central Institucional V11.0 não pôde ser carregada.")
+        st.error("A Central Institucional V11.0.1 não pôde ser carregada.")
         if _PAIR_INTEL_V110_IMPORT_ERROR:
             st.caption(f"Diagnóstico: {_PAIR_INTEL_V110_IMPORT_ERROR}")
     elif "matriz_v61" not in globals() or matriz_v61 is None or matriz_v61.empty:
