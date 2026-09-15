@@ -1,7 +1,10 @@
 import unittest
 import pandas as pd
 
-from atlasquant_dashboard_v1 import build_g8_radar, radar_summary, strengths_from_ranking
+from atlasquant_dashboard_v1 import (
+    build_g8_radar, radar_summary, strengths_from_ranking,
+    focus_rows, focus_card_html,
+)
 
 
 class AtlasQuantDashboardTests(unittest.TestCase):
@@ -31,6 +34,26 @@ class AtlasQuantDashboardTests(unittest.TestCase):
         self.assertGreaterEqual(radar.iloc[0]["Intensidade relativa"], radar.iloc[-1]["Intensidade relativa"])
         s = radar_summary(radar)
         self.assertEqual(s["total"], 28)
+
+    def test_focus_cards_never_claim_entry_authorization(self):
+        radar = build_g8_radar(self.ranking)
+        rows = focus_rows(radar, 3)
+        self.assertEqual(len(rows), 3)
+        self.assertTrue(all(r["operational_state"] == "AGUARDAR CONFIRMAÇÃO" for r in rows))
+
+    def test_focus_card_escapes_pair_and_state(self):
+        html = focus_card_html({
+            "pair": "<script>x</script>",
+            "side": "COMPRA",
+            "base_strength": 80,
+            "quote_strength": 40,
+            "difference": 40,
+            "intensity": 90,
+            "operational_state": "<b>GO</b>",
+        })
+        self.assertNotIn("<script>", html)
+        self.assertNotIn("<b>GO</b>", html)
+        self.assertIn("&lt;script&gt;", html)
 
 
 if __name__ == "__main__":
