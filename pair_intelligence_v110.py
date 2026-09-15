@@ -11,6 +11,7 @@ import json
 import math
 import os
 import time
+from html import escape
 from typing import Any, Mapping
 
 import numpy as np
@@ -399,6 +400,75 @@ def _stack_rows(p:Mapping[str,Any])->pd.DataFrame:
     return pd.DataFrame(rows,columns=["Camada","Leitura","Estado","Score"])
 
 
+def atlasquant_operational_card(pack: Mapping[str, Any]) -> dict[str, Any]:
+    """Presentation state derived only from already-audited institutional output."""
+    p = dict(pack or {})
+    ready = bool((p.get("data_ready", {}) or {}).get("sufficient", False))
+    executable = bool(p.get("executable", False))
+    raw_state = str(p.get("state", "⚪ AGUARDAR"))
+    if executable and ready:
+        light, action = "GREEN", "SETUP EXECUTÁVEL"
+    elif raw_state.startswith("🔴") or not ready:
+        light, action = "RED", "NÃO OPERAR"
+    else:
+        light, action = "YELLOW", "AGUARDAR CONFIRMAÇÃO"
+    return {
+        "pair": str(p.get("pair", "—")),
+        "direction": str(p.get("direction", "⚪ AGUARDAR")),
+        "state": raw_state,
+        "traffic_light": light,
+        "action": action,
+        "priority": _safe(p.get("priority", 0)),
+        "quality": _safe(p.get("quality", 0)),
+        "data_score": _safe((p.get("data_ready", {}) or {}).get("score", 0)),
+        "m15": str(p.get("m15", "—")),
+        "gate": str(p.get("gate", "—")),
+        "reason": str(p.get("reason", "—")),
+    }
+
+
+def _render_atlasquant_operational_cards(packs: list[Mapping[str, Any]]) -> None:
+    cards = [atlasquant_operational_card(p) for p in list(packs or [])[:3]]
+    if not cards:
+        return
+    st.markdown("""
+<style>
+.aq-op-card{border:1px solid rgba(137,170,210,.18);border-radius:15px;padding:15px 16px;
+background:linear-gradient(180deg,rgba(17,34,57,.88),rgba(10,24,41,.82));min-height:205px}
+.aq-op-card.green{border-top:3px solid #42d392}.aq-op-card.yellow{border-top:3px solid #f2c14e}
+.aq-op-card.red{border-top:3px solid #ff6b7a}
+.aq-op-pair{font-size:1.05rem;font-weight:800}.aq-op-action{font-size:.72rem;font-weight:800;letter-spacing:.05em}
+.aq-op-priority{font-size:1.8rem;font-weight:850;margin-top:10px}.aq-op-priority span{font-size:.75rem;color:#9fb0c6}
+.aq-op-small{font-size:.72rem;color:#9fb0c6;margin-top:8px}.aq-op-state{font-size:.76rem;margin-top:11px;font-weight:700}
+</style>
+""", unsafe_allow_html=True)
+    st.markdown("### 🚦 Melhores contextos operacionais")
+    st.caption("Usa a decisão institucional já auditada. Verde só aparece quando o próprio motor marca o setup como executável e os dados estão suficientes.")
+    cols = st.columns(len(cards))
+    icons = {"GREEN": "🟢", "YELLOW": "🟡", "RED": "🔴"}
+    for col, card in zip(cols, cards):
+        with col:
+            tone = card["traffic_light"].lower()
+            pair = escape(card["pair"])
+            action = escape(card["action"])
+            direction = escape(card["direction"])
+            state = escape(card["state"])
+            m15 = escape(card["m15"])
+            gate = escape(card["gate"])
+            icon = icons.get(card["traffic_light"], "⚪")
+            st.markdown(f"""
+<div class="aq-op-card {tone}">
+  <div style="display:flex;justify-content:space-between;gap:8px">
+    <span class="aq-op-pair">{pair}</span><span class="aq-op-action">{icon} {action}</span>
+  </div>
+  <div class="aq-op-priority">{card['priority']:.0f}<span>/100 prioridade</span></div>
+  <div class="aq-op-small">Dados {card['data_score']:.0f}/100 · Qualidade {card['quality']:.0f}/100</div>
+  <div class="aq-op-small">M15 {m15} · Gate {gate}</div>
+  <div class="aq-op-state">{direction}<br>{state}</div>
+</div>
+""", unsafe_allow_html=True)
+
+
 def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:Mapping[str,Any]|None=None,macro_context:Mapping[str,Any]|None=None,weights:Mapping[str,float]|None=None):
     _css()
     st.markdown("## Central institucional")
@@ -419,6 +489,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
 
     opctx=select_operational_context(packs)
     best=opctx.get("best") or packs[0]
+    _render_atlasquant_operational_cards(packs)
     no_trade=bool(opctx.get("no_trade",False))
     strongest,weakest=_major_extremes(ranking)
     process_age=_age_minutes(auto.get("last_run"))
