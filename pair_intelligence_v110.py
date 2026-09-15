@@ -32,6 +32,7 @@ from atlasquant_central_brief import render_central_brief
 from atlasquant_context_explain import render_context_explain
 from atlasquant_data_quality_center import render_data_confidence
 from atlasquant_confluence_map import render_confluence_map
+from atlasquant_operational_plan import render_operational_plan
 
 try:
     from currency_news_v107 import pair_news_table
@@ -498,6 +499,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     _render_atlasquant_operational_cards(packs)
     render_confluence_map(best)
     render_context_explain(best)
+    render_operational_plan(best)
     no_trade=bool(opctx.get("no_trade",False))
     strongest,weakest=_major_extremes(ranking)
     process_age=_age_minutes(auto.get("last_run"))
