@@ -31,6 +31,7 @@ import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
+from twelve_cache_v1108 import cached_series, clear_shared_cache
 import re
 
 # V10 — camada observacional profissional. O try/except evita derrubar
@@ -101,12 +102,12 @@ except Exception as _autopilot_exc:
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "11.0.7 — STRENGTH ATTRIBUTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2"
+APP_VERSION = "11.0.8 — STRENGTH ATTRIBUTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro V11.0.7 — Strength Attribution + Audit Integrity",
+    page_title="USD Macro Pro V11.0.8 — Strength Attribution + Audit Integrity",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -195,7 +196,7 @@ else:
     st.sidebar.info("EODHD sem token: consenso permanece manual.")
 
 if CHAVE_TWELVE_DATA:
-    st.sidebar.success("Twelve Data configurado: H4/H1/M15 automáticos ativos.")
+    st.sidebar.success("Twelve Data configurado: coleta exclusiva do Autopilot; telas usam cache.")
 else:
     st.sidebar.info("Twelve Data sem chave: análise técnica automática ficará aguardando configuração.")
 
@@ -996,8 +997,7 @@ def calcular_ranking(dados: dict, macro_us: dict, fed: dict) -> pd.DataFrame:
         df.loc[iu, "Pontuação_Macro"] = (
             usd_det["componentes"]["Inflação"] * 0.25
             + usd_det["componentes"]["Emprego"] * 0.25
-            + usd_det["componentes"]["Atividade"] * 0.15
-            + usd_det["componentes"]["Juros / Treasury 2Y"] * 0.35
+            + usd_det["componentes"]["Atividade"] * 0.15            + usd_det["componentes"]["Juros / Treasury 2Y"] * 0.35
         )
         df.loc[iu, "Influência_Fed"] = usd_det["componentes"]["Federal Reserve"] - 50
 
@@ -1706,7 +1706,7 @@ usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
 st.title("USD Macro Pro")
-st.caption("V11.0.7 · Força auditável e interface compacta")
+st.caption("V11.0.8 · Força auditável · coleta com orçamento diário")
 st.caption("Macro semanal → Macro do dia → W1/D1 → Quarterly → Liquidez → Killzones → H4/H1/M15 → Performance real")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -1996,8 +1996,7 @@ def _explicar_sinal_v78(par, moeda_base, moeda_cotada, score_base, score_cotada,
             observacoes.append(f"Score Mestre moderado ({sm:.0f}/100)")
         else:
             fatores_contra.append(f"Score Mestre ainda fraco ({sm:.0f}/100)")
-    except Exception:
-        pass
+    except Exception:        pass
 
     # Conclusão textual
     if direcao == "WAIT":
@@ -2996,8 +2995,7 @@ def _avaliar_sinais_v82():
         _salvar_sinais_v82(df)
 
     # Apenas diagnóstico de interface; não altera a classificação histórica.
-    st.session_state["v1073_linhas_legadas_ignoradas"] = int(_ignorados_legado_v1073)
-    return df, atualizados
+    st.session_state["v1073_linhas_legadas_ignoradas"] = int(_ignorados_legado_v1073)    return df, atualizados
 
 
 def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca, confl):
@@ -3473,7 +3471,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 # Somente interface/orientação; não altera o motor do modelo.
 # ============================================================
 with st.expander("Guia do operador", expanded=False):
-    st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V11.0.7")
+    st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V11.0.8")
     st.caption("O APP define o viés macro; o gráfico confirma a entrada.")
 
     with st.container(border=True):
@@ -3996,7 +3994,6 @@ def _score_tendencias_eua() -> dict:
     desemp = _tendencia_serie("UNRATE", None, 3)
     t2 = _tendencia_serie("DGS2", None, 5)
     broad = _tendencia_serie("DTWEXBGS", None, 5)
-
     # Inflação persistente e yields subindo podem sustentar expectativa de juros;
     # desemprego subindo tende a enfraquecer o bloco de atividade/emprego.
     bruto = (
@@ -4996,8 +4993,7 @@ def _mostrar_risco_timing_v63(confl: dict, diferenca: float):
         )
     else:
         st.info(
-            "Nenhum evento foi informado nesta avaliação. O timing não recebeu penalidade de calendário."
-        )
+            "Nenhum evento foi informado nesta avaliação. O timing não recebeu penalidade de calendário."        )
 
     st.markdown(
         "**Fluxo recomendado pelo painel:** Macro → risco de notícia → estrutura/preço → gestão de risco."
@@ -5996,7 +5992,6 @@ with abas[4]:
 
         st.write(f"Motivo: {base} está em **{score_base:.1f}** e {cotada} em **{score_cotada:.1f}**. O USD, quando presente, já inclui o ajuste das surpresas econômicas.")
         st.warning("⚠️ O viés macro não é gatilho de entrada nem probabilidade de lucro. Confirme preço, estrutura, liquidez, sessão e risco.")
-
         st.markdown("#### 📝 Registrar sinal para teste histórico")
         preco = st.number_input("Preço de entrada", min_value=0.00001, max_value=1000.0, value=1.10000, step=0.00001, format="%.5f")
         horizonte = st.selectbox("Tempo para avaliar (horas)", [1,4,8,24,48,72], 3)
@@ -6698,62 +6693,13 @@ with abas[3]:
 # O motor técnico usa regras explícitas e reproduzíveis.
 # =========================================================
 
-@st.cache_data(ttl=1800, show_spinner=False)
 def _td_time_series_v92(par: str, interval: str, outputsize: int = 140) -> pd.DataFrame:
-    """V9.3.6.4: captura diagnóstico seguro da Twelve Data sem salvar/exibir API key."""
-    def vazio(msg="", http=None, api_status="", api_code="", values_count=0, valid_count=0):
-        d = pd.DataFrame()
-        d.attrs["erro_td"] = str(msg or "")
-        d.attrs["td_diag"] = {
-            "symbol": str(par), "interval": str(interval), "outputsize": int(outputsize),
-            "http_status": http, "api_status": str(api_status or ""),
-            "api_code": str(api_code or ""), "api_message": str(msg or ""),
-            "values_count": int(values_count or 0), "candles_validos": int(valid_count or 0),
-        }
-        return d
-
-    if not CHAVE_TWELVE_DATA:
-        return vazio("CHAVE_TWELVE_DATA não configurada.")
-
-    url = "https://api.twelvedata.com/time_series"
-    params = {"symbol":par,"interval":interval,"outputsize":int(outputsize),
-              "apikey":CHAVE_TWELVE_DATA,"format":"JSON","order":"ASC","timezone":"UTC"}
-    ultimo = {}
-    for tentativa in range(2):
-        try:
-            r=requests.get(url,params=params,timeout=20)
-            http=int(r.status_code)
-            try:
-                j=r.json()
-            except Exception as e:
-                return vazio(f"Resposta não-JSON: {type(e).__name__}", http=http)
-            status=j.get("status",""); code=j.get("code",""); msg=j.get("message","")
-            vals=j.get("values",[])
-            nvals=len(vals) if isinstance(vals,list) else 0
-            ultimo={"http":http,"status":status,"code":code,"msg":msg,"nvals":nvals}
-            if http != 200 or status=="error" or "values" not in j:
-                erro=str(msg or code or f"HTTP {http}")
-                if tentativa==1 or any(x in erro.lower() for x in ["credit","limit","rate","quota"]):
-                    return vazio(erro,http,status,code,nvals,0)
-                continue
-            df=pd.DataFrame(vals)
-            if df.empty:
-                return vazio("Resposta sem candles.",http,status,code,0,0)
-            df["datetime"]=pd.to_datetime(df["datetime"],errors="coerce",utc=True)
-            for c in ["open","high","low","close"]:
-                df[c]=pd.to_numeric(df[c],errors="coerce")
-            df=(df.dropna(subset=["datetime","open","high","low","close"])
-                  .sort_values("datetime").drop_duplicates("datetime").reset_index(drop=True))
-            df.attrs["erro_td"]=""
-            df.attrs["td_diag"]={
-                "symbol":str(par),"interval":str(interval),"outputsize":int(outputsize),
-                "http_status":http,"api_status":str(status or ""),"api_code":str(code or ""),
-                "api_message":str(msg or ""),"values_count":nvals,"candles_validos":int(len(df))}
-            return df
-        except Exception as e:
-            ultimo={"http":None,"status":"","code":"","msg":f"{type(e).__name__}: {e}","nvals":0}
-    return vazio(ultimo.get("msg","Falha ao consultar candles."),ultimo.get("http"),
-                 ultimo.get("status",""),ultimo.get("code",""),ultimo.get("nvals",0),0)
+    df,err=cached_series(par,interval,outputsize)
+    df.attrs["erro_td"]=err
+    df.attrs["td_diag"]={"symbol":par,"interval":interval,"api_message":err,
+                         "source":"CACHE_AUTOPILOT","candles_validos":len(df)}
+    return df
+_td_time_series_v92.clear = clear_shared_cache
 
 def _indicadores_tecnicos_v92(df: pd.DataFrame) -> pd.DataFrame:
     d = df.copy()
@@ -7045,8 +6991,7 @@ def _registrar_config_completa_v937(
     par, direcao = str(par), str(direcao)
     candle = str(candle_m15 or "")
     chave = f"{par}|{direcao}|{candle}"
-    df, erro = _config_ler_v937()
-    if erro and df.empty:
+    df, erro = _config_ler_v937()    if erro and df.empty:
         return False, erro, False
     if not df.empty:
         chaves = (
@@ -7086,40 +7031,16 @@ def _retorno_direcional_v938(direcao, entrada, saida):
     return -bruto if "VENDA" in str(direcao).upper() else bruto
 
 def _td_preco_historico_v938(par, alvo_utc):
-    """Busca candles M15 e devolve o primeiro fechamento em/apos o horário-alvo."""
-    chave = st.secrets.get("CHAVE_TWELVE_DATA", "")
-    if not chave:
-        return None, None, "CHAVE_TWELVE_DATA ausente."
+    df,err=cached_series(par,"15min",500,history=True)
+    if err or df.empty: return None,None,err or "Histórico fora do cache; aguarde coleta."
     try:
-        alvo = pd.to_datetime(alvo_utc, utc=True)
-        params = {
-            "symbol": str(par),
-            "interval": "15min",
-            "outputsize": 500,
-            "apikey": chave,
-            "timezone": "UTC",
-            "format": "JSON",
-        }
-        r = requests.get("https://api.twelvedata.com/time_series", params=params, timeout=20)
-        if r.status_code != 200:
-            return None, None, f"HTTP {r.status_code}"
-        js = r.json()
-        vals = js.get("values") or []
-        candidatos = []
-        for v in vals:
-            try:
-                dt = pd.to_datetime(v.get("datetime"), utc=True)
-                close = float(v.get("close"))
-                if dt >= alvo:
-                    candidatos.append((dt, close))
-            except Exception:
-                pass
-        if not candidatos:
-            return None, None, "Ainda não há candle posterior ao horizonte."
-        dt, close = sorted(candidatos, key=lambda x: x[0])[0]
-        return close, dt.isoformat(), ""
-    except Exception as e:
-        return None, None, f"{type(e).__name__}: {e}"
+        target=pd.to_datetime(alvo_utc,utc=True)
+        eligible=df[(df["datetime"]>=target)&(df["datetime"]<target+pd.Timedelta(minutes=15))]
+        if eligible.empty: return None,None,"Horizonte sem candle no cache; permanece pendente."
+        row=eligible.iloc[0]
+        return float(row["close"]),row["datetime"].isoformat(),""
+    except Exception:
+        return None,None,"Horário histórico inválido."
 
 def _validar_configuracoes_v938():
     """
@@ -7477,29 +7398,7 @@ def _scanner_load_v934():
         return vazio
 
 def _scanner_save_v934(data):
-    token, repo, branch = _gh_cfg_v934()
-    if not token or not repo:
-        return False, "Persistência GitHub não configurada."
-    url = f"https://api.github.com/repos/{repo}/contents/{_SCANNER_GH_PATH_V934}"
-    headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
-    try:
-        current = requests.get(url, headers=headers, params={"ref": branch}, timeout=20)
-        sha = current.json().get("sha", "") if current.status_code == 200 else ""
-        clean = {k:v for k,v in data.items() if not str(k).startswith("_")}
-        payload = {
-            "message": "Atualiza scanner técnico V9.3.4",
-            "content": base64.b64encode(
-                json.dumps(clean, ensure_ascii=False, indent=2).encode("utf-8")
-            ).decode("ascii"),
-            "branch": branch,
-        }
-        if sha:
-            payload["sha"] = sha
-        r = requests.put(url, headers=headers, json=payload, timeout=25)
-        r.raise_for_status()
-        return True, ""
-    except Exception as e:
-        return False, f"{type(e).__name__}: {e}"
+    return False, "Scanner gerenciado pelo Autopilot. Releia o cache; novas coletas e gravações ocorrem no workflow Autopilot."
 
 def _tec_to_json_v934(tec):
     """Converte somente o resumo técnico necessário; DataFrames nunca são persistidos."""
@@ -7711,9 +7610,9 @@ with abas[8]:
         # -----------------------------
         st.markdown("### 5️⃣ Confirmação técnica automática — V9.2")
         st.caption(
-            "Fonte técnica: Twelve Data. H4 = direção/estrutura; "
+            "Fonte técnica: cache do Autopilot. H4 = direção/estrutura; "
             "H1 = alinhamento/pullback; M15 = gatilho curto. "
-            "Os candles ficam em cache por ~30 minutos para respeitar limites da API."
+            "As telas reutilizam candles sem novas consultas. Dados antigos continuam bloqueados."
         )
 
         if st.button("🔄 Atualizar técnica agora", key="v92_refresh_tecnico"):
@@ -8091,8 +7990,7 @@ with abas[8]:
                 _c3.metric("Score Mestre", f"{_score958}/100")
                 _c4.metric("Qualidade", _qual958)
 
-                st.caption(
-                    f"Índice operacional: {_idx958:.1f}/100 · "
+                st.caption(                    f"Índice operacional: {_idx958:.1f}/100 · "
                     "Ranking automático entre os pares com dados técnicos disponíveis."
                 )
 
@@ -8891,7 +8789,7 @@ if os.getenv("USD_MACRO_AUTOPILOT", "") == "1":
 # =========================================================
 with abas[0]:
     if render_pair_intelligence_v110 is None:
-        st.error("A Central Institucional V11.0.7 não pôde ser carregada.")
+        st.error("A Central Institucional V11.0.8 não pôde ser carregada.")
         if _PAIR_INTEL_V110_IMPORT_ERROR:
             st.caption(f"Diagnóstico: {_PAIR_INTEL_V110_IMPORT_ERROR}")
     elif "matriz_v61" not in globals() or matriz_v61 is None or matriz_v61.empty:
@@ -8902,4 +8800,3 @@ with abas[0]:
             "usd_quality": float(qualidade_usd) if "qualidade_usd" in globals() else 0.0,
         }
         render_pair_intelligence_v110(matriz_v61, ranking, fed=fed, macro_context=_macro_v108, weights=PESOS)
-
