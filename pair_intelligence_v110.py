@@ -31,6 +31,7 @@ from strength_breakdown_v1104 import build_strength_breakdown, attribution_sides
 from atlasquant_central_brief import render_central_brief
 from atlasquant_context_explain import render_context_explain
 from atlasquant_data_quality_center import render_data_confidence
+from atlasquant_confluence_map import render_confluence_map
 
 try:
     from currency_news_v107 import pair_news_table
@@ -495,6 +496,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     render_central_brief(packs, auto)
     render_data_confidence(packs, auto)
     _render_atlasquant_operational_cards(packs)
+    render_confluence_map(best)
     render_context_explain(best)
     no_trade=bool(opctx.get("no_trade",False))
     strongest,weakest=_major_extremes(ranking)
