@@ -62,7 +62,11 @@ def render_autopilot_v107():
     elif daily_blocked:
         block_type = str(status.get("twelve_block_type", "") or "")
         reason = str(status.get("twelve_daily_block_reason", "")).lower()
-        if "current minute" in reason or "per minute" in reason:
+        if block_type in ('RITMO_DIARIO','ORCAMENTO_DIARIO'):
+            st.info("Orçamento protegido: o coletor adiou consultas para respeitar a distribuição diária.")
+        elif block_type == 'CONTROLE_INDISPONIVEL':
+            st.warning("Coleta pausada: não foi possível confirmar o orçamento persistido.")
+        elif block_type == 'LIMITE_MINUTO' or "current minute" in reason or "per minute" in reason:
             st.warning("🟠 TWELVE DATA: LIMITE POR MINUTO — consultas interrompidas nesta rodada")
         elif block_type == "COTA_DIARIA":
             st.warning("🟠 TWELVE DATA: COTA DIÁRIA/CRÉDITOS ESGOTADOS — o Autopilot parou novas consultas nesta rodada")
@@ -75,6 +79,26 @@ def render_autopilot_v107():
     if age is not None:
         st.caption(f"Última execução há {age:.0f} min · {status.get('last_run','')}")
 
+    budget=status.get('twelve_budget',{}) or {}
+    if budget and not budget.get('error'):
+        st.markdown('### Orçamento diário — última rodada')
+        b1,b2,b3=st.columns(3)
+        b1.metric('Créditos contabilizados',int(budget.get('used',0)))
+        b2.metric('Limite do aplicativo',int(budget.get('limit',480)))
+        b3.metric('Saldo protegido',int(budget.get('remaining',0)))
+        st.caption('Contagem conservadora: inclui tentativas com falha e uso diário informado pela API. Consultas feitas fora deste aplicativo não são controladas aqui.')
+        for label,key in [('Renovação diária','reset_at'),('Pausa registrada até','blocked_until')]:
+            value=budget.get(key)
+            if value:
+                stamp=pd.to_datetime(value,utc=True,errors='coerce')
+                if pd.notna(stamp):
+                    local=stamp.tz_convert('America/Cuiaba')
+                    st.caption(f'{label}: {local:%d/%m %H:%M} (Cuiabá) · {stamp:%H:%M UTC}')
+        retry=status.get('twelve_retry_after')
+        if retry and not budget.get('blocked_until'):
+            stamp=pd.to_datetime(retry,utc=True,errors='coerce')
+            if pd.notna(stamp): st.caption(f'Nova consulta permitida a partir de {stamp.tz_convert("America/Cuiaba"):%d/%m %H:%M}. A coleta depende da próxima rodada do Autopilot.')
+
     a,b,c,d=st.columns(4)
     a.metric("Scanner fresco",f"{int(status.get('scanner_fresh',0))}/7")
     b.metric("Market Map fresco",f"{int(status.get('market_map_fresh',0))}/7")
@@ -84,14 +108,14 @@ def render_autopilot_v107():
     e,f,g,h=st.columns(4)
     e.metric("Histórias únicas",int(status.get("news_unique_stories",0) or 0))
     f.metric("Snapshots",int(status.get("validation_rows",0)))
-    g.metric("Calls Twelve/run",int(status.get("twelve_calls_this_run",0)), "externas reais")
+    g.metric("Consultas nesta rodada",int(status.get("twelve_calls_this_run",0)), "externas reais")
     h.metric("Mercado FX", "ABERTO" if status.get("forex_market_open") else "FECHADO")
 
     st.markdown("### ⚙️ O que ficou automático")
     st.markdown(
         "- ✅ execução headless do app para atualizar macro/FRED e Matriz\n"
         "- ✅ notícias globais USD/EUR/GBP/JPY/CHF/CAD/AUD/NZD\n"
-        "- ✅ scanner M15 ~30min, H1 ~1h e H4 ~4h\n- ✅ limitador automático distribui as consultas Twelve Data no tempo\n"
+        "- ✅ M15 ~30–60min, H1 ~1–2h e H4 ~4h, sujeitos a orçamento e agendamento\n- ✅ limite persistido de 480 créditos/dia, com distribuição por hora\n"
         "- ✅ W1/D1/liquidez/ADR/Market Map em background\n"
         "- ✅ 1 snapshot por par/dia sem duplicidade\n"
         "- ✅ Timing Integrity: entry_time = momento real do congelamento\n"
@@ -99,8 +123,8 @@ def render_autopilot_v107():
         "- ✅ fim de semana reduz consultas técnicas automaticamente"
     )
     st.info(
-        "Os botões manuais continuam no app apenas como contingência. "
-        "O fluxo normal da V10.7 não depende deles."
+        "As telas reutilizam o cache, sem novas consultas à Twelve Data. "
+        "A coleta externa é exclusiva do Autopilot. Atualizar a página não renova a cota."
     )
 
     if daily_blocked:
