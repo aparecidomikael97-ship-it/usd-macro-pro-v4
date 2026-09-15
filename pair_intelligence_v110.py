@@ -426,6 +426,11 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     process_label=("🟢 PROCESSO OK" if process_ok and process_age is not None and process_age<=90 else "🟡 SEM RODADA RECENTE" if process_ok else "🔴 FALHA HEADLESS")
     data_ok=sum(1 for x in packs if bool((x.get("data_ready",{}) or {}).get("sufficient",False)))
     twelve_label="🟠 COTA/PLANO BLOQUEADO" if auto.get("twelve_daily_blocked") else "🟢 SEM BLOQUEIO REGISTRADO"
+    if auto.get('twelve_daily_blocked'):
+        labels={'COTA_DIARIA':'🟠 COTA DIÁRIA ESGOTADA','LIMITE_MINUTO':'🟠 PAUSA POR MINUTO',
+                'RITMO_DIARIO':'🟡 ORÇAMENTO EM PAUSA','ORCAMENTO_DIARIO':'🟡 LIMITE DO APP ATINGIDO',
+                'CONTROLE_INDISPONIVEL':'🟠 ORÇAMENTO INDISPONÍVEL'}
+        twelve_label=labels.get(auto.get('twelve_block_type'),twelve_label)
     c1,c2,c3,c4=st.columns(4)
     c1.metric("Melhor contexto",opctx.get("label",best["pair"])); c2.metric("Prioridade",f"{best['priority']:.1f}/100"); c3.metric("Mais forte (G8)",strongest); c4.metric("Mais fraca (G8)",weakest)
     st.info(opctx.get("state",best["state"]) if no_trade else best["state"])
@@ -475,7 +480,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
         st.session_state["v110_pair_deep"]=_pair_options[0]
     pair=st.selectbox("Escolha o par",_pair_options,key="v110_pair_deep")
 
-    # V11.0.7: resolve o pack e REFAZ o breakdown a partir do par selecionado.
+    # V11.0.8: resolve o pack e REFAZ o breakdown a partir do par selecionado.
     # Assim a interface nunca pode mostrar USD/CHF no seletor e EUR/USD na força.
     p=next(x for x in packs if x["pair"]==pair)
     _base_sel,_quote_sel=pair.split("/")
@@ -505,7 +510,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     with st.expander("Como a força foi calculada", expanded=False):
         if not _s.get("attribution_exact"):
             st.warning("Ranking antigo: componentes estimados; o residual não identifica causas econômicas. Recalcule o ranking para obter as contribuições efetivas.")
-        # V11.0.7 — conta de chegada, separando Macro puro, Fed e ajustes.
+        # V11.0.8 — conta de chegada, separando Macro puro, Fed e ajustes.
         _a=attribution_sides(_s)
         st.markdown("#### 🧮 Conta de chegada da força")
         _c1,_c2,_c3=st.columns(3)
@@ -626,7 +631,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     elif p["state"].startswith("🔴"): st.error(msg)
     else: st.warning(msg)
 
-    with st.expander("📚 Como ler o V11.0.7"):
+    with st.expander("📚 Como ler o V11.0.8"):
         st.markdown("""
 - **Macro** escolhe o lado; execução nunca inverte o lado macro sozinha.
 - **SMT** procura divergência entre EUR/USD↔GBP/USD, AUD/USD↔NZD/USD e USD/CHF↔USD/JPY.
