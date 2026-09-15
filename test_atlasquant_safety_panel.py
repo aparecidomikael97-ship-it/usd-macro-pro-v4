@@ -45,6 +45,16 @@ class AtlasQuantSafetyPanelTests(unittest.TestCase):
         inp=build_safety_input(p,{"app_headless_ok":True})
         self.assertEqual(inp.data_quality,40)
 
+    def test_regime_override_can_only_add_caution(self):
+        p=self.base()
+        r=evaluate_live_safety(
+            p,
+            {"app_headless_ok":True},
+            regime_supported_override=False,
+        )
+        self.assertEqual(r["traffic_light"],"YELLOW")
+        self.assertIn("Regime atual", " ".join(r["warnings"]))
+
 
 if __name__=="__main__":
     unittest.main()
