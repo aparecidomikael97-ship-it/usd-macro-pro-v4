@@ -1,4 +1,4 @@
-"""USD Macro Pro V10.7.7 — Quota Guard + First-429 Stop.
+"""USD Macro Pro V11.0 — Institutional Decision Autopilot.
 
 Executado pelo GitHub Actions a cada 30 minutos.
 
@@ -38,6 +38,7 @@ from currency_news_v107 import (
     pair_news_table,
 )
 from ict_execution_v108 import detect_crt, detect_ote, detect_amd, detect_fvg
+from institutional_engine_v110 import build_institutional_snapshot, SMT_COMPANIONS
 
 from market_map_core_v10 import (
     NY_TZ,
@@ -504,6 +505,20 @@ def _is_priority_pair_v1075(pair: str, pmap: Mapping[str, Mapping[str, Any]]) ->
     return pair in top
 
 
+def _serialize_tf_cache(df: pd.DataFrame, limit: int) -> list[dict[str, Any]]:
+    if df is None or df.empty:
+        return []
+    x=df.tail(max(8,int(limit))).copy()
+    if "datetime" in x.columns:
+        x["datetime"] = pd.to_datetime(x["datetime"], utc=True, errors="coerce").astype(str)
+    cols=[c for c in ("datetime","open","high","low","close") if c in x.columns]
+    return x[cols].to_dict("records")
+
+
+def _deserialize_tf_cache(records: list[dict[str, Any]] | None) -> pd.DataFrame:
+    return normalize_ohlc(records or [])
+
+
 def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, pd.DataFrame], list[str], int]:
     state, _ = gh_get_json(SCANNER_PATH, {"versao":"V10.7","resultados":{}})
     if not isinstance(state, dict):
@@ -560,6 +575,8 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
             "h1": dict(old_tec.get("h1", {}) or {}),
             "m15": dict(old_tec.get("m15", {}) or {}),
             "ict": dict(old_tec.get("ict", {}) or {}),
+            "institutional": dict(old_tec.get("institutional", {}) or {}),
+            "cache_v110": dict(old_tec.get("cache_v110", {}) or {}),
             "preco_m15": old_tec.get("preco_m15"),
             "ultima_atualizacao": old_tec.get("ultima_atualizacao"),
             "motivo": "",
@@ -611,6 +628,9 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
                 tec["preco_m15"] = float(closed.iloc[-1]["close"])
                 tec["ultima_atualizacao"] = pd.Timestamp(closed.iloc[-1]["datetime"]).isoformat()
                 old["m15_fetched_at"] = fetched_at
+                _cache_v110 = dict(tec.get("cache_v110", {}) or {})
+                _cache_v110["m15"] = _serialize_tf_cache(closed, 128)
+                tec["cache_v110"] = _cache_v110
             elif key == "h1":
                 tec["h1"] = analyze_h1(closed, side)
                 _ict = dict(tec.get("ict", {}) or {})
@@ -618,6 +638,9 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
                 _ict["ote"] = detect_ote(closed, side)
                 tec["ict"] = _ict
                 old["h1_fetched_at"] = fetched_at
+                _cache_v110 = dict(tec.get("cache_v110", {}) or {})
+                _cache_v110["h1"] = _serialize_tf_cache(closed, 80)
+                tec["cache_v110"] = _cache_v110
             elif key == "h4":
                 tec["h4"] = analyze_h4(closed, side)
                 old["h4_fetched_at"] = fetched_at
@@ -655,7 +678,7 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
             "macro_direction": direction,
             "processado_em": time.time() if ok_any else old.get("processado_em", 0),
             "tentativa_v107": True,
-            "versao_tentativa": "V10.8_AUTOPILOT",
+            "versao_tentativa": "V11.0_INSTITUTIONAL_AUTOPILOT",
         })
         results[pair] = old
         fetches[pair] = pair_fetch
@@ -663,7 +686,38 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
         if _TD_DAILY_BLOCKED:
             break
 
-    state["versao"] = "V10.8_AUTOPILOT"
+    # V11.0 — calcula a camada institucional para TODOS os pares usando cache
+    # persistido. Não consome API e permite SMT entre pares correlacionados.
+    for _pair in PAIR_ORDER:
+        _row = pmap.get(_pair, {})
+        _direction = str(_row.get("Direção", _row.get("Direcao", "⚪ AGUARDAR")))
+        _side = macro_side(_direction)
+        _old = dict(results.get(_pair, {}) or {})
+        _tec = dict(_old.get("tecnico", {}) or {})
+        _cache = dict(_tec.get("cache_v110", {}) or {})
+        _h1 = _deserialize_tf_cache(_cache.get("h1", []))
+        _m15 = _deserialize_tf_cache(_cache.get("m15", []))
+        _comp = SMT_COMPANIONS.get(_pair)
+        _comp_m15 = pd.DataFrame()
+        if _comp:
+            _comp_old = dict(results.get(_comp, {}) or {})
+            _comp_tec = dict(_comp_old.get("tecnico", {}) or {})
+            _comp_cache = dict(_comp_tec.get("cache_v110", {}) or {})
+            _comp_m15 = _deserialize_tf_cache(_comp_cache.get("m15", []))
+        try:
+            _tec["institutional"] = build_institutional_snapshot(
+                _pair, _h1, _m15, _side, _comp_m15, _comp
+            )
+        except Exception as _inst_exc:
+            _tec["institutional"] = {
+                "pair":_pair,"side":_side,"readiness":0.0,
+                "label":"⚪ INSTITUCIONAL INDISPONÍVEL",
+                "error":f"{type(_inst_exc).__name__}: {_inst_exc}",
+            }
+        _old["tecnico"] = _tec
+        results[_pair] = _old
+
+    state["versao"] = "V11.0_INSTITUTIONAL_AUTOPILOT"
     state["resultados"] = results
     state["ultimo_processamento_ts"] = time.time()
     auto_meta.update({
@@ -812,7 +866,7 @@ def update_market_map(inputs: Mapping[str, Any], m15_frames: Mapping[str,pd.Data
             errors.append(f"{pair} map: {type(exc).__name__}: {exc}")
 
     state.update({
-        "version":"V10.8_AUTOPILOT",
+        "version":"V11.0_INSTITUTIONAL_AUTOPILOT",
         "contexts":contexts,
         "last_batch_ts":time.time(),
         "autopilot_updated_at":utcnow().isoformat(),
@@ -1166,7 +1220,7 @@ def main() -> int:
 
     # 5. Automatic snapshots + timing migration + 1H/4H/24H validation.
     validation,snap_stats=manage_snapshots(intel,pair_df,m15_frames)
-    ok,err=gh_put_csv(NEWS_VALIDATION_PATH,validation,"V10.7 Autopilot: snapshots/validação automática")
+    ok,err=gh_put_csv(NEWS_VALIDATION_PATH,validation,"V11.0 Autopilot: snapshots/validação automática")
     if not ok: all_errors.append("Salvar validação: "+err)
 
     # 6. Health/status.
@@ -1174,7 +1228,7 @@ def main() -> int:
         app_ok,app_msg,inputs,scanner,master,intel,validation,
         all_errors,total_calls,snap_stats
     )
-    ok,err=gh_put_json(STATUS_PATH,status,"V10.7 Autopilot: status")
+    ok,err=gh_put_json(STATUS_PATH,status,"V11.0 Autopilot: status")
     if not ok:
         all_errors.append("Salvar status: "+err)
 
