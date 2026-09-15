@@ -116,6 +116,14 @@ except Exception as _stability_exc:
 
 
 try:
+    from atlasquant_expansion_budget import render_expansion_budget_planner
+    _ATLASQUANT_EXPANSION_BUDGET_IMPORT_ERROR = ""
+except Exception as _exp_budget_exc:
+    render_expansion_budget_planner = None
+    _ATLASQUANT_EXPANSION_BUDGET_IMPORT_ERROR = f"{type(_exp_budget_exc).__name__}: {_exp_budget_exc}"
+
+
+try:
     from currency_news_v107 import render_currency_news_panel
     _CURRENCY_NEWS_V106_IMPORT_ERROR = ""
 except Exception as _currency_news_exc:
@@ -8886,6 +8894,18 @@ with abas[12]:
         except Exception as _aq_stability_render_exc:
             st.warning("Stability Lab em modo seguro; auto-otimização continua desativada.")
             st.caption(f"Diagnóstico: {type(_aq_stability_render_exc).__name__}: {_aq_stability_render_exc}")
+
+    st.divider()
+    if render_expansion_budget_planner is None:
+        st.warning("Planejador de expansão técnica indisponível; cobertura atual permanece inalterada.")
+        if _ATLASQUANT_EXPANSION_BUDGET_IMPORT_ERROR:
+            st.caption(f"Diagnóstico Budget Planner: {_ATLASQUANT_EXPANSION_BUDGET_IMPORT_ERROR}")
+    else:
+        render_expansion_budget_planner(
+            current_pairs=7,
+            target_pairs=28,
+            daily_cap=480,
+        )
 
 # =========================================================
 # ABA 13 — V10.6.2 FRESH-PRICE SNAPSHOT RECOVERY
