@@ -129,6 +129,16 @@ except Exception as _atlasquant_ui_exc:
     navigation_labels = None
     _ATLASQUANT_UI_IMPORT_ERROR = f"{type(_atlasquant_ui_exc).__name__}: {_atlasquant_ui_exc}"
 
+
+try:
+    from atlasquant_dashboard_v1 import render_g8_radar
+    _ATLASQUANT_DASHBOARD_IMPORT_ERROR = ""
+except Exception as _atlasquant_dashboard_exc:
+    render_g8_radar = None
+    _ATLASQUANT_DASHBOARD_IMPORT_ERROR = (
+        f"{type(_atlasquant_dashboard_exc).__name__}: {_atlasquant_dashboard_exc}"
+    )
+
 MOEDAS = {
     "USD": "Dólar Americano",
     "EUR": "Euro",
@@ -8812,6 +8822,15 @@ if os.getenv("USD_MACRO_AUTOPILOT", "") == "1":
 # Renderizada ao final para reutilizar a Matriz oficial já calculada.
 # =========================================================
 with abas[0]:
+    if render_g8_radar is not None:
+        try:
+            render_g8_radar(ranking, neutral_band=5.0, top_n=8)
+        except Exception as _aq_radar_exc:
+            st.warning("Radar G8 temporariamente indisponível; motor operacional preservado.")
+            st.caption(f"Diagnóstico Radar G8: {type(_aq_radar_exc).__name__}")
+    elif _ATLASQUANT_DASHBOARD_IMPORT_ERROR:
+        st.caption(f"Radar G8 em modo compatível: {_ATLASQUANT_DASHBOARD_IMPORT_ERROR}")
+
     if render_pair_intelligence_v110 is None:
         st.error("A Central Institucional V11.0.8 não pôde ser carregada.")
         if _PAIR_INTEL_V110_IMPORT_ERROR:
