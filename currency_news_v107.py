@@ -38,6 +38,7 @@ import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
+from twelve_cache_v1108 import cached_series
 
 
 CURRENCY_PROFILES = {
@@ -998,7 +999,6 @@ def _gh_write_csv_v1061(path: str, df: pd.DataFrame, message: str) -> tuple[bool
     except Exception as exc:
         return False, f"{type(exc).__name__}: {exc}"
 
-
 def _gh_read_json_v1061(path: str) -> tuple[dict[str, Any], str]:
     token, repo, branch = _gh_cfg_v1061()
     if not token or not repo:
@@ -1440,39 +1440,8 @@ def register_daily_news_snapshot_v1061(
 
 
 
-def _td_candles_v1061(pair: str, outputsize: int = 500) -> tuple[pd.DataFrame, str]:
-    try:
-        api_key = st.secrets.get("CHAVE_TWELVE_DATA", os.getenv("CHAVE_TWELVE_DATA", ""))
-    except Exception:
-        api_key = os.getenv("CHAVE_TWELVE_DATA", "")
-    if not api_key:
-        return pd.DataFrame(), "CHAVE_TWELVE_DATA ausente."
-    try:
-        r = requests.get(
-            "https://api.twelvedata.com/time_series",
-            params={
-                "symbol": pair,
-                "interval": "15min",
-                "outputsize": int(outputsize),
-                "apikey": api_key,
-                "timezone": "UTC",
-                "format": "JSON",
-            },
-            timeout=20,
-        )
-        if r.status_code != 200:
-            return pd.DataFrame(), f"HTTP {r.status_code}"
-        js = r.json()
-        vals = js.get("values") or []
-        if not vals:
-            return pd.DataFrame(), str(js.get("message", "Sem candles M15."))
-        df = pd.DataFrame(vals)
-        df["datetime"] = pd.to_datetime(df["datetime"], utc=True, errors="coerce")
-        df["close"] = pd.to_numeric(df["close"], errors="coerce")
-        df = df.dropna(subset=["datetime", "close"]).sort_values("datetime").reset_index(drop=True)
-        return df, ""
-    except Exception as exc:
-        return pd.DataFrame(), f"{type(exc).__name__}: {exc}"
+def _td_candles_v1061(pair: str, outputsize: int = 500):
+    return cached_series(pair,"15min",outputsize,history=True)
 
 
 def _directional_return_v1061(side: str, entry: float, exit_price: float) -> float | None:
@@ -1880,4 +1849,3 @@ def render_currency_news_panel(
         "text/csv",
         use_container_width=True,
     )
-
