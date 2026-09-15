@@ -42,6 +42,26 @@ def _safe(v, default=0.0):
         return float(default)
 
 
+def _safe_bool(v, default=False):
+    """Avoids bool(pd.NA)/bool(NaN-like) crashes at UI decision boundaries."""
+    if v is None:
+        return bool(default)
+    try:
+        s = str(v).strip().lower()
+        if s in ("", "none", "nan", "nat", "<na>"):
+            return bool(default)
+        if s in ("true", "1", "sim", "yes"):
+            return True
+        if s in ("false", "0", "nao", "não", "no"):
+            return False
+    except Exception:
+        return bool(default)
+    try:
+        return bool(v)
+    except Exception:
+        return bool(default)
+
+
 def _gh_cfg():
     try:
         token=st.secrets.get("GITHUB_TOKEN_HISTORICO",os.getenv("GITHUB_TOKEN_HISTORICO",""))
@@ -247,7 +267,7 @@ def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro"):
         side=side,score=score,quality=quality,rank_index=idx,h4=h4,h1=h1,m15=m15,
         ict_readiness=ict_read,institutional_readiness=inst_read,gate=gate,gate_score=gate_score,
         adr_used_pct=adr,event_risk=event,technical_age_min=age,news_alignment=news_align,
-        data_sufficient=bool(data_ready.get("sufficient",False)),
+        data_sufficient=_safe_bool(data_ready.get("sufficient", False), False),
         data_readiness_score=_safe(data_ready.get("score",0)),
     )
     state=decision["state"]

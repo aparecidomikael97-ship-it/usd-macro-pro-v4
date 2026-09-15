@@ -9,6 +9,42 @@ import math
 import numpy as np
 
 
+def _is_missing(v: Any) -> bool:
+    """Safe missing-value check for None/NaN/NaT/pd.NA-like scalars."""
+    if v is None:
+        return True
+    try:
+        s = str(v).strip().upper()
+        if s in ("", "NONE", "NAN", "NAT", "<NA>"):
+            return True
+    except Exception:
+        pass
+    try:
+        neq = (v != v)
+        if isinstance(neq, (bool, np.bool_)) and bool(neq):
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _bool_or_none(v: Any) -> bool | None:
+    if _is_missing(v):
+        return None
+    if isinstance(v, (bool, np.bool_)):
+        return bool(v)
+    s = str(v).strip().lower()
+    if s in ("true", "1", "sim", "yes"):
+        return True
+    if s in ("false", "0", "nao", "não", "no"):
+        return False
+    try:
+        return bool(v)
+    except Exception:
+        return None
+
+
+
 def _f(v: Any, default: float = 0.0) -> float:
     try:
         x=float(v)
@@ -29,7 +65,7 @@ def _status_score(s: str) -> float:
 
 
 def _event_level(v: Any) -> str:
-    u=str(v or "NORMAL").upper().strip()
+    u = "NORMAL" if _is_missing(v) else str(v).upper().strip()
     if u in ("MÁXIMO","MAXIMO","MÁXIMA","MAXIMA","CRÍTICO","CRITICO"):
         return "MAXIMO"
     if u in ("ALTO","ELEVADO","HIGH"):
@@ -48,14 +84,18 @@ def evaluate_decision_integrity(
     event_risk: str,
     technical_age_min: float | None = None,
     news_alignment: str = "",
+    data_sufficient: bool | None = None,
+    data_readiness_score: float | None = None,
 ) -> dict[str, Any]:
     side=str(side).upper()
     score=_f(score); quality=_f(quality); rank_index=_f(rank_index)
     ict=_f(ict_readiness); inst=_f(institutional_readiness)
     gate_score=_f(gate_score)
-    adr=None if adr_used_pct in (None,"") else _f(adr_used_pct)
-    age=None if technical_age_min in (None,"") else _f(technical_age_min)
-    event=_event_level(event_risk)
+    adr = None if _is_missing(adr_used_pct) else _f(adr_used_pct)
+    age = None if _is_missing(technical_age_min) else _f(technical_age_min)
+    event = _event_level(event_risk)
+    data_score = None if _is_missing(data_readiness_score) else _f(data_readiness_score)
+    data_ok = _bool_or_none(data_sufficient)
 
     tech_scores=[_status_score(h4),_status_score(h1),_status_score(m15)]
     tech_avg=float(np.mean(tech_scores))
@@ -64,6 +104,11 @@ def evaluate_decision_integrity(
     macro_wait = side not in ("BUY","SELL")
     if quality < 60:
         hard.append(f"Qualidade de dados baixa ({quality:.0f}%)")
+    if data_ok is False:
+        if data_score is None:
+            hard.append("Dados técnicos insuficientes para decisão")
+        else:
+            hard.append(f"Dados técnicos insuficientes ({data_score:.0f}/100)")
     if _status_score(h4) <= 25:
         hard.append("H4 está contra o viés")
     if _status_score(h1) <= 25:
@@ -114,7 +159,8 @@ def evaluate_decision_integrity(
         side in ("BUY","SELL") and not hard and
         _status_score(h4)>=80 and _status_score(h1)>=80 and _status_score(m15)>=80 and
         ict>=70 and inst>=70 and gate_score>=65 and "WAIT" not in gate_u and
-        event not in ("MAXIMO","ELEVADO") and (adr is None or adr<95)
+        event not in ("MAXIMO","ELEVADO") and (adr is None or adr<95) and
+        data_ok is not False
     )
 
     if macro_wait:
@@ -151,5 +197,7 @@ def evaluate_decision_integrity(
         "executable":bool(executable),
         "next_action":next_action,
         "event_level":event,
+        "data_sufficient":data_ok,
+        "data_readiness_score":None if data_score is None else round(data_score,1),
         "note":"Prioridade operacional; não é probabilidade de lucro.",
     }
