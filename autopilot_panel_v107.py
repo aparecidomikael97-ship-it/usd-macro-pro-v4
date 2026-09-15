@@ -37,7 +37,7 @@ def _age_min(value):
     except Exception: return None
 
 def render_autopilot_v107():
-    st.subheader("🤖 Autopilot Total — V10.7.7")
+    st.subheader("Autopilot — saúde e atualização")
     st.caption(
         "Macro/FRED → Matriz → Notícias 8 moedas → Scanner H4/H1/M15 → Market Map "
         "→ snapshots → validação 1H/4H/24H. Rodando em background pelo GitHub Actions."
@@ -61,7 +61,10 @@ def render_autopilot_v107():
         st.error("🔴 AUTOPILOT: APP HEADLESS NÃO ATUALIZOU A MATRIZ")
     elif daily_blocked:
         block_type = str(status.get("twelve_block_type", "") or "")
-        if block_type == "COTA_DIARIA":
+        reason = str(status.get("twelve_daily_block_reason", "")).lower()
+        if "current minute" in reason or "per minute" in reason:
+            st.warning("🟠 TWELVE DATA: LIMITE POR MINUTO — consultas interrompidas nesta rodada")
+        elif block_type == "COTA_DIARIA":
             st.warning("🟠 TWELVE DATA: COTA DIÁRIA/CRÉDITOS ESGOTADOS — o Autopilot parou novas consultas nesta rodada")
         else:
             st.warning("🟠 TWELVE DATA: COTA/PLANO BLOQUEOU CONSULTAS — o Autopilot parou após o primeiro 429")

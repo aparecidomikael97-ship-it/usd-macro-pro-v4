@@ -13,6 +13,6 @@ class PairIntelligenceV108SourceTests(unittest.TestCase):
     def test_first_tab_is_unified_central(self):
         src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
         pos=src.index("abas = st.tabs([")
-        self.assertIn('"🏛️ CENTRAL INSTITUCIONAL V11.0.6"',src[pos:pos+300])
+        self.assertTrue(src[pos:].split('[',1)[1].lstrip().startswith('"Central"'))
 
 if __name__=="__main__": unittest.main()

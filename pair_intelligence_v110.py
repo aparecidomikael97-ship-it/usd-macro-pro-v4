@@ -225,7 +225,8 @@ def _component(inst:Mapping[str,Any],key:str)->dict[str,Any]:
 def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro",weights=None):
     side=_side(row.get("Direção","")); base,quote=pair.split("/")
     base_score=_currency_score(ranking,base); quote_score=_currency_score(ranking,quote)
-    macro_diff=_safe(row.get("Dif. macro",base_score-quote_score))
+    matrix_diff=_safe(row.get("Dif. macro",base_score-quote_score))
+    macro_diff=base_score-quote_score
     score=_safe(row.get("Score final",0)); quality=_safe(row.get("Qualidade",0)); idx=_safe(row.get("Índice ranking",0))
 
     raw_sc=dict(scanner or {}); tec=dict(raw_sc.get("tecnico",{}) or {})
@@ -250,8 +251,8 @@ def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro",weights=
     news_diff=_safe((news or {}).get("Diferencial notícias",0)); news_align=str((news or {}).get("Alinhamento","—")); news_conv=_safe((news or {}).get("Convicção heurística",0))
 
     up=[]; down=[]; evidence=[]
-    if macro_diff>0: up.append(f"{base} está {abs(macro_diff):.1f} pts mais forte que {quote} no macro relativo")
-    elif macro_diff<0: down.append(f"{quote} está {abs(macro_diff):.1f} pts mais forte que {base} no macro relativo")
+    if macro_diff>0: up.append(f"{base} está {abs(macro_diff):.1f} pts mais forte que {quote} na força final do ranking")
+    elif macro_diff<0: down.append(f"{quote} está {abs(macro_diff):.1f} pts mais forte que {base} na força final do ranking")
     if news_diff>=2: up.append(f"notícias favorecem a moeda base ({news_diff:+.2f})")
     elif news_diff<=-2: down.append(f"notícias favorecem a moeda cotada ({news_diff:+.2f})")
 
@@ -319,7 +320,7 @@ def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro",weights=
     return {
         "pair":pair,"side":side,"direction":str(row.get("Direção","⚪ AGUARDAR")),"state":state,
         "priority":_safe(decision.get("priority_score",0)),"score":score,"quality":quality,"index":idx,
-        "base_score":base_score,"quote_score":quote_score,"macro_diff":macro_diff,
+        "base_score":base_score,"quote_score":quote_score,"macro_diff":macro_diff,"matrix_diff":matrix_diff,
         "h4":h4,"h1":h1,"m15":m15,"w1":w1,"d1":d1,"gate":gate,"gate_score":gate_score,
         "pd_zone":pd_zone,"pd_position":mc["pd_position"],"adr":adr,"event":event,"price":price,
         "sweep_type":mc["sweep_type"],"sweep_level":mc["sweep_level"],"sweep_price":mc["sweep_price"],"sweep_rejection":mc["sweep_rejection"],
@@ -374,7 +375,7 @@ def _stack_rows(p:Mapping[str,Any])->pd.DataFrame:
 
     rows=[
         ("Macro","Direção",p.get("direction","—"),p.get("score",0)),
-        ("Macro","Força relativa",f"{p.get('macro_diff',0):+.1f} pts",None),
+        ("Ranking","Força final",f"{p.get('macro_diff',0):+.1f} pts",None),
         ("Contexto","W1",p.get("w1","—"),None),
         ("Contexto","D1",p.get("d1","—"),None),
         ("Liquidez","Sweep",f"{p.get('sweep_type') or '—'} {p.get('sweep_level') or ''}".strip(),None),
@@ -400,8 +401,8 @@ def _stack_rows(p:Mapping[str,Any])->pd.DataFrame:
 
 def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:Mapping[str,Any]|None=None,macro_context:Mapping[str,Any]|None=None,weights:Mapping[str,float]|None=None):
     _css()
-    st.markdown("""<div class="v110-hero"><h2>🏛️ Central Institucional dos 7 Pares — V11.0.6</h2><p>Macro → notícias → W1/D1 → liquidez → SMT → displacement → MSS → CRT/AMD/OTE/FVG → H4/H1/M15 → ADR/evento → decisão final.</p><span class="v110-badge">1 tela</span><span class="v110-badge">sem novas chamadas de API</span><span class="v110-badge">hard gates</span><span class="v110-badge">auditável</span></div>""",unsafe_allow_html=True)
-    st.caption("Objetivo: reproduzir um processo disciplinado de decisão multi-camada. Não representa fluxo real de instituições. Prioridade/readiness não é probabilidade de lucro.")
+    st.markdown("## Central institucional")
+    st.caption("7 pares · Contexto, qualidade dos dados e condições de execução. Prioridade não é probabilidade de lucro.")
     if matrix is None or matrix.empty:
         st.warning("A Matriz ainda não está disponível nesta execução."); return
 
@@ -425,16 +426,16 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     process_label=("🟢 PROCESSO OK" if process_ok and process_age is not None and process_age<=90 else "🟡 SEM RODADA RECENTE" if process_ok else "🔴 FALHA HEADLESS")
     data_ok=sum(1 for x in packs if bool((x.get("data_ready",{}) or {}).get("sufficient",False)))
     twelve_label="🟠 COTA/PLANO BLOQUEADO" if auto.get("twelve_daily_blocked") else "🟢 SEM BLOQUEIO REGISTRADO"
-    c1,c2,c3,c4,c5=st.columns(5)
-    c1.metric("Melhor contexto",opctx.get("label",best["pair"])); c2.metric("Prioridade",f"{best['priority']:.1f}/100"); c3.metric("Mais forte (G8)",strongest); c4.metric("Mais fraca (G8)",weakest); c5.metric("Estado",opctx.get("state",best["state"]) if no_trade else best["state"])
+    c1,c2,c3,c4=st.columns(4)
+    c1.metric("Melhor contexto",opctx.get("label",best["pair"])); c2.metric("Prioridade",f"{best['priority']:.1f}/100"); c3.metric("Mais forte (G8)",strongest); c4.metric("Mais fraca (G8)",weakest)
+    st.info(opctx.get("state",best["state"]) if no_trade else best["state"])
     if no_trade:
         st.error("🚫 NENHUM SETUP EXECUTÁVEL AGORA — os vieses macro continuam visíveis, mas nenhum dos 7 pares passou pelos hard gates/frescor.")
-    st.markdown("### 🩺 Saúde do processo x prontidão dos dados")
-    h1,h2,h3,h4=st.columns(4)
-    h1.metric("Autopilot / Headless",process_label)
-    h2.metric("Dados técnicos suficientes",f"{data_ok}/7")
-    h3.metric("Twelve Data",twelve_label)
-    h4.metric("Decisão operacional","🚫 NO-TRADE" if no_trade else best["state"])
+    st.caption("Saúde do processo x prontidão dos dados")
+    h1,h2,h3=st.columns(3)
+    h1.metric("Dados técnicos suficientes",f"{data_ok}/7")
+    h2.markdown(f"**Autopilot / Headless**  \n{process_label}")
+    h3.markdown(f"**Twelve Data**  \n{twelve_label}")
     if auto.get("twelve_daily_blocked"):
         st.warning("🟠 O processo do Autopilot pode estar saudável mesmo com a fonte técnica bloqueada. A Central separa processo, fonte e frescor para evitar falso 'OK'.")
 
@@ -443,25 +444,29 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
         "Par":p["pair"],"Decisão final":p["state"],"Direção":p["direction"],"Prioridade":p["priority"],"Score Mestre":p["score"],"Qualidade %":p["quality"],
         "Força base":(p.get("strength",{}) or {}).get("base_score"),"Força cotada":(p.get("strength",{}) or {}).get("quote_score"),"Δ força pts":(p.get("strength",{}) or {}).get("difference"),
         "Dados?":"SIM" if (p.get("data_ready",{}) or {}).get("sufficient") else "NÃO","Data Score":round(_safe((p.get("data_ready",{}) or {}).get("score",0)),0),
-        "ICT":round(p["ict_read"],0) if (p.get("ict_fresh",{}) or {}).get("ready") else "N/D","Institucional":round(p["inst_read"],0) if (p.get("data_ready",{}) or {}).get("institutional_data_ready") else "N/D","H4":p["h4"],"H1":p["h1"],"M15":p["m15"],"Gate":p["gate"],"ADR %":round(p["adr"],0) if p["adr"] else None,"Evento":p["event"],"Motivo":p["reason"]
+        "ICT":round(p["ict_read"],0) if (p.get("ict_fresh",{}) or {}).get("ready") else "N/D","Institucional":round(p["inst_read"],0) if (p.get("data_ready",{}) or {}).get("institutional_data_ready") else "N/D","H4":p["h4"],"H1":p["h1"],"M15":p["m15"],"Gate":p["gate"],"ADR %":round(p["adr"],0) if p["adr"] is not None else None,"Evento":p["event"],"Motivo":p["reason"]
     } for p in packs])
-    st.dataframe(executive,use_container_width=True,hide_index=True,height=330)
-    st.bar_chart(executive[["Par","Prioridade"]].set_index("Par"),horizontal=True,height=250)
+    overview=executive[["Par","Decisão final","Direção","Prioridade","Δ força pts","Dados?","M15","Gate"]]
+    st.dataframe(overview,use_container_width=True,hide_index=True,height=285)
+    with st.expander("Matriz completa e comparação de prioridades"):
+        st.dataframe(executive,use_container_width=True,hide_index=True,height=330)
+        st.bar_chart(executive[["Par","Prioridade"]].set_index("Par"),horizontal=True,height=220)
 
-    st.markdown("### 🧩 Leitura executiva")
-    for i in range(0,len(packs),2):
-        cols=st.columns(2)
-        for j,p in enumerate(packs[i:i+2]):
-            with cols[j]:
-                st.markdown(f"#### {p['pair']} · {p['state']}")
-                a,b,c,d=st.columns(4); a.metric("Prioridade",f"{p['priority']:.0f}/100"); b.metric("Dados",f"{_safe((p.get('data_ready',{}) or {}).get('score',0)):.0f}/100"); c.metric("ICT",f"{p['ict_read']:.0f}" if (p.get("ict_fresh",{}) or {}).get("ready") else "N/D"); d.metric("Institucional",f"{p['inst_read']:.0f}" if (p.get("data_ready",{}) or {}).get("institutional_data_ready") else "N/D")
-                st.markdown(f"**Por quê:** {p['reason']}")
-                _s=p.get("strength",{}) or {}
-                st.caption(f"Força: {_s.get('base',p['pair'].split('/')[0])} {_safe(_s.get('base_score',50)):.1f} × {_s.get('quote',p['pair'].split('/')[1])} {_safe(_s.get('quote_score',50)):.1f} = Δ {_safe(_s.get('difference',0)):+.1f} pts")
-                _dr=p.get("data_ready",{}) or {}; _tf=_dr.get("timeframes",{}) or {}
-                _adr_exec='N/D' if p.get('adr') is None else f"{p['adr']:.0f}%"
-                st.caption(f"H4 {p['h4']} ({(_tf.get('h4',{}) or {}).get('state','—')}) · H1 {p['h1']} ({(_tf.get('h1',{}) or {}).get('state','—')}) · M15 {p['m15']} ({(_tf.get('m15',{}) or {}).get('state','—')}) · Gate {p['gate']} · ADR {_adr_exec}")
-                st.caption(f"Alvo de liquidez: {p['target']} · Próximo passo: {p['next_action']}")
+    with st.expander("Resumo detalhado dos sete pares", expanded=False):
+        st.markdown("### 🧩 Leitura executiva")
+        for i in range(0,len(packs),2):
+            cols=st.columns(2)
+            for j,p in enumerate(packs[i:i+2]):
+                with cols[j]:
+                    st.markdown(f"#### {p['pair']} · {p['state']}")
+                    a,b,c,d=st.columns(4); a.metric("Prioridade",f"{p['priority']:.0f}/100"); b.metric("Dados",f"{_safe((p.get('data_ready',{}) or {}).get('score',0)):.0f}/100"); c.metric("ICT",f"{p['ict_read']:.0f}" if (p.get("ict_fresh",{}) or {}).get("ready") else "N/D"); d.metric("Institucional",f"{p['inst_read']:.0f}" if (p.get("data_ready",{}) or {}).get("institutional_data_ready") else "N/D")
+                    st.markdown(f"**Por quê:** {p['reason']}")
+                    _s=p.get("strength",{}) or {}
+                    st.caption(f"Força: {_s.get('base',p['pair'].split('/')[0])} {_safe(_s.get('base_score',50)):.1f} × {_s.get('quote',p['pair'].split('/')[1])} {_safe(_s.get('quote_score',50)):.1f} = Δ {_safe(_s.get('difference',0)):+.1f} pts")
+                    _dr=p.get("data_ready",{}) or {}; _tf=_dr.get("timeframes",{}) or {}
+                    _adr_exec='N/D' if p.get('adr') is None else f"{p['adr']:.0f}%"
+                    st.caption(f"H4 {p['h4']} ({(_tf.get('h4',{}) or {}).get('state','—')}) · H1 {p['h1']} ({(_tf.get('h1',{}) or {}).get('state','—')}) · M15 {p['m15']} ({(_tf.get('m15',{}) or {}).get('state','—')}) · Gate {p['gate']} · ADR {_adr_exec}")
+                    st.caption(f"Alvo de liquidez: {p['target']} · Próximo passo: {p['next_action']}")
 
     st.divider(); st.markdown("## 🔬 Raio-X institucional")
     _pair_options=[x["pair"] for x in packs]
@@ -470,14 +475,16 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
         st.session_state["v110_pair_deep"]=_pair_options[0]
     pair=st.selectbox("Escolha o par",_pair_options,key="v110_pair_deep")
 
-    # V11.0.6: resolve o pack e REFAZ o breakdown a partir do par selecionado.
+    # V11.0.7: resolve o pack e REFAZ o breakdown a partir do par selecionado.
     # Assim a interface nunca pode mostrar USD/CHF no seletor e EUR/USD na força.
     p=next(x for x in packs if x["pair"]==pair)
     _base_sel,_quote_sel=pair.split("/")
     _selected_strength=build_strength_breakdown(ranking,_base_sel,_quote_sel,weights)
     p["strength"]=_selected_strength
     _dr=p.get("data_ready",{}) or {}
-    a,b,c,d,e,f=st.columns(6); a.metric("Decisão",p["state"]); b.metric("Prioridade",f"{p['priority']:.1f}/100"); c.metric("Score Mestre",f"{p['score']:.0f}/100"); d.metric("Dados",f"{_safe(_dr.get('score',0)):.0f}/100"); e.metric("ICT",f"{p['ict_read']:.0f}/100" if (p.get("ict_fresh",{}) or {}).get("ready") else "N/D"); f.metric("Institucional",f"{p['inst_read']:.0f}/100" if _dr.get("institutional_data_ready") else "N/D")
+    st.info(p["state"])
+    b,c,d,e,f=st.columns(5); b.metric("Prioridade",f"{p['priority']:.1f}/100"); c.metric("Score Mestre",f"{p['score']:.0f}/100"); d.metric("Dados",f"{_safe(_dr.get('score',0)):.0f}/100"); e.metric("ICT",f"{p['ict_read']:.0f}/100" if (p.get("ict_fresh",{}) or {}).get("ready") else "N/D"); f.metric("Institucional",f"{p['inst_read']:.0f}/100" if _dr.get("institutional_data_ready") else "N/D")
+    st.caption(f"Diferencial usado pela Matriz: {p['matrix_diff']:+.1f} pts. Pode incluir ajustes do motor; o ranking abaixo mostra a força final das moedas.")
     _s=p.get("strength",{}) or {}
     st.markdown(f"### ⚖️ Pontos de força — {pair}")
     s1,s2,s3=st.columns(3)
@@ -495,33 +502,36 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
 
     st.caption(f"Principais diferenças: {_s.get('dominant','—')} · Pontos internos do modelo; não são pips nem probabilidade de lucro.")
 
-    # V11.0.6 — conta de chegada, separando Macro puro, Fed e ajustes.
-    _a=attribution_sides(_s)
-    st.markdown("#### 🧮 Conta de chegada da força")
-    _c1,_c2,_c3=st.columns(3)
-    _c1.metric("Macro puro",f"{_base_sel} {_safe(_s.get('base_macro',50)):.1f} × {_quote_sel} {_safe(_s.get('quote_macro',50)):.1f}",f"Δ {_safe(_s.get('macro_difference',0)):+.1f} pts")
-    _c2.metric("Fed",f"{_base_sel} {_safe(_s.get('base_fed',0)):+.1f} × {_quote_sel} {_safe(_s.get('quote_fed',0)):+.1f}",f"Δ {_safe(_s.get('fed_difference',0)):+.1f} pts")
-    _c3.metric("Outros ajustes",f"{_base_sel} {_safe(_s.get('base_adjustments',0)):+.1f} × {_quote_sel} {_safe(_s.get('quote_adjustments',0)):+.1f}",f"Δ {_safe(_s.get('adjustment_difference',0)):+.1f} pts")
-    _left,_right=st.columns(2)
-    with _left:
-        st.markdown(f"**A favor de {_base_sel}**")
-        if _a.get('base_items'):
-            for _it in _a['base_items'][:8]: st.caption(f"• {_it['Fator']}: +{_it['pts']:.1f} pts")
-        else: st.caption("Nenhum fator líquido favorece a base.")
-    with _right:
-        st.markdown(f"**A favor de {_quote_sel}**")
-        if _a.get('quote_items'):
-            for _it in _a['quote_items'][:8]: st.caption(f"• {_it['Fator']}: +{_it['pts']:.1f} pts")
-        else: st.caption("Nenhum fator líquido favorece a cotada.")
-    st.info(f"Conta líquida: vantagens {_base_sel} {_safe(_a.get('base_advantages',0)):.1f} − vantagens {_quote_sel} {_safe(_a.get('quote_advantages',0)):.1f} = {_safe(_a.get('net',0)):+.1f} pts. A força final continua {_base_sel} {_safe(_s.get('base_score',50)):.1f} × {_quote_sel} {_safe(_s.get('quote_score',50)):.1f}.")
-    _sr=pd.DataFrame(_s.get("rows",[]) or [])
-    if not _sr.empty:
-        st.dataframe(_sr,use_container_width=True,hide_index=True,height=315)
-        st.caption(
-            f"Conferência: {_base_sel} explicado {_safe(_s.get('explained_base',0)):.1f}/100 "
-            f"× {_quote_sel} explicado {_safe(_s.get('explained_quote',0)):.1f}/100. "
-            "A soma dos fatores + Fed + residual reconcilia com a força final exibida."
-        )
+    with st.expander("Como a força foi calculada", expanded=False):
+        if not _s.get("attribution_exact"):
+            st.warning("Ranking antigo: componentes estimados; o residual não identifica causas econômicas. Recalcule o ranking para obter as contribuições efetivas.")
+        # V11.0.7 — conta de chegada, separando Macro puro, Fed e ajustes.
+        _a=attribution_sides(_s)
+        st.markdown("#### 🧮 Conta de chegada da força")
+        _c1,_c2,_c3=st.columns(3)
+        _c1.metric("Contribuição macro",f"{_base_sel} {_safe(_s.get('base_macro',50)):.1f} × {_quote_sel} {_safe(_s.get('quote_macro',50)):.1f}",f"Δ {_safe(_s.get('macro_difference',0)):+.1f} pts")
+        _c2.metric("Fed",f"{_base_sel} {_safe(_s.get('base_fed',0)):+.1f} × {_quote_sel} {_safe(_s.get('quote_fed',0)):+.1f}",f"Δ {_safe(_s.get('fed_difference',0)):+.1f} pts")
+        _c3.metric("Outros ajustes",f"{_base_sel} {_safe(_s.get('base_adjustments',0)):+.1f} × {_quote_sel} {_safe(_s.get('quote_adjustments',0)):+.1f}",f"Δ {_safe(_s.get('adjustment_difference',0)):+.1f} pts")
+        _left,_right=st.columns(2)
+        with _left:
+            st.markdown(f"**A favor de {_base_sel}**")
+            if _a.get('base_items'):
+                for _it in _a['base_items'][:8]: st.caption(f"• {_it['Fator']}: +{_it['pts']:.1f} pts")
+            else: st.caption("Nenhum fator líquido favorece a base.")
+        with _right:
+            st.markdown(f"**A favor de {_quote_sel}**")
+            if _a.get('quote_items'):
+                for _it in _a['quote_items'][:8]: st.caption(f"• {_it['Fator']}: +{_it['pts']:.1f} pts")
+            else: st.caption("Nenhum fator líquido favorece a cotada.")
+        st.info(f"Conta líquida: vantagens {_base_sel} {_safe(_a.get('base_advantages',0)):.2f} − vantagens {_quote_sel} {_safe(_a.get('quote_advantages',0)):.2f} = {_safe(_a.get('net',0)):+.2f} pts. A força final continua {_base_sel} {_safe(_s.get('base_score',50)):.1f} × {_quote_sel} {_safe(_s.get('quote_score',50)):.1f}.")
+        _sr=pd.DataFrame(_s.get("rows",[]) or [])
+        if not _sr.empty:
+            st.dataframe(_sr,use_container_width=True,hide_index=True,height=315)
+            st.caption(
+                f"Conferência: {_base_sel} explicado {_safe(_s.get('explained_base',0)):.1f}/100 "
+                f"× {_quote_sel} explicado {_safe(_s.get('explained_quote',0)):.1f}/100. "
+                + ("Contribuições efetivas do modelo; limite e arredondamento separados." if _s.get("attribution_exact") else "Reconciliação contábil estimada; residual sem atribuição causal.")
+            )
 
     st.markdown("### 📡 Data Readiness — dados suficientes para decisão?")
     if _dr.get("sufficient"):
@@ -560,35 +570,37 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
             for x in p.get("stale_technical",[]):
                 st.caption("• " + x)
 
-    st.markdown("### 🧠 Decision Stack — tudo em uma tabela")
-    st.dataframe(_stack_rows(p),use_container_width=True,hide_index=True,height=650)
+    with st.expander("Todas as camadas de decisão", expanded=False):
+        st.markdown("### 🧠 Decision Stack — tudo em uma tabela")
+        st.dataframe(_stack_rows(p),use_container_width=True,hide_index=True,height=650)
 
-    inst=p.get("inst",{}) or {}
-    st.markdown("### 🏛️ Institutional Execution Engine")
-    cards=[("MSS","mss"),("Displacement","displacement"),("SMT","smt"),("Premium/Discount","dealing_range"),("Judas/Sessão","session"),("Breaker/Mitigation","pd_array"),("Liquidez","liquidity")]
-    for i in range(0,len(cards),4):
-        cols=st.columns(min(4,len(cards)-i))
-        for col,(title,key) in zip(cols,cards[i:i+4]):
-            comp=_component(inst,key); _status,_text=display_component_status(comp,key,_dr); col.metric(title,_status); col.caption(_text)
-    if inst and _dr.get("institutional_data_ready"):
-        st.progress(min(1,max(0,p["inst_read"]/100)),text=f"Prontidão institucional: {p['inst_read']:.0f}/100 — {p['inst_label']}")
-    elif inst:
-        st.info("Prontidão institucional: N/D — dados H1/M15 atuais insuficientes. Leituras antigas ficam visíveis apenas como histórico.")
-    else:
-        st.info("A camada institucional será preenchida pelo próximo ciclo do Autopilot usando H1/M15 persistidos. Abrir esta aba não consome API.")
+    with st.expander("Detalhes institucionais e ICT", expanded=False):
+        inst=p.get("inst",{}) or {}
+        st.markdown("### 🏛️ Institutional Execution Engine")
+        cards=[("MSS","mss"),("Displacement","displacement"),("SMT","smt"),("Premium/Discount","dealing_range"),("Judas/Sessão","session"),("Breaker/Mitigation","pd_array"),("Liquidez","liquidity")]
+        for i in range(0,len(cards),4):
+            cols=st.columns(min(4,len(cards)-i))
+            for col,(title,key) in zip(cols,cards[i:i+4]):
+                comp=_component(inst,key); _status,_text=display_component_status(comp,key,_dr); col.metric(title,_status); col.caption(_text)
+        if inst and _dr.get("institutional_data_ready"):
+            st.progress(min(1,max(0,p["inst_read"]/100)),text=f"Prontidão institucional: {p['inst_read']:.0f}/100 — {p['inst_label']}")
+        elif inst:
+            st.info("Prontidão institucional: N/D — dados H1/M15 atuais insuficientes. Leituras antigas ficam visíveis apenas como histórico.")
+        else:
+            st.info("A camada institucional será preenchida pelo próximo ciclo do Autopilot usando H1/M15 persistidos. Abrir esta aba não consome API.")
 
-    st.markdown("### 🧠 ICT Execution Engine")
-    ict=p.get("ict",{}) or {}
-    icards=[("CRT","crt"),("OTE","ote"),("AMD / PO3","amd"),("FVG","fvg")]
-    cols=st.columns(4)
-    for col,(title,key) in zip(cols,icards):
-        comp=_component(ict,key)
-        _status,_text,_current=display_ict_component_status(comp,key,_dr)
-        col.metric(title,_status); col.caption(_text)
-    if ict and (p.get("ict_fresh",{}) or {}).get("ready"):
-        st.progress(min(1,max(0,p["ict_read"]/100)),text=f"Prontidão ICT: {p['ict_read']:.0f}/100 — {p['ict_label']}")
-    elif ict:
-        st.info("Prontidão ICT: N/D — H1/M15 não estão simultaneamente frescos com cache mínimo. O score anterior não vale como confirmação atual.")
+        st.markdown("### 🧠 ICT Execution Engine")
+        ict=p.get("ict",{}) or {}
+        icards=[("CRT","crt"),("OTE","ote"),("AMD / PO3","amd"),("FVG","fvg")]
+        cols=st.columns(4)
+        for col,(title,key) in zip(cols,icards):
+            comp=_component(ict,key)
+            _status,_text,_current=display_ict_component_status(comp,key,_dr)
+            col.metric(title,_status); col.caption(_text)
+        if ict and (p.get("ict_fresh",{}) or {}).get("ready"):
+            st.progress(min(1,max(0,p["ict_read"]/100)),text=f"Prontidão ICT: {p['ict_read']:.0f}/100 — {p['ict_label']}")
+        elif ict:
+            st.info("Prontidão ICT: N/D — H1/M15 não estão simultaneamente frescos com cache mínimo. O score anterior não vale como confirmação atual.")
 
     st.markdown("### 💧 Liquidez e contexto")
     _pdop=premium_discount_operational(p.get("side","WAIT"),_component(inst,"dealing_range"),_dr)
@@ -614,7 +626,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     elif p["state"].startswith("🔴"): st.error(msg)
     else: st.warning(msg)
 
-    with st.expander("📚 Como ler o V11.0.6"):
+    with st.expander("📚 Como ler o V11.0.7"):
         st.markdown("""
 - **Macro** escolhe o lado; execução nunca inverte o lado macro sozinha.
 - **SMT** procura divergência entre EUR/USD↔GBP/USD, AUD/USD↔NZD/USD e USD/CHF↔USD/JPY.

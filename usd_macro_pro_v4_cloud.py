@@ -101,16 +101,19 @@ except Exception as _autopilot_exc:
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "11.0.6 — STRENGTH ATTRIBUTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2"
+APP_VERSION = "11.0.7 — STRENGTH ATTRIBUTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro V11.0.6 — Strength Attribution + Audit Integrity",
+    page_title="USD Macro Pro V11.0.7 — Strength Attribution + Audit Integrity",
     page_icon="🦅",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
+
+from compact_ui_v1107 import apply_compact_theme
+apply_compact_theme()
 
 MOEDAS = {
     "USD": "Dólar Americano",
@@ -998,6 +1001,13 @@ def calcular_ranking(dados: dict, macro_us: dict, fed: dict) -> pd.DataFrame:
         )
         df.loc[iu, "Influência_Fed"] = usd_det["componentes"]["Federal Reserve"] - 50
 
+    # Attribution metadata only: does not change any ranking score or weight.
+    from strength_breakdown_v1104 import make_score_attribution
+    df["strength_attribution"] = [
+        make_score_attribution(row, PESOS, usd_det if row["Código"] == "USD" else None)
+        for _, row in df.iterrows()
+    ]
+
     df = df.sort_values("Pontuação_Final", ascending=False).reset_index(drop=True)
     df["Posição"] = df.index + 1
 
@@ -1695,7 +1705,8 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro V11.0.6 — Strength Attribution + Audit Integrity")
+st.title("USD Macro Pro")
+st.caption("V11.0.7 · Força auditável e interface compacta")
 st.caption("Macro semanal → Macro do dia → W1/D1 → Quarterly → Liquidez → Killzones → H4/H1/M15 → Performance real")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -3461,23 +3472,24 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 # V9.0 — CENTRAL DO OPERADOR
 # Somente interface/orientação; não altera o motor do modelo.
 # ============================================================
-st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V11.0.6")
-st.caption("O APP define o viés macro; o gráfico confirma a entrada.")
+with st.expander("Guia do operador", expanded=False):
+    st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V11.0.7")
+    st.caption("O APP define o viés macro; o gráfico confirma a entrada.")
 
-with st.container(border=True):
-    _op1, _op2, _op3 = st.columns(3)
-    _op1.markdown("**1️⃣ CENÁRIO**")
-    _op1.caption("Força das moedas + Macro EUA + Fed")
-    _op2.markdown("**2️⃣ DECISÃO**")
-    _op2.caption("Calendário + Matriz + Score + Qualidade")
-    _op3.markdown("**3️⃣ EXECUÇÃO**")
-    _op3.caption("Raio-X → gráfico → gatilho → risco")
-    st.markdown(
-        "**Fluxo diário:** FORÇA → MACRO → FED → CALENDÁRIO → MATRIZ "
-        "→ SCORE/QUALIDADE → GRÁFICO → ENTRADA → RISCO"
-    )
+    with st.container(border=True):
+        _op1, _op2, _op3 = st.columns(3)
+        _op1.markdown("**1️⃣ CENÁRIO**")
+        _op1.caption("Força das moedas + Macro EUA + Fed")
+        _op2.markdown("**2️⃣ DECISÃO**")
+        _op2.caption("Calendário + Matriz + Score + Qualidade")
+        _op3.markdown("**3️⃣ EXECUÇÃO**")
+        _op3.caption("Raio-X → gráfico → gatilho → risco")
+        st.markdown(
+            "**Fluxo diário:** FORÇA → MACRO → FED → CALENDÁRIO → MATRIZ "
+            "→ SCORE/QUALIDADE → GRÁFICO → ENTRADA → RISCO"
+        )
 
-with st.expander("✍️ Preciso preencher algum dado manual?", expanded=True):
+with st.expander("Dados manuais e configurações opcionais", expanded=False):
     st.success(
         "🟢 No uso normal, você NÃO precisa digitar manualmente CPI, PCE, Payroll, "
         "desemprego, Fed Funds, Treasuries ou preços dos pares."
@@ -3657,21 +3669,9 @@ def _autopilot_save_inputs_v107():
 
 
 abas = st.tabs([
-    "🏛️ CENTRAL INSTITUCIONAL V11.0.6",
-    "🧠 PAINEL MESTRE V11.0.6",
-    "🏆 Classificação",
-    "🇺🇸 Painel EUA",
-    "💱 Pares e Confiança",
-    "🏦 Fed e Notícias",
-    "🧾 Histórico",
-    "📈 Teste Histórico",
-    "🎯 Decisão Automática",
-    "🧭 Macro Market Map V11.0.6",
-    "✨ Aprenda & Personalize",
-    "🚀 Produto V11.0.6",
-    "🧭 Melhorias V11.0.6",
-    "🌍 Notícias Globais V11.0.6",
-    "🤖 AUTOPILOT V11.0.6",
+    "Central", "Painel mestre", "Moedas", "EUA", "Pares", "Fed",
+    "Histórico", "Backtest", "Decisão", "Market Map", "Aprender",
+    "Produto", "Melhorias", "Notícias", "Autopilot",
 ])
 
 # =========================================================
@@ -8891,7 +8891,7 @@ if os.getenv("USD_MACRO_AUTOPILOT", "") == "1":
 # =========================================================
 with abas[0]:
     if render_pair_intelligence_v110 is None:
-        st.error("A Central Institucional V11.0.6 não pôde ser carregada.")
+        st.error("A Central Institucional V11.0.7 não pôde ser carregada.")
         if _PAIR_INTEL_V110_IMPORT_ERROR:
             st.caption(f"Diagnóstico: {_PAIR_INTEL_V110_IMPORT_ERROR}")
     elif "matriz_v61" not in globals() or matriz_v61 is None or matriz_v61.empty:

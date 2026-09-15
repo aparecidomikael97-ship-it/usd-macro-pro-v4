@@ -37,6 +37,26 @@ def _num(v: Any, default: float = 0.0) -> float:
         return float(default)
 
 
+def make_score_attribution(row, weights, usd_detail=None):
+    """Capture actual weighted terms at the score source, without changing it."""
+    if usd_detail is not None:
+        components, w = usd_detail["componentes"], usd_detail["pesos"]
+        aliases = {"Juros / Treasury": "Juros / Treasury 2Y"}
+        factors = {label: _num(components.get(aliases.get(label, label), 0)) *
+                   _num(w.get(aliases.get(label, label), 0))
+                   for label, _, _ in FACTOR_META}
+        fed = _num(components["Federal Reserve"]) * _num(w["Federal Reserve"])
+        other = {"Índice amplo USD": _num(components["Índice amplo USD"]) * _num(w["Índice amplo USD"])}
+    else:
+        factors = _raw_contributions(row, str(row["Código"]), weights)
+        fed = _num(row["Influência_Fed"])
+        other = {}
+    raw = sum(factors.values()) + fed + sum(other.values())
+    other["Limite da escala 0–100"] = _num(row["Pontuação_Final"]) - raw
+    return {"factors": factors, "fed": fed, "other": other,
+            "unrounded_final": _num(row["Pontuação_Final"])}
+
+
 def _currency_row(ranking: pd.DataFrame, code: str) -> dict[str, Any]:
     if ranking is None or ranking.empty or "Código" not in ranking.columns:
         return {}
@@ -104,6 +124,24 @@ def build_strength_breakdown(
     residual_b = fb - sum(cb.values()) - fedb
     residual_q = fq - sum(cq.values()) - fedq
 
+    # Prefer source-recorded terms. Old persisted rankings remain readable, but
+    # their residual must not be mistaken for an identified economic driver.
+    def recorded(row, final):
+        a = row.get("strength_attribution")
+        if not isinstance(a, dict) or not isinstance(a.get("factors"), dict):
+            return None
+        factors = {label: _num(a["factors"].get(label, 0)) for label, _, _ in FACTOR_META}
+        other = {str(k): _num(v) for k,v in a.get("other", {}).items()}
+        other["Arredondamento da exibição"] = final - _num(a.get("unrounded_final", final))
+        return factors, _num(a.get("fed")), other
+    ab, aq = recorded(rb, fb), recorded(rq, fq)
+    exact = ab is not None and aq is not None
+    if exact:
+        cb, fedb, ob = ab
+        cq, fedq, oq = aq
+        mb, mq = sum(cb.values()), sum(cq.values())
+        residual_b, residual_q = sum(ob.values()), sum(oq.values())
+
     rows = []
     def _row(label: str, vb: float, vq: float) -> dict[str, Any]:
         d = float(vb) - float(vq)
@@ -119,7 +157,20 @@ def build_strength_breakdown(
     for label, _, _ in FACTOR_META:
         rows.append(_row(label, cb[label], cq[label]))
     rows.append(_row("Federal Reserve", fedb, fedq))
-    rows.append(_row("Ajustes dedicados / residual", residual_b, residual_q))
+    if exact:
+        for label in dict.fromkeys([*ob, *oq]):
+            rows.append(_row(label, ob.get(label, 0), oq.get(label, 0)))
+    else:
+        rows.append(_row("Ajustes dedicados / residual", residual_b, residual_q))
+
+    # Reconcile displayed (two-decimal) rows too, rather than overriding the net.
+    for code, final in ((base, fb), (quote, fq)):
+        correction = round(final - sum(r[str(code)] for r in rows), 2)
+        rows[-1][str(code)] = round(rows[-1][str(code)] + correction, 2)
+    for r in rows:
+        d = round(r[str(base)] - r[str(quote)], 2)
+        r["Diferença base−cotada"] = d
+        r["Favorece"] = base if d > 0 else quote if d < 0 else "EMPATE"
 
     diff = fb - fq
     ordered = sorted(rows, key=lambda r: abs(float(r["Diferença base−cotada"])), reverse=True)
@@ -135,6 +186,7 @@ def build_strength_breakdown(
 
     return {
         "base": base,
+        "attribution_exact": exact,
         "quote": quote,
         "base_score": round(fb, 2),
         "quote_score": round(fq, 2),
