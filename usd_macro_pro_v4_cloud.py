@@ -3067,7 +3067,8 @@ def _avaliar_sinais_v82():
         _salvar_sinais_v82(df)
 
     # Apenas diagnóstico de interface; não altera a classificação histórica.
-    st.session_state["v1073_linhas_legadas_ignoradas"] = int(_ignorados_legado_v1073)    return df, atualizados
+    st.session_state["v1073_linhas_legadas_ignoradas"] = int(_ignorados_legado_v1073)
+    return df, atualizados
 
 
 def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca, confl):
