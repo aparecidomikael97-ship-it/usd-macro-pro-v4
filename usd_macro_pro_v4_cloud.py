@@ -84,6 +84,14 @@ except Exception as _evolution_exc:
 
 
 try:
+    from atlasquant_shadow_mode import render_shadow_mode_panel
+    _ATLASQUANT_SHADOW_IMPORT_ERROR = ""
+except Exception as _shadow_exc:
+    render_shadow_mode_panel = None
+    _ATLASQUANT_SHADOW_IMPORT_ERROR = f"{type(_shadow_exc).__name__}: {_shadow_exc}"
+
+
+try:
     from currency_news_v107 import render_currency_news_panel
     _CURRENCY_NEWS_V106_IMPORT_ERROR = ""
 except Exception as _currency_news_exc:
@@ -8775,6 +8783,17 @@ with abas[12]:
         except Exception as _v105_render_exc:
             st.error("A aba Melhorias V10.5 encontrou um erro, mas o motor operacional continua preservado.")
             st.code(f"{type(_v105_render_exc).__name__}: {_v105_render_exc}")
+
+    st.divider()
+    if render_shadow_mode_panel is None:
+        st.warning("Shadow Mode AtlasQuant indisponível; produção permanece inalterada.")
+        if _ATLASQUANT_SHADOW_IMPORT_ERROR:
+            st.caption(f"Diagnóstico Shadow Mode: {_ATLASQUANT_SHADOW_IMPORT_ERROR}")
+    else:
+        render_shadow_mode_panel(
+            st.session_state.get("atlasquant_shadow_samples", []),
+            min_samples=100,
+        )
 
 # =========================================================
 # ABA 13 — V10.6.2 FRESH-PRICE SNAPSHOT RECOVERY
