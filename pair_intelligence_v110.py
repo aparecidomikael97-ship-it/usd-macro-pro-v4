@@ -34,6 +34,7 @@ from atlasquant_data_quality_center import render_data_confidence
 from atlasquant_confluence_map import render_confluence_map
 from atlasquant_operational_plan import render_operational_plan
 from atlasquant_safety_panel import render_safety_core
+from atlasquant_flight_recorder_panel import render_flight_recorder
 
 try:
     from currency_news_v107 import pair_news_table
@@ -502,6 +503,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     render_confluence_map(best)
     render_context_explain(best)
     render_operational_plan(best)
+    render_flight_recorder(best, "V11.0.8 / AtlasQuant DEV")
     no_trade=bool(opctx.get("no_trade",False))
     strongest,weakest=_major_extremes(ranking)
     process_age=_age_minutes(auto.get("last_run"))
