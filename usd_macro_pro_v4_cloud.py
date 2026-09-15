@@ -107,14 +107,27 @@ HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro V11.0.8 — Strength Attribution + Audit Integrity",
-    page_icon="🦅",
+    page_title="AtlasQuant — Market Intelligence Platform · DEV",
+    page_icon="🧭",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
 from compact_ui_v1107 import apply_compact_theme
 apply_compact_theme()
+
+try:
+    from atlasquant_ui_v1 import (
+        apply_atlasquant_theme,
+        render_atlasquant_header,
+        navigation_labels,
+    )
+    _ATLASQUANT_UI_IMPORT_ERROR = ""
+    apply_atlasquant_theme()
+except Exception as _atlasquant_ui_exc:
+    render_atlasquant_header = None
+    navigation_labels = None
+    _ATLASQUANT_UI_IMPORT_ERROR = f"{type(_atlasquant_ui_exc).__name__}: {_atlasquant_ui_exc}"
 
 MOEDAS = {
     "USD": "Dólar Americano",
@@ -155,8 +168,9 @@ if render_experience_controls is not None:
 else:
     _UX_PREFS_V103 = {}
 
-st.sidebar.title("🦅 USD Macro Pro")
-st.sidebar.caption(f"Versão {APP_VERSION}")
+st.sidebar.title("🧭 AtlasQuant")
+st.sidebar.caption("Market Intelligence Platform · DEV")
+st.sidebar.caption(f"Engine base {APP_VERSION}")
 
 ESCALA_CONFIANCA = st.sidebar.slider(
     "Sensibilidade da comparação", 2.0, 30.0, 10.0, 0.5,
@@ -3666,11 +3680,21 @@ def _autopilot_save_inputs_v107():
         return False, f"{type(exc).__name__}: {exc}"
 
 
-abas = st.tabs([
-    "Central", "Painel mestre", "Moedas", "EUA", "Pares", "Fed",
-    "Histórico", "Backtest", "Decisão", "Market Map", "Aprender",
-    "Produto", "Melhorias", "Notícias", "Autopilot",
-])
+if render_atlasquant_header is not None:
+    render_atlasquant_header(APP_VERSION, environment="DEV")
+else:
+    st.title("🧭 AtlasQuant")
+    st.caption("Market Intelligence Platform · DEV")
+    if _ATLASQUANT_UI_IMPORT_ERROR:
+        st.caption(f"UI profissional em modo compatível: {_ATLASQUANT_UI_IMPORT_ERROR}")
+
+abas = st.tabs(
+    list(navigation_labels()) if navigation_labels is not None else [
+        "Central", "Painel mestre", "Moedas", "EUA", "Pares", "Fed",
+        "Histórico", "Backtest", "Decisão", "Market Map", "Aprender",
+        "Produto", "Melhorias", "Notícias", "Autopilot",
+    ]
+)
 
 # =========================================================
 # ABA 2 — CLASSIFICAÇÃO
