@@ -24,6 +24,7 @@ def valid_records(records, interval, now=None):
     good=d['datetime'].notna()
     for c in cols[1:]: good &= d[c].map(lambda v: pd.notna(v) and math.isfinite(v) and v>0)
     good &= (d['high']>=d[['open','low','close']].max(axis=1)) & (d['low']<=d[['open','high','close']].min(axis=1))
+    # D1 cache may include today's live candle; daily consumers exclude it themselves.
     good &= d['datetime']<=now
     if interval!='1day': good &= d['datetime']+pd.Timedelta(minutes=DURATION[interval])<=now
     return d.loc[good].sort_values('datetime').drop_duplicates('datetime').reset_index(drop=True)
