@@ -848,6 +848,68 @@ VALIDATION_COLS = [
 def news_side(diff: float) -> str:
     return "BUY" if diff >= 2 else "SELL" if diff <= -2 else "NEUTRAL"
 
+def _bool_or_none_v1081(value):
+    """Normaliza booleanos persistidos em CSV sem depender do dtype inferido pelo pandas."""
+    try:
+        if pd.isna(value):
+            return None
+    except Exception:
+        pass
+    text = str(value).strip().lower()
+    if text in ("true", "1", "sim", "yes"):
+        return True
+    if text in ("false", "0", "nao", "não", "no"):
+        return False
+    return None
+
+
+def _normalize_news_validation_dtypes_v1081(df: pd.DataFrame) -> pd.DataFrame:
+    """V10.8.1 — Pandas dtype guard para snapshots/validações de notícias.
+
+    CSVs antigos podem fazer colunas booleanas vazias serem inferidas como float64.
+    Pandas 2.x rejeita `df.at[..., col] = True` nessas colunas. Normalizamos antes
+    de qualquer migração/backfill/validação.
+    """
+    if df is None:
+        return pd.DataFrame(columns=VALIDATION_COLS)
+    df = df.copy()
+
+    for c in VALIDATION_COLS:
+        if c not in df.columns:
+            df[c] = None
+
+    bool_cols = (
+        "auto_managed", "timing_migrated_v107",
+        "hit_1h", "hit_4h", "hit_24h",
+    )
+    for c in bool_cols:
+        df[c] = df[c].map(_bool_or_none_v1081).astype("object")
+
+    numeric_cols = (
+        "news_diff", "coverage", "conviction",
+        "base_news_score", "quote_news_score",
+        "base_independent_stories", "quote_independent_stories",
+        "base_shared_ratio", "quote_shared_ratio",
+        "entry_price", "price_1h", "return_1h_pct",
+        "price_4h", "return_4h_pct",
+        "price_24h", "return_24h_pct",
+    )
+    for c in numeric_cols:
+        df[c] = pd.to_numeric(df[c], errors="coerce").astype("float64")
+
+    # Campos textuais permanecem object para aceitar strings/None com segurança.
+    text_cols = (
+        "day_utc", "registered_at", "pair", "motor_base", "news_side",
+        "alignment", "signal_frozen_at", "entry_origin", "backfilled_at",
+        "m15_candle_time", "entry_time", "price_source", "validation_status",
+    )
+    for c in text_cols:
+        df[c] = df[c].astype("object")
+
+    return df
+
+
+
 def pair_rows(pair_df: pd.DataFrame) -> dict[str,dict[str,Any]]:
     return {str(r["Par"]):r.to_dict() for _,r in pair_df.iterrows()} if pair_df is not None and not pair_df.empty else {}
 
@@ -874,6 +936,7 @@ def migrate_timing(df: pd.DataFrame) -> int:
     for c in VALIDATION_COLS:
         if c not in df.columns:
             df[c] = None
+    df = _normalize_news_validation_dtypes_v1081(df)
     for idx,row in df.iterrows():
         if str(row.get("timing_migrated_v107","")).lower() in ("true","1","sim"):
             continue
@@ -895,8 +958,9 @@ def manage_snapshots(intel: Mapping[str,Any], pair_df: pd.DataFrame, m15_frames:
     for c in VALIDATION_COLS:
         if c not in df.columns:
             df[c] = None
-    for c in ("hit_1h","hit_4h","hit_24h"):
-        df[c] = df[c].astype("object")
+
+    # V10.8.1 — evita TypeError: Invalid value 'True' for dtype 'float64'.
+    df = _normalize_news_validation_dtypes_v1081(df)
 
     migrated = migrate_timing(df)
     lookup = pair_rows(pair_df)

@@ -1065,6 +1065,41 @@ def _validation_columns_v1061() -> list[str]:
     ]
 
 
+def _bool_or_none_news_v1081(value):
+    try:
+        if pd.isna(value):
+            return None
+    except Exception:
+        pass
+    text = str(value).strip().lower()
+    if text in ("true", "1", "sim", "yes"):
+        return True
+    if text in ("false", "0", "nao", "não", "no"):
+        return False
+    return None
+
+
+def _normalize_validation_dtypes_v1081(df: pd.DataFrame) -> pd.DataFrame:
+    """Evita bool em coluna float64 ao ler snapshots antigos do GitHub CSV."""
+    cols = _validation_columns_v1061()
+    if df is None:
+        return pd.DataFrame(columns=cols)
+    df = df.copy()
+    for c in cols:
+        if c not in df.columns:
+            df[c] = None
+    for c in ("auto_managed", "timing_migrated_v107", "hit_1h", "hit_4h", "hit_24h"):
+        df[c] = df[c].map(_bool_or_none_news_v1081).astype("object")
+    for c in (
+        "news_diff", "coverage", "conviction", "base_news_score", "quote_news_score",
+        "base_independent_stories", "quote_independent_stories", "base_shared_ratio",
+        "quote_shared_ratio", "entry_price", "price_1h", "return_1h_pct",
+        "price_4h", "return_4h_pct", "price_24h", "return_24h_pct",
+    ):
+        df[c] = pd.to_numeric(df[c], errors="coerce").astype("float64")
+    return df
+
+
 def _side_from_diff_v1062(diff: float) -> str:
     diff = float(diff or 0.0)
     if diff >= 2.0:
@@ -1215,6 +1250,7 @@ def backfill_today_news_prices_v1062(
     if df.empty:
         return True, "Nenhum snapshot existe ainda para recuperar.", df
 
+    df = _normalize_validation_dtypes_v1081(df)
     cols = _validation_columns_v1061()
     for c in cols:
         if c not in df.columns:
