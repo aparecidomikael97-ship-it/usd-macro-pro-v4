@@ -477,6 +477,24 @@ background:linear-gradient(180deg,rgba(17,34,57,.88),rgba(10,24,41,.82));min-hei
 """, unsafe_allow_html=True)
 
 
+def atlasquant_basic_table(packs: list[Mapping[str, Any]]) -> pd.DataFrame:
+    """Compact seven-pair view for Basic mode. Presentation only."""
+    rows=[]
+    for p in list(packs or []):
+        dr=dict(p.get("data_ready", {}) or {})
+        rows.append({
+            "Par":str(p.get("pair","—")),
+            "Estado":str(p.get("state","⚪ AGUARDAR")),
+            "Direção":str(p.get("direction","⚪ AGUARDAR")),
+            "Prioridade":round(_safe(p.get("priority",0)),1),
+            "Dados":f"{_safe(dr.get('score',0)):.0f}/100",
+            "Pronto?":"SIM" if bool(dr.get("sufficient",False)) else "NÃO",
+            "M15":str(p.get("m15","—")),
+            "Gate":str(p.get("gate","—")),
+        })
+    return pd.DataFrame(rows)
+
+
 def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:Mapping[str,Any]|None=None,macro_context:Mapping[str,Any]|None=None,weights:Mapping[str,float]|None=None):
     _css()
     st.markdown("## Central institucional")
@@ -509,6 +527,22 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     render_confluence_map(best)
     render_context_explain(best)
     render_operational_plan(best)
+
+    _aq_view_mode = str(st.session_state.get("atlasquant_view_mode", "Básico"))
+    if _aq_view_mode != "Pro":
+        st.markdown("### 🧾 Mesa rápida — 7 pares")
+        st.caption(
+            "Modo Básico mostra o essencial. Use Pro para abrir Flight Recorder, "
+            "matriz completa, comparação detalhada e Raio-X institucional."
+        )
+        st.dataframe(
+            atlasquant_basic_table(packs),
+            use_container_width=True,
+            hide_index=True,
+            height=285,
+        )
+        return
+
     render_flight_recorder(best, "V11.0.8 / AtlasQuant DEV")
     no_trade=bool(opctx.get("no_trade",False))
     strongest,weakest=_major_extremes(ranking)
