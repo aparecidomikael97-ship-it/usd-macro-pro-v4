@@ -77,13 +77,43 @@ def display_ict_component_status(
 
 
 
+def _missing_scalar(value: Any) -> bool:
+    if value is None:
+        return True
+    try:
+        if pd.isna(value):
+            return True
+    except Exception:
+        pass
+    try:
+        return str(value).strip().upper() in ("", "NONE", "NAN", "NAT", "<NA>")
+    except Exception:
+        return False
+
+
 def _age_minutes(value: Any, now: pd.Timestamp | None = None) -> float | None:
-    if value in (None, "", 0, 0.0):
+    if _missing_scalar(value) or value in (0, 0.0):
         return None
     try:
-        ts = pd.Timestamp(float(value), unit="s", tz="UTC") if isinstance(value, (int, float)) else pd.to_datetime(value, utc=True)
+        if isinstance(value, (int, float)):
+            if not math.isfinite(float(value)):
+                return None
+            ts = pd.Timestamp(float(value), unit="s", tz="UTC")
+        else:
+            ts = pd.to_datetime(value, utc=True, errors="coerce")
+        if pd.isna(ts):
+            return None
         ref = now if now is not None else pd.Timestamp.now(tz="UTC")
-        return max(0.0, (ref - ts).total_seconds() / 60.0)
+        ref = pd.Timestamp(ref)
+        if ref.tzinfo is None:
+            ref = ref.tz_localize("UTC")
+        else:
+            ref = ref.tz_convert("UTC")
+        delta = (ref - ts).total_seconds() / 60.0
+        # Timestamp futuro não é dado fresco: é relógio/metadata inválido.
+        if delta < -1.0:
+            return None
+        return max(0.0, float(delta))
     except Exception:
         return None
 
@@ -104,12 +134,44 @@ def _status_present(v: Any) -> bool:
     return bool(s and s not in ("—", "None", "nan"))
 
 
-def _map_ready(map_context: Mapping[str, Any] | None) -> bool:
+def _valid_cache_bars(records: Any) -> int:
+    """Conta apenas candles OHLC estruturalmente válidos, não apenas itens da lista."""
+    if not isinstance(records, (list, tuple)):
+        return 0
+    seen = set(); valid = 0
+    for r in records:
+        if not isinstance(r, Mapping):
+            continue
+        try:
+            dt = pd.to_datetime(r.get("datetime"), utc=True, errors="coerce")
+            vals = [float(r.get(k)) for k in ("open","high","low","close")]
+            if pd.isna(dt) or not all(math.isfinite(x) and x > 0 for x in vals):
+                continue
+            o,h,l,c = vals
+            if h < max(o,c,l) or l > min(o,c,h):
+                continue
+            key = str(dt)
+            if key in seen:
+                continue
+            seen.add(key); valid += 1
+        except Exception:
+            continue
+    return valid
+
+
+def _map_ready(map_context: Mapping[str, Any] | None, now: pd.Timestamp | None = None) -> bool:
     c = dict(map_context or {})
     if not c:
         return False
-    keys = ("w1_bias", "d1_bias", "w1", "d1", "readiness_grade", "event_risk", "adr_used_pct")
-    return any(c.get(k) not in (None, "", "—") for k in keys)
+    age = _age_minutes(c.get("updated_at"), now)
+    if age is None or age > 180.0:
+        return False
+    # O mapa operacional precisa de Gate, ADR e risco explícitos.
+    if c.get("readiness_grade") in (None,"","—"):
+        return False
+    if _missing_scalar(c.get("adr_used_pct")) or _missing_scalar(c.get("event_risk")):
+        return False
+    return True
 
 
 def assess_pair_data_readiness(
@@ -117,6 +179,7 @@ def assess_pair_data_readiness(
     map_context: Mapping[str, Any] | None = None,
     *,
     now: pd.Timestamp | None = None,
+    expected_direction: str | None = None,
 ) -> dict[str, Any]:
     raw = dict(scanner_row or {})
     tec = dict(raw.get("tecnico", {}) or {})
@@ -129,8 +192,8 @@ def assess_pair_data_readiness(
     }
     tf = {k: _freshness(k, ages[k]) for k in ("m15", "h1", "h4")}
 
-    m15_bars = len(cache.get("m15", []) or [])
-    h1_bars = len(cache.get("h1", []) or [])
+    m15_bars = _valid_cache_bars(cache.get("m15", []) or [])
+    h1_bars = _valid_cache_bars(cache.get("h1", []) or [])
     cache_m15_score = 100.0 if m15_bars >= MIN_CACHE["m15"] else 55.0 if m15_bars >= 16 else 0.0
     cache_h1_score = 100.0 if h1_bars >= MIN_CACHE["h1"] else 55.0 if h1_bars >= 8 else 0.0
 
@@ -140,7 +203,15 @@ def assess_pair_data_readiness(
         "m15": str((tec.get("m15", {}) or {}).get("status", "—")),
     }
     status_complete = all(_status_present(v) for v in statuses.values())
-    map_ok = _map_ready(map_context)
+    map_ok = _map_ready(map_context, now)
+    expected = str(expected_direction or "").strip()
+    scanner_direction = str(raw.get("macro_direction", "") or "").strip()
+    map_direction = str(dict(map_context or {}).get("macro_direction", "") or "").strip()
+    scanner_direction_ok = (not expected or not scanner_direction or scanner_direction == expected)
+    map_direction_ok = (not expected or not map_direction or map_direction == expected)
+    direction_consistent = scanner_direction_ok and map_direction_ok
+    if not map_direction_ok:
+        map_ok = False
 
     score = (
         tf["m15"]["score"] * .25 + tf["h1"]["score"] * .20 + tf["h4"]["score"] * .15 +
@@ -161,14 +232,20 @@ def assess_pair_data_readiness(
         missing.append(f"cache H1 insuficiente ({h1_bars}/{MIN_CACHE['h1']})")
     if not status_complete:
         missing.append("H4/H1/M15 sem leitura completa")
+    if not scanner_direction_ok:
+        missing.append("scanner técnico pertence à direção macro anterior")
+    if not map_direction_ok:
+        missing.append("Market Map pertence à direção macro anterior")
+    if not map_ok:
+        missing.append("Market Map ausente, incompleto ou antigo")
 
     sufficient = (
         tf["m15"]["fresh"] and tf["h1"]["fresh"] and tf["h4"]["fresh"] and
-        m15_bars >= MIN_CACHE["m15"] and h1_bars >= MIN_CACHE["h1"] and status_complete
+        m15_bars >= MIN_CACHE["m15"] and h1_bars >= MIN_CACHE["h1"] and status_complete and direction_consistent and map_ok
     )
     institutional_data_ready = (
         tf["m15"]["fresh"] and tf["h1"]["fresh"] and
-        m15_bars >= MIN_CACHE["m15"] and h1_bars >= MIN_CACHE["h1"]
+        m15_bars >= MIN_CACHE["m15"] and h1_bars >= MIN_CACHE["h1"] and direction_consistent
     )
 
     if sufficient and score >= 85:
@@ -188,6 +265,7 @@ def assess_pair_data_readiness(
         "cache_h1_bars": int(h1_bars),
         "status_complete": bool(status_complete),
         "map_ready": bool(map_ok),
+        "direction_consistent": bool(direction_consistent),
         "missing": missing,
         "note": "Readiness de dados; não é probabilidade de lucro.",
     }

@@ -17,8 +17,8 @@ class TypeSafetyV1102Tests(unittest.TestCase):
     def test_fake_na_is_missing(self):
         self.assertTrue(_is_missing(FakeNA()))
 
-    def test_event_na_defaults_normal(self):
-        self.assertEqual(_event_level(FakeNA()), "NORMAL")
+    def test_event_na_fails_closed(self):
+        self.assertEqual(_event_level(FakeNA()), "DESCONHECIDO")
 
     def test_bool_na_is_none(self):
         self.assertIsNone(_bool_or_none(FakeNA()))

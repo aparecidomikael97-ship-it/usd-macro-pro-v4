@@ -568,18 +568,20 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
             or minutes_since(pair_fetch.get("h4")) >= H4_EVERY_MIN
         )
 
+        # Candles em cache são matéria-prima neutra; estados H4/H1/M15/ICT são dependentes do lado macro.
+        # Se a direção muda, nunca reaproveitamos uma confirmação calculada para o lado anterior.
         tec = {
-            "disponivel": bool(old_tec.get("disponivel", False)),
-            "dados_disponiveis": bool(old_tec.get("dados_disponiveis", old_tec.get("disponivel", False))),
-            "h4": dict(old_tec.get("h4", {}) or {}),
-            "h1": dict(old_tec.get("h1", {}) or {}),
-            "m15": dict(old_tec.get("m15", {}) or {}),
-            "ict": dict(old_tec.get("ict", {}) or {}),
-            "institutional": dict(old_tec.get("institutional", {}) or {}),
+            "disponivel": False if direction_changed else bool(old_tec.get("disponivel", False)),
+            "dados_disponiveis": False if direction_changed else bool(old_tec.get("dados_disponiveis", old_tec.get("disponivel", False))),
+            "h4": {} if direction_changed else dict(old_tec.get("h4", {}) or {}),
+            "h1": {} if direction_changed else dict(old_tec.get("h1", {}) or {}),
+            "m15": {} if direction_changed else dict(old_tec.get("m15", {}) or {}),
+            "ict": {} if direction_changed else dict(old_tec.get("ict", {}) or {}),
+            "institutional": {} if direction_changed else dict(old_tec.get("institutional", {}) or {}),
             "cache_v110": dict(old_tec.get("cache_v110", {}) or {}),
             "preco_m15": old_tec.get("preco_m15"),
             "ultima_atualizacao": old_tec.get("ultima_atualizacao"),
-            "motivo": "",
+            "motivo": "Direção macro mudou; confirmações anteriores invalidadas." if direction_changed else "",
             "erro": "",
             "diagnostico": "",
         }
@@ -1057,7 +1059,10 @@ def manage_snapshots(intel: Mapping[str,Any], pair_df: pd.DataFrame, m15_frames:
         }])],ignore_index=True)
         added += 1
 
-    # Update unfrozen rows to current news and freeze automatically when directional + M15 closed.
+    # Timing integrity V11.0.6:
+    # 1) congela o sinal quando ele se torna direcional;
+    # 2) a entrada usa somente o primeiro candle M15 disponível EM/DEPOIS do congelamento.
+    # Nunca usa preço anterior ao sinal como se fosse preço de entrada.
     for idx,row in df.iterrows():
         if str(row.get("day_utc","")) != day or pd.notna(pd.to_numeric(pd.Series([row.get("entry_price")]),errors="coerce").iloc[0]):
             continue
@@ -1065,39 +1070,59 @@ def manage_snapshots(intel: Mapping[str,Any], pair_df: pd.DataFrame, m15_frames:
         current = lookup.get(pair,{})
         if not current:
             continue
-        base,quote = pair.split("/")
-        b,q = currencies.get(base,{}), currencies.get(quote,{})
-        diff = float(current.get("Diferencial notícias",0) or 0)
-        side = news_side(diff)
-        df.at[idx,"motor_base"] = str(current.get("Motor base",""))
-        df.at[idx,"news_side"] = side
-        df.at[idx,"news_diff"] = diff
-        df.at[idx,"alignment"] = str(current.get("Alinhamento",""))
-        df.at[idx,"coverage"] = float(current.get("Cobertura notícias",0) or 0)
-        df.at[idx,"conviction"] = float(current.get("Convicção heurística",0) or 0)
-        df.at[idx,"base_news_score"] = float(b.get("news_score",50) or 50)
-        df.at[idx,"quote_news_score"] = float(q.get("news_score",50) or 50)
-        df.at[idx,"base_independent_stories"] = float(b.get("effective_independent_stories",0) or 0)
-        df.at[idx,"quote_independent_stories"] = float(q.get("effective_independent_stories",0) or 0)
-        if side=="NEUTRAL":
-            df.at[idx,"validation_status"]="OBSERVACAO_NEUTRA"
+        frozen_at = pd.to_datetime(row.get("signal_frozen_at"),utc=True,errors="coerce")
+
+        # Enquanto ainda não congelou, acompanha o estado corrente e congela ao ficar direcional.
+        if pd.isna(frozen_at):
+            base,quote = pair.split("/")
+            b,q = currencies.get(base,{}), currencies.get(quote,{})
+            diff = float(current.get("Diferencial notícias",0) or 0)
+            side = news_side(diff)
+            df.at[idx,"motor_base"] = str(current.get("Motor base",""))
+            df.at[idx,"news_side"] = side
+            df.at[idx,"news_diff"] = diff
+            df.at[idx,"alignment"] = str(current.get("Alinhamento",""))
+            df.at[idx,"coverage"] = float(current.get("Cobertura notícias",0) or 0)
+            df.at[idx,"conviction"] = float(current.get("Convicção heurística",0) or 0)
+            df.at[idx,"base_news_score"] = float(b.get("news_score",50) or 50)
+            df.at[idx,"quote_news_score"] = float(q.get("news_score",50) or 50)
+            df.at[idx,"base_independent_stories"] = float(b.get("effective_independent_stories",0) or 0)
+            df.at[idx,"quote_independent_stories"] = float(q.get("effective_independent_stories",0) or 0)
+            if side=="NEUTRAL":
+                df.at[idx,"validation_status"]="OBSERVACAO_NEUTRA"
+                continue
+            df.at[idx,"signal_frozen_at"] = now_iso
+            df.at[idx,"entry_origin"] = "AUTOPILOT_WAIT_POST_SIGNAL_M15"
+            df.at[idx,"price_source"] = "Aguardando primeiro M15 posterior ao sinal"
+            df.at[idx,"validation_status"] = "AGUARDANDO_PRECO_POS_SINAL"
+            frozen_at = now
+            frozen += 1
+
+        # Sinal já congelado: não altera lado/notícias; busca somente candle posterior ao sinal.
+        side = str(df.at[idx,"news_side"] or "")
+        if side not in ("BUY","SELL"):
             continue
         frame = m15_frames.get(pair)
         if frame is None or frame.empty:
-            df.at[idx,"validation_status"]="SEM_PRECO_FRESCO"
             continue
-        last = frame.iloc[-1]
-        df.at[idx,"entry_price"] = float(last["close"])
-        df.at[idx,"m15_candle_time"] = pd.Timestamp(last["datetime"]).isoformat()
-        df.at[idx,"signal_frozen_at"] = now_iso
-        df.at[idx,"entry_time"] = now_iso
-        df.at[idx,"entry_origin"] = "AUTOPILOT_M15_FECHADO"
+        x=frame.copy()
+        x["datetime"]=pd.to_datetime(x["datetime"],utc=True,errors="coerce")
+        x=x.dropna(subset=["datetime"]).sort_values("datetime")
+        eligible=x[x["datetime"] >= frozen_at]
+        if eligible.empty:
+            df.at[idx,"validation_status"]="AGUARDANDO_PRECO_POS_SINAL"
+            continue
+        first=eligible.iloc[0]
+        candle_time=pd.Timestamp(first["datetime"])
+        df.at[idx,"entry_price"] = float(first["close"])
+        df.at[idx,"m15_candle_time"] = candle_time.isoformat()
+        df.at[idx,"entry_time"] = candle_time.isoformat()
+        df.at[idx,"entry_origin"] = "AUTOPILOT_M15_POS_SINAL"
         df.at[idx,"backfilled_at"] = now_iso
         df.at[idx,"auto_managed"] = True
         df.at[idx,"timing_migrated_v107"] = True
-        df.at[idx,"price_source"] = "Autopilot: último M15 fechado"
+        df.at[idx,"price_source"] = "Autopilot: primeiro M15 em/depois do sinal congelado"
         df.at[idx,"validation_status"] = "PENDENTE"
-        frozen += 1
 
     # Validate all matured horizons, reusing the same M15 frame.
     for idx,row in df.iterrows():

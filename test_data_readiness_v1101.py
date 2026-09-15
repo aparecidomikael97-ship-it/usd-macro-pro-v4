@@ -3,6 +3,11 @@ import pandas as pd
 from data_readiness_v1101 import assess_pair_data_readiness, premium_discount_operational, display_component_status
 
 class DataReadinessTests(unittest.TestCase):
+    def _bars(self, now, n, freq):
+        idx=pd.date_range(end=now,periods=n,freq=freq)
+        return [{"datetime":x.isoformat(),"open":1.10,"high":1.11,"low":1.09,"close":1.105} for x in idx]
+    def _map(self, now):
+        return {"updated_at":now.isoformat(),"readiness_grade":"A","readiness_score":85,"adr_used_pct":60,"event_risk":"NORMAL","w1_bias":"ALTISTA"}
     def _row(self, now, age_m15=20, age_h1=50, age_h4=120, m15_bars=64, h1_bars=40):
         return {
             "m15_fetched_at": (now-pd.Timedelta(minutes=age_m15)).isoformat(),
@@ -10,19 +15,19 @@ class DataReadinessTests(unittest.TestCase):
             "h4_fetched_at": (now-pd.Timedelta(minutes=age_h4)).isoformat(),
             "tecnico": {
                 "h4":{"status":"🟢 CONFIRMA"},"h1":{"status":"🟢 PULLBACK OK"},"m15":{"status":"🟢 GATILHO"},
-                "cache_v110":{"m15":[{}]*m15_bars,"h1":[{}]*h1_bars},
+                "cache_v110":{"m15":self._bars(now,m15_bars,"15min"),"h1":self._bars(now,h1_bars,"1h")},
             },
         }
 
     def test_fresh_complete_data_is_sufficient(self):
         now=pd.Timestamp("2026-09-15T00:00:00Z")
-        r=assess_pair_data_readiness(self._row(now),{"w1_bias":"ALTISTA"},now=now)
+        r=assess_pair_data_readiness(self._row(now),self._map(now),now=now)
         self.assertTrue(r["sufficient"])
         self.assertGreaterEqual(r["score"],85)
 
     def test_stale_m15_blocks_sufficiency(self):
         now=pd.Timestamp("2026-09-15T00:00:00Z")
-        r=assess_pair_data_readiness(self._row(now,age_m15=80),{"w1_bias":"ALTISTA"},now=now)
+        r=assess_pair_data_readiness(self._row(now,age_m15=80),self._map(now),now=now)
         self.assertFalse(r["sufficient"])
         self.assertEqual(r["timeframes"]["m15"]["state"],"🟡 ENVELHECENDO")
 

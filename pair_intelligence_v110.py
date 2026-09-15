@@ -26,7 +26,7 @@ from data_readiness_v1101 import (
 from evidence_integrity_v1104 import (
     masked_technical_status, select_operational_context, sweep_freshness,
 )
-from strength_breakdown_v1104 import build_strength_breakdown
+from strength_breakdown_v1104 import build_strength_breakdown, attribution_sides
 
 try:
     from currency_news_v107 import pair_news_table
@@ -80,13 +80,13 @@ def _gh_cfg():
 
 
 @st.cache_data(ttl=60,show_spinner=False)
-def _read_json(path:str,_token:str,_repo:str,_branch:str):
-    if not _token or not _repo:
+def _read_json(path:str,token:str,repo:str,branch:str):
+    if not token or not repo:
         return {},"Persistência GitHub não configurada."
     try:
-        url=f"https://api.github.com/repos/{_repo}/contents/{path}"
-        headers={"Authorization":f"Bearer {_token}","Accept":"application/vnd.github+json"}
-        r=requests.get(url,headers=headers,params={"ref":_branch},timeout=15)
+        url=f"https://api.github.com/repos/{repo}/contents/{path}"
+        headers={"Authorization":f"Bearer {token}","Accept":"application/vnd.github+json"}
+        r=requests.get(url,headers=headers,params={"ref":branch},timeout=15)
         if r.status_code==404:
             return {},""
         r.raise_for_status()
@@ -102,13 +102,13 @@ def _side(direction:str)->str:
 
 
 def _status_score(s:str)->float:
-    u=str(s).upper()
-    if "🟢" in s or "CONFIRMA" in u or "GATILHO" in u or "PULLBACK OK" in u:
-        return 100
-    if "🟡" in s or "PARCIAL" in u or "ALINHADO" in u or "AGUARDAR" in u or "ESTICADO" in u:
-        return 60
-    if "🔴" in s or "CONTRA" in u or "SEM GATILHO" in u:
+    raw=str(s or ""); u=raw.upper().strip()
+    if "🔴" in raw or "SEM GATILHO" in u or "CONTRA" in u or "INVALID" in u or "BLOQUE" in u:
         return 20
+    if "🟡" in raw or "AGUARDAR" in u or "PARCIAL" in u or "ALINHADO" in u or "ESTICADO" in u:
+        return 60
+    if "🟢" in raw or "CONFIRMA" in u or "PULLBACK OK" in u or u == "GATILHO" or u.endswith(" GATILHO"):
+        return 100
     return 45
 
 
@@ -149,14 +149,19 @@ def _pair_news(news_state:Mapping[str,Any],matrix:pd.DataFrame):
 
 
 def _age_minutes(value:Any)->float|None:
-    if value in (None,"",0,0.0):
-        return None
+    try:
+        if value is None or pd.isna(value) or value in ("",0,0.0): return None
+    except Exception:
+        pass
     try:
         if isinstance(value,(int,float)):
+            if not math.isfinite(float(value)): return None
             ts=pd.Timestamp(float(value),unit="s",tz="UTC")
         else:
-            ts=pd.to_datetime(value,utc=True)
-        return max(0.0,(pd.Timestamp.now(tz="UTC")-ts).total_seconds()/60)
+            ts=pd.to_datetime(value,utc=True,errors="coerce")
+        if pd.isna(ts): return None
+        delta=(pd.Timestamp.now(tz="UTC")-ts).total_seconds()/60
+        return None if delta < -1 else max(0.0,delta)
     except Exception:
         return None
 
@@ -204,7 +209,10 @@ def _map_normalize(ctx:Mapping[str,Any]|None,pair:str)->dict[str,Any]:
         "sweep_type":sweep_type,"sweep_level":sweep_level,"sweep_price":sweep_price,
         "sweep_rejection":sweep_rej,"sweep_time":sweep_time,
         "gate":str(c.get("readiness_grade","—")),"gate_score":_safe(c.get("readiness_score",0)),
-        "adr":_safe(c.get("adr_used_pct",0)),"event":str(c.get("event_risk","NORMAL")),
+        "adr":None if c.get("adr_used_pct") in (None,"","—") else _safe(c.get("adr_used_pct")),
+        "event":str(c.get("event_risk","DESCONHECIDO") or "DESCONHECIDO"),
+        "updated_at":c.get("updated_at"),
+        "macro_direction":str(c.get("macro_direction","") or ""),
         "price":c.get("price"),"bsl_name":bsl_name,"bsl_price":bsl_price,
         "ssl_name":ssl_name,"ssl_price":ssl_price,"levels":levels,
     }
@@ -224,16 +232,19 @@ def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro",weights=
     h4=str((tec.get("h4",{}) or {}).get("status","—")); h1=str((tec.get("h1",{}) or {}).get("status","—")); m15=str((tec.get("m15",{}) or {}).get("status","—"))
     ict=dict(tec.get("ict",{}) or {}); ict_read=_safe(ict.get("readiness",0)); ict_label=str(ict.get("label","⏳ aguardando ICT"))
     inst=dict(tec.get("institutional",{}) or {}); inst_read=_safe(inst.get("readiness",0)); inst_label=str(inst.get("label","⏳ aguardando motor institucional"))
-    data_ready=assess_pair_data_readiness(raw_sc,mapctx)
+    data_ready=assess_pair_data_readiness(raw_sc,mapctx,expected_direction=str(row.get("Direção","")))
     ict_fresh=assess_ict_freshness(data_ready)
     age=(data_ready.get("timeframes",{}).get("m15",{}) or {}).get("age_minutes")
     strength=build_strength_breakdown(ranking,base,quote,weights)
 
     mc=_map_normalize(mapctx,pair)
     sweep_state=sweep_freshness(mc.get("sweep_time"))
-    w1,d1=mc["w1"],mc["d1"]
-    gate,gate_score=mc["gate"],mc["gate_score"]
-    pd_zone=mc["pd_zone"]; adr=mc["adr"]; event=mc["event"]
+    map_current=bool(data_ready.get("map_ready",False))
+    w1,d1=(mc["w1"],mc["d1"]) if map_current else ("N/D — MAP ANTIGO","N/D — MAP ANTIGO")
+    gate,gate_score=(mc["gate"],mc["gate_score"]) if map_current else ("WAIT",0.0)
+    pd_zone=mc["pd_zone"] if map_current else "N/D"
+    adr=mc["adr"] if map_current else None
+    event=mc["event"] if map_current else "DESCONHECIDO"
     price=mc["price"] if mc["price"] is not None else tec.get("preco_m15")
 
     news_diff=_safe((news or {}).get("Diferencial notícias",0)); news_align=str((news or {}).get("Alinhamento","—")); news_conv=_safe((news or {}).get("Convicção heurística",0))
@@ -248,20 +259,22 @@ def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro",weights=
     for tf,status in (("H4",h4),("H1",h1),("M15",m15)):
         shown,current=masked_technical_status(status,tf,data_ready)
         ss=_status_score(status)
+        current = bool(current and data_ready.get("direction_consistent", True))
         if current:
             if side=="BUY" and ss>=80: up.append(f"{tf} confirma compra")
             elif side=="SELL" and ss>=80: down.append(f"{tf} confirma venda")
         elif _status_score(status)>=80:
             stale_technical.append(f"{tf}: {status} — histórico; não conta como confirmação atual")
-    for tf,bias in (("W1",w1),("D1",d1)):
-        match=_trend_matches(bias,side)
-        if match is True: (up if side=="BUY" else down).append(f"{tf} alinhado ao viés")
+    if map_current:
+        for tf,bias in (("W1",w1),("D1",d1)):
+            match=_trend_matches(bias,side)
+            if match is True: (up if side=="BUY" else down).append(f"{tf} alinhado ao viés")
 
     # Sweep sem dicionário bruto.
     if mc["sweep_type"]:
         coherent=(side=="BUY" and "SSL" in mc["sweep_type"].upper()) or (side=="SELL" and "BSL" in mc["sweep_type"].upper())
         msg=f"{mc['sweep_type']} em {mc['sweep_level'] or 'nível'} ({_fmt_price(mc['sweep_price'],pair)})"
-        if coherent and sweep_state.get("current"):
+        if coherent and sweep_state.get("current") and map_current:
             (up if side=="BUY" else down).append("liquidez atual: "+msg)
         evidence.append(msg)
 
@@ -274,7 +287,7 @@ def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro",weights=
     for key,label in (("mss","MSS"),("displacement","Displacement"),("smt","SMT"),("dealing_range","Premium/Discount"),("session","Judas/Sessão"),("pd_array","Breaker/Mitigation"),("liquidity","Draw on Liquidity")):
         comp=_component(inst,key)
         status,_text=display_component_status(comp,key,data_ready)
-        if "🟢" in status and not status.startswith("⏳"):
+        if "🟢" in status and not status.startswith("⏳") and data_ready.get("direction_consistent", True):
             (up if side=="BUY" else down).append(f"{label}: {status.replace('🟢','').strip()}")
 
     ft=str(fed_tone).upper()
@@ -315,7 +328,7 @@ def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro",weights=
         "up":up,"down":down,"reason":reason,"next_action":decision["next_action"],"target":target,
         "hard_blocks":decision["hard_blocks"],"soft_blocks":decision["soft_blocks"],"positives":decision["positives"],
         "executable":decision["executable"],"technical_age":age,"data_ready":data_ready,
-        "stale_technical":stale_technical,"sweep_state":sweep_state,"strength":strength,
+        "stale_technical":stale_technical,"sweep_state":sweep_state,"strength":strength,"map_current":map_current,
     }
 
 
@@ -378,7 +391,7 @@ def _stack_rows(p:Mapping[str,Any])->pd.DataFrame:
         ("Técnico","H4",masked_technical_status(p.get("h4","—"),"H4",dr)[0],_status_score(p.get("h4","—")) if masked_technical_status(p.get("h4","—"),"H4",dr)[1] else None),
         ("Técnico","H1",masked_technical_status(p.get("h1","—"),"H1",dr)[0],_status_score(p.get("h1","—")) if masked_technical_status(p.get("h1","—"),"H1",dr)[1] else None),
         ("Técnico","M15",masked_technical_status(p.get("m15","—"),"M15",dr)[0],_status_score(p.get("m15","—")) if masked_technical_status(p.get("m15","—"),"M15",dr)[1] else None),
-        ("Risco","ADR14",f"{p.get('adr',0):.0f}% consumido",None),
+        ("Risco","ADR14",("N/D" if p.get("adr") is None else f"{p.get('adr'):.0f}% consumido"),None),
         ("Risco","Evento",p.get("event","NORMAL"),None),
         ("Gate","Gate",f"{p.get('gate','—')} · {p.get('gate_score',0):.0f}/100",p.get("gate_score")),
     ]
@@ -387,7 +400,7 @@ def _stack_rows(p:Mapping[str,Any])->pd.DataFrame:
 
 def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:Mapping[str,Any]|None=None,macro_context:Mapping[str,Any]|None=None,weights:Mapping[str,float]|None=None):
     _css()
-    st.markdown("""<div class="v110-hero"><h2>🏛️ Central Institucional dos 7 Pares — V11.0.5</h2><p>Macro → notícias → W1/D1 → liquidez → SMT → displacement → MSS → CRT/AMD/OTE/FVG → H4/H1/M15 → ADR/evento → decisão final.</p><span class="v110-badge">1 tela</span><span class="v110-badge">sem novas chamadas de API</span><span class="v110-badge">hard gates</span><span class="v110-badge">auditável</span></div>""",unsafe_allow_html=True)
+    st.markdown("""<div class="v110-hero"><h2>🏛️ Central Institucional dos 7 Pares — V11.0.6</h2><p>Macro → notícias → W1/D1 → liquidez → SMT → displacement → MSS → CRT/AMD/OTE/FVG → H4/H1/M15 → ADR/evento → decisão final.</p><span class="v110-badge">1 tela</span><span class="v110-badge">sem novas chamadas de API</span><span class="v110-badge">hard gates</span><span class="v110-badge">auditável</span></div>""",unsafe_allow_html=True)
     st.caption("Objetivo: reproduzir um processo disciplinado de decisão multi-camada. Não representa fluxo real de instituições. Prioridade/readiness não é probabilidade de lucro.")
     if matrix is None or matrix.empty:
         st.warning("A Matriz ainda não está disponível nesta execução."); return
@@ -409,7 +422,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     strongest,weakest=_major_extremes(ranking)
     process_age=_age_minutes(auto.get("last_run"))
     process_ok=bool(auto.get("app_headless_ok",False))
-    process_label=("🟢 PROCESSO OK" if process_ok and (process_age is None or process_age<=90) else "🟡 SEM RODADA RECENTE" if process_ok else "🔴 FALHA HEADLESS")
+    process_label=("🟢 PROCESSO OK" if process_ok and process_age is not None and process_age<=90 else "🟡 SEM RODADA RECENTE" if process_ok else "🔴 FALHA HEADLESS")
     data_ok=sum(1 for x in packs if bool((x.get("data_ready",{}) or {}).get("sufficient",False)))
     twelve_label="🟠 COTA/PLANO BLOQUEADO" if auto.get("twelve_daily_blocked") else "🟢 SEM BLOQUEIO REGISTRADO"
     c1,c2,c3,c4,c5=st.columns(5)
@@ -446,7 +459,8 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
                 _s=p.get("strength",{}) or {}
                 st.caption(f"Força: {_s.get('base',p['pair'].split('/')[0])} {_safe(_s.get('base_score',50)):.1f} × {_s.get('quote',p['pair'].split('/')[1])} {_safe(_s.get('quote_score',50)):.1f} = Δ {_safe(_s.get('difference',0)):+.1f} pts")
                 _dr=p.get("data_ready",{}) or {}; _tf=_dr.get("timeframes",{}) or {}
-                st.caption(f"H4 {p['h4']} ({(_tf.get('h4',{}) or {}).get('state','—')}) · H1 {p['h1']} ({(_tf.get('h1',{}) or {}).get('state','—')}) · M15 {p['m15']} ({(_tf.get('m15',{}) or {}).get('state','—')}) · Gate {p['gate']} · ADR {p['adr']:.0f}%")
+                _adr_exec='N/D' if p.get('adr') is None else f"{p['adr']:.0f}%"
+                st.caption(f"H4 {p['h4']} ({(_tf.get('h4',{}) or {}).get('state','—')}) · H1 {p['h1']} ({(_tf.get('h1',{}) or {}).get('state','—')}) · M15 {p['m15']} ({(_tf.get('m15',{}) or {}).get('state','—')}) · Gate {p['gate']} · ADR {_adr_exec}")
                 st.caption(f"Alvo de liquidez: {p['target']} · Próximo passo: {p['next_action']}")
 
     st.divider(); st.markdown("## 🔬 Raio-X institucional")
@@ -456,7 +470,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
         st.session_state["v110_pair_deep"]=_pair_options[0]
     pair=st.selectbox("Escolha o par",_pair_options,key="v110_pair_deep")
 
-    # V11.0.5: resolve o pack e REFAZ o breakdown a partir do par selecionado.
+    # V11.0.6: resolve o pack e REFAZ o breakdown a partir do par selecionado.
     # Assim a interface nunca pode mostrar USD/CHF no seletor e EUR/USD na força.
     p=next(x for x in packs if x["pair"]==pair)
     _base_sel,_quote_sel=pair.split("/")
@@ -480,6 +494,26 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
         st.info("⚪ As duas moedas estão equilibradas na força relativa do modelo.")
 
     st.caption(f"Principais diferenças: {_s.get('dominant','—')} · Pontos internos do modelo; não são pips nem probabilidade de lucro.")
+
+    # V11.0.6 — conta de chegada, separando Macro puro, Fed e ajustes.
+    _a=attribution_sides(_s)
+    st.markdown("#### 🧮 Conta de chegada da força")
+    _c1,_c2,_c3=st.columns(3)
+    _c1.metric("Macro puro",f"{_base_sel} {_safe(_s.get('base_macro',50)):.1f} × {_quote_sel} {_safe(_s.get('quote_macro',50)):.1f}",f"Δ {_safe(_s.get('macro_difference',0)):+.1f} pts")
+    _c2.metric("Fed",f"{_base_sel} {_safe(_s.get('base_fed',0)):+.1f} × {_quote_sel} {_safe(_s.get('quote_fed',0)):+.1f}",f"Δ {_safe(_s.get('fed_difference',0)):+.1f} pts")
+    _c3.metric("Outros ajustes",f"{_base_sel} {_safe(_s.get('base_adjustments',0)):+.1f} × {_quote_sel} {_safe(_s.get('quote_adjustments',0)):+.1f}",f"Δ {_safe(_s.get('adjustment_difference',0)):+.1f} pts")
+    _left,_right=st.columns(2)
+    with _left:
+        st.markdown(f"**A favor de {_base_sel}**")
+        if _a.get('base_items'):
+            for _it in _a['base_items'][:8]: st.caption(f"• {_it['Fator']}: +{_it['pts']:.1f} pts")
+        else: st.caption("Nenhum fator líquido favorece a base.")
+    with _right:
+        st.markdown(f"**A favor de {_quote_sel}**")
+        if _a.get('quote_items'):
+            for _it in _a['quote_items'][:8]: st.caption(f"• {_it['Fator']}: +{_it['pts']:.1f} pts")
+        else: st.caption("Nenhum fator líquido favorece a cotada.")
+    st.info(f"Conta líquida: vantagens {_base_sel} {_safe(_a.get('base_advantages',0)):.1f} − vantagens {_quote_sel} {_safe(_a.get('quote_advantages',0)):.1f} = {_safe(_a.get('net',0)):+.1f} pts. A força final continua {_base_sel} {_safe(_s.get('base_score',50)):.1f} × {_quote_sel} {_safe(_s.get('quote_score',50)):.1f}.")
     _sr=pd.DataFrame(_s.get("rows",[]) or [])
     if not _sr.empty:
         st.dataframe(_sr,use_container_width=True,hide_index=True,height=315)
@@ -571,7 +605,8 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
         if name in levels and levels.get(name) is not None:
             level_rows.append({"Nível":name,"Preço":_fmt_price(levels.get(name),pair)})
     if level_rows: st.dataframe(pd.DataFrame(level_rows),use_container_width=True,hide_index=True)
-    st.caption(f"Alvo principal: {p['target']} · Gate {p['gate']} ({p['gate_score']:.0f}/100) · ADR {p['adr']:.0f}% · idade técnica {p['technical_age']:.0f} min" if p['technical_age'] is not None else f"Alvo principal: {p['target']} · Gate {p['gate']} ({p['gate_score']:.0f}/100) · ADR {p['adr']:.0f}%")
+    _adr_txt='N/D' if p.get('adr') is None else f"{p['adr']:.0f}%"
+    st.caption(f"Alvo principal: {p['target']} · Gate {p['gate']} ({p['gate_score']:.0f}/100) · ADR {_adr_txt} · idade técnica {p['technical_age']:.0f} min" if p['technical_age'] is not None else f"Alvo principal: {p['target']} · Gate {p['gate']} ({p['gate_score']:.0f}/100) · ADR {_adr_txt}")
 
     st.markdown("### 🎯 Plano objetivo")
     msg=f"**Decisão:** {p['state']} · **Direção:** {p['direction']} · **Motivo dominante:** {p['reason']} · **Próximo passo:** {p['next_action']}"
@@ -579,7 +614,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     elif p["state"].startswith("🔴"): st.error(msg)
     else: st.warning(msg)
 
-    with st.expander("📚 Como ler o V11.0.5"):
+    with st.expander("📚 Como ler o V11.0.6"):
         st.markdown("""
 - **Macro** escolhe o lado; execução nunca inverte o lado macro sozinha.
 - **SMT** procura divergência entre EUR/USD↔GBP/USD, AUD/USD↔NZD/USD e USD/CHF↔USD/JPY.

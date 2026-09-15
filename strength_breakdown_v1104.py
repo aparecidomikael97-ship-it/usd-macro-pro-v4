@@ -1,4 +1,4 @@
-"""USD Macro Pro V11.0.4 — detalhamento dos pontos de força por moeda/par.
+"""USD Macro Pro V11.0.6 — detalhamento dos pontos de força por moeda/par.
 
 The pair total is exact from Pontuação_Final. Component rows explain where
 the macro-strength gap comes from. These are internal model points, not pips
@@ -151,5 +151,31 @@ def build_strength_breakdown(
         ),
         "explained_base": round(sum(cb.values()) + fedb + residual_b, 2),
         "explained_quote": round(sum(cq.values()) + fedq + residual_q, 2),
+        "base_macro": round(mb, 2),
+        "quote_macro": round(mq, 2),
+        "base_fed": round(fedb, 2),
+        "quote_fed": round(fedq, 2),
+        "base_adjustments": round(residual_b, 2),
+        "quote_adjustments": round(residual_q, 2),
+        "adjustment_difference": round(residual_b - residual_q, 2),
         "note": "Pontos internos do modelo; não são pips nem probabilidade de lucro.",
+    }
+
+
+def attribution_sides(breakdown: Mapping[str, Any]) -> dict[str, Any]:
+    """Agrupa fatores a favor de cada moeda e reconcilia o resultado líquido."""
+    base=str(breakdown.get("base","BASE")); quote=str(breakdown.get("quote","COTADA"))
+    base_items=[]; quote_items=[]
+    for r in breakdown.get("rows",[]) or []:
+        d=_num(r.get("Diferença base−cotada",0),0)
+        item={"Fator":str(r.get("Fator","")),"pts":round(abs(d),2)}
+        if d>0.005: base_items.append(item)
+        elif d<-0.005: quote_items.append(item)
+    base_items.sort(key=lambda x:x["pts"],reverse=True); quote_items.sort(key=lambda x:x["pts"],reverse=True)
+    return {
+        "base":base,"quote":quote,
+        "base_items":base_items,"quote_items":quote_items,
+        "base_advantages":round(sum(x["pts"] for x in base_items),2),
+        "quote_advantages":round(sum(x["pts"] for x in quote_items),2),
+        "net":round(_num(breakdown.get("difference",0),0),2),
     }

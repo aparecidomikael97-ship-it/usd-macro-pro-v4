@@ -54,25 +54,33 @@ def _f(v: Any, default: float = 0.0) -> float:
 
 
 def _status_score(s: str) -> float:
-    u=str(s).upper()
-    if "🟢" in s or "CONFIRMA" in u or "GATILHO" in u or "PULLBACK OK" in u:
-        return 100.0
-    if "🟡" in s or "PARCIAL" in u or "ALINHADO" in u or "AGUARDAR" in u or "ESTICADO" in u:
-        return 60.0
-    if "🔴" in s or "CONTRA" in u or "SEM GATILHO" in u:
+    """Classifica o estado sem deixar palavras positivas dentro de estados negativos liberarem execução."""
+    raw = str(s or "")
+    u = raw.upper().strip()
+    # Ordem importa: SEM GATILHO contém a palavra GATILHO.
+    if "🔴" in raw or "SEM GATILHO" in u or "CONTRA" in u or "INVALID" in u or "BLOQUE" in u:
         return 20.0
+    if "🟡" in raw or "AGUARDAR" in u or "PARCIAL" in u or "ALINHADO" in u or "ESTICADO" in u:
+        return 60.0
+    if "🟢" in raw or "CONFIRMA" in u or "PULLBACK OK" in u or u == "GATILHO" or u.endswith(" GATILHO"):
+        return 100.0
     return 45.0
 
 
 def _event_level(v: Any) -> str:
-    u = "NORMAL" if _is_missing(v) else str(v).upper().strip()
-    if u in ("MÁXIMO","MAXIMO","MÁXIMA","MAXIMA","CRÍTICO","CRITICO"):
+    """Normaliza risco de evento. Ausente/desconhecido nunca vira NORMAL por padrão."""
+    if _is_missing(v):
+        return "DESCONHECIDO"
+    u = str(v).upper().strip()
+    if u in ("MÁXIMO","MAXIMO","MÁXIMA","MAXIMA","CRÍTICO","CRITICO","CRITICAL","MUITO ALTO","VERY HIGH","SEVERE"):
         return "MAXIMO"
-    if u in ("ALTO","ELEVADO","HIGH"):
+    if u in ("ALTO","ELEVADO","HIGH","ATENÇÃO","ATENCAO","ATTENTION"):
         return "ELEVADO"
     if u in ("MÉDIO","MEDIO","MODERADO","MEDIUM"):
         return "MODERADO"
-    return "NORMAL"
+    if u in ("NORMAL","BAIXO","LOW"):
+        return "NORMAL"
+    return "DESCONHECIDO"
 
 
 def evaluate_decision_integrity(
@@ -104,11 +112,19 @@ def evaluate_decision_integrity(
     macro_wait = side not in ("BUY","SELL")
     if quality < 60:
         hard.append(f"Qualidade de dados baixa ({quality:.0f}%)")
-    if data_ok is False:
+    if data_ok is not True:
         if data_score is None:
-            hard.append("Dados técnicos insuficientes para decisão")
+            hard.append("Dados técnicos ausentes/insuficientes para decisão")
         else:
             hard.append(f"Dados técnicos insuficientes ({data_score:.0f}/100)")
+    if data_score is None:
+        hard.append("Score de prontidão dos dados indisponível")
+    if age is None:
+        hard.append("Idade técnica indisponível")
+    if adr is None:
+        hard.append("ADR14 indisponível")
+    if event == "DESCONHECIDO":
+        hard.append("Risco de evento desconhecido")
     if _status_score(h4) <= 25:
         hard.append("H4 está contra o viés")
     if _status_score(h1) <= 25:
@@ -138,7 +154,7 @@ def evaluate_decision_integrity(
 
     if score >= 80: positives.append(f"Score Mestre forte ({score:.0f}/100)")
     if quality >= 75: positives.append(f"Qualidade alta ({quality:.0f}%)")
-    if tech_avg >= 85: positives.append("H4/H1/M15 fortemente alinhados")
+    if tech_avg >= 85 and data_ok is True: positives.append("H4/H1/M15 fortemente alinhados")
     if ict >= 75: positives.append(f"ICT alinhado ({ict:.0f}/100)")
     if inst >= 75: positives.append(f"Fluxo institucional alinhado ({inst:.0f}/100)")
     if gate_score >= 70 and "WAIT" not in gate_u: positives.append(f"Gate liberado ({gate_score:.0f}/100)")
@@ -159,8 +175,8 @@ def evaluate_decision_integrity(
         side in ("BUY","SELL") and not hard and
         _status_score(h4)>=80 and _status_score(h1)>=80 and _status_score(m15)>=80 and
         ict>=70 and inst>=70 and gate_score>=65 and "WAIT" not in gate_u and
-        event not in ("MAXIMO","ELEVADO") and (adr is None or adr<95) and
-        data_ok is not False
+        event not in ("MAXIMO","ELEVADO","DESCONHECIDO") and adr is not None and adr<95 and
+        age is not None and data_ok is True and data_score is not None
     )
 
     if macro_wait:

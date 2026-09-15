@@ -192,6 +192,12 @@ DOVISH = (
     "more rate cuts", "ready to cut", "inflation cooling", "disinflation",
     "growth slowing", "weaker labor", "recession risk"
 )
+RATE_CUT_NEGATIONS = (
+    "rules out rate cuts", "rule out rate cuts", "rules out a rate cut", "rule out a rate cut",
+    "no rate cuts", "no rate cut", "rate cuts off the table", "rate cut off the table",
+    "unlikely to cut", "will not cut", "won't cut", "not cutting rates", "rejects rate cuts",
+)
+
 
 MACRO_POS = (
     "stronger than expected", "beats expectations", "beat expectations",
@@ -501,8 +507,9 @@ def _specific_adjustment(currency: str, title: str) -> tuple[float, str]:
 
 def _headline_impact(currency: str, title: str) -> tuple[float, str, str]:
     t = _norm_text(title)
-    hawk = _contains_any(t, HAWKISH)
-    dove = _contains_any(t, DOVISH)
+    negated_cut = _contains_any(t, RATE_CUT_NEGATIONS)
+    hawk = _contains_any(t, HAWKISH) + negated_cut
+    dove = 0 if negated_cut else _contains_any(t, DOVISH)
     pos = _contains_any(t, MACRO_POS)
     neg = _contains_any(t, MACRO_NEG)
     hot = _contains_any(t, INFLATION_HOT)

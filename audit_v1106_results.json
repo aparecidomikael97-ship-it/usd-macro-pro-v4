@@ -1,0 +1,166 @@
+{
+  "01_status_m15": {
+    "🟢 GATILHO": {
+      "status_score": 100.0,
+      "executable": true,
+      "soft_blocks": []
+    },
+    "🟡 AGUARDAR GATILHO": {
+      "status_score": 60.0,
+      "executable": false,
+      "soft_blocks": [
+        "M15 ainda não confirmou gatilho"
+      ]
+    },
+    "🔴 SEM GATILHO": {
+      "status_score": 20.0,
+      "executable": false,
+      "soft_blocks": [
+        "M15 ainda não confirmou gatilho"
+      ]
+    }
+  },
+  "02_campos_ausentes": "🔴 BLOQUEADO",
+  "03_risco_nao_reconhecido": {
+    "MUITO ALTO": "MAXIMO",
+    "CRITICAL": "MAXIMO",
+    "ATENÇÃO": "ELEVADO",
+    "N/D": "DESCONHECIDO",
+    "ALTO": "ELEVADO"
+  },
+  "04_timestamps": {
+    "pd.NA": {
+      "age": null,
+      "fresh": false
+    },
+    "pd.NaT": {
+      "age": null,
+      "fresh": false
+    },
+    "NaN": {
+      "age": null,
+      "fresh": false
+    },
+    "future": {
+      "age": null,
+      "fresh": false
+    }
+  },
+  "05_mapa_7_dias": {
+    "state": "🔴 BLOQUEADO",
+    "map_ready": false
+  },
+  "06_direcao_trocada": "🔴 BLOQUEADO",
+  "07_cache_invalido": {
+    "data_sufficient": false,
+    "state": "🔴 BLOQUEADO"
+  },
+  "08_evidencias_antigas": {
+    "state": "🔴 BLOQUEADO",
+    "up": [
+      "EUR está 10.0 pts mais forte que USD no macro relativo"
+    ],
+    "positives": [
+      "Score Mestre forte (92/100)",
+      "Qualidade alta (88%)"
+    ]
+  },
+  "09_adr_ausente_mapa": {
+    "w1": "—",
+    "d1": "—",
+    "pd_zone": "—",
+    "pd_position": null,
+    "sweep_type": "",
+    "sweep_level": "",
+    "sweep_price": null,
+    "sweep_rejection": "",
+    "sweep_time": "",
+    "gate": "A",
+    "gate_score": 85.0,
+    "adr": null,
+    "event": "N/D",
+    "updated_at": null,
+    "price": null,
+    "bsl_name": "BSL",
+    "bsl_price": null,
+    "ssl_name": "SSL",
+    "ssl_price": null,
+    "levels": {}
+  },
+  "10_smt_sem_sincronia": {
+    "matched_times": 0,
+    "aligned_rows": 0,
+    "result": {
+      "status": "⚪ SMT INDISPONÍVEL",
+      "score": 0,
+      "companion": "GBP/USD",
+      "text": "Sem dados sincronizados suficientes para SMT."
+    }
+  },
+  "11_troca_direcao_api_falha": {
+    "macro_direction": "VENDA EUR/USD",
+    "h4": {
+      "status": "⚪ AGUARDANDO NOVA LEITURA",
+      "reason": "direção macro mudou"
+    },
+    "h1": {
+      "status": "⚪ AGUARDANDO NOVA LEITURA",
+      "reason": "direção macro mudou"
+    },
+    "m15": {
+      "status": "⚪ AGUARDANDO NOVO GATILHO",
+      "reason": "direção macro mudou"
+    },
+    "ict_side": "SELL",
+    "ict_readiness": 0.0,
+    "errors": [
+      "EUR/USD 15min: simulated failure",
+      "EUR/USD 1h: simulated failure",
+      "EUR/USD 4h: simulated failure"
+    ]
+  },
+  "12_cache_repositorios": {
+    "http_calls": 2,
+    "first": [
+      {
+        "origin": "repo-A"
+      },
+      ""
+    ],
+    "second": [
+      {
+        "origin": "repo-A"
+      },
+      ""
+    ]
+  },
+  "13_negacao_noticias": {
+    "Fed signals rate cuts": [
+      -0.84,
+      "🔴 Enfraquece",
+      "tom mais dovish / maior chance de cortes"
+    ],
+    "Fed rules out rate cuts": [
+      0.42,
+      "🟢 Fortalece",
+      "tom mais hawkish / juros altos por mais tempo"
+    ]
+  },
+  "14_fvg_invalidado_e_revisitado": {
+    "status": "🔴 FVG INVALIDADO",
+    "score": 15,
+    "zone_low": 1.1,
+    "zone_high": 1.12,
+    "price": 1.11,
+    "invalidated": true,
+    "text": "O FVG recente foi atravessado/invalido antes do preço retornar; não vale como confirmação atual."
+  },
+  "15_preco_anterior_ao_sinal": [
+    {
+      "entry_time": null,
+      "m15_candle_time": null,
+      "signal_frozen_at": "2026-09-14T12:07:00+00:00",
+      "entry_price": null
+    }
+  ]
+}

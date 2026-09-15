@@ -339,17 +339,19 @@ def detect_session_judas(m15: pd.DataFrame | None, side: str) -> dict[str, Any]:
 
 
 def _align_frames(a: pd.DataFrame, b: pd.DataFrame, bars: int = 40) -> tuple[pd.DataFrame,pd.DataFrame]:
+    """SMT só pode comparar candles que compartilham o mesmo timestamp."""
     aa=_frame(a).tail(bars).copy(); bb=_frame(b).tail(bars).copy()
-    if aa.empty or bb.empty:
+    if aa.empty or bb.empty or "datetime" not in aa.columns or "datetime" not in bb.columns:
         return pd.DataFrame(),pd.DataFrame()
-    if "datetime" in aa.columns and "datetime" in bb.columns:
-        m=aa.merge(bb,on="datetime",how="inner",suffixes=("_a","_b"))
-        if len(m)>=12:
-            acols={"datetime":"datetime","open_a":"open","high_a":"high","low_a":"low","close_a":"close"}
-            bcols={"datetime":"datetime","open_b":"open","high_b":"high","low_b":"low","close_b":"close"}
-            return m[list(acols)].rename(columns=acols), m[list(bcols)].rename(columns=bcols)
-    n=min(len(aa),len(bb))
-    return aa.tail(n).reset_index(drop=True),bb.tail(n).reset_index(drop=True)
+    aa["datetime"]=pd.to_datetime(aa["datetime"],utc=True,errors="coerce")
+    bb["datetime"]=pd.to_datetime(bb["datetime"],utc=True,errors="coerce")
+    aa=aa.dropna(subset=["datetime"]); bb=bb.dropna(subset=["datetime"])
+    m=aa.merge(bb,on="datetime",how="inner",suffixes=("_a","_b"))
+    if len(m)<12:
+        return pd.DataFrame(),pd.DataFrame()
+    acols={"datetime":"datetime","open_a":"open","high_a":"high","low_a":"low","close_a":"close"}
+    bcols={"datetime":"datetime","open_b":"open","high_b":"high","low_b":"low","close_b":"close"}
+    return m[list(acols)].rename(columns=acols).reset_index(drop=True), m[list(bcols)].rename(columns=bcols).reset_index(drop=True)
 
 
 def detect_smt(primary: pd.DataFrame | None, companion: pd.DataFrame | None, pair: str, companion_pair: str, side: str) -> dict[str, Any]:

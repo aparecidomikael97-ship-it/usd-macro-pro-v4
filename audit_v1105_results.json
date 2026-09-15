@@ -1,0 +1,156 @@
+{
+  "01_status_m15": {
+    "🟢 GATILHO": {
+      "status_score": 100.0,
+      "executable": true,
+      "soft_blocks": []
+    },
+    "🟡 AGUARDAR GATILHO": {
+      "status_score": 100.0,
+      "executable": true,
+      "soft_blocks": []
+    },
+    "🔴 SEM GATILHO": {
+      "status_score": 100.0,
+      "executable": true,
+      "soft_blocks": []
+    }
+  },
+  "02_campos_ausentes": "🟢 EXECUTÁVEL",
+  "03_risco_nao_reconhecido": {
+    "MUITO ALTO": "NORMAL",
+    "CRITICAL": "NORMAL",
+    "ATENÇÃO": "NORMAL",
+    "N/D": "NORMAL",
+    "ALTO": "ELEVADO"
+  },
+  "04_timestamps": {
+    "pd.NA": "TypeError: boolean value of NA is ambiguous",
+    "pd.NaT": {
+      "age": 0.0,
+      "fresh": true
+    },
+    "NaN": {
+      "age": 0.0,
+      "fresh": true
+    },
+    "future": {
+      "age": 0.0,
+      "fresh": true
+    }
+  },
+  "05_mapa_7_dias": {
+    "state": "🟢 EXECUTÁVEL",
+    "map_ready": true
+  },
+  "06_direcao_trocada": "🟢 EXECUTÁVEL",
+  "07_cache_invalido": {
+    "data_sufficient": true,
+    "state": "🟢 EXECUTÁVEL"
+  },
+  "08_evidencias_antigas": {
+    "state": "🔴 BLOQUEADO",
+    "up": [
+      "EUR está 10.0 pts mais forte que USD no macro relativo"
+    ],
+    "positives": [
+      "Score Mestre forte (92/100)",
+      "Qualidade alta (88%)",
+      "H4/H1/M15 fortemente alinhados",
+      "Gate liberado (85/100)"
+    ]
+  },
+  "09_adr_ausente_mapa": {
+    "w1": "—",
+    "d1": "—",
+    "pd_zone": "—",
+    "pd_position": null,
+    "sweep_type": "",
+    "sweep_level": "",
+    "sweep_price": null,
+    "sweep_rejection": "",
+    "sweep_time": "",
+    "gate": "A",
+    "gate_score": 85.0,
+    "adr": 0.0,
+    "event": "NORMAL",
+    "price": null,
+    "bsl_name": "BSL",
+    "bsl_price": null,
+    "ssl_name": "SSL",
+    "ssl_price": null,
+    "levels": {}
+  },
+  "10_smt_sem_sincronia": {
+    "matched_times": 0,
+    "aligned_rows": 48,
+    "result": {
+      "status": "🟢 SMT BULLISH",
+      "score": 100,
+      "companion": "GBP/USD",
+      "text": "EUR/USD fez nova mínima e GBP/USD não confirmou: divergência favorável ao BUY."
+    }
+  },
+  "11_troca_direcao_api_falha": {
+    "macro_direction": "VENDA EUR/USD",
+    "h4": {
+      "status": "🟢 CONFIRMA"
+    },
+    "h1": {
+      "status": "🟢 PULLBACK OK"
+    },
+    "m15": {
+      "status": "🟢 GATILHO"
+    },
+    "ict_side": "SELL",
+    "ict_readiness": 90.0,
+    "errors": [
+      "EUR/USD 15min: simulated failure",
+      "EUR/USD 1h: simulated failure",
+      "EUR/USD 4h: simulated failure"
+    ]
+  },
+  "12_cache_repositorios": {
+    "http_calls": 2,
+    "first": [
+      {
+        "origin": "repo-A"
+      },
+      ""
+    ],
+    "second": [
+      {
+        "origin": "repo-A"
+      },
+      ""
+    ]
+  },
+  "13_negacao_noticias": {
+    "Fed signals rate cuts": [
+      -0.84,
+      "🔴 Enfraquece",
+      "tom mais dovish / maior chance de cortes"
+    ],
+    "Fed rules out rate cuts": [
+      -0.84,
+      "🔴 Enfraquece",
+      "tom mais dovish / maior chance de cortes"
+    ]
+  },
+  "14_fvg_invalidado_e_revisitado": {
+    "status": "🟢 FVG EM TESTE",
+    "score": 90,
+    "zone_low": 1.1,
+    "zone_high": 1.12,
+    "price": 1.11,
+    "text": "Preço está dentro do FVG M15 recente."
+  },
+  "15_preco_anterior_ao_sinal": [
+    {
+      "entry_time": "2026-09-14T12:07:00+00:00",
+      "m15_candle_time": "2026-09-14T11:45:00+00:00",
+      "signal_frozen_at": "2026-09-14T12:07:00+00:00",
+      "entry_price": 1.105
+    }
+  ]
+}

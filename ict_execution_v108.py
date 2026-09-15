@@ -145,19 +145,31 @@ def detect_fvg(m15: pd.DataFrame | None, side: str) -> dict[str, Any]:
     if len(d) < 3 or side not in ("BUY","SELL"):
         return {"status":"⚪ SEM FVG", "score":0, "text":"FVG aguarda candles M15 válidos."}
     candidates=[]
+    invalidated=0
     for i in range(2,len(d)):
         if side=="BUY" and float(d.loc[i,"low"]) > float(d.loc[i-2,"high"]):
-            candidates.append((float(d.loc[i-2,"high"]),float(d.loc[i,"low"])))
+            lo,hi=float(d.loc[i-2,"high"]),float(d.loc[i,"low"])
+            future=d.iloc[i+1:]
+            # Bullish FVG deixa de existir se o preço atravessa toda a zona.
+            is_invalid=not future.empty and float(future["low"].min()) <= lo
+            if is_invalid: invalidated += 1
+            else: candidates.append((i,lo,hi))
         elif side=="SELL" and float(d.loc[i,"high"]) < float(d.loc[i-2,"low"]):
-            candidates.append((float(d.loc[i,"high"]),float(d.loc[i-2,"low"])))
+            lo,hi=float(d.loc[i,"high"]),float(d.loc[i-2,"low"])
+            future=d.iloc[i+1:]
+            is_invalid=not future.empty and float(future["high"].max()) >= hi
+            if is_invalid: invalidated += 1
+            else: candidates.append((i,lo,hi))
     if not candidates:
+        if invalidated:
+            return {"status":"⚪ FVG INVALIDADO", "score":20, "text":"O FVG recente foi totalmente atravessado; revisita posterior não reativa a zona antiga."}
         return {"status":"⚪ SEM FVG RECENTE", "score":30, "text":"Nenhum desequilíbrio M15 recente no lado macro."}
-    lo,hi=candidates[-1]
+    _,lo,hi=candidates[-1]
     px=float(d.iloc[-1].close)
     inside=lo <= px <= hi
     return {"status":"🟢 FVG EM TESTE" if inside else "🟡 FVG PRESENTE", "score":90 if inside else 65,
             "zone_low":lo, "zone_high":hi, "price":px,
-            "text":"Preço está dentro do FVG M15 recente." if inside else "Há FVG M15 recente no lado macro; aguarde retorno/continuação conforme o plano."}
+            "text":"Preço está dentro de um FVG M15 ainda válido." if inside else "Há FVG M15 ainda válido no lado macro; aguarde retorno/continuação conforme o plano."}
 
 
 def build_ict_snapshot(h1: pd.DataFrame | None, m15: pd.DataFrame | None, side: str) -> dict[str, Any]:
