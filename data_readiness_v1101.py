@@ -15,6 +15,67 @@ TF_LIMITS = {
 }
 MIN_CACHE = {"m15": 32, "h1": 12}
 
+ICT_TF_REQUIREMENTS = {
+    "crt": "h1",
+    "ote": "h1",
+    "amd": "m15",
+    "fvg": "m15",
+}
+
+
+def _tf_layer_ready(readiness: Mapping[str, Any], tf_name: str) -> bool:
+    """True only when the required timeframe is fresh AND its institutional cache is sufficient."""
+    tf = dict(readiness.get("timeframes", {}) or {})
+    fresh = bool((tf.get(tf_name, {}) or {}).get("fresh", False))
+    bars = int(readiness.get(f"cache_{tf_name}_bars", 0) or 0)
+    minimum = int(MIN_CACHE.get(tf_name, 0) or 0)
+    return fresh and bars >= minimum
+
+
+def assess_ict_freshness(readiness: Mapping[str, Any]) -> dict[str, Any]:
+    """Freshness gate for the persisted ICT snapshot.
+
+    CRT/OTE require H1. AMD/FVG require M15. The combined ICT readiness is
+    executable only when both H1 and M15 inputs are current enough.
+    """
+    h1_ready = _tf_layer_ready(readiness, "h1")
+    m15_ready = _tf_layer_ready(readiness, "m15")
+    fully_ready = h1_ready and m15_ready
+    if fully_ready:
+        label = "🟢 ICT ATUAL"
+    elif h1_ready or m15_ready:
+        label = "🟡 ICT PARCIAL — NÃO USAR COMO CONFIRMAÇÃO FINAL"
+    else:
+        label = "🔴 ICT DESATUALIZADO — NÃO USAR PARA EXECUÇÃO"
+    return {
+        "ready": bool(fully_ready),
+        "h1_ready": bool(h1_ready),
+        "m15_ready": bool(m15_ready),
+        "label": label,
+    }
+
+
+def display_ict_component_status(
+    component: Mapping[str, Any] | None,
+    key: str,
+    readiness: Mapping[str, Any],
+) -> tuple[str, str, bool]:
+    """Masks stale ICT snapshots so old confirmations never look current."""
+    comp = dict(component or {})
+    raw_status = str(comp.get("status", "—"))
+    raw_text = str(comp.get("text", ""))
+    tf_name = ICT_TF_REQUIREMENTS.get(str(key).lower())
+    if tf_name and not _tf_layer_ready(readiness, tf_name):
+        tf_label = tf_name.upper()
+        return (
+            f"⏳ {tf_label} ANTIGO/INSUFICIENTE — NÃO USAR",
+            f"A leitura anterior ({raw_status}) foi preservada apenas para histórico. "
+            f"{tf_label} precisa estar fresco e com cache mínimo antes de valer para execução.",
+            False,
+        )
+    return raw_status, raw_text, True
+
+
 
 def _age_minutes(value: Any, now: pd.Timestamp | None = None) -> float | None:
     if value in (None, "", 0, 0.0):

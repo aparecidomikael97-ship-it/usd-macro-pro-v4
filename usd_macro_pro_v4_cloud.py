@@ -101,12 +101,12 @@ except Exception as _autopilot_exc:
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "11.0.2 — TYPE SAFETY & NA GUARD · MOTOR BASE V9.3.9.2"
+APP_VERSION = "11.0.3 — FRESHNESS INTEGRITY · MOTOR BASE V9.3.9.2"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro V11.0.2 — Type Safety & NA Guard",
+    page_title="USD Macro Pro V11.0.3 — Freshness Integrity",
     page_icon="🦅",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1695,7 +1695,7 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("🦅 USD Macro Pro V11.0.2 — Type Safety & NA Guard")
+st.title("🦅 USD Macro Pro V11.0.3 — Freshness Integrity")
 st.caption("Macro semanal → Macro do dia → W1/D1 → Quarterly → Liquidez → Killzones → H4/H1/M15 → Performance real")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -3461,7 +3461,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 # V9.0 — CENTRAL DO OPERADOR
 # Somente interface/orientação; não altera o motor do modelo.
 # ============================================================
-st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V11.0.2")
+st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V11.0.3")
 st.caption("O APP define o viés macro; o gráfico confirma a entrada.")
 
 with st.container(border=True):
@@ -3657,8 +3657,8 @@ def _autopilot_save_inputs_v107():
 
 
 abas = st.tabs([
-    "🏛️ CENTRAL INSTITUCIONAL V11.0.2",
-    "🧠 PAINEL MESTRE V11.0.2",
+    "🏛️ CENTRAL INSTITUCIONAL V11.0.3",
+    "🧠 PAINEL MESTRE V11.0.3",
     "🏆 Classificação",
     "🇺🇸 Painel EUA",
     "💱 Pares e Confiança",
@@ -3666,12 +3666,12 @@ abas = st.tabs([
     "🧾 Histórico",
     "📈 Teste Histórico",
     "🎯 Decisão Automática",
-    "🧭 Macro Market Map V11.0.2",
+    "🧭 Macro Market Map V11.0.3",
     "✨ Aprenda & Personalize",
-    "🚀 Produto V11.0.2",
-    "🧭 Melhorias V11.0.2",
-    "🌍 Notícias Globais V11.0.2",
-    "🤖 AUTOPILOT V11.0.2",
+    "🚀 Produto V11.0.3",
+    "🧭 Melhorias V11.0.3",
+    "🌍 Notícias Globais V11.0.3",
+    "🤖 AUTOPILOT V11.0.3",
 ])
 
 # =========================================================

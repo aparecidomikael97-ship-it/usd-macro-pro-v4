@@ -19,7 +19,10 @@ import requests
 import streamlit as st
 
 from decision_integrity_v110 import evaluate_decision_integrity
-from data_readiness_v1101 import assess_pair_data_readiness, display_component_status, premium_discount_operational
+from data_readiness_v1101 import (
+    assess_pair_data_readiness, display_component_status, premium_discount_operational,
+    assess_ict_freshness, display_ict_component_status, TF_LIMITS,
+)
 
 try:
     from currency_news_v107 import pair_news_table
@@ -218,6 +221,7 @@ def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro"):
     ict=dict(tec.get("ict",{}) or {}); ict_read=_safe(ict.get("readiness",0)); ict_label=str(ict.get("label","⏳ aguardando ICT"))
     inst=dict(tec.get("institutional",{}) or {}); inst_read=_safe(inst.get("readiness",0)); inst_label=str(inst.get("label","⏳ aguardando motor institucional"))
     data_ready=assess_pair_data_readiness(raw_sc,mapctx)
+    ict_fresh=assess_ict_freshness(data_ready)
     age=(data_ready.get("timeframes",{}).get("m15",{}) or {}).get("age_minutes")
 
     mc=_map_normalize(mapctx,pair)
@@ -251,8 +255,10 @@ def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro"):
 
     # Componentes ICT + Institucionais.
     for key,label in (("crt","CRT"),("amd","AMD/PO3"),("ote","OTE"),("fvg","FVG")):
-        comp=dict(ict.get(key,{}) or {}); status=str(comp.get("status",""))
-        if "🟢" in status: (up if side=="BUY" else down).append(f"{label}: {status.replace('🟢','').strip()}")
+        comp=dict(ict.get(key,{}) or {})
+        status,_text,_current=display_ict_component_status(comp,key,data_ready)
+        if _current and "🟢" in status:
+            (up if side=="BUY" else down).append(f"{label}: {status.replace('🟢','').strip()}")
     for key,label in (("mss","MSS"),("displacement","Displacement"),("smt","SMT"),("dealing_range","Premium/Discount"),("session","Judas/Sessão"),("pd_array","Breaker/Mitigation"),("liquidity","Draw on Liquidity")):
         comp=_component(inst,key); status=str(comp.get("status",""))
         if "🟢" in status: (up if side=="BUY" else down).append(f"{label}: {status.replace('🟢','').strip()}")
@@ -265,7 +271,9 @@ def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro"):
 
     decision=evaluate_decision_integrity(
         side=side,score=score,quality=quality,rank_index=idx,h4=h4,h1=h1,m15=m15,
-        ict_readiness=ict_read,institutional_readiness=inst_read,gate=gate,gate_score=gate_score,
+        ict_readiness=ict_read if ict_fresh.get("ready") else 0.0,
+        institutional_readiness=inst_read if data_ready.get("institutional_data_ready") else 0.0,
+        gate=gate,gate_score=gate_score,
         adr_used_pct=adr,event_risk=event,technical_age_min=age,news_alignment=news_align,
         data_sufficient=_safe_bool(data_ready.get("sufficient", False), False),
         data_readiness_score=_safe(data_ready.get("score",0)),
@@ -289,7 +297,7 @@ def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro"):
         "pd_zone":pd_zone,"pd_position":mc["pd_position"],"adr":adr,"event":event,"price":price,
         "sweep_type":mc["sweep_type"],"sweep_level":mc["sweep_level"],"sweep_price":mc["sweep_price"],"sweep_rejection":mc["sweep_rejection"],
         "levels":mc["levels"],"news_diff":news_diff,"news_align":news_align,"news_conv":news_conv,
-        "ict":ict,"ict_read":ict_read,"ict_label":ict_label,"inst":inst,"inst_read":inst_read,"inst_label":inst_label,
+        "ict":ict,"ict_read":ict_read,"ict_label":ict_label,"ict_fresh":ict_fresh,"inst":inst,"inst_read":inst_read,"inst_label":inst_label,
         "up":up,"down":down,"reason":reason,"next_action":decision["next_action"],"target":target,
         "hard_blocks":decision["hard_blocks"],"soft_blocks":decision["soft_blocks"],"positives":decision["positives"],
         "executable":decision["executable"],"technical_age":age,"data_ready":data_ready,
@@ -319,23 +327,39 @@ def _major_extremes(ranking:pd.DataFrame)->tuple[str,str]:
 
 
 def _stack_rows(p:Mapping[str,Any])->pd.DataFrame:
-    ict=p.get("ict",{}) or {}; inst=p.get("inst",{}) or {}
+    ict=p.get("ict",{}) or {}; inst=p.get("inst",{}) or {}; dr=p.get("data_ready",{}) or {}
+
+    def _inst_state(key:str):
+        comp=_component(inst,key)
+        status,_text=display_component_status(comp,key,dr)
+        score=comp.get("score") if bool(dr.get("institutional_data_ready",False)) else None
+        return status,score
+
+    def _ict_state(key:str):
+        comp=_component(ict,key)
+        status,_text,current=display_ict_component_status(comp,key,dr)
+        return status, comp.get("score") if current else None
+
+    smt_s,smt_sc=_inst_state("smt"); disp_s,disp_sc=_inst_state("displacement"); mss_s,mss_sc=_inst_state("mss")
+    dr_s,dr_sc=_inst_state("dealing_range"); ses_s,ses_sc=_inst_state("session"); pd_s,pd_sc=_inst_state("pd_array")
+    crt_s,crt_sc=_ict_state("crt"); ote_s,ote_sc=_ict_state("ote"); amd_s,amd_sc=_ict_state("amd"); fvg_s,fvg_sc=_ict_state("fvg")
+
     rows=[
         ("Macro","Direção",p.get("direction","—"),p.get("score",0)),
         ("Macro","Força relativa",f"{p.get('macro_diff',0):+.1f} pts",None),
         ("Contexto","W1",p.get("w1","—"),None),
         ("Contexto","D1",p.get("d1","—"),None),
         ("Liquidez","Sweep",f"{p.get('sweep_type') or '—'} {p.get('sweep_level') or ''}".strip(),None),
-        ("Institucional","SMT",_component(inst,"smt").get("status","—"),_component(inst,"smt").get("score")),
-        ("Institucional","Displacement",_component(inst,"displacement").get("status","—"),_component(inst,"displacement").get("score")),
-        ("Institucional","MSS",_component(inst,"mss").get("status","—"),_component(inst,"mss").get("score")),
-        ("Institucional","Premium/Discount",_component(inst,"dealing_range").get("status",p.get("pd_zone","—")),_component(inst,"dealing_range").get("score")),
-        ("Institucional","Judas/Sessão",_component(inst,"session").get("status","—"),_component(inst,"session").get("score")),
-        ("Institucional","Breaker/Mitigation",_component(inst,"pd_array").get("status","—"),_component(inst,"pd_array").get("score")),
-        ("ICT","CRT",_component(ict,"crt").get("status","—"),_component(ict,"crt").get("score")),
-        ("ICT","OTE",_component(ict,"ote").get("status","—"),_component(ict,"ote").get("score")),
-        ("ICT","AMD / PO3",_component(ict,"amd").get("status","—"),_component(ict,"amd").get("score")),
-        ("ICT","FVG",_component(ict,"fvg").get("status","—"),_component(ict,"fvg").get("score")),
+        ("Institucional","SMT",smt_s,smt_sc),
+        ("Institucional","Displacement",disp_s,disp_sc),
+        ("Institucional","MSS",mss_s,mss_sc),
+        ("Institucional","Premium/Discount",dr_s,dr_sc),
+        ("Institucional","Judas/Sessão",ses_s,ses_sc),
+        ("Institucional","Breaker/Mitigation",pd_s,pd_sc),
+        ("ICT","CRT",crt_s,crt_sc),
+        ("ICT","OTE",ote_s,ote_sc),
+        ("ICT","AMD / PO3",amd_s,amd_sc),
+        ("ICT","FVG",fvg_s,fvg_sc),
         ("Técnico","H4",p.get("h4","—"),_status_score(p.get("h4","—"))),
         ("Técnico","H1",p.get("h1","—"),_status_score(p.get("h1","—"))),
         ("Técnico","M15",p.get("m15","—"),_status_score(p.get("m15","—"))),
@@ -348,7 +372,7 @@ def _stack_rows(p:Mapping[str,Any])->pd.DataFrame:
 
 def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:Mapping[str,Any]|None=None,macro_context:Mapping[str,Any]|None=None):
     _css()
-    st.markdown("""<div class="v110-hero"><h2>🏛️ Central Institucional dos 7 Pares — V11.0.1</h2><p>Macro → notícias → W1/D1 → liquidez → SMT → displacement → MSS → CRT/AMD/OTE/FVG → H4/H1/M15 → ADR/evento → decisão final.</p><span class="v110-badge">1 tela</span><span class="v110-badge">sem novas chamadas de API</span><span class="v110-badge">hard gates</span><span class="v110-badge">auditável</span></div>""",unsafe_allow_html=True)
+    st.markdown("""<div class="v110-hero"><h2>🏛️ Central Institucional dos 7 Pares — V11.0.3</h2><p>Macro → notícias → W1/D1 → liquidez → SMT → displacement → MSS → CRT/AMD/OTE/FVG → H4/H1/M15 → ADR/evento → decisão final.</p><span class="v110-badge">1 tela</span><span class="v110-badge">sem novas chamadas de API</span><span class="v110-badge">hard gates</span><span class="v110-badge">auditável</span></div>""",unsafe_allow_html=True)
     st.caption("Objetivo: reproduzir um processo disciplinado de decisão multi-camada. Não representa fluxo real de instituições. Prioridade/readiness não é probabilidade de lucro.")
     if matrix is None or matrix.empty:
         st.warning("A Matriz ainda não está disponível nesta execução."); return
@@ -386,7 +410,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     executive=pd.DataFrame([{
         "Par":p["pair"],"Decisão final":p["state"],"Direção":p["direction"],"Prioridade":p["priority"],"Score Mestre":p["score"],"Qualidade %":p["quality"],
         "Dados?":"SIM" if (p.get("data_ready",{}) or {}).get("sufficient") else "NÃO","Data Score":round(_safe((p.get("data_ready",{}) or {}).get("score",0)),0),
-        "ICT":round(p["ict_read"],0),"Institucional":round(p["inst_read"],0) if (p.get("data_ready",{}) or {}).get("institutional_data_ready") else "N/D","H4":p["h4"],"H1":p["h1"],"M15":p["m15"],"Gate":p["gate"],"ADR %":round(p["adr"],0) if p["adr"] else None,"Evento":p["event"],"Motivo":p["reason"]
+        "ICT":round(p["ict_read"],0) if (p.get("ict_fresh",{}) or {}).get("ready") else "N/D","Institucional":round(p["inst_read"],0) if (p.get("data_ready",{}) or {}).get("institutional_data_ready") else "N/D","H4":p["h4"],"H1":p["h1"],"M15":p["m15"],"Gate":p["gate"],"ADR %":round(p["adr"],0) if p["adr"] else None,"Evento":p["event"],"Motivo":p["reason"]
     } for p in packs])
     st.dataframe(executive,use_container_width=True,hide_index=True,height=330)
     st.bar_chart(executive[["Par","Prioridade"]].set_index("Par"),horizontal=True,height=250)
@@ -397,7 +421,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
         for j,p in enumerate(packs[i:i+2]):
             with cols[j]:
                 st.markdown(f"#### {p['pair']} · {p['state']}")
-                a,b,c,d=st.columns(4); a.metric("Prioridade",f"{p['priority']:.0f}/100"); b.metric("Dados",f"{_safe((p.get('data_ready',{}) or {}).get('score',0)):.0f}/100"); c.metric("ICT",f"{p['ict_read']:.0f}"); d.metric("Institucional",f"{p['inst_read']:.0f}" if (p.get("data_ready",{}) or {}).get("institutional_data_ready") else "N/D")
+                a,b,c,d=st.columns(4); a.metric("Prioridade",f"{p['priority']:.0f}/100"); b.metric("Dados",f"{_safe((p.get('data_ready',{}) or {}).get('score',0)):.0f}/100"); c.metric("ICT",f"{p['ict_read']:.0f}" if (p.get("ict_fresh",{}) or {}).get("ready") else "N/D"); d.metric("Institucional",f"{p['inst_read']:.0f}" if (p.get("data_ready",{}) or {}).get("institutional_data_ready") else "N/D")
                 st.markdown(f"**Por quê:** {p['reason']}")
                 _dr=p.get("data_ready",{}) or {}; _tf=_dr.get("timeframes",{}) or {}
                 st.caption(f"H4 {p['h4']} ({(_tf.get('h4',{}) or {}).get('state','—')}) · H1 {p['h1']} ({(_tf.get('h1',{}) or {}).get('state','—')}) · M15 {p['m15']} ({(_tf.get('m15',{}) or {}).get('state','—')}) · Gate {p['gate']} · ADR {p['adr']:.0f}%")
@@ -407,7 +431,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     pair=st.selectbox("Escolha o par",[p["pair"] for p in packs],key="v110_pair_deep")
     p=next(x for x in packs if x["pair"]==pair)
     _dr=p.get("data_ready",{}) or {}
-    a,b,c,d,e,f=st.columns(6); a.metric("Decisão",p["state"]); b.metric("Prioridade",f"{p['priority']:.1f}/100"); c.metric("Score Mestre",f"{p['score']:.0f}/100"); d.metric("Dados",f"{_safe(_dr.get('score',0)):.0f}/100"); e.metric("ICT",f"{p['ict_read']:.0f}/100"); f.metric("Institucional",f"{p['inst_read']:.0f}/100" if _dr.get("institutional_data_ready") else "N/D")
+    a,b,c,d,e,f=st.columns(6); a.metric("Decisão",p["state"]); b.metric("Prioridade",f"{p['priority']:.1f}/100"); c.metric("Score Mestre",f"{p['score']:.0f}/100"); d.metric("Dados",f"{_safe(_dr.get('score',0)):.0f}/100"); e.metric("ICT",f"{p['ict_read']:.0f}/100" if (p.get("ict_fresh",{}) or {}).get("ready") else "N/D"); f.metric("Institucional",f"{p['inst_read']:.0f}/100" if _dr.get("institutional_data_ready") else "N/D")
     st.markdown("### 📡 Data Readiness — dados suficientes para decisão?")
     if _dr.get("sufficient"):
         st.success(f"✅ SIM — {_dr.get('label','')} · {_safe(_dr.get('score',0)):.0f}/100")
@@ -421,6 +445,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
         _x=_tf.get(_name,{}) or {}; _age=_x.get("age_minutes")
         _col.metric(_name.upper(),_x.get("state","—"),"sem timestamp" if _age is None else f"{_age:.0f} min")
     st.caption(f"Cache institucional: H1 {_dr.get('cache_h1_bars',0)} candles · M15 {_dr.get('cache_m15_bars',0)} candles")
+    st.caption("Limites de frescor: M15 ≤60 min (aviso até 90) · H1 ≤150 min (aviso até 210) · H4 ≤360 min (aviso até 480).")
 
     if p["hard_blocks"]:
         st.error("**Bloqueios duros:** " + " · ".join(p["hard_blocks"]))
@@ -449,8 +474,10 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
         cols=st.columns(min(4,len(cards)-i))
         for col,(title,key) in zip(cols,cards[i:i+4]):
             comp=_component(inst,key); _status,_text=display_component_status(comp,key,_dr); col.metric(title,_status); col.caption(_text)
-    if inst:
+    if inst and _dr.get("institutional_data_ready"):
         st.progress(min(1,max(0,p["inst_read"]/100)),text=f"Prontidão institucional: {p['inst_read']:.0f}/100 — {p['inst_label']}")
+    elif inst:
+        st.info("Prontidão institucional: N/D — dados H1/M15 atuais insuficientes. Leituras antigas ficam visíveis apenas como histórico.")
     else:
         st.info("A camada institucional será preenchida pelo próximo ciclo do Autopilot usando H1/M15 persistidos. Abrir esta aba não consome API.")
 
@@ -459,8 +486,13 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     icards=[("CRT","crt"),("OTE","ote"),("AMD / PO3","amd"),("FVG","fvg")]
     cols=st.columns(4)
     for col,(title,key) in zip(cols,icards):
-        comp=_component(ict,key); col.metric(title,str(comp.get("status","—"))); col.caption(str(comp.get("text","")))
-    if ict: st.progress(min(1,max(0,p["ict_read"]/100)),text=f"Prontidão ICT: {p['ict_read']:.0f}/100 — {p['ict_label']}")
+        comp=_component(ict,key)
+        _status,_text,_current=display_ict_component_status(comp,key,_dr)
+        col.metric(title,_status); col.caption(_text)
+    if ict and (p.get("ict_fresh",{}) or {}).get("ready"):
+        st.progress(min(1,max(0,p["ict_read"]/100)),text=f"Prontidão ICT: {p['ict_read']:.0f}/100 — {p['ict_label']}")
+    elif ict:
+        st.info("Prontidão ICT: N/D — H1/M15 não estão simultaneamente frescos com cache mínimo. O score anterior não vale como confirmação atual.")
 
     st.markdown("### 💧 Liquidez e contexto")
     _pdop=premium_discount_operational(p.get("side","WAIT"),_component(inst,"dealing_range"),_dr)
@@ -482,7 +514,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     elif p["state"].startswith("🔴"): st.error(msg)
     else: st.warning(msg)
 
-    with st.expander("📚 Como ler o V11.0.1"):
+    with st.expander("📚 Como ler o V11.0.3"):
         st.markdown("""
 - **Macro** escolhe o lado; execução nunca inverte o lado macro sozinha.
 - **SMT** procura divergência entre EUR/USD↔GBP/USD, AUD/USD↔NZD/USD e USD/CHF↔USD/JPY.
