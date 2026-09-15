@@ -108,6 +108,14 @@ except Exception as _perf_exc:
 
 
 try:
+    from atlasquant_stability_lab import render_stability_lab
+    _ATLASQUANT_STABILITY_IMPORT_ERROR = ""
+except Exception as _stability_exc:
+    render_stability_lab = None
+    _ATLASQUANT_STABILITY_IMPORT_ERROR = f"{type(_stability_exc).__name__}: {_stability_exc}"
+
+
+try:
     from currency_news_v107 import render_currency_news_panel
     _CURRENCY_NEWS_V106_IMPORT_ERROR = ""
 except Exception as _currency_news_exc:
@@ -8850,6 +8858,26 @@ with abas[12]:
         except Exception as _aq_perf_render_exc:
             st.warning("Performance Lab em modo seguro; pesos, thresholds e gates permanecem inalterados.")
             st.caption(f"Diagnóstico: {type(_aq_perf_render_exc).__name__}: {_aq_perf_render_exc}")
+
+    st.divider()
+    if render_stability_lab is None:
+        st.warning("Stability Lab indisponível; nenhuma decisão operacional foi alterada.")
+        if _ATLASQUANT_STABILITY_IMPORT_ERROR:
+            st.caption(f"Diagnóstico Stability Lab: {_ATLASQUANT_STABILITY_IMPORT_ERROR}")
+    else:
+        try:
+            _aq_stability_df, _aq_stability_err = _config_ler_v937()
+            if _aq_stability_err and (_aq_stability_df is None or _aq_stability_df.empty):
+                st.info(f"Stability Lab aguardando histórico persistente: {_aq_stability_err}")
+            else:
+                render_stability_lab(
+                    _aq_stability_df,
+                    min_fold_samples=30,
+                    session_min_samples=10,
+                )
+        except Exception as _aq_stability_render_exc:
+            st.warning("Stability Lab em modo seguro; auto-otimização continua desativada.")
+            st.caption(f"Diagnóstico: {type(_aq_stability_render_exc).__name__}: {_aq_stability_render_exc}")
 
 # =========================================================
 # ABA 13 — V10.6.2 FRESH-PRICE SNAPSHOT RECOVERY
