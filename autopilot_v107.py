@@ -37,6 +37,8 @@ from currency_news_v107 import (
     load_currency_news_intelligence,
     pair_news_table,
 )
+from ict_execution_v108 import detect_crt, detect_ote, detect_amd, detect_fvg
+
 from market_map_core_v10 import (
     NY_TZ,
     adr_context,
@@ -557,6 +559,7 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
             "h4": dict(old_tec.get("h4", {}) or {}),
             "h1": dict(old_tec.get("h1", {}) or {}),
             "m15": dict(old_tec.get("m15", {}) or {}),
+            "ict": dict(old_tec.get("ict", {}) or {}),
             "preco_m15": old_tec.get("preco_m15"),
             "ultima_atualizacao": old_tec.get("ultima_atualizacao"),
             "motivo": "",
@@ -601,11 +604,19 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
             if key == "m15":
                 m15_frames[pair] = closed
                 tec["m15"] = analyze_m15(closed, side)
+                _ict = dict(tec.get("ict", {}) or {})
+                _ict["amd"] = detect_amd(closed, side)
+                _ict["fvg"] = detect_fvg(closed, side)
+                tec["ict"] = _ict
                 tec["preco_m15"] = float(closed.iloc[-1]["close"])
                 tec["ultima_atualizacao"] = pd.Timestamp(closed.iloc[-1]["datetime"]).isoformat()
                 old["m15_fetched_at"] = fetched_at
             elif key == "h1":
                 tec["h1"] = analyze_h1(closed, side)
+                _ict = dict(tec.get("ict", {}) or {})
+                _ict["crt"] = detect_crt(closed, side)
+                _ict["ote"] = detect_ote(closed, side)
+                tec["ict"] = _ict
                 old["h1_fetched_at"] = fetched_at
             elif key == "h4":
                 tec["h4"] = analyze_h4(closed, side)
@@ -616,6 +627,22 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
         if pair not in m15_frames and due_m15 is False:
             # No API call here. Background map may keep previous context this cycle.
             pass
+
+        _ict = dict(tec.get("ict", {}) or {})
+        if side in ("BUY", "SELL") and _ict:
+            _parts = [dict(_ict.get(k, {}) or {}) for k in ("crt", "ote", "amd", "fvg")]
+            _scores = [float(x.get("score", 0) or 0) for x in _parts]
+            _weights = (0.30, 0.25, 0.30, 0.15)
+            _ready = float(np.clip(sum(v*w for v,w in zip(_scores,_weights)), 0, 100))
+            _ict["readiness"] = round(_ready, 1)
+            _ict["label"] = "🟢 ICT MUITO ALINHADO" if _ready >= 80 else "🟡 ICT EM PREPARAÇÃO" if _ready >= 60 else "⚪ ICT AINDA INCOMPLETO"
+            _ict["side"] = side
+            _ict["updated_at"] = now.isoformat()
+        elif side == "WAIT":
+            _ict["readiness"] = 0.0
+            _ict["label"] = "⚪ MACRO AGUARDAR"
+            _ict["side"] = side
+        tec["ict"] = _ict
 
         tec["disponivel"] = bool(tec.get("h4") and tec.get("h1") and tec.get("m15"))
         tec["dados_disponiveis"] = tec["disponivel"]
@@ -628,7 +655,7 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
             "macro_direction": direction,
             "processado_em": time.time() if ok_any else old.get("processado_em", 0),
             "tentativa_v107": True,
-            "versao_tentativa": "V10.7_AUTOPILOT",
+            "versao_tentativa": "V10.8_AUTOPILOT",
         })
         results[pair] = old
         fetches[pair] = pair_fetch
@@ -636,7 +663,7 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
         if _TD_DAILY_BLOCKED:
             break
 
-    state["versao"] = "V10.7_AUTOPILOT"
+    state["versao"] = "V10.8_AUTOPILOT"
     state["resultados"] = results
     state["ultimo_processamento_ts"] = time.time()
     auto_meta.update({
@@ -785,7 +812,7 @@ def update_market_map(inputs: Mapping[str, Any], m15_frames: Mapping[str,pd.Data
             errors.append(f"{pair} map: {type(exc).__name__}: {exc}")
 
     state.update({
-        "version":"V10.7_AUTOPILOT",
+        "version":"V10.8_AUTOPILOT",
         "contexts":contexts,
         "last_batch_ts":time.time(),
         "autopilot_updated_at":utcnow().isoformat(),
