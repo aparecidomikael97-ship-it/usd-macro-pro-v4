@@ -34,6 +34,7 @@ from atlasquant_data_quality_center import render_data_confidence
 from atlasquant_confluence_map import render_confluence_map
 from atlasquant_operational_plan import render_operational_plan
 from atlasquant_safety_panel import render_safety_core
+from atlasquant_regime_detector import render_regime_detector
 from atlasquant_flight_recorder_panel import render_flight_recorder
 
 try:
@@ -498,7 +499,12 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     best=opctx.get("best") or packs[0]
     render_central_brief(packs, auto)
     render_data_confidence(packs, auto)
-    render_safety_core(best, auto)
+    _regime_result = render_regime_detector(best)
+    render_safety_core(
+        best,
+        auto,
+        regime_supported_override=_regime_result.get("supported"),
+    )
     _render_atlasquant_operational_cards(packs)
     render_confluence_map(best)
     render_context_explain(best)
