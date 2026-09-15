@@ -7072,7 +7072,8 @@ def _registrar_config_completa_v937(
     par, direcao = str(par), str(direcao)
     candle = str(candle_m15 or "")
     chave = f"{par}|{direcao}|{candle}"
-    df, erro = _config_ler_v937()    if erro and df.empty:
+    df, erro = _config_ler_v937()
+    if erro and df.empty:
         return False, erro, False
     if not df.empty:
         chaves = (
