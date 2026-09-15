@@ -92,6 +92,14 @@ except Exception as _shadow_exc:
 
 
 try:
+    from atlasquant_calibration_lab import render_calibration_lab
+    _ATLASQUANT_CALIBRATION_IMPORT_ERROR = ""
+except Exception as _calib_exc:
+    render_calibration_lab = None
+    _ATLASQUANT_CALIBRATION_IMPORT_ERROR = f"{type(_calib_exc).__name__}: {_calib_exc}"
+
+
+try:
     from currency_news_v107 import render_currency_news_panel
     _CURRENCY_NEWS_V106_IMPORT_ERROR = ""
 except Exception as _currency_news_exc:
@@ -8794,6 +8802,26 @@ with abas[12]:
             st.session_state.get("atlasquant_shadow_samples", []),
             min_samples=100,
         )
+
+    st.divider()
+    if render_calibration_lab is None:
+        st.warning("Conviction Calibration Lab indisponível; pesos e score permanecem inalterados.")
+        if _ATLASQUANT_CALIBRATION_IMPORT_ERROR:
+            st.caption(f"Diagnóstico Calibration Lab: {_ATLASQUANT_CALIBRATION_IMPORT_ERROR}")
+    else:
+        try:
+            _aq_calib_df, _aq_calib_err = _config_ler_v937()
+            if _aq_calib_err and (_aq_calib_df is None or _aq_calib_df.empty):
+                st.info(f"Calibration Lab aguardando histórico persistente: {_aq_calib_err}")
+            else:
+                render_calibration_lab(
+                    _aq_calib_df,
+                    min_band_samples=30,
+                    min_total_samples=100,
+                )
+        except Exception as _aq_calib_render_exc:
+            st.warning("Calibration Lab em modo seguro; nenhuma regra/ponderação foi alterada.")
+            st.caption(f"Diagnóstico: {type(_aq_calib_render_exc).__name__}: {_aq_calib_render_exc}")
 
 # =========================================================
 # ABA 13 — V10.6.2 FRESH-PRICE SNAPSHOT RECOVERY
