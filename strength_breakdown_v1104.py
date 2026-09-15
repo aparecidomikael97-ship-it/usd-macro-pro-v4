@@ -60,12 +60,29 @@ def _factor_weights(code: str, weights: Mapping[str, float] | None) -> dict[str,
     return w
 
 
-def _contributions(row: Mapping[str, Any], code: str, weights: Mapping[str, float] | None) -> dict[str, float]:
+def _raw_contributions(row: Mapping[str, Any], code: str, weights: Mapping[str, float] | None) -> dict[str, float]:
     w = _factor_weights(code, weights)
     out = {}
     for label, col, key in FACTOR_META:
         out[label] = _num(row.get(col, 50.0), 50.0) * _num(w.get(key, 0.0))
     return out
+
+
+def _scaled_contributions(
+    row: Mapping[str, Any],
+    code: str,
+    weights: Mapping[str, float] | None,
+    macro_score: float,
+) -> dict[str, float]:
+    """Scales factor contributions so they sum exactly to Pontuação_Macro."""
+    raw = _raw_contributions(row, code, weights)
+    total = sum(raw.values())
+    if abs(total) < 1e-12:
+        # No usable factors: keep all zero and let residual explain the macro score.
+        return {k: 0.0 for k in raw}
+    scale = float(macro_score) / float(total)
+    return {k: float(v) * scale for k, v in raw.items()}
+
 
 
 def build_strength_breakdown(
@@ -79,40 +96,37 @@ def build_strength_breakdown(
     mb, mq = _num(rb.get("Pontuação_Macro", 50), 50), _num(rq.get("Pontuação_Macro", 50), 50)
     fedb, fedq = _num(rb.get("Influência_Fed", 0), 0), _num(rq.get("Influência_Fed", 0), 0)
 
-    cb, cq = _contributions(rb, base, weights), _contributions(rq, quote, weights)
+    cb = _scaled_contributions(rb, base, weights, mb)
+    cq = _scaled_contributions(rq, quote, weights, mq)
 
     # Residual makes the decomposition exact. For USD this can contain its
     # dedicated DXY/surprise/model adjustments not represented by generic factors.
-    residual_b = fb - mb - fedb
-    residual_q = fq - mq - fedq
+    residual_b = fb - sum(cb.values()) - fedb
+    residual_q = fq - sum(cq.values()) - fedq
 
     rows = []
-    for label, _, _ in FACTOR_META:
-        rows.append({
+    def _row(label: str, vb: float, vq: float) -> dict[str, Any]:
+        d = float(vb) - float(vq)
+        winner = base if d > 0.005 else quote if d < -0.005 else "EMPATE"
+        return {
             "Fator": label,
-            str(base): round(cb[label], 2),
-            str(quote): round(cq[label], 2),
-            "Vantagem base": round(cb[label] - cq[label], 2),
-        })
-    rows.append({
-        "Fator": "Federal Reserve",
-        str(base): round(fedb, 2),
-        str(quote): round(fedq, 2),
-        "Vantagem base": round(fedb - fedq, 2),
-    })
-    rows.append({
-        "Fator": "Ajustes dedicados / residual",
-        str(base): round(residual_b, 2),
-        str(quote): round(residual_q, 2),
-        "Vantagem base": round(residual_b - residual_q, 2),
-    })
+            str(base): round(vb, 2),
+            str(quote): round(vq, 2),
+            "Diferença base−cotada": round(d, 2),
+            "Favorece": winner,
+        }
+
+    for label, _, _ in FACTOR_META:
+        rows.append(_row(label, cb[label], cq[label]))
+    rows.append(_row("Federal Reserve", fedb, fedq))
+    rows.append(_row("Ajustes dedicados / residual", residual_b, residual_q))
 
     diff = fb - fq
-    ordered = sorted(rows, key=lambda r: abs(float(r["Vantagem base"])), reverse=True)
+    ordered = sorted(rows, key=lambda r: abs(float(r["Diferença base−cotada"])), reverse=True)
     top = ordered[:3]
     reasons = []
     for r in top:
-        d = float(r["Vantagem base"])
+        d = float(r["Diferença base−cotada"])
         if abs(d) < 0.05:
             continue
         winner = base if d > 0 else quote
@@ -130,5 +144,12 @@ def build_strength_breakdown(
         "rows": rows,
         "dominant": dominant,
         "stronger": base if diff > 0 else quote if diff < 0 else "EMPATE",
+        "pair_pressure": (
+            f"viés relativo favorece alta de {base}/{quote}" if diff > 0
+            else f"viés relativo favorece queda de {base}/{quote}" if diff < 0
+            else "força relativa equilibrada"
+        ),
+        "explained_base": round(sum(cb.values()) + fedb + residual_b, 2),
+        "explained_quote": round(sum(cq.values()) + fedq + residual_q, 2),
         "note": "Pontos internos do modelo; não são pips nem probabilidade de lucro.",
     }

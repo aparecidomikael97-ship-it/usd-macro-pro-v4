@@ -387,7 +387,7 @@ def _stack_rows(p:Mapping[str,Any])->pd.DataFrame:
 
 def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:Mapping[str,Any]|None=None,macro_context:Mapping[str,Any]|None=None,weights:Mapping[str,float]|None=None):
     _css()
-    st.markdown("""<div class="v110-hero"><h2>🏛️ Central Institucional dos 7 Pares — V11.0.4</h2><p>Macro → notícias → W1/D1 → liquidez → SMT → displacement → MSS → CRT/AMD/OTE/FVG → H4/H1/M15 → ADR/evento → decisão final.</p><span class="v110-badge">1 tela</span><span class="v110-badge">sem novas chamadas de API</span><span class="v110-badge">hard gates</span><span class="v110-badge">auditável</span></div>""",unsafe_allow_html=True)
+    st.markdown("""<div class="v110-hero"><h2>🏛️ Central Institucional dos 7 Pares — V11.0.5</h2><p>Macro → notícias → W1/D1 → liquidez → SMT → displacement → MSS → CRT/AMD/OTE/FVG → H4/H1/M15 → ADR/evento → decisão final.</p><span class="v110-badge">1 tela</span><span class="v110-badge">sem novas chamadas de API</span><span class="v110-badge">hard gates</span><span class="v110-badge">auditável</span></div>""",unsafe_allow_html=True)
     st.caption("Objetivo: reproduzir um processo disciplinado de decisão multi-camada. Não representa fluxo real de instituições. Prioridade/readiness não é probabilidade de lucro.")
     if matrix is None or matrix.empty:
         st.warning("A Matriz ainda não está disponível nesta execução."); return
@@ -450,20 +450,44 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
                 st.caption(f"Alvo de liquidez: {p['target']} · Próximo passo: {p['next_action']}")
 
     st.divider(); st.markdown("## 🔬 Raio-X institucional")
-    pair=st.selectbox("Escolha o par",[p["pair"] for p in packs],key="v110_pair_deep")
+    _pair_options=[x["pair"] for x in packs]
+    _stored_pair=st.session_state.get("v110_pair_deep")
+    if _stored_pair not in _pair_options:
+        st.session_state["v110_pair_deep"]=_pair_options[0]
+    pair=st.selectbox("Escolha o par",_pair_options,key="v110_pair_deep")
+
+    # V11.0.5: resolve o pack e REFAZ o breakdown a partir do par selecionado.
+    # Assim a interface nunca pode mostrar USD/CHF no seletor e EUR/USD na força.
     p=next(x for x in packs if x["pair"]==pair)
+    _base_sel,_quote_sel=pair.split("/")
+    _selected_strength=build_strength_breakdown(ranking,_base_sel,_quote_sel,weights)
+    p["strength"]=_selected_strength
     _dr=p.get("data_ready",{}) or {}
     a,b,c,d,e,f=st.columns(6); a.metric("Decisão",p["state"]); b.metric("Prioridade",f"{p['priority']:.1f}/100"); c.metric("Score Mestre",f"{p['score']:.0f}/100"); d.metric("Dados",f"{_safe(_dr.get('score',0)):.0f}/100"); e.metric("ICT",f"{p['ict_read']:.0f}/100" if (p.get("ict_fresh",{}) or {}).get("ready") else "N/D"); f.metric("Institucional",f"{p['inst_read']:.0f}/100" if _dr.get("institutional_data_ready") else "N/D")
     _s=p.get("strength",{}) or {}
-    st.markdown("### ⚖️ Pontos de força — de onde vem a vantagem?")
+    st.markdown(f"### ⚖️ Pontos de força — {pair}")
     s1,s2,s3=st.columns(3)
-    s1.metric(f"Força {_s.get('base',pair.split('/')[0])}",f"{_safe(_s.get('base_score',50)):.1f}/100")
-    s2.metric(f"Força {_s.get('quote',pair.split('/')[1])}",f"{_safe(_s.get('quote_score',50)):.1f}/100")
-    s3.metric("Diferença de força",f"{_safe(_s.get('difference',0)):+.1f} pts")
+    s1.metric(f"Força {_s.get('base',_base_sel)}",f"{_safe(_s.get('base_score',50)):.1f}/100")
+    s2.metric(f"Força {_s.get('quote',_quote_sel)}",f"{_safe(_s.get('quote_score',50)):.1f}/100")
+    s3.metric("Base − cotada",f"{_safe(_s.get('difference',0)):+.1f} pts")
+
+    _diff=_safe(_s.get("difference",0))
+    if _diff>0:
+        st.success(f"🟢 {_base_sel} está {_diff:.1f} pts acima de {_quote_sel}. Em força relativa, isso favorece {pair} para CIMA — ainda sujeito aos demais gates.")
+    elif _diff<0:
+        st.error(f"🔴 {_quote_sel} está {abs(_diff):.1f} pts acima de {_base_sel}. Em força relativa, isso favorece {pair} para BAIXO — ainda sujeito aos demais gates.")
+    else:
+        st.info("⚪ As duas moedas estão equilibradas na força relativa do modelo.")
+
     st.caption(f"Principais diferenças: {_s.get('dominant','—')} · Pontos internos do modelo; não são pips nem probabilidade de lucro.")
     _sr=pd.DataFrame(_s.get("rows",[]) or [])
     if not _sr.empty:
         st.dataframe(_sr,use_container_width=True,hide_index=True,height=315)
+        st.caption(
+            f"Conferência: {_base_sel} explicado {_safe(_s.get('explained_base',0)):.1f}/100 "
+            f"× {_quote_sel} explicado {_safe(_s.get('explained_quote',0)):.1f}/100. "
+            "A soma dos fatores + Fed + residual reconcilia com a força final exibida."
+        )
 
     st.markdown("### 📡 Data Readiness — dados suficientes para decisão?")
     if _dr.get("sufficient"):
@@ -555,7 +579,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     elif p["state"].startswith("🔴"): st.error(msg)
     else: st.warning(msg)
 
-    with st.expander("📚 Como ler o V11.0.4"):
+    with st.expander("📚 Como ler o V11.0.5"):
         st.markdown("""
 - **Macro** escolhe o lado; execução nunca inverte o lado macro sozinha.
 - **SMT** procura divergência entre EUR/USD↔GBP/USD, AUD/USD↔NZD/USD e USD/CHF↔USD/JPY.
