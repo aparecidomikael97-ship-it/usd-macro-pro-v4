@@ -1,0 +1,157 @@
+"""AtlasQuant Flight Recorder Panel V1.
+
+Session-safe adapter for the AtlasQuant journal foundation. It records only
+already-computed decisions/blocks, deduplicates identical states, and exposes a
+CSV export. It does not create entries, stops, targets or trade results.
+"""
+from __future__ import annotations
+
+from hashlib import sha256
+import json
+from typing import Any, Mapping, Sequence
+import math
+import streamlit as st
+
+from atlasquant_journal import make_decision_record, make_blocked_record, to_csv
+
+
+def _num(value: Any, default: float = 0.0) -> float:
+    try:
+        out=float(value)
+        return out if math.isfinite(out) else default
+    except Exception:
+        return default
+
+
+def decision_fingerprint(pack: Mapping[str, Any] | None, engine_version: str) -> str:
+    p=dict(pack or {})
+    dr=dict(p.get("data_ready", {}) or {})
+    payload={
+        "engine_version": str(engine_version),
+        "pair": str(p.get("pair","—")),
+        "side": str(p.get("side","NEUTRAL")),
+        "state": str(p.get("state","—")),
+        "executable": bool(p.get("executable",False)),
+        "priority": round(_num(p.get("priority",0)),2),
+        "score": round(_num(p.get("score",0)),2),
+        "quality": round(_num(p.get("quality",0)),2),
+        "data_score": round(_num(dr.get("score",0)),2),
+        "data_sufficient": bool(dr.get("sufficient",False)),
+        "gate": str(p.get("gate","—")),
+        "m15": str(p.get("m15","—")),
+        "event": str(p.get("event","—")),
+        "hard_blocks": [str(x) for x in (p.get("hard_blocks",[]) or [])],
+        "soft_blocks": [str(x) for x in (p.get("soft_blocks",[]) or [])],
+    }
+    raw=json.dumps(payload,sort_keys=True,ensure_ascii=False,separators=(",",":"))
+    return sha256(raw.encode("utf-8")).hexdigest()
+
+
+def record_from_pack(pack: Mapping[str, Any] | None, engine_version: str) -> dict[str, Any]:
+    p=dict(pack or {})
+    dr=dict(p.get("data_ready", {}) or {})
+    pair=str(p.get("pair","—"))
+    side=str(p.get("side","NEUTRAL")).upper()
+    executable=bool(p.get("executable",False))
+    sufficient=bool(dr.get("sufficient",False))
+    hard=[str(x) for x in (p.get("hard_blocks",[]) or [])]
+    soft=[str(x) for x in (p.get("soft_blocks",[]) or [])]
+    reason=str(p.get("reason","—"))
+
+    snapshot={
+        "state": str(p.get("state","—")),
+        "direction": str(p.get("direction","—")),
+        "priority": _num(p.get("priority",0)),
+        "score": _num(p.get("score",0)),
+        "quality": _num(p.get("quality",0)),
+        "data_score": _num(dr.get("score",0)),
+        "data_sufficient": sufficient,
+        "gate": str(p.get("gate","—")),
+        "m15": str(p.get("m15","—")),
+        "h1": str(p.get("h1","—")),
+        "h4": str(p.get("h4","—")),
+        "event": str(p.get("event","—")),
+        "next_action": str(p.get("next_action","—")),
+        "target": str(p.get("target","—")),
+    }
+    fp=decision_fingerprint(p,engine_version)
+
+    if executable and sufficient and side in ("BUY","SELL"):
+        record=make_decision_record(
+            asset=pair,
+            side=side,
+            directional_score=_num(p.get("score",0)),
+            data_quality=_num(dr.get("score",0)),
+            engine_version=str(engine_version),
+            reasons=[reason] + [str(x) for x in (p.get("positives",[]) or [])[:5]],
+            contradictions=hard + soft,
+            model_versions={"institutional":"pair_intelligence_v110"},
+            snapshot=snapshot,
+        )
+        record["record_type"]="DECISION"
+    else:
+        reasons=list(hard)
+        if not sufficient:
+            reasons.append("Dados insuficientes ou sem frescor operacional")
+        if not executable and not reasons:
+            reasons.append(str(p.get("state","AGUARDAR CONFIRMAÇÃO")))
+        record=make_blocked_record(
+            asset=pair,
+            reasons=reasons,
+            engine_version=str(engine_version),
+            snapshot=snapshot,
+        )
+        record["record_type"]="BLOCKED"
+        record["side"]=side if side in ("BUY","SELL") else "NO_TRADE"
+    record["_fingerprint"]=fp
+    return record
+
+
+def append_unique(records: Sequence[Mapping[str, Any]] | None, record: Mapping[str, Any]) -> tuple[list[dict[str, Any]], bool]:
+    rows=[dict(x) for x in (records or [])]
+    fp=str(record.get("_fingerprint",""))
+    if fp and any(str(x.get("_fingerprint",""))==fp for x in rows):
+        return rows,False
+    rows.append(dict(record))
+    return rows,True
+
+
+def recorder_summary(records: Sequence[Mapping[str, Any]] | None) -> dict[str, int]:
+    rows=list(records or [])
+    return {
+        "records":len(rows),
+        "decisions":sum(1 for x in rows if x.get("record_type")=="DECISION"),
+        "blocked":sum(1 for x in rows if x.get("record_type")=="BLOCKED"),
+    }
+
+
+def render_flight_recorder(pack: Mapping[str, Any] | None, engine_version: str) -> dict[str, int]:
+    key="atlasquant_session_flight_recorder"
+    current=record_from_pack(pack,engine_version)
+    rows,added=append_unique(st.session_state.get(key,[]),current)
+    st.session_state[key]=rows
+    summary=recorder_summary(rows)
+
+    st.markdown("### 🧾 Flight Recorder")
+    st.caption(
+        "Registro automático desta sessão. Guarda decisões e bloqueios sem inventar resultado de trade."
+    )
+    c1,c2,c3=st.columns(3)
+    c1.metric("Registros",summary["records"])
+    c2.metric("Decisões liberadas",summary["decisions"])
+    c3.metric("Bloqueios/esperas",summary["blocked"])
+    if added:
+        st.caption("Novo estado operacional registrado nesta sessão.")
+    else:
+        st.caption("Estado idêntico ao último registro; duplicidade evitada.")
+
+    export_rows=[{k:v for k,v in row.items() if k!="_fingerprint"} for row in rows]
+    csv_data=to_csv(export_rows)
+    st.download_button(
+        "📥 Exportar Flight Recorder (CSV)",
+        data=csv_data,
+        file_name="atlasquant_flight_recorder.csv",
+        mime="text/csv",
+        disabled=not bool(csv_data),
+    )
+    return summary
