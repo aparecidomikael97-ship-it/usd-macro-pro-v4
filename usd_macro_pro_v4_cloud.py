@@ -171,6 +171,14 @@ except Exception as _atlasquant_dashboard_exc:
         f"{type(_atlasquant_dashboard_exc).__name__}: {_atlasquant_dashboard_exc}"
     )
 
+
+try:
+    from atlasquant_coverage_funnel import render_coverage_funnel
+    _ATLASQUANT_COVERAGE_IMPORT_ERROR = ""
+except Exception as _coverage_exc:
+    render_coverage_funnel = None
+    _ATLASQUANT_COVERAGE_IMPORT_ERROR = f"{type(_coverage_exc).__name__}: {_coverage_exc}"
+
 MOEDAS = {
     "USD": "Dólar Americano",
     "EUR": "Euro",
@@ -8931,6 +8939,15 @@ with abas[0]:
             st.caption(f"Diagnóstico Radar G8: {type(_aq_radar_exc).__name__}")
     elif _ATLASQUANT_DASHBOARD_IMPORT_ERROR:
         st.caption(f"Radar G8 em modo compatível: {_ATLASQUANT_DASHBOARD_IMPORT_ERROR}")
+
+    if render_coverage_funnel is not None:
+        try:
+            render_coverage_funnel(ranking, neutral_band=5.0)
+        except Exception as _aq_coverage_exc:
+            st.warning("Mapa de cobertura temporariamente indisponível; nenhuma permissão operacional foi ampliada.")
+            st.caption(f"Diagnóstico Coverage Funnel: {type(_aq_coverage_exc).__name__}")
+    elif _ATLASQUANT_COVERAGE_IMPORT_ERROR:
+        st.caption(f"Coverage Funnel em modo compatível: {_ATLASQUANT_COVERAGE_IMPORT_ERROR}")
 
     if render_pair_intelligence_v110 is None:
         st.error("A Central Institucional V11.0.8 não pôde ser carregada.")
