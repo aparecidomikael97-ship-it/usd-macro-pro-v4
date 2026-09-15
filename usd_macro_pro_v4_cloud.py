@@ -3698,13 +3698,11 @@ else:
     if _ATLASQUANT_UI_IMPORT_ERROR:
         st.caption(f"UI profissional em modo compatível: {_ATLASQUANT_UI_IMPORT_ERROR}")
 
-abas = st.tabs(
-    list(navigation_labels()) if navigation_labels is not None else [
-        "Central", "Painel mestre", "Moedas", "EUA", "Pares", "Fed",
-        "Histórico", "Backtest", "Decisão", "Market Map", "Aprender",
-        "Produto", "Melhorias", "Notícias", "Autopilot",
-    ]
-)
+abas = st.tabs([
+    "Central", "Painel mestre", "Moedas", "EUA", "Pares", "Fed",
+    "Histórico", "Backtest", "Decisão", "Market Map", "Aprender",
+    "Produto", "Melhorias", "Notícias", "Autopilot",
+])
 
 # =========================================================
 # ABA 2 — CLASSIFICAÇÃO
