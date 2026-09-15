@@ -124,6 +124,14 @@ except Exception as _exp_budget_exc:
 
 
 try:
+    from atlasquant_validation_readiness import render_validation_readiness
+    _ATLASQUANT_VALIDATION_IMPORT_ERROR = ""
+except Exception as _validation_exc:
+    render_validation_readiness = None
+    _ATLASQUANT_VALIDATION_IMPORT_ERROR = f"{type(_validation_exc).__name__}: {_validation_exc}"
+
+
+try:
     from currency_news_v107 import render_currency_news_panel
     _CURRENCY_NEWS_V106_IMPORT_ERROR = ""
 except Exception as _currency_news_exc:
@@ -8908,6 +8916,26 @@ with abas[12]:
             target_pairs=28,
             daily_cap=480,
         )
+
+    st.divider()
+    if render_validation_readiness is None:
+        st.warning("Validation Readiness Center indisponível; nenhuma promoção é permitida.")
+        if _ATLASQUANT_VALIDATION_IMPORT_ERROR:
+            st.caption(f"Diagnóstico Validation Center: {_ATLASQUANT_VALIDATION_IMPORT_ERROR}")
+    else:
+        try:
+            _aq_validation_df, _aq_validation_err = _config_ler_v937()
+            if _aq_validation_err and (_aq_validation_df is None or _aq_validation_df.empty):
+                st.info(f"Validation Center aguardando histórico persistente: {_aq_validation_err}")
+            else:
+                render_validation_readiness(
+                    _aq_validation_df,
+                    st.session_state.get("atlasquant_shadow_samples", []),
+                    horizon="24h",
+                )
+        except Exception as _aq_validation_exc:
+            st.warning("Validation Center em modo seguro; merge/promoção continuam bloqueados.")
+            st.caption(f"Diagnóstico: {type(_aq_validation_exc).__name__}: {_aq_validation_exc}")
 
 # =========================================================
 # ABA 13 — V10.6.2 FRESH-PRICE SNAPSHOT RECOVERY
