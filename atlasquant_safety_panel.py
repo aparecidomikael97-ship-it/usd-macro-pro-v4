@@ -24,6 +24,8 @@ def _finite(value: Any) -> float | None:
 def build_safety_input(
     pack: Mapping[str, Any] | None,
     autopilot: Mapping[str, Any] | None = None,
+    *,
+    regime_supported_override: bool | None = None,
 ) -> SafetyInput:
     p=dict(pack or {})
     auto=dict(autopilot or {})
@@ -41,7 +43,11 @@ def build_safety_input(
     hard=tuple(str(x) for x in (p.get("hard_blocks", []) or []) if str(x).strip())
     model_conflict=bool(p.get("model_conflict", False))
     lookahead_risk=bool(p.get("lookahead_risk", False))
-    regime_supported=p.get("regime_supported", True)
+    regime_supported=(
+        regime_supported_override
+        if regime_supported_override is not None
+        else p.get("regime_supported", True)
+    )
     technical_ready=bool(p.get("executable", False))
 
     return SafetyInput(
@@ -62,15 +68,29 @@ def build_safety_input(
 def evaluate_live_safety(
     pack: Mapping[str, Any] | None,
     autopilot: Mapping[str, Any] | None = None,
+    *,
+    regime_supported_override: bool | None = None,
 ) -> dict[str, object]:
-    return evaluate_safety(build_safety_input(pack, autopilot))
+    return evaluate_safety(
+        build_safety_input(
+            pack,
+            autopilot,
+            regime_supported_override=regime_supported_override,
+        )
+    )
 
 
 def render_safety_core(
     pack: Mapping[str, Any] | None,
     autopilot: Mapping[str, Any] | None = None,
+    *,
+    regime_supported_override: bool | None = None,
 ) -> dict[str, object]:
-    result=evaluate_live_safety(pack, autopilot)
+    result=evaluate_live_safety(
+        pack,
+        autopilot,
+        regime_supported_override=regime_supported_override,
+    )
     icon={"GREEN":"🟢","YELLOW":"🟡","RED":"🔴"}.get(str(result["traffic_light"]),"⚪")
 
     st.markdown("### 🛡️ Safety Core")
