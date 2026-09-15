@@ -28,6 +28,7 @@ from evidence_integrity_v1104 import (
     masked_technical_status, select_operational_context, sweep_freshness,
 )
 from strength_breakdown_v1104 import build_strength_breakdown, attribution_sides
+from atlasquant_central_brief import render_central_brief
 
 try:
     from currency_news_v107 import pair_news_table
@@ -489,6 +490,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
 
     opctx=select_operational_context(packs)
     best=opctx.get("best") or packs[0]
+    render_central_brief(packs, auto)
     _render_atlasquant_operational_cards(packs)
     no_trade=bool(opctx.get("no_trade",False))
     strongest,weakest=_major_extremes(ranking)
