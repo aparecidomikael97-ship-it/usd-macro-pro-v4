@@ -100,6 +100,14 @@ except Exception as _calib_exc:
 
 
 try:
+    from atlasquant_performance_lab import render_performance_lab
+    _ATLASQUANT_PERFORMANCE_IMPORT_ERROR = ""
+except Exception as _perf_exc:
+    render_performance_lab = None
+    _ATLASQUANT_PERFORMANCE_IMPORT_ERROR = f"{type(_perf_exc).__name__}: {_perf_exc}"
+
+
+try:
     from currency_news_v107 import render_currency_news_panel
     _CURRENCY_NEWS_V106_IMPORT_ERROR = ""
 except Exception as _currency_news_exc:
@@ -8822,6 +8830,26 @@ with abas[12]:
         except Exception as _aq_calib_render_exc:
             st.warning("Calibration Lab em modo seguro; nenhuma regra/ponderação foi alterada.")
             st.caption(f"Diagnóstico: {type(_aq_calib_render_exc).__name__}: {_aq_calib_render_exc}")
+
+    st.divider()
+    if render_performance_lab is None:
+        st.warning("Performance Lab indisponível; nenhuma regra operacional foi alterada.")
+        if _ATLASQUANT_PERFORMANCE_IMPORT_ERROR:
+            st.caption(f"Diagnóstico Performance Lab: {_ATLASQUANT_PERFORMANCE_IMPORT_ERROR}")
+    else:
+        try:
+            _aq_perf_df, _aq_perf_err = _config_ler_v937()
+            if _aq_perf_err and (_aq_perf_df is None or _aq_perf_df.empty):
+                st.info(f"Performance Lab aguardando histórico persistente: {_aq_perf_err}")
+            else:
+                render_performance_lab(
+                    _aq_perf_df,
+                    min_total_samples=100,
+                    min_group_samples=30,
+                )
+        except Exception as _aq_perf_render_exc:
+            st.warning("Performance Lab em modo seguro; pesos, thresholds e gates permanecem inalterados.")
+            st.caption(f"Diagnóstico: {type(_aq_perf_render_exc).__name__}: {_aq_perf_render_exc}")
 
 # =========================================================
 # ABA 13 — V10.6.2 FRESH-PRICE SNAPSHOT RECOVERY
