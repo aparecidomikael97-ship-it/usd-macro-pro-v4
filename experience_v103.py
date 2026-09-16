@@ -324,7 +324,7 @@ def _currency_chart(ranking: pd.DataFrame):
     df[value_col] = pd.to_numeric(df[value_col], errors="coerce")
     df = df.dropna()
     if alt is None:
-        st.bar_chart(df.set_index(code_col)[value_col], use_container_width=True)
+        st.bar_chart(df.set_index(code_col)[value_col], width="stretch")
         return
     chart = (
         alt.Chart(df)
@@ -337,7 +337,7 @@ def _currency_chart(ranking: pd.DataFrame):
         .properties(height=300)
         .interactive()
     )
-    st.altair_chart(chart, use_container_width=True)
+    st.altair_chart(chart, width="stretch")
 
 
 def render_experience_hub(
@@ -446,7 +446,7 @@ def render_experience_hub(
         hits = select_alert_hits(matrix, min_score, min_quality, watch_pairs)
         if hits:
             st.success(f"🔔 {len(hits)} contexto(s) atendem seus filtros agora.")
-            st.dataframe(pd.DataFrame(hits), hide_index=True, use_container_width=True)
+            st.dataframe(pd.DataFrame(hits), hide_index=True, width="stretch")
         else:
             st.warning("Nenhum par atende aos limites configurados neste momento.")
 
@@ -479,7 +479,7 @@ def render_experience_hub(
         for name, value in sources.items():
             source_rows.append({"Fonte / bloco": str(name), "Estado": str(value)})
         if source_rows:
-            st.dataframe(pd.DataFrame(source_rows), hide_index=True, use_container_width=True)
+            st.dataframe(pd.DataFrame(source_rows), hide_index=True, width="stretch")
         else:
             st.caption("Os estados detalhados das fontes continuam disponíveis nas abas operacionais.")
 
