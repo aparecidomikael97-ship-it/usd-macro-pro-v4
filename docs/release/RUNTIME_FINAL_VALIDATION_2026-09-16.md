@@ -71,3 +71,18 @@ sozinho não consegue provar.
 - Deploy real validado: **pendente**
 - TradingView Pine compilado no ambiente real: **pendente**
 
+
+
+## Atualização — Runtime 653 e rótulo de ambiente
+
+- Runtime promovida para `03cf06c1064be5e0a5a9bc92c3709341d48db0ca`.
+- Backup pré-promoção: `atlasquant-runtime-backup-20260916-911a8a2`.
+- Quality Runtime: run `35115636444`.
+- Resultado: **653/653 testes OK**, compile gate verde.
+- A Runtime recebeu o rótulo de ambiente dinâmico; o smoke verifica explicitamente a presença de `RUNTIME`.
+- A apresentação não possui mais `DEV` hardcoded no app principal.
+- O diff DEV → Runtime contém somente os sete arquivos operacionais preservados em `dados/`.
+- Nenhum dado Runtime foi substituído por cópia DEV.
+- A `main` não foi alterada por esta promoção.
+
+Estado atual: **RUNTIME_CODE_VALIDATED_EXTERNAL_CHECKS_PENDING**.
