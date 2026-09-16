@@ -258,3 +258,44 @@ Regra do replay:
 
 O arquivo `tradingview/atlasquant_amd_strategy_v1.pine` permite pesquisa visual no Strategy Tester.
 A estatística AMD/PO3 permanece independente dos demais operacionais.
+
+
+## Comparador dos 5 operacionais
+
+A aba Backtest possui um bloco **Comparador dos 5 operacionais**.
+
+Com o mesmo CSV de candles, o AtlasQuant roda separadamente:
+
+- BOS/CHOCH + Order Block;
+- FVG;
+- OTE;
+- CRT;
+- AMD / Power of Three.
+
+O sistema não mistura os sinais entre estratégias. Cada setup mantém seus próprios trades e métricas.
+
+A comparação mostra:
+
+- número de sinais e trades;
+- Gain / Loss / Break-even;
+- Win Rate observado;
+- expectativa em R;
+- resultado líquido em R;
+- Profit Factor;
+- Drawdown máximo;
+- maior sequência de Loss;
+- tamanho da amostra;
+- ranking de expectativa observada apenas para estratégias com amostra mínima.
+
+Por padrão, o ranking exige pelo menos **20 trades**. Esse valor pode ser ajustado na tela.
+
+O ranking é somente uma ordenação descritiva do histórico usado no teste. Ele não é previsão,
+probabilidade de lucro ou autorização para operar.
+
+Também é possível baixar:
+
+- a tabela geral de comparação em CSV;
+- um ledger combinado em CSV, com a estratégia de origem identificada em cada linha.
+
+A próxima camada de validação recomendada é verificar estabilidade por períodos do histórico,
+para evitar favorecer um setup que funcionou apenas em um trecho específico.
