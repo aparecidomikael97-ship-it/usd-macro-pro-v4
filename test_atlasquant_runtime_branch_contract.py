@@ -52,7 +52,7 @@ class AtlasQuantRuntimeBranchContractTests(unittest.TestCase):
     def test_pair_captures_flight_recorder_before_basic_return(self):
         src=(ROOT/"pair_intelligence_v110.py").read_text(encoding="utf-8")
         capture_pos=src.index("_flight_capture = capture_flight_recorder")
-        basic_pos=src.index('if _aq_view_mode != "Pro":')
+        basic_pos=src.index("if not _is_pro:")
         self.assertLess(capture_pos,basic_pos)
 
     def test_all_packaged_workflows_avoid_main_runtime_writes(self):
