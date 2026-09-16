@@ -308,3 +308,15 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - Adicionada exportação ZIP com manifest, timeline, changes e snapshots válidos.
 - GitHub Actions run `35110147000`: **641/641 testes OK**, compile gate verde.
 - Runtime/Main não foram alteradas.
+
+
+## 16/09/2026 UTC — restauração segura do histórico de snapshots
+
+- Adicionada importação de ZIP do histórico com validação completa antes de qualquer escrita.
+- ZIP é lido em memória; caminhos arbitrários não são extraídos.
+- Rejeição fail-closed para path traversal, arquivos inesperados, nomes duplicados, criptografia, limites excedidos, manifesto divergente, snapshot inválido e CRC corrompido.
+- Limites: 1000 membros, 500 snapshots, 100 MiB descompactados, 10 MiB por snapshot.
+- Novos arquivos usam o snapshot_id completo no nome e deduplicação usa o id completo.
+- UI ganhou upload e botão explícito para validar/restaurar o histórico exportado.
+- GitHub Actions run `35110865542`: **645/645 testes OK**, compile gate verde.
+- Runtime/Main não foram alteradas.
