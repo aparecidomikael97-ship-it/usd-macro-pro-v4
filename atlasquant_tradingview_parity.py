@@ -16,6 +16,7 @@ from atlasquant_strategy_replay import generate_bos_choch_ob_signals
 from atlasquant_fvg_replay import generate_fvg_signals
 from atlasquant_ote_replay import generate_ote_signals
 from atlasquant_crt_replay import generate_crt_signals
+from atlasquant_amd_replay import generate_amd_signals
 import ict_structure_v111
 
 
@@ -59,7 +60,9 @@ def validate_tradingview_parity() -> dict[str, Any]:
     fvg=_pine("atlasquant_fvg_strategy_v1.pine")
     ote=_pine("atlasquant_ote_strategy_v1.pine")
     crt=_pine("atlasquant_crt_strategy_v1.pine")
+    amd=_pine("atlasquant_amd_strategy_v1.pine")
     ote_src=inspect.getsource(generate_ote_signals)
+    amd_src=inspect.getsource(generate_amd_signals)
     structure_src=inspect.getsource(ict_structure_v111)
     checks=[]
 
@@ -73,6 +76,8 @@ def validate_tradingview_parity() -> dict[str, Any]:
         _check("ote_no_external_series","request.security" not in ote.lower(),"OTE Pine must stay single-series/offline."),
         _check("crt_next_bar_processing","process_orders_on_close=false" in crt.replace(" ",""),"Pine CRT must process orders after the signal close."),
         _check("crt_no_external_series","request.security" not in crt.lower(),"CRT Pine must stay single-series/offline."),
+        _check("amd_next_bar_processing","process_orders_on_close=false" in amd.replace(" ",""),"Pine AMD must process orders after the distribution close."),
+        _check("amd_no_external_series","request.security" not in amd.lower(),"AMD Pine must stay single-series/offline."),
     ]
 
     # FVG defaults and core geometry.
@@ -118,6 +123,23 @@ def validate_tradingview_parity() -> dict[str, Any]:
         _check("crt_sell_delivery","close < close[1] and close < anchorMid" in crt,"CRT SELL delivery rule must match."),
         _check("crt_structural_targets","buyTarget = anchorHigh" in crt and "sellTarget = anchorLow" in crt,"CRT targets must remain the opposite anchor boundary."),
         _check("crt_entry_close","buyEntry = close" in crt and "sellEntry = close" in crt,"CRT confirmed delivery close must remain the pending entry reference."),
+    ]
+
+    # AMD / Power of Three defaults and strict temporal state contract.
+    checks += [
+        _check("amd_accumulation_default",_input_number(amd,"accumulationBars")==float(_default(generate_amd_signals,"accumulation_bars")),"Pine/Python accumulation length must match."),
+        _check("amd_distribution_window_default",_input_number(amd,"maxDistributionBars")==float(_default(generate_amd_signals,"max_distribution_bars")),"Pine/Python distribution window must match."),
+        _check("amd_stop_buffer_default",_input_number(amd,"stopBufferAtr")==float(_default(generate_amd_signals,"stop_buffer_atr")),"Pine/Python AMD stop buffer must match."),
+        _check("amd_min_rr_default",_input_number(amd,"minRR")==float(_default(generate_amd_signals,"min_rr")),"Pine/Python AMD min RR must match."),
+        _check("amd_wait_default",_input_number(amd,"maxSetupAge")==8.0,"Pine AMD pending-order life must match backtest default."),
+        _check("amd_warmup","replayReady = bar_index >= 13 and not na(atr)" in amd and int(_default(generate_amd_signals,"min_bars"))==14,"AMD Pine/Python warmup must align at 14 bars."),
+        _check("amd_buy_manip","low < accLow and close > accLow" in amd and 'float(row["low"])<al and float(row["close"])>al' in amd_src,"BUY manipulation must sweep SSL and reclaim the frozen accumulation."),
+        _check("amd_sell_manip","high > accHigh and close < accHigh" in amd and 'float(row["high"])>ah and float(row["close"])<ah' in amd_src,"SELL manipulation must sweep BSL and reclaim the frozen accumulation."),
+        _check("amd_buy_distribution","close > frozenAccMid and close > manipulationClose" in amd and 'close>mid and close>p.manipulation_close' in amd_src,"BUY distribution must occur later above midpoint and manipulation close."),
+        _check("amd_sell_distribution","close < frozenAccMid and close < manipulationClose" in amd and 'close<mid and close<p.manipulation_close' in amd_src,"SELL distribution must occur later below midpoint and manipulation close."),
+        _check("amd_phase_order","bar_index > manipulationBar" in amd and 'i>p.manipulation_index' in amd_src,"Distribution cannot confirm on the manipulation candle."),
+        _check("amd_two_sided_resolution","buyDepth >= sellDepth ? 1 : -1" in amd and 'selected="BUY" if buy_depth>=sell_depth else "SELL"' in amd_src,"Two-sided sweeps must resolve deterministically by normalized depth."),
+        _check("amd_structural_targets","candidateTarget = frozenAccHigh" in amd and "candidateTarget = frozenAccLow" in amd,"AMD targets must remain opposite accumulation boundaries."),
     ]
 
     # BOS/CHOCH + OB defaults and rule contract.
