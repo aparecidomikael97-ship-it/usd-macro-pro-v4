@@ -1,0 +1,105 @@
+# AtlasQuant — Backtest Operacional com TradingView
+
+## Objetivo
+
+Validar os operacionais do AtlasQuant com dados históricos sem inventar entrada,
+stop ou alvo. O fluxo atual é offline e auditável: o usuário exporta OHLC do
+TradingView e fornece uma planilha de sinais com níveis explícitos.
+
+## Fluxo V1
+
+1. No TradingView, exporte os candles do ativo/timeframe em CSV.
+2. Na aba **Backtest** do AtlasQuant, envie o CSV de candles.
+3. Envie a planilha de sinais/operacionais.
+4. Rode o backtest.
+5. Analise Gain, Loss, Break-even, Win Rate, resultado em R, expectativa,
+   drawdown, sequências, setup e sessão.
+6. Baixe o ledger completo em CSV para usar como planilha/diário.
+
+Abrir a aba ou carregar o painel não faz chamadas a provedores.
+
+## Colunas dos candles
+
+O painel aceita os nomes do TradingView e aliases em português. O formato
+canônico é:
+
+\`datetime,open,high,low,close\`
+
+## Colunas da planilha de sinais
+
+Obrigatórias:
+
+- \`signal_time\`
+- \`side\` — BUY/SELL; também aceita COMPRA/VENDA e LONG/SHORT
+- \`entry\`
+- \`stop\`
+- \`target\`
+
+Opcionais/recomendadas:
+
+- \`pair\`
+- \`setup\`
+- \`session\`
+- \`source\`
+- \`notes\`
+
+O painel possui botões para baixar modelos vazios dos dois CSVs.
+
+## Regras conservadoras do simulador
+
+- Por padrão, a execução começa **depois** do candle do sinal, evitando
+  look-ahead no candle que gerou a decisão.
+- A entrada só existe se o OHLC tocar o preço de entrada dentro da janela
+  configurada.
+- BUY exige \`stop < entry < target\`.
+- SELL exige \`target < entry < stop\`.
+- Plano inválido vira \`NO_TRADE\`.
+- Se stop e alvo forem tocados no mesmo candle OHLC, a ordem intrabar é
+  desconhecida; por segurança o resultado é LOSS.
+- Custos podem ser informados em R e são descontados do resultado.
+- Após o limite de candles em posição, o simulador encerra pelo último close e
+  marca \`TIME_EXIT\`.
+- O motor registra MFE/MAE em R, barras de espera e barras em posição.
+
+## Métricas e planilha
+
+O resultado mostra e exporta:
+
+- Trades
+- Gain
+- Loss
+- Break-even
+- No Trade
+- Win Rate observado
+- Resultado líquido em R
+- Expectativa média em R
+- Profit Factor
+- Drawdown máximo em R
+- Maior sequência de Gain
+- Maior sequência de Loss
+- Casos ambíguos de stop+alvo no mesmo candle
+- Resultado por setup
+- Resultado por sessão
+- Ledger completo por operação
+
+## TradingView e AtlasQuant
+
+Esta primeira integração usa o TradingView como fonte de candles históricos e
+visualização. Ela não afirma reproduzir automaticamente o contexto macro dentro
+do Pine Script.
+
+A etapa posterior será separar os operacionais que podem ser expressos de forma
+100% objetiva em Pine Script e criar estratégias específicas para validação
+visual no TradingView. Regras macro/institucionais que dependem do AtlasQuant
+continuam sendo validadas pelo motor Python, a menos que exista uma forma
+determinística de reproduzi-las no Pine.
+
+## Estado de validação
+
+O motor e o painel foram adicionados na branch \`atlasquant-dev\`. O checkpoint
+de código testado que introduziu o painel é \`f7adc098249c09c3d544786a2f8a110bf5602d6b\`.
+
+GitHub Actions Quality run \`35095699342\`:
+**518 testes executados, 518 OK**, além do compile gate verde.
+
+O Runtime não foi alterado por esta etapa.

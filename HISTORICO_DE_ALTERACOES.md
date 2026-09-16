@@ -84,3 +84,18 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - GitHub Actions run \`35094192679\`: **503/503 testes OK**, compile gate verde.
 - Runtime/Main não foram alteradas.
 - Gate/readiness continuam sem novos pesos.
+
+
+## 16/09/2026 UTC — backtest operacional e planilha
+
+- Criado \`atlasquant_operational_backtest.py\`.
+- Criado painel offline \`atlasquant_backtest_panel.py\`.
+- Aba Backtest agora aceita OHLC do TradingView + planilha de sinais.
+- Adicionados modelos CSV vazios e exportação do ledger completo.
+- Métricas: Gain/Loss/BE, Win Rate, R, expectativa, profit factor, drawdown,
+  sequências, MFE/MAE, setup e sessão.
+- Proteções: anti-look-ahead, geometria BUY/SELL, NO_TRADE em plano inválido e
+  LOSS conservador quando stop/alvo são tocados no mesmo candle.
+- Backtest legado preservado por compatibilidade.
+- GitHub Actions run \`35095699342\`: **518/518 testes OK**, compile gate verde.
+- Runtime não foi alterado.

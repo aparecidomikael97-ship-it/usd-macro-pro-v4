@@ -197,3 +197,46 @@ Após a correção, o run \`35094192679\` passou com **503/503**.
 **Regra preservada:** essa telemetria é observacional e não altera Gate, pesos de readiness ou autorização de execução.
 
 Próximo passo seguro: testar a mesma telemetria de profundidade/reteste no lado BUY e validar cenários de gap/vela que toca a zona apenas por wick, mantendo simetria entre os dois lados.
+
+
+## 16/09/2026 UTC — backtest operacional + TradingView CSV + ledger
+
+Estado verificado:
+
+- DEV testada em \`f7adc098249c09c3d544786a2f8a110bf5602d6b\`.
+- Quality run \`35095699342\`: compile gate verde, **518 testes executados, 518 OK**.
+- Runtime não foi alterado nesta etapa.
+
+### Novo motor
+
+Foi criado \`atlasquant_operational_backtest.py\`:
+
+- recebe candles OHLC e planos com entrada/stop/alvo explícitos;
+- não inventa níveis;
+- inicia a simulação após o candle do sinal por padrão (anti-look-ahead);
+- plano inválido falha fechado como \`NO_TRADE\`;
+- stop + alvo no mesmo candle é tratado como LOSS por ambiguidade intrabar;
+- calcula Gain/Loss/BE, resultado líquido em R, MFE/MAE, drawdown,
+  profit factor e sequências;
+- permite agrupamento por setup, sessão e outras dimensões;
+- produz ledger tabular completo.
+
+### Nova tela de Backtest
+
+Foi criado \`atlasquant_backtest_panel.py\` e integrado à aba Backtest:
+
+- upload de candles CSV exportados do TradingView;
+- upload da planilha de sinais;
+- aliases de colunas em inglês/português;
+- download de modelos vazios;
+- configuração de janela para entrada, tempo máximo em posição e custos em R;
+- métricas gerais, por operacional/setup e por sessão;
+- download do ledger completo em CSV.
+
+O backtest legado foi mantido por compatibilidade, abaixo do novo painel.
+
+Guia operacional: \`docs/backtest/GUIA_TRADINGVIEW_BACKTEST.md\`.
+
+Próximo passo seguro: construir a ponte Pine Script apenas para os operacionais
+que possam ser reproduzidos de forma determinística no TradingView, sem fingir
+que o Pine consegue consumir diretamente o contexto macro do AtlasQuant.
