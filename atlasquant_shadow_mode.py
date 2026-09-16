@@ -15,6 +15,7 @@ import streamlit as st
 
 
 VALID_SIDES={"BUY","SELL","NEUTRAL","NO_TRADE"}
+DEFAULT_SHADOW_PAIRS=("EUR/USD","GBP/USD","AUD/USD","NZD/USD","USD/JPY","USD/CHF","USD/CAD")
 
 
 def _num(value: Any) -> float | None:
@@ -108,10 +109,56 @@ def append_shadow_sample(
     return rows,True
 
 
+def shadow_pair_breakdown(
+    samples: Sequence[Mapping[str, Any]] | None,
+    *,
+    expected_pairs: Sequence[str] | None = None,
+    min_pair_samples: int = 10,
+) -> list[dict[str, Any]]:
+    rows=[dict(x) for x in (samples or [])]
+    observed={
+        str((x.get("champion",{}) or {}).get("pair", "—"))
+        for x in rows
+        if str((x.get("champion",{}) or {}).get("pair", "")).strip()
+    }
+    pairs=(
+        [str(x) for x in expected_pairs]
+        if expected_pairs is not None
+        else sorted(observed)
+    )
+    out=[]
+    for pair in pairs:
+        subset=[
+            x for x in rows
+            if str((x.get("champion",{}) or {}).get("pair","—"))==pair
+        ]
+        total=len(subset)
+        side=sum(1 for x in subset if bool(x.get("side_match")))
+        execution=sum(1 for x in subset if bool(x.get("execution_match")))
+        critical=sum(1 for x in subset if bool(x.get("critical_mismatch")))
+        score_deltas=[
+            abs(float(x["score_delta"]))
+            for x in subset
+            if _num(x.get("score_delta")) is not None
+        ]
+        out.append({
+            "pair":pair,
+            "samples":total,
+            "minimum_met":total>=int(min_pair_samples),
+            "side_agreement_pct":None if total==0 else round(side/total*100.0,2),
+            "execution_agreement_pct":None if total==0 else round(execution/total*100.0,2),
+            "critical_mismatches":critical,
+            "mean_abs_score_delta":None if not score_deltas else round(mean(score_deltas),4),
+        })
+    return out
+
+
 def summarize_shadow(
     samples: Sequence[Mapping[str, Any]] | None,
     *,
     min_samples: int = 100,
+    expected_pairs: Sequence[str] | None = None,
+    min_pair_samples: int = 10,
 ) -> dict[str, Any]:
     rows=[dict(x) for x in (samples or [])]
     total=len(rows)
@@ -121,6 +168,16 @@ def summarize_shadow(
     quality_deltas=[abs(float(x["quality_delta"])) for x in rows if _num(x.get("quality_delta")) is not None]
     critical=sum(1 for x in rows if bool(x.get("critical_mismatch",False)))
     enough=total>=int(min_samples)
+
+    pair_rows=shadow_pair_breakdown(
+        rows,
+        expected_pairs=expected_pairs,
+        min_pair_samples=min_pair_samples,
+    )
+    balanced=all(bool(x["minimum_met"]) for x in pair_rows) if pair_rows else True
+    missing=[x["pair"] for x in pair_rows if int(x["samples"])==0]
+    under=[x["pair"] for x in pair_rows if 0<int(x["samples"])<int(min_pair_samples)]
+
     return {
         "samples":total,
         "min_samples":int(min_samples),
@@ -132,7 +189,14 @@ def summarize_shadow(
         "opposite_direction_count":sum(1 for x in rows if bool(x.get("opposite_direction",False))),
         "mean_abs_score_delta":None if not score_deltas else round(mean(score_deltas),4),
         "mean_abs_quality_delta":None if not quality_deltas else round(mean(quality_deltas),4),
-        "eligible_for_manual_review":bool(enough and critical==0),
+        "pair_breakdown":pair_rows,
+        "expected_pair_count":len(pair_rows),
+        "pairs_meeting_minimum":sum(1 for x in pair_rows if bool(x["minimum_met"])),
+        "coverage_balanced":balanced,
+        "missing_pairs":missing,
+        "under_sampled_pairs":under,
+        "min_pair_samples":int(min_pair_samples),
+        "eligible_for_manual_review":bool(enough and critical==0 and balanced),
         "auto_promotion_allowed":False,
     }
 
@@ -141,8 +205,15 @@ def render_shadow_mode_panel(
     samples: Sequence[Mapping[str, Any]] | None = None,
     *,
     min_samples: int = 100,
+    expected_pairs: Sequence[str] | None = DEFAULT_SHADOW_PAIRS,
+    min_pair_samples: int = 10,
 ) -> dict[str, Any]:
-    summary=summarize_shadow(samples,min_samples=min_samples)
+    summary=summarize_shadow(
+        samples,
+        min_samples=min_samples,
+        expected_pairs=expected_pairs,
+        min_pair_samples=min_pair_samples,
+    )
     st.markdown("### 🌓 Shadow Mode — Champion × Challenger")
     st.caption(
         "O Challenger roda em observação e não altera decisões de produção. "
@@ -157,11 +228,36 @@ def render_shadow_mode_panel(
     if summary["samples"]==0:
         st.info("Infraestrutura pronta. Ainda não há pares Champion/Challenger registrados para comparação.")
     elif summary["eligible_for_manual_review"]:
-        st.success("Amostra mínima atingida sem divergência crítica: elegível apenas para revisão manual.")
+        st.success("Amostra mínima e cobertura por par atingidas sem divergência crítica: elegível apenas para revisão manual.")
     elif not summary["minimum_met"]:
         st.warning("Shadow Mode ainda precisa de mais amostras antes de qualquer revisão de promoção.")
-    else:
+    elif summary["critical_mismatches"]:
         st.error("Há divergências críticas; Challenger não deve ser promovido.")
+    else:
+        st.warning("A amostra total existe, mas a cobertura por par ainda está concentrada ou incompleta.")
 
-    st.caption("Auto-promoção: DESATIVADA por design.")
+    if summary["pair_breakdown"]:
+        table=[]
+        for row in summary["pair_breakdown"]:
+            table.append({
+                "Par":row["pair"],
+                "Amostras":row["samples"],
+                "Mínimo por par":row["minimum_met"],
+                "Concordância direção":(
+                    "—" if row["side_agreement_pct"] is None
+                    else f"{row['side_agreement_pct']:.1f}%"
+                ),
+                "Concordância execução":(
+                    "—" if row["execution_agreement_pct"] is None
+                    else f"{row['execution_agreement_pct']:.1f}%"
+                ),
+                "Divergências críticas":row["critical_mismatches"],
+            })
+        with st.expander("Cobertura Shadow por par"):
+            st.dataframe(table,use_container_width=True,hide_index=True)
+
+    st.caption(
+        f"Cobertura mínima por par: {summary['pairs_meeting_minimum']}/"
+        f"{summary['expected_pair_count']} · Auto-promoção: DESATIVADA por design."
+    )
     return summary
