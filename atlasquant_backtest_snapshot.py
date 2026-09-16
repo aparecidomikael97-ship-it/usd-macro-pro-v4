@@ -24,6 +24,7 @@ CODE_FILES=(
     "atlasquant_strategy_stability.py","atlasquant_strategy_walkforward.py",
     "atlasquant_strategy_friction.py","atlasquant_strategy_parameter_robustness.py",
     "atlasquant_backtest_evidence.py","atlasquant_backtest_snapshot.py",
+    "atlasquant_backtest_snapshot_history.py",
     "atlasquant_tradingview_parity.py","atlasquant_backtest_panel.py",
     "tradingview/atlasquant_bos_choch_ob_strategy_v1.pine",
     "tradingview/atlasquant_fvg_strategy_v1.pine","tradingview/atlasquant_ote_strategy_v1.pine",
@@ -106,7 +107,19 @@ def validate_snapshot(snapshot:Mapping[str,Any])->dict[str,Any]:
     identity=data.get("identity")
     if not isinstance(identity,dict) or any(not isinstance(identity.get(k),str) or len(identity.get(k))!=64 for k in IDENTITY_KEYS): raise ValueError("snapshot identity incompleta")
     settings=data.get("settings") or {}; evidence=data.get("evidence") or {}; raw=data.get("raw_csv") or {}; normalized=data.get("normalized_data") or {}; code=data.get("code") or {}
-    expected=_identity(raw.get("sha256"),normalized.get("sha256"),settings_fingerprint(settings.get("values") or {})["sha256"],code.get("sha256"),_sha256_bytes(canonical_json(evidence.get("bundle") or {}).encode()))
+    code_files=code.get("files") or []
+    if not isinstance(code_files,list):
+        raise ValueError("snapshot adulterado: code files inválidos")
+    code_manifest=[
+        {"path":x.get("path"),"sha256":x.get("sha256"),"missing":bool(x.get("missing"))}
+        for x in code_files if isinstance(x,dict)
+    ]
+    if len(code_manifest)!=len(code_files):
+        raise ValueError("snapshot adulterado: code files inválidos")
+    recomputed_code_sha=_sha256_bytes(canonical_json(code_manifest).encode())
+    if code.get("sha256")!=recomputed_code_sha:
+        raise ValueError("snapshot adulterado: code sha256 não confere")
+    expected=_identity(raw.get("sha256"),normalized.get("sha256"),settings_fingerprint(settings.get("values") or {})["sha256"],recomputed_code_sha,_sha256_bytes(canonical_json(evidence.get("bundle") or {}).encode()))
     if identity!=expected: raise ValueError("snapshot adulterado: fingerprints internos não conferem")
     expected_id=_sha256_bytes(canonical_json(identity).encode())
     if data.get("snapshot_id")!=expected_id: raise ValueError("snapshot adulterado: snapshot_id não confere")
