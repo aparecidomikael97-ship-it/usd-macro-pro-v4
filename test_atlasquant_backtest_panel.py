@@ -147,6 +147,15 @@ class BacktestPanelTests(unittest.TestCase):
         self.assertIn("Baixar custos/slippage",source)
         self.assertIn("slippage_r=float(slippage_r)",source)
 
+    def test_panel_exposes_segmented_friction_and_parameter_robustness(self):
+        source=inspect.getsource(render_operational_backtest_panel)
+        self.assertIn("Ver custos/slippage por sessão e par",source)
+        self.assertIn("friction_breakdown",source)
+        self.assertIn("Robustez de parâmetros pré-definidos",source)
+        self.assertIn("parameter_robustness_report",source)
+        self.assertIn("não procura nem escolhe automaticamente o melhor parâmetro",source)
+        self.assertIn("Baixar robustez de parâmetros",source)
+
     def test_csv_bytes_read_utf8(self):
         raw=b"time,open,high,low,close\n2026-09-15T00:00:00Z,1,2,0.5,1.5\n"
         out=read_csv_bytes(raw)
