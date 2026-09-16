@@ -26,6 +26,12 @@ from atlasquant_fvg_replay import generate_fvg_signals
 from atlasquant_ote_replay import generate_ote_signals
 from atlasquant_crt_replay import generate_crt_signals
 from atlasquant_amd_replay import generate_amd_signals
+from atlasquant_strategy_comparator import (
+    run_strategy_suite,
+    comparison_frame,
+    breakdown_frame,
+    combined_ledger,
+)
 from atlasquant_tradingview_parity import validate_tradingview_parity
 
 
@@ -780,6 +786,97 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                         "Não inclui macro/Fed e não altera o Gate."
                     )
                     return {**result,"mode":"AUTO_AMD","signals":amd_signals}
+
+    with st.expander("📊 Comparador dos 5 operacionais", expanded=True):
+        st.caption(
+            "Roda BOS/CHOCH+OB, FVG, OTE, CRT e AMD separadamente sobre o mesmo CSV "
+            "com os defaults de pesquisa. Não mistura sinais e não altera o Gate."
+        )
+        min_rank_trades=st.number_input(
+            "Mínimo de trades para ranking observado",
+            min_value=5,max_value=500,value=20,step=5,
+            key="atlasquant_compare_min_rank_trades",
+        )
+
+        if candle_file is None:
+            st.info("Envie o CSV de candles para comparar os cinco operacionais.")
+        else:
+            try:
+                cmp_raw=read_csv_bytes(candle_file.getvalue())
+                cmp_candles=normalize_tradingview_candles(cmp_raw)
+            except Exception as exc:
+                cmp_candles=pd.DataFrame()
+                st.error(f"CSV de candles inválido: {type(exc).__name__}: {exc}")
+
+            if not cmp_candles.empty and st.button(
+                "📊 Comparar os 5 operacionais",
+                type="primary",
+                key="atlasquant_compare_five",
+            ):
+                suite=run_strategy_suite(
+                    cmp_candles,
+                    pair=default_pair,
+                    max_wait_bars=int(max_wait),
+                    max_hold_bars=int(max_hold),
+                    cost_r=float(cost_r),
+                )
+                comparison=comparison_frame(
+                    suite,
+                    min_trades_for_rank=int(min_rank_trades),
+                )
+                st.markdown("#### Comparação geral")
+                display_cols=[
+                    "operacional","trades","gains","losses","breakeven",
+                    "win_rate_pct","expectancy_r","net_r","profit_factor",
+                    "max_drawdown_r","max_loss_streak","sample_tier",
+                    "observed_expectancy_rank",
+                ]
+                st.dataframe(
+                    comparison.reindex(columns=display_cols),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+                eligible=int(comparison["eligible_observed_rank"].sum())
+                if eligible == 0:
+                    st.warning(
+                        "Nenhum operacional atingiu a amostra mínima para ranking observado. "
+                        "As métricas continuam visíveis, mas não há ranking."
+                    )
+                else:
+                    st.info(
+                        f"{eligible} operacional(is) atingiram a amostra mínima. "
+                        "O ranking é apenas da expectativa observada nesta amostra histórica."
+                    )
+
+                by_session=breakdown_frame(suite,"session")
+                if not by_session.empty:
+                    st.markdown("#### Comparação por sessão")
+                    st.dataframe(by_session,use_container_width=True,hide_index=True)
+
+                all_ledger=combined_ledger(suite)
+                cexp1,cexp2=st.columns(2)
+                with cexp1:
+                    st.download_button(
+                        "📥 Baixar comparação (CSV)",
+                        data=comparison.to_csv(index=False),
+                        file_name=f"atlasquant_comparacao_5_{default_pair.replace('/','_')}.csv",
+                        mime="text/csv",
+                        key="atlasquant_compare_export_table",
+                    )
+                with cexp2:
+                    st.download_button(
+                        "📥 Baixar ledger dos 5 (CSV)",
+                        data=all_ledger.to_csv(index=False),
+                        file_name=f"atlasquant_ledger_5_{default_pair.replace('/','_')}.csv",
+                        mime="text/csv",
+                        key="atlasquant_compare_export_ledger",
+                    )
+
+                st.caption(
+                    "Comparação histórica não garante resultado futuro. Estratégias com poucas "
+                    "operações ficam fora do ranking observado para reduzir leitura enganosa de amostra pequena."
+                )
 
     if candle_file is None or signal_file is None:
         st.info(
