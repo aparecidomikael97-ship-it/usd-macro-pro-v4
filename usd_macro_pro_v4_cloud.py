@@ -32,6 +32,7 @@ import pandas as pd
 import requests
 import streamlit as st
 from twelve_cache_v1108 import cached_series, clear_shared_cache
+from atlasquant_runtime_store import resolve_runtime_branch
 import re
 
 # V10 — camada observacional profissional. O try/except evita derrubar
@@ -2719,9 +2720,12 @@ def _github_cfg_v84():
     try:
         token = st.secrets.get("GITHUB_TOKEN_HISTORICO", "")
         repo = st.secrets.get("GITHUB_REPO_HISTORICO", "aparecidomikael97-ship-it/usd-macro-pro-v4")
-        branch = st.secrets.get("GITHUB_BRANCH_HISTORICO", "main")
+        branch = resolve_runtime_branch(
+            st.secrets.get("GITHUB_DATA_BRANCH", os.getenv("GITHUB_DATA_BRANCH", "")),
+            st.secrets.get("GITHUB_BRANCH_HISTORICO", os.getenv("GITHUB_BRANCH_HISTORICO", "")),
+        )
     except Exception:
-        token, repo, branch = "", "aparecidomikael97-ship-it/usd-macro-pro-v4", "main"
+        token, repo, branch = "", "aparecidomikael97-ship-it/usd-macro-pro-v4", resolve_runtime_branch()
     return str(token).strip(), str(repo).strip(), str(branch).strip()
 
 def _github_ler_csv_v84():
@@ -3689,7 +3693,10 @@ def _autopilot_save_inputs_v107():
 
         token = st.secrets.get("GITHUB_TOKEN_HISTORICO", os.getenv("GITHUB_TOKEN_HISTORICO", ""))
         repo = st.secrets.get("GITHUB_REPO_HISTORICO", os.getenv("GITHUB_REPO_HISTORICO", ""))
-        branch = st.secrets.get("GITHUB_BRANCH_HISTORICO", os.getenv("GITHUB_BRANCH_HISTORICO", "main"))
+        branch = resolve_runtime_branch(
+            st.secrets.get("GITHUB_DATA_BRANCH", os.getenv("GITHUB_DATA_BRANCH", "")),
+            st.secrets.get("GITHUB_BRANCH_HISTORICO", os.getenv("GITHUB_BRANCH_HISTORICO", "")),
+        )
         if not token or not repo:
             return False, "GitHub persistente ausente."
 
@@ -7462,7 +7469,10 @@ _SCANNER_GH_PATH_V934 = "dados/scanner_tecnico_v934.json"
 def _gh_cfg_v934():
     token = st.secrets.get("GITHUB_TOKEN_HISTORICO", os.getenv("GITHUB_TOKEN_HISTORICO", ""))
     repo = st.secrets.get("GITHUB_REPO_HISTORICO", os.getenv("GITHUB_REPO_HISTORICO", ""))
-    branch = st.secrets.get("GITHUB_BRANCH_HISTORICO", os.getenv("GITHUB_BRANCH_HISTORICO", "main"))
+    branch = resolve_runtime_branch(
+        st.secrets.get("GITHUB_DATA_BRANCH", os.getenv("GITHUB_DATA_BRANCH", "")),
+        st.secrets.get("GITHUB_BRANCH_HISTORICO", os.getenv("GITHUB_BRANCH_HISTORICO", "")),
+    )
     return str(token), str(repo), str(branch)
 
 def _scanner_load_v934():
