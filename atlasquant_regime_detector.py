@@ -148,11 +148,20 @@ def detect_regime_change(
     }
 
 
-def render_regime_detector(pack: Mapping[str, Any] | None) -> dict[str, Any]:
+def capture_regime_detector(pack: Mapping[str, Any] | None) -> dict[str, Any]:
     key="atlasquant_regime_previous_snapshot"
     previous=st.session_state.get(key)
     result=detect_regime_change(pack,previous)
     st.session_state[key]=result["snapshot"]
+    return result
+
+
+def render_regime_detector(
+    pack: Mapping[str, Any] | None,
+    *,
+    capture_result: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    result=dict(capture_result or capture_regime_detector(pack))
 
     icon={"BASELINE":"⚪","STABLE":"🟢","WATCH":"🟡","TRANSITION":"🟠","SHIFT":"🔴"}.get(result["status"],"⚪")
     st.markdown("### 🌡️ Regime Change Detector")
