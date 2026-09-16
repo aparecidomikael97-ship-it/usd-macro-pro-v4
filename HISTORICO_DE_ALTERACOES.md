@@ -320,3 +320,13 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - UI ganhou upload e botão explícito para validar/restaurar o histórico exportado.
 - GitHub Actions run `35110865542`: **645/645 testes OK**, compile gate verde.
 - Runtime/Main não foram alteradas.
+
+
+## 16/09/2026 UTC — auditoria pre-release da DEV
+
+- Criado `atlasquant_dev_preflight.py`.
+- Preflight verifica contratos centrais de Backtest/UI/Runtime/Pine sem chamadas live e sem promover branches.
+- Criado manifesto documental `docs/release/DEV_READINESS_2026-09-16.md`.
+- GitHub Actions run `35111419129`: **650/650 testes OK**, compile gate verde.
+- Estado da DEV: `DEV_VALIDATED_PENDING_RUNTIME_ACTIVATION`.
+- Runtime/Main não foram alteradas.
