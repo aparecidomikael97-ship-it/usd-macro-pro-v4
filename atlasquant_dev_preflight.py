@@ -1,0 +1,203 @@
+"""AtlasQuant DEV pre-release readiness audit.
+
+This module is offline/read-only. It checks whether the DEV tree contains the
+expected research/backtest/runtime-safety contracts before a human considers a
+separate Runtime activation.
+
+It does NOT promote branches, execute live providers, compile Pine in
+TradingView, or claim production readiness.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Mapping
+import json
+
+from atlasquant_runtime_store import evaluate_runtime_branch, DEFAULT_RUNTIME_BRANCH
+from atlasquant_tradingview_parity import validate_tradingview_parity
+from atlasquant_backtest_snapshot_history import DEFAULT_HISTORY_DIR
+
+
+ROOT=Path(__file__).resolve().parent
+
+REQUIRED_FILES=(
+    "usd_macro_pro_v4_cloud.py",
+    "atlasquant_operational_backtest.py",
+    "atlasquant_strategy_replay.py",
+    "atlasquant_fvg_replay.py",
+    "atlasquant_ote_replay.py",
+    "atlasquant_crt_replay.py",
+    "atlasquant_amd_replay.py",
+    "atlasquant_strategy_comparator.py",
+    "atlasquant_strategy_stability.py",
+    "atlasquant_strategy_walkforward.py",
+    "atlasquant_strategy_friction.py",
+    "atlasquant_strategy_parameter_robustness.py",
+    "atlasquant_backtest_evidence.py",
+    "atlasquant_backtest_snapshot.py",
+    "atlasquant_backtest_snapshot_history.py",
+    "atlasquant_runtime_store.py",
+    "atlasquant_release_guard.py",
+    "tradingview/atlasquant_bos_choch_ob_strategy_v1.pine",
+    "tradingview/atlasquant_fvg_strategy_v1.pine",
+    "tradingview/atlasquant_ote_strategy_v1.pine",
+    "tradingview/atlasquant_crt_strategy_v1.pine",
+    "tradingview/atlasquant_amd_strategy_v1.pine",
+    ".github/workflows/autopilot-v107.yml",
+    ".github/workflows/quality-tests.yml",
+    "docs/continuidade/PLANO_ATIVACAO_RUNTIME.md",
+)
+
+
+def _check(name: str, ok: bool, detail: str) -> dict[str,Any]:
+    return {"name":name,"ok":bool(ok),"detail":str(detail)}
+
+
+def run_dev_preflight(
+    *,
+    root: str | Path | None = None,
+    parity_report: Mapping[str,Any] | None = None,
+) -> dict[str,Any]:
+    base=Path(root) if root is not None else ROOT
+    checks=[]
+
+    missing=[path for path in REQUIRED_FILES if not (base/path).is_file()]
+    checks.append(_check(
+        "required_files",
+        not missing,
+        "Arquivos essenciais presentes." if not missing else "Ausentes: "+", ".join(missing),
+    ))
+
+    app=(base/"usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8") if (base/"usd_macro_pro_v4_cloud.py").is_file() else ""
+    panel=(base/"atlasquant_backtest_panel.py").read_text(encoding="utf-8") if (base/"atlasquant_backtest_panel.py").is_file() else ""
+    workflow=(base/".github/workflows/autopilot-v107.yml").read_text(encoding="utf-8") if (base/".github/workflows/autopilot-v107.yml").is_file() else ""
+    gitignore=(base/".gitignore").read_text(encoding="utf-8") if (base/".gitignore").is_file() else ""
+
+    checks.append(_check(
+        "backtest_ui_integrated",
+        "from atlasquant_backtest_panel import render_operational_backtest_panel" in app
+        and "render_operational_backtest_panel()" in app,
+        "Backtest avançado importado e renderizado no app DEV.",
+    ))
+
+    provider_markers=(
+        "api.twelvedata.com",
+        "api.stlouisfed.org",
+        "newsapi.org",
+        "requests.get(",
+        "requests.post(",
+        "requests.put(",
+    )
+    panel_hits=[marker for marker in provider_markers if marker in panel]
+    checks.append(_check(
+        "backtest_panel_offline",
+        not panel_hits,
+        "Painel de Backtest sem chamadas diretas a provedores."
+        if not panel_hits else "Marcadores de rede encontrados: "+", ".join(panel_hits),
+    ))
+
+    runtime_policy=evaluate_runtime_branch(DEFAULT_RUNTIME_BRANCH)
+    main_policy=evaluate_runtime_branch("main")
+    dev_policy=evaluate_runtime_branch("atlasquant-dev")
+    checks.append(_check(
+        "runtime_branch_policy",
+        runtime_policy.safe_for_runtime_writes
+        and not main_policy.safe_for_runtime_writes
+        and not dev_policy.safe_for_runtime_writes,
+        "Runtime dedicada aceita escrita; main/DEV rejeitam escrita operacional.",
+    ))
+
+    checks.append(_check(
+        "autopilot_targets_runtime",
+        'GITHUB_DATA_BRANCH: "atlasquant-runtime"' in workflow
+        and 'GITHUB_BRANCH_HISTORICO: "atlasquant-runtime"' in workflow
+        and 'GITHUB_BRANCH_HISTORICO: "main"' not in workflow,
+        "Workflow de Autopilot aponta para atlasquant-runtime.",
+    ))
+
+    history_parts={str(x).lower() for x in DEFAULT_HISTORY_DIR.parts}
+    checks.append(_check(
+        "research_history_isolated",
+        "dados" not in history_parts and ".atlasquant_research/" in gitignore,
+        "Histórico de pesquisa fora de dados/ e ignorado pelo Git.",
+    ))
+
+    if parity_report is None:
+        parity_report=validate_tradingview_parity()
+    parity_ok=str(parity_report.get("status") or "")=="OK" and int(parity_report.get("failed") or 0)==0
+    checks.append(_check(
+        "tradingview_python_static_parity",
+        parity_ok,
+        f"Paridade estática: {parity_report.get('passed',0)} OK / {parity_report.get('failed',0)} falha(s).",
+    ))
+
+    failed=[x for x in checks if not x["ok"]]
+    return {
+        "schema":"ATLASQUANT_DEV_PREFLIGHT_V1",
+        "status":"DEV_PREFLIGHT_OK" if not failed else "DEV_PREFLIGHT_BLOCKED",
+        "checks":checks,
+        "passed":len(checks)-len(failed),
+        "failed":len(failed),
+        "blockers":[x["name"] for x in failed],
+        "manual_runtime_activation_required":True,
+        "runtime_promotion_performed":False,
+        "limitations":[
+            "Não executa provedores live nem valida credenciais.",
+            "Não compila Pine dentro do TradingView.",
+            "Não substitui health check pós-deploy da Runtime.",
+            "Não promove DEV para Runtime/Main.",
+        ],
+    }
+
+
+def build_dev_readiness_manifest(
+    preflight: Mapping[str,Any],
+    *,
+    dev_sha: str,
+    quality_run_id: str | int,
+    tests_total: int,
+    tests_failed: int,
+    compile_ok: bool,
+) -> dict[str,Any]:
+    """Combine static preflight with externally observed CI evidence."""
+    total=max(0,int(tests_total))
+    failed=max(0,int(tests_failed))
+    quality_ok=bool(compile_ok) and total>0 and failed==0
+    preflight_ok=str(preflight.get("status") or "")=="DEV_PREFLIGHT_OK" and int(preflight.get("failed") or 0)==0
+
+    blockers=[]
+    if not preflight_ok:
+        blockers.append("DEV_PREFLIGHT_BLOCKED")
+    if not compile_ok:
+        blockers.append("COMPILE_FAILED")
+    if total<=0:
+        blockers.append("NO_TEST_EVIDENCE")
+    if failed:
+        blockers.append("QUALITY_TEST_FAILURES")
+
+    return {
+        "schema":"ATLASQUANT_DEV_READINESS_MANIFEST_V1",
+        "dev_sha":str(dev_sha or ""),
+        "quality_run_id":str(quality_run_id or ""),
+        "tests_total":total,
+        "tests_failed":failed,
+        "compile_ok":bool(compile_ok),
+        "quality_ok":quality_ok,
+        "preflight_status":preflight.get("status"),
+        "preflight_passed":int(preflight.get("passed") or 0),
+        "preflight_failed":int(preflight.get("failed") or 0),
+        "status":"DEV_VALIDATED_PENDING_RUNTIME_ACTIVATION"
+        if quality_ok and preflight_ok else "DEV_BLOCKED",
+        "blockers":blockers,
+        "manual_runtime_activation_required":True,
+        "runtime_health_check_pending":True,
+        "runtime_promotion_performed":False,
+        "notes":[
+            "Manifesto descreve a DEV; não certifica produção.",
+            "Ativação Runtime exige autorização específica e validação pós-deploy.",
+        ],
+    }
+
+
+def readiness_manifest_json(manifest: Mapping[str,Any]) -> str:
+    return json.dumps(dict(manifest),ensure_ascii=False,indent=2,sort_keys=True)
