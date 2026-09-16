@@ -1273,3 +1273,16 @@ Próximo passo seguro: auditoria final de pré-release da DEV e manifesto de rea
 - Runtime observada permaneceu `7a2ad3e53055fb1ef6091c39442c4c0f5212c3c1`.
 - Main observada em `513d0afd85df80640a2c0ed635783f46b4c3df7d`; mudou fora desta etapa.
 - Nenhuma promoção Runtime/Main foi executada. Health check pós-deploy, validação de ambiente e compilação Pine no TradingView continuam pendentes.
+
+
+## 16/09/2026 UTC — Runtime promovida e validada
+
+- DEV promovida para Runtime preservando os sete arquivos operacionais divergentes em `dados/`.
+- Runtime final validada: `998ef4ba8030d6babd73f43a287c7eeb33ebcdb3`.
+- Backup anterior preservado em `atlasquant-runtime-backup-20260916-7a2ad3e` e `atlasquant-runtime-backup-20260916-ff979dc`.
+- Quality run da própria branch Runtime `35112939791`: **650/650 testes OK**, compile gate verde.
+- O diff DEV → Runtime após a promoção contém somente os sete arquivos mutáveis de dados operacionais preservados.
+- Workflow de Quality passou a aceitar pushes de código em `atlasquant-runtime`, permitindo validar a árvore efetivamente promovida.
+- `main` não foi alterada por esta promoção.
+- Evidência detalhada: `docs/release/RUNTIME_ACTIVATION_2026-09-16.md`.
+- Pendências externas ao CI: health check do deploy real, credenciais do ambiente hospedado, compilação Pine no TradingView e conferência visual em navegador real.
