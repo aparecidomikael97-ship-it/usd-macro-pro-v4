@@ -111,6 +111,14 @@ except Exception as _perf_exc:
 
 
 try:
+    from atlasquant_backtest_panel import render_operational_backtest_panel
+    _ATLASQUANT_BACKTEST_IMPORT_ERROR = ""
+except Exception as _backtest_exc:
+    render_operational_backtest_panel = None
+    _ATLASQUANT_BACKTEST_IMPORT_ERROR = f"{type(_backtest_exc).__name__}: {_backtest_exc}"
+
+
+try:
     from atlasquant_stability_lab import render_stability_lab
     _ATLASQUANT_STABILITY_IMPORT_ERROR = ""
 except Exception as _stability_exc:
@@ -6402,6 +6410,17 @@ with abas[6]:
 # =========================================================
 with abas[7]:
     st.subheader("📈 Teste Histórico — Validação do Modelo")
+
+    if render_operational_backtest_panel is not None:
+        render_operational_backtest_panel()
+        st.divider()
+    else:
+        st.warning("Backtest operacional avançado indisponível neste carregamento.")
+        if _ATLASQUANT_BACKTEST_IMPORT_ERROR:
+            st.caption(_ATLASQUANT_BACKTEST_IMPORT_ERROR)
+
+    st.markdown("### Histórico legado de sinais")
+    st.caption("Mantido por compatibilidade; o painel acima é o backtest operacional auditável.")
     sinais = carregar_sinais()
 
     if sinais.empty:
