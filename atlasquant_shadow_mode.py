@@ -260,7 +260,7 @@ def render_shadow_mode_panel(
                 "Divergências críticas":row["critical_mismatches"],
             })
         with st.expander("Cobertura Shadow por par"):
-            st.dataframe(table,use_container_width=True,hide_index=True)
+            st.dataframe(table,width="stretch",hide_index=True)
 
     st.caption(
         f"Cobertura mínima por par: {summary['pairs_meeting_minimum']}/"
