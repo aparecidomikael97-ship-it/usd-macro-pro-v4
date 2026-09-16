@@ -188,3 +188,15 @@ Regra do replay:
 
 O arquivo `tradingview/atlasquant_ote_strategy_v1.pine` permite pesquisa visual no Strategy Tester.
 A estatística OTE permanece independente das demais estratégias.
+
+
+### Proteção contra reancoragem do OTE
+
+Para reduzir sinais repetidos no mesmo movimento, o OTE usa uma regra de nova perna:
+
+- após um BUY, outro BUY só pode usar uma nova origem low que comece depois do terminal high anterior;
+- após um SELL, outro SELL só pode usar uma nova origem high que comece depois do terminal low anterior;
+- apenas estender o mesmo high/low não cria um novo setup;
+- um segundo impulso próximo é permitido quando há uma nova origem real depois do terminal anterior.
+
+Essa regra é aplicada no replay Python e na Pine Strategy e faz parte do contrato de paridade.
