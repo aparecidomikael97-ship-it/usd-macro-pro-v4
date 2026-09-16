@@ -42,6 +42,10 @@ class TradingViewAssetsTests(unittest.TestCase):
         self.assertIn("pendingStop",text)
         self.assertIn("pendingTarget",text)
 
+    def test_strategy_uses_next_bar_order_processing(self):
+        text=PINE.read_text(encoding="utf-8").replace(" ","").lower()
+        self.assertIn("process_orders_on_close=false",text)
+
     def test_panel_loader_returns_exact_asset(self):
         expected=PINE.read_text(encoding="utf-8")
         self.assertEqual(load_tradingview_pine_asset(),expected)
