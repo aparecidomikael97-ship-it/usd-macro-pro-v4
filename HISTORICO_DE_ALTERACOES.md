@@ -232,3 +232,17 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - Aba Backtest ganhou controles, resumo, detalhe e exportação CSV de walk-forward.
 - GitHub Actions run `35104652826`: **595/595 testes OK**, compile gate verde.
 - Runtime/Main não foram alteradas por esta etapa.
+
+
+## 16/09/2026 UTC — custos e slippage no Backtest
+
+- Motor de backtest passou a aceitar `slippage_r` além de `cost_r`.
+- Resultado líquido agora registra `gross_r`, `cost_r`, `slippage_r`, `total_friction_r` e `net_r`.
+- Fricção inválida/negativa falha fechado.
+- Criado `atlasquant_strategy_friction.py` para reprecificar os mesmos trades sob cenários diferentes de atrito.
+- Cenários não regeneram sinais nem mudam caminho estrutural do trade.
+- Resumo mostra quando a expectativa permanece positiva em todos os cenários, quebra sob stress, já nasce não positiva ou tem amostra insuficiente.
+- Aba Backtest ganhou input de slippage, stress configurável, tabela detalhada e exportação CSV.
+- Todos os cinco operacionais, comparador e backtest manual agora recebem custo + slippage.
+- GitHub Actions run `35105537324`: **605/605 testes OK**, compile gate verde.
+- Runtime/Main não foram alteradas por esta etapa.
