@@ -165,6 +165,15 @@ class BacktestPanelTests(unittest.TestCase):
         self.assertIn("Baixar resumo de evidências",source)
         self.assertIn("não qualidade do setup",source)
 
+    def test_panel_exposes_reproducible_snapshot_and_diff(self):
+        source=inspect.getsource(render_operational_backtest_panel)
+        self.assertIn("Snapshot reproduzível do Backtest",source)
+        self.assertIn("build_backtest_snapshot",source)
+        self.assertIn("Baixar snapshot reproduzível",source)
+        self.assertIn("Comparar dois snapshots salvos",source)
+        self.assertIn("compare_backtest_snapshots",source)
+        self.assertIn("Baixar diff dos snapshots",source)
+
     def test_csv_bytes_read_utf8(self):
         raw=b"time,open,high,low,close\n2026-09-15T00:00:00Z,1,2,0.5,1.5\n"
         out=read_csv_bytes(raw)
