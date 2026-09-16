@@ -11,7 +11,7 @@ strategy(
 )
 
 // Technical-only FVG research bridge.
-// No macro/Fed context, no request.security and no future-data imports.
+// No macro/Fed context and no future-data imports.
 
 groupFVG      = "Fair Value Gap"
 atrLen        = input.int(14, "ATR", minval=2, maxval=100, group=groupFVG)
