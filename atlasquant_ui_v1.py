@@ -9,7 +9,7 @@ from html import escape
 import math
 import streamlit as st
 
-UI_VERSION = "0.1-dev"
+UI_VERSION = "0.2"
 
 NAVIGATION_LABELS = (
     "🎯 Central",
@@ -173,7 +173,7 @@ def navigation_labels() -> tuple[str, ...]:
     return NAVIGATION_LABELS
 
 
-def hero_html(app_version: str, environment: str = "DEV") -> str:
+def hero_html(app_version: str, environment: str = "LOCAL") -> str:
     version = escape(str(app_version))
     env = escape(str(environment).upper())
     return f"""
@@ -198,5 +198,5 @@ def apply_atlasquant_theme() -> None:
     st.markdown(ATLASQUANT_CSS, unsafe_allow_html=True)
 
 
-def render_atlasquant_header(app_version: str, environment: str = "DEV") -> None:
+def render_atlasquant_header(app_version: str, environment: str = "LOCAL") -> None:
     st.markdown(hero_html(app_version, environment), unsafe_allow_html=True)

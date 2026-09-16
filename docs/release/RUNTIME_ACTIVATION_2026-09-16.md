@@ -54,3 +54,13 @@ Esta validação não substitui:
 - verificação visual humana de todas as telas em navegador real.
 
 Nenhuma alteração foi feita na `main` durante a promoção.
+
+
+## Atualização final de compatibilidade
+
+- Runtime atual após migração Streamlit: `911a8a2968b6391d8306f421d5d7dce328f33a74`.
+- Quality run Runtime: `35114708095`.
+- Resultado: **652/652 testes OK**, compile gate verde.
+- Smoke headless continuou sem exceções, sem chamada Twelve Data na abertura e sem escrita HTTP remota.
+- Os avisos de `use_container_width` observados no smoke anterior deixaram de aparecer após a migração para `width`.
+- Os sete arquivos operacionais divergentes em `dados/` permanecem preservados.

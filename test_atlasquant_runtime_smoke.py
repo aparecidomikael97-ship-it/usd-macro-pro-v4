@@ -64,6 +64,13 @@ class AtlasQuantRuntimeSmokeTests(unittest.TestCase):
             [str(x.value) for x in list(at.title)+list(at.caption)+list(at.info)]
         )
         self.assertIn("USD Macro Pro",rendered)
+        self.assertIn("RUNTIME",rendered)
+
+    def test_app_source_has_no_hardcoded_dev_badge(self):
+        src=open("usd_macro_pro_v4_cloud.py",encoding="utf-8").read()
+        self.assertNotIn("Market Intelligence Platform · DEV",src)
+        self.assertNotIn('environment="DEV"',src)
+        self.assertIn("ATLASQUANT_ENVIRONMENT",src)
 
 
 if __name__=="__main__":
