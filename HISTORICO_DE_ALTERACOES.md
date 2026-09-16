@@ -45,3 +45,15 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - GitHub Actions run \`35092846046\`: **491/491 testes OK** e compile gate verde.
 - Checkpoint ZIP run \`35092846140\`: sucesso.
 - Pesos de decisão e Gate permanecem inalterados.
+
+
+## 16/09/2026 UTC — estrutura resiliente a range/ruído
+
+- ICT Structure Engine atualizado para V1.1.2.
+- Tolerância por ATR aplicada a viés estrutural e quebra por fechamento.
+- Mesmo swing não pode gerar eventos duplicados após recruzamento.
+- Adicionados metadados auditáveis de margem da quebra e tolerância de ruído.
+- Novos testes: lateralização, equal-ish pivots, mesmo swing reutilizado e break marginal.
+- GitHub Actions run \`35093251163\`: **495/495 testes OK**, compile gate verde.
+- Checkpoint ZIP run \`35093251055\`: sucesso.
+- Gate/readiness permanecem sem novos pesos nesta etapa.

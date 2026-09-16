@@ -104,3 +104,21 @@ Próximo passo seguro: ampliar os testes do novo motor (SELL, invalidação, dad
 - Checkpoint ZIP automático da DEV foi gerado com sucesso pelo run \`35092846140\`.
 
 Próximo passo seguro: auditar a qualidade semântica do detector em cenários de mercado lateral/flat, equal highs/lows e múltiplas quebras próximas; só depois discutir qualquer peso no Gate.
+
+
+## 16/09/2026 UTC — robustez contra lateralização e ruído estrutural
+
+- DEV validada em \`cd92cb5f4bbdbc7c6c1d10f5cc561e9d6fcd5714\`.
+- Quality run \`35093251163\`: compile gate verde, **495 testes executados, 495 OK**.
+- \`ict_structure_v111.py\` atualizado para V1.1.2.
+- Adicionada tolerância baseada em ATR para evitar classificar microdiferenças/equal-ish highs/lows como estrutura direcional forte.
+- Fechamentos marginais dentro da tolerância de ruído não geram BOS/CHOCH.
+- Um mesmo swing confirmado pode gerar no máximo um evento estrutural; retestes/recruzamentos do mesmo nível não criam BOS/CHOCH duplicados.
+- Metadados \`break_margin\` e \`noise_tolerance\` foram adicionados à leitura para auditoria.
+- Testes adversariais adicionados para range lateral, pivôs quase iguais, reutilização do mesmo swing e rompimento marginal.
+- Pesos do readiness institucional e Gate permanecem inalterados.
+- Checkpoint ZIP automático foi gerado no run \`35093251055\`.
+- Runtime continua em \`7a2ad3e53055fb1ef6091c39442c4c0f5212c3c1\`.
+- Main foi observada em \`8a41a9acc8360753bbb31627e227156182fdac2b\`; essa mudança ocorreu fora desta etapa e não foi tocada.
+
+Próximo passo seguro: revisar a seleção/qualidade do Order Block em cenários com múltiplos candles de origem e confirmar que a zona escolhida não reaproveita origem velha depois de uma nova quebra estrutural.
