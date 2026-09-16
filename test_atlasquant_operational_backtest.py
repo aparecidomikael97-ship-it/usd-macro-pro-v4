@@ -93,6 +93,31 @@ class OperationalBacktestTests(unittest.TestCase):
         self.assertEqual(r["outcome"],"NO_TRADE")
         self.assertIsNone(r["net_r"])
 
+    def test_cost_and_slippage_are_both_deducted_in_r(self):
+        d=candles([
+            (10,10.2,9.8,10.0),
+            (10,10.1,9.9,10.0),
+            (10,12.2,9.9,12.0),
+        ])
+        plan={"signal_time":d.iloc[0]["datetime"],"side":"BUY",
+              "entry":10.0,"stop":9.0,"target":12.0}
+        r=backtest_signal(d,plan,cost_r=0.10,slippage_r=0.05)
+        self.assertEqual(r["status"],"TARGET")
+        self.assertAlmostEqual(r["gross_r"],2.0)
+        self.assertAlmostEqual(r["cost_r"],0.10)
+        self.assertAlmostEqual(r["slippage_r"],0.05)
+        self.assertAlmostEqual(r["total_friction_r"],0.15)
+        self.assertAlmostEqual(r["net_r"],1.85)
+
+    def test_negative_friction_fails_closed(self):
+        d=candles([(10,10.2,9.8,10.0),(10,10.2,9.8,10.0)])
+        plan={"signal_time":d.iloc[0]["datetime"],"side":"BUY",
+              "entry":10.0,"stop":9.0,"target":12.0}
+        r=backtest_signal(d,plan,slippage_r=-0.01)
+        self.assertEqual(r["status"],"INVALID_FRICTION")
+        self.assertEqual(r["outcome"],"NO_TRADE")
+        self.assertIsNone(r["net_r"])
+
     def test_summary_counts_gain_loss_be_and_streaks(self):
         rows=[
             {"outcome":"GAIN","net_r":2.0},
