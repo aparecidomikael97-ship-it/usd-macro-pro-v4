@@ -8855,6 +8855,18 @@ with abas[12]:
             min_samples=100,
         )
 
+    # AtlasQuant research history snapshot — one persistent read per rerun.
+    # Calibration, Performance, Stability and Validation consume the same
+    # immutable snapshot so opening Improvements does not repeat GitHub reads.
+    _aq_research_df = pd.DataFrame(columns=_config_cols_v937())
+    _aq_research_err = ""
+    try:
+        _aq_research_df, _aq_research_err = _config_ler_v937()
+    except Exception as _aq_research_load_exc:
+        _aq_research_err = (
+            f"{type(_aq_research_load_exc).__name__}: {_aq_research_load_exc}"
+        )
+
     st.divider()
     if render_calibration_lab is None:
         st.warning("Conviction Calibration Lab indisponível; pesos e score permanecem inalterados.")
@@ -8862,12 +8874,11 @@ with abas[12]:
             st.caption(f"Diagnóstico Calibration Lab: {_ATLASQUANT_CALIBRATION_IMPORT_ERROR}")
     else:
         try:
-            _aq_calib_df, _aq_calib_err = _config_ler_v937()
-            if _aq_calib_err and (_aq_calib_df is None or _aq_calib_df.empty):
-                st.info(f"Calibration Lab aguardando histórico persistente: {_aq_calib_err}")
+            if _aq_research_err and (_aq_research_df is None or _aq_research_df.empty):
+                st.info(f"Calibration Lab aguardando histórico persistente: {_aq_research_err}")
             else:
                 render_calibration_lab(
-                    _aq_calib_df,
+                    _aq_research_df.copy(),
                     min_band_samples=30,
                     min_total_samples=100,
                 )
@@ -8882,12 +8893,11 @@ with abas[12]:
             st.caption(f"Diagnóstico Performance Lab: {_ATLASQUANT_PERFORMANCE_IMPORT_ERROR}")
     else:
         try:
-            _aq_perf_df, _aq_perf_err = _config_ler_v937()
-            if _aq_perf_err and (_aq_perf_df is None or _aq_perf_df.empty):
-                st.info(f"Performance Lab aguardando histórico persistente: {_aq_perf_err}")
+            if _aq_research_err and (_aq_research_df is None or _aq_research_df.empty):
+                st.info(f"Performance Lab aguardando histórico persistente: {_aq_research_err}")
             else:
                 render_performance_lab(
-                    _aq_perf_df,
+                    _aq_research_df.copy(),
                     min_total_samples=100,
                     min_group_samples=30,
                 )
@@ -8902,12 +8912,11 @@ with abas[12]:
             st.caption(f"Diagnóstico Stability Lab: {_ATLASQUANT_STABILITY_IMPORT_ERROR}")
     else:
         try:
-            _aq_stability_df, _aq_stability_err = _config_ler_v937()
-            if _aq_stability_err and (_aq_stability_df is None or _aq_stability_df.empty):
-                st.info(f"Stability Lab aguardando histórico persistente: {_aq_stability_err}")
+            if _aq_research_err and (_aq_research_df is None or _aq_research_df.empty):
+                st.info(f"Stability Lab aguardando histórico persistente: {_aq_research_err}")
             else:
                 render_stability_lab(
-                    _aq_stability_df,
+                    _aq_research_df.copy(),
                     min_fold_samples=30,
                     session_min_samples=10,
                 )
@@ -8934,12 +8943,11 @@ with abas[12]:
             st.caption(f"Diagnóstico Validation Center: {_ATLASQUANT_VALIDATION_IMPORT_ERROR}")
     else:
         try:
-            _aq_validation_df, _aq_validation_err = _config_ler_v937()
-            if _aq_validation_err and (_aq_validation_df is None or _aq_validation_df.empty):
-                st.info(f"Validation Center aguardando histórico persistente: {_aq_validation_err}")
+            if _aq_research_err and (_aq_research_df is None or _aq_research_df.empty):
+                st.info(f"Validation Center aguardando histórico persistente: {_aq_research_err}")
             else:
                 render_validation_readiness(
-                    _aq_validation_df,
+                    _aq_research_df.copy(),
                     st.session_state.get("atlasquant_shadow_samples", []),
                     horizon="24h",
                 )
