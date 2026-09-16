@@ -36,6 +36,7 @@ from atlasquant_operational_plan import render_operational_plan
 from atlasquant_safety_panel import render_safety_core
 from atlasquant_regime_detector import render_regime_detector
 from atlasquant_flight_recorder_panel import render_flight_recorder
+from atlasquant_runtime_store import resolve_runtime_branch
 
 try:
     from currency_news_v107 import pair_news_table
@@ -82,10 +83,13 @@ def _gh_cfg():
     try:
         token=st.secrets.get("GITHUB_TOKEN_HISTORICO",os.getenv("GITHUB_TOKEN_HISTORICO",""))
         repo=st.secrets.get("GITHUB_REPO_HISTORICO",os.getenv("GITHUB_REPO_HISTORICO",""))
-        branch=st.secrets.get("GITHUB_BRANCH_HISTORICO",os.getenv("GITHUB_BRANCH_HISTORICO","main"))
+        branch=resolve_runtime_branch(
+            st.secrets.get("GITHUB_DATA_BRANCH",os.getenv("GITHUB_DATA_BRANCH","")),
+            st.secrets.get("GITHUB_BRANCH_HISTORICO",os.getenv("GITHUB_BRANCH_HISTORICO","")),
+        )
     except Exception:
-        token,repo,branch="","","main"
-    return str(token),str(repo),str(branch or "main")
+        token,repo,branch="","",resolve_runtime_branch()
+    return str(token),str(repo),str(branch)
 
 
 @st.cache_data(ttl=60,show_spinner=False)
