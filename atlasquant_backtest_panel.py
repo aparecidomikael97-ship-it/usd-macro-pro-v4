@@ -49,6 +49,13 @@ from atlasquant_backtest_snapshot import (
     load_snapshot_json,
     compare_backtest_snapshots,
 )
+from atlasquant_backtest_snapshot_history import (
+    save_snapshot_local,
+    load_snapshot_history,
+    history_timeline_frame,
+    consecutive_history_diffs,
+    history_archive_zip,
+)
 from atlasquant_tradingview_parity import validate_tradingview_parity
 
 
@@ -1207,6 +1214,8 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                     evidence_bundle=evidence_bundle,
                 )
                 snapshot_raw=snapshot_json(snapshot)
+                st.session_state["atlasquant_latest_snapshot"]=snapshot
+                st.session_state["atlasquant_latest_snapshot_pair"]=default_pair
                 st.markdown("#### Snapshot reproduzível do Backtest")
                 st.caption(
                     "Fingerprint do CSV original, candles normalizados, configuração, código de pesquisa "
@@ -1275,6 +1284,59 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                     "Comparação histórica não garante resultado futuro. Estratégias com poucas "
                     "operações ficam fora do ranking observado para reduzir leitura enganosa de amostra pequena."
                 )
+
+    with st.expander("🗂️ Histórico local de snapshots", expanded=False):
+        st.caption(
+            "Histórico opcional de pesquisa salvo em .atlasquant_research/backtest_snapshots, "
+            "fora de dados/ e sem escrever na branch Runtime. Em hospedagem efêmera, exporte o ZIP "
+            "para manter uma cópia permanente."
+        )
+        latest_snapshot=st.session_state.get("atlasquant_latest_snapshot")
+        if latest_snapshot is not None:
+            if st.button(
+                "💾 Salvar último snapshot no histórico local",
+                key="atlasquant_snapshot_history_save",
+            ):
+                try:
+                    saved=save_snapshot_local(latest_snapshot)
+                except Exception as exc:
+                    st.error(f"Não foi possível salvar o snapshot: {type(exc).__name__}: {exc}")
+                else:
+                    if saved.get("reason")=="ALREADY_PRESENT":
+                        st.info("Esse snapshot já está presente no histórico local.")
+                    else:
+                        st.success("Snapshot salvo no histórico local de pesquisa.")
+
+        history=load_snapshot_history()
+        invalid_history=history.get("invalid_files") or []
+        snapshots_history=history.get("snapshots") or []
+        if invalid_history:
+            st.error(
+                f"{len(invalid_history)} arquivo(s) do histórico falharam na validação de integridade "
+                "e foram excluídos da linha do tempo."
+            )
+            st.dataframe(pd.DataFrame(invalid_history),use_container_width=True,hide_index=True)
+
+        if snapshots_history:
+            timeline=history_timeline_frame(snapshots_history)
+            st.markdown("##### Linha do tempo")
+            st.dataframe(timeline,use_container_width=True,hide_index=True)
+
+            changes=consecutive_history_diffs(snapshots_history)
+            if not changes.empty:
+                st.markdown("##### Mudanças entre execuções consecutivas")
+                st.dataframe(changes,use_container_width=True,hide_index=True)
+
+            archive=history_archive_zip(snapshots_history)
+            st.download_button(
+                "📦 Baixar histórico de snapshots (ZIP)",
+                data=archive,
+                file_name="atlasquant_snapshot_history.zip",
+                mime="application/zip",
+                key="atlasquant_snapshot_history_export",
+            )
+        else:
+            st.info("Nenhum snapshot válido salvo no histórico local ainda.")
 
     with st.expander("🧬 Comparar dois snapshots salvos", expanded=False):
         st.caption(
