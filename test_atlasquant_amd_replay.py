@@ -115,6 +115,21 @@ class AMDReplayTests(unittest.TestCase):
         )
         self.assertEqual(rows,[])
 
+    def test_two_sided_sweep_chooses_deeper_manipulation_deterministically(self):
+        d=frame(
+            acc_prefix()
+            + [
+                (10.5,11.2,9.5,10.5),  # both sides swept; BUY depth 0.5 > SELL depth 0.2
+                (10.5,10.9,10.4,10.7),
+            ]
+        )
+        rows=generate_amd_signals(
+            d,pair="EUR/USD",accumulation_bars=8,max_distribution_bars=2,min_bars=9
+        )
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]["side"],"BUY")
+        self.assertEqual(rows[0]["manipulation_side"],"SSL")
+
     def test_min_rr_filter_is_fail_closed(self):
         d=frame(
             acc_prefix()
