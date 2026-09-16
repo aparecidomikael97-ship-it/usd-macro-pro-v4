@@ -156,6 +156,15 @@ class BacktestPanelTests(unittest.TestCase):
         self.assertIn("não procura nem escolhe automaticamente o melhor parâmetro",source)
         self.assertIn("Baixar robustez de parâmetros",source)
 
+    def test_panel_exposes_consolidated_evidence_report(self):
+        source=inspect.getsource(render_operational_backtest_panel)
+        self.assertIn("Relatório consolidado de evidências",source)
+        self.assertIn("consolidated_evidence_frame",source)
+        self.assertIn("build_evidence_bundle",source)
+        self.assertIn("Baixar relatório de evidências",source)
+        self.assertIn("Baixar resumo de evidências",source)
+        self.assertIn("não qualidade do setup",source)
+
     def test_csv_bytes_read_utf8(self):
         raw=b"time,open,high,low,close\n2026-09-15T00:00:00Z,1,2,0.5,1.5\n"
         out=read_csv_bytes(raw)
