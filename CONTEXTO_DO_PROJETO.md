@@ -1314,3 +1314,16 @@ Próximo passo seguro: auditoria final de pré-release da DEV e manifesto de rea
 - `main` permaneceu em `513d0afd85df80640a2c0ed635783f46b4c3df7d`.
 - Evidência detalhada: `docs/release/RUNTIME_FINAL_VALIDATION_2026-09-16.md`.
 - Estado: código/CI da Runtime validado; seguem pendentes apenas checks externos de deploy real, browser real, secrets hospedados e compilação Pine no TradingView.
+
+
+## 16/09/2026 UTC — Runtime 653 após rótulo dinâmico de ambiente
+
+- Runtime promovida para `03cf06c1064be5e0a5a9bc92c3709341d48db0ca`.
+- Backup pré-promoção: `atlasquant-runtime-backup-20260916-911a8a2`.
+- Quality Runtime run `35115636444`: **653/653 testes OK**, compile gate verde.
+- Smoke headless valida boot sem exceções, zero chamadas Twelve Data por simples abertura, zero escritas HTTP remotas no boot e presença do rótulo `RUNTIME`.
+- A apresentação deixou de ter `DEV` hardcoded no app principal.
+- O diff DEV → Runtime contém apenas os sete arquivos operacionais divergentes preservados em `dados/`.
+- Nenhum blob operacional foi substituído por dado DEV.
+- Estado: `RUNTIME_CODE_VALIDATED_EXTERNAL_CHECKS_PENDING`.
+- Pendências restantes são externas ao repositório/CI: URL real de produção, inspeção visual em navegador real, secrets hospedados, compilação Pine no TradingView e uma rodada live controlada.
