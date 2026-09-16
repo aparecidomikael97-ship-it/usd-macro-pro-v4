@@ -23,7 +23,7 @@ sideFilter    = input.string("Both", "Lados", options=["Both","Long only","Short
 
 groupOB       = "Order Block"
 maxOrigin     = input.int(8, "Máx. candles para origem", minval=1, maxval=20, group=groupOB)
-maxSetupAge   = input.int(16, "Validade do setup (candles)", minval=1, maxval=100, group=groupOB)
+maxSetupAge   = input.int(8, "Validade do setup (candles)", minval=1, maxval=100, group=groupOB)
 bodyAtrMin    = input.float(0.65, "Body mínimo / ATR", minval=0.1, maxval=5.0, step=0.05, group=groupOB)
 rangeAtrMin   = input.float(0.85, "Range mínimo / ATR", minval=0.1, maxval=5.0, step=0.05, group=groupOB)
 entryMode     = input.string("Midpoint", "Entrada na zona", options=["Midpoint","Proximal"], group=groupOB)
@@ -36,6 +36,7 @@ inSession     = not na(time(timeframe.period, tradeSession))
 
 atr = ta.atr(atrLen)
 noise = math.max(syminfo.mintick, nz(atr) * noiseAtr)
+replayReady = bar_index >= 19 and not na(atr)
 ph = ta.pivothigh(high, leftBars, rightBars)
 pl = ta.pivotlow(low, leftBars, rightBars)
 
@@ -60,8 +61,8 @@ if not na(pl)
 
 bullBias = not na(prevHigh) and not na(lastHigh) and not na(prevLow) and not na(lastLow) and lastHigh > prevHigh + noise and lastLow > prevLow + noise
 bearBias = not na(prevHigh) and not na(lastHigh) and not na(prevLow) and not na(lastLow) and lastHigh < prevHigh - noise and lastLow < prevLow - noise
-bullBreak = not na(lastHigh) and not na(lastHighBar) and lastHighBar != consumedHighBar and close > lastHigh + noise and close[1] <= lastHigh + noise
-bearBreak = not na(lastLow) and not na(lastLowBar) and lastLowBar != consumedLowBar and close < lastLow - noise and close[1] >= lastLow - noise
+bullBreak = replayReady and not na(lastHigh) and not na(lastHighBar) and lastHighBar != consumedHighBar and close > lastHigh + noise and close[1] <= lastHigh + noise
+bearBreak = replayReady and not na(lastLow) and not na(lastLowBar) and lastLowBar != consumedLowBar and close < lastLow - noise and close[1] >= lastLow - noise
 bullKind = bullBias ? "BOS" : bearBias ? "CHOCH" : "MSS"
 bearKind = bearBias ? "BOS" : bullBias ? "CHOCH" : "MSS"
 

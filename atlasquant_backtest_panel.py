@@ -23,6 +23,7 @@ from atlasquant_operational_backtest import (
 )
 from atlasquant_strategy_replay import generate_bos_choch_ob_signals
 from atlasquant_fvg_replay import generate_fvg_signals
+from atlasquant_tradingview_parity import validate_tradingview_parity
 
 
 CANDLE_ALIASES = {
@@ -298,6 +299,15 @@ def render_operational_backtest_panel() -> dict[str, Any]:
             disabled=not bool(fvg_pine),
             key="atlasquant_bt_pine_fvg",
         )
+
+    parity=validate_tradingview_parity()
+    with st.expander("🔎 Paridade TradingView ↔ Python", expanded=False):
+        if parity["status"]=="OK":
+            st.success(f"Contrato estático OK: {parity['passed']} verificações.")
+        else:
+            st.error(f"DRIFT detectado: {parity['failed']} verificação(ões) falharam.")
+        st.dataframe(pd.DataFrame(parity["checks"]),use_container_width=True,hide_index=True)
+        st.caption(" ".join(parity["limitations"]))
 
     default_pair = st.text_input(
         "Par/ativo dos candles (usado apenas se a planilha não tiver a coluna par)",

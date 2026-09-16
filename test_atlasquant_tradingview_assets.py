@@ -47,6 +47,11 @@ class TradingViewAssetsTests(unittest.TestCase):
         text=PINE.read_text(encoding="utf-8").replace(" ","").lower()
         self.assertIn("process_orders_on_close=false",text)
 
+    def test_bos_strategy_warmup_and_pending_age_match_replay_defaults(self):
+        text=PINE.read_text(encoding="utf-8")
+        self.assertIn("replayReady = bar_index >= 19 and not na(atr)",text)
+        self.assertIn('maxSetupAge   = input.int(8, "Validade do setup (candles)"',text)
+
     def test_panel_loader_returns_exact_asset(self):
         expected=PINE.read_text(encoding="utf-8")
         self.assertEqual(load_tradingview_pine_asset(),expected)
