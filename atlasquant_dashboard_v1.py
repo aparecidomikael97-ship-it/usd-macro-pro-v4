@@ -177,14 +177,14 @@ def render_g8_radar(ranking: pd.DataFrame, neutral_band: float = 5.0, top_n: int
     c4.metric("Maior desequilíbrio", summary["top_pair"] or "—")
 
     shown = radar.head(max(1, int(top_n))).copy()
-    st.dataframe(shown, use_container_width=True, hide_index=True)
+    st.dataframe(shown, width="stretch", hide_index=True)
 
     if mode == "Pro":
         st.markdown("#### 🔎 Leitura completa")
-        st.dataframe(radar, use_container_width=True, hide_index=True)
+        st.dataframe(radar, width="stretch", hide_index=True)
     else:
         with st.expander("Ver os 28 pares"):
-            st.dataframe(radar, use_container_width=True, hide_index=True)
+            st.dataframe(radar, width="stretch", hide_index=True)
 
     st.info(
         "Fluxo operacional: força relativa → filtro macro/qualidade → Safety Core → "
