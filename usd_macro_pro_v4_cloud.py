@@ -86,9 +86,11 @@ except Exception as _evolution_exc:
 
 try:
     from atlasquant_shadow_mode import render_shadow_mode_panel
+    from atlasquant_shadow_capture import ensure_shadow_hydrated
     _ATLASQUANT_SHADOW_IMPORT_ERROR = ""
 except Exception as _shadow_exc:
     render_shadow_mode_panel = None
+    ensure_shadow_hydrated = None
     _ATLASQUANT_SHADOW_IMPORT_ERROR = f"{type(_shadow_exc).__name__}: {_shadow_exc}"
 
 
@@ -8858,10 +8860,25 @@ with abas[12]:
         if _ATLASQUANT_SHADOW_IMPORT_ERROR:
             st.caption(f"Diagnóstico Shadow Mode: {_ATLASQUANT_SHADOW_IMPORT_ERROR}")
     else:
-        render_shadow_mode_panel(
-            st.session_state.get("atlasquant_shadow_samples", []),
-            min_samples=100,
-        )
+        try:
+            if ensure_shadow_hydrated is not None:
+                _aq_shadow_rows, _aq_shadow_load = ensure_shadow_hydrated()
+            else:
+                _aq_shadow_rows, _aq_shadow_load = (
+                    st.session_state.get("atlasquant_shadow_samples", []),
+                    {"ok":False,"reason":"HYDRATOR_UNAVAILABLE"},
+                )
+            render_shadow_mode_panel(
+                _aq_shadow_rows,
+                min_samples=100,
+            )
+            if bool(_aq_shadow_load.get("ok",False)) and _aq_shadow_load.get("reason")=="LOADED":
+                st.caption(
+                    f"Shadow persistente carregado: {int(_aq_shadow_load.get('samples',0))} amostra(s)."
+                )
+        except Exception as _aq_shadow_load_exc:
+            st.warning("Shadow Mode persistente em modo seguro; produção permanece inalterada.")
+            st.caption(f"Diagnóstico: {type(_aq_shadow_load_exc).__name__}: {_aq_shadow_load_exc}")
 
     # AtlasQuant research history snapshot — one persistent read per rerun.
     # Calibration, Performance, Stability and Validation consume the same
