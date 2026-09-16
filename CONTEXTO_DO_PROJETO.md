@@ -693,3 +693,70 @@ readiness, Runtime ou direção macro/Fed.
 Próximo passo seguro: adicionar análise de estabilidade temporal (janelas/blocos do histórico)
 para detectar se um setup só parece bom em um trecho específico, antes de qualquer tentativa
 de usar performance histórica como filtro operacional.
+
+
+## 16/09/2026 UTC — estabilidade temporal dos 5 operacionais
+
+Estado verificado:
+
+- DEV testada em `ee21ff8abb1236d241ad6da8a71e654f49fc0f52`.
+- Quality run `35103716697`: compile gate verde, **588 testes executados, 588 OK**.
+- Runtime permanece protegida e não foi alterada nesta etapa.
+- Main não foi alterada nesta etapa.
+
+### Diagnóstico de estabilidade temporal
+
+Foi criado `atlasquant_strategy_stability.py` para testar se a performance observada de cada
+operacional permanece parecida ao longo do histórico ou se está concentrada em apenas um trecho.
+
+O diagnóstico:
+
+- usa somente trades executados com timestamp válido;
+- preserva cada estratégia separadamente;
+- divide cronologicamente os trades de cada operacional em blocos de tamanho quase igual;
+- suporta 3, 4 ou 5 blocos;
+- calcula por bloco:
+  - trades;
+  - gains/losses/BE;
+  - win rate observado;
+  - expectativa em R;
+  - net R;
+  - drawdown máximo;
+  - maior sequência de loss.
+
+### Status temporal descritivo
+
+Cada operacional recebe apenas um status histórico:
+
+- `POSITIVE_ACROSS_FOLDS`: expectativa positiva em todos os blocos;
+- `NEGATIVE_ACROSS_FOLDS`: expectativa negativa em todos os blocos;
+- `MIXED_ACROSS_FOLDS`: sinais diferentes entre os blocos;
+- `INSUFFICIENT`: amostra mínima por bloco não atendida.
+
+Também são mostrados:
+
+- número de blocos positivos/negativos/neutros;
+- percentual de blocos positivos;
+- pior e melhor expectativa por bloco;
+- spread entre melhor/pior expectativa;
+- desvio da expectativa;
+- net R total.
+
+A amostra mínima por bloco é configurável na tela, padrão **5 trades**.
+
+### UI / exportação
+
+O bloco **Comparador dos 5 operacionais** agora possui:
+
+- seletor de 3/4/5 blocos temporais;
+- mínimo de trades por bloco;
+- tabela de estabilidade temporal;
+- detalhamento de cada bloco;
+- exportação CSV dos blocos temporais.
+
+Esse diagnóstico não cria probabilidade, previsão, score de lucro, recomendação nem autorização
+de Gate. Ele serve apenas para mostrar quando um resultado histórico depende de uma fase
+específica da amostra.
+
+Próximo passo seguro: adicionar validação por janela móvel / walk-forward simples e medir
+degradação entre treino e teste sem otimização automática, mantendo tudo como pesquisa.
