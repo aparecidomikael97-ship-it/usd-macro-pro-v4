@@ -117,6 +117,45 @@ def render_autopilot_v107():
     g.metric("Consultas nesta rodada",int(status.get("twelve_calls_this_run",0)), "externas reais")
     h.metric("Mercado FX", "ABERTO" if status.get("forex_market_open") else "FECHADO")
 
+    quota_shadow=dict(status.get("quota_shadow",{}) or {})
+    if quota_shadow:
+        st.markdown("### 🌐 28FX — Quota Shadow")
+        st.caption(
+            "Telemetria observacional para validar a expansão adaptativa 7→28. "
+            "Não altera PAIR_ORDER, cadência, quota nem libera novos pares."
+        )
+        q1,q2,q3,q4=st.columns(4)
+        q1.metric(
+            "Rodadas mercado aberto",
+            f"{int(quota_shadow.get('market_open_runs',0))}/{int(quota_shadow.get('min_market_runs',20))}",
+        )
+        q2.metric(
+            "Bloqueios do provedor",
+            int(quota_shadow.get("provider_blocked_runs",0)),
+        )
+        q3.metric(
+            "Plano cabe no cap",
+            "SIM" if quota_shadow.get("adaptive_plan_fit_all_samples") else "NÃO",
+        )
+        q4.metric(
+            "Revisão manual",
+            "ELEGÍVEL" if quota_shadow.get("eligible_for_manual_review") else "AGUARDANDO",
+        )
+        if quota_shadow.get("quota_shadow_validated"):
+            st.success(
+                "Quota Shadow atingiu a amostra mínima sem bloqueios registrados. "
+                "Isso habilita apenas revisão manual da expansão; expansão automática continua desativada."
+            )
+        else:
+            st.info(
+                "Quota Shadow ainda está acumulando evidência real. "
+                "Nenhuma expansão automática é permitida."
+            )
+        st.caption(
+            "Auto-expansão: DESATIVADA · "
+            f"persistência: {'OK' if quota_shadow.get('persisted') else 'aguardando/indisponível'}"
+        )
+
     st.markdown("### ⚙️ O que ficou automático")
     st.markdown(
         "- ✅ execução headless do app para atualizar macro/FRED e Matriz\n"
