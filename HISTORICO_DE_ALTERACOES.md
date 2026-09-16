@@ -246,3 +246,21 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - Todos os cinco operacionais, comparador e backtest manual agora recebem custo + slippage.
 - GitHub Actions run `35105537324`: **605/605 testes OK**, compile gate verde.
 - Runtime/Main não foram alteradas por esta etapa.
+
+
+## 16/09/2026 UTC — robustez segmentada e grade fixa de parâmetros
+
+- Sensibilidade de custos/slippage passou a ter breakdown por sessão e por par.
+- Adicionada exportação CSV do stress segmentado.
+- Criado `atlasquant_strategy_parameter_robustness.py`.
+- Grade pré-definida testa 3 variantes por cada um dos 5 operacionais, total de 15 variantes.
+- Não existe otimização, auto-seleção, ranking de parâmetros ou promoção automática.
+- BOS/CHOCH+OB: 1,5R / 2,0R / 2,5R.
+- FVG: gap mínimo 0 / 0,10 / 0,20 ATR.
+- OTE: Sweet 70,5 / Zone Midpoint / impulso mínimo 0,50 ATR.
+- CRT: RR mínimo 0 / 0,50 / 1,00.
+- AMD/PO3: acumulação 6 / 8 / 10 candles.
+- UI ganhou opção explícita de ativar robustez, tabela resumida/detalhada e exportação CSV.
+- Robustez fica desativada por padrão para evitar custo desnecessário em históricos longos.
+- GitHub Actions run `35106389108`: **615/615 testes OK**, compile gate verde.
+- Runtime/Main não foram alteradas.
