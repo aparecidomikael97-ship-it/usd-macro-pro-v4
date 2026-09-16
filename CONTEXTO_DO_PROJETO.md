@@ -90,3 +90,17 @@ Testes específicos adicionados em \`test_ict_structure_v111.py\` e integrados a
 Foi criado \`.github/workflows/atlasquant-checkpoint.yml\` na DEV. Cada push em \`atlasquant-dev\` cria um ZIP do commit exato, incluindo \`CHECKPOINT_INFO.md\` e os arquivos de continuidade do repositório. O workflow não chama provedores e não altera a branch runtime.
 
 Próximo passo seguro: ampliar os testes do novo motor (SELL, invalidação, dados insuficientes e regressões de integração) antes de considerar qualquer influência adicional no readiness/Gate.
+
+
+## 16/09/2026 UTC — hardening BOS/CHOCH/Order Block
+
+- DEV testada em \`04276854213c3b75534099d92e0a6dfc1a5140e8\`.
+- Quality run \`35092846046\`: compile gate verde, **491 testes executados, 491 OK**.
+- Adicionados testes SELL para BOS e CHOCH.
+- Adicionado teste de invalidação fail-closed de Order Block.
+- Adicionado teste de dados insuficientes: estrutura/Order Block não podem alegar confirmação.
+- Adicionados testes de integração do Data Readiness: \`structure\` e \`order_block\` são mascarados quando M15 está stale/insuficiente e voltam a aparecer quando M15 está fresco.
+- Nenhuma alteração de pesos/readiness/Gate nesta etapa.
+- Checkpoint ZIP automático da DEV foi gerado com sucesso pelo run \`35092846140\`.
+
+Próximo passo seguro: auditar a qualidade semântica do detector em cenários de mercado lateral/flat, equal highs/lows e múltiplas quebras próximas; só depois discutir qualquer peso no Gate.

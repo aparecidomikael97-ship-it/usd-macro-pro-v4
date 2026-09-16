@@ -34,3 +34,14 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - Checkpoint ZIP run \`35092388358\`: sucesso.
 - Runtime permaneceu em \`7a2ad3e53055fb1ef6091c39442c4c0f5212c3c1\`.
 - Main observada em \`b36ba5c457b446ea8b2dfd76f1157ba4af6c52d5\`; nenhuma alteração foi feita nela nesta etapa.
+
+
+## 16/09/2026 UTC — hardening do novo motor ICT estrutural
+
+- Cobertura adicional para SELL em BOS/CHOCH.
+- Cobertura de invalidação de Order Block.
+- Cobertura fail-closed para dados insuficientes.
+- Regressões de integração de frescor M15 no Data Readiness.
+- GitHub Actions run \`35092846046\`: **491/491 testes OK** e compile gate verde.
+- Checkpoint ZIP run \`35092846140\`: sucesso.
+- Pesos de decisão e Gate permanecem inalterados.
