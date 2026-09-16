@@ -447,3 +447,44 @@ pesos do ICT readiness, Runtime ou macro/Fed.
 Próximo passo seguro: endurecer o OTE contra reancoragem prematura de swings e validar cenários
 de dois impulsos próximos, depois avançar para CRT/AMD apenas se as regras puderem ser
 reproduzidas de forma objetiva e auditável.
+
+
+## 16/09/2026 UTC — hardening OTE contra reancoragem prematura
+
+Estado verificado:
+
+- DEV testada em `2ca4e249a3dbd7e0629ffe8f3f602aa1f2668c8b`.
+- Quality run `35101330822`: compile gate verde, **554 testes executados, 554 OK**.
+- Runtime permanece em `7a2ad3e53055fb1ef6091c39442c4c0f5212c3c1`.
+- Main observada em `d66df22927f36190caa0b8f6b012e7b9ba921cd5`; nenhuma alteração foi feita nela.
+
+### Re-anchor guard OTE
+
+O replay OTE deixou de aceitar extensões marginais do mesmo impulso como se fossem um novo setup:
+
+- após um OTE BUY emitido, o próximo BUY só pode nascer de um swing low de origem **posterior** ao terminal high do impulso anterior;
+- após um OTE SELL emitido, o próximo SELL só pode nascer de um swing high de origem **posterior** ao terminal low do impulso anterior;
+- novos highs/lows que apenas estendem a mesma perna não geram um segundo OTE;
+- um segundo impulso próximo continua permitido quando sua origem realmente começa depois do terminal anterior.
+
+Foram adicionados metadados auditáveis aos sinais OTE:
+
+- `impulse_origin_index`;
+- `impulse_terminal_index`;
+- `previous_same_side_terminal_index`;
+- `reanchor_guard=NEW_ORIGIN_AFTER_PREVIOUS_TERMINAL`.
+
+A Pine OTE recebeu a mesma regra, e o contrato TradingView ↔ Python passou a verificar
+explicitamente o re-anchor guard nos dois lados.
+
+Novos testes cobrem:
+
+- mesma origem + novo extremo => não cria segundo sinal;
+- novo impulso com origem após o terminal anterior => pode criar novo sinal.
+
+**Regra preservada:** OTE continua pesquisa técnica e não altera Gate, Safety Core, pesos,
+Runtime ou decisões macro/Fed.
+
+Próximo passo seguro: iniciar CRT como quarto operacional somente com definição objetiva de
+range/sweep/reclaim e manter estatística totalmente separada; AMD/Power of Three vem depois,
+por exigir mais estados e validação temporal.
