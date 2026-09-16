@@ -383,3 +383,67 @@ A tabela detalhada pode ser baixada em CSV.
 Esse walk-forward é apenas uma validação histórica fora da amostra. Ele não é previsão,
 probabilidade de lucro ou autorização de operação e não altera automaticamente parâmetros,
 pesos ou o Gate do AtlasQuant.
+
+
+## Custos e slippage em R
+
+O Backtest agora permite informar separadamente:
+
+- **Custos totais por trade (R)**;
+- **Slippage adverso por trade (R)**.
+
+A conta usada no resultado histórico é:
+
+`Net R = Gross R - Custos R - Slippage R`.
+
+Exemplo:
+
+- trade bruto: +2,00R;
+- custo: 0,05R;
+- slippage: 0,03R;
+- resultado líquido: +1,92R.
+
+Valores negativos de custo/slippage são rejeitados.
+
+### Sensibilidade a custos e slippage
+
+No **Comparador dos 5 operacionais**, o AtlasQuant também pode reprecificar os mesmos trades
+sob diferentes níveis de atrito.
+
+O teste sempre mantém iguais:
+
+- sinais;
+- entradas;
+- stops;
+- alvos;
+- candles usados;
+- horários de entrada/saída.
+
+Somente o drag em R é alterado.
+
+A tabela mostra, por setup e cenário:
+
+- custo;
+- slippage;
+- fricção total;
+- trades;
+- Gain/Loss/BE;
+- expectativa em R;
+- Net R;
+- Profit Factor;
+- Drawdown.
+
+O resumo usa estados descritivos:
+
+- **POSITIVE_ALL_TESTED_FRICTION** — expectativa positiva em todos os níveis testados;
+- **BREAKS_UNDER_TESTED_FRICTION** — expectativa positiva sem/baixo atrito, mas não positiva em algum stress;
+- **NONPOSITIVE_BASELINE** — expectativa já não positiva no cenário sem fricção;
+- **INSUFFICIENT** — amostra mínima não atendida.
+
+Também é mostrado o primeiro nível testado de fricção em que a expectativa deixa de ser positiva.
+
+Importante: o slippage desta etapa é modelado como um **drag fixo em R por trade**. Não é uma
+simulação tick a tick de preenchimento de ordens. O objetivo é testar sensibilidade do histórico,
+não reproduzir perfeitamente microestrutura de execução.
+
+A tabela detalhada pode ser baixada em CSV.
