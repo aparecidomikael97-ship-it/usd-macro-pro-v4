@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 import csv
 import io
+import json
 
 import pandas as pd
 import streamlit as st
@@ -41,6 +42,12 @@ from atlasquant_backtest_evidence import (
     build_evidence_bundle,
     evidence_bundle_json,
     evidence_markdown,
+)
+from atlasquant_backtest_snapshot import (
+    build_backtest_snapshot,
+    snapshot_json,
+    load_snapshot_json,
+    compare_backtest_snapshots,
 )
 from atlasquant_tradingview_parity import validate_tradingview_parity
 
@@ -1193,6 +1200,33 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                         key="atlasquant_compare_export_evidence_md",
                     )
 
+                snapshot=build_backtest_snapshot(
+                    raw_csv=candle_file.getvalue(),
+                    candles=cmp_candles,
+                    settings=evidence_settings,
+                    evidence_bundle=evidence_bundle,
+                )
+                snapshot_raw=snapshot_json(snapshot)
+                st.markdown("#### Snapshot reproduzível do Backtest")
+                st.caption(
+                    "Fingerprint do CSV original, candles normalizados, configuração, código de pesquisa "
+                    "e evidências. O snapshot_id só muda quando o conteúdo do teste muda."
+                )
+                fp1,fp2,fp3=st.columns(3)
+                with fp1:
+                    st.code(f"snapshot_id\n{snapshot['snapshot_id'][:16]}…")
+                with fp2:
+                    st.code(f"data\n{snapshot['normalized_data']['sha256'][:16]}…")
+                with fp3:
+                    st.code(f"code\n{snapshot['code']['sha256'][:16]}…")
+                st.download_button(
+                    "📥 Baixar snapshot reproduzível (JSON)",
+                    data=snapshot_raw,
+                    file_name=f"atlasquant_snapshot_{default_pair.replace('/','_')}_{snapshot['snapshot_id'][:12]}.json",
+                    mime="application/json",
+                    key="atlasquant_compare_export_snapshot",
+                )
+
                 all_ledger=combined_ledger(suite)
                 cexp1,cexp2,cexp3,cexp4,cexp5=st.columns(5)
                 with cexp1:
@@ -1240,6 +1274,70 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                 st.caption(
                     "Comparação histórica não garante resultado futuro. Estratégias com poucas "
                     "operações ficam fora do ranking observado para reduzir leitura enganosa de amostra pequena."
+                )
+
+    with st.expander("🧬 Comparar dois snapshots salvos", expanded=False):
+        st.caption(
+            "Envie dois snapshots JSON exportados pelo AtlasQuant. A comparação mostra se mudou "
+            "o CSV, os dados normalizados, as configurações, o código ou as evidências."
+        )
+        sn1,sn2=st.columns(2)
+        with sn1:
+            snapshot_before_file=st.file_uploader(
+                "Snapshot anterior (JSON)",
+                type=["json"],
+                key="atlasquant_snapshot_before",
+            )
+        with sn2:
+            snapshot_after_file=st.file_uploader(
+                "Snapshot posterior (JSON)",
+                type=["json"],
+                key="atlasquant_snapshot_after",
+            )
+
+        if st.button(
+            "🔎 Comparar snapshots",
+            key="atlasquant_snapshot_compare_button",
+            disabled=snapshot_before_file is None or snapshot_after_file is None,
+        ):
+            try:
+                before_snapshot=load_snapshot_json(snapshot_before_file.getvalue())
+                after_snapshot=load_snapshot_json(snapshot_after_file.getvalue())
+                snapshot_diff=compare_backtest_snapshots(before_snapshot,after_snapshot)
+            except Exception as exc:
+                st.error(f"Snapshot inválido: {type(exc).__name__}: {exc}")
+            else:
+                flags=pd.DataFrame([
+                    {"item":"CSV original","mudou":snapshot_diff["raw_csv_changed"]},
+                    {"item":"Dados normalizados","mudou":snapshot_diff["normalized_data_changed"]},
+                    {"item":"Configurações","mudou":snapshot_diff["settings_changed"]},
+                    {"item":"Código","mudou":snapshot_diff["code_changed"]},
+                    {"item":"Evidências","mudou":snapshot_diff["evidence_changed"]},
+                ])
+                st.dataframe(flags,use_container_width=True,hide_index=True)
+                st.caption(
+                    "Deltas abaixo são descritivos. O comparador não classifica mudança como melhora ou piora."
+                )
+                if snapshot_diff["settings_changes"]:
+                    st.markdown("##### Configurações alteradas")
+                    st.dataframe(
+                        pd.DataFrame(snapshot_diff["settings_changes"]),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+                if snapshot_diff["evidence_metric_deltas"]:
+                    st.markdown("##### Deltas de evidências")
+                    st.dataframe(
+                        pd.DataFrame(snapshot_diff["evidence_metric_deltas"]),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+                st.download_button(
+                    "📥 Baixar diff dos snapshots (JSON)",
+                    data=json.dumps(snapshot_diff,ensure_ascii=False,indent=2,sort_keys=True),
+                    file_name="atlasquant_snapshot_diff.json",
+                    mime="application/json",
+                    key="atlasquant_snapshot_diff_export",
                 )
 
     if candle_file is None or signal_file is None:
