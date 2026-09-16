@@ -98,6 +98,48 @@ class AtlasQuantValidationReadinessTests(unittest.TestCase):
             {"performance_reviewable","calibration_consistent","stability_consistent","shadow_reviewable"},
         )
 
+    def test_shadow_total_can_pass_while_pair_coverage_remains_pending(self):
+        r=build_validation_readiness(
+            self.history(),
+            self.shadow_samples(100),
+            min_total_samples=50,
+            min_group_samples=10,
+            min_band_samples=10,
+            min_fold_samples=10,
+            min_shadow_samples=100,
+            min_shadow_pair_samples=1,
+            expected_shadow_pairs=("EUR/USD","GBP/USD"),
+        )
+        self.assertTrue(r["shadow"]["minimum_met"])
+        self.assertFalse(r["shadow"]["coverage_balanced"])
+        self.assertFalse(r["checks"]["shadow_reviewable"])
+        self.assertTrue(any("cobertura por par" in x.lower() for x in r["pending"]))
+
+    def test_balanced_shadow_coverage_can_pass_shadow_check(self):
+        samples=[]
+        for pair in ("EUR/USD","GBP/USD"):
+            for i in range(2):
+                champion={
+                    "pair":pair,"side":"BUY","state":"WAIT","score":80,
+                    "data_quality":90,"executable":False,"version":"champ",
+                    "timestamp":f"2026-01-01T12:0{i}:00Z",
+                }
+                challenger=dict(champion); challenger["version"]="challenger"
+                samples.append(compare_shadow_sample(champion,challenger))
+        r=build_validation_readiness(
+            self.history(),
+            samples,
+            min_total_samples=50,
+            min_group_samples=10,
+            min_band_samples=10,
+            min_fold_samples=10,
+            min_shadow_samples=4,
+            min_shadow_pair_samples=2,
+            expected_shadow_pairs=("EUR/USD","GBP/USD"),
+        )
+        self.assertTrue(r["shadow"]["coverage_balanced"])
+        self.assertTrue(r["checks"]["shadow_reviewable"])
+
 
 if __name__=="__main__":
     unittest.main()
