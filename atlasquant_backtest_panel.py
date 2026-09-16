@@ -55,6 +55,8 @@ from atlasquant_backtest_snapshot_history import (
     history_timeline_frame,
     consecutive_history_diffs,
     history_archive_zip,
+    inspect_history_archive,
+    restore_history_archive,
 )
 from atlasquant_tradingview_parity import validate_tradingview_parity
 
@@ -1306,6 +1308,30 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                         st.info("Esse snapshot já está presente no histórico local.")
                     else:
                         st.success("Snapshot salvo no histórico local de pesquisa.")
+
+        history_zip_file=st.file_uploader(
+            "Restaurar histórico exportado (ZIP)",
+            type=["zip"],
+            key="atlasquant_snapshot_history_restore_file",
+        )
+        if st.button(
+            "♻️ Validar e restaurar histórico ZIP",
+            key="atlasquant_snapshot_history_restore_button",
+            disabled=history_zip_file is None,
+        ):
+            try:
+                archive_bytes=history_zip_file.getvalue()
+                inspected=inspect_history_archive(archive_bytes)
+                restored=restore_history_archive(archive_bytes)
+            except Exception as exc:
+                st.error(
+                    f"Histórico rejeitado antes da restauração: {type(exc).__name__}: {exc}"
+                )
+            else:
+                st.success(
+                    f"Histórico validado: {inspected['snapshot_count']} snapshot(s). "
+                    f"Adicionados: {restored['saved']} · Já existentes: {restored['duplicates']}."
+                )
 
         history=load_snapshot_history()
         invalid_history=history.get("invalid_files") or []
