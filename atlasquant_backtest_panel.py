@@ -36,6 +36,12 @@ from atlasquant_strategy_stability import temporal_stability_report
 from atlasquant_strategy_walkforward import walk_forward_report
 from atlasquant_strategy_friction import friction_sensitivity_report
 from atlasquant_strategy_parameter_robustness import parameter_robustness_report
+from atlasquant_backtest_evidence import (
+    consolidated_evidence_frame,
+    build_evidence_bundle,
+    evidence_bundle_json,
+    evidence_markdown,
+)
 from atlasquant_tradingview_parity import validate_tradingview_parity
 
 
@@ -1063,6 +1069,8 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                             key="atlasquant_compare_export_friction_breakdown",
                         )
 
+                robustness_summary=pd.DataFrame()
+                robustness_variants=pd.DataFrame()
                 if include_param_robustness:
                     robustness=parameter_robustness_report(
                         cmp_candles,
@@ -1104,6 +1112,86 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                             mime="text/csv",
                             key="atlasquant_compare_export_param_robustness",
                         )
+
+                evidence=consolidated_evidence_frame(
+                    comparison,
+                    stability_summary,
+                    wf_summary,
+                    friction_summary,
+                    robustness_summary if include_param_robustness else None,
+                )
+                st.markdown("#### Relatório consolidado de evidências")
+                st.caption(
+                    "Reúne Backtest, estabilidade temporal, walk-forward, fricção e robustez "
+                    "de parâmetros em uma única leitura. Cobertura indica disponibilidade de "
+                    "diagnósticos, não qualidade do setup."
+                )
+                evidence_cols=[
+                    "operacional","trades","win_rate_pct","expectancy_r","net_r",
+                    "max_drawdown_r","sample_tier","temporal_status","walk_forward_status",
+                    "friction_status","parameter_status","evidence_diagnostics_available",
+                    "evidence_diagnostics_total","evidence_coverage",
+                ]
+                st.dataframe(
+                    evidence.reindex(columns=evidence_cols),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+                evidence_settings={
+                    "pair":default_pair,
+                    "max_wait_bars":int(max_wait),
+                    "max_hold_bars":int(max_hold),
+                    "cost_r":float(cost_r),
+                    "slippage_r":float(slippage_r),
+                    "stability_folds":int(stability_folds),
+                    "min_fold_trades":int(min_fold_trades),
+                    "walk_forward_train_pct":int(wf_train_pct),
+                    "walk_forward_windows":int(wf_windows),
+                    "walk_forward_min_train":int(wf_min_train),
+                    "walk_forward_min_test":int(wf_min_test),
+                    "friction_min_trades":int(friction_min_trades),
+                    "parameter_robustness_ran":bool(include_param_robustness),
+                    "parameter_min_trades":int(param_min_trades),
+                }
+                evidence_bundle=build_evidence_bundle(
+                    pair=default_pair,
+                    evidence=evidence,
+                    comparison=comparison,
+                    stability_summary=stability_summary,
+                    stability_folds=stability_folds_df,
+                    walkforward_summary=wf_summary,
+                    walkforward_windows=wf_windows_df,
+                    friction_summary=friction_summary,
+                    friction_scenarios=friction_scenarios,
+                    friction_breakdown=friction_breakdown,
+                    parameter_summary=robustness_summary if include_param_robustness else None,
+                    parameter_variants=robustness_variants if include_param_robustness else None,
+                    settings=evidence_settings,
+                )
+                evidence_json=evidence_bundle_json(evidence_bundle)
+                evidence_md=evidence_markdown(
+                    evidence,
+                    pair=default_pair,
+                    settings=evidence_settings,
+                )
+                er1,er2=st.columns(2)
+                with er1:
+                    st.download_button(
+                        "📥 Baixar relatório de evidências (JSON)",
+                        data=evidence_json,
+                        file_name=f"atlasquant_evidencias_{default_pair.replace('/','_')}.json",
+                        mime="application/json",
+                        key="atlasquant_compare_export_evidence_json",
+                    )
+                with er2:
+                    st.download_button(
+                        "📥 Baixar resumo de evidências (MD)",
+                        data=evidence_md,
+                        file_name=f"atlasquant_evidencias_{default_pair.replace('/','_')}.md",
+                        mime="text/markdown",
+                        key="atlasquant_compare_export_evidence_md",
+                    )
 
                 all_ledger=combined_ledger(suite)
                 cexp1,cexp2,cexp3,cexp4,cexp5=st.columns(5)
