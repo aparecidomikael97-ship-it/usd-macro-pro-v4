@@ -1,0 +1,47 @@
+# Continuidade do AtlasQuant
+
+## Como retomar
+
+Leia este arquivo, o [registro original completo](docs/continuidade/REGISTRO_ORIGINAL_2026-09-15.md), o [plano de ativação](docs/continuidade/PLANO_ATIVACAO_RUNTIME.md) e o [histórico](HISTORICO_DE_ALTERACOES.md). O registro original preserva o conteúdo do Word entregue pelo usuário; não representa uma transcrição integral da conversa antiga.
+
+Antes de alterar código, consulte as instruções AGENTS.md disponíveis, as SHAs das três branches e o workflow/log real mais recente. Se o estado mudou, informe a diferença. Não trate um resultado antigo de CI como resultado do commit atual.
+
+## Regras acordadas
+
+- Desenvolver em `atlasquant-dev`. Melhorias seguras em DEV estão autorizadas; “vamos lá” significa continuar a próxima etapa segura.
+- Merge para `main`, promoção, alterações destrutivas de dados e mudanças de credenciais exigem autorização específica.
+- Preservar o motor base, Safety Core fail-closed, rastreabilidade e dados ausentes como ausentes. Score não é probabilidade de lucro.
+- Abertura da UI não deve gerar chamadas Twelve Data. Não inventar eventos, horários, entradas, stops, alvos ou estatísticas.
+- Radar macro de 28 pares não equivale a pipeline técnico de 28 pares: o pipeline completo permanece nos 7 majors USD.
+- Challenger e expansão 28FX não têm promoção automática. Academy/vídeos permanecem no plano após estabilização das telas; índices/WIN/WDO precisam de motores próprios.
+- Ao concluir etapa importante, entregar arquivos e contexto cumulativo, com decisões, justificativas, pendências e testes realmente executados. Não prometer trabalho em background.
+
+## Verificação desta retomada em 16/09/2026 UTC
+
+Repositório: `aparecidomikael97-ship-it/usd-macro-pro-v4`.
+
+| Referência | SHA consultada | Resultado |
+| --- | --- | --- |
+| DEV antes desta entrega documental | `d6d7779458dbd93735090d1eba45d44418fa672f` | Igual ao Word |
+| main | `d5f6b4fe6c718ea3cb6bafd3758c31560523488a` | 7 commits após a main citada no Word |
+| runtime | `2432a32833426f53cf834d2245ac3bf2ce10a5a1` | Igual ao Word |
+
+[Quality tests 35047014369](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/35047014369): sucesso no SHA DEV acima. Log do job `104638929498`: `Ran 471 tests in 1.481s`, seguido de `OK`; etapa de compilação também concluída com sucesso. Esta retomada verificou a execução existente, não iniciou uma nova suíte.
+
+Os 7 commits adicionais da main alteraram somente `dados/autopilot_inputs_v107.json`, `dados/autopilot_status_v107.json`, `dados/master_market_map_v102.json` e `dados/scanner_tecnico_v934.json`. Antes desta entrega documental, a comparação DEV/main era 191 à frente e 72 atrás. São valores de uma consulta, não constantes permanentes.
+
+Os workflows consultados na main continuam apontando o histórico para `main`; os equivalentes na DEV apontam para `atlasquant-runtime`. A árvore runtime consultada ainda não contém `dados/atlasquant_flight_recorder.jsonl`, `dados/atlasquant_shadow_samples.jsonl` nem `dados/atlasquant_quota_shadow_v1.json`. A falta desses arquivos nessa branch não prova ausência de toda e qualquer amostra em outros locais.
+
+## Etapa entregue
+
+Registro original convertido para Markdown sem executar o código Python enviado anteriormente; contexto cumulativo; histórico; plano de ativação e rollback. Somente documentação foi alterada. Sem merge, mudança de modelo, workflow operacional, secrets ou dados.
+
+## Próxima etapa segura
+
+Preparar em DEV uma ferramenta de inventário/reconciliação em modo somente leitura, com testes de dados inválidos, conflitos, duplicatas e mudança concorrente de SHA. Inventariar também budget/cache Twelve para impedir reinício indevido do consumo diário. A ferramenta deve gerar proposta e bloqueios sem fazer escrita remota.
+
+Depois, revisar a proposta concreta de ativação com evidências e solicitar autorização específica somente para executar a promoção. Não há autorização de promoção nesta retomada.
+
+## Validação ainda pendente
+
+Ativação real do runtime, histórico persistente e evidência Shadow/Quota; validação técnica da pesquisa 28FX e inspeção de UX em produção. Os 471 testes não comprovam lucratividade nem substituem essas etapas. Critérios históricos: Shadow com 100 amostras totais e 10 por par, zero divergências críticas; Quota com pelo menos 20 rodadas de mercado aberto e critérios do módulo satisfeitos. Esses limiares permitem revisão manual, não ativação automática.
