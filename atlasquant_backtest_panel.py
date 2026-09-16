@@ -1,8 +1,8 @@
-"""AtlasQuant Operational Backtest Panel V1.
+"""AtlasQuant Operational Backtest Panel V1.1.
 
-Offline Streamlit adapter for TradingView/exported OHLC + explicit signal plans.
-Opening the panel performs no provider/API calls. It never invents entry, stop
-or target; missing/invalid plans are shown as NO_TRADE.
+Offline Streamlit adapter for TradingView/exported OHLC. It supports explicit
+signal plans and an objective BOS/CHOCH + Order Block historical replay.
+Opening the panel performs no provider/API calls.
 """
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ from atlasquant_operational_backtest import (
     summarize_by,
     summarize_results,
 )
+from atlasquant_strategy_replay import generate_bos_choch_ob_signals
 
 
 CANDLE_ALIASES = {
@@ -162,12 +163,76 @@ def _records(df: pd.DataFrame) -> list[dict[str, Any]]:
     return rows
 
 
+def _render_result_block(
+    results: list[dict[str, Any]],
+    pair: str,
+    *,
+    key_suffix: str,
+    generated_signals: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    metrics = summarize_results(results)
+    ledger = ledger_frame(results)
+
+    st.markdown("#### Resultado")
+    m1, m2, m3, m4, m5 = st.columns(5)
+    m1.metric("Trades", metrics["trades"])
+    m2.metric("Gain", metrics["gains"])
+    m3.metric("Loss", metrics["losses"])
+    m4.metric("BE", metrics["breakeven"])
+    win = metrics["win_rate_pct"]
+    m5.metric("Win Rate", "—" if win is None else f"{win:.1f}%")
+
+    n1, n2, n3, n4 = st.columns(4)
+    n1.metric("Resultado", f"{metrics['net_r']:+.2f}R")
+    n2.metric("Expectativa", "—" if metrics["expectancy_r"] is None else f"{metrics['expectancy_r']:+.2f}R")
+    n3.metric("Drawdown máx.", f"{metrics['max_drawdown_r']:.2f}R")
+    n4.metric("Maior seq. Loss", metrics["max_loss_streak"])
+
+    if metrics["ambiguous_same_bar"]:
+        st.warning(
+            f"{metrics['ambiguous_same_bar']} trade(s) tocaram stop e alvo no mesmo candle OHLC. "
+            "O motor marcou LOSS por segurança porque a ordem intrabar é desconhecida."
+        )
+
+    st.markdown("#### Diário completo")
+    st.dataframe(ledger, use_container_width=True, hide_index=True)
+
+    st.download_button(
+        "📥 Baixar planilha completa do backtest (CSV)",
+        data=ledger.to_csv(index=False),
+        file_name=f"atlasquant_backtest_{pair.replace('/','_')}.csv",
+        mime="text/csv",
+        key=f"atlasquant_bt_export_ledger_{key_suffix}",
+    )
+
+    if generated_signals:
+        signals_df=pd.DataFrame(generated_signals)
+        st.download_button(
+            "📥 Baixar sinais gerados pelo replay (CSV)",
+            data=signals_df.to_csv(index=False),
+            file_name=f"atlasquant_sinais_replay_{pair.replace('/','_')}.csv",
+            mime="text/csv",
+            key=f"atlasquant_bt_export_signals_{key_suffix}",
+        )
+
+    if "setup" in ledger.columns:
+        by_setup = summarize_by(results, "setup")
+        st.markdown("#### Por operacional/setup")
+        st.dataframe(by_setup, use_container_width=True, hide_index=True)
+    if "session" in ledger.columns:
+        by_session = summarize_by(results, "session")
+        st.markdown("#### Por sessão")
+        st.dataframe(by_session, use_container_width=True, hide_index=True)
+
+    return {"status": "DONE", "metrics": metrics, "rows": results}
+
+
 def render_operational_backtest_panel() -> dict[str, Any]:
     st.markdown("### 🧪 Backtest Operacional — TradingView → AtlasQuant")
     st.caption(
-        "Importe candles OHLC exportados do TradingView e uma planilha de sinais com "
-        "entrada/stop/alvo explícitos. O AtlasQuant mede Gain/Loss/BE, R, drawdown, "
-        "sequências, setup e sessão. Não cria níveis que não existam na planilha."
+        "Importe candles OHLC exportados do TradingView. Você pode usar uma planilha "
+        "de sinais explícitos ou deixar o AtlasQuant fazer replay automático do "
+        "BOS/CHOCH + Order Block, candle a candle, para pesquisa histórica."
     )
 
     c1, c2 = st.columns(2)
@@ -234,8 +299,97 @@ def render_operational_backtest_panel() -> dict[str, Any]:
             format="%.2f",
         )
 
+    with st.expander("🤖 Backtest automático — BOS/CHOCH + Order Block", expanded=True):
+        st.caption(
+            "Usa somente os candles enviados. O replay percorre o histórico sem ver candles futuros, "
+            "gera entrada/stop/alvo por regras fixas de pesquisa e bloqueia sobreposição de posição no mesmo par."
+        )
+        ac1, ac2, ac3 = st.columns(3)
+        with ac1:
+            auto_rr = st.number_input(
+                "Alvo automático (R)", min_value=0.25, max_value=10.0,
+                value=2.0, step=0.25, key="atlasquant_auto_rr"
+            )
+        with ac2:
+            auto_buffer = st.number_input(
+                "Buffer do stop (ATR)", min_value=0.0, max_value=1.0,
+                value=0.05, step=0.01, key="atlasquant_auto_buffer"
+            )
+        with ac3:
+            auto_entry_mode = st.selectbox(
+                "Entrada", ["MIDPOINT","PROXIMAL"], key="atlasquant_auto_entry_mode"
+            )
+
+        af1, af2 = st.columns(2)
+        with af1:
+            auto_events = st.multiselect(
+                "Eventos", ["BOS","CHOCH"], default=["BOS","CHOCH"],
+                key="atlasquant_auto_events"
+            )
+        with af2:
+            auto_sides = st.multiselect(
+                "Lados", ["BUY","SELL"], default=["BUY","SELL"],
+                key="atlasquant_auto_sides"
+            )
+
+        if candle_file is None:
+            st.info("Envie o CSV de candles para habilitar o replay automático.")
+        else:
+            try:
+                auto_raw=read_csv_bytes(candle_file.getvalue())
+                auto_candles=normalize_tradingview_candles(auto_raw)
+            except Exception as exc:
+                auto_candles=pd.DataFrame()
+                st.error(f"CSV de candles inválido: {type(exc).__name__}: {exc}")
+
+            if not auto_candles.empty:
+                auto_signals=generate_bos_choch_ob_signals(
+                    auto_candles,
+                    pair=default_pair,
+                    rr_target=float(auto_rr),
+                    stop_buffer_atr=float(auto_buffer),
+                    entry_mode=str(auto_entry_mode),
+                    allow_bos="BOS" in auto_events,
+                    allow_choch="CHOCH" in auto_events,
+                    allow_buy="BUY" in auto_sides,
+                    allow_sell="SELL" in auto_sides,
+                )
+                st.caption(
+                    f"Replay encontrou {len(auto_signals)} setup(s) objetivo(s) em "
+                    f"{len(auto_candles)} candle(s)."
+                )
+                if st.button(
+                    "▶️ Rodar backtest automático",
+                    type="primary",
+                    key="atlasquant_bt_auto_run",
+                    disabled=not bool(auto_signals),
+                ):
+                    auto_results=backtest_many(
+                        {default_pair:auto_candles},
+                        auto_signals,
+                        single_position_per_pair=True,
+                        max_wait_bars=int(max_wait),
+                        max_hold_bars=int(max_hold),
+                        cost_r=float(cost_r),
+                        start_after_signal_bar=True,
+                    )
+                    result=_render_result_block(
+                        auto_results,
+                        default_pair,
+                        key_suffix="auto",
+                        generated_signals=auto_signals,
+                    )
+                    st.caption(
+                        "Resultado automático = pesquisa técnica histórica. "
+                        "Não inclui macro/Fed e não altera o Gate do AtlasQuant."
+                    )
+                    return {**result, "mode":"AUTO_REPLAY", "signals":auto_signals}
+
     if candle_file is None or signal_file is None:
-        st.info("Envie os dois CSVs para executar o backtest. Abrir esta tela não consome API.")
+        st.info(
+            "Para o backtest manual, envie também a planilha de sinais. "
+            "O replay automático acima precisa apenas do CSV de candles."
+        )
         return {"status": "WAITING_FILES"}
 
     try:
@@ -279,53 +433,9 @@ def render_operational_backtest_panel() -> dict[str, Any]:
         cost_r=float(cost_r),
         start_after_signal_bar=True,
     )
-    metrics = summarize_results(results)
-    ledger = ledger_frame(results)
-
-    st.markdown("#### Resultado")
-    m1, m2, m3, m4, m5 = st.columns(5)
-    m1.metric("Trades", metrics["trades"])
-    m2.metric("Gain", metrics["gains"])
-    m3.metric("Loss", metrics["losses"])
-    m4.metric("BE", metrics["breakeven"])
-    win = metrics["win_rate_pct"]
-    m5.metric("Win Rate", "—" if win is None else f"{win:.1f}%")
-
-    n1, n2, n3, n4 = st.columns(4)
-    n1.metric("Resultado", f"{metrics['net_r']:+.2f}R")
-    n2.metric("Expectativa", "—" if metrics["expectancy_r"] is None else f"{metrics['expectancy_r']:+.2f}R")
-    n3.metric("Drawdown máx.", f"{metrics['max_drawdown_r']:.2f}R")
-    n4.metric("Maior seq. Loss", metrics["max_loss_streak"])
-
-    if metrics["ambiguous_same_bar"]:
-        st.warning(
-            f"{metrics['ambiguous_same_bar']} trade(s) tocaram stop e alvo no mesmo candle OHLC. "
-            "O motor marcou LOSS por segurança porque a ordem intrabar é desconhecida."
-        )
-
-    st.markdown("#### Diário completo")
-    st.dataframe(ledger, use_container_width=True, hide_index=True)
-
-    csv_data = ledger.to_csv(index=False)
-    st.download_button(
-        "📥 Baixar planilha completa do backtest (CSV)",
-        data=csv_data,
-        file_name=f"atlasquant_backtest_{pair.replace('/','_')}.csv",
-        mime="text/csv",
-        key="atlasquant_bt_export_ledger",
-    )
-
-    if "setup" in ledger.columns:
-        by_setup = summarize_by(results, "setup")
-        st.markdown("#### Por operacional/setup")
-        st.dataframe(by_setup, use_container_width=True, hide_index=True)
-    if "session" in ledger.columns:
-        by_session = summarize_by(results, "session")
-        st.markdown("#### Por sessão")
-        st.dataframe(by_session, use_container_width=True, hide_index=True)
-
+    result=_render_result_block(results,pair,key_suffix="manual")
     st.caption(
         "Backtest histórico não garante resultado futuro. Esta tela mede apenas as regras "
         "e níveis fornecidos, com política conservadora para ambiguidades OHLC."
     )
-    return {"status": "DONE", "metrics": metrics, "rows": results}
+    return {**result, "mode":"MANUAL"}

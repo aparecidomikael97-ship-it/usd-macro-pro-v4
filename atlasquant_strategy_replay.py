@@ -84,16 +84,18 @@ def generate_bos_choch_ob_signals(
     seen=set()
     start=max(12,int(min_bars))
     for end in range(start-1,len(d)):
-        prefix=d.iloc[:end+1].copy()
-        now=pd.Timestamp(prefix.iloc[-1]["datetime"])
-        atr=_atr_last(prefix)
+        # The structure engine only needs a bounded recent window. Keeping the
+        # replay window bounded avoids quadratic copies on long TradingView CSVs.
+        window=d.iloc[max(0,end-179):end+1].copy().reset_index(drop=True)
+        now=pd.Timestamp(d.iloc[end]["datetime"])
+        atr=_atr_last(window)
         if atr is None:
             continue
 
         for side,side_allowed in (("BUY",allow_buy),("SELL",allow_sell)):
             if not side_allowed:
                 continue
-            structure=detect_bos_choch(prefix,side)
+            structure=detect_bos_choch(window,side)
             event=str(structure.get("event","NONE")).upper()
             if event not in ("BOS","CHOCH"):
                 continue
@@ -106,8 +108,8 @@ def generate_bos_choch_ob_signals(
             if int(structure.get("bars_ago",999999))!=0:
                 continue
 
-            ob=detect_order_block(prefix,side)
-            if int(ob.get("structure_index",-1)) != len(prefix)-1:
+            ob=detect_order_block(window,side)
+            if int(ob.get("structure_index",-1)) != len(window)-1:
                 continue
             if bool(ob.get("invalidated",False)):
                 continue
@@ -156,8 +158,9 @@ def generate_bos_choch_ob_signals(
                 "noise_tolerance":structure.get("noise_tolerance"),
                 "ob_zone_low":zlow,
                 "ob_zone_high":zhigh,
-                "ob_origin_index":ob.get("origin_index"),
-                "ob_structure_index":ob.get("structure_index"),
+                "replay_bar_index":int(end),
+                "ob_origin_window_index":ob.get("origin_index"),
+                "ob_structure_window_index":ob.get("structure_index"),
                 "rr_target":rr,
                 "stop_buffer_atr":buf,
                 "entry_mode":mode,

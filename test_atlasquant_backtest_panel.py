@@ -1,3 +1,4 @@
+import inspect
 import unittest
 import pandas as pd
 
@@ -7,6 +8,7 @@ from atlasquant_backtest_panel import (
     normalize_signal_sheet,
     signal_template_csv,
     candles_template_csv,
+    render_operational_backtest_panel,
 )
 
 
@@ -61,6 +63,12 @@ class BacktestPanelTests(unittest.TestCase):
         self.assertIn("signal_time",signal_template_csv())
         self.assertEqual(candles_template_csv().count("\n"),1)
         self.assertIn("datetime",candles_template_csv())
+
+    def test_panel_exposes_automatic_replay(self):
+        source=inspect.getsource(render_operational_backtest_panel)
+        self.assertIn("Rodar backtest automático",source)
+        self.assertIn("single_position_per_pair=True",source)
+        self.assertIn("generate_bos_choch_ob_signals",source)
 
     def test_csv_bytes_read_utf8(self):
         raw=b"time,open,high,low,close\n2026-09-15T00:00:00Z,1,2,0.5,1.5\n"
