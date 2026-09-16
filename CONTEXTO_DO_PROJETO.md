@@ -1148,3 +1148,96 @@ Safety Core, readiness, parâmetros, Runtime ou macro/Fed.
 
 Próximo passo seguro: adicionar persistência opcional de histórico de snapshots/execuções e
 uma tabela de mudanças entre versões, mantendo a gravação fora de dados operacionais de Runtime.
+
+
+## 16/09/2026 UTC — histórico local de snapshots e integridade reforçada
+
+Estado verificado:
+
+- DEV testada em `196bb63bf3f834ce0089f9e812ce6516478a0614`.
+- Quality run `35110147000`: compile gate verde, **641 testes executados, 641 OK**.
+- Runtime permanece em `7a2ad3e53055fb1ef6091c39442c4c0f5212c3c1`.
+- Main permanece em `db17c9f60b3cfbb33597f46e7469ba30c4c1b516`; não foi alterada nesta etapa.
+
+### Integridade fail-closed dos snapshots
+
+Antes desta etapa, o carregamento de snapshots foi endurecido para rejeitar:
+
+- `snapshot_id` adulterado;
+- configurações modificadas sem recomputar fingerprints;
+- evidências alteradas;
+- identity incompleta;
+- JSON inválido.
+
+Nesta etapa, a validação também passou a recomputar o hash do manifesto de arquivos de código,
+em vez de confiar apenas no `code.sha256` informado no snapshot.
+
+O arquivo `atlasquant_backtest_snapshot_history.py` reutiliza essa validação antes de salvar,
+listar, comparar ou exportar snapshots. Arquivos inválidos aparecem como erro de integridade e
+não entram na linha do tempo válida.
+
+### Histórico local de pesquisa
+
+Foi criado `atlasquant_backtest_snapshot_history.py`.
+
+O armazenamento padrão é:
+
+`.atlasquant_research/backtest_snapshots`
+
+Esse caminho fica deliberadamente fora de `dados/` e não escreve na branch Runtime.
+
+A gravação é:
+
+- opcional;
+- acionada explicitamente pelo usuário;
+- atômica via arquivo temporário + rename;
+- deduplicada pelo `snapshot_id` derivado do conteúdo.
+
+Também foi criado `.gitignore` para impedir commit acidental de `.atlasquant_research/`.
+
+### Linha do tempo e mudanças consecutivas
+
+A aba Backtest ganhou **Histórico local de snapshots**.
+
+Ela mostra:
+
+- data/hora da execução;
+- snapshot id;
+- par;
+- quantidade de candles;
+- início/fim da amostra;
+- custo/slippage;
+- fingerprints curtos de CSV, dados, configuração, código e evidências.
+
+Também monta uma tabela de mudanças entre snapshots consecutivos, indicando separadamente se
+mudaram:
+
+- CSV bruto;
+- dados normalizados;
+- configurações;
+- código;
+- evidências.
+
+A tabela ainda mostra quantidade de configurações alteradas e quantos operacionais tiveram
+mudanças nas métricas consolidadas.
+
+### Exportação do histórico
+
+O histórico válido pode ser exportado como `atlasquant_snapshot_history.zip`.
+
+O ZIP contém:
+
+- `manifest.json`;
+- `timeline.csv`;
+- `changes.csv`;
+- os snapshots JSON validados.
+
+Em hospedagens com filesystem efêmero, o histórico local pode desaparecer entre deployments.
+Por isso o ZIP serve como cópia portátil/auditável.
+
+**Regra preservada:** nenhum snapshot histórico altera Gate, Safety Core, readiness,
+parâmetros dos setups, dados operacionais de Runtime ou macro/Fed.
+
+Próximo passo seguro: permitir importar/restaurar um ZIP de histórico validando cada snapshot
+antes de incorporá-lo, e depois fechar a camada de auditoria do Backtest para partir para
+validação de UI/Runtime final.
