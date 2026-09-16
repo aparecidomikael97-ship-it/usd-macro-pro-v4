@@ -38,6 +38,7 @@ from atlasquant_regime_detector import render_regime_detector, capture_regime_de
 from atlasquant_next_event import render_next_event
 from atlasquant_flight_recorder_panel import render_flight_recorder, capture_flight_recorder
 from atlasquant_runtime_store import resolve_runtime_branch
+from atlasquant_shadow_capture import capture_shadow_batch
 
 try:
     from currency_news_v107 import pair_news_table
@@ -344,6 +345,7 @@ def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro",weights=
         "hard_blocks":decision["hard_blocks"],"soft_blocks":decision["soft_blocks"],"positives":decision["positives"],
         "executable":decision["executable"],"technical_age":age,"data_ready":data_ready,
         "stale_technical":stale_technical,"sweep_state":sweep_state,"strength":strength,"map_current":map_current,
+        "updated_at":mc.get("updated_at"),
     }
 
 
@@ -546,6 +548,10 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
 
     render_operational_plan(best)
     _flight_capture = capture_flight_recorder(best, "V11.0.8 / AtlasQuant DEV")
+    _shadow_capture_status = capture_shadow_batch(
+        packs,
+        champion_version="V11.0.8 / AtlasQuant DEV",
+    )
 
     if not _is_pro:
         st.markdown("### 🧾 Mesa rápida — 7 pares")
