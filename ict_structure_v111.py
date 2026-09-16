@@ -1,4 +1,4 @@
-"""AtlasQuant ICT Structure Engine V1.1.3.
+"""AtlasQuant ICT Structure Engine V1.1.4.
 
 Deterministic/observational structure layer for BOS, CHOCH and Order Blocks.
 It never decides macro direction, never calls providers and never reports
@@ -249,6 +249,60 @@ def detect_bos_choch(
     }
 
 
+def _mitigation_stats(
+    future: pd.DataFrame,
+    zone_low: float,
+    zone_high: float,
+) -> dict[str, Any]:
+    """Measure retest/mitigation without changing execution permission."""
+    width = max(float(zone_high) - float(zone_low), 0.0)
+    if future is None or future.empty or width <= 0:
+        return {
+            "touched": False,
+            "retest_count": 0,
+            "mitigation_depth_pct": 0.0,
+            "first_touch_time": "",
+        }
+
+    overlap = (future["low"] <= zone_high) & (future["high"] >= zone_low)
+    touched = bool(overlap.any())
+    if not touched:
+        return {
+            "touched": False,
+            "retest_count": 0,
+            "mitigation_depth_pct": 0.0,
+            "first_touch_time": "",
+        }
+
+    retest_count = 0
+    was_touching = False
+    for flag in overlap.tolist():
+        flag = bool(flag)
+        if flag and not was_touching:
+            retest_count += 1
+        was_touching = flag
+
+    touched_rows = future.loc[overlap]
+    deepest_low = float(touched_rows["low"].min())
+    deepest_high = float(touched_rows["high"].max())
+    # Symmetric penetration metric: how much of the zone's vertical width was
+    # visited by any touch. It is descriptive only; side-specific validity is
+    # still governed by closing invalidation below/above the far edge.
+    penetration_from_top = (zone_high - max(deepest_low, zone_low)) / width * 100.0
+    penetration_from_bottom = (min(deepest_high, zone_high) - zone_low) / width * 100.0
+    depth = max(penetration_from_top, penetration_from_bottom)
+    depth = max(0.0, min(100.0, float(depth)))
+
+    first_idx = touched_rows.index[0]
+    ts = future.loc[first_idx, "datetime"] if "datetime" in future.columns else None
+    return {
+        "touched": True,
+        "retest_count": int(retest_count),
+        "mitigation_depth_pct": round(depth, 1),
+        "first_touch_time": pd.Timestamp(ts).isoformat() if ts is not None and pd.notna(ts) else "",
+    }
+
+
 def detect_order_block(
     df: pd.DataFrame | None,
     side: str,
@@ -366,9 +420,10 @@ def detect_order_block(
     else:
         invalidated = (not future.empty) and bool((future["close"] > zhigh).any())
 
-    touched = False
-    if not future.empty:
-        touched = bool(((future["low"] <= zhigh) & (future["high"] >= zlow)).any())
+    mitigation = _mitigation_stats(future, zlow, zhigh)
+    touched = bool(mitigation["touched"])
+    depth = float(mitigation["mitigation_depth_pct"])
+    retests = int(mitigation["retest_count"])
     inside = zlow <= price <= zhigh
 
     if invalidated:
@@ -376,10 +431,22 @@ def detect_order_block(
         text = "A zona candidata foi invalidada por fechamento além da borda oposta."
     elif inside:
         status, score = "🟢 ORDER BLOCK EM MITIGAÇÃO", 92
-        text = "Preço está dentro do Order Block ainda válido após quebra + displacement."
+        text = (
+            f"Preço está dentro do Order Block ainda válido; mitigação máxima {depth:.1f}% "
+            f"em {retests} episódio(s) de reteste."
+        )
+    elif touched and depth < 50.0:
+        status, score = "🟡 ORDER BLOCK PARCIALMENTE MITIGADO / ATIVO", 70
+        text = (
+            f"Order Block recebeu mitigação parcial de {depth:.1f}% em "
+            f"{retests} episódio(s) e segue válido."
+        )
     elif touched:
         status, score = "🟡 ORDER BLOCK MITIGADO / ATIVO", 72
-        text = "Order Block já recebeu mitigação e segue válido, mas o preço não está dentro da zona."
+        text = (
+            f"Order Block recebeu mitigação de {depth:.1f}% em "
+            f"{retests} episódio(s) e segue válido."
+        )
     else:
         status, score = "🟡 ORDER BLOCK ATIVO", 68
         text = "Order Block validado por quebra + displacement; ainda sem mitigação posterior."
@@ -400,6 +467,9 @@ def detect_order_block(
         "price": price,
         "inside": bool(inside),
         "mitigated": bool(touched),
+        "mitigation_depth_pct": float(mitigation["mitigation_depth_pct"]),
+        "retest_count": int(mitigation["retest_count"]),
+        "first_touch_time": str(mitigation["first_touch_time"]),
         "invalidated": bool(invalidated),
         "body_atr": round(body_atr, 2),
         "range_atr": round(range_atr, 2),

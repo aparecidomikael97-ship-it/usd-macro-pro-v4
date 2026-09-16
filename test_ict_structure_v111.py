@@ -220,6 +220,104 @@ class ICTStructureV111Tests(unittest.TestCase):
         self.assertEqual(r["origin_index"],12)
         self.assertGreaterEqual(r["origin_search_start"],11)
 
+    def test_sell_order_block_uses_nearest_bullish_origin(self):
+        rows=[]
+        for i in range(14):
+            if i == 9:
+                rows.append((9.8,10.8,9.7,10.5))
+            elif i == 11:
+                rows.append((10.2,10.9,10.1,10.8))  # origem bullish mais recente
+            elif i == 12:
+                rows.append((10.8,10.9,9.2,9.4))   # break SELL + displacement
+            else:
+                rows.append((9.8,10.0,9.3,9.6))
+        d=custom_frame(rows)
+        fake_events=[
+            {"index":12,"side":"SELL","kind":"BOS","prior_bias":"BEARISH","level":9.8,"pivot_index":8},
+        ]
+        with patch("ict_structure_v111._structure_events", return_value=fake_events),              patch("ict_structure_v111._atr", return_value=pd.Series([1.0]*len(d))):
+            r=detect_order_block(d,"SELL")
+        self.assertEqual(r["origin_index"],11)
+        self.assertAlmostEqual(r["zone_low"],10.1)
+        self.assertAlmostEqual(r["zone_high"],10.9)
+        self.assertEqual(r["status"],"🟡 ORDER BLOCK ATIVO")
+
+    def test_sell_order_block_partial_mitigation_stays_active(self):
+        rows=[]
+        for i in range(15):
+            if i == 11:
+                rows.append((10.2,11.0,10.0,10.8))  # zona 10.0-11.0
+            elif i == 12:
+                rows.append((10.8,10.9,9.1,9.3))
+            elif i == 13:
+                rows.append((9.3,10.35,9.0,9.4))    # 35% dentro da zona
+            elif i == 14:
+                rows.append((9.4,9.8,9.0,9.2))
+            else:
+                rows.append((9.8,10.0,9.3,9.6))
+        d=custom_frame(rows)
+        fake_events=[
+            {"index":12,"side":"SELL","kind":"BOS","prior_bias":"BEARISH","level":9.8,"pivot_index":8},
+        ]
+        with patch("ict_structure_v111._structure_events", return_value=fake_events),              patch("ict_structure_v111._atr", return_value=pd.Series([1.0]*len(d))):
+            r=detect_order_block(d,"SELL")
+        self.assertEqual(r["status"],"🟡 ORDER BLOCK PARCIALMENTE MITIGADO / ATIVO")
+        self.assertAlmostEqual(r["mitigation_depth_pct"],35.0,places=1)
+        self.assertEqual(r["retest_count"],1)
+        self.assertFalse(r["inside"])
+        self.assertFalse(r["invalidated"])
+
+    def test_sell_order_block_separate_retests_are_counted(self):
+        rows=[]
+        for i in range(17):
+            if i == 11:
+                rows.append((10.2,11.0,10.0,10.8))
+            elif i == 12:
+                rows.append((10.8,10.9,9.1,9.3))
+            elif i == 13:
+                rows.append((9.3,10.30,9.0,9.4))    # reteste 1
+            elif i == 14:
+                rows.append((9.4,9.8,9.0,9.2))      # sai da zona
+            elif i == 15:
+                rows.append((9.2,10.70,9.1,9.5))    # reteste 2, 70%
+            elif i == 16:
+                rows.append((9.5,9.9,9.0,9.3))
+            else:
+                rows.append((9.8,10.0,9.3,9.6))
+        d=custom_frame(rows)
+        fake_events=[
+            {"index":12,"side":"SELL","kind":"BOS","prior_bias":"BEARISH","level":9.8,"pivot_index":8},
+        ]
+        with patch("ict_structure_v111._structure_events", return_value=fake_events),              patch("ict_structure_v111._atr", return_value=pd.Series([1.0]*len(d))):
+            r=detect_order_block(d,"SELL")
+        self.assertEqual(r["status"],"🟡 ORDER BLOCK MITIGADO / ATIVO")
+        self.assertAlmostEqual(r["mitigation_depth_pct"],70.0,places=1)
+        self.assertEqual(r["retest_count"],2)
+        self.assertTrue(r["first_touch_time"])
+
+    def test_sell_order_block_wick_through_without_close_is_not_invalidated(self):
+        rows=[]
+        for i in range(15):
+            if i == 11:
+                rows.append((10.2,11.0,10.0,10.8))
+            elif i == 12:
+                rows.append((10.8,10.9,9.1,9.3))
+            elif i == 13:
+                rows.append((9.3,11.2,9.0,10.7))    # wick acima, fecha dentro
+            elif i == 14:
+                rows.append((10.7,10.9,9.2,9.5))
+            else:
+                rows.append((9.8,10.0,9.3,9.6))
+        d=custom_frame(rows)
+        fake_events=[
+            {"index":12,"side":"SELL","kind":"BOS","prior_bias":"BEARISH","level":9.8,"pivot_index":8},
+        ]
+        with patch("ict_structure_v111._structure_events", return_value=fake_events),              patch("ict_structure_v111._atr", return_value=pd.Series([1.0]*len(d))):
+            r=detect_order_block(d,"SELL")
+        self.assertFalse(r["invalidated"])
+        self.assertEqual(r["mitigation_depth_pct"],100.0)
+        self.assertIn("MITIGADO",r["status"])
+
     def test_macro_wait_never_claims_structure(self):
         d = frame([10 + i * 0.1 for i in range(30)])
         r = build_structure_snapshot(d, "WAIT")
