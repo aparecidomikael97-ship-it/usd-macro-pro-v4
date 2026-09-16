@@ -11,6 +11,7 @@ from atlasquant_backtest_panel import (
     render_operational_backtest_panel,
     load_tradingview_fvg_pine_asset,
     load_tradingview_ote_pine_asset,
+    load_tradingview_crt_pine_asset,
 )
 
 
@@ -92,6 +93,17 @@ class BacktestPanelTests(unittest.TestCase):
     def test_ote_pine_loader_returns_content(self):
         text=load_tradingview_ote_pine_asset()
         self.assertIn("AtlasQuant OTE Research V1",text)
+        self.assertIn("strategy.entry",text)
+
+    def test_panel_exposes_separate_crt_replay(self):
+        source=inspect.getsource(render_operational_backtest_panel)
+        self.assertIn("Rodar backtest CRT",source)
+        self.assertIn("generate_crt_signals",source)
+        self.assertIn('key_suffix="crt"',source)
+
+    def test_crt_pine_loader_returns_content(self):
+        text=load_tradingview_crt_pine_asset()
+        self.assertIn("AtlasQuant CRT Research V1",text)
         self.assertIn("strategy.entry",text)
 
     def test_csv_bytes_read_utf8(self):
