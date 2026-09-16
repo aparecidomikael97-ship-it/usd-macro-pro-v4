@@ -166,7 +166,7 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str,
         help="Há variações públicas da Quarterly Theory. A âncora fica explícita para evitar regra escondida.",
     )
     anchor_hour = 0 if anchor_label.startswith("00") else 18
-    if ctrl3.button("🔄 Atualizar Market Map", use_container_width=True, key="v102_market_map_refresh"):
+    if ctrl3.button("🔄 Atualizar Market Map", width="stretch", key="v102_market_map_refresh"):
         _td_series.clear()
         st.rerun()
 
@@ -205,7 +205,7 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str,
                 "Relação com o viés": status,
                 "Peso explicativo": f"{item['weight']:.0f}%",
             })
-        st.dataframe(pd.DataFrame(macro_rows), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(macro_rows), hide_index=True, width="stretch")
     risk_level = regime["event_risk"]["level"]
     if risk_level in {"ALTO", "ELEVADO"}:
         st.warning("📅 " + regime["event_risk"]["text"])
@@ -292,7 +292,7 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str,
         df_liq = pd.DataFrame(liq)
         df_liq["Preço"] = df_liq["Preço"].map(lambda x: _fmt_price(x, pair))
         df_liq["Distância (pips)"] = df_liq["Distância (pips)"].map(lambda x: round(float(x), 1))
-        st.dataframe(df_liq, hide_index=True, use_container_width=True)
+        st.dataframe(df_liq, hide_index=True, width="stretch")
 
     sweeps = recent_sweeps(m15, levels, bars=16)
     if sweeps:
@@ -346,7 +346,7 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str,
             "Status": "🟢 ATIVA" if active and w["name"] == active["name"] else "—",
         })
     if kz_rows:
-        st.dataframe(pd.DataFrame(kz_rows), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(kz_rows), hide_index=True, width="stretch")
 
     # -----------------------------------------------------
     # 5 — STRICT READINESS GATE
@@ -368,7 +368,7 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str,
     for item in readiness["checks"]:
         status = "🟢 PASSA" if item["ok"] is True else "🔴 FALHA" if item["ok"] is False else "⚪ SEM DADO"
         gate_rows.append({"Filtro": item["name"], "Status": status, "Detalhe": item["detail"], "Peso": f"{item['weight']:.0f}%"})
-    st.dataframe(pd.DataFrame(gate_rows), hide_index=True, use_container_width=True)
+    st.dataframe(pd.DataFrame(gate_rows), hide_index=True, width="stretch")
 
     st.markdown("### 6️⃣ Leitura integrada · narrativa profissional")
     align = alignment_summary(
@@ -473,7 +473,7 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str,
         "readiness_grade": readiness["grade"],
         "versao": "V10.2 Professional Macro Market Map",
     }
-    if st.button("💾 Registrar leitura atual do Market Map", key="v102_save_snapshot", use_container_width=True):
+    if st.button("💾 Registrar leitura atual do Market Map", key="v102_save_snapshot", width="stretch"):
         ok, msg, created = _save_snapshot(snapshot)
         if ok and created:
             st.success(msg)
