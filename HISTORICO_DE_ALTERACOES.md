@@ -192,3 +192,17 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - Primeiro run encontrou 1 teste com expectativa mais frouxa que a regra do motor; teste corrigido sem afrouxar a lógica.
 - GitHub Actions run `35102692080`: **576/576 testes OK**, compile gate verde.
 - Runtime/Main não foram alteradas.
+
+
+## 16/09/2026 UTC — comparador dos 5 operacionais
+
+- Criado `atlasquant_strategy_comparator.py`.
+- Comparador executa BOS/CHOCH+OB, FVG, OTE, CRT e AMD no mesmo histórico, mantendo resultados separados.
+- Métricas por estratégia: trades, gain/loss/BE, win rate, expectativa R, net R, profit factor, drawdown, streak de loss e ambiguidades OHLC.
+- Adicionada classificação descritiva de tamanho de amostra.
+- Ranking observado só é liberado acima de um mínimo configurável de trades (padrão 20).
+- Estratégias com amostra pequena continuam visíveis, mas sem posição no ranking.
+- Adicionados breakdown por sessão e ledger combinado com identidade da estratégia preservada.
+- Aba Backtest ganhou bloco **Comparador dos 5 operacionais** e exportações CSV.
+- GitHub Actions run `35103238881`: **582/582 testes OK**, compile gate verde.
+- Runtime/Main não foram alteradas.
