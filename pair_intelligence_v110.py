@@ -34,7 +34,7 @@ from atlasquant_data_quality_center import render_data_confidence
 from atlasquant_confluence_map import render_confluence_map
 from atlasquant_operational_plan import render_operational_plan
 from atlasquant_safety_panel import render_safety_core
-from atlasquant_regime_detector import render_regime_detector
+from atlasquant_regime_detector import render_regime_detector, capture_regime_detector
 from atlasquant_next_event import render_next_event
 from atlasquant_flight_recorder_panel import render_flight_recorder, capture_flight_recorder
 from atlasquant_runtime_store import resolve_runtime_branch
@@ -520,10 +520,18 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
 
     opctx=select_operational_context(packs)
     best=opctx.get("best") or packs[0]
+    _aq_view_mode = str(st.session_state.get("atlasquant_view_mode", "Básico"))
+    _is_pro = _aq_view_mode == "Pro"
+
     render_central_brief(packs, auto)
-    render_data_confidence(packs, auto)
+    if _is_pro:
+        render_data_confidence(packs, auto)
+
     _event_result = render_next_event((macro_context or {}).get("event"))
-    _regime_result = render_regime_detector(best)
+    _regime_result = capture_regime_detector(best)
+    if _is_pro:
+        render_regime_detector(best, capture_result=_regime_result)
+
     render_safety_core(
         best,
         auto,
@@ -531,13 +539,15 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
         major_event_minutes_override=_event_result.get("safety_minutes"),
     )
     _render_atlasquant_operational_cards(packs)
-    render_confluence_map(best)
-    render_context_explain(best)
+
+    if _is_pro:
+        render_confluence_map(best)
+        render_context_explain(best)
+
     render_operational_plan(best)
     _flight_capture = capture_flight_recorder(best, "V11.0.8 / AtlasQuant DEV")
 
-    _aq_view_mode = str(st.session_state.get("atlasquant_view_mode", "Básico"))
-    if _aq_view_mode != "Pro":
+    if not _is_pro:
         st.markdown("### 🧾 Mesa rápida — 7 pares")
         st.caption(
             "Modo Básico mostra o essencial. Use Pro para abrir Flight Recorder, "
