@@ -28,6 +28,11 @@ from atlasquant_backtest_snapshot import (
 
 
 DEFAULT_HISTORY_DIR=Path(".atlasquant_research")/"backtest_snapshots"
+HISTORY_SCHEMA="ATLASQUANT_BACKTEST_SNAPSHOT_HISTORY_V1"
+MAX_ARCHIVE_FILES=1000
+MAX_ARCHIVE_SNAPSHOTS=500
+MAX_ARCHIVE_UNCOMPRESSED_BYTES=100*1024*1024
+MAX_SNAPSHOT_BYTES=10*1024*1024
 
 
 def resolve_history_dir(root: str | Path | None = None) -> Path:
@@ -45,7 +50,7 @@ def _safe_created_at(snapshot: Mapping[str,Any]) -> str:
 
 def snapshot_history_filename(snapshot: Mapping[str,Any]) -> str:
     clean=validate_snapshot(snapshot)
-    return f"{_safe_created_at(clean)}_{clean['snapshot_id'][:16]}.json"
+    return f"{_safe_created_at(clean)}_{clean['snapshot_id']}.json"
 
 
 def save_snapshot_local(
@@ -60,7 +65,7 @@ def save_snapshot_local(
     filename=snapshot_history_filename(clean)
     path=directory/filename
 
-    for existing in directory.glob(f"*_{clean['snapshot_id'][:16]}.json"):
+    for existing in directory.glob("*.json"):
         try:
             loaded=load_snapshot_file(existing)
         except Exception:
@@ -205,7 +210,7 @@ def history_archive_zip(
     timeline=history_timeline_frame(valid)
     diffs=consecutive_history_diffs(valid)
     manifest={
-        "schema":"ATLASQUANT_BACKTEST_SNAPSHOT_HISTORY_V1",
+        "schema":HISTORY_SCHEMA,
         "research_only":True,
         "no_live_gate_effect":True,
         "snapshot_count":len(valid),
@@ -226,3 +231,159 @@ def history_archive_zip(
                 snapshot_json(snap),
             )
     return buf.getvalue()
+
+
+
+def _safe_archive_member(name: str) -> bool:
+    raw=str(name or "")
+    if not raw or raw.startswith(("/", "\\")):
+        return False
+    normalized=raw.replace("\\","/")
+    parts=[p for p in normalized.split("/") if p not in ("", ".")]
+    if any(p==".." for p in parts):
+        return False
+    return normalized in {"manifest.json","timeline.csv","changes.csv"} or (
+        len(parts)==2
+        and parts[0]=="snapshots"
+        and parts[1].endswith(".json")
+        and parts[1] not in (".json","..json")
+    )
+
+
+def inspect_history_archive(raw_zip: bytes | bytearray | memoryview) -> dict[str,Any]:
+    """Validate an exported history ZIP fully in memory before any local write.
+
+    The archive is rejected as a whole when structure, size, manifest or any
+    snapshot fails validation. timeline.csv/changes.csv are treated as
+    convenience exports only; they are never trusted for restoration.
+    """
+    raw=bytes(raw_zip or b"")
+    if not raw:
+        raise ValueError("arquivo ZIP vazio")
+
+    try:
+        zf=zipfile.ZipFile(BytesIO(raw),"r")
+    except Exception as exc:
+        raise ValueError("arquivo ZIP inválido") from exc
+
+    with zf:
+        infos=zf.infolist()
+        if len(infos)>MAX_ARCHIVE_FILES:
+            raise ValueError("arquivo ZIP excede o limite de arquivos")
+
+        total_uncompressed=sum(max(0,int(info.file_size)) for info in infos)
+        if total_uncompressed>MAX_ARCHIVE_UNCOMPRESSED_BYTES:
+            raise ValueError("arquivo ZIP excede o limite de tamanho descompactado")
+
+        names=[info.filename for info in infos]
+        if len(names)!=len(set(names)):
+            raise ValueError("arquivo ZIP contém nomes duplicados")
+        if any(info.flag_bits & 0x1 for info in infos):
+            raise ValueError("arquivo ZIP criptografado não é suportado")
+        if any(not _safe_archive_member(name) for name in names):
+            raise ValueError("arquivo ZIP contém caminho ou arquivo não permitido")
+        if "manifest.json" not in names:
+            raise ValueError("manifest.json ausente")
+
+        try:
+            manifest=json.loads(zf.read("manifest.json").decode("utf-8"))
+        except Exception as exc:
+            raise ValueError("manifest.json inválido") from exc
+
+        if not isinstance(manifest,dict) or manifest.get("schema")!=HISTORY_SCHEMA:
+            raise ValueError("schema do histórico inválido")
+        if manifest.get("research_only") is not True or manifest.get("no_live_gate_effect") is not True:
+            raise ValueError("manifesto do histórico sem flags de segurança")
+
+        snapshot_infos=[
+            info for info in infos
+            if info.filename.replace("\\","/").startswith("snapshots/")
+            and info.filename.lower().endswith(".json")
+        ]
+        if len(snapshot_infos)>MAX_ARCHIVE_SNAPSHOTS:
+            raise ValueError("histórico excede o limite de snapshots")
+
+        snapshots=[]
+        seen_ids=set()
+        for info in snapshot_infos:
+            if int(info.file_size)>MAX_SNAPSHOT_BYTES:
+                raise ValueError(f"snapshot excede o limite de tamanho: {info.filename}")
+            try:
+                data=json.loads(zf.read(info).decode("utf-8"))
+            except Exception as exc:
+                raise ValueError(f"snapshot JSON inválido: {info.filename}") from exc
+            if not isinstance(data,dict):
+                raise ValueError(f"snapshot inválido: {info.filename}")
+            try:
+                clean=validate_snapshot(data)
+            except Exception as exc:
+                raise ValueError(f"snapshot falhou na integridade: {info.filename}: {exc}") from exc
+            sid=str(clean.get("snapshot_id") or "")
+            if sid in seen_ids:
+                raise ValueError("histórico contém snapshot_id duplicado")
+            seen_ids.add(sid)
+            snapshots.append(clean)
+
+        declared_count=manifest.get("snapshot_count")
+        if not isinstance(declared_count,int) or declared_count!=len(snapshots):
+            raise ValueError("snapshot_count do manifesto não confere")
+
+        declared_ids=manifest.get("snapshot_ids")
+        if not isinstance(declared_ids,list) or any(not isinstance(x,str) for x in declared_ids):
+            raise ValueError("snapshot_ids do manifesto inválido")
+        if len(declared_ids)!=len(set(declared_ids)):
+            raise ValueError("manifesto contém snapshot_ids duplicados")
+        if set(declared_ids)!=seen_ids:
+            raise ValueError("snapshot_ids do manifesto não conferem")
+
+        # Force CRC/decompression validation for every member after structural limits.
+        bad=zf.testzip()
+        if bad is not None:
+            raise ValueError(f"arquivo ZIP corrompido: {bad}")
+
+        snapshots.sort(
+            key=lambda x:(str(x.get("created_at") or ""),str(x.get("snapshot_id") or ""))
+        )
+        return {
+            "schema":HISTORY_SCHEMA,
+            "snapshot_count":len(snapshots),
+            "snapshot_ids":[x["snapshot_id"] for x in snapshots],
+            "snapshots":snapshots,
+            "archive_files":len(infos),
+            "uncompressed_bytes":total_uncompressed,
+        }
+
+
+def restore_history_archive(
+    raw_zip: bytes | bytearray | memoryview,
+    *,
+    root: str | Path | None = None,
+) -> dict[str,Any]:
+    """Validate the whole archive first, then merge snapshots into local history.
+
+    Existing identical snapshots are preserved and counted as duplicates.
+    No file from the ZIP is extracted directly to disk.
+    """
+    inspected=inspect_history_archive(raw_zip)
+    saved=0
+    duplicates=0
+    paths=[]
+    for snap in inspected["snapshots"]:
+        result=save_snapshot_local(snap,root=root)
+        paths.append(result.get("path"))
+        if result.get("reason")=="ALREADY_PRESENT":
+            duplicates+=1
+        elif result.get("reason")=="SAVED":
+            saved+=1
+        else:
+            raise ValueError("falha inesperada ao restaurar snapshot")
+
+    return {
+        "ok":True,
+        "reason":"RESTORED",
+        "snapshots_validated":inspected["snapshot_count"],
+        "saved":saved,
+        "duplicates":duplicates,
+        "root":str(resolve_history_dir(root)),
+        "paths":paths,
+    }
