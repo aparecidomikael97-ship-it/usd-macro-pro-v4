@@ -174,6 +174,16 @@ class BacktestPanelTests(unittest.TestCase):
         self.assertIn("compare_backtest_snapshots",source)
         self.assertIn("Baixar diff dos snapshots",source)
 
+    def test_panel_exposes_local_snapshot_history(self):
+        source=inspect.getsource(render_operational_backtest_panel)
+        self.assertIn("Histórico local de snapshots",source)
+        self.assertIn("save_snapshot_local",source)
+        self.assertIn("load_snapshot_history",source)
+        self.assertIn("Linha do tempo",source)
+        self.assertIn("Mudanças entre execuções consecutivas",source)
+        self.assertIn("Baixar histórico de snapshots",source)
+        self.assertIn("fora de dados/",source)
+
     def test_csv_bytes_read_utf8(self):
         raw=b"time,open,high,low,close\n2026-09-15T00:00:00Z,1,2,0.5,1.5\n"
         out=read_csv_bytes(raw)
