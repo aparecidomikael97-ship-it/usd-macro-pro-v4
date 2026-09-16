@@ -1,7 +1,7 @@
 import unittest
 
 from atlasquant_flight_recorder_panel import (
-    decision_fingerprint, record_from_pack, append_unique, recorder_summary,
+    decision_fingerprint, record_from_pack, append_unique, recorder_summary, prepare_flight_capture,
 )
 
 
@@ -55,6 +55,17 @@ class AtlasQuantFlightRecorderPanelTests(unittest.TestCase):
         self.assertEqual(s["records"],2)
         self.assertEqual(s["decisions"],1)
         self.assertEqual(s["blocked"],1)
+
+    def test_prepare_capture_is_mode_agnostic(self):
+        cap=prepare_flight_capture([],self.base(),"v1")
+        self.assertTrue(cap["added"])
+        self.assertEqual(cap["summary"]["records"],1)
+
+    def test_prepare_capture_deduplicates_existing_state(self):
+        first=prepare_flight_capture([],self.base(),"v1")
+        second=prepare_flight_capture(first["rows"],self.base(),"v1")
+        self.assertFalse(second["added"])
+        self.assertEqual(second["summary"]["records"],1)
 
 
 if __name__=="__main__":
