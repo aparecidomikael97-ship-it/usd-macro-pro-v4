@@ -571,7 +571,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
         )
         st.dataframe(
             atlasquant_basic_table(packs),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
             height=285,
         )
@@ -615,9 +615,9 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
         "ICT":round(p["ict_read"],0) if (p.get("ict_fresh",{}) or {}).get("ready") else "N/D","Institucional":round(p["inst_read"],0) if (p.get("data_ready",{}) or {}).get("institutional_data_ready") else "N/D","H4":p["h4"],"H1":p["h1"],"M15":p["m15"],"Gate":p["gate"],"ADR %":round(p["adr"],0) if p["adr"] is not None else None,"Evento":p["event"],"Motivo":p["reason"]
     } for p in packs])
     overview=executive[["Par","Decisão final","Direção","Prioridade","Δ força pts","Dados?","M15","Gate"]]
-    st.dataframe(overview,use_container_width=True,hide_index=True,height=285)
+    st.dataframe(overview,width="stretch",hide_index=True,height=285)
     with st.expander("Matriz completa e comparação de prioridades"):
-        st.dataframe(executive,use_container_width=True,hide_index=True,height=330)
+        st.dataframe(executive,width="stretch",hide_index=True,height=330)
         st.bar_chart(executive[["Par","Prioridade"]].set_index("Par"),horizontal=True,height=220)
 
     with st.expander("Resumo detalhado dos sete pares", expanded=False):
@@ -694,7 +694,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
         st.info(f"Conta líquida: vantagens {_base_sel} {_safe(_a.get('base_advantages',0)):.2f} − vantagens {_quote_sel} {_safe(_a.get('quote_advantages',0)):.2f} = {_safe(_a.get('net',0)):+.2f} pts. A força final continua {_base_sel} {_safe(_s.get('base_score',50)):.1f} × {_quote_sel} {_safe(_s.get('quote_score',50)):.1f}.")
         _sr=pd.DataFrame(_s.get("rows",[]) or [])
         if not _sr.empty:
-            st.dataframe(_sr,use_container_width=True,hide_index=True,height=315)
+            st.dataframe(_sr,width="stretch",hide_index=True,height=315)
             st.caption(
                 f"Conferência: {_base_sel} explicado {_safe(_s.get('explained_base',0)):.1f}/100 "
                 f"× {_quote_sel} explicado {_safe(_s.get('explained_quote',0)):.1f}/100. "
@@ -740,7 +740,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
 
     with st.expander("Todas as camadas de decisão", expanded=False):
         st.markdown("### 🧠 Decision Stack — tudo em uma tabela")
-        st.dataframe(_stack_rows(p),use_container_width=True,hide_index=True,height=650)
+        st.dataframe(_stack_rows(p),width="stretch",hide_index=True,height=650)
 
     with st.expander("Detalhes institucionais e ICT", expanded=False):
         inst=p.get("inst",{}) or {}
@@ -784,7 +784,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     for name in ("PWH","PWL","PDH","PDL","Asia High","Asia Low","EQH","EQL"):
         if name in levels and levels.get(name) is not None:
             level_rows.append({"Nível":name,"Preço":_fmt_price(levels.get(name),pair)})
-    if level_rows: st.dataframe(pd.DataFrame(level_rows),use_container_width=True,hide_index=True)
+    if level_rows: st.dataframe(pd.DataFrame(level_rows),width="stretch",hide_index=True)
     _adr_txt='N/D' if p.get('adr') is None else f"{p['adr']:.0f}%"
     st.caption(f"Alvo principal: {p['target']} · Gate {p['gate']} ({p['gate_score']:.0f}/100) · ADR {_adr_txt} · idade técnica {p['technical_age']:.0f} min" if p['technical_age'] is not None else f"Alvo principal: {p['target']} · Gate {p['gate']} ({p['gate_score']:.0f}/100) · ADR {_adr_txt}")
 
