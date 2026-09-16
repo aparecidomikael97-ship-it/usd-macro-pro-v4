@@ -1,0 +1,72 @@
+name: AtlasQuant DEV Checkpoint
+
+on:
+  push:
+    branches:
+      - atlasquant-dev
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checkpoint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+
+      - name: Build checkpoint ZIP
+        shell: python
+        run: |
+          from __future__ import annotations
+          import hashlib
+          import os
+          from pathlib import Path
+          import zipfile
+
+          root = Path.cwd()
+          sha = os.environ.get("GITHUB_SHA", "unknown")
+          branch = os.environ.get("GITHUB_REF_NAME", "unknown")
+          short = sha[:7]
+          out = Path("/tmp") / f"AtlasQuant_DEV_{short}_checkpoint.zip"
+          info = Path("/tmp") / "CHECKPOINT_INFO.md"
+
+          info.write_text(
+              "# AtlasQuant checkpoint\n\n"
+              f"- Branch: `{branch}`\n"
+              f"- Commit: `{sha}`\n"
+              "- Snapshot: exact GitHub Actions checkout of this commit.\n"
+              "- Continuity context: `CONTEXTO_DO_PROJETO.md`, "
+              "`HISTORICO_DE_ALTERACOES.md` and `docs/continuidade/` are included when present.\n"
+              "- Runtime data branch is not modified by this workflow.\n"
+              "- This archive is a source-code checkpoint; no provider/API calls are made.\n",
+              encoding="utf-8",
+          )
+
+          excluded_dirs = {".git", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".venv", "venv"}
+          with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
+              zf.write(info, "CHECKPOINT_INFO.md")
+              for path in sorted(root.rglob("*")):
+                  if not path.is_file():
+                      continue
+                  rel = path.relative_to(root)
+                  if any(part in excluded_dirs for part in rel.parts):
+                      continue
+                  if path.suffix.lower() == ".zip":
+                      continue
+                  zf.write(path, rel.as_posix())
+
+          digest = hashlib.sha256(out.read_bytes()).hexdigest()
+          print(f"Created: {out}")
+          print(f"SHA256: {digest}")
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
+              env.write(f"CHECKPOINT_ZIP={out}\n")
+
+      - name: Upload checkpoint artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AtlasQuant-DEV-${{ github.sha }}
+          path: ${{ env.CHECKPOINT_ZIP }}
+          if-no-files-found: error
+          retention-days: 30
