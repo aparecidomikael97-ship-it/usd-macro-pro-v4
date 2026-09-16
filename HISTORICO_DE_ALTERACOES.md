@@ -362,3 +362,13 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - Runtime `911a8a2968b6391d8306f421d5d7dce328f33a74`, run `35114708095`: **652/652 testes OK**.
 - Smoke sem avisos `use_container_width`, sem Twelve Data no boot e sem escrita HTTP remota.
 - `main` não foi alterada.
+
+
+## 16/09/2026 UTC — Runtime 653 validada
+
+- Promoção final de apresentação para Runtime em `03cf06c1064be5e0a5a9bc92c3709341d48db0ca`.
+- Backup: `atlasquant-runtime-backup-20260916-911a8a2`.
+- Quality Runtime run `35115636444`: **653/653 testes OK**, compile gate verde.
+- Rótulo de ambiente dinâmico validado como `RUNTIME`.
+- Diff DEV → Runtime permanece restrito aos sete arquivos operacionais preservados em `dados/`.
+- Estado: `RUNTIME_CODE_VALIDATED_EXTERNAL_CHECKS_PENDING`.
