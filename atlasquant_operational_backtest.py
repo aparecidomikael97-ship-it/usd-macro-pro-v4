@@ -122,6 +122,7 @@ def backtest_signal(
     max_wait_bars: int = 8,
     max_hold_bars: int = 96,
     cost_r: float = 0.0,
+    slippage_r: float = 0.0,
     start_after_signal_bar: bool = True,
 ) -> dict[str, Any]:
     """Backtest one explicit plan against OHLC candles.
@@ -147,6 +148,20 @@ def backtest_signal(
             "reason": reason,
             "net_r": None,
         }
+
+    cost=_finite(cost_r)
+    slippage=_finite(slippage_r)
+    if cost is None or slippage is None or cost < 0 or slippage < 0:
+        return {
+            **base,
+            **plan,
+            "status":"INVALID_FRICTION",
+            "outcome":"NO_TRADE",
+            "reason":"COST_AND_SLIPPAGE_MUST_BE_FINITE_NON_NEGATIVE_R",
+            "net_r":None,
+        }
+    total_friction=float(cost+slippage)
+
     if d.empty:
         return {
             **base,
@@ -245,13 +260,13 @@ def backtest_signal(
     observed = d.loc[entry_idx:exit_idx].copy()
     mfe_r, mae_r = _excursions(observed, side, entry, stop)
     gross_r = _r_for_price(side, entry, stop, float(exit_price))
-    net_r = gross_r - float(cost_r)
+    net_r = gross_r - total_friction
     if status == "TARGET":
         gross_r = abs(target - entry) / abs(entry - stop)
-        net_r = gross_r - float(cost_r)
+        net_r = gross_r - total_friction
     elif status in ("STOP", "AMBIGUOUS_SAME_BAR_STOP_FIRST"):
         gross_r = -1.0
-        net_r = -1.0 - float(cost_r)
+        net_r = -1.0 - total_friction
 
     final_outcome = "BREAKEVEN" if abs(net_r) < 1e-12 else ("GAIN" if net_r > 0 else "LOSS")
     return {
@@ -263,7 +278,9 @@ def backtest_signal(
         "exit_time": pd.Timestamp(exit_time).isoformat(),
         "exit_price": float(exit_price),
         "gross_r": round(float(gross_r), 6),
-        "cost_r": round(float(cost_r), 6),
+        "cost_r": round(float(cost), 6),
+        "slippage_r": round(float(slippage), 6),
+        "total_friction_r": round(float(total_friction), 6),
         "net_r": round(float(net_r), 6),
         "mfe_r": round(float(mfe_r), 6),
         "mae_r": round(float(mae_r), 6),
@@ -418,7 +435,7 @@ def ledger_frame(records: Iterable[Mapping[str, Any]]) -> pd.DataFrame:
     preferred = [
         "signal_time", "pair", "setup", "session", "side",
         "entry", "stop", "target", "entry_time", "exit_time", "exit_price",
-        "status", "outcome", "gross_r", "cost_r", "net_r",
+        "status", "outcome", "gross_r", "cost_r", "slippage_r", "total_friction_r", "net_r",
         "mfe_r", "mae_r", "bars_waited", "bars_held",
         "same_bar_ambiguous", "source", "notes", "reason",
     ]
