@@ -1300,3 +1300,17 @@ Próximo passo seguro: auditoria final de pré-release da DEV e manifesto de rea
 - Backup pré-etapa: `atlasquant-runtime-backup-20260916-998ef4b`.
 - `main` permaneceu inalterada.
 - O log do AppTest revelou avisos de depreciação `use_container_width`; próxima ação de fechamento é remover essa dívida de compatibilidade sem alterar semântica.
+
+
+## 16/09/2026 UTC — fechamento de compatibilidade e validação Runtime 652
+
+- Migração Streamlit `use_container_width` → `width` concluída nos módulos app-facing cobertos pelo smoke.
+- Adicionado `test_streamlit_width_compat.py` para impedir regressão.
+- DEV validada no run `35114484403`: **652/652 testes OK**, compile gate verde e smoke sem avisos `use_container_width`.
+- Compatibilidade promovida para Runtime preservando os sete blobs operacionais divergentes em `dados/`.
+- Runtime validada: `911a8a2968b6391d8306f421d5d7dce328f33a74`.
+- Quality Runtime `35114708095`: **652/652 testes OK**, compile gate verde.
+- Smoke Runtime: boot sem exceções, zero chamadas Twelve Data por simples abertura e zero escritas HTTP remotas no boot.
+- `main` permaneceu em `513d0afd85df80640a2c0ed635783f46b4c3df7d`.
+- Evidência detalhada: `docs/release/RUNTIME_FINAL_VALIDATION_2026-09-16.md`.
+- Estado: código/CI da Runtime validado; seguem pendentes apenas checks externos de deploy real, browser real, secrets hospedados e compilação Pine no TradingView.
