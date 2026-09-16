@@ -139,6 +139,14 @@ class BacktestPanelTests(unittest.TestCase):
         self.assertIn("Janelas OOS",source)
         self.assertIn("Baixar walk-forward",source)
 
+    def test_panel_exposes_cost_and_slippage_sensitivity(self):
+        source=inspect.getsource(render_operational_backtest_panel)
+        self.assertIn("Slippage adverso por trade (R)",source)
+        self.assertIn("Sensibilidade a custos e slippage",source)
+        self.assertIn("friction_sensitivity_report",source)
+        self.assertIn("Baixar custos/slippage",source)
+        self.assertIn("slippage_r=float(slippage_r)",source)
+
     def test_csv_bytes_read_utf8(self):
         raw=b"time,open,high,low,close\n2026-09-15T00:00:00Z,1,2,0.5,1.5\n"
         out=read_csv_bytes(raw)
