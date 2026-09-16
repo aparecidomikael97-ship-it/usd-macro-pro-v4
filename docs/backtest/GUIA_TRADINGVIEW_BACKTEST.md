@@ -158,3 +158,33 @@ outro, o Quality workflow deve falhar.
 A verificação não substitui a compilação do Pine no TradingView e não promete equivalência
 perfeita com o broker emulator. Diferenças de timezone, sessão e tick size ainda precisam ser
 observadas durante validação no gráfico.
+
+
+## Operacional automático OTE 62%-79%
+
+O OTE possui replay Python e Pine Strategy próprios, separados de FVG e BOS/CHOCH + Order Block.
+
+No AtlasQuant:
+
+1. envie o CSV de candles;
+2. abra **Backtest automático — OTE 62–79%**;
+3. configure alvo em R, buffer do stop em ATR e filtro de impulso mínimo/ATR;
+4. escolha entrada no sweet spot 70,5% ou midpoint da zona;
+5. escolha BUY, SELL ou ambos;
+6. rode o backtest;
+7. baixe os sinais OTE e o ledger separados.
+
+Regra do replay:
+
+- usa lookback de 28 candles;
+- procura o extremo mais recente dentro dos últimos 12 candles;
+- BUY ancora low anterior -> high recente;
+- SELL ancora high anterior -> low recente;
+- a zona OTE é 62%-79% da retração;
+- o sweet spot é 70,5%;
+- um mesmo impulso só pode gerar um sinal;
+- se BUY e SELL coincidirem no mesmo candle, o candidato mais próximo do 70,5% é escolhido de forma determinística;
+- a execução começa após o candle do sinal, preservando a proteção anti-look-ahead.
+
+O arquivo `tradingview/atlasquant_ote_strategy_v1.pine` permite pesquisa visual no Strategy Tester.
+A estatística OTE permanece independente das demais estratégias.
