@@ -1,4 +1,4 @@
-"""AtlasQuant ICT Structure Engine V1.1.1.
+"""AtlasQuant ICT Structure Engine V1.1.2.
 
 Deterministic/observational structure layer for BOS, CHOCH and Order Blocks.
 It never decides macro direction, never calls providers and never reports
@@ -78,6 +78,7 @@ def _bias_before(
     highs: list[tuple[int, float]],
     lows: list[tuple[int, float]],
     cutoff: int,
+    tolerance: float = 0.0,
 ) -> str:
     hs = [p for p in highs if p[0] <= cutoff]
     ls = [p for p in lows if p[0] <= cutoff]
@@ -85,7 +86,10 @@ def _bias_before(
         return "MIXED"
     dh = hs[-1][1] - hs[-2][1]
     dl = ls[-1][1] - ls[-2][1]
-    eps = max(abs(hs[-1][1]), abs(ls[-1][1]), 1.0) * 1e-10
+    eps = max(
+        float(tolerance),
+        max(abs(hs[-1][1]), abs(ls[-1][1]), 1.0) * 1e-10,
+    )
     if dh > eps and dl > eps:
         return "BULLISH"
     if dh < -eps and dl < -eps:
@@ -99,7 +103,13 @@ def _structure_events(d: pd.DataFrame) -> list[dict[str, Any]]:
     if not highs or not lows:
         return events
 
+    atr = _atr(d)
+    consumed_highs: set[int] = set()
+    consumed_lows: set[int] = set()
+
     # A pivot with right=2 is usable only after two later candles exist.
+    # Each swing can generate at most one structure event: returning below/above
+    # the same already-broken level does not create a second BOS/CHOCH.
     for i in range(5, len(d)):
         eligible_h = [x for x in highs if x[0] <= i - 2]
         eligible_l = [x for x in lows if x[0] <= i - 2]
@@ -110,9 +120,18 @@ def _structure_events(d: pd.DataFrame) -> list[dict[str, Any]]:
         lo_idx, lo = eligible_l[-1]
         prev_close = float(d.loc[i - 1, "close"])
         close = float(d.loc[i, "close"])
-        prior_bias = _bias_before(highs, lows, i - 2)
+        atr_ref = 0.0
+        atr_idx = max(0, i - 2)
+        if atr_idx < len(atr) and pd.notna(atr.iloc[atr_idx]):
+            atr_ref = max(float(atr.iloc[atr_idx]), 0.0)
+        noise_tolerance = max(abs(close) * 1e-7, atr_ref * 0.05)
+        prior_bias = _bias_before(highs, lows, i - 2, tolerance=noise_tolerance)
 
-        if close > hi and prev_close <= hi:
+        if (
+            hi_idx not in consumed_highs
+            and close > hi + noise_tolerance
+            and prev_close <= hi + noise_tolerance
+        ):
             kind = (
                 "BOS" if prior_bias == "BULLISH"
                 else "CHOCH" if prior_bias == "BEARISH"
@@ -126,10 +145,17 @@ def _structure_events(d: pd.DataFrame) -> list[dict[str, Any]]:
                     "prior_bias": prior_bias,
                     "level": hi,
                     "pivot_index": hi_idx,
+                    "break_margin": float(close - hi),
+                    "noise_tolerance": float(noise_tolerance),
                 }
             )
+            consumed_highs.add(hi_idx)
 
-        if close < lo and prev_close >= lo:
+        if (
+            lo_idx not in consumed_lows
+            and close < lo - noise_tolerance
+            and prev_close >= lo - noise_tolerance
+        ):
             kind = (
                 "BOS" if prior_bias == "BEARISH"
                 else "CHOCH" if prior_bias == "BULLISH"
@@ -143,8 +169,11 @@ def _structure_events(d: pd.DataFrame) -> list[dict[str, Any]]:
                     "prior_bias": prior_bias,
                     "level": lo,
                     "pivot_index": lo_idx,
+                    "break_margin": float(lo - close),
+                    "noise_tolerance": float(noise_tolerance),
                 }
             )
+            consumed_lows.add(lo_idx)
     return events
 
 
@@ -210,6 +239,8 @@ def detect_bos_choch(
         "prior_bias": event["prior_bias"],
         "level": float(event["level"]),
         "bars_ago": int(bars_ago),
+        "break_margin": float(event.get("break_margin", 0.0)),
+        "noise_tolerance": float(event.get("noise_tolerance", 0.0)),
         "break_time": pd.Timestamp(ts).isoformat() if ts is not None and pd.notna(ts) else "",
         "text": (
             f"{kind} {event_side} por fechamento além do swing confirmado "
