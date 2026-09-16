@@ -506,3 +506,48 @@ mudar o Gate, os pesos ou o operacional ao vivo.
 
 Como essa auditoria executa 15 replays, ela fica desativada por padrão. Ative somente quando
 quiser fazer a análise de robustez do histórico atual.
+
+
+## Relatório consolidado de evidências
+
+Depois de executar o **Comparador dos 5 operacionais**, o AtlasQuant reúne os principais
+diagnósticos em uma única tabela.
+
+Para cada operacional, a tela mostra:
+
+- Trades;
+- Win Rate observado;
+- Expectativa em R;
+- Net R;
+- Drawdown máximo;
+- tamanho da amostra;
+- estabilidade temporal;
+- walk-forward OOS;
+- sensibilidade a custos/slippage;
+- robustez de parâmetros, quando ativada;
+- cobertura dos diagnósticos disponíveis.
+
+### Cobertura não é nota
+
+A coluna de cobertura informa somente se os diagnósticos tiveram amostra suficiente:
+
+- **COMPLETE** — todos disponíveis;
+- **PARTIAL** — parte disponível;
+- **INSUFFICIENT** — sem amostra válida suficiente.
+
+Ela não significa “setup bom” ou “setup ruim”.
+
+Quando a auditoria de robustez de parâmetros não foi ativada, ela aparece como **NOT_RUN**.
+
+### Exportações
+
+O relatório pode ser baixado em dois formatos:
+
+- **JSON** — pacote auditável com configurações, resumo e dados detalhados;
+- **Markdown** — resumo em texto para leitura rápida e arquivamento.
+
+O JSON usa o schema `ATLASQUANT_BACKTEST_EVIDENCE_V1` e marca explicitamente que o
+conteúdo é pesquisa histórica, não altera o Gate e não representa probabilidade de lucro.
+
+Use esse relatório para revisar as evidências do histórico em conjunto. Ele não escolhe
+automaticamente um operacional e não modifica os parâmetros do sistema.
