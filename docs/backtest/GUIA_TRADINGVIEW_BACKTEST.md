@@ -551,3 +551,59 @@ conteúdo é pesquisa histórica, não altera o Gate e não representa probabili
 
 Use esse relatório para revisar as evidências do histórico em conjunto. Ele não escolhe
 automaticamente um operacional e não modifica os parâmetros do sistema.
+
+
+## Snapshot reproduzível do Backtest
+
+Depois de gerar o relatório consolidado, o AtlasQuant pode salvar um **snapshot reproduzível** da execução.
+
+O snapshot guarda fingerprints SHA-256 separados para:
+
+- arquivo CSV original;
+- candles normalizados;
+- configurações do teste;
+- código usado no Backtest;
+- evidências geradas.
+
+O arquivo usa o schema `ATLASQUANT_BACKTEST_SNAPSHOT_V1`.
+
+O `snapshot_id` depende do conteúdo do teste. Se CSV normalizado, configurações, código e
+evidências forem iguais, o mesmo teste gera o mesmo identificador.
+
+### Comparar duas execuções
+
+Abra **Comparar dois snapshots salvos** e envie:
+
+1. o snapshot anterior;
+2. o snapshot posterior.
+
+O AtlasQuant informa separadamente se mudou:
+
+- CSV bruto;
+- dados normalizados;
+- configuração;
+- código;
+- evidências.
+
+Se houver mudanças de configuração, a tabela mostra o valor anterior e o valor novo.
+
+Se as evidências mudarem, a comparação mostra deltas descritivos de:
+
+- quantidade de trades;
+- expectativa em R;
+- Net R;
+- Drawdown máximo.
+
+Esses deltas não recebem interpretação automática de melhora ou piora.
+
+### Por que isso é útil
+
+Esse recurso ajuda a descobrir se duas execuções produziram resultados diferentes porque:
+
+- o histórico mudou;
+- o CSV foi alterado;
+- algum parâmetro mudou;
+- o código foi atualizado;
+- ou apenas as evidências finais mudaram.
+
+O diff também pode ser exportado em JSON para auditoria.
