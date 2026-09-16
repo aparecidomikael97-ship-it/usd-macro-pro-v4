@@ -102,7 +102,7 @@ def generate_amd_signals(
     if not math.isfinite(minimum_rr) or minimum_rr<0:
         raise ValueError("min_rr must be >= 0")
 
-    pending: dict[str,_PendingAMD|None]={"BUY":None,"SELL":None}
+    pending: _PendingAMD|None=None
     rows=[]
     start=max(acc_n+1,int(min_bars))
 
@@ -113,71 +113,65 @@ def generate_amd_signals(
             continue
 
         # Phase 3: distribution can only occur AFTER manipulation.
-        for side in ("BUY","SELL"):
-            p=pending[side]
-            if p is None:
-                continue
+        if pending is not None:
+            p=pending
+            side=p.side
             if i>p.expires_index:
-                pending[side]=None
-                continue
-            if i<=p.manipulation_index:
-                continue
+                pending=None
+            elif i>p.manipulation_index:
+                close=float(d.iloc[i]["close"])
+                mid=(p.acc_high+p.acc_low)/2.0
+                if side=="BUY":
+                    distribution=close>mid and close>p.manipulation_close
+                    entry=close
+                    stop=p.manipulation_extreme-atr*buf
+                    target=p.acc_high
+                    risk=entry-stop
+                    reward=target-entry
+                    raid_side="SSL"
+                else:
+                    distribution=close<mid and close<p.manipulation_close
+                    entry=close
+                    stop=p.manipulation_extreme+atr*buf
+                    target=p.acc_low
+                    risk=stop-entry
+                    reward=entry-target
+                    raid_side="BSL"
 
-            close=float(d.iloc[i]["close"])
-            mid=(p.acc_high+p.acc_low)/2.0
-            if side=="BUY":
-                distribution=close>mid and close>p.manipulation_close
-                entry=close
-                stop=p.manipulation_extreme-atr*buf
-                target=p.acc_high
-                risk=entry-stop
-                reward=target-entry
-                raid_side="SSL"
-            else:
-                distribution=close<mid and close<p.manipulation_close
-                entry=close
-                stop=p.manipulation_extreme+atr*buf
-                target=p.acc_low
-                risk=stop-entry
-                reward=entry-target
-                raid_side="BSL"
-
-            if not distribution:
-                continue
-
-            setup_rr=reward/risk if risk>0 else -1.0
-            if risk>0 and reward>0 and setup_rr>=minimum_rr:
-                rows.append({
-                    "signal_time":ts.isoformat(),
-                    "pair":pair,
-                    "setup":"AMD_PO3",
-                    "session":_session_label(ts),
-                    "side":side,
-                    "entry":float(entry),
-                    "stop":float(stop),
-                    "target":float(target),
-                    "source":"AUTO_REPLAY_AMD_V1",
-                    "notes":"AMD/PO3 técnico com ordem temporal rígida; sem contexto macro/Fed.",
-                    "phase":"DISTRIBUTION",
-                    "acc_high":float(p.acc_high),
-                    "acc_low":float(p.acc_low),
-                    "acc_mid":float(mid),
-                    "acc_start_index":int(p.acc_start_index),
-                    "acc_end_index":int(p.acc_end_index),
-                    "manipulation_index":int(p.manipulation_index),
-                    "distribution_index":int(i),
-                    "manipulation_side":raid_side,
-                    "manipulation_extreme":float(p.manipulation_extreme),
-                    "manipulation_close":float(p.manipulation_close),
-                    "distribution_close":float(close),
-                    "setup_rr":float(setup_rr),
-                    "stop_buffer_atr":buf,
-                    "min_rr":minimum_rr,
-                    "accumulation_bars":acc_n,
-                    "max_distribution_bars":max_dist,
-                })
-            # Once distribution resolves this state, do not recycle it.
-            pending[side]=None
+                if distribution:
+                    setup_rr=reward/risk if risk>0 else -1.0
+                    if risk>0 and reward>0 and setup_rr>=minimum_rr:
+                        rows.append({
+                            "signal_time":ts.isoformat(),
+                            "pair":pair,
+                            "setup":"AMD_PO3",
+                            "session":_session_label(ts),
+                            "side":side,
+                            "entry":float(entry),
+                            "stop":float(stop),
+                            "target":float(target),
+                            "source":"AUTO_REPLAY_AMD_V1",
+                            "notes":"AMD/PO3 técnico com ordem temporal rígida; sem contexto macro/Fed.",
+                            "phase":"DISTRIBUTION",
+                            "acc_high":float(p.acc_high),
+                            "acc_low":float(p.acc_low),
+                            "acc_mid":float(mid),
+                            "acc_start_index":int(p.acc_start_index),
+                            "acc_end_index":int(p.acc_end_index),
+                            "manipulation_index":int(p.manipulation_index),
+                            "distribution_index":int(i),
+                            "manipulation_side":raid_side,
+                            "manipulation_extreme":float(p.manipulation_extreme),
+                            "manipulation_close":float(p.manipulation_close),
+                            "distribution_close":float(close),
+                            "setup_rr":float(setup_rr),
+                            "stop_buffer_atr":buf,
+                            "min_rr":minimum_rr,
+                            "accumulation_bars":acc_n,
+                            "max_distribution_bars":max_dist,
+                        })
+                    # Once distribution resolves this state, do not recycle it.
+                    pending=None
 
         # Phase 2: detect a NEW manipulation using a range frozen from prior bars.
         if i<acc_n:
@@ -189,10 +183,23 @@ def generate_amd_signals(
             continue
 
         row=d.iloc[i]
-        if allow_buy and pending["BUY"] is None:
-            buy_manip=float(row["low"])<al and float(row["close"])>al
-            if buy_manip:
-                pending["BUY"]=_PendingAMD(
+        if pending is None:
+            buy_manip=allow_buy and float(row["low"])<al and float(row["close"])>al
+            sell_manip=allow_sell and float(row["high"])>ah and float(row["close"])<ah
+
+            selected=None
+            if buy_manip and sell_manip:
+                width=ah-al
+                buy_depth=(al-float(row["low"]))/width
+                sell_depth=(float(row["high"])-ah)/width
+                selected="BUY" if buy_depth>=sell_depth else "SELL"
+            elif buy_manip:
+                selected="BUY"
+            elif sell_manip:
+                selected="SELL"
+
+            if selected=="BUY":
+                pending=_PendingAMD(
                     side="BUY",
                     acc_high=ah,
                     acc_low=al,
@@ -203,11 +210,8 @@ def generate_amd_signals(
                     manipulation_close=float(row["close"]),
                     expires_index=i+max_dist,
                 )
-
-        if allow_sell and pending["SELL"] is None:
-            sell_manip=float(row["high"])>ah and float(row["close"])<ah
-            if sell_manip:
-                pending["SELL"]=_PendingAMD(
+            elif selected=="SELL":
+                pending=_PendingAMD(
                     side="SELL",
                     acc_high=ah,
                     acc_low=al,
