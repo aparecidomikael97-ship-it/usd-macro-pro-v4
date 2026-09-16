@@ -42,6 +42,8 @@ from currency_news_v107 import (
 from ict_execution_v108 import detect_crt, detect_ote, detect_amd, detect_fvg
 from institutional_engine_v110 import build_institutional_snapshot, SMT_COMPANIONS
 
+from atlasquant_runtime_store import resolve_runtime_branch, require_runtime_branch
+
 from market_map_core_v10 import (
     NY_TZ,
     adr_context,
@@ -62,7 +64,10 @@ from market_map_core_v10 import (
 )
 
 REPO = os.getenv("GITHUB_REPO_HISTORICO", os.getenv("GITHUB_REPOSITORY", "")).strip()
-BRANCH = os.getenv("GITHUB_BRANCH_HISTORICO", "main").strip() or "main"
+BRANCH = require_runtime_branch(resolve_runtime_branch(
+    os.getenv("GITHUB_DATA_BRANCH", ""),
+    os.getenv("GITHUB_BRANCH_HISTORICO", ""),
+))
 TOKEN = os.getenv("GITHUB_TOKEN_HISTORICO", os.getenv("GITHUB_TOKEN", "")).strip()
 TD_KEY = os.getenv("CHAVE_TWELVE_DATA", "").strip()
 NEWS_KEY = os.getenv("CHAVE_NEWSAPI", "").strip()
