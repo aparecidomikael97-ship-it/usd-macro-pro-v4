@@ -103,3 +103,21 @@ GitHub Actions Quality run \`35095699342\`:
 **518 testes executados, 518 OK**, além do compile gate verde.
 
 O Runtime não foi alterado por esta etapa.
+
+
+## Modo automático — sem planilha de sinais
+
+A aba Backtest também possui **Backtest automático — BOS/CHOCH + Order Block**.
+
+Nesse modo:
+
+1. envie apenas o CSV de candles exportado do TradingView;
+2. informe o par/ativo;
+3. escolha alvo em R, buffer do stop em ATR, entrada Midpoint/Proximal, eventos BOS/CHOCH e lados BUY/SELL;
+4. o AtlasQuant faz replay candle a candle;
+5. sinais só aparecem quando a estrutura está confirmada naquele ponto histórico;
+6. o simulador começa a procurar a entrada depois do candle do sinal;
+7. uma nova operação no mesmo par é bloqueada enquanto a anterior ainda estiver ativa;
+8. baixe tanto a planilha de sinais gerados quanto o ledger final.
+
+Esse replay é técnico. Ele não reconstrói automaticamente Fed, calendário macro ou força de moedas histórica.

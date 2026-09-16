@@ -240,3 +240,52 @@ Guia operacional: \`docs/backtest/GUIA_TRADINGVIEW_BACKTEST.md\`.
 Próximo passo seguro: construir a ponte Pine Script apenas para os operacionais
 que possam ser reproduzidos de forma determinística no TradingView, sem fingir
 que o Pine consegue consumir diretamente o contexto macro do AtlasQuant.
+
+
+## 16/09/2026 UTC — Pine Strategy + replay automático sem planilha de sinais
+
+Estado verificado:
+
+- DEV testada em \`2cb38cca9a2958a77945f9ca2b3eb00aae926ae8\`.
+- Quality run \`35097346652\`: compile gate verde, **530 testes executados, 530 OK**.
+- Runtime permanece em \`7a2ad3e53055fb1ef6091c39442c4c0f5212c3c1\`.
+- Main observada em \`107c77100bc49c39da922a3bfb18ff7557d74d22\`; nenhuma alteração foi feita nela.
+
+### Ponte TradingView
+
+Foi criado \`tradingview/atlasquant_bos_choch_ob_strategy_v1.pine\`:
+
+- Strategy Tester, não indicador apenas visual;
+- pivôs confirmados;
+- BOS/CHOCH por fechamento além de swing confirmado;
+- tolerância de ruído por ATR;
+- evita reutilizar o mesmo swing;
+- Order Block baseado na origem oposta mais recente dentro da perna estrutural;
+- exige displacement mínimo;
+- entrada midpoint/proximal;
+- stop com buffer ATR;
+- alvo configurável em R;
+- filtro de sessão e lado;
+- sem \`request.security\` e sem primitivas conhecidas de lookahead;
+- \`process_orders_on_close=false\`, preservando processamento de ordens no próximo candle.
+
+O painel Backtest oferece download direto do Pine.
+
+### Replay automático Python
+
+Foi criado \`atlasquant_strategy_replay.py\` e integrado à aba Backtest:
+
+- usuário pode enviar apenas o CSV de candles;
+- o AtlasQuant percorre o histórico candle a candle;
+- gera sinais BOS/CHOCH + Order Block apenas quando o evento confirmado ocorre no candle atual do replay;
+- deriva entrada/stop/alvo por regras fixas de pesquisa;
+- roda o backtest sem reutilizar informação futura;
+- bloqueia sobreposição de posição no mesmo par com \`single_position_per_pair=True\`;
+- exporta os sinais gerados e o ledger final em CSV;
+- mantém resultado separado por setup e sessão.
+
+O replay usa janela estrutural limitada para evitar crescimento quadrático em CSVs longos.
+
+**Limite mantido:** Pine/replay são pesquisa técnica. Macro, Fed, eventos, força relativa, Safety Core e Gate continuam no motor AtlasQuant e não são fingidos no TradingView.
+
+Próximo passo seguro: ampliar a validação de paridade entre Pine e replay Python e adicionar FVG como segundo operacional técnico objetivo, sem misturar estatísticas entre estratégias.

@@ -99,3 +99,16 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - Backtest legado preservado por compatibilidade.
 - GitHub Actions run \`35095699342\`: **518/518 testes OK**, compile gate verde.
 - Runtime não foi alterado.
+
+
+## 16/09/2026 UTC — TradingView Strategy + replay automático
+
+- Criada Strategy Pine BOS/CHOCH + Order Block para o Strategy Tester.
+- Painel Backtest passou a disponibilizar download direto do Pine.
+- Adicionados testes de presença da estratégia, pivôs confirmados, controles de risco, ausência de primitivas conhecidas de lookahead e processamento no próximo candle.
+- Criado \`atlasquant_strategy_replay.py\` para gerar planos automaticamente a partir de OHLC, candle a candle.
+- Adicionado bloqueio de operações sobrepostas por par no motor de backtest.
+- A aba Backtest agora aceita modo automático com apenas o CSV de candles, além do modo manual com planilha de sinais.
+- Replay exporta sinais gerados e ledger completo.
+- GitHub Actions run \`35097346652\`: **530/530 testes OK**, compile gate verde.
+- Runtime/Main não foram alteradas.
