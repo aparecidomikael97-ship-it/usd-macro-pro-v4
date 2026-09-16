@@ -13,7 +13,9 @@ from atlasquant_backtest_snapshot_history import (
     consecutive_history_diffs,
     history_archive_zip,
     history_timeline_frame,
+    inspect_history_archive,
     load_snapshot_history,
+    restore_history_archive,
     save_snapshot_local,
 )
 
@@ -105,6 +107,89 @@ class BacktestSnapshotHistoryTests(unittest.TestCase):
             self.assertTrue(bool(diffs.iloc[0]["settings_changed"]))
             self.assertTrue(bool(diffs.iloc[0]["evidence_changed"]))
             self.assertEqual(int(diffs.iloc[0]["settings_changes"]),1)
+
+    def test_restore_roundtrip_validates_then_saves(self):
+        with tempfile.TemporaryDirectory() as code_td, tempfile.TemporaryDirectory() as dest:
+            code=Path(code_td)
+            (code/"logic.py").write_text("x=1\n",encoding="utf-8")
+            a=snapshot(code,cost=0.01)
+            b=snapshot(code,cost=0.02)
+            a["created_at"]="2026-09-16T10:00:00+00:00"
+            b["created_at"]="2026-09-16T11:00:00+00:00"
+            raw=history_archive_zip([a,b])
+
+            inspected=inspect_history_archive(raw)
+            self.assertEqual(inspected["snapshot_count"],2)
+
+            restored=restore_history_archive(raw,root=dest)
+            self.assertEqual(restored["saved"],2)
+            self.assertEqual(restored["duplicates"],0)
+
+            again=restore_history_archive(raw,root=dest)
+            self.assertEqual(again["saved"],0)
+            self.assertEqual(again["duplicates"],2)
+
+            loaded=load_snapshot_history(root=dest)
+            self.assertEqual(len(loaded["snapshots"]),2)
+
+    def test_restore_rejects_path_traversal_before_writes(self):
+        with tempfile.TemporaryDirectory() as dest:
+            buf=io.BytesIO()
+            manifest={
+                "schema":"ATLASQUANT_BACKTEST_SNAPSHOT_HISTORY_V1",
+                "research_only":True,
+                "no_live_gate_effect":True,
+                "snapshot_count":0,
+                "snapshot_ids":[],
+            }
+            with zipfile.ZipFile(buf,"w",compression=zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr("manifest.json",json.dumps(manifest))
+                zf.writestr("../evil.json","{}")
+            with self.assertRaisesRegex(ValueError,"não permitido"):
+                restore_history_archive(buf.getvalue(),root=dest)
+            self.assertFalse(any(Path(dest).iterdir()))
+
+    def test_restore_rejects_manifest_id_mismatch_before_writes(self):
+        with tempfile.TemporaryDirectory() as code_td, tempfile.TemporaryDirectory() as dest:
+            code=Path(code_td)
+            (code/"logic.py").write_text("x=1\n",encoding="utf-8")
+            a=snapshot(code)
+            raw=history_archive_zip([a])
+            src=zipfile.ZipFile(io.BytesIO(raw),"r")
+            buf=io.BytesIO()
+            with src, zipfile.ZipFile(buf,"w",compression=zipfile.ZIP_DEFLATED) as dst:
+                for info in src.infolist():
+                    data=src.read(info.filename)
+                    if info.filename=="manifest.json":
+                        manifest=json.loads(data.decode("utf-8"))
+                        manifest["snapshot_ids"]=["0"*64]
+                        data=json.dumps(manifest).encode("utf-8")
+                    dst.writestr(info.filename,data)
+
+            with self.assertRaisesRegex(ValueError,"snapshot_ids"):
+                restore_history_archive(buf.getvalue(),root=dest)
+            self.assertFalse(any(Path(dest).iterdir()))
+
+    def test_restore_rejects_tampered_snapshot_before_writes(self):
+        with tempfile.TemporaryDirectory() as code_td, tempfile.TemporaryDirectory() as dest:
+            code=Path(code_td)
+            (code/"logic.py").write_text("x=1\n",encoding="utf-8")
+            a=snapshot(code)
+            raw=history_archive_zip([a])
+            src=zipfile.ZipFile(io.BytesIO(raw),"r")
+            buf=io.BytesIO()
+            with src, zipfile.ZipFile(buf,"w",compression=zipfile.ZIP_DEFLATED) as dst:
+                for info in src.infolist():
+                    data=src.read(info.filename)
+                    if info.filename.startswith("snapshots/"):
+                        obj=json.loads(data.decode("utf-8"))
+                        obj["snapshot_id"]="0"*64
+                        data=json.dumps(obj).encode("utf-8")
+                    dst.writestr(info.filename,data)
+
+            with self.assertRaisesRegex(ValueError,"integridade"):
+                restore_history_archive(buf.getvalue(),root=dest)
+            self.assertFalse(any(Path(dest).iterdir()))
 
     def test_archive_contains_manifest_timeline_changes_and_snapshots(self):
         with tempfile.TemporaryDirectory() as code_td:
