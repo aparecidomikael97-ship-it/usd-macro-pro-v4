@@ -26,6 +26,7 @@ def build_safety_input(
     autopilot: Mapping[str, Any] | None = None,
     *,
     regime_supported_override: bool | None = None,
+    major_event_minutes_override: float | None = None,
 ) -> SafetyInput:
     p=dict(pack or {})
     auto=dict(autopilot or {})
@@ -55,7 +56,11 @@ def build_safety_input(
         data_fresh=data_fresh,
         essential_sources_ok=essential_ok,
         source_conflict=bool(p.get("source_conflict", False)),
-        major_event_minutes=_finite(p.get("major_event_minutes")),
+        major_event_minutes=(
+            _finite(major_event_minutes_override)
+            if major_event_minutes_override is not None
+            else _finite(p.get("major_event_minutes"))
+        ),
         update_health_ok=process_ok,
         regime_supported=regime_supported,
         model_conflict=model_conflict,
@@ -70,12 +75,14 @@ def evaluate_live_safety(
     autopilot: Mapping[str, Any] | None = None,
     *,
     regime_supported_override: bool | None = None,
+    major_event_minutes_override: float | None = None,
 ) -> dict[str, object]:
     return evaluate_safety(
         build_safety_input(
             pack,
             autopilot,
             regime_supported_override=regime_supported_override,
+            major_event_minutes_override=major_event_minutes_override,
         )
     )
 
@@ -85,11 +92,13 @@ def render_safety_core(
     autopilot: Mapping[str, Any] | None = None,
     *,
     regime_supported_override: bool | None = None,
+    major_event_minutes_override: float | None = None,
 ) -> dict[str, object]:
     result=evaluate_live_safety(
         pack,
         autopilot,
         regime_supported_override=regime_supported_override,
+        major_event_minutes_override=major_event_minutes_override,
     )
     icon={"GREEN":"🟢","YELLOW":"🟡","RED":"🔴"}.get(str(result["traffic_light"]),"⚪")
 
