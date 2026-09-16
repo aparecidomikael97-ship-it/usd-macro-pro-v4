@@ -620,3 +620,76 @@ Safety Core, pesos de readiness, Runtime ou decisões macro/Fed.
 Próximo passo seguro: consolidar um comparador de performance entre os cinco operacionais
 (BOS/CHOCH+OB, FVG, OTE, CRT, AMD) sem misturar seus sinais, para descobrir objetivamente
 quais regras têm melhor expectativa, drawdown e estabilidade por par/sessão.
+
+
+## 16/09/2026 UTC — comparador de performance dos 5 operacionais
+
+Estado verificado:
+
+- DEV testada em `92d1cf49012ad5400f5d6a3eb1af8e80fe36057a`.
+- Quality run `35103238881`: compile gate verde, **582 testes executados, 582 OK**.
+- Runtime permanece protegida e não foi alterada nesta etapa.
+- Main não foi alterada nesta etapa.
+
+### Comparador de pesquisa
+
+Foi criado `atlasquant_strategy_comparator.py` para executar e comparar, no mesmo CSV OHLC,
+os cinco operacionais técnicos independentes:
+
+1. BOS/CHOCH + Order Block;
+2. FVG;
+3. OTE 62–79%;
+4. CRT;
+5. AMD / Power of Three.
+
+O comparador preserva a identidade de cada estratégia e **não mistura sinais**.
+
+Para cada operacional, registra separadamente:
+
+- signals;
+- trades executados;
+- gains/losses/breakeven/no-trade;
+- win rate observado;
+- expectativa em R;
+- resultado líquido em R;
+- profit factor;
+- drawdown máximo em R;
+- maior sequência de loss;
+- casos OHLC ambíguos;
+- relação net R / drawdown;
+- faixa de tamanho da amostra.
+
+### Proteção contra leitura enganosa de amostra pequena
+
+O comparador possui um limiar configurável para ranking observado, padrão de **20 trades**.
+
+- abaixo do limiar, o operacional continua com todas as métricas visíveis;
+- porém não recebe posição no ranking de expectativa observada;
+- o ranking é explicitamente histórico/descritivo e não vira probabilidade, recomendação,
+  score de lucro ou autorização de Gate.
+
+Faixas descritivas:
+
+- <20 trades: `AMOSTRA PEQUENA`;
+- 20–49: `AMOSTRA INICIAL`;
+- 50–99: `AMOSTRA INTERMEDIÁRIA`;
+- >=100: `AMOSTRA MAIOR`.
+
+### UI e exportação
+
+A aba Backtest ganhou o bloco **Comparador dos 5 operacionais**.
+
+Com um único CSV, o usuário pode:
+
+- rodar os 5 replays com defaults de pesquisa;
+- comparar resultados gerais;
+- comparar por sessão;
+- exportar tabela de comparação;
+- exportar ledger combinado, mantendo `strategy_family` e `operacional` em cada linha.
+
+**Regra preservada:** comparador é pesquisa histórica. Não altera Gate, Safety Core,
+readiness, Runtime ou direção macro/Fed.
+
+Próximo passo seguro: adicionar análise de estabilidade temporal (janelas/blocos do histórico)
+para detectar se um setup só parece bom em um trecho específico, antes de qualquer tentativa
+de usar performance histórica como filtro operacional.
