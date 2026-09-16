@@ -25,6 +25,7 @@ from atlasquant_strategy_replay import generate_bos_choch_ob_signals
 from atlasquant_fvg_replay import generate_fvg_signals
 from atlasquant_ote_replay import generate_ote_signals
 from atlasquant_crt_replay import generate_crt_signals
+from atlasquant_amd_replay import generate_amd_signals
 from atlasquant_tradingview_parity import validate_tradingview_parity
 
 
@@ -171,6 +172,10 @@ def load_tradingview_crt_pine_asset() -> str:
     return _load_pine_file("atlasquant_crt_strategy_v1.pine")
 
 
+def load_tradingview_amd_pine_asset() -> str:
+    return _load_pine_file("atlasquant_amd_strategy_v1.pine")
+
+
 def _records(df: pd.DataFrame) -> list[dict[str, Any]]:
     if not isinstance(df, pd.DataFrame) or df.empty:
         return []
@@ -289,7 +294,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
         "Estratégia técnica de pesquisa para o Strategy Tester do TradingView. "
         "Não inclui macro/Fed e não altera o Gate do AtlasQuant."
     )
-    p1,p2,p3,p4=st.columns(4)
+    p1,p2,p3,p4,p5=st.columns(5)
     with p1:
         st.download_button(
             "⬇️ Pine BOS/CHOCH + OB",
@@ -328,6 +333,16 @@ def render_operational_backtest_panel() -> dict[str, Any]:
             mime="text/plain",
             disabled=not bool(crt_pine),
             key="atlasquant_bt_pine_crt",
+        )
+    amd_pine=load_tradingview_amd_pine_asset()
+    with p5:
+        st.download_button(
+            "⬇️ Pine AMD",
+            data=amd_pine,
+            file_name="atlasquant_amd_strategy_v1.pine",
+            mime="text/plain",
+            disabled=not bool(amd_pine),
+            key="atlasquant_bt_pine_amd",
         )
 
     parity=validate_tradingview_parity()
@@ -681,6 +696,90 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                         "Não inclui macro/Fed e não altera o Gate."
                     )
                     return {**result,"mode":"AUTO_CRT","signals":crt_signals}
+
+    with st.expander("🤖 Backtest automático — AMD / Power of Three", expanded=False):
+        st.caption(
+            "Quinto operacional independente. Usa máquina de estados temporal "
+            "Acumulação → Manipulação → Distribuição, sem misturar estatísticas."
+        )
+        ac1,ac2,ac3=st.columns(3)
+        with ac1:
+            amd_acc_bars=st.number_input(
+                "Candles de acumulação",min_value=4,max_value=50,
+                value=8,step=1,key="atlasquant_amd_acc_bars"
+            )
+        with ac2:
+            amd_max_dist=st.number_input(
+                "Máx. candles até distribuição",min_value=1,max_value=20,
+                value=4,step=1,key="atlasquant_amd_max_dist"
+            )
+        with ac3:
+            amd_buffer=st.number_input(
+                "Buffer AMD stop (ATR)",min_value=0.0,max_value=1.0,
+                value=0.0,step=0.01,key="atlasquant_amd_buffer"
+            )
+        ad1,ad2=st.columns(2)
+        with ad1:
+            amd_min_rr=st.number_input(
+                "RR mínimo AMD",min_value=0.0,max_value=20.0,
+                value=0.0,step=0.25,key="atlasquant_amd_min_rr"
+            )
+        with ad2:
+            amd_sides=st.multiselect(
+                "Lados AMD",["BUY","SELL"],default=["BUY","SELL"],key="atlasquant_amd_sides"
+            )
+
+        if candle_file is None:
+            st.info("Envie o CSV de candles para habilitar o replay AMD.")
+        else:
+            try:
+                amd_raw=read_csv_bytes(candle_file.getvalue())
+                amd_candles=normalize_tradingview_candles(amd_raw)
+            except Exception as exc:
+                amd_candles=pd.DataFrame()
+                st.error(f"CSV de candles inválido: {type(exc).__name__}: {exc}")
+
+            if not amd_candles.empty:
+                amd_signals=generate_amd_signals(
+                    amd_candles,
+                    pair=default_pair,
+                    accumulation_bars=int(amd_acc_bars),
+                    max_distribution_bars=int(amd_max_dist),
+                    stop_buffer_atr=float(amd_buffer),
+                    min_rr=float(amd_min_rr),
+                    allow_buy="BUY" in amd_sides,
+                    allow_sell="SELL" in amd_sides,
+                )
+                st.caption(
+                    f"Replay AMD encontrou {len(amd_signals)} setup(s) em "
+                    f"{len(amd_candles)} candle(s)."
+                )
+                if st.button(
+                    "▶️ Rodar backtest AMD",
+                    type="primary",
+                    key="atlasquant_bt_amd_run",
+                    disabled=not bool(amd_signals),
+                ):
+                    amd_results=backtest_many(
+                        {default_pair:amd_candles},
+                        amd_signals,
+                        single_position_per_pair=True,
+                        max_wait_bars=int(max_wait),
+                        max_hold_bars=int(max_hold),
+                        cost_r=float(cost_r),
+                        start_after_signal_bar=True,
+                    )
+                    result=_render_result_block(
+                        amd_results,
+                        default_pair,
+                        key_suffix="amd",
+                        generated_signals=amd_signals,
+                    )
+                    st.caption(
+                        "AMD/PO3 é medido separadamente de CRT, OTE, FVG e BOS/CHOCH + OB. "
+                        "Não inclui macro/Fed e não altera o Gate."
+                    )
+                    return {**result,"mode":"AUTO_AMD","signals":amd_signals}
 
     if candle_file is None or signal_file is None:
         st.info(
