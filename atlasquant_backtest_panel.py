@@ -252,7 +252,7 @@ def _render_result_block(
         )
 
     st.markdown("#### Diário completo")
-    st.dataframe(ledger, use_container_width=True, hide_index=True)
+    st.dataframe(ledger, width="stretch", hide_index=True)
 
     st.download_button(
         "📥 Baixar planilha completa do backtest (CSV)",
@@ -275,11 +275,11 @@ def _render_result_block(
     if "setup" in ledger.columns:
         by_setup = summarize_by(results, "setup")
         st.markdown("#### Por operacional/setup")
-        st.dataframe(by_setup, use_container_width=True, hide_index=True)
+        st.dataframe(by_setup, width="stretch", hide_index=True)
     if "session" in ledger.columns:
         by_session = summarize_by(results, "session")
         st.markdown("#### Por sessão")
-        st.dataframe(by_session, use_container_width=True, hide_index=True)
+        st.dataframe(by_session, width="stretch", hide_index=True)
 
     return {"status": "DONE", "metrics": metrics, "rows": results}
 
@@ -383,7 +383,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
             st.success(f"Contrato estático OK: {parity['passed']} verificações.")
         else:
             st.error(f"DRIFT detectado: {parity['failed']} verificação(ões) falharam.")
-        st.dataframe(pd.DataFrame(parity["checks"]),use_container_width=True,hide_index=True)
+        st.dataframe(pd.DataFrame(parity["checks"]),width="stretch",hide_index=True)
         st.caption(" ".join(parity["limitations"]))
 
     default_pair = st.text_input(
@@ -948,7 +948,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                 ]
                 st.dataframe(
                     comparison.reindex(columns=display_cols),
-                    use_container_width=True,
+                    width="stretch",
                     hide_index=True,
                 )
 
@@ -967,7 +967,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                 by_session=breakdown_frame(suite,"session")
                 if not by_session.empty:
                     st.markdown("#### Comparação por sessão")
-                    st.dataframe(by_session,use_container_width=True,hide_index=True)
+                    st.dataframe(by_session,width="stretch",hide_index=True)
 
                 stability=temporal_stability_report(
                     suite,
@@ -989,14 +989,14 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                 ]
                 st.dataframe(
                     stability_summary.reindex(columns=stability_cols),
-                    use_container_width=True,
+                    width="stretch",
                     hide_index=True,
                 )
                 if not stability_folds_df.empty:
                     with st.expander("Ver blocos temporais detalhados",expanded=False):
                         st.dataframe(
                             stability_folds_df,
-                            use_container_width=True,
+                            width="stretch",
                             hide_index=True,
                         )
 
@@ -1023,14 +1023,14 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                 ]
                 st.dataframe(
                     wf_summary.reindex(columns=wf_cols),
-                    use_container_width=True,
+                    width="stretch",
                     hide_index=True,
                 )
                 if not wf_windows_df.empty:
                     with st.expander("Ver janelas walk-forward detalhadas",expanded=False):
                         st.dataframe(
                             wf_windows_df,
-                            use_container_width=True,
+                            width="stretch",
                             hide_index=True,
                         )
 
@@ -1060,21 +1060,21 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                 ]
                 st.dataframe(
                     friction_summary.reindex(columns=friction_cols),
-                    use_container_width=True,
+                    width="stretch",
                     hide_index=True,
                 )
                 if not friction_scenarios.empty:
                     with st.expander("Ver cenários de custos/slippage detalhados",expanded=False):
                         st.dataframe(
                             friction_scenarios,
-                            use_container_width=True,
+                            width="stretch",
                             hide_index=True,
                         )
                 if not friction_breakdown.empty:
                     with st.expander("Ver custos/slippage por sessão e par",expanded=False):
                         st.dataframe(
                             friction_breakdown,
-                            use_container_width=True,
+                            width="stretch",
                             hide_index=True,
                         )
                         st.download_button(
@@ -1112,13 +1112,13 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                     ]
                     st.dataframe(
                         robustness_summary.reindex(columns=robustness_cols),
-                        use_container_width=True,
+                        width="stretch",
                         hide_index=True,
                     )
                     with st.expander("Ver variantes pré-definidas detalhadas",expanded=False):
                         st.dataframe(
                             robustness_variants,
-                            use_container_width=True,
+                            width="stretch",
                             hide_index=True,
                         )
                         st.download_button(
@@ -1150,7 +1150,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                 ]
                 st.dataframe(
                     evidence.reindex(columns=evidence_cols),
-                    use_container_width=True,
+                    width="stretch",
                     hide_index=True,
                 )
 
@@ -1341,17 +1341,17 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                 f"{len(invalid_history)} arquivo(s) do histórico falharam na validação de integridade "
                 "e foram excluídos da linha do tempo."
             )
-            st.dataframe(pd.DataFrame(invalid_history),use_container_width=True,hide_index=True)
+            st.dataframe(pd.DataFrame(invalid_history),width="stretch",hide_index=True)
 
         if snapshots_history:
             timeline=history_timeline_frame(snapshots_history)
             st.markdown("##### Linha do tempo")
-            st.dataframe(timeline,use_container_width=True,hide_index=True)
+            st.dataframe(timeline,width="stretch",hide_index=True)
 
             changes=consecutive_history_diffs(snapshots_history)
             if not changes.empty:
                 st.markdown("##### Mudanças entre execuções consecutivas")
-                st.dataframe(changes,use_container_width=True,hide_index=True)
+                st.dataframe(changes,width="stretch",hide_index=True)
 
             archive=history_archive_zip(snapshots_history)
             st.download_button(
@@ -1402,7 +1402,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                     {"item":"Código","mudou":snapshot_diff["code_changed"]},
                     {"item":"Evidências","mudou":snapshot_diff["evidence_changed"]},
                 ])
-                st.dataframe(flags,use_container_width=True,hide_index=True)
+                st.dataframe(flags,width="stretch",hide_index=True)
                 st.caption(
                     "Deltas abaixo são descritivos. O comparador não classifica mudança como melhora ou piora."
                 )
@@ -1410,14 +1410,14 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                     st.markdown("##### Configurações alteradas")
                     st.dataframe(
                         pd.DataFrame(snapshot_diff["settings_changes"]),
-                        use_container_width=True,
+                        width="stretch",
                         hide_index=True,
                     )
                 if snapshot_diff["evidence_metric_deltas"]:
                     st.markdown("##### Deltas de evidências")
                     st.dataframe(
                         pd.DataFrame(snapshot_diff["evidence_metric_deltas"]),
-                        use_container_width=True,
+                        width="stretch",
                         hide_index=True,
                     )
                 st.download_button(
