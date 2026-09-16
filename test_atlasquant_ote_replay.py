@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 import pandas as pd
 
 from atlasquant_ote_replay import _impulse_range, generate_ote_signals
@@ -86,6 +87,42 @@ class OTEReplayTests(unittest.TestCase):
             generate_ote_signals(d,pair="EUR/USD",lookback=6)
         with self.assertRaises(ValueError):
             generate_ote_signals(d,pair="EUR/USD",entry_mode="BAD")
+
+    def test_same_origin_reanchor_does_not_create_second_signal(self):
+        d=frame([(3.0,10.0,0.0,3.0)]*12)
+        sequence=[
+            {"swing_low":0.0,"swing_high":10.0,"low_index":1,"high_index":5},
+            {"swing_low":0.0,"swing_high":10.2,"low_index":0,"high_index":6},
+            None,None,None,
+        ]
+        with patch("atlasquant_ote_replay._atr_last",return_value=1.0),              patch("atlasquant_ote_replay._impulse_range",side_effect=sequence):
+            rows=generate_ote_signals(
+                d,pair="EUR/USD",allow_sell=False,
+                lookback=8,recent_extreme=4,min_bars=8,stop_buffer_atr=0.0
+            )
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]["impulse_origin_index"],1)
+        self.assertEqual(rows[0]["impulse_terminal_index"],5)
+        self.assertEqual(rows[0]["reanchor_guard"],"NEW_ORIGIN_AFTER_PREVIOUS_TERMINAL")
+
+    def test_new_impulse_after_previous_terminal_can_signal(self):
+        d=frame([(3.0,10.0,0.0,3.0)]*12)
+        sequence=[
+            {"swing_low":0.0,"swing_high":10.0,"low_index":1,"high_index":5},
+            None,
+            {"swing_low":0.0,"swing_high":10.0,"low_index":4,"high_index":6},
+            None,None,
+        ]
+        with patch("atlasquant_ote_replay._atr_last",return_value=1.0),              patch("atlasquant_ote_replay._impulse_range",side_effect=sequence):
+            rows=generate_ote_signals(
+                d,pair="EUR/USD",allow_sell=False,
+                lookback=8,recent_extreme=4,min_bars=8,stop_buffer_atr=0.0
+            )
+        self.assertEqual(len(rows),2)
+        self.assertEqual(rows[0]["impulse_terminal_index"],5)
+        self.assertEqual(rows[1]["impulse_origin_index"],6)
+        self.assertEqual(rows[1]["impulse_terminal_index"],8)
+        self.assertEqual(rows[1]["previous_same_side_terminal_index"],5)
 
     def test_generated_ote_runs_in_generic_backtester(self):
         d=buy_case()
