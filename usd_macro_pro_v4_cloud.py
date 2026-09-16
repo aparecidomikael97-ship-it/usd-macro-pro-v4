@@ -182,7 +182,7 @@ HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="AtlasQuant — Market Intelligence Platform · DEV",
+    page_title="AtlasQuant — Market Intelligence Platform",
     page_icon="🧭",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -245,6 +245,19 @@ CHAVE_NEWSAPI = st.secrets.get("CHAVE_NEWSAPI", os.getenv("CHAVE_NEWSAPI", ""))
 CHAVE_EODHD = st.secrets.get("CHAVE_EODHD", os.getenv("CHAVE_EODHD", ""))
 CHAVE_TWELVE_DATA = st.secrets.get("CHAVE_TWELVE_DATA", os.getenv("CHAVE_TWELVE_DATA", ""))
 
+_ATLASQUANT_ENV_EXPLICIT = str(
+    st.secrets.get("ATLASQUANT_ENV", os.getenv("ATLASQUANT_ENV", ""))
+).strip().upper()
+_ATLASQUANT_DATA_BRANCH = str(
+    st.secrets.get("GITHUB_DATA_BRANCH", os.getenv("GITHUB_DATA_BRANCH", ""))
+).strip()
+if _ATLASQUANT_ENV_EXPLICIT:
+    ATLASQUANT_ENVIRONMENT = _ATLASQUANT_ENV_EXPLICIT
+elif _ATLASQUANT_DATA_BRANCH == "atlasquant-runtime":
+    ATLASQUANT_ENVIRONMENT = "RUNTIME"
+else:
+    ATLASQUANT_ENVIRONMENT = "LOCAL"
+
 IMPACTO_MAX_FED = 18.0
 STATUS_FONTE = {}
 
@@ -262,7 +275,7 @@ else:
     _UX_PREFS_V103 = {}
 
 st.sidebar.title("🧭 AtlasQuant")
-st.sidebar.caption("Market Intelligence Platform · DEV")
+st.sidebar.caption(f"Market Intelligence Platform · {ATLASQUANT_ENVIRONMENT}")
 st.sidebar.caption(f"Engine base {APP_VERSION}")
 
 ESCALA_CONFIANCA = st.sidebar.slider(
@@ -3781,10 +3794,10 @@ def _autopilot_save_inputs_v107():
 
 
 if render_atlasquant_header is not None:
-    render_atlasquant_header(APP_VERSION, environment="DEV")
+    render_atlasquant_header(APP_VERSION, environment=ATLASQUANT_ENVIRONMENT)
 else:
     st.title("🧭 AtlasQuant")
-    st.caption("Market Intelligence Platform · DEV")
+    st.caption(f"Market Intelligence Platform · {ATLASQUANT_ENVIRONMENT}")
     if _ATLASQUANT_UI_IMPORT_ERROR:
         st.caption(f"UI profissional em modo compatível: {_ATLASQUANT_UI_IMPORT_ERROR}")
 
