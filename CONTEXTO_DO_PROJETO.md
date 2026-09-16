@@ -389,3 +389,61 @@ manualmente e arredondamento por tick continuam podendo causar diferenças prát
 
 Próximo passo seguro: OTE como terceiro operacional independente, mantendo replay Python,
 Pine Strategy, estatísticas e ledger separados antes de qualquer combinação de confluência.
+
+
+## 16/09/2026 UTC — OTE como terceiro operacional independente
+
+Estado verificado:
+
+- DEV testada em `adfe95b15386fb8333aadfd4cea8df43e8dcbe24`.
+- Quality run `35099427531`: compile gate verde, **552 testes executados, 552 OK**.
+- Runtime permanece em `7a2ad3e53055fb1ef6091c39442c4c0f5212c3c1`.
+- Main observada em `d66df22927f36190caa0b8f6b012e7b9ba921cd5`; nenhuma alteração foi feita nela.
+
+### Replay OTE Python
+
+Foi criado `atlasquant_ote_replay.py`:
+
+- operacional OTE 62%-79% independente;
+- usa geometria de impulso alinhada ao ICT Engine: lookback 28 e extremo recente 12;
+- BUY: ancora low anterior -> high recente;
+- SELL: ancora high anterior -> low recente;
+- sinaliza no primeiro fechamento dentro da zona OTE por impulso;
+- evita sinal repetido no mesmo impulso;
+- se BUY e SELL estiverem válidos no mesmo candle, escolhe de forma determinística o candidato mais próximo do sweet spot 70,5%;
+- entrada `SWEET_705` ou midpoint da zona;
+- stop no swing de origem com buffer ATR opcional;
+- alvo configurável em R;
+- filtro opcional de impulso mínimo em ATR;
+- exporta retração, zona OTE, sweet 70,5%, swings, índices e impulso/ATR.
+
+### Pine Strategy OTE
+
+Foi criado `tradingview/atlasquant_ote_strategy_v1.pine`:
+
+- Strategy Tester separado de BOS/CHOCH+OB e FVG;
+- OTE 62%-79%;
+- lookback 28 / extremo recente 12;
+- sweet spot 70,5%;
+- entrada Sweet 70.5 ou Zone midpoint;
+- stop buffer ATR e alvo em R;
+- filtro de impulso/ATR, lado e sessão;
+- validade padrão de ordem pendente em 8 candles;
+- `process_orders_on_close=false`;
+- sem série externa e sem primitivas conhecidas de lookahead.
+
+### UI e paridade
+
+A aba Backtest agora possui terceiro bloco automático exclusivo para OTE, com Pine próprio,
+sinais exportáveis e ledger separado.
+
+O contrato `atlasquant_tradingview_parity.py` foi ampliado para OTE e compara defaults e
+regras centrais entre Pine e Python: RR, stop buffer, lookback, janela recente, filtro de
+impulso, 62/70,5/79, warmup e validade da ordem.
+
+**Regra preservada:** OTE continua pesquisa técnica independente. Não altera Gate, Safety Core,
+pesos do ICT readiness, Runtime ou macro/Fed.
+
+Próximo passo seguro: endurecer o OTE contra reancoragem prematura de swings e validar cenários
+de dois impulsos próximos, depois avançar para CRT/AMD apenas se as regras puderem ser
+reproduzidas de forma objetiva e auditável.
