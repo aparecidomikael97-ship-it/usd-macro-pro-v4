@@ -1260,3 +1260,16 @@ Novos arquivos usam o `snapshot_id` completo no nome. Snapshots idênticos já e
 **Regra preservada:** a restauração grava somente em `.atlasquant_research/backtest_snapshots`; não altera `dados/`, Runtime, Main, Gate ou Safety Core.
 
 Próximo passo seguro: auditoria final de pré-release da DEV e manifesto de readiness para promoção, sem promover Runtime/Main nesta etapa.
+
+
+## 16/09/2026 UTC — pre-release readiness da DEV
+
+- DEV testada em `f3bf849a21f213464e0d6f59e0fbc15c775f93de`.
+- Quality run `35111419129`: compile gate verde, **650/650 testes OK**.
+- Criado `atlasquant_dev_preflight.py` com auditoria offline/read-only de arquivos essenciais, integração do Backtest, isolamento de rede do painel, política Runtime, workflow do Autopilot, isolamento do histórico de pesquisa e paridade TradingView/Python.
+- A suíte confirmou `DEV_PREFLIGHT_OK` no estado testado.
+- Criado `docs/release/DEV_READINESS_2026-09-16.md` com evidência e limitações.
+- Estado formal: `DEV_VALIDATED_PENDING_RUNTIME_ACTIVATION`.
+- Runtime observada permaneceu `7a2ad3e53055fb1ef6091c39442c4c0f5212c3c1`.
+- Main observada em `513d0afd85df80640a2c0ed635783f46b4c3df7d`; mudou fora desta etapa.
+- Nenhuma promoção Runtime/Main foi executada. Health check pós-deploy, validação de ambiente e compilação Pine no TradingView continuam pendentes.
