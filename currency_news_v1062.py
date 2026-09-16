@@ -38,6 +38,7 @@ import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
+from atlasquant_runtime_store import resolve_runtime_branch
 
 
 CURRENCY_PROFILES = {
@@ -937,9 +938,12 @@ def _gh_cfg_v1061() -> tuple[str, str, str]:
             "GITHUB_REPO_HISTORICO",
             os.getenv("GITHUB_REPO_HISTORICO", "aparecidomikael97-ship-it/usd-macro-pro-v4")
         )
-        branch = st.secrets.get("GITHUB_BRANCH_HISTORICO", os.getenv("GITHUB_BRANCH_HISTORICO", "main"))
+        branch = resolve_runtime_branch(
+            st.secrets.get("GITHUB_DATA_BRANCH", os.getenv("GITHUB_DATA_BRANCH", "")),
+            st.secrets.get("GITHUB_BRANCH_HISTORICO", os.getenv("GITHUB_BRANCH_HISTORICO", "")),
+        )
     except Exception:
-        token, repo, branch = "", "aparecidomikael97-ship-it/usd-macro-pro-v4", "main"
+        token, repo, branch = "", "aparecidomikael97-ship-it/usd-macro-pro-v4", resolve_runtime_branch()
     return str(token).strip(), str(repo).strip(), str(branch).strip()
 
 
