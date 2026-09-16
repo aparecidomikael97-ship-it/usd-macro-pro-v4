@@ -337,3 +337,49 @@ O diagnóstico é histórico e descritivo; ele não é previsão, probabilidade 
 autorização para operar.
 
 A tabela detalhada dos blocos também pode ser baixada em CSV.
+
+
+## Walk-forward — treino anterior × teste futuro
+
+Depois do comparador e da estabilidade temporal, o AtlasQuant também pode executar um
+diagnóstico walk-forward dos cinco operacionais.
+
+O fluxo é cronológico:
+
+1. uma parte inicial do histórico vira treino;
+2. o bloco seguinte vira teste OOS;
+3. depois o treino é expandido para incluir o que já passou;
+4. o próximo bloco futuro vira novo teste;
+5. as regras dos operacionais permanecem iguais durante todo o processo.
+
+Não existe otimização automática nessa etapa.
+
+Na tela é possível escolher:
+
+- treino inicial de 50%, 60% ou 70%;
+- 2, 3 ou 4 janelas OOS;
+- mínimo de trades exigido no treino;
+- mínimo de trades exigido em cada teste.
+
+Para cada janela são mostrados:
+
+- trades de treino e teste;
+- expectativa em R de treino e teste;
+- diferença entre expectativa de teste e treino;
+- net R;
+- win rate;
+- drawdown do teste;
+- maior sequência de Loss do teste.
+
+O resumo usa quatro estados descritivos:
+
+- **POSITIVE_ALL_OOS_WINDOWS** — expectativa OOS positiva em todas as janelas válidas;
+- **NEGATIVE_ALL_OOS_WINDOWS** — expectativa OOS negativa em todas;
+- **MIXED_OOS_WINDOWS** — comportamento OOS misto;
+- **INSUFFICIENT** — amostra mínima não atendida.
+
+A tabela detalhada pode ser baixada em CSV.
+
+Esse walk-forward é apenas uma validação histórica fora da amostra. Ele não é previsão,
+probabilidade de lucro ou autorização de operação e não altera automaticamente parâmetros,
+pesos ou o Gate do AtlasQuant.
