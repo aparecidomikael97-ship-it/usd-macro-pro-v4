@@ -79,7 +79,13 @@ class ICTStructureV111Tests(unittest.TestCase):
 
     def test_order_block_invalidation_is_fail_closed(self):
         d = frame([10,11,12,11,10.5,11.5,13,12,11.5,12.5,14,13,12.5,13.5,15,10.0])
-        r = detect_order_block(d, "BUY")
+        # Isola a invalidação da zona. O caso em que surge uma quebra estrutural
+        # contrária mais nova é coberto separadamente e deve bloquear antes.
+        fake_events = [
+            {"index":14,"side":"BUY","kind":"BOS","prior_bias":"BULLISH","level":14.0,"pivot_index":10},
+        ]
+        with patch("ict_structure_v111._structure_events", return_value=fake_events):
+            r = detect_order_block(d, "BUY")
         self.assertEqual(r["status"], "🔴 ORDER BLOCK INVALIDADO")
         self.assertTrue(r["invalidated"])
         self.assertEqual(r["score"], 10)
