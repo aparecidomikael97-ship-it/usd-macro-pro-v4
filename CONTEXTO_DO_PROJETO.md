@@ -760,3 +760,87 @@ específica da amostra.
 
 Próximo passo seguro: adicionar validação por janela móvel / walk-forward simples e medir
 degradação entre treino e teste sem otimização automática, mantendo tudo como pesquisa.
+
+
+## 16/09/2026 UTC — walk-forward dos 5 operacionais
+
+Estado verificado:
+
+- DEV testada em `76a79c6760e6e5b76b4156cb3bab989fbd7dafa1`.
+- Quality run `35104652826`: compile gate verde, **595 testes executados, 595 OK**.
+- Runtime permanece em `7a2ad3e53055fb1ef6091c39442c4c0f5212c3c1`.
+- Main observada em `07b632a28e82a8cdb83f7a5219fc73d6ceb2f42a`; mudou fora desta etapa e não foi alterada.
+
+### Diagnóstico walk-forward
+
+Foi criado `atlasquant_strategy_walkforward.py`.
+
+O método usa apenas os trades históricos já executados pelos cinco replays e cria janelas
+cronológicas de **treino expansivo → teste posterior**, sem otimização automática de parâmetros.
+
+Configuração padrão:
+
+- 60% inicial do histórico como treino;
+- 3 janelas OOS posteriores;
+- mínimo de 20 trades no treino;
+- mínimo de 5 trades em cada janela de teste.
+
+Também podem ser usados:
+
+- treino inicial de 50%, 60% ou 70%;
+- 2, 3 ou 4 janelas OOS.
+
+Em cada janela:
+
+- o treino contém somente trades anteriores ao período de teste;
+- o teste nunca volta para dados anteriores;
+- depois de cada teste, a janela de treino se expande cronologicamente;
+- parâmetros e regras dos operacionais permanecem fixos;
+- nenhum resultado do teste é usado para recalibrar o setup.
+
+### Métricas walk-forward
+
+Por janela são registrados:
+
+- número de trades no treino e no teste;
+- expectativa em R no treino;
+- expectativa em R no teste;
+- diferença `test expectancy - train expectancy`;
+- net R de treino e teste;
+- win rate de treino e teste;
+- drawdown e maior sequência de loss no teste.
+
+Resumo descritivo por operacional:
+
+- `POSITIVE_ALL_OOS_WINDOWS`;
+- `NEGATIVE_ALL_OOS_WINDOWS`;
+- `MIXED_OOS_WINDOWS`;
+- `INSUFFICIENT`.
+
+Também mostra:
+
+- número de janelas OOS positivas/negativas;
+- percentual de janelas positivas;
+- expectativa média de treino;
+- expectativa média OOS;
+- degradação média da expectativa;
+- pior e melhor expectativa OOS;
+- net R total OOS.
+
+### UI / exportação
+
+O **Comparador dos 5 operacionais** ganhou:
+
+- seletor de percentual inicial de treino;
+- número de janelas OOS;
+- mínimos de trades no treino/teste;
+- resumo walk-forward;
+- tabela detalhada das janelas;
+- exportação `atlasquant_walkforward_5_*.csv`.
+
+**Limite preservado:** walk-forward é diagnóstico histórico fora da amostra, não previsão,
+não probabilidade de lucro, não otimiza parâmetros e não altera Gate, Safety Core,
+readiness, Runtime ou macro/Fed.
+
+Próximo passo seguro: auditar custos/slippage e sensibilidade dos resultados a custos antes de
+considerar qualquer uso dos resultados históricos como evidência operacional.
