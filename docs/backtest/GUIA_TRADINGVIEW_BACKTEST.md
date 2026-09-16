@@ -200,3 +200,30 @@ Para reduzir sinais repetidos no mesmo movimento, o OTE usa uma regra de nova pe
 - um segundo impulso próximo é permitido quando há uma nova origem real depois do terminal anterior.
 
 Essa regra é aplicada no replay Python e na Pine Strategy e faz parte do contrato de paridade.
+
+
+## Operacional automático CRT
+
+O CRT possui replay Python e Pine Strategy próprios, separados de OTE, FVG e BOS/CHOCH + Order Block.
+
+No AtlasQuant:
+
+1. envie o CSV de candles;
+2. abra **Backtest automático — CRT**;
+3. configure buffer do stop em ATR e, se desejar, RR mínimo;
+4. escolha BUY, SELL ou ambos;
+5. rode o backtest;
+6. baixe os sinais CRT e o ledger separados.
+
+Regra do replay:
+
+- candle 1 define o anchor range;
+- BUY: candle 2 varre o low do anchor e fecha de volta acima; candle 3 entrega para cima, fechando acima do candle 2 e do midpoint do anchor;
+- SELL: candle 2 varre o high do anchor e fecha de volta abaixo; candle 3 entrega para baixo, fechando abaixo do candle 2 e do midpoint;
+- entrada de pesquisa usa o fechamento do candle de delivery;
+- stop usa o extremo da varredura/anchor, com buffer ATR opcional;
+- alvo usa a borda oposta do anchor range;
+- a execução começa após o candle de confirmação, preservando a proteção anti-look-ahead.
+
+O arquivo `tradingview/atlasquant_crt_strategy_v1.pine` permite pesquisa visual no Strategy Tester.
+A estatística CRT permanece independente dos demais operacionais.
