@@ -71,3 +71,16 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - GitHub Actions run \`35093708480\`: **499/499 testes OK**, compile gate verde.
 - Runtime e Main não foram alteradas.
 - Pesos de Gate/readiness continuam inalterados.
+
+
+## 16/09/2026 UTC — SELL Order Block + mitigação/reteste
+
+- ICT Structure Engine atualizado para V1.1.4.
+- Adicionados \`mitigation_depth_pct\`, \`retest_count\` e \`first_touch_time\`.
+- Criado estado específico para mitigação parcial (<50%).
+- SELL coberto com múltiplas origens, origem mais recente, mitigação parcial, retestes separados e wick-through.
+- Run \`35094093071\` expôs bug na direção da métrica de profundidade para SELL.
+- Correção aplicada: BUY mede da borda superior; SELL mede da borda inferior.
+- GitHub Actions run \`35094192679\`: **503/503 testes OK**, compile gate verde.
+- Runtime/Main não foram alteradas.
+- Gate/readiness continuam sem novos pesos.

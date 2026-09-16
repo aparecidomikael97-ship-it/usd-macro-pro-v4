@@ -158,3 +158,42 @@ O primeiro run desta etapa (\`35093608004\`) encontrou 1 regressão no teste ant
 **Regra preservada:** BOS/CHOCH e Order Block continuam observacionais. Nenhum peso de readiness institucional nem Gate foi alterado.
 
 Próximo passo seguro: testar Order Block SELL com múltiplas origens e cenários de mitigação parcial/reteste, mantendo a lógica fail-closed antes de qualquer discussão sobre pesos.
+
+
+## 16/09/2026 UTC — Order Block SELL, mitigação parcial e retestes
+
+Estado verificado:
+
+- DEV testada em \`66d6257991aabcd6114a6171c98de98ab2e34755\`.
+- Quality run \`35094192679\`: compile gate verde, **503 testes executados, 503 OK**.
+- Runtime permanece em \`7a2ad3e53055fb1ef6091c39442c4c0f5212c3c1\`.
+- Main permanece em \`8a41a9acc8360753bbb31627e227156182fdac2b\`; nenhuma alteração foi feita nela.
+
+### ICT Structure Engine V1.1.4
+
+- Adicionada telemetria de mitigação do Order Block:
+  - \`mitigation_depth_pct\`;
+  - \`retest_count\`;
+  - \`first_touch_time\`.
+- Mitigação parcial (<50%) recebe estado próprio: \`ORDER BLOCK PARCIALMENTE MITIGADO / ATIVO\`.
+- Retestes separados são contados por episódios, não apenas por número de candles dentro da zona.
+- Wick que atravessa a zona sem fechamento além da borda de invalidação não invalida automaticamente o OB.
+- SELL ganhou cobertura simétrica para:
+  - múltiplas origens bullish;
+  - escolha da origem mais recente;
+  - mitigação parcial;
+  - múltiplos retestes;
+  - wick-through sem fechamento invalidante.
+
+### Defeito encontrado e corrigido pelos testes
+
+O primeiro run desta etapa (\`35094093071\`) encontrou 2 falhas. A métrica inicial de profundidade usava o maior valor entre penetração por cima e por baixo, o que superestimava a mitigação em SELL. A função foi corrigida para medir a profundidade pela borda correta do Order Block:
+
+- BUY: entrada/mitigação medida a partir da borda superior;
+- SELL: entrada/mitigação medida a partir da borda inferior.
+
+Após a correção, o run \`35094192679\` passou com **503/503**.
+
+**Regra preservada:** essa telemetria é observacional e não altera Gate, pesos de readiness ou autorização de execução.
+
+Próximo passo seguro: testar a mesma telemetria de profundidade/reteste no lado BUY e validar cenários de gap/vela que toca a zona apenas por wick, mantendo simetria entre os dois lados.
