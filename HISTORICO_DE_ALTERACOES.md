@@ -112,3 +112,16 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - Replay exporta sinais gerados e ledger completo.
 - GitHub Actions run \`35097346652\`: **530/530 testes OK**, compile gate verde.
 - Runtime/Main não foram alteradas.
+
+
+## 16/09/2026 UTC — FVG independente no Backtest e TradingView
+
+- Criado \`atlasquant_fvg_replay.py\`.
+- Criada \`tradingview/atlasquant_fvg_strategy_v1.pine\`.
+- Aba Backtest ganhou replay FVG separado do BOS/CHOCH + Order Block.
+- FVG exporta sinais e ledger próprios; estatísticas não são misturadas.
+- Parâmetros: Midpoint/Proximal, stop buffer ATR, alvo R, gap mínimo/ATR, BUY/SELL.
+- Workflow de qualidade passou a reagir também a mudanças em \`tradingview/**\`.
+- Run \`35097878643\` encontrou 1 falha de contrato textual no comentário do Pine; corrigido sem alterar lógica.
+- GitHub Actions run \`35097997003\`: **540/540 testes OK**, compile gate verde.
+- Runtime/Main não foram alteradas.

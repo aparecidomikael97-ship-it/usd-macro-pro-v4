@@ -289,3 +289,61 @@ O replay usa janela estrutural limitada para evitar crescimento quadrático em C
 **Limite mantido:** Pine/replay são pesquisa técnica. Macro, Fed, eventos, força relativa, Safety Core e Gate continuam no motor AtlasQuant e não são fingidos no TradingView.
 
 Próximo passo seguro: ampliar a validação de paridade entre Pine e replay Python e adicionar FVG como segundo operacional técnico objetivo, sem misturar estatísticas entre estratégias.
+
+
+## 16/09/2026 UTC — FVG como segundo operacional independente
+
+Estado verificado:
+
+- DEV testada em \`34e7bc55247fd4e43412a91853bff1ee39114a52\`.
+- Quality run \`35097997003\`: compile gate verde, **540 testes executados, 540 OK**.
+- Runtime permanece em \`7a2ad3e53055fb1ef6091c39442c4c0f5212c3c1\`.
+- Main permanece em \`107c77100bc49c39da922a3bfb18ff7557d74d22\`; nenhuma alteração foi feita nela.
+
+### Replay FVG Python
+
+Foi criado \`atlasquant_fvg_replay.py\`:
+
+- FVG BUY: low do terceiro candle acima do high de dois candles atrás;
+- FVG SELL: high do terceiro candle abaixo do low de dois candles atrás;
+- sinal é criado somente no candle em que o gap nasce;
+- entrada Midpoint ou Proximal;
+- stop na borda oposta, com buffer ATR opcional;
+- alvo em múltiplos de R;
+- filtro opcional de tamanho mínimo do gap em ATR;
+- BUY e SELL podem ser ativados separadamente;
+- cada sinal registra tamanho do gap, gap/ATR, zona, sessão e índice histórico;
+- usa o mesmo motor genérico de backtest e bloqueio de posição sobreposta por par.
+
+### Pine Strategy FVG
+
+Foi criado \`tradingview/atlasquant_fvg_strategy_v1.pine\`:
+
+- Strategy Tester independente do BOS/CHOCH + OB;
+- FVG bullish/bearish de três candles;
+- entrada Midpoint/Proximal;
+- stop/buffer ATR;
+- alvo em R;
+- validade do setup em candles;
+- filtro de sessão e lado;
+- \`process_orders_on_close=false\`;
+- sem \`request.security\` e sem primitivas conhecidas de lookahead.
+
+O workflow de qualidade agora também dispara quando arquivos em \`tradingview/**\` mudam.
+
+### UI / estatística separada
+
+A aba Backtest ganhou um segundo bloco automático exclusivo para FVG. Ele não mistura
+estatísticas com BOS/CHOCH + Order Block. O usuário pode baixar o Pine FVG, os sinais
+gerados e o ledger completo separadamente.
+
+O primeiro run desta etapa (\`35097878643\`) encontrou 1 falha apenas no contrato textual
+de segurança: o comentário do Pine continha literalmente o nome de uma primitiva
+proibida. O comentário foi corrigido sem mudar a lógica; o run seguinte
+(\`35097997003\`) ficou totalmente verde com 540/540.
+
+**Regra preservada:** FVG continua pesquisa técnica. Não altera pesos do ICT readiness,
+Safety Core, Gate ou Runtime.
+
+Próximo passo seguro: criar validação de paridade de regras entre Pine e replay Python
+para FVG e BOS/CHOCH+OB, e depois avançar para OTE como terceiro operacional objetivo.

@@ -121,3 +121,27 @@ Nesse modo:
 8. baixe tanto a planilha de sinais gerados quanto o ledger final.
 
 Esse replay é técnico. Ele não reconstrói automaticamente Fed, calendário macro ou força de moedas histórica.
+
+
+## Operacional automático FVG
+
+O FVG agora possui um replay e uma Pine Strategy independentes.
+
+No AtlasQuant:
+
+1. envie o CSV de candles;
+2. abra **Backtest automático — FVG**;
+3. configure alvo em R, buffer do stop em ATR, tamanho mínimo do gap em ATR e entrada Midpoint/Proximal;
+4. escolha BUY, SELL ou ambos;
+5. rode o backtest;
+6. baixe os sinais FVG e o ledger separados.
+
+Regra do replay:
+
+- bullish FVG: o low do terceiro candle está acima do high de dois candles atrás;
+- bearish FVG: o high do terceiro candle está abaixo do low de dois candles atrás;
+- o sinal só existe depois que o terceiro candle está disponível;
+- a execução do backtest começa depois do candle do sinal.
+
+O arquivo \`tradingview/atlasquant_fvg_strategy_v1.pine\` serve para pesquisa visual no
+Strategy Tester. A estatística FVG é mantida separada da estratégia BOS/CHOCH + Order Block.
