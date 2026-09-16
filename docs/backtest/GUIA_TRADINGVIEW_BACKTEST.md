@@ -145,3 +145,16 @@ Regra do replay:
 
 O arquivo \`tradingview/atlasquant_fvg_strategy_v1.pine\` serve para pesquisa visual no
 Strategy Tester. A estatística FVG é mantida separada da estratégia BOS/CHOCH + Order Block.
+
+
+## Paridade TradingView ↔ Python
+
+A tela de Backtest possui um bloco de verificação de paridade estática.
+
+Ele compara parâmetros e regras-chave das Pine Strategies com os replays Python para reduzir
+drift acidental durante o desenvolvimento. Se um parâmetro central mudar de um lado e não do
+outro, o Quality workflow deve falhar.
+
+A verificação não substitui a compilação do Pine no TradingView e não promete equivalência
+perfeita com o broker emulator. Diferenças de timezone, sessão e tick size ainda precisam ser
+observadas durante validação no gráfico.

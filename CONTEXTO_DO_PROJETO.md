@@ -347,3 +347,45 @@ Safety Core, Gate ou Runtime.
 
 Próximo passo seguro: criar validação de paridade de regras entre Pine e replay Python
 para FVG e BOS/CHOCH+OB, e depois avançar para OTE como terceiro operacional objetivo.
+
+
+## 16/09/2026 UTC — contrato de paridade TradingView ↔ Python
+
+Estado verificado:
+
+- DEV testada em \`5c09c5a62802c0b7b071da02d1be29d7e118c52e\`.
+- Quality run \`35098491162\`: compile gate verde, **543 testes executados, 543 OK**.
+- Runtime permanece em \`7a2ad3e53055fb1ef6091c39442c4c0f5212c3c1\`.
+- Main permanece em \`107c77100bc49c39da922a3bfb18ff7557d74d22\`; nenhuma alteração foi feita nela.
+
+### Validador de drift Pine/Python
+
+Foi criado \`atlasquant_tradingview_parity.py\`, offline/read-only, para impedir drift silencioso
+entre as estratégias Pine e os replays Python.
+
+O contrato verifica:
+
+- processamento das ordens após o candle do sinal;
+- ausência de série externa no Pine;
+- defaults de RR, stop buffer e modo de entrada;
+- FVG: fórmula bullish/bearish, gap mínimo e validade padrão da ordem;
+- BOS/CHOCH + OB: warmup, pivôs 2/2, ATR 14, ruído 0,05 ATR, origem limitada a 8 candles,
+  displacement 0,65 body/ATR e 0,85 range/ATR;
+- validade padrão da ordem pendente alinhada em 8 candles entre Pine e backtest Python.
+
+A Pine BOS/CHOCH + OB foi ajustada para:
+
+- \`maxSetupAge = 8\`, alinhando a janela padrão de entrada com o Python;
+- warmup explícito de 20 candles (\`bar_index >= 19\`), alinhando o início do replay técnico.
+
+A aba Backtest ganhou um painel **Paridade TradingView ↔ Python** com o status das
+verificações.
+
+### Limite explícito
+
+Esse contrato é **paridade estática de regras**, não compilação do Pine e não prova
+equivalência integral com o broker emulator do TradingView. Timezone, sessão configurada
+manualmente e arredondamento por tick continuam podendo causar diferenças práticas.
+
+Próximo passo seguro: OTE como terceiro operacional independente, mantendo replay Python,
+Pine Strategy, estatísticas e ledger separados antes de qualquer combinação de confluência.

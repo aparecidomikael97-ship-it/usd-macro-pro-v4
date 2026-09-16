@@ -125,3 +125,14 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - Run \`35097878643\` encontrou 1 falha de contrato textual no comentário do Pine; corrigido sem alterar lógica.
 - GitHub Actions run \`35097997003\`: **540/540 testes OK**, compile gate verde.
 - Runtime/Main não foram alteradas.
+
+
+## 16/09/2026 UTC — paridade TradingView/Python
+
+- Criado \`atlasquant_tradingview_parity.py\` para detectar drift estático entre Pine e replay Python.
+- Ajustado BOS/CHOCH+OB Pine para validade padrão de 8 candles, igual ao backtest Python.
+- Adicionado warmup explícito de 20 candles na Pine BOS/CHOCH+OB.
+- Contratos cobrem defaults e fórmulas-chave de FVG e BOS/CHOCH+OB.
+- Aba Backtest exibe status da paridade.
+- GitHub Actions run \`35098491162\`: **543/543 testes OK**, compile gate verde.
+- Runtime/Main não foram alteradas.
