@@ -925,3 +925,76 @@ não otimiza setup, não altera Gate, Safety Core, readiness, Runtime ou macro/F
 
 Próximo passo seguro: adicionar análise por sessão/par sob fricção e um teste de robustez de
 parâmetros em grade pequena e pré-definida, sem escolher automaticamente "o melhor" conjunto.
+
+
+## 16/09/2026 UTC — robustez por sessão/par e parâmetros pré-definidos
+
+Estado verificado:
+
+- DEV testada em `65897994707855420ad3d3494a9c9cfe2ad703b1`.
+- Quality run `35106389108`: compile gate verde, **615 testes executados, 615 OK**.
+- Runtime permanece em `7a2ad3e53055fb1ef6091c39442c4c0f5212c3c1`.
+- Main permanece em `07b632a28e82a8cdb83f7a5219fc73d6ceb2f42a`; não foi alterada nesta etapa.
+
+### Fricção por sessão e par
+
+`atlasquant_strategy_friction.py` agora também quebra o stress de custos/slippage por:
+
+- sessão;
+- par/ativo;
+- estratégia;
+- cenário de fricção.
+
+Cada segmento mantém sua própria contagem de trades, Gain/Loss/BE, Win Rate observado,
+expectativa em R, Net R, Profit Factor, Drawdown e sequência máxima de Loss.
+
+A tela possui o expander **Ver custos/slippage por sessão e par** e exportação CSV específica.
+
+### Robustez de parâmetros pré-definidos
+
+Foi criado `atlasquant_strategy_parameter_robustness.py`.
+
+O objetivo é verificar se o comportamento histórico muda de forma abrupta quando pequenas
+variações, definidas previamente no código, são aplicadas. **Não há busca automática do melhor
+parâmetro e não existe ranking de variantes.**
+
+Grade fixa atual:
+
+- BOS/CHOCH + OB: alvo 1,5R / 2,0R base / 2,5R;
+- FVG: gap mínimo 0 / 0,10 / 0,20 ATR;
+- OTE: Sweet 70,5 base / Zone Midpoint / impulso mínimo 0,50 ATR;
+- CRT: RR mínimo 0 / 0,50 / 1,00;
+- AMD/PO3: acumulação 6 / 8 base / 10 candles.
+
+Cada variante é executada de forma independente com o mesmo histórico e os mesmos parâmetros
+gerais de backtest/custos/slippage.
+
+Resumo por operacional:
+
+- `POSITIVE_ALL_PREDEFINED_VARIANTS`;
+- `NEGATIVE_ALL_PREDEFINED_VARIANTS`;
+- `MIXED_PREDEFINED_VARIANTS`;
+- `INSUFFICIENT`.
+
+Também são mostrados:
+
+- número de variantes positivas;
+- expectativa da variante BASE;
+- pior/melhor expectativa;
+- spread de expectativa;
+- mínimo/máximo de trades entre variantes.
+
+A amostra mínima por variante é configurável, padrão **20 trades**.
+
+### Proteção de performance e interpretação
+
+A robustez de parâmetros fica **desativada por padrão na UI**, pois roda 15 replays
+(3 variantes × 5 operacionais) e pode ser mais pesada em CSVs longos. O usuário ativa
+explicitamente quando quiser executar essa auditoria.
+
+**Regra preservada:** nenhuma variante é promovida automaticamente, nenhum "melhor setup" é
+selecionado e nenhum resultado altera Gate, Safety Core, readiness, Runtime ou macro/Fed.
+
+Próximo passo seguro: endurecer a robustez com comparação por sessão dentro das variantes e
+depois preparar um relatório consolidado de evidências do Backtest, sem transformar métricas
+históricas em previsão.
