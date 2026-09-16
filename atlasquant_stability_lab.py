@@ -219,12 +219,12 @@ def render_stability_lab(
 
     if not folds.empty:
         st.markdown("#### Walk-forward cronológico")
-        st.dataframe(folds,use_container_width=True,hide_index=True)
+        st.dataframe(folds,width="stretch",hide_index=True)
 
     if not sessions.empty:
         st.markdown("#### Performance por sessão")
         st.caption("Sessões calculadas com fusos oficiais e ajuste automático de horário de verão.")
-        st.dataframe(sessions,use_container_width=True,hide_index=True)
+        st.dataframe(sessions,width="stretch",hide_index=True)
 
     data=add_stability_dimensions(df,horizon)
     if not data.empty and "Regime" in data.columns:
@@ -241,7 +241,7 @@ def render_stability_lab(
                     "Retorno médio %":round(float(vals.mean()),4),
                 })
         if regime_rows:
-            st.dataframe(pd.DataFrame(regime_rows),use_container_width=True,hide_index=True)
+            st.dataframe(pd.DataFrame(regime_rows),width="stretch",hide_index=True)
 
     if summary["status"]=="STABLE":
         st.success("As janelas avaliadas estão relativamente consistentes; qualquer mudança de modelo continua manual.")
