@@ -176,3 +176,19 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - Paridade TradingView/Python passou a verificar regras e defaults centrais do CRT.
 - GitHub Actions run `35101892468`: **564/564 testes OK**, compile gate verde.
 - Runtime/Main não foram alteradas.
+
+
+## 16/09/2026 UTC — AMD / Power of Three independente
+
+- Criado `atlasquant_amd_replay.py`.
+- Criada `tradingview/atlasquant_amd_strategy_v1.pine`.
+- AMD usa máquina de estados rígida: Acumulação → Manipulação → Distribuição.
+- Range de acumulação é congelado antes da manipulação.
+- Distribuição só pode confirmar em candle posterior e também precisa superar o fechamento da manipulação no lado esperado.
+- Adicionadas expiração da manipulação, buffer ATR, RR mínimo e alvos estruturais na borda oposta da acumulação.
+- Sweep nos dois lados é resolvido de forma determinística pela profundidade normalizada.
+- Aba Backtest ganhou bloco AMD separado, Pine próprio, sinais exportáveis e ledger exclusivo.
+- Paridade TradingView/Python passou a validar os contratos centrais do AMD/PO3.
+- Primeiro run encontrou 1 teste com expectativa mais frouxa que a regra do motor; teste corrigido sem afrouxar a lógica.
+- GitHub Actions run `35102692080`: **576/576 testes OK**, compile gate verde.
+- Runtime/Main não foram alteradas.
