@@ -5,15 +5,21 @@ from typing import Any
 import pandas as pd
 import requests
 import streamlit as st
+from atlasquant_runtime_store import resolve_runtime_branch
 
 STATUS_PATH="dados/autopilot_status_v107.json"
 
 def _cfg():
-    return (
-        str(st.secrets.get("GITHUB_TOKEN_HISTORICO", os.getenv("GITHUB_TOKEN_HISTORICO",""))),
-        str(st.secrets.get("GITHUB_REPO_HISTORICO", os.getenv("GITHUB_REPO_HISTORICO",""))),
-        str(st.secrets.get("GITHUB_BRANCH_HISTORICO", os.getenv("GITHUB_BRANCH_HISTORICO","main")) or "main"),
-    )
+    try:
+        token=st.secrets.get("GITHUB_TOKEN_HISTORICO", os.getenv("GITHUB_TOKEN_HISTORICO",""))
+        repo=st.secrets.get("GITHUB_REPO_HISTORICO", os.getenv("GITHUB_REPO_HISTORICO",""))
+        branch=resolve_runtime_branch(
+            st.secrets.get("GITHUB_DATA_BRANCH", os.getenv("GITHUB_DATA_BRANCH","")),
+            st.secrets.get("GITHUB_BRANCH_HISTORICO", os.getenv("GITHUB_BRANCH_HISTORICO","")),
+        )
+    except Exception:
+        token,repo,branch="","",resolve_runtime_branch()
+    return str(token),str(repo),str(branch)
 
 def _load_status() -> tuple[dict[str,Any],str]:
     token,repo,branch=_cfg()
