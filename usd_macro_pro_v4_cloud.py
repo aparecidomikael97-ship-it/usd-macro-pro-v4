@@ -125,6 +125,14 @@ except Exception as _exp_budget_exc:
 
 
 try:
+    from atlasquant_adaptive_coverage import render_adaptive_coverage_plan
+    _ATLASQUANT_ADAPTIVE_COVERAGE_IMPORT_ERROR = ""
+except Exception as _adaptive_coverage_exc:
+    render_adaptive_coverage_plan = None
+    _ATLASQUANT_ADAPTIVE_COVERAGE_IMPORT_ERROR = f"{type(_adaptive_coverage_exc).__name__}: {_adaptive_coverage_exc}"
+
+
+try:
     from atlasquant_validation_readiness import render_validation_readiness
     _ATLASQUANT_VALIDATION_IMPORT_ERROR = ""
 except Exception as _validation_exc:
@@ -8935,6 +8943,14 @@ with abas[12]:
             target_pairs=28,
             daily_cap=480,
         )
+
+    st.divider()
+    if render_adaptive_coverage_plan is None:
+        st.warning("Plano adaptativo de cobertura indisponível; pipeline atual permanece inalterado.")
+        if _ATLASQUANT_ADAPTIVE_COVERAGE_IMPORT_ERROR:
+            st.caption(f"Diagnóstico Adaptive Coverage: {_ATLASQUANT_ADAPTIVE_COVERAGE_IMPORT_ERROR}")
+    else:
+        render_adaptive_coverage_plan()
 
     st.divider()
     if render_validation_readiness is None:
