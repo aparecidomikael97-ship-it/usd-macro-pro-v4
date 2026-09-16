@@ -15,6 +15,7 @@ from typing import Any
 from atlasquant_strategy_replay import generate_bos_choch_ob_signals
 from atlasquant_fvg_replay import generate_fvg_signals
 from atlasquant_ote_replay import generate_ote_signals
+from atlasquant_crt_replay import generate_crt_signals
 import ict_structure_v111
 
 
@@ -57,6 +58,7 @@ def validate_tradingview_parity() -> dict[str, Any]:
     bos=_pine("atlasquant_bos_choch_ob_strategy_v1.pine")
     fvg=_pine("atlasquant_fvg_strategy_v1.pine")
     ote=_pine("atlasquant_ote_strategy_v1.pine")
+    crt=_pine("atlasquant_crt_strategy_v1.pine")
     ote_src=inspect.getsource(generate_ote_signals)
     structure_src=inspect.getsource(ict_structure_v111)
     checks=[]
@@ -69,6 +71,8 @@ def validate_tradingview_parity() -> dict[str, Any]:
         _check("fvg_no_external_series","request.security" not in fvg.lower(),"FVG Pine must stay single-series/offline."),
         _check("ote_next_bar_processing","process_orders_on_close=false" in ote.replace(" ",""),"Pine OTE must process orders after the signal close."),
         _check("ote_no_external_series","request.security" not in ote.lower(),"OTE Pine must stay single-series/offline."),
+        _check("crt_next_bar_processing","process_orders_on_close=false" in crt.replace(" ",""),"Pine CRT must process orders after the signal close."),
+        _check("crt_no_external_series","request.security" not in crt.lower(),"CRT Pine must stay single-series/offline."),
     ]
 
     # FVG defaults and core geometry.
@@ -100,6 +104,20 @@ def validate_tradingview_parity() -> dict[str, Any]:
             and "origin_global<=previous_terminal" in ote_src,
             "OTE same-side signals must start after the previous emitted impulse terminal.",
         ),
+    ]
+
+    # CRT defaults and three-candle rule contract.
+    checks += [
+        _check("crt_stop_buffer_default",_input_number(crt,"stopBufferAtr")==float(_default(generate_crt_signals,"stop_buffer_atr")),"Pine/Python CRT stop buffer default must match."),
+        _check("crt_min_rr_default",_input_number(crt,"minRR")==float(_default(generate_crt_signals,"min_rr")),"Pine/Python CRT min RR default must match."),
+        _check("crt_wait_default",_input_number(crt,"maxSetupAge")==8.0,"Pine CRT pending-order life must match backtest default."),
+        _check("crt_warmup","replayReady = bar_index >= 13 and not na(atr)" in crt and int(_default(generate_crt_signals,"min_bars"))==14,"CRT Pine/Python warmup must align at 14 bars."),
+        _check("crt_buy_raid","low[1] < anchorLow and close[1] > anchorLow" in crt,"CRT BUY raid/reclaim rule must match."),
+        _check("crt_buy_delivery","close > close[1] and close > anchorMid" in crt,"CRT BUY delivery rule must match."),
+        _check("crt_sell_raid","high[1] > anchorHigh and close[1] < anchorHigh" in crt,"CRT SELL raid/reclaim rule must match."),
+        _check("crt_sell_delivery","close < close[1] and close < anchorMid" in crt,"CRT SELL delivery rule must match."),
+        _check("crt_structural_targets","buyTarget = anchorHigh" in crt and "sellTarget = anchorLow" in crt,"CRT targets must remain the opposite anchor boundary."),
+        _check("crt_entry_close","buyEntry = close" in crt and "sellEntry = close" in crt,"CRT confirmed delivery close must remain the pending entry reference."),
     ]
 
     # BOS/CHOCH + OB defaults and rule contract.
