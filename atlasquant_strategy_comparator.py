@@ -75,6 +75,7 @@ def run_strategy_suite(
     max_wait_bars: int = 8,
     max_hold_bars: int = 96,
     cost_r: float = 0.0,
+    slippage_r: float = 0.0,
 ) -> "OrderedDict[str, dict[str, Any]]":
     """Generate + backtest all five strategies without mixing their trades."""
     signals_by_strategy=generate_strategy_signals(candles,pair)
@@ -88,6 +89,7 @@ def run_strategy_suite(
             max_wait_bars=int(max_wait_bars),
             max_hold_bars=int(max_hold_bars),
             cost_r=float(cost_r),
+            slippage_r=float(slippage_r),
             start_after_signal_bar=True,
         )
         suite[strategy]={
