@@ -277,14 +277,66 @@ def backtest_signal(
 def backtest_many(
     candles_by_pair: Mapping[str, pd.DataFrame],
     signals: Iterable[Mapping[str, Any]],
+    *,
+    single_position_per_pair: bool = False,
     **kwargs: Any,
 ) -> list[dict[str, Any]]:
-    rows = []
-    for raw in signals:
-        signal = dict(raw)
+    raw_signals=[dict(x) for x in signals]
+    if not single_position_per_pair:
+        rows = []
+        for signal in raw_signals:
+            pair = str(signal.get("pair", signal.get("asset", "")))
+            frame = candles_by_pair.get(pair, pd.DataFrame())
+            rows.append(backtest_signal(frame, signal, **kwargs))
+        return rows
+
+    def _signal_key(signal: Mapping[str, Any]) -> tuple[str, pd.Timestamp]:
+        pair=str(signal.get("pair",signal.get("asset","")))
+        try:
+            ts=pd.Timestamp(signal.get("signal_time"))
+            if ts.tzinfo is None:
+                ts=ts.tz_localize("UTC")
+            else:
+                ts=ts.tz_convert("UTC")
+        except Exception:
+            ts=pd.Timestamp.max.tz_localize("UTC")
+        return pair,ts
+
+    rows=[]
+    busy_until: dict[str,pd.Timestamp] = {}
+    for signal in sorted(raw_signals,key=_signal_key):
         pair = str(signal.get("pair", signal.get("asset", "")))
+        _,signal_ts=_signal_key(signal)
+        last_exit=busy_until.get(pair)
+        if last_exit is not None and signal_ts <= last_exit:
+            rows.append({
+                "pair":pair,
+                "setup":str(signal.get("setup","UNSPECIFIED")),
+                "session":str(signal.get("session","")),
+                "source":str(signal.get("source","ATLASQUANT")),
+                "notes":str(signal.get("notes","")),
+                "signal_time":signal_ts,
+                "side":str(signal.get("side","")).upper(),
+                "status":"OVERLAP_BLOCKED",
+                "outcome":"NO_TRADE",
+                "reason":"SINGLE_POSITION_PER_PAIR",
+                "net_r":None,
+            })
+            continue
+
         frame = candles_by_pair.get(pair, pd.DataFrame())
-        rows.append(backtest_signal(frame, signal, **kwargs))
+        result=backtest_signal(frame, signal, **kwargs)
+        rows.append(result)
+        if result.get("net_r") is not None and result.get("exit_time"):
+            try:
+                exit_ts=pd.Timestamp(result["exit_time"])
+                if exit_ts.tzinfo is None:
+                    exit_ts=exit_ts.tz_localize("UTC")
+                else:
+                    exit_ts=exit_ts.tz_convert("UTC")
+                busy_until[pair]=exit_ts
+            except Exception:
+                pass
     return rows
 
 
