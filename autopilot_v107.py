@@ -43,6 +43,11 @@ from ict_execution_v108 import detect_crt, detect_ote, detect_amd, detect_fvg
 from institutional_engine_v110 import build_institutional_snapshot, SMT_COMPANIONS
 
 from atlasquant_runtime_store import resolve_runtime_branch, require_runtime_branch
+from atlasquant_quota_shadow import (
+    build_quota_shadow_sample,
+    append_quota_shadow_sample,
+    summarize_quota_shadow,
+)
 
 from market_map_core_v10 import (
     NY_TZ,
@@ -79,6 +84,7 @@ MASTER_PATH = "dados/master_market_map_v102.json"
 DAILY_CACHE_PATH = "dados/autopilot_daily_cache_v107.json"
 NEWS_CURRENT_PATH = "dados/currency_news_current_v107.json"
 NEWS_VALIDATION_PATH = "dados/currency_news_validation_v1061.csv"
+QUOTA_SHADOW_PATH = "dados/atlasquant_quota_shadow_v1.json"
 
 M15_EVERY_MIN = 55
 H1_EVERY_MIN = 115
@@ -242,6 +248,7 @@ def run_headless_app() -> tuple[bool, str]:
             "CHAVE_EODHD",
             "GITHUB_TOKEN_HISTORICO",
             "GITHUB_REPO_HISTORICO",
+            "GITHUB_DATA_BRANCH",
             "GITHUB_BRANCH_HISTORICO",
         ]
         injected = 0
@@ -1256,6 +1263,39 @@ def main() -> int:
         app_ok,app_msg,inputs,scanner,master,intel,validation,
         all_errors,total_calls,snap_stats
     )
+
+    # 7. 28FX quota shadow telemetry — observational only.
+    # Never changes PAIR_ORDER, cadence, quota, API behavior or execution gates.
+    quota_state,quota_read_err=gh_get_json(
+        QUOTA_SHADOW_PATH,
+        {"version":"V1","samples":[]},
+    )
+    quota_samples=list((quota_state or {}).get("samples",[]) or []) if isinstance(quota_state,Mapping) else []
+    quota_sample=build_quota_shadow_sample(status)
+    quota_samples,quota_added=append_quota_shadow_sample(quota_samples,quota_sample)
+    quota_summary=summarize_quota_shadow(quota_samples)
+    quota_payload={
+        "version":"V1",
+        "updated_at":status.get("last_run"),
+        "samples":quota_samples,
+        "summary":quota_summary,
+    }
+    quota_ok=False
+    quota_write_err=""
+    if not quota_read_err:
+        quota_ok,quota_write_err=gh_put_json(
+            QUOTA_SHADOW_PATH,
+            quota_payload,
+            "AtlasQuant 28FX: quota shadow telemetry",
+        )
+    status["quota_shadow"]={
+        **quota_summary,
+        "sample_added":bool(quota_added),
+        "persisted":bool(quota_ok),
+        "error":quota_read_err or quota_write_err,
+        "automatic_expansion_allowed":False,
+    }
+
     ok,err=gh_put_json(STATUS_PATH,status,"V11.0 Autopilot: status")
     if not ok:
         all_errors.append("Salvar status: "+err)
