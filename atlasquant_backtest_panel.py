@@ -33,6 +33,7 @@ from atlasquant_strategy_comparator import (
     combined_ledger,
 )
 from atlasquant_strategy_stability import temporal_stability_report
+from atlasquant_strategy_walkforward import walk_forward_report
 from atlasquant_tradingview_parity import validate_tradingview_parity
 
 
@@ -814,6 +815,35 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                 key="atlasquant_compare_min_fold_trades",
             )
 
+        wf1,wf2,wf3,wf4=st.columns(4)
+        with wf1:
+            wf_train_pct=st.selectbox(
+                "Treino inicial walk-forward",
+                [50,60,70],
+                index=1,
+                format_func=lambda x:f"{x}%",
+                key="atlasquant_compare_wf_train_pct",
+            )
+        with wf2:
+            wf_windows=st.selectbox(
+                "Janelas OOS",
+                [2,3,4],
+                index=1,
+                key="atlasquant_compare_wf_windows",
+            )
+        with wf3:
+            wf_min_train=st.number_input(
+                "Mín. trades treino",
+                min_value=5,max_value=500,value=20,step=5,
+                key="atlasquant_compare_wf_min_train",
+            )
+        with wf4:
+            wf_min_test=st.number_input(
+                "Mín. trades teste",
+                min_value=2,max_value=100,value=5,step=1,
+                key="atlasquant_compare_wf_min_test",
+            )
+
         if candle_file is None:
             st.info("Envie o CSV de candles para comparar os cinco operacionais.")
         else:
@@ -901,8 +931,42 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                             hide_index=True,
                         )
 
+                walkforward=walk_forward_report(
+                    suite,
+                    initial_train_pct=int(wf_train_pct),
+                    test_windows=int(wf_windows),
+                    min_train_trades=int(wf_min_train),
+                    min_test_trades=int(wf_min_test),
+                )
+                wf_summary=walkforward["summary"]
+                wf_windows_df=walkforward["windows"]
+
+                st.markdown("#### Walk-forward — treino anterior × teste futuro")
+                st.caption(
+                    "Usa treino expansivo e janelas posteriores de teste, sem otimizar parâmetros. "
+                    "Cada janela de teste fica cronologicamente depois do treino correspondente."
+                )
+                wf_cols=[
+                    "operacional","windows_available","positive_test_windows","negative_test_windows",
+                    "positive_test_pct","avg_train_expectancy_r","avg_test_expectancy_r",
+                    "avg_expectancy_delta_r","worst_test_expectancy_r","best_test_expectancy_r",
+                    "total_test_net_r","walk_forward_status",
+                ]
+                st.dataframe(
+                    wf_summary.reindex(columns=wf_cols),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+                if not wf_windows_df.empty:
+                    with st.expander("Ver janelas walk-forward detalhadas",expanded=False):
+                        st.dataframe(
+                            wf_windows_df,
+                            use_container_width=True,
+                            hide_index=True,
+                        )
+
                 all_ledger=combined_ledger(suite)
-                cexp1,cexp2,cexp3=st.columns(3)
+                cexp1,cexp2,cexp3,cexp4=st.columns(4)
                 with cexp1:
                     st.download_button(
                         "📥 Baixar comparação (CSV)",
@@ -927,6 +991,14 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                         file_name=f"atlasquant_estabilidade_5_{default_pair.replace('/','_')}.csv",
                         mime="text/csv",
                         key="atlasquant_compare_export_stability",
+                    )
+                with cexp4:
+                    st.download_button(
+                        "📥 Baixar walk-forward (CSV)",
+                        data=wf_windows_df.to_csv(index=False),
+                        file_name=f"atlasquant_walkforward_5_{default_pair.replace('/','_')}.csv",
+                        mime="text/csv",
+                        key="atlasquant_compare_export_walkforward",
                     )
 
                 st.caption(
