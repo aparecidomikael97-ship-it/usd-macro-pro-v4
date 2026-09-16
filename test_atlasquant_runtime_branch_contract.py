@@ -55,6 +55,26 @@ class AtlasQuantRuntimeBranchContractTests(unittest.TestCase):
         basic_pos=src.index('if _aq_view_mode != "Pro":')
         self.assertLess(capture_pos,basic_pos)
 
+    def test_all_packaged_workflows_avoid_main_runtime_writes(self):
+        paths=[
+            ROOT/".github/workflows/autopilot-v107.yml",
+            ROOT/"autopilot-v107.yml",
+            ROOT/".github/workflows/coleta_automatica.yml",
+        ]
+        for path in paths:
+            with self.subTest(path=str(path)):
+                src=path.read_text(encoding="utf-8")
+                self.assertIn("atlasquant-runtime",src)
+                self.assertNotIn('GITHUB_BRANCH_HISTORICO: "main"',src)
+                self.assertNotIn('GITHUB_BRANCH_HISTORICO = "main"',src)
+
+    def test_legacy_news_modules_use_runtime_resolver(self):
+        for name in ("currency_news_v1061.py","currency_news_v1062.py"):
+            with self.subTest(name=name):
+                src=(ROOT/name).read_text(encoding="utf-8")
+                self.assertIn("resolve_runtime_branch",src)
+                self.assertNotIn('GITHUB_BRANCH_HISTORICO", os.getenv("GITHUB_BRANCH_HISTORICO", "main")',src)
+
 
 if __name__=="__main__":
     unittest.main()
