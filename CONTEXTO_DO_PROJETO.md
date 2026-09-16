@@ -545,3 +545,78 @@ pesos, Runtime ou contexto macro/Fed.
 Próximo passo seguro: AMD/Power of Three em modo de pesquisa separado, começando por uma máquina
 de estados Accumulation → Manipulation → Distribution com testes de sequência temporal antes de
 qualquer Pine ou influência no Gate.
+
+
+## 16/09/2026 UTC — AMD / Power of Three como quinto operacional independente
+
+Estado verificado:
+
+- DEV testada em `06d70dfad51fe310fcce5497ff366534aa56f21c`.
+- Quality run `35102692080`: compile gate verde, **576 testes executados, 576 OK**.
+- Runtime permanece em `7a2ad3e53055fb1ef6091c39442c4c0f5212c3c1`.
+- Main permanece em `ad2763827bcdd0822efad7f04a0286a5a91cd8af`; não foi alterada nesta etapa.
+
+### Replay AMD / Power of Three
+
+Foi criado `atlasquant_amd_replay.py` com máquina de estados temporal estrita:
+
+1. **Accumulation** — range congelado em candles anteriores;
+2. **Manipulation** — sweep + reclaim do range congelado;
+3. **Distribution** — somente em candle posterior à manipulação.
+
+Regras:
+
+- BUY: sweep abaixo do `acc_low` + fechamento de volta acima; distribuição posterior fecha acima do midpoint e acima do fechamento da manipulação;
+- SELL: espelho exato acima do `acc_high`;
+- o candle de manipulação não pode confirmar distribuição no mesmo candle;
+- manipulação expira após janela configurável;
+- entrada de pesquisa = fechamento da distribuição;
+- stop = extremo da manipulação com buffer ATR opcional;
+- alvo estrutural = borda oposta do range de acumulação;
+- filtro de RR mínimo;
+- se um candle varrer os dois lados, apenas uma manipulação é mantida: o sweep de maior profundidade normalizada vence; empate favorece BUY de forma determinística;
+- resultado segue separado dos demais operacionais.
+
+### Pine Strategy AMD
+
+Foi criado `tradingview/atlasquant_amd_strategy_v1.pine`:
+
+- Strategy Tester independente;
+- máquina de estados temporal;
+- acumulação padrão 8 candles;
+- distribuição deve ocorrer depois da manipulação;
+- janela padrão até distribuição = 4 candles;
+- stop buffer ATR e RR mínimo;
+- filtros de lado e sessão;
+- validade da ordem pendente em 8 candles;
+- `process_orders_on_close=false`;
+- sem série externa e sem primitivas conhecidas de lookahead.
+
+### UI / paridade / testes
+
+A aba Backtest agora possui quinto bloco automático exclusivo para AMD/PO3, Pine próprio,
+sinais exportáveis e ledger separado.
+
+O contrato TradingView ↔ Python foi ampliado para validar:
+
+- accumulation bars;
+- distribution window;
+- stop buffer e RR mínimo;
+- warmup;
+- manipulation BUY/SELL;
+- distribution posterior BUY/SELL;
+- proibição de distribuição no candle da manipulação;
+- resolução determinística de sweep nos dois lados;
+- alvos estruturais nas bordas da acumulação.
+
+O primeiro run desta etapa (`35102616879`) encontrou 1 falha em um teste que chamava de
+"distribuição válida" um candle que ainda não fechava acima do fechamento da manipulação BUY.
+O teste foi corrigido para respeitar a regra mais conservadora, sem afrouxar o motor.
+O run seguinte (`35102692080`) ficou verde com **576/576**.
+
+**Regra preservada:** AMD/PO3 continua pesquisa técnica independente. Não altera Gate,
+Safety Core, pesos de readiness, Runtime ou decisões macro/Fed.
+
+Próximo passo seguro: consolidar um comparador de performance entre os cinco operacionais
+(BOS/CHOCH+OB, FVG, OTE, CRT, AMD) sem misturar seus sinais, para descobrir objetivamente
+quais regras têm melhor expectativa, drawdown e estabilidade por par/sessão.
