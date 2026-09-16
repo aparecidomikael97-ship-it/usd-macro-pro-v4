@@ -36,7 +36,7 @@ Os workflows consultados na main continuam apontando o histórico para `main`; o
 
 Registro original convertido para Markdown sem executar o código Python enviado anteriormente; contexto cumulativo; histórico; plano de ativação e rollback. Somente documentação foi alterada. Sem merge, mudança de modelo, workflow operacional, secrets ou dados.
 
-## Próxima etapa segura
+## Próxima etapa segura no checkpoint anterior
 
 Preparar em DEV uma ferramenta de inventário/reconciliação em modo somente leitura, com testes de dados inválidos, conflitos, duplicatas e mudança concorrente de SHA. Inventariar também budget/cache Twelve para impedir reinício indevido do consumo diário. A ferramenta deve gerar proposta e bloqueios sem fazer escrita remota.
 
@@ -45,3 +45,13 @@ Depois, revisar a proposta concreta de ativação com evidências e solicitar au
 ## Validação ainda pendente
 
 Ativação real do runtime, histórico persistente e evidência Shadow/Quota; validação técnica da pesquisa 28FX e inspeção de UX em produção. Os 471 testes não comprovam lucratividade nem substituem essas etapas. Critérios históricos: Shadow com 100 amostras totais e 10 por par, zero divergências críticas; Quota com pelo menos 20 rodadas de mercado aberto e critérios do módulo satisfeitos. Esses limiares permitem revisão manual, não ativação automática.
+
+## Atualização da etapa de auditoria somente leitura
+
+Implementados `atlasquant_migration_audit.py` e 9 testes em `test_atlasquant_migration_audit.py`, incluídos no Quality workflow. A ferramenta lê objetos Git locais de commits imutáveis e imprime JSON. Não acessa provedores, não faz fetch, não escreve no GitHub e não migra dados. Saída CLI: 0 sem pendências de inventário (não autoriza promoção); 2 com revisão pendente; 1 com falha de leitura.
+
+Auditoria real registrada em `docs/continuidade/AUDITORIA_RUNTIME_2026-09-16.json`: main `1b5a07593838deba6561599ea4cc88183edbe016` versus runtime `2432a32833426f53cf834d2245ac3bf2ce10a5a1`. Nove arquivos rastreados em dados/: seis divergentes, três idênticos; sete itens exigem revisão, incluindo o cache diário mesmo idêntico. Migração e promoção automáticas permanecem desabilitadas.
+
+Limitações explícitas: verifica sintaxe/estrutura genérica, hashes e algumas duplicatas, mas não valida schemas específicos, timestamps/frescor, IDs aninhados ou a reconciliação entre históricos. A estabilidade de refs é local; refs remotas devem ser reconsultadas antes de qualquer operação futura. Arquivos fora de dados/ não entram no inventário, portanto budget/cache externos ainda precisam ser mapeados.
+
+Próxima etapa: mapear os caminhos efetivos de budget/cache e definir validadores de schema e reconciliação específicos dos seis arquivos divergentes. Não executar promoção nem gravar dados reais. Validação local desta etapa: 9 testes novos aprovados e compilação dos dois novos arquivos. Consultar o CI do commit desta implementação para o resultado da suíte completa; não reutilizar automaticamente os 471 testes da baseline antiga.
