@@ -14,7 +14,7 @@ import math
 import streamlit as st
 
 from atlasquant_journal import make_decision_record, make_blocked_record, to_csv
-from atlasquant_flight_recorder_store import persist_records
+from atlasquant_flight_recorder_store import persist_records, load_persistent_records
 from atlasquant_runtime_store import resolve_runtime_branch
 
 
@@ -159,6 +159,37 @@ def persist_current_record(record: Mapping[str, Any]) -> dict[str, Any]:
     )
 
 
+def hydrate_persistent_records(
+    session_records: Sequence[Mapping[str, Any]] | None,
+    remote_records: Sequence[Mapping[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    rows=[dict(x) for x in (remote_records or [])]
+    for raw in (session_records or []):
+        row=dict(raw)
+        rows,_=append_unique(rows,row)
+    return rows
+
+
+def load_remote_records() -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    cfg=runtime_persistence_config()
+    if not cfg["repo"] or not cfg["token"]:
+        return [],{"ok":False,"reason":"NOT_CONFIGURED","records":0,"error":""}
+    try:
+        rows=load_persistent_records(
+            repo=cfg["repo"],
+            branch=cfg["branch"],
+            token=cfg["token"],
+        )
+        return rows,{"ok":True,"reason":"LOADED","records":len(rows),"error":""}
+    except Exception as exc:
+        return [],{
+            "ok":False,
+            "reason":"LOAD_ERROR",
+            "records":0,
+            "error":f"{type(exc).__name__}: {exc}",
+        }
+
+
 def prepare_flight_capture(
     existing: Sequence[Mapping[str, Any]] | None,
     pack: Mapping[str, Any] | None,
@@ -179,8 +210,19 @@ def capture_flight_recorder(
     engine_version: str,
 ) -> dict[str, Any]:
     key="atlasquant_session_flight_recorder"
+    hydrated_key="atlasquant_flight_recorder_hydrated"
+    load_status_key="atlasquant_flight_recorder_load_status"
+
+    session_rows=list(st.session_state.get(key,[]) or [])
+    if not bool(st.session_state.get(hydrated_key,False)):
+        remote_rows,load_status=load_remote_records()
+        session_rows=hydrate_persistent_records(session_rows,remote_rows)
+        st.session_state[key]=session_rows
+        st.session_state[hydrated_key]=True
+        st.session_state[load_status_key]=load_status
+
     capture=prepare_flight_capture(
-        st.session_state.get(key,[]),
+        session_rows,
         pack,
         engine_version,
     )
@@ -199,6 +241,12 @@ def capture_flight_recorder(
         st.session_state["atlasquant_flight_recorder_persistence"]=persistence
 
     capture["persistence"]=persistence
+    capture["load_status"]=dict(
+        st.session_state.get(
+            load_status_key,
+            {"ok":False,"reason":"NOT_LOADED","records":0,"error":""},
+        ) or {}
+    )
     return capture
 
 
@@ -213,10 +261,12 @@ def render_flight_recorder(
     added=bool(capture.get("added",False))
     summary=dict(capture.get("summary",recorder_summary(rows)) or {})
     persistence=dict(capture.get("persistence",{}) or {})
+    load_status=dict(capture.get("load_status",{}) or {})
 
     st.markdown("### 🧾 Flight Recorder")
     st.caption(
-        "Registro automático desta sessão. Guarda decisões e bloqueios sem inventar resultado de trade."
+        "Registro automático com hidratação do histórico persistente. "
+        "Guarda decisões e bloqueios sem inventar resultado de trade."
     )
     c1,c2,c3=st.columns(3)
     c1.metric("Registros",summary["records"])
@@ -246,6 +296,18 @@ def render_flight_recorder(
             )
             if persistence.get("error"):
                 st.caption(f"Diagnóstico: {persistence.get('reason','ERRO')} · {persistence.get('error')}")
+
+    if load_status:
+        if bool(load_status.get("ok",False)):
+            st.caption(
+                f"📚 Histórico persistente carregado: {int(load_status.get('records',0))} registro(s)."
+            )
+        elif load_status.get("reason")=="NOT_CONFIGURED":
+            st.caption("Histórico persistente ainda não carregado: credencial GitHub indisponível nesta execução.")
+        elif load_status.get("reason") not in ("","NOT_LOADED"):
+            st.caption(
+                f"Histórico persistente não pôde ser carregado: {load_status.get('reason')}."
+            )
 
     export_rows=[{k:v for k,v in row.items() if k!="_fingerprint"} for row in rows]
     csv_data=to_csv(export_rows)
