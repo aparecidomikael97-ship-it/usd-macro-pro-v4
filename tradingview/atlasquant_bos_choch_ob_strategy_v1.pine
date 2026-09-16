@@ -11,7 +11,7 @@ strategy(
 )
 
 // AtlasQuant TradingView Research Bridge.
-// Technical-only: no macro/Fed context, no future data, no request.security.
+// Technical-only: no macro/Fed context and no future-data imports.
 
 groupStructure = "Estrutura"
 leftBars      = input.int(2, "Pivot esquerda", minval=1, maxval=10, group=groupStructure)
