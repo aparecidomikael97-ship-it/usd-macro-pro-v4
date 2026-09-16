@@ -19,3 +19,18 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - Nove testes novos aprovados localmente; incluídos no workflow para execução conjunta com os 471 anteriores.
 - Auditoria real: nove arquivos, seis diferenças, sete revisões obrigatórias. Resultado preservado em JSON.
 - Contexto cumulativo preservado; próxima etapa e limitações descritas em CONTEXTO_DO_PROJETO.md.
+
+
+## 16/09/2026 UTC — BOS/CHOCH, Order Block e checkpoint ZIP
+
+- Criado workflow \`AtlasQuant DEV Checkpoint\` para produzir ZIP automático do commit exato em cada push da DEV, sem chamadas a provedores e sem tocar runtime.
+- Implementado \`ict_structure_v111.py\` com BOS, CHOCH e Order Block rule-based auditável.
+- BOS/CHOCH diferencia continuação, mudança de caráter e estrutura mista; não força classificação quando a evidência estrutural é ambígua.
+- Order Block exige quebra + displacement + candle oposto de origem; rastreia mitigação/invalidação.
+- Integrado ao Institutional Engine, Data Readiness e Central dos 7 pares como camada observacional.
+- Pesos do readiness/Gate foram preservados; os componentes novos ainda não autorizam execução por si mesmos.
+- Adicionados 5 testes específicos e integração ao Quality workflow.
+- GitHub Actions run \`35092388237\`: **485/485 testes OK**, compile gate verde.
+- Checkpoint ZIP run \`35092388358\`: sucesso.
+- Runtime permaneceu em \`7a2ad3e53055fb1ef6091c39442c4c0f5212c3c1\`.
+- Main observada em \`b36ba5c457b446ea8b2dfd76f1157ba4af6c52d5\`; nenhuma alteração foi feita nela nesta etapa.

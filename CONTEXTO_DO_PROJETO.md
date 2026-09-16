@@ -55,3 +55,38 @@ Auditoria real registrada em `docs/continuidade/AUDITORIA_RUNTIME_2026-09-16.jso
 Limitações explícitas: verifica sintaxe/estrutura genérica, hashes e algumas duplicatas, mas não valida schemas específicos, timestamps/frescor, IDs aninhados ou a reconciliação entre históricos. A estabilidade de refs é local; refs remotas devem ser reconsultadas antes de qualquer operação futura. Arquivos fora de dados/ não entram no inventário, portanto budget/cache externos ainda precisam ser mapeados.
 
 Próxima etapa: mapear os caminhos efetivos de budget/cache e definir validadores de schema e reconciliação específicos dos seis arquivos divergentes. Não executar promoção nem gravar dados reais. Validação local desta etapa: 9 testes novos aprovados e compilação dos dois novos arquivos. Consultar o CI do commit desta implementação para o resultado da suíte completa; não reutilizar automaticamente os 471 testes da baseline antiga.
+
+
+## 16/09/2026 UTC — checkpoint ICT/SMC estruturado + ZIP automático
+
+Estado verificado após a auditoria/implementação desta etapa:
+
+- \`atlasquant-dev\`: \`720beb2c43926ab7025268295bf6404502f1f292\` antes deste registro documental.
+- \`atlasquant-runtime\`: \`7a2ad3e53055fb1ef6091c39442c4c0f5212c3c1\`; permanece protegida e não foi alterada nesta etapa.
+- \`main\`: \`b36ba5c457b446ea8b2dfd76f1157ba4af6c52d5\`; mudou fora desta etapa e não foi tocada.
+- GitHub Actions Quality tests run \`35092388237\`: compile gate verde, **485 testes executados, 485 OK**.
+- GitHub Actions checkpoint run \`35092388358\`: sucesso; artefato ZIP do snapshot DEV gerado.
+
+### Nova camada ICT/SMC
+
+Foi adicionado \`ict_structure_v111.py\`, sem chamadas de API e sem decidir direção macro.
+
+Implementado de forma determinística/observacional:
+
+- BOS de continuação por fechamento além de swing confirmado;
+- CHOCH quando a quebra ocorre contra estrutura direcional anterior;
+- estrutura mista é rotulada MSS em vez de forçar BOS/CHOCH;
+- Order Block rule-based exige quebra estrutural recente + displacement relativo a ATR + candle oposto de origem;
+- mitigação e invalidação da zona são rastreadas explicitamente.
+
+Integração realizada em \`institutional_engine_v110.py\`, \`data_readiness_v1101.py\` e \`pair_intelligence_v110.py\`.
+
+**Regra de segurança preservada:** BOS/CHOCH e Order Block aparecem no snapshot institucional/UI e respeitam frescor M15, mas ainda **não alteram os pesos do readiness institucional nem o Gate de execução**. Primeiro acumulamos validação; depois qualquer mudança de peso exige revisão.
+
+Testes específicos adicionados em \`test_ict_structure_v111.py\` e integrados ao workflow de qualidade.
+
+### Checkpoint ZIP
+
+Foi criado \`.github/workflows/atlasquant-checkpoint.yml\` na DEV. Cada push em \`atlasquant-dev\` cria um ZIP do commit exato, incluindo \`CHECKPOINT_INFO.md\` e os arquivos de continuidade do repositório. O workflow não chama provedores e não altera a branch runtime.
+
+Próximo passo seguro: ampliar os testes do novo motor (SELL, invalidação, dados insuficientes e regressões de integração) antes de considerar qualquer influência adicional no readiness/Gate.
