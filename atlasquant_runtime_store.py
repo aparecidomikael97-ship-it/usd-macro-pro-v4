@@ -32,8 +32,10 @@ def resolve_runtime_branch(
     - Legacy values main/atlasquant-dev are redirected to atlasquant-runtime.
     """
     explicit=_clean(explicit_data_branch)
-    if explicit:
+    if explicit and explicit not in CODE_BRANCHES:
         return explicit
+    if explicit in CODE_BRANCHES:
+        return _clean(default) or DEFAULT_RUNTIME_BRANCH
 
     legacy=_clean(legacy_history_branch)
     if legacy and legacy not in CODE_BRANCHES:
