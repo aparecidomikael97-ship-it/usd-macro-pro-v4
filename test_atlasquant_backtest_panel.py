@@ -182,6 +182,10 @@ class BacktestPanelTests(unittest.TestCase):
         self.assertIn("Linha do tempo",source)
         self.assertIn("Mudanças entre execuções consecutivas",source)
         self.assertIn("Baixar histórico de snapshots",source)
+        self.assertIn("Restaurar histórico exportado",source)
+        self.assertIn("Validar e restaurar histórico ZIP",source)
+        self.assertIn("inspect_history_archive",source)
+        self.assertIn("restore_history_archive",source)
         self.assertIn("fora de dados/",source)
 
     def test_csv_bytes_read_utf8(self):
