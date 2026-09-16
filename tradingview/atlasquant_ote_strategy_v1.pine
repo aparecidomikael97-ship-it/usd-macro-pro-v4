@@ -94,10 +94,8 @@ buyHiBar = buyValid ? bar_index - buyHiOff : na
 sellLoBar = sellValid ? bar_index - sellLoOff : na
 sellHiBar = sellValid ? bar_index - sellHiOff : na
 
-var int lastBuyLoBar = na
-var int lastBuyHiBar = na
-var int lastSellLoBar = na
-var int lastSellHiBar = na
+var int lastBuyTerminalBar = na
+var int lastSellTerminalBar = na
 var int pendingSide = 0
 var int setupBar = na
 var float zoneLow = na
@@ -110,14 +108,15 @@ cancelPending() =>
     strategy.cancel("OTE-L")
     strategy.cancel("OTE-S")
 
-newBuyImpulse = chooseBuy and (buyLoBar != lastBuyLoBar or buyHiBar != lastBuyHiBar)
-newSellImpulse = chooseSell and (sellLoBar != lastSellLoBar or sellHiBar != lastSellHiBar)
+// Re-anchor guard: a new same-side OTE must start after the previous emitted
+// impulse terminal. Minor extensions of the same leg cannot create a new trade.
+newBuyImpulse = chooseBuy and (na(lastBuyTerminalBar) or buyLoBar > lastBuyTerminalBar)
+newSellImpulse = chooseSell and (na(lastSellTerminalBar) or sellHiBar > lastSellTerminalBar)
 
 if newBuyImpulse
     cancelPending()
     pendingSide := 0
-    lastBuyLoBar := buyLoBar
-    lastBuyHiBar := buyHiBar
+    lastBuyTerminalBar := buyHiBar
     if inSession and strategy.position_size == 0
         zoneLow := math.min(buyZ62,buyZ79)
         zoneHigh := math.max(buyZ62,buyZ79)
@@ -131,8 +130,7 @@ if newBuyImpulse
 if newSellImpulse
     cancelPending()
     pendingSide := 0
-    lastSellLoBar := sellLoBar
-    lastSellHiBar := sellHiBar
+    lastSellTerminalBar := sellLoBar
     if inSession and strategy.position_size == 0
         zoneLow := math.min(sellZ62,sellZ79)
         zoneHigh := math.max(sellZ62,sellZ79)
