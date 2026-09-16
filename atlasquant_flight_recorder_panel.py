@@ -159,17 +159,37 @@ def persist_current_record(record: Mapping[str, Any]) -> dict[str, Any]:
     )
 
 
-def render_flight_recorder(pack: Mapping[str, Any] | None, engine_version: str) -> dict[str, int]:
-    key="atlasquant_session_flight_recorder"
+def prepare_flight_capture(
+    existing: Sequence[Mapping[str, Any]] | None,
+    pack: Mapping[str, Any] | None,
+    engine_version: str,
+) -> dict[str, Any]:
     current=record_from_pack(pack,engine_version)
-    rows,added=append_unique(st.session_state.get(key,[]),current)
-    st.session_state[key]=rows
-    summary=recorder_summary(rows)
+    rows,added=append_unique(existing,current)
+    return {
+        "current":current,
+        "rows":rows,
+        "added":added,
+        "summary":recorder_summary(rows),
+    }
+
+
+def capture_flight_recorder(
+    pack: Mapping[str, Any] | None,
+    engine_version: str,
+) -> dict[str, Any]:
+    key="atlasquant_session_flight_recorder"
+    capture=prepare_flight_capture(
+        st.session_state.get(key,[]),
+        pack,
+        engine_version,
+    )
+    st.session_state[key]=capture["rows"]
 
     persistence=st.session_state.get("atlasquant_flight_recorder_persistence", {})
-    if added:
+    if capture["added"]:
         try:
-            persistence=persist_current_record(current)
+            persistence=persist_current_record(capture["current"])
         except Exception as exc:
             persistence={
                 "ok":False,"added":0,"records":0,
@@ -177,6 +197,22 @@ def render_flight_recorder(pack: Mapping[str, Any] | None, engine_version: str) 
                 "error":f"{type(exc).__name__}: {exc}",
             }
         st.session_state["atlasquant_flight_recorder_persistence"]=persistence
+
+    capture["persistence"]=persistence
+    return capture
+
+
+def render_flight_recorder(
+    pack: Mapping[str, Any] | None,
+    engine_version: str,
+    *,
+    capture_result: Mapping[str, Any] | None = None,
+) -> dict[str, int]:
+    capture=dict(capture_result or capture_flight_recorder(pack,engine_version))
+    rows=list(capture.get("rows",[]) or [])
+    added=bool(capture.get("added",False))
+    summary=dict(capture.get("summary",recorder_summary(rows)) or {})
+    persistence=dict(capture.get("persistence",{}) or {})
 
     st.markdown("### 🧾 Flight Recorder")
     st.caption(
