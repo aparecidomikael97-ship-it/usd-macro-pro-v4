@@ -227,3 +227,34 @@ Regra do replay:
 
 O arquivo `tradingview/atlasquant_crt_strategy_v1.pine` permite pesquisa visual no Strategy Tester.
 A estatística CRT permanece independente dos demais operacionais.
+
+
+## Operacional automático AMD / Power of Three
+
+O AMD/PO3 possui replay Python e Pine Strategy próprios, separados de CRT, OTE, FVG e BOS/CHOCH + Order Block.
+
+No AtlasQuant:
+
+1. envie o CSV de candles;
+2. abra **Backtest automático — AMD / Power of Three**;
+3. configure candles da acumulação, janela máxima até distribuição, buffer do stop em ATR e RR mínimo;
+4. escolha BUY, SELL ou ambos;
+5. rode o backtest;
+6. baixe os sinais AMD e o ledger separados.
+
+Regra do replay:
+
+- primeiro o sistema congela uma faixa de acumulação usando apenas candles anteriores;
+- BUY manipulation: varre abaixo do range e fecha de volta acima;
+- SELL manipulation: varre acima do range e fecha de volta abaixo;
+- a distribuição só pode ocorrer em candle posterior à manipulação;
+- BUY distribution precisa fechar acima do midpoint da acumulação e acima do fechamento da manipulação;
+- SELL usa a regra espelhada;
+- o estado de manipulação expira após a janela configurada;
+- entrada de pesquisa usa o fechamento da distribuição;
+- stop usa o extremo da manipulação com buffer ATR opcional;
+- alvo usa a borda oposta da acumulação;
+- se o mesmo candle varrer os dois lados, apenas o sweep proporcionalmente mais profundo é mantido.
+
+O arquivo `tradingview/atlasquant_amd_strategy_v1.pine` permite pesquisa visual no Strategy Tester.
+A estatística AMD/PO3 permanece independente dos demais operacionais.
