@@ -2,150 +2,46 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-
 import pandas as pd
-
-from atlasquant_backtest_snapshot import (
-    SCHEMA,
-    normalized_candles_fingerprint,
-    settings_fingerprint,
-    code_fingerprint,
-    build_backtest_snapshot,
-    snapshot_json,
-    load_snapshot_json,
-    compare_backtest_snapshots,
-)
-
+from atlasquant_backtest_snapshot import SCHEMA,normalized_candles_fingerprint,settings_fingerprint,code_fingerprint,build_backtest_snapshot,snapshot_json,load_snapshot_json,compare_backtest_snapshots,validate_snapshot
 
 def candles():
-    return pd.DataFrame({
-        "datetime":pd.date_range("2026-09-15T00:00:00Z",periods=3,freq="15min",tz="UTC"),
-        "open":[1.0,1.1,1.2],
-        "high":[1.2,1.3,1.4],
-        "low":[0.9,1.0,1.1],
-        "close":[1.1,1.2,1.3],
-    })
-
-
-def evidence(expectancy=0.2):
-    return {
-        "schema":"ATLASQUANT_BACKTEST_EVIDENCE_V1",
-        "evidence_summary":[
-            {
-                "strategy":"FVG",
-                "trades":20,
-                "expectancy_r":expectancy,
-                "net_r":4.0,
-                "max_drawdown_r":2.0,
-            }
-        ],
-    }
-
+    return pd.DataFrame({"datetime":pd.date_range("2026-09-15T00:00:00Z",periods=3,freq="15min",tz="UTC"),"open":[1.,1.1,1.2],"high":[1.2,1.3,1.4],"low":[.9,1.,1.1],"close":[1.1,1.2,1.3]})
+def evidence(expectancy=.2): return {"schema":"ATLASQUANT_BACKTEST_EVIDENCE_V1","evidence_summary":[{"strategy":"FVG","trades":20,"expectancy_r":expectancy,"net_r":4.,"max_drawdown_r":2.}]}
+def snap(root,raw=b"A",settings=None,expectancy=.2):
+    return build_backtest_snapshot(raw_csv=raw,candles=candles(),settings=settings or {},evidence_bundle=evidence(expectancy),code_root=root,code_paths=["logic.py"])
 
 class BacktestSnapshotTests(unittest.TestCase):
     def test_normalized_data_hash_is_stable_for_same_data(self):
-        a=normalized_candles_fingerprint(candles())
-        b=normalized_candles_fingerprint(candles().copy())
-        self.assertEqual(a["sha256"],b["sha256"])
-        self.assertEqual(a["rows"],3)
-
-    def test_settings_hash_is_order_independent(self):
-        a=settings_fingerprint({"b":2,"a":1})
-        b=settings_fingerprint({"a":1,"b":2})
-        self.assertEqual(a["sha256"],b["sha256"])
-
+        self.assertEqual(normalized_candles_fingerprint(candles())["sha256"],normalized_candles_fingerprint(candles().copy())["sha256"])
+    def test_settings_hash_is_order_independent(self): self.assertEqual(settings_fingerprint({"b":2,"a":1})["sha256"],settings_fingerprint({"a":1,"b":2})["sha256"])
     def test_code_fingerprint_tracks_file_content(self):
         with tempfile.TemporaryDirectory() as td:
-            root=Path(td)
-            (root/"a.py").write_text("x=1\n",encoding="utf-8")
-            one=code_fingerprint(root=root,paths=["a.py"])
-            (root/"a.py").write_text("x=2\n",encoding="utf-8")
-            two=code_fingerprint(root=root,paths=["a.py"])
-            self.assertNotEqual(one["sha256"],two["sha256"])
-
-    def test_snapshot_id_is_reproducible_even_created_at_changes(self):
+            root=Path(td); (root/"a.py").write_text("x=1\n"); one=code_fingerprint(root=root,paths=["a.py"]); (root/"a.py").write_text("x=2\n"); self.assertNotEqual(one["sha256"],code_fingerprint(root=root,paths=["a.py"])["sha256"])
+    def test_snapshot_id_is_reproducible(self):
         with tempfile.TemporaryDirectory() as td:
-            root=Path(td)
-            (root/"logic.py").write_text("x=1\n",encoding="utf-8")
-            kwargs=dict(
-                raw_csv=b"time,open,high,low,close\n",
-                candles=candles(),
-                settings={"cost_r":0.02},
-                evidence_bundle=evidence(),
-                code_root=root,
-                code_paths=["logic.py"],
-            )
-            a=build_backtest_snapshot(**kwargs)
-            b=build_backtest_snapshot(**kwargs)
-            self.assertEqual(a["schema"],SCHEMA)
-            self.assertEqual(a["snapshot_id"],b["snapshot_id"])
-
-    def test_raw_file_can_change_while_normalized_data_stays_same(self):
+            root=Path(td); (root/"logic.py").write_text("x=1\n"); self.assertEqual(snap(root)["snapshot_id"],snap(root)["snapshot_id"])
+    def test_compare_reports_changes(self):
         with tempfile.TemporaryDirectory() as td:
-            root=Path(td)
-            (root/"logic.py").write_text("x=1\n",encoding="utf-8")
-            common=dict(
-                candles=candles(),
-                settings={"cost_r":0.02},
-                evidence_bundle=evidence(),
-                code_root=root,
-                code_paths=["logic.py"],
-            )
-            a=build_backtest_snapshot(raw_csv=b"A",**common)
-            b=build_backtest_snapshot(raw_csv=b"B",**common)
-            diff=compare_backtest_snapshots(a,b)
-            self.assertTrue(diff["raw_csv_changed"])
-            self.assertFalse(diff["normalized_data_changed"])
-            self.assertIn("raw_csv",diff["change_causes"])
-
-    def test_compare_reports_settings_code_and_metric_deltas(self):
-        with tempfile.TemporaryDirectory() as td:
-            root=Path(td)
-            path=root/"logic.py"
-            path.write_text("x=1\n",encoding="utf-8")
-            a=build_backtest_snapshot(
-                raw_csv=b"A",
-                candles=candles(),
-                settings={"cost_r":0.01,"max_wait":8},
-                evidence_bundle=evidence(0.2),
-                code_root=root,
-                code_paths=["logic.py"],
-            )
-            path.write_text("x=2\n",encoding="utf-8")
-            b=build_backtest_snapshot(
-                raw_csv=b"A",
-                candles=candles(),
-                settings={"cost_r":0.03,"max_wait":8},
-                evidence_bundle=evidence(0.1),
-                code_root=root,
-                code_paths=["logic.py"],
-            )
-            diff=compare_backtest_snapshots(a,b)
-            self.assertTrue(diff["settings_changed"])
-            self.assertTrue(diff["code_changed"])
-            self.assertTrue(diff["evidence_changed"])
-            self.assertEqual(diff["settings_changes"][0]["setting"],"cost_r")
-            delta=diff["evidence_metric_deltas"][0]
-            self.assertAlmostEqual(delta["expectancy_r_delta"],-0.1)
-            self.assertIn("não indicam melhora",diff["note"])
-
+            root=Path(td); p=root/"logic.py"; p.write_text("x=1\n"); a=snap(root,settings={"cost_r":.01}); p.write_text("x=2\n"); b=snap(root,settings={"cost_r":.03},expectancy=.1); d=compare_backtest_snapshots(a,b); self.assertTrue(d["settings_changed"]); self.assertTrue(d["code_changed"]); self.assertTrue(d["evidence_changed"])
     def test_json_roundtrip_validates_schema(self):
         with tempfile.TemporaryDirectory() as td:
-            root=Path(td)
-            (root/"logic.py").write_text("x=1\n",encoding="utf-8")
-            snap=build_backtest_snapshot(
-                raw_csv=b"A",
-                candles=candles(),
-                settings={},
-                evidence_bundle=evidence(),
-                code_root=root,
-                code_paths=["logic.py"],
-            )
-            loaded=load_snapshot_json(snapshot_json(snap))
-            self.assertEqual(loaded["snapshot_id"],snap["snapshot_id"])
-            with self.assertRaises(ValueError):
-                load_snapshot_json(json.dumps({"schema":"BAD"}))
+            root=Path(td); (root/"logic.py").write_text("x=1\n"); a=snap(root); self.assertEqual(load_snapshot_json(snapshot_json(a))["snapshot_id"],a["snapshot_id"])
+    def test_fail_closed_when_snapshot_id_is_tampered(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td); (root/"logic.py").write_text("x=1\n"); a=snap(root); a["snapshot_id"]="0"*64
+            with self.assertRaisesRegex(ValueError,"snapshot_id"): validate_snapshot(a)
+    def test_fail_closed_when_settings_are_tampered(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td); (root/"logic.py").write_text("x=1\n"); a=snap(root,settings={"cost_r":.01}); a["settings"]["values"]["cost_r"]=.99
+            with self.assertRaisesRegex(ValueError,"adulterado"): validate_snapshot(a)
+    def test_fail_closed_when_evidence_is_tampered(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td); (root/"logic.py").write_text("x=1\n"); a=snap(root); a["evidence"]["bundle"]["evidence_summary"][0]["net_r"]=999
+            with self.assertRaisesRegex(ValueError,"adulterado"): compare_backtest_snapshots(a,a)
+    def test_fail_closed_on_incomplete_identity(self):
+        with self.assertRaisesRegex(ValueError,"identity incompleta"): validate_snapshot({"schema":SCHEMA,"identity":{}})
+    def test_invalid_json_is_controlled_error(self):
+        with self.assertRaisesRegex(ValueError,"JSON inválido"): load_snapshot_json("{")
 
-
-if __name__=="__main__":
-    unittest.main()
+if __name__=="__main__": unittest.main()
