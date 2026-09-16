@@ -239,6 +239,61 @@ def friction_sensitivity_summary(
     return pd.DataFrame(rows)
 
 
+def friction_breakdown_frame(
+    suite: Mapping[str, Mapping[str, Any]],
+    scenarios: Iterable[Mapping[str, Any]],
+    *,
+    dimensions: Iterable[str] = ("session","pair"),
+) -> pd.DataFrame:
+    """Describe friction sensitivity by segment without mixing strategies."""
+    scenario_rows=[dict(x) for x in scenarios]
+    dims=[str(x).strip() for x in dimensions if str(x).strip()]
+    rows=[]
+    for strategy in STRATEGY_ORDER:
+        pack=dict(suite.get(strategy,{}) or {})
+        original=list(pack.get("results",[]) or [])
+        for scenario in scenario_rows:
+            cost=_finite(scenario.get("cost_r"))
+            slip=_finite(scenario.get("slippage_r"))
+            if cost is None or slip is None or cost<0 or slip<0:
+                raise ValueError("scenario cost/slippage must be finite and >= 0")
+            repriced=_reprice_results(original,cost_r=cost,slippage_r=slip)
+            for dimension in dims:
+                grouped={}
+                for raw in repriced:
+                    row=dict(raw)
+                    value=str(row.get(dimension,"N/D") or "N/D")
+                    grouped.setdefault(value,[]).append(row)
+                for segment,records in grouped.items():
+                    m=summarize_results(records)
+                    rows.append({
+                        "strategy":strategy,
+                        "operacional":pack.get("label",STRATEGY_LABELS[strategy]),
+                        "dimension":dimension,
+                        "segment":segment,
+                        "scenario":str(scenario.get("scenario") or f"C{cost:.3f}_S{slip:.3f}"),
+                        "cost_r":float(cost),
+                        "slippage_r":float(slip),
+                        "total_friction_r":float(cost+slip),
+                        "trades":m["trades"],
+                        "gains":m["gains"],
+                        "losses":m["losses"],
+                        "breakeven":m["breakeven"],
+                        "win_rate_pct":m["win_rate_pct"],
+                        "expectancy_r":m["expectancy_r"],
+                        "net_r":m["net_r"],
+                        "profit_factor":m["profit_factor"],
+                        "max_drawdown_r":m["max_drawdown_r"],
+                        "max_loss_streak":m["max_loss_streak"],
+                    })
+    if not rows:
+        return pd.DataFrame()
+    return pd.DataFrame(rows).sort_values(
+        ["dimension","strategy","segment","total_friction_r"],
+        ascending=[True,True,True,True],
+    ).reset_index(drop=True)
+
+
 def friction_sensitivity_report(
     suite: Mapping[str, Mapping[str, Any]],
     *,
@@ -253,4 +308,9 @@ def friction_sensitivity_report(
     )
     detail=friction_sensitivity_frame(suite,scenarios)
     summary=friction_sensitivity_summary(detail,min_trades=min_trades)
-    return {"summary":summary,"scenarios":detail}
+    breakdown=friction_breakdown_frame(
+        suite,
+        scenarios,
+        dimensions=("session","pair"),
+    )
+    return {"summary":summary,"scenarios":detail,"breakdown":breakdown}
