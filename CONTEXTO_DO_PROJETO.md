@@ -844,3 +844,84 @@ readiness, Runtime ou macro/Fed.
 
 Próximo passo seguro: auditar custos/slippage e sensibilidade dos resultados a custos antes de
 considerar qualquer uso dos resultados históricos como evidência operacional.
+
+
+## 16/09/2026 UTC — sensibilidade a custos e slippage
+
+Estado verificado:
+
+- DEV testada em `cdeff107162dd609d487a74bb0545e3c677a14f1`.
+- Quality run `35105537324`: compile gate verde, **605 testes executados, 605 OK**.
+- Runtime permanece protegida e não foi alterada nesta etapa.
+- Main não foi alterada por esta etapa.
+
+### Slippage explícito no motor de backtest
+
+O motor `atlasquant_operational_backtest.py` agora aceita separadamente:
+
+- `cost_r`;
+- `slippage_r`;
+- `total_friction_r = cost_r + slippage_r`.
+
+A fricção é aplicada de forma conservadora ao resultado bruto em R de cada trade executado:
+
+`net_r = gross_r - cost_r - slippage_r`.
+
+Custos/slippage negativos, não finitos ou inválidos falham fechado com
+`INVALID_FRICTION`.
+
+O ledger passou a registrar `cost_r`, `slippage_r` e `total_friction_r`.
+
+**Limite explícito:** `slippage_r` é um drag adverso fixo em R por trade para stress histórico.
+Não é simulador tick a tick e não altera retroativamente a sequência OHLC de entrada/stop/alvo.
+
+### Diagnóstico de sensibilidade
+
+Foi criado `atlasquant_strategy_friction.py`.
+
+O diagnóstico reprecifica **os mesmos trades já executados** em diferentes cenários de atrito.
+Ele não regenera sinais nem muda entrada, stop, alvo ou tempo de saída entre os cenários.
+
+Por estratégia/cenário registra:
+
+- custo em R;
+- slippage em R;
+- fricção total em R;
+- trades;
+- gain/loss/BE;
+- win rate observado;
+- expectativa em R;
+- net R;
+- profit factor;
+- drawdown;
+- maior sequência de loss;
+- sinal da expectativa após fricção.
+
+Resumo descritivo:
+
+- `POSITIVE_ALL_TESTED_FRICTION`;
+- `BREAKS_UNDER_TESTED_FRICTION`;
+- `NONPOSITIVE_BASELINE`;
+- `INSUFFICIENT`.
+
+Também registra o primeiro nível testado de fricção em que a expectativa fica não positiva.
+
+### UI / stress
+
+A aba Backtest ganhou:
+
+- campo **Slippage adverso por trade (R)**;
+- aplicação do slippage em todos os cinco replays, comparador e backtest manual;
+- stress adicional configurável de slippage;
+- amostra mínima para leitura de sensibilidade;
+- resumo e tabela detalhada de custos/slippage;
+- exportação `atlasquant_friction_5_*.csv`.
+
+O stress sempre inclui um cenário `ZERO_FRICTION` para referência e depois combina o custo
+informado pelo usuário com os níveis de slippage selecionados.
+
+**Regra preservada:** sensibilidade de custos é pesquisa histórica. Não muda parâmetros,
+não otimiza setup, não altera Gate, Safety Core, readiness, Runtime ou macro/Fed.
+
+Próximo passo seguro: adicionar análise por sessão/par sob fricção e um teste de robustez de
+parâmetros em grade pequena e pré-definida, sem escolher automaticamente "o melhor" conjunto.
