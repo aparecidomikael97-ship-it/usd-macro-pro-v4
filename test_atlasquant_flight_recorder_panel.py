@@ -1,7 +1,7 @@
 import unittest
 
 from atlasquant_flight_recorder_panel import (
-    decision_fingerprint, record_from_pack, append_unique, recorder_summary, prepare_flight_capture,
+    decision_fingerprint, record_from_pack, append_unique, recorder_summary, prepare_flight_capture, hydrate_persistent_records,
 )
 
 
@@ -66,6 +66,26 @@ class AtlasQuantFlightRecorderPanelTests(unittest.TestCase):
         second=prepare_flight_capture(first["rows"],self.base(),"v1")
         self.assertFalse(second["added"])
         self.assertEqual(second["summary"]["records"],1)
+
+    def test_hydrate_persistent_records_merges_remote_and_session(self):
+        remote=record_from_pack(self.base(),"v1")
+        changed=self.base(); changed["m15"]="CONFIRMADO"
+        session=record_from_pack(changed,"v1")
+        rows=hydrate_persistent_records([session],[remote])
+        self.assertEqual(len(rows),2)
+
+    def test_hydrate_persistent_records_deduplicates(self):
+        row=record_from_pack(self.base(),"v1")
+        rows=hydrate_persistent_records([row],[row])
+        self.assertEqual(len(rows),1)
+
+    def test_hydrate_prefers_remote_order_then_session(self):
+        remote=record_from_pack(self.base(),"v1")
+        changed=self.base(); changed["m15"]="CONFIRMADO"
+        session=record_from_pack(changed,"v1")
+        rows=hydrate_persistent_records([session],[remote])
+        self.assertEqual(rows[0]["_fingerprint"],remote["_fingerprint"])
+        self.assertEqual(rows[1]["_fingerprint"],session["_fingerprint"])
 
 
 if __name__=="__main__":
