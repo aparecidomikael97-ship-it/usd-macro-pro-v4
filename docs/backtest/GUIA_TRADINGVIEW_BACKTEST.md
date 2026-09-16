@@ -607,3 +607,63 @@ Esse recurso ajuda a descobrir se duas execuções produziram resultados diferen
 - ou apenas as evidências finais mudaram.
 
 O diff também pode ser exportado em JSON para auditoria.
+
+
+## Histórico local de snapshots
+
+A aba Backtest possui o bloco **Histórico local de snapshots**.
+
+O armazenamento padrão fica em:
+
+`.atlasquant_research/backtest_snapshots`
+
+Esse diretório é exclusivo para pesquisa e auditoria. Ele não usa `dados/` e não grava na
+branch Runtime.
+
+### Como salvar
+
+Depois de gerar um snapshot reproduzível:
+
+1. abra **Histórico local de snapshots**;
+2. clique em **Salvar último snapshot no histórico local**;
+3. snapshots idênticos são deduplicados pelo `snapshot_id`.
+
+A gravação é explícita e atômica.
+
+### Linha do tempo
+
+O histórico mostra:
+
+- data/hora;
+- snapshot id;
+- par;
+- quantidade de candles;
+- início/fim do histórico;
+- custo e slippage;
+- fingerprints de CSV, dados, configuração, código e evidências.
+
+Também aparece uma tabela com as mudanças entre execuções consecutivas.
+
+### Integridade
+
+Todo snapshot é validado novamente antes de entrar na linha do tempo.
+
+Arquivos adulterados ou inválidos:
+
+- não são usados nas comparações;
+- não entram na linha do tempo válida;
+- aparecem na tela como erro de integridade.
+
+### Exportar histórico
+
+Clique em **Baixar histórico de snapshots (ZIP)**.
+
+O pacote contém:
+
+- `manifest.json`;
+- `timeline.csv`;
+- `changes.csv`;
+- todos os snapshots JSON válidos.
+
+Em hospedagem com armazenamento efêmero, exporte esse ZIP para não depender do filesystem local
+entre reinicializações ou deployments.
