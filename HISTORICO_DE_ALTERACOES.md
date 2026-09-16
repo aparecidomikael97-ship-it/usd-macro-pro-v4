@@ -149,3 +149,17 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - Paridade TradingView/Python passou a validar parâmetros e fórmulas centrais do OTE.
 - GitHub Actions run `35099427531`: **552/552 testes OK**, compile gate verde.
 - Runtime/Main não foram alteradas.
+
+
+## 16/09/2026 UTC — hardening OTE contra reancoragem
+
+- Replay OTE passou a exigir nova perna estrutural para novo sinal no mesmo lado.
+- BUY novo: origem low precisa estar após o terminal high do OTE anterior.
+- SELL novo: origem high precisa estar após o terminal low do OTE anterior.
+- Extensão do mesmo impulso não cria segundo trade.
+- Dois impulsos próximos continuam aceitos quando a nova origem realmente começa após o terminal anterior.
+- Adicionados índices de origem/terminal e identificação explícita do re-anchor guard.
+- Pine OTE recebeu a mesma regra.
+- Paridade TradingView/Python passou a validar o guard.
+- GitHub Actions run `35101330822`: **554/554 testes OK**, compile gate verde.
+- Runtime/Main não foram alteradas.
