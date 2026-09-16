@@ -1241,3 +1241,22 @@ parâmetros dos setups, dados operacionais de Runtime ou macro/Fed.
 Próximo passo seguro: permitir importar/restaurar um ZIP de histórico validando cada snapshot
 antes de incorporá-lo, e depois fechar a camada de auditoria do Backtest para partir para
 validação de UI/Runtime final.
+
+
+## 16/09/2026 UTC — restauração segura do histórico de snapshots
+
+- DEV testada em `77f4ed223676c148c1ac7095bfca0d90f876ecbc`.
+- Quality run `35110865542`: compile gate verde, **645 testes executados, 645 OK**.
+- Runtime permanece em `7a2ad3e53055fb1ef6091c39442c4c0f5212c3c1`; Main permanece em `db17c9f60b3cfbb33597f46e7469ba30c4c1b516`.
+
+### Importação/restauração fail-closed
+
+`atlasquant_backtest_snapshot_history.py` agora valida e restaura o ZIP exportado pelo histórico. O pacote é lido em memória; nenhum arquivo arbitrário do ZIP é extraído diretamente para o disco. A restauração inteira é validada antes de qualquer gravação.
+
+O pacote é rejeitado se houver ZIP inválido, path traversal, arquivos inesperados, nomes duplicados, criptografia, excesso de tamanho/quantidade, manifesto inválido, contagens/IDs divergentes, snapshot inválido ou corrupção CRC. Limites: 1000 membros, 500 snapshots, 100 MiB descompactados e 10 MiB por snapshot.
+
+Novos arquivos usam o `snapshot_id` completo no nome. Snapshots idênticos já existentes são deduplicados. A UI ganhou **Restaurar histórico exportado (ZIP)** e **Validar e restaurar histórico ZIP**.
+
+**Regra preservada:** a restauração grava somente em `.atlasquant_research/backtest_snapshots`; não altera `dados/`, Runtime, Main, Gate ou Safety Core.
+
+Próximo passo seguro: auditoria final de pré-release da DEV e manifesto de readiness para promoção, sem promover Runtime/Main nesta etapa.
