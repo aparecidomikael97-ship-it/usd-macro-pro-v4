@@ -264,3 +264,17 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - Robustez fica desativada por padrão para evitar custo desnecessário em históricos longos.
 - GitHub Actions run `35106389108`: **615/615 testes OK**, compile gate verde.
 - Runtime/Main não foram alteradas.
+
+
+## 16/09/2026 UTC — relatório consolidado de evidências
+
+- Criado `atlasquant_backtest_evidence.py`.
+- Backtest geral, estabilidade temporal, walk-forward, custos/slippage e robustez de parâmetros passam a ser consolidados em uma única visão.
+- Cobertura de diagnósticos é separada de performance e usa apenas `COMPLETE`, `PARTIAL` e `INSUFFICIENT`.
+- Robustez de parâmetros não executada fica `NOT_RUN`; nenhuma conclusão é inventada.
+- Relatório não cria score, ranking, recomendação, previsão ou probabilidade de lucro.
+- UI ganhou tabela **Relatório consolidado de evidências**.
+- Adicionadas exportações JSON auditável e Markdown resumido.
+- JSON usa schema `ATLASQUANT_BACKTEST_EVIDENCE_V1` e flags explícitas de pesquisa-only/no-Gate/no-probability.
+- GitHub Actions run `35107095265`: **622/622 testes OK**, compile gate verde.
+- Runtime/Main não foram alteradas.
