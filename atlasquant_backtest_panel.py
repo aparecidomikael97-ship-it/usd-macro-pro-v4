@@ -35,6 +35,7 @@ from atlasquant_strategy_comparator import (
 from atlasquant_strategy_stability import temporal_stability_report
 from atlasquant_strategy_walkforward import walk_forward_report
 from atlasquant_strategy_friction import friction_sensitivity_report
+from atlasquant_strategy_parameter_robustness import parameter_robustness_report
 from atlasquant_tradingview_parity import validate_tradingview_parity
 
 
@@ -874,6 +875,21 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                 key="atlasquant_compare_friction_slippage_levels",
             )
 
+        pr1,pr2=st.columns(2)
+        with pr1:
+            include_param_robustness=st.checkbox(
+                "Incluir robustez de parâmetros pré-definidos",
+                value=False,
+                key="atlasquant_compare_include_param_robustness",
+            )
+        with pr2:
+            param_min_trades=st.number_input(
+                "Mínimo de trades por variante",
+                min_value=5,max_value=500,value=20,step=5,
+                key="atlasquant_compare_param_min_trades",
+                disabled=not include_param_robustness,
+            )
+
         if candle_file is None:
             st.info("Envie o CSV de candles para comparar os cinco operacionais.")
         else:
@@ -1007,6 +1023,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                 )
                 friction_summary=friction["summary"]
                 friction_scenarios=friction["scenarios"]
+                friction_breakdown=friction["breakdown"]
 
                 st.markdown("#### Sensibilidade a custos e slippage")
                 st.caption(
@@ -1030,6 +1047,62 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                             friction_scenarios,
                             use_container_width=True,
                             hide_index=True,
+                        )
+                if not friction_breakdown.empty:
+                    with st.expander("Ver custos/slippage por sessão e par",expanded=False):
+                        st.dataframe(
+                            friction_breakdown,
+                            use_container_width=True,
+                            hide_index=True,
+                        )
+                        st.download_button(
+                            "📥 Baixar stress por sessão/par (CSV)",
+                            data=friction_breakdown.to_csv(index=False),
+                            file_name=f"atlasquant_friction_segmentos_{default_pair.replace('/','_')}.csv",
+                            mime="text/csv",
+                            key="atlasquant_compare_export_friction_breakdown",
+                        )
+
+                if include_param_robustness:
+                    robustness=parameter_robustness_report(
+                        cmp_candles,
+                        pair=default_pair,
+                        max_wait_bars=int(max_wait),
+                        max_hold_bars=int(max_hold),
+                        cost_r=float(cost_r),
+                        slippage_r=float(slippage_r),
+                        min_trades_per_variant=int(param_min_trades),
+                    )
+                    robustness_summary=robustness["summary"]
+                    robustness_variants=robustness["variants"]
+                    st.markdown("#### Robustez de parâmetros pré-definidos")
+                    st.caption(
+                        "Executa uma grade pequena e fixa, declarada no código. "
+                        "O sistema não procura nem escolhe automaticamente o melhor parâmetro."
+                    )
+                    robustness_cols=[
+                        "operacional","variants_tested","all_variants_sufficient",
+                        "positive_variants","positive_variant_pct","base_expectancy_r",
+                        "worst_expectancy_r","best_expectancy_r","expectancy_spread_r",
+                        "min_variant_trades","max_variant_trades","parameter_robustness_status",
+                    ]
+                    st.dataframe(
+                        robustness_summary.reindex(columns=robustness_cols),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+                    with st.expander("Ver variantes pré-definidas detalhadas",expanded=False):
+                        st.dataframe(
+                            robustness_variants,
+                            use_container_width=True,
+                            hide_index=True,
+                        )
+                        st.download_button(
+                            "📥 Baixar robustez de parâmetros (CSV)",
+                            data=robustness_variants.to_csv(index=False),
+                            file_name=f"atlasquant_param_robustness_{default_pair.replace('/','_')}.csv",
+                            mime="text/csv",
+                            key="atlasquant_compare_export_param_robustness",
                         )
 
                 all_ledger=combined_ledger(suite)
