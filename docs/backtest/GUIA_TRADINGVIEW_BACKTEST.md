@@ -447,3 +447,62 @@ simulação tick a tick de preenchimento de ordens. O objetivo é testar sensibi
 não reproduzir perfeitamente microestrutura de execução.
 
 A tabela detalhada pode ser baixada em CSV.
+
+
+## Stress por sessão/par e robustez de parâmetros
+
+### Custos/slippage por sessão e par
+
+Além do resumo geral, o AtlasQuant agora pode mostrar o efeito da fricção separado por:
+
+- sessão;
+- par/ativo;
+- operacional;
+- cenário de custo/slippage.
+
+Isso ajuda a enxergar, por exemplo, quando a mesma estratégia perde expectativa sob atrito em
+uma sessão específica.
+
+A tabela segmentada também pode ser baixada em CSV.
+
+### Robustez de parâmetros pré-definidos
+
+Existe uma auditoria opcional chamada **Robustez de parâmetros pré-definidos**.
+
+Ela usa uma grade pequena e fixa:
+
+- BOS/CHOCH + OB: alvo 1,5R / 2,0R / 2,5R;
+- FVG: gap mínimo 0 / 0,10 / 0,20 ATR;
+- OTE: Sweet 70,5 / midpoint da zona / filtro de impulso 0,50 ATR;
+- CRT: RR mínimo 0 / 0,50 / 1,00;
+- AMD / Power of Three: acumulação 6 / 8 / 10 candles.
+
+A grade não é criada depois de olhar os resultados. Ela está definida previamente no código.
+
+Para cada variante são mostrados:
+
+- sinais;
+- trades;
+- Gain / Loss / Break-even;
+- Win Rate observado;
+- expectativa em R;
+- Net R;
+- Profit Factor;
+- Drawdown;
+- maior sequência de Loss.
+
+O resumo por operacional mostra a expectativa da variante base, pior/melhor expectativa,
+spread entre variantes e se todas possuem amostra mínima.
+
+Estados descritivos:
+
+- **POSITIVE_ALL_PREDEFINED_VARIANTS**;
+- **NEGATIVE_ALL_PREDEFINED_VARIANTS**;
+- **MIXED_PREDEFINED_VARIANTS**;
+- **INSUFFICIENT**.
+
+O AtlasQuant **não escolhe automaticamente a melhor variante** e não usa esse resultado para
+mudar o Gate, os pesos ou o operacional ao vivo.
+
+Como essa auditoria executa 15 replays, ela fica desativada por padrão. Ative somente quando
+quiser fazer a análise de robustez do histórico atual.
