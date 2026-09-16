@@ -998,3 +998,79 @@ selecionado e nenhum resultado altera Gate, Safety Core, readiness, Runtime ou m
 Próximo passo seguro: endurecer a robustez com comparação por sessão dentro das variantes e
 depois preparar um relatório consolidado de evidências do Backtest, sem transformar métricas
 históricas em previsão.
+
+
+## 16/09/2026 UTC — relatório consolidado de evidências do Backtest
+
+Estado verificado:
+
+- DEV testada em `dca3a278c07068765903731d13b6e1e639569217`.
+- Quality run `35107095265`: compile gate verde, **622 testes executados, 622 OK**.
+- Runtime permanece em `7a2ad3e53055fb1ef6091c39442c4c0f5212c3c1`.
+- Main permanece em `07b632a28e82a8cdb83f7a5219fc73d6ceb2f42a`; não foi alterada nesta etapa.
+
+### Relatório consolidado
+
+Foi criado `atlasquant_backtest_evidence.py` para reunir, em uma única visão, as evidências
+históricas já calculadas para cada um dos cinco operacionais:
+
+- Backtest geral;
+- estabilidade temporal;
+- walk-forward OOS;
+- sensibilidade a custos/slippage;
+- robustez de parâmetros pré-definidos, quando executada.
+
+O relatório **não cria score de qualidade, ranking, recomendação, previsão nem probabilidade de
+lucro**. Ele apenas consolida resultados e informa a cobertura dos diagnósticos.
+
+### Cobertura de evidências
+
+Para cada operacional são exibidos:
+
+- trades;
+- Win Rate observado;
+- expectativa em R;
+- Net R;
+- Profit Factor;
+- Drawdown máximo;
+- maior sequência de Loss;
+- tamanho da amostra;
+- status da estabilidade temporal;
+- status walk-forward;
+- status de fricção;
+- status de robustez de parâmetros;
+- quantidade de diagnósticos disponíveis.
+
+A cobertura usa apenas três estados de disponibilidade:
+
+- `COMPLETE` — todos os quatro diagnósticos complementares possuem leitura válida;
+- `PARTIAL` — pelo menos um está disponível e algum está ausente/insuficiente;
+- `INSUFFICIENT` — nenhum dos diagnósticos complementares possui amostra válida.
+
+**Cobertura não mede qualidade do setup.**
+
+Quando a robustez de parâmetros opcional não é executada, o status fica `NOT_RUN` e a
+cobertura permanece parcial, sem inventar conclusão.
+
+### Exportação auditável
+
+A aba Backtest ganhou o bloco **Relatório consolidado de evidências** e duas exportações:
+
+- JSON `ATLASQUANT_BACKTEST_EVIDENCE_V1` com resumo, configurações e tabelas detalhadas;
+- Markdown resumido para leitura humana.
+
+O JSON inclui flags explícitas:
+
+- `research_only=true`;
+- `no_live_gate_effect=true`;
+- `no_profit_probability=true`.
+
+Também preserva as configurações usadas no teste: par, espera/holding, custo, slippage,
+estabilidade temporal, walk-forward e parâmetros mínimos de amostra.
+
+**Regra preservada:** o relatório não altera Gate, Safety Core, readiness, Runtime, parâmetros
+dos setups ou contexto macro/Fed.
+
+Próximo passo seguro: criar um snapshot reproduzível do conjunto de evidências com fingerprint
+do CSV/configuração para permitir comparar duas execuções do Backtest e detectar exatamente
+o que mudou, sem promover automaticamente nenhum operacional.
