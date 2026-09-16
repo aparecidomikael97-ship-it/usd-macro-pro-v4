@@ -57,6 +57,7 @@ def validate_tradingview_parity() -> dict[str, Any]:
     bos=_pine("atlasquant_bos_choch_ob_strategy_v1.pine")
     fvg=_pine("atlasquant_fvg_strategy_v1.pine")
     ote=_pine("atlasquant_ote_strategy_v1.pine")
+    ote_src=inspect.getsource(generate_ote_signals)
     structure_src=inspect.getsource(ict_structure_v111)
     checks=[]
 
@@ -92,6 +93,13 @@ def validate_tradingview_parity() -> dict[str, Any]:
         _check("ote_sweet_formula","0.705" in ote,"OTE Pine must retain 70.5% sweet spot."),
         _check("ote_zone_formula","0.62" in ote and "0.79" in ote,"OTE Pine must retain the 62%-79% zone."),
         _check("ote_warmup","replayReady = bar_index >= lookback - 1 and not na(atr)" in ote and int(_default(generate_ote_signals,"min_bars"))==28,"OTE Pine/Python warmup must align at 28 bars."),
+        _check(
+            "ote_reanchor_guard",
+            "buyLoBar > lastBuyTerminalBar" in ote
+            and "sellHiBar > lastSellTerminalBar" in ote
+            and "origin_global<=previous_terminal" in ote_src,
+            "OTE same-side signals must start after the previous emitted impulse terminal.",
+        ),
     ]
 
     # BOS/CHOCH + OB defaults and rule contract.
