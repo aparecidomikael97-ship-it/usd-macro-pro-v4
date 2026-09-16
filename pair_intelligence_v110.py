@@ -35,6 +35,7 @@ from atlasquant_confluence_map import render_confluence_map
 from atlasquant_operational_plan import render_operational_plan
 from atlasquant_safety_panel import render_safety_core
 from atlasquant_regime_detector import render_regime_detector
+from atlasquant_next_event import render_next_event
 from atlasquant_flight_recorder_panel import render_flight_recorder
 from atlasquant_runtime_store import resolve_runtime_branch
 
@@ -521,11 +522,13 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     best=opctx.get("best") or packs[0]
     render_central_brief(packs, auto)
     render_data_confidence(packs, auto)
+    _event_result = render_next_event((macro_context or {}).get("event"))
     _regime_result = render_regime_detector(best)
     render_safety_core(
         best,
         auto,
         regime_supported_override=_regime_result.get("supported"),
+        major_event_minutes_override=_event_result.get("safety_minutes"),
     )
     _render_atlasquant_operational_cards(packs)
     render_confluence_map(best)
