@@ -300,7 +300,7 @@ def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro",weights=
         status,_text,_current=display_ict_component_status(comp,key,data_ready)
         if _current and "🟢" in status:
             (up if side=="BUY" else down).append(f"{label}: {status.replace('🟢','').strip()}")
-    for key,label in (("mss","MSS"),("displacement","Displacement"),("smt","SMT"),("dealing_range","Premium/Discount"),("session","Judas/Sessão"),("pd_array","Breaker/Mitigation"),("liquidity","Draw on Liquidity")):
+    for key,label in (("mss","MSS"),("structure","BOS/CHOCH"),("order_block","Order Block"),("displacement","Displacement"),("smt","SMT"),("dealing_range","Premium/Discount"),("session","Judas/Sessão"),("pd_array","Breaker/Mitigation"),("liquidity","Draw on Liquidity")):
         comp=_component(inst,key)
         status,_text=display_component_status(comp,key,data_ready)
         if "🟢" in status and not status.startswith("⏳") and data_ready.get("direction_consistent", True):
@@ -386,6 +386,7 @@ def _stack_rows(p:Mapping[str,Any])->pd.DataFrame:
         return status, comp.get("score") if current else None
 
     smt_s,smt_sc=_inst_state("smt"); disp_s,disp_sc=_inst_state("displacement"); mss_s,mss_sc=_inst_state("mss")
+    str_s,str_sc=_inst_state("structure"); ob_s,ob_sc=_inst_state("order_block")
     dr_s,dr_sc=_inst_state("dealing_range"); ses_s,ses_sc=_inst_state("session"); pd_s,pd_sc=_inst_state("pd_array")
     crt_s,crt_sc=_ict_state("crt"); ote_s,ote_sc=_ict_state("ote"); amd_s,amd_sc=_ict_state("amd"); fvg_s,fvg_sc=_ict_state("fvg")
 
@@ -398,6 +399,8 @@ def _stack_rows(p:Mapping[str,Any])->pd.DataFrame:
         ("Institucional","SMT",smt_s,smt_sc),
         ("Institucional","Displacement",disp_s,disp_sc),
         ("Institucional","MSS",mss_s,mss_sc),
+        ("Institucional","BOS/CHOCH",str_s,str_sc),
+        ("Institucional","Order Block",ob_s,ob_sc),
         ("Institucional","Premium/Discount",dr_s,dr_sc),
         ("Institucional","Judas/Sessão",ses_s,ses_sc),
         ("Institucional","Breaker/Mitigation",pd_s,pd_sc),
@@ -742,7 +745,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     with st.expander("Detalhes institucionais e ICT", expanded=False):
         inst=p.get("inst",{}) or {}
         st.markdown("### 🏛️ Institutional Execution Engine")
-        cards=[("MSS","mss"),("Displacement","displacement"),("SMT","smt"),("Premium/Discount","dealing_range"),("Judas/Sessão","session"),("Breaker/Mitigation","pd_array"),("Liquidez","liquidity")]
+        cards=[("MSS","mss"),("BOS/CHOCH","structure"),("Order Block","order_block"),("Displacement","displacement"),("SMT","smt"),("Premium/Discount","dealing_range"),("Judas/Sessão","session"),("Breaker/Mitigation","pd_array"),("Liquidez","liquidity")]
         for i in range(0,len(cards),4):
             cols=st.columns(min(4,len(cards)-i))
             for col,(title,key) in zip(cols,cards[i:i+4]):

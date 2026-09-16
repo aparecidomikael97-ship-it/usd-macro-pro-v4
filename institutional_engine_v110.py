@@ -22,6 +22,8 @@ import math
 import numpy as np
 import pandas as pd
 
+from ict_structure_v111 import build_structure_snapshot
+
 try:
     from zoneinfo import ZoneInfo
     NY_TZ = ZoneInfo("America/New_York")
@@ -392,9 +394,12 @@ def build_institutional_snapshot(
     liq=detect_liquidity_engine(h1,m15,side)
     session=detect_session_judas(m15,side)
     zone=detect_orderflow_zone(h1,side)
+    structure_pack=build_structure_snapshot(m15,side)
+    structure=dict(structure_pack.get("structure",{}) or {})
+    order_block=dict(structure_pack.get("order_block",{}) or {})
     smt=detect_smt(m15,companion_m15,pair,companion_pair or "",side) if companion_pair else {"status":"⚪ SEM PAR SMT","score":45,"companion":"—","text":"Não há companion SMT primário configurado para este par."}
 
-    parts={"displacement":disp,"mss":mss,"smt":smt,"dealing_range":pdloc,"liquidity":liq,"session":session,"pd_array":zone}
+    parts={"displacement":disp,"mss":mss,"smt":smt,"dealing_range":pdloc,"liquidity":liq,"session":session,"pd_array":zone,"structure":structure,"order_block":order_block}
     weights={"displacement":.18,"mss":.22,"smt":.14,"dealing_range":.12,"liquidity":.12,"session":.10,"pd_array":.12}
     scores={k:_finite(v.get("score"),0) for k,v in parts.items()}
     readiness=float(np.clip(sum(scores[k]*weights[k] for k in weights),0,100))
@@ -415,5 +420,5 @@ def build_institutional_snapshot(
         "pair":pair,"side":side,"readiness":round(readiness,1),"label":label,
         **parts,
         "updated_at":pd.Timestamp.now(tz="UTC").isoformat(),
-        "algorithm_note":"Score de prontidão observacional; não é probabilidade de lucro.",
+        "algorithm_note":"Score de prontidão observacional; não é probabilidade de lucro. BOS/CHOCH e Order Block são observacionais e ainda não alteram o readiness institucional.",
     }

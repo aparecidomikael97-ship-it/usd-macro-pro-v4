@@ -279,7 +279,7 @@ def display_component_status(component: Mapping[str, Any] | None, key: str, read
     low = text.lower()
 
     h1_keys = {"dealing_range", "pd_array", "liquidity"}
-    m15_keys = {"mss", "displacement", "session", "smt"}
+    m15_keys = {"mss", "displacement", "session", "smt", "structure", "order_block"}
     tf = dict(readiness.get("timeframes", {}) or {})
 
     if key in h1_keys and not bool(readiness.get("institutional_data_ready", False)):

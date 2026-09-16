@@ -64,6 +64,8 @@ class InstitutionalEngineTests(unittest.TestCase):
         d=frame([1.1+0.0001*i for i in range(80)])
         r=build_institutional_snapshot("EUR/USD",d,d,"BUY",d,"GBP/USD")
         self.assertIn("readiness",r)
+        self.assertIn("structure",r)
+        self.assertIn("order_block",r)
         self.assertIn("não é probabilidade",r["algorithm_note"])
 
 

@@ -38,6 +38,28 @@ class DataReadinessTests(unittest.TestCase):
         s,_=display_component_status({"status":"⚪ SEM MSS","score":0,"text":"MSS aguarda estrutura válida."},"mss",r)
         self.assertIn("DADOS",s)
 
+    def test_new_structure_components_are_masked_when_m15_is_stale(self):
+        now=pd.Timestamp("2026-09-15T00:00:00Z")
+        r=assess_pair_data_readiness(self._row(now,age_m15=80),self._map(now),now=now)
+        for key in ("structure","order_block"):
+            s,_=display_component_status(
+                {"status":"🟢 CONFIRMADO","score":100,"text":"leitura anterior"},
+                key,
+                r,
+            )
+            self.assertIn("DADOS M15 INSUFICIENTES",s)
+
+    def test_new_structure_components_are_visible_with_fresh_m15(self):
+        now=pd.Timestamp("2026-09-15T00:00:00Z")
+        r=assess_pair_data_readiness(self._row(now),self._map(now),now=now)
+        for key in ("structure","order_block"):
+            s,_=display_component_status(
+                {"status":"🟢 CONFIRMADO","score":100,"text":"leitura atual"},
+                key,
+                r,
+            )
+            self.assertEqual(s,"🟢 CONFIRMADO")
+
     def test_premium_discount_is_operational(self):
         ready={"institutional_data_ready":True}
         x=premium_discount_operational("BUY",{"zone":"PRÊMIO","position_pct":75},ready)

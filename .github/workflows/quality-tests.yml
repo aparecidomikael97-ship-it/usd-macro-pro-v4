@@ -6,6 +6,7 @@ on:
     branches: [main, atlasquant-dev]
     paths:
       - "*.py"
+      - "tradingview/**"
       - ".github/workflows/quality-tests.yml"
       - ".github/workflows/autopilot-v107.yml"
 
@@ -47,6 +48,7 @@ jobs:
             test_quota_guard_v1077.py \
             test_twelve_budget_v1108.py \
             test_ict_execution_v108.py \
+            test_ict_structure_v111.py \
             test_pair_intelligence_v108.py \
             test_dtype_guard_v1081.py \
             test_institutional_engine_v110.py \
@@ -73,6 +75,24 @@ jobs:
             test_atlasquant_data_quality_center.py \
             test_atlasquant_confluence_map.py \
             test_atlasquant_operational_plan.py \
+            test_atlasquant_operational_backtest.py \
+            test_atlasquant_strategy_replay.py \
+            test_atlasquant_fvg_replay.py \
+            test_atlasquant_ote_replay.py \
+            test_atlasquant_crt_replay.py \
+            test_atlasquant_amd_replay.py \
+            test_atlasquant_strategy_comparator.py \
+            test_atlasquant_strategy_stability.py \
+            test_atlasquant_strategy_walkforward.py \
+            test_atlasquant_strategy_friction.py \
+            test_atlasquant_strategy_parameter_robustness.py \
+            test_atlasquant_backtest_evidence.py \
+            test_atlasquant_backtest_snapshot.py \
+            test_atlasquant_backtest_snapshot_history.py \
+            test_atlasquant_dev_preflight.py \
+            test_atlasquant_tradingview_parity.py \
+            test_atlasquant_backtest_panel.py \
+            test_atlasquant_tradingview_assets.py \
             test_atlasquant_safety_panel.py \
             test_atlasquant_flight_recorder_panel.py \
             test_atlasquant_flight_recorder_store.py \
