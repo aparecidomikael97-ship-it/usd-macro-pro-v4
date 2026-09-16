@@ -22,6 +22,18 @@ class AtlasQuantRuntimeStoreTests(unittest.TestCase):
             "custom-runtime",
         )
 
+    def test_explicit_main_is_redirected(self):
+        self.assertEqual(
+            resolve_runtime_branch("main", "history-data"),
+            DEFAULT_RUNTIME_BRANCH,
+        )
+
+    def test_explicit_dev_is_redirected(self):
+        self.assertEqual(
+            resolve_runtime_branch("atlasquant-dev", "history-data"),
+            DEFAULT_RUNTIME_BRANCH,
+        )
+
     def test_legacy_main_is_migrated_away_from_code_branch(self):
         self.assertEqual(
             resolve_runtime_branch(None, "main"),
