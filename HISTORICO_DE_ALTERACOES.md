@@ -278,3 +278,18 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - JSON usa schema `ATLASQUANT_BACKTEST_EVIDENCE_V1` e flags explícitas de pesquisa-only/no-Gate/no-probability.
 - GitHub Actions run `35107095265`: **622/622 testes OK**, compile gate verde.
 - Runtime/Main não foram alteradas.
+
+
+## 16/09/2026 UTC — snapshot reproduzível do Backtest
+
+- Criado `atlasquant_backtest_snapshot.py`.
+- Snapshot usa SHA-256 do CSV bruto, dados normalizados, configurações, código e evidências.
+- `snapshot_id` é derivado do conteúdo e permanece igual quando a execução é realmente idêntica.
+- Fingerprint de código cobre motores/replays/diagnósticos, painel e Pine Strategies.
+- Aba Backtest ganhou exportação de snapshot JSON.
+- Adicionado comparador de dois snapshots salvos.
+- Diff mostra mudanças de CSV, dados, configuração, código e evidências.
+- Configurações alteradas são listadas antes/depois.
+- Evidências alteradas mostram deltas descritivos de trades, expectativa R, Net R e drawdown.
+- GitHub Actions run `35108514542`: **630/630 testes OK**, compile gate verde.
+- Runtime/Main não foram alteradas.
