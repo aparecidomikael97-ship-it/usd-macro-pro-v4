@@ -35,6 +35,13 @@ class BacktestSnapshotTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td); (root/"logic.py").write_text("x=1\n"); a=snap(root,settings={"cost_r":.01}); a["settings"]["values"]["cost_r"]=.99
             with self.assertRaisesRegex(ValueError,"adulterado"): validate_snapshot(a)
+    def test_fail_closed_when_code_manifest_is_tampered(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td); (root/"logic.py").write_text("x=1\n"); a=snap(root)
+            a["code"]["files"][0]["sha256"]="0"*64
+            with self.assertRaisesRegex(ValueError,"code sha256"):
+                validate_snapshot(a)
+
     def test_fail_closed_when_evidence_is_tampered(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td); (root/"logic.py").write_text("x=1\n"); a=snap(root); a["evidence"]["bundle"]["evidence_summary"][0]["net_r"]=999
