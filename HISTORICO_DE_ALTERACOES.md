@@ -219,3 +219,16 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - Aba Backtest ganhou tabela de estabilidade, detalhe dos blocos e exportação CSV.
 - GitHub Actions run `35103716697`: **588/588 testes OK**, compile gate verde.
 - Runtime/Main não foram alteradas.
+
+
+## 16/09/2026 UTC — walk-forward no comparador dos 5 operacionais
+
+- Criado `atlasquant_strategy_walkforward.py`.
+- Implementado walk-forward cronológico com treino expansivo e janelas OOS posteriores.
+- Sem otimização automática: regras e parâmetros dos setups ficam fixos.
+- Configurações: treino inicial 50/60/70% e 2/3/4 janelas OOS.
+- Métricas por janela: trades, expectativa R, net R, win rate, drawdown, streak de loss e delta teste-treino.
+- Resumo por estratégia: `POSITIVE_ALL_OOS_WINDOWS`, `NEGATIVE_ALL_OOS_WINDOWS`, `MIXED_OOS_WINDOWS` ou `INSUFFICIENT`.
+- Aba Backtest ganhou controles, resumo, detalhe e exportação CSV de walk-forward.
+- GitHub Actions run `35104652826`: **595/595 testes OK**, compile gate verde.
+- Runtime/Main não foram alteradas por esta etapa.
