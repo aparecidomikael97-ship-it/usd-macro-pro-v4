@@ -36,7 +36,7 @@ from atlasquant_operational_plan import render_operational_plan
 from atlasquant_safety_panel import render_safety_core
 from atlasquant_regime_detector import render_regime_detector
 from atlasquant_next_event import render_next_event
-from atlasquant_flight_recorder_panel import render_flight_recorder
+from atlasquant_flight_recorder_panel import render_flight_recorder, capture_flight_recorder
 from atlasquant_runtime_store import resolve_runtime_branch
 
 try:
@@ -534,6 +534,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     render_confluence_map(best)
     render_context_explain(best)
     render_operational_plan(best)
+    _flight_capture = capture_flight_recorder(best, "V11.0.8 / AtlasQuant DEV")
 
     _aq_view_mode = str(st.session_state.get("atlasquant_view_mode", "Básico"))
     if _aq_view_mode != "Pro":
@@ -550,7 +551,11 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
         )
         return
 
-    render_flight_recorder(best, "V11.0.8 / AtlasQuant DEV")
+    render_flight_recorder(
+        best,
+        "V11.0.8 / AtlasQuant DEV",
+        capture_result=_flight_capture,
+    )
     no_trade=bool(opctx.get("no_trade",False))
     strongest,weakest=_major_extremes(ranking)
     process_age=_age_minutes(auto.get("last_run"))
