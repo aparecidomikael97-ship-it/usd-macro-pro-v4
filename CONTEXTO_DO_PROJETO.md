@@ -1286,3 +1286,17 @@ Próximo passo seguro: auditoria final de pré-release da DEV e manifesto de rea
 - `main` não foi alterada por esta promoção.
 - Evidência detalhada: `docs/release/RUNTIME_ACTIVATION_2026-09-16.md`.
 - Pendências externas ao CI: health check do deploy real, credenciais do ambiente hospedado, compilação Pine no TradingView e conferência visual em navegador real.
+
+
+## 16/09/2026 UTC — smoke test da UI na Runtime
+
+- Criado `test_atlasquant_runtime_smoke.py`.
+- O smoke test abre `usd_macro_pro_v4_cloud.py` via Streamlit AppTest com provedores indisponíveis.
+- Verifica boot sem exceções, ausência de chamadas Twelve Data por simples abertura da UI e ausência de escritas remotas HTTP durante o boot.
+- DEV validada no run `35113532164`: **651/651 testes OK**, compile gate verde.
+- Smoke test promovido para Runtime preservando os sete arquivos operacionais divergentes em `dados/`.
+- Runtime final desta etapa: `383584007031189b56eb75ce2bdf6dad5c5377c9`.
+- Quality run da própria Runtime `35113739106`: **651/651 testes OK**, compile gate verde.
+- Backup pré-etapa: `atlasquant-runtime-backup-20260916-998ef4b`.
+- `main` permaneceu inalterada.
+- O log do AppTest revelou avisos de depreciação `use_container_width`; próxima ação de fechamento é remover essa dívida de compatibilidade sem alterar semântica.

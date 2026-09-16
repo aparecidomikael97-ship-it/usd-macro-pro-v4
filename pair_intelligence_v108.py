@@ -307,7 +307,7 @@ def render_pair_intelligence_v108(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
         "ICT":p["ict_label"],"Gate":p["gate"],"Notícias":p["news_align"],"ADR %":round(p["adr"],0) if p["adr"] else None,
         "Motivo dominante":p["reason"],
     } for p in packs])
-    st.dataframe(executive,use_container_width=True,hide_index=True,height=320)
+    st.dataframe(executive,width="stretch",hide_index=True,height=320)
     st.bar_chart(executive[["Par","Índice"]].set_index("Par"),horizontal=True,height=250)
 
     st.markdown("### 🧩 Leitura rápida dos 7 pares")

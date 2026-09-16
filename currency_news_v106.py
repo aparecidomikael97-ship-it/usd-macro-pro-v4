@@ -790,7 +790,7 @@ def render_currency_news_panel(
 
     c_refresh, c_info = st.columns([1, 3])
     with c_refresh:
-        if st.button("🔄 Atualizar notícias", key="v106_refresh_news", use_container_width=True):
+        if st.button("🔄 Atualizar notícias", key="v106_refresh_news", width="stretch"):
             load_currency_news_intelligence.clear()
             st.rerun()
     with c_info:
@@ -859,14 +859,14 @@ def render_currency_news_panel(
             pass
 
     st.markdown("### 🧭 Força de notícias por moeda")
-    st.dataframe(summary, hide_index=True, use_container_width=True)
+    st.dataframe(summary, hide_index=True, width="stretch")
 
     st.markdown("### 💱 Confluência das notícias com os 7 pares")
     st.caption(
         "Diferencial = impacto da moeda base − impacto da moeda cotada. "
         "A tabela compara esse lado com a direção atual do motor base."
     )
-    st.dataframe(pair_df, hide_index=True, use_container_width=True)
+    st.dataframe(pair_df, hide_index=True, width="stretch")
 
     aligned = pair_df[pair_df["Alinhamento"] == "🟢 CONFIRMA"] if not pair_df.empty else pd.DataFrame()
     conflicts = pair_df[pair_df["Alinhamento"] == "🔴 CONFLITA"] if not pair_df.empty else pd.DataFrame()
@@ -919,7 +919,7 @@ def render_currency_news_panel(
                 "Manchete": a.get("title", ""),
                 "Leitura": a.get("explanation", ""),
             })
-        st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
     else:
         st.warning("Nenhuma manchete relevante foi encontrada para esta moeda agora.")
 
@@ -945,5 +945,5 @@ def render_currency_news_panel(
         summary.to_csv(index=False).encode("utf-8"),
         "currency_news_v106.csv",
         "text/csv",
-        use_container_width=True,
+        width="stretch",
     )

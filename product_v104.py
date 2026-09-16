@@ -126,7 +126,7 @@ def _interactive_chart(df: pd.DataFrame, ytitle: str, chart_type: str):
         st.info("Sem valores válidos para o gráfico.")
         return
     if alt is None:
-        st.line_chart(d.set_index("date")["value"], use_container_width=True)
+        st.line_chart(d.set_index("date")["value"], width="stretch")
         return
     common = {
         "x": alt.X("date:T", title="Data"),
@@ -139,7 +139,7 @@ def _interactive_chart(df: pd.DataFrame, ytitle: str, chart_type: str):
         chart = alt.Chart(d).mark_area(opacity=.30, line=True).encode(**common)
     else:
         chart = alt.Chart(d).mark_line(point=True).encode(**common)
-    st.altair_chart(chart.properties(height=340).interactive(), use_container_width=True)
+    st.altair_chart(chart.properties(height=340).interactive(), width="stretch")
     st.caption("Passe o mouse/toque nos pontos para valores. Zoom e pan dependem do navegador/dispositivo.")
 
 
@@ -201,14 +201,14 @@ def render_v104_hub(
                            "wireframe_usd_macro_pro_v104.svg", "image/svg+xml")
         st.markdown("**Objetivo:** Resumo Macro → 2 gráficos principais → Meus Indicadores → navegação curta.")
         c1, c2, c3 = st.columns(3)
-        if c1.button("🔄 Atualizar agora", use_container_width=True):
+        if c1.button("🔄 Atualizar agora", width="stretch"):
             if refresh_callback:
                 ok, msg = refresh_callback()
                 (st.success if ok else st.warning)(msg)
             else:
                 st.info("Atualização central indisponível nesta execução.")
         c2.link_button("📱 Abrir PWA", "https://aparecidomikael97-ship-it.github.io/usd-macro-pro-v4/",
-                       use_container_width=True)
+                       width="stretch")
         c3.metric("Teste A/B", f"Grupo {variant}")
         st.info("A V10.4 usa cache do servidor + PWA para a casca visual. Dados vivos continuam exigindo internet.")
 
@@ -246,7 +246,7 @@ def render_v104_hub(
         st.markdown("### 🧪 Testes A/B e planejamento")
         st.write(f"Variante desta sessão: **{variant}**")
         st.caption("A = dock fixo. B = navegação compacta. O feedback registra a variante.")
-        st.dataframe(ROADMAP, hide_index=True, use_container_width=True)
+        st.dataframe(ROADMAP, hide_index=True, width="stretch")
         st.download_button("⬇️ Baixar roadmap CSV", ROADMAP.to_csv(index=False).encode("utf-8"),
                            "roadmap_v104.csv", "text/csv")
         st.warning("Google Optimize foi descontinuado; a V10.4 usa um laboratório A/B interno simples e auditável.")

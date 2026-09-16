@@ -484,7 +484,7 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
 
     c1, c2, c3 = st.columns([1.35, 1.2, 2.45])
     with c1:
-        if st.button("▶️ Atualizar próximo lote (2 pares)", key="v102_master_batch", disabled=(remaining > 0 or not bool(api_key)), use_container_width=True):
+        if st.button("▶️ Atualizar próximo lote (2 pares)", key="v102_master_batch", disabled=(remaining > 0 or not bool(api_key)), width="stretch"):
             candidates = []
             for offset in range(len(pairs)):
                 p = pairs[(cursor + offset) % len(pairs)]
@@ -510,7 +510,7 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
             else:
                 st.rerun()
     with c2:
-        if st.button("🔄 Recarregar painel", key="v102_master_reload", use_container_width=True):
+        if st.button("🔄 Recarregar painel", key="v102_master_reload", width="stretch"):
             st.rerun()
     with c3:
         if remaining > 0:
@@ -534,7 +534,7 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
             "🔄 Atualizar scanner técnico (2 pares)",
             key="v1022_master_refresh_scanner",
             disabled=(scanner_refresh_cb is None or _cooldown_v1022 > 0 or not bool(api_key)),
-            use_container_width=True,
+            width="stretch",
         ):
             try:
                 _ok_v1022, _msg_v1022 = scanner_refresh_cb()
@@ -551,7 +551,7 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
         if st.button(
             "🔁 Atualizar leitura",
             key="v1022_master_refresh_view",
-            use_container_width=True,
+            width="stretch",
         ):
             st.rerun()
 
@@ -631,7 +631,7 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
     show["Score"] = pd.to_numeric(show["Score"], errors="coerce").round(0)
     show["Qualidade"] = pd.to_numeric(show["Qualidade"], errors="coerce").round(0)
     show["ADR usado %"] = pd.to_numeric(show["ADR usado %"], errors="coerce").round(1)
-    st.dataframe(show, hide_index=True, use_container_width=True)
+    st.dataframe(show, hide_index=True, width="stretch")
 
     st.caption(
         "Índice Integrado = ranking operacional de Macro + Gate + Técnica. Não é probabilidade de gain. "

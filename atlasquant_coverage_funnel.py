@@ -90,5 +90,5 @@ def render_coverage_funnel(
                 "Ordenação apenas para planejar expansão de infraestrutura. "
                 "Não significa recomendação de trade nem autorização operacional."
             )
-            st.dataframe(watch,use_container_width=True,hide_index=True)
+            st.dataframe(watch,width="stretch",hide_index=True)
     return matrix

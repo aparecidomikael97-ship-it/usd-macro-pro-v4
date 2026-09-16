@@ -239,7 +239,7 @@ def render_performance_lab(
         if grouped.empty:
             st.info("Sem dados suficientes para esta quebra.")
         else:
-            st.dataframe(grouped,use_container_width=True,hide_index=True)
+            st.dataframe(grouped,width="stretch",hide_index=True)
 
     if readiness["status"]=="BUILDING":
         st.warning("Amostra ainda pequena. Não alterar pesos, thresholds ou regras com base neste painel.")

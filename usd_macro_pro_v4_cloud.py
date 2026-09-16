@@ -1518,7 +1518,7 @@ def _painel_eodhd_v73(diagnostico, dados):
             "Anterior": d.get("anterior") if d.get("anterior") is not None else "—",
             "Real": d.get("real") if d.get("real") is not None else "—",
         })
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
     st.caption(
         "EODHD fornece estimate/previous/actual. FRED/BLS/BEA continuam sendo "
         "as fontes principais do histórico oficial do motor."
@@ -1592,7 +1592,7 @@ def _mostrar_expectativa_v66():
 
     resumo = _resumo_expectativa_v66(linhas)
     tabela = pd.DataFrame(linhas).drop(columns=["tem_consenso"])
-    st.dataframe(tabela, use_container_width=True, hide_index=True)
+    st.dataframe(tabela, width="stretch", hide_index=True)
 
     a,b,c,d = st.columns(4)
     a.metric("Expectativa USD", f"{resumo['score']:.0f}/100")
@@ -2230,7 +2230,7 @@ def _raiox_v79(par, base, cotada, score_base, score_cotada, diferenca, confl):
         })
 
     if linhas:
-        st.dataframe(pd.DataFrame(linhas), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(linhas), width="stretch", hide_index=True)
 
     # Bloco juros
     dt = confl.get("diferencial_taxas", {})
@@ -2271,7 +2271,7 @@ def _raiox_v79(par, base, cotada, score_base, score_cotada, diferenca, confl):
                 "Variação média": round(float(x.get("delta",0)),4)
             })
     if rows:
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
     score = float(confl.get("score_confluencia", 50))
     qualidade = float(confl.get("qualidade_confluencia", 0))
@@ -3290,7 +3290,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
             exibir[col] = pd.to_datetime(exibir[col], errors="coerce").dt.strftime("%d/%m/%Y")
     st.dataframe(
         exibir.tail(50).sort_values("timestamp", ascending=False),
-        use_container_width=True,
+        width="stretch",
         hide_index=True
     )
 
@@ -3347,7 +3347,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
             })
     if faixas:
         st.markdown("### 🎯 Resultado por faixa de Score Mestre")
-        st.dataframe(pd.DataFrame(faixas), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(faixas), width="stretch", hide_index=True)
 
     # V8.8 — desempenho por par.
     st.markdown("### 💱 Resultado por par")
@@ -3372,7 +3372,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
     if por_par:
         st.dataframe(
             pd.DataFrame(por_par).sort_values(["N", "Par"], ascending=[False, True]),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -3394,7 +3394,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
                 "Score médio": f"{pd.to_numeric(_sub88['score_mestre'], errors='coerce').mean():.1f}",
             })
     if faixas_q88:
-        st.dataframe(pd.DataFrame(faixas_q88), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(faixas_q88), width="stretch", hide_index=True)
 
     # =====================================================
     # V8.9 — PAINEL DE PERFORMANCE
@@ -3469,7 +3469,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
             "Qualidade média (%)": 1,
             "Retorno direcional médio (%)": 3,
         }),
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -3509,7 +3509,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
                 "Taxa de acerto (%)": 1,
                 "Retorno direcional médio (%)": 3,
             }),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -3566,7 +3566,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
                 "Qualidade média": f"{pd.to_numeric(sub['qualidade'], errors='coerce').mean():.1f}%"
             })
     if regimes:
-        st.dataframe(pd.DataFrame(regimes), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(regimes), width="stretch", hide_index=True)
     else:
         st.caption("Ainda não há sinais avaliados suficientes para comparar regimes de evento.")
 
@@ -3810,7 +3810,7 @@ with abas[2]:
         "Juros %", "Juros reais aprox. %", "Inflação anual %", "PIB real anual %",
         "Sentimento das notícias", "Fonte"
     ]
-    st.dataframe(tabela, use_container_width=True, hide_index=True)
+    st.dataframe(tabela, width="stretch", hide_index=True)
 
     top3 = ranking.head(3)["Código"].tolist()
     ultimas3 = ranking.tail(3)["Código"].tolist()
@@ -3821,7 +3821,7 @@ with abas[2]:
         st.write("O sistema rejeita automaticamente valores fora de faixas plausíveis e usa um valor de segurança quando a série está ausente, antiga ou em unidade incompatível.")
         st.dataframe(
             tabela[["Código", "Juros %", "Juros reais aprox. %", "Inflação anual %", "PIB real anual %", "Fonte"]],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -3859,7 +3859,7 @@ with abas[3]:
         {"Componente": nome, "Score 0–100": round(valor, 1), "Peso %": int(usd_detalhado["pesos"][nome] * 100)}
         for nome, valor in usd_detalhado["componentes"].items()
     ])
-    st.dataframe(comp_df, use_container_width=True, hide_index=True)
+    st.dataframe(comp_df, width="stretch", hide_index=True)
     st.caption("O score é uma leitura macro relativa, não uma promessa de taxa de acerto nem uma probabilidade estatística.")
 
     st.markdown("---")
@@ -3893,7 +3893,7 @@ with abas[3]:
     st.caption("Data da última observação, série usada e status de atualização de cada indicador.")
     auditoria_df = pd.DataFrame(macro_eua.get("_auditoria", []))
     if not auditoria_df.empty:
-        st.dataframe(auditoria_df, use_container_width=True, hide_index=True)
+        st.dataframe(auditoria_df, width="stretch", hide_index=True)
         atrasados = auditoria_df[auditoria_df["Status"].astype(str).str.contains("🔴|Fallback", regex=True)]
         atencao = auditoria_df[auditoria_df["Status"].astype(str).str.contains("🟡", regex=True)]
         if len(atrasados):
@@ -3910,7 +3910,7 @@ with abas[3]:
     st.caption("Datas de releases obtidas da FRED. A data do release não garante o horário exato em que o dado ficará disponível na API.")
     cal = carregar_calendario_fred()
     if not cal.empty:
-        st.dataframe(cal, use_container_width=True, hide_index=True)
+        st.dataframe(cal, width="stretch", hide_index=True)
     st.info("ℹ️ A FRED fornece dados realizados e datas de releases. O consenso/forecast é tentado via EODHD; se indisponível, permanece manual.")
 
     _mostrar_expectativa_v66()
@@ -3931,7 +3931,7 @@ with abas[3]:
             "Real FRED": round(_real, 3) if _real is not None else "—",
             "Anterior FRED": round(_ant, 3) if _ant is not None else "—",
         })
-    st.dataframe(pd.DataFrame(auto_rows), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(auto_rows), width="stretch", hide_index=True)
 
     if st.button("⚡ Preencher Real e Anterior com FRED", type="primary"):
         for _ind, (_real, _ant) in autom.items():
@@ -4015,7 +4015,7 @@ with abas[3]:
         })
 
     df_surpresa = pd.DataFrame(linhas)
-    st.dataframe(df_surpresa, use_container_width=True, hide_index=True)
+    st.dataframe(df_surpresa, width="stretch", hide_index=True)
 
     leitura_surpresa = interpretar_conjunto_surpresas(df_surpresa, usd_detalhado["score"])
     st.session_state["usd_score_ajustado_surpresas"] = float(leitura_surpresa["score_ajustado"])
@@ -4821,7 +4821,7 @@ def _mostrar_risco_timing_v65(confl: dict, diferenca: float):
             agenda["Data"] = agenda["Data"].dt.strftime("%d/%m/%Y")
             st.dataframe(
                 agenda[["Data","Evento","Impacto","Fonte","Dias"]],
-                use_container_width=True, hide_index=True
+                width="stretch", hide_index=True
             )
 
     with st.expander("⏱️ Ajuste manual opcional do horário"):
@@ -5673,7 +5673,7 @@ def _mostrar_score_mestre_v70(base: str, cotada: str, diferenca: float, confl: d
                 "Peso normalizado": f"{(x['Peso']/peso_ativo)*100:.1f}%" if peso_ativo else "—",
                 "Observação": x["Observação"],
             })
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
     st.warning(
         "Score Mestre 80/100 NÃO significa 80% de chance de lucro. "
@@ -5768,7 +5768,7 @@ def _status_automacao_v71():
             "Data": dt.strftime("%d/%m/%Y") if dt is not None else "—",
             "Fonte": "FRED",
         })
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
     st.info(
         "Você NÃO precisa digitar CPI, PCE, Payroll, desemprego, Fed Funds, "
@@ -5925,7 +5925,7 @@ with abas[4]:
                 "Qualidade/frescor": f"{fator*100:.0f}%",
                 "Peso efetivo": f"{peso_eff:.1f}%",
             })
-        st.dataframe(pd.DataFrame(detalhes), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(detalhes), width="stretch", hide_index=True)
 
         dt = confl["diferencial_taxas"]
         mercado3m = confl["mercado_3m"]
@@ -6006,7 +6006,7 @@ with abas[4]:
                     "Tendência": x["texto"],
                     "Variação média": round(x["delta"], 4),
                 })
-            st.dataframe(pd.DataFrame(trend_rows), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(trend_rows), width="stretch", hide_index=True)
             st.caption("A V7.1.1 combina diferencial de juros oficiais, spread de mercado e direção do spread com pesos ajustados pelo frescor dos dados. O Treasury 2Y permanece como tendência dos EUA, sem ser comparado diretamente a uma maturidade estrangeira diferente.")
 
         # Substitui a confiança antiga pela confiança de confluência.
@@ -6307,7 +6307,7 @@ with abas[4]:
 
     st.dataframe(
         matriz_v61,
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
         column_config={
             "Score final": st.column_config.NumberColumn(format="%.0f/100"),
@@ -6403,7 +6403,7 @@ with abas[6]:
     if historico.empty:
         st.info("Ainda não há histórico. Salve um registro na aba 🏆 Classificação.")
     else:
-        st.dataframe(historico.sort_values("data", ascending=False), use_container_width=True)
+        st.dataframe(historico.sort_values("data", ascending=False), width="stretch")
 
 # =========================================================
 # ABA 6 — TESTE HISTÓRICO
@@ -6426,7 +6426,7 @@ with abas[7]:
     if sinais.empty:
         st.info("Nenhum sinal registrado. Registre sinais na aba 💱 Pares e Confiança.")
     else:
-        st.dataframe(sinais.sort_values("data", ascending=False), use_container_width=True)
+        st.dataframe(sinais.sort_values("data", ascending=False), width="stretch")
 
         abertos = sinais[sinais["resultado"].isna()]
         if not abertos.empty:
@@ -7381,14 +7381,14 @@ def _painel_performance_v939(df):
     if tab_par.empty:
         st.info(f"Ainda não há avaliações {horizonte}.")
     else:
-        st.dataframe(tab_par, use_container_width=True, hide_index=True)
+        st.dataframe(tab_par, width="stretch", hide_index=True)
 
     col_a, col_b = st.columns(2)
     with col_a:
         st.markdown(f"#### 🧠 Por Score Mestre — {horizonte}")
         tab_score = _tabela_grupo_v939(base, "Faixa Score", suf)
         if not tab_score.empty:
-            st.dataframe(tab_score, use_container_width=True, hide_index=True)
+            st.dataframe(tab_score, width="stretch", hide_index=True)
         else:
             st.info("Sem amostra.")
 
@@ -7396,7 +7396,7 @@ def _painel_performance_v939(df):
         st.markdown(f"#### 🛡️ Por qualidade — {horizonte}")
         tab_q = _tabela_grupo_v939(base, "Faixa Qualidade", suf)
         if not tab_q.empty:
-            st.dataframe(tab_q, use_container_width=True, hide_index=True)
+            st.dataframe(tab_q, width="stretch", hide_index=True)
         else:
             st.info("Sem amostra.")
 
@@ -7463,7 +7463,7 @@ def _painel_configuracoes_v937():
         "indice_operacional", "preco_entrada",
         "Resultado 1H", "Resultado 4H", "Resultado 24H", "status_validacao"
     ]
-    st.dataframe(vis[cols_show].tail(30).iloc[::-1], use_container_width=True, hide_index=True)
+    st.dataframe(vis[cols_show].tail(30).iloc[::-1], width="stretch", hide_index=True)
 
     avaliados = {}
     for suf in ("1h", "4h", "24h"):
@@ -7719,7 +7719,7 @@ with abas[8]:
             {"Indicador": "Treasury 10Y", "Valor": f"{macro_eua['Treasury 10 anos']:.2f}%"},
             {"Indicador": "Índice amplo USD", "Valor": f"{macro_eua['Índice amplo do dólar']:.1f}"},
         ])
-        st.dataframe(_macro_show91, use_container_width=True, hide_index=True)
+        st.dataframe(_macro_show91, width="stretch", hide_index=True)
 
         # -----------------------------
         # 3. Calendário
@@ -7740,7 +7740,7 @@ with abas[8]:
         _r2.metric("Neutros", _neu91)
         _r3.metric("Contra", _contra91)
         if _xrows91:
-            st.dataframe(pd.DataFrame(_xrows91), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(_xrows91), width="stretch", hide_index=True)
 
         # -----------------------------
         # 5. Técnica automática V9.2
@@ -7798,7 +7798,7 @@ with abas[8]:
                     "Leitura": _tec92["m15"]["texto"],
                 },
             ])
-            st.dataframe(_tech92_df, use_container_width=True, hide_index=True)
+            st.dataframe(_tech92_df, width="stretch", hide_index=True)
             st.caption(
                 f"Último candle recebido: {_tec92['ultima_atualizacao'].strftime('%d/%m/%Y %H:%M UTC')}"
             )
@@ -8085,7 +8085,7 @@ with abas[8]:
                           .reset_index(drop=True)
             )
             _scan_show93.insert(0, "Prioridade", range(1, len(_scan_show93) + 1))
-            st.dataframe(_scan_show93, use_container_width=True, hide_index=True)
+            st.dataframe(_scan_show93, width="stretch", hide_index=True)
 
             # =========================================================
             # V9.3.6.4 — MELHOR OPORTUNIDADE AGORA
@@ -8321,7 +8321,7 @@ with abas[8]:
                     if st.button(
                         f"🔎 Verificar novo M15 de {_par958}",
                         key=f"v9362_recheck_m15_{_par958.replace('/','_')}",
-                        use_container_width=False,
+                        width="content",
                     ):
                         _lado962 = _lado_macro_v92(_dir958)
                         _anterior962 = st.session_state.get("v9362_m15_monitor", {})
@@ -8532,7 +8532,7 @@ with abas[8]:
                         "Registros antigos podem mostrar apenas a mensagem genérica. "
                         "A V9.3.6.4 salva HTTP, código/mensagem da API e quantidade de candles por timeframe, sem expor a chave."
                     )
-                    st.dataframe(pd.DataFrame(_diag_rows9353), use_container_width=True, hide_index=True)
+                    st.dataframe(pd.DataFrame(_diag_rows9353), width="stretch", hide_index=True)
                     _deep9356=[]
                     for _p9356,_r9356 in _resultados933.items():
                         if _resultado_tecnico_valido_v935(_r9356):
@@ -8554,7 +8554,7 @@ with abas[8]:
                                 })
                     if _deep9356:
                         st.markdown("**🧪 Diagnóstico profundo V9.3.6.4**")
-                        st.dataframe(pd.DataFrame(_deep9356),use_container_width=True,hide_index=True)
+                        st.dataframe(pd.DataFrame(_deep9356),width="stretch",hide_index=True)
                         st.caption("A chave da Twelve Data não é exibida nem persistida.")
                     st.caption(
                         "Este painel lê o diagnóstico já persistido e não consome créditos da Twelve Data."
@@ -8598,7 +8598,7 @@ with abas[8]:
             if not _falt93.empty:
                 _falt93.columns = ["Par", "Motivo técnico"]
                 with st.expander("🔎 Diagnóstico dos pares indisponíveis", expanded=False):
-                    st.dataframe(_falt93, use_container_width=True, hide_index=True)
+                    st.dataframe(_falt93, width="stretch", hide_index=True)
                     st.caption(
                         "Se aparecer limite/crédito/quota, aguarde a renovação da cota da API. "
                         "Não é sinal contra o par."

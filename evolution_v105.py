@@ -177,7 +177,7 @@ def _compare_chart(long_df: pd.DataFrame):
         return
     if alt is None:
         pivot = long_df.pivot_table(index="date", columns="indicator", values="normalized", aggfunc="last")
-        st.line_chart(pivot, use_container_width=True)
+        st.line_chart(pivot, width="stretch")
         return
     chart = (
         alt.Chart(long_df)
@@ -196,7 +196,7 @@ def _compare_chart(long_df: pd.DataFrame):
         .properties(height=380)
         .interactive()
     )
-    st.altair_chart(chart, use_container_width=True)
+    st.altair_chart(chart, width="stretch")
 
 
 def _single_chart(df: pd.DataFrame, label: str, chart_type: str = "Linha"):
@@ -211,7 +211,7 @@ def _single_chart(df: pd.DataFrame, label: str, chart_type: str = "Linha"):
         st.info("Sem valores válidos.")
         return
     if alt is None:
-        st.line_chart(d.set_index("date")["value"], use_container_width=True)
+        st.line_chart(d.set_index("date")["value"], width="stretch")
         return
     enc = {
         "x": alt.X("date:T", title="Data"),
@@ -227,7 +227,7 @@ def _single_chart(df: pd.DataFrame, label: str, chart_type: str = "Linha"):
         chart = alt.Chart(d).mark_area(opacity=.30, line=True).encode(**enc)
     else:
         chart = alt.Chart(d).mark_line(point=True).encode(**enc)
-    st.altair_chart(chart.properties(height=280).interactive(), use_container_width=True)
+    st.altair_chart(chart.properties(height=280).interactive(), width="stretch")
 
 
 def _guide_for(indicator: str) -> dict[str, str]:
@@ -406,7 +406,7 @@ def render_v105_center(
                     )
                     _compare_chart(long_df)
                     if latest_rows:
-                        st.dataframe(pd.DataFrame(latest_rows), hide_index=True, use_container_width=True)
+                        st.dataframe(pd.DataFrame(latest_rows), hide_index=True, width="stretch")
 
                     st.markdown("#### Lado a lado")
                     cols = st.columns(min(2, len(selected)))
@@ -480,7 +480,7 @@ def render_v105_center(
             _export_preferences(prefs),
             "usd_macro_preferencias.json",
             "application/json",
-            use_container_width=True,
+            width="stretch",
         )
 
         uploaded = st.file_uploader("Importar preferências (.json)", type=["json"], key="v105_pref_upload")
@@ -512,7 +512,7 @@ def render_v105_center(
             rules = st.data_editor(
                 st.session_state.get("v105_alert_rules", defaults),
                 num_rows="dynamic",
-                use_container_width=True,
+                width="stretch",
                 key="v105_alert_editor",
                 column_config={
                     "Ativo": st.column_config.CheckboxColumn("Ativo"),
@@ -555,7 +555,7 @@ def render_v105_center(
                         hits.append((indicator, float(value), condition, limit))
 
                 if checked:
-                    st.dataframe(pd.DataFrame(checked), hide_index=True, use_container_width=True)
+                    st.dataframe(pd.DataFrame(checked), hide_index=True, width="stretch")
                 if hits:
                     for indicator, value, condition, limit in hits:
                         st.warning(f"🔔 {indicator}: {value:.3f} está {condition.lower()} {limit:.3f}.")
@@ -621,7 +621,7 @@ def render_v105_center(
                     "Frescor": f"{dot} {fresh} ({age}d)",
                     "Cadência": latest["frequency"],
                 })
-            st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+            st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
         u1, u2 = st.columns(2)
         u1.metric("Cache histórico", "1 hora")
@@ -670,7 +670,7 @@ def render_v105_center(
     # --------------------------------------------------------
     with tabs[6]:
         st.markdown("### 🗺️ Plano de execução dentro do app")
-        st.dataframe(EXECUTION_PLAN, hide_index=True, use_container_width=True)
+        st.dataframe(EXECUTION_PLAN, hide_index=True, width="stretch")
         implemented = EXECUTION_PLAN["Status"].astype(str).str.contains("✅|🟢", regex=True).sum()
         progress = implemented / len(EXECUTION_PLAN)
         st.progress(progress)
@@ -680,7 +680,7 @@ def render_v105_center(
             EXECUTION_PLAN.to_csv(index=False).encode("utf-8"),
             "plano_execucao_v105.csv",
             "text/csv",
-            use_container_width=True,
+            width="stretch",
         )
         st.info(
             "O plano aparece no app para acompanhamento. As melhorias futuras devem ser promovidas para o motor "
