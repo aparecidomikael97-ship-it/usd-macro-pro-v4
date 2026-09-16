@@ -34,6 +34,7 @@ from atlasquant_strategy_comparator import (
 )
 from atlasquant_strategy_stability import temporal_stability_report
 from atlasquant_strategy_walkforward import walk_forward_report
+from atlasquant_strategy_friction import friction_sensitivity_report
 from atlasquant_tradingview_parity import validate_tradingview_parity
 
 
@@ -368,7 +369,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
         key="atlasquant_bt_default_pair",
     ).strip().upper()
 
-    a, b, c = st.columns(3)
+    a, b, c, d = st.columns(4)
     with a:
         max_wait = st.number_input("Máx. candles para entrada", min_value=1, max_value=100, value=8, step=1)
     with b:
@@ -376,6 +377,15 @@ def render_operational_backtest_panel() -> dict[str, Any]:
     with c:
         cost_r = st.number_input(
             "Custos totais por trade (R)",
+            min_value=0.0,
+            max_value=5.0,
+            value=0.0,
+            step=0.01,
+            format="%.2f",
+        )
+    with d:
+        slippage_r = st.number_input(
+            "Slippage adverso por trade (R)",
             min_value=0.0,
             max_value=5.0,
             value=0.0,
@@ -455,6 +465,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                         max_wait_bars=int(max_wait),
                         max_hold_bars=int(max_hold),
                         cost_r=float(cost_r),
+                        slippage_r=float(slippage_r),
                         start_after_signal_bar=True,
                     )
                     result=_render_result_block(
@@ -538,6 +549,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                         max_wait_bars=int(max_wait),
                         max_hold_bars=int(max_hold),
                         cost_r=float(cost_r),
+                        slippage_r=float(slippage_r),
                         start_after_signal_bar=True,
                     )
                     result=_render_result_block(
@@ -621,6 +633,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                         max_wait_bars=int(max_wait),
                         max_hold_bars=int(max_hold),
                         cost_r=float(cost_r),
+                        slippage_r=float(slippage_r),
                         start_after_signal_bar=True,
                     )
                     result=_render_result_block(
@@ -691,6 +704,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                         max_wait_bars=int(max_wait),
                         max_hold_bars=int(max_hold),
                         cost_r=float(cost_r),
+                        slippage_r=float(slippage_r),
                         start_after_signal_bar=True,
                     )
                     result=_render_result_block(
@@ -775,6 +789,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                         max_wait_bars=int(max_wait),
                         max_hold_bars=int(max_hold),
                         cost_r=float(cost_r),
+                        slippage_r=float(slippage_r),
                         start_after_signal_bar=True,
                     )
                     result=_render_result_block(
@@ -844,6 +859,21 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                 key="atlasquant_compare_wf_min_test",
             )
 
+        fr1,fr2=st.columns(2)
+        with fr1:
+            friction_min_trades=st.number_input(
+                "Mínimo de trades para teste de custos",
+                min_value=5,max_value=500,value=20,step=5,
+                key="atlasquant_compare_friction_min_trades",
+            )
+        with fr2:
+            friction_slippage_levels=st.multiselect(
+                "Stress adicional de slippage (R)",
+                [0.0,0.01,0.02,0.05,0.10,0.20,0.30],
+                default=[0.0,0.02,0.05,0.10],
+                key="atlasquant_compare_friction_slippage_levels",
+            )
+
         if candle_file is None:
             st.info("Envie o CSV de candles para comparar os cinco operacionais.")
         else:
@@ -865,6 +895,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                     max_wait_bars=int(max_wait),
                     max_hold_bars=int(max_hold),
                     cost_r=float(cost_r),
+                    slippage_r=float(slippage_r),
                 )
                 comparison=comparison_frame(
                     suite,
@@ -965,8 +996,44 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                             hide_index=True,
                         )
 
+                stress_levels=sorted({
+                    float(x) for x in list(friction_slippage_levels)+[float(slippage_r)]
+                })
+                friction=friction_sensitivity_report(
+                    suite,
+                    base_cost_r=float(cost_r),
+                    slippage_levels_r=stress_levels,
+                    min_trades=int(friction_min_trades),
+                )
+                friction_summary=friction["summary"]
+                friction_scenarios=friction["scenarios"]
+
+                st.markdown("#### Sensibilidade a custos e slippage")
+                st.caption(
+                    "Reprecifica exatamente os mesmos trades sob diferentes atritos em R. "
+                    "Slippage aqui é um drag adverso por trade, não um simulador tick a tick."
+                )
+                friction_cols=[
+                    "operacional","trades","scenarios_tested","positive_scenarios",
+                    "positive_scenario_pct","baseline_expectancy_r","worst_expectancy_r",
+                    "expectancy_drop_to_worst_r","first_nonpositive_total_friction_r",
+                    "first_nonpositive_cost_r","first_nonpositive_slippage_r","sensitivity_status",
+                ]
+                st.dataframe(
+                    friction_summary.reindex(columns=friction_cols),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+                if not friction_scenarios.empty:
+                    with st.expander("Ver cenários de custos/slippage detalhados",expanded=False):
+                        st.dataframe(
+                            friction_scenarios,
+                            use_container_width=True,
+                            hide_index=True,
+                        )
+
                 all_ledger=combined_ledger(suite)
-                cexp1,cexp2,cexp3,cexp4=st.columns(4)
+                cexp1,cexp2,cexp3,cexp4,cexp5=st.columns(5)
                 with cexp1:
                     st.download_button(
                         "📥 Baixar comparação (CSV)",
@@ -999,6 +1066,14 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                         file_name=f"atlasquant_walkforward_5_{default_pair.replace('/','_')}.csv",
                         mime="text/csv",
                         key="atlasquant_compare_export_walkforward",
+                    )
+                with cexp5:
+                    st.download_button(
+                        "📥 Baixar custos/slippage (CSV)",
+                        data=friction_scenarios.to_csv(index=False),
+                        file_name=f"atlasquant_friction_5_{default_pair.replace('/','_')}.csv",
+                        mime="text/csv",
+                        key="atlasquant_compare_export_friction",
                     )
 
                 st.caption(
@@ -1052,6 +1127,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
         max_wait_bars=int(max_wait),
         max_hold_bars=int(max_hold),
         cost_r=float(cost_r),
+        slippage_r=float(slippage_r),
         start_after_signal_bar=True,
     )
     result=_render_result_block(results,pair,key_suffix="manual")
