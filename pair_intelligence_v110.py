@@ -548,10 +548,17 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
 
     render_operational_plan(best)
     _flight_capture = capture_flight_recorder(best, "V11.0.8 / AtlasQuant DEV")
-    _shadow_capture_status = capture_shadow_batch(
-        packs,
-        champion_version="V11.0.8 / AtlasQuant DEV",
-    )
+    try:
+        _shadow_capture_status = capture_shadow_batch(
+            packs,
+            champion_version="V11.0.8 / AtlasQuant DEV",
+        )
+    except Exception as _shadow_capture_exc:
+        _shadow_capture_status = {
+            "ok":False,
+            "reason":"CAPTURE_EXCEPTION",
+            "error":f"{type(_shadow_capture_exc).__name__}: {_shadow_capture_exc}",
+        }
 
     if not _is_pro:
         st.markdown("### 🧾 Mesa rápida — 7 pares")
