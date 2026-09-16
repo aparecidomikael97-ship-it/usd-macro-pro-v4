@@ -143,6 +143,14 @@ except Exception as _validation_exc:
 
 
 try:
+    from atlasquant_evidence_bundle import render_validation_evidence
+    _ATLASQUANT_EVIDENCE_IMPORT_ERROR = ""
+except Exception as _evidence_exc:
+    render_validation_evidence = None
+    _ATLASQUANT_EVIDENCE_IMPORT_ERROR = f"{type(_evidence_exc).__name__}: {_evidence_exc}"
+
+
+try:
     from currency_news_v107 import render_currency_news_panel
     _CURRENCY_NEWS_V106_IMPORT_ERROR = ""
 except Exception as _currency_news_exc:
@@ -8979,11 +8987,20 @@ with abas[12]:
             if _aq_research_err and (_aq_research_df is None or _aq_research_df.empty):
                 st.info(f"Validation Center aguardando histórico persistente: {_aq_research_err}")
             else:
-                render_validation_readiness(
+                _aq_validation_result = render_validation_readiness(
                     _aq_research_df.copy(),
                     st.session_state.get("atlasquant_shadow_samples", []),
                     horizon="24h",
                 )
+                if render_validation_evidence is not None:
+                    render_validation_evidence(
+                        _aq_validation_result,
+                        engine_version=APP_VERSION,
+                    )
+                elif _ATLASQUANT_EVIDENCE_IMPORT_ERROR:
+                    st.caption(
+                        f"Evidence Bundle indisponível: {_ATLASQUANT_EVIDENCE_IMPORT_ERROR}"
+                    )
         except Exception as _aq_validation_exc:
             st.warning("Validation Center em modo seguro; merge/promoção continuam bloqueados.")
             st.caption(f"Diagnóstico: {type(_aq_validation_exc).__name__}: {_aq_validation_exc}")
