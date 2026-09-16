@@ -64,3 +64,16 @@ Nenhuma alteração foi feita na `main` durante a promoção.
 - Smoke headless continuou sem exceções, sem chamada Twelve Data na abertura e sem escrita HTTP remota.
 - Os avisos de `use_container_width` observados no smoke anterior deixaram de aparecer após a migração para `width`.
 - Os sete arquivos operacionais divergentes em `dados/` permanecem preservados.
+
+
+## Atualização — Runtime 653
+
+- Runtime atual: `03cf06c1064be5e0a5a9bc92c3709341d48db0ca`.
+- Backup imediatamente anterior: `atlasquant-runtime-backup-20260916-911a8a2`.
+- Quality run Runtime: `35115636444`.
+- Resultado: **653/653 testes OK**, compile gate verde.
+- O rótulo de ambiente agora é dinâmico e o smoke confirma `RUNTIME`.
+- O diff DEV → Runtime segue contendo apenas os sete blobs operacionais preservados em `dados/`.
+- Nenhuma alteração foi feita na `main` durante esta promoção.
+
+Estado: **RUNTIME_CODE_VALIDATED_EXTERNAL_CHECKS_PENDING**.
