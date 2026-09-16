@@ -340,3 +340,14 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - Quality da própria Runtime: run `35112939791`, **650/650 testes OK**, compile gate verde.
 - Quality workflow agora valida pushes de código também em `atlasquant-runtime`.
 - `main` não foi alterada.
+
+
+## 16/09/2026 UTC — smoke test headless da Runtime
+
+- Criado teste de boot Streamlit offline com AppTest.
+- Boot deve permanecer sem exceções com provedores indisponíveis.
+- A simples abertura não pode consumir Twelve Data nem efetuar escrita HTTP remota.
+- DEV: run `35113532164`, **651/651 testes OK**.
+- Runtime: `383584007031189b56eb75ce2bdf6dad5c5377c9`, run `35113739106`, **651/651 testes OK**.
+- Dados operacionais preservados e backup criado antes da promoção.
+- Próximo fechamento: substituir usos depreciados de `use_container_width` pela API `width` do Streamlit.
