@@ -132,6 +132,13 @@ class BacktestPanelTests(unittest.TestCase):
         self.assertIn("Blocos temporais",source)
         self.assertIn("Baixar estabilidade",source)
 
+    def test_panel_exposes_walk_forward_diagnostics(self):
+        source=inspect.getsource(render_operational_backtest_panel)
+        self.assertIn("Walk-forward — treino anterior × teste futuro",source)
+        self.assertIn("walk_forward_report",source)
+        self.assertIn("Janelas OOS",source)
+        self.assertIn("Baixar walk-forward",source)
+
     def test_csv_bytes_read_utf8(self):
         raw=b"time,open,high,low,close\n2026-09-15T00:00:00Z,1,2,0.5,1.5\n"
         out=read_csv_bytes(raw)
