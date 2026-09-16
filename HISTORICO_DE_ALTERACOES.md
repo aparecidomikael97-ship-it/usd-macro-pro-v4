@@ -351,3 +351,14 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - Runtime: `383584007031189b56eb75ce2bdf6dad5c5377c9`, run `35113739106`, **651/651 testes OK**.
 - Dados operacionais preservados e backup criado antes da promoção.
 - Próximo fechamento: substituir usos depreciados de `use_container_width` pela API `width` do Streamlit.
+
+
+## 16/09/2026 UTC — Runtime 652 e compatibilidade Streamlit
+
+- Removidos usos depreciados de `use_container_width` nos módulos app-facing cobertos.
+- Adicionado teste de contrato `test_streamlit_width_compat.py`.
+- DEV run `35114484403`: **652/652 testes OK**.
+- Mudanças promovidas para Runtime preservando os sete arquivos operacionais divergentes.
+- Runtime `911a8a2968b6391d8306f421d5d7dce328f33a74`, run `35114708095`: **652/652 testes OK**.
+- Smoke sem avisos `use_container_width`, sem Twelve Data no boot e sem escrita HTTP remota.
+- `main` não foi alterada.
