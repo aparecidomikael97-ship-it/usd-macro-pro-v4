@@ -32,6 +32,7 @@ from atlasquant_strategy_comparator import (
     breakdown_frame,
     combined_ledger,
 )
+from atlasquant_strategy_stability import temporal_stability_report
 from atlasquant_tradingview_parity import validate_tradingview_parity
 
 
@@ -792,11 +793,26 @@ def render_operational_backtest_panel() -> dict[str, Any]:
             "Roda BOS/CHOCH+OB, FVG, OTE, CRT e AMD separadamente sobre o mesmo CSV "
             "com os defaults de pesquisa. Não mistura sinais e não altera o Gate."
         )
-        min_rank_trades=st.number_input(
-            "Mínimo de trades para ranking observado",
-            min_value=5,max_value=500,value=20,step=5,
-            key="atlasquant_compare_min_rank_trades",
-        )
+        sc1,sc2,sc3=st.columns(3)
+        with sc1:
+            min_rank_trades=st.number_input(
+                "Mínimo de trades para ranking observado",
+                min_value=5,max_value=500,value=20,step=5,
+                key="atlasquant_compare_min_rank_trades",
+            )
+        with sc2:
+            stability_folds=st.selectbox(
+                "Blocos temporais",
+                [3,4,5],
+                index=0,
+                key="atlasquant_compare_stability_folds",
+            )
+        with sc3:
+            min_fold_trades=st.number_input(
+                "Mínimo de trades por bloco",
+                min_value=2,max_value=100,value=5,step=1,
+                key="atlasquant_compare_min_fold_trades",
+            )
 
         if candle_file is None:
             st.info("Envie o CSV de candles para comparar os cinco operacionais.")
@@ -854,8 +870,39 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                     st.markdown("#### Comparação por sessão")
                     st.dataframe(by_session,use_container_width=True,hide_index=True)
 
+                stability=temporal_stability_report(
+                    suite,
+                    folds=int(stability_folds),
+                    min_trades_per_fold=int(min_fold_trades),
+                )
+                stability_summary=stability["summary"]
+                stability_folds_df=stability["folds"]
+
+                st.markdown("#### Estabilidade temporal")
+                st.caption(
+                    "Cada operacional é dividido em blocos cronológicos de quantidade semelhante de trades. "
+                    "O objetivo é detectar quando a expectativa positiva aparece só em uma parte do histórico."
+                )
+                stability_cols=[
+                    "operacional","folds_available","positive_folds","negative_folds","flat_folds",
+                    "positive_fold_pct","worst_expectancy_r","best_expectancy_r",
+                    "expectancy_spread_r","expectancy_std_r","total_net_r","stability_status",
+                ]
+                st.dataframe(
+                    stability_summary.reindex(columns=stability_cols),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+                if not stability_folds_df.empty:
+                    with st.expander("Ver blocos temporais detalhados",expanded=False):
+                        st.dataframe(
+                            stability_folds_df,
+                            use_container_width=True,
+                            hide_index=True,
+                        )
+
                 all_ledger=combined_ledger(suite)
-                cexp1,cexp2=st.columns(2)
+                cexp1,cexp2,cexp3=st.columns(3)
                 with cexp1:
                     st.download_button(
                         "📥 Baixar comparação (CSV)",
@@ -871,6 +918,15 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                         file_name=f"atlasquant_ledger_5_{default_pair.replace('/','_')}.csv",
                         mime="text/csv",
                         key="atlasquant_compare_export_ledger",
+                    )
+                with cexp3:
+                    stability_export=stability_folds_df.copy()
+                    st.download_button(
+                        "📥 Baixar estabilidade (CSV)",
+                        data=stability_export.to_csv(index=False),
+                        file_name=f"atlasquant_estabilidade_5_{default_pair.replace('/','_')}.csv",
+                        mime="text/csv",
+                        key="atlasquant_compare_export_stability",
                     )
 
                 st.caption(
