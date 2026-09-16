@@ -9020,4 +9020,8 @@ with abas[0]:
             "usd_score": float(usd_detalhado.get("score", 50.0)) if "usd_detalhado" in globals() else 50.0,
             "usd_quality": float(qualidade_usd) if "qualidade_usd" in globals() else 0.0,
         }
+        try:
+            _macro_v108["event"] = _proximo_evento_macro_v65()
+        except Exception:
+            _macro_v108["event"] = {}
         render_pair_intelligence_v110(matriz_v61, ranking, fed=fed, macro_context=_macro_v108, weights=PESOS)
