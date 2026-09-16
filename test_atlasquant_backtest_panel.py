@@ -118,6 +118,13 @@ class BacktestPanelTests(unittest.TestCase):
         self.assertIn("AtlasQuant AMD Power of Three Research V1",text)
         self.assertIn("strategy.entry",text)
 
+    def test_panel_exposes_five_strategy_comparator(self):
+        source=inspect.getsource(render_operational_backtest_panel)
+        self.assertIn("Comparar os 5 operacionais",source)
+        self.assertIn("run_strategy_suite",source)
+        self.assertIn("comparison_frame",source)
+        self.assertIn("observed_expectancy_rank",source)
+
     def test_csv_bytes_read_utf8(self):
         raw=b"time,open,high,low,close\n2026-09-15T00:00:00Z,1,2,0.5,1.5\n"
         out=read_csv_bytes(raw)
