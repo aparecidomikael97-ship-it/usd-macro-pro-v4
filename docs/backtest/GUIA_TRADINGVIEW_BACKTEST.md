@@ -667,3 +667,16 @@ O pacote contém:
 
 Em hospedagem com armazenamento efêmero, exporte esse ZIP para não depender do filesystem local
 entre reinicializações ou deployments.
+
+
+## Restaurar um histórico exportado
+
+No bloco **Histórico local de snapshots**, envie o arquivo ZIP criado pelo próprio AtlasQuant em **Restaurar histórico exportado (ZIP)** e depois clique em **Validar e restaurar histórico ZIP**.
+
+Antes de salvar qualquer snapshot, o AtlasQuant valida o pacote inteiro. Ele rejeita arquivos com caminhos inseguros, conteúdo inesperado, manifesto divergente, snapshots inválidos/adulterados, excesso de tamanho/quantidade ou corrupção do ZIP.
+
+A restauração não extrai os membros do ZIP diretamente para o filesystem. Somente snapshots que passaram na validação são gravados pelo armazenamento local de pesquisa.
+
+Snapshots já existentes são deduplicados pelo `snapshot_id` completo. O resultado mostra quantos foram validados, adicionados e quantos já estavam presentes.
+
+O histórico restaurado continua em `.atlasquant_research/backtest_snapshots`, fora de `dados/` e sem escrita na branch Runtime.
