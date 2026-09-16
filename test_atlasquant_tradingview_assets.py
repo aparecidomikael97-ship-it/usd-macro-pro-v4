@@ -1,10 +1,11 @@
 import unittest
 from pathlib import Path
 
-from atlasquant_backtest_panel import load_tradingview_pine_asset
+from atlasquant_backtest_panel import load_tradingview_pine_asset, load_tradingview_fvg_pine_asset
 
 ROOT=Path(__file__).resolve().parent
 PINE=ROOT/"tradingview"/"atlasquant_bos_choch_ob_strategy_v1.pine"
+FVG_PINE=ROOT/"tradingview"/"atlasquant_fvg_strategy_v1.pine"
 
 
 class TradingViewAssetsTests(unittest.TestCase):
@@ -49,6 +50,21 @@ class TradingViewAssetsTests(unittest.TestCase):
     def test_panel_loader_returns_exact_asset(self):
         expected=PINE.read_text(encoding="utf-8")
         self.assertEqual(load_tradingview_pine_asset(),expected)
+
+    def test_fvg_pine_is_separate_strategy_and_safe_contract(self):
+        text=FVG_PINE.read_text(encoding="utf-8")
+        low=text.lower()
+        self.assertIn("AtlasQuant FVG Research V1",text)
+        self.assertIn("strategy(",text)
+        self.assertIn("bullFvg",text)
+        self.assertIn("bearFvg",text)
+        self.assertIn("strategy.entry",text)
+        self.assertIn("strategy.exit",text)
+        self.assertIn("process_orders_on_close=false",text.replace(" ",""))
+        self.assertNotIn("request.security",low)
+        self.assertNotIn("lookahead_on",low)
+        self.assertNotIn("barmerge.lookahead",low)
+        self.assertEqual(load_tradingview_fvg_pine_asset(),text)
 
 
 if __name__=="__main__":

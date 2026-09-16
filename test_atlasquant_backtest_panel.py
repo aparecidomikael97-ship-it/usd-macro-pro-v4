@@ -9,6 +9,7 @@ from atlasquant_backtest_panel import (
     signal_template_csv,
     candles_template_csv,
     render_operational_backtest_panel,
+    load_tradingview_fvg_pine_asset,
 )
 
 
@@ -69,6 +70,17 @@ class BacktestPanelTests(unittest.TestCase):
         self.assertIn("Rodar backtest automático",source)
         self.assertIn("single_position_per_pair=True",source)
         self.assertIn("generate_bos_choch_ob_signals",source)
+
+    def test_panel_exposes_separate_fvg_replay(self):
+        source=inspect.getsource(render_operational_backtest_panel)
+        self.assertIn("Rodar backtest FVG",source)
+        self.assertIn("generate_fvg_signals",source)
+        self.assertIn('key_suffix="fvg"',source)
+
+    def test_fvg_pine_loader_returns_content(self):
+        text=load_tradingview_fvg_pine_asset()
+        self.assertIn("AtlasQuant FVG Research V1",text)
+        self.assertIn("strategy.entry",text)
 
     def test_csv_bytes_read_utf8(self):
         raw=b"time,open,high,low,close\n2026-09-15T00:00:00Z,1,2,0.5,1.5\n"

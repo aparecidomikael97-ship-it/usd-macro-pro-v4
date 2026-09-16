@@ -22,6 +22,7 @@ from atlasquant_operational_backtest import (
     summarize_results,
 )
 from atlasquant_strategy_replay import generate_bos_choch_ob_signals
+from atlasquant_fvg_replay import generate_fvg_signals
 
 
 CANDLE_ALIASES = {
@@ -143,12 +144,20 @@ def candles_template_csv() -> str:
     return buf.getvalue()
 
 
-def load_tradingview_pine_asset() -> str:
-    path = Path(__file__).resolve().parent / "tradingview" / "atlasquant_bos_choch_ob_strategy_v1.pine"
+def _load_pine_file(filename: str) -> str:
+    path = Path(__file__).resolve().parent / "tradingview" / filename
     try:
         return path.read_text(encoding="utf-8")
     except Exception:
         return ""
+
+
+def load_tradingview_pine_asset() -> str:
+    return _load_pine_file("atlasquant_bos_choch_ob_strategy_v1.pine")
+
+
+def load_tradingview_fvg_pine_asset() -> str:
+    return _load_pine_file("atlasquant_fvg_strategy_v1.pine")
 
 
 def _records(df: pd.DataFrame) -> list[dict[str, Any]]:
@@ -269,14 +278,26 @@ def render_operational_backtest_panel() -> dict[str, Any]:
         "Estratégia técnica de pesquisa para o Strategy Tester do TradingView. "
         "Não inclui macro/Fed e não altera o Gate do AtlasQuant."
     )
-    st.download_button(
-        "⬇️ Baixar Pine Strategy BOS/CHOCH + OB",
-        data=pine_asset,
-        file_name="atlasquant_bos_choch_ob_strategy_v1.pine",
-        mime="text/plain",
-        disabled=not bool(pine_asset),
-        key="atlasquant_bt_pine_bos_choch_ob",
-    )
+    p1,p2=st.columns(2)
+    with p1:
+        st.download_button(
+            "⬇️ Pine BOS/CHOCH + OB",
+            data=pine_asset,
+            file_name="atlasquant_bos_choch_ob_strategy_v1.pine",
+            mime="text/plain",
+            disabled=not bool(pine_asset),
+            key="atlasquant_bt_pine_bos_choch_ob",
+        )
+    fvg_pine=load_tradingview_fvg_pine_asset()
+    with p2:
+        st.download_button(
+            "⬇️ Pine FVG",
+            data=fvg_pine,
+            file_name="atlasquant_fvg_strategy_v1.pine",
+            mime="text/plain",
+            disabled=not bool(fvg_pine),
+            key="atlasquant_bt_pine_fvg",
+        )
 
     default_pair = st.text_input(
         "Par/ativo dos candles (usado apenas se a planilha não tiver a coluna par)",
@@ -385,10 +406,93 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                     )
                     return {**result, "mode":"AUTO_REPLAY", "signals":auto_signals}
 
+    with st.expander("🤖 Backtest automático — FVG", expanded=False):
+        st.caption(
+            "Operacional separado do BOS/CHOCH + OB. Detecta FVG novo de três candles "
+            "e mede sua estatística de forma independente."
+        )
+        fc1,fc2,fc3=st.columns(3)
+        with fc1:
+            fvg_rr=st.number_input(
+                "Alvo FVG (R)",min_value=0.25,max_value=10.0,
+                value=2.0,step=0.25,key="atlasquant_fvg_rr"
+            )
+        with fc2:
+            fvg_buffer=st.number_input(
+                "Buffer FVG stop (ATR)",min_value=0.0,max_value=1.0,
+                value=0.0,step=0.01,key="atlasquant_fvg_buffer"
+            )
+        with fc3:
+            fvg_min_gap=st.number_input(
+                "Gap mínimo (ATR)",min_value=0.0,max_value=5.0,
+                value=0.0,step=0.05,key="atlasquant_fvg_min_gap"
+            )
+        ff1,ff2=st.columns(2)
+        with ff1:
+            fvg_entry_mode=st.selectbox(
+                "Entrada FVG",["MIDPOINT","PROXIMAL"],key="atlasquant_fvg_entry_mode"
+            )
+        with ff2:
+            fvg_sides=st.multiselect(
+                "Lados FVG",["BUY","SELL"],default=["BUY","SELL"],key="atlasquant_fvg_sides"
+            )
+
+        if candle_file is None:
+            st.info("Envie o CSV de candles para habilitar o replay FVG.")
+        else:
+            try:
+                fvg_raw=read_csv_bytes(candle_file.getvalue())
+                fvg_candles=normalize_tradingview_candles(fvg_raw)
+            except Exception as exc:
+                fvg_candles=pd.DataFrame()
+                st.error(f"CSV de candles inválido: {type(exc).__name__}: {exc}")
+
+            if not fvg_candles.empty:
+                fvg_signals=generate_fvg_signals(
+                    fvg_candles,
+                    pair=default_pair,
+                    rr_target=float(fvg_rr),
+                    stop_buffer_atr=float(fvg_buffer),
+                    min_gap_atr=float(fvg_min_gap),
+                    entry_mode=str(fvg_entry_mode),
+                    allow_buy="BUY" in fvg_sides,
+                    allow_sell="SELL" in fvg_sides,
+                )
+                st.caption(
+                    f"Replay FVG encontrou {len(fvg_signals)} setup(s) em "
+                    f"{len(fvg_candles)} candle(s)."
+                )
+                if st.button(
+                    "▶️ Rodar backtest FVG",
+                    type="primary",
+                    key="atlasquant_bt_fvg_run",
+                    disabled=not bool(fvg_signals),
+                ):
+                    fvg_results=backtest_many(
+                        {default_pair:fvg_candles},
+                        fvg_signals,
+                        single_position_per_pair=True,
+                        max_wait_bars=int(max_wait),
+                        max_hold_bars=int(max_hold),
+                        cost_r=float(cost_r),
+                        start_after_signal_bar=True,
+                    )
+                    result=_render_result_block(
+                        fvg_results,
+                        default_pair,
+                        key_suffix="fvg",
+                        generated_signals=fvg_signals,
+                    )
+                    st.caption(
+                        "FVG é medido separadamente do BOS/CHOCH + Order Block. "
+                        "Não inclui macro/Fed e não altera o Gate."
+                    )
+                    return {**result,"mode":"AUTO_FVG","signals":fvg_signals}
+
     if candle_file is None or signal_file is None:
         st.info(
             "Para o backtest manual, envie também a planilha de sinais. "
-            "O replay automático acima precisa apenas do CSV de candles."
+            "Os replays automáticos acima precisam apenas do CSV de candles."
         )
         return {"status": "WAITING_FILES"}
 
