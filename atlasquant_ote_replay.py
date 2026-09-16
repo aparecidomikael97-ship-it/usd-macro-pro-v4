@@ -128,6 +128,10 @@ def generate_ote_signals(
 
     rows=[]
     seen=set()
+    # After an OTE signal is emitted, a same-side future signal must come from
+    # a genuinely new impulse leg. Minor extensions/re-anchors of the previous
+    # leg are not allowed to create another trade.
+    last_terminal_by_side={"BUY":-1,"SELL":-1}
     start=max(lb,int(min_bars))
     for end in range(start-1,len(d)):
         window=d.iloc[max(0,end-lb+1):end+1].copy().reset_index(drop=True)
@@ -179,6 +183,17 @@ def generate_ote_signals(
             impulse_key=(side,low_global,high_global)
             if impulse_key in seen:
                 continue
+
+            # Re-anchor guard:
+            # BUY origin is the swing low and must begin after the last emitted
+            # BUY terminal high. SELL origin is the swing high and must begin
+            # after the last emitted SELL terminal low.
+            previous_terminal=int(last_terminal_by_side.get(side,-1))
+            origin_global=low_global if side=="BUY" else high_global
+            terminal_global=high_global if side=="BUY" else low_global
+            if previous_terminal>=0 and origin_global<=previous_terminal:
+                continue
+
             candidates.append({
                 "distance":abs(retr-.705),
                 "impulse_key":impulse_key,
@@ -194,6 +209,9 @@ def generate_ote_signals(
                 "hi":hi,
                 "low_global":low_global,
                 "high_global":high_global,
+                "origin_global":origin_global,
+                "terminal_global":terminal_global,
+                "previous_terminal":previous_terminal,
                 "impulse_atr":rng/atr,
             })
 
@@ -202,6 +220,7 @@ def generate_ote_signals(
         candidates.sort(key=lambda x:(x["distance"],0 if x["side"]=="BUY" else 1))
         chosen=candidates[0]
         seen.add(chosen["impulse_key"])
+        last_terminal_by_side[chosen["side"]]=int(chosen["terminal_global"])
         rows.append({
             "signal_time":ts.isoformat(),
             "pair":pair,
@@ -221,6 +240,10 @@ def generate_ote_signals(
             "swing_high":float(chosen["hi"]),
             "impulse_low_index":int(chosen["low_global"]),
             "impulse_high_index":int(chosen["high_global"]),
+            "impulse_origin_index":int(chosen["origin_global"]),
+            "impulse_terminal_index":int(chosen["terminal_global"]),
+            "previous_same_side_terminal_index":int(chosen["previous_terminal"]),
+            "reanchor_guard":"NEW_ORIGIN_AFTER_PREVIOUS_TERMINAL",
             "impulse_atr":float(chosen["impulse_atr"]),
             "replay_bar_index":int(end),
             "rr_target":rr,
