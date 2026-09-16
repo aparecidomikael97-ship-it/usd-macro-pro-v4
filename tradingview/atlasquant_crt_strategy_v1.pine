@@ -1,0 +1,124 @@
+//@version=5
+strategy(
+     "AtlasQuant CRT Research V1",
+     overlay=true,
+     pyramiding=0,
+     process_orders_on_close=false,
+     calc_on_order_fills=true,
+     initial_capital=10000,
+     commission_type=strategy.commission.percent,
+     commission_value=0.0
+)
+
+// Technical-only three-candle CRT research bridge.
+// Anchor range -> raid/reclaim -> directional delivery.
+
+groupCRT      = "CRT"
+atrLen        = input.int(14, "ATR", minval=2, maxval=100, group=groupCRT)
+stopBufferAtr = input.float(0.0, "Buffer do stop (ATR)", minval=0.0, maxval=1.0, step=0.01, group=groupCRT)
+minRR         = input.float(0.0, "RR mínimo", minval=0.0, maxval=20.0, step=0.25, group=groupCRT)
+maxSetupAge   = input.int(8, "Validade do setup (candles)", minval=1, maxval=100, group=groupCRT)
+sideFilter    = input.string("Both", "Lados", options=["Both","Long only","Short only"], group=groupCRT)
+
+groupSession = "Sessão"
+tradeSession = input.session("0000-2359", "Janela permitida", group=groupSession)
+inSession    = not na(time(timeframe.period, tradeSession))
+
+atr = ta.atr(atrLen)
+replayReady = bar_index >= 13 and not na(atr)
+longAllowed  = sideFilter != "Short only"
+shortAllowed = sideFilter != "Long only"
+
+anchorHigh = high[2]
+anchorLow = low[2]
+anchorMid = (anchorHigh + anchorLow) / 2.0
+
+buyRaid = replayReady and low[1] < anchorLow and close[1] > anchorLow
+buyDelivery = buyRaid and close > close[1] and close > anchorMid
+sellRaid = replayReady and high[1] > anchorHigh and close[1] < anchorHigh
+sellDelivery = sellRaid and close < close[1] and close < anchorMid
+
+buyEntry = close
+buyStop = math.min(low[1], anchorLow) - atr * stopBufferAtr
+buyTarget = anchorHigh
+buyRisk = buyEntry - buyStop
+buyReward = buyTarget - buyEntry
+buyRR = buyRisk > 0 ? buyReward / buyRisk : -1.0
+buyCRT = buyDelivery and longAllowed and buyRisk > syminfo.mintick and buyReward > syminfo.mintick and buyRR >= minRR
+
+sellEntry = close
+sellStop = math.max(high[1], anchorHigh) + atr * stopBufferAtr
+sellTarget = anchorLow
+sellRisk = sellStop - sellEntry
+sellReward = sellEntry - sellTarget
+sellRR = sellRisk > 0 ? sellReward / sellRisk : -1.0
+sellCRT = sellDelivery and shortAllowed and sellRisk > syminfo.mintick and sellReward > syminfo.mintick and sellRR >= minRR
+
+var int pendingSide = 0
+var int setupBar = na
+var float pendingEntry = na
+var float pendingStop = na
+var float pendingTarget = na
+var float activeAnchorHigh = na
+var float activeAnchorLow = na
+
+cancelPending() =>
+    strategy.cancel("CRT-L")
+    strategy.cancel("CRT-S")
+
+if buyCRT
+    cancelPending()
+    pendingSide := 0
+    if inSession and strategy.position_size == 0
+        pendingEntry := buyEntry
+        pendingStop := buyStop
+        pendingTarget := buyTarget
+        activeAnchorHigh := anchorHigh
+        activeAnchorLow := anchorLow
+        setupBar := bar_index
+        pendingSide := 1
+
+if sellCRT
+    cancelPending()
+    pendingSide := 0
+    if inSession and strategy.position_size == 0
+        pendingEntry := sellEntry
+        pendingStop := sellStop
+        pendingTarget := sellTarget
+        activeAnchorHigh := anchorHigh
+        activeAnchorLow := anchorLow
+        setupBar := bar_index
+        pendingSide := -1
+
+pendingExpired = pendingSide != 0 and not na(setupBar) and bar_index - setupBar > maxSetupAge
+if pendingExpired and strategy.position_size == 0
+    cancelPending()
+    pendingSide := 0
+
+if pendingSide == 1 and strategy.position_size == 0
+    strategy.entry("CRT-L", strategy.long, limit=pendingEntry)
+    strategy.exit("CRT-LX", "CRT-L", stop=pendingStop, limit=pendingTarget)
+
+if pendingSide == -1 and strategy.position_size == 0
+    strategy.entry("CRT-S", strategy.short, limit=pendingEntry)
+    strategy.exit("CRT-SX", "CRT-S", stop=pendingStop, limit=pendingTarget)
+
+if strategy.position_size > 0
+    pendingSide := 0
+    strategy.exit("CRT-LX", "CRT-L", stop=pendingStop, limit=pendingTarget)
+
+if strategy.position_size < 0
+    pendingSide := 0
+    strategy.exit("CRT-SX", "CRT-S", stop=pendingStop, limit=pendingTarget)
+
+plotshape(buyCRT, title="Buy CRT", text="CRT↑", style=shape.labelup, location=location.belowbar, size=size.tiny)
+plotshape(sellCRT, title="Sell CRT", text="CRT↓", style=shape.labeldown, location=location.abovebar, size=size.tiny)
+
+plot(pendingSide != 0 or strategy.position_size != 0 ? activeAnchorHigh : na, "Anchor High", style=plot.style_linebr)
+plot(pendingSide != 0 or strategy.position_size != 0 ? activeAnchorLow : na, "Anchor Low", style=plot.style_linebr)
+plot(pendingSide != 0 or strategy.position_size != 0 ? pendingEntry : na, "Entry", style=plot.style_linebr)
+plot(strategy.position_size != 0 ? pendingStop : na, "Stop", style=plot.style_linebr)
+plot(strategy.position_size != 0 ? pendingTarget : na, "Target", style=plot.style_linebr)
+
+alertcondition(buyCRT, "AtlasQuant Buy CRT", "AtlasQuant: CRT BUY confirmado")
+alertcondition(sellCRT, "AtlasQuant Sell CRT", "AtlasQuant: CRT SELL confirmado")
