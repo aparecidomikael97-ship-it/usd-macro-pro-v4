@@ -5,6 +5,7 @@ from atlasquant_strategy_friction import (
     friction_sensitivity_frame,
     friction_sensitivity_summary,
     friction_sensitivity_report,
+    friction_breakdown_frame,
 )
 
 
@@ -106,6 +107,46 @@ class StrategyFrictionTests(unittest.TestCase):
         )
         fvg=report["summary"][report["summary"]["strategy"]=="FVG"].iloc[0]
         self.assertEqual(fvg["sensitivity_status"],"INSUFFICIENT")
+
+    def test_breakdown_preserves_session_pair_and_scenario(self):
+        suite=empty_suite()
+        a=trade(1.0)
+        a["session"]="London"
+        a["pair"]="EUR/USD"
+        b=trade(-1.0)
+        b["session"]="New York"
+        b["pair"]="EUR/USD"
+        suite["FVG"]["results"]=[a,b]
+        scenarios=build_friction_scenarios(
+            base_cost_r=0.05,
+            slippage_levels_r=[0.0,0.05],
+        )
+        out=friction_breakdown_frame(
+            suite,
+            scenarios,
+            dimensions=("session","pair"),
+        )
+        fvg=out[out["strategy"]=="FVG"]
+        self.assertEqual(set(fvg["dimension"]),{"session","pair"})
+        self.assertEqual(set(fvg[fvg["dimension"]=="session"]["segment"]),{"London","New York"})
+        self.assertEqual(set(fvg[fvg["dimension"]=="pair"]["segment"]),{"EUR/USD"})
+        self.assertGreaterEqual(fvg["scenario"].nunique(),2)
+
+    def test_report_exposes_segment_breakdown(self):
+        suite=empty_suite()
+        a=trade(1.0)
+        a["session"]="London"
+        a["pair"]="EUR/USD"
+        suite["FVG"]["results"]=[a for _ in range(20)]
+        report=friction_sensitivity_report(
+            suite,
+            base_cost_r=0.02,
+            slippage_levels_r=[0.0,0.05],
+            min_trades=20,
+        )
+        self.assertIn("breakdown",report)
+        self.assertFalse(report["breakdown"].empty)
+        self.assertIn("dimension",report["breakdown"].columns)
 
     def test_negative_inputs_fail_closed(self):
         with self.assertRaises(ValueError):
