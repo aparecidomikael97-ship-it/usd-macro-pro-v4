@@ -3,10 +3,11 @@ from pathlib import Path
 import autopilot_v107 as a
 
 class QuotaGuardV1077Tests(unittest.TestCase):
-    def test_daily_classifier_is_broad(self):
+    def test_daily_classifier_requires_explicit_day(self):
         self.assertTrue(a._td_is_daily_quota("You have run out of API credits for the day"))
         self.assertTrue(a._td_is_daily_quota("Daily limit reached"))
-        self.assertTrue(a._td_is_daily_quota("API credits exhausted"))
+        self.assertFalse(a._td_is_daily_quota("API credits exhausted"))
+        self.assertFalse(a._td_is_daily_quota("You have run out of API credits for the current minute"))
 
     def test_minute_classifier_is_separate(self):
         self.assertTrue(a._td_is_minute_limit("8 API credits per minute"))

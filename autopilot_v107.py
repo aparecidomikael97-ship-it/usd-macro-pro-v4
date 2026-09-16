@@ -31,6 +31,8 @@ import pandas as pd
 import requests
 
 from engine import closed_candles
+from twelve_budget_v1108 import Budget, GitHubStore, BudgetUnavailable, classify_limit
+from twelve_cache_v1108 import SERIES_PATH, read_series, valid_records
 from currency_news_v107 import (
     CURRENCY_PROFILES,
     PAIR_ORDER,
@@ -39,6 +41,13 @@ from currency_news_v107 import (
 )
 from ict_execution_v108 import detect_crt, detect_ote, detect_amd, detect_fvg
 from institutional_engine_v110 import build_institutional_snapshot, SMT_COMPANIONS
+
+from atlasquant_runtime_store import resolve_runtime_branch, require_runtime_branch
+from atlasquant_quota_shadow import (
+    build_quota_shadow_sample,
+    append_quota_shadow_sample,
+    summarize_quota_shadow,
+)
 
 from market_map_core_v10 import (
     NY_TZ,
@@ -60,7 +69,10 @@ from market_map_core_v10 import (
 )
 
 REPO = os.getenv("GITHUB_REPO_HISTORICO", os.getenv("GITHUB_REPOSITORY", "")).strip()
-BRANCH = os.getenv("GITHUB_BRANCH_HISTORICO", "main").strip() or "main"
+BRANCH = require_runtime_branch(resolve_runtime_branch(
+    os.getenv("GITHUB_DATA_BRANCH", ""),
+    os.getenv("GITHUB_BRANCH_HISTORICO", ""),
+))
 TOKEN = os.getenv("GITHUB_TOKEN_HISTORICO", os.getenv("GITHUB_TOKEN", "")).strip()
 TD_KEY = os.getenv("CHAVE_TWELVE_DATA", "").strip()
 NEWS_KEY = os.getenv("CHAVE_NEWSAPI", "").strip()
@@ -72,6 +84,7 @@ MASTER_PATH = "dados/master_market_map_v102.json"
 DAILY_CACHE_PATH = "dados/autopilot_daily_cache_v107.json"
 NEWS_CURRENT_PATH = "dados/currency_news_current_v107.json"
 NEWS_VALIDATION_PATH = "dados/currency_news_validation_v1061.csv"
+QUOTA_SHADOW_PATH = "dados/atlasquant_quota_shadow_v1.json"
 
 M15_EVERY_MIN = 55
 H1_EVERY_MIN = 115
@@ -99,6 +112,10 @@ _TD_DAILY_BLOCKED = False
 _TD_DAILY_BLOCK_REASON = ""
 _TD_BLOCK_TYPE = ""
 _TD_HTTP_CALLS = 0
+_TD_BUDGET = None
+_TD_SERIES = {"series":{}}
+_TD_CACHE_HITS = 0
+_TD_STOP_UNTIL = ""
 
 
 
@@ -117,7 +134,7 @@ def _td_rate_gate() -> None:
         wait_for = TD_SAFE_WINDOW_SECONDS - (now - _TD_CALL_TIMES[0]) + 0.25
         if wait_for > 0:
             print(f"[rate-safe] aguardando {wait_for:.1f}s antes da próxima consulta Twelve Data")
-            time.sleep(wait_for)
+            time.sleep(min(60.0, wait_for))
         else:
             _TD_CALL_TIMES = []
 
@@ -231,6 +248,7 @@ def run_headless_app() -> tuple[bool, str]:
             "CHAVE_EODHD",
             "GITHUB_TOKEN_HISTORICO",
             "GITHUB_REPO_HISTORICO",
+            "GITHUB_DATA_BRANCH",
             "GITHUB_BRANCH_HISTORICO",
         ]
         injected = 0
@@ -277,113 +295,95 @@ def _td_message(resp: requests.Response) -> str:
 # para os testes V10.7.6. A V10.7.7 usa mensagens mais específicas em runtime.
 
 def _td_is_minute_limit(message: str) -> bool:
-    low = (message or "").lower()
-    minute_markers = (
-        "per minute", "minute limit", "requests per minute",
-        "credits per minute", "rate limit per minute", "rpm",
-    )
-    return any(m in low for m in minute_markers)
+    return classify_limit(message)=="LIMITE_MINUTO"
 
 
 def _td_is_daily_quota(message: str) -> bool:
-    low = (message or "").lower()
-    daily_markers = (
-        "run out of api credits for the day",
-        "out of api credits",
-        "daily limit",
-        "daily credits",
-        "credits for the day",
-        "for the day",
-        "current limit",
-        "api credits",
-        "plan limit",
-        "quota exceeded",
-        "credit limit",
-    )
-    return any(m in low for m in daily_markers)
+    return classify_limit(message)=="COTA_DIARIA"
+
+
+def _td_initialize():
+    global _TD_BUDGET, _TD_SERIES, _TD_DAILY_BLOCKED, _TD_BLOCK_TYPE, _TD_DAILY_BLOCK_REASON, _TD_STOP_UNTIL, _TD_HTTP_CALLS, _TD_CACHE_HITS, _TD_CALL_TIMES
+    _TD_DAILY_BLOCKED=False; _TD_BLOCK_TYPE=''; _TD_DAILY_BLOCK_REASON=''; _TD_STOP_UNTIL=''
+    _TD_HTTP_CALLS=0; _TD_CACHE_HITS=0; _TD_CALL_TIMES=[]
+    _TD_BUDGET=Budget(GitHubStore(TOKEN,REPO,BRANCH))
+    try:
+        previous,err=gh_get_json(STATUS_PATH,{})
+        old_scanner,err2=gh_get_json(SCANNER_PATH,{})
+        _TD_SERIES,err3=gh_get_json(SERIES_PATH,{"series":{}})
+        if err or err2 or err3: raise BudgetUnavailable("Falha ao ler estado persistido; coleta adiada")
+        _TD_SERIES.setdefault("series",{})
+        _TD_BUDGET.bootstrap(previous,old_scanner,utcnow().to_pydatetime())
+        summary=_TD_BUDGET.summary(utcnow().to_pydatetime())
+        if summary.get("blocked_until"):
+            _TD_DAILY_BLOCKED=True
+            _TD_BLOCK_TYPE=summary.get("block_type","")
+            _TD_DAILY_BLOCK_REASON=summary.get("block_reason","")
+            _TD_STOP_UNTIL=summary["blocked_until"]
+    except Exception as exc:
+        _TD_DAILY_BLOCKED=True
+        _TD_BLOCK_TYPE="CONTROLE_INDISPONIVEL"
+        _TD_DAILY_BLOCK_REASON="Orçamento persistido indisponível; nenhuma consulta liberada."
 
 
 def td_fetch(pair: str, interval: str, outputsize: int) -> tuple[pd.DataFrame, str]:
-    global _TD_DAILY_BLOCKED, _TD_DAILY_BLOCK_REASON, _TD_BLOCK_TYPE, _TD_HTTP_CALLS
-
-    if not TD_KEY:
-        return pd.DataFrame(), "CHAVE_TWELVE_DATA ausente."
-
-    # Depois de uma cota/quota 429, ZERO chamadas externas adicionais nesta execução.
+    global _TD_DAILY_BLOCKED, _TD_DAILY_BLOCK_REASON, _TD_BLOCK_TYPE, _TD_HTTP_CALLS, _TD_CACHE_HITS, _TD_STOP_UNTIL
+    if pair not in PAIR_ORDER or interval not in ('15min','1h','4h','1day'):
+        return pd.DataFrame(), "Consulta fora dos sete pares/intervalos previstos."
+    if not TD_KEY: return pd.DataFrame(), "CHAVE_TWELVE_DATA ausente."
     if _TD_DAILY_BLOCKED:
         return pd.DataFrame(), f"API_COTA_BLOQUEADA: {_TD_DAILY_BLOCK_REASON}"
-
-    _td_rate_gate()
-
-    def _request_once():
-        global _TD_HTTP_CALLS
-        _TD_HTTP_CALLS += 1
-        return requests.get(
-            "https://api.twelvedata.com/time_series",
-            params={
-                "symbol": pair,
-                "interval": interval,
-                "outputsize": int(outputsize),
-                "apikey": TD_KEY,
-                "timezone": "UTC",
-                "format": "JSON",
-                "order": "ASC",
-            },
-            timeout=25,
-        )
-
+    # Reuse direction-neutral candles, never old directional confirmations.
+    limits={"15min":24,"1h":54,"4h":234,"1day":0}
+    if interval!="1day":
+        cached,err=read_series(_TD_SERIES,pair,interval,outputsize,now=utcnow(),max_age=limits.get(interval,0))
+        if not err and len(cached)>=min(outputsize,80):
+            _TD_CACHE_HITS+=1
+            return cached,""
+    if _TD_BUDGET is None: return pd.DataFrame(),"Controle de orçamento não inicializado."
     try:
-        r = _request_once()
-
-        if r.status_code == 429:
-            msg = _td_message(r)
-            minute_limited = _td_is_minute_limit(msg)
-
-            # Só espera/retry se a mensagem disser claramente "por minuto".
-            if minute_limited:
-                print(f"[429-minute] {pair} {interval}: aguardando 66s para uma única retentativa")
-                time.sleep(66)
-                _td_rate_gate()
-                r = _request_once()
-
-                if r.status_code != 429:
-                    # segue fluxo normal com a resposta da retentativa
-                    pass
-                else:
-                    msg2 = _td_message(r)
-                    # Se continuou 429, para esta execução também.
-                    _TD_DAILY_BLOCKED = True
-                    _TD_DAILY_BLOCK_REASON = msg2 or msg or "HTTP 429 persistente"
-                    _TD_BLOCK_TYPE = "429_PERSISTENTE"
-                    return pd.DataFrame(), f"HTTP 429 STOP: {_TD_DAILY_BLOCK_REASON}"
-
-            if r.status_code == 429:
-                msg = _td_message(r)
-                _TD_DAILY_BLOCKED = True
-                _TD_DAILY_BLOCK_REASON = msg or "cota/créditos indisponíveis"
-                _TD_BLOCK_TYPE = "COTA_DIARIA" if _td_is_daily_quota(msg) else "COTA_OU_PLANO"
-                return pd.DataFrame(), f"HTTP 429 QUOTA: {_TD_DAILY_BLOCK_REASON}"
-
-        if r.status_code != 200:
-            return pd.DataFrame(), f"HTTP {r.status_code}: {_td_message(r)}"
-
-        js = r.json()
-        if isinstance(js, dict) and js.get("status") == "error":
-            msg = str(js.get("message", "Twelve Data error"))
-            if _td_is_daily_quota(msg):
-                _TD_DAILY_BLOCKED = True
-                _TD_DAILY_BLOCK_REASON = msg
-                _TD_BLOCK_TYPE = "COTA_DIARIA"
-                return pd.DataFrame(), f"API QUOTA: {msg}"
-            return pd.DataFrame(), msg
-
-        vals = js.get("values", []) if isinstance(js, dict) else []
-        df = normalize_ohlc(vals)
-        if df.empty:
-            return df, "Sem OHLC válido."
-        return df, ""
+        _td_rate_gate()
+        allowed,kind,until=_TD_BUDGET.reserve(utcnow().to_pydatetime())
+        if not allowed:
+            _TD_DAILY_BLOCKED=True; _TD_BLOCK_TYPE=kind; _TD_STOP_UNTIL=until
+            _TD_DAILY_BLOCK_REASON=f"{kind}: novas consultas adiadas até {until}. Cache preservado."
+            return pd.DataFrame(),_TD_DAILY_BLOCK_REASON
+        # Reservation is durable before even a timeout can consume a credit.
+        _TD_HTTP_CALLS+=1
+        r=requests.get("https://api.twelvedata.com/time_series",
+            params={"symbol":pair,"interval":interval,"outputsize":int(outputsize),
+                    "apikey":TD_KEY,"timezone":"UTC","format":"JSON","order":"ASC"},timeout=25)
+        try: js=r.json()
+        except Exception:
+            if r.status_code!=429: return pd.DataFrame(),f"Resposta não JSON: HTTP {r.status_code}"
+            js={"message":"HTTP 429: limite não especificado", "status":"error"}
+        message=str(js.get("message", "")) if isinstance(js,dict) else ""
+        is_error=isinstance(js,dict) and js.get("status")=="error"
+        if r.status_code==429 or (is_error and (str(js.get("code"))=="429" or classify_limit(message)!="COTA_OU_PLANO" or any(w in message.lower() for w in ('credits','quota','limit')))):
+            _TD_DAILY_BLOCKED=True
+            _TD_BLOCK_TYPE=classify_limit(message)
+            _TD_DAILY_BLOCK_REASON=message or "HTTP 429: limite não especificado"
+            result=_TD_BUDGET.block(_TD_DAILY_BLOCK_REASON,utcnow().to_pydatetime())
+            _TD_STOP_UNTIL=result.get("blocked_until","")
+            return pd.DataFrame(),f"HTTP 429 QUOTA: {_TD_DAILY_BLOCK_REASON}"
+        if r.status_code!=200 or is_error: return pd.DataFrame(),f"HTTP {r.status_code}: {message[:500]}"
+        df=valid_records(js.get("values",[]) if isinstance(js,dict) else [],interval,now=utcnow())
+        if df.empty: return df,"Sem OHLC fechado válido."
+        observed=utcnow().isoformat()
+        records=_serialize_tf_cache(df,outputsize)
+        candidate={"series":{f"{pair}|{interval}":{"fetched_at":observed,"records":records}}}
+        _,error=read_series(candidate,pair,interval,outputsize,now=utcnow())
+        if error: return pd.DataFrame(),error
+        _TD_SERIES.setdefault("series",{})[f"{pair}|{interval}"]=candidate["series"][f"{pair}|{interval}"]
+        df.attrs["source_fetched_at"]=observed
+        return df,""
+    except BudgetUnavailable:
+        _TD_DAILY_BLOCKED=True; _TD_BLOCK_TYPE="CONTROLE_INDISPONIVEL"
+        _TD_DAILY_BLOCK_REASON="Falha ao persistir orçamento; coleta interrompida."
+        return pd.DataFrame(),_TD_DAILY_BLOCK_REASON
     except Exception as exc:
-        return pd.DataFrame(), f"{type(exc).__name__}: {exc}"
+        # A failed write/request never refunds the already reserved credit.
+        return pd.DataFrame(),f"Falha na consulta ou persistência: {type(exc).__name__}"
 
 
 
@@ -541,7 +541,9 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
         state["autopilot_v107"] = auto_meta
         return state, m15_frames, errors, calls
 
-    for pair in PAIR_ORDER:
+    # Oldest M15 first avoids starving the last symbols when pacing defers a run.
+    ordered_pairs=sorted(PAIR_ORDER, key=lambda p: minutes_since((fetches.get(p,{}) or {}).get('m15')) if minutes_since((fetches.get(p,{}) or {}).get('m15')) is not None else 10**9, reverse=True)
+    for pair in ordered_pairs:
         row = pmap.get(pair, {})
         direction = str(row.get("Direção", row.get("Direcao", "⚪ AGUARDAR")))
         side = macro_side(direction)
@@ -596,16 +598,10 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
         for key, interval, outputsize in interval_specs:
             if _TD_DAILY_BLOCKED:
                 break
-            if budget_calls >= AUTOPILOT_DAILY_CALL_BUDGET:
-                errors.append(
-                    f"API_BUDGET: limite interno diário {AUTOPILOT_DAILY_CALL_BUDGET} atingido; "
-                    f"{pair} {interval} adiado."
-                )
-                continue
-
+            before_calls=_TD_HTTP_CALLS
             frame, err = td_fetch(pair, interval, outputsize)
-            calls += 1
-            budget_calls += 1
+            calls += _TD_HTTP_CALLS-before_calls
+            budget_calls += _TD_HTTP_CALLS-before_calls
             if err or frame.empty:
                 errors.append(f"{pair} {interval}: {err or 'sem dados'}")
                 continue
@@ -619,6 +615,7 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
                 continue
 
             ok_any = True
+            fetched_at=frame.attrs.get("source_fetched_at",fetched_at)
             pair_fetch[key] = fetched_at
             if key == "m15":
                 m15_frames[pair] = closed
@@ -646,12 +643,13 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
             elif key == "h4":
                 tec["h4"] = analyze_h4(closed, side)
                 old["h4_fetched_at"] = fetched_at
+                tec["cache_v110"]["h4"] = _serialize_tf_cache(closed,100)
 
         # If M15 wasn't due, still try to make it available for market-map/validation
         # from one fresh fetch only when needed by those modules.
         if pair not in m15_frames and due_m15 is False:
-            # No API call here. Background map may keep previous context this cycle.
-            pass
+            cached,cache_err=read_series(_TD_SERIES,pair,"15min",500)
+            if not cache_err: m15_frames[pair]=cached
 
         _ict = dict(tec.get("ict", {}) or {})
         if side in ("BUY", "SELL") and _ict:
@@ -685,8 +683,7 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
         results[pair] = old
         fetches[pair] = pair_fetch
 
-        if _TD_DAILY_BLOCKED:
-            break
+        # Continue invalidating changed directions even when no further HTTP is allowed.
 
     # V11.0 — calcula a camada institucional para TODOS os pares usando cache
     # persistido. Não consome API e permite SMT entre pares correlacionados.
@@ -762,8 +759,9 @@ def ensure_daily_cache() -> tuple[dict[str, Any], list[str], int]:
         raw = dict(pairs.get(pair, {}) or {})
         if str(raw.get("cache_day","")) == today and raw.get("records"):
             continue
+        before_calls=_TD_HTTP_CALLS
         df, err = td_fetch(pair, "1day", 320)
-        calls += 1
+        calls += _TD_HTTP_CALLS-before_calls
         if err or df.empty:
             errors.append(f"{pair} D1: {err or 'sem dados'}")
             continue
@@ -863,6 +861,8 @@ def update_market_map(inputs: Mapping[str, Any], m15_frames: Mapping[str,pd.Data
         try:
             ctx = market_context_from_data(pair, pmap.get(pair,{}), macro_context, daily, m15)
             if ctx:
+                # Recomputing from cache must not advance the data's timestamp.
+                ctx['updated_at']=m15.attrs.get('source_fetched_at',ctx.get('updated_at'))
                 contexts[pair] = ctx
         except Exception as exc:
             errors.append(f"{pair} map: {type(exc).__name__}: {exc}")
@@ -1009,8 +1009,7 @@ def migrate_timing(df: pd.DataFrame) -> int:
 
 def manage_snapshots(intel: Mapping[str,Any], pair_df: pd.DataFrame, m15_frames: Mapping[str,pd.DataFrame]) -> tuple[pd.DataFrame, dict[str,int]]:
     df, _ = gh_get_csv(NEWS_VALIDATION_PATH)
-    if df.empty:
-        df = pd.DataFrame(columns=VALIDATION_COLS)
+    if df.empty:        df = pd.DataFrame(columns=VALIDATION_COLS)
     for c in VALIDATION_COLS:
         if c not in df.columns:
             df[c] = None
@@ -1163,7 +1162,8 @@ def status_summary(
     scanner_fresh = 0
     for p in PAIR_ORDER:
         raw = results.get(p,{}) if isinstance(results,dict) else {}
-        if (minutes_since(raw.get("m15_fetched_at")) or 10**9) <= 60:
+        scanner_age=minutes_since(raw.get("m15_fetched_at"))
+        if scanner_age is not None and scanner_age <= 60:
             scanner_fresh += 1
     contexts = dict(master.get("contexts",{}) or {})
     map_fresh = 0
@@ -1173,8 +1173,13 @@ def status_summary(
             map_fresh += 1
     pending = int(validation["validation_status"].astype(str).isin(["PENDENTE","PARCIAL"]).sum()) if not validation.empty else 0
     complete = int((validation["validation_status"].astype(str)=="COMPLETO").sum()) if not validation.empty else 0
+    try: budget=_TD_BUDGET.summary(now.to_pydatetime()) if _TD_BUDGET else {}
+    except Exception: budget={"error":"Orçamento indisponível"}
     return {
-        "version":"V10.7_FULL_AUTOPILOT",
+        "twelve_budget":budget,
+        "twelve_cache_hits":_TD_CACHE_HITS,
+        "twelve_retry_after":_TD_STOP_UNTIL,
+        "version":"V11.0.8_BUDGET_AUTOPILOT",
         "last_run":now.isoformat(),
         "app_headless_ok":bool(app_ok),
         "app_headless_message":app_msg,
@@ -1198,12 +1203,14 @@ def status_summary(
         "twelve_safe_window_seconds":TD_SAFE_WINDOW_SECONDS,
         "forex_market_open":forex_market_likely_open(now),
         "errors":errors[:20],
-        "healthy": bool(app_ok and scanner_fresh >= (5 if forex_market_likely_open(now) else 0) and len(errors)<8),
+        "healthy": bool(app_ok and not _TD_DAILY_BLOCKED and scanner_fresh >= (5 if forex_market_likely_open(now) else 0) and len(errors)<8),
     }
 
 def main() -> int:
     all_errors: list[str] = []
     total_calls = 0
+
+    _td_initialize()
 
     # 1. Full app headless: refreshes macro/FRED/matrix and persists INPUT_PATH.
     app_ok, app_msg = run_headless_app()
@@ -1226,6 +1233,9 @@ def main() -> int:
     all_errors.extend(daily_errors); total_calls+=daily_calls
     ok,err=gh_put_json(DAILY_CACHE_PATH,daily_cache,"V10.7 Autopilot: cache diário FX")
     if not ok: all_errors.append("Salvar D1 cache: "+err)
+
+    cache_ok,cache_err=gh_put_json(SERIES_PATH,_TD_SERIES,"V11.0.8: cache compartilhado sem duplicar consultas")
+    if not cache_ok: all_errors.append("Salvar cache compartilhado: "+cache_err)
 
     master,map_errors=update_market_map(inputs,m15_frames,daily_cache)
     all_errors.extend(map_errors)
@@ -1253,6 +1263,39 @@ def main() -> int:
         app_ok,app_msg,inputs,scanner,master,intel,validation,
         all_errors,total_calls,snap_stats
     )
+
+    # 7. 28FX quota shadow telemetry — observational only.
+    # Never changes PAIR_ORDER, cadence, quota, API behavior or execution gates.
+    quota_state,quota_read_err=gh_get_json(
+        QUOTA_SHADOW_PATH,
+        {"version":"V1","samples":[]},
+    )
+    quota_samples=list((quota_state or {}).get("samples",[]) or []) if isinstance(quota_state,Mapping) else []
+    quota_sample=build_quota_shadow_sample(status)
+    quota_samples,quota_added=append_quota_shadow_sample(quota_samples,quota_sample)
+    quota_summary=summarize_quota_shadow(quota_samples)
+    quota_payload={
+        "version":"V1",
+        "updated_at":status.get("last_run"),
+        "samples":quota_samples,
+        "summary":quota_summary,
+    }
+    quota_ok=False
+    quota_write_err=""
+    if not quota_read_err:
+        quota_ok,quota_write_err=gh_put_json(
+            QUOTA_SHADOW_PATH,
+            quota_payload,
+            "AtlasQuant 28FX: quota shadow telemetry",
+        )
+    status["quota_shadow"]={
+        **quota_summary,
+        "sample_added":bool(quota_added),
+        "persisted":bool(quota_ok),
+        "error":quota_read_err or quota_write_err,
+        "automatic_expansion_allowed":False,
+    }
+
     ok,err=gh_put_json(STATUS_PATH,status,"V11.0 Autopilot: status")
     if not ok:
         all_errors.append("Salvar status: "+err)

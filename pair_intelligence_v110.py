@@ -11,6 +11,7 @@ import json
 import math
 import os
 import time
+from html import escape
 from typing import Any, Mapping
 
 import numpy as np
@@ -27,6 +28,17 @@ from evidence_integrity_v1104 import (
     masked_technical_status, select_operational_context, sweep_freshness,
 )
 from strength_breakdown_v1104 import build_strength_breakdown, attribution_sides
+from atlasquant_central_brief import render_central_brief
+from atlasquant_context_explain import render_context_explain
+from atlasquant_data_quality_center import render_data_confidence
+from atlasquant_confluence_map import render_confluence_map
+from atlasquant_operational_plan import render_operational_plan
+from atlasquant_safety_panel import render_safety_core
+from atlasquant_regime_detector import render_regime_detector, capture_regime_detector
+from atlasquant_next_event import render_next_event
+from atlasquant_flight_recorder_panel import render_flight_recorder, capture_flight_recorder
+from atlasquant_runtime_store import resolve_runtime_branch
+from atlasquant_shadow_capture import capture_shadow_batch
 
 try:
     from currency_news_v107 import pair_news_table
@@ -73,10 +85,13 @@ def _gh_cfg():
     try:
         token=st.secrets.get("GITHUB_TOKEN_HISTORICO",os.getenv("GITHUB_TOKEN_HISTORICO",""))
         repo=st.secrets.get("GITHUB_REPO_HISTORICO",os.getenv("GITHUB_REPO_HISTORICO",""))
-        branch=st.secrets.get("GITHUB_BRANCH_HISTORICO",os.getenv("GITHUB_BRANCH_HISTORICO","main"))
+        branch=resolve_runtime_branch(
+            st.secrets.get("GITHUB_DATA_BRANCH",os.getenv("GITHUB_DATA_BRANCH","")),
+            st.secrets.get("GITHUB_BRANCH_HISTORICO",os.getenv("GITHUB_BRANCH_HISTORICO","")),
+        )
     except Exception:
-        token,repo,branch="","","main"
-    return str(token),str(repo),str(branch or "main")
+        token,repo,branch="","",resolve_runtime_branch()
+    return str(token),str(repo),str(branch)
 
 
 @st.cache_data(ttl=60,show_spinner=False)
@@ -330,6 +345,7 @@ def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro",weights=
         "hard_blocks":decision["hard_blocks"],"soft_blocks":decision["soft_blocks"],"positives":decision["positives"],
         "executable":decision["executable"],"technical_age":age,"data_ready":data_ready,
         "stale_technical":stale_technical,"sweep_state":sweep_state,"strength":strength,"map_current":map_current,
+        "updated_at":mc.get("updated_at"),
     }
 
 
@@ -399,6 +415,93 @@ def _stack_rows(p:Mapping[str,Any])->pd.DataFrame:
     return pd.DataFrame(rows,columns=["Camada","Leitura","Estado","Score"])
 
 
+def atlasquant_operational_card(pack: Mapping[str, Any]) -> dict[str, Any]:
+    """Presentation state derived only from already-audited institutional output."""
+    p = dict(pack or {})
+    ready = bool((p.get("data_ready", {}) or {}).get("sufficient", False))
+    executable = bool(p.get("executable", False))
+    raw_state = str(p.get("state", "⚪ AGUARDAR"))
+    if executable and ready:
+        light, action = "GREEN", "SETUP EXECUTÁVEL"
+    elif raw_state.startswith("🔴") or not ready:
+        light, action = "RED", "NÃO OPERAR"
+    else:
+        light, action = "YELLOW", "AGUARDAR CONFIRMAÇÃO"
+    return {
+        "pair": str(p.get("pair", "—")),
+        "direction": str(p.get("direction", "⚪ AGUARDAR")),
+        "state": raw_state,
+        "traffic_light": light,
+        "action": action,
+        "priority": _safe(p.get("priority", 0)),
+        "quality": _safe(p.get("quality", 0)),
+        "data_score": _safe((p.get("data_ready", {}) or {}).get("score", 0)),
+        "m15": str(p.get("m15", "—")),
+        "gate": str(p.get("gate", "—")),
+        "reason": str(p.get("reason", "—")),
+    }
+
+
+def _render_atlasquant_operational_cards(packs: list[Mapping[str, Any]]) -> None:
+    cards = [atlasquant_operational_card(p) for p in list(packs or [])[:3]]
+    if not cards:
+        return
+    st.markdown("""
+<style>
+.aq-op-card{border:1px solid rgba(137,170,210,.18);border-radius:15px;padding:15px 16px;
+background:linear-gradient(180deg,rgba(17,34,57,.88),rgba(10,24,41,.82));min-height:205px}
+.aq-op-card.green{border-top:3px solid #42d392}.aq-op-card.yellow{border-top:3px solid #f2c14e}
+.aq-op-card.red{border-top:3px solid #ff6b7a}
+.aq-op-pair{font-size:1.05rem;font-weight:800}.aq-op-action{font-size:.72rem;font-weight:800;letter-spacing:.05em}
+.aq-op-priority{font-size:1.8rem;font-weight:850;margin-top:10px}.aq-op-priority span{font-size:.75rem;color:#9fb0c6}
+.aq-op-small{font-size:.72rem;color:#9fb0c6;margin-top:8px}.aq-op-state{font-size:.76rem;margin-top:11px;font-weight:700}
+</style>
+""", unsafe_allow_html=True)
+    st.markdown("### 🚦 Melhores contextos operacionais")
+    st.caption("Usa a decisão institucional já auditada. Verde só aparece quando o próprio motor marca o setup como executável e os dados estão suficientes.")
+    cols = st.columns(len(cards))
+    icons = {"GREEN": "🟢", "YELLOW": "🟡", "RED": "🔴"}
+    for col, card in zip(cols, cards):
+        with col:
+            tone = card["traffic_light"].lower()
+            pair = escape(card["pair"])
+            action = escape(card["action"])
+            direction = escape(card["direction"])
+            state = escape(card["state"])
+            m15 = escape(card["m15"])
+            gate = escape(card["gate"])
+            icon = icons.get(card["traffic_light"], "⚪")
+            st.markdown(f"""
+<div class="aq-op-card {tone}">
+  <div style="display:flex;justify-content:space-between;gap:8px">
+    <span class="aq-op-pair">{pair}</span><span class="aq-op-action">{icon} {action}</span>
+  </div>
+  <div class="aq-op-priority">{card['priority']:.0f}<span>/100 prioridade</span></div>
+  <div class="aq-op-small">Dados {card['data_score']:.0f}/100 · Qualidade {card['quality']:.0f}/100</div>
+  <div class="aq-op-small">M15 {m15} · Gate {gate}</div>
+  <div class="aq-op-state">{direction}<br>{state}</div>
+</div>
+""", unsafe_allow_html=True)
+
+
+def atlasquant_basic_table(packs: list[Mapping[str, Any]]) -> pd.DataFrame:
+    """Compact seven-pair view for Basic mode. Presentation only."""
+    rows=[]
+    for p in list(packs or []):
+        dr=dict(p.get("data_ready", {}) or {})
+        rows.append({
+            "Par":str(p.get("pair","—")),
+            "Estado":str(p.get("state","⚪ AGUARDAR")),
+            "Direção":str(p.get("direction","⚪ AGUARDAR")),
+            "Prioridade":round(_safe(p.get("priority",0)),1),
+            "Dados":f"{_safe(dr.get('score',0)):.0f}/100",
+            "Pronto?":"SIM" if bool(dr.get("sufficient",False)) else "NÃO",
+            "M15":str(p.get("m15","—")),
+            "Gate":str(p.get("gate","—")),
+        })
+    return pd.DataFrame(rows)
+
+
 def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:Mapping[str,Any]|None=None,macro_context:Mapping[str,Any]|None=None,weights:Mapping[str,float]|None=None):
     _css()
     st.markdown("## Central institucional")
@@ -419,6 +522,63 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
 
     opctx=select_operational_context(packs)
     best=opctx.get("best") or packs[0]
+    _aq_view_mode = str(st.session_state.get("atlasquant_view_mode", "Básico"))
+    _is_pro = _aq_view_mode == "Pro"
+
+    render_central_brief(packs, auto)
+    if _is_pro:
+        render_data_confidence(packs, auto)
+
+    _event_result = render_next_event((macro_context or {}).get("event"))
+    _regime_result = capture_regime_detector(best)
+    if _is_pro:
+        render_regime_detector(best, capture_result=_regime_result)
+
+    render_safety_core(
+        best,
+        auto,
+        regime_supported_override=_regime_result.get("supported"),
+        major_event_minutes_override=_event_result.get("safety_minutes"),
+    )
+    _render_atlasquant_operational_cards(packs)
+
+    if _is_pro:
+        render_confluence_map(best)
+        render_context_explain(best)
+
+    render_operational_plan(best)
+    _flight_capture = capture_flight_recorder(best, "V11.0.8 / AtlasQuant DEV")
+    try:
+        _shadow_capture_status = capture_shadow_batch(
+            packs,
+            champion_version="V11.0.8 / AtlasQuant DEV",
+        )
+    except Exception as _shadow_capture_exc:
+        _shadow_capture_status = {
+            "ok":False,
+            "reason":"CAPTURE_EXCEPTION",
+            "error":f"{type(_shadow_capture_exc).__name__}: {_shadow_capture_exc}",
+        }
+
+    if not _is_pro:
+        st.markdown("### 🧾 Mesa rápida — 7 pares")
+        st.caption(
+            "Modo Básico mostra o essencial. Use Pro para abrir Flight Recorder, "
+            "matriz completa, comparação detalhada e Raio-X institucional."
+        )
+        st.dataframe(
+            atlasquant_basic_table(packs),
+            use_container_width=True,
+            hide_index=True,
+            height=285,
+        )
+        return
+
+    render_flight_recorder(
+        best,
+        "V11.0.8 / AtlasQuant DEV",
+        capture_result=_flight_capture,
+    )
     no_trade=bool(opctx.get("no_trade",False))
     strongest,weakest=_major_extremes(ranking)
     process_age=_age_minutes(auto.get("last_run"))
@@ -426,6 +586,11 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     process_label=("🟢 PROCESSO OK" if process_ok and process_age is not None and process_age<=90 else "🟡 SEM RODADA RECENTE" if process_ok else "🔴 FALHA HEADLESS")
     data_ok=sum(1 for x in packs if bool((x.get("data_ready",{}) or {}).get("sufficient",False)))
     twelve_label="🟠 COTA/PLANO BLOQUEADO" if auto.get("twelve_daily_blocked") else "🟢 SEM BLOQUEIO REGISTRADO"
+    if auto.get('twelve_daily_blocked'):
+        labels={'COTA_DIARIA':'🟠 COTA DIÁRIA ESGOTADA','LIMITE_MINUTO':'🟠 PAUSA POR MINUTO',
+                'RITMO_DIARIO':'🟡 ORÇAMENTO EM PAUSA','ORCAMENTO_DIARIO':'🟡 LIMITE DO APP ATINGIDO',
+                'CONTROLE_INDISPONIVEL':'🟠 ORÇAMENTO INDISPONÍVEL'}
+        twelve_label=labels.get(auto.get('twelve_block_type'),twelve_label)
     c1,c2,c3,c4=st.columns(4)
     c1.metric("Melhor contexto",opctx.get("label",best["pair"])); c2.metric("Prioridade",f"{best['priority']:.1f}/100"); c3.metric("Mais forte (G8)",strongest); c4.metric("Mais fraca (G8)",weakest)
     st.info(opctx.get("state",best["state"]) if no_trade else best["state"])
@@ -475,7 +640,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
         st.session_state["v110_pair_deep"]=_pair_options[0]
     pair=st.selectbox("Escolha o par",_pair_options,key="v110_pair_deep")
 
-    # V11.0.7: resolve o pack e REFAZ o breakdown a partir do par selecionado.
+    # V11.0.8: resolve o pack e REFAZ o breakdown a partir do par selecionado.
     # Assim a interface nunca pode mostrar USD/CHF no seletor e EUR/USD na força.
     p=next(x for x in packs if x["pair"]==pair)
     _base_sel,_quote_sel=pair.split("/")
@@ -505,7 +670,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     with st.expander("Como a força foi calculada", expanded=False):
         if not _s.get("attribution_exact"):
             st.warning("Ranking antigo: componentes estimados; o residual não identifica causas econômicas. Recalcule o ranking para obter as contribuições efetivas.")
-        # V11.0.7 — conta de chegada, separando Macro puro, Fed e ajustes.
+        # V11.0.8 — conta de chegada, separando Macro puro, Fed e ajustes.
         _a=attribution_sides(_s)
         st.markdown("#### 🧮 Conta de chegada da força")
         _c1,_c2,_c3=st.columns(3)
@@ -626,7 +791,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     elif p["state"].startswith("🔴"): st.error(msg)
     else: st.warning(msg)
 
-    with st.expander("📚 Como ler o V11.0.7"):
+    with st.expander("📚 Como ler o V11.0.8"):
         st.markdown("""
 - **Macro** escolhe o lado; execução nunca inverte o lado macro sozinha.
 - **SMT** procura divergência entre EUR/USD↔GBP/USD, AUD/USD↔NZD/USD e USD/CHF↔USD/JPY.

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import time as _time
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -21,6 +22,8 @@ import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
+from twelve_cache_v1108 import cached_series, clear_shared_cache
+from atlasquant_runtime_store import resolve_runtime_branch
 
 from market_map_core_v10 import (
     NY_TZ,
@@ -63,10 +66,16 @@ def _fmt_price(value: Any, pair: str) -> str:
 
 
 def _gh_config() -> tuple[str, str, str]:
-    token = st.secrets.get("GITHUB_TOKEN_HISTORICO", "")
-    repo = st.secrets.get("GITHUB_REPO_HISTORICO", "")
-    branch = st.secrets.get("GITHUB_BRANCH_HISTORICO", "main")
-    return str(token), str(repo), str(branch or "main")
+    try:
+        token = st.secrets.get("GITHUB_TOKEN_HISTORICO", os.getenv("GITHUB_TOKEN_HISTORICO", ""))
+        repo = st.secrets.get("GITHUB_REPO_HISTORICO", os.getenv("GITHUB_REPO_HISTORICO", ""))
+        branch = resolve_runtime_branch(
+            st.secrets.get("GITHUB_DATA_BRANCH", os.getenv("GITHUB_DATA_BRANCH", "")),
+            st.secrets.get("GITHUB_BRANCH_HISTORICO", os.getenv("GITHUB_BRANCH_HISTORICO", "")),
+        )
+    except Exception:
+        token, repo, branch = "", "", resolve_runtime_branch()
+    return str(token), str(repo), str(branch)
 
 
 def _empty_state() -> dict[str, Any]:
@@ -128,35 +137,9 @@ def _save_state(state: Mapping[str, Any]) -> tuple[bool, str]:
         return False, f"{type(exc).__name__}: {exc}"
 
 
-@st.cache_data(ttl=900, show_spinner=False)
-def _td_series(symbol: str, interval: str, outputsize: int, _api_key: str) -> tuple[pd.DataFrame, str]:
-    if not _api_key:
-        return pd.DataFrame(), "CHAVE_TWELVE_DATA ausente."
-    try:
-        r = requests.get(
-            "https://api.twelvedata.com/time_series",
-            params={
-                "symbol": symbol,
-                "interval": interval,
-                "outputsize": int(outputsize),
-                "apikey": _api_key,
-                "timezone": "UTC",
-                "format": "JSON",
-                "order": "ASC",
-            },
-            timeout=20,
-        )
-        if r.status_code != 200:
-            return pd.DataFrame(), f"Twelve Data HTTP {r.status_code}."
-        js = r.json()
-        if isinstance(js, dict) and js.get("status") == "error":
-            return pd.DataFrame(), str(js.get("message") or "Erro da Twelve Data.")
-        df = normalize_ohlc(js.get("values", []) if isinstance(js, dict) else [])
-        if df.empty:
-            return df, "Sem candles OHLC válidos."
-        return df, ""
-    except Exception as exc:
-        return pd.DataFrame(), f"Falha Twelve Data: {type(exc).__name__}."
+def _td_series(symbol: str, interval: str, outputsize: int, _api_key: str):
+    return cached_series(symbol,interval,outputsize)
+_td_series.clear = clear_shared_cache
 
 
 def _matrix_row(matrix: pd.DataFrame, pair: str) -> dict[str, Any]:
@@ -211,7 +194,7 @@ def _build_pair_context(pair: str, row: Mapping[str, Any], api_key: str, macro_c
 
     return {
         "pair": pair,
-        "updated_at": pd.Timestamp.utcnow().isoformat(),
+        "updated_at": m15.attrs.get('source_fetched_at',pd.Timestamp.utcnow().isoformat()),
         "candle_m15": candle.isoformat(),
         "price": price,
         "macro_direction": direction,

@@ -20,7 +20,8 @@ jobs:
       USD_MACRO_AUTOPILOT: "1"
       GITHUB_TOKEN_HISTORICO: ${{ github.token }}
       GITHUB_REPO_HISTORICO: ${{ github.repository }}
-      GITHUB_BRANCH_HISTORICO: "main"
+      GITHUB_DATA_BRANCH: "atlasquant-runtime"
+      GITHUB_BRANCH_HISTORICO: "atlasquant-runtime"
       CHAVE_FRED: ${{ secrets.CHAVE_FRED }}
       CHAVE_TWELVE_DATA: ${{ secrets.CHAVE_TWELVE_DATA }}
       CHAVE_NEWSAPI: ${{ secrets.CHAVE_NEWSAPI }}
@@ -51,6 +52,7 @@ jobs:
               "CHAVE_EODHD",
               "GITHUB_TOKEN_HISTORICO",
               "GITHUB_REPO_HISTORICO",
+              "GITHUB_DATA_BRANCH",
               "GITHUB_BRANCH_HISTORICO",
           ]
           with open(".streamlit/secrets.toml", "w", encoding="utf-8") as f:

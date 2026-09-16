@@ -31,6 +31,8 @@ import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
+from twelve_cache_v1108 import cached_series, clear_shared_cache
+from atlasquant_runtime_store import resolve_runtime_branch
 import re
 
 # V10 — camada observacional profissional. O try/except evita derrubar
@@ -83,6 +85,72 @@ except Exception as _evolution_exc:
 
 
 try:
+    from atlasquant_shadow_mode import render_shadow_mode_panel
+    from atlasquant_shadow_capture import ensure_shadow_hydrated
+    _ATLASQUANT_SHADOW_IMPORT_ERROR = ""
+except Exception as _shadow_exc:
+    render_shadow_mode_panel = None
+    ensure_shadow_hydrated = None
+    _ATLASQUANT_SHADOW_IMPORT_ERROR = f"{type(_shadow_exc).__name__}: {_shadow_exc}"
+
+
+try:
+    from atlasquant_calibration_lab import render_calibration_lab
+    _ATLASQUANT_CALIBRATION_IMPORT_ERROR = ""
+except Exception as _calib_exc:
+    render_calibration_lab = None
+    _ATLASQUANT_CALIBRATION_IMPORT_ERROR = f"{type(_calib_exc).__name__}: {_calib_exc}"
+
+
+try:
+    from atlasquant_performance_lab import render_performance_lab
+    _ATLASQUANT_PERFORMANCE_IMPORT_ERROR = ""
+except Exception as _perf_exc:
+    render_performance_lab = None
+    _ATLASQUANT_PERFORMANCE_IMPORT_ERROR = f"{type(_perf_exc).__name__}: {_perf_exc}"
+
+
+try:
+    from atlasquant_stability_lab import render_stability_lab
+    _ATLASQUANT_STABILITY_IMPORT_ERROR = ""
+except Exception as _stability_exc:
+    render_stability_lab = None
+    _ATLASQUANT_STABILITY_IMPORT_ERROR = f"{type(_stability_exc).__name__}: {_stability_exc}"
+
+
+try:
+    from atlasquant_expansion_budget import render_expansion_budget_planner
+    _ATLASQUANT_EXPANSION_BUDGET_IMPORT_ERROR = ""
+except Exception as _exp_budget_exc:
+    render_expansion_budget_planner = None
+    _ATLASQUANT_EXPANSION_BUDGET_IMPORT_ERROR = f"{type(_exp_budget_exc).__name__}: {_exp_budget_exc}"
+
+
+try:
+    from atlasquant_adaptive_coverage import render_adaptive_coverage_plan
+    _ATLASQUANT_ADAPTIVE_COVERAGE_IMPORT_ERROR = ""
+except Exception as _adaptive_coverage_exc:
+    render_adaptive_coverage_plan = None
+    _ATLASQUANT_ADAPTIVE_COVERAGE_IMPORT_ERROR = f"{type(_adaptive_coverage_exc).__name__}: {_adaptive_coverage_exc}"
+
+
+try:
+    from atlasquant_validation_readiness import render_validation_readiness
+    _ATLASQUANT_VALIDATION_IMPORT_ERROR = ""
+except Exception as _validation_exc:
+    render_validation_readiness = None
+    _ATLASQUANT_VALIDATION_IMPORT_ERROR = f"{type(_validation_exc).__name__}: {_validation_exc}"
+
+
+try:
+    from atlasquant_evidence_bundle import render_validation_evidence
+    _ATLASQUANT_EVIDENCE_IMPORT_ERROR = ""
+except Exception as _evidence_exc:
+    render_validation_evidence = None
+    _ATLASQUANT_EVIDENCE_IMPORT_ERROR = f"{type(_evidence_exc).__name__}: {_evidence_exc}"
+
+
+try:
     from currency_news_v107 import render_currency_news_panel
     _CURRENCY_NEWS_V106_IMPORT_ERROR = ""
 except Exception as _currency_news_exc:
@@ -101,19 +169,50 @@ except Exception as _autopilot_exc:
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "11.0.7 — STRENGTH ATTRIBUTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2"
+APP_VERSION = "11.0.8 — STRENGTH ATTRIBUTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
 st.set_page_config(
-    page_title="USD Macro Pro V11.0.7 — Strength Attribution + Audit Integrity",
-    page_icon="🦅",
+    page_title="AtlasQuant — Market Intelligence Platform · DEV",
+    page_icon="🧭",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
 from compact_ui_v1107 import apply_compact_theme
 apply_compact_theme()
+
+try:
+    from atlasquant_ui_v1 import (
+        apply_atlasquant_theme,
+        render_atlasquant_header,
+        navigation_labels,
+    )
+    _ATLASQUANT_UI_IMPORT_ERROR = ""
+    apply_atlasquant_theme()
+except Exception as _atlasquant_ui_exc:
+    render_atlasquant_header = None
+    navigation_labels = None
+    _ATLASQUANT_UI_IMPORT_ERROR = f"{type(_atlasquant_ui_exc).__name__}: {_atlasquant_ui_exc}"
+
+
+try:
+    from atlasquant_dashboard_v1 import render_g8_radar
+    _ATLASQUANT_DASHBOARD_IMPORT_ERROR = ""
+except Exception as _atlasquant_dashboard_exc:
+    render_g8_radar = None
+    _ATLASQUANT_DASHBOARD_IMPORT_ERROR = (
+        f"{type(_atlasquant_dashboard_exc).__name__}: {_atlasquant_dashboard_exc}"
+    )
+
+
+try:
+    from atlasquant_coverage_funnel import render_coverage_funnel
+    _ATLASQUANT_COVERAGE_IMPORT_ERROR = ""
+except Exception as _coverage_exc:
+    render_coverage_funnel = None
+    _ATLASQUANT_COVERAGE_IMPORT_ERROR = f"{type(_coverage_exc).__name__}: {_coverage_exc}"
 
 MOEDAS = {
     "USD": "Dólar Americano",
@@ -154,8 +253,9 @@ if render_experience_controls is not None:
 else:
     _UX_PREFS_V103 = {}
 
-st.sidebar.title("🦅 USD Macro Pro")
-st.sidebar.caption(f"Versão {APP_VERSION}")
+st.sidebar.title("🧭 AtlasQuant")
+st.sidebar.caption("Market Intelligence Platform · DEV")
+st.sidebar.caption(f"Engine base {APP_VERSION}")
 
 ESCALA_CONFIANCA = st.sidebar.slider(
     "Sensibilidade da comparação", 2.0, 30.0, 10.0, 0.5,
@@ -195,7 +295,7 @@ else:
     st.sidebar.info("EODHD sem token: consenso permanece manual.")
 
 if CHAVE_TWELVE_DATA:
-    st.sidebar.success("Twelve Data configurado: H4/H1/M15 automáticos ativos.")
+    st.sidebar.success("Twelve Data configurado: coleta exclusiva do Autopilot; telas usam cache.")
 else:
     st.sidebar.info("Twelve Data sem chave: análise técnica automática ficará aguardando configuração.")
 
@@ -996,8 +1096,7 @@ def calcular_ranking(dados: dict, macro_us: dict, fed: dict) -> pd.DataFrame:
         df.loc[iu, "Pontuação_Macro"] = (
             usd_det["componentes"]["Inflação"] * 0.25
             + usd_det["componentes"]["Emprego"] * 0.25
-            + usd_det["componentes"]["Atividade"] * 0.15
-            + usd_det["componentes"]["Juros / Treasury 2Y"] * 0.35
+            + usd_det["componentes"]["Atividade"] * 0.15            + usd_det["componentes"]["Juros / Treasury 2Y"] * 0.35
         )
         df.loc[iu, "Influência_Fed"] = usd_det["componentes"]["Federal Reserve"] - 50
 
@@ -1706,7 +1805,7 @@ usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
 st.title("USD Macro Pro")
-st.caption("V11.0.7 · Força auditável e interface compacta")
+st.caption("V11.0.8 · Força auditável · coleta com orçamento diário")
 st.caption("Macro semanal → Macro do dia → W1/D1 → Quarterly → Liquidez → Killzones → H4/H1/M15 → Performance real")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -1996,8 +2095,7 @@ def _explicar_sinal_v78(par, moeda_base, moeda_cotada, score_base, score_cotada,
             observacoes.append(f"Score Mestre moderado ({sm:.0f}/100)")
         else:
             fatores_contra.append(f"Score Mestre ainda fraco ({sm:.0f}/100)")
-    except Exception:
-        pass
+    except Exception:        pass
 
     # Conclusão textual
     if direcao == "WAIT":
@@ -2640,9 +2738,12 @@ def _github_cfg_v84():
     try:
         token = st.secrets.get("GITHUB_TOKEN_HISTORICO", "")
         repo = st.secrets.get("GITHUB_REPO_HISTORICO", "aparecidomikael97-ship-it/usd-macro-pro-v4")
-        branch = st.secrets.get("GITHUB_BRANCH_HISTORICO", "main")
+        branch = resolve_runtime_branch(
+            st.secrets.get("GITHUB_DATA_BRANCH", os.getenv("GITHUB_DATA_BRANCH", "")),
+            st.secrets.get("GITHUB_BRANCH_HISTORICO", os.getenv("GITHUB_BRANCH_HISTORICO", "")),
+        )
     except Exception:
-        token, repo, branch = "", "aparecidomikael97-ship-it/usd-macro-pro-v4", "main"
+        token, repo, branch = "", "aparecidomikael97-ship-it/usd-macro-pro-v4", resolve_runtime_branch()
     return str(token).strip(), str(repo).strip(), str(branch).strip()
 
 def _github_ler_csv_v84():
@@ -3473,7 +3574,7 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 # Somente interface/orientação; não altera o motor do modelo.
 # ============================================================
 with st.expander("Guia do operador", expanded=False):
-    st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V11.0.7")
+    st.markdown("## 🎛️ Central do Operador — Núcleo de Decisão V11.0.8")
     st.caption("O APP define o viés macro; o gráfico confirma a entrada.")
 
     with st.container(border=True):
@@ -3610,7 +3711,10 @@ def _autopilot_save_inputs_v107():
 
         token = st.secrets.get("GITHUB_TOKEN_HISTORICO", os.getenv("GITHUB_TOKEN_HISTORICO", ""))
         repo = st.secrets.get("GITHUB_REPO_HISTORICO", os.getenv("GITHUB_REPO_HISTORICO", ""))
-        branch = st.secrets.get("GITHUB_BRANCH_HISTORICO", os.getenv("GITHUB_BRANCH_HISTORICO", "main"))
+        branch = resolve_runtime_branch(
+            st.secrets.get("GITHUB_DATA_BRANCH", os.getenv("GITHUB_DATA_BRANCH", "")),
+            st.secrets.get("GITHUB_BRANCH_HISTORICO", os.getenv("GITHUB_BRANCH_HISTORICO", "")),
+        )
         if not token or not repo:
             return False, "GitHub persistente ausente."
 
@@ -3667,6 +3771,14 @@ def _autopilot_save_inputs_v107():
     except Exception as exc:
         return False, f"{type(exc).__name__}: {exc}"
 
+
+if render_atlasquant_header is not None:
+    render_atlasquant_header(APP_VERSION, environment="DEV")
+else:
+    st.title("🧭 AtlasQuant")
+    st.caption("Market Intelligence Platform · DEV")
+    if _ATLASQUANT_UI_IMPORT_ERROR:
+        st.caption(f"UI profissional em modo compatível: {_ATLASQUANT_UI_IMPORT_ERROR}")
 
 abas = st.tabs([
     "Central", "Painel mestre", "Moedas", "EUA", "Pares", "Fed",
@@ -3996,7 +4108,6 @@ def _score_tendencias_eua() -> dict:
     desemp = _tendencia_serie("UNRATE", None, 3)
     t2 = _tendencia_serie("DGS2", None, 5)
     broad = _tendencia_serie("DTWEXBGS", None, 5)
-
     # Inflação persistente e yields subindo podem sustentar expectativa de juros;
     # desemprego subindo tende a enfraquecer o bloco de atividade/emprego.
     bruto = (
@@ -4996,8 +5107,7 @@ def _mostrar_risco_timing_v63(confl: dict, diferenca: float):
         )
     else:
         st.info(
-            "Nenhum evento foi informado nesta avaliação. O timing não recebeu penalidade de calendário."
-        )
+            "Nenhum evento foi informado nesta avaliação. O timing não recebeu penalidade de calendário."        )
 
     st.markdown(
         "**Fluxo recomendado pelo painel:** Macro → risco de notícia → estrutura/preço → gestão de risco."
@@ -5996,7 +6106,6 @@ with abas[4]:
 
         st.write(f"Motivo: {base} está em **{score_base:.1f}** e {cotada} em **{score_cotada:.1f}**. O USD, quando presente, já inclui o ajuste das surpresas econômicas.")
         st.warning("⚠️ O viés macro não é gatilho de entrada nem probabilidade de lucro. Confirme preço, estrutura, liquidez, sessão e risco.")
-
         st.markdown("#### 📝 Registrar sinal para teste histórico")
         preco = st.number_input("Preço de entrada", min_value=0.00001, max_value=1000.0, value=1.10000, step=0.00001, format="%.5f")
         horizonte = st.selectbox("Tempo para avaliar (horas)", [1,4,8,24,48,72], 3)
@@ -6698,62 +6807,13 @@ with abas[3]:
 # O motor técnico usa regras explícitas e reproduzíveis.
 # =========================================================
 
-@st.cache_data(ttl=1800, show_spinner=False)
 def _td_time_series_v92(par: str, interval: str, outputsize: int = 140) -> pd.DataFrame:
-    """V9.3.6.4: captura diagnóstico seguro da Twelve Data sem salvar/exibir API key."""
-    def vazio(msg="", http=None, api_status="", api_code="", values_count=0, valid_count=0):
-        d = pd.DataFrame()
-        d.attrs["erro_td"] = str(msg or "")
-        d.attrs["td_diag"] = {
-            "symbol": str(par), "interval": str(interval), "outputsize": int(outputsize),
-            "http_status": http, "api_status": str(api_status or ""),
-            "api_code": str(api_code or ""), "api_message": str(msg or ""),
-            "values_count": int(values_count or 0), "candles_validos": int(valid_count or 0),
-        }
-        return d
-
-    if not CHAVE_TWELVE_DATA:
-        return vazio("CHAVE_TWELVE_DATA não configurada.")
-
-    url = "https://api.twelvedata.com/time_series"
-    params = {"symbol":par,"interval":interval,"outputsize":int(outputsize),
-              "apikey":CHAVE_TWELVE_DATA,"format":"JSON","order":"ASC","timezone":"UTC"}
-    ultimo = {}
-    for tentativa in range(2):
-        try:
-            r=requests.get(url,params=params,timeout=20)
-            http=int(r.status_code)
-            try:
-                j=r.json()
-            except Exception as e:
-                return vazio(f"Resposta não-JSON: {type(e).__name__}", http=http)
-            status=j.get("status",""); code=j.get("code",""); msg=j.get("message","")
-            vals=j.get("values",[])
-            nvals=len(vals) if isinstance(vals,list) else 0
-            ultimo={"http":http,"status":status,"code":code,"msg":msg,"nvals":nvals}
-            if http != 200 or status=="error" or "values" not in j:
-                erro=str(msg or code or f"HTTP {http}")
-                if tentativa==1 or any(x in erro.lower() for x in ["credit","limit","rate","quota"]):
-                    return vazio(erro,http,status,code,nvals,0)
-                continue
-            df=pd.DataFrame(vals)
-            if df.empty:
-                return vazio("Resposta sem candles.",http,status,code,0,0)
-            df["datetime"]=pd.to_datetime(df["datetime"],errors="coerce",utc=True)
-            for c in ["open","high","low","close"]:
-                df[c]=pd.to_numeric(df[c],errors="coerce")
-            df=(df.dropna(subset=["datetime","open","high","low","close"])
-                  .sort_values("datetime").drop_duplicates("datetime").reset_index(drop=True))
-            df.attrs["erro_td"]=""
-            df.attrs["td_diag"]={
-                "symbol":str(par),"interval":str(interval),"outputsize":int(outputsize),
-                "http_status":http,"api_status":str(status or ""),"api_code":str(code or ""),
-                "api_message":str(msg or ""),"values_count":nvals,"candles_validos":int(len(df))}
-            return df
-        except Exception as e:
-            ultimo={"http":None,"status":"","code":"","msg":f"{type(e).__name__}: {e}","nvals":0}
-    return vazio(ultimo.get("msg","Falha ao consultar candles."),ultimo.get("http"),
-                 ultimo.get("status",""),ultimo.get("code",""),ultimo.get("nvals",0),0)
+    df,err=cached_series(par,interval,outputsize)
+    df.attrs["erro_td"]=err
+    df.attrs["td_diag"]={"symbol":par,"interval":interval,"api_message":err,
+                         "source":"CACHE_AUTOPILOT","candles_validos":len(df)}
+    return df
+_td_time_series_v92.clear = clear_shared_cache
 
 def _indicadores_tecnicos_v92(df: pd.DataFrame) -> pd.DataFrame:
     d = df.copy()
@@ -7086,40 +7146,16 @@ def _retorno_direcional_v938(direcao, entrada, saida):
     return -bruto if "VENDA" in str(direcao).upper() else bruto
 
 def _td_preco_historico_v938(par, alvo_utc):
-    """Busca candles M15 e devolve o primeiro fechamento em/apos o horário-alvo."""
-    chave = st.secrets.get("CHAVE_TWELVE_DATA", "")
-    if not chave:
-        return None, None, "CHAVE_TWELVE_DATA ausente."
+    df,err=cached_series(par,"15min",500,history=True)
+    if err or df.empty: return None,None,err or "Histórico fora do cache; aguarde coleta."
     try:
-        alvo = pd.to_datetime(alvo_utc, utc=True)
-        params = {
-            "symbol": str(par),
-            "interval": "15min",
-            "outputsize": 500,
-            "apikey": chave,
-            "timezone": "UTC",
-            "format": "JSON",
-        }
-        r = requests.get("https://api.twelvedata.com/time_series", params=params, timeout=20)
-        if r.status_code != 200:
-            return None, None, f"HTTP {r.status_code}"
-        js = r.json()
-        vals = js.get("values") or []
-        candidatos = []
-        for v in vals:
-            try:
-                dt = pd.to_datetime(v.get("datetime"), utc=True)
-                close = float(v.get("close"))
-                if dt >= alvo:
-                    candidatos.append((dt, close))
-            except Exception:
-                pass
-        if not candidatos:
-            return None, None, "Ainda não há candle posterior ao horizonte."
-        dt, close = sorted(candidatos, key=lambda x: x[0])[0]
-        return close, dt.isoformat(), ""
-    except Exception as e:
-        return None, None, f"{type(e).__name__}: {e}"
+        target=pd.to_datetime(alvo_utc,utc=True)
+        eligible=df[(df["datetime"]>=target)&(df["datetime"]<target+pd.Timedelta(minutes=15))]
+        if eligible.empty: return None,None,"Horizonte sem candle no cache; permanece pendente."
+        row=eligible.iloc[0]
+        return float(row["close"]),row["datetime"].isoformat(),""
+    except Exception:
+        return None,None,"Horário histórico inválido."
 
 def _validar_configuracoes_v938():
     """
@@ -7451,7 +7487,10 @@ _SCANNER_GH_PATH_V934 = "dados/scanner_tecnico_v934.json"
 def _gh_cfg_v934():
     token = st.secrets.get("GITHUB_TOKEN_HISTORICO", os.getenv("GITHUB_TOKEN_HISTORICO", ""))
     repo = st.secrets.get("GITHUB_REPO_HISTORICO", os.getenv("GITHUB_REPO_HISTORICO", ""))
-    branch = st.secrets.get("GITHUB_BRANCH_HISTORICO", os.getenv("GITHUB_BRANCH_HISTORICO", "main"))
+    branch = resolve_runtime_branch(
+        st.secrets.get("GITHUB_DATA_BRANCH", os.getenv("GITHUB_DATA_BRANCH", "")),
+        st.secrets.get("GITHUB_BRANCH_HISTORICO", os.getenv("GITHUB_BRANCH_HISTORICO", "")),
+    )
     return str(token), str(repo), str(branch)
 
 def _scanner_load_v934():
@@ -7477,29 +7516,7 @@ def _scanner_load_v934():
         return vazio
 
 def _scanner_save_v934(data):
-    token, repo, branch = _gh_cfg_v934()
-    if not token or not repo:
-        return False, "Persistência GitHub não configurada."
-    url = f"https://api.github.com/repos/{repo}/contents/{_SCANNER_GH_PATH_V934}"
-    headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
-    try:
-        current = requests.get(url, headers=headers, params={"ref": branch}, timeout=20)
-        sha = current.json().get("sha", "") if current.status_code == 200 else ""
-        clean = {k:v for k,v in data.items() if not str(k).startswith("_")}
-        payload = {
-            "message": "Atualiza scanner técnico V9.3.4",
-            "content": base64.b64encode(
-                json.dumps(clean, ensure_ascii=False, indent=2).encode("utf-8")
-            ).decode("ascii"),
-            "branch": branch,
-        }
-        if sha:
-            payload["sha"] = sha
-        r = requests.put(url, headers=headers, json=payload, timeout=25)
-        r.raise_for_status()
-        return True, ""
-    except Exception as e:
-        return False, f"{type(e).__name__}: {e}"
+    return False, "Scanner gerenciado pelo Autopilot. Releia o cache; novas coletas e gravações ocorrem no workflow Autopilot."
 
 def _tec_to_json_v934(tec):
     """Converte somente o resumo técnico necessário; DataFrames nunca são persistidos."""
@@ -7711,9 +7728,9 @@ with abas[8]:
         # -----------------------------
         st.markdown("### 5️⃣ Confirmação técnica automática — V9.2")
         st.caption(
-            "Fonte técnica: Twelve Data. H4 = direção/estrutura; "
+            "Fonte técnica: cache do Autopilot. H4 = direção/estrutura; "
             "H1 = alinhamento/pullback; M15 = gatilho curto. "
-            "Os candles ficam em cache por ~30 minutos para respeitar limites da API."
+            "As telas reutilizam candles sem novas consultas. Dados antigos continuam bloqueados."
         )
 
         if st.button("🔄 Atualizar técnica agora", key="v92_refresh_tecnico"):
@@ -8091,8 +8108,7 @@ with abas[8]:
                 _c3.metric("Score Mestre", f"{_score958}/100")
                 _c4.metric("Qualidade", _qual958)
 
-                st.caption(
-                    f"Índice operacional: {_idx958:.1f}/100 · "
+                st.caption(                    f"Índice operacional: {_idx958:.1f}/100 · "
                     "Ranking automático entre os pares com dados técnicos disponíveis."
                 )
 
@@ -8846,6 +8862,149 @@ with abas[12]:
             st.error("A aba Melhorias V10.5 encontrou um erro, mas o motor operacional continua preservado.")
             st.code(f"{type(_v105_render_exc).__name__}: {_v105_render_exc}")
 
+    st.divider()
+    if render_shadow_mode_panel is None:
+        st.warning("Shadow Mode AtlasQuant indisponível; produção permanece inalterada.")
+        if _ATLASQUANT_SHADOW_IMPORT_ERROR:
+            st.caption(f"Diagnóstico Shadow Mode: {_ATLASQUANT_SHADOW_IMPORT_ERROR}")
+    else:
+        try:
+            if ensure_shadow_hydrated is not None:
+                _aq_shadow_rows, _aq_shadow_load = ensure_shadow_hydrated()
+            else:
+                _aq_shadow_rows, _aq_shadow_load = (
+                    st.session_state.get("atlasquant_shadow_samples", []),
+                    {"ok":False,"reason":"HYDRATOR_UNAVAILABLE"},
+                )
+            render_shadow_mode_panel(
+                _aq_shadow_rows,
+                min_samples=100,
+            )
+            if bool(_aq_shadow_load.get("ok",False)) and _aq_shadow_load.get("reason")=="LOADED":
+                st.caption(
+                    f"Shadow persistente carregado: {int(_aq_shadow_load.get('samples',0))} amostra(s)."
+                )
+        except Exception as _aq_shadow_load_exc:
+            st.warning("Shadow Mode persistente em modo seguro; produção permanece inalterada.")
+            st.caption(f"Diagnóstico: {type(_aq_shadow_load_exc).__name__}: {_aq_shadow_load_exc}")
+
+    # AtlasQuant research history snapshot — one persistent read per rerun.
+    # Calibration, Performance, Stability and Validation consume the same
+    # immutable snapshot so opening Improvements does not repeat GitHub reads.
+    _aq_research_df = pd.DataFrame(columns=_config_cols_v937())
+    _aq_research_err = ""
+    try:
+        _aq_research_df, _aq_research_err = _config_ler_v937()
+    except Exception as _aq_research_load_exc:
+        _aq_research_err = (
+            f"{type(_aq_research_load_exc).__name__}: {_aq_research_load_exc}"
+        )
+
+    st.divider()
+    if render_calibration_lab is None:
+        st.warning("Conviction Calibration Lab indisponível; pesos e score permanecem inalterados.")
+        if _ATLASQUANT_CALIBRATION_IMPORT_ERROR:
+            st.caption(f"Diagnóstico Calibration Lab: {_ATLASQUANT_CALIBRATION_IMPORT_ERROR}")
+    else:
+        try:
+            if _aq_research_err and (_aq_research_df is None or _aq_research_df.empty):
+                st.info(f"Calibration Lab aguardando histórico persistente: {_aq_research_err}")
+            else:
+                render_calibration_lab(
+                    _aq_research_df.copy(),
+                    min_band_samples=30,
+                    min_total_samples=100,
+                )
+        except Exception as _aq_calib_render_exc:
+            st.warning("Calibration Lab em modo seguro; nenhuma regra/ponderação foi alterada.")
+            st.caption(f"Diagnóstico: {type(_aq_calib_render_exc).__name__}: {_aq_calib_render_exc}")
+
+    st.divider()
+    if render_performance_lab is None:
+        st.warning("Performance Lab indisponível; nenhuma regra operacional foi alterada.")
+        if _ATLASQUANT_PERFORMANCE_IMPORT_ERROR:
+            st.caption(f"Diagnóstico Performance Lab: {_ATLASQUANT_PERFORMANCE_IMPORT_ERROR}")
+    else:
+        try:
+            if _aq_research_err and (_aq_research_df is None or _aq_research_df.empty):
+                st.info(f"Performance Lab aguardando histórico persistente: {_aq_research_err}")
+            else:
+                render_performance_lab(
+                    _aq_research_df.copy(),
+                    min_total_samples=100,
+                    min_group_samples=30,
+                )
+        except Exception as _aq_perf_render_exc:
+            st.warning("Performance Lab em modo seguro; pesos, thresholds e gates permanecem inalterados.")
+            st.caption(f"Diagnóstico: {type(_aq_perf_render_exc).__name__}: {_aq_perf_render_exc}")
+
+    st.divider()
+    if render_stability_lab is None:
+        st.warning("Stability Lab indisponível; nenhuma decisão operacional foi alterada.")
+        if _ATLASQUANT_STABILITY_IMPORT_ERROR:
+            st.caption(f"Diagnóstico Stability Lab: {_ATLASQUANT_STABILITY_IMPORT_ERROR}")
+    else:
+        try:
+            if _aq_research_err and (_aq_research_df is None or _aq_research_df.empty):
+                st.info(f"Stability Lab aguardando histórico persistente: {_aq_research_err}")
+            else:
+                render_stability_lab(
+                    _aq_research_df.copy(),
+                    min_fold_samples=30,
+                    session_min_samples=10,
+                )
+        except Exception as _aq_stability_render_exc:
+            st.warning("Stability Lab em modo seguro; auto-otimização continua desativada.")
+            st.caption(f"Diagnóstico: {type(_aq_stability_render_exc).__name__}: {_aq_stability_render_exc}")
+
+    st.divider()
+    if render_expansion_budget_planner is None:
+        st.warning("Planejador de expansão técnica indisponível; cobertura atual permanece inalterada.")
+        if _ATLASQUANT_EXPANSION_BUDGET_IMPORT_ERROR:
+            st.caption(f"Diagnóstico Budget Planner: {_ATLASQUANT_EXPANSION_BUDGET_IMPORT_ERROR}")
+    else:
+        render_expansion_budget_planner(
+            current_pairs=7,
+            target_pairs=28,
+            daily_cap=480,
+        )
+
+    st.divider()
+    if render_adaptive_coverage_plan is None:
+        st.warning("Plano adaptativo de cobertura indisponível; pipeline atual permanece inalterado.")
+        if _ATLASQUANT_ADAPTIVE_COVERAGE_IMPORT_ERROR:
+            st.caption(f"Diagnóstico Adaptive Coverage: {_ATLASQUANT_ADAPTIVE_COVERAGE_IMPORT_ERROR}")
+    else:
+        render_adaptive_coverage_plan()
+
+    st.divider()
+    if render_validation_readiness is None:
+        st.warning("Validation Readiness Center indisponível; nenhuma promoção é permitida.")
+        if _ATLASQUANT_VALIDATION_IMPORT_ERROR:
+            st.caption(f"Diagnóstico Validation Center: {_ATLASQUANT_VALIDATION_IMPORT_ERROR}")
+    else:
+        try:
+            if _aq_research_err and (_aq_research_df is None or _aq_research_df.empty):
+                st.info(f"Validation Center aguardando histórico persistente: {_aq_research_err}")
+            else:
+                _aq_validation_result = render_validation_readiness(
+                    _aq_research_df.copy(),
+                    st.session_state.get("atlasquant_shadow_samples", []),
+                    horizon="24h",
+                )
+                if render_validation_evidence is not None:
+                    render_validation_evidence(
+                        _aq_validation_result,
+                        engine_version=APP_VERSION,
+                    )
+                elif _ATLASQUANT_EVIDENCE_IMPORT_ERROR:
+                    st.caption(
+                        f"Evidence Bundle indisponível: {_ATLASQUANT_EVIDENCE_IMPORT_ERROR}"
+                    )
+        except Exception as _aq_validation_exc:
+            st.warning("Validation Center em modo seguro; merge/promoção continuam bloqueados.")
+            st.caption(f"Diagnóstico: {type(_aq_validation_exc).__name__}: {_aq_validation_exc}")
+
 # =========================================================
 # ABA 13 — V10.6.2 FRESH-PRICE SNAPSHOT RECOVERY
 # =========================================================
@@ -8890,8 +9049,26 @@ if os.getenv("USD_MACRO_AUTOPILOT", "") == "1":
 # Renderizada ao final para reutilizar a Matriz oficial já calculada.
 # =========================================================
 with abas[0]:
+    if render_g8_radar is not None:
+        try:
+            render_g8_radar(ranking, neutral_band=5.0, top_n=8)
+        except Exception as _aq_radar_exc:
+            st.warning("Radar G8 temporariamente indisponível; motor operacional preservado.")
+            st.caption(f"Diagnóstico Radar G8: {type(_aq_radar_exc).__name__}")
+    elif _ATLASQUANT_DASHBOARD_IMPORT_ERROR:
+        st.caption(f"Radar G8 em modo compatível: {_ATLASQUANT_DASHBOARD_IMPORT_ERROR}")
+
+    if render_coverage_funnel is not None:
+        try:
+            render_coverage_funnel(ranking, neutral_band=5.0)
+        except Exception as _aq_coverage_exc:
+            st.warning("Mapa de cobertura temporariamente indisponível; nenhuma permissão operacional foi ampliada.")
+            st.caption(f"Diagnóstico Coverage Funnel: {type(_aq_coverage_exc).__name__}")
+    elif _ATLASQUANT_COVERAGE_IMPORT_ERROR:
+        st.caption(f"Coverage Funnel em modo compatível: {_ATLASQUANT_COVERAGE_IMPORT_ERROR}")
+
     if render_pair_intelligence_v110 is None:
-        st.error("A Central Institucional V11.0.7 não pôde ser carregada.")
+        st.error("A Central Institucional V11.0.8 não pôde ser carregada.")
         if _PAIR_INTEL_V110_IMPORT_ERROR:
             st.caption(f"Diagnóstico: {_PAIR_INTEL_V110_IMPORT_ERROR}")
     elif "matriz_v61" not in globals() or matriz_v61 is None or matriz_v61.empty:
@@ -8901,5 +9078,8 @@ with abas[0]:
             "usd_score": float(usd_detalhado.get("score", 50.0)) if "usd_detalhado" in globals() else 50.0,
             "usd_quality": float(qualidade_usd) if "qualidade_usd" in globals() else 0.0,
         }
+        try:
+            _macro_v108["event"] = _proximo_evento_macro_v65()
+        except Exception:
+            _macro_v108["event"] = {}
         render_pair_intelligence_v110(matriz_v61, ranking, fed=fed, macro_context=_macro_v108, weights=PESOS)
-
