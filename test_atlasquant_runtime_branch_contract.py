@@ -49,6 +49,12 @@ class AtlasQuantRuntimeBranchContractTests(unittest.TestCase):
         store=(ROOT/"atlasquant_flight_recorder_store.py").read_text(encoding="utf-8")
         self.assertIn("require_runtime_branch",store)
 
+    def test_pair_captures_flight_recorder_before_basic_return(self):
+        src=(ROOT/"pair_intelligence_v110.py").read_text(encoding="utf-8")
+        capture_pos=src.index("_flight_capture = capture_flight_recorder")
+        basic_pos=src.index('if _aq_view_mode != "Pro":')
+        self.assertLess(capture_pos,basic_pos)
+
 
 if __name__=="__main__":
     unittest.main()
