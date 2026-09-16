@@ -253,6 +253,7 @@ def _mitigation_stats(
     future: pd.DataFrame,
     zone_low: float,
     zone_high: float,
+    side: str,
 ) -> dict[str, Any]:
     """Measure retest/mitigation without changing execution permission."""
     width = max(float(zone_high) - float(zone_low), 0.0)
@@ -285,12 +286,15 @@ def _mitigation_stats(
     touched_rows = future.loc[overlap]
     deepest_low = float(touched_rows["low"].min())
     deepest_high = float(touched_rows["high"].max())
-    # Symmetric penetration metric: how much of the zone's vertical width was
-    # visited by any touch. It is descriptive only; side-specific validity is
-    # still governed by closing invalidation below/above the far edge.
-    penetration_from_top = (zone_high - max(deepest_low, zone_low)) / width * 100.0
-    penetration_from_bottom = (min(deepest_high, zone_high) - zone_low) / width * 100.0
-    depth = max(penetration_from_top, penetration_from_bottom)
+    side = str(side).upper()
+    # Mitigation depth must be measured from the expected entry edge:
+    # BUY revisits a bullish OB from above; SELL revisits a bearish OB from below.
+    if side == "BUY":
+        depth = (zone_high - max(deepest_low, zone_low)) / width * 100.0
+    elif side == "SELL":
+        depth = (min(deepest_high, zone_high) - zone_low) / width * 100.0
+    else:
+        depth = 0.0
     depth = max(0.0, min(100.0, float(depth)))
 
     first_idx = touched_rows.index[0]
@@ -420,7 +424,7 @@ def detect_order_block(
     else:
         invalidated = (not future.empty) and bool((future["close"] > zhigh).any())
 
-    mitigation = _mitigation_stats(future, zlow, zhigh)
+    mitigation = _mitigation_stats(future, zlow, zhigh, side)
     touched = bool(mitigation["touched"])
     depth = float(mitigation["mitigation_depth_pct"])
     retests = int(mitigation["retest_count"])
