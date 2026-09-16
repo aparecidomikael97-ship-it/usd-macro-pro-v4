@@ -174,7 +174,12 @@ def summarize_shadow(
         expected_pairs=expected_pairs,
         min_pair_samples=min_pair_samples,
     )
-    balanced=all(bool(x["minimum_met"]) for x in pair_rows) if pair_rows else True
+    coverage_gate_enabled=expected_pairs is not None
+    balanced=(
+        all(bool(x["minimum_met"]) for x in pair_rows)
+        if coverage_gate_enabled
+        else True
+    )
     missing=[x["pair"] for x in pair_rows if int(x["samples"])==0]
     under=[x["pair"] for x in pair_rows if 0<int(x["samples"])<int(min_pair_samples)]
 
@@ -192,6 +197,7 @@ def summarize_shadow(
         "pair_breakdown":pair_rows,
         "expected_pair_count":len(pair_rows),
         "pairs_meeting_minimum":sum(1 for x in pair_rows if bool(x["minimum_met"])),
+        "coverage_gate_enabled":coverage_gate_enabled,
         "coverage_balanced":balanced,
         "missing_pairs":missing,
         "under_sampled_pairs":under,
