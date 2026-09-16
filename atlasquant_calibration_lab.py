@@ -155,7 +155,7 @@ def render_calibration_lab(
     c3.metric("Relação monotônica","SIM" if summary["monotonic"] else "NÃO")
     c4.metric("Autoajuste de pesos","DESATIVADO")
 
-    st.dataframe(table,use_container_width=True,hide_index=True)
+    st.dataframe(table,width="stretch",hide_index=True)
 
     if summary["status"]=="INSUFFICIENT":
         st.warning("Amostra insuficiente: não converter score em probabilidade e não alterar pesos.")
