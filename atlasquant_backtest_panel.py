@@ -24,6 +24,7 @@ from atlasquant_operational_backtest import (
 from atlasquant_strategy_replay import generate_bos_choch_ob_signals
 from atlasquant_fvg_replay import generate_fvg_signals
 from atlasquant_ote_replay import generate_ote_signals
+from atlasquant_crt_replay import generate_crt_signals
 from atlasquant_tradingview_parity import validate_tradingview_parity
 
 
@@ -166,6 +167,10 @@ def load_tradingview_ote_pine_asset() -> str:
     return _load_pine_file("atlasquant_ote_strategy_v1.pine")
 
 
+def load_tradingview_crt_pine_asset() -> str:
+    return _load_pine_file("atlasquant_crt_strategy_v1.pine")
+
+
 def _records(df: pd.DataFrame) -> list[dict[str, Any]]:
     if not isinstance(df, pd.DataFrame) or df.empty:
         return []
@@ -284,7 +289,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
         "Estratégia técnica de pesquisa para o Strategy Tester do TradingView. "
         "Não inclui macro/Fed e não altera o Gate do AtlasQuant."
     )
-    p1,p2,p3=st.columns(3)
+    p1,p2,p3,p4=st.columns(4)
     with p1:
         st.download_button(
             "⬇️ Pine BOS/CHOCH + OB",
@@ -313,6 +318,16 @@ def render_operational_backtest_panel() -> dict[str, Any]:
             mime="text/plain",
             disabled=not bool(ote_pine),
             key="atlasquant_bt_pine_ote",
+        )
+    crt_pine=load_tradingview_crt_pine_asset()
+    with p4:
+        st.download_button(
+            "⬇️ Pine CRT",
+            data=crt_pine,
+            file_name="atlasquant_crt_strategy_v1.pine",
+            mime="text/plain",
+            disabled=not bool(crt_pine),
+            key="atlasquant_bt_pine_crt",
         )
 
     parity=validate_tradingview_parity()
@@ -596,6 +611,76 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                         "Não inclui macro/Fed e não altera o Gate."
                     )
                     return {**result,"mode":"AUTO_OTE","signals":ote_signals}
+
+    with st.expander("🤖 Backtest automático — CRT", expanded=False):
+        st.caption(
+            "Quarto operacional independente. Usa anchor range → raid/reclaim → delivery "
+            "e mantém resultado separado dos demais setups."
+        )
+        cc1,cc2=st.columns(2)
+        with cc1:
+            crt_buffer=st.number_input(
+                "Buffer CRT stop (ATR)",min_value=0.0,max_value=1.0,
+                value=0.0,step=0.01,key="atlasquant_crt_buffer"
+            )
+        with cc2:
+            crt_min_rr=st.number_input(
+                "RR mínimo CRT",min_value=0.0,max_value=20.0,
+                value=0.0,step=0.25,key="atlasquant_crt_min_rr"
+            )
+        crt_sides=st.multiselect(
+            "Lados CRT",["BUY","SELL"],default=["BUY","SELL"],key="atlasquant_crt_sides"
+        )
+
+        if candle_file is None:
+            st.info("Envie o CSV de candles para habilitar o replay CRT.")
+        else:
+            try:
+                crt_raw=read_csv_bytes(candle_file.getvalue())
+                crt_candles=normalize_tradingview_candles(crt_raw)
+            except Exception as exc:
+                crt_candles=pd.DataFrame()
+                st.error(f"CSV de candles inválido: {type(exc).__name__}: {exc}")
+
+            if not crt_candles.empty:
+                crt_signals=generate_crt_signals(
+                    crt_candles,
+                    pair=default_pair,
+                    stop_buffer_atr=float(crt_buffer),
+                    min_rr=float(crt_min_rr),
+                    allow_buy="BUY" in crt_sides,
+                    allow_sell="SELL" in crt_sides,
+                )
+                st.caption(
+                    f"Replay CRT encontrou {len(crt_signals)} setup(s) em "
+                    f"{len(crt_candles)} candle(s)."
+                )
+                if st.button(
+                    "▶️ Rodar backtest CRT",
+                    type="primary",
+                    key="atlasquant_bt_crt_run",
+                    disabled=not bool(crt_signals),
+                ):
+                    crt_results=backtest_many(
+                        {default_pair:crt_candles},
+                        crt_signals,
+                        single_position_per_pair=True,
+                        max_wait_bars=int(max_wait),
+                        max_hold_bars=int(max_hold),
+                        cost_r=float(cost_r),
+                        start_after_signal_bar=True,
+                    )
+                    result=_render_result_block(
+                        crt_results,
+                        default_pair,
+                        key_suffix="crt",
+                        generated_signals=crt_signals,
+                    )
+                    st.caption(
+                        "CRT é medido separadamente de OTE, FVG e BOS/CHOCH + OB. "
+                        "Não inclui macro/Fed e não altera o Gate."
+                    )
+                    return {**result,"mode":"AUTO_CRT","signals":crt_signals}
 
     if candle_file is None or signal_file is None:
         st.info(
