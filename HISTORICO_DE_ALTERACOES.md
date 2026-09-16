@@ -57,3 +57,17 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - GitHub Actions run \`35093251163\`: **495/495 testes OK**, compile gate verde.
 - Checkpoint ZIP run \`35093251055\`: sucesso.
 - Gate/readiness permanecem sem novos pesos nesta etapa.
+
+
+## 16/09/2026 UTC — Order Block preso à estrutura atual
+
+- ICT Structure Engine atualizado para V1.1.3.
+- A quebra estrutural mais recente passou a governar a validade do Order Block.
+- Quebra contrária mais nova bloqueia reutilização de zona alinhada antiga.
+- Busca de origem limitada à perna estrutural atual, sem atravessar swing/evento anterior.
+- Entre múltiplos candles opostos válidos, usa o mais recente antes do displacement.
+- Metadados de auditoria adicionados para estrutura, pivô, início da busca e origem.
+- Run \`35093608004\` expôs 1 regressão de expectativa em teste legado de invalidação; o teste foi isolado/corrigido sem afrouxar o motor.
+- GitHub Actions run \`35093708480\`: **499/499 testes OK**, compile gate verde.
+- Runtime e Main não foram alteradas.
+- Pesos de Gate/readiness continuam inalterados.

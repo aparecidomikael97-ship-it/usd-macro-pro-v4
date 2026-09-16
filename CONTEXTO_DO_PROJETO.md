@@ -122,3 +122,39 @@ Próximo passo seguro: auditar a qualidade semântica do detector em cenários d
 - Main foi observada em \`8a41a9acc8360753bbb31627e227156182fdac2b\`; essa mudança ocorreu fora desta etapa e não foi tocada.
 
 Próximo passo seguro: revisar a seleção/qualidade do Order Block em cenários com múltiplos candles de origem e confirmar que a zona escolhida não reaproveita origem velha depois de uma nova quebra estrutural.
+
+
+## 16/09/2026 UTC — Order Block vinculado à perna estrutural mais recente
+
+Estado verificado:
+
+- DEV testada em \`cae59a537d9d0f39f39036c0443b3469a54eb5a1\`.
+- Quality run \`35093708480\`: compile gate verde, **499 testes executados, 499 OK**.
+- Runtime permanece em \`7a2ad3e53055fb1ef6091c39442c4c0f5212c3c1\`.
+- Main observada em \`8a41a9acc8360753bbb31627e227156182fdac2b\`; nenhuma alteração foi feita nela.
+
+### Mudanças no ICT Structure Engine V1.1.3
+
+- Order Block agora considera o **evento estrutural mais recente**, não apenas a última quebra alinhada antiga.
+- Se a quebra mais recente estiver contra o lado macro, o motor entra em fail-closed: \`ESTRUTURA MAIS RECENTE CONTRÁRIA — SEM ORDER BLOCK\`.
+- A busca pelo candle de origem fica limitada à **perna estrutural atual**:
+  - não atravessa o swing de referência;
+  - não atravessa o evento estrutural anterior;
+  - mantém limite máximo de busca de 8 candles antes da quebra.
+- Entre múltiplos candles opostos válidos na perna atual, escolhe o mais recente, imediatamente anterior ao displacement.
+- Foram adicionados índices auditáveis: \`structure_index\`, \`reference_pivot_index\`, \`origin_search_start\`, \`origin_index\`.
+
+### Evidência de teste
+
+Novos testes cobrem:
+
+- quebra contrária mais nova bloqueando Order Block antigo;
+- proibição de reutilizar candle de origem anterior à perna atual;
+- seleção do candle oposto mais recente entre múltiplos candidatos;
+- nova quebra no mesmo lado assumindo sua própria zona/origem.
+
+O primeiro run desta etapa (\`35093608004\`) encontrou 1 regressão no teste antigo de invalidação: o novo bloqueio de estrutura contrária, corretamente mais conservador, passou a ocorrer antes da invalidação da zona. O teste foi corrigido para isolar especificamente a invalidação do Order Block, sem remover o novo bloqueio fail-closed. O run seguinte ficou totalmente verde.
+
+**Regra preservada:** BOS/CHOCH e Order Block continuam observacionais. Nenhum peso de readiness institucional nem Gate foi alterado.
+
+Próximo passo seguro: testar Order Block SELL com múltiplas origens e cenários de mitigação parcial/reteste, mantendo a lógica fail-closed antes de qualquer discussão sobre pesos.
