@@ -293,3 +293,18 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - Evidências alteradas mostram deltas descritivos de trades, expectativa R, Net R e drawdown.
 - GitHub Actions run `35108514542`: **630/630 testes OK**, compile gate verde.
 - Runtime/Main não foram alteradas.
+
+
+## 16/09/2026 UTC — histórico local de snapshots do Backtest
+
+- Snapshot loader reforçado para rejeitar adulteração de id, settings, evidence, identity e JSON.
+- Validação passou a recomputar também o hash do manifesto de arquivos de código.
+- Criado `atlasquant_backtest_snapshot_history.py`.
+- Histórico padrão fica em `.atlasquant_research/backtest_snapshots`, fora de `dados/`.
+- Gravação é opcional, explícita, atômica e deduplicada por `snapshot_id`.
+- Criado `.gitignore` para evitar commit acidental do histórico local.
+- UI ganhou linha do tempo dos snapshots e tabela de mudanças entre execuções consecutivas.
+- Arquivos inválidos não entram na linha do tempo e são exibidos como falha de integridade.
+- Adicionada exportação ZIP com manifest, timeline, changes e snapshots válidos.
+- GitHub Actions run `35110147000`: **641/641 testes OK**, compile gate verde.
+- Runtime/Main não foram alteradas.
