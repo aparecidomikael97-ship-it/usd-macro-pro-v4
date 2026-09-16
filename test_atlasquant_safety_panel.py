@@ -55,6 +55,26 @@ class AtlasQuantSafetyPanelTests(unittest.TestCase):
         self.assertEqual(r["traffic_light"],"YELLOW")
         self.assertIn("Regime atual", " ".join(r["warnings"]))
 
+    def test_exact_event_override_can_block(self):
+        p=self.base()
+        r=evaluate_live_safety(
+            p,
+            {"app_headless_ok":True},
+            major_event_minutes_override=10,
+        )
+        self.assertEqual(r["traffic_light"],"RED")
+        self.assertTrue(any("Evento de alto impacto" in x for x in r["hard_blocks"]))
+
+    def test_missing_event_override_does_not_invent_block(self):
+        p=self.base()
+        p.pop("major_event_minutes",None)
+        r=evaluate_live_safety(
+            p,
+            {"app_headless_ok":True},
+            major_event_minutes_override=None,
+        )
+        self.assertNotEqual(r["traffic_light"],"RED")
+
 
 if __name__=="__main__":
     unittest.main()
