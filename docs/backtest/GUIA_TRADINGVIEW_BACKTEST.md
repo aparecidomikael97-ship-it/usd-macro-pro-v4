@@ -299,3 +299,41 @@ Também é possível baixar:
 
 A próxima camada de validação recomendada é verificar estabilidade por períodos do histórico,
 para evitar favorecer um setup que funcionou apenas em um trecho específico.
+
+
+## Estabilidade temporal dos 5 operacionais
+
+Depois de rodar o comparador, o AtlasQuant também pode dividir o histórico de cada estratégia
+em blocos cronológicos para verificar se o resultado observado foi consistente ao longo da
+amostra.
+
+Você pode escolher:
+
+- 3 blocos;
+- 4 blocos;
+- 5 blocos.
+
+Também pode definir o mínimo de trades exigido em cada bloco.
+
+Para cada operacional e bloco, são mostrados:
+
+- Trades;
+- Gain / Loss / Break-even;
+- Win Rate observado;
+- Expectativa em R;
+- Resultado líquido em R;
+- Drawdown máximo;
+- Maior sequência de Loss.
+
+O resumo temporal usa quatro estados descritivos:
+
+- **POSITIVE_ACROSS_FOLDS** — expectativa positiva em todos os blocos;
+- **NEGATIVE_ACROSS_FOLDS** — expectativa negativa em todos os blocos;
+- **MIXED_ACROSS_FOLDS** — o sinal da expectativa muda entre os blocos;
+- **INSUFFICIENT** — não há amostra mínima suficiente em todos os blocos.
+
+Isso ajuda a enxergar quando um setup ficou positivo apenas em uma parte do histórico.
+O diagnóstico é histórico e descritivo; ele não é previsão, probabilidade de lucro ou
+autorização para operar.
+
+A tabela detalhada dos blocos também pode ser baixada em CSV.
