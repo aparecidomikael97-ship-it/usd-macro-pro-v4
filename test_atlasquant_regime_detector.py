@@ -1,6 +1,8 @@
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
-from atlasquant_regime_detector import regime_snapshot, detect_regime_change
+from atlasquant_regime_detector import regime_snapshot, detect_regime_change, capture_regime_detector
 
 
 class AtlasQuantRegimeDetectorTests(unittest.TestCase):
@@ -66,6 +68,15 @@ class AtlasQuantRegimeDetectorTests(unittest.TestCase):
     def test_snapshot_normalizes_numbers(self):
         p=self.base(); p["priority"]=float("nan")
         self.assertIsNone(regime_snapshot(p)["priority"])
+
+    def test_capture_updates_session_without_render_requirement(self):
+        fake=SimpleNamespace(session_state={})
+        with patch("atlasquant_regime_detector.st",fake):
+            first=capture_regime_detector(self.base())
+            second=capture_regime_detector(self.base())
+        self.assertEqual(first["status"],"BASELINE")
+        self.assertEqual(second["status"],"STABLE")
+        self.assertIn("atlasquant_regime_previous_snapshot",fake.session_state)
 
 
 if __name__=="__main__":
