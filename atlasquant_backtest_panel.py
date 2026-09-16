@@ -7,6 +7,7 @@ or target; missing/invalid plans are shown as NO_TRADE.
 from __future__ import annotations
 
 from io import BytesIO
+from pathlib import Path
 from typing import Any
 import csv
 import io
@@ -141,6 +142,14 @@ def candles_template_csv() -> str:
     return buf.getvalue()
 
 
+def load_tradingview_pine_asset() -> str:
+    path = Path(__file__).resolve().parent / "tradingview" / "atlasquant_bos_choch_ob_strategy_v1.pine"
+    try:
+        return path.read_text(encoding="utf-8")
+    except Exception:
+        return ""
+
+
 def _records(df: pd.DataFrame) -> list[dict[str, Any]]:
     if not isinstance(df, pd.DataFrame) or df.empty:
         return []
@@ -188,6 +197,21 @@ def render_operational_backtest_panel() -> dict[str, Any]:
             mime="text/csv",
             key="atlasquant_bt_signals_template",
         )
+
+    pine_asset = load_tradingview_pine_asset()
+    st.markdown("#### Pine Script — BOS/CHOCH + Order Block")
+    st.caption(
+        "Estratégia técnica de pesquisa para o Strategy Tester do TradingView. "
+        "Não inclui macro/Fed e não altera o Gate do AtlasQuant."
+    )
+    st.download_button(
+        "⬇️ Baixar Pine Strategy BOS/CHOCH + OB",
+        data=pine_asset,
+        file_name="atlasquant_bos_choch_ob_strategy_v1.pine",
+        mime="text/plain",
+        disabled=not bool(pine_asset),
+        key="atlasquant_bt_pine_bos_choch_ob",
+    )
 
     default_pair = st.text_input(
         "Par/ativo dos candles (usado apenas se a planilha não tiver a coluna par)",
