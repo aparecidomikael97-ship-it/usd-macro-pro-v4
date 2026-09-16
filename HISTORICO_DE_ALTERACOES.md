@@ -206,3 +206,16 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - Aba Backtest ganhou bloco **Comparador dos 5 operacionais** e exportações CSV.
 - GitHub Actions run `35103238881`: **582/582 testes OK**, compile gate verde.
 - Runtime/Main não foram alteradas.
+
+
+## 16/09/2026 UTC — estabilidade temporal no comparador
+
+- Criado `atlasquant_strategy_stability.py`.
+- Cada um dos 5 operacionais passa a ser analisado em blocos cronológicos independentes.
+- Suporte a 3, 4 ou 5 blocos.
+- Métricas por bloco: trades, gain/loss/BE, win rate, expectativa R, net R, drawdown e streak de loss.
+- Status descritivos: `POSITIVE_ACROSS_FOLDS`, `NEGATIVE_ACROSS_FOLDS`, `MIXED_ACROSS_FOLDS` e `INSUFFICIENT`.
+- Estratégias sem amostra mínima por bloco não recebem leitura de estabilidade.
+- Aba Backtest ganhou tabela de estabilidade, detalhe dos blocos e exportação CSV.
+- GitHub Actions run `35103716697`: **588/588 testes OK**, compile gate verde.
+- Runtime/Main não foram alteradas.
