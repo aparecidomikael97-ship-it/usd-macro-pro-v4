@@ -136,3 +136,16 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - Aba Backtest exibe status da paridade.
 - GitHub Actions run \`35098491162\`: **543/543 testes OK**, compile gate verde.
 - Runtime/Main não foram alteradas.
+
+
+## 16/09/2026 UTC — OTE independente no Backtest e TradingView
+
+- Criado `atlasquant_ote_replay.py`.
+- Criada `tradingview/atlasquant_ote_strategy_v1.pine`.
+- OTE usa zona 62%-79%, sweet spot 70,5%, lookback 28 e extremo recente 12.
+- Entrada Sweet 70.5 ou midpoint, stop no swing com buffer ATR e alvo em R.
+- Sinal repetido no mesmo impulso é bloqueado; empate BUY/SELL é resolvido de forma determinística pela proximidade ao 70,5%.
+- Aba Backtest ganhou bloco OTE separado, Pine próprio, sinais exportáveis e ledger exclusivo.
+- Paridade TradingView/Python passou a validar parâmetros e fórmulas centrais do OTE.
+- GitHub Actions run `35099427531`: **552/552 testes OK**, compile gate verde.
+- Runtime/Main não foram alteradas.
