@@ -8,11 +8,14 @@ from __future__ import annotations
 
 from hashlib import sha256
 import json
+import os
 from typing import Any, Mapping, Sequence
 import math
 import streamlit as st
 
 from atlasquant_journal import make_decision_record, make_blocked_record, to_csv
+from atlasquant_flight_recorder_store import persist_records
+from atlasquant_runtime_store import resolve_runtime_branch
 
 
 def _num(value: Any, default: float = 0.0) -> float:
@@ -125,12 +128,55 @@ def recorder_summary(records: Sequence[Mapping[str, Any]] | None) -> dict[str, i
     }
 
 
+def _secret_or_env(key: str, default: str = "") -> str:
+    try:
+        value=st.secrets.get(key, os.getenv(key, default))
+    except Exception:
+        value=os.getenv(key, default)
+    return str(value or "").strip()
+
+
+def runtime_persistence_config() -> dict[str, str]:
+    repo=_secret_or_env(
+        "GITHUB_REPO_HISTORICO",
+        os.getenv("GITHUB_REPOSITORY", "aparecidomikael97-ship-it/usd-macro-pro-v4"),
+    )
+    branch=resolve_runtime_branch(
+        _secret_or_env("GITHUB_DATA_BRANCH", ""),
+        _secret_or_env("GITHUB_BRANCH_HISTORICO", ""),
+    )
+    token=_secret_or_env("GITHUB_TOKEN_HISTORICO", os.getenv("GITHUB_TOKEN", ""))
+    return {"repo":repo,"branch":branch,"token":token}
+
+
+def persist_current_record(record: Mapping[str, Any]) -> dict[str, Any]:
+    cfg=runtime_persistence_config()
+    return persist_records(
+        [record],
+        repo=cfg["repo"],
+        branch=cfg["branch"],
+        token=cfg["token"],
+    )
+
+
 def render_flight_recorder(pack: Mapping[str, Any] | None, engine_version: str) -> dict[str, int]:
     key="atlasquant_session_flight_recorder"
     current=record_from_pack(pack,engine_version)
     rows,added=append_unique(st.session_state.get(key,[]),current)
     st.session_state[key]=rows
     summary=recorder_summary(rows)
+
+    persistence=st.session_state.get("atlasquant_flight_recorder_persistence", {})
+    if added:
+        try:
+            persistence=persist_current_record(current)
+        except Exception as exc:
+            persistence={
+                "ok":False,"added":0,"records":0,
+                "reason":"PERSISTENCE_EXCEPTION",
+                "error":f"{type(exc).__name__}: {exc}",
+            }
+        st.session_state["atlasquant_flight_recorder_persistence"]=persistence
 
     st.markdown("### 🧾 Flight Recorder")
     st.caption(
@@ -144,6 +190,26 @@ def render_flight_recorder(pack: Mapping[str, Any] | None, engine_version: str) 
         st.caption("Novo estado operacional registrado nesta sessão.")
     else:
         st.caption("Estado idêntico ao último registro; duplicidade evitada.")
+
+    if persistence:
+        reason=str(persistence.get("reason",""))
+        if bool(persistence.get("ok",False)):
+            if reason=="SAVED":
+                st.caption(
+                    f"☁️ Persistência runtime: +{int(persistence.get('added',0))} registro(s) · "
+                    f"{int(persistence.get('records',0))} no histórico persistente."
+                )
+            elif reason=="ALREADY_PRESENT":
+                st.caption("☁️ Estado já existente no Flight Recorder persistente; duplicidade remota evitada.")
+        elif reason=="NOT_CONFIGURED":
+            st.caption("Persistência permanente aguardando credencial GitHub; registro da sessão preservado localmente.")
+        else:
+            st.warning(
+                "Flight Recorder persistente indisponível neste ciclo; "
+                "a decisão da sessão continua preservada localmente."
+            )
+            if persistence.get("error"):
+                st.caption(f"Diagnóstico: {persistence.get('reason','ERRO')} · {persistence.get('error')}")
 
     export_rows=[{k:v for k,v in row.items() if k!="_fingerprint"} for row in rows]
     csv_data=to_csv(export_rows)
