@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 import pandas as pd
 
 from ict_structure_v111 import (
@@ -138,6 +139,80 @@ class ICTStructureV111Tests(unittest.TestCase):
         ])
         events = _structure_events(d)
         self.assertFalse(any(x["index"] == 6 and x["side"] == "BUY" for x in events))
+
+    def test_newer_contrary_structure_blocks_stale_aligned_order_block(self):
+        d = frame([10 + i * 0.2 for i in range(16)])
+        fake_events = [
+            {"index":10,"side":"BUY","kind":"BOS","prior_bias":"BULLISH","level":11.0,"pivot_index":6},
+            {"index":13,"side":"SELL","kind":"CHOCH","prior_bias":"BULLISH","level":10.5,"pivot_index":9},
+        ]
+        with patch("ict_structure_v111._structure_events", return_value=fake_events):
+            r = detect_order_block(d, "BUY")
+        self.assertEqual(r["score"],10)
+        self.assertIn("ESTRUTURA MAIS RECENTE CONTRÁRIA",r["status"])
+        self.assertEqual(r["structure_index"],13)
+
+    def test_order_block_does_not_reuse_origin_before_current_leg(self):
+        rows=[]
+        for i in range(14):
+            if i == 7:
+                rows.append((10.8,11.0,9.8,10.0))  # candle oposto velho
+            elif i == 12:
+                rows.append((10.0,11.4,9.9,11.2))  # break/displacement
+            else:
+                rows.append((10.0,10.8,9.9,10.5))
+        d=custom_frame(rows)
+        fake_events=[
+            {"index":12,"side":"BUY","kind":"BOS","prior_bias":"BULLISH","level":11.0,"pivot_index":8},
+        ]
+        with patch("ict_structure_v111._structure_events", return_value=fake_events),              patch("ict_structure_v111._atr", return_value=pd.Series([1.0]*len(d))):
+            r=detect_order_block(d,"BUY")
+        self.assertEqual(r["status"],"⚪ SEM ORDER BLOCK VALIDADO")
+        self.assertGreaterEqual(r["origin_search_start"],9)
+        self.assertNotIn("origin_index",r)
+
+    def test_order_block_uses_nearest_opposing_candle_in_current_leg(self):
+        rows=[]
+        for i in range(14):
+            if i == 9:
+                rows.append((10.8,11.0,10.0,10.2))
+            elif i == 11:
+                rows.append((10.9,11.1,10.3,10.4))  # origem mais recente
+            elif i == 12:
+                rows.append((10.4,11.8,10.3,11.6))  # break/displacement
+            else:
+                rows.append((10.0,10.7,9.9,10.5))
+        d=custom_frame(rows)
+        fake_events=[
+            {"index":12,"side":"BUY","kind":"BOS","prior_bias":"BULLISH","level":11.0,"pivot_index":8},
+        ]
+        with patch("ict_structure_v111._structure_events", return_value=fake_events),              patch("ict_structure_v111._atr", return_value=pd.Series([1.0]*len(d))):
+            r=detect_order_block(d,"BUY")
+        self.assertEqual(r["origin_index"],11)
+        self.assertAlmostEqual(r["zone_low"],10.3)
+        self.assertAlmostEqual(r["zone_high"],11.1)
+
+    def test_newer_same_side_break_owns_new_order_block_leg(self):
+        rows=[]
+        for i in range(15):
+            if i == 9:
+                rows.append((10.8,11.0,10.0,10.2))   # origem da quebra velha
+            elif i == 12:
+                rows.append((11.2,11.4,10.5,10.7))  # nova origem
+            elif i == 13:
+                rows.append((10.7,12.2,10.6,12.0))  # nova quebra
+            else:
+                rows.append((10.0,10.8,9.9,10.5))
+        d=custom_frame(rows)
+        fake_events=[
+            {"index":10,"side":"BUY","kind":"BOS","prior_bias":"BULLISH","level":10.9,"pivot_index":6},
+            {"index":13,"side":"BUY","kind":"BOS","prior_bias":"BULLISH","level":11.5,"pivot_index":11},
+        ]
+        with patch("ict_structure_v111._structure_events", return_value=fake_events),              patch("ict_structure_v111._atr", return_value=pd.Series([1.0]*len(d))):
+            r=detect_order_block(d,"BUY")
+        self.assertEqual(r["structure_index"],13)
+        self.assertEqual(r["origin_index"],12)
+        self.assertGreaterEqual(r["origin_search_start"],11)
 
     def test_macro_wait_never_claims_structure(self):
         d = frame([10 + i * 0.1 for i in range(30)])

@@ -1,4 +1,4 @@
-"""AtlasQuant ICT Structure Engine V1.1.2.
+"""AtlasQuant ICT Structure Engine V1.1.3.
 
 Deterministic/observational structure layer for BOS, CHOCH and Order Blocks.
 It never decides macro direction, never calls providers and never reports
@@ -275,19 +275,32 @@ def detect_order_block(
             "text": "Order Block aguarda M15 suficiente e direção macro.",
         }
 
-    events = [
+    all_events = [
         e for e in _structure_events(d)
-        if e["side"] == side and len(d) - 1 - int(e["index"]) <= int(max_structure_age)
+        if len(d) - 1 - int(e["index"]) <= int(max_structure_age)
     ]
-    if not events:
+    if not all_events:
         return {
             "status": "⚪ SEM ORDER BLOCK VALIDADO",
             "score": 30,
-            "text": "Não há quebra estrutural recente alinhada para validar um Order Block.",
+            "text": "Não há quebra estrutural recente para validar um Order Block.",
         }
 
-    event = events[-1]
+    # Fail-closed: a zona antiga não pode sobreviver a uma quebra estrutural
+    # mais recente no lado contrário ao macro.
+    event = all_events[-1]
     break_idx = int(event["index"])
+    event_side = str(event.get("side", "")).upper()
+    if event_side != side:
+        return {
+            "status": "🔴 ESTRUTURA MAIS RECENTE CONTRÁRIA — SEM ORDER BLOCK",
+            "score": 10,
+            "structure_event": event.get("kind", "MSS"),
+            "event_side": event_side,
+            "structure_index": break_idx,
+            "bars_ago": int(len(d) - 1 - break_idx),
+            "text": "A quebra estrutural mais recente está contra o lado macro; um Order Block anterior não pode ser reaproveitado.",
+        }
     atr = _atr(d)
     atr_value = float(atr.iloc[break_idx]) if break_idx < len(atr) and pd.notna(atr.iloc[break_idx]) else 0.0
     row = d.loc[break_idx]
@@ -311,8 +324,19 @@ def detect_order_block(
             "text": "Há quebra de estrutura, mas falta displacement suficiente para validar a zona de origem.",
         }
 
+    # A origem precisa pertencer à perna estrutural atual. Não atravessamos o
+    # swing rompido nem um evento estrutural anterior para buscar candle velho.
+    pivot_idx = int(event.get("pivot_index", -1))
+    previous_event_idx = int(all_events[-2]["index"]) if len(all_events) >= 2 else -1
+    origin_search_start = max(
+        0,
+        break_idx - 8,
+        pivot_idx + 1,
+        previous_event_idx + 1,
+    )
+
     candidate = None
-    for j in range(break_idx - 1, max(-1, break_idx - 9), -1):
+    for j in range(break_idx - 1, origin_search_start - 1, -1):
         o = float(d.loc[j, "open"])
         c = float(d.loc[j, "close"])
         opposite = c < o if side == "BUY" else c > o
@@ -325,7 +349,10 @@ def detect_order_block(
             "status": "⚪ SEM ORDER BLOCK VALIDADO",
             "score": 35,
             "structure_event": event["kind"],
-            "text": "Quebra + displacement existem, mas não há candle oposto de origem claro.",
+            "structure_index": break_idx,
+            "reference_pivot_index": pivot_idx,
+            "origin_search_start": origin_search_start,
+            "text": "Quebra + displacement existem, mas não há candle oposto de origem dentro da perna estrutural atual.",
         }
 
     zlow = float(d.loc[candidate, "low"])
@@ -364,6 +391,10 @@ def detect_order_block(
         "score": score,
         "side": side,
         "structure_event": event["kind"],
+        "structure_index": break_idx,
+        "reference_pivot_index": pivot_idx,
+        "origin_search_start": origin_search_start,
+        "origin_index": int(candidate),
         "zone_low": zlow,
         "zone_high": zhigh,
         "price": price,
