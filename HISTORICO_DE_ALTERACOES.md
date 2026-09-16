@@ -330,3 +330,13 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - GitHub Actions run `35111419129`: **650/650 testes OK**, compile gate verde.
 - Estado da DEV: `DEV_VALIDATED_PENDING_RUNTIME_ACTIVATION`.
 - Runtime/Main não foram alteradas.
+
+
+## 16/09/2026 UTC — promoção Runtime validada
+
+- DEV promovida para `atlasquant-runtime` preservando os sete arquivos operacionais divergentes em `dados/`.
+- Runtime final: `998ef4ba8030d6babd73f43a287c7eeb33ebcdb3`.
+- Criados backups antes das duas etapas da promoção.
+- Quality da própria Runtime: run `35112939791`, **650/650 testes OK**, compile gate verde.
+- Quality workflow agora valida pushes de código também em `atlasquant-runtime`.
+- `main` não foi alterada.
