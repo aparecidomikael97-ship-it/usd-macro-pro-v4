@@ -74,7 +74,7 @@ class AMDReplayTests(unittest.TestCase):
             acc_prefix()
             + [
                 (10.4,11.2,9.6,10.8),  # manip BUY, also > mid, but same candle must not distribute
-                (10.8,10.9,10.2,10.6), # later valid distribution
+                (10.8,11.0,10.2,10.9), # later valid distribution above manip close
             ]
         )
         rows=generate_amd_signals(
