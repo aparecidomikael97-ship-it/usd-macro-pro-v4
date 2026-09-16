@@ -125,6 +125,13 @@ class BacktestPanelTests(unittest.TestCase):
         self.assertIn("comparison_frame",source)
         self.assertIn("observed_expectancy_rank",source)
 
+    def test_panel_exposes_temporal_stability_for_comparator(self):
+        source=inspect.getsource(render_operational_backtest_panel)
+        self.assertIn("Estabilidade temporal",source)
+        self.assertIn("temporal_stability_report",source)
+        self.assertIn("Blocos temporais",source)
+        self.assertIn("Baixar estabilidade",source)
+
     def test_csv_bytes_read_utf8(self):
         raw=b"time,open,high,low,close\n2026-09-15T00:00:00Z,1,2,0.5,1.5\n"
         out=read_csv_bytes(raw)
