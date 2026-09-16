@@ -163,3 +163,16 @@ O histórico de desenvolvimento anterior está no registro original e no histór
 - Paridade TradingView/Python passou a validar o guard.
 - GitHub Actions run `35101330822`: **554/554 testes OK**, compile gate verde.
 - Runtime/Main não foram alteradas.
+
+
+## 16/09/2026 UTC — CRT independente no Backtest e TradingView
+
+- Criado `atlasquant_crt_replay.py`.
+- Criada `tradingview/atlasquant_crt_strategy_v1.pine`.
+- CRT usa sequência anchor range → raid/reclaim → directional delivery.
+- BUY/SELL são medidos separadamente, com entrada no delivery close, stop na varredura/anchor e alvo na borda oposta do range.
+- Adicionados buffer ATR opcional e filtro de RR mínimo.
+- Aba Backtest ganhou bloco CRT independente, Pine próprio, sinais exportáveis e ledger separado.
+- Paridade TradingView/Python passou a verificar regras e defaults centrais do CRT.
+- GitHub Actions run `35101892468`: **564/564 testes OK**, compile gate verde.
+- Runtime/Main não foram alteradas.
