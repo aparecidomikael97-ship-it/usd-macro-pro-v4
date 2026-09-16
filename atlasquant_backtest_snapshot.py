@@ -39,6 +39,13 @@ CODE_FILES=(
     "atlasquant_strategy_parameter_robustness.py",
     "atlasquant_backtest_evidence.py",
     "atlasquant_backtest_snapshot.py",
+    "atlasquant_tradingview_parity.py",
+    "atlasquant_backtest_panel.py",
+    "tradingview/atlasquant_bos_choch_ob_strategy_v1.pine",
+    "tradingview/atlasquant_fvg_strategy_v1.pine",
+    "tradingview/atlasquant_ote_strategy_v1.pine",
+    "tradingview/atlasquant_crt_strategy_v1.pine",
+    "tradingview/atlasquant_amd_strategy_v1.pine",
 )
 
 
