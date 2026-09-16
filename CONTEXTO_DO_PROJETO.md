@@ -1074,3 +1074,77 @@ dos setups ou contexto macro/Fed.
 Próximo passo seguro: criar um snapshot reproduzível do conjunto de evidências com fingerprint
 do CSV/configuração para permitir comparar duas execuções do Backtest e detectar exatamente
 o que mudou, sem promover automaticamente nenhum operacional.
+
+
+## 16/09/2026 UTC — snapshot reproduzível e comparação de execuções
+
+Estado verificado:
+
+- DEV testada em `624a38f9f7eb3e9c10ab9c14d76a61ee99f92bed`.
+- Quality run `35108514542`: compile gate verde, **630 testes executados, 630 OK**.
+- Runtime permanece protegida e não foi alterada nesta etapa.
+- Main não foi alterada nesta etapa.
+
+### Snapshot reproduzível do Backtest
+
+Foi criado `atlasquant_backtest_snapshot.py`.
+
+Cada execução consolidada pode gerar um snapshot JSON com fingerprints SHA-256 de:
+
+- bytes do CSV original enviado;
+- candles OHLC normalizados;
+- configurações efetivas do Backtest;
+- arquivos centrais do motor/replays/diagnósticos;
+- painel de Backtest e Pine Strategies dos cinco operacionais;
+- pacote consolidado de evidências.
+
+O `snapshot_id` é derivado do conteúdo desses fingerprints. O horário de criação é apenas
+metadado e não altera o identificador, permitindo reproduzir a mesma execução com o mesmo ID.
+
+O snapshot registra separadamente:
+
+- `raw_csv_sha256`;
+- `normalized_data_sha256`;
+- `settings_sha256`;
+- `code_sha256`;
+- `evidence_sha256`.
+
+Isso permite diferenciar, por exemplo, um CSV que mudou apenas de formatação de uma alteração
+real nos dados normalizados.
+
+### Comparação de snapshots
+
+A aba Backtest ganhou o bloco **Comparar dois snapshots salvos**.
+
+Dois snapshots JSON podem ser enviados para detectar de forma explícita se mudou:
+
+- CSV original;
+- dados normalizados;
+- configurações;
+- código;
+- evidências históricas.
+
+Quando as configurações mudam, o diff mostra cada chave com valor anterior e posterior.
+Quando as evidências mudam, o diff mostra deltas descritivos de:
+
+- trades;
+- expectativa em R;
+- Net R;
+- Drawdown máximo.
+
+Os deltas não recebem rótulo de melhora/piora e não promovem nenhum operacional.
+
+### Exportações
+
+Após o comparador dos cinco operacionais, a tela agora oferece:
+
+- `atlasquant_snapshot_*.json` com a execução reproduzível;
+- `atlasquant_snapshot_diff.json` ao comparar duas execuções salvas.
+
+O schema do snapshot é `ATLASQUANT_BACKTEST_SNAPSHOT_V1`.
+
+**Regra preservada:** fingerprint/diff são ferramentas de auditoria. Não alteram Gate,
+Safety Core, readiness, parâmetros, Runtime ou macro/Fed.
+
+Próximo passo seguro: adicionar persistência opcional de histórico de snapshots/execuções e
+uma tabela de mudanças entre versões, mantendo a gravação fora de dados operacionais de Runtime.
