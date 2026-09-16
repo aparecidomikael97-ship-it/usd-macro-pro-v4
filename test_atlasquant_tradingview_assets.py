@@ -5,12 +5,14 @@ from atlasquant_backtest_panel import (
     load_tradingview_pine_asset,
     load_tradingview_fvg_pine_asset,
     load_tradingview_ote_pine_asset,
+    load_tradingview_crt_pine_asset,
 )
 
 ROOT=Path(__file__).resolve().parent
 PINE=ROOT/"tradingview"/"atlasquant_bos_choch_ob_strategy_v1.pine"
 FVG_PINE=ROOT/"tradingview"/"atlasquant_fvg_strategy_v1.pine"
 OTE_PINE=ROOT/"tradingview"/"atlasquant_ote_strategy_v1.pine"
+CRT_PINE=ROOT/"tradingview"/"atlasquant_crt_strategy_v1.pine"
 
 
 class TradingViewAssetsTests(unittest.TestCase):
@@ -90,6 +92,22 @@ class TradingViewAssetsTests(unittest.TestCase):
         self.assertNotIn("lookahead_on",low)
         self.assertNotIn("barmerge.lookahead",low)
         self.assertEqual(load_tradingview_ote_pine_asset(),text)
+
+    def test_crt_pine_is_separate_strategy_and_safe_contract(self):
+        text=CRT_PINE.read_text(encoding="utf-8")
+        low=text.lower()
+        self.assertIn("AtlasQuant CRT Research V1",text)
+        self.assertIn("buyRaid",text)
+        self.assertIn("buyDelivery",text)
+        self.assertIn("sellRaid",text)
+        self.assertIn("sellDelivery",text)
+        self.assertIn("strategy.entry",text)
+        self.assertIn("strategy.exit",text)
+        self.assertIn("process_orders_on_close=false",text.replace(" ",""))
+        self.assertNotIn("request.security",low)
+        self.assertNotIn("lookahead_on",low)
+        self.assertNotIn("barmerge.lookahead",low)
+        self.assertEqual(load_tradingview_crt_pine_asset(),text)
 
 
 if __name__=="__main__":
