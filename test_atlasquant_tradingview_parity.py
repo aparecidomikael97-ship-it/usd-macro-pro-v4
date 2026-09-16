@@ -9,7 +9,7 @@ class TradingViewParityTests(unittest.TestCase):
         failed=[x for x in report["checks"] if not x["ok"]]
         self.assertEqual(failed,[],msg=str(failed))
         self.assertEqual(report["status"],"OK")
-        self.assertGreaterEqual(report["passed"],30)
+        self.assertGreaterEqual(report["passed"],40)
 
     def test_limitations_are_explicit(self):
         report=validate_tradingview_parity()
