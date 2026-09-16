@@ -488,3 +488,60 @@ Runtime ou decisões macro/Fed.
 Próximo passo seguro: iniciar CRT como quarto operacional somente com definição objetiva de
 range/sweep/reclaim e manter estatística totalmente separada; AMD/Power of Three vem depois,
 por exigir mais estados e validação temporal.
+
+
+## 16/09/2026 UTC — CRT como quarto operacional independente
+
+Estado verificado:
+
+- DEV testada em `9705c7b8d04c4df3269b2bc54a219bf442edab92`.
+- Quality run `35101892468`: compile gate verde, **564 testes executados, 564 OK**.
+- Runtime permanece em `7a2ad3e53055fb1ef6091c39442c4c0f5212c3c1`.
+- Main observada em `ad2763827bcdd0822efad7f04a0286a5a91cd8af`; mudou fora desta etapa e não foi alterada.
+
+### Replay CRT Python
+
+Foi criado `atlasquant_crt_replay.py`, separado dos demais operacionais.
+
+Regra técnica objetiva, alinhada ao detector CRT já existente:
+
+- candle 1 = anchor range;
+- BUY: candle 2 varre abaixo do anchor low e fecha de volta acima; candle 3 fecha acima do candle 2 e acima do midpoint;
+- SELL: candle 2 varre acima do anchor high e fecha de volta abaixo; candle 3 fecha abaixo do candle 2 e abaixo do midpoint;
+- entrada de pesquisa = fechamento do candle de delivery;
+- stop = extremo da varredura/anchor, com buffer ATR opcional;
+- alvo estrutural = lado oposto do anchor range;
+- filtro opcional de RR mínimo;
+- execução continua começando somente após o candle do sinal.
+
+### Pine Strategy CRT
+
+Foi criado `tradingview/atlasquant_crt_strategy_v1.pine`:
+
+- Strategy Tester independente;
+- regras BUY/SELL de raid/reclaim + delivery;
+- stop buffer ATR;
+- RR mínimo;
+- validade padrão da ordem pendente em 8 candles;
+- filtros de lado e sessão;
+- `process_orders_on_close=false`;
+- sem série externa e sem primitivas conhecidas de lookahead.
+
+### UI / paridade / testes
+
+A aba Backtest agora possui quarto bloco automático exclusivo para CRT, Pine próprio, sinais
+exportáveis e ledger separado.
+
+O contrato TradingView ↔ Python foi ampliado para verificar defaults e fórmulas centrais do CRT:
+stop buffer, RR mínimo, warmup, raid/reclaim BUY/SELL, delivery BUY/SELL, entrada no delivery close
+e alvos nas bordas opostas do anchor.
+
+Novos testes cobrem BUY, SELL, raid sem reclaim, delivery sem confirmação, filtro RR, parâmetros
+inválidos e integração com o backtester genérico.
+
+**Regra preservada:** CRT continua pesquisa técnica independente e não altera Gate, Safety Core,
+pesos, Runtime ou contexto macro/Fed.
+
+Próximo passo seguro: AMD/Power of Three em modo de pesquisa separado, começando por uma máquina
+de estados Accumulation → Manipulation → Distribution com testes de sequência temporal antes de
+qualquer Pine ou influência no Gate.
