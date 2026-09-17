@@ -1,0 +1,76 @@
+name: AtlasQuant - Production Health
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/production-health.yml"
+  schedule:
+    - cron: "23 */2 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlasquant-production-health
+  cancel-in-progress: true
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      APP_URL: "https://atlasquant-private.onrender.com"
+    steps:
+      - name: Check Streamlit health endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp)"
+          code="000"
+          for attempt in 1 2 3 4; do
+            code=$(curl -L -sS \
+              --connect-timeout 20 \
+              --max-time 180 \
+              -o "$tmp" \
+              -w "%{http_code}" \
+              "$APP_URL/_stcore/health" || true)
+            echo "health attempt=$attempt http=$code"
+            if [ "$code" = "200" ]; then
+              break
+            fi
+            sleep 20
+          done
+          test "$code" = "200"
+          test -s "$tmp"
+          echo "Streamlit health endpoint: HTTP 200" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Check production root page
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp)"
+          code=$(curl -L -sS \
+            --connect-timeout 20 \
+            --max-time 180 \
+            -o "$tmp" \
+            -w "%{http_code}" \
+            "$APP_URL/" || true)
+          echo "root http=$code"
+          test "$code" = "200"
+          test -s "$tmp"
+          bytes=$(wc -c < "$tmp" | tr -d ' ')
+          echo "Production root: HTTP 200 (${bytes} bytes)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Record production health summary
+        shell: bash
+        run: |
+          {
+            echo "## AtlasQuant production health"
+            echo ""
+            echo "- URL: $APP_URL"
+            echo "- Streamlit health: OK"
+            echo "- Root page: OK"
+            echo "- Checked at UTC: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          } >> "$GITHUB_STEP_SUMMARY"
