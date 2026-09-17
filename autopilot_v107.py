@@ -281,7 +281,7 @@ def _td_is_minute_limit(message: str) -> bool:
     low = (message or "").lower()
     minute_markers = (
         "per minute", "minute limit", "requests per minute",
-        "credits per minute", "rate limit per minute", "rpm",
+        "credits per minute", "rate limit per minute", "current minute", "rpm", 
     )
     return any(m in low for m in minute_markers)
 
