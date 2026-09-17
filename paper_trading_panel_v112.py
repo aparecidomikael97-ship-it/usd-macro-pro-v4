@@ -256,7 +256,7 @@ def render_paper_trading_v112() -> None:
                 "Bloqueios": " | ".join(hard + soft) if (hard or soft) else "—",
             })
         st.markdown("#### Checklist da última rodada")
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
     by_pair = dict(summary.get("by_pair", {}) or {})
     if by_pair:
@@ -273,7 +273,7 @@ def render_paper_trading_v112() -> None:
                 "Média R": x.get("avg_r", 0),
             })
         st.markdown("#### Desempenho por par")
-        st.dataframe(pd.DataFrame(perf), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(perf), width="stretch", hide_index=True)
 
     st.markdown("#### Diário automático")
     if trades.empty:
@@ -288,14 +288,14 @@ def render_paper_trading_v112() -> None:
                 "realized_r", "mfe_r", "mae_r", "bars_held", "exit_reason", "checklist_note",
             ] if c in trades.columns
         ]
-        st.dataframe(trades[cols].tail(100).iloc[::-1], use_container_width=True, hide_index=True)
+        st.dataframe(trades[cols].tail(100).iloc[::-1], width="stretch", hide_index=True)
         if csv_raw is not None:
             st.download_button(
                 "⬇️ Baixar diário Paper Trading (CSV)",
                 data=csv_raw,
                 file_name="AtlasQuant_Paper_Trading_V11_2.csv",
                 mime="text/csv",
-                use_container_width=True,
+                width="stretch",
             )
 
     with st.expander("Como o teste funciona"):
