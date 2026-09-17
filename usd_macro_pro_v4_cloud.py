@@ -7528,11 +7528,11 @@ import json
 _SCANNER_GH_PATH_V934 = "dados/scanner_tecnico_v934.json"
 
 def _gh_cfg_v934():
-    token = st.secrets.get("GITHUB_TOKEN_HISTORICO", os.getenv("GITHUB_TOKEN_HISTORICO", ""))
-    repo = st.secrets.get("GITHUB_REPO_HISTORICO", os.getenv("GITHUB_REPO_HISTORICO", ""))
+    token = _config_value("GITHUB_TOKEN_HISTORICO")
+    repo = _config_value("GITHUB_REPO_HISTORICO")
     branch = resolve_runtime_branch(
-        st.secrets.get("GITHUB_DATA_BRANCH", os.getenv("GITHUB_DATA_BRANCH", "")),
-        st.secrets.get("GITHUB_BRANCH_HISTORICO", os.getenv("GITHUB_BRANCH_HISTORICO", "")),
+        _config_value("GITHUB_DATA_BRANCH"),
+        _config_value("GITHUB_BRANCH_HISTORICO"),
     )
     return str(token), str(repo), str(branch)
 
