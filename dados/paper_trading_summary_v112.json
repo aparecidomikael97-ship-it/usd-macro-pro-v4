@@ -14,7 +14,7 @@
   "by_pair": {},
   "last_cycle": {
     "version": "V11.2_PAPER_TRADING",
-    "ran_at": "2026-09-17T19:45:49.790228+00:00",
+    "ran_at": "2026-09-17T20:22:36.271125+00:00",
     "pending_created": 0,
     "entries_opened": 0,
     "trades_closed": 0,
@@ -26,7 +26,7 @@
         "state": "🔴 BLOQUEADO",
         "hard_blocks": [
           "Dados técnicos insuficientes (0/100)",
-          "Técnica desatualizada (439 min)"
+          "Técnica desatualizada (476 min)"
         ],
         "soft_blocks": [
           "ICT incompleto (33/100)",
@@ -40,7 +40,7 @@
         "state": "🔴 BLOQUEADO",
         "hard_blocks": [
           "Dados técnicos insuficientes (0/100)",
-          "Técnica desatualizada (439 min)"
+          "Técnica desatualizada (476 min)"
         ],
         "soft_blocks": [
           "Gate ainda não liberou execução",
@@ -54,7 +54,7 @@
         "state": "🔴 BLOQUEADO",
         "hard_blocks": [
           "Dados técnicos insuficientes (0/100)",
-          "Técnica desatualizada (439 min)"
+          "Técnica desatualizada (476 min)"
         ],
         "soft_blocks": [
           "Gate ainda não liberou execução",
@@ -68,7 +68,7 @@
         "state": "🔴 BLOQUEADO",
         "hard_blocks": [
           "Dados técnicos insuficientes (0/100)",
-          "Técnica desatualizada (414 min)"
+          "Técnica desatualizada (451 min)"
         ],
         "soft_blocks": [
           "Gate ainda não liberou execução",
@@ -83,7 +83,7 @@
         "state": "🔴 BLOQUEADO",
         "hard_blocks": [
           "Dados técnicos insuficientes (0/100)",
-          "Técnica desatualizada (414 min)"
+          "Técnica desatualizada (451 min)"
         ],
         "soft_blocks": [
           "Gate ainda não liberou execução",
@@ -99,7 +99,7 @@
         "state": "⚪ AGUARDAR DIREÇÃO",
         "hard_blocks": [
           "Dados técnicos insuficientes (0/100)",
-          "Técnica desatualizada (414 min)"
+          "Técnica desatualizada (451 min)"
         ],
         "soft_blocks": [
           "ICT incompleto (0/100)",
@@ -113,7 +113,7 @@
         "state": "🔴 BLOQUEADO",
         "hard_blocks": [
           "Dados técnicos insuficientes (0/100)",
-          "Técnica desatualizada (414 min)",
+          "Técnica desatualizada (451 min)",
           "ADR14 muito esticado (136%)"
         ],
         "soft_blocks": [
@@ -136,6 +136,31 @@
     "avg_r": 0.0,
     "profit_factor_r": null
   },
+  "friction_v116": {
+    "version": "V11.6_PAPER_FRICTION",
+    "closed_costed": 0,
+    "gross_r": 0.0,
+    "friction_r": 0.0,
+    "net_r": 0.0,
+    "avg_net_r": 0.0,
+    "profit_factor_net_r": null,
+    "assumptions": {
+      "spread_cost_r_per_closed_trade": 0.04,
+      "slippage_cost_r_per_closed_trade": 0.02,
+      "total_friction_r_per_closed_trade": 0.06,
+      "model": "fixed conservative research friction; not broker-specific"
+    },
+    "safety": {
+      "real_orders": false,
+      "broker_connection": false,
+      "changes_signal": false,
+      "changes_gate": false,
+      "auto_strategy_selection": false
+    }
+  },
+  "gross_r_before_friction": 0.0,
+  "friction_r": 0.0,
+  "net_r_after_friction": 0.0,
   "safety": {
     "real_orders": false,
     "broker_connection": false,
@@ -144,6 +169,9 @@
     "stop_model": "1.0 ATR M15 pré-entrada",
     "target_model": "2R",
     "same_candle_stop_and_target": "LOSS conservador",
-    "max_hold": "96 candles M15 / 24h"
+    "max_hold": "96 candles M15 / 24h",
+    "friction_model": "V11.6 fixed conservative research friction",
+    "friction_changes_signal": false,
+    "friction_changes_result_classification": false
   }
 }
