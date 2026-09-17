@@ -23,11 +23,11 @@ def _cfg():
 
 def _load_status() -> tuple[dict[str,Any],str]:
     token,repo,branch=_cfg()
-    if not token or not repo: return {},"Persistência GitHub não configurada."
+    if not repo: return {},"Persistência GitHub não configurada."
     try:
         r=requests.get(
             f"https://api.github.com/repos/{repo}/contents/{STATUS_PATH}",
-            headers={"Authorization":f"Bearer {token}","Accept":"application/vnd.github+json"},
+            headers=({"Authorization":f"Bearer {token}","Accept":"application/vnd.github+json"} if token else {"Accept":"application/vnd.github+json"}),
             params={"ref":branch},timeout=15
         )
         if r.status_code==404: return {},"Autopilot ainda não executou."
