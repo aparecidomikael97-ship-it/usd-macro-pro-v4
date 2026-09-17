@@ -214,10 +214,18 @@ def render_autopilot_v107():
 
     st.divider()
     try:
-        from atlasquant_forward_validation_v113 import render_forward_validation_v113
-        render_forward_validation_v113()
+        from atlasquant_paper_friction_panel_v116 import render_paper_friction_v116
+        render_paper_friction_v116()
     except Exception as exc:
-        st.warning("Backtest × Paper Trading V11.3 indisponível neste carregamento.")
+        st.warning("Custos e resultado líquido V11.6 indisponíveis neste carregamento.")
+        st.caption(f"{type(exc).__name__}: {exc}")
+
+    st.divider()
+    try:
+        from atlasquant_forward_validation_v116 import render_forward_validation_v116
+        render_forward_validation_v116()
+    except Exception as exc:
+        st.warning("Backtest × Paper Trading V11.6 indisponível neste carregamento.")
         st.caption(f"{type(exc).__name__}: {exc}")
 
     st.divider()
