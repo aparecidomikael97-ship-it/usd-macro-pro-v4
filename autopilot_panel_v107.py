@@ -211,3 +211,11 @@ def render_autopilot_v107():
     except Exception as exc:
         st.warning("Paper Trading V11.2 indisponível neste carregamento.")
         st.caption(f"{type(exc).__name__}: {exc}")
+
+    st.divider()
+    try:
+        from atlasquant_forward_validation_v113 import render_forward_validation_v113
+        render_forward_validation_v113()
+    except Exception as exc:
+        st.warning("Backtest × Paper Trading V11.3 indisponível neste carregamento.")
+        st.caption(f"{type(exc).__name__}: {exc}")
