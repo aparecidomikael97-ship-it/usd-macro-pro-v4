@@ -240,16 +240,27 @@ SENSIBILIDADE_FED_PADRAO = {
     "BRL": -0.60,
 }
 
-CHAVE_FRED = st.secrets.get("CHAVE_FRED", os.getenv("CHAVE_FRED", ""))
-CHAVE_NEWSAPI = st.secrets.get("CHAVE_NEWSAPI", os.getenv("CHAVE_NEWSAPI", ""))
-CHAVE_EODHD = st.secrets.get("CHAVE_EODHD", os.getenv("CHAVE_EODHD", ""))
-CHAVE_TWELVE_DATA = st.secrets.get("CHAVE_TWELVE_DATA", os.getenv("CHAVE_TWELVE_DATA", ""))
+def _config_value(nome: str, padrao: str = "") -> str:
+    valor_env = os.getenv(nome)
+    if valor_env is not None:
+        return valor_env
+    try:
+        return st.secrets.get(nome, padrao)
+    except Exception:
+        return padrao
+
+
+CHAVE_FRED = _config_value("CHAVE_FRED")
+CHAVE_NEWSAPI = _config_value("CHAVE_NEWSAPI")
+CHAVE_EODHD = _config_value("CHAVE_EODHD")
+CHAVE_TWELVE_DATA = _config_value("CHAVE_TWELVE_DATA")
 
 _ATLASQUANT_ENV_EXPLICIT = str(
-    st.secrets.get("ATLASQUANT_ENV", os.getenv("ATLASQUANT_ENV", ""))
+    _config_value("ATLASQUANT_ENV")
 ).strip().upper()
+
 _ATLASQUANT_DATA_BRANCH = str(
-    st.secrets.get("GITHUB_DATA_BRANCH", os.getenv("GITHUB_DATA_BRANCH", ""))
+    _config_value("GITHUB_DATA_BRANCH")
 ).strip()
 if _ATLASQUANT_ENV_EXPLICIT:
     ATLASQUANT_ENVIRONMENT = _ATLASQUANT_ENV_EXPLICIT
