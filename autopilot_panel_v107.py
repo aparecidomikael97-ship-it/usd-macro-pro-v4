@@ -9,17 +9,23 @@ from atlasquant_runtime_store import resolve_runtime_branch
 
 STATUS_PATH="dados/autopilot_status_v107.json"
 
-def _cfg():
+def _cfg_value(name: str, default: str = "") -> str:
+    valor_env = os.getenv(name)
+    if valor_env is not None and str(valor_env).strip():
+        return str(valor_env)
     try:
-        token=st.secrets.get("GITHUB_TOKEN_HISTORICO", os.getenv("GITHUB_TOKEN_HISTORICO",""))
-        repo=st.secrets.get("GITHUB_REPO_HISTORICO", os.getenv("GITHUB_REPO_HISTORICO",""))
-        branch=resolve_runtime_branch(
-            st.secrets.get("GITHUB_DATA_BRANCH", os.getenv("GITHUB_DATA_BRANCH","")),
-            st.secrets.get("GITHUB_BRANCH_HISTORICO", os.getenv("GITHUB_BRANCH_HISTORICO","")),
-        )
+        return str(st.secrets.get(name, default))
     except Exception:
-        token,repo,branch="","",resolve_runtime_branch()
-    return str(token),str(repo),str(branch)
+        return default
+
+def _cfg():
+    token = _cfg_value("GITHUB_TOKEN_HISTORICO")
+    repo = _cfg_value("GITHUB_REPO_HISTORICO")
+    branch = resolve_runtime_branch(
+        _cfg_value("GITHUB_DATA_BRANCH"),
+        _cfg_value("GITHUB_BRANCH_HISTORICO"),
+    )
+    return token, repo, branch
 
 def _load_status() -> tuple[dict[str,Any],str]:
     token,repo,branch=_cfg()
