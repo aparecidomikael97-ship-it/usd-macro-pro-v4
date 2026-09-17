@@ -3,7 +3,7 @@ name: Quality tests
 on:
   workflow_dispatch:
   push:
-    branches: [main, atlasquant-dev, atlasquant-runtime]
+    branches: [main, atlasquant-dev, atlasquant-runtime, atlasquant-private-deploy]
     paths:
       - "*.py"
       - "tradingview/**"
@@ -102,6 +102,7 @@ jobs:
             test_atlasquant_regime_detector.py \
             test_atlasquant_next_event.py \
             test_atlasquant_performance_lab.py \
+            test_atlasquant_forward_validation_v113.py \
             test_atlasquant_stability_lab.py \
             test_atlasquant_coverage_funnel.py \
             test_atlasquant_expansion_budget.py \
