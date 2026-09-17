@@ -232,6 +232,7 @@ def run_headless_app() -> tuple[bool, str]:
             "GITHUB_TOKEN_HISTORICO",
             "GITHUB_REPO_HISTORICO",
             "GITHUB_BRANCH_HISTORICO",
+            "GITHUB_DATA_BRANCH",
         ]
         injected = 0
         for key in secret_keys:
