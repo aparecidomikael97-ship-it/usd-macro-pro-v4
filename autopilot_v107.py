@@ -225,8 +225,7 @@ def run_headless_app() -> tuple[bool, str]:
         at = AppTest.from_file("usd_macro_pro_v4_cloud.py", default_timeout=180)
 
         secret_keys = [
-            "CHAVE_FRED",
-            "CHAVE_TWELVE_DATA",
+            "CHAVE_FRED"
             "CHAVE_NEWSAPI",
             "CHAVE_EODHD",
             "GITHUB_TOKEN_HISTORICO",
@@ -234,14 +233,19 @@ def run_headless_app() -> tuple[bool, str]:
             "GITHUB_BRANCH_HISTORICO",
             "GITHUB_DATA_BRANCH",
         ]
-        injected = 0
+        injected = 
         for key in secret_keys:
             value = os.getenv(key, "")
             if value:
                 at.secrets[key] = value
                 injected += 1
 
-        at.run(timeout=180)
+        td_env = os.environ.pop("CHAVE_TWELVE_DATA", None)
+        try:
+            at.run(timeout=180)
+        finally:
+            if td_env is not None:
+                os.environ["CHAVE_TWELVE_DATA"] = td_env
 
         if at.exception:
             msgs = []
