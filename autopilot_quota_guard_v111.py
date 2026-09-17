@@ -7,8 +7,6 @@ novas chamadas ao provedor.
 """
 from __future__ import annotations
 
-from typing import Any
-
 import pandas as pd
 
 import autopilot_v107 as base
@@ -18,6 +16,7 @@ import autopilot_v107 as base
 M15_DERIVATION_OUTPUTSIZE = 1200
 
 _ORIGINAL_TD_FETCH = base.td_fetch
+_ORIGINAL_STATUS_SUMMARY = base.status_summary
 _M15_SOURCE_CACHE: dict[str, pd.DataFrame] = {}
 
 
@@ -71,10 +70,24 @@ def quota_saver_td_fetch(pair: str, interval: str, outputsize: int) -> tuple[pd.
     return frame, err
 
 
+def quota_saver_status_summary(*args, **kwargs):
+    """Acrescenta evidência observável de que a camada V11.1 está ativa."""
+    status = _ORIGINAL_STATUS_SUMMARY(*args, **kwargs)
+    if isinstance(status, dict):
+        status["twelve_quota_saver_v111"] = {
+            "enabled": True,
+            "m15_source_pairs_this_run": len(_M15_SOURCE_CACHE),
+            "derived_timeframes": ["1h", "4h"],
+            "m15_outputsize": M15_DERIVATION_OUTPUTSIZE,
+        }
+    return status
+
+
 def install_quota_guard() -> None:
     """Instala a camada de economia apenas no processo atual."""
     _M15_SOURCE_CACHE.clear()
     base.td_fetch = quota_saver_td_fetch
+    base.status_summary = quota_saver_status_summary
 
 
 def main() -> int:
