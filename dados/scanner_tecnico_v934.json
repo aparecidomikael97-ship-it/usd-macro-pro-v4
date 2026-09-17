@@ -1,7 +1,7 @@
 {
   "versao": "V11.0_INSTITUTIONAL_AUTOPILOT",
   "lote": 3,
-  "ultimo_processamento_ts": 1789606670.962246,
+  "ultimo_processamento_ts": 1789608205.3146346,
   "resultados": {
     "USD/CHF": {
       "tecnico": {
@@ -18,25 +18,28 @@
           "texto": "H1 pullback confirmado."
         },
         "m15": {
-          "status": "🔴 SEM GATILHO",
-          "score": 25,
-          "texto": "M15 sem gatilho."
+          "status": "🟢 GATILHO",
+          "score": 100,
+          "texto": "M15 gatilho confirmado."
         },
         "ict": {
           "amd": {
-            "status": "⚪ AMD EM ACUMULAÇÃO",
-            "score": 40,
-            "phase": "ACUMULAÇÃO",
-            "acc_high": 0.82759,
-            "acc_low": 0.8229,
-            "target": 0.82759,
+            "status": "🟢 AMD / PO3 EM DISTRIBUIÇÃO",
+            "score": 100,
+            "phase": "DISTRIBUIÇÃO",
+            "acc_high": 0.82628,
+            "acc_low": 0.82513,
+            "target": 0.82628,
             "manipulation_side": "SSL",
-            "text": "Range de acumulação identificado; manipulação ainda não confirmou."
+            "text": "Acumulação → sweep SSL → distribuição no lado macro detectados no M15."
           },
           "fvg": {
-            "status": "⚪ FVG INVALIDADO",
-            "score": 20,
-            "text": "O FVG recente foi totalmente atravessado; revisita posterior não reativa a zona antiga."
+            "status": "🟡 FVG PRESENTE",
+            "score": 65,
+            "zone_low": 0.8256,
+            "zone_high": 0.82577,
+            "price": 0.82605,
+            "text": "Há FVG M15 ainda válido no lado macro; aguarde retorno/continuação conforme o plano."
           },
           "crt": {
             "status": "⚪ SEM CRT",
@@ -61,20 +64,24 @@
             "price": 0.82537,
             "text": "Retração atual 23.0% está fora da zona OTE 62–79%."
           },
-          "readiness": 32.8,
+          "readiness": 57.5,
           "label": "⚪ ICT AINDA INCOMPLETO",
           "side": "BUY",
-          "updated_at": "2026-09-17T00:54:42.707383+00:00"
+          "updated_at": "2026-09-17T01:23:24.409053+00:00"
         },
         "institutional": {
           "pair": "USD/CHF",
           "side": "BUY",
-          "readiness": 52.0,
-          "label": "⚪ FLUXO INCOMPLETO",
+          "readiness": 60.1,
+          "label": "🟡 CONTEXTO INSTITUCIONAL PARCIAL",
           "displacement": {
-            "status": "⚪ SEM DISPLACEMENT",
-            "score": 25,
-            "text": "Não há candle recente com expansão/fechamento forte no lado macro."
+            "status": "🟡 DISPLACEMENT MODERADO",
+            "score": 70.0,
+            "body_atr": 0.92,
+            "range_atr": 1.0,
+            "candle_time": "2026-09-17T00:45:00+00:00",
+            "close": 0.82579,
+            "text": "Candle de expansão com corpo 0.92×ATR e range 1.00×ATR no lado macro."
           },
           "mss": {
             "status": "🟡 MSS PENDENTE",
@@ -104,12 +111,12 @@
             "score": 80,
             "target_type": "BSL",
             "target_price": 0.82759,
-            "distance_atr": 1.35,
+            "distance_atr": 0.95,
             "eqh_count": 13,
             "eql_count": 4,
             "external_high": 0.82759,
             "external_low": 0.81541,
-            "text": "Próximo draw BSL a 1.35×ATR."
+            "text": "Próximo draw BSL a 0.95×ATR."
           },
           "session": {
             "status": "🟢 JUDAS / MANIPULAÇÃO COERENTE",
@@ -129,25 +136,11 @@
             "invalidated": false,
             "text": "Zona de origem segue válida; aguarde retorno/reação se fizer parte do plano."
           },
-          "updated_at": "2026-09-17T00:57:50.842204+00:00",
+          "updated_at": "2026-09-17T01:23:25.265960+00:00",
           "algorithm_note": "Score de prontidão observacional; não é probabilidade de lucro."
         },
         "cache_v110": {
           "m15": [
-            {
-              "datetime": "2026-09-15 16:45:00+00:00",
-              "open": 0.819,
-              "high": 0.819,
-              "low": 0.81855,
-              "close": 0.81864
-            },
-            {
-              "datetime": "2026-09-15 17:00:00+00:00",
-              "open": 0.81862,
-              "high": 0.81887,
-              "low": 0.81852,
-              "close": 0.81887
-            },
             {
               "datetime": "2026-09-15 17:15:00+00:00",
               "open": 0.81886,
@@ -1029,6 +1022,20 @@
               "high": 0.8256,
               "low": 0.82525,
               "close": 0.82541
+            },
+            {
+              "datetime": "2026-09-17 00:45:00+00:00",
+              "open": 0.82543,
+              "high": 0.82579,
+              "low": 0.8254,
+              "close": 0.82579
+            },
+            {
+              "datetime": "2026-09-17 01:00:00+00:00",
+              "open": 0.82577,
+              "high": 0.82611,
+              "low": 0.82577,
+              "close": 0.82605
             }
           ],
           "h1": [
@@ -1594,20 +1601,20 @@
             }
           ]
         },
-        "preco_m15": 0.82541,
-        "ultima_atualizacao": "2026-09-17T00:30:00+00:00",
+        "preco_m15": 0.82605,
+        "ultima_atualizacao": "2026-09-17T01:00:00+00:00",
         "motivo": "",
         "erro": "",
         "diagnostico": ""
       },
-      "decisao": "🟡 AGUARDAR GATILHO",
-      "texto": "H4/H1 alinhados; aguardar M15.",
-      "processado_em": 1789606608.3870718,
+      "decisao": "🟢 CONFIGURAÇÃO COMPLETA",
+      "texto": "Macro + H4 + H1 + M15 alinhados.",
+      "processado_em": 1789608204.7872427,
       "tentativa_v1022": true,
       "versao_tentativa": "V11.0_INSTITUTIONAL_AUTOPILOT",
       "macro_direction": "🟢 COMPRA USD/CHF",
       "tentativa_v107": true,
-      "m15_fetched_at": "2026-09-17T00:54:42.707383+00:00",
+      "m15_fetched_at": "2026-09-17T01:23:24.409053+00:00",
       "h1_fetched_at": "2026-09-17T00:54:42.707383+00:00",
       "h4_fetched_at": "2026-09-17T00:54:42.707383+00:00"
     },
@@ -1626,9 +1633,9 @@
           "texto": "H1 pullback confirmado."
         },
         "m15": {
-          "status": "🟡 AGUARDAR GATILHO",
-          "score": 65,
-          "texto": "M15 momentum alinhado."
+          "status": "🟢 GATILHO",
+          "score": 100,
+          "texto": "M15 gatilho confirmado."
         },
         "ict": {
           "amd": {
@@ -1636,7 +1643,7 @@
             "score": 100,
             "phase": "DISTRIBUIÇÃO",
             "acc_high": 1.39927,
-            "acc_low": 1.39852,
+            "acc_low": 1.39863,
             "target": 1.39927,
             "manipulation_side": "SSL",
             "text": "Acumulação → sweep SSL → distribuição no lado macro detectados no M15."
@@ -1672,21 +1679,17 @@
           "readiness": 52.2,
           "label": "⚪ ICT AINDA INCOMPLETO",
           "side": "BUY",
-          "updated_at": "2026-09-17T00:54:42.707383+00:00"
+          "updated_at": "2026-09-17T01:23:24.409053+00:00"
         },
         "institutional": {
           "pair": "USD/CAD",
           "side": "BUY",
-          "readiness": 53.2,
-          "label": "🟡 CONTEXTO INSTITUCIONAL PARCIAL",
+          "readiness": 47.0,
+          "label": "⚪ FLUXO INCOMPLETO",
           "displacement": {
-            "status": "⚪ IMPULSO FRACO",
-            "score": 42.6,
-            "body_atr": 0.2,
-            "range_atr": 0.6,
-            "candle_time": "2026-09-16T22:45:00+00:00",
-            "close": 1.39885,
-            "text": "Candle de expansão com corpo 0.20×ATR e range 0.60×ATR no lado macro."
+            "status": "⚪ SEM DISPLACEMENT",
+            "score": 25,
+            "text": "Não há candle recente com expansão/fechamento forte no lado macro."
           },
           "mss": {
             "status": "🟢 MSS CONFIRMADO",
@@ -1714,16 +1717,16 @@
             "text": "Preço em prêmio (90.0% do dealing range H1)."
           },
           "liquidity": {
-            "status": "🟡 LIQUIDEZ PARCIAL",
-            "score": 60,
+            "status": "⚪ SEM ALVO CLARO",
+            "score": 35,
             "target_type": "BSL",
-            "target_price": 1.3995,
-            "distance_atr": 0.37,
+            "target_price": null,
+            "distance_atr": null,
             "eqh_count": 1,
             "eql_count": 3,
             "external_high": 1.3995,
             "external_low": 1.38863,
-            "text": "Próximo draw BSL a 0.37×ATR."
+            "text": "Nenhum BSL H1 claro à frente do preço."
           },
           "session": {
             "status": "🔴 MANIPULAÇÃO CONTRÁRIA",
@@ -1741,25 +1744,11 @@
             "invalidated": false,
             "text": "Zona de origem segue válida; aguarde retorno/reação se fizer parte do plano."
           },
-          "updated_at": "2026-09-17T00:57:50.962086+00:00",
+          "updated_at": "2026-09-17T01:23:25.314586+00:00",
           "algorithm_note": "Score de prontidão observacional; não é probabilidade de lucro."
         },
         "cache_v110": {
           "m15": [
-            {
-              "datetime": "2026-09-15 16:45:00+00:00",
-              "open": 1.3914,
-              "high": 1.39143,
-              "low": 1.39114,
-              "close": 1.39118
-            },
-            {
-              "datetime": "2026-09-15 17:00:00+00:00",
-              "open": 1.39116,
-              "high": 1.3914,
-              "low": 1.39098,
-              "close": 1.39138
-            },
             {
               "datetime": "2026-09-15 17:15:00+00:00",
               "open": 1.39135,
@@ -2641,6 +2630,20 @@
               "high": 1.39925,
               "low": 1.39883,
               "close": 1.39906
+            },
+            {
+              "datetime": "2026-09-17 00:45:00+00:00",
+              "open": 1.39906,
+              "high": 1.39948,
+              "low": 1.39901,
+              "close": 1.39932
+            },
+            {
+              "datetime": "2026-09-17 01:00:00+00:00",
+              "open": 1.39933,
+              "high": 1.39982,
+              "low": 1.39925,
+              "close": 1.39962
             }
           ],
           "h1": [
@@ -3206,20 +3209,20 @@
             }
           ]
         },
-        "preco_m15": 1.39906,
-        "ultima_atualizacao": "2026-09-17T00:30:00+00:00",
+        "preco_m15": 1.39962,
+        "ultima_atualizacao": "2026-09-17T01:00:00+00:00",
         "motivo": "",
         "erro": "",
         "diagnostico": ""
       },
-      "decisao": "🟡 AGUARDAR GATILHO",
-      "texto": "H4/H1 alinhados; aguardar M15.",
-      "processado_em": 1789606670.0817976,
+      "decisao": "🟢 CONFIGURAÇÃO COMPLETA",
+      "texto": "Macro + H4 + H1 + M15 alinhados.",
+      "processado_em": 1789608204.950614,
       "tentativa_v1022": true,
       "versao_tentativa": "V11.0_INSTITUTIONAL_AUTOPILOT",
       "macro_direction": "🟢 COMPRA USD/CAD",
       "tentativa_v107": true,
-      "m15_fetched_at": "2026-09-17T00:54:42.707383+00:00",
+      "m15_fetched_at": "2026-09-17T01:23:24.409053+00:00",
       "h1_fetched_at": "2026-09-17T00:54:42.707383+00:00",
       "h4_fetched_at": "2026-09-17T00:54:42.707383+00:00"
     },
@@ -3284,7 +3287,7 @@
           "readiness": 43.2,
           "label": "⚪ ICT AINDA INCOMPLETO",
           "side": "SELL",
-          "updated_at": "2026-09-17T00:54:42.707383+00:00"
+          "updated_at": "2026-09-17T01:23:24.409053+00:00"
         },
         "institutional": {
           "pair": "NZD/USD",
@@ -3353,7 +3356,7 @@
             "invalidated": false,
             "text": "Zona de origem segue válida; aguarde retorno/reação se fizer parte do plano."
           },
-          "updated_at": "2026-09-17T00:57:50.564760+00:00",
+          "updated_at": "2026-09-17T01:23:25.152060+00:00",
           "algorithm_note": "Score de prontidão observacional; não é probabilidade de lucro."
         },
         "cache_v110": {
@@ -4850,25 +4853,28 @@
           "texto": "H1 pullback confirmado."
         },
         "m15": {
-          "status": "🔴 SEM GATILHO",
-          "score": 25,
-          "texto": "M15 sem gatilho."
+          "status": "🟢 GATILHO",
+          "score": 100,
+          "texto": "M15 gatilho confirmado."
         },
         "ict": {
           "amd": {
-            "status": "⚪ AMD EM ACUMULAÇÃO",
-            "score": 40,
-            "phase": "ACUMULAÇÃO",
-            "acc_high": 156.38668,
-            "acc_low": 156.06981,
-            "target": 156.38668,
+            "status": "🟡 AMD EM MANIPULAÇÃO",
+            "score": 70,
+            "phase": "MANIPULAÇÃO",
+            "acc_high": 156.33751,
+            "acc_low": 156.18386,
+            "target": 156.33751,
             "manipulation_side": "SSL",
-            "text": "Range de acumulação identificado; manipulação ainda não confirmou."
+            "text": "A liquidez SSL foi varrida; aguarda expansão/distribuição no lado macro."
           },
           "fvg": {
-            "status": "⚪ FVG INVALIDADO",
-            "score": 20,
-            "text": "O FVG recente foi totalmente atravessado; revisita posterior não reativa a zona antiga."
+            "status": "🟡 FVG PRESENTE",
+            "score": 65,
+            "zone_low": 156.12575,
+            "zone_high": 156.14751,
+            "price": 156.21906,
+            "text": "Há FVG M15 ainda válido no lado macro; aguarde retorno/continuação conforme o plano."
           },
           "crt": {
             "status": "⚪ SEM CRT",
@@ -4893,20 +4899,24 @@
             "price": 156.02553,
             "text": "Retração atual 25.6% está fora da zona OTE 62–79%."
           },
-          "readiness": 32.8,
+          "readiness": 48.5,
           "label": "⚪ ICT AINDA INCOMPLETO",
           "side": "BUY",
-          "updated_at": "2026-09-17T00:54:42.707383+00:00"
+          "updated_at": "2026-09-17T01:23:24.409053+00:00"
         },
         "institutional": {
           "pair": "USD/JPY",
           "side": "BUY",
-          "readiness": 52.0,
-          "label": "⚪ FLUXO INCOMPLETO",
+          "readiness": 65.5,
+          "label": "🟡 CONTEXTO INSTITUCIONAL PARCIAL",
           "displacement": {
-            "status": "⚪ SEM DISPLACEMENT",
-            "score": 25,
-            "text": "Não há candle recente com expansão/fechamento forte no lado macro."
+            "status": "🟢 DISPLACEMENT FORTE",
+            "score": 100.0,
+            "body_atr": 1.39,
+            "range_atr": 2.18,
+            "candle_time": "2026-09-17T00:45:00+00:00",
+            "close": 156.19163,
+            "text": "Candle de expansão com corpo 1.39×ATR e range 2.18×ATR no lado macro."
           },
           "mss": {
             "status": "🟡 MSS PENDENTE",
@@ -4936,12 +4946,12 @@
             "score": 80,
             "target_type": "BSL",
             "target_price": 156.41302,
-            "distance_atr": 1.44,
+            "distance_atr": 0.75,
             "eqh_count": 3,
             "eql_count": 4,
             "external_high": 156.41302,
             "external_low": 153.38261,
-            "text": "Próximo draw BSL a 1.44×ATR."
+            "text": "Próximo draw BSL a 0.75×ATR."
           },
           "session": {
             "status": "🟢 JUDAS / MANIPULAÇÃO COERENTE",
@@ -4961,25 +4971,11 @@
             "invalidated": false,
             "text": "Zona de origem segue válida; aguarde retorno/reação se fizer parte do plano."
           },
-          "updated_at": "2026-09-17T00:57:50.702722+00:00",
+          "updated_at": "2026-09-17T01:23:25.208878+00:00",
           "algorithm_note": "Score de prontidão observacional; não é probabilidade de lucro."
         },
         "cache_v110": {
           "m15": [
-            {
-              "datetime": "2026-09-15 16:45:00+00:00",
-              "open": 155.09814,
-              "high": 155.10545,
-              "low": 155.04409,
-              "close": 155.06981
-            },
-            {
-              "datetime": "2026-09-15 17:00:00+00:00",
-              "open": 155.06697,
-              "high": 155.12589,
-              "low": 155.04257,
-              "close": 155.09199
-            },
             {
               "datetime": "2026-09-15 17:15:00+00:00",
               "open": 155.10683,
@@ -5861,6 +5857,20 @@
               "high": 156.12575,
               "low": 156.02999,
               "close": 156.04109
+            },
+            {
+              "datetime": "2026-09-17 00:45:00+00:00",
+              "open": 156.05172,
+              "high": 156.19825,
+              "low": 155.9794,
+              "close": 156.19163
+            },
+            {
+              "datetime": "2026-09-17 01:00:00+00:00",
+              "open": 156.18263,
+              "high": 156.24375,
+              "low": 156.14751,
+              "close": 156.21906
             }
           ],
           "h1": [
@@ -6426,20 +6436,20 @@
             }
           ]
         },
-        "preco_m15": 156.04109,
-        "ultima_atualizacao": "2026-09-17T00:30:00+00:00",
+        "preco_m15": 156.21906,
+        "ultima_atualizacao": "2026-09-17T01:00:00+00:00",
         "motivo": "",
         "erro": "",
         "diagnostico": ""
       },
-      "decisao": "🟡 AGUARDAR GATILHO",
-      "texto": "H4/H1 alinhados; aguardar M15.",
-      "processado_em": 1789606607.8260705,
+      "decisao": "🟢 CONFIGURAÇÃO COMPLETA",
+      "texto": "Macro + H4 + H1 + M15 alinhados.",
+      "processado_em": 1789608204.6248999,
       "tentativa_v1022": true,
       "versao_tentativa": "V11.0_INSTITUTIONAL_AUTOPILOT",
       "macro_direction": "🟢 COMPRA USD/JPY",
       "tentativa_v107": true,
-      "m15_fetched_at": "2026-09-17T00:54:42.707383+00:00",
+      "m15_fetched_at": "2026-09-17T01:23:24.409053+00:00",
       "h1_fetched_at": "2026-09-17T00:54:42.707383+00:00",
       "h4_fetched_at": "2026-09-17T00:54:42.707383+00:00"
     },
@@ -6504,7 +6514,7 @@
           "readiness": 41.8,
           "label": "⚪ ICT AINDA INCOMPLETO",
           "side": "SELL",
-          "updated_at": "2026-09-17T00:54:42.707383+00:00"
+          "updated_at": "2026-09-17T01:23:24.409053+00:00"
         },
         "institutional": {
           "pair": "EUR/USD",
@@ -6575,7 +6585,7 @@
             "invalidated": false,
             "text": "Zona de origem segue válida; aguarde retorno/reação se fizer parte do plano."
           },
-          "updated_at": "2026-09-17T00:57:50.230516+00:00",
+          "updated_at": "2026-09-17T01:23:25.011792+00:00",
           "algorithm_note": "Score de prontidão observacional; não é probabilidade de lucro."
         },
         "cache_v110": {
@@ -8118,7 +8128,7 @@
           "readiness": 34.2,
           "label": "⚪ ICT AINDA INCOMPLETO",
           "side": "SELL",
-          "updated_at": "2026-09-17T00:54:42.707383+00:00"
+          "updated_at": "2026-09-17T01:23:24.409053+00:00"
         },
         "institutional": {
           "pair": "GBP/USD",
@@ -8187,7 +8197,7 @@
             "invalidated": false,
             "text": "Zona de origem segue válida; aguarde retorno/reação se fizer parte do plano."
           },
-          "updated_at": "2026-09-17T00:57:50.370933+00:00",
+          "updated_at": "2026-09-17T01:23:25.069235+00:00",
           "algorithm_note": "Score de prontidão observacional; não é probabilidade de lucro."
         },
         "cache_v110": {
@@ -9754,7 +9764,7 @@
             "score": 0,
             "text": "Sem H1 suficiente para breaker/mitigation."
           },
-          "updated_at": "2026-09-17T00:57:50.426206+00:00",
+          "updated_at": "2026-09-17T01:23:25.094486+00:00",
           "algorithm_note": "Score de prontidão observacional; não é probabilidade de lucro."
         },
         "cache_v110": {
@@ -11238,7 +11248,7 @@
     }
   },
   "autopilot_v107": {
-    "last_run": "2026-09-17T00:54:42.707383+00:00",
+    "last_run": "2026-09-17T01:23:24.409053+00:00",
     "market_open": true,
     "last_fetches": {
       "EUR/USD": {
@@ -11262,25 +11272,25 @@
         "h4": "2026-09-17T00:54:42.707383+00:00"
       },
       "USD/JPY": {
-        "m15": "2026-09-17T00:54:42.707383+00:00",
+        "m15": "2026-09-17T01:23:24.409053+00:00",
         "h1": "2026-09-17T00:54:42.707383+00:00",
         "h4": "2026-09-17T00:54:42.707383+00:00"
       },
       "USD/CHF": {
-        "m15": "2026-09-17T00:54:42.707383+00:00",
+        "m15": "2026-09-17T01:23:24.409053+00:00",
         "h1": "2026-09-17T00:54:42.707383+00:00",
         "h4": "2026-09-17T00:54:42.707383+00:00"
       },
       "USD/CAD": {
-        "m15": "2026-09-17T00:54:42.707383+00:00",
+        "m15": "2026-09-17T01:23:24.409053+00:00",
         "h1": "2026-09-17T00:54:42.707383+00:00",
         "h4": "2026-09-17T00:54:42.707383+00:00"
       }
     },
-    "twelve_calls_last_run": 21,
+    "twelve_calls_last_run": 3,
     "daily_budget": {
       "day": "2026-09-17",
-      "calls": 22,
+      "calls": 25,
       "limit": 480
     }
   }
