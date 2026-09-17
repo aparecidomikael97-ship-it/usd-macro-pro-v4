@@ -57,6 +57,34 @@ class TestAutopilotQuotaGuardV111(unittest.TestCase):
             [("EUR/USD", "15min", guard.M15_DERIVATION_OUTPUTSIZE)],
         )
 
+    def test_incomplete_h1_bucket_is_discarded(self):
+        source = self._m15_frame(8)
+        # Remove 00:15. The 00:00 H1 bucket is therefore incomplete;
+        # the 01:00 bucket remains complete and must be the only one returned.
+        source = source[source["datetime"] != pd.Timestamp("2026-01-01T00:15:00Z")].reset_index(drop=True)
+
+        def fake_fetch(pair, interval, outputsize):
+            return source.copy(), ""
+
+        guard._ORIGINAL_TD_FETCH = fake_fetch
+        h1, err = guard.quota_saver_td_fetch("EUR/USD", "1h", 100)
+
+        self.assertEqual(err, "")
+        self.assertEqual(len(h1), 1)
+        self.assertEqual(pd.Timestamp(h1.iloc[0]["datetime"]), pd.Timestamp("2026-01-01T01:00:00Z"))
+
+    def test_open_m15_candle_is_not_used_in_derived_bucket(self):
+        source = self._m15_frame(5)
+        # Directly exercise the strict helper with a deterministic clock.
+        derived = guard.derive_from_m15(
+            source,
+            "1h",
+            now_utc="2026-01-01T01:05:00Z",
+        )
+        # 01:00 candle is still open until 01:15, so only 00:00 H1 is valid.
+        self.assertEqual(len(derived), 1)
+        self.assertEqual(pd.Timestamp(derived.iloc[0]["datetime"]), pd.Timestamp("2026-01-01T00:00:00Z"))
+
     def test_d1_still_uses_original_provider_fetch(self):
         calls = []
         source = self._m15_frame(320)
