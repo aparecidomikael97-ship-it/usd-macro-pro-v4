@@ -261,7 +261,7 @@ def render_setup_performance_v114() -> None:
                 ] if col in view.columns
             ]
             st.markdown("#### Estado do componente × resultado prospectivo")
-            st.dataframe(view[keep], use_container_width=True, hide_index=True)
+            st.dataframe(view[keep], width="stretch", hide_index=True)
 
             pair_view = component_pair_frame(audit, selected)
             if not pair_view.empty:
@@ -280,7 +280,7 @@ def render_setup_performance_v114() -> None:
                     "sample_state": "Amostra",
                 })
                 st.markdown("#### Mesmo componente, separado por par")
-                st.dataframe(pair_view, use_container_width=True, hide_index=True)
+                st.dataframe(pair_view, width="stretch", hide_index=True)
 
     st.info(
         "Como ler: cada linha é um estado realmente observado no momento em que o sinal Paper apareceu. "
@@ -301,7 +301,7 @@ def render_setup_performance_v114() -> None:
             data=audit_raw,
             file_name="AtlasQuant_Setup_Audit_V11_4.csv",
             mime="text/csv",
-            use_container_width=True,
+            width="stretch",
         )
     if perf_raw is not None:
         st.download_button(
@@ -309,7 +309,7 @@ def render_setup_performance_v114() -> None:
             data=perf_raw,
             file_name="AtlasQuant_Setup_Performance_V11_4.csv",
             mime="text/csv",
-            use_container_width=True,
+            width="stretch",
         )
 
     errors = [x for x in (audit_err, perf_err) if x]
