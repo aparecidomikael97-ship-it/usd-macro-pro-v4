@@ -1,0 +1,125 @@
+name: AtlasQuant - Production Browser Smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/production-browser-smoke.yml"
+  schedule:
+    - cron: "41 12 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlasquant-production-browser-smoke
+  cancel-in-progress: true
+
+jobs:
+  browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      APP_URL: "https://atlasquant-private.onrender.com"
+    steps:
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install Playwright Chromium
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Open production in desktop and mobile Chromium
+        shell: bash
+        run: |
+          cat > /tmp/atlasquant_browser_smoke.py <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          from playwright.sync_api import sync_playwright
+
+          url = os.environ["APP_URL"]
+          out = Path("browser-smoke")
+          out.mkdir(exist_ok=True)
+
+          profiles = {
+              "desktop": {"viewport": {"width": 1440, "height": 1000}, "is_mobile": False},
+              "mobile": {"viewport": {"width": 390, "height": 844}, "is_mobile": True},
+          }
+          report = {"url": url, "profiles": {}}
+          failures = []
+
+          with sync_playwright() as p:
+              browser = p.chromium.launch(headless=True)
+              for name, cfg in profiles.items():
+                  context = browser.new_context(
+                      viewport=cfg["viewport"],
+                      is_mobile=cfg["is_mobile"],
+                      device_scale_factor=1,
+                  )
+                  page = context.new_page()
+                  response = page.goto(url, wait_until="domcontentloaded", timeout=180_000)
+                  status = response.status if response else None
+                  try:
+                      page.locator('[data-testid="stAppViewContainer"]').wait_for(timeout=90_000)
+                  except Exception:
+                      pass
+                  page.wait_for_timeout(8_000)
+
+                  exception_count = page.locator('[data-testid="stException"]').count()
+                  body_text = page.locator("body").inner_text(timeout=30_000)
+                  screenshot = out / f"{name}.png"
+                  page.screenshot(path=str(screenshot), full_page=False)
+
+                  info = {
+                      "http_status": status,
+                      "title": page.title(),
+                      "body_chars": len(body_text),
+                      "streamlit_container": page.locator('[data-testid="stAppViewContainer"]').count(),
+                      "streamlit_exceptions": exception_count,
+                      "screenshot": str(screenshot),
+                  }
+                  report["profiles"][name] = info
+
+                  if status is None or status >= 400:
+                      failures.append(f"{name}: HTTP {status}")
+                  if len(body_text.strip()) < 20:
+                      failures.append(f"{name}: body vazio/curto")
+                  if exception_count:
+                      failures.append(f"{name}: {exception_count} stException")
+
+                  context.close()
+              browser.close()
+
+          (out / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+          print(json.dumps(report, ensure_ascii=False, indent=2))
+          if failures:
+              raise SystemExit(" | ".join(failures))
+          PY
+          python /tmp/atlasquant_browser_smoke.py
+
+      - name: Browser smoke summary
+        if: always()
+        shell: bash
+        run: |
+          echo "## AtlasQuant browser smoke" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f browser-smoke/report.json ]; then
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat browser-smoke/report.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Relatorio nao foi gerado." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: atlasquant-production-browser-smoke
+          path: browser-smoke/
+          if-no-files-found: warn
+          retention-days: 14
