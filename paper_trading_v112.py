@@ -1,8 +1,8 @@
 """AtlasQuant V11.2 — Paper Trading Engine.
 
-Camada determinística de simulação. Nunca envia ordens reais e nunca conversa
-com corretora. Um sinal simulado só é aceito quando o Decision Integrity está
-EXECUTÁVEL e sem nenhum bloqueio duro ou brando.
+Simulação determinística e auditável. Nunca envia ordens reais e nunca se
+conecta a corretora. Uma operação simulada só nasce quando o Decision
+Integrity está EXECUTÁVEL e sem bloqueios duros ou brandos.
 """
 from __future__ import annotations
 
@@ -157,7 +157,6 @@ def evaluate_pair_checklist(
 ) -> dict[str, Any]:
     now = pd.Timestamp.now(tz="UTC") if now is None else pd.Timestamp(now)
     now = now.tz_localize("UTC") if now.tzinfo is None else now.tz_convert("UTC")
-
     direction = str((input_row or {}).get("Direção", (input_row or {}).get("Direcao", "")))
     side = _side(direction)
     tec = dict((scanner_pair or {}).get("tecnico", {}) or {})
@@ -166,7 +165,6 @@ def evaluate_pair_checklist(
     m15 = str((tec.get("m15", {}) or {}).get("status", ""))
     ict = dict(tec.get("ict", {}) or {})
     inst = dict(tec.get("institutional", {}) or {})
-
     technical_age = _age_minutes(
         (scanner_pair or {}).get("m15_fetched_at") or tec.get("ultima_atualizacao"), now
     )
@@ -176,7 +174,6 @@ def evaluate_pair_checklist(
     technical_current = technical_age is not None and technical_age <= 75.0
     data_sufficient = bool(tec_available and map_current and technical_current)
     data_score = 100.0 if data_sufficient else 0.0
-
     adr_raw = (map_ctx or {}).get("adr_used_pct")
     adr = None if _missing(adr_raw) or adr_raw == "" else _finite(adr_raw)
 
@@ -203,7 +200,6 @@ def evaluate_pair_checklist(
         and not (decision.get("hard_blocks") or [])
         and not (decision.get("soft_blocks") or [])
     )
-
     return {
         "pair": pair,
         "side": side,
@@ -257,8 +253,7 @@ def _active_pairs(trades: pd.DataFrame) -> set[str]:
 def _make_wait_entry(chk: Mapping[str, Any], frame: pd.DataFrame, *, now: pd.Timestamp) -> dict[str, Any] | None:
     if not chk.get("all_checks_passed") or frame.empty:
         return None
-    last = frame.iloc[-1]
-    candle_time = pd.Timestamp(last["datetime"])
+    candle_time = pd.Timestamp(frame.iloc[-1]["datetime"])
     signal_time = candle_time + pd.Timedelta(minutes=15)
     sid = _signal_id(str(chk["pair"]), str(chk["side"]), candle_time)
     row = {c: None for c in PAPER_COLUMNS}
@@ -316,11 +311,9 @@ def _fill_entry(row: pd.Series, frame: pd.DataFrame, *, now: pd.Timestamp) -> di
     side = str(out.get("side"))
     risk = atr * STOP_ATR_MULT
     if side == "BUY":
-        stop = entry - risk
-        target = entry + risk * TARGET_R
+        stop, target = entry - risk, entry + risk * TARGET_R
     elif side == "SELL":
-        stop = entry + risk
-        target = entry - risk * TARGET_R
+        stop, target = entry + risk, entry - risk * TARGET_R
     else:
         return out
     out.update({
@@ -366,16 +359,16 @@ def _close_open(row: pd.Series, frame: pd.DataFrame, *, now: pd.Timestamp) -> di
         if side == "BUY":
             favorable.append((high - entry) / risk)
             adverse.append((entry - low) / risk)
-            hit_stop = low <= stop
-            hit_target = high >= target
+            hit_stop, hit_target = low <= stop, high >= target
         else:
             favorable.append((entry - low) / risk)
             adverse.append((high - entry) / risk)
-            hit_stop = high >= stop
-            hit_target = low <= target
+            hit_stop, hit_target = high >= stop, low <= target
 
         if hit_stop and hit_target:
-            exit_idx, exit_price, exit_reason, result, ambiguous = j, stop, "STOP_AND_TARGET_SAME_CANDLE", "LOSS", True
+            exit_idx, exit_price, exit_reason, result, ambiguous = (
+                j, stop, "STOP_AND_TARGET_SAME_CANDLE", "LOSS", True
+            )
             break
         if hit_stop:
             exit_idx, exit_price, exit_reason, result = j, stop, "STOP", "LOSS"
@@ -422,7 +415,6 @@ def summarize_paper_trades(trades: pd.DataFrame) -> dict[str, Any]:
     gross_win = float(rr[rr > 0].sum()) if not rr.empty else 0.0
     gross_loss = float(-rr[rr < 0].sum()) if not rr.empty else 0.0
     profit_factor = None if gross_loss <= 0 else gross_win / gross_loss
-
     by_pair: dict[str, Any] = {}
     for pair, g in closed.groupby("pair", dropna=False):
         gr = pd.to_numeric(g["realized_r"], errors="coerce").dropna()
@@ -436,7 +428,6 @@ def summarize_paper_trades(trades: pd.DataFrame) -> dict[str, Any]:
             "net_r": round(float(gr.sum()) if not gr.empty else 0.0, 3),
             "avg_r": round(float(gr.mean()) if not gr.empty else 0.0, 3),
         }
-
     return {
         "version": PAPER_VERSION,
         "trades_total": int(len(d)),
@@ -464,7 +455,6 @@ def run_paper_cycle(
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     now = pd.Timestamp.now(tz="UTC") if now is None else pd.Timestamp(now)
     now = now.tz_localize("UTC") if now.tzinfo is None else now.tz_convert("UTC")
-
     d = normalize_trades(trades)
     inputs_by_pair = _pair_rows(inputs or {})
     scanner_by_pair = _scanner_rows(scanner or {})
@@ -472,8 +462,10 @@ def run_paper_cycle(
     opened = 0
     closed = 0
     pending_created = 0
+    closed_pairs_this_cycle: set[str] = set()
 
-    # Atualiza primeiro as simulações já existentes.
+    # Primeiro atualiza operações existentes. Um par que fecha nesta mesma rodada
+    # não pode ser rearmado imediatamente com o mesmo estado persistente.
     if not d.empty:
         rows = []
         for _, row in d.iterrows():
@@ -488,6 +480,7 @@ def run_paper_cycle(
             upd2 = _close_open(upd_series, frame, now=now)
             if before2 == "OPEN" and str(upd2.get("status")) == "CLOSED":
                 closed += 1
+                closed_pairs_this_cycle.add(pair)
             rows.append(upd2)
         d = normalize_trades(pd.DataFrame(rows))
 
@@ -495,7 +488,7 @@ def run_paper_cycle(
     existing_signals = set(d["signal_id"].astype(str)) if not d.empty else set()
     checklist_states: dict[str, Any] = {}
 
-    # Depois cria novos sinais. A entrada sempre espera candle M15 posterior.
+    # Depois cria sinais novos. A entrada sempre espera o M15 posterior ao sinal.
     for pair, input_row in inputs_by_pair.items():
         scanner_pair = scanner_by_pair.get(pair, {})
         map_ctx = map_by_pair.get(pair, {})
@@ -507,7 +500,7 @@ def run_paper_cycle(
             "hard_blocks": list(chk["decision"].get("hard_blocks", []) or []),
             "soft_blocks": list(chk["decision"].get("soft_blocks", []) or []),
         }
-        if pair in active_pairs:
+        if pair in active_pairs or pair in closed_pairs_this_cycle:
             continue
         frame = _m15_frame(scanner_pair)
         candidate = _make_wait_entry(chk, frame, now=now)
@@ -526,6 +519,7 @@ def run_paper_cycle(
         "pending_created": pending_created,
         "entries_opened": opened,
         "trades_closed": closed,
+        "closed_pairs_this_cycle": sorted(closed_pairs_this_cycle),
         "checklists": checklist_states,
         **{k: summary[k] for k in (
             "trades_total", "pending_entries", "open_positions", "closed_trades",
