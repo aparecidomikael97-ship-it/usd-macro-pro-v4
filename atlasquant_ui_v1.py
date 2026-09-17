@@ -9,7 +9,7 @@ from html import escape
 import math
 import streamlit as st
 
-UI_VERSION = "0.2"
+UI_VERSION = "0.3"
 
 NAVIGATION_LABELS = (
     "🎯 Central",
@@ -49,6 +49,24 @@ ATLASQUANT_CSS = r"""
     radial-gradient(circle at 8% -10%, rgba(36, 111, 190, .17), transparent 28%),
     radial-gradient(circle at 88% 2%, rgba(48, 174, 150, .10), transparent 24%),
     linear-gradient(180deg, #081321 0%, #07101d 100%);
+}
+/* Branding bridge: the legacy entrypoint still emits one old st.title().
+   Replace only the first main-page H1 visually, without touching engine logic. */
+[data-testid="stAppViewContainer"] h1:first-of-type {
+  font-size: 0 !important;
+  line-height: 1.08 !important;
+  margin-bottom: .2rem !important;
+}
+[data-testid="stAppViewContainer"] h1:first-of-type > * {
+  display: none !important;
+}
+[data-testid="stAppViewContainer"] h1:first-of-type::after {
+  content: "ATLASQUANT";
+  color: var(--aq-text);
+  font-size: 2.05rem;
+  font-weight: 800;
+  letter-spacing: -.035em;
+  line-height: 1.08;
 }
 [data-testid="stSidebar"] {
   background: linear-gradient(180deg, rgba(8,18,32,.98), rgba(9,22,38,.98));
