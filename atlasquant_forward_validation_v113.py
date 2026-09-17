@@ -231,7 +231,7 @@ def render_forward_validation_v113() -> None:
         "max_drawdown_r": "DD Máx R",
         "amostra": "Amostra",
     })
-    st.dataframe(view, use_container_width=True, hide_index=True)
+    st.dataframe(view, width="stretch", hide_index=True)
 
     bt_pair = str(st.session_state.get("atlasquant_latest_snapshot_pair", "") or "").strip()
     if bt_pair:
