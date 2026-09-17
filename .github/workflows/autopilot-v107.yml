@@ -60,5 +60,5 @@ jobs:
           print("secrets.toml criado para AppTest (valores não exibidos).")
           PY
 
-      - name: Run quota-safe autopilot + paper trading
-        run: python autopilot_paper_v112.py
+      - name: Run quota-safe autopilot + paper trading + setup audit
+        run: python autopilot_setup_audit_v114.py
