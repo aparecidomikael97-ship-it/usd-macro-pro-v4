@@ -3,6 +3,10 @@
 Executa o Autopilot V11.1 (quota saver) e, sem consumir chamadas adicionais
 da Twelve Data, reutiliza o cache M15 persistido para simular entradas somente
 quando o checklist operacional completo estiver liberado.
+
+V11.6 acrescenta uma camada analítica de custos conservadores ao diário Paper.
+Ela não altera sinal, entrada, stop, alvo, resultado bruto ou classificação
+WIN/LOSS; apenas registra spread/slippage e calcula o R líquido auditável.
 """
 from __future__ import annotations
 
@@ -12,6 +16,7 @@ import pandas as pd
 
 import autopilot_v107 as base
 import autopilot_quota_guard_v111 as quota
+from paper_friction_v116 import apply_paper_friction, summarize_net
 from paper_trading_v112 import run_paper_cycle, summarize_paper_trades
 
 PAPER_CSV_PATH = "dados/paper_trades_v112.csv"
@@ -48,16 +53,26 @@ def _paper_cycle() -> tuple[bool, dict, list[str]]:
     except Exception as exc:
         return False, {}, errors + [f"Paper engine: {type(exc).__name__}: {exc}"]
 
+    # V11.6: reaplica a fricção a cada ciclo. O motor V11.2 normaliza apenas suas
+    # colunas-base, então esta etapa garante que os campos de custo permaneçam
+    # reproduzíveis sem contaminar a lógica de execução simulada.
+    costed = apply_paper_friction(updated)
+
     ok, err = base.gh_put_csv(
         PAPER_CSV_PATH,
-        updated,
-        "V11.2 Paper Trading: atualiza diário simulado",
+        costed,
+        "V11.6 Paper Trading: atualiza diário simulado com custos",
     )
     if not ok:
         errors.append("Salvar Paper diário: " + err)
 
     summary = summarize_paper_trades(updated)
+    friction = summarize_net(costed)
     summary["last_cycle"] = cycle
+    summary["friction_v116"] = friction
+    summary["gross_r_before_friction"] = friction.get("gross_r", 0.0)
+    summary["friction_r"] = friction.get("friction_r", 0.0)
+    summary["net_r_after_friction"] = friction.get("net_r", 0.0)
     summary["safety"] = {
         "real_orders": False,
         "broker_connection": False,
@@ -67,12 +82,15 @@ def _paper_cycle() -> tuple[bool, dict, list[str]]:
         "target_model": "2R",
         "same_candle_stop_and_target": "LOSS conservador",
         "max_hold": "96 candles M15 / 24h",
+        "friction_model": "V11.6 fixed conservative research friction",
+        "friction_changes_signal": False,
+        "friction_changes_result_classification": False,
     }
 
     ok2, err2 = base.gh_put_json(
         PAPER_SUMMARY_PATH,
         summary,
-        "V11.2 Paper Trading: resumo de desempenho",
+        "V11.6 Paper Trading: resumo bruto e líquido após custos",
     )
     if not ok2:
         errors.append("Salvar Paper resumo: " + err2)
@@ -91,9 +109,16 @@ def _paper_cycle() -> tuple[bool, dict, list[str]]:
         "losses": summary.get("losses", 0),
         "breakeven": summary.get("breakeven", 0),
         "win_rate_pct": summary.get("win_rate_pct", 0.0),
+        # Mantém o campo legado por compatibilidade e expõe explicitamente o
+        # líquido após fricção para painéis/validação novos.
         "net_r": summary.get("net_r", 0.0),
+        "gross_r_before_friction": friction.get("gross_r", 0.0),
+        "friction_r": friction.get("friction_r", 0.0),
+        "net_r_after_friction": friction.get("net_r", 0.0),
+        "friction_version": friction.get("version"),
         "avg_r": summary.get("avg_r", 0.0),
         "profit_factor_r": summary.get("profit_factor_r"),
+        "profit_factor_net_r": friction.get("profit_factor_net_r"),
         "last_cycle": cycle,
         "errors": errors[:10],
     }
@@ -102,7 +127,7 @@ def _paper_cycle() -> tuple[bool, dict, list[str]]:
     ok3, err3 = base.gh_put_json(
         base.STATUS_PATH,
         status,
-        "V11.2 Autopilot: status com Paper Trading",
+        "V11.6 Autopilot: status com custos do Paper Trading",
     )
     if not ok3:
         errors.append("Salvar status Paper: " + err3)
