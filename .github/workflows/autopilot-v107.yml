@@ -60,5 +60,5 @@ jobs:
           print("secrets.toml criado para AppTest (valores não exibidos).")
           PY
 
-      - name: Run full background autopilot
-        run: python autopilot_v107.py
+      - name: Run quota-safe background autopilot
+        run: python autopilot_quota_guard_v111.py
