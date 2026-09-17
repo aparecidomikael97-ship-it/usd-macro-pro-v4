@@ -203,3 +203,11 @@ def render_autopilot_v107():
                 st.write("•",x)
     else:
         st.success("Nenhum erro registrado na última rodada.")
+
+    st.divider()
+    try:
+        from paper_trading_panel_v112 import render_paper_trading_v112
+        render_paper_trading_v112()
+    except Exception as exc:
+        st.warning("Paper Trading V11.2 indisponível neste carregamento.")
+        st.caption(f"{type(exc).__name__}: {exc}")
