@@ -90,6 +90,89 @@ def _pf_text(value: Any) -> str:
         return str(value)
 
 
+def _closed_trades(trades: pd.DataFrame) -> pd.DataFrame:
+    if not isinstance(trades, pd.DataFrame) or trades.empty or "status" not in trades.columns:
+        return pd.DataFrame()
+    d = trades[trades["status"].astype(str).str.upper() == "CLOSED"].copy()
+    if d.empty:
+        return d
+    d["realized_r_num"] = pd.to_numeric(d.get("realized_r"), errors="coerce")
+    d = d[d["realized_r_num"].notna()].copy()
+    if "exit_time" in d.columns:
+        d["exit_time_dt"] = pd.to_datetime(d["exit_time"], utc=True, errors="coerce")
+        d = d.sort_values(["exit_time_dt", "trade_id" if "trade_id" in d.columns else "status"], na_position="last")
+    return d.reset_index(drop=True)
+
+
+def _paper_analytics(trades: pd.DataFrame) -> dict[str, Any]:
+    closed = _closed_trades(trades)
+    if closed.empty:
+        return {
+            "closed": 0,
+            "expectancy_r": None,
+            "max_drawdown_r": None,
+            "avg_mfe_r": None,
+            "avg_mae_r": None,
+            "payoff_ratio": None,
+            "best_r": None,
+            "worst_r": None,
+            "equity": pd.DataFrame(),
+        }
+
+    rr = closed["realized_r_num"].astype(float)
+    wins = rr[rr > 0]
+    losses = rr[rr < 0]
+    equity = rr.cumsum()
+    running_peak = equity.cummax().clip(lower=0.0)
+    drawdown = running_peak - equity
+
+    payoff = None
+    if not wins.empty and not losses.empty:
+        avg_win = float(wins.mean())
+        avg_loss = abs(float(losses.mean()))
+        if avg_loss > 0:
+            payoff = avg_win / avg_loss
+
+    avg_mfe = None
+    if "mfe_r" in closed.columns:
+        x = pd.to_numeric(closed["mfe_r"], errors="coerce").dropna()
+        if not x.empty:
+            avg_mfe = float(x.mean())
+
+    avg_mae = None
+    if "mae_r" in closed.columns:
+        x = pd.to_numeric(closed["mae_r"], errors="coerce").dropna()
+        if not x.empty:
+            avg_mae = float(x.mean())
+
+    curve = pd.DataFrame({
+        "Trade": range(1, len(equity) + 1),
+        "R acumulado": equity.values,
+    }).set_index("Trade")
+
+    return {
+        "closed": int(len(closed)),
+        "expectancy_r": float(rr.mean()),
+        "max_drawdown_r": float(drawdown.max()) if not drawdown.empty else 0.0,
+        "avg_mfe_r": avg_mfe,
+        "avg_mae_r": avg_mae,
+        "payoff_ratio": payoff,
+        "best_r": float(rr.max()),
+        "worst_r": float(rr.min()),
+        "equity": curve,
+    }
+
+
+def _fmt_r(value: Any, signed: bool = False) -> str:
+    if value is None:
+        return "—"
+    try:
+        x = float(value)
+        return f"{x:+.2f} R" if signed else f"{x:.2f} R"
+    except Exception:
+        return "—"
+
+
 def render_paper_trading_v112() -> None:
     st.markdown("### 🧪 Paper Trading — validação automática")
     st.caption(
@@ -127,6 +210,30 @@ def render_paper_trading_v112() -> None:
     f.metric("Losses", int(summary.get("losses", 0) or 0))
     g.metric("Resultado líquido", f"{float(summary.get('net_r',0) or 0):+.2f} R")
     h.metric("Profit Factor", _pf_text(summary.get("profit_factor_r")))
+
+    analytics = _paper_analytics(trades)
+    if analytics["closed"]:
+        st.markdown("#### 📊 Estatística prospectiva")
+        p1, p2, p3, p4 = st.columns(4)
+        p1.metric("Expectativa / trade", _fmt_r(analytics["expectancy_r"], signed=True))
+        p2.metric("Drawdown máximo", _fmt_r(analytics["max_drawdown_r"]))
+        p3.metric("Payoff médio", "—" if analytics["payoff_ratio"] is None else f"{analytics['payoff_ratio']:.2f}x")
+        p4.metric("MFE médio", _fmt_r(analytics["avg_mfe_r"]))
+
+        q1, q2, q3, q4 = st.columns(4)
+        q1.metric("MAE médio", _fmt_r(analytics["avg_mae_r"]))
+        q2.metric("Melhor trade", _fmt_r(analytics["best_r"], signed=True))
+        q3.metric("Pior trade", _fmt_r(analytics["worst_r"], signed=True))
+        q4.metric("Amostra fechada", int(analytics["closed"]))
+
+        curve = analytics["equity"]
+        if isinstance(curve, pd.DataFrame) and not curve.empty:
+            st.markdown("##### Curva de resultado em R")
+            st.line_chart(curve)
+            st.caption(
+                "A curva usa apenas trades encerrados do Paper Trading. Ela mede consistência da regra, "
+                "não representa lucro real em dinheiro e não considera execução de corretora."
+            )
 
     st.caption(
         "Regra inicial auditável: entrada no OPEN do primeiro M15 posterior ao sinal · "
@@ -178,7 +285,7 @@ def render_paper_trading_v112() -> None:
             c for c in [
                 "pair", "side", "status", "result", "signal_time", "entry_time",
                 "entry_price", "stop_price", "target_price", "exit_time", "exit_price",
-                "realized_r", "mfe_r", "mae_r", "checklist_note",
+                "realized_r", "mfe_r", "mae_r", "bars_held", "exit_reason", "checklist_note",
             ] if c in trades.columns
         ]
         st.dataframe(trades[cols].tail(100).iloc[::-1], use_container_width=True, hide_index=True)
@@ -196,6 +303,7 @@ def render_paper_trading_v112() -> None:
             "- O sinal só é criado com Decision Integrity executável **e zero bloqueios**.\n"
             "- A entrada nunca usa o mesmo candle que gerou o sinal.\n"
             "- O preço de entrada, stop, alvo e resultado ficam congelados no diário.\n"
+            "- MFE/MAE, expectativa, drawdown e curva em R são calculados somente com operações fechadas.\n"
             "- Nenhuma estatística do Paper Trading altera o Score Mestre.\n"
             "- Este módulo serve para medir consistência antes de qualquer uso real."
         )
