@@ -120,21 +120,60 @@ function Prepare-AtlasQuant {
     Pause-AtlasQuant
 }
 
-function Get-AtlasQuantProcess {
-    $pidFile = ".atlasquant_streamlit.pid"
-    if (-not (Test-Path $pidFile)) { return $null }
+function Get-AtlasQuantPidFile {
+    $configDir = Join-Path $env:LOCALAPPDATA "AtlasQuant"
+    New-Item -ItemType Directory -Force -Path $configDir | Out-Null
+    return (Join-Path $configDir "atlasquant_streamlit.pid")
+}
+
+function Get-AtlasQuantListenerProcess {
     try {
-        $savedPid = [int](Get-Content $pidFile -ErrorAction Stop | Select-Object -First 1)
-        $proc = Get-Process -Id $savedPid -ErrorAction SilentlyContinue
-        if ($null -eq $proc) {
-            Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+        $conn = Get-NetTCPConnection -LocalPort 8501 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($null -eq $conn) {
             return $null
         }
-        return $proc
+
+        $pidValue = [int]$conn.OwningProcess
+        $proc = Get-Process -Id $pidValue -ErrorAction SilentlyContinue
+        if ($null -eq $proc) {
+            return $null
+        }
+
+        $cim = Get-CimInstance Win32_Process -Filter ("ProcessId = " + $pidValue) -ErrorAction SilentlyContinue
+        $cmd = ""
+        if ($null -ne $cim) {
+            $cmd = [string]$cim.CommandLine
+        }
+
+        if ($cmd -match "streamlit" -and $cmd -match "usd_macro_pro_v4_cloud.py") {
+            return $proc
+        }
+
+        throw "A porta 8501 esta sendo usada por outro programa. Feche esse programa ou libere a porta antes de iniciar o AtlasQuant."
     } catch {
-        Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+        if ($_.Exception.Message -like "A porta 8501*") {
+            throw
+        }
         return $null
     }
+}
+
+function Get-AtlasQuantProcess {
+    $pidFile = Get-AtlasQuantPidFile
+    if (Test-Path $pidFile) {
+        try {
+            $savedPid = [int](Get-Content $pidFile -ErrorAction Stop | Select-Object -First 1)
+            $proc = Get-Process -Id $savedPid -ErrorAction SilentlyContinue
+            if ($null -ne $proc) {
+                return $proc
+            }
+            Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+        } catch {
+            Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    return Get-AtlasQuantListenerProcess
 }
 
 function Start-AtlasQuant {
@@ -153,11 +192,11 @@ function Start-AtlasQuant {
 
     $existing = Get-AtlasQuantProcess
     if ($null -ne $existing) {
-        Write-Host "[OK] AtlasQuant ja esta rodando em segundo plano."
-        Write-Host "Abrindo http://127.0.0.1:8501"
-        Start-Process "http://127.0.0.1:8501"
-        Pause-AtlasQuant
-        return
+        Write-Host "[INFO] AtlasQuant anterior detectado na porta 8501."
+        Write-Host "Encerrando a instancia anterior para iniciar este Build..."
+        Stop-Process -Id $existing.Id -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Milliseconds 700
+        Remove-Item (Get-AtlasQuantPidFile) -Force -ErrorAction SilentlyContinue
     }
 
     $secretState = Import-AtlasQuantLocalSecrets
@@ -192,7 +231,7 @@ function Start-AtlasQuant {
     )
 
     $proc = Start-Process -FilePath $python -ArgumentList $args -WorkingDirectory (Get-Location).Path -WindowStyle Hidden -PassThru
-    Set-Content -Path ".atlasquant_streamlit.pid" -Value $proc.Id -Encoding ASCII
+    Set-Content -Path (Get-AtlasQuantPidFile) -Value $proc.Id -Encoding ASCII
 
     Write-Host "Aguardando o servidor local iniciar..."
     $ready = $false
@@ -200,7 +239,7 @@ function Start-AtlasQuant {
         Start-Sleep -Milliseconds 750
         $proc.Refresh()
         if ($proc.HasExited) {
-            Remove-Item ".atlasquant_streamlit.pid" -Force -ErrorAction SilentlyContinue
+            Remove-Item (Get-AtlasQuantPidFile) -Force -ErrorAction SilentlyContinue
             throw "O servidor encerrou durante a inicializacao."
         }
         try {
@@ -230,12 +269,12 @@ function Stop-AtlasQuant {
     Clear-Host
     $proc = Get-AtlasQuantProcess
     if ($null -eq $proc) {
-        Write-Host "[INFO] Nenhum servidor AtlasQuant iniciado por este launcher esta ativo."
+        Write-Host "[INFO] Nenhum servidor AtlasQuant esta ativo na porta 8501."
         Pause-AtlasQuant
         return
     }
     Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
-    Remove-Item ".atlasquant_streamlit.pid" -Force -ErrorAction SilentlyContinue
+    Remove-Item (Get-AtlasQuantPidFile) -Force -ErrorAction SilentlyContinue
     Write-Host "[OK] Servidor local do AtlasQuant encerrado."
     Pause-AtlasQuant
 }
