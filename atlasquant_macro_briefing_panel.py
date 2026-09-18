@@ -57,6 +57,22 @@ def render_macro_briefing_panel(currency_rows: Sequence[Mapping[str, Any]] | Non
         "voice": voice_request.voice,
     }
     st.caption("O pedido de áudio só fica preparado; a geração exige ação explícita e provedor TTS configurado.")
+    if st.button("🎙️ Gerar narração", key=f"aq_macro_brief_generate_{horizon}"):
+        st.session_state["aq_macro_brief_voice_generate_requested"] = True
+        st.info(
+            "Pedido de narração registrado. O player só será exibido quando um provedor TTS "
+            "configurado devolver áudio válido."
+        )
+    audio_bytes = st.session_state.get("aq_macro_brief_audio_bytes")
+    if isinstance(audio_bytes, (bytes, bytearray)) and audio_bytes:
+        st.audio(bytes(audio_bytes), format="audio/mp3")
+        st.download_button(
+            "Baixar áudio",
+            data=bytes(audio_bytes),
+            file_name=f"atlasquant_macro_briefing_{horizon}.mp3",
+            mime="audio/mpeg",
+            key=f"aq_macro_brief_audio_download_{horizon}",
+        )
 
     st.download_button(
         "Baixar roteiro da narração",
