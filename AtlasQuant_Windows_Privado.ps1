@@ -44,6 +44,23 @@ function Prepare-AtlasQuant {
     Pause-AtlasQuant
 }
 
+function Get-AtlasQuantProcess {
+    $pidFile = ".atlasquant_streamlit.pid"
+    if (-not (Test-Path $pidFile)) { return $null }
+    try {
+        $savedPid = [int](Get-Content $pidFile -ErrorAction Stop | Select-Object -First 1)
+        $proc = Get-Process -Id $savedPid -ErrorAction SilentlyContinue
+        if ($null -eq $proc) {
+            Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+            return $null
+        }
+        return $proc
+    } catch {
+        Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+        return $null
+    }
+}
+
 function Start-AtlasQuant {
     Clear-Host
     if (-not (Test-Path ".venv\Scripts\python.exe")) {
@@ -52,14 +69,77 @@ function Start-AtlasQuant {
         Pause-AtlasQuant
         return
     }
+
     Write-Host "============================================================"
     Write-Host "               INICIANDO O ATLASQUANT"
     Write-Host "============================================================"
     Write-Host ""
+
+    $existing = Get-AtlasQuantProcess
+    if ($null -ne $existing) {
+        Write-Host "[OK] AtlasQuant ja esta rodando em segundo plano."
+        Write-Host "Abrindo http://127.0.0.1:8501"
+        Start-Process "http://127.0.0.1:8501"
+        Pause-AtlasQuant
+        return
+    }
+
+    $python = (Resolve-Path ".\.venv\Scripts\python.exe").Path
+    $args = @(
+        "-m", "streamlit", "run", "usd_macro_pro_v4_cloud.py",
+        "--server.address", "127.0.0.1",
+        "--server.port", "8501",
+        "--server.headless", "true",
+        "--browser.gatherUsageStats", "false"
+    )
+
+    $proc = Start-Process -FilePath $python -ArgumentList $args -WorkingDirectory (Get-Location).Path -WindowStyle Hidden -PassThru
+    Set-Content -Path ".atlasquant_streamlit.pid" -Value $proc.Id -Encoding ASCII
+
+    Write-Host "Aguardando o servidor local iniciar..."
+    $ready = $false
+    for ($i = 0; $i -lt 20; $i++) {
+        Start-Sleep -Milliseconds 750
+        $proc.Refresh()
+        if ($proc.HasExited) {
+            Remove-Item ".atlasquant_streamlit.pid" -Force -ErrorAction SilentlyContinue
+            throw "O servidor encerrou durante a inicializacao."
+        }
+        try {
+            $resp = Invoke-WebRequest -Uri "http://127.0.0.1:8501" -UseBasicParsing -TimeoutSec 1
+            if ($resp.StatusCode -ge 200 -and $resp.StatusCode -lt 500) {
+                $ready = $true
+                break
+            }
+        } catch {}
+    }
+
+    if (-not $ready) {
+        Write-Host "[AVISO] O processo esta ativo, mas o navegador pode levar mais alguns segundos."
+    } else {
+        Write-Host "[OK] AtlasQuant iniciado em segundo plano."
+    }
+
     Write-Host "Endereco local: http://127.0.0.1:8501"
-    Write-Host "Para encerrar, feche esta janela ou pressione CTRL+C."
+    Start-Process "http://127.0.0.1:8501"
     Write-Host ""
-    & ".\.venv\Scripts\python.exe" -m streamlit run "usd_macro_pro_v4_cloud.py" --server.address 127.0.0.1 --server.port 8501 --server.headless false --browser.gatherUsageStats false
+    Write-Host "Voce pode fechar este launcher; o AtlasQuant continuara rodando."
+    Write-Host "Use a opcao 6 para encerrar o servidor local quando quiser."
+    Pause-AtlasQuant
+}
+
+function Stop-AtlasQuant {
+    Clear-Host
+    $proc = Get-AtlasQuantProcess
+    if ($null -eq $proc) {
+        Write-Host "[INFO] Nenhum servidor AtlasQuant iniciado por este launcher esta ativo."
+        Pause-AtlasQuant
+        return
+    }
+    Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+    Remove-Item ".atlasquant_streamlit.pid" -Force -ErrorAction SilentlyContinue
+    Write-Host "[OK] Servidor local do AtlasQuant encerrado."
+    Pause-AtlasQuant
 }
 
 function Test-AtlasQuant {
@@ -115,6 +195,7 @@ while ($true) {
     Write-Host " [3] Verificar a instalacao"
     Write-Host " [4] Configurar Twelve Data local"
     Write-Host " [5] Sair"
+    Write-Host " [6] Parar AtlasQuant local"
     Write-Host ""
     $choice = Read-Host "Escolha uma opcao"
     try {
@@ -124,6 +205,7 @@ while ($true) {
             "3" { Test-AtlasQuant }
             "4" { Configure-TwelveData }
             "5" { exit 0 }
+            "6" { Stop-AtlasQuant }
             default {
                 Write-Host ""
                 Write-Host "Opcao invalida."
