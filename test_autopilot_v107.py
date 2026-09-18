@@ -91,6 +91,33 @@ class AutopilotV107Tests(unittest.TestCase):
         self.assertEqual(flight_status["reason"],"FLIGHT_EXCEPTION")
         self.assertEqual(len(errors),1)
 
+    def test_shadow_returned_failure_is_visible_and_flight_still_runs(self):
+        packs=[{"pair":"EUR/USD"}]
+        with patch.object(a,"build_shadow_batch",return_value=[{"sample_id":"s1"}]), \
+             patch.object(a,"persist_shadow_samples",return_value={"ok":False,"added":0,"samples":0,"reason":"CORRUPT_REMOTE","error":""}), \
+             patch.object(a,"record_from_pack",return_value={"decision_id":"d1"}), \
+             patch.object(a,"persist_records",return_value={"ok":True,"added":1,"records":1,"reason":"SAVED","error":""}) as flight:
+            shadow,flight_status,errors=a.persist_decision_evidence(
+                packs,engine_version="test",repo="o/r",branch="atlasquant-runtime",token="t"
+            )
+        self.assertFalse(shadow["ok"])
+        self.assertTrue(flight_status["ok"])
+        self.assertEqual(flight.call_count,1)
+        self.assertTrue(any("CORRUPT_REMOTE" in x for x in errors))
+
+    def test_flight_returned_failure_is_visible_without_erasing_shadow(self):
+        packs=[{"pair":"EUR/USD"}]
+        with patch.object(a,"build_shadow_batch",return_value=[{"sample_id":"s1"}]), \
+             patch.object(a,"persist_shadow_samples",return_value={"ok":True,"added":1,"samples":1,"reason":"SAVED","error":""}), \
+             patch.object(a,"record_from_pack",return_value={"decision_id":"d1"}), \
+             patch.object(a,"persist_records",return_value={"ok":False,"added":0,"records":0,"reason":"NOT_CONFIGURED","error":""}):
+            shadow,flight_status,errors=a.persist_decision_evidence(
+                packs,engine_version="test",repo="o/r",branch="atlasquant-runtime",token=""
+            )
+        self.assertTrue(shadow["ok"])
+        self.assertFalse(flight_status["ok"])
+        self.assertTrue(any("NOT_CONFIGURED" in x for x in errors))
+
     def test_main_has_autopilot_serialization_imports(self):
         from pathlib import Path
         text = Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
