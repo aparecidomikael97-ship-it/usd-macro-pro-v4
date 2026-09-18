@@ -45,6 +45,11 @@ class WindowsPrivateLauncherTests(unittest.TestCase):
         self.assertIn("$env:CHAVE_FRED = $fred", self.ps1)
         self.assertIn("[OK] FRED local carregado para esta sessao.", self.ps1)
 
+    def test_launcher_uses_persistent_user_secret_store(self):
+        self.assertIn('Join-Path $env:LOCALAPPDATA "AtlasQuant"', self.ps1)
+        self.assertIn('$stablePath', self.ps1)
+        self.assertIn('$legacyPath', self.ps1)
+
     def test_launcher_keeps_window_open_on_errors(self):
         self.assertIn("A janela permanecera aberta para voce poder ler o erro.", self.ps1)
         self.assertIn("Pause-AtlasQuant", self.ps1)
@@ -65,6 +70,15 @@ class WindowsPrivateLauncherTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PersistentSecretConfiguratorTests(unittest.TestCase):
+    def test_configurators_store_secrets_outside_build_folder(self):
+        twelve = Path("AtlasQuant_Configurar_TwelveData.ps1").read_text(encoding="utf-8")
+        fred = Path("AtlasQuant_Configurar_FRED.ps1").read_text(encoding="utf-8")
+        for script in (twelve, fred):
+            self.assertIn('Join-Path $env:LOCALAPPDATA "AtlasQuant"', script)
+            self.assertNotIn('$streamlitDir = Join-Path $root ".streamlit"', script)
 
 
 class TwelveDataConfiguratorEncodingTests(unittest.TestCase):
