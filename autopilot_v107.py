@@ -337,14 +337,19 @@ def td_fetch(pair: str, interval: str, outputsize: int) -> tuple[pd.DataFrame, s
     global _TD_DAILY_BLOCKED, _TD_DAILY_BLOCK_REASON, _TD_BLOCK_TYPE, _TD_HTTP_CALLS, _TD_CACHE_HITS, _TD_STOP_UNTIL
     if pair not in PAIR_ORDER or interval not in ('15min','1h','4h','1day'):
         return pd.DataFrame(), "Consulta fora dos sete pares/intervalos previstos."
+    try:
+        requested=int(outputsize)
+        if requested <= 0 or requested > 5000: raise ValueError()
+    except Exception:
+        return pd.DataFrame(), "Outputsize inválido."
     if not TD_KEY: return pd.DataFrame(), "CHAVE_TWELVE_DATA ausente."
     if _TD_DAILY_BLOCKED:
         return pd.DataFrame(), f"API_COTA_BLOQUEADA: {_TD_DAILY_BLOCK_REASON}"
     # Reuse direction-neutral candles, never old directional confirmations.
     limits={"15min":24,"1h":54,"4h":234,"1day":0}
     if interval!="1day":
-        cached,err=read_series(_TD_SERIES,pair,interval,outputsize,now=utcnow(),max_age=limits.get(interval,0))
-        if not err and len(cached)>=min(outputsize,80):
+        cached,err=read_series(_TD_SERIES,pair,interval,requested,now=utcnow(),max_age=limits.get(interval,0))
+        if not err and len(cached)>=min(requested,80):
             _TD_CACHE_HITS+=1
             return cached,""
     if _TD_BUDGET is None: return pd.DataFrame(),"Controle de orçamento não inicializado."
@@ -358,7 +363,7 @@ def td_fetch(pair: str, interval: str, outputsize: int) -> tuple[pd.DataFrame, s
         # Reservation is durable before even a timeout can consume a credit.
         _TD_HTTP_CALLS+=1
         r=requests.get("https://api.twelvedata.com/time_series",
-            params={"symbol":pair,"interval":interval,"outputsize":int(outputsize),
+            params={"symbol":pair,"interval":interval,"outputsize":requested,
                     "apikey":TD_KEY,"timezone":"UTC","format":"JSON","order":"ASC"},timeout=25)
         try: js=r.json()
         except Exception:
@@ -377,9 +382,9 @@ def td_fetch(pair: str, interval: str, outputsize: int) -> tuple[pd.DataFrame, s
         df=valid_records(js.get("values",[]) if isinstance(js,dict) else [],interval,now=utcnow())
         if df.empty: return df,"Sem OHLC fechado válido."
         observed=utcnow().isoformat()
-        records=_serialize_tf_cache(df,outputsize)
+        records=_serialize_tf_cache(df,requested)
         candidate={"series":{f"{pair}|{interval}":{"fetched_at":observed,"records":records}}}
-        _,error=read_series(candidate,pair,interval,outputsize,now=utcnow())
+        _,error=read_series(candidate,pair,interval,requested,now=utcnow())
         if error: return pd.DataFrame(),error
         _TD_SERIES.setdefault("series",{})[f"{pair}|{interval}"]=candidate["series"][f"{pair}|{interval}"]
         df.attrs["source_fetched_at"]=observed
