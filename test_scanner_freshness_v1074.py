@@ -46,8 +46,8 @@ class ScannerFreshnessV1074Tests(unittest.TestCase):
         state={"resultados":{"EUR/USD":{"m15_fetched_at":now-3600,"tecnico":{"disponivel":True}}}}
         with patch("master_panel_v102._time.time",return_value=now):
             info=m._scanner_for_pair(state,"EUR/USD")
-        self.assertTrue(info["fresh"])
-        self.assertLessEqual(info["age_minutes"],60)
+        self.assertFalse(info["fresh"])
+        self.assertGreaterEqual(info["age_minutes"],60)
 
     def test_future_timestamp_does_not_create_negative_age(self):
         now=time.time()
