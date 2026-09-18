@@ -1,12 +1,26 @@
 {
-  "version": "V10.7_FULL_AUTOPILOT",
-  "last_run": "2026-09-18T20:20:56.315424+00:00",
+  "twelve_budget": {
+    "version": 1,
+    "day": "2026-09-18",
+    "used": 332,
+    "hours": {},
+    "recent": [],
+    "migration_done": true,
+    "limit": 480,
+    "remaining": 148,
+    "reset_at": "2026-09-19T00:00:00+00:00",
+    "pace_ceiling": 448
+  },
+  "twelve_cache_hits": 0,
+  "twelve_retry_after": "",
+  "version": "V11.0.8_BUDGET_AUTOPILOT",
+  "last_run": "2026-09-18T21:20:23.425448+00:00",
   "app_headless_ok": true,
-  "app_headless_message": "App headless executado; 7 secret(s) injetado(s) no AppTest.",
-  "matrix_generated_at": "2026-09-18T20:20:45.162695+00:00",
-  "scanner_fresh": 7,
-  "market_map_fresh": 7,
-  "news_updated_at": "2026-09-18T20:20:44.592134+00:00",
+  "app_headless_message": "App headless executado; 8 secret(s) injetado(s) no AppTest.",
+  "matrix_generated_at": "2026-09-18T21:20:04.877063+00:00",
+  "scanner_fresh": 4,
+  "market_map_fresh": 4,
+  "news_updated_at": "2026-09-18T21:20:03.976305+00:00",
   "news_unique_stories": 221,
   "validation_rows": 35,
   "validation_pending": 7,
@@ -17,8 +31,8 @@
     "validated_horizons": 0,
     "migrated": 0
   },
-  "twelve_calls_this_run": 4,
-  "twelve_calls_requested_internal": 4,
+  "twelve_calls_this_run": 0,
+  "twelve_calls_requested_internal": 0,
   "twelve_rate_safe": true,
   "twelve_api_budget_limit": 480,
   "twelve_daily_blocked": false,
@@ -26,12 +40,12 @@
   "twelve_daily_block_reason": "",
   "twelve_safe_calls_per_window": 6,
   "twelve_safe_window_seconds": 62.0,
-  "forex_market_open": true,
+  "forex_market_open": false,
   "errors": [],
   "healthy": true,
   "twelve_quota_saver_v111": {
     "enabled": true,
-    "m15_source_pairs_this_run": 4,
+    "m15_source_pairs_this_run": 0,
     "derived_timeframes": [
       "1h",
       "4h"
@@ -41,151 +55,43 @@
     "partial_groups_discarded": true,
     "contiguous_m15_required": true
   },
-  "paper_trading_v112": {
-    "enabled": true,
-    "real_orders": false,
-    "trades_total": 0,
-    "pending_entries": 0,
-    "open_positions": 0,
-    "closed_trades": 0,
-    "wins": 0,
-    "losses": 0,
-    "breakeven": 0,
-    "win_rate_pct": 0.0,
-    "net_r": 0.0,
-    "gross_r_before_friction": 0.0,
-    "friction_r": 0.0,
-    "net_r_after_friction": 0.0,
-    "friction_version": "V11.6_PAPER_FRICTION",
-    "avg_r": 0.0,
-    "profit_factor_r": null,
-    "profit_factor_net_r": null,
-    "last_cycle": {
-      "version": "V11.2_PAPER_TRADING",
-      "ran_at": "2026-09-18T20:20:58.064512+00:00",
-      "pending_created": 0,
-      "entries_opened": 0,
-      "trades_closed": 0,
-      "closed_pairs_this_cycle": [],
-      "checklists": {
-        "USD/CHF": {
-          "side": "BUY",
-          "passed": false,
-          "state": "🔴 BLOQUEADO",
-          "hard_blocks": [
-            "H1 está contra o viés"
-          ],
-          "soft_blocks": [
-            "ADR14 em 107%: evitar perseguir preço",
-            "ICT incompleto (42/100)",
-            "Fluxo institucional incompleto (48/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "USD/CAD": {
-          "side": "BUY",
-          "passed": false,
-          "state": "⚪ EM OBSERVAÇÃO",
-          "hard_blocks": [],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ICT incompleto (42/100)",
-            "Fluxo institucional incompleto (59/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "USD/JPY": {
-          "side": "BUY",
-          "passed": false,
-          "state": "🔴 BLOQUEADO",
-          "hard_blocks": [
-            "ADR14 muito esticado (117%)"
-          ],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ADR14 em 117%: evitar perseguir preço",
-            "ICT incompleto (51/100)",
-            "Fluxo institucional incompleto (59/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "NZD/USD": {
-          "side": "SELL",
-          "passed": false,
-          "state": "⚪ EM OBSERVAÇÃO",
-          "hard_blocks": [],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ADR14 em 91%: espaço reduzido",
-            "ICT incompleto (34/100)",
-            "Fluxo institucional incompleto (50/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "EUR/USD": {
-          "side": "SELL",
-          "passed": false,
-          "state": "⚪ EM OBSERVAÇÃO",
-          "hard_blocks": [],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ADR14 em 92%: espaço reduzido",
-            "ICT incompleto (42/100)",
-            "Fluxo institucional incompleto (67/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "AUD/USD": {
-          "side": "WAIT",
-          "passed": false,
-          "state": "⚪ AGUARDAR DIREÇÃO",
-          "hard_blocks": [],
-          "soft_blocks": [
-            "ADR14 em 91%: espaço reduzido",
-            "ICT incompleto (0/100)",
-            "Fluxo institucional incompleto (0/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "GBP/USD": {
-          "side": "SELL",
-          "passed": false,
-          "state": "🔴 BLOQUEADO",
-          "hard_blocks": [
-            "H1 está contra o viés",
-            "ADR14 muito esticado (128%)"
-          ],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ADR14 em 128%: evitar perseguir preço",
-            "ICT incompleto (34/100)",
-            "Fluxo institucional incompleto (69/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        }
-      },
-      "trades_total": 0,
-      "pending_entries": 0,
-      "open_positions": 0,
-      "closed_trades": 0,
-      "wins": 0,
-      "losses": 0,
-      "breakeven": 0,
-      "win_rate_pct": 0.0,
-      "net_r": 0.0,
-      "avg_r": 0.0,
-      "profit_factor_r": null
+  "decision_evidence": {
+    "packs": 7,
+    "shadow": {
+      "ok": true,
+      "added": 7,
+      "samples": 14,
+      "reason": "SAVED",
+      "error": ""
     },
-    "errors": []
-  },
-  "setup_audit_v114": {
-    "enabled": true,
-    "audited_trades": 0,
-    "closed_trades": 0,
-    "component_state_rows": 0,
-    "sample_state": "AGUARDANDO AMOSTRA",
+    "flight_recorder": {
+      "ok": true,
+      "added": 7,
+      "records": 8,
+      "reason": "SAVED",
+      "error": ""
+    },
     "real_orders": false,
-    "broker_connection": false,
-    "errors": []
+    "automatic_gate_change": false,
+    "automatic_promotion": false
+  },
+  "quota_shadow": {
+    "samples": 1,
+    "market_open_runs": 0,
+    "min_market_runs": 20,
+    "minimum_met": false,
+    "provider_blocked_runs": 0,
+    "provider_block_rate_pct": null,
+    "headless_failed_runs": 0,
+    "avg_actual_http_calls_per_market_run": null,
+    "max_actual_http_calls_per_market_run": null,
+    "adaptive_plan_fit_all_samples": true,
+    "eligible_for_manual_review": false,
+    "quota_shadow_validated": false,
+    "automatic_expansion_allowed": false,
+    "manual_review_required": true,
+    "sample_added": true,
+    "persisted": true,
+    "error": ""
   }
 }
