@@ -33,6 +33,14 @@ class DriftAudit:
 
 def classify_path(path: str) -> str:
     p=str(path or "").strip().replace("\\","/")
+    while "//" in p:
+        p=p.replace("//","/")
+    if p.startswith("./"):
+        p=p[2:]
+    parts=[x for x in p.split("/") if x not in ("",".")]
+    if any(x==".." for x in parts) or p.startswith("/"):
+        return "CODE_OR_CONFIG"
+    p="/".join(parts)
     if p in RUNTIME_MUTABLE_PATHS:
         return "RUNTIME"
     if p.startswith("dados/"):
