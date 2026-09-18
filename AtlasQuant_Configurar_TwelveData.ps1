@@ -1,8 +1,7 @@
 $ErrorActionPreference = "Stop"
 
-$root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$streamlitDir = Join-Path $root ".streamlit"
-$secretsPath = Join-Path $streamlitDir "secrets.toml"
+$configDir = Join-Path $env:LOCALAPPDATA "AtlasQuant"
+$secretsPath = Join-Path $configDir "secrets.toml"
 
 Write-Host ""
 Write-Host "============================================================"
@@ -22,7 +21,7 @@ try {
         throw "A chave foi deixada em branco."
     }
 
-    New-Item -ItemType Directory -Force -Path $streamlitDir | Out-Null
+    New-Item -ItemType Directory -Force -Path $configDir | Out-Null
 
     $existing = @()
     if (Test-Path $secretsPath) {
