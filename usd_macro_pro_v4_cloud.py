@@ -7538,8 +7538,21 @@ def _scanner_load_v934():
     token, repo, branch = _gh_cfg_v934()
     vazio = {"versao": "V9.3.5", "lote": 0, "ultimo_processamento_ts": 0.0, "resultados": {}}
     if not token or not repo:
-        vazio["_erro"] = "Persistência GitHub não configurada."
-        return vazio
+        # Modo Windows/local: use o arquivo local e mantenha tudo neste computador.
+        try:
+            local_path = Path(_SCANNER_GH_PATH_V934)
+            if local_path.exists():
+                data = json.loads(local_path.read_text(encoding="utf-8"))
+                if isinstance(data, dict):
+                    data.setdefault("resultados", {})
+                    data["_storage"] = "LOCAL"
+                    return data
+            vazio["_storage"] = "LOCAL"
+            return vazio
+        except Exception as e:
+            vazio["_erro"] = f"Persistência local: {type(e).__name__}: {e}"
+            vazio["_storage"] = "LOCAL"
+            return vazio
     url = f"https://api.github.com/repos/{repo}/contents/{_SCANNER_GH_PATH_V934}"
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
     try:
@@ -7557,6 +7570,19 @@ def _scanner_load_v934():
         return vazio
 
 def _scanner_save_v934(data):
+    token, repo, branch = _gh_cfg_v934()
+    if not token or not repo:
+        # Modo Windows/local: o botão do Painel Mestre pode atualizar e persistir o scanner localmente.
+        try:
+            local_path = Path(_SCANNER_GH_PATH_V934)
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+            clean = {k: v for k, v in dict(data).items() if not str(k).startswith("_")}
+            tmp_path = local_path.with_suffix(local_path.suffix + ".tmp")
+            tmp_path.write_text(json.dumps(clean, ensure_ascii=False, indent=2), encoding="utf-8")
+            tmp_path.replace(local_path)
+            return True, ""
+        except Exception as e:
+            return False, f"Persistência local: {type(e).__name__}: {e}"
     return False, "Scanner gerenciado pelo Autopilot. Releia o cache; novas coletas e gravações ocorrem no workflow Autopilot."
 
 def _tec_to_json_v934(tec):
