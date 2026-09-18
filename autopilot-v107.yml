@@ -1,9 +1,9 @@
-name: USD Macro Pro - Autopilot V11.0
+name: AtlasQuant - Automatic Scanner + Autopilot
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "7,37 * * * *"
+    # 30-minute automatic scanner cadence. Runtime freshness/budget gates prevent unsafe duplicate API work.\n    - cron: "7,37 * * * *"
 
 permissions:
   contents: write
@@ -27,7 +27,7 @@ jobs:
       CHAVE_NEWSAPI: ${{ secrets.CHAVE_NEWSAPI }}
       CHAVE_EODHD: ${{ secrets.CHAVE_EODHD }}
     steps:
-      - uses: actions/checkout@v4
+      # IMPORTANT: scheduled workflow may live on main, but execution code/data is isolated on runtime.\n      - uses: actions/checkout@v4\n        with:\n          ref: atlasquant-runtime
 
       - uses: actions/setup-python@v5
         with:
