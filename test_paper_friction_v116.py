@@ -22,6 +22,20 @@ class PaperFrictionV116Tests(unittest.TestCase):
                 out=f.apply_paper_friction(pd.DataFrame([{"status":"CLOSED","realized_r":value}]))
                 self.assertTrue(pd.isna(out.loc[0,"net_r"]))
 
+
+    def test_summary_remains_finite_with_invalid_realized_r(self):
+        d=pd.DataFrame([
+            {"status":"CLOSED","realized_r":2.0},
+            {"status":"CLOSED","realized_r":float("nan")},
+            {"status":"CLOSED","realized_r":float("inf")},
+            {"status":"CLOSED","realized_r":float("-inf")},
+        ])
+        s=f.summarize_net(d)
+        self.assertEqual(s["closed_costed"],1)
+        self.assertTrue(math.isfinite(s["gross_r"]))
+        self.assertTrue(math.isfinite(s["net_r"]))
+        self.assertTrue(math.isfinite(s["avg_net_r"]))
+
     def test_summary_safety_contract_never_enables_execution(self):
         s=f.summarize_net(pd.DataFrame([{"status":"CLOSED","realized_r":1.0}]))
         self.assertFalse(s["safety"]["real_orders"])
