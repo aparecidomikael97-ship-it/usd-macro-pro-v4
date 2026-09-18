@@ -78,6 +78,20 @@ class PaperTradingV112SafetyTests(unittest.TestCase):
         self.assertEqual(out["exit_reason"],"STOP_AND_TARGET_SAME_CANDLE")
         self.assertTrue(out["ambiguous_touch"])
 
+
+    def test_nonfinite_realized_r_does_not_contaminate_paper_summary(self):
+        rows=[
+            {"trade_id":"good","pair":"EUR/USD","status":"CLOSED","result":"WIN","realized_r":2.0},
+            {"trade_id":"nan","pair":"EUR/USD","status":"CLOSED","result":"WIN","realized_r":float("nan")},
+            {"trade_id":"inf","pair":"GBP/USD","status":"CLOSED","result":"WIN","realized_r":float("inf")},
+            {"trade_id":"ninf","pair":"GBP/USD","status":"CLOSED","result":"LOSS","realized_r":float("-inf")},
+        ]
+        summary=p.summarize_paper_trades(pd.DataFrame(rows))
+        self.assertEqual(summary["net_r"],2.0)
+        self.assertEqual(summary["avg_r"],2.0)
+        self.assertEqual(summary["by_pair"]["EUR/USD"]["net_r"],2.0)
+        self.assertEqual(summary["by_pair"]["GBP/USD"]["net_r"],0.0)
+
     def test_module_has_no_live_broker_execution_contract(self):
         self.assertNotIn("broker", {x.lower() for x in dir(p) if callable(getattr(p,x,None))})
         self.assertEqual(p.ACTIVE_STATUSES,{"WAIT_ENTRY","OPEN"})
