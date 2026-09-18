@@ -31,6 +31,7 @@ class WindowsPrivatePackageTests(unittest.TestCase):
             "atlasquant_ui_v1.py",
             "tradingview/atlasquant_fvg_strategy_v1.pine",
             "dados/example.json",
+            "academy_media/manifest.json",
         )
         for path in allowed:
             with self.subTest(path=path):
@@ -47,6 +48,7 @@ class WindowsPrivatePackageTests(unittest.TestCase):
         self.assertIn("usd_macro_pro_v4_cloud.py", files)
         self.assertIn("requirements.txt", files)
         self.assertIn("AtlasQuant_Windows_Privado.bat", files)
+        self.assertIn("academy_media/manifest.json", files)
         self.assertFalse(any(path.startswith(".github/") for path in files))
         self.assertFalse(any(path.startswith("docs/") for path in files))
         self.assertFalse(any(path.endswith(".md") for path in files))
