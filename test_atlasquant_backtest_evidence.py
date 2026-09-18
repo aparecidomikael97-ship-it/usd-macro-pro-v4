@@ -144,5 +144,23 @@ class BacktestEvidenceTests(unittest.TestCase):
         self.assertEqual(bos["evidence_coverage"],"INSUFFICIENT")
 
 
+    def test_corrupt_counts_and_statuses_fail_closed_in_evidence(self):
+        comp=comparison()
+        comp.loc[comp["strategy"]=="FVG","trades"]=float("inf")
+        comp.loc[comp["strategy"]=="FVG","max_loss_streak"]=-1
+        stab=status_frame("stability_status","POSITIVE_ACROSS_FOLDS")
+        stab.loc[stab["strategy"]=="FVG","stability_status"]="NaN"
+        out=consolidated_evidence_frame(
+            comp,stab,
+            status_frame("walk_forward_status","INSUFFICIENT"),
+            status_frame("sensitivity_status","INSUFFICIENT"),
+            None,
+        )
+        fvg=out[out["strategy"]=="FVG"].iloc[0]
+        self.assertEqual(int(fvg["trades"]),0)
+        self.assertEqual(int(fvg["max_loss_streak"]),0)
+        self.assertEqual(fvg["evidence_coverage"],"INSUFFICIENT")
+
+
 if __name__=="__main__":
     unittest.main()
