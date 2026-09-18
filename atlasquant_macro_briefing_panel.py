@@ -8,6 +8,7 @@ from typing import Any, Mapping, Sequence
 import streamlit as st
 
 from atlasquant_macro_briefing import build_macro_briefing
+from atlasquant_macro_briefing_voice import VoiceRequest
 
 
 def render_macro_briefing_panel(currency_rows: Sequence[Mapping[str, Any]] | None, events: Sequence[Mapping[str, Any]] | None = None, central_banks: Sequence[Mapping[str, Any]] | None = None) -> dict[str, Any]:
@@ -44,6 +45,19 @@ def render_macro_briefing_panel(currency_rows: Sequence[Mapping[str, Any]] | Non
         "Narração preparada para TTS neural. O áudio é opcional e deve consumir somente "
         "o speech_text acima; nenhum provedor de voz é chamado automaticamente ao abrir a tela."
     )
+    voice_style = st.selectbox(
+        "Estilo da voz",
+        ["deep", "clear", "normal", "crisp", "fancy", "delicate"],
+        index=0,
+        key="aq_macro_brief_voice_style",
+    )
+    voice_request = VoiceRequest(brief["speech_text"], voice_style).validated()
+    st.session_state["aq_macro_brief_voice_request"] = {
+        "transcript": voice_request.transcript,
+        "voice": voice_request.voice,
+    }
+    st.caption("O pedido de áudio só fica preparado; a geração exige ação explícita e provedor TTS configurado.")
+
     st.download_button(
         "Baixar roteiro da narração",
         data=brief["speech_text"],
