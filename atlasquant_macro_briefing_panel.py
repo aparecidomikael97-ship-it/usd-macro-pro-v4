@@ -39,5 +39,17 @@ def render_macro_briefing_panel(currency_rows: Sequence[Mapping[str, Any]] | Non
     st.markdown("#### 🔊 Texto da apresentação")
     st.write(brief["speech_text"])
     st.caption("A camada de voz deve ler exatamente este texto; ela não pode gerar sinal ou alterar o diagnóstico.")
+    st.markdown("#### 🎧 Voz")
+    st.caption(
+        "Narração preparada para TTS neural. O áudio é opcional e deve consumir somente "
+        "o speech_text acima; nenhum provedor de voz é chamado automaticamente ao abrir a tela."
+    )
+    st.download_button(
+        "Baixar roteiro da narração",
+        data=brief["speech_text"],
+        file_name=f"atlasquant_macro_briefing_{horizon}.txt",
+        mime="text/plain",
+        key=f"aq_macro_brief_script_{horizon}",
+    )
     st.caption(brief["disclaimer"])
     return brief
