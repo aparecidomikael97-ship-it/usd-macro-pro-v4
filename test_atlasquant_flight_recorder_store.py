@@ -48,21 +48,21 @@ class AtlasQuantFlightRecorderStoreTests(unittest.TestCase):
     def test_same_decision_id_deduplicates_without_fingerprint(self):
         a={"decision_id":"d1","asset":"EUR/USD","outcome":"BLOCKED"}
         b={"decision_id":"d1","asset":"EUR/USD","outcome":"BLOCKED"}
-        rows,added=store.merge_unique_records([a],[b],max_records=10)
+        rows,added=merge_unique_records([a],[b],max_records=10)
         self.assertEqual(len(rows),1)
         self.assertEqual(added,0)
 
     def test_different_decision_ids_are_preserved(self):
         a={"decision_id":"d1","asset":"EUR/USD","outcome":"BLOCKED"}
         b={"decision_id":"d2","asset":"EUR/USD","outcome":"BLOCKED"}
-        rows,added=store.merge_unique_records([a],[b],max_records=10)
+        rows,added=merge_unique_records([a],[b],max_records=10)
         self.assertEqual(len(rows),2)
         self.assertEqual(added,1)
 
     def test_fingerprint_has_priority_over_decision_id(self):
         a={"_fingerprint":"fp1","decision_id":"d1"}
         b={"_fingerprint":"fp1","decision_id":"d2"}
-        rows,added=store.merge_unique_records([a],[b],max_records=10)
+        rows,added=merge_unique_records([a],[b],max_records=10)
         self.assertEqual(len(rows),1)
         self.assertEqual(added,0)
 
