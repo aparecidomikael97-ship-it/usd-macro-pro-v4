@@ -12,6 +12,7 @@ class AcademyVideoScriptsTests(unittest.TestCase):
         cls.ict_scripts = None
         cls.atlas_scripts = None
         cls.visuals = None
+        cls.quizzes = None
         for node in tree.body:
             if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
                 if node.target.id == "MACRO_VIDEO_SCRIPTS":
@@ -22,6 +23,8 @@ class AcademyVideoScriptsTests(unittest.TestCase):
                     cls.atlas_scripts = ast.literal_eval(node.value)
                 elif node.target.id == "ACADEMY_VISUALS":
                     cls.visuals = ast.literal_eval(node.value)
+                elif node.target.id == "ACADEMY_QUIZZES":
+                    cls.quizzes = ast.literal_eval(node.value)
         if cls.scripts is None:
             raise AssertionError("MACRO_VIDEO_SCRIPTS não encontrado")
         if cls.ict_scripts is None:
@@ -30,6 +33,8 @@ class AcademyVideoScriptsTests(unittest.TestCase):
             raise AssertionError("ATLASQUANT_VIDEO_SCRIPTS não encontrado")
         if cls.visuals is None:
             raise AssertionError("ACADEMY_VISUALS não encontrado")
+        if cls.quizzes is None:
+            raise AssertionError("ACADEMY_QUIZZES não encontrado")
 
     def test_all_macro_lessons_have_complete_video_scripts(self):
         expected = {f"macro_{i:02d}" for i in range(1, 9)}
@@ -74,6 +79,34 @@ class AcademyVideoScriptsTests(unittest.TestCase):
             self.assertTrue(visual.get("subtitulo"), lesson_id)
             self.assertGreaterEqual(len(visual.get("itens", [])), 3, lesson_id)
             self.assertTrue(visual.get("nota"), lesson_id)
+
+    def test_all_22_lessons_have_two_quiz_questions(self):
+        expected = (
+            {f"macro_{i:02d}" for i in range(1, 9)}
+            | {f"ict_{i:02d}" for i in range(1, 8)}
+            | {f"aq_{i:02d}" for i in range(1, 8)}
+        )
+        self.assertEqual(set(self.quizzes), expected)
+        self.assertEqual(sum(len(items) for items in self.quizzes.values()), 44)
+        for lesson_id, items in self.quizzes.items():
+            self.assertEqual(len(items), 2, lesson_id)
+            for item in items:
+                self.assertTrue(item.get("pergunta"))
+                self.assertEqual(len(item.get("opcoes", [])), 4)
+                self.assertIn(item.get("correta"), range(4))
+                self.assertTrue(item.get("explicacao"))
+
+    def test_progress_persists_outside_zip(self):
+        self.assertIn('os.environ["LOCALAPPDATA"]', self.source)
+        self.assertIn('/ "AtlasQuant"', self.source)
+        self.assertIn('academy_progress.json', self.source)
+        self.assertIn('tmp.replace(path)', self.source)
+
+    def test_certificate_requires_full_completion(self):
+        self.assertIn("Concluir as 22 aulas", self.source.replace("concluiu", "Concluir"))
+        self.assertIn("_course_complete = _all_ids.issubset(completed) and _all_ids.issubset(passed_quizzes)", self.source)
+        self.assertIn("Baixar certificado (HTML)", self.source)
+        self.assertIn("CERTIFICADO DE CONCLUSÃO", self.source)
 
     def test_academy_renders_native_offline_visuals(self):
         self.assertIn("def _academy_visual_html", self.source)
