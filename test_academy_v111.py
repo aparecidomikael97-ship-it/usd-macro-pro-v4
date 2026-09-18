@@ -61,12 +61,14 @@ class AcademyVideoScriptsTests(unittest.TestCase):
                 self.assertTrue(segment.get("tela"))
                 self.assertTrue(segment.get("narracao"))
 
-    def test_core_visual_atlas_has_eight_lessons(self):
-        expected = {
-            "macro_01", "macro_02", "macro_04", "macro_07",
-            "ict_02", "ict_03", "ict_04", "ict_05",
-        }
+    def test_visual_atlas_covers_all_22_lessons(self):
+        expected = (
+            {f"macro_{i:02d}" for i in range(1, 9)}
+            | {f"ict_{i:02d}" for i in range(1, 8)}
+            | {f"aq_{i:02d}" for i in range(1, 8)}
+        )
         self.assertEqual(set(self.visuals), expected)
+        self.assertEqual(len(self.visuals), 22)
         for lesson_id, visual in self.visuals.items():
             self.assertTrue(visual.get("titulo"), lesson_id)
             self.assertTrue(visual.get("subtitulo"), lesson_id)
