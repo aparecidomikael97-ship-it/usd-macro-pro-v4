@@ -265,6 +265,113 @@ function Start-AtlasQuant {
     Pause-AtlasQuant
 }
 
+
+function Get-AtlasQuantLanIp {
+    try {
+        $cfg = Get-NetIPConfiguration -ErrorAction Stop |
+            Where-Object { $null -ne $_.IPv4DefaultGateway -and $null -ne $_.IPv4Address } |
+            Select-Object -First 1
+        if ($null -ne $cfg -and $null -ne $cfg.IPv4Address) {
+            return [string]$cfg.IPv4Address.IPAddress
+        }
+    } catch {}
+    return ""
+}
+
+function Start-AtlasQuantMobile {
+    Clear-Host
+    if (-not (Test-Path ".venv\Scripts\python.exe")) {
+        Write-Host "[AVISO] O ambiente ainda nao foi preparado."
+        Write-Host "Execute primeiro a opcao 1."
+        Pause-AtlasQuant
+        return
+    }
+
+    Write-Host "============================================================"
+    Write-Host "        ATLASQUANT - MODO CELULAR / WI-FI LOCAL"
+    Write-Host "============================================================"
+    Write-Host ""
+    Write-Host "[IMPORTANTE] Este modo permite acesso apenas pela sua rede local."
+    Write-Host "Use somente em uma rede Wi-Fi confiavel."
+    Write-Host "Nao encaminhe a porta 8501 no roteador e nao exponha este endereco na internet."
+    Write-Host ""
+    $confirm = Read-Host "Continuar? (S/N)"
+    if ($confirm -notmatch "^[Ss]$") {
+        Write-Host "Operacao cancelada."
+        Pause-AtlasQuant
+        return
+    }
+
+    $existing = Get-AtlasQuantProcess
+    if ($null -ne $existing) {
+        Write-Host "[INFO] AtlasQuant anterior detectado na porta 8501."
+        Write-Host "Encerrando a instancia anterior para iniciar o modo celular..."
+        Stop-Process -Id $existing.Id -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Milliseconds 700
+        Remove-Item (Get-AtlasQuantPidFile) -Force -ErrorAction SilentlyContinue
+    }
+
+    $secretState = Import-AtlasQuantLocalSecrets
+    if ($secretState.TwelveData) { Write-Host "[OK] Twelve Data carregado." }
+    if ($secretState.Fred) { Write-Host "[OK] FRED carregado." }
+    if ($secretState.Eodhd) { Write-Host "[OK] EODHD carregado." }
+    if ($secretState.NewsApi) { Write-Host "[OK] NewsAPI carregado." }
+
+    $python = (Resolve-Path ".\.venv\Scripts\python.exe").Path
+    $args = @(
+        "-m", "streamlit", "run", "usd_macro_pro_v4_cloud.py",
+        "--server.address", "0.0.0.0",
+        "--server.port", "8501",
+        "--server.headless", "true",
+        "--browser.gatherUsageStats", "false"
+    )
+
+    $proc = Start-Process -FilePath $python -ArgumentList $args -WorkingDirectory (Get-Location).Path -WindowStyle Hidden -PassThru
+    Set-Content -Path (Get-AtlasQuantPidFile) -Value $proc.Id -Encoding ASCII
+
+    Write-Host "Aguardando o servidor iniciar..."
+    $ready = $false
+    for ($i = 0; $i -lt 20; $i++) {
+        Start-Sleep -Milliseconds 750
+        $proc.Refresh()
+        if ($proc.HasExited) {
+            Remove-Item (Get-AtlasQuantPidFile) -Force -ErrorAction SilentlyContinue
+            throw "O servidor encerrou durante a inicializacao."
+        }
+        try {
+            $resp = Invoke-WebRequest -Uri "http://127.0.0.1:8501" -UseBasicParsing -TimeoutSec 1
+            if ($resp.StatusCode -ge 200 -and $resp.StatusCode -lt 500) {
+                $ready = $true
+                break
+            }
+        } catch {}
+    }
+
+    $lanIp = Get-AtlasQuantLanIp
+    Write-Host ""
+    if ($ready) {
+        Write-Host "[OK] AtlasQuant pronto para conexao pelo celular."
+    } else {
+        Write-Host "[AVISO] O servidor ainda pode levar alguns segundos."
+    }
+
+    Write-Host "No computador: http://127.0.0.1:8501"
+    if ([string]::IsNullOrWhiteSpace($lanIp)) {
+        Write-Host "[AVISO] Nao foi possivel detectar automaticamente o IP da rede."
+        Write-Host "Use ipconfig para localizar o endereco IPv4 do computador."
+    } else {
+        Write-Host ("No celular: http://" + $lanIp + ":8501")
+        Write-Host ""
+        Write-Host "Digite esse endereco no aplicativo AtlasQuant Android."
+    }
+    Write-Host ""
+    Write-Host "O celular e o computador precisam estar na mesma rede Wi-Fi."
+    Write-Host "Se o Windows Firewall perguntar, permita somente em redes privadas."
+    Start-Process "http://127.0.0.1:8501"
+    Pause-AtlasQuant
+}
+
+
 function Stop-AtlasQuant {
     Clear-Host
     $proc = Get-AtlasQuantProcess
@@ -363,6 +470,7 @@ while ($true) {
     Write-Host " [6] Parar AtlasQuant local"
     Write-Host " [7] Configurar FRED local"
     Write-Host " [8] Configurar as 4 APIs locais"
+    Write-Host " [9] Iniciar modo celular - Wi-Fi local"
     Write-Host ""
     $choice = Read-Host "Escolha uma opcao"
     try {
@@ -375,6 +483,7 @@ while ($true) {
             "6" { Stop-AtlasQuant }
             "7" { Configure-Fred }
             "8" { Configure-AllApis }
+            "9" { Start-AtlasQuantMobile }
             default {
                 Write-Host ""
                 Write-Host "Opcao invalida."
