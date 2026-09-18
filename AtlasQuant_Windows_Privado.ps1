@@ -17,36 +17,55 @@ function Get-PythonLauncher {
 }
 
 
-function Import-AtlasQuantLocalSecrets {
+function Read-AtlasQuantLocalSecret {
+    param([Parameter(Mandatory=$true)][string]$Name)
+
     $secretsPath = Join-Path (Get-Location).Path ".streamlit\secrets.toml"
     if (-not (Test-Path $secretsPath)) {
-        return $false
+        return ""
     }
 
     try {
+        $escapedName = [regex]::Escape($Name)
         $line = Get-Content -LiteralPath $secretsPath | Where-Object {
-            $_ -match '^\s*CHAVE_TWELVE_DATA\s*='
+            $_ -match ("^\s*" + $escapedName + "\s*=")
         } | Select-Object -Last 1
 
         if ([string]::IsNullOrWhiteSpace($line)) {
-            return $false
+            return ""
         }
 
-        if ($line -notmatch '^\s*CHAVE_TWELVE_DATA\s*=\s*"(.*)"\s*$') {
-            return $false
+        if ($line -notmatch ("^\s*" + $escapedName + "\s*=\s*\"(.*)\"\s*$")) {
+            return ""
         }
 
         $value = $Matches[1]
         $value = $value.Replace('\"', '"').Replace('\\', '\')
-        if ([string]::IsNullOrWhiteSpace($value)) {
-            return $false
-        }
-
-        $env:CHAVE_TWELVE_DATA = $value
-        return $true
+        return $value
     } catch {
-        return $false
+        return ""
     }
+}
+
+function Import-AtlasQuantLocalSecrets {
+    $state = @{
+        TwelveData = $false
+        Fred = $false
+    }
+
+    $twelve = Read-AtlasQuantLocalSecret -Name "CHAVE_TWELVE_DATA"
+    if (-not [string]::IsNullOrWhiteSpace($twelve)) {
+        $env:CHAVE_TWELVE_DATA = $twelve
+        $state.TwelveData = $true
+    }
+
+    $fred = Read-AtlasQuantLocalSecret -Name "CHAVE_FRED"
+    if (-not [string]::IsNullOrWhiteSpace($fred)) {
+        $env:CHAVE_FRED = $fred
+        $state.Fred = $true
+    }
+
+    return $state
 }
 
 function Prepare-AtlasQuant {
@@ -117,11 +136,16 @@ function Start-AtlasQuant {
         return
     }
 
-    $secretLoaded = Import-AtlasQuantLocalSecrets
-    if ($secretLoaded) {
+    $secretState = Import-AtlasQuantLocalSecrets
+    if ($secretState.TwelveData) {
         Write-Host "[OK] Twelve Data local carregado para esta sessao."
     } else {
         Write-Host "[AVISO] Chave Twelve Data local nao foi localizada ou nao pode ser lida."
+    }
+    if ($secretState.Fred) {
+        Write-Host "[OK] FRED local carregado para esta sessao."
+    } else {
+        Write-Host "[AVISO] CHAVE_FRED nao configurada. A aba EUA pode ficar sem dados oficiais."
     }
 
     $python = (Resolve-Path ".\.venv\Scripts\python.exe").Path
@@ -217,6 +241,17 @@ function Configure-TwelveData {
     & powershell -NoProfile -ExecutionPolicy Bypass -File ".\AtlasQuant_Configurar_TwelveData.ps1"
 }
 
+function Configure-Fred {
+    Clear-Host
+    if (-not (Test-Path "AtlasQuant_Configurar_FRED.ps1")) {
+        Write-Host "[ERRO] Configurador da FRED nao encontrado."
+        Write-Host "Atualize o pacote do AtlasQuant."
+        Pause-AtlasQuant
+        return
+    }
+    & powershell -NoProfile -ExecutionPolicy Bypass -File ".\AtlasQuant_Configurar_FRED.ps1"
+}
+
 if (-not (Test-Path "usd_macro_pro_v4_cloud.py")) {
     Write-Host "[ERRO] Este launcher precisa ficar na pasta principal do AtlasQuant."
     Write-Host "Arquivo esperado: usd_macro_pro_v4_cloud.py"
@@ -236,6 +271,7 @@ while ($true) {
     Write-Host " [4] Configurar Twelve Data local"
     Write-Host " [5] Sair"
     Write-Host " [6] Parar AtlasQuant local"
+    Write-Host " [7] Configurar FRED local"
     Write-Host ""
     $choice = Read-Host "Escolha uma opcao"
     try {
@@ -246,6 +282,7 @@ while ($true) {
             "4" { Configure-TwelveData }
             "5" { exit 0 }
             "6" { Stop-AtlasQuant }
+            "7" { Configure-Fred }
             default {
                 Write-Host ""
                 Write-Host "Opcao invalida."
