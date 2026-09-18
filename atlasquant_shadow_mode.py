@@ -109,12 +109,21 @@ def append_shadow_sample(
     return rows,True
 
 
+def _valid_threshold(value: Any, *, minimum: int = 1) -> tuple[int,bool]:
+    if isinstance(value,bool): return minimum,False
+    try:
+        x=float(value)
+        if not math.isfinite(x) or not x.is_integer() or x < minimum: return minimum,False
+        return int(x),True
+    except Exception: return minimum,False
+
 def shadow_pair_breakdown(
     samples: Sequence[Mapping[str, Any]] | None,
     *,
     expected_pairs: Sequence[str] | None = None,
     min_pair_samples: int = 10,
 ) -> list[dict[str, Any]]:
+    pair_min,pair_min_valid=_valid_threshold(min_pair_samples)
     rows=[dict(x) for x in (samples or [])]
     observed={
         str((x.get("champion",{}) or {}).get("pair", "—"))
@@ -144,7 +153,7 @@ def shadow_pair_breakdown(
         out.append({
             "pair":pair,
             "samples":total,
-            "minimum_met":total>=int(min_pair_samples),
+            "minimum_met":bool(pair_min_valid and total>=pair_min),
             "side_agreement_pct":None if total==0 else round(side/total*100.0,2),
             "execution_agreement_pct":None if total==0 else round(execution/total*100.0,2),
             "critical_mismatches":critical,
@@ -162,17 +171,20 @@ def summarize_shadow(
 ) -> dict[str, Any]:
     rows=[dict(x) for x in (samples or [])]
     total=len(rows)
+    min_total,min_total_valid=_valid_threshold(min_samples)
+    pair_min,pair_min_valid=_valid_threshold(min_pair_samples)
+    thresholds_valid=bool(min_total_valid and pair_min_valid)
     def pct(key: str) -> float | None:
         return None if total==0 else round(sum(1 for x in rows if bool(x.get(key)))/total*100.0,2)
     score_deltas=[abs(float(x["score_delta"])) for x in rows if _num(x.get("score_delta")) is not None]
     quality_deltas=[abs(float(x["quality_delta"])) for x in rows if _num(x.get("quality_delta")) is not None]
     critical=sum(1 for x in rows if bool(x.get("critical_mismatch",False)))
-    enough=total>=int(min_samples)
+    enough=bool(thresholds_valid and total>=min_total)
 
     pair_rows=shadow_pair_breakdown(
         rows,
         expected_pairs=expected_pairs,
-        min_pair_samples=min_pair_samples,
+        min_pair_samples=pair_min,
     )
     coverage_gate_enabled=expected_pairs is not None
     balanced=(
@@ -181,11 +193,12 @@ def summarize_shadow(
         else True
     )
     missing=[x["pair"] for x in pair_rows if int(x["samples"])==0]
-    under=[x["pair"] for x in pair_rows if 0<int(x["samples"])<int(min_pair_samples)]
+    under=[x["pair"] for x in pair_rows if 0<int(x["samples"])<pair_min]
 
     return {
         "samples":total,
-        "min_samples":int(min_samples),
+        "min_samples":min_total,
+        "thresholds_valid":thresholds_valid,
         "minimum_met":enough,
         "side_agreement_pct":pct("side_match"),
         "execution_agreement_pct":pct("execution_match"),
@@ -201,8 +214,8 @@ def summarize_shadow(
         "coverage_balanced":balanced,
         "missing_pairs":missing,
         "under_sampled_pairs":under,
-        "min_pair_samples":int(min_pair_samples),
-        "eligible_for_manual_review":bool(enough and critical==0 and balanced),
+        "min_pair_samples":pair_min,
+        "eligible_for_manual_review":bool(thresholds_valid and enough and critical==0 and balanced),
         "auto_promotion_allowed":False,
     }
 
