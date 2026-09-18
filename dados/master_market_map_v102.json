@@ -1,17 +1,17 @@
 {
   "version": "V11.0_INSTITUTIONAL_AUTOPILOT",
   "cursor": 2,
-  "last_batch_ts": 1789757254.719443,
+  "last_batch_ts": 1789759267.8379424,
   "contexts": {
     "USD/CHF": {
       "pair": "USD/CHF",
-      "updated_at": "2026-09-18T18:23:19.896538+00:00",
-      "candle_m15": "2026-09-18T18:00:00+00:00",
-      "price": 0.82197,
+      "updated_at": "2026-09-18T19:21:07.709472+00:00",
+      "candle_m15": "2026-09-18T19:00:00+00:00",
+      "price": 0.82202,
       "macro_direction": "🟢 COMPRA USD/CHF",
-      "macro_score": 89.0,
-      "quality": 91.0,
-      "rank_index": 89.9,
+      "macro_score": 79.0,
+      "quality": 88.0,
+      "rank_index": 82.7,
       "w1": {
         "bias": "ALTISTA",
         "score": 80.0,
@@ -474,10 +474,10 @@
       },
       "premium_discount": {
         "zone": "ACIMA DO RANGE",
-        "position": 145.49718574108837,
+        "position": 145.96622889305831,
         "equilibrium": 0.81179,
         "inside_range": false,
-        "expansion_pct": 45.49718574108837
+        "expansion_pct": 45.966228893058314
       },
       "bsl": [
         "Asia High",
@@ -499,7 +499,7 @@
         "rejection": "fechou de volta acima do nível"
       },
       "killzone": {
-        "now_ny": "2026-09-18 14:23:19.750853-04:00",
+        "now_ny": "2026-09-18 15:21:07.579109-04:00",
         "active": {
           "name": "New York PM",
           "start": "2026-09-18 13:30:00-04:00",
@@ -590,8 +590,8 @@
       },
       "macro_regime": {
         "side": "ALTISTA",
-        "weekly_label": "FORTE",
-        "consistency": 100.0,
+        "weekly_label": "FRÁGIL / CONFLITANTE",
+        "consistency": 50.0,
         "recent_label": "NEUTRO / SEM DADO",
         "event_risk": {
           "level": "NORMAL",
@@ -601,14 +601,14 @@
         "components": [
           {
             "name": "Regime macro USD",
-            "ok": true,
-            "detail": "USD 62/100",
+            "ok": null,
+            "detail": "USD 56/100",
             "weight": 25.0
           },
           {
             "name": "Federal Reserve",
-            "ok": true,
-            "detail": "Restritivo",
+            "ok": null,
+            "detail": "Neutro",
             "weight": 20.0
           },
           {
@@ -624,8 +624,8 @@
             "weight": 15.0
           }
         ],
-        "macro_score": 89.0,
-        "quality": 91.0
+        "macro_score": 79.0,
+        "quality": 88.0
       },
       "readiness": {
         "score": 77.0,
@@ -636,13 +636,13 @@
             "name": "Macro forte",
             "ok": true,
             "weight": 15.0,
-            "detail": "Score 89/100"
+            "detail": "Score 79/100"
           },
           {
             "name": "Qualidade dos dados",
             "ok": true,
             "weight": 15.0,
-            "detail": "91%"
+            "detail": "88%"
           },
           {
             "name": "W1 alinhado",
@@ -703,7 +703,7 @@
       "adr_used_pct": 104.1181581233721,
       "intraday_opens": {
         "available": true,
-        "current": 0.82197,
+        "current": 0.82202,
         "day_open": 0.82356,
         "week_open": 0.81828,
         "above_day_open": false,
@@ -713,13 +713,13 @@
     },
     "NZD/USD": {
       "pair": "NZD/USD",
-      "updated_at": "2026-09-18T18:47:34.719340+00:00",
-      "candle_m15": "2026-09-18T18:30:00+00:00",
-      "price": 0.57229,
+      "updated_at": "2026-09-18T19:21:07.440335+00:00",
+      "candle_m15": "2026-09-18T19:00:00+00:00",
+      "price": 0.57247,
       "macro_direction": "🔴 VENDA NZD/USD",
-      "macro_score": 84.0,
-      "quality": 91.0,
-      "rank_index": 87.1,
+      "macro_score": 74.0,
+      "quality": 88.0,
+      "rank_index": 79.8,
       "w1": {
         "bias": "NEUTRO",
         "score": 60.0,
@@ -1138,10 +1138,10 @@
       },
       "premium_discount": {
         "zone": "ABAIXO DO RANGE",
-        "position": -73.8445378151252,
+        "position": -71.95378151260347,
         "equilibrium": 0.5840799999999999,
         "inside_range": false,
-        "expansion_pct": 73.8445378151252
+        "expansion_pct": 71.95378151260347
       },
       "bsl": [
         "Asia High",
@@ -1163,7 +1163,7 @@
         "rejection": "fechou de volta acima do nível"
       },
       "killzone": {
-        "now_ny": "2026-09-18 14:47:34.398822-04:00",
+        "now_ny": "2026-09-18 15:21:07.308368-04:00",
         "active": {
           "name": "New York PM",
           "start": "2026-09-18 13:30:00-04:00",
@@ -1254,8 +1254,8 @@
       },
       "macro_regime": {
         "side": "BAIXISTA",
-        "weekly_label": "FORTE",
-        "consistency": 100.0,
+        "weekly_label": "FRÁGIL / CONFLITANTE",
+        "consistency": 50.0,
         "recent_label": "NEUTRO / SEM DADO",
         "event_risk": {
           "level": "NORMAL",
@@ -1265,14 +1265,14 @@
         "components": [
           {
             "name": "Regime macro USD",
-            "ok": true,
-            "detail": "USD 62/100",
+            "ok": null,
+            "detail": "USD 56/100",
             "weight": 25.0
           },
           {
             "name": "Federal Reserve",
-            "ok": true,
-            "detail": "Restritivo",
+            "ok": null,
+            "detail": "Neutro",
             "weight": 20.0
           },
           {
@@ -1288,8 +1288,8 @@
             "weight": 15.0
           }
         ],
-        "macro_score": 84.0,
-        "quality": 91.0
+        "macro_score": 74.0,
+        "quality": 88.0
       },
       "readiness": {
         "score": 57.0,
@@ -1300,13 +1300,13 @@
             "name": "Macro forte",
             "ok": true,
             "weight": 15.0,
-            "detail": "Score 84/100"
+            "detail": "Score 74/100"
           },
           {
             "name": "Qualidade dos dados",
             "ok": true,
             "weight": 15.0,
-            "detail": "91%"
+            "detail": "88%"
           },
           {
             "name": "W1 alinhado",
@@ -1367,7 +1367,7 @@
       "adr_used_pct": 90.99350046425072,
       "intraday_opens": {
         "available": true,
-        "current": 0.57229,
+        "current": 0.57247,
         "day_open": 0.57313,
         "week_open": 0.57821,
         "above_day_open": false,
@@ -1377,13 +1377,13 @@
     },
     "USD/JPY": {
       "pair": "USD/JPY",
-      "updated_at": "2026-09-18T18:23:19.746774+00:00",
-      "candle_m15": "2026-09-18T18:00:00+00:00",
-      "price": 156.70262,
+      "updated_at": "2026-09-18T19:21:07.575457+00:00",
+      "candle_m15": "2026-09-18T19:00:00+00:00",
+      "price": 156.68565,
       "macro_direction": "🟢 COMPRA USD/JPY",
-      "macro_score": 90.0,
-      "quality": 84.0,
-      "rank_index": 87.2,
+      "macro_score": 79.0,
+      "quality": 81.0,
+      "rank_index": 79.5,
       "w1": {
         "bias": "NEUTRO",
         "score": 40.0,
@@ -1858,10 +1858,10 @@
       },
       "premium_discount": {
         "zone": "ACIMA DO RANGE",
-        "position": 109.2251984640983,
+        "position": 108.73673787771574,
         "equilibrium": 154.64503,
         "inside_range": false,
-        "expansion_pct": 9.225198464098298
+        "expansion_pct": 8.73673787771574
       },
       "bsl": [
         "Asia High",
@@ -1883,7 +1883,7 @@
         "rejection": "fechou de volta abaixo do nível"
       },
       "killzone": {
-        "now_ny": "2026-09-18 14:23:19.601872-04:00",
+        "now_ny": "2026-09-18 15:21:07.443810-04:00",
         "active": {
           "name": "New York PM",
           "start": "2026-09-18 13:30:00-04:00",
@@ -1974,8 +1974,8 @@
       },
       "macro_regime": {
         "side": "ALTISTA",
-        "weekly_label": "FORTE",
-        "consistency": 100.0,
+        "weekly_label": "FRÁGIL / CONFLITANTE",
+        "consistency": 50.0,
         "recent_label": "NEUTRO / SEM DADO",
         "event_risk": {
           "level": "NORMAL",
@@ -1985,14 +1985,14 @@
         "components": [
           {
             "name": "Regime macro USD",
-            "ok": true,
-            "detail": "USD 62/100",
+            "ok": null,
+            "detail": "USD 56/100",
             "weight": 25.0
           },
           {
             "name": "Federal Reserve",
-            "ok": true,
-            "detail": "Restritivo",
+            "ok": null,
+            "detail": "Neutro",
             "weight": 20.0
           },
           {
@@ -2008,8 +2008,8 @@
             "weight": 15.0
           }
         ],
-        "macro_score": 90.0,
-        "quality": 84.0
+        "macro_score": 79.0,
+        "quality": 81.0
       },
       "readiness": {
         "score": 42.0,
@@ -2020,13 +2020,13 @@
             "name": "Macro forte",
             "ok": true,
             "weight": 15.0,
-            "detail": "Score 90/100"
+            "detail": "Score 79/100"
           },
           {
             "name": "Qualidade dos dados",
             "ok": true,
             "weight": 15.0,
-            "detail": "84%"
+            "detail": "81%"
           },
           {
             "name": "W1 alinhado",
@@ -2087,7 +2087,7 @@
       "adr_used_pct": 116.76589848605411,
       "intraday_opens": {
         "available": true,
-        "current": 156.70262,
+        "current": 156.68565,
         "day_open": 157.06391,
         "week_open": 154.07314,
         "above_day_open": false,
@@ -2793,13 +2793,13 @@
     },
     "USD/CAD": {
       "pair": "USD/CAD",
-      "updated_at": "2026-09-18T18:23:20.045925+00:00",
-      "candle_m15": "2026-09-18T18:00:00+00:00",
-      "price": 1.39943,
+      "updated_at": "2026-09-18T19:21:07.837912+00:00",
+      "candle_m15": "2026-09-18T19:00:00+00:00",
+      "price": 1.39884,
       "macro_direction": "🟢 COMPRA USD/CAD",
-      "macro_score": 89.0,
-      "quality": 91.0,
-      "rank_index": 89.9,
+      "macro_score": 79.0,
+      "quality": 88.0,
+      "rank_index": 82.7,
       "w1": {
         "bias": "ALTISTA",
         "score": 80.0,
@@ -3214,32 +3214,32 @@
       },
       "premium_discount": {
         "zone": "ACIMA DO RANGE",
-        "position": 189.4184168012913,
+        "position": 184.65266558966073,
         "equilibrium": 1.38217,
         "inside_range": false,
-        "expansion_pct": 89.4184168012913
+        "expansion_pct": 84.65266558966073
       },
       "bsl": [
-        "PDH",
-        1.40022
+        "Asia High",
+        1.39931
       ],
       "ssl": [
         "Asia Low",
         1.39796
       ],
       "latest_sweep": {
-        "level": "PDH",
+        "level": "Asia High",
         "type": "SWEEP BSL",
-        "datetime": "2026-09-18 16:45:00+00:00",
-        "price": 1.40022,
-        "high": 1.40024,
-        "low": 1.39999,
-        "close": 1.40006,
-        "excess_abs": 1.999999999990898e-05,
+        "datetime": "2026-09-18 19:00:00+00:00",
+        "price": 1.39931,
+        "high": 1.3994,
+        "low": 1.39883,
+        "close": 1.39884,
+        "excess_abs": 8.999999999992347e-05,
         "rejection": "fechou de volta abaixo do nível"
       },
       "killzone": {
-        "now_ny": "2026-09-18 14:23:19.900626-04:00",
+        "now_ny": "2026-09-18 15:21:07.712821-04:00",
         "active": {
           "name": "New York PM",
           "start": "2026-09-18 13:30:00-04:00",
@@ -3330,8 +3330,8 @@
       },
       "macro_regime": {
         "side": "ALTISTA",
-        "weekly_label": "FORTE",
-        "consistency": 100.0,
+        "weekly_label": "FRÁGIL / CONFLITANTE",
+        "consistency": 50.0,
         "recent_label": "NEUTRO / SEM DADO",
         "event_risk": {
           "level": "NORMAL",
@@ -3341,14 +3341,14 @@
         "components": [
           {
             "name": "Regime macro USD",
-            "ok": true,
-            "detail": "USD 62/100",
+            "ok": null,
+            "detail": "USD 56/100",
             "weight": 25.0
           },
           {
             "name": "Federal Reserve",
-            "ok": true,
-            "detail": "Restritivo",
+            "ok": null,
+            "detail": "Neutro",
             "weight": 20.0
           },
           {
@@ -3364,8 +3364,8 @@
             "weight": 15.0
           }
         ],
-        "macro_score": 89.0,
-        "quality": 91.0
+        "macro_score": 79.0,
+        "quality": 88.0
       },
       "readiness": {
         "score": 57.0,
@@ -3376,13 +3376,13 @@
             "name": "Macro forte",
             "ok": true,
             "weight": 15.0,
-            "detail": "Score 89/100"
+            "detail": "Score 79/100"
           },
           {
             "name": "Qualidade dos dados",
             "ok": true,
             "weight": 15.0,
-            "detail": "91%"
+            "detail": "88%"
           },
           {
             "name": "W1 alinhado",
@@ -3443,7 +3443,7 @@
       "adr_used_pct": 77.14162720619547,
       "intraday_opens": {
         "available": true,
-        "current": 1.39943,
+        "current": 1.39884,
         "day_open": 1.39799,
         "week_open": 1.38741,
         "above_day_open": true,
@@ -3453,13 +3453,13 @@
     },
     "GBP/USD": {
       "pair": "GBP/USD",
-      "updated_at": "2026-09-18T18:47:34.062136+00:00",
-      "candle_m15": "2026-09-18T18:30:00+00:00",
-      "price": 1.33876,
-      "macro_direction": "🔴 VENDA GBP/USD",
-      "macro_score": 68.0,
-      "quality": 70.0,
-      "rank_index": 69.1,
+      "updated_at": "2026-09-18T19:21:07.304783+00:00",
+      "candle_m15": "2026-09-18T19:00:00+00:00",
+      "price": 1.33951,
+      "macro_direction": "⚪ AGUARDAR",
+      "macro_score": 54.0,
+      "quality": 67.0,
+      "rank_index": 59.5,
       "w1": {
         "bias": "ALTISTA",
         "score": 80.0,
@@ -3942,10 +3942,10 @@
       },
       "premium_discount": {
         "zone": "ABAIXO DO RANGE",
-        "position": -106.87285223367884,
+        "position": -98.2817869415822,
         "equilibrium": 1.352455,
         "inside_range": false,
-        "expansion_pct": 106.87285223367884
+        "expansion_pct": 98.2817869415822
       },
       "bsl": [
         "PDH",
@@ -3967,7 +3967,7 @@
         "rejection": "fechou de volta abaixo do nível"
       },
       "killzone": {
-        "now_ny": "2026-09-18 14:47:33.735306-04:00",
+        "now_ny": "2026-09-18 15:21:07.170686-04:00",
         "active": {
           "name": "New York PM",
           "start": "2026-09-18 13:30:00-04:00",
@@ -4057,9 +4057,9 @@
         ]
       },
       "macro_regime": {
-        "side": "BAIXISTA",
-        "weekly_label": "FORTE",
-        "consistency": 100.0,
+        "side": "NEUTRO",
+        "weekly_label": "SEM LADO",
+        "consistency": 50.0,
         "recent_label": "NEUTRO / SEM DADO",
         "event_risk": {
           "level": "NORMAL",
@@ -4069,14 +4069,14 @@
         "components": [
           {
             "name": "Regime macro USD",
-            "ok": true,
-            "detail": "USD 62/100",
+            "ok": null,
+            "detail": "USD 56/100",
             "weight": 25.0
           },
           {
             "name": "Federal Reserve",
-            "ok": true,
-            "detail": "Restritivo",
+            "ok": null,
+            "detail": "Neutro",
             "weight": 20.0
           },
           {
@@ -4092,53 +4092,53 @@
             "weight": 15.0
           }
         ],
-        "macro_score": 68.0,
-        "quality": 70.0
+        "macro_score": 54.0,
+        "quality": 67.0
       },
       "readiness": {
-        "score": 20.0,
+        "score": 44.44444444444444,
         "grade": "WAIT",
         "action": "🔴 NÃO FORÇAR ENTRADA",
         "checks": [
           {
             "name": "Macro forte",
-            "ok": false,
+            "ok": null,
             "weight": 15.0,
-            "detail": "Score 68/100"
+            "detail": "Score 54/100"
           },
           {
             "name": "Qualidade dos dados",
             "ok": false,
             "weight": 15.0,
-            "detail": "70%"
+            "detail": "67%"
           },
           {
             "name": "W1 alinhado",
-            "ok": false,
+            "ok": null,
             "weight": 15.0,
             "detail": "CONFIRMADA"
           },
           {
             "name": "D1 alinhado",
-            "ok": false,
+            "ok": null,
             "weight": 15.0,
             "detail": "NEUTRA"
           },
           {
             "name": "Estrutura W1+D1 limpa",
-            "ok": false,
+            "ok": null,
             "weight": 10.0,
             "detail": "W1 TENDÊNCIA ALTISTA · D1 TENDÊNCIA ALTISTA"
           },
           {
             "name": "Localização eficiente",
-            "ok": false,
+            "ok": null,
             "weight": 10.0,
             "detail": "ABAIXO DO RANGE"
           },
           {
             "name": "Sweep coerente",
-            "ok": true,
+            "ok": null,
             "weight": 8.0,
             "detail": "SWEEP BSL"
           },
@@ -4158,20 +4158,20 @@
         "hard_conflict": true
       },
       "readiness_grade": "WAIT",
-      "readiness_score": 20.0,
+      "readiness_score": 44.44444444444444,
       "event_risk": "NORMAL",
       "adr": {
         "available": true,
         "adr": 0.004862857142857105,
-        "today_range": 0.005889999999999951,
-        "used_pct": 121.12220916568735,
+        "today_range": 0.005980000000000096,
+        "used_pct": 122.9729729729759,
         "state": "🔴 RANGE EXTREMO",
         "length": 14
       },
-      "adr_used_pct": 121.12220916568735,
+      "adr_used_pct": 122.9729729729759,
       "intraday_opens": {
         "available": true,
-        "current": 1.33876,
+        "current": 1.33951,
         "day_open": 1.33717,
         "week_open": 1.35051,
         "above_day_open": true,
@@ -4891,5 +4891,5 @@
       "autopilot_v107": true
     }
   },
-  "autopilot_updated_at": "2026-09-18T18:47:34.719445+00:00"
+  "autopilot_updated_at": "2026-09-18T19:21:07.837943+00:00"
 }
