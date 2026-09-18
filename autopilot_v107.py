@@ -1198,6 +1198,15 @@ def status_summary(
         "matrix_generated_at":inputs.get("generated_at"),
         "scanner_fresh":scanner_fresh,
         "market_map_fresh":map_fresh,
+        "scanner_ready":bool(scanner_fresh >= (5 if forex_market_likely_open(now) else 0)),
+        "market_map_ready":bool(map_fresh >= (5 if forex_market_likely_open(now) else 0)),
+        "operational_readiness":(
+            "READY" if (
+                app_ok and not _TD_DAILY_BLOCKED and
+                scanner_fresh >= (5 if forex_market_likely_open(now) else 0) and
+                map_fresh >= (5 if forex_market_likely_open(now) else 0) and len(errors)<8
+            ) else "DEGRADED"
+        ),
         "news_updated_at":intel.get("updated_at"),
         "news_unique_stories":intel.get("global_unique_stories",0),
         "validation_rows":len(validation),
