@@ -196,7 +196,8 @@ def evaluate_pair_checklist(
         data_readiness_score=data_score,
     )
     all_clear = bool(
-        decision.get("executable")
+        data_sufficient
+        and decision.get("executable")
         and not (decision.get("hard_blocks") or [])
         and not (decision.get("soft_blocks") or [])
     )
