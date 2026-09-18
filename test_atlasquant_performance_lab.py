@@ -76,5 +76,17 @@ class AtlasQuantPerformanceLabTests(unittest.TestCase):
         self.assertTrue(prepare_performance_history(pd.DataFrame({"x":[1]}),"24h").empty)
 
 
+    def test_nonfinite_returns_are_excluded_from_all_performance_metrics(self):
+        df=self.frame()
+        df.loc[0,"retorno_24h_pct"]=float("nan")
+        df.loc[1,"retorno_24h_pct"]=float("inf")
+        df.loc[2,"retorno_24h_pct"]=float("-inf")
+        out=prepare_performance_history(df,"24h")
+        self.assertEqual(len(out),1)
+        m=overall_metrics(df,"24h")
+        self.assertEqual(m["samples"],1)
+        self.assertTrue(pd.notna(m["mean_return_pct"]))
+
+
 if __name__=="__main__":
     unittest.main()
