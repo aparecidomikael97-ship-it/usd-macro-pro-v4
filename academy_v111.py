@@ -10,6 +10,65 @@ from typing import Any
 import streamlit as st
 
 
+MACRO_VIDEO_SCRIPTS: dict[str, list[dict[str, str]]] = {
+    "macro_01": [
+        {"bloco": "Abertura", "tela": "AtlasQuant > Moedas / Pares", "narracao": "Hoje você vai entender a lógica mais importante da macroeconomia aplicada ao Forex: crescimento, inflação, emprego e juros formam um ciclo. O objetivo não é decorar indicador; é descobrir qual moeda tem mais força relativa."},
+        {"bloco": "Conceito", "tela": "Quadro simples com Crescimento → Inflação → Juros → Moeda", "narracao": "Quando a economia cresce com força, empresas produzem mais, contratam mais e a demanda aumenta. Se essa demanda pressiona preços, a inflação pode subir. O banco central reage com juros mais altos ou mantendo juros altos por mais tempo."},
+        {"bloco": "Leitura de moeda", "tela": "Comparação USD x EUR", "narracao": "No Forex você nunca analisa uma moeda sozinha. Em EUR/USD, por exemplo, você compara a economia da zona do euro com a dos Estados Unidos. Se o lado americano estiver mais forte e com juros relativamente mais altos, isso tende a favorecer o dólar, tudo o mais constante."},
+        {"bloco": "Exemplo", "tela": "AtlasQuant > ranking de moedas", "narracao": "Imagine USD com atividade forte, emprego resistente e Fed ainda restritivo, enquanto EUR desacelera e o BCE sinaliza cortes. A leitura relativa fica favorável ao dólar. Isso não é entrada automática; é direção macro para depois validar no gráfico."},
+        {"bloco": "Fechamento", "tela": "Checklist da aula", "narracao": "Antes de olhar o gráfico, responda cinco perguntas: crescimento, inflação, emprego, banco central e juros relativos. Depois compare as duas moedas do par."},
+    ],
+    "macro_02": [
+        {"bloco": "Abertura", "tela": "AtlasQuant > EUA", "narracao": "Agora vamos separar CPI, Core CPI, PCE, Core PCE e PPI. Todos falam de preços, mas não contam exatamente a mesma história."},
+        {"bloco": "Conceito", "tela": "Cards CPI / Core / PCE / PPI", "narracao": "CPI mede inflação ao consumidor. Core CPI exclui itens mais voláteis e ajuda a enxergar persistência. PCE é outra medida de consumo e recebe muita atenção do Fed. PPI observa preços no produtor e pode sinalizar pressões que chegam depois ao consumidor."},
+        {"bloco": "Surpresa", "tela": "Real x Consenso x Anterior", "narracao": "O mercado reage principalmente ao que saiu versus o que era esperado. Se o CPI vem acima do consenso, a surpresa pode elevar a expectativa de juros mais altos por mais tempo. Se vem abaixo, o efeito pode ser o oposto."},
+        {"bloco": "Confirmação", "tela": "Treasury 2Y + USD", "narracao": "Depois do dado, confirme a narrativa no Treasury de 2 anos e no dólar. Se inflação surpreende para cima e o 2Y também sobe, a leitura hawkish ganha força."},
+        {"bloco": "Fechamento", "tela": "Checklist Real / Consenso / Core / 2Y", "narracao": "Nunca opere só porque a inflação veio alta ou baixa. Compare real, consenso, anterior, núcleo e reação dos juros de mercado."},
+    ],
+    "macro_03": [
+        {"bloco": "Abertura", "tela": "Calendário econômico > emprego", "narracao": "Payroll sozinho não explica todo o mercado de trabalho. Nesta aula, você vai ler NFP, desemprego, salários e revisões como um conjunto."},
+        {"bloco": "Conceito", "tela": "NFP / Unemployment / AHE / ADP", "narracao": "NFP mostra criação líquida de vagas fora do setor agrícola. A taxa de desemprego mede a parcela da força de trabalho sem emprego. Average Hourly Earnings ajuda a medir pressão salarial. ADP é uma referência privada, mas não substitui o NFP oficial."},
+        {"bloco": "Combinações", "tela": "Tabela de cenários", "narracao": "NFP forte com salários fortes costuma reforçar uma leitura de economia resistente. Mas NFP forte com desemprego subindo e revisões negativas pode deixar o quadro mais misto. Por isso, evite olhar só um número."},
+        {"bloco": "Fed", "tela": "Fed narrativo", "narracao": "Mercado de trabalho muito apertado pode dificultar cortes de juros. Já uma desaceleração consistente pode aumentar a probabilidade de uma postura mais dovish."},
+        {"bloco": "Fechamento", "tela": "Checklist emprego", "narracao": "Sua conclusão deve caber em uma frase usando pelo menos NFP, desemprego e salários. Depois, veja se as revisões confirmam ou contradizem a leitura."},
+    ],
+    "macro_04": [
+        {"bloco": "Abertura", "tela": "AtlasQuant > Fed", "narracao": "O mercado não negocia apenas a taxa de hoje. Ele tenta antecipar o caminho futuro dos juros. É por isso que comunicado, coletiva e dot plot podem mover o dólar mesmo sem mudança na taxa."},
+        {"bloco": "FOMC", "tela": "Taxa / comunicado / coletiva", "narracao": "O FOMC define a faixa-alvo dos Fed Funds. A decisão é só a primeira camada. Depois, o mercado lê o texto e a coletiva para entender se o Fed está mais preocupado com inflação ou com crescimento."},
+        {"bloco": "Hawkish e dovish", "tela": "Semáforo Hawkish / Neutro / Dovish", "narracao": "Hawkish significa inclinação a juros mais altos ou cortes mais lentos. Dovish significa maior abertura para cortes ou estímulo. Neutro é quando a mensagem não muda de forma clara o caminho esperado."},
+        {"bloco": "Dot plot", "tela": "Exemplo de pontos por ano", "narracao": "O dot plot mostra onde cada participante projeta a taxa futura. O importante não é um ponto isolado, mas a mediana e a mudança em relação à reunião anterior."},
+        {"bloco": "Fechamento", "tela": "Comparação reunião atual x anterior", "narracao": "Sempre compare a reunião atual com a anterior. O que move o mercado muitas vezes é a mudança de narrativa, não o nível absoluto da taxa."},
+    ],
+    "macro_05": [
+        {"bloco": "Abertura", "tela": "AtlasQuant > EUA > Treasury 2Y / 10Y", "narracao": "Os Treasuries ajudam a confirmar se o mercado está acreditando na narrativa macro. O 2Y responde mais de perto à expectativa de política monetária; o 10Y mistura crescimento, inflação e prêmio de prazo."},
+        {"bloco": "2Y", "tela": "Treasury 2Y", "narracao": "Se o mercado espera Fed mais restritivo, o rendimento de 2 anos tende a subir. Se espera cortes mais rápidos, tende a cair. Por isso ele é uma ótima confirmação para CPI, Payroll e FOMC."},
+        {"bloco": "10Y", "tela": "Treasury 10Y", "narracao": "O 10Y olha um horizonte maior e pode se mover por crescimento, inflação de longo prazo e oferta de títulos. Nem sempre ele anda igual ao 2Y."},
+        {"bloco": "Juro real", "tela": "Nominal - inflação esperada", "narracao": "Uma forma simples de pensar juro real é rendimento nominal menos inflação esperada. Quando o retorno real relativo dos EUA sobe, o dólar pode ganhar suporte."},
+        {"bloco": "Fechamento", "tela": "Exemplo CPI acima + 2Y sobe", "narracao": "Se CPI surpreende para cima e o 2Y também sobe, a confirmação é mais limpa. Depois compare a reação do USD com a moeda do outro lado do par."},
+    ],
+    "macro_06": [
+        {"bloco": "Abertura", "tela": "PIB / ISM / PMI", "narracao": "PIB mostra o quadro amplo, mas chega mais devagar. ISM e PMI são mais rápidos e ajudam a perceber se a atividade está acelerando ou esfriando."},
+        {"bloco": "PIB", "tela": "PIB real", "narracao": "PIB real mede a produção ajustada pela inflação. Crescimento mais forte que o esperado pode sustentar emprego e juros, mas também pode aumentar pressão inflacionária."},
+        {"bloco": "ISM e PMI", "tela": "Índices de difusão", "narracao": "Nos índices de difusão, 50 costuma separar expansão de contração. Mas o nível sozinho não basta: compare também tendência e surpresa contra o consenso."},
+        {"bloco": "Serviços", "tela": "ISM Serviços", "narracao": "Nos Estados Unidos, serviços têm grande peso. Um ISM Serviços muito forte pode alterar rapidamente a leitura de atividade, especialmente se preços e emprego dentro do relatório também vierem fortes."},
+        {"bloco": "Fechamento", "tela": "Exemplo 56 vs 52", "narracao": "Se o ISM Serviços sai 56 contra consenso 52, a surpresa inicial é de atividade mais forte. Depois veja Treasuries, dólar e se isso muda a expectativa para o Fed."},
+    ],
+    "macro_07": [
+        {"bloco": "Abertura", "tela": "AtlasQuant > Moedas", "narracao": "O objetivo aqui é parar de perguntar apenas se o dólar está forte. Você vai comparar oito moedas e procurar contraste: uma forte contra outra fraca."},
+        {"bloco": "Score relativo", "tela": "Ranking 0–100", "narracao": "O score de 0 a 100 é um ranking relativo, não probabilidade de gain. Ele organiza juros, inflação, crescimento, emprego e narrativa dos bancos centrais."},
+        {"bloco": "Base e cotada", "tela": "EUR/USD, GBP/USD, USD/JPY", "narracao": "Em EUR/USD, euro é base e dólar é cotada. Se EUR fortalece e USD enfraquece, o par tende a ter pressão de alta. Em USD/JPY, um USD mais forte contra JPY mais fraco favorece pressão de alta."},
+        {"bloco": "Escolha de par", "tela": "Top 3 e Bottom 3", "narracao": "A melhor oportunidade costuma aparecer quando existe boa diferença de força e qualidade dos dados. Depois, Market Map e scanner técnico precisam confirmar estrutura e timing."},
+        {"bloco": "Fechamento", "tela": "Checklist força / qualidade / direção", "narracao": "Primeiro escolha forte contra fraca. Depois confirme qualidade, direção macro, estrutura e gatilho. O ranking sozinho nunca executa uma operação."},
+    ],
+    "macro_08": [
+        {"bloco": "Abertura", "tela": "Calendário Econômico Automático", "narracao": "Calendário não serve para prever o futuro pela cor do evento. Ele serve para organizar expectativa, risco e surpresa."},
+        {"bloco": "Antes do release", "tela": "Anterior / Consenso", "narracao": "Antes do dado, compare anterior e consenso. O consenso representa a expectativa média do mercado. É essa expectativa que cria o ponto de referência para a surpresa."},
+        {"bloco": "No release", "tela": "Real / Consenso / Revisão", "narracao": "Quando sai o real, compare imediatamente com consenso. Depois confira revisão do dado anterior. Uma revisão grande pode reforçar ou anular a leitura do número principal."},
+        {"bloco": "Depois do release", "tela": "Surprise Engine + Treasuries + USD", "narracao": "O Surprise Engine mede direção e intensidade da diferença. Mas a reação final depende do que já estava precificado. Confirme a leitura no Treasury 2Y, no dólar e na estrutura do par."},
+        {"bloco": "Fechamento", "tela": "Checklist pré / durante / pós-release", "narracao": "Pré-release: expectativa e risco. Release: real, consenso e revisão. Pós-release: confirmação nos juros e no preço. Essa sequência reduz decisões impulsivas."},
+    ],
+}
+
 ACADEMY_TRACKS: list[dict[str, Any]] = [
     {
         "id": "macro_forex",
@@ -416,6 +475,14 @@ def render_academy() -> None:
         st.markdown("##### 🎬 Roteiro do vídeo")
         for idx, item in enumerate(lesson["roteiro"], 1):
             st.markdown(f"{idx}. {item}")
+
+        _video_script = MACRO_VIDEO_SCRIPTS.get(lesson["id"], [])
+        if _video_script:
+            with st.expander("🎥 Roteiro completo de gravação", expanded=False):
+                for _segment in _video_script:
+                    st.markdown(f"**{_segment['bloco']}**")
+                    st.caption(f"🖥️ Tela sugerida: {_segment['tela']}")
+                    st.write(_segment["narracao"])
 
         st.markdown("##### 🧪 Exercício prático")
         st.info(lesson["pratica"])
