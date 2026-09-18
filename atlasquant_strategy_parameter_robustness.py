@@ -12,6 +12,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from typing import Any
 import json
+import math
 
 import pandas as pd
 
@@ -166,15 +167,17 @@ def parameter_robustness_summary(
 
         trades=pd.to_numeric(group["trades"],errors="coerce").fillna(0)
         exps=pd.to_numeric(group["expectancy_r"],errors="coerce")
-        sufficient=bool((trades>=minimum).all() and exps.notna().all())
-        exp_values=[float(x) for x in exps.dropna().tolist()]
+        finite_exps=exps.map(lambda x: bool(pd.notna(x) and math.isfinite(float(x))))
+        sufficient=bool((trades>=minimum).all() and finite_exps.all())
+        exp_values=[float(x) for x in exps[finite_exps].tolist()]
         positive=sum(1 for x in exp_values if x>1e-12)
         negative=sum(1 for x in exp_values if x<-1e-12)
         base_rows=group[group["is_base"]==True]
         base_exp=None
         if not base_rows.empty:
             try:
-                base_exp=float(base_rows.iloc[0]["expectancy_r"])
+                candidate=float(base_rows.iloc[0]["expectancy_r"])
+                base_exp=candidate if math.isfinite(candidate) else None
             except Exception:
                 base_exp=None
 
