@@ -11,6 +11,37 @@ class AutopilotV107Tests(unittest.TestCase):
         self.assertFalse(a.forex_market_likely_open(sat))
         self.assertTrue(a.forex_market_likely_open(mon))
 
+
+    def test_minutes_since_future_and_invalid_fail_closed(self):
+        now=pd.Timestamp("2026-09-18T12:00:00Z")
+        with patch.object(a,"utcnow",return_value=now):
+            self.assertIsNone(a.minutes_since("2026-09-18T12:05:00Z"))
+            self.assertIsNone(a.minutes_since("not-a-time"))
+            self.assertIsNone(a.minutes_since(None))
+            self.assertAlmostEqual(a.minutes_since("2026-09-18T11:30:00Z"),30.0)
+
+    def test_status_summary_exact_60_minutes_is_stale(self):
+        now=pd.Timestamp("2026-09-18T12:00:00Z")
+        ts=(now-pd.Timedelta(minutes=60)).isoformat()
+        scanner={"resultados":{p:{"m15_fetched_at":ts} for p in a.PAIR_ORDER}}
+        master={"contexts":{p:{"updated_at":ts} for p in a.PAIR_ORDER}}
+        with patch.object(a,"utcnow",return_value=now), patch.object(a,"forex_market_likely_open",return_value=True):
+            status=a.status_summary(True,"ok",{},scanner,master,{},pd.DataFrame(),[],0,{})
+        self.assertEqual(status["scanner_fresh"],0)
+        self.assertEqual(status["market_map_fresh"],0)
+        self.assertFalse(status["healthy"])
+
+    def test_status_summary_future_evidence_is_not_fresh(self):
+        now=pd.Timestamp("2026-09-18T12:00:00Z")
+        ts=(now+pd.Timedelta(minutes=5)).isoformat()
+        scanner={"resultados":{p:{"m15_fetched_at":ts} for p in a.PAIR_ORDER}}
+        master={"contexts":{p:{"updated_at":ts} for p in a.PAIR_ORDER}}
+        with patch.object(a,"utcnow",return_value=now), patch.object(a,"forex_market_likely_open",return_value=True):
+            status=a.status_summary(True,"ok",{},scanner,master,{},pd.DataFrame(),[],0,{})
+        self.assertEqual(status["scanner_fresh"],0)
+        self.assertEqual(status["market_map_fresh"],0)
+        self.assertFalse(status["healthy"])
+
     def test_macro_side(self):
         self.assertEqual(a.macro_side("COMPRA USD/CHF"), "BUY")
         self.assertEqual(a.macro_side("VENDA EUR/USD"), "SELL")
