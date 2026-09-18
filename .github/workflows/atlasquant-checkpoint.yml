@@ -1,4 +1,4 @@
-name: AtlasQuant DEV Checkpoint
+name: AtlasQuant Source Checkpoint
 
 on:
   push:
@@ -30,7 +30,7 @@ jobs:
           sha = os.environ.get("GITHUB_SHA", "unknown")
           branch = os.environ.get("GITHUB_REF_NAME", "unknown")
           short = sha[:7]
-          out = Path("/tmp") / f"AtlasQuant_DEV_{short}_checkpoint.zip"
+          out = Path("/tmp") / f"AtlasQuant_{branch}_{short}_checkpoint.zip"
           info = Path("/tmp") / "CHECKPOINT_INFO.md"
 
           info.write_text(
