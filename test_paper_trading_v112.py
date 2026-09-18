@@ -55,7 +55,7 @@ class PaperTradingV112SafetyTests(unittest.TestCase):
     def test_same_bar_stop_and_target_is_conservative_loss(self):
         frame=pd.DataFrame([{"datetime":"2026-09-18T10:00:00Z","open":1.0,"high":1.3,"low":0.7,"close":1.0}])
         row=pd.Series({"status":"OPEN","entry_time":"2026-09-18T10:00:00Z","entry_price":1.0,"stop_price":0.9,"target_price":1.2,"risk_distance":0.1,"side":"BUY"})
-        out=p._close_open(row,p.normalize_m15(frame),now=self.now)
+        out=p._close_open(row,frame.assign(datetime=pd.to_datetime(frame["datetime"],utc=True)),now=self.now)
         self.assertEqual(out["status"],"CLOSED")
         self.assertEqual(out["result"],"LOSS")
         self.assertEqual(out["exit_reason"],"STOP_AND_TARGET_SAME_CANDLE")
