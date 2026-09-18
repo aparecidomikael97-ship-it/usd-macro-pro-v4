@@ -118,6 +118,32 @@ class OperationalBacktestTests(unittest.TestCase):
         self.assertEqual(r["outcome"],"NO_TRADE")
         self.assertIsNone(r["net_r"])
 
+    def test_nonfinite_friction_fails_closed(self):
+        d=candles([(10,10.2,9.8,10.0),(10,10.2,9.8,10.0)])
+        plan={"signal_time":d.iloc[0]["datetime"],"side":"BUY",
+              "entry":10.0,"stop":9.0,"target":12.0}
+        for value in (float("nan"),float("inf")):
+            r=backtest_signal(d,plan,cost_r=value)
+            self.assertEqual(r["status"],"INVALID_FRICTION")
+            self.assertEqual(r["outcome"],"NO_TRADE")
+            self.assertIsNone(r["net_r"])
+
+    def test_single_position_per_pair_blocks_overlapping_signal(self):
+        d=candles([
+            (10,10.1,9.9,10.0),
+            (10,10.2,9.9,10.0),
+            (10,12.2,9.9,12.0),
+            (12,12.1,11.9,12.0),
+        ])
+        signals=[
+            {"signal_time":d.iloc[0]["datetime"],"pair":"EUR/USD","side":"BUY","entry":10,"stop":9,"target":12},
+            {"signal_time":d.iloc[1]["datetime"],"pair":"EUR/USD","side":"BUY","entry":10,"stop":9,"target":12},
+        ]
+        rows=backtest_many({"EUR/USD":d},signals,single_position_per_pair=True)
+        self.assertEqual(rows[0]["outcome"],"GAIN")
+        self.assertEqual(rows[1]["status"],"OVERLAP_BLOCKED")
+        self.assertEqual(rows[1]["outcome"],"NO_TRADE")
+
     def test_summary_counts_gain_loss_be_and_streaks(self):
         rows=[
             {"outcome":"GAIN","net_r":2.0},
