@@ -27,6 +27,10 @@ class WindowsPrivateLauncherTests(unittest.TestCase):
         for forbidden in ("metatrader", "mt5", "broker api", "place_order", "send_order"):
             self.assertNotIn(forbidden, lowered)
 
+    def test_launcher_offers_twelve_data_local_setup(self):
+        self.assertIn("Configurar Twelve Data local", self.text)
+        self.assertIn("AtlasQuant_Configurar_TwelveData.ps1", self.text)
+
 
 if __name__ == "__main__":
     unittest.main()
