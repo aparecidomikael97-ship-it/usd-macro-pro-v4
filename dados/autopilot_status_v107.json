@@ -93,5 +93,150 @@
     "sample_added": true,
     "persisted": true,
     "error": ""
+  },
+  "paper_trading_v112": {
+    "enabled": true,
+    "real_orders": false,
+    "trades_total": 0,
+    "pending_entries": 0,
+    "open_positions": 0,
+    "closed_trades": 0,
+    "wins": 0,
+    "losses": 0,
+    "breakeven": 0,
+    "win_rate_pct": 0.0,
+    "net_r": 0.0,
+    "gross_r_before_friction": 0.0,
+    "friction_r": 0.0,
+    "net_r_after_friction": 0.0,
+    "friction_version": "V11.6_PAPER_FRICTION",
+    "avg_r": 0.0,
+    "profit_factor_r": null,
+    "profit_factor_net_r": null,
+    "last_cycle": {
+      "version": "V11.2_PAPER_TRADING",
+      "ran_at": "2026-09-18T21:20:27.099467+00:00",
+      "pending_created": 0,
+      "entries_opened": 0,
+      "trades_closed": 0,
+      "closed_pairs_this_cycle": [],
+      "checklists": {
+        "USD/CHF": {
+          "side": "BUY",
+          "passed": false,
+          "state": "🔴 BLOQUEADO",
+          "hard_blocks": [
+            "H1 está contra o viés"
+          ],
+          "soft_blocks": [
+            "ADR14 em 107%: evitar perseguir preço",
+            "ICT incompleto (42/100)",
+            "Fluxo institucional incompleto (48/100)",
+            "M15 ainda não confirmou gatilho"
+          ]
+        },
+        "USD/CAD": {
+          "side": "BUY",
+          "passed": false,
+          "state": "⚪ EM OBSERVAÇÃO",
+          "hard_blocks": [],
+          "soft_blocks": [
+            "Gate ainda não liberou execução",
+            "ICT incompleto (42/100)",
+            "Fluxo institucional incompleto (59/100)",
+            "M15 ainda não confirmou gatilho"
+          ]
+        },
+        "USD/JPY": {
+          "side": "BUY",
+          "passed": false,
+          "state": "🔴 BLOQUEADO",
+          "hard_blocks": [
+            "ADR14 muito esticado (117%)"
+          ],
+          "soft_blocks": [
+            "Gate ainda não liberou execução",
+            "ADR14 em 117%: evitar perseguir preço",
+            "ICT incompleto (51/100)",
+            "Fluxo institucional incompleto (59/100)",
+            "M15 ainda não confirmou gatilho"
+          ]
+        },
+        "NZD/USD": {
+          "side": "SELL",
+          "passed": false,
+          "state": "⚪ EM OBSERVAÇÃO",
+          "hard_blocks": [],
+          "soft_blocks": [
+            "Gate ainda não liberou execução",
+            "ADR14 em 91%: espaço reduzido",
+            "ICT incompleto (34/100)",
+            "Fluxo institucional incompleto (50/100)",
+            "M15 ainda não confirmou gatilho"
+          ]
+        },
+        "EUR/USD": {
+          "side": "SELL",
+          "passed": false,
+          "state": "🔴 BLOQUEADO",
+          "hard_blocks": [
+            "Dados técnicos insuficientes (0/100)",
+            "Técnica desatualizada (96 min)"
+          ],
+          "soft_blocks": [
+            "Gate ainda não liberou execução",
+            "ADR14 em 92%: espaço reduzido",
+            "ICT incompleto (42/100)",
+            "Fluxo institucional incompleto (67/100)",
+            "M15 ainda não confirmou gatilho"
+          ]
+        },
+        "AUD/USD": {
+          "side": "WAIT",
+          "passed": false,
+          "state": "⚪ AGUARDAR DIREÇÃO",
+          "hard_blocks": [
+            "Dados técnicos insuficientes (0/100)",
+            "Técnica desatualizada (96 min)"
+          ],
+          "soft_blocks": [
+            "ADR14 em 91%: espaço reduzido",
+            "ICT incompleto (0/100)",
+            "Fluxo institucional incompleto (0/100)",
+            "M15 ainda não confirmou gatilho"
+          ]
+        },
+        "GBP/USD": {
+          "side": "SELL",
+          "passed": false,
+          "state": "🔴 BLOQUEADO",
+          "hard_blocks": [
+            "Dados técnicos insuficientes (0/100)",
+            "H1 está contra o viés",
+            "Técnica desatualizada (96 min)",
+            "ADR14 muito esticado (128%)"
+          ],
+          "soft_blocks": [
+            "Gate ainda não liberou execução",
+            "ADR14 em 128%: evitar perseguir preço",
+            "ICT incompleto (34/100)",
+            "Fluxo institucional incompleto (69/100)",
+            "M15 ainda não confirmou gatilho"
+          ]
+        }
+      },
+      "trades_total": 0,
+      "pending_entries": 0,
+      "open_positions": 0,
+      "closed_trades": 0,
+      "wins": 0,
+      "losses": 0,
+      "breakeven": 0,
+      "win_rate_pct": 0.0,
+      "net_r": 0.0,
+      "avg_r": 0.0,
+      "profit_factor_r": null
+    },
+    "errors": []
   }
 }
