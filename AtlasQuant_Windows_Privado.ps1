@@ -123,7 +123,7 @@ function Prepare-AtlasQuant {
 function Get-AtlasQuantPidFile {
     $configDir = Join-Path $env:LOCALAPPDATA "AtlasQuant"
     New-Item -ItemType Directory -Force -Path $configDir | Out-Null
-    return (Join-Path $configDir "atlasquant_streamlit.pid")
+    return (Join-Path $configDir ".atlasquant_streamlit.pid")
 }
 
 function Get-AtlasQuantListenerProcess {
