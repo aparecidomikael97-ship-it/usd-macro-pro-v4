@@ -1,13 +1,13 @@
 {
   "version": "V11.0_INSTITUTIONAL_AUTOPILOT",
   "cursor": 2,
-  "last_batch_ts": 1789708787.4614232,
+  "last_batch_ts": 1789710472.5564134,
   "contexts": {
     "USD/CHF": {
       "pair": "USD/CHF",
-      "updated_at": "2026-09-18T05:19:47.144501+00:00",
-      "candle_m15": "2026-09-18T05:00:00+00:00",
-      "price": 0.82376,
+      "updated_at": "2026-09-18T05:47:52.351152+00:00",
+      "candle_m15": "2026-09-18T05:30:00+00:00",
+      "price": 0.82398,
       "macro_direction": "🟢 COMPRA USD/CHF",
       "macro_score": 89.0,
       "quality": 91.0,
@@ -474,10 +474,10 @@
       },
       "premium_discount": {
         "zone": "ACIMA DO RANGE",
-        "position": 162.28893058161432,
+        "position": 164.35272045028225,
         "equilibrium": 0.81179,
         "inside_range": false,
-        "expansion_pct": 62.28893058161432
+        "expansion_pct": 64.35272045028225
       },
       "bsl": [
         "Asia High",
@@ -499,7 +499,7 @@
         "rejection": "fechou de volta acima do nível"
       },
       "killzone": {
-        "now_ny": "2026-09-18 01:19:46.832493-04:00",
+        "now_ny": "2026-09-18 01:47:52.152311-04:00",
         "active": null,
         "next": {
           "name": "London Killzone",
@@ -691,15 +691,15 @@
       "adr": {
         "available": true,
         "adr": 0.004110714285714301,
-        "today_range": 0.0011700000000000044,
-        "used_pct": 28.462206776715902,
+        "today_range": 0.0017099999999999893,
+        "used_pct": 41.59860990443052,
         "state": "🟢 ESPAÇO DISPONÍVEL",
         "length": 14
       },
-      "adr_used_pct": 28.462206776715902,
+      "adr_used_pct": 41.59860990443052,
       "intraday_opens": {
         "available": true,
-        "current": 0.82376,
+        "current": 0.82398,
         "day_open": 0.82356,
         "week_open": 0.81828,
         "above_day_open": true,
@@ -709,9 +709,9 @@
     },
     "NZD/USD": {
       "pair": "NZD/USD",
-      "updated_at": "2026-09-18T04:48:30.755616+00:00",
-      "candle_m15": "2026-09-18T04:30:00+00:00",
-      "price": 0.57338,
+      "updated_at": "2026-09-18T05:47:51.939472+00:00",
+      "candle_m15": "2026-09-18T05:30:00+00:00",
+      "price": 0.57256,
       "macro_direction": "🔴 VENDA NZD/USD",
       "macro_score": 84.0,
       "quality": 91.0,
@@ -1134,22 +1134,32 @@
       },
       "premium_discount": {
         "zone": "ABAIXO DO RANGE",
-        "position": -62.39495798319216,
+        "position": -71.00840336134378,
         "equilibrium": 0.5840799999999999,
         "inside_range": false,
-        "expansion_pct": 62.39495798319216
+        "expansion_pct": 71.00840336134378
       },
       "bsl": [
-        "PDH",
-        0.57505
+        "Asia High",
+        0.57326
       ],
       "ssl": [
         "Asia Low",
         0.57155
       ],
-      "latest_sweep": null,
+      "latest_sweep": {
+        "level": "Asia High",
+        "type": "SWEEP BSL",
+        "datetime": "2026-09-18 04:45:00+00:00",
+        "price": 0.57326,
+        "high": 0.57341,
+        "low": 0.57305,
+        "close": 0.57307,
+        "excess_abs": 0.00014999999999998348,
+        "rejection": "fechou de volta abaixo do nível"
+      },
       "killzone": {
-        "now_ny": "2026-09-18 00:48:30.451517-04:00",
+        "now_ny": "2026-09-18 01:47:51.740183-04:00",
         "active": null,
         "next": {
           "name": "London Killzone",
@@ -1274,7 +1284,7 @@
         "quality": 91.0
       },
       "readiness": {
-        "score": 50.0,
+        "score": 58.0,
         "grade": "WAIT",
         "action": "🔴 NÃO FORÇAR ENTRADA",
         "checks": [
@@ -1316,9 +1326,9 @@
           },
           {
             "name": "Sweep coerente",
-            "ok": false,
+            "ok": true,
             "weight": 8.0,
-            "detail": "Sem sweep recente"
+            "detail": "SWEEP BSL"
           },
           {
             "name": "Killzone ativa",
@@ -1336,32 +1346,32 @@
         "hard_conflict": true
       },
       "readiness_grade": "WAIT",
-      "readiness_score": 50.0,
+      "readiness_score": 58.0,
       "event_risk": "NORMAL",
       "adr": {
         "available": true,
         "adr": 0.0038464285714285918,
-        "today_range": 0.0010099999999999554,
-        "used_pct": 26.25812441968301,
+        "today_range": 0.0016800000000000148,
+        "used_pct": 43.67688022284138,
         "state": "🟢 ESPAÇO DISPONÍVEL",
         "length": 14
       },
-      "adr_used_pct": 26.25812441968301,
+      "adr_used_pct": 43.67688022284138,
       "intraday_opens": {
         "available": true,
-        "current": 0.57338,
+        "current": 0.57256,
         "day_open": 0.57313,
         "week_open": 0.57821,
-        "above_day_open": true,
+        "above_day_open": false,
         "above_week_open": false
       },
       "autopilot_v107": true
     },
     "USD/JPY": {
       "pair": "USD/JPY",
-      "updated_at": "2026-09-18T05:19:46.825220+00:00",
-      "candle_m15": "2026-09-18T05:00:00+00:00",
-      "price": 157.25115,
+      "updated_at": "2026-09-18T05:47:52.146258+00:00",
+      "candle_m15": "2026-09-18T05:30:00+00:00",
+      "price": 157.15563,
       "macro_direction": "🟢 COMPRA USD/JPY",
       "macro_score": 90.0,
       "quality": 84.0,
@@ -1840,14 +1850,14 @@
       },
       "premium_discount": {
         "zone": "ACIMA DO RANGE",
-        "position": 125.01396012872137,
+        "position": 122.2645343649442,
         "equilibrium": 154.64503,
         "inside_range": false,
-        "expansion_pct": 25.013960128721365
+        "expansion_pct": 22.264534364944197
       },
       "bsl": [
-        "PMH",
-        160.23685
+        "Asia High",
+        157.1575
       ],
       "ssl": [
         "Asia Low",
@@ -1856,16 +1866,16 @@
       "latest_sweep": {
         "level": "Asia High",
         "type": "SWEEP BSL",
-        "datetime": "2026-09-18 04:45:00+00:00",
+        "datetime": "2026-09-18 05:30:00+00:00",
         "price": 157.1575,
-        "high": 157.17268,
-        "low": 157.05283,
-        "close": 157.10773,
-        "excess_abs": 0.01518000000001507,
+        "high": 157.32377,
+        "low": 157.14874,
+        "close": 157.15563,
+        "excess_abs": 0.16626999999999725,
         "rejection": "fechou de volta abaixo do nível"
       },
       "killzone": {
-        "now_ny": "2026-09-18 01:19:46.513668-04:00",
+        "now_ny": "2026-09-18 01:47:51.944852-04:00",
         "active": null,
         "next": {
           "name": "London Killzone",
@@ -2057,15 +2067,15 @@
       "adr": {
         "available": true,
         "adr": 1.2269249999999983,
-        "today_range": 0.3666199999999833,
-        "used_pct": 29.8812070827462,
+        "today_range": 0.4312799999999868,
+        "used_pct": 35.151292866311096,
         "state": "🟢 ESPAÇO DISPONÍVEL",
         "length": 14
       },
-      "adr_used_pct": 29.8812070827462,
+      "adr_used_pct": 35.151292866311096,
       "intraday_opens": {
         "available": true,
-        "current": 157.25115,
+        "current": 157.15563,
         "day_open": 157.06391,
         "week_open": 154.07314,
         "above_day_open": true,
@@ -2075,9 +2085,9 @@
     },
     "EUR/USD": {
       "pair": "EUR/USD",
-      "updated_at": "2026-09-18T04:48:29.814808+00:00",
-      "candle_m15": "2026-09-18T04:30:00+00:00",
-      "price": 1.14889,
+      "updated_at": "2026-09-18T05:47:51.296069+00:00",
+      "candle_m15": "2026-09-18T05:30:00+00:00",
+      "price": 1.1482,
       "macro_direction": "🔴 VENDA EUR/USD",
       "macro_score": 91.0,
       "quality": 70.0,
@@ -2532,10 +2542,10 @@
       },
       "premium_discount": {
         "zone": "ABAIXO DO RANGE",
-        "position": -94.6871310507693,
+        "position": -102.8335301062576,
         "equilibrium": 1.161145,
         "inside_range": false,
-        "expansion_pct": 94.6871310507693
+        "expansion_pct": 102.8335301062576
       },
       "bsl": [
         "Asia High",
@@ -2548,16 +2558,16 @@
       "latest_sweep": {
         "level": "Asia High",
         "type": "SWEEP BSL",
-        "datetime": "2026-09-18 04:30:00+00:00",
+        "datetime": "2026-09-18 04:45:00+00:00",
         "price": 1.1489,
-        "high": 1.14907,
-        "low": 1.1488,
-        "close": 1.14889,
-        "excess_abs": 0.00017000000000000348,
+        "high": 1.14896,
+        "low": 1.14871,
+        "close": 1.14874,
+        "excess_abs": 5.999999999994898e-05,
         "rejection": "fechou de volta abaixo do nível"
       },
       "killzone": {
-        "now_ny": "2026-09-18 00:48:29.508724-04:00",
+        "now_ny": "2026-09-18 01:47:51.091605-04:00",
         "active": null,
         "next": {
           "name": "London Killzone",
@@ -2749,27 +2759,27 @@
       "adr": {
         "available": true,
         "adr": 0.004012857142857119,
-        "today_range": 0.00041000000000002146,
-        "used_pct": 10.217159131364069,
+        "today_range": 0.0011799999999999589,
+        "used_pct": 29.405482378069635,
         "state": "🟢 ESPAÇO DISPONÍVEL",
         "length": 14
       },
-      "adr_used_pct": 10.217159131364069,
+      "adr_used_pct": 29.405482378069635,
       "intraday_opens": {
         "available": true,
-        "current": 1.14889,
+        "current": 1.1482,
         "day_open": 1.14884,
         "week_open": 1.15705,
-        "above_day_open": true,
+        "above_day_open": false,
         "above_week_open": false
       },
       "autopilot_v107": true
     },
     "USD/CAD": {
       "pair": "USD/CAD",
-      "updated_at": "2026-09-18T05:19:47.461336+00:00",
-      "candle_m15": "2026-09-18T05:00:00+00:00",
-      "price": 1.39838,
+      "updated_at": "2026-09-18T05:47:52.556338+00:00",
+      "candle_m15": "2026-09-18T05:30:00+00:00",
+      "price": 1.39893,
       "macro_direction": "🟢 COMPRA USD/CAD",
       "macro_score": 89.0,
       "quality": 91.0,
@@ -3188,10 +3198,10 @@
       },
       "premium_discount": {
         "zone": "ACIMA DO RANGE",
-        "position": 180.9369951534723,
+        "position": 185.37964458804458,
         "equilibrium": 1.38217,
         "inside_range": false,
-        "expansion_pct": 80.93699515347231
+        "expansion_pct": 85.37964458804458
       },
       "bsl": [
         "Asia High",
@@ -3213,7 +3223,7 @@
         "rejection": "fechou de volta acima do nível"
       },
       "killzone": {
-        "now_ny": "2026-09-18 01:19:47.151802-04:00",
+        "now_ny": "2026-09-18 01:47:52.356522-04:00",
         "active": null,
         "next": {
           "name": "London Killzone",
@@ -3405,15 +3415,15 @@
       "adr": {
         "available": true,
         "adr": 0.004977857142857161,
-        "today_range": 0.0007800000000000029,
-        "used_pct": 15.66939302625915,
+        "today_range": 0.0013799999999999368,
+        "used_pct": 27.722772277226355,
         "state": "🟢 ESPAÇO DISPONÍVEL",
         "length": 14
       },
-      "adr_used_pct": 15.66939302625915,
+      "adr_used_pct": 27.722772277226355,
       "intraday_opens": {
         "available": true,
-        "current": 1.39838,
+        "current": 1.39893,
         "day_open": 1.39799,
         "week_open": 1.38741,
         "above_day_open": true,
@@ -3423,9 +3433,9 @@
     },
     "GBP/USD": {
       "pair": "GBP/USD",
-      "updated_at": "2026-09-18T04:48:30.129917+00:00",
-      "candle_m15": "2026-09-18T04:30:00+00:00",
-      "price": 1.33719,
+      "updated_at": "2026-09-18T05:47:51.528874+00:00",
+      "candle_m15": "2026-09-18T05:30:00+00:00",
+      "price": 1.33621,
       "macro_direction": "🔴 VENDA GBP/USD",
       "macro_score": 68.0,
       "quality": 70.0,
@@ -3912,10 +3922,10 @@
       },
       "premium_discount": {
         "zone": "ABAIXO DO RANGE",
-        "position": -124.8568155784654,
+        "position": -136.0824742268069,
         "equilibrium": 1.352455,
         "inside_range": false,
-        "expansion_pct": 124.8568155784654
+        "expansion_pct": 136.0824742268069
       },
       "bsl": [
         "Asia High",
@@ -3937,7 +3947,7 @@
         "rejection": "fechou de volta abaixo do nível"
       },
       "killzone": {
-        "now_ny": "2026-09-18 00:48:29.822080-04:00",
+        "now_ny": "2026-09-18 01:47:51.301895-04:00",
         "active": null,
         "next": {
           "name": "London Killzone",
@@ -4129,27 +4139,27 @@
       "adr": {
         "available": true,
         "adr": 0.004862857142857105,
-        "today_range": 0.0005800000000000249,
-        "used_pct": 11.927144535840792,
+        "today_range": 0.0014199999999999768,
+        "used_pct": 29.200940070505037,
         "state": "🟢 ESPAÇO DISPONÍVEL",
         "length": 14
       },
-      "adr_used_pct": 11.927144535840792,
+      "adr_used_pct": 29.200940070505037,
       "intraday_opens": {
         "available": true,
-        "current": 1.33719,
+        "current": 1.33621,
         "day_open": 1.33717,
         "week_open": 1.35051,
-        "above_day_open": true,
+        "above_day_open": false,
         "above_week_open": false
       },
       "autopilot_v107": true
     },
     "AUD/USD": {
       "pair": "AUD/USD",
-      "updated_at": "2026-09-18T04:48:30.444275+00:00",
-      "candle_m15": "2026-09-18T04:30:00+00:00",
-      "price": 0.71304,
+      "updated_at": "2026-09-18T05:47:51.734672+00:00",
+      "candle_m15": "2026-09-18T05:30:00+00:00",
+      "price": 0.71237,
       "macro_direction": "⚪ AGUARDAR",
       "macro_score": 55.0,
       "quality": 91.0,
@@ -4619,32 +4629,32 @@
       },
       "premium_discount": {
         "zone": "ABAIXO DO RANGE",
-        "position": -22.1088435374152,
+        "position": -29.705215419502096,
         "equilibrium": 0.7194,
         "inside_range": false,
-        "expansion_pct": 22.1088435374152
+        "expansion_pct": 29.705215419502096
       },
       "bsl": [
-        "Asia High",
-        0.71346
+        "PDH",
+        0.71259
       ],
       "ssl": [
         "Asia Low",
         0.71113
       ],
       "latest_sweep": {
-        "level": "Asia High",
+        "level": "PDH",
         "type": "SWEEP BSL",
-        "datetime": "2026-09-18 04:15:00+00:00",
-        "price": 0.71346,
-        "high": 0.71351,
-        "low": 0.71315,
-        "close": 0.71319,
-        "excess_abs": 4.999999999999449e-05,
+        "datetime": "2026-09-18 05:15:00+00:00",
+        "price": 0.71259,
+        "high": 0.71287,
+        "low": 0.71244,
+        "close": 0.71257,
+        "excess_abs": 0.000280000000000058,
         "rejection": "fechou de volta abaixo do nível"
       },
       "killzone": {
-        "now_ny": "2026-09-18 00:48:30.137117-04:00",
+        "now_ny": "2026-09-18 01:47:51.534418-04:00",
         "active": null,
         "next": {
           "name": "London Killzone",
@@ -4836,15 +4846,15 @@
       "adr": {
         "available": true,
         "adr": 0.003369285714285702,
-        "today_range": 0.0007500000000000284,
-        "used_pct": 22.259910960357086,
+        "today_range": 0.0013699999999999823,
+        "used_pct": 40.66143735425021,
         "state": "🟢 ESPAÇO DISPONÍVEL",
         "length": 14
       },
-      "adr_used_pct": 22.259910960357086,
+      "adr_used_pct": 40.66143735425021,
       "intraday_opens": {
         "available": true,
-        "current": 0.71304,
+        "current": 0.71237,
         "day_open": 0.7133,
         "week_open": 0.71476,
         "above_day_open": false,
@@ -4853,5 +4863,5 @@
       "autopilot_v107": true
     }
   },
-  "autopilot_updated_at": "2026-09-18T05:19:47.461425+00:00"
+  "autopilot_updated_at": "2026-09-18T05:47:52.556414+00:00"
 }
