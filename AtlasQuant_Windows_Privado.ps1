@@ -16,6 +16,39 @@ function Get-PythonLauncher {
     throw "Python 3 nao foi encontrado. Instale o Python 3 e marque Add Python to PATH."
 }
 
+
+function Import-AtlasQuantLocalSecrets {
+    $secretsPath = Join-Path (Get-Location).Path ".streamlit\secrets.toml"
+    if (-not (Test-Path $secretsPath)) {
+        return $false
+    }
+
+    try {
+        $line = Get-Content -LiteralPath $secretsPath | Where-Object {
+            $_ -match '^\s*CHAVE_TWELVE_DATA\s*='
+        } | Select-Object -Last 1
+
+        if ([string]::IsNullOrWhiteSpace($line)) {
+            return $false
+        }
+
+        if ($line -notmatch '^\s*CHAVE_TWELVE_DATA\s*=\s*"(.*)"\s*$') {
+            return $false
+        }
+
+        $value = $Matches[1]
+        $value = $value.Replace('\"', '"').Replace('\\', '\')
+        if ([string]::IsNullOrWhiteSpace($value)) {
+            return $false
+        }
+
+        $env:CHAVE_TWELVE_DATA = $value
+        return $true
+    } catch {
+        return $false
+    }
+}
+
 function Prepare-AtlasQuant {
     Clear-Host
     Write-Host "============================================================"
@@ -82,6 +115,13 @@ function Start-AtlasQuant {
         Start-Process "http://127.0.0.1:8501"
         Pause-AtlasQuant
         return
+    }
+
+    $secretLoaded = Import-AtlasQuantLocalSecrets
+    if ($secretLoaded) {
+        Write-Host "[OK] Twelve Data local carregado para esta sessao."
+    } else {
+        Write-Host "[AVISO] Chave Twelve Data local nao foi localizada ou nao pode ser lida."
     }
 
     $python = (Resolve-Path ".\.venv\Scripts\python.exe").Path
