@@ -183,6 +183,48 @@ class OperationalBacktestTests(unittest.TestCase):
         self.assertIn("net_r",ledger.columns)
         self.assertIn("setup",ledger.columns)
 
+    def test_zero_or_negative_windows_fail_closed(self):
+        d=candles([(10,10.2,9.8,10.0),(10,10.2,9.8,10.0)])
+        plan={"signal_time":d.iloc[0]["datetime"],"side":"BUY","entry":10,"stop":9,"target":12}
+        for kwargs in ({"max_wait_bars":0},{"max_hold_bars":0},{"max_wait_bars":-1},{"max_hold_bars":-1}):
+            with self.subTest(kwargs=kwargs):
+                r=backtest_signal(d,plan,**kwargs)
+                self.assertEqual(r["status"],"INVALID_WINDOW")
+                self.assertEqual(r["outcome"],"NO_TRADE")
+                self.assertIsNone(r["net_r"])
+
+    def test_malformed_and_nonfinite_candles_fail_closed(self):
+        d=pd.DataFrame([
+            {"datetime":"bad","open":10,"high":11,"low":9,"close":10},
+            {"datetime":"2026-09-15T00:15:00Z","open":10,"high":9,"low":8,"close":10},
+            {"datetime":"2026-09-15T00:30:00Z","open":10,"high":float("inf"),"low":9,"close":10},
+        ])
+        plan={"signal_time":"2026-09-15T00:00:00Z","side":"BUY","entry":10,"stop":9,"target":12}
+        r=backtest_signal(d,plan)
+        self.assertEqual(r["status"],"NO_DATA")
+        self.assertEqual(r["outcome"],"NO_TRADE")
+
+    def test_duplicate_candle_timestamp_keep_last_is_deterministic(self):
+        d=pd.DataFrame([
+            {"datetime":"2026-09-15T00:00:00Z","open":10,"high":10.2,"low":9.8,"close":10},
+            {"datetime":"2026-09-15T00:15:00Z","open":10,"high":10.2,"low":9.8,"close":10},
+            {"datetime":"2026-09-15T00:15:00Z","open":10,"high":12.2,"low":9.9,"close":12},
+        ])
+        plan={"signal_time":"2026-09-15T00:00:00Z","side":"BUY","entry":10,"stop":9,"target":12}
+        a=backtest_signal(d,plan)
+        b=backtest_signal(d,plan)
+        self.assertEqual(a["status"],"TARGET")
+        self.assertEqual(a,b)
+
+    def test_separate_pairs_may_overlap(self):
+        d=candles([(10,10.1,9.9,10),(10,10.2,9.9,10),(10,12.2,9.9,12)])
+        signals=[
+            {"signal_time":d.iloc[0]["datetime"],"pair":"EUR/USD","side":"BUY","entry":10,"stop":9,"target":12},
+            {"signal_time":d.iloc[0]["datetime"],"pair":"GBP/USD","side":"BUY","entry":10,"stop":9,"target":12},
+        ]
+        rows=backtest_many({"EUR/USD":d,"GBP/USD":d},signals,single_position_per_pair=True)
+        self.assertEqual([r["outcome"] for r in rows],["GAIN","GAIN"])
+
 
 if __name__=="__main__":
     unittest.main()
