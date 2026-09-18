@@ -55,5 +55,30 @@ class DecisionIntegrityTests(unittest.TestCase):
         self.assertTrue(any("Dados técnicos insuficientes" in x for x in r["hard_blocks"]))
 
 
+    def test_invalid_temporal_and_readiness_inputs_fail_closed(self):
+        for bad in (float("nan"),float("inf"),float("-inf"),-1):
+            with self.subTest(age=bad):
+                r=evaluate_decision_integrity(
+                    side="BUY",score=92,quality=88,rank_index=82,
+                    h4="🟢 CONFIRMA",h1="🟢 PULLBACK OK",m15="🟢 GATILHO",
+                    ict_readiness=82,institutional_readiness=84,
+                    gate="A",gate_score=82,adr_used_pct=68,event_risk="NORMAL",
+                    technical_age_min=bad,data_sufficient=True,data_readiness_score=100,
+                )
+                self.assertFalse(r["executable"])
+                self.assertEqual(r["state"],"🔴 BLOQUEADO")
+        for bad in (float("nan"),float("inf"),float("-inf")):
+            with self.subTest(readiness=bad):
+                r=evaluate_decision_integrity(
+                    side="BUY",score=92,quality=88,rank_index=82,
+                    h4="🟢 CONFIRMA",h1="🟢 PULLBACK OK",m15="🟢 GATILHO",
+                    ict_readiness=82,institutional_readiness=84,
+                    gate="A",gate_score=82,adr_used_pct=68,event_risk="NORMAL",
+                    technical_age_min=10,data_sufficient=True,data_readiness_score=bad,
+                )
+                self.assertFalse(r["executable"])
+                self.assertEqual(r["state"],"🔴 BLOQUEADO")
+
+
 if __name__ == "__main__":
     unittest.main()
