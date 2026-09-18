@@ -47,5 +47,15 @@ class AtlasQuantBranchDriftTests(unittest.TestCase):
         self.assertGreater(len(RUNTIME_MUTABLE_PATHS),5)
 
 
+    def test_path_normalization_cannot_bypass_runtime_classification(self):
+        self.assertEqual(classify_path("./dados/scanner_tecnico_v934.json"),"RUNTIME")
+        self.assertEqual(classify_path("dados//scanner_tecnico_v934.json"),"RUNTIME")
+        self.assertEqual(classify_path("../dados/scanner_tecnico_v934.json"),"CODE_OR_CONFIG")
+        self.assertEqual(classify_path("/dados/scanner_tecnico_v934.json"),"CODE_OR_CONFIG")
+        audit=audit_branch_drift(["../dados/scanner_tecnico_v934.json"])
+        self.assertFalse(audit.runtime_only)
+        self.assertTrue(audit.requires_code_reconciliation)
+
+
 if __name__=="__main__":
     unittest.main()
