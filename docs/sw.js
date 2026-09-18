@@ -1,4 +1,4 @@
-const CACHE = "usd-macro-pro-pwa-v1";
+const CACHE = "atlasquant-pwa-v2";
 const SHELL = [
   "./",
   "./index.html",
@@ -25,7 +25,7 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
-  // Cache only the PWA shell. The Streamlit app is cross-origin and stays live.
+  // Cache somente o shell da PWA. O AtlasQuant no Render e cross-origin e permanece live.
   if (url.origin === self.location.origin) {
     event.respondWith(
       fetch(event.request)
