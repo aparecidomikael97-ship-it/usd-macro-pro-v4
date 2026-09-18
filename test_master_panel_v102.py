@@ -109,6 +109,13 @@ class MasterPanelTests(unittest.TestCase):
         self.assertIn("Prioriza pares ausentes ou com Market Map mais antigo.", src)
         self.assertIn("sorted(", src)
 
+    def test_master_panel_uses_stable_diagnostic_dom(self):
+        src = open("master_panel_v102.py", encoding="utf-8").read()
+        self.assertIn('class="atlas-master-diagnostic"', src)
+        self.assertIn('translate="no"', src)
+        self.assertIn("Nenhum sweep recente confirmado para este contexto.", src)
+        self.assertIn("NotFoundError/removeChild", src)
+
 
 
 if __name__ == '__main__':
