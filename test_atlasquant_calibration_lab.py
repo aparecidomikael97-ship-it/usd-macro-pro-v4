@@ -72,5 +72,28 @@ class AtlasQuantCalibrationLabTests(unittest.TestCase):
         self.assertFalse(s["auto_reweight_allowed"])
 
 
+    def test_nonfinite_scores_and_returns_are_excluded(self):
+        df=pd.DataFrame({
+            "score_mestre":[75,float("nan"),float("inf"),85,95],
+            "retorno_24h_pct":[1.0,1.0,1.0,float("inf"),float("-inf")],
+        })
+        t=calibration_table(df,"24h",min_band_samples=1)
+        self.assertEqual(int(t["Amostra"].sum()),1)
+
+    def test_summary_invalid_sample_counts_fail_closed(self):
+        for bad in (float("nan"),float("inf"),float("-inf"),-1):
+            with self.subTest(sample=bad):
+                table=pd.DataFrame({
+                    "Faixa":["70–79","80–89"],
+                    "Amostra":[30,bad],
+                    "Amostra suficiente":[True,True],
+                    "Taxa observada %":[50.0,60.0],
+                })
+                s=calibration_summary(table,min_total_samples=1)
+                self.assertEqual(s["status"],"INSUFFICIENT")
+                self.assertEqual(s["total_samples"],0)
+                self.assertFalse(s["auto_reweight_allowed"])
+
+
 if __name__=="__main__":
     unittest.main()
