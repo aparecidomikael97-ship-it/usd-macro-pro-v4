@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - atlasquant-dev
+      - atlasquant-runtime
   workflow_dispatch:
 
 permissions:
@@ -66,7 +67,7 @@ jobs:
       - name: Upload checkpoint artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AtlasQuant-DEV-${{ github.sha }}
+          name: AtlasQuant-${{ github.ref_name }}-${{ github.sha }}
           path: ${{ env.CHECKPOINT_ZIP }}
           if-no-files-found: error
           retention-days: 30
