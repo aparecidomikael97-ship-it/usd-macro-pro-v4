@@ -155,8 +155,10 @@ def walk_forward_summary(
             })
             continue
 
-        train_n=pd.to_numeric(group["train_trades"],errors="coerce").fillna(0)
-        test_n=pd.to_numeric(group["test_trades"],errors="coerce").fillna(0)
+        train_n=pd.to_numeric(group["train_trades"],errors="coerce")
+        test_n=pd.to_numeric(group["test_trades"],errors="coerce")
+        finite_train_n=train_n.map(lambda x: bool(pd.notna(x) and math.isfinite(float(x)) and float(x)>=0))
+        finite_test_n=test_n.map(lambda x: bool(pd.notna(x) and math.isfinite(float(x)) and float(x)>=0))
         train_exp=pd.to_numeric(group["train_expectancy_r"],errors="coerce")
         test_exp=pd.to_numeric(group["test_expectancy_r"],errors="coerce")
         deltas=pd.to_numeric(group["expectancy_delta_r"],errors="coerce")
@@ -168,6 +170,8 @@ def walk_forward_summary(
         finite_net=test_net.map(lambda x: bool(pd.notna(x) and math.isfinite(float(x))))
         sufficient=bool(
             len(group)>=k
+            and finite_train_n.all()
+            and finite_test_n.all()
             and (train_n>=min_train).all()
             and (test_n>=min_test).all()
             and finite_train.all()
