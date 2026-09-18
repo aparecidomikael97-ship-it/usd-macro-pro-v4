@@ -10,6 +10,10 @@ class WindowsPrivatePackageTests(unittest.TestCase):
             ".streamlit/secrets.toml",
             ".github/workflows/quality-tests.yml",
             "docs/release/checklist.md",
+            "README_V11_0_6.md",
+            "quality-tests.yml",
+            "build_windows_private_package.py",
+            ".gitignore",
             "test_engine.py",
             ".venv/Scripts/python.exe",
             "private.key",
@@ -45,6 +49,10 @@ class WindowsPrivatePackageTests(unittest.TestCase):
         self.assertIn("AtlasQuant_Windows_Privado.bat", files)
         self.assertFalse(any(path.startswith(".github/") for path in files))
         self.assertFalse(any(path.startswith("docs/") for path in files))
+        self.assertFalse(any(path.endswith(".md") for path in files))
+        self.assertFalse(any(path.endswith((".yml", ".yaml")) for path in files))
+        self.assertNotIn("build_windows_private_package.py", files)
+        self.assertNotIn(".gitignore", files)
         self.assertFalse(any(path.split("/")[-1].startswith("test_") for path in files))
 
 
