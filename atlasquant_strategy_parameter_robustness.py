@@ -165,10 +165,11 @@ def parameter_robustness_summary(
             })
             continue
 
-        trades=pd.to_numeric(group["trades"],errors="coerce").fillna(0)
+        trades=pd.to_numeric(group["trades"],errors="coerce")
+        finite_trades=trades.map(lambda x: bool(pd.notna(x) and math.isfinite(float(x)) and float(x)>=0))
         exps=pd.to_numeric(group["expectancy_r"],errors="coerce")
         finite_exps=exps.map(lambda x: bool(pd.notna(x) and math.isfinite(float(x))))
-        sufficient=bool((trades>=minimum).all() and finite_exps.all())
+        sufficient=bool(finite_trades.all() and (trades>=minimum).all() and finite_exps.all())
         exp_values=[float(x) for x in exps[finite_exps].tolist()]
         positive=sum(1 for x in exp_values if x>1e-12)
         negative=sum(1 for x in exp_values if x<-1e-12)
@@ -204,8 +205,8 @@ def parameter_robustness_summary(
             "worst_expectancy_r":None if worst is None else round(worst,4),
             "best_expectancy_r":None if best is None else round(best,4),
             "expectancy_spread_r":None if spread is None else round(spread,4),
-            "min_variant_trades":int(trades.min()) if len(trades) else 0,
-            "max_variant_trades":int(trades.max()) if len(trades) else 0,
+            "min_variant_trades":int(trades.min()) if len(trades) and finite_trades.all() else 0,
+            "max_variant_trades":int(trades.max()) if len(trades) and finite_trades.all() else 0,
             "parameter_robustness_status":status,
         })
     return pd.DataFrame(rows)
