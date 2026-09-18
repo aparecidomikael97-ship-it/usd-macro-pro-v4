@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.net.Uri;
 import android.view.Gravity;
 import android.view.View;
 import android.webkit.WebChromeClient;
@@ -37,6 +38,10 @@ public class MainActivity extends Activity {
 
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         String savedUrl = prefs.getString(PREF_URL, "");
+        if (isLoopbackAddress(savedUrl)) {
+            prefs.edit().remove(PREF_URL).apply();
+            savedUrl = "";
+        }
         urlInput.setText(savedUrl);
         showAcademy();
     }
@@ -155,8 +160,10 @@ public class MainActivity extends Activity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 progress.setVisibility(View.GONE);
-                status.setText("Conectado.");
-                connectionPanel.setVisibility(View.GONE);
+                if (url != null && (url.startsWith("http://") || url.startsWith("https://"))) {
+                    status.setText("Conectado.");
+                    connectionPanel.setVisibility(View.GONE);
+                }
             }
 
             @Override
@@ -177,13 +184,39 @@ public class MainActivity extends Activity {
 
     private void showAcademy() {
         connectionPanel.setVisibility(View.GONE);
+        webView.setVisibility(View.VISIBLE);
         status.setText("Academy offline.");
         webView.loadUrl("file:///android_asset/academy.html");
     }
 
     private void showDesktopConnection() {
+        webView.stopLoading();
+        webView.setVisibility(View.GONE);
         connectionPanel.setVisibility(View.VISIBLE);
-        status.setText("Digite o endereço mostrado no Windows.");
+        status.setText("Digite o endereço mostrado no Windows. Não use localhost no celular.");
+    }
+
+    private boolean isLoopbackAddress(String rawUrl) {
+        String value = rawUrl == null ? "" : rawUrl.trim();
+        if (value.isEmpty()) {
+            return false;
+        }
+        if (!value.startsWith("http://") && !value.startsWith("https://")) {
+            value = "http://" + value;
+        }
+        try {
+            String host = Uri.parse(value).getHost();
+            if (host == null) {
+                return false;
+            }
+            host = host.toLowerCase();
+            return host.equals("localhost")
+                || host.equals("127.0.0.1")
+                || host.equals("0.0.0.0")
+                || host.equals("::1");
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private void connect(String rawUrl) {
@@ -199,6 +232,17 @@ public class MainActivity extends Activity {
             Toast.makeText(this, "Endereço inválido.", Toast.LENGTH_LONG).show();
             return;
         }
+        if (isLoopbackAddress(url)) {
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove(PREF_URL).apply();
+            urlInput.setText("");
+            status.setText("No celular, localhost aponta para o próprio telefone. Use o IP mostrado no Windows.");
+            Toast.makeText(
+                this,
+                "Não use localhost. Use algo como http://192.168.1.10:8501",
+                Toast.LENGTH_LONG
+            ).show();
+            return;
+        }
 
         getSharedPreferences(PREFS, MODE_PRIVATE)
             .edit()
@@ -206,6 +250,7 @@ public class MainActivity extends Activity {
             .apply();
 
         connectionPanel.setVisibility(View.VISIBLE);
+        webView.setVisibility(View.VISIBLE);
         status.setText("Conectando…");
         webView.loadUrl(url);
     }
