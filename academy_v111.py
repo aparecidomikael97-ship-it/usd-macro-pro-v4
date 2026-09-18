@@ -8,6 +8,11 @@ from __future__ import annotations
 from typing import Any
 
 import html
+import json
+import os
+from datetime import datetime
+from pathlib import Path
+
 import streamlit as st
 
 
@@ -534,6 +539,99 @@ ACADEMY_TRACKS: list[dict[str, Any]] = [
 
 
 
+
+ACADEMY_QUIZZES: dict[str, list[dict[str, Any]]] = {
+    "macro_01": [
+        {"pergunta": "No Forex, por que é importante comparar duas economias?", "opcoes": ["Porque todo par compara uma moeda base com uma cotada", "Porque só o dólar importa", "Porque o gráfico ignora juros", "Porque inflação não afeta moedas"], "correta": 0, "explicacao": "Um par expressa força relativa entre duas moedas; a análise macro precisa comparar os dois lados."},
+        {"pergunta": "Qual sequência resume melhor um ciclo macro possível?", "opcoes": ["Crescimento → emprego → inflação → juros", "Juros → feriado → spread → volume", "NFP → FVG → CPI → BOS", "Inflação → gráfico → calendário → PIB"], "correta": 0, "explicacao": "Crescimento pode fortalecer emprego e demanda, pressionar inflação e influenciar juros."},
+    ],
+    "macro_02": [
+        {"pergunta": "Qual medida recebe atenção especial do Fed para inflação?", "opcoes": ["PCE", "DXY", "ADR", "VIX"], "correta": 0, "explicacao": "PCE, especialmente o Core PCE, é uma referência importante para o Fed."},
+        {"pergunta": "O que o mercado costuma comparar primeiro no release de inflação?", "opcoes": ["Real versus consenso", "A cor do calendário", "O nome do indicador", "O horário de Londres"], "correta": 0, "explicacao": "A surpresa nasce da diferença entre o dado realizado e a expectativa do mercado."},
+    ],
+    "macro_03": [
+        {"pergunta": "Por que o Payroll não deve ser lido sozinho?", "opcoes": ["Porque desemprego, salários e revisões completam a leitura", "Porque o Payroll não mede emprego", "Porque só o ADP vale", "Porque emprego não afeta o Fed"], "correta": 0, "explicacao": "O bloco de emprego é mais confiável quando NFP, desemprego, salários e revisões são lidos juntos."},
+        {"pergunta": "Salários mais fortes podem preocupar o Fed porque:", "opcoes": ["Podem sustentar pressão inflacionária", "Sempre derrubam o dólar", "Eliminam o desemprego", "Reduzem automaticamente o CPI"], "correta": 0, "explicacao": "Pressão salarial persistente pode contribuir para inflação de serviços e postura mais restritiva."},
+    ],
+    "macro_04": [
+        {"pergunta": "Hawkish significa, em geral:", "opcoes": ["Inclinação a política monetária mais restritiva", "Cortes imediatos obrigatórios", "Ausência de inflação", "Moeda sempre fraca"], "correta": 0, "explicacao": "Hawkish indica maior preocupação com inflação e/ou juros mais altos por mais tempo."},
+        {"pergunta": "Por que comparar a reunião atual do Fed com a anterior?", "opcoes": ["Para detectar mudança de narrativa", "Para prever o preço exato", "Para ignorar o dot plot", "Para eliminar o risco"], "correta": 0, "explicacao": "O mercado reage muito à mudança marginal de tom e de projeções."},
+    ],
+    "macro_05": [
+        {"pergunta": "Qual Treasury tende a ser mais sensível às expectativas de política monetária do Fed?", "opcoes": ["2 anos", "30 anos apenas", "Nenhum", "Somente títulos europeus"], "correta": 0, "explicacao": "O Treasury de 2 anos costuma reagir fortemente ao caminho esperado dos Fed Funds."},
+        {"pergunta": "Uma forma simples de pensar juro real é:", "opcoes": ["Juro nominal menos inflação esperada", "PIB menos NFP", "CPI mais PPI", "DXY menos EUR/USD"], "correta": 0, "explicacao": "Juro real aproxima o retorno após descontar inflação esperada."},
+    ],
+    "macro_06": [
+        {"pergunta": "Em índices de difusão como PMI/ISM, 50 costuma separar:", "opcoes": ["Expansão de contração", "Compra de venda", "Bull de bear market", "Londres de Nova York"], "correta": 0, "explicacao": "Acima de 50 tende a indicar expansão; abaixo, contração."},
+        {"pergunta": "Qual leitura é mais completa para um ISM?", "opcoes": ["Nível, tendência e surpresa versus consenso", "Somente se está verde", "Somente o valor anterior", "Somente o horário"], "correta": 0, "explicacao": "O nível absoluto precisa ser combinado com direção e surpresa."},
+    ],
+    "macro_07": [
+        {"pergunta": "O score 0–100 das moedas representa:", "opcoes": ["Ranking relativo, não probabilidade de gain", "Probabilidade exata de lucro", "Preço futuro", "Stop obrigatório"], "correta": 0, "explicacao": "O score organiza força relativa; ele não é uma promessa estatística."},
+        {"pergunta": "Depois de escolher forte contra fraca, o próximo passo é:", "opcoes": ["Validar qualidade, Market Map e scanner", "Entrar imediatamente", "Ignorar evento", "Operar só pelo M15"], "correta": 0, "explicacao": "A força relativa cria hipótese; estrutura e timing ainda precisam confirmar."},
+    ],
+    "macro_08": [
+        {"pergunta": "Antes de um release, o consenso representa:", "opcoes": ["A expectativa média do mercado", "O resultado garantido", "O preço de entrada", "O spread futuro"], "correta": 0, "explicacao": "O consenso é a referência contra a qual o realizado será comparado."},
+        {"pergunta": "Depois do release, o que deve confirmar a surpresa?", "opcoes": ["Treasuries, USD e reação do preço", "Somente o calendário", "Somente a cor do candle", "Nada; a surpresa basta"], "correta": 0, "explicacao": "A reação entre mercados ajuda a validar se a surpresa mudou a narrativa."},
+    ],
+    "ict_01": [
+        {"pergunta": "Qual timeframe deve entrar por último como gatilho?", "opcoes": ["M15", "W1", "D1", "H4"], "correta": 0, "explicacao": "W1/D1 dão contexto, H4/H1 confirmam e M15 serve ao timing."},
+        {"pergunta": "Se M15 está alinhado, mas W1/D1 estão contra, o correto é:", "opcoes": ["Não deixar o M15 escolher a direção", "Ignorar W1/D1", "Entrar com mais risco", "Duplicar posição"], "correta": 0, "explicacao": "O timeframe curto não deve substituir o contexto maior."},
+    ],
+    "ict_02": [
+        {"pergunta": "BSL costuma ficar:", "opcoes": ["Acima de máximas relevantes", "Abaixo de mínimas", "No meio do range sempre", "Somente no H1"], "correta": 0, "explicacao": "Buy-side liquidity é mapeada acima de máximas onde stops/ordens podem se concentrar."},
+        {"pergunta": "Um sweep, sozinho, significa reversão garantida?", "opcoes": ["Não", "Sim, sempre", "Só em EUR/USD", "Só em Londres"], "correta": 0, "explicacao": "Sweep é contexto de liquidez; reação, estrutura e macro ainda importam."},
+    ],
+    "ict_03": [
+        {"pergunta": "BOS costuma representar:", "opcoes": ["Continuidade de estrutura", "Inflação", "Risco de evento", "Juro real"], "correta": 0, "explicacao": "BOS é usado como quebra a favor da estrutura anterior."},
+        {"pergunta": "O AtlasQuant exige para uma quebra estrutural válida:", "opcoes": ["Fechamento além de swing confirmado", "Qualquer pavio", "Apenas volume alto", "Somente horário de killzone"], "correta": 0, "explicacao": "A regra é conservadora e usa fechamento além do swing confirmado."},
+    ],
+    "ict_04": [
+        {"pergunta": "Order Block no AtlasQuant deve ser tratado como:", "opcoes": ["Zona contextual auditável", "Prova de ordens institucionais reais", "Entrada garantida", "Probabilidade de lucro"], "correta": 0, "explicacao": "É uma heurística determinística baseada em estrutura e deslocamento."},
+        {"pergunta": "O que invalida a zona segundo a regra?", "opcoes": ["Fechamento além da borda oposta", "Qualquer toque", "Uma notícia", "Um FVG"], "correta": 0, "explicacao": "A invalidação ocorre por fechamento que atravessa a borda definida."},
+    ],
+    "ict_05": [
+        {"pergunta": "FVG representa:", "opcoes": ["Desequilíbrio entre candles", "Taxa de juros", "Nível de desemprego", "Score macro"], "correta": 0, "explicacao": "FVG é uma ineficiência de preço observada entre três candles."},
+        {"pergunta": "Um FVG deve ser usado como:", "opcoes": ["Zona contextual com confirmação", "Entrada automática", "Garantia de preenchimento", "Substituto do macro"], "correta": 0, "explicacao": "FVG pode ajudar na localização, mas precisa de estrutura e contexto."},
+    ],
+    "ict_06": [
+        {"pergunta": "Killzone serve principalmente para:", "opcoes": ["Organizar quando observar", "Escolher direção automaticamente", "Garantir expansão", "Calcular CPI"], "correta": 0, "explicacao": "Tempo organiza timing e observação; não determina a direção."},
+        {"pergunta": "Quarterly Theory deve ser tratada como:", "opcoes": ["Heurística temporal", "Lei garantida do mercado", "Indicador macro oficial", "Fonte de dados"], "correta": 0, "explicacao": "É uma forma de organizar períodos, não uma certeza causal."},
+    ],
+    "ict_07": [
+        {"pergunta": "Qual é a ordem mais coerente?", "opcoes": ["Macro → contexto → confirmação → gatilho → risco", "M15 → entrada → macro", "Stop → CPI → W1", "FVG → NFP → entrada"], "correta": 0, "explicacao": "O setup integrado começa pela hipótese macro e termina com gatilho e gestão."},
+        {"pergunta": "Se uma camada importante falha, o processo deve:", "opcoes": ["Parar em WAIT", "Forçar entrada", "Aumentar lote", "Ignorar o Gate"], "correta": 0, "explicacao": "O desenho do sistema é seletivo e fail-closed."},
+    ],
+    "aq_01": [
+        {"pergunta": "O Índice Integrado é:", "opcoes": ["Ranking operacional, não probabilidade", "Chance exata de gain", "Preço alvo", "Stop automático"], "correta": 0, "explicacao": "Ele combina componentes para priorização, sem prometer resultado."},
+        {"pergunta": "Antes de decidir no Painel Mestre, confirme:", "opcoes": ["Estado, Gate, ADR e técnica", "Somente o score", "Somente o M15", "Somente a moeda"], "correta": 0, "explicacao": "A decisão é multicamada."},
+    ],
+    "aq_02": [
+        {"pergunta": "O Market Map existe para:", "opcoes": ["Organizar contexto antes do gatilho", "Substituir o scanner", "Dar sinal automático", "Prever o próximo candle"], "correta": 0, "explicacao": "Ele mapeia estrutura, localização, liquidez, evento e ADR."},
+        {"pergunta": "Um cenário pode ficar em WAIT mesmo com parte da técnica verde?", "opcoes": ["Sim", "Não", "Só no JPY", "Só sem FRED"], "correta": 0, "explicacao": "Conflito de contexto, evento ou extensão pode bloquear a execução."},
+    ],
+    "aq_03": [
+        {"pergunta": "O scanner automático atualiza por ciclo no máximo:", "opcoes": ["2 pares", "7 pares", "20 pares", "Todos sem limite"], "correta": 0, "explicacao": "O lote de dois pares protege a cota da Twelve Data."},
+        {"pergunta": "O que significa técnica vencida?", "opcoes": ["Leitura mais antiga que a janela de frescura", "Trade perdido", "API desligada sempre", "Par sem spread"], "correta": 0, "explicacao": "Frescura mede idade do processamento técnico."},
+    ],
+    "aq_04": [
+        {"pergunta": "Na aba EUA, o primeiro passo é:", "opcoes": ["Validar qualidade e auditoria dos dados", "Operar pelo score", "Abrir M15", "Ignorar a fonte"], "correta": 0, "explicacao": "Fonte e frescura vêm antes da interpretação."},
+        {"pergunta": "Treasury 2Y ajuda principalmente a confirmar:", "opcoes": ["Expectativa de política monetária", "Order Block", "Killzone", "ADR"], "correta": 0, "explicacao": "O 2Y é sensível ao caminho esperado dos juros do Fed."},
+    ],
+    "aq_05": [
+        {"pergunta": "A aba Moedas ajuda a:", "opcoes": ["Encontrar contraste forte/fraco", "Gerar entrada automática", "Ignorar qualidade", "Definir stop"], "correta": 0, "explicacao": "O ranking organiza força relativa."},
+        {"pergunta": "Depois do ranking, o par deve ser validado com:", "opcoes": ["Market Map e scanner", "Somente calendário", "Somente PCE", "Nada"], "correta": 0, "explicacao": "Estrutura e timing ainda precisam confirmar."},
+    ],
+    "aq_06": [
+        {"pergunta": "Por que win rate sozinho é insuficiente?", "opcoes": ["Porque payoff e drawdown também importam", "Porque não mede gains", "Porque sempre deve ser 100%", "Porque elimina o risco"], "correta": 0, "explicacao": "Resultado depende da relação entre frequência de acerto e tamanho de ganhos/perdas."},
+        {"pergunta": "Antes de mudar uma regra do setup, é melhor:", "opcoes": ["Juntar uma amostra suficiente", "Mudar após um loss", "Mudar várias regras juntas", "Ignorar o diário"], "correta": 0, "explicacao": "Amostra e alteração controlada ajudam a separar ruído de evidência."},
+    ],
+    "aq_07": [
+        {"pergunta": "Qual sequência começa a rotina diária?", "opcoes": ["Calendário → Macro → Moedas/Pares", "M15 → entrada → calendário", "Stop → gain → CPI", "FVG → lote → Fed"], "correta": 0, "explicacao": "A rotina começa pelo risco de eventos e pelo contexto macro."},
+        {"pergunta": "No pós-mercado, além do resultado, registre:", "opcoes": ["Se o processo foi seguido", "Só o gain", "Só o spread", "Nada"], "correta": 0, "explicacao": "O diário deve medir qualidade do processo, não apenas P&L."},
+    ],
+}
+
+
 ACADEMY_VISUALS: dict[str, dict[str, Any]] = {
     "macro_01": {
         "titulo": "Ciclo macroeconômico",
@@ -921,6 +1019,82 @@ def build_storyboard(lesson_id: str) -> list[dict[str, str | int]]:
     return storyboard
 
 
+
+def _academy_progress_path() -> Path:
+    if os.name == "nt" and os.environ.get("LOCALAPPDATA"):
+        root = Path(os.environ["LOCALAPPDATA"]) / "AtlasQuant"
+    else:
+        root = Path.home() / ".atlasquant"
+    root.mkdir(parents=True, exist_ok=True)
+    return root / "academy_progress.json"
+
+
+def _academy_default_progress() -> dict[str, Any]:
+    return {
+        "version": 1,
+        "completed": [],
+        "passed_quizzes": [],
+        "student_name": "",
+        "updated_at": "",
+    }
+
+
+def _academy_load_progress() -> dict[str, Any]:
+    base = _academy_default_progress()
+    path = _academy_progress_path()
+    try:
+        if path.exists():
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(raw, dict):
+                base.update(raw)
+    except Exception:
+        pass
+    base["completed"] = sorted(set(str(x) for x in base.get("completed", [])))
+    base["passed_quizzes"] = sorted(set(str(x) for x in base.get("passed_quizzes", [])))
+    return base
+
+
+def _academy_save_progress(progress: dict[str, Any]) -> tuple[bool, str]:
+    path = _academy_progress_path()
+    try:
+        clean = dict(progress)
+        clean["completed"] = sorted(set(str(x) for x in clean.get("completed", [])))
+        clean["passed_quizzes"] = sorted(set(str(x) for x in clean.get("passed_quizzes", [])))
+        clean["updated_at"] = datetime.now().isoformat(timespec="seconds")
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(clean, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.replace(path)
+        return True, ""
+    except Exception as exc:
+        return False, f"{type(exc).__name__}: {exc}"
+
+
+def _academy_track_stats(track: dict[str, Any], completed_ids: set[str]) -> tuple[int, int]:
+    ids = [str(lesson["id"]) for lesson in track.get("aulas", [])]
+    done = sum(1 for lesson_id in ids if lesson_id in completed_ids)
+    return done, len(ids)
+
+
+def _academy_certificate_html(student_name: str, completed_at: str) -> str:
+    safe_name = html.escape(student_name.strip() or "Aluno AtlasQuant")
+    safe_date = html.escape(completed_at)
+    return f"""<!doctype html>
+<html lang="pt-BR"><meta charset="utf-8">
+<title>Certificado AtlasQuant Academy</title>
+<body style="font-family:Arial,sans-serif;background:#07111f;color:#eef7ff;padding:40px">
+<div style="max-width:900px;margin:auto;border:2px solid #3aa7e8;border-radius:22px;padding:56px;text-align:center;background:#0d2032">
+<h1 style="font-size:42px;margin:0 0 10px">ATLASQUANT ACADEMY</h1>
+<p style="letter-spacing:4px;color:#73c8ff">CERTIFICADO DE CONCLUSÃO</p>
+<p style="margin-top:46px">Certificamos que</p>
+<h2 style="font-size:34px">{safe_name}</h2>
+<p>concluiu as 22 aulas das trilhas Macro & Forex, ICT & Smart Money e Operação no AtlasQuant,<br>
+incluindo os quizzes de validação de conhecimento.</p>
+<p style="margin-top:40px;color:#a8bfd2">Conclusão registrada em {safe_date}</p>
+<p style="margin-top:50px;font-size:12px;color:#829db2">Material educacional. Não representa certificação profissional nem promessa de resultado financeiro.</p>
+</div></body></html>"""
+
+
+
 def academy_stats(completed_ids=None) -> dict[str, int]:
     completed = set(completed_ids or [])
     all_ids = [lesson["id"] for track in ACADEMY_TRACKS for lesson in track["aulas"]]
@@ -938,7 +1112,17 @@ def get_lesson(lesson_id: str):
 
 def render_academy() -> None:
     completed_key = "atlasquant_academy_completed"
+    passed_key = "atlasquant_academy_passed_quizzes"
+
+    if "atlasquant_academy_progress_loaded" not in st.session_state:
+        _persisted = _academy_load_progress()
+        st.session_state[completed_key] = list(_persisted.get("completed", []))
+        st.session_state[passed_key] = list(_persisted.get("passed_quizzes", []))
+        st.session_state["atlasquant_academy_student_name"] = str(_persisted.get("student_name", ""))
+        st.session_state["atlasquant_academy_progress_loaded"] = True
+
     completed = set(st.session_state.get(completed_key, []))
+    passed_quizzes = set(st.session_state.get(passed_key, []))
     stats = academy_stats(completed)
 
     st.markdown("### 🎓 AtlasQuant Academy")
@@ -947,10 +1131,11 @@ def render_academy() -> None:
         "Os roteiros abaixo são material original para produzir os vídeos da Academy."
     )
 
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3, c4 = st.columns(4)
     c1.metric("Aulas", stats["total"])
     c2.metric("Concluídas", stats["concluidas"])
-    c3.metric("Restantes", stats["restantes"])
+    c3.metric("Quizzes aprovados", f"{len(passed_quizzes)}/{stats['total']}")
+    c4.metric("Restantes", stats["restantes"])
     if stats["total"]:
         st.progress(stats["concluidas"] / stats["total"])
 
@@ -1006,24 +1191,120 @@ def render_academy() -> None:
         st.markdown("##### ✅ Checklist")
         st.markdown(" · ".join(str(item) for item in lesson["checklist"]))
 
+        st.markdown("##### 🧠 Quiz da aula")
+        _quiz_items = ACADEMY_QUIZZES.get(lesson["id"], [])
+        _quiz_passed = lesson["id"] in passed_quizzes
+        if _quiz_passed:
+            st.success("Quiz aprovado. Esta aula está liberada para conclusão.")
+        elif _quiz_items:
+            _answers: list[int] = []
+            for _qi, _question in enumerate(_quiz_items):
+                _options = list(_question["opcoes"])
+                _choice = st.radio(
+                    _question["pergunta"],
+                    options=list(range(len(_options))),
+                    format_func=lambda idx, opts=_options: opts[idx],
+                    index=None,
+                    key=f"academy_quiz_{lesson['id']}_{_qi}",
+                )
+                _answers.append(-1 if _choice is None else int(_choice))
+
+            if st.button("Corrigir quiz", key=f"academy_quiz_submit_{lesson['id']}"):
+                _all_answered = all(answer >= 0 for answer in _answers)
+                _correct = sum(
+                    1 for answer, question in zip(_answers, _quiz_items)
+                    if answer == int(question["correta"])
+                )
+                if not _all_answered:
+                    st.warning("Responda todas as perguntas antes de corrigir.")
+                elif _correct == len(_quiz_items):
+                    passed_quizzes.add(lesson["id"])
+                    st.session_state[passed_key] = sorted(passed_quizzes)
+                    _progress = _academy_load_progress()
+                    _progress["completed"] = sorted(completed)
+                    _progress["passed_quizzes"] = sorted(passed_quizzes)
+                    _progress["student_name"] = st.session_state.get("atlasquant_academy_student_name", "")
+                    _academy_save_progress(_progress)
+                    st.success("✅ Quiz aprovado: 100%. Agora você pode concluir esta aula.")
+                    st.rerun()
+                else:
+                    st.warning(f"Você acertou {_correct}/{len(_quiz_items)}. Revise a aula e tente novamente.")
+                    for _answer, _question in zip(_answers, _quiz_items):
+                        if _answer != int(_question["correta"]):
+                            st.caption(f"💡 {_question['explicacao']}")
+
         is_done = lesson["id"] in completed
         new_done = st.checkbox(
             "Marcar esta aula como concluída",
             value=is_done,
+            disabled=(not is_done and lesson["id"] not in passed_quizzes),
             key=f"academy_done_{lesson['id']}",
+            help="A conclusão é liberada após aprovação no quiz da aula.",
         )
         if new_done and not is_done:
             completed.add(lesson["id"])
             st.session_state[completed_key] = sorted(completed)
+            _progress = _academy_load_progress()
+            _progress["completed"] = sorted(completed)
+            _progress["passed_quizzes"] = sorted(passed_quizzes)
+            _progress["student_name"] = st.session_state.get("atlasquant_academy_student_name", "")
+            _academy_save_progress(_progress)
             st.rerun()
         elif is_done and not new_done:
             completed.discard(lesson["id"])
             st.session_state[completed_key] = sorted(completed)
+            _progress = _academy_load_progress()
+            _progress["completed"] = sorted(completed)
+            _progress["passed_quizzes"] = sorted(passed_quizzes)
+            _progress["student_name"] = st.session_state.get("atlasquant_academy_student_name", "")
+            _academy_save_progress(_progress)
             st.rerun()
 
     with st.expander("📋 Ver programa completo"):
         for tr in ACADEMY_TRACKS:
-            st.markdown(f"**{tr['titulo']}** — {tr['descricao']}")
+            _done_track, _total_track = _academy_track_stats(tr, completed)
+            st.markdown(f"**{tr['titulo']}** — {tr['descricao']} · **{_done_track}/{_total_track} concluídas**")
+            if _total_track:
+                st.progress(_done_track / _total_track)
             for lesson_item in tr["aulas"]:
                 mark = "✅" if lesson_item["id"] in completed else "⬜"
-                st.markdown(f"{mark} {lesson_item['titulo']} · {lesson_item['duracao']}")
+                quiz_mark = "🧠✅" if lesson_item["id"] in passed_quizzes else "🧠⬜"
+                st.markdown(f"{mark} {quiz_mark} {lesson_item['titulo']} · {lesson_item['duracao']}")
+
+    st.markdown("---")
+    st.markdown("### 🏆 Conclusão e certificado")
+    _all_ids = {lesson["id"] for tr in ACADEMY_TRACKS for lesson in tr["aulas"]}
+    _course_complete = _all_ids.issubset(completed) and _all_ids.issubset(passed_quizzes)
+    _student_name = st.text_input(
+        "Nome no certificado",
+        value=st.session_state.get("atlasquant_academy_student_name", ""),
+        key="atlasquant_academy_certificate_name_input",
+        placeholder="Digite seu nome",
+    )
+    if _student_name != st.session_state.get("atlasquant_academy_student_name", ""):
+        st.session_state["atlasquant_academy_student_name"] = _student_name
+        _progress = _academy_load_progress()
+        _progress["completed"] = sorted(completed)
+        _progress["passed_quizzes"] = sorted(passed_quizzes)
+        _progress["student_name"] = _student_name
+        _academy_save_progress(_progress)
+
+    if _course_complete:
+        st.success("🎓 Parabéns! As 22 aulas e os 22 quizzes foram concluídos.")
+        _cert_date = datetime.now().strftime("%d/%m/%Y")
+        _cert_html = _academy_certificate_html(_student_name, _cert_date)
+        st.download_button(
+            "⬇️ Baixar certificado (HTML)",
+            data=_cert_html.encode("utf-8"),
+            file_name="Certificado_AtlasQuant_Academy.html",
+            mime="text/html",
+            disabled=not bool(_student_name.strip()),
+        )
+        st.caption("Abra o certificado no navegador e use Imprimir → Salvar como PDF, se desejar.")
+    else:
+        _missing_lessons = len(_all_ids - completed)
+        _missing_quizzes = len(_all_ids - passed_quizzes)
+        st.info(
+            f"Faltam {_missing_lessons} aula(s) para concluir e "
+            f"{_missing_quizzes} quiz(zes) para aprovação completa."
+        )
