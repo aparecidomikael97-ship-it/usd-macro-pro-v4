@@ -193,11 +193,13 @@ def friction_sensitivity_summary(
             })
             continue
 
-        trades=int(pd.to_numeric(group["trades"],errors="coerce").fillna(0).max())
+        trade_counts=pd.to_numeric(group["trades"],errors="coerce")
+        trades_valid=bool(trade_counts.notna().all() and trade_counts.map(lambda x: math.isfinite(float(x)) and float(x)>=0).all())
+        trades=int(trade_counts.max()) if trades_valid and len(trade_counts) else 0
         exps=pd.to_numeric(group["expectancy_r"],errors="coerce")
         baseline=group.iloc[0]
         baseline_exp=_finite(baseline.get("expectancy_r"))
-        finite_exps=[float(x) for x in exps.dropna().tolist()]
+        finite_exps=[float(x) for x in exps.dropna().tolist() if math.isfinite(float(x))]
         positive=sum(1 for x in finite_exps if x>1e-12)
 
         first_nonpositive=None
@@ -212,7 +214,7 @@ def friction_sensitivity_summary(
         if baseline_exp is not None and worst is not None:
             drop=baseline_exp-worst
 
-        if trades<threshold or baseline_exp is None:
+        if not trades_valid or trades<threshold or baseline_exp is None:
             status="INSUFFICIENT"
         elif baseline_exp<=1e-12:
             status="NONPOSITIVE_BASELINE"
