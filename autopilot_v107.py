@@ -224,7 +224,9 @@ def minutes_since(value: Any) -> float | None:
             ts = pd.Timestamp(float(value), unit="s", tz="UTC")
         else:
             ts = pd.to_datetime(value, utc=True)
-        return max(0.0, (utcnow() - ts).total_seconds() / 60.0)
+        age = float((utcnow() - ts).total_seconds() / 60.0)
+        # Future-dated evidence is invalid, not fresh. Clock/data errors fail closed.
+        return None if age < 0 else age
     except Exception:
         return None
 
@@ -1168,13 +1170,13 @@ def status_summary(
     for p in PAIR_ORDER:
         raw = results.get(p,{}) if isinstance(results,dict) else {}
         scanner_age=minutes_since(raw.get("m15_fetched_at"))
-        if scanner_age is not None and scanner_age <= 60:
+        if scanner_age is not None and scanner_age < 60:
             scanner_fresh += 1
     contexts = dict(master.get("contexts",{}) or {})
     map_fresh = 0
     for p in PAIR_ORDER:
         age=minutes_since((contexts.get(p,{}) or {}).get("updated_at"))
-        if age is not None and age <= 60:
+        if age is not None and age < 60:
             map_fresh += 1
     pending = int(validation["validation_status"].astype(str).isin(["PENDENTE","PARCIAL"]).sum()) if not validation.empty else 0
     complete = int((validation["validation_status"].astype(str)=="COMPLETO").sum()) if not validation.empty else 0
