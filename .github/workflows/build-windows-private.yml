@@ -1,0 +1,64 @@
+name: AtlasQuant - Build Windows Private
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [atlasquant-private-deploy]
+    paths:
+      - "*.py"
+      - "requirements.txt"
+      - "AtlasQuant_Windows_Privado.bat"
+      - "tradingview/**"
+      - ".github/workflows/build-windows-private.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build private Windows ZIP
+        run: |
+          python build_windows_private_package.py
+          python - <<'PY'
+          import zipfile
+          from pathlib import Path
+
+          path = Path("dist/AtlasQuant_Windows_Privado.zip")
+          assert path.exists() and path.stat().st_size > 0
+          with zipfile.ZipFile(path) as zf:
+              names = set(zf.namelist())
+              required = {
+                  "usd_macro_pro_v4_cloud.py",
+                  "requirements.txt",
+                  "AtlasQuant_Windows_Privado.bat",
+                  "LEIA-ME_WINDOWS.txt",
+              }
+              missing = required - names
+              assert not missing, f"Missing package files: {sorted(missing)}"
+              forbidden = [
+                  n for n in names
+                  if n.startswith(".github/")
+                  or n.startswith("docs/")
+                  or "/secrets.toml" in n.lower()
+                  or n.lower() == ".env"
+                  or n.split("/")[-1].startswith("test_")
+              ]
+              assert not forbidden, f"Forbidden files in package: {forbidden[:10]}"
+          print(f"Package OK: {path} ({path.stat().st_size} bytes)")
+          PY
+
+      - name: Upload Windows private package
+        uses: actions/upload-artifact@v4
+        with:
+          name: AtlasQuant_Windows_Privado
+          path: dist/AtlasQuant_Windows_Privado.zip
+          if-no-files-found: error
+          retention-days: 14
