@@ -809,11 +809,21 @@ def carregar_macro_eua() -> dict:
         "Índice amplo do dólar": (50, 200),
     }
 
+    # Limites de frescura medidos a partir da DATA DA OBSERVAÇÃO da FRED.
+    # Séries mensais/trimestrais usam o início do período como timestamp, portanto
+    # precisam de uma janela maior que dados de mercado diários para evitar falsos alertas.
     frescura = {
-        "Juros do Fed": 45, "IPC anual": 50, "IPC Núcleo anual": 50,
-        "PCE anual": 50, "PCE Núcleo anual": 50, "Payroll variação mensal (mil)": 50,
-        "Desemprego": 50, "PIB": 130, "Treasury 2 anos": 5,
-        "Treasury 10 anos": 5, "Índice amplo do dólar": 10,
+        "Juros do Fed": 65,
+        "IPC anual": 70,
+        "IPC Núcleo anual": 70,
+        "PCE anual": 95,
+        "PCE Núcleo anual": 95,
+        "Payroll variação mensal (mil)": 70,
+        "Desemprego": 70,
+        "PIB": 200,
+        "Treasury 2 anos": 5,
+        "Treasury 10 anos": 5,
+        "Índice amplo do dólar": 10,
     }
 
     dados, auditoria = {}, []
@@ -3977,7 +3987,7 @@ with abas[3]:
             st.warning(f"🟡 {len(atencao)} indicador(es) estão mais antigos que o ideal para a frequência da série.")
         else:
             st.success("✅ Todos os indicadores principais passaram na validação de data e faixa.")
-    st.caption("Treasuries usam janela curta de frescura. CPI/PCE/Payroll são mensais; PIB é trimestral. A data exibida é a data da observação da FRED.")
+    st.caption("Frescura respeita a frequência da série: Treasuries usam janela curta; Fed/CPI/PCE/Payroll/Desemprego são mensais e PIB é trimestral. A data exibida é a data da observação da FRED, não a data de publicação.")
 
     st.markdown("---")
     st.markdown("---")
