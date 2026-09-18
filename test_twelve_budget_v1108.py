@@ -207,6 +207,13 @@ class CollectorTests(unittest.TestCase):
             d,e=ap.td_fetch('EUR/USD','15min',100)
         self.assertTrue(d.empty); self.assertTrue(e)
 
+    def test_invalid_outputsize_never_reserves_or_calls_provider(self):
+        for bad in (0,-1,5001,'bad'):
+            with self.subTest(outputsize=bad), patch.object(ap.requests,'get',side_effect=AssertionError('must not call')):
+                d,e=ap.td_fetch('EUR/USD','15min',bad)
+                self.assertTrue(d.empty); self.assertTrue(e)
+        self.assertEqual(self.store.writes,0)
+
     def test_batch_symbols_cannot_bypass_credit_weight(self):
         with patch.object(ap.requests,'get',side_effect=AssertionError('must not call')):
             d,e=ap.td_fetch('EUR/USD,GBP/USD','15min',100)
