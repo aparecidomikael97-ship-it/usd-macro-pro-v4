@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>AtlasQuant Academy</title>
+<style>
+:root{color-scheme:dark;--bg:#050f1c;--panel:#102d46;--panel2:#0d2235;--line:#2d7096;--cyan:#4cc0ff;--text:#f0f7fc;--muted:#a6c0d3;--green:#32cd8c;--gold:#f4be54}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
+.wrap{max-width:900px;margin:auto;padding:20px}.brand{font-size:28px;font-weight:800;color:var(--cyan)}.sub{color:var(--muted);margin:4px 0 18px}
+.card{background:var(--panel2);border:1px solid #244c66;border-radius:18px;padding:16px;margin:12px 0}.track{margin-top:24px;font-size:20px;color:var(--cyan);font-weight:800}
+.lesson{cursor:pointer}.lesson h3{margin:0 0 8px;font-size:18px}.meta{font-size:13px;color:var(--muted)}.body{display:none;margin-top:14px;border-top:1px solid #244c66;padding-top:14px}
+.label{font-size:12px;color:var(--cyan);font-weight:800;text-transform:uppercase;letter-spacing:.04em;margin-top:12px}.body p{line-height:1.48;margin:6px 0}.check{color:var(--muted)}
+.row{display:flex;gap:10px;align-items:center;justify-content:space-between}.done{accent-color:var(--green);width:22px;height:22px}.progress{height:12px;background:#12314a;border-radius:999px;overflow:hidden}.bar{height:100%;background:var(--green);width:0}.stats{display:flex;gap:12px;flex-wrap:wrap}.pill{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:8px 12px;color:var(--muted)}
+.note{color:var(--gold);font-size:13px;line-height:1.4}.search{width:100%;padding:12px 14px;border-radius:12px;border:1px solid #315c77;background:#0d2235;color:white;margin:14px 0}
+button{background:#123b5a;color:white;border:1px solid #347ca5;border-radius:10px;padding:9px 12px}.hide{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">ATLASQUANT ACADEMY</div>
+  <div class="sub">Academy offline • funciona sem PC e sem internet</div>
+  <div class="stats">
+    <div class="pill"><b id="doneCount">0</b>/22 concluídas</div>
+    <div class="pill"><b id="pct">0%</b> progresso</div>
+  </div>
+  <div class="progress"><div id="bar" class="bar"></div></div>
+  <input id="search" class="search" placeholder="Buscar aula, tema ou palavra...">
+  <div class="note">Material educacional. Scores e exemplos não representam promessa de resultado financeiro.</div>
+  <div id="content"></div>
+</div>
+<script>
+const tracks=[
+{title:"📈 Macro & Forex",desc:"Do ciclo econômico à leitura prática de moedas e pares.",lessons:[
+{id:"macro_01",title:"1. Ciclo econômico e direção da moeda",dur:"12–15 min",obj:"Entender como crescimento, inflação, juros e moeda se conectam.",sum:"O Forex reage ao que o mercado espera para crescimento, inflação e juros. A ideia central é comparar economias: qual banco central tende a apertar ou afrouxar mais?",practice:"Escolha EUR/USD e escreva em uma frase qual economia parece mais forte e por quê.",check:"Crescimento • Inflação • Emprego • Banco central • Juros relativos"},
+{id:"macro_02",title:"2. Inflação: CPI, Core CPI, PCE e PPI",dur:"15–18 min",obj:"Saber qual dado mede o quê e como a surpresa afeta o USD.",sum:"CPI e Core CPI mostram inflação ao consumidor; PCE é referência importante para o Fed; PPI observa preços ao produtor. O mercado reage principalmente ao resultado versus consenso.",practice:"Pegue um CPI fictício de 3,2% vs consenso 3,0% e descreva o primeiro impacto provável no USD.",check:"Real • Consenso • Anterior • Core • Treasury 2Y"},
+{id:"macro_03",title:"3. Emprego: NFP, desemprego, salários e ADP",dur:"15–18 min",obj:"Ler o mercado de trabalho como bloco, e não só o Payroll.",sum:"NFP mostra criação de vagas, desemprego mede folga no mercado de trabalho e salários ajudam a medir pressão inflacionária. Um único número raramente conta a história inteira.",practice:"Monte uma conclusão usando NFP, desemprego e salários juntos em uma única frase.",check:"NFP • Desemprego • Salários • Revisões • Fed"},
+{id:"macro_04",title:"4. Federal Reserve: FOMC, dot plot e hawkish/dovish",dur:"18–22 min",obj:"Entender a decisão de juros e, principalmente, a narrativa do Fed.",sum:"A taxa atual importa, mas o mercado negocia o caminho futuro dos juros. Comunicado, coletiva, dot plot e discursos podem mudar a precificação mesmo sem alteração da taxa.",practice:"Leia uma frase hipotética do Fed e classifique: hawkish, dovish ou neutra.",check:"Taxa • Comunicado • Coletiva • Dot plot • Mudança de narrativa"},
+{id:"macro_05",title:"5. Treasury 2Y, 10Y, juros reais e dólar",dur:"12–15 min",obj:"Usar os juros de mercado como confirmação da narrativa macro.",sum:"O Treasury 2Y reage fortemente às expectativas de política monetária. O 10Y incorpora também crescimento, inflação e prêmio de prazo. O dólar costuma responder à mudança relativa de rendimentos.",practice:"Se o 2Y sobe forte após CPI acima do consenso, descreva o que você procuraria no USD.",check:"2Y • 10Y • Juros reais • USD • Confirmação"},
+{id:"macro_06",title:"6. PIB, ISM e PMI: atividade econômica",dur:"14–17 min",obj:"Identificar aceleração ou desaceleração antes da decisão do banco central.",sum:"PIB é amplo e trimestral; ISM/PMI são mais rápidos e ajudam a enxergar a direção da atividade. Acima de 50 geralmente sinaliza expansão nos índices de difusão.",practice:"Compare ISM Serviços 56 com consenso 52 e escreva o efeito macro inicial.",check:"PIB • ISM Industrial • ISM Serviços • 50 pontos • Surpresa"},
+{id:"macro_07",title:"7. Força das 8 moedas e comparação de pares",dur:"16–20 min",obj:"Comparar USD, EUR, GBP, JPY, CHF, CAD, AUD e NZD antes de escolher o par.",sum:"Um par é uma comparação. A melhor leitura surge quando uma moeda tem fundamentos claramente mais fortes e a outra mais fracos, com qualidade de dados suficiente.",practice:"Escolha a moeda mais forte e a mais fraca no ranking e forme um par coerente.",check:"Base • Cotada • Diferença macro • Qualidade • Direção"},
+{id:"macro_08",title:"8. Calendário econômico e Surprise Engine",dur:"18–22 min",obj:"Ler notícia antes, durante e depois do release sem operar só pela cor do calendário.",sum:"O calendário organiza risco. Antes do dado, o consenso representa a expectativa. Depois, a diferença entre real e consenso gera surpresa; a reação depende também da narrativa já precificada.",practice:"Simule um release e escreva: surpresa, reação inicial e o que precisa confirmar no preço.",check:"Anterior • Consenso • Real • Revisão • Narrativa precificada"}]},
+{title:"🧠 ICT & Smart Money",desc:"Estrutura, liquidez, localização e timing depois da direção macro.",lessons:[
+{id:"ict_01",title:"1. Top-down: W1 → D1 → H4 → H1 → M15",dur:"14–18 min",obj:"Usar cada timeframe para uma função específica.",sum:"W1/D1 definem contexto; H4/H1 confirmam estrutura; M15 serve para gatilho e timing.",practice:"Escreva uma leitura top-down em cinco linhas, uma por timeframe.",check:"W1 • D1 • H4 • H1 • M15"},
+{id:"ict_02",title:"2. Liquidez: BSL, SSL e sweeps",dur:"15–18 min",obj:"Mapear onde o preço pode buscar liquidez e reconhecer varreduras.",sum:"BSL fica acima de máximas; SSL abaixo de mínimas. Sweep é a busca do nível seguida de rejeição ou retorno.",practice:"Marque BSL e SSL num gráfico e escreva qual lado faz sentido com o viés macro.",check:"BSL • SSL • Asia High/Low • Sweep • Rejeição"},
+{id:"ict_03",title:"3. BOS, CHoCH e mudança de estrutura",dur:"14–17 min",obj:"Diferenciar continuação de mudança de comportamento.",sum:"BOS confirma continuidade de estrutura; CHoCH/MSS pode sinalizar mudança, mas precisa de contexto.",practice:"Classifique três movimentos fictícios como BOS, CHoCH ou ruído.",check:"Swing • BOS • CHoCH/MSS • Fechamento • Contexto"},
+{id:"ict_04",title:"4. Order Blocks e localização",dur:"14–18 min",obj:"Usar Order Block como zona contextual, não como entrada automática.",sum:"Order Block é uma região associada ao deslocamento; sua qualidade depende de estrutura, liquidez e contexto.",practice:"Descreva o que tornaria um Order Block válido ou fraco.",check:"Deslocamento • Mitigação • Invalidação • Premium/Discount • Contexto"},
+{id:"ict_05",title:"5. FVG, imbalance e deslocamento",dur:"12–16 min",obj:"Entender desequilíbrio de preço e sua função no pullback.",sum:"FVG representa desequilíbrio entre candles. Pode servir como área de retorno, mas não garante reação.",practice:"Identifique um FVG e escreva qual confirmação adicional exigiria.",check:"FVG • Deslocamento • Retorno • Estrutura • Confirmação"},
+{id:"ict_06",title:"6. Killzones, Quarterly e perfis semanais",dur:"18–22 min",obj:"Organizar o timing sem transformar horário em sinal.",sum:"Killzones e divisões temporais ajudam a organizar quando procurar liquidez, manipulação e expansão.",practice:"Monte um plano de observação para Londres e Nova York sem prever direção pelo horário.",check:"Ásia • Londres • Nova York • Quarterly • Perfil semanal"},
+{id:"ict_07",title:"7. Setup integrado: Macro → Liquidez → Gatilho",dur:"20–25 min",obj:"Juntar tudo em uma rotina seletiva.",sum:"A execução só ganha prioridade quando macro, estrutura, localização, volatilidade e gatilho concordam.",practice:"Preencha o checklist completo de um par sem executar nenhuma ordem.",check:"Macro • W1/D1 • Liquidez • ADR • H4/H1 • M15"}]},
+{title:"🧭 Operação no AtlasQuant",desc:"Como usar cada bloco do aplicativo sem confundir score com certeza.",lessons:[
+{id:"aq_01",title:"1. Painel Mestre: leitura em 60 segundos",dur:"10–12 min",obj:"Saber priorizar pares usando o painel consolidado.",sum:"O Painel Mestre junta macro, Market Map, scanner técnico, ADR e Gate; índice integrado é ranking, não probabilidade.",practice:"Escolha o melhor contexto e justifique usando pelo menos quatro campos.",check:"Estado • Índice • Gate • ADR • Técnica"},
+{id:"aq_02",title:"2. Market Map e top-down operacional",dur:"12–15 min",obj:"Interpretar W1/D1, liquidez, localização e evento.",sum:"Market Map organiza o cenário e impede que o scanner técnico opere fora de contexto.",practice:"Descreva um cenário de WAIT mesmo com técnica parcialmente alinhada.",check:"W1 • D1 • Localização • Sweep • Evento • ADR"},
+{id:"aq_03",title:"3. Scanner técnico automático",dur:"10–12 min",obj:"Entender H4/H1/M15 e o modo automático.",sum:"O scanner atualiza pares ausentes/vencidos em lotes controlados, respeitando a cota da Twelve Data.",practice:"Observe um par com H4 verde, H1 amarelo e M15 vermelho e explique por que ainda é WAIT.",check:"H4 • H1 • M15 • Frescura • Cooldown"},
+{id:"aq_04",title:"4. Aba EUA e Fed",dur:"12–16 min",obj:"Usar qualidade de dados, indicadores e narrativa do Fed.",sum:"A aba EUA mostra dados oficiais, frescura e score macro; a aba Fed contextualiza a política monetária.",practice:"Faça uma conclusão do USD usando três indicadores e o Fed.",check:"Qualidade • FRED • Fed • 2Y • Conclusão"},
+{id:"aq_05",title:"5. Moedas e Pares: força relativa",dur:"12–15 min",obj:"Transformar ranking de moedas em hipótese de par.",sum:"O ranking ajuda a encontrar contraste de força; a aba Pares testa essa diferença dentro da matriz.",practice:"Forme dois pares candidatos e elimine um por baixa qualidade ou conflito técnico.",check:"Força • Qualidade • Par • Market Map • Scanner"},
+{id:"aq_06",title:"6. Backtest, performance e diário",dur:"15–20 min",obj:"Medir se o operacional funciona em vez de confiar na memória.",sum:"Backtest e diário servem para separar percepção de evidência: taxa de acerto, payoff, drawdown e contexto.",practice:"Registre cinco operações fictícias com motivo de entrada e motivo de saída.",check:"Setup • Resultado • Risco • Payoff • Amostra"},
+{id:"aq_07",title:"7. Rotina diária completa",dur:"15–18 min",obj:"Ter uma sequência fixa antes, durante e depois da sessão.",sum:"Rotina reduz decisão impulsiva: macro semanal, calendário, força, Market Map, scanner, execução e revisão.",practice:"Use o checklist em um dia completo sem pular etapas.",check:"Calendário • Macro • Pares • Market Map • Scanner • Diário"}]}
+];
+
+const key="atlasquant_academy_mobile_done_v1";
+let done=new Set(JSON.parse(localStorage.getItem(key)||"[]"));
+function persist(){localStorage.setItem(key,JSON.stringify([...done]));updateStats()}
+function updateStats(){document.getElementById("doneCount").textContent=done.size;const p=Math.round(done.size/22*100);document.getElementById("pct").textContent=p+"%";document.getElementById("bar").style.width=p+"%"}
+function render(filter=""){
+  const root=document.getElementById("content");root.innerHTML="";
+  tracks.forEach(track=>{
+    const all=track.lessons.filter(l=>(track.title+" "+l.title+" "+l.obj+" "+l.sum+" "+l.check).toLowerCase().includes(filter.toLowerCase()));
+    if(!all.length)return;
+    const h=document.createElement("div");h.className="track";h.textContent=track.title;root.appendChild(h);
+    const d=document.createElement("div");d.className="sub";d.textContent=track.desc;root.appendChild(d);
+    all.forEach(l=>{
+      const c=document.createElement("div");c.className="card lesson";
+      c.innerHTML=`<div class="row"><div><h3>${l.title}</h3><div class="meta">⏱ ${l.dur}</div></div><input class="done" type="checkbox" ${done.has(l.id)?"checked":""} aria-label="Concluir"></div>
+      <div class="body"><div class="label">Objetivo</div><p>${l.obj}</p><div class="label">Resumo</div><p>${l.sum}</p><div class="label">Prática</div><p>${l.practice}</p><div class="label">Checklist</div><p class="check">${l.check}</p></div>`;
+      const body=c.querySelector(".body");
+      c.addEventListener("click",e=>{if(e.target.tagName!=="INPUT")body.style.display=body.style.display==="block"?"none":"block"});
+      const cb=c.querySelector("input");
+      cb.addEventListener("change",()=>{cb.checked?done.add(l.id):done.delete(l.id);persist()});
+      root.appendChild(c);
+    });
+  });
+}
+document.getElementById("search").addEventListener("input",e=>render(e.target.value));
+updateStats();render();
+</script>
+</body></html>
