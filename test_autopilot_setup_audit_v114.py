@@ -1,4 +1,7 @@
 import unittest
+from unittest.mock import patch
+from io import StringIO
+from contextlib import redirect_stdout
 
 import pandas as pd
 
@@ -6,6 +9,7 @@ from autopilot_setup_audit_v114 import (
     aggregate_setup_performance,
     build_summary,
     sync_setup_audit,
+    _audit_cycle,
 )
 
 
@@ -186,6 +190,21 @@ class SetupAuditV114Tests(unittest.TestCase):
         self.assertEqual(summary["sample_state"], "AGUARDANDO AMOSTRA")
         self.assertFalse(summary["safety"]["real_orders"])
         self.assertFalse(summary["safety"]["auto_strategy_selection"])
+
+
+    def test_status_write_failure_is_visible_in_stdout_even_when_status_cannot_persist(self):
+        with patch("autopilot_setup_audit_v114.base.gh_get_csv",return_value=(pd.DataFrame(),"")), \
+             patch("autopilot_setup_audit_v114.base.gh_get_json",side_effect=[({},""),({},"")]), \
+             patch("autopilot_setup_audit_v114.base.gh_put_csv",return_value=(True,"")), \
+             patch("autopilot_setup_audit_v114.base.gh_put_json",side_effect=[(True,""),(False,"remote unavailable")]), \
+             patch("autopilot_setup_audit_v114.base.utcnow",return_value=NOW):
+            out=StringIO()
+            with redirect_stdout(out):
+                ok,summary,errors=_audit_cycle()
+        self.assertFalse(ok)
+        self.assertTrue(any("Salvar status setup audit" in x for x in errors))
+        self.assertIn("[setup-audit][status-write-failed]",out.getvalue())
+        self.assertIn("remote unavailable",out.getvalue())
 
 
 if __name__ == "__main__":
