@@ -38,6 +38,15 @@ class WindowsPrivatePackageTests(unittest.TestCase):
         self.assertIn("não ativa envio de ordens reais", text)
         self.assertIn("não contém chaves de API", text)
 
+    def test_real_package_selection_has_required_files(self):
+        files = pkg.package_files()
+        self.assertIn("usd_macro_pro_v4_cloud.py", files)
+        self.assertIn("requirements.txt", files)
+        self.assertIn("AtlasQuant_Windows_Privado.bat", files)
+        self.assertFalse(any(path.startswith(".github/") for path in files))
+        self.assertFalse(any(path.startswith("docs/") for path in files))
+        self.assertFalse(any(path.split("/")[-1].startswith("test_") for path in files))
+
 
 if __name__ == "__main__":
     unittest.main()
