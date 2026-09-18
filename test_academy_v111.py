@@ -11,6 +11,7 @@ class AcademyVideoScriptsTests(unittest.TestCase):
         cls.scripts = None
         cls.ict_scripts = None
         cls.atlas_scripts = None
+        cls.visuals = None
         for node in tree.body:
             if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
                 if node.target.id == "MACRO_VIDEO_SCRIPTS":
@@ -19,12 +20,16 @@ class AcademyVideoScriptsTests(unittest.TestCase):
                     cls.ict_scripts = ast.literal_eval(node.value)
                 elif node.target.id == "ATLASQUANT_VIDEO_SCRIPTS":
                     cls.atlas_scripts = ast.literal_eval(node.value)
+                elif node.target.id == "ACADEMY_VISUALS":
+                    cls.visuals = ast.literal_eval(node.value)
         if cls.scripts is None:
             raise AssertionError("MACRO_VIDEO_SCRIPTS não encontrado")
         if cls.ict_scripts is None:
             raise AssertionError("ICT_VIDEO_SCRIPTS não encontrado")
         if cls.atlas_scripts is None:
             raise AssertionError("ATLASQUANT_VIDEO_SCRIPTS não encontrado")
+        if cls.visuals is None:
+            raise AssertionError("ACADEMY_VISUALS não encontrado")
 
     def test_all_macro_lessons_have_complete_video_scripts(self):
         expected = {f"macro_{i:02d}" for i in range(1, 9)}
@@ -55,6 +60,25 @@ class AcademyVideoScriptsTests(unittest.TestCase):
                 self.assertTrue(segment.get("bloco"))
                 self.assertTrue(segment.get("tela"))
                 self.assertTrue(segment.get("narracao"))
+
+    def test_core_visual_atlas_has_eight_lessons(self):
+        expected = {
+            "macro_01", "macro_02", "macro_04", "macro_07",
+            "ict_02", "ict_03", "ict_04", "ict_05",
+        }
+        self.assertEqual(set(self.visuals), expected)
+        for lesson_id, visual in self.visuals.items():
+            self.assertTrue(visual.get("titulo"), lesson_id)
+            self.assertTrue(visual.get("subtitulo"), lesson_id)
+            self.assertGreaterEqual(len(visual.get("itens", [])), 3, lesson_id)
+            self.assertTrue(visual.get("nota"), lesson_id)
+
+    def test_academy_renders_native_offline_visuals(self):
+        self.assertIn("def _academy_visual_html", self.source)
+        self.assertIn("Visual didático", self.source)
+        self.assertIn("unsafe_allow_html=True", self.source)
+        self.assertIn("aqv-shell", self.source)
+        self.assertIn("ACADEMY_VISUALS.get(lesson_id)", self.source)
 
     def test_academy_renders_full_recording_script(self):
         self.assertIn('Roteiro completo de gravação', self.source)
