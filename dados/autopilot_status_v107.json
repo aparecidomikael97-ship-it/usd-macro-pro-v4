@@ -42,7 +42,8 @@
   "twelve_safe_window_seconds": 62.0,
   "forex_market_open": false,
   "errors": [
-    "Salvar scanner: HTTPError: 409 Client Error: Conflict for url: https://api.github.com/repos/aparecidomikael97-ship-it/usd-macro-pro-v4/contents/dados/scanner_tecnico_v934.json"
+    "Salvar scanner: HTTPError: 409 Client Error: Conflict for url: https://api.github.com/repos/aparecidomikael97-ship-it/usd-macro-pro-v4/contents/dados/scanner_tecnico_v934.json",
+    "Salvar performance setup: HTTPError: 409 Client Error: Conflict for url: https://api.github.com/repos/aparecidomikael97-ship-it/usd-macro-pro-v4/contents/dados/paper_setup_performance_v114.csv"
   ],
   "healthy": true,
   "twelve_quota_saver_v111": {
@@ -250,5 +251,17 @@
       "profit_factor_r": null
     },
     "errors": []
+  },
+  "setup_audit_v114": {
+    "enabled": true,
+    "audited_trades": 0,
+    "closed_trades": 0,
+    "component_state_rows": 0,
+    "sample_state": "AGUARDANDO AMOSTRA",
+    "real_orders": false,
+    "broker_connection": false,
+    "errors": [
+      "Salvar performance setup: HTTPError: 409 Client Error: Conflict for url: https://api.github.com/repos/aparecidomikael97-ship-it/usd-macro-pro-v4/contents/dados/paper_setup_performance_v114.csv"
+    ]
   }
 }
