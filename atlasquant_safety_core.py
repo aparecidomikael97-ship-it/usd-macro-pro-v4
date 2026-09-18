@@ -50,10 +50,15 @@ def evaluate_safety(inp: SafetyInput, *, min_data_quality: float = 75.0,
         hard.append("Versão/health check do sistema não está saudável")
     if inp.lookahead_risk:
         hard.append("Risco de look-ahead / informação futura detectado")
-    if inp.major_event_minutes is not None and _finite(inp.major_event_minutes):
-        minutes = float(inp.major_event_minutes)
-        if 0 <= minutes <= float(major_event_buffer_min):
-            hard.append(f"Evento de alto impacto em {minutes:.0f} min")
+    if inp.major_event_minutes is not None:
+        if not _finite(inp.major_event_minutes):
+            hard.append("Janela de evento de alto impacto inválida")
+        else:
+            minutes = float(inp.major_event_minutes)
+            if minutes < 0:
+                hard.append("Janela de evento de alto impacto inválida")
+            elif minutes <= float(major_event_buffer_min):
+                hard.append(f"Evento de alto impacto em {minutes:.0f} min")
     if inp.regime_supported is False:
         warnings.append("Regime atual fora/na borda da amostra validada")
     if inp.model_conflict:
