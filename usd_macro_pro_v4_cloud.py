@@ -19,6 +19,7 @@
 
 import base64
 import json
+from io import StringIO
 import math
 import os
 import time
@@ -320,7 +321,7 @@ st.sidebar.divider()
 st.sidebar.caption("Modelo FX: prioriza juros reais, Treasury 2Y e Fed para o USD.")
 st.sidebar.caption(f"🕒 Atualizado: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
 if not CHAVE_FRED:
-    st.sidebar.warning("FRED sem chave: alguns dados usarão valores de segurança.")
+    st.sidebar.info("FRED sem chave de API: usando CSV público oficial da FRED como fonte automática.")
 if CHAVE_EODHD:
     st.sidebar.success("EODHD configurado: consenso automático tentará usar Economic Events.")
 else:
@@ -344,32 +345,67 @@ def _get(url: str, timeout: int = 15):
         return None
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def _fred_observacoes(series_id: str, limite: int = 24, unidades: str | None = None) -> pd.DataFrame:
-    if not CHAVE_FRED:
-        return pd.DataFrame(columns=["date", "value"])
-
-    url = (
-        "https://api.stlouisfed.org/fred/series/observations"
-        f"?series_id={series_id}&api_key={CHAVE_FRED}&file_type=json"
-        f"&sort_order=desc&limit={limite}"
-    )
-    if unidades:
-        url += f"&units={unidades}"
-
-    resposta = _get(url)
+def _fred_csv_publico(series_id: str, limite: int = 24, unidades: str | None = None) -> pd.DataFrame:
+    """Fallback oficial sem API key usando o CSV público do FRED Graph."""
+    resposta = _get(f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}")
     if resposta is None:
         return pd.DataFrame(columns=["date", "value"])
-
     try:
-        df = pd.DataFrame(resposta.json().get("observations", []))
+        raw = pd.read_csv(StringIO(resposta.text))
+        if raw.empty or len(raw.columns) < 2:
+            return pd.DataFrame(columns=["date", "value"])
+        date_col = raw.columns[0]
+        value_col = series_id if series_id in raw.columns else raw.columns[1]
+        df = pd.DataFrame({
+            "date": pd.to_datetime(raw[date_col], errors="coerce"),
+            "value": pd.to_numeric(raw[value_col], errors="coerce"),
+        }).dropna(subset=["date", "value"]).sort_values("date")
         if df.empty:
             return pd.DataFrame(columns=["date", "value"])
-        df["date"] = pd.to_datetime(df["date"], errors="coerce")
-        df["value"] = pd.to_numeric(df["value"], errors="coerce")
-        return df.dropna(subset=["date", "value"]).sort_values("date")
+
+        if unidades == "pc1":
+            # FRED API units=pc1 = variação percentual contra o mesmo período do ano anterior.
+            # No CSV público calculamos a mesma transformação localmente.
+            deltas = df["date"].diff().dt.days.dropna()
+            mediana = float(deltas.median()) if not deltas.empty else 30.0
+            periodos = 252 if mediana <= 10 else (12 if mediana <= 60 else 4)
+            df["value"] = df["value"].pct_change(periods=periodos, fill_method=None) * 100.0
+            df = df.dropna(subset=["value"])
+
+        df = df.tail(max(int(limite), 1)).copy()
+        df.attrs["fred_source"] = "CSV público oficial FRED"
+        return df
     except Exception:
         return pd.DataFrame(columns=["date", "value"])
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _fred_observacoes(series_id: str, limite: int = 24, unidades: str | None = None) -> pd.DataFrame:
+    # Caminho 1: API oficial quando há chave.
+    if CHAVE_FRED:
+        url = (
+            "https://api.stlouisfed.org/fred/series/observations"
+            f"?series_id={series_id}&api_key={CHAVE_FRED}&file_type=json"
+            f"&sort_order=desc&limit={limite}"
+        )
+        if unidades:
+            url += f"&units={unidades}"
+        resposta = _get(url)
+        if resposta is not None:
+            try:
+                df = pd.DataFrame(resposta.json().get("observations", []))
+                if not df.empty:
+                    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+                    df["value"] = pd.to_numeric(df["value"], errors="coerce")
+                    df = df.dropna(subset=["date", "value"]).sort_values("date")
+                    if not df.empty:
+                        df.attrs["fred_source"] = "API oficial FRED"
+                        return df
+            except Exception:
+                pass
+
+    # Caminho 2: CSV público oficial, sem exigir API key.
+    return _fred_csv_publico(series_id, limite=limite, unidades=unidades)
 
 
 def _fred_ultimo(series_id: str, idade_max_dias: int | None = None) -> float | None:
@@ -398,6 +434,7 @@ def _fred_ultimo_com_meta(series_id: str, limite: int = 24, unidades: str | None
         "data": data.strftime("%d/%m/%Y"),
         "idade_dias": idade,
         "serie": series_id,
+        "fonte": str(df.attrs.get("fred_source", "FRED")),
     }
 
 
@@ -414,6 +451,7 @@ def _fred_variacao_mensal_com_meta(series_id: str) -> dict:
         "data": data.strftime("%d/%m/%Y"),
         "idade_dias": int((hoje - data).days),
         "serie": series_id,
+        "fonte": str(df.attrs.get("fred_source", "FRED")),
     }
 
 
@@ -784,7 +822,7 @@ def carregar_macro_eua() -> dict:
         bruto = meta.get("valor")
         valido = _valor_valido(bruto, *limites[chave])
         valor_final = float(bruto) if valido else float(fallback_val)
-        fonte = f"FRED · {meta.get('serie')}" if valido else "Valor de segurança"
+        fonte = f"{meta.get('fonte', 'FRED')} · {meta.get('serie')}" if valido else "Valor de segurança"
         idade = meta.get("idade_dias") if valido else None
         icone, status = _status_frescura(idade, frescura[chave])
         dados[chave] = valor_final
@@ -800,7 +838,12 @@ def carregar_macro_eua() -> dict:
     dados["_auditoria"] = auditoria
     dados["_metadados"] = metas
     dados["_fallbacks"] = sum(1 for x in auditoria if x["Fonte"] == "Valor de segurança")
-    STATUS_FONTE["EUA"] = "✅ FRED + validação + datas" if CHAVE_FRED else "⚠️ Valores de segurança"
+    oficiais = len(auditoria) - dados["_fallbacks"]
+    STATUS_FONTE["EUA"] = (
+        f"✅ FRED oficial · {oficiais}/{len(auditoria)} indicadores"
+        if oficiais
+        else "⚠️ FRED indisponível nesta execução"
+    )
     return dados
 
 
@@ -1055,8 +1098,18 @@ def faixa_forca(score: float) -> tuple[str, str]:
 
 
 def qualidade_dados_usd() -> tuple[int, str]:
-    # FRED abastece a maior parte do painel; sem chave a qualidade cai porque entram fallbacks.
-    pontos = 90 if CHAVE_FRED else 45
+    # A qualidade depende do que realmente foi carregado de fonte oficial,
+    # e não da presença de uma API key. O CSV público oficial da FRED é válido.
+    dados = carregar_macro_eua()
+    auditoria = list(dados.get("_auditoria", []) or [])
+    if not auditoria:
+        pontos = 0
+    else:
+        oficiais = [x for x in auditoria if "Valor de segurança" not in str(x.get("Fonte", ""))]
+        atuais = [x for x in oficiais if "Atual" in str(x.get("Status", ""))]
+        proporcao_oficial = len(oficiais) / len(auditoria)
+        proporcao_atual = len(atuais) / len(auditoria)
+        pontos = int(round(100 * (0.70 * proporcao_oficial + 0.30 * proporcao_atual)))
     rotulo = "ALTA" if pontos >= 80 else ("MÉDIA" if pontos >= 60 else "BAIXA")
     return pontos, rotulo
 
