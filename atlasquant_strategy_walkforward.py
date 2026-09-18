@@ -162,15 +162,21 @@ def walk_forward_summary(
         deltas=pd.to_numeric(group["expectancy_delta_r"],errors="coerce")
         test_net=pd.to_numeric(group["test_net_r"],errors="coerce").fillna(0.0)
 
+        finite_train=train_exp.map(lambda x: bool(pd.notna(x) and math.isfinite(float(x))))
+        finite_test=test_exp.map(lambda x: bool(pd.notna(x) and math.isfinite(float(x))))
+        finite_delta=deltas.map(lambda x: bool(pd.notna(x) and math.isfinite(float(x))))
+        finite_net=test_net.map(lambda x: bool(pd.notna(x) and math.isfinite(float(x))))
         sufficient=bool(
             len(group)>=k
             and (train_n>=min_train).all()
             and (test_n>=min_test).all()
-            and train_exp.notna().all()
-            and test_exp.notna().all()
+            and finite_train.all()
+            and finite_test.all()
+            and finite_delta.all()
+            and finite_net.all()
         )
 
-        tests=[float(x) for x in test_exp.dropna().tolist()]
+        tests=[float(x) for x in test_exp[finite_test].tolist()]
         positive=sum(1 for x in tests if x>1e-12)
         negative=sum(1 for x in tests if x<-1e-12)
 
@@ -191,12 +197,12 @@ def walk_forward_summary(
             "positive_test_windows":positive,
             "negative_test_windows":negative,
             "positive_test_pct":round(positive/len(group)*100.0,2) if len(group) else None,
-            "avg_train_expectancy_r":round(float(train_exp.mean()),4) if train_exp.notna().any() else None,
-            "avg_test_expectancy_r":round(float(test_exp.mean()),4) if test_exp.notna().any() else None,
-            "avg_expectancy_delta_r":round(float(deltas.mean()),4) if deltas.notna().any() else None,
+            "avg_train_expectancy_r":round(float(train_exp[finite_train].mean()),4) if finite_train.any() else None,
+            "avg_test_expectancy_r":round(float(test_exp[finite_test].mean()),4) if finite_test.any() else None,
+            "avg_expectancy_delta_r":round(float(deltas[finite_delta].mean()),4) if finite_delta.any() else None,
             "worst_test_expectancy_r":round(min(tests),4) if tests else None,
             "best_test_expectancy_r":round(max(tests),4) if tests else None,
-            "total_test_net_r":round(float(test_net.sum()),4),
+            "total_test_net_r":round(float(test_net.sum()),4) if finite_net.all() else 0.0,
             "walk_forward_status":status,
         })
 
