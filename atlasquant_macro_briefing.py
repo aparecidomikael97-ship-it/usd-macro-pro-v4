@@ -58,7 +58,7 @@ def build_macro_briefing(currency_rows: Sequence[Mapping[str, Any]] | None, even
         label = _txt(e.get("event", e.get("name")), "Evento macro")
         ccy = _txt(e.get("currency"), "")
         when = _txt(e.get("time", e.get("datetime")), "horário não confirmado")
-        event_lines.append(f"{label}{' ' + ccy if ccy else ''}}, {when}")
+        event_lines.append(f"{label} {ccy}, {when}" if ccy else f"{label}, {when}")
     title = "Briefing macro de hoje" if horizon == "today" else "Briefing macro da semana"
     speech_parts = [title + ".", summary]
     if bank_lines:
