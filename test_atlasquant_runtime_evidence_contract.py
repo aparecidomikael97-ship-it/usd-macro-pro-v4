@@ -94,6 +94,30 @@ class RuntimeEvidenceContractTests(unittest.TestCase):
         rows=build_shadow_batch([pack(p,executable=False) for p in PAIRS],champion_version="V")
         self.assertTrue(all(not x["challenger"]["executable"] for x in rows))
 
+    def test_executable_champion_cannot_make_strict_challenger_execute_without_all_gates(self):
+        p=pack("EUR/USD",executable=True)
+        p["score"]=90
+        p["quality"]=95
+        p["data_ready"]={"score":95,"sufficient":True}
+        p["macro_diff"]=10
+        p["h4"]="ALINHADO"
+        p["h1"]="ALINHADO"
+        p["m15"]="NO_TRIGGER"
+        row=build_shadow_batch([p],champion_version="V")[0]
+        self.assertTrue(row["champion"]["executable"])
+        self.assertFalse(row["challenger"]["executable"])
+        self.assertFalse(row["execution_match"])
+        self.assertTrue(row["critical_mismatch"])
+
+    def test_strict_challenger_can_only_observe_when_every_gate_passes(self):
+        p=pack("EUR/USD",executable=True)
+        p.update({"score":90,"quality":95,"macro_diff":10,"h4":"ALINHADO","h1":"ALINHADO","m15":"GATILHO"})
+        p["data_ready"]={"score":95,"sufficient":True}
+        row=build_shadow_batch([p],champion_version="V")[0]
+        self.assertTrue(row["challenger"]["executable"])
+        self.assertTrue(row["execution_match"])
+        self.assertFalse(row["critical_mismatch"])
+
     def test_append_unique_rejects_duplicate_fingerprint(self):
         rec=prepare_flight_capture([],pack("USD/JPY"),"V")["current"]
         rows,added=append_unique([rec],rec)
