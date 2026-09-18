@@ -20,26 +20,30 @@ function Get-PythonLauncher {
 function Read-AtlasQuantLocalSecret {
     param([Parameter(Mandatory=$true)][string]$Name)
 
-    $secretsPath = Join-Path (Get-Location).Path ".streamlit\secrets.toml"
     $pythonPath = Join-Path (Get-Location).Path ".venv\Scripts\python.exe"
-
-    if (-not (Test-Path $secretsPath)) {
-        return ""
-    }
     if (-not (Test-Path $pythonPath)) {
         return ""
     }
 
-    try {
-        $code = 'import pathlib,sys,tomllib; p=pathlib.Path(sys.argv[1]); d=tomllib.loads(p.read_text(encoding="utf-8")); v=d.get(sys.argv[2],""); print(v if isinstance(v,str) else "")'
-        $value = & $pythonPath -c $code $secretsPath $Name 2>$null | Select-Object -Last 1
-        if ([string]::IsNullOrWhiteSpace($value)) {
-            return ""
+    $stablePath = Join-Path (Join-Path $env:LOCALAPPDATA "AtlasQuant") "secrets.toml"
+    $legacyPath = Join-Path (Get-Location).Path ".streamlit\secrets.toml"
+    $paths = @($stablePath, $legacyPath) | Select-Object -Unique
+
+    foreach ($secretsPath in $paths) {
+        if (-not (Test-Path $secretsPath)) {
+            continue
         }
-        return ([string]$value).Trim()
-    } catch {
-        return ""
+
+        try {
+            $code = 'import pathlib,sys,tomllib; p=pathlib.Path(sys.argv[1]); d=tomllib.loads(p.read_text(encoding="utf-8")); v=d.get(sys.argv[2],""); print(v if isinstance(v,str) else "")'
+            $value = & $pythonPath -c $code $secretsPath $Name 2>$null | Select-Object -Last 1
+            if (-not [string]::IsNullOrWhiteSpace($value)) {
+                return ([string]$value).Trim()
+            }
+        } catch {}
     }
+
+    return ""
 }
 
 function Import-AtlasQuantLocalSecrets {
