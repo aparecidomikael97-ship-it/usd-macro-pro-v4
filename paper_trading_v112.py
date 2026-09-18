@@ -66,7 +66,12 @@ def _age_minutes(v: Any, now: pd.Timestamp) -> float | None:
     t = _as_utc(v)
     if t is None:
         return None
-    return max(0.0, float((now - t).total_seconds() / 60.0))
+    age = float((now - t).total_seconds() / 60.0)
+    # Future-dated evidence is not fresh evidence. Fail closed instead of
+    # clamping clock/data errors to age zero.
+    if age < 0:
+        return None
+    return age
 
 
 def _side(direction: Any) -> str:
