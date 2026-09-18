@@ -505,6 +505,19 @@ def atlasquant_basic_table(packs: list[Mapping[str, Any]]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def build_pair_intelligence_packs(matrix:pd.DataFrame, ranking:pd.DataFrame, *, scanner_state:Mapping[str,Any]|None=None, map_state:Mapping[str,Any]|None=None, news_state:Mapping[str,Any]|None=None, fed_tone:str="Neutro", weights:Mapping[str,float]|None=None) -> list[dict[str,Any]]:
+    """Pure adapter used by UI and background Autopilot; performs no API calls."""
+    if matrix is None or matrix.empty:
+        return []
+    scanner_rows=dict((scanner_state or {}).get("resultados",{}) or {})
+    map_rows=dict((map_state or {}).get("contexts",{}) or {})
+    news_map=_pair_news(dict(news_state or {}),matrix)
+    bypair={str(r["Par"]):r.to_dict() for _,r in matrix.iterrows() if str(r.get("Par","")) in PAIR_ORDER}
+    packs=[_reason_pack(p,bypair[p],ranking,scanner_rows.get(p,{}),map_rows.get(p,{}),news_map.get(p,{}),fed_tone,weights) for p in PAIR_ORDER if p in bypair]
+    packs.sort(key=lambda x:x["priority"],reverse=True)
+    return packs
+
+
 def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:Mapping[str,Any]|None=None,macro_context:Mapping[str,Any]|None=None,weights:Mapping[str,float]|None=None):
     _css()
     st.markdown("## Central institucional")
@@ -514,13 +527,11 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
 
     token,repo,branch=_gh_cfg()
     scanner,_=_read_json(SCANNER_PATH,token,repo,branch); mmap,_=_read_json(MAP_PATH,token,repo,branch); news_state,_=_read_json(NEWS_PATH,token,repo,branch); auto,_=_read_json(AUTO_PATH,token,repo,branch)
-    news_map=_pair_news(news_state,matrix)
-    scanner_rows=dict(scanner.get("resultados",{}) or {}) if isinstance(scanner,dict) else {}
-    map_rows=dict(mmap.get("contexts",{}) or {}) if isinstance(mmap,dict) else {}
     fed_tone=str((fed or {}).get("tom",(fed or {}).get("tone","Neutro")))
-    bypair={str(r["Par"]):r.to_dict() for _,r in matrix.iterrows() if str(r.get("Par","")) in PAIR_ORDER}
-    packs=[_reason_pack(p,bypair[p],ranking,scanner_rows.get(p,{}),map_rows.get(p,{}),news_map.get(p,{}),fed_tone,weights) for p in PAIR_ORDER if p in bypair]
-    packs.sort(key=lambda x:x["priority"],reverse=True)
+    packs=build_pair_intelligence_packs(
+        matrix, ranking, scanner_state=scanner, map_state=mmap,
+        news_state=news_state, fed_tone=fed_tone, weights=weights,
+    )
     if not packs: st.warning("Nenhum dos 7 pares foi encontrado na Matriz."); return
 
     opctx=select_operational_context(packs)
