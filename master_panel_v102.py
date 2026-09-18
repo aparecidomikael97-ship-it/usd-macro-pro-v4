@@ -48,6 +48,7 @@ from market_map_core_v10 import (
 
 MASTER_PATH = "dados/master_market_map_v102.json"
 PAIR_ORDER = ("EUR/USD", "GBP/USD", "AUD/USD", "NZD/USD", "USD/JPY", "USD/CHF", "USD/CAD")
+AUTO_SCANNER_INTERVAL_SECONDS = 75
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
@@ -468,7 +469,7 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
                         scanner_state: Mapping[str, Any] | None = None,
                         scanner_refresh_cb: Callable[[], tuple[bool, str]] | None = None,
                         scanner_refresh_remaining: int = 0) -> None:
-    st.subheader("🧠 Painel Mestre de Oportunidades — V10.7.4")
+    st.subheader("🧠 Painel Mestre de Oportunidades — V10.7.5")
     st.caption(
         "Decisão Automática + Macro Market Map + H4/H1/M15 + ADR14 em uma única visão dos 7 pares. "
         "O painel serve para priorização; não transforma índice em probabilidade de lucro."
@@ -564,12 +565,74 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
             st.caption("Cada lote usa até 4 consultas (D1 + M15 para 2 pares), abaixo do limite conservador usado no app.")
 
     # ---------------------------------------------------------
-    # V10.2.2 — Scanner técnico direto no Painel Mestre.
-    # Atualiza somente 2 pares por clique para respeitar o
-    # orçamento conservador da Twelve Data.
+    # V10.7.5 — Scanner técnico automático + botão manual.
+    # O automático verifica periodicamente, mas só consulta a
+    # Twelve Data quando o callback encontra par ausente ou
+    # técnica vencida. O callback mantém lote de 2 pares e
+    # cooldown próprio, preservando o orçamento de API.
     # ---------------------------------------------------------
-    st.markdown("#### 🔄 Atualização técnica sem sair do Painel Mestre")
+    st.markdown("#### 🤖 Scanner técnico automático")
     _cooldown_v1022 = max(int(scanner_refresh_remaining or 0), int(remaining or 0))
+
+    _auto_enabled_v1075 = st.toggle(
+        "Atualização automática do scanner técnico",
+        value=True,
+        key="v1075_auto_scanner_enabled",
+        help=(
+            "Verifica o scanner periodicamente enquanto o AtlasQuant estiver aberto. "
+            "Só atualiza pares ausentes ou vencidos e mantém o limite de 2 pares por ciclo."
+        ),
+    )
+
+    _fragment_factory_v1075 = getattr(st, "fragment", None)
+    if (
+        _auto_enabled_v1075
+        and scanner_refresh_cb is not None
+        and bool(api_key)
+        and callable(_fragment_factory_v1075)
+    ):
+        @_fragment_factory_v1075(run_every=AUTO_SCANNER_INTERVAL_SECONDS)
+        def _auto_scanner_tick_v1075():
+            try:
+                _ok_auto_v1075, _msg_auto_v1075 = scanner_refresh_cb()
+            except Exception as _exc_auto_v1075:
+                _ok_auto_v1075 = False
+                _msg_auto_v1075 = f"{type(_exc_auto_v1075).__name__}: {_exc_auto_v1075}"
+
+            st.session_state["v1075_auto_scanner_last"] = (
+                bool(_ok_auto_v1075),
+                str(_msg_auto_v1075),
+                datetime.now().strftime("%H:%M:%S"),
+            )
+
+            # Só força um rerun completo quando houve atualização REAL de pares.
+            # "Tudo atual" e "aguarde cooldown" não geram loop de reruns.
+            if _ok_auto_v1075 and str(_msg_auto_v1075).startswith("Scanner atualizado para:"):
+                st.session_state["v1022_scanner_feedback"] = ("success", _msg_auto_v1075)
+                st.rerun()
+
+            _kind_auto_v1075 = "🟢" if _ok_auto_v1075 else "🟡"
+            st.caption(f"{_kind_auto_v1075} Automático: {_msg_auto_v1075}")
+
+        _auto_scanner_tick_v1075()
+    elif _auto_enabled_v1075 and not callable(_fragment_factory_v1075):
+        st.caption(
+            "Modo automático indisponível nesta versão do Streamlit; o botão manual continua ativo."
+        )
+    elif _auto_enabled_v1075 and not api_key:
+        st.warning("CHAVE_TWELVE_DATA ausente: scanner automático indisponível.")
+    elif _auto_enabled_v1075 and scanner_refresh_cb is None:
+        st.caption("Atualização automática indisponível nesta execução.")
+
+    _last_auto_v1075 = st.session_state.get("v1075_auto_scanner_last")
+    if _last_auto_v1075:
+        _ok_last_v1075, _msg_last_v1075, _time_last_v1075 = _last_auto_v1075
+        st.caption(
+            f"Última checagem automática: {_time_last_v1075} · "
+            f"{'OK' if _ok_last_v1075 else 'aguardando'}"
+        )
+
+    st.markdown("#### 🔄 Controle manual")
     _s1_v1022, _s2_v1022, _s3_v1022 = st.columns([1.55, 1.25, 2.2])
 
     with _s1_v1022:
@@ -607,8 +670,9 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
             st.caption("Atualização técnica direta indisponível nesta execução.")
         else:
             st.caption(
-                "O botão atualiza primeiro os pares ausentes ou com técnica >45 min. "
-                "Cada clique consulta no máximo 2 pares (H4 + H1 + M15)."
+                f"Automático verifica a cada ~{AUTO_SCANNER_INTERVAL_SECONDS}s. "
+                "Só pares ausentes ou com técnica >45 min entram na fila; "
+                "cada ciclo consulta no máximo 2 pares (H4 + H1 + M15)."
             )
 
     _fb_v1022 = st.session_state.pop("v1022_scanner_feedback", None)
