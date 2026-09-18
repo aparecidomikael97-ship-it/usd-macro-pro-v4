@@ -63,7 +63,7 @@ class AtlasQuantRuntimeSmokeTests(unittest.TestCase):
         rendered=" ".join(
             [str(x.value) for x in list(at.title)+list(at.caption)+list(at.info)]
         )
-        self.assertIn("USD Macro Pro",rendered)
+        self.assertIn("AtlasQuant",rendered)
         self.assertIn("RUNTIME",rendered)
 
     def test_app_source_has_no_hardcoded_dev_badge(self):
