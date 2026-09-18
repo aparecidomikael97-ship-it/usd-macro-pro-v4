@@ -118,6 +118,19 @@ class AutopilotV107Tests(unittest.TestCase):
         self.assertFalse(flight_status["ok"])
         self.assertTrue(any("NOT_CONFIGURED" in x for x in errors))
 
+    def test_empty_evidence_batch_is_safe_and_observable(self):
+        with patch.object(a,"build_shadow_batch",return_value=[]), \
+             patch.object(a,"persist_shadow_samples",return_value={"ok":True,"added":0,"samples":0,"reason":"ALREADY_PRESENT","error":""}) as shadow, \
+             patch.object(a,"persist_records",return_value={"ok":True,"added":0,"records":0,"reason":"ALREADY_PRESENT","error":""}) as flight:
+            shadow_status,flight_status,errors=a.persist_decision_evidence(
+                [],engine_version="test",repo="o/r",branch="atlasquant-runtime",token="t"
+            )
+        self.assertTrue(shadow_status["ok"])
+        self.assertTrue(flight_status["ok"])
+        self.assertEqual(errors,[])
+        shadow.assert_called_once()
+        flight.assert_called_once_with([],repo="o/r",branch="atlasquant-runtime",token="t")
+
     def test_main_has_autopilot_serialization_imports(self):
         from pathlib import Path
         text = Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
