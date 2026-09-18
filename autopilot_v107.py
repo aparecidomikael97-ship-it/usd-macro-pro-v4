@@ -1217,12 +1217,20 @@ def persist_decision_evidence(packs, *, engine_version: str, repo: str, branch: 
     try:
         shadow_batch=build_shadow_batch(packs,champion_version=engine_version)
         shadow_status=persist_shadow_samples(shadow_batch,repo=repo,branch=branch,token=token)
+        if not bool(shadow_status.get("ok",False)):
+            reason=str(shadow_status.get("reason","PERSISTENCE_FAILED"))
+            detail=str(shadow_status.get("error","") or reason)
+            errors.append("Decision evidence Shadow: "+detail)
     except Exception as exc:
         shadow_status={"ok":False,"added":0,"samples":0,"reason":"SHADOW_EXCEPTION","error":f"{type(exc).__name__}: {exc}"}
         errors.append("Decision evidence Shadow: "+shadow_status["error"])
     try:
         flight_records=[record_from_pack(p,engine_version) for p in packs]
         flight_status=persist_records(flight_records,repo=repo,branch=branch,token=token)
+        if not bool(flight_status.get("ok",False)):
+            reason=str(flight_status.get("reason","PERSISTENCE_FAILED"))
+            detail=str(flight_status.get("error","") or reason)
+            errors.append("Decision evidence Flight: "+detail)
     except Exception as exc:
         flight_status={"ok":False,"added":0,"records":0,"reason":"FLIGHT_EXCEPTION","error":f"{type(exc).__name__}: {exc}"}
         errors.append("Decision evidence Flight: "+flight_status["error"])
