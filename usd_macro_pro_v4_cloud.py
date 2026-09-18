@@ -206,6 +206,14 @@ except Exception as _atlasquant_ui_exc:
 
 
 try:
+    from atlasquant_macro_briefing_panel import render_macro_briefing_panel
+    _ATLASQUANT_MACRO_BRIEFING_IMPORT_ERROR = ""
+except Exception as _macro_brief_panel_exc:
+    render_macro_briefing_panel = None
+    _ATLASQUANT_MACRO_BRIEFING_IMPORT_ERROR = f"{type(_macro_brief_panel_exc).__name__}: {_macro_brief_panel_exc}"
+
+
+try:
     from atlasquant_dashboard_v1 import render_g8_radar
     _ATLASQUANT_DASHBOARD_IMPORT_ERROR = ""
 except Exception as _atlasquant_dashboard_exc:
@@ -240,16 +248,27 @@ SENSIBILIDADE_FED_PADRAO = {
     "BRL": -0.60,
 }
 
-CHAVE_FRED = st.secrets.get("CHAVE_FRED", os.getenv("CHAVE_FRED", ""))
-CHAVE_NEWSAPI = st.secrets.get("CHAVE_NEWSAPI", os.getenv("CHAVE_NEWSAPI", ""))
-CHAVE_EODHD = st.secrets.get("CHAVE_EODHD", os.getenv("CHAVE_EODHD", ""))
-CHAVE_TWELVE_DATA = st.secrets.get("CHAVE_TWELVE_DATA", os.getenv("CHAVE_TWELVE_DATA", ""))
+def _config_value(nome: str, padrao: str = "") -> str:
+    valor_env = os.getenv(nome)
+    if valor_env is not None:
+        return valor_env
+    try:
+        return st.secrets.get(nome, padrao)
+    except Exception:
+        return padrao
+
+
+CHAVE_FRED = _config_value("CHAVE_FRED")
+CHAVE_NEWSAPI = _config_value("CHAVE_NEWSAPI")
+CHAVE_EODHD = _config_value("CHAVE_EODHD")
+CHAVE_TWELVE_DATA = _config_value("CHAVE_TWELVE_DATA")
 
 _ATLASQUANT_ENV_EXPLICIT = str(
-    st.secrets.get("ATLASQUANT_ENV", os.getenv("ATLASQUANT_ENV", ""))
+    _config_value("ATLASQUANT_ENV")
 ).strip().upper()
+
 _ATLASQUANT_DATA_BRANCH = str(
-    st.secrets.get("GITHUB_DATA_BRANCH", os.getenv("GITHUB_DATA_BRANCH", ""))
+    _config_value("GITHUB_DATA_BRANCH")
 ).strip()
 if _ATLASQUANT_ENV_EXPLICIT:
     ATLASQUANT_ENVIRONMENT = _ATLASQUANT_ENV_EXPLICIT
@@ -3803,9 +3822,55 @@ else:
 
 abas = st.tabs([
     "Central", "Painel mestre", "Moedas", "EUA", "Pares", "Fed",
-    "Histórico", "Backtest", "Decisão", "Market Map", "Aprender",
+    "Histórico", "Backtest", "Decisão", "Market Map", "Macro Briefing", "Aprender",
     "Produto", "Melhorias", "Notícias", "Autopilot",
 ])
+
+# =========================================================
+# MACRO BRIEFING — apresentação sobre o estado JÁ calculado
+# Não chama Twelve Data nem força refresh de fonte ao abrir.
+# =========================================================
+with abas[10]:
+    if render_macro_briefing_panel is None:
+        st.warning("Macro Briefing indisponível neste carregamento.")
+        if _ATLASQUANT_MACRO_BRIEFING_IMPORT_ERROR:
+            st.caption(_ATLASQUANT_MACRO_BRIEFING_IMPORT_ERROR)
+    else:
+        _brief_rows = []
+        for _, _r in ranking.iterrows():
+            _brief_rows.append({
+                "currency": str(_r.get("Código", "")),
+                "score": float(_r.get("Pontuação_Final", 0.0)),
+                "data_ready": True,
+                "quality": "valid",
+            })
+
+        # Segurança de quota: o Macro Briefing não inicia coleta de calendário.
+        # Eventos entram apenas quando outra camada já os disponibilizou em memória.
+        _brief_events = []
+        _agenda_brief = st.session_state.get("atlasquant_macro_events")
+        if isinstance(_agenda_brief, pd.DataFrame) and not _agenda_brief.empty:
+            for _, _e in _agenda_brief.head(12).iterrows():
+                _brief_events.append({
+                    "event": str(_e.get("Evento", "")),
+                    "currency": str(_e.get("Moeda", "USD")),
+                    "datetime": (
+                        _e.get("Data").strftime("%d/%m/%Y")
+                        if hasattr(_e.get("Data"), "strftime") else str(_e.get("Data", ""))
+                    ),
+                    "impact": str(_e.get("Impacto", "")),
+                    "data_ready": True,
+                    "quality": "valid",
+                })
+
+        _brief_banks = [{
+            "bank": "Federal Reserve",
+            "tone": str(fed.get("tom", "Neutro")),
+            "data_ready": True,
+            "quality": "valid",
+        }]
+        render_macro_briefing_panel(_brief_rows, _brief_events, _brief_banks)
+
 
 # =========================================================
 # ABA 2 — CLASSIFICAÇÃO
@@ -7517,11 +7582,11 @@ import json
 _SCANNER_GH_PATH_V934 = "dados/scanner_tecnico_v934.json"
 
 def _gh_cfg_v934():
-    token = st.secrets.get("GITHUB_TOKEN_HISTORICO", os.getenv("GITHUB_TOKEN_HISTORICO", ""))
-    repo = st.secrets.get("GITHUB_REPO_HISTORICO", os.getenv("GITHUB_REPO_HISTORICO", ""))
+    token = _config_value("GITHUB_TOKEN_HISTORICO")
+    repo = _config_value("GITHUB_REPO_HISTORICO")
     branch = resolve_runtime_branch(
-        st.secrets.get("GITHUB_DATA_BRANCH", os.getenv("GITHUB_DATA_BRANCH", "")),
-        st.secrets.get("GITHUB_BRANCH_HISTORICO", os.getenv("GITHUB_BRANCH_HISTORICO", "")),
+        _config_value("GITHUB_DATA_BRANCH"),
+        _config_value("GITHUB_BRANCH_HISTORICO"),
     )
     return str(token), str(repo), str(branch)
 
@@ -8825,7 +8890,7 @@ with abas[1]:
 # ABA 10 — V10.3 EXPERIÊNCIA, EDUCAÇÃO E PERSONALIZAÇÃO
 # Não altera o motor de decisão.
 # =========================================================
-with abas[10]:
+with abas[11]:
     if render_experience_hub is None:
         st.error("A camada de experiência V10.3 não pôde ser carregada.")
         if _UX_V103_IMPORT_ERROR:
@@ -8858,7 +8923,7 @@ with abas[10]:
 # =========================================================
 # ABA 11 — V10.4 PRODUTO, NAVEGAÇÃO, GRÁFICOS E FEEDBACK
 # =========================================================
-with abas[11]:
+with abas[12]:
     if render_v104_hub is None:
         st.error("A camada de produto V10.4 não pôde ser carregada.")
         if _PRODUCT_V104_IMPORT_ERROR:
@@ -8878,7 +8943,7 @@ with abas[11]:
 # =========================================================
 # ABA 12 — V10.5 CENTRO DE MELHORIAS
 # =========================================================
-with abas[12]:
+with abas[13]:
     if render_v105_center is None:
         st.error("O Centro de Melhorias V10.5 não pôde ser carregado.")
         if _EVOLUTION_V105_IMPORT_ERROR:
@@ -9040,7 +9105,7 @@ with abas[12]:
 # =========================================================
 # ABA 13 — V10.6.2 FRESH-PRICE SNAPSHOT RECOVERY
 # =========================================================
-with abas[13]:
+with abas[14]:
     if render_currency_news_panel is None:
         st.error("A inteligência global de notícias V10.6 não pôde ser carregada.")
         if _CURRENCY_NEWS_V106_IMPORT_ERROR:
@@ -9062,7 +9127,7 @@ with abas[13]:
 # =========================================================
 # ABA 14 — V10.7 FULL BACKGROUND AUTOPILOT
 # =========================================================
-with abas[14]:
+with abas[15]:
     if render_autopilot_v107 is None:
         st.error("O painel Autopilot V10.7 não pôde ser carregado.")
         if _AUTOPILOT_V107_IMPORT_ERROR:
