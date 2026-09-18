@@ -1,7 +1,8 @@
 """Build the AtlasQuant private Windows ZIP from tracked repository files.
 
 Safety goals:
-- package only Git-tracked files;
+- package only Git-tracked regular files;
+- never follow symlinks or accept paths outside the repository;
 - never include local secrets, virtual environments or caches;
 - exclude development tests/docs/workflows from the end-user package;
 - keep the Windows launcher local-only.
@@ -50,6 +51,11 @@ def tracked_files() -> list[str]:
 
 def is_safe_package_path(path: str) -> bool:
     p = PurePosixPath(path)
+    # Fail closed for absolute/traversal paths even if a malformed Git index is
+    # ever presented to the builder. ZIP members must stay repository-relative.
+    if p.is_absolute() or not p.parts or any(part in {"", ".", ".."} for part in p.parts):
+        return False
+
     lower_parts = {part.lower() for part in p.parts}
     name = p.name.lower()
 
@@ -75,7 +81,17 @@ def is_safe_package_path(path: str) -> bool:
 
 
 def package_files() -> list[str]:
-    files = [p for p in tracked_files() if is_safe_package_path(p)]
+    files: list[str] = []
+    for rel in tracked_files():
+        if not is_safe_package_path(rel):
+            continue
+        source = Path(rel)
+        # zipfile.write() follows symlinks. Refuse them so a tracked link can
+        # never make the release archive copy bytes from outside the checkout.
+        if source.is_symlink() or not source.is_file():
+            continue
+        files.append(rel)
+
     required = {
         "usd_macro_pro_v4_cloud.py",
         "requirements.txt",
