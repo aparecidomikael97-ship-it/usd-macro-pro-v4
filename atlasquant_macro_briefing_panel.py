@@ -22,6 +22,12 @@ def render_macro_briefing_panel(currency_rows: Sequence[Mapping[str, Any]] | Non
         st.caption("O AtlasQuant não cria narrativa quando os dados necessários não estão válidos.")
         return brief
     st.info(brief["summary"])
+    bias = str(brief.get("context_bias", "neutro"))
+    if bias == "divergência macro":
+        st.metric("Contexto entre moedas", "Divergência macro")
+        st.caption("Há separação relevante entre os scores válidos; isto não é sinal de compra ou venda.")
+    else:
+        st.metric("Contexto entre moedas", "Neutro")
     c1, c2 = st.columns(2)
     with c1:
         st.markdown("#### 🏦 Bancos centrais")
