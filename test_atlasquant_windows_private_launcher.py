@@ -18,8 +18,8 @@ class WindowsPrivateLauncherTests(unittest.TestCase):
         self.assertNotIn("goto instalar", self.bat.lower())
 
     def test_launcher_keeps_streamlit_local_only(self):
-        self.assertIn("--server.address 127.0.0.1", self.ps1)
-        self.assertNotIn("--server.address 0.0.0.0", self.ps1)
+        self.assertIn('"--server.address", "127.0.0.1"', self.ps1)
+        self.assertNotIn('"--server.address", "0.0.0.0"', self.ps1)
 
     def test_launcher_uses_isolated_environment(self):
         self.assertIn(".venv\\Scripts\\python.exe", self.ps1)
