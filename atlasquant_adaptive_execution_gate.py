@@ -44,7 +44,9 @@ def adaptive_pair_permission(
         blockers.append("Frescor M15 indisponível")
     elif age < 0:
         blockers.append("Timestamp M15 futuro/inválido")
-    elif age > float(max_active_m15_age_min):
+    elif not math.isfinite(float(max_active_m15_age_min)) or float(max_active_m15_age_min) <= 0:
+        blockers.append("Limite de frescor M15 inválido")
+    elif age >= float(max_active_m15_age_min):
         blockers.append(f"M15 acima do limite ativo ({age:.1f} min)")
 
     health=dict(derived_health or {})
