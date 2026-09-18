@@ -50,6 +50,8 @@ function Import-AtlasQuantLocalSecrets {
     $state = @{
         TwelveData = $false
         Fred = $false
+        Eodhd = $false
+        NewsApi = $false
     }
 
     $twelve = Read-AtlasQuantLocalSecret -Name "CHAVE_TWELVE_DATA"
@@ -62,6 +64,18 @@ function Import-AtlasQuantLocalSecrets {
     if (-not [string]::IsNullOrWhiteSpace($fred)) {
         $env:CHAVE_FRED = $fred
         $state.Fred = $true
+    }
+
+    $eodhd = Read-AtlasQuantLocalSecret -Name "CHAVE_EODHD"
+    if (-not [string]::IsNullOrWhiteSpace($eodhd)) {
+        $env:CHAVE_EODHD = $eodhd
+        $state.Eodhd = $true
+    }
+
+    $newsapi = Read-AtlasQuantLocalSecret -Name "CHAVE_NEWSAPI"
+    if (-not [string]::IsNullOrWhiteSpace($newsapi)) {
+        $env:CHAVE_NEWSAPI = $newsapi
+        $state.NewsApi = $true
     }
 
     return $state
@@ -146,6 +160,16 @@ function Start-AtlasQuant {
     } else {
         Write-Host "[AVISO] CHAVE_FRED nao configurada. A aba EUA pode ficar sem dados oficiais."
     }
+    if ($secretState.Eodhd) {
+        Write-Host "[OK] EODHD local carregado para esta sessao."
+    } else {
+        Write-Host "[AVISO] CHAVE_EODHD nao configurada. Consensos podem permanecer manuais."
+    }
+    if ($secretState.NewsApi) {
+        Write-Host "[OK] NewsAPI local carregado para esta sessao."
+    } else {
+        Write-Host "[AVISO] CHAVE_NEWSAPI nao configurada. Noticias usam fontes alternativas."
+    }
 
     $python = (Resolve-Path ".\.venv\Scripts\python.exe").Path
     $args = @(
@@ -224,6 +248,8 @@ function Test-AtlasQuant {
     $secretState = Import-AtlasQuantLocalSecrets
     Write-Host ("FRED local: " + $(if ($secretState.Fred) { "OK" } else { "NAO CONFIGURADO" }))
     Write-Host ("Twelve Data local: " + $(if ($secretState.TwelveData) { "OK" } else { "NAO CONFIGURADO" }))
+    Write-Host ("EODHD local: " + $(if ($secretState.Eodhd) { "OK" } else { "NAO CONFIGURADO" }))
+    Write-Host ("NewsAPI local: " + $(if ($secretState.NewsApi) { "OK" } else { "NAO CONFIGURADO" }))
     Write-Host "Verificando sintaxe do aplicativo principal..."
     & ".\.venv\Scripts\python.exe" -m py_compile "usd_macro_pro_v4_cloud.py"
     if ($LASTEXITCODE -ne 0) { throw "Falha de sintaxe no aplicativo principal." }
@@ -255,6 +281,17 @@ function Configure-Fred {
     & powershell -NoProfile -ExecutionPolicy Bypass -File ".\AtlasQuant_Configurar_FRED.ps1"
 }
 
+function Configure-AllApis {
+    Clear-Host
+    if (-not (Test-Path "AtlasQuant_Configurar_APIs.ps1")) {
+        Write-Host "[ERRO] Configurador unificado de APIs nao encontrado."
+        Write-Host "Atualize o pacote do AtlasQuant."
+        Pause-AtlasQuant
+        return
+    }
+    & powershell -NoProfile -ExecutionPolicy Bypass -File ".\AtlasQuant_Configurar_APIs.ps1"
+}
+
 if (-not (Test-Path "usd_macro_pro_v4_cloud.py")) {
     Write-Host "[ERRO] Este launcher precisa ficar na pasta principal do AtlasQuant."
     Write-Host "Arquivo esperado: usd_macro_pro_v4_cloud.py"
@@ -275,6 +312,7 @@ while ($true) {
     Write-Host " [5] Sair"
     Write-Host " [6] Parar AtlasQuant local"
     Write-Host " [7] Configurar FRED local"
+    Write-Host " [8] Configurar as 4 APIs locais"
     Write-Host ""
     $choice = Read-Host "Escolha uma opcao"
     try {
@@ -286,6 +324,7 @@ while ($true) {
             "5" { exit 0 }
             "6" { Stop-AtlasQuant }
             "7" { Configure-Fred }
+            "8" { Configure-AllApis }
             default {
                 Write-Host ""
                 Write-Host "Opcao invalida."
