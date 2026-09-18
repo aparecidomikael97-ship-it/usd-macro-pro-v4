@@ -25,6 +25,23 @@ class PaperTradingV112SafetyTests(unittest.TestCase):
         self.assertFalse(chk["data_sufficient"])
         self.assertFalse(chk["all_checks_passed"])
 
+    def test_future_dated_technical_evidence_fails_closed(self):
+        scanner={"m15_fetched_at":(self.now+pd.Timedelta(minutes=5)).isoformat(),"tecnico":self.tec}
+        with patch("paper_trading_v112.evaluate_decision_integrity",return_value={"executable":True,"hard_blocks":[],"soft_blocks":[]}):
+            chk=p.evaluate_pair_checklist("EUR/USD",self.input,scanner,self.map,now=self.now)
+        self.assertIsNone(chk["technical_age_min"])
+        self.assertFalse(chk["data_sufficient"])
+        self.assertFalse(chk["all_checks_passed"])
+
+    def test_future_dated_market_map_fails_closed(self):
+        scanner={"m15_fetched_at":self.now.isoformat(),"tecnico":self.tec}
+        future={**self.map,"updated_at":(self.now+pd.Timedelta(minutes=5)).isoformat()}
+        with patch("paper_trading_v112.evaluate_decision_integrity",return_value={"executable":True,"hard_blocks":[],"soft_blocks":[]}):
+            chk=p.evaluate_pair_checklist("EUR/USD",self.input,scanner,future,now=self.now)
+        self.assertIsNone(chk["map_age_min"])
+        self.assertFalse(chk["data_sufficient"])
+        self.assertFalse(chk["all_checks_passed"])
+
     def test_hard_or_soft_block_prevents_paper_signal(self):
         scanner={"m15_fetched_at":self.now.isoformat(),"tecnico":self.tec}
         for decision in ({"executable":True,"hard_blocks":["X"],"soft_blocks":[]},{"executable":True,"hard_blocks":[],"soft_blocks":["Y"]},{"executable":False,"hard_blocks":[],"soft_blocks":[]}):
