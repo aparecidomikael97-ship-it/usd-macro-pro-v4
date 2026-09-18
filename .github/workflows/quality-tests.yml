@@ -9,6 +9,7 @@ on:
       - "*.ps1"
       - "*.bat"
       - "tradingview/**"
+      - "mobile/android/**"
       - ".github/workflows/quality-tests.yml"
       - ".github/workflows/autopilot-v107.yml"
 
@@ -156,4 +157,5 @@ jobs:
             test_atlasquant_branch_drift.py \
             test_atlasquant_runtime_smoke.py \
             test_atlasquant_windows_private_launcher.py \
-            test_streamlit_width_compat.py
+            test_streamlit_width_compat.py \
+            test_android_mobile_standalone.py
