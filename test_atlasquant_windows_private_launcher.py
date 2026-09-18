@@ -50,6 +50,12 @@ class WindowsPrivateLauncherTests(unittest.TestCase):
         self.assertIn('$stablePath', self.ps1)
         self.assertIn('$legacyPath', self.ps1)
 
+    def test_launcher_reads_persistent_keys_with_native_powershell(self):
+        self.assertIn('Get-Content -LiteralPath $secretsPath', self.ps1)
+        self.assertIn('StartsWith($Name + " =")', self.ps1)
+        self.assertIn('$parts = $line -split "=", 2', self.ps1)
+        self.assertNotIn('tomllib.loads', self.ps1)
+
     def test_launcher_loads_all_four_api_keys(self):
         self.assertIn('$env:CHAVE_FRED = $fred', self.ps1)
         self.assertIn('$env:CHAVE_TWELVE_DATA = $twelve', self.ps1)
