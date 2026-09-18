@@ -121,6 +121,17 @@ class AcademyVideoScriptsTests(unittest.TestCase):
         self.assertIn("def _academy_save_uploaded_video", self.source)
         self.assertIn("tmp.replace(target)", self.source)
 
+    def test_media_production_dashboard_and_export_kit(self):
+        self.assertIn("def _academy_media_stats", self.source)
+        self.assertIn("def _academy_production_text", self.source)
+        self.assertIn("def _academy_media_track_rows", self.source)
+        self.assertIn("Produção dos vídeos", self.source)
+        self.assertIn("MP4 disponíveis", self.source)
+        self.assertIn("Ver status dos 22 vídeos", self.source)
+        self.assertIn("Baixar pacote de produção desta aula", self.source)
+        self.assertIn("1920x1080", self.source)
+        self.assertIn("Material educacional AtlasQuant Academy.", self.source)
+
     def test_progress_persists_outside_zip(self):
         self.assertIn('os.environ["LOCALAPPDATA"]', self.source)
         self.assertIn('/ "AtlasQuant"', self.source)
