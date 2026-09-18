@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from typing import Any, Mapping
+import math
 
 import pandas as pd
 
@@ -118,8 +119,15 @@ def comparison_frame(
         pack=dict(suite.get(strategy,{}) or {})
         results=list(pack.get("results",[]) or [])
         m=summarize_results(results)
-        dd=float(m.get("max_drawdown_r",0.0) or 0.0)
-        net=float(m.get("net_r",0.0) or 0.0)
+        try: dd=float(m.get("max_drawdown_r",0.0) or 0.0)
+        except Exception: dd=float("nan")
+        try: net=float(m.get("net_r",0.0) or 0.0)
+        except Exception: net=float("nan")
+        metrics_finite=all(
+            math.isfinite(float(v))
+            for v in (m.get("expectancy_r"),m.get("net_r"),m.get("max_drawdown_r"))
+            if v is not None
+        ) and all(m.get(k) is not None for k in ("expectancy_r","net_r","max_drawdown_r"))
         rows.append({
             "strategy":strategy,
             "operacional":pack.get("label",STRATEGY_LABELS[strategy]),
@@ -136,9 +144,9 @@ def comparison_frame(
             "max_drawdown_r":m["max_drawdown_r"],
             "max_loss_streak":m["max_loss_streak"],
             "ambiguous_same_bar":m["ambiguous_same_bar"],
-            "net_r_per_drawdown":None if dd<=0 else round(net/dd,4),
+            "net_r_per_drawdown":None if not (math.isfinite(dd) and math.isfinite(net)) or dd<=0 else round(net/dd,4),
             "sample_tier":_sample_tier(m["trades"]),
-            "eligible_observed_rank":bool(m["trades"]>=threshold),
+            "eligible_observed_rank":bool(m["trades"]>=threshold and metrics_finite),
             "observed_expectancy_rank":None,
         })
 
