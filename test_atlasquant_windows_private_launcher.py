@@ -68,6 +68,14 @@ class WindowsPrivateLauncherTests(unittest.TestCase):
         self.assertIn("A janela permanecera aberta para voce poder ler o erro.", self.ps1)
         self.assertIn("Pause-AtlasQuant", self.ps1)
 
+    def test_launcher_replaces_stale_atlasquant_on_port_8501(self):
+        self.assertIn("Get-NetTCPConnection -LocalPort 8501", self.ps1)
+        self.assertIn("Get-CimInstance Win32_Process", self.ps1)
+        self.assertIn('cmd -match "streamlit"', self.ps1)
+        self.assertIn('cmd -match "usd_macro_pro_v4_cloud.py"', self.ps1)
+        self.assertIn("AtlasQuant anterior detectado na porta 8501", self.ps1)
+        self.assertIn("Get-AtlasQuantPidFile", self.ps1)
+
     def test_launcher_runs_streamlit_in_background(self):
         self.assertIn("Start-Process -FilePath $python", self.ps1)
         self.assertIn(".atlasquant_streamlit.pid", self.ps1)
