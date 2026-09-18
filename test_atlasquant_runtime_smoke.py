@@ -66,6 +66,12 @@ class AtlasQuantRuntimeSmokeTests(unittest.TestCase):
         self.assertIn("AtlasQuant",rendered)
         self.assertIn("RUNTIME",rendered)
 
+    def test_local_scanner_persistence_path_is_available(self):
+        src=open("usd_macro_pro_v4_cloud.py",encoding="utf-8").read()
+        self.assertIn('local_path = Path(_SCANNER_GH_PATH_V934)', src)
+        self.assertIn('local_path.parent.mkdir(parents=True, exist_ok=True)', src)
+        self.assertIn('tmp_path.replace(local_path)', src)
+
     def test_app_source_has_no_hardcoded_dev_badge(self):
         src=open("usd_macro_pro_v4_cloud.py",encoding="utf-8").read()
         self.assertNotIn("Market Intelligence Platform · DEV",src)
