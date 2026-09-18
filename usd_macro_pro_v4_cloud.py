@@ -3845,15 +3845,15 @@ with abas[10]:
                 "quality": "valid",
             })
 
-        # O briefing usa somente o calendário que já foi calculado/cacheado
-        # nesta execução; nenhuma coleta técnica/Twelve Data é acionada aqui.
+        # Segurança de quota: o Macro Briefing não inicia coleta de calendário.
+        # Eventos entram apenas quando outra camada já os disponibilizou em memória.
         _brief_events = []
-        try:
-            _agenda_brief = _eventos_macro_v65().head(12)
-            for _, _e in _agenda_brief.iterrows():
+        _agenda_brief = st.session_state.get("atlasquant_macro_events")
+        if isinstance(_agenda_brief, pd.DataFrame) and not _agenda_brief.empty:
+            for _, _e in _agenda_brief.head(12).iterrows():
                 _brief_events.append({
                     "event": str(_e.get("Evento", "")),
-                    "currency": "USD",
+                    "currency": str(_e.get("Moeda", "USD")),
                     "datetime": (
                         _e.get("Data").strftime("%d/%m/%Y")
                         if hasattr(_e.get("Data"), "strftime") else str(_e.get("Data", ""))
@@ -3862,8 +3862,6 @@ with abas[10]:
                     "data_ready": True,
                     "quality": "valid",
                 })
-        except Exception:
-            _brief_events = []
 
         _brief_banks = [{
             "bank": "Federal Reserve",
