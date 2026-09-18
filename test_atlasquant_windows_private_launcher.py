@@ -50,6 +50,12 @@ class WindowsPrivateLauncherTests(unittest.TestCase):
         self.assertIn("Stop-AtlasQuant", self.ps1)
         self.assertIn("Voce pode fechar este launcher; o AtlasQuant continuara rodando.", self.ps1)
 
+    def test_launcher_injects_local_twelve_secret_into_child_environment(self):
+        self.assertIn("function Import-AtlasQuantLocalSecrets", self.ps1)
+        self.assertIn("$env:CHAVE_TWELVE_DATA = $value", self.ps1)
+        self.assertIn("[OK] Twelve Data local carregado para esta sessao.", self.ps1)
+        self.assertNotIn("setx CHAVE_TWELVE_DATA", self.ps1)
+
 
 if __name__ == "__main__":
     unittest.main()
