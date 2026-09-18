@@ -40,7 +40,7 @@ try {
     }
     $output += $line
 
-    Set-Content -Path $secretsPath -Value $output -Encoding UTF8
+    # Windows PowerShell 5.1 grava BOM com -Encoding UTF8; alguns parsers TOML podem rejeitar esse BOM.\n    # Grave UTF-8 sem BOM para garantir que o Streamlit leia .streamlit/secrets.toml.\n    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)\n    [System.IO.File]::WriteAllLines($secretsPath, [string[]]$output, $utf8NoBom)
 
     Write-Host ""
     Write-Host "[OK] CHAVE_TWELVE_DATA configurada localmente."
