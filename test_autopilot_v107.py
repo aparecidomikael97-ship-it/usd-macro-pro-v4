@@ -52,9 +52,9 @@ class AutopilotV107Tests(unittest.TestCase):
     def test_autopilot_source_keeps_real_execution_out_of_decision_evidence(self):
         from pathlib import Path
         text = Path("autopilot_v107.py").read_text(encoding="utf-8")
-        self.assertIn('"real_orders": False', text)
-        self.assertIn('"automatic_gate_change": False', text)
-        self.assertIn('"automatic_promotion": False', text)
+        self.assertIn('"real_orders":False', text)
+        self.assertIn('"automatic_gate_change":False', text)
+        self.assertIn('"automatic_promotion":False', text)
 
     def test_autopilot_persists_shadow_and_flight_evidence(self):
         from pathlib import Path
