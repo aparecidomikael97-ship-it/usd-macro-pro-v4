@@ -17,9 +17,14 @@ class WindowsPrivateLauncherTests(unittest.TestCase):
         self.assertIn("powershell -NoProfile -ExecutionPolicy Bypass", self.bat)
         self.assertNotIn("goto instalar", self.bat.lower())
 
-    def test_launcher_keeps_streamlit_local_only(self):
+    def test_launcher_keeps_private_default_and_explicit_mobile_lan_mode(self):
         self.assertIn('"--server.address", "127.0.0.1"', self.ps1)
-        self.assertNotIn('"--server.address", "0.0.0.0"', self.ps1)
+        self.assertIn("function Start-AtlasQuantMobile", self.ps1)
+        self.assertIn('"--server.address", "0.0.0.0"', self.ps1)
+        self.assertIn("Continuar? (S/N)", self.ps1)
+        self.assertIn("Use somente em uma rede Wi-Fi confiavel.", self.ps1)
+        self.assertIn("Nao encaminhe a porta 8501 no roteador", self.ps1)
+        self.assertIn("Iniciar modo celular - Wi-Fi local", self.ps1)
 
     def test_launcher_uses_isolated_environment(self):
         self.assertIn(".venv\\Scripts\\python.exe", self.ps1)
