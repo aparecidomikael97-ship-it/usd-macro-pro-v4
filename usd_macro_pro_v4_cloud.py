@@ -177,7 +177,7 @@ except Exception as _autopilot_exc:
 # CONFIGURAÇÕES GERAIS
 # =========================================================
 
-APP_VERSION = "11.0.8 — STRENGTH ATTRIBUTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2"
+APP_VERSION = "11.6 — ATLASQUANT PRIVATE · PAPER FRICTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2"
 HIST_SCORES = "historico_scores_v5.parquet"
 HIST_SINAIS = "historico_sinais_v5.parquet"
 
@@ -1836,8 +1836,14 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("USD Macro Pro")
-st.caption("V11.0.8 · Força auditável · coleta com orçamento diário")
+if render_atlasquant_header is not None:
+    render_atlasquant_header(APP_VERSION, environment=ATLASQUANT_ENVIRONMENT)
+else:
+    st.title("🧭 AtlasQuant")
+    st.caption(f"Plataforma de Inteligência de Mercado · {ATLASQUANT_ENVIRONMENT}")
+    if _ATLASQUANT_UI_IMPORT_ERROR:
+        st.caption(f"UI profissional em modo compatível: {_ATLASQUANT_UI_IMPORT_ERROR}")
+
 st.caption("Macro semanal → Macro do dia → W1/D1 → Quarterly → Liquidez → Killzones → H4/H1/M15 → Performance real")
 
 icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
@@ -3803,14 +3809,6 @@ def _autopilot_save_inputs_v107():
     except Exception as exc:
         return False, f"{type(exc).__name__}: {exc}"
 
-
-if render_atlasquant_header is not None:
-    render_atlasquant_header(APP_VERSION, environment=ATLASQUANT_ENVIRONMENT)
-else:
-    st.title("🧭 AtlasQuant")
-    st.caption(f"Market Intelligence Platform · {ATLASQUANT_ENVIRONMENT}")
-    if _ATLASQUANT_UI_IMPORT_ERROR:
-        st.caption(f"UI profissional em modo compatível: {_ATLASQUANT_UI_IMPORT_ERROR}")
 
 abas = st.tabs([
     "Central", "Painel mestre", "Moedas", "EUA", "Pares", "Fed",
