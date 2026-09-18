@@ -22,6 +22,7 @@ NAVIGATION_LABELS = (
     "🧪 Backtest",
     "⚡ Decisão",
     "🗺️ Market Map",
+    "🎙️ Macro Briefing",
     "🎓 Aprender",
     "🧩 Produto",
     "🛠️ Melhorias",
