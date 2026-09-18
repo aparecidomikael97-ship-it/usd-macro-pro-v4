@@ -302,6 +302,16 @@ function Start-AtlasQuantMobile {
         return
     }
 
+    $lanIp = Get-AtlasQuantLanIp
+    if ([string]::IsNullOrWhiteSpace($lanIp)) {
+        Write-Host ""
+        Write-Host "[FALHA] Nao foi possivel detectar o IPv4 da sua rede local."
+        Write-Host "Conecte o computador ao Wi-Fi/LAN e tente novamente."
+        Pause-AtlasQuant
+        return
+    }
+    $mobileUrl = "http://" + $lanIp + ":8501"
+
     $existing = Get-AtlasQuantProcess
     if ($null -ne $existing) {
         Write-Host "[INFO] AtlasQuant anterior detectado na porta 8501."
@@ -320,7 +330,7 @@ function Start-AtlasQuantMobile {
     $python = (Resolve-Path ".\.venv\Scripts\python.exe").Path
     $args = @(
         "-m", "streamlit", "run", "usd_macro_pro_v4_cloud.py",
-        "--server.address", "0.0.0.0",
+        "--server.address", $lanIp,
         "--server.port", "8501",
         "--server.headless", "true",
         "--browser.gatherUsageStats", "false"
@@ -347,7 +357,6 @@ function Start-AtlasQuantMobile {
         } catch {}
     }
 
-    $lanIp = Get-AtlasQuantLanIp
     Write-Host ""
     if ($ready) {
         Write-Host "[OK] AtlasQuant pronto para conexao pelo celular."
@@ -355,19 +364,15 @@ function Start-AtlasQuantMobile {
         Write-Host "[AVISO] O servidor ainda pode levar alguns segundos."
     }
 
-    Write-Host "No computador: http://127.0.0.1:8501"
-    if ([string]::IsNullOrWhiteSpace($lanIp)) {
-        Write-Host "[AVISO] Nao foi possivel detectar automaticamente o IP da rede."
-        Write-Host "Use ipconfig para localizar o endereco IPv4 do computador."
-    } else {
-        Write-Host ("No celular: http://" + $lanIp + ":8501")
-        Write-Host ""
-        Write-Host "Digite esse endereco no aplicativo AtlasQuant Android."
-    }
+    Write-Host ("No computador: " + $mobileUrl)
+    Write-Host ("No celular:    " + $mobileUrl)
+    Write-Host ""
+    Write-Host "[IMPORTANTE] No celular, NAO use localhost ou 127.0.0.1."
+    Write-Host "Digite exatamente o endereco acima no aplicativo AtlasQuant Android."
     Write-Host ""
     Write-Host "O celular e o computador precisam estar na mesma rede Wi-Fi."
     Write-Host "Se o Windows Firewall perguntar, permita somente em redes privadas."
-    Start-Process "http://127.0.0.1:8501"
+    Start-Process $mobileUrl
     Pause-AtlasQuant
 }
 
