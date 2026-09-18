@@ -196,7 +196,7 @@ def render_v104_hub(
 
     with tabs[0]:
         st.markdown("### 🏠 Tela inicial proposta")
-        st.components.v1.html(WIREFRAME_SVG, height=520, scrolling=True)
+        # Renderiza o wireframe sem componente iframe legado. Evita erro React removeChild em reruns do Streamlit.\n        st.image(WIREFRAME_SVG.encode("utf-8"), width="stretch")
         st.download_button("⬇️ Baixar wireframe SVG", WIREFRAME_SVG.encode("utf-8"),
                            "wireframe_usd_macro_pro_v104.svg", "image/svg+xml")
         st.markdown("**Objetivo:** Resumo Macro → 2 gráficos principais → Meus Indicadores → navegação curta.")
