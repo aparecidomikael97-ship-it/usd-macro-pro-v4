@@ -120,5 +120,20 @@ class StrategyParameterRobustnessTests(unittest.TestCase):
         self.assertEqual(len(report["variants"]),15)
 
 
+    def test_invalid_variant_trade_counts_fail_closed(self):
+        for bad in (float("nan"),float("inf"),float("-inf"),-1):
+            with self.subTest(trades=bad):
+                d=pd.DataFrame([
+                    {"strategy":"FVG","operacional":"FVG","variant":"A","is_base":False,"trades":25,"expectancy_r":0.2},
+                    {"strategy":"FVG","operacional":"FVG","variant":"BASE","is_base":True,"trades":bad,"expectancy_r":0.2},
+                    {"strategy":"FVG","operacional":"FVG","variant":"C","is_base":False,"trades":25,"expectancy_r":0.3},
+                ])
+                x=parameter_robustness_summary(d,min_trades_per_variant=20)
+                r=x[x["strategy"]=="FVG"].iloc[0]
+                self.assertEqual(r["parameter_robustness_status"],"INSUFFICIENT")
+                self.assertFalse(bool(r["all_variants_sufficient"]))
+
+
+
 if __name__=="__main__":
     unittest.main()
