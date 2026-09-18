@@ -51,16 +51,20 @@ def build_safety_input(
     )
     technical_ready=bool(p.get("executable", False))
 
+    event_raw = major_event_minutes_override if major_event_minutes_override is not None else p.get("major_event_minutes")
+    event_minutes = _finite(event_raw)
+    # Preserve the fact that a supplied timing value was invalid so the
+    # independent Safety Core can fail closed instead of confusing it with
+    # "no event information supplied".
+    if event_raw is not None and event_minutes is None:
+        event_minutes = float("nan")
+
     return SafetyInput(
         data_quality=data_score,
         data_fresh=data_fresh,
         essential_sources_ok=essential_ok,
         source_conflict=bool(p.get("source_conflict", False)),
-        major_event_minutes=(
-            _finite(major_event_minutes_override)
-            if major_event_minutes_override is not None
-            else _finite(p.get("major_event_minutes"))
-        ),
+        major_event_minutes=event_minutes,
         update_health_ok=process_ok,
         regime_supported=regime_supported,
         model_conflict=model_conflict,
