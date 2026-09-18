@@ -55,13 +55,19 @@ def is_safe_package_path(path: str) -> bool:
 
     if lower_parts & {part.lower() for part in BLOCKED_PARTS}:
         return False
-    if name in BLOCKED_NAMES:
+    if name in BLOCKED_NAMES or name == ".gitignore":
         return False
     if p.suffix.lower() in BLOCKED_SUFFIXES:
         return False
     if name.startswith("test_") and p.suffix.lower() == ".py":
         return False
     if p.parts and p.parts[0].lower() == "docs":
+        return False
+    if p.suffix.lower() in {".md", ".yml", ".yaml"}:
+        return False
+    if p.suffix.lower() == ".txt" and name != "requirements.txt":
+        return False
+    if name == "build_windows_private_package.py":
         return False
     if "secret" in name or "credential" in name:
         return False
