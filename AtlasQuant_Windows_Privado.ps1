@@ -35,10 +35,12 @@ function Read-AtlasQuantLocalSecret {
             return ""
         }
 
-        $pattern = '^\s*' + $escapedName + '\s*=\s*"(.*)"\s*
-        $value = $Matches[1]
-        $value = $value.Replace('\"', '"').Replace('\\', '\')
-        return $value
+        $pattern = '^\s*' + $escapedName + '\s*=\s*"([^"]*)"\s*$'
+        if ($line -notmatch $pattern) {
+            return ""
+        }
+
+        return $Matches[1]
     } catch {
         return ""
     }
