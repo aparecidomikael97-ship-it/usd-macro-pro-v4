@@ -48,6 +48,11 @@ from atlasquant_quota_shadow import (
     append_quota_shadow_sample,
     summarize_quota_shadow,
 )
+from pair_intelligence_v110 import build_pair_intelligence_packs
+from atlasquant_shadow_capture import build_shadow_batch
+from atlasquant_shadow_store import persist_shadow_samples
+from atlasquant_flight_recorder_panel import record_from_pack
+from atlasquant_flight_recorder_store import persist_records
 
 from market_map_core_v10 import (
     NY_TZ,
@@ -1258,13 +1263,46 @@ def main() -> int:
     ok,err=gh_put_csv(NEWS_VALIDATION_PATH,validation,"V11.0 Autopilot: snapshots/validação automática")
     if not ok: all_errors.append("Salvar validação: "+err)
 
-    # 6. Health/status.
+    # 6. Decision evidence capture — observational only.
+    # Reuses the same Decision Integrity pack builder as the UI. Never changes gates or orders.
+    try:
+        ranking_rows=list(inputs.get("ranking",[]) or []) if isinstance(inputs,Mapping) else []
+        ranking=pd.DataFrame(ranking_rows)
+        if ranking.empty:
+            ranking=matrix.copy()
+        fed_state=dict(inputs.get("fed",{}) or {}) if isinstance(inputs,Mapping) else {}
+        fed_tone=str(fed_state.get("tom",fed_state.get("tone","Neutro")))
+        packs=build_pair_intelligence_packs(
+            matrix,ranking,scanner_state=scanner,map_state=master,
+            news_state=intel or {},fed_tone=fed_tone,weights=inputs.get("weights") if isinstance(inputs,Mapping) else None,
+        )
+        engine_version="V11.0.8 / AtlasQuant Runtime"
+        shadow_batch=build_shadow_batch(packs,champion_version=engine_version)
+        shadow_status=persist_shadow_samples(shadow_batch,repo=REPO,branch=BRANCH,token=TOKEN)
+        flight_records=[record_from_pack(p,engine_version) for p in packs]
+        flight_status=persist_records(flight_records,repo=REPO,branch=BRANCH,token=TOKEN)
+    except Exception as evidence_exc:
+        packs=[]
+        shadow_status={"ok":False,"added":0,"samples":0,"reason":"CAPTURE_EXCEPTION","error":f"{type(evidence_exc).__name__}: {evidence_exc}"}
+        flight_status={"ok":False,"added":0,"records":0,"reason":"CAPTURE_EXCEPTION","error":f"{type(evidence_exc).__name__}: {evidence_exc}"}
+        all_errors.append("Decision evidence: "+flight_status["error"])
+
+    # 7. Health/status.
     status=status_summary(
         app_ok,app_msg,inputs,scanner,master,intel,validation,
         all_errors,total_calls,snap_stats
     )
 
-    # 7. 28FX quota shadow telemetry — observational only.
+    status["decision_evidence"]={
+        "packs":len(packs),
+        "shadow":shadow_status,
+        "flight_recorder":flight_status,
+        "real_orders":False,
+        "automatic_gate_change":False,
+        "automatic_promotion":False,
+    }
+
+    # 8. 28FX quota shadow telemetry — observational only.
     # Never changes PAIR_ORDER, cadence, quota, API behavior or execution gates.
     quota_state,quota_read_err=gh_get_json(
         QUOTA_SHADOW_PATH,
