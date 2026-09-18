@@ -321,7 +321,7 @@ st.sidebar.divider()
 st.sidebar.caption("Modelo FX: prioriza juros reais, Treasury 2Y e Fed para o USD.")
 st.sidebar.caption(f"🕒 Atualizado: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
 if not CHAVE_FRED:
-    st.sidebar.info("FRED sem chave de API: usando CSV público oficial da FRED como fonte automática.")
+    st.sidebar.warning("FRED sem chave de API: configure a CHAVE_FRED no launcher para liberar os dados oficiais da aba EUA.")
 if CHAVE_EODHD:
     st.sidebar.success("EODHD configurado: consenso automático tentará usar Economic Events.")
 else:
