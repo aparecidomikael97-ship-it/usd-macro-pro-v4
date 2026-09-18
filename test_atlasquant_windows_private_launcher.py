@@ -43,6 +43,13 @@ class WindowsPrivateLauncherTests(unittest.TestCase):
         self.assertIn("A janela permanecera aberta para voce poder ler o erro.", self.ps1)
         self.assertIn("Pause-AtlasQuant", self.ps1)
 
+    def test_launcher_runs_streamlit_in_background(self):
+        self.assertIn("Start-Process -FilePath $python", self.ps1)
+        self.assertIn(".atlasquant_streamlit.pid", self.ps1)
+        self.assertIn("Get-AtlasQuantProcess", self.ps1)
+        self.assertIn("Stop-AtlasQuant", self.ps1)
+        self.assertIn("Voce pode fechar este launcher; o AtlasQuant continuara rodando.", self.ps1)
+
 
 if __name__ == "__main__":
     unittest.main()
