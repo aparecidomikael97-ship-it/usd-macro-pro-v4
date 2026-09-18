@@ -44,6 +44,34 @@ class AtlasQuantShadowModeTests(unittest.TestCase):
         self.assertFalse(added2)
         self.assertEqual(len(rows2),1)
 
+    def test_sample_id_changes_across_timestamped_observations(self):
+        a=self.snap(); b=self.snap(version="v2")
+        s1=compare_shadow_sample(a,b)
+        a2=dict(a); b2=dict(b)
+        a2["timestamp"]="2026-09-15T12:15:00Z"
+        b2["timestamp"]="2026-09-15T12:15:00Z"
+        s2=compare_shadow_sample(a2,b2)
+        self.assertNotEqual(s1["sample_id"],s2["sample_id"])
+
+    def test_nonfinite_scores_do_not_poison_summary(self):
+        a=self.snap(score=float("nan"))
+        b=self.snap(score=float("inf"),version="v2")
+        s=compare_shadow_sample(a,b)
+        self.assertIsNone(s["score_delta"])
+        summary=summarize_shadow([s],min_samples=1)
+        self.assertIsNone(summary["mean_abs_score_delta"])
+
+    def test_expected_pair_coverage_requires_every_pair(self):
+        s=compare_shadow_sample(self.snap(),self.snap(version="v2"))
+        summary=summarize_shadow(
+            [s],min_samples=1,
+            expected_pairs=("EUR/USD","GBP/USD","USD/JPY"),
+            min_pair_samples=1,
+        )
+        self.assertEqual(summary["pairs_meeting_minimum"],1)
+        self.assertEqual(set(summary["missing_pairs"]),{"GBP/USD","USD/JPY"})
+        self.assertFalse(summary["eligible_for_manual_review"])
+
     def test_summary_never_allows_auto_promotion(self):
         s=compare_shadow_sample(self.snap(),self.snap(version="v2"))
         summary=summarize_shadow([s],min_samples=1)
