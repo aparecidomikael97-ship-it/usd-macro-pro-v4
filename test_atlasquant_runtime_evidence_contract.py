@@ -71,6 +71,25 @@ class RuntimeEvidenceContractTests(unittest.TestCase):
         rows=hydrate_shadow_samples([row],[row])
         self.assertEqual(len(rows),1)
 
+    def test_all_seven_pairs_generate_unique_flight_fingerprints(self):
+        rows=[prepare_flight_capture([],pack(p),"V")["current"] for p in PAIRS]
+        fps=[x["_fingerprint"] for x in rows]
+        self.assertEqual(len(fps),7)
+        self.assertEqual(len(set(fps)),7)
+        self.assertEqual({x["asset"] for x in rows},set(PAIRS))
+
+    def test_all_seven_pairs_remain_blocked_when_not_executable(self):
+        rows=[prepare_flight_capture([],pack(p,executable=False),"V")["current"] for p in PAIRS]
+        self.assertTrue(all(x["record_type"]=="BLOCKED" for x in rows))
+        self.assertTrue(all(x["outcome"]=="BLOCKED" for x in rows))
+
+    def test_shadow_pair_identity_and_direction_match(self):
+        rows=build_shadow_batch([pack(p) for p in PAIRS],champion_version="V")
+        self.assertTrue(all(x["pair_match"] for x in rows))
+        self.assertTrue(all(x["side_match"] for x in rows))
+        self.assertTrue(all(not x["opposite_direction"] for x in rows))
+        self.assertTrue(all(not x["critical_mismatch"] for x in rows))
+
     def test_shadow_never_turns_challenger_into_live_execution(self):
         rows=build_shadow_batch([pack(p,executable=False) for p in PAIRS],champion_version="V")
         self.assertTrue(all(not x["challenger"]["executable"] for x in rows))
