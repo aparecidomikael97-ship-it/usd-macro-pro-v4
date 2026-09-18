@@ -2,6 +2,9 @@ name: AtlasQuant - Automatic Scanner + Autopilot
 
 on:
   workflow_dispatch:
+  push:
+    branches: [atlasquant-runtime]
+    paths: [.github/workflows/autopilot-v107.yml]
   schedule:
     - cron: "7,37 * * * *"
 
