@@ -213,5 +213,23 @@ class BacktestSnapshotHistoryTests(unittest.TestCase):
                 self.assertTrue(manifest["no_live_gate_effect"])
 
 
+    def test_restore_rejects_malformed_manifest_snapshot_ids_before_writes(self):
+        with tempfile.TemporaryDirectory() as code_td, tempfile.TemporaryDirectory() as dest:
+            code=Path(code_td); (code/"logic.py").write_text("x=1\n",encoding="utf-8")
+            a=snapshot(code); raw=history_archive_zip([a])
+            src=zipfile.ZipFile(io.BytesIO(raw),"r"); buf=io.BytesIO()
+            with src, zipfile.ZipFile(buf,"w",compression=zipfile.ZIP_DEFLATED) as dst:
+                for info in src.infolist():
+                    data=src.read(info.filename)
+                    if info.filename=="manifest.json":
+                        manifest=json.loads(data.decode("utf-8"))
+                        manifest["snapshot_ids"]=["not-a-sha256"]
+                        data=json.dumps(manifest).encode("utf-8")
+                    dst.writestr(info.filename,data)
+            with self.assertRaisesRegex(ValueError,"snapshot_id"):
+                restore_history_archive(buf.getvalue(),root=dest)
+            self.assertFalse(any(Path(dest).iterdir()))
+
+
 if __name__=="__main__":
     unittest.main()
