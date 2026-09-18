@@ -675,8 +675,7 @@ def _academy_production_text(lesson: dict[str, Any]) -> str:
         "",
         "Material educacional AtlasQuant Academy.",
     ])
-    return "
-".join(lines)
+    return "\n".join(lines)
 
 
 def _academy_media_track_rows() -> list[dict[str, Any]]:
