@@ -770,6 +770,23 @@ SERIES_EUA = {
     "Índice amplo do dólar": "DTWEXBGS",
 }
 
+# Dias máximos desde a data da observação FRED para considerar o dado "Atual".
+# A FRED data séries mensais/trimestrais pelo início do período de referência,
+# não pela data em que o release foi publicado.
+FRESCURA_EUA_DIAS = {
+    "Juros do Fed": 65,
+    "IPC anual": 70,
+    "IPC Núcleo anual": 70,
+    "PCE anual": 95,
+    "PCE Núcleo anual": 95,
+    "Payroll variação mensal (mil)": 70,
+    "Desemprego": 70,
+    "PIB": 200,
+    "Treasury 2 anos": 5,
+    "Treasury 10 anos": 5,
+    "Índice amplo do dólar": 10,
+}
+
 
 @st.cache_data(ttl=900, show_spinner="Carregando e validando dados macroeconômicos dos EUA...")
 def carregar_macro_eua() -> dict:
@@ -809,22 +826,7 @@ def carregar_macro_eua() -> dict:
         "Índice amplo do dólar": (50, 200),
     }
 
-    # Limites de frescura medidos a partir da DATA DA OBSERVAÇÃO da FRED.
-    # Séries mensais/trimestrais usam o início do período como timestamp, portanto
-    # precisam de uma janela maior que dados de mercado diários para evitar falsos alertas.
-    frescura = {
-        "Juros do Fed": 65,
-        "IPC anual": 70,
-        "IPC Núcleo anual": 70,
-        "PCE anual": 95,
-        "PCE Núcleo anual": 95,
-        "Payroll variação mensal (mil)": 70,
-        "Desemprego": 70,
-        "PIB": 200,
-        "Treasury 2 anos": 5,
-        "Treasury 10 anos": 5,
-        "Índice amplo do dólar": 10,
-    }
+    frescura = FRESCURA_EUA_DIAS
 
     dados, auditoria = {}, []
     for chave, fallback_val in fallback.items():
