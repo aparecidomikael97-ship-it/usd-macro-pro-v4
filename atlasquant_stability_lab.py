@@ -101,6 +101,8 @@ def temporal_folds(
         g=data.iloc[start:start+size].copy()
         start+=size
         vals=pd.to_numeric(g[retcol],errors="coerce").dropna().astype(float)
+        vals=vals[vals.map(math.isfinite)]
+        vals=vals[vals.map(math.isfinite)]
         if vals.empty:
             continue
         hits=int((vals>0).sum()); total=int(len(vals))
@@ -162,9 +164,12 @@ def stability_summary(
             "mean_return_sign_consistent":False,"auto_change_allowed":False,
         }
     rates=pd.to_numeric(folds_df["Taxa observada %"],errors="coerce").dropna()
+    rates=rates[rates.map(math.isfinite)]
     rets=pd.to_numeric(folds_df["Retorno médio %"],errors="coerce").dropna()
-    samples=pd.to_numeric(folds_df["Amostra"],errors="coerce").fillna(0)
-    sufficient=bool(len(samples)>=2 and (samples>=int(min_fold_samples)).all())
+    rets=rets[rets.map(math.isfinite)]
+    samples=pd.to_numeric(folds_df["Amostra"],errors="coerce")
+    samples_valid=bool(len(samples)>=2 and samples.notna().all() and samples.map(lambda x: math.isfinite(float(x)) and float(x)>=0).all())
+    sufficient=bool(samples_valid and (samples>=int(min_fold_samples)).all())
     spread=float(rates.max()-rates.min()) if len(rates) else None
     nonzero=[x for x in rets.tolist() if abs(float(x))>1e-12]
     sign_consistent=bool(
@@ -234,6 +239,7 @@ def render_stability_lab(
         retcol=f"retorno_{horizon}_pct"
         for regime,g in data.groupby("Regime",dropna=False):
             vals=pd.to_numeric(g[retcol],errors="coerce").dropna().astype(float)
+            vals=vals[vals.map(math.isfinite)]
             if len(vals):
                 regime_rows.append({
                     "Regime":str(regime),"Amostra":len(vals),
