@@ -38,6 +38,31 @@ class AutopilotV107Tests(unittest.TestCase):
             self.assertIn(c,a.VALIDATION_COLS)
 
 
+    def test_market_closed_does_not_look_open_near_weekend_boundaries(self):
+        fri_after_close = pd.Timestamp("2026-09-18T21:01:00Z")
+        sun_before_open = pd.Timestamp("2026-09-20T20:59:00Z")
+        sun_open = pd.Timestamp("2026-09-20T21:00:00Z")
+        self.assertFalse(a.forex_market_likely_open(fri_after_close))
+        self.assertFalse(a.forex_market_likely_open(sun_before_open))
+        self.assertTrue(a.forex_market_likely_open(sun_open))
+
+    def test_runtime_branch_is_never_a_code_branch(self):
+        self.assertNotIn(a.BRANCH, {"main","atlasquant-dev"})
+
+    def test_autopilot_source_keeps_real_execution_out_of_decision_evidence(self):
+        from pathlib import Path
+        text = Path("autopilot_v107.py").read_text(encoding="utf-8")
+        self.assertIn('"real_orders": False', text)
+        self.assertIn('"automatic_gate_change": False', text)
+        self.assertIn('"automatic_promotion": False', text)
+
+    def test_autopilot_persists_shadow_and_flight_evidence(self):
+        from pathlib import Path
+        text = Path("autopilot_v107.py").read_text(encoding="utf-8")
+        self.assertIn("persist_shadow_samples", text)
+        self.assertIn("persist_records", text)
+        self.assertIn("build_pair_intelligence_packs", text)
+
     def test_main_has_autopilot_serialization_imports(self):
         from pathlib import Path
         text = Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
