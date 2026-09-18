@@ -54,5 +54,21 @@ class AtlasQuantAdaptiveCoverageTests(unittest.TestCase):
         self.assertEqual(p["background_pairs"],0)
 
 
+    def test_invalid_numeric_inputs_fail_closed_without_crashing(self):
+        for bad in (float("nan"),float("inf"),float("-inf"),"bad"):
+            with self.subTest(value=bad):
+                p=adaptive_coverage_plan(active_m15_min=bad)
+                self.assertFalse(p["inputs_valid"])
+                self.assertFalse(p["within_usable_cap"])
+                self.assertFalse(p["automatic_expansion_allowed"])
+
+    def test_zero_or_negative_cadence_is_not_quota_safe(self):
+        for bad in (0,-1):
+            with self.subTest(cadence=bad):
+                p=adaptive_coverage_plan(background_m15_min=bad)
+                self.assertFalse(p["within_usable_cap"])
+                self.assertEqual(p["background_m15_calls_per_pair"],0)
+
+
 if __name__=="__main__":
     unittest.main()
