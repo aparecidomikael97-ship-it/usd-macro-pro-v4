@@ -87,6 +87,21 @@ class StrategyParameterRobustnessTests(unittest.TestCase):
         self.assertEqual(ote["parameter_robustness_status"],"INSUFFICIENT")
         self.assertFalse(bool(ote["all_variants_sufficient"]))
 
+
+    def test_nonfinite_expectancy_never_gets_positive_status(self):
+        for bad in (float("nan"),float("inf"),float("-inf")):
+            with self.subTest(expectancy=bad):
+                rows=[
+                    {"strategy":"FVG","operacional":"FVG","variant":"A","is_base":False,"trades":25,"expectancy_r":0.2},
+                    {"strategy":"FVG","operacional":"FVG","variant":"BASE","is_base":True,"trades":25,"expectancy_r":bad},
+                    {"strategy":"FVG","operacional":"FVG","variant":"C","is_base":False,"trades":25,"expectancy_r":0.3},
+                ]
+                summary=parameter_robustness_summary(pd.DataFrame(rows),min_trades_per_variant=20)
+                fvg=summary[summary["strategy"]=="FVG"].iloc[0]
+                self.assertEqual(fvg["parameter_robustness_status"],"INSUFFICIENT")
+                self.assertFalse(bool(fvg["all_variants_sufficient"]))
+                self.assertIsNone(fvg["base_expectancy_r"])
+
     def test_report_exposes_summary_and_variants(self):
         n=40
         d=pd.DataFrame({
