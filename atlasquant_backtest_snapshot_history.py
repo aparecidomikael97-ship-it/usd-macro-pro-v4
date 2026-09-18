@@ -271,7 +271,9 @@ def inspect_history_archive(raw_zip: bytes | bytearray | memoryview) -> dict[str
         if len(infos)>MAX_ARCHIVE_FILES:
             raise ValueError("arquivo ZIP excede o limite de arquivos")
 
-        total_uncompressed=sum(max(0,int(info.file_size)) for info in infos)
+        if any(int(info.file_size) < 0 or int(info.compress_size) < 0 for info in infos):
+            raise ValueError("arquivo ZIP contém metadados de tamanho inválidos")
+        total_uncompressed=sum(int(info.file_size) for info in infos)
         if total_uncompressed>MAX_ARCHIVE_UNCOMPRESSED_BYTES:
             raise ValueError("arquivo ZIP excede o limite de tamanho descompactado")
 
@@ -284,6 +286,9 @@ def inspect_history_archive(raw_zip: bytes | bytearray | memoryview) -> dict[str
             raise ValueError("arquivo ZIP contém caminho ou arquivo não permitido")
         if "manifest.json" not in names:
             raise ValueError("manifest.json ausente")
+        manifest_info=next(info for info in infos if info.filename=="manifest.json")
+        if int(manifest_info.file_size)>MAX_SNAPSHOT_BYTES:
+            raise ValueError("manifest.json excede o limite de tamanho")
 
         try:
             manifest=json.loads(zf.read("manifest.json").decode("utf-8"))
@@ -333,6 +338,10 @@ def inspect_history_archive(raw_zip: bytes | bytearray | memoryview) -> dict[str
             raise ValueError("snapshot_ids do manifesto inválido")
         if len(declared_ids)!=len(set(declared_ids)):
             raise ValueError("manifesto contém snapshot_ids duplicados")
+        if len(declared_ids)!=declared_count:
+            raise ValueError("quantidade de snapshot_ids do manifesto não confere")
+        if any(len(x)!=64 or any(ch not in "0123456789abcdef" for ch in x.lower()) for x in declared_ids):
+            raise ValueError("manifesto contém snapshot_id inválido")
         if set(declared_ids)!=seen_ids:
             raise ValueError("snapshot_ids do manifesto não conferem")
 
