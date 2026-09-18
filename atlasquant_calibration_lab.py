@@ -62,7 +62,9 @@ def _completed_rows(df: pd.DataFrame, horizon: str) -> pd.DataFrame:
     out=df.copy()
     out[score_col]=pd.to_numeric(out[score_col],errors="coerce")
     out[ret_col]=pd.to_numeric(out[ret_col],errors="coerce")
-    out=out[out[score_col].notna() & out[ret_col].notna()].copy()
+    valid_score=out[score_col].map(lambda x: bool(pd.notna(x) and math.isfinite(float(x))))
+    valid_ret=out[ret_col].map(lambda x: bool(pd.notna(x) and math.isfinite(float(x))))
+    out=out[valid_score & valid_ret].copy()
     if out.empty:
         return out
     out["faixa_score"]=out[score_col].map(score_band)
@@ -108,9 +110,13 @@ def calibration_summary(
             "status":"INSUFFICIENT","label":"AMOSTRA INSUFICIENTE",
             "auto_reweight_allowed":False,
         }
-    total=int(pd.to_numeric(table["Amostra"],errors="coerce").fillna(0).sum())
-    eligible=table[table["Amostra suficiente"]==True].copy()
-    rates=pd.to_numeric(eligible["Taxa observada %"],errors="coerce").dropna().tolist()
+    sample_counts=pd.to_numeric(table["Amostra"],errors="coerce")
+    samples_valid=bool(sample_counts.notna().all() and sample_counts.map(lambda x: math.isfinite(float(x)) and float(x)>=0).all())
+    total=int(sample_counts.sum()) if samples_valid else 0
+    eligible=table[table["Amostra suficiente"]==True].copy() if samples_valid else table.iloc[0:0].copy()
+    rate_series=pd.to_numeric(eligible["Taxa observada %"],errors="coerce").dropna()
+    rate_series=rate_series[rate_series.map(math.isfinite)]
+    rates=rate_series.tolist()
     monotonic=len(rates)>=2 and all(rates[i+1]>=rates[i] for i in range(len(rates)-1))
     enough=total>=int(min_total_samples) and len(eligible)>=2
     if not enough:
