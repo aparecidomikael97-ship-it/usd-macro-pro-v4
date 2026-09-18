@@ -6,10 +6,11 @@
   <meta name="theme-color" content="#18345b" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="USD Macro" />
+  <meta name="apple-mobile-web-app-title" content="AtlasQuant" />
+  <meta name="description" content="AtlasQuant — inteligência macro, técnica e institucional para Forex." />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <title>USD Macro Pro</title>
+  <title>AtlasQuant</title>
   <style>
     * { box-sizing: border-box; }
     html, body { margin: 0; width: 100%; height: 100%; background: #0d1728; font-family: Arial, sans-serif; }
@@ -17,7 +18,7 @@
       height: 48px; display:flex; align-items:center; gap:10px; padding:0 12px;
       background:#0d1728; color:#fff; border-bottom:1px solid rgba(255,255,255,.12);
     }
-    #brand { font-weight: 700; flex: 1; }
+    #brand { font-weight: 700; flex: 1; white-space: nowrap; }
     button, a.btn {
       border:0; border-radius:8px; padding:8px 11px; font-weight:700; cursor:pointer;
       background:#1f6feb; color:#fff; text-decoration:none; font-size:13px;
@@ -31,19 +32,24 @@
       background:#fff; color:#111; border-radius:12px; padding:12px 14px; box-shadow:0 8px 28px rgba(0,0,0,.35);
       font-size:14px;
     }
+    @media (max-width: 520px) {
+      #bar { gap:6px; padding:0 8px; }
+      #brand { font-size:14px; overflow:hidden; text-overflow:ellipsis; }
+      button, a.btn { padding:7px 9px; font-size:12px; }
+    }
   </style>
 </head>
 <body>
   <div id="bar">
-    <div id="brand">🦅 USD Macro Pro</div>
+    <div id="brand">🦅 AtlasQuant</div>
     <button id="installBtn">Instalar app</button>
-    <a class="btn" href="https://usd-macro-pro-v4-hxbdx7fqmf2q7yn24sjsbs.streamlit.app/" target="_blank" rel="noopener">Abrir direto</a>
+    <a class="btn" href="https://atlasquant-private.onrender.com/" target="_blank" rel="noopener">Abrir direto</a>
   </div>
 
   <iframe
     id="frame"
-    src="https://usd-macro-pro-v4-hxbdx7fqmf2q7yn24sjsbs.streamlit.app/?embed=true"
-    title="USD Macro Pro"
+    src="https://atlasquant-private.onrender.com/?embed=true"
+    title="AtlasQuant"
     allow="clipboard-read; clipboard-write; fullscreen"
   ></iframe>
 
