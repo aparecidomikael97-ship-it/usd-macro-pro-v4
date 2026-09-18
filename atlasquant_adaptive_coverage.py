@@ -8,6 +8,7 @@ validated M15 cache before this policy can ever be wired into live collection.
 from __future__ import annotations
 
 from math import ceil
+import math
 from typing import Any
 import streamlit as st
 
@@ -25,9 +26,21 @@ DEFAULT_POLICY={
 }
 
 
+def _safe_int(value: Any, default: int = 0) -> int:
+    try:
+        x=float(value)
+        if not math.isfinite(x):
+            return default
+        return int(x)
+    except Exception:
+        return default
+
+
 def _calls(cadence_min: int, market_minutes: int) -> int:
-    cadence=max(1,int(cadence_min))
-    minutes=max(0,int(market_minutes))
+    cadence=_safe_int(cadence_min,0)
+    minutes=_safe_int(market_minutes,0)
+    if cadence <= 0 or minutes < 0:
+        return 0
     return 0 if minutes==0 else int(ceil(minutes/cadence))
 
 
@@ -43,28 +56,38 @@ def adaptive_coverage_plan(
     reserved_calls: int = DEFAULT_POLICY["reserved_calls"],
     required_m15_history_bars: int = DEFAULT_POLICY["required_m15_history_bars"],
 ) -> dict[str,Any]:
-    pairs=max(0,int(pair_count))
-    active=max(0,min(int(active_pairs),pairs))
+    raw_values=(pair_count,active_pairs,market_minutes,active_m15_min,background_m15_min,daily_context_calls_per_pair,daily_cap,reserved_calls,required_m15_history_bars)
+    inputs_valid=True
+    for value in raw_values:
+        try:
+            x=float(value)
+            if not math.isfinite(x):
+                inputs_valid=False
+        except Exception:
+            inputs_valid=False
+    pairs=max(0,_safe_int(pair_count,0))
+    active=max(0,min(_safe_int(active_pairs,0),pairs))
     background=pairs-active
-    cap=max(1,int(daily_cap))
-    reserve=max(0,min(int(reserved_calls),cap))
+    cap=max(1,_safe_int(daily_cap,1))
+    reserve=max(0,min(_safe_int(reserved_calls,0),cap))
     usable=cap-reserve
 
     active_per_pair=_calls(active_m15_min,market_minutes)
     background_per_pair=_calls(background_m15_min,market_minutes)
-    daily_context=max(0,int(daily_context_calls_per_pair))
+    daily_context=max(0,_safe_int(daily_context_calls_per_pair,0))
 
     m15_calls=active*active_per_pair+background*background_per_pair
     context_calls=pairs*daily_context
     total=m15_calls+context_calls
-    within_usable=total<=usable
+    within_usable=bool(inputs_valid and _safe_int(active_m15_min,0)>0 and _safe_int(background_m15_min,0)>0 and _safe_int(market_minutes,0)>=0 and total<=usable)
 
     return {
         "pair_count":pairs,
         "active_pairs":active,
         "background_pairs":background,
-        "active_m15_min":int(active_m15_min),
-        "background_m15_min":int(background_m15_min),
+        "inputs_valid":bool(inputs_valid),
+        "active_m15_min":_safe_int(active_m15_min,0),
+        "background_m15_min":_safe_int(background_m15_min,0),
         "active_m15_calls_per_pair":active_per_pair,
         "background_m15_calls_per_pair":background_per_pair,
         "m15_calls":m15_calls,
@@ -76,7 +99,7 @@ def adaptive_coverage_plan(
         "headroom_calls":max(0,usable-total),
         "excess_calls":max(0,total-usable),
         "within_usable_cap":within_usable,
-        "required_m15_history_bars":max(0,int(required_m15_history_bars)),
+        "required_m15_history_bars":max(0,_safe_int(required_m15_history_bars,0)),
         "derive_h1_h4_from_m15_required":True,
         "execution_grade_only_for_active_set":True,
         "background_pairs_must_not_be_executable_when_stale":True,
