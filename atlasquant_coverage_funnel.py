@@ -7,6 +7,7 @@ operationally executable.
 from __future__ import annotations
 
 from typing import Iterable, Any
+import math
 import pandas as pd
 import streamlit as st
 
@@ -52,10 +53,20 @@ def coverage_summary(matrix: pd.DataFrame) -> dict[str, Any]:
 def expansion_watchlist(matrix: pd.DataFrame, top_n: int = 5) -> pd.DataFrame:
     if not isinstance(matrix,pd.DataFrame) or matrix.empty:
         return pd.DataFrame()
+    required={"Cobertura operacional","Par","Direção macro","Diferença","Intensidade relativa"}
+    if not required.issubset(matrix.columns):
+        return pd.DataFrame()
     x=matrix[matrix["Cobertura operacional"]=="RADAR MACRO"].copy()
+    x["Intensidade relativa"]=pd.to_numeric(x["Intensidade relativa"],errors="coerce")
+    x=x[x["Intensidade relativa"].map(lambda v: bool(pd.notna(v) and math.isfinite(float(v))))]
     if x.empty:
         return x
-    return x.sort_values("Intensidade relativa",ascending=False).head(max(1,int(top_n)))[
+    try:
+        n=int(top_n)
+        if isinstance(top_n,bool) or n<=0: return x.iloc[0:0].copy()
+    except Exception:
+        return x.iloc[0:0].copy()
+    return x.sort_values("Intensidade relativa",ascending=False).head(n)[
         ["Par","Direção macro","Diferença","Intensidade relativa","Cobertura operacional"]
     ].reset_index(drop=True)
 
