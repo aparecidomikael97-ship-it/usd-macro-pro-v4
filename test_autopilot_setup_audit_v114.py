@@ -151,6 +151,21 @@ class SetupAuditV114Tests(unittest.TestCase):
         )
         self.assertTrue(pd.isna(audit.iloc[0]["fvg_score"]))
 
+
+    def test_nonfinite_realized_r_is_excluded_from_performance_and_summary(self):
+        for bad in (float("nan"),float("inf"),float("-inf")):
+            with self.subTest(realized_r=bad):
+                audit=sync_setup_audit(
+                    pd.DataFrame([trade_row(status="CLOSED",result="WIN",realized_r=bad)]),
+                    scanner_with_fvg("FVG ATIVO",70),
+                    now=NOW,
+                )
+                perf=aggregate_setup_performance(audit)
+                summary=build_summary(audit,perf,now=NOW)
+                self.assertTrue(perf.empty)
+                self.assertEqual(summary["closed_trades"],0)
+                self.assertEqual(summary["net_r"],0.0)
+
     def test_summary_never_enables_execution_or_strategy_selection(self):
         audit=sync_setup_audit(pd.DataFrame([trade_row()]),scanner_with_fvg("FVG",70),now=NOW)
         summary=build_summary(audit,aggregate_setup_performance(audit),now=NOW)
