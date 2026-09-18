@@ -50,6 +50,14 @@ class WindowsPrivateLauncherTests(unittest.TestCase):
         self.assertIn('$stablePath', self.ps1)
         self.assertIn('$legacyPath', self.ps1)
 
+    def test_launcher_loads_all_four_api_keys(self):
+        self.assertIn('$env:CHAVE_FRED = $fred', self.ps1)
+        self.assertIn('$env:CHAVE_TWELVE_DATA = $twelve', self.ps1)
+        self.assertIn('$env:CHAVE_EODHD = $eodhd', self.ps1)
+        self.assertIn('$env:CHAVE_NEWSAPI = $newsapi', self.ps1)
+        self.assertIn("Configurar as 4 APIs locais", self.ps1)
+        self.assertIn("AtlasQuant_Configurar_APIs.ps1", self.ps1)
+
     def test_launcher_keeps_window_open_on_errors(self):
         self.assertIn("A janela permanecera aberta para voce poder ler o erro.", self.ps1)
         self.assertIn("Pause-AtlasQuant", self.ps1)
@@ -76,9 +84,15 @@ class PersistentSecretConfiguratorTests(unittest.TestCase):
     def test_configurators_store_secrets_outside_build_folder(self):
         twelve = Path("AtlasQuant_Configurar_TwelveData.ps1").read_text(encoding="utf-8")
         fred = Path("AtlasQuant_Configurar_FRED.ps1").read_text(encoding="utf-8")
-        for script in (twelve, fred):
+        all_apis = Path("AtlasQuant_Configurar_APIs.ps1").read_text(encoding="utf-8")
+        for script in (twelve, fred, all_apis):
             self.assertIn('Join-Path $env:LOCALAPPDATA "AtlasQuant"', script)
             self.assertNotIn('$streamlitDir = Join-Path $root ".streamlit"', script)
+
+    def test_unified_configurator_contains_all_four_keys(self):
+        script = Path("AtlasQuant_Configurar_APIs.ps1").read_text(encoding="utf-8")
+        for key in ("CHAVE_FRED", "CHAVE_TWELVE_DATA", "CHAVE_EODHD", "CHAVE_NEWSAPI"):
+            self.assertIn(key, script)
 
 
 class TwelveDataConfiguratorEncodingTests(unittest.TestCase):
