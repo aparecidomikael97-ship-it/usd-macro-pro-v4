@@ -1,4 +1,6 @@
 import unittest
+import os
+import tempfile
 import pandas as pd
 
 # Streamlit is not needed for testing the pure assembly logic in CI; provide a tiny stub
@@ -12,6 +14,7 @@ except Exception:
     st.secrets = {}
     sys.modules['streamlit'] = st
 
+import master_panel_v102 as master_panel
 from master_panel_v102 import build_master_rows, _technical_score, _integrated_state, _scanner_for_pair
 
 
@@ -63,6 +66,24 @@ class MasterPanelTests(unittest.TestCase):
     def test_technical_score_is_bounded(self):
         self.assertEqual(_technical_score({'h4':'🟢 CONFIRMA','h1':'🟢 CONFIRMA','m15':'🟢 CONFIRMA'}), 100.0)
         self.assertGreaterEqual(_technical_score({'h4':'—','h1':'—','m15':'—'}), 0.0)
+
+    def test_local_persistence_roundtrip_without_github(self):
+        old_cfg = master_panel._gh_config
+        old_cwd = os.getcwd()
+        try:
+            master_panel._gh_config = lambda: ("", "", "")
+            with tempfile.TemporaryDirectory() as tmp:
+                os.chdir(tmp)
+                state = master_panel._empty_state()
+                state["contexts"] = {"EUR/USD": {"readiness_score": 81}}
+                ok, err = master_panel._save_state(state)
+                self.assertTrue(ok, err)
+                loaded = master_panel._load_state()
+                self.assertEqual(loaded["contexts"]["EUR/USD"]["readiness_score"], 81)
+                self.assertEqual(loaded.get("_storage"), "LOCAL")
+        finally:
+            os.chdir(old_cwd)
+            master_panel._gh_config = old_cfg
 
     def test_scanner_freshness_is_explicit(self):
         now = pd.Timestamp.now(tz='UTC')
