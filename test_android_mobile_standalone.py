@@ -34,6 +34,15 @@ class AndroidMobileStandaloneTests(unittest.TestCase):
         self.assertIn('showDesktopConnection()', self.activity)
         self.assertIn('PREF_URL', self.activity)
 
+    def test_mobile_rejects_loopback_desktop_addresses(self):
+        self.assertIn("isLoopbackAddress", self.activity)
+        self.assertIn('host.equals("localhost")', self.activity)
+        self.assertIn('host.equals("127.0.0.1")', self.activity)
+        self.assertIn('host.equals("0.0.0.0")', self.activity)
+        self.assertIn("Não use localhost", self.activity)
+        self.assertIn("webView.setVisibility(View.GONE)", self.activity)
+        self.assertIn("webView.setVisibility(View.VISIBLE)", self.activity)
+
     def test_mobile_progress_is_persistent(self):
         self.assertIn('localStorage', self.academy)
         self.assertIn('atlasquant_academy_mobile_done_v1', self.academy)
