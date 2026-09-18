@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 import pandas as pd
 
 import autopilot_v107 as a
@@ -62,6 +63,33 @@ class AutopilotV107Tests(unittest.TestCase):
         self.assertIn("persist_shadow_samples", text)
         self.assertIn("persist_records", text)
         self.assertIn("build_pair_intelligence_packs", text)
+
+    def test_shadow_failure_does_not_prevent_flight_persistence(self):
+        packs=[{"pair":"EUR/USD"}]
+        with patch.object(a,"build_shadow_batch",side_effect=RuntimeError("shadow down")), \
+             patch.object(a,"persist_records",return_value={"ok":True,"added":1,"records":1,"reason":"SAVED","error":""}) as flight, \
+             patch.object(a,"record_from_pack",return_value={"decision_id":"d1"}):
+            shadow,flight_status,errors=a.persist_decision_evidence(
+                packs,engine_version="test",repo="o/r",branch="atlasquant-runtime",token="t"
+            )
+        self.assertFalse(shadow["ok"])
+        self.assertEqual(shadow["reason"],"SHADOW_EXCEPTION")
+        self.assertTrue(flight_status["ok"])
+        self.assertEqual(flight.call_count,1)
+        self.assertEqual(len(errors),1)
+
+    def test_flight_failure_preserves_successful_shadow_status(self):
+        packs=[{"pair":"EUR/USD"}]
+        with patch.object(a,"build_shadow_batch",return_value=[{"sample_id":"s1"}]), \
+             patch.object(a,"persist_shadow_samples",return_value={"ok":True,"added":1,"samples":1,"reason":"SAVED","error":""}), \
+             patch.object(a,"record_from_pack",side_effect=RuntimeError("flight down")):
+            shadow,flight_status,errors=a.persist_decision_evidence(
+                packs,engine_version="test",repo="o/r",branch="atlasquant-runtime",token="t"
+            )
+        self.assertTrue(shadow["ok"])
+        self.assertFalse(flight_status["ok"])
+        self.assertEqual(flight_status["reason"],"FLIGHT_EXCEPTION")
+        self.assertEqual(len(errors),1)
 
     def test_main_has_autopilot_serialization_imports(self):
         from pathlib import Path
