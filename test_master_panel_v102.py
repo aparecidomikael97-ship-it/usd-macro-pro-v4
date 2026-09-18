@@ -24,9 +24,10 @@ class MasterPanelTests(unittest.TestCase):
 
     def scanner(self, green=True):
         status = '🟢 CONFIRMA' if green else '🔴 CONTRA'
+        now = pd.Timestamp.now(tz='UTC').isoformat()
         return {'resultados': {
-            'USD/CHF': {'tecnico': {'disponivel': True, 'h4': {'status': status}, 'h1': {'status': status}, 'm15': {'status': status}}},
-            'EUR/USD': {'tecnico': {'disponivel': True, 'h4': {'status':'🟢 CONFIRMA'}, 'h1': {'status':'🟢 PULLBACK OK'}, 'm15': {'status':'🟡 AGUARDAR GATILHO'}}},
+            'USD/CHF': {'m15_fetched_at': now, 'tecnico': {'disponivel': True, 'h4': {'status': status}, 'h1': {'status': status}, 'm15': {'status': status}}},
+            'EUR/USD': {'m15_fetched_at': now, 'tecnico': {'disponivel': True, 'h4': {'status':'🟢 CONFIRMA'}, 'h1': {'status':'🟢 PULLBACK OK'}, 'm15': {'status':'🟡 AGUARDAR GATILHO'}}},
         }}
 
     def contexts(self):
