@@ -44,8 +44,8 @@ def normalize_candles(frame: pd.DataFrame | None) -> pd.DataFrame:
     d = d.dropna(subset=list(REQUIRED_CANDLE_COLUMNS)).sort_values("datetime")
     finite = d[["open", "high", "low", "close"]].apply(lambda col: col.map(math.isfinite)).all(axis=1)
     geometry = (d["low"] <= d[["open", "close"]].min(axis=1)) & (d["high"] >= d[["open", "close"]].max(axis=1)) & (d["low"] <= d["high"])
-    positive = (d[["open", "high", "low", "close"]] > 0).all(axis=1)
-    d = d[finite & geometry & positive]
+    nonnegative = (d[["open", "high", "low", "close"]] >= 0).all(axis=1)
+    d = d[finite & geometry & nonnegative]
     d = d.drop_duplicates(subset=["datetime"], keep="last").reset_index(drop=True)
     return d
 
