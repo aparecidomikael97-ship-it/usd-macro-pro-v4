@@ -19,3 +19,10 @@ def test_panel_requires_explicit_generate_action_before_audio_contract():
     assert 'st.button("🎙️ Gerar narração"' in source
     assert "aq_macro_brief_voice_generate_requested" in source
     assert "st.audio(" in source
+
+
+def test_panel_labels_context_without_buy_sell_signal():
+    import inspect
+    source = inspect.getsource(panel)
+    assert '"Divergência macro"' in source
+    assert "não é sinal de compra ou venda" in source
