@@ -47,5 +47,19 @@ class AtlasQuantExpansionBudgetTests(unittest.TestCase):
         self.assertLess(slow["estimated_daily_calls"],fast["estimated_daily_calls"])
 
 
+    def test_invalid_planner_inputs_fail_closed(self):
+        for bad in (float("nan"),float("inf"),float("-inf"),-1,True,"bad"):
+            with self.subTest(bad=bad):
+                out=estimate_daily_calls(pair_count=7,daily_cap=bad)
+                self.assertFalse(out["inputs_valid"])
+                self.assertFalse(out["within_cap"])
+
+    def test_invalid_cadence_never_looks_within_cap(self):
+        for bad in (0,-1,float("nan"),float("inf")):
+            with self.subTest(bad=bad):
+                out=estimate_daily_calls(pair_count=7,normal_m15_min=bad)
+                self.assertFalse(out["within_cap"])
+
+
 if __name__=="__main__":
     unittest.main()
