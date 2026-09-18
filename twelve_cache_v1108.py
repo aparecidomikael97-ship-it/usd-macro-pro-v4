@@ -40,13 +40,24 @@ def read_series(state, symbol, interval, outputsize, now=None, max_age=None, his
         age=(now-stamp).total_seconds()/60
         if age<0: raise ValueError()
         limit=MAX_AGE[interval] if max_age is None else max_age
-        if not history and age>limit: return pd.DataFrame(),'Cache antigo; aguarde o Autopilot. Sem nova chamada de API.'
+        try:
+            limit=float(limit)
+            if not math.isfinite(limit) or limit < 0: raise ValueError()
+        except Exception:
+            raise ValueError()
+        if not history and age>=limit: return pd.DataFrame(),'Cache antigo; aguarde o Autopilot. Sem nova chamada de API.'
         df=valid_records(raw.get('records',[]),interval,now)
         if df.empty: return df,'Cache sem candles fechados válidos; aguarde o Autopilot.'
         candle_age=(now-df.iloc[-1]['datetime']).total_seconds()/60
-        if not history and candle_age>limit+DURATION[interval]:
+        if candle_age < 0: raise ValueError()
+        if not history and candle_age>=limit+DURATION[interval]:
             return pd.DataFrame(),'Candles antigos na fonte; não usar para execução.'
-        df=df.tail(int(outputsize)).copy()
+        try:
+            n=int(outputsize)
+            if n <= 0: raise ValueError()
+        except Exception:
+            raise ValueError()
+        df=df.tail(n).copy()
         df.attrs['source_fetched_at']=stamp.isoformat()
         df.attrs['cache_only']=True
         return df,''
