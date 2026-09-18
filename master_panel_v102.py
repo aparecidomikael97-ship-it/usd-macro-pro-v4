@@ -91,8 +91,20 @@ def _load_state() -> dict[str, Any]:
     token, repo, branch = _gh_config()
     state = _empty_state()
     if not token or not repo:
-        state["_error"] = "Persistência GitHub não configurada."
-        return state
+        # Modo Windows/local: persiste no próprio computador.
+        try:
+            if os.path.exists(MASTER_PATH):
+                with open(MASTER_PATH, "r", encoding="utf-8") as fh:
+                    loaded = json.load(fh)
+                if isinstance(loaded, dict):
+                    state.update(loaded)
+            state.setdefault("contexts", {})
+            state["_storage"] = "LOCAL"
+            return state
+        except Exception as exc:
+            state["_error"] = f"Persistência local: {type(exc).__name__}: {exc}"
+            state["_storage"] = "LOCAL"
+            return state
     url = f"https://api.github.com/repos/{repo}/contents/{MASTER_PATH}"
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
     try:
@@ -116,7 +128,17 @@ def _load_state() -> dict[str, Any]:
 def _save_state(state: Mapping[str, Any]) -> tuple[bool, str]:
     token, repo, branch = _gh_config()
     if not token or not repo:
-        return False, "Persistência GitHub não configurada."
+        # Modo Windows/local: não exige token GitHub e não publica nada.
+        try:
+            os.makedirs(os.path.dirname(MASTER_PATH) or ".", exist_ok=True)
+            clean = {k: v for k, v in dict(state).items() if not str(k).startswith("_")}
+            tmp_path = MASTER_PATH + ".tmp"
+            with open(tmp_path, "w", encoding="utf-8") as fh:
+                json.dump(clean, fh, ensure_ascii=False, indent=2)
+            os.replace(tmp_path, MASTER_PATH)
+            return True, ""
+        except Exception as exc:
+            return False, f"Persistência local: {type(exc).__name__}: {exc}"
     url = f"https://api.github.com/repos/{repo}/contents/{MASTER_PATH}"
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
     try:
