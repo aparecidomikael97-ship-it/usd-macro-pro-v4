@@ -140,6 +140,21 @@ class CacheTests(unittest.TestCase):
         with patch.object(cache,'_load',return_value=(self.state(),'')), patch.object(cache,'_setting',return_value='x'), patch.object(requests,'get',side_effect=AssertionError('network')):
             for _ in range(30): cached_series('EUR/USD','15min')
 
+
+    def test_exact_cache_boundaries_and_invalid_limits_fail_closed(self):
+        d,e=read_series(self.state(),'EUR/USD','15min',100,now=NOW+timedelta(minutes=55))
+        self.assertTrue(d.empty); self.assertTrue(e)
+        for bad in (float("nan"),float("inf"),float("-inf"),-1):
+            with self.subTest(limit=bad):
+                d,e=read_series(self.state(),'EUR/USD','15min',100,now=NOW+timedelta(minutes=10),max_age=bad)
+                self.assertTrue(d.empty); self.assertTrue(e)
+
+    def test_invalid_outputsize_fails_closed(self):
+        for bad in (0,-1,'bad'):
+            with self.subTest(outputsize=bad):
+                d,e=read_series(self.state(),'EUR/USD','15min',bad,now=NOW+timedelta(minutes=10))
+                self.assertTrue(d.empty); self.assertTrue(e)
+
 class CollectorTests(unittest.TestCase):
     def setUp(self):
         self.store=Store(); self.budget=Budget(self.store)
