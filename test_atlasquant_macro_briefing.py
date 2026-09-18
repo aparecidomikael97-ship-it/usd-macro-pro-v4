@@ -32,3 +32,13 @@ def test_macro_briefing_week_and_speech_are_presentation_only():
     assert "Fed: tom hawkish" in out["speech_text"]
     assert "FOMC USD, 18:00" in out["speech_text"]
     assert "não constitui sinal" in out["disclaimer"]
+
+
+def test_context_bias_is_non_directional_and_based_on_spread():
+    rows = [
+        {"currency": "USD", "score": 82, "quality": "valid"},
+        {"currency": "EUR", "score": 48, "quality": "valid"},
+    ]
+    brief = build_macro_briefing(rows)
+    assert brief["context_bias"] == "divergência macro"
+    assert brief["context_bias"] not in {"comprar", "vender", "buy", "sell"}
