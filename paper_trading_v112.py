@@ -418,12 +418,14 @@ def summarize_paper_trades(trades: pd.DataFrame) -> dict[str, Any]:
     losses = int((closed["result"].astype(str) == "LOSS").sum())
     breakeven = int((closed["result"].astype(str) == "BREAKEVEN").sum())
     rr = pd.to_numeric(closed["realized_r"], errors="coerce").dropna()
+    rr = rr[rr.map(lambda x: math.isfinite(float(x)))]
     gross_win = float(rr[rr > 0].sum()) if not rr.empty else 0.0
     gross_loss = float(-rr[rr < 0].sum()) if not rr.empty else 0.0
     profit_factor = None if gross_loss <= 0 else gross_win / gross_loss
     by_pair: dict[str, Any] = {}
     for pair, g in closed.groupby("pair", dropna=False):
         gr = pd.to_numeric(g["realized_r"], errors="coerce").dropna()
+        gr = gr[gr.map(lambda x: math.isfinite(float(x)))]
         gw = int((g["result"].astype(str) == "WIN").sum())
         gl = int((g["result"].astype(str) == "LOSS").sum())
         by_pair[str(pair)] = {
