@@ -38,7 +38,17 @@ def _row_for(df: pd.DataFrame | None, strategy: str) -> dict[str, Any]:
 
 def _status_available(status: Any) -> bool:
     value=str(status or "").strip().upper()
-    return bool(value and value not in {"INSUFFICIENT","NOT_RUN","N/D","NONE"})
+    return bool(value and value not in {"INSUFFICIENT","NOT_RUN","N/D","NONE","NAN","INF","-INF"})
+
+
+def _safe_nonnegative_int(value: Any, default: int = 0) -> int:
+    try:
+        x=float(value)
+        if not math.isfinite(x) or x < 0:
+            return default
+        return int(x)
+    except Exception:
+        return default
 
 
 def consolidated_evidence_frame(
@@ -95,13 +105,13 @@ def consolidated_evidence_frame(
         rows.append({
             "strategy":strategy,
             "operacional":_value(comp,"operacional",STRATEGY_LABELS[strategy]),
-            "trades":int(_value(comp,"trades",0) or 0),
+            "trades":_safe_nonnegative_int(_value(comp,"trades",0),0),
             "win_rate_pct":_value(comp,"win_rate_pct"),
             "expectancy_r":_value(comp,"expectancy_r"),
             "net_r":_value(comp,"net_r"),
             "profit_factor":_value(comp,"profit_factor"),
             "max_drawdown_r":_value(comp,"max_drawdown_r"),
-            "max_loss_streak":int(_value(comp,"max_loss_streak",0) or 0),
+            "max_loss_streak":_safe_nonnegative_int(_value(comp,"max_loss_streak",0),0),
             "sample_tier":str(_value(comp,"sample_tier","N/D")),
             "temporal_status":temporal_status,
             "temporal_positive_fold_pct":_value(stab,"positive_fold_pct"),
