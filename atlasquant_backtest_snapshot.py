@@ -106,7 +106,15 @@ def validate_snapshot(snapshot:Mapping[str,Any])->dict[str,Any]:
     if data.get("schema")!=SCHEMA: raise ValueError("snapshot schema inválido")
     identity=data.get("identity")
     if not isinstance(identity,dict) or any(not isinstance(identity.get(k),str) or len(identity.get(k))!=64 for k in IDENTITY_KEYS): raise ValueError("snapshot identity incompleta")
+    if data.get("research_only") is not True or data.get("no_live_gate_effect") is not True:
+        raise ValueError("snapshot sem flags de segurança")
     settings=data.get("settings") or {}; evidence=data.get("evidence") or {}; raw=data.get("raw_csv") or {}; normalized=data.get("normalized_data") or {}; code=data.get("code") or {}
+    raw_bytes=raw.get("bytes")
+    normalized_rows=normalized.get("rows")
+    if not isinstance(raw_bytes,int) or isinstance(raw_bytes,bool) or raw_bytes < 0:
+        raise ValueError("snapshot adulterado: raw bytes inválidos")
+    if not isinstance(normalized_rows,int) or isinstance(normalized_rows,bool) or normalized_rows < 0:
+        raise ValueError("snapshot adulterado: normalized rows inválidos")
     code_files=code.get("files") or []
     if not isinstance(code_files,list):
         raise ValueError("snapshot adulterado: code files inválidos")
