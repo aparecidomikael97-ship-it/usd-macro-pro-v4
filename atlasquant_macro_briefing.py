@@ -66,4 +66,9 @@ def build_macro_briefing(currency_rows: Sequence[Mapping[str, Any]] | None, even
     if event_lines:
         speech_parts.append("Eventos relevantes: " + "; ".join(event_lines) + ".")
     speech_parts.append("Antes de qualquer operação, confirme o calendário, a qualidade dos dados e os gates do Safety Core.")
-    return {"horizon": horizon, "title": title, "state": state, "generated_at": generated_at, "summary": summary, "strongest": strongest, "weakest": weakest, "central_banks": bank_lines, "events": event_lines, "speech_text": " ".join(speech_parts), "disclaimer": "Briefing informativo baseado no estado do AtlasQuant; não constitui sinal nem garantia de resultado.", "data_sufficient": bool(rows)}
+    context_bias = "neutro"
+    if len(scored) >= 2:
+        spread = _f(scored[0].get("score", scored[0].get("strength", 0))) - _f(scored[-1].get("score", scored[-1].get("strength", 0)))
+        if abs(spread) >= 10:
+            context_bias = "divergência macro"
+    return {"horizon": horizon, "title": title, "state": state, "context_bias": context_bias, "generated_at": generated_at, "summary": summary, "strongest": strongest, "weakest": weakest, "central_banks": bank_lines, "events": event_lines, "speech_text": " ".join(speech_parts), "disclaimer": "Briefing informativo baseado no estado do AtlasQuant; não constitui sinal nem garantia de resultado.", "data_sufficient": bool(rows)}
