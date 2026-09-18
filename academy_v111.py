@@ -540,6 +540,69 @@ ACADEMY_TRACKS: list[dict[str, Any]] = [
 
 
 
+
+ACADEMY_MEDIA_FILES: dict[str, str] = {
+    **{f"macro_{i:02d}": f"macro_{i:02d}.mp4" for i in range(1, 9)},
+    **{f"ict_{i:02d}": f"ict_{i:02d}.mp4" for i in range(1, 8)},
+    **{f"aq_{i:02d}": f"aq_{i:02d}.mp4" for i in range(1, 8)},
+}
+
+
+def _academy_media_dirs() -> list[Path]:
+    dirs: list[Path] = []
+    if os.name == "nt" and os.environ.get("LOCALAPPDATA"):
+        dirs.append(Path(os.environ["LOCALAPPDATA"]) / "AtlasQuant" / "academy_media")
+    else:
+        dirs.append(Path.home() / ".atlasquant" / "academy_media")
+    dirs.append(Path(__file__).resolve().parent / "academy_media")
+    return dirs
+
+
+def _academy_media_user_dir() -> Path:
+    path = _academy_media_dirs()[0]
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _academy_video_path(lesson_id: str) -> Path | None:
+    filename = ACADEMY_MEDIA_FILES.get(lesson_id)
+    if not filename:
+        return None
+    for directory in _academy_media_dirs():
+        candidate = directory / filename
+        if candidate.is_file() and candidate.stat().st_size > 0:
+            return candidate
+    return None
+
+
+def _academy_video_status(lesson_id: str) -> dict[str, Any]:
+    path = _academy_video_path(lesson_id)
+    return {
+        "lesson_id": lesson_id,
+        "filename": ACADEMY_MEDIA_FILES.get(lesson_id, ""),
+        "available": path is not None,
+        "path": str(path) if path else "",
+    }
+
+
+def _academy_save_uploaded_video(lesson_id: str, uploaded_file: Any) -> tuple[bool, str]:
+    filename = ACADEMY_MEDIA_FILES.get(lesson_id)
+    if not filename:
+        return False, "Aula sem arquivo de mídia configurado."
+    try:
+        target = _academy_media_user_dir() / filename
+        tmp = target.with_suffix(".mp4.tmp")
+        payload = uploaded_file.getbuffer()
+        if len(payload) <= 0:
+            return False, "Arquivo de vídeo vazio."
+        tmp.write_bytes(bytes(payload))
+        tmp.replace(target)
+        return True, str(target)
+    except Exception as exc:
+        return False, f"{type(exc).__name__}: {exc}"
+
+
+
 ACADEMY_QUIZZES: dict[str, list[dict[str, Any]]] = {
     "macro_01": [
         {"pergunta": "No Forex, por que é importante comparar duas economias?", "opcoes": ["Porque todo par compara uma moeda base com uma cotada", "Porque só o dólar importa", "Porque o gráfico ignora juros", "Porque inflação não afeta moedas"], "correta": 0, "explicacao": "Um par expressa força relativa entre duas moedas; a análise macro precisa comparar os dois lados."},
@@ -1153,6 +1216,40 @@ def render_academy() -> None:
         st.caption(f"⏱️ {lesson['duracao']}")
         st.markdown(f"**Objetivo:** {lesson['objetivo']}")
         st.markdown(f"**Resumo:** {lesson['resumo']}")
+
+        st.markdown("##### ▶️ Vídeo da aula")
+        _video_state = _academy_video_status(lesson["id"])
+        if _video_state["available"]:
+            st.success(f"Vídeo disponível · {_video_state['filename']}")
+            st.video(_video_state["path"])
+        else:
+            st.info(
+                f"Vídeo ainda não produzido/importado. Arquivo esperado: "
+                f"{_video_state['filename']}"
+            )
+            st.caption(
+                "Enquanto o MP4 não estiver disponível, use o Visual Atlas, o roteiro completo "
+                "e o storyboard desta aula."
+            )
+
+        with st.expander("📥 Importar MP4 desta aula", expanded=False):
+            st.caption(
+                "O vídeo é salvo fora do ZIP na pasta local da Academy e permanece disponível "
+                "mesmo quando você instala um Build novo."
+            )
+            _uploaded_video = st.file_uploader(
+                "Selecione um arquivo MP4",
+                type=["mp4"],
+                key=f"academy_video_upload_{lesson['id']}",
+            )
+            if _uploaded_video is not None:
+                if st.button("Salvar vídeo nesta aula", key=f"academy_video_save_{lesson['id']}"):
+                    _saved, _video_msg = _academy_save_uploaded_video(lesson["id"], _uploaded_video)
+                    if _saved:
+                        st.success("Vídeo salvo na mídia local da Academy.")
+                        st.rerun()
+                    else:
+                        st.error(f"Não foi possível salvar o vídeo: {_video_msg}")
 
         _visual_html = _academy_visual_html(lesson["id"])
         if _visual_html:
