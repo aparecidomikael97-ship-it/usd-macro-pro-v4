@@ -1,0 +1,58 @@
+name: AtlasQuant - Fetch Neural Voice
+
+on:
+  push:
+    branches: [atlasquant-private-deploy]
+    paths:
+      - "academy_voice_jobs.txt"
+      - ".github/workflows/fetch-academy-voice.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+
+      - name: Fetch neural voice files
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p neural_voice
+          while IFS='|' read -r lesson url; do
+            [ -n "$lesson" ] || continue
+            ok=0
+            for attempt in $(seq 1 36); do
+              echo "Fetching $lesson (attempt $attempt)..."
+              rm -f "neural_voice/$lesson.tmp"
+              if curl -LfsS --connect-timeout 15 --max-time 60 "$url" -o "neural_voice/$lesson.tmp"; then
+                if ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "neural_voice/$lesson.tmp" >/tmp/duration 2>/dev/null; then
+                  duration=$(cat /tmp/duration)
+                  echo "$lesson audio ready: $duration seconds"
+                  mv "neural_voice/$lesson.tmp" "neural_voice/$lesson.mp3"
+                  ok=1
+                  break
+                fi
+              fi
+              sleep 10
+            done
+            if [ "$ok" -ne 1 ]; then
+              echo "Failed to fetch valid audio for $lesson"
+              exit 1
+            fi
+          done < academy_voice_jobs.txt
+
+      - name: Upload neural voice
+        uses: actions/upload-artifact@v4
+        with:
+          name: AtlasQuant_Academy_Neural_Voice
+          path: neural_voice/
+          if-no-files-found: error
+          retention-days: 14
