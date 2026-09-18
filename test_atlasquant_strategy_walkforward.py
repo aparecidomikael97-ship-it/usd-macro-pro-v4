@@ -84,6 +84,20 @@ class StrategyWalkForwardTests(unittest.TestCase):
         self.assertEqual(amd["walk_forward_status"],"INSUFFICIENT")
         self.assertFalse(bool(amd["all_windows_sufficient"]))
 
+
+    def test_nonfinite_oos_metrics_fail_closed(self):
+        for bad in (float("nan"),float("inf"),float("-inf")):
+            with self.subTest(value=bad):
+                detail=pd.DataFrame([
+                    {"strategy":"FVG","operacional":"FVG","window":"W1","window_index":1,"train_trades":10,"test_trades":5,"train_expectancy_r":0.2,"test_expectancy_r":0.2,"expectancy_delta_r":0.0,"test_net_r":1.0},
+                    {"strategy":"FVG","operacional":"FVG","window":"W2","window_index":2,"train_trades":15,"test_trades":5,"train_expectancy_r":0.2,"test_expectancy_r":bad,"expectancy_delta_r":0.0,"test_net_r":1.0},
+                    {"strategy":"FVG","operacional":"FVG","window":"W3","window_index":3,"train_trades":20,"test_trades":5,"train_expectancy_r":0.2,"test_expectancy_r":0.3,"expectancy_delta_r":0.1,"test_net_r":1.0},
+                ])
+                out=walk_forward_summary(detail,expected_windows=3,min_train_trades=10,min_test_trades=5)
+                fvg=out[out["strategy"]=="FVG"].iloc[0]
+                self.assertEqual(fvg["walk_forward_status"],"INSUFFICIENT")
+                self.assertFalse(bool(fvg["all_windows_sufficient"]))
+
     def test_expectancy_delta_is_test_minus_train(self):
         suite=empty_suite()
         suite["FVG"]["results"]=[row(i,1.0) for i in range(10)] + [row(i+10,0.5) for i in range(10)]
