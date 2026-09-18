@@ -59,15 +59,33 @@ class OTEReplayTests(unittest.TestCase):
         self.assertLess(r["entry"],r["target"])
 
     def test_sell_geometry_is_valid(self):
-        d=buy_case().copy()
-        pivot=20.0
-        for col in ("open","high","low","close"):
-            d[col]=2*pivot-d[col]
-        rows=generate_ote_signals(
+        # Use a native bearish sequence instead of algebraically mirroring BUY
+        # candles, because mirroring OHLC values also swaps high/low geometry.
+        rows=[
+            (30.0,30.2,29.8,30.0),
+        ]*16
+        rows += [
+            (30.5,31.0,30.0,30.6),
+            (30.6,30.7,29.8,30.0),
+            (30.0,30.1,29.2,29.4),
+            (29.4,29.5,28.6,28.8),
+            (28.8,28.9,28.0,28.2),
+            (28.2,28.3,27.4,27.6),
+            (27.6,27.7,27.0,27.2),
+            (27.2,27.3,26.8,27.0),
+            (27.0,28.0,26.9,27.8),
+            (27.8,29.0,27.7,28.8),
+            (28.8,29.4,28.7,29.2),
+            (29.2,29.9,29.1,29.7),
+            (29.7,30.0,29.2,29.4),
+            (29.4,29.5,28.0,28.2),
+        ]
+        d=frame(rows)
+        signals=generate_ote_signals(
             d,pair="GBP/USD",allow_buy=False,min_bars=28,stop_buffer_atr=0.0
         )
-        self.assertTrue(rows)
-        r=rows[0]
+        self.assertTrue(signals)
+        r=signals[0]
         self.assertEqual(r["side"],"SELL")
         self.assertLess(r["target"],r["entry"])
         self.assertLess(r["entry"],r["stop"])
