@@ -72,5 +72,28 @@ class AtlasQuantStabilityLabTests(unittest.TestCase):
         self.assertIn("Regime",data2.columns)
 
 
+    def test_stability_summary_rejects_nonfinite_or_negative_sample_counts(self):
+        for bad in (float("nan"),float("inf"),float("-inf"),-1):
+            with self.subTest(sample=bad):
+                f=pd.DataFrame({
+                    "Amostra":[30,30,bad],
+                    "Taxa observada %":[55,55,55],
+                    "Retorno médio %":[1.0,1.0,1.0],
+                })
+                s=stability_summary(f,min_fold_samples=30)
+                self.assertEqual(s["status"],"INSUFFICIENT")
+                self.assertFalse(s["all_folds_sufficient"])
+
+    def test_temporal_and_session_metrics_exclude_nonfinite_returns(self):
+        df=self.frame(6)
+        df.loc[0,"retorno_24h_pct"]=float("nan")
+        df.loc[1,"retorno_24h_pct"]=float("inf")
+        df.loc[2,"retorno_24h_pct"]=float("-inf")
+        folds=temporal_folds(df,"24h",folds=3)
+        sessions=session_metrics(df,"24h",min_samples=1)
+        self.assertEqual(int(folds["Amostra"].sum()),3)
+        self.assertEqual(int(sessions["Amostra"].sum()),3)
+
+
 if __name__=="__main__":
     unittest.main()
