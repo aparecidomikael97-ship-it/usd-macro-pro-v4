@@ -21,14 +21,16 @@ echo.
 echo  [1] Preparar ou atualizar o ambiente
 echo  [2] Iniciar o AtlasQuant
 echo  [3] Verificar a instalacao
-echo  [4] Sair
+echo  [4] Configurar Twelve Data local
+echo  [5] Sair
 echo.
 set /p AQ_OPCAO=Escolha uma opcao: 
 
 if "%AQ_OPCAO%"=="1" goto instalar
 if "%AQ_OPCAO%"=="2" goto iniciar
 if "%AQ_OPCAO%"=="3" goto verificar
-if "%AQ_OPCAO%"=="4" goto fim
+if "%AQ_OPCAO%"=="4" goto configurar_twelve
+if "%AQ_OPCAO%"=="5" goto fim
 
 echo.
 echo Opcao invalida.
@@ -135,6 +137,19 @@ echo [OK] Verificacao basica concluida.
 echo Modo privado/local preservado. Nenhuma ordem real e enviada por este launcher.
 echo.
 pause
+goto menu
+
+:configurar_twelve
+cls
+if not exist "AtlasQuant_Configurar_TwelveData.ps1" (
+  echo.
+  echo [ERRO] Configurador do Twelve Data nao encontrado.
+  echo Atualize o pacote do AtlasQuant.
+  echo.
+  pause
+  goto menu
+)
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0AtlasQuant_Configurar_TwelveData.ps1"
 goto menu
 
 :falha
