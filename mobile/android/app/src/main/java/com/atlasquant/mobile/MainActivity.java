@@ -38,9 +38,7 @@ public class MainActivity extends Activity {
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         String savedUrl = prefs.getString(PREF_URL, "");
         urlInput.setText(savedUrl);
-        if (!savedUrl.isEmpty()) {
-            connect(savedUrl);
-        }
+        showAcademy();
     }
 
     private TextView makeText(String value, int sizeSp, int color, boolean bold) {
@@ -64,8 +62,26 @@ public class MainActivity extends Activity {
         TextView brand = makeText("ATLASQUANT", 27, Color.rgb(76, 192, 255), true);
         root.addView(brand);
 
-        TextView subtitle = makeText("Mobile Test • conexão privada", 14, Color.rgb(166, 192, 211), false);
+        TextView subtitle = makeText("Mobile Standalone • Academy offline + conexão privada", 14, Color.rgb(166, 192, 211), false);
         root.addView(subtitle);
+
+        LinearLayout nav = new LinearLayout(this);
+        nav.setOrientation(LinearLayout.HORIZONTAL);
+        nav.setPadding(0, 14, 0, 10);
+
+        Button academyButton = new Button(this);
+        academyButton.setText("Academy Offline");
+        academyButton.setOnClickListener(v -> showAcademy());
+        nav.addView(academyButton, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        Button desktopButton = new Button(this);
+        desktopButton.setText("Conectar ao Desktop");
+        desktopButton.setOnClickListener(v -> showDesktopConnection());
+        LinearLayout.LayoutParams desktopParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        desktopParams.setMargins(10, 0, 0, 0);
+        nav.addView(desktopButton, desktopParams);
+
+        root.addView(nav);
 
         connectionPanel = new LinearLayout(this);
         connectionPanel.setOrientation(LinearLayout.VERTICAL);
@@ -159,6 +175,17 @@ public class MainActivity extends Activity {
         });
     }
 
+    private void showAcademy() {
+        connectionPanel.setVisibility(View.GONE);
+        status.setText("Academy offline.");
+        webView.loadUrl("file:///android_asset/academy.html");
+    }
+
+    private void showDesktopConnection() {
+        connectionPanel.setVisibility(View.VISIBLE);
+        status.setText("Digite o endereço mostrado no Windows.");
+    }
+
     private void connect(String rawUrl) {
         String url = rawUrl == null ? "" : rawUrl.trim();
         if (url.isEmpty()) {
@@ -187,8 +214,8 @@ public class MainActivity extends Activity {
     public void onBackPressed() {
         if (webView != null && webView.canGoBack()) {
             webView.goBack();
-        } else if (connectionPanel.getVisibility() == View.GONE) {
-            connectionPanel.setVisibility(View.VISIBLE);
+        } else if (connectionPanel.getVisibility() == View.VISIBLE) {
+            showAcademy();
         } else {
             super.onBackPressed();
         }
