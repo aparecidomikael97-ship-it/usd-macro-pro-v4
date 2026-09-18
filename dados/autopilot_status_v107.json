@@ -1,9 +1,9 @@
 {
   "version": "V10.7_FULL_AUTOPILOT",
-  "last_run": "2026-09-18T19:21:13.295336+00:00",
+  "last_run": "2026-09-18T19:44:12.609828+00:00",
   "app_headless_ok": true,
   "app_headless_message": "App headless executado; 7 secret(s) injetado(s) no AppTest.",
-  "matrix_generated_at": "2026-09-18T19:20:58.102571+00:00",
+  "matrix_generated_at": "2026-09-18T19:43:54.546875+00:00",
   "scanner_fresh": 7,
   "market_map_fresh": 7,
   "news_updated_at": "2026-09-18T19:20:57.126602+00:00",
@@ -13,12 +13,12 @@
   "validation_complete": 8,
   "snapshot_stats": {
     "added": 0,
-    "frozen": 1,
+    "frozen": 0,
     "validated_horizons": 0,
     "migrated": 0
   },
-  "twelve_calls_this_run": 5,
-  "twelve_calls_requested_internal": 7,
+  "twelve_calls_this_run": 6,
+  "twelve_calls_requested_internal": 8,
   "twelve_rate_safe": true,
   "twelve_api_budget_limit": 480,
   "twelve_daily_blocked": false,
@@ -31,7 +31,7 @@
   "healthy": true,
   "twelve_quota_saver_v111": {
     "enabled": true,
-    "m15_source_pairs_this_run": 5,
+    "m15_source_pairs_this_run": 6,
     "derived_timeframes": [
       "1h",
       "4h"
@@ -40,151 +40,5 @@
     "strict_complete_groups": true,
     "partial_groups_discarded": true,
     "contiguous_m15_required": true
-  },
-  "paper_trading_v112": {
-    "enabled": true,
-    "real_orders": false,
-    "trades_total": 0,
-    "pending_entries": 0,
-    "open_positions": 0,
-    "closed_trades": 0,
-    "wins": 0,
-    "losses": 0,
-    "breakeven": 0,
-    "win_rate_pct": 0.0,
-    "net_r": 0.0,
-    "gross_r_before_friction": 0.0,
-    "friction_r": 0.0,
-    "net_r_after_friction": 0.0,
-    "friction_version": "V11.6_PAPER_FRICTION",
-    "avg_r": 0.0,
-    "profit_factor_r": null,
-    "profit_factor_net_r": null,
-    "last_cycle": {
-      "version": "V11.2_PAPER_TRADING",
-      "ran_at": "2026-09-18T19:21:16.357034+00:00",
-      "pending_created": 0,
-      "entries_opened": 0,
-      "trades_closed": 0,
-      "closed_pairs_this_cycle": [],
-      "checklists": {
-        "USD/CHF": {
-          "side": "BUY",
-          "passed": false,
-          "state": "🔴 BLOQUEADO",
-          "hard_blocks": [
-            "H1 está contra o viés"
-          ],
-          "soft_blocks": [
-            "ADR14 em 104%: evitar perseguir preço",
-            "ICT incompleto (42/100)",
-            "Fluxo institucional incompleto (56/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "USD/CAD": {
-          "side": "BUY",
-          "passed": false,
-          "state": "⚪ EM OBSERVAÇÃO",
-          "hard_blocks": [],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ICT incompleto (43/100)",
-            "Fluxo institucional incompleto (54/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "NZD/USD": {
-          "side": "SELL",
-          "passed": false,
-          "state": "⚪ EM OBSERVAÇÃO",
-          "hard_blocks": [],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ADR14 em 91%: espaço reduzido",
-            "ICT incompleto (43/100)",
-            "Fluxo institucional incompleto (50/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "USD/JPY": {
-          "side": "BUY",
-          "passed": false,
-          "state": "🔴 BLOQUEADO",
-          "hard_blocks": [
-            "ADR14 muito esticado (117%)"
-          ],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ADR14 em 117%: evitar perseguir preço",
-            "ICT incompleto (54/100)",
-            "Fluxo institucional incompleto (59/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "EUR/USD": {
-          "side": "SELL",
-          "passed": false,
-          "state": "⚪ EM OBSERVAÇÃO",
-          "hard_blocks": [],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ADR14 em 92%: espaço reduzido",
-            "ICT incompleto (42/100)",
-            "Fluxo institucional incompleto (65/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "AUD/USD": {
-          "side": "WAIT",
-          "passed": false,
-          "state": "⚪ AGUARDAR DIREÇÃO",
-          "hard_blocks": [],
-          "soft_blocks": [
-            "ADR14 em 91%: espaço reduzido",
-            "ICT incompleto (0/100)",
-            "Fluxo institucional incompleto (0/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "GBP/USD": {
-          "side": "WAIT",
-          "passed": false,
-          "state": "⚪ AGUARDAR DIREÇÃO",
-          "hard_blocks": [
-            "ADR14 muito esticado (123%)"
-          ],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ADR14 em 123%: evitar perseguir preço",
-            "ICT incompleto (0/100)",
-            "Fluxo institucional incompleto (0/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        }
-      },
-      "trades_total": 0,
-      "pending_entries": 0,
-      "open_positions": 0,
-      "closed_trades": 0,
-      "wins": 0,
-      "losses": 0,
-      "breakeven": 0,
-      "win_rate_pct": 0.0,
-      "net_r": 0.0,
-      "avg_r": 0.0,
-      "profit_factor_r": null
-    },
-    "errors": []
-  },
-  "setup_audit_v114": {
-    "enabled": true,
-    "audited_trades": 0,
-    "closed_trades": 0,
-    "component_state_rows": 0,
-    "sample_state": "AGUARDANDO AMOSTRA",
-    "real_orders": false,
-    "broker_connection": false,
-    "errors": []
   }
 }
