@@ -131,5 +131,24 @@ class AtlasQuantShadowModeTests(unittest.TestCase):
         self.assertTrue(summary["eligible_for_manual_review"])
 
 
+    def test_invalid_review_thresholds_fail_closed(self):
+        samples=[]
+        for i in range(120):
+            pair=DEFAULT_SHADOW_PAIRS[i % len(DEFAULT_SHADOW_PAIRS)]
+            samples.append(compare_shadow_sample(
+                {"pair":pair,"side":"BUY","state":"OK","score":70,"quality":90,"executable":True,"version":"c","timestamp":str(i)},
+                {"pair":pair,"side":"BUY","state":"OK","score":70,"quality":90,"executable":True,"version":"x","timestamp":str(i)},
+            ))
+        for bad in (0,-1,float("nan"),float("inf"),True,"bad"):
+            with self.subTest(min_samples=bad):
+                s=summarize_shadow(samples,min_samples=bad,expected_pairs=DEFAULT_SHADOW_PAIRS,min_pair_samples=1)
+                self.assertFalse(s["thresholds_valid"])
+                self.assertFalse(s["eligible_for_manual_review"])
+            with self.subTest(min_pair=bad):
+                s=summarize_shadow(samples,min_samples=1,expected_pairs=DEFAULT_SHADOW_PAIRS,min_pair_samples=bad)
+                self.assertFalse(s["thresholds_valid"])
+                self.assertFalse(s["eligible_for_manual_review"])
+
+
 if __name__=="__main__":
     unittest.main()
