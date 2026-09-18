@@ -58,6 +58,17 @@ class StrategyComparatorTests(unittest.TestCase):
         self.assertFalse(bool(ote["eligible_observed_rank"]))
         self.assertTrue(pd.isna(ote["observed_expectancy_rank"]))
 
+
+    def test_nonfinite_metrics_cannot_receive_observed_rank(self):
+        bad=[result("FVG","GAIN",float("inf")) for _ in range(20)]
+        suite={k:{"results":[]} for k in STRATEGY_ORDER}
+        suite["FVG"]={"results":bad}
+        df=comparison_frame(suite,min_trades_for_rank=20)
+        fvg=df[df["strategy"]=="FVG"].iloc[0]
+        self.assertFalse(bool(fvg["eligible_observed_rank"]))
+        self.assertTrue(pd.isna(fvg["observed_expectancy_rank"]))
+        self.assertTrue(pd.isna(fvg["net_r_per_drawdown"]))
+
     def test_breakdown_preserves_strategy_and_session(self):
         suite={
             "BOS_CHOCH_OB":{"results":[
