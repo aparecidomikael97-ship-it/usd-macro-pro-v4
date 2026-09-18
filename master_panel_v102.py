@@ -255,7 +255,9 @@ def _minutes_since(value: Any) -> float | None:
         else:
             ts = pd.Timestamp(value)
             ts = ts.tz_localize("UTC") if ts.tzinfo is None else ts.tz_convert("UTC")
-        return max(0.0, (pd.Timestamp.now(tz="UTC") - ts).total_seconds() / 60.0)
+        age = float((pd.Timestamp.now(tz="UTC") - ts).total_seconds() / 60.0)
+        # Future timestamps are invalid evidence, not fresh evidence.
+        return None if age < 0 else age
     except Exception:
         return None
 
@@ -296,7 +298,9 @@ def _scanner_for_pair(scanner_state: Mapping[str, Any] | None, pair: str) -> dic
     # timestamp ausente como "não comprovadamente velho". Mantemos isso apenas
     # para legado; quando m15_fetched_at existe, a regra real é <=60 min.
     available = bool(tec.get("disponivel", False))
-    fresh = available and (True if age is None else age <= 60.0)
+    # Freshness must be positively proven by a valid timestamp. Missing or
+    # future-dated timestamps fail closed instead of being treated as fresh.
+    fresh = available and age is not None and age < 60.0
 
     return {
         "available": available,
