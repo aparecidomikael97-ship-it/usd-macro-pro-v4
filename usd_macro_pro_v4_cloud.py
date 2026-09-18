@@ -206,6 +206,14 @@ except Exception as _atlasquant_ui_exc:
 
 
 try:
+    from atlasquant_macro_briefing_panel import render_macro_briefing_panel
+    _ATLASQUANT_MACRO_BRIEFING_IMPORT_ERROR = ""
+except Exception as _macro_brief_panel_exc:
+    render_macro_briefing_panel = None
+    _ATLASQUANT_MACRO_BRIEFING_IMPORT_ERROR = f"{type(_macro_brief_panel_exc).__name__}: {_macro_brief_panel_exc}"
+
+
+try:
     from atlasquant_dashboard_v1 import render_g8_radar
     _ATLASQUANT_DASHBOARD_IMPORT_ERROR = ""
 except Exception as _atlasquant_dashboard_exc:
@@ -3814,9 +3822,57 @@ else:
 
 abas = st.tabs([
     "Central", "Painel mestre", "Moedas", "EUA", "Pares", "Fed",
-    "Histórico", "Backtest", "Decisão", "Market Map", "Aprender",
+    "Histórico", "Backtest", "Decisão", "Market Map", "Macro Briefing", "Aprender",
     "Produto", "Melhorias", "Notícias", "Autopilot",
 ])
+
+# =========================================================
+# MACRO BRIEFING — apresentação sobre o estado JÁ calculado
+# Não chama Twelve Data nem força refresh de fonte ao abrir.
+# =========================================================
+with abas[10]:
+    if render_macro_briefing_panel is None:
+        st.warning("Macro Briefing indisponível neste carregamento.")
+        if _ATLASQUANT_MACRO_BRIEFING_IMPORT_ERROR:
+            st.caption(_ATLASQUANT_MACRO_BRIEFING_IMPORT_ERROR)
+    else:
+        _brief_rows = []
+        for _, _r in ranking.iterrows():
+            _brief_rows.append({
+                "currency": str(_r.get("Código", "")),
+                "score": float(_r.get("Pontuação_Final", 0.0)),
+                "data_ready": True,
+                "quality": "valid",
+            })
+
+        # O briefing usa somente o calendário que já foi calculado/cacheado
+        # nesta execução; nenhuma coleta técnica/Twelve Data é acionada aqui.
+        _brief_events = []
+        try:
+            _agenda_brief = _eventos_macro_v65().head(12)
+            for _, _e in _agenda_brief.iterrows():
+                _brief_events.append({
+                    "event": str(_e.get("Evento", "")),
+                    "currency": "USD",
+                    "datetime": (
+                        _e.get("Data").strftime("%d/%m/%Y")
+                        if hasattr(_e.get("Data"), "strftime") else str(_e.get("Data", ""))
+                    ),
+                    "impact": str(_e.get("Impacto", "")),
+                    "data_ready": True,
+                    "quality": "valid",
+                })
+        except Exception:
+            _brief_events = []
+
+        _brief_banks = [{
+            "bank": "Federal Reserve",
+            "tone": str(fed.get("tom", "Neutro")),
+            "data_ready": True,
+            "quality": "valid",
+        }]
+        render_macro_briefing_panel(_brief_rows, _brief_events, _brief_banks)
+
 
 # =========================================================
 # ABA 2 — CLASSIFICAÇÃO
@@ -8836,7 +8892,7 @@ with abas[1]:
 # ABA 10 — V10.3 EXPERIÊNCIA, EDUCAÇÃO E PERSONALIZAÇÃO
 # Não altera o motor de decisão.
 # =========================================================
-with abas[10]:
+with abas[11]:
     if render_experience_hub is None:
         st.error("A camada de experiência V10.3 não pôde ser carregada.")
         if _UX_V103_IMPORT_ERROR:
@@ -8869,7 +8925,7 @@ with abas[10]:
 # =========================================================
 # ABA 11 — V10.4 PRODUTO, NAVEGAÇÃO, GRÁFICOS E FEEDBACK
 # =========================================================
-with abas[11]:
+with abas[12]:
     if render_v104_hub is None:
         st.error("A camada de produto V10.4 não pôde ser carregada.")
         if _PRODUCT_V104_IMPORT_ERROR:
@@ -8889,7 +8945,7 @@ with abas[11]:
 # =========================================================
 # ABA 12 — V10.5 CENTRO DE MELHORIAS
 # =========================================================
-with abas[12]:
+with abas[13]:
     if render_v105_center is None:
         st.error("O Centro de Melhorias V10.5 não pôde ser carregado.")
         if _EVOLUTION_V105_IMPORT_ERROR:
@@ -9051,7 +9107,7 @@ with abas[12]:
 # =========================================================
 # ABA 13 — V10.6.2 FRESH-PRICE SNAPSHOT RECOVERY
 # =========================================================
-with abas[13]:
+with abas[14]:
     if render_currency_news_panel is None:
         st.error("A inteligência global de notícias V10.6 não pôde ser carregada.")
         if _CURRENCY_NEWS_V106_IMPORT_ERROR:
@@ -9073,7 +9129,7 @@ with abas[13]:
 # =========================================================
 # ABA 14 — V10.7 FULL BACKGROUND AUTOPILOT
 # =========================================================
-with abas[14]:
+with abas[15]:
     if render_autopilot_v107 is None:
         st.error("O painel Autopilot V10.7 não pôde ser carregado.")
         if _AUTOPILOT_V107_IMPORT_ERROR:
