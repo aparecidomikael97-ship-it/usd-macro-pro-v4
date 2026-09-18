@@ -65,6 +65,24 @@ class AtlasQuantSafetyPanelTests(unittest.TestCase):
         self.assertEqual(r["traffic_light"],"RED")
         self.assertTrue(any("Evento de alto impacto" in x for x in r["hard_blocks"]))
 
+
+    def test_nonfinite_data_quality_fails_closed(self):
+        for bad in (float("nan"),float("inf"),float("-inf")):
+            with self.subTest(score=bad):
+                p=self.base(); p["data_ready"]["score"]=bad
+                r=evaluate_live_safety(p,{"app_headless_ok":True})
+                self.assertEqual(r["traffic_light"],"RED")
+
+    def test_invalid_major_event_timing_fails_closed(self):
+        for bad in (float("nan"),float("inf"),float("-inf"),-1):
+            with self.subTest(minutes=bad):
+                r=evaluate_live_safety(
+                    self.base(),
+                    {"app_headless_ok":True},
+                    major_event_minutes_override=bad,
+                )
+                self.assertEqual(r["traffic_light"],"RED")
+
     def test_missing_event_override_does_not_invent_block(self):
         p=self.base()
         p.pop("major_event_minutes",None)
