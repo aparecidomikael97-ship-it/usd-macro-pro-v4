@@ -114,5 +114,20 @@ class StrategyWalkForwardTests(unittest.TestCase):
             walk_forward_frame(empty_suite(),initial_train_pct=95)
 
 
+    def test_invalid_sample_counts_fail_closed(self):
+        for bad in (float("nan"),float("inf"),float("-inf"),-1):
+            with self.subTest(trades=bad):
+                d=pd.DataFrame([
+                    {"strategy":"FVG","window_index":1,"train_trades":10,"test_trades":5,"train_expectancy_r":0.2,"test_expectancy_r":0.2,"expectancy_delta_r":0.0,"test_net_r":1.0},
+                    {"strategy":"FVG","window_index":2,"train_trades":bad,"test_trades":5,"train_expectancy_r":0.2,"test_expectancy_r":0.2,"expectancy_delta_r":0.0,"test_net_r":1.0},
+                    {"strategy":"FVG","window_index":3,"train_trades":20,"test_trades":5,"train_expectancy_r":0.2,"test_expectancy_r":0.2,"expectancy_delta_r":0.0,"test_net_r":1.0},
+                ])
+                x=walk_forward_summary(d,expected_windows=3,min_train_trades=10,min_test_trades=5)
+                r=x[x["strategy"]=="FVG"].iloc[0]
+                self.assertEqual(r["walk_forward_status"],"INSUFFICIENT")
+                self.assertFalse(bool(r["all_windows_sufficient"]))
+
+
+
 if __name__=="__main__":
     unittest.main()
