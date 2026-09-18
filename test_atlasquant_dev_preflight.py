@@ -82,5 +82,15 @@ class DevPreReleaseReadinessTests(unittest.TestCase):
         self.assertIn('"runtime_promotion_performed": false',raw)
 
 
+    def test_readiness_manifest_rejects_corrupt_test_counts(self):
+        pre={"status":"DEV_PREFLIGHT_OK","passed":7,"failed":0}
+        for total,failed in ((float("nan"),0),(float("inf"),0),(-1,0),(10,float("inf")),(10,-1),(10,11),(True,0)):
+            with self.subTest(total=total,failed=failed):
+                out=build_dev_readiness_manifest(pre,dev_sha="abc",quality_run_id="1",tests_total=total,tests_failed=failed,compile_ok=True)
+                self.assertEqual(out["status"],"DEV_BLOCKED")
+                self.assertIn("INVALID_TEST_EVIDENCE",out["blockers"])
+                self.assertFalse(out["runtime_promotion_performed"])
+
+
 if __name__=="__main__":
     unittest.main()
