@@ -11,6 +11,7 @@ O Índice Integrado é apenas um ranking operacional. Não é probabilidade de l
 from __future__ import annotations
 
 import base64
+import html
 import json
 import os
 import time as _time
@@ -691,22 +692,41 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
     d4.metric("Risco de evento", str(ctx.get("event_risk", "—")) if ctx else "—")
 
     if ctx:
-        st.markdown(
-            f"**Top-down:** W1 {ctx.get('w1_bias','—')} ({ctx.get('w1_regime','—')}) · "
-            f"D1 {ctx.get('d1_bias','—')} ({ctx.get('d1_regime','—')}) · "
-            f"Localização {ctx.get('location','—')} · Killzone {ctx.get('killzone','—')}."
-        )
+        # Renderiza o diagnóstico dinâmico em um único nó HTML estável.
+        # Em reruns rápidos do Streamlit, o bloco Sweep pode aparecer/desaparecer.
+        # Manter sempre as mesmas três linhas evita reconciliação React inconsistente
+        # (NotFoundError/removeChild) sem alterar nenhum cálculo do Painel Mestre.
         if ctx.get("latest_sweep"):
             try:
                 ny_time = pd.Timestamp(ctx.get("latest_sweep_time")).tz_convert(NY_TZ).strftime("%d/%m %H:%M NY")
             except Exception:
                 ny_time = "horário indisponível"
-            st.markdown(
-                f"**Sweep:** {ctx.get('latest_sweep')} em {ctx.get('latest_sweep_level') or 'nível'} "
-                f"({_fmt_price(ctx.get('latest_sweep_price'), chosen)}) · {ny_time} · {ctx.get('latest_sweep_rejection','')}."
+            sweep_text = (
+                f"{ctx.get('latest_sweep')} em {ctx.get('latest_sweep_level') or 'nível'} "
+                f"({_fmt_price(ctx.get('latest_sweep_price'), chosen)}) · {ny_time} · "
+                f"{ctx.get('latest_sweep_rejection','')}."
             )
+        else:
+            sweep_text = "Nenhum sweep recente confirmado para este contexto."
+
+        topdown_text = (
+            f"W1 {ctx.get('w1_bias','—')} ({ctx.get('w1_regime','—')}) · "
+            f"D1 {ctx.get('d1_bias','—')} ({ctx.get('d1_regime','—')}) · "
+            f"Localização {ctx.get('location','—')} · Killzone {ctx.get('killzone','—')}."
+        )
+        volatility_text = (
+            f"{ctx.get('adr_state','—')} · ADR14 consumido "
+            f"{_safe_float(ctx.get('adr_used_pct',0)):.1f}%."
+        )
         st.markdown(
-            f"**Volatilidade:** {ctx.get('adr_state','—')} · ADR14 consumido {_safe_float(ctx.get('adr_used_pct',0)):.1f}%."
+            (
+                '<div class="atlas-master-diagnostic" translate="no">'
+                f'<div><strong>Top-down:</strong> {html.escape(topdown_text)}</div>'
+                f'<div><strong>Sweep:</strong> {html.escape(sweep_text)}</div>'
+                f'<div><strong>Volatilidade:</strong> {html.escape(volatility_text)}</div>'
+                '</div>'
+            ),
+            unsafe_allow_html=True,
         )
     st.markdown(
         f"**Técnica:** H4 {tech.get('h4','—')} · H1 {tech.get('h1','—')} · M15 {tech.get('m15','—')}."
