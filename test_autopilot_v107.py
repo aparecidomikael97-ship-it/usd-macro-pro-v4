@@ -168,5 +168,29 @@ class AutopilotV107Tests(unittest.TestCase):
         self.assertIn("import base64", text[:2500])
         self.assertIn("import json", text[:2500])
 
+
+    def test_operational_readiness_requires_both_scanner_and_market_map(self):
+        now=pd.Timestamp("2026-09-18T12:00:00Z")
+        fresh=(now-pd.Timedelta(minutes=10)).isoformat()
+        stale=(now-pd.Timedelta(minutes=61)).isoformat()
+        scanner={"resultados":{p:{"m15_fetched_at":fresh} for p in a.PAIR_ORDER}}
+        master={"contexts":{p:{"updated_at":stale} for p in a.PAIR_ORDER}}
+        with patch.object(a,"utcnow",return_value=now), patch.object(a,"forex_market_likely_open",return_value=True):
+            status=a.status_summary(True,"ok",{},scanner,master,{},pd.DataFrame(),[],0,{})
+        self.assertTrue(status["scanner_ready"])
+        self.assertFalse(status["market_map_ready"])
+        self.assertEqual(status["operational_readiness"],"DEGRADED")
+
+    def test_operational_readiness_ready_when_both_layers_are_fresh(self):
+        now=pd.Timestamp("2026-09-18T12:00:00Z")
+        fresh=(now-pd.Timedelta(minutes=10)).isoformat()
+        scanner={"resultados":{p:{"m15_fetched_at":fresh} for p in a.PAIR_ORDER}}
+        master={"contexts":{p:{"updated_at":fresh} for p in a.PAIR_ORDER}}
+        with patch.object(a,"utcnow",return_value=now), patch.object(a,"forex_market_likely_open",return_value=True):
+            status=a.status_summary(True,"ok",{},scanner,master,{},pd.DataFrame(),[],0,{})
+        self.assertTrue(status["scanner_ready"])
+        self.assertTrue(status["market_map_ready"])
+        self.assertEqual(status["operational_readiness"],"READY")
+
 if __name__=="__main__":
     unittest.main()
