@@ -603,6 +603,97 @@ def _academy_save_uploaded_video(lesson_id: str, uploaded_file: Any) -> tuple[bo
 
 
 
+def _academy_media_stats() -> dict[str, Any]:
+    states = [_academy_video_status(lesson_id) for lesson_id in ACADEMY_MEDIA_FILES]
+    available = sum(1 for state in states if state["available"])
+    return {
+        "total": len(states),
+        "available": available,
+        "missing": len(states) - available,
+        "states": states,
+    }
+
+
+def _academy_production_text(lesson: dict[str, Any]) -> str:
+    lesson_id = str(lesson["id"])
+    video = _academy_video_status(lesson_id)
+    visual = ACADEMY_VISUALS.get(lesson_id, {})
+    script = _video_script_for_lesson(lesson_id)
+    storyboard = build_storyboard(lesson_id)
+
+    lines = [
+        "ATLASQUANT ACADEMY — PACOTE DE PRODUÇÃO",
+        "=" * 52,
+        f"Aula: {lesson['titulo']}",
+        f"ID: {lesson_id}",
+        f"Duração planejada: {lesson['duracao']}",
+        f"Arquivo final esperado: {video['filename']}",
+        "",
+        f"OBJETIVO: {lesson['objetivo']}",
+        "",
+        f"RESUMO: {lesson['resumo']}",
+        "",
+        "VISUAL DIDÁTICO",
+        f"Título: {visual.get('titulo', '')}",
+        f"Subtítulo: {visual.get('subtitulo', '')}",
+    ]
+    for tag, title, desc in visual.get("itens", []):
+        lines.append(f"- {tag} | {title} | {desc}")
+    if visual.get("nota"):
+        lines.append(f"Nota: {visual['nota']}")
+
+    lines.extend(["", "ROTEIRO COMPLETO DE NARRAÇÃO"])
+    for idx, segment in enumerate(script, 1):
+        lines.extend([
+            f"",
+            f"CENA {idx} — {segment['bloco']}",
+            f"Tela: {segment['tela']}",
+            f"Narração: {segment['narracao']}",
+        ])
+
+    lines.extend(["", "STORYBOARD / DIREÇÃO VISUAL"])
+    for scene in storyboard:
+        lines.extend([
+            f"",
+            f"Cena {scene['cena']} — {scene['bloco']}",
+            f"Tela: {scene['tela']}",
+            f"Direção visual: {scene['direcao_visual']}",
+        ])
+
+    lines.extend([
+        "",
+        "CHECKLIST DA AULA",
+        *[f"- {item}" for item in lesson.get("checklist", [])],
+        "",
+        "PADRÃO DE ENTREGA",
+        "- Formato final: MP4",
+        "- Nome do arquivo: " + str(video["filename"]),
+        "- Proporção recomendada: 16:9",
+        "- Resolução recomendada: 1920x1080",
+        "- Narração clara; evitar promessas de lucro ou taxa de acerto.",
+        "- Importar no player da própria aula após renderização.",
+        "",
+        "Material educacional AtlasQuant Academy.",
+    ])
+    return "
+".join(lines)
+
+
+def _academy_media_track_rows() -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for track in ACADEMY_TRACKS:
+        for lesson in track.get("aulas", []):
+            state = _academy_video_status(str(lesson["id"]))
+            rows.append({
+                "trilha": track["titulo"],
+                "aula": lesson["titulo"],
+                "id": lesson["id"],
+                "arquivo": state["filename"],
+                "status": "✅ Disponível" if state["available"] else "⬜ Pendente",
+            })
+    return rows
+
+
 ACADEMY_QUIZZES: dict[str, list[dict[str, Any]]] = {
     "macro_01": [
         {"pergunta": "No Forex, por que é importante comparar duas economias?", "opcoes": ["Porque todo par compara uma moeda base com uma cotada", "Porque só o dólar importa", "Porque o gráfico ignora juros", "Porque inflação não afeta moedas"], "correta": 0, "explicacao": "Um par expressa força relativa entre duas moedas; a análise macro precisa comparar os dois lados."},
@@ -1202,6 +1293,25 @@ def render_academy() -> None:
     if stats["total"]:
         st.progress(stats["concluidas"] / stats["total"])
 
+    _media_stats = _academy_media_stats()
+    st.markdown("#### 🎬 Produção dos vídeos")
+    _m1, _m2, _m3 = st.columns(3)
+    _m1.metric("MP4 disponíveis", f"{_media_stats['available']}/{_media_stats['total']}")
+    _m2.metric("Pendentes", _media_stats["missing"])
+    _m3.metric(
+        "Mídia pronta",
+        f"{round((_media_stats['available'] / _media_stats['total']) * 100) if _media_stats['total'] else 0}%",
+    )
+    if _media_stats["total"]:
+        st.progress(_media_stats["available"] / _media_stats["total"])
+
+    with st.expander("📦 Ver status dos 22 vídeos", expanded=False):
+        for _row in _academy_media_track_rows():
+            st.markdown(
+                f"{_row['status']} **{_row['aula']}** · "
+                f"`{_row['arquivo']}`"
+            )
+
     track_titles = [track["titulo"] for track in ACADEMY_TRACKS]
     selected_track_title = st.selectbox("Trilha", track_titles, key="academy_track")
     track = next(track for track in ACADEMY_TRACKS if track["titulo"] == selected_track_title)
@@ -1250,6 +1360,15 @@ def render_academy() -> None:
                         st.rerun()
                     else:
                         st.error(f"Não foi possível salvar o vídeo: {_video_msg}")
+
+        _production_text = _academy_production_text(lesson)
+        st.download_button(
+            "📝 Baixar pacote de produção desta aula",
+            data=_production_text.encode("utf-8"),
+            file_name=f"{lesson['id']}_producao.txt",
+            mime="text/plain",
+            key=f"academy_production_download_{lesson['id']}",
+        )
 
         _visual_html = _academy_visual_html(lesson["id"])
         if _visual_html:
