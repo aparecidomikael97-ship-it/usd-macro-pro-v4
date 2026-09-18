@@ -507,12 +507,32 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
     c1, c2, c3 = st.columns([1.35, 1.2, 2.45])
     with c1:
         if st.button("▶️ Atualizar próximo lote (2 pares)", key="v102_master_batch", disabled=(remaining > 0 or not bool(api_key)), width="stretch"):
-            candidates = []
-            for offset in range(len(pairs)):
-                p = pairs[(cursor + offset) % len(pairs)]
-                candidates.append(p)
-                if len(candidates) == 2:
-                    break
+            # Prioriza pares ausentes ou com Market Map mais antigo.
+            def _context_age_minutes_v102(pair_name: str) -> float:
+                ctx = dict(contexts.get(pair_name, {}) or {})
+                if not ctx:
+                    return 10**12
+                stamp = ctx.get("updated_at") or ctx.get("candle_m15")
+                if not stamp:
+                    return 10**12
+                try:
+                    ts = pd.Timestamp(stamp)
+                    if ts.tzinfo is None:
+                        ts = ts.tz_localize("UTC")
+                    else:
+                        ts = ts.tz_convert("UTC")
+                    return max(
+                        0.0,
+                        (pd.Timestamp.now(tz="UTC") - ts).total_seconds() / 60.0,
+                    )
+                except Exception:
+                    return 10**12
+
+            candidates = sorted(
+                pairs,
+                key=lambda p: (_context_age_minutes_v102(p), -pairs.index(p)),
+                reverse=True,
+            )[:2]
             errors = []
             for p in candidates:
                 row = _matrix_row(matrix, p)
