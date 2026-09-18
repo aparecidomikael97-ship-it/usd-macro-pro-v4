@@ -6,6 +6,8 @@ on:
     branches: [main, atlasquant-dev, atlasquant-runtime, atlasquant-private-deploy]
     paths:
       - "*.py"
+      - "*.ps1"
+      - "*.bat"
       - "tradingview/**"
       - ".github/workflows/quality-tests.yml"
       - ".github/workflows/autopilot-v107.yml"
@@ -25,6 +27,28 @@ jobs:
       - name: Compile Python sources
         run: |
           python -m compileall -q .
+
+      - name: Validate PowerShell launcher syntax
+        shell: pwsh
+        run: |
+          $files = @(
+            "AtlasQuant_Windows_Privado.ps1",
+            "AtlasQuant_Configurar_TwelveData.ps1",
+            "AtlasQuant_Configurar_FRED.ps1"
+          )
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $file),
+              [ref]$tokens,
+              [ref]$errors
+            ) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error ($file + ": " + $_.Message) }
+              exit 1
+            }
+          }
 
       - name: Run quality suite
         run: |
