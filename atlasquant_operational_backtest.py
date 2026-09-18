@@ -42,6 +42,10 @@ def normalize_candles(frame: pd.DataFrame | None) -> pd.DataFrame:
     for c in ("open", "high", "low", "close"):
         d[c] = pd.to_numeric(d[c], errors="coerce")
     d = d.dropna(subset=list(REQUIRED_CANDLE_COLUMNS)).sort_values("datetime")
+    finite = d[["open", "high", "low", "close"]].apply(lambda col: col.map(math.isfinite)).all(axis=1)
+    geometry = (d["low"] <= d[["open", "close"]].min(axis=1)) & (d["high"] >= d[["open", "close"]].max(axis=1)) & (d["low"] <= d["high"])
+    positive = (d[["open", "high", "low", "close"]] > 0).all(axis=1)
+    d = d[finite & geometry & positive]
     d = d.drop_duplicates(subset=["datetime"], keep="last").reset_index(drop=True)
     return d
 
@@ -188,7 +192,18 @@ def backtest_signal(
             "net_r": None,
         }
 
-    wait = future.head(max(1, int(max_wait_bars)))
+    try:
+        wait_bars = int(max_wait_bars)
+        hold_bars = int(max_hold_bars)
+    except Exception:
+        wait_bars = hold_bars = 0
+    if wait_bars <= 0 or hold_bars <= 0:
+        return {
+            **base, **plan, "status": "INVALID_WINDOW", "outcome": "NO_TRADE",
+            "reason": "MAX_WAIT_AND_HOLD_MUST_BE_POSITIVE", "net_r": None,
+        }
+
+    wait = future.head(wait_bars)
     entry = plan["entry"]
     touched = wait[(wait["low"] <= entry) & (wait["high"] >= entry)]
     if touched.empty:
@@ -204,7 +219,7 @@ def backtest_signal(
 
     entry_idx = int(touched.index[0])
     entry_bar = d.loc[entry_idx]
-    active = d.loc[entry_idx:].head(max(1, int(max_hold_bars))).copy()
+    active = d.loc[entry_idx:].head(hold_bars).copy()
     side = plan["side"]
     stop = plan["stop"]
     target = plan["target"]
