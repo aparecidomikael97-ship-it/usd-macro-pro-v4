@@ -1,4 +1,5 @@
 import ast
+import json
 from pathlib import Path
 import unittest
 
@@ -95,6 +96,30 @@ class AcademyVideoScriptsTests(unittest.TestCase):
                 self.assertEqual(len(item.get("opcoes", [])), 4)
                 self.assertIn(item.get("correta"), range(4))
                 self.assertTrue(item.get("explicacao"))
+
+    def test_media_manifest_covers_all_22_lessons(self):
+        manifest = json.loads(Path("academy_media/manifest.json").read_text(encoding="utf-8"))
+        rows = manifest.get("lessons", [])
+        self.assertEqual(len(rows), 22)
+        ids = {row["id"] for row in rows}
+        expected = (
+            {f"macro_{i:02d}" for i in range(1, 9)}
+            | {f"ict_{i:02d}" for i in range(1, 8)}
+            | {f"aq_{i:02d}" for i in range(1, 8)}
+        )
+        self.assertEqual(ids, expected)
+        files = [row["file"] for row in rows]
+        self.assertEqual(len(files), len(set(files)))
+        self.assertTrue(all(name.endswith(".mp4") for name in files))
+
+    def test_video_player_prefers_persistent_media_and_supports_import(self):
+        self.assertIn('/ "AtlasQuant" / "academy_media"', self.source)
+        self.assertIn('Path(__file__).resolve().parent / "academy_media"', self.source)
+        self.assertIn("def _academy_video_path", self.source)
+        self.assertIn("st.video(_video_state[\"path\"])", self.source)
+        self.assertIn("Importar MP4 desta aula", self.source)
+        self.assertIn("def _academy_save_uploaded_video", self.source)
+        self.assertIn("tmp.replace(target)", self.source)
 
     def test_progress_persists_outside_zip(self):
         self.assertIn('os.environ["LOCALAPPDATA"]', self.source)
