@@ -18,6 +18,8 @@ class ReleaseEvidence:
     shadow_samples: int = 0
     shadow_critical_mismatches: int = 0
     data_migrations_ok: bool = True
+    paper_only_ok: bool = True
+    secrets_untouched: bool = True
 
 
 def assess_release(ev: ReleaseEvidence, *, min_tests: int = 1,
@@ -37,6 +39,10 @@ def assess_release(ev: ReleaseEvidence, *, min_tests: int = 1,
         hard.append("Health check falhou")
     if not ev.data_migrations_ok:
         hard.append("Migração/compatibilidade de dados falhou")
+    if not ev.paper_only_ok:
+        hard.append("Contrato Paper Trading foi violado")
+    if not ev.secrets_untouched:
+        hard.append("Credenciais/secrets foram alterados durante o release")
     if ev.shadow_critical_mismatches:
         hard.append("Shadow mode detectou divergência crítica")
     if core_model_change and ev.shadow_samples < min_shadow_samples_for_core:
@@ -56,6 +62,8 @@ def assess_release(ev: ReleaseEvidence, *, min_tests: int = 1,
 def should_rollback(*, app_boot_ok: bool, health_check_ok: bool,
                     critical_engine_error: bool = False,
                     data_integrity_breach: bool = False,
+                    paper_only_breach: bool = False,
+                    secrets_changed: bool = False,
                     error_rate_pct: float = 0.0, max_error_rate_pct: float = 5.0) -> dict[str, object]:
     reasons = []
     if not app_boot_ok:
@@ -66,6 +74,10 @@ def should_rollback(*, app_boot_ok: bool, health_check_ok: bool,
         reasons.append("Erro crítico no motor")
     if data_integrity_breach:
         reasons.append("Violação de integridade dos dados")
+    if paper_only_breach:
+        reasons.append("Violação do contrato Paper Trading")
+    if secrets_changed:
+        reasons.append("Credenciais/secrets mudaram durante o deploy")
     if float(error_rate_pct) > float(max_error_rate_pct):
         reasons.append("Taxa de erros acima do limite")
     return {"rollback": bool(reasons), "reasons": reasons}
