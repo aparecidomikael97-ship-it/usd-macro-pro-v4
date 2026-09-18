@@ -223,7 +223,7 @@ def aggregate_setup_performance(audit: pd.DataFrame | None) -> pd.DataFrame:
     if closed.empty:
         return pd.DataFrame(columns=PERFORMANCE_COLUMNS)
     closed["_r"] = pd.to_numeric(closed["realized_r"], errors="coerce")
-    closed = closed[closed["_r"].notna()].copy()
+    closed = closed[closed["_r"].map(lambda x: bool(pd.notna(x) and math.isfinite(float(x))))].copy()
     if closed.empty:
         return pd.DataFrame(columns=PERFORMANCE_COLUMNS)
     closed["_exit"] = pd.to_datetime(closed["exit_time"], utc=True, errors="coerce")
@@ -275,6 +275,7 @@ def build_summary(audit: pd.DataFrame, performance: pd.DataFrame, *, now: pd.Tim
     d = _normalize_audit(audit)
     closed = d[d["status"].astype(str).str.upper().eq("CLOSED")].copy() if not d.empty else d
     r = pd.to_numeric(closed.get("realized_r"), errors="coerce").dropna() if not closed.empty else pd.Series(dtype=float)
+    r = r[r.map(lambda x: math.isfinite(float(x)))] if len(r) else r
     return {
         "version": AUDIT_VERSION,
         "generated_at": now.isoformat(),
