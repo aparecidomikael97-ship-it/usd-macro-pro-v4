@@ -367,6 +367,11 @@ def _audit_cycle() -> tuple[bool, dict[str, Any], list[str]]:
     )
     if not ok4:
         errors.append("Salvar status setup audit: " + str(err4))
+        # The status sink itself failed, so make the failure observable in CI logs.
+        print("[setup-audit][status-write-failed] " + str(err4))
+
+    if errors:
+        print("[setup-audit][errors] " + " | ".join(str(x) for x in errors[:10]))
 
     return bool(ok1 and ok2 and ok3 and ok4), summary, errors
 
