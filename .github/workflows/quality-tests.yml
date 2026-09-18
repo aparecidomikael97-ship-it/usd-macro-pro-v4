@@ -34,7 +34,8 @@ jobs:
           $files = @(
             "AtlasQuant_Windows_Privado.ps1",
             "AtlasQuant_Configurar_TwelveData.ps1",
-            "AtlasQuant_Configurar_FRED.ps1"
+            "AtlasQuant_Configurar_FRED.ps1",
+            "AtlasQuant_Configurar_APIs.ps1"
           )
           foreach ($file in $files) {
             $tokens = $null
