@@ -26,6 +26,14 @@ def reconcile_numeric(observations: Iterable[Observation], *, now: datetime | No
                       max_age_minutes: float = 120.0, absolute_tolerance: float = 0.0,
                       relative_tolerance: float = 0.0025, min_sources: int = 2) -> dict[str, object]:
     ref = _utc(now or datetime.now(timezone.utc))
+    try:
+        max_age=float(max_age_minutes); abs_tol=float(absolute_tolerance); rel_tol=float(relative_tolerance)
+        min_src=int(min_sources)
+        params_valid=(math.isfinite(max_age) and max_age>=0 and math.isfinite(abs_tol) and abs_tol>=0 and math.isfinite(rel_tol) and rel_tol>=0 and min_src>=1 and not isinstance(min_sources,bool))
+    except Exception:
+        params_valid=False; max_age=abs_tol=rel_tol=0.0; min_src=1
+    if not params_valid:
+        return {"confirmed":False,"golden_value":None,"quality":0.0,"reason":"Parâmetros de reconciliação inválidos","valid_sources":[],"rejected_sources":[]}
     valid: list[tuple[Observation, float]] = []
     rejected: list[str] = []
     for obs in observations:
@@ -35,12 +43,12 @@ def reconcile_numeric(observations: Iterable[Observation], *, now: datetime | No
         except Exception:
             rejected.append(str(getattr(obs, "source", "?")))
             continue
-        if not math.isfinite(value) or age < -1 or age > float(max_age_minutes):
+        if not math.isfinite(value) or age < 0 or age >= max_age:
             rejected.append(obs.source)
             continue
         valid.append((obs, age))
 
-    if len(valid) < int(min_sources):
+    if len(valid) < min_src:
         return {
             "confirmed": False, "golden_value": None, "quality": 0.0,
             "reason": "Fontes válidas insuficientes", "valid_sources": [o.source for o, _ in valid],
@@ -49,12 +57,12 @@ def reconcile_numeric(observations: Iterable[Observation], *, now: datetime | No
 
     values = [float(o.value) for o, _ in valid]
     center = float(median(values))
-    tol = max(float(absolute_tolerance), abs(center) * float(relative_tolerance))
+    tol = max(abs_tol, abs(center) * rel_tol)
     spread = max(values) - min(values)
     confirmed = spread <= tol + 1e-12
-    freshness_penalty = min(35.0, max(age for _, age in valid) / max(float(max_age_minutes), 1.0) * 35.0)
+    freshness_penalty = min(35.0, max(age for _, age in valid) / max(max_age, 1.0) * 35.0)
     disagreement_penalty = 0.0 if confirmed else min(60.0, spread / max(tol, 1e-12) * 20.0)
-    source_bonus = min(10.0, (len(valid) - int(min_sources)) * 5.0)
+    source_bonus = min(10.0, (len(valid) - min_src) * 5.0)
     quality = max(0.0, min(100.0, 100.0 - freshness_penalty - disagreement_penalty + source_bonus))
     return {
         "confirmed": confirmed,
