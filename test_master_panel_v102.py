@@ -103,6 +103,13 @@ class MasterPanelTests(unittest.TestCase):
         self.assertTrue(info['fresh'])
         self.assertLess(info['age_minutes'], 45)
 
+    def test_master_panel_source_prioritizes_stalest_pairs(self):
+        src = open("master_panel_v102.py", encoding="utf-8").read()
+        self.assertIn("def _context_age_minutes_v102", src)
+        self.assertIn("Prioriza pares ausentes ou com Market Map mais antigo.", src)
+        self.assertIn("sorted(", src)
+
+
 
 if __name__ == '__main__':
     unittest.main()
