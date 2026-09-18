@@ -69,6 +69,60 @@ MACRO_VIDEO_SCRIPTS: dict[str, list[dict[str, str]]] = {
     ],
 }
 
+
+ICT_VIDEO_SCRIPTS: dict[str, list[dict[str, str]]] = {
+    "ict_01": [
+        {"bloco": "Abertura", "tela": "AtlasQuant > Painel Mestre / Market Map", "narracao": "Nesta aula você vai aprender a dar uma função para cada timeframe. W1 e D1 servem para contexto; H4 e H1 para confirmar estrutura; M15 para timing. O erro mais comum é deixar o M15 escolher uma direção que deveria vir do macro e dos timeframes maiores."},
+        {"bloco": "W1 e D1", "tela": "Market Map > W1 / D1", "narracao": "No semanal e diário, procure direção estrutural, localização no range e liquidez relevante. Esses timeframes dizem onde o mercado está dentro do contexto maior e ajudam a evitar operar contra uma estrutura dominante."},
+        {"bloco": "H4 e H1", "tela": "Scanner técnico > H4 / H1", "narracao": "H4 confirma tendência e estrutura intermediária. H1 ajuda a avaliar se existe pullback, alinhamento ou preço esticado. Eles funcionam como filtro entre a ideia macro e o gatilho de execução."},
+        {"bloco": "M15", "tela": "Scanner técnico > M15", "narracao": "M15 não escolhe a direção. Ele procura confirmação curta, como momentum e quebra estrutural, depois que contexto e direção já estão definidos."},
+        {"bloco": "Fechamento", "tela": "Checklist W1 → D1 → H4 → H1 → M15", "narracao": "A sequência é simples: contexto maior, confirmação intermediária e gatilho curto. Se um timeframe importante entrar em conflito, a resposta mais profissional pode ser esperar."},
+    ],
+    "ict_02": [
+        {"bloco": "Abertura", "tela": "Market Map > níveis de liquidez", "narracao": "Liquidez é uma forma de organizar onde ordens e stops tendem a se concentrar. Nesta aula vamos trabalhar com BSL acima de máximas, SSL abaixo de mínimas e o conceito de sweep."},
+        {"bloco": "BSL e SSL", "tela": "PWH / PWL / PDH / PDL / Asia High-Low", "narracao": "Buy-side liquidity costuma ficar acima de máximas relevantes; sell-side liquidity abaixo de mínimas. Máximas e mínimas anteriores, extremos da Ásia e níveis iguais podem funcionar como referências de liquidez."},
+        {"bloco": "Sweep", "tela": "Exemplo de varredura + retorno", "narracao": "Sweep acontece quando o preço busca um nível e depois rejeita ou retorna para dentro da estrutura. Isso é diferente de assumir que toda perfuração é reversão; o contexto e o fechamento importam."},
+        {"bloco": "Contexto", "tela": "Macro + liquidez alvo", "narracao": "Com viés comprador, uma varredura de SSL seguida de recuperação pode ser mais interessante do que perseguir preço no topo. Com viés vendedor, o raciocínio se inverte."},
+        {"bloco": "Fechamento", "tela": "Checklist BSL / SSL / sweep / rejeição", "narracao": "Marque primeiro onde está a liquidez. Depois espere o mercado mostrar como reage ao nível. Liquidez indica área de interesse, não entrada automática."},
+    ],
+    "ict_03": [
+        {"bloco": "Abertura", "tela": "AtlasQuant > estrutura M15", "narracao": "BOS, CHoCH e MSS são formas de descrever mudança ou continuidade da estrutura. O mais importante é usar fechamento e swings confirmados, não qualquer pavio."},
+        {"bloco": "Swings", "tela": "Swing High / Swing Low", "narracao": "Um swing high é uma máxima estrutural; um swing low é uma mínima estrutural. Esses pontos formam a referência para saber se o mercado continua a estrutura ou quebra um lado importante."},
+        {"bloco": "BOS", "tela": "Exemplo de continuação", "narracao": "Break of Structure é mais útil quando confirma a direção que já vinha sendo construída. Em uma estrutura altista, romper uma máxima relevante por fechamento pode reforçar continuidade."},
+        {"bloco": "CHoCH / MSS", "tela": "Exemplo de quebra contrária", "narracao": "CHoCH ou MSS aparece quando o preço rompe contra a estrutura anterior. Isso pode sinalizar mudança de comportamento, mas não deve ser usado isoladamente para inverter a direção macro."},
+        {"bloco": "Fechamento", "tela": "Estrutura + contexto", "narracao": "Sempre pergunte: qual swing foi rompido, houve fechamento, qual era a estrutura anterior e isso está alinhado ao contexto? Sem essas respostas, a quebra pode ser apenas ruído."},
+    ],
+    "ict_04": [
+        {"bloco": "Abertura", "tela": "AtlasQuant > Order Block", "narracao": "Order Block deve ser tratado como zona contextual, não como ordem institucional comprovada e nem como entrada automática. O AtlasQuant usa uma regra determinística baseada em estrutura e deslocamento."},
+        {"bloco": "Origem", "tela": "Candle oposto antes do deslocamento", "narracao": "Uma zona candidata nasce a partir do último candle oposto dentro da perna estrutural que antecede uma quebra com deslocamento suficiente. Isso evita buscar candles antigos sem relação com a estrutura atual."},
+        {"bloco": "Mitigação", "tela": "Zona ativa / em mitigação", "narracao": "Quando o preço retorna à zona, dizemos que houve mitigação. O retorno pode ser parcial ou profundo. O importante é observar se a zona continua válida e se a estrutura permanece alinhada."},
+        {"bloco": "Invalidação", "tela": "Fechamento além da borda oposta", "narracao": "Uma zona perde validade quando o preço fecha além da borda de invalidação definida pela regra. Nesse caso, o sistema não reaproveita o Order Block antigo."},
+        {"bloco": "Fechamento", "tela": "OB + premium/discount + macro", "narracao": "Use Order Block junto de localização, liquidez, FVG e direção macro. Uma zona sozinha não é motivo suficiente para executar."},
+    ],
+    "ict_05": [
+        {"bloco": "Abertura", "tela": "AtlasQuant > FVG", "narracao": "Fair Value Gap é um desequilíbrio entre candles criado por deslocamento. Ele pode servir como área de retorno, mas não existe garantia de preenchimento ou reação."},
+        {"bloco": "Formação", "tela": "Padrão de três candles", "narracao": "Em um FVG altista, existe um espaço entre a máxima do primeiro candle e a mínima do terceiro. No FVG baixista, o raciocínio é invertido. O AtlasQuant procura esse desequilíbrio em dados recentes."},
+        {"bloco": "Deslocamento", "tela": "Movimento impulsivo", "narracao": "Quanto mais claro o deslocamento que criou a ineficiência, mais útil o FVG pode ser como referência contextual. Mesmo assim, ele precisa estar alinhado à estrutura."},
+        {"bloco": "Validação", "tela": "FVG presente / em teste / invalidado", "narracao": "O sistema diferencia FVG ainda válido, FVG sendo testado e zona invalidada. Uma zona totalmente atravessada não deve ser tratada como se continuasse ativa."},
+        {"bloco": "Fechamento", "tela": "FVG + estrutura + gatilho", "narracao": "Use FVG para melhorar localização do pullback. A entrada só ganha qualidade quando estrutura, macro e gatilho também concordam."},
+    ],
+    "ict_06": [
+        {"bloco": "Abertura", "tela": "Market Map > sessões / Killzones", "narracao": "Killzones e divisões temporais organizam quando observar o mercado. Elas não escolhem a direção e não garantem movimento."},
+        {"bloco": "Sessões", "tela": "Ásia / Londres / Nova York", "narracao": "A sessão asiática costuma construir referências importantes. Londres e Nova York frequentemente concentram mais liquidez e expansão. Por isso Asia High e Asia Low entram no mapa."},
+        {"bloco": "Killzones", "tela": "Janela ativa", "narracao": "Killzone é uma janela de horário em que você presta mais atenção a liquidez, sweep e deslocamento. Fora dela, o setup pode continuar válido, mas o timing pode ser menos interessante."},
+        {"bloco": "Quarterly", "tela": "Divisão temporal em quartis", "narracao": "Quarterly Theory pode ser usada como heurística temporal para dividir períodos e observar acumulação, manipulação e expansão. Ela organiza observação; não deve ser apresentada como lei de mercado."},
+        {"bloco": "Fechamento", "tela": "Perfil semanal + horário + contexto", "narracao": "Use tempo para decidir quando observar, não para inventar direção. A direção continua vindo de macro, estrutura e localização."},
+    ],
+    "ict_07": [
+        {"bloco": "Abertura", "tela": "Painel Mestre > melhor contexto", "narracao": "Agora vamos juntar tudo em uma sequência operacional. A ideia é reduzir trades impulsivos e só avançar quando as camadas principais concordarem."},
+        {"bloco": "1. Macro", "tela": "Moedas / Pares / evento do dia", "narracao": "Comece identificando moeda forte contra moeda fraca, qualidade dos dados e risco de evento. Isso define a hipótese, não a entrada."},
+        {"bloco": "2. Contexto", "tela": "Market Map W1/D1 + liquidez + ADR", "narracao": "Depois confirme W1 e D1, posição no range, liquidez alvo e quanto do ADR já foi consumido. Um preço muito esticado pode reduzir a qualidade mesmo com macro alinhado."},
+        {"bloco": "3. Confirmação", "tela": "Scanner H4/H1", "narracao": "H4 e H1 precisam apoiar a hipótese. Se algum deles estiver claramente contra, o sistema deve priorizar espera em vez de forçar entrada."},
+        {"bloco": "4. Gatilho", "tela": "M15 + sweep + BOS/CHoCH + FVG/OB", "narracao": "No M15, procure o gatilho final dentro da localização planejada. Sweep, estrutura, FVG ou Order Block podem ajudar, mas sempre como confluência, não como certeza."},
+        {"bloco": "Fechamento", "tela": "Checklist Macro → Contexto → Confirmação → Gatilho → Risco", "narracao": "Se uma etapa importante falhar, pare. O objetivo do setup integrado é selecionar menos operações, mas com contexto mais claro e auditável."},
+    ],
+}
+
 ACADEMY_TRACKS: list[dict[str, Any]] = [
     {
         "id": "macro_forex",
@@ -476,7 +530,7 @@ def render_academy() -> None:
         for idx, item in enumerate(lesson["roteiro"], 1):
             st.markdown(f"{idx}. {item}")
 
-        _video_script = MACRO_VIDEO_SCRIPTS.get(lesson["id"], [])
+        _video_script = MACRO_VIDEO_SCRIPTS.get(lesson["id"], []) or ICT_VIDEO_SCRIPTS.get(lesson["id"], [])
         if _video_script:
             with st.expander("🎥 Roteiro completo de gravação", expanded=False):
                 for _segment in _video_script:
