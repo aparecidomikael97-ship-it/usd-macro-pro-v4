@@ -70,6 +70,23 @@ class AtlasQuantShadowStoreTests(unittest.TestCase):
         self.assertEqual(r["reason"],"ALREADY_PRESENT")
         p.assert_not_called()
 
+    def test_missing_configuration_avoids_remote_io(self):
+        with patch("atlasquant_shadow_store.requests.get") as get, patch("atlasquant_shadow_store.requests.put") as put:
+            r=persist_shadow_samples([self.row()],repo="",branch="atlasquant-runtime",token="")
+        self.assertFalse(r["ok"])
+        self.assertEqual(r["reason"],"NOT_CONFIGURED")
+        get.assert_not_called()
+        put.assert_not_called()
+
+    def test_corrupt_remote_fails_closed_without_overwrite(self):
+        corrupt=b'{"ok":1}\nnot-json\n'
+        get=_Resp(200,{"sha":"abc","content":base64.b64encode(corrupt).decode("ascii")})
+        with patch("atlasquant_shadow_store.requests.get",return_value=get), patch("atlasquant_shadow_store.requests.put") as put:
+            r=persist_shadow_samples([self.row()],repo="o/r",branch="atlasquant-runtime",token="t")
+        self.assertFalse(r["ok"])
+        self.assertEqual(r["reason"],"CORRUPT_REMOTE")
+        put.assert_not_called()
+
     def test_conflict_retries_once(self):
         with patch("atlasquant_shadow_store.requests.get",side_effect=[_Resp(404,{}),_Resp(404,{})]), \
              patch("atlasquant_shadow_store.requests.put",side_effect=[_Resp(409,{}),_Resp(201,{})]) as p:
