@@ -10,6 +10,7 @@ TradingView, or claim production readiness.
 from __future__ import annotations
 
 from pathlib import Path
+import math
 from typing import Any, Mapping
 import json
 
@@ -160,14 +161,27 @@ def build_dev_readiness_manifest(
     compile_ok: bool,
 ) -> dict[str,Any]:
     """Combine static preflight with externally observed CI evidence."""
-    total=max(0,int(tests_total))
-    failed=max(0,int(tests_failed))
-    quality_ok=bool(compile_ok) and total>0 and failed==0
+    def safe_count(value: Any) -> tuple[int,bool]:
+        if isinstance(value,bool):
+            return 0,False
+        try:
+            x=float(value)
+            if not math.isfinite(x) or x < 0 or not x.is_integer():
+                return 0,False
+            return int(x),True
+        except Exception:
+            return 0,False
+    total,total_valid=safe_count(tests_total)
+    failed,failed_valid=safe_count(tests_failed)
+    counts_valid=bool(total_valid and failed_valid and failed<=total)
+    quality_ok=bool(compile_ok) and counts_valid and total>0 and failed==0
     preflight_ok=str(preflight.get("status") or "")=="DEV_PREFLIGHT_OK" and int(preflight.get("failed") or 0)==0
 
     blockers=[]
     if not preflight_ok:
         blockers.append("DEV_PREFLIGHT_BLOCKED")
+    if not counts_valid:
+        blockers.append("INVALID_TEST_EVIDENCE")
     if not compile_ok:
         blockers.append("COMPILE_FAILED")
     if total<=0:
