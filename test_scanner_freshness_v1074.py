@@ -54,7 +54,18 @@ class ScannerFreshnessV1074Tests(unittest.TestCase):
         state={"resultados":{"EUR/USD":{"m15_fetched_at":now+300,"tecnico":{"disponivel":True}}}}
         with patch("master_panel_v102._time.time",return_value=now):
             info=m._scanner_for_pair(state,"EUR/USD")
-        self.assertGreaterEqual(info["age_minutes"],0)
+        self.assertIsNone(info["age_minutes"])
+        self.assertFalse(info["fresh"])
+
+
+    def test_missing_timestamp_is_not_fresh_even_when_technical_available(self):
+        now=time.time()
+        state={"resultados":{"EUR/USD":{"tecnico":{"disponivel":True}}}}
+        with patch("master_panel_v102._time.time",return_value=now):
+            info=m._scanner_for_pair(state,"EUR/USD")
+        self.assertTrue(info["available"])
+        self.assertIsNone(info["age_minutes"])
+        self.assertFalse(info["fresh"])
 
     def test_missing_pair_fails_closed(self):
         now=time.time()
