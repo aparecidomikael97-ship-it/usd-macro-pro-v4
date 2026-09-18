@@ -60,7 +60,7 @@ class OTEReplayTests(unittest.TestCase):
 
     def test_sell_geometry_is_valid(self):
         d=buy_case().copy()
-        pivot=11.0
+        # Mirror around a sufficiently high positive pivot so the synthetic SELL\n        # fixture preserves valid non-negative OHLC prices.\n        pivot=20.0
         for c in ("open","high","low","close"):
             d[c]=2*pivot-d[c]
         rows=generate_ote_signals(
