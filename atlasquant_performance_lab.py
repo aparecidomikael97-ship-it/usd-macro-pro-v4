@@ -66,7 +66,7 @@ def prepare_performance_history(df: pd.DataFrame, horizon: str = "24h") -> pd.Da
         out["qualidade"].astype(str).str.replace("%","",regex=False).str.replace(",",".",regex=False),
         errors="coerce",
     )
-    out=out[out[retcol].notna()].copy()
+    out=out[out[retcol].map(lambda x: bool(pd.notna(x) and math.isfinite(float(x))))].copy()
     if out.empty:
         return out
     out["hit"]=out[retcol] > 0
