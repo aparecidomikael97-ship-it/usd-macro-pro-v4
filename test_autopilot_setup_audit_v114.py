@@ -136,6 +136,30 @@ class SetupAuditV114Tests(unittest.TestCase):
         self.assertEqual(float(fvg["avg_r"]), 0.5)
         self.assertEqual(float(fvg["profit_factor_r"]), 2.0)
 
+    def test_duplicate_trade_id_remains_single_frozen_audit_row(self):
+        duplicate=pd.DataFrame([trade_row(),trade_row()])
+        audit=sync_setup_audit(duplicate,scanner_with_fvg("FVG ORIGINAL",71),now=NOW)
+        self.assertEqual(len(audit),1)
+        self.assertEqual(audit.iloc[0]["trade_id"],"t1")
+        self.assertEqual(audit.iloc[0]["fvg_status"],"FVG ORIGINAL")
+
+    def test_nonfinite_component_score_is_not_propagated(self):
+        audit=sync_setup_audit(
+            pd.DataFrame([trade_row()]),
+            scanner_with_fvg("FVG ATIVO",float("nan")),
+            now=NOW,
+        )
+        self.assertTrue(pd.isna(audit.iloc[0]["fvg_score"]))
+
+    def test_summary_never_enables_execution_or_strategy_selection(self):
+        audit=sync_setup_audit(pd.DataFrame([trade_row()]),scanner_with_fvg("FVG",70),now=NOW)
+        summary=build_summary(audit,aggregate_setup_performance(audit),now=NOW)
+        safety=summary["safety"]
+        self.assertFalse(safety["real_orders"])
+        self.assertFalse(safety["broker_connection"])
+        self.assertFalse(safety["auto_strategy_selection"])
+        self.assertFalse(safety["auto_gate_change"])
+
     def test_empty_is_safe(self):
         audit = sync_setup_audit(pd.DataFrame(), {}, pd.DataFrame(), now=NOW)
         perf = aggregate_setup_performance(audit)
