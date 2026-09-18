@@ -45,5 +45,20 @@ class AtlasQuantCoverageFunnelTests(unittest.TestCase):
         self.assertEqual(int((m["Cobertura operacional"]=="PIPELINE COMPLETO").sum()),1)
 
 
+    def test_watchlist_excludes_nonfinite_intensity_and_invalid_top_n(self):
+        m=self.matrix().copy()
+        idx=m.index[m["Cobertura operacional"]=="RADAR MACRO"][:3]
+        m.loc[idx[0],"Intensidade relativa"]=float("nan")
+        m.loc[idx[1],"Intensidade relativa"]=float("inf")
+        m.loc[idx[2],"Intensidade relativa"]=float("-inf")
+        w=expansion_watchlist(m,top_n=28)
+        self.assertTrue(pd.to_numeric(w["Intensidade relativa"],errors="coerce").map(lambda x: pd.notna(x) and abs(float(x))!=float("inf")).all())
+        self.assertTrue(expansion_watchlist(m,top_n=0).empty)
+        self.assertTrue(expansion_watchlist(m,top_n="bad").empty)
+
+    def test_watchlist_missing_required_columns_fails_closed(self):
+        self.assertTrue(expansion_watchlist(pd.DataFrame({"Par":["EUR/GBP"]})).empty)
+
+
 if __name__=="__main__":
     unittest.main()
