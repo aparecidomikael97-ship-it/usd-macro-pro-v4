@@ -41,7 +41,7 @@ class ScannerFreshnessV1074Tests(unittest.TestCase):
             info = m._scanner_for_pair(state, "USD/CHF")
         self.assertFalse(info["fresh"])
 
-    def test_exactly_60_minutes_is_still_fresh(self):
+    def test_exactly_60_minutes_is_stale_by_conservative_boundary(self):
         now=time.time()
         state={"resultados":{"EUR/USD":{"m15_fetched_at":now-3600,"tecnico":{"disponivel":True}}}}
         with patch("master_panel_v102._time.time",return_value=now):
