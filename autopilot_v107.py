@@ -1211,6 +1211,23 @@ def status_summary(
         "healthy": bool(app_ok and not _TD_DAILY_BLOCKED and scanner_fresh >= (5 if forex_market_likely_open(now) else 0) and len(errors)<8),
     }
 
+def persist_decision_evidence(packs, *, engine_version: str, repo: str, branch: str, token: str) -> tuple[dict[str,Any],dict[str,Any],list[str]]:
+    """Persist Shadow and Flight evidence independently; one sink cannot mask the other."""
+    errors=[]
+    try:
+        shadow_batch=build_shadow_batch(packs,champion_version=engine_version)
+        shadow_status=persist_shadow_samples(shadow_batch,repo=repo,branch=branch,token=token)
+    except Exception as exc:
+        shadow_status={"ok":False,"added":0,"samples":0,"reason":"SHADOW_EXCEPTION","error":f"{type(exc).__name__}: {exc}"}
+        errors.append("Decision evidence Shadow: "+shadow_status["error"])
+    try:
+        flight_records=[record_from_pack(p,engine_version) for p in packs]
+        flight_status=persist_records(flight_records,repo=repo,branch=branch,token=token)
+    except Exception as exc:
+        flight_status={"ok":False,"added":0,"records":0,"reason":"FLIGHT_EXCEPTION","error":f"{type(exc).__name__}: {exc}"}
+        errors.append("Decision evidence Flight: "+flight_status["error"])
+    return shadow_status,flight_status,errors
+
 def main() -> int:
     all_errors: list[str] = []
     total_calls = 0
@@ -1277,15 +1294,16 @@ def main() -> int:
             news_state=intel or {},fed_tone=fed_tone,weights=inputs.get("weights") if isinstance(inputs,Mapping) else None,
         )
         engine_version="V11.0.8 / AtlasQuant Runtime"
-        shadow_batch=build_shadow_batch(packs,champion_version=engine_version)
-        shadow_status=persist_shadow_samples(shadow_batch,repo=REPO,branch=BRANCH,token=TOKEN)
-        flight_records=[record_from_pack(p,engine_version) for p in packs]
-        flight_status=persist_records(flight_records,repo=REPO,branch=BRANCH,token=TOKEN)
+        shadow_status,flight_status,evidence_errors=persist_decision_evidence(
+            packs,engine_version=engine_version,repo=REPO,branch=BRANCH,token=TOKEN,
+        )
+        all_errors.extend(evidence_errors)
     except Exception as evidence_exc:
         packs=[]
-        shadow_status={"ok":False,"added":0,"samples":0,"reason":"CAPTURE_EXCEPTION","error":f"{type(evidence_exc).__name__}: {evidence_exc}"}
-        flight_status={"ok":False,"added":0,"records":0,"reason":"CAPTURE_EXCEPTION","error":f"{type(evidence_exc).__name__}: {evidence_exc}"}
-        all_errors.append("Decision evidence: "+flight_status["error"])
+        err=f"{type(evidence_exc).__name__}: {evidence_exc}"
+        shadow_status={"ok":False,"added":0,"samples":0,"reason":"PACK_BUILD_EXCEPTION","error":err}
+        flight_status={"ok":False,"added":0,"records":0,"reason":"PACK_BUILD_EXCEPTION","error":err}
+        all_errors.append("Decision evidence Pack: "+err)
 
     # 7. Health/status.
     status=status_summary(
