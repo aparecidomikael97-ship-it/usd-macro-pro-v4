@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import html
 import streamlit as st
 
 
@@ -532,6 +533,167 @@ ACADEMY_TRACKS: list[dict[str, Any]] = [
 ]
 
 
+
+ACADEMY_VISUALS: dict[str, dict[str, Any]] = {
+    "macro_01": {
+        "titulo": "Ciclo macroeconômico",
+        "subtitulo": "Como crescimento, inflação, juros e moeda se conectam",
+        "tipo": "flow",
+        "itens": [
+            ("1", "Crescimento", "Atividade acelera"),
+            ("2", "Emprego", "Demanda e salários"),
+            ("3", "Inflação", "Pressão de preços"),
+            ("4", "Juros", "Banco central reage"),
+            ("5", "Moeda", "Força relativa muda"),
+        ],
+        "nota": "O ciclo não é mecânico; compare sempre as duas economias do par.",
+    },
+    "macro_02": {
+        "titulo": "Mapa da inflação",
+        "subtitulo": "CPI, Core CPI, PCE e PPI em uma única leitura",
+        "tipo": "grid",
+        "itens": [
+            ("CPI", "Consumidor", "Preço da cesta ao consumidor"),
+            ("Core CPI", "Persistência", "Exclui componentes mais voláteis"),
+            ("PCE", "Fed", "Medida ampla de consumo observada pelo Fed"),
+            ("Core PCE", "Núcleo", "Persistência na medida PCE"),
+            ("PPI", "Produtor", "Pressão de preços na origem"),
+            ("Surpresa", "Mercado", "Real versus consenso"),
+        ],
+        "nota": "Depois do release, confirme a narrativa no Treasury 2Y e no USD.",
+    },
+    "macro_04": {
+        "titulo": "Como ler o Fed",
+        "subtitulo": "Da decisão de juros à mudança de narrativa",
+        "tipo": "flow",
+        "itens": [
+            ("1", "Taxa", "Faixa-alvo dos Fed Funds"),
+            ("2", "Comunicado", "Mudanças no texto"),
+            ("3", "Dot plot", "Caminho esperado dos juros"),
+            ("4", "Coletiva", "Tom hawkish, neutro ou dovish"),
+            ("5", "Mercado", "Treasuries e USD reprecificam"),
+        ],
+        "nota": "Compare sempre a reunião atual com a anterior; a mudança costuma importar mais que o nível isolado.",
+    },
+    "macro_07": {
+        "titulo": "Força relativa das moedas",
+        "subtitulo": "Encontrar contraste antes de escolher o par",
+        "tipo": "strength",
+        "itens": [
+            ("USD", "82", "Forte"),
+            ("EUR", "67", "Moderada"),
+            ("GBP", "61", "Moderada"),
+            ("JPY", "38", "Fraca"),
+            ("AUD", "34", "Fraca"),
+            ("NZD", "31", "Fraca"),
+        ],
+        "nota": "Exemplo didático: score organiza comparação; não representa probabilidade de gain.",
+    },
+    "ict_02": {
+        "titulo": "Liquidez: BSL e SSL",
+        "subtitulo": "Onde estão as referências acima e abaixo do preço",
+        "tipo": "liquidity",
+        "itens": [
+            ("BSL", "Acima das máximas", "Buy-side liquidity"),
+            ("Preço", "Range atual", "Estrutura em observação"),
+            ("SSL", "Abaixo das mínimas", "Sell-side liquidity"),
+        ],
+        "nota": "Sweep é busca de liquidez seguida de reação; perfurar um nível não garante reversão.",
+    },
+    "ict_03": {
+        "titulo": "BOS, CHoCH e MSS",
+        "subtitulo": "Continuidade versus mudança de estrutura",
+        "tipo": "structure",
+        "itens": [
+            ("Swing", "Referência", "Máxima/mínima estrutural"),
+            ("BOS", "Continuidade", "Rompe a favor da estrutura anterior"),
+            ("CHoCH", "Mudança", "Rompe contra uma estrutura direcional"),
+            ("MSS", "Mista", "Quebra quando a estrutura anterior não é limpa"),
+        ],
+        "nota": "O AtlasQuant exige fechamento além do swing confirmado e usa contexto para evitar ruído.",
+    },
+    "ict_05": {
+        "titulo": "FVG e imbalance",
+        "subtitulo": "Desequilíbrio de três candles e retorno de preço",
+        "tipo": "fvg",
+        "itens": [
+            ("Candle 1", "Origem", "Define uma borda"),
+            ("Candle 2", "Deslocamento", "Movimento impulsivo"),
+            ("FVG", "Ineficiência", "Área entre Candle 1 e Candle 3"),
+            ("Candle 3", "Confirmação", "Mantém o espaço do desequilíbrio"),
+        ],
+        "nota": "FVG é zona contextual: presente, em teste ou invalidado; não é entrada automática.",
+    },
+    "ict_04": {
+        "titulo": "Order Block",
+        "subtitulo": "Zona de origem validada por estrutura e deslocamento",
+        "tipo": "ob",
+        "itens": [
+            ("1", "Candle oposto", "Origem dentro da perna atual"),
+            ("2", "Displacement", "Movimento com força suficiente"),
+            ("3", "Quebra", "BOS/CHoCH alinhado"),
+            ("4", "Mitigação", "Retorno à zona"),
+            ("5", "Invalidação", "Fechamento além da borda oposta"),
+        ],
+        "nota": "É uma heurística auditável do AtlasQuant; não prova existência de ordens institucionais reais.",
+    },
+}
+
+
+def _academy_visual_html(lesson_id: str) -> str:
+    visual = ACADEMY_VISUALS.get(lesson_id)
+    if not visual:
+        return ""
+
+    items = list(visual.get("itens", []))
+    kind = str(visual.get("tipo", "grid"))
+    cards = []
+    for tag, title, desc in items:
+        tag_e = html.escape(str(tag))
+        title_e = html.escape(str(title))
+        desc_e = html.escape(str(desc))
+        if kind == "strength":
+            try:
+                width = max(8, min(100, int(float(str(desc).replace("%", ""))))) if False else max(8, min(100, int(float(str(title)))))
+            except Exception:
+                width = 50
+            cards.append(
+                f'<div class="aqv-strength-row"><b>{tag_e}</b>'
+                f'<div class="aqv-bar"><span style="width:{width}%"></span></div>'
+                f'<em>{title_e}</em><small>{desc_e}</small></div>'
+            )
+        else:
+            cards.append(
+                f'<div class="aqv-card"><span class="aqv-tag">{tag_e}</span>'
+                f'<b>{title_e}</b><small>{desc_e}</small></div>'
+            )
+
+    body_class = "aqv-strength" if kind == "strength" else f"aqv-{html.escape(kind)}"
+    title = html.escape(str(visual.get("titulo", "")))
+    subtitle = html.escape(str(visual.get("subtitulo", "")))
+    note = html.escape(str(visual.get("nota", "")))
+    return f"""
+    <div class="aqv-shell" translate="no">
+      <style>
+        .aqv-shell{{border:1px solid rgba(70,150,220,.35);border-radius:16px;padding:18px;background:linear-gradient(145deg,#07111f,#0d2032);color:#eef7ff;margin:8px 0 14px 0}}
+        .aqv-head b{{font-size:1.08rem}} .aqv-head p{{margin:.25rem 0 .9rem 0;color:#a8bfd2;font-size:.9rem}}
+        .aqv-grid,.aqv-flow,.aqv-liquidity,.aqv-structure,.aqv-fvg,.aqv-ob{{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:9px}}
+        .aqv-card{{min-height:88px;padding:12px;border-radius:12px;background:#10283c;border:1px solid rgba(91,183,255,.24);display:flex;flex-direction:column;gap:4px}}
+        .aqv-card b{{font-size:.95rem}} .aqv-card small{{color:#b7cad9;line-height:1.25}}
+        .aqv-tag{{display:inline-flex;width:max-content;min-width:28px;justify-content:center;padding:2px 7px;border-radius:999px;background:#1178b8;color:white;font-size:.73rem;font-weight:700}}
+        .aqv-strength{{display:flex;flex-direction:column;gap:8px}} .aqv-strength-row{{display:grid;grid-template-columns:42px 1fr 42px 70px;gap:8px;align-items:center;font-size:.84rem}}
+        .aqv-strength-row em{{font-style:normal;text-align:right}} .aqv-strength-row small{{color:#a8bfd2}}
+        .aqv-bar{{height:11px;border-radius:10px;background:#173247;overflow:hidden}} .aqv-bar span{{display:block;height:100%;background:linear-gradient(90deg,#1586c7,#6ec8ff);border-radius:10px}}
+        .aqv-note{{margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.09);color:#b8cede;font-size:.82rem}}
+      </style>
+      <div class="aqv-head"><b>🖼️ {title}</b><p>{subtitle}</p></div>
+      <div class="{body_class}">{''.join(cards)}</div>
+      <div class="aqv-note">💡 {note}</div>
+    </div>
+    """
+
+
+
 def _video_script_for_lesson(lesson_id: str) -> list[dict[str, str]]:
     return (
         MACRO_VIDEO_SCRIPTS.get(lesson_id, [])
@@ -616,6 +778,11 @@ def render_academy() -> None:
         st.caption(f"⏱️ {lesson['duracao']}")
         st.markdown(f"**Objetivo:** {lesson['objetivo']}")
         st.markdown(f"**Resumo:** {lesson['resumo']}")
+
+        _visual_html = _academy_visual_html(lesson["id"])
+        if _visual_html:
+            st.markdown("##### 🖼️ Visual didático")
+            st.markdown(_visual_html, unsafe_allow_html=True)
 
         st.markdown("##### 🎬 Roteiro do vídeo")
         for idx, item in enumerate(lesson["roteiro"], 1):
