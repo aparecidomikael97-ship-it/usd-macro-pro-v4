@@ -11,6 +11,7 @@ except Exception:
 
 from product_v104 import choose_ab_variant, history_limit, freshness_by_frequency, HISTORY_MAP, ROADMAP
 
+
 class ProductV104Tests(unittest.TestCase):
     def test_ab_variant_is_deterministic(self):
         self.assertEqual(choose_ab_variant("abc"), choose_ab_variant("abc"))
@@ -31,12 +32,13 @@ class ProductV104Tests(unittest.TestCase):
     def test_required_content(self):
         self.assertIn("CPI / IPC", HISTORY_MAP)
         self.assertIn("PIB", HISTORY_MAP)
-        self.assertGrea
+        self.assertGreaterEqual(len(ROADMAP), 6)
+
     def test_wireframe_avoids_deprecated_components_html(self):
         src = Path("product_v104.py").read_text(encoding="utf-8")
         self.assertNotIn("components.v1.html", src)
         self.assertIn('st.image(WIREFRAME_SVG.encode("utf-8"), width="stretch")', src)
-terEqual(len(ROADMAP), 6)
+
 
 if __name__ == "__main__":
     unittest.main()
