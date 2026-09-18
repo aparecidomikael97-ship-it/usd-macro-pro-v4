@@ -96,5 +96,20 @@ class StrategyStabilityTests(unittest.TestCase):
         self.assertEqual(int(amd["trades"].sum()),3)
 
 
+    def test_invalid_trade_counts_fail_closed(self):
+        for bad in (float("nan"),float("inf"),float("-inf"),-1):
+            with self.subTest(trades=bad):
+                d=pd.DataFrame([
+                    {"strategy":"FVG","fold_index":1,"trades":5,"expectancy_r":0.2,"net_r":1.0},
+                    {"strategy":"FVG","fold_index":2,"trades":bad,"expectancy_r":0.2,"net_r":1.0},
+                    {"strategy":"FVG","fold_index":3,"trades":5,"expectancy_r":0.2,"net_r":1.0},
+                ])
+                x=temporal_stability_summary(d,folds=3,min_trades_per_fold=5)
+                r=x[x["strategy"]=="FVG"].iloc[0]
+                self.assertEqual(r["stability_status"],"INSUFFICIENT")
+                self.assertFalse(bool(r["all_folds_sufficient"]))
+
+
+
 if __name__=="__main__":
     unittest.main()
