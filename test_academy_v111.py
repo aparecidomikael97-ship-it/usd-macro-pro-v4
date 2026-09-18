@@ -58,9 +58,18 @@ class AcademyVideoScriptsTests(unittest.TestCase):
 
     def test_academy_renders_full_recording_script(self):
         self.assertIn('Roteiro completo de gravação', self.source)
-        self.assertIn('MACRO_VIDEO_SCRIPTS.get(lesson["id"], [])', self.source)
-        self.assertIn('ICT_VIDEO_SCRIPTS.get(lesson["id"], [])', self.source)
-        self.assertIn('ATLASQUANT_VIDEO_SCRIPTS.get(lesson["id"], [])', self.source)
+        self.assertIn('def _video_script_for_lesson', self.source)
+        self.assertIn('MACRO_VIDEO_SCRIPTS.get(lesson_id, [])', self.source)
+        self.assertIn('ICT_VIDEO_SCRIPTS.get(lesson_id, [])', self.source)
+        self.assertIn('ATLASQUANT_VIDEO_SCRIPTS.get(lesson_id, [])', self.source)
+
+    def test_all_22_lessons_have_storyboard_support(self):
+        all_ids = set(self.scripts) | set(self.ict_scripts) | set(self.atlas_scripts)
+        self.assertEqual(len(all_ids), 22)
+        self.assertIn('def build_storyboard', self.source)
+        self.assertIn('Storyboard visual da aula', self.source)
+        self.assertIn('"direcao_visual"', self.source)
+        self.assertIn('Sequência pronta para gravação', self.source)
 
 
 if __name__ == "__main__":
