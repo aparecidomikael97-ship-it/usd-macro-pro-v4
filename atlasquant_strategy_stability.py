@@ -144,9 +144,11 @@ def temporal_stability_summary(
         trades=pd.to_numeric(group["trades"],errors="coerce").fillna(0)
         exps=pd.to_numeric(group["expectancy_r"],errors="coerce")
         nets=pd.to_numeric(group["net_r"],errors="coerce").fillna(0.0)
-        sufficient=bool((trades>=minimum).all() and exps.notna().all())
+        finite_exps=exps.map(lambda x: bool(pd.notna(x) and math.isfinite(float(x))))
+        finite_nets=nets.map(lambda x: bool(pd.notna(x) and math.isfinite(float(x))))
+        sufficient=bool((trades>=minimum).all() and finite_exps.all() and finite_nets.all())
 
-        exp_values=[float(x) for x in exps.dropna().tolist()]
+        exp_values=[float(x) for x in exps[finite_exps].tolist()]
         positive=sum(1 for x in exp_values if x>1e-12)
         negative=sum(1 for x in exp_values if x<-1e-12)
         flat=len(exp_values)-positive-negative
@@ -178,7 +180,7 @@ def temporal_stability_summary(
             "best_expectancy_r":None if best is None else round(best,4),
             "expectancy_spread_r":None if spread is None else round(spread,4),
             "expectancy_std_r":None if std is None else round(std,4),
-            "total_net_r":round(float(nets.sum()),4),
+            "total_net_r":round(float(nets.sum()),4) if finite_nets.all() else 0.0,
             "stability_status":status,
         })
     return pd.DataFrame(rows)
