@@ -109,6 +109,15 @@ class MasterPanelTests(unittest.TestCase):
         self.assertIn("Prioriza pares ausentes ou com Market Map mais antigo.", src)
         self.assertIn("sorted(", src)
 
+    def test_scanner_auto_refresh_is_enabled_and_budget_aware(self):
+        src = open("master_panel_v102.py", encoding="utf-8").read()
+        self.assertIn("AUTO_SCANNER_INTERVAL_SECONDS = 75", src)
+        self.assertIn("Atualização automática do scanner técnico", src)
+        self.assertIn("@_fragment_factory_v1075(run_every=AUTO_SCANNER_INTERVAL_SECONDS)", src)
+        self.assertIn('startswith("Scanner atualizado para:")', src)
+        self.assertIn("Só pares ausentes ou com técnica >45 min", src)
+        self.assertIn("cada ciclo consulta no máximo 2 pares", src)
+
     def test_master_panel_uses_stable_diagnostic_dom(self):
         src = open("master_panel_v102.py", encoding="utf-8").read()
         self.assertIn('class="atlas-master-diagnostic"', src)
