@@ -1,4 +1,5 @@
 import unittest
+import pandas as pd
 
 from atlasquant_strategy_friction import (
     build_friction_scenarios,
@@ -153,6 +154,30 @@ class StrategyFrictionTests(unittest.TestCase):
             build_friction_scenarios(base_cost_r=-0.01)
         with self.assertRaises(ValueError):
             build_friction_scenarios(base_cost_r=0.0,slippage_levels_r=[-0.01])
+
+
+    def test_summary_invalid_trade_counts_fail_closed(self):
+        for bad in (float("nan"),float("inf"),float("-inf"),-1):
+            with self.subTest(trades=bad):
+                detail=pd.DataFrame([{
+                    "strategy":"FVG","operacional":"FVG","trades":bad,
+                    "expectancy_r":1.0,"total_friction_r":0.0,
+                    "cost_r":0.0,"slippage_r":0.0,
+                }])
+                row=friction_sensitivity_summary(detail,min_trades=1)
+                fvg=row[row["strategy"]=="FVG"].iloc[0]
+                self.assertEqual(fvg["sensitivity_status"],"INSUFFICIENT")
+
+    def test_summary_nonfinite_expectancy_never_counts_positive(self):
+        detail=pd.DataFrame([{
+            "strategy":"FVG","operacional":"FVG","trades":20,
+            "expectancy_r":float("inf"),"total_friction_r":0.0,
+            "cost_r":0.0,"slippage_r":0.0,
+        }])
+        fvg=friction_sensitivity_summary(detail,min_trades=20)
+        row=fvg[fvg["strategy"]=="FVG"].iloc[0]
+        self.assertEqual(row["sensitivity_status"],"INSUFFICIENT")
+        self.assertEqual(int(row["positive_scenarios"]),0)
 
 
 if __name__=="__main__":
