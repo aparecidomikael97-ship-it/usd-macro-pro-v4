@@ -21,26 +21,22 @@ function Read-AtlasQuantLocalSecret {
     param([Parameter(Mandatory=$true)][string]$Name)
 
     $secretsPath = Join-Path (Get-Location).Path ".streamlit\secrets.toml"
+    $pythonPath = Join-Path (Get-Location).Path ".venv\Scripts\python.exe"
+
     if (-not (Test-Path $secretsPath)) {
+        return ""
+    }
+    if (-not (Test-Path $pythonPath)) {
         return ""
     }
 
     try {
-        $escapedName = [regex]::Escape($Name)
-        $line = Get-Content -LiteralPath $secretsPath | Where-Object {
-            $_ -match ("^\s*" + $escapedName + "\s*=")
-        } | Select-Object -Last 1
-
-        if ([string]::IsNullOrWhiteSpace($line)) {
+        $code = 'import pathlib,sys,tomllib; p=pathlib.Path(sys.argv[1]); d=tomllib.loads(p.read_text(encoding="utf-8")); v=d.get(sys.argv[2],""); print(v if isinstance(v,str) else "")'
+        $value = & $pythonPath -c $code $secretsPath $Name 2>$null | Select-Object -Last 1
+        if ([string]::IsNullOrWhiteSpace($value)) {
             return ""
         }
-
-        $pattern = '^\s*' + $escapedName + '\s*=\s*"([^"]*)"\s*$'
-        if ($line -notmatch $pattern) {
-            return ""
-        }
-
-        return $Matches[1]
+        return ([string]$value).Trim()
     } catch {
         return ""
     }
@@ -220,6 +216,10 @@ function Test-AtlasQuant {
     Write-Host "Verificando dependencias principais..."
     & ".\.venv\Scripts\python.exe" -c "import streamlit,pandas,numpy,requests,pyarrow; print('Dependencias principais: OK')"
     if ($LASTEXITCODE -ne 0) { throw "Falha ao importar dependencias principais." }
+
+    $secretState = Import-AtlasQuantLocalSecrets
+    Write-Host ("FRED local: " + $(if ($secretState.Fred) { "OK" } else { "NAO CONFIGURADO" }))
+    Write-Host ("Twelve Data local: " + $(if ($secretState.TwelveData) { "OK" } else { "NAO CONFIGURADO" }))
     Write-Host "Verificando sintaxe do aplicativo principal..."
     & ".\.venv\Scripts\python.exe" -m py_compile "usd_macro_pro_v4_cloud.py"
     if ($LASTEXITCODE -ne 0) { throw "Falha de sintaxe no aplicativo principal." }
