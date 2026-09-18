@@ -62,6 +62,22 @@ class ReleaseGuardTests(unittest.TestCase):
         self.assertFalse(report["staging_ok"])
         self.assertFalse(report["eligible_for_manual_promotion"])
 
+    def test_paper_only_or_secrets_breach_blocks_release(self):
+        ev = ReleaseEvidence(
+            tests_total=700,
+            tests_failed=0,
+            critical_regressions=0,
+            compile_ok=True,
+            health_check_ok=True,
+            paper_only_ok=False,
+            secrets_untouched=False,
+        )
+        report = assess_release(ev)
+        self.assertFalse(report["staging_ok"])
+        self.assertFalse(report["eligible_for_manual_promotion"])
+        self.assertTrue(any("Paper Trading" in x for x in report["hard_blocks"]))
+        self.assertTrue(any("secrets" in x for x in report["hard_blocks"]))
+
     def test_integrity_breach_forces_rollback(self):
         report = should_rollback(
             app_boot_ok=True,
@@ -70,6 +86,16 @@ class ReleaseGuardTests(unittest.TestCase):
         )
         self.assertTrue(report["rollback"])
         self.assertTrue(report["reasons"])
+
+    def test_paper_or_secrets_breach_forces_rollback(self):
+        report = should_rollback(
+            app_boot_ok=True,
+            health_check_ok=True,
+            paper_only_breach=True,
+            secrets_changed=True,
+        )
+        self.assertTrue(report["rollback"])
+        self.assertGreaterEqual(len(report["reasons"]), 2)
 
 
 if __name__ == "__main__":
