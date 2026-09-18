@@ -99,5 +99,20 @@ class AtlasQuantAdaptiveExecutionGateTests(unittest.TestCase):
         self.assertFalse(r["automatic_live_wiring_allowed"])
 
 
+    def test_exact_freshness_boundary_and_invalid_limit_fail_closed(self):
+        r=adaptive_pair_permission(
+            "EUR/USD",active_pairs=["EUR/USD"],m15_age_minutes=60,
+            derived_health=GOOD_HEALTH,data_sufficient=True,max_active_m15_age_min=60,
+        )
+        self.assertFalse(r["executable"])
+        for bad in (0,-1,float("nan"),float("inf"),float("-inf")):
+            with self.subTest(limit=bad):
+                r=adaptive_pair_permission(
+                    "EUR/USD",active_pairs=["EUR/USD"],m15_age_minutes=20,
+                    derived_health=GOOD_HEALTH,data_sufficient=True,max_active_m15_age_min=bad,
+                )
+                self.assertFalse(r["executable"])
+
+
 if __name__=="__main__":
     unittest.main()
