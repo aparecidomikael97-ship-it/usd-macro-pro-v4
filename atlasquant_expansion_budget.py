@@ -7,6 +7,7 @@ change cadence, expand PAIR_ORDER, or alter production behavior.
 from __future__ import annotations
 
 from math import ceil
+import math
 from typing import Any
 import streamlit as st
 
@@ -23,9 +24,18 @@ DEFAULTS={
 }
 
 
+def _safe_int(value: Any, default: int = 0) -> tuple[int,bool]:
+    if isinstance(value,bool): return default,False
+    try:
+        x=float(value)
+        if not math.isfinite(x) or not x.is_integer(): return default,False
+        return int(x),True
+    except Exception: return default,False
+
 def _calls_per_day(cadence_min: int, market_minutes: int) -> int:
-    cadence=max(1,int(cadence_min))
-    minutes=max(0,int(market_minutes))
+    cadence,ok1=_safe_int(cadence_min)
+    minutes,ok2=_safe_int(market_minutes)
+    if not ok1 or not ok2 or cadence<=0 or minutes<0: return 0
     return 0 if minutes==0 else int(ceil(minutes/cadence))
 
 
@@ -42,26 +52,29 @@ def estimate_daily_calls(
     d1_calls_per_pair: int = DEFAULTS["d1_calls_per_pair"],
     daily_cap: int = DEFAULTS["daily_cap"],
 ) -> dict[str, Any]:
-    pairs=max(0,int(pair_count))
-    priority=max(0,min(int(priority_count),pairs))
+    raw=(pair_count,priority_count,market_minutes,priority_m15_min,priority_h1_min,normal_m15_min,normal_h1_min,h4_min,d1_calls_per_pair,daily_cap)
+    parsed=[_safe_int(x) for x in raw]
+    inputs_valid=all(ok for _,ok in parsed)
+    pairs=max(0,parsed[0][0]); priority=max(0,min(parsed[1][0],pairs))
     normal=pairs-priority
 
     priority_per_pair=(
         _calls_per_day(priority_m15_min,market_minutes)
         +_calls_per_day(priority_h1_min,market_minutes)
         +_calls_per_day(h4_min,market_minutes)
-        +max(0,int(d1_calls_per_pair))
+        +max(0,parsed[8][0])
     )
     normal_per_pair=(
         _calls_per_day(normal_m15_min,market_minutes)
         +_calls_per_day(normal_h1_min,market_minutes)
         +_calls_per_day(h4_min,market_minutes)
-        +max(0,int(d1_calls_per_pair))
+        +max(0,parsed[8][0])
     )
     total=priority*priority_per_pair+normal*normal_per_pair
-    cap=max(1,int(daily_cap))
+    cap=max(1,parsed[9][0])
     ratio=total/cap
     return {
+        "inputs_valid":bool(inputs_valid and pairs>=0 and parsed[1][0]>=0 and parsed[2][0]>=0 and all(v>0 for v in (parsed[3][0],parsed[4][0],parsed[5][0],parsed[6][0],parsed[7][0])) and parsed[8][0]>=0 and parsed[9][0]>0),
         "pair_count":pairs,
         "priority_count":priority,
         "normal_count":normal,
@@ -70,7 +83,7 @@ def estimate_daily_calls(
         "estimated_daily_calls":total,
         "daily_cap":cap,
         "cap_usage_pct":round(ratio*100.0,1),
-        "within_cap":bool(total<=cap),
+        "within_cap":bool(inputs_valid and pairs>=0 and parsed[1][0]>=0 and parsed[2][0]>=0 and all(v>0 for v in (parsed[3][0],parsed[4][0],parsed[5][0],parsed[6][0],parsed[7][0])) and parsed[8][0]>=0 and parsed[9][0]>0 and total<=cap),
         "excess_calls":max(0,total-cap),
         "headroom_calls":max(0,cap-total),
     }
