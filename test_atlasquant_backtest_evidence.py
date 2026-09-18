@@ -146,6 +146,8 @@ class BacktestEvidenceTests(unittest.TestCase):
 
     def test_corrupt_counts_and_statuses_fail_closed_in_evidence(self):
         comp=comparison()
+        comp["trades"]=comp["trades"].astype(float)
+        comp["max_loss_streak"]=comp["max_loss_streak"].astype(float)
         comp.loc[comp["strategy"]=="FVG","trades"]=float("inf")
         comp.loc[comp["strategy"]=="FVG","max_loss_streak"]=-1
         stab=status_frame("stability_status","POSITIVE_ACROSS_FOLDS")
