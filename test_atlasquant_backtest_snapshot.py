@@ -51,4 +51,24 @@ class BacktestSnapshotTests(unittest.TestCase):
     def test_invalid_json_is_controlled_error(self):
         with self.assertRaisesRegex(ValueError,"JSON inválido"): load_snapshot_json("{")
 
+
+    def test_fail_closed_when_safety_flags_are_removed_or_false(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td); (root/"logic.py").write_text("x=1\n")
+            for key,value in (("research_only",False),("no_live_gate_effect",False)):
+                with self.subTest(flag=key):
+                    a=snap(root); a[key]=value
+                    with self.assertRaisesRegex(ValueError,"flags de segurança"):
+                        validate_snapshot(a)
+
+    def test_fail_closed_on_invalid_count_metadata(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td); (root/"logic.py").write_text("x=1\n")
+            for section,key,bad in (("raw_csv","bytes",-1),("raw_csv","bytes",True),("normalized_data","rows",-1),("normalized_data","rows",1.5)):
+                with self.subTest(section=section,key=key,bad=bad):
+                    a=snap(root); a[section][key]=bad
+                    with self.assertRaisesRegex(ValueError,"inválidos"):
+                        validate_snapshot(a)
+
+
 if __name__=="__main__": unittest.main()
