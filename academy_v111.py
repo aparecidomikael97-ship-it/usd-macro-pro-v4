@@ -123,6 +123,60 @@ ICT_VIDEO_SCRIPTS: dict[str, list[dict[str, str]]] = {
     ],
 }
 
+
+ATLASQUANT_VIDEO_SCRIPTS: dict[str, list[dict[str, str]]] = {
+    "aq_01": [
+        {"bloco": "Abertura", "tela": "AtlasQuant > Painel Mestre", "narracao": "Nesta aula você vai aprender a ler o Painel Mestre em cerca de um minuto. O objetivo é priorizar contexto, não transformar um número em sinal automático."},
+        {"bloco": "Visão geral", "tela": "Cards Pares / Market Map / Scanner técnico atual / Modo", "narracao": "Comece pelos quatro cards do topo. Pares mostra o universo analisado. Market Map processado indica quantos pares têm contexto estrutural. Scanner técnico atual mostra quantos estão frescos. Modo seletivo lembra que o sistema deve filtrar, não forçar operação."},
+        {"bloco": "Estado e Gate", "tela": "Tabela consolidada > Estado / Gate", "narracao": "Estado resume a condição atual: executável, quase pronto, conflito, esticado ou aguardar. Gate mede seletividade do contexto. Um score alto sem Gate adequado ou com conflito técnico não deve ser tratado como confirmação."},
+        {"bloco": "Índice Integrado", "tela": "Índice Integrado / ADR usado / Liquidez", "narracao": "O Índice Integrado combina componentes para ranking operacional. Ele não é probabilidade de gain. ADR ajuda a evitar perseguir preço esticado e liquidez alvo mostra onde o mercado pode buscar interesse."},
+        {"bloco": "Fechamento", "tela": "Melhor contexto consolidado + diagnóstico", "narracao": "Antes de qualquer decisão, abra o diagnóstico do melhor contexto e confirme pelo menos Estado, Gate, ADR e H4/H1/M15. Se uma camada importante falhar, mantenha WAIT."},
+    ],
+    "aq_02": [
+        {"bloco": "Abertura", "tela": "AtlasQuant > Market Map", "narracao": "O Market Map organiza o cenário antes do gatilho. Ele responde quatro perguntas: qual é a estrutura maior, onde o preço está, qual liquidez é relevante e existe risco de evento ou exaustão de range?"},
+        {"bloco": "W1 e D1", "tela": "W1 / D1", "narracao": "Leia semanal e diário primeiro. Quando os dois concordam, o contexto tende a ficar mais limpo. Quando divergem, reduza a confiança e exija mais confirmação nos timeframes menores."},
+        {"bloco": "Localização e liquidez", "tela": "Premium/Discount / PWH-PWL / PDH-PDL / Asia High-Low", "narracao": "Localização importa. O mesmo gatilho pode ter qualidade diferente dependendo de onde ocorre no range. Marque a liquidez acima e abaixo antes de procurar entrada."},
+        {"bloco": "Sweep, evento e ADR", "tela": "Sweep recente / Event Risk / ADR14", "narracao": "Sweep recente pode reforçar uma hipótese se estiver alinhado ao contexto. Evento de alto impacto pode bloquear execução. ADR mostra se o movimento diário já está consumido demais."},
+        {"bloco": "Fechamento", "tela": "Exemplo de WAIT", "narracao": "Um Market Map correto também sabe dizer para não operar. Se estrutura, localização ou risco de evento estiverem ruins, WAIT é uma saída válida mesmo que parte da técnica esteja verde."},
+    ],
+    "aq_03": [
+        {"bloco": "Abertura", "tela": "Painel Mestre > Scanner técnico automático", "narracao": "O scanner técnico acompanha H4, H1 e M15 e agora pode se atualizar automaticamente enquanto o AtlasQuant está aberto."},
+        {"bloco": "Função dos timeframes", "tela": "H4 / H1 / M15", "narracao": "H4 mede tendência e estrutura intermediária. H1 procura alinhamento, pullback ou preço esticado. M15 procura o gatilho curto. O scanner não deve inverter sozinho uma direção macro já definida."},
+        {"bloco": "Frescura", "tela": "Scanner técnico atual X/7 / Técnica atualizada", "narracao": "O indicador X de 7 mostra quantos pares têm técnica recente. Dado vencido não deve participar como se fosse atual; por isso o sistema rastreia idade e marca técnica desatualizada."},
+        {"bloco": "Automação e cota", "tela": "Toggle automático / cooldown Twelve Data", "narracao": "No modo automático, o sistema verifica periodicamente quais pares estão ausentes ou vencidos e atualiza no máximo dois por ciclo. Isso protege a cota da Twelve Data e evita consultas desnecessárias."},
+        {"bloco": "Fechamento", "tela": "Botão manual como reserva", "narracao": "Deixe o automático ligado para manutenção normal. Use o botão manual apenas como reserva. E lembre: H4 verde, H1 amarelo e M15 vermelho ainda é contexto incompleto, não execução."},
+    ],
+    "aq_04": [
+        {"bloco": "Abertura", "tela": "AtlasQuant > EUA", "narracao": "A aba EUA é onde você valida a base macro do dólar. O primeiro passo não é olhar o score; é conferir a qualidade dos dados."},
+        {"bloco": "Qualidade", "tela": "Qualidade dos dados / Auditoria", "narracao": "Cheque a porcentagem de qualidade e abra a Auditoria dos dados. Confirme fonte, última observação, idade e status. Dado oficial e fresco vale mais que um número bonito sem procedência."},
+        {"bloco": "Indicadores", "tela": "Fed Funds / CPI / PCE / Payroll / Desemprego / PIB / Treasuries", "narracao": "Leia os indicadores em bloco. Inflação conversa com juros; emprego conversa com crescimento e Fed; Treasury 2Y ajuda a confirmar expectativa de política monetária."},
+        {"bloco": "Fed", "tela": "AtlasQuant > Fed", "narracao": "Depois compare o score macro com a narrativa do Fed. Se dados sugerem pressão inflacionária e o Fed está restritivo, existe coerência. Se os dois divergem, trate a leitura com mais cautela."},
+        {"bloco": "Fechamento", "tela": "Conclusão macro USD", "narracao": "Faça uma conclusão em uma frase usando pelo menos três indicadores e o tom do Fed. O objetivo é explicar o porquê da leitura, não apenas repetir o score."},
+    ],
+    "aq_05": [
+        {"bloco": "Abertura", "tela": "AtlasQuant > Moedas", "narracao": "A aba Moedas serve para encontrar contraste relativo. Você procura uma moeda mais forte contra outra mais fraca, sempre conferindo qualidade dos dados."},
+        {"bloco": "Ranking", "tela": "Ranking das moedas", "narracao": "Leia força relativa e qualidade lado a lado. Score alto com baixa qualidade deve perder prioridade para um contexto um pouco menor, mas melhor documentado."},
+        {"bloco": "Formação do par", "tela": "AtlasQuant > Pares", "narracao": "Depois forme pares coerentes. Forte na base contra fraca na cotada tende a favorecer alta; fraca na base contra forte na cotada tende a favorecer baixa. Isso é hipótese macro, não ordem."},
+        {"bloco": "Validação", "tela": "Matriz de Pares + Market Map + Scanner", "narracao": "A aba Pares testa a diferença macro. Em seguida, Market Map valida estrutura e localização, e o scanner verifica H4, H1 e M15."},
+        {"bloco": "Fechamento", "tela": "Dois candidatos → eliminar um", "narracao": "Monte dois candidatos e elimine o pior por baixa qualidade, evento, conflito técnico ou preço esticado. O AtlasQuant deve ajudar você a excluir cenário ruim, não apenas procurar cenário bom."},
+    ],
+    "aq_06": [
+        {"bloco": "Abertura", "tela": "AtlasQuant > Backtest / Histórico", "narracao": "Backtest e diário existem para responder uma pergunta simples: o operacional tem evidência ou só parece funcionar na memória?"},
+        {"bloco": "Métricas", "tela": "Gain / Loss / Breakeven / Payoff / Drawdown", "narracao": "Taxa de acerto sozinha não basta. Um sistema pode acertar muito e ainda perder dinheiro se o loss médio for grande. Payoff, drawdown e tamanho da amostra precisam entrar na análise."},
+        {"bloco": "Registro", "tela": "Diário de trade", "narracao": "Registre setup, par, direção, contexto macro, horário, risco, entrada, saída e resultado. Se possível, inclua screenshot e motivo de entrada e saída."},
+        {"bloco": "Revisão", "tela": "Filtro por setup / sessão / estado", "narracao": "Revise por grupo. Compare, por exemplo, setups com Gate A contra Gate B, sessão de Londres contra Nova York ou scanner completo contra incompleto. Isso mostra onde realmente está a vantagem ou o problema."},
+        {"bloco": "Fechamento", "tela": "Amostra antes de mudar regra", "narracao": "Não altere o operacional por causa de dois ou três resultados. Junte uma amostra suficiente e mude uma variável por vez. O objetivo é aprendizado mensurável."},
+    ],
+    "aq_07": [
+        {"bloco": "Abertura", "tela": "AtlasQuant > fluxo completo", "narracao": "Nesta última aula você vai montar uma rotina diária fixa. A vantagem da rotina é reduzir improviso e impedir que o gráfico escolha a narrativa depois que o preço já andou."},
+        {"bloco": "Pré-mercado", "tela": "Calendário / EUA / Fed / Moedas", "narracao": "Comece pelo calendário. Depois leia macro, Fed e força relativa. Marque eventos de alto impacto antes de escolher qualquer par."},
+        {"bloco": "Seleção", "tela": "Pares / Market Map", "narracao": "Escolha poucos pares com contraste de força e boa qualidade. Confirme W1, D1, localização, liquidez, ADR e risco de evento."},
+        {"bloco": "Execução", "tela": "Scanner H4/H1/M15", "narracao": "Só depois vá para H4 e H1. M15 entra por último como gatilho. Se o scanner estiver vencido, espere a atualização automática ou atualize manualmente."},
+        {"bloco": "Pós-mercado", "tela": "Diário / Backtest / Histórico", "narracao": "Depois da sessão, registre o resultado e o contexto. Não avalie só se ganhou ou perdeu; avalie se seguiu o processo."},
+        {"bloco": "Fechamento", "tela": "Checklist diário completo", "narracao": "A rotina final é: Calendário → Macro → Moedas → Pares → Market Map → Scanner → Decisão → Diário. Repetir a mesma sequência torna o processo auditável."},
+    ],
+}
+
 ACADEMY_TRACKS: list[dict[str, Any]] = [
     {
         "id": "macro_forex",
@@ -530,7 +584,7 @@ def render_academy() -> None:
         for idx, item in enumerate(lesson["roteiro"], 1):
             st.markdown(f"{idx}. {item}")
 
-        _video_script = MACRO_VIDEO_SCRIPTS.get(lesson["id"], []) or ICT_VIDEO_SCRIPTS.get(lesson["id"], [])
+        _video_script = (MACRO_VIDEO_SCRIPTS.get(lesson["id"], []) or ICT_VIDEO_SCRIPTS.get(lesson["id"], []) or ATLASQUANT_VIDEO_SCRIPTS.get(lesson["id"], []))
         if _video_script:
             with st.expander("🎥 Roteiro completo de gravação", expanded=False):
                 for _segment in _video_script:
