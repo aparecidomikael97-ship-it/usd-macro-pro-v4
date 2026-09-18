@@ -70,4 +70,4 @@ jobs:
           name: AtlasQuant-${{ github.ref_name }}-${{ github.sha }}
           path: ${{ env.CHECKPOINT_ZIP }}
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 90
