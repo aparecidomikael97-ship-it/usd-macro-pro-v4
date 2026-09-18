@@ -60,9 +60,9 @@ class OTEReplayTests(unittest.TestCase):
 
     def test_sell_geometry_is_valid(self):
         d=buy_case().copy()
-        # Mirror around a sufficiently high positive pivot so the synthetic SELL\n        # fixture preserves valid non-negative OHLC prices.\n        pivot=20.0
-        for c in ("open","high","low","close"):
-            d[c]=2*pivot-d[c]
+        pivot=20.0
+        for col in ("open","high","low","close"):
+            d[col]=2*pivot-d[col]
         rows=generate_ote_signals(
             d,pair="GBP/USD",allow_buy=False,min_bars=28,stop_buffer_atr=0.0
         )
