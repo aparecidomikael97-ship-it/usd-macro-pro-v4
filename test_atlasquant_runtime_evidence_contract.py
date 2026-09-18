@@ -118,6 +118,22 @@ class RuntimeEvidenceContractTests(unittest.TestCase):
         self.assertTrue(row["execution_match"])
         self.assertFalse(row["critical_mismatch"])
 
+    def test_repeated_seven_pair_batch_is_idempotent_in_memory(self):
+        records=[]
+        for p in PAIRS:
+            current=prepare_flight_capture([],pack(p),"V")["current"]
+            records,added=append_unique(records,current)
+            self.assertTrue(added)
+        for p in PAIRS:
+            current=prepare_flight_capture([],pack(p),"V")["current"]
+            records,added=append_unique(records,current)
+            self.assertFalse(added)
+        self.assertEqual(len(records),7)
+
+        samples=build_shadow_batch([pack(p) for p in PAIRS],champion_version="V")
+        hydrated=hydrate_shadow_samples(samples,samples)
+        self.assertEqual(len(hydrated),7)
+
     def test_append_unique_rejects_duplicate_fingerprint(self):
         rec=prepare_flight_capture([],pack("USD/JPY"),"V")["current"]
         rows,added=append_unique([rec],rec)
