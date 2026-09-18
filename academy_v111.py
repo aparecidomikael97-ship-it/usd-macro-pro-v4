@@ -532,6 +532,43 @@ ACADEMY_TRACKS: list[dict[str, Any]] = [
 ]
 
 
+def _video_script_for_lesson(lesson_id: str) -> list[dict[str, str]]:
+    return (
+        MACRO_VIDEO_SCRIPTS.get(lesson_id, [])
+        or ICT_VIDEO_SCRIPTS.get(lesson_id, [])
+        or ATLASQUANT_VIDEO_SCRIPTS.get(lesson_id, [])
+    )
+
+
+def _visual_direction_for_segment(segment: dict[str, str], index: int) -> str:
+    bloco = str(segment.get("bloco", "")).lower()
+    tela = str(segment.get("tela", "")).strip()
+    if "abertura" in bloco:
+        return f"Cartela curta com o título da aula; entrar em {tela} e destacar o objetivo."
+    if "fechamento" in bloco:
+        return f"Voltar para {tela}; mostrar checklist final e deixar os pontos principais visíveis."
+    if any(word in bloco for word in ("exemplo", "combina", "surpresa", "validação", "validacao")):
+        return f"Usar {tela} em tela cheia; destacar o exemplo passo a passo com zoom apenas no campo relevante."
+    if any(word in bloco for word in ("conceito", "formação", "formacao", "swings", "fomc", "2y", "10y", "pib")):
+        return f"Mostrar {tela}; manter poucos elementos na tela e realçar somente o conceito explicado."
+    return f"Mostrar {tela}; acompanhar a narração com destaque visual simples e sem trocar de tela desnecessariamente."
+
+
+def build_storyboard(lesson_id: str) -> list[dict[str, str | int]]:
+    """Transforma o roteiro completo em cenas reutilizáveis para gravação."""
+    script = _video_script_for_lesson(lesson_id)
+    storyboard: list[dict[str, str | int]] = []
+    for idx, segment in enumerate(script, 1):
+        storyboard.append({
+            "cena": idx,
+            "bloco": str(segment.get("bloco", f"Cena {idx}")),
+            "tela": str(segment.get("tela", "")),
+            "narracao": str(segment.get("narracao", "")),
+            "direcao_visual": _visual_direction_for_segment(segment, idx),
+        })
+    return storyboard
+
+
 def academy_stats(completed_ids=None) -> dict[str, int]:
     completed = set(completed_ids or [])
     all_ids = [lesson["id"] for track in ACADEMY_TRACKS for lesson in track["aulas"]]
@@ -584,13 +621,27 @@ def render_academy() -> None:
         for idx, item in enumerate(lesson["roteiro"], 1):
             st.markdown(f"{idx}. {item}")
 
-        _video_script = (MACRO_VIDEO_SCRIPTS.get(lesson["id"], []) or ICT_VIDEO_SCRIPTS.get(lesson["id"], []) or ATLASQUANT_VIDEO_SCRIPTS.get(lesson["id"], []))
+        _video_script = _video_script_for_lesson(lesson["id"])
         if _video_script:
             with st.expander("🎥 Roteiro completo de gravação", expanded=False):
                 for _segment in _video_script:
                     st.markdown(f"**{_segment['bloco']}**")
                     st.caption(f"🖥️ Tela sugerida: {_segment['tela']}")
                     st.write(_segment["narracao"])
+
+        if _video_script:
+            _storyboard = build_storyboard(lesson["id"])
+            with st.expander("🎞️ Storyboard visual da aula", expanded=False):
+                st.caption(
+                    "Sequência pronta para gravação: cada cena mostra o que aparece na tela, "
+                    "o texto da narração e a direção visual."
+                )
+                for _scene in _storyboard:
+                    with st.container(border=True):
+                        st.markdown(f"**Cena {_scene['cena']} — {_scene['bloco']}**")
+                        st.markdown(f"**🖥️ Tela:** {_scene['tela']}")
+                        st.markdown(f"**🎨 Direção visual:** {_scene['direcao_visual']}")
+                        st.markdown(f"**🎙️ Narração:** {_scene['narracao']}")
 
         st.markdown("##### 🧪 Exercício prático")
         st.info(lesson["pratica"])
