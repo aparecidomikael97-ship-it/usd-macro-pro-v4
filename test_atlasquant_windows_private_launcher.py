@@ -39,6 +39,12 @@ class WindowsPrivateLauncherTests(unittest.TestCase):
         self.assertIn("Configurar Twelve Data local", self.ps1)
         self.assertIn("AtlasQuant_Configurar_TwelveData.ps1", self.ps1)
 
+    def test_launcher_offers_fred_local_setup(self):
+        self.assertIn("Configurar FRED local", self.ps1)
+        self.assertIn("AtlasQuant_Configurar_FRED.ps1", self.ps1)
+        self.assertIn("$env:CHAVE_FRED = $fred", self.ps1)
+        self.assertIn("[OK] FRED local carregado para esta sessao.", self.ps1)
+
     def test_launcher_keeps_window_open_on_errors(self):
         self.assertIn("A janela permanecera aberta para voce poder ler o erro.", self.ps1)
         self.assertIn("Pause-AtlasQuant", self.ps1)
