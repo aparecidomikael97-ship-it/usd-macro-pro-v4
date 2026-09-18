@@ -112,6 +112,11 @@ def readme_text() -> str:
 4. Depois escolha [2] para iniciar.
 5. O navegador abrirá o AtlasQuant localmente em http://127.0.0.1:8501.
 
+ACADEMY / VÍDEOS
+- O pacote inclui o manifesto das 22 aulas em academy_media/manifest.json.
+- MP4s importados pelo app são salvos fora do ZIP em %LOCALAPPDATA%\\AtlasQuant\\academy_media.
+- Isso permite atualizar o AtlasQuant sem perder os vídeos locais da Academy.
+
 SEGURANÇA
 - Este pacote não contém chaves de API nem arquivo secrets.toml.
 - O launcher abre somente em 127.0.0.1 (computador local).
