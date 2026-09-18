@@ -28,6 +28,8 @@ jobs:
       CHAVE_EODHD: ${{ secrets.CHAVE_EODHD }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: "atlasquant-runtime"
 
       - uses: actions/setup-python@v7
         with:
