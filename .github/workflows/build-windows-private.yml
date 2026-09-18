@@ -55,6 +55,17 @@ jobs:
           print(f"Package OK: {path} ({path.stat().st_size} bytes)")
           PY
 
+      - name: Compile packaged Python sources
+        run: |
+          rm -rf package-smoke
+          mkdir package-smoke
+          python - <<'PY'
+          import zipfile
+          with zipfile.ZipFile("dist/AtlasQuant_Windows_Privado.zip") as zf:
+              zf.extractall("package-smoke")
+          PY
+          python -m compileall -q package-smoke
+
       - name: Upload Windows private package
         uses: actions/upload-artifact@v4
         with:
