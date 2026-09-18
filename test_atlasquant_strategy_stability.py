@@ -69,6 +69,20 @@ class StrategyStabilityTests(unittest.TestCase):
         self.assertEqual(crt["stability_status"],"INSUFFICIENT")
         self.assertFalse(bool(crt["all_folds_sufficient"]))
 
+
+    def test_nonfinite_fold_metrics_fail_closed(self):
+        for bad in (float("nan"),float("inf"),float("-inf")):
+            with self.subTest(value=bad):
+                detail=pd.DataFrame([
+                    {"strategy":"FVG","operacional":"FVG","fold":"F1","fold_index":1,"trades":5,"expectancy_r":0.2,"net_r":1.0},
+                    {"strategy":"FVG","operacional":"FVG","fold":"F2","fold_index":2,"trades":5,"expectancy_r":bad,"net_r":1.0},
+                    {"strategy":"FVG","operacional":"FVG","fold":"F3","fold_index":3,"trades":5,"expectancy_r":0.3,"net_r":1.0},
+                ])
+                out=temporal_stability_summary(detail,folds=3,min_trades_per_fold=5)
+                fvg=out[out["strategy"]=="FVG"].iloc[0]
+                self.assertEqual(fvg["stability_status"],"INSUFFICIENT")
+                self.assertFalse(bool(fvg["all_folds_sufficient"]))
+
     def test_no_timestamp_is_excluded_from_temporal_folds(self):
         suite=empty_suite()
         suite["AMD_PO3"]["results"]=[
