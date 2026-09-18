@@ -14,7 +14,7 @@
   "by_pair": {},
   "last_cycle": {
     "version": "V11.2_PAPER_TRADING",
-    "ran_at": "2026-09-18T19:21:16.357034+00:00",
+    "ran_at": "2026-09-18T19:44:15.053753+00:00",
     "pending_created": 0,
     "entries_opened": 0,
     "trades_closed": 0,
@@ -41,8 +41,23 @@
         "hard_blocks": [],
         "soft_blocks": [
           "Gate ainda não liberou execução",
-          "ICT incompleto (43/100)",
+          "ICT incompleto (51/100)",
           "Fluxo institucional incompleto (54/100)",
+          "M15 ainda não confirmou gatilho"
+        ]
+      },
+      "USD/JPY": {
+        "side": "BUY",
+        "passed": false,
+        "state": "🔴 BLOQUEADO",
+        "hard_blocks": [
+          "ADR14 muito esticado (117%)"
+        ],
+        "soft_blocks": [
+          "Gate ainda não liberou execução",
+          "ADR14 em 117%: evitar perseguir preço",
+          "ICT incompleto (42/100)",
+          "Fluxo institucional incompleto (59/100)",
           "M15 ainda não confirmou gatilho"
         ]
       },
@@ -59,21 +74,6 @@
           "M15 ainda não confirmou gatilho"
         ]
       },
-      "USD/JPY": {
-        "side": "BUY",
-        "passed": false,
-        "state": "🔴 BLOQUEADO",
-        "hard_blocks": [
-          "ADR14 muito esticado (117%)"
-        ],
-        "soft_blocks": [
-          "Gate ainda não liberou execução",
-          "ADR14 em 117%: evitar perseguir preço",
-          "ICT incompleto (54/100)",
-          "Fluxo institucional incompleto (59/100)",
-          "M15 ainda não confirmou gatilho"
-        ]
-      },
       "EUR/USD": {
         "side": "SELL",
         "passed": false,
@@ -83,7 +83,7 @@
           "Gate ainda não liberou execução",
           "ADR14 em 92%: espaço reduzido",
           "ICT incompleto (42/100)",
-          "Fluxo institucional incompleto (65/100)",
+          "Fluxo institucional incompleto (67/100)",
           "M15 ainda não confirmou gatilho"
         ]
       },
@@ -100,17 +100,18 @@
         ]
       },
       "GBP/USD": {
-        "side": "WAIT",
+        "side": "SELL",
         "passed": false,
-        "state": "⚪ AGUARDAR DIREÇÃO",
+        "state": "🔴 BLOQUEADO",
         "hard_blocks": [
-          "ADR14 muito esticado (123%)"
+          "H1 está contra o viés",
+          "ADR14 muito esticado (128%)"
         ],
         "soft_blocks": [
           "Gate ainda não liberou execução",
-          "ADR14 em 123%: evitar perseguir preço",
-          "ICT incompleto (0/100)",
-          "Fluxo institucional incompleto (0/100)",
+          "ADR14 em 128%: evitar perseguir preço",
+          "ICT incompleto (34/100)",
+          "Fluxo institucional incompleto (69/100)",
           "M15 ainda não confirmou gatilho"
         ]
       }
