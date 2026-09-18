@@ -53,3 +53,14 @@ class WindowsPrivateLauncherTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TwelveDataConfiguratorEncodingTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.script = Path("AtlasQuant_Configurar_TwelveData.ps1").read_text(encoding="utf-8")
+
+    def test_twelve_data_secret_uses_utf8_without_bom(self):
+        self.assertIn("UTF8Encoding($false)", self.script)
+        self.assertIn("WriteAllLines", self.script)
+        self.assertNotIn("Set-Content -Path $secretsPath -Value $output -Encoding UTF8", self.script)
