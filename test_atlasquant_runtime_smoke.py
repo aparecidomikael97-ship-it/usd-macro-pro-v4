@@ -61,9 +61,9 @@ class AtlasQuantRuntimeSmokeTests(unittest.TestCase):
         self.assertEqual(writes,[],"UI boot must not perform remote writes")
 
         rendered=" ".join(
-            [str(x.value) for x in list(at.title)+list(at.caption)+list(at.info)]
+            [str(x.value) for x in list(at.title)+list(at.caption)+list(at.info)+list(at.markdown)]
         )
-        self.assertIn("USD Macro Pro",rendered)
+        self.assertIn("ATLASQUANT",rendered.upper())
         self.assertIn("RUNTIME",rendered)
 
     def test_offline_ui_smoke_mode_is_explicit_and_fail_safe(self):
