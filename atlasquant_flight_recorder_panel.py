@@ -250,6 +250,28 @@ def capture_flight_recorder(
     return capture
 
 
+
+def recorder_visual_state(
+    summary: Mapping[str,Any] | None,
+    persistence: Mapping[str,Any] | None = None,
+    load_status: Mapping[str,Any] | None = None,
+) -> dict[str,str]:
+    s=dict(summary or {}); p=dict(persistence or {}); l=dict(load_status or {})
+    try:
+        records=max(0,int(s.get("records",0) or 0))
+    except Exception:
+        return {"label":"REVISAR","detail":"Resumo do Flight Recorder inválido"}
+    if records==0:
+        return {"label":"SEM REGISTROS","detail":"Aguardando o primeiro estado operacional"}
+    if p and not bool(p.get("ok",False)) and str(p.get("reason","")) not in ("","NOT_CONFIGURED"):
+        return {"label":"SESSÃO PRESERVADA","detail":"Registro local mantido; persistência remota requer revisão"}
+    if l and str(l.get("reason","")) not in ("","LOADED","NOT_LOADED","NOT_CONFIGURED") and not bool(l.get("ok",False)):
+        return {"label":"HISTÓRICO PARCIAL","detail":"Sessão ativa; histórico remoto não pôde ser carregado"}
+    if p and bool(p.get("ok",False)):
+        return {"label":"REGISTRO PERSISTIDO","detail":f"{records} estado(s) disponível(is) para auditoria"}
+    return {"label":"REGISTRO DE SESSÃO","detail":f"{records} estado(s) preservado(s) nesta execução"}
+
+
 def render_flight_recorder(
     pack: Mapping[str, Any] | None,
     engine_version: str,
@@ -264,6 +286,14 @@ def render_flight_recorder(
     load_status=dict(capture.get("load_status",{}) or {})
 
     st.markdown("### 🧾 Flight Recorder")
+    visual=recorder_visual_state(summary,persistence,load_status)
+    st.markdown(
+        f"""<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:11px 13px;
+        border:1px solid rgba(137,170,210,.18);border-radius:12px;margin:4px 0 13px;background:rgba(11,27,47,.52)">
+        <strong>{visual['label']}</strong><span style="opacity:.74;font-size:.78rem">{visual['detail']}</span>
+        <span style="margin-left:auto;opacity:.68;font-size:.72rem">Auditoria somente · não cria resultado de trade</span></div>""",
+        unsafe_allow_html=True,
+    )
     st.caption(
         "Registro automático com hidratação do histórico persistente. "
         "Guarda decisões e bloqueios sem inventar resultado de trade."
