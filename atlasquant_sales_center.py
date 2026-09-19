@@ -71,11 +71,19 @@ def commercial_readiness(access:Mapping[str,Any]|None=None)->dict[str,Any]:
 
 def sales_launch_summary(status:Mapping[str,Any]|None)->dict[str,str]:
     s=dict(status or {})
+    security_ok=all(bool(s.get(k,False)) for k in (
+        "sales_role_isolation_verified",
+        "account_revocation_verified",
+        "account_admin_verified",
+        "audit_manifest_verified",
+    ))
+    if not security_ok:
+        return {"label":"SEGURANÇA A REVISAR","detail":"Um ou mais contratos internos de acesso/auditoria não foram verificados"}
     if not bool(s.get("pwa_ready",False)):
         return {"label":"DISTRIBUIÇÃO BLOQUEADA","detail":"PWA ainda não passou no checklist de instalação"}
     if bool(s.get("payments_integrated",False)) and bool(s.get("academy_ready",False)):
         return {"label":"REVISÃO COMERCIAL","detail":"Infraestrutura principal pronta; lançamento continua manual"}
-    return {"label":"PRÉ-LANÇAMENTO","detail":"PWA pronta, mas itens comerciais essenciais continuam pendentes"}
+    return {"label":"PRÉ-LANÇAMENTO","detail":"Segurança interna e PWA verificadas; itens externos/comerciais continuam pendentes"}
 
 
 def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
@@ -102,6 +110,11 @@ def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
     c2.metric("Contas ativas",status["active_accounts"])
     c3.metric("Academy","PLANEJADA")
     c4.metric("Trading real","DESATIVADO")
+    security_ok=all(bool(status.get(k,False)) for k in (
+        "sales_role_isolation_verified","account_revocation_verified",
+        "account_admin_verified","audit_manifest_verified",
+    ))
+    st.caption("Segurança interna: "+("✅ contratos verificados" if security_ok else "⚠️ revisão necessária"))
 
     st.markdown("### Fluxo de onboarding")
     st.dataframe(onboarding_steps(),width="stretch",hide_index=True)
