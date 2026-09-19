@@ -42,6 +42,8 @@ REQUIRED_FILES=(
     "atlasquant_access_control.py",
     "atlasquant_access_panel.py",
     "atlasquant_account_portal.py",
+    "atlasquant_registry_admin.py",
+    "atlasquant_sales_center.py",
     "atlasquant_user_bootstrap.py",
     "atlasquant_platform_center.py",
     "docs/release/ACCESS_CONTROL_SETUP.md",
@@ -118,6 +120,24 @@ def run_dev_preflight(
         and '"Google Play","Distribuição atual":"PENDENTE"' in platform_center
         and '"Apple App Store","Distribuição atual":"PENDENTE"' in platform_center,
         "Central multiplataforma integrada sem confundir PWA com publicação nativa.",
+    ))
+
+    sales_center=(base/"atlasquant_sales_center.py").read_text(encoding="utf-8") if (base/"atlasquant_sales_center.py").is_file() else ""
+    registry_admin=(base/"atlasquant_registry_admin.py").read_text(encoding="utf-8") if (base/"atlasquant_registry_admin.py").is_file() else ""
+    checks.append(_check(
+        "sales_center_integrated",
+        "from atlasquant_sales_center import render_sales_center" in app
+        and 'with abas[18]:' in app
+        and "render_sales_center(_ATLASQUANT_ACCESS)" in app
+        and "Área comercial restrita aos perfis SALES e ADMIN autenticados." in sales_center,
+        "Portal SALES integrado e protegido por perfil autenticado.",
+    ))
+    checks.append(_check(
+        "account_registry_non_destructive",
+        "apply_non_destructive_change" in registry_admin
+        and "destructive account removal is not allowed" in registry_admin
+        and "automatic" not in registry_admin.lower(),
+        "Administração de contas exporta mudanças para revisão e bloqueia remoção destrutiva.",
     ))
 
     provider_markers=(
