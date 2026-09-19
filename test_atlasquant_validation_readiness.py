@@ -95,7 +95,7 @@ class AtlasQuantValidationReadinessTests(unittest.TestCase):
         r=build_validation_readiness(pd.DataFrame(),[])
         self.assertEqual(
             set(r["checks"]),
-            {"performance_reviewable","calibration_consistent","stability_consistent","shadow_reviewable"},
+            {"performance_reviewable","calibration_consistent","stability_consistent","shadow_reviewable","quota_shadow_reviewable"},
         )
 
     def test_shadow_total_can_pass_while_pair_coverage_remains_pending(self):
@@ -170,6 +170,34 @@ class AtlasQuantValidationReadinessTests(unittest.TestCase):
         self.assertEqual(validation_visual_state({"status":"BUILDING"})["label"],"EM FORMAÇÃO")
         self.assertEqual(validation_visual_state({"status":"UNKNOWN"})["label"],"REVISAR")
 
+
+
+    def test_quota_shadow_is_explicit_readiness_gate(self):
+        quota=[]
+        for i in range(20):
+            quota.append({
+                "market_open":True,"provider_blocked":False,"app_headless_ok":True,
+                "adaptive_within_usable_cap":True,"actual_http_calls":4,
+            })
+        r=build_validation_readiness(
+            self.history(), self.shadow_samples(100), quota,
+            min_total_samples=50, min_group_samples=10, min_band_samples=10,
+            min_fold_samples=10, min_shadow_samples=100,
+            min_shadow_pair_samples=1, expected_shadow_pairs=("EUR/USD",),
+            min_quota_market_runs=20,
+        )
+        self.assertTrue(r["checks"]["quota_shadow_reviewable"])
+        self.assertTrue(r["quota_shadow"]["eligible_for_manual_review"])
+        self.assertFalse(r["automatic_promotion_allowed"])
+
+    def test_closed_market_quota_samples_remain_pending(self):
+        quota=[{
+            "market_open":False,"provider_blocked":False,"app_headless_ok":True,
+            "adaptive_within_usable_cap":True,"actual_http_calls":0,
+        } for _ in range(44)]
+        r=build_validation_readiness(pd.DataFrame(), [], quota, min_quota_market_runs=20)
+        self.assertFalse(r["checks"]["quota_shadow_reviewable"])
+        self.assertTrue(any("Quota Shadow" in x for x in r["pending"]))
 
 
 if __name__=="__main__":
