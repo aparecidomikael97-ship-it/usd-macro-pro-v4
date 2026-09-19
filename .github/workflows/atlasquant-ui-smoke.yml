@@ -3,7 +3,7 @@ name: AtlasQuant Integration UI Smoke
 on:
   workflow_dispatch:
   push:
-    branches: [atlasquant-integration, atlasquant-release-final, atlasquant-support-final, atlasquant-support-ui, atlasquant-brokers-guide, atlasquant-voice-readiness, atlasquant-academy-media, atlasquant-commercial-prep]
+    branches: [atlasquant-integration, atlasquant-release-final, atlasquant-support-final, atlasquant-support-ui, atlasquant-brokers-guide, atlasquant-voice-readiness, atlasquant-academy-media, atlasquant-commercial-prep, atlasquant-final-release-prep]
     paths:
       - "usd_macro_pro_v4_cloud.py"
       - "atlasquant_ui_v1.py"
@@ -19,6 +19,8 @@ on:
       - "atlasquant_billing_contract.py"
       - "atlasquant_data_licensing_inventory.py"
       - "atlasquant_public_launch_readiness.py"
+      - "atlasquant_native_packaging.py"
+      - "native/**"
       - "docs/commercial/**"
       - "atlasquant_voice_readiness.py"
       - "experience_v103.py"
