@@ -171,5 +171,12 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("Safety Core monitorado",hero_html("X","LOCAL"))
 
 
+    def test_mobile_above_fold_density_is_intentionally_compact(self):
+        self.assertIn(".aq-title{font-size:1.62rem}",ATLASQUANT_CSS)
+        self.assertIn(".aq-badge{font-size:.62rem;padding:5px 7px}",ATLASQUANT_CSS)
+        self.assertIn(".aq-context-strip>div{padding:9px 10px;min-height:54px",ATLASQUANT_CSS)
+        self.assertIn(".aq-focus-main strong{font-size:.9rem}",ATLASQUANT_CSS)
+
+
 if __name__ == "__main__":
     unittest.main()
