@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 from atlasquant_academy import ACADEMY_TOPICS, academy_topic
+from atlasquant_academy_video_blueprints import video_blueprint
 
 SCHEMA="ATLASQUANT_ACADEMY_MEDIA_V1"
 
@@ -31,6 +32,7 @@ def academy_video_script(topic_id: object)->dict[str,Any] | None:
     ]
     words=len(narration.split())
     seconds=max(45,min(180,round(words/2.35)))
+    blueprint=video_blueprint(topic["id"])
     return {
         "schema":SCHEMA,
         "topic_id":topic["id"],
@@ -40,6 +42,8 @@ def academy_video_script(topic_id: object)->dict[str,Any] | None:
         "narration":narration,
         "scenes":scenes,
         "estimated_seconds":seconds,
+        "detailed_blueprint_seconds":int((blueprint or {}).get("total_seconds",0)),
+        "detailed_blueprint_ready":bool(blueprint and blueprint.get("within_20_min")),
         "script_ready":True,
         "rendered_video":False,
         "published_video":False,
