@@ -28,6 +28,7 @@ NAVIGATION_LABELS = (
     "🛠️ Melhorias",
     "📰 Notícias",
     "🤖 Autopilot",
+    "👤 Conta",
 )
 
 ATLASQUANT_CSS = r"""
