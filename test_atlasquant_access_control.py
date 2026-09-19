@@ -4,7 +4,7 @@ import unittest
 from atlasquant_access_control import (
     AccessUser, ROLE_PERMISSIONS, authenticate, has_permission,
     hash_password, load_users_config, normalize_role, normalize_username,
-    verify_password,
+    verify_password, session_is_current,
 )
 
 class AtlasQuantAccessControlTests(unittest.TestCase):
@@ -81,6 +81,24 @@ class AtlasQuantAccessControlTests(unittest.TestCase):
             for i in range(501)
         }}
         self.assertEqual(load_users_config(raw),{})
+
+
+
+    def test_session_is_revoked_when_password_role_or_active_state_changes(self):
+        raw={"users":{"user.01":{"role":"USER","password_hash":self.encoded,"active":True}}}
+        users=load_users_config(raw)
+        session=authenticate("user.01",self.password,users)
+        self.assertTrue(session_is_current(session,users))
+
+        changed_password=hash_password("OutraSenha#2026",salt=b"fedcba9876543210",iterations=200000)
+        users_changed=load_users_config({"users":{"user.01":{"role":"USER","password_hash":changed_password,"active":True}}})
+        self.assertFalse(session_is_current(session,users_changed))
+
+        users_role=load_users_config({"users":{"user.01":{"role":"SALES","password_hash":self.encoded,"active":True}}})
+        self.assertFalse(session_is_current(session,users_role))
+
+        users_off=load_users_config({"users":{"user.01":{"role":"USER","password_hash":self.encoded,"active":False}}})
+        self.assertFalse(session_is_current(session,users_off))
 
 
 if __name__=="__main__":
