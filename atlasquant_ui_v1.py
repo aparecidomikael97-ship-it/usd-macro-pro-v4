@@ -30,6 +30,7 @@ NAVIGATION_LABELS = (
     "🤖 Autopilot",
     "👤 Conta",
     "📱 Instalar",
+    "💼 Vendas",
 )
 
 ATLASQUANT_CSS = r"""
