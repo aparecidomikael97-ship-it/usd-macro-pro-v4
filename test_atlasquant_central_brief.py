@@ -48,5 +48,22 @@ class AtlasQuantCentralBriefTests(unittest.TestCase):
         self.assertTrue(b["source_blocked"])
 
 
+    def test_executable_pack_is_not_green_when_process_or_source_is_unhealthy(self):
+        pack={
+            "pair":"EUR/USD","priority":91,"executable":True,"state":"🟢 EXECUTÁVEL",
+            "data_ready":{"sufficient":True}
+        }
+        for auto in (
+            {"app_headless_ok":False,"twelve_daily_blocked":False},
+            {"app_headless_ok":True,"twelve_daily_blocked":True},
+            {},
+        ):
+            with self.subTest(auto=auto):
+                b=build_central_brief([pack],auto)
+                self.assertEqual(b["traffic_light"],"RED")
+                self.assertEqual(b["state"],"NÃO OPERAR")
+
+
+
 if __name__=="__main__":
     unittest.main()
