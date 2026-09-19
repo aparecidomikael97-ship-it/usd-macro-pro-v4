@@ -24,6 +24,9 @@ def _bool_setting(value:Any)->bool:
     return str(value or "").strip().lower() in {"1","true","yes","on","sim"}
 
 def access_required()->bool:
+    environment=_setting("ATLASQUANT_ENV","").upper()
+    if environment=="PRODUCTION":
+        return True
     return _bool_setting(_setting("ATLASQUANT_AUTH_REQUIRED","false"))
 
 def configured_users():
