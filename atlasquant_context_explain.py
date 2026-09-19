@@ -94,10 +94,14 @@ def context_validity(pack: Mapping[str, Any] | None) -> dict[str, Any]:
         status="BLOCKED"
         label="NÃO OPERAR"
         explanation="Contexto inválido para execução enquanto houver hard block ou dados insuficientes."
+    elif soft:
+        status="WAIT"
+        label="AGUARDAR CONFIRMAÇÃO"
+        explanation="Há alerta(s) soft pendente(s); o contexto não deve ser tratado como liberado."
     elif snap["executable"]:
         status="ACTIVE"
-        label="VÁLIDO PARA PROCURAR ENTRADA"
-        explanation="O motor liberou execução; ainda depende do plano e do risco permanecerem válidos."
+        label="MOTOR LIBEROU CONTEXTO"
+        explanation="O motor liberou o contexto; Safety Core, plano e risco ainda precisam permanecer válidos."
     else:
         status="WAIT"
         label="AGUARDAR CONFIRMAÇÃO"
