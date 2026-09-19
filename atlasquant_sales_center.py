@@ -19,6 +19,7 @@ from atlasquant_voice_readiness import voice_contract_ready
 from atlasquant_commercial_prep import commercial_prep_audit, commercial_external_blockers
 from atlasquant_billing_contract import billing_contract_ready
 from atlasquant_data_licensing_inventory import data_inventory_ready, data_licensing_status
+from atlasquant_public_launch_readiness import collect_public_launch_readiness
 
 SCHEMA="ATLASQUANT_SALES_CENTER_V1"
 
@@ -48,6 +49,7 @@ def commercial_readiness(access:Mapping[str,Any]|None=None)->dict[str,Any]:
     security=collect_commercial_security_evidence()
     prep=commercial_prep_audit()
     licensing=data_licensing_status()
+    public_readiness=collect_public_launch_readiness()
     registry=(access or {}).get("registry") if isinstance(access,Mapping) else {}
     if not isinstance(registry,Mapping):
         registry={}
@@ -80,6 +82,9 @@ def commercial_readiness(access:Mapping[str,Any]|None=None)->dict[str,Any]:
         "billing_checklist_ready":bool(prep["billing_checklist_ready"]),
         "billing_contract_ready":bool(billing_contract_ready()),
         "store_checklist_ready":bool(prep["store_checklist_ready"]),
+        "internal_preparation_complete":bool(public_readiness["internal_preparation_complete"]),
+        "external_dependencies_complete":bool(public_readiness["external_dependencies_complete"]),
+        "public_launch_ready":bool(public_readiness["public_launch_ready"]),
         "native_stores_ready":False,
         "payments_integrated":False,
         "broker_execution_enabled":False,
@@ -193,7 +198,9 @@ def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
     else:
         st.success("Pré-requisitos comerciais completos para revisão humana final.")
     st.markdown("### Preparação de lançamento")
-    if status["commercial_prep_ready"]:
+    if status["internal_preparation_complete"]:
+        st.success("Preparação interna do produto: COMPLETA. Dependências externas ainda bloqueiam lançamento público.")
+    elif status["commercial_prep_ready"]:
         st.success("Pacote interno de preparação comercial pronto. Validações externas continuam obrigatórias.")
     else:
         st.warning("Pacote interno de preparação comercial incompleto.")
