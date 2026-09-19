@@ -1,6 +1,6 @@
 import unittest
 
-from atlasquant_data_quality_center import build_data_confidence
+from atlasquant_data_quality_center import build_data_confidence, data_confidence_visual_state
 
 
 class AtlasQuantDataConfidenceTests(unittest.TestCase):
@@ -43,6 +43,15 @@ class AtlasQuantDataConfidenceTests(unittest.TestCase):
         packs=[self.pack(event="ALTO FOMC"),self.pack(event="NORMAL")]
         s=build_data_confidence(packs,{"app_headless_ok":True})
         self.assertEqual(s["event_risk_pairs"],1)
+
+
+    def test_data_confidence_visual_state_never_implies_trade_permission(self):
+        self.assertEqual(data_confidence_visual_state({"status":"GREEN"})["label"],"DADOS OPERACIONAIS")
+        self.assertEqual(data_confidence_visual_state({"status":"YELLOW"})["label"],"ATENÇÃO NOS DADOS")
+        self.assertEqual(data_confidence_visual_state({"status":"RED"})["label"],"DADOS INSUFICIENTES")
+        self.assertEqual(data_confidence_visual_state({"status":"UNKNOWN"})["label"],"REVISAR")
+        self.assertIn("não é autorização de trade",data_confidence_visual_state({"status":"GREEN"})["detail"])
+
 
 
 if __name__=="__main__":
