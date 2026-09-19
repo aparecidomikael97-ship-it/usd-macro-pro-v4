@@ -55,6 +55,17 @@ class AutopilotRecoveryV1075Tests(unittest.TestCase):
         wf=Path(".github/workflows/autopilot-v107.yml").read_text(encoding="utf-8")
         self.assertIn("python autopilot_setup_audit_v114.py",wf)
 
+    def test_workflow_revalidates_when_runtime_engine_files_change(self):
+        wf=Path(".github/workflows/autopilot-v107.yml").read_text(encoding="utf-8")
+        for name in (
+            "autopilot_v107.py","autopilot_paper_v112.py",
+            "autopilot_setup_audit_v114.py","autopilot_quota_guard_v111.py",
+            "paper_trading_v112.py","paper_friction_v116.py",
+        ):
+            with self.subTest(name=name):
+                self.assertIn(name,wf)
+
+
     def test_runner_reports_429_message(self):
         src = Path("autopilot_v107.py").read_text(encoding="utf-8")
         self.assertIn("HTTP 429:", src)
