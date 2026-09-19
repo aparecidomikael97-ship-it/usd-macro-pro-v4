@@ -94,7 +94,9 @@ def summarize_quota_shadow(
         minimum=DEFAULT_MIN_MARKET_RUNS
     if isinstance(min_market_runs,bool) or minimum < 1:
         minimum=DEFAULT_MIN_MARKET_RUNS
-    market=[x for x in rows if bool(x.get("market_open",False))]
+    valid_rows=[x for x in rows if str(x.get("timestamp","") or "").strip()]
+    invalid_timestamp_rows=len(rows)-len(valid_rows)
+    market=[x for x in valid_rows if bool(x.get("market_open",False))]
     blocked=[x for x in market if bool(x.get("provider_blocked",False))]
     unhealthy=[x for x in market if not bool(x.get("app_headless_ok",False))]
     plan_over=[x for x in rows if not bool(x.get("adaptive_within_usable_cap",False))]
@@ -102,11 +104,12 @@ def summarize_quota_shadow(
 
     enough=len(market)>=minimum
     no_quota_blocks=len(blocked)==0
-    plan_fits=len(plan_over)==0 and bool(rows)
+    plan_fits=len(plan_over)==0 and bool(valid_rows)
     eligible=bool(enough and no_quota_blocks and not unhealthy and plan_fits)
 
     return {
-        "samples":len(rows),
+        "samples":len(valid_rows),
+        "invalid_timestamp_rows":invalid_timestamp_rows,
         "market_open_runs":len(market),
         "min_market_runs":minimum,
         "minimum_met":enough,
