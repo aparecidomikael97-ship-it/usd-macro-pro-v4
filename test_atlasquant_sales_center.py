@@ -37,6 +37,8 @@ class AtlasQuantSalesCenterTests(unittest.TestCase):
         self.assertTrue(status["commercial_prep_ready"])
         self.assertTrue(status["legal_drafts_ready"])
         self.assertTrue(status["data_licensing_checklist_ready"])
+        self.assertTrue(status["data_provider_inventory_ready"])
+        self.assertFalse(status["data_licenses_verified"])
         self.assertTrue(status["billing_checklist_ready"])
         self.assertTrue(status["billing_contract_ready"])
         self.assertTrue(status["store_checklist_ready"])
