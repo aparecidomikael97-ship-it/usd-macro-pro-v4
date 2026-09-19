@@ -218,5 +218,24 @@ class AtlasQuantEvidenceBundleTests(unittest.TestCase):
         self.assertIn("setup_summary=setup_summary",source)
 
 
+    def test_balanced_pair_diagnostics_are_integrity_protected(self):
+        r=self.readiness()
+        r["shadow"]["min_pair_samples"]=10
+        r["shadow"]["expected_pairs"]=["EUR/USD","GBP/USD","USD/JPY"]
+        r["shadow"]["pair_breakdown"]=[
+            {"pair":"EUR/USD","samples":12},
+            {"pair":"GBP/USD","samples":4},
+        ]
+        b=build_validation_evidence(r,engine_version="dev")
+        s=b["evidence"]["shadow"]
+        self.assertEqual(s["balanced_pairs_complete"],1)
+        self.assertEqual(s["balanced_pairs_total"],3)
+        self.assertEqual(s["balanced_pairs_missing"],["USD/JPY"])
+        self.assertEqual(s["balanced_pairs_under_target"],["GBP/USD"])
+        self.assertTrue(verify_validation_evidence(b))
+        b["evidence"]["shadow"]["balanced_pairs_complete"]=3
+        self.assertFalse(verify_validation_evidence(b))
+
+
 if __name__=="__main__":
     unittest.main()
