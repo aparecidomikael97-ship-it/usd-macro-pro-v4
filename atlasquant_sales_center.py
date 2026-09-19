@@ -11,6 +11,7 @@ import streamlit as st
 from atlasquant_platform_center import pwa_asset_audit, PWA_URL
 from atlasquant_commercial_launch_guard import CommercialEvidence, assess_commercial_launch
 from atlasquant_commercial_security_evidence import collect_commercial_security_evidence
+from atlasquant_academy import academy_minimum_text_ready
 
 SCHEMA="ATLASQUANT_SALES_CENTER_V1"
 
@@ -30,7 +31,7 @@ def onboarding_steps()->list[dict[str,str]]:
         {"Etapa":"1","Item":"Conta","Status":"PRONTO","Descrição":"Criar USER/SALES/ADMIN e validar acesso."},
         {"Etapa":"2","Item":"Instalação","Status":"PRONTO — PWA","Descrição":"Android, iOS/iPadOS, Windows, macOS e Linux via PWA."},
         {"Etapa":"3","Item":"Primeiro acesso","Status":"PRONTO","Descrição":"Entrar, revisar viés e qualidade dos dados."},
-        {"Etapa":"4","Item":"Academy","Status":"PLANEJADO","Descrição":"Vídeos e trilhas serão produzidos após estabilização das telas."},
+        {"Etapa":"4","Item":"Academy","Status":"TEXTO PRONTO · VÍDEOS PENDENTES","Descrição":"Trilha textual estruturada já está no app; vídeos curtos continuam em produção futura."},
         {"Etapa":"5","Item":"Assistente de voz","Status":"PLANEJADO","Descrição":"Briefing diário/semanal e explicação do viés."},
         {"Etapa":"6","Item":"Corretoras & plataformas","Status":"PLANEJADO","Descrição":"Guia comparativo revisado próximo ao lançamento comercial."},
     ]
@@ -55,6 +56,7 @@ def commercial_readiness(access:Mapping[str,Any]|None=None)->dict[str,Any]:
         "schema":SCHEMA,
         "pwa_ready":bool(audit.get("pwa_ready")),
         "active_accounts":total,
+        "academy_text_ready":bool(academy_minimum_text_ready()),
         "academy_ready":False,
         "voice_ready":False,
         "brokers_guide_ready":False,
@@ -108,7 +110,7 @@ def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
     c1,c2,c3,c4=st.columns(4)
     c1.metric("PWA","PRONTA" if status["pwa_ready"] else "BLOQUEADA")
     c2.metric("Contas ativas",status["active_accounts"])
-    c3.metric("Academy","PLANEJADA")
+    c3.metric("Academy","TEXTO PRONTO" if status["academy_text_ready"] else "PENDENTE")
     c4.metric("Trading real","DESATIVADO")
     security_ok=all(bool(status.get(k,False)) for k in (
         "sales_role_isolation_verified","account_revocation_verified",
@@ -129,7 +131,8 @@ def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
         ("Revogação de conta/sessão","VERIFICADA" if status["account_revocation_verified"] else "REVISAR"),
         ("Auditoria administrativa","VERIFICADA" if status["audit_manifest_verified"] else "REVISAR"),
         ("PWA instalável","PRONTO" if status["pwa_ready"] else "BLOQUEADO"),
-        ("Academy e vídeos","PENDENTE"),
+        ("Academy — trilha textual","PRONTO" if status["academy_text_ready"] else "PENDENTE"),
+        ("Academy — vídeos","PENDENTE"),
         ("Assistente de voz","PENDENTE"),
         ("Guia de corretoras","PENDENTE"),
         ("Termos / privacidade / riscos","PENDENTE"),
