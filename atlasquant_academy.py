@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 import re
+import json
 import streamlit as st
 
 SCHEMA="ATLASQUANT_ACADEMY_V1"
@@ -354,6 +355,13 @@ def render_academy_panel()->dict[str,Any]:
                     f"🎨 {scene['visual']}  \\n"
                     f"🎓 {scene['teaching']}"
                 )
+            st.download_button(
+                "Baixar storyboard JSON",
+                data=json.dumps(blueprint,ensure_ascii=False,indent=2),
+                file_name=f"atlasquant_{item['id']}_storyboard.json",
+                mime="application/json",
+                key=f"aq_academy_storyboard_{item['id']}",
+            )
     st.info("Roteiros e storyboards estão preparados; renderização/publicação da mídia continua como etapa externa separada.")
     return {"visible":len(rows),**academy_progress(completed),"text_ready":academy_minimum_text_ready()}
 
