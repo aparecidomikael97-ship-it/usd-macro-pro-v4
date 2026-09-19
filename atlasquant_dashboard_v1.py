@@ -24,7 +24,13 @@ def strengths_from_ranking(ranking: pd.DataFrame) -> dict[str, float]:
     for _, row in ranking.iterrows():
         code = str(row["Código"]).strip().upper()
         if code in CURRENCIES:
-            out[code] = float(row["Pontuação_Final"])
+            try:
+                score=float(row["Pontuação_Final"])
+            except Exception:
+                raise ValueError(f"Pontuação inválida para {code}")
+            if not math.isfinite(score):
+                raise ValueError(f"Pontuação não finita para {code}")
+            out[code] = score
     missing = [c for c in CURRENCIES if c not in out]
     if missing:
         raise ValueError("Moedas G8 ausentes: " + ", ".join(missing))
@@ -66,7 +72,13 @@ def radar_summary(radar: pd.DataFrame) -> dict[str, Any]:
 def focus_rows(radar: pd.DataFrame, top_n: int = 3) -> list[dict[str, Any]]:
     if radar is None or radar.empty:
         return []
-    rows = radar[radar["Direção macro"].isin(["COMPRA", "VENDA"])].head(max(0, int(top_n)))
+    try:
+        n=int(top_n)
+        if isinstance(top_n,bool) or n<0:
+            n=0
+    except Exception:
+        n=0
+    rows = radar[radar["Direção macro"].isin(["COMPRA", "VENDA"])].head(n)
     out = []
     for _, row in rows.iterrows():
         out.append({
