@@ -88,5 +88,27 @@ class AtlasQuantQuotaShadowTests(unittest.TestCase):
         self.assertFalse(r["quota_shadow_validated"])
 
 
+    def test_exactly_twenty_clean_market_runs_validate_but_never_auto_expand(self):
+        rows=[
+            build_quota_shadow_sample(status(f"2026-09-{16+i//10:02d}T{i%10:02d}:00:00Z"),plan=GOOD_PLAN)
+            for i in range(20)
+        ]
+        r=summarize_quota_shadow(rows,min_market_runs=20)
+        self.assertEqual(r["market_open_runs"],20)
+        self.assertTrue(r["quota_shadow_validated"])
+        self.assertTrue(r["eligible_for_manual_review"])
+        self.assertFalse(r["automatic_expansion_allowed"])
+        self.assertTrue(r["manual_review_required"])
+
+    def test_invalid_minimum_threshold_fails_closed_to_default(self):
+        rows=[build_quota_shadow_sample(status("2026-09-16T01:00:00Z"),plan=GOOD_PLAN)]
+        for bad in (0,-1,True,"bad"):
+            with self.subTest(value=bad):
+                r=summarize_quota_shadow(rows,min_market_runs=bad)
+                self.assertEqual(r["min_market_runs"],20)
+                self.assertFalse(r["quota_shadow_validated"])
+
+
+
 if __name__=="__main__":
     unittest.main()
