@@ -19,6 +19,7 @@ ROLES=("USER","SALES","ADMIN")
 DEFAULT_ITERATIONS=310_000
 MIN_ITERATIONS=200_000
 MAX_ITERATIONS=2_000_000
+MAX_USERS=500
 _USERNAME_RE=re.compile(r"^[a-z0-9][a-z0-9._-]{2,63}$")
 
 ROLE_PERMISSIONS={
@@ -111,12 +112,19 @@ def load_users_config(raw:Any)->dict[str,AccessUser]:
     if not isinstance(data,Mapping):
         return {}
     users_raw=data.get("users",data)
-    if not isinstance(users_raw,Mapping):
+    if not isinstance(users_raw,Mapping) or len(users_raw)>MAX_USERS:
         return {}
     out={}
+    ambiguous=set()
     for username,record in users_raw.items():
         user=_user_from_record(username,record)
-        if user is None or user.username in out:
+        if user is None:
+            continue
+        if user.username in ambiguous:
+            continue
+        if user.username in out:
+            out.pop(user.username,None)
+            ambiguous.add(user.username)
             continue
         out[user.username]=user
     return out
