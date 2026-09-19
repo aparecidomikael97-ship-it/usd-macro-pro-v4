@@ -130,6 +130,21 @@ def build_validation_readiness(
     }
 
 
+
+def validation_visual_state(result: Mapping[str,Any] | None)->dict[str,str]:
+    r=dict(result or {})
+    status=str(r.get("status","") or "").upper()
+    if status=="BLOCKED":
+        return {"label":"BLOQUEADA","detail":"Há divergência crítica ou bloqueio de validação"}
+    if status=="REVIEWABLE":
+        return {"label":"PRONTA PARA REVISÃO","detail":"Critérios mínimos atingidos; promoção continua manual"}
+    if status=="PARTIAL":
+        return {"label":"PARCIAL","detail":"Parte da evidência passou; ainda existem pendências"}
+    if status=="BUILDING":
+        return {"label":"EM FORMAÇÃO","detail":"Amostras e evidências ainda estão sendo acumuladas"}
+    return {"label":"REVISAR","detail":"Estado de validação inválido ou indisponível"}
+
+
 def render_validation_readiness(
     history: pd.DataFrame,
     shadow_samples: Sequence[Mapping[str, Any]] | None = None,
@@ -149,6 +164,14 @@ def render_validation_readiness(
     }.get(result["status"],"⚪")
 
     st.markdown("### ✅ Validation Readiness Center")
+    visual=validation_visual_state(result)
+    st.markdown(
+        f"""<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:11px 13px;
+        border:1px solid rgba(137,170,210,.18);border-radius:12px;margin:4px 0 13px;background:rgba(11,27,47,.52)">
+        <strong>{visual['label']}</strong><span style="opacity:.74;font-size:.78rem">{visual['detail']}</span>
+        <span style="margin-left:auto;opacity:.68;font-size:.72rem">Promoção, pesos e merge continuam manuais</span></div>""",
+        unsafe_allow_html=True,
+    )
     st.caption(
         "Resume a maturidade da evidência. Não promove versão, não altera pesos "
         "e não faz merge automático."
