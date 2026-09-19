@@ -186,7 +186,9 @@ def render_g8_radar(ranking: pd.DataFrame, neutral_band: float = 5.0, top_n: int
     radar = build_g8_radar(ranking, neutral_band=neutral_band)
     summary = radar_summary(radar)
 
-    st.markdown(DASHBOARD_CSS + market_pulse_html(summary), unsafe_allow_html=True)\n\n    mode = st.radio(
+    st.markdown(DASHBOARD_CSS + market_pulse_html(summary), unsafe_allow_html=True)
+
+    mode = st.radio(
         "Visualização",
         ["Básico", "Pro"],
         horizontal=True,
