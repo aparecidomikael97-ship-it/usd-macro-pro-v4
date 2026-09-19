@@ -36,6 +36,7 @@ def reconcile_numeric(observations: Iterable[Observation], *, now: datetime | No
         return {"confirmed":False,"golden_value":None,"quality":0.0,"reason":"Parâmetros de reconciliação inválidos","valid_sources":[],"rejected_sources":[]}
     valid: list[tuple[Observation, float]] = []
     rejected: list[str] = []
+    seen_sources: set[str] = set()
     for obs in observations:
         try:
             value = float(obs.value)
@@ -43,9 +44,11 @@ def reconcile_numeric(observations: Iterable[Observation], *, now: datetime | No
         except Exception:
             rejected.append(str(getattr(obs, "source", "?")))
             continue
-        if not math.isfinite(value) or age < 0 or age >= max_age:
-            rejected.append(obs.source)
+        source=str(obs.source or "").strip()
+        if not source or source in seen_sources or not math.isfinite(value) or age < 0 or age >= max_age:
+            rejected.append(source or "?")
             continue
+        seen_sources.add(source)
         valid.append((obs, age))
 
     if len(valid) < min_src:
