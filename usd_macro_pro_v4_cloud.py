@@ -245,6 +245,7 @@ try:
         render_atlasquant_header,
         navigation_labels,
         decision_strip_html,
+        context_strip_html,
     )
     _ATLASQUANT_UI_IMPORT_ERROR = ""
     apply_atlasquant_theme()
@@ -252,6 +253,7 @@ except Exception as _atlasquant_ui_exc:
     render_atlasquant_header = None
     navigation_labels = None
     decision_strip_html = None
+    context_strip_html = None
     _ATLASQUANT_UI_IMPORT_ERROR = f"{type(_atlasquant_ui_exc).__name__}: {_atlasquant_ui_exc}"
 
 
@@ -1906,15 +1908,30 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("USD Macro Pro")
-st.caption("V11.0.8 · Força auditável · coleta com orçamento diário")
-st.caption("Macro semanal → Macro do dia → W1/D1 → Quarterly → Liquidez → Killzones → H4/H1/M15 → Performance real")
+if render_atlasquant_header is not None:
+    render_atlasquant_header(APP_VERSION, environment=ATLASQUANT_ENVIRONMENT)
+else:
+    st.title("🧭 AtlasQuant")
+    st.caption(f"Market Intelligence Platform · {ATLASQUANT_ENVIRONMENT}")
+    if _ATLASQUANT_UI_IMPORT_ERROR:
+        st.caption(f"UI profissional em modo compatível: {_ATLASQUANT_UI_IMPORT_ERROR}")
 
-icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
-st.info(
-    f"Fed narrativo: {icone_tom} **{fed['tom']}** | "
-    f"Intensidade: {fed['forca']:+.2f}"
-)
+if context_strip_html is not None:
+    st.markdown(
+        context_strip_html(
+            fed.get("tom", "Neutro"),
+            fed.get("forca", 0.0),
+            qualidade_rotulo,
+            ATLASQUANT_ENVIRONMENT,
+        ),
+        unsafe_allow_html=True,
+    )
+else:
+    st.caption(
+        f"Fed narrativo: {fed.get('tom','Neutro')} · "
+        f"Intensidade {float(fed.get('forca',0.0)):+.2f} · "
+        f"Qualidade USD {qualidade_rotulo}"
+    )
 
 if st.session_state.get("v77_fomc_integrado", False):
     _v77_top_score = float(st.session_state.get("v76_fomc_usd_score", 50.0))
@@ -3878,14 +3895,6 @@ def _autopilot_save_inputs_v107():
     except Exception as exc:
         return False, f"{type(exc).__name__}: {exc}"
 
-
-if render_atlasquant_header is not None:
-    render_atlasquant_header(APP_VERSION, environment=ATLASQUANT_ENVIRONMENT)
-else:
-    st.title("🧭 AtlasQuant")
-    st.caption(f"Market Intelligence Platform · {ATLASQUANT_ENVIRONMENT}")
-    if _ATLASQUANT_UI_IMPORT_ERROR:
-        st.caption(f"UI profissional em modo compatível: {_ATLASQUANT_UI_IMPORT_ERROR}")
 
 _fallback_nav = [
     "🎯 Central", "🧭 Painel mestre", "💱 Moedas", "🇺🇸 EUA", "🔀 Pares", "🏦 Fed",
