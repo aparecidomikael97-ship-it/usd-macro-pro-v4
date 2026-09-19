@@ -94,17 +94,34 @@ jobs:
                       pass
                   page.wait_for_timeout(8_000)
 
+                  body_text = ""
+                  page_title = ""
+                  streamlit_container = 0
+                  main_container = 0
+                  auth_inputs = 0
+                  rendered = False
+                  for render_attempt in range(1, 5):
+                      streamlit_container = page.locator('[data-testid="stAppViewContainer"]').count()
+                      main_container = page.locator('[data-testid="stMainBlockContainer"]').count()
+                      auth_inputs = page.locator('[data-testid="stTextInput"]').count()
+                      page_title = page.title()
+                      body_text = page.locator("body").inner_text(timeout=30_000)
+                      rendered = (
+                          "AtlasQuant" in page_title
+                          or "AtlasQuant" in body_text
+                          or auth_inputs >= 1
+                      ) and streamlit_container >= 1 and main_container >= 1
+                      if rendered:
+                          break
+                      page.wait_for_timeout(5_000)
+
                   exception_count = page.locator('[data-testid="stException"]').count()
-                  streamlit_container = page.locator('[data-testid="stAppViewContainer"]').count()
-                  main_container = page.locator('[data-testid="stMainBlockContainer"]').count()
-                  auth_inputs = page.locator('[data-testid="stTextInput"]').count()
-                  body_text = page.locator("body").inner_text(timeout=30_000)
                   screenshot = out / f"{name}.png"
                   page.screenshot(path=str(screenshot), full_page=False)
 
                   info = {
                       "http_status": status,
-                      "title": page.title(),
+                      "title": page_title,
                       "body_chars": len(body_text),
                       "streamlit_container": streamlit_container,
                       "main_container": main_container,
@@ -118,8 +135,8 @@ jobs:
                       failures.append(f"{name}: HTTP {status}")
                   if streamlit_container < 1:
                       failures.append(f"{name}: Streamlit container ausente")
-                  if main_container < 1 and auth_inputs < 1:
-                      failures.append(f"{name}: UI principal/login não renderizou")
+                  if not rendered:
+                      failures.append(f"{name}: AtlasQuant/login não terminou de renderizar")
                   if exception_count:
                       failures.append(f"{name}: {exception_count} stException")
 
