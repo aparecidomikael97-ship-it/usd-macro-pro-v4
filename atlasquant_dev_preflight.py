@@ -249,12 +249,16 @@ def run_dev_preflight(
         and "contents: write" not in integration_ui_smoke
         and 'ATLASQUANT_ENV: "LOCAL"' in integration_ui_smoke
         and 'ATLASQUANT_AUTH_REQUIRED: "false"' in integration_ui_smoke
+        and 'ATLASQUANT_OFFLINE_SMOKE: "true"' in integration_ui_smoke
         and '"width":390' in integration_ui_smoke
         and '"width":1440' in integration_ui_smoke
+        and 'page.locator(".aq-hero").count()' in integration_ui_smoke
+        and '"ATLASQUANT" in body_text' in integration_ui_smoke
+        and '"Carregando dados macroeconômicos globais" in body_text' in integration_ui_smoke
         and "horizontal_overflow_px" in integration_ui_smoke
         and "stException" in integration_ui_smoke
         and "secrets." not in integration_ui_smoke,
-        "Candidato de integração possui smoke local desktop/mobile sem segredos e sem escrita remota.",
+        "Candidato possui smoke local desktop/mobile offline, sem segredos, que exige o hero AtlasQuant realmente renderizado.",
     ))
 
     provider_markers=(
