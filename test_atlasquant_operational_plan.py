@@ -50,5 +50,14 @@ class AtlasQuantOperationalPlanTests(unittest.TestCase):
         self.assertIn("FOMC",joined)
 
 
+    def test_soft_block_keeps_plan_in_wait_even_if_motor_executable(self):
+        p=self.base(); p["executable"]=True; p["soft_blocks"]=["Evento próximo"]
+        plan=build_operational_plan(p)
+        self.assertEqual(plan["status"],"WAIT")
+        self.assertEqual(plan["label"],"AGUARDAR CONFIRMAÇÃO")
+        self.assertIn("alerta",plan["instruction"].lower())
+
+
+
 if __name__=="__main__":
     unittest.main()
