@@ -10,6 +10,7 @@ import streamlit as st
 
 from atlasquant_platform_center import pwa_asset_audit, PWA_URL
 from atlasquant_commercial_launch_guard import CommercialEvidence, assess_commercial_launch
+from atlasquant_commercial_security_evidence import collect_commercial_security_evidence
 
 SCHEMA="ATLASQUANT_SALES_CENTER_V1"
 
@@ -36,6 +37,7 @@ def onboarding_steps()->list[dict[str,str]]:
 
 def commercial_readiness(access:Mapping[str,Any]|None=None)->dict[str,Any]:
     audit=pwa_asset_audit()
+    security=collect_commercial_security_evidence()
     registry=(access or {}).get("registry") if isinstance(access,Mapping) else {}
     if not isinstance(registry,Mapping):
         registry={}
@@ -60,9 +62,10 @@ def commercial_readiness(access:Mapping[str,Any]|None=None)->dict[str,Any]:
         "payments_integrated":False,
         "broker_execution_enabled":False,
         "real_orders_enabled":False,
-        "sales_role_isolation_verified":False,
-        "account_revocation_verified":False,
-        "audit_manifest_verified":False,
+        "sales_role_isolation_verified":bool(security.get("sales_role_isolated_ok",False)),
+        "account_revocation_verified":bool(security.get("account_revocation_ok",False)),
+        "account_admin_verified":bool(security.get("account_admin_ok",False)),
+        "audit_manifest_verified":bool(security.get("audit_manifest_ok",False)),
     }
 
 
@@ -124,8 +127,8 @@ def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
         hide_index=True,
     )
     launch=assess_commercial_launch(CommercialEvidence(
-        private_access_ok=True,
-        account_admin_ok=True,
+        private_access_ok=sales_access_allowed(access),
+        account_admin_ok=bool(status.get("account_admin_verified",False)),
         distribution_ok=bool(status["pwa_ready"]),
         terms_privacy_ok=False,
         data_licensing_ok=False,
