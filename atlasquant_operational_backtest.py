@@ -38,7 +38,7 @@ def normalize_candles(frame: pd.DataFrame | None) -> pd.DataFrame:
     if not all(c in frame.columns for c in REQUIRED_CANDLE_COLUMNS):
         return pd.DataFrame(columns=REQUIRED_CANDLE_COLUMNS)
     d = frame.copy()
-    d["datetime"] = pd.to_datetime(d["datetime"], utc=True, errors="coerce")
+    d["datetime"] = pd.to_datetime(d["datetime"], utc=True, errors="coerce", format="mixed")
     for c in ("open", "high", "low", "close"):
         d[c] = pd.to_numeric(d[c], errors="coerce")
     d = d.dropna(subset=list(REQUIRED_CANDLE_COLUMNS)).sort_values("datetime")
