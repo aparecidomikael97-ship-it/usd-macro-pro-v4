@@ -140,5 +140,19 @@ class AtlasQuantQuotaShadowTests(unittest.TestCase):
         self.assertFalse(summary["minimum_met"])
 
 
+    def test_invalid_evidence_cannot_be_eligible_even_with_enough_valid_runs(self):
+        rows=[]
+        for i in range(20):
+            rows.append({"timestamp":f"2026-09-18T{i:02d}:00:00+00:00","market_open":True,
+                         "provider_blocked":False,"app_headless_ok":True,
+                         "adaptive_within_usable_cap":True,"actual_http_calls":4})
+        rows.append({"timestamp":"broken","market_open":False,"app_headless_ok":True,
+                     "adaptive_within_usable_cap":True})
+        summary=summarize_quota_shadow(rows,min_market_runs=20)
+        self.assertTrue(summary["minimum_met"])
+        self.assertFalse(summary["evidence_integrity_ok"])
+        self.assertFalse(summary["eligible_for_manual_review"])
+
+
 if __name__=="__main__":
     unittest.main()
