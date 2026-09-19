@@ -73,5 +73,16 @@ class AtlasQuantRuntimeStoreTests(unittest.TestCase):
             self.assertEqual(runtime_branch_from_env(), "runtime-x")
 
 
+    def test_whitespace_code_branch_cannot_bypass_runtime_write_guard(self):
+        self.assertTrue(is_code_branch(" main "))
+        with self.assertRaises(ValueError):
+            require_runtime_branch(" main ")
+
+    def test_blank_default_still_resolves_to_dedicated_runtime_branch(self):
+        self.assertEqual(resolve_runtime_branch(default="   "),DEFAULT_RUNTIME_BRANCH)
+        self.assertTrue(evaluate_runtime_branch(resolve_runtime_branch(default="   ")).safe_for_runtime_writes)
+
+
+
 if __name__=="__main__":
     unittest.main()
