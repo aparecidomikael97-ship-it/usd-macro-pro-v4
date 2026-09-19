@@ -65,12 +65,29 @@ def platform_matrix(audit:dict[str,Any]|None=None)->list[dict[str,str]]:
         {"Plataforma":"Apple App Store","Distribuição atual":"PENDENTE","Tipo":"Pacote nativo/store ainda não assinado/publicado"},
     ]
 
+
+def platform_status(audit:dict[str,Any]|None=None)->dict[str,str]:
+    a=dict(audit or {})
+    if bool(a.get("pwa_ready",False)):
+        return {"label":"PWA PRONTA","detail":"Android, iOS/iPadOS, Windows, macOS e Linux via navegador instalável"}
+    missing=a.get("missing",[]) if isinstance(a.get("missing",[]),list) else []
+    return {"label":"PWA BLOQUEADA","detail":f"{len(missing)} requisito(s) de instalação pendente(s)"}
+
+
 def render_platform_center()->dict[str,Any]:
     audit=pwa_asset_audit()
     st.subheader("📱 Instalação & Plataformas")
     st.caption(
         "A versão PWA cobre instalação pelo navegador em celular e desktop. "
         "Publicação nativa na Play Store/App Store é uma etapa separada e ainda não é marcada como concluída."
+    )
+    visual=platform_status(audit)
+    st.markdown(
+        f"""<div style="padding:11px 13px;border:1px solid rgba(137,170,210,.18);border-radius:12px;margin:4px 0 13px">
+        <strong>PLATAFORMAS · {visual['label']}</strong><br>
+        <span style="opacity:.74;font-size:.78rem">{visual['detail']}</span>
+        <span style="float:right;opacity:.68;font-size:.72rem">Lojas nativas continuam separadas</span></div>""",
+        unsafe_allow_html=True,
     )
     if audit["pwa_ready"]:
         st.success("PWA AtlasQuant: pronta no repositório para distribuição web instalável.")
