@@ -4,7 +4,14 @@ on:
   workflow_dispatch:
   push:
     branches: [atlasquant-runtime]
-    paths: [.github/workflows/autopilot-v107.yml]
+    paths:
+      - ".github/workflows/autopilot-v107.yml"
+      - "autopilot_v107.py"
+      - "autopilot_paper_v112.py"
+      - "autopilot_setup_audit_v114.py"
+      - "autopilot_quota_guard_v111.py"
+      - "paper_trading_v112.py"
+      - "paper_friction_v116.py"
   schedule:
     - cron: "7,37 * * * *"
 
