@@ -54,12 +54,16 @@ OUTCOME_FIELDS = [
 AUDIT_META_FIELDS = [
     "audit_capture_at", "audit_capture_delay_min", "audit_capture_mode", "audit_version",
 ]
+VALIDATION_CONTEXT_FIELDS = [
+    "d1_regime", "w1_regime", "active_session", "premium_discount_zone",
+    "latest_sweep_type",
+]
 COMPONENT_FIELDS = [
     item
     for name, _, _ in COMPONENTS
     for item in (f"{name.lower()}_status", f"{name.lower()}_score")
 ]
-AUDIT_COLUMNS = BASE_FIELDS + OUTCOME_FIELDS + AUDIT_META_FIELDS + COMPONENT_FIELDS
+AUDIT_COLUMNS = BASE_FIELDS + OUTCOME_FIELDS + AUDIT_META_FIELDS + VALIDATION_CONTEXT_FIELDS + COMPONENT_FIELDS
 PERFORMANCE_COLUMNS = [
     "component", "state", "trades_closed", "wins", "losses", "breakeven",
     "win_rate_pct", "net_r", "avg_r", "profit_factor_r", "max_drawdown_r",
@@ -120,6 +124,7 @@ def extract_setup_snapshot(
     trade: Mapping[str, Any],
     scanner: Mapping[str, Any],
     *,
+    market_map: Mapping[str, Any] | None = None,
     now: pd.Timestamp | None = None,
 ) -> dict[str, Any]:
     """Congela o contexto observável do scanner para um trade visto pela 1ª vez."""
@@ -143,6 +148,27 @@ def extract_setup_snapshot(
         "audit_version": AUDIT_VERSION,
     })
 
+    contexts=_mapping(_mapping(market_map).get("contexts"))
+    market_ctx=_mapping(contexts.get(pair))
+    d1_structure=_mapping(_mapping(market_ctx.get("d1")).get("structure"))
+    w1_structure=_mapping(_mapping(market_ctx.get("w1")).get("structure"))
+    killzone=_mapping(market_ctx.get("killzone"))
+    active=killzone.get("active")
+    if isinstance(active,Mapping):
+        active_session=str(active.get("name","") or "")
+    else:
+        active_session=str(active or "")
+    premium=_mapping(market_ctx.get("premium_discount"))
+    latest=market_ctx.get("latest_sweep")
+    latest_type=str(_mapping(latest).get("type","") or "") if isinstance(latest,Mapping) else str(latest or "")
+    row.update({
+        "d1_regime":str(d1_structure.get("regime","") or ""),
+        "w1_regime":str(w1_structure.get("regime","") or ""),
+        "active_session":active_session,
+        "premium_discount_zone":str(premium.get("zone","") or ""),
+        "latest_sweep_type":latest_type,
+    })
+
     for name, group, key in COMPONENTS:
         status, score = _component_value(tecnico, group, key)
         row[f"{name.lower()}_status"] = status
@@ -155,6 +181,7 @@ def sync_setup_audit(
     scanner: Mapping[str, Any] | None,
     existing: pd.DataFrame | None = None,
     *,
+    market_map: Mapping[str, Any] | None = None,
     now: pd.Timestamp | None = None,
 ) -> pd.DataFrame:
     """Adiciona novos snapshots e preserva os campos de setup já congelados.
@@ -180,7 +207,7 @@ def sync_setup_audit(
             if not trade_id:
                 continue
             if trade_id not in by_id:
-                by_id[trade_id] = extract_setup_snapshot(trade, scanner, now=now)
+                by_id[trade_id] = extract_setup_snapshot(trade, scanner, market_map=market_map, now=now)
             else:
                 frozen = dict(by_id[trade_id])
                 # Campos de contexto/setup permanecem imutáveis. Só o desfecho evolui.
@@ -311,6 +338,11 @@ def _audit_cycle() -> tuple[bool, dict[str, Any], list[str]]:
         errors.append("Scanner: " + str(err))
     scanner = scanner if isinstance(scanner, Mapping) else {}
 
+    master, err = base.gh_get_json(base.MASTER_PATH, {})
+    if err:
+        errors.append("Market Map: " + str(err))
+    master = master if isinstance(master, Mapping) else {}
+
     existing, err = base.gh_get_csv(AUDIT_CSV_PATH)
     if err:
         if "404" not in str(err):
@@ -318,7 +350,7 @@ def _audit_cycle() -> tuple[bool, dict[str, Any], list[str]]:
         existing = pd.DataFrame()
 
     now = base.utcnow()
-    audit = sync_setup_audit(trades, scanner, existing, now=now)
+    audit = sync_setup_audit(trades, scanner, existing, market_map=master, now=now)
     performance = aggregate_setup_performance(audit)
     summary = build_summary(audit, performance, now=now)
 
