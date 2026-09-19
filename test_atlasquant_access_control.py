@@ -84,6 +84,11 @@ class AtlasQuantAccessControlTests(unittest.TestCase):
 
 
 
+
+    def test_oversized_json_payload_is_rejected_before_use(self):
+        raw="{"+"x"*(1_000_001)+"}"
+        self.assertEqual(load_users_config(raw),{})
+
     def test_session_is_revoked_when_password_role_or_active_state_changes(self):
         raw={"users":{"user.01":{"role":"USER","password_hash":self.encoded,"active":True}}}
         users=load_users_config(raw)
