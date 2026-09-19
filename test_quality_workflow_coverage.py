@@ -26,5 +26,21 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
         self.assertIn("actions/upload-artifact@v7",joined)
 
 
+    def test_production_observability_workflows_are_read_only_and_main_scoped(self):
+        workflow_dir=ROOT/".github"/"workflows"
+        for name in ("production-health.yml","production-browser-smoke.yml"):
+            src=(workflow_dir/name).read_text(encoding="utf-8")
+            with self.subTest(name=name):
+                self.assertIn("permissions:\n  contents: read",src)
+                self.assertIn("branches: [main]",src)
+                self.assertNotIn("contents: write",src)
+                self.assertNotIn("GITHUB_TOKEN_HISTORICO",src)
+                self.assertNotIn("requests.put(",src)
+        browser=(workflow_dir/"production-browser-smoke.yml").read_text(encoding="utf-8")
+        self.assertIn("actions/setup-python@v7",browser)
+        self.assertIn("actions/upload-artifact@v7",browser)
+
+
+
 if __name__=="__main__":
     unittest.main()
