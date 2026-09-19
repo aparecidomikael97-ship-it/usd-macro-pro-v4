@@ -95,5 +95,26 @@ class AtlasQuantStabilityLabTests(unittest.TestCase):
         self.assertEqual(int(sessions["Amostra"].sum()),3)
 
 
+    def test_invalid_stability_thresholds_fail_closed(self):
+        folds=temporal_folds(self.frame(90),"24h",folds=3)
+        for bad in (0,-1,float("nan"),float("inf"),True,"bad"):
+            with self.subTest(min_fold=bad):
+                s=stability_summary(folds,min_fold_samples=bad)
+                self.assertEqual(s["status"],"INSUFFICIENT")
+                self.assertFalse(s["thresholds_valid"])
+            with self.subTest(session=bad):
+                self.assertTrue(session_metrics(self.frame(20),"24h",min_samples=bad).empty)
+            with self.subTest(folds=bad):
+                self.assertTrue(temporal_folds(self.frame(90),"24h",folds=bad).empty)
+
+    def test_invalid_spread_limit_fails_closed(self):
+        folds=temporal_folds(self.frame(90),"24h",folds=3)
+        for bad in (-1,float("nan"),float("inf"),"bad"):
+            with self.subTest(spread=bad):
+                s=stability_summary(folds,min_fold_samples=30,max_hit_rate_spread_pp=bad)
+                self.assertEqual(s["status"],"INSUFFICIENT")
+                self.assertFalse(s["thresholds_valid"])
+
+
 if __name__=="__main__":
     unittest.main()
