@@ -119,7 +119,9 @@ def summarize_quota_shadow(
 
     return {
         "samples":len(valid_rows),
+        "raw_samples":len(rows),
         "invalid_timestamp_rows":invalid_timestamp_rows,
+        "evidence_integrity_ok":invalid_timestamp_rows==0,
         "market_open_runs":len(market),
         "min_market_runs":minimum,
         "minimum_met":enough,
