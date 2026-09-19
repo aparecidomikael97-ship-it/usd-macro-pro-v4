@@ -4,6 +4,7 @@ from atlasquant_sales_center import (
     commercial_readiness,
     onboarding_steps,
     sales_access_allowed,
+    sales_launch_summary,
 )
 
 class AtlasQuantSalesCenterTests(unittest.TestCase):
@@ -47,6 +48,13 @@ class AtlasQuantSalesCenterTests(unittest.TestCase):
         self.assertEqual(by["Academy"]["Status"],"PLANEJADO")
         self.assertEqual(by["Assistente de voz"]["Status"],"PLANEJADO")
         self.assertEqual(by["Corretoras & plataformas"]["Status"],"PLANEJADO")
+
+
+    def test_sales_launch_summary_is_conservative(self):
+        self.assertEqual(sales_launch_summary({})["label"],"DISTRIBUIÇÃO BLOQUEADA")
+        self.assertEqual(sales_launch_summary({"pwa_ready":True})["label"],"PRÉ-LANÇAMENTO")
+        self.assertEqual(sales_launch_summary({"pwa_ready":True,"payments_integrated":True,"academy_ready":True})["label"],"REVISÃO COMERCIAL")
+
 
 if __name__=="__main__":
     unittest.main()
