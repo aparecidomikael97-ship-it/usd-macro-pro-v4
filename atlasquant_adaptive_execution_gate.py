@@ -32,10 +32,12 @@ def adaptive_pair_permission(
     max_active_m15_age_min: float = 60.0,
 ) -> dict[str,Any]:
     p=str(pair or "").upper().strip()
-    active={str(x).upper().strip() for x in active_pairs}
+    active={str(x).upper().strip() for x in (active_pairs or []) if str(x).strip()}
     tier="ACTIVE" if p in active else "BACKGROUND"
     blockers=[]
 
+    if not p:
+        blockers.append("Par inválido/vazio")
     if tier!="ACTIVE":
         blockers.append("Par fora do conjunto ativo; cobertura apenas de contexto")
 
