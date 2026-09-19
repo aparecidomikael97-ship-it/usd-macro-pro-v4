@@ -9219,6 +9219,8 @@ with abas[13]:
                         st.caption(f"Proveniência da validação: dados persistidos de runtime · {_aq_runtime_source}.")
                     elif any(str(x).startswith("GitHub:") for x in _aq_sources):
                         st.caption("Proveniência da validação: fontes persistidas parcialmente disponíveis; revisão permanece conservadora.")
+                    else:
+                        st.caption("Proveniência da validação: runtime persistido indisponível; revisão permanece conservadora.")
                 except Exception:
                     _aq_runtime_status = {}
                     _aq_paper_summary = {}
