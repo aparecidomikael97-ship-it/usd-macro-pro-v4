@@ -24,6 +24,8 @@ _REQUIRED_HANDOFF_DOCS=(
     "docs/release/STORE_METADATA_TEMPLATE.md",
     "docs/release/PROVIDER_SETUP_TEMPLATE.md",
     "docs/release/USER_QUICKSTART.md",
+    "docs/release/BRANCH_POLICY.md",
+    "docs/release/INCIDENT_ROLLBACK_RUNBOOK.md",
 )
 
 def finalization_audit(root:Path|None=None)->dict[str,Any]:
