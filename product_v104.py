@@ -54,6 +54,12 @@ ROADMAP = pd.DataFrame([
     {"Prioridade": "P2", "Área": "Analytics", "Melhoria": "Telemetria externa com consentimento", "Estado": "🟡 Opcional"},
     {"Prioridade": "P2", "Área": "Push", "Melhoria": "Notificação com app fechado", "Estado": "🟡 Exige serviço externo"},
     {"Prioridade": "P0", "Área": "Acesso", "Melhoria": "Login privado com perfis USER / SALES / ADMIN", "Estado": "✅ Base segura integrada"},
+    {"Prioridade": "P0", "Área": "Admin", "Melhoria": "Ciclo de conta não destrutivo + exportação revisável", "Estado": "✅ Integrado"},
+    {"Prioridade": "P0", "Área": "Vendas", "Melhoria": "Portal comercial + onboarding + checklist de lançamento", "Estado": "✅ Integrado"},
+    {"Prioridade": "P0", "Área": "Instalação", "Melhoria": "PWA Android/iOS/Windows/macOS/Linux", "Estado": "✅ Integrado"},
+    {"Prioridade": "P1", "Área": "Academy", "Melhoria": "Vídeos macro/SMC/plataforma/corretoras", "Estado": "🟡 Planejado"},
+    {"Prioridade": "P1", "Área": "Voz", "Melhoria": "Briefing diário/semanal e explicação do viés", "Estado": "🟡 Planejado"},
+    {"Prioridade": "P2", "Área": "Institucional", "Melhoria": "COT/open interest/posicionamento institucional", "Estado": "🟡 Fase final"},
 ])
 
 WIREFRAME_SVG = r"""<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="700" viewBox="0 0 1100 700">
