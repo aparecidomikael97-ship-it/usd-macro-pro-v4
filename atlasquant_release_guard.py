@@ -19,6 +19,12 @@ class ReleaseEvidence:
     shadow_samples: int = 0
     shadow_critical_mismatches: int = 0
     data_migrations_ok: bool = True
+    private_access_required: bool = False
+    access_config_ok: bool = True
+
+
+def _valid_bool(value: object) -> bool:
+    return isinstance(value,bool)
 
 
 def _valid_count(value: object) -> bool:
@@ -44,18 +50,31 @@ def assess_release(ev: ReleaseEvidence, *, min_tests: int = 1,
         hard.append("Limite mínimo de testes inválido")
     if not _valid_count(min_shadow_samples_for_core):
         hard.append("Limite mínimo de Shadow inválido")
+    bool_fields=(
+        ("compile_ok",ev.compile_ok),
+        ("health_check_ok",ev.health_check_ok),
+        ("data_migrations_ok",ev.data_migrations_ok),
+        ("private_access_required",ev.private_access_required),
+        ("access_config_ok",ev.access_config_ok),
+    )
+    invalid_bools=[name for name,value in bool_fields if not _valid_bool(value)]
+    if invalid_bools:
+        hard.append("Flags de release inválidas: "+", ".join(invalid_bools))
     if _valid_count(ev.tests_total) and _valid_count(min_tests) and ev.tests_total < min_tests:
         hard.append("Cobertura de testes insuficiente")
     if _valid_count(ev.tests_failed) and ev.tests_failed:
         hard.append(f"{ev.tests_failed} teste(s) falharam")
     if _valid_count(ev.critical_regressions) and ev.critical_regressions:
         hard.append(f"{ev.critical_regressions} regressão(ões) crítica(s)")
-    if not ev.compile_ok:
+    if _valid_bool(ev.compile_ok) and not ev.compile_ok:
         hard.append("Compilação/sintaxe falhou")
-    if not ev.health_check_ok:
+    if _valid_bool(ev.health_check_ok) and not ev.health_check_ok:
         hard.append("Health check falhou")
-    if not ev.data_migrations_ok:
+    if _valid_bool(ev.data_migrations_ok) and not ev.data_migrations_ok:
         hard.append("Migração/compatibilidade de dados falhou")
+    if _valid_bool(ev.private_access_required) and ev.private_access_required:
+        if not _valid_bool(ev.access_config_ok) or not ev.access_config_ok:
+            hard.append("Acesso privado obrigatório sem configuração válida")
     if _valid_count(ev.shadow_critical_mismatches) and ev.shadow_critical_mismatches:
         hard.append("Shadow mode detectou divergência crítica")
     if core_model_change and _valid_count(ev.shadow_samples) and _valid_count(min_shadow_samples_for_core) and ev.shadow_samples < min_shadow_samples_for_core:
