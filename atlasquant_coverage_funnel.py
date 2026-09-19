@@ -74,6 +74,22 @@ def expansion_watchlist(matrix: pd.DataFrame, top_n: int = 5) -> pd.DataFrame:
     ].reset_index(drop=True)
 
 
+
+def coverage_visual_state(summary: dict[str,Any] | None)->dict[str,str]:
+    s=dict(summary or {})
+    try:
+        total=max(0,int(s.get("total",0) or 0)); full=max(0,int(s.get("full",0) or 0))
+    except Exception:
+        return {"label":"REVISAR","detail":"Resumo de cobertura inválido"}
+    if total<=0:
+        return {"label":"SEM COBERTURA","detail":"Universo macro indisponível"}
+    if full<=0:
+        return {"label":"RADAR APENAS","detail":"Nenhum par possui pipeline operacional completo"}
+    if full>=total:
+        return {"label":"COBERTURA COMPLETA","detail":"Todos os pares exibidos possuem pipeline completo"}
+    return {"label":"COBERTURA PARCIAL","detail":f"{full}/{total} pares com pipeline completo; demais são radar macro"}
+
+
 def render_coverage_funnel(
     ranking: pd.DataFrame,
     operational_pairs: Iterable[str] = DEFAULT_OPERATIONAL_PAIRS,
@@ -85,6 +101,14 @@ def render_coverage_funnel(
     )
     s=coverage_summary(matrix)
     st.markdown("### 🧭 Cobertura do motor — 28 → pipeline operacional")
+    visual=coverage_visual_state(s)
+    st.markdown(
+        f"""<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:11px 13px;
+        border:1px solid rgba(137,170,210,.18);border-radius:12px;margin:4px 0 13px;background:rgba(11,27,47,.52)">
+        <strong>{visual['label']}</strong><span style="opacity:.74;font-size:.78rem">{visual['detail']}</span>
+        <span style="margin-left:auto;opacity:.68;font-size:.72rem">Radar macro não recebe status executável</span></div>""",
+        unsafe_allow_html=True,
+    )
     st.caption(
         "Os 28 pares recebem leitura macro relativa. Apenas os pares com pipeline completo "
         "podem avançar para Safety Core, ICT/SMC e status executável."
