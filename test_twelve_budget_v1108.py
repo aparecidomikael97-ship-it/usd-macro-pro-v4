@@ -219,4 +219,31 @@ class CollectorTests(unittest.TestCase):
             d,e=ap.td_fetch('EUR/USD,GBP/USD','15min',100)
         self.assertTrue(e); self.assertEqual(self.store.writes,0)
 
+
+    def test_unsupported_pair_or_interval_never_reserves_or_calls_provider(self):
+        for pair,interval in (("EUR/JPY","15min"),("EUR/USD","30min")):
+            with self.subTest(pair=pair,interval=interval), patch.object(ap.requests,'get',side_effect=AssertionError('must not call')):
+                d,e=ap.td_fetch(pair,interval,100)
+                self.assertTrue(d.empty); self.assertTrue(e)
+        self.assertEqual(self.store.writes,0)
+
+    def test_generic_provider_error_does_not_trip_quota_circuit(self):
+        response=self.response(200,{'status':'error','message':'invalid symbol'})
+        with patch.object(ap.requests,'get',return_value=response) as get:
+            d,e=ap.td_fetch('EUR/USD','15min',100)
+        self.assertTrue(d.empty); self.assertTrue(e)
+        self.assertFalse(ap._TD_DAILY_BLOCKED)
+        self.assertEqual(get.call_count,1)
+        self.assertEqual(self.store.state['used'],1)
+
+    def test_minute_limit_error_trips_circuit_and_stops_followup(self):
+        response=self.response(200,{'status':'error','message':'current minute API credits exhausted'})
+        with patch.object(ap.requests,'get',return_value=response) as get:
+            ap.td_fetch('EUR/USD','15min',100)
+            ap.td_fetch('GBP/USD','15min',100)
+        self.assertEqual(get.call_count,1)
+        self.assertTrue(ap._TD_DAILY_BLOCKED)
+        self.assertEqual(ap._TD_BLOCK_TYPE,'LIMITE_MINUTO')
+
+
 if __name__=='__main__': unittest.main()
