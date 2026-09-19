@@ -1,6 +1,6 @@
 import unittest
 
-from atlasquant_safety_panel import build_safety_input, evaluate_live_safety
+from atlasquant_safety_panel import build_safety_input, evaluate_live_safety, safety_visual_state
 
 
 class AtlasQuantSafetyPanelTests(unittest.TestCase):
@@ -92,6 +92,14 @@ class AtlasQuantSafetyPanelTests(unittest.TestCase):
             major_event_minutes_override=None,
         )
         self.assertNotEqual(r["traffic_light"],"RED")
+
+
+    def test_safety_visual_state_never_upgrades_unknown_or_blocked(self):
+        self.assertEqual(safety_visual_state({"traffic_light":"RED"})["label"],"BLOQUEADO")
+        self.assertEqual(safety_visual_state({"traffic_light":"YELLOW"})["label"],"AGUARDAR")
+        self.assertEqual(safety_visual_state({"traffic_light":"GREEN"})["label"],"SEM VETO ADICIONAL")
+        self.assertEqual(safety_visual_state({"traffic_light":"UNKNOWN"})["label"],"REVISAR")
+
 
 
 if __name__=="__main__":
