@@ -1,6 +1,6 @@
 import unittest
 
-from atlasquant_ui_v1 import NAVIGATION_LABELS, NAVIGATION_GROUPS, hero_html, navigation_labels, navigation_groups, navigation_groups_html, score_semantics, section_title_html, state_badge_html, decision_strip_html, context_strip_html
+from atlasquant_ui_v1 import NAVIGATION_LABELS, NAVIGATION_GROUPS, hero_html, navigation_labels, navigation_groups, navigation_groups_html, operation_focus_html, score_semantics, section_title_html, state_badge_html, decision_strip_html, context_strip_html
 
 
 class AtlasQuantUiTests(unittest.TestCase):
@@ -25,6 +25,23 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("Pesquisa",html)
         self.assertIn("Sistema",html)
         self.assertIn("Conta",html)
+
+
+    def test_operation_focus_is_safe_and_responsive(self):
+        html=operation_focus_html(
+            decision="<NÃO OPERAR>",
+            market="EUR/USD",
+            data="98%",
+            safety="BLOQUEADO",
+        )
+        self.assertIn("&lt;NÃO OPERAR&gt;",html)
+        self.assertIn("EUR/USD",html)
+        self.assertIn("98%",html)
+        self.assertIn("BLOQUEADO",html)
+        self.assertIn("aq-focus-main",html)
+        self.assertIn("aq-focus-card",html)
+        self.assertIn("aq-focus",ATLASQUANT_CSS)
+        self.assertIn("grid-template-columns:1fr 1fr",ATLASQUANT_CSS)
 
     def test_score_semantics_is_not_probability(self):
         self.assertEqual(score_semantics(80)["label"], "FORTE")
@@ -91,7 +108,7 @@ class AtlasQuantUiTests(unittest.TestCase):
 
     def test_tab_navigation_is_mobile_scrollable_and_sticky(self):
         from atlasquant_ui_v1 import ATLASQUANT_CSS, UI_VERSION
-        self.assertEqual(UI_VERSION,"0.7")
+        self.assertEqual(UI_VERSION,"0.8")
         self.assertIn("overflow-x: auto",ATLASQUANT_CSS)
         self.assertIn("flex-wrap: nowrap",ATLASQUANT_CSS)
         self.assertIn("position: sticky",ATLASQUANT_CSS)
