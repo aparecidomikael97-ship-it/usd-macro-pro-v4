@@ -23,6 +23,17 @@ def _finite(value: Any) -> float | None:
     except Exception:
         return None
 
+def _positive_int(value: Any, *, minimum: int = 1) -> tuple[int,bool]:
+    if isinstance(value,bool):
+        return minimum,False
+    try:
+        x=float(value)
+        if not math.isfinite(x) or not x.is_integer() or x < minimum:
+            return minimum,False
+        return int(x),True
+    except Exception:
+        return minimum,False
+
 
 def _wilson(hits: int, n: int, z: float = 1.96) -> tuple[float | None, float | None]:
     if n <= 0:
@@ -86,8 +97,8 @@ def temporal_folds(
         return pd.DataFrame()
     data=data[data["registrado_em_dt"].notna()].sort_values("registrado_em_dt").copy()
     n=len(data)
-    k=max(2,int(folds))
-    if n < k:
+    k,k_valid=_positive_int(folds,minimum=2)
+    if not k_valid or n < k:
         return pd.DataFrame()
 
     # Deterministic chronological folds with near-equal sizes.
@@ -101,7 +112,6 @@ def temporal_folds(
         g=data.iloc[start:start+size].copy()
         start+=size
         vals=pd.to_numeric(g[retcol],errors="coerce").dropna().astype(float)
-        vals=vals[vals.map(math.isfinite)]
         vals=vals[vals.map(math.isfinite)]
         if vals.empty:
             continue
@@ -127,13 +137,15 @@ def session_metrics(
     *,
     min_samples: int = 10,
 ) -> pd.DataFrame:
+    threshold,threshold_valid=_positive_int(min_samples)
     data=add_stability_dimensions(df,horizon)
-    if data.empty or "Sessão" not in data.columns:
+    if not threshold_valid or data.empty or "Sessão" not in data.columns:
         return pd.DataFrame()
     retcol=f"retorno_{str(horizon).lower()}_pct"
     rows=[]
     for session,g in data.groupby("Sessão",dropna=False):
         vals=pd.to_numeric(g[retcol],errors="coerce").dropna().astype(float)
+        vals=vals[vals.map(math.isfinite)]
         n=int(len(vals))
         if not n:
             continue
@@ -146,7 +158,7 @@ def session_metrics(
             "IC95 baixo %":round(low,2) if low is not None else None,
             "IC95 alto %":round(high,2) if high is not None else None,
             "Retorno médio %":round(float(vals.mean()),4),
-            "Amostra suficiente":bool(n>=int(min_samples)),
+            "Amostra suficiente":bool(n>=threshold),
         })
     return pd.DataFrame(rows).sort_values(["Amostra","Sessão"],ascending=[False,True]).reset_index(drop=True)
 
@@ -163,13 +175,16 @@ def stability_summary(
             "folds":0,"all_folds_sufficient":False,"hit_rate_spread_pp":None,
             "mean_return_sign_consistent":False,"auto_change_allowed":False,
         }
+    fold_min,fold_min_valid=_positive_int(min_fold_samples)
+    spread_limit=_finite(max_hit_rate_spread_pp)
+    thresholds_valid=bool(fold_min_valid and spread_limit is not None and spread_limit>=0)
     rates=pd.to_numeric(folds_df["Taxa observada %"],errors="coerce").dropna()
     rates=rates[rates.map(math.isfinite)]
     rets=pd.to_numeric(folds_df["Retorno médio %"],errors="coerce").dropna()
     rets=rets[rets.map(math.isfinite)]
     samples=pd.to_numeric(folds_df["Amostra"],errors="coerce")
     samples_valid=bool(len(samples)>=2 and samples.notna().all() and samples.map(lambda x: math.isfinite(float(x)) and float(x)>=0).all())
-    sufficient=bool(samples_valid and (samples>=int(min_fold_samples)).all())
+    sufficient=bool(thresholds_valid and samples_valid and (samples>=fold_min).all())
     spread=float(rates.max()-rates.min()) if len(rates) else None
     nonzero=[x for x in rets.tolist() if abs(float(x))>1e-12]
     sign_consistent=bool(
@@ -178,7 +193,7 @@ def stability_summary(
 
     if not sufficient:
         status="INSUFFICIENT"; label="AMOSTRA TEMPORAL INSUFICIENTE"
-    elif spread is not None and spread <= float(max_hit_rate_spread_pp) and sign_consistent:
+    elif spread is not None and spread <= spread_limit and sign_consistent:
         status="STABLE"; label="ESTABILIDADE TEMPORAL CONSISTENTE"
     else:
         status="UNSTABLE"; label="INSTABILIDADE ENTRE JANELAS"
@@ -188,6 +203,7 @@ def stability_summary(
         "label":label,
         "folds":int(len(folds_df)),
         "all_folds_sufficient":sufficient,
+        "thresholds_valid":thresholds_valid,
         "hit_rate_spread_pp":None if spread is None else round(spread,2),
         "mean_return_sign_consistent":sign_consistent,
         "auto_change_allowed":False,
