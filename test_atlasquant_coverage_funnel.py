@@ -46,7 +46,7 @@ class AtlasQuantCoverageFunnelTests(unittest.TestCase):
 
 
     def test_watchlist_excludes_nonfinite_intensity_and_invalid_top_n(self):
-        m=self.matrix().copy()
+        m=build_coverage_matrix(self.ranking).copy()
         idx=m.index[m["Cobertura operacional"]=="RADAR MACRO"][:3]
         m.loc[idx[0],"Intensidade relativa"]=float("nan")
         m.loc[idx[1],"Intensidade relativa"]=float("inf")
