@@ -9224,6 +9224,10 @@ with abas[13]:
                         st.caption("Proveniência da validação: fontes persistidas parcialmente disponíveis; revisão permanece conservadora.")
                     else:
                         st.caption("Proveniência da validação: runtime persistido indisponível; revisão permanece conservadora.")
+                    if isinstance(_aq_runtime_status, dict):
+                        _aq_last_run = str(_aq_runtime_status.get("last_run") or "").strip()
+                        if _aq_last_run:
+                            st.caption(f"Último ciclo persistido do Autopilot: {_aq_last_run}.")
                 except Exception:
                     _aq_runtime_status = {}
                     _aq_paper_summary = {}
