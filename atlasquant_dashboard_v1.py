@@ -70,6 +70,18 @@ def radar_summary(radar: pd.DataFrame) -> dict[str, Any]:
     }
 
 
+def market_pulse_html(summary: dict[str, Any]) -> str:
+    total=int(summary.get("total",0) or 0); directed=int(summary.get("directed",0) or 0); neutral=int(summary.get("neutral",0) or 0)
+    pair=escape(str(summary.get("top_pair") or "—")); side=escape(str(summary.get("top_side") or "NEUTRO"))
+    try: intensity=float(summary.get("top_intensity") or 0.0)
+    except Exception: intensity=0.0
+    return f"""<div class="aq-pulse">
+<div><span class="aq-pulse-kicker">VISÃO DO MERCADO</span><strong>{directed}/{total}</strong><small>pares com viés</small></div>
+<div><span>Maior desequilíbrio</span><strong>{pair}</strong><small>{side} · intensidade {intensity:.0f}/100</small></div>
+<div><span>Neutros</span><strong>{neutral}</strong><small>aguardando vantagem relativa</small></div>
+<div><span>Execução</span><strong>PROTEGIDA</strong><small>confirmação técnica obrigatória</small></div>
+</div>"""
+
 def focus_rows(radar: pd.DataFrame, top_n: int = 3) -> list[dict[str, Any]]:
     if radar is None or radar.empty:
         return []
@@ -126,6 +138,12 @@ def focus_card_html(row: dict[str, Any]) -> str:
 
 DASHBOARD_CSS = """
 <style>
+.aq-pulse{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:4px 0 16px}
+.aq-pulse>div{padding:13px 14px;border:1px solid rgba(137,170,210,.18);border-radius:13px;background:rgba(11,27,47,.66)}
+.aq-pulse span,.aq-pulse small{display:block;color:#9fb0c6;font-size:.69rem}
+.aq-pulse strong{display:block;color:#edf4ff;font-size:1.02rem;margin:3px 0}
+.aq-pulse-kicker{color:#6de2c5!important;font-weight:800;letter-spacing:.08em}
+@media(max-width:760px){.aq-pulse{grid-template-columns:repeat(2,minmax(0,1fr))}.aq-focus-card{min-height:160px}}
 .aq-focus-card{
   border:1px solid rgba(137,170,210,.18); border-radius:15px; padding:16px 17px;
   min-height:178px; background:linear-gradient(180deg,rgba(17,34,57,.88),rgba(10,24,41,.82));
@@ -168,7 +186,7 @@ def render_g8_radar(ranking: pd.DataFrame, neutral_band: float = 5.0, top_n: int
     radar = build_g8_radar(ranking, neutral_band=neutral_band)
     summary = radar_summary(radar)
 
-    mode = st.radio(
+    st.markdown(DASHBOARD_CSS + market_pulse_html(summary), unsafe_allow_html=True)\n\n    mode = st.radio(
         "Visualização",
         ["Básico", "Pro"],
         horizontal=True,
