@@ -42,7 +42,7 @@ def onboarding_steps()->list[dict[str,str]]:
         {"Etapa":"1","Item":"Conta","Status":"PRONTO","Descrição":"Criar USER/SALES/ADMIN e validar acesso."},
         {"Etapa":"2","Item":"Instalação","Status":"PRONTO — PWA","Descrição":"Android, iOS/iPadOS, Windows, macOS e Linux via PWA."},
         {"Etapa":"3","Item":"Primeiro acesso","Status":"PRONTO","Descrição":"Entrar, revisar viés e qualidade dos dados."},
-        {"Etapa":"4","Item":"Academy","Status":"TEXTO + ROTEIROS PRONTOS · VÍDEOS PENDENTES","Descrição":"Trilha textual e roteiros dos vídeos estão prontos; renderização/publicação ainda é externa."},
+        {"Etapa":"4","Item":"Academy","Status":"TEXTO + ROTEIROS + STORYBOARDS PRONTOS · VÍDEOS PENDENTES","Descrição":"Trilha textual, roteiros e storyboards animados estão prontos; renderização/publicação ainda é externa."},
         {"Etapa":"5","Item":"Assistente de voz","Status":"INFRA PRONTA · PROVEDOR PENDENTE","Descrição":"Contrato, UX e safety internos prontos; falta configurar um provedor TTS externo."},
         {"Etapa":"6","Item":"Corretoras & plataformas","Status":"GUIA INFORMATIVO PRONTO","Descrição":"Compatibilidade, Paper/Demo e segurança documentadas; conexão real continua desativada."},
     ]
