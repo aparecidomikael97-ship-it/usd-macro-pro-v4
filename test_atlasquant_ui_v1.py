@@ -5,10 +5,11 @@ from atlasquant_ui_v1 import UI_VERSION, ATLASQUANT_CSS, NAVIGATION_LABELS, NAVI
 
 class AtlasQuantUiTests(unittest.TestCase):
     def test_navigation_includes_macro_briefing_without_losing_endpoints(self):
-        self.assertEqual(len(NAVIGATION_LABELS), 19)
+        self.assertEqual(len(NAVIGATION_LABELS), 20)
         self.assertIn("🎙️ Macro Briefing", NAVIGATION_LABELS)
         self.assertEqual(navigation_labels()[0], "🎯 Central")
-        self.assertEqual(navigation_labels()[-1], "💼 Vendas")
+        self.assertEqual(navigation_labels()[-1], "🛟 Suporte")
+        self.assertIn("💼 Vendas", navigation_labels())
         self.assertIn("📱 Instalar", navigation_labels())
         self.assertIn("👤 Conta", navigation_labels())
         self.assertIn("🤖 Autopilot", navigation_labels())
@@ -93,7 +94,7 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("_nav_items = list(navigation_labels())",src)
         self.assertIn("abas = st.tabs(_nav_items)",src)
         self.assertIn("navigation_groups_html()",src)
-        self.assertEqual(len(NAVIGATION_LABELS),19)
+        self.assertEqual(len(NAVIGATION_LABELS),20)
 
 
 
