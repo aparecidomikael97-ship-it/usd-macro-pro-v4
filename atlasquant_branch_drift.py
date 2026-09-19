@@ -145,6 +145,34 @@ def reconciliation_state(
     }
 
 
+def build_reconciliation_manifest(
+    paths: Iterable[str],
+    *,
+    ahead_by: object,
+    behind_by: object,
+) -> dict[str, object]:
+    audit=audit_branch_drift(paths)
+    state=reconciliation_state(audit,ahead_by=ahead_by,behind_by=behind_by)
+    return {
+        "schema":"ATLASQUANT_BRANCH_RECONCILIATION_V1",
+        "status":state["status"],
+        "label":state["label"],
+        "ahead_by":ahead_by,
+        "behind_by":behind_by,
+        "runtime_files":len(audit.runtime_files),
+        "code_or_config_files":len(audit.code_or_config_files),
+        "unknown_data_files":len(audit.unknown_data_files),
+        "runtime_only":audit.runtime_only,
+        "requires_code_reconciliation":audit.requires_code_reconciliation,
+        "automatic_merge_allowed":False,
+        "manual_reconciliation_required":bool(state["manual_reconciliation_required"]),
+        "runtime_drift_can_be_ignored_for_source_review":bool(state["runtime_drift_can_be_ignored_for_source_review"]),
+        "source_paths":list(audit.code_or_config_files),
+        "unknown_data_paths":list(audit.unknown_data_files),
+    }
+
+
+
 def drift_release_message(audit: DriftAudit) -> str:
     if audit.requires_code_reconciliation:
         return "Branch drift includes code/config or unclassified data; reconcile before promotion."
