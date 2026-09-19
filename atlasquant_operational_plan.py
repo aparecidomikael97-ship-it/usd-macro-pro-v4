@@ -39,6 +39,10 @@ def build_operational_plan(pack: Mapping[str, Any] | None) -> dict[str, Any]:
         status="NO_TRADE"
         label="NÃO OPERAR"
         instruction="Preservar capital; aguardar os bloqueios/dados serem resolvidos."
+    elif soft:
+        status="WAIT"
+        label="AGUARDAR CONFIRMAÇÃO"
+        instruction="Há alerta(s) operacional(is) pendente(s); não procurar entrada até a confirmação."
     elif executable and side in ("BUY","SELL"):
         status="SEARCH_ENTRY"
         label="PROCURAR ENTRADA"
@@ -100,7 +104,7 @@ def render_operational_plan(pack: Mapping[str, Any] | None) -> dict[str, Any]:
 
     st.markdown("### 📋 Plano Operacional Automático")
     st.caption(
-        "Checklist derivado do motor atual. Não cria entrada, stop ou alvo novo; usa apenas o que já foi validado."
+        "Checklist derivado do motor atual. Não cria entrada, stop ou alvo novo; alertas soft mantêm o plano em espera."
     )
 
     c1,c2,c3,c4=st.columns(4)
