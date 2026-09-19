@@ -129,6 +129,12 @@ def load_users_config(raw:Any)->dict[str,AccessUser]:
         out[user.username]=user
     return out
 
+def credential_fingerprint(user:AccessUser)->str:
+    if not isinstance(user,AccessUser):
+        return ""
+    payload=(user.username+"|"+user.role+"|"+user.password_hash+"|"+str(user.active)).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()[:24]
+
 def authenticate(username:Any,password:Any,users:Mapping[str,AccessUser]|None)->dict[str,Any]|None:
     name=normalize_username(username)
     if not name or not isinstance(password,str) or not isinstance(users,Mapping):
@@ -138,7 +144,27 @@ def authenticate(username:Any,password:Any,users:Mapping[str,AccessUser]|None)->
         return None
     if not verify_password(password,user.password_hash):
         return None
-    return {"schema":SCHEMA,"username":user.username,"role":user.role,"permissions":sorted(ROLE_PERMISSIONS[user.role])}
+    return {
+        "schema":SCHEMA,
+        "username":user.username,
+        "role":user.role,
+        "permissions":sorted(ROLE_PERMISSIONS[user.role]),
+        "credential_fingerprint":credential_fingerprint(user),
+    }
+
+def session_is_current(session:Mapping[str,Any]|None, users:Mapping[str,AccessUser]|None)->bool:
+    if not isinstance(session,Mapping) or not isinstance(users,Mapping):
+        return False
+    name=normalize_username(session.get("username"))
+    role=normalize_role(session.get("role"))
+    user=users.get(name)
+    if not name or not role or not isinstance(user,AccessUser) or not user.active:
+        return False
+    if role!=user.role:
+        return False
+    supplied=str(session.get("credential_fingerprint") or "")
+    expected=credential_fingerprint(user)
+    return bool(supplied and expected and hmac.compare_digest(supplied,expected))
 
 def has_permission(session:Mapping[str,Any]|None, permission:str)->bool:
     if not isinstance(session,Mapping):
