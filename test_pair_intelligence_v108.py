@@ -34,4 +34,17 @@ class PairIntelligenceV108SourceTests(unittest.TestCase):
         self.assertNotIn("probabilidade",pair_panel.pair_intelligence_status({"state":"🟢 EXECUÇÃO CONFIRMADA"},{"forex_market_open":True,"healthy":True})["label"].lower())
 
 
+
+    def test_pair_focus_card_escapes_external_text_and_keeps_index_nonprobabilistic(self):
+        html=pair_panel.pair_focus_card_html({
+            "pair":"<b>EUR/USD</b>","side":"BUY","state":"<script>x</script>",
+            "reason":"<img src=x>","gate":"A","m15":"OK","unified":88,
+        })
+        self.assertNotIn("<b>EUR/USD</b>",html)
+        self.assertNotIn("<script>",html)
+        self.assertNotIn("<img src=x>",html)
+        self.assertIn("&lt;b&gt;EUR/USD&lt;/b&gt;",html)
+        self.assertIn("não é probabilidade",html)
+
+
 if __name__=="__main__": unittest.main()
