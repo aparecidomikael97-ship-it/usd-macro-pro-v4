@@ -44,10 +44,12 @@ jobs:
           import hashlib
           import os
           from pathlib import Path
+          import sys
           import zipfile
-          from atlasquant_branch_drift import RUNTIME_MUTABLE_PATHS
 
           root = Path.cwd()
+          sys.path.insert(0, str(root))
+          from atlasquant_branch_drift import RUNTIME_MUTABLE_PATHS
           sha = os.environ.get("GITHUB_SHA", "unknown")
           branch = os.environ.get("GITHUB_REF_NAME", "unknown")
           short = sha[:7]
