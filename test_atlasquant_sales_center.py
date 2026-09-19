@@ -35,6 +35,9 @@ class AtlasQuantSalesCenterTests(unittest.TestCase):
         self.assertFalse(status["payments_integrated"])
         self.assertFalse(status["broker_execution_enabled"])
         self.assertFalse(status["real_orders_enabled"])
+        self.assertFalse(status["sales_role_isolation_verified"])
+        self.assertFalse(status["account_revocation_verified"])
+        self.assertFalse(status["audit_manifest_verified"])
 
     def test_corrupt_account_count_fails_closed(self):
         for bad in (-1,float("nan"),float("inf"),"bad",True):
@@ -54,6 +57,14 @@ class AtlasQuantSalesCenterTests(unittest.TestCase):
         self.assertEqual(sales_launch_summary({})["label"],"DISTRIBUIÇÃO BLOQUEADA")
         self.assertEqual(sales_launch_summary({"pwa_ready":True})["label"],"PRÉ-LANÇAMENTO")
         self.assertEqual(sales_launch_summary({"pwa_ready":True,"payments_integrated":True,"academy_ready":True})["label"],"REVISÃO COMERCIAL")
+
+
+
+    def test_commercial_security_evidence_is_not_inferred_from_login(self):
+        status=commercial_readiness({"role":"ADMIN","session":{"username":"admin.01","role":"ADMIN"},"registry":{"TOTAL":1}})
+        self.assertFalse(status["sales_role_isolation_verified"])
+        self.assertFalse(status["account_revocation_verified"])
+        self.assertFalse(status["audit_manifest_verified"])
 
 
 if __name__=="__main__":
