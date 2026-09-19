@@ -29,6 +29,17 @@ def _num(value: Any) -> float | None:
     except Exception:
         return None
 
+def _positive_int(value: Any) -> tuple[int,bool]:
+    if isinstance(value,bool):
+        return 1,False
+    try:
+        x=float(value)
+        if not math.isfinite(x) or not x.is_integer() or x < 1:
+            return 1,False
+        return int(x),True
+    except Exception:
+        return 1,False
+
 
 def score_band(score: Any) -> str:
     x=_num(score)
@@ -78,6 +89,7 @@ def calibration_table(
     *,
     min_band_samples: int = 30,
 ) -> pd.DataFrame:
+    threshold,threshold_valid=_positive_int(min_band_samples)
     data=_completed_rows(df,horizon)
     rows=[]
     for label,_,_ in BANDS:
@@ -94,7 +106,7 @@ def calibration_table(
             "IC95 baixo %":None if low is None else round(low,2),
             "IC95 alto %":None if high is None else round(high,2),
             "Retorno direcional médio %":None if avg_ret is None else round(avg_ret,4),
-            "Amostra suficiente":bool(n>=int(min_band_samples)),
+            "Amostra suficiente":bool(threshold_valid and n>=threshold),
         })
     return pd.DataFrame(rows)
 
@@ -112,13 +124,14 @@ def calibration_summary(
         }
     sample_counts=pd.to_numeric(table["Amostra"],errors="coerce")
     samples_valid=bool(sample_counts.notna().all() and sample_counts.map(lambda x: math.isfinite(float(x)) and float(x)>=0).all())
+    total_min,total_min_valid=_positive_int(min_total_samples)
     total=int(sample_counts.sum()) if samples_valid else 0
     eligible=table[table["Amostra suficiente"]==True].copy() if samples_valid else table.iloc[0:0].copy()
     rate_series=pd.to_numeric(eligible["Taxa observada %"],errors="coerce").dropna()
     rate_series=rate_series[rate_series.map(math.isfinite)]
     rates=rate_series.tolist()
     monotonic=len(rates)>=2 and all(rates[i+1]>=rates[i] for i in range(len(rates)-1))
-    enough=total>=int(min_total_samples) and len(eligible)>=2
+    enough=bool(total_min_valid and total>=total_min and len(eligible)>=2)
     if not enough:
         status="INSUFFICIENT"; label="AMOSTRA INSUFICIENTE"
     elif monotonic:
@@ -128,6 +141,7 @@ def calibration_summary(
     return {
         "total_samples":total,
         "eligible_bands":int(len(eligible)),
+        "threshold_valid":bool(total_min_valid),
         "monotonic":bool(monotonic),
         "status":status,
         "label":label,
