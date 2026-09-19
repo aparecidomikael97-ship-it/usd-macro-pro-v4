@@ -16,6 +16,26 @@ SESSION_KEY="atlasquant_access_session"
 THROTTLE_KEY="atlasquant_login_throttle"
 MAX_FAILED_ATTEMPTS=5
 LOCK_SECONDS=300
+SESSION_MAX_SECONDS=12*60*60
+SESSION_IDLE_SECONDS=2*60*60
+
+def session_time_status(session:Any, now:float)->dict[str,Any]:
+    if not isinstance(session,dict):
+        return {"valid":False,"reason":"NO_SESSION"}
+    try:
+        issued=float(session.get("authenticated_at"))
+        last_seen=float(session.get("last_seen"))
+        now_f=float(now)
+        if issued<=0 or last_seen<=0 or not (issued<=last_seen<=now_f):
+            raise ValueError()
+        if now_f-issued>SESSION_MAX_SECONDS:
+            return {"valid":False,"reason":"SESSION_MAX_AGE"}
+        if now_f-last_seen>SESSION_IDLE_SECONDS:
+            return {"valid":False,"reason":"SESSION_IDLE_TIMEOUT"}
+        return {"valid":True,"reason":"OK"}
+    except Exception:
+        return {"valid":False,"reason":"INVALID_SESSION_TIME"}
+
 
 def throttle_status(state:Any, now:float)->dict[str,Any]:
     try:
@@ -105,6 +125,15 @@ def render_access_gate()->dict[str,Any]:
     role_counts=registry_role_counts(users)
     session=current_session()
     decision=evaluate_access(required=required,users_count=len(users),session=session,users=users)
+    if required and decision["allowed"]:
+        time_check=session_time_status(session,time.time())
+        if not time_check["valid"]:
+            clear_session()
+            session=None
+            decision={"allowed":False,"mode":"LOGIN","reason":time_check["reason"]}
+        else:
+            session["last_seen"]=time.time()
+            st.session_state[SESSION_KEY]=session
     if not required:
         return {**decision,"session":None,"role":"OPEN","registry":role_counts}
 
@@ -148,6 +177,9 @@ def render_access_gate()->dict[str,Any]:
             st.error("Usuário ou senha inválidos.")
         else:
             reset_login_throttle()
+            now_login=time.time()
+            authenticated["authenticated_at"]=now_login
+            authenticated["last_seen"]=now_login
             st.session_state[SESSION_KEY]=authenticated
             st.rerun()
     return {**decision,"session":None,"role":None,"registry":role_counts}
