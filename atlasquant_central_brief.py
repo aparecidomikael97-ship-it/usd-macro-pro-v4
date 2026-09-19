@@ -32,10 +32,18 @@ def build_central_brief(
     blocked = [p for p in rows if str(p.get("state", "")).startswith("🔴")]
     waiting = [p for p in rows if p not in executable and p not in blocked]
 
-    if executable:
+    process_ok = bool(auto.get("app_headless_ok", False))
+    source_blocked = bool(auto.get("twelve_daily_blocked", False))
+
+    if executable and process_ok and not source_blocked:
         state = "PROCURAR ENTRADA"
         light = "GREEN"
-        headline = "Há setup executável confirmado pelo motor"
+        headline = "Há setup executável confirmado pelo motor e processo saudável"
+        candidates = executable
+    elif executable and (not process_ok or source_blocked):
+        state = "NÃO OPERAR"
+        light = "RED"
+        headline = "Setup aparente bloqueado por saúde de processo/fonte"
         candidates = executable
     elif not rows or not ready or len(blocked) == len(rows):
         state = "NÃO OPERAR"
@@ -49,8 +57,6 @@ def build_central_brief(
         candidates = ready
 
     best = max(candidates, key=lambda p: _score(p.get("priority", 0)), default=None)
-    process_ok = bool(auto.get("app_headless_ok", False))
-    source_blocked = bool(auto.get("twelve_daily_blocked", False))
 
     return {
         "state": state,
