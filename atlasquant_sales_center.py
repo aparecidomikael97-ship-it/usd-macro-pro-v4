@@ -20,6 +20,8 @@ from atlasquant_commercial_prep import commercial_prep_audit, commercial_externa
 from atlasquant_billing_contract import billing_contract_ready
 from atlasquant_data_licensing_inventory import data_inventory_ready, data_licensing_status
 from atlasquant_public_launch_readiness import collect_public_launch_readiness
+from atlasquant_native_packaging import native_packaging_audit
+from atlasquant_finalization_audit import finalization_audit
 
 SCHEMA="ATLASQUANT_SALES_CENTER_V1"
 
@@ -50,6 +52,8 @@ def commercial_readiness(access:Mapping[str,Any]|None=None)->dict[str,Any]:
     prep=commercial_prep_audit()
     licensing=data_licensing_status()
     public_readiness=collect_public_launch_readiness()
+    native=native_packaging_audit()
+    final_audit=finalization_audit()
     registry=(access or {}).get("registry") if isinstance(access,Mapping) else {}
     if not isinstance(registry,Mapping):
         registry={}
@@ -82,9 +86,11 @@ def commercial_readiness(access:Mapping[str,Any]|None=None)->dict[str,Any]:
         "billing_checklist_ready":bool(prep["billing_checklist_ready"]),
         "billing_contract_ready":bool(billing_contract_ready()),
         "store_checklist_ready":bool(prep["store_checklist_ready"]),
+        "native_packaging_preparation_ready":bool(native["preparation_ready"]),
         "internal_preparation_complete":bool(public_readiness["internal_preparation_complete"]),
         "external_dependencies_complete":bool(public_readiness["external_dependencies_complete"]),
         "public_launch_ready":bool(public_readiness["public_launch_ready"]),
+        "internal_release_preparation_complete":bool(final_audit["internal_release_preparation_complete"]),
         "native_stores_ready":False,
         "payments_integrated":False,
         "broker_execution_enabled":False,
@@ -172,7 +178,8 @@ def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
         ("Pagamento / assinatura — contrato técnico","PRONTO" if status["billing_contract_ready"] else "PENDENTE"),
         ("Pagamento / assinatura — integração com provedor","PENDENTE"),
         ("Lojas nativas — checklist","PRONTO" if status["store_checklist_ready"] else "PENDENTE"),
-        ("Play Store / App Store — publicação","PENDENTE"),
+        ("Lojas nativas — preparação de empacotamento","PRONTA" if status["native_packaging_preparation_ready"] else "PENDENTE"),
+        ("Play Store / App Store — pacote assinado/publicação","PENDENTE"),
     ]
     st.dataframe(
         [{"Item":item,"Estado":state} for item,state in checklist],
@@ -198,7 +205,9 @@ def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
     else:
         st.success("Pré-requisitos comerciais completos para revisão humana final.")
     st.markdown("### Preparação de lançamento")
-    if status["internal_preparation_complete"]:
+    if status["internal_release_preparation_complete"]:
+        st.success("Finalização interna do AtlasQuant: COMPLETA. Dependências externas ainda bloqueiam lançamento público.")
+    elif status["internal_preparation_complete"]:
         st.success("Preparação interna do produto: COMPLETA. Dependências externas ainda bloqueiam lançamento público.")
     elif status["commercial_prep_ready"]:
         st.success("Pacote interno de preparação comercial pronto. Validações externas continuam obrigatórias.")

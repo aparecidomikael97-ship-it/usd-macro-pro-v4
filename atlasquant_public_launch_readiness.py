@@ -16,6 +16,7 @@ from atlasquant_brokers_guide import brokers_guide_minimum_ready
 from atlasquant_commercial_prep import commercial_prep_audit
 from atlasquant_billing_contract import billing_contract_ready
 from atlasquant_data_licensing_inventory import data_inventory_ready
+from atlasquant_native_packaging import native_packaging_audit
 
 SCHEMA="ATLASQUANT_PUBLIC_LAUNCH_READINESS_V1"
 
@@ -31,6 +32,7 @@ def collect_public_launch_readiness()->dict[str,Any]:
         "commercial_pack":bool(prep.get("internal_prep_ready")),
         "billing_contract":bool(billing_contract_ready()),
         "data_provider_inventory":bool(data_inventory_ready()),
+        "native_packaging_preparation":bool(native_packaging_audit().get("preparation_ready")),
     }
     external={
         "legal_review":False,

@@ -3,7 +3,7 @@ name: Quality tests
 on:
   workflow_dispatch:
   push:
-    branches: [main, atlasquant-dev, atlasquant-runtime, atlasquant-runtime-integration, atlasquant-integration, atlasquant-release-final, atlasquant-support-final, atlasquant-support-ui, atlasquant-brokers-guide, atlasquant-voice-readiness, atlasquant-academy-media, atlasquant-commercial-prep]
+    branches: [main, atlasquant-dev, atlasquant-runtime, atlasquant-runtime-integration, atlasquant-integration, atlasquant-release-final, atlasquant-support-final, atlasquant-support-ui, atlasquant-brokers-guide, atlasquant-voice-readiness, atlasquant-academy-media, atlasquant-commercial-prep, atlasquant-final-release-prep]
     paths:
       - "*.py"
       - "tradingview/**"
@@ -15,6 +15,7 @@ on:
       - ".github/workflows/atlasquant-ui-smoke.yml"
       - ".github/workflows/production-health.yml"
       - ".github/workflows/production-browser-smoke.yml"
+      - ".github/workflows/atlasquant-release-readiness.yml"
 
 jobs:
   test:
@@ -154,6 +155,10 @@ jobs:
             test_atlasquant_user_bootstrap.py \
             test_atlasquant_pwa_assets.py \
             test_atlasquant_platform_center.py \
+            test_atlasquant_native_packaging.py \
+            test_atlasquant_finalization_audit.py \
+            test_atlasquant_release_readiness_workflow.py \
+            test_atlasquant_release_documentation.py \
             test_atlasquant_data_confidence.py \
             test_atlasquant_release_guard.py \
             test_atlasquant_release_candidate.py \

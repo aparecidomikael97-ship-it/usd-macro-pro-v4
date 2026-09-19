@@ -28,8 +28,10 @@ O perfil SALES pode:
 
 - acessar o Portal Comercial;
 - visualizar o fluxo de onboarding;
-- conferir a situação de instalação/PWA;
-- conferir o que está pronto e o que ainda está pendente antes da venda.
+- conferir a situação da PWA e a preparação para lojas nativas;
+- conferir Academy, suporte, voz e guia de corretoras;
+- conferir preparação jurídica, billing e licenciamento;
+- diferenciar claramente preparação interna de dependências externas.
 
 O perfil SALES não pode:
 
@@ -38,7 +40,7 @@ O perfil SALES não pode:
 - habilitar broker;
 - ativar ordens reais;
 - alterar pesos/gates/estratégias;
-- marcar Academy, voz, pagamentos, lojas nativas ou guia de corretoras como prontos antes da implementação real.
+- marcar revisão jurídica, licenças comerciais, pagamento, TTS, mídia renderizada ou publicação em lojas como concluídos sem evidência real.
 
 ## USER
 
@@ -66,18 +68,27 @@ O perfil USER acessa o aplicativo, mas não recebe privilégios ADMIN ou SALES.
 
 ## Estado comercial
 
-A PWA pode ser usada em Android, iPhone/iPad, Windows, macOS e Linux via navegador compatível.
+A preparação interna inclui:
 
-Ainda permanecem separados e pendentes para uma venda pública completa:
+- PWA instalável;
+- Academy textual e roteiros dos vídeos;
+- Central de Suporte;
+- Guia informativo de Corretoras & Plataformas;
+- infraestrutura/contrato de voz;
+- rascunhos jurídicos internos;
+- checklist e contrato técnico de billing;
+- inventário/checklist de licenciamento de dados;
+- preparação de empacotamento nativo.
 
-- Academy/vídeos;
-- assistente de voz;
-- guia final de corretoras/plataformas;
-- termos/política de privacidade/riscos;
-- licenciamento comercial de dados;
-- pagamentos/assinatura;
-- publicação Google Play;
-- publicação Apple App Store.
+Continuam pendentes como dependências externas:
+
+- revisão jurídica/privacidade final;
+- licenciamento comercial dos provedores de dados;
+- integração com provedor real de pagamento/assinatura;
+- provedor TTS;
+- renderização/publicação dos vídeos da Academy;
+- pacote assinado/publicação Google Play;
+- pacote assinado/publicação Apple App Store.
 
 ## Segurança de trading
 

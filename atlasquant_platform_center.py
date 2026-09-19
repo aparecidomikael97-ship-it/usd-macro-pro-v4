@@ -11,6 +11,8 @@ from typing import Any
 import json
 import streamlit as st
 
+from atlasquant_native_packaging import native_packaging_audit
+
 ROOT=Path(__file__).resolve().parent
 DOCS=ROOT/"docs"
 PWA_URL="https://aparecidomikael97-ship-it.github.io/usd-macro-pro-v4/"
@@ -76,6 +78,7 @@ def platform_status(audit:dict[str,Any]|None=None)->dict[str,str]:
 
 def render_platform_center()->dict[str,Any]:
     audit=pwa_asset_audit()
+    native=native_packaging_audit()
     st.subheader("📱 Instalação & Plataformas")
     st.caption(
         "A versão PWA cobre instalação pelo navegador em celular e desktop. "
@@ -97,10 +100,17 @@ def render_platform_center()->dict[str,Any]:
         if audit["missing"]:
             st.write("Arquivos ausentes: "+", ".join(audit["missing"]))
     st.dataframe(platform_matrix(audit),width="stretch",hide_index=True)
+    st.markdown("### Preparação para lojas nativas")
+    if native["preparation_ready"]:
+        st.success("Metadados e checklists de empacotamento nativo: PRONTOS para a etapa externa de assinatura/build.")
+    else:
+        st.warning("Preparação de empacotamento nativo incompleta.")
+    st.caption("Pacotes Android/iOS assinados e publicação nas lojas continuam pendentes e não são inferidos destes checklists.")
+
     st.markdown("### Como instalar hoje")
     st.markdown(
         "- **Android / Windows / macOS / Linux:** abra a PWA em navegador compatível e escolha Instalar/Adicionar aplicativo.\n"
         "- **iPhone / iPad:** abra no Safari → Compartilhar → Adicionar à Tela de Início.\n"
         "- **Play Store / App Store:** continuam pendentes de empacotamento, assinatura e publicação."
     )
-    return audit
+    return {**audit,"native_packaging_preparation_ready":bool(native["preparation_ready"]),"native_store_publication_verified":False}

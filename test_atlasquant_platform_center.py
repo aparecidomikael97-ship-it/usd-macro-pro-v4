@@ -21,6 +21,14 @@ class AtlasQuantPlatformCenterTests(unittest.TestCase):
         self.assertTrue(PWA_URL.startswith("https://"))
         self.assertIn("github.io",PWA_URL)
 
+    def test_render_contract_can_report_native_prep_without_store_publication(self):
+        from atlasquant_native_packaging import native_packaging_audit
+        native=native_packaging_audit()
+        self.assertTrue(native["preparation_ready"])
+        self.assertFalse(native["native_store_publication_verified"])
+        self.assertFalse(native["android_signed"])
+        self.assertFalse(native["ios_signed"])
+
     def test_native_stores_are_not_falsely_marked_ready(self):
         rows=platform_matrix({"pwa_ready":True})
         by={r["Plataforma"]:r for r in rows}

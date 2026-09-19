@@ -1,0 +1,75 @@
+name: AtlasQuant - Release Readiness
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, atlasquant-final-release-prep]
+    paths:
+      - "atlasquant_finalization_audit.py"
+      - "atlasquant_support_center.py"
+      - "atlasquant_academy.py"
+      - "atlasquant_academy_media.py"
+      - "atlasquant_voice_readiness.py"
+      - "atlasquant_brokers_guide.py"
+      - "atlasquant_billing_contract.py"
+      - "atlasquant_data_licensing_inventory.py"
+      - "atlasquant_platform_center.py"
+      - "atlasquant_public_launch_readiness.py"
+      - "atlasquant_native_packaging.py"
+      - "atlasquant_commercial_prep.py"
+      - "atlasquant_sales_center.py"
+      - "docs/release/**"
+      - "docs/commercial/**"
+      - "native/**"
+      - ".github/workflows/atlasquant-release-readiness.yml"
+  schedule:
+    - cron: "17 12 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ATLASQUANT_REAL_EXECUTION: "0"
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install readiness dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install streamlit pandas numpy requests altair pyarrow
+
+      - name: Audit internal release preparation
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from atlasquant_finalization_audit import finalization_audit
+
+          status=finalization_audit()
+          print(json.dumps(status,ensure_ascii=False,indent=2))
+
+          if not status["internal_release_preparation_complete"]:
+              raise SystemExit("AtlasQuant internal release preparation regressed")
+          if status["real_orders_enabled"] or status["broker_execution_enabled"]:
+              raise SystemExit("Safety invariant violated: real execution unexpectedly enabled")
+          PY
+
+      - name: Readiness summary
+        if: always()
+        shell: bash
+        run: |
+          echo "## AtlasQuant Release Readiness" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Internal preparation must remain complete." >> "$GITHUB_STEP_SUMMARY"
+          echo "- External legal/licensing/billing/TTS/media/store dependencies are reported separately." >> "$GITHUB_STEP_SUMMARY"
+          echo "- Real-order execution remains disabled." >> "$GITHUB_STEP_SUMMARY"

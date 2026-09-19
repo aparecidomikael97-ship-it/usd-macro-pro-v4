@@ -12,6 +12,16 @@ SCHEMA="ATLASQUANT_SUPPORT_CENTER_V1"
 
 SUPPORT_TOPICS=(
     {
+        "id":"first-steps",
+        "title":"Primeiros passos",
+        "symptoms":"Primeiro acesso ou dúvida sobre a ordem correta de leitura.",
+        "actions":(
+            "Leia nesta ordem: estado → qualidade dos dados → contexto macro → força relativa → Safety Core → estrutura técnica → plano → invalidação.",
+            "Use Paper Trading, Backtest e Academy para treinamento antes de tratar qualquer leitura como operacional.",
+            "Se houver hard block, dado stale ou mercado fechado, aguarde; não force um setup.",
+        ),
+    },
+    {
         "id":"app-access",
         "title":"Acesso ao aplicativo",
         "symptoms":"Login recusado, sessão expirada ou perfil sem acesso.",
@@ -61,6 +71,46 @@ SUPPORT_TOPICS=(
             "O AtlasQuant deve permanecer fail-closed quando integridade ou dados não forem suficientes.",
         ),
     },
+    {
+        "id":"voice",
+        "title":"Assistente de voz",
+        "symptoms":"A narração não aparece ou o provedor TTS ainda não está configurado.",
+        "actions":(
+            "O texto do Macro Briefing continua disponível mesmo sem áudio.",
+            "A infraestrutura de voz pode estar pronta enquanto o provedor TTS externo permanece pendente.",
+            "Nunca envie token/chave do provedor por suporte; configure secrets somente no ambiente autorizado.",
+        ),
+    },
+    {
+        "id":"academy-media",
+        "title":"Vídeos da Academy",
+        "symptoms":"A aula possui conteúdo/roteiro, mas ainda não mostra vídeo final.",
+        "actions":(
+            "A trilha textual e os roteiros/storyboards podem estar prontos antes da renderização da mídia.",
+            "Vídeo só deve ser marcado como pronto depois de existir arquivo/URL final revisado.",
+            "Conteúdo da Academy é educacional e não substitui os controles de risco do AtlasQuant.",
+        ),
+    },
+    {
+        "id":"billing",
+        "title":"Pagamento e assinatura",
+        "symptoms":"Dúvida sobre cobrança, plano ou ativação comercial.",
+        "actions":(
+            "O contrato técnico de billing não significa que um provedor de pagamento já esteja integrado.",
+            "Nenhuma cobrança automática deve ocorrer sem integração real, webhook validado e revisão humana.",
+            "Nunca envie cartão, senha, token ou secret em solicitações de suporte.",
+        ),
+    },
+    {
+        "id":"public-launch",
+        "title":"Lançamento público e lojas",
+        "symptoms":"Dúvida sobre Play Store, App Store ou estado comercial do produto.",
+        "actions":(
+            "A PWA é a distribuição atual; preparação nativa não equivale a pacote assinado/publicado.",
+            "Lançamento público depende de revisão jurídica, licenciamento de dados, billing, TTS/mídia e lojas quando aplicável.",
+            "Use o Portal Comercial para separar preparação interna de dependências externas pendentes.",
+        ),
+    },
 )
 
 def support_catalog()->list[dict[str,Any]]:
@@ -71,7 +121,7 @@ def support_topic(topic_id:object)->dict[str,Any]|None:
     return next((dict(x) for x in SUPPORT_TOPICS if str(x["id"]).casefold()==key),None)
 
 def support_minimum_ready()->bool:
-    required={"app-access","stale-data","paper-trading","pwa-install","security"}
+    required={"first-steps","app-access","stale-data","paper-trading","pwa-install","security","voice","academy-media","billing","public-launch"}
     ids={str(x["id"]) for x in SUPPORT_TOPICS}
     return required.issubset(ids) and all(bool(x.get("actions")) for x in SUPPORT_TOPICS)
 
