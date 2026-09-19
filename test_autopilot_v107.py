@@ -192,5 +192,19 @@ class AutopilotV107Tests(unittest.TestCase):
         self.assertTrue(status["market_map_ready"])
         self.assertEqual(status["operational_readiness"],"READY")
 
+
+    def test_market_closed_has_explicit_non_ready_state(self):
+        now=pd.Timestamp("2026-09-19T12:00:00Z")
+        scanner={"resultados":{}}
+        master={"contexts":{}}
+        with patch.object(a,"utcnow",return_value=now), patch.object(a,"forex_market_likely_open",return_value=False):
+            status=a.status_summary(True,"ok",{},scanner,master,{},pd.DataFrame(),[],0,{})
+        self.assertFalse(status["forex_market_open"])
+        self.assertFalse(status["scanner_ready"])
+        self.assertFalse(status["market_map_ready"])
+        self.assertEqual(status["operational_readiness"],"MARKET_CLOSED")
+        self.assertTrue(status["healthy"])
+
+
 if __name__=="__main__":
     unittest.main()
