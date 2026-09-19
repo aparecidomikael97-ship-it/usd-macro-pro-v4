@@ -194,8 +194,15 @@ def render_validation_evidence(
     readiness: Mapping[str,Any],
     *,
     engine_version: str,
+    paper_summary: Mapping[str,Any] | None = None,
+    setup_summary: Mapping[str,Any] | None = None,
 ) -> dict[str,Any]:
-    bundle=build_validation_evidence(readiness,engine_version=engine_version)
+    bundle=build_validation_evidence(
+        readiness,
+        engine_version=engine_version,
+        paper_summary=paper_summary,
+        setup_summary=setup_summary,
+    )
     validation=bundle["validation"]
     shadow=bundle["evidence"]["shadow"]
     quota=bundle["evidence"]["quota_shadow"]
