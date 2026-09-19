@@ -45,6 +45,10 @@ REQUIRED_FILES=(
     "atlasquant_account_change_audit.py",
     "atlasquant_registry_admin.py",
     "atlasquant_commercial_launch_guard.py",
+    "atlasquant_commercial_security_evidence.py",
+    "atlasquant_branch_drift.py",
+    "atlasquant_validation_readiness.py",
+    "atlasquant_evidence_bundle.py",
     "atlasquant_sales_center.py",
     "atlasquant_user_bootstrap.py",
     "atlasquant_platform_center.py",
@@ -59,6 +63,9 @@ REQUIRED_FILES=(
     "tradingview/atlasquant_amd_strategy_v1.pine",
     ".github/workflows/autopilot-v107.yml",
     ".github/workflows/quality-tests.yml",
+    ".github/workflows/atlasquant-checkpoint.yml",
+    ".github/workflows/production-health.yml",
+    ".github/workflows/production-browser-smoke.yml",
     "docs/continuidade/PLANO_ATIVACAO_RUNTIME.md",
 )
 
@@ -145,6 +152,17 @@ def run_dev_preflight(
         and "Venda pública ainda BLOQUEADA" in sales_center,
         "Venda pública permanece fail-closed e exige revisão humana.",
     ))
+    security_evidence=(base/"atlasquant_commercial_security_evidence.py").read_text(encoding="utf-8") if (base/"atlasquant_commercial_security_evidence.py").is_file() else ""
+    checks.append(_check(
+        "commercial_security_evidence_bounded",
+        '"external_legal_verified":False' in security_evidence
+        and '"external_data_licensing_verified":False' in security_evidence
+        and '"external_billing_verified":False' in security_evidence
+        and "automatic_launch=True" not in security_evidence
+        and "real_orders=True" not in security_evidence,
+        "Evidência interna de segurança não certifica requisitos externos nem habilita lançamento/trading.",
+    ))
+
     checks.append(_check(
         "account_registry_non_destructive",
         "apply_non_destructive_change" in registry_admin
@@ -195,6 +213,30 @@ def run_dev_preflight(
         and 'GITHUB_BRANCH_HISTORICO: "atlasquant-runtime"' in workflow
         and 'GITHUB_BRANCH_HISTORICO: "main"' not in workflow,
         "Workflow de Autopilot aponta para atlasquant-runtime.",
+    ))
+    checkpoint=(base/".github/workflows/atlasquant-checkpoint.yml").read_text(encoding="utf-8") if (base/".github/workflows/atlasquant-checkpoint.yml").is_file() else ""
+    branch_drift=(base/"atlasquant_branch_drift.py").read_text(encoding="utf-8") if (base/"atlasquant_branch_drift.py").is_file() else ""
+    checks.append(_check(
+        "source_checkpoint_excludes_runtime_evidence",
+        "RUNTIME_MUTABLE_PATHS" in checkpoint
+        and "paths-ignore:" in checkpoint
+        and "automatic_merge_allowed" in branch_drift
+        and '"automatic_merge_allowed":False' in branch_drift,
+        "Checkpoint de fonte exclui evidência mutável e reconciliação de branch permanece manual.",
+    ))
+
+    prod_health=(base/".github/workflows/production-health.yml").read_text(encoding="utf-8") if (base/".github/workflows/production-health.yml").is_file() else ""
+    prod_browser=(base/".github/workflows/production-browser-smoke.yml").read_text(encoding="utf-8") if (base/".github/workflows/production-browser-smoke.yml").is_file() else ""
+    checks.append(_check(
+        "production_observability_read_only",
+        "permissions:\n  contents: read" in prod_health
+        and "permissions:\n  contents: read" in prod_browser
+        and "branches: [main]" in prod_health
+        and "branches: [main]" in prod_browser
+        and "actions/setup-python@v7" in prod_browser
+        and "requests.put(" not in prod_health
+        and "requests.put(" not in prod_browser,
+        "Health/browser smoke de produção são observacionais, read-only e ligados à main.",
     ))
 
     history_parts={str(x).lower() for x in DEFAULT_HISTORY_DIR.parts}
