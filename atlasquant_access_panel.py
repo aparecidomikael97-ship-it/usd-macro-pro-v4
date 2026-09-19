@@ -7,11 +7,42 @@ from __future__ import annotations
 
 from typing import Any
 import os
+import time
 import streamlit as st
 
 from atlasquant_access_control import authenticate, load_users_config, has_permission, session_is_current
 
 SESSION_KEY="atlasquant_access_session"
+THROTTLE_KEY="atlasquant_login_throttle"
+MAX_FAILED_ATTEMPTS=5
+LOCK_SECONDS=300
+
+def throttle_status(state:Any, now:float)->dict[str,Any]:
+    try:
+        data=dict(state) if isinstance(state,dict) else {}
+        attempts=int(data.get("attempts",0))
+        lock_until=float(data.get("lock_until",0.0))
+        if attempts<0 or lock_until<0:
+            raise ValueError()
+    except Exception:
+        return {"attempts":MAX_FAILED_ATTEMPTS,"lock_until":float(now)+LOCK_SECONDS,"locked":True,"retry_after":LOCK_SECONDS}
+    if lock_until and lock_until<=float(now):
+        attempts=0
+        lock_until=0.0
+    locked=bool(lock_until>float(now))
+    retry=max(0,int(lock_until-float(now))) if locked else 0
+    return {"attempts":attempts,"lock_until":lock_until,"locked":locked,"retry_after":retry}
+
+def record_login_failure(state:Any, now:float)->dict[str,Any]:
+    current=throttle_status(state,now)
+    if current["locked"]:
+        return current
+    attempts=int(current["attempts"])+1
+    lock_until=float(now)+LOCK_SECONDS if attempts>=MAX_FAILED_ATTEMPTS else 0.0
+    return throttle_status({"attempts":attempts,"lock_until":lock_until},now)
+
+def reset_login_throttle()->None:
+    st.session_state.pop(THROTTLE_KEY,None)
 
 def _setting(key:str, default:str="")->str:
     try:
@@ -93,6 +124,14 @@ def render_access_gate()->dict[str,Any]:
     if decision["reason"]=="SESSION_REVOKED":
         clear_session()
         st.warning("Sua sessão foi encerrada porque a conta, o perfil ou a credencial mudou.")
+
+    now=time.time()
+    throttle=throttle_status(st.session_state.get(THROTTLE_KEY,{}),now)
+    if throttle["locked"]:
+        st.error("🔒 Muitas tentativas inválidas. Aguarde antes de tentar novamente.")
+        st.caption("Nova tentativa em aproximadamente "+str(max(1,int(throttle["retry_after"]/60)+1))+" minuto(s).")
+        return {**decision,"mode":"LOGIN_LOCKED","reason":"TOO_MANY_ATTEMPTS","session":None,"role":None,"registry":role_counts}
+
     st.markdown("## 🔐 AtlasQuant")
     st.caption("Acesso privado. Use sua conta autorizada.")
     with st.form("atlasquant_login_form",clear_on_submit=False):
@@ -102,8 +141,13 @@ def render_access_gate()->dict[str,Any]:
     if submit:
         authenticated=authenticate(username,password,users)
         if authenticated is None:
+            st.session_state[THROTTLE_KEY]=record_login_failure(
+                st.session_state.get(THROTTLE_KEY,{}),
+                time.time(),
+            )
             st.error("Usuário ou senha inválidos.")
         else:
+            reset_login_throttle()
             st.session_state[SESSION_KEY]=authenticated
             st.rerun()
     return {**decision,"session":None,"role":None,"registry":role_counts}
