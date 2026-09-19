@@ -73,6 +73,18 @@ class AtlasQuantAccountPortalTests(unittest.TestCase):
         self.assertNotIn("password",str(summary).lower())
 
 
+
+    def test_corrupt_registry_counts_are_sanitized(self):
+        summary=account_summary({
+            "allowed":True,
+            "mode":"AUTHENTICATED",
+            "role":"ADMIN",
+            "session":{"username":"admin.01","role":"ADMIN"},
+            "registry":{"USER":float("nan"),"SALES":-1,"ADMIN":"bad","TOTAL":float("inf")},
+        })
+        self.assertFalse(summary["registry_valid"])
+        self.assertEqual(summary["registry"],{"USER":0,"SALES":0,"ADMIN":0,"TOTAL":0})
+
     def test_mismatched_declared_and_session_role_fails_closed(self):
         summary=account_summary({
             "allowed":True,
