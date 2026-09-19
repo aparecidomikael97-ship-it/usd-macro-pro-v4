@@ -33,6 +33,21 @@ jobs:
           pip install playwright
           python -m playwright install --with-deps chromium
 
+      - name: Warm production service
+        shell: bash
+        run: |
+          set -euo pipefail
+          code="000"
+          for attempt in 1 2 3 4 5; do
+            code=$(curl -L -sS --connect-timeout 20 --max-time 180 -o /tmp/atlasquant-health.txt -w "%{http_code}" "$APP_URL/_stcore/health" || true)
+            echo "warm attempt=$attempt http=$code"
+            if [ "$code" = "200" ]; then
+              break
+            fi
+            sleep 15
+          done
+          test "$code" = "200"
+
       - name: Open production in desktop and mobile Chromium
         shell: bash
         run: |
@@ -62,8 +77,17 @@ jobs:
                       device_scale_factor=1,
                   )
                   page = context.new_page()
-                  response = page.goto(url, wait_until="domcontentloaded", timeout=180_000)
-                  status = response.status if response else None
+                  status = None
+                  for attempt in range(1, 4):
+                      try:
+                          response = page.goto(url, wait_until="domcontentloaded", timeout=180_000)
+                          status = response.status if response else None
+                      except Exception:
+                          status = None
+                      if status is not None and status < 500:
+                          break
+                      page.wait_for_timeout(5_000)
+
                   try:
                       page.locator('[data-testid="stAppViewContainer"]').wait_for(timeout=90_000)
                   except Exception:
@@ -71,6 +95,9 @@ jobs:
                   page.wait_for_timeout(8_000)
 
                   exception_count = page.locator('[data-testid="stException"]').count()
+                  streamlit_container = page.locator('[data-testid="stAppViewContainer"]').count()
+                  main_container = page.locator('[data-testid="stMainBlockContainer"]').count()
+                  auth_inputs = page.locator('[data-testid="stTextInput"]').count()
                   body_text = page.locator("body").inner_text(timeout=30_000)
                   screenshot = out / f"{name}.png"
                   page.screenshot(path=str(screenshot), full_page=False)
@@ -79,7 +106,9 @@ jobs:
                       "http_status": status,
                       "title": page.title(),
                       "body_chars": len(body_text),
-                      "streamlit_container": page.locator('[data-testid="stAppViewContainer"]').count(),
+                      "streamlit_container": streamlit_container,
+                      "main_container": main_container,
+                      "auth_inputs": auth_inputs,
                       "streamlit_exceptions": exception_count,
                       "screenshot": str(screenshot),
                   }
@@ -87,8 +116,10 @@ jobs:
 
                   if status is None or status >= 400:
                       failures.append(f"{name}: HTTP {status}")
-                  if len(body_text.strip()) < 20:
-                      failures.append(f"{name}: body vazio/curto")
+                  if streamlit_container < 1:
+                      failures.append(f"{name}: Streamlit container ausente")
+                  if main_container < 1 and auth_inputs < 1:
+                      failures.append(f"{name}: UI principal/login não renderizou")
                   if exception_count:
                       failures.append(f"{name}: {exception_count} stException")
 
