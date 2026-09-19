@@ -23,6 +23,7 @@ _REQUIRED_HANDOFF_DOCS=(
     "docs/release/EXTERNAL_DEPENDENCY_HANDOFF.md",
     "docs/release/STORE_METADATA_TEMPLATE.md",
     "docs/release/PROVIDER_SETUP_TEMPLATE.md",
+    "docs/release/USER_QUICKSTART.md",
 )
 
 def finalization_audit(root:Path|None=None)->dict[str,Any]:
