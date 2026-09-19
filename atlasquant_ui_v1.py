@@ -9,7 +9,7 @@ from html import escape
 import math
 import streamlit as st
 
-UI_VERSION = "0.7"
+UI_VERSION = "0.8"
 
 NAVIGATION_LABELS = (
     "🎯 Central",
@@ -141,6 +141,12 @@ html { scroll-behavior: smooth; }
 .aq-decision-strip>div{padding:11px 12px;border:1px solid var(--aq-line);border-radius:12px;background:rgba(11,27,47,.64)}
 .aq-decision-strip span{display:block;color:var(--aq-muted);font-size:.64rem;font-weight:800;letter-spacing:.08em}
 .aq-decision-strip strong{display:block;color:var(--aq-text);font-size:.88rem;margin-top:3px;overflow-wrap:anywhere}
+.aq-focus{display:grid;grid-template-columns:1.35fr repeat(3,minmax(0,.72fr));gap:8px;margin:8px 0 12px}
+.aq-focus-main,.aq-focus-card{border:1px solid var(--aq-line);border-radius:14px;background:linear-gradient(180deg,rgba(17,39,66,.88),rgba(9,24,43,.78));padding:10px 12px;min-width:0}
+.aq-focus-main small,.aq-focus-card small{display:block;color:var(--aq-muted);font-size:.66rem;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px}
+.aq-focus-main strong{display:block;color:var(--aq-text);font-size:.98rem;line-height:1.2}
+.aq-focus-main span,.aq-focus-card span{display:block;color:var(--aq-muted);font-size:.72rem;line-height:1.25;margin-top:3px}
+.aq-focus-card strong{display:block;color:var(--aq-text);font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .aq-nav-groups{display:flex;gap:7px;align-items:center;overflow-x:auto;scrollbar-width:none;margin:2px 0 9px;padding:2px 1px}
 .aq-nav-groups::-webkit-scrollbar{display:none}
 .aq-nav-group{flex:0 0 auto;border:1px solid var(--aq-line);border-radius:999px;padding:5px 9px;background:rgba(10,25,44,.56)}
@@ -229,9 +235,12 @@ html { scroll-behavior: smooth; }
   .aq-decision-strip{grid-template-columns:repeat(2,minmax(0,1fr))}
   .aq-decision-strip .wide{grid-column:1/-1}
   .aq-context-strip{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .aq-focus{grid-template-columns:1fr 1fr}
+  .aq-focus-main{grid-column:1/-1}
   .aq-nav-groups{margin-left:-.15rem;margin-right:-.15rem}
   .aq-nav-group span{display:none}
   .aq-nav-group{padding:5px 8px}
+  .aq-focus-main,.aq-focus-card{padding:9px 10px}
   [data-testid="stSidebar"] { min-width: 280px; }
   [data-testid="stTabs"] [role="tablist"] { margin-left:-.25rem; margin-right:-.25rem; border-radius:10px; }
   [data-testid="stTabs"] [role="tab"] { font-size:.78rem; padding-left:.65rem; padding-right:.65rem; }
@@ -279,6 +288,29 @@ def navigation_groups_html() -> str:
             f'<span>{count} áreas</span></div>'
         )
     return '<div class="aq-nav-groups" aria-label="Grupos de navegação">'+"".join(parts)+"</div>"
+
+
+def operation_focus_html(
+    *,
+    decision: str = "Aguardando leitura",
+    market: str = "Contexto em atualização",
+    data: str = "Qualidade monitorada",
+    safety: str = "Safety Core ativo",
+) -> str:
+    """Compact decision-first orientation strip; presentation only."""
+    return (
+        '<div class="aq-focus">'
+        '<div class="aq-focus-main"><small>Agora</small>'
+        f'<strong>{escape(str(decision))}</strong>'
+        '<span>Decisão primeiro; detalhes e evidências abaixo.</span></div>'
+        '<div class="aq-focus-card"><small>Mercado</small>'
+        f'<strong>{escape(str(market))}</strong><span>Macro + técnico</span></div>'
+        '<div class="aq-focus-card"><small>Dados</small>'
+        f'<strong>{escape(str(data))}</strong><span>Frescor e cobertura</span></div>'
+        '<div class="aq-focus-card"><small>Proteção</small>'
+        f'<strong>{escape(str(safety))}</strong><span>Veto independente</span></div>'
+        '</div>'
+    )
 
 
 def hero_html(app_version: str, environment: str = "LOCAL") -> str:
