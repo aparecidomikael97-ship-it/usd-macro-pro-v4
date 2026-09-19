@@ -108,7 +108,7 @@ class AtlasQuantUiTests(unittest.TestCase):
 
     def test_tab_navigation_is_mobile_scrollable_and_sticky(self):
         from atlasquant_ui_v1 import ATLASQUANT_CSS, UI_VERSION
-        self.assertEqual(UI_VERSION,"0.9")
+        self.assertEqual(UI_VERSION,"1.0")
         self.assertIn("overflow-x: auto",ATLASQUANT_CSS)
         self.assertIn("flex-wrap: nowrap",ATLASQUANT_CSS)
         self.assertIn("position: sticky",ATLASQUANT_CSS)
@@ -145,7 +145,7 @@ class AtlasQuantUiTests(unittest.TestCase):
         tabs=app.index("abas = st.tabs(_nav_items)")
         self.assertLess(focus,tabs)
         self.assertIn('decision="Central pronta para leitura"',app)
-        self.assertIn('safety="Safety Core ativo"',app)
+        self.assertIn('safety="Safety Core monitorado"',app)
 
 
     def test_mobile_navigation_is_compact_sticky_and_labeled(self):
@@ -163,6 +163,12 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertLess(hint,tabs)
         self.assertIn(".aq-mobile-hint{display:none",ATLASQUANT_CSS)
         self.assertIn(".aq-mobile-hint{display:block}",ATLASQUANT_CSS)
+
+
+    def test_ui_1_0_does_not_claim_live_safety_state_in_static_header(self):
+        self.assertEqual(UI_VERSION,"1.0")
+        self.assertNotIn("Safety Core ativo",ATLASQUANT_CSS)
+        self.assertIn("Safety Core monitorado",hero_html("X","LOCAL"))
 
 
 if __name__ == "__main__":
