@@ -62,6 +62,22 @@ class AtlasQuantRegistryAdminTests(unittest.TestCase):
         diff=registry_diff(before,after)
         self.assertEqual(diff["changed"],[{"username":"user.01","fields":["credential"]}])
 
+
+    def test_last_active_admin_cannot_be_deactivated_or_demoted(self):
+        before=self.users()
+        with self.assertRaises(ValueError):
+            set_account_active(before,"admin.01",False)
+        with self.assertRaises(ValueError):
+            set_account_role(before,"admin.01","USER")
+
+    def test_one_admin_can_change_when_another_active_admin_remains(self):
+        before=self.users()
+        before=add_account(before,username="admin.02",role="ADMIN",password="OutraSenha#2026")
+        after=set_account_active(before,"admin.01",False)
+        self.assertFalse(after["admin.01"].active)
+        self.assertTrue(after["admin.02"].active)
+
+
     def test_destructive_removal_is_detected_and_export_blocked(self):
         before=self.users()
         after={"admin.01":before["admin.01"]}
