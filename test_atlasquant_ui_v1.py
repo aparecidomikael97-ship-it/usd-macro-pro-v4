@@ -138,5 +138,15 @@ class AtlasQuantUiTests(unittest.TestCase):
 
 
 
+    def test_main_workspace_surfaces_focus_strip_before_tabs(self):
+        app=(__import__("pathlib").Path(__file__).resolve().parent/"usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        self.assertIn("operation_focus_html",app)
+        focus=app.index("operation_focus_html(")
+        tabs=app.index("abas = st.tabs(_nav_items)")
+        self.assertLess(focus,tabs)
+        self.assertIn('decision="Central pronta para leitura"',app)
+        self.assertIn('safety="Safety Core ativo"',app)
+
+
 if __name__ == "__main__":
     unittest.main()
