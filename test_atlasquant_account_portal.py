@@ -40,6 +40,17 @@ class AtlasQuantAccountPortalTests(unittest.TestCase):
         self.assertIsNotNone(session)
         self.assertEqual(session["role"],"SALES")
 
+
+    def test_manual_plaintext_or_invalid_provisioning_record_is_rejected(self):
+        invalid_plain={"bad.user":{"role":"USER","password":"plaintext","active":True}}
+        invalid_role={"bad.user":{"role":"ROOT","password_hash":"pbkdf2_sha256$200000$00$00","active":True}}
+        for record in (invalid_plain,invalid_role):
+            with self.subTest(record=record):
+                with self.assertRaises(ValueError):
+                    provisioning_json(record)
+                with self.assertRaises(ValueError):
+                    merge_provisioning_records(record)
+
     def test_duplicate_provisioning_records_fail_closed(self):
         a=build_provisioning_record("cliente.01","USER","SenhaSegura#2026")
         b=build_provisioning_record("cliente.01","SALES","OutraSenha#2026")
