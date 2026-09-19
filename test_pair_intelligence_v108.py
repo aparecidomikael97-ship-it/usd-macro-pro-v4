@@ -16,4 +16,12 @@ class PairIntelligenceV108SourceTests(unittest.TestCase):
         self.assertIn('"🎯 Central"',src)
         self.assertIn("abas = st.tabs(_nav_items)",src)
 
+
+    def test_pair_intelligence_uses_runtime_branch_resolver(self):
+        src=Path("pair_intelligence_v108.py").read_text(encoding="utf-8")
+        self.assertIn("resolve_runtime_branch(",src)
+        self.assertIn("GITHUB_DATA_BRANCH",src)
+        self.assertNotIn('branch="main"',src)
+
+
 if __name__=="__main__": unittest.main()
