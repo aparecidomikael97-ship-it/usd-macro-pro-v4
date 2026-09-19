@@ -160,5 +160,12 @@ class RuntimeEvidenceContractTests(unittest.TestCase):
         self.assertIn("return default",source)
 
 
+    def test_validation_ui_shows_persisted_autopilot_cycle_not_live_timestamp(self):
+        source=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        self.assertIn("Último ciclo persistido do Autopilot",source)
+        self.assertIn('_aq_runtime_status.get("last_run")',source)
+        self.assertNotIn("Última atualização ao vivo do Autopilot",source)
+
+
 if __name__=="__main__":
     unittest.main()
