@@ -9,7 +9,7 @@ from html import escape
 import math
 import streamlit as st
 
-UI_VERSION = "0.6"
+UI_VERSION = "0.7"
 
 NAVIGATION_LABELS = (
     "🎯 Central",
@@ -31,6 +31,14 @@ NAVIGATION_LABELS = (
     "👤 Conta",
     "📱 Instalar",
     "💼 Vendas",
+)
+
+NAVIGATION_GROUPS = (
+    ("Operação", ("🎯 Central", "🧭 Painel mestre", "⚡ Decisão", "🗺️ Market Map")),
+    ("Mercado", ("💱 Moedas", "🇺🇸 EUA", "🔀 Pares", "🏦 Fed", "📰 Notícias")),
+    ("Pesquisa", ("🗂️ Histórico", "🧪 Backtest", "🎙️ Macro Briefing", "🎓 Aprender")),
+    ("Sistema", ("🤖 Autopilot", "🧩 Produto", "🛠️ Melhorias")),
+    ("Conta", ("👤 Conta", "📱 Instalar", "💼 Vendas")),
 )
 
 ATLASQUANT_CSS = r"""
@@ -133,6 +141,11 @@ html { scroll-behavior: smooth; }
 .aq-decision-strip>div{padding:11px 12px;border:1px solid var(--aq-line);border-radius:12px;background:rgba(11,27,47,.64)}
 .aq-decision-strip span{display:block;color:var(--aq-muted);font-size:.64rem;font-weight:800;letter-spacing:.08em}
 .aq-decision-strip strong{display:block;color:var(--aq-text);font-size:.88rem;margin-top:3px;overflow-wrap:anywhere}
+.aq-nav-groups{display:flex;gap:7px;align-items:center;overflow-x:auto;scrollbar-width:none;margin:2px 0 9px;padding:2px 1px}
+.aq-nav-groups::-webkit-scrollbar{display:none}
+.aq-nav-group{flex:0 0 auto;border:1px solid var(--aq-line);border-radius:999px;padding:5px 9px;background:rgba(10,25,44,.56)}
+.aq-nav-group strong{color:var(--aq-text);font-size:.69rem}
+.aq-nav-group span{color:var(--aq-muted);font-size:.64rem;margin-left:5px}
 .aq-context-strip{
   display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 14px;
 }
@@ -216,6 +229,9 @@ html { scroll-behavior: smooth; }
   .aq-decision-strip{grid-template-columns:repeat(2,minmax(0,1fr))}
   .aq-decision-strip .wide{grid-column:1/-1}
   .aq-context-strip{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .aq-nav-groups{margin-left:-.15rem;margin-right:-.15rem}
+  .aq-nav-group span{display:none}
+  .aq-nav-group{padding:5px 8px}
   [data-testid="stSidebar"] { min-width: 280px; }
   [data-testid="stTabs"] [role="tablist"] { margin-left:-.25rem; margin-right:-.25rem; border-radius:10px; }
   [data-testid="stTabs"] [role="tab"] { font-size:.78rem; padding-left:.65rem; padding-right:.65rem; }
@@ -246,6 +262,23 @@ def score_semantics(value: float | int | None) -> dict[str, str]:
 
 def navigation_labels() -> tuple[str, ...]:
     return NAVIGATION_LABELS
+
+
+def navigation_groups() -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """Presentation-only grouping; every existing endpoint remains available."""
+    return NAVIGATION_GROUPS
+
+
+def navigation_groups_html() -> str:
+    parts=[]
+    for name, items in NAVIGATION_GROUPS:
+        label=escape(str(name))
+        count=len(items)
+        parts.append(
+            f'<div class="aq-nav-group"><strong>{label}</strong>'
+            f'<span>{count} áreas</span></div>'
+        )
+    return '<div class="aq-nav-groups" aria-label="Grupos de navegação">'+"".join(parts)+"</div>"
 
 
 def hero_html(app_version: str, environment: str = "LOCAL") -> str:
