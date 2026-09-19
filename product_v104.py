@@ -65,7 +65,7 @@ ROADMAP = pd.DataFrame([
 WIREFRAME_SVG = r"""<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="700" viewBox="0 0 1100 700">
 <rect width="1100" height="700" fill="#f4f7fb"/>
 <rect x="40" y="30" width="1020" height="70" rx="18" fill="#15345d"/>
-<text x="75" y="75" font-family="Arial" font-size="28" font-weight="700" fill="white">USD Macro Pro — Início</text>
+<text x="75" y="75" font-family="Arial" font-size="28" font-weight="700" fill="white">AtlasQuant — Início</text>
 <rect x="40" y="125" width="1020" height="80" rx="18" fill="white" stroke="#cbd7e6"/>
 <text x="70" y="160" font-family="Arial" font-size="18" font-weight="700" fill="#15345d">Resumo rápido</text>
 <text x="70" y="188" font-family="Arial" font-size="15" fill="#56677b">USD Macro • Fed • Evento • Melhor oportunidade • Frescor dos dados</text>
@@ -205,7 +205,7 @@ def render_v104_hub(
 
     with tabs[0]:
         st.markdown("### 🏠 Tela inicial proposta")
-        st.components.v1.html(WIREFRAME_SVG, height=520, scrolling=True)
+        st.html(WIREFRAME_SVG)
         st.download_button("⬇️ Baixar wireframe SVG", WIREFRAME_SVG.encode("utf-8"),
                            "wireframe_usd_macro_pro_v104.svg", "image/svg+xml")
         st.markdown("**Objetivo:** Resumo Macro → 2 gráficos principais → Meus Indicadores → navegação curta.")
