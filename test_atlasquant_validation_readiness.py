@@ -1,7 +1,7 @@
 import unittest
 import pandas as pd
 
-from atlasquant_validation_readiness import build_validation_readiness, validation_visual_state
+from atlasquant_validation_readiness import build_validation_readiness, validation_visual_state, render_validation_readiness
 from atlasquant_shadow_mode import compare_shadow_sample
 
 
