@@ -10,6 +10,7 @@ on:
       - "docs/**"
       - ".github/workflows/quality-tests.yml"
       - ".github/workflows/autopilot-v107.yml"
+      - ".github/workflows/atlasquant-integration-gate.yml"
 
 jobs:
   test:
@@ -142,6 +143,7 @@ jobs:
             test_atlasquant_platform_center.py \
             test_atlasquant_data_confidence.py \
             test_atlasquant_release_guard.py \
+            test_atlasquant_integration_gate.py \\
             test_autopilot_panel_v107.py \
             test_twelve_cache_integrity_v1108.py \
             test_quality_workflow_coverage.py \
