@@ -218,6 +218,7 @@ def summarize_shadow(
         "mean_abs_score_delta":None if not score_deltas else round(mean(score_deltas),4),
         "mean_abs_quality_delta":None if not quality_deltas else round(mean(quality_deltas),4),
         "pair_breakdown":pair_rows,
+        "expected_pairs":[x["pair"] for x in pair_rows],
         "expected_pair_count":len(pair_rows),
         "pairs_meeting_minimum":sum(1 for x in pair_rows if bool(x["minimum_met"])),
         "coverage_gate_enabled":coverage_gate_enabled,
