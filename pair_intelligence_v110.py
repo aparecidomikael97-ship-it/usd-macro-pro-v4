@@ -531,20 +531,50 @@ def build_pair_intelligence_packs(matrix:pd.DataFrame, ranking:pd.DataFrame, *, 
     return packs
 
 
-def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:Mapping[str,Any]|None=None,macro_context:Mapping[str,Any]|None=None,weights:Mapping[str,float]|None=None):
+def load_current_pair_intelligence(matrix:pd.DataFrame, ranking:pd.DataFrame, *, fed:Mapping[str,Any]|None=None, weights:Mapping[str,float]|None=None) -> dict[str,Any]:
+    """Loads persisted runtime evidence only; never calls Twelve Data or creates orders."""
+    token,repo,branch=_gh_cfg()
+    scanner,scanner_error=_read_json(SCANNER_PATH,token,repo,branch)
+    mmap,map_error=_read_json(MAP_PATH,token,repo,branch)
+    news_state,news_error=_read_json(NEWS_PATH,token,repo,branch)
+    auto,auto_error=_read_json(AUTO_PATH,token,repo,branch)
+    fed_tone=str((fed or {}).get("tom",(fed or {}).get("tone","Neutro")))
+    packs=build_pair_intelligence_packs(
+        matrix, ranking, scanner_state=scanner, map_state=mmap,
+        news_state=news_state, fed_tone=fed_tone, weights=weights,
+    )
+    return {
+        "packs":packs,
+        "scanner":scanner,
+        "market_map":mmap,
+        "news":news_state,
+        "auto":auto,
+        "errors":{
+            "scanner":scanner_error,
+            "market_map":map_error,
+            "news":news_error,
+            "auto":auto_error,
+        },
+        "runtime_branch":branch,
+        "real_orders_enabled":False,
+    }
+
+
+def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:Mapping[str,Any]|None=None,macro_context:Mapping[str,Any]|None=None,weights:Mapping[str,float]|None=None,runtime_snapshot:Mapping[str,Any]|None=None):
     _css()
     st.markdown("## Central institucional")
     st.caption("7 pares · Leia de cima para baixo: decisão → proteção → plano → detalhes. Prioridade não é probabilidade de lucro.")
     if matrix is None or matrix.empty:
         st.warning("A Matriz ainda não está disponível nesta execução."); return
 
-    token,repo,branch=_gh_cfg()
-    scanner,_=_read_json(SCANNER_PATH,token,repo,branch); mmap,_=_read_json(MAP_PATH,token,repo,branch); news_state,_=_read_json(NEWS_PATH,token,repo,branch); auto,_=_read_json(AUTO_PATH,token,repo,branch)
-    fed_tone=str((fed or {}).get("tom",(fed or {}).get("tone","Neutro")))
-    packs=build_pair_intelligence_packs(
-        matrix, ranking, scanner_state=scanner, map_state=mmap,
-        news_state=news_state, fed_tone=fed_tone, weights=weights,
-    )
+    _runtime=dict(runtime_snapshot or {})
+    if _runtime:
+        packs=list(_runtime.get("packs",[]) or [])
+        auto=dict(_runtime.get("auto",{}) or {})
+    else:
+        _runtime=load_current_pair_intelligence(matrix,ranking,fed=fed,weights=weights)
+        packs=list(_runtime.get("packs",[]) or [])
+        auto=dict(_runtime.get("auto",{}) or {})
     if not packs: st.warning("Nenhum dos 7 pares foi encontrado na Matriz."); return
 
     opctx=select_operational_context(packs)
