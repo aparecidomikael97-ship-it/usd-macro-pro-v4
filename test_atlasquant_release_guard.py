@@ -54,5 +54,20 @@ class ReleaseGuardTests(unittest.TestCase):
     def test_error_rate_above_limit_rolls_back(self):
         self.assertTrue(should_rollback(app_boot_ok=True,health_check_ok=True,error_rate_pct=5.1,max_error_rate_pct=5.0)["rollback"])
 
+
+    def test_failed_quality_suite_blocks_release_even_if_other_checks_pass(self):
+        out=assess_release(self.base(tests_total=899,tests_failed=1),core_model_change=False)
+        self.assertFalse(out["staging_ok"])
+        self.assertFalse(out["eligible_for_manual_promotion"])
+        self.assertTrue(any("teste(s) falharam" in x for x in out["hard_blocks"]))
+
+    def test_core_change_below_shadow_minimum_is_pending_not_auto_promoted(self):
+        out=assess_release(self.base(shadow_samples=99),core_model_change=True,min_shadow_samples_for_core=100)
+        self.assertTrue(out["staging_ok"])
+        self.assertFalse(out["eligible_for_manual_promotion"])
+        self.assertFalse(out["automatic_core_promotion"])
+        self.assertTrue(out["pending"])
+
+
 if __name__=="__main__":
     unittest.main()
