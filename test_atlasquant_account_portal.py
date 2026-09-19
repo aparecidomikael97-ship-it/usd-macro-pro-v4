@@ -8,6 +8,7 @@ from atlasquant_account_portal import (
     password_policy,
     provisioning_json,
     role_sections,
+    account_visual_state,
 )
 from atlasquant_access_control import load_users_config, authenticate
 
@@ -150,6 +151,14 @@ class AtlasQuantAccountPortalTests(unittest.TestCase):
             with self.subTest(username=username,role=role):
                 with self.assertRaises(ValueError):
                     build_provisioning_record(username,role,password)
+
+
+    def test_account_visual_state_is_role_aware_and_conservative(self):
+        self.assertEqual(account_visual_state({"role":"INVALID"})["label"],"ACESSO INVÁLIDO")
+        self.assertEqual(account_visual_state({"role":"OPEN","authenticated":False})["label"],"MODO LOCAL/ABERTO")
+        self.assertEqual(account_visual_state({"role":"SALES","authenticated":True})["label"],"SESSÃO AUTENTICADA")
+        self.assertEqual(account_visual_state({"role":"USER","authenticated":False})["label"],"ACESSO BLOQUEADO")
+
 
 if __name__=="__main__":
     unittest.main()
