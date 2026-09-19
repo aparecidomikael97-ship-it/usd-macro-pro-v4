@@ -1187,6 +1187,16 @@ def status_summary(
     complete = int((validation["validation_status"].astype(str)=="COMPLETO").sum()) if not validation.empty else 0
     try: budget=_TD_BUDGET.summary(now.to_pydatetime()) if _TD_BUDGET else {}
     except Exception: budget={"error":"Orçamento indisponível"}
+    market_open=bool(forex_market_likely_open(now))
+    scanner_ready=bool(market_open and scanner_fresh >= 5)
+    market_map_ready=bool(market_open and map_fresh >= 5)
+    operational_readiness=(
+        "MARKET_CLOSED" if not market_open else
+        "READY" if (
+            app_ok and not _TD_DAILY_BLOCKED and
+            scanner_ready and market_map_ready and len(errors)<8
+        ) else "DEGRADED"
+    )
     return {
         "twelve_budget":budget,
         "twelve_cache_hits":_TD_CACHE_HITS,
@@ -1198,15 +1208,9 @@ def status_summary(
         "matrix_generated_at":inputs.get("generated_at"),
         "scanner_fresh":scanner_fresh,
         "market_map_fresh":map_fresh,
-        "scanner_ready":bool(scanner_fresh >= (5 if forex_market_likely_open(now) else 0)),
-        "market_map_ready":bool(map_fresh >= (5 if forex_market_likely_open(now) else 0)),
-        "operational_readiness":(
-            "READY" if (
-                app_ok and not _TD_DAILY_BLOCKED and
-                scanner_fresh >= (5 if forex_market_likely_open(now) else 0) and
-                map_fresh >= (5 if forex_market_likely_open(now) else 0) and len(errors)<8
-            ) else "DEGRADED"
-        ),
+        "scanner_ready":scanner_ready,
+        "market_map_ready":market_map_ready,
+        "operational_readiness":operational_readiness,
         "news_updated_at":intel.get("updated_at"),
         "news_unique_stories":intel.get("global_unique_stories",0),
         "validation_rows":len(validation),
@@ -1222,7 +1226,7 @@ def status_summary(
         "twelve_daily_block_reason":_TD_DAILY_BLOCK_REASON,
         "twelve_safe_calls_per_window":TD_SAFE_CALLS_PER_WINDOW,
         "twelve_safe_window_seconds":TD_SAFE_WINDOW_SECONDS,
-        "forex_market_open":forex_market_likely_open(now),
+        "forex_market_open":market_open,
         "errors":errors[:20],
         "healthy": bool(app_ok and not _TD_DAILY_BLOCKED and scanner_fresh >= (5 if forex_market_likely_open(now) else 0) and len(errors)<8),
     }
