@@ -10,6 +10,7 @@ from hashlib import sha256
 import json
 import math
 from typing import Any, Mapping, Sequence
+from datetime import datetime
 
 from atlasquant_adaptive_coverage import adaptive_coverage_plan
 
@@ -94,8 +95,17 @@ def summarize_quota_shadow(
         minimum=DEFAULT_MIN_MARKET_RUNS
     if isinstance(min_market_runs,bool) or minimum < 1:
         minimum=DEFAULT_MIN_MARKET_RUNS
-    valid_rows=[x for x in rows if str(x.get("timestamp","") or "").strip()]
-    invalid_timestamp_rows=len(rows)-len(valid_rows)
+    valid_rows=[]
+    invalid_timestamp_rows=0
+    for row in rows:
+        timestamp=str(row.get("timestamp","") or "").strip()
+        try:
+            parsed=datetime.fromisoformat(timestamp.replace("Z","+00:00"))
+            if parsed.tzinfo is None:
+                raise ValueError("timezone required")
+            valid_rows.append(row)
+        except Exception:
+            invalid_timestamp_rows+=1
     market=[x for x in valid_rows if bool(x.get("market_open",False))]
     blocked=[x for x in market if bool(x.get("provider_blocked",False))]
     unhealthy=[x for x in market if not bool(x.get("app_headless_ok",False))]
