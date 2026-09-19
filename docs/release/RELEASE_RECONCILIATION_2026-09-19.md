@@ -33,6 +33,23 @@ Additional Paper Trading/Friction test coverage from `main` was merged into the 
 
 This removes missing-file drift, but it does **not** mean the overlapping source files are conflict-free or safe to blind-merge. Content-level reconciliation remains required for the overlapping files.
 
+## Main-based integration candidate
+
+A dedicated `atlasquant-integration` branch was created from the current `main` and overlaid with the reconciled AtlasQuant source only.
+
+Validated state at this checkpoint:
+
+- Integration branch behind `main`: **0**
+- Runtime/evidence files under `dados/` in the integration diff: **0**
+- Non-runtime source parity against `atlasquant-runtime`: **260/260 blob SHAs identical**
+- Quality suite on integration candidate: **970 tests, 0 failures**
+- Source Checkpoint on integration candidate: **PASS**
+- Draft PR: **#1**
+- PR mergeability reported by GitHub: **clean**
+- PR remains draft; no merge was performed.
+
+This converts the historical Runtime/Main divergence into a reviewable source-only candidate without moving `main` or copying mutable runtime evidence.
+
 ## Release meaning
 
 The branch is **not a safe blind-merge candidate**. The source/config/documentation/workflow differences still require reconciliation because `main` also advanced by 470 commits.
