@@ -16,7 +16,7 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
 
     def test_core_workflows_use_current_node24_action_generation(self):
         workflow_dir=ROOT/".github"/"workflows"
-        names=("quality-tests.yml","autopilot-v107.yml","atlasquant-checkpoint.yml")
+        names=("quality-tests.yml","autopilot-v107.yml","atlasquant-checkpoint.yml","coleta_automatica.yml")
         joined="\n".join((workflow_dir/name).read_text(encoding="utf-8") for name in names)
         self.assertNotIn("actions/checkout@v4",joined)
         self.assertNotIn("actions/setup-python@v5",joined)
