@@ -27,6 +27,11 @@ class ProductV104Tests(unittest.TestCase):
         label, dot, _ = freshness_by_frequency("2026-09-01", "daily", "2026-09-14")
         self.assertEqual((label, dot), ("DESATUALIZADO", "🔴"))
 
+
+    def test_future_freshness_timestamp_fails_closed(self):
+        label,dot,age=freshness_by_frequency("2026-09-15","daily","2026-09-14")
+        self.assertEqual((label,dot,age),("SEM DATA","⚪",None))
+
     def test_required_content(self):
         self.assertIn("CPI / IPC", HISTORY_MAP)
         self.assertIn("PIB", HISTORY_MAP)
