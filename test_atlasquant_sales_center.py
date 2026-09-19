@@ -28,6 +28,7 @@ class AtlasQuantSalesCenterTests(unittest.TestCase):
     def test_commercial_readiness_never_claims_future_features_ready(self):
         status=commercial_readiness({"registry":{"TOTAL":7}})
         self.assertEqual(status["active_accounts"],7)
+        self.assertTrue(status["academy_text_ready"])
         self.assertFalse(status["academy_ready"])
         self.assertFalse(status["voice_ready"])
         self.assertFalse(status["brokers_guide_ready"])
@@ -46,12 +47,19 @@ class AtlasQuantSalesCenterTests(unittest.TestCase):
                 status=commercial_readiness({"registry":{"TOTAL":bad}})
                 self.assertEqual(status["active_accounts"],0)
 
-    def test_onboarding_keeps_education_and_voice_planned(self):
+    def test_onboarding_distinguishes_text_academy_from_pending_videos(self):
         rows=onboarding_steps()
         by={row["Item"]:row for row in rows}
-        self.assertEqual(by["Academy"]["Status"],"PLANEJADO")
+        self.assertEqual(by["Academy"]["Status"],"TEXTO PRONTO · VÍDEOS PENDENTES")
         self.assertEqual(by["Assistente de voz"]["Status"],"PLANEJADO")
         self.assertEqual(by["Corretoras & plataformas"]["Status"],"PLANEJADO")
+
+
+    def test_text_academy_does_not_fake_full_commercial_academy(self):
+        status=commercial_readiness({"registry":{"TOTAL":1}})
+        self.assertTrue(status["academy_text_ready"])
+        self.assertFalse(status["academy_ready"])
+
 
 
     def test_sales_launch_summary_is_conservative(self):
