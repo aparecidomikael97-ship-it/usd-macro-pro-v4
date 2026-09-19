@@ -60,11 +60,14 @@ def build_validation_evidence(
     calib=dict(r.get("calibration",{}) or {})
     stability=dict(r.get("stability",{}) or {})
     shadow=dict(r.get("shadow",{}) or {})
-    pair_coverage=balanced_pair_coverage(
-        shadow.get("expected_pairs") or [],
-        shadow.get("pair_breakdown") or [],
-        shadow.get("min_pair_samples") or 0,
-    )
+    pair_coverage=dict(r.get("shadow_balanced_coverage",{}) or {})
+    required_coverage_keys={"covered","required","complete","pairs_complete","pairs_total","pairs_missing","pairs_under_target"}
+    if not required_coverage_keys.issubset(pair_coverage):
+        pair_coverage=balanced_pair_coverage(
+            shadow.get("expected_pairs") or [],
+            shadow.get("pair_breakdown") or [],
+            shadow.get("min_pair_samples") or 0,
+        )
     pair_required_total=pair_coverage["required"]
     pair_covered_total=pair_coverage["covered"]
     quota_shadow=dict(r.get("quota_shadow",{}) or {})
