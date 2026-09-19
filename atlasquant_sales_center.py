@@ -9,6 +9,7 @@ from typing import Any, Mapping
 import streamlit as st
 
 from atlasquant_platform_center import pwa_asset_audit, PWA_URL
+from atlasquant_commercial_launch_guard import CommercialEvidence, assess_commercial_launch
 
 SCHEMA="ATLASQUANT_SALES_CENTER_V1"
 
@@ -98,8 +99,23 @@ def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
         width="stretch",
         hide_index=True,
     )
+    launch=assess_commercial_launch(CommercialEvidence(
+        private_access_ok=True,
+        account_admin_ok=True,
+        distribution_ok=bool(status["pwa_ready"]),
+        terms_privacy_ok=False,
+        data_licensing_ok=False,
+        support_ok=False,
+        academy_minimum_ok=bool(status["academy_ready"]),
+        billing_ok=bool(status["payments_integrated"]),
+    ))
+    if launch["status"]=="BLOCKED":
+        st.warning("Venda pública ainda BLOQUEADA pelo guard comercial.")
+        st.caption(" · ".join(launch["blockers"]))
+    else:
+        st.success("Pré-requisitos comerciais completos para revisão humana final.")
     st.info(
         "O produto ainda não deve ser marcado como pronto para venda pública "
         "enquanto itens comerciais/regulatórios essenciais permanecerem pendentes."
     )
-    return {"allowed":True,**status}
+    return {"allowed":True,**status,"launch_guard":launch}
