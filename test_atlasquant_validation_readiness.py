@@ -287,5 +287,31 @@ class AtlasQuantValidationReadinessTests(unittest.TestCase):
         self.assertFalse(r["complete"])
 
 
+    def test_balanced_pair_coverage_complete_and_overfilled_stays_at_100(self):
+        exact=balanced_pair_coverage(
+            ("EUR/USD","GBP/USD"),
+            ({"pair":"EUR/USD","samples":10},{"pair":"GBP/USD","samples":10}),
+            10,
+        )
+        over=balanced_pair_coverage(
+            ("EUR/USD","GBP/USD"),
+            ({"pair":"EUR/USD","samples":100},{"pair":"GBP/USD","samples":20}),
+            10,
+        )
+        self.assertEqual(exact["covered"],20)
+        self.assertEqual(exact["progress_pct"],100.0)
+        self.assertTrue(exact["complete"])
+        self.assertEqual(over["covered"],20)
+        self.assertEqual(over["progress_pct"],100.0)
+        self.assertTrue(over["complete"])
+
+    def test_balanced_pair_coverage_empty_expected_pairs_is_safe_not_complete(self):
+        r=balanced_pair_coverage((),({"pair":"EUR/USD","samples":999},),10)
+        self.assertEqual(r["required"],0)
+        self.assertEqual(r["covered"],0)
+        self.assertEqual(r["progress_pct"],0.0)
+        self.assertFalse(r["complete"])
+
+
 if __name__=="__main__":
     unittest.main()
