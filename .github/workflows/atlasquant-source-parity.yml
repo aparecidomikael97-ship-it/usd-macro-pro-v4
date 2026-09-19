@@ -3,7 +3,7 @@ name: AtlasQuant Runtime Source Parity
 on:
   workflow_dispatch:
   push:
-    branches: [atlasquant-runtime]
+    branches: [atlasquant-runtime, atlasquant-integration]
     paths:
       - "*.py"
       - "docs/**"
@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: atlasquant-runtime-source-parity
+  group: atlasquant-source-parity-${{ github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout runtime source
+      - name: Checkout source branch
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
@@ -33,8 +33,9 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Fetch integration source
-        run: git fetch origin atlasquant-integration --prune
+      - name: Fetch counterpart source
+        run: |
+          git fetch origin atlasquant-integration atlasquant-runtime --prune
 
       - name: Compare source blobs
         shell: bash
@@ -54,8 +55,15 @@ jobs:
               )
               return parse_ls_tree(raw)
 
-          integration=tree("origin/atlasquant-integration")
-          runtime=tree("HEAD")
+          branch=subprocess.check_output(["git","branch","--show-current"],text=True).strip()
+          if branch=="atlasquant-integration":
+              integration=tree("HEAD")
+              runtime=tree("origin/atlasquant-runtime")
+          elif branch=="atlasquant-runtime":
+              integration=tree("origin/atlasquant-integration")
+              runtime=tree("HEAD")
+          else:
+              raise SystemExit(f"Unsupported parity branch: {branch}")
           result=compare_source_trees(integration,runtime)
           Path("source-parity.json").write_text(
               json.dumps(result,ensure_ascii=False,indent=2,sort_keys=True),
