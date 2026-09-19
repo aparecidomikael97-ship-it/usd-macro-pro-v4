@@ -30,7 +30,6 @@ class AtlasQuantSalesCenterTests(unittest.TestCase):
         self.assertEqual(status["active_accounts"],7)
         self.assertTrue(status["academy_text_ready"])
         self.assertTrue(status["academy_video_scripts_ready"])
-        self.assertTrue(status["academy_video_scripts_ready"])
         self.assertFalse(status["academy_ready"])
         self.assertTrue(status["voice_contract_ready"])
         self.assertFalse(status["voice_ready"])
@@ -61,6 +60,7 @@ class AtlasQuantSalesCenterTests(unittest.TestCase):
     def test_text_academy_does_not_fake_full_commercial_academy(self):
         status=commercial_readiness({"registry":{"TOTAL":1}})
         self.assertTrue(status["academy_text_ready"])
+        self.assertTrue(status["academy_video_scripts_ready"])
         self.assertFalse(status["academy_ready"])
         self.assertTrue(status["voice_contract_ready"])
         self.assertFalse(status["voice_ready"])
