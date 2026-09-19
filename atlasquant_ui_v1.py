@@ -9,7 +9,7 @@ from html import escape
 import math
 import streamlit as st
 
-UI_VERSION = "0.5"
+UI_VERSION = "0.6"
 
 NAVIGATION_LABELS = (
     "🎯 Central",
@@ -133,6 +133,15 @@ html { scroll-behavior: smooth; }
 .aq-decision-strip>div{padding:11px 12px;border:1px solid var(--aq-line);border-radius:12px;background:rgba(11,27,47,.64)}
 .aq-decision-strip span{display:block;color:var(--aq-muted);font-size:.64rem;font-weight:800;letter-spacing:.08em}
 .aq-decision-strip strong{display:block;color:var(--aq-text);font-size:.88rem;margin-top:3px;overflow-wrap:anywhere}
+.aq-context-strip{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 14px;
+}
+.aq-context-strip>div{
+  border:1px solid var(--aq-line);border-radius:12px;padding:10px 12px;
+  background:linear-gradient(180deg,rgba(15,31,52,.78),rgba(9,23,40,.72));
+}
+.aq-context-strip span{display:block;color:#9fb0c6;font-size:.62rem;font-weight:800;letter-spacing:.08em}
+.aq-context-strip strong{display:block;color:#edf4ff;font-size:.82rem;margin-top:3px;overflow-wrap:anywhere}
 [data-testid="stMetric"] {
   background: linear-gradient(180deg, rgba(17,34,57,.80), rgba(11,25,43,.72));
   border: 1px solid var(--aq-line) !important;
@@ -158,8 +167,15 @@ html { scroll-behavior: smooth; }
 [data-testid="stNumberInput"] input,
 [data-baseweb="select"] > div { border-radius: 10px !important; }
 [data-testid="stExpander"] {
-  border: 1px solid var(--aq-line) !important;
-  background: rgba(12,26,44,.48);
+  border: 1px solid var(--ux-border, var(--aq-line)) !important;
+  background: var(--ux-card, rgba(12,26,44,.48)) !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+}
+[data-testid="stExpander"] details > summary {
+  background: var(--ux-card, rgba(12,26,44,.48)) !important;
+  color: var(--ux-text, var(--aq-text)) !important;
+  min-height: 2.75rem;
 }
 [data-testid="stTabs"] [role="tablist"] {
   padding: 5px;
@@ -182,6 +198,8 @@ html { scroll-behavior: smooth; }
   flex: 0 0 auto;
   white-space: nowrap;
   min-height: 2.25rem;
+  color: #b9c9dc !important;
+  font-weight: 650;
 }
 [data-testid="stTabs"] [role="tab"][aria-selected="true"] {
   background: rgba(79,163,255,.16) !important;
@@ -197,6 +215,7 @@ html { scroll-behavior: smooth; }
   .aq-section-title { font-size:.94rem; margin-top:.9rem; }
   .aq-decision-strip{grid-template-columns:repeat(2,minmax(0,1fr))}
   .aq-decision-strip .wide{grid-column:1/-1}
+  .aq-context-strip{grid-template-columns:repeat(2,minmax(0,1fr))}
   [data-testid="stSidebar"] { min-width: 280px; }
   [data-testid="stTabs"] [role="tablist"] { margin-left:-.25rem; margin-right:-.25rem; border-radius:10px; }
   [data-testid="stTabs"] [role="tab"] { font-size:.78rem; padding-left:.65rem; padding-right:.65rem; }
@@ -257,6 +276,29 @@ def section_title_html(title: str, icon: str = "") -> str:
 def state_badge_html(label: str, tone: str = "info") -> str:
     safe_tone=tone if tone in {"good","warn","bad","info"} else "info"
     return f'<span class="aq-state aq-state-{safe_tone}">{escape(str(label))}</span>'
+
+
+
+def context_strip_html(
+    fed_tone: str,
+    fed_strength: float | int | None,
+    data_quality: str,
+    environment: str,
+) -> str:
+    tone=escape(str(fed_tone or "Neutro"))
+    quality=escape(str(data_quality or "—"))
+    env=escape(str(environment or "LOCAL").upper())
+    try:
+        strength=float(fed_strength)
+        strength_text=f"{strength:+.2f}" if math.isfinite(strength) else "—"
+    except Exception:
+        strength_text="—"
+    return f"""<div class="aq-context-strip">
+      <div><span>FED NARRATIVO</span><strong>{tone}</strong></div>
+      <div><span>INTENSIDADE FED</span><strong>{strength_text}</strong></div>
+      <div><span>QUALIDADE USD</span><strong>{quality}</strong></div>
+      <div><span>AMBIENTE</span><strong>{env}</strong></div>
+    </div>"""
 
 
 
