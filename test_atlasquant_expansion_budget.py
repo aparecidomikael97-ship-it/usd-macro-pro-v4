@@ -61,5 +61,12 @@ class AtlasQuantExpansionBudgetTests(unittest.TestCase):
                 self.assertFalse(out["within_cap"])
 
 
+    def test_max_supported_pairs_invalid_cap_returns_zero(self):
+        from atlasquant_expansion_budget import max_supported_pairs
+        for bad in (0,-1,float("nan"),float("inf"),True,"bad"):
+            with self.subTest(bad=bad):
+                self.assertEqual(max_supported_pairs(daily_cap=bad),0)
+
+
 if __name__=="__main__":
     unittest.main()
