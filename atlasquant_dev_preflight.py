@@ -43,6 +43,7 @@ REQUIRED_FILES=(
     "atlasquant_access_panel.py",
     "atlasquant_account_portal.py",
     "atlasquant_registry_admin.py",
+    "atlasquant_commercial_launch_guard.py",
     "atlasquant_sales_center.py",
     "atlasquant_user_bootstrap.py",
     "atlasquant_platform_center.py",
@@ -132,6 +133,16 @@ def run_dev_preflight(
         and "render_sales_center(_ATLASQUANT_ACCESS)" in app
         and "Área comercial restrita aos perfis SALES e ADMIN autenticados." in sales_center,
         "Portal SALES integrado e protegido por perfil autenticado.",
+    ))
+
+    launch_guard=(base/"atlasquant_commercial_launch_guard.py").read_text(encoding="utf-8") if (base/"atlasquant_commercial_launch_guard.py").is_file() else ""
+    checks.append(_check(
+        "commercial_launch_fail_closed",
+        "automatic_launch" in launch_guard
+        and '"automatic_launch":False' in launch_guard
+        and '"status":"REVIEWABLE" if not blockers else "BLOCKED"' in launch_guard
+        and "Venda pública ainda BLOQUEADA" in sales_center,
+        "Venda pública permanece fail-closed e exige revisão humana.",
     ))
     checks.append(_check(
         "account_registry_non_destructive",
