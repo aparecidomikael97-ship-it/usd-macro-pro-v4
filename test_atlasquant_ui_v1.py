@@ -29,5 +29,14 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn('ATLASQUANT', html)
 
 
+    def test_theme_has_responsive_mobile_and_consistent_controls(self):
+        from atlasquant_ui_v1 import ATLASQUANT_CSS
+        self.assertIn("@media (max-width: 760px)", ATLASQUANT_CSS)
+        self.assertIn('data-testid="stButton"', ATLASQUANT_CSS)
+        self.assertIn("stMainBlockContainer", ATLASQUANT_CSS)
+        self.assertIn('data-testid="stMetric"', ATLASQUANT_CSS)
+
+
+
 if __name__ == "__main__":
     unittest.main()
