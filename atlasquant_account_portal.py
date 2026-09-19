@@ -309,7 +309,7 @@ def render_account_portal(access:Mapping[str,Any]|None)->dict[str,Any]:
                 if diff.get("destructive_removal_detected"):
                     st.error("Remoção destrutiva detectada — exportação bloqueada.")
             st.markdown("#### 📦 Registro completo revisado")
-            st.code(snippet,language="json")
+            st.caption("O conteúdo contém hashes de autenticação e não é exibido na tela. Use apenas o download administrativo.")
             st.download_button(
                 "Baixar ATLASQUANT_USERS_JSON revisado",
                 data=snippet.encode("utf-8"),
