@@ -88,13 +88,19 @@ def summarize_quota_shadow(
     min_market_runs: int = DEFAULT_MIN_MARKET_RUNS,
 ) -> dict[str,Any]:
     rows=[dict(x) for x in (samples or [])]
+    try:
+        minimum=int(min_market_runs)
+    except Exception:
+        minimum=DEFAULT_MIN_MARKET_RUNS
+    if isinstance(min_market_runs,bool) or minimum < 1:
+        minimum=DEFAULT_MIN_MARKET_RUNS
     market=[x for x in rows if bool(x.get("market_open",False))]
     blocked=[x for x in market if bool(x.get("provider_blocked",False))]
     unhealthy=[x for x in market if not bool(x.get("app_headless_ok",False))]
     plan_over=[x for x in rows if not bool(x.get("adaptive_within_usable_cap",False))]
     calls=[_num(x.get("actual_http_calls",0)) for x in market]
 
-    enough=len(market)>=int(min_market_runs)
+    enough=len(market)>=minimum
     no_quota_blocks=len(blocked)==0
     plan_fits=len(plan_over)==0 and bool(rows)
     eligible=bool(enough and no_quota_blocks and not unhealthy and plan_fits)
@@ -102,7 +108,7 @@ def summarize_quota_shadow(
     return {
         "samples":len(rows),
         "market_open_runs":len(market),
-        "min_market_runs":int(min_market_runs),
+        "min_market_runs":minimum,
         "minimum_met":enough,
         "provider_blocked_runs":len(blocked),
         "provider_block_rate_pct":(
