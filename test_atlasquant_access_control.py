@@ -24,9 +24,15 @@ class AtlasQuantAccessControlTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             hash_password("Abcdef#1234")
         with self.assertRaises(ValueError):
+            hash_password("A"*1025)
+        with self.assertRaises(ValueError):
             hash_password(self.password,salt=b"short",iterations=200000)
         with self.assertRaises(ValueError):
             hash_password(self.password,salt=b"0123456789abcdef",iterations=1)
+
+
+    def test_oversized_login_password_is_rejected_without_hashing(self):
+        self.assertFalse(verify_password("A"*1025,self.encoded))
 
     def test_users_config_rejects_plaintext_and_invalid_roles(self):
         raw={
