@@ -1,0 +1,45 @@
+name: AtlasQuant - Source Backup ZIP
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ATLASQUANT_REAL_EXECUTION: "0"
+    steps:
+      - name: Checkout stable source
+        uses: actions/checkout@v7
+
+      - name: Build source ZIP and manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          short_sha="${GITHUB_SHA:0:8}"
+          name="AtlasQuant_SOURCE_${short_sha}"
+          mkdir -p backup-out
+          {
+            echo "AtlasQuant source backup"
+            echo "commit=${GITHUB_SHA}"
+            echo "branch=${GITHUB_REF_NAME}"
+            echo "real_execution=0"
+            echo "generated_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > backup-out/BACKUP_MANIFEST.txt
+          zip -qr "backup-out/${name}.zip" .             -x ".git/*"                "backup-out/*"                "__pycache__/*"                "*.pyc"
+          sha256sum "backup-out/${name}.zip" > "backup-out/${name}.sha256"
+          ls -lh backup-out/
+
+      - name: Upload source backup
+        uses: actions/upload-artifact@v7
+        with:
+          name: atlasquant-source-backup-${{ github.sha }}
+          path: backup-out/
+          if-no-files-found: error
+          retention-days: 30
