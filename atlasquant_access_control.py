@@ -45,8 +45,8 @@ def normalize_role(value:Any)->str:
     return role if role in ROLES else ""
 
 def hash_password(password:str, *, salt:bytes|None=None, iterations:int=DEFAULT_ITERATIONS)->str:
-    if not isinstance(password,str) or len(password)<10:
-        raise ValueError("password must have at least 10 characters")
+    if not isinstance(password,str) or len(password)<12:
+        raise ValueError("password must have at least 12 characters")
     if isinstance(iterations,bool):
         raise ValueError("invalid iterations")
     try:
