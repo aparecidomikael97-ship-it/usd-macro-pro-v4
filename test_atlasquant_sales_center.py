@@ -86,5 +86,16 @@ class AtlasQuantSalesCenterTests(unittest.TestCase):
         self.assertFalse(evidence["external_billing_verified"])
 
 
+
+    def test_sales_checklist_surfaces_internal_security_controls(self):
+        from pathlib import Path
+        src=Path("atlasquant_sales_center.py").read_text(encoding="utf-8")
+        self.assertIn("Isolamento SALES",src)
+        self.assertIn("Revogação de conta/sessão",src)
+        self.assertIn("Auditoria administrativa",src)
+        self.assertNotIn("private_access_ok=True",src)
+        self.assertNotIn("account_admin_ok=True",src)
+
+
 if __name__=="__main__":
     unittest.main()
