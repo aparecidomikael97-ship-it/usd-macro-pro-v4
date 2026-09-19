@@ -127,5 +127,13 @@ class AtlasQuantEvidenceBundleTests(unittest.TestCase):
         self.assertFalse(verify_validation_evidence(b))
 
 
+    def test_evidence_panel_source_exposes_quota_market_progress(self):
+        import inspect, atlasquant_evidence_bundle as module
+        source=inspect.getsource(module.render_validation_evidence)
+        self.assertIn('"Quota mercado"',source)
+        self.assertIn("market_open_runs",source)
+        self.assertIn("min_market_runs",source)
+
+
 if __name__=="__main__":
     unittest.main()
