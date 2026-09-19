@@ -57,5 +57,14 @@ class AtlasQuantUiTests(unittest.TestCase):
 
 
 
+    def test_main_tabs_reuse_navigation_labels_without_changing_count(self):
+        from pathlib import Path
+        src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        self.assertIn("_nav_items = list(navigation_labels())",src)
+        self.assertIn("abas = st.tabs(_nav_items)",src)
+        self.assertEqual(len(NAVIGATION_LABELS),19)
+
+
+
 if __name__ == "__main__":
     unittest.main()
