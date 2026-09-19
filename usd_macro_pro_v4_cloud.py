@@ -245,6 +245,7 @@ try:
         render_atlasquant_header,
         navigation_labels,
         decision_strip_html,
+        context_strip_html,
     )
     _ATLASQUANT_UI_IMPORT_ERROR = ""
     apply_atlasquant_theme()
@@ -252,6 +253,7 @@ except Exception as _atlasquant_ui_exc:
     render_atlasquant_header = None
     navigation_labels = None
     decision_strip_html = None
+    context_strip_html = None
     _ATLASQUANT_UI_IMPORT_ERROR = f"{type(_atlasquant_ui_exc).__name__}: {_atlasquant_ui_exc}"
 
 
@@ -312,6 +314,10 @@ CHAVE_FRED = _config_value("CHAVE_FRED")
 CHAVE_NEWSAPI = _config_value("CHAVE_NEWSAPI")
 CHAVE_EODHD = _config_value("CHAVE_EODHD")
 CHAVE_TWELVE_DATA = _config_value("CHAVE_TWELVE_DATA")
+
+_ATLASQUANT_OFFLINE_SMOKE = str(
+    _config_value("ATLASQUANT_OFFLINE_SMOKE", "false")
+).strip().lower() in {"1", "true", "yes", "on", "sim"}
 
 _ATLASQUANT_ENV_EXPLICIT = str(
     _config_value("ATLASQUANT_ENV")
@@ -392,6 +398,11 @@ with st.sidebar.expander("📡 Fontes & status", expanded=False):
 # =========================================================
 
 def _get(url: str, timeout: int = 15):
+    # Deterministic, CI-only offline mode. Production defaults to false.
+    # It prevents UI smoke tests from waiting on public providers and never
+    # enables trading, writes or provider fallbacks beyond existing local data.
+    if _ATLASQUANT_OFFLINE_SMOKE:
+        return None
     try:
         resposta = requests.get(url, timeout=timeout)
         resposta.raise_for_status()
@@ -714,6 +725,9 @@ def _score_palavras(titulos: list[str], positivas, negativas) -> float:
 
 @st.cache_data(ttl=1800, show_spinner="Lendo a narrativa do Fed...")
 def carregar_narrativa_fed() -> dict:
+    if _ATLASQUANT_OFFLINE_SMOKE:
+        STATUS_FONTE["Fed"] = "⚪ Offline smoke"
+        return {"tom": "Neutro", "forca": 0.0, "titulos": [], "analisadas": []}
     # Consulta focada em política monetária para evitar manchetes pessoais/irrelevantes.
     brutas = _rss_titulos('(Federal Reserve OR FOMC OR "Fed rate" OR "Fed Chair") when:7d')
     analisadas = []
@@ -751,6 +765,8 @@ def carregar_narrativa_fed() -> dict:
 
 @st.cache_data(ttl=1800, show_spinner="Analisando sentimento das notícias...")
 def sentimento_noticias(nome_moeda: str) -> float:
+    if _ATLASQUANT_OFFLINE_SMOKE:
+        return 50.0
     titulos = _rss_titulos(f"{nome_moeda} currency when:7d", "pt-BR", "BR", "BR:pt-419")
     if titulos:
         return float(np.clip(50 + 50 * _score_palavras(titulos, POSITIVAS, NEGATIVAS), 0, 100))
@@ -1892,15 +1908,30 @@ ranking = calcular_ranking(dados_moedas, macro_eua, fed)
 usd_detalhado = score_usd_detalhado(macro_eua, fed)
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 
-st.title("USD Macro Pro")
-st.caption("V11.0.8 · Força auditável · coleta com orçamento diário")
-st.caption("Macro semanal → Macro do dia → W1/D1 → Quarterly → Liquidez → Killzones → H4/H1/M15 → Performance real")
+if render_atlasquant_header is not None:
+    render_atlasquant_header(APP_VERSION, environment=ATLASQUANT_ENVIRONMENT)
+else:
+    st.title("🧭 AtlasQuant")
+    st.caption(f"Market Intelligence Platform · {ATLASQUANT_ENVIRONMENT}")
+    if _ATLASQUANT_UI_IMPORT_ERROR:
+        st.caption(f"UI profissional em modo compatível: {_ATLASQUANT_UI_IMPORT_ERROR}")
 
-icone_tom = {"Restritivo": "🔴", "Flexível": "🟢", "Neutro": "⚪"}.get(fed["tom"], "⚪")
-st.info(
-    f"Fed narrativo: {icone_tom} **{fed['tom']}** | "
-    f"Intensidade: {fed['forca']:+.2f}"
-)
+if context_strip_html is not None:
+    st.markdown(
+        context_strip_html(
+            fed.get("tom", "Neutro"),
+            fed.get("forca", 0.0),
+            qualidade_rotulo,
+            ATLASQUANT_ENVIRONMENT,
+        ),
+        unsafe_allow_html=True,
+    )
+else:
+    st.caption(
+        f"Fed narrativo: {fed.get('tom','Neutro')} · "
+        f"Intensidade {float(fed.get('forca',0.0)):+.2f} · "
+        f"Qualidade USD {qualidade_rotulo}"
+    )
 
 if st.session_state.get("v77_fomc_integrado", False):
     _v77_top_score = float(st.session_state.get("v76_fomc_usd_score", 50.0))
@@ -3864,14 +3895,6 @@ def _autopilot_save_inputs_v107():
     except Exception as exc:
         return False, f"{type(exc).__name__}: {exc}"
 
-
-if render_atlasquant_header is not None:
-    render_atlasquant_header(APP_VERSION, environment=ATLASQUANT_ENVIRONMENT)
-else:
-    st.title("🧭 AtlasQuant")
-    st.caption(f"Market Intelligence Platform · {ATLASQUANT_ENVIRONMENT}")
-    if _ATLASQUANT_UI_IMPORT_ERROR:
-        st.caption(f"UI profissional em modo compatível: {_ATLASQUANT_UI_IMPORT_ERROR}")
 
 _fallback_nav = [
     "🎯 Central", "🧭 Painel mestre", "💱 Moedas", "🇺🇸 EUA", "🔀 Pares", "🏦 Fed",
