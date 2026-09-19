@@ -110,5 +110,16 @@ class AtlasQuantQuotaShadowTests(unittest.TestCase):
 
 
 
+    def test_summary_ignores_malformed_non_mapping_samples(self):
+        valid=build_quota_shadow_sample(
+            {"last_run":"2026-09-19T18:00:00+00:00","forex_market_open":True,"app_headless_ok":True},
+            plan={"within_usable_cap":True},
+        )
+        summary=summarize_quota_shadow([None,"bad",42,valid],min_market_runs=1)
+        self.assertEqual(summary["samples"],1)
+        self.assertEqual(summary["market_open_runs"],1)
+        self.assertTrue(summary["eligible_for_manual_review"])
+
+
 if __name__=="__main__":
     unittest.main()
