@@ -226,9 +226,10 @@ class AtlasQuantValidationReadinessTests(unittest.TestCase):
 
     def test_closed_market_history_does_not_dilute_open_market_quota_gate(self):
         quota=[{
+            "timestamp":f"2026-09-17T{(i%24):02d}:{(i//24):02d}:00+00:00",
             "market_open":False,"provider_blocked":False,"app_headless_ok":True,
             "adaptive_within_usable_cap":True,"actual_http_calls":0,
-        } for _ in range(44)]
+        } for i in range(44)]
         quota += [{
             "timestamp":f"2026-09-18T{i:02d}:00:00+00:00","market_open":True,"provider_blocked":False,"app_headless_ok":True,
             "adaptive_within_usable_cap":True,"actual_http_calls":4,
