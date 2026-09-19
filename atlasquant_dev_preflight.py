@@ -47,6 +47,7 @@ REQUIRED_FILES=(
     "atlasquant_user_bootstrap.py",
     "atlasquant_platform_center.py",
     "docs/release/ACCESS_CONTROL_SETUP.md",
+    "docs/release/SALES_ADMIN_OPERATIONS.md",
     "docs/manifest.webmanifest",
     "docs/sw.js",
     "tradingview/atlasquant_bos_choch_ob_strategy_v1.pine",
