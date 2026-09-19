@@ -87,7 +87,7 @@ def summarize_quota_shadow(
     *,
     min_market_runs: int = DEFAULT_MIN_MARKET_RUNS,
 ) -> dict[str,Any]:
-    rows=[dict(x) for x in (samples or [])]
+    rows=[dict(x) for x in (samples or []) if isinstance(x, Mapping)]
     try:
         minimum=int(min_market_runs)
     except Exception:
