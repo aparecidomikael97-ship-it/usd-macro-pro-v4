@@ -29,18 +29,21 @@ def _num(value: Any) -> float | None:
 def normalize_snapshot(payload: Mapping[str, Any] | None, *, role: str) -> dict[str, Any]:
     p=dict(payload or {})
     side=str(p.get("side","NEUTRAL") or "NEUTRAL").upper()
+    pair=str(p.get("pair","") or "").strip().upper()
+    version=str(p.get("version","") or "").strip()
+    timestamp=str(p.get("timestamp","") or "").strip()
     if side not in VALID_SIDES:
         side="NEUTRAL"
     return {
         "role":str(role).upper(),
-        "pair":str(p.get("pair","—")),
+        "pair":pair or "—",
         "side":side,
         "state":str(p.get("state","—")),
         "score":_num(p.get("score")),
         "data_quality":_num(p.get("data_quality",p.get("quality"))),
         "executable":bool(p.get("executable",False)),
-        "version":str(p.get("version","—")),
-        "timestamp":str(p.get("timestamp","")),
+        "version":version or "—",
+        "timestamp":timestamp,
     }
 
 
@@ -81,11 +84,18 @@ def compare_shadow_sample(
     if champion["data_quality"] is not None and challenger["data_quality"] is not None:
         quality_delta=round(float(challenger["data_quality"])-float(champion["data_quality"]),4)
 
-    critical=bool(not pair_match or opposite or not execution_match)
+    identity_valid=bool(
+        champion["pair"]!="—" and challenger["pair"]!="—"
+        and champion["timestamp"] and challenger["timestamp"]
+        and champion["timestamp"]==challenger["timestamp"]
+        and champion["version"]!="—" and challenger["version"]!="—"
+    )
+    critical=bool(not identity_valid or not pair_match or opposite or not execution_match)
     return {
         "sample_id":_sample_id(champion,challenger),
         "champion":champion,
         "challenger":challenger,
+        "identity_valid":identity_valid,
         "pair_match":pair_match,
         "side_match":side_match,
         "execution_match":execution_match,
