@@ -1,6 +1,6 @@
 import unittest
 
-from atlasquant_ui_v1 import NAVIGATION_LABELS, hero_html, navigation_labels, score_semantics
+from atlasquant_ui_v1 import NAVIGATION_LABELS, hero_html, navigation_labels, score_semantics, section_title_html, state_badge_html
 
 
 class AtlasQuantUiTests(unittest.TestCase):
@@ -35,6 +35,16 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn('data-testid="stButton"', ATLASQUANT_CSS)
         self.assertIn("stMainBlockContainer", ATLASQUANT_CSS)
         self.assertIn('data-testid="stMetric"', ATLASQUANT_CSS)
+
+
+
+    def test_reusable_ui_primitives_escape_text_and_restrict_tones(self):
+        section=section_title_html("<script>x</script>","⚡")
+        badge=state_badge_html("<b>READY</b>","evil")
+        self.assertNotIn("<script>",section)
+        self.assertIn("&lt;script&gt;",section)
+        self.assertNotIn("<b>READY</b>",badge)
+        self.assertIn("aq-state-info",badge)
 
 
 
