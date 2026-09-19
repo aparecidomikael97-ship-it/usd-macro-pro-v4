@@ -142,5 +142,13 @@ class RuntimeEvidenceContractTests(unittest.TestCase):
         self.assertEqual(len(rows),1)
 
 
+    def test_validation_ui_surfaces_runtime_provenance_without_live_claim(self):
+        source=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        self.assertIn("Proveniência da validação: dados persistidos de runtime",source)
+        self.assertIn("_aq_runtime_source",source)
+        self.assertIn("_aq_quota_source",source)
+        self.assertNotIn("Proveniência da validação: dados ao vivo",source)
+
+
 if __name__=="__main__":
     unittest.main()
