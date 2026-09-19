@@ -269,5 +269,19 @@ class AtlasQuantEvidenceBundleTests(unittest.TestCase):
         self.assertTrue(verify_validation_evidence(b))
 
 
+    def test_bundle_protects_quota_integrity_diagnostics(self):
+        readiness=self.readiness()
+        readiness["quota_shadow"].update({
+            "samples":20,"raw_samples":21,"invalid_timestamp_rows":1,
+            "evidence_integrity_ok":False,
+        })
+        bundle=build_validation_evidence(readiness,engine_version="v-test")
+        quota=bundle["body"]["evidence"]["quota_shadow"]
+        self.assertEqual(quota["raw_samples"],21)
+        self.assertEqual(quota["invalid_timestamp_rows"],1)
+        self.assertFalse(quota["evidence_integrity_ok"])
+        self.assertTrue(verify_validation_evidence(bundle)["ok"])
+
+
 if __name__=="__main__":
     unittest.main()
