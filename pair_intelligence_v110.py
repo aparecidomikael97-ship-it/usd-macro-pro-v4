@@ -356,7 +356,13 @@ def _css():
       .v110-hero h2{margin:0 0 6px 0;color:white}.v110-hero p{margin:0;color:#dbeafe}
       .v110-badge{display:inline-block;padding:5px 9px;border-radius:999px;background:rgba(255,255,255,.12);margin:8px 6px 0 0;font-size:.85rem}
       div[data-testid="stMetric"]{border:1px solid rgba(100,116,139,.18);padding:10px;border-radius:14px}
-    </style>
+    
+.aq-reading-order{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:2px 0 12px}
+.aq-reading-order span,.aq-reading-order b{font-size:.68rem;letter-spacing:.04em;border:1px solid rgba(148,163,184,.18);border-radius:999px;padding:5px 8px;background:rgba(15,32,53,.72)}
+.aq-reading-order span{color:#9fb0c5}.aq-reading-order b{color:#dce8f6;margin-left:auto}
+.aq-stage-label{margin:12px 0 5px;color:#91a6bd;font-size:.69rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:760px){.aq-reading-order{gap:5px}.aq-reading-order span,.aq-reading-order b{font-size:.61rem;padding:4px 6px}.aq-reading-order b{width:100%;margin-left:0;text-align:center}.aq-stage-label{margin-top:10px}}
+</style>
     """,unsafe_allow_html=True)
 
 
@@ -458,6 +464,13 @@ background:linear-gradient(180deg,rgba(17,34,57,.88),rgba(10,24,41,.82));min-hei
 .aq-op-pair{font-size:1.05rem;font-weight:800}.aq-op-action{font-size:.72rem;font-weight:800;letter-spacing:.05em}
 .aq-op-priority{font-size:1.8rem;font-weight:850;margin-top:10px}.aq-op-priority span{font-size:.75rem;color:#9fb0c6}
 .aq-op-small{font-size:.72rem;color:#9fb0c6;margin-top:8px}.aq-op-state{font-size:.76rem;margin-top:11px;font-weight:700}
+@media(max-width:760px){
+  .aq-op-card{min-height:auto;padding:11px 12px;margin-bottom:7px}
+  .aq-op-priority{font-size:1.45rem;margin-top:6px}
+  .aq-op-small{font-size:.67rem;margin-top:5px}
+  .aq-op-state{font-size:.7rem;margin-top:7px}
+  .aq-op-action{font-size:.64rem}
+}
 </style>
 """, unsafe_allow_html=True)
     st.markdown("### 🚦 Melhores contextos operacionais")
@@ -521,7 +534,7 @@ def build_pair_intelligence_packs(matrix:pd.DataFrame, ranking:pd.DataFrame, *, 
 def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:Mapping[str,Any]|None=None,macro_context:Mapping[str,Any]|None=None,weights:Mapping[str,float]|None=None):
     _css()
     st.markdown("## Central institucional")
-    st.caption("7 pares · Contexto, qualidade dos dados e condições de execução. Prioridade não é probabilidade de lucro.")
+    st.caption("7 pares · Leia de cima para baixo: decisão → proteção → plano → detalhes. Prioridade não é probabilidade de lucro.")
     if matrix is None or matrix.empty:
         st.warning("A Matriz ainda não está disponível nesta execução."); return
 
@@ -538,6 +551,12 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     best=opctx.get("best") or packs[0]
     _aq_view_mode = str(st.session_state.get("atlasquant_view_mode", "Básico"))
     _is_pro = _aq_view_mode == "Pro"
+    _mode_label = "PRO · diagnóstico completo" if _is_pro else "BÁSICO · leitura rápida"
+    st.markdown(
+        f'<div class="aq-reading-order"><span>1 · DECISÃO</span><span>2 · PROTEÇÃO</span>'
+        f'<span>3 · PLANO</span><span>4 · DETALHES</span><b>{_mode_label}</b></div>',
+        unsafe_allow_html=True,
+    )
 
     render_central_brief(packs, auto)
     if _is_pro:
@@ -548,6 +567,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     if _is_pro:
         render_regime_detector(best, capture_result=_regime_result)
 
+    st.markdown('<div class="aq-stage-label">02 · Proteção operacional</div>', unsafe_allow_html=True)
     render_safety_core(
         best,
         auto,
@@ -560,6 +580,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
         render_confluence_map(best)
         render_context_explain(best)
 
+    st.markdown('<div class="aq-stage-label">03 · Plano objetivo</div>', unsafe_allow_html=True)
     render_operational_plan(best)
     _flight_capture = capture_flight_recorder(best, "V11.0.8 / AtlasQuant DEV")
     try:

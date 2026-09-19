@@ -244,6 +244,9 @@ try:
         apply_atlasquant_theme,
         render_atlasquant_header,
         navigation_labels,
+        navigation_groups_html,
+        operation_focus_html,
+        mobile_navigation_hint_html,
         decision_strip_html,
         context_strip_html,
     )
@@ -252,6 +255,9 @@ try:
 except Exception as _atlasquant_ui_exc:
     render_atlasquant_header = None
     navigation_labels = None
+    navigation_groups_html = None
+    operation_focus_html = None
+    mobile_navigation_hint_html = None
     decision_strip_html = None
     context_strip_html = None
     _ATLASQUANT_UI_IMPORT_ERROR = f"{type(_atlasquant_ui_exc).__name__}: {_atlasquant_ui_exc}"
@@ -3902,6 +3908,20 @@ _fallback_nav = [
     "🧩 Produto", "🛠️ Melhorias", "📰 Notícias", "🤖 Autopilot", "👤 Conta", "📱 Instalar", "💼 Vendas",
 ]
 _nav_items = list(navigation_labels()) if navigation_labels is not None else _fallback_nav
+if operation_focus_html is not None:
+    st.markdown(
+        operation_focus_html(
+            decision="Central pronta para leitura",
+            market="G8 + 7 pares",
+            data="Frescor monitorado",
+            safety="Safety Core monitorado",
+        ),
+        unsafe_allow_html=True,
+    )
+if navigation_groups_html is not None:
+    st.markdown(navigation_groups_html(), unsafe_allow_html=True)
+if mobile_navigation_hint_html is not None:
+    st.markdown(mobile_navigation_hint_html(), unsafe_allow_html=True)
 abas = st.tabs(_nav_items)
 
 # =========================================================

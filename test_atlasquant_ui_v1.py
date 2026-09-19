@@ -1,6 +1,6 @@
 import unittest
 
-from atlasquant_ui_v1 import NAVIGATION_LABELS, hero_html, navigation_labels, score_semantics, section_title_html, state_badge_html, decision_strip_html, context_strip_html
+from atlasquant_ui_v1 import UI_VERSION, ATLASQUANT_CSS, NAVIGATION_LABELS, NAVIGATION_GROUPS, hero_html, navigation_labels, navigation_groups, navigation_groups_html, operation_focus_html, score_semantics, section_title_html, state_badge_html, decision_strip_html, context_strip_html
 
 
 class AtlasQuantUiTests(unittest.TestCase):
@@ -12,6 +12,36 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("📱 Instalar", navigation_labels())
         self.assertIn("👤 Conta", navigation_labels())
         self.assertIn("🤖 Autopilot", navigation_labels())
+
+    def test_navigation_groups_cover_every_endpoint_once(self):
+        grouped=[item for _, items in navigation_groups() for item in items]
+        self.assertEqual(len(NAVIGATION_GROUPS),5)
+        self.assertEqual(len(grouped),len(NAVIGATION_LABELS))
+        self.assertEqual(set(grouped),set(NAVIGATION_LABELS))
+        self.assertEqual(len(grouped),len(set(grouped)))
+        html=navigation_groups_html()
+        self.assertIn("Operação",html)
+        self.assertIn("Mercado",html)
+        self.assertIn("Pesquisa",html)
+        self.assertIn("Sistema",html)
+        self.assertIn("Conta",html)
+
+
+    def test_operation_focus_is_safe_and_responsive(self):
+        html=operation_focus_html(
+            decision="<NÃO OPERAR>",
+            market="EUR/USD",
+            data="98%",
+            safety="BLOQUEADO",
+        )
+        self.assertIn("&lt;NÃO OPERAR&gt;",html)
+        self.assertIn("EUR/USD",html)
+        self.assertIn("98%",html)
+        self.assertIn("BLOQUEADO",html)
+        self.assertIn("aq-focus-main",html)
+        self.assertIn("aq-focus-card",html)
+        self.assertIn("aq-focus",ATLASQUANT_CSS)
+        self.assertIn("grid-template-columns:1fr 1fr",ATLASQUANT_CSS)
 
     def test_score_semantics_is_not_probability(self):
         self.assertEqual(score_semantics(80)["label"], "FORTE")
@@ -62,6 +92,7 @@ class AtlasQuantUiTests(unittest.TestCase):
         src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
         self.assertIn("_nav_items = list(navigation_labels())",src)
         self.assertIn("abas = st.tabs(_nav_items)",src)
+        self.assertIn("navigation_groups_html()",src)
         self.assertEqual(len(NAVIGATION_LABELS),19)
 
 
@@ -77,11 +108,12 @@ class AtlasQuantUiTests(unittest.TestCase):
 
     def test_tab_navigation_is_mobile_scrollable_and_sticky(self):
         from atlasquant_ui_v1 import ATLASQUANT_CSS, UI_VERSION
-        self.assertEqual(UI_VERSION,"0.6")
+        self.assertEqual(UI_VERSION,"1.0")
         self.assertIn("overflow-x: auto",ATLASQUANT_CSS)
         self.assertIn("flex-wrap: nowrap",ATLASQUANT_CSS)
         self.assertIn("position: sticky",ATLASQUANT_CSS)
         self.assertIn("white-space: nowrap",ATLASQUANT_CSS)
+        self.assertIn("aq-nav-groups",ATLASQUANT_CSS)
 
 
 
@@ -104,6 +136,46 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertLess(exec_pos,hero_pos)
         self.assertLess(hero_pos,tabs_pos)
 
+
+
+    def test_main_workspace_surfaces_focus_strip_before_tabs(self):
+        app=(__import__("pathlib").Path(__file__).resolve().parent/"usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        self.assertIn("operation_focus_html",app)
+        focus=app.index("operation_focus_html(")
+        tabs=app.index("abas = st.tabs(_nav_items)")
+        self.assertLess(focus,tabs)
+        self.assertIn('decision="Central pronta para leitura"',app)
+        self.assertIn('safety="Safety Core monitorado"',app)
+
+
+    def test_mobile_navigation_is_compact_sticky_and_labeled(self):
+        self.assertIn('content:"NAVEGAÇÃO"',ATLASQUANT_CSS)
+        self.assertIn("position:sticky;top:0;z-index:20",ATLASQUANT_CSS)
+        self.assertIn("backdrop-filter:blur(8px)",ATLASQUANT_CSS)
+        self.assertIn("min-height:34px",ATLASQUANT_CSS)
+
+
+    def test_mobile_tab_guidance_is_wired_before_tabs(self):
+        app=(__import__("pathlib").Path(__file__).resolve().parent/"usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        self.assertIn("mobile_navigation_hint_html",app)
+        hint=app.index("mobile_navigation_hint_html()")
+        tabs=app.index("abas = st.tabs(_nav_items)")
+        self.assertLess(hint,tabs)
+        self.assertIn(".aq-mobile-hint{display:none",ATLASQUANT_CSS)
+        self.assertIn(".aq-mobile-hint{display:block}",ATLASQUANT_CSS)
+
+
+    def test_ui_1_0_does_not_claim_live_safety_state_in_static_header(self):
+        self.assertEqual(UI_VERSION,"1.0")
+        self.assertNotIn("Safety Core ativo",ATLASQUANT_CSS)
+        self.assertIn("Safety Core monitorado",hero_html("X","LOCAL"))
+
+
+    def test_mobile_above_fold_density_is_intentionally_compact(self):
+        self.assertIn(".aq-title{font-size:1.62rem}",ATLASQUANT_CSS)
+        self.assertIn(".aq-badge{font-size:.62rem;padding:5px 7px}",ATLASQUANT_CSS)
+        self.assertIn(".aq-context-strip>div{padding:9px 10px;min-height:54px",ATLASQUANT_CSS)
+        self.assertIn(".aq-focus-main strong{font-size:.9rem}",ATLASQUANT_CSS)
 
 
 if __name__ == "__main__":

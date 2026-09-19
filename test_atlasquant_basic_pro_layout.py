@@ -45,5 +45,27 @@ class AtlasQuantBasicProLayoutTests(unittest.TestCase):
         self.assertLess(capture,basic_return)
 
 
+    def test_central_declares_decision_first_reading_order(self):
+        for label in ("1 · DECISÃO","2 · PROTEÇÃO","3 · PLANO","4 · DETALHES"):
+            self.assertIn(label,self.src)
+        self.assertIn("BÁSICO · leitura rápida",self.src)
+        self.assertIn("PRO · diagnóstico completo",self.src)
+
+    def test_safety_still_precedes_operational_plan(self):
+        safety=self.src.index("render_safety_core(")
+        plan=self.src.index("render_operational_plan(best)")
+        self.assertLess(safety,plan)
+
+    def test_mobile_reading_order_css_exists(self):
+        self.assertIn(".aq-reading-order",self.src)
+        self.assertIn("@media(max-width:760px)",self.src)
+
+
+    def test_operational_cards_have_mobile_compaction(self):
+        self.assertIn(".aq-op-card{min-height:auto;padding:11px 12px",self.src)
+        self.assertIn(".aq-op-priority{font-size:1.45rem",self.src)
+        self.assertIn(".aq-op-action{font-size:.64rem}",self.src)
+
+
 if __name__=="__main__":
     unittest.main()
