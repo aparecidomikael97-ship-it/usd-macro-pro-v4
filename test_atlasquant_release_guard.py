@@ -69,5 +69,23 @@ class ReleaseGuardTests(unittest.TestCase):
         self.assertTrue(out["pending"])
 
 
+
+    def test_zero_shadow_minimum_is_invalid_for_core_change(self):
+        out=assess_release(self.base(),core_model_change=True,min_shadow_samples_for_core=0)
+        self.assertFalse(out["staging_ok"])
+        self.assertFalse(out["eligible_for_manual_promotion"])
+
+    def test_rollback_boolean_inputs_must_be_real_booleans(self):
+        fields=("app_boot_ok","health_check_ok","critical_engine_error","data_integrity_breach")
+        base=dict(app_boot_ok=True,health_check_ok=True,critical_engine_error=False,data_integrity_breach=False)
+        for field in fields:
+            for bad in ("true",1,None):
+                with self.subTest(field=field,bad=bad):
+                    kw=dict(base); kw[field]=bad
+                    out=should_rollback(**kw)
+                    self.assertTrue(out["rollback"])
+                    self.assertTrue(any("Flags de rollback inválidas" in x for x in out["reasons"]))
+
+
 if __name__=="__main__":
     unittest.main()
