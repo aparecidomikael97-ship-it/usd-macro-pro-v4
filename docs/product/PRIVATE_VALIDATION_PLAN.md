@@ -76,3 +76,18 @@ Durante esta fase:
 - ordens reais permanecem desligadas;
 - alterações automáticas de gate/pesos permanecem desligadas;
 - resultados passados não são tratados como promessa futura.
+
+## Implementação no AtlasQuant
+
+A infraestrutura desta fase fica separada do motor operacional:
+
+- `atlasquant_setup_validation.py`: catálogo e critérios mínimos para **revisão humana**;
+- `atlasquant_setup_journal.py`: esquema de planilha/observações Forward/Paper por setup;
+- `autopilot_setup_audit_v114.py`: congela prospectivamente o contexto do Paper Trading, incluindo componentes ICT/SMC e, quando disponível, regime D1/W1, sessão, Premium/Discount e sweep;
+- a aba **Melhorias** no modo Avançado mostra o centro de Validação Privada e permite baixar a planilha-modelo.
+
+Backtest histórico, walk-forward OOS e Forward/Paper real da fase privada são evidências diferentes. O sistema não trata OOS histórico como se fosse amostra Forward/Paper.
+
+Amostra, expectativa, drawdown, estabilidade temporal, OOS, fricção, robustez de parâmetros, regimes e sessões são analisados em conjunto. Win rate sozinho nunca qualifica um setup.
+
+Mesmo quando os mínimos forem atingidos, o estado é apenas **pronto para revisão humana**. Promoção para o modo Iniciante continua manual.

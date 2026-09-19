@@ -42,6 +42,20 @@ def scanner_with_fvg(status: str, score: float = 70.0) -> dict:
     }
 
 
+def market_map_context(*, d1_regime="TENDÊNCIA ALTISTA", session="London Killzone") -> dict:
+    return {
+        "contexts":{
+            "EUR/USD":{
+                "d1":{"structure":{"regime":d1_regime}},
+                "w1":{"structure":{"regime":"EXPANSÃO"}},
+                "killzone":{"active":{"name":session} if session else None},
+                "premium_discount":{"zone":"DESCONTO"},
+                "latest_sweep":{"type":"SSL"},
+            }
+        }
+    }
+
+
 def trade_row(*, trade_id="t1", status="WAIT_ENTRY", result="", realized_r=None) -> dict:
     return {
         "trade_id": trade_id,
@@ -98,6 +112,39 @@ class SetupAuditV114Tests(unittest.TestCase):
         self.assertEqual(float(audit.iloc[0]["fvg_score"]), 72.0)
         self.assertEqual(audit.iloc[0]["mss_status"], "MSS TESTE")
         self.assertEqual(audit.iloc[0]["audit_capture_mode"], "FIRST_SEEN_V114")
+
+
+    def test_new_trade_freezes_regime_and_session_context(self):
+        audit=sync_setup_audit(
+            pd.DataFrame([trade_row()]),
+            scanner_with_fvg("FVG ATIVO",72),
+            market_map=market_map_context(),
+            now=NOW,
+        )
+        row=audit.iloc[0]
+        self.assertEqual(row["d1_regime"],"TENDÊNCIA ALTISTA")
+        self.assertEqual(row["w1_regime"],"EXPANSÃO")
+        self.assertEqual(row["active_session"],"London Killzone")
+        self.assertEqual(row["premium_discount_zone"],"DESCONTO")
+        self.assertEqual(row["latest_sweep_type"],"SSL")
+
+    def test_regime_context_is_frozen_after_first_seen(self):
+        first=sync_setup_audit(
+            pd.DataFrame([trade_row()]),
+            scanner_with_fvg("FVG ORIGINAL",71),
+            market_map=market_map_context(d1_regime="TENDÊNCIA ALTISTA"),
+            now=NOW,
+        )
+        second=sync_setup_audit(
+            pd.DataFrame([trade_row(status="CLOSED",result="WIN",realized_r=2.0)]),
+            scanner_with_fvg("FVG ALTERADO",10),
+            first,
+            market_map=market_map_context(d1_regime="TENDÊNCIA BAIXISTA",session="New York AM"),
+            now=NOW+pd.Timedelta(minutes=30),
+        )
+        row=second.iloc[0]
+        self.assertEqual(row["d1_regime"],"TENDÊNCIA ALTISTA")
+        self.assertEqual(row["active_session"],"London Killzone")
 
     def test_existing_snapshot_is_not_overwritten_but_outcome_updates(self):
         first = sync_setup_audit(
@@ -194,7 +241,7 @@ class SetupAuditV114Tests(unittest.TestCase):
 
     def test_status_write_failure_is_visible_in_stdout_even_when_status_cannot_persist(self):
         with patch("autopilot_setup_audit_v114.base.gh_get_csv",return_value=(pd.DataFrame(),"")), \
-             patch("autopilot_setup_audit_v114.base.gh_get_json",side_effect=[({},""),({},"")]), \
+             patch("autopilot_setup_audit_v114.base.gh_get_json",side_effect=[({},""),({},""),({},"")]), \
              patch("autopilot_setup_audit_v114.base.gh_put_csv",return_value=(True,"")), \
              patch("autopilot_setup_audit_v114.base.gh_put_json",side_effect=[(True,""),(False,"remote unavailable")]), \
              patch("autopilot_setup_audit_v114.base.utcnow",return_value=NOW):
