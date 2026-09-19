@@ -191,6 +191,8 @@ def render_account_portal(access:Mapping[str,Any]|None)->dict[str,Any]:
     if "admin" in summary["sections"]:
         st.markdown("### 🛡️ Administração de Contas")
         registry=summary.get("registry",{})
+        if not summary.get("registry_valid",False):
+            st.warning("Contadores de contas inválidos; exibindo zero até a configuração ser corrigida.")
         r1,r2,r3,r4=st.columns(4)
         r1.metric("Usuários",int(registry.get("USER",0)))
         r2.metric("Vendas",int(registry.get("SALES",0)))
