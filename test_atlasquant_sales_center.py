@@ -55,9 +55,11 @@ class AtlasQuantSalesCenterTests(unittest.TestCase):
 
 
     def test_sales_launch_summary_is_conservative(self):
-        self.assertEqual(sales_launch_summary({})["label"],"DISTRIBUIÇÃO BLOQUEADA")
-        self.assertEqual(sales_launch_summary({"pwa_ready":True})["label"],"PRÉ-LANÇAMENTO")
-        self.assertEqual(sales_launch_summary({"pwa_ready":True,"payments_integrated":True,"academy_ready":True})["label"],"REVISÃO COMERCIAL")
+        self.assertEqual(sales_launch_summary({})["label"],"SEGURANÇA A REVISAR")
+        secure={"sales_role_isolation_verified":True,"account_revocation_verified":True,"account_admin_verified":True,"audit_manifest_verified":True}
+        self.assertEqual(sales_launch_summary(secure)["label"],"DISTRIBUIÇÃO BLOQUEADA")
+        self.assertEqual(sales_launch_summary({**secure,"pwa_ready":True})["label"],"PRÉ-LANÇAMENTO")
+        self.assertEqual(sales_launch_summary({**secure,"pwa_ready":True,"payments_integrated":True,"academy_ready":True})["label"],"REVISÃO COMERCIAL")
 
 
 
