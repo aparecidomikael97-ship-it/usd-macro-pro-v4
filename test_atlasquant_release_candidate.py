@@ -19,6 +19,7 @@ class AtlasQuantReleaseCandidateTests(unittest.TestCase):
             production_health_baseline_ok=True,
             runtime_source_parity_ok=True,
             integration_ui_smoke_ok=True,
+            ui_smoke_covers_current_ui_sources=True,
             runtime_data_files=0,
             browser_smoke_baseline_ok=False,
             pr_draft=True,
@@ -60,6 +61,14 @@ class AtlasQuantReleaseCandidateTests(unittest.TestCase):
         self.assertTrue(any("UI smoke" in x for x in out["hard_blocks"]))
 
 
+    def test_ui_smoke_must_cover_current_ui_sensitive_source(self):
+        out=assess_source_release_candidate(
+            self.base(ui_smoke_covers_current_ui_sources=False)
+        )
+        self.assertEqual(out["status"],"BLOCKED")
+        self.assertFalse(out["source_reviewable"])
+        self.assertTrue(any("UI-sensitive source changed" in x for x in out["hard_blocks"]))
+
     def test_any_runtime_data_in_source_candidate_blocks(self):
         out=assess_source_release_candidate(self.base(runtime_data_files=1))
         self.assertEqual(out["status"],"BLOCKED")
@@ -94,7 +103,7 @@ class AtlasQuantReleaseCandidateTests(unittest.TestCase):
         fields=(
             "integration_gate_ok","source_checkpoint_ok","pr_mergeable",
             "candidate_based_on_current_main","secret_hygiene_ok",
-            "production_health_baseline_ok","runtime_source_parity_ok","integration_ui_smoke_ok","browser_smoke_baseline_ok","pr_draft",
+            "production_health_baseline_ok","runtime_source_parity_ok","integration_ui_smoke_ok","ui_smoke_covers_current_ui_sources","browser_smoke_baseline_ok","pr_draft",
         )
         for field in fields:
             for bad in ("true",1,None):
