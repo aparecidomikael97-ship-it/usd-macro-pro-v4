@@ -33,6 +33,14 @@ class AtlasQuantSourceParityTests(unittest.TestCase):
         self.assertEqual(out["mismatched"],["a.py"])
         self.assertTrue(out["manual_reconciliation_required"])
 
+    def test_unknown_dados_file_is_not_hidden_by_runtime_allowlist(self):
+        out=compare_source_trees(
+            {"dados/unexpected.json":"a"*40},
+            {"dados/unexpected.json":"b"*40},
+        )
+        self.assertEqual(out["status"],"SOURCE_PARITY_MISMATCH")
+        self.assertEqual(out["mismatched"],["dados/unexpected.json"])
+
     def test_source_file_missing_on_either_side_fails(self):
         left=compare_source_trees({"a.py":"a"*40},{})
         right=compare_source_trees({},{"a.py":"a"*40})
@@ -40,8 +48,9 @@ class AtlasQuantSourceParityTests(unittest.TestCase):
         self.assertEqual(right["only_runtime"],["a.py"])
 
     def test_runtime_data_prefix_is_explicit(self):
-        self.assertTrue(is_runtime_data_path("dados/x.json"))
-        self.assertTrue(is_runtime_data_path("./dados/x.json"))
+        self.assertTrue(is_runtime_data_path("dados/autopilot_status_v107.json"))
+        self.assertTrue(is_runtime_data_path("./dados/autopilot_status_v107.json"))
+        self.assertFalse(is_runtime_data_path("dados/unexpected.json"))
         self.assertFalse(is_runtime_data_path("docs/dados/x.md"))
         self.assertFalse(is_runtime_data_path("atlasquant.py"))
 
