@@ -9210,10 +9210,15 @@ with abas[13]:
                 _aq_setup_summary = {}
                 _aq_quota_store = {}
                 try:
-                    _aq_runtime_status, _ = _github_get_json_v937("dados/autopilot_status_v107.json", {})
-                    _aq_paper_summary, _ = _github_get_json_v937("dados/paper_trading_summary_v112.json", {})
-                    _aq_setup_summary, _ = _github_get_json_v937("dados/paper_setup_summary_v114.json", {})
-                    _aq_quota_store, _ = _github_get_json_v937("dados/atlasquant_quota_shadow_v1.json", {})
+                    _aq_runtime_status, _aq_runtime_source = _github_get_json_v937("dados/autopilot_status_v107.json", {})
+                    _aq_paper_summary, _aq_paper_source = _github_get_json_v937("dados/paper_trading_summary_v112.json", {})
+                    _aq_setup_summary, _aq_setup_source = _github_get_json_v937("dados/paper_setup_summary_v114.json", {})
+                    _aq_quota_store, _aq_quota_source = _github_get_json_v937("dados/atlasquant_quota_shadow_v1.json", {})
+                    _aq_sources = {_aq_runtime_source, _aq_paper_source, _aq_setup_source, _aq_quota_source}
+                    if len(_aq_sources)==1 and str(_aq_runtime_source).startswith("GitHub:"):
+                        st.caption(f"Proveniência da validação: dados persistidos de runtime · {_aq_runtime_source}.")
+                    elif any(str(x).startswith("GitHub:") for x in _aq_sources):
+                        st.caption("Proveniência da validação: fontes persistidas parcialmente disponíveis; revisão permanece conservadora.")
                 except Exception:
                     _aq_runtime_status = {}
                     _aq_paper_summary = {}
