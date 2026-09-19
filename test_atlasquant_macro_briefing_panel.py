@@ -36,3 +36,10 @@ def test_cloud_integration_does_not_fetch_calendar_for_briefing():
     assert "_eventos_macro_v65(" not in block
     assert 'st.session_state.get("atlasquant_macro_events")' in block
     assert "_td_series(" not in block
+
+
+def test_briefing_status_is_fail_closed_and_not_a_trade_signal():
+    assert panel.briefing_status({})["label"]=="DADOS INSUFICIENTES"
+    out=panel.briefing_status({"data_sufficient":True,"context_bias":"divergência macro"})
+    assert out["label"]=="DIVERGÊNCIA MACRO"
+    assert "não é sinal de trade" in out["detail"]
