@@ -253,12 +253,29 @@ def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro"):
     }
 
 
+
+def pair_intelligence_status(best:Mapping[str,Any]|None,auto:Mapping[str,Any]|None)->dict[str,str]:
+    p=dict(best or {}); a=dict(auto or {})
+    if a and not bool(a.get("forex_market_open",False)):
+        return {"label":"EM ESPERA","detail":"Mercado FX fechado; leitura mantida para contexto"}
+    if a and not bool(a.get("healthy",False)):
+        return {"label":"ATENÇÃO","detail":"Autopilot ou dados exigem revisão antes de usar leitura nova"}
+    state=str(p.get("state","") or "").upper()
+    if "BLOQUEADO" in state or "CONTRA" in state:
+        return {"label":"BLOQUEADO","detail":"Há conflito ou bloqueio nas camadas consolidadas"}
+    if "CONFIRMADA" in state:
+        return {"label":"CONTEXTO CONFIRMADO","detail":"Camadas alinhadas; execução continua dependente do plano e dos gates"}
+    return {"label":"EM OBSERVAÇÃO","detail":"Contexto ainda precisa de confirmação adicional"}
+
+
 def _css():
     st.markdown("""
     <style>
       .v108-hero{padding:20px 22px;border:1px solid rgba(100,116,139,.22);border-radius:18px;background:linear-gradient(135deg,rgba(15,23,42,.96),rgba(30,64,175,.88));color:white;margin-bottom:14px}
       .v108-hero h2{margin:0 0 5px 0;color:white}.v108-hero p{margin:0;color:#dbeafe}
       div[data-testid="stMetric"]{border:1px solid rgba(100,116,139,.18);padding:10px;border-radius:14px}
+      .v108-status{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:11px 13px;border:1px solid rgba(100,116,139,.22);border-radius:13px;background:rgba(15,23,42,.58);margin:5px 0 14px}
+      .v108-status strong{font-size:.82rem}.v108-status span{font-size:.76rem;opacity:.76}.v108-status .guard{margin-left:auto;font-size:.7rem}
     </style>
     """,unsafe_allow_html=True)
 
@@ -301,6 +318,13 @@ def render_pair_intelligence_v108(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     c3.metric("Moeda mais forte",strongest)
     c4.metric("Moeda mais fraca",weakest)
     c5.metric("Autopilot","🟢 OK" if auto.get("healthy") else "🟡 ATENÇÃO")
+    overview=pair_intelligence_status(best,auto)
+    st.markdown(
+        f"""<div class="v108-status"><strong>{overview['label']}</strong>
+        <span>{overview['detail']}</span>
+        <span class="guard">Índice interno · não é probabilidade · sem ordem automática</span></div>""",
+        unsafe_allow_html=True,
+    )
     if auto.get("twelve_daily_blocked"):
         st.warning("🟠 A Twelve Data está com cota/plano bloqueado. Esta aba continua mostrando a última leitura persistida sem gastar novas chamadas.")
 
