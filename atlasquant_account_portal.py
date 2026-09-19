@@ -17,6 +17,14 @@ from atlasquant_access_control import (
     normalize_username,
     load_users_config,
 )
+from atlasquant_access_panel import configured_users
+from atlasquant_registry_admin import (
+    add_account,
+    apply_non_destructive_change,
+    rotate_account_password,
+    set_account_active,
+    set_account_role,
+)
 
 ROLE_LABELS={
     "USER":"Usuário",
@@ -195,6 +203,7 @@ def render_account_portal(access:Mapping[str,Any]|None)->dict[str,Any]:
     if "admin" in summary["sections"]:
         st.markdown("### 🛡️ Administração de Contas")
         registry=summary.get("registry",{})
+        live_users=configured_users()
         if not summary.get("registry_valid",False):
             st.warning("Contadores de contas inválidos; exibindo zero até a configuração ser corrigida.")
         r1,r2,r3,r4=st.columns(4)
@@ -206,40 +215,93 @@ def render_account_portal(access:Mapping[str,Any]|None)->dict[str,Any]:
             "Gera um registro seguro para ATLASQUANT_USERS_JSON. "
             "Nada é gravado automaticamente nos Secrets e a senha em texto puro não é persistida."
         )
-        with st.form("atlasquant_admin_create_user",clear_on_submit=True):
-            username=st.text_input("Novo usuário",help="3–64 caracteres: letras, números, ponto, hífen ou underscore.")
-            role=st.selectbox("Perfil",["USER","SALES","ADMIN"],index=0)
-            password=st.text_input("Senha temporária",type="password")
-            confirm=st.text_input("Confirmar senha",type="password")
-            active=st.checkbox("Conta ativa",value=True)
-            submit=st.form_submit_button("Gerar registro seguro")
-        if submit:
-            if password!=confirm:
-                st.error("As senhas não conferem.")
+        create_tab,manage_tab=st.tabs(["Criar conta","Gerenciar contas"])
+
+        with create_tab:
+            with st.form("atlasquant_admin_create_user",clear_on_submit=True):
+                username=st.text_input("Novo usuário",help="3–64 caracteres: letras, números, ponto, hífen ou underscore.")
+                role=st.selectbox("Perfil",["USER","SALES","ADMIN"],index=0)
+                password=st.text_input("Senha temporária",type="password")
+                confirm=st.text_input("Confirmar senha",type="password")
+                active=st.checkbox("Conta ativa",value=True)
+                submit=st.form_submit_button("Gerar cadastro completo")
+            if submit:
+                if password!=confirm:
+                    st.error("As senhas não conferem.")
+                else:
+                    try:
+                        updated=add_account(
+                            live_users,
+                            username=username,
+                            role=role,
+                            password=password,
+                            active=active,
+                        )
+                        snippet=apply_non_destructive_change(live_users,updated)
+                        st.session_state["atlasquant_admin_registry_export"]=snippet
+                        st.success("Cadastro completo gerado para revisão. Nenhum Secret foi alterado automaticamente.")
+                    except Exception:
+                        st.error(
+                            "Não foi possível gerar a conta. Use usuário único e senha com 12+ caracteres, "
+                            "maiúscula, minúscula, número e símbolo."
+                        )
+
+        with manage_tab:
+            names=sorted(live_users)
+            if not names:
+                st.info("Nenhuma conta configurada para gerenciar.")
             else:
-                try:
-                    record=build_provisioning_record(username,role,password,active=active)
-                    snippet=provisioning_json(record)
-                    st.session_state["atlasquant_admin_provisioning_snippet"]=snippet
-                    st.success("Registro gerado localmente. A senha em texto puro não foi armazenada.")
-                except Exception:
-                    st.error(
-                        "Não foi possível gerar a conta. Use usuário válido e senha com 12+ caracteres, "
-                        "maiúscula, minúscula, número e símbolo."
+                selected=st.selectbox("Conta",names,key="atlasquant_admin_manage_user")
+                current=live_users.get(selected)
+                st.caption(
+                    "Estado atual: "
+                    + str(getattr(current,"role","N/D"))
+                    + " · "
+                    + ("ATIVA" if bool(getattr(current,"active",False)) else "INATIVA")
+                )
+
+                with st.form("atlasquant_admin_account_change"):
+                    action=st.selectbox(
+                        "Alteração",
+                        ["Alterar perfil","Ativar/desativar","Redefinir senha"],
                     )
-        snippet=st.session_state.get("atlasquant_admin_provisioning_snippet","")
+                    new_role=st.selectbox("Novo perfil",["USER","SALES","ADMIN"],index=0)
+                    new_active=st.checkbox("Conta ativa",value=bool(getattr(current,"active",False)))
+                    new_password=st.text_input("Nova senha",type="password")
+                    confirm_password=st.text_input("Confirmar nova senha",type="password")
+                    apply_change=st.form_submit_button("Gerar configuração revisada")
+                if apply_change:
+                    try:
+                        if action=="Alterar perfil":
+                            updated=set_account_role(live_users,selected,new_role)
+                        elif action=="Ativar/desativar":
+                            updated=set_account_active(live_users,selected,new_active)
+                        else:
+                            if new_password!=confirm_password:
+                                raise ValueError("password mismatch")
+                            updated=rotate_account_password(live_users,selected,new_password)
+                        snippet=apply_non_destructive_change(live_users,updated)
+                        st.session_state["atlasquant_admin_registry_export"]=snippet
+                        st.success(
+                            "Configuração revisada gerada. A mudança só entra em vigor depois da atualização manual do Secret."
+                        )
+                    except Exception:
+                        st.error("Alteração rejeitada. Revise os dados e tente novamente.")
+
+        snippet=st.session_state.get("atlasquant_admin_registry_export","")
         if isinstance(snippet,str) and snippet:
+            st.markdown("#### 📦 Registro completo revisado")
             st.code(snippet,language="json")
             st.download_button(
-                "Baixar registro JSON",
+                "Baixar ATLASQUANT_USERS_JSON revisado",
                 data=snippet.encode("utf-8"),
-                file_name="atlasquant_user_record.json",
+                file_name="atlasquant_users_registry.json",
                 mime="application/json",
-                key="atlasquant_admin_download_user_record",
+                key="atlasquant_admin_download_registry",
             )
             st.caption(
-                "Adicione o registro ao JSON de usuários existente com cuidado. "
-                "Usuários duplicados após normalização são rejeitados por segurança."
+                "Esse arquivo é uma proposta completa e não destrutiva. "
+                "A aplicação nunca altera Secrets automaticamente."
             )
 
     return summary
