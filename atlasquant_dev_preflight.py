@@ -39,6 +39,13 @@ REQUIRED_FILES=(
     "atlasquant_backtest_snapshot_history.py",
     "atlasquant_runtime_store.py",
     "atlasquant_release_guard.py",
+    "atlasquant_access_control.py",
+    "atlasquant_access_panel.py",
+    "atlasquant_account_portal.py",
+    "atlasquant_user_bootstrap.py",
+    "docs/release/ACCESS_CONTROL_SETUP.md",
+    "docs/manifest.webmanifest",
+    "docs/sw.js",
     "tradingview/atlasquant_bos_choch_ob_strategy_v1.pine",
     "tradingview/atlasquant_fvg_strategy_v1.pine",
     "tradingview/atlasquant_ote_strategy_v1.pine",
@@ -79,6 +86,26 @@ def run_dev_preflight(
         "from atlasquant_backtest_panel import render_operational_backtest_panel" in app
         and "render_operational_backtest_panel()" in app,
         "Backtest avançado importado e renderizado no app DEV.",
+    ))
+
+    access_panel=(base/"atlasquant_access_panel.py").read_text(encoding="utf-8") if (base/"atlasquant_access_panel.py").is_file() else ""
+    account_portal=(base/"atlasquant_account_portal.py").read_text(encoding="utf-8") if (base/"atlasquant_account_portal.py").is_file() else ""
+    gate_import="from atlasquant_access_panel import render_access_gate" in app
+    gate_call=app.find("render_access_gate()")
+    first_provider=app.find("def _get(")
+    checks.append(_check(
+        "private_access_gate_integrated",
+        gate_import and gate_call>=0 and first_provider>=0 and gate_call<first_provider
+        and 'environment=="PRODUCTION"' in access_panel,
+        "Login fail-closed integrado antes da coleta principal e obrigatório em PRODUCTION.",
+    ))
+    checks.append(_check(
+        "role_portal_integrated",
+        "from atlasquant_account_portal import render_account_portal" in app
+        and 'with abas[16]:' in app
+        and 'render_account_portal(_ATLASQUANT_ACCESS)' in app
+        and '"Trading real","DESATIVADO"' in account_portal,
+        "Portal USER/SALES/ADMIN integrado sem habilitar trading real.",
     ))
 
     provider_markers=(
