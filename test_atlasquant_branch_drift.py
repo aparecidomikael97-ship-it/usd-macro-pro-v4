@@ -6,6 +6,7 @@ from atlasquant_branch_drift import (
     audit_branch_drift,
     classify_path,
     drift_release_message,
+    reconciliation_state,
 )
 
 
@@ -84,6 +85,31 @@ class AtlasQuantBranchDriftTests(unittest.TestCase):
         for path in RUNTIME_MUTABLE_PATHS:
             with self.subTest(path=path):
                 self.assertIn(f'"{path}"',wf)
+
+
+
+    def test_reconciliation_state_never_auto_merges_diverged_code(self):
+        audit=audit_branch_drift(["autopilot_v107.py","dados/autopilot_status_v107.json"])
+        out=reconciliation_state(audit,ahead_by=2304,behind_by=470)
+        self.assertEqual(out["status"],"SOURCE_DIVERGED")
+        self.assertFalse(out["automatic_merge_allowed"])
+        self.assertTrue(out["manual_reconciliation_required"])
+
+    def test_runtime_only_drift_is_distinguished_from_source_divergence(self):
+        audit=audit_branch_drift(["dados/autopilot_status_v107.json"])
+        out=reconciliation_state(audit,ahead_by=10,behind_by=0)
+        self.assertEqual(out["status"],"RUNTIME_ONLY")
+        self.assertTrue(out["runtime_drift_can_be_ignored_for_source_review"])
+        self.assertFalse(out["automatic_merge_allowed"])
+
+    def test_invalid_branch_counts_fail_closed(self):
+        audit=audit_branch_drift(["dados/autopilot_status_v107.json"])
+        for ahead,behind in ((-1,0),(0,-1),(True,0),("bad",0),(1.5,0)):
+            with self.subTest(ahead=ahead,behind=behind):
+                out=reconciliation_state(audit,ahead_by=ahead,behind_by=behind)
+                self.assertEqual(out["status"],"REVIEW_REQUIRED")
+                self.assertFalse(out["automatic_merge_allowed"])
+                self.assertTrue(out["manual_reconciliation_required"])
 
 
 
