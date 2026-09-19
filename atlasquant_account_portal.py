@@ -6,6 +6,7 @@ creates broker credentials, changes trading gates or enables real orders.
 from __future__ import annotations
 
 from typing import Any, Mapping
+from datetime import datetime, timezone
 import json
 import re
 import streamlit as st
@@ -25,6 +26,10 @@ from atlasquant_registry_admin import (
     set_account_active,
     set_account_role,
     registry_diff,
+)
+from atlasquant_account_change_audit import (
+    account_change_audit_json,
+    build_account_change_audit,
 )
 
 ROLE_LABELS={
@@ -239,8 +244,16 @@ def render_account_portal(access:Mapping[str,Any]|None)->dict[str,Any]:
                             active=active,
                         )
                         snippet=apply_non_destructive_change(live_users,updated)
+                        diff_obj=registry_diff(live_users,updated)
+                        audit_obj=build_account_change_audit(
+                            actor=summary.get("username"),
+                            diff=diff_obj,
+                            registry_json=snippet,
+                            generated_at=datetime.now(timezone.utc).isoformat(),
+                        )
                         st.session_state["atlasquant_admin_registry_export"]=snippet
-                        st.session_state["atlasquant_admin_registry_diff"]=registry_diff(live_users,updated)
+                        st.session_state["atlasquant_admin_registry_diff"]=diff_obj
+                        st.session_state["atlasquant_admin_registry_audit"]=account_change_audit_json(audit_obj)
                         st.success("Cadastro completo gerado para revisão. Nenhum Secret foi alterado automaticamente.")
                     except Exception:
                         st.error(
@@ -283,8 +296,16 @@ def render_account_portal(access:Mapping[str,Any]|None)->dict[str,Any]:
                                 raise ValueError("password mismatch")
                             updated=rotate_account_password(live_users,selected,new_password)
                         snippet=apply_non_destructive_change(live_users,updated)
+                        diff_obj=registry_diff(live_users,updated)
+                        audit_obj=build_account_change_audit(
+                            actor=summary.get("username"),
+                            diff=diff_obj,
+                            registry_json=snippet,
+                            generated_at=datetime.now(timezone.utc).isoformat(),
+                        )
                         st.session_state["atlasquant_admin_registry_export"]=snippet
-                        st.session_state["atlasquant_admin_registry_diff"]=registry_diff(live_users,updated)
+                        st.session_state["atlasquant_admin_registry_diff"]=diff_obj
+                        st.session_state["atlasquant_admin_registry_audit"]=account_change_audit_json(audit_obj)
                         st.success(
                             "Configuração revisada gerada. A mudança só entra em vigor depois da atualização manual do Secret."
                         )
@@ -317,6 +338,15 @@ def render_account_portal(access:Mapping[str,Any]|None)->dict[str,Any]:
                 mime="application/json",
                 key="atlasquant_admin_download_registry",
             )
+            audit_raw=st.session_state.get("atlasquant_admin_registry_audit","")
+            if isinstance(audit_raw,str) and audit_raw:
+                st.download_button(
+                    "Baixar manifesto de auditoria",
+                    data=audit_raw.encode("utf-8"),
+                    file_name="atlasquant_account_change_audit.json",
+                    mime="application/json",
+                    key="atlasquant_admin_download_registry_audit",
+                )
             st.caption(
                 "Esse arquivo é uma proposta completa e não destrutiva. "
                 "A aplicação nunca altera Secrets automaticamente."
