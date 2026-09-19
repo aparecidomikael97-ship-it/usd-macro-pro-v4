@@ -14,6 +14,8 @@ from typing import Any, Mapping, Sequence
 import pandas as pd
 import streamlit as st
 
+from atlasquant_setup_journal import setup_forward_summary
+
 SCHEMA="ATLASQUANT_SETUP_VALIDATION_V1"
 
 VALID_STATES=(
@@ -26,6 +28,14 @@ VALID_STATES=(
 )
 
 SETUP_CATALOG=(
+    {
+        "id":"bos-choch-ob",
+        "name":"BOS/CHOCH + Order Block",
+        "family":"ICT/SMC",
+        "complexity":"INICIANTE_CANDIDATO",
+        "status":"BACKTEST",
+        "notes":"Já possui replay/backtest objetivo; validar clareza, estabilidade e Forward/Paper.",
+    },
     {
         "id":"fvg",
         "name":"FVG / desequilíbrio",
@@ -57,6 +67,14 @@ SETUP_CATALOG=(
         "complexity":"AVANÇADO",
         "status":"BACKTEST",
         "notes":"Avaliar estabilidade temporal e sensibilidade à definição de sessão.",
+    },
+    {
+        "id":"breaker-mitigation",
+        "name":"Breaker / Mitigation Block",
+        "family":"ICT/SMC",
+        "complexity":"AVANÇADO",
+        "status":"PESQUISA",
+        "notes":"Definir regras objetivas antes de qualquer comparação; não inferir setup a partir do resultado.",
     },
     {
         "id":"session-liquidity-mss",
@@ -258,6 +276,73 @@ def evaluate_setup_for_review(
     }
 
 
+_STRATEGY_TO_SETUP={
+    "BOS_CHOCH_OB":"bos-choch-ob",
+    "FVG":"fvg",
+    "OTE":"ote",
+    "CRT":"crt",
+    "AMD_PO3":"amd-po3",
+}
+
+
+def build_setup_evidence_map(
+    backtest_evidence:pd.DataFrame|None=None,
+    forward_records:Sequence[Mapping[str,Any]]|None=None,
+    *,
+    frozen_setup_ids:Sequence[str]|None=None,
+    methodology_verified_setup_ids:Sequence[str]|None=None,
+)->dict[str,dict[str,Any]]:
+    """Merge historical diagnostics with setup-tagged Paper evidence.
+
+    Historical OOS/walk-forward remains distinct from actual Forward/Paper.
+    Explicit frozen/methodology flags are human inputs and default fail-closed.
+    """
+    out:dict[str,dict[str,Any]]={}
+    frozen={str(x).strip().casefold() for x in list(frozen_setup_ids or [])}
+    verified={str(x).strip().casefold() for x in list(methodology_verified_setup_ids or [])}
+
+    if isinstance(backtest_evidence,pd.DataFrame) and not backtest_evidence.empty:
+        for _,raw in backtest_evidence.iterrows():
+            strategy=str(raw.get("strategy") or "").strip().upper()
+            setup_id=_STRATEGY_TO_SETUP.get(strategy)
+            if not setup_id:
+                continue
+            out[setup_id]={
+                "backtest_samples":raw.get("trades"),
+                "expectancy_r":raw.get("expectancy_r"),
+                "profit_factor":raw.get("profit_factor"),
+                "max_drawdown_r":raw.get("max_drawdown_r"),
+                "positive_fold_pct":raw.get("temporal_positive_fold_pct"),
+                "oos_positive_pct":raw.get("oos_positive_pct"),
+                "friction_positive_pct":raw.get("friction_positive_scenario_pct"),
+                "parameter_positive_pct":raw.get("parameter_positive_variant_pct"),
+                "rules_frozen_before_evaluation":setup_id in frozen,
+                "source_methodology_verified":setup_id in verified,
+            }
+
+    forward=setup_forward_summary(forward_records)
+    for setup_id,summary in forward.items():
+        current=out.setdefault(setup_id,{
+            "rules_frozen_before_evaluation":setup_id in frozen,
+            "source_methodology_verified":setup_id in verified,
+        })
+        current.update({
+            "forward_samples":summary.get("forward_samples"),
+            "forward_expectancy_r":summary.get("forward_expectancy_r"),
+            "regimes":summary.get("regimes",[]),
+            "sessions":summary.get("sessions",[]),
+        })
+        current["rules_frozen_before_evaluation"]=setup_id in frozen
+        current["source_methodology_verified"]=setup_id in verified
+
+    for item in SETUP_CATALOG:
+        setup_id=item["id"]
+        current=out.setdefault(setup_id,{})
+        current.setdefault("rules_frozen_before_evaluation",setup_id in frozen)
+        current.setdefault("source_methodology_verified",setup_id in verified)
+    return out
+
+
 def evaluate_catalog(
     evidence_by_setup:Mapping[str,Mapping[str,Any]]|None=None,
     *,
@@ -343,6 +428,6 @@ def render_private_validation_center(
 
 __all__=[
     "SCHEMA","VALID_STATES","SETUP_CATALOG","ReviewThresholds","setup_catalog",
-    "normalize_evidence","evaluate_setup_for_review","evaluate_catalog",
+    "normalize_evidence","evaluate_setup_for_review","build_setup_evidence_map","evaluate_catalog",
     "validation_frame","render_private_validation_center",
 ]
