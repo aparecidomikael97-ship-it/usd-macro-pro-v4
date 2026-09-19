@@ -3,7 +3,7 @@ name: Quality tests
 on:
   workflow_dispatch:
   push:
-    branches: [main, atlasquant-dev, atlasquant-runtime, atlasquant-runtime-integration, atlasquant-integration, atlasquant-release-final, atlasquant-support-final]
+    branches: [main, atlasquant-dev, atlasquant-runtime, atlasquant-runtime-integration, atlasquant-integration, atlasquant-release-final, atlasquant-support-final, atlasquant-support-ui]
     paths:
       - "*.py"
       - "tradingview/**"
