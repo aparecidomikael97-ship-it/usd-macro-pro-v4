@@ -59,10 +59,18 @@ def build_validation_evidence(
     expansion=dict(r.get("expansion",{}) or {})
 
     generated=generated_at or datetime.now(timezone.utc).isoformat()
+    engine=str(engine_version or "").strip()
+    try:
+        generated_dt=datetime.fromisoformat(str(generated).replace("Z","+00:00"))
+        generated_valid=generated_dt.tzinfo is not None
+    except Exception:
+        generated_valid=False
+    source_valid=bool(engine and generated_valid)
     body={
         "schema_version":SCHEMA_VERSION,
         "generated_at":str(generated),
-        "engine_version":str(engine_version),
+        "engine_version":engine,
+        "source_metadata_valid":source_valid,
         "validation":{
             "status":str(r.get("status","UNKNOWN")),
             "label":str(r.get("label","—")),
