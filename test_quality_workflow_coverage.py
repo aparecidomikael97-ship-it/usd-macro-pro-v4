@@ -16,7 +16,7 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
 
     def test_core_workflows_use_current_node24_action_generation(self):
         workflow_dir=ROOT/".github"/"workflows"
-        names=("quality-tests.yml","autopilot-v107.yml","atlasquant-checkpoint.yml","coleta_automatica.yml","atlasquant-integration-gate.yml")
+        names=("quality-tests.yml","autopilot-v107.yml","atlasquant-checkpoint.yml","coleta_automatica.yml","atlasquant-integration-gate.yml","atlasquant-source-parity.yml")
         joined="\n".join((workflow_dir/name).read_text(encoding="utf-8") for name in names)
         self.assertNotIn("actions/checkout@v4",joined)
         self.assertNotIn("actions/setup-python@v5",joined)
@@ -62,6 +62,21 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
         self.assertNotIn("contents: write",src)
         self.assertNotIn("git merge",src)
         self.assertNotIn("git push",src)
+
+
+
+    def test_runtime_source_parity_workflow_is_read_only_and_integration_based(self):
+        src=(ROOT/".github"/"workflows"/"atlasquant-source-parity.yml").read_text(encoding="utf-8")
+        self.assertIn("branches: [atlasquant-runtime]",src)
+        self.assertIn("permissions:\n  contents: read",src)
+        self.assertIn("git fetch origin atlasquant-integration --prune",src)
+        self.assertIn("compare_source_trees",src)
+        self.assertIn("actions/checkout@v7",src)
+        self.assertIn("actions/setup-python@v7",src)
+        self.assertIn("actions/upload-artifact@v7",src)
+        self.assertNotIn("contents: write",src)
+        self.assertNotIn("git push",src)
+        self.assertNotIn("update-ref",src)
 
 
 
