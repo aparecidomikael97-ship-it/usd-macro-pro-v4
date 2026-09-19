@@ -16,6 +16,7 @@ from atlasquant_academy_media import academy_video_scripts_ready
 from atlasquant_support_center import support_minimum_ready
 from atlasquant_brokers_guide import brokers_guide_minimum_ready, render_brokers_guide
 from atlasquant_voice_readiness import voice_contract_ready
+from atlasquant_commercial_prep import commercial_prep_audit, commercial_external_blockers
 
 SCHEMA="ATLASQUANT_SALES_CENTER_V1"
 
@@ -43,6 +44,7 @@ def onboarding_steps()->list[dict[str,str]]:
 def commercial_readiness(access:Mapping[str,Any]|None=None)->dict[str,Any]:
     audit=pwa_asset_audit()
     security=collect_commercial_security_evidence()
+    prep=commercial_prep_audit()
     registry=(access or {}).get("registry") if isinstance(access,Mapping) else {}
     if not isinstance(registry,Mapping):
         registry={}
@@ -67,6 +69,11 @@ def commercial_readiness(access:Mapping[str,Any]|None=None)->dict[str,Any]:
         "voice_contract_ready":bool(voice_contract_ready()),
         "voice_ready":False,
         "brokers_guide_ready":bool(brokers_guide_minimum_ready()),
+        "commercial_prep_ready":bool(prep["internal_prep_ready"]),
+        "legal_drafts_ready":bool(prep["legal_drafts_ready"]),
+        "data_licensing_checklist_ready":bool(prep["data_licensing_checklist_ready"]),
+        "billing_checklist_ready":bool(prep["billing_checklist_ready"]),
+        "store_checklist_ready":bool(prep["store_checklist_ready"]),
         "native_stores_ready":False,
         "payments_integrated":False,
         "broker_execution_enabled":False,
@@ -145,10 +152,14 @@ def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
         ("Assistente de voz — infraestrutura","PRONTA" if status["voice_contract_ready"] else "PENDENTE"),
         ("Assistente de voz — provedor TTS","PENDENTE"),
         ("Guia de corretoras","PRONTO — INFORMATIVO" if status["brokers_guide_ready"] else "PENDENTE"),
-        ("Termos / privacidade / riscos","PENDENTE"),
-        ("Licenciamento comercial de dados","PENDENTE"),
-        ("Pagamento / assinatura","PENDENTE"),
-        ("Play Store / App Store","PENDENTE"),
+        ("Termos / privacidade / riscos — rascunhos","PRONTOS" if status["legal_drafts_ready"] else "PENDENTE"),
+        ("Termos / privacidade / riscos — revisão final","PENDENTE"),
+        ("Licenciamento de dados — checklist","PRONTO" if status["data_licensing_checklist_ready"] else "PENDENTE"),
+        ("Licenciamento comercial de dados — aprovação","PENDENTE"),
+        ("Pagamento / assinatura — checklist","PRONTO" if status["billing_checklist_ready"] else "PENDENTE"),
+        ("Pagamento / assinatura — integração","PENDENTE"),
+        ("Lojas nativas — checklist","PRONTO" if status["store_checklist_ready"] else "PENDENTE"),
+        ("Play Store / App Store — publicação","PENDENTE"),
     ]
     st.dataframe(
         [{"Item":item,"Estado":state} for item,state in checklist],
@@ -173,6 +184,15 @@ def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
         st.caption(" · ".join(launch["blockers"]))
     else:
         st.success("Pré-requisitos comerciais completos para revisão humana final.")
+    st.markdown("### Preparação de lançamento")
+    if status["commercial_prep_ready"]:
+        st.success("Pacote interno de preparação comercial pronto. Validações externas continuam obrigatórias.")
+    else:
+        st.warning("Pacote interno de preparação comercial incompleto.")
+    with st.expander("Pendências externas para lançamento público",expanded=False):
+        for blocker in commercial_external_blockers():
+            st.markdown(f"- {blocker}")
+
     st.markdown("### Corretoras & plataformas")
     render_brokers_guide()
     st.info(
