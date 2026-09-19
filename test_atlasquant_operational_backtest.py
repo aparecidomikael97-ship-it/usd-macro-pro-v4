@@ -7,6 +7,7 @@ from atlasquant_operational_backtest import (
     summarize_results,
     summarize_by,
     ledger_frame,
+    normalize_candles,
 )
 
 
@@ -224,6 +225,17 @@ class OperationalBacktestTests(unittest.TestCase):
         ]
         rows=backtest_many({"EUR/USD":d,"GBP/USD":d},signals,single_position_per_pair=True)
         self.assertEqual([r["outcome"] for r in rows],["GAIN","GAIN"])
+
+
+    def test_mixed_timestamp_formats_are_normalized_without_losing_valid_rows(self):
+        d=pd.DataFrame([
+            {"datetime":"2026-09-15T00:00:00Z","open":10,"high":10.2,"low":9.8,"close":10},
+            {"datetime":"2026-09-15 00:15:00+00:00","open":10,"high":10.3,"low":9.9,"close":10.1},
+        ])
+        out=normalize_candles(d)
+        self.assertEqual(len(out),2)
+        self.assertTrue(str(out.iloc[0]["datetime"].tzinfo))
+
 
 
 if __name__=="__main__":
