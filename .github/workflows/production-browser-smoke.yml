@@ -134,6 +134,9 @@ jobs:
                       page.wait_for_timeout(5_000)
 
                   exception_count = page.locator('[data-testid="stException"]').count()
+                  viewport_width = page.evaluate("window.innerWidth")
+                  document_width = page.evaluate("document.documentElement.scrollWidth")
+                  horizontal_overflow = max(0, int(document_width) - int(viewport_width))
                   screenshot = out / f"{name}.png"
                   page.screenshot(path=str(screenshot), full_page=False)
 
@@ -148,6 +151,9 @@ jobs:
                       "main_container": main_container,
                       "auth_inputs": auth_inputs,
                       "streamlit_exceptions": exception_count,
+                      "viewport_width": viewport_width,
+                      "document_width": document_width,
+                      "horizontal_overflow_px": horizontal_overflow,
                       "console_errors": console_errors[-10:],
                       "page_errors": page_errors[-10:],
                       "screenshot": str(screenshot),
@@ -164,6 +170,8 @@ jobs:
                       failures.append(f"{name}: {exception_count} stException")
                   if page_errors:
                       failures.append(f"{name}: {len(page_errors)} pageerror")
+                  if horizontal_overflow > 8:
+                      failures.append(f"{name}: overflow horizontal {horizontal_overflow}px")
 
                   context.close()
               browser.close()
