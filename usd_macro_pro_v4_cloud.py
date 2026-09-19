@@ -313,6 +313,10 @@ CHAVE_NEWSAPI = _config_value("CHAVE_NEWSAPI")
 CHAVE_EODHD = _config_value("CHAVE_EODHD")
 CHAVE_TWELVE_DATA = _config_value("CHAVE_TWELVE_DATA")
 
+_ATLASQUANT_OFFLINE_SMOKE = str(
+    _config_value("ATLASQUANT_OFFLINE_SMOKE", "false")
+).strip().lower() in {"1", "true", "yes", "on", "sim"}
+
 _ATLASQUANT_ENV_EXPLICIT = str(
     _config_value("ATLASQUANT_ENV")
 ).strip().upper()
@@ -392,6 +396,11 @@ with st.sidebar.expander("📡 Fontes & status", expanded=False):
 # =========================================================
 
 def _get(url: str, timeout: int = 15):
+    # Deterministic, CI-only offline mode. Production defaults to false.
+    # It prevents UI smoke tests from waiting on public providers and never
+    # enables trading, writes or provider fallbacks beyond existing local data.
+    if _ATLASQUANT_OFFLINE_SMOKE:
+        return None
     try:
         resposta = requests.get(url, timeout=timeout)
         resposta.raise_for_status()
@@ -714,6 +723,9 @@ def _score_palavras(titulos: list[str], positivas, negativas) -> float:
 
 @st.cache_data(ttl=1800, show_spinner="Lendo a narrativa do Fed...")
 def carregar_narrativa_fed() -> dict:
+    if _ATLASQUANT_OFFLINE_SMOKE:
+        STATUS_FONTE["Fed"] = "⚪ Offline smoke"
+        return {"tom": "Neutro", "forca": 0.0, "titulos": [], "analisadas": []}
     # Consulta focada em política monetária para evitar manchetes pessoais/irrelevantes.
     brutas = _rss_titulos('(Federal Reserve OR FOMC OR "Fed rate" OR "Fed Chair") when:7d')
     analisadas = []
@@ -751,6 +763,8 @@ def carregar_narrativa_fed() -> dict:
 
 @st.cache_data(ttl=1800, show_spinner="Analisando sentimento das notícias...")
 def sentimento_noticias(nome_moeda: str) -> float:
+    if _ATLASQUANT_OFFLINE_SMOKE:
+        return 50.0
     titulos = _rss_titulos(f"{nome_moeda} currency when:7d", "pt-BR", "BR", "BR:pt-419")
     if titulos:
         return float(np.clip(50 + 50 * _score_palavras(titulos, POSITIVAS, NEGATIVAS), 0, 100))
