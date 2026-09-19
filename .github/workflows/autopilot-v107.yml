@@ -30,11 +30,11 @@ jobs:
       CHAVE_NEWSAPI: ${{ secrets.CHAVE_NEWSAPI }}
       CHAVE_EODHD: ${{ secrets.CHAVE_EODHD }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: atlasquant-runtime
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: "pip"
