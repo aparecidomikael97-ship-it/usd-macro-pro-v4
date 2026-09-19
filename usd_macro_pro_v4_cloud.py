@@ -9182,15 +9182,34 @@ with abas[13]:
             if _aq_research_err and (_aq_research_df is None or _aq_research_df.empty):
                 st.info(f"Validation Center aguardando histórico persistente: {_aq_research_err}")
             else:
+                _aq_runtime_status = {}
+                _aq_paper_summary = {}
+                _aq_setup_summary = {}
+                try:
+                    _aq_runtime_status, _ = _github_get_json_v937("dados/autopilot_status_v107.json", {})
+                    _aq_paper_summary, _ = _github_get_json_v937("dados/paper_trading_summary_v112.json", {})
+                    _aq_setup_summary, _ = _github_get_json_v937("dados/paper_setup_summary_v114.json", {})
+                except Exception:
+                    _aq_runtime_status = {}
+                    _aq_paper_summary = {}
+                    _aq_setup_summary = {}
+                _aq_quota_samples = []
+                if isinstance(_aq_runtime_status, dict):
+                    _aq_quota_snapshot = _aq_runtime_status.get("quota_shadow")
+                    if isinstance(_aq_quota_snapshot, dict):
+                        _aq_quota_samples = [_aq_quota_snapshot]
                 _aq_validation_result = render_validation_readiness(
                     _aq_research_df.copy(),
                     st.session_state.get("atlasquant_shadow_samples", []),
+                    _aq_quota_samples,
                     horizon="24h",
                 )
                 if render_validation_evidence is not None:
                     render_validation_evidence(
                         _aq_validation_result,
                         engine_version=APP_VERSION,
+                        paper_summary=_aq_paper_summary if isinstance(_aq_paper_summary, dict) else {},
+                        setup_summary=_aq_setup_summary if isinstance(_aq_setup_summary, dict) else {},
                     )
                 elif _ATLASQUANT_EVIDENCE_IMPORT_ERROR:
                     st.caption(
