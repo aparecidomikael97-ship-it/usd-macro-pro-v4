@@ -62,6 +62,16 @@ def commercial_readiness(access:Mapping[str,Any]|None=None)->dict[str,Any]:
         "real_orders_enabled":False,
     }
 
+
+def sales_launch_summary(status:Mapping[str,Any]|None)->dict[str,str]:
+    s=dict(status or {})
+    if not bool(s.get("pwa_ready",False)):
+        return {"label":"DISTRIBUIÇÃO BLOQUEADA","detail":"PWA ainda não passou no checklist de instalação"}
+    if bool(s.get("payments_integrated",False)) and bool(s.get("academy_ready",False)):
+        return {"label":"REVISÃO COMERCIAL","detail":"Infraestrutura principal pronta; lançamento continua manual"}
+    return {"label":"PRÉ-LANÇAMENTO","detail":"PWA pronta, mas itens comerciais essenciais continuam pendentes"}
+
+
 def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
     st.subheader("💼 Portal Comercial")
     if not sales_access_allowed(access):
@@ -69,6 +79,13 @@ def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
         return {"allowed":False,"schema":SCHEMA}
 
     status=commercial_readiness(access)
+    visual=sales_launch_summary(status)
+    st.markdown(
+        f"""<div style="padding:11px 13px;border:1px solid rgba(137,170,210,.18);border-radius:12px;margin:4px 0 13px">
+        <strong>COMERCIAL · {visual['label']}</strong><br>
+        <span style="opacity:.74;font-size:.78rem">{visual['detail']}</span>
+        </div>""", unsafe_allow_html=True,
+    )
     st.caption(
         "Onboarding e preparação comercial. Esta área não processa pagamentos, "
         "não ativa broker e não concede permissão de trading real."
