@@ -35,7 +35,7 @@ def onboarding_steps()->list[dict[str,str]]:
         {"Etapa":"3","Item":"Primeiro acesso","Status":"PRONTO","Descrição":"Entrar, revisar viés e qualidade dos dados."},
         {"Etapa":"4","Item":"Academy","Status":"TEXTO PRONTO · VÍDEOS PENDENTES","Descrição":"Trilha textual estruturada já está no app; vídeos curtos continuam em produção futura."},
         {"Etapa":"5","Item":"Assistente de voz","Status":"PLANEJADO","Descrição":"Briefing diário/semanal e explicação do viés."},
-        {"Etapa":"6","Item":"Corretoras & plataformas","Status":"PLANEJADO","Descrição":"Guia comparativo revisado próximo ao lançamento comercial."},
+        {"Etapa":"6","Item":"Corretoras & plataformas","Status":"GUIA INFORMATIVO PRONTO","Descrição":"Compatibilidade, Paper/Demo e segurança documentadas; conexão real continua desativada."},
     ]
 
 def commercial_readiness(access:Mapping[str,Any]|None=None)->dict[str,Any]:
