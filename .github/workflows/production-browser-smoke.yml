@@ -82,14 +82,16 @@ jobs:
                   page.on("console", lambda msg: console_errors.append(msg.text) if msg.type == "error" else None)
                   page.on("pageerror", lambda exc: page_errors.append(str(exc)))
                   status = None
+                  status_history = []
                   http_attempts = 0
-                  for attempt in range(1, 4):
+                  for attempt in range(1, 6):
                       http_attempts = attempt
                       try:
                           response = page.goto(url, wait_until="domcontentloaded", timeout=180_000)
                           status = response.status if response else None
                       except Exception:
                           status = None
+                      status_history.append(status)
                       if status is not None and status < 500:
                           break
                       page.wait_for_timeout(5_000)
@@ -123,9 +125,12 @@ jobs:
                           break
                       if render_attempt in (2, 4):
                           try:
-                              page.reload(wait_until="domcontentloaded", timeout=180_000)
+                              reload_response = page.reload(wait_until="domcontentloaded", timeout=180_000)
+                              if reload_response is not None:
+                                  status = reload_response.status
+                                  status_history.append(status)
                           except Exception:
-                              pass
+                              status_history.append(None)
                       page.wait_for_timeout(5_000)
 
                   exception_count = page.locator('[data-testid="stException"]').count()
@@ -135,6 +140,7 @@ jobs:
                   info = {
                       "http_status": status,
                       "http_attempts": http_attempts,
+                      "http_status_history": status_history,
                       "render_attempts": render_attempts,
                       "title": page_title,
                       "body_chars": len(body_text),
