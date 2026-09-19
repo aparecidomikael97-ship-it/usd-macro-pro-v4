@@ -114,5 +114,17 @@ class AtlasQuantAdaptiveExecutionGateTests(unittest.TestCase):
                 self.assertFalse(r["executable"])
 
 
+    def test_empty_pair_and_missing_active_set_fail_closed(self):
+        for pair,active in (("",["EUR/USD"]),("EUR/USD",None)):
+            with self.subTest(pair=pair,active=active):
+                r=adaptive_pair_permission(
+                    pair,active_pairs=active,m15_age_minutes=10,
+                    derived_health=GOOD_HEALTH,data_sufficient=True,
+                )
+                self.assertFalse(r["executable"])
+                self.assertEqual(r["state"],"NO_EXECUTION")
+
+
+
 if __name__=="__main__":
     unittest.main()
