@@ -196,5 +196,15 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertNotIn('[_aq_runtime_status.get("quota_shadow"',src)
 
 
+    def test_validation_runtime_json_reader_is_defined_and_uses_resolved_branch(self):
+        import inspect
+        import usd_macro_pro_v4_cloud as app
+        self.assertTrue(hasattr(app,"_github_get_json_v937"))
+        source=inspect.getsource(app._github_get_json_v937)
+        self.assertIn("_github_cfg_v84()",source)
+        self.assertIn('params={"ref": branch}',source)
+        self.assertNotIn('"ref": "main"',source)
+
+
 if __name__ == "__main__":
     unittest.main()
