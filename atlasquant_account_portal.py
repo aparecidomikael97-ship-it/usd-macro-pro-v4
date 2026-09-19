@@ -110,12 +110,18 @@ def provisioning_json(record:Mapping[str,Any])->str:
 def account_summary(access:Mapping[str,Any]|None)->dict[str,Any]:
     data=dict(access or {})
     session=data.get("session") if isinstance(data.get("session"),Mapping) else {}
-    role=str(data.get("role") or session.get("role") or "OPEN").upper()
-    username=str(session.get("username") or "")
+    mode=str(data.get("mode") or "OPEN").upper()
+    declared_role=str(data.get("role") or "").strip().upper()
+    session_role=str(session.get("role") or "").strip().upper()
+    if session:
+        role=session_role if session_role and (not declared_role or declared_role==session_role) else "INVALID"
+    else:
+        role=declared_role or ("OPEN" if mode=="OPEN" else "INVALID")
+    username=str(session.get("username") or "") if role!="INVALID" else ""
     permissions=tuple(sorted(ROLE_PERMISSIONS.get(role,frozenset())))
     registry=data.get("registry") if isinstance(data.get("registry"),Mapping) else {}
     return {
-        "mode":str(data.get("mode") or "OPEN"),
+        "mode":mode,
         "role":role if role in ROLE_LABELS else "INVALID",
         "role_label":role_label(role),
         "username":username,
