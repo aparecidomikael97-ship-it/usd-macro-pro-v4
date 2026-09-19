@@ -168,5 +168,16 @@ class AtlasQuantShadowModeTests(unittest.TestCase):
 
 
 
+    def test_shadow_summary_exposes_normalized_expected_pair_universe(self):
+        summary=summarize_shadow(
+            [],
+            expected_pairs=("EUR/USD","GBP/USD","USD/JPY"),
+            min_pair_samples=10,
+        )
+        self.assertEqual(summary["expected_pairs"],["EUR/USD","GBP/USD","USD/JPY"])
+        self.assertEqual(summary["expected_pair_count"],3)
+        self.assertEqual(summary["missing_pairs"],["EUR/USD","GBP/USD","USD/JPY"])
+
+
 if __name__=="__main__":
     unittest.main()
