@@ -21,6 +21,7 @@ MIN_ITERATIONS=200_000
 MAX_ITERATIONS=2_000_000
 MAX_USERS=500
 MAX_CONFIG_CHARS=1_000_000
+MAX_PASSWORD_CHARS=1024
 _USERNAME_RE=re.compile(r"^[a-z0-9][a-z0-9._-]{2,63}$")
 
 ROLE_PERMISSIONS={
@@ -45,8 +46,8 @@ def normalize_role(value:Any)->str:
     return role if role in ROLES else ""
 
 def hash_password(password:str, *, salt:bytes|None=None, iterations:int=DEFAULT_ITERATIONS)->str:
-    if not isinstance(password,str) or len(password)<12:
-        raise ValueError("password must have at least 12 characters")
+    if not isinstance(password,str) or len(password)<12 or len(password)>MAX_PASSWORD_CHARS:
+        raise ValueError("password length must be between 12 and 1024 characters")
     if isinstance(iterations,bool):
         raise ValueError("invalid iterations")
     try:
@@ -62,7 +63,7 @@ def hash_password(password:str, *, salt:bytes|None=None, iterations:int=DEFAULT_
     return f"pbkdf2_sha256${it}${raw_salt.hex()}${digest.hex()}"
 
 def verify_password(password:str, encoded:str)->bool:
-    if not isinstance(password,str) or not isinstance(encoded,str):
+    if not isinstance(password,str) or len(password)>MAX_PASSWORD_CHARS or not isinstance(encoded,str):
         return False
     try:
         algorithm,it_raw,salt_hex,digest_hex=encoded.split("$",3)
