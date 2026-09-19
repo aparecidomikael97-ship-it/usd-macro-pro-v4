@@ -30,13 +30,13 @@ class AtlasQuantSalesCenterTests(unittest.TestCase):
         self.assertEqual(status["active_accounts"],7)
         self.assertTrue(status["academy_text_ready"])
         self.assertFalse(status["academy_ready"])
+        self.assertTrue(status["voice_contract_ready"])
         self.assertFalse(status["voice_ready"])
         self.assertTrue(status["brokers_guide_ready"])
         self.assertFalse(status["native_stores_ready"])
         self.assertFalse(status["payments_integrated"])
         self.assertFalse(status["broker_execution_enabled"])
         self.assertFalse(status["real_orders_enabled"])
-        self.assertTrue(status["brokers_guide_ready"])
         self.assertTrue(status["sales_role_isolation_verified"])
         self.assertTrue(status["account_revocation_verified"])
         self.assertTrue(status["account_admin_verified"])
@@ -52,7 +52,7 @@ class AtlasQuantSalesCenterTests(unittest.TestCase):
         rows=onboarding_steps()
         by={row["Item"]:row for row in rows}
         self.assertEqual(by["Academy"]["Status"],"TEXTO PRONTO · VÍDEOS PENDENTES")
-        self.assertEqual(by["Assistente de voz"]["Status"],"PLANEJADO")
+        self.assertEqual(by["Assistente de voz"]["Status"],"INFRA PRONTA · PROVEDOR PENDENTE")
         self.assertEqual(by["Corretoras & plataformas"]["Status"],"GUIA INFORMATIVO PRONTO")
 
 
@@ -60,6 +60,8 @@ class AtlasQuantSalesCenterTests(unittest.TestCase):
         status=commercial_readiness({"registry":{"TOTAL":1}})
         self.assertTrue(status["academy_text_ready"])
         self.assertFalse(status["academy_ready"])
+        self.assertTrue(status["voice_contract_ready"])
+        self.assertFalse(status["voice_ready"])
 
 
 
