@@ -33,6 +33,8 @@ class AtlasQuantBranchDriftTests(unittest.TestCase):
 
     def test_current_evidence_outputs_are_runtime_mutable(self):
         paths=[
+            "dados/twelve_budget_v1108.json",
+            "dados/twelve_series_v1108.json",
             "dados/atlasquant_flight_recorder.jsonl",
             "dados/atlasquant_quota_shadow_v1.json",
             "dados/atlasquant_shadow_samples.jsonl",
