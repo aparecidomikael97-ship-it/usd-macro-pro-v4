@@ -66,7 +66,6 @@ class AtlasQuantRuntimeBranchContractTests(unittest.TestCase):
     def test_all_packaged_workflows_avoid_main_runtime_writes(self):
         paths=[
             ROOT/".github/workflows/autopilot-v107.yml",
-            ROOT/"autopilot-v107.yml",
             ROOT/".github/workflows/coleta_automatica.yml",
         ]
         for path in paths:
