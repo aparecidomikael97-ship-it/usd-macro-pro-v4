@@ -7,6 +7,7 @@ from atlasquant_branch_drift import (
     classify_path,
     drift_release_message,
     reconciliation_state,
+    build_reconciliation_manifest,
 )
 
 
@@ -111,6 +112,30 @@ class AtlasQuantBranchDriftTests(unittest.TestCase):
                 self.assertEqual(out["status"],"REVIEW_REQUIRED")
                 self.assertFalse(out["automatic_merge_allowed"])
                 self.assertTrue(out["manual_reconciliation_required"])
+
+
+
+    def test_reconciliation_manifest_separates_runtime_and_source_drift(self):
+        manifest=build_reconciliation_manifest(
+            ["dados/autopilot_status_v107.json","autopilot_v107.py"],
+            ahead_by=2335,behind_by=470,
+        )
+        self.assertEqual(manifest["schema"],"ATLASQUANT_BRANCH_RECONCILIATION_V1")
+        self.assertEqual(manifest["status"],"SOURCE_DIVERGED")
+        self.assertEqual(manifest["runtime_files"],1)
+        self.assertEqual(manifest["code_or_config_files"],1)
+        self.assertEqual(manifest["unknown_data_files"],0)
+        self.assertFalse(manifest["automatic_merge_allowed"])
+        self.assertTrue(manifest["manual_reconciliation_required"])
+
+    def test_reconciliation_manifest_never_upgrades_unknown_data(self):
+        manifest=build_reconciliation_manifest(
+            ["dados/new_runtime_blob.json"],
+            ahead_by=1,behind_by=0,
+        )
+        self.assertEqual(manifest["unknown_data_files"],1)
+        self.assertTrue(manifest["requires_code_reconciliation"])
+        self.assertFalse(manifest["automatic_merge_allowed"])
 
 
 
