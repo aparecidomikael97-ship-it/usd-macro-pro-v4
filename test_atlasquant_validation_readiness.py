@@ -336,5 +336,31 @@ class AtlasQuantValidationReadinessTests(unittest.TestCase):
         self.assertIn("Pares na meta:",source)
 
 
+    def test_readiness_exposes_canonical_balanced_coverage(self):
+        samples=[]
+        for pair,count in (("EUR/USD",12),("GBP/USD",4)):
+            for i in range(count):
+                samples.append({
+                    "sample_id":f"{pair}-{i}",
+                    "champion":{"pair":pair},
+                    "side_match":True,
+                    "execution_match":True,
+                    "critical_mismatch":False,
+                })
+        r=build_validation_readiness(
+            pd.DataFrame(),
+            samples,
+            [],
+            expected_shadow_pairs=("EUR/USD","GBP/USD","USD/JPY"),
+            min_shadow_pair_samples=10,
+        )
+        c=r["shadow_balanced_coverage"]
+        self.assertEqual(c["covered"],14)
+        self.assertEqual(c["required"],30)
+        self.assertEqual(c["pairs_complete"],1)
+        self.assertEqual(c["pairs_missing"],["USD/JPY"])
+        self.assertEqual(c["pairs_under_target"],["GBP/USD"])
+
+
 if __name__=="__main__":
     unittest.main()
