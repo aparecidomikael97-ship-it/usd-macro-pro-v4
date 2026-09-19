@@ -220,6 +220,14 @@ def render_validation_evidence(
         "Quota mercado",
         f"{quota.get('market_open_runs') or 0}/{quota.get('min_market_runs') or 0}",
     )
+    balanced_required=int(shadow.get("balanced_pair_required") or 0)
+    balanced_covered=int(shadow.get("balanced_pair_covered") or 0)
+    if balanced_required:
+        balanced_state="COMPLETA" if shadow.get("balanced_pair_complete") else "EM CONSTRUÇÃO"
+        st.caption(
+            f"Cobertura balanceada protegida no manifesto: "
+            f"{balanced_covered}/{balanced_required} · {balanced_state}."
+        )
     paper=bundle["evidence"].get("paper_forward_test",{})
     setup=bundle["evidence"].get("setup_audit",{})
     st.markdown("#### Evidência prospectiva")
