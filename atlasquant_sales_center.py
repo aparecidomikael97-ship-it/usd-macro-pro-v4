@@ -17,6 +17,7 @@ from atlasquant_support_center import support_minimum_ready
 from atlasquant_brokers_guide import brokers_guide_minimum_ready, render_brokers_guide
 from atlasquant_voice_readiness import voice_contract_ready
 from atlasquant_commercial_prep import commercial_prep_audit, commercial_external_blockers
+from atlasquant_billing_contract import billing_contract_ready
 
 SCHEMA="ATLASQUANT_SALES_CENTER_V1"
 
@@ -73,6 +74,7 @@ def commercial_readiness(access:Mapping[str,Any]|None=None)->dict[str,Any]:
         "legal_drafts_ready":bool(prep["legal_drafts_ready"]),
         "data_licensing_checklist_ready":bool(prep["data_licensing_checklist_ready"]),
         "billing_checklist_ready":bool(prep["billing_checklist_ready"]),
+        "billing_contract_ready":bool(billing_contract_ready()),
         "store_checklist_ready":bool(prep["store_checklist_ready"]),
         "native_stores_ready":False,
         "payments_integrated":False,
@@ -157,7 +159,8 @@ def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
         ("Licenciamento de dados — checklist","PRONTO" if status["data_licensing_checklist_ready"] else "PENDENTE"),
         ("Licenciamento comercial de dados — aprovação","PENDENTE"),
         ("Pagamento / assinatura — checklist","PRONTO" if status["billing_checklist_ready"] else "PENDENTE"),
-        ("Pagamento / assinatura — integração","PENDENTE"),
+        ("Pagamento / assinatura — contrato técnico","PRONTO" if status["billing_contract_ready"] else "PENDENTE"),
+        ("Pagamento / assinatura — integração com provedor","PENDENTE"),
         ("Lojas nativas — checklist","PRONTO" if status["store_checklist_ready"] else "PENDENTE"),
         ("Play Store / App Store — publicação","PENDENTE"),
     ]
