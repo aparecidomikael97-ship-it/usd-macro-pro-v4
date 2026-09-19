@@ -134,6 +134,21 @@ def serialize_validation_evidence(bundle: Mapping[str,Any]) -> str:
     return json.dumps(_safe(bundle),ensure_ascii=False,sort_keys=True,indent=2)
 
 
+
+def evidence_visual_state(bundle: Mapping[str,Any] | None)->dict[str,str]:
+    b=dict(bundle or {})
+    if not bool(b.get("source_metadata_valid",False)):
+        return {"label":"PROVENIÊNCIA A REVISAR","detail":"Integridade pode estar válida, mas versão/timestamp da origem não são confiáveis"}
+    if not verify_validation_evidence(b):
+        return {"label":"INTEGRIDADE INVÁLIDA","detail":"O manifesto foi alterado ou está incompleto"}
+    status=str((b.get("validation") or {}).get("status","UNKNOWN")).upper() if isinstance(b.get("validation"),Mapping) else "UNKNOWN"
+    if status=="REVIEWABLE":
+        return {"label":"EVIDÊNCIA ÍNTEGRA","detail":"Pacote pronto apenas para revisão humana"}
+    if status=="BLOCKED":
+        return {"label":"EVIDÊNCIA BLOQUEADA","detail":"Pacote íntegro, mas a validação contém bloqueios"}
+    return {"label":"EVIDÊNCIA PARCIAL","detail":"Pacote íntegro; maturidade ainda não atingiu revisão completa"}
+
+
 def render_validation_evidence(
     readiness: Mapping[str,Any],
     *,
@@ -144,6 +159,14 @@ def render_validation_evidence(
     shadow=bundle["evidence"]["shadow"]
 
     st.markdown("### 📦 Validation Evidence Bundle")
+    visual=evidence_visual_state(bundle)
+    st.markdown(
+        f"""<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:11px 13px;
+        border:1px solid rgba(137,170,210,.18);border-radius:12px;margin:4px 0 13px;background:rgba(11,27,47,.52)">
+        <strong>{visual['label']}</strong><span style="opacity:.74;font-size:.78rem">{visual['detail']}</span>
+        <span style="margin-left:auto;opacity:.68;font-size:.72rem">SHA-256 · somente leitura</span></div>""",
+        unsafe_allow_html=True,
+    )
     st.caption(
         "Manifesto somente leitura para auditoria/revisão humana. "
         "Não promove versão, não muda pesos e não executa merge."
