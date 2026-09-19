@@ -87,6 +87,15 @@ class AtlasQuantRegistryAdminTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             apply_non_destructive_change(before,after)
 
+
+    def test_mixed_validity_registry_is_rejected_not_silently_truncated(self):
+        before=self.users()
+        mixed=dict(before)
+        mixed["broken.01"]={"role":"USER"}
+        with self.assertRaises(ValueError):
+            export_registry_json(mixed)
+
+
     def test_export_roundtrip_contains_hashes_not_plaintext(self):
         raw=export_registry_json(self.users())
         rebuilt=load_users_config(raw)
