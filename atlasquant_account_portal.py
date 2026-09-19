@@ -24,6 +24,7 @@ from atlasquant_registry_admin import (
     rotate_account_password,
     set_account_active,
     set_account_role,
+    registry_diff,
 )
 
 ROLE_LABELS={
@@ -239,6 +240,7 @@ def render_account_portal(access:Mapping[str,Any]|None)->dict[str,Any]:
                         )
                         snippet=apply_non_destructive_change(live_users,updated)
                         st.session_state["atlasquant_admin_registry_export"]=snippet
+                        st.session_state["atlasquant_admin_registry_diff"]=registry_diff(live_users,updated)
                         st.success("Cadastro completo gerado para revisão. Nenhum Secret foi alterado automaticamente.")
                     except Exception:
                         st.error(
@@ -282,6 +284,7 @@ def render_account_portal(access:Mapping[str,Any]|None)->dict[str,Any]:
                             updated=rotate_account_password(live_users,selected,new_password)
                         snippet=apply_non_destructive_change(live_users,updated)
                         st.session_state["atlasquant_admin_registry_export"]=snippet
+                        st.session_state["atlasquant_admin_registry_diff"]=registry_diff(live_users,updated)
                         st.success(
                             "Configuração revisada gerada. A mudança só entra em vigor depois da atualização manual do Secret."
                         )
@@ -289,7 +292,22 @@ def render_account_portal(access:Mapping[str,Any]|None)->dict[str,Any]:
                         st.error("Alteração rejeitada. Revise os dados e tente novamente.")
 
         snippet=st.session_state.get("atlasquant_admin_registry_export","")
+        diff=st.session_state.get("atlasquant_admin_registry_diff",{})
         if isinstance(snippet,str) and snippet:
+            st.markdown("#### 🔎 Revisão da mudança")
+            if isinstance(diff,Mapping):
+                if diff.get("added"):
+                    st.write("Contas adicionadas: "+", ".join(diff.get("added") or []))
+                for item in diff.get("changed") or []:
+                    if isinstance(item,Mapping):
+                        st.write(
+                            "Alterado: "
+                            + str(item.get("username",""))
+                            + " · "
+                            + ", ".join(str(x) for x in (item.get("fields") or []))
+                        )
+                if diff.get("destructive_removal_detected"):
+                    st.error("Remoção destrutiva detectada — exportação bloqueada.")
             st.markdown("#### 📦 Registro completo revisado")
             st.code(snippet,language="json")
             st.download_button(
