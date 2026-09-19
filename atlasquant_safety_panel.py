@@ -91,6 +91,19 @@ def evaluate_live_safety(
     )
 
 
+
+def safety_visual_state(result: Mapping[str,Any] | None) -> dict[str,str]:
+    r=dict(result or {})
+    light=str(r.get("traffic_light","") or "").upper()
+    if light=="RED":
+        return {"label":"BLOQUEADO","detail":"Há veto de segurança ativo; execução não deve prosseguir"}
+    if light=="YELLOW":
+        return {"label":"AGUARDAR","detail":"Contexto exige confirmação adicional ou redução de confiança"}
+    if light=="GREEN":
+        return {"label":"SEM VETO ADICIONAL","detail":"Safety Core não adicionou bloqueio; demais gates continuam obrigatórios"}
+    return {"label":"REVISAR","detail":"Estado de segurança inválido ou indisponível"}
+
+
 def render_safety_core(
     pack: Mapping[str, Any] | None,
     autopilot: Mapping[str, Any] | None = None,
@@ -107,6 +120,14 @@ def render_safety_core(
     icon={"GREEN":"🟢","YELLOW":"🟡","RED":"🔴"}.get(str(result["traffic_light"]),"⚪")
 
     st.markdown("### 🛡️ Safety Core")
+    visual=safety_visual_state(result)
+    st.markdown(
+        f"""<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:11px 13px;
+        border:1px solid rgba(137,170,210,.18);border-radius:12px;margin:4px 0 13px;background:rgba(11,27,47,.52)">
+        <strong>{visual['label']}</strong><span style="opacity:.74;font-size:.78rem">{visual['detail']}</span>
+        <span style="margin-left:auto;opacity:.68;font-size:.72rem">Veto independente · nunca cria direção</span></div>""",
+        unsafe_allow_html=True,
+    )
     st.caption(
         "Veto independente. Pode bloquear ou mandar aguardar, mas nunca aumenta score nem cria direção."
     )
