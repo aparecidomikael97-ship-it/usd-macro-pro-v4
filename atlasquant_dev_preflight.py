@@ -68,6 +68,7 @@ REQUIRED_FILES=(
     ".github/workflows/quality-tests.yml",
     ".github/workflows/atlasquant-integration-gate.yml",
     ".github/workflows/atlasquant-source-parity.yml",
+    ".github/workflows/atlasquant-ui-smoke.yml",
     ".github/workflows/production-health.yml",
     ".github/workflows/production-browser-smoke.yml",
     "atlasquant_integration_gate.py",
@@ -201,6 +202,7 @@ def run_dev_preflight(
     integration_gate=(base/".github/workflows/atlasquant-integration-gate.yml").read_text(encoding="utf-8") if (base/".github/workflows/atlasquant-integration-gate.yml").is_file() else ""
     production_health=(base/".github/workflows/production-health.yml").read_text(encoding="utf-8") if (base/".github/workflows/production-health.yml").is_file() else ""
     production_browser=(base/".github/workflows/production-browser-smoke.yml").read_text(encoding="utf-8") if (base/".github/workflows/production-browser-smoke.yml").is_file() else ""
+    integration_ui_smoke=(base/".github/workflows/atlasquant-ui-smoke.yml").read_text(encoding="utf-8") if (base/".github/workflows/atlasquant-ui-smoke.yml").is_file() else ""
     checks.append(_check(
         "source_integration_gate_manual",
         "branches: [atlasquant-integration]" in integration_gate
@@ -238,6 +240,21 @@ def run_dev_preflight(
         and 'page.on("pageerror"' in production_browser
         and "actions/upload-artifact@v7" in production_browser,
         "Health permanece main-scoped; browser smoke é read-only, resiliente a cold start e preserva evidência diagnóstica.",
+    ))
+
+    checks.append(_check(
+        "integration_ui_smoke_read_only",
+        "branches: [atlasquant-integration]" in integration_ui_smoke
+        and "permissions:\n  contents: read" in integration_ui_smoke
+        and "contents: write" not in integration_ui_smoke
+        and 'ATLASQUANT_ENV: "LOCAL"' in integration_ui_smoke
+        and 'ATLASQUANT_AUTH_REQUIRED: "false"' in integration_ui_smoke
+        and '"width":390' in integration_ui_smoke
+        and '"width":1440' in integration_ui_smoke
+        and "horizontal_overflow_px" in integration_ui_smoke
+        and "stException" in integration_ui_smoke
+        and "secrets." not in integration_ui_smoke,
+        "Candidato de integração possui smoke local desktop/mobile sem segredos e sem escrita remota.",
     ))
 
     provider_markers=(
