@@ -26,6 +26,7 @@ _REQUIRED_HANDOFF_DOCS=(
     "docs/release/USER_QUICKSTART.md",
     "docs/release/BRANCH_POLICY.md",
     "docs/release/INCIDENT_ROLLBACK_RUNBOOK.md",
+    "docs/release/FINAL_ACCEPTANCE_MATRIX.md",
 )
 
 def finalization_audit(root:Path|None=None)->dict[str,Any]:
