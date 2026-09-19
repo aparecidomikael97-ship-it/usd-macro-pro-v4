@@ -75,5 +75,15 @@ class AtlasQuantUiTests(unittest.TestCase):
 
 
 
+    def test_tab_navigation_is_mobile_scrollable_and_sticky(self):
+        from atlasquant_ui_v1 import ATLASQUANT_CSS, UI_VERSION
+        self.assertEqual(UI_VERSION,"0.5")
+        self.assertIn("overflow-x: auto",ATLASQUANT_CSS)
+        self.assertIn("flex-wrap: nowrap",ATLASQUANT_CSS)
+        self.assertIn("position: sticky",ATLASQUANT_CSS)
+        self.assertIn("white-space: nowrap",ATLASQUANT_CSS)
+
+
+
 if __name__ == "__main__":
     unittest.main()
