@@ -117,6 +117,11 @@ def build_validation_readiness(
         quota_shadow_samples or [],
         min_market_runs=min_quota_market_runs,
     )
+    shadow_balanced_coverage=balanced_pair_coverage(
+        shadow.get("expected_pairs") or [],
+        shadow.get("pair_breakdown") or [],
+        shadow.get("min_pair_samples") or 0,
+    )
 
     checks={
         "performance_reviewable": perf["status"]=="REVIEWABLE",
@@ -183,6 +188,7 @@ def build_validation_readiness(
         "calibration":calib,
         "stability":stability,
         "shadow":shadow,
+        "shadow_balanced_coverage":shadow_balanced_coverage,
         "quota_shadow":quota_shadow,
         "expansion":expansion,
         "manual_review_required":True,
@@ -246,11 +252,7 @@ def render_validation_readiness(
     c3.metric("Shadow samples",result["shadow"]["samples"])
     c4.metric("Quota mercado",f"{result['quota_shadow']['market_open_runs']}/{result['quota_shadow']['min_market_runs']}")
     shadow_progress=min(100.0,(float(result["shadow"]["samples"])/max(1,float(result["shadow"]["min_samples"])))*100.0)
-    pair_coverage=balanced_pair_coverage(
-        result["shadow"]["expected_pairs"],
-        result["shadow"]["pair_breakdown"],
-        result["shadow"]["min_pair_samples"],
-    )
+    pair_coverage=result["shadow_balanced_coverage"]
     pair_required_total=pair_coverage["required"]
     pair_covered_total=pair_coverage["covered"]
     pair_progress=pair_coverage["progress_pct"]
