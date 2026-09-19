@@ -35,9 +35,10 @@ class AtlasQuantSalesCenterTests(unittest.TestCase):
         self.assertFalse(status["payments_integrated"])
         self.assertFalse(status["broker_execution_enabled"])
         self.assertFalse(status["real_orders_enabled"])
-        self.assertFalse(status["sales_role_isolation_verified"])
-        self.assertFalse(status["account_revocation_verified"])
-        self.assertFalse(status["audit_manifest_verified"])
+        self.assertTrue(status["sales_role_isolation_verified"])
+        self.assertTrue(status["account_revocation_verified"])
+        self.assertTrue(status["account_admin_verified"])
+        self.assertTrue(status["audit_manifest_verified"])
 
     def test_corrupt_account_count_fails_closed(self):
         for bad in (-1,float("nan"),float("inf"),"bad",True):
@@ -60,11 +61,27 @@ class AtlasQuantSalesCenterTests(unittest.TestCase):
 
 
 
-    def test_commercial_security_evidence_is_not_inferred_from_login(self):
+    def test_commercial_security_evidence_is_code_verified_not_login_inferred(self):
         status=commercial_readiness({"role":"ADMIN","session":{"username":"admin.01","role":"ADMIN"},"registry":{"TOTAL":1}})
-        self.assertFalse(status["sales_role_isolation_verified"])
-        self.assertFalse(status["account_revocation_verified"])
-        self.assertFalse(status["audit_manifest_verified"])
+        self.assertTrue(status["sales_role_isolation_verified"])
+        self.assertTrue(status["account_revocation_verified"])
+        self.assertTrue(status["account_admin_verified"])
+        self.assertTrue(status["audit_manifest_verified"])
+        self.assertFalse(status["payments_integrated"])
+        self.assertFalse(status["academy_ready"])
+
+
+
+    def test_internal_security_collector_never_marks_external_launch_items_ready(self):
+        from atlasquant_commercial_security_evidence import collect_commercial_security_evidence
+        evidence=collect_commercial_security_evidence()
+        self.assertTrue(evidence["sales_role_isolated_ok"])
+        self.assertTrue(evidence["account_revocation_ok"])
+        self.assertTrue(evidence["account_admin_ok"])
+        self.assertTrue(evidence["audit_manifest_ok"])
+        self.assertFalse(evidence["external_legal_verified"])
+        self.assertFalse(evidence["external_data_licensing_verified"])
+        self.assertFalse(evidence["external_billing_verified"])
 
 
 if __name__=="__main__":
