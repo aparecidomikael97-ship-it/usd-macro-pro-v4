@@ -56,6 +56,7 @@ def build_validation_evidence(
     calib=dict(r.get("calibration",{}) or {})
     stability=dict(r.get("stability",{}) or {})
     shadow=dict(r.get("shadow",{}) or {})
+    quota_shadow=dict(r.get("quota_shadow",{}) or {})
     expansion=dict(r.get("expansion",{}) or {})
 
     generated=generated_at or datetime.now(timezone.utc).isoformat()
@@ -106,6 +107,15 @@ def build_validation_evidence(
                 "missing_pairs":shadow.get("missing_pairs",[]),
                 "under_sampled_pairs":shadow.get("under_sampled_pairs",[]),
                 "eligible_for_manual_review":shadow.get("eligible_for_manual_review"),
+            },
+            "quota_shadow":{
+                "samples":quota_shadow.get("samples"),
+                "market_open_runs":quota_shadow.get("market_open_runs"),
+                "min_market_runs":quota_shadow.get("min_market_runs"),
+                "provider_blocked_runs":quota_shadow.get("provider_blocked_runs"),
+                "headless_failed_runs":quota_shadow.get("headless_failed_runs"),
+                "adaptive_plan_fit_all_samples":quota_shadow.get("adaptive_plan_fit_all_samples"),
+                "eligible_for_manual_review":quota_shadow.get("eligible_for_manual_review"),
             },
             "technical_expansion":{
                 "target_requires_change":expansion.get("target_requires_change"),
