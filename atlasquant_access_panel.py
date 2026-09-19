@@ -29,6 +29,18 @@ def access_required()->bool:
 def configured_users():
     return load_users_config(_setting("ATLASQUANT_USERS_JSON",""))
 
+def registry_role_counts(users)->dict[str,int]:
+    counts={"USER":0,"SALES":0,"ADMIN":0,"TOTAL":0}
+    if not isinstance(users,dict):
+        return counts
+    for user in users.values():
+        role=str(getattr(user,"role","") or "").upper()
+        active=bool(getattr(user,"active",False))
+        if active and role in ("USER","SALES","ADMIN"):
+            counts[role]+=1
+            counts["TOTAL"]+=1
+    return counts
+
 def current_session()->dict[str,Any]|None:
     raw=st.session_state.get(SESSION_KEY)
     return dict(raw) if isinstance(raw,dict) else None
@@ -56,15 +68,16 @@ def evaluate_access(
 def render_access_gate()->dict[str,Any]:
     required=access_required()
     users=configured_users()
+    role_counts=registry_role_counts(users)
     session=current_session()
     decision=evaluate_access(required=required,users_count=len(users),session=session,users=users)
     if not required:
-        return {**decision,"session":None,"role":"OPEN"}
+        return {**decision,"session":None,"role":"OPEN","registry":role_counts}
 
     if decision["reason"]=="NO_USERS_CONFIGURED":
         st.error("🔒 Login obrigatório, mas nenhum usuário seguro foi configurado.")
         st.caption("Configure ATLASQUANT_USERS_JSON com hashes PBKDF2; credenciais em texto puro não são aceitas.")
-        return {**decision,"session":None,"role":None}
+        return {**decision,"session":None,"role":None,"registry":role_counts}
 
     if decision["allowed"]:
         c1,c2=st.sidebar.columns([3,1])
@@ -72,7 +85,7 @@ def render_access_gate()->dict[str,Any]:
         if c2.button("Sair",key="atlasquant_logout"):
             clear_session()
             st.rerun()
-        return {**decision,"session":session,"role":session.get("role")}
+        return {**decision,"session":session,"role":session.get("role"),"registry":role_counts}
 
     if decision["reason"]=="SESSION_REVOKED":
         clear_session()
@@ -90,4 +103,4 @@ def render_access_gate()->dict[str,Any]:
         else:
             st.session_state[SESSION_KEY]=authenticated
             st.rerun()
-    return {**decision,"session":None,"role":None}
+    return {**decision,"session":None,"role":None,"registry":role_counts}
