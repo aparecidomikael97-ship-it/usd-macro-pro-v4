@@ -244,7 +244,7 @@ def run_dev_preflight(
 
     checks.append(_check(
         "integration_ui_smoke_read_only",
-        "branches: [atlasquant-integration]" in integration_ui_smoke
+        "atlasquant-integration" in integration_ui_smoke\n        and "atlasquant-release-final" in integration_ui_smoke
         and "permissions:\n  contents: read" in integration_ui_smoke
         and "contents: write" not in integration_ui_smoke
         and 'ATLASQUANT_ENV: "LOCAL"' in integration_ui_smoke
