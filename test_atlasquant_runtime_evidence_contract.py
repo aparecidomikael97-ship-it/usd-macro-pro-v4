@@ -22,6 +22,7 @@ def pack(pair,side="BUY",state="OBS",executable=False):
         "gate":"WAIT","m15":"NO_TRIGGER","h1":"OK","h4":"OK",
         "event":"NORMAL","hard_blocks":[],"soft_blocks":[],
         "direction":side,"reason":"contract","next_action":"wait","target":"—",
+        "timestamp":"2026-09-19T09:00:00Z",
     }
 
 
