@@ -1,8 +1,10 @@
 import unittest
+import pandas as pd
 
 from atlasquant_setup_validation import (
     ReviewThresholds,
     evaluate_setup_for_review,
+    build_setup_evidence_map,
     setup_catalog,
 )
 
@@ -31,8 +33,8 @@ def evidence(**overrides):
 class AtlasQuantSetupValidationTests(unittest.TestCase):
     def test_catalog_contains_existing_and_research_candidates(self):
         ids={x["id"] for x in setup_catalog()}
-        self.assertTrue({"fvg","ote","crt","amd-po3"}.issubset(ids))
-        self.assertTrue({"session-liquidity-mss","opening-range","volume-profile"}.issubset(ids))
+        self.assertTrue({"bos-choch-ob","fvg","ote","crt","amd-po3"}.issubset(ids))
+        self.assertTrue({"breaker-mitigation","session-liquidity-mss","opening-range","volume-profile"}.issubset(ids))
 
     def test_clear_candidate_can_be_ready_only_for_human_review(self):
         result=evaluate_setup_for_review("session-liquidity-mss",evidence())
@@ -115,6 +117,41 @@ class AtlasQuantSetupValidationTests(unittest.TestCase):
         self.assertGreaterEqual(t.min_forward_samples,30)
         self.assertGreaterEqual(t.min_regimes,2)
         self.assertGreaterEqual(t.min_sessions,2)
+
+    def test_backtest_and_forward_are_kept_as_distinct_evidence_sources(self):
+        frame=pd.DataFrame([{
+            "strategy":"FVG","trades":120,"expectancy_r":0.20,"profit_factor":1.4,
+            "max_drawdown_r":6.0,"temporal_positive_fold_pct":75,
+            "oos_positive_pct":67,"friction_positive_scenario_pct":75,
+            "parameter_positive_variant_pct":70,
+        }])
+        forward_rows=[{
+            "setup_id":"fvg","pair":"EUR/USD","observed_at":"2026-09-19T12:00:00Z",
+            "session":"London","regime":"trend","direction":"BUY","entry":1.1,
+            "stop":1.09,"target":1.12,"result_r":1.0,"data_quality":90,
+            "decision_state":"PAPER",
+        }]
+        mapped=build_setup_evidence_map(
+            frame,forward_rows,frozen_setup_ids=["fvg"]
+        )
+        self.assertEqual(mapped["fvg"]["backtest_samples"],120)
+        self.assertEqual(mapped["fvg"]["forward_samples"],1)
+        self.assertEqual(mapped["fvg"]["expectancy_r"],0.20)
+        self.assertEqual(mapped["fvg"]["forward_expectancy_r"],1.0)
+        self.assertTrue(mapped["fvg"]["rules_frozen_before_evaluation"])
+
+    def test_historical_oos_does_not_fake_forward_paper_samples(self):
+        frame=pd.DataFrame([{
+            "strategy":"OTE","trades":200,"expectancy_r":0.15,"profit_factor":1.3,
+            "max_drawdown_r":8.0,"temporal_positive_fold_pct":80,
+            "oos_positive_pct":90,"friction_positive_scenario_pct":80,
+            "parameter_positive_variant_pct":80,
+        }])
+        mapped=build_setup_evidence_map(frame,[],frozen_setup_ids=["ote"])
+        result=evaluate_setup_for_review("ote",mapped["ote"])
+        self.assertFalse(result["review_ready"])
+        self.assertIsNone(result["evidence"]["forward_samples"])
+        self.assertTrue(any("forward_samples" in x for x in result["pending"]))
 
 
 if __name__=="__main__":
