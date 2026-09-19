@@ -362,5 +362,14 @@ class AtlasQuantValidationReadinessTests(unittest.TestCase):
         self.assertEqual(c["pairs_under_target"],["GBP/USD"])
 
 
+    def test_invalid_quota_timestamp_blocks_validation(self):
+        quota=[{"timestamp":"broken","market_open":True,"provider_blocked":False,
+                "app_headless_ok":True,"adaptive_within_usable_cap":True,"actual_http_calls":4}]
+        r=build_validation_readiness(pd.DataFrame(),[],quota,min_quota_market_runs=1)
+        self.assertEqual(r["status"],"BLOCKED")
+        self.assertFalse(r["quota_shadow"]["evidence_integrity_ok"])
+        self.assertTrue(any("timestamp inválido" in x for x in r["blockers"]))
+
+
 if __name__=="__main__":
     unittest.main()
