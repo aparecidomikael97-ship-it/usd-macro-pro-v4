@@ -48,5 +48,14 @@ class AtlasQuantUiTests(unittest.TestCase):
 
 
 
+    def test_main_sidebar_groups_advanced_controls(self):
+        from pathlib import Path
+        src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        self.assertIn('st.sidebar.expander("⚙️ Modelo macro"',src)
+        self.assertIn('st.sidebar.expander("🏦 Sensibilidade ao Fed"',src)
+        self.assertIn('st.sidebar.expander("📡 Fontes & status"',src)
+
+
+
 if __name__ == "__main__":
     unittest.main()
