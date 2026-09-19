@@ -444,6 +444,16 @@ def build_master_rows(matrix: pd.DataFrame, contexts: Mapping[str, Any], scanner
     return rows
 
 
+
+def master_overview_state(*, pairs: int, processed: int, scanner_fresh: int) -> dict[str,str]:
+    try: p=max(0,int(pairs)); m=max(0,int(processed)); s=max(0,int(scanner_fresh))
+    except Exception: return {"label":"REVISAR","detail":"Estado operacional inválido"}
+    if p<=0: return {"label":"AGUARDANDO DADOS","detail":"Sem pares disponíveis para consolidar"}
+    if m>=p and s>=p: return {"label":"COBERTURA COMPLETA","detail":"Market Map e scanner atuais nos pares exibidos"}
+    if m==0 and s==0: return {"label":"CONSTRUINDO CONTEXTO","detail":"Market Map e scanner ainda sem cobertura atual"}
+    return {"label":"COBERTURA PARCIAL","detail":f"Market Map {min(m,p)}/{p} · Scanner atual {min(s,p)}/{p}"}
+
+
 def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str,
                         macro_context: Mapping[str, Any] | None = None,
                         scanner_state: Mapping[str, Any] | None = None,
@@ -480,6 +490,14 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
         delta=(f"{_scanner_available_v1022}/{len(pairs)} com dados" if _scanner_available_v1022 != _scanner_fresh_v1022 else None),
     )
     top4.metric("Modo", "SELETIVO")
+    overview=master_overview_state(pairs=len(pairs),processed=processed,scanner_fresh=_scanner_fresh_v1022)
+    st.markdown(
+        f"""<div style="padding:11px 13px;border:1px solid rgba(137,170,210,.18);border-radius:12px;margin:4px 0 13px">
+        <strong>PAINEL MESTRE · {overview['label']}</strong>
+        <span style="margin-left:8px;opacity:.72;font-size:.78rem">{overview['detail']}</span>
+        <span style="float:right;opacity:.68;font-size:.72rem">Ranking ≠ probabilidade de lucro</span></div>""",
+        unsafe_allow_html=True,
+    )
 
     now_ts = _time.time()
     last_batch = _safe_float(state.get("last_batch_ts", 0.0))
