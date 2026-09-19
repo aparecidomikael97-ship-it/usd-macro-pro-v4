@@ -1,7 +1,7 @@
 import unittest
 import pandas as pd
 
-from atlasquant_validation_readiness import build_validation_readiness, validation_visual_state, render_validation_readiness
+from atlasquant_validation_readiness import build_validation_readiness, validation_visual_state, render_validation_readiness, balanced_pair_coverage
 from atlasquant_shadow_mode import compare_shadow_sample
 
 
@@ -221,7 +221,7 @@ class AtlasQuantValidationReadinessTests(unittest.TestCase):
         source=inspect.getsource(render_validation_readiness)
         self.assertIn("Cobertura balanceada por par",source)
         self.assertIn("pair_covered_total",source)
-        self.assertIn("min(pair_target",source)
+        self.assertIn("balanced_pair_coverage(",source)
 
 
     def test_closed_market_history_does_not_dilute_open_market_quota_gate(self):
@@ -254,6 +254,37 @@ class AtlasQuantValidationReadinessTests(unittest.TestCase):
         self.assertFalse(r["checks"]["quota_shadow_reviewable"])
         self.assertTrue(any("Quota Shadow" in x for x in r["blockers"]))
         self.assertEqual(r["status"],"BLOCKED")
+
+
+    def test_balanced_pair_coverage_caps_surplus_and_counts_missing_as_zero(self):
+        r=balanced_pair_coverage(
+            ("EUR/USD","GBP/USD","USD/JPY"),
+            ({"pair":"EUR/USD","samples":30},{"pair":"GBP/USD","samples":4}),
+            10,
+        )
+        self.assertEqual(r["required"],30)
+        self.assertEqual(r["covered"],14)
+        self.assertAlmostEqual(r["progress_pct"],46.6666666667)
+        self.assertFalse(r["complete"])
+        self.assertEqual(r["counts"]["USD/JPY"],0)
+
+    def test_balanced_pair_coverage_is_conservative_with_duplicates_and_invalid_rows(self):
+        r=balanced_pair_coverage(
+            ("EUR/USD","EUR/USD","GBP/USD"),
+            (
+                {"pair":"EUR/USD","samples":3},
+                {"pair":"EUR/USD","samples":8},
+                {"pair":"GBP/USD","samples":-5},
+                {"pair":"GBP/USD","samples":"bad"},
+                {"pair":"AUD/USD","samples":999},
+                "invalid",
+            ),
+            10,
+        )
+        self.assertEqual(r["required"],20)
+        self.assertEqual(r["covered"],8)
+        self.assertEqual(r["counts"],{"EUR/USD":8,"GBP/USD":0})
+        self.assertFalse(r["complete"])
 
 
 if __name__=="__main__":
