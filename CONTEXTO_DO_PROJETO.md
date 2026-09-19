@@ -1339,3 +1339,25 @@ Diretrizes preservadas:
 O commit `ffe2795da7ee08c6ea275ffcdf6cdad322a72b66` foi validado pelo Quality run `35410009133`: **852 testes, 852 OK**. Checkpoint congelado: `backup/atlasquant-runtime-2026-09-18-852-green`.
 
 O trabalho posterior a esse marco deve ganhar novo número de baseline somente depois de um workflow completo verde no SHA correspondente.
+
+
+## 18/09/2026 — bloco grande ADMIN / SALES / segurança comercial
+
+Marco validado: commit `54d40305b318c0d6294df5f6acce6986a8807995`, Quality run `35413373904`, **882 testes executados, 882 OK**. Checkpoint congelado: `backup/atlasquant-runtime-2026-09-18-882-green`.
+
+Entregas consolidadas neste bloco:
+
+- visão mestre/backlog preservada em `docs/continuidade/VISAO_MESTRE_BACKLOG_2026-09-18.md`;
+- administração não destrutiva de contas;
+- criação, alteração de perfil, ativação/desativação e rotação de senha por proposta/exportação;
+- proibição de remover/demover/desativar o último ADMIN ativo;
+- portal SALES protegido por sessão e perfil coerentes;
+- Commercial Launch Guard fail-closed e sempre manual;
+- sessão autenticada com timeout por inatividade e idade máxima;
+- hashes de autenticação não são exibidos inline;
+- manifesto de auditoria de alteração de conta usa apenas SHA-256 do registro e metadados não sensíveis;
+- PWA / instalação e portal comercial permanecem separados de trading real;
+- documentação operacional ADMIN/SALES atualizada;
+- CI cobre os novos módulos e mantém verificação de que todo `test_*.py` raiz está incluído na suíte.
+
+Contratos preservados: nenhuma dessas áreas escreve Secrets automaticamente, processa pagamento, conecta broker, habilita ordem real, promove estratégia ou publica o produto automaticamente.
