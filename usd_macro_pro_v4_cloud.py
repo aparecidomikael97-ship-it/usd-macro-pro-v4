@@ -2893,7 +2893,10 @@ def _github_get_json_v937(path: str, default):
             return default, f"Arquivo ausente em {branch}"
         r.raise_for_status()
         payload = r.json()
-        raw = base64.b64decode(payload["content"])
+        content = payload.get("content") if isinstance(payload, dict) else None
+        if not isinstance(content, str) or not content.strip():
+            return default, f"GitHub inválido em {branch}: conteúdo ausente"
+        raw = base64.b64decode(content, validate=True)
         return json.loads(raw.decode("utf-8")), f"GitHub:{branch}"
     except Exception as exc:
         return default, f"GitHub indisponível: {type(exc).__name__}"
