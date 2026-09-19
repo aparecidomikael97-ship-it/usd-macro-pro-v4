@@ -15,7 +15,7 @@ from atlasquant_access_control import (
     hash_password,
     normalize_role,
     normalize_username,
-    has_permission,
+    load_users_config,
 )
 
 ROLE_LABELS={
@@ -111,12 +111,16 @@ def merge_provisioning_records(*records:Mapping[str,Any])->dict[str,Any]:
             if not name or name in users:
                 raise ValueError("duplicate or invalid username")
             users[name]=dict(value) if isinstance(value,Mapping) else value
+    validated=load_users_config({"users":users})
+    if len(validated)!=len(users) or set(validated)!=set(users):
+        raise ValueError("invalid provisioning record")
     return {"users":users}
 
 def provisioning_json(record:Mapping[str,Any])->str:
     if not isinstance(record,Mapping):
         raise ValueError("invalid record")
-    return json.dumps({"users":dict(record)},ensure_ascii=False,indent=2,sort_keys=True)
+    merged=merge_provisioning_records(record)
+    return json.dumps(merged,ensure_ascii=False,indent=2,sort_keys=True)
 
 def account_summary(access:Mapping[str,Any]|None)->dict[str,Any]:
     data=dict(access or {})
