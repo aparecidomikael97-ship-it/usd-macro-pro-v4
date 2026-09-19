@@ -39,7 +39,8 @@ def _load_status() -> tuple[dict[str,Any],str]:
 def _age_min(value):
     try:
         ts=pd.to_datetime(value,utc=True)
-        return max(0,(pd.Timestamp.now(tz="UTC")-ts).total_seconds()/60)
+        age=(pd.Timestamp.now(tz="UTC")-ts).total_seconds()/60
+        return None if age < 0 else age
     except Exception: return None
 
 def render_autopilot_v107():
@@ -56,12 +57,16 @@ def render_autopilot_v107():
 
     age=_age_min(status.get("last_run"))
     healthy=bool(status.get("healthy",False))
+    readiness=str(status.get("operational_readiness","") or "").upper()
+    market_open=bool(status.get("forex_market_open",False))
     errors = status.get("errors", []) or []
     daily_blocked = bool(status.get("twelve_daily_blocked", False))
     has_429 = any("HTTP 429" in str(x) for x in errors)
     headless_bad = not bool(status.get("app_headless_ok", False))
 
-    if healthy:
+    if readiness=="MARKET_CLOSED" or not market_open:
+        st.info("🌙 MERCADO FX FECHADO — AUTOPILOT EM ESPERA SEGURA")
+    elif healthy and readiness in ("","READY"):
         st.success("🟢 AUTOPILOT SAUDÁVEL")
     elif headless_bad:
         st.error("🔴 AUTOPILOT: APP HEADLESS NÃO ATUALIZOU A MATRIZ")
@@ -115,7 +120,13 @@ def render_autopilot_v107():
     e.metric("Histórias únicas",int(status.get("news_unique_stories",0) or 0))
     f.metric("Snapshots",int(status.get("validation_rows",0)))
     g.metric("Consultas nesta rodada",int(status.get("twelve_calls_this_run",0)), "externas reais")
-    h.metric("Mercado FX", "ABERTO" if status.get("forex_market_open") else "FECHADO")
+    h.metric("Mercado FX", "ABERTO" if market_open else "FECHADO")
+    st.caption(
+        "Prontidão operacional: "
+        + ("MERCADO FECHADO" if readiness=="MARKET_CLOSED" else readiness or "N/D")
+        + f" · Scanner pronto: {'SIM' if status.get('scanner_ready') else 'NÃO'}"
+        + f" · Market Map pronto: {'SIM' if status.get('market_map_ready') else 'NÃO'}"
+    )
 
     quota_shadow=dict(status.get("quota_shadow",{}) or {})
     if quota_shadow:
