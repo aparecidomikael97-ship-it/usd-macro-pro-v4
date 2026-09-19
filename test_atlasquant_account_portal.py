@@ -72,6 +72,26 @@ class AtlasQuantAccountPortalTests(unittest.TestCase):
         self.assertEqual(summary["registry"]["SALES"],2)
         self.assertNotIn("password",str(summary).lower())
 
+
+    def test_mismatched_declared_and_session_role_fails_closed(self):
+        summary=account_summary({
+            "allowed":True,
+            "mode":"AUTHENTICATED",
+            "role":"ADMIN",
+            "session":{"username":"user.01","role":"USER"},
+        })
+        self.assertEqual(summary["role"],"INVALID")
+        self.assertFalse(summary["authenticated"])
+        self.assertNotIn("admin",summary["sections"])
+
+    def test_portal_source_never_writes_secrets_or_enables_live_trading(self):
+        from pathlib import Path
+        src=Path("atlasquant_account_portal.py").read_text(encoding="utf-8")
+        self.assertNotIn("st.secrets[",src)
+        self.assertNotIn("requests.",src)
+        self.assertNotIn("real_orders=True",src)
+        self.assertIn('"Trading real","DESATIVADO"',src)
+
     def test_invalid_provisioning_inputs_are_rejected(self):
         cases=[
             ("ab","USER","SenhaSegura#2026"),
