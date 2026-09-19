@@ -2876,6 +2876,29 @@ def _github_cfg_v84():
         token, repo, branch = "", "aparecidomikael97-ship-it/usd-macro-pro-v4", resolve_runtime_branch()
     return str(token).strip(), str(repo).strip(), str(branch).strip()
 
+def _github_get_json_v937(path: str, default):
+    """Read validation/runtime JSON from the dedicated runtime-data branch."""
+    token, repo, branch = _github_cfg_v84()
+    if not token or not repo:
+        return default, "GitHub persistente não configurado"
+    try:
+        url = f"https://api.github.com/repos/{repo}/contents/{str(path).lstrip('/')}"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        r = requests.get(url, headers=headers, params={"ref": branch}, timeout=15)
+        if r.status_code == 404:
+            return default, f"Arquivo ausente em {branch}"
+        r.raise_for_status()
+        payload = r.json()
+        raw = base64.b64decode(payload["content"])
+        return json.loads(raw.decode("utf-8")), f"GitHub:{branch}"
+    except Exception as exc:
+        return default, f"GitHub indisponível: {type(exc).__name__}"
+
+
 def _github_ler_csv_v84():
     """Lê dados/sinais_v84.csv do GitHub. Retorna None se não configurado/indisponível."""
     token, repo, branch = _github_cfg_v84()
