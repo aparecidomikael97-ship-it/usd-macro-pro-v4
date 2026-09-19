@@ -16,6 +16,14 @@ class AtlasQuantSalesCenterTests(unittest.TestCase):
         self.assertFalse(sales_access_allowed(user))
         self.assertFalse(sales_access_allowed({"role":"SALES","session":None}))
 
+
+    def test_mismatched_sales_session_role_is_denied(self):
+        forged={"role":"SALES","session":{"username":"user.01","role":"USER"}}
+        empty_name={"role":"SALES","session":{"username":"","role":"SALES"}}
+        self.assertFalse(sales_access_allowed(forged))
+        self.assertFalse(sales_access_allowed(empty_name))
+
+
     def test_commercial_readiness_never_claims_future_features_ready(self):
         status=commercial_readiness({"registry":{"TOTAL":7}})
         self.assertEqual(status["active_accounts"],7)
