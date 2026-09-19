@@ -152,5 +152,13 @@ class RuntimeEvidenceContractTests(unittest.TestCase):
         self.assertNotIn("Proveniência da validação: dados ao vivo",source)
 
 
+    def test_runtime_json_reader_rejects_missing_or_malformed_content(self):
+        source=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        self.assertIn('payload.get("content")',source)
+        self.assertIn("conteúdo ausente",source)
+        self.assertIn("validate=True",source)
+        self.assertIn("return default",source)
+
+
 if __name__=="__main__":
     unittest.main()
