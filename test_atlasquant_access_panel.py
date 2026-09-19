@@ -27,6 +27,19 @@ class AtlasQuantAccessPanelTests(unittest.TestCase):
         self.assertFalse(bad["allowed"])
 
 
+
+    def test_registry_role_counts_exposes_counts_only(self):
+        encoded=hash_password("SenhaSegura#2026",salt=b"0123456789abcdef",iterations=200000)
+        users=load_users_config({"users":{
+            "user.01":{"role":"USER","password_hash":encoded,"active":True},
+            "sales.01":{"role":"SALES","password_hash":encoded,"active":True},
+            "admin.01":{"role":"ADMIN","password_hash":encoded,"active":True},
+            "off.01":{"role":"USER","password_hash":encoded,"active":False},
+        }})
+        counts=panel.registry_role_counts(users)
+        self.assertEqual(counts,{"USER":1,"SALES":1,"ADMIN":1,"TOTAL":3})
+        self.assertNotIn("user.01",str(counts))
+
     def test_current_session_must_still_match_configured_user(self):
         encoded=hash_password("SenhaSegura#2026",salt=b"0123456789abcdef",iterations=200000)
         users=load_users_config({"users":{"user.01":{"role":"USER","password_hash":encoded,"active":True}}})
