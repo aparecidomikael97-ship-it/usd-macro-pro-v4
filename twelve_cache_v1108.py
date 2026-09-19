@@ -27,7 +27,7 @@ def valid_records(records, interval, now=None):
     # D1 cache may include today's live candle; daily consumers exclude it themselves.
     good &= d['datetime']<=now
     if interval!='1day': good &= d['datetime']+pd.Timedelta(minutes=DURATION[interval])<=now
-    return d.loc[good].sort_values('datetime').drop_duplicates('datetime').reset_index(drop=True)
+    # Deduplicate before sorting so equal timestamps deterministically keep the\n    # last provider record in original source order (stable update semantics).\n    return d.loc[good].drop_duplicates('datetime',keep='last').sort_values('datetime',kind='mergesort').reset_index(drop=True)
 
 
 def read_series(state, symbol, interval, outputsize, now=None, max_age=None, history=False):
