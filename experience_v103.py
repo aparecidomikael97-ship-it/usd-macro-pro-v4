@@ -18,6 +18,11 @@ try:
 except Exception:  # fallback: o app continua sem gráfico Altair
     alt = None
 
+try:
+    from atlasquant_academy import render_academy_panel
+except Exception:
+    render_academy_panel = None
+
 
 INDICATOR_GUIDE = {
     "Taxa de juros": {
@@ -414,7 +419,13 @@ def render_experience_hub(
         _currency_chart(ranking)
 
     with t2:
-        st.markdown("### 📚 Aprenda no próprio app")
+        if render_academy_panel is not None:
+            render_academy_panel()
+            st.divider()
+        else:
+            st.warning("AtlasQuant Academy estruturada indisponível; o guia rápido continua acessível.")
+
+        st.markdown("### 📚 Guia rápido de conceitos")
         indicator = st.selectbox("Escolha um conceito", list(INDICATOR_GUIDE.keys()), key="ux103_learn_indicator")
         info = INDICATOR_GUIDE[indicator]
         st.markdown(f"""
