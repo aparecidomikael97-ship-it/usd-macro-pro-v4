@@ -1,5 +1,6 @@
 import unittest
 from pathlib import Path
+import pair_intelligence_v108 as pair_panel
 
 class PairIntelligenceV108SourceTests(unittest.TestCase):
     def test_unified_tab_does_not_call_twelve(self):
@@ -22,6 +23,14 @@ class PairIntelligenceV108SourceTests(unittest.TestCase):
         self.assertIn("resolve_runtime_branch(",src)
         self.assertIn("GITHUB_DATA_BRANCH",src)
         self.assertNotIn('branch="main"',src)
+
+
+
+    def test_pair_intelligence_visual_state_is_conservative(self):
+        self.assertEqual(pair_panel.pair_intelligence_status({},{"forex_market_open":False})["label"],"EM ESPERA")
+        self.assertEqual(pair_panel.pair_intelligence_status({"state":"🔴 BLOQUEADO / CONTRA"},{"forex_market_open":True,"healthy":True})["label"],"BLOQUEADO")
+        self.assertEqual(pair_panel.pair_intelligence_status({"state":"🟢 EXECUÇÃO CONFIRMADA"},{"forex_market_open":True,"healthy":True})["label"],"CONTEXTO CONFIRMADO")
+        self.assertNotIn("probabilidade",pair_panel.pair_intelligence_status({"state":"🟢 EXECUÇÃO CONFIRMADA"},{"forex_market_open":True,"healthy":True})["label"].lower())
 
 
 if __name__=="__main__": unittest.main()
