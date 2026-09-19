@@ -53,6 +53,7 @@ ROADMAP = pd.DataFrame([
     {"Prioridade": "P2", "Área": "A/B", "Melhoria": "Comparar dock fixo vs navegação compacta", "Estado": "✅ Laboratório"},
     {"Prioridade": "P2", "Área": "Analytics", "Melhoria": "Telemetria externa com consentimento", "Estado": "🟡 Opcional"},
     {"Prioridade": "P2", "Área": "Push", "Melhoria": "Notificação com app fechado", "Estado": "🟡 Exige serviço externo"},
+    {"Prioridade": "P0", "Área": "Acesso", "Melhoria": "Login privado com perfis USER / SALES / ADMIN", "Estado": "✅ Base segura integrada"},
 ])
 
 WIREFRAME_SVG = r"""<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="700" viewBox="0 0 1100 700">
@@ -98,7 +99,9 @@ def freshness_by_frequency(date_value: Any, frequency: str, now: Any = None) -> 
     try:
         dt = pd.Timestamp(date_value).tz_localize(None).normalize()
         today = pd.Timestamp(now).tz_localize(None).normalize() if now is not None else pd.Timestamp.now().normalize()
-        age = max(0, int((today - dt).days))
+        age = int((today - dt).days)
+        if age < 0:
+            return "SEM DATA", "⚪", None
     except Exception:
         return "SEM DATA", "⚪", None
     if frequency == "daily":
