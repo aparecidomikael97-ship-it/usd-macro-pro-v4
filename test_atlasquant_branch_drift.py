@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from atlasquant_branch_drift import (
     RUNTIME_MUTABLE_PATHS,
@@ -73,6 +74,17 @@ class AtlasQuantBranchDriftTests(unittest.TestCase):
         audit=audit_branch_drift(["../dados/scanner_tecnico_v934.json"])
         self.assertFalse(audit.runtime_only)
         self.assertTrue(audit.requires_code_reconciliation)
+
+
+    def test_checkpoint_workflow_excludes_all_known_runtime_mutable_files(self):
+        wf=Path(".github/workflows/atlasquant-checkpoint.yml").read_text(encoding="utf-8")
+        self.assertIn("from atlasquant_branch_drift import RUNTIME_MUTABLE_PATHS",wf)
+        self.assertIn("if rel_text in RUNTIME_MUTABLE_PATHS",wf)
+        self.assertIn("paths-ignore:",wf)
+        for path in RUNTIME_MUTABLE_PATHS:
+            with self.subTest(path=path):
+                self.assertIn(f'"{path}"',wf)
+
 
 
 if __name__=="__main__":
