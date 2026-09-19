@@ -153,10 +153,10 @@ class AtlasQuantEvidenceBundleTests(unittest.TestCase):
     def test_evidence_panel_exposes_prospective_maturity_without_live_claims(self):
         import inspect, atlasquant_evidence_bundle as module
         source=inspect.getsource(module.render_validation_evidence)
-        self.assertIn('"Evidência prospectiva"',source)
-        self.assertIn('"Paper fechados"',source)
-        self.assertIn('"Setups auditados"',source)
-        self.assertIn('"Maturidade setup"',source)
+        self.assertIn("Evidência prospectiva",source)
+        self.assertIn("Paper fechados",source)
+        self.assertIn("Setups auditados",source)
+        self.assertIn("Maturidade setup",source)
         self.assertIn("não liberam operação real",source)
 
 
