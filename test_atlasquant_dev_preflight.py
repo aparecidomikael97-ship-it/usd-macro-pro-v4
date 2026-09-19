@@ -28,6 +28,7 @@ class DevPreReleaseReadinessTests(unittest.TestCase):
         self.assertIn("account_registry_non_destructive",names)
         self.assertIn("commercial_launch_fail_closed",names)
         self.assertIn("account_change_audit_safe",names)
+        self.assertIn("academy_text_curriculum_ready",names)
         self.assertIn("source_integration_gate_manual",names)
         self.assertIn("runtime_source_parity_observational",names)
         self.assertIn("production_observability_read_only",names)
