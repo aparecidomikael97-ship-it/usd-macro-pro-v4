@@ -13,6 +13,7 @@ class AtlasQuantCommercialSafetyContractTests(unittest.TestCase):
             ROOT/"atlasquant_registry_admin.py",
             ROOT/"atlasquant_sales_center.py",
             ROOT/"atlasquant_commercial_launch_guard.py",
+            ROOT/"atlasquant_commercial_security_evidence.py",
         ]
 
     def test_commercial_modules_do_not_enable_live_trading(self):
@@ -37,6 +38,7 @@ class AtlasQuantCommercialSafetyContractTests(unittest.TestCase):
         for name in (
             "atlasquant_registry_admin.py",
             "atlasquant_commercial_launch_guard.py",
+            "atlasquant_commercial_security_evidence.py",
         ):
             src=(ROOT/name).read_text(encoding="utf-8")
             with self.subTest(name=name):
@@ -68,6 +70,16 @@ class AtlasQuantCommercialSafetyContractTests(unittest.TestCase):
         for token in (".env",".streamlit/secrets.toml","secrets.toml","*.pem","*.key"):
             with self.subTest(token=token):
                 self.assertIn(token,src)
+
+
+
+    def test_internal_security_evidence_cannot_certify_external_requirements(self):
+        src=(ROOT/"atlasquant_commercial_security_evidence.py").read_text(encoding="utf-8")
+        self.assertIn('"external_legal_verified":False',src)
+        self.assertIn('"external_data_licensing_verified":False',src)
+        self.assertIn('"external_billing_verified":False',src)
+        self.assertNotIn("automatic_launch=True",src)
+        self.assertNotIn("real_orders=True",src)
 
 
 if __name__=="__main__":
