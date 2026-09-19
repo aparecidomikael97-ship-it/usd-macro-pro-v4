@@ -164,12 +164,14 @@ def validation_visual_state(result: Mapping[str,Any] | None)->dict[str,str]:
 def render_validation_readiness(
     history: pd.DataFrame,
     shadow_samples: Sequence[Mapping[str, Any]] | None = None,
+    quota_shadow_samples: Sequence[Mapping[str, Any]] | None = None,
     *,
     horizon: str = "24h",
 ) -> dict[str, Any]:
     result=build_validation_readiness(
         history,
         shadow_samples,
+        quota_shadow_samples,
         horizon=horizon,
     )
     icon={
