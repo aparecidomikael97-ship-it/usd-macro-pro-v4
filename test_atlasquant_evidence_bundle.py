@@ -246,5 +246,28 @@ class AtlasQuantEvidenceBundleTests(unittest.TestCase):
         self.assertIn("Diagnóstico da cobertura protegida",source)
 
 
+    def test_evidence_prefers_normalized_readiness_coverage(self):
+        r=self.readiness()
+        r["shadow_balanced_coverage"]={
+            "covered":7,"required":20,"complete":False,
+            "pairs_complete":0,"pairs_total":2,
+            "pairs_missing":["GBP/USD"],"pairs_under_target":["EUR/USD"],
+        }
+        b=build_validation_evidence(r,engine_version="dev")
+        shadow=b["evidence"]["shadow"]
+        self.assertEqual(shadow["balanced_pair_covered"],7)
+        self.assertEqual(shadow["balanced_pair_required"],20)
+        self.assertEqual(shadow["balanced_pairs_missing"],["GBP/USD"])
+        self.assertEqual(shadow["balanced_pairs_under_target"],["EUR/USD"])
+        self.assertTrue(verify_validation_evidence(b))
+
+    def test_evidence_keeps_legacy_coverage_fallback(self):
+        r=self.readiness()
+        r.pop("shadow_balanced_coverage",None)
+        b=build_validation_evidence(r,engine_version="dev")
+        self.assertIn("balanced_pair_covered",b["evidence"]["shadow"])
+        self.assertTrue(verify_validation_evidence(b))
+
+
 if __name__=="__main__":
     unittest.main()
