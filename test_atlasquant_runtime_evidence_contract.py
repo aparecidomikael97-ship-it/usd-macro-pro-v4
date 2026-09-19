@@ -148,6 +148,7 @@ class RuntimeEvidenceContractTests(unittest.TestCase):
         self.assertIn("Proveniência da validação: dados persistidos de runtime",source)
         self.assertIn("_aq_runtime_source",source)
         self.assertIn("_aq_quota_source",source)
+        self.assertIn("runtime persistido indisponível; revisão permanece conservadora",source)
         self.assertNotIn("Proveniência da validação: dados ao vivo",source)
 
 
