@@ -200,10 +200,17 @@ def render_validation_readiness(
     c3.metric("Shadow samples",result["shadow"]["samples"])
     c4.metric("Quota mercado",f"{result['quota_shadow']['market_open_runs']}/{result['quota_shadow']['min_market_runs']}")
     shadow_progress=min(100.0,(float(result["shadow"]["samples"])/max(1,float(result["shadow"]["min_samples"])))*100.0)
+    pair_target=int(result["shadow"]["min_pair_samples"])
+    pair_counts={row["pair"]:int(row["samples"]) for row in result["shadow"]["pair_breakdown"]}
+    expected_pairs=list(result["shadow"]["expected_pairs"])
+    pair_required_total=max(1,pair_target*len(expected_pairs))
+    pair_covered_total=sum(min(pair_target,pair_counts.get(pair,0)) for pair in expected_pairs)
+    pair_progress=min(100.0,pair_covered_total/pair_required_total*100.0)
     quota_progress=min(100.0,(float(result["quota_shadow"]["market_open_runs"])/max(1,float(result["quota_shadow"]["min_market_runs"])))*100.0)
     st.markdown("#### Progresso da evidência")
     st.progress(shadow_progress/100.0,text=f"Shadow Mode · {result['shadow']['samples']}/{result['shadow']['min_samples']} · {shadow_progress:.0f}%")
     st.progress(quota_progress/100.0,text=f"Quota com mercado aberto · {result['quota_shadow']['market_open_runs']}/{result['quota_shadow']['min_market_runs']} · {quota_progress:.0f}%")
+    st.progress(pair_progress/100.0,text=f"Cobertura balanceada por par · {pair_covered_total}/{pair_required_total} · {pair_progress:.0f}%")
 
     rows=[
         {"Camada":"Performance","OK":result["checks"]["performance_reviewable"],"Estado":result["performance"]["label"]},
