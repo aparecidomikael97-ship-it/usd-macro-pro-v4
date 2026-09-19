@@ -86,6 +86,12 @@ class AtlasQuantIntegrationGateTests(unittest.TestCase):
                 self.assertEqual(out["status"],"BLOCKED")
                 self.assertTrue(any("Unsafe path" in x for x in out["blockers"]))
 
+    def test_empty_candidate_is_blocked(self):
+        out=self.good(paths=[])
+        self.assertEqual(out["status"],"BLOCKED")
+        self.assertTrue(any("no changed source files" in x for x in out["blockers"]))
+
+
     def test_manifest_preserves_manual_contract(self):
         raw=integration_manifest_json(self.good())
         self.assertIn('"automatic_merge_allowed": false',raw)
