@@ -237,5 +237,14 @@ class AtlasQuantEvidenceBundleTests(unittest.TestCase):
         self.assertFalse(verify_validation_evidence(b))
 
 
+    def test_evidence_panel_surfaces_protected_pair_diagnostics(self):
+        import inspect
+        source=inspect.getsource(render_validation_evidence)
+        self.assertIn("Pares na meta:",source)
+        self.assertIn("sem amostra:",source)
+        self.assertIn("abaixo da meta:",source)
+        self.assertIn("Diagnóstico da cobertura protegida",source)
+
+
 if __name__=="__main__":
     unittest.main()
