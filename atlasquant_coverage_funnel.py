@@ -27,7 +27,10 @@ def build_coverage_matrix(
     neutral_band: float = 5.0,
 ) -> pd.DataFrame:
     radar=build_g8_radar(ranking,neutral_band=neutral_band).copy()
-    supported={str(x).strip().upper() for x in operational_pairs}
+    supported={
+        str(x).strip().upper() for x in (operational_pairs or ())
+        if str(x).strip()
+    }
     radar["Cobertura operacional"]=radar["Par"].map(
         lambda p: "PIPELINE COMPLETO" if str(p).upper() in supported else "RADAR MACRO"
     )
