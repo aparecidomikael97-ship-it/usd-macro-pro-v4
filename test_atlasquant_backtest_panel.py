@@ -13,6 +13,7 @@ from atlasquant_backtest_panel import (
     load_tradingview_ote_pine_asset,
     load_tradingview_crt_pine_asset,
     load_tradingview_amd_pine_asset,
+    backtest_result_status,
 )
 
 
@@ -193,6 +194,17 @@ class BacktestPanelTests(unittest.TestCase):
         out=read_csv_bytes(raw)
         self.assertEqual(len(out),1)
         self.assertIn("time",out.columns)
+
+
+    def test_backtest_status_is_descriptive_not_trade_authorization(self):
+        self.assertEqual(backtest_result_status({"trades":0})["label"],"SEM AMOSTRA")
+        self.assertEqual(backtest_result_status({"trades":10,"net_r":4,"max_drawdown_r":1})["label"],"AMOSTRA POSITIVA")
+        self.assertEqual(backtest_result_status({"trades":10,"net_r":-1,"max_drawdown_r":3})["label"],"AMOSTRA NEGATIVA")
+        source=inspect.getsource(backtest_result_status)
+        self.assertNotIn("EXECUTÁVEL",source)
+        self.assertNotIn("BUY",source)
+        self.assertNotIn("SELL",source)
+
 
 
 if __name__=="__main__":
