@@ -66,6 +66,14 @@ class AtlasQuantRuntimeSmokeTests(unittest.TestCase):
         self.assertIn("USD Macro Pro",rendered)
         self.assertIn("RUNTIME",rendered)
 
+    def test_offline_ui_smoke_mode_is_explicit_and_fail_safe(self):
+        src=__import__("pathlib").Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        self.assertIn('ATLASQUANT_OFFLINE_SMOKE',src)
+        self.assertIn('if _ATLASQUANT_OFFLINE_SMOKE:\n        return None',src)
+        self.assertIn('STATUS_FONTE["Fed"] = "⚪ Offline smoke"',src)
+        self.assertIn('if _ATLASQUANT_OFFLINE_SMOKE:\n        return 50.0',src)
+        self.assertNotIn('ATLASQUANT_OFFLINE_SMOKE", "true"',src)
+
     def test_app_source_has_no_hardcoded_dev_badge(self):
         src=__import__("pathlib").Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
         self.assertNotIn("Market Intelligence Platform · DEV",src)
