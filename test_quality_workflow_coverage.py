@@ -16,7 +16,7 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
 
     def test_core_workflows_use_current_node24_action_generation(self):
         workflow_dir=ROOT/".github"/"workflows"
-        names=("quality-tests.yml","autopilot-v107.yml","atlasquant-checkpoint.yml","coleta_automatica.yml","atlasquant-integration-gate.yml","atlasquant-source-parity.yml")
+        names=("quality-tests.yml","autopilot-v107.yml","atlasquant-checkpoint.yml","coleta_automatica.yml","atlasquant-integration-gate.yml","atlasquant-source-parity.yml","atlasquant-ui-smoke.yml")
         joined="\n".join((workflow_dir/name).read_text(encoding="utf-8") for name in names)
         self.assertNotIn("actions/checkout@v4",joined)
         self.assertNotIn("actions/setup-python@v5",joined)
@@ -56,6 +56,21 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
         self.assertIn('"AtlasQuant" in body_text',browser)
         self.assertIn("if not rendered:",browser)
         self.assertNotIn("body vazio/curto",browser)
+
+
+    def test_integration_ui_smoke_is_local_read_only_and_mobile_aware(self):
+        src=(ROOT/".github"/"workflows"/"atlasquant-ui-smoke.yml").read_text(encoding="utf-8")
+        self.assertIn("branches: [atlasquant-integration]",src)
+        self.assertIn("permissions:\\n  contents: read",src)
+        self.assertNotIn("contents: write",src)
+        self.assertIn('ATLASQUANT_ENV: "LOCAL"',src)
+        self.assertIn('ATLASQUANT_AUTH_REQUIRED: "false"',src)
+        self.assertIn('"width":390',src)
+        self.assertIn('"width":1440',src)
+        self.assertIn("horizontal_overflow_px",src)
+        self.assertIn("stException",src)
+        self.assertIn("actions/upload-artifact@v7",src)
+        self.assertNotIn("secrets.",src)
 
 
 
