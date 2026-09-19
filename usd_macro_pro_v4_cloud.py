@@ -246,6 +246,7 @@ try:
         navigation_labels,
         navigation_groups_html,
         operation_focus_html,
+        mobile_navigation_hint_html,
         decision_strip_html,
         context_strip_html,
     )
@@ -256,6 +257,7 @@ except Exception as _atlasquant_ui_exc:
     navigation_labels = None
     navigation_groups_html = None
     operation_focus_html = None
+    mobile_navigation_hint_html = None
     decision_strip_html = None
     context_strip_html = None
     _ATLASQUANT_UI_IMPORT_ERROR = f"{type(_atlasquant_ui_exc).__name__}: {_atlasquant_ui_exc}"
@@ -3918,6 +3920,8 @@ if operation_focus_html is not None:
     )
 if navigation_groups_html is not None:
     st.markdown(navigation_groups_html(), unsafe_allow_html=True)
+if mobile_navigation_hint_html is not None:
+    st.markdown(mobile_navigation_hint_html(), unsafe_allow_html=True)
 abas = st.tabs(_nav_items)
 
 # =========================================================
