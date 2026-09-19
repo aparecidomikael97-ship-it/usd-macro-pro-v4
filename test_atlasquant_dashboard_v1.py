@@ -72,5 +72,14 @@ class AtlasQuantDashboardTests(unittest.TestCase):
                 self.assertEqual(focus_rows(radar,bad),[])
 
 
+    def test_market_pulse_is_safe_and_never_claims_trade_authorization(self):
+        html=market_pulse_html({"total":28,"directed":18,"neutral":10,"top_pair":"<b>EUR/USD</b>","top_side":"COMPRA","top_intensity":82})
+        self.assertNotIn("<b>EUR/USD</b>",html)
+        self.assertIn("&lt;b&gt;EUR/USD&lt;/b&gt;",html)
+        self.assertIn("PROTEGIDA",html)
+        self.assertIn("confirmação técnica obrigatória",html)
+
+
+
 if __name__ == "__main__":
     unittest.main()
