@@ -141,5 +141,27 @@ class AtlasQuantValidationReadinessTests(unittest.TestCase):
         self.assertTrue(r["checks"]["shadow_reviewable"])
 
 
+    def test_invalid_review_thresholds_never_enable_automatic_actions(self):
+        bad=float("nan")
+        r=build_validation_readiness(
+            self.history(),
+            self.shadow_samples(10),
+            min_total_samples=bad,
+            min_group_samples=bad,
+            min_band_samples=bad,
+            min_fold_samples=bad,
+            min_shadow_samples=bad,
+            min_shadow_pair_samples=bad,
+            current_pairs=7,
+            target_pairs=28,
+            daily_cap=bad,
+        )
+        self.assertNotEqual(r["status"],"REVIEWABLE")
+        self.assertFalse(r["automatic_promotion_allowed"])
+        self.assertFalse(r["automatic_weight_change_allowed"])
+        self.assertFalse(r["automatic_merge_allowed"])
+        self.assertTrue(r["manual_review_required"])
+
+
 if __name__=="__main__":
     unittest.main()
