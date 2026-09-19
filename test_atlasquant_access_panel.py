@@ -47,6 +47,22 @@ class AtlasQuantAccessPanelTests(unittest.TestCase):
         self.assertTrue(status["locked"])
         self.assertEqual(status["attempts"],panel.MAX_FAILED_ATTEMPTS)
 
+
+    def test_session_time_contract_expires_idle_and_absolute_age(self):
+        now=100000.0
+        valid={"authenticated_at":now-60,"last_seen":now-10}
+        self.assertTrue(panel.session_time_status(valid,now)["valid"])
+
+        idle={"authenticated_at":now-panel.SESSION_IDLE_SECONDS-10,"last_seen":now-panel.SESSION_IDLE_SECONDS-1}
+        self.assertEqual(panel.session_time_status(idle,now)["reason"],"SESSION_IDLE_TIMEOUT")
+
+        old={"authenticated_at":now-panel.SESSION_MAX_SECONDS-1,"last_seen":now-1}
+        self.assertEqual(panel.session_time_status(old,now)["reason"],"SESSION_MAX_AGE")
+
+        bad={"authenticated_at":"bad","last_seen":now}
+        self.assertFalse(panel.session_time_status(bad,now)["valid"])
+
+
     def test_explicit_production_environment_forces_authentication(self):
         def fake_setting(key,default=""):
             if key=="ATLASQUANT_ENV":
