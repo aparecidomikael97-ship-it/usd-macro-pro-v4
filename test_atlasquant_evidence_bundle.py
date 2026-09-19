@@ -208,5 +208,15 @@ class AtlasQuantEvidenceBundleTests(unittest.TestCase):
         self.assertEqual(shadow["balanced_pair_complete"],expected["complete"])
 
 
+    def test_renderer_accepts_and_forwards_prospective_summaries(self):
+        import inspect
+        sig=inspect.signature(render_validation_evidence)
+        self.assertIn("paper_summary",sig.parameters)
+        self.assertIn("setup_summary",sig.parameters)
+        source=inspect.getsource(render_validation_evidence)
+        self.assertIn("paper_summary=paper_summary",source)
+        self.assertIn("setup_summary=setup_summary",source)
+
+
 if __name__=="__main__":
     unittest.main()
