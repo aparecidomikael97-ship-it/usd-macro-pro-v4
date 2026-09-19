@@ -18,6 +18,46 @@ from atlasquant_expansion_budget import expansion_plan
 from atlasquant_quota_shadow import summarize_quota_shadow
 
 
+
+def balanced_pair_coverage(
+    expected_pairs: Sequence[str] | None,
+    pair_breakdown: Sequence[Mapping[str, Any]] | None,
+    min_pair_samples: int,
+) -> dict[str, Any]:
+    """Conservative capped coverage: surplus on one pair cannot hide gaps on another."""
+    try:
+        target=max(0,int(min_pair_samples))
+    except (TypeError,ValueError,OverflowError):
+        target=0
+    pairs=[]
+    for raw in expected_pairs or []:
+        pair=str(raw or "").strip()
+        if pair and pair not in pairs:
+            pairs.append(pair)
+    counts={pair:0 for pair in pairs}
+    for row in pair_breakdown or []:
+        if not isinstance(row,Mapping):
+            continue
+        pair=str(row.get("pair","") or "").strip()
+        if pair not in counts:
+            continue
+        try:
+            value=max(0,int(row.get("samples",0) or 0))
+        except (TypeError,ValueError,OverflowError):
+            value=0
+        counts[pair]=max(counts[pair],value)
+    required=target*len(pairs)
+    covered=sum(min(target,counts[pair]) for pair in pairs)
+    progress=(covered/required*100.0) if required>0 else 0.0
+    return {
+        "covered":covered,
+        "required":required,
+        "progress_pct":min(100.0,max(0.0,progress)),
+        "complete":bool(required>0 and covered>=required),
+        "counts":counts,
+    }
+
+
 def build_validation_readiness(
     history: pd.DataFrame,
     shadow_samples: Sequence[Mapping[str, Any]] | None = None,
@@ -200,12 +240,14 @@ def render_validation_readiness(
     c3.metric("Shadow samples",result["shadow"]["samples"])
     c4.metric("Quota mercado",f"{result['quota_shadow']['market_open_runs']}/{result['quota_shadow']['min_market_runs']}")
     shadow_progress=min(100.0,(float(result["shadow"]["samples"])/max(1,float(result["shadow"]["min_samples"])))*100.0)
-    pair_target=int(result["shadow"]["min_pair_samples"])
-    pair_counts={row["pair"]:int(row["samples"]) for row in result["shadow"]["pair_breakdown"]}
-    expected_pairs=list(result["shadow"]["expected_pairs"])
-    pair_required_total=max(1,pair_target*len(expected_pairs))
-    pair_covered_total=sum(min(pair_target,pair_counts.get(pair,0)) for pair in expected_pairs)
-    pair_progress=min(100.0,pair_covered_total/pair_required_total*100.0)
+    pair_coverage=balanced_pair_coverage(
+        result["shadow"]["expected_pairs"],
+        result["shadow"]["pair_breakdown"],
+        result["shadow"]["min_pair_samples"],
+    )
+    pair_required_total=pair_coverage["required"]
+    pair_covered_total=pair_coverage["covered"]
+    pair_progress=pair_coverage["progress_pct"]
     quota_progress=min(100.0,(float(result["quota_shadow"]["market_open_runs"])/max(1,float(result["quota_shadow"]["min_market_runs"])))*100.0)
     st.markdown("#### Progresso da evidência")
     st.progress(shadow_progress/100.0,text=f"Shadow Mode · {result['shadow']['samples']}/{result['shadow']['min_samples']} · {shadow_progress:.0f}%")
