@@ -224,5 +224,37 @@ class AtlasQuantValidationReadinessTests(unittest.TestCase):
         self.assertIn("min(pair_target",source)
 
 
+    def test_closed_market_history_does_not_dilute_open_market_quota_gate(self):
+        quota=[{
+            "market_open":False,"provider_blocked":False,"app_headless_ok":True,
+            "adaptive_within_usable_cap":True,"actual_http_calls":0,
+        } for _ in range(44)]
+        quota += [{
+            "market_open":True,"provider_blocked":False,"app_headless_ok":True,
+            "adaptive_within_usable_cap":True,"actual_http_calls":4,
+        } for _ in range(20)]
+        r=build_validation_readiness(
+            pd.DataFrame(), [], quota, min_quota_market_runs=20
+        )
+        self.assertEqual(r["quota_shadow"]["samples"],64)
+        self.assertEqual(r["quota_shadow"]["market_open_runs"],20)
+        self.assertTrue(r["quota_shadow"]["minimum_met"])
+        self.assertTrue(r["checks"]["quota_shadow_reviewable"])
+
+    def test_unhealthy_open_market_quota_reaches_minimum_but_blocks(self):
+        quota=[{
+            "market_open":True,"provider_blocked":False,"app_headless_ok":True,
+            "adaptive_within_usable_cap":True,"actual_http_calls":4,
+        } for _ in range(20)]
+        quota[-1]["provider_blocked"]=True
+        r=build_validation_readiness(
+            pd.DataFrame(), [], quota, min_quota_market_runs=20
+        )
+        self.assertTrue(r["quota_shadow"]["minimum_met"])
+        self.assertFalse(r["checks"]["quota_shadow_reviewable"])
+        self.assertTrue(any("Quota Shadow" in x for x in r["blockers"]))
+        self.assertEqual(r["status"],"BLOCKED")
+
+
 if __name__=="__main__":
     unittest.main()
