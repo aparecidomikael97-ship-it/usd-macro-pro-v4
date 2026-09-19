@@ -14,6 +14,7 @@ from atlasquant_commercial_security_evidence import collect_commercial_security_
 from atlasquant_academy import academy_minimum_text_ready
 from atlasquant_support_center import support_minimum_ready
 from atlasquant_brokers_guide import brokers_guide_minimum_ready, render_brokers_guide
+from atlasquant_voice_readiness import voice_contract_ready
 
 SCHEMA="ATLASQUANT_SALES_CENTER_V1"
 
@@ -34,7 +35,7 @@ def onboarding_steps()->list[dict[str,str]]:
         {"Etapa":"2","Item":"Instalação","Status":"PRONTO — PWA","Descrição":"Android, iOS/iPadOS, Windows, macOS e Linux via PWA."},
         {"Etapa":"3","Item":"Primeiro acesso","Status":"PRONTO","Descrição":"Entrar, revisar viés e qualidade dos dados."},
         {"Etapa":"4","Item":"Academy","Status":"TEXTO PRONTO · VÍDEOS PENDENTES","Descrição":"Trilha textual estruturada já está no app; vídeos curtos continuam em produção futura."},
-        {"Etapa":"5","Item":"Assistente de voz","Status":"PLANEJADO","Descrição":"Briefing diário/semanal e explicação do viés."},
+        {"Etapa":"5","Item":"Assistente de voz","Status":"INFRA PRONTA · PROVEDOR PENDENTE","Descrição":"Contrato, UX e safety internos prontos; falta configurar um provedor TTS externo."},
         {"Etapa":"6","Item":"Corretoras & plataformas","Status":"GUIA INFORMATIVO PRONTO","Descrição":"Compatibilidade, Paper/Demo e segurança documentadas; conexão real continua desativada."},
     ]
 
@@ -61,6 +62,7 @@ def commercial_readiness(access:Mapping[str,Any]|None=None)->dict[str,Any]:
         "academy_text_ready":bool(academy_minimum_text_ready()),
         "academy_ready":False,
         "support_ready":bool(support_minimum_ready()),
+        "voice_contract_ready":bool(voice_contract_ready()),
         "voice_ready":False,
         "brokers_guide_ready":bool(brokers_guide_minimum_ready()),
         "native_stores_ready":False,
@@ -137,7 +139,8 @@ def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
         ("Academy — trilha textual","PRONTO" if status["academy_text_ready"] else "PENDENTE"),
         ("Academy — vídeos","PENDENTE"),
         ("Central de suporte","PRONTO" if status["support_ready"] else "PENDENTE"),
-        ("Assistente de voz","PENDENTE"),
+        ("Assistente de voz — infraestrutura","PRONTA" if status["voice_contract_ready"] else "PENDENTE"),
+        ("Assistente de voz — provedor TTS","PENDENTE"),
         ("Guia de corretoras","PRONTO — INFORMATIVO" if status["brokers_guide_ready"] else "PENDENTE"),
         ("Termos / privacidade / riscos","PENDENTE"),
         ("Licenciamento comercial de dados","PENDENTE"),
