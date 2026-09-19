@@ -33,6 +33,7 @@ class DevPreReleaseReadinessTests(unittest.TestCase):
         self.assertIn("source_integration_gate_manual",names)
         self.assertIn("runtime_source_parity_observational",names)
         self.assertIn("production_observability_read_only",names)
+        self.assertIn("integration_ui_smoke_read_only",names)
         self.assertIn("commercial_security_evidence_bounded",names)
         self.assertIn("source_checkpoint_excludes_runtime_evidence",names)
 
@@ -41,6 +42,7 @@ class DevPreReleaseReadinessTests(unittest.TestCase):
         self.assertEqual(len(REQUIRED_FILES),len(set(REQUIRED_FILES)))
         self.assertIn(".github/workflows/production-health.yml",REQUIRED_FILES)
         self.assertIn(".github/workflows/production-browser-smoke.yml",REQUIRED_FILES)
+        self.assertIn(".github/workflows/atlasquant-ui-smoke.yml",REQUIRED_FILES)
         report=run_dev_preflight()
         obs=[x for x in report["checks"] if x["name"]=="production_observability_read_only"]
         self.assertEqual(len(obs),1)
