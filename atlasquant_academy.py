@@ -322,7 +322,9 @@ def render_academy_panel()->dict[str,Any]:
     st.session_state["aq_academy_completed"]=list(dict.fromkeys(completed))
 
     from atlasquant_academy_media import academy_video_script
+    from atlasquant_academy_video_blueprints import video_blueprint
     media=academy_video_script(item["id"])
+    blueprint=video_blueprint(item["id"])
     if media:
         with st.expander("🎬 Roteiro do vídeo curto",expanded=False):
             st.caption(f"Roteiro pronto · duração estimada: {media['estimated_seconds']}s · vídeo ainda não renderizado")
@@ -335,7 +337,18 @@ def render_academy_panel()->dict[str,Any]:
                 mime="text/plain",
                 key=f"aq_academy_video_script_{item['id']}",
             )
-    st.info("Roteiros dos vídeos estão preparados; renderização/publicação de mídia continua como etapa externa separada.")
+    if blueprint:
+        with st.expander("🎞 Storyboard animado detalhado",expanded=False):
+            mins=max(1,round(float(blueprint["total_seconds"])/60.0))
+            st.caption(f"Plano didático · ~{mins} min · limite máximo 20 min · vídeo ainda não renderizado")
+            st.markdown(f"**Gancho:** {blueprint['hook']}")
+            for scene in blueprint["scenes"]:
+                st.markdown(
+                    f"**{scene['order']}. {scene['title']} · {scene['seconds']}s**  \\n"
+                    f"🎨 {scene['visual']}  \\n"
+                    f"🎓 {scene['teaching']}"
+                )
+    st.info("Roteiros e storyboards estão preparados; renderização/publicação da mídia continua como etapa externa separada.")
     return {"visible":len(rows),**academy_progress(completed),"text_ready":academy_minimum_text_ready()}
 
 
