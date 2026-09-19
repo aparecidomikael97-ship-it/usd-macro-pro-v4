@@ -86,6 +86,65 @@ def audit_branch_drift(paths: Iterable[str]) -> DriftAudit:
     )
 
 
+
+def reconciliation_state(
+    audit: DriftAudit,
+    *,
+    ahead_by: object,
+    behind_by: object,
+) -> dict[str, object]:
+    def valid_count(value: object) -> int | None:
+        if isinstance(value,bool):
+            return None
+        try:
+            out=int(value)
+        except Exception:
+            return None
+        return out if out>=0 and str(out)==str(value).strip() else None
+
+    ahead=valid_count(ahead_by)
+    behind=valid_count(behind_by)
+    if ahead is None or behind is None:
+        return {
+            "status":"REVIEW_REQUIRED",
+            "label":"CONTAGENS DE BRANCH INVÁLIDAS",
+            "automatic_merge_allowed":False,
+            "manual_reconciliation_required":True,
+            "runtime_drift_can_be_ignored_for_source_review":False,
+        }
+    if audit.requires_code_reconciliation:
+        return {
+            "status":"SOURCE_DIVERGED" if behind>0 else "SOURCE_AHEAD",
+            "label":"RECONCILIAÇÃO DE CÓDIGO NECESSÁRIA",
+            "automatic_merge_allowed":False,
+            "manual_reconciliation_required":True,
+            "runtime_drift_can_be_ignored_for_source_review":False,
+        }
+    if audit.runtime_only:
+        return {
+            "status":"RUNTIME_ONLY_BEHIND" if behind>0 else "RUNTIME_ONLY",
+            "label":"DRIFT APENAS DE RUNTIME" if behind==0 else "RUNTIME ISOLADO, MAIN AVANÇOU",
+            "automatic_merge_allowed":False,
+            "manual_reconciliation_required":bool(behind>0),
+            "runtime_drift_can_be_ignored_for_source_review":True,
+        }
+    if ahead==0 and behind==0:
+        return {
+            "status":"ALIGNED",
+            "label":"BRANCHES ALINHADOS",
+            "automatic_merge_allowed":False,
+            "manual_reconciliation_required":False,
+            "runtime_drift_can_be_ignored_for_source_review":False,
+        }
+    return {
+        "status":"REVIEW_REQUIRED",
+        "label":"DIVERGÊNCIA SEM ARQUIVOS CLASSIFICADOS",
+        "automatic_merge_allowed":False,
+        "manual_reconciliation_required":True,
+        "runtime_drift_can_be_ignored_for_source_review":False,
+    }
+
+
 def drift_release_message(audit: DriftAudit) -> str:
     if audit.requires_code_reconciliation:
         return "Branch drift includes code/config or unclassified data; reconcile before promotion."
