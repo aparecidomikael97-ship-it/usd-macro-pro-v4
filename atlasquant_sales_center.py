@@ -18,6 +18,7 @@ from atlasquant_brokers_guide import brokers_guide_minimum_ready, render_brokers
 from atlasquant_voice_readiness import voice_contract_ready
 from atlasquant_commercial_prep import commercial_prep_audit, commercial_external_blockers
 from atlasquant_billing_contract import billing_contract_ready
+from atlasquant_data_licensing_inventory import data_inventory_ready, data_licensing_status
 
 SCHEMA="ATLASQUANT_SALES_CENTER_V1"
 
@@ -46,6 +47,7 @@ def commercial_readiness(access:Mapping[str,Any]|None=None)->dict[str,Any]:
     audit=pwa_asset_audit()
     security=collect_commercial_security_evidence()
     prep=commercial_prep_audit()
+    licensing=data_licensing_status()
     registry=(access or {}).get("registry") if isinstance(access,Mapping) else {}
     if not isinstance(registry,Mapping):
         registry={}
@@ -73,6 +75,8 @@ def commercial_readiness(access:Mapping[str,Any]|None=None)->dict[str,Any]:
         "commercial_prep_ready":bool(prep["internal_prep_ready"]),
         "legal_drafts_ready":bool(prep["legal_drafts_ready"]),
         "data_licensing_checklist_ready":bool(prep["data_licensing_checklist_ready"]),
+        "data_provider_inventory_ready":bool(data_inventory_ready()),
+        "data_licenses_verified":bool(licensing["all_commercial_licenses_verified"]),
         "billing_checklist_ready":bool(prep["billing_checklist_ready"]),
         "billing_contract_ready":bool(billing_contract_ready()),
         "store_checklist_ready":bool(prep["store_checklist_ready"]),
@@ -157,7 +161,8 @@ def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
         ("Termos / privacidade / riscos — rascunhos","PRONTOS" if status["legal_drafts_ready"] else "PENDENTE"),
         ("Termos / privacidade / riscos — revisão final","PENDENTE"),
         ("Licenciamento de dados — checklist","PRONTO" if status["data_licensing_checklist_ready"] else "PENDENTE"),
-        ("Licenciamento comercial de dados — aprovação","PENDENTE"),
+        ("Licenciamento de dados — inventário técnico","PRONTO" if status["data_provider_inventory_ready"] else "PENDENTE"),
+        ("Licenciamento comercial de dados — aprovação","VERIFICADO" if status["data_licenses_verified"] else "PENDENTE"),
         ("Pagamento / assinatura — checklist","PRONTO" if status["billing_checklist_ready"] else "PENDENTE"),
         ("Pagamento / assinatura — contrato técnico","PRONTO" if status["billing_contract_ready"] else "PENDENTE"),
         ("Pagamento / assinatura — integração com provedor","PENDENTE"),
