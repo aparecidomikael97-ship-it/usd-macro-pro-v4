@@ -212,6 +212,18 @@ def render_validation_evidence(
         "Quota mercado",
         f"{quota.get('market_open_runs') or 0}/{quota.get('min_market_runs') or 0}",
     )
+    paper=bundle["evidence"].get("paper_forward_test",{})
+    setup=bundle["evidence"].get("setup_audit",{})
+    st.markdown("#### Evidência prospectiva")
+    p1,p2,p3,p4=st.columns(4)
+    p1.metric("Paper total",paper.get("trades_total") or 0)
+    p2.metric("Paper fechados",paper.get("closed_trades") or 0)
+    p3.metric("Setups auditados",setup.get("audited_trades") or 0)
+    p4.metric("Maturidade setup",setup.get("sample_state") or "AGUARDANDO AMOSTRA")
+    st.caption(
+        "Forward test e Setup Audit são evidência prospectiva descritiva; "
+        "não liberam operação real nem selecionam estratégia automaticamente."
+    )
     st.caption(f"Integridade SHA-256: {bundle['integrity_sha256'][:16]}…")
     st.download_button(
         "📥 Exportar evidência de validação (JSON)",
