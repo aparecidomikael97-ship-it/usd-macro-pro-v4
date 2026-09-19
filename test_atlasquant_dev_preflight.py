@@ -24,6 +24,8 @@ class DevPreReleaseReadinessTests(unittest.TestCase):
         self.assertIn("private_access_gate_integrated",names)
         self.assertIn("role_portal_integrated",names)
         self.assertIn("platform_center_integrated",names)
+        self.assertIn("sales_center_integrated",names)
+        self.assertIn("account_registry_non_destructive",names)
 
     def test_missing_tree_is_blocked_fail_closed(self):
         with tempfile.TemporaryDirectory() as td:
