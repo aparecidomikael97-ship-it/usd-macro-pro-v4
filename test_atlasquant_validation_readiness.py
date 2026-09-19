@@ -176,7 +176,7 @@ class AtlasQuantValidationReadinessTests(unittest.TestCase):
         quota=[]
         for i in range(20):
             quota.append({
-                "market_open":True,"provider_blocked":False,"app_headless_ok":True,
+                "timestamp":f"2026-09-18T{i:02d}:00:00+00:00","market_open":True,"provider_blocked":False,"app_headless_ok":True,
                 "adaptive_within_usable_cap":True,"actual_http_calls":4,
             })
         r=build_validation_readiness(
@@ -192,9 +192,9 @@ class AtlasQuantValidationReadinessTests(unittest.TestCase):
 
     def test_closed_market_quota_samples_remain_pending(self):
         quota=[{
-            "market_open":False,"provider_blocked":False,"app_headless_ok":True,
+            "timestamp":f"2026-09-17T{i%24:02d}:{i//24:02d}:00+00:00","market_open":False,"provider_blocked":False,"app_headless_ok":True,
             "adaptive_within_usable_cap":True,"actual_http_calls":0,
-        } for _ in range(44)]
+        } for i in range(44)]
         r=build_validation_readiness(pd.DataFrame(), [], quota, min_quota_market_runs=20)
         self.assertFalse(r["checks"]["quota_shadow_reviewable"])
         self.assertTrue(any("Quota Shadow" in x for x in r["pending"]))
@@ -230,9 +230,9 @@ class AtlasQuantValidationReadinessTests(unittest.TestCase):
             "adaptive_within_usable_cap":True,"actual_http_calls":0,
         } for _ in range(44)]
         quota += [{
-            "market_open":True,"provider_blocked":False,"app_headless_ok":True,
+            "timestamp":f"2026-09-18T{i:02d}:00:00+00:00","market_open":True,"provider_blocked":False,"app_headless_ok":True,
             "adaptive_within_usable_cap":True,"actual_http_calls":4,
-        } for _ in range(20)]
+        } for i in range(20)]
         r=build_validation_readiness(
             pd.DataFrame(), [], quota, min_quota_market_runs=20
         )
@@ -243,9 +243,9 @@ class AtlasQuantValidationReadinessTests(unittest.TestCase):
 
     def test_unhealthy_open_market_quota_reaches_minimum_but_blocks(self):
         quota=[{
-            "market_open":True,"provider_blocked":False,"app_headless_ok":True,
+            "timestamp":f"2026-09-18T{i:02d}:00:00+00:00","market_open":True,"provider_blocked":False,"app_headless_ok":True,
             "adaptive_within_usable_cap":True,"actual_http_calls":4,
-        } for _ in range(20)]
+        } for i in range(20)]
         quota[-1]["provider_blocked"]=True
         r=build_validation_readiness(
             pd.DataFrame(), [], quota, min_quota_market_runs=20
