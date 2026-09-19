@@ -9185,19 +9185,22 @@ with abas[13]:
                 _aq_runtime_status = {}
                 _aq_paper_summary = {}
                 _aq_setup_summary = {}
+                _aq_quota_store = {}
                 try:
                     _aq_runtime_status, _ = _github_get_json_v937("dados/autopilot_status_v107.json", {})
                     _aq_paper_summary, _ = _github_get_json_v937("dados/paper_trading_summary_v112.json", {})
                     _aq_setup_summary, _ = _github_get_json_v937("dados/paper_setup_summary_v114.json", {})
+                    _aq_quota_store, _ = _github_get_json_v937("dados/atlasquant_quota_shadow_v1.json", {})
                 except Exception:
                     _aq_runtime_status = {}
                     _aq_paper_summary = {}
                     _aq_setup_summary = {}
+                    _aq_quota_store = {}
                 _aq_quota_samples = []
-                if isinstance(_aq_runtime_status, dict):
-                    _aq_quota_snapshot = _aq_runtime_status.get("quota_shadow")
-                    if isinstance(_aq_quota_snapshot, dict):
-                        _aq_quota_samples = [_aq_quota_snapshot]
+                if isinstance(_aq_quota_store, dict):
+                    _aq_quota_rows = _aq_quota_store.get("samples", [])
+                    if isinstance(_aq_quota_rows, list):
+                        _aq_quota_samples = [x for x in _aq_quota_rows if isinstance(x, dict)]
                 _aq_validation_result = render_validation_readiness(
                     _aq_research_df.copy(),
                     st.session_state.get("atlasquant_shadow_samples", []),
