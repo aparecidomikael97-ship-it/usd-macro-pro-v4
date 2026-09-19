@@ -44,6 +44,9 @@ def derive_from_m15(
     expected=TF_EXPECTED_M15[tf]
     rule=f"{TF_MINUTES[tf]}min"
 
+    # Duplicate source timestamps are ambiguous market data. Fail closed by
+    # excluding every bucket touched by a duplicate instead of silently choosing one.
+    duplicate_times=set(d.loc[d["datetime"].duplicated(keep=False),"datetime"].tolist())
     x=d.set_index("datetime").sort_index()
     grouped=x.resample(rule,label="left",closed="left",origin="epoch").agg(
         open=("open","first"),
@@ -68,7 +71,11 @@ def derive_from_m15(
             tz="UTC",
         )
         actual=pd.DatetimeIndex(subset["datetime"]).tz_convert("UTC")
-        if actual.equals(expected_times):
+        bucket_has_duplicate=any(
+            bucket <= ts < bucket+pd.Timedelta(minutes=TF_MINUTES[tf])
+            for ts in duplicate_times
+        )
+        if not bucket_has_duplicate and actual.equals(expected_times):
             valid_rows.append(bucket)
 
     grouped=grouped.loc[grouped.index.isin(valid_rows)]
