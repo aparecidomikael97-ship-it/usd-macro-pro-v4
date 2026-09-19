@@ -313,5 +313,18 @@ class AtlasQuantValidationReadinessTests(unittest.TestCase):
         self.assertFalse(r["complete"])
 
 
+    def test_balanced_pair_coverage_reports_actionable_diagnostics(self):
+        r=balanced_pair_coverage(
+            ("EUR/USD","GBP/USD","USD/JPY"),
+            ({"pair":"EUR/USD","samples":12},{"pair":"GBP/USD","samples":4}),
+            10,
+        )
+        self.assertEqual(r["target_per_pair"],10)
+        self.assertEqual(r["pairs_complete"],1)
+        self.assertEqual(r["pairs_total"],3)
+        self.assertEqual(r["pairs_missing"],["USD/JPY"])
+        self.assertEqual(r["pairs_under_target"],["GBP/USD"])
+
+
 if __name__=="__main__":
     unittest.main()
