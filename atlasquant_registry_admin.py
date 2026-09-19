@@ -21,6 +21,14 @@ from atlasquant_access_control import (
 
 SCHEMA="ATLASQUANT_REGISTRY_ADMIN_V1"
 
+def _active_admin_count(users:Mapping[str,AccessUser]|None)->int:
+    if not isinstance(users,Mapping):
+        return 0
+    return sum(
+        1 for user in users.values()
+        if isinstance(user,AccessUser) and user.active and user.role=="ADMIN"
+    )
+
 def registry_to_mapping(users:Mapping[str,AccessUser]|None)->dict[str,dict[str,Any]]:
     if not isinstance(users,Mapping):
         return {}
@@ -90,6 +98,8 @@ def set_account_active(
     validated=load_users_config({"users":current})
     if set(validated)!=set(current):
         raise ValueError("registry validation failed")
+    if _active_admin_count(users)>0 and _active_admin_count(validated)==0:
+        raise ValueError("cannot deactivate the last active admin")
     return validated
 
 def set_account_role(
@@ -106,6 +116,8 @@ def set_account_role(
     validated=load_users_config({"users":current})
     if set(validated)!=set(current):
         raise ValueError("registry validation failed")
+    if _active_admin_count(users)>0 and _active_admin_count(validated)==0:
+        raise ValueError("cannot demote the last active admin")
     return validated
 
 def rotate_account_password(
@@ -155,4 +167,6 @@ def apply_non_destructive_change(
     diff=registry_diff(before,after)
     if diff["destructive_removal_detected"]:
         raise ValueError("destructive account removal is not allowed")
+    if _active_admin_count(before)>0 and _active_admin_count(after)==0:
+        raise ValueError("registry must preserve at least one active admin")
     return export_registry_json(after)
