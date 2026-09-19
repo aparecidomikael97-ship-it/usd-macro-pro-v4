@@ -59,6 +59,19 @@ class AtlasQuantAccountPortalTests(unittest.TestCase):
         self.assertTrue(admin_summary["authenticated"])
         self.assertIn("admin",admin_summary["sections"])
 
+
+    def test_admin_summary_receives_safe_registry_counts(self):
+        summary=account_summary({
+            "allowed":True,
+            "mode":"AUTHENTICATED",
+            "role":"ADMIN",
+            "session":{"username":"admin.01","role":"ADMIN"},
+            "registry":{"USER":4,"SALES":2,"ADMIN":1,"TOTAL":7},
+        })
+        self.assertEqual(summary["registry"]["TOTAL"],7)
+        self.assertEqual(summary["registry"]["SALES"],2)
+        self.assertNotIn("password",str(summary).lower())
+
     def test_invalid_provisioning_inputs_are_rejected(self):
         cases=[
             ("ab","USER","SenhaSegura#2026"),
