@@ -61,5 +61,11 @@ class AtlasQuantBasicProLayoutTests(unittest.TestCase):
         self.assertIn("@media(max-width:760px)",self.src)
 
 
+    def test_operational_cards_have_mobile_compaction(self):
+        self.assertIn(".aq-op-card{min-height:auto;padding:11px 12px",self.src)
+        self.assertIn(".aq-op-priority{font-size:1.45rem",self.src)
+        self.assertIn(".aq-op-action{font-size:.64rem}",self.src)
+
+
 if __name__=="__main__":
     unittest.main()
