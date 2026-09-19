@@ -1,0 +1,135 @@
+import json
+import unittest
+
+from atlasquant_access_control import (
+    AccessUser, ROLE_PERMISSIONS, authenticate, has_permission,
+    hash_password, load_users_config, normalize_role, normalize_username,
+    verify_password, session_is_current,
+)
+
+class AtlasQuantAccessControlTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.password="SenhaSegura#2026"
+        cls.encoded=hash_password(cls.password,salt=b"0123456789abcdef",iterations=200000)
+
+    def test_password_hash_roundtrip_and_wrong_password(self):
+        self.assertTrue(verify_password(self.password,self.encoded))
+        self.assertFalse(verify_password("senha-errada",self.encoded))
+        self.assertNotIn(self.password,self.encoded)
+
+    def test_short_password_and_weak_hash_parameters_are_rejected(self):
+        with self.assertRaises(ValueError):
+            hash_password("curta")
+        with self.assertRaises(ValueError):
+            hash_password("Abcdef#1234")
+        with self.assertRaises(ValueError):
+            hash_password("A"*1025)
+        with self.assertRaises(ValueError):
+            hash_password(self.password,salt=b"short",iterations=200000)
+        with self.assertRaises(ValueError):
+            hash_password(self.password,salt=b"0123456789abcdef",iterations=1)
+
+
+    def test_oversized_login_password_is_rejected_without_hashing(self):
+        self.assertFalse(verify_password("A"*1025,self.encoded))
+
+    def test_users_config_rejects_plaintext_and_invalid_roles(self):
+        raw={
+            "users":{
+                "admin.ok":{"role":"ADMIN","password_hash":self.encoded,"active":True},
+                "plain.user":{"role":"USER","password":"plaintext","password_hash":self.encoded,"active":True},
+                "bad.role":{"role":"ROOT","password_hash":self.encoded,"active":True},
+            }
+        }
+        users=load_users_config(raw)
+        self.assertEqual(set(users),{"admin.ok"})
+
+    def test_json_config_authenticates_active_user_only(self):
+        raw=json.dumps({"users":{
+            "sales.user":{"role":"SALES","password_hash":self.encoded,"active":True},
+            "off.user":{"role":"USER","password_hash":self.encoded,"active":False},
+        }})
+        users=load_users_config(raw)
+        session=authenticate(" SALES.USER ",self.password,users)
+        self.assertIsNotNone(session)
+        self.assertEqual(session["role"],"SALES")
+        self.assertIsNone(authenticate("off.user",self.password,users))
+        self.assertIsNone(authenticate("sales.user","wrong",users))
+
+    def test_permissions_are_role_bounded(self):
+        user={"role":"USER"}
+        sales={"role":"SALES"}
+        admin={"role":"ADMIN"}
+        self.assertTrue(has_permission(user,"app:read"))
+        self.assertFalse(has_permission(user,"sales:read"))
+        self.assertTrue(has_permission(sales,"sales:read"))
+        self.assertFalse(has_permission(sales,"admin:read"))
+        self.assertTrue(has_permission(admin,"admin:manage_users"))
+
+    def test_sales_cannot_manage_users_or_read_admin(self):
+        sales={"role":"SALES"}
+        self.assertTrue(has_permission(sales,"app:read"))
+        self.assertTrue(has_permission(sales,"sales:read"))
+        self.assertFalse(has_permission(sales,"admin:read"))
+        self.assertFalse(has_permission(sales,"admin:manage_users"))
+
+    def test_user_cannot_access_sales_or_admin_permissions(self):
+        user={"role":"USER"}
+        self.assertTrue(has_permission(user,"app:read"))
+        for permission in ("sales:read","admin:read","admin:manage_users"):
+            self.assertFalse(has_permission(user,permission))
+
+    def test_unknown_permission_is_denied_for_every_role(self):
+        for role in ("USER","SALES","ADMIN"):
+            self.assertFalse(has_permission({"role":role},"broker:real_orders"))
+
+    def test_invalid_usernames_roles_and_malformed_hash_fail_closed(self):
+        self.assertEqual(normalize_username("../admin"),"")
+        self.assertEqual(normalize_username("ab"),"")
+        self.assertEqual(normalize_role("root"),"")
+        self.assertFalse(verify_password(self.password,"plaintext"))
+        self.assertEqual(load_users_config("not-json"),{})
+
+
+    def test_normalized_username_collision_is_rejected_as_ambiguous(self):
+        raw={"users":{
+            "Admin.User":{"role":"ADMIN","password_hash":self.encoded,"active":True},
+            "admin.user":{"role":"ADMIN","password_hash":self.encoded,"active":True},
+        }}
+        users=load_users_config(raw)
+        self.assertNotIn("admin.user",users)
+
+    def test_oversized_registry_fails_closed(self):
+        raw={"users":{
+            f"user{i:03d}":{"role":"USER","password_hash":self.encoded,"active":True}
+            for i in range(501)
+        }}
+        self.assertEqual(load_users_config(raw),{})
+
+
+
+
+    def test_oversized_json_payload_is_rejected_before_use(self):
+        raw="{"+"x"*(1_000_001)+"}"
+        self.assertEqual(load_users_config(raw),{})
+
+    def test_session_is_revoked_when_password_role_or_active_state_changes(self):
+        raw={"users":{"user.01":{"role":"USER","password_hash":self.encoded,"active":True}}}
+        users=load_users_config(raw)
+        session=authenticate("user.01",self.password,users)
+        self.assertTrue(session_is_current(session,users))
+
+        changed_password=hash_password("OutraSenha#2026",salt=b"fedcba9876543210",iterations=200000)
+        users_changed=load_users_config({"users":{"user.01":{"role":"USER","password_hash":changed_password,"active":True}}})
+        self.assertFalse(session_is_current(session,users_changed))
+
+        users_role=load_users_config({"users":{"user.01":{"role":"SALES","password_hash":self.encoded,"active":True}}})
+        self.assertFalse(session_is_current(session,users_role))
+
+        users_off=load_users_config({"users":{"user.01":{"role":"USER","password_hash":self.encoded,"active":False}}})
+        self.assertFalse(session_is_current(session,users_off))
+
+
+if __name__=="__main__":
+    unittest.main()

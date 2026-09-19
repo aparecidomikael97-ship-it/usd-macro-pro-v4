@@ -17,5 +17,12 @@ class PairIntelligenceSourceTests(unittest.TestCase):
         self.assertIn("não é probabilidade de lucro",src.lower())
 
 
+
+
+class AtlasQuantPackBuilderContractTests(unittest.TestCase):
+    def test_builder_is_exposed_for_background_runtime(self):
+        import pair_intelligence_v110 as m
+        self.assertTrue(callable(m.build_pair_intelligence_packs))
+
 if __name__ == "__main__":
     unittest.main()

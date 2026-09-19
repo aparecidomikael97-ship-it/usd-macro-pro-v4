@@ -1,0 +1,19 @@
+# AtlasQuant local research artifacts
+.atlasquant_research/
+
+# Local secrets / credentials — never commit
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+secrets.toml
+credentials*.json
+service-account*.json
+*.pem
+*.key
+
+# Local Python/runtime noise
+__pycache__/
+*.pyc
+.venv/
+venv/

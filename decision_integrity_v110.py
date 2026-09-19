@@ -99,10 +99,16 @@ def evaluate_decision_integrity(
     score=_f(score); quality=_f(quality); rank_index=_f(rank_index)
     ict=_f(ict_readiness); inst=_f(institutional_readiness)
     gate_score=_f(gate_score)
-    adr = None if _is_missing(adr_used_pct) else _f(adr_used_pct)
-    age = None if _is_missing(technical_age_min) else _f(technical_age_min)
+    adr = None if _is_missing(adr_used_pct) else _f(adr_used_pct, default=float("nan"))
+    if adr is not None and not math.isfinite(adr):
+        adr = None
+    age = None if _is_missing(technical_age_min) else _f(technical_age_min, default=float("nan"))
+    if age is not None and (not math.isfinite(age) or age < 0):
+        age = None
     event = _event_level(event_risk)
-    data_score = None if _is_missing(data_readiness_score) else _f(data_readiness_score)
+    data_score = None if _is_missing(data_readiness_score) else _f(data_readiness_score, default=float("nan"))
+    if data_score is not None and not math.isfinite(data_score):
+        data_score = None
     data_ok = _bool_or_none(data_sufficient)
 
     tech_scores=[_status_score(h4),_status_score(h1),_status_score(m15)]

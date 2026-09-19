@@ -9,7 +9,7 @@ except Exception:
     st.session_state = {}
     sys.modules["streamlit"] = st
 
-from experience_v103 import inflation_projection, select_alert_hits, INDICATOR_GUIDE
+from experience_v103 import inflation_projection, select_alert_hits, INDICATOR_GUIDE, experience_theme_summary
 
 
 class ExperienceV103Tests(unittest.TestCase):
@@ -32,6 +32,15 @@ class ExperienceV103Tests(unittest.TestCase):
     def test_glossary_has_core_macro(self):
         for key in ("CPI / IPC", "PCE", "Payroll / NFP", "Fed", "ADR14", "Killzones"):
             self.assertIn(key, INDICATOR_GUIDE)
+
+
+    def test_theme_preferences_fail_safe_to_known_values(self):
+        out=experience_theme_summary("INVALID","gigante",1)
+        self.assertEqual(out["theme"],"Claro")
+        self.assertEqual(out["font_scale"],"Normal")
+        self.assertTrue(out["reduced_motion"])
+        self.assertTrue(out["responsive"])
+
 
 
 if __name__ == "__main__":

@@ -1,0 +1,161 @@
+//@version=5
+strategy(
+     "AtlasQuant AMD Power of Three Research V1",
+     overlay=true,
+     pyramiding=0,
+     process_orders_on_close=false,
+     calc_on_order_fills=true,
+     initial_capital=10000,
+     commission_type=strategy.commission.percent,
+     commission_value=0.0
+)
+
+// Technical-only AMD / Power of Three research bridge.
+// Strict sequence: accumulation -> manipulation -> later distribution.
+
+groupAMD             = "AMD / Power of Three"
+accumulationBars     = input.int(8, "Candles de acumulação", minval=4, maxval=50, group=groupAMD)
+maxDistributionBars  = input.int(4, "Máx. candles até distribuição", minval=1, maxval=20, group=groupAMD)
+atrLen               = input.int(14, "ATR", minval=2, maxval=100, group=groupAMD)
+stopBufferAtr        = input.float(0.0, "Buffer do stop (ATR)", minval=0.0, maxval=1.0, step=0.01, group=groupAMD)
+minRR                = input.float(0.0, "RR mínimo", minval=0.0, maxval=20.0, step=0.25, group=groupAMD)
+maxSetupAge          = input.int(8, "Validade da ordem (candles)", minval=1, maxval=100, group=groupAMD)
+sideFilter           = input.string("Both", "Lados", options=["Both","Long only","Short only"], group=groupAMD)
+
+groupSession = "Sessão"
+tradeSession = input.session("0000-2359", "Janela permitida", group=groupSession)
+inSession    = not na(time(timeframe.period, tradeSession))
+
+atr = ta.atr(atrLen)
+replayReady = bar_index >= 13 and not na(atr)
+longAllowed  = sideFilter != "Short only"
+shortAllowed = sideFilter != "Long only"
+
+accHigh = ta.highest(high[1], accumulationBars)
+accLow = ta.lowest(low[1], accumulationBars)
+accMid = (accHigh + accLow) / 2.0
+accWidth = accHigh - accLow
+
+var int pendingSide = 0
+var int manipulationBar = na
+var int pendingExpires = na
+var float frozenAccHigh = na
+var float frozenAccLow = na
+var float frozenAccMid = na
+var float manipulationExtreme = na
+var float manipulationClose = na
+
+var int orderSide = 0
+var int orderBar = na
+var float orderEntry = na
+var float orderStop = na
+var float orderTarget = na
+
+cancelOrders() =>
+    strategy.cancel("AMD-L")
+    strategy.cancel("AMD-S")
+
+// Clear stale pending manipulation before checking distribution.
+if pendingSide != 0 and not na(pendingExpires) and bar_index > pendingExpires
+    pendingSide := 0
+    manipulationBar := na
+    pendingExpires := na
+
+// Phase 3: distribution can confirm only on a later candle.
+orderSide := 0
+if pendingSide != 0 and not na(manipulationBar) and bar_index > manipulationBar
+    if pendingSide == 1
+        distribution = close > frozenAccMid and close > manipulationClose
+        if distribution
+            candidateEntry = close
+            candidateStop = manipulationExtreme - atr * stopBufferAtr
+            candidateTarget = frozenAccHigh
+            risk = candidateEntry - candidateStop
+            reward = candidateTarget - candidateEntry
+            setupRR = risk > 0 ? reward / risk : -1.0
+            if inSession and longAllowed and strategy.position_size == 0 and risk > syminfo.mintick and reward > syminfo.mintick and setupRR >= minRR
+                orderSide := 1
+                orderEntry := candidateEntry
+                orderStop := candidateStop
+                orderTarget := candidateTarget
+                orderBar := bar_index
+            pendingSide := 0
+    else
+        distribution = close < frozenAccMid and close < manipulationClose
+        if distribution
+            candidateEntry = close
+            candidateStop = manipulationExtreme + atr * stopBufferAtr
+            candidateTarget = frozenAccLow
+            risk = candidateStop - candidateEntry
+            reward = candidateEntry - candidateTarget
+            setupRR = risk > 0 ? reward / risk : -1.0
+            if inSession and shortAllowed and strategy.position_size == 0 and risk > syminfo.mintick and reward > syminfo.mintick and setupRR >= minRR
+                orderSide := -1
+                orderEntry := candidateEntry
+                orderStop := candidateStop
+                orderTarget := candidateTarget
+                orderBar := bar_index
+            pendingSide := 0
+
+// Phase 2: freeze a fresh accumulation range before a manipulation candle.
+// If one candle sweeps both sides, keep only the deeper normalized raid.
+if orderSide == 0 and pendingSide == 0 and replayReady and accWidth > syminfo.mintick
+    buyManip = longAllowed and low < accLow and close > accLow
+    sellManip = shortAllowed and high > accHigh and close < accHigh
+
+    selectedSide = 0
+    if buyManip and sellManip
+        buyDepth = (accLow - low) / accWidth
+        sellDepth = (high - accHigh) / accWidth
+        selectedSide := buyDepth >= sellDepth ? 1 : -1
+    else if buyManip
+        selectedSide := 1
+    else if sellManip
+        selectedSide := -1
+
+    if selectedSide != 0
+        pendingSide := selectedSide
+        manipulationBar := bar_index
+        pendingExpires := bar_index + maxDistributionBars
+        frozenAccHigh := accHigh
+        frozenAccLow := accLow
+        frozenAccMid := accMid
+        manipulationExtreme := selectedSide == 1 ? low : high
+        manipulationClose := close
+
+// Phase 4: submit entry after the confirmed distribution candle.
+if orderSide == 1
+    cancelOrders()
+    strategy.entry("AMD-L", strategy.long, limit=orderEntry)
+    strategy.exit("AMD-LX", "AMD-L", stop=orderStop, limit=orderTarget)
+
+if orderSide == -1
+    cancelOrders()
+    strategy.entry("AMD-S", strategy.short, limit=orderEntry)
+    strategy.exit("AMD-SX", "AMD-S", stop=orderStop, limit=orderTarget)
+
+pendingOrderExpired = orderSide != 0 and not na(orderBar) and bar_index - orderBar > maxSetupAge
+if pendingOrderExpired and strategy.position_size == 0
+    cancelOrders()
+    orderSide := 0
+
+if strategy.position_size > 0
+    orderSide := 0
+    strategy.exit("AMD-LX", "AMD-L", stop=orderStop, limit=orderTarget)
+
+if strategy.position_size < 0
+    orderSide := 0
+    strategy.exit("AMD-SX", "AMD-S", stop=orderStop, limit=orderTarget)
+
+plotshape(orderSide == 1, title="Buy AMD", text="AMD↑", style=shape.labelup, location=location.belowbar, size=size.tiny)
+plotshape(orderSide == -1, title="Sell AMD", text="AMD↓", style=shape.labeldown, location=location.abovebar, size=size.tiny)
+
+plot(pendingSide != 0 ? frozenAccHigh : na, "Accumulation High", style=plot.style_linebr)
+plot(pendingSide != 0 ? frozenAccLow : na, "Accumulation Low", style=plot.style_linebr)
+plot(pendingSide != 0 ? frozenAccMid : na, "Accumulation Mid", style=plot.style_linebr)
+plot(orderSide != 0 or strategy.position_size != 0 ? orderEntry : na, "Entry", style=plot.style_linebr)
+plot(strategy.position_size != 0 ? orderStop : na, "Stop", style=plot.style_linebr)
+plot(strategy.position_size != 0 ? orderTarget : na, "Target", style=plot.style_linebr)
+
+alertcondition(orderSide == 1, "AtlasQuant Buy AMD", "AtlasQuant: AMD BUY em distribuição")
+alertcondition(orderSide == -1, "AtlasQuant Sell AMD", "AtlasQuant: AMD SELL em distribuição")

@@ -66,6 +66,8 @@ def summarize_net(trades: pd.DataFrame | None) -> dict[str, Any]:
         closed = d[d.get("status", pd.Series(index=d.index, dtype=str)).astype(str).str.upper().eq("CLOSED")]
         gross = pd.to_numeric(closed.get("gross_r"), errors="coerce").dropna()
         net = pd.to_numeric(closed.get("net_r"), errors="coerce").dropna()
+        gross = gross[gross.map(lambda x: math.isfinite(float(x)))]
+        net = net[net.map(lambda x: math.isfinite(float(x)))]
     gp = float(net[net > 0].sum()) if not net.empty else 0.0
     gl = float(-net[net < 0].sum()) if not net.empty else 0.0
     return {

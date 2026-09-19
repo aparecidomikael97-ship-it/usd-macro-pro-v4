@@ -1,4 +1,4 @@
-const CACHE = "usd-macro-pro-pwa-v1";
+const CACHE = "atlasquant-pwa-v2";
 const SHELL = [
   "./",
   "./index.html",
@@ -25,16 +25,21 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
-  // Cache only the PWA shell. The Streamlit app is cross-origin and stays live.
-  if (url.origin === self.location.origin) {
+  // Cache somente o shell da PWA. O AtlasQuant no Render e cross-origin e permanece live.
+  if (event.request.method === "GET" && url.origin === self.location.origin) {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+          if (response && response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+          }
           return response;
         })
-        .catch(() => caches.match(event.request).then((r) => r || caches.match("./index.html")))
+        .catch(() => caches.match(event.request).then((r) => {
+          if (r) return r;
+          return event.request.mode === "navigate" ? caches.match("./index.html") : Response.error();
+        }))
     );
   }
 });

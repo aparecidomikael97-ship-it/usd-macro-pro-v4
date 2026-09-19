@@ -1,0 +1,32 @@
+import unittest
+from pathlib import Path
+import pandas as pd
+import autopilot_panel_v107 as panel
+
+class AutopilotPanelV107Tests(unittest.TestCase):
+    def test_age_future_timestamp_fails_closed(self):
+        future=(pd.Timestamp.now(tz="UTC")+pd.Timedelta(minutes=5)).isoformat()
+        self.assertIsNone(panel._age_min(future))
+
+    def test_age_past_timestamp_is_nonnegative(self):
+        past=(pd.Timestamp.now(tz="UTC")-pd.Timedelta(minutes=5)).isoformat()
+        age=panel._age_min(past)
+        self.assertIsNotNone(age)
+        self.assertGreaterEqual(age,0)
+
+    def test_panel_exposes_market_closed_and_readiness_states(self):
+        src=Path("autopilot_panel_v107.py").read_text(encoding="utf-8")
+        self.assertIn("MARKET_CLOSED",src)
+        self.assertIn("operational_readiness",src)
+        self.assertIn("Scanner pronto",src)
+        self.assertIn("Market Map pronto",src)
+
+    def test_status_summary_is_conservative_and_clear(self):
+        self.assertEqual(panel.autopilot_status_summary({"forex_market_open":False})["label"],"EM ESPERA")
+        self.assertEqual(panel.autopilot_status_summary({"forex_market_open":True,"healthy":True,"operational_readiness":"READY"})["label"],"SAUDÁVEL")
+        self.assertEqual(panel.autopilot_status_summary({"forex_market_open":True,"healthy":False,"app_headless_ok":False})["label"],"BLOQUEADO")
+
+
+
+if __name__=="__main__":
+    unittest.main()
