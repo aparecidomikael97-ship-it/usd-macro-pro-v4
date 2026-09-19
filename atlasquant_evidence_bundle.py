@@ -133,6 +133,9 @@ def build_validation_evidence(
             },
             "quota_shadow":{
                 "samples":quota_shadow.get("samples"),
+                "raw_samples":quota_shadow.get("raw_samples"),
+                "invalid_timestamp_rows":quota_shadow.get("invalid_timestamp_rows"),
+                "evidence_integrity_ok":quota_shadow.get("evidence_integrity_ok"),
                 "market_open_runs":quota_shadow.get("market_open_runs"),
                 "min_market_runs":quota_shadow.get("min_market_runs"),
                 "provider_blocked_runs":quota_shadow.get("provider_blocked_runs"),
