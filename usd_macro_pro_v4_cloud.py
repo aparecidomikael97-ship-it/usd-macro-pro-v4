@@ -244,12 +244,14 @@ try:
         apply_atlasquant_theme,
         render_atlasquant_header,
         navigation_labels,
+        decision_strip_html,
     )
     _ATLASQUANT_UI_IMPORT_ERROR = ""
     apply_atlasquant_theme()
 except Exception as _atlasquant_ui_exc:
     render_atlasquant_header = None
     navigation_labels = None
+    decision_strip_html = None
     _ATLASQUANT_UI_IMPORT_ERROR = f"{type(_atlasquant_ui_exc).__name__}: {_atlasquant_ui_exc}"
 
 
@@ -2483,6 +2485,11 @@ def _central_decisao_v80(par, base, cotada, score_base, score_cotada, diferenca,
     principal = max(ativos, key=lambda x: abs(x[2])) if ativos else None
 
     st.markdown("## 🎛️ Central de Decisão Forex — V8.0")
+    if decision_strip_html is not None:
+        st.markdown(
+            decision_strip_html(par,direcao,decisao,timing,qualidade),
+            unsafe_allow_html=True,
+        )
 
     # Linha principal
     c1,c2,c3,c4 = st.columns(4)
