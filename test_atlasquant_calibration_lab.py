@@ -95,5 +95,19 @@ class AtlasQuantCalibrationLabTests(unittest.TestCase):
                 self.assertFalse(s["auto_reweight_allowed"])
 
 
+    def test_invalid_calibration_thresholds_fail_closed(self):
+        df=pd.DataFrame({"score_mestre":[75,85,95],"retorno_24h_pct":[1.0,1.0,1.0]})
+        for bad in (0,-1,float("nan"),float("inf"),True,"bad"):
+            with self.subTest(band=bad):
+                t=calibration_table(df,"24h",min_band_samples=bad)
+                self.assertFalse(t["Amostra suficiente"].any())
+            with self.subTest(total=bad):
+                t=calibration_table(df,"24h",min_band_samples=1)
+                s=calibration_summary(t,min_total_samples=bad)
+                self.assertEqual(s["status"],"INSUFFICIENT")
+                self.assertFalse(s["threshold_valid"])
+                self.assertFalse(s["auto_reweight_allowed"])
+
+
 if __name__=="__main__":
     unittest.main()
