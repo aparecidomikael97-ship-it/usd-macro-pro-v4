@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from atlasquant_platform_center import pwa_asset_audit, platform_matrix
+from atlasquant_platform_center import pwa_asset_audit, platform_matrix, PWA_URL
 
 class AtlasQuantPlatformCenterTests(unittest.TestCase):
     def test_current_repository_has_ready_pwa_assets(self):
@@ -15,6 +15,11 @@ class AtlasQuantPlatformCenterTests(unittest.TestCase):
             audit=pwa_asset_audit(Path(td))
         self.assertFalse(audit["pwa_ready"])
         self.assertTrue(audit["missing"])
+
+
+    def test_pwa_entry_point_is_https_github_pages(self):
+        self.assertTrue(PWA_URL.startswith("https://"))
+        self.assertIn("github.io",PWA_URL)
 
     def test_native_stores_are_not_falsely_marked_ready(self):
         rows=platform_matrix({"pwa_ready":True})
