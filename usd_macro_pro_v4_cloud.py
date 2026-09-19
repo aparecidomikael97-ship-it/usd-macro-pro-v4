@@ -3914,7 +3914,7 @@ if operation_focus_html is not None:
             decision="Central pronta para leitura",
             market="G8 + 7 pares",
             data="Frescor monitorado",
-            safety="Safety Core ativo",
+            safety="Safety Core monitorado",
         ),
         unsafe_allow_html=True,
     )
