@@ -9,21 +9,21 @@
     "limit": 480,
     "remaining": 480,
     "reset_at": "2026-09-20T00:00:00+00:00",
-    "pace_ceiling": 28
+    "pace_ceiling": 48
   },
   "twelve_cache_hits": 0,
   "twelve_retry_after": "",
   "version": "V11.0.8_BUDGET_AUTOPILOT",
-  "last_run": "2026-09-19T00:50:00.795587+00:00",
+  "last_run": "2026-09-19T01:19:55.513973+00:00",
   "app_headless_ok": true,
   "app_headless_message": "App headless executado; 8 secret(s) injetado(s) no AppTest.",
-  "matrix_generated_at": "2026-09-19T00:49:45.812227+00:00",
+  "matrix_generated_at": "2026-09-19T01:19:42.565458+00:00",
   "scanner_fresh": 0,
   "market_map_fresh": 0,
   "scanner_ready": false,
   "market_map_ready": false,
   "operational_readiness": "MARKET_CLOSED",
-  "news_updated_at": "2026-09-19T00:27:23.921419+00:00",
+  "news_updated_at": "2026-09-19T01:19:41.948856+00:00",
   "news_unique_stories": 218,
   "validation_rows": 42,
   "validation_pending": 7,
@@ -70,7 +70,7 @@
     "flight_recorder": {
       "ok": true,
       "added": 7,
-      "records": 72,
+      "records": 80,
       "reason": "SAVED",
       "error": ""
     },
@@ -79,7 +79,7 @@
     "automatic_promotion": false
   },
   "quota_shadow": {
-    "samples": 9,
+    "samples": 10,
     "market_open_runs": 0,
     "min_market_runs": 20,
     "minimum_met": false,
@@ -96,170 +96,5 @@
     "sample_added": true,
     "persisted": true,
     "error": ""
-  },
-  "paper_trading_v112": {
-    "enabled": true,
-    "real_orders": false,
-    "trades_total": 0,
-    "pending_entries": 0,
-    "open_positions": 0,
-    "closed_trades": 0,
-    "wins": 0,
-    "losses": 0,
-    "breakeven": 0,
-    "win_rate_pct": 0.0,
-    "net_r": 0.0,
-    "gross_r_before_friction": 0.0,
-    "friction_r": 0.0,
-    "net_r_after_friction": 0.0,
-    "friction_version": "V11.6_PAPER_FRICTION",
-    "avg_r": 0.0,
-    "profit_factor_r": null,
-    "profit_factor_net_r": null,
-    "last_cycle": {
-      "version": "V11.2_PAPER_TRADING",
-      "ran_at": "2026-09-19T00:50:03.972191+00:00",
-      "pending_created": 0,
-      "entries_opened": 0,
-      "trades_closed": 0,
-      "closed_pairs_this_cycle": [],
-      "checklists": {
-        "USD/CHF": {
-          "side": "BUY",
-          "passed": false,
-          "state": "🔴 BLOQUEADO",
-          "hard_blocks": [
-            "Dados técnicos insuficientes (0/100)",
-            "H1 está contra o viés",
-            "Técnica desatualizada (269 min)"
-          ],
-          "soft_blocks": [
-            "ADR14 em 107%: evitar perseguir preço",
-            "ICT incompleto (42/100)",
-            "Fluxo institucional incompleto (48/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "USD/CAD": {
-          "side": "BUY",
-          "passed": false,
-          "state": "🔴 BLOQUEADO",
-          "hard_blocks": [
-            "Dados técnicos insuficientes (0/100)",
-            "Técnica desatualizada (269 min)"
-          ],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ICT incompleto (42/100)",
-            "Fluxo institucional incompleto (59/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "USD/JPY": {
-          "side": "BUY",
-          "passed": false,
-          "state": "🔴 BLOQUEADO",
-          "hard_blocks": [
-            "Dados técnicos insuficientes (0/100)",
-            "Técnica desatualizada (269 min)",
-            "ADR14 muito esticado (117%)"
-          ],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ADR14 em 117%: evitar perseguir preço",
-            "ICT incompleto (51/100)",
-            "Fluxo institucional incompleto (59/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "NZD/USD": {
-          "side": "SELL",
-          "passed": false,
-          "state": "🔴 BLOQUEADO",
-          "hard_blocks": [
-            "Dados técnicos insuficientes (0/100)",
-            "Técnica desatualizada (269 min)"
-          ],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ADR14 em 91%: espaço reduzido",
-            "ICT incompleto (34/100)",
-            "Fluxo institucional incompleto (50/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "EUR/USD": {
-          "side": "SELL",
-          "passed": false,
-          "state": "🔴 BLOQUEADO",
-          "hard_blocks": [
-            "Dados técnicos insuficientes (0/100)",
-            "Técnica desatualizada (306 min)"
-          ],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ADR14 em 92%: espaço reduzido",
-            "ICT incompleto (42/100)",
-            "Fluxo institucional incompleto (67/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "AUD/USD": {
-          "side": "WAIT",
-          "passed": false,
-          "state": "⚪ AGUARDAR DIREÇÃO",
-          "hard_blocks": [
-            "Dados técnicos insuficientes (0/100)",
-            "Técnica desatualizada (306 min)"
-          ],
-          "soft_blocks": [
-            "ADR14 em 91%: espaço reduzido",
-            "ICT incompleto (0/100)",
-            "Fluxo institucional incompleto (0/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "GBP/USD": {
-          "side": "SELL",
-          "passed": false,
-          "state": "🔴 BLOQUEADO",
-          "hard_blocks": [
-            "Dados técnicos insuficientes (0/100)",
-            "H1 está contra o viés",
-            "Técnica desatualizada (306 min)",
-            "ADR14 muito esticado (128%)"
-          ],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ADR14 em 128%: evitar perseguir preço",
-            "ICT incompleto (34/100)",
-            "Fluxo institucional incompleto (69/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        }
-      },
-      "trades_total": 0,
-      "pending_entries": 0,
-      "open_positions": 0,
-      "closed_trades": 0,
-      "wins": 0,
-      "losses": 0,
-      "breakeven": 0,
-      "win_rate_pct": 0.0,
-      "net_r": 0.0,
-      "avg_r": 0.0,
-      "profit_factor_r": null
-    },
-    "errors": []
-  },
-  "setup_audit_v114": {
-    "enabled": true,
-    "audited_trades": 0,
-    "closed_trades": 0,
-    "component_state_rows": 0,
-    "sample_state": "AGUARDANDO AMOSTRA",
-    "real_orders": false,
-    "broker_connection": false,
-    "errors": []
   }
 }
