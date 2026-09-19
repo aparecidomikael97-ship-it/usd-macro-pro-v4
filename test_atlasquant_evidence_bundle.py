@@ -6,6 +6,7 @@ from atlasquant_evidence_bundle import (
     serialize_validation_evidence,
     verify_validation_evidence,
     evidence_visual_state,
+    render_validation_evidence,
 )
 
 
