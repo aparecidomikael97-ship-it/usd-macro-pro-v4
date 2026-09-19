@@ -178,5 +178,23 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn(".aq-focus-main strong{font-size:.9rem}",ATLASQUANT_CSS)
 
 
+    def test_validation_hydrates_persisted_shadow_before_readiness(self):
+        from pathlib import Path
+        src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        validation=src.index("_aq_validation_shadow_rows =")
+        hydrate=src.index("ensure_shadow_hydrated()",validation)
+        render=src.index("_aq_validation_result = render_validation_readiness(",hydrate)
+        self.assertLess(validation,hydrate)
+        self.assertLess(hydrate,render)
+        self.assertIn("_aq_validation_shadow_rows,",src[render:render+500])
+
+    def test_validation_uses_raw_quota_history_not_runtime_summary(self):
+        from pathlib import Path
+        src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        self.assertIn('_github_get_json_v937("dados/atlasquant_quota_shadow_v1.json", {})',src)
+        self.assertIn('_aq_quota_rows = _aq_quota_store.get("samples", [])',src)
+        self.assertNotIn('[_aq_runtime_status.get("quota_shadow"',src)
+
+
 if __name__ == "__main__":
     unittest.main()
