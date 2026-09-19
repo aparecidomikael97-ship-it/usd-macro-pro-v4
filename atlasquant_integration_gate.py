@@ -103,6 +103,8 @@ def evaluate_integration_candidate(
         blockers.append("Source candidate contains secret-like file paths")
 
     unique=sorted(set(normalized))
+    if not unique:
+        blockers.append("Candidate contains no changed source files")
     reviewable=not blockers
     return {
         "schema":SCHEMA,
