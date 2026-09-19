@@ -194,6 +194,13 @@ except Exception as _platform_exc:
     render_platform_center = None
     _ATLASQUANT_PLATFORM_IMPORT_ERROR = f"{type(_platform_exc).__name__}: {_platform_exc}"
 
+try:
+    from atlasquant_sales_center import render_sales_center
+    _ATLASQUANT_SALES_IMPORT_ERROR = ""
+except Exception as _sales_exc:
+    render_sales_center = None
+    _ATLASQUANT_SALES_IMPORT_ERROR = f"{type(_sales_exc).__name__}: {_sales_exc}"
+
 # =========================================================
 # CONFIGURAÇÕES GERAIS
 # =========================================================
@@ -3864,7 +3871,7 @@ else:
 abas = st.tabs([
     "Central", "Painel mestre", "Moedas", "EUA", "Pares", "Fed",
     "Histórico", "Backtest", "Decisão", "Market Map", "Macro Briefing", "Aprender",
-    "Produto", "Melhorias", "Notícias", "Autopilot", "Conta", "Instalar",
+    "Produto", "Melhorias", "Notícias", "Autopilot", "Conta", "Instalar", "Vendas",
 ])
 
 # =========================================================
@@ -9197,6 +9204,17 @@ with abas[17]:
             st.caption("Diagnóstico: "+_ATLASQUANT_PLATFORM_IMPORT_ERROR)
     else:
         render_platform_center()
+
+# =========================================================
+# VENDAS / ONBOARDING COMERCIAL
+# =========================================================
+with abas[18]:
+    if render_sales_center is None:
+        st.error("Portal comercial indisponível neste carregamento.")
+        if _ATLASQUANT_SALES_IMPORT_ERROR:
+            st.caption("Diagnóstico: "+_ATLASQUANT_SALES_IMPORT_ERROR)
+    else:
+        render_sales_center(_ATLASQUANT_ACCESS)
 
 # No modo GitHub Actions/AppTest, persiste a Matriz atual para o runner background.
 if os.getenv("USD_MACRO_AUTOPILOT", "") == "1":
