@@ -20,6 +20,17 @@ def _finite(value: Any) -> float | None:
     except Exception:
         return None
 
+def _positive_int(value: Any) -> tuple[int,bool]:
+    if isinstance(value,bool):
+        return 1,False
+    try:
+        x=float(value)
+        if not math.isfinite(x) or not x.is_integer() or x < 1:
+            return 1,False
+        return int(x),True
+    except Exception:
+        return 1,False
+
 
 def _wilson(hits: int, n: int, z: float = 1.96) -> tuple[float | None, float | None]:
     if n <= 0:
@@ -132,8 +143,9 @@ def grouped_metrics(
     *,
     min_group_samples: int = 10,
 ) -> pd.DataFrame:
+    threshold,threshold_valid=_positive_int(min_group_samples)
     data=prepare_performance_history(df,horizon)
-    if data.empty or dimension not in data.columns:
+    if not threshold_valid or data.empty or dimension not in data.columns:
         return pd.DataFrame()
     retcol=f"retorno_{str(horizon).lower()}_pct"
     rows=[]
@@ -153,7 +165,7 @@ def grouped_metrics(
             "Retorno médio %":round(float(vals.mean()),4),
             "Retorno mediano %":round(float(vals.median()),4),
             "Volatilidade %":round(float(vals.std(ddof=0)),4),
-            "Amostra suficiente":bool(n>=int(min_group_samples)),
+            "Amostra suficiente":bool(n>=threshold),
         })
     if not rows:
         return pd.DataFrame()
@@ -167,14 +179,19 @@ def performance_readiness(
     min_total_samples: int = 100,
     min_group_samples: int = 30,
 ) -> dict[str, Any]:
+    total_min,total_min_valid=_positive_int(min_total_samples)
+    group_min,group_min_valid=_positive_int(min_group_samples)
+    thresholds_valid=bool(total_min_valid and group_min_valid)
     data=prepare_performance_history(df,horizon)
     total=int(len(data))
     pairs=int(data["par"].nunique()) if not data.empty and "par" in data.columns else 0
     months=int(data["Mês"].nunique()) if not data.empty and "Mês" in data.columns else 0
     per_pair=(data.groupby("par").size() if not data.empty and "par" in data.columns else pd.Series(dtype=int))
-    adequately_sampled_pairs=int((per_pair>=int(min_group_samples)).sum()) if not per_pair.empty else 0
+    adequately_sampled_pairs=int((per_pair>=group_min).sum()) if thresholds_valid and not per_pair.empty else 0
 
-    if total < int(min_total_samples):
+    if not thresholds_valid:
+        status="BUILDING"; label="PARÂMETROS DE AMOSTRA INVÁLIDOS"
+    elif total < total_min:
         status="BUILDING"; label="AMOSTRA EM FORMAÇÃO"
     elif adequately_sampled_pairs < 2:
         status="CONCENTRATED"; label="AMOSTRA CONCENTRADA"
@@ -190,6 +207,7 @@ def performance_readiness(
         "pairs":pairs,
         "months":months,
         "adequately_sampled_pairs":adequately_sampled_pairs,
+        "thresholds_valid":thresholds_valid,
         "auto_model_change_allowed":False,
     }
 
