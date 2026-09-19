@@ -203,7 +203,7 @@ def run_dev_preflight(
     source_parity_workflow=(base/".github/workflows/atlasquant-source-parity.yml").read_text(encoding="utf-8") if (base/".github/workflows/atlasquant-source-parity.yml").is_file() else ""
     checks.append(_check(
         "runtime_source_parity_observational",
-        "branches: [atlasquant-runtime]" in source_parity_workflow
+        "branches: [atlasquant-runtime, atlasquant-integration]" in source_parity_workflow
         and "permissions:\n  contents: read" in source_parity_workflow
         and "origin/atlasquant-integration" in source_parity_workflow
         and "compare_source_trees" in source_parity_workflow
@@ -213,11 +213,14 @@ def run_dev_preflight(
     ))
     checks.append(_check(
         "production_observability_read_only",
-        all("permissions:\n  contents: read" in src and "branches: [main]" in src for src in (production_health,production_browser))
+        "permissions:\n  contents: read" in production_health
+        and "permissions:\n  contents: read" in production_browser
+        and "branches: [main]" in production_health
+        and "branches: [main, atlasquant-integration]" in production_browser
         and "Warm production service" in production_browser
         and "_stcore/health" in production_health
         and "_stcore/health" in production_browser,
-        "Health e browser smoke de produção são read-only, main-scoped e tolerantes a cold start.",
+        "Health permanece main-scoped; browser smoke é read-only e pode validar o candidato de integração contra a produção atual.",
     ))
 
     provider_markers=(
@@ -272,11 +275,11 @@ def run_dev_preflight(
         "permissions:\n  contents: read" in prod_health
         and "permissions:\n  contents: read" in prod_browser
         and "branches: [main]" in prod_health
-        and "branches: [main]" in prod_browser
+        and "branches: [main, atlasquant-integration]" in prod_browser
         and "actions/setup-python@v7" in prod_browser
         and "requests.put(" not in prod_health
         and "requests.put(" not in prod_browser,
-        "Health/browser smoke de produção são observacionais, read-only e ligados à main.",
+        "Health é main-scoped; browser smoke é observacional/read-only e também pode rodar no candidato de integração.",
     ))
 
     history_parts={str(x).lower() for x in DEFAULT_HISTORY_DIR.parts}
