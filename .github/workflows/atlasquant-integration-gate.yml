@@ -42,7 +42,7 @@ jobs:
         run: git fetch origin main --prune
 
       - name: Compile candidate
-        run: python -m compileall -q .
+        run: python -m compileall -q -x '(^|/)\\.git/' .
 
       - name: Evaluate source-only integration candidate
         shell: bash
