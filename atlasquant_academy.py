@@ -265,7 +265,9 @@ def academy_minimum_text_ready()->bool:
         "macro-foundations","inflation","cpi","pce","ppi","nfp","unemployment-wages",
         "pmi-ism","gdp","central-banks","hawkish-dovish","fomc-dotplot",
         "calendar-surprise","dxy-crossasset","relative-strength","liquidity-structure",
-        "fvg","ote","crt-amd","risk","atlasquant-reading",
+        "fvg","ote","crt-amd","technical-to-liquidity","liquidity-sweeps",
+        "bos-choch-mss","order-block","breaker-mitigation","sessions-killzones",
+        "volume-profile","vwap-opening-range","risk","atlasquant-reading",
     }
     ids={str(x["id"]) for x in ACADEMY_TOPICS}
     return required.issubset(ids) and len(ids)==len(ACADEMY_TOPICS)
