@@ -29,6 +29,24 @@ class AtlasQuantAccessPanelTests(unittest.TestCase):
 
 
 
+
+    def test_login_throttle_locks_after_five_failures_and_resets_after_window(self):
+        state={}
+        now=1000.0
+        for i in range(5):
+            state=panel.record_login_failure(state,now+i)
+        locked=panel.throttle_status(state,now+5)
+        self.assertTrue(locked["locked"])
+        self.assertGreater(locked["retry_after"],0)
+        expired=panel.throttle_status(state,now+panel.LOCK_SECONDS+10)
+        self.assertFalse(expired["locked"])
+        self.assertEqual(expired["attempts"],0)
+
+    def test_corrupt_throttle_state_fails_closed(self):
+        status=panel.throttle_status({"attempts":-1,"lock_until":-5},1000.0)
+        self.assertTrue(status["locked"])
+        self.assertEqual(status["attempts"],panel.MAX_FAILED_ATTEMPTS)
+
     def test_explicit_production_environment_forces_authentication(self):
         def fake_setting(key,default=""):
             if key=="ATLASQUANT_ENV":
