@@ -28,6 +28,7 @@ jobs:
     env:
       ATLASQUANT_ENV: "LOCAL"
       ATLASQUANT_AUTH_REQUIRED: "false"
+      ATLASQUANT_OFFLINE_SMOKE: "true"
       CHAVE_FRED: ""
       CHAVE_NEWSAPI: ""
       CHAVE_EODHD: ""
@@ -109,14 +110,23 @@ jobs:
                   rendered=False
                   body_text=""
                   title=""
-                  for attempt in range(1,9):
+                  hero_count=0
+                  loading_macro=False
+                  for attempt in range(1,13):
                       title=page.title()
                       body_text=page.locator("body").inner_text(timeout=30_000)
                       main_count=page.locator('[data-testid="stMainBlockContainer"]').count()
-                      rendered=("AtlasQuant" in title or "ATLASQUANT" in body_text) and main_count>=1
+                      hero_count=page.locator(".aq-hero").count()
+                      loading_macro="Carregando dados macroeconômicos globais" in body_text
+                      rendered=(
+                          hero_count>=1
+                          and "ATLASQUANT" in body_text
+                          and main_count>=1
+                          and not loading_macro
+                      )
                       if rendered:
                           break
-                      page.wait_for_timeout(3_000)
+                      page.wait_for_timeout(2_000)
 
                   exception_count=page.locator('[data-testid="stException"]').count()
                   viewport_width=page.evaluate("window.innerWidth")
@@ -130,6 +140,8 @@ jobs:
                       "title":title,
                       "body_chars":len(body_text),
                       "rendered":rendered,
+                      "hero_count":hero_count,
+                      "loading_macro":loading_macro,
                       "streamlit_exceptions":exception_count,
                       "viewport_width":viewport_width,
                       "document_width":document_width,
@@ -143,7 +155,10 @@ jobs:
                   if status is None or status>=400:
                       failures.append(f"{name}: HTTP {status}")
                   if not rendered:
-                      failures.append(f"{name}: AtlasQuant não renderizou")
+                      failures.append(
+                          f"{name}: AtlasQuant hero não renderizou "
+                          f"(hero={hero_count}, loading_macro={loading_macro})"
+                      )
                   if exception_count:
                       failures.append(f"{name}: {exception_count} stException")
                   if page_errors:
