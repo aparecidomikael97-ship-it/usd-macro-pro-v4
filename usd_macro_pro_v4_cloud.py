@@ -38,10 +38,11 @@ import re
 # V10 — camada observacional profissional. O try/except evita derrubar
 # o motor base caso o arquivo adicional ainda não tenha sido enviado.
 try:
-    from pair_intelligence_v110 import render_pair_intelligence_v110
+    from pair_intelligence_v110 import render_pair_intelligence_v110, load_current_pair_intelligence
     _PAIR_INTEL_V110_IMPORT_ERROR = ""
 except Exception as _pair_intel_exc:
     render_pair_intelligence_v110 = None
+    load_current_pair_intelligence = None
     _PAIR_INTEL_V110_IMPORT_ERROR = f"{type(_pair_intel_exc).__name__}: {_pair_intel_exc}"
 
 try:
@@ -252,6 +253,7 @@ try:
         render_atlasquant_header,
         navigation_labels,
         navigation_groups_html,
+        render_experience_mode_switch,
         operation_focus_html,
         mobile_navigation_hint_html,
         decision_strip_html,
@@ -263,6 +265,7 @@ except Exception as _atlasquant_ui_exc:
     render_atlasquant_header = None
     navigation_labels = None
     navigation_groups_html = None
+    render_experience_mode_switch = None
     operation_focus_html = None
     mobile_navigation_hint_html = None
     decision_strip_html = None
@@ -286,6 +289,14 @@ except Exception as _atlasquant_dashboard_exc:
     _ATLASQUANT_DASHBOARD_IMPORT_ERROR = (
         f"{type(_atlasquant_dashboard_exc).__name__}: {_atlasquant_dashboard_exc}"
     )
+
+
+try:
+    from atlasquant_home_radar import render_home_radar
+    _ATLASQUANT_HOME_RADAR_IMPORT_ERROR = ""
+except Exception as _home_radar_exc:
+    render_home_radar = None
+    _ATLASQUANT_HOME_RADAR_IMPORT_ERROR = f"{type(_home_radar_exc).__name__}: {_home_radar_exc}"
 
 
 try:
@@ -3936,15 +3947,20 @@ def _autopilot_save_inputs_v107():
 
 
 _fallback_nav = [
-    "🎯 Central", "🧭 Painel mestre", "💱 Moedas", "🇺🇸 EUA", "🔀 Pares", "🏦 Fed",
+    "🎯 Radar", "🧭 Painel mestre", "💱 Moedas", "🇺🇸 EUA", "🔀 Pares", "🏦 Fed",
     "🗂️ Histórico", "🧪 Backtest", "⚡ Decisão", "🗺️ Market Map", "🎙️ Macro Briefing", "🎓 Aprender",
     "🧩 Produto", "🛠️ Melhorias", "📰 Notícias", "🤖 Autopilot", "👤 Conta", "📱 Instalar", "💼 Vendas", "🛟 Suporte",
 ]
 _nav_items = list(navigation_labels()) if navigation_labels is not None else _fallback_nav
+_aq_experience_mode = (
+    render_experience_mode_switch()
+    if render_experience_mode_switch is not None
+    else "Iniciante"
+)
 if operation_focus_html is not None:
     st.markdown(
         operation_focus_html(
-            decision="Central pronta para leitura",
+            decision="Radar pronto para leitura",
             market="G8 + 7 pares",
             data="Frescor monitorado",
             safety="Safety Core monitorado",
@@ -9362,30 +9378,8 @@ if os.getenv("USD_MACRO_AUTOPILOT", "") == "1":
 # Renderizada ao final para reutilizar a Matriz oficial já calculada.
 # =========================================================
 with abas[0]:
-    if render_g8_radar is not None:
-        try:
-            render_g8_radar(ranking, neutral_band=5.0, top_n=8)
-        except Exception as _aq_radar_exc:
-            st.warning("Radar G8 temporariamente indisponível; motor operacional preservado.")
-            st.caption(f"Diagnóstico Radar G8: {type(_aq_radar_exc).__name__}")
-    elif _ATLASQUANT_DASHBOARD_IMPORT_ERROR:
-        st.caption(f"Radar G8 em modo compatível: {_ATLASQUANT_DASHBOARD_IMPORT_ERROR}")
-
-    if render_coverage_funnel is not None:
-        try:
-            render_coverage_funnel(ranking, neutral_band=5.0)
-        except Exception as _aq_coverage_exc:
-            st.warning("Mapa de cobertura temporariamente indisponível; nenhuma permissão operacional foi ampliada.")
-            st.caption(f"Diagnóstico Coverage Funnel: {type(_aq_coverage_exc).__name__}")
-    elif _ATLASQUANT_COVERAGE_IMPORT_ERROR:
-        st.caption(f"Coverage Funnel em modo compatível: {_ATLASQUANT_COVERAGE_IMPORT_ERROR}")
-
-    if render_pair_intelligence_v110 is None:
-        st.error("A Central Institucional V11.0.8 não pôde ser carregada.")
-        if _PAIR_INTEL_V110_IMPORT_ERROR:
-            st.caption(f"Diagnóstico: {_PAIR_INTEL_V110_IMPORT_ERROR}")
-    elif "matriz_v61" not in globals() or matriz_v61 is None or matriz_v61.empty:
-        st.warning("A Matriz dos 7 pares ainda não ficou disponível nesta execução.")
+    if "matriz_v61" not in globals() or matriz_v61 is None or matriz_v61.empty:
+        st.warning("O Radar aguarda a Matriz dos 7 pares nesta execução.")
     else:
         _macro_v108 = {
             "usd_score": float(usd_detalhado.get("score", 50.0)) if "usd_detalhado" in globals() else 50.0,
@@ -9395,4 +9389,59 @@ with abas[0]:
             _macro_v108["event"] = _proximo_evento_macro_v65()
         except Exception:
             _macro_v108["event"] = {}
-        render_pair_intelligence_v110(matriz_v61, ranking, fed=fed, macro_context=_macro_v108, weights=PESOS)
+
+        _aq_runtime_snapshot = {}
+        if load_current_pair_intelligence is not None:
+            try:
+                _aq_runtime_snapshot = load_current_pair_intelligence(
+                    matriz_v61, ranking, fed=fed, weights=PESOS
+                )
+            except Exception as _aq_runtime_exc:
+                st.caption(f"Runtime persistido em modo compatível: {type(_aq_runtime_exc).__name__}")
+
+        if render_home_radar is not None:
+            try:
+                render_home_radar(
+                    _aq_runtime_snapshot.get("packs", []),
+                    experience_mode=_aq_experience_mode,
+                )
+            except Exception as _aq_home_exc:
+                st.warning("Radar principal em modo seguro; nenhuma permissão operacional foi ampliada.")
+                st.caption(f"Diagnóstico Home Radar: {type(_aq_home_exc).__name__}: {_aq_home_exc}")
+        elif _ATLASQUANT_HOME_RADAR_IMPORT_ERROR:
+            st.caption(f"Home Radar indisponível: {_ATLASQUANT_HOME_RADAR_IMPORT_ERROR}")
+
+        if str(_aq_experience_mode) == "Avançado":
+            st.divider()
+            st.markdown("## Diagnóstico avançado")
+            if render_g8_radar is not None:
+                try:
+                    render_g8_radar(ranking, neutral_band=5.0, top_n=8)
+                except Exception as _aq_radar_exc:
+                    st.warning("Radar G8 temporariamente indisponível; motor operacional preservado.")
+                    st.caption(f"Diagnóstico Radar G8: {type(_aq_radar_exc).__name__}")
+            elif _ATLASQUANT_DASHBOARD_IMPORT_ERROR:
+                st.caption(f"Radar G8 em modo compatível: {_ATLASQUANT_DASHBOARD_IMPORT_ERROR}")
+
+            if render_coverage_funnel is not None:
+                try:
+                    render_coverage_funnel(ranking, neutral_band=5.0)
+                except Exception as _aq_coverage_exc:
+                    st.warning("Mapa de cobertura temporariamente indisponível; nenhuma permissão operacional foi ampliada.")
+                    st.caption(f"Diagnóstico Coverage Funnel: {type(_aq_coverage_exc).__name__}")
+            elif _ATLASQUANT_COVERAGE_IMPORT_ERROR:
+                st.caption(f"Coverage Funnel em modo compatível: {_ATLASQUANT_COVERAGE_IMPORT_ERROR}")
+
+            if render_pair_intelligence_v110 is None:
+                st.error("A Central Institucional V11.0.8 não pôde ser carregada.")
+                if _PAIR_INTEL_V110_IMPORT_ERROR:
+                    st.caption(f"Diagnóstico: {_PAIR_INTEL_V110_IMPORT_ERROR}")
+            else:
+                render_pair_intelligence_v110(
+                    matriz_v61,
+                    ranking,
+                    fed=fed,
+                    macro_context=_macro_v108,
+                    weights=PESOS,
+                    runtime_snapshot=_aq_runtime_snapshot,
+                )
