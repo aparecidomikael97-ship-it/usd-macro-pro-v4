@@ -26,17 +26,18 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
         self.assertIn("actions/upload-artifact@v7",joined)
 
 
-    def test_production_observability_workflows_are_read_only_and_main_scoped(self):
+    def test_production_observability_workflows_are_read_only_and_candidate_safe(self):
         workflow_dir=ROOT/".github"/"workflows"
-        for name in ("production-health.yml","production-browser-smoke.yml"):
-            src=(workflow_dir/name).read_text(encoding="utf-8")
+        health=(workflow_dir/"production-health.yml").read_text(encoding="utf-8")
+        browser=(workflow_dir/"production-browser-smoke.yml").read_text(encoding="utf-8")
+        for name,src in (("production-health.yml",health),("production-browser-smoke.yml",browser)):
             with self.subTest(name=name):
                 self.assertIn("permissions:\n  contents: read",src)
-                self.assertIn("branches: [main]",src)
                 self.assertNotIn("contents: write",src)
                 self.assertNotIn("GITHUB_TOKEN_HISTORICO",src)
                 self.assertNotIn("requests.put(",src)
-        browser=(workflow_dir/"production-browser-smoke.yml").read_text(encoding="utf-8")
+        self.assertIn("branches: [main]",health)
+        self.assertIn("branches: [main, atlasquant-integration]",browser)
         self.assertIn("actions/setup-python@v7",browser)
         self.assertIn("actions/upload-artifact@v7",browser)
         self.assertIn("Warm production service",browser)
@@ -44,6 +45,9 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
         self.assertIn("for attempt in range(1, 4)",browser)
         self.assertIn("stMainBlockContainer",browser)
         self.assertIn("stTextInput",browser)
+        self.assertIn('"AtlasQuant" in page_title',browser)
+        self.assertIn('"AtlasQuant" in body_text',browser)
+        self.assertIn("if not rendered:",browser)
         self.assertNotIn("body vazio/curto",browser)
 
 
@@ -67,9 +71,11 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
 
     def test_runtime_source_parity_workflow_is_read_only_and_integration_based(self):
         src=(ROOT/".github"/"workflows"/"atlasquant-source-parity.yml").read_text(encoding="utf-8")
-        self.assertIn("branches: [atlasquant-runtime]",src)
+        self.assertIn("branches: [atlasquant-runtime, atlasquant-integration]",src)
         self.assertIn("permissions:\n  contents: read",src)
-        self.assertIn("git fetch origin atlasquant-integration --prune",src)
+        self.assertIn("git fetch origin atlasquant-integration atlasquant-runtime --prune",src)
+        self.assertIn('branch=="atlasquant-integration"',src)
+        self.assertIn('branch=="atlasquant-runtime"',src)
         self.assertIn("compare_source_trees",src)
         self.assertIn("actions/checkout@v7",src)
         self.assertIn("actions/setup-python@v7",src)
