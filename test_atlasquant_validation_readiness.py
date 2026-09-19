@@ -206,5 +206,15 @@ class AtlasQuantValidationReadinessTests(unittest.TestCase):
         self.assertIn("quota_shadow_samples",sig.parameters)
 
 
+    def test_validation_panel_exposes_progress_and_pair_coverage(self):
+        import inspect
+        source=inspect.getsource(render_validation_readiness)
+        self.assertIn('"Progresso da evidência"',source)
+        self.assertIn('"Shadow Mode ·',source)
+        self.assertIn('"Quota com mercado aberto ·',source)
+        self.assertIn('"Cobertura de validação por par"',source)
+        self.assertIn('"Críticas"',source)
+
+
 if __name__=="__main__":
     unittest.main()
