@@ -265,7 +265,21 @@ def render_academy_panel()->dict[str,Any]:
         completed=[x for x in completed if x!=item["id"]]
     st.session_state["aq_academy_completed"]=list(dict.fromkeys(completed))
 
-    st.info("Vídeos curtos e narração são uma etapa separada; esta versão confirma a trilha textual estruturada.")
+    from atlasquant_academy_media import academy_video_script
+    media=academy_video_script(item["id"])
+    if media:
+        with st.expander("🎬 Roteiro do vídeo curto",expanded=False):
+            st.caption(f"Roteiro pronto · duração estimada: {media['estimated_seconds']}s · vídeo ainda não renderizado")
+            for scene in media["scenes"]:
+                st.markdown(f"**{scene['order']}. {scene['title']}** — {scene['text']}")
+            st.download_button(
+                "Baixar roteiro do vídeo",
+                data=media["narration"],
+                file_name=f"atlasquant_academy_{item['id']}_roteiro.txt",
+                mime="text/plain",
+                key=f"aq_academy_video_script_{item['id']}",
+            )
+    st.info("Roteiros dos vídeos estão preparados; renderização/publicação de mídia continua como etapa externa separada.")
     return {"visible":len(rows),**academy_progress(completed),"text_ready":academy_minimum_text_ready()}
 
 

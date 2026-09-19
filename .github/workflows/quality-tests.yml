@@ -3,7 +3,7 @@ name: Quality tests
 on:
   workflow_dispatch:
   push:
-    branches: [main, atlasquant-dev, atlasquant-runtime, atlasquant-runtime-integration, atlasquant-integration, atlasquant-release-final, atlasquant-support-final, atlasquant-support-ui, atlasquant-brokers-guide, atlasquant-voice-readiness]
+    branches: [main, atlasquant-dev, atlasquant-runtime, atlasquant-runtime-integration, atlasquant-integration, atlasquant-release-final, atlasquant-support-final, atlasquant-support-ui, atlasquant-brokers-guide, atlasquant-voice-readiness, atlasquant-academy-media]
     paths:
       - "*.py"
       - "tradingview/**"
@@ -41,6 +41,7 @@ jobs:
             test_master_panel_v102.py \
             test_experience_v103.py \
             test_atlasquant_academy.py \
+            test_atlasquant_academy_media.py \
             test_atlasquant_support_center.py \
             test_atlasquant_brokers_guide.py \
             test_product_v104.py \

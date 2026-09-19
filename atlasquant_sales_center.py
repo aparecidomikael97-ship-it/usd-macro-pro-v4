@@ -12,6 +12,7 @@ from atlasquant_platform_center import pwa_asset_audit, PWA_URL
 from atlasquant_commercial_launch_guard import CommercialEvidence, assess_commercial_launch
 from atlasquant_commercial_security_evidence import collect_commercial_security_evidence
 from atlasquant_academy import academy_minimum_text_ready
+from atlasquant_academy_media import academy_video_scripts_ready
 from atlasquant_support_center import support_minimum_ready
 from atlasquant_brokers_guide import brokers_guide_minimum_ready, render_brokers_guide
 from atlasquant_voice_readiness import voice_contract_ready
@@ -34,7 +35,7 @@ def onboarding_steps()->list[dict[str,str]]:
         {"Etapa":"1","Item":"Conta","Status":"PRONTO","Descrição":"Criar USER/SALES/ADMIN e validar acesso."},
         {"Etapa":"2","Item":"Instalação","Status":"PRONTO — PWA","Descrição":"Android, iOS/iPadOS, Windows, macOS e Linux via PWA."},
         {"Etapa":"3","Item":"Primeiro acesso","Status":"PRONTO","Descrição":"Entrar, revisar viés e qualidade dos dados."},
-        {"Etapa":"4","Item":"Academy","Status":"TEXTO PRONTO · VÍDEOS PENDENTES","Descrição":"Trilha textual estruturada já está no app; vídeos curtos continuam em produção futura."},
+        {"Etapa":"4","Item":"Academy","Status":"TEXTO + ROTEIROS PRONTOS · VÍDEOS PENDENTES","Descrição":"Trilha textual e roteiros dos vídeos estão prontos; renderização/publicação ainda é externa."},
         {"Etapa":"5","Item":"Assistente de voz","Status":"INFRA PRONTA · PROVEDOR PENDENTE","Descrição":"Contrato, UX e safety internos prontos; falta configurar um provedor TTS externo."},
         {"Etapa":"6","Item":"Corretoras & plataformas","Status":"GUIA INFORMATIVO PRONTO","Descrição":"Compatibilidade, Paper/Demo e segurança documentadas; conexão real continua desativada."},
     ]
@@ -60,6 +61,7 @@ def commercial_readiness(access:Mapping[str,Any]|None=None)->dict[str,Any]:
         "pwa_ready":bool(audit.get("pwa_ready")),
         "active_accounts":total,
         "academy_text_ready":bool(academy_minimum_text_ready()),
+        "academy_video_scripts_ready":bool(academy_video_scripts_ready()),
         "academy_ready":False,
         "support_ready":bool(support_minimum_ready()),
         "voice_contract_ready":bool(voice_contract_ready()),
@@ -137,7 +139,8 @@ def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
         ("Auditoria administrativa","VERIFICADA" if status["audit_manifest_verified"] else "REVISAR"),
         ("PWA instalável","PRONTO" if status["pwa_ready"] else "BLOQUEADO"),
         ("Academy — trilha textual","PRONTO" if status["academy_text_ready"] else "PENDENTE"),
-        ("Academy — vídeos","PENDENTE"),
+        ("Academy — roteiros de vídeo","PRONTOS" if status["academy_video_scripts_ready"] else "PENDENTE"),
+        ("Academy — vídeos renderizados","PENDENTE"),
         ("Central de suporte","PRONTO" if status["support_ready"] else "PENDENTE"),
         ("Assistente de voz — infraestrutura","PRONTA" if status["voice_contract_ready"] else "PENDENTE"),
         ("Assistente de voz — provedor TTS","PENDENTE"),
