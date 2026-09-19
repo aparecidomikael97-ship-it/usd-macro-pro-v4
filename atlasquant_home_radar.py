@@ -14,7 +14,6 @@ from typing import Any, Mapping, Sequence
 
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
 
 SCHEMA="ATLASQUANT_HOME_RADAR_V1"
 
@@ -217,7 +216,7 @@ def render_browser_voice(script:str, *, key:str)->None:
     }})();
     </script>
     """
-    components.html(html,height=72,scrolling=False)
+    st.iframe(html,height=72,width="stretch",tab_index=0)
 
 
 def render_home_radar(packs:Sequence[Mapping[str,Any]]|None, *, experience_mode:str="Iniciante")->dict[str,Any]:
