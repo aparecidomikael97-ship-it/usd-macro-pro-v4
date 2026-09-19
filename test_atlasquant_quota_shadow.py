@@ -121,5 +121,15 @@ class AtlasQuantQuotaShadowTests(unittest.TestCase):
         self.assertTrue(summary["eligible_for_manual_review"])
 
 
+    def test_timestamp_less_rows_do_not_advance_quota_maturity(self):
+        row={"market_open":True,"app_headless_ok":True,"adaptive_within_usable_cap":True}
+        summary=summarize_quota_shadow([row],min_market_runs=1)
+        self.assertEqual(summary["samples"],0)
+        self.assertEqual(summary["invalid_timestamp_rows"],1)
+        self.assertEqual(summary["market_open_runs"],0)
+        self.assertFalse(summary["minimum_met"])
+        self.assertFalse(summary["eligible_for_manual_review"])
+
+
 if __name__=="__main__":
     unittest.main()
