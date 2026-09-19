@@ -84,5 +84,14 @@ class MasterPanelTests(unittest.TestCase):
         self.assertLess(info['age_minutes'], 45)
 
 
+    def test_master_overview_state_is_descriptive_and_fail_closed(self):
+        from master_panel_v102 import master_overview_state
+        self.assertEqual(master_overview_state(pairs=0,processed=0,scanner_fresh=0)["label"],"AGUARDANDO DADOS")
+        self.assertEqual(master_overview_state(pairs=7,processed=7,scanner_fresh=7)["label"],"COBERTURA COMPLETA")
+        self.assertEqual(master_overview_state(pairs=7,processed=3,scanner_fresh=2)["label"],"COBERTURA PARCIAL")
+        self.assertEqual(master_overview_state(pairs="bad",processed=0,scanner_fresh=0)["label"],"REVISAR")
+
+
+
 if __name__ == '__main__':
     unittest.main()
