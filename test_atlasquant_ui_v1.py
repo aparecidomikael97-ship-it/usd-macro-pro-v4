@@ -5,10 +5,11 @@ from atlasquant_ui_v1 import NAVIGATION_LABELS, hero_html, navigation_labels, sc
 
 class AtlasQuantUiTests(unittest.TestCase):
     def test_navigation_includes_macro_briefing_without_losing_endpoints(self):
-        self.assertEqual(len(NAVIGATION_LABELS), 16)
+        self.assertEqual(len(NAVIGATION_LABELS), 17)
         self.assertIn("🎙️ Macro Briefing", NAVIGATION_LABELS)
         self.assertEqual(navigation_labels()[0], "🎯 Central")
-        self.assertEqual(navigation_labels()[-1], "🤖 Autopilot")
+        self.assertEqual(navigation_labels()[-1], "👤 Conta")
+        self.assertIn("🤖 Autopilot", navigation_labels())
 
     def test_score_semantics_is_not_probability(self):
         self.assertEqual(score_semantics(80)["label"], "FORTE")
