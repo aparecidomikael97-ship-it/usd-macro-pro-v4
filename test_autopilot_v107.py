@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 import pandas as pd
 
 import autopilot_v107 as a
@@ -204,6 +204,40 @@ class AutopilotV107Tests(unittest.TestCase):
         self.assertFalse(status["market_map_ready"])
         self.assertEqual(status["operational_readiness"],"MARKET_CLOSED")
         self.assertTrue(status["healthy"])
+
+
+    def test_github_write_retries_transient_409_with_fresh_sha(self):
+        get1=Mock(status_code=200); get1.json.return_value={"sha":"oldsha"}
+        get2=Mock(status_code=200); get2.json.return_value={"sha":"newsha"}
+        put1=Mock(status_code=409)
+        put2=Mock(status_code=200)
+        put2.raise_for_status.return_value=None
+        with patch.object(a,"TOKEN","token"), patch.object(a,"REPO","owner/repo"), patch.object(a,"BRANCH","atlasquant-runtime"), \
+             patch.object(a.requests,"get",side_effect=[get1,get2]) as get_call, \
+             patch.object(a.requests,"put",side_effect=[put1,put2]) as put_call, \
+             patch.object(a.time,"sleep") as sleep_call:
+            ok,err=a.gh_put_bytes("dados/teste.json",b"{}","teste")
+        self.assertTrue(ok)
+        self.assertEqual(err,"")
+        self.assertEqual(get_call.call_count,2)
+        self.assertEqual(put_call.call_count,2)
+        self.assertEqual(put_call.call_args_list[0].kwargs["json"]["sha"],"oldsha")
+        self.assertEqual(put_call.call_args_list[1].kwargs["json"]["sha"],"newsha")
+        sleep_call.assert_called_once()
+
+    def test_github_write_does_not_retry_non_conflict_failure(self):
+        get1=Mock(status_code=200); get1.json.return_value={"sha":"sha"}
+        put1=Mock(status_code=500)
+        put1.raise_for_status.side_effect=RuntimeError("server down")
+        with patch.object(a,"TOKEN","token"), patch.object(a,"REPO","owner/repo"), patch.object(a,"BRANCH","atlasquant-runtime"), \
+             patch.object(a.requests,"get",return_value=get1), patch.object(a.requests,"put",return_value=put1) as put_call, \
+             patch.object(a.time,"sleep") as sleep_call:
+            ok,err=a.gh_put_bytes("dados/teste.json",b"{}","teste")
+        self.assertFalse(ok)
+        self.assertIn("server down",err)
+        self.assertEqual(put_call.call_count,1)
+        sleep_call.assert_not_called()
+
 
 
 if __name__=="__main__":
