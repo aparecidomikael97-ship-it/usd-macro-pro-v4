@@ -60,6 +60,7 @@ class AtlasQuantDashboardTests(unittest.TestCase):
         for bad in (float("nan"),float("inf"),float("-inf")):
             with self.subTest(bad=bad):
                 df=self.ranking.copy()
+                df["Pontuação_Final"]=df["Pontuação_Final"].astype(float)
                 df.loc[df["Código"]=="USD","Pontuação_Final"]=bad
                 with self.assertRaises(ValueError):
                     strengths_from_ranking(df)
