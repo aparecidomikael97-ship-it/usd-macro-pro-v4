@@ -39,6 +39,12 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
         browser=(workflow_dir/"production-browser-smoke.yml").read_text(encoding="utf-8")
         self.assertIn("actions/setup-python@v7",browser)
         self.assertIn("actions/upload-artifact@v7",browser)
+        self.assertIn("Warm production service",browser)
+        self.assertIn("$APP_URL/_stcore/health",browser)
+        self.assertIn("for attempt in range(1, 4)",browser)
+        self.assertIn("stMainBlockContainer",browser)
+        self.assertIn("stTextInput",browser)
+        self.assertNotIn("body vazio/curto",browser)
 
 
 
