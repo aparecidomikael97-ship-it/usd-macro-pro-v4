@@ -167,8 +167,29 @@ def account_summary(access:Mapping[str,Any]|None)->dict[str,Any]:
         "authenticated":bool(role in ("USER","SALES","ADMIN") and username),
     }
 
+
+def account_visual_state(summary:Mapping[str,Any]|None)->dict[str,str]:
+    s=dict(summary or {})
+    role=str(s.get("role") or "INVALID").upper()
+    if role=="INVALID":
+        return {"label":"ACESSO INVÁLIDO","detail":"Sessão ou perfil inconsistente"}
+    if role=="OPEN":
+        return {"label":"MODO LOCAL/ABERTO","detail":"Autenticação privada ainda não exigida neste ambiente"}
+    if bool(s.get("authenticated",False)):
+        return {"label":"SESSÃO AUTENTICADA","detail":f"Perfil {role} validado"}
+    return {"label":"ACESSO BLOQUEADO","detail":"Autenticação necessária para este perfil"}
+
+
 def render_account_portal(access:Mapping[str,Any]|None)->dict[str,Any]:
     summary=account_summary(access)
+    visual=account_visual_state(summary)
+    st.markdown(
+        f"""<div style="padding:11px 13px;border:1px solid rgba(137,170,210,.18);border-radius:12px;margin:4px 0 13px">
+        <strong>CONTA · {visual['label']}</strong>
+        <span style="margin-left:8px;opacity:.74;font-size:.78rem">{visual['detail']}</span>
+        <span style="float:right;opacity:.68;font-size:.72rem">Trading real desativado</span></div>""",
+        unsafe_allow_html=True,
+    )
     st.subheader("👤 Conta & Acesso")
     st.caption(
         "Perfis USER / SALES / ADMIN são separados do motor de trading. "
