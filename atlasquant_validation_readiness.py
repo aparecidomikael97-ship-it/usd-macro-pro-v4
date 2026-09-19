@@ -55,6 +55,12 @@ def balanced_pair_coverage(
         "progress_pct":min(100.0,max(0.0,progress)),
         "complete":bool(required>0 and covered>=required),
         "counts":counts,
+        "target_per_pair":target,
+        "expected_pairs":pairs,
+        "pairs_complete":sum(1 for pair in pairs if target>0 and counts[pair]>=target),
+        "pairs_total":len(pairs),
+        "pairs_missing":[pair for pair in pairs if counts[pair]<=0],
+        "pairs_under_target":[pair for pair in pairs if 0<counts[pair]<target],
     }
 
 
