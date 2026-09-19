@@ -16,7 +16,7 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
 
     def test_core_workflows_use_current_node24_action_generation(self):
         workflow_dir=ROOT/".github"/"workflows"
-        names=("quality-tests.yml","autopilot-v107.yml","atlasquant-checkpoint.yml","coleta_automatica.yml")
+        names=("quality-tests.yml","autopilot-v107.yml","atlasquant-checkpoint.yml","coleta_automatica.yml","atlasquant-integration-gate.yml")
         joined="\n".join((workflow_dir/name).read_text(encoding="utf-8") for name in names)
         self.assertNotIn("actions/checkout@v4",joined)
         self.assertNotIn("actions/setup-python@v5",joined)
@@ -39,6 +39,29 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
         browser=(workflow_dir/"production-browser-smoke.yml").read_text(encoding="utf-8")
         self.assertIn("actions/setup-python@v7",browser)
         self.assertIn("actions/upload-artifact@v7",browser)
+        self.assertIn("Warm production service",browser)
+        self.assertIn("$APP_URL/_stcore/health",browser)
+        self.assertIn("for attempt in range(1, 4)",browser)
+        self.assertIn("stMainBlockContainer",browser)
+        self.assertIn("stTextInput",browser)
+        self.assertNotIn("body vazio/curto",browser)
+
+
+
+    def test_integration_gate_is_source_only_manual_and_current_main_based(self):
+        src=(ROOT/".github"/"workflows"/"atlasquant-integration-gate.yml").read_text(encoding="utf-8")
+        self.assertIn("branches: [atlasquant-integration]",src)
+        self.assertIn("fetch-depth: 0",src)
+        self.assertIn("git fetch origin main --prune",src)
+        self.assertIn("merge-base",src)
+        self.assertIn("origin/main...HEAD",src)
+        self.assertIn("evaluate_integration_candidate",src)
+        self.assertIn("actions/checkout@v7",src)
+        self.assertIn("actions/setup-python@v7",src)
+        self.assertIn("actions/upload-artifact@v7",src)
+        self.assertNotIn("contents: write",src)
+        self.assertNotIn("git merge",src)
+        self.assertNotIn("git push",src)
 
 
 
