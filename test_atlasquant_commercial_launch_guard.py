@@ -1,0 +1,46 @@
+import unittest
+from atlasquant_commercial_launch_guard import CommercialEvidence, assess_commercial_launch
+
+class AtlasQuantCommercialLaunchGuardTests(unittest.TestCase):
+    def evidence(self, **kw):
+        data=dict(
+            private_access_ok=True,
+            account_admin_ok=True,
+            distribution_ok=True,
+            terms_privacy_ok=True,
+            data_licensing_ok=True,
+            support_ok=True,
+            academy_minimum_ok=True,
+            billing_ok=True,
+        )
+        data.update(kw)
+        return CommercialEvidence(**data)
+
+    def test_complete_evidence_is_reviewable_but_never_auto_launches(self):
+        out=assess_commercial_launch(self.evidence())
+        self.assertEqual(out["status"],"REVIEWABLE")
+        self.assertTrue(out["manual_launch_required"])
+        self.assertFalse(out["automatic_launch"])
+        self.assertFalse(out["legal_certification"])
+        self.assertFalse(out["trading_permission_changed"])
+
+    def test_any_missing_requirement_blocks_public_launch(self):
+        for field in (
+            "private_access_ok","account_admin_ok","distribution_ok",
+            "terms_privacy_ok","data_licensing_ok","support_ok",
+            "academy_minimum_ok","billing_ok",
+        ):
+            with self.subTest(field=field):
+                out=assess_commercial_launch(self.evidence(**{field:False}))
+                self.assertEqual(out["status"],"BLOCKED")
+                self.assertTrue(out["blockers"])
+
+    def test_non_boolean_evidence_fails_closed(self):
+        for bad in (1,"true",None):
+            with self.subTest(bad=bad):
+                out=assess_commercial_launch(self.evidence(billing_ok=bad))
+                self.assertEqual(out["status"],"BLOCKED")
+                self.assertTrue(any("Flag inválida" in x for x in out["blockers"]))
+
+if __name__=="__main__":
+    unittest.main()
