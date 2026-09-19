@@ -425,7 +425,7 @@ def atlasquant_operational_card(pack: Mapping[str, Any]) -> dict[str, Any]:
     executable = bool(p.get("executable", False))
     raw_state = str(p.get("state", "⚪ AGUARDAR"))
     if executable and ready:
-        light, action = "GREEN", "SETUP EXECUTÁVEL"
+        light, action = "GREEN", "MOTOR EXECUTÁVEL"
     elif raw_state.startswith("🔴") or not ready:
         light, action = "RED", "NÃO OPERAR"
     else:
@@ -461,7 +461,7 @@ background:linear-gradient(180deg,rgba(17,34,57,.88),rgba(10,24,41,.82));min-hei
 </style>
 """, unsafe_allow_html=True)
     st.markdown("### 🚦 Melhores contextos operacionais")
-    st.caption("Usa a decisão institucional já auditada. Verde só aparece quando o próprio motor marca o setup como executável e os dados estão suficientes.")
+    st.caption("Usa a decisão institucional já auditada. Verde indica motor executável com dados suficientes; Safety Core e demais vetos continuam soberanos.")
     cols = st.columns(len(cards))
     icons = {"GREEN": "🟢", "YELLOW": "🟡", "RED": "🔴"}
     for col, card in zip(cols, cards):
