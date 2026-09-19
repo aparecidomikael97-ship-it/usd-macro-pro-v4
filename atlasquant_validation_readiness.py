@@ -118,7 +118,7 @@ def build_validation_readiness(
         min_market_runs=min_quota_market_runs,
     )
     shadow_balanced_coverage=balanced_pair_coverage(
-        shadow.get("expected_pairs") or [],
+        expected_shadow_pairs or [],
         shadow.get("pair_breakdown") or [],
         shadow.get("min_pair_samples") or 0,
     )
