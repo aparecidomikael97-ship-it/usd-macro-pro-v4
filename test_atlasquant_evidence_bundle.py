@@ -283,5 +283,13 @@ class AtlasQuantEvidenceBundleTests(unittest.TestCase):
         self.assertTrue(verify_validation_evidence(bundle))
 
 
+    def test_evidence_ui_surfaces_quota_temporal_integrity(self):
+        import inspect
+        source=inspect.getsource(render_validation_evidence)
+        self.assertIn("Integridade temporal do Quota Shadow",source)
+        self.assertIn("invalid_timestamp_rows",source)
+        self.assertIn("BLOQUEADA",source)
+
+
 if __name__=="__main__":
     unittest.main()
