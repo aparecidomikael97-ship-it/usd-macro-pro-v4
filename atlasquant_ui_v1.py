@@ -31,6 +31,7 @@ NAVIGATION_LABELS = (
     "👤 Conta",
     "📱 Instalar",
     "💼 Vendas",
+    "🛟 Suporte",
 )
 
 NAVIGATION_GROUPS = (
@@ -38,7 +39,7 @@ NAVIGATION_GROUPS = (
     ("Mercado", ("💱 Moedas", "🇺🇸 EUA", "🔀 Pares", "🏦 Fed", "📰 Notícias")),
     ("Pesquisa", ("🗂️ Histórico", "🧪 Backtest", "🎙️ Macro Briefing", "🎓 Aprender")),
     ("Sistema", ("🤖 Autopilot", "🧩 Produto", "🛠️ Melhorias")),
-    ("Conta", ("👤 Conta", "📱 Instalar", "💼 Vendas")),
+    ("Conta", ("👤 Conta", "📱 Instalar", "💼 Vendas", "🛟 Suporte")),
 )
 
 ATLASQUANT_CSS = r"""
