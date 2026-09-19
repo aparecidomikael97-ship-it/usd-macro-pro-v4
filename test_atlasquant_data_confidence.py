@@ -38,4 +38,15 @@ class DataConfidenceTests(unittest.TestCase):
         self.assertIsNone(r["golden_value"])
         self.assertGreater(r["spread"],r["tolerance"])
 
+    def test_duplicate_source_name_cannot_fake_two_source_confirmation(self):
+        r=reconcile_numeric([self.obs("A",100),self.obs("A",100)],now=NOW,min_sources=2)
+        self.assertFalse(r["confirmed"])
+        self.assertIsNone(r["golden_value"])
+        self.assertIn("A",r["rejected_sources"])
+
+    def test_blank_source_name_is_rejected(self):
+        r=reconcile_numeric([self.obs("",100),self.obs("B",100)],now=NOW,min_sources=2)
+        self.assertFalse(r["confirmed"])
+        self.assertIn("?",r["rejected_sources"])
+
 if __name__=="__main__": unittest.main()
