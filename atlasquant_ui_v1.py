@@ -9,7 +9,7 @@ from html import escape
 import math
 import streamlit as st
 
-UI_VERSION = "0.8"
+UI_VERSION = "0.9"
 
 NAVIGATION_LABELS = (
     "🎯 Central",
@@ -152,6 +152,7 @@ html { scroll-behavior: smooth; }
 .aq-nav-group{flex:0 0 auto;border:1px solid var(--aq-line);border-radius:999px;padding:5px 9px;background:rgba(10,25,44,.56)}
 .aq-nav-group strong{color:var(--aq-text);font-size:.69rem}
 .aq-nav-group span{color:var(--aq-muted);font-size:.64rem;margin-left:5px}
+.aq-nav-groups:before{content:"NAVEGAÇÃO";flex:0 0 auto;color:var(--aq-muted);font-size:.58rem;font-weight:800;letter-spacing:.09em;margin-right:1px}
 .aq-context-strip{
   display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 14px;
 }
@@ -237,13 +238,15 @@ html { scroll-behavior: smooth; }
   .aq-context-strip{grid-template-columns:repeat(2,minmax(0,1fr))}
   .aq-focus{grid-template-columns:1fr 1fr}
   .aq-focus-main{grid-column:1/-1}
-  .aq-nav-groups{margin-left:-.15rem;margin-right:-.15rem}
+  .aq-nav-groups{margin-left:-.15rem;margin-right:-.15rem;position:sticky;top:0;z-index:20;padding:6px 4px;background:linear-gradient(180deg,rgba(5,16,30,.96),rgba(5,16,30,.84));backdrop-filter:blur(8px)}
+  .aq-nav-groups:before{display:none}
   .aq-nav-group span{display:none}
   .aq-nav-group{padding:5px 8px}
   .aq-focus-main,.aq-focus-card{padding:9px 10px}
   [data-testid="stSidebar"] { min-width: 280px; }
   [data-testid="stTabs"] [role="tablist"] { margin-left:-.25rem; margin-right:-.25rem; border-radius:10px; }
-  [data-testid="stTabs"] [role="tab"] { font-size:.78rem; padding-left:.65rem; padding-right:.65rem; }
+  [data-testid="stTabs"] [role="tab"] { font-size:.74rem; padding-left:.55rem; padding-right:.55rem; min-height:34px; }
+  [data-testid="stTabs"] [role="tablist"] { scrollbar-width:none; }
 }
 </style>
 """
