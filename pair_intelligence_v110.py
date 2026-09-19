@@ -475,7 +475,6 @@ background:linear-gradient(180deg,rgba(17,34,57,.88),rgba(10,24,41,.82));min-hei
 """, unsafe_allow_html=True)
     st.markdown("### 🚦 Melhores contextos operacionais")
     st.caption("Usa a decisão institucional já auditada. Verde indica motor executável com dados suficientes; Safety Core e demais vetos continuam soberanos.")
-    _mobile_compact = len(cards) >= 3
     cols = st.columns(len(cards))
     icons = {"GREEN": "🟢", "YELLOW": "🟡", "RED": "🔴"}
     for col, card in zip(cols, cards):
