@@ -160,5 +160,23 @@ class AtlasQuantEvidenceBundleTests(unittest.TestCase):
         self.assertIn("não liberam operação real",source)
 
 
+    def test_balanced_pair_coverage_is_integrity_protected(self):
+        r=self.readiness()
+        r["shadow"]["min_pair_samples"]=10
+        r["shadow"]["expected_pairs"]=["EUR/USD","GBP/USD"]
+        r["shadow"]["pair_breakdown"]=[
+            {"pair":"EUR/USD","samples":15,"critical_mismatches":0},
+            {"pair":"GBP/USD","samples":4,"critical_mismatches":0},
+        ]
+        b=build_validation_evidence(r,engine_version="dev")
+        shadow=b["evidence"]["shadow"]
+        self.assertEqual(shadow["balanced_pair_covered"],14)
+        self.assertEqual(shadow["balanced_pair_required"],20)
+        self.assertFalse(shadow["balanced_pair_complete"])
+        self.assertTrue(verify_validation_evidence(b))
+        b["evidence"]["shadow"]["balanced_pair_complete"]=True
+        self.assertFalse(verify_validation_evidence(b))
+
+
 if __name__=="__main__":
     unittest.main()
