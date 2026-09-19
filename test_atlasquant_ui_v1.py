@@ -197,13 +197,16 @@ class AtlasQuantUiTests(unittest.TestCase):
 
 
     def test_validation_runtime_json_reader_is_defined_and_uses_resolved_branch(self):
-        import inspect
-        import usd_macro_pro_v4_cloud as app
-        self.assertTrue(hasattr(app,"_github_get_json_v937"))
-        source=inspect.getsource(app._github_get_json_v937)
-        self.assertIn("_github_cfg_v84()",source)
-        self.assertIn('params={"ref": branch}',source)
-        self.assertNotIn('"ref": "main"',source)
+        import ast
+        from pathlib import Path
+        source=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        tree=ast.parse(source)
+        node=next((n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=="_github_get_json_v937"),None)
+        self.assertIsNotNone(node)
+        fn=ast.get_source_segment(source,node) or ""
+        self.assertIn("_github_cfg_v84()",fn)
+        self.assertIn('params={"ref": branch}',fn)
+        self.assertNotIn('"ref": "main"',fn)
 
 
 if __name__ == "__main__":
