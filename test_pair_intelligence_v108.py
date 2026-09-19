@@ -27,6 +27,7 @@ class PairIntelligenceV108SourceTests(unittest.TestCase):
 
 
     def test_pair_intelligence_visual_state_is_conservative(self):
+        self.assertEqual(pair_panel.pair_intelligence_status({},None)["label"],"ATENÇÃO")
         self.assertEqual(pair_panel.pair_intelligence_status({},{"forex_market_open":False})["label"],"EM ESPERA")
         self.assertEqual(pair_panel.pair_intelligence_status({"state":"🔴 BLOQUEADO / CONTRA"},{"forex_market_open":True,"healthy":True})["label"],"BLOQUEADO")
         self.assertEqual(pair_panel.pair_intelligence_status({"state":"🟢 EXECUÇÃO CONFIRMADA"},{"forex_market_open":True,"healthy":True})["label"],"CONTEXTO CONFIRMADO")
