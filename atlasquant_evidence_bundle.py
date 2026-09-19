@@ -14,6 +14,8 @@ from typing import Any, Mapping
 
 import streamlit as st
 
+from atlasquant_validation_readiness import balanced_pair_coverage
+
 
 SCHEMA_VERSION="atlasquant.validation-evidence.v1"
 
@@ -58,11 +60,13 @@ def build_validation_evidence(
     calib=dict(r.get("calibration",{}) or {})
     stability=dict(r.get("stability",{}) or {})
     shadow=dict(r.get("shadow",{}) or {})
-    pair_target=int(shadow.get("min_pair_samples") or 0)
-    expected_pairs=list(shadow.get("expected_pairs") or [])
-    pair_counts={str(x.get("pair")):int(x.get("samples") or 0) for x in (shadow.get("pair_breakdown") or [])}
-    pair_required_total=pair_target*len(expected_pairs)
-    pair_covered_total=sum(min(pair_target,pair_counts.get(pair,0)) for pair in expected_pairs)
+    pair_coverage=balanced_pair_coverage(
+        shadow.get("expected_pairs") or [],
+        shadow.get("pair_breakdown") or [],
+        shadow.get("min_pair_samples") or 0,
+    )
+    pair_required_total=pair_coverage["required"]
+    pair_covered_total=pair_coverage["covered"]
     quota_shadow=dict(r.get("quota_shadow",{}) or {})
     expansion=dict(r.get("expansion",{}) or {})
     paper=dict(paper_summary or {})
