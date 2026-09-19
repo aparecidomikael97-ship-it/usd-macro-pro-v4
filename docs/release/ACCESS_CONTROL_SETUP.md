@@ -60,6 +60,9 @@ Sessões antigas deixam de ser aceitas quando o registro atual não corresponde 
 - sessão vinculada à credencial atual;
 - bloqueio temporário por repetidas tentativas inválidas na mesma sessão;
 - produção explícita exige autenticação;
+
+- sessão autenticada expira por inatividade e por idade máxima;
+- hashes de contas não são exibidos inline no portal ADMIN; o registro completo é somente para download administrativo;
 - falha da camada de login com autenticação obrigatória bloqueia o app.
 
 O bloqueio por tentativas é uma proteção local de sessão e não substitui rate limiting/WAF da plataforma quando o serviço estiver exposto publicamente.
