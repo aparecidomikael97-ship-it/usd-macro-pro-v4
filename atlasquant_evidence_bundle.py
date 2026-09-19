@@ -243,6 +243,20 @@ def render_validation_evidence(
             f"Cobertura balanceada protegida no manifesto: "
             f"{balanced_covered}/{balanced_required} · {balanced_state}."
         )
+        balanced_complete=int(shadow.get("balanced_pairs_complete") or 0)
+        balanced_total=int(shadow.get("balanced_pairs_total") or 0)
+        balanced_missing=list(shadow.get("balanced_pairs_missing") or [])
+        balanced_under=list(shadow.get("balanced_pairs_under_target") or [])
+        st.caption(
+            f"Pares na meta: {balanced_complete}/{balanced_total} · "
+            f"sem amostra: {len(balanced_missing)} · abaixo da meta: {len(balanced_under)}."
+        )
+        if balanced_missing or balanced_under:
+            with st.expander("Diagnóstico da cobertura protegida"):
+                if balanced_missing:
+                    st.write("Sem amostra:", ", ".join(map(str,balanced_missing)))
+                if balanced_under:
+                    st.write("Abaixo da meta:", ", ".join(map(str,balanced_under)))
     paper=bundle["evidence"].get("paper_forward_test",{})
     setup=bundle["evidence"].get("setup_audit",{})
     st.markdown("#### Evidência prospectiva")
