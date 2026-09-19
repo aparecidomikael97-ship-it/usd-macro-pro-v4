@@ -216,5 +216,13 @@ class AtlasQuantValidationReadinessTests(unittest.TestCase):
         self.assertIn("Críticas",source)
 
 
+    def test_validation_panel_protects_balanced_pair_progress_semantics(self):
+        import inspect
+        source=inspect.getsource(render_validation_readiness)
+        self.assertIn("Cobertura balanceada por par",source)
+        self.assertIn("pair_covered_total",source)
+        self.assertIn("min(pair_target",source)
+
+
 if __name__=="__main__":
     unittest.main()
