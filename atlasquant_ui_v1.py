@@ -9,7 +9,7 @@ from html import escape
 import math
 import streamlit as st
 
-UI_VERSION = "0.2"
+UI_VERSION = "0.3"
 
 NAVIGATION_LABELS = (
     "🎯 Central",
@@ -48,16 +48,22 @@ ATLASQUANT_CSS = r"""
   --aq-warn: #f2c14e;
   --aq-bad: #ff6b7a;
 }
+html { scroll-behavior: smooth; }
 .stApp {
   background:
     radial-gradient(circle at 8% -10%, rgba(36, 111, 190, .17), transparent 28%),
     radial-gradient(circle at 88% 2%, rgba(48, 174, 150, .10), transparent 24%),
     linear-gradient(180deg, #081321 0%, #07101d 100%);
 }
+.stMainBlockContainer { max-width: 1500px; padding-top: 1.15rem; padding-bottom: 2.4rem; }
 [data-testid="stSidebar"] {
   background: linear-gradient(180deg, rgba(8,18,32,.98), rgba(9,22,38,.98));
   border-right: 1px solid var(--aq-line);
 }
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p { color: var(--aq-muted); }
+[data-testid="stSidebar"] [role="radiogroup"] label,
+[data-testid="stSidebar"] [data-baseweb="select"] { border-radius: 10px; }
+[data-testid="stHeader"] { background: rgba(7,17,31,.76); backdrop-filter: blur(12px); }
 .aq-hero {
   position: relative;
   overflow: hidden;
@@ -121,12 +127,24 @@ ATLASQUANT_CSS = r"""
   border: 1px solid var(--aq-line) !important;
   border-radius: 13px !important;
 }
-[data-testid="stMetricValue"] { letter-spacing: -.035em; }
+[data-testid="stMetricValue"] { letter-spacing: -.035em; color: var(--aq-text); }
+[data-testid="stMetricLabel"] { color: var(--aq-muted); }
+[data-testid="stButton"] button {
+  border-radius: 10px; min-height: 2.45rem; font-weight: 700;
+  border: 1px solid var(--aq-line);
+}
+[data-testid="stButton"] button[kind="primary"] {
+  box-shadow: 0 8px 24px rgba(79,163,255,.16);
+}
 [data-testid="stDataFrame"] {
   border: 1px solid var(--aq-line);
   border-radius: 12px;
   overflow: hidden;
 }
+[data-testid="stAlert"] { border-radius: 12px; }
+[data-testid="stTextInput"] input,
+[data-testid="stNumberInput"] input,
+[data-baseweb="select"] > div { border-radius: 10px !important; }
 [data-testid="stExpander"] {
   border: 1px solid var(--aq-line) !important;
   background: rgba(12,26,44,.48);
@@ -145,6 +163,9 @@ ATLASQUANT_CSS = r"""
   color: #f4f8ff !important;
 }
 @media (max-width: 760px) {
+  .stMainBlockContainer { padding-left: .85rem; padding-right: .85rem; padding-top: .7rem; }
+  [data-testid="stHorizontalBlock"] { flex-wrap: wrap !important; gap: .55rem !important; }
+  [data-testid="stColumn"] { min-width: 150px !important; flex: 1 1 150px !important; }
   .aq-hero { padding: 18px 16px 16px; border-radius: 14px; }
   .aq-subtitle { font-size: .84rem; }
   .aq-badge { font-size: .68rem; padding: 4px 8px; }
