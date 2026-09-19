@@ -21,6 +21,7 @@ from atlasquant_billing_contract import billing_contract_ready
 from atlasquant_data_licensing_inventory import data_inventory_ready, data_licensing_status
 from atlasquant_public_launch_readiness import collect_public_launch_readiness
 from atlasquant_native_packaging import native_packaging_audit
+from atlasquant_finalization_audit import finalization_audit
 
 SCHEMA="ATLASQUANT_SALES_CENTER_V1"
 
@@ -52,6 +53,7 @@ def commercial_readiness(access:Mapping[str,Any]|None=None)->dict[str,Any]:
     licensing=data_licensing_status()
     public_readiness=collect_public_launch_readiness()
     native=native_packaging_audit()
+    final_audit=finalization_audit()
     registry=(access or {}).get("registry") if isinstance(access,Mapping) else {}
     if not isinstance(registry,Mapping):
         registry={}
@@ -88,6 +90,7 @@ def commercial_readiness(access:Mapping[str,Any]|None=None)->dict[str,Any]:
         "internal_preparation_complete":bool(public_readiness["internal_preparation_complete"]),
         "external_dependencies_complete":bool(public_readiness["external_dependencies_complete"]),
         "public_launch_ready":bool(public_readiness["public_launch_ready"]),
+        "internal_release_preparation_complete":bool(final_audit["internal_release_preparation_complete"]),
         "native_stores_ready":False,
         "payments_integrated":False,
         "broker_execution_enabled":False,
@@ -202,7 +205,9 @@ def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
     else:
         st.success("Pré-requisitos comerciais completos para revisão humana final.")
     st.markdown("### Preparação de lançamento")
-    if status["internal_preparation_complete"]:
+    if status["internal_release_preparation_complete"]:
+        st.success("Finalização interna do AtlasQuant: COMPLETA. Dependências externas ainda bloqueiam lançamento público.")
+    elif status["internal_preparation_complete"]:
         st.success("Preparação interna do produto: COMPLETA. Dependências externas ainda bloqueiam lançamento público.")
     elif status["commercial_prep_ready"]:
         st.success("Pacote interno de preparação comercial pronto. Validações externas continuam obrigatórias.")
