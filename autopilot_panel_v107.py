@@ -79,7 +79,9 @@ def render_autopilot_v107():
         st.info("Depois de ativar o workflow Autopilot V10.7, esta tela passa a mostrar a saúde automática.")
         return
 
-    _render_status_strip(status)\n\n    age=_age_min(status.get("last_run"))
+    _render_status_strip(status)
+
+    age=_age_min(status.get("last_run"))
     healthy=bool(status.get("healthy",False))
     readiness=str(status.get("operational_readiness","") or "").upper()
     market_open=bool(status.get("forex_market_open",False))
