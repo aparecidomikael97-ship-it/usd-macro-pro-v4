@@ -4,8 +4,6 @@ on:
   workflow_dispatch:
   push:
     branches: [main, atlasquant-integration]
-    paths:
-      - ".github/workflows/production-browser-smoke.yml"
   schedule:
     - cron: "41 12 * * *"
 
