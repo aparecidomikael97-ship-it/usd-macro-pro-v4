@@ -18,6 +18,8 @@ RUNTIME_MUTABLE_PATHS=frozenset({
     "dados/master_market_map_v102.json",
     "dados/scanner_tecnico_v934.json",
     "dados/autopilot_daily_cache_v107.json",
+    "dados/twelve_budget_v1108.json",
+    "dados/twelve_series_v1108.json",
     "dados/sinais_v84.csv",
     "dados/atlasquant_flight_recorder.jsonl",
     "dados/atlasquant_quota_shadow_v1.json",
