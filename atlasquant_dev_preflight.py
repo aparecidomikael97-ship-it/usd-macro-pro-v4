@@ -42,6 +42,7 @@ REQUIRED_FILES=(
     "atlasquant_access_control.py",
     "atlasquant_access_panel.py",
     "atlasquant_account_portal.py",
+    "atlasquant_account_change_audit.py",
     "atlasquant_registry_admin.py",
     "atlasquant_commercial_launch_guard.py",
     "atlasquant_sales_center.py",
@@ -150,6 +151,15 @@ def run_dev_preflight(
         and "destructive account removal is not allowed" in registry_admin
         and "automatic" not in registry_admin.lower(),
         "Administração de contas exporta mudanças para revisão e bloqueia remoção destrutiva.",
+    ))
+
+    account_audit=(base/"atlasquant_account_change_audit.py").read_text(encoding="utf-8") if (base/"atlasquant_account_change_audit.py").is_file() else ""
+    checks.append(_check(
+        "account_change_audit_safe",
+        '"contains_password":False' in account_audit
+        and '"contains_password_hash":False' in account_audit
+        and '"automatic_apply":False' in account_audit,
+        "Mudanças administrativas geram manifesto sem credenciais e sem aplicação automática.",
     ))
 
     provider_markers=(
