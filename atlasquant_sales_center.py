@@ -18,7 +18,11 @@ def sales_access_allowed(access:Mapping[str,Any]|None)->bool:
         return False
     role=str(access.get("role") or "").strip().upper()
     session=access.get("session")
-    return bool(role in ("SALES","ADMIN") and isinstance(session,Mapping))
+    if role not in ("SALES","ADMIN") or not isinstance(session,Mapping):
+        return False
+    session_role=str(session.get("role") or "").strip().upper()
+    username=str(session.get("username") or "").strip()
+    return bool(username and session_role==role)
 
 def onboarding_steps()->list[dict[str,str]]:
     return [
