@@ -10,8 +10,10 @@ from __future__ import annotations
 from pathlib import PurePosixPath
 from typing import Mapping, Iterable, Any
 
+from atlasquant_branch_drift import RUNTIME_MUTABLE_PATHS
+
 SCHEMA="ATLASQUANT_SOURCE_PARITY_V1"
-DEFAULT_IGNORED_PREFIXES=("dados/",)
+DEFAULT_IGNORED_PATHS=frozenset(RUNTIME_MUTABLE_PATHS)
 
 
 def _normalize(path: object) -> str:
@@ -23,19 +25,19 @@ def _normalize(path: object) -> str:
     return raw
 
 
-def is_runtime_data_path(path: object, ignored_prefixes: Iterable[str] = DEFAULT_IGNORED_PREFIXES) -> bool:
+def is_runtime_data_path(path: object, ignored_paths: Iterable[str] = DEFAULT_IGNORED_PATHS) -> bool:
     p=_normalize(path)
     if not p:
         return False
-    prefixes=tuple(_normalize(x) for x in ignored_prefixes if _normalize(x))
-    return any(p.startswith(prefix) for prefix in prefixes)
+    allowed={_normalize(x) for x in ignored_paths if _normalize(x)}
+    return p in allowed
 
 
 def compare_source_trees(
     integration: Mapping[str,str] | None,
     runtime: Mapping[str,str] | None,
     *,
-    ignored_prefixes: Iterable[str] = DEFAULT_IGNORED_PREFIXES,
+    ignored_paths: Iterable[str] = DEFAULT_IGNORED_PATHS,
 ) -> dict[str,Any]:
     left={_normalize(k):str(v or "").strip() for k,v in dict(integration or {}).items()}
     right={_normalize(k):str(v or "").strip() for k,v in dict(runtime or {}).items()}
@@ -47,7 +49,7 @@ def compare_source_trees(
     mismatched=[]
 
     for path in all_paths:
-        if not path or is_runtime_data_path(path,ignored_prefixes):
+        if not path or is_runtime_data_path(path,ignored_paths):
             continue
         checked.append(path)
         l=left.get(path)
