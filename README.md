@@ -58,3 +58,9 @@ Antes de alterar o motor, preserve os contratos de Safety Core, integridade/fres
 Checkpoints e histórico detalhado permanecem em `CONTEXTO_DO_PROJETO.md`, `HISTORICO_DE_ALTERACOES.md` e `docs/continuidade/`.
 
 Documentos com nomes USD Macro Pro / V11.x são registros históricos e não definem o branding atual do produto.
+
+## Operação segura
+
+- Política de branches: `docs/release/BRANCH_POLICY.md`
+- Runbook de incidente/rollback: `docs/release/INCIDENT_ROLLBACK_RUNBOOK.md`
+- Handoff externo: `docs/release/EXTERNAL_DEPENDENCY_HANDOFF.md`
