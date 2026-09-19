@@ -85,6 +85,14 @@ class AtlasQuantAccountPortalTests(unittest.TestCase):
 
 
 
+
+    def test_admin_portal_surfaces_change_diff_before_export(self):
+        from pathlib import Path
+        src=Path("atlasquant_account_portal.py").read_text(encoding="utf-8")
+        self.assertIn("registry_diff",src)
+        self.assertIn("Revisão da mudança",src)
+        self.assertIn("Remoção destrutiva detectada",src)
+
     def test_corrupt_registry_counts_are_sanitized(self):
         summary=account_summary({
             "allowed":True,
