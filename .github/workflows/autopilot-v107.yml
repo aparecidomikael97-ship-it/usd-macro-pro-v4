@@ -67,5 +67,5 @@ jobs:
           print("secrets.toml criado para AppTest (valores não exibidos).")
           PY
 
-      - name: Run full background autopilot
-        run: python autopilot_v107.py
+      - name: Run full background autopilot + paper + setup audit
+        run: python autopilot_setup_audit_v114.py
