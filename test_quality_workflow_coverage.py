@@ -66,7 +66,7 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
 
     def test_integration_ui_smoke_is_local_read_only_and_mobile_aware(self):
         src=(ROOT/".github"/"workflows"/"atlasquant-ui-smoke.yml").read_text(encoding="utf-8")
-        self.assertIn("branches: [atlasquant-integration]",src)
+        self.assertIn("atlasquant-integration",src)\n        self.assertIn("atlasquant-release-final",src)
         self.assertIn("permissions:\n  contents: read",src)
         self.assertNotIn("contents: write",src)
         self.assertIn('ATLASQUANT_ENV: "LOCAL"',src)
