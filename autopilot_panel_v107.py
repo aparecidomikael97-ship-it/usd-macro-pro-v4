@@ -43,6 +43,30 @@ def _age_min(value):
         return None if age < 0 else age
     except Exception: return None
 
+def autopilot_status_summary(status: dict[str,Any] | None) -> dict[str,str]:
+    s=dict(status or {})
+    readiness=str(s.get("operational_readiness","") or "").upper()
+    market_open=bool(s.get("forex_market_open",False))
+    if readiness=="MARKET_CLOSED" or not market_open:
+        return {"label":"EM ESPERA","tone":"info","detail":"Mercado FX fechado"}
+    if bool(s.get("healthy",False)) and readiness in ("","READY"):
+        return {"label":"SAUDÁVEL","tone":"good","detail":"Dados e serviços dentro dos gates"}
+    if not bool(s.get("app_headless_ok",False)):
+        return {"label":"BLOQUEADO","tone":"bad","detail":"Atualização headless indisponível"}
+    return {"label":"ATENÇÃO","tone":"warn","detail":"Há gates ou dados aguardando validação"}
+
+def _render_status_strip(status: dict[str,Any]) -> None:
+    s=autopilot_status_summary(status)
+    st.markdown(
+        f"""<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 14px;
+        border:1px solid rgba(137,170,210,.18);border-radius:13px;background:rgba(11,27,47,.62);margin:4px 0 14px">
+        <strong style="font-size:.82rem">AUTOPILOT</strong>
+        <span style="font-weight:850">{s['label']}</span>
+        <span style="opacity:.72;font-size:.78rem">{s['detail']}</span>
+        <span style="margin-left:auto;font-size:.72rem;opacity:.72">Safety Core ativo · execução real desativada</span>
+        </div>""", unsafe_allow_html=True,
+    )
+
 def render_autopilot_v107():
     st.subheader("Autopilot — saúde e atualização")
     st.caption(
@@ -55,7 +79,7 @@ def render_autopilot_v107():
         st.info("Depois de ativar o workflow Autopilot V10.7, esta tela passa a mostrar a saúde automática.")
         return
 
-    age=_age_min(status.get("last_run"))
+    _render_status_strip(status)\n\n    age=_age_min(status.get("last_run"))
     healthy=bool(status.get("healthy",False))
     readiness=str(status.get("operational_readiness","") or "").upper()
     market_open=bool(status.get("forex_market_open",False))
