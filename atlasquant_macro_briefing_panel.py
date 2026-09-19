@@ -11,12 +11,29 @@ from atlasquant_macro_briefing import build_macro_briefing
 from atlasquant_macro_briefing_voice import VoiceRequest
 
 
+
+def briefing_status(brief: Mapping[str,Any] | None) -> dict[str,str]:
+    b=dict(brief or {})
+    if not bool(b.get("data_sufficient",False)):
+        return {"label":"DADOS INSUFICIENTES","detail":"Narrativa bloqueada até os dados serem válidos"}
+    bias=str(b.get("context_bias","neutro") or "neutro")
+    if bias=="divergência macro":
+        return {"label":"DIVERGÊNCIA MACRO","detail":"Há separação relevante entre moedas; não é sinal de trade"}
+    return {"label":"CONTEXTO NEUTRO","detail":"Sem divergência macro relevante no estado atual"}
+
+
 def render_macro_briefing_panel(currency_rows: Sequence[Mapping[str, Any]] | None, events: Sequence[Mapping[str, Any]] | None = None, central_banks: Sequence[Mapping[str, Any]] | None = None) -> dict[str, Any]:
     st.subheader("🎙️ Macro Briefing")
     st.caption("Panorama informativo gerado somente a partir do estado macro disponível no AtlasQuant.")
     mode = st.radio("Horizonte", ["Hoje", "Semana"], horizontal=True, key="aq_macro_brief_horizon")
     horizon = "today" if mode == "Hoje" else "week"
     brief = build_macro_briefing(currency_rows, events, central_banks, horizon=horizon)
+    ui_status=briefing_status(brief)
+    st.markdown(
+        f"""<div style="padding:11px 13px;border:1px solid rgba(137,170,210,.18);border-radius:12px;margin:4px 0 13px">
+        <strong>{ui_status['label']}</strong><br><span style="opacity:.74;font-size:.78rem">{ui_status['detail']}</span>
+        </div>""", unsafe_allow_html=True,
+    )
     if not brief["data_sufficient"]:
         st.warning(brief["summary"])
         st.caption("O AtlasQuant não cria narrativa quando os dados necessários não estão válidos.")
