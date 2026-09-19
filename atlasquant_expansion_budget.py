@@ -95,7 +95,10 @@ def max_supported_pairs(
     daily_cap: int = DEFAULTS["daily_cap"],
     **kwargs,
 ) -> int:
-    cap=max(1,int(daily_cap))
+    cap_raw,cap_ok=_safe_int(daily_cap,1)
+    if not cap_ok or cap_raw<=0:
+        return 0
+    cap=max(1,cap_raw)
     # Search is intentionally bounded well above the 28-pair G8 universe.
     last=0
     for pairs in range(0,101):
