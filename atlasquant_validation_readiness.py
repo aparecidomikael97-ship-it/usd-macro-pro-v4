@@ -259,6 +259,11 @@ def render_validation_readiness(
     st.progress(shadow_progress/100.0,text=f"Shadow Mode · {result['shadow']['samples']}/{result['shadow']['min_samples']} · {shadow_progress:.0f}%")
     st.progress(quota_progress/100.0,text=f"Quota com mercado aberto · {result['quota_shadow']['market_open_runs']}/{result['quota_shadow']['min_market_runs']} · {quota_progress:.0f}%")
     st.progress(pair_progress/100.0,text=f"Cobertura balanceada por par · {pair_covered_total}/{pair_required_total} · {pair_progress:.0f}%")
+    st.caption(
+        f"Pares na meta: {pair_coverage['pairs_complete']}/{pair_coverage['pairs_total']} · "
+        f"sem amostra: {len(pair_coverage['pairs_missing'])} · "
+        f"abaixo da meta: {len(pair_coverage['pairs_under_target'])}."
+    )
 
     rows=[
         {"Camada":"Performance","OK":result["checks"]["performance_reviewable"],"Estado":result["performance"]["label"]},
