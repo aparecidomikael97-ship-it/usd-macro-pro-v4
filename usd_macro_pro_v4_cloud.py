@@ -345,47 +345,45 @@ st.sidebar.title("🧭 AtlasQuant")
 st.sidebar.caption(f"Market Intelligence Platform · {ATLASQUANT_ENVIRONMENT}")
 st.sidebar.caption(f"Engine base {APP_VERSION}")
 
-ESCALA_CONFIANCA = st.sidebar.slider(
-    "Sensibilidade da comparação", 2.0, 30.0, 10.0, 0.5,
-    help="Quanto a diferença de força entre duas moedas altera a confiança relativa do modelo."
-)
-
-PESOS = {
-    "juros": st.sidebar.slider("Peso — Juros", 0.0, 0.50, 0.20, 0.05),
-    "inflacao": st.sidebar.slider("Peso — Inflação", 0.0, 0.50, 0.15, 0.05),
-    "pib": st.sidebar.slider("Peso — PIB", 0.0, 0.50, 0.15, 0.05),
-    "emprego": st.sidebar.slider("Peso — Emprego", 0.0, 0.50, 0.20, 0.05),
-    "atividade": st.sidebar.slider("Peso — Atividade", 0.0, 0.50, 0.20, 0.05),
-    "sentimento": st.sidebar.slider("Peso — Sentimento", 0.0, 0.50, 0.10, 0.05),
-}
-
-peso_total = sum(PESOS.values())
-st.sidebar.caption(f"Soma dos pesos: {peso_total:.2f}")
-if abs(peso_total - 1.0) > 0.01:
-    st.sidebar.warning("⚠️ O ideal é a soma dos pesos ficar em 1,00.")
-
-st.sidebar.subheader("Sensibilidade ao Federal Reserve")
-SENSIBILIDADE_FED = {
-    moeda: st.sidebar.slider(
-        moeda, -1.0, 1.0, float(SENSIBILIDADE_FED_PADRAO[moeda]), 0.05
+with st.sidebar.expander("⚙️ Modelo macro", expanded=False):
+    ESCALA_CONFIANCA = st.slider(
+        "Sensibilidade da comparação", 2.0, 30.0, 10.0, 0.5,
+        help="Quanto a diferença de força entre duas moedas altera a confiança relativa do modelo."
     )
-    for moeda in MOEDAS
-}
+    PESOS = {
+        "juros": st.slider("Peso — Juros", 0.0, 0.50, 0.20, 0.05),
+        "inflacao": st.slider("Peso — Inflação", 0.0, 0.50, 0.15, 0.05),
+        "pib": st.slider("Peso — PIB", 0.0, 0.50, 0.15, 0.05),
+        "emprego": st.slider("Peso — Emprego", 0.0, 0.50, 0.20, 0.05),
+        "atividade": st.slider("Peso — Atividade", 0.0, 0.50, 0.20, 0.05),
+        "sentimento": st.slider("Peso — Sentimento", 0.0, 0.50, 0.10, 0.05),
+    }
+    peso_total = sum(PESOS.values())
+    st.caption(f"Soma dos pesos: {peso_total:.2f}")
+    if abs(peso_total - 1.0) > 0.01:
+        st.warning("⚠️ O ideal é a soma dos pesos ficar em 1,00.")
 
-st.sidebar.divider()
-st.sidebar.caption("Modelo FX: prioriza juros reais, Treasury 2Y e Fed para o USD.")
-st.sidebar.caption(f"🕒 Atualizado: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
-if not CHAVE_FRED:
-    st.sidebar.warning("FRED sem chave: alguns dados usarão valores de segurança.")
-if CHAVE_EODHD:
-    st.sidebar.success("EODHD configurado: consenso automático tentará usar Economic Events.")
-else:
-    st.sidebar.info("EODHD sem token: consenso permanece manual.")
+with st.sidebar.expander("🏦 Sensibilidade ao Fed", expanded=False):
+    SENSIBILIDADE_FED = {
+        moeda: st.slider(
+            moeda, -1.0, 1.0, float(SENSIBILIDADE_FED_PADRAO[moeda]), 0.05
+        )
+        for moeda in MOEDAS
+    }
 
-if CHAVE_TWELVE_DATA:
-    st.sidebar.success("Twelve Data configurado: coleta exclusiva do Autopilot; telas usam cache.")
-else:
-    st.sidebar.info("Twelve Data sem chave: análise técnica automática ficará aguardando configuração.")
+with st.sidebar.expander("📡 Fontes & status", expanded=False):
+    st.caption("Modelo FX: prioriza juros reais, Treasury 2Y e Fed para o USD.")
+    st.caption(f"🕒 Atualizado: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    if not CHAVE_FRED:
+        st.warning("FRED sem chave: alguns dados usarão valores de segurança.")
+    if CHAVE_EODHD:
+        st.success("EODHD configurado: consenso automático tentará usar Economic Events.")
+    else:
+        st.info("EODHD sem token: consenso permanece manual.")
+    if CHAVE_TWELVE_DATA:
+        st.success("Twelve Data configurado: coleta exclusiva do Autopilot; telas usam cache.")
+    else:
+        st.info("Twelve Data sem chave: análise técnica automática ficará aguardando configuração.")
 
 # =========================================================
 # CONEXÃO E FRED
