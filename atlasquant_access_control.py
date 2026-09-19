@@ -20,6 +20,7 @@ DEFAULT_ITERATIONS=310_000
 MIN_ITERATIONS=200_000
 MAX_ITERATIONS=2_000_000
 MAX_USERS=500
+MAX_CONFIG_CHARS=1_000_000
 _USERNAME_RE=re.compile(r"^[a-z0-9][a-z0-9._-]{2,63}$")
 
 ROLE_PERMISSIONS={
@@ -104,6 +105,8 @@ def _user_from_record(username:Any, record:Any)->AccessUser|None:
 
 def load_users_config(raw:Any)->dict[str,AccessUser]:
     if raw is None or raw=="":
+        return {}
+    if isinstance(raw,str) and len(raw)>MAX_CONFIG_CHARS:
         return {}
     try:
         data=json.loads(raw) if isinstance(raw,str) else raw
