@@ -284,6 +284,14 @@ def _theme_css(theme: str, font_scale: str, reduced_motion: bool) -> str:
     """
 
 
+
+def experience_theme_summary(theme: str, font_scale: str, reduced_motion: bool) -> dict[str,Any]:
+    allowed={"Claro","Escuro","Alto contraste"}
+    safe_theme=theme if theme in allowed else "Claro"
+    safe_font=font_scale if font_scale in {"Normal","Grande","Muito grande"} else "Normal"
+    return {"theme":safe_theme,"font_scale":safe_font,"reduced_motion":bool(reduced_motion),"responsive":True}
+
+
 def render_experience_controls() -> dict[str, Any]:
     with st.sidebar.expander("🎨 Aparência & acessibilidade", expanded=False):
         theme = st.selectbox(
@@ -307,8 +315,10 @@ def render_experience_controls() -> dict[str, Any]:
         )
         st.caption("O layout responsivo também foi reforçado para celular e tablet.")
 
-    st.markdown(_theme_css(theme, font_scale, reduced_motion), unsafe_allow_html=True)
-    return {"theme": theme, "font_scale": font_scale, "reduced_motion": reduced_motion}
+    prefs=experience_theme_summary(theme,font_scale,reduced_motion)
+    st.markdown(_theme_css(prefs["theme"], prefs["font_scale"], prefs["reduced_motion"]), unsafe_allow_html=True)
+    st.sidebar.caption(f"Interface: {prefs['theme']} · Texto {prefs['font_scale']} · Mobile responsivo")
+    return prefs
 
 
 def _currency_chart(ranking: pd.DataFrame):
