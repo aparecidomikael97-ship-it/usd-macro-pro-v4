@@ -187,6 +187,13 @@ except Exception as _account_portal_exc:
     render_account_portal = None
     _ATLASQUANT_ACCOUNT_PORTAL_IMPORT_ERROR = f"{type(_account_portal_exc).__name__}: {_account_portal_exc}"
 
+try:
+    from atlasquant_platform_center import render_platform_center
+    _ATLASQUANT_PLATFORM_IMPORT_ERROR = ""
+except Exception as _platform_exc:
+    render_platform_center = None
+    _ATLASQUANT_PLATFORM_IMPORT_ERROR = f"{type(_platform_exc).__name__}: {_platform_exc}"
+
 # =========================================================
 # CONFIGURAÇÕES GERAIS
 # =========================================================
@@ -3857,7 +3864,7 @@ else:
 abas = st.tabs([
     "Central", "Painel mestre", "Moedas", "EUA", "Pares", "Fed",
     "Histórico", "Backtest", "Decisão", "Market Map", "Macro Briefing", "Aprender",
-    "Produto", "Melhorias", "Notícias", "Autopilot", "Conta",
+    "Produto", "Melhorias", "Notícias", "Autopilot", "Conta", "Instalar",
 ])
 
 # =========================================================
@@ -9179,6 +9186,17 @@ with abas[16]:
             st.caption("Diagnóstico: "+_ATLASQUANT_ACCOUNT_PORTAL_IMPORT_ERROR)
     else:
         render_account_portal(_ATLASQUANT_ACCESS)
+
+# =========================================================
+# INSTALAÇÃO / DISTRIBUIÇÃO MULTIPLATAFORMA
+# =========================================================
+with abas[17]:
+    if render_platform_center is None:
+        st.error("Central de instalação indisponível neste carregamento.")
+        if _ATLASQUANT_PLATFORM_IMPORT_ERROR:
+            st.caption("Diagnóstico: "+_ATLASQUANT_PLATFORM_IMPORT_ERROR)
+    else:
+        render_platform_center()
 
 # No modo GitHub Actions/AppTest, persiste a Matriz atual para o runner background.
 if os.getenv("USD_MACRO_AUTOPILOT", "") == "1":
