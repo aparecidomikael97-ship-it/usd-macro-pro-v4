@@ -19,6 +19,14 @@ RUNTIME_MUTABLE_PATHS=frozenset({
     "dados/scanner_tecnico_v934.json",
     "dados/autopilot_daily_cache_v107.json",
     "dados/sinais_v84.csv",
+    "dados/atlasquant_flight_recorder.jsonl",
+    "dados/atlasquant_quota_shadow_v1.json",
+    "dados/atlasquant_shadow_samples.jsonl",
+    "dados/paper_trades_v112.csv",
+    "dados/paper_trading_summary_v112.json",
+    "dados/paper_setup_audit_v114.csv",
+    "dados/paper_setup_performance_v114.csv",
+    "dados/paper_setup_summary_v114.json",
 })
 
 
