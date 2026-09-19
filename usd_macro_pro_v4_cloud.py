@@ -9201,9 +9201,17 @@ with abas[13]:
                     _aq_quota_rows = _aq_quota_store.get("samples", [])
                     if isinstance(_aq_quota_rows, list):
                         _aq_quota_samples = [x for x in _aq_quota_rows if isinstance(x, dict)]
+                _aq_validation_shadow_rows = st.session_state.get("atlasquant_shadow_samples", [])
+                if ensure_shadow_hydrated is not None:
+                    try:
+                        _aq_hydrated_shadow_rows, _aq_validation_shadow_load = ensure_shadow_hydrated()
+                        if isinstance(_aq_hydrated_shadow_rows, list):
+                            _aq_validation_shadow_rows = _aq_hydrated_shadow_rows
+                    except Exception:
+                        pass
                 _aq_validation_result = render_validation_readiness(
                     _aq_research_df.copy(),
-                    st.session_state.get("atlasquant_shadow_samples", []),
+                    _aq_validation_shadow_rows,
                     _aq_quota_samples,
                     horizon="24h",
                 )
