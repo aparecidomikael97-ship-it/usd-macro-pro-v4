@@ -39,6 +39,7 @@ REQUIRED_FILES=(
     "atlasquant_backtest_snapshot_history.py",
     "atlasquant_runtime_store.py",
     "atlasquant_release_guard.py",
+    "atlasquant_release_candidate.py",
     "atlasquant_access_control.py",
     "atlasquant_access_panel.py",
     "atlasquant_account_portal.py",
