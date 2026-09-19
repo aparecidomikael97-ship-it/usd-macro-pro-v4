@@ -87,6 +87,12 @@ Nenhum destes itens é inferido automaticamente por existir código, checklist o
 
 Dados operacionais mutáveis não devem voltar a ser usados como motivo para commits contínuos no `main`.
 
+## Backup automático da fonte
+
+O workflow `AtlasQuant - Source Backup ZIP` cria um ZIP da `main` em cada push e também pode ser executado manualmente. O artefato inclui manifesto, SHA-256 e retenção temporária no GitHub Actions.
+
+O backup contém a fonte estável da release e não substitui o histórico Git nem a branch mutável de runtime.
+
 ## Auditoria automatizada de prontidão
 
 O workflow `AtlasQuant - Release Readiness` executa periodicamente e em mudanças relevantes para confirmar que:
