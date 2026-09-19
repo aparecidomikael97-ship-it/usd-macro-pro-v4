@@ -4,8 +4,6 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths:
-      - ".github/workflows/production-health.yml"
   schedule:
     - cron: "23 */2 * * *"
 
