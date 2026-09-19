@@ -9,7 +9,7 @@ from html import escape
 import math
 import streamlit as st
 
-UI_VERSION = "0.9"
+UI_VERSION = "1.0"
 
 NAVIGATION_LABELS = (
     "🎯 Central",
@@ -302,7 +302,7 @@ def operation_focus_html(
     decision: str = "Aguardando leitura",
     market: str = "Contexto em atualização",
     data: str = "Qualidade monitorada",
-    safety: str = "Safety Core ativo",
+    safety: str = "Safety Core monitorado",
 ) -> str:
     """Compact decision-first orientation strip; presentation only."""
     return (
@@ -315,7 +315,7 @@ def operation_focus_html(
         '<div class="aq-focus-card"><small>Dados</small>'
         f'<strong>{escape(str(data))}</strong><span>Frescor e cobertura</span></div>'
         '<div class="aq-focus-card"><small>Proteção</small>'
-        f'<strong>{escape(str(safety))}</strong><span>Veto independente</span></div>'
+        f'<strong>{escape(str(safety))}</strong><span>Confirmação no fluxo operacional</span></div>'
         '</div>'
     )
 
@@ -338,8 +338,8 @@ def hero_html(app_version: str, environment: str = "LOCAL") -> str:
   <div class="aq-badges">
     <span class="aq-badge aq-dev">{env}</span>
     <span class="aq-badge">Engine base {version}</span>
-    <span class="aq-badge">Safety Core</span>
-    <span class="aq-badge">Fail-closed</span>
+    <span class="aq-badge">Safety Core monitorado</span>
+    <span class="aq-badge">Fail-closed por desenho</span>
     <span class="aq-badge">Auditável</span>
   </div>
 </div>
