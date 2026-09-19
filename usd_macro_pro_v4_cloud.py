@@ -173,6 +173,13 @@ except Exception as _autopilot_exc:
     render_autopilot_v107 = None
     _AUTOPILOT_V107_IMPORT_ERROR = f"{type(_autopilot_exc).__name__}: {_autopilot_exc}"
 
+try:
+    from atlasquant_access_panel import render_access_gate
+    _ATLASQUANT_ACCESS_IMPORT_ERROR = ""
+except Exception as _access_exc:
+    render_access_gate = None
+    _ATLASQUANT_ACCESS_IMPORT_ERROR = f"{type(_access_exc).__name__}: {_access_exc}"
+
 # =========================================================
 # CONFIGURAÇÕES GERAIS
 # =========================================================
@@ -187,6 +194,26 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
+
+# Optional private-access gate. Disabled by default; when required it fails closed.
+if render_access_gate is not None:
+    _ATLASQUANT_ACCESS = render_access_gate()
+    if not bool(_ATLASQUANT_ACCESS.get("allowed",False)):
+        st.stop()
+else:
+    try:
+        _auth_required_raw = st.secrets.get(
+            "ATLASQUANT_AUTH_REQUIRED",
+            os.getenv("ATLASQUANT_AUTH_REQUIRED","false"),
+        )
+    except Exception:
+        _auth_required_raw = os.getenv("ATLASQUANT_AUTH_REQUIRED","false")
+    _auth_required_fallback = str(_auth_required_raw or "").strip().lower() in {"1","true","yes","on","sim"}
+    if _auth_required_fallback:
+        st.error("🔒 Camada de acesso indisponível; aplicação bloqueada por segurança.")
+        st.caption(_ATLASQUANT_ACCESS_IMPORT_ERROR)
+        st.stop()
+    _ATLASQUANT_ACCESS = {"allowed":True,"mode":"OPEN","role":"OPEN"}
 
 from compact_ui_v1107 import apply_compact_theme
 apply_compact_theme()
