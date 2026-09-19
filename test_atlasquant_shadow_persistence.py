@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from atlasquant_challenger_v1 import build_challenger_snapshot, champion_snapshot
 from atlasquant_shadow_store import parse_samples,serialize_samples,merge_unique_samples,persist_shadow_samples
-from atlasquant_shadow_capture import build_shadow_batch,hydrate_shadow_samples
+from atlasquant_shadow_capture import ensure_shadow_hydrated, build_shadow_batch,hydrate_shadow_samples
 
 
 class _Resp:
@@ -74,7 +74,16 @@ class AtlasQuantShadowPersistenceTests(unittest.TestCase):
             r=persist_shadow_samples([sample],repo="o/r",branch="atlasquant-runtime",token="t")
         self.assertTrue(r["ok"]); self.assertEqual(r["added"],1)
         raw=base64.b64decode(p.call_args.kwargs["json"]["content"]).decode("utf-8")
-        self.assertEqual(parse_samples(raw)[0]["sample_id"],sample["sample_id"])
+        self.assertEqual(parse_samples(raw)[0]["sample_id
+
+    def test_shadow_hydration_source_metadata_is_safe_and_explicit(self):
+        import inspect
+        source=inspect.getsource(ensure_shadow_hydrated)
+        self.assertIn('"source":"runtime_persistent"',source)
+        self.assertIn('"source":"session_fallback"',source)
+        self.assertIn('"branch":cfg["branch"]',source)
+        self.assertNotIn('"token":cfg["token"]',source)
+"],sample["sample_id"])
 
 
 if __name__=="__main__":
