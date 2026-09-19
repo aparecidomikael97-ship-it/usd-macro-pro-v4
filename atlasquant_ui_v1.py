@@ -9,7 +9,7 @@ from html import escape
 import math
 import streamlit as st
 
-UI_VERSION = "0.3"
+UI_VERSION = "0.4"
 
 NAVIGATION_LABELS = (
     "🎯 Central",
@@ -122,6 +122,13 @@ html { scroll-behavior: smooth; }
   font-weight: 650;
 }
 .aq-dev { color: #f2c14e; border-color: rgba(242,193,78,.34); }
+.aq-section-title {display:flex;align-items:center;gap:9px;margin:1.15rem 0 .55rem;color:var(--aq-text);font-size:1.02rem;font-weight:800}
+.aq-section-title:after {content:"";height:1px;flex:1;background:linear-gradient(90deg,var(--aq-line),transparent)}
+.aq-state {display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 9px;font-size:.7rem;font-weight:800;border:1px solid var(--aq-line)}
+.aq-state-good{color:var(--aq-good);background:rgba(66,211,146,.08)}
+.aq-state-warn{color:var(--aq-warn);background:rgba(242,193,78,.08)}
+.aq-state-bad{color:var(--aq-bad);background:rgba(255,107,122,.08)}
+.aq-state-info{color:var(--aq-accent);background:rgba(79,163,255,.08)}
 [data-testid="stMetric"] {
   background: linear-gradient(180deg, rgba(17,34,57,.80), rgba(11,25,43,.72));
   border: 1px solid var(--aq-line) !important;
@@ -169,6 +176,8 @@ html { scroll-behavior: smooth; }
   .aq-hero { padding: 18px 16px 16px; border-radius: 14px; }
   .aq-subtitle { font-size: .84rem; }
   .aq-badge { font-size: .68rem; padding: 4px 8px; }
+  .aq-section-title { font-size:.94rem; margin-top:.9rem; }
+  [data-testid="stSidebar"] { min-width: 280px; }
 }
 </style>
 """
@@ -217,6 +226,15 @@ def hero_html(app_version: str, environment: str = "LOCAL") -> str:
   </div>
 </div>
 """
+
+
+
+def section_title_html(title: str, icon: str = "") -> str:
+    return f'<div class="aq-section-title"><span>{escape(str(icon))}</span><span>{escape(str(title))}</span></div>'
+
+def state_badge_html(label: str, tone: str = "info") -> str:
+    safe_tone=tone if tone in {"good","warn","bad","info"} else "info"
+    return f'<span class="aq-state aq-state-{safe_tone}">{escape(str(label))}</span>'
 
 
 def apply_atlasquant_theme() -> None:
