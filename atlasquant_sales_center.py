@@ -125,6 +125,9 @@ def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
     checklist=[
         ("Login e perfis","PRONTO"),
         ("Portal ADMIN / SALES","PRONTO"),
+        ("Isolamento SALES","VERIFICADO" if status["sales_role_isolation_verified"] else "REVISAR"),
+        ("Revogação de conta/sessão","VERIFICADA" if status["account_revocation_verified"] else "REVISAR"),
+        ("Auditoria administrativa","VERIFICADA" if status["audit_manifest_verified"] else "REVISAR"),
         ("PWA instalável","PRONTO" if status["pwa_ready"] else "BLOQUEADO"),
         ("Academy e vídeos","PENDENTE"),
         ("Assistente de voz","PENDENTE"),
