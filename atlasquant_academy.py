@@ -315,6 +315,10 @@ def render_academy_panel()->dict[str,Any]:
         unsafe_allow_html=True,
     )
 
+    from atlasquant_academy_visuals import render_concept_visual
+    if render_concept_visual(item["id"]):
+        st.caption("Animação didática local · sem chamada externa e sem efeito no motor.")
+
     done=item["id"] in set(progress["completed_ids"])
     if st.checkbox("Marcar esta aula como concluída",value=done,key=f"aq_academy_done_{item['id']}"):
         if not done:
