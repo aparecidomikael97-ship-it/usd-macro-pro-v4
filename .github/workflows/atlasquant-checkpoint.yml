@@ -1,0 +1,101 @@
+name: AtlasQuant Source Checkpoint
+
+on:
+  push:
+    branches:
+      - atlasquant-dev
+      - atlasquant-runtime
+      - atlasquant-integration
+    paths-ignore:
+      - "dados/autopilot_inputs_v107.json"
+      - "dados/autopilot_status_v107.json"
+      - "dados/configuracoes_completas_v937.csv"
+      - "dados/currency_news_current_v107.json"
+      - "dados/currency_news_validation_v1061.csv"
+      - "dados/master_market_map_v102.json"
+      - "dados/scanner_tecnico_v934.json"
+      - "dados/autopilot_daily_cache_v107.json"
+      - "dados/twelve_budget_v1108.json"
+      - "dados/twelve_series_v1108.json"
+      - "dados/sinais_v84.csv"
+      - "dados/atlasquant_flight_recorder.jsonl"
+      - "dados/atlasquant_quota_shadow_v1.json"
+      - "dados/atlasquant_shadow_samples.jsonl"
+      - "dados/paper_trades_v112.csv"
+      - "dados/paper_trading_summary_v112.json"
+      - "dados/paper_setup_audit_v114.csv"
+      - "dados/paper_setup_performance_v114.csv"
+      - "dados/paper_setup_summary_v114.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checkpoint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v7
+
+      - name: Build checkpoint ZIP
+        shell: python
+        run: |
+          from __future__ import annotations
+          import hashlib
+          import os
+          from pathlib import Path
+          import sys
+          import zipfile
+
+          root = Path.cwd()
+          sys.path.insert(0, str(root))
+          from atlasquant_branch_drift import RUNTIME_MUTABLE_PATHS
+          sha = os.environ.get("GITHUB_SHA", "unknown")
+          branch = os.environ.get("GITHUB_REF_NAME", "unknown")
+          short = sha[:7]
+          out = Path("/tmp") / f"AtlasQuant_{branch}_{short}_checkpoint.zip"
+          info = Path("/tmp") / "CHECKPOINT_INFO.md"
+
+          info.write_text(
+              "# AtlasQuant checkpoint\n\n"
+              f"- Branch: `{branch}`\n"
+              f"- Commit: `{sha}`\n"
+              "- Snapshot: exact GitHub Actions checkout of this commit.\n"
+              "- Continuity context: `CONTEXTO_DO_PROJETO.md`, "
+              "`HISTORICO_DE_ALTERACOES.md` and `docs/continuidade/` are included when present.\n"
+              "- Runtime data branch is not modified by this workflow.\n"
+              "- Known mutable runtime evidence under dados/ is excluded from the archive.\n"
+              "- This archive is a source-code checkpoint; no provider/API calls are made.\n",
+              encoding="utf-8",
+          )
+
+          excluded_dirs = {".git", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".venv", "venv"}
+          with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
+              zf.write(info, "CHECKPOINT_INFO.md")
+              for path in sorted(root.rglob("*")):
+                  if not path.is_file():
+                      continue
+                  rel = path.relative_to(root)
+                  if any(part in excluded_dirs for part in rel.parts):
+                      continue
+                  if path.suffix.lower() == ".zip":
+                      continue
+                  rel_text = rel.as_posix()
+                  if rel_text in RUNTIME_MUTABLE_PATHS:
+                      continue
+                  zf.write(path, rel_text)
+
+          digest = hashlib.sha256(out.read_bytes()).hexdigest()
+          print(f"Created: {out}")
+          print(f"SHA256: {digest}")
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
+              env.write(f"CHECKPOINT_ZIP={out}\n")
+
+      - name: Upload checkpoint artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: AtlasQuant-${{ github.ref_name }}-${{ github.sha }}
+          path: ${{ env.CHECKPOINT_ZIP }}
+          if-no-files-found: error
+          retention-days: 90

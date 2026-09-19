@@ -8,12 +8,15 @@ from __future__ import annotations
 
 import base64
 import io
+import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import pandas as pd
 import requests
 import streamlit as st
+from twelve_cache_v1108 import cached_series, clear_shared_cache
+from atlasquant_runtime_store import resolve_runtime_branch
 
 from market_map_core_v10 import (
     NY_TZ,
@@ -42,36 +45,9 @@ from market_map_core_v10 import (
 MARKET_MAP_DATA_PATH = "dados/market_map_v10.csv"
 
 
-@st.cache_data(ttl=900, show_spinner=False)
-def _td_series(symbol: str, interval: str, outputsize: int, _api_key: str) -> tuple[pd.DataFrame, str]:
-    if not _api_key:
-        return pd.DataFrame(), "CHAVE_TWELVE_DATA ausente."
-    try:
-        r = requests.get(
-            "https://api.twelvedata.com/time_series",
-            params={
-                "symbol": symbol,
-                "interval": interval,
-                "outputsize": int(outputsize),
-                "apikey": _api_key,
-                "timezone": "UTC",
-                "format": "JSON",
-                "order": "ASC",
-            },
-            timeout=20,
-        )
-        if r.status_code != 200:
-            return pd.DataFrame(), f"Twelve Data HTTP {r.status_code}."
-        js = r.json()
-        if isinstance(js, dict) and js.get("status") == "error":
-            return pd.DataFrame(), str(js.get("message") or "Erro da Twelve Data.")
-        values = js.get("values", []) if isinstance(js, dict) else []
-        df = normalize_ohlc(values)
-        if df.empty:
-            return df, "A Twelve Data não retornou candles OHLC válidos."
-        return df, ""
-    except Exception as exc:
-        return pd.DataFrame(), f"Falha Twelve Data: {type(exc).__name__}."
+def _td_series(symbol: str, interval: str, outputsize: int, _api_key: str):
+    return cached_series(symbol,interval,outputsize)
+_td_series.clear = clear_shared_cache
 
 
 def _matrix_row(matrix: pd.DataFrame, pair: str) -> dict:
@@ -101,10 +77,16 @@ def _safe_float(value, default=0.0) -> float:
 
 
 def _gh_config() -> tuple[str, str, str]:
-    token = st.secrets.get("GITHUB_TOKEN_HISTORICO", "")
-    repo = st.secrets.get("GITHUB_REPO_HISTORICO", "")
-    branch = st.secrets.get("GITHUB_BRANCH_HISTORICO", "main")
-    return str(token), str(repo), str(branch or "main")
+    try:
+        token = st.secrets.get("GITHUB_TOKEN_HISTORICO", os.getenv("GITHUB_TOKEN_HISTORICO", ""))
+        repo = st.secrets.get("GITHUB_REPO_HISTORICO", os.getenv("GITHUB_REPO_HISTORICO", ""))
+        branch = resolve_runtime_branch(
+            st.secrets.get("GITHUB_DATA_BRANCH", os.getenv("GITHUB_DATA_BRANCH", "")),
+            st.secrets.get("GITHUB_BRANCH_HISTORICO", os.getenv("GITHUB_BRANCH_HISTORICO", "")),
+        )
+    except Exception:
+        token, repo, branch = "", "", resolve_runtime_branch()
+    return str(token), str(repo), str(branch)
 
 
 def _save_snapshot(snapshot: dict) -> tuple[bool, str, bool]:
@@ -184,7 +166,7 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str,
         help="Há variações públicas da Quarterly Theory. A âncora fica explícita para evitar regra escondida.",
     )
     anchor_hour = 0 if anchor_label.startswith("00") else 18
-    if ctrl3.button("🔄 Atualizar Market Map", use_container_width=True, key="v102_market_map_refresh"):
+    if ctrl3.button("🔄 Atualizar Market Map", width="stretch", key="v102_market_map_refresh"):
         _td_series.clear()
         st.rerun()
 
@@ -223,7 +205,7 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str,
                 "Relação com o viés": status,
                 "Peso explicativo": f"{item['weight']:.0f}%",
             })
-        st.dataframe(pd.DataFrame(macro_rows), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(macro_rows), hide_index=True, width="stretch")
     risk_level = regime["event_risk"]["level"]
     if risk_level in {"ALTO", "ELEVADO"}:
         st.warning("📅 " + regime["event_risk"]["text"])
@@ -310,7 +292,7 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str,
         df_liq = pd.DataFrame(liq)
         df_liq["Preço"] = df_liq["Preço"].map(lambda x: _fmt_price(x, pair))
         df_liq["Distância (pips)"] = df_liq["Distância (pips)"].map(lambda x: round(float(x), 1))
-        st.dataframe(df_liq, hide_index=True, use_container_width=True)
+        st.dataframe(df_liq, hide_index=True, width="stretch")
 
     sweeps = recent_sweeps(m15, levels, bars=16)
     if sweeps:
@@ -364,7 +346,7 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str,
             "Status": "🟢 ATIVA" if active and w["name"] == active["name"] else "—",
         })
     if kz_rows:
-        st.dataframe(pd.DataFrame(kz_rows), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(kz_rows), hide_index=True, width="stretch")
 
     # -----------------------------------------------------
     # 5 — STRICT READINESS GATE
@@ -386,7 +368,7 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str,
     for item in readiness["checks"]:
         status = "🟢 PASSA" if item["ok"] is True else "🔴 FALHA" if item["ok"] is False else "⚪ SEM DADO"
         gate_rows.append({"Filtro": item["name"], "Status": status, "Detalhe": item["detail"], "Peso": f"{item['weight']:.0f}%"})
-    st.dataframe(pd.DataFrame(gate_rows), hide_index=True, use_container_width=True)
+    st.dataframe(pd.DataFrame(gate_rows), hide_index=True, width="stretch")
 
     st.markdown("### 6️⃣ Leitura integrada · narrativa profissional")
     align = alignment_summary(
@@ -491,7 +473,7 @@ def render_market_map(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str,
         "readiness_grade": readiness["grade"],
         "versao": "V10.2 Professional Macro Market Map",
     }
-    if st.button("💾 Registrar leitura atual do Market Map", key="v102_save_snapshot", use_container_width=True):
+    if st.button("💾 Registrar leitura atual do Market Map", key="v102_save_snapshot", width="stretch"):
         ok, msg, created = _save_snapshot(snapshot)
         if ok and created:
             st.success(msg)

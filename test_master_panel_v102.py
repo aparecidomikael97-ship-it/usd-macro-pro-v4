@@ -24,9 +24,10 @@ class MasterPanelTests(unittest.TestCase):
 
     def scanner(self, green=True):
         status = '🟢 CONFIRMA' if green else '🔴 CONTRA'
+        now = pd.Timestamp.now(tz='UTC').isoformat()
         return {'resultados': {
-            'USD/CHF': {'tecnico': {'disponivel': True, 'h4': {'status': status}, 'h1': {'status': status}, 'm15': {'status': status}}},
-            'EUR/USD': {'tecnico': {'disponivel': True, 'h4': {'status':'🟢 CONFIRMA'}, 'h1': {'status':'🟢 PULLBACK OK'}, 'm15': {'status':'🟡 AGUARDAR GATILHO'}}},
+            'USD/CHF': {'m15_fetched_at': now, 'tecnico': {'disponivel': True, 'h4': {'status': status}, 'h1': {'status': status}, 'm15': {'status': status}}},
+            'EUR/USD': {'m15_fetched_at': now, 'tecnico': {'disponivel': True, 'h4': {'status':'🟢 CONFIRMA'}, 'h1': {'status':'🟢 PULLBACK OK'}, 'm15': {'status':'🟡 AGUARDAR GATILHO'}}},
         }}
 
     def contexts(self):
@@ -81,6 +82,15 @@ class MasterPanelTests(unittest.TestCase):
         self.assertTrue(info['available'])
         self.assertTrue(info['fresh'])
         self.assertLess(info['age_minutes'], 45)
+
+
+    def test_master_overview_state_is_descriptive_and_fail_closed(self):
+        from master_panel_v102 import master_overview_state
+        self.assertEqual(master_overview_state(pairs=0,processed=0,scanner_fresh=0)["label"],"AGUARDANDO DADOS")
+        self.assertEqual(master_overview_state(pairs=7,processed=7,scanner_fresh=7)["label"],"COBERTURA COMPLETA")
+        self.assertEqual(master_overview_state(pairs=7,processed=3,scanner_fresh=2)["label"],"COBERTURA PARCIAL")
+        self.assertEqual(master_overview_state(pairs="bad",processed=0,scanner_fresh=0)["label"],"REVISAR")
+
 
 
 if __name__ == '__main__':

@@ -50,7 +50,8 @@ jobs:
               "CHAVE_EODHD = " + toml_string(os.getenv("CHAVE_EODHD")),
               "GITHUB_TOKEN_HISTORICO = " + toml_string(os.getenv("GH_TOKEN_APP")),
               "GITHUB_REPO_HISTORICO = " + toml_string(repo),
-              'GITHUB_BRANCH_HISTORICO = "main"',
+              'GITHUB_DATA_BRANCH = "atlasquant-runtime"',
+              'GITHUB_BRANCH_HISTORICO = "atlasquant-runtime"',
               "",
           ])
           Path(".streamlit/secrets.toml").write_text(data, encoding="utf-8")

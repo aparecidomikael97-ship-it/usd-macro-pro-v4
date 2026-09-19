@@ -1,0 +1,107 @@
+//@version=5
+strategy(
+     "AtlasQuant FVG Research V1",
+     overlay=true,
+     pyramiding=0,
+     process_orders_on_close=false,
+     calc_on_order_fills=true,
+     initial_capital=10000,
+     commission_type=strategy.commission.percent,
+     commission_value=0.0
+)
+
+// Technical-only FVG research bridge.
+// No macro/Fed context and no future-data imports.
+
+groupFVG      = "Fair Value Gap"
+atrLen        = input.int(14, "ATR", minval=2, maxval=100, group=groupFVG)
+minGapAtr     = input.float(0.0, "Gap mínimo / ATR", minval=0.0, maxval=5.0, step=0.05, group=groupFVG)
+entryMode     = input.string("Midpoint", "Entrada", options=["Midpoint","Proximal"], group=groupFVG)
+stopBufferAtr = input.float(0.0, "Buffer do stop (ATR)", minval=0.0, maxval=1.0, step=0.01, group=groupFVG)
+rrTarget      = input.float(2.0, "Alvo em R", minval=0.25, maxval=10.0, step=0.25, group=groupFVG)
+maxSetupAge   = input.int(8, "Validade do setup (candles)", minval=1, maxval=100, group=groupFVG)
+sideFilter    = input.string("Both", "Lados", options=["Both","Long only","Short only"], group=groupFVG)
+
+groupSession = "Sessão"
+tradeSession = input.session("0000-2359", "Janela permitida", group=groupSession)
+inSession    = not na(time(timeframe.period, tradeSession))
+
+atr = ta.atr(atrLen)
+bullGapSize = low - high[2]
+bearGapSize = low[2] - high
+bullFvg = bar_index >= 2 and bullGapSize > 0 and bullGapSize >= nz(atr) * minGapAtr
+bearFvg = bar_index >= 2 and bearGapSize > 0 and bearGapSize >= nz(atr) * minGapAtr
+
+longAllowed  = sideFilter != "Short only"
+shortAllowed = sideFilter != "Long only"
+
+var int pendingSide = 0
+var int setupBar = na
+var float zoneLow = na
+var float zoneHigh = na
+var float pendingEntry = na
+var float pendingStop = na
+var float pendingTarget = na
+
+cancelPending() =>
+    strategy.cancel("FVG-L")
+    strategy.cancel("FVG-S")
+
+if bullFvg
+    cancelPending()
+    pendingSide := 0
+    if longAllowed and inSession and strategy.position_size == 0
+        zoneLow := high[2]
+        zoneHigh := low
+        pendingEntry := entryMode == "Midpoint" ? (zoneLow + zoneHigh) / 2.0 : zoneHigh
+        pendingStop := zoneLow - atr * stopBufferAtr
+        risk = pendingEntry - pendingStop
+        pendingTarget := pendingEntry + risk * rrTarget
+        setupBar := bar_index
+        pendingSide := risk > syminfo.mintick ? 1 : 0
+
+if bearFvg
+    cancelPending()
+    pendingSide := 0
+    if shortAllowed and inSession and strategy.position_size == 0
+        zoneLow := high
+        zoneHigh := low[2]
+        pendingEntry := entryMode == "Midpoint" ? (zoneLow + zoneHigh) / 2.0 : zoneLow
+        pendingStop := zoneHigh + atr * stopBufferAtr
+        risk = pendingStop - pendingEntry
+        pendingTarget := pendingEntry - risk * rrTarget
+        setupBar := bar_index
+        pendingSide := risk > syminfo.mintick ? -1 : 0
+
+pendingExpired = pendingSide != 0 and not na(setupBar) and bar_index - setupBar > maxSetupAge
+if pendingExpired and strategy.position_size == 0
+    cancelPending()
+    pendingSide := 0
+
+if pendingSide == 1 and strategy.position_size == 0
+    strategy.entry("FVG-L", strategy.long, limit=pendingEntry)
+    strategy.exit("FVG-LX", "FVG-L", stop=pendingStop, limit=pendingTarget)
+
+if pendingSide == -1 and strategy.position_size == 0
+    strategy.entry("FVG-S", strategy.short, limit=pendingEntry)
+    strategy.exit("FVG-SX", "FVG-S", stop=pendingStop, limit=pendingTarget)
+
+if strategy.position_size > 0
+    pendingSide := 0
+    strategy.exit("FVG-LX", "FVG-L", stop=pendingStop, limit=pendingTarget)
+
+if strategy.position_size < 0
+    pendingSide := 0
+    strategy.exit("FVG-SX", "FVG-S", stop=pendingStop, limit=pendingTarget)
+
+plotshape(bullFvg, title="Bull FVG", text="FVG↑", style=shape.labelup, location=location.belowbar, size=size.tiny)
+plotshape(bearFvg, title="Bear FVG", text="FVG↓", style=shape.labeldown, location=location.abovebar, size=size.tiny)
+
+plot(pendingSide != 0 or strategy.position_size != 0 ? zoneHigh : na, "FVG High", style=plot.style_linebr)
+plot(pendingSide != 0 or strategy.position_size != 0 ? zoneLow : na, "FVG Low", style=plot.style_linebr)
+plot(pendingSide != 0 or strategy.position_size != 0 ? pendingEntry : na, "Entry", style=plot.style_linebr)
+plot(strategy.position_size != 0 ? pendingStop : na, "Stop", style=plot.style_linebr)
+plot(strategy.position_size != 0 ? pendingTarget : na, "Target", style=plot.style_linebr)
+
+alertcondition(bullFvg, "AtlasQuant Bull FVG", "AtlasQuant: bullish FVG formado")
+alertcondition(bearFvg, "AtlasQuant Bear FVG", "AtlasQuant: bearish FVG formado")

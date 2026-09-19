@@ -53,12 +53,19 @@ ROADMAP = pd.DataFrame([
     {"Prioridade": "P2", "Área": "A/B", "Melhoria": "Comparar dock fixo vs navegação compacta", "Estado": "✅ Laboratório"},
     {"Prioridade": "P2", "Área": "Analytics", "Melhoria": "Telemetria externa com consentimento", "Estado": "🟡 Opcional"},
     {"Prioridade": "P2", "Área": "Push", "Melhoria": "Notificação com app fechado", "Estado": "🟡 Exige serviço externo"},
+    {"Prioridade": "P0", "Área": "Acesso", "Melhoria": "Login privado com perfis USER / SALES / ADMIN", "Estado": "✅ Base segura integrada"},
+    {"Prioridade": "P0", "Área": "Admin", "Melhoria": "Ciclo de conta não destrutivo + exportação revisável", "Estado": "✅ Integrado"},
+    {"Prioridade": "P0", "Área": "Vendas", "Melhoria": "Portal comercial + onboarding + checklist de lançamento", "Estado": "✅ Integrado"},
+    {"Prioridade": "P0", "Área": "Instalação", "Melhoria": "PWA Android/iOS/Windows/macOS/Linux", "Estado": "✅ Integrado"},
+    {"Prioridade": "P1", "Área": "Academy", "Melhoria": "Vídeos macro/SMC/plataforma/corretoras", "Estado": "🟡 Planejado"},
+    {"Prioridade": "P1", "Área": "Voz", "Melhoria": "Briefing diário/semanal e explicação do viés", "Estado": "🟡 Planejado"},
+    {"Prioridade": "P2", "Área": "Institucional", "Melhoria": "COT/open interest/posicionamento institucional", "Estado": "🟡 Fase final"},
 ])
 
 WIREFRAME_SVG = r"""<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="700" viewBox="0 0 1100 700">
 <rect width="1100" height="700" fill="#f4f7fb"/>
 <rect x="40" y="30" width="1020" height="70" rx="18" fill="#15345d"/>
-<text x="75" y="75" font-family="Arial" font-size="28" font-weight="700" fill="white">USD Macro Pro — Início</text>
+<text x="75" y="75" font-family="Arial" font-size="28" font-weight="700" fill="white">AtlasQuant — Início</text>
 <rect x="40" y="125" width="1020" height="80" rx="18" fill="white" stroke="#cbd7e6"/>
 <text x="70" y="160" font-family="Arial" font-size="18" font-weight="700" fill="#15345d">Resumo rápido</text>
 <text x="70" y="188" font-family="Arial" font-size="15" fill="#56677b">USD Macro • Fed • Evento • Melhor oportunidade • Frescor dos dados</text>
@@ -98,7 +105,9 @@ def freshness_by_frequency(date_value: Any, frequency: str, now: Any = None) -> 
     try:
         dt = pd.Timestamp(date_value).tz_localize(None).normalize()
         today = pd.Timestamp(now).tz_localize(None).normalize() if now is not None else pd.Timestamp.now().normalize()
-        age = max(0, int((today - dt).days))
+        age = int((today - dt).days)
+        if age < 0:
+            return "SEM DATA", "⚪", None
     except Exception:
         return "SEM DATA", "⚪", None
     if frequency == "daily":
@@ -126,7 +135,7 @@ def _interactive_chart(df: pd.DataFrame, ytitle: str, chart_type: str):
         st.info("Sem valores válidos para o gráfico.")
         return
     if alt is None:
-        st.line_chart(d.set_index("date")["value"], use_container_width=True)
+        st.line_chart(d.set_index("date")["value"], width="stretch")
         return
     common = {
         "x": alt.X("date:T", title="Data"),
@@ -139,7 +148,7 @@ def _interactive_chart(df: pd.DataFrame, ytitle: str, chart_type: str):
         chart = alt.Chart(d).mark_area(opacity=.30, line=True).encode(**common)
     else:
         chart = alt.Chart(d).mark_line(point=True).encode(**common)
-    st.altair_chart(chart.properties(height=340).interactive(), use_container_width=True)
+    st.altair_chart(chart.properties(height=340).interactive(), width="stretch")
     st.caption("Passe o mouse/toque nos pontos para valores. Zoom e pan dependem do navegador/dispositivo.")
 
 
@@ -196,19 +205,19 @@ def render_v104_hub(
 
     with tabs[0]:
         st.markdown("### 🏠 Tela inicial proposta")
-        st.components.v1.html(WIREFRAME_SVG, height=520, scrolling=True)
+        st.html(WIREFRAME_SVG)
         st.download_button("⬇️ Baixar wireframe SVG", WIREFRAME_SVG.encode("utf-8"),
                            "wireframe_usd_macro_pro_v104.svg", "image/svg+xml")
         st.markdown("**Objetivo:** Resumo Macro → 2 gráficos principais → Meus Indicadores → navegação curta.")
         c1, c2, c3 = st.columns(3)
-        if c1.button("🔄 Atualizar agora", use_container_width=True):
+        if c1.button("🔄 Atualizar agora", width="stretch"):
             if refresh_callback:
                 ok, msg = refresh_callback()
                 (st.success if ok else st.warning)(msg)
             else:
                 st.info("Atualização central indisponível nesta execução.")
         c2.link_button("📱 Abrir PWA", "https://aparecidomikael97-ship-it.github.io/usd-macro-pro-v4/",
-                       use_container_width=True)
+                       width="stretch")
         c3.metric("Teste A/B", f"Grupo {variant}")
         st.info("A V10.4 usa cache do servidor + PWA para a casca visual. Dados vivos continuam exigindo internet.")
 
@@ -246,7 +255,7 @@ def render_v104_hub(
         st.markdown("### 🧪 Testes A/B e planejamento")
         st.write(f"Variante desta sessão: **{variant}**")
         st.caption("A = dock fixo. B = navegação compacta. O feedback registra a variante.")
-        st.dataframe(ROADMAP, hide_index=True, use_container_width=True)
+        st.dataframe(ROADMAP, hide_index=True, width="stretch")
         st.download_button("⬇️ Baixar roadmap CSV", ROADMAP.to_csv(index=False).encode("utf-8"),
                            "roadmap_v104.csv", "text/csv")
         st.warning("Google Optimize foi descontinuado; a V10.4 usa um laboratório A/B interno simples e auditável.")

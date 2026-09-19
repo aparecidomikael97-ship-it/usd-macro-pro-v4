@@ -2,6 +2,16 @@ name: AtlasQuant - Automatic Scanner + Autopilot
 
 on:
   workflow_dispatch:
+  push:
+    branches: [atlasquant-runtime]
+    paths:
+      - ".github/workflows/autopilot-v107.yml"
+      - "autopilot_v107.py"
+      - "autopilot_paper_v112.py"
+      - "autopilot_setup_audit_v114.py"
+      - "autopilot_quota_guard_v111.py"
+      - "paper_trading_v112.py"
+      - "paper_friction_v116.py"
   schedule:
     - cron: "7,37 * * * *"
 
@@ -20,8 +30,8 @@ jobs:
       USD_MACRO_AUTOPILOT: "1"
       GITHUB_TOKEN_HISTORICO: ${{ github.token }}
       GITHUB_REPO_HISTORICO: ${{ github.repository }}
-      GITHUB_BRANCH_HISTORICO: "atlasquant-runtime"
       GITHUB_DATA_BRANCH: "atlasquant-runtime"
+      GITHUB_BRANCH_HISTORICO: "atlasquant-runtime"
       CHAVE_FRED: ${{ secrets.CHAVE_FRED }}
       CHAVE_TWELVE_DATA: ${{ secrets.CHAVE_TWELVE_DATA }}
       CHAVE_NEWSAPI: ${{ secrets.CHAVE_NEWSAPI }}
@@ -29,7 +39,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: "atlasquant-runtime"
+          ref: atlasquant-runtime
 
       - uses: actions/setup-python@v7
         with:
@@ -54,6 +64,7 @@ jobs:
               "CHAVE_EODHD",
               "GITHUB_TOKEN_HISTORICO",
               "GITHUB_REPO_HISTORICO",
+              "GITHUB_DATA_BRANCH",
               "GITHUB_BRANCH_HISTORICO",
           ]
           with open(".streamlit/secrets.toml", "w", encoding="utf-8") as f:
@@ -63,5 +74,5 @@ jobs:
           print("secrets.toml criado para AppTest (valores não exibidos).")
           PY
 
-      - name: Run quota-safe autopilot + paper trading + setup audit
+      - name: Run full background autopilot + paper + setup audit
         run: python autopilot_setup_audit_v114.py

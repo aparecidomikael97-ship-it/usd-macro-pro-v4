@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import time as _time
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -21,6 +22,8 @@ import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
+from twelve_cache_v1108 import cached_series, clear_shared_cache
+from atlasquant_runtime_store import resolve_runtime_branch
 
 from market_map_core_v10 import (
     NY_TZ,
@@ -63,10 +66,16 @@ def _fmt_price(value: Any, pair: str) -> str:
 
 
 def _gh_config() -> tuple[str, str, str]:
-    token = st.secrets.get("GITHUB_TOKEN_HISTORICO", "")
-    repo = st.secrets.get("GITHUB_REPO_HISTORICO", "")
-    branch = st.secrets.get("GITHUB_BRANCH_HISTORICO", "main")
-    return str(token), str(repo), str(branch or "main")
+    try:
+        token = st.secrets.get("GITHUB_TOKEN_HISTORICO", os.getenv("GITHUB_TOKEN_HISTORICO", ""))
+        repo = st.secrets.get("GITHUB_REPO_HISTORICO", os.getenv("GITHUB_REPO_HISTORICO", ""))
+        branch = resolve_runtime_branch(
+            st.secrets.get("GITHUB_DATA_BRANCH", os.getenv("GITHUB_DATA_BRANCH", "")),
+            st.secrets.get("GITHUB_BRANCH_HISTORICO", os.getenv("GITHUB_BRANCH_HISTORICO", "")),
+        )
+    except Exception:
+        token, repo, branch = "", "", resolve_runtime_branch()
+    return str(token), str(repo), str(branch)
 
 
 def _empty_state() -> dict[str, Any]:
@@ -128,35 +137,9 @@ def _save_state(state: Mapping[str, Any]) -> tuple[bool, str]:
         return False, f"{type(exc).__name__}: {exc}"
 
 
-@st.cache_data(ttl=900, show_spinner=False)
-def _td_series(symbol: str, interval: str, outputsize: int, _api_key: str) -> tuple[pd.DataFrame, str]:
-    if not _api_key:
-        return pd.DataFrame(), "CHAVE_TWELVE_DATA ausente."
-    try:
-        r = requests.get(
-            "https://api.twelvedata.com/time_series",
-            params={
-                "symbol": symbol,
-                "interval": interval,
-                "outputsize": int(outputsize),
-                "apikey": _api_key,
-                "timezone": "UTC",
-                "format": "JSON",
-                "order": "ASC",
-            },
-            timeout=20,
-        )
-        if r.status_code != 200:
-            return pd.DataFrame(), f"Twelve Data HTTP {r.status_code}."
-        js = r.json()
-        if isinstance(js, dict) and js.get("status") == "error":
-            return pd.DataFrame(), str(js.get("message") or "Erro da Twelve Data.")
-        df = normalize_ohlc(js.get("values", []) if isinstance(js, dict) else [])
-        if df.empty:
-            return df, "Sem candles OHLC válidos."
-        return df, ""
-    except Exception as exc:
-        return pd.DataFrame(), f"Falha Twelve Data: {type(exc).__name__}."
+def _td_series(symbol: str, interval: str, outputsize: int, _api_key: str):
+    return cached_series(symbol,interval,outputsize)
+_td_series.clear = clear_shared_cache
 
 
 def _matrix_row(matrix: pd.DataFrame, pair: str) -> dict[str, Any]:
@@ -211,7 +194,7 @@ def _build_pair_context(pair: str, row: Mapping[str, Any], api_key: str, macro_c
 
     return {
         "pair": pair,
-        "updated_at": pd.Timestamp.utcnow().isoformat(),
+        "updated_at": m15.attrs.get('source_fetched_at',pd.Timestamp.utcnow().isoformat()),
         "candle_m15": candle.isoformat(),
         "price": price,
         "macro_direction": direction,
@@ -272,7 +255,9 @@ def _minutes_since(value: Any) -> float | None:
         else:
             ts = pd.Timestamp(value)
             ts = ts.tz_localize("UTC") if ts.tzinfo is None else ts.tz_convert("UTC")
-        return max(0.0, (pd.Timestamp.now(tz="UTC") - ts).total_seconds() / 60.0)
+        age = float((pd.Timestamp.now(tz="UTC") - ts).total_seconds() / 60.0)
+        # Future timestamps are invalid evidence, not fresh evidence.
+        return None if age < 0 else age
     except Exception:
         return None
 
@@ -313,7 +298,9 @@ def _scanner_for_pair(scanner_state: Mapping[str, Any] | None, pair: str) -> dic
     # timestamp ausente como "não comprovadamente velho". Mantemos isso apenas
     # para legado; quando m15_fetched_at existe, a regra real é <=60 min.
     available = bool(tec.get("disponivel", False))
-    fresh = available and (True if age is None else age <= 60.0)
+    # Freshness must be positively proven by a valid timestamp. Missing or
+    # future-dated timestamps fail closed instead of being treated as fresh.
+    fresh = available and age is not None and age < 60.0
 
     return {
         "available": available,
@@ -457,6 +444,16 @@ def build_master_rows(matrix: pd.DataFrame, contexts: Mapping[str, Any], scanner
     return rows
 
 
+
+def master_overview_state(*, pairs: int, processed: int, scanner_fresh: int) -> dict[str,str]:
+    try: p=max(0,int(pairs)); m=max(0,int(processed)); s=max(0,int(scanner_fresh))
+    except Exception: return {"label":"REVISAR","detail":"Estado operacional inválido"}
+    if p<=0: return {"label":"AGUARDANDO DADOS","detail":"Sem pares disponíveis para consolidar"}
+    if m>=p and s>=p: return {"label":"COBERTURA COMPLETA","detail":"Market Map e scanner atuais nos pares exibidos"}
+    if m==0 and s==0: return {"label":"CONSTRUINDO CONTEXTO","detail":"Market Map e scanner ainda sem cobertura atual"}
+    return {"label":"COBERTURA PARCIAL","detail":f"Market Map {min(m,p)}/{p} · Scanner atual {min(s,p)}/{p}"}
+
+
 def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str,
                         macro_context: Mapping[str, Any] | None = None,
                         scanner_state: Mapping[str, Any] | None = None,
@@ -493,6 +490,14 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
         delta=(f"{_scanner_available_v1022}/{len(pairs)} com dados" if _scanner_available_v1022 != _scanner_fresh_v1022 else None),
     )
     top4.metric("Modo", "SELETIVO")
+    overview=master_overview_state(pairs=len(pairs),processed=processed,scanner_fresh=_scanner_fresh_v1022)
+    st.markdown(
+        f"""<div style="padding:11px 13px;border:1px solid rgba(137,170,210,.18);border-radius:12px;margin:4px 0 13px">
+        <strong>PAINEL MESTRE · {overview['label']}</strong>
+        <span style="margin-left:8px;opacity:.72;font-size:.78rem">{overview['detail']}</span>
+        <span style="float:right;opacity:.68;font-size:.72rem">Ranking ≠ probabilidade de lucro</span></div>""",
+        unsafe_allow_html=True,
+    )
 
     now_ts = _time.time()
     last_batch = _safe_float(state.get("last_batch_ts", 0.0))
@@ -501,7 +506,7 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
 
     c1, c2, c3 = st.columns([1.35, 1.2, 2.45])
     with c1:
-        if st.button("▶️ Atualizar próximo lote (2 pares)", key="v102_master_batch", disabled=(remaining > 0 or not bool(api_key)), use_container_width=True):
+        if st.button("▶️ Atualizar próximo lote (2 pares)", key="v102_master_batch", disabled=(remaining > 0 or not bool(api_key)), width="stretch"):
             candidates = []
             for offset in range(len(pairs)):
                 p = pairs[(cursor + offset) % len(pairs)]
@@ -527,7 +532,7 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
             else:
                 st.rerun()
     with c2:
-        if st.button("🔄 Recarregar painel", key="v102_master_reload", use_container_width=True):
+        if st.button("🔄 Recarregar painel", key="v102_master_reload", width="stretch"):
             st.rerun()
     with c3:
         if remaining > 0:
@@ -551,7 +556,7 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
             "🔄 Atualizar scanner técnico (2 pares)",
             key="v1022_master_refresh_scanner",
             disabled=(scanner_refresh_cb is None or _cooldown_v1022 > 0 or not bool(api_key)),
-            use_container_width=True,
+            width="stretch",
         ):
             try:
                 _ok_v1022, _msg_v1022 = scanner_refresh_cb()
@@ -568,7 +573,7 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
         if st.button(
             "🔁 Atualizar leitura",
             key="v1022_master_refresh_view",
-            use_container_width=True,
+            width="stretch",
         ):
             st.rerun()
 
@@ -648,7 +653,7 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
     show["Score"] = pd.to_numeric(show["Score"], errors="coerce").round(0)
     show["Qualidade"] = pd.to_numeric(show["Qualidade"], errors="coerce").round(0)
     show["ADR usado %"] = pd.to_numeric(show["ADR usado %"], errors="coerce").round(1)
-    st.dataframe(show, hide_index=True, use_container_width=True)
+    st.dataframe(show, hide_index=True, width="stretch")
 
     st.caption(
         "Índice Integrado = ranking operacional de Macro + Gate + Técnica. Não é probabilidade de gain. "

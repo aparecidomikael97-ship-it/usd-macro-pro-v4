@@ -38,6 +38,8 @@ import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
+from atlasquant_runtime_store import resolve_runtime_branch
+from twelve_cache_v1108 import cached_series
 
 
 CURRENCY_PROFILES = {
@@ -944,9 +946,12 @@ def _gh_cfg_v1061() -> tuple[str, str, str]:
             "GITHUB_REPO_HISTORICO",
             os.getenv("GITHUB_REPO_HISTORICO", "aparecidomikael97-ship-it/usd-macro-pro-v4")
         )
-        branch = st.secrets.get("GITHUB_BRANCH_HISTORICO", os.getenv("GITHUB_BRANCH_HISTORICO", "main"))
+        branch = resolve_runtime_branch(
+            st.secrets.get("GITHUB_DATA_BRANCH", os.getenv("GITHUB_DATA_BRANCH", "")),
+            st.secrets.get("GITHUB_BRANCH_HISTORICO", os.getenv("GITHUB_BRANCH_HISTORICO", "")),
+        )
     except Exception:
-        token, repo, branch = "", "aparecidomikael97-ship-it/usd-macro-pro-v4", "main"
+        token, repo, branch = "", "aparecidomikael97-ship-it/usd-macro-pro-v4", resolve_runtime_branch()
     return str(token).strip(), str(repo).strip(), str(branch).strip()
 
 
@@ -997,7 +1002,6 @@ def _gh_write_csv_v1061(path: str, df: pd.DataFrame, message: str) -> tuple[bool
         return True, ""
     except Exception as exc:
         return False, f"{type(exc).__name__}: {exc}"
-
 
 def _gh_read_json_v1061(path: str) -> tuple[dict[str, Any], str]:
     token, repo, branch = _gh_cfg_v1061()
@@ -1440,39 +1444,8 @@ def register_daily_news_snapshot_v1061(
 
 
 
-def _td_candles_v1061(pair: str, outputsize: int = 500) -> tuple[pd.DataFrame, str]:
-    try:
-        api_key = st.secrets.get("CHAVE_TWELVE_DATA", os.getenv("CHAVE_TWELVE_DATA", ""))
-    except Exception:
-        api_key = os.getenv("CHAVE_TWELVE_DATA", "")
-    if not api_key:
-        return pd.DataFrame(), "CHAVE_TWELVE_DATA ausente."
-    try:
-        r = requests.get(
-            "https://api.twelvedata.com/time_series",
-            params={
-                "symbol": pair,
-                "interval": "15min",
-                "outputsize": int(outputsize),
-                "apikey": api_key,
-                "timezone": "UTC",
-                "format": "JSON",
-            },
-            timeout=20,
-        )
-        if r.status_code != 200:
-            return pd.DataFrame(), f"HTTP {r.status_code}"
-        js = r.json()
-        vals = js.get("values") or []
-        if not vals:
-            return pd.DataFrame(), str(js.get("message", "Sem candles M15."))
-        df = pd.DataFrame(vals)
-        df["datetime"] = pd.to_datetime(df["datetime"], utc=True, errors="coerce")
-        df["close"] = pd.to_numeric(df["close"], errors="coerce")
-        df = df.dropna(subset=["datetime", "close"]).sort_values("datetime").reset_index(drop=True)
-        return df, ""
-    except Exception as exc:
-        return pd.DataFrame(), f"{type(exc).__name__}: {exc}"
+def _td_candles_v1061(pair: str, outputsize: int = 500):
+    return cached_series(pair,"15min",outputsize,history=True)
 
 
 def _directional_return_v1061(side: str, entry: float, exit_price: float) -> float | None:
@@ -1614,14 +1587,14 @@ def render_news_validation_panel_v1061(
         "Se estiver 0/7, atualize o scanner técnico no Painel Mestre e volte aqui."
     )
     with st.expander("📡 Ver frescor do scanner M15", expanded=False):
-        st.dataframe(pd.DataFrame(diag_rows), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(diag_rows), hide_index=True, width="stretch")
 
     a, b, c = st.columns(3)
     with a:
         if st.button(
             "🧰 Manual: registrar/atualizar",
             key="v1062_register_snapshot",
-            use_container_width=True
+            width="stretch"
         ):
             ok, msg, _ = register_daily_news_snapshot_v1061(intelligence, pair_df)
             (st.success if ok else st.error)(msg)
@@ -1629,7 +1602,7 @@ def render_news_validation_panel_v1061(
         if st.button(
             "🧰 Manual: recuperar preço",
             key="v1062_backfill_price",
-            use_container_width=True
+            width="stretch"
         ):
             ok, msg, _ = backfill_today_news_prices_v1062(intelligence, pair_df)
             (st.success if ok else st.warning)(msg)
@@ -1637,7 +1610,7 @@ def render_news_validation_panel_v1061(
         if st.button(
             "🧰 Manual: validar próximos 2",
             key="v1062_validate_news",
-            use_container_width=True
+            width="stretch"
         ):
             ok, msg, _ = validate_next_news_snapshots_v1061(max_rows=2)
             (st.success if ok else st.warning)(msg)
@@ -1683,7 +1656,7 @@ def render_news_validation_panel_v1061(
         })
     if stats_rows:
         st.markdown("#### Notícias confirmando x conflitando com o motor")
-        st.dataframe(pd.DataFrame(stats_rows), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(stats_rows), hide_index=True, width="stretch")
 
     show_cols = [
         "day_utc", "pair", "news_side", "news_diff", "alignment",
@@ -1693,7 +1666,7 @@ def render_news_validation_panel_v1061(
         "return_24h_pct", "hit_24h",
     ]
     show_cols = [c for c in show_cols if c in hist.columns]
-    st.dataframe(hist[show_cols].tail(30).iloc[::-1], hide_index=True, use_container_width=True)
+    st.dataframe(hist[show_cols].tail(30).iloc[::-1], hide_index=True, width="stretch")
 
 
 def _macro_score_map(ranking: pd.DataFrame | None) -> dict[str, float]:
@@ -1722,7 +1695,7 @@ def render_currency_news_panel(
 
     c_refresh, c_info = st.columns([1, 3])
     with c_refresh:
-        if st.button("🔄 Atualizar notícias", key="v1061_refresh_news", use_container_width=True):
+        if st.button("🔄 Atualizar notícias", key="v1061_refresh_news", width="stretch"):
             load_currency_news_intelligence.clear()
             st.rerun()
     with c_info:
@@ -1798,14 +1771,14 @@ def render_currency_news_panel(
     )
 
     st.markdown("### 🧭 Força calibrada de notícias por moeda")
-    st.dataframe(summary, hide_index=True, use_container_width=True)
+    st.dataframe(summary, hide_index=True, width="stretch")
 
     st.markdown("### 💱 Confluência das notícias com os 7 pares")
     st.caption(
         "A mesma história publicada/citada em várias moedas perde peso de independência. "
         "Assim reduzimos dupla contagem."
     )
-    st.dataframe(pair_df, hide_index=True, use_container_width=True)
+    st.dataframe(pair_df, hide_index=True, width="stretch")
 
     aligned = pair_df[pair_df["Alinhamento"] == "🟢 CONFIRMA"] if not pair_df.empty else pd.DataFrame()
     conflicts = pair_df[pair_df["Alinhamento"] == "🔴 CONFLITA"] if not pair_df.empty else pd.DataFrame()
@@ -1857,7 +1830,7 @@ def render_currency_news_panel(
                 "Manchete": a.get("title", ""),
                 "Leitura": a.get("explanation", ""),
             })
-        st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
     else:
         st.warning("Nenhuma manchete relevante encontrada agora.")
 
@@ -1878,6 +1851,5 @@ def render_currency_news_panel(
         summary.to_csv(index=False).encode("utf-8"),
         "currency_news_v1061.csv",
         "text/csv",
-        use_container_width=True,
+        width="stretch",
     )
-

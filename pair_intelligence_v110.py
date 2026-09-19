@@ -11,6 +11,7 @@ import json
 import math
 import os
 import time
+from html import escape
 from typing import Any, Mapping
 
 import numpy as np
@@ -27,6 +28,17 @@ from evidence_integrity_v1104 import (
     masked_technical_status, select_operational_context, sweep_freshness,
 )
 from strength_breakdown_v1104 import build_strength_breakdown, attribution_sides
+from atlasquant_central_brief import render_central_brief
+from atlasquant_context_explain import render_context_explain
+from atlasquant_data_quality_center import render_data_confidence
+from atlasquant_confluence_map import render_confluence_map
+from atlasquant_operational_plan import render_operational_plan
+from atlasquant_safety_panel import render_safety_core
+from atlasquant_regime_detector import render_regime_detector, capture_regime_detector
+from atlasquant_next_event import render_next_event
+from atlasquant_flight_recorder_panel import render_flight_recorder, capture_flight_recorder
+from atlasquant_runtime_store import resolve_runtime_branch
+from atlasquant_shadow_capture import capture_shadow_batch
 
 try:
     from currency_news_v107 import pair_news_table
@@ -73,10 +85,13 @@ def _gh_cfg():
     try:
         token=st.secrets.get("GITHUB_TOKEN_HISTORICO",os.getenv("GITHUB_TOKEN_HISTORICO",""))
         repo=st.secrets.get("GITHUB_REPO_HISTORICO",os.getenv("GITHUB_REPO_HISTORICO",""))
-        branch=st.secrets.get("GITHUB_BRANCH_HISTORICO",os.getenv("GITHUB_BRANCH_HISTORICO","main"))
+        branch=resolve_runtime_branch(
+            st.secrets.get("GITHUB_DATA_BRANCH",os.getenv("GITHUB_DATA_BRANCH","")),
+            st.secrets.get("GITHUB_BRANCH_HISTORICO",os.getenv("GITHUB_BRANCH_HISTORICO","")),
+        )
     except Exception:
-        token,repo,branch="","","main"
-    return str(token),str(repo),str(branch or "main")
+        token,repo,branch="","",resolve_runtime_branch()
+    return str(token),str(repo),str(branch)
 
 
 @st.cache_data(ttl=60,show_spinner=False)
@@ -285,7 +300,7 @@ def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro",weights=
         status,_text,_current=display_ict_component_status(comp,key,data_ready)
         if _current and "🟢" in status:
             (up if side=="BUY" else down).append(f"{label}: {status.replace('🟢','').strip()}")
-    for key,label in (("mss","MSS"),("displacement","Displacement"),("smt","SMT"),("dealing_range","Premium/Discount"),("session","Judas/Sessão"),("pd_array","Breaker/Mitigation"),("liquidity","Draw on Liquidity")):
+    for key,label in (("mss","MSS"),("structure","BOS/CHOCH"),("order_block","Order Block"),("displacement","Displacement"),("smt","SMT"),("dealing_range","Premium/Discount"),("session","Judas/Sessão"),("pd_array","Breaker/Mitigation"),("liquidity","Draw on Liquidity")):
         comp=_component(inst,key)
         status,_text=display_component_status(comp,key,data_ready)
         if "🟢" in status and not status.startswith("⏳") and data_ready.get("direction_consistent", True):
@@ -330,6 +345,7 @@ def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro",weights=
         "hard_blocks":decision["hard_blocks"],"soft_blocks":decision["soft_blocks"],"positives":decision["positives"],
         "executable":decision["executable"],"technical_age":age,"data_ready":data_ready,
         "stale_technical":stale_technical,"sweep_state":sweep_state,"strength":strength,"map_current":map_current,
+        "updated_at":mc.get("updated_at"),
     }
 
 
@@ -370,6 +386,7 @@ def _stack_rows(p:Mapping[str,Any])->pd.DataFrame:
         return status, comp.get("score") if current else None
 
     smt_s,smt_sc=_inst_state("smt"); disp_s,disp_sc=_inst_state("displacement"); mss_s,mss_sc=_inst_state("mss")
+    str_s,str_sc=_inst_state("structure"); ob_s,ob_sc=_inst_state("order_block")
     dr_s,dr_sc=_inst_state("dealing_range"); ses_s,ses_sc=_inst_state("session"); pd_s,pd_sc=_inst_state("pd_array")
     crt_s,crt_sc=_ict_state("crt"); ote_s,ote_sc=_ict_state("ote"); amd_s,amd_sc=_ict_state("amd"); fvg_s,fvg_sc=_ict_state("fvg")
 
@@ -382,6 +399,8 @@ def _stack_rows(p:Mapping[str,Any])->pd.DataFrame:
         ("Institucional","SMT",smt_s,smt_sc),
         ("Institucional","Displacement",disp_s,disp_sc),
         ("Institucional","MSS",mss_s,mss_sc),
+        ("Institucional","BOS/CHOCH",str_s,str_sc),
+        ("Institucional","Order Block",ob_s,ob_sc),
         ("Institucional","Premium/Discount",dr_s,dr_sc),
         ("Institucional","Judas/Sessão",ses_s,ses_sc),
         ("Institucional","Breaker/Mitigation",pd_s,pd_sc),
@@ -399,6 +418,106 @@ def _stack_rows(p:Mapping[str,Any])->pd.DataFrame:
     return pd.DataFrame(rows,columns=["Camada","Leitura","Estado","Score"])
 
 
+def atlasquant_operational_card(pack: Mapping[str, Any]) -> dict[str, Any]:
+    """Presentation state derived only from already-audited institutional output."""
+    p = dict(pack or {})
+    ready = bool((p.get("data_ready", {}) or {}).get("sufficient", False))
+    executable = bool(p.get("executable", False))
+    raw_state = str(p.get("state", "⚪ AGUARDAR"))
+    if executable and ready:
+        light, action = "GREEN", "MOTOR EXECUTÁVEL"
+    elif raw_state.startswith("🔴") or not ready:
+        light, action = "RED", "NÃO OPERAR"
+    else:
+        light, action = "YELLOW", "AGUARDAR CONFIRMAÇÃO"
+    return {
+        "pair": str(p.get("pair", "—")),
+        "direction": str(p.get("direction", "⚪ AGUARDAR")),
+        "state": raw_state,
+        "traffic_light": light,
+        "action": action,
+        "priority": _safe(p.get("priority", 0)),
+        "quality": _safe(p.get("quality", 0)),
+        "data_score": _safe((p.get("data_ready", {}) or {}).get("score", 0)),
+        "m15": str(p.get("m15", "—")),
+        "gate": str(p.get("gate", "—")),
+        "reason": str(p.get("reason", "—")),
+    }
+
+
+def _render_atlasquant_operational_cards(packs: list[Mapping[str, Any]]) -> None:
+    cards = [atlasquant_operational_card(p) for p in list(packs or [])[:3]]
+    if not cards:
+        return
+    st.markdown("""
+<style>
+.aq-op-card{border:1px solid rgba(137,170,210,.18);border-radius:15px;padding:15px 16px;
+background:linear-gradient(180deg,rgba(17,34,57,.88),rgba(10,24,41,.82));min-height:205px}
+.aq-op-card.green{border-top:3px solid #42d392}.aq-op-card.yellow{border-top:3px solid #f2c14e}
+.aq-op-card.red{border-top:3px solid #ff6b7a}
+.aq-op-pair{font-size:1.05rem;font-weight:800}.aq-op-action{font-size:.72rem;font-weight:800;letter-spacing:.05em}
+.aq-op-priority{font-size:1.8rem;font-weight:850;margin-top:10px}.aq-op-priority span{font-size:.75rem;color:#9fb0c6}
+.aq-op-small{font-size:.72rem;color:#9fb0c6;margin-top:8px}.aq-op-state{font-size:.76rem;margin-top:11px;font-weight:700}
+</style>
+""", unsafe_allow_html=True)
+    st.markdown("### 🚦 Melhores contextos operacionais")
+    st.caption("Usa a decisão institucional já auditada. Verde indica motor executável com dados suficientes; Safety Core e demais vetos continuam soberanos.")
+    cols = st.columns(len(cards))
+    icons = {"GREEN": "🟢", "YELLOW": "🟡", "RED": "🔴"}
+    for col, card in zip(cols, cards):
+        with col:
+            tone = card["traffic_light"].lower()
+            pair = escape(card["pair"])
+            action = escape(card["action"])
+            direction = escape(card["direction"])
+            state = escape(card["state"])
+            m15 = escape(card["m15"])
+            gate = escape(card["gate"])
+            icon = icons.get(card["traffic_light"], "⚪")
+            st.markdown(f"""
+<div class="aq-op-card {tone}">
+  <div style="display:flex;justify-content:space-between;gap:8px">
+    <span class="aq-op-pair">{pair}</span><span class="aq-op-action">{icon} {action}</span>
+  </div>
+  <div class="aq-op-priority">{card['priority']:.0f}<span>/100 prioridade</span></div>
+  <div class="aq-op-small">Dados {card['data_score']:.0f}/100 · Qualidade {card['quality']:.0f}/100</div>
+  <div class="aq-op-small">M15 {m15} · Gate {gate}</div>
+  <div class="aq-op-state">{direction}<br>{state}</div>
+</div>
+""", unsafe_allow_html=True)
+
+
+def atlasquant_basic_table(packs: list[Mapping[str, Any]]) -> pd.DataFrame:
+    """Compact seven-pair view for Basic mode. Presentation only."""
+    rows=[]
+    for p in list(packs or []):
+        dr=dict(p.get("data_ready", {}) or {})
+        rows.append({
+            "Par":str(p.get("pair","—")),
+            "Estado":str(p.get("state","⚪ AGUARDAR")),
+            "Direção":str(p.get("direction","⚪ AGUARDAR")),
+            "Prioridade":round(_safe(p.get("priority",0)),1),
+            "Dados":f"{_safe(dr.get('score',0)):.0f}/100",
+            "Pronto?":"SIM" if bool(dr.get("sufficient",False)) else "NÃO",
+            "M15":str(p.get("m15","—")),
+            "Gate":str(p.get("gate","—")),
+        })
+    return pd.DataFrame(rows)
+
+
+def build_pair_intelligence_packs(matrix:pd.DataFrame, ranking:pd.DataFrame, *, scanner_state:Mapping[str,Any]|None=None, map_state:Mapping[str,Any]|None=None, news_state:Mapping[str,Any]|None=None, fed_tone:str="Neutro", weights:Mapping[str,float]|None=None) -> list[dict[str,Any]]:
+    """Pure adapter used by UI and background Autopilot; performs no API calls."""
+    if matrix is None or matrix.empty:
+        return []
+    scanner_rows=dict((scanner_state or {}).get("resultados",{}) or {})
+    map_rows=dict((map_state or {}).get("contexts",{}) or {})
+    news_map=_pair_news(dict(news_state or {}),matrix)
+    bypair={str(r["Par"]):r.to_dict() for _,r in matrix.iterrows() if str(r.get("Par","")) in PAIR_ORDER}
+    packs=[_reason_pack(p,bypair[p],ranking,scanner_rows.get(p,{}),map_rows.get(p,{}),news_map.get(p,{}),fed_tone,weights) for p in PAIR_ORDER if p in bypair]
+    packs.sort(key=lambda x:x["priority"],reverse=True)
+    return packs
+
+
 def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:Mapping[str,Any]|None=None,macro_context:Mapping[str,Any]|None=None,weights:Mapping[str,float]|None=None):
     _css()
     st.markdown("## Central institucional")
@@ -408,17 +527,72 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
 
     token,repo,branch=_gh_cfg()
     scanner,_=_read_json(SCANNER_PATH,token,repo,branch); mmap,_=_read_json(MAP_PATH,token,repo,branch); news_state,_=_read_json(NEWS_PATH,token,repo,branch); auto,_=_read_json(AUTO_PATH,token,repo,branch)
-    news_map=_pair_news(news_state,matrix)
-    scanner_rows=dict(scanner.get("resultados",{}) or {}) if isinstance(scanner,dict) else {}
-    map_rows=dict(mmap.get("contexts",{}) or {}) if isinstance(mmap,dict) else {}
     fed_tone=str((fed or {}).get("tom",(fed or {}).get("tone","Neutro")))
-    bypair={str(r["Par"]):r.to_dict() for _,r in matrix.iterrows() if str(r.get("Par","")) in PAIR_ORDER}
-    packs=[_reason_pack(p,bypair[p],ranking,scanner_rows.get(p,{}),map_rows.get(p,{}),news_map.get(p,{}),fed_tone,weights) for p in PAIR_ORDER if p in bypair]
-    packs.sort(key=lambda x:x["priority"],reverse=True)
+    packs=build_pair_intelligence_packs(
+        matrix, ranking, scanner_state=scanner, map_state=mmap,
+        news_state=news_state, fed_tone=fed_tone, weights=weights,
+    )
     if not packs: st.warning("Nenhum dos 7 pares foi encontrado na Matriz."); return
 
     opctx=select_operational_context(packs)
     best=opctx.get("best") or packs[0]
+    _aq_view_mode = str(st.session_state.get("atlasquant_view_mode", "Básico"))
+    _is_pro = _aq_view_mode == "Pro"
+
+    render_central_brief(packs, auto)
+    if _is_pro:
+        render_data_confidence(packs, auto)
+
+    _event_result = render_next_event((macro_context or {}).get("event"))
+    _regime_result = capture_regime_detector(best)
+    if _is_pro:
+        render_regime_detector(best, capture_result=_regime_result)
+
+    render_safety_core(
+        best,
+        auto,
+        regime_supported_override=_regime_result.get("supported"),
+        major_event_minutes_override=_event_result.get("safety_minutes"),
+    )
+    _render_atlasquant_operational_cards(packs)
+
+    if _is_pro:
+        render_confluence_map(best)
+        render_context_explain(best)
+
+    render_operational_plan(best)
+    _flight_capture = capture_flight_recorder(best, "V11.0.8 / AtlasQuant DEV")
+    try:
+        _shadow_capture_status = capture_shadow_batch(
+            packs,
+            champion_version="V11.0.8 / AtlasQuant DEV",
+        )
+    except Exception as _shadow_capture_exc:
+        _shadow_capture_status = {
+            "ok":False,
+            "reason":"CAPTURE_EXCEPTION",
+            "error":f"{type(_shadow_capture_exc).__name__}: {_shadow_capture_exc}",
+        }
+
+    if not _is_pro:
+        st.markdown("### 🧾 Mesa rápida — 7 pares")
+        st.caption(
+            "Modo Básico mostra o essencial. Use Pro para abrir Flight Recorder, "
+            "matriz completa, comparação detalhada e Raio-X institucional."
+        )
+        st.dataframe(
+            atlasquant_basic_table(packs),
+            width="stretch",
+            hide_index=True,
+            height=285,
+        )
+        return
+
+    render_flight_recorder(
+        best,
+        "V11.0.8 / AtlasQuant DEV",
+        capture_result=_flight_capture,
+    )
     no_trade=bool(opctx.get("no_trade",False))
     strongest,weakest=_major_extremes(ranking)
     process_age=_age_minutes(auto.get("last_run"))
@@ -426,6 +600,11 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     process_label=("🟢 PROCESSO OK" if process_ok and process_age is not None and process_age<=90 else "🟡 SEM RODADA RECENTE" if process_ok else "🔴 FALHA HEADLESS")
     data_ok=sum(1 for x in packs if bool((x.get("data_ready",{}) or {}).get("sufficient",False)))
     twelve_label="🟠 COTA/PLANO BLOQUEADO" if auto.get("twelve_daily_blocked") else "🟢 SEM BLOQUEIO REGISTRADO"
+    if auto.get('twelve_daily_blocked'):
+        labels={'COTA_DIARIA':'🟠 COTA DIÁRIA ESGOTADA','LIMITE_MINUTO':'🟠 PAUSA POR MINUTO',
+                'RITMO_DIARIO':'🟡 ORÇAMENTO EM PAUSA','ORCAMENTO_DIARIO':'🟡 LIMITE DO APP ATINGIDO',
+                'CONTROLE_INDISPONIVEL':'🟠 ORÇAMENTO INDISPONÍVEL'}
+        twelve_label=labels.get(auto.get('twelve_block_type'),twelve_label)
     c1,c2,c3,c4=st.columns(4)
     c1.metric("Melhor contexto",opctx.get("label",best["pair"])); c2.metric("Prioridade",f"{best['priority']:.1f}/100"); c3.metric("Mais forte (G8)",strongest); c4.metric("Mais fraca (G8)",weakest)
     st.info(opctx.get("state",best["state"]) if no_trade else best["state"])
@@ -447,9 +626,9 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
         "ICT":round(p["ict_read"],0) if (p.get("ict_fresh",{}) or {}).get("ready") else "N/D","Institucional":round(p["inst_read"],0) if (p.get("data_ready",{}) or {}).get("institutional_data_ready") else "N/D","H4":p["h4"],"H1":p["h1"],"M15":p["m15"],"Gate":p["gate"],"ADR %":round(p["adr"],0) if p["adr"] is not None else None,"Evento":p["event"],"Motivo":p["reason"]
     } for p in packs])
     overview=executive[["Par","Decisão final","Direção","Prioridade","Δ força pts","Dados?","M15","Gate"]]
-    st.dataframe(overview,use_container_width=True,hide_index=True,height=285)
+    st.dataframe(overview,width="stretch",hide_index=True,height=285)
     with st.expander("Matriz completa e comparação de prioridades"):
-        st.dataframe(executive,use_container_width=True,hide_index=True,height=330)
+        st.dataframe(executive,width="stretch",hide_index=True,height=330)
         st.bar_chart(executive[["Par","Prioridade"]].set_index("Par"),horizontal=True,height=220)
 
     with st.expander("Resumo detalhado dos sete pares", expanded=False):
@@ -475,7 +654,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
         st.session_state["v110_pair_deep"]=_pair_options[0]
     pair=st.selectbox("Escolha o par",_pair_options,key="v110_pair_deep")
 
-    # V11.0.7: resolve o pack e REFAZ o breakdown a partir do par selecionado.
+    # V11.0.8: resolve o pack e REFAZ o breakdown a partir do par selecionado.
     # Assim a interface nunca pode mostrar USD/CHF no seletor e EUR/USD na força.
     p=next(x for x in packs if x["pair"]==pair)
     _base_sel,_quote_sel=pair.split("/")
@@ -505,7 +684,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     with st.expander("Como a força foi calculada", expanded=False):
         if not _s.get("attribution_exact"):
             st.warning("Ranking antigo: componentes estimados; o residual não identifica causas econômicas. Recalcule o ranking para obter as contribuições efetivas.")
-        # V11.0.7 — conta de chegada, separando Macro puro, Fed e ajustes.
+        # V11.0.8 — conta de chegada, separando Macro puro, Fed e ajustes.
         _a=attribution_sides(_s)
         st.markdown("#### 🧮 Conta de chegada da força")
         _c1,_c2,_c3=st.columns(3)
@@ -526,7 +705,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
         st.info(f"Conta líquida: vantagens {_base_sel} {_safe(_a.get('base_advantages',0)):.2f} − vantagens {_quote_sel} {_safe(_a.get('quote_advantages',0)):.2f} = {_safe(_a.get('net',0)):+.2f} pts. A força final continua {_base_sel} {_safe(_s.get('base_score',50)):.1f} × {_quote_sel} {_safe(_s.get('quote_score',50)):.1f}.")
         _sr=pd.DataFrame(_s.get("rows",[]) or [])
         if not _sr.empty:
-            st.dataframe(_sr,use_container_width=True,hide_index=True,height=315)
+            st.dataframe(_sr,width="stretch",hide_index=True,height=315)
             st.caption(
                 f"Conferência: {_base_sel} explicado {_safe(_s.get('explained_base',0)):.1f}/100 "
                 f"× {_quote_sel} explicado {_safe(_s.get('explained_quote',0)):.1f}/100. "
@@ -572,12 +751,12 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
 
     with st.expander("Todas as camadas de decisão", expanded=False):
         st.markdown("### 🧠 Decision Stack — tudo em uma tabela")
-        st.dataframe(_stack_rows(p),use_container_width=True,hide_index=True,height=650)
+        st.dataframe(_stack_rows(p),width="stretch",hide_index=True,height=650)
 
     with st.expander("Detalhes institucionais e ICT", expanded=False):
         inst=p.get("inst",{}) or {}
         st.markdown("### 🏛️ Institutional Execution Engine")
-        cards=[("MSS","mss"),("Displacement","displacement"),("SMT","smt"),("Premium/Discount","dealing_range"),("Judas/Sessão","session"),("Breaker/Mitigation","pd_array"),("Liquidez","liquidity")]
+        cards=[("MSS","mss"),("BOS/CHOCH","structure"),("Order Block","order_block"),("Displacement","displacement"),("SMT","smt"),("Premium/Discount","dealing_range"),("Judas/Sessão","session"),("Breaker/Mitigation","pd_array"),("Liquidez","liquidity")]
         for i in range(0,len(cards),4):
             cols=st.columns(min(4,len(cards)-i))
             for col,(title,key) in zip(cols,cards[i:i+4]):
@@ -616,7 +795,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     for name in ("PWH","PWL","PDH","PDL","Asia High","Asia Low","EQH","EQL"):
         if name in levels and levels.get(name) is not None:
             level_rows.append({"Nível":name,"Preço":_fmt_price(levels.get(name),pair)})
-    if level_rows: st.dataframe(pd.DataFrame(level_rows),use_container_width=True,hide_index=True)
+    if level_rows: st.dataframe(pd.DataFrame(level_rows),width="stretch",hide_index=True)
     _adr_txt='N/D' if p.get('adr') is None else f"{p['adr']:.0f}%"
     st.caption(f"Alvo principal: {p['target']} · Gate {p['gate']} ({p['gate_score']:.0f}/100) · ADR {_adr_txt} · idade técnica {p['technical_age']:.0f} min" if p['technical_age'] is not None else f"Alvo principal: {p['target']} · Gate {p['gate']} ({p['gate_score']:.0f}/100) · ADR {_adr_txt}")
 
@@ -626,7 +805,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     elif p["state"].startswith("🔴"): st.error(msg)
     else: st.warning(msg)
 
-    with st.expander("📚 Como ler o V11.0.7"):
+    with st.expander("📚 Como ler o V11.0.8"):
         st.markdown("""
 - **Macro** escolhe o lado; execução nunca inverte o lado macro sozinha.
 - **SMT** procura divergência entre EUR/USD↔GBP/USD, AUD/USD↔NZD/USD e USD/CHF↔USD/JPY.

@@ -1,4 +1,7 @@
 import unittest
+from unittest.mock import patch
+from io import StringIO
+from contextlib import redirect_stdout
 
 import pandas as pd
 
@@ -6,6 +9,7 @@ from autopilot_setup_audit_v114 import (
     aggregate_setup_performance,
     build_summary,
     sync_setup_audit,
+    _audit_cycle,
 )
 
 
@@ -136,6 +140,45 @@ class SetupAuditV114Tests(unittest.TestCase):
         self.assertEqual(float(fvg["avg_r"]), 0.5)
         self.assertEqual(float(fvg["profit_factor_r"]), 2.0)
 
+    def test_duplicate_trade_id_remains_single_frozen_audit_row(self):
+        duplicate=pd.DataFrame([trade_row(),trade_row()])
+        audit=sync_setup_audit(duplicate,scanner_with_fvg("FVG ORIGINAL",71),now=NOW)
+        self.assertEqual(len(audit),1)
+        self.assertEqual(audit.iloc[0]["trade_id"],"t1")
+        self.assertEqual(audit.iloc[0]["fvg_status"],"FVG ORIGINAL")
+
+    def test_nonfinite_component_score_is_not_propagated(self):
+        audit=sync_setup_audit(
+            pd.DataFrame([trade_row()]),
+            scanner_with_fvg("FVG ATIVO",float("nan")),
+            now=NOW,
+        )
+        self.assertTrue(pd.isna(audit.iloc[0]["fvg_score"]))
+
+
+    def test_nonfinite_realized_r_is_excluded_from_performance_and_summary(self):
+        for bad in (float("nan"),float("inf"),float("-inf")):
+            with self.subTest(realized_r=bad):
+                audit=sync_setup_audit(
+                    pd.DataFrame([trade_row(status="CLOSED",result="WIN",realized_r=bad)]),
+                    scanner_with_fvg("FVG ATIVO",70),
+                    now=NOW,
+                )
+                perf=aggregate_setup_performance(audit)
+                summary=build_summary(audit,perf,now=NOW)
+                self.assertTrue(perf.empty)
+                self.assertEqual(summary["closed_trades"],0)
+                self.assertEqual(summary["net_r"],0.0)
+
+    def test_summary_never_enables_execution_or_strategy_selection(self):
+        audit=sync_setup_audit(pd.DataFrame([trade_row()]),scanner_with_fvg("FVG",70),now=NOW)
+        summary=build_summary(audit,aggregate_setup_performance(audit),now=NOW)
+        safety=summary["safety"]
+        self.assertFalse(safety["real_orders"])
+        self.assertFalse(safety["broker_connection"])
+        self.assertFalse(safety["auto_strategy_selection"])
+        self.assertFalse(safety["auto_gate_change"])
+
     def test_empty_is_safe(self):
         audit = sync_setup_audit(pd.DataFrame(), {}, pd.DataFrame(), now=NOW)
         perf = aggregate_setup_performance(audit)
@@ -147,6 +190,21 @@ class SetupAuditV114Tests(unittest.TestCase):
         self.assertEqual(summary["sample_state"], "AGUARDANDO AMOSTRA")
         self.assertFalse(summary["safety"]["real_orders"])
         self.assertFalse(summary["safety"]["auto_strategy_selection"])
+
+
+    def test_status_write_failure_is_visible_in_stdout_even_when_status_cannot_persist(self):
+        with patch("autopilot_setup_audit_v114.base.gh_get_csv",return_value=(pd.DataFrame(),"")), \
+             patch("autopilot_setup_audit_v114.base.gh_get_json",side_effect=[({},""),({},"")]), \
+             patch("autopilot_setup_audit_v114.base.gh_put_csv",return_value=(True,"")), \
+             patch("autopilot_setup_audit_v114.base.gh_put_json",side_effect=[(True,""),(False,"remote unavailable")]), \
+             patch("autopilot_setup_audit_v114.base.utcnow",return_value=NOW):
+            out=StringIO()
+            with redirect_stdout(out):
+                ok,summary,errors=_audit_cycle()
+        self.assertFalse(ok)
+        self.assertTrue(any("Salvar status setup audit" in x for x in errors))
+        self.assertIn("[setup-audit][status-write-failed]",out.getvalue())
+        self.assertIn("remote unavailable",out.getvalue())
 
 
 if __name__ == "__main__":

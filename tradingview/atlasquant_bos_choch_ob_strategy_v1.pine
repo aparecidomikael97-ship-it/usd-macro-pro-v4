@@ -1,0 +1,201 @@
+//@version=5
+strategy(
+     "AtlasQuant BOS/CHOCH + Order Block Research V1",
+     overlay=true,
+     pyramiding=0,
+     process_orders_on_close=false,
+     calc_on_order_fills=true,
+     initial_capital=10000,
+     commission_type=strategy.commission.percent,
+     commission_value=0.0
+)
+
+// AtlasQuant TradingView Research Bridge.
+// Technical-only: no macro/Fed context and no future-data imports.
+
+groupStructure = "Estrutura"
+leftBars      = input.int(2, "Pivot esquerda", minval=1, maxval=10, group=groupStructure)
+rightBars     = input.int(2, "Pivot direita", minval=1, maxval=10, group=groupStructure)
+atrLen        = input.int(14, "ATR", minval=2, maxval=100, group=groupStructure)
+noiseAtr      = input.float(0.05, "Tolerância de ruído (ATR)", minval=0.0, maxval=1.0, step=0.01, group=groupStructure)
+eventFilter   = input.string("BOS + CHOCH", "Eventos", options=["BOS + CHOCH","BOS only","CHOCH only"], group=groupStructure)
+sideFilter    = input.string("Both", "Lados", options=["Both","Long only","Short only"], group=groupStructure)
+
+groupOB       = "Order Block"
+maxOrigin     = input.int(8, "Máx. candles para origem", minval=1, maxval=20, group=groupOB)
+maxSetupAge   = input.int(8, "Validade do setup (candles)", minval=1, maxval=100, group=groupOB)
+bodyAtrMin    = input.float(0.65, "Body mínimo / ATR", minval=0.1, maxval=5.0, step=0.05, group=groupOB)
+rangeAtrMin   = input.float(0.85, "Range mínimo / ATR", minval=0.1, maxval=5.0, step=0.05, group=groupOB)
+entryMode     = input.string("Midpoint", "Entrada na zona", options=["Midpoint","Proximal"], group=groupOB)
+stopBufferAtr = input.float(0.05, "Buffer do stop (ATR)", minval=0.0, maxval=1.0, step=0.01, group=groupOB)
+rrTarget      = input.float(2.0, "Alvo em R", minval=0.25, maxval=10.0, step=0.25, group=groupOB)
+
+groupSession  = "Sessão"
+tradeSession  = input.session("0000-2359", "Janela permitida", group=groupSession)
+inSession     = not na(time(timeframe.period, tradeSession))
+
+atr = ta.atr(atrLen)
+noise = math.max(syminfo.mintick, nz(atr) * noiseAtr)
+replayReady = bar_index >= 19 and not na(atr)
+ph = ta.pivothigh(high, leftBars, rightBars)
+pl = ta.pivotlow(low, leftBars, rightBars)
+
+var float prevHigh = na
+var float lastHigh = na
+var int lastHighBar = na
+var float prevLow = na
+var float lastLow = na
+var int lastLowBar = na
+var int consumedHighBar = na
+var int consumedLowBar = na
+
+if not na(ph)
+    prevHigh := lastHigh
+    lastHigh := ph
+    lastHighBar := bar_index - rightBars
+
+if not na(pl)
+    prevLow := lastLow
+    lastLow := pl
+    lastLowBar := bar_index - rightBars
+
+bullBias = not na(prevHigh) and not na(lastHigh) and not na(prevLow) and not na(lastLow) and lastHigh > prevHigh + noise and lastLow > prevLow + noise
+bearBias = not na(prevHigh) and not na(lastHigh) and not na(prevLow) and not na(lastLow) and lastHigh < prevHigh - noise and lastLow < prevLow - noise
+bullBreak = replayReady and not na(lastHigh) and not na(lastHighBar) and lastHighBar != consumedHighBar and close > lastHigh + noise and close[1] <= lastHigh + noise
+bearBreak = replayReady and not na(lastLow) and not na(lastLowBar) and lastLowBar != consumedLowBar and close < lastLow - noise and close[1] >= lastLow - noise
+bullKind = bullBias ? "BOS" : bearBias ? "CHOCH" : "MSS"
+bearKind = bearBias ? "BOS" : bullBias ? "CHOCH" : "MSS"
+
+eventAllowed(kind) =>
+    eventFilter == "BOS + CHOCH" ? (kind == "BOS" or kind == "CHOCH") :
+     eventFilter == "BOS only" ? kind == "BOS" :
+     kind == "CHOCH"
+
+longAllowed  = sideFilter != "Short only"
+shortAllowed = sideFilter != "Long only"
+
+var int lastStructureBar = na
+var int pendingSide = 0
+var int setupBar = na
+var float obLow = na
+var float obHigh = na
+var float pendingEntry = na
+var float pendingStop = na
+var float pendingTarget = na
+
+cancelPending() =>
+    strategy.cancel("AQ-L")
+    strategy.cancel("AQ-S")
+
+buildLongSetup(referencePivotBar, previousStructureBar, kind) =>
+    bool ok = false
+    float zoneLow = na
+    float zoneHigh = na
+    int originOffset = na
+    body = math.abs(close - open)
+    rng = high - low
+    displaced = close > open and not na(atr) and body / atr >= bodyAtrMin and rng / atr >= rangeAtrMin
+    if displaced
+        for i = 1 to maxOrigin
+            originBar = bar_index - i
+            afterPivot = na(referencePivotBar) or originBar > referencePivotBar
+            afterPrevEvent = na(previousStructureBar) or originBar > previousStructureBar
+            if afterPivot and afterPrevEvent and close[i] < open[i]
+                originOffset := i
+                break
+    if not na(originOffset)
+        zoneLow := low[originOffset]
+        zoneHigh := high[originOffset]
+        ok := zoneHigh > zoneLow and eventAllowed(kind)
+    [ok, zoneLow, zoneHigh]
+
+buildShortSetup(referencePivotBar, previousStructureBar, kind) =>
+    bool ok = false
+    float zoneLow = na
+    float zoneHigh = na
+    int originOffset = na
+    body = math.abs(close - open)
+    rng = high - low
+    displaced = close < open and not na(atr) and body / atr >= bodyAtrMin and rng / atr >= rangeAtrMin
+    if displaced
+        for i = 1 to maxOrigin
+            originBar = bar_index - i
+            afterPivot = na(referencePivotBar) or originBar > referencePivotBar
+            afterPrevEvent = na(previousStructureBar) or originBar > previousStructureBar
+            if afterPivot and afterPrevEvent and close[i] > open[i]
+                originOffset := i
+                break
+    if not na(originOffset)
+        zoneLow := low[originOffset]
+        zoneHigh := high[originOffset]
+        ok := zoneHigh > zoneLow and eventAllowed(kind)
+    [ok, zoneLow, zoneHigh]
+
+if bullBreak
+    previousStructureBar = lastStructureBar
+    consumedHighBar := lastHighBar
+    lastStructureBar := bar_index
+    cancelPending()
+    pendingSide := 0
+    [okLong, zLow, zHigh] = buildLongSetup(lastHighBar, previousStructureBar, bullKind)
+    if okLong and longAllowed and inSession and strategy.position_size == 0
+        obLow := zLow
+        obHigh := zHigh
+        pendingEntry := entryMode == "Midpoint" ? (obLow + obHigh) / 2.0 : obHigh
+        pendingStop := obLow - atr * stopBufferAtr
+        risk = pendingEntry - pendingStop
+        pendingTarget := pendingEntry + risk * rrTarget
+        setupBar := bar_index
+        pendingSide := risk > syminfo.mintick ? 1 : 0
+
+if bearBreak
+    previousStructureBar = lastStructureBar
+    consumedLowBar := lastLowBar
+    lastStructureBar := bar_index
+    cancelPending()
+    pendingSide := 0
+    [okShort, zLow, zHigh] = buildShortSetup(lastLowBar, previousStructureBar, bearKind)
+    if okShort and shortAllowed and inSession and strategy.position_size == 0
+        obLow := zLow
+        obHigh := zHigh
+        pendingEntry := entryMode == "Midpoint" ? (obLow + obHigh) / 2.0 : obLow
+        pendingStop := obHigh + atr * stopBufferAtr
+        risk = pendingStop - pendingEntry
+        pendingTarget := pendingEntry - risk * rrTarget
+        setupBar := bar_index
+        pendingSide := risk > syminfo.mintick ? -1 : 0
+
+pendingExpired = pendingSide != 0 and not na(setupBar) and bar_index - setupBar > maxSetupAge
+if pendingExpired and strategy.position_size == 0
+    cancelPending()
+    pendingSide := 0
+
+if pendingSide == 1 and strategy.position_size == 0
+    strategy.entry("AQ-L", strategy.long, limit=pendingEntry)
+    strategy.exit("AQ-LX", "AQ-L", stop=pendingStop, limit=pendingTarget)
+
+if pendingSide == -1 and strategy.position_size == 0
+    strategy.entry("AQ-S", strategy.short, limit=pendingEntry)
+    strategy.exit("AQ-SX", "AQ-S", stop=pendingStop, limit=pendingTarget)
+
+if strategy.position_size > 0
+    pendingSide := 0
+    strategy.exit("AQ-LX", "AQ-L", stop=pendingStop, limit=pendingTarget)
+
+if strategy.position_size < 0
+    pendingSide := 0
+    strategy.exit("AQ-SX", "AQ-S", stop=pendingStop, limit=pendingTarget)
+
+plotshape(bullBreak and bullKind == "BOS", title="Bull BOS", text="BOS↑", style=shape.labelup, location=location.belowbar, size=size.tiny)
+plotshape(bullBreak and bullKind == "CHOCH", title="Bull CHOCH", text="CHOCH↑", style=shape.labelup, location=location.belowbar, size=size.tiny)
+plotshape(bearBreak and bearKind == "BOS", title="Bear BOS", text="BOS↓", style=shape.labeldown, location=location.abovebar, size=size.tiny)
+plotshape(bearBreak and bearKind == "CHOCH", title="Bear CHOCH", text="CHOCH↓", style=shape.labeldown, location=location.abovebar, size=size.tiny)
+
+plot(pendingSide != 0 or strategy.position_size != 0 ? obHigh : na, "OB High", style=plot.style_linebr)
+plot(pendingSide != 0 or strategy.position_size != 0 ? obLow : na, "OB Low", style=plot.style_linebr)
+plot(pendingSide != 0 or strategy.position_size != 0 ? pendingEntry : na, "Entry", style=plot.style_linebr)
+plot(strategy.position_size != 0 ? pendingStop : na, "Stop", style=plot.style_linebr)
+plot(strategy.position_size != 0 ? pendingTarget : na, "Target", style=plot.style_linebr)
+
+alertcondition(bullBreak and (bullKind == "BOS" or bullKind == "CHOCH"), "AtlasQuant Bull Structure", "AtlasQuant: bullish BOS/CHOCH confirmado")
+alertcondition(bearBreak and (bearKind == "BOS" or bearKind == "CHOCH"), "AtlasQuant Bear Structure", "AtlasQuant: bearish BOS/CHOCH confirmado")

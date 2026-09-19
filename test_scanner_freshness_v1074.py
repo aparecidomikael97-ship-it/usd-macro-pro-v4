@@ -41,6 +41,39 @@ class ScannerFreshnessV1074Tests(unittest.TestCase):
             info = m._scanner_for_pair(state, "USD/CHF")
         self.assertFalse(info["fresh"])
 
+    def test_exactly_60_minutes_is_stale_by_conservative_boundary(self):
+        now=time.time()
+        state={"resultados":{"EUR/USD":{"m15_fetched_at":now-3600,"tecnico":{"disponivel":True}}}}
+        with patch("master_panel_v102._time.time",return_value=now):
+            info=m._scanner_for_pair(state,"EUR/USD")
+        self.assertFalse(info["fresh"])
+        self.assertGreaterEqual(info["age_minutes"],60)
+
+    def test_future_timestamp_does_not_create_negative_age(self):
+        now=time.time()
+        state={"resultados":{"EUR/USD":{"m15_fetched_at":now+300,"tecnico":{"disponivel":True}}}}
+        with patch("master_panel_v102._time.time",return_value=now):
+            info=m._scanner_for_pair(state,"EUR/USD")
+        self.assertIsNone(info["age_minutes"])
+        self.assertFalse(info["fresh"])
+
+
+    def test_missing_timestamp_is_not_fresh_even_when_technical_available(self):
+        now=time.time()
+        state={"resultados":{"EUR/USD":{"tecnico":{"disponivel":True}}}}
+        with patch("master_panel_v102._time.time",return_value=now):
+            info=m._scanner_for_pair(state,"EUR/USD")
+        self.assertTrue(info["available"])
+        self.assertIsNone(info["age_minutes"])
+        self.assertFalse(info["fresh"])
+
+    def test_missing_pair_fails_closed(self):
+        now=time.time()
+        with patch("master_panel_v102._time.time",return_value=now):
+            info=m._scanner_for_pair({"resultados":{}},"EUR/USD")
+        self.assertFalse(info["available"])
+        self.assertFalse(info["fresh"])
+
     def test_fallback_to_legacy_processado_em(self):
         now = time.time()
         state = {

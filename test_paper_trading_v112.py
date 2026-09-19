@@ -1,154 +1,210 @@
 import unittest
-
+from unittest.mock import patch
 import pandas as pd
+import paper_trading_v112 as p
 
-from paper_trading_v112 import (
-    evaluate_pair_checklist,
-    run_paper_cycle,
-)
-
-
-class PaperTradingV112Tests(unittest.TestCase):
-    def _bars(self, start="2026-09-17T08:00:00Z", n=40, base=1.1000):
-        rows = []
-        ts = pd.Timestamp(start)
-        price = base
+class PaperTradingV112SafetyTests(unittest.TestCase):
+    def _bars(self,start="2026-09-17T08:00:00Z",n=40,base=1.1000):
+        rows=[]
+        ts=pd.Timestamp(start)
+        price=base
         for i in range(n):
-            o = price
-            c = o + 0.00005
+            o=price; cl=o+0.00005
             rows.append({
-                "datetime": (ts + pd.Timedelta(minutes=15 * i)).isoformat(),
-                "open": o,
-                "high": o + 0.00030,
-                "low": o - 0.00030,
-                "close": c,
+                "datetime":(ts+pd.Timedelta(minutes=15*i)).isoformat(),
+                "open":o,"high":o+0.00030,"low":o-0.00030,"close":cl,
             })
-            price = c
+            price=cl
         return rows
 
-    def _state(self, now, bars=None, m15_status="🟢 GATILHO", adr=45.0):
-        bars = bars or self._bars()
-        last_dt = pd.Timestamp(bars[-1]["datetime"])
-        inputs = {
-            "pairs": [{
-                "Par": "EUR/USD",
-                "Direção": "🟢 COMPRA EUR/USD",
-                "Score final": 90.0,
-                "Qualidade": 90.0,
-                "Índice ranking": 90.0,
-            }]
-        }
-        scanner = {
-            "resultados": {
-                "EUR/USD": {
-                    "m15_fetched_at": last_dt.isoformat(),
-                    "tecnico": {
-                        "disponivel": True,
-                        "dados_disponiveis": True,
-                        "h4": {"status": "🟢 CONFIRMA"},
-                        "h1": {"status": "🟢 PULLBACK OK"},
-                        "m15": {"status": m15_status},
-                        "ict": {"readiness": 82.0},
-                        "institutional": {"readiness": 84.0},
-                        "cache_v110": {"m15": bars},
-                    },
-                }
-            }
-        }
-        master = {
-            "contexts": {
-                "EUR/USD": {
-                    "updated_at": now.isoformat(),
-                    "readiness_grade": "READY",
-                    "readiness_score": 78.0,
-                    "adr_used_pct": adr,
-                    "event_risk": "NORMAL",
-                }
-            }
-        }
-        return inputs, scanner, master
+    def _state(self,now,bars=None,m15_status="🟢 GATILHO",adr=45.0):
+        bars=bars or self._bars()
+        last_dt=pd.Timestamp(bars[-1]["datetime"])
+        inputs={"pairs":[{
+            "Par":"EUR/USD","Direção":"🟢 COMPRA EUR/USD",
+            "Score final":90.0,"Qualidade":90.0,"Índice ranking":90.0,
+        }]}
+        scanner={"resultados":{"EUR/USD":{
+            "m15_fetched_at":last_dt.isoformat(),
+            "tecnico":{
+                "disponivel":True,"dados_disponiveis":True,
+                "h4":{"status":"🟢 CONFIRMA"},"h1":{"status":"🟢 PULLBACK OK"},
+                "m15":{"status":m15_status},
+                "ict":{"readiness":82.0},"institutional":{"readiness":84.0},
+                "cache_v110":{"m15":bars},
+            },
+        }}}
+        master={"contexts":{"EUR/USD":{
+            "updated_at":now.isoformat(),"readiness_grade":"READY","readiness_score":78.0,
+            "adr_used_pct":adr,"event_risk":"NORMAL",
+        }}}
+        return inputs,scanner,master
+    def setUp(self):
+        self.now=pd.Timestamp("2026-09-18T12:00:00Z")
+        self.input={"Score final":100,"Qualidade":100,"Índice ranking":100,"Direção":"COMPRA"}
+        self.tec={"dados_disponiveis":True,"h4":{"status":"OK"},"h1":{"status":"OK"},"m15":{"status":"OK"},"ict":{"readiness":100},"institutional":{"readiness":100}}
+        self.map={"updated_at":self.now.isoformat(),"readiness_grade":"READY","readiness_score":100,"adr_used_pct":20,"event_risk":"BAIXO"}
+
+    def test_stale_technical_fails_closed(self):
+        scanner={"m15_fetched_at":(self.now-pd.Timedelta(minutes=76)).isoformat(),"tecnico":self.tec}
+        with patch("paper_trading_v112.evaluate_decision_integrity",return_value={"executable":True,"hard_blocks":[],"soft_blocks":[]}):
+            chk=p.evaluate_pair_checklist("EUR/USD",self.input,scanner,self.map,now=self.now)
+        self.assertFalse(chk["data_sufficient"])
+        self.assertFalse(chk["all_checks_passed"])
+
+    def test_stale_market_map_fails_closed(self):
+        scanner={"m15_fetched_at":self.now.isoformat(),"tecnico":self.tec}
+        old={**self.map,"updated_at":(self.now-pd.Timedelta(minutes=76)).isoformat()}
+        with patch("paper_trading_v112.evaluate_decision_integrity",return_value={"executable":True,"hard_blocks":[],"soft_blocks":[]}):
+            chk=p.evaluate_pair_checklist("EUR/USD",self.input,scanner,old,now=self.now)
+        self.assertFalse(chk["data_sufficient"])
+        self.assertFalse(chk["all_checks_passed"])
+
+    def test_future_dated_technical_evidence_fails_closed(self):
+        scanner={"m15_fetched_at":(self.now+pd.Timedelta(minutes=5)).isoformat(),"tecnico":self.tec}
+        with patch("paper_trading_v112.evaluate_decision_integrity",return_value={"executable":True,"hard_blocks":[],"soft_blocks":[]}):
+            chk=p.evaluate_pair_checklist("EUR/USD",self.input,scanner,self.map,now=self.now)
+        self.assertIsNone(chk["technical_age_min"])
+        self.assertFalse(chk["data_sufficient"])
+        self.assertFalse(chk["all_checks_passed"])
+
+    def test_future_dated_market_map_fails_closed(self):
+        scanner={"m15_fetched_at":self.now.isoformat(),"tecnico":self.tec}
+        future={**self.map,"updated_at":(self.now+pd.Timedelta(minutes=5)).isoformat()}
+        with patch("paper_trading_v112.evaluate_decision_integrity",return_value={"executable":True,"hard_blocks":[],"soft_blocks":[]}):
+            chk=p.evaluate_pair_checklist("EUR/USD",self.input,scanner,future,now=self.now)
+        self.assertIsNone(chk["map_age_min"])
+        self.assertFalse(chk["data_sufficient"])
+        self.assertFalse(chk["all_checks_passed"])
+
+    def test_hard_or_soft_block_prevents_paper_signal(self):
+        scanner={"m15_fetched_at":self.now.isoformat(),"tecnico":self.tec}
+        for decision in ({"executable":True,"hard_blocks":["X"],"soft_blocks":[]},{"executable":True,"hard_blocks":[],"soft_blocks":["Y"]},{"executable":False,"hard_blocks":[],"soft_blocks":[]}):
+            with self.subTest(decision=decision), patch("paper_trading_v112.evaluate_decision_integrity",return_value=decision):
+                chk=p.evaluate_pair_checklist("EUR/USD",self.input,scanner,self.map,now=self.now)
+                self.assertFalse(chk["all_checks_passed"])
+
+    def test_normalize_m15_deduplicates_and_rejects_bad_geometry(self):
+        rows=[
+          {"datetime":"2026-09-18T10:00:00Z","open":1.0,"high":1.2,"low":0.9,"close":1.1},
+          {"datetime":"2026-09-18T10:00:00Z","open":1.1,"high":1.3,"low":1.0,"close":1.2},
+          {"datetime":"2026-09-18T10:15:00Z","open":1.0,"high":0.9,"low":0.8,"close":1.1},
+        ]
+        d=p.normalize_m15(rows)
+        self.assertEqual(len(d),1)
+        self.assertAlmostEqual(float(d.iloc[0]["open"]),1.1)
+
+    def test_wait_entry_is_first_bar_after_signal_and_atr_uses_prior_bars(self):
+        times=pd.date_range("2026-09-18T08:00:00Z",periods=12,freq="15min")
+        frame=pd.DataFrame([{"datetime":t,"open":1.10,"high":1.11,"low":1.09,"close":1.10} for t in times])
+        chk={"all_checks_passed":True,"pair":"EUR/USD","side":"BUY","score_master":100,"quality":100,"rank_index":1,"h4":"OK","h1":"OK","m15":"OK","ict_readiness":100,"institutional_readiness":100,"gate":"READY","gate_score":100,"adr_used_pct":20,"event_risk":"BAIXO","technical_age_min":0,"map_age_min":0,"data_sufficient":True}
+        row=p._make_wait_entry(chk,frame.iloc[:9],now=self.now)
+        out=p._fill_entry(pd.Series(row),frame,now=self.now)
+        self.assertEqual(out["status"],"OPEN")
+        self.assertEqual(pd.Timestamp(out["entry_time"]),times[9])
+        self.assertAlmostEqual(float(out["entry_price"]),1.10)
+
+    def test_same_bar_stop_and_target_is_conservative_loss(self):
+        frame=pd.DataFrame([{"datetime":"2026-09-18T10:00:00Z","open":1.0,"high":1.3,"low":0.7,"close":1.0}])
+        row=pd.Series({"status":"OPEN","entry_time":"2026-09-18T10:00:00Z","entry_price":1.0,"stop_price":0.9,"target_price":1.2,"risk_distance":0.1,"side":"BUY"})
+        out=p._close_open(row,frame.assign(datetime=pd.to_datetime(frame["datetime"],utc=True)),now=self.now)
+        self.assertEqual(out["status"],"CLOSED")
+        self.assertEqual(out["result"],"LOSS")
+        self.assertEqual(out["exit_reason"],"STOP_AND_TARGET_SAME_CANDLE")
+        self.assertTrue(out["ambiguous_touch"])
+
+
+    def test_nonfinite_realized_r_does_not_contaminate_paper_summary(self):
+        rows=[
+            {"trade_id":"good","pair":"EUR/USD","status":"CLOSED","result":"WIN","realized_r":2.0},
+            {"trade_id":"nan","pair":"EUR/USD","status":"CLOSED","result":"WIN","realized_r":float("nan")},
+            {"trade_id":"inf","pair":"GBP/USD","status":"CLOSED","result":"WIN","realized_r":float("inf")},
+            {"trade_id":"ninf","pair":"GBP/USD","status":"CLOSED","result":"LOSS","realized_r":float("-inf")},
+        ]
+        summary=p.summarize_paper_trades(pd.DataFrame(rows))
+        self.assertEqual(summary["net_r"],2.0)
+        self.assertEqual(summary["avg_r"],2.0)
+        self.assertEqual(summary["by_pair"]["EUR/USD"]["net_r"],2.0)
+        self.assertEqual(summary["by_pair"]["GBP/USD"]["net_r"],0.0)
+
+    def test_module_has_no_live_broker_execution_contract(self):
+        self.assertNotIn("broker", {x.lower() for x in dir(p) if callable(getattr(p,x,None))})
+        self.assertEqual(p.ACTIVE_STATUSES,{"WAIT_ENTRY","OPEN"})
 
     def test_checklist_only_passes_when_everything_is_clear(self):
-        now = pd.Timestamp("2026-09-17T18:00:00Z")
-        bars = self._bars(start="2026-09-17T08:15:00Z", n=39)
-        inputs, scanner, master = self._state(now, bars=bars)
-        row = inputs["pairs"][0]
-        sp = scanner["resultados"]["EUR/USD"]
-        mp = master["contexts"]["EUR/USD"]
-        chk = evaluate_pair_checklist("EUR/USD", row, sp, mp, now=now)
+        now=pd.Timestamp("2026-09-17T18:00:00Z")
+        bars=self._bars(start="2026-09-17T08:15:00Z",n=39)
+        inputs,scanner,master=self._state(now,bars=bars)
+        row=inputs["pairs"][0]
+        sp=scanner["resultados"]["EUR/USD"]
+        mp=master["contexts"]["EUR/USD"]
+        chk=p.evaluate_pair_checklist("EUR/USD",row,sp,mp,now=now)
         self.assertTrue(chk["all_checks_passed"])
         self.assertTrue(chk["decision"]["executable"])
-        self.assertEqual(chk["decision"]["hard_blocks"], [])
-        self.assertEqual(chk["decision"]["soft_blocks"], [])
+        self.assertEqual(chk["decision"]["hard_blocks"],[])
+        self.assertEqual(chk["decision"]["soft_blocks"],[])
 
     def test_missing_m15_trigger_blocks_paper_entry(self):
-        now = pd.Timestamp("2026-09-17T18:00:00Z")
-        bars = self._bars(start="2026-09-17T08:15:00Z", n=39)
-        inputs, scanner, master = self._state(now, bars=bars, m15_status="🔴 SEM GATILHO")
-        trades, cycle = run_paper_cycle(inputs, scanner, master, now=now)
+        now=pd.Timestamp("2026-09-17T18:00:00Z")
+        bars=self._bars(start="2026-09-17T08:15:00Z",n=39)
+        inputs,scanner,master=self._state(now,bars=bars,m15_status="🔴 SEM GATILHO")
+        trades,cycle=p.run_paper_cycle(inputs,scanner,master,now=now)
         self.assertTrue(trades.empty)
-        self.assertEqual(cycle["pending_created"], 0)
+        self.assertEqual(cycle["pending_created"],0)
         self.assertFalse(cycle["checklists"]["EUR/USD"]["passed"])
 
     def test_signal_waits_next_m15_then_opens_and_closes_at_target(self):
-        # Primeiro ciclo: checklist passou, mas não entra no mesmo candle do sinal.
-        now1 = pd.Timestamp("2026-09-17T18:00:00Z")
-        bars1 = self._bars(start="2026-09-17T08:15:00Z", n=39)
-        inputs, scanner1, master1 = self._state(now1, bars=bars1)
-        trades1, cycle1 = run_paper_cycle(inputs, scanner1, master1, now=now1)
-        self.assertEqual(len(trades1), 1)
-        self.assertEqual(trades1.iloc[0]["status"], "WAIT_ENTRY")
-        self.assertEqual(cycle1["pending_created"], 1)
+        now1=pd.Timestamp("2026-09-17T18:00:00Z")
+        bars1=self._bars(start="2026-09-17T08:15:00Z",n=39)
+        inputs,scanner1,master1=self._state(now1,bars=bars1)
+        trades1,cycle1=p.run_paper_cycle(inputs,scanner1,master1,now=now1)
+        self.assertEqual(len(trades1),1)
+        self.assertEqual(trades1.iloc[0]["status"],"WAIT_ENTRY")
+        self.assertEqual(cycle1["pending_created"],1)
 
-        # Segundo ciclo: aparece o M15 seguinte; entrada é no OPEN dele.
-        signal_time = pd.Timestamp(trades1.iloc[0]["signal_time"])
-        last_close = float(bars1[-1]["close"])
-        next_bar = {
-            "datetime": signal_time.isoformat(),
-            "open": last_close,
-            "high": last_close + 0.00020,
-            "low": last_close - 0.00020,
-            "close": last_close + 0.00002,
+        signal_time=pd.Timestamp(trades1.iloc[0]["signal_time"])
+        last_close=float(bars1[-1]["close"])
+        next_bar={
+            "datetime":signal_time.isoformat(),"open":last_close,
+            "high":last_close+0.00020,"low":last_close-0.00020,"close":last_close+0.00002,
         }
-        bars2 = bars1 + [next_bar]
-        now2 = signal_time + pd.Timedelta(minutes=20)
-        inputs, scanner2, master2 = self._state(now2, bars=bars2)
-        trades2, cycle2 = run_paper_cycle(inputs, scanner2, master2, trades1, now=now2)
-        self.assertEqual(len(trades2), 1)
-        self.assertEqual(trades2.iloc[0]["status"], "OPEN")
-        self.assertAlmostEqual(float(trades2.iloc[0]["entry_price"]), last_close, places=8)
-        self.assertEqual(cycle2["entries_opened"], 1)
+        bars2=bars1+[next_bar]
+        now2=signal_time+pd.Timedelta(minutes=20)
+        inputs,scanner2,master2=self._state(now2,bars=bars2)
+        trades2,cycle2=p.run_paper_cycle(inputs,scanner2,master2,trades1,now=now2)
+        self.assertEqual(len(trades2),1)
+        self.assertEqual(trades2.iloc[0]["status"],"OPEN")
+        self.assertAlmostEqual(float(trades2.iloc[0]["entry_price"]),last_close,places=8)
+        self.assertEqual(cycle2["entries_opened"],1)
 
-        # Terceiro ciclo: candle posterior alcança somente o alvo.
-        target = float(trades2.iloc[0]["target_price"])
-        stop = float(trades2.iloc[0]["stop_price"])
-        entry = float(trades2.iloc[0]["entry_price"])
-        future = {
-            "datetime": (signal_time + pd.Timedelta(minutes=15)).isoformat(),
-            "open": entry,
-            "high": target + 0.00001,
-            "low": max(stop + 0.00001, entry - 0.00005),
-            "close": target,
+        target=float(trades2.iloc[0]["target_price"])
+        stop=float(trades2.iloc[0]["stop_price"])
+        entry=float(trades2.iloc[0]["entry_price"])
+        future={
+            "datetime":(signal_time+pd.Timedelta(minutes=15)).isoformat(),
+            "open":entry,"high":target+0.00001,
+            "low":max(stop+0.00001,entry-0.00005),"close":target,
         }
-        bars3 = bars2 + [future]
-        now3 = signal_time + pd.Timedelta(minutes=40)
-        inputs, scanner3, master3 = self._state(now3, bars=bars3)
-        trades3, cycle3 = run_paper_cycle(inputs, scanner3, master3, trades2, now=now3)
-        self.assertEqual(len(trades3), 1)
-        self.assertEqual(trades3.iloc[0]["status"], "CLOSED")
-        self.assertEqual(trades3.iloc[0]["result"], "WIN")
-        self.assertAlmostEqual(float(trades3.iloc[0]["realized_r"]), 2.0, places=6)
-        self.assertEqual(cycle3["trades_closed"], 1)
+        bars3=bars2+[future]
+        now3=signal_time+pd.Timedelta(minutes=40)
+        inputs,scanner3,master3=self._state(now3,bars=bars3)
+        trades3,cycle3=p.run_paper_cycle(inputs,scanner3,master3,trades2,now=now3)
+        self.assertEqual(len(trades3),1)
+        self.assertEqual(trades3.iloc[0]["status"],"CLOSED")
+        self.assertEqual(trades3.iloc[0]["result"],"WIN")
+        self.assertAlmostEqual(float(trades3.iloc[0]["realized_r"]),2.0,places=6)
+        self.assertEqual(cycle3["trades_closed"],1)
 
     def test_high_adr_soft_block_prevents_simulation(self):
-        now = pd.Timestamp("2026-09-17T18:00:00Z")
-        bars = self._bars(start="2026-09-17T08:15:00Z", n=39)
-        inputs, scanner, master = self._state(now, bars=bars, adr=90.0)
-        trades, cycle = run_paper_cycle(inputs, scanner, master, now=now)
+        now=pd.Timestamp("2026-09-17T18:00:00Z")
+        bars=self._bars(start="2026-09-17T08:15:00Z",n=39)
+        inputs,scanner,master=self._state(now,bars=bars,adr=90.0)
+        trades,cycle=p.run_paper_cycle(inputs,scanner,master,now=now)
         self.assertTrue(trades.empty)
         self.assertFalse(cycle["checklists"]["EUR/USD"]["passed"])
         self.assertTrue(cycle["checklists"]["EUR/USD"]["soft_blocks"])
 
 
-if __name__ == "__main__":
+
+if __name__=="__main__":
     unittest.main()
