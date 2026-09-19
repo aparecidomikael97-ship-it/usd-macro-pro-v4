@@ -56,5 +56,20 @@ class AtlasQuantDashboardTests(unittest.TestCase):
         self.assertIn("&lt;script&gt;", html)
 
 
+    def test_nonfinite_g8_strength_fails_closed(self):
+        for bad in (float("nan"),float("inf"),float("-inf")):
+            with self.subTest(bad=bad):
+                df=self.ranking.copy()
+                df.loc[df["Código"]=="USD","Pontuação_Final"]=bad
+                with self.assertRaises(ValueError):
+                    strengths_from_ranking(df)
+
+    def test_invalid_focus_count_returns_no_cards(self):
+        radar=build_g8_radar(self.ranking)
+        for bad in (-1,True,"bad"):
+            with self.subTest(bad=bad):
+                self.assertEqual(focus_rows(radar,bad),[])
+
+
 if __name__ == "__main__":
     unittest.main()
