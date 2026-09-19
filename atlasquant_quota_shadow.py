@@ -99,7 +99,7 @@ def summarize_quota_shadow(
     market=[x for x in valid_rows if bool(x.get("market_open",False))]
     blocked=[x for x in market if bool(x.get("provider_blocked",False))]
     unhealthy=[x for x in market if not bool(x.get("app_headless_ok",False))]
-    plan_over=[x for x in rows if not bool(x.get("adaptive_within_usable_cap",False))]
+    plan_over=[x for x in valid_rows if not bool(x.get("adaptive_within_usable_cap",False))]
     calls=[_num(x.get("actual_http_calls",0)) for x in market]
 
     enough=len(market)>=minimum
