@@ -74,7 +74,7 @@ class AtlasQuantShadowPersistenceTests(unittest.TestCase):
             r=persist_shadow_samples([sample],repo="o/r",branch="atlasquant-runtime",token="t")
         self.assertTrue(r["ok"]); self.assertEqual(r["added"],1)
         raw=base64.b64decode(p.call_args.kwargs["json"]["content"]).decode("utf-8")
-        self.assertEqual(parse_samples(raw)[0]["sample_id
+        self.assertEqual(parse_samples(raw)[0]["sample_id"],sample["sample_id"])
 
     def test_shadow_hydration_source_metadata_is_safe_and_explicit(self):
         import inspect
@@ -83,7 +83,6 @@ class AtlasQuantShadowPersistenceTests(unittest.TestCase):
         self.assertIn('"source":"session_fallback"',source)
         self.assertIn('"branch":cfg["branch"]',source)
         self.assertNotIn('"token":cfg["token"]',source)
-"],sample["sample_id"])
 
 
 if __name__=="__main__":
