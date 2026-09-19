@@ -15,11 +15,13 @@ from atlasquant_calibration_lab import calibration_table, calibration_summary
 from atlasquant_stability_lab import temporal_folds, stability_summary
 from atlasquant_shadow_mode import summarize_shadow, DEFAULT_SHADOW_PAIRS
 from atlasquant_expansion_budget import expansion_plan
+from atlasquant_quota_shadow import summarize_quota_shadow
 
 
 def build_validation_readiness(
     history: pd.DataFrame,
     shadow_samples: Sequence[Mapping[str, Any]] | None = None,
+    quota_shadow_samples: Sequence[Mapping[str, Any]] | None = None,
     *,
     horizon: str = "24h",
     min_total_samples: int = 100,
@@ -32,6 +34,7 @@ def build_validation_readiness(
     current_pairs: int = 7,
     target_pairs: int = 28,
     daily_cap: int = 480,
+    min_quota_market_runs: int = 20,
 ) -> dict[str, Any]:
     perf=performance_readiness(
         history,
@@ -64,12 +67,17 @@ def build_validation_readiness(
         target_pairs=target_pairs,
         daily_cap=daily_cap,
     )
+    quota_shadow=summarize_quota_shadow(
+        quota_shadow_samples or [],
+        min_market_runs=min_quota_market_runs,
+    )
 
     checks={
         "performance_reviewable": perf["status"]=="REVIEWABLE",
         "calibration_consistent": calib["status"]=="CONSISTENT",
         "stability_consistent": stability["status"]=="STABLE",
         "shadow_reviewable": bool(shadow["eligible_for_manual_review"]),
+        "quota_shadow_reviewable": bool(quota_shadow["eligible_for_manual_review"]),
     }
     passed=sum(1 for ok in checks.values() if ok)
 
@@ -81,6 +89,13 @@ def build_validation_readiness(
         pending.append(f"Calibração: {calib['label']}")
     if stability["status"]!="STABLE":
         pending.append(f"Estabilidade: {stability['label']}")
+    if not quota_shadow["minimum_met"]:
+        pending.append(
+            f"Quota Shadow: {quota_shadow['market_open_runs']}/{quota_shadow['min_market_runs']} execuções com mercado aberto"
+        )
+    elif not quota_shadow["eligible_for_manual_review"]:
+        blockers.append("Quota Shadow atingiu amostra mínima, mas falhou nos critérios de saúde/cota")
+
     if shadow["critical_mismatches"]:
         blockers.append(
             f"Shadow Mode com {shadow['critical_mismatches']} divergência(s) crítica(s)"
@@ -122,6 +137,7 @@ def build_validation_readiness(
         "calibration":calib,
         "stability":stability,
         "shadow":shadow,
+        "quota_shadow":quota_shadow,
         "expansion":expansion,
         "manual_review_required":True,
         "automatic_promotion_allowed":False,
@@ -180,12 +196,21 @@ def render_validation_readiness(
     c1.metric("Estado",f"{icon} {result['label']}")
     c2.metric("Checks aprovados",f"{result['passed_checks']}/{result['total_checks']}")
     c3.metric("Shadow samples",result["shadow"]["samples"])
-    c4.metric("Auto-promoção","DESATIVADA")
+    c4.metric("Quota mercado",f"{result['quota_shadow']['market_open_runs']}/{result['quota_shadow']['min_market_runs']}")
 
     rows=[
         {"Camada":"Performance","OK":result["checks"]["performance_reviewable"],"Estado":result["performance"]["label"]},
         {"Camada":"Calibração","OK":result["checks"]["calibration_consistent"],"Estado":result["calibration"]["label"]},
         {"Camada":"Estabilidade","OK":result["checks"]["stability_consistent"],"Estado":result["stability"]["label"]},
+        {
+            "Camada":"Quota Shadow",
+            "OK":result["checks"]["quota_shadow_reviewable"],
+            "Estado":(
+                "ELEGÍVEL PARA REVISÃO"
+                if result["quota_shadow"]["eligible_for_manual_review"]
+                else f"{result['quota_shadow']['market_open_runs']}/{result['quota_shadow']['min_market_runs']} mercado aberto"
+            ),
+        },
         {
             "Camada":"Shadow Mode",
             "OK":result["checks"]["shadow_reviewable"],
@@ -208,7 +233,7 @@ def render_validation_readiness(
             for item in result["pending"]:
                 st.write("•",item)
     else:
-        st.success("Os quatro blocos atingiram os critérios mínimos para revisão humana.")
+        st.success("Os cinco blocos atingiram os critérios mínimos para revisão humana.")
 
     exp=result["expansion"]
     if exp["target_requires_change"]:
