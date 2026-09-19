@@ -231,14 +231,22 @@ html { scroll-behavior: smooth; }
   .stMainBlockContainer { padding-left: .85rem; padding-right: .85rem; padding-top: .7rem; }
   [data-testid="stHorizontalBlock"] { flex-wrap: wrap !important; gap: .55rem !important; }
   [data-testid="stColumn"] { min-width: 150px !important; flex: 1 1 150px !important; }
-  .aq-hero { padding: 18px 16px 16px; border-radius: 14px; }
+  .aq-hero { padding: 15px 16px 14px; border-radius: 14px; }
+  .aq-title{font-size:1.62rem}
+  .aq-subtitle{font-size:.78rem;line-height:1.45;margin-top:5px}
+  .aq-badges{margin-top:10px}
+  .aq-badge{font-size:.62rem;padding:5px 7px}
+  .aq-context-strip{gap:7px;margin:8px 0 10px}
+  .aq-context-strip>div{padding:9px 10px;min-height:54px}
   .aq-subtitle { font-size: .84rem; }
   .aq-badge { font-size: .68rem; padding: 4px 8px; }
   .aq-section-title { font-size:.94rem; margin-top:.9rem; }
   .aq-decision-strip{grid-template-columns:repeat(2,minmax(0,1fr))}
   .aq-decision-strip .wide{grid-column:1/-1}
   .aq-context-strip{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .aq-focus{grid-template-columns:1fr 1fr}
+  .aq-focus{grid-template-columns:1fr 1fr;margin-top:6px}
+  .aq-focus-card strong{font-size:.74rem}
+  .aq-focus-main strong{font-size:.9rem}
   .aq-focus-main{grid-column:1/-1}
   .aq-nav-groups{margin-left:-.15rem;margin-right:-.15rem;position:sticky;top:0;z-index:20;padding:6px 4px;background:linear-gradient(180deg,rgba(5,16,30,.96),rgba(5,16,30,.84));backdrop-filter:blur(8px)}
   .aq-nav-groups:before{display:none}
