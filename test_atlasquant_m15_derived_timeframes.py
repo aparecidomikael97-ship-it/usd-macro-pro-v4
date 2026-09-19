@@ -55,6 +55,20 @@ class AtlasQuantM15DerivedTests(unittest.TestCase):
         h1=derive_from_m15(d,"1h",now_utc="2026-09-15T12:59:00Z")
         self.assertTrue(h1.empty)
 
+    def test_future_candles_cannot_leak_into_h1(self):
+        closed=bars("2026-09-15T12:00:00Z",4)
+        future=bars("2026-09-15T13:00:00Z",4)
+        d=pd.concat([closed,future],ignore_index=True)
+        h1=derive_from_m15(d,"1h",now_utc="2026-09-15T13:00:00Z")
+        self.assertEqual(len(h1),1)
+        self.assertEqual(h1.iloc[0]["datetime"],pd.Timestamp("2026-09-15T12:00:00Z"))
+
+    def test_duplicate_m15_timestamp_invalidates_bucket(self):
+        d=bars("2026-09-15T12:00:00Z",4)
+        d=pd.concat([d,d.iloc[[0]]],ignore_index=True)
+        h1=derive_from_m15(d,"1h",now_utc="2026-09-15T13:00:00Z")
+        self.assertTrue(h1.empty)
+
     def test_unsupported_timeframe_fails_closed(self):
         with self.assertRaises(ValueError):
             derive_from_m15(bars("2026-09-15T12:00:00Z",4),"2h",now_utc="2026-09-15T13:00:00Z")
