@@ -63,6 +63,10 @@ REQUIRED_FILES=(
     "tradingview/atlasquant_amd_strategy_v1.pine",
     ".github/workflows/autopilot-v107.yml",
     ".github/workflows/quality-tests.yml",
+    ".github/workflows/atlasquant-integration-gate.yml",
+    ".github/workflows/production-health.yml",
+    ".github/workflows/production-browser-smoke.yml",
+    "atlasquant_integration_gate.py",
     ".github/workflows/atlasquant-checkpoint.yml",
     ".github/workflows/production-health.yml",
     ".github/workflows/production-browser-smoke.yml",
@@ -178,6 +182,28 @@ def run_dev_preflight(
         and '"contains_password_hash":False' in account_audit
         and '"automatic_apply":False' in account_audit,
         "Mudanças administrativas geram manifesto sem credenciais e sem aplicação automática.",
+    ))
+
+    integration_gate=(base/".github/workflows/atlasquant-integration-gate.yml").read_text(encoding="utf-8") if (base/".github/workflows/atlasquant-integration-gate.yml").is_file() else ""
+    production_health=(base/".github/workflows/production-health.yml").read_text(encoding="utf-8") if (base/".github/workflows/production-health.yml").is_file() else ""
+    production_browser=(base/".github/workflows/production-browser-smoke.yml").read_text(encoding="utf-8") if (base/".github/workflows/production-browser-smoke.yml").is_file() else ""
+    checks.append(_check(
+        "source_integration_gate_manual",
+        "branches: [atlasquant-integration]" in integration_gate
+        and "contents: read" in integration_gate
+        and "origin/main...HEAD" in integration_gate
+        and "evaluate_integration_candidate" in integration_gate
+        and "git merge" not in integration_gate
+        and "git push" not in integration_gate,
+        "Gate de integração é source-only, baseado no main atual e não faz merge/push.",
+    ))
+    checks.append(_check(
+        "production_observability_read_only",
+        all("permissions:\n  contents: read" in src and "branches: [main]" in src for src in (production_health,production_browser))
+        and "Warm production service" in production_browser
+        and "_stcore/health" in production_health
+        and "_stcore/health" in production_browser,
+        "Health e browser smoke de produção são read-only, main-scoped e tolerantes a cold start.",
     ))
 
     provider_markers=(
