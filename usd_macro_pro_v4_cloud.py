@@ -180,6 +180,13 @@ except Exception as _access_exc:
     render_access_gate = None
     _ATLASQUANT_ACCESS_IMPORT_ERROR = f"{type(_access_exc).__name__}: {_access_exc}"
 
+try:
+    from atlasquant_account_portal import render_account_portal
+    _ATLASQUANT_ACCOUNT_PORTAL_IMPORT_ERROR = ""
+except Exception as _account_portal_exc:
+    render_account_portal = None
+    _ATLASQUANT_ACCOUNT_PORTAL_IMPORT_ERROR = f"{type(_account_portal_exc).__name__}: {_account_portal_exc}"
+
 # =========================================================
 # CONFIGURAÇÕES GERAIS
 # =========================================================
@@ -3850,7 +3857,7 @@ else:
 abas = st.tabs([
     "Central", "Painel mestre", "Moedas", "EUA", "Pares", "Fed",
     "Histórico", "Backtest", "Decisão", "Market Map", "Macro Briefing", "Aprender",
-    "Produto", "Melhorias", "Notícias", "Autopilot",
+    "Produto", "Melhorias", "Notícias", "Autopilot", "Conta",
 ])
 
 # =========================================================
@@ -9161,6 +9168,17 @@ with abas[15]:
             st.caption(f"Diagnóstico: {_AUTOPILOT_V107_IMPORT_ERROR}")
     else:
         render_autopilot_v107()
+
+# =========================================================
+# CONTA — USER / SALES / ADMIN
+# =========================================================
+with abas[16]:
+    if render_account_portal is None:
+        st.error("Portal de conta indisponível neste carregamento.")
+        if _ATLASQUANT_ACCOUNT_PORTAL_IMPORT_ERROR:
+            st.caption("Diagnóstico: "+_ATLASQUANT_ACCOUNT_PORTAL_IMPORT_ERROR)
+    else:
+        render_account_portal(_ATLASQUANT_ACCESS)
 
 # No modo GitHub Actions/AppTest, persiste a Matriz atual para o runner background.
 if os.getenv("USD_MACRO_AUTOPILOT", "") == "1":
