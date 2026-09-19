@@ -1,13 +1,13 @@
 import unittest
 
-from atlasquant_ui_v1 import UI_VERSION, ATLASQUANT_CSS, NAVIGATION_LABELS, NAVIGATION_GROUPS, hero_html, navigation_labels, navigation_groups, navigation_groups_html, operation_focus_html, score_semantics, section_title_html, state_badge_html, decision_strip_html, context_strip_html
+from atlasquant_ui_v1 import UI_VERSION, ATLASQUANT_CSS, NAVIGATION_LABELS, NAVIGATION_GROUPS, hero_html, navigation_labels, navigation_groups, navigation_groups_html, operation_focus_html, score_semantics, section_title_html, state_badge_html, decision_strip_html, context_strip_html, normalize_experience_mode, navigation_mode_css
 
 
 class AtlasQuantUiTests(unittest.TestCase):
     def test_navigation_includes_macro_briefing_without_losing_endpoints(self):
         self.assertEqual(len(NAVIGATION_LABELS), 20)
         self.assertIn("🎙️ Macro Briefing", NAVIGATION_LABELS)
-        self.assertEqual(navigation_labels()[0], "🎯 Central")
+        self.assertEqual(navigation_labels()[0], "🎯 Radar")
         self.assertEqual(navigation_labels()[-1], "🛟 Suporte")
         self.assertIn("💼 Vendas", navigation_labels())
         self.assertIn("📱 Instalar", navigation_labels())
@@ -145,7 +145,7 @@ class AtlasQuantUiTests(unittest.TestCase):
         focus=app.index("operation_focus_html(")
         tabs=app.index("abas = st.tabs(_nav_items)")
         self.assertLess(focus,tabs)
-        self.assertIn('decision="Central pronta para leitura"',app)
+        self.assertIn('decision="Radar pronto para leitura"',app)
         self.assertIn('safety="Safety Core monitorado"',app)
 
 
@@ -222,6 +222,27 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("if r.status_code == 404:",fn)
         self.assertIn("return default",fn)
         self.assertIn("r.raise_for_status()",fn)
+
+    def test_beginner_mode_hides_advanced_tab_buttons_without_changing_indices(self):
+        self.assertEqual(normalize_experience_mode("iniciante"),"Iniciante")
+        self.assertEqual(normalize_experience_mode("Pro"),"Avançado")
+        css=navigation_mode_css("Iniciante")
+        self.assertIn("nth-child(2)",css)
+        self.assertNotIn("nth-child(11){display:none",css)
+        self.assertNotIn("nth-child(12){display:none",css)
+        self.assertNotIn("nth-child(17){display:none",css)
+        self.assertNotIn("nth-child(18){display:none",css)
+        self.assertNotIn("nth-child(20){display:none",css)
+        self.assertEqual(navigation_mode_css("Avançado"),"<style></style>")
+
+    def test_main_wires_global_experience_switch_before_tabs(self):
+        from pathlib import Path
+        src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        switch=src.index("render_experience_mode_switch()")
+        tabs=src.index("abas = st.tabs(_nav_items)")
+        self.assertLess(switch,tabs)
+        self.assertIn("_aq_experience_mode",src)
+        self.assertIn("render_home_radar",src)
 
 
 if __name__ == "__main__":
