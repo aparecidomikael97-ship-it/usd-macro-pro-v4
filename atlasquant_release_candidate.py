@@ -23,6 +23,7 @@ class SourceReleaseCandidateEvidence:
     production_health_baseline_ok: bool
     runtime_source_parity_ok: bool
     integration_ui_smoke_ok: bool
+    ui_smoke_covers_current_ui_sources: bool
     runtime_data_files: int = 0
     browser_smoke_baseline_ok: bool = False
     pr_draft: bool = True
@@ -59,6 +60,7 @@ def assess_source_release_candidate(
         ("production_health_baseline_ok",ev.production_health_baseline_ok),
         ("runtime_source_parity_ok",ev.runtime_source_parity_ok),
         ("integration_ui_smoke_ok",ev.integration_ui_smoke_ok),
+        ("ui_smoke_covers_current_ui_sources",ev.ui_smoke_covers_current_ui_sources),
         ("browser_smoke_baseline_ok",ev.browser_smoke_baseline_ok),
         ("pr_draft",ev.pr_draft),
     )
@@ -99,6 +101,7 @@ def assess_source_release_candidate(
         ("production_health_baseline_ok",ev.production_health_baseline_ok,"Current production health baseline is not healthy"),
         ("runtime_source_parity_ok",ev.runtime_source_parity_ok,"Runtime source does not match integration candidate"),
         ("integration_ui_smoke_ok",ev.integration_ui_smoke_ok,"Integration desktop/mobile UI smoke failed or is missing"),
+        ("ui_smoke_covers_current_ui_sources",ev.ui_smoke_covers_current_ui_sources,"UI-sensitive source changed after the last successful UI smoke"),
     ):
         if _valid_bool(value) and not value:
             hard.append(message)
