@@ -150,5 +150,23 @@ class AtlasQuantShadowModeTests(unittest.TestCase):
                 self.assertFalse(s["eligible_for_manual_review"])
 
 
+    def test_missing_identity_metadata_is_critical(self):
+        for field in ("pair","timestamp","version"):
+            a=self.snap(); b=self.snap(version="v2")
+            a[field]=""
+            with self.subTest(field=field):
+                s=compare_shadow_sample(a,b)
+                self.assertFalse(s["identity_valid"])
+                self.assertTrue(s["critical_mismatch"])
+                self.assertFalse(summarize_shadow([s],min_samples=1)["eligible_for_manual_review"])
+
+    def test_unsynchronized_timestamps_are_critical(self):
+        a=self.snap(); b=self.snap(version="v2"); b["timestamp"]="2026-09-15T12:15:00Z"
+        s=compare_shadow_sample(a,b)
+        self.assertFalse(s["identity_valid"])
+        self.assertTrue(s["critical_mismatch"])
+
+
+
 if __name__=="__main__":
     unittest.main()
