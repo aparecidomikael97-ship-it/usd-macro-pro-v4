@@ -25,17 +25,18 @@ class AtlasQuantSalesCenterTests(unittest.TestCase):
         self.assertFalse(sales_access_allowed(empty_name))
 
 
-    def test_commercial_readiness_never_claims_future_features_ready(self):
+    def test_commercial_readiness_distinguishes_internal_guide_from_external_features(self):
         status=commercial_readiness({"registry":{"TOTAL":7}})
         self.assertEqual(status["active_accounts"],7)
         self.assertTrue(status["academy_text_ready"])
         self.assertFalse(status["academy_ready"])
         self.assertFalse(status["voice_ready"])
-        self.assertFalse(status["brokers_guide_ready"])
+        self.assertTrue(status["brokers_guide_ready"])
         self.assertFalse(status["native_stores_ready"])
         self.assertFalse(status["payments_integrated"])
         self.assertFalse(status["broker_execution_enabled"])
         self.assertFalse(status["real_orders_enabled"])
+        self.assertTrue(status["brokers_guide_ready"])
         self.assertTrue(status["sales_role_isolation_verified"])
         self.assertTrue(status["account_revocation_verified"])
         self.assertTrue(status["account_admin_verified"])
@@ -52,7 +53,7 @@ class AtlasQuantSalesCenterTests(unittest.TestCase):
         by={row["Item"]:row for row in rows}
         self.assertEqual(by["Academy"]["Status"],"TEXTO PRONTO · VÍDEOS PENDENTES")
         self.assertEqual(by["Assistente de voz"]["Status"],"PLANEJADO")
-        self.assertEqual(by["Corretoras & plataformas"]["Status"],"PLANEJADO")
+        self.assertEqual(by["Corretoras & plataformas"]["Status"],"GUIA INFORMATIVO PRONTO")
 
 
     def test_text_academy_does_not_fake_full_commercial_academy(self):

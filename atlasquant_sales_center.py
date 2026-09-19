@@ -13,6 +13,7 @@ from atlasquant_commercial_launch_guard import CommercialEvidence, assess_commer
 from atlasquant_commercial_security_evidence import collect_commercial_security_evidence
 from atlasquant_academy import academy_minimum_text_ready
 from atlasquant_support_center import support_minimum_ready
+from atlasquant_brokers_guide import brokers_guide_minimum_ready, render_brokers_guide
 
 SCHEMA="ATLASQUANT_SALES_CENTER_V1"
 
@@ -34,7 +35,7 @@ def onboarding_steps()->list[dict[str,str]]:
         {"Etapa":"3","Item":"Primeiro acesso","Status":"PRONTO","Descrição":"Entrar, revisar viés e qualidade dos dados."},
         {"Etapa":"4","Item":"Academy","Status":"TEXTO PRONTO · VÍDEOS PENDENTES","Descrição":"Trilha textual estruturada já está no app; vídeos curtos continuam em produção futura."},
         {"Etapa":"5","Item":"Assistente de voz","Status":"PLANEJADO","Descrição":"Briefing diário/semanal e explicação do viés."},
-        {"Etapa":"6","Item":"Corretoras & plataformas","Status":"PLANEJADO","Descrição":"Guia comparativo revisado próximo ao lançamento comercial."},
+        {"Etapa":"6","Item":"Corretoras & plataformas","Status":"GUIA INFORMATIVO PRONTO","Descrição":"Compatibilidade, Paper/Demo e segurança documentadas; conexão real continua desativada."},
     ]
 
 def commercial_readiness(access:Mapping[str,Any]|None=None)->dict[str,Any]:
@@ -61,7 +62,7 @@ def commercial_readiness(access:Mapping[str,Any]|None=None)->dict[str,Any]:
         "academy_ready":False,
         "support_ready":bool(support_minimum_ready()),
         "voice_ready":False,
-        "brokers_guide_ready":False,
+        "brokers_guide_ready":bool(brokers_guide_minimum_ready()),
         "native_stores_ready":False,
         "payments_integrated":False,
         "broker_execution_enabled":False,
@@ -137,7 +138,7 @@ def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
         ("Academy — vídeos","PENDENTE"),
         ("Central de suporte","PRONTO" if status["support_ready"] else "PENDENTE"),
         ("Assistente de voz","PENDENTE"),
-        ("Guia de corretoras","PENDENTE"),
+        ("Guia de corretoras","PRONTO — INFORMATIVO" if status["brokers_guide_ready"] else "PENDENTE"),
         ("Termos / privacidade / riscos","PENDENTE"),
         ("Licenciamento comercial de dados","PENDENTE"),
         ("Pagamento / assinatura","PENDENTE"),
@@ -166,6 +167,8 @@ def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
         st.caption(" · ".join(launch["blockers"]))
     else:
         st.success("Pré-requisitos comerciais completos para revisão humana final.")
+    st.markdown("### Corretoras & plataformas")
+    render_brokers_guide()
     st.info(
         "O produto ainda não deve ser marcado como pronto para venda pública "
         "enquanto itens comerciais/regulatórios essenciais permanecerem pendentes."
