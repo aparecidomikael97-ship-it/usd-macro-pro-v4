@@ -60,5 +60,16 @@ class AtlasQuantCoverageFunnelTests(unittest.TestCase):
         self.assertTrue(expansion_watchlist(pd.DataFrame({"Par":["EUR/GBP"]})).empty)
 
 
+    def test_missing_operational_pair_set_never_marks_pair_executable(self):
+        m=build_coverage_matrix(self.ranking,operational_pairs=None)
+        self.assertEqual(int((m["Cobertura operacional"]=="PIPELINE COMPLETO").sum()),0)
+        self.assertTrue((m["Pode receber status executável?"]=="NÃO").all())
+
+    def test_blank_operational_pair_names_are_ignored(self):
+        m=build_coverage_matrix(self.ranking,operational_pairs=("", "   ", "EUR/USD"))
+        self.assertEqual(int((m["Cobertura operacional"]=="PIPELINE COMPLETO").sum()),1)
+
+
+
 if __name__=="__main__":
     unittest.main()
