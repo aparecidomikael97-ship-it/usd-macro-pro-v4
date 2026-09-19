@@ -22,6 +22,7 @@ class SourceReleaseCandidateEvidence:
     secret_hygiene_ok: bool
     production_health_baseline_ok: bool
     runtime_source_parity_ok: bool
+    integration_ui_smoke_ok: bool
     runtime_data_files: int = 0
     browser_smoke_baseline_ok: bool = False
     pr_draft: bool = True
@@ -57,6 +58,7 @@ def assess_source_release_candidate(
         ("secret_hygiene_ok",ev.secret_hygiene_ok),
         ("production_health_baseline_ok",ev.production_health_baseline_ok),
         ("runtime_source_parity_ok",ev.runtime_source_parity_ok),
+        ("integration_ui_smoke_ok",ev.integration_ui_smoke_ok),
         ("browser_smoke_baseline_ok",ev.browser_smoke_baseline_ok),
         ("pr_draft",ev.pr_draft),
     )
@@ -96,6 +98,7 @@ def assess_source_release_candidate(
         ("secret_hygiene_ok",ev.secret_hygiene_ok,"Repository secret hygiene failed"),
         ("production_health_baseline_ok",ev.production_health_baseline_ok,"Current production health baseline is not healthy"),
         ("runtime_source_parity_ok",ev.runtime_source_parity_ok,"Runtime source does not match integration candidate"),
+        ("integration_ui_smoke_ok",ev.integration_ui_smoke_ok,"Integration desktop/mobile UI smoke failed or is missing"),
     ):
         if _valid_bool(value) and not value:
             hard.append(message)
