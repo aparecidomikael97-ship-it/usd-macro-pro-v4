@@ -21,6 +21,8 @@ class DevPreReleaseReadinessTests(unittest.TestCase):
         self.assertIn("backtest_panel_offline",names)
         self.assertIn("runtime_branch_policy",names)
         self.assertIn("tradingview_python_static_parity",names)
+        self.assertIn("private_access_gate_integrated",names)
+        self.assertIn("role_portal_integrated",names)
 
     def test_missing_tree_is_blocked_fail_closed(self):
         with tempfile.TemporaryDirectory() as td:
