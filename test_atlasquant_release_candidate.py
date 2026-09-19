@@ -17,6 +17,7 @@ class AtlasQuantReleaseCandidateTests(unittest.TestCase):
             candidate_based_on_current_main=True,
             secret_hygiene_ok=True,
             production_health_baseline_ok=True,
+            runtime_source_parity_ok=True,
             runtime_data_files=0,
             browser_smoke_baseline_ok=False,
             pr_draft=True,
@@ -44,6 +45,13 @@ class AtlasQuantReleaseCandidateTests(unittest.TestCase):
         self.assertFalse(out["automatic_merge_allowed"])
         self.assertTrue(out["manual_review_required"])
 
+    def test_runtime_source_parity_is_required_for_release_candidate(self):
+        out=assess_source_release_candidate(self.base(runtime_source_parity_ok=False))
+        self.assertEqual(out["status"],"BLOCKED")
+        self.assertFalse(out["source_reviewable"])
+        self.assertTrue(any("Runtime source" in x for x in out["hard_blocks"]))
+
+
     def test_any_runtime_data_in_source_candidate_blocks(self):
         out=assess_source_release_candidate(self.base(runtime_data_files=1))
         self.assertEqual(out["status"],"BLOCKED")
@@ -67,6 +75,7 @@ class AtlasQuantReleaseCandidateTests(unittest.TestCase):
             "candidate_based_on_current_main",
             "secret_hygiene_ok",
             "production_health_baseline_ok",
+            "runtime_source_parity_ok",
         )
         for field in fields:
             with self.subTest(field=field):
@@ -77,7 +86,7 @@ class AtlasQuantReleaseCandidateTests(unittest.TestCase):
         fields=(
             "integration_gate_ok","source_checkpoint_ok","pr_mergeable",
             "candidate_based_on_current_main","secret_hygiene_ok",
-            "production_health_baseline_ok","browser_smoke_baseline_ok","pr_draft",
+            "production_health_baseline_ok","runtime_source_parity_ok","browser_smoke_baseline_ok","pr_draft",
         )
         for field in fields:
             for bad in ("true",1,None):
