@@ -170,25 +170,36 @@ def gh_get_bytes(path: str) -> tuple[bytes | None, str]:
 def gh_put_bytes(path: str, raw: bytes, message: str) -> tuple[bool, str]:
     if not TOKEN or not REPO:
         return False, "GitHub token/repo ausente."
-    try:
-        url = f"https://api.github.com/repos/{REPO}/contents/{path}"
-        h = gh_headers()
-        cur = requests.get(url, headers=h, params={"ref": BRANCH}, timeout=20)
-        sha = cur.json().get("sha", "") if cur.status_code == 200 else ""
-        if cur.status_code not in (200, 404):
-            cur.raise_for_status()
-        payload = {
-            "message": message,
-            "content": base64.b64encode(raw).decode("ascii"),
-            "branch": BRANCH,
-        }
-        if sha:
-            payload["sha"] = sha
-        r = requests.put(url, headers=h, json=payload, timeout=30)
-        r.raise_for_status()
-        return True, ""
-    except Exception as exc:
-        return False, f"{type(exc).__name__}: {exc}"
+    url = f"https://api.github.com/repos/{REPO}/contents/{path}"
+    h = gh_headers()
+    last_error = ""
+    # Runtime writers share one data branch. A concurrent commit between GET
+    # and PUT can make the blob SHA stale and GitHub returns HTTP 409. Re-read
+    # the current SHA and retry a small bounded number of times.
+    for attempt in range(3):
+        try:
+            cur = requests.get(url, headers=h, params={"ref": BRANCH}, timeout=20)
+            sha = cur.json().get("sha", "") if cur.status_code == 200 else ""
+            if cur.status_code not in (200, 404):
+                cur.raise_for_status()
+            payload = {
+                "message": message,
+                "content": base64.b64encode(raw).decode("ascii"),
+                "branch": BRANCH,
+            }
+            if sha:
+                payload["sha"] = sha
+            r = requests.put(url, headers=h, json=payload, timeout=30)
+            if r.status_code == 409 and attempt < 2:
+                last_error = "HTTP 409: conflito de escrita concorrente"
+                time.sleep(0.20 * (attempt + 1))
+                continue
+            r.raise_for_status()
+            return True, ""
+        except Exception as exc:
+            last_error = f"{type(exc).__name__}: {exc}"
+            return False, last_error
+    return False, last_error or "HTTP 409: conflito de escrita concorrente"
 
 def gh_get_json(path: str, default: Any = None) -> tuple[Any, str]:
     raw, err = gh_get_bytes(path)
