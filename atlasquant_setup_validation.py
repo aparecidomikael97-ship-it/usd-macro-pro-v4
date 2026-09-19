@@ -14,7 +14,7 @@ from typing import Any, Mapping, Sequence
 import pandas as pd
 import streamlit as st
 
-from atlasquant_setup_journal import setup_forward_summary
+from atlasquant_setup_journal import setup_forward_summary, journal_template
 
 SCHEMA="ATLASQUANT_SETUP_VALIDATION_V1"
 
@@ -397,6 +397,14 @@ def render_private_validation_center(
     c4.metric("Trading real","DESATIVADO")
 
     st.dataframe(validation_frame(results),width="stretch",hide_index=True)
+    template=journal_template()
+    st.download_button(
+        "Baixar planilha-modelo do Forward/Paper",
+        data=template.to_csv(index=False).encode("utf-8"),
+        file_name="atlasquant_setup_forward_paper_template.csv",
+        mime="text/csv",
+        key="aq_private_validation_template",
+    )
     selected=st.selectbox(
         "Ver critérios de um setup",
         [r["setup_id"] for r in results],
