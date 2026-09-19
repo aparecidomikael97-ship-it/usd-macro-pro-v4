@@ -3,7 +3,7 @@ import pandas as pd
 
 from atlasquant_dashboard_v1 import (
     build_g8_radar, radar_summary, strengths_from_ranking,
-    focus_rows, focus_card_html,
+    focus_rows, focus_card_html, market_pulse_html,
 )
 
 
