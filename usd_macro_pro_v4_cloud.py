@@ -152,6 +152,14 @@ except Exception as _validation_exc:
 
 
 try:
+    from atlasquant_setup_validation import render_private_validation_center
+    _ATLASQUANT_SETUP_VALIDATION_IMPORT_ERROR = ""
+except Exception as _setup_validation_exc:
+    render_private_validation_center = None
+    _ATLASQUANT_SETUP_VALIDATION_IMPORT_ERROR = f"{type(_setup_validation_exc).__name__}: {_setup_validation_exc}"
+
+
+try:
     from atlasquant_evidence_bundle import render_validation_evidence
     _ATLASQUANT_EVIDENCE_IMPORT_ERROR = ""
 except Exception as _evidence_exc:
@@ -9289,6 +9297,18 @@ with abas[13]:
         except Exception as _aq_validation_exc:
             st.warning("Validation Center em modo seguro; merge/promoção continuam bloqueados.")
             st.caption(f"Diagnóstico: {type(_aq_validation_exc).__name__}: {_aq_validation_exc}")
+
+    st.divider()
+    if render_private_validation_center is None:
+        st.warning("Validação Privada de Setups indisponível; nenhuma promoção é permitida.")
+        if _ATLASQUANT_SETUP_VALIDATION_IMPORT_ERROR:
+            st.caption(f"Diagnóstico Setup Validation: {_ATLASQUANT_SETUP_VALIDATION_IMPORT_ERROR}")
+    else:
+        try:
+            render_private_validation_center()
+        except Exception as _aq_setup_validation_exc:
+            st.warning("Validação Privada em modo seguro; setups permanecem sem promoção automática.")
+            st.caption(f"Diagnóstico: {type(_aq_setup_validation_exc).__name__}: {_aq_setup_validation_exc}")
 
 # =========================================================
 # ABA 13 — V10.6.2 FRESH-PRICE SNAPSHOT RECOVERY
