@@ -220,6 +220,16 @@ def _records(df: pd.DataFrame) -> list[dict[str, Any]]:
     return rows
 
 
+def backtest_result_status(metrics: dict[str,Any] | None) -> dict[str,str]:
+    m=dict(metrics or {})
+    trades=int(m.get("trades",0) or 0)
+    if trades<=0: return {"label":"SEM AMOSTRA","tone":"info","detail":"Nenhum trade válido para resumir"}
+    try: net=float(m.get("net_r",0) or 0); dd=float(m.get("max_drawdown_r",0) or 0)
+    except Exception: return {"label":"REVISAR","tone":"warn","detail":"Métricas incompletas"}
+    if net>0 and dd<=max(2.0,abs(net)): return {"label":"AMOSTRA POSITIVA","tone":"good","detail":"Resultado histórico positivo; não é previsão"}
+    if net<0: return {"label":"AMOSTRA NEGATIVA","tone":"bad","detail":"Resultado histórico negativo nesta amostra"}
+    return {"label":"NEUTRO","tone":"info","detail":"Amostra sem vantagem líquida"}
+
 def _render_result_block(
     results: list[dict[str, Any]],
     pair: str,
@@ -230,6 +240,13 @@ def _render_result_block(
     metrics = summarize_results(results)
     ledger = ledger_frame(results)
 
+    status=backtest_result_status(metrics)
+    st.markdown(
+        f"""<div style="padding:11px 13px;border:1px solid rgba(137,170,210,.18);border-radius:12px;margin:3px 0 12px">
+        <strong>{status['label']}</strong> · <span style="opacity:.75">{status['detail']}</span>
+        <span style="float:right;opacity:.68;font-size:.75rem">Pesquisa histórica · não autoriza execução</span></div>""",
+        unsafe_allow_html=True,
+    )
     st.markdown("#### Resultado")
     m1, m2, m3, m4, m5 = st.columns(5)
     m1.metric("Trades", metrics["trades"])
