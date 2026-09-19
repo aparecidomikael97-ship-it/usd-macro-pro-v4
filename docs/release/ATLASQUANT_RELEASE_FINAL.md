@@ -87,6 +87,16 @@ Nenhum destes itens é inferido automaticamente por existir código, checklist o
 
 Dados operacionais mutáveis não devem voltar a ser usados como motivo para commits contínuos no `main`.
 
+## Auditoria automatizada de prontidão
+
+O workflow `AtlasQuant - Release Readiness` executa periodicamente e em mudanças relevantes para confirmar que:
+- a preparação interna continua completa;
+- os documentos de handoff continuam presentes;
+- as dependências externas não são inferidas como concluídas;
+- broker e ordens reais continuam desativados.
+
+Essa auditoria complementa Quality, Production Health e Browser Smoke; ela não publica nem promove automaticamente.
+
 ## Regra de release
 
 Mudanças de acabamento devem preservar o motor. Alterações de UI/documentação não devem modificar matemática macro, Safety Core, Gate, scanner, Paper Trading ou regras de execução.
