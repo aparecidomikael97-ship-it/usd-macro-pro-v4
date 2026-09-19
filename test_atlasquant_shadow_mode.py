@@ -1,7 +1,7 @@
 import unittest
 
 from atlasquant_shadow_mode import (
-    normalize_snapshot, compare_shadow_sample, append_shadow_sample, summarize_shadow, shadow_pair_breakdown,
+    normalize_snapshot, compare_shadow_sample, append_shadow_sample, summarize_shadow, shadow_pair_breakdown, DEFAULT_SHADOW_PAIRS,
 )
 
 
