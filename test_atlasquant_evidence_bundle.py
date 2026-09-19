@@ -81,5 +81,16 @@ class AtlasQuantEvidenceBundleTests(unittest.TestCase):
         self.assertIn("integrity_sha256",parsed)
 
 
+    def test_evidence_provenance_metadata_must_be_identifiable(self):
+        good=build_validation_evidence(self.readiness(),engine_version="V11",generated_at="2026-09-16T00:00:00+00:00")
+        self.assertTrue(good["source_metadata_valid"])
+        for engine,stamp in (("","2026-09-16T00:00:00+00:00"),("V11","bad"),("V11","2026-09-16T00:00:00")):
+            with self.subTest(engine=engine,stamp=stamp):
+                b=build_validation_evidence(self.readiness(),engine_version=engine,generated_at=stamp)
+                self.assertFalse(b["source_metadata_valid"])
+                self.assertTrue(verify_validation_evidence(b))
+
+
+
 if __name__=="__main__":
     unittest.main()
