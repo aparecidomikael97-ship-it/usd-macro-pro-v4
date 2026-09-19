@@ -31,6 +31,22 @@ class AtlasQuantBranchDriftTests(unittest.TestCase):
         self.assertTrue(audit.runtime_only)
         self.assertFalse(audit.requires_code_reconciliation)
 
+    def test_current_evidence_outputs_are_runtime_mutable(self):
+        paths=[
+            "dados/atlasquant_flight_recorder.jsonl",
+            "dados/atlasquant_quota_shadow_v1.json",
+            "dados/atlasquant_shadow_samples.jsonl",
+            "dados/paper_trades_v112.csv",
+            "dados/paper_trading_summary_v112.json",
+            "dados/paper_setup_audit_v114.csv",
+            "dados/paper_setup_performance_v114.csv",
+            "dados/paper_setup_summary_v114.json",
+        ]
+        audit=audit_branch_drift(paths)
+        self.assertTrue(audit.runtime_only)
+        self.assertFalse(audit.requires_code_reconciliation)
+        self.assertFalse(audit.unknown_data_files)
+
     def test_code_change_blocks_runtime_only_label(self):
         audit=audit_branch_drift([
             "dados/autopilot_status_v107.json",
