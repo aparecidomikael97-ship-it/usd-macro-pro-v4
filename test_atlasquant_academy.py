@@ -13,7 +13,7 @@ from atlasquant_academy import (
 class AtlasQuantAcademyTests(unittest.TestCase):
     def test_minimum_curriculum_is_present_and_ids_are_unique(self):
         ids=[x["id"] for x in ACADEMY_TOPICS]
-        self.assertGreaterEqual(len(ids),20)
+        self.assertGreaterEqual(len(ids),29)
         self.assertEqual(len(ids),len(set(ids)))
         self.assertTrue(academy_minimum_text_ready())
 
@@ -46,6 +46,14 @@ class AtlasQuantAcademyTests(unittest.TestCase):
         self.assertEqual(set(out["completed_ids"]),{"cpi","risk"})
         self.assertGreater(out["pct"],0)
         self.assertLess(out["pct"],100)
+
+    def test_didactic_bridge_topics_are_present(self):
+        ids={x["id"] for x in ACADEMY_TOPICS}
+        self.assertTrue({
+            "technical-to-liquidity","liquidity-sweeps","bos-choch-mss",
+            "order-block","breaker-mitigation","sessions-killzones",
+            "volume-profile","vwap-opening-range",
+        }.issubset(ids))
 
     def test_content_never_calls_internal_score_probability(self):
         joined=" ".join(
