@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout exact commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Build checkpoint ZIP
         shell: python
@@ -65,7 +65,7 @@ jobs:
               env.write(f"CHECKPOINT_ZIP={out}\n")
 
       - name: Upload checkpoint artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: AtlasQuant-${{ github.ref_name }}-${{ github.sha }}
           path: ${{ env.CHECKPOINT_ZIP }}
