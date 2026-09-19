@@ -48,7 +48,7 @@ def assess_release(ev: ReleaseEvidence, *, min_tests: int = 1,
         hard.append("Contagens de release inválidas: "+", ".join(invalid_counts))
     if not _valid_count(min_tests) or int(min_tests)<1:
         hard.append("Limite mínimo de testes inválido")
-    if not _valid_count(min_shadow_samples_for_core):
+    if not _valid_count(min_shadow_samples_for_core) or int(min_shadow_samples_for_core)<1:
         hard.append("Limite mínimo de Shadow inválido")
     bool_fields=(
         ("compile_ok",ev.compile_ok),
@@ -96,6 +96,15 @@ def should_rollback(*, app_boot_ok: bool, health_check_ok: bool,
                     data_integrity_breach: bool = False,
                     error_rate_pct: float = 0.0, max_error_rate_pct: float = 5.0) -> dict[str, object]:
     reasons = []
+    bool_inputs=(
+        ("app_boot_ok",app_boot_ok),
+        ("health_check_ok",health_check_ok),
+        ("critical_engine_error",critical_engine_error),
+        ("data_integrity_breach",data_integrity_breach),
+    )
+    invalid=[name for name,value in bool_inputs if not isinstance(value,bool)]
+    if invalid:
+        reasons.append("Flags de rollback inválidas: "+", ".join(invalid))
     try:
         rate=float(error_rate_pct); limit=float(max_error_rate_pct)
         rates_valid=math.isfinite(rate) and math.isfinite(limit) and rate>=0 and limit>=0
