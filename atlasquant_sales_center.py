@@ -36,9 +36,12 @@ def commercial_readiness(access:Mapping[str,Any]|None=None)->dict[str,Any]:
         registry={}
     total=registry.get("TOTAL",0)
     try:
+        if isinstance(total,bool):
+            raise ValueError("boolean count")
+        total=float(total)
+        if not total.is_integer() or total<0 or total!=total or total in (float("inf"),float("-inf")):
+            raise ValueError("invalid count")
         total=int(total)
-        if total<0:
-            total=0
     except Exception:
         total=0
     return {
