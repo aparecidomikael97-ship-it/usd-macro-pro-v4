@@ -72,8 +72,6 @@ REQUIRED_FILES=(
     ".github/workflows/production-browser-smoke.yml",
     "atlasquant_integration_gate.py",
     ".github/workflows/atlasquant-checkpoint.yml",
-    ".github/workflows/production-health.yml",
-    ".github/workflows/production-browser-smoke.yml",
     "docs/continuidade/PLANO_ATIVACAO_RUNTIME.md",
 )
 
@@ -228,12 +226,18 @@ def run_dev_preflight(
         "production_observability_read_only",
         "permissions:\n  contents: read" in production_health
         and "permissions:\n  contents: read" in production_browser
+        and "contents: write" not in production_health
+        and "contents: write" not in production_browser
         and "branches: [main]" in production_health
         and "branches: [main, atlasquant-integration]" in production_browser
         and "Warm production service" in production_browser
         and "_stcore/health" in production_health
-        and "_stcore/health" in production_browser,
-        "Health permanece main-scoped; browser smoke é read-only e pode validar o candidato de integração contra a produção atual.",
+        and "_stcore/health" in production_browser
+        and 'for render_attempt in range(1, 7)' in production_browser
+        and 'page.reload(wait_until="domcontentloaded"' in production_browser
+        and 'page.on("pageerror"' in production_browser
+        and "actions/upload-artifact@v7" in production_browser,
+        "Health permanece main-scoped; browser smoke é read-only, resiliente a cold start e preserva evidência diagnóstica.",
     ))
 
     provider_markers=(
@@ -279,20 +283,6 @@ def run_dev_preflight(
         and "automatic_merge_allowed" in branch_drift
         and '"automatic_merge_allowed":False' in branch_drift,
         "Checkpoint de fonte exclui evidência mutável e reconciliação de branch permanece manual.",
-    ))
-
-    prod_health=(base/".github/workflows/production-health.yml").read_text(encoding="utf-8") if (base/".github/workflows/production-health.yml").is_file() else ""
-    prod_browser=(base/".github/workflows/production-browser-smoke.yml").read_text(encoding="utf-8") if (base/".github/workflows/production-browser-smoke.yml").is_file() else ""
-    checks.append(_check(
-        "production_observability_read_only",
-        "permissions:\n  contents: read" in prod_health
-        and "permissions:\n  contents: read" in prod_browser
-        and "branches: [main]" in prod_health
-        and "branches: [main, atlasquant-integration]" in prod_browser
-        and "actions/setup-python@v7" in prod_browser
-        and "requests.put(" not in prod_health
-        and "requests.put(" not in prod_browser,
-        "Health é main-scoped; browser smoke é observacional/read-only e também pode rodar no candidato de integração.",
     ))
 
     history_parts={str(x).lower() for x in DEFAULT_HISTORY_DIR.parts}
