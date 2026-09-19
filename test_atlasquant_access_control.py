@@ -67,6 +67,23 @@ class AtlasQuantAccessControlTests(unittest.TestCase):
         self.assertFalse(has_permission(sales,"admin:read"))
         self.assertTrue(has_permission(admin,"admin:manage_users"))
 
+    def test_sales_cannot_manage_users_or_read_admin(self):
+        sales={"role":"SALES"}
+        self.assertTrue(has_permission(sales,"app:read"))
+        self.assertTrue(has_permission(sales,"sales:read"))
+        self.assertFalse(has_permission(sales,"admin:read"))
+        self.assertFalse(has_permission(sales,"admin:manage_users"))
+
+    def test_user_cannot_access_sales_or_admin_permissions(self):
+        user={"role":"USER"}
+        self.assertTrue(has_permission(user,"app:read"))
+        for permission in ("sales:read","admin:read","admin:manage_users"):
+            self.assertFalse(has_permission(user,permission))
+
+    def test_unknown_permission_is_denied_for_every_role(self):
+        for role in ("USER","SALES","ADMIN"):
+            self.assertFalse(has_permission({"role":role},"broker:real_orders"))
+
     def test_invalid_usernames_roles_and_malformed_hash_fail_closed(self):
         self.assertEqual(normalize_username("../admin"),"")
         self.assertEqual(normalize_username("ab"),"")
