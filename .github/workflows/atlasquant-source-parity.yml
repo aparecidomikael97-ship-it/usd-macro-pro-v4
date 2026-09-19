@@ -1,0 +1,87 @@
+name: AtlasQuant Runtime Source Parity
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [atlasquant-runtime]
+    paths:
+      - "*.py"
+      - "docs/**"
+      - "tradingview/**"
+      - ".github/workflows/**"
+      - ".gitignore"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlasquant-runtime-source-parity
+  cancel-in-progress: true
+
+jobs:
+  source-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout runtime source
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Fetch integration source
+        run: git fetch origin atlasquant-integration --prune
+
+      - name: Compare source blobs
+        shell: bash
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+          import json
+          import subprocess
+          from pathlib import Path
+
+          from atlasquant_source_parity import compare_source_trees, parse_ls_tree
+
+          def tree(ref: str) -> dict[str,str]:
+              raw=subprocess.check_output(
+                  ["git","ls-tree","-r","--full-tree",ref],
+                  text=True,
+              )
+              return parse_ls_tree(raw)
+
+          integration=tree("origin/atlasquant-integration")
+          runtime=tree("HEAD")
+          result=compare_source_trees(integration,runtime)
+          Path("source-parity.json").write_text(
+              json.dumps(result,ensure_ascii=False,indent=2,sort_keys=True),
+              encoding="utf-8",
+          )
+          print(Path("source-parity.json").read_text(encoding="utf-8"))
+          if result["status"]!="SOURCE_PARITY_OK":
+              raise SystemExit("Runtime source differs from atlasquant-integration")
+          PY
+
+      - name: Source parity summary
+        if: always()
+        shell: bash
+        run: |
+          echo "## AtlasQuant Runtime Source Parity" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f source-parity.json ]; then
+            cat source-parity.json >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Parity manifest was not generated." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload parity evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: atlasquant-runtime-source-parity-${{ github.sha }}
+          path: source-parity.json
+          if-no-files-found: warn
+          retention-days: 90
