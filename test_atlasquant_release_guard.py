@@ -29,6 +29,22 @@ class ReleaseGuardTests(unittest.TestCase):
             with self.subTest(shadow=bad):
                 self.assertFalse(assess_release(self.base(),core_model_change=True,min_shadow_samples_for_core=bad)["staging_ok"])
 
+
+    def test_private_release_requires_valid_access_configuration(self):
+        blocked=assess_release(self.base(private_access_required=True,access_config_ok=False))
+        self.assertFalse(blocked["staging_ok"])
+        self.assertTrue(any("Acesso privado obrigatório" in x for x in blocked["hard_blocks"]))
+        ok=assess_release(self.base(private_access_required=True,access_config_ok=True))
+        self.assertTrue(ok["staging_ok"])
+
+    def test_boolean_release_evidence_must_be_actual_bool(self):
+        for field in ("compile_ok","health_check_ok","data_migrations_ok","private_access_required","access_config_ok"):
+            for bad in ("true",1,None):
+                with self.subTest(field=field,bad=bad):
+                    out=assess_release(self.base(**{field:bad}))
+                    self.assertFalse(out["staging_ok"])
+                    self.assertTrue(any("Flags de release inválidas" in x for x in out["hard_blocks"]))
+
     def test_invalid_error_rates_force_rollback(self):
         for bad in (float("nan"),float("inf"),float("-inf"),-1,"bad"):
             with self.subTest(rate=bad):
