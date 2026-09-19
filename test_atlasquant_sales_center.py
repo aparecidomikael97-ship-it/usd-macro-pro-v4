@@ -53,7 +53,7 @@ class AtlasQuantSalesCenterTests(unittest.TestCase):
         by={row["Item"]:row for row in rows}
         self.assertEqual(by["Academy"]["Status"],"TEXTO PRONTO · VÍDEOS PENDENTES")
         self.assertEqual(by["Assistente de voz"]["Status"],"PLANEJADO")
-        self.assertEqual(by["Corretoras & plataformas"]["Status"],"PLANEJADO")
+        self.assertEqual(by["Corretoras & plataformas"]["Status"],"GUIA INFORMATIVO PRONTO")
 
 
     def test_text_academy_does_not_fake_full_commercial_academy(self):
