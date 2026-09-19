@@ -41,7 +41,8 @@ def build_account_change_audit(
             raise ValueError("invalid changed item")
         name=normalize_username(item.get("username"))
         fields=[str(x) for x in (item.get("fields") or [])]
-        if not name or not fields:
+        allowed_fields={"role","active","credential"}
+        if not name or not fields or any(x not in allowed_fields for x in fields):
             raise ValueError("invalid changed item")
         changed.append({"username":name,"fields":fields})
 
