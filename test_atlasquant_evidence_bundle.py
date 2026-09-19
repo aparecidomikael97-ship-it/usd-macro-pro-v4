@@ -135,5 +135,20 @@ class AtlasQuantEvidenceBundleTests(unittest.TestCase):
         self.assertIn("min_market_runs",source)
 
 
+    def test_prospective_paper_and_setup_state_are_integrity_protected(self):
+        paper={"trades_total":3,"pending_entries":1,"open_positions":1,"closed_trades":1,
+               "net_r_after_friction":0.94,"safety":{"real_orders":False}}
+        setup={"audited_trades":3,"closed_trades":1,"component_state_rows":4,
+               "sample_state":"AMOSTRA PEQUENA","safety":{"real_orders":False}}
+        b=build_validation_evidence(self.readiness(),engine_version="dev",
+                                    paper_summary=paper,setup_summary=setup)
+        self.assertEqual(b["evidence"]["paper_forward_test"]["closed_trades"],1)
+        self.assertEqual(b["evidence"]["setup_audit"]["audited_trades"],3)
+        self.assertFalse(b["evidence"]["paper_forward_test"]["real_orders"])
+        self.assertTrue(verify_validation_evidence(b))
+        b["evidence"]["paper_forward_test"]["closed_trades"]=99
+        self.assertFalse(verify_validation_evidence(b))
+
+
 if __name__=="__main__":
     unittest.main()
