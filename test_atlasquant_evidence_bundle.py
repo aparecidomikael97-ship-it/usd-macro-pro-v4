@@ -5,6 +5,7 @@ from atlasquant_evidence_bundle import (
     build_validation_evidence,
     serialize_validation_evidence,
     verify_validation_evidence,
+    evidence_visual_state,
 )
 
 
@@ -89,6 +90,18 @@ class AtlasQuantEvidenceBundleTests(unittest.TestCase):
                 b=build_validation_evidence(self.readiness(),engine_version=engine,generated_at=stamp)
                 self.assertFalse(b["source_metadata_valid"])
                 self.assertTrue(verify_validation_evidence(b))
+
+
+
+    def test_evidence_visual_state_separates_integrity_from_provenance(self):
+        good=build_validation_evidence(self.readiness(),engine_version="V11",generated_at="2026-09-16T00:00:00+00:00")
+        self.assertEqual(evidence_visual_state(good)["label"],"EVIDÊNCIA PARCIAL")
+        bad_meta=build_validation_evidence(self.readiness(),engine_version="",generated_at="2026-09-16T00:00:00+00:00")
+        self.assertEqual(evidence_visual_state(bad_meta)["label"],"PROVENIÊNCIA A REVISAR")
+        tampered=dict(good)
+        tampered["validation"]=dict(good["validation"])
+        tampered["validation"]["status"]="REVIEWABLE"
+        self.assertEqual(evidence_visual_state(tampered)["label"],"INTEGRIDADE INVÁLIDA")
 
 
 
