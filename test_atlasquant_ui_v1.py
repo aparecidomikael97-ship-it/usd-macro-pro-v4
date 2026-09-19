@@ -155,5 +155,15 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("min-height:34px",ATLASQUANT_CSS)
 
 
+    def test_mobile_tab_guidance_is_wired_before_tabs(self):
+        app=(__import__("pathlib").Path(__file__).resolve().parent/"usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        self.assertIn("mobile_navigation_hint_html",app)
+        hint=app.index("mobile_navigation_hint_html()")
+        tabs=app.index("abas = st.tabs(_nav_items)")
+        self.assertLess(hint,tabs)
+        self.assertIn(".aq-mobile-hint{display:none",ATLASQUANT_CSS)
+        self.assertIn(".aq-mobile-hint{display:block}",ATLASQUANT_CSS)
+
+
 if __name__ == "__main__":
     unittest.main()
