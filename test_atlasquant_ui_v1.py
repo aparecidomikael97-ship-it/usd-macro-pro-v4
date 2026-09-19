@@ -1,6 +1,6 @@
 import unittest
 
-from atlasquant_ui_v1 import NAVIGATION_LABELS, hero_html, navigation_labels, score_semantics, section_title_html, state_badge_html
+from atlasquant_ui_v1 import NAVIGATION_LABELS, hero_html, navigation_labels, score_semantics, section_title_html, state_badge_html, decision_strip_html
 
 
 class AtlasQuantUiTests(unittest.TestCase):
@@ -63,6 +63,15 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("_nav_items = list(navigation_labels())",src)
         self.assertIn("abas = st.tabs(_nav_items)",src)
         self.assertEqual(len(NAVIGATION_LABELS),19)
+
+
+
+    def test_decision_strip_escapes_content_and_is_not_probability(self):
+        html=decision_strip_html("<b>EUR/USD</b>","BUY","AGUARDAR","NORMAL",88)
+        self.assertNotIn("<b>EUR/USD</b>",html)
+        self.assertIn("&lt;b&gt;EUR/USD&lt;/b&gt;",html)
+        self.assertIn("QUALIDADE",html)
+        self.assertNotIn("probabilidade",html.lower())
 
 
 
