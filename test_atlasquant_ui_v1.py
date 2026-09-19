@@ -148,5 +148,12 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn('safety="Safety Core ativo"',app)
 
 
+    def test_mobile_navigation_is_compact_sticky_and_labeled(self):
+        self.assertIn('content:"NAVEGAÇÃO"',ATLASQUANT_CSS)
+        self.assertIn("position:sticky;top:0;z-index:20",ATLASQUANT_CSS)
+        self.assertIn("backdrop-filter:blur(8px)",ATLASQUANT_CSS)
+        self.assertIn("min-height:34px",ATLASQUANT_CSS)
+
+
 if __name__ == "__main__":
     unittest.main()
