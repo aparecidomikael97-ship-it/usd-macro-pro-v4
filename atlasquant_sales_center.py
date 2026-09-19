@@ -60,6 +60,9 @@ def commercial_readiness(access:Mapping[str,Any]|None=None)->dict[str,Any]:
         "payments_integrated":False,
         "broker_execution_enabled":False,
         "real_orders_enabled":False,
+        "sales_role_isolation_verified":False,
+        "account_revocation_verified":False,
+        "audit_manifest_verified":False,
     }
 
 
@@ -129,6 +132,9 @@ def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
         support_ok=False,
         academy_minimum_ok=bool(status["academy_ready"]),
         billing_ok=bool(status["payments_integrated"]),
+        sales_role_isolated_ok=bool(status["sales_role_isolation_verified"]),
+        account_revocation_ok=bool(status["account_revocation_verified"]),
+        audit_manifest_ok=bool(status["audit_manifest_verified"]),
     ))
     if launch["status"]=="BLOCKED":
         st.warning("Venda pública ainda BLOQUEADA pelo guard comercial.")
