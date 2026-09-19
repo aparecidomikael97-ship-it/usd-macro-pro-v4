@@ -199,6 +199,11 @@ def render_validation_readiness(
     c2.metric("Checks aprovados",f"{result['passed_checks']}/{result['total_checks']}")
     c3.metric("Shadow samples",result["shadow"]["samples"])
     c4.metric("Quota mercado",f"{result['quota_shadow']['market_open_runs']}/{result['quota_shadow']['min_market_runs']}")
+    shadow_progress=min(100.0,(float(result["shadow"]["samples"])/max(1,float(result["shadow"]["min_samples"])))*100.0)
+    quota_progress=min(100.0,(float(result["quota_shadow"]["market_open_runs"])/max(1,float(result["quota_shadow"]["min_market_runs"])))*100.0)
+    st.markdown("#### Progresso da evidência")
+    st.progress(shadow_progress/100.0,text=f"Shadow Mode · {result['shadow']['samples']}/{result['shadow']['min_samples']} · {shadow_progress:.0f}%")
+    st.progress(quota_progress/100.0,text=f"Quota com mercado aberto · {result['quota_shadow']['market_open_runs']}/{result['quota_shadow']['min_market_runs']} · {quota_progress:.0f}%")
 
     rows=[
         {"Camada":"Performance","OK":result["checks"]["performance_reviewable"],"Estado":result["performance"]["label"]},
@@ -227,6 +232,19 @@ def render_validation_readiness(
         },
     ]
     st.dataframe(pd.DataFrame(rows),width="stretch",hide_index=True)
+    if result["shadow"]["pair_breakdown"]:
+        coverage=pd.DataFrame([
+            {
+                "Par":row["pair"],
+                "Amostras":row["samples"],
+                "Meta":result["shadow"]["min_pair_samples"],
+                "Progresso %":round(min(100.0,row["samples"]/max(1,result["shadow"]["min_pair_samples"])*100.0),1),
+                "Críticas":row["critical_mismatches"],
+            }
+            for row in result["shadow"]["pair_breakdown"]
+        ])
+        with st.expander("Cobertura de validação por par"):
+            st.dataframe(coverage,width="stretch",hide_index=True)
 
     if result["blockers"]:
         st.error(" · ".join(result["blockers"]))
