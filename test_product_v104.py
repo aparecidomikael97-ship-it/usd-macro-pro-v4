@@ -46,5 +46,14 @@ class ProductV104Tests(unittest.TestCase):
         self.assertIn("PIB", HISTORY_MAP)
         self.assertGreaterEqual(len(ROADMAP), 6)
 
+
+    def test_wireframe_uses_supported_streamlit_html_renderer(self):
+        from pathlib import Path
+        src=Path("product_v104.py").read_text(encoding="utf-8")
+        self.assertIn("st.html(WIREFRAME_SVG)",src)
+        self.assertNotIn("st.components.v1.html",src)
+        self.assertIn("AtlasQuant — Início",src)
+
+
 if __name__ == "__main__":
     unittest.main()
