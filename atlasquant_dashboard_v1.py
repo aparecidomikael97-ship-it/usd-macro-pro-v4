@@ -7,6 +7,7 @@ or the institutional execution gates.
 from __future__ import annotations
 
 from html import escape
+import math
 from typing import Any
 import pandas as pd
 import streamlit as st
