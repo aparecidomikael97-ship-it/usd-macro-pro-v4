@@ -209,5 +209,19 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertNotIn('"ref": "main"',fn)
 
 
+    def test_validation_runtime_json_reader_has_conservative_failure_fallbacks(self):
+        import ast
+        from pathlib import Path
+        source=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        tree=ast.parse(source)
+        node=next((n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=="_github_get_json_v937"),None)
+        self.assertIsNotNone(node)
+        fn=ast.get_source_segment(source,node) or ""
+        self.assertIn("if not token or not repo:",fn)
+        self.assertIn("if r.status_code == 404:",fn)
+        self.assertIn("return default",fn)
+        self.assertIn("r.raise_for_status()",fn)
+
+
 if __name__ == "__main__":
     unittest.main()
