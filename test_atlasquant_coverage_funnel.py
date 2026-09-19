@@ -4,6 +4,7 @@ import pandas as pd
 from atlasquant_coverage_funnel import (
     build_coverage_matrix, coverage_summary, expansion_watchlist,
     DEFAULT_OPERATIONAL_PAIRS,
+    coverage_visual_state,
 )
 
 
@@ -68,6 +69,17 @@ class AtlasQuantCoverageFunnelTests(unittest.TestCase):
     def test_blank_operational_pair_names_are_ignored(self):
         m=build_coverage_matrix(self.ranking,operational_pairs=("", "   ", "EUR/USD"))
         self.assertEqual(int((m["Cobertura operacional"]=="PIPELINE COMPLETO").sum()),1)
+
+
+
+    def test_coverage_visual_state_is_explicit_about_partial_pipeline(self):
+        self.assertEqual(coverage_visual_state({"total":0,"full":0})["label"],"SEM COBERTURA")
+        self.assertEqual(coverage_visual_state({"total":28,"full":0})["label"],"RADAR APENAS")
+        partial=coverage_visual_state({"total":28,"full":7})
+        self.assertEqual(partial["label"],"COBERTURA PARCIAL")
+        self.assertIn("7/28",partial["detail"])
+        self.assertEqual(coverage_visual_state({"total":7,"full":7})["label"],"COBERTURA COMPLETA")
+        self.assertEqual(coverage_visual_state({"total":"bad","full":0})["label"],"REVISAR")
 
 
 
