@@ -9,7 +9,7 @@ from html import escape
 import math
 import streamlit as st
 
-UI_VERSION = "0.4"
+UI_VERSION = "0.5"
 
 NAVIGATION_LABELS = (
     "🎯 Central",
@@ -138,8 +138,9 @@ html { scroll-behavior: smooth; }
   border: 1px solid var(--aq-line) !important;
   border-radius: 13px !important;
 }
+[data-testid="stMetric"] > div { padding: .15rem .2rem; }
 [data-testid="stMetricValue"] { letter-spacing: -.035em; color: var(--aq-text); }
-[data-testid="stMetricLabel"] { color: var(--aq-muted); }
+[data-testid="stMetricLabel"] { color: var(--aq-muted); font-size: .78rem; }
 [data-testid="stButton"] button {
   border-radius: 10px; min-height: 2.45rem; font-weight: 700;
   border: 1px solid var(--aq-line);
@@ -162,12 +163,25 @@ html { scroll-behavior: smooth; }
 }
 [data-testid="stTabs"] [role="tablist"] {
   padding: 5px;
-  background: rgba(8,20,35,.74);
+  background: rgba(8,20,35,.82);
   border: 1px solid var(--aq-line);
   border-radius: 12px;
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: none;
+  position: sticky;
+  top: .2rem;
+  z-index: 990;
+  backdrop-filter: blur(12px);
 }
+[data-testid="stTabs"] [role="tablist"]::-webkit-scrollbar { display:none; }
 [data-testid="stTabs"] [role="tab"] {
   border-radius: 8px !important;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  min-height: 2.25rem;
 }
 [data-testid="stTabs"] [role="tab"][aria-selected="true"] {
   background: rgba(79,163,255,.16) !important;
@@ -184,6 +198,8 @@ html { scroll-behavior: smooth; }
   .aq-decision-strip{grid-template-columns:repeat(2,minmax(0,1fr))}
   .aq-decision-strip .wide{grid-column:1/-1}
   [data-testid="stSidebar"] { min-width: 280px; }
+  [data-testid="stTabs"] [role="tablist"] { margin-left:-.25rem; margin-right:-.25rem; border-radius:10px; }
+  [data-testid="stTabs"] [role="tab"] { font-size:.78rem; padding-left:.65rem; padding-right:.65rem; }
 }
 </style>
 """
