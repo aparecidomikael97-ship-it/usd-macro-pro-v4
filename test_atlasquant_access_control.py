@@ -66,5 +66,22 @@ class AtlasQuantAccessControlTests(unittest.TestCase):
         self.assertFalse(verify_password(self.password,"plaintext"))
         self.assertEqual(load_users_config("not-json"),{})
 
+
+    def test_normalized_username_collision_is_rejected_as_ambiguous(self):
+        raw={"users":{
+            "Admin.User":{"role":"ADMIN","password_hash":self.encoded,"active":True},
+            "admin.user":{"role":"ADMIN","password_hash":self.encoded,"active":True},
+        }}
+        users=load_users_config(raw)
+        self.assertNotIn("admin.user",users)
+
+    def test_oversized_registry_fails_closed(self):
+        raw={"users":{
+            f"user{i:03d}":{"role":"USER","password_hash":self.encoded,"active":True}
+            for i in range(501)
+        }}
+        self.assertEqual(load_users_config(raw),{})
+
+
 if __name__=="__main__":
     unittest.main()
