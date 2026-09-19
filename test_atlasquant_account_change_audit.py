@@ -35,6 +35,21 @@ class AtlasQuantAccountChangeAuditTests(unittest.TestCase):
                 generated_at="2026-09-19T01:00:00Z",
             )
 
+
+    def test_sensitive_field_names_are_rejected(self):
+        with self.assertRaises(ValueError):
+            build_account_change_audit(
+                actor="admin.01",
+                diff={
+                    "added":[],
+                    "changed":[{"username":"user.01","fields":["password_hash"]}],
+                    "destructive_removal_detected":False,
+                },
+                registry_json='{"users":{}}',
+                generated_at="2026-09-19T01:00:00Z",
+            )
+
+
     def test_invalid_actor_or_change_item_fails_closed(self):
         with self.assertRaises(ValueError):
             build_account_change_audit(
