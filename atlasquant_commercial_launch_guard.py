@@ -21,6 +21,9 @@ class CommercialEvidence:
     support_ok: bool
     academy_minimum_ok: bool
     billing_ok: bool
+    sales_role_isolated_ok: bool = True
+    account_revocation_ok: bool = True
+    audit_manifest_ok: bool = True
 
 _FIELDS=(
     "private_access_ok",
@@ -31,6 +34,9 @@ _FIELDS=(
     "support_ok",
     "academy_minimum_ok",
     "billing_ok",
+    "sales_role_isolated_ok",
+    "account_revocation_ok",
+    "audit_manifest_ok",
 )
 
 _LABELS={
@@ -42,6 +48,9 @@ _LABELS={
     "support_ok":"Suporte operacional",
     "academy_minimum_ok":"Academy mínima para lançamento",
     "billing_ok":"Pagamento/assinatura",
+    "sales_role_isolated_ok":"Isolamento do perfil SALES",
+    "account_revocation_ok":"Revogação de contas/sessões",
+    "audit_manifest_ok":"Auditoria administrativa sem credenciais",
 }
 
 def assess_commercial_launch(evidence:CommercialEvidence)->dict[str,Any]:
