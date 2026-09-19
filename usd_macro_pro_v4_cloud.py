@@ -201,6 +201,13 @@ except Exception as _sales_exc:
     render_sales_center = None
     _ATLASQUANT_SALES_IMPORT_ERROR = f"{type(_sales_exc).__name__}: {_sales_exc}"
 
+try:
+    from atlasquant_support_center import render_support_center
+    _ATLASQUANT_SUPPORT_IMPORT_ERROR = ""
+except Exception as _support_exc:
+    render_support_center = None
+    _ATLASQUANT_SUPPORT_IMPORT_ERROR = f"{type(_support_exc).__name__}: {_support_exc}"
+
 # =========================================================
 # CONFIGURAÇÕES GERAIS
 # =========================================================
@@ -3931,7 +3938,7 @@ def _autopilot_save_inputs_v107():
 _fallback_nav = [
     "🎯 Central", "🧭 Painel mestre", "💱 Moedas", "🇺🇸 EUA", "🔀 Pares", "🏦 Fed",
     "🗂️ Histórico", "🧪 Backtest", "⚡ Decisão", "🗺️ Market Map", "🎙️ Macro Briefing", "🎓 Aprender",
-    "🧩 Produto", "🛠️ Melhorias", "📰 Notícias", "🤖 Autopilot", "👤 Conta", "📱 Instalar", "💼 Vendas",
+    "🧩 Produto", "🛠️ Melhorias", "📰 Notícias", "🤖 Autopilot", "👤 Conta", "📱 Instalar", "💼 Vendas", "🛟 Suporte",
 ]
 _nav_items = list(navigation_labels()) if navigation_labels is not None else _fallback_nav
 if operation_focus_html is not None:
@@ -9332,6 +9339,17 @@ with abas[18]:
             st.caption("Diagnóstico: "+_ATLASQUANT_SALES_IMPORT_ERROR)
     else:
         render_sales_center(_ATLASQUANT_ACCESS)
+
+# =========================================================
+# SUPORTE — SELF-SERVICE SEGURO
+# =========================================================
+with abas[19]:
+    if render_support_center is None:
+        st.error("Central de suporte indisponível neste carregamento.")
+        if _ATLASQUANT_SUPPORT_IMPORT_ERROR:
+            st.caption("Diagnóstico: "+_ATLASQUANT_SUPPORT_IMPORT_ERROR)
+    else:
+        render_support_center()
 
 # No modo GitHub Actions/AppTest, persiste a Matriz atual para o runner background.
 if os.getenv("USD_MACRO_AUTOPILOT", "") == "1":
