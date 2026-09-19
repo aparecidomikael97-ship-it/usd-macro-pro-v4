@@ -27,4 +27,15 @@ class DataConfidenceTests(unittest.TestCase):
             with self.subTest(bad=bad):
                 r=reconcile_numeric([self.obs("bad",bad),self.obs("A",100)],now=NOW,min_sources=2)
                 self.assertFalse(r["confirmed"]); self.assertIn("bad",r["rejected_sources"])
+    def test_single_source_never_confirms_when_two_required(self):
+        r=reconcile_numeric([self.obs("A",100)],now=NOW,min_sources=2)
+        self.assertFalse(r["confirmed"])
+        self.assertIsNone(r["golden_value"])
+
+    def test_disagreement_above_tolerance_has_no_golden_value(self):
+        r=reconcile_numeric([self.obs("A",100),self.obs("B",110)],now=NOW,relative_tolerance=.002,min_sources=2)
+        self.assertFalse(r["confirmed"])
+        self.assertIsNone(r["golden_value"])
+        self.assertGreater(r["spread"],r["tolerance"])
+
 if __name__=="__main__": unittest.main()
