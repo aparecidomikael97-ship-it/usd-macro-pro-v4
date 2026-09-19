@@ -200,5 +200,11 @@ class AtlasQuantValidationReadinessTests(unittest.TestCase):
         self.assertTrue(any("Quota Shadow" in x for x in r["pending"]))
 
 
+    def test_renderer_signature_accepts_quota_shadow_samples(self):
+        import inspect
+        sig=inspect.signature(render_validation_readiness)
+        self.assertIn("quota_shadow_samples",sig.parameters)
+
+
 if __name__=="__main__":
     unittest.main()
