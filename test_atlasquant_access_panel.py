@@ -28,6 +28,17 @@ class AtlasQuantAccessPanelTests(unittest.TestCase):
 
 
 
+
+    def test_explicit_production_environment_forces_authentication(self):
+        def fake_setting(key,default=""):
+            if key=="ATLASQUANT_ENV":
+                return "PRODUCTION"
+            if key=="ATLASQUANT_AUTH_REQUIRED":
+                return "false"
+            return default
+        with patch.object(panel,"_setting",side_effect=fake_setting):
+            self.assertTrue(panel.access_required())
+
     def test_registry_role_counts_exposes_counts_only(self):
         encoded=hash_password("SenhaSegura#2026",salt=b"0123456789abcdef",iterations=200000)
         users=load_users_config({"users":{
