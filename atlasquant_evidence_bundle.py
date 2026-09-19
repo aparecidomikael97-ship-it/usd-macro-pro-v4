@@ -58,6 +58,11 @@ def build_validation_evidence(
     calib=dict(r.get("calibration",{}) or {})
     stability=dict(r.get("stability",{}) or {})
     shadow=dict(r.get("shadow",{}) or {})
+    pair_target=int(shadow.get("min_pair_samples") or 0)
+    expected_pairs=list(shadow.get("expected_pairs") or [])
+    pair_counts={str(x.get("pair")):int(x.get("samples") or 0) for x in (shadow.get("pair_breakdown") or [])}
+    pair_required_total=pair_target*len(expected_pairs)
+    pair_covered_total=sum(min(pair_target,pair_counts.get(pair,0)) for pair in expected_pairs)
     quota_shadow=dict(r.get("quota_shadow",{}) or {})
     expansion=dict(r.get("expansion",{}) or {})
     paper=dict(paper_summary or {})
@@ -105,6 +110,9 @@ def build_validation_evidence(
                 "samples":shadow.get("samples"),
                 "min_samples":shadow.get("min_samples"),
                 "critical_mismatches":shadow.get("critical_mismatches"),
+                "balanced_pair_covered":pair_covered_total,
+                "balanced_pair_required":pair_required_total,
+                "balanced_pair_complete":bool(pair_required_total and pair_covered_total>=pair_required_total),
                 "coverage_balanced":shadow.get("coverage_balanced"),
                 "pairs_meeting_minimum":shadow.get("pairs_meeting_minimum"),
                 "expected_pair_count":shadow.get("expected_pair_count"),
