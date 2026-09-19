@@ -113,12 +113,19 @@ def account_summary(access:Mapping[str,Any]|None)->dict[str,Any]:
     role=str(data.get("role") or session.get("role") or "OPEN").upper()
     username=str(session.get("username") or "")
     permissions=tuple(sorted(ROLE_PERMISSIONS.get(role,frozenset())))
+    registry=data.get("registry") if isinstance(data.get("registry"),Mapping) else {}
     return {
         "mode":str(data.get("mode") or "OPEN"),
         "role":role if role in ROLE_LABELS else "INVALID",
         "role_label":role_label(role),
         "username":username,
         "permissions":permissions,
+        "registry":{
+            "USER":int(registry.get("USER",0) or 0),
+            "SALES":int(registry.get("SALES",0) or 0),
+            "ADMIN":int(registry.get("ADMIN",0) or 0),
+            "TOTAL":int(registry.get("TOTAL",0) or 0),
+        },
         "sections":role_sections(role),
         "authenticated":bool(role in ("USER","SALES","ADMIN") and username),
     }
@@ -164,6 +171,12 @@ def render_account_portal(access:Mapping[str,Any]|None)->dict[str,Any]:
 
     if "admin" in summary["sections"]:
         st.markdown("### 🛡️ Administração de Contas")
+        registry=summary.get("registry",{})
+        r1,r2,r3,r4=st.columns(4)
+        r1.metric("Usuários",int(registry.get("USER",0)))
+        r2.metric("Vendas",int(registry.get("SALES",0)))
+        r3.metric("Admins",int(registry.get("ADMIN",0)))
+        r4.metric("Total ativo",int(registry.get("TOTAL",0)))
         st.caption(
             "Gera um registro seguro para ATLASQUANT_USERS_JSON. "
             "Nada é gravado automaticamente nos Secrets e a senha em texto puro não é persistida."
@@ -192,6 +205,13 @@ def render_account_portal(access:Mapping[str,Any]|None)->dict[str,Any]:
         snippet=st.session_state.get("atlasquant_admin_provisioning_snippet","")
         if isinstance(snippet,str) and snippet:
             st.code(snippet,language="json")
+            st.download_button(
+                "Baixar registro JSON",
+                data=snippet.encode("utf-8"),
+                file_name="atlasquant_user_record.json",
+                mime="application/json",
+                key="atlasquant_admin_download_user_record",
+            )
             st.caption(
                 "Adicione o registro ao JSON de usuários existente com cuidado. "
                 "Usuários duplicados após normalização são rejeitados por segurança."
