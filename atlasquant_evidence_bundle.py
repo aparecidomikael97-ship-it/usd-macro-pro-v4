@@ -50,6 +50,8 @@ def build_validation_evidence(
     *,
     engine_version: str,
     generated_at: str | None = None,
+    paper_summary: Mapping[str,Any] | None = None,
+    setup_summary: Mapping[str,Any] | None = None,
 ) -> dict[str,Any]:
     r=dict(readiness or {})
     perf=dict(r.get("performance",{}) or {})
@@ -58,6 +60,8 @@ def build_validation_evidence(
     shadow=dict(r.get("shadow",{}) or {})
     quota_shadow=dict(r.get("quota_shadow",{}) or {})
     expansion=dict(r.get("expansion",{}) or {})
+    paper=dict(paper_summary or {})
+    setup=dict(setup_summary or {})
 
     generated=generated_at or datetime.now(timezone.utc).isoformat()
     engine=str(engine_version or "").strip()
@@ -116,6 +120,21 @@ def build_validation_evidence(
                 "headless_failed_runs":quota_shadow.get("headless_failed_runs"),
                 "adaptive_plan_fit_all_samples":quota_shadow.get("adaptive_plan_fit_all_samples"),
                 "eligible_for_manual_review":quota_shadow.get("eligible_for_manual_review"),
+            },
+            "paper_forward_test":{
+                "trades_total":paper.get("trades_total"),
+                "pending_entries":paper.get("pending_entries"),
+                "open_positions":paper.get("open_positions"),
+                "closed_trades":paper.get("closed_trades"),
+                "net_r_after_friction":paper.get("net_r_after_friction"),
+                "real_orders":dict(paper.get("safety",{}) or {}).get("real_orders",False),
+            },
+            "setup_audit":{
+                "audited_trades":setup.get("audited_trades"),
+                "closed_trades":setup.get("closed_trades"),
+                "component_state_rows":setup.get("component_state_rows"),
+                "sample_state":setup.get("sample_state"),
+                "real_orders":dict(setup.get("safety",{}) or {}).get("real_orders",False),
             },
             "technical_expansion":{
                 "target_requires_change":expansion.get("target_requires_change"),
