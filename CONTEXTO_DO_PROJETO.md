@@ -1314,3 +1314,28 @@ Próximo passo seguro: auditoria final de pré-release da DEV e manifesto de rea
 - `main` permaneceu em `513d0afd85df80640a2c0ed635783f46b4c3df7d`.
 - Evidência detalhada: `docs/release/RUNTIME_FINAL_VALIDATION_2026-09-16.md`.
 - Estado: código/CI da Runtime validado; seguem pendentes apenas checks externos de deploy real, browser real, secrets hospedados e compilação Pine no TradingView.
+
+
+## 18/09/2026 — regra de execução em blocos grandes e visão de produto consolidada
+
+Regra operacional de interação definida pelo usuário: cada mensagem **“vamos lá”** autoriza um bloco extenso de trabalho seguro. O objetivo é reduzir interrupções. Dentro de um turno ativo, agrupar implementação, testes, correções, CI e checkpoint sempre que possível; interromper apenas por decisão realmente necessária, risco material ou hard stop. Isso não autoriza trabalho em background entre respostas.
+
+A visão futura foi consolidada em `docs/continuidade/VISAO_MESTRE_BACKLOG_2026-09-18.md`. Esse documento deve ser consultado antes de remover ou esquecer funcionalidades planejadas.
+
+Diretrizes preservadas:
+
+- Home/Radar deve entregar viés por moeda/par de forma simples, com horizonte, qualidade, motivos, contrários, invalidação e próximos catalisadores.
+- Academy/vídeos permanece entrega obrigatória após estabilização das telas.
+- Assistente de voz permanece planejado para briefing diário/semanal e explicação do viés.
+- Aba de Corretoras & Plataformas permanece planejada para a fase comercial.
+- COT/posicionamento institucional permanece reservado para a fase final e começa observacional.
+- Elliott fica fora do motor; Wyckoff não é prioridade e pode permanecer apenas como referência futura.
+- Backtest/forward/TradingView devem continuar como validação técnica; automação real só depois de OOS/Shadow/Paper e revisão.
+- Fontes oficiais, cache e custo mínimo continuam prioridade.
+- `real_orders=false`, `broker_connection=false`, `automatic_gate_change=false` e `automatic_promotion=false` permanecem contratos de segurança.
+
+### Marco verificado antes do bloco ADMIN/SALES atual
+
+O commit `ffe2795da7ee08c6ea275ffcdf6cdad322a72b66` foi validado pelo Quality run `35410009133`: **852 testes, 852 OK**. Checkpoint congelado: `backup/atlasquant-runtime-2026-09-18-852-green`.
+
+O trabalho posterior a esse marco deve ganhar novo número de baseline somente depois de um workflow completo verde no SHA correspondente.
