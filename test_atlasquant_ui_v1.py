@@ -1,6 +1,6 @@
 import unittest
 
-from atlasquant_ui_v1 import NAVIGATION_LABELS, hero_html, navigation_labels, score_semantics, section_title_html, state_badge_html, decision_strip_html
+from atlasquant_ui_v1 import NAVIGATION_LABELS, hero_html, navigation_labels, score_semantics, section_title_html, state_badge_html, decision_strip_html, context_strip_html
 
 
 class AtlasQuantUiTests(unittest.TestCase):
@@ -77,11 +77,32 @@ class AtlasQuantUiTests(unittest.TestCase):
 
     def test_tab_navigation_is_mobile_scrollable_and_sticky(self):
         from atlasquant_ui_v1 import ATLASQUANT_CSS, UI_VERSION
-        self.assertEqual(UI_VERSION,"0.5")
+        self.assertEqual(UI_VERSION,"0.6")
         self.assertIn("overflow-x: auto",ATLASQUANT_CSS)
         self.assertIn("flex-wrap: nowrap",ATLASQUANT_CSS)
         self.assertIn("position: sticky",ATLASQUANT_CSS)
         self.assertIn("white-space: nowrap",ATLASQUANT_CSS)
+
+
+
+    def test_context_strip_escapes_values_and_keeps_brand_state_compact(self):
+        html=context_strip_html("<b>Neutro</b>",0.25,"ALTA","local")
+        self.assertNotIn("<b>Neutro</b>",html)
+        self.assertIn("&lt;b&gt;Neutro&lt;/b&gt;",html)
+        self.assertIn("+0.25",html)
+        self.assertIn("QUALIDADE USD",html)
+        self.assertIn("LOCAL",html)
+
+    def test_primary_app_header_is_at_execution_start_not_duplicated_before_tabs(self):
+        from pathlib import Path
+        src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        self.assertEqual(src.count("render_atlasquant_header(APP_VERSION, environment=ATLASQUANT_ENVIRONMENT)"),1)
+        self.assertNotIn('st.title("USD Macro Pro")',src)
+        exec_pos=src.index("# EXECUÇÃO PRINCIPAL")
+        hero_pos=src.index("render_atlasquant_header(APP_VERSION, environment=ATLASQUANT_ENVIRONMENT)")
+        tabs_pos=src.index("abas = st.tabs(_nav_items)")
+        self.assertLess(exec_pos,hero_pos)
+        self.assertLess(hero_pos,tabs_pos)
 
 
 
