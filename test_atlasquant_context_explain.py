@@ -24,7 +24,7 @@ class AtlasQuantContextExplainTests(unittest.TestCase):
         p=self.base(); p["executable"]=True
         v=context_validity(p)
         self.assertEqual(v["status"],"ACTIVE")
-        self.assertIn("PROCURAR ENTRADA",v["label"])
+        self.assertEqual(v["label"],"MOTOR LIBEROU CONTEXTO")
 
     def test_wait_when_ready_but_not_executable(self):
         v=context_validity(self.base())
@@ -57,6 +57,14 @@ class AtlasQuantContextExplainTests(unittest.TestCase):
     def test_snapshot_is_finite_safe(self):
         p=self.base(); p["priority"]=float("nan")
         self.assertEqual(pack_snapshot(p)["priority"],0.0)
+
+
+    def test_soft_block_prevents_active_context_even_if_executable(self):
+        p=self.base(); p["executable"]=True; p["soft_blocks"]=["M15 ainda parcial"]
+        v=context_validity(p)
+        self.assertEqual(v["status"],"WAIT")
+        self.assertEqual(v["label"],"AGUARDAR CONFIRMAÇÃO")
+
 
 
 if __name__=="__main__":
