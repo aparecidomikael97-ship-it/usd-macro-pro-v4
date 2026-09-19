@@ -11,7 +11,7 @@ class AtlasQuantOperationalCardsTests(unittest.TestCase):
             "data_ready":{"sufficient":True,"score":95},"m15":"🟢 CONFIRMADO","gate":"🟢"
         })
         self.assertEqual(row["traffic_light"], "GREEN")
-        self.assertEqual(row["action"], "SETUP EXECUTÁVEL")
+        self.assertEqual(row["action"], "MOTOR EXECUTÁVEL")
 
     def test_not_ready_is_red_even_with_positive_state(self):
         row = atlasquant_operational_card({
@@ -60,6 +60,17 @@ class AtlasQuantOperationalCardsTests(unittest.TestCase):
             "m15":"AGUARDAR","gate":"WAIT",
         }])
         self.assertEqual(table.iloc[0]["Pronto?"],"NÃO")
+
+
+    def test_green_card_wording_does_not_claim_final_safety_permission(self):
+        row=atlasquant_operational_card({
+            "pair":"EUR/USD","state":"🟢 EXECUTÁVEL","direction":"🟢 COMPRA EUR/USD",
+            "executable":True,"data_ready":{"sufficient":True,"score":95}
+        })
+        self.assertEqual(row["traffic_light"],"GREEN")
+        self.assertEqual(row["action"],"MOTOR EXECUTÁVEL")
+        self.assertNotEqual(row["action"],"ORDEM LIBERADA")
+
 
 
 if __name__ == "__main__":
