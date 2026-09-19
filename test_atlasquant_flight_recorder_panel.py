@@ -1,7 +1,7 @@
 import unittest
 
 from atlasquant_flight_recorder_panel import (
-    decision_fingerprint, record_from_pack, append_unique, recorder_summary, prepare_flight_capture, hydrate_persistent_records,
+    decision_fingerprint, record_from_pack, append_unique, recorder_summary, prepare_flight_capture, hydrate_persistent_records, recorder_visual_state,
 )
 
 
@@ -86,6 +86,14 @@ class AtlasQuantFlightRecorderPanelTests(unittest.TestCase):
         rows=hydrate_persistent_records([session],[remote])
         self.assertEqual(rows[0]["_fingerprint"],remote["_fingerprint"])
         self.assertEqual(rows[1]["_fingerprint"],session["_fingerprint"])
+
+
+    def test_recorder_visual_state_is_audit_only_and_fail_safe(self):
+        self.assertEqual(recorder_visual_state({"records":0})["label"],"SEM REGISTROS")
+        self.assertEqual(recorder_visual_state({"records":3},{"ok":True})["label"],"REGISTRO PERSISTIDO")
+        self.assertEqual(recorder_visual_state({"records":3},{"ok":False,"reason":"SAVE_ERROR"})["label"],"SESSÃO PRESERVADA")
+        self.assertEqual(recorder_visual_state({"records":"bad"})["label"],"REVISAR")
+
 
 
 if __name__=="__main__":
