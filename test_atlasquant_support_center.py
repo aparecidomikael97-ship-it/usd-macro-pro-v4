@@ -3,8 +3,16 @@ import atlasquant_support_center as s
 def test_support_minimum_ready():
     assert s.support_minimum_ready() is True
     rows=s.support_catalog()
-    assert len(rows)>=9
-    assert {x["id"] for x in rows}>={"app-access","stale-data","paper-trading","pwa-install","security","voice","academy-media","billing","public-launch"}
+    assert len(rows)>=10
+    assert {x["id"] for x in rows}>={"first-steps","app-access","stale-data","paper-trading","pwa-install","security","voice","academy-media","billing","public-launch"}
+
+def test_first_steps_prioritizes_data_and_safety():
+    row=s.support_topic("first-steps")
+    assert row is not None
+    text=" ".join(row["actions"]).lower()
+    assert "qualidade dos dados" in text
+    assert "safety core" in text
+    assert "hard block" in text
 
 def test_support_topic_is_safe_and_actionable():
     row=s.support_topic("security")
