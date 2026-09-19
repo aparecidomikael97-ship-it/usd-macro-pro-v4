@@ -221,7 +221,7 @@ class AtlasQuantValidationReadinessTests(unittest.TestCase):
         source=inspect.getsource(render_validation_readiness)
         self.assertIn("Cobertura balanceada por par",source)
         self.assertIn("pair_covered_total",source)
-        self.assertIn("balanced_pair_coverage(",source)
+        self.assertIn('result["shadow_balanced_coverage"]',source)
 
 
     def test_closed_market_history_does_not_dilute_open_market_quota_gate(self):
