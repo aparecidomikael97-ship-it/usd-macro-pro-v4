@@ -89,6 +89,19 @@ def build_data_confidence(
     }
 
 
+
+def data_confidence_visual_state(summary: Mapping[str,Any] | None)->dict[str,str]:
+    s=dict(summary or {})
+    status=str(s.get("status","") or "").upper()
+    if status=="GREEN":
+        return {"label":"DADOS OPERACIONAIS","detail":"Cobertura e frescor mínimos atendidos; ainda não é autorização de trade"}
+    if status=="YELLOW":
+        return {"label":"ATENÇÃO NOS DADOS","detail":"Há cobertura parcial, stale, processo ou orçamento exigindo revisão"}
+    if status=="RED":
+        return {"label":"DADOS INSUFICIENTES","detail":"Leitura operacional deve permanecer bloqueada"}
+    return {"label":"REVISAR","detail":"Estado de dados inválido ou indisponível"}
+
+
 def render_data_confidence(
     packs: Sequence[Mapping[str, Any]] | None,
     autopilot: Mapping[str, Any] | None = None,
@@ -97,6 +110,14 @@ def render_data_confidence(
     icon={"GREEN":"🟢","YELLOW":"🟡","RED":"🔴"}.get(s["status"],"⚪")
 
     st.markdown("### 🛡️ Data Confidence Center")
+    visual=data_confidence_visual_state(s)
+    st.markdown(
+        f"""<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:11px 13px;
+        border:1px solid rgba(137,170,210,.18);border-radius:12px;margin:4px 0 13px;background:rgba(11,27,47,.52)">
+        <strong>{visual['label']}</strong><span style="opacity:.74;font-size:.78rem">{visual['detail']}</span>
+        <span style="margin-left:auto;opacity:.68;font-size:.72rem">Saúde dos dados ≠ direção</span></div>""",
+        unsafe_allow_html=True,
+    )
     st.caption(
         "Saúde dos dados separada do direcional. Este painel não aumenta score e não libera operação."
     )
