@@ -12,6 +12,7 @@ from atlasquant_platform_center import pwa_asset_audit, PWA_URL
 from atlasquant_commercial_launch_guard import CommercialEvidence, assess_commercial_launch
 from atlasquant_commercial_security_evidence import collect_commercial_security_evidence
 from atlasquant_academy import academy_minimum_text_ready
+from atlasquant_support_center import support_minimum_ready
 
 SCHEMA="ATLASQUANT_SALES_CENTER_V1"
 
@@ -58,6 +59,7 @@ def commercial_readiness(access:Mapping[str,Any]|None=None)->dict[str,Any]:
         "active_accounts":total,
         "academy_text_ready":bool(academy_minimum_text_ready()),
         "academy_ready":False,
+        "support_ready":bool(support_minimum_ready()),
         "voice_ready":False,
         "brokers_guide_ready":False,
         "native_stores_ready":False,
@@ -133,6 +135,7 @@ def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
         ("PWA instalável","PRONTO" if status["pwa_ready"] else "BLOQUEADO"),
         ("Academy — trilha textual","PRONTO" if status["academy_text_ready"] else "PENDENTE"),
         ("Academy — vídeos","PENDENTE"),
+        ("Central de suporte","PRONTO" if status["support_ready"] else "PENDENTE"),
         ("Assistente de voz","PENDENTE"),
         ("Guia de corretoras","PENDENTE"),
         ("Termos / privacidade / riscos","PENDENTE"),
@@ -151,7 +154,7 @@ def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
         distribution_ok=bool(status["pwa_ready"]),
         terms_privacy_ok=False,
         data_licensing_ok=False,
-        support_ok=False,
+        support_ok=bool(status["support_ready"]),
         academy_minimum_ok=bool(status["academy_ready"]),
         billing_ok=bool(status["payments_integrated"]),
         sales_role_isolated_ok=bool(status["sales_role_isolation_verified"]),
