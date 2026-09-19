@@ -88,5 +88,19 @@ class AtlasQuantPerformanceLabTests(unittest.TestCase):
         self.assertTrue(pd.notna(m["mean_return_pct"]))
 
 
+    def test_invalid_sample_thresholds_fail_closed(self):
+        for bad in (0,-1,float("nan"),float("inf"),True,"bad"):
+            with self.subTest(total=bad):
+                r=performance_readiness(self.frame(),"24h",min_total_samples=bad,min_group_samples=1)
+                self.assertEqual(r["status"],"BUILDING")
+                self.assertFalse(r["thresholds_valid"])
+                self.assertFalse(r["auto_model_change_allowed"])
+            with self.subTest(group=bad):
+                r=performance_readiness(self.frame(),"24h",min_total_samples=1,min_group_samples=bad)
+                self.assertEqual(r["status"],"BUILDING")
+                self.assertFalse(r["thresholds_valid"])
+                self.assertTrue(grouped_metrics(self.frame(),"24h","par",min_group_samples=bad).empty)
+
+
 if __name__=="__main__":
     unittest.main()
