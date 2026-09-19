@@ -1,7 +1,7 @@
 import unittest
 import pandas as pd
 
-from atlasquant_validation_readiness import build_validation_readiness
+from atlasquant_validation_readiness import build_validation_readiness, validation_visual_state
 from atlasquant_shadow_mode import compare_shadow_sample
 
 
@@ -161,6 +161,15 @@ class AtlasQuantValidationReadinessTests(unittest.TestCase):
         self.assertFalse(r["automatic_weight_change_allowed"])
         self.assertFalse(r["automatic_merge_allowed"])
         self.assertTrue(r["manual_review_required"])
+
+
+    def test_validation_visual_state_is_conservative(self):
+        self.assertEqual(validation_visual_state({"status":"BLOCKED"})["label"],"BLOQUEADA")
+        self.assertEqual(validation_visual_state({"status":"REVIEWABLE"})["label"],"PRONTA PARA REVISÃO")
+        self.assertEqual(validation_visual_state({"status":"PARTIAL"})["label"],"PARCIAL")
+        self.assertEqual(validation_visual_state({"status":"BUILDING"})["label"],"EM FORMAÇÃO")
+        self.assertEqual(validation_visual_state({"status":"UNKNOWN"})["label"],"REVISAR")
+
 
 
 if __name__=="__main__":
