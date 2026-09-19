@@ -10,6 +10,16 @@ class AtlasQuantAdaptiveCoverageTests(unittest.TestCase):
         self.assertTrue(p["within_usable_cap"])
         self.assertLessEqual(p["estimated_daily_calls"],p["usable_cap"])
 
+    def test_default_budget_arithmetic_is_explicit_and_stable(self):
+        p=adaptive_coverage_plan()
+        self.assertEqual(p["active_m15_calls_per_pair"],27)
+        self.assertEqual(p["background_m15_calls_per_pair"],8)
+        self.assertEqual(p["m15_calls"],281)
+        self.assertEqual(p["daily_context_calls"],28)
+        self.assertEqual(p["estimated_daily_calls"],309)
+        self.assertEqual(p["usable_cap"],400)
+        self.assertEqual(p["headroom_calls"],91)
+
     def test_only_active_set_is_execution_grade(self):
         p=adaptive_coverage_plan(active_pairs=3)
         self.assertTrue(p["execution_grade_only_for_active_set"])
