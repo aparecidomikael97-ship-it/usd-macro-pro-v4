@@ -464,10 +464,18 @@ background:linear-gradient(180deg,rgba(17,34,57,.88),rgba(10,24,41,.82));min-hei
 .aq-op-pair{font-size:1.05rem;font-weight:800}.aq-op-action{font-size:.72rem;font-weight:800;letter-spacing:.05em}
 .aq-op-priority{font-size:1.8rem;font-weight:850;margin-top:10px}.aq-op-priority span{font-size:.75rem;color:#9fb0c6}
 .aq-op-small{font-size:.72rem;color:#9fb0c6;margin-top:8px}.aq-op-state{font-size:.76rem;margin-top:11px;font-weight:700}
+@media(max-width:760px){
+  .aq-op-card{min-height:auto;padding:11px 12px;margin-bottom:7px}
+  .aq-op-priority{font-size:1.45rem;margin-top:6px}
+  .aq-op-small{font-size:.67rem;margin-top:5px}
+  .aq-op-state{font-size:.7rem;margin-top:7px}
+  .aq-op-action{font-size:.64rem}
+}
 </style>
 """, unsafe_allow_html=True)
     st.markdown("### 🚦 Melhores contextos operacionais")
     st.caption("Usa a decisão institucional já auditada. Verde indica motor executável com dados suficientes; Safety Core e demais vetos continuam soberanos.")
+    _mobile_compact = len(cards) >= 3
     cols = st.columns(len(cards))
     icons = {"GREEN": "🟢", "YELLOW": "🟡", "RED": "🔴"}
     for col, card in zip(cols, cards):
