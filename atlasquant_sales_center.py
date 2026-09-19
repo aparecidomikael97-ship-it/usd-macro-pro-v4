@@ -13,6 +13,7 @@ from atlasquant_commercial_launch_guard import CommercialEvidence, assess_commer
 from atlasquant_commercial_security_evidence import collect_commercial_security_evidence
 from atlasquant_academy import academy_minimum_text_ready
 from atlasquant_academy_media import academy_video_scripts_ready
+from atlasquant_academy_video_blueprints import blueprints_ready
 from atlasquant_support_center import support_minimum_ready
 from atlasquant_brokers_guide import brokers_guide_minimum_ready, render_brokers_guide
 from atlasquant_voice_readiness import voice_contract_ready
@@ -73,6 +74,7 @@ def commercial_readiness(access:Mapping[str,Any]|None=None)->dict[str,Any]:
         "active_accounts":total,
         "academy_text_ready":bool(academy_minimum_text_ready()),
         "academy_video_scripts_ready":bool(academy_video_scripts_ready()),
+        "academy_storyboards_ready":bool(blueprints_ready()),
         "academy_ready":False,
         "support_ready":bool(support_minimum_ready()),
         "voice_contract_ready":bool(voice_contract_ready()),
@@ -164,6 +166,7 @@ def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
         ("PWA instalável","PRONTO" if status["pwa_ready"] else "BLOQUEADO"),
         ("Academy — trilha textual","PRONTO" if status["academy_text_ready"] else "PENDENTE"),
         ("Academy — roteiros de vídeo","PRONTOS" if status["academy_video_scripts_ready"] else "PENDENTE"),
+        ("Academy — storyboards animados","PRONTOS" if status["academy_storyboards_ready"] else "PENDENTE"),
         ("Academy — vídeos renderizados","PENDENTE"),
         ("Central de suporte","PRONTO" if status["support_ready"] else "PENDENTE"),
         ("Assistente de voz — infraestrutura","PRONTA" if status["voice_contract_ready"] else "PENDENTE"),
