@@ -35,17 +35,17 @@ def registry_to_mapping(users:Mapping[str,AccessUser]|None)->dict[str,dict[str,A
     out={}
     for username,user in users.items():
         if not isinstance(user,AccessUser):
-            continue
+            return {}
         name=normalize_username(username)
         if not name or name!=user.username:
-            continue
+            return {}
         out[name]={
             "role":user.role,
             "password_hash":user.password_hash,
             "active":bool(user.active),
         }
     validated=load_users_config({"users":out})
-    if set(validated)!=set(out):
+    if set(validated)!=set(out) or len(out)!=len(users):
         return {}
     return out
 
