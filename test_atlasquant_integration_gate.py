@@ -13,7 +13,7 @@ BASE_SHA="b"*40
 class AtlasQuantIntegrationGateTests(unittest.TestCase):
     def good(self, paths=None, **kw):
         data=dict(
-            changed_paths=paths or ["atlasquant_ui_v1.py","test_atlasquant_ui_v1.py"],
+            changed_paths=["atlasquant_ui_v1.py","test_atlasquant_ui_v1.py"] if paths is None else paths,
             main_is_ancestor=True,
             compile_ok=True,
             preflight_ok=True,
