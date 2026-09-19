@@ -167,6 +167,7 @@ def render_validation_evidence(
     bundle=build_validation_evidence(readiness,engine_version=engine_version)
     validation=bundle["validation"]
     shadow=bundle["evidence"]["shadow"]
+    quota=bundle["evidence"]["quota_shadow"]
 
     st.markdown("### 📦 Validation Evidence Bundle")
     visual=evidence_visual_state(bundle)
@@ -181,12 +182,16 @@ def render_validation_evidence(
         "Manifesto somente leitura para auditoria/revisão humana. "
         "Não promove versão, não muda pesos e não executa merge."
     )
-    c1,c2,c3=st.columns(3)
+    c1,c2,c3,c4=st.columns(4)
     c1.metric("Estado",validation["status"])
     c2.metric("Checks",f"{validation['passed_checks']}/{validation['total_checks']}")
     c3.metric(
         "Shadow por par",
         f"{shadow.get('pairs_meeting_minimum') or 0}/{shadow.get('expected_pair_count') or 0}",
+    )
+    c4.metric(
+        "Quota mercado",
+        f"{quota.get('market_open_runs') or 0}/{quota.get('min_market_runs') or 0}",
     )
     st.caption(f"Integridade SHA-256: {bundle['integrity_sha256'][:16]}…")
     st.download_button(
