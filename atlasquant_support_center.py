@@ -12,6 +12,16 @@ SCHEMA="ATLASQUANT_SUPPORT_CENTER_V1"
 
 SUPPORT_TOPICS=(
     {
+        "id":"first-steps",
+        "title":"Primeiros passos",
+        "symptoms":"Primeiro acesso ou dúvida sobre a ordem correta de leitura.",
+        "actions":(
+            "Leia nesta ordem: estado → qualidade dos dados → contexto macro → força relativa → Safety Core → estrutura técnica → plano → invalidação.",
+            "Use Paper Trading, Backtest e Academy para treinamento antes de tratar qualquer leitura como operacional.",
+            "Se houver hard block, dado stale ou mercado fechado, aguarde; não force um setup.",
+        ),
+    },
+    {
         "id":"app-access",
         "title":"Acesso ao aplicativo",
         "symptoms":"Login recusado, sessão expirada ou perfil sem acesso.",
@@ -111,7 +121,7 @@ def support_topic(topic_id:object)->dict[str,Any]|None:
     return next((dict(x) for x in SUPPORT_TOPICS if str(x["id"]).casefold()==key),None)
 
 def support_minimum_ready()->bool:
-    required={"app-access","stale-data","paper-trading","pwa-install","security","voice","academy-media","billing","public-launch"}
+    required={"first-steps","app-access","stale-data","paper-trading","pwa-install","security","voice","academy-media","billing","public-launch"}
     ids={str(x["id"]) for x in SUPPORT_TOPICS}
     return required.issubset(ids) and all(bool(x.get("actions")) for x in SUPPORT_TOPICS)
 
