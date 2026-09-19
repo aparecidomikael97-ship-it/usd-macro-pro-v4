@@ -140,6 +140,10 @@ def build_validation_readiness(
         pending.append(f"Calibração: {calib['label']}")
     if stability["status"]!="STABLE":
         pending.append(f"Estabilidade: {stability['label']}")
+    if not quota_shadow.get("evidence_integrity_ok",True):
+        blockers.append(
+            f"Quota Shadow contém {quota_shadow.get('invalid_timestamp_rows',0)} amostra(s) com timestamp inválido"
+        )
     if not quota_shadow["minimum_met"]:
         pending.append(
             f"Quota Shadow: {quota_shadow['market_open_runs']}/{quota_shadow['min_market_runs']} execuções com mercado aberto"
