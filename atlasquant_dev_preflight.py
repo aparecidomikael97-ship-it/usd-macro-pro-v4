@@ -40,6 +40,7 @@ REQUIRED_FILES=(
     "atlasquant_runtime_store.py",
     "atlasquant_release_guard.py",
     "atlasquant_release_candidate.py",
+    "atlasquant_source_parity.py",
     "atlasquant_access_control.py",
     "atlasquant_access_panel.py",
     "atlasquant_account_portal.py",
@@ -65,6 +66,7 @@ REQUIRED_FILES=(
     ".github/workflows/autopilot-v107.yml",
     ".github/workflows/quality-tests.yml",
     ".github/workflows/atlasquant-integration-gate.yml",
+    ".github/workflows/atlasquant-source-parity.yml",
     ".github/workflows/production-health.yml",
     ".github/workflows/production-browser-smoke.yml",
     "atlasquant_integration_gate.py",
@@ -197,6 +199,17 @@ def run_dev_preflight(
         and "git merge" not in integration_gate
         and "git push" not in integration_gate,
         "Gate de integração é source-only, baseado no main atual e não faz merge/push.",
+    ))
+    source_parity_workflow=(base/".github/workflows/atlasquant-source-parity.yml").read_text(encoding="utf-8") if (base/".github/workflows/atlasquant-source-parity.yml").is_file() else ""
+    checks.append(_check(
+        "runtime_source_parity_observational",
+        "branches: [atlasquant-runtime]" in source_parity_workflow
+        and "permissions:\n  contents: read" in source_parity_workflow
+        and "origin/atlasquant-integration" in source_parity_workflow
+        and "compare_source_trees" in source_parity_workflow
+        and "git push" not in source_parity_workflow
+        and "update-ref" not in source_parity_workflow,
+        "Paridade de fonte Runtime↔Integration é observacional, read-only e não sincroniza automaticamente.",
     ))
     checks.append(_check(
         "production_observability_read_only",
