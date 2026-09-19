@@ -187,5 +187,26 @@ class AtlasQuantEvidenceBundleTests(unittest.TestCase):
         self.assertIn("balanced_pair_required",source)
 
 
+    def test_evidence_and_validation_share_canonical_balanced_coverage(self):
+        from atlasquant_validation_readiness import balanced_pair_coverage
+        r=self.readiness()
+        r["shadow"]["min_pair_samples"]=10
+        r["shadow"]["expected_pairs"]=["EUR/USD","GBP/USD","USD/JPY"]
+        r["shadow"]["pair_breakdown"]=[
+            {"pair":"EUR/USD","samples":30},
+            {"pair":"EUR/USD","samples":8},
+            {"pair":"GBP/USD","samples":4},
+            {"pair":"AUD/USD","samples":999},
+        ]
+        expected=balanced_pair_coverage(
+            r["shadow"]["expected_pairs"],r["shadow"]["pair_breakdown"],10
+        )
+        b=build_validation_evidence(r,engine_version="dev")
+        shadow=b["evidence"]["shadow"]
+        self.assertEqual(shadow["balanced_pair_covered"],expected["covered"])
+        self.assertEqual(shadow["balanced_pair_required"],expected["required"])
+        self.assertEqual(shadow["balanced_pair_complete"],expected["complete"])
+
+
 if __name__=="__main__":
     unittest.main()
