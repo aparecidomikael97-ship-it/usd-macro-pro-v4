@@ -241,6 +241,11 @@ def render_validation_evidence(
         "Quota mercado",
         f"{quota.get('market_open_runs') or 0}/{quota.get('min_market_runs') or 0}",
     )
+    st.caption(
+        f"Integridade temporal do Quota Shadow: "
+        f"{'OK' if quota.get('evidence_integrity_ok',True) else 'BLOQUEADA'} · "
+        f"{quota.get('invalid_timestamp_rows') or 0} timestamp(s) inválido(s)."
+    )
     balanced_required=int(shadow.get("balanced_pair_required") or 0)
     balanced_covered=int(shadow.get("balanced_pair_covered") or 0)
     if balanced_required:
