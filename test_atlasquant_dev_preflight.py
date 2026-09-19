@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 from atlasquant_dev_preflight import (
+    REQUIRED_FILES,
     build_dev_readiness_manifest,
     readiness_manifest_json,
     run_dev_preflight,
@@ -34,7 +35,17 @@ class DevPreReleaseReadinessTests(unittest.TestCase):
         self.assertIn("production_observability_read_only",names)
         self.assertIn("commercial_security_evidence_bounded",names)
         self.assertIn("source_checkpoint_excludes_runtime_evidence",names)
-        self.assertIn("production_observability_read_only",names)
+
+
+    def test_preflight_required_files_are_unique_and_include_observability(self):
+        self.assertEqual(len(REQUIRED_FILES),len(set(REQUIRED_FILES)))
+        self.assertIn(".github/workflows/production-health.yml",REQUIRED_FILES)
+        self.assertIn(".github/workflows/production-browser-smoke.yml",REQUIRED_FILES)
+        report=run_dev_preflight()
+        obs=[x for x in report["checks"] if x["name"]=="production_observability_read_only"]
+        self.assertEqual(len(obs),1)
+        self.assertTrue(obs[0]["ok"])
+
 
     def test_missing_tree_is_blocked_fail_closed(self):
         with tempfile.TemporaryDirectory() as td:
