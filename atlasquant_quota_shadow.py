@@ -115,13 +115,14 @@ def summarize_quota_shadow(
     enough=len(market)>=minimum
     no_quota_blocks=len(blocked)==0
     plan_fits=len(plan_over)==0 and bool(valid_rows)
-    eligible=bool(enough and no_quota_blocks and not unhealthy and plan_fits)
+    integrity_ok=invalid_timestamp_rows==0
+    eligible=bool(enough and no_quota_blocks and not unhealthy and plan_fits and integrity_ok)
 
     return {
         "samples":len(valid_rows),
         "raw_samples":len(rows),
         "invalid_timestamp_rows":invalid_timestamp_rows,
-        "evidence_integrity_ok":invalid_timestamp_rows==0,
+        "evidence_integrity_ok":integrity_ok,
         "market_open_runs":len(market),
         "min_market_runs":minimum,
         "minimum_met":enough,
