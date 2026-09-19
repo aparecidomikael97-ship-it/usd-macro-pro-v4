@@ -55,7 +55,7 @@ def ensure_shadow_hydrated() -> tuple[list[dict[str,Any]],dict[str,Any]]:
 
     cfg=shadow_persistence_config()
     if not cfg["repo"] or not cfg["token"]:
-        status={"ok":False,"reason":"NOT_CONFIGURED","samples":len(current),"error":""}
+        status={"ok":False,"reason":"NOT_CONFIGURED","samples":len(current),"source":"session","branch":cfg["branch"],"error":""}
         st.session_state[HYDRATED_KEY]=True
         st.session_state[STATUS_KEY]=status
         return current,status
@@ -65,9 +65,9 @@ def ensure_shadow_hydrated() -> tuple[list[dict[str,Any]],dict[str,Any]]:
             repo=cfg["repo"],branch=cfg["branch"],token=cfg["token"]
         )
         current=hydrate_shadow_samples(current,remote)
-        status={"ok":True,"reason":"LOADED","samples":len(remote),"error":""}
+        status={"ok":True,"reason":"LOADED","samples":len(remote),"source":"runtime_persistent","branch":cfg["branch"],"error":""}
     except Exception as exc:
-        status={"ok":False,"reason":"LOAD_ERROR","samples":len(current),"error":f"{type(exc).__name__}: {exc}"}
+        status={"ok":False,"reason":"LOAD_ERROR","samples":len(current),"source":"session_fallback","branch":cfg["branch"],"error":f"{type(exc).__name__}: {exc}"}
 
     st.session_state[SESSION_KEY]=current
     st.session_state[HYDRATED_KEY]=True
