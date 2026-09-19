@@ -35,6 +35,14 @@ class AtlasQuantCommercialLaunchGuardTests(unittest.TestCase):
                 self.assertEqual(out["status"],"BLOCKED")
                 self.assertTrue(out["blockers"])
 
+    def test_account_security_evidence_is_required_for_launch(self):
+        for field in ("sales_role_isolated_ok","account_revocation_ok","audit_manifest_ok"):
+            with self.subTest(field=field):
+                out=assess_commercial_launch(self.evidence(**{field:False}))
+                self.assertEqual(out["status"],"BLOCKED")
+                self.assertTrue(out["manual_launch_required"])
+                self.assertFalse(out["automatic_launch"])
+
     def test_non_boolean_evidence_fails_closed(self):
         for bad in (1,"true",None):
             with self.subTest(bad=bad):
