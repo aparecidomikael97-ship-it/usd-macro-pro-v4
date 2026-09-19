@@ -22,7 +22,7 @@ class AutopilotPanelV107Tests(unittest.TestCase):
         self.assertIn("Market Map pronto",src)
 
     def test_status_summary_is_conservative_and_clear(self):
-        self.assertEqual(autopilot_status_summary({"forex_market_open":False})["label"],"EM ESPERA")
+        self.assertEqual(panel.autopilot_status_summary({"forex_market_open":False})["label"],"EM ESPERA")
         self.assertEqual(autopilot_status_summary({"forex_market_open":True,"healthy":True,"operational_readiness":"READY"})["label"],"SAUDÁVEL")
         self.assertEqual(autopilot_status_summary({"forex_market_open":True,"healthy":False,"app_headless_ok":False})["label"],"BLOQUEADO")
 
