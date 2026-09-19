@@ -24,6 +24,16 @@ class AtlasQuantPWAAssetsTests(unittest.TestCase):
         self.assertIn('event.request.mode === "navigate"',src)
         self.assertNotIn('url.origin !== self.location.origin',src)
 
+
+    def test_shell_exposes_network_status_without_caching_private_app(self):
+        src=(ROOT/"docs"/"index.html").read_text(encoding="utf-8")
+        self.assertIn('id="status"',src)
+        self.assertIn('window.addEventListener("offline"',src)
+        self.assertIn('window.addEventListener("online"',src)
+        self.assertIn('referrerpolicy="no-referrer"',src)
+        sw=(ROOT/"docs"/"sw.js").read_text(encoding="utf-8")
+        self.assertIn("url.origin === self.location.origin",sw)
+
     def test_shell_references_manifest_service_worker_and_private_app(self):
         src=(ROOT/"docs"/"index.html").read_text(encoding="utf-8")
         self.assertIn('rel="manifest"',src)
