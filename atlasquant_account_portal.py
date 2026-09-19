@@ -52,6 +52,17 @@ def role_sections(role:Any)->tuple[str,...]:
         return ("account",)
     return ()
 
+def _safe_nonnegative_int(value:Any)->tuple[int,bool]:
+    if isinstance(value,bool):
+        return 0,False
+    try:
+        x=float(value)
+        if not x.is_integer() or x<0 or x!=x or x in (float("inf"),float("-inf")):
+            return 0,False
+        return int(x),True
+    except Exception:
+        return 0,False
+
 def password_policy(password:Any)->dict[str,Any]:
     value=password if isinstance(password,str) else ""
     checks={
@@ -120,18 +131,20 @@ def account_summary(access:Mapping[str,Any]|None)->dict[str,Any]:
     username=str(session.get("username") or "") if role!="INVALID" else ""
     permissions=tuple(sorted(ROLE_PERMISSIONS.get(role,frozenset())))
     registry=data.get("registry") if isinstance(data.get("registry"),Mapping) else {}
+    safe_registry={}
+    registry_valid=True
+    for key in ("USER","SALES","ADMIN","TOTAL"):
+        value,valid=_safe_nonnegative_int(registry.get(key,0))
+        safe_registry[key]=value
+        registry_valid=registry_valid and valid
     return {
         "mode":mode,
         "role":role if role in ROLE_LABELS else "INVALID",
         "role_label":role_label(role),
         "username":username,
         "permissions":permissions,
-        "registry":{
-            "USER":int(registry.get("USER",0) or 0),
-            "SALES":int(registry.get("SALES",0) or 0),
-            "ADMIN":int(registry.get("ADMIN",0) or 0),
-            "TOTAL":int(registry.get("TOTAL",0) or 0),
-        },
+        "registry":safe_registry,
+        "registry_valid":registry_valid,
         "sections":role_sections(role),
         "authenticated":bool(role in ("USER","SALES","ADMIN") and username),
     }
