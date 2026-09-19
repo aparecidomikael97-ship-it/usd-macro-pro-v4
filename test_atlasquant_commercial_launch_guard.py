@@ -12,6 +12,9 @@ class AtlasQuantCommercialLaunchGuardTests(unittest.TestCase):
             support_ok=True,
             academy_minimum_ok=True,
             billing_ok=True,
+            sales_role_isolated_ok=True,
+            account_revocation_ok=True,
+            audit_manifest_ok=True,
         )
         data.update(kw)
         return CommercialEvidence(**data)
@@ -42,6 +45,19 @@ class AtlasQuantCommercialLaunchGuardTests(unittest.TestCase):
                 self.assertEqual(out["status"],"BLOCKED")
                 self.assertTrue(out["manual_launch_required"])
                 self.assertFalse(out["automatic_launch"])
+
+    def test_omitted_security_evidence_blocks_by_default(self):
+        e=CommercialEvidence(
+            private_access_ok=True,account_admin_ok=True,distribution_ok=True,
+            terms_privacy_ok=True,data_licensing_ok=True,support_ok=True,
+            academy_minimum_ok=True,billing_ok=True,
+        )
+        out=assess_commercial_launch(e)
+        self.assertEqual(out["status"],"BLOCKED")
+        self.assertTrue(any("SALES" in x for x in out["blockers"]))
+        self.assertTrue(any("Revogação" in x for x in out["blockers"]))
+        self.assertTrue(any("Auditoria" in x for x in out["blockers"]))
+
 
     def test_non_boolean_evidence_fails_closed(self):
         for bad in (1,"true",None):
