@@ -20,6 +20,8 @@ Remoção destrutiva de conta é bloqueada pelo módulo de registro. Para encerr
 
 Alterar perfil, senha ou status invalida a sessão antiga porque a sessão é vinculada ao fingerprint atual da credencial.
 
+Além disso, sessões expiram por inatividade e por idade máxima. O JSON completo contém hashes de autenticação e não é mostrado inline na interface; o ADMIN recebe apenas o arquivo para download.
+
 ## SALES
 
 O perfil SALES pode:
