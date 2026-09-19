@@ -19,9 +19,10 @@ class AtlasQuantEvidenceBundleTests(unittest.TestCase):
                 "calibration_consistent":False,
                 "stability_consistent":True,
                 "shadow_reviewable":False,
+                "quota_shadow_reviewable":False,
             },
             "passed_checks":2,
-            "total_checks":4,
+            "total_checks":5,
             "blockers":[],
             "pending":["Shadow Mode: cobertura por par insuficiente"],
             "performance":{"status":"REVIEWABLE","label":"REVIEWABLE","samples":120},
@@ -36,6 +37,15 @@ class AtlasQuantEvidenceBundleTests(unittest.TestCase):
                 "expected_pair_count":7,
                 "missing_pairs":["AUD/USD"],
                 "under_sampled_pairs":["USD/CAD"],
+                "eligible_for_manual_review":False,
+            },
+            "quota_shadow":{
+                "samples":44,
+                "market_open_runs":0,
+                "min_market_runs":20,
+                "provider_blocked_runs":0,
+                "headless_failed_runs":0,
+                "adaptive_plan_fit_all_samples":True,
                 "eligible_for_manual_review":False,
             },
             "expansion":{
@@ -103,6 +113,18 @@ class AtlasQuantEvidenceBundleTests(unittest.TestCase):
         tampered["validation"]["status"]="REVIEWABLE"
         self.assertEqual(evidence_visual_state(tampered)["label"],"INTEGRIDADE INVÁLIDA")
 
+
+
+    def test_quota_shadow_evidence_is_exported_and_integrity_protected(self):
+        b=build_validation_evidence(self.readiness(),engine_version="dev")
+        q=b["evidence"]["quota_shadow"]
+        self.assertEqual(q["samples"],44)
+        self.assertEqual(q["market_open_runs"],0)
+        self.assertEqual(q["min_market_runs"],20)
+        self.assertFalse(q["eligible_for_manual_review"])
+        self.assertTrue(verify_validation_evidence(b))
+        b["evidence"]["quota_shadow"]["market_open_runs"]=20
+        self.assertFalse(verify_validation_evidence(b))
 
 
 if __name__=="__main__":
