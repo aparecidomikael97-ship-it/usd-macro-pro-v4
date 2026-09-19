@@ -32,6 +32,15 @@ class ProductV104Tests(unittest.TestCase):
         label,dot,age=freshness_by_frequency("2026-09-15","daily","2026-09-14")
         self.assertEqual((label,dot,age),("SEM DATA","⚪",None))
 
+
+    def test_roadmap_tracks_current_and_future_product_layers(self):
+        rows=ROADMAP.to_dict("records")
+        by={(r["Área"],r["Melhoria"]):r["Estado"] for r in rows}
+        self.assertTrue(any(r["Área"]=="Admin" and "Integrado" in r["Estado"] for r in rows))
+        self.assertTrue(any(r["Área"]=="Vendas" and "Integrado" in r["Estado"] for r in rows))
+        self.assertTrue(any(r["Área"]=="Academy" and "Planejado" in r["Estado"] for r in rows))
+        self.assertTrue(any(r["Área"]=="Institucional" and "Fase final" in r["Estado"] for r in rows))
+
     def test_required_content(self):
         self.assertIn("CPI / IPC", HISTORY_MAP)
         self.assertIn("PIB", HISTORY_MAP)
