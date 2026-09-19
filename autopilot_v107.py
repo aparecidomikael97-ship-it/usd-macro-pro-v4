@@ -371,9 +371,17 @@ def td_fetch(pair: str, interval: str, outputsize: int) -> tuple[pd.DataFrame, s
             js={"message":"HTTP 429: limite não especificado", "status":"error"}
         message=str(js.get("message", "")) if isinstance(js,dict) else ""
         is_error=isinstance(js,dict) and js.get("status")=="error"
-        if r.status_code==429 or (is_error and (str(js.get("code"))=="429" or classify_limit(message)!="COTA_OU_PLANO" or any(w in message.lower() for w in ('credits','quota','limit')))):
+        limit_kind=classify_limit(message)
+        limit_words=any(w in message.lower() for w in ('credits','quota','limit'))
+        provider_limit=bool(
+            r.status_code==429
+            or (is_error and str(js.get("code"))=="429")
+            or (is_error and limit_kind in ("LIMITE_MINUTO","COTA_DIARIA"))
+            or (is_error and limit_words)
+        )
+        if provider_limit:
             _TD_DAILY_BLOCKED=True
-            _TD_BLOCK_TYPE=classify_limit(message)
+            _TD_BLOCK_TYPE=limit_kind
             _TD_DAILY_BLOCK_REASON=message or "HTTP 429: limite não especificado"
             result=_TD_BUDGET.block(_TD_DAILY_BLOCK_REASON,utcnow().to_pydatetime())
             _TD_STOP_UNTIL=result.get("blocked_until","")
