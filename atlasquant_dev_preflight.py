@@ -43,6 +43,7 @@ REQUIRED_FILES=(
     "atlasquant_access_panel.py",
     "atlasquant_account_portal.py",
     "atlasquant_user_bootstrap.py",
+    "atlasquant_platform_center.py",
     "docs/release/ACCESS_CONTROL_SETUP.md",
     "docs/manifest.webmanifest",
     "docs/sw.js",
@@ -106,6 +107,17 @@ def run_dev_preflight(
         and 'render_account_portal(_ATLASQUANT_ACCESS)' in app
         and '"Trading real","DESATIVADO"' in account_portal,
         "Portal USER/SALES/ADMIN integrado sem habilitar trading real.",
+    ))
+
+    platform_center=(base/"atlasquant_platform_center.py").read_text(encoding="utf-8") if (base/"atlasquant_platform_center.py").is_file() else ""
+    checks.append(_check(
+        "platform_center_integrated",
+        "from atlasquant_platform_center import render_platform_center" in app
+        and 'with abas[17]:' in app
+        and "render_platform_center()" in app
+        and '"Google Play","Distribuição atual":"PENDENTE"' in platform_center
+        and '"Apple App Store","Distribuição atual":"PENDENTE"' in platform_center,
+        "Central multiplataforma integrada sem confundir PWA com publicação nativa.",
     ))
 
     provider_markers=(
