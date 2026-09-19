@@ -256,7 +256,9 @@ def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro"):
 
 def pair_intelligence_status(best:Mapping[str,Any]|None,auto:Mapping[str,Any]|None)->dict[str,str]:
     p=dict(best or {}); a=dict(auto or {})
-    if a and not bool(a.get("forex_market_open",False)):
+    if not a:
+        return {"label":"ATENÇÃO","detail":"Estado do Autopilot indisponível; usar somente como contexto"}
+    if not bool(a.get("forex_market_open",False)):
         return {"label":"EM ESPERA","detail":"Mercado FX fechado; leitura mantida para contexto"}
     if a and not bool(a.get("healthy",False)):
         return {"label":"ATENÇÃO","detail":"Autopilot ou dados exigem revisão antes de usar leitura nova"}
