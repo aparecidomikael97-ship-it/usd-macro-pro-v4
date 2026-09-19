@@ -178,5 +178,13 @@ class AtlasQuantEvidenceBundleTests(unittest.TestCase):
         self.assertFalse(verify_validation_evidence(b))
 
 
+    def test_evidence_panel_exposes_protected_balanced_coverage(self):
+        import inspect
+        source=inspect.getsource(render_validation_evidence)
+        self.assertIn("Cobertura balanceada protegida no manifesto",source)
+        self.assertIn("balanced_pair_covered",source)
+        self.assertIn("balanced_pair_required",source)
+
+
 if __name__=="__main__":
     unittest.main()
