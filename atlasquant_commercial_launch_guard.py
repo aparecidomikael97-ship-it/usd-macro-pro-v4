@@ -21,9 +21,9 @@ class CommercialEvidence:
     support_ok: bool
     academy_minimum_ok: bool
     billing_ok: bool
-    sales_role_isolated_ok: bool = True
-    account_revocation_ok: bool = True
-    audit_manifest_ok: bool = True
+    sales_role_isolated_ok: bool = False
+    account_revocation_ok: bool = False
+    audit_manifest_ok: bool = False
 
 _FIELDS=(
     "private_access_ok",
