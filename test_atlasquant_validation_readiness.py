@@ -326,5 +326,15 @@ class AtlasQuantValidationReadinessTests(unittest.TestCase):
         self.assertEqual(r["pairs_under_target"],["GBP/USD"])
 
 
+    def test_validation_panel_surfaces_canonical_pair_diagnostics(self):
+        import inspect
+        source=inspect.getsource(render_validation_readiness)
+        self.assertIn("pairs_complete",source)
+        self.assertIn("pairs_total",source)
+        self.assertIn("pairs_missing",source)
+        self.assertIn("pairs_under_target",source)
+        self.assertIn("Pares na meta:",source)
+
+
 if __name__=="__main__":
     unittest.main()
