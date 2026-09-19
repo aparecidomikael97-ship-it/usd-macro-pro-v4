@@ -12,7 +12,7 @@ import streamlit as st
 UI_VERSION = "1.0"
 
 NAVIGATION_LABELS = (
-    "🎯 Central",
+    "🎯 Radar",
     "🧭 Painel mestre",
     "💱 Moedas",
     "🇺🇸 EUA",
@@ -35,7 +35,7 @@ NAVIGATION_LABELS = (
 )
 
 NAVIGATION_GROUPS = (
-    ("Operação", ("🎯 Central", "🧭 Painel mestre", "⚡ Decisão", "🗺️ Market Map")),
+    ("Operação", ("🎯 Radar", "🧭 Painel mestre", "⚡ Decisão", "🗺️ Market Map")),
     ("Mercado", ("💱 Moedas", "🇺🇸 EUA", "🔀 Pares", "🏦 Fed", "📰 Notícias")),
     ("Pesquisa", ("🗂️ Histórico", "🧪 Backtest", "🎙️ Macro Briefing", "🎓 Aprender")),
     ("Sistema", ("🤖 Autopilot", "🧩 Produto", "🛠️ Melhorias")),
@@ -287,6 +287,44 @@ def score_semantics(value: float | int | None) -> dict[str, str]:
 
 def navigation_labels() -> tuple[str, ...]:
     return NAVIGATION_LABELS
+
+
+def normalize_experience_mode(value: object) -> str:
+    raw=str(value or "").strip().casefold()
+    return "Avançado" if raw.startswith("avan") or raw in {"pro","advanced"} else "Iniciante"
+
+
+def navigation_mode_css(mode: object) -> str:
+    """Hide advanced tab buttons in beginner mode without changing tab indices."""
+    if normalize_experience_mode(mode)=="Avançado":
+        return "<style></style>"
+    visible={1,11,12,17,18,20}
+    hidden=[i for i in range(1,len(NAVIGATION_LABELS)+1) if i not in visible]
+    selectors=",".join(
+        f'[data-testid="stTabs"] [role="tablist"] > [role="tab"]:nth-child({i})'
+        for i in hidden
+    )
+    return f"<style>{selectors}{{display:none!important}}</style>"
+
+
+def render_experience_mode_switch() -> str:
+    current=normalize_experience_mode(st.session_state.get("atlasquant_experience_mode","Iniciante"))
+    mode=st.radio(
+        "Experiência",
+        ["Iniciante","Avançado"],
+        index=0 if current=="Iniciante" else 1,
+        horizontal=True,
+        key="atlasquant_experience_mode",
+        help="Iniciante mostra só o essencial. Avançado libera todas as áreas e diagnósticos.",
+    )
+    mode=normalize_experience_mode(mode)
+    st.session_state["atlasquant_view_mode"]="Básico" if mode=="Iniciante" else "Pro"
+    st.markdown(navigation_mode_css(mode),unsafe_allow_html=True)
+    if mode=="Iniciante":
+        st.caption("Modo Iniciante · Radar, Macro Briefing, Aprender, Conta, Instalar e Suporte.")
+    else:
+        st.caption("Modo Avançado · todas as áreas e diagnósticos disponíveis.")
+    return mode
 
 
 def navigation_groups() -> tuple[tuple[str, tuple[str, ...]], ...]:
