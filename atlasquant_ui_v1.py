@@ -129,6 +129,10 @@ html { scroll-behavior: smooth; }
 .aq-state-warn{color:var(--aq-warn);background:rgba(242,193,78,.08)}
 .aq-state-bad{color:var(--aq-bad);background:rgba(255,107,122,.08)}
 .aq-state-info{color:var(--aq-accent);background:rgba(79,163,255,.08)}
+.aq-decision-strip{display:grid;grid-template-columns:1fr 1fr 2fr 1fr 1fr;gap:8px;margin:5px 0 14px}
+.aq-decision-strip>div{padding:11px 12px;border:1px solid var(--aq-line);border-radius:12px;background:rgba(11,27,47,.64)}
+.aq-decision-strip span{display:block;color:var(--aq-muted);font-size:.64rem;font-weight:800;letter-spacing:.08em}
+.aq-decision-strip strong{display:block;color:var(--aq-text);font-size:.88rem;margin-top:3px;overflow-wrap:anywhere}
 [data-testid="stMetric"] {
   background: linear-gradient(180deg, rgba(17,34,57,.80), rgba(11,25,43,.72));
   border: 1px solid var(--aq-line) !important;
@@ -177,6 +181,8 @@ html { scroll-behavior: smooth; }
   .aq-subtitle { font-size: .84rem; }
   .aq-badge { font-size: .68rem; padding: 4px 8px; }
   .aq-section-title { font-size:.94rem; margin-top:.9rem; }
+  .aq-decision-strip{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .aq-decision-strip .wide{grid-column:1/-1}
   [data-testid="stSidebar"] { min-width: 280px; }
 }
 </style>
@@ -235,6 +241,23 @@ def section_title_html(title: str, icon: str = "") -> str:
 def state_badge_html(label: str, tone: str = "info") -> str:
     safe_tone=tone if tone in {"good","warn","bad","info"} else "info"
     return f'<span class="aq-state aq-state-{safe_tone}">{escape(str(label))}</span>'
+
+
+
+def decision_strip_html(pair: str, direction: str, decision: str, timing: str, quality: float | int | None = None) -> str:
+    p=escape(str(pair or "—")); d=escape(str(direction or "WAIT")); dec=escape(str(decision or "AGUARDAR")); t=escape(str(timing or "—"))
+    try:
+        q=float(quality)
+        q_text=f"{max(0.0,min(100.0,q)):.0f}%" if math.isfinite(q) else "—"
+    except Exception:
+        q_text="—"
+    return f"""<div class="aq-decision-strip">
+      <div><span>PAR</span><strong>{p}</strong></div>
+      <div><span>DIREÇÃO MACRO</span><strong>{d}</strong></div>
+      <div class="wide"><span>ESTADO</span><strong>{dec}</strong></div>
+      <div><span>TIMING</span><strong>{t}</strong></div>
+      <div><span>QUALIDADE</span><strong>{q_text}</strong></div>
+    </div>"""
 
 
 def apply_atlasquant_theme() -> None:
