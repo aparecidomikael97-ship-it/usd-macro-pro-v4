@@ -147,6 +147,8 @@ html { scroll-behavior: smooth; }
 .aq-focus-main strong{display:block;color:var(--aq-text);font-size:.98rem;line-height:1.2}
 .aq-focus-main span,.aq-focus-card span{display:block;color:var(--aq-muted);font-size:.72rem;line-height:1.25;margin-top:3px}
 .aq-focus-card strong{display:block;color:var(--aq-text);font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.aq-section-divider{height:1px;background:linear-gradient(90deg,transparent,var(--aq-line),transparent);margin:10px 0 12px}
+.aq-mobile-hint{display:none;color:var(--aq-muted);font-size:.62rem;text-align:center;margin:-3px 0 6px}
 .aq-nav-groups{display:flex;gap:7px;align-items:center;overflow-x:auto;scrollbar-width:none;margin:2px 0 9px;padding:2px 1px}
 .aq-nav-groups::-webkit-scrollbar{display:none}
 .aq-nav-group{flex:0 0 auto;border:1px solid var(--aq-line);border-radius:999px;padding:5px 9px;background:rgba(10,25,44,.56)}
@@ -243,6 +245,8 @@ html { scroll-behavior: smooth; }
   .aq-nav-group span{display:none}
   .aq-nav-group{padding:5px 8px}
   .aq-focus-main,.aq-focus-card{padding:9px 10px}
+  .aq-mobile-hint{display:block}
+  .aq-section-divider{margin:7px 0 9px}
   [data-testid="stSidebar"] { min-width: 280px; }
   [data-testid="stTabs"] [role="tablist"] { margin-left:-.25rem; margin-right:-.25rem; border-radius:10px; }
   [data-testid="stTabs"] [role="tab"] { font-size:.74rem; padding-left:.55rem; padding-right:.55rem; min-height:34px; }
@@ -314,6 +318,11 @@ def operation_focus_html(
         f'<strong>{escape(str(safety))}</strong><span>Veto independente</span></div>'
         '</div>'
     )
+
+
+def mobile_navigation_hint_html() -> str:
+    """Small mobile-only affordance; presentation only."""
+    return '<div class="aq-mobile-hint">Deslize as abas para ver mais áreas →</div><div class="aq-section-divider"></div>'
 
 
 def hero_html(app_version: str, environment: str = "LOCAL") -> str:
