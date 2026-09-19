@@ -54,6 +54,7 @@ REQUIRED_FILES=(
     "atlasquant_sales_center.py",
     "atlasquant_user_bootstrap.py",
     "atlasquant_platform_center.py",
+    "atlasquant_academy.py",
     "docs/release/ACCESS_CONTROL_SETUP.md",
     "docs/release/SALES_ADMIN_OPERATIONS.md",
     "docs/manifest.webmanifest",
@@ -141,6 +142,18 @@ def run_dev_preflight(
 
     sales_center=(base/"atlasquant_sales_center.py").read_text(encoding="utf-8") if (base/"atlasquant_sales_center.py").is_file() else ""
     registry_admin=(base/"atlasquant_registry_admin.py").read_text(encoding="utf-8") if (base/"atlasquant_registry_admin.py").is_file() else ""
+    academy=(base/"atlasquant_academy.py").read_text(encoding="utf-8") if (base/"atlasquant_academy.py").is_file() else ""
+    experience=(base/"experience_v103.py").read_text(encoding="utf-8") if (base/"experience_v103.py").is_file() else ""
+    checks.append(_check(
+        "academy_text_curriculum_ready",
+        "ACADEMY_TOPICS" in academy
+        and "academy_minimum_text_ready" in academy
+        and "render_academy_panel" in academy
+        and "from atlasquant_academy import render_academy_panel" in experience
+        and "render_academy_panel()" in experience
+        and '"academy_text_ready":bool(academy_minimum_text_ready())' in sales_center,
+        "Academy textual estruturada está integrada; vídeos permanecem uma etapa separada.",
+    ))
     checks.append(_check(
         "sales_center_integrated",
         "from atlasquant_sales_center import render_sales_center" in app
