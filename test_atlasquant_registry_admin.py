@@ -78,6 +78,25 @@ class AtlasQuantRegistryAdminTests(unittest.TestCase):
         self.assertTrue(after["admin.02"].active)
 
 
+    def test_full_sales_account_lifecycle_preserves_admin_and_audit_safe_diff(self):
+        before=self.users()
+        created=add_account(before,username="sales.01",role="SALES",password="VendaSegura#2026")
+        self.assertIsNotNone(authenticate("sales.01","VendaSegura#2026",created))
+        rotated=rotate_account_password(created,"sales.01","VendaNova#2026")
+        self.assertIsNone(authenticate("sales.01","VendaSegura#2026",rotated))
+        self.assertIsNotNone(authenticate("sales.01","VendaNova#2026",rotated))
+        disabled=set_account_active(rotated,"sales.01",False)
+        self.assertIsNone(authenticate("sales.01","VendaNova#2026",disabled))
+        self.assertTrue(disabled["admin.01"].active)
+        self.assertEqual(disabled["admin.01"].role,"ADMIN")
+        diff=registry_diff(before,disabled)
+        self.assertEqual(diff["added"],["sales.01"])
+        self.assertFalse(diff["destructive_removal_detected"])
+        self.assertTrue(diff["safe_for_manual_export"])
+        raw=apply_non_destructive_change(before,disabled)
+        self.assertNotIn("VendaSegura#2026",raw)
+        self.assertNotIn("VendaNova#2026",raw)
+
     def test_destructive_removal_is_detected_and_export_blocked(self):
         before=self.users()
         after={"admin.01":before["admin.01"]}
