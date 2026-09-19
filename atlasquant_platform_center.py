@@ -13,6 +13,7 @@ import streamlit as st
 
 ROOT=Path(__file__).resolve().parent
 DOCS=ROOT/"docs"
+PWA_URL="https://aparecidomikael97-ship-it.github.io/usd-macro-pro-v4/"
 
 def pwa_asset_audit(root:Path|None=None)->dict[str,Any]:
     base=Path(root) if root is not None else ROOT
@@ -73,6 +74,7 @@ def render_platform_center()->dict[str,Any]:
     )
     if audit["pwa_ready"]:
         st.success("PWA AtlasQuant: pronta no repositório para distribuição web instalável.")
+        st.link_button("Abrir AtlasQuant PWA",PWA_URL,width="stretch")
     else:
         st.error("PWA bloqueada: faltam arquivos ou contratos de segurança.")
         if audit["missing"]:
