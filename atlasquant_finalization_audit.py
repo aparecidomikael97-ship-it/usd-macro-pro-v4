@@ -25,6 +25,7 @@ _REQUIRED_HANDOFF_DOCS=(
     "docs/release/ATLASQUANT_RELEASE_FINAL.md",
     "docs/release/SALES_ADMIN_OPERATIONS.md",
     "docs/release/EXTERNAL_DEPENDENCY_HANDOFF.md",
+    "docs/release/EXTERNAL_EVIDENCE_RECORD.md",
     "docs/release/STORE_METADATA_TEMPLATE.md",
     "docs/release/PROVIDER_SETUP_TEMPLATE.md",
     "docs/release/USER_QUICKSTART.md",
