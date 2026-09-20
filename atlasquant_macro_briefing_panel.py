@@ -10,6 +10,7 @@ import streamlit as st
 from atlasquant_macro_briefing import build_macro_briefing
 from atlasquant_macro_briefing_voice import VoiceRequest
 from atlasquant_voice_assistant import browser_speech_html
+from atlasquant_voice_profile import VOICE_PROFILE_ID, voice_profile
 
 
 
@@ -79,16 +80,17 @@ def render_macro_briefing_panel(currency_rows: Sequence[Mapping[str, Any]] | Non
         width="stretch",
         tab_index=0,
     )
-    voice_style = st.selectbox(
-        "Estilo da voz",
-        ["deep", "clear", "normal", "crisp", "fancy", "delicate"],
-        index=0,
-        key="aq_macro_brief_voice_style",
+    profile=voice_profile()
+    voice_style=str(profile["external_style"])
+    st.caption(
+        "Voz padrão AtlasQuant: masculina/grave. No navegador, o app prioriza uma voz natural/neural "
+        "em português do Brasil; no TTS externo, o estilo fica fixado em deep."
     )
     voice_request = VoiceRequest(brief["speech_text"], voice_style).validated()
     st.session_state["aq_macro_brief_voice_request"] = {
         "transcript": voice_request.transcript,
         "voice": voice_request.voice,
+        "voice_profile_id": VOICE_PROFILE_ID,
     }
     st.caption("O pedido de áudio só fica preparado; a geração exige ação explícita e provedor TTS configurado.")
     if st.button("🎙️ Gerar narração", key=f"aq_macro_brief_generate_{horizon}"):
