@@ -1,3 +1,4 @@
+import inspect
 import unittest
 
 import pandas as pd
@@ -9,6 +10,7 @@ from atlasquant_admin_insights import (
     evaluate_beginner_readiness,
 )
 from atlasquant_admin_research_panel import (
+    render_admin_research_panel,
     admin_research_access_allowed,
     build_admin_research_snapshot,
     normalize_weekly_research_csv,
@@ -124,6 +126,14 @@ class AdminResearchPanelTests(unittest.TestCase):
         self.assertEqual(rows[0]["record_id"],"abcdef123456")
         self.assertEqual(rows[0]["evidence_state"],"PAPER_EVIDENCE_PENDING")
         self.assertEqual(rows[0]["evidence_coverage_pct"],60)
+
+    def test_admin_panel_exposes_persistent_history_and_evidence_fusion(self):
+        source=inspect.getsource(render_admin_research_panel)
+        self.assertIn("Histórico persistente de evidências",source)
+        self.assertIn("Persistir evidências da sessão no Runtime",source)
+        self.assertIn("Cruzar Backtest × Paper/Forward × Shadow",source)
+        self.assertIn("fuse_operational_evidence",source)
+        self.assertIn("summarize_shadow",source)
 
     def test_admin_snapshot_never_promotes_or_changes_strategy(self):
         backtest={
