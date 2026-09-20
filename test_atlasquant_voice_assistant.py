@@ -118,6 +118,16 @@ class AtlasQuantVoiceAssistantTests(unittest.TestCase):
         self.assertIn("\\u003c/script\\u003e",html)
         self.assertIn("speechSynthesis",html)
 
+    def test_browser_speech_prefers_natural_deep_ptbr_profile(self):
+        html=browser_speech_html("Teste.",key="profile")
+        self.assertIn("masculina/grave",html)
+        self.assertIn('"pt-BR"',html)
+        self.assertIn('"natural"',html)
+        self.assertIn('"neural"',html)
+        self.assertIn("u.pitch=Number(profile.pitch||0.88)",html)
+        self.assertIn("u.rate=Number(profile.rate||0.93)",html)
+        self.assertIn("if(voice) u.voice=voice",html)
+
     def test_browser_mic_has_text_safe_context_and_no_order_api(self):
         bad=row()
         bad["reason"]='</script><script>alert("x")</script>'
@@ -128,6 +138,14 @@ class AtlasQuantVoiceAssistantTests(unittest.TestCase):
         self.assertIn("speechSynthesis",html)
         self.assertNotIn("fetch(",html)
         self.assertNotIn("XMLHttpRequest",html)
+
+    def test_microphone_answers_use_same_deep_voice_profile(self):
+        ctx=assistant_context(row(),macro_context=macro())
+        html=browser_mic_assistant_html(ctx,key="samevoice")
+        self.assertIn('"external_style": "deep"',html)
+        self.assertIn("u.pitch=Number(profile.pitch||0.88)",html)
+        self.assertIn("u.rate=Number(profile.rate||0.93)",html)
+        self.assertIn("if(voice)u.voice=voice",html)
 
     def test_missing_context_stays_descriptive_not_invented(self):
         ctx=assistant_context({"pair":"USD/JPY","action":"NÃO OPERAR"})

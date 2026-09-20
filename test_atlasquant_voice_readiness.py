@@ -21,6 +21,8 @@ class AtlasQuantVoiceReadinessTests(unittest.TestCase):
         self.assertTrue(pending["contract_ready"])
         self.assertTrue(pending["contextual_contract_ready"])
         self.assertTrue(pending["in_app_voice_ready"])
+        self.assertTrue(pending["voice_profile_ready"])
+        self.assertEqual(pending["voice_profile_id"],"atlasquant_ptbr_neural_male_deep_v1")
         self.assertFalse(pending["provider_configured"])
         self.assertFalse(pending["neural_tts_ready"])
         self.assertFalse(pending["voice_ready"])
