@@ -345,6 +345,69 @@ def build_structured_macro(
 
 
 
+_EVENT_RULES = (
+    (("core pce", "pce nucleo"), True, 0.20, "inflation"),
+    (("pce",), True, 0.20, "inflation"),
+    (("core cpi", "ipc nucleo"), True, 0.20, "inflation"),
+    (("cpi", "ipc anual", "inflation rate"), True, 0.20, "inflation"),
+    (("nonfarm payroll", "payroll", "nfp"), True, 50.0, "labour"),
+    (("unemployment", "desemprego"), False, 0.10, "labour"),
+    (("ism manufacturing", "ism industrial", "manufacturing pmi"), True, 1.0, "activity"),
+    (("ism services", "ism servicos", "services pmi"), True, 1.0, "activity"),
+    (("gdp", "pib"), True, 0.50, "growth"),
+)
+
+
+def economic_rows_to_indicators(
+    rows: Mapping[str, Any] | Sequence[Mapping[str, Any]] | None,
+    *,
+    currency: str = "USD",
+    quality: float = 82.0,
+) -> list[dict[str, Any]]:
+    """Adapt a current economic-event snapshot to explicit surprise inputs.
+
+    Only an allow-list of well-known releases receives a directional rule.
+    Unknown releases are skipped instead of being guessed.
+    """
+    normalized_rows: list[tuple[str, Mapping[str, Any]]] = []
+    if isinstance(rows, Mapping):
+        for name, payload in rows.items():
+            if isinstance(payload, Mapping):
+                normalized_rows.append((str(name), payload))
+    elif isinstance(rows, Sequence) and not isinstance(rows, (str, bytes)):
+        for payload in rows:
+            if isinstance(payload, Mapping):
+                normalized_rows.append((str(payload.get("name", payload.get("event", "")) or ""), payload))
+
+    out: list[dict[str, Any]] = []
+    for fallback_name, payload in normalized_rows:
+        name = str(payload.get("nome", payload.get("evento", payload.get("name", fallback_name))) or fallback_name)
+        n = _norm(name)
+        rule = next((r for r in _EVENT_RULES if any(alias in n for alias in r[0])), None)
+        if rule is None:
+            continue
+        _, higher_supports, scale, category = rule
+        consensus = payload.get("consenso", payload.get("consensus", payload.get("forecast")))
+        previous = payload.get("anterior", payload.get("previous"))
+        actual = payload.get("real", payload.get("actual"))
+        if actual is None and consensus is None:
+            continue
+        out.append({
+            "currency": str(payload.get("currency") or currency).upper().strip(),
+            "name": name,
+            "category": category,
+            "actual": actual,
+            "consensus": consensus,
+            "previous": previous,
+            "higher_supports_currency": higher_supports,
+            "scale": scale,
+            "quality": max(0.0, min(100.0, _finite(payload.get("quality", quality), quality))),
+            "fresh": bool(payload.get("fresh", True)),
+            "source": str(payload.get("source") or payload.get("fonte") or "economic snapshot"),
+        })
+    return out
+
+
 def ranking_rows_to_currency_context(
     rows: Sequence[Mapping[str, Any]] | None,
     *,
@@ -403,4 +466,4 @@ def ranking_rows_to_currency_context(
     return out
 
 
-__all__ = ["SCHEMA", "GROUP_WEIGHTS", "CORE_GROUPS", "build_structured_macro", "ranking_rows_to_currency_context"]
+__all__ = ["SCHEMA", "GROUP_WEIGHTS", "CORE_GROUPS", "build_structured_macro", "ranking_rows_to_currency_context", "economic_rows_to_indicators"]
