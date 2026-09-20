@@ -1435,6 +1435,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                         "evidence_gaps":" · ".join(str(x) for x in passport.get("evidence_flags",[]) or []),
                         "evidence_state":ladder.get("state"),
                         "evidence_coverage_pct":ladder.get("evidence_coverage_pct"),
+                        "evidence_sufficient_pct":ladder.get("evidence_sufficient_pct"),
                         "automatic_promotion":False,
                     })
                 st.session_state["atlasquant_last_strategy_suite_intelligence"]={
