@@ -9,6 +9,10 @@ on:
     paths:
       - "usd_macro_pro_v4_cloud.py"
       - "atlasquant_ui_v1.py"
+      - "compact_ui_v1107.py"
+      - "atlasquant_investment_panel.py"
+      - "atlasquant_voice_assistant.py"
+      - "atlasquant_voice_profile.py"
       - "atlasquant_fast_startup.py"
       - "atlasquant_home_radar.py"
       - "test_atlasquant_navigation_stability.py"
@@ -228,6 +232,7 @@ jobs:
                       "👤 Conta",
                       "📱 Instalar",
                       "💼 Vendas",
+                      "💰 Investir",
                       "🛟 Suporte",
                       "🎯 Radar",
                       "⚡ Decisão",
@@ -270,12 +275,54 @@ jobs:
                   errors.append("console contém NotFoundError/removeChild")
 
               page.screenshot(path=str(OUT/"mobile-final.png"),full_page=False)
+
+              # Visual smoke at the three widths used as AtlasQuant mobile targets.
+              width_reports=[]
+              for width,height in ((360,800),(390,844),(412,915)):
+                  visual_context=browser.new_context(
+                      viewport={"width":width,"height":height},
+                      is_mobile=True,
+                      device_scale_factor=1,
+                      locale="pt-BR",
+                  )
+                  visual_page=visual_context.new_page()
+                  visual_errors=[]
+                  visual_page.on("pageerror",lambda exc, bucket=visual_errors: bucket.append(str(exc)))
+                  visual_page.goto(URL,wait_until="domcontentloaded",timeout=180_000)
+                  visual_page.locator('[data-testid="stAppViewContainer"]').wait_for(timeout=90_000)
+                  wait_radar_state(visual_page,timeout=90_000)
+                  visual_page.wait_for_timeout(800)
+                  viewport_w=visual_page.evaluate("window.innerWidth")
+                  document_w=visual_page.evaluate("document.documentElement.scrollWidth")
+                  visual_overflow=max(0,int(document_w)-int(viewport_w))
+                  metrics=visual_page.locator('[data-testid="stMetricValue"]')
+                  metric_sample=""
+                  if metrics.count():
+                      metric_sample=metrics.first.evaluate(
+                          "(el)=>({color:getComputedStyle(el).color,fontWeight:getComputedStyle(el).fontWeight})"
+                      )
+                  width_reports.append({
+                      "width":width,
+                      "viewport_width":viewport_w,
+                      "document_width":document_w,
+                      "horizontal_overflow_px":visual_overflow,
+                      "metric_style":metric_sample,
+                      "page_errors":visual_errors[-5:],
+                  })
+                  if visual_overflow>8:
+                      errors.append(f"visual-{width}: overflow horizontal {visual_overflow}px")
+                  if visual_errors:
+                      errors.append(f"visual-{width}: {len(visual_errors)} pageerror")
+                  visual_page.screenshot(path=str(OUT/f"mobile-{width}.png"),full_page=False)
+                  visual_context.close()
+
               report={
                   "url":URL,
                   "trace":trace,
                   "page_errors":page_errors[-20:],
                   "console_errors":console_errors[-20:],
                   "horizontal_overflow_px":overflow,
+                  "mobile_widths":width_reports,
                   "failures":errors,
               }
               (OUT/"report.json").write_text(
