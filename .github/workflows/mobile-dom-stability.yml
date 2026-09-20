@@ -136,12 +136,9 @@ jobs:
 
           with sync_playwright() as p:
               browser=p.chromium.launch(headless=True)
-              context=browser.new_context(
-                  viewport={"width":390,"height":844},
-                  is_mobile=True,
-                  device_scale_factor=1,
-                  locale="pt-BR",
-              )
+              device=dict(p.devices["Pixel 7"])
+              device["locale"]="pt-BR"
+              context=browser.new_context(**device)
               page=context.new_page()
               page_errors=[]
               console_errors=[]
