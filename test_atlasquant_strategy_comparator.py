@@ -1,3 +1,4 @@
+import inspect
 import unittest
 import pandas as pd
 
@@ -96,6 +97,12 @@ class StrategyComparatorTests(unittest.TestCase):
         df=combined_ledger(suite)
         self.assertEqual(set(df["strategy_family"]),{"BOS_CHOCH_OB","FVG"})
         self.assertEqual(len(df),2)
+
+    def test_suite_accepts_point_in_time_context_without_changing_default_contract(self):
+        source=inspect.getsource(run_strategy_suite)
+        self.assertIn("context_snapshots",source)
+        self.assertIn("enrich_signals_point_in_time",source)
+        self.assertIn("backtest_many",source)
 
     def test_run_suite_returns_all_five_strategies_even_without_signals(self):
         n=40
