@@ -461,7 +461,8 @@ def render_stable_navigation(
         format_func=_format_option,
         help=(
             "Escolha a área do AtlasQuant. No modo Iniciante, áreas com cadeado "
-            "abrem apenas uma prévia; no Avançado, os workspaces completos são renderizados."
+            "abrem apenas uma prévia; no Avançado, os workspaces completos são renderizados, "
+            "reduzindo carga e instabilidade de DOM no celular."
         ),
     )
     group=navigation_group_for(selected)
