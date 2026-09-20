@@ -98,6 +98,25 @@ class AtlasQuantHomeRadarTests(unittest.TestCase):
         self.assertIn("não é garantia",script)
         self.assertIn("nem ordem para corretora",script)
 
+    def test_research_consensus_is_visible_but_does_not_override_action(self):
+        rows=home_rows_from_packs([_pack()],macro_context={"fed":{"tom":"Neutro","forca":0}})
+        row=rows[0]
+        self.assertEqual(row["action"],"COMPRA")
+        self.assertIn("research_state",row)
+        self.assertGreaterEqual(row["research_layers"],2)
+        self.assertIsInstance(row["research_blockers"],list)
+
+    def test_geopolitical_news_can_reach_research_layers_without_becoming_order(self):
+        article={
+            "title":"Geopolitical tensions escalate after attack and sanctions",
+            "source":"Reuters","weighted_impact":-0.2,
+            "recency_factor":1.0,"source_factor":1.0,"independence_factor":1.0,
+        }
+        news={"currencies":{"EUR":{"articles":[article]},"USD":{"articles":[article]}}}
+        row=home_rows_from_packs([_pack()],news_state=news)[0]
+        self.assertGreaterEqual(row["research_layers"],3)
+        self.assertEqual(row["action"],"COMPRA")
+
     def test_adr_is_described_without_calling_it_probability(self):
         row=home_rows_from_packs([_pack()])[0]
         self.assertIn("ADR 63%",row["movement"])
