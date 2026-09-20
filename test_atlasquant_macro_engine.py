@@ -1,6 +1,6 @@
 import unittest
 
-from atlasquant_macro_engine import build_structured_macro, ranking_rows_to_currency_context
+from atlasquant_macro_engine import build_structured_macro, ranking_rows_to_currency_context, economic_rows_to_indicators
 
 
 def comp(score, quality=90, **extra):
@@ -178,6 +178,28 @@ class StructuredMacroEngineTests(unittest.TestCase):
         out=ranking_rows_to_currency_context(rows)
         self.assertFalse(out["AUD"]["rates"]["fresh"])
         self.assertEqual(out["AUD"]["rates"]["quality"],35.0)
+
+
+    def test_economic_adapter_maps_known_release_rules(self):
+        rows={
+            "PCE Núcleo anual":{"consenso":2.8,"anterior":2.7,"real":3.0,"source":"EODHD"},
+            "Desemprego":{"consenso":4.2,"anterior":4.1,"real":4.4,"source":"EODHD"},
+            "Unknown thing":{"consenso":10,"anterior":9,"real":11,"source":"EODHD"},
+        }
+        out=economic_rows_to_indicators(rows)
+        self.assertEqual(len(out),2)
+        pce=next(x for x in out if "PCE" in x["name"])
+        unemp=next(x for x in out if "Desemprego" in x["name"])
+        self.assertTrue(pce["higher_supports_currency"])
+        self.assertFalse(unemp["higher_supports_currency"])
+        self.assertEqual(pce["scale"],0.2)
+
+    def test_economic_adapter_skips_unknown_or_empty_release(self):
+        rows={
+            "Mystery release":{"consenso":1,"anterior":0},
+            "Payroll":{"consenso":None,"real":None,"anterior":150},
+        }
+        self.assertEqual(economic_rows_to_indicators(rows),[])
 
 
 if __name__=="__main__":
