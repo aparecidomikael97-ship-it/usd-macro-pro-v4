@@ -35,6 +35,8 @@ class AtlasQuantCommercialPrepTests(unittest.TestCase):
 
     def test_external_blockers_remain_explicit(self):
         blockers=" ".join(commercial_external_blockers()).casefold()
+        self.assertIn("admin",blockers)
+        self.assertIn("produção",blockers)
         self.assertIn("revisão jurídica",blockers)
         self.assertIn("licenciamento comercial",blockers)
         self.assertIn("pagamento",blockers)
