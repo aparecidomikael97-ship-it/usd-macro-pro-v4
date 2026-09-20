@@ -193,6 +193,7 @@ def geopolitical_layer(
     out["countries"]=list(engine.get("countries",[]) or [])
     out["commodities"]=list(engine.get("commodities",[]) or [])
     out["events"]=list(engine.get("events",[]) or [])
+    out["research_blockers"]=[str(x) for x in list(engine.get("research_blockers",[]) or []) if str(x).strip()]
     return out
 
 def micro_fundamentals_layer(
