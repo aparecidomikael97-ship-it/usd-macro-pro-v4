@@ -69,6 +69,40 @@ class BacktestPanelTests(unittest.TestCase):
         self.assertEqual(candles_template_csv().count("\n"),1)
         self.assertIn("datetime",candles_template_csv())
 
+    def test_signal_sheet_preserves_optional_point_in_time_context(self):
+        raw=pd.DataFrame({
+            "signal_time":["2026-09-15T00:00:00Z"],
+            "pair":["EUR/USD"],
+            "side":["BUY"],
+            "entry":[1.10],
+            "stop":[1.09],
+            "target":[1.12],
+            "macro_alignment":[1],
+            "technical_confirmation":[True],
+            "liquidity_confirmation":[True],
+            "regime_fit":[True],
+            "regime":["TREND"],
+            "known_high_impact_event":[False],
+            "data_quality_pct":[96],
+            "plan_followed":[True],
+            "event_label":["CPI"],
+            "event_impact":["HIGH"],
+        })
+        out=normalize_signal_sheet(raw)
+        self.assertEqual(out.iloc[0]["macro_alignment"],1)
+        self.assertTrue(out.iloc[0]["technical_confirmation"])
+        self.assertEqual(out.iloc[0]["regime"],"TREND")
+        self.assertEqual(out.iloc[0]["event_label"],"CPI")
+
+    def test_signal_template_exposes_diagnostic_columns(self):
+        template=signal_template_csv()
+        for field in (
+            "macro_alignment","technical_confirmation","liquidity_confirmation",
+            "regime_fit","known_high_impact_event","data_quality_pct","plan_followed",
+            "event_time","event_label","event_impact",
+        ):
+            self.assertIn(field,template)
+
     def test_panel_exposes_automatic_replay(self):
         source=inspect.getsource(render_operational_backtest_panel)
         self.assertIn("Rodar backtest automático",source)
@@ -195,6 +229,15 @@ class BacktestPanelTests(unittest.TestCase):
         self.assertEqual(len(out),1)
         self.assertIn("time",out.columns)
 
+
+    def test_panel_exposes_gain_loss_diagnosis_and_passport(self):
+        source=inspect.getsource(render_operational_backtest_panel)
+        module_source=inspect.getsource(__import__("atlasquant_backtest_panel"))
+        self.assertIn("backtest_intelligence_bundle",module_source)
+        self.assertIn("Por que deu gain ou loss?",module_source)
+        self.assertIn("Passaporte do Operacional",module_source)
+        self.assertIn("atlasquant_last_backtest_intelligence",module_source)
+        self.assertIn("não inventa uma causa",module_source)
 
     def test_backtest_status_is_descriptive_not_trade_authorization(self):
         self.assertEqual(backtest_result_status({"trades":0})["label"],"SEM AMOSTRA")
