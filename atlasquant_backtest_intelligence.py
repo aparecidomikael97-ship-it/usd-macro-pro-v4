@@ -82,9 +82,9 @@ def _macro_alignment(value:Any)->int|None:
     except Exception:
         pass
     raw=_text(value).casefold()
-    if raw in {"aligned","alinhado","favor","supportive","bullish","buy"}:
+    if raw in {"aligned","alinhado","favor","favoravel","favorável","supportive"}:
         return 1
-    if raw in {"conflict","conflito","contra","adverse","bearish","sell"}:
+    if raw in {"conflict","conflito","contra","adverse"}:
         return -1
     if raw in {"neutral","neutro","unknown","incerto"}:
         return 0
