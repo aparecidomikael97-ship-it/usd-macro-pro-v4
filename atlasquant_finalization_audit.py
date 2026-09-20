@@ -13,6 +13,9 @@ from atlasquant_public_launch_readiness import collect_public_launch_readiness
 from atlasquant_native_packaging import native_packaging_audit
 from atlasquant_commercial_prep import commercial_prep_audit
 from atlasquant_fast_startup import DEFAULT_MAX_AGE_MIN
+from atlasquant_voice_readiness import voice_readiness
+from atlasquant_academy_media import academy_media_readiness
+from atlasquant_data_licensing_inventory import data_licensing_status
 
 SCHEMA="ATLASQUANT_FINALIZATION_AUDIT_V1"
 ROOT=Path(__file__).resolve().parent
@@ -44,6 +47,16 @@ def finalization_audit(root:Path|None=None)->dict[str,Any]:
         and not missing_docs
     )
     external_complete=bool(launch.get("external_dependencies_complete"))
+    voice=voice_readiness(provider_configured=False)
+    media=academy_media_readiness()
+    licensing=data_licensing_status()
+    external_evidence={
+        "production_admin_secret_configured":False,
+        "neural_tts_provider_ready":bool(voice.get("neural_tts_ready")),
+        "academy_videos_published":bool(media.get("academy_video_ready")),
+        "commercial_data_licenses_verified":bool(licensing.get("all_commercial_licenses_verified")),
+        "native_store_publication_verified":bool(native.get("native_store_publication_verified")),
+    }
     fast_home_contract={
         "snapshot_max_age_min":float(DEFAULT_MAX_AGE_MIN),
         "snapshot_required_for_fast_path":True,
@@ -58,6 +71,8 @@ def finalization_audit(root:Path|None=None)->dict[str,Any]:
         "missing_handoff_docs":missing_docs,
         "external_dependencies_complete":external_complete,
         "fast_home_contract":fast_home_contract,
+        "external_evidence":external_evidence,
+        "external_evidence_complete":all(external_evidence.values()),
         "public_launch_ready":bool(internal_complete and external_complete),
         "real_orders_enabled":False,
         "broker_execution_enabled":False,
