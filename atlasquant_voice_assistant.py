@@ -80,7 +80,9 @@ def _blockers(row:Mapping[str,Any])->list[str]:
 
 def _supporting(row:Mapping[str,Any])->list[str]:
     values=[]
-    for key in ("up","down","positives"):
+    action=_action(row)
+    keys=("up","positives") if action=="COMPRA" else ("down","positives") if action=="VENDA" else ("positives",)
+    for key in keys:
         raw=row.get(key,[])
         if isinstance(raw,(list,tuple)):
             values.extend(str(x).strip() for x in raw if str(x).strip())
