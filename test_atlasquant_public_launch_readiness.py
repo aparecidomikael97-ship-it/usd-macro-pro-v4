@@ -18,6 +18,7 @@ class AtlasQuantPublicLaunchReadinessTests(unittest.TestCase):
         status=collect_public_launch_readiness()
         self.assertTrue(status["external"])
         self.assertTrue(all(v is False for v in status["external"].values()))
+        self.assertFalse(status["external"]["production_admin_secret_configured"])
         self.assertFalse(status["automatic_launch"])
         self.assertFalse(status["broker_execution_enabled"])
         self.assertFalse(status["real_orders_enabled"])
