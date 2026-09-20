@@ -19,6 +19,8 @@ from typing import Any, Mapping, Sequence
 
 import streamlit as st
 
+from atlasquant_voice_profile import VOICE_PROFILE_ID, voice_profile
+
 SCHEMA="ATLASQUANT_VOICE_ASSISTANT_V1"
 
 QUESTION_CATEGORIES=(
@@ -309,16 +311,47 @@ def browser_speech_html(text:object, *, button_label:str="🔊 Ouvir", key:str="
     safe_text=_json_for_script(str(text or ""))
     safe_key=re.sub(r"[^a-zA-Z0-9_-]","_",str(key or "voice"))
     label=escape(str(button_label or "🔊 Ouvir"))
+    profile=_json_for_script(voice_profile())
     return f"""
     <div style="font-family:system-ui;margin:0;padding:0">
       <button id="speak_{safe_key}" style="width:100%;min-height:42px;border-radius:10px;border:1px solid rgba(120,150,190,.35);background:#10243d;color:#edf4ff;font-weight:700;cursor:pointer">{label}</button>
-      <div id="status_{safe_key}" style="font-size:12px;color:#8fa5bf;margin-top:5px">Reprodução somente após seu toque.</div>
+      <div id="status_{safe_key}" style="font-size:12px;color:#8fa5bf;margin-top:5px">Voz AtlasQuant · masculina/grave · reprodução após seu toque.</div>
     </div>
     <script>
     (() => {{
       const btn=document.getElementById("speak_{safe_key}");
       const status=document.getElementById("status_{safe_key}");
       const text={safe_text};
+      const profile={profile};
+      const norm=(s)=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+      const scoreVoice=(voice)=>{{
+        const lang=(voice.lang||"").toLowerCase();
+        const name=norm(voice.name);
+        let score=0;
+        if(lang==="pt-br") score+=500;
+        else if(lang.startsWith("pt")) score+=220;
+        else score-=1000;
+        (profile.quality_terms||[]).forEach((term,idx)=>{{if(name.includes(norm(term))) score+=120-(idx*8);}});
+        (profile.preferred_terms||[]).forEach((term,idx)=>{{if(name.includes(norm(term))) score+=180-(idx*6);}});
+        (profile.fallback_terms||[]).forEach((term,idx)=>{{if(name.includes(norm(term))) score+=70-(idx*4);}});
+        if(voice.default) score+=5;
+        return score;
+      }};
+      const chooseVoice=()=>{{
+        const voices=window.speechSynthesis.getVoices()||[];
+        const compatible=voices.filter(v=>((v.lang||"").toLowerCase().startsWith("pt")));
+        const pool=compatible.length?compatible:voices;
+        return pool.slice().sort((a,b)=>scoreVoice(b)-scoreVoice(a))[0]||null;
+      }};
+      const configure=(u)=>{{
+        u.lang=profile.language;
+        u.rate=Number(profile.rate||0.93);
+        u.pitch=Number(profile.pitch||0.88);
+        u.volume=Number(profile.volume||1.0);
+        const voice=chooseVoice();
+        if(voice) u.voice=voice;
+        return voice;
+      }};
       btn.addEventListener("click",()=>{{
         if(!("speechSynthesis" in window)){{
           status.textContent="Voz indisponível neste navegador. Use o texto exibido.";
@@ -326,8 +359,10 @@ def browser_speech_html(text:object, *, button_label:str="🔊 Ouvir", key:str="
         }}
         window.speechSynthesis.cancel();
         const u=new SpeechSynthesisUtterance(text);
-        u.lang="pt-BR"; u.rate=.96; u.pitch=1.0;
-        u.onstart=()=>status.textContent="Reproduzindo…";
+        const selected=configure(u);
+        u.onstart=()=>status.textContent=selected
+          ? "Reproduzindo · "+selected.name+" · voz AtlasQuant grave."
+          : "Reproduzindo · voz AtlasQuant grave.";
         u.onend=()=>status.textContent="Concluído.";
         u.onerror=()=>status.textContent="Falha na reprodução neste dispositivo.";
         window.speechSynthesis.speak(u);
@@ -343,6 +378,7 @@ def browser_mic_assistant_html(context:Mapping[str,Any], *, key:str)->str:
     answers={cat:_answer_for_category(cat,c,beginner=False) for cat in QUESTION_CATEGORIES}
     safe_answers=_json_for_script(answers)
     safe_key=re.sub(r"[^a-zA-Z0-9_-]","_",str(key or "assistant"))
+    profile=_json_for_script(voice_profile())
     return f"""
     <div style="font-family:system-ui;border:1px solid rgba(137,170,210,.22);border-radius:12px;padding:10px;background:#0b1d31;color:#e7f0fb">
       <div style="font-weight:800;margin-bottom:7px">🎤 Conversa por voz no navegador</div>
@@ -356,6 +392,7 @@ def browser_mic_assistant_html(context:Mapping[str,Any], *, key:str)->str:
     <script>
     (() => {{
       const answers={safe_answers};
+      const profile={profile};
       const heard=document.getElementById("heard_{safe_key}");
       const reply=document.getElementById("reply_{safe_key}");
       const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -375,10 +412,36 @@ def browser_mic_assistant_html(context:Mapping[str,Any], *, key:str)->str:
         if(has(["porque","por que","motivo","subir","descer","alta","baixa","compra","venda","vies"]))return "why";
         return "overview";
       }};
+      const voiceNorm=(s)=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+      const voiceScore=(voice)=>{{
+        const lang=(voice.lang||"").toLowerCase();
+        const name=voiceNorm(voice.name);
+        let score=0;
+        if(lang==="pt-br") score+=500;
+        else if(lang.startsWith("pt")) score+=220;
+        else score-=1000;
+        (profile.quality_terms||[]).forEach((term,idx)=>{{if(name.includes(voiceNorm(term))) score+=120-(idx*8);}});
+        (profile.preferred_terms||[]).forEach((term,idx)=>{{if(name.includes(voiceNorm(term))) score+=180-(idx*6);}});
+        (profile.fallback_terms||[]).forEach((term,idx)=>{{if(name.includes(voiceNorm(term))) score+=70-(idx*4);}});
+        if(voice.default) score+=5;
+        return score;
+      }};
+      const chooseVoice=()=>{{
+        const voices=window.speechSynthesis.getVoices()||[];
+        const compatible=voices.filter(v=>((v.lang||"").toLowerCase().startsWith("pt")));
+        const pool=compatible.length?compatible:voices;
+        return pool.slice().sort((a,b)=>voiceScore(b)-voiceScore(a))[0]||null;
+      }};
       const speak=(text)=>{{
         if(!("speechSynthesis" in window))return;
         window.speechSynthesis.cancel();
-        const u=new SpeechSynthesisUtterance(text);u.lang="pt-BR";u.rate=.96;
+        const u=new SpeechSynthesisUtterance(text);
+        u.lang=profile.language;
+        u.rate=Number(profile.rate||0.93);
+        u.pitch=Number(profile.pitch||0.88);
+        u.volume=Number(profile.volume||1.0);
+        const voice=chooseVoice();
+        if(voice)u.voice=voice;
         window.speechSynthesis.speak(u);
       }};
       document.getElementById("mic_{safe_key}").onclick=()=>{{
@@ -421,6 +484,7 @@ def render_contextual_voice_assistant(
     pair_key=re.sub(r"[^a-zA-Z0-9_-]","_",c["pair"])
 
     st.markdown("### 🎙️ Assistente de Voz")
+    st.caption("Voz padrão AtlasQuant: masculina, mais grave e com preferência por mecanismo natural/neural em português do Brasil.")
     if advanced:
         st.caption("Modo Avançado: explicação detalhada + perguntas contextuais. A resposta usa somente o estado já calculado pelo AtlasQuant.")
     else:
@@ -486,6 +550,7 @@ def render_contextual_voice_assistant(
         "script":script,
         "last_answer":answer,
         "last_category":category,
+        "voice_profile_id":VOICE_PROFILE_ID,
         "real_orders_enabled":False,
         "automatic_execution":False,
         "changes_model_state":False,
