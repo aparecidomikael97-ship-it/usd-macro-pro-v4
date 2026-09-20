@@ -9,6 +9,7 @@ import streamlit as st
 
 from atlasquant_macro_briefing import build_macro_briefing
 from atlasquant_macro_briefing_voice import VoiceRequest
+from atlasquant_voice_assistant import browser_speech_html
 
 
 
@@ -65,8 +66,18 @@ def render_macro_briefing_panel(currency_rows: Sequence[Mapping[str, Any]] | Non
     st.caption("A camada de voz deve ler exatamente este texto; ela não pode gerar sinal ou alterar o diagnóstico.")
     st.markdown("#### 🎧 Voz")
     st.caption(
-        "Narração preparada para TTS neural. O áudio é opcional e deve consumir somente "
-        "o speech_text acima; nenhum provedor de voz é chamado automaticamente ao abrir a tela."
+        "A leitura pode ser reproduzida agora pela voz do navegador/dispositivo. "
+        "TTS neural continua opcional para áudio externo/baixável; nenhum provedor é chamado automaticamente."
+    )
+    st.iframe(
+        browser_speech_html(
+            brief["speech_text"],
+            button_label="🔊 Ouvir briefing agora",
+            key=f"macro_brief_{horizon}",
+        ),
+        height=72,
+        width="stretch",
+        tab_index=0,
     )
     voice_style = st.selectbox(
         "Estilo da voz",

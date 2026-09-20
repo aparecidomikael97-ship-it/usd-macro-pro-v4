@@ -37,6 +37,18 @@ def _pack(
         "next_action":"Esperar gatilho válido no M15.",
         "blockers":["M15 ainda aguarda gatilho"],
         "target":"BSL",
+        "w1":"🟢 altista",
+        "d1":"🟢 altista",
+        "pd_zone":"DISCOUNT",
+        "sweep_type":"SSL",
+        "sweep_level":"PDL",
+        "ict_read":74,
+        "inst_read":81,
+        "up":["H4 confirma compra"],
+        "down":["evento contrário"],
+        "positives":["estrutura coerente"],
+        "hard_blocks":[],
+        "soft_blocks":["M15 ainda aguarda gatilho"],
     }
 
 
@@ -94,3 +106,16 @@ class AtlasQuantHomeRadarTests(unittest.TestCase):
 
 if __name__=="__main__":
     unittest.main()
+
+
+class AtlasQuantHomeVoiceContextTests(unittest.TestCase):
+    def test_home_row_preserves_advanced_voice_context(self):
+        row=home_rows_from_packs([_pack()])[0]
+        self.assertEqual(row["w1"],"🟢 altista")
+        self.assertEqual(row["d1"],"🟢 altista")
+        self.assertEqual(row["pd_zone"],"DISCOUNT")
+        self.assertEqual(row["sweep_type"],"SSL")
+        self.assertEqual(row["ict_read"],74)
+        self.assertEqual(row["inst_read"],81)
+        self.assertIn("H4 confirma compra",row["up"])
+        self.assertIn("M15 ainda aguarda gatilho",row["soft_blocks"])
