@@ -98,7 +98,12 @@ def capture_research_evidence(
     captured_at:object|None=None,
     persist:bool=True,
 )->dict[str,Any]:
-    current,_=ensure_research_evidence_hydrated()
+    if persist:
+        current,_=ensure_research_evidence_hydrated()
+    else:
+        # Backtest/session capture must stay fast and side-effect free: no remote
+        # read is triggered merely to remember the evidence in this session.
+        current=list(st.session_state.get(SESSION_KEY,[]) or [])
     timestamp=str(
         captured_at
         or datetime.now(timezone.utc).isoformat()
