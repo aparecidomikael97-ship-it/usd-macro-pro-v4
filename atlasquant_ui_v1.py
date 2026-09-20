@@ -319,7 +319,9 @@ def render_experience_mode_switch() -> str:
     )
     mode=normalize_experience_mode(mode)
     st.session_state["atlasquant_view_mode"]="Básico" if mode=="Iniciante" else "Pro"
-    st.markdown(navigation_mode_css(mode),unsafe_allow_html=True)
+    # Primary navigation no longer relies on hiding mounted tab buttons.
+    # Avoid injecting mode-dependent tab CSS on every rerun; this keeps the
+    # mobile DOM stable while nested tabs elsewhere retain the global theme.
     if mode=="Iniciante":
         st.caption("Modo Iniciante · Radar, Macro Briefing, Aprender, Conta, Instalar e Suporte.")
     else:
