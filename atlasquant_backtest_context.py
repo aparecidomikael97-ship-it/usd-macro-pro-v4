@@ -47,6 +47,20 @@ _CONTEXT_ALIASES={
 def _norm(value:Any)->str:
     return str(value or "").strip().lower()
 
+
+def _has_value(value:Any)->bool:
+    if value is None:
+        return False
+    if isinstance(value,str):
+        return bool(value.strip())
+    try:
+        missing=pd.isna(value)
+        if isinstance(missing,bool) and missing:
+            return False
+    except Exception:
+        pass
+    return True
+
 def _rename_aliases(frame:pd.DataFrame)->pd.DataFrame:
     out=frame.copy()
     by_norm={_norm(c):c for c in out.columns}
@@ -127,11 +141,11 @@ def enrich_signals_point_in_time(
             continue
         snap=candidates.iloc[-1]
         matched+=1
-        if row.get("decision_captured_at") in (None,""):
+        if not _has_value(row.get("decision_captured_at")):
             row["decision_captured_at"]=pd.Timestamp(snap["captured_at"]).isoformat()
         for field in CONTEXT_FIELDS:
             # Explicit signal metadata wins over joined context.
-            if field in row and row.get(field) not in (None,""):
+            if field in row and _has_value(row.get(field)):
                 continue
             value=snap.get(field)
             if pd.isna(value):
