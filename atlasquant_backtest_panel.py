@@ -60,6 +60,11 @@ from atlasquant_backtest_snapshot_history import (
 )
 from atlasquant_tradingview_parity import validate_tradingview_parity
 from atlasquant_backtest_intelligence import backtest_intelligence_bundle
+from atlasquant_backtest_context import (
+    context_template_csv,
+    enrich_signals_point_in_time,
+    normalize_context_snapshots,
+)
 
 
 CANDLE_ALIASES = {
@@ -430,6 +435,50 @@ def render_operational_backtest_panel() -> dict[str, Any]:
             key="atlasquant_bt_signals_template",
         )
 
+    with st.expander("🕰️ Contexto histórico point-in-time (opcional)",expanded=False):
+        st.caption(
+            "Envie snapshots históricos de macro, notícia, regime, liquidez e qualidade. "
+            "Para cada sinal, o AtlasQuant usa somente o último snapshot capturado ATÉ o horário do sinal. "
+            "Snapshot futuro nunca é usado para explicar um trade passado."
+        )
+        context_file=st.file_uploader(
+            "3) Contexto histórico (CSV)",
+            type=["csv"],
+            key="atlasquant_bt_context_csv",
+        )
+        st.download_button(
+            "⬇️ Modelo CSV de contexto histórico",
+            data=context_template_csv(),
+            file_name="atlasquant_contexto_historico_template.csv",
+            mime="text/csv",
+            key="atlasquant_bt_context_template",
+        )
+        context_snapshots=pd.DataFrame()
+        if context_file is not None:
+            try:
+                context_raw=read_csv_bytes(context_file.getvalue())
+                context_snapshots=normalize_context_snapshots(context_raw)
+            except Exception as exc:
+                st.error(f"Contexto histórico inválido: {type(exc).__name__}: {exc}")
+                context_snapshots=pd.DataFrame()
+            if context_snapshots.empty:
+                st.warning("O CSV de contexto não possui captured_at + pair válidos.")
+            else:
+                st.success(
+                    f"{len(context_snapshots)} snapshot(s) point-in-time prontos para enriquecer os sinais."
+                )
+    if "context_snapshots" not in locals():
+        context_snapshots=pd.DataFrame()
+
+    def _enrich_with_historical_context(signals):
+        pack=enrich_signals_point_in_time(signals,context_snapshots)
+        if not context_snapshots.empty:
+            st.caption(
+                f"Contexto point-in-time: {int(pack['matched'])} sinal(is) enriquecido(s), "
+                f"{int(pack['unmatched'])} sem snapshot anterior disponível."
+            )
+        return list(pack.get("signals",[]) or [])
+
     pine_asset = load_tradingview_pine_asset()
     st.markdown("#### Pine Script — BOS/CHOCH + Order Block")
     st.caption(
@@ -581,6 +630,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                     allow_buy="BUY" in auto_sides,
                     allow_sell="SELL" in auto_sides,
                 )
+                auto_signals=_enrich_with_historical_context(auto_signals)
                 st.caption(
                     f"Replay encontrou {len(auto_signals)} setup(s) objetivo(s) em "
                     f"{len(auto_candles)} candle(s)."
@@ -665,6 +715,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                     allow_buy="BUY" in fvg_sides,
                     allow_sell="SELL" in fvg_sides,
                 )
+                fvg_signals=_enrich_with_historical_context(fvg_signals)
                 st.caption(
                     f"Replay FVG encontrou {len(fvg_signals)} setup(s) em "
                     f"{len(fvg_candles)} candle(s)."
@@ -749,6 +800,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                     allow_buy="BUY" in ote_sides,
                     allow_sell="SELL" in ote_sides,
                 )
+                ote_signals=_enrich_with_historical_context(ote_signals)
                 st.caption(
                     f"Replay OTE encontrou {len(ote_signals)} setup(s) em "
                     f"{len(ote_candles)} candle(s)."
@@ -820,6 +872,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                     allow_buy="BUY" in crt_sides,
                     allow_sell="SELL" in crt_sides,
                 )
+                crt_signals=_enrich_with_historical_context(crt_signals)
                 st.caption(
                     f"Replay CRT encontrou {len(crt_signals)} setup(s) em "
                     f"{len(crt_candles)} candle(s)."
@@ -905,6 +958,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                     allow_buy="BUY" in amd_sides,
                     allow_sell="SELL" in amd_sides,
                 )
+                amd_signals=_enrich_with_historical_context(amd_signals)
                 st.caption(
                     f"Replay AMD encontrou {len(amd_signals)} setup(s) em "
                     f"{len(amd_candles)} candle(s)."
@@ -1044,6 +1098,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                     max_hold_bars=int(max_hold),
                     cost_r=float(cost_r),
                     slippage_r=float(slippage_r),
+                    context_snapshots=context_snapshots,
                 )
                 comparison=comparison_frame(
                     suite,
@@ -1594,6 +1649,14 @@ def render_operational_backtest_panel() -> dict[str, Any]:
 
     candles = normalize_tradingview_candles(raw_candles)
     signals = normalize_signal_sheet(raw_signals, default_pair=default_pair)
+    if not signals.empty:
+        enriched_manual=enrich_signals_point_in_time(_records(signals),context_snapshots)
+        signals=pd.DataFrame(enriched_manual.get("signals",[]) or [])
+        if not context_snapshots.empty:
+            st.caption(
+                f"Planilha manual enriquecida com contexto: {int(enriched_manual['matched'])} sinal(is); "
+                f"{int(enriched_manual['unmatched'])} sem snapshot anterior."
+            )
     if candles.empty:
         st.error("CSV de candles sem datetime/open/high/low/close válidos.")
         return {"status": "INVALID_CANDLES"}
