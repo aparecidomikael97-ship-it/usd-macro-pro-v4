@@ -216,7 +216,15 @@ def render_beginner_shell(
 
     if page=="🎯 Radar":
         from atlasquant_home_radar import render_home_radar
-        render_home_radar(list(snapshot.get("packs",[]) or []),experience_mode="Iniciante")
+        _inputs=dict(snapshot.get("inputs",{}) or {})
+        _macro=dict(_inputs.get("macro_context",{}) or {})
+        _fast=dict(_inputs.get("fast_boot",{}) or {})
+        _macro["fed"]=dict(_fast.get("fed",{}) or {})
+        render_home_radar(
+            list(snapshot.get("packs",[]) or []),
+            experience_mode="Iniciante",
+            macro_context=_macro,
+        )
     elif page=="🎙️ Macro":
         from atlasquant_macro_briefing_panel import render_macro_briefing_panel
         fast=dict(dict(snapshot.get("inputs",{}) or {}).get("fast_boot",{}) or {})
