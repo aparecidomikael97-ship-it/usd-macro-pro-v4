@@ -78,6 +78,21 @@ class AtlasQuantVoiceAssistantTests(unittest.TestCase):
         self.assertIn("M15 ainda sem gatilho",text)
         self.assertIn("não executa ordens",text)
 
+    def test_macro_question_uses_structured_macro_metadata_when_present(self):
+        r=row()
+        r.update({
+            "macro_research_direction":"VENDA",
+            "macro_research_balance":-42,
+            "macro_research_quality":88,
+            "macro_research_coverage":64,
+            "macro_research_mode":"structured",
+        })
+        ctx=assistant_context(r,macro_context=macro())
+        out=answer_question("Como está o macro?",ctx,mode="Avançado")
+        self.assertIn("motor macro estruturado está VENDA",out["answer"])
+        self.assertIn("cobertura 64%",out["answer"])
+        self.assertIn("qualidade 88/100",out["answer"])
+
     def test_question_classifier_handles_requested_use_cases(self):
         cases={
             "Por que esse viés está de venda?":"why",
