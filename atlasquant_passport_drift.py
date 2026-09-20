@@ -7,6 +7,7 @@ weight, Gate or execution setting is changed automatically.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from math import isfinite
 from typing import Any, Iterable, Mapping
 
@@ -28,6 +29,20 @@ def _finite(value:Any)->float|None:
         return out if isfinite(out) else None
     except Exception:
         return None
+
+
+def _time_key(value:Any)->tuple[int,float,str]:
+    raw=str(value or "").strip()
+    if not raw:
+        return (0,0.0,"")
+    try:
+        normalized=raw[:-1]+"+00:00" if raw.endswith("Z") else raw
+        dt=datetime.fromisoformat(normalized)
+        if dt.tzinfo is None:
+            dt=dt.replace(tzinfo=timezone.utc)
+        return (1,dt.astimezone(timezone.utc).timestamp(),raw)
+    except Exception:
+        return (0,0.0,raw)
 
 
 def passport_metric_snapshot(record:Mapping[str,Any]|None)->dict[str,Any]:
@@ -162,7 +177,7 @@ def latest_passport_drift(
     for strategy,rows in groups.items():
         ordered=sorted(
             rows,
-            key=lambda x:(str(x.get("captured_at") or ""),str(x.get("record_id") or "")),
+            key=lambda x:(_time_key(x.get("captured_at")),str(x.get("record_id") or "")),
         )
         if len(ordered)<2:
             continue
