@@ -230,6 +230,19 @@ class BacktestPanelTests(unittest.TestCase):
         self.assertIn("time",out.columns)
 
 
+    def test_panel_exposes_point_in_time_historical_context(self):
+        module_source=inspect.getsource(__import__("atlasquant_backtest_panel"))
+        self.assertIn("Contexto histórico point-in-time",module_source)
+        self.assertIn("context_template_csv",module_source)
+        self.assertIn("enrich_signals_point_in_time",module_source)
+        self.assertIn("Snapshot futuro nunca é usado",module_source)
+
+    def test_comparator_builds_passports_for_all_five_operational_models(self):
+        source=inspect.getsource(render_operational_backtest_panel)
+        self.assertIn("Passaportes dos 5 operacionais",source)
+        self.assertIn("atlasquant_last_strategy_suite_intelligence",source)
+        self.assertIn("automatic_promotion",source)
+
     def test_panel_exposes_gain_loss_diagnosis_and_passport(self):
         source=inspect.getsource(render_operational_backtest_panel)
         module_source=inspect.getsource(__import__("atlasquant_backtest_panel"))
