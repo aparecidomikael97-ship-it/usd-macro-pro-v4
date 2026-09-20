@@ -52,6 +52,10 @@ def finalization_audit(root:Path|None=None)->dict[str,Any]:
         "public_launch_ready":bool(internal_complete and external_complete),
         "real_orders_enabled":False,
         "broker_execution_enabled":False,
+        "automatic_strategy_changes_enabled":False,
+        "automatic_weight_changes_enabled":False,
+        "small_sample_auto_promotion_enabled":False,
+        "human_strategy_review_required":True,
         "automatic_public_launch":False,
         "manual_external_completion_required":True,
     }
