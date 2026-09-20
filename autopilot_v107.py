@@ -53,6 +53,7 @@ from atlasquant_shadow_capture import build_shadow_batch
 from atlasquant_shadow_store import persist_shadow_samples
 from atlasquant_flight_recorder_panel import record_from_pack
 from atlasquant_flight_recorder_store import persist_records
+from atlasquant_setup_candidates import build_setup_candidates
 
 from market_map_core_v10 import (
     NY_TZ,
@@ -697,6 +698,12 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
             _ict["readiness"] = 0.0
             _ict["label"] = "⚪ MACRO AGUARDAR"
             _ict["side"] = side
+        _ict["setup_candidates"] = build_setup_candidates(
+            pair=pair,
+            side=side,
+            ict_snapshot=_ict,
+            captured_at=now.isoformat(),
+        )
         tec["ict"] = _ict
 
         tec["disponivel"] = bool(tec.get("h4") and tec.get("h1") and tec.get("m15"))

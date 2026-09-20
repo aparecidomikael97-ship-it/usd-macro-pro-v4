@@ -88,6 +88,16 @@ class AutopilotV107Tests(unittest.TestCase):
         self.assertIn('"automatic_gate_change":False', text)
         self.assertIn('"automatic_promotion":False', text)
 
+    def test_autopilot_freezes_model_specific_setup_candidates_without_execution(self):
+        from pathlib import Path
+        text = Path("autopilot_v107.py").read_text(encoding="utf-8")
+        self.assertIn("build_setup_candidates",text)
+        self.assertIn('setup_candidates',text)
+        candidate_source=Path("atlasquant_setup_candidates.py").read_text(encoding="utf-8")
+        self.assertIn('"automatic_paper_entry":False',candidate_source)
+        self.assertIn('"real_orders_enabled":False',candidate_source)
+        self.assertIn('"setup_inference_from_outcome":False',candidate_source)
+
     def test_autopilot_persists_shadow_and_flight_evidence(self):
         from pathlib import Path
         text = Path("autopilot_v107.py").read_text(encoding="utf-8")
