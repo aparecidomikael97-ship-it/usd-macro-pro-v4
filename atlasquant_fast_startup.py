@@ -11,6 +11,7 @@ full app. This module never sends orders, changes gates, weights or providers.
 from __future__ import annotations
 
 import base64
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 import json
 import math
@@ -24,6 +25,12 @@ import streamlit as st
 SCHEMA="ATLASQUANT_HOME_SNAPSHOT_V1"
 HOME_SNAPSHOT_PATH="dados/atlasquant_home_snapshot_v1.json"
 DEFAULT_MAX_AGE_MIN=90.0
+LEGACY_RUNTIME_PATHS={
+    "inputs":"dados/autopilot_inputs_v107.json",
+    "scanner":"dados/scanner_tecnico_v934.json",
+    "master":"dados/master_market_map_v102.json",
+    "news":"dados/currency_news_current_v107.json",
+}
 
 
 def _finite(value:Any, default:float=0.0)->float:
@@ -65,7 +72,10 @@ def validate_home_snapshot(
     if not isinstance(inputs,Mapping):
         errors.append("inputs")
     fast=dict((inputs or {}).get("fast_boot",{}) or {}) if isinstance(inputs,Mapping) else {}
-    for key in ("ranking","fed","macro_eua","dados_moedas","usd_detalhado"):
+    macro=dict((inputs or {}).get("macro_context",{}) or {}) if isinstance(inputs,Mapping) else {}
+    if not macro:
+        errors.append("macro_context")
+    for key in ("ranking","fed","usd_detalhado"):
         if not fast.get(key):
             errors.append("fast_boot."+key)
     age=snapshot_age_minutes(s,now=now)
@@ -88,22 +98,112 @@ def validate_home_snapshot(
     }
 
 
-@st.cache_data(ttl=45,show_spinner=False)
-def load_home_snapshot(
-    repo:str,
-    branch:str="atlasquant-runtime",
-    token:str="",
-    timeout:float=4.0,
+def legacy_ranking_rows(inputs:Mapping[str,Any]|None)->list[dict[str,Any]]:
+    """Recover G8 relative-strength rows from the persisted 7-pair matrix."""
+    src=dict(inputs or {}) if isinstance(inputs,Mapping) else {}
+    macro=dict(src.get("macro_context",{}) or {})
+    usd=max(0.0,min(100.0,_finite(macro.get("usd_score"),50.0)))
+    scores={"USD":usd}
+    for raw in list(src.get("pairs",[]) or []):
+        row=dict(raw or {}) if isinstance(raw,Mapping) else {}
+        pair=str(row.get("Par") or "").strip().upper()
+        if "/" not in pair:
+            continue
+        base,quote=pair.split("/",1)
+        diff=_finite(row.get("Dif. macro"),0.0)
+        if quote=="USD" and base:
+            scores[base]=max(0.0,min(100.0,usd+diff))
+        elif base=="USD" and quote:
+            scores[quote]=max(0.0,min(100.0,usd-diff))
+    return [
+        {
+            "Código":code,
+            "Moeda":code,
+            "Pontuação_Macro":round(score,4),
+            "Influência_Fed":0.0,
+            "Pontuação_Final":round(score,4),
+        }
+        for code,score in sorted(scores.items(),key=lambda x:x[1],reverse=True)
+    ]
+
+
+def build_legacy_home_snapshot(
+    inputs:Mapping[str,Any]|None,
+    scanner:Mapping[str,Any]|None,
+    master:Mapping[str,Any]|None,
+    news:Mapping[str,Any]|None,
 )->dict[str,Any]:
-    """Read one compact runtime artifact. Public raw URL first; API fallback for private repos."""
+    """Build the fast Home from runtime artifacts that already exist today."""
+    src=dict(inputs or {}) if isinstance(inputs,Mapping) else {}
+    matrix=pd.DataFrame(list(src.get("pairs",[]) or []))
+    ranking_rows=legacy_ranking_rows(src)
+    ranking=pd.DataFrame(ranking_rows)
+    macro=dict(src.get("macro_context",{}) or {})
+    fed={
+        "tom":str(macro.get("fed_tone") or "Neutro"),
+        "forca":_finite(macro.get("fed_strength"),0.0),
+    }
+    packs=[]
+    if not matrix.empty:
+        try:
+            from pair_intelligence_v110 import build_pair_intelligence_packs
+            packs=build_pair_intelligence_packs(
+                matrix,
+                ranking,
+                scanner_state=dict(scanner or {}),
+                map_state=dict(master or {}),
+                news_state=dict(news or {}),
+                fed_tone=fed["tom"],
+                weights=None,
+            )
+        except Exception:
+            packs=[]
+
+    enriched=dict(src)
+    fast=dict(enriched.get("fast_boot",{}) or {})
+    fast.setdefault("ranking",ranking_rows)
+    fast.setdefault("fed",fed)
+    fast.setdefault("usd_detalhado",{"score":_finite(macro.get("usd_score"),50.0)})
+    fast["source"]="legacy-runtime-cache"
+    enriched["fast_boot"]=fast
+    return {
+        "schema":SCHEMA,
+        "generated_at":str(src.get("generated_at") or ""),
+        "runtime_generated_at":str(src.get("generated_at") or ""),
+        "engine_version":str(src.get("app_version") or "AtlasQuant Runtime"),
+        "inputs":enriched,
+        "packs":packs,
+        "runtime":{
+            "market_open":None,
+            "scanner_pairs":len(dict(dict(scanner or {}).get("resultados",{}) or {})),
+            "market_map_pairs":len(dict(dict(master or {}).get("contexts",{}) or {})),
+            "news_available":bool(news),
+            "fallback_source":"legacy-runtime-cache",
+        },
+        "safety":{
+            "real_orders":False,
+            "automatic_execution":False,
+            "automatic_gate_change":False,
+            "automatic_weight_change":False,
+            "automatic_promotion":False,
+        },
+    }
+
+
+def _runtime_json(
+    repo:str,
+    branch:str,
+    token:str,
+    path:str,
+    timeout:float,
+)->dict[str,Any]:
     repo=str(repo or "").strip()
     branch=str(branch or "atlasquant-runtime").strip()
     token=str(token or "").strip()
-    if not repo or "/" not in repo:
+    path=str(path or "").lstrip("/")
+    if not repo or "/" not in repo or not path:
         return {}
-    timeout=max(1.0,min(float(timeout),8.0))
-
-    raw_url=f"https://raw.githubusercontent.com/{repo}/{quote(branch,safe='')}/{HOME_SNAPSHOT_PATH}"
+    raw_url=f"https://raw.githubusercontent.com/{repo}/{quote(branch,safe='')}/{path}"
     try:
         r=requests.get(raw_url,timeout=timeout,headers={"User-Agent":"AtlasQuant-FastBoot/1"})
         if r.ok:
@@ -111,11 +211,10 @@ def load_home_snapshot(
             return dict(obj) if isinstance(obj,Mapping) else {}
     except Exception:
         pass
-
     if not token:
         return {}
     try:
-        api=f"https://api.github.com/repos/{repo}/contents/{HOME_SNAPSHOT_PATH}"
+        api=f"https://api.github.com/repos/{repo}/contents/{path}"
         headers={
             "Authorization":f"Bearer {token}",
             "Accept":"application/vnd.github+json",
@@ -132,6 +231,42 @@ def load_home_snapshot(
         return dict(obj) if isinstance(obj,Mapping) else {}
     except Exception:
         return {}
+
+
+@st.cache_data(ttl=45,show_spinner=False)
+def load_home_snapshot(
+    repo:str,
+    branch:str="atlasquant-runtime",
+    token:str="",
+    timeout:float=2.5,
+)->dict[str,Any]:
+    """One compact read when available; parallel legacy-cache fallback otherwise."""
+    repo=str(repo or "").strip()
+    branch=str(branch or "atlasquant-runtime").strip()
+    token=str(token or "").strip()
+    timeout=max(0.75,min(float(timeout),4.0))
+    compact=_runtime_json(repo,branch,token,HOME_SNAPSHOT_PATH,timeout)
+    if validate_home_snapshot(compact).get("valid"):
+        return compact
+
+    def get_item(item):
+        key,path=item
+        return key,_runtime_json(repo,branch,token,path,timeout)
+
+    data={}
+    try:
+        with ThreadPoolExecutor(max_workers=len(LEGACY_RUNTIME_PATHS)) as pool:
+            for key,obj in pool.map(get_item,LEGACY_RUNTIME_PATHS.items()):
+                data[key]=obj
+    except Exception:
+        return compact
+    legacy=build_legacy_home_snapshot(
+        data.get("inputs",{}),
+        data.get("scanner",{}),
+        data.get("master",{}),
+        data.get("news",{}),
+    )
+    return legacy if validate_home_snapshot(legacy).get("valid") else compact
 
 
 def _brief_rows(snapshot:Mapping[str,Any])->list[dict[str,Any]]:
@@ -254,6 +389,7 @@ def render_beginner_shell(
 
 
 __all__=[
-    "SCHEMA","HOME_SNAPSHOT_PATH","DEFAULT_MAX_AGE_MIN","snapshot_age_minutes",
+    "SCHEMA","HOME_SNAPSHOT_PATH","DEFAULT_MAX_AGE_MIN","LEGACY_RUNTIME_PATHS",
+    "snapshot_age_minutes","legacy_ranking_rows","build_legacy_home_snapshot",
     "validate_home_snapshot","load_home_snapshot","render_beginner_shell",
 ]
