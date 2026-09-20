@@ -104,6 +104,41 @@ class PaperTradingV112SafetyTests(unittest.TestCase):
         self.assertEqual(pd.Timestamp(out["entry_time"]),times[9])
         self.assertAlmostEqual(float(out["entry_price"]),1.10)
 
+    def test_setup_attribution_is_only_explicit_and_preserves_point_in_time_context(self):
+        scanner={"m15_fetched_at":self.now.isoformat(),"tecnico":self.tec}
+        input_row={**self.input,"setup_id":"FVG"}
+        market={
+            **self.map,
+            "d1":{"structure":{"regime":"TENDÊNCIA"}},
+            "w1":{"structure":{"regime":"EXPANSÃO"}},
+            "killzone":{"active":{"name":"London Killzone"}},
+        }
+        with patch("paper_trading_v112.evaluate_decision_integrity",return_value={"executable":True,"hard_blocks":[],"soft_blocks":[]}):
+            chk=p.evaluate_pair_checklist("EUR/USD",input_row,scanner,market,now=self.now)
+        self.assertEqual(chk["setup_id"],"fvg")
+        self.assertEqual(chk["setup_attribution"],"EXPLICIT_INPUT")
+        self.assertEqual(chk["d1_regime"],"TENDÊNCIA")
+        self.assertEqual(chk["w1_regime"],"EXPANSÃO")
+        self.assertEqual(chk["active_session"],"London Killzone")
+        self.assertEqual(chk["data_quality_pct"],100.0)
+
+        frame=pd.DataFrame(self._bars(start="2026-09-18T08:00:00Z",n=12))
+        frame["datetime"]=pd.to_datetime(frame["datetime"],utc=True)
+        row=p._make_wait_entry(chk,frame,now=self.now)
+        self.assertEqual(row["setup_id"],"fvg")
+        self.assertEqual(row["setup_attribution"],"EXPLICIT_INPUT")
+        self.assertEqual(row["active_session"],"London Killzone")
+
+    def test_missing_setup_never_gets_inferred_from_ict_state(self):
+        scanner={"m15_fetched_at":self.now.isoformat(),"tecnico":{
+            **self.tec,
+            "ict":{"readiness":100,"fvg":{"status":"FVG ATIVO","score":100}},
+        }}
+        with patch("paper_trading_v112.evaluate_decision_integrity",return_value={"executable":True,"hard_blocks":[],"soft_blocks":[]}):
+            chk=p.evaluate_pair_checklist("EUR/USD",self.input,scanner,self.map,now=self.now)
+        self.assertEqual(chk["setup_id"],"")
+        self.assertEqual(chk["setup_attribution"],"UNATTRIBUTED")
+
     def test_same_bar_stop_and_target_is_conservative_loss(self):
         frame=pd.DataFrame([{"datetime":"2026-09-18T10:00:00Z","open":1.0,"high":1.3,"low":0.7,"close":1.0}])
         row=pd.Series({"status":"OPEN","entry_time":"2026-09-18T10:00:00Z","entry_price":1.0,"stop_price":0.9,"target_price":1.2,"risk_distance":0.1,"side":"BUY"})
@@ -126,6 +161,25 @@ class PaperTradingV112SafetyTests(unittest.TestCase):
         self.assertEqual(summary["avg_r"],2.0)
         self.assertEqual(summary["by_pair"]["EUR/USD"]["net_r"],2.0)
         self.assertEqual(summary["by_pair"]["GBP/USD"]["net_r"],0.0)
+
+    def test_summary_by_setup_uses_explicit_tags_only(self):
+        rows=[
+            {
+                "trade_id":"tagged","pair":"EUR/USD","setup_id":"fvg",
+                "setup_attribution":"EXPLICIT_INPUT","status":"CLOSED",
+                "result":"WIN","realized_r":2.0,
+            },
+            {
+                "trade_id":"untagged","pair":"GBP/USD","setup_id":"",
+                "setup_attribution":"UNATTRIBUTED","status":"CLOSED",
+                "result":"LOSS","realized_r":-1.0,
+            },
+        ]
+        summary=p.summarize_paper_trades(pd.DataFrame(rows))
+        self.assertIn("fvg",summary["by_setup"])
+        self.assertEqual(summary["by_setup"]["fvg"]["trades"],1)
+        self.assertTrue(summary["by_setup"]["fvg"]["explicit_attribution_only"])
+        self.assertFalse(summary["setup_attribution_inferred"])
 
     def test_module_has_no_live_broker_execution_contract(self):
         self.assertNotIn("broker", {x.lower() for x in dir(p) if callable(getattr(p,x,None))})
