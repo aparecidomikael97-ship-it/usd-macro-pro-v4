@@ -13,9 +13,8 @@ def candles_for_day(*, sweep="none"):
         o=px
         h=px+0.0004
         l=px-0.0004
-        c=px+0.0001
+        c=px
         rows.append({"datetime":ts,"open":o,"high":h,"low":l,"close":c})
-        px=c
     df=pd.DataFrame(rows)
     # NY 00:00-06:00 corresponds to first 24 candles here.
     prev=df.iloc[:24]
