@@ -244,6 +244,14 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertNotIn("nth-child(20){display:none",css)
         self.assertEqual(navigation_mode_css("Avançado"),"<style></style>")
 
+    def test_experience_switch_no_longer_injects_mode_dependent_tab_css(self):
+        import inspect
+        from atlasquant_ui_v1 import render_experience_mode_switch
+        src=inspect.getsource(render_experience_mode_switch)
+        self.assertNotIn("navigation_mode_css(mode)",src)
+        self.assertNotIn("st.tabs(",src)
+        self.assertIn("atlasquant_view_mode",src)
+
     def test_main_wires_global_experience_switch_before_stable_navigation(self):
         from pathlib import Path
         src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
