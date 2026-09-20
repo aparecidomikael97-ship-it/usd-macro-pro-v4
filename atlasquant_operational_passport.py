@@ -28,7 +28,7 @@ class OperationalPassportInput:
     regimes_covered: int
     paper_trades: int
     paper_expectancy_r: float | None
-    data_quality_pct: float
+    data_quality_pct: float | None
     last_validation_date: date | None = None
 
 
@@ -57,9 +57,12 @@ def build_operational_passport(params: OperationalPassportInput)->dict[str,objec
     pf=_finite("profit_factor",params.profit_factor)
     net=_finite("net_r",params.net_r)
     dd=abs(_finite("max_drawdown_r",params.max_drawdown_r))
-    quality=_finite("data_quality_pct",params.data_quality_pct)
-    if not 0 <= quality <= 100:
-        raise ValueError("data_quality_pct deve estar entre 0 e 100")
+    if params.data_quality_pct is None:
+        quality=None
+    else:
+        quality=_finite("data_quality_pct",params.data_quality_pct)
+        if not 0 <= quality <= 100:
+            raise ValueError("data_quality_pct deve estar entre 0 e 100")
 
     if params.paper_expectancy_r is None:
         paper_gap=None
@@ -74,7 +77,9 @@ def build_operational_passport(params: OperationalPassportInput)->dict[str,objec
         evidence_flags.append("cobertura de regimes insuficiente")
     if params.sessions_covered < 2:
         evidence_flags.append("cobertura de sessões limitada")
-    if quality < 70:
+    if quality is None:
+        evidence_flags.append("qualidade dos dados não registrada")
+    elif quality < 70:
         evidence_flags.append("qualidade dos dados abaixo de 70%")
     if params.paper_trades < 20:
         evidence_flags.append("paper trading ainda insuficiente")
