@@ -63,6 +63,22 @@ jobs:
               raise SystemExit("AtlasQuant internal release preparation regressed")
           if status["real_orders_enabled"] or status["broker_execution_enabled"]:
               raise SystemExit("Safety invariant violated: real execution unexpectedly enabled")
+          if status["automatic_public_launch"]:
+              raise SystemExit("Safety invariant violated: automatic public launch unexpectedly enabled")
+          evidence=status.get("external_evidence",{})
+          required=(
+              "production_admin_secret_configured",
+              "neural_tts_provider_ready",
+              "academy_videos_published",
+              "commercial_data_licenses_verified",
+              "native_store_publication_verified",
+          )
+          missing=[key for key in required if key not in evidence]
+          if missing:
+              raise SystemExit(f"Release evidence contract incomplete: {missing}")
+          if status.get("external_evidence_complete") != all(bool(evidence[key]) for key in required):
+              raise SystemExit("Release evidence aggregate is inconsistent")
+          print("External release evidence remains explicit and fail-closed:", evidence)
           PY
 
       - name: Readiness summary
@@ -71,5 +87,6 @@ jobs:
         run: |
           echo "## AtlasQuant Release Readiness" >> "$GITHUB_STEP_SUMMARY"
           echo "- Internal preparation must remain complete." >> "$GITHUB_STEP_SUMMARY"
-          echo "- External legal/licensing/billing/TTS/media/store dependencies are reported separately." >> "$GITHUB_STEP_SUMMARY"
+          echo "- External ADMIN/legal/licensing/billing/TTS/media/store dependencies are reported separately." >> "$GITHUB_STEP_SUMMARY"
+          echo "- Concrete external evidence must remain explicit; missing evidence fails the readiness contract." >> "$GITHUB_STEP_SUMMARY"
           echo "- Real-order execution remains disabled." >> "$GITHUB_STEP_SUMMARY"
