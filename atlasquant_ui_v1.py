@@ -201,8 +201,8 @@ html { scroll-behavior: smooth; }
   border-radius: 13px !important;
 }
 [data-testid="stMetric"] > div { padding: .15rem .2rem; }
-[data-testid="stMetricValue"] { letter-spacing: -.035em; color: var(--aq-text); }
-[data-testid="stMetricLabel"] { color: var(--aq-muted); font-size: .78rem; }
+[data-testid="stMetricValue"], [data-testid="stMetricValue"] * { letter-spacing: -.035em; color: var(--text-color, #111827) !important; font-weight: 800 !important; opacity: 1 !important; }
+[data-testid="stMetricLabel"], [data-testid="stMetricLabel"] * { color: var(--text-color, #111827) !important; font-size: .78rem; font-weight: 650 !important; opacity: .82 !important; }
 [data-testid="stButton"] button {
   border-radius: 10px; min-height: 2.45rem; font-weight: 700;
   border: 1px solid var(--aq-line);
@@ -218,7 +218,16 @@ html { scroll-behavior: smooth; }
 [data-testid="stAlert"] { border-radius: 12px; }
 [data-testid="stTextInput"] input,
 [data-testid="stNumberInput"] input,
+[data-testid="stTextArea"] textarea,
 [data-baseweb="select"] > div { border-radius: 10px !important; }
+[data-testid="stTextInput"] input,
+[data-testid="stNumberInput"] input,
+[data-testid="stTextArea"] textarea {
+  color: var(--text-color, #111827) !important;
+  -webkit-text-fill-color: var(--text-color, #111827) !important;
+  font-weight: 650 !important;
+  opacity: 1 !important;
+}
 [data-testid="stExpander"] {
   border: 1px solid var(--ux-border, var(--aq-line)) !important;
   background: var(--ux-card, rgba(12,26,44,.48)) !important;
