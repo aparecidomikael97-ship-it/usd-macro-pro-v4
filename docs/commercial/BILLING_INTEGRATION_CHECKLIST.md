@@ -13,3 +13,17 @@ Antes de integrar cobrança:
 - Definir política de reembolso/cancelamento aprovada.
 - Auditar logs para não registrar dados sensíveis.
 - Ativação pública e `billing_ok=True` exigem integração real verificada e revisão humana.
+
+
+## Evidência mínima de produção
+
+A integração só pode sair de **PENDENTE** depois de registrar:
+- identificador do ambiente/provedor sem expor credenciais;
+- teste de checkout em sandbox;
+- validação criptográfica de webhook;
+- teste de idempotência/replay;
+- cancelamento e reembolso;
+- confirmação de que entitlement comercial não concede ADMIN nem trading real;
+- aprovação humana para ativação.
+
+Falha ou ausência de evidência mantém cobrança pública desativada.
