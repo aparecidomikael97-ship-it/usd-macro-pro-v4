@@ -1378,12 +1378,20 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                     walk_status=None if wf_row.empty else wf_row.iloc[0].get("walk_forward_status")
                     friction_status=None if friction_row.empty else friction_row.iloc[0].get("sensitivity_status")
                     parameter_status=None if parameter_row.empty else parameter_row.iloc[0].get("parameter_robustness_status")
+                    positive_fold_pct=None if temporal_row.empty else temporal_row.iloc[0].get("positive_fold_pct")
+                    oos_positive_pct=None if wf_row.empty else wf_row.iloc[0].get("positive_test_pct")
+                    friction_positive_pct=None if friction_row.empty else friction_row.iloc[0].get("positive_scenario_pct")
+                    parameter_positive_pct=None if parameter_row.empty else parameter_row.iloc[0].get("positive_variant_pct")
                     ladder=fuse_operational_evidence(
                         intel.get("passport",{}),
                         temporal_status=temporal_status,
                         walk_forward_status=walk_status,
                         friction_status=friction_status,
                         parameter_status=parameter_status,
+                        positive_fold_pct=positive_fold_pct,
+                        oos_positive_pct=oos_positive_pct,
+                        friction_positive_pct=friction_positive_pct,
+                        parameter_positive_pct=parameter_positive_pct,
                     )
                     intel["evidence_ladder"]=ladder
                     intel["research_diagnostics"]={
@@ -1391,6 +1399,10 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                         "walk_forward_status":walk_status,
                         "friction_status":friction_status,
                         "parameter_status":parameter_status,
+                        "positive_fold_pct":positive_fold_pct,
+                        "oos_positive_pct":oos_positive_pct,
+                        "friction_positive_pct":friction_positive_pct,
+                        "parameter_positive_pct":parameter_positive_pct,
                     }
                     suite_intelligence[strategy_id]=intel
                     capture_research_evidence(
