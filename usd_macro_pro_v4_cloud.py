@@ -1930,6 +1930,43 @@ def metricas_backtest(hist):
     return {"n": len(validos), "acuracia": acuracia, "brier": brier}
 
 # =========================================================
+# FAST STARTUP — MODO INICIANTE
+# =========================================================
+# Em uso interativo, tenta abrir a Home a partir de um único snapshot já
+# calculado pelo Autopilot. O run headless continua sempre completo.
+if os.getenv("USD_MACRO_AUTOPILOT", "") != "1" and not _ATLASQUANT_OFFLINE_SMOKE:
+    try:
+        from atlasquant_fast_startup import load_home_snapshot, render_beginner_shell
+        _fast_repo = str(_config_value(
+            "GITHUB_REPO_HISTORICO",
+            "aparecidomikael97-ship-it/usd-macro-pro-v4",
+        ) or "").strip()
+        _fast_branch = resolve_runtime_branch(
+            _config_value("GITHUB_DATA_BRANCH"),
+            _config_value("GITHUB_BRANCH_HISTORICO"),
+        )
+        _fast_token = str(_config_value("GITHUB_TOKEN_HISTORICO") or "").strip()
+        _fast_snapshot = load_home_snapshot(
+            _fast_repo,
+            _fast_branch,
+            _fast_token,
+            4.0,
+        )
+        _fast_result = render_beginner_shell(
+            _fast_snapshot,
+            access=_ATLASQUANT_ACCESS,
+            app_version=APP_VERSION,
+            environment=ATLASQUANT_ENVIRONMENT,
+        )
+        if bool(_fast_result.get("handled",False)):
+            st.stop()
+    except Exception as _fast_exc:
+        # Falha do acelerador nunca amplia permissões nem derruba o app completo.
+        st.session_state["atlasquant_fast_startup_error"] = (
+            f"{type(_fast_exc).__name__}: {_fast_exc}"
+        )
+
+# =========================================================
 # EXECUÇÃO PRINCIPAL
 # =========================================================
 
