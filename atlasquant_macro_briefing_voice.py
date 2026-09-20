@@ -8,13 +8,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
+from atlasquant_voice_profile import voice_profile
+
 AudioProvider = Callable[[str, str], bytes]
+DEFAULT_VOICE_STYLE=str(voice_profile()["external_style"])
 
 
 @dataclass(frozen=True)
 class VoiceRequest:
     transcript: str
-    voice: str = "deep"
+    voice: str = DEFAULT_VOICE_STYLE
 
     def validated(self) -> "VoiceRequest":
         text = str(self.transcript or "").strip()
@@ -22,7 +25,7 @@ class VoiceRequest:
             raise ValueError("speech_text vazio")
         if len(text) > 12000:
             raise ValueError("speech_text excede o limite seguro")
-        voice = str(self.voice or "deep").strip().lower()
+        voice = str(self.voice or DEFAULT_VOICE_STYLE).strip().lower()
         if voice not in {"normal", "clear", "fancy", "deep", "crisp", "delicate"}:
             raise ValueError("voz não permitida")
         return VoiceRequest(text, voice)
@@ -37,3 +40,5 @@ def generate_voice_audio(request: VoiceRequest, provider: AudioProvider | None =
     if not isinstance(audio, (bytes, bytearray)) or not audio:
         raise RuntimeError("provedor TTS não retornou áudio válido")
     return bytes(audio)
+
+__all__=["AudioProvider","DEFAULT_VOICE_STYLE","VoiceRequest","generate_voice_audio"]
