@@ -1,7 +1,9 @@
 """AtlasQuant optional Streamlit login gate.
 
-Disabled by default. When ATLASQUANT_AUTH_REQUIRED=true, the app fails closed
-unless ATLASQUANT_USERS_JSON contains valid PBKDF2 user records.
+Disabled by default. When authentication is required, configured users are
+always enforced. During first-run bootstrap only, an explicitly bounded preview
+may keep app:read available until the first secure user registry is configured.
+The preview never creates users, sessions, admin/sales permissions or live trading.
 """
 from __future__ import annotations
 
@@ -108,10 +110,18 @@ def evaluate_access(
     users_count:int,
     session:dict[str,Any]|None,
     users:dict|None=None,
+    allow_unconfigured_preview:bool=False,
 )->dict[str,Any]:
     if not required:
         return {"allowed":True,"mode":"OPEN","reason":"AUTH_DISABLED"}
     if users_count<=0:
+        if bool(allow_unconfigured_preview):
+            return {
+                "allowed":True,
+                "mode":"PREVIEW",
+                "reason":"BOOTSTRAP_PREVIEW_NO_USERS",
+                "read_only":True,
+            }
         return {"allowed":False,"mode":"LOCKED","reason":"NO_USERS_CONFIGURED"}
     if not isinstance(session,dict) or not has_permission(session,"app:read"):
         return {"allowed":False,"mode":"LOGIN","reason":"AUTH_REQUIRED"}
@@ -124,7 +134,24 @@ def render_access_gate()->dict[str,Any]:
     users=configured_users()
     role_counts=registry_role_counts(users)
     session=current_session()
-    decision=evaluate_access(required=required,users_count=len(users),session=session,users=users)
+    bootstrap_preview=_bool_setting(_setting("ATLASQUANT_BOOTSTRAP_PREVIEW","true"))
+    decision=evaluate_access(
+        required=required,
+        users_count=len(users),
+        session=session,
+        users=users,
+        allow_unconfigured_preview=bootstrap_preview,
+    )
+    if decision.get("mode")=="PREVIEW":
+        st.warning(
+            "👁️ Visualização provisória: o administrador ainda não foi configurado. "
+            "Acesso somente ao aplicativo; Vendas e Administração permanecem bloqueados."
+        )
+        st.caption(
+            "Assim que ATLASQUANT_USERS_JSON receber a primeira conta segura, "
+            "o login obrigatório passa a valer automaticamente."
+        )
+        return {**decision,"session":None,"role":"PREVIEW","registry":role_counts}
     if required and decision["allowed"]:
         time_check=session_time_status(session,time.time())
         if not time_check["valid"]:

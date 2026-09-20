@@ -15,6 +15,28 @@ class AtlasQuantAccessPanelTests(unittest.TestCase):
         self.assertFalse(out["allowed"])
         self.assertEqual(out["reason"],"NO_USERS_CONFIGURED")
 
+    def test_bootstrap_preview_must_be_explicit_and_has_no_admin_session(self):
+        out=panel.evaluate_access(
+            required=True,
+            users_count=0,
+            session=None,
+            allow_unconfigured_preview=True,
+        )
+        self.assertTrue(out["allowed"])
+        self.assertEqual(out["mode"],"PREVIEW")
+        self.assertEqual(out["reason"],"BOOTSTRAP_PREVIEW_NO_USERS")
+        self.assertTrue(out["read_only"])
+
+    def test_bootstrap_preview_never_bypasses_configured_user_login(self):
+        out=panel.evaluate_access(
+            required=True,
+            users_count=1,
+            session=None,
+            allow_unconfigured_preview=True,
+        )
+        self.assertFalse(out["allowed"])
+        self.assertEqual(out["mode"],"LOGIN")
+
     def test_required_mode_without_session_demands_login(self):
         out=panel.evaluate_access(required=True,users_count=2,session=None)
         self.assertFalse(out["allowed"])
