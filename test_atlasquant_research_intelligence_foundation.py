@@ -19,6 +19,7 @@ from atlasquant_operational_passport import (
     build_operational_passport,
 )
 from atlasquant_weekly_profile import analyze_weekly_extremes
+from atlasquant_behavior_shift import BehaviorStats, detect_behavior_shift
 from atlasquant_post_trade_diagnosis import (
     DecisionSnapshot,
     DuringTradeEvent,
@@ -161,6 +162,41 @@ class WeeklyProfileTests(unittest.TestCase):
         self.assertAlmostEqual(out["tuesday_wednesday_high_pct"],66.67,places=2)
         self.assertAlmostEqual(out["tuesday_wednesday_low_pct"],66.67,places=2)
         self.assertIn("não provam comportamento institucional",out["interpretation"].lower())
+
+
+class BehaviorShiftTests(unittest.TestCase):
+    def test_detects_observable_shift_without_claiming_institutional_intent(self):
+        baseline=BehaviorStats(
+            sample_size=120,
+            london_expansion_pct=55,
+            new_york_expansion_pct=40,
+            sweep_followthrough_pct=62,
+            reversal_after_sweep_pct=28,
+            level_reaction_pct=58,
+            average_range=100,
+        )
+        recent=BehaviorStats(
+            sample_size=35,
+            london_expansion_pct=30,
+            new_york_expansion_pct=65,
+            sweep_followthrough_pct=40,
+            reversal_after_sweep_pct=52,
+            level_reaction_pct=57,
+            average_range=138,
+        )
+        out=detect_behavior_shift(baseline,recent)
+        self.assertEqual(out["state"],"MEANINGFUL_SHIFT_REVIEW")
+        self.assertGreaterEqual(out["change_count"],4)
+        self.assertFalse(out["institutional_intent_inferred"])
+        self.assertFalse(out["automatic_strategy_change"])
+
+    def test_small_recent_window_does_not_trigger_behavior_story(self):
+        baseline=BehaviorStats(100,50,45,60,30,55,100)
+        recent=BehaviorStats(8,20,75,30,60,30,150)
+        out=detect_behavior_shift(baseline,recent)
+        self.assertEqual(out["state"],"INSUFFICIENT_SAMPLE")
+        self.assertFalse(out["sample_sufficient"])
+        self.assertEqual(out["change_count"],0)
 
 
 class PostTradeDiagnosisTests(unittest.TestCase):
