@@ -137,10 +137,10 @@ def _render_planner() -> dict[str, object]:
     if not frame.empty:
         st.line_chart(
             frame.set_index("Ano")[["Aportado", "Valor projetado"]],
-            use_container_width=True,
+            width="stretch",
         )
         with st.expander("Ver evolução ano a ano"):
-            st.dataframe(frame, hide_index=True, use_container_width=True)
+            st.dataframe(frame, hide_index=True, width="stretch")
     st.info(SIMULATION_NOTICE)
     return result
 
@@ -230,7 +230,7 @@ def _render_income() -> dict[str, object]:
     if not frame.empty:
         columns = [c for c in ("Aportado", "Valor projetado", "Renda gerada", "Renda recebida") if c in frame.columns]
         if columns:
-            st.line_chart(frame.set_index("Ano")[columns], use_container_width=True)
+            st.line_chart(frame.set_index("Ano")[columns], width="stretch")
     st.info(SIMULATION_NOTICE)
     return result
 
@@ -259,7 +259,7 @@ def _render_small_start() -> list[dict[str, float]]:
     display = pd.DataFrame(rows)
     for col in ("Aporte mensal", "Total aportado", "Valor projetado", "Ganho projetado"):
         display[col] = display[col].map(format_brl)
-    st.dataframe(display, hide_index=True, use_container_width=True)
+    st.dataframe(display, hide_index=True, width="stretch")
     st.caption(
         "A comparação serve para mostrar o efeito de constância + tempo. "
         "A taxa é apenas uma hipótese editável."
