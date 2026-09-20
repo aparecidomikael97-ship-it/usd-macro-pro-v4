@@ -1,5 +1,7 @@
 import unittest
 
+import pandas as pd
+
 from atlasquant_admin_insights import (
     BeginnerReadinessCriteria,
     StrategyObservation,
@@ -9,6 +11,9 @@ from atlasquant_admin_insights import (
 from atlasquant_admin_research_panel import (
     admin_research_access_allowed,
     build_admin_research_snapshot,
+    normalize_weekly_research_csv,
+    behavior_stats_from_frame,
+    behavior_template_csv,
 )
 from atlasquant_position_event_manager import (
     EventContext,
@@ -59,6 +64,24 @@ class AdminResearchPanelTests(unittest.TestCase):
         self.assertTrue(admin_research_access_allowed({"role":"OPEN","mode":"OPEN"}))
         self.assertFalse(admin_research_access_allowed({"role":"USER","mode":"AUTHENTICATED"}))
         self.assertFalse(admin_research_access_allowed({"role":"PREVIEW","mode":"PREVIEW"}))
+
+    def test_admin_weekly_csv_accepts_portuguese_date_high_low_aliases(self):
+        raw=pd.DataFrame({
+            "data":["2026-09-14"],
+            "máxima":[1.2],
+            "mínima":[1.0],
+        })
+        out=normalize_weekly_research_csv(raw)
+        self.assertEqual(list(out.columns),["datetime","high","low"])
+        self.assertEqual(len(out),1)
+
+    def test_behavior_shift_template_parses_baseline_and_recent(self):
+        frame=pd.read_csv(__import__("io").StringIO(behavior_template_csv()))
+        baseline,recent=behavior_stats_from_frame(frame)
+        self.assertIsNotNone(baseline)
+        self.assertIsNotNone(recent)
+        self.assertEqual(baseline.sample_size,100)
+        self.assertEqual(recent.sample_size,30)
 
     def test_admin_snapshot_never_promotes_or_changes_strategy(self):
         backtest={
