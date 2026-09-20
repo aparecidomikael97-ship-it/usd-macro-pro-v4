@@ -64,7 +64,7 @@ class InvestmentEcosystemTests(unittest.TestCase):
         )
         self.assertLess(result["dividend_quality_index"], 50)
         self.assertGreaterEqual(len(result["risk_flags"]), 4)
-        self.assertNotIn("probabilidade de pagamento", result["interpretation"].lower())
+        self.assertIn("não representa probabilidade de pagamento", result["interpretation"].lower())
 
     def test_growth_watch_is_monitoring_not_buy_signal(self):
         result = growth_watch_snapshot(
@@ -123,7 +123,7 @@ class RiskGuardianTests(unittest.TestCase):
             can_apply_limit_change(
                 self.limits,
                 tighter,
-                last_relaxation_at=None,
+                relaxation_requested_at=None,
                 now=now,
             )
         )
@@ -132,7 +132,7 @@ class RiskGuardianTests(unittest.TestCase):
             can_apply_limit_change(
                 self.limits,
                 relaxed,
-                last_relaxation_at=None,
+                relaxation_requested_at=None,
                 now=now,
             )
         )
@@ -140,7 +140,7 @@ class RiskGuardianTests(unittest.TestCase):
             can_apply_limit_change(
                 self.limits,
                 relaxed,
-                last_relaxation_at=now - timedelta(hours=25),
+                relaxation_requested_at=now - timedelta(hours=25),
                 now=now,
             )
         )
