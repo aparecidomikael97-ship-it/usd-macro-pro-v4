@@ -6,6 +6,10 @@ from atlasquant_admin_insights import (
     build_weekly_admin_brief,
     evaluate_beginner_readiness,
 )
+from atlasquant_admin_research_panel import (
+    admin_research_access_allowed,
+    build_admin_research_snapshot,
+)
 from atlasquant_position_event_manager import (
     EventContext,
     PositionContext,
@@ -47,6 +51,36 @@ class PositionEventManagerTests(unittest.TestCase):
         result = assess_post_event(position, event, realized_currency_effect="SUPPORTIVE")
         self.assertEqual(result["thesis_state"], "EVENT_ALIGNED_WITH_POSITION")
         self.assertEqual(result["action"], "HUMAN_REVIEW_ONLY")
+
+
+class AdminResearchPanelTests(unittest.TestCase):
+    def test_admin_and_local_open_mode_can_view_research_panel(self):
+        self.assertTrue(admin_research_access_allowed({"role":"ADMIN","mode":"AUTHENTICATED"}))
+        self.assertTrue(admin_research_access_allowed({"role":"OPEN","mode":"OPEN"}))
+        self.assertFalse(admin_research_access_allowed({"role":"USER","mode":"AUTHENTICATED"}))
+        self.assertFalse(admin_research_access_allowed({"role":"PREVIEW","mode":"PREVIEW"}))
+
+    def test_admin_snapshot_never_promotes_or_changes_strategy(self):
+        backtest={
+            "strategy":"FVG",
+            "executed_trades":10,
+            "rich_context_trades":4,
+            "diagnoses":[{} for _ in range(10)],
+            "passport":{
+                "state":"TESTING",
+                "evidence_flags":["paper trading ainda insuficiente"],
+            },
+        }
+        out=build_admin_research_snapshot(
+            access={"role":"ADMIN","mode":"AUTHENTICATED"},
+            last_backtest=backtest,
+        )
+        self.assertTrue(out["allowed"])
+        self.assertEqual(out["last_strategy"],"FVG")
+        self.assertEqual(out["context_gap_trades"],6)
+        self.assertFalse(out["automatic_promotion"])
+        self.assertFalse(out["automatic_strategy_change"])
+        self.assertFalse(out["real_orders_enabled"])
 
 
 class AdminInsightsTests(unittest.TestCase):
