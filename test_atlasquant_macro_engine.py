@@ -1,6 +1,6 @@
 import unittest
 
-from atlasquant_macro_engine import build_structured_macro
+from atlasquant_macro_engine import build_structured_macro, ranking_rows_to_currency_context
 
 
 def comp(score, quality=90, **extra):
@@ -158,6 +158,26 @@ class StructuredMacroEngineTests(unittest.TestCase):
         self.assertFalse(out["changes_weights"])
         self.assertFalse(out["real_orders_enabled"])
         self.assertFalse(out["automatic_execution"])
+
+
+    def test_ranking_adapter_maps_real_pair_components(self):
+        rows=[
+            {"Código":"EUR","n_juros":40,"n_inflacao":45,"n_pib":55,"n_emprego":50,"n_atividade":50,"fonte":"FRED + transformação anual"},
+            {"Código":"USD","n_juros":75,"n_inflacao":65,"n_pib":60,"n_emprego":70,"n_atividade":62,"fonte":"FRED + transformação anual"},
+        ]
+        out=ranking_rows_to_currency_context(rows,usd_quality=92)
+        self.assertIn("rates",out["EUR"])
+        self.assertNotIn("labour",out["EUR"])
+        self.assertNotIn("activity",out["EUR"])
+        self.assertIn("labour",out["USD"])
+        self.assertIn("activity",out["USD"])
+        self.assertEqual(out["USD"]["rates"]["quality"],92)
+
+    def test_ranking_adapter_does_not_promote_fallback_as_fresh(self):
+        rows=[{"Código":"AUD","n_juros":50,"n_inflacao":50,"n_pib":50,"fonte":"FRED + fallback parcial"}]
+        out=ranking_rows_to_currency_context(rows)
+        self.assertFalse(out["AUD"]["rates"]["fresh"])
+        self.assertEqual(out["AUD"]["rates"]["quality"],35.0)
 
 
 if __name__=="__main__":
