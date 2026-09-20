@@ -47,6 +47,15 @@ class AtlasQuantAcademyTests(unittest.TestCase):
         self.assertGreater(out["pct"],0)
         self.assertLess(out["pct"],100)
 
+    def test_quarterly_curriculum_is_complete_and_advanced(self):
+        ids={"quarterly-theory","quarterly-multitimeframe","quarterly-amd","quarterly-execution"}
+        rows=[academy_topic(topic_id) for topic_id in ids]
+        self.assertTrue(all(rows))
+        self.assertTrue(all(x["level"]=="Avançado" for x in rows))
+        self.assertTrue(all(x["category"]=="ICT / SMC" for x in rows))
+        self.assertTrue(any(x["id"]=="quarterly-theory" for x in academy_search("quarterly")))
+        self.assertIn("AMD",academy_topic("quarterly-amd")["title"])
+
     def test_content_never_calls_internal_score_probability(self):
         joined=" ".join(
             str(topic[key])
