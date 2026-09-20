@@ -1,0 +1,249 @@
+name: AtlasQuant - Mobile DOM Stability
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, atlasquant-mobile-dom-stability]
+    paths:
+      - "usd_macro_pro_v4_cloud.py"
+      - "atlasquant_ui_v1.py"
+      - "atlasquant_fast_startup.py"
+      - "atlasquant_home_radar.py"
+      - "test_atlasquant_navigation_stability.py"
+      - ".github/workflows/mobile-dom-stability.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlasquant-mobile-dom-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  mobile-dom:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ATLASQUANT_ENV: "LOCAL"
+      ATLASQUANT_AUTH_REQUIRED: "false"
+      ATLASQUANT_OFFLINE_SMOKE: "true"
+      CHAVE_FRED: ""
+      CHAVE_NEWSAPI: ""
+      CHAVE_EODHD: ""
+      CHAVE_TWELVE_DATA: ""
+      GITHUB_TOKEN_HISTORICO: ""
+      GITHUB_REPO_HISTORICO: ""
+      GITHUB_DATA_BRANCH: ""
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install browser dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install streamlit pandas numpy requests altair pyarrow playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Start local AtlasQuant
+        shell: bash
+        run: |
+          set -euo pipefail
+          nohup streamlit run usd_macro_pro_v4_cloud.py \
+            --server.headless true \
+            --server.address 127.0.0.1 \
+            --server.port 8501 \
+            > /tmp/atlasquant-mobile-dom.log 2>&1 &
+          echo $! > /tmp/atlasquant-mobile-dom.pid
+          code="000"
+          for attempt in $(seq 1 70); do
+            code=$(curl -sS --connect-timeout 2 --max-time 5 \
+              -o /tmp/atlasquant-local-health.txt \
+              -w "%{http_code}" \
+              http://127.0.0.1:8501/_stcore/health || true)
+            echo "health attempt=$attempt http=$code"
+            if [ "$code" = "200" ]; then break; fi
+            sleep 2
+          done
+          test "$code" = "200"
+
+      - name: Stress mobile navigation and rerenders
+        shell: bash
+        run: |
+          cat > /tmp/mobile_dom_stability.py <<'PY'
+          import json
+          import time
+          from pathlib import Path
+          from playwright.sync_api import sync_playwright
+
+          URL="http://127.0.0.1:8501"
+          OUT=Path("mobile-dom-evidence")
+          OUT.mkdir(exist_ok=True)
+          errors=[]
+          trace=[]
+
+          def body(page):
+              try:
+                  return page.locator("body").inner_text(timeout=20_000)
+              except Exception:
+                  return ""
+
+          def assert_clean(page,label,page_errors):
+              text=body(page)
+              exception_count=page.locator('[data-testid="stException"]').count()
+              dom_text_error=("NotFoundError" in text or "removeChild" in text)
+              recent=[x for x in page_errors if "NotFoundError" in x or "removeChild" in x]
+              trace.append({
+                  "label":label,
+                  "stException":exception_count,
+                  "notfound_in_body":dom_text_error,
+                  "page_errors":page_errors[-5:],
+                  "body_chars":len(text),
+              })
+              if exception_count:
+                  errors.append(f"{label}: {exception_count} stException")
+              if dom_text_error:
+                  errors.append(f"{label}: NotFoundError/removeChild visível")
+              if recent:
+                  errors.append(f"{label}: pageerror removeChild/NotFoundError")
+
+          def wait_text(page,needle,timeout=120_000):
+              deadline=time.time()+timeout/1000
+              while time.time()<deadline:
+                  if needle in body(page):
+                      return True
+                  page.wait_for_timeout(800)
+              return False
+
+          def select_area(page,label):
+              combos=page.get_by_role("combobox")
+              count=combos.count()
+              if count < 1:
+                  raise RuntimeError("combobox de navegação não encontrado")
+              combo=combos.last
+              combo.click()
+              option=page.get_by_role("option",name=label,exact=True)
+              if option.count()<1:
+                  option=page.get_by_text(label,exact=True)
+              option.last.click()
+              page.wait_for_timeout(900)
+              wait_text(page,"ATLASQUANT",timeout=60_000)
+
+          with sync_playwright() as p:
+              browser=p.chromium.launch(headless=True)
+              context=browser.new_context(
+                  viewport={"width":390,"height":844},
+                  is_mobile=True,
+                  device_scale_factor=1,
+                  locale="pt-BR",
+              )
+              page=context.new_page()
+              page_errors=[]
+              console_errors=[]
+              page.on("pageerror",lambda exc: page_errors.append(str(exc)))
+              page.on("console",lambda msg: console_errors.append(msg.text) if msg.type=="error" else None)
+
+              response=page.goto(URL,wait_until="domcontentloaded",timeout=180_000)
+              if not response or response.status>=400:
+                  errors.append(f"HTTP inicial {response.status if response else None}")
+              page.locator('[data-testid="stAppViewContainer"]').wait_for(timeout=90_000)
+              if not wait_text(page,"Radar de Oportunidades",timeout=150_000):
+                  errors.append("Radar inicial não apareceu")
+              assert_clean(page,"beginner-initial",page_errors)
+
+              # Enter advanced mode. Streamlit radio interaction itself reruns the app.
+              advanced=page.get_by_text("Avançado",exact=True)
+              if advanced.count()<1:
+                  errors.append("controle Avançado não encontrado")
+              else:
+                  advanced.first.click()
+                  if not wait_text(page,"Área avançada",timeout=150_000):
+                      errors.append("seletor Área avançada não apareceu")
+                  assert_clean(page,"advanced-enter",page_errors)
+
+                  # Repeatedly cross the workspaces most likely to cause large DOM churn.
+                  sequence=[
+                      "🎯 Radar",
+                      "🔀 Pares",
+                      "⚡ Decisão",
+                      "🎙️ Macro Briefing",
+                      "🤖 Autopilot",
+                      "🗂️ Histórico",
+                      "🛠️ Melhorias",
+                      "🧭 Painel mestre",
+                      "🎯 Radar",
+                      "⚡ Decisão",
+                      "🎯 Radar",
+                  ]
+                  for idx,label in enumerate(sequence,1):
+                      try:
+                          select_area(page,label)
+                          assert_clean(page,f"nav-{idx}-{label}",page_errors)
+                      except Exception as exc:
+                          errors.append(f"nav-{idx}-{label}: {type(exc).__name__}: {exc}")
+                          break
+
+              # A fast sequence of experience toggles exercises the rerender boundary
+              # that previously coincided with the mobile removeChild screenshot.
+              for cycle in range(2):
+                  beginner=page.get_by_text("Iniciante",exact=True)
+                  if beginner.count():
+                      beginner.first.click()
+                      wait_text(page,"Radar de Oportunidades",timeout=90_000)
+                      assert_clean(page,f"cycle-{cycle}-beginner",page_errors)
+                  advanced=page.get_by_text("Avançado",exact=True)
+                  if advanced.count():
+                      advanced.first.click()
+                      wait_text(page,"Área avançada",timeout=120_000)
+                      assert_clean(page,f"cycle-{cycle}-advanced",page_errors)
+
+              viewport=page.evaluate("window.innerWidth")
+              document_width=page.evaluate("document.documentElement.scrollWidth")
+              overflow=max(0,int(document_width)-int(viewport))
+              if overflow>8:
+                  errors.append(f"overflow horizontal {overflow}px")
+              if any("NotFoundError" in x or "removeChild" in x for x in console_errors):
+                  errors.append("console contém NotFoundError/removeChild")
+
+              page.screenshot(path=str(OUT/"mobile-final.png"),full_page=False)
+              report={
+                  "url":URL,
+                  "trace":trace,
+                  "page_errors":page_errors[-20:],
+                  "console_errors":console_errors[-20:],
+                  "horizontal_overflow_px":overflow,
+                  "failures":errors,
+              }
+              (OUT/"report.json").write_text(
+                  json.dumps(report,ensure_ascii=False,indent=2),
+                  encoding="utf-8",
+              )
+              print(json.dumps(report,ensure_ascii=False,indent=2))
+              context.close()
+              browser.close()
+
+          if errors:
+              raise SystemExit(" | ".join(errors))
+          PY
+          python /tmp/mobile_dom_stability.py
+
+      - name: Preserve Streamlit log
+        if: always()
+        run: |
+          mkdir -p mobile-dom-evidence
+          cp /tmp/atlasquant-mobile-dom.log mobile-dom-evidence/streamlit.log || true
+
+      - name: Upload mobile DOM evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: atlasquant-mobile-dom-${{ github.sha }}
+          path: mobile-dom-evidence/
+          if-no-files-found: warn
+          retention-days: 30
