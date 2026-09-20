@@ -65,6 +65,8 @@ from atlasquant_backtest_context import (
     enrich_signals_point_in_time,
     normalize_context_snapshots,
 )
+from atlasquant_research_evidence_capture import capture_research_evidence
+from atlasquant_passport_evidence import fuse_operational_evidence
 
 
 CANDLE_ALIASES = {
@@ -342,6 +344,25 @@ def _render_result_block(
     )
     intelligence=backtest_intelligence_bundle(results,strategy=strategy_name)
     st.session_state["atlasquant_last_backtest_intelligence"]=intelligence
+    session_evidence=fuse_operational_evidence(
+        intelligence.get("passport",{}),
+        temporal_status=None,
+        walk_forward_status=None,
+    )
+    intelligence["evidence_ladder"]=session_evidence
+    capture_research_evidence(
+        strategy=strategy_name,
+        source="BACKTEST_SESSION",
+        passport=intelligence.get("passport",{}),
+        evidence={
+            "executed_trades":intelligence.get("executed_trades",0),
+            "rich_context_pct":intelligence.get("rich_context_pct"),
+            "cause_summary":intelligence.get("cause_summary",[]),
+            "evidence_ladder":session_evidence,
+        },
+        pair=pair,
+        persist=False,
+    )
 
     st.markdown("#### 🔎 Por que deu gain ou loss?")
     st.caption(
@@ -396,6 +417,13 @@ def _render_result_block(
     else:
         st.info("Nenhuma lacuna do contrato atual foi detectada; ainda assim a promoção é somente por revisão humana.")
     st.caption(passport.get("interpretation",""))
+    ladder=dict(intelligence.get("evidence_ladder",{}) or {})
+    if ladder:
+        st.markdown("##### Escada de Evidências")
+        steps=pd.DataFrame(ladder.get("evidence_steps",[]) or [])
+        if not steps.empty:
+            st.dataframe(steps,width="stretch",hide_index=True)
+        st.caption(ladder.get("interpretation",""))
     st.caption("Promoção automática: DESLIGADA · Execução real: DESLIGADA")
 
     return {
@@ -1334,7 +1362,49 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                         list(pack.get("results",[]) or []),
                         strategy=str(pack.get("label") or strategy_id),
                     )
+                    temporal_row=stability_summary[
+                        stability_summary["operacional"].astype(str).eq(str(pack.get("label") or strategy_id))
+                    ] if not stability_summary.empty and "operacional" in stability_summary.columns else pd.DataFrame()
+                    wf_row=wf_summary[
+                        wf_summary["operacional"].astype(str).eq(str(pack.get("label") or strategy_id))
+                    ] if not wf_summary.empty and "operacional" in wf_summary.columns else pd.DataFrame()
+                    friction_row=friction_summary[
+                        friction_summary["operacional"].astype(str).eq(str(pack.get("label") or strategy_id))
+                    ] if not friction_summary.empty and "operacional" in friction_summary.columns else pd.DataFrame()
+                    parameter_row=robustness_summary[
+                        robustness_summary["operacional"].astype(str).eq(str(pack.get("label") or strategy_id))
+                    ] if include_param_robustness and not robustness_summary.empty and "operacional" in robustness_summary.columns else pd.DataFrame()
+                    temporal_status=None if temporal_row.empty else temporal_row.iloc[0].get("stability_status")
+                    walk_status=None if wf_row.empty else wf_row.iloc[0].get("walk_forward_status")
+                    friction_status=None if friction_row.empty else friction_row.iloc[0].get("sensitivity_status")
+                    parameter_status=None if parameter_row.empty else parameter_row.iloc[0].get("parameter_robustness_status")
+                    ladder=fuse_operational_evidence(
+                        intel.get("passport",{}),
+                        temporal_status=temporal_status,
+                        walk_forward_status=walk_status,
+                        friction_status=friction_status,
+                        parameter_status=parameter_status,
+                    )
+                    intel["evidence_ladder"]=ladder
+                    intel["research_diagnostics"]={
+                        "temporal_status":temporal_status,
+                        "walk_forward_status":walk_status,
+                        "friction_status":friction_status,
+                        "parameter_status":parameter_status,
+                    }
                     suite_intelligence[strategy_id]=intel
+                    capture_research_evidence(
+                        strategy=str(pack.get("label") or strategy_id),
+                        source="BACKTEST_SUITE_SESSION",
+                        passport=intel.get("passport",{}),
+                        evidence={
+                            "evidence_ladder":ladder,
+                            "research_diagnostics":intel["research_diagnostics"],
+                            "cause_summary":intel.get("cause_summary",[]),
+                        },
+                        pair=default_pair,
+                        persist=False,
+                    )
                     passport=dict(intel.get("passport",{}) or {})
                     observed=dict(passport.get("observed_metrics",{}) or {})
                     coverage=dict(passport.get("coverage",{}) or {})
@@ -1351,6 +1421,8 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                         "context_complete_pct":intel.get("rich_context_pct"),
                         "passport_state":passport.get("state"),
                         "evidence_gaps":" · ".join(str(x) for x in passport.get("evidence_flags",[]) or []),
+                        "evidence_state":ladder.get("state"),
+                        "evidence_coverage_pct":ladder.get("evidence_coverage_pct"),
                         "automatic_promotion":False,
                     })
                 st.session_state["atlasquant_last_strategy_suite_intelligence"]={
