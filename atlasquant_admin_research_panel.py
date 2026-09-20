@@ -285,6 +285,21 @@ def render_admin_research_panel(
         st.session_state[paper_audit_key]=runtime_audit
         st.session_state[paper_audit_status_key]=runtime_status
         st.session_state[paper_audit_hydrated_key]=True
+
+    if st.button(
+        "🔄 Atualizar Paper Audit Runtime",
+        key="atlasquant_admin_refresh_paper_setup_audit",
+    ):
+        cfg=research_evidence_config()
+        runtime_audit,runtime_status=load_paper_audit_runtime(
+            repo=cfg.get("repo",""),
+            branch=cfg.get("branch",""),
+            token=cfg.get("token",""),
+        )
+        st.session_state[paper_audit_key]=runtime_audit
+        st.session_state[paper_audit_status_key]=runtime_status
+        st.session_state[paper_audit_hydrated_key]=True
+
     runtime_audit=st.session_state.get(paper_audit_key,pd.DataFrame())
     if not isinstance(runtime_audit,pd.DataFrame):
         runtime_audit=pd.DataFrame()
