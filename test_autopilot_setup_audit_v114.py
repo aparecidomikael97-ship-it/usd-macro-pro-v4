@@ -260,6 +260,17 @@ class SetupAuditV114Tests(unittest.TestCase):
         self.assertEqual(summary["explicit_setup_closed_trades"],1)
         self.assertFalse(summary["setup_attribution_inferred"])
 
+    def test_untrusted_setup_id_is_not_counted_as_explicit(self):
+        row=trade_row(
+            status="CLOSED",result="WIN",realized_r=2.0,
+            setup_id="fvg",setup_attribution="",
+        )
+        audit=sync_setup_audit(pd.DataFrame([row]),scanner_with_fvg("FVG",70),now=NOW)
+        summary=build_summary(audit,aggregate_setup_performance(audit),now=NOW)
+        self.assertEqual(summary["explicit_setup_trades"],0)
+        self.assertEqual(summary["explicit_setup_closed_trades"],0)
+        self.assertFalse(summary["setup_attribution_inferred"])
+
     def test_summary_never_enables_execution_or_strategy_selection(self):
         audit=sync_setup_audit(pd.DataFrame([trade_row()]),scanner_with_fvg("FVG",70),now=NOW)
         summary=build_summary(audit,aggregate_setup_performance(audit),now=NOW)
