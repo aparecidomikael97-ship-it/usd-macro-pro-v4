@@ -15,6 +15,8 @@ from typing import Any, Mapping, Sequence
 import pandas as pd
 import streamlit as st
 
+from atlasquant_voice_assistant import render_contextual_voice_assistant
+
 SCHEMA="ATLASQUANT_HOME_RADAR_V1"
 
 
@@ -97,6 +99,18 @@ def home_rows_from_packs(packs:Sequence[Mapping[str,Any]]|None)->list[dict[str,A
             "movement":_adr_label(p.get("adr")),
             "blockers":blockers,
             "target":str(p.get("target") or "—"),
+            "w1":str(p.get("w1") or "—"),
+            "d1":str(p.get("d1") or "—"),
+            "pd_zone":str(p.get("pd_zone") or "—"),
+            "sweep_type":str(p.get("sweep_type") or "—"),
+            "sweep_level":str(p.get("sweep_level") or "—"),
+            "ict_read":_safe(p.get("ict_read",0)),
+            "inst_read":_safe(p.get("inst_read",0)),
+            "up":[str(x) for x in list(p.get("up",[]) or []) if str(x).strip()],
+            "down":[str(x) for x in list(p.get("down",[]) or []) if str(x).strip()],
+            "positives":[str(x) for x in list(p.get("positives",[]) or []) if str(x).strip()],
+            "hard_blocks":[str(x) for x in list(p.get("hard_blocks",[]) or []) if str(x).strip()],
+            "soft_blocks":[str(x) for x in list(p.get("soft_blocks",[]) or []) if str(x).strip()],
         })
     rows.sort(key=lambda x:(x["action"]!="NÃO OPERAR",x["priority"],x["data_score"]),reverse=True)
     return rows
@@ -219,7 +233,12 @@ def render_browser_voice(script:str, *, key:str)->None:
     st.iframe(html,height=72,width="stretch",tab_index=0)
 
 
-def render_home_radar(packs:Sequence[Mapping[str,Any]]|None, *, experience_mode:str="Iniciante")->dict[str,Any]:
+def render_home_radar(
+    packs:Sequence[Mapping[str,Any]]|None,
+    *,
+    experience_mode:str="Iniciante",
+    macro_context:Mapping[str,Any]|None=None,
+)->dict[str,Any]:
     rows=home_rows_from_packs(packs)
     summary=home_summary(rows)
     mode="Avançado" if str(experience_mode).casefold().startswith("avan") else "Iniciante"
@@ -273,10 +292,12 @@ def render_home_radar(packs:Sequence[Mapping[str,Any]]|None, *, experience_mode:
     )
     st.markdown('</div>',unsafe_allow_html=True)
 
-    script=voice_script_for_row(row)
-    render_browser_voice(script,key=row["pair"].replace("/","_"))
-    with st.expander("Ler a explicação completa"):
-        st.write(script)
+    render_contextual_voice_assistant(
+        row,
+        mode=mode,
+        macro_context=macro_context,
+        key_prefix="aq_home_voice",
+    )
 
     if mode=="Avançado":
         st.markdown("### Diagnóstico avançado")
