@@ -203,7 +203,17 @@ jobs:
                   initial_body_text = body_text
                   initial_fast_snapshot_shell = "carregamento rápido por snapshot validado" in initial_body_text
                   initial_radar_visible = "Radar de Oportunidades" in initial_body_text
-                  initial_meaningful = bool(initial_radar_visible or initial_fast_snapshot_shell or auth_inputs >= 1)
+                  initial_private_home = (
+                      "MARKET INTELLIGENCE PLATFORM" in initial_body_text
+                      and "ATLASQUANT" in initial_body_text
+                      and "Safety Core monitorado" in initial_body_text
+                  )
+                  initial_meaningful = bool(
+                      initial_radar_visible
+                      or initial_fast_snapshot_shell
+                      or initial_private_home
+                      or auth_inputs >= 1
+                  )
 
                   mobile_transition = {"attempted": False, "advanced": False, "decision": False, "radar_back": False}
                   if name == "mobile" and auth_inputs < 1 and initial_radar_visible:
@@ -262,6 +272,7 @@ jobs:
 
                   fast_snapshot_shell = initial_fast_snapshot_shell
                   radar_visible = initial_radar_visible
+                  private_home_visible = initial_private_home
                   meaningful = initial_meaningful
 
                   info = {
@@ -274,6 +285,7 @@ jobs:
                       "meaningful_content_ms": meaningful_ms,
                       "fast_snapshot_shell": fast_snapshot_shell,
                       "radar_visible": radar_visible,
+                      "private_home_visible": private_home_visible,
                       "meaningful": meaningful,
                       "title": page_title,
                       "body_chars": len(body_text),
@@ -298,9 +310,9 @@ jobs:
                   if not rendered:
                       failures.append(f"{name}: AtlasQuant/login não terminou de renderizar")
                   if not meaningful:
-                      failures.append(f"{name}: conteúdo útil não apareceu (Radar/Fast Home/login ausentes)")
-                  if auth_inputs < 1 and not (radar_visible or fast_snapshot_shell):
-                      failures.append(f"{name}: produção carregou Streamlit, mas não abriu a Home/Radar atual")
+                      failures.append(f"{name}: conteúdo útil não apareceu (Home/Radar/Fast Home/login ausentes)")
+                  if auth_inputs < 1 and not (radar_visible or fast_snapshot_shell or private_home_visible):
+                      failures.append(f"{name}: produção carregou Streamlit, mas não abriu uma Home válida")
                   if meaningful_ms is None:
                       failures.append(f"{name}: tempo até conteúdo útil não foi medido")
                   elif auth_inputs < 1 and meaningful_ms > 30000:
