@@ -44,6 +44,18 @@ def _norm(value:object)->str:
     return "".join(ch for ch in raw if not unicodedata.combining(ch)).casefold()
 
 
+def _json_for_script(value:Any)->str:
+    """JSON safe inside an HTML script element; dynamic market text cannot close the script."""
+    return (
+        json.dumps(value,ensure_ascii=False)
+        .replace("&","\\u0026")
+        .replace("<","\\u003c")
+        .replace(">","\\u003e")
+        .replace("\u2028","\\u2028")
+        .replace("\u2029","\\u2029")
+    )
+
+
 def _action(row:Mapping[str,Any])->str:
     action=str(row.get("action") or "").upper()
     if action in {"COMPRA","VENDA","NÃO OPERAR","NAO OPERAR"}:
@@ -288,7 +300,7 @@ def answer_question(
 
 
 def browser_speech_html(text:object, *, button_label:str="🔊 Ouvir", key:str="voice")->str:
-    safe_text=json.dumps(str(text or ""),ensure_ascii=False)
+    safe_text=_json_for_script(str(text or ""))
     safe_key=re.sub(r"[^a-zA-Z0-9_-]","_",str(key or "voice"))
     label=escape(str(button_label or "🔊 Ouvir"))
     return f"""
@@ -323,7 +335,7 @@ def browser_mic_assistant_html(context:Mapping[str,Any], *, key:str)->str:
     """Optional browser mic: keyword Q&A in-page, with no trading side effects."""
     c=dict(context or {})
     answers={cat:_answer_for_category(cat,c,beginner=False) for cat in QUESTION_CATEGORIES}
-    safe_answers=json.dumps(answers,ensure_ascii=False)
+    safe_answers=_json_for_script(answers)
     safe_key=re.sub(r"[^a-zA-Z0-9_-]","_",str(key or "assistant"))
     return f"""
     <div style="font-family:system-ui;border:1px solid rgba(137,170,210,.22);border-radius:12px;padding:10px;background:#0b1d31;color:#e7f0fb">
