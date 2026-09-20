@@ -1950,7 +1950,7 @@ if os.getenv("USD_MACRO_AUTOPILOT", "") != "1" and not _ATLASQUANT_OFFLINE_SMOKE
             _fast_repo,
             _fast_branch,
             _fast_token,
-            4.0,
+            2.5,
         )
         _fast_result = render_beginner_shell(
             _fast_snapshot,
