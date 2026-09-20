@@ -192,6 +192,78 @@ def classify_question(question:object)->str:
     return "overview"
 
 
+def _answer_for_category(category:str, c:Mapping[str,Any], *, beginner:bool=False)->str:
+    c=dict(c or {})
+    pair=_text(c.get("pair"),"este ativo")
+    action=_action(c)
+    blockers=[str(x) for x in list(c.get("blockers",[]) or []) if str(x).strip()]
+    support=[str(x) for x in list(c.get("supporting",[]) or []) if str(x).strip()]
+
+    if beginner:
+        return beginner_script(c)
+    if category=="wrong":
+        why=("; ".join(blockers[:5]) if blockers else
+             "o cenário pode mudar se estrutura, dados, evento ou gate deixarem de confirmar o estado atual")
+        return (
+            f"Sim, o viés de {pair} pode estar errado. O AtlasQuant não trata esse viés como certeza. "
+            f"Hoje, os principais pontos que podem invalidar ou enfraquecer a leitura são: {why}. "
+            f"H4 {_text(c.get('h4'))}, H1 {_text(c.get('h1'))}, M15 {_text(c.get('m15'))} e Gate {_text(c.get('gate'))}. "
+            f"Se esses elementos deixarem de confirmar, a leitura deve voltar para aguardar ou não operar."
+        )
+    if category=="against":
+        why="; ".join(blockers[:6]) if blockers else "não há bloqueio explícito registrado neste snapshot"
+        return (
+            f"Os fatores contra a leitura de {pair} são: {why}. "
+            f"Evento: {_text(c.get('event'))}; movimento: {_text(c.get('movement'))}; dados {_safe(c.get('data_score')):.0f}/100. "
+            "Mesmo sem bloqueio explícito, risco nunca é zero."
+        )
+    if category=="macro":
+        return (
+            f"No macro de {pair}, a diferença de força está em {_safe(c.get('strength_diff')):+.1f} pontos. "
+            f"O tom do Fed está {_text(c.get('fed_tone'))}, com intensidade {_safe(c.get('fed_strength')):+.2f}. "
+            f"Notícias: {_text(c.get('news'))}. Evento relevante: {_text(c.get('event'))}. "
+            f"O motivo dominante registrado pelo motor é: {_text(c.get('reason'))}."
+        )
+    if category=="technical":
+        return (
+            f"No técnico de {pair}: W1 {_text(c.get('w1'))}; D1 {_text(c.get('d1'))}; "
+            f"H4 {_text(c.get('h4'))}; H1 {_text(c.get('h1'))}; M15 {_text(c.get('m15'))}. "
+            f"Leitura ICT {_safe(c.get('ict_read')):.0f}/100 e institucional {_safe(c.get('inst_read')):.0f}/100. "
+            f"O Gate está {_text(c.get('gate'))}. Isso serve como confirmação ou veto do contexto, não como ordem automática."
+        )
+    if category=="liquidity":
+        return (
+            f"Na liquidez de {pair}, o sweep registrado é {_text(c.get('sweep_type'))} em {_text(c.get('sweep_level'))}. "
+            f"A localização Premium ou Discount está {_text(c.get('pd_zone'))}, e o alvo de referência é {_text(c.get('target'))}. "
+            "A liquidez precisa ser lida junto de deslocamento, estrutura, dados frescos e gate."
+        )
+    if category=="event":
+        return (
+            f"Para {pair}, a leitura de notícia está {_text(c.get('news'))}. "
+            f"O evento atual está classificado como {_text(c.get('event'))}, com data {_text(c.get('event_date'))}. "
+            "Evento de alto impacto pode reduzir a confiança do contexto e exigir nova confirmação depois da divulgação."
+        )
+    if category=="data":
+        return (
+            f"A prontidão dos dados de {pair} está em {_safe(c.get('data_score')):.0f}/100 e a qualidade em {_safe(c.get('quality')):.0f}/100. "
+            f"O Gate está {_text(c.get('gate'))}. Se o dado ficar stale, incompleto ou inconsistente, o comportamento seguro é não operar."
+        )
+    if category=="next":
+        return (
+            f"Para {pair}, o próximo passo registrado é: {_text(c.get('next_action'))}. "
+            f"A leitura atual é {action}. Isso descreve o que o modelo precisa ver a seguir; não é uma ordem para entrar no mercado."
+        )
+    if category=="why":
+        extra=(" Fatores adicionais: "+"; ".join(support[:4])+".") if support else ""
+        return (
+            f"O {pair} está com leitura {action} principalmente porque {_text(c.get('reason'))}. "
+            f"A diferença de força é {_safe(c.get('strength_diff')):+.1f} pontos, "
+            f"com H4 {_text(c.get('h4'))}, H1 {_text(c.get('h1'))} e M15 {_text(c.get('m15'))}."
+            f"{extra}"
+        )
+    return advanced_script(c)
+
+
 def answer_question(
     question:object,
     context:Mapping[str,Any],
@@ -201,83 +273,14 @@ def answer_question(
     c=dict(context or {})
     category=classify_question(question)
     beginner=not str(mode or "").casefold().startswith("avan")
-    pair=_text(c.get("pair"),"este ativo")
-    action=_action(c)
-    blockers=[str(x) for x in list(c.get("blockers",[]) or []) if str(x).strip()]
-    support=[str(x) for x in list(c.get("supporting",[]) or []) if str(x).strip()]
-
-    if beginner:
-        answer=beginner_script(c)
-    elif category=="wrong":
-        why=("; ".join(blockers[:5]) if blockers else
-             "o cenário pode mudar se estrutura, dados, evento ou gate deixarem de confirmar o estado atual")
-        answer=(
-            f"Sim, o viés de {pair} pode estar errado. O AtlasQuant não trata esse viés como certeza. "
-            f"Hoje, os principais pontos que podem invalidar ou enfraquecer a leitura são: {why}. "
-            f"H4 {_text(c.get('h4'))}, H1 {_text(c.get('h1'))}, M15 {_text(c.get('m15'))} e Gate {_text(c.get('gate'))}. "
-            f"Se esses elementos deixarem de confirmar, a leitura deve voltar para aguardar ou não operar."
-        )
-    elif category=="against":
-        why="; ".join(blockers[:6]) if blockers else "não há bloqueio explícito registrado neste snapshot"
-        answer=(
-            f"Os fatores contra a leitura de {pair} são: {why}. "
-            f"Evento: {_text(c.get('event'))}; movimento: {_text(c.get('movement'))}; dados {_safe(c.get('data_score')):.0f}/100. "
-            "Mesmo sem bloqueio explícito, risco nunca é zero."
-        )
-    elif category=="macro":
-        answer=(
-            f"No macro de {pair}, a diferença de força está em {_safe(c.get('strength_diff')):+.1f} pontos. "
-            f"O tom do Fed está {_text(c.get('fed_tone'))}, com intensidade {_safe(c.get('fed_strength')):+.2f}. "
-            f"Notícias: {_text(c.get('news'))}. Evento relevante: {_text(c.get('event'))}. "
-            f"O motivo dominante registrado pelo motor é: {_text(c.get('reason'))}."
-        )
-    elif category=="technical":
-        answer=(
-            f"No técnico de {pair}: W1 {_text(c.get('w1'))}; D1 {_text(c.get('d1'))}; "
-            f"H4 {_text(c.get('h4'))}; H1 {_text(c.get('h1'))}; M15 {_text(c.get('m15'))}. "
-            f"Leitura ICT {_safe(c.get('ict_read')):.0f}/100 e institucional {_safe(c.get('inst_read')):.0f}/100. "
-            f"O Gate está {_text(c.get('gate'))}. Isso serve como confirmação ou veto do contexto, não como ordem automática."
-        )
-    elif category=="liquidity":
-        answer=(
-            f"Na liquidez de {pair}, o sweep registrado é {_text(c.get('sweep_type'))} em {_text(c.get('sweep_level'))}. "
-            f"A localização Premium ou Discount está {_text(c.get('pd_zone'))}, e o alvo de referência é {_text(c.get('target'))}. "
-            "A liquidez precisa ser lida junto de deslocamento, estrutura, dados frescos e gate."
-        )
-    elif category=="event":
-        answer=(
-            f"Para {pair}, a leitura de notícia está {_text(c.get('news'))}. "
-            f"O evento atual está classificado como {_text(c.get('event'))}, com data {_text(c.get('event_date'))}. "
-            "Evento de alto impacto pode reduzir a confiança do contexto e exigir nova confirmação depois da divulgação."
-        )
-    elif category=="data":
-        answer=(
-            f"A prontidão dos dados de {pair} está em {_safe(c.get('data_score')):.0f}/100 e a qualidade em {_safe(c.get('quality')):.0f}/100. "
-            f"O Gate está {_text(c.get('gate'))}. Se o dado ficar stale, incompleto ou inconsistente, o comportamento seguro é não operar."
-        )
-    elif category=="next":
-        answer=(
-            f"Para {pair}, o próximo passo registrado é: {_text(c.get('next_action'))}. "
-            f"A leitura atual é {action}. Isso descreve o que o modelo precisa ver a seguir; não é uma ordem para entrar no mercado."
-        )
-    elif category=="why":
-        extra=(" Fatores adicionais: "+"; ".join(support[:4])+".") if support else ""
-        answer=(
-            f"O {pair} está com leitura {action} principalmente porque {_text(c.get('reason'))}. "
-            f"A diferença de força é {_safe(c.get('strength_diff')):+.1f} pontos, "
-            f"com H4 {_text(c.get('h4'))}, H1 {_text(c.get('h1'))} e M15 {_text(c.get('m15'))}."
-            f"{extra}"
-        )
-    else:
-        answer=advanced_script(c)
-
+    answer=_answer_for_category(category,c,beginner=beginner)
     return {
         "schema":SCHEMA,
         "category":category,
         "question":str(question or "").strip(),
         "answer":answer,
         "mode":"Avançado" if not beginner else "Iniciante",
-        "pair":pair,
+        "pair":_text(c.get("pair"),"este ativo"),
         "real_orders_enabled":False,
         "automatic_execution":False,
         "changes_model_state":False,
@@ -319,10 +322,7 @@ def browser_speech_html(text:object, *, button_label:str="🔊 Ouvir", key:str="
 def browser_mic_assistant_html(context:Mapping[str,Any], *, key:str)->str:
     """Optional browser mic: keyword Q&A in-page, with no trading side effects."""
     c=dict(context or {})
-    answers={
-        cat:answer_question(cat,c,mode="Avançado")["answer"]
-        for cat in QUESTION_CATEGORIES
-    }
+    answers={cat:_answer_for_category(cat,c,beginner=False) for cat in QUESTION_CATEGORIES}
     safe_answers=json.dumps(answers,ensure_ascii=False)
     safe_key=re.sub(r"[^a-zA-Z0-9_-]","_",str(key or "assistant"))
     return f"""
