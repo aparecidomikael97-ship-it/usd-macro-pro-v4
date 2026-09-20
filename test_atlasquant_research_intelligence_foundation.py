@@ -1,5 +1,7 @@
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
+
+import pandas as pd
 
 from atlasquant_operational_catalog import (
     catalog_summary,
@@ -12,6 +14,11 @@ from atlasquant_decision_stack import (
     deduplicate_evidence,
     evaluate_decision_stack,
 )
+from atlasquant_operational_passport import (
+    OperationalPassportInput,
+    build_operational_passport,
+)
+from atlasquant_weekly_profile import analyze_weekly_extremes
 from atlasquant_post_trade_diagnosis import (
     DecisionSnapshot,
     DuringTradeEvent,
@@ -89,6 +96,71 @@ class DecisionStackTests(unittest.TestCase):
         ])
         self.assertEqual(out["state"],"BLOCKED_BY_SAFETY")
         self.assertEqual(len(out["vetoes"]),1)
+
+
+class OperationalPassportTests(unittest.TestCase):
+    def test_passport_separates_observed_metrics_from_promotion(self):
+        out=build_operational_passport(OperationalPassportInput(
+            strategy="FVG",
+            state="OBSERVATION",
+            trades=120,
+            expectancy_r=0.22,
+            profit_factor=1.35,
+            net_r=26.4,
+            max_drawdown_r=6.2,
+            assets_covered=4,
+            sessions_covered=3,
+            regimes_covered=3,
+            paper_trades=45,
+            paper_expectancy_r=0.18,
+            data_quality_pct=92,
+            last_validation_date=date(2026,9,20),
+        ))
+        self.assertTrue(out["eligible_for_human_review"])
+        self.assertFalse(out["automatic_promotion"])
+        self.assertIsNone(out["profit_probability"])
+        self.assertEqual(out["paper"]["gap_vs_backtest_r"],-0.04)
+
+    def test_passport_flags_small_or_narrow_evidence(self):
+        out=build_operational_passport(OperationalPassportInput(
+            strategy="NEW",
+            state="TESTING",
+            trades=12,
+            expectancy_r=0.8,
+            profit_factor=2.5,
+            net_r=9.6,
+            max_drawdown_r=2.0,
+            assets_covered=1,
+            sessions_covered=1,
+            regimes_covered=1,
+            paper_trades=0,
+            paper_expectancy_r=None,
+            data_quality_pct=60,
+        ))
+        self.assertFalse(out["eligible_for_human_review"])
+        self.assertGreaterEqual(len(out["evidence_flags"]),4)
+
+
+class WeeklyProfileTests(unittest.TestCase):
+    def test_weekly_extremes_are_measured_not_assumed(self):
+        rows=[]
+        start=pd.Timestamp("2026-08-03",tz="UTC")
+        # Three Mon-Fri weeks with deliberately different extreme days.
+        patterns=[
+            ([10,12,14,13,11],[5,4,3,4,5]),   # Wed high, Wed low
+            ([10,15,13,12,11],[5,4,2,3,4]),   # Tue high, Wed low
+            ([11,12,13,16,14],[4,3,2,1,2]),   # Thu high, Thu low
+        ]
+        for week,(highs,lows) in enumerate(patterns):
+            for day in range(5):
+                dt=start+pd.Timedelta(days=week*7+day)
+                rows.append({"datetime":dt,"high":highs[day],"low":lows[day]})
+        out=analyze_weekly_extremes(pd.DataFrame(rows))
+        self.assertEqual(out["weeks"],3)
+        self.assertFalse(out["fixed_day_rule_assumed"])
+        self.assertAlmostEqual(out["tuesday_wednesday_high_pct"],66.67,places=2)
+        self.assertAlmostEqual(out["tuesday_wednesday_low_pct"],66.67,places=2)
+        self.assertIn("não provam comportamento institucional",out["interpretation"].lower())
 
 
 class PostTradeDiagnosisTests(unittest.TestCase):
