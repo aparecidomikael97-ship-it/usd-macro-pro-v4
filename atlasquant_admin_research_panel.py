@@ -190,6 +190,36 @@ def _match_forward_summary(
     return None,{}
 
 
+def _resolve_forward_evidence(
+    strategy:object,
+    runtime_summaries:Mapping[str,Mapping[str,Any]]|None,
+    manual_summaries:Mapping[str,Mapping[str,Any]]|None=None,
+    *,
+    manual_selected:object|None=None,
+)->dict[str,Any]:
+    runtime=dict(runtime_summaries or {})
+    manual=dict(manual_summaries or {})
+    source="MANUAL_JOURNAL" if manual else ("RUNTIME_EXPLICIT" if runtime else "NONE")
+    summaries=manual if manual else runtime
+    matched,summary=_match_forward_summary(strategy,summaries)
+    needs_manual_selection=bool(source=="MANUAL_JOURNAL" and summaries and matched is None)
+    if needs_manual_selection and manual_selected is not None:
+        selected=str(manual_selected)
+        if selected in summaries:
+            matched=selected
+            summary=dict(summaries[selected] or {})
+            needs_manual_selection=False
+    return {
+        "source":source,
+        "summaries":summaries,
+        "matched_setup":matched,
+        "summary":dict(summary or {}),
+        "needs_manual_selection":needs_manual_selection,
+        "available_setups":sorted(summaries),
+        "runtime_cross_setup_reuse":False,
+    }
+
+
 def _research_history_rows(records:list[dict[str,Any]])->list[dict[str,Any]]:
     rows=[]
     for raw in records:
@@ -448,10 +478,6 @@ def render_admin_research_panel(
         "O cruzamento não promove o operacional sozinho."
     )
     runtime_forward_summaries=dict(runtime_bridge.get("summary_by_setup",{}) or {})
-    forward_summaries=runtime_forward_summaries
-    forward_source="RUNTIME_EXPLICIT" if forward_summaries else "NONE"
-    matched_setup=None
-    forward_summary={}
 
     if runtime_status.get("reason")=="LOADED":
         if runtime_bridge.get("explicit_rows",0) and not runtime_bridge.get("eligible_records",0):
@@ -470,6 +496,7 @@ def render_admin_research_panel(
         type=["csv"],
         key="atlasquant_admin_forward_journal_csv",
     )
+    manual_summaries={}
     if journal_file is not None:
         try:
             journal_frame=pd.read_csv(journal_file)
@@ -477,33 +504,37 @@ def render_admin_research_panel(
         except Exception as exc:
             st.error(f"Diário Paper/Forward inválido: {type(exc).__name__}: {exc}")
             manual_summaries={}
-        if manual_summaries:
-            forward_summaries=manual_summaries
-            forward_source="MANUAL_JOURNAL"
 
-    if forward_summaries:
-        matched_setup,forward_summary=_match_forward_summary(
-            backtest.get("strategy"),
-            forward_summaries,
+    resolved_forward=_resolve_forward_evidence(
+        backtest.get("strategy"),
+        runtime_forward_summaries,
+        manual_summaries,
+    )
+    if resolved_forward["needs_manual_selection"]:
+        selected=st.selectbox(
+            "Relacionar o Passaporte ao setup do diário manual",
+            resolved_forward["available_setups"],
+            key="atlasquant_admin_forward_setup_link",
         )
-        if matched_setup is None and forward_source=="MANUAL_JOURNAL":
-            options=sorted(forward_summaries)
-            selected=st.selectbox(
-                "Relacionar o Passaporte ao setup do diário manual",
-                options,
-                key="atlasquant_admin_forward_setup_link",
-            )
-            matched_setup=selected
-            forward_summary=dict(forward_summaries.get(selected,{}) or {})
-        elif matched_setup is None:
-            st.info(
-                "Existe evidência Paper explícita para outros setups, mas não para este operacional. "
-                "Ela não será reaproveitada em outro setup."
-            )
-        if matched_setup is not None:
-            st.caption(
-                f"Paper/Forward relacionado: {matched_setup} · fonte {forward_source}"
-            )
+        resolved_forward=_resolve_forward_evidence(
+            backtest.get("strategy"),
+            runtime_forward_summaries,
+            manual_summaries,
+            manual_selected=selected,
+        )
+
+    matched_setup=resolved_forward["matched_setup"]
+    forward_summary=dict(resolved_forward["summary"] or {})
+    forward_source=resolved_forward["source"]
+    if matched_setup is None and forward_source=="RUNTIME_EXPLICIT" and runtime_forward_summaries:
+        st.info(
+            "Existe evidência Paper explícita para outros setups, mas não para este operacional. "
+            "Ela não será reaproveitada em outro setup."
+        )
+    if matched_setup is not None:
+        st.caption(
+            f"Paper/Forward relacionado: {matched_setup} · fonte {forward_source}"
+        )
 
     shadow_samples=list(st.session_state.get("atlasquant_shadow_samples",[]) or [])
     shadow_summary=summarize_shadow(shadow_samples) if shadow_samples else {}
@@ -587,6 +618,7 @@ __all__=[
     "behavior_template_csv",
     "_journal_records_from_frame",
     "_match_forward_summary",
+    "_resolve_forward_evidence",
     "_research_history_rows",
     "render_admin_research_panel",
 ]
