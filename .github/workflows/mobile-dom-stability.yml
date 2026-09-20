@@ -177,7 +177,12 @@ jobs:
               assert_clean(page,"beginner-initial",page_errors)
 
               # Enter advanced mode. Streamlit radio interaction itself reruns the app.
-              advanced=page.get_by_text("Avançado",exact=True)
+              experience=page.locator('[data-testid="stRadio"]').filter(has_text="Experiência").first
+              advanced=experience.get_by_text("Avançado",exact=True)
+              if advanced.count()<1:
+                  # Streamlit may render the radio option text inside a label span;
+                  # scope to the Experience widget first to avoid page-text ambiguity.
+                  advanced=experience.locator('label').filter(has_text="Avançado")
               if advanced.count()<1:
                   errors.append("controle Avançado não encontrado")
               else:
@@ -223,12 +228,14 @@ jobs:
               # A fast sequence of experience toggles exercises the rerender boundary
               # that previously coincided with the mobile removeChild screenshot.
               for cycle in range(2):
-                  beginner=page.get_by_text("Iniciante",exact=True)
+                  experience=page.locator('[data-testid="stRadio"]').filter(has_text="Experiência").first
+                  beginner=experience.get_by_text("Iniciante",exact=True)
                   if beginner.count():
                       beginner.first.click()
                       wait_radar_state(page,timeout=90_000)
                       assert_clean(page,f"cycle-{cycle}-beginner",page_errors)
-                  advanced=page.get_by_text("Avançado",exact=True)
+                  experience=page.locator('[data-testid="stRadio"]').filter(has_text="Experiência").first
+                  advanced=experience.get_by_text("Avançado",exact=True)
                   if advanced.count():
                       advanced.first.click()
                       wait_text(page,"Área avançada",timeout=120_000)
