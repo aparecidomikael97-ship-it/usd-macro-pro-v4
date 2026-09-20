@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 from hashlib import sha256
 import json
+from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
 
 import requests
@@ -24,6 +25,20 @@ def _canonical_json(value:Any)->str:
     return json.dumps(value,ensure_ascii=False,sort_keys=True,separators=(",",":"),default=str)
 
 
+def _timestamp_key(value:Any)->tuple[int,float,str]:
+    raw=str(value or "").strip()
+    if not raw:
+        return (0,0.0,"")
+    try:
+        normalized=raw[:-1]+"+00:00" if raw.endswith("Z") else raw
+        dt=datetime.fromisoformat(normalized)
+        if dt.tzinfo is None:
+            dt=dt.replace(tzinfo=timezone.utc)
+        return (1,dt.astimezone(timezone.utc).timestamp(),raw)
+    except Exception:
+        return (0,0.0,raw)
+
+
 def evidence_record(
     *,
     strategy:object,
@@ -33,11 +48,20 @@ def evidence_record(
     evidence:Mapping[str,Any]|None=None,
     pair:object="",
 )->dict[str,Any]:
+    strategy_name=str(strategy or "").strip()
+    captured=str(captured_at or "").strip()
+    source_name=str(source or "").strip().upper()
+    if not strategy_name:
+        raise ValueError("strategy is required")
+    if not captured:
+        raise ValueError("captured_at is required")
+    if not source_name:
+        raise ValueError("source is required")
     payload={
         "schema":SCHEMA,
-        "strategy":str(strategy or "").strip(),
-        "captured_at":str(captured_at or "").strip(),
-        "source":str(source or "").strip().upper(),
+        "strategy":strategy_name,
+        "captured_at":captured,
+        "source":source_name,
         "pair":str(pair or "").strip().upper(),
         "passport":dict(passport or {}),
         "evidence":dict(evidence or {}),
@@ -115,7 +139,7 @@ def latest_evidence_by_strategy(
         if not strategy:
             continue
         current=out.get(strategy)
-        if current is None or str(row.get("captured_at") or "")>=str(current.get("captured_at") or ""):
+        if current is None or _timestamp_key(row.get("captured_at"))>=_timestamp_key(current.get("captured_at")):
             out[strategy]=row
     return out
 
