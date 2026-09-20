@@ -227,6 +227,41 @@ class OperationalBacktestTests(unittest.TestCase):
         self.assertEqual([r["outcome"] for r in rows],["GAIN","GAIN"])
 
 
+    def test_point_in_time_diagnostic_context_is_preserved_on_result(self):
+        d=candles([
+            (10,10.1,9.9,10.0),
+            (10,10.2,9.9,10.0),
+            (10,12.2,9.9,12.0),
+        ])
+        plan={
+            "signal_time":d.iloc[0]["datetime"],
+            "pair":"EUR/USD",
+            "setup":"FVG",
+            "side":"BUY",
+            "entry":10.0,
+            "stop":9.0,
+            "target":12.0,
+            "macro_alignment":1,
+            "technical_confirmation":True,
+            "liquidity_confirmation":True,
+            "regime_fit":True,
+            "regime":"TREND",
+            "known_high_impact_event":False,
+            "data_quality_pct":94,
+            "plan_followed":True,
+            "event_label":"CPI",
+            "event_impact":"HIGH",
+            "event_time":"2026-09-15T00:20:00+00:00",
+            "event_known_before_entry":True,
+        }
+        out=backtest_signal(d,plan)
+        self.assertEqual(out["outcome"],"GAIN")
+        self.assertEqual(out["macro_alignment"],1)
+        self.assertTrue(out["technical_confirmation"])
+        self.assertEqual(out["regime"],"TREND")
+        self.assertEqual(out["data_quality_pct"],94)
+        self.assertEqual(out["event_label"],"CPI")
+
     def test_mixed_timestamp_formats_are_normalized_without_losing_valid_rows(self):
         d=pd.DataFrame([
             {"datetime":"2026-09-15T00:00:00Z","open":10,"high":10.2,"low":9.8,"close":10},
