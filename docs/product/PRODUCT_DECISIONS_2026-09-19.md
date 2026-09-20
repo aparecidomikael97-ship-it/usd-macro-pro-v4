@@ -106,3 +106,23 @@ Candidatos para validação, não para promoção automática:
 O AtlasQuant deve ser poderoso por dentro e simples por fora.
 
 Nenhuma melhoria de interface, Academy, voz ou ranking habilita broker ou ordens reais.
+
+
+## Expansão de ecossistema — 20/09/2026
+
+Foi aprovada como direção futura a experiência **Operar / Investir / Os dois**.
+
+Regras fixadas:
+- o AtlasQuant pode comparar investimentos e projetar cenários, mas nunca afirmar ganho, dividendo ou valorização garantidos;
+- renda fixa, FIIs, ações de dividendos e empresas em crescimento entram como trilha de análise/educação, com riscos e dados transparentes;
+- o Planejador de Patrimônio deve mostrar aporte, rendimento projetado, reinvestimento, renda mensal e evolução em vários horizontes;
+- o Radar de Dividendos prioriza sustentabilidade/qualidade, não somente yield;
+- o Radar de Crescimento cria lista de observação, não recomendação automática;
+- o Agente de Comportamento Financeiro não será apresentado como psicólogo;
+- o Guardião de Risco é requisito de segurança antes de qualquer execução real;
+- o Admin terá copiloto e resumos automáticos, mas promoção de setups ao modo Iniciante exige evidência robusta;
+- a arquitetura alvo é 24/7 no servidor, independente de o aplicativo estar aberto;
+- a comercialização futura preferida é assinatura/mensalidade;
+- fontes pagas serão escolhidas por custo-benefício + qualidade + licença de redistribuição, depois da validação privada.
+
+Especificação completa: `docs/product/INVESTMENT_ECOSYSTEM_FOUNDATION_2026-09-20.md`.

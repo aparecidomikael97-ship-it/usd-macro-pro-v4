@@ -245,3 +245,25 @@ Cada bloco deve preferir:
 Implementar → testar → corrigir → confirmar CI → congelar checkpoint → gerar ZIP em marcos relevantes.
 
 Nada neste backlog é justificativa para misturar todas as features de uma vez. A ordem deve preservar o núcleo estável e a rastreabilidade.
+
+
+## 13. Ecossistema Operar + Investir
+
+A expansão consolidada em 20/09/2026 passa a incluir três caminhos de entrada: **Operar**, **Investir** ou **Os dois**. A visão detalhada está em `docs/product/INVESTMENT_ECOSYSTEM_FOUNDATION_2026-09-20.md`.
+
+Pontos obrigatórios para as fases futuras:
+- Planejador de Patrimônio no próprio app, sem dependência de Excel;
+- simulações com aportes recorrentes e horizontes longos, incluindo experiência "Comece com pouco";
+- Radar de Renda/Dividendos e Radar de Crescimento com comparação e riscos, sem promessa de retorno;
+- educação financeira, reserva, liquidez, impostos, diversificação e prevenção a golpes;
+- Agente de Comportamento Financeiro, sem se apresentar como psicólogo;
+- possibilidade futura de realocar resultado operacional para construção patrimonial;
+- day, swing, position e investimento tratados como horizontes distintos;
+- Gestor de Posição por Evento antes/depois de indicadores e bancos centrais;
+- motor 24/7 independente do app aberto;
+- Copiloto do Admin com relatórios de desempenho, falhas e robustez;
+- modelo comercial futuro por assinatura, condicionado a validação e licenciamento;
+- backup, portabilidade e ambiente paper separado;
+- Guardião de Risco obrigatório antes de qualquer execução real.
+
+A fundação inicial de código fica isolada em `atlasquant_investment_ecosystem.py` e `atlasquant_risk_guardian.py`, sem habilitar broker ou ordens reais.
