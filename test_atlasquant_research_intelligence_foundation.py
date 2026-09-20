@@ -21,6 +21,11 @@ from atlasquant_operational_passport import (
 from atlasquant_weekly_profile import analyze_weekly_extremes
 from atlasquant_behavior_shift import BehaviorStats, detect_behavior_shift
 from atlasquant_passport_evidence import EvidenceCriteria, fuse_operational_evidence
+from atlasquant_passport_drift import (
+    compare_passport_records,
+    latest_passport_drift,
+    passport_drift_rows,
+)
 from atlasquant_research_evidence_capture import hydrate_research_evidence
 from atlasquant_research_evidence_store import (
     evidence_record,
@@ -539,6 +544,68 @@ class PassportEvidenceFusionTests(unittest.TestCase):
             out["backtest_paper_comparison"]["expectancy_gap_r"],
             -0.42,
         )
+
+
+class PassportDriftTests(unittest.TestCase):
+    def _record(self,captured_at,*,expectancy,pf,dd,quality,gap,state="HUMAN_REVIEW_CANDIDATE"):
+        return evidence_record(
+            strategy="FVG",
+            captured_at=captured_at,
+            source="BACKTEST",
+            passport={
+                "strategy":"FVG",
+                "data_quality_pct":quality,
+                "observed_metrics":{
+                    "trades":150,
+                    "expectancy_r":expectancy,
+                    "profit_factor":pf,
+                    "max_drawdown_r":dd,
+                },
+            },
+            evidence={
+                "evidence_ladder":{
+                    "state":state,
+                    "evidence_coverage_pct":100,
+                    "backtest_paper_comparison":{"expectancy_gap_r":gap},
+                }
+            },
+        )
+
+    def test_drift_alerts_on_research_degradation_without_auto_change(self):
+        previous=self._record(
+            "2026-09-19T12:00:00Z",
+            expectancy=0.30,pf=1.6,dd=5,quality=95,gap=-0.03,
+        )
+        current=self._record(
+            "2026-09-20T12:00:00Z",
+            expectancy=0.10,pf=1.2,dd=9,quality=75,gap=-0.22,
+            state="EVIDENCE_GAPS",
+        )
+        out=compare_passport_records(previous,current)
+        codes={x["code"] for x in out["alerts"]}
+        self.assertIn("EXPECTANCY_DROP",codes)
+        self.assertIn("PROFIT_FACTOR_DROP",codes)
+        self.assertIn("DRAWDOWN_INCREASE",codes)
+        self.assertIn("DATA_QUALITY_DROP",codes)
+        self.assertIn("PAPER_GAP_WIDENED",codes)
+        self.assertIn("EVIDENCE_STATE_REGRESSED",codes)
+        self.assertTrue(out["review_required"])
+        self.assertFalse(out["automatic_strategy_change"])
+        self.assertFalse(out["automatic_weight_change"])
+        self.assertFalse(out["automatic_gate_change"])
+        self.assertFalse(out["real_orders_enabled"])
+
+    def test_latest_drift_uses_only_last_two_records_per_strategy(self):
+        a=self._record("2026-09-18T12:00:00Z",expectancy=0.40,pf=1.7,dd=4,quality=95,gap=-0.02)
+        b=self._record("2026-09-19T12:00:00Z",expectancy=0.35,pf=1.6,dd=4.5,quality=94,gap=-0.03)
+        c=self._record("2026-09-20T12:00:00Z",expectancy=0.34,pf=1.58,dd=4.6,quality=93,gap=-0.04)
+        rows=latest_passport_drift([c,a,b])
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]["previous"]["captured_at"],"2026-09-19T12:00:00Z")
+        self.assertEqual(rows[0]["current"]["captured_at"],"2026-09-20T12:00:00Z")
+        self.assertFalse(rows[0]["review_required"])
+        compact=passport_drift_rows([a,b,c])
+        self.assertEqual(compact[0]["strategy"],"FVG")
 
 
 class ResearchEvidenceStoreTests(unittest.TestCase):
