@@ -442,8 +442,14 @@ class PassportEvidenceFusionTests(unittest.TestCase):
         out=fuse_operational_evidence(
             self._passport(),
             paper_summary=paper,
-            temporal_status="STABLE",
-            walk_forward_status="POSITIVE",
+            temporal_status="POSITIVE_ACROSS_FOLDS",
+            walk_forward_status="POSITIVE_ALL_OOS_WINDOWS",
+            friction_status="POSITIVE_ALL_TESTED_FRICTION",
+            parameter_status="POSITIVE_ALL_PREDEFINED_VARIANTS",
+            positive_fold_pct=75,
+            oos_positive_pct=67,
+            friction_positive_pct=75,
+            parameter_positive_pct=70,
             shadow_summary=shadow,
             criteria=EvidenceCriteria(require_shadow=True),
         )
@@ -457,21 +463,53 @@ class PassportEvidenceFusionTests(unittest.TestCase):
     def test_good_backtest_without_paper_stays_pending(self):
         out=fuse_operational_evidence(
             self._passport(),
-            temporal_status="STABLE",
-            walk_forward_status="POSITIVE",
+            temporal_status="POSITIVE_ACROSS_FOLDS",
+            walk_forward_status="POSITIVE_ALL_OOS_WINDOWS",
+            friction_status="POSITIVE_ALL_TESTED_FRICTION",
+            parameter_status="POSITIVE_ALL_PREDEFINED_VARIANTS",
+            positive_fold_pct=75,
+            oos_positive_pct=67,
+            friction_positive_pct=75,
+            parameter_positive_pct=70,
         )
         self.assertEqual(out["state"],"PAPER_EVIDENCE_PENDING")
         self.assertFalse(out["eligible_for_human_review"])
         self.assertIn("paper_sample",out["failures"])
         self.assertIn("paper_backtest_alignment",out["failures"])
 
+    def test_negative_or_weak_robustness_does_not_count_as_sufficient(self):
+        paper={"forward_samples":40,"forward_expectancy_r":0.18}
+        out=fuse_operational_evidence(
+            self._passport(),
+            paper_summary=paper,
+            temporal_status="MIXED_ACROSS_FOLDS",
+            walk_forward_status="MIXED_OOS_WINDOWS",
+            friction_status="BREAKS_UNDER_TESTED_FRICTION",
+            parameter_status="MIXED_PREDEFINED_VARIANTS",
+            positive_fold_pct=33,
+            oos_positive_pct=33,
+            friction_positive_pct=50,
+            parameter_positive_pct=33,
+        )
+        self.assertFalse(out["checks"]["temporal_diagnostic"])
+        self.assertFalse(out["checks"]["walk_forward_diagnostic"])
+        self.assertFalse(out["checks"]["friction_diagnostic"])
+        self.assertFalse(out["checks"]["parameter_diagnostic"])
+        self.assertFalse(out["eligible_for_human_review"])
+
     def test_paper_gap_is_descriptive_and_can_block_review(self):
         paper={"forward_samples":50,"forward_expectancy_r":-0.20}
         out=fuse_operational_evidence(
             self._passport(),
             paper_summary=paper,
-            temporal_status="STABLE",
-            walk_forward_status="POSITIVE",
+            temporal_status="POSITIVE_ACROSS_FOLDS",
+            walk_forward_status="POSITIVE_ALL_OOS_WINDOWS",
+            friction_status="POSITIVE_ALL_TESTED_FRICTION",
+            parameter_status="POSITIVE_ALL_PREDEFINED_VARIANTS",
+            positive_fold_pct=75,
+            oos_positive_pct=67,
+            friction_positive_pct=75,
+            parameter_positive_pct=70,
         )
         self.assertEqual(out["state"],"EVIDENCE_GAPS")
         self.assertFalse(out["checks"]["paper_backtest_alignment"])
