@@ -34,31 +34,6 @@ RESEARCH_WEIGHTS={
     "technical_flow":0.30,
 }
 
-RISK_SENSITIVITY={
-    "USD":0.35,
-    "JPY":0.85,
-    "CHF":0.80,
-    "EUR":-0.20,
-    "GBP":-0.20,
-    "CAD":-0.55,
-    "AUD":-0.75,
-    "NZD":-0.75,
-}
-
-GEO_RISK_OFF=(
-    "war","conflict","attack","missile","invasion","escalat","sanction",
-    "embargo","blockade","geopolitical tension","trade war","export ban",
-    "political crisis","state of emergency","military strike","hostilities",
-)
-GEO_RISK_ON=(
-    "ceasefire","peace deal","peace talks","de-escal","truce",
-    "sanctions relief","diplomatic agreement","diplomatic breakthrough",
-)
-GEO_CONTEXT=(
-    "geopolit","sanction","tariff","trade restriction","export control",
-    "election uncertainty","political uncertainty","government crisis",
-)
-
 
 def _finite(value:Any,default:float=0.0)->float:
     try:
@@ -187,32 +162,6 @@ def macro_layer(
     out["macro_conflict"]=bool(engine.get("macro_conflict",False))
     out["groups"]=list(engine.get("groups",[]) or [])
     return out
-
-def _geo_article_score(article:Mapping[str,Any])->tuple[float,list[str]]:
-    title=_norm(article.get("title",""))
-    if not title:
-        return 0.0,[]
-    off=sum(1 for term in GEO_RISK_OFF if term in title)
-    on=sum(1 for term in GEO_RISK_ON if term in title)
-    context=sum(1 for term in GEO_CONTEXT if term in title)
-    if not (off or on or context):
-        return 0.0,[]
-    raw=float(off-on)
-    if raw==0 and context:
-        raw=0.35
-    rec=max(0.15,min(1.0,_finite(article.get("recency_factor",1.0),1.0)))
-    source=max(0.50,min(1.35,_finite(article.get("source_factor",1.0),1.0)))
-    independent=max(0.30,min(1.0,_finite(article.get("independence_factor",1.0),1.0)))
-    score=max(-2.0,min(2.0,raw))*rec*source*independent
-    tags=[]
-    if off:
-        tags.append("risk-off/escalada")
-    if on:
-        tags.append("descompressão/peace")
-    if context:
-        tags.append("política/comércio")
-    return score,tags
-
 
 def geopolitical_layer(
     pair:object,
