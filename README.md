@@ -20,7 +20,7 @@ A preparação comercial interna inclui:
 - inventário técnico das fontes de dados/licenciamento;
 - checklists e metadados para empacotamento nativo.
 
-Isso **não** significa lançamento público concluído. Revisão jurídica, licenças comerciais dos provedores, provedor real de pagamentos, TTS externo, renderização/publicação dos vídeos e pacotes assinados/publicação nas lojas continuam dependências externas.
+Isso **não** significa lançamento público concluído. Configuração/validação do primeiro ADMIN em produção, revisão jurídica, licenças comerciais dos provedores, provedor real de pagamentos, TTS externo, renderização/publicação dos vídeos e pacotes assinados/publicação nas lojas continuam dependências externas.
 
 Para o estado detalhado da release atual, consulte `docs/release/ATLASQUANT_RELEASE_FINAL.md`. Para o primeiro acesso, use `docs/release/USER_QUICKSTART.md`.
 
