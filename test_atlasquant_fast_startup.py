@@ -3,6 +3,8 @@ from datetime import datetime, timezone, timedelta
 
 from atlasquant_fast_startup import (
     SCHEMA,
+    build_legacy_home_snapshot,
+    legacy_ranking_rows,
     snapshot_age_minutes,
     validate_home_snapshot,
 )
@@ -96,6 +98,48 @@ class FastStartupTests(unittest.TestCase):
         from pathlib import Path
         src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
         self.assertIn('os.getenv("USD_MACRO_AUTOPILOT", "") != "1"',src)
+
+
+    def test_legacy_ranking_reconstructs_usd_centric_pairs(self):
+        inputs={
+            "pairs":[
+                {"Par":"EUR/USD","Dif. macro":-20.7},
+                {"Par":"USD/JPY","Dif. macro":25.4},
+            ],
+            "macro_context":{"usd_score":60.0},
+        }
+        rows={r["Código"]:r["Pontuação_Final"] for r in legacy_ranking_rows(inputs)}
+        self.assertAlmostEqual(rows["USD"],60.0,places=4)
+        self.assertAlmostEqual(rows["EUR"],39.3,places=4)
+        self.assertAlmostEqual(rows["JPY"],34.6,places=4)
+
+    def test_legacy_runtime_cache_builds_safe_home_snapshot(self):
+        generated=(self.now-timedelta(minutes=20)).isoformat()
+        inputs={
+            "generated_at":generated,
+            "app_version":"test",
+            "pairs":[
+                {
+                    "Par":"EUR/USD","Direção":"🔴 VENDA EUR/USD",
+                    "Score final":80.0,"Qualidade":75.0,
+                    "Confluência":"ALTA","Dif. macro":-20.0,
+                    "Índice ranking":78.0,
+                }
+            ],
+            "macro_context":{
+                "usd_score":60.0,"usd_quality":90.0,
+                "fed_tone":"Restritivo","fed_strength":0.4,
+                "event":{"disponivel":False},
+            },
+        }
+        out=build_legacy_home_snapshot(inputs,{"resultados":{}},{"contexts":{}},{})
+        check=validate_home_snapshot(out,now=self.now,max_age_min=90)
+        self.assertTrue(check["valid"],check["errors"])
+        self.assertEqual(out["inputs"]["fast_boot"]["source"],"legacy-runtime-cache")
+        self.assertEqual(len(out["packs"]),1)
+        self.assertFalse(out["safety"]["real_orders"])
+        self.assertFalse(out["safety"]["automatic_execution"])
+        self.assertFalse(out["packs"][0]["executable"])
 
 
 if __name__=="__main__":
