@@ -524,11 +524,17 @@ def render_market_layers_panel(
             if layer["detail"]:
                 st.caption(layer["detail"])
             st.divider()
+    consensus=dict(result.get("consensus",{}) or {})
+    state=str(consensus.get("research_state","AGUARDAR"))
+    blockers=list(consensus.get("blockers",[]) or [])
     st.info(
-        f"Saldo de pesquisa: {result['research_balance']:+.1f} · "
-        f"{result['research_direction']} · {result['available_layers']}/4 camadas disponíveis. "
+        f"Consenso de pesquisa: {state} · saldo {result['research_balance']:+.1f} · "
+        f"{result['available_layers']}/4 camadas disponíveis · "
+        f"concordância {_finite(consensus.get('agreement_pct',0)):.0f}%. "
         "Não entra no Score Mestre enquanto não for validado."
     )
+    if blockers:
+        st.warning("Bloqueios do consenso: "+" · ".join(str(x) for x in blockers[:3]))
     return result
 
 
