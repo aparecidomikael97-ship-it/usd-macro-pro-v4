@@ -22,6 +22,7 @@ from typing import Any, Mapping, Sequence
 import streamlit as st
 
 from atlasquant_layer_consensus import build_layer_consensus
+from atlasquant_macro_engine import build_structured_macro
 
 SCHEMA="ATLASQUANT_MARKET_LAYERS_V1"
 LAYER_ORDER=("macro","geopolitics","micro","technical_flow")
@@ -136,45 +137,54 @@ def macro_layer(
     diff=_finite(p.get("macro_diff",p.get("strength_diff",0)))
     data=p.get("data_ready")
     data_score=_finite((data or {}).get("score",0)) if isinstance(data,Mapping) else _finite(p.get("data_score",0))
-    pair_quality=max(_finite(p.get("quality",0)),data_score)
-    reasons=[]
-    risks=[]
+    pair_quality=max(_finite(p.get("quality",0)),data_score,_finite(m.get("usd_quality",0)))
 
-    if abs(diff)>0.01:
-        stronger=base if diff>0 else quote
-        weaker=quote if diff>0 else base
-        reasons.append(f"{stronger} está {abs(diff):.1f} pts acima de {weaker} na força macro relativa.")
-    else:
-        reasons.append("Diferença macro relativa sem vantagem clara no estado atual.")
+    engine=build_structured_macro(
+        pair,
+        m,
+        legacy_balance=_clip(diff*4.0),
+        legacy_quality=pair_quality,
+    )
+    reasons=list(engine.get("reasons",[]) or [])
+    risks=list(engine.get("risks",[]) or [])
+
+    if not reasons:
+        if abs(diff)>0.01:
+            stronger=base if diff>0 else quote
+            weaker=quote if diff>0 else base
+            reasons.append(f"{stronger} está {abs(diff):.1f} pts acima de {weaker} na força macro relativa.")
+        else:
+            reasons.append("Diferença macro relativa sem vantagem clara no estado atual.")
 
     fed=dict(m.get("fed",{}) or {})
     fed_tone=str(fed.get("tom",m.get("fed_tone","")) or "").strip()
     fed_strength=_finite(fed.get("forca",m.get("fed_strength",0)))
-    if "USD" in {base,quote} and fed_tone:
+    if "USD" in {base,quote} and fed_tone and not any("fed" in _norm(x) for x in reasons):
         reasons.append(f"Fed: {fed_tone} · intensidade {fed_strength:+.2f}.")
+
     event=m.get("event")
-    if isinstance(event,Mapping) and event.get("disponivel"):
+    if isinstance(event,Mapping) and event.get("disponivel") and not any("proximo evento" in _norm(x) for x in risks):
         name=str(event.get("evento") or "evento macro")
         impact=str(event.get("impacto") or "")
         risks.append(f"Próximo evento: {name}{' · '+impact if impact else ''}.")
 
-    available=bool(
-        abs(diff)>0.01
-        or pair_quality>0
-        or fed_tone
-        or _finite(m.get("usd_score",0))>0
-    )
-    balance=_clip(diff*4.0)
-    return _layer(
+    out=_layer(
         "macro","Macro",
-        available=available,
-        balance=balance,
-        quality=pair_quality or _finite(m.get("usd_quality",0)),
+        available=bool(engine.get("available",False)),
+        balance=_finite(engine.get("balance",0)),
+        quality=_finite(engine.get("quality",0)),
         reasons=reasons,
         risks=risks,
-        detail="Saldo observacional derivado da força macro relativa já calculada. Não é probabilidade.",
+        detail=(
+            f"Motor macro {engine.get('mode','insufficient')} · cobertura "
+            f"{_finite(engine.get('coverage',0)):.0f}% · juros, inflação, emprego, "
+            "crescimento/atividade, expectativas/surpresas e bancos centrais. Não é probabilidade."
+        ),
     )
-
+    out["engine_mode"]=str(engine.get("mode") or "insufficient")
+    out["coverage"]=round(_finite(engine.get("coverage",0)),1)
+    out["groups"]=list(engine.get("groups",[]) or [])
+    return out
 
 def _geo_article_score(article:Mapping[str,Any])->tuple[float,list[str]]:
     title=_norm(article.get("title",""))
