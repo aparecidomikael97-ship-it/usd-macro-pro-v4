@@ -43,8 +43,16 @@ def compare_backtest_paper(evidence: Mapping[str, Any] | None) -> dict[str, Any]
     paper_dd = _finite(source.get("forward_max_drawdown_r"))
     paper_win_rate = _finite(source.get("forward_win_rate_pct"))
 
-    required = (backtest_samples, paper_samples, backtest_expectancy, paper_expectancy)
-    comparable = all(value is not None for value in required)
+    required_metrics_present = all(
+        value is not None for value in (backtest_expectancy, paper_expectancy)
+    )
+    samples_present = (
+        backtest_samples is not None
+        and paper_samples is not None
+        and backtest_samples > 0
+        and paper_samples > 0
+    )
+    comparable = required_metrics_present and samples_present
     expectancy_gap = None
     expectancy_retention_pct = None
     if comparable:
