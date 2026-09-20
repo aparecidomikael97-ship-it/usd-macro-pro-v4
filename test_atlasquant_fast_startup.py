@@ -78,5 +78,24 @@ class FastStartupTests(unittest.TestCase):
         self.assertIn("schema",out["errors"])
 
 
+    def test_main_attempts_fast_shell_before_heavy_provider_boot(self):
+        from pathlib import Path
+        src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        shell=src.index("load_home_snapshot(")
+        macro=src.index("macro_eua = carregar_macro_eua()")
+        fed=src.index("fed = carregar_narrativa_fed()")
+        currencies=src.index("dados_moedas = carregar_dados_moedas()")
+        self.assertLess(shell,macro)
+        self.assertLess(shell,fed)
+        self.assertLess(shell,currencies)
+        self.assertIn("if bool(_fast_result.get(\"handled\",False)):",src[shell:macro])
+        self.assertIn("st.stop()",src[shell:macro])
+
+    def test_headless_autopilot_never_uses_fast_shell(self):
+        from pathlib import Path
+        src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        self.assertIn('os.getenv("USD_MACRO_AUTOPILOT", "") != "1"',src)
+
+
 if __name__=="__main__":
     unittest.main()
