@@ -122,7 +122,7 @@ def run_dev_preflight(
     checks.append(_check(
         "role_portal_integrated",
         "from atlasquant_account_portal import render_account_portal" in app
-        and 'with abas[16]:' in app
+        and ('if _aq_active_index == 16:' in app or 'with abas[16]:' in app)
         and 'render_account_portal(_ATLASQUANT_ACCESS)' in app
         and '"Trading real","DESATIVADO"' in account_portal,
         "Portal USER/SALES/ADMIN integrado sem habilitar trading real.",
@@ -132,7 +132,7 @@ def run_dev_preflight(
     checks.append(_check(
         "platform_center_integrated",
         "from atlasquant_platform_center import render_platform_center" in app
-        and 'with abas[17]:' in app
+        and ('if _aq_active_index == 17:' in app or 'with abas[17]:' in app)
         and "render_platform_center()" in app
         and '"Google Play","Distribuição atual":"PENDENTE"' in platform_center
         and '"Apple App Store","Distribuição atual":"PENDENTE"' in platform_center,
@@ -156,7 +156,7 @@ def run_dev_preflight(
     checks.append(_check(
         "sales_center_integrated",
         "from atlasquant_sales_center import render_sales_center" in app
-        and 'with abas[18]:' in app
+        and ('if _aq_active_index == 18:' in app or 'with abas[18]:' in app)
         and "render_sales_center(_ATLASQUANT_ACCESS)" in app
         and "Área comercial restrita aos perfis SALES e ADMIN autenticados." in sales_center,
         "Portal SALES integrado e protegido por perfil autenticado.",
