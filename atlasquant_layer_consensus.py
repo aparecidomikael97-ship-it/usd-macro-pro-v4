@@ -42,6 +42,14 @@ def build_layer_consensus(result: Mapping[str, Any] | None) -> dict[str, Any]:
     if strong_pos and strong_neg and spread >= CONFLICT_SPREAD:
         blockers.append("CONFLITO FORTE: camadas independentes apontam direções opostas.")
 
+    for layer in available:
+        layer_name = str(layer.get("label") or layer.get("id") or "Camada")
+        for item in list(layer.get("research_blockers", []) or []):
+            msg = str(item).strip()
+            if msg:
+                blockers.append(f"{layer_name}: {msg}")
+    blockers = list(dict.fromkeys(blockers))
+
     balance = _finite(r.get("research_balance", 0))
     direction = "COMPRA" if balance >= DIRECTION_THRESHOLD else "VENDA" if balance <= -DIRECTION_THRESHOLD else "NEUTRO"
     if blockers:
