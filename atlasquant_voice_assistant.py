@@ -102,6 +102,10 @@ def assistant_context(
         event={}
     pair=_text(r.get("pair"),"este ativo")
     action=_action(r)
+    ready_raw=r.get("data_ready")
+    ready_map=dict(ready_raw) if isinstance(ready_raw,Mapping) else {}
+    data_score_raw=r.get("data_score",ready_map.get("score",0))
+    data_sufficient=bool(ready_map.get("sufficient",False)) if ready_map else bool(ready_raw)
     return {
         "schema":SCHEMA,
         "pair":pair,
@@ -112,7 +116,7 @@ def assistant_context(
         "next_action":_text(r.get("next_action"),"aguardar confirmação válida"),
         "priority":max(0.0,min(100.0,_safe(r.get("priority",0)))),
         "quality":max(0.0,min(100.0,_safe(r.get("quality",0)))),
-        "data_score":max(0.0,min(100.0,_safe(r.get("data_score",(r.get("data_ready",{}) or {}).get("score",0))))),
+        "data_score":max(0.0,min(100.0,_safe(data_score_raw))),
         "h4":_text(r.get("h4")),
         "h1":_text(r.get("h1")),
         "m15":_text(r.get("m15")),
@@ -135,7 +139,7 @@ def assistant_context(
         "fed_tone":_text(fed.get("tom",macro.get("fed_tone")),"neutro"),
         "fed_strength":_safe(fed.get("forca",macro.get("fed_strength",0)),0),
         "usd_score":_safe(macro.get("usd_score",0),0),
-        "data_sufficient":bool(r.get("data_ready",False)) if not isinstance(r.get("data_ready"),Mapping) else bool((r.get("data_ready") or {}).get("sufficient",False)),
+        "data_sufficient":data_sufficient,
         "real_orders_enabled":False,
         "automatic_execution":False,
     }
