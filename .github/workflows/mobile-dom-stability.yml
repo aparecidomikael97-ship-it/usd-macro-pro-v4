@@ -122,11 +122,10 @@ jobs:
               return False
 
           def select_area(page,label):
-              combos=page.get_by_role("combobox")
-              count=combos.count()
-              if count < 1:
-                  raise RuntimeError("combobox de navegação não encontrado")
-              combo=combos.last
+              nav=page.locator('[data-testid="stSelectbox"]').filter(has_text="Área avançada")
+              if nav.count()<1:
+                  raise RuntimeError("selectbox Área avançada não encontrado")
+              combo=nav.first.get_by_role("combobox")
               combo.click()
               option=page.get_by_role("option",name=label,exact=True)
               if option.count()<1:
