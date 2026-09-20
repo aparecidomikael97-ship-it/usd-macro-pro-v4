@@ -1264,6 +1264,46 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                     hide_index=True,
                 )
 
+                suite_intelligence={}
+                passport_rows=[]
+                for strategy_id,pack in suite.items():
+                    intel=backtest_intelligence_bundle(
+                        list(pack.get("results",[]) or []),
+                        strategy=str(pack.get("label") or strategy_id),
+                    )
+                    suite_intelligence[strategy_id]=intel
+                    passport=dict(intel.get("passport",{}) or {})
+                    observed=dict(passport.get("observed_metrics",{}) or {})
+                    coverage=dict(passport.get("coverage",{}) or {})
+                    passport_rows.append({
+                        "strategy":strategy_id,
+                        "operacional":str(pack.get("label") or strategy_id),
+                        "trades":int(observed.get("trades",0) or 0),
+                        "expectancy_r":observed.get("expectancy_r"),
+                        "profit_factor":observed.get("profit_factor"),
+                        "max_drawdown_r":observed.get("max_drawdown_r"),
+                        "assets":int(coverage.get("assets",0) or 0),
+                        "sessions":int(coverage.get("sessions",0) or 0),
+                        "regimes":int(coverage.get("regimes",0) or 0),
+                        "context_complete_pct":intel.get("rich_context_pct"),
+                        "passport_state":passport.get("state"),
+                        "evidence_gaps":" · ".join(str(x) for x in passport.get("evidence_flags",[]) or []),
+                        "automatic_promotion":False,
+                    })
+                st.session_state["atlasquant_last_strategy_suite_intelligence"]={
+                    "pair":default_pair,
+                    "strategies":suite_intelligence,
+                    "passport_rows":passport_rows,
+                    "automatic_promotion":False,
+                    "real_orders_enabled":False,
+                }
+                st.markdown("#### 🪪 Passaportes dos 5 operacionais")
+                st.caption(
+                    "O Passaporte junta amostra, drawdown, cobertura e lacunas de validação. "
+                    "Ele não escolhe automaticamente o melhor operacional e não libera execução."
+                )
+                st.dataframe(pd.DataFrame(passport_rows),width="stretch",hide_index=True)
+
                 evidence_settings={
                     "pair":default_pair,
                     "max_wait_bars":int(max_wait),
