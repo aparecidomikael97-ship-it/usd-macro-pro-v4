@@ -181,6 +181,24 @@ class GeopoliticalEngineTests(unittest.TestCase):
         out=build_geopolitical_context("EUR/USD",state)
         self.assertFalse(out["available"])
 
+    def test_critical_uncorroborated_event_creates_advisory_blocker(self):
+        state={"geopolitical_events":[{
+            "event_id":"CRIT-1",
+            "title":"Major escalation after invasion",
+            "category":"conflict",
+            "source":"Single source",
+            "quality":90,
+            "severity":"critical",
+            "duration":"long",
+            "currency_impacts":{"EUR":-70,"USD":25},
+        }]}
+        out=build_geopolitical_context("EUR/USD",state)
+        self.assertTrue(out["available"])
+        self.assertEqual(out["severity"],"CRÍTICO")
+        self.assertTrue(out["research_blockers"])
+        self.assertTrue(any("CORROBORAÇÃO" in x for x in out["research_blockers"]))
+        self.assertFalse(out["changes_gate"])
+
     def test_never_changes_operational_controls(self):
         state={"geopolitical_events":[{
             "event_id":"SAFE",
