@@ -18,6 +18,7 @@ from atlasquant_admin_research_panel import (
     behavior_template_csv,
     _journal_records_from_frame,
     _match_forward_summary,
+    _resolve_forward_evidence,
     _research_history_rows,
 )
 from atlasquant_position_event_manager import (
@@ -87,6 +88,34 @@ class AdminResearchPanelTests(unittest.TestCase):
         self.assertIsNotNone(recent)
         self.assertEqual(baseline.sample_size,100)
         self.assertEqual(recent.sample_size,30)
+
+    def test_runtime_forward_evidence_never_cross_maps_to_another_setup(self):
+        out=_resolve_forward_evidence(
+            "FVG",
+            {"ote":{"forward_samples":40,"forward_expectancy_r":0.2}},
+        )
+        self.assertEqual(out["source"],"RUNTIME_EXPLICIT")
+        self.assertIsNone(out["matched_setup"])
+        self.assertEqual(out["summary"],{})
+        self.assertFalse(out["runtime_cross_setup_reuse"])
+        self.assertFalse(out["needs_manual_selection"])
+
+    def test_manual_journal_can_require_explicit_human_link(self):
+        out=_resolve_forward_evidence(
+            "FVG",
+            {},
+            {"custom-manual":{"forward_samples":35,"forward_expectancy_r":0.1}},
+        )
+        self.assertEqual(out["source"],"MANUAL_JOURNAL")
+        self.assertTrue(out["needs_manual_selection"])
+        linked=_resolve_forward_evidence(
+            "FVG",
+            {},
+            {"custom-manual":{"forward_samples":35,"forward_expectancy_r":0.1}},
+            manual_selected="custom-manual",
+        )
+        self.assertEqual(linked["matched_setup"],"custom-manual")
+        self.assertFalse(linked["needs_manual_selection"])
 
     def test_forward_summary_matching_handles_strategy_aliases(self):
         summaries={
