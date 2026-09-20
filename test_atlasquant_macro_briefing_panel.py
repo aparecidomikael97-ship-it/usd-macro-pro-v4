@@ -51,3 +51,11 @@ def test_macro_briefing_has_immediate_device_voice_without_provider_call():
     assert "browser_speech_html" in source
     assert "Ouvir briefing agora" in source
     assert "nenhum provedor é chamado automaticamente" in source
+
+def test_macro_briefing_locks_approved_deep_voice_profile():
+    import inspect
+    source=inspect.getsource(panel)
+    assert "VOICE_PROFILE_ID" in source
+    assert 'voice_style=str(profile["external_style"])' in source
+    assert "masculina/grave" in source
+    assert "st.selectbox(\n        \"Estilo da voz\"" not in source
