@@ -137,13 +137,14 @@ jobs:
                       hero_count=page.locator(".aq-hero").count()
                       loading_macro="Carregando dados macroeconômicos globais" in body_text
                       radar_home="Radar de Oportunidades" in body_text
+                      radar_wait="O Radar aguarda a Matriz dos 7 pares nesta execução." in body_text
                       stable_nav_count=page.locator('[data-testid="stSelectbox"]').filter(has_text="Área").count()
                       rendered=(
                           hero_count>=1
                           and "ATLASQUANT" in body_text
                           and main_count>=1
                           and not loading_macro
-                          and radar_home
+                          and (radar_home or radar_wait)
                           and stable_nav_count>=1
                       )
                       if rendered:
@@ -165,6 +166,7 @@ jobs:
                       "hero_count":hero_count,
                       "loading_macro":loading_macro,
                       "radar_home":radar_home,
+                      "radar_wait":radar_wait,
                       "stable_nav_count":stable_nav_count,
                       "streamlit_exceptions":exception_count,
                       "viewport_width":viewport_width,
