@@ -30,9 +30,16 @@ class ExperienceV103Tests(unittest.TestCase):
         self.assertEqual(hits[0]["Par"], "USD/CHF")
 
     def test_glossary_has_core_macro(self):
-        for key in ("CPI / IPC", "PCE", "Payroll / NFP", "Fed", "ADR14", "Killzones"):
+        for key in ("Taxa de juros", "CPI / IPC", "Core CPI", "PCE", "Payroll / NFP", "Desemprego", "PIB", "ISM / PMI", "Treasury 2Y", "Fed", "ADR14", "W1 / D1", "BSL / SSL", "Killzones", "Quarterly Theory"):
             self.assertIn(key, INDICATOR_GUIDE)
 
+
+    def test_indicator_guide_keeps_quarterly_as_context_not_direction(self):
+        item=INDICATOR_GUIDE["Quarterly Theory"]
+        text=" ".join(str(v) for v in item.values()).casefold()
+        self.assertIn("timing",text)
+        self.assertIn("nunca",text)
+        self.assertIn("gestão de risco",text)
 
     def test_theme_preferences_fail_safe_to_known_values(self):
         out=experience_theme_summary("INVALID","gigante",1)
