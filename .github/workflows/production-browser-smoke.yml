@@ -153,6 +153,10 @@ jobs:
                   screenshot = out / f"{name}.png"
                   page.screenshot(path=str(screenshot), full_page=False)
 
+                  fast_snapshot_shell = "carregamento rápido por snapshot validado" in body_text
+                  radar_visible = "Radar de Oportunidades" in body_text
+                  meaningful = bool(radar_visible or fast_snapshot_shell or auth_inputs >= 1)
+
                   info = {
                       "http_status": status,
                       "http_attempts": http_attempts,
@@ -161,8 +165,9 @@ jobs:
                       "dom_loaded_ms": dom_loaded_ms,
                       "app_container_ms": app_container_ms,
                       "meaningful_content_ms": meaningful_ms,
-                      "fast_snapshot_shell": "carregamento rápido por snapshot validado" in body_text,
-                      "radar_visible": "Radar de Oportunidades" in body_text,
+                      "fast_snapshot_shell": fast_snapshot_shell,
+                      "radar_visible": radar_visible,
+                      "meaningful": meaningful,
                       "title": page_title,
                       "body_chars": len(body_text),
                       "streamlit_container": streamlit_container,
@@ -184,6 +189,14 @@ jobs:
                       failures.append(f"{name}: Streamlit container ausente")
                   if not rendered:
                       failures.append(f"{name}: AtlasQuant/login não terminou de renderizar")
+                  if not meaningful:
+                      failures.append(f"{name}: conteúdo útil não apareceu (Radar/Fast Home/login ausentes)")
+                  if auth_inputs < 1 and not (radar_visible or fast_snapshot_shell):
+                      failures.append(f"{name}: produção carregou Streamlit, mas não abriu a Home/Radar atual")
+                  if meaningful_ms is None:
+                      failures.append(f"{name}: tempo até conteúdo útil não foi medido")
+                  elif auth_inputs < 1 and meaningful_ms > 30000:
+                      failures.append(f"{name}: Home/Radar demorou {meaningful_ms}ms (>30000ms) após warm-up")
                   if exception_count:
                       failures.append(f"{name}: {exception_count} stException")
                   if page_errors:
