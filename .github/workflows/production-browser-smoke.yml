@@ -52,6 +52,7 @@ jobs:
           cat > /tmp/atlasquant_browser_smoke.py <<'PY'
           import json
           import os
+          import time
           from pathlib import Path
           from playwright.sync_api import sync_playwright
 
@@ -79,14 +80,20 @@ jobs:
                   page_errors = []
                   page.on("console", lambda msg: console_errors.append(msg.text) if msg.type == "error" else None)
                   page.on("pageerror", lambda exc: page_errors.append(str(exc)))
+                  started = time.perf_counter()
                   status = None
                   status_history = []
                   http_attempts = 0
+                  dom_loaded_ms = None
+                  app_container_ms = None
+                  meaningful_ms = None
                   for attempt in range(1, 6):
                       http_attempts = attempt
                       try:
                           response = page.goto(url, wait_until="domcontentloaded", timeout=180_000)
                           status = response.status if response else None
+                          if dom_loaded_ms is None:
+                              dom_loaded_ms = round((time.perf_counter()-started)*1000)
                       except Exception:
                           status = None
                       status_history.append(status)
@@ -96,9 +103,10 @@ jobs:
 
                   try:
                       page.locator('[data-testid="stAppViewContainer"]').wait_for(timeout=90_000)
+                      app_container_ms = round((time.perf_counter()-started)*1000)
                   except Exception:
                       pass
-                  page.wait_for_timeout(8_000)
+                  page.wait_for_timeout(2_000)
 
                   body_text = ""
                   page_title = ""
@@ -119,7 +127,14 @@ jobs:
                           or "AtlasQuant" in body_text
                           or auth_inputs >= 1
                       ) and streamlit_container >= 1 and main_container >= 1
-                      if rendered:
+                      meaningful = (
+                          "Radar de Oportunidades" in body_text
+                          or "carregamento rápido por snapshot validado" in body_text
+                          or auth_inputs >= 1
+                      )
+                      if meaningful and meaningful_ms is None:
+                          meaningful_ms = round((time.perf_counter()-started)*1000)
+                      if rendered and meaningful:
                           break
                       if render_attempt in (2, 4):
                           try:
@@ -143,6 +158,11 @@ jobs:
                       "http_attempts": http_attempts,
                       "http_status_history": status_history,
                       "render_attempts": render_attempts,
+                      "dom_loaded_ms": dom_loaded_ms,
+                      "app_container_ms": app_container_ms,
+                      "meaningful_content_ms": meaningful_ms,
+                      "fast_snapshot_shell": "carregamento rápido por snapshot validado" in body_text,
+                      "radar_visible": "Radar de Oportunidades" in body_text,
                       "title": page_title,
                       "body_chars": len(body_text),
                       "streamlit_container": streamlit_container,
