@@ -149,6 +149,17 @@ class AtlasQuantMarketLayersTests(unittest.TestCase):
         self.assertIn(no_geo["research_direction"],{"COMPRA","VENDA","NEUTRO"})
         self.assertFalse(no_geo["probability"])
 
+    def test_consensus_fails_closed_on_cross_layer_conflict(self):
+        result=build_market_layers(
+            pack(macro_diff=20.0,side="SELL",h4="confirma venda",h1="confirma venda",m15="confirma venda",ict_read=100,inst_read=100),
+            news_state=news_state(),
+        )
+        consensus=result["consensus"]
+        self.assertTrue(consensus["advisory_only"])
+        self.assertFalse(consensus["changes_score_mestre"])
+        self.assertFalse(consensus["changes_gate"])
+        self.assertFalse(consensus["real_orders_enabled"])
+
     def test_beginner_summary_is_plain_language(self):
         result=build_market_layers(pack(),news_state=news_state())
         text=beginner_layer_summary(result)
