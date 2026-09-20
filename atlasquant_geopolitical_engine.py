@@ -500,9 +500,12 @@ def build_geopolitical_context(pair: object, state: Mapping[str, Any] | None) ->
     risks: list[str] = [
         "Geopolítica é contexto de mercado; manchetes podem mudar rapidamente e causalidade não é garantida."
     ]
+    research_blockers: list[str] = []
     if geo_conflict:
         quality *= 0.82
         risks.append("Eventos geopolíticos independentes apontam impactos opostos para o par.")
+        if max(ev["severity"] for ev in events) >= 65:
+            research_blockers.append("CONFLITO GEOPOLÍTICO ALTO: eventos independentes apontam impactos opostos.")
     if independent_stories == 1:
         quality *= 0.78
         risks.append("A leitura depende de uma única história independente; confirmação adicional é necessária.")
@@ -515,6 +518,8 @@ def build_geopolitical_context(pair: object, state: Mapping[str, Any] | None) ->
     risk_regime = "RISK-OFF" if avg_risk >= 0.18 else "DESCOMPRESSÃO" if avg_risk <= -0.18 else "MISTO/NEUTRO"
     max_severity = max(ev["severity"] for ev in events)
     severity_label = "CRÍTICO" if max_severity >= 85 else "ALTO" if max_severity >= 65 else "MÉDIO" if max_severity >= 40 else "BAIXO"
+    if severity_label == "CRÍTICO" and (independent_stories < 2 or len(source_union) < 2):
+        research_blockers.append("EVENTO GEOPOLÍTICO CRÍTICO SEM CORROBORAÇÃO SUFICIENTE.")
     channels = sorted({ch for ev in events for ch in ev["channels"]})
 
     top = sorted(events, key=lambda x: (abs(x["pair_balance"]), x["quality"], x["severity"]), reverse=True)[:5]
@@ -548,6 +553,7 @@ def build_geopolitical_context(pair: object, state: Mapping[str, Any] | None) ->
         "events": top,
         "reasons": reasons,
         "risks": risks[:8],
+        "research_blockers": research_blockers[:4],
         "dropped_non_geo": dropped_non_geo,
         "probability": False,
         "decision_effect": False,
