@@ -30,6 +30,7 @@ PAPER_COLUMNS = [
     "created_at", "updated_at", "engine_version",
 ]
 ACTIVE_STATUSES = {"WAIT_ENTRY", "OPEN"}
+TRUSTED_SETUP_ATTRIBUTIONS = {"EXPLICIT_INPUT", "MANUAL_TAG"}
 MAX_HOLD_BARS = 96
 STOP_ATR_MULT = 1.0
 TARGET_R = 2.0
@@ -467,7 +468,12 @@ def summarize_paper_trades(trades: pd.DataFrame) -> dict[str, Any]:
     profit_factor = None if gross_loss <= 0 else gross_win / gross_loss
     by_setup: dict[str, Any] = {}
     if "setup_id" in closed.columns:
-        tagged=closed[closed["setup_id"].fillna("").astype(str).str.strip().ne("")].copy()
+        setup_mask=closed["setup_id"].fillna("").astype(str).str.strip().ne("")
+        if "setup_attribution" in closed.columns:
+            attribution_mask=closed["setup_attribution"].fillna("").astype(str).str.upper().isin(TRUSTED_SETUP_ATTRIBUTIONS)
+        else:
+            attribution_mask=pd.Series(False,index=closed.index)
+        tagged=closed[setup_mask & attribution_mask].copy()
         for setup_id,g in tagged.groupby("setup_id",dropna=False):
             gr=pd.to_numeric(g["realized_r"],errors="coerce").dropna()
             gr=gr[gr.map(lambda x: math.isfinite(float(x)))]
