@@ -140,6 +140,10 @@ def home_rows_from_packs(packs:Sequence[Mapping[str,Any]]|None, *, news_state:Ma
             "geo_research_severity":str(geo_research.get("severity") or "N/D"),
             "geo_research_conflict":bool(geo_research.get("geo_conflict",False)),
             "geo_research_events":[dict(x) for x in list(geo_research.get("events",[]) or []) if isinstance(x,Mapping)],
+            "geo_research_channels":[str(x) for x in list(geo_research.get("channels",[]) or []) if str(x).strip()],
+            "geo_research_regions":[str(x) for x in list(geo_research.get("regions",[]) or []) if str(x).strip()],
+            "geo_research_countries":[str(x) for x in list(geo_research.get("countries",[]) or []) if str(x).strip()],
+            "geo_research_commodities":[str(x) for x in list(geo_research.get("commodities",[]) or []) if str(x).strip()],
             "geo_research_reasons":[str(x) for x in list(geo_research.get("reasons",[]) or []) if str(x).strip()],
             "geo_research_risks":[str(x) for x in list(geo_research.get("risks",[]) or []) if str(x).strip()],
         })
@@ -332,6 +336,8 @@ def render_home_radar(
         f"severidade {row['geo_research_severity']} · cobertura {row['geo_research_coverage']:.0f}% · "
         f"qualidade {row['geo_research_quality']:.0f}/100."
     )
+    if row["geo_research_channels"]:
+        st.caption("Canais geopolíticos observados: "+", ".join(row["geo_research_channels"][:5])+".")
     if row["geo_research_conflict"]:
         st.warning("Geopolítica em conflito: histórias independentes apontam impactos opostos para este par.")
     if row["macro_research_conflict"]:
@@ -395,6 +401,8 @@ def render_home_radar(
                     "Duração":str(ev.get("duration_label") or "N/D"),
                     "Qualidade":round(_safe(ev.get("quality",0)),1),
                     "Canais":", ".join(str(x) for x in list(ev.get("channels",[]) or [])),
+                    "Regiões":", ".join(str(x) for x in list(ev.get("regions",[]) or [])[:3]),
+                    "Commodities":", ".join(str(x) for x in list(ev.get("commodities",[]) or [])[:3]),
                     "Fontes":", ".join(str(x) for x in list(ev.get("sources",[]) or [])[:2]),
                 } for ev in events])
                 st.dataframe(geo_table,width="stretch",hide_index=True)
@@ -405,6 +413,14 @@ def render_home_radar(
             geo_risks=list(row.get("geo_research_risks",[]) or [])
             if geo_risks:
                 st.warning("Riscos geopolíticos: "+" · ".join(str(x) for x in geo_risks[:4]))
+            if row.get("geo_research_regions") or row.get("geo_research_commodities"):
+                st.caption(
+                    "Mapa de transmissão: regiões "
+                    +(", ".join(row.get("geo_research_regions",[])[:4]) or "N/D")
+                    +" · commodities "
+                    +(", ".join(row.get("geo_research_commodities",[])[:4]) or "N/D")
+                    +". Sem impacto cambial explícito, esses campos são contexto e não viram direção automática."
+                )
 
     st.info("O Radar organiza onde olhar primeiro. Ele não envia ordens e não transforma prioridade em probabilidade de lucro.")
     return {
