@@ -21,6 +21,8 @@ from typing import Any, Mapping, Sequence
 
 import streamlit as st
 
+from atlasquant_layer_consensus import build_layer_consensus
+
 SCHEMA="ATLASQUANT_MARKET_LAYERS_V1"
 LAYER_ORDER=("macro","geopolitics","micro","technical_flow")
 RESEARCH_WEIGHTS={
@@ -441,13 +443,12 @@ def build_market_layers(
     denom=0.0
     for layer in available:
         w=RESEARCH_WEIGHTS.get(layer["id"],0.0)
-        # Quality is a confidence-of-evidence weight, not a probability.
         effective=w*(0.25+0.75*layer["quality"]/100.0)
         weighted+=layer["balance"]*effective
         denom+=effective
     balance=weighted/denom if denom>0 else 0.0
     min_quality=min((x["quality"] for x in available),default=0.0)
-    return {
+    output={
         "schema":SCHEMA,
         "pair":pair,
         "layers":layers,
@@ -464,7 +465,8 @@ def build_market_layers(
         "real_orders_enabled":False,
         "automatic_execution":False,
     }
-
+    output["consensus"]=build_layer_consensus(output)
+    return output
 
 def beginner_layer_summary(result:Mapping[str,Any]|None)->str:
     r=dict(result or {})
