@@ -39,6 +39,22 @@ class BacktestPaperComparisonTests(unittest.TestCase):
                 self.assertIsNone(result["expectancy_gap_r"])
                 self.assertFalse(result["real_orders_enabled"])
 
+    def test_zero_sample_evidence_fails_closed(self):
+        for evidence in (
+            {"backtest_samples": 0, "forward_samples": 30, "expectancy_r": 0.1, "forward_expectancy_r": 0.1},
+            {"backtest_samples": 100, "forward_samples": 0, "expectancy_r": 0.1, "forward_expectancy_r": 0.1},
+            {"backtest_samples": 0, "forward_samples": 0, "expectancy_r": 0.1, "forward_expectancy_r": 0.1},
+        ):
+            with self.subTest(evidence=evidence):
+                result = compare_backtest_paper(evidence)
+                self.assertFalse(result["comparable"])
+                self.assertIsNone(result["expectancy_gap_r"])
+                self.assertIsNone(result["expectancy_retention_pct"])
+                self.assertTrue(result["manual_review_required"])
+                self.assertFalse(result["automatic_strategy_change"])
+                self.assertFalse(result["automatic_weight_change"])
+                self.assertFalse(result["real_orders_enabled"])
+
     def test_zero_backtest_expectancy_does_not_divide_by_zero(self):
         result = compare_backtest_paper({
             "backtest_samples": 100,
