@@ -203,6 +203,7 @@ def _research_history_rows(records:list[dict[str,Any]])->list[dict[str,Any]]:
             "passport_state":passport.get("state"),
             "evidence_state":ladder.get("state"),
             "evidence_coverage_pct":ladder.get("evidence_coverage_pct"),
+            "evidence_sufficient_pct":ladder.get("evidence_sufficient_pct"),
             "record_id":str(row.get("record_id") or "")[:12],
         })
     return rows
@@ -268,6 +269,7 @@ def render_admin_research_panel(
                     "source":record.get("source"),
                     "evidence_state":ladder.get("state"),
                     "evidence_coverage_pct":ladder.get("evidence_coverage_pct"),
+                    "evidence_sufficient_pct":ladder.get("evidence_sufficient_pct"),
                 })
             if latest_rows:
                 st.markdown("##### Último registro por operacional")
@@ -463,10 +465,11 @@ def render_admin_research_panel(
         shadow_summary=shadow_summary,
     )
     st.session_state["atlasquant_last_fused_passport_evidence"]=ladder
-    l1,l2,l3=st.columns(3)
+    l1,l2,l3,l4=st.columns(4)
     l1.metric("Estado da evidência",str(ladder.get("state","—")))
     l2.metric("Cobertura",f"{float(ladder.get('evidence_coverage_pct',0.0) or 0.0):.0f}%")
-    l3.metric("Revisão humana","Elegível" if ladder.get("eligible_for_human_review") else "Ainda não")
+    l3.metric("Critérios suficientes",f"{float(ladder.get('evidence_sufficient_pct',0.0) or 0.0):.0f}%")
+    l4.metric("Revisão humana","Elegível" if ladder.get("eligible_for_human_review") else "Ainda não")
     ladder_frame=pd.DataFrame(ladder.get("evidence_steps",[]) or [])
     if not ladder_frame.empty:
         st.dataframe(ladder_frame,width="stretch",hide_index=True)
