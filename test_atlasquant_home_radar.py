@@ -154,6 +154,7 @@ class AtlasQuantHomeRadarTests(unittest.TestCase):
         self.assertEqual(row["geo_research_severity"],"ALTO")
         self.assertGreater(row["geo_research_coverage"],0)
         self.assertTrue(row["geo_research_events"])
+        self.assertIn("trade",row["geo_research_channels"])
         self.assertEqual(row["action"],"COMPRA")
 
     def test_adr_is_described_without_calling_it_probability(self):
