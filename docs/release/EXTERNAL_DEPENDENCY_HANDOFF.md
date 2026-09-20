@@ -1,6 +1,6 @@
 # AtlasQuant — Handoff das Dependências Externas
 
-Este documento começa exatamente onde a preparação interna termina. Nenhum item abaixo é marcado como concluído apenas porque existe código, checklist ou rascunho no repositório.
+Este documento começa exatamente onde a preparação interna termina. Nenhum item abaixo é marcado como concluído apenas porque existe código, checklist ou rascunho no repositório. As evidências verificadas devem ser registradas em `docs/release/EXTERNAL_EVIDENCE_RECORD.md`.
 
 ## 1. Administrador de produção
 
