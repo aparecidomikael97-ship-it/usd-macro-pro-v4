@@ -181,6 +181,16 @@ class PaperTradingV112SafetyTests(unittest.TestCase):
         self.assertTrue(summary["by_setup"]["fvg"]["explicit_attribution_only"])
         self.assertFalse(summary["setup_attribution_inferred"])
 
+    def test_untrusted_setup_label_does_not_enter_by_setup_summary(self):
+        rows=[{
+            "trade_id":"legacy","pair":"EUR/USD","setup_id":"fvg",
+            "setup_attribution":"", "status":"CLOSED",
+            "result":"WIN","realized_r":2.0,
+        }]
+        summary=p.summarize_paper_trades(pd.DataFrame(rows))
+        self.assertEqual(summary["by_setup"],{})
+        self.assertFalse(summary["setup_attribution_inferred"])
+
     def test_module_has_no_live_broker_execution_contract(self):
         self.assertNotIn("broker", {x.lower() for x in dir(p) if callable(getattr(p,x,None))})
         self.assertEqual(p.ACTIVE_STATUSES,{"WAIT_ENTRY","OPEN"})
