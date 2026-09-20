@@ -135,16 +135,24 @@ jobs:
               return False
 
           def select_area(page,label):
-              nav=page.locator('[data-testid="stSelectbox"]').filter(has_text="Área avançada")
+              nav=page.locator('[data-testid="stSelectbox"]').filter(has_text="Área avançada").first
               if nav.count()<1:
                   raise RuntimeError("selectbox Área avançada não encontrado")
-              combo=nav.first.get_by_role("combobox")
+              combo=nav.get_by_role("combobox")
+              try:
+                  current=combo.input_value(timeout=5_000)
+              except Exception:
+                  current=""
+              if current.strip()==label:
+                  return
               combo.click()
-              option=page.get_by_role("option",name=label,exact=True)
-              if option.count()<1:
-                  option=page.get_by_text(label,exact=True)
-              option.last.click()
+              combo.fill(label)
+              page.wait_for_timeout(180)
+              combo.press("Enter")
               page.wait_for_timeout(900)
+              nav=page.locator('[data-testid="stSelectbox"]').filter(has_text="Área avançada").first
+              if label not in nav.inner_text(timeout=20_000):
+                  raise RuntimeError(f"área não selecionada: {label}")
               wait_text(page,"ATLASQUANT",timeout=60_000)
 
           with sync_playwright() as p:
