@@ -1,11 +1,11 @@
 import unittest
 
-from atlasquant_ui_v1 import UI_VERSION, ATLASQUANT_CSS, NAVIGATION_LABELS, NAVIGATION_GROUPS, hero_html, navigation_labels, navigation_groups, navigation_groups_html, navigation_group_for, operation_focus_html, score_semantics, section_title_html, state_badge_html, decision_strip_html, context_strip_html, normalize_experience_mode, navigation_mode_css
+from atlasquant_ui_v1 import UI_VERSION, ATLASQUANT_CSS, NAVIGATION_LABELS, NAVIGATION_GROUPS, BEGINNER_OPEN_AREAS, hero_html, navigation_labels, navigation_groups, navigation_groups_html, navigation_group_for, operation_focus_html, score_semantics, section_title_html, state_badge_html, decision_strip_html, context_strip_html, normalize_experience_mode, navigation_mode_css, is_page_locked_for_mode, advanced_preview_model
 
 
 class AtlasQuantUiTests(unittest.TestCase):
     def test_navigation_includes_macro_briefing_without_losing_endpoints(self):
-        self.assertEqual(len(NAVIGATION_LABELS), 20)
+        self.assertEqual(len(NAVIGATION_LABELS), 21)
         self.assertIn("🎙️ Macro Briefing", NAVIGATION_LABELS)
         self.assertEqual(navigation_labels()[0], "🎯 Radar")
         self.assertEqual(navigation_labels()[-1], "🛟 Suporte")
@@ -13,10 +13,11 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("📱 Instalar", navigation_labels())
         self.assertIn("👤 Conta", navigation_labels())
         self.assertIn("🤖 Autopilot", navigation_labels())
+        self.assertIn("💰 Investir", navigation_labels())
 
     def test_navigation_groups_cover_every_endpoint_once(self):
         grouped=[item for _, items in navigation_groups() for item in items]
-        self.assertEqual(len(NAVIGATION_GROUPS),5)
+        self.assertEqual(len(NAVIGATION_GROUPS),7)
         self.assertEqual(len(grouped),len(NAVIGATION_LABELS))
         self.assertEqual(set(grouped),set(NAVIGATION_LABELS))
         self.assertEqual(len(grouped),len(set(grouped)))
@@ -102,7 +103,7 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertNotIn("abas = st.tabs(_nav_items)",src)
         self.assertNotIn("with abas[",src)
         self.assertIn("navigation_groups_html()",src)
-        self.assertEqual(len(NAVIGATION_LABELS),20)
+        self.assertEqual(len(NAVIGATION_LABELS),21)
 
 
 
@@ -242,7 +243,25 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertNotIn("nth-child(17){display:none",css)
         self.assertNotIn("nth-child(18){display:none",css)
         self.assertNotIn("nth-child(20){display:none",css)
+        self.assertNotIn("nth-child(21){display:none",css)
         self.assertEqual(navigation_mode_css("Avançado"),"<style></style>")
+
+    def test_beginner_keeps_advanced_destinations_visible_but_locked(self):
+        self.assertIn("💰 Investir", BEGINNER_OPEN_AREAS)
+        self.assertFalse(is_page_locked_for_mode("🎯 Radar","Iniciante"))
+        self.assertFalse(is_page_locked_for_mode("💰 Investir","Iniciante"))
+        self.assertTrue(is_page_locked_for_mode("🧪 Backtest","Iniciante"))
+        self.assertFalse(is_page_locked_for_mode("🧪 Backtest","Avançado"))
+        preview=advanced_preview_model("🧪 Backtest")
+        self.assertEqual(preview["page"],"🧪 Backtest")
+        self.assertGreaterEqual(len(preview["features"]),3)
+        self.assertIn("bloqueados",preview["message"])
+
+    def test_metric_and_number_input_contrast_follow_streamlit_text_color(self):
+        self.assertIn("var(--text-color, #111827)",ATLASQUANT_CSS)
+        self.assertIn('[data-testid="stMetricValue"]',ATLASQUANT_CSS)
+        self.assertIn("-webkit-text-fill-color",ATLASQUANT_CSS)
+        self.assertIn("font-weight: 800",ATLASQUANT_CSS)
 
     def test_experience_switch_no_longer_injects_mode_dependent_tab_css(self):
         import inspect
