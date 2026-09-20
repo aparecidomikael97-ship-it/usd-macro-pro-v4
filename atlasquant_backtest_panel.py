@@ -373,6 +373,14 @@ def _render_result_block(
         else:
             st.success("Todos os trades executados possuem contexto point-in-time suficiente para diagnóstico completo.")
 
+    cause_df=pd.DataFrame(intelligence.get("cause_summary",[]) or [])
+    if not cause_df.empty:
+        st.markdown("##### Padrões recorrentes de gain/loss")
+        st.caption(
+            "Frequência de fatores registrados por resultado. É associação descritiva, não prova de causalidade."
+        )
+        st.dataframe(cause_df,width="stretch",hide_index=True)
+
     passport=dict(intelligence["passport"])
     st.markdown("#### 🪪 Passaporte do Operacional")
     p1,p2,p3,p4=st.columns(4)
