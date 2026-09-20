@@ -3921,12 +3921,37 @@ def _autopilot_save_inputs_v107():
         except Exception:
             _macro["event"] = {}
 
+        _calendar_fast = []
+        try:
+            _cal_fast = carregar_calendario_fred()
+            if isinstance(_cal_fast, pd.DataFrame) and not _cal_fast.empty:
+                _calendar_fast = _cal_fast.to_dict("records")
+        except Exception:
+            _calendar_fast = []
+
+        _fast_boot = {
+            "macro_eua": dict(macro_eua) if "macro_eua" in globals() else {},
+            "fed": dict(fed) if "fed" in globals() else {},
+            "dados_moedas": dict(dados_moedas) if "dados_moedas" in globals() else {},
+            "ranking": (
+                ranking.to_dict("records")
+                if "ranking" in globals() and isinstance(ranking, pd.DataFrame) and not ranking.empty
+                else []
+            ),
+            "usd_detalhado": dict(usd_detalhado) if "usd_detalhado" in globals() else {},
+            "qualidade_usd": float(qualidade_usd) if "qualidade_usd" in globals() else 0.0,
+            "qualidade_rotulo": str(qualidade_rotulo) if "qualidade_rotulo" in globals() else "N/D",
+            "status_fonte": dict(STATUS_FONTE) if isinstance(STATUS_FONTE, dict) else {},
+            "calendar_fred": _calendar_fast,
+        }
+
         obj = {
-            "version": "V10.7",
+            "version": "V10.7_FAST_BOOT_1",
             "generated_at": pd.Timestamp.now(tz="UTC").isoformat(),
             "app_version": APP_VERSION,
             "pairs": pairs,
             "macro_context": _macro,
+            "fast_boot": _fast_boot,
         }
 
         path = "dados/autopilot_inputs_v107.json"
