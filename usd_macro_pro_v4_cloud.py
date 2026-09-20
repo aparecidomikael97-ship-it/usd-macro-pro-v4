@@ -264,6 +264,7 @@ try:
         render_experience_mode_switch,
         operation_focus_html,
         mobile_navigation_hint_html,
+        render_stable_navigation,
         decision_strip_html,
         context_strip_html,
     )
@@ -276,6 +277,7 @@ except Exception as _atlasquant_ui_exc:
     render_experience_mode_switch = None
     operation_focus_html = None
     mobile_navigation_hint_html = None
+    render_stable_navigation = None
     decision_strip_html = None
     context_strip_html = None
     _ATLASQUANT_UI_IMPORT_ERROR = f"{type(_atlasquant_ui_exc).__name__}: {_atlasquant_ui_exc}"
@@ -4041,13 +4043,33 @@ if navigation_groups_html is not None:
     st.markdown(navigation_groups_html(), unsafe_allow_html=True)
 if mobile_navigation_hint_html is not None:
     st.markdown(mobile_navigation_hint_html(), unsafe_allow_html=True)
-abas = st.tabs(_nav_items)
+
+if render_stable_navigation is not None:
+    _aq_active_page = render_stable_navigation(
+        _nav_items,
+        mode=_aq_experience_mode,
+    )
+else:
+    _aq_allowed_nav = (
+        _nav_items
+        if str(_aq_experience_mode).casefold().startswith("avan")
+        else [
+            item for item in _nav_items
+            if item in {"🎯 Radar","🎙️ Macro Briefing","🎓 Aprender","👤 Conta","📱 Instalar","🛟 Suporte"}
+        ]
+    )
+    _aq_active_page = st.selectbox(
+        "Área avançada" if str(_aq_experience_mode).casefold().startswith("avan") else "Área",
+        _aq_allowed_nav,
+        key="atlasquant_stable_nav_fallback",
+    )
+_aq_active_index = _nav_items.index(_aq_active_page) if _aq_active_page in _nav_items else 0
 
 # =========================================================
 # MACRO BRIEFING — apresentação sobre o estado JÁ calculado
 # Não chama Twelve Data nem força refresh de fonte ao abrir.
 # =========================================================
-with abas[10]:
+if _aq_active_index == 10:
     if render_macro_briefing_panel is None:
         st.warning("Macro Briefing indisponível neste carregamento.")
         if _ATLASQUANT_MACRO_BRIEFING_IMPORT_ERROR:
@@ -4092,7 +4114,7 @@ with abas[10]:
 # =========================================================
 # ABA 2 — CLASSIFICAÇÃO
 # =========================================================
-with abas[2]:
+if _aq_active_index == 2:
     st.subheader("Força Macroeconômica das Moedas")
     st.caption("Inflação e PIB são exibidos como variação percentual anual, não como nível do índice.")
 
@@ -4126,7 +4148,7 @@ with abas[2]:
 # =========================================================
 # ABA 3 — EUA
 # =========================================================
-with abas[3]:
+if _aq_active_index == 3:
     diagnostico_eod_v73, dados_eod_v73 = ({"ok": False, "status": 403, "erro": "Economic Events não incluído no plano gratuito.", "dados": []}, {})
     st.subheader("🇺🇸 Painel de Força Macro do USD")
 
@@ -6095,7 +6117,7 @@ _sincronizar_anteriores_v711()
 # =========================================================
 # ABA 3 — PARES
 # =========================================================
-with abas[4]:
+if _aq_active_index == 4:
     _status_automacao_v71()
 
     st.subheader("💱 Painel de Decisão — V7.8")
@@ -6641,7 +6663,7 @@ with abas[4]:
 # =========================================================
 # ABA 4 — FED E NOTÍCIAS
 # =========================================================
-with abas[5]:
+if _aq_active_index == 5:
     st.subheader("🏦 Federal Reserve e impacto no USD")
 
     c1, c2, c3 = st.columns(3)
@@ -6691,7 +6713,7 @@ with abas[5]:
 # =========================================================
 # ABA 5 — HISTÓRICO
 # =========================================================
-with abas[6]:
+if _aq_active_index == 6:
     st.subheader("Histórico das classificações")
     st.caption("No Streamlit Community Cloud, arquivos locais podem desaparecer após reinicialização ou novo deploy. Para histórico permanente, use um banco externo.")
     historico = carregar_snapshots()
@@ -6703,7 +6725,7 @@ with abas[6]:
 # =========================================================
 # ABA 6 — TESTE HISTÓRICO
 # =========================================================
-with abas[7]:
+if _aq_active_index == 7:
     st.subheader("📈 Teste Histórico — Validação do Modelo")
 
     if render_operational_backtest_panel is not None:
@@ -7108,7 +7130,7 @@ def _painel_fomc_calibrado_v76():
 # =========================================================
 # V7.6.1 — RENDERIZAÇÃO SEGURA
 # =========================================================
-with abas[3]:
+if _aq_active_index == 3:
     _painel_hibrido_v74()
     _painel_fomc_calibrado_v76()
 
@@ -7853,7 +7875,7 @@ def _tec_to_json_v934(tec):
 # NÃO cria sinal técnico H4/H1/M15 porque esses candles
 # ainda não são alimentados automaticamente pelo sistema.
 # =========================================================
-with abas[8]:
+if _aq_active_index == 8:
     st.subheader("🎯 Central de Decisão Automática — V9.3.5")
     st.caption(
         "Resumo automático dos dados que já existem no APP. "
@@ -8927,7 +8949,7 @@ with abas[8]:
 # ABA 9 — V10.2 PROFESSIONAL MACRO MARKET MAP (CAMADA OBSERVACIONAL)
 # Não altera o motor base, Score Mestre ou histórico oficial.
 # =========================================================
-with abas[9]:
+if _aq_active_index == 9:
     if render_market_map is None:
         st.error(
             "A camada Professional Market Map V10.2 não pôde ser carregada. "
@@ -8967,7 +8989,7 @@ with abas[9]:
 # Consolida Macro + Market Map + Scanner técnico + ADR.
 # Não altera Score Mestre nem históricos oficiais.
 # =========================================================
-with abas[1]:
+if _aq_active_index == 1:
     if render_master_panel is None:
         st.error(
             "O Painel Mestre V10.2 não pôde ser carregado. "
@@ -9107,7 +9129,7 @@ with abas[1]:
 # ABA 10 — V10.3 EXPERIÊNCIA, EDUCAÇÃO E PERSONALIZAÇÃO
 # Não altera o motor de decisão.
 # =========================================================
-with abas[11]:
+if _aq_active_index == 11:
     if render_experience_hub is None:
         st.error("A camada de experiência V10.3 não pôde ser carregada.")
         if _UX_V103_IMPORT_ERROR:
@@ -9140,7 +9162,7 @@ with abas[11]:
 # =========================================================
 # ABA 11 — V10.4 PRODUTO, NAVEGAÇÃO, GRÁFICOS E FEEDBACK
 # =========================================================
-with abas[12]:
+if _aq_active_index == 12:
     if render_v104_hub is None:
         st.error("A camada de produto V10.4 não pôde ser carregada.")
         if _PRODUCT_V104_IMPORT_ERROR:
@@ -9160,7 +9182,7 @@ with abas[12]:
 # =========================================================
 # ABA 12 — V10.5 CENTRO DE MELHORIAS
 # =========================================================
-with abas[13]:
+if _aq_active_index == 13:
     if render_v105_center is None:
         st.error("O Centro de Melhorias V10.5 não pôde ser carregado.")
         if _EVOLUTION_V105_IMPORT_ERROR:
@@ -9375,7 +9397,7 @@ with abas[13]:
 # =========================================================
 # ABA 13 — V10.6.2 FRESH-PRICE SNAPSHOT RECOVERY
 # =========================================================
-with abas[14]:
+if _aq_active_index == 14:
     if render_currency_news_panel is None:
         st.error("A inteligência global de notícias V10.6 não pôde ser carregada.")
         if _CURRENCY_NEWS_V106_IMPORT_ERROR:
@@ -9397,7 +9419,7 @@ with abas[14]:
 # =========================================================
 # ABA 14 — V10.7 FULL BACKGROUND AUTOPILOT
 # =========================================================
-with abas[15]:
+if _aq_active_index == 15:
     if render_autopilot_v107 is None:
         st.error("O painel Autopilot V10.7 não pôde ser carregado.")
         if _AUTOPILOT_V107_IMPORT_ERROR:
@@ -9408,7 +9430,7 @@ with abas[15]:
 # =========================================================
 # CONTA — USER / SALES / ADMIN
 # =========================================================
-with abas[16]:
+if _aq_active_index == 16:
     if render_account_portal is None:
         st.error("Portal de conta indisponível neste carregamento.")
         if _ATLASQUANT_ACCOUNT_PORTAL_IMPORT_ERROR:
@@ -9419,7 +9441,7 @@ with abas[16]:
 # =========================================================
 # INSTALAÇÃO / DISTRIBUIÇÃO MULTIPLATAFORMA
 # =========================================================
-with abas[17]:
+if _aq_active_index == 17:
     if render_platform_center is None:
         st.error("Central de instalação indisponível neste carregamento.")
         if _ATLASQUANT_PLATFORM_IMPORT_ERROR:
@@ -9430,7 +9452,7 @@ with abas[17]:
 # =========================================================
 # VENDAS / ONBOARDING COMERCIAL
 # =========================================================
-with abas[18]:
+if _aq_active_index == 18:
     if render_sales_center is None:
         st.error("Portal comercial indisponível neste carregamento.")
         if _ATLASQUANT_SALES_IMPORT_ERROR:
@@ -9441,7 +9463,7 @@ with abas[18]:
 # =========================================================
 # SUPORTE — SELF-SERVICE SEGURO
 # =========================================================
-with abas[19]:
+if _aq_active_index == 19:
     if render_support_center is None:
         st.error("Central de suporte indisponível neste carregamento.")
         if _ATLASQUANT_SUPPORT_IMPORT_ERROR:
@@ -9459,7 +9481,7 @@ if os.getenv("USD_MACRO_AUTOPILOT", "") == "1":
 # ABA 1 — CENTRAL INSTITUCIONAL DOS 7 PARES V11.0.1
 # Renderizada ao final para reutilizar a Matriz oficial já calculada.
 # =========================================================
-with abas[0]:
+if _aq_active_index == 0:
     if "matriz_v61" not in globals() or matriz_v61 is None or matriz_v61.empty:
         st.warning("O Radar aguarda a Matriz dos 7 pares nesta execução.")
     else:

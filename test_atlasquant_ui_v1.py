@@ -1,6 +1,6 @@
 import unittest
 
-from atlasquant_ui_v1 import UI_VERSION, ATLASQUANT_CSS, NAVIGATION_LABELS, NAVIGATION_GROUPS, hero_html, navigation_labels, navigation_groups, navigation_groups_html, operation_focus_html, score_semantics, section_title_html, state_badge_html, decision_strip_html, context_strip_html, normalize_experience_mode, navigation_mode_css
+from atlasquant_ui_v1 import UI_VERSION, ATLASQUANT_CSS, NAVIGATION_LABELS, NAVIGATION_GROUPS, hero_html, navigation_labels, navigation_groups, navigation_groups_html, navigation_group_for, operation_focus_html, score_semantics, section_title_html, state_badge_html, decision_strip_html, context_strip_html, normalize_experience_mode, navigation_mode_css
 
 
 class AtlasQuantUiTests(unittest.TestCase):
@@ -27,6 +27,11 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("Sistema",html)
         self.assertIn("Conta",html)
 
+
+    def test_navigation_group_lookup_is_total_for_all_primary_pages(self):
+        for label in NAVIGATION_LABELS:
+            self.assertNotEqual(navigation_group_for(label),"AtlasQuant")
+        self.assertEqual(navigation_group_for("inexistente"),"AtlasQuant")
 
     def test_operation_focus_is_safe_and_responsive(self):
         html=operation_focus_html(
@@ -88,11 +93,14 @@ class AtlasQuantUiTests(unittest.TestCase):
 
 
 
-    def test_main_tabs_reuse_navigation_labels_without_changing_count(self):
+    def test_main_navigation_reuses_labels_but_mounts_one_workspace(self):
         from pathlib import Path
         src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
         self.assertIn("_nav_items = list(navigation_labels())",src)
-        self.assertIn("abas = st.tabs(_nav_items)",src)
+        self.assertIn("render_stable_navigation(",src)
+        self.assertIn("_aq_active_index",src)
+        self.assertNotIn("abas = st.tabs(_nav_items)",src)
+        self.assertNotIn("with abas[",src)
         self.assertIn("navigation_groups_html()",src)
         self.assertEqual(len(NAVIGATION_LABELS),20)
 
@@ -107,14 +115,15 @@ class AtlasQuantUiTests(unittest.TestCase):
 
 
 
-    def test_tab_navigation_is_mobile_scrollable_and_sticky(self):
+    def test_nested_tabs_remain_styled_but_primary_navigation_is_not_tab_overflow(self):
+        from pathlib import Path
         from atlasquant_ui_v1 import ATLASQUANT_CSS, UI_VERSION
         self.assertEqual(UI_VERSION,"1.0")
-        self.assertIn("overflow-x: auto",ATLASQUANT_CSS)
-        self.assertIn("flex-wrap: nowrap",ATLASQUANT_CSS)
-        self.assertIn("position: sticky",ATLASQUANT_CSS)
-        self.assertIn("white-space: nowrap",ATLASQUANT_CSS)
+        self.assertIn('data-testid="stTabs"',ATLASQUANT_CSS)
         self.assertIn("aq-nav-groups",ATLASQUANT_CSS)
+        src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        self.assertNotIn("st.tabs(_nav_items)",src)
+        self.assertIn('key="atlasquant_stable_nav_fallback"',src)
 
 
 
@@ -133,18 +142,18 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertNotIn('st.title("USD Macro Pro")',src)
         exec_pos=src.index("# EXECUÇÃO PRINCIPAL")
         hero_pos=src.index("render_atlasquant_header(APP_VERSION, environment=ATLASQUANT_ENVIRONMENT)")
-        tabs_pos=src.index("abas = st.tabs(_nav_items)")
+        nav_pos=src.index("render_stable_navigation(")
         self.assertLess(exec_pos,hero_pos)
-        self.assertLess(hero_pos,tabs_pos)
+        self.assertLess(hero_pos,nav_pos)
 
 
 
-    def test_main_workspace_surfaces_focus_strip_before_tabs(self):
+    def test_main_workspace_surfaces_focus_strip_before_stable_navigation(self):
         app=(__import__("pathlib").Path(__file__).resolve().parent/"usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
         self.assertIn("operation_focus_html",app)
         focus=app.index("operation_focus_html(")
-        tabs=app.index("abas = st.tabs(_nav_items)")
-        self.assertLess(focus,tabs)
+        nav=app.index("render_stable_navigation(",focus)
+        self.assertLess(focus,nav)
         self.assertIn('decision="Radar pronto para leitura"',app)
         self.assertIn('safety="Safety Core monitorado"',app)
 
@@ -156,12 +165,12 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("min-height:34px",ATLASQUANT_CSS)
 
 
-    def test_mobile_tab_guidance_is_wired_before_tabs(self):
+    def test_mobile_navigation_guidance_precedes_stable_selector(self):
         app=(__import__("pathlib").Path(__file__).resolve().parent/"usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
         self.assertIn("mobile_navigation_hint_html",app)
         hint=app.index("mobile_navigation_hint_html()")
-        tabs=app.index("abas = st.tabs(_nav_items)")
-        self.assertLess(hint,tabs)
+        nav=app.index("render_stable_navigation(",hint)
+        self.assertLess(hint,nav)
         self.assertIn(".aq-mobile-hint{display:none",ATLASQUANT_CSS)
         self.assertIn(".aq-mobile-hint{display:block}",ATLASQUANT_CSS)
 
@@ -235,12 +244,20 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertNotIn("nth-child(20){display:none",css)
         self.assertEqual(navigation_mode_css("Avançado"),"<style></style>")
 
-    def test_main_wires_global_experience_switch_before_tabs(self):
+    def test_experience_switch_no_longer_injects_mode_dependent_tab_css(self):
+        import inspect
+        from atlasquant_ui_v1 import render_experience_mode_switch
+        src=inspect.getsource(render_experience_mode_switch)
+        self.assertNotIn("navigation_mode_css(mode)",src)
+        self.assertNotIn("st.tabs(",src)
+        self.assertIn("atlasquant_view_mode",src)
+
+    def test_main_wires_global_experience_switch_before_stable_navigation(self):
         from pathlib import Path
         src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
         switch=src.index("render_experience_mode_switch()")
-        tabs=src.index("abas = st.tabs(_nav_items)")
-        self.assertLess(switch,tabs)
+        nav=src.index("render_stable_navigation(",switch)
+        self.assertLess(switch,nav)
         self.assertIn("_aq_experience_mode",src)
         self.assertIn("render_home_radar",src)
 

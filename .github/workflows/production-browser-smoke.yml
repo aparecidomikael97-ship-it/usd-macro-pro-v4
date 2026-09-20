@@ -119,11 +119,16 @@ jobs:
           with sync_playwright() as p:
               browser = p.chromium.launch(headless=True)
               for name, cfg in profiles.items():
-                  context = browser.new_context(
-                      viewport=cfg["viewport"],
-                      is_mobile=cfg["is_mobile"],
-                      device_scale_factor=1,
-                  )
+                  if name == "mobile":
+                      device = dict(p.devices["Pixel 7"])
+                      device["locale"] = "pt-BR"
+                      context = browser.new_context(**device)
+                  else:
+                      context = browser.new_context(
+                          viewport=cfg["viewport"],
+                          is_mobile=cfg["is_mobile"],
+                          device_scale_factor=1,
+                      )
                   page = context.new_page()
                   console_errors = []
                   page_errors = []
@@ -195,6 +200,31 @@ jobs:
                               status_history.append(None)
                       page.wait_for_timeout(5_000)
 
+                  mobile_transition = {"attempted": False, "advanced": False, "decision": False, "radar_back": False}
+                  if name == "mobile" and auth_inputs < 1 and "Radar de Oportunidades" in body_text:
+                      mobile_transition["attempted"] = True
+                      try:
+                          advanced = page.get_by_text("Avançado", exact=True)
+                          if advanced.count():
+                              advanced.first.click()
+                              page.get_by_text("Área avançada", exact=True).wait_for(timeout=120_000)
+                              mobile_transition["advanced"] = True
+                              nav = page.locator('[data-testid="stSelectbox"]').filter(has_text="Área avançada").first
+                              combo = nav.get_by_role("combobox")
+                              combo.click()
+                              page.get_by_role("option", name="⚡ Decisão", exact=True).click()
+                              page.wait_for_timeout(1_500)
+                              mobile_transition["decision"] = True
+                              nav = page.locator('[data-testid="stSelectbox"]').filter(has_text="Área avançada").first
+                              combo = nav.get_by_role("combobox")
+                              combo.click()
+                              page.get_by_role("option", name="🎯 Radar", exact=True).click()
+                              page.wait_for_timeout(1_500)
+                              mobile_transition["radar_back"] = "Radar de Oportunidades" in page.locator("body").inner_text(timeout=30_000)
+                          body_text = page.locator("body").inner_text(timeout=30_000)
+                      except Exception as exc:
+                          page_errors.append(f"mobile-transition: {type(exc).__name__}: {exc}")
+
                   exception_count = page.locator('[data-testid="stException"]').count()
                   viewport_width = page.evaluate("window.innerWidth")
                   document_width = page.evaluate("document.documentElement.scrollWidth")
@@ -228,6 +258,7 @@ jobs:
                       "horizontal_overflow_px": horizontal_overflow,
                       "console_errors": console_errors[-10:],
                       "page_errors": page_errors[-10:],
+                      "mobile_transition": mobile_transition,
                       "screenshot": str(screenshot),
                   }
                   report["profiles"][name] = info
@@ -250,6 +281,12 @@ jobs:
                       failures.append(f"{name}: {exception_count} stException")
                   if page_errors:
                       failures.append(f"{name}: {len(page_errors)} pageerror")
+                  if name == "mobile" and mobile_transition["attempted"] and not all(
+                      mobile_transition.get(key, False) for key in ("advanced", "decision", "radar_back")
+                  ):
+                      failures.append(f"{name}: transição móvel Iniciante→Avançado→Decisão→Radar incompleta")
+                  if "NotFoundError" in body_text or "removeChild" in body_text:
+                      failures.append(f"{name}: erro DOM NotFoundError/removeChild visível")
                   if horizontal_overflow > 8:
                       failures.append(f"{name}: overflow horizontal {horizontal_overflow}px")
 

@@ -92,6 +92,16 @@ class FastStartupTests(unittest.TestCase):
         self.assertIn('if bool(_fast_result.get("handled",False)):',between)
         self.assertIn("st.stop()",between)
 
+    def test_advanced_transition_does_not_force_extra_streamlit_rerun(self):
+        from pathlib import Path
+        src=Path("atlasquant_fast_startup.py").read_text(encoding="utf-8")
+        start=src.index("mode=st.radio(")
+        end=src.index('age=float(check["age_minutes"] or 0.0)',start)
+        block=src[start:end]
+        self.assertIn('"handled":False',block)
+        self.assertIn('"mode":"Avançado"',block)
+        self.assertNotIn("st.rerun()",block)
+
     def test_headless_autopilot_never_uses_fast_shell(self):
         from pathlib import Path
         src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")

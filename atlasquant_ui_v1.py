@@ -319,12 +319,65 @@ def render_experience_mode_switch() -> str:
     )
     mode=normalize_experience_mode(mode)
     st.session_state["atlasquant_view_mode"]="Básico" if mode=="Iniciante" else "Pro"
-    st.markdown(navigation_mode_css(mode),unsafe_allow_html=True)
+    # Primary navigation no longer relies on hiding mounted tab buttons.
+    # Avoid injecting mode-dependent tab CSS on every rerun; this keeps the
+    # mobile DOM stable while nested tabs elsewhere retain the global theme.
     if mode=="Iniciante":
         st.caption("Modo Iniciante · Radar, Macro Briefing, Aprender, Conta, Instalar e Suporte.")
     else:
         st.caption("Modo Avançado · todas as áreas e diagnósticos disponíveis.")
     return mode
+
+
+def navigation_group_for(label: object) -> str:
+    target=str(label or "")
+    for group, items in NAVIGATION_GROUPS:
+        if target in items:
+            return group
+    return "AtlasQuant"
+
+
+def render_stable_navigation(
+    items: tuple[str, ...] | list[str],
+    *,
+    mode: object = "Avançado",
+) -> str:
+    """Render one stable page selector instead of a 20-tab overflow menu.
+
+    Streamlit tabs keep every tab body mounted and mobile Chromium adds an
+    overflow popover when the labels do not fit. A single controlled selectbox
+    avoids that high-churn DOM path and lets the app execute only the selected
+    workspace.
+    """
+    options=[str(x) for x in list(items or []) if str(x).strip()]
+    if not options:
+        return ""
+    normalized=normalize_experience_mode(mode)
+    if normalized=="Iniciante":
+        allowed={"🎯 Radar","🎙️ Macro Briefing","🎓 Aprender","👤 Conta","📱 Instalar","🛟 Suporte"}
+        options=[x for x in options if x in allowed] or [options[0]]
+        label="Área"
+        key="atlasquant_beginner_area_full"
+    else:
+        label="Área avançada"
+        key="atlasquant_advanced_area"
+
+    current=str(st.session_state.get(key,options[0]) or options[0])
+    if current not in options:
+        current=options[0]
+    selected=st.selectbox(
+        label,
+        options,
+        index=options.index(current),
+        key=key,
+        help=(
+            "Escolha a área do AtlasQuant. Só a área selecionada é renderizada, "
+            "reduzindo carga e instabilidade de DOM no celular."
+        ),
+    )
+    group=navigation_group_for(selected)
+    st.caption(f"Modo {normalized} · {group} · navegação estável para celular e desktop.")
+    return str(selected)
 
 
 def navigation_groups() -> tuple[tuple[str, tuple[str, ...]], ...]:
@@ -369,7 +422,7 @@ def operation_focus_html(
 
 def mobile_navigation_hint_html() -> str:
     """Small mobile-only affordance; presentation only."""
-    return '<div class="aq-mobile-hint">Deslize as abas para ver mais áreas →</div><div class="aq-section-divider"></div>'
+    return '<div class="aq-mobile-hint">Use o seletor de área para navegar sem sobrecarregar a tela.</div><div class="aq-section-divider"></div>'
 
 
 def hero_html(app_version: str, environment: str = "LOCAL") -> str:
