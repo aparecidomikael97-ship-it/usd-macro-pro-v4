@@ -80,6 +80,7 @@ def home_rows_from_packs(packs:Sequence[Mapping[str,Any]]|None, *, news_state:Ma
         research=build_market_layers(p,news_state=news_state,macro_context=macro_context,micro_state=micro_state)
         consensus=dict(research.get("consensus",{}) or {})
         macro_research=next((dict(x) for x in list(research.get("layers",[]) or []) if str(x.get("id"))=="macro"),{})
+        geo_research=next((dict(x) for x in list(research.get("layers",[]) or []) if str(x.get("id"))=="geopolitics"),{})
         rows.append({
             "pair":pair,
             "bias":bias,
@@ -131,6 +132,16 @@ def home_rows_from_packs(packs:Sequence[Mapping[str,Any]]|None, *, news_state:Ma
             "macro_research_groups":[dict(x) for x in list(macro_research.get("groups",[]) or []) if isinstance(x,Mapping)],
             "macro_research_reasons":[str(x) for x in list(macro_research.get("reasons",[]) or []) if str(x).strip()],
             "macro_research_risks":[str(x) for x in list(macro_research.get("risks",[]) or []) if str(x).strip()],
+            "geo_research_direction":str(geo_research.get("direction") or "INDISPONÍVEL"),
+            "geo_research_balance":_safe(geo_research.get("balance",0)),
+            "geo_research_quality":_safe(geo_research.get("quality",0)),
+            "geo_research_coverage":_safe(geo_research.get("coverage",0)),
+            "geo_research_regime":str(geo_research.get("risk_regime") or "INDISPONÍVEL"),
+            "geo_research_severity":str(geo_research.get("severity") or "N/D"),
+            "geo_research_conflict":bool(geo_research.get("geo_conflict",False)),
+            "geo_research_events":[dict(x) for x in list(geo_research.get("events",[]) or []) if isinstance(x,Mapping)],
+            "geo_research_reasons":[str(x) for x in list(geo_research.get("reasons",[]) or []) if str(x).strip()],
+            "geo_research_risks":[str(x) for x in list(geo_research.get("risks",[]) or []) if str(x).strip()],
         })
     rows.sort(key=lambda x:(x["action"]!="NÃO OPERAR",x["priority"],x["data_score"]),reverse=True)
     return rows
@@ -316,6 +327,13 @@ def render_home_radar(
         f"Macro estruturado: {row['macro_research_direction']} · saldo {row['macro_research_balance']:+.0f} · "
         f"cobertura {row['macro_research_coverage']:.0f}% · qualidade {row['macro_research_quality']:.0f}/100."
     )
+    st.caption(
+        f"Geopolítica estruturada: {row['geo_research_direction']} · regime {row['geo_research_regime']} · "
+        f"severidade {row['geo_research_severity']} · cobertura {row['geo_research_coverage']:.0f}% · "
+        f"qualidade {row['geo_research_quality']:.0f}/100."
+    )
+    if row["geo_research_conflict"]:
+        st.warning("Geopolítica em conflito: histórias independentes apontam impactos opostos para este par.")
     if row["macro_research_conflict"]:
         st.warning("Macro em conflito interno: juros, inflação, emprego/crescimento ou expectativas não estão apontando para o mesmo lado.")
     st.caption(
@@ -340,6 +358,8 @@ def render_home_radar(
             "Motores":r["research_state"],"Camadas":f"{r['research_layers']}/4","Consenso %":round(r["research_agreement"],1),
             "Macro":r["macro_research_direction"],"Macro cobertura %":round(r["macro_research_coverage"],1),
             "Macro conflito":"SIM" if r["macro_research_conflict"] else "NÃO",
+            "Geo":r["geo_research_direction"],"Regime geo":r["geo_research_regime"],
+            "Geo severidade":r["geo_research_severity"],"Geo cobertura %":round(r["geo_research_coverage"],1),
         } for r in rows])
         st.dataframe(adv,width="stretch",hide_index=True)
         if row["blockers"]:
@@ -365,6 +385,26 @@ def render_home_radar(
             risks=list(row.get("macro_research_risks",[]) or [])
             if risks:
                 st.warning("Riscos macro: "+" · ".join(str(x) for x in risks[:4]))
+        with st.expander("Motor Geopolítico — abrir eventos e canais",expanded=False):
+            events=list(row.get("geo_research_events",[]) or [])
+            if events:
+                geo_table=pd.DataFrame([{
+                    "Categoria":str(ev.get("category") or "—"),
+                    "Saldo no par":round(_safe(ev.get("pair_balance",0)),1),
+                    "Severidade":str(ev.get("severity_label") or "N/D"),
+                    "Duração":str(ev.get("duration_label") or "N/D"),
+                    "Qualidade":round(_safe(ev.get("quality",0)),1),
+                    "Canais":", ".join(str(x) for x in list(ev.get("channels",[]) or [])),
+                    "Fontes":", ".join(str(x) for x in list(ev.get("sources",[]) or [])[:2]),
+                } for ev in events])
+                st.dataframe(geo_table,width="stretch",hide_index=True)
+            else:
+                st.caption("Sem histórias geopolíticas independentes suficientes neste snapshot.")
+            for reason in list(row.get("geo_research_reasons",[]) or [])[:6]:
+                st.write("• "+str(reason))
+            geo_risks=list(row.get("geo_research_risks",[]) or [])
+            if geo_risks:
+                st.warning("Riscos geopolíticos: "+" · ".join(str(x) for x in geo_risks[:4]))
 
     st.info("O Radar organiza onde olhar primeiro. Ele não envia ordens e não transforma prioridade em probabilidade de lucro.")
     return {
