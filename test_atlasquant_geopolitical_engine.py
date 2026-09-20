@@ -58,6 +58,30 @@ class GeopoliticalEngineTests(unittest.TestCase):
         self.assertEqual(out["events"][0]["duration_label"],"MÉDIO")
         self.assertLess(out["events"][0]["direct_pair_balance"],0)
 
+    def test_explicit_pair_impact_and_geography_take_priority_without_inference(self):
+        state={"geopolitical_events":[{
+            "event_id":"PAIR-1",
+            "title":"Trade restrictions expand across shipping corridor",
+            "category":"trade",
+            "source":"Verified wire",
+            "quality":94,
+            "severity":"high",
+            "duration":"long",
+            "risk_regime":"neutral",
+            "pair_impacts":{"EUR/USD":-70},
+            "regions":["Europe"],
+            "countries":["Country A","Country B"],
+            "commodities":["natural gas"],
+        }]}
+        out=build_geopolitical_context("EUR/USD",state)
+        self.assertTrue(out["available"])
+        event=out["events"][0]
+        self.assertTrue(event["pair_impact_explicit"])
+        self.assertEqual(event["direct_pair_balance"],-70.0)
+        self.assertIn("Europe",out["regions"])
+        self.assertIn("natural gas",out["commodities"])
+        self.assertEqual(out["risk_regime"],"MISTO/NEUTRO")
+
     def test_one_story_is_available_but_low_confidence_risk_is_visible(self):
         state={"geopolitical_events":[{
             "event_id":"G2",
