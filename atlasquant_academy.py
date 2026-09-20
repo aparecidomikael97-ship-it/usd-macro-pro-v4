@@ -139,6 +139,34 @@ ACADEMY_TOPICS=(
         "pitfall":"Forçar Fibonacci em swings sem estrutura.",
     },
     {
+        "id":"quarterly-theory","category":"ICT / SMC","title":"Quarterly Theory — ciclos e quarters","level":"Avançado",
+        "summary":"Quarterly Theory organiza o tempo em quatro partes para estudar repetição de fases e contexto; é uma lente de leitura, não uma previsão garantida.",
+        "watch":"Defina primeiro o período-mãe (ano, mês, semana, dia ou sessão), divida-o em Q1–Q4 e observe contexto, liquidez, acumulação/manipulação/distribuição e transições entre quarters.",
+        "forex":"Use os quarters para organizar timing e narrativa junto de HTF, liquidez, CRT/AMD e contexto macro; a divisão temporal não substitui confirmação nem gestão de risco.",
+        "pitfall":"Forçar todo ciclo a repetir a mesma sequência ou assumir que Q1/Q2/Q3/Q4 determinam direção sozinhos.",
+    },
+    {
+        "id":"quarterly-multitimeframe","category":"ICT / SMC","title":"Quarterly — anual, mensal, semanal e diário","level":"Avançado",
+        "summary":"O mesmo raciocínio de quatro partes pode ser aplicado em escalas diferentes, mantendo cada leitura vinculada ao seu período-mãe.",
+        "watch":"Comece no timeframe maior, marque o quarter atual e só depois desça para semana, dia e sessão procurando alinhamento, deslocamento e liquidez.",
+        "forex":"A leitura top-down ajuda a separar contexto de execução: o quarter maior dá referência e o menor pode ajudar no timing.",
+        "pitfall":"Misturar quarters de períodos diferentes sem hierarquia e chamar qualquer movimento de confirmação.",
+    },
+    {
+        "id":"quarterly-amd","category":"ICT / SMC","title":"Quarterly + AMD / Power of Three","level":"Avançado",
+        "summary":"Quarterly pode ser estudado junto de AMD/Power of Three para descrever fases de acumulação, manipulação e distribuição dentro de uma janela temporal.",
+        "watch":"Procure range/acumulação, tomada de liquidez ou falso rompimento e depois deslocamento/expansão; aceite também ciclos incompletos ou fora de ordem.",
+        "forex":"Quando contexto macro, estrutura e liquidez concordam, a leitura temporal pode ajudar a planejar onde esperar confirmação e onde invalidar a hipótese.",
+        "pitfall":"Tratar AMD como roteiro obrigatório ou entrar antecipadamente apenas porque um novo quarter começou.",
+    },
+    {
+        "id":"quarterly-execution","category":"ICT / SMC","title":"Quarterly — checklist de leitura","level":"Avançado",
+        "summary":"Uma leitura disciplinada separa período, contexto, liquidez, confirmação, alvo e invalidação antes de considerar uma execução.",
+        "watch":"1) período-mãe; 2) quarter atual; 3) bias HTF; 4) liquidez; 5) sweep/manipulação; 6) displacement/BOS-CHOCH; 7) FVG/OTE; 8) alvo e invalidação.",
+        "forex":"Use o checklist como filtro educacional e de timing; decisões continuam sujeitas ao Safety Core, dados válidos, risco e gates do AtlasQuant.",
+        "pitfall":"Transformar o checklist em sinal automático ou ignorar notícias de alto impacto, dados stale e limites de risco.",
+    },
+    {
         "id":"crt-amd","category":"ICT / SMC","title":"CRT e AMD","level":"Avançado",
         "summary":"CRT e AMD organizam fases de range, manipulação e expansão como modelos de contexto/timing.",
         "watch":"Range definido, sweep/manipulação, deslocamento e alvo de liquidez.",
@@ -209,7 +237,7 @@ def academy_minimum_text_ready()->bool:
         "macro-foundations","inflation","cpi","pce","ppi","nfp","unemployment-wages",
         "pmi-ism","gdp","central-banks","hawkish-dovish","fomc-dotplot",
         "calendar-surprise","dxy-crossasset","relative-strength","liquidity-structure",
-        "fvg","ote","crt-amd","risk","atlasquant-reading",
+        "fvg","ote","quarterly-theory","quarterly-multitimeframe","quarterly-amd","quarterly-execution","crt-amd","risk","atlasquant-reading",
     }
     ids={str(x["id"]) for x in ACADEMY_TOPICS}
     return required.issubset(ids) and len(ids)==len(ACADEMY_TOPICS)
