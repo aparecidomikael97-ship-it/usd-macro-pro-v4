@@ -306,6 +306,13 @@ except Exception as _home_radar_exc:
     render_home_radar = None
     _ATLASQUANT_HOME_RADAR_IMPORT_ERROR = f"{type(_home_radar_exc).__name__}: {_home_radar_exc}"
 
+try:
+    from atlasquant_macro_engine import ranking_rows_to_currency_context
+    _ATLASQUANT_MACRO_ENGINE_IMPORT_ERROR = ""
+except Exception as _macro_engine_exc:
+    ranking_rows_to_currency_context = None
+    _ATLASQUANT_MACRO_ENGINE_IMPORT_ERROR = f"{type(_macro_engine_exc).__name__}: {_macro_engine_exc}"
+
 
 try:
     from atlasquant_coverage_funnel import render_coverage_funnel
@@ -3949,6 +3956,14 @@ def _autopilot_save_inputs_v107():
             "fed_tone": str(fed.get("tom", "Neutro")) if "fed" in globals() else "Neutro",
             "fed_strength": float(fed.get("forca", 0.0)) if "fed" in globals() else 0.0,
         }
+        if ranking_rows_to_currency_context is not None and "ranking" in globals():
+            try:
+                _macro["currencies"] = ranking_rows_to_currency_context(
+                    ranking.to_dict("records"),
+                    usd_quality=float(qualidade_usd) if "qualidade_usd" in globals() else None,
+                )
+            except Exception:
+                _macro["currencies"] = {}
         try:
             _macro["trend"] = _score_tendencias_eua()
         except Exception:
@@ -9475,6 +9490,18 @@ with abas[0]:
             _macro_v108["event"] = _proximo_evento_macro_v65()
         except Exception:
             _macro_v108["event"] = {}
+
+        if ranking_rows_to_currency_context is not None:
+            try:
+                _macro_v108["currencies"] = ranking_rows_to_currency_context(
+                    ranking.to_dict("records"),
+                    usd_quality=float(qualidade_usd) if "qualidade_usd" in globals() else None,
+                )
+            except Exception as _macro_ctx_exc:
+                _macro_v108["currencies"] = {}
+                _macro_v108["structured_macro_error"] = f"{type(_macro_ctx_exc).__name__}: {_macro_ctx_exc}"
+        else:
+            _macro_v108["currencies"] = {}
 
         _aq_runtime_snapshot = {}
         if load_current_pair_intelligence is not None:
