@@ -9466,6 +9466,10 @@ with abas[0]:
         _macro_v108 = {
             "usd_score": float(usd_detalhado.get("score", 50.0)) if "usd_detalhado" in globals() else 50.0,
             "usd_quality": float(qualidade_usd) if "qualidade_usd" in globals() else 0.0,
+            "fed": {
+                "tom": str(fed.get("tom", "Neutro")) if "fed" in globals() else "Neutro",
+                "forca": float(fed.get("forca", 0.0)) if "fed" in globals() else 0.0,
+            },
         }
         try:
             _macro_v108["event"] = _proximo_evento_macro_v65()
@@ -9486,6 +9490,7 @@ with abas[0]:
                 render_home_radar(
                     _aq_runtime_snapshot.get("packs", []),
                     experience_mode=_aq_experience_mode,
+                    macro_context=_macro_v108,
                 )
             except Exception as _aq_home_exc:
                 st.warning("Radar principal em modo seguro; nenhuma permissão operacional foi ampliada.")
