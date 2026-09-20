@@ -121,6 +121,19 @@ jobs:
                   page.wait_for_timeout(800)
               return False
 
+          def wait_radar_state(page,timeout=90_000):
+              deadline=time.time()+timeout/1000
+              while time.time()<deadline:
+                  text=body(page)
+                  if (
+                      "Radar de Oportunidades" in text
+                      or "O Radar aguarda a Matriz dos 7 pares nesta execução." in text
+                      or "Radar aguardando a Matriz dos pares e dados persistidos." in text
+                  ):
+                      return True
+                  page.wait_for_timeout(800)
+              return False
+
           def select_area(page,label):
               nav=page.locator('[data-testid="stSelectbox"]').filter(has_text="Área avançada")
               if nav.count()<1:
@@ -149,8 +162,8 @@ jobs:
               if not response or response.status>=400:
                   errors.append(f"HTTP inicial {response.status if response else None}")
               page.locator('[data-testid="stAppViewContainer"]').wait_for(timeout=90_000)
-              if not wait_text(page,"Radar de Oportunidades",timeout=150_000):
-                  errors.append("Radar inicial não apareceu")
+              if not wait_radar_state(page,timeout=90_000):
+                  errors.append("Radar inicial/fail-closed não apareceu")
               assert_clean(page,"beginner-initial",page_errors)
 
               # Enter advanced mode. Streamlit radio interaction itself reruns the app.
@@ -203,7 +216,7 @@ jobs:
                   beginner=page.get_by_text("Iniciante",exact=True)
                   if beginner.count():
                       beginner.first.click()
-                      wait_text(page,"Radar de Oportunidades",timeout=90_000)
+                      wait_radar_state(page,timeout=90_000)
                       assert_clean(page,f"cycle-{cycle}-beginner",page_errors)
                   advanced=page.get_by_text("Avançado",exact=True)
                   if advanced.count():
