@@ -22,7 +22,10 @@ _VOICE_PROFILE={
     "volume":1.0,
     "quality_terms":["natural","neural","premium","enhanced"],
     "preferred_terms":["antonio","antônio","fabio","fábio","daniel","ricardo","thiago","male","masculino"],
-    "fallback_terms":["google português do brasil","google portugues do brasil","portuguese brazil","português brasil","portugues brasil"],
+    "fallback_terms":[],
+    "strict_fixed_voice":True,
+    "allow_generic_device_fallback":False,
+    "fallback_behavior":"text_only",
     "automatic_playback":False,
     "provider_required":False,
     "trading_side_effects":False,
@@ -45,6 +48,9 @@ def voice_profile_ready()->bool:
         and p["external_style"]=="deep"
         and 0.80 <= float(p["pitch"]) < 1.0
         and 0.85 <= float(p["rate"]) <= 1.0
+        and p["strict_fixed_voice"] is True
+        and p["allow_generic_device_fallback"] is False
+        and p["fallback_behavior"]=="text_only"
         and p["automatic_playback"] is False
         and p["trading_side_effects"] is False
     )
