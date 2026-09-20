@@ -36,6 +36,16 @@ class AtlasQuantFinalizationAuditTests(unittest.TestCase):
         self.assertFalse(fast["real_orders_enabled"])
         self.assertFalse(fast["automatic_execution"])
 
+    def test_external_release_evidence_is_explicit_and_fail_closed(self):
+        status=finalization_audit()
+        evidence=status["external_evidence"]
+        self.assertFalse(status["external_evidence_complete"])
+        self.assertFalse(evidence["production_admin_secret_configured"])
+        self.assertFalse(evidence["neural_tts_provider_ready"])
+        self.assertFalse(evidence["academy_videos_published"])
+        self.assertFalse(evidence["commercial_data_licenses_verified"])
+        self.assertFalse(evidence["native_store_publication_verified"])
+
     def test_missing_handoff_docs_blocks_internal_completion(self):
         with tempfile.TemporaryDirectory() as td:
             status=finalization_audit(Path(td))
