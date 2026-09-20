@@ -49,6 +49,20 @@ def _finite(value: Any) -> float | None:
         return None
 
 
+def _present(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value,str):
+        return bool(value.strip())
+    try:
+        missing=pd.isna(value)
+        if isinstance(missing,bool) and missing:
+            return False
+    except Exception:
+        pass
+    return True
+
+
 def normalize_candles(frame: pd.DataFrame | None) -> pd.DataFrame:
     if not isinstance(frame, pd.DataFrame) or frame.empty:
         return pd.DataFrame(columns=REQUIRED_CANDLE_COLUMNS)
@@ -162,7 +176,7 @@ def backtest_signal(
         "notes": str(signal.get("notes", "")),
     }
     for field in OPTIONAL_DIAGNOSTIC_FIELDS:
-        if field in signal and signal.get(field) not in (None, ""):
+        if field in signal and _present(signal.get(field)):
             base[field] = signal.get(field)
     if not ok:
         return {
@@ -370,7 +384,7 @@ def backtest_many(
                 **{
                     field: signal.get(field)
                     for field in OPTIONAL_DIAGNOSTIC_FIELDS
-                    if field in signal and signal.get(field) not in (None, "")
+                    if field in signal and _present(signal.get(field))
                 },
                 "signal_time":signal_ts,
                 "side":str(signal.get("side","")).upper(),
