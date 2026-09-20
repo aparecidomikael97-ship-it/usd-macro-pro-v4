@@ -192,7 +192,17 @@ def render_beginner_shell(
         help="Iniciante abre rápido e mostra só o essencial. Avançado libera todos os diagnósticos.",
     )
     if str(mode).casefold().startswith("avan"):
-        st.rerun()
+        # The widget interaction already updates session state. Continue into the
+        # full app in this same run instead of forcing a second React/Streamlit
+        # rerender at the mobile mode-switch boundary.
+        return {
+            "handled":False,
+            "mode":"Avançado",
+            "snapshot_valid":True,
+            "snapshot_age_minutes":float(check["age_minutes"] or 0.0),
+            "real_orders_enabled":False,
+            "automatic_execution":False,
+        }
 
     age=float(check["age_minutes"] or 0.0)
     st.markdown(
