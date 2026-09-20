@@ -307,10 +307,11 @@ except Exception as _home_radar_exc:
     _ATLASQUANT_HOME_RADAR_IMPORT_ERROR = f"{type(_home_radar_exc).__name__}: {_home_radar_exc}"
 
 try:
-    from atlasquant_macro_engine import ranking_rows_to_currency_context
+    from atlasquant_macro_engine import ranking_rows_to_currency_context, economic_rows_to_indicators
     _ATLASQUANT_MACRO_ENGINE_IMPORT_ERROR = ""
 except Exception as _macro_engine_exc:
     ranking_rows_to_currency_context = None
+    economic_rows_to_indicators = None
     _ATLASQUANT_MACRO_ENGINE_IMPORT_ERROR = f"{type(_macro_engine_exc).__name__}: {_macro_engine_exc}"
 
 
@@ -3964,6 +3965,14 @@ def _autopilot_save_inputs_v107():
                 )
             except Exception:
                 _macro["currencies"] = {}
+        if economic_rows_to_indicators is not None:
+            try:
+                _macro["indicators"] = economic_rows_to_indicators(
+                    dados_eod_v73 if "dados_eod_v73" in globals() else {},
+                    currency="USD",
+                )
+            except Exception:
+                _macro["indicators"] = []
         try:
             _macro["trend"] = _score_tendencias_eua()
         except Exception:
@@ -9502,6 +9511,17 @@ with abas[0]:
                 _macro_v108["structured_macro_error"] = f"{type(_macro_ctx_exc).__name__}: {_macro_ctx_exc}"
         else:
             _macro_v108["currencies"] = {}
+
+        if economic_rows_to_indicators is not None:
+            try:
+                _macro_v108["indicators"] = economic_rows_to_indicators(
+                    dados_eod_v73 if "dados_eod_v73" in globals() else {},
+                    currency="USD",
+                )
+            except Exception:
+                _macro_v108["indicators"] = []
+        else:
+            _macro_v108["indicators"] = []
 
         _aq_runtime_snapshot = {}
         if load_current_pair_intelligence is not None:
