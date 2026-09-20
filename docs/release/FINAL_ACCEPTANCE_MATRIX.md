@@ -23,7 +23,8 @@ Atualizada para a preparação interna final da release.
 | Licenciamento de dados | inventário + checklist | PREPARAÇÃO PRONTA |
 | Termos/Privacidade/Riscos | rascunhos internos | PREPARAÇÃO PRONTA |
 | Lojas nativas | metadados + checklists | PREPARAÇÃO PRONTA |
-| Administrador de produção | secret + primeiro ADMIN configurados manualmente | PENDENTE |\n| Revisão jurídica final | evidência externa | PENDENTE |
+| Administrador de produção | secret + primeiro ADMIN configurados manualmente | PENDENTE |
+| Revisão jurídica final | evidência externa | PENDENTE |
 | Licenças comerciais dos dados | evidência externa | PENDENTE |
 | Provedor real de pagamentos | conta/integração externa | PENDENTE |
 | Provedor TTS | conta/integração externa | PENDENTE |
