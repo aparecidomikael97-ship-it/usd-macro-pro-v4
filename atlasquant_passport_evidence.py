@@ -17,15 +17,21 @@ SCHEMA="ATLASQUANT_PASSPORT_EVIDENCE_V1"
 
 @dataclass(frozen=True)
 class EvidenceCriteria:
-    min_backtest_trades:int=50
-    min_paper_trades:int=20
+    min_backtest_trades:int=100
+    min_paper_trades:int=30
     min_regimes:int=2
     min_sessions:int=2
     min_assets:int=1
-    max_abs_expectancy_gap_r:float=0.25
+    max_abs_expectancy_gap_r:float=0.20
     min_data_quality_pct:float=70.0
+    min_positive_fold_pct:float=66.0
+    min_oos_positive_pct:float=60.0
+    min_friction_positive_pct:float=60.0
+    min_parameter_positive_pct:float=60.0
     require_temporal:bool=True
     require_walk_forward:bool=True
+    require_friction:bool=True
+    require_parameter:bool=True
     require_shadow:bool=False
 
 
@@ -60,6 +66,10 @@ def fuse_operational_evidence(
     walk_forward_status:Any=None,
     friction_status:Any=None,
     parameter_status:Any=None,
+    positive_fold_pct:Any=None,
+    oos_positive_pct:Any=None,
+    friction_positive_pct:Any=None,
+    parameter_positive_pct:Any=None,
     shadow_summary:Mapping[str,Any]|None=None,
     criteria:EvidenceCriteria|None=None,
 )->dict[str,Any]:
@@ -94,6 +104,11 @@ def fuse_operational_evidence(
     })
     expectancy_gap=_finite(comparison.get("expectancy_gap_r"))
 
+    fold_pct=_finite(positive_fold_pct)
+    oos_pct=_finite(oos_positive_pct)
+    friction_pct=_finite(friction_positive_pct)
+    parameter_pct=_finite(parameter_positive_pct)
+
     checks={
         "backtest_sample":bt_trades>=int(c.min_backtest_trades),
         "asset_coverage":_count(coverage.get("assets"))>=int(c.min_assets),
@@ -106,10 +121,36 @@ def fuse_operational_evidence(
             and abs(expectancy_gap)<=float(c.max_abs_expectancy_gap_r)
         ),
         "temporal_diagnostic":(
-            _available_status(temporal_status) if c.require_temporal else True
+            bool(
+                _available_status(temporal_status)
+                and fold_pct is not None
+                and fold_pct>=float(c.min_positive_fold_pct)
+            )
+            if c.require_temporal else True
         ),
         "walk_forward_diagnostic":(
-            _available_status(walk_forward_status) if c.require_walk_forward else True
+            bool(
+                _available_status(walk_forward_status)
+                and oos_pct is not None
+                and oos_pct>=float(c.min_oos_positive_pct)
+            )
+            if c.require_walk_forward else True
+        ),
+        "friction_diagnostic":(
+            bool(
+                _available_status(friction_status)
+                and friction_pct is not None
+                and friction_pct>=float(c.min_friction_positive_pct)
+            )
+            if c.require_friction else True
+        ),
+        "parameter_diagnostic":(
+            bool(
+                _available_status(parameter_status)
+                and parameter_pct is not None
+                and parameter_pct>=float(c.min_parameter_positive_pct)
+            )
+            if c.require_parameter else True
         ),
         "shadow_review":(
             bool(shadow.get("eligible_for_manual_review",False))
@@ -126,15 +167,27 @@ def fuse_operational_evidence(
         },
         {
             "step":"TEMPORAL",
-            "available":_available_status(temporal_status),
+            "available":_available_status(temporal_status) and fold_pct is not None,
             "sufficient":checks["temporal_diagnostic"],
-            "detail":str(temporal_status or "não executado"),
+            "detail":str(temporal_status or "não executado")+" · "+("—" if fold_pct is None else f"{fold_pct:.1f}% folds positivos"),
         },
         {
             "step":"WALK_FORWARD",
-            "available":_available_status(walk_forward_status),
+            "available":_available_status(walk_forward_status) and oos_pct is not None,
             "sufficient":checks["walk_forward_diagnostic"],
-            "detail":str(walk_forward_status or "não executado"),
+            "detail":str(walk_forward_status or "não executado")+" · "+("—" if oos_pct is None else f"{oos_pct:.1f}% OOS positivo"),
+        },
+        {
+            "step":"FRICTION",
+            "available":_available_status(friction_status) and friction_pct is not None,
+            "sufficient":checks["friction_diagnostic"],
+            "detail":str(friction_status or "não executado")+" · "+("—" if friction_pct is None else f"{friction_pct:.1f}% cenários positivos"),
+        },
+        {
+            "step":"PARAMETERS",
+            "available":_available_status(parameter_status) and parameter_pct is not None,
+            "sufficient":checks["parameter_diagnostic"],
+            "detail":str(parameter_status or "não executado")+" · "+("—" if parameter_pct is None else f"{parameter_pct:.1f}% variantes positivas"),
         },
         {
             "step":"PAPER_FORWARD",
@@ -173,7 +226,7 @@ def fuse_operational_evidence(
         state="HUMAN_REVIEW_CANDIDATE"
 
     available_count=sum(1 for step in evidence_steps[:-1] if step["available"])
-    required_evidence_steps=5
+    required_evidence_steps=7
     evidence_coverage_pct=round(100.0*available_count/required_evidence_steps,1)
 
     return {
