@@ -1,9 +1,13 @@
 import unittest
 
-from atlasquant_macro_briefing_voice import VoiceRequest, generate_voice_audio
+from atlasquant_macro_briefing_voice import DEFAULT_VOICE_STYLE, VoiceRequest, generate_voice_audio
 
 
 class MacroBriefingVoiceTests(unittest.TestCase):
+    def test_default_voice_style_is_approved_deep_profile(self):
+        self.assertEqual(DEFAULT_VOICE_STYLE,"deep")
+        self.assertEqual(VoiceRequest("Texto.").validated().voice,"deep")
+
     def test_voice_requires_explicit_provider(self):
         with self.assertRaisesRegex(RuntimeError, "provedor TTS"):
             generate_voice_audio(VoiceRequest("Briefing validado."))
