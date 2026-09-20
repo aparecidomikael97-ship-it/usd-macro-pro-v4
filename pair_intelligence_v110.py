@@ -720,3 +720,164 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     _dr=p.get("data_ready",{}) or {}
     st.info(p["state"])
     b,c,d,e,f=st.columns(5); b.metric("Prioridade",f"{p['priority']:.1f}/100"); c.metric("Score Mestre",f"{p['score']:.0f}/100"); d.metric("Dados",f"{_safe(_dr.get('score',0)):.0f}/100"); e.metric("ICT",f"{p['ict_read']:.0f}/100" if (p.get("ict_fresh",{}) or {}).get("ready") else "N/D"); f.metric("Institucional",f"{p['inst_read']:.0f}/100" if _dr.get("institutional_data_ready") else "N/D")
+    st.caption(f"Diferencial usado pela Matriz: {p['matrix_diff']:+.1f} pts. Pode incluir ajustes do motor; o ranking abaixo mostra a força final das moedas.")
+    _s=p.get("strength",{}) or {}
+    st.markdown(f"### ⚖️ Pontos de força — {pair}")
+    s1,s2,s3=st.columns(3)
+    s1.metric(f"Força {_s.get('base',_base_sel)}",f"{_safe(_s.get('base_score',50)):.1f}/100")
+    s2.metric(f"Força {_s.get('quote',_quote_sel)}",f"{_safe(_s.get('quote_score',50)):.1f}/100")
+    s3.metric("Base − cotada",f"{_safe(_s.get('difference',0)):+.1f} pts")
+
+    _diff=_safe(_s.get("difference",0))
+    if _diff>0:
+        st.success(f"🟢 {_base_sel} está {_diff:.1f} pts acima de {_quote_sel}. Em força relativa, isso favorece {pair} para CIMA — ainda sujeito aos demais gates.")
+    elif _diff<0:
+        st.error(f"🔴 {_quote_sel} está {abs(_diff):.1f} pts acima de {_base_sel}. Em força relativa, isso favorece {pair} para BAIXO — ainda sujeito aos demais gates.")
+    else:
+        st.info("⚪ As duas moedas estão equilibradas na força relativa do modelo.")
+
+    st.caption(f"Principais diferenças: {_s.get('dominant','—')} · Pontos internos do modelo; não são pips nem probabilidade de lucro.")
+
+    with st.expander("Como a força foi calculada", expanded=False):
+        if not _s.get("attribution_exact"):
+            st.warning("Ranking antigo: componentes estimados; o residual não identifica causas econômicas. Recalcule o ranking para obter as contribuições efetivas.")
+        # V11.0.8 — conta de chegada, separando Macro puro, Fed e ajustes.
+        _a=attribution_sides(_s)
+        st.markdown("#### 🧮 Conta de chegada da força")
+        _c1,_c2,_c3=st.columns(3)
+        _c1.metric("Contribuição macro",f"{_base_sel} {_safe(_s.get('base_macro',50)):.1f} × {_quote_sel} {_safe(_s.get('quote_macro',50)):.1f}",f"Δ {_safe(_s.get('macro_difference',0)):+.1f} pts")
+        _c2.metric("Fed",f"{_base_sel} {_safe(_s.get('base_fed',0)):+.1f} × {_quote_sel} {_safe(_s.get('quote_fed',0)):+.1f}",f"Δ {_safe(_s.get('fed_difference',0)):+.1f} pts")
+        _c3.metric("Outros ajustes",f"{_base_sel} {_safe(_s.get('base_adjustments',0)):+.1f} × {_quote_sel} {_safe(_s.get('quote_adjustments',0)):+.1f}",f"Δ {_safe(_s.get('adjustment_difference',0)):+.1f} pts")
+        _left,_right=st.columns(2)
+        with _left:
+            st.markdown(f"**A favor de {_base_sel}**")
+            if _a.get('base_items'):
+                for _it in _a['base_items'][:8]: st.caption(f"• {_it['Fator']}: +{_it['pts']:.1f} pts")
+            else: st.caption("Nenhum fator líquido favorece a base.")
+        with _right:
+            st.markdown(f"**A favor de {_quote_sel}**")
+            if _a.get('quote_items'):
+                for _it in _a['quote_items'][:8]: st.caption(f"• {_it['Fator']}: +{_it['pts']:.1f} pts")
+            else: st.caption("Nenhum fator líquido favorece a cotada.")
+        st.info(f"Conta líquida: vantagens {_base_sel} {_safe(_a.get('base_advantages',0)):.2f} − vantagens {_quote_sel} {_safe(_a.get('quote_advantages',0)):.2f} = {_safe(_a.get('net',0)):+.2f} pts. A força final continua {_base_sel} {_safe(_s.get('base_score',50)):.1f} × {_quote_sel} {_safe(_s.get('quote_score',50)):.1f}.")
+        _sr=pd.DataFrame(_s.get("rows",[]) or [])
+        if not _sr.empty:
+            st.dataframe(_sr,width="stretch",hide_index=True,height=315)
+            st.caption(
+                f"Conferência: {_base_sel} explicado {_safe(_s.get('explained_base',0)):.1f}/100 "
+                f"× {_quote_sel} explicado {_safe(_s.get('explained_quote',0)):.1f}/100. "
+                + ("Contribuições efetivas do modelo; limite e arredondamento separados." if _s.get("attribution_exact") else "Reconciliação contábil estimada; residual sem atribuição causal.")
+            )
+
+    st.markdown("### 📡 Data Readiness — dados suficientes para decisão?")
+    if _dr.get("sufficient"):
+        st.success(f"✅ SIM — {_dr.get('label','')} · {_safe(_dr.get('score',0)):.0f}/100")
+    else:
+        st.error(f"❌ NÃO — {_dr.get('label','')} · {_safe(_dr.get('score',0)):.0f}/100")
+        if _dr.get("missing"):
+            st.caption("Faltando: " + " · ".join(_dr.get("missing",[])[:6]))
+    _tf=_dr.get("timeframes",{}) or {}
+    tfc=st.columns(3)
+    for _col,_name in zip(tfc,("h4","h1","m15")):
+        _x=_tf.get(_name,{}) or {}; _age=_x.get("age_minutes")
+        _col.metric(_name.upper(),_x.get("state","—"),"sem timestamp" if _age is None else f"{_age:.0f} min")
+    st.caption(f"Cache institucional: H1 {_dr.get('cache_h1_bars',0)} candles · M15 {_dr.get('cache_m15_bars',0)} candles")
+    st.caption("Limites de frescor: M15 ≤60 min (aviso até 90) · H1 ≤150 min (aviso até 210) · H4 ≤360 min (aviso até 480).")
+
+    if p["hard_blocks"]:
+        st.error("**Bloqueios duros:** " + " · ".join(p["hard_blocks"]))
+    elif p["soft_blocks"]:
+        st.warning("**Faltando antes da execução:** " + " · ".join(p["soft_blocks"]))
+    else:
+        st.success("Nenhum bloqueio principal detectado nas camadas persistidas.")
+
+    left,right=st.columns(2)
+    with left:
+        st.markdown("### 🟢 Evidências de alta")
+        for x in p["up"][:12]: st.markdown(f"- {x}")
+        if not p["up"]: st.caption("Nenhuma evidência forte de alta.")
+    with right:
+        st.markdown("### 🔴 Evidências de queda")
+        for x in p["down"][:12]: st.markdown(f"- {x}")
+        if not p["down"]: st.caption("Nenhuma evidência forte de queda.")
+
+    if p.get("stale_technical"):
+        with st.expander("🕰️ Leituras técnicas antigas — apenas histórico"):
+            for x in p.get("stale_technical",[]):
+                st.caption("• " + x)
+
+    with st.expander("Todas as camadas de decisão", expanded=False):
+        st.markdown("### 🧠 Decision Stack — tudo em uma tabela")
+        st.dataframe(_stack_rows(p),width="stretch",hide_index=True,height=650)
+
+    with st.expander("Detalhes institucionais e ICT", expanded=False):
+        inst=p.get("inst",{}) or {}
+        st.markdown("### 🏛️ Institutional Execution Engine")
+        cards=[("MSS","mss"),("BOS/CHOCH","structure"),("Order Block","order_block"),("Displacement","displacement"),("SMT","smt"),("Premium/Discount","dealing_range"),("Judas/Sessão","session"),("Breaker/Mitigation","pd_array"),("Liquidez","liquidity")]
+        for i in range(0,len(cards),4):
+            cols=st.columns(min(4,len(cards)-i))
+            for col,(title,key) in zip(cols,cards[i:i+4]):
+                comp=_component(inst,key); _status,_text=display_component_status(comp,key,_dr); col.metric(title,_status); col.caption(_text)
+        if inst and _dr.get("institutional_data_ready"):
+            st.progress(min(1,max(0,p["inst_read"]/100)),text=f"Prontidão institucional: {p['inst_read']:.0f}/100 — {p['inst_label']}")
+        elif inst:
+            st.info("Prontidão institucional: N/D — dados H1/M15 atuais insuficientes. Leituras antigas ficam visíveis apenas como histórico.")
+        else:
+            st.info("A camada institucional será preenchida pelo próximo ciclo do Autopilot usando H1/M15 persistidos. Abrir esta aba não consome API.")
+
+        st.markdown("### 🧠 ICT Execution Engine")
+        ict=p.get("ict",{}) or {}
+        icards=[("CRT","crt"),("OTE","ote"),("AMD / PO3","amd"),("FVG","fvg")]
+        cols=st.columns(4)
+        for col,(title,key) in zip(cols,icards):
+            comp=_component(ict,key)
+            _status,_text,_current=display_ict_component_status(comp,key,_dr)
+            col.metric(title,_status); col.caption(_text)
+        if ict and (p.get("ict_fresh",{}) or {}).get("ready"):
+            st.progress(min(1,max(0,p["ict_read"]/100)),text=f"Prontidão ICT: {p['ict_read']:.0f}/100 — {p['ict_label']}")
+        elif ict:
+            st.info("Prontidão ICT: N/D — H1/M15 não estão simultaneamente frescos com cache mínimo. O score anterior não vale como confirmação atual.")
+
+    st.markdown("### 💧 Liquidez e contexto")
+    _pdop=premium_discount_operational(p.get("side","WAIT"),_component(inst,"dealing_range"),_dr)
+    _sw=p.get("sweep_state",{}) or {}
+    x1,x2,x3,x4,x5=st.columns(5); x1.metric("W1",p["w1"]); x2.metric("D1",p["d1"]); x3.metric("Premium/Discount",_pdop.get("status","—")); x4.metric("Sweep",p["sweep_type"] or "—"); x5.metric("Evento",p["event"])
+    st.caption("Premium/Discount: " + _pdop.get("text",""))
+    if p["sweep_type"]:
+        _msg=f"💧 {p['sweep_type']} em **{p['sweep_level'] or 'nível'}** ({_fmt_price(p['sweep_price'],pair)}). {p['sweep_rejection']} · {_sw.get('label','')}"
+        if _sw.get("current"): st.info(_msg)
+        else: st.warning(_msg)
+    levels=p.get("levels",{}) or {}
+    level_rows=[]
+    for name in ("PWH","PWL","PDH","PDL","Asia High","Asia Low","EQH","EQL"):
+        if name in levels and levels.get(name) is not None:
+            level_rows.append({"Nível":name,"Preço":_fmt_price(levels.get(name),pair)})
+    if level_rows: st.dataframe(pd.DataFrame(level_rows),width="stretch",hide_index=True)
+    _adr_txt='N/D' if p.get('adr') is None else f"{p['adr']:.0f}%"
+    st.caption(f"Alvo principal: {p['target']} · Gate {p['gate']} ({p['gate_score']:.0f}/100) · ADR {_adr_txt} · idade técnica {p['technical_age']:.0f} min" if p['technical_age'] is not None else f"Alvo principal: {p['target']} · Gate {p['gate']} ({p['gate_score']:.0f}/100) · ADR {_adr_txt}")
+
+    st.markdown("### 🎯 Plano objetivo")
+    msg=f"**Decisão:** {p['state']} · **Direção:** {p['direction']} · **Motivo dominante:** {p['reason']} · **Próximo passo:** {p['next_action']}"
+    if p["state"].startswith("🟢"): st.success(msg)
+    elif p["state"].startswith("🔴"): st.error(msg)
+    else: st.warning(msg)
+
+    with st.expander("📚 Como ler o V11.0.8"):
+        st.markdown("""
+- **Macro** escolhe o lado; execução nunca inverte o lado macro sozinha.
+- **SMT** procura divergência entre EUR/USD↔GBP/USD, AUD/USD↔NZD/USD e USD/CHF↔USD/JPY.
+- **Displacement + MSS** formam o núcleo de confirmação de mudança/entrega de fluxo.
+- **Premium/Discount** mede a localização no dealing range H1.
+- **Judas/Sessão** procura sweep/rejeição do range asiático durante Londres/NY.
+- **Breaker/Mitigation** é uma heurística de zona de origem do displacement; não é ordem institucional observável.
+- **CRT/OTE/AMD/FVG** continuam como camada ICT de timing/localização.
+- **Data Readiness** separa processo saudável de dado operacional utilizável; sem H4/H1/M15 frescos e cache mínimo, a execução fica bloqueada.
+- **Hard gates** impedem que um par apareça “executável” quando evento, ADR, H4/H1, qualidade ou frescor não permitem.
+        """)
+    with st.expander("🛡️ Limites do algoritmo"):
+        st.markdown("""
+- O sistema **não vê ordens de bancos/fundos** e não sabe o que um “big player” está fazendo de fato.
+- Os modelos são inferências determinísticas sobre preço, volatilidade, estrutura, liquidez e contexto.
+- Prioridade/Readiness são **scores internos**, não probabilidades de acerto ou lucro.
+- A melhoria deve ser validada por amostra histórica antes de alterar pesos do Score Mestre.
+        """)
