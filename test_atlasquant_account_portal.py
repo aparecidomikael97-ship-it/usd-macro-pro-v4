@@ -17,6 +17,7 @@ class AtlasQuantAccountPortalTests(unittest.TestCase):
         self.assertEqual(role_sections("USER"),("account",))
         self.assertEqual(role_sections("SALES"),("account","sales"))
         self.assertEqual(role_sections("ADMIN"),("account","sales","admin"))
+        self.assertEqual(role_sections("PREVIEW"),("account",))
         self.assertEqual(role_sections("ROOT"),())
 
     def test_password_policy_requires_length_case_digit_and_symbol(self):
@@ -62,6 +63,11 @@ class AtlasQuantAccountPortalTests(unittest.TestCase):
         open_summary=account_summary({"allowed":True,"mode":"OPEN","role":"OPEN"})
         self.assertFalse(open_summary["authenticated"])
         self.assertNotIn("admin",open_summary["sections"])
+        preview_summary=account_summary({"allowed":True,"mode":"PREVIEW","role":"PREVIEW"})
+        self.assertFalse(preview_summary["authenticated"])
+        self.assertEqual(preview_summary["sections"],("account",))
+        self.assertNotIn("sales",preview_summary["sections"])
+        self.assertNotIn("admin",preview_summary["sections"])
         admin_summary=account_summary({
             "allowed":True,
             "mode":"AUTHENTICATED",
@@ -156,6 +162,7 @@ class AtlasQuantAccountPortalTests(unittest.TestCase):
     def test_account_visual_state_is_role_aware_and_conservative(self):
         self.assertEqual(account_visual_state({"role":"INVALID"})["label"],"ACESSO INVÁLIDO")
         self.assertEqual(account_visual_state({"role":"OPEN","authenticated":False})["label"],"MODO LOCAL/ABERTO")
+        self.assertEqual(account_visual_state({"role":"PREVIEW","authenticated":False})["label"],"VISUALIZAÇÃO PROVISÓRIA")
         self.assertEqual(account_visual_state({"role":"SALES","authenticated":True})["label"],"SESSÃO AUTENTICADA")
         self.assertEqual(account_visual_state({"role":"USER","authenticated":False})["label"],"ACESSO BLOQUEADO")
 
