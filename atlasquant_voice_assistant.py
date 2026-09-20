@@ -151,6 +151,9 @@ def assistant_context(
         "geo_research_regime":_text(r.get("geo_research_regime"),"indisponível"),
         "geo_research_severity":_text(r.get("geo_research_severity"),"não disponível"),
         "geo_research_conflict":bool(r.get("geo_research_conflict",False)),
+        "geo_research_channels":[str(x) for x in list(r.get("geo_research_channels",[]) or []) if str(x).strip()],
+        "geo_research_regions":[str(x) for x in list(r.get("geo_research_regions",[]) or []) if str(x).strip()],
+        "geo_research_commodities":[str(x) for x in list(r.get("geo_research_commodities",[]) or []) if str(x).strip()],
         "data_sufficient":data_sufficient,
         "real_orders_enabled":False,
         "automatic_execution":False,
@@ -265,12 +268,17 @@ def _answer_for_category(category:str, c:Mapping[str,Any], *, beginner:bool=Fals
         )
     if category=="geopolitics":
         conflict=" Há conflito entre histórias independentes." if bool(c.get("geo_research_conflict")) else ""
+        channels=", ".join(list(c.get("geo_research_channels",[]) or [])[:4]) or "não confirmados"
+        regions=", ".join(list(c.get("geo_research_regions",[]) or [])[:3]) or "não confirmadas"
+        commodities=", ".join(list(c.get("geo_research_commodities",[]) or [])[:3]) or "não confirmadas"
         return (
             f"Na geopolítica de {pair}, o motor está {_text(c.get('geo_research_direction'))}, com saldo "
             f"{_safe(c.get('geo_research_balance')):+.0f}. O regime está {_text(c.get('geo_research_regime'))}, "
             f"severidade {_text(c.get('geo_research_severity'))}, cobertura {_safe(c.get('geo_research_coverage')):.0f}% "
-            f"e qualidade {_safe(c.get('geo_research_quality')):.0f}/100.{conflict} "
-            "Essa camada descreve impacto de mercado das evidências disponíveis; não julga atores políticos, "
+            f"e qualidade {_safe(c.get('geo_research_quality')):.0f}/100. "
+            f"Canais observados: {channels}. Regiões: {regions}. Commodities: {commodities}.{conflict} "
+            "Esses campos descrevem transmissão de mercado das evidências disponíveis; região ou commodity sem "
+            "impacto cambial explícito não vira direção automática. A camada não julga atores políticos, "
             "não prevê resultado eleitoral e não transforma manchete em ordem."
         )
     if category=="technical":
