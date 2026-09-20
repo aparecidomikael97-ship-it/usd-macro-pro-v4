@@ -27,6 +27,15 @@ class AtlasQuantFinalizationAuditTests(unittest.TestCase):
         self.assertFalse(status["small_sample_auto_promotion_enabled"])
         self.assertTrue(status["human_strategy_review_required"])
 
+    def test_fast_home_contract_is_safe_and_fail_closed(self):
+        status=finalization_audit()
+        fast=status["fast_home_contract"]
+        self.assertEqual(fast["snapshot_max_age_min"],90.0)
+        self.assertTrue(fast["snapshot_required_for_fast_path"])
+        self.assertTrue(fast["fallback_to_full_app"])
+        self.assertFalse(fast["real_orders_enabled"])
+        self.assertFalse(fast["automatic_execution"])
+
     def test_missing_handoff_docs_blocks_internal_completion(self):
         with tempfile.TemporaryDirectory() as td:
             status=finalization_audit(Path(td))
