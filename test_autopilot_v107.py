@@ -268,5 +268,9 @@ class AutopilotV107Tests(unittest.TestCase):
         self.assertFalse(out["safety"]["real_orders"])
 
 
+    def test_home_snapshot_path_is_dedicated_runtime_artifact(self):
+        self.assertEqual(a.HOME_SNAPSHOT_PATH,"dados/atlasquant_home_snapshot_v1.json")
+
+
 if __name__=="__main__":
     unittest.main()
