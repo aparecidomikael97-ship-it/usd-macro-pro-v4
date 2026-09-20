@@ -10,6 +10,7 @@ class AtlasQuantFinalizationAuditTests(unittest.TestCase):
         self.assertTrue(status["internal_release_preparation_complete"])
         self.assertTrue(status["handoff_docs_complete"])
         self.assertEqual(status["missing_handoff_docs"],[])
+        self.assertTrue((Path(__file__).resolve().parent/"docs/release/EXTERNAL_EVIDENCE_RECORD.md").is_file())
 
     def test_external_completion_remains_fail_closed(self):
         status=finalization_audit()
