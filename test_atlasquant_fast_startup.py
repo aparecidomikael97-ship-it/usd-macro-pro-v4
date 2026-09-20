@@ -5,6 +5,7 @@ from atlasquant_fast_startup import (
     SCHEMA,
     snapshot_age_minutes,
     validate_home_snapshot,
+    load_home_snapshot,
 )
 
 
@@ -77,6 +78,14 @@ class FastStartupTests(unittest.TestCase):
         self.assertFalse(out["valid"])
         self.assertIn("schema",out["errors"])
 
+
+    def test_snapshot_loader_timeout_is_bounded_for_fast_boot(self):
+        import inspect
+        signature=inspect.signature(load_home_snapshot)
+        self.assertEqual(signature.parameters["timeout"].default,4.0)
+        src=inspect.getsource(load_home_snapshot)
+        self.assertIn("min(float(timeout),8.0)",src)
+        self.assertIn("if not token:",src)
 
     def test_main_attempts_fast_shell_before_heavy_provider_boot(self):
         from pathlib import Path
