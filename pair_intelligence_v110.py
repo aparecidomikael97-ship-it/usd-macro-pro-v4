@@ -40,6 +40,7 @@ from atlasquant_flight_recorder_panel import render_flight_recorder, capture_fli
 from atlasquant_runtime_store import resolve_runtime_branch
 from atlasquant_shadow_capture import capture_shadow_batch
 from atlasquant_quarterly_context import build_quarterly_snapshot
+from atlasquant_intermarket_context import build_intermarket_snapshot
 
 try:
     from currency_news_v107 import pair_news_table
@@ -238,7 +239,7 @@ def _component(inst:Mapping[str,Any],key:str)->dict[str,Any]:
     return dict((inst or {}).get(key,{}) or {})
 
 
-def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro",weights=None):
+def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro",weights=None,intermarket_state=None):
     side=_side(row.get("Direção","")); base,quote=pair.split("/")
     base_score=_currency_score(ranking,base); quote_score=_currency_score(ranking,quote)
     matrix_diff=_safe(row.get("Dif. macro",base_score-quote_score))
@@ -251,6 +252,7 @@ def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro",weights=
     inst=dict(tec.get("institutional",{}) or {}); inst_read=_safe(inst.get("readiness",0)); inst_label=str(inst.get("label","⏳ aguardando motor institucional"))
     cache_v110=dict(tec.get("cache_v110",{}) or {})
     quarterly=build_quarterly_snapshot(cache_v110.get("m15",[]),side)
+    intermarket=build_intermarket_snapshot(pair,intermarket_state)
     data_ready=assess_pair_data_readiness(raw_sc,mapctx,expected_direction=str(row.get("Direção","")))
     ict_fresh=assess_ict_freshness(data_ready)
     age=(data_ready.get("timeframes",{}).get("m15",{}) or {}).get("age_minutes")
@@ -344,7 +346,7 @@ def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro",weights=
         "sweep_type":mc["sweep_type"],"sweep_level":mc["sweep_level"],"sweep_price":mc["sweep_price"],"sweep_rejection":mc["sweep_rejection"],
         "levels":mc["levels"],"news_diff":news_diff,"news_align":news_align,"news_conv":news_conv,
         "ict":ict,"ict_read":ict_read,"ict_label":ict_label,"ict_fresh":ict_fresh,"inst":inst,"inst_read":inst_read,"inst_label":inst_label,
-        "quarterly":quarterly,
+        "quarterly":quarterly,"intermarket":intermarket,
         "up":up,"down":down,"reason":reason,"next_action":decision["next_action"],"target":target,
         "hard_blocks":decision["hard_blocks"],"soft_blocks":decision["soft_blocks"],"positives":decision["positives"],
         "executable":decision["executable"],"technical_age":age,"data_ready":data_ready,
@@ -522,7 +524,7 @@ def atlasquant_basic_table(packs: list[Mapping[str, Any]]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def build_pair_intelligence_packs(matrix:pd.DataFrame, ranking:pd.DataFrame, *, scanner_state:Mapping[str,Any]|None=None, map_state:Mapping[str,Any]|None=None, news_state:Mapping[str,Any]|None=None, fed_tone:str="Neutro", weights:Mapping[str,float]|None=None) -> list[dict[str,Any]]:
+def build_pair_intelligence_packs(matrix:pd.DataFrame, ranking:pd.DataFrame, *, scanner_state:Mapping[str,Any]|None=None, map_state:Mapping[str,Any]|None=None, news_state:Mapping[str,Any]|None=None, fed_tone:str="Neutro", weights:Mapping[str,float]|None=None, intermarket_state:Mapping[str,Any]|None=None) -> list[dict[str,Any]]:
     """Pure adapter used by UI and background Autopilot; performs no API calls."""
     if matrix is None or matrix.empty:
         return []
@@ -530,7 +532,7 @@ def build_pair_intelligence_packs(matrix:pd.DataFrame, ranking:pd.DataFrame, *, 
     map_rows=dict((map_state or {}).get("contexts",{}) or {})
     news_map=_pair_news(dict(news_state or {}),matrix)
     bypair={str(r["Par"]):r.to_dict() for _,r in matrix.iterrows() if str(r.get("Par","")) in PAIR_ORDER}
-    packs=[_reason_pack(p,bypair[p],ranking,scanner_rows.get(p,{}),map_rows.get(p,{}),news_map.get(p,{}),fed_tone,weights) for p in PAIR_ORDER if p in bypair]
+    packs=[_reason_pack(p,bypair[p],ranking,scanner_rows.get(p,{}),map_rows.get(p,{}),news_map.get(p,{}),fed_tone,weights,intermarket_state) for p in PAIR_ORDER if p in bypair]
     packs.sort(key=lambda x:x["priority"],reverse=True)
     return packs
 
@@ -718,7 +720,3 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     _dr=p.get("data_ready",{}) or {}
     st.info(p["state"])
     b,c,d,e,f=st.columns(5); b.metric("Prioridade",f"{p['priority']:.1f}/100"); c.metric("Score Mestre",f"{p['score']:.0f}/100"); d.metric("Dados",f"{_safe(_dr.get('score',0)):.0f}/100"); e.metric("ICT",f"{p['ict_read']:.0f}/100" if (p.get("ict_fresh",{}) or {}).get("ready") else "N/D"); f.metric("Institucional",f"{p['inst_read']:.0f}/100" if _dr.get("institutional_data_ready") else "N/D")
-    st.caption(f"Diferencial usado pela Matriz: {p['matrix_diff']:+.1f} pts. Pode incluir ajustes do motor; o ranking abaixo mostra a força final das moedas.")
-    _s=p.get("strength",{}) or {}
-    st.markdown(f"### ⚖️ Pontos de força — {pair}")
-    s1,s2,s3=st.columns(3)
