@@ -59,11 +59,17 @@ def render_admin_research_panel(
     access:Mapping[str,Any]|None,
     *,
     last_backtest:Mapping[str,Any]|None=None,
+    last_suite:Mapping[str,Any]|None=None,
 )->dict[str,Any]:
     backtest=(
         dict(last_backtest)
         if isinstance(last_backtest,Mapping)
         else dict(st.session_state.get("atlasquant_last_backtest_intelligence",{}) or {})
+    )
+    suite=(
+        dict(last_suite)
+        if isinstance(last_suite,Mapping)
+        else dict(st.session_state.get("atlasquant_last_strategy_suite_intelligence",{}) or {})
     )
     snapshot=build_admin_research_snapshot(access=access,last_backtest=backtest)
 
@@ -96,11 +102,22 @@ def render_admin_research_panel(
             "Não significa VALIDATED, aprovado para Iniciante ou lucrativo."
         )
 
+    if suite:
+        passport_rows=pd.DataFrame(suite.get("passport_rows",[]) or [])
+        if not passport_rows.empty:
+            st.markdown("#### Comparador · Passaportes dos operacionais")
+            st.dataframe(passport_rows,width="stretch",hide_index=True)
+            st.caption(
+                "A comparação descreve evidência observada. O Admin não transforma ranking "
+                "histórico em promoção automática."
+            )
+
     if not backtest:
-        st.info(
-            "Nenhum backtest desta sessão foi enviado ao Copiloto Admin ainda. "
-            "Rode um operacional na aba Backtest para alimentar este painel."
-        )
+        if not suite:
+            st.info(
+                "Nenhum backtest desta sessão foi enviado ao Copiloto Admin ainda. "
+                "Rode um operacional na aba Backtest para alimentar este painel."
+            )
         return snapshot
 
     st.markdown("#### Último Passaporte recebido")
