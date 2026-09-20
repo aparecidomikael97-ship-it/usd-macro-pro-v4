@@ -240,6 +240,9 @@ def geopolitical_layer(
     out["severity"]=str(engine.get("severity") or "N/D")
     out["geo_conflict"]=bool(engine.get("geo_conflict",False))
     out["channels"]=list(engine.get("channels",[]) or [])
+    out["regions"]=list(engine.get("regions",[]) or [])
+    out["countries"]=list(engine.get("countries",[]) or [])
+    out["commodities"]=list(engine.get("commodities",[]) or [])
     out["events"]=list(engine.get("events",[]) or [])
     return out
 
