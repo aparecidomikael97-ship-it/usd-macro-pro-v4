@@ -15,6 +15,7 @@ from atlasquant_operational_catalog import catalog_rows, catalog_summary
 from atlasquant_weekly_profile import analyze_weekly_extremes
 from atlasquant_behavior_shift import BehaviorStats, detect_behavior_shift
 from atlasquant_passport_evidence import fuse_operational_evidence
+from atlasquant_passport_drift import latest_passport_drift, passport_drift_rows
 from atlasquant_setup_journal import setup_forward_summary
 from atlasquant_shadow_mode import summarize_shadow
 from atlasquant_research_evidence_capture import (
@@ -293,6 +294,23 @@ def render_admin_research_panel(
                     "Persistência externa não disponível agora; os registros permanecem na sessão. "
                     f"Motivo: {status.get('reason','N/D')}."
                 )
+
+    drift_rows=passport_drift_rows(research_records)
+    if drift_rows:
+        st.markdown("#### 📉 Mudança do Passaporte no tempo")
+        st.caption(
+            "Compara os dois últimos registros de cada operacional. Alerta de mudança pede revisão; "
+            "não altera setup, Gate ou peso automaticamente."
+        )
+        drift_frame=pd.DataFrame(drift_rows)
+        st.dataframe(drift_frame,width="stretch",hide_index=True)
+        drifts=latest_passport_drift(research_records)
+        flagged=[x for x in drifts if x.get("review_required")]
+        if flagged:
+            st.warning(
+                f"{len(flagged)} operacional(is) com mudança relevante para revisão humana. "
+                "Isso é diagnóstico de pesquisa, não previsão."
+            )
 
     with st.expander("📚 Matriz Mestre ICT / SMC / Price Action",expanded=False):
         frame=pd.DataFrame(catalog_rows())
