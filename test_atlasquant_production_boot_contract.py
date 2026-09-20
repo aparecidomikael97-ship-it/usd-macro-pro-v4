@@ -25,6 +25,9 @@ class ProductionBootContractTests(unittest.TestCase):
         self.assertIn("produção carregou Streamlit, mas não abriu a Home/Radar atual",workflow)
         self.assertIn("Home/Radar demorou",workflow)
         self.assertIn("meaningful_ms > 30000",workflow)
+        self.assertIn("Wait for fresh Fast Home snapshot",workflow)
+        self.assertIn("atlasquant_home_snapshot_v1.json?ref=atlasquant-runtime",workflow)
+        self.assertIn('obj.get("schema")=="ATLASQUANT_HOME_SNAPSHOT_V1"',workflow)
 
     def test_fast_home_still_precedes_heavy_provider_boot(self):
         src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
