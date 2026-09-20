@@ -15,7 +15,9 @@ class PairIntelligenceV108SourceTests(unittest.TestCase):
         src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
         self.assertIn("_nav_items = list(navigation_labels())",src)
         self.assertIn('"🎯 Radar"',src)
-        self.assertIn("abas = st.tabs(_nav_items)",src)
+        self.assertIn("render_stable_navigation(",src)
+        self.assertIn("_aq_active_index",src)
+        self.assertNotIn("st.tabs(_nav_items)",src)
 
 
     def test_pair_intelligence_uses_runtime_branch_resolver(self):
