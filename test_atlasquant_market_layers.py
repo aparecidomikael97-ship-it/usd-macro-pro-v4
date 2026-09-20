@@ -107,6 +107,26 @@ class AtlasQuantMarketLayersTests(unittest.TestCase):
         self.assertLessEqual(abs(out["balance"]),100)
         self.assertFalse(out["probability"])
 
+    def test_geopolitical_layer_exposes_structured_metadata(self):
+        state={"geopolitical_events":[{
+            "event_id":"GEO-1",
+            "title":"Shipping route disruption after maritime attack",
+            "category":"shipping",
+            "source":"Verified wire",
+            "quality":92,
+            "severity":"high",
+            "duration":"medium",
+            "currency_impacts":{"EUR":-55,"USD":20},
+        }]}
+        out=geopolitical_layer("EUR/USD",state)
+        self.assertTrue(out["available"])
+        self.assertEqual(out["direction"],"VENDA")
+        self.assertEqual(out["risk_regime"],"RISK-OFF")
+        self.assertEqual(out["severity"],"ALTO")
+        self.assertGreater(out["coverage"],0)
+        self.assertTrue(out["events"])
+        self.assertFalse(out["decision_effect"])
+
     def test_non_geopolitical_macro_headline_does_not_fake_geo_signal(self):
         state={"currencies":{
             "EUR":{"articles":[{"title":"Euro area CPI inflation slows","weighted_impact":-0.2}]},
