@@ -25,6 +25,7 @@ import streamlit as st
 SCHEMA="ATLASQUANT_HOME_SNAPSHOT_V1"
 HOME_SNAPSHOT_PATH="dados/atlasquant_home_snapshot_v1.json"
 DEFAULT_MAX_AGE_MIN=90.0
+DEFAULT_FAST_TIMEOUT=2.5
 
 
 def _finite(value:Any, default:float=0.0)->float:
@@ -94,7 +95,7 @@ def load_home_snapshot(
     repo:str,
     branch:str="atlasquant-runtime",
     token:str="",
-    timeout:float=4.0,
+    timeout:float=DEFAULT_FAST_TIMEOUT,
 )->dict[str,Any]:
     """Read one compact runtime artifact. Public raw URL first; API fallback for private repos."""
     repo=str(repo or "").strip()
@@ -102,7 +103,7 @@ def load_home_snapshot(
     token=str(token or "").strip()
     if not repo or "/" not in repo:
         return {}
-    timeout=max(1.0,min(float(timeout),8.0))
+    timeout=max(1.0,min(float(timeout),4.0))
     started=time.perf_counter()
 
     raw_url=f"https://raw.githubusercontent.com/{repo}/{quote(branch,safe='')}/{HOME_SNAPSHOT_PATH}"
@@ -295,5 +296,5 @@ def render_beginner_shell(
 
 __all__=[
     "SCHEMA","HOME_SNAPSHOT_PATH","DEFAULT_MAX_AGE_MIN","snapshot_age_minutes",
-    "validate_home_snapshot","load_home_snapshot","render_beginner_shell",
+    "validate_home_snapshot","load_home_snapshot","render_beginner_shell","DEFAULT_FAST_TIMEOUT",
 ]
