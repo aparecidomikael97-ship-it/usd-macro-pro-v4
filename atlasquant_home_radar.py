@@ -128,6 +128,9 @@ def home_rows_from_packs(packs:Sequence[Mapping[str,Any]]|None, *, news_state:Ma
             "macro_research_coverage":_safe(macro_research.get("coverage",0)),
             "macro_research_mode":str(macro_research.get("engine_mode") or "insufficient"),
             "macro_research_conflict":bool(macro_research.get("macro_conflict",False)),
+            "macro_research_groups":[dict(x) for x in list(macro_research.get("groups",[]) or []) if isinstance(x,Mapping)],
+            "macro_research_reasons":[str(x) for x in list(macro_research.get("reasons",[]) or []) if str(x).strip()],
+            "macro_research_risks":[str(x) for x in list(macro_research.get("risks",[]) or []) if str(x).strip()],
         })
     rows.sort(key=lambda x:(x["action"]!="NÃO OPERAR",x["priority"],x["data_score"]),reverse=True)
     return rows
@@ -343,6 +346,25 @@ def render_home_radar(
             st.warning("Bloqueios/atenções: "+" · ".join(row["blockers"][:6]))
         if row["research_blockers"]:
             st.warning("Bloqueios dos motores de pesquisa: "+" · ".join(row["research_blockers"][:4]))
+        with st.expander("Motor Macro — abrir componentes",expanded=False):
+            groups=list(row.get("macro_research_groups",[]) or [])
+            if groups:
+                macro_table=pd.DataFrame([{
+                    "Grupo":str(g.get("group") or "—"),
+                    "Saldo":round(_safe(g.get("balance",0)),1),
+                    "Qualidade":round(_safe(g.get("quality",0)),1),
+                    "Peso pesquisa %":round(_safe(g.get("weight",0))*100,1),
+                    "Base":g.get("base_score","—"),
+                    "Cotada":g.get("quote_score","—"),
+                } for g in groups])
+                st.dataframe(macro_table,width="stretch",hide_index=True)
+            else:
+                st.caption("Sem grupos macro estruturados suficientes neste snapshot.")
+            for reason in list(row.get("macro_research_reasons",[]) or [])[:6]:
+                st.write("• "+str(reason))
+            risks=list(row.get("macro_research_risks",[]) or [])
+            if risks:
+                st.warning("Riscos macro: "+" · ".join(str(x) for x in risks[:4]))
 
     st.info("O Radar organiza onde olhar primeiro. Ele não envia ordens e não transforma prioridade em probabilidade de lucro.")
     return {
