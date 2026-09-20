@@ -46,6 +46,55 @@ jobs:
           done
           test "$code" = "200"
 
+      - name: Wait for fresh Fast Home snapshot
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/dados/atlasquant_home_snapshot_v1.json?ref=atlasquant-runtime"
+          fresh="0"
+          for attempt in $(seq 1 24); do
+            code=$(curl -sS \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -o /tmp/atlasquant-home-api.json \
+              -w "%{http_code}" \
+              "$api" || true)
+            echo "home snapshot attempt=$attempt http=$code"
+            if [ "$code" = "200" ]; then
+              fresh=$(python - <<'PY'
+          import base64, json
+          from datetime import datetime, timezone
+          from pathlib import Path
+          try:
+              payload=json.loads(Path("/tmp/atlasquant-home-api.json").read_text(encoding="utf-8"))
+              obj=json.loads(base64.b64decode(payload.get("content","")).decode("utf-8"))
+              generated=str(obj.get("runtime_generated_at") or obj.get("generated_at") or "")
+              ts=datetime.fromisoformat(generated.replace("Z","+00:00")).astimezone(timezone.utc)
+              age=(datetime.now(timezone.utc)-ts).total_seconds()/60.0
+              ok=(
+                  obj.get("schema")=="ATLASQUANT_HOME_SNAPSHOT_V1"
+                  and bool(obj.get("packs"))
+                  and age >= 0
+                  and age <= 120
+                  and (obj.get("safety") or {}).get("real_orders") is False
+                  and (obj.get("safety") or {}).get("automatic_execution") is False
+              )
+              print("1" if ok else "0")
+          except Exception:
+              print("0")
+          PY
+              )
+              if [ "$fresh" = "1" ]; then
+                echo "Fast Home snapshot: fresh and safe"
+                break
+              fi
+            fi
+            sleep 10
+          done
+          test "$fresh" = "1"
+
       - name: Open production in desktop and mobile Chromium
         shell: bash
         run: |
