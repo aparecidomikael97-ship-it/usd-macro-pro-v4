@@ -7,14 +7,20 @@ tagged with provenance).
 """
 from __future__ import annotations
 
+import base64
+from io import BytesIO
 from math import isfinite
 from typing import Any
 
 import pandas as pd
+import requests
 
+from atlasquant_runtime_store import require_runtime_branch
 from atlasquant_setup_journal import setup_forward_summary, validate_setup_record
 
 SCHEMA="ATLASQUANT_PAPER_SETUP_BRIDGE_V1"
+PAPER_AUDIT_PATH="dados/paper_setup_audit_v114.csv"
+DEFAULT_MAX_RUNTIME_ROWS=10000
 
 SETUP_ALIASES={
     "bos-choch-ob":"bos-choch-ob",
@@ -161,10 +167,72 @@ def bridge_paper_audit(audit:pd.DataFrame|None)->dict[str,Any]:
     }
 
 
+
+def load_paper_audit_runtime(
+    *,
+    repo:str,
+    branch:str,
+    token:str,
+    timeout:int=15,
+    max_rows:int=DEFAULT_MAX_RUNTIME_ROWS,
+)->tuple[pd.DataFrame,dict[str,Any]]:
+    """Read the prospective Paper audit from the dedicated runtime branch.
+
+    Read-only. It never writes runtime data and never falls back to a code branch.
+    """
+    try:
+        safe=require_runtime_branch(branch)
+    except Exception as exc:
+        return pd.DataFrame(),{
+            "ok":False,"reason":"UNSAFE_BRANCH","rows":0,"error":str(exc),
+        }
+    repo=str(repo or "").strip()
+    token=str(token or "").strip()
+    if not repo or not token:
+        return pd.DataFrame(),{
+            "ok":False,"reason":"NOT_CONFIGURED","rows":0,"branch":safe,"error":"",
+        }
+    url=f"https://api.github.com/repos/{repo}/contents/{PAPER_AUDIT_PATH}"
+    headers={
+        "Authorization":f"Bearer {token}",
+        "Accept":"application/vnd.github+json",
+        "X-GitHub-Api-Version":"2022-11-28",
+    }
+    try:
+        response=requests.get(
+            url,
+            headers=headers,
+            params={"ref":safe},
+            timeout=timeout,
+        )
+        if response.status_code==404:
+            return pd.DataFrame(),{
+                "ok":True,"reason":"NOT_FOUND","rows":0,"branch":safe,"error":"",
+            }
+        response.raise_for_status()
+        payload=response.json()
+        raw=base64.b64decode(payload.get("content",""))
+        frame=pd.read_csv(BytesIO(raw))
+        limit=max(1,int(max_rows))
+        if len(frame)>limit:
+            frame=frame.tail(limit).reset_index(drop=True)
+        return frame,{
+            "ok":True,"reason":"LOADED","rows":int(len(frame)),
+            "branch":safe,"error":"",
+        }
+    except Exception as exc:
+        return pd.DataFrame(),{
+            "ok":False,"reason":"IO_ERROR","rows":0,"branch":safe,
+            "error":f"{type(exc).__name__}: {exc}",
+        }
+
+
 __all__=[
     "SCHEMA",
     "SETUP_ALIASES",
     "TRUSTED_ATTRIBUTIONS",
+    "PAPER_AUDIT_PATH",
     "canonical_setup_id",
     "bridge_paper_audit",
+    "load_paper_audit_runtime",
 ]
