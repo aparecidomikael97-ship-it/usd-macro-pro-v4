@@ -466,6 +466,33 @@ class PassportEvidenceFusionTests(unittest.TestCase):
         self.assertFalse(out["real_orders_enabled"])
         self.assertIn("não mede probabilidade",out["interpretation"].lower())
 
+    def test_default_shadow_is_optional_and_does_not_reduce_required_coverage(self):
+        paper={
+            "forward_samples":45,
+            "forward_expectancy_r":0.18,
+            "forward_profit_factor":1.3,
+            "forward_max_drawdown_r":4.0,
+            "forward_win_rate_pct":55,
+        }
+        out=fuse_operational_evidence(
+            self._passport(),
+            paper_summary=paper,
+            temporal_status="POSITIVE_ACROSS_FOLDS",
+            walk_forward_status="POSITIVE_ALL_OOS_WINDOWS",
+            friction_status="POSITIVE_ALL_TESTED_FRICTION",
+            parameter_status="POSITIVE_ALL_PREDEFINED_VARIANTS",
+            positive_fold_pct=75,
+            oos_positive_pct=67,
+            friction_positive_pct=75,
+            parameter_positive_pct=70,
+        )
+        self.assertEqual(out["state"],"HUMAN_REVIEW_CANDIDATE")
+        self.assertEqual(out["evidence_coverage_pct"],100.0)
+        self.assertEqual(out["evidence_sufficient_pct"],100.0)
+        shadow=next(x for x in out["evidence_steps"] if x["step"]=="SHADOW")
+        self.assertFalse(shadow["required"])
+        self.assertTrue(shadow["sufficient"])
+
     def test_good_backtest_without_paper_stays_pending(self):
         out=fuse_operational_evidence(
             self._passport(),
@@ -523,6 +550,26 @@ class PassportEvidenceFusionTests(unittest.TestCase):
         self.assertFalse(out["checks"]["backtest_expectancy"])
         self.assertFalse(out["checks"]["paper_expectancy"])
         self.assertFalse(out["eligible_for_human_review"])
+
+    def test_negative_paper_expectancy_marks_paper_step_insufficient(self):
+        paper={"forward_samples":45,"forward_expectancy_r":-0.05}
+        out=fuse_operational_evidence(
+            self._passport(),
+            paper_summary=paper,
+            temporal_status="POSITIVE_ACROSS_FOLDS",
+            walk_forward_status="POSITIVE_ALL_OOS_WINDOWS",
+            friction_status="POSITIVE_ALL_TESTED_FRICTION",
+            parameter_status="POSITIVE_ALL_PREDEFINED_VARIANTS",
+            positive_fold_pct=75,
+            oos_positive_pct=67,
+            friction_positive_pct=75,
+            parameter_positive_pct=70,
+        )
+        paper_step=next(x for x in out["evidence_steps"] if x["step"]=="PAPER_FORWARD")
+        self.assertTrue(paper_step["available"])
+        self.assertFalse(paper_step["sufficient"])
+        self.assertFalse(out["eligible_for_human_review"])
+        self.assertLess(out["evidence_sufficient_pct"],100.0)
 
     def test_paper_gap_is_descriptive_and_can_block_review(self):
         paper={"forward_samples":50,"forward_expectancy_r":-0.20}
