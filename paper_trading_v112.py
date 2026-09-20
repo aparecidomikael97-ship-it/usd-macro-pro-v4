@@ -17,7 +17,7 @@ from decision_integrity_v110 import evaluate_decision_integrity
 
 PAPER_VERSION = "V11.2_PAPER_TRADING"
 PAPER_COLUMNS = [
-    "trade_id", "signal_id", "pair", "side", "status", "result",
+    "trade_id", "signal_id", "pair", "side", "setup_id", "setup_attribution", "status", "result",
     "signal_time", "signal_candle_time", "entry_time", "entry_price",
     "stop_price", "target_price", "risk_distance", "target_rr",
     "exit_time", "exit_price", "exit_reason", "realized_r",
@@ -25,7 +25,8 @@ PAPER_COLUMNS = [
     "score_master", "quality", "rank_index", "h4", "h1", "m15",
     "ict_readiness", "institutional_readiness", "gate", "gate_score",
     "adr_used_pct", "event_risk", "technical_age_min", "map_age_min",
-    "data_sufficient", "checklist_passed", "checklist_note",
+    "data_sufficient", "data_quality_pct", "d1_regime", "w1_regime", "active_session",
+    "checklist_passed", "checklist_note",
     "created_at", "updated_at", "engine_version",
 ]
 ACTIVE_STATUSES = {"WAIT_ENTRY", "OPEN"}
@@ -81,6 +82,20 @@ def _side(direction: Any) -> str:
     if "VENDA" in u or u == "SELL":
         return "SELL"
     return "WAIT"
+
+
+def _explicit_setup_id(input_row: Mapping[str, Any] | None) -> str:
+    """Return only an explicitly supplied setup identifier.
+
+    No ICT/SMC component, score or outcome is used to infer a setup. This keeps
+    Paper/Forward attribution auditable and avoids retroactive labeling.
+    """
+    row=dict(input_row or {})
+    for key in ("setup_id","Setup ID","setup","Setup","operacional","Operacional"):
+        value=str(row.get(key) or "").strip()
+        if value:
+            return value.casefold()
+    return ""
 
 
 def normalize_m15(records: Any) -> pd.DataFrame:
@@ -206,15 +221,37 @@ def evaluate_pair_checklist(
         and not (decision.get("hard_blocks") or [])
         and not (decision.get("soft_blocks") or [])
     )
+    killzone=dict((map_ctx or {}).get("killzone",{}) or {})
+    active=killzone.get("active")
+    if isinstance(active,Mapping):
+        active_session=str(active.get("name","") or "")
+    else:
+        active_session=str(active or "")
+    d1_regime=str(
+        dict(dict((map_ctx or {}).get("d1",{}) or {}).get("structure",{}) or {}).get("regime","")
+        or ""
+    )
+    w1_regime=str(
+        dict(dict((map_ctx or {}).get("w1",{}) or {}).get("structure",{}) or {}).get("regime","")
+        or ""
+    )
+    setup_id=_explicit_setup_id(input_row)
+
     return {
         "pair": pair,
         "side": side,
         "direction": direction,
+        "setup_id":setup_id,
+        "setup_attribution":"EXPLICIT_INPUT" if setup_id else "UNATTRIBUTED",
         "decision": decision,
         "all_checks_passed": all_clear,
         "technical_age_min": technical_age,
         "map_age_min": map_age,
         "data_sufficient": data_sufficient,
+        "data_quality_pct": data_score,
+        "d1_regime": d1_regime,
+        "w1_regime": w1_regime,
+        "active_session": active_session,
         "h4": h4,
         "h1": h1,
         "m15": m15,
@@ -268,6 +305,8 @@ def _make_wait_entry(chk: Mapping[str, Any], frame: pd.DataFrame, *, now: pd.Tim
         "signal_id": sid,
         "pair": chk["pair"],
         "side": chk["side"],
+        "setup_id": chk.get("setup_id",""),
+        "setup_attribution": chk.get("setup_attribution","UNATTRIBUTED"),
         "status": "WAIT_ENTRY",
         "result": "",
         "signal_time": signal_time.isoformat(),
@@ -288,6 +327,10 @@ def _make_wait_entry(chk: Mapping[str, Any], frame: pd.DataFrame, *, now: pd.Tim
         "technical_age_min": chk["technical_age_min"],
         "map_age_min": chk["map_age_min"],
         "data_sufficient": chk["data_sufficient"],
+        "data_quality_pct": chk.get("data_quality_pct"),
+        "d1_regime": chk.get("d1_regime",""),
+        "w1_regime": chk.get("w1_regime",""),
+        "active_session": chk.get("active_session",""),
         "checklist_passed": True,
         "checklist_note": "Checklist 100% liberado: executável e sem bloqueios duros/brandos.",
         "ambiguous_touch": False,
@@ -422,6 +465,27 @@ def summarize_paper_trades(trades: pd.DataFrame) -> dict[str, Any]:
     gross_win = float(rr[rr > 0].sum()) if not rr.empty else 0.0
     gross_loss = float(-rr[rr < 0].sum()) if not rr.empty else 0.0
     profit_factor = None if gross_loss <= 0 else gross_win / gross_loss
+    by_setup: dict[str, Any] = {}
+    if "setup_id" in closed.columns:
+        tagged=closed[closed["setup_id"].fillna("").astype(str).str.strip().ne("")].copy()
+        for setup_id,g in tagged.groupby("setup_id",dropna=False):
+            gr=pd.to_numeric(g["realized_r"],errors="coerce").dropna()
+            gr=gr[gr.map(lambda x: math.isfinite(float(x)))]
+            gw=int((g["result"].astype(str)=="WIN").sum())
+            gl=int((g["result"].astype(str)=="LOSS").sum())
+            gross_win=float(gr[gr>0].sum()) if not gr.empty else 0.0
+            gross_loss=float(-gr[gr<0].sum()) if not gr.empty else 0.0
+            by_setup[str(setup_id)]={
+                "trades":int(len(g)),
+                "wins":gw,
+                "losses":gl,
+                "win_rate_pct":round(gw/max(gw+gl,1)*100.0,1),
+                "net_r":round(float(gr.sum()) if not gr.empty else 0.0,3),
+                "avg_r":round(float(gr.mean()) if not gr.empty else 0.0,3),
+                "profit_factor_r":None if gross_loss<=0 else round(gross_win/gross_loss,3),
+                "explicit_attribution_only":True,
+            }
+
     by_pair: dict[str, Any] = {}
     for pair, g in closed.groupby("pair", dropna=False):
         gr = pd.to_numeric(g["realized_r"], errors="coerce").dropna()
@@ -450,6 +514,8 @@ def summarize_paper_trades(trades: pd.DataFrame) -> dict[str, Any]:
         "avg_r": round(float(rr.mean()) if not rr.empty else 0.0, 3),
         "profit_factor_r": None if profit_factor is None else round(float(profit_factor), 3),
         "by_pair": by_pair,
+        "by_setup": by_setup,
+        "setup_attribution_inferred": False,
     }
 
 
