@@ -10,6 +10,11 @@ from atlasquant_investment_ecosystem import (
     project_income_asset,
     required_capital_for_monthly_income,
 )
+from atlasquant_investment_panel import (
+    format_brl,
+    investment_sections,
+    small_contribution_scenarios,
+)
 from atlasquant_risk_guardian import (
     RiskLimits,
     RiskState,
@@ -76,6 +81,24 @@ class InvestmentEcosystemTests(unittest.TestCase):
         )
         self.assertGreaterEqual(result["growth_quality_index"], 90)
         self.assertIn("não é previsão de preço", result["interpretation"])
+
+
+class InvestmentPanelTests(unittest.TestCase):
+    def test_beginner_and_advanced_tools_are_deliberately_separated(self):
+        self.assertEqual(
+            investment_sections("Iniciante"),
+            ("Planejador","Renda","Comece com pouco"),
+        )
+        advanced=investment_sections("Avançado")
+        self.assertIn("Qualidade da renda",advanced)
+        self.assertIn("Radar de crescimento",advanced)
+
+    def test_small_contribution_scenarios_keep_contribution_and_projection_separate(self):
+        rows=small_contribution_scenarios((50,100,200),years=10,annual_return_pct=8)
+        self.assertEqual([x["Aporte mensal"] for x in rows],[50.0,100.0,200.0])
+        for row in rows:
+            self.assertGreaterEqual(row["Valor projetado"],row["Total aportado"])
+        self.assertEqual(format_brl(1234.5),"R$ 1.234,50")
 
 
 class RiskGuardianTests(unittest.TestCase):
