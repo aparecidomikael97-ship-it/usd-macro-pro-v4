@@ -23,6 +23,9 @@ class EvidenceCriteria:
     min_sessions:int=2
     min_assets:int=1
     max_abs_expectancy_gap_r:float=0.20
+    min_expectancy_r:float=0.0
+    min_profit_factor:float=1.0
+    max_drawdown_r:float=12.0
     min_data_quality_pct:float=70.0
     min_positive_fold_pct:float=66.0
     min_oos_positive_pct:float=60.0
@@ -115,7 +118,14 @@ def fuse_operational_evidence(
         "session_coverage":_count(coverage.get("sessions"))>=int(c.min_sessions),
         "regime_coverage":_count(coverage.get("regimes"))>=int(c.min_regimes),
         "data_quality":bool(data_quality is not None and data_quality>=float(c.min_data_quality_pct)),
+        "backtest_expectancy":bool(bt_expectancy is not None and bt_expectancy>float(c.min_expectancy_r)),
+        "profit_factor":bool(bt_pf is not None and bt_pf>=float(c.min_profit_factor)),
+        "drawdown":bool(bt_dd is not None and abs(bt_dd)<=float(c.max_drawdown_r)),
         "paper_sample":forward_samples>=int(c.min_paper_trades),
+        "paper_expectancy":bool(
+            forward_expectancy is not None
+            and forward_expectancy>float(c.min_expectancy_r)
+        ),
         "paper_backtest_alignment":bool(
             expectancy_gap is not None
             and abs(expectancy_gap)<=float(c.max_abs_expectancy_gap_r)
