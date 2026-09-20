@@ -87,6 +87,26 @@ class FastStartupTests(unittest.TestCase):
         self.assertIn("min(float(timeout),8.0)",src)
         self.assertIn("if not token:",src)
 
+    def test_fast_loader_records_non_trading_observability(self):
+        import inspect
+        src=inspect.getsource(load_home_snapshot)
+        self.assertIn('"_fast_boot_observability"',src)
+        self.assertIn('"load_ms"',src)
+        self.assertIn('"source":"raw"',src)
+        self.assertIn('"source":"api"',src)
+        self.assertNotIn("real_orders_enabled",src)
+        self.assertNotIn("automatic_execution",src)
+
+    def test_beginner_shell_persists_startup_observability_only_after_valid_snapshot(self):
+        from pathlib import Path
+        src=Path("atlasquant_fast_startup.py").read_text(encoding="utf-8")
+        validate_pos=src.index("check=validate_home_snapshot(snapshot)")
+        obs_pos=src.index('st.session_state["atlasquant_fast_boot_observability"]')
+        self.assertLess(validate_pos,obs_pos)
+        block=src[obs_pos:src.index("st.markdown(",obs_pos)]
+        self.assertIn('"snapshot_valid":True',block)
+        self.assertIn('"mode":"Iniciante"',block)
+
     def test_main_attempts_fast_shell_before_heavy_provider_boot(self):
         from pathlib import Path
         src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
