@@ -19,6 +19,10 @@ class AtlasQuantVoiceProfileTests(unittest.TestCase):
         self.assertIn("natural",p["quality_terms"])
         self.assertIn("neural",p["quality_terms"])
         self.assertTrue(p["preferred_terms"])
+        self.assertEqual(p["fallback_terms"],[])
+        self.assertTrue(p["strict_fixed_voice"])
+        self.assertFalse(p["allow_generic_device_fallback"])
+        self.assertEqual(p["fallback_behavior"],"text_only")
         self.assertTrue(voice_profile_ready())
 
     def test_profile_never_enables_automatic_audio_or_trading(self):
