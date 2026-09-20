@@ -74,6 +74,26 @@ class AtlasQuantMarketLayersTests(unittest.TestCase):
         self.assertFalse(out["probability"])
         self.assertFalse(out["decision_effect"])
 
+    def test_macro_layer_exposes_structured_groups_and_coverage(self):
+        ctx={"currencies":{
+            "EUR":{
+                "rates":{"score":40,"quality":90,"fresh":True},
+                "inflation":{"score":45,"quality":90,"fresh":True},
+                "growth":{"score":42,"quality":90,"fresh":True},
+            },
+            "USD":{
+                "rates":{"score":75,"quality":90,"fresh":True},
+                "inflation":{"score":68,"quality":90,"fresh":True},
+                "growth":{"score":60,"quality":90,"fresh":True},
+            },
+        }}
+        out=macro_layer(pack(),macro_context=ctx)
+        self.assertEqual(out["engine_mode"],"structured")
+        self.assertEqual(out["direction"],"VENDA")
+        self.assertGreater(out["coverage"],40)
+        self.assertEqual({x["group"] for x in out["groups"]},{"rates","inflation","growth"})
+        self.assertFalse(out["decision_effect"])
+
     def test_geopolitics_requires_actual_geo_stories(self):
         empty=geopolitical_layer("EUR/USD",{"currencies":{"EUR":{"articles":[]},"USD":{"articles":[]}}})
         self.assertFalse(empty["available"])
