@@ -61,6 +61,7 @@ def commercial_prep_audit(root: Path | None=None)->dict[str,Any]:
 
 def commercial_external_blockers()->tuple[str,...]:
     return (
+        "Configuração e validação do primeiro ADMIN no ambiente de produção",
         "Revisão jurídica/privacidade dos documentos finais",
         "Licenciamento comercial dos provedores de dados",
         "Integração real e verificada de pagamento/assinatura",
