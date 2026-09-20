@@ -204,12 +204,23 @@ def _duration(item: Mapping[str, Any]) -> tuple[float, str, bool]:
     return DURATION_FACTORS["unknown"], "NÃO CONFIRMADO", False
 
 
-def _risk_vote(category: str) -> float:
-    if category in ESCALATION_CATEGORIES:
-        return 1.0
-    if category in DEESCALATION_CATEGORIES:
-        return -1.0
-    return 0.0
+def _risk_vote(item: Mapping[str, Any], category: str) -> float:
+    explicit = _norm(item.get("risk_regime", item.get("market_regime", "")))
+    if explicit:
+        if explicit in {"risk off", "riskoff", "defensive", "aversao a risco"}:
+            return 1.0
+        if explicit in {"risk on", "riskon", "de escalation", "deescalation", "descompressao"}:
+            return -1.0
+        if explicit in {"neutral", "neutro", "mixed", "misto"}:
+            return 0.0
+    return {
+        "conflict_escalation": 1.00,
+        "sanctions_trade": 0.70,
+        "shipping_logistics": 0.85,
+        "energy_supply": 0.80,
+        "political_uncertainty": 0.45,
+        "diplomacy_deescalation": -0.80,
+    }.get(category, 0.0)
 
 
 def _story_key(item: Mapping[str, Any]) -> str:
@@ -254,6 +265,34 @@ def _explicit_currency_impacts(item: Mapping[str, Any]) -> dict[str, float]:
         except Exception:
             continue
     return out
+
+
+def _explicit_pair_impact(item: Mapping[str, Any], pair: str) -> float | None:
+    raw = item.get("pair_impacts", {})
+    if not isinstance(raw, Mapping):
+        return None
+    wanted = pair.upper().replace("-", "/")
+    for key, value in raw.items():
+        normalized = str(key or "").upper().replace("-", "/").strip()
+        if normalized != wanted:
+            continue
+        if isinstance(value, Mapping):
+            value = value.get("impact", value.get("balance", value.get("score")))
+        try:
+            return _clip(float(value))
+        except Exception:
+            return None
+    return None
+
+
+def _list_field(item: Mapping[str, Any], *names: str) -> list[str]:
+    for name in names:
+        raw = item.get(name)
+        if isinstance(raw, Sequence) and not isinstance(raw, (str, bytes)):
+            return [str(x).strip() for x in raw if str(x).strip()]
+        if isinstance(raw, str) and raw.strip():
+            return [raw.strip()]
+    return []
 
 
 def _structured_events(state: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -330,6 +369,10 @@ def build_geopolitical_context(pair: object, state: Mapping[str, Any] | None) ->
             "duration_explicit": False,
             "risk_votes": [],
             "currency_impacts": defaultdict(list),
+            "pair_impacts": [],
+            "regions": set(),
+            "countries": set(),
+            "commodities": set(),
             "mentions": set(),
             "structured": False,
         })
@@ -345,7 +388,13 @@ def build_geopolitical_context(pair: object, state: Mapping[str, Any] | None) ->
         rec["duration_labels"].append(duration_label)
         rec["severity_explicit"] = bool(rec["severity_explicit"] or severity_explicit)
         rec["duration_explicit"] = bool(rec["duration_explicit"] or duration_explicit)
-        rec["risk_votes"].append(_risk_vote(cat) * severity / 100.0 * duration_factor)
+        rec["risk_votes"].append(_risk_vote(item, cat) * severity / 100.0 * duration_factor)
+        rec["regions"].update(_list_field(item, "regions", "affected_regions"))
+        rec["countries"].update(_list_field(item, "countries", "affected_countries"))
+        rec["commodities"].update(_list_field(item, "commodities", "affected_commodities"))
+        pair_impact = _explicit_pair_impact(item, f"{base}/{quote}")
+        if pair_impact is not None:
+            rec["pair_impacts"].append(pair_impact)
 
         explicit = _explicit_currency_impacts(item)
         for ccy, impact in explicit.items():
@@ -369,13 +418,18 @@ def build_geopolitical_context(pair: object, state: Mapping[str, Any] | None) ->
         impacts = {}
         for ccy, vals in rec["currency_impacts"].items():
             impacts[ccy] = sum(vals) / max(1, len(vals))
-        direct_pair = _clip(impacts.get(base, 0.0) - impacts.get(quote, 0.0))
+        currency_pair = _clip(impacts.get(base, 0.0) - impacts.get(quote, 0.0))
+        explicit_pair = (
+            sum(rec["pair_impacts"]) / len(rec["pair_impacts"])
+            if rec["pair_impacts"] else None
+        )
+        direct_pair = _clip(explicit_pair if explicit_pair is not None else currency_pair)
         risk_pair = _clip(
             risk_vote * (RISK_SENSITIVITY.get(base, 0.0) - RISK_SENSITIVITY.get(quote, 0.0)) * 55.0
         )
-        # Explicit currency impact has priority; broad regime is contextual and lower-weight.
+        # Explicit pair/currency impact has priority; broad regime is contextual and lower-weight.
         pair_balance = _clip(0.72 * direct_pair + 0.28 * risk_pair)
-        if not impacts:
+        if not impacts and explicit_pair is None:
             quality *= 0.78
         if not rec["severity_explicit"]:
             quality *= 0.92
@@ -397,6 +451,10 @@ def build_geopolitical_context(pair: object, state: Mapping[str, Any] | None) ->
             "quality": round(max(0.0, min(100.0, quality)), 1),
             "risk_vote": round(risk_vote, 3),
             "currency_impacts": {k: round(v, 1) for k, v in impacts.items()},
+            "pair_impact_explicit": explicit_pair is not None,
+            "regions": sorted(rec["regions"]),
+            "countries": sorted(rec["countries"]),
+            "commodities": sorted(rec["commodities"]),
             "direct_pair_balance": round(direct_pair, 1),
             "risk_pair_balance": round(risk_pair, 1),
             "pair_balance": round(pair_balance, 1),
@@ -450,7 +508,7 @@ def build_geopolitical_context(pair: object, state: Mapping[str, Any] | None) ->
         risks.append("A leitura depende de uma única história independente; confirmação adicional é necessária.")
     if any(not ev["structured"] for ev in events):
         risks.append("Parte da classificação vem de manchete; severidade/duração inferidas recebem desconto de qualidade.")
-    if any(not ev["currency_impacts"] for ev in events):
+    if any((not ev["currency_impacts"]) and (not ev.get("pair_impact_explicit")) for ev in events):
         risks.append("Evento sem impacto cambial explícito usa apenas efeito amplo de regime, com peso reduzido.")
 
     avg_risk = sum(ev["risk_vote"] * ev["quality"] for ev in events) / max(1e-9, sum(ev["quality"] for ev in events))
@@ -484,6 +542,9 @@ def build_geopolitical_context(pair: object, state: Mapping[str, Any] | None) ->
         "severity": severity_label,
         "geo_conflict": geo_conflict,
         "channels": channels,
+        "regions": sorted({x for ev in events for x in ev.get("regions",[])}),
+        "countries": sorted({x for ev in events for x in ev.get("countries",[])}),
+        "commodities": sorted({x for ev in events for x in ev.get("commodities",[])}),
         "events": top,
         "reasons": reasons,
         "risks": risks[:8],
