@@ -32,6 +32,7 @@ class AtlasQuantSalesCenterTests(unittest.TestCase):
         self.assertTrue(status["academy_video_scripts_ready"])
         self.assertFalse(status["academy_ready"])
         self.assertTrue(status["voice_contract_ready"])
+        self.assertTrue(status["voice_assistant_ready"])
         self.assertFalse(status["voice_ready"])
         self.assertTrue(status["brokers_guide_ready"])
         self.assertTrue(status["commercial_prep_ready"])
@@ -66,7 +67,7 @@ class AtlasQuantSalesCenterTests(unittest.TestCase):
         rows=onboarding_steps()
         by={row["Item"]:row for row in rows}
         self.assertEqual(by["Academy"]["Status"],"TEXTO + ROTEIROS PRONTOS · VÍDEOS PENDENTES")
-        self.assertEqual(by["Assistente de voz"]["Status"],"INFRA PRONTA · PROVEDOR PENDENTE")
+        self.assertEqual(by["Assistente de voz"]["Status"],"NO APP PRONTO · TTS NEURAL OPCIONAL PENDENTE")
         self.assertEqual(by["Corretoras & plataformas"]["Status"],"GUIA INFORMATIVO PRONTO")
 
 
