@@ -40,11 +40,12 @@ COMPONENTS: tuple[tuple[str, str, str], ...] = (
 )
 
 BASE_FIELDS = [
-    "trade_id", "signal_id", "pair", "side", "signal_time", "signal_candle_time",
+    "trade_id", "signal_id", "pair", "side", "setup_id", "setup_attribution",
+    "signal_time", "signal_candle_time",
     "score_master", "quality", "rank_index", "h4", "h1", "m15",
     "ict_readiness", "institutional_readiness", "gate", "gate_score",
     "adr_used_pct", "event_risk", "technical_age_min", "map_age_min",
-    "data_sufficient", "checklist_passed", "checklist_note", "engine_version",
+    "data_sufficient", "data_quality_pct", "checklist_passed", "checklist_note", "engine_version",
 ]
 OUTCOME_FIELDS = [
     "status", "result", "entry_time", "entry_price", "stop_price", "target_price",
@@ -162,9 +163,9 @@ def extract_setup_snapshot(
     latest=market_ctx.get("latest_sweep")
     latest_type=str(_mapping(latest).get("type","") or "") if isinstance(latest,Mapping) else str(latest or "")
     row.update({
-        "d1_regime":str(d1_structure.get("regime","") or ""),
-        "w1_regime":str(w1_structure.get("regime","") or ""),
-        "active_session":active_session,
+        "d1_regime":str(trade.get("d1_regime") or d1_structure.get("regime","") or ""),
+        "w1_regime":str(trade.get("w1_regime") or w1_structure.get("regime","") or ""),
+        "active_session":str(trade.get("active_session") or active_session or ""),
         "premium_discount_zone":str(premium.get("zone","") or ""),
         "latest_sweep_type":latest_type,
     })
@@ -303,11 +304,29 @@ def build_summary(audit: pd.DataFrame, performance: pd.DataFrame, *, now: pd.Tim
     closed = d[d["status"].astype(str).str.upper().eq("CLOSED")].copy() if not d.empty else d
     r = pd.to_numeric(closed.get("realized_r"), errors="coerce").dropna() if not closed.empty else pd.Series(dtype=float)
     r = r[r.map(lambda x: math.isfinite(float(x)))] if len(r) else r
+    trusted={"EXPLICIT_INPUT","MANUAL_TAG"}
+    if "setup_id" in d.columns and "setup_attribution" in d.columns:
+        explicit_setups=(
+            d["setup_id"].fillna("").astype(str).str.strip().ne("")
+            & d["setup_attribution"].fillna("").astype(str).str.upper().isin(trusted)
+        )
+    else:
+        explicit_setups=pd.Series(False,index=d.index)
+    if isinstance(closed,pd.DataFrame) and "setup_id" in closed.columns and "setup_attribution" in closed.columns:
+        explicit_setup_closed=(
+            closed["setup_id"].fillna("").astype(str).str.strip().ne("")
+            & closed["setup_attribution"].fillna("").astype(str).str.upper().isin(trusted)
+        )
+    else:
+        explicit_setup_closed=pd.Series(False,index=closed.index)
     return {
         "version": AUDIT_VERSION,
         "generated_at": now.isoformat(),
         "audited_trades": int(len(d)),
         "closed_trades": int(len(r)),
+        "explicit_setup_trades": int(explicit_setups.sum()) if len(d) else 0,
+        "explicit_setup_closed_trades": int(explicit_setup_closed.sum()) if len(closed) else 0,
+        "setup_attribution_inferred": False,
         "component_state_rows": int(len(performance)) if isinstance(performance, pd.DataFrame) else 0,
         "sample_state": _sample_state(int(len(r))),
         "net_r": round(float(r.sum()), 4) if len(r) else 0.0,

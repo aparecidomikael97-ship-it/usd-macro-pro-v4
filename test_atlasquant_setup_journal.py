@@ -1,10 +1,17 @@
+import base64
 import unittest
+from unittest.mock import Mock, patch
 
 from atlasquant_setup_journal import (
     journal_template,
     normalize_setup_record,
     setup_forward_summary,
     validate_setup_record,
+)
+from atlasquant_paper_setup_bridge import (
+    bridge_paper_audit,
+    canonical_setup_id,
+    load_paper_audit_runtime,
 )
 
 
@@ -79,6 +86,97 @@ class AtlasQuantSetupJournalTests(unittest.TestCase):
         rows=[record(),record(observed_at="bad")]
         summary=setup_forward_summary(rows)["session-liquidity-mss"]
         self.assertEqual(summary["forward_samples"],1)
+
+    def test_paper_bridge_accepts_only_explicit_known_setup_tags(self):
+        import pandas as pd
+        audit=pd.DataFrame([
+            {
+                "trade_id":"t1","setup_id":"FVG","setup_attribution":"EXPLICIT_INPUT",
+                "pair":"EUR/USD","status":"CLOSED","side":"BUY",
+                "signal_time":"2026-09-20T12:00:00Z",
+                "active_session":"London","d1_regime":"trend",
+                "entry_price":1.1,"stop_price":1.09,"target_price":1.12,
+                "realized_r":2.0,"data_quality_pct":100,
+            },
+            {
+                "trade_id":"t2","setup_id":"","setup_attribution":"UNATTRIBUTED",
+                "pair":"EUR/USD","status":"CLOSED","side":"SELL",
+                "signal_time":"2026-09-20T13:00:00Z",
+                "active_session":"London","d1_regime":"trend",
+                "entry_price":1.1,"stop_price":1.11,"target_price":1.08,
+                "realized_r":-1.0,"data_quality_pct":100,
+            },
+        ])
+        out=bridge_paper_audit(audit)
+        self.assertEqual(out["closed_rows"],2)
+        self.assertEqual(out["explicit_rows"],1)
+        self.assertEqual(out["eligible_records"],1)
+        self.assertEqual(out["records"][0]["setup_id"],"fvg")
+        self.assertEqual(out["summary_by_setup"]["fvg"]["forward_samples"],1)
+        self.assertFalse(out["setup_inference_used"])
+        self.assertEqual(out["excluded"]["ATTRIBUTION_NOT_EXPLICIT"],1)
+
+    def test_paper_bridge_rejects_unknown_or_incomplete_attribution(self):
+        import pandas as pd
+        audit=pd.DataFrame([
+            {
+                "trade_id":"unknown","setup_id":"mystery","setup_attribution":"EXPLICIT_INPUT",
+                "pair":"EUR/USD","status":"CLOSED","side":"BUY",
+                "signal_time":"2026-09-20T12:00:00Z","active_session":"London",
+                "d1_regime":"trend","entry_price":1.1,"stop_price":1.09,
+                "target_price":1.12,"realized_r":2.0,"data_quality_pct":100,
+            },
+            {
+                "trade_id":"quality","setup_id":"fvg","setup_attribution":"EXPLICIT_INPUT",
+                "pair":"EUR/USD","status":"CLOSED","side":"BUY",
+                "signal_time":"2026-09-20T12:15:00Z","active_session":"London",
+                "d1_regime":"trend","entry_price":1.1,"stop_price":1.09,
+                "target_price":1.12,"realized_r":2.0,"data_quality_pct":None,
+            },
+        ])
+        out=bridge_paper_audit(audit)
+        self.assertEqual(out["eligible_records"],0)
+        self.assertEqual(out["excluded"]["UNKNOWN_SETUP_ID"],1)
+        self.assertEqual(out["excluded"]["MISSING_DATA_QUALITY"],1)
+
+    def test_runtime_loader_rejects_code_branch_before_network(self):
+        with patch("atlasquant_paper_setup_bridge.requests.get") as get:
+            frame,status=load_paper_audit_runtime(
+                repo="owner/repo",branch="main",token="secret"
+            )
+        self.assertTrue(frame.empty)
+        self.assertEqual(status["reason"],"UNSAFE_BRANCH")
+        get.assert_not_called()
+
+    def test_runtime_loader_reads_csv_from_safe_runtime_branch(self):
+        csv=(
+            "trade_id,setup_id,setup_attribution,pair,status,side,signal_time,"
+            "active_session,d1_regime,entry_price,stop_price,target_price,"
+            "realized_r,data_quality_pct\n"
+            "t1,fvg,EXPLICIT_INPUT,EUR/USD,CLOSED,BUY,2026-09-20T12:00:00Z,"
+            "London,trend,1.10,1.09,1.12,2.0,100\n"
+        )
+        response=Mock()
+        response.status_code=200
+        response.json.return_value={"content":base64.b64encode(csv.encode("utf-8")).decode("ascii")}
+        response.raise_for_status.return_value=None
+        with patch("atlasquant_paper_setup_bridge.requests.get",return_value=response) as get:
+            frame,status=load_paper_audit_runtime(
+                repo="owner/repo",branch="atlasquant-runtime",token="secret"
+            )
+        self.assertTrue(status["ok"])
+        self.assertEqual(status["reason"],"LOADED")
+        self.assertEqual(len(frame),1)
+        self.assertEqual(frame.iloc[0]["setup_id"],"fvg")
+        get.assert_called_once()
+
+    def test_setup_aliases_are_canonical_without_guessing_from_components(self):
+        self.assertEqual(canonical_setup_id("AMD / PO3"),"amd-po3")
+        self.assertEqual(canonical_setup_id("FVG"),"fvg")
+        self.assertEqual(canonical_setup_id("FVG / desequilíbrio"),"fvg")
+        self.assertEqual(canonical_setup_id("OTE / Fibonacci"),"ote")
+        self.assertEqual(canonical_setup_id("Liquidez de sessão + MSS"),"session-liquidity-mss")
+        self.assertEqual(canonical_setup_id("random ict state"),"")
 
     def test_template_has_no_filled_trade_result(self):
         df=journal_template()

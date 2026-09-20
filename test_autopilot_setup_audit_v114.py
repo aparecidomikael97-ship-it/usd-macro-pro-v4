@@ -56,12 +56,14 @@ def market_map_context(*, d1_regime="TENDÊNCIA ALTISTA", session="London Killzo
     }
 
 
-def trade_row(*, trade_id="t1", status="WAIT_ENTRY", result="", realized_r=None) -> dict:
+def trade_row(*, trade_id="t1", status="WAIT_ENTRY", result="", realized_r=None, setup_id="", setup_attribution="UNATTRIBUTED", d1_regime="", active_session="", data_quality_pct=100.0) -> dict:
     return {
         "trade_id": trade_id,
         "signal_id": trade_id,
         "pair": "EUR/USD",
         "side": "BUY",
+        "setup_id":setup_id,
+        "setup_attribution":setup_attribution,
         "status": status,
         "result": result,
         "signal_time": "2026-09-17T16:15:00Z",
@@ -81,6 +83,10 @@ def trade_row(*, trade_id="t1", status="WAIT_ENTRY", result="", realized_r=None)
         "technical_age_min": 5.0,
         "map_age_min": 3.0,
         "data_sufficient": True,
+        "data_quality_pct":data_quality_pct,
+        "d1_regime":d1_regime,
+        "w1_regime":"",
+        "active_session":active_session,
         "checklist_passed": True,
         "checklist_note": "ok",
         "created_at": "2026-09-17T16:16:00Z",
@@ -127,6 +133,27 @@ class SetupAuditV114Tests(unittest.TestCase):
         self.assertEqual(row["active_session"],"London Killzone")
         self.assertEqual(row["premium_discount_zone"],"DESCONTO")
         self.assertEqual(row["latest_sweep_type"],"SSL")
+
+    def test_explicit_setup_and_original_session_context_are_frozen(self):
+        trade=trade_row(
+            setup_id="fvg",
+            setup_attribution="EXPLICIT_INPUT",
+            d1_regime="REGIME NO SINAL",
+            active_session="Asia",
+            data_quality_pct=100,
+        )
+        audit=sync_setup_audit(
+            pd.DataFrame([trade]),
+            scanner_with_fvg("FVG ATIVO",72),
+            market_map=market_map_context(d1_regime="REGIME DEPOIS",session="London"),
+            now=NOW,
+        )
+        row=audit.iloc[0]
+        self.assertEqual(row["setup_id"],"fvg")
+        self.assertEqual(row["setup_attribution"],"EXPLICIT_INPUT")
+        self.assertEqual(row["d1_regime"],"REGIME NO SINAL")
+        self.assertEqual(row["active_session"],"Asia")
+        self.assertEqual(float(row["data_quality_pct"]),100.0)
 
     def test_regime_context_is_frozen_after_first_seen(self):
         first=sync_setup_audit(
@@ -216,6 +243,33 @@ class SetupAuditV114Tests(unittest.TestCase):
                 self.assertTrue(perf.empty)
                 self.assertEqual(summary["closed_trades"],0)
                 self.assertEqual(summary["net_r"],0.0)
+
+    def test_summary_counts_only_explicit_setup_tags_without_inference(self):
+        rows=[
+            trade_row(
+                trade_id="tagged",status="CLOSED",result="WIN",realized_r=2.0,
+                setup_id="fvg",setup_attribution="EXPLICIT_INPUT",
+            ),
+            trade_row(
+                trade_id="plain",status="CLOSED",result="LOSS",realized_r=-1.0,
+            ),
+        ]
+        audit=sync_setup_audit(pd.DataFrame(rows),scanner_with_fvg("FVG",70),now=NOW)
+        summary=build_summary(audit,aggregate_setup_performance(audit),now=NOW)
+        self.assertEqual(summary["explicit_setup_trades"],1)
+        self.assertEqual(summary["explicit_setup_closed_trades"],1)
+        self.assertFalse(summary["setup_attribution_inferred"])
+
+    def test_untrusted_setup_id_is_not_counted_as_explicit(self):
+        row=trade_row(
+            status="CLOSED",result="WIN",realized_r=2.0,
+            setup_id="fvg",setup_attribution="",
+        )
+        audit=sync_setup_audit(pd.DataFrame([row]),scanner_with_fvg("FVG",70),now=NOW)
+        summary=build_summary(audit,aggregate_setup_performance(audit),now=NOW)
+        self.assertEqual(summary["explicit_setup_trades"],0)
+        self.assertEqual(summary["explicit_setup_closed_trades"],0)
+        self.assertFalse(summary["setup_attribution_inferred"])
 
     def test_summary_never_enables_execution_or_strategy_selection(self):
         audit=sync_setup_audit(pd.DataFrame([trade_row()]),scanner_with_fvg("FVG",70),now=NOW)
