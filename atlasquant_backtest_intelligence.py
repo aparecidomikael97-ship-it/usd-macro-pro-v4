@@ -300,6 +300,54 @@ def diagnose_backtest_record(record:Mapping[str,Any], *, index:int=0)->dict[str,
 def diagnose_backtest_records(records:Iterable[Mapping[str,Any]])->list[dict[str,object]]:
     return [diagnose_backtest_record(row,index=i) for i,row in enumerate(records)]
 
+def diagnosis_cause_summary(
+    diagnoses:Iterable[Mapping[str,Any]],
+)->list[dict[str,object]]:
+    rows=[dict(x) for x in diagnoses]
+    outcome_totals={}
+    for row in rows:
+        outcome=_text(row.get("outcome")).upper()
+        if outcome in {"GAIN","LOSS","BREAKEVEN"}:
+            outcome_totals[outcome]=outcome_totals.get(outcome,0)+1
+
+    counts={}
+    details={}
+    confidences={}
+    for row in rows:
+        outcome=_text(row.get("outcome")).upper()
+        if outcome not in {"GAIN","LOSS","BREAKEVEN"}:
+            continue
+        seen=set()
+        for raw in list(row.get("probable_explanations",[]) or []):
+            reason=dict(raw or {})
+            code=_text(reason.get("code")).upper() or "UNKNOWN"
+            key=(outcome,code)
+            if key in seen:
+                continue
+            seen.add(key)
+            counts[key]=counts.get(key,0)+1
+            details[key]=_text(reason.get("detail"))
+            confidences[key]=_text(reason.get("confidence")).upper() or "UNKNOWN"
+
+    out=[]
+    for (outcome,code),count in counts.items():
+        total=outcome_totals.get(outcome,0)
+        out.append({
+            "outcome":outcome,
+            "code":code,
+            "trades":count,
+            "outcome_trades":total,
+            "share_of_outcome_pct":None if not total else round(100.0*count/total,1),
+            "confidence":confidences.get((outcome,code),"UNKNOWN"),
+            "detail":details.get((outcome,code),""),
+            "causality_claimed":False,
+        })
+    return sorted(
+        out,
+        key=lambda x:(str(x["outcome"]),-int(x["trades"]),str(x["code"])),
+    )
+
+
 def diagnosis_table(records:Iterable[Mapping[str,Any]])->list[dict[str,object]]:
     out=[]
     for diag in diagnose_backtest_records(records):
@@ -374,6 +422,7 @@ def backtest_intelligence_bundle(
 )->dict[str,object]:
     rows=[dict(x) for x in records]
     diagnoses=diagnose_backtest_records(rows)
+    causes=diagnosis_cause_summary(diagnoses)
     passport=build_passport_from_backtest(rows,strategy=strategy)
     executed=[x for x in diagnoses if x.get("outcome") in {"GAIN","LOSS","BREAKEVEN"}]
     rich=sum(1 for x in executed if x.get("context_diagnosis_available"))
@@ -382,6 +431,7 @@ def backtest_intelligence_bundle(
         "strategy":strategy,
         "diagnoses":diagnoses,
         "diagnosis_table":diagnosis_table(rows),
+        "cause_summary":causes,
         "passport":passport,
         "executed_trades":len(executed),
         "rich_context_trades":rich,
@@ -396,6 +446,7 @@ __all__=[
     "diagnose_backtest_record",
     "diagnose_backtest_records",
     "diagnosis_table",
+    "diagnosis_cause_summary",
     "build_passport_from_backtest",
     "backtest_intelligence_bundle",
 ]
