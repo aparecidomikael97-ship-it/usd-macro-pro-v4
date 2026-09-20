@@ -20,8 +20,10 @@ class ProductionBootContractTests(unittest.TestCase):
 
     def test_production_smoke_requires_current_home_when_not_at_login(self):
         workflow=Path(".github/workflows/production-browser-smoke.yml").read_text(encoding="utf-8")
-        self.assertIn('radar_visible = "Radar de Oportunidades" in body_text',workflow)
-        self.assertIn('fast_snapshot_shell = "carregamento rápido por snapshot validado" in body_text',workflow)
+        self.assertIn('initial_radar_visible = "Radar de Oportunidades" in initial_body_text',workflow)
+        self.assertIn('initial_fast_snapshot_shell = "carregamento rápido por snapshot validado" in initial_body_text',workflow)
+        self.assertIn("radar_visible = initial_radar_visible",workflow)
+        self.assertIn("fast_snapshot_shell = initial_fast_snapshot_shell",workflow)
         self.assertIn("produção carregou Streamlit, mas não abriu a Home/Radar atual",workflow)
         self.assertIn("Home/Radar demorou",workflow)
         self.assertIn("meaningful_ms > 30000",workflow)
