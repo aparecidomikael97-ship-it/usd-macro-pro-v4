@@ -99,6 +99,7 @@ class AtlasQuantVoiceAssistantTests(unittest.TestCase):
             "O que pode deixar esse viés errado?":"wrong",
             "Quais fatores estão contra?":"against",
             "Como está o Fed e os juros?":"macro",
+            "Como está a geopolítica e o risk-off?":"geopolitics",
             "Como está o FVG e o MSS?":"technical",
             "Onde está a liquidez e o sweep?":"liquidity",
             "Tem notícia importante?":"event",
@@ -108,6 +109,26 @@ class AtlasQuantVoiceAssistantTests(unittest.TestCase):
         for q,expected in cases.items():
             with self.subTest(q=q):
                 self.assertEqual(classify_question(q),expected)
+
+    def test_geopolitical_question_uses_structured_geo_metadata(self):
+        r=row()
+        r.update({
+            "geo_research_direction":"VENDA",
+            "geo_research_balance":-36,
+            "geo_research_quality":74,
+            "geo_research_coverage":68,
+            "geo_research_regime":"RISK-OFF",
+            "geo_research_severity":"ALTO",
+            "geo_research_conflict":True,
+        })
+        ctx=assistant_context(r,macro_context=macro())
+        out=answer_question("Como está a geopolítica?",ctx,mode="Avançado")
+        self.assertEqual(out["category"],"geopolitics")
+        self.assertIn("regime está RISK-OFF",out["answer"])
+        self.assertIn("severidade ALTO",out["answer"])
+        self.assertIn("conflito entre histórias independentes",out["answer"])
+        self.assertIn("não julga atores políticos",out["answer"])
+        self.assertFalse(out["real_orders_enabled"])
 
     def test_wrong_bias_answer_is_explicitly_uncertain_and_safe(self):
         ctx=assistant_context(row(),macro_context=macro())
