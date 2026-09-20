@@ -106,6 +106,27 @@ class AtlasQuantHomeRadarTests(unittest.TestCase):
         self.assertGreaterEqual(row["research_layers"],2)
         self.assertIsInstance(row["research_blockers"],list)
 
+    def test_structured_macro_metadata_reaches_home_row(self):
+        macro_context={
+            "currencies":{
+                "EUR":{
+                    "rates":{"score":40,"quality":90,"fresh":True},
+                    "inflation":{"score":45,"quality":90,"fresh":True},
+                    "growth":{"score":42,"quality":90,"fresh":True},
+                },
+                "USD":{
+                    "rates":{"score":75,"quality":90,"fresh":True},
+                    "inflation":{"score":68,"quality":90,"fresh":True},
+                    "growth":{"score":60,"quality":90,"fresh":True},
+                },
+            }
+        }
+        row=home_rows_from_packs([_pack()],macro_context=macro_context)[0]
+        self.assertEqual(row["macro_research_mode"],"structured")
+        self.assertEqual(row["macro_research_direction"],"VENDA")
+        self.assertGreater(row["macro_research_coverage"],40)
+        self.assertEqual(row["action"],"COMPRA")
+
     def test_geopolitical_news_can_reach_research_layers_without_becoming_order(self):
         article={
             "title":"Geopolitical tensions escalate after attack and sanctions",
