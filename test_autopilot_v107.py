@@ -239,6 +239,34 @@ class AutopilotV107Tests(unittest.TestCase):
         sleep_call.assert_not_called()
 
 
+    def test_home_snapshot_payload_is_compact_and_fail_closed(self):
+        now=pd.Timestamp("2026-09-18T12:00:00Z")
+        inputs={
+            "generated_at":"2026-09-18T11:59:00Z",
+            "fast_boot":{"ranking":[{"Código":"USD"}]},
+        }
+        packs=[{"pair":"EUR/USD","direction":"VENDA"}]
+        scanner={"resultados":{"EUR/USD":{}}}
+        master={"contexts":{"EUR/USD":{}}}
+        out=a.build_home_snapshot_payload(inputs,packs,scanner,master,{"stories":[1]},now=now)
+        self.assertEqual(out["schema"],"ATLASQUANT_HOME_SNAPSHOT_V1")
+        self.assertEqual(out["generated_at"],inputs["generated_at"])
+        self.assertEqual(len(out["packs"]),1)
+        self.assertEqual(out["runtime"]["scanner_pairs"],1)
+        self.assertEqual(out["runtime"]["market_map_pairs"],1)
+        self.assertTrue(out["runtime"]["news_available"])
+        self.assertFalse(out["safety"]["real_orders"])
+        self.assertFalse(out["safety"]["automatic_execution"])
+        self.assertFalse(out["safety"]["automatic_gate_change"])
+        self.assertFalse(out["safety"]["automatic_weight_change"])
+        self.assertFalse(out["safety"]["automatic_promotion"])
+
+    def test_home_snapshot_drops_non_mapping_pack_rows(self):
+        now=pd.Timestamp("2026-09-18T12:00:00Z")
+        out=a.build_home_snapshot_payload({},[{"pair":"EUR/USD"},None,"bad"],{}, {}, {},now=now)
+        self.assertEqual(out["packs"],[{"pair":"EUR/USD"}])
+        self.assertFalse(out["safety"]["real_orders"])
+
 
 if __name__=="__main__":
     unittest.main()
