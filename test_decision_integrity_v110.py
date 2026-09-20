@@ -80,5 +80,31 @@ class DecisionIntegrityTests(unittest.TestCase):
                 self.assertEqual(r["state"],"🔴 BLOQUEADO")
 
 
+    def test_unknown_event_risk_fails_closed_even_with_full_stack(self):
+        r=evaluate_decision_integrity(
+            side="BUY",score=95,quality=95,rank_index=95,
+            h4="🟢 CONFIRMA",h1="🟢 PULLBACK OK",m15="🟢 GATILHO",
+            ict_readiness=95,institutional_readiness=95,
+            gate="A",gate_score=95,adr_used_pct=50,event_risk="",technical_age_min=5,
+            data_sufficient=True,data_readiness_score=100,
+        )
+        self.assertFalse(r["executable"])
+        self.assertEqual(r["state"],"🔴 BLOQUEADO")
+        self.assertEqual(r["event_level"],"DESCONHECIDO")
+        self.assertTrue(any("Risco de evento desconhecido" in x for x in r["hard_blocks"]))
+
+    def test_high_event_risk_never_becomes_executable(self):
+        r=evaluate_decision_integrity(
+            side="SELL",score=95,quality=95,rank_index=95,
+            h4="🟢 CONFIRMA",h1="🟢 PULLBACK OK",m15="🟢 GATILHO",
+            ict_readiness=95,institutional_readiness=95,
+            gate="A",gate_score=95,adr_used_pct=50,event_risk="ALTO",technical_age_min=5,
+            data_sufficient=True,data_readiness_score=100,
+        )
+        self.assertFalse(r["executable"])
+        self.assertNotEqual(r["state"],"🟢 EXECUTÁVEL")
+        self.assertEqual(r["event_level"],"ELEVADO")
+        self.assertTrue(any("Risco de evento elevado" in x for x in r["soft_blocks"]))
+
 if __name__ == "__main__":
     unittest.main()
