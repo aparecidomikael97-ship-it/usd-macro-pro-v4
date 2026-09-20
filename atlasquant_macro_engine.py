@@ -343,4 +343,64 @@ def build_structured_macro(
     }
 
 
-__all__ = ["SCHEMA", "GROUP_WEIGHTS", "CORE_GROUPS", "build_structured_macro"]
+
+
+def ranking_rows_to_currency_context(
+    rows: Sequence[Mapping[str, Any]] | None,
+    *,
+    usd_quality: float | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Adapt AtlasQuant ranking rows into the structured macro contract.
+
+    Current AtlasQuant has real labour/activity sub-scores only for USD.
+    Non-USD placeholder 50s are intentionally not promoted to evidence.
+    """
+    out: dict[str, dict[str, Any]] = {}
+    for raw in list(rows or []):
+        if not isinstance(raw, Mapping):
+            continue
+        code = str(raw.get("Código", raw.get("currency", raw.get("symbol", ""))) or "").upper().strip()
+        if len(code) != 3:
+            continue
+        source = str(raw.get("fonte", raw.get("Fonte", "")) or "")
+        source_norm = _norm(source)
+        fallback = any(x in source_norm for x in ("fallback", "seguranca", "safety"))
+        quality = 35.0 if fallback else 85.0
+        if code == "USD" and usd_quality is not None:
+            quality = max(0.0, min(100.0, _finite(usd_quality, quality)))
+
+        row: dict[str, Any] = {}
+        for group, key in (("rates", "n_juros"), ("inflation", "n_inflacao"), ("growth", "n_pib")):
+            value = raw.get(key)
+            try:
+                score = float(value)
+            except Exception:
+                continue
+            if math.isfinite(score):
+                row[group] = {
+                    "score": max(0.0, min(100.0, score)),
+                    "quality": quality,
+                    "fresh": not fallback,
+                    "source": source,
+                }
+
+        if code == "USD":
+            for group, key in (("labour", "n_emprego"), ("activity", "n_atividade")):
+                value = raw.get(key)
+                try:
+                    score = float(value)
+                except Exception:
+                    continue
+                if math.isfinite(score):
+                    row[group] = {
+                        "score": max(0.0, min(100.0, score)),
+                        "quality": quality,
+                        "fresh": not fallback,
+                        "source": source,
+                    }
+        if row:
+            out[code] = row
+    return out
+
+
+__all__ = ["SCHEMA", "GROUP_WEIGHTS", "CORE_GROUPS", "build_structured_macro", "ranking_rows_to_currency_context"]
