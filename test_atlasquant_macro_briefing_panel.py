@@ -43,3 +43,11 @@ def test_briefing_status_is_fail_closed_and_not_a_trade_signal():
     out=panel.briefing_status({"data_sufficient":True,"context_bias":"divergência macro"})
     assert out["label"]=="DIVERGÊNCIA MACRO"
     assert "não é sinal de trade" in out["detail"]
+
+
+def test_macro_briefing_has_immediate_device_voice_without_provider_call():
+    import inspect
+    source=inspect.getsource(panel)
+    assert "browser_speech_html" in source
+    assert "Ouvir briefing agora" in source
+    assert "nenhum provedor é chamado automaticamente" in source
