@@ -23,6 +23,23 @@ import pandas as pd
 REQUIRED_CANDLE_COLUMNS = ("datetime", "open", "high", "low", "close")
 REQUIRED_SIGNAL_FIELDS = ("signal_time", "side", "entry", "stop", "target")
 
+OPTIONAL_DIAGNOSTIC_FIELDS = (
+    "trade_id",
+    "decision_captured_at",
+    "macro_alignment",
+    "technical_confirmation",
+    "liquidity_confirmation",
+    "regime_fit",
+    "regime",
+    "known_high_impact_event",
+    "data_quality_pct",
+    "plan_followed",
+    "event_time",
+    "event_label",
+    "event_impact",
+    "event_known_before_entry",
+)
+
 
 def _finite(value: Any) -> float | None:
     try:
@@ -144,6 +161,9 @@ def backtest_signal(
         "source": str(signal.get("source", "ATLASQUANT")),
         "notes": str(signal.get("notes", "")),
     }
+    for field in OPTIONAL_DIAGNOSTIC_FIELDS:
+        if field in signal and signal.get(field) not in (None, ""):
+            base[field] = signal.get(field)
     if not ok:
         return {
             **base,
@@ -347,6 +367,11 @@ def backtest_many(
                 "session":str(signal.get("session","")),
                 "source":str(signal.get("source","ATLASQUANT")),
                 "notes":str(signal.get("notes","")),
+                **{
+                    field: signal.get(field)
+                    for field in OPTIONAL_DIAGNOSTIC_FIELDS
+                    if field in signal and signal.get(field) not in (None, "")
+                },
                 "signal_time":signal_ts,
                 "side":str(signal.get("side","")).upper(),
                 "status":"OVERLAP_BLOCKED",
