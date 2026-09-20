@@ -74,6 +74,33 @@ forma idempotente.
 
 Cada registro possui record_id determinístico para evitar duplicatas.
 
+## Monitor de mudança do Passaporte
+
+Novo módulo:
+
+- atlasquant_passport_drift.py
+
+O Admin compara os dois snapshots mais recentes de cada operacional e destaca
+mudanças relevantes em expectativa observada, profit factor, drawdown,
+qualidade dos dados, diferença Backtest × Paper e regressão do estado de
+evidência.
+
+Esses alertas significam apenas **revisar**. Eles não provam mudança
+institucional e não alteram setup, Gate, pesos ou execução automaticamente.
+
+A ordenação temporal normaliza timestamps com Z/offset para evitar comparar
+snapshots fora de ordem.
+
+## Cobertura × suficiência
+
+A Escada separa duas ideias:
+
+- **cobertura** — a etapa de evidência existe;
+- **suficiência** — a etapa atende aos critérios conservadores de revisão.
+
+Shadow permanece opcional por padrão. Quando não é exigido, sua ausência não
+reduz a cobertura das etapas obrigatórias.
+
 ## Segurança
 
 - nenhuma ordem real;
@@ -86,5 +113,6 @@ Cada registro possui record_id determinístico para evitar duplicatas.
 - cobertura de evidência não é apresentada como probabilidade de ganho.
 
 Próximo passo: alimentar automaticamente o histórico com evidência prospectiva
-do Paper/Setup Audit e criar comparações temporais do Passaporte para detectar
-degradação de comportamento sem reotimização automática.
+do Paper/Setup Audit, reduzindo a necessidade de importar manualmente o diário,
+e depois cruzar essa evidência com o Detector de Mudança de Comportamento sem
+reotimização automática.
