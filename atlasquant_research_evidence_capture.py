@@ -142,6 +142,27 @@ def capture_research_evidence(
     return status
 
 
+def persist_session_research_evidence()->dict[str,Any]:
+    records,_=ensure_research_evidence_hydrated()
+    cfg=research_evidence_config()
+    if not records:
+        status={
+            "ok":True,"reason":"NO_RECORDS","added":0,
+            "records":0,"branch":cfg["branch"],"error":"",
+        }
+        st.session_state[STATUS_KEY]=status
+        return status
+    status=persist_research_evidence(
+        records,
+        repo=cfg["repo"],
+        branch=cfg["branch"],
+        token=cfg["token"],
+    )
+    status["session_records"]=len(records)
+    st.session_state[STATUS_KEY]=status
+    return status
+
+
 def latest_research_evidence()->dict[str,dict[str,Any]]:
     records,_=ensure_research_evidence_hydrated()
     return latest_evidence_by_strategy(records)
@@ -155,5 +176,6 @@ __all__=[
     "hydrate_research_evidence",
     "ensure_research_evidence_hydrated",
     "capture_research_evidence",
+    "persist_session_research_evidence",
     "latest_research_evidence",
 ]
