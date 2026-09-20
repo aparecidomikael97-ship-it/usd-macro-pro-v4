@@ -79,6 +79,7 @@ def home_rows_from_packs(packs:Sequence[Mapping[str,Any]]|None, *, news_state:Ma
         blockers=[str(x) for x in list(p.get("blockers",[]) or []) if str(x).strip()]
         research=build_market_layers(p,news_state=news_state,macro_context=macro_context,micro_state=micro_state)
         consensus=dict(research.get("consensus",{}) or {})
+        macro_research=next((dict(x) for x in list(research.get("layers",[]) or []) if str(x.get("id"))=="macro"),{})
         rows.append({
             "pair":pair,
             "bias":bias,
@@ -121,6 +122,11 @@ def home_rows_from_packs(packs:Sequence[Mapping[str,Any]]|None, *, news_state:Ma
             "research_agreement":_safe(consensus.get("agreement_pct",0)),
             "research_blockers":[str(x) for x in list(consensus.get("blockers",[]) or []) if str(x).strip()],
             "research_summary":beginner_layer_summary(research),
+            "macro_research_direction":str(macro_research.get("direction") or "INDISPONÍVEL"),
+            "macro_research_balance":_safe(macro_research.get("balance",0)),
+            "macro_research_quality":_safe(macro_research.get("quality",0)),
+            "macro_research_coverage":_safe(macro_research.get("coverage",0)),
+            "macro_research_mode":str(macro_research.get("engine_mode") or "insufficient"),
         })
     rows.sort(key=lambda x:(x["action"]!="NÃO OPERAR",x["priority"],x["data_score"]),reverse=True)
     return rows
@@ -303,6 +309,10 @@ def render_home_radar(
         f"concordância {row['research_agreement']:.0f}% · {row['research_summary']}"
     )
     st.caption(
+        f"Macro estruturado: {row['macro_research_direction']} · saldo {row['macro_research_balance']:+.0f} · "
+        f"cobertura {row['macro_research_coverage']:.0f}% · qualidade {row['macro_research_quality']:.0f}/100."
+    )
+    st.caption(
         f"Força relativa Δ {row['strength_diff']:+.1f} pts · H4 {row['h4']} · "
         f"H1 {row['h1']} · M15 {row['m15']} · Gate {row['gate']} · {row['movement']}"
     )
@@ -322,6 +332,7 @@ def render_home_radar(
             "Qualidade":round(r["quality"],1),"Dados":round(r["data_score"],1),"H4":r["h4"],"H1":r["h1"],
             "M15":r["m15"],"Gate":r["gate"],"Movimento":r["movement"],"Notícias":r["news"],"Evento":r["event"],
             "Motores":r["research_state"],"Camadas":f"{r['research_layers']}/4","Consenso %":round(r["research_agreement"],1),
+            "Macro":r["macro_research_direction"],"Macro cobertura %":round(r["macro_research_coverage"],1),
         } for r in rows])
         st.dataframe(adv,width="stretch",hide_index=True)
         if row["blockers"]:
