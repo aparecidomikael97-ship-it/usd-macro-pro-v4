@@ -2,8 +2,10 @@ name: Quality tests
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
   push:
-    branches: [main, atlasquant-dev, atlasquant-runtime, atlasquant-runtime-integration, atlasquant-integration, atlasquant-release-final, atlasquant-support-final, atlasquant-support-ui, atlasquant-brokers-guide, atlasquant-voice-readiness, atlasquant-academy-media, atlasquant-commercial-prep, atlasquant-final-release-prep, atlasquant-backup-workflow, atlasquant-home-radar, atlasquant-private-validation, atlasquant-fast-startup, atlasquant-startup-observability, atlasquant-voice-assistant-final]
+    branches: [main, atlasquant-dev, atlasquant-runtime, atlasquant-runtime-integration, atlasquant-integration, atlasquant-release-final, atlasquant-support-final, atlasquant-support-ui, atlasquant-brokers-guide, atlasquant-voice-readiness, atlasquant-academy-media, atlasquant-commercial-prep, atlasquant-final-release-prep, atlasquant-backup-workflow, atlasquant-home-radar, atlasquant-private-validation, atlasquant-fast-startup, atlasquant-startup-observability, atlasquant-voice-assistant-final, atlasquant-render-fast-home]
     paths:
       - "*.py"
       - "tradingview/**"
@@ -87,6 +89,7 @@ jobs:
             test_atlasquant_dashboard_v1.py \
             test_atlasquant_home_radar.py \
             test_atlasquant_fast_startup.py \
+            test_atlasquant_production_boot_contract.py \
             test_atlasquant_setup_validation.py \
             test_atlasquant_setup_journal.py \
             test_atlasquant_operational_cards.py \
@@ -176,5 +179,4 @@ jobs:
             test_twelve_cache_integrity_v1108.py \
             test_quality_workflow_coverage.py \
             test_streamlit_width_compat.py
-
 
