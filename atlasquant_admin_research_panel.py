@@ -12,6 +12,8 @@ import pandas as pd
 import streamlit as st
 
 from atlasquant_operational_catalog import catalog_rows, catalog_summary
+from atlasquant_weekly_profile import analyze_weekly_extremes
+from atlasquant_behavior_shift import BehaviorStats, detect_behavior_shift
 
 SCHEMA="ATLASQUANT_ADMIN_RESEARCH_PANEL_V1"
 
@@ -53,6 +55,69 @@ def build_admin_research_snapshot(
         "automatic_strategy_change":False,
         "real_orders_enabled":False,
     }
+
+
+def normalize_weekly_research_csv(frame:pd.DataFrame|None)->pd.DataFrame:
+    if not isinstance(frame,pd.DataFrame) or frame.empty:
+        return pd.DataFrame(columns=["datetime","high","low"])
+    out=frame.copy()
+    aliases={
+        "datetime":("datetime","date","data","time","timestamp"),
+        "high":("high","max","maxima","máxima"),
+        "low":("low","min","minima","mínima"),
+    }
+    by_norm={str(c).strip().casefold():c for c in out.columns}
+    rename={}
+    for canonical,names in aliases.items():
+        if canonical in out.columns:
+            continue
+        for name in names:
+            actual=by_norm.get(str(name).strip().casefold())
+            if actual is not None:
+                rename[actual]=canonical
+                break
+    out=out.rename(columns=rename)
+    if not {"datetime","high","low"}.issubset(out.columns):
+        return pd.DataFrame(columns=["datetime","high","low"])
+    return out[["datetime","high","low"]].copy()
+
+
+_BEHAVIOR_FIELDS=(
+    "sample_size","london_expansion_pct","new_york_expansion_pct",
+    "sweep_followthrough_pct","reversal_after_sweep_pct",
+    "level_reaction_pct","average_range",
+)
+
+def behavior_stats_from_frame(frame:pd.DataFrame|None)->tuple[BehaviorStats|None,BehaviorStats|None]:
+    if not isinstance(frame,pd.DataFrame) or frame.empty or "window" not in frame.columns:
+        return None,None
+    normalized=frame.copy()
+    normalized["window"]=normalized["window"].astype(str).str.strip().str.casefold()
+    def build(name:str)->BehaviorStats|None:
+        rows=normalized[normalized["window"].eq(name)]
+        if rows.empty:
+            return None
+        row=rows.iloc[-1]
+        try:
+            return BehaviorStats(
+                sample_size=int(row["sample_size"]),
+                london_expansion_pct=float(row["london_expansion_pct"]),
+                new_york_expansion_pct=float(row["new_york_expansion_pct"]),
+                sweep_followthrough_pct=float(row["sweep_followthrough_pct"]),
+                reversal_after_sweep_pct=float(row["reversal_after_sweep_pct"]),
+                level_reaction_pct=float(row["level_reaction_pct"]),
+                average_range=float(row["average_range"]),
+            )
+        except Exception:
+            return None
+    return build("baseline"),build("recent")
+
+
+def behavior_template_csv()->str:
+    header="window,"+",".join(_BEHAVIOR_FIELDS)
+    baseline="baseline,100,50,45,60,30,55,100"
+    recent="recent,30,50,45,60,30,55,100"
+    return header+"\n"+baseline+"\n"+recent+"\n"
 
 
 def render_admin_research_panel(
@@ -101,6 +166,70 @@ def render_admin_research_panel(
             "CODED significa que existem regras objetivas/replay. "
             "Não significa VALIDATED, aprovado para Iniciante ou lucrativo."
         )
+
+    with st.expander("📅 Perfil Semanal · pesquisa estatística",expanded=False):
+        st.caption(
+            "Teste a hipótese de high/low semanal por dia usando dados históricos. "
+            "O laboratório mede a amostra; não assume terça/quarta como regra institucional."
+        )
+        weekly_file=st.file_uploader(
+            "OHLC diário para Perfil Semanal (CSV)",
+            type=["csv"],
+            key="atlasquant_admin_weekly_profile_csv",
+        )
+        if weekly_file is not None:
+            try:
+                weekly_raw=pd.read_csv(weekly_file)
+                weekly_frame=normalize_weekly_research_csv(weekly_raw)
+                weekly=analyze_weekly_extremes(weekly_frame)
+            except Exception as exc:
+                st.error(f"Perfil semanal inválido: {type(exc).__name__}: {exc}")
+            else:
+                w1,w2,w3=st.columns(3)
+                w1.metric("Semanas válidas",weekly.get("weeks",0))
+                tw_high=weekly.get("tuesday_wednesday_high_pct")
+                tw_low=weekly.get("tuesday_wednesday_low_pct")
+                w2.metric("High terça/quarta","—" if tw_high is None else f"{float(tw_high):.1f}%")
+                w3.metric("Low terça/quarta","—" if tw_low is None else f"{float(tw_low):.1f}%")
+                rows=pd.DataFrame(weekly.get("rows",[]) or [])
+                if not rows.empty:
+                    st.dataframe(rows,width="stretch",hide_index=True)
+                st.caption(weekly.get("interpretation",""))
+
+    with st.expander("🔄 Detector de Mudança de Comportamento",expanded=False):
+        st.caption(
+            "Compara uma janela baseline com uma janela recente de estatísticas observáveis. "
+            "Não tenta adivinhar intenção oculta das instituições."
+        )
+        st.download_button(
+            "⬇️ Modelo CSV de comportamento",
+            data=behavior_template_csv(),
+            file_name="atlasquant_behavior_shift_template.csv",
+            mime="text/csv",
+            key="atlasquant_admin_behavior_template",
+        )
+        behavior_file=st.file_uploader(
+            "Baseline + recente (CSV)",
+            type=["csv"],
+            key="atlasquant_admin_behavior_csv",
+        )
+        if behavior_file is not None:
+            try:
+                behavior_frame=pd.read_csv(behavior_file)
+                baseline,recent=behavior_stats_from_frame(behavior_frame)
+                if baseline is None or recent is None:
+                    raise ValueError("CSV precisa ter uma linha baseline e uma recent com todas as métricas")
+                shift=detect_behavior_shift(baseline,recent)
+            except Exception as exc:
+                st.error(f"Detector de comportamento inválido: {type(exc).__name__}: {exc}")
+            else:
+                s1,s2=st.columns(2)
+                s1.metric("Estado",shift.get("state","—"))
+                s2.metric("Mudanças relevantes",shift.get("change_count",0))
+                changes=pd.DataFrame(shift.get("changes",[]) or [])
+                if not changes.empty:
+                    st.dataframe(changes,width="stretch",hide_index=True)
+                st.caption(shift.get("interpretation",""))
 
     if suite:
         passport_rows=pd.DataFrame(suite.get("passport_rows",[]) or [])
@@ -171,5 +300,8 @@ __all__=[
     "SCHEMA",
     "admin_research_access_allowed",
     "build_admin_research_snapshot",
+    "normalize_weekly_research_csv",
+    "behavior_stats_from_frame",
+    "behavior_template_csv",
     "render_admin_research_panel",
 ]
