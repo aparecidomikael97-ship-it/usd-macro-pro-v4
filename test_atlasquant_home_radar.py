@@ -138,6 +138,24 @@ class AtlasQuantHomeRadarTests(unittest.TestCase):
         self.assertGreaterEqual(row["research_layers"],3)
         self.assertEqual(row["action"],"COMPRA")
 
+    def test_structured_geopolitical_metadata_reaches_home_without_overriding_action(self):
+        news={"geopolitical_events":[{
+            "event_id":"GEO-RADAR",
+            "title":"New sanctions and shipping disruption",
+            "category":"sanctions",
+            "source":"Verified wire",
+            "quality":90,
+            "severity":"high",
+            "duration":"medium",
+            "currency_impacts":{"EUR":-50,"USD":20},
+        }]}
+        row=home_rows_from_packs([_pack()],news_state=news)[0]
+        self.assertEqual(row["geo_research_direction"],"VENDA")
+        self.assertEqual(row["geo_research_severity"],"ALTO")
+        self.assertGreater(row["geo_research_coverage"],0)
+        self.assertTrue(row["geo_research_events"])
+        self.assertEqual(row["action"],"COMPRA")
+
     def test_adr_is_described_without_calling_it_probability(self):
         row=home_rows_from_packs([_pack()])[0]
         self.assertIn("ADR 63%",row["movement"])
