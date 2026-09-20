@@ -37,6 +37,7 @@ ROLE_LABELS={
     "SALES":"Vendas",
     "ADMIN":"Administrador",
     "OPEN":"Acesso aberto",
+    "PREVIEW":"Visualização provisória",
 }
 
 ROLE_DESCRIPTIONS={
@@ -44,6 +45,7 @@ ROLE_DESCRIPTIONS={
     "SALES":"Acesso ao aplicativo e à área comercial, sem poderes administrativos.",
     "ADMIN":"Acesso administrativo ao portal de contas; trading real continua independente e desativado.",
     "OPEN":"Autenticação ainda não exigida neste ambiente.",
+    "PREVIEW":"Acesso provisório somente de leitura até a primeira conta segura ser configurada.",
 }
 
 def role_label(role:Any)->str:
@@ -63,6 +65,8 @@ def role_sections(role:Any)->tuple[str,...]:
     if raw=="USER":
         return ("account",)
     if raw=="OPEN":
+        return ("account",)
+    if raw=="PREVIEW":
         return ("account",)
     return ()
 
@@ -175,6 +179,8 @@ def account_visual_state(summary:Mapping[str,Any]|None)->dict[str,str]:
         return {"label":"ACESSO INVÁLIDO","detail":"Sessão ou perfil inconsistente"}
     if role=="OPEN":
         return {"label":"MODO LOCAL/ABERTO","detail":"Autenticação privada ainda não exigida neste ambiente"}
+    if role=="PREVIEW":
+        return {"label":"VISUALIZAÇÃO PROVISÓRIA","detail":"Sem privilégios de Vendas ou Administração"}
     if bool(s.get("authenticated",False)):
         return {"label":"SESSÃO AUTENTICADA","detail":f"Perfil {role} validado"}
     return {"label":"ACESSO BLOQUEADO","detail":"Autenticação necessária para este perfil"}
@@ -209,6 +215,13 @@ def render_account_portal(access:Mapping[str,Any]|None)->dict[str,Any]:
         st.warning(
             "O login privado está desativado neste ambiente. "
             "Para produção comercial, ATLASQUANT_AUTH_REQUIRED deve ser ativado somente após configurar usuários seguros."
+        )
+        return summary
+
+    if summary["role"]=="PREVIEW":
+        st.warning(
+            "Visualização provisória ativa até a configuração da primeira conta segura. "
+            "Este perfil não acessa Vendas nem Administração e não habilita trading real."
         )
         return summary
 
