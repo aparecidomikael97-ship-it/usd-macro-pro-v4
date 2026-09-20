@@ -15,7 +15,7 @@ from typing import Any, Mapping, Sequence
 import pandas as pd
 import streamlit as st
 
-from atlasquant_voice_assistant import render_contextual_voice_assistant
+from atlasquant_voice_assistant import browser_speech_html, render_contextual_voice_assistant
 
 SCHEMA="ATLASQUANT_HOME_RADAR_V1"
 
@@ -199,38 +199,17 @@ HOME_CSS="""
 
 
 def render_browser_voice(script:str, *, key:str)->None:
-    """Explicit-click browser/device TTS. No server/provider call is made."""
-    safe_script=json.dumps(str(script),ensure_ascii=False)
-    safe_key=escape(str(key))
-    html=f"""
-    <div style="font-family:system-ui;padding:0;margin:0">
-      <button id="aq_voice_{safe_key}" style="width:100%;min-height:42px;border-radius:10px;border:1px solid rgba(120,150,190,.35);background:#10243d;color:#edf4ff;font-weight:700;cursor:pointer">🔊 Ouvir análise no dispositivo</button>
-      <div id="aq_voice_status_{safe_key}" style="font-size:12px;color:#8fa5bf;margin-top:5px">A voz usa o mecanismo disponível no navegador/celular.</div>
-    </div>
-    <script>
-    (() => {{
-      const btn=document.getElementById("aq_voice_{safe_key}");
-      const status=document.getElementById("aq_voice_status_{safe_key}");
-      const text={safe_script};
-      btn.addEventListener("click", () => {{
-        if (!("speechSynthesis" in window)) {{
-          status.textContent="Voz do navegador indisponível. Use a transcrição abaixo.";
-          return;
-        }}
-        window.speechSynthesis.cancel();
-        const u=new SpeechSynthesisUtterance(text);
-        u.lang="pt-BR";
-        u.rate=0.96;
-        u.pitch=1.0;
-        status.textContent="Reproduzindo análise…";
-        u.onend=()=>status.textContent="Análise concluída.";
-        u.onerror=()=>status.textContent="Não foi possível reproduzir a voz neste dispositivo.";
-        window.speechSynthesis.speak(u);
-      }});
-    }})();
-    </script>
-    """
-    st.iframe(html,height=72,width="stretch",tab_index=0)
+    """Explicit-click AtlasQuant deep voice playback; no server/provider call is made."""
+    st.iframe(
+        browser_speech_html(
+            script,
+            button_label="🔊 Ouvir análise",
+            key=f"home_{key}",
+        ),
+        height=72,
+        width="stretch",
+        tab_index=0,
+    )
 
 
 def render_home_radar(
