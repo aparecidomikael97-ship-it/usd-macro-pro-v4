@@ -6,7 +6,7 @@ from atlasquant_quarterly_context import build_quarterly_snapshot
 
 def candles_for_day(*, sweep="none"):
     # 15-minute candles spanning 00:00-12:00 New York on 2026-09-18.
-    idx = pd.date_range("2026-09-18 04:00:00+00:00", periods=49, freq="15min")
+    idx = pd.date_range("2026-09-18 04:00:00+00:00", periods=41, freq="15min")
     rows=[]
     px=1.1000
     for i,ts in enumerate(idx):
