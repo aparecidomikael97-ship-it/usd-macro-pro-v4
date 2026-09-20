@@ -642,6 +642,18 @@ class PassportDriftTests(unittest.TestCase):
         self.assertFalse(out["automatic_gate_change"])
         self.assertFalse(out["real_orders_enabled"])
 
+    def test_drift_orders_equivalent_timezone_formats_chronologically(self):
+        older=self._record(
+            "2026-09-20T12:30:00+01:00",
+            expectancy=0.30,pf=1.5,dd=5,quality=90,gap=-0.02,
+        )
+        newer=self._record(
+            "2026-09-20T12:00:00Z",
+            expectancy=0.29,pf=1.49,dd=5.1,quality=89,gap=-0.03,
+        )
+        latest=latest_passport_drift([newer,older])
+        self.assertEqual(latest[0]["current"]["captured_at"],"2026-09-20T12:00:00Z")
+
     def test_latest_drift_uses_only_last_two_records_per_strategy(self):
         a=self._record("2026-09-18T12:00:00Z",expectancy=0.40,pf=1.7,dd=4,quality=95,gap=-0.02)
         b=self._record("2026-09-19T12:00:00Z",expectancy=0.35,pf=1.6,dd=4.5,quality=94,gap=-0.03)
@@ -672,6 +684,24 @@ class ResearchEvidenceStoreTests(unittest.TestCase):
         self.assertEqual(added,0)
         self.assertEqual(len(merged),1)
 
+    def test_evidence_record_requires_identity_fields(self):
+        with self.assertRaises(ValueError):
+            evidence_record(
+                strategy="",
+                captured_at="2026-09-20T12:00:00Z",
+                source="BACKTEST",
+                passport={},
+                evidence={},
+            )
+        with self.assertRaises(ValueError):
+            evidence_record(
+                strategy="FVG",
+                captured_at="",
+                source="BACKTEST",
+                passport={},
+                evidence={},
+            )
+
     def test_latest_evidence_by_strategy_uses_latest_timestamp(self):
         old=evidence_record(
             strategy="FVG",captured_at="2026-09-20T10:00:00+00:00",
@@ -682,6 +712,18 @@ class ResearchEvidenceStoreTests(unittest.TestCase):
             source="BACKTEST",passport={"state":"NEW"},evidence={},
         )
         latest=latest_evidence_by_strategy([new,old])
+        self.assertEqual(latest["FVG"]["passport"]["state"],"NEW")
+
+    def test_latest_timestamp_normalizes_z_and_offsets(self):
+        old=evidence_record(
+            strategy="FVG",captured_at="2026-09-20T12:30:00+01:00",
+            source="BACKTEST",passport={"state":"OLD"},evidence={},
+        )
+        new=evidence_record(
+            strategy="FVG",captured_at="2026-09-20T12:00:00Z",
+            source="BACKTEST",passport={"state":"NEW"},evidence={},
+        )
+        latest=latest_evidence_by_strategy([old,new])
         self.assertEqual(latest["FVG"]["passport"]["state"],"NEW")
 
     def test_session_and_remote_evidence_hydrate_without_duplicates(self):
