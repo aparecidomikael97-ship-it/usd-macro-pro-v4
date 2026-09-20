@@ -2,7 +2,25 @@
 
 Este documento começa exatamente onde a preparação interna termina. Nenhum item abaixo é marcado como concluído apenas porque existe código, checklist ou rascunho no repositório.
 
-## 1. Jurídico e privacidade
+## 1. Administrador de produção
+
+**Já preparado internamente**
+- RBAC USER / SALES / ADMIN;
+- bootstrap seguro com PBKDF2-SHA256;
+- autenticação obrigatória em produção;
+- revogação e auditoria de contas.
+
+**Ação externa necessária**
+- executar o bootstrap local do primeiro ADMIN;
+- configurar `ATLASQUANT_USERS_JSON`, `ATLASQUANT_AUTH_REQUIRED=true` e `ATLASQUANT_ENV=PRODUCTION` no ambiente de produção;
+- validar login, expiração e revogação no aplicativo publicado.
+
+**Evidência de conclusão**
+- primeiro ADMIN autenticado em produção;
+- secret configurado sem senha em texto puro;
+- teste de revogação concluído.
+
+## 2. Jurídico e privacidade
 
 **Já preparado internamente**
 - rascunho de Termos de Uso;
@@ -21,7 +39,7 @@ Este documento começa exatamente onde a preparação interna termina. Nenhum it
 - documentos finais aprovados, versionados e publicados;
 - responsável/aprovação registrada.
 
-## 2. Licenciamento comercial de dados
+## 3. Licenciamento comercial de dados
 
 **Já preparado internamente**
 - inventário técnico de FRED, BCB/SGS, NewsAPI, EODHD, Twelve Data, Google News RSS, endpoint de tradução, calendários Fed/ISM;
@@ -35,7 +53,7 @@ Este documento começa exatamente onde a preparação interna termina. Nenhum it
 **Evidência de conclusão**
 - documentação/contrato aplicável para cada fonte usada no produto público.
 
-## 3. Pagamento e assinatura
+## 4. Pagamento e assinatura
 
 **Já preparado internamente**
 - contrato técnico fail-closed de eventos de billing;
@@ -56,7 +74,7 @@ Este documento começa exatamente onde a preparação interna termina. Nenhum it
 - fluxo de assinatura/cancelamento/reembolso testado;
 - revisão humana antes de ativar produção.
 
-## 4. Assistente de voz
+## 5. Assistente de voz
 
 **Já preparado internamente**
 - contrato TTS;
@@ -75,7 +93,7 @@ Este documento começa exatamente onde a preparação interna termina. Nenhum it
 - fallback testado;
 - `voice_ready` só deve mudar depois disso.
 
-## 5. Vídeos da Academy
+## 6. Vídeos da Academy
 
 **Já preparado internamente**
 - currículo textual;
@@ -92,7 +110,7 @@ Este documento começa exatamente onde a preparação interna termina. Nenhum it
 - revisão visual e educacional;
 - todos os tópicos associados a mídia válida.
 
-## 6. Google Play e Apple App Store
+## 7. Google Play e Apple App Store
 
 **Já preparado internamente**
 - PWA funcionando;

@@ -41,6 +41,7 @@ def collect_public_launch_readiness()->dict[str,Any]:
         "academy_videos_rendered_and_published":False,
         "tts_provider":False,
         "native_store_publication":False,
+        "production_admin_secret_configured":False,
     }
     internal_complete=all(internal.values())
     external_complete=all(external.values())

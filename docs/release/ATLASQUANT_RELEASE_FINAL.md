@@ -67,15 +67,13 @@ A preparação interna pode ser marcada como completa **sem** marcar dependênci
 
 ## Dependências externas ainda obrigatórias
 
-Antes de venda pública completa permanecem necessárias:
-
-1. revisão jurídica/privacidade dos documentos finais;
-2. confirmação contratual/licenciamento comercial dos provedores de dados;
-3. escolha e integração real de um provedor de pagamento/assinatura;
-4. configuração de provedor TTS externo para narração;
-5. renderização e publicação dos vídeos da Academy;
-6. geração de pacotes assinados e publicação/revisão em Google Play/Apple App Store;
-7. revisão humana final do lançamento.
+Antes de venda pública completa permanecem necessárias:\n\n1. configurar e validar o primeiro ADMIN no ambiente de produção;\n2. revisão jurídica/privacidade dos documentos finais;
+3. confirmação contratual/licenciamento comercial dos provedores de dados;
+4. escolha e integração real de um provedor de pagamento/assinatura;
+5. configuração de provedor TTS externo para narração;
+6. renderização e publicação dos vídeos da Academy;
+7. geração de pacotes assinados e publicação/revisão em Google Play/Apple App Store;
+8. revisão humana final do lançamento.
 
 Nenhum destes itens é inferido automaticamente por existir código, checklist ou documentação.
 

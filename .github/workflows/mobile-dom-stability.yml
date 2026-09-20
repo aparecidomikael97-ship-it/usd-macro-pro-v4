@@ -177,14 +177,30 @@ jobs:
               assert_clean(page,"beginner-initial",page_errors)
 
               # Enter advanced mode. Streamlit radio interaction itself reruns the app.
+              # Wait for the experience control itself, not only the app container.
+              # Streamlit may report health/DOM ready a moment before the sidebar radio
+              # is committed on slower CI runners.
               experience=page.locator('[data-testid="stRadio"]').filter(has_text="Experiência").first
+              try:
+                  experience.wait_for(state="visible",timeout=30_000)
+              except Exception:
+                  pass
               advanced=experience.get_by_text("Avançado",exact=True)
               if advanced.count()<1:
                   advanced=page.locator('label').filter(has_text="Avançado")
               if advanced.count()<1:
                   advanced=page.get_by_text("Avançado",exact=True)
               if advanced.count()<1:
-                  errors.append("controle Avançado não encontrado")
+                  # Capture a real UI failure only after a bounded retry window.
+                  deadline=time.time()+30
+                  while time.time()<deadline and advanced.count()<1:
+                      page.wait_for_timeout(500)
+                      experience=page.locator('[data-testid="stRadio"]').filter(has_text="Experiência").first
+                      advanced=experience.get_by_text("Avançado",exact=True)
+                      if advanced.count()<1:
+                          advanced=page.get_by_text("Avançado",exact=True)
+              if advanced.count()<1:
+                  errors.append("controle Avançado não encontrado após retry")
               else:
                   advanced.first.click()
                   if not wait_text(page,"Área avançada",timeout=150_000):
