@@ -131,6 +131,20 @@ Este documento começa exatamente onde a preparação interna termina. Nenhum it
 - versão/release id;
 - resultado da revisão/publicação de cada loja.
 
+## 8. Checklist de aceite antes do lançamento público
+
+Registrar a evidência de cada item abaixo antes da revisão final:
+
+- ADMIN de produção: login, expiração e revogação validados;
+- jurídico/privacidade: documentos finais aprovados e publicados;
+- dados: licença/termos comerciais verificados para cada fonte realmente usada;
+- pagamento: sandbox, webhook assinado, cancelamento e reembolso validados;
+- voz neural externa: provedor, custo, privacidade e fallback validados, se habilitado;
+- Academy: mídia final revisada e associada às aulas publicadas;
+- lojas nativas: pacote assinado e resultado de revisão/publicação registrado, quando aplicável.
+
+A ausência de qualquer evidência necessária deve permanecer como pendência explícita; não converter preparação interna em conclusão externa.
+
 ## Regra final
 
 Mesmo quando todas as dependências externas forem concluídas, o lançamento continua exigindo revisão humana final. Isso não habilita broker nem ordens reais.
