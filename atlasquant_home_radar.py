@@ -127,6 +127,7 @@ def home_rows_from_packs(packs:Sequence[Mapping[str,Any]]|None, *, news_state:Ma
             "macro_research_quality":_safe(macro_research.get("quality",0)),
             "macro_research_coverage":_safe(macro_research.get("coverage",0)),
             "macro_research_mode":str(macro_research.get("engine_mode") or "insufficient"),
+            "macro_research_conflict":bool(macro_research.get("macro_conflict",False)),
         })
     rows.sort(key=lambda x:(x["action"]!="NÃO OPERAR",x["priority"],x["data_score"]),reverse=True)
     return rows
@@ -312,6 +313,8 @@ def render_home_radar(
         f"Macro estruturado: {row['macro_research_direction']} · saldo {row['macro_research_balance']:+.0f} · "
         f"cobertura {row['macro_research_coverage']:.0f}% · qualidade {row['macro_research_quality']:.0f}/100."
     )
+    if row["macro_research_conflict"]:
+        st.warning("Macro em conflito interno: juros, inflação, emprego/crescimento ou expectativas não estão apontando para o mesmo lado.")
     st.caption(
         f"Força relativa Δ {row['strength_diff']:+.1f} pts · H4 {row['h4']} · "
         f"H1 {row['h1']} · M15 {row['m15']} · Gate {row['gate']} · {row['movement']}"
@@ -333,6 +336,7 @@ def render_home_radar(
             "M15":r["m15"],"Gate":r["gate"],"Movimento":r["movement"],"Notícias":r["news"],"Evento":r["event"],
             "Motores":r["research_state"],"Camadas":f"{r['research_layers']}/4","Consenso %":round(r["research_agreement"],1),
             "Macro":r["macro_research_direction"],"Macro cobertura %":round(r["macro_research_coverage"],1),
+            "Macro conflito":"SIM" if r["macro_research_conflict"] else "NÃO",
         } for r in rows])
         st.dataframe(adv,width="stretch",hide_index=True)
         if row["blockers"]:
