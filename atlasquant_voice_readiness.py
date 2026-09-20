@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from atlasquant_voice_profile import VOICE_PROFILE_ID, voice_profile_ready
+
 SCHEMA="ATLASQUANT_VOICE_READINESS_V1"
 
 VOICE_REQUIREMENTS=(
@@ -51,7 +53,9 @@ def voice_readiness(provider_configured: bool=False)->dict[str,Any]:
         "schema":SCHEMA,
         "contract_ready":contract,
         "contextual_contract_ready":contextual,
-        "in_app_voice_ready":bool(contract and contextual),
+        "in_app_voice_ready":bool(contract and contextual and voice_profile_ready()),
+        "voice_profile_id":VOICE_PROFILE_ID,
+        "voice_profile_ready":voice_profile_ready(),
         "provider_configured":provider,
         "neural_tts_ready":bool(contract and provider),
         # Backward-compatible meaning: external/provider TTS readiness.
