@@ -9491,6 +9491,7 @@ with abas[0]:
                     _aq_runtime_snapshot.get("packs", []),
                     experience_mode=_aq_experience_mode,
                     macro_context=_macro_v108,
+                    news_state=_aq_runtime_snapshot.get("news", {}),
                 )
             except Exception as _aq_home_exc:
                 st.warning("Radar principal em modo seguro; nenhuma permissão operacional foi ampliada.")
