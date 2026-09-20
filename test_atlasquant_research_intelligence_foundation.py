@@ -497,6 +497,27 @@ class PassportEvidenceFusionTests(unittest.TestCase):
         self.assertFalse(out["checks"]["parameter_diagnostic"])
         self.assertFalse(out["eligible_for_human_review"])
 
+    def test_negative_backtest_or_paper_expectancy_cannot_be_review_ready(self):
+        bad_passport=self._passport()
+        bad_passport["observed_metrics"]=dict(bad_passport["observed_metrics"])
+        bad_passport["observed_metrics"]["expectancy_r"]=-0.05
+        paper={"forward_samples":45,"forward_expectancy_r":-0.04}
+        out=fuse_operational_evidence(
+            bad_passport,
+            paper_summary=paper,
+            temporal_status="POSITIVE_ACROSS_FOLDS",
+            walk_forward_status="POSITIVE_ALL_OOS_WINDOWS",
+            friction_status="POSITIVE_ALL_TESTED_FRICTION",
+            parameter_status="POSITIVE_ALL_PREDEFINED_VARIANTS",
+            positive_fold_pct=75,
+            oos_positive_pct=67,
+            friction_positive_pct=75,
+            parameter_positive_pct=70,
+        )
+        self.assertFalse(out["checks"]["backtest_expectancy"])
+        self.assertFalse(out["checks"]["paper_expectancy"])
+        self.assertFalse(out["eligible_for_human_review"])
+
     def test_paper_gap_is_descriptive_and_can_block_review(self):
         paper={"forward_samples":50,"forward_expectancy_r":-0.20}
         out=fuse_operational_evidence(
