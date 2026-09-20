@@ -28,7 +28,10 @@ SETUP_ALIASES={
     "bos/choch + order block":"bos-choch-ob",
     "fvg":"fvg",
     "fair value gap":"fvg",
+    "fvg / desequilíbrio":"fvg",
+    "fvg / desequilibrio":"fvg",
     "ote":"ote",
+    "ote / fibonacci":"ote",
     "crt":"crt",
     "amd":"amd-po3",
     "amd-po3":"amd-po3",
@@ -37,12 +40,17 @@ SETUP_ALIASES={
     "power of three":"amd-po3",
     "breaker-mitigation":"breaker-mitigation",
     "breaker_mitigation":"breaker-mitigation",
+    "breaker / mitigation block":"breaker-mitigation",
     "session-liquidity-mss":"session-liquidity-mss",
     "session_liquidity_mss":"session-liquidity-mss",
+    "liquidez de sessão + mss":"session-liquidity-mss",
+    "liquidez de sessao + mss":"session-liquidity-mss",
     "opening-range":"opening-range",
     "opening_range":"opening-range",
+    "opening range":"opening-range",
     "volume-profile":"volume-profile",
     "volume_profile":"volume-profile",
+    "volume profile":"volume-profile",
 }
 
 TRUSTED_ATTRIBUTIONS={"EXPLICIT_INPUT","MANUAL_TAG"}
