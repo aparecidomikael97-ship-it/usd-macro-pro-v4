@@ -21,6 +21,7 @@ from atlasquant_operational_passport import (
 from atlasquant_weekly_profile import analyze_weekly_extremes
 from atlasquant_behavior_shift import BehaviorStats, detect_behavior_shift
 from atlasquant_passport_evidence import EvidenceCriteria, fuse_operational_evidence
+from atlasquant_research_evidence_capture import hydrate_research_evidence
 from atlasquant_research_evidence_store import (
     evidence_record,
     latest_evidence_by_strategy,
@@ -568,6 +569,19 @@ class ResearchEvidenceStoreTests(unittest.TestCase):
         )
         latest=latest_evidence_by_strategy([new,old])
         self.assertEqual(latest["FVG"]["passport"]["state"],"NEW")
+
+    def test_session_and_remote_evidence_hydrate_without_duplicates(self):
+        a=evidence_record(
+            strategy="FVG",captured_at="2026-09-20T12:00:00Z",
+            source="BACKTEST",passport={},evidence={},
+        )
+        b=evidence_record(
+            strategy="OTE",captured_at="2026-09-20T12:01:00Z",
+            source="BACKTEST",passport={},evidence={},
+        )
+        rows=hydrate_research_evidence([a],[a,b])
+        self.assertEqual(len(rows),2)
+        self.assertEqual({x["strategy"] for x in rows},{"FVG","OTE"})
 
     def test_store_refuses_runtime_write_to_main_without_network(self):
         record=evidence_record(
