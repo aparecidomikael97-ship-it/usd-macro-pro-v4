@@ -212,15 +212,25 @@ jobs:
                               nav = page.locator('[data-testid="stSelectbox"]').filter(has_text="Área avançada").first
                               combo = nav.get_by_role("combobox")
                               combo.click()
-                              page.get_by_role("option", name="⚡ Decisão", exact=True).click()
+                              combo.fill("⚡ Decisão")
+                              page.wait_for_timeout(180)
+                              combo.press("Enter")
                               page.wait_for_timeout(1_500)
-                              mobile_transition["decision"] = True
                               nav = page.locator('[data-testid="stSelectbox"]').filter(has_text="Área avançada").first
                               combo = nav.get_by_role("combobox")
+                              mobile_transition["decision"] = combo.input_value(timeout=20_000).strip() == "⚡ Decisão"
                               combo.click()
-                              page.get_by_role("option", name="🎯 Radar", exact=True).click()
+                              combo.fill("🎯 Radar")
+                              page.wait_for_timeout(180)
+                              combo.press("Enter")
                               page.wait_for_timeout(1_500)
-                              mobile_transition["radar_back"] = "Radar de Oportunidades" in page.locator("body").inner_text(timeout=30_000)
+                              nav = page.locator('[data-testid="stSelectbox"]').filter(has_text="Área avançada").first
+                              combo = nav.get_by_role("combobox")
+                              selected_radar = combo.input_value(timeout=20_000).strip() == "🎯 Radar"
+                              mobile_transition["radar_back"] = (
+                                  selected_radar
+                                  and "Radar de Oportunidades" in page.locator("body").inner_text(timeout=30_000)
+                              )
                           body_text = page.locator("body").inner_text(timeout=30_000)
                       except Exception as exc:
                           page_errors.append(f"mobile-transition: {type(exc).__name__}: {exc}")
