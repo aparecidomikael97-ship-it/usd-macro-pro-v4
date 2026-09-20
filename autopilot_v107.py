@@ -90,6 +90,7 @@ DAILY_CACHE_PATH = "dados/autopilot_daily_cache_v107.json"
 NEWS_CURRENT_PATH = "dados/currency_news_current_v107.json"
 NEWS_VALIDATION_PATH = "dados/currency_news_validation_v1061.csv"
 QUOTA_SHADOW_PATH = "dados/atlasquant_quota_shadow_v1.json"
+HOME_SNAPSHOT_PATH = "dados/atlasquant_home_snapshot_v1.json"
 
 M15_EVERY_MIN = 55
 H1_EVERY_MIN = 115
@@ -1352,11 +1353,51 @@ def main() -> int:
         flight_status={"ok":False,"added":0,"records":0,"reason":"PACK_BUILD_EXCEPTION","error":err}
         all_errors.append("Decision evidence Pack: "+err)
 
+    # 6.1 Compact startup snapshot — one read for the interactive beginner Home.
+    # It contains only already-computed state; no provider call, gate change or execution.
+    home_snapshot={
+        "schema":"ATLASQUANT_HOME_SNAPSHOT_V1",
+        "generated_at":str(inputs.get("generated_at") or utcnow().isoformat()) if isinstance(inputs,Mapping) else utcnow().isoformat(),
+        "runtime_generated_at":utcnow().isoformat(),
+        "engine_version":"V11.0.8 / AtlasQuant Runtime",
+        "inputs":dict(inputs or {}) if isinstance(inputs,Mapping) else {},
+        "packs":list(packs or []),
+        "runtime":{
+            "market_open":bool(forex_market_likely_open()),
+            "scanner_pairs":len(dict(scanner.get("resultados",{}) or {})) if isinstance(scanner,Mapping) else 0,
+            "market_map_pairs":len(dict(master.get("contexts",{}) or {})) if isinstance(master,Mapping) else 0,
+            "news_available":bool(intel),
+        },
+        "safety":{
+            "real_orders":False,
+            "automatic_execution":False,
+            "automatic_gate_change":False,
+            "automatic_weight_change":False,
+            "automatic_promotion":False,
+        },
+    }
+    home_ok,home_err=gh_put_json(
+        HOME_SNAPSHOT_PATH,
+        home_snapshot,
+        "AtlasQuant: atualiza snapshot compacto da Home",
+    )
+    if not home_ok:
+        all_errors.append("Salvar Home snapshot: "+str(home_err))
+
     # 7. Health/status.
     status=status_summary(
         app_ok,app_msg,inputs,scanner,master,intel,validation,
         all_errors,total_calls,snap_stats
     )
+
+    status["fast_home_snapshot"]={
+        "path":HOME_SNAPSHOT_PATH,
+        "persisted":bool(home_ok),
+        "error":str(home_err or ""),
+        "packs":len(packs),
+        "real_orders":False,
+        "automatic_execution":False,
+    }
 
     status["decision_evidence"]={
         "packs":len(packs),
