@@ -184,6 +184,11 @@ jobs:
                       meaningful = (
                           "Radar de Oportunidades" in body_text
                           or "carregamento rápido por snapshot validado" in body_text
+                          or (
+                              "MARKET INTELLIGENCE PLATFORM" in body_text
+                              and "ATLASQUANT" in body_text
+                              and "Safety Core monitorado" in body_text
+                          )
                           or auth_inputs >= 1
                       )
                       if meaningful and meaningful_ms is None:
