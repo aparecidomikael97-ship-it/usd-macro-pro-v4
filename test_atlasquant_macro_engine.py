@@ -145,6 +145,17 @@ class StructuredMacroEngineTests(unittest.TestCase):
         self.assertEqual(out["direction"],"INDISPONÍVEL")
         self.assertEqual(out["mode"],"insufficient")
 
+    def test_internal_macro_conflict_is_flagged_and_quality_discounted(self):
+        ctx={"currencies":{
+            "EUR":{"rates":comp(75),"inflation":comp(70),"growth":comp(25),"activity":comp(30),"labour":comp(30)},
+            "USD":{"rates":comp(35),"inflation":comp(40),"growth":comp(70),"activity":comp(68),"labour":comp(65)},
+        }}
+        out=build_structured_macro("EUR/USD",ctx)
+        self.assertTrue(out["macro_conflict"])
+        self.assertTrue(any("Divergência interna" in x for x in out["risks"]))
+        self.assertTrue(any("Juros/política" in x for x in out["risks"]))
+        self.assertLess(out["quality"],90)
+
     def test_research_engine_never_changes_operational_controls(self):
         ctx={"currencies":{
             "EUR":{"rates":comp(70),"inflation":comp(70),"growth":comp(70)},
