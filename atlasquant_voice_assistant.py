@@ -139,6 +139,11 @@ def assistant_context(
         "fed_tone":_text(fed.get("tom",macro.get("fed_tone")),"neutro"),
         "fed_strength":_safe(fed.get("forca",macro.get("fed_strength",0)),0),
         "usd_score":_safe(macro.get("usd_score",0),0),
+        "macro_research_direction":_text(r.get("macro_research_direction"),"indisponível"),
+        "macro_research_balance":_safe(r.get("macro_research_balance",0),0),
+        "macro_research_quality":_safe(r.get("macro_research_quality",0),0),
+        "macro_research_coverage":_safe(r.get("macro_research_coverage",0),0),
+        "macro_research_mode":_text(r.get("macro_research_mode"),"insufficient"),
         "data_sufficient":data_sufficient,
         "real_orders_enabled":False,
         "automatic_execution":False,
@@ -183,6 +188,8 @@ def advanced_script(context:Mapping[str,Any])->str:
         f"Premium ou Discount: {_text(c.get('pd_zone'))}; alvo de referência {_text(c.get('target'))}. "
         f"Notícias: {_text(c.get('news'))}. Evento: {_text(c.get('event'))}. "
         f"Fed: tom {_text(c.get('fed_tone'))}, intensidade {_safe(c.get('fed_strength')):+.2f}. "
+        f"Macro estruturado: {_text(c.get('macro_research_direction'))}, saldo {_safe(c.get('macro_research_balance')):+.0f}, "
+        f"cobertura {_safe(c.get('macro_research_coverage')):.0f}% e qualidade {_safe(c.get('macro_research_quality')):.0f}/100. "
         f"Fatores a favor: {support_txt}. Fatores contra ou invalidações: {against_txt}. "
         f"Próximo passo: {_text(c.get('next_action'))}. "
         "A explicação descreve o estado calculado e não executa ordens nem garante resultado."
@@ -238,6 +245,9 @@ def _answer_for_category(category:str, c:Mapping[str,Any], *, beginner:bool=Fals
     if category=="macro":
         return (
             f"No macro de {pair}, a diferença de força está em {_safe(c.get('strength_diff')):+.1f} pontos. "
+            f"O motor macro estruturado está {_text(c.get('macro_research_direction'))}, com saldo "
+            f"{_safe(c.get('macro_research_balance')):+.0f}, cobertura {_safe(c.get('macro_research_coverage')):.0f}% "
+            f"e qualidade {_safe(c.get('macro_research_quality')):.0f}/100. "
             f"O tom do Fed está {_text(c.get('fed_tone'))}, com intensidade {_safe(c.get('fed_strength')):+.2f}. "
             f"Notícias: {_text(c.get('news'))}. Evento relevante: {_text(c.get('event'))}. "
             f"O motivo dominante registrado pelo motor é: {_text(c.get('reason'))}."
