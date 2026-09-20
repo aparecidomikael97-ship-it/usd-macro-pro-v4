@@ -179,6 +179,10 @@ def render_beginner_shell(
     if current.casefold().startswith("avan"):
         return {"handled":False,"mode":"Avançado"}
 
+    check=validate_home_snapshot(snapshot)
+    if not check["valid"]:
+        return {"handled":False,"mode":"Iniciante","snapshot_valid":False,"errors":check["errors"]}
+
     mode=st.radio(
         "Experiência",
         ["Iniciante","Avançado"],
@@ -189,10 +193,6 @@ def render_beginner_shell(
     )
     if str(mode).casefold().startswith("avan"):
         st.rerun()
-
-    check=validate_home_snapshot(snapshot)
-    if not check["valid"]:
-        return {"handled":False,"mode":"Iniciante","snapshot_valid":False,"errors":check["errors"]}
 
     age=float(check["age_minutes"] or 0.0)
     st.markdown(
