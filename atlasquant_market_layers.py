@@ -396,13 +396,61 @@ def technical_flow_layer(pack:Mapping[str,Any]|None)->dict[str,Any]:
             detail="Dados insuficientes falham fechado; não são convertidos em neutralidade confiável.",
         )
 
-    vote_balance=(sum(votes)/max(1,len(votes)))*70.0
+    vote_balance=(sum(votes)/max(1,len(votes)))*65.0
     side=str(p.get("side") or "").upper()
     directional=1.0 if side=="BUY" else -1.0 if side=="SELL" else 0.0
     ict=_finite(p.get("ict_read",0))
     inst=_finite(p.get("inst_read",0))
-    support=((ict+inst)/200.0)*30.0*directional
-    balance=_clip(vote_balance+support)
+    readiness_support=((ict+inst)/200.0)*23.0*directional
+
+    quarterly=dict(p.get("quarterly",{}) or {})
+    q_support=0.0
+    if quarterly.get("available"):
+        qdir=str(quarterly.get("direction") or "NEUTRO")
+        qvote=1.0 if qdir=="COMPRA" else -1.0 if qdir=="VENDA" else 0.0
+        qquality=max(0.0,min(100.0,_finite(quarterly.get("quality",0))))
+        q_support=12.0*qvote*(qquality/100.0)
+        reasons.append(
+            f"Quarterly {quarterly.get('quarter_label','—')}: "
+            f"{quarterly.get('event','SEM EVENTO')} · {qdir}."
+        )
+        if str(quarterly.get("side_alignment"))=="CONTRÁRIO":
+            risks.append("Quarterly atual está contrário ao lado macro; observação de pesquisa, sem veto operacional.")
+        if quarterly.get("phase_hint"):
+            reasons.append(
+                f"Fase temporal: {quarterly.get('phase_hint')} (rótulo educacional, não preditivo)."
+            )
+    else:
+        reasons.append("Quarterly: sem evidência temporal suficiente.")
+
+    intermarket=dict(p.get("intermarket",{}) or {})
+    im_support=0.0
+    if intermarket.get("available"):
+        im_balance=_finite(intermarket.get("balance",0))
+        im_quality=max(0.0,min(100.0,_finite(intermarket.get("quality",0))))
+        im_support=0.15*im_balance*(im_quality/100.0)
+        for reason in list(intermarket.get("reasons",[]) or [])[:3]:
+            reasons.append("Intermarket: "+str(reason))
+        if str(intermarket.get("direction")) not in {"NEUTRO","INDISPONÍVEL"}:
+            expected="COMPRA" if side=="BUY" else "VENDA" if side=="SELL" else "NEUTRO"
+            if expected!="NEUTRO" and str(intermarket.get("direction"))!=expected:
+                risks.append("Intermarket diverge do lado macro; não altera o Gate nesta fase de pesquisa.")
+    else:
+        reasons.append("Intermarket: aguardando pelo menos dois grupos independentes atuais.")
+
+    inst_map=dict(p.get("inst",{}) or {})
+    for key,label in (
+        ("structure","BOS/CHOCH"),("order_block","Order Block"),
+        ("liquidity","Draw on Liquidity"),("session","Sessão/Judas"),
+        ("displacement","Displacement"),("mss","MSS"),("smt","SMT"),
+        ("dealing_range","Premium/Discount"),("pd_array","Breaker/Mitigation"),
+    ):
+        comp=dict(inst_map.get(key,{}) or {})
+        status=str(comp.get("status") or "").strip()
+        if status:
+            reasons.append(f"{label}: {status}.")
+
+    balance=_clip(vote_balance+readiness_support+q_support+im_support)
 
     if ict>0:
         reasons.append(f"ICT readiness {ict:.0f}/100.")
@@ -419,9 +467,11 @@ def technical_flow_layer(pack:Mapping[str,Any]|None)->dict[str,Any]:
         quality=quality,
         reasons=reasons,
         risks=risks,
-        detail="Top-down + ICT/SMC + fluxo institucional já calculados; camada observacional.",
+        detail=(
+            "Top-down + ICT/SMC + estrutura/liquidez/sessão + Quarterly e "
+            "intermarket quando houver evidência independente. Camada observacional."
+        ),
     )
-
 
 def build_market_layers(
     pack:Mapping[str,Any]|None,
