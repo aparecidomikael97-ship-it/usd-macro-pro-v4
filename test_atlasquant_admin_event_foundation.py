@@ -14,6 +14,9 @@ from atlasquant_admin_research_panel import (
     normalize_weekly_research_csv,
     behavior_stats_from_frame,
     behavior_template_csv,
+    _journal_records_from_frame,
+    _match_forward_summary,
+    _research_history_rows,
 )
 from atlasquant_position_event_manager import (
     EventContext,
@@ -82,6 +85,45 @@ class AdminResearchPanelTests(unittest.TestCase):
         self.assertIsNotNone(recent)
         self.assertEqual(baseline.sample_size,100)
         self.assertEqual(recent.sample_size,30)
+
+    def test_forward_summary_matching_handles_strategy_aliases(self):
+        summaries={
+            "fvg":{"forward_samples":25,"forward_expectancy_r":0.2},
+            "amd_po3":{"forward_samples":30,"forward_expectancy_r":0.1},
+        }
+        matched,row=_match_forward_summary("FVG",summaries)
+        self.assertEqual(matched,"fvg")
+        self.assertEqual(row["forward_samples"],25)
+        matched2,row2=_match_forward_summary("AMD / Power of Three",summaries)
+        self.assertEqual(matched2,"amd_po3")
+        self.assertEqual(row2["forward_samples"],30)
+
+    def test_journal_csv_block_lists_are_normalized(self):
+        frame=pd.DataFrame([{
+            "setup_id":"fvg",
+            "hard_blocks":"event|data",
+            "soft_blocks":"m15;spread",
+        }])
+        row=_journal_records_from_frame(frame)[0]
+        self.assertEqual(row["hard_blocks"],["event","data"])
+        self.assertEqual(row["soft_blocks"],["m15","spread"])
+
+    def test_research_history_rows_are_compact_and_descriptive(self):
+        rows=_research_history_rows([{
+            "record_id":"abcdef123456789",
+            "strategy":"FVG",
+            "captured_at":"2026-09-20T12:00:00Z",
+            "source":"BACKTEST",
+            "pair":"EUR/USD",
+            "passport":{"state":"TESTING"},
+            "evidence":{"evidence_ladder":{
+                "state":"PAPER_EVIDENCE_PENDING",
+                "evidence_coverage_pct":60,
+            }},
+        }])
+        self.assertEqual(rows[0]["record_id"],"abcdef123456")
+        self.assertEqual(rows[0]["evidence_state"],"PAPER_EVIDENCE_PENDING")
+        self.assertEqual(rows[0]["evidence_coverage_pct"],60)
 
     def test_admin_snapshot_never_promotes_or_changes_strategy(self):
         backtest={
