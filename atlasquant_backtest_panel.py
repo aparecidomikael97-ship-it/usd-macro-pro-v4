@@ -59,6 +59,12 @@ from atlasquant_backtest_snapshot_history import (
     restore_history_archive,
 )
 from atlasquant_tradingview_parity import validate_tradingview_parity
+from atlasquant_backtest_intelligence import backtest_intelligence_bundle
+from atlasquant_backtest_context import (
+    context_template_csv,
+    enrich_signals_point_in_time,
+    normalize_context_snapshots,
+)
 
 
 CANDLE_ALIASES = {
@@ -80,6 +86,19 @@ SIGNAL_ALIASES = {
     "target": ("target", "tp", "take_profit", "takeprofit", "alvo"),
     "source": ("source", "fonte"),
     "notes": ("notes", "observacoes", "observações", "obs"),
+    "decision_captured_at": ("decision_captured_at", "captured_at", "snapshot_time"),
+    "macro_alignment": ("macro_alignment", "macro", "macro_context"),
+    "technical_confirmation": ("technical_confirmation", "technical_ok", "tecnico_confirmado"),
+    "liquidity_confirmation": ("liquidity_confirmation", "liquidity_ok", "liquidez_confirmada"),
+    "regime_fit": ("regime_fit", "regime_ok", "regime_alinhado"),
+    "regime": ("regime", "market_regime"),
+    "known_high_impact_event": ("known_high_impact_event", "high_impact_event", "evento_alto_impacto"),
+    "data_quality_pct": ("data_quality_pct", "data_quality", "qualidade_dados"),
+    "plan_followed": ("plan_followed", "followed_plan", "plano_seguido"),
+    "event_time": ("event_time", "news_time", "noticia_hora"),
+    "event_label": ("event_label", "event", "news_event", "evento"),
+    "event_impact": ("event_impact", "impact", "impacto"),
+    "event_known_before_entry": ("event_known_before_entry", "event_known", "evento_conhecido_antes"),
 }
 
 
@@ -163,12 +182,25 @@ def normalize_signal_sheet(df: pd.DataFrame, default_pair: str = "") -> pd.DataF
     for c in ("entry", "stop", "target"):
         out[c] = pd.to_numeric(out[c], errors="coerce")
 
-    cols = ["signal_time", "pair", "setup", "session", "side", "entry", "stop", "target", "source", "notes"]
-    return out.reindex(columns=cols)
+    cols = [
+        "signal_time", "pair", "setup", "session", "side", "entry", "stop", "target", "source", "notes",
+        "decision_captured_at", "macro_alignment", "technical_confirmation",
+        "liquidity_confirmation", "regime_fit", "regime", "known_high_impact_event",
+        "data_quality_pct", "plan_followed", "event_time", "event_label", "event_impact",
+        "event_known_before_entry",
+    ]
+    existing=[col for col in cols if col in out.columns]
+    return out.reindex(columns=existing)
 
 
 def signal_template_csv() -> str:
-    fields = ["signal_time", "pair", "setup", "session", "side", "entry", "stop", "target", "source", "notes"]
+    fields = [
+        "signal_time", "pair", "setup", "session", "side", "entry", "stop", "target", "source", "notes",
+        "decision_captured_at", "macro_alignment", "technical_confirmation",
+        "liquidity_confirmation", "regime_fit", "regime", "known_high_impact_event",
+        "data_quality_pct", "plan_followed", "event_time", "event_label", "event_impact",
+        "event_known_before_entry",
+    ]
     buf = io.StringIO()
     csv.writer(buf).writerow(fields)
     return buf.getvalue()
@@ -298,15 +330,89 @@ def _render_result_block(
         st.markdown("#### Por sessão")
         st.dataframe(by_session, width="stretch", hide_index=True)
 
-    return {"status": "DONE", "metrics": metrics, "rows": results}
+    strategy_names=[
+        str(x.get("setup") or "").strip()
+        for x in results
+        if str(x.get("setup") or "").strip()
+    ]
+    strategy_name=(
+        strategy_names[0]
+        if strategy_names and len(set(strategy_names))==1
+        else f"BACKTEST_{key_suffix.upper()}"
+    )
+    intelligence=backtest_intelligence_bundle(results,strategy=strategy_name)
+    st.session_state["atlasquant_last_backtest_intelligence"]=intelligence
+
+    st.markdown("#### 🔎 Por que deu gain ou loss?")
+    st.caption(
+        "O AtlasQuant separa o resultado mecânico do trade da qualidade da decisão. "
+        "Sem snapshot histórico de macro/notícia/regime, esses fatores ficam como desconhecidos — "
+        "o sistema não inventa uma causa olhando o futuro."
+    )
+    diagnosis_df=pd.DataFrame(intelligence["diagnosis_table"])
+    if diagnosis_df.empty:
+        st.info("Nenhum trade executado para diagnosticar.")
+    else:
+        st.dataframe(diagnosis_df,width="stretch",hide_index=True)
+        st.download_button(
+            "📥 Baixar diagnóstico gain/loss (CSV)",
+            data=diagnosis_df.to_csv(index=False),
+            file_name=f"atlasquant_diagnostico_{pair.replace('/','_')}_{key_suffix}.csv",
+            mime="text/csv",
+            key=f"atlasquant_bt_export_diagnosis_{key_suffix}",
+        )
+        rich=intelligence.get("rich_context_pct")
+        if rich is None:
+            st.caption("Cobertura contextual: sem trades executados.")
+        elif float(rich)<100:
+            st.warning(
+                f"Diagnóstico contextual completo em {float(rich):.1f}% dos trades. "
+                "Para investigar macro/notícia/regime de forma histórica, inclua as colunas point-in-time "
+                "no CSV de sinais. O resultado mecânico continua disponível em todas as operações executadas."
+            )
+        else:
+            st.success("Todos os trades executados possuem contexto point-in-time suficiente para diagnóstico completo.")
+
+    cause_df=pd.DataFrame(intelligence.get("cause_summary",[]) or [])
+    if not cause_df.empty:
+        st.markdown("##### Padrões recorrentes de gain/loss")
+        st.caption(
+            "Frequência de fatores registrados por resultado. É associação descritiva, não prova de causalidade."
+        )
+        st.dataframe(cause_df,width="stretch",hide_index=True)
+
+    passport=dict(intelligence["passport"])
+    st.markdown("#### 🪪 Passaporte do Operacional")
+    p1,p2,p3,p4=st.columns(4)
+    observed=dict(passport.get("observed_metrics",{}) or {})
+    coverage=dict(passport.get("coverage",{}) or {})
+    p1.metric("Amostra",int(observed.get("trades",0) or 0))
+    p2.metric("Expectativa observada",f"{float(observed.get('expectancy_r',0.0) or 0.0):+.2f}R")
+    p3.metric("Drawdown",f"{float(observed.get('max_drawdown_r',0.0) or 0.0):.2f}R")
+    p4.metric("Regimes cobertos",int(coverage.get("regimes",0) or 0))
+    flags=list(passport.get("evidence_flags",[]) or [])
+    if flags:
+        st.warning("Lacunas de validação: "+" · ".join(str(x) for x in flags))
+    else:
+        st.info("Nenhuma lacuna do contrato atual foi detectada; ainda assim a promoção é somente por revisão humana.")
+    st.caption(passport.get("interpretation",""))
+    st.caption("Promoção automática: DESLIGADA · Execução real: DESLIGADA")
+
+    return {
+        "status": "DONE",
+        "metrics": metrics,
+        "rows": results,
+        "intelligence": intelligence,
+        "passport": passport,
+    }
 
 
 def render_operational_backtest_panel() -> dict[str, Any]:
     st.markdown("### 🧪 Backtest Operacional — TradingView → AtlasQuant")
     st.caption(
         "Importe candles OHLC exportados do TradingView. Você pode usar uma planilha "
-        "de sinais explícitos ou deixar o AtlasQuant fazer replay automático do "
-        "BOS/CHOCH + Order Block, candle a candle, para pesquisa histórica."
+        "de sinais explícitos ou deixar o AtlasQuant fazer replay automático dos modelos objetivos. "
+        "Cada trade executado recebe diagnóstico de gain/loss e Passaporte de evidência, sem look-ahead."
     )
 
     c1, c2 = st.columns(2)
@@ -336,6 +442,50 @@ def render_operational_backtest_panel() -> dict[str, Any]:
             mime="text/csv",
             key="atlasquant_bt_signals_template",
         )
+
+    with st.expander("🕰️ Contexto histórico point-in-time (opcional)",expanded=False):
+        st.caption(
+            "Envie snapshots históricos de macro, notícia, regime, liquidez e qualidade. "
+            "Para cada sinal, o AtlasQuant usa somente o último snapshot capturado ATÉ o horário do sinal. "
+            "Snapshot futuro nunca é usado para explicar um trade passado."
+        )
+        context_file=st.file_uploader(
+            "3) Contexto histórico (CSV)",
+            type=["csv"],
+            key="atlasquant_bt_context_csv",
+        )
+        st.download_button(
+            "⬇️ Modelo CSV de contexto histórico",
+            data=context_template_csv(),
+            file_name="atlasquant_contexto_historico_template.csv",
+            mime="text/csv",
+            key="atlasquant_bt_context_template",
+        )
+        context_snapshots=pd.DataFrame()
+        if context_file is not None:
+            try:
+                context_raw=read_csv_bytes(context_file.getvalue())
+                context_snapshots=normalize_context_snapshots(context_raw)
+            except Exception as exc:
+                st.error(f"Contexto histórico inválido: {type(exc).__name__}: {exc}")
+                context_snapshots=pd.DataFrame()
+            if context_snapshots.empty:
+                st.warning("O CSV de contexto não possui captured_at + pair válidos.")
+            else:
+                st.success(
+                    f"{len(context_snapshots)} snapshot(s) point-in-time prontos para enriquecer os sinais."
+                )
+    if "context_snapshots" not in locals():
+        context_snapshots=pd.DataFrame()
+
+    def _enrich_with_historical_context(signals):
+        pack=enrich_signals_point_in_time(signals,context_snapshots)
+        if not context_snapshots.empty:
+            st.caption(
+                f"Contexto point-in-time: {int(pack['matched'])} sinal(is) enriquecido(s), "
+                f"{int(pack['unmatched'])} sem snapshot anterior disponível."
+            )
+        return list(pack.get("signals",[]) or [])
 
     pine_asset = load_tradingview_pine_asset()
     st.markdown("#### Pine Script — BOS/CHOCH + Order Block")
@@ -488,6 +638,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                     allow_buy="BUY" in auto_sides,
                     allow_sell="SELL" in auto_sides,
                 )
+                auto_signals=_enrich_with_historical_context(auto_signals)
                 st.caption(
                     f"Replay encontrou {len(auto_signals)} setup(s) objetivo(s) em "
                     f"{len(auto_candles)} candle(s)."
@@ -572,6 +723,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                     allow_buy="BUY" in fvg_sides,
                     allow_sell="SELL" in fvg_sides,
                 )
+                fvg_signals=_enrich_with_historical_context(fvg_signals)
                 st.caption(
                     f"Replay FVG encontrou {len(fvg_signals)} setup(s) em "
                     f"{len(fvg_candles)} candle(s)."
@@ -656,6 +808,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                     allow_buy="BUY" in ote_sides,
                     allow_sell="SELL" in ote_sides,
                 )
+                ote_signals=_enrich_with_historical_context(ote_signals)
                 st.caption(
                     f"Replay OTE encontrou {len(ote_signals)} setup(s) em "
                     f"{len(ote_candles)} candle(s)."
@@ -727,6 +880,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                     allow_buy="BUY" in crt_sides,
                     allow_sell="SELL" in crt_sides,
                 )
+                crt_signals=_enrich_with_historical_context(crt_signals)
                 st.caption(
                     f"Replay CRT encontrou {len(crt_signals)} setup(s) em "
                     f"{len(crt_candles)} candle(s)."
@@ -812,6 +966,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                     allow_buy="BUY" in amd_sides,
                     allow_sell="SELL" in amd_sides,
                 )
+                amd_signals=_enrich_with_historical_context(amd_signals)
                 st.caption(
                     f"Replay AMD encontrou {len(amd_signals)} setup(s) em "
                     f"{len(amd_candles)} candle(s)."
@@ -951,6 +1106,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                     max_hold_bars=int(max_hold),
                     cost_r=float(cost_r),
                     slippage_r=float(slippage_r),
+                    context_snapshots=context_snapshots,
                 )
                 comparison=comparison_frame(
                     suite,
@@ -1170,6 +1326,46 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                     width="stretch",
                     hide_index=True,
                 )
+
+                suite_intelligence={}
+                passport_rows=[]
+                for strategy_id,pack in suite.items():
+                    intel=backtest_intelligence_bundle(
+                        list(pack.get("results",[]) or []),
+                        strategy=str(pack.get("label") or strategy_id),
+                    )
+                    suite_intelligence[strategy_id]=intel
+                    passport=dict(intel.get("passport",{}) or {})
+                    observed=dict(passport.get("observed_metrics",{}) or {})
+                    coverage=dict(passport.get("coverage",{}) or {})
+                    passport_rows.append({
+                        "strategy":strategy_id,
+                        "operacional":str(pack.get("label") or strategy_id),
+                        "trades":int(observed.get("trades",0) or 0),
+                        "expectancy_r":observed.get("expectancy_r"),
+                        "profit_factor":observed.get("profit_factor"),
+                        "max_drawdown_r":observed.get("max_drawdown_r"),
+                        "assets":int(coverage.get("assets",0) or 0),
+                        "sessions":int(coverage.get("sessions",0) or 0),
+                        "regimes":int(coverage.get("regimes",0) or 0),
+                        "context_complete_pct":intel.get("rich_context_pct"),
+                        "passport_state":passport.get("state"),
+                        "evidence_gaps":" · ".join(str(x) for x in passport.get("evidence_flags",[]) or []),
+                        "automatic_promotion":False,
+                    })
+                st.session_state["atlasquant_last_strategy_suite_intelligence"]={
+                    "pair":default_pair,
+                    "strategies":suite_intelligence,
+                    "passport_rows":passport_rows,
+                    "automatic_promotion":False,
+                    "real_orders_enabled":False,
+                }
+                st.markdown("#### 🪪 Passaportes dos 5 operacionais")
+                st.caption(
+                    "O Passaporte junta amostra, drawdown, cobertura e lacunas de validação. "
+                    "Ele não escolhe automaticamente o melhor operacional e não libera execução."
+                )
+                st.dataframe(pd.DataFrame(passport_rows),width="stretch",hide_index=True)
 
                 evidence_settings={
                     "pair":default_pair,
@@ -1461,6 +1657,14 @@ def render_operational_backtest_panel() -> dict[str, Any]:
 
     candles = normalize_tradingview_candles(raw_candles)
     signals = normalize_signal_sheet(raw_signals, default_pair=default_pair)
+    if not signals.empty:
+        enriched_manual=enrich_signals_point_in_time(_records(signals),context_snapshots)
+        signals=pd.DataFrame(enriched_manual.get("signals",[]) or [])
+        if not context_snapshots.empty:
+            st.caption(
+                f"Planilha manual enriquecida com contexto: {int(enriched_manual['matched'])} sinal(is); "
+                f"{int(enriched_manual['unmatched'])} sem snapshot anterior."
+            )
     if candles.empty:
         st.error("CSV de candles sem datetime/open/high/low/close válidos.")
         return {"status": "INVALID_CANDLES"}

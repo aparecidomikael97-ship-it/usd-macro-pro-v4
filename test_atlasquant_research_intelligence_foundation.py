@@ -20,6 +20,17 @@ from atlasquant_operational_passport import (
 )
 from atlasquant_weekly_profile import analyze_weekly_extremes
 from atlasquant_behavior_shift import BehaviorStats, detect_behavior_shift
+from atlasquant_backtest_intelligence import (
+    backtest_intelligence_bundle,
+    build_passport_from_backtest,
+    diagnose_backtest_record,
+    diagnosis_cause_summary,
+)
+from atlasquant_backtest_context import (
+    context_template_csv,
+    enrich_signals_point_in_time,
+    normalize_context_snapshots,
+)
 from atlasquant_post_trade_diagnosis import (
     DecisionSnapshot,
     DuringTradeEvent,
@@ -122,6 +133,26 @@ class OperationalPassportTests(unittest.TestCase):
         self.assertIsNone(out["profit_probability"])
         self.assertEqual(out["paper"]["gap_vs_backtest_r"],-0.04)
 
+    def test_passport_accepts_unknown_data_quality_as_evidence_gap(self):
+        out=build_operational_passport(OperationalPassportInput(
+            strategy="FVG",
+            state="TESTING",
+            trades=80,
+            expectancy_r=0.15,
+            profit_factor=1.2,
+            net_r=12.0,
+            max_drawdown_r=5.0,
+            assets_covered=2,
+            sessions_covered=2,
+            regimes_covered=2,
+            paper_trades=0,
+            paper_expectancy_r=None,
+            data_quality_pct=None,
+        ))
+        self.assertIsNone(out["data_quality_pct"])
+        self.assertIn("qualidade dos dados não registrada",out["evidence_flags"])
+        self.assertFalse(out["eligible_for_human_review"])
+
     def test_passport_flags_small_or_narrow_evidence(self):
         out=build_operational_passport(OperationalPassportInput(
             strategy="NEW",
@@ -197,6 +228,181 @@ class BehaviorShiftTests(unittest.TestCase):
         self.assertEqual(out["state"],"INSUFFICIENT_SAMPLE")
         self.assertFalse(out["sample_sufficient"])
         self.assertEqual(out["change_count"],0)
+
+
+class BacktestContextTests(unittest.TestCase):
+    def test_join_uses_latest_snapshot_before_signal_only(self):
+        context=pd.DataFrame([
+            {
+                "captured_at":"2026-09-20T11:00:00Z","pair":"EUR/USD",
+                "macro_alignment":-1,"regime":"RANGE","data_quality_pct":80,
+            },
+            {
+                "captured_at":"2026-09-20T11:55:00Z","pair":"EUR/USD",
+                "macro_alignment":1,"regime":"TREND","data_quality_pct":95,
+            },
+            {
+                "captured_at":"2026-09-20T12:05:00Z","pair":"EUR/USD",
+                "macro_alignment":-1,"regime":"FUTURE","data_quality_pct":99,
+            },
+        ])
+        signal={
+            "signal_time":"2026-09-20T12:00:00Z",
+            "pair":"EUR/USD","side":"BUY","entry":1.1,"stop":1.09,"target":1.12,
+        }
+        out=enrich_signals_point_in_time([signal],context)
+        self.assertEqual(out["matched"],1)
+        self.assertFalse(out["future_context_used"])
+        enriched=out["signals"][0]
+        self.assertEqual(enriched["macro_alignment"],1)
+        self.assertEqual(enriched["regime"],"TREND")
+        self.assertNotEqual(enriched["regime"],"FUTURE")
+        self.assertTrue(str(enriched["decision_captured_at"]).startswith("2026-09-20T11:55:00"))
+
+    def test_explicit_signal_metadata_is_never_overwritten(self):
+        context=pd.DataFrame([{
+            "captured_at":"2026-09-20T11:55:00Z","pair":"EUR/USD",
+            "macro_alignment":-1,"regime":"RANGE",
+        }])
+        signal={
+            "signal_time":"2026-09-20T12:00:00Z","pair":"EUR/USD",
+            "macro_alignment":1,"regime":"TREND",
+        }
+        out=enrich_signals_point_in_time([signal],context)
+        self.assertEqual(out["signals"][0]["macro_alignment"],1)
+        self.assertEqual(out["signals"][0]["regime"],"TREND")
+        self.assertEqual(out["overwritten_explicit_fields"],0)
+
+    def test_context_template_and_normalization_require_provenance_time_and_pair(self):
+        self.assertIn("captured_at,pair",context_template_csv())
+        normalized=normalize_context_snapshots(pd.DataFrame({
+            "snapshot_time":["2026-09-20T11:00:00Z"],
+            "par":["EUR/USD"],
+            "macro":[1],
+        }))
+        self.assertEqual(len(normalized),1)
+        self.assertEqual(normalized.iloc[0]["pair"],"EUR/USD")
+        self.assertEqual(normalized.iloc[0]["macro_alignment"],1)
+
+
+class BacktestIntelligenceTests(unittest.TestCase):
+    def test_incomplete_context_explains_mechanics_without_inventing_macro(self):
+        row={
+            "signal_time":"2026-09-20T11:55:00+00:00",
+            "entry_time":"2026-09-20T12:00:00+00:00",
+            "exit_time":"2026-09-20T12:30:00+00:00",
+            "pair":"EUR/USD",
+            "setup":"FVG",
+            "side":"BUY",
+            "status":"STOP",
+            "outcome":"LOSS",
+            "net_r":-1.0,
+            "cost_r":0.0,
+            "slippage_r":0.0,
+        }
+        out=diagnose_backtest_record(row)
+        self.assertFalse(out["context_diagnosis_available"])
+        self.assertEqual(out["decision_outcome_relation"],"CONTEXT_INCOMPLETE")
+        self.assertGreater(len(out["missing_context"]),0)
+        self.assertIn("stop",out["probable_explanations"][0]["detail"].lower())
+        self.assertFalse(out["causality_claimed"])
+        self.assertFalse(out["lookahead_used"])
+
+    def test_full_point_in_time_context_diagnoses_gain_quality_separately(self):
+        row={
+            "trade_id":"FULL-1",
+            "signal_time":"2026-09-20T11:55:00+00:00",
+            "decision_captured_at":"2026-09-20T11:55:00+00:00",
+            "entry_time":"2026-09-20T12:00:00+00:00",
+            "exit_time":"2026-09-20T12:45:00+00:00",
+            "pair":"EUR/USD",
+            "setup":"FVG",
+            "side":"SELL",
+            "status":"TARGET",
+            "outcome":"GAIN",
+            "net_r":1.8,
+            "cost_r":0.1,
+            "slippage_r":0.1,
+            "macro_alignment":-1,
+            "technical_confirmation":False,
+            "liquidity_confirmation":True,
+            "regime_fit":False,
+            "known_high_impact_event":True,
+            "data_quality_pct":52,
+            "plan_followed":False,
+            "event_time":"2026-09-20T12:20:00+00:00",
+            "event_label":"CPI",
+            "event_impact":"HIGH",
+            "event_known_before_entry":False,
+        }
+        out=diagnose_backtest_record(row)
+        self.assertTrue(out["context_diagnosis_available"])
+        self.assertEqual(out["context_coverage_pct"],100.0)
+        self.assertEqual(out["decision_outcome_relation"],"GAIN_WITH_WEAK_DECISION_QUALITY")
+        codes={x["code"] for x in out["risk_or_failure_factors"]}
+        self.assertIn("MACRO_CONFLICT",codes)
+        self.assertIn("TECH_UNCONFIRMED",codes)
+        self.assertIn("REGIME_MISMATCH",codes)
+        self.assertIn("KNOWN_EVENT_RISK",codes)
+        self.assertIn("HIGH_IMPACT_DURING_TRADE",codes)
+        self.assertFalse(out["causality_claimed"])
+
+    def test_passport_from_backtest_marks_missing_quality_and_paper(self):
+        rows=[
+            {"pair":"EUR/USD","setup":"FVG","session":"London","outcome":"GAIN","net_r":2.0},
+            {"pair":"EUR/USD","setup":"FVG","session":"London","outcome":"LOSS","net_r":-1.0},
+        ]
+        out=build_passport_from_backtest(rows,strategy="FVG")
+        self.assertEqual(out["state"],"TESTING")
+        self.assertFalse(out["automatic_promotion"])
+        self.assertIn("qualidade dos dados não registrada",out["evidence_flags"])
+        self.assertIn("paper trading ainda insuficiente",out["evidence_flags"])
+
+    def test_cause_summary_counts_loss_factors_without_calling_them_causal(self):
+        diagnoses=[
+            {
+                "outcome":"LOSS",
+                "probable_explanations":[
+                    {"code":"STOP_HIT","detail":"stop","confidence":"HIGH"},
+                    {"code":"MACRO_CONFLICT","detail":"macro contra","confidence":"HIGH"},
+                ],
+            },
+            {
+                "outcome":"LOSS",
+                "probable_explanations":[
+                    {"code":"STOP_HIT","detail":"stop","confidence":"HIGH"},
+                    {"code":"MACRO_CONFLICT","detail":"macro contra","confidence":"HIGH"},
+                ],
+            },
+            {
+                "outcome":"GAIN",
+                "probable_explanations":[
+                    {"code":"TARGET_HIT","detail":"alvo","confidence":"HIGH"},
+                ],
+            },
+        ]
+        rows=diagnosis_cause_summary(diagnoses)
+        macro=[x for x in rows if x["outcome"]=="LOSS" and x["code"]=="MACRO_CONFLICT"][0]
+        self.assertEqual(macro["trades"],2)
+        self.assertEqual(macro["share_of_outcome_pct"],100.0)
+        self.assertFalse(macro["causality_claimed"])
+
+    def test_bundle_keeps_diagnosis_and_passport_together(self):
+        rows=[
+            {
+                "signal_time":"2026-09-20T11:55:00+00:00",
+                "entry_time":"2026-09-20T12:00:00+00:00",
+                "exit_time":"2026-09-20T12:30:00+00:00",
+                "pair":"EUR/USD","setup":"FVG","session":"London",
+                "side":"BUY","status":"TARGET","outcome":"GAIN","net_r":2.0,
+            }
+        ]
+        out=backtest_intelligence_bundle(rows,strategy="FVG")
+        self.assertEqual(out["executed_trades"],1)
+        self.assertEqual(out["rich_context_trades"],0)
+        self.assertEqual(out["passport"]["strategy"],"FVG")
+        self.assertFalse(out["automatic_execution"])
+        self.assertFalse(out["automatic_promotion"])
 
 
 class PostTradeDiagnosisTests(unittest.TestCase):

@@ -118,6 +118,13 @@ except Exception as _backtest_exc:
     render_operational_backtest_panel = None
     _ATLASQUANT_BACKTEST_IMPORT_ERROR = f"{type(_backtest_exc).__name__}: {_backtest_exc}"
 
+try:
+    from atlasquant_admin_research_panel import render_admin_research_panel
+    _ATLASQUANT_ADMIN_RESEARCH_IMPORT_ERROR = ""
+except Exception as _admin_research_exc:
+    render_admin_research_panel = None
+    _ATLASQUANT_ADMIN_RESEARCH_IMPORT_ERROR = f"{type(_admin_research_exc).__name__}: {_admin_research_exc}"
+
 
 try:
     from atlasquant_stability_lab import render_stability_lab
@@ -9218,6 +9225,17 @@ if _aq_active_index == 13:
         except Exception as _v105_render_exc:
             st.error("A aba Melhorias V10.5 encontrou um erro, mas o motor operacional continua preservado.")
             st.code(f"{type(_v105_render_exc).__name__}: {_v105_render_exc}")
+
+    st.divider()
+    if render_admin_research_panel is None:
+        if _ATLASQUANT_ADMIN_RESEARCH_IMPORT_ERROR:
+            st.caption("Inteligência Admin indisponível: "+_ATLASQUANT_ADMIN_RESEARCH_IMPORT_ERROR)
+    else:
+        try:
+            render_admin_research_panel(_ATLASQUANT_ACCESS)
+        except Exception as _admin_research_render_exc:
+            st.warning("Inteligência dos Operacionais em modo seguro; nenhuma promoção foi realizada.")
+            st.caption(f"Diagnóstico Admin Research: {type(_admin_research_render_exc).__name__}: {_admin_research_render_exc}")
 
     st.divider()
     if render_shadow_mode_panel is None:

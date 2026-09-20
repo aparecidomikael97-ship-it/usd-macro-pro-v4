@@ -23,6 +23,23 @@ import pandas as pd
 REQUIRED_CANDLE_COLUMNS = ("datetime", "open", "high", "low", "close")
 REQUIRED_SIGNAL_FIELDS = ("signal_time", "side", "entry", "stop", "target")
 
+OPTIONAL_DIAGNOSTIC_FIELDS = (
+    "trade_id",
+    "decision_captured_at",
+    "macro_alignment",
+    "technical_confirmation",
+    "liquidity_confirmation",
+    "regime_fit",
+    "regime",
+    "known_high_impact_event",
+    "data_quality_pct",
+    "plan_followed",
+    "event_time",
+    "event_label",
+    "event_impact",
+    "event_known_before_entry",
+)
+
 
 def _finite(value: Any) -> float | None:
     try:
@@ -30,6 +47,20 @@ def _finite(value: Any) -> float | None:
         return out if math.isfinite(out) else None
     except Exception:
         return None
+
+
+def _present(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value,str):
+        return bool(value.strip())
+    try:
+        missing=pd.isna(value)
+        if isinstance(missing,bool) and missing:
+            return False
+    except Exception:
+        pass
+    return True
 
 
 def normalize_candles(frame: pd.DataFrame | None) -> pd.DataFrame:
@@ -144,6 +175,9 @@ def backtest_signal(
         "source": str(signal.get("source", "ATLASQUANT")),
         "notes": str(signal.get("notes", "")),
     }
+    for field in OPTIONAL_DIAGNOSTIC_FIELDS:
+        if field in signal and _present(signal.get(field)):
+            base[field] = signal.get(field)
     if not ok:
         return {
             **base,
@@ -347,6 +381,11 @@ def backtest_many(
                 "session":str(signal.get("session","")),
                 "source":str(signal.get("source","ATLASQUANT")),
                 "notes":str(signal.get("notes","")),
+                **{
+                    field: signal.get(field)
+                    for field in OPTIONAL_DIAGNOSTIC_FIELDS
+                    if field in signal and _present(signal.get(field))
+                },
                 "signal_time":signal_ts,
                 "side":str(signal.get("side","")).upper(),
                 "status":"OVERLAP_BLOCKED",

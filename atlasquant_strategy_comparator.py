@@ -23,6 +23,7 @@ from atlasquant_fvg_replay import generate_fvg_signals
 from atlasquant_ote_replay import generate_ote_signals
 from atlasquant_crt_replay import generate_crt_signals
 from atlasquant_amd_replay import generate_amd_signals
+from atlasquant_backtest_context import enrich_signals_point_in_time
 
 
 STRATEGY_ORDER = (
@@ -77,12 +78,17 @@ def run_strategy_suite(
     max_hold_bars: int = 96,
     cost_r: float = 0.0,
     slippage_r: float = 0.0,
+    context_snapshots: pd.DataFrame | None = None,
 ) -> "OrderedDict[str, dict[str, Any]]":
     """Generate + backtest all five strategies without mixing their trades."""
     signals_by_strategy=generate_strategy_signals(candles,pair)
     suite: "OrderedDict[str, dict[str, Any]]"=OrderedDict()
     for strategy in STRATEGY_ORDER:
-        signals=signals_by_strategy.get(strategy,[])
+        signals=list(signals_by_strategy.get(strategy,[]) or [])
+        if isinstance(context_snapshots,pd.DataFrame) and not context_snapshots.empty:
+            signals=list(
+                enrich_signals_point_in_time(signals,context_snapshots).get("signals",[])
+            )
         results=backtest_many(
             {pair:candles},
             signals,
