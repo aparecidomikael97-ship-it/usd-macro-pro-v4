@@ -56,6 +56,20 @@ class AtlasQuantAcademyTests(unittest.TestCase):
         self.assertTrue(any(x["id"]=="quarterly-theory" for x in academy_search("quarterly")))
         self.assertIn("AMD",academy_topic("quarterly-amd")["title"])
 
+    def test_core_curriculum_contract_covers_macro_technical_and_risk(self):
+        required={
+            "macro-foundations","cpi","pce","nfp","pmi-ism","gdp",
+            "central-banks","fomc-dotplot","calendar-surprise","dxy-crossasset",
+            "relative-strength","liquidity-structure","fvg","ote","crt-amd",
+            "quarterly-theory","quarterly-multitimeframe","quarterly-amd",
+            "quarterly-execution","risk","atlasquant-reading",
+        }
+        ids={str(x["id"]) for x in ACADEMY_TOPICS}
+        self.assertTrue(required.issubset(ids))
+        self.assertIn("Iniciante",{x["level"] for x in ACADEMY_TOPICS})
+        self.assertIn("Intermediário",{x["level"] for x in ACADEMY_TOPICS})
+        self.assertIn("Avançado",{x["level"] for x in ACADEMY_TOPICS})
+
     def test_content_never_calls_internal_score_probability(self):
         joined=" ".join(
             str(topic[key])
