@@ -3,7 +3,7 @@ name: AtlasQuant Integration UI Smoke
 on:
   workflow_dispatch:
   push:
-    branches: [atlasquant-integration, atlasquant-release-final, atlasquant-support-final, atlasquant-support-ui, atlasquant-brokers-guide, atlasquant-voice-readiness, atlasquant-academy-media, atlasquant-commercial-prep, atlasquant-final-release-prep, atlasquant-home-radar, atlasquant-private-validation, atlasquant-fast-startup, atlasquant-voice-assistant-final]
+    branches: [atlasquant-integration, atlasquant-release-final, atlasquant-support-final, atlasquant-support-ui, atlasquant-brokers-guide, atlasquant-voice-readiness, atlasquant-academy-media, atlasquant-commercial-prep, atlasquant-final-release-prep, atlasquant-home-radar, atlasquant-private-validation, atlasquant-fast-startup, atlasquant-voice-assistant-final, atlasquant-mobile-dom-stability]
     paths:
       - "usd_macro_pro_v4_cloud.py"
       - "atlasquant_ui_v1.py"
@@ -137,13 +137,14 @@ jobs:
                       hero_count=page.locator(".aq-hero").count()
                       loading_macro="Carregando dados macroeconômicos globais" in body_text
                       radar_home="Radar de Oportunidades" in body_text
-                      visible_tab_count=page.locator('[data-testid="stTabs"] [role="tab"]:visible').count()
+                      stable_nav_count=page.locator('[data-testid="stSelectbox"]').filter(has_text="Área").count()
                       rendered=(
                           hero_count>=1
                           and "ATLASQUANT" in body_text
                           and main_count>=1
                           and not loading_macro
                           and radar_home
+                          and stable_nav_count>=1
                       )
                       if rendered:
                           break
@@ -164,7 +165,7 @@ jobs:
                       "hero_count":hero_count,
                       "loading_macro":loading_macro,
                       "radar_home":radar_home,
-                      "visible_tab_count":visible_tab_count,
+                      "stable_nav_count":stable_nav_count,
                       "streamlit_exceptions":exception_count,
                       "viewport_width":viewport_width,
                       "document_width":document_width,
@@ -182,8 +183,8 @@ jobs:
                           f"{name}: AtlasQuant hero não renderizou "
                           f"(hero={hero_count}, loading_macro={loading_macro})"
                       )
-                  if visible_tab_count!=6:
-                      failures.append(f"{name}: modo Iniciante deveria mostrar 6 abas, encontrou {visible_tab_count}")
+                  if stable_nav_count<1:
+                      failures.append(f"{name}: seletor de área estável não apareceu no modo Iniciante")
                   if exception_count:
                       failures.append(f"{name}: {exception_count} stException")
                   if page_errors:
