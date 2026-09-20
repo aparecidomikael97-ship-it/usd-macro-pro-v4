@@ -59,6 +59,7 @@ from atlasquant_backtest_snapshot_history import (
     restore_history_archive,
 )
 from atlasquant_tradingview_parity import validate_tradingview_parity
+from atlasquant_backtest_intelligence import backtest_intelligence_bundle
 
 
 CANDLE_ALIASES = {
@@ -80,6 +81,19 @@ SIGNAL_ALIASES = {
     "target": ("target", "tp", "take_profit", "takeprofit", "alvo"),
     "source": ("source", "fonte"),
     "notes": ("notes", "observacoes", "observações", "obs"),
+    "decision_captured_at": ("decision_captured_at", "captured_at", "snapshot_time"),
+    "macro_alignment": ("macro_alignment", "macro", "macro_context"),
+    "technical_confirmation": ("technical_confirmation", "technical_ok", "tecnico_confirmado"),
+    "liquidity_confirmation": ("liquidity_confirmation", "liquidity_ok", "liquidez_confirmada"),
+    "regime_fit": ("regime_fit", "regime_ok", "regime_alinhado"),
+    "regime": ("regime", "market_regime"),
+    "known_high_impact_event": ("known_high_impact_event", "high_impact_event", "evento_alto_impacto"),
+    "data_quality_pct": ("data_quality_pct", "data_quality", "qualidade_dados"),
+    "plan_followed": ("plan_followed", "followed_plan", "plano_seguido"),
+    "event_time": ("event_time", "news_time", "noticia_hora"),
+    "event_label": ("event_label", "event", "news_event", "evento"),
+    "event_impact": ("event_impact", "impact", "impacto"),
+    "event_known_before_entry": ("event_known_before_entry", "event_known", "evento_conhecido_antes"),
 }
 
 
@@ -163,12 +177,25 @@ def normalize_signal_sheet(df: pd.DataFrame, default_pair: str = "") -> pd.DataF
     for c in ("entry", "stop", "target"):
         out[c] = pd.to_numeric(out[c], errors="coerce")
 
-    cols = ["signal_time", "pair", "setup", "session", "side", "entry", "stop", "target", "source", "notes"]
-    return out.reindex(columns=cols)
+    cols = [
+        "signal_time", "pair", "setup", "session", "side", "entry", "stop", "target", "source", "notes",
+        "decision_captured_at", "macro_alignment", "technical_confirmation",
+        "liquidity_confirmation", "regime_fit", "regime", "known_high_impact_event",
+        "data_quality_pct", "plan_followed", "event_time", "event_label", "event_impact",
+        "event_known_before_entry",
+    ]
+    existing=[col for col in cols if col in out.columns]
+    return out.reindex(columns=existing)
 
 
 def signal_template_csv() -> str:
-    fields = ["signal_time", "pair", "setup", "session", "side", "entry", "stop", "target", "source", "notes"]
+    fields = [
+        "signal_time", "pair", "setup", "session", "side", "entry", "stop", "target", "source", "notes",
+        "decision_captured_at", "macro_alignment", "technical_confirmation",
+        "liquidity_confirmation", "regime_fit", "regime", "known_high_impact_event",
+        "data_quality_pct", "plan_followed", "event_time", "event_label", "event_impact",
+        "event_known_before_entry",
+    ]
     buf = io.StringIO()
     csv.writer(buf).writerow(fields)
     return buf.getvalue()
@@ -298,15 +325,81 @@ def _render_result_block(
         st.markdown("#### Por sessão")
         st.dataframe(by_session, width="stretch", hide_index=True)
 
-    return {"status": "DONE", "metrics": metrics, "rows": results}
+    strategy_names=[
+        str(x.get("setup") or "").strip()
+        for x in results
+        if str(x.get("setup") or "").strip()
+    ]
+    strategy_name=(
+        strategy_names[0]
+        if strategy_names and len(set(strategy_names))==1
+        else f"BACKTEST_{key_suffix.upper()}"
+    )
+    intelligence=backtest_intelligence_bundle(results,strategy=strategy_name)
+    st.session_state["atlasquant_last_backtest_intelligence"]=intelligence
+
+    st.markdown("#### 🔎 Por que deu gain ou loss?")
+    st.caption(
+        "O AtlasQuant separa o resultado mecânico do trade da qualidade da decisão. "
+        "Sem snapshot histórico de macro/notícia/regime, esses fatores ficam como desconhecidos — "
+        "o sistema não inventa uma causa olhando o futuro."
+    )
+    diagnosis_df=pd.DataFrame(intelligence["diagnosis_table"])
+    if diagnosis_df.empty:
+        st.info("Nenhum trade executado para diagnosticar.")
+    else:
+        st.dataframe(diagnosis_df,width="stretch",hide_index=True)
+        st.download_button(
+            "📥 Baixar diagnóstico gain/loss (CSV)",
+            data=diagnosis_df.to_csv(index=False),
+            file_name=f"atlasquant_diagnostico_{pair.replace('/','_')}_{key_suffix}.csv",
+            mime="text/csv",
+            key=f"atlasquant_bt_export_diagnosis_{key_suffix}",
+        )
+        rich=intelligence.get("rich_context_pct")
+        if rich is None:
+            st.caption("Cobertura contextual: sem trades executados.")
+        elif float(rich)<100:
+            st.warning(
+                f"Diagnóstico contextual completo em {float(rich):.1f}% dos trades. "
+                "Para investigar macro/notícia/regime de forma histórica, inclua as colunas point-in-time "
+                "no CSV de sinais. O resultado mecânico continua disponível em todas as operações executadas."
+            )
+        else:
+            st.success("Todos os trades executados possuem contexto point-in-time suficiente para diagnóstico completo.")
+
+    passport=dict(intelligence["passport"])
+    st.markdown("#### 🪪 Passaporte do Operacional")
+    p1,p2,p3,p4=st.columns(4)
+    observed=dict(passport.get("observed_metrics",{}) or {})
+    coverage=dict(passport.get("coverage",{}) or {})
+    p1.metric("Amostra",int(observed.get("trades",0) or 0))
+    p2.metric("Expectativa observada",f"{float(observed.get('expectancy_r',0.0) or 0.0):+.2f}R")
+    p3.metric("Drawdown",f"{float(observed.get('max_drawdown_r',0.0) or 0.0):.2f}R")
+    p4.metric("Regimes cobertos",int(coverage.get("regimes",0) or 0))
+    flags=list(passport.get("evidence_flags",[]) or [])
+    if flags:
+        st.warning("Lacunas de validação: "+" · ".join(str(x) for x in flags))
+    else:
+        st.info("Nenhuma lacuna do contrato atual foi detectada; ainda assim a promoção é somente por revisão humana.")
+    st.caption(passport.get("interpretation",""))
+    st.caption("Promoção automática: DESLIGADA · Execução real: DESLIGADA")
+
+    return {
+        "status": "DONE",
+        "metrics": metrics,
+        "rows": results,
+        "intelligence": intelligence,
+        "passport": passport,
+    }
 
 
 def render_operational_backtest_panel() -> dict[str, Any]:
     st.markdown("### 🧪 Backtest Operacional — TradingView → AtlasQuant")
     st.caption(
         "Importe candles OHLC exportados do TradingView. Você pode usar uma planilha "
-        "de sinais explícitos ou deixar o AtlasQuant fazer replay automático do "
-        "BOS/CHOCH + Order Block, candle a candle, para pesquisa histórica."
+        "de sinais explícitos ou deixar o AtlasQuant fazer replay automático dos modelos objetivos. "
+        "Cada trade executado recebe diagnóstico de gain/loss e Passaporte de evidência, sem look-ahead."
     )
 
     c1, c2 = st.columns(2)
