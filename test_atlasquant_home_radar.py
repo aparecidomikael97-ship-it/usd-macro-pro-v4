@@ -98,6 +98,13 @@ class AtlasQuantHomeRadarTests(unittest.TestCase):
         self.assertIn("não é garantia",script)
         self.assertIn("nem ordem para corretora",script)
 
+    def test_home_voice_reuses_shared_approved_voice_renderer(self):
+        import inspect
+        import atlasquant_home_radar as home
+        source=inspect.getsource(home.render_browser_voice)
+        self.assertIn("browser_speech_html",source)
+        self.assertNotIn("SpeechSynthesisUtterance",source)
+
     def test_adr_is_described_without_calling_it_probability(self):
         row=home_rows_from_packs([_pack()])[0]
         self.assertIn("ADR 63%",row["movement"])
