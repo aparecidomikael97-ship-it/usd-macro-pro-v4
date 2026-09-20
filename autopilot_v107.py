@@ -1276,6 +1276,45 @@ def persist_decision_evidence(packs, *, engine_version: str, repo: str, branch: 
         errors.append("Decision evidence Flight: "+flight_status["error"])
     return shadow_status,flight_status,errors
 
+def build_home_snapshot_payload(
+    inputs: Mapping[str,Any] | None,
+    packs: list[Mapping[str,Any]] | None,
+    scanner: Mapping[str,Any] | None,
+    master: Mapping[str,Any] | None,
+    intel: Mapping[str,Any] | None,
+    *,
+    now: pd.Timestamp | None = None,
+) -> dict[str,Any]:
+    """Compact already-computed state for fast interactive startup."""
+    current=utcnow() if now is None else pd.Timestamp(now)
+    current=current.tz_localize("UTC") if current.tzinfo is None else current.tz_convert("UTC")
+    src=dict(inputs or {}) if isinstance(inputs,Mapping) else {}
+    scanner_map=dict(scanner or {}) if isinstance(scanner,Mapping) else {}
+    master_map=dict(master or {}) if isinstance(master,Mapping) else {}
+    generated=str(src.get("generated_at") or current.isoformat())
+    return {
+        "schema":"ATLASQUANT_HOME_SNAPSHOT_V1",
+        "generated_at":generated,
+        "runtime_generated_at":current.isoformat(),
+        "engine_version":"V11.0.8 / AtlasQuant Runtime",
+        "inputs":src,
+        "packs":[dict(x) for x in list(packs or []) if isinstance(x,Mapping)],
+        "runtime":{
+            "market_open":bool(forex_market_likely_open(current)),
+            "scanner_pairs":len(dict(scanner_map.get("resultados",{}) or {})),
+            "market_map_pairs":len(dict(master_map.get("contexts",{}) or {})),
+            "news_available":bool(intel),
+        },
+        "safety":{
+            "real_orders":False,
+            "automatic_execution":False,
+            "automatic_gate_change":False,
+            "automatic_weight_change":False,
+            "automatic_promotion":False,
+        },
+    }
+
+
 def main() -> int:
     all_errors: list[str] = []
     total_calls = 0
@@ -1355,27 +1394,9 @@ def main() -> int:
 
     # 6.1 Compact startup snapshot — one read for the interactive beginner Home.
     # It contains only already-computed state; no provider call, gate change or execution.
-    home_snapshot={
-        "schema":"ATLASQUANT_HOME_SNAPSHOT_V1",
-        "generated_at":str(inputs.get("generated_at") or utcnow().isoformat()) if isinstance(inputs,Mapping) else utcnow().isoformat(),
-        "runtime_generated_at":utcnow().isoformat(),
-        "engine_version":"V11.0.8 / AtlasQuant Runtime",
-        "inputs":dict(inputs or {}) if isinstance(inputs,Mapping) else {},
-        "packs":list(packs or []),
-        "runtime":{
-            "market_open":bool(forex_market_likely_open()),
-            "scanner_pairs":len(dict(scanner.get("resultados",{}) or {})) if isinstance(scanner,Mapping) else 0,
-            "market_map_pairs":len(dict(master.get("contexts",{}) or {})) if isinstance(master,Mapping) else 0,
-            "news_available":bool(intel),
-        },
-        "safety":{
-            "real_orders":False,
-            "automatic_execution":False,
-            "automatic_gate_change":False,
-            "automatic_weight_change":False,
-            "automatic_promotion":False,
-        },
-    }
+    home_snapshot=build_home_snapshot_payload(
+        inputs,packs,scanner,master,intel,now=utcnow()
+    )
     home_ok,home_err=gh_put_json(
         HOME_SNAPSHOT_PATH,
         home_snapshot,
