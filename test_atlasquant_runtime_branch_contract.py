@@ -12,11 +12,14 @@ class AtlasQuantRuntimeBranchContractTests(unittest.TestCase):
         self.assertIn('GITHUB_BRANCH_HISTORICO: "atlasquant-runtime"',src)
         self.assertNotIn('GITHUB_BRANCH_HISTORICO: "main"',src)
 
-    def test_scheduled_workflow_checks_out_runtime_code_explicitly(self):
+    def test_scheduled_workflow_runs_current_main_code_and_writes_runtime_data(self):
         src=(ROOT/".github/workflows/autopilot-v107.yml").read_text(encoding="utf-8")
         normalized=src.replace('"',"")
         self.assertIn("actions/checkout@",src)
-        self.assertIn("ref: atlasquant-runtime",normalized)
+        self.assertIn("ref: main",normalized)
+        self.assertNotIn("ref: atlasquant-runtime",normalized)
+        self.assertIn("GITHUB_DATA_BRANCH: atlasquant-runtime",normalized)
+        self.assertIn("GITHUB_BRANCH_HISTORICO: atlasquant-runtime",normalized)
         self.assertIn("CHAVE_TWELVE_DATA:",src)
         self.assertIn("secrets.CHAVE_TWELVE_DATA",src)
 

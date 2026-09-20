@@ -3,13 +3,16 @@ name: AtlasQuant - Automatic Scanner + Autopilot
 on:
   workflow_dispatch:
   push:
-    branches: [atlasquant-runtime]
+    branches: [main]
     paths:
       - ".github/workflows/autopilot-v107.yml"
       - "autopilot_v107.py"
       - "autopilot_paper_v112.py"
       - "autopilot_setup_audit_v114.py"
       - "autopilot_quota_guard_v111.py"
+      - "pair_intelligence_v110.py"
+      - "atlasquant_fast_startup.py"
+      - "atlasquant_home_radar.py"
       - "paper_trading_v112.py"
       - "paper_friction_v116.py"
   schedule:
@@ -37,9 +40,10 @@ jobs:
       CHAVE_NEWSAPI: ${{ secrets.CHAVE_NEWSAPI }}
       CHAVE_EODHD: ${{ secrets.CHAVE_EODHD }}
     steps:
-      - uses: actions/checkout@v7
+      - name: Checkout current application code
+        uses: actions/checkout@v7
         with:
-          ref: atlasquant-runtime
+          ref: main
 
       - uses: actions/setup-python@v7
         with:
