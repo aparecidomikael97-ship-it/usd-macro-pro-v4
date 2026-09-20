@@ -23,6 +23,7 @@ import streamlit as st
 
 from atlasquant_layer_consensus import build_layer_consensus
 from atlasquant_macro_engine import build_structured_macro
+from atlasquant_geopolitical_engine import build_geopolitical_context
 
 SCHEMA="ATLASQUANT_MARKET_LAYERS_V1"
 LAYER_ORDER=("macro","geopolitics","micro","technical_flow")
@@ -217,81 +218,30 @@ def geopolitical_layer(
     pair:object,
     news_state:Mapping[str,Any]|None,
 )->dict[str,Any]:
-    base,quote=_pair(pair)
-    state=dict(news_state or {})
-    currencies=dict(state.get("currencies",{}) or {})
-    if not base or not quote or not currencies:
-        return _layer(
-            "geopolitics","Geopolítica",
-            available=False,
-            detail="Sem notícias estruturadas suficientes para separar geopolítica de macro.",
-        )
-
-    selected=[]
-    regime_scores=[]
-    direct={base:0.0,quote:0.0}
-    qualities=[]
-    for ccy in (base,quote):
-        cdata=dict(currencies.get(ccy,{}) or {})
-        for article in list(cdata.get("articles",[]) or []):
-            if not isinstance(article,Mapping):
-                continue
-            geo_score,tags=_geo_article_score(article)
-            if not tags:
-                continue
-            weighted=_finite(article.get("weighted_impact",0))
-            direct[ccy]+=weighted
-            regime_scores.append(geo_score)
-            qualities.append(
-                100.0
-                * max(0.0,min(1.0,_finite(article.get("recency_factor",0.5),0.5)))
-                * max(0.45,min(1.0,_finite(article.get("independence_factor",1.0),1.0)))
-            )
-            selected.append({
-                "currency":ccy,
-                "title":str(article.get("title") or ""),
-                "source":str(article.get("source") or ""),
-                "geo_score":geo_score,
-                "weighted_impact":weighted,
-                "tags":tags,
-            })
-
-    if not selected:
-        return _layer(
-            "geopolitics","Geopolítica",
-            available=False,
-            detail="Nenhuma história geopolítica identificada no conjunto atual; ausência não vira sinal neutro.",
-        )
-
-    regime=sum(regime_scores)/max(1,len(regime_scores))
-    base_sens=RISK_SENSITIVITY.get(base,0.0)
-    quote_sens=RISK_SENSITIVITY.get(quote,0.0)
-    risk_component=regime*(base_sens-quote_sens)*24.0
-    direct_component=(direct.get(base,0.0)-direct.get(quote,0.0))*18.0
-    balance=_clip(risk_component+direct_component)
-
-    top=sorted(selected,key=lambda x:abs(x["geo_score"])+abs(x["weighted_impact"]),reverse=True)[:4]
-    reasons=[]
-    for item in top:
-        tag="/".join(item["tags"])
-        source=f" · {item['source']}" if item["source"] else ""
-        reasons.append(f"{item['currency']}: {tag}{source}.")
-    risks=[
-        "Geopolítica é uma camada de contexto; manchetes podem mudar rapidamente.",
-        "Sensibilidade risk-on/risk-off é uma aproximação de pesquisa e não substitui reação observada no preço.",
-    ]
-    quality=sum(qualities)/max(1,len(qualities))
-    quality=min(85.0,quality*(min(len(selected),4)/4.0+0.25))
-    return _layer(
+    engine=build_geopolitical_context(pair,news_state)
+    out=_layer(
         "geopolitics","Geopolítica",
-        available=True,
-        balance=balance,
-        quality=quality,
-        reasons=reasons,
-        risks=risks,
-        detail=f"{len(selected)} história(s) geopolítica(s) independente(s)/calibrada(s) encontrada(s).",
+        available=bool(engine.get("available",False)),
+        balance=_finite(engine.get("balance",0)),
+        quality=_finite(engine.get("quality",0)),
+        reasons=list(engine.get("reasons",[]) or []),
+        risks=list(engine.get("risks",[]) or []),
+        detail=(
+            f"Motor geopolítico estruturado · {int(engine.get('independent_stories',0) or 0)} história(s) independente(s) · "
+            f"regime {engine.get('risk_regime','INDISPONÍVEL')} · severidade {engine.get('severity','N/D')} · "
+            f"cobertura {_finite(engine.get('coverage',0)):.0f}%. Não é previsão política nem probabilidade."
+        ),
     )
-
+    out["coverage"]=round(_finite(engine.get("coverage",0)),1)
+    out["event_count"]=int(engine.get("event_count",0) or 0)
+    out["independent_stories"]=int(engine.get("independent_stories",0) or 0)
+    out["source_count"]=int(engine.get("source_count",0) or 0)
+    out["risk_regime"]=str(engine.get("risk_regime") or "INDISPONÍVEL")
+    out["severity"]=str(engine.get("severity") or "N/D")
+    out["geo_conflict"]=bool(engine.get("geo_conflict",False))
+    out["channels"]=list(engine.get("channels",[]) or [])
+    out["events"]=list(engine.get("events",[]) or [])
+    return out
 
 def micro_fundamentals_layer(
     pair:object,
