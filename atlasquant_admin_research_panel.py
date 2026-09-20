@@ -14,6 +14,17 @@ import streamlit as st
 from atlasquant_operational_catalog import catalog_rows, catalog_summary
 from atlasquant_weekly_profile import analyze_weekly_extremes
 from atlasquant_behavior_shift import BehaviorStats, detect_behavior_shift
+from atlasquant_passport_evidence import fuse_operational_evidence
+from atlasquant_passport_drift import latest_passport_drift, passport_drift_rows
+from atlasquant_setup_journal import setup_forward_summary
+from atlasquant_shadow_mode import summarize_shadow
+from atlasquant_research_evidence_capture import (
+    SESSION_KEY as RESEARCH_SESSION_KEY,
+    STATUS_KEY as RESEARCH_STATUS_KEY,
+    ensure_research_evidence_hydrated,
+    latest_research_evidence,
+    persist_session_research_evidence,
+)
 
 SCHEMA="ATLASQUANT_ADMIN_RESEARCH_PANEL_V1"
 
@@ -120,6 +131,83 @@ def behavior_template_csv()->str:
     return header+"\n"+baseline+"\n"+recent+"\n"
 
 
+def _journal_records_from_frame(frame:pd.DataFrame|None)->list[dict[str,Any]]:
+    if not isinstance(frame,pd.DataFrame) or frame.empty:
+        return []
+    rows=[]
+    for raw in frame.to_dict("records"):
+        row=dict(raw)
+        for field in ("hard_blocks","soft_blocks"):
+            value=row.get(field)
+            if isinstance(value,str):
+                row[field]=[
+                    part.strip()
+                    for part in value.replace(";", "|").split("|")
+                    if part.strip()
+                ]
+        rows.append(row)
+    return rows
+
+
+def _strategy_key(value:object)->str:
+    return (
+        str(value or "")
+        .strip()
+        .casefold()
+        .replace(" / ","_")
+        .replace("/","_")
+        .replace(" ","_")
+        .replace("+","_")
+        .replace("–","_")
+        .replace("-","_")
+    )
+
+
+def _match_forward_summary(
+    strategy:object,
+    summaries:Mapping[str,Mapping[str,Any]]|None,
+)->tuple[str|None,dict[str,Any]]:
+    data=dict(summaries or {})
+    if not data:
+        return None,{}
+    target=_strategy_key(strategy)
+    for setup_id,summary in data.items():
+        if _strategy_key(setup_id)==target:
+            return str(setup_id),dict(summary or {})
+    aliases={
+        "fvg":{"fvg"},
+        "ote_62_79%":{"ote","ote_62_79","ote_62_79%"},
+        "crt":{"crt"},
+        "amd_power_of_three":{"amd","amd_po3","power_of_three","po3"},
+        "bos_choch_order_block":{"bos_choch_ob","bos_choch_order_block","ob_choch"},
+    }
+    targets=aliases.get(target,{target})
+    for setup_id,summary in data.items():
+        if _strategy_key(setup_id) in targets:
+            return str(setup_id),dict(summary or {})
+    return None,{}
+
+
+def _research_history_rows(records:list[dict[str,Any]])->list[dict[str,Any]]:
+    rows=[]
+    for raw in records:
+        row=dict(raw)
+        evidence=dict(row.get("evidence",{}) or {})
+        ladder=dict(evidence.get("evidence_ladder",{}) or {})
+        passport=dict(row.get("passport",{}) or {})
+        rows.append({
+            "strategy":row.get("strategy"),
+            "captured_at":row.get("captured_at"),
+            "source":row.get("source"),
+            "pair":row.get("pair"),
+            "passport_state":passport.get("state"),
+            "evidence_state":ladder.get("state"),
+            "evidence_coverage_pct":ladder.get("evidence_coverage_pct"),
+            "record_id":str(row.get("record_id") or "")[:12],
+        })
+    return rows
+
+
 def render_admin_research_panel(
     access:Mapping[str,Any]|None,
     *,
@@ -149,12 +237,80 @@ def render_admin_research_panel(
         st.caption("Usuários Iniciante/Avançado podem usar suas áreas, mas não recebem controles administrativos.")
         return snapshot
 
+    research_records,research_status=ensure_research_evidence_hydrated()
     cat=catalog_summary()
     c1,c2,c3,c4=st.columns(4)
     c1.metric("Modelos catalogados",cat["models"])
     c2.metric("Replays objetivos",cat["objective_replay_ready"])
     c3.metric("Último backtest",snapshot["executed_trades"])
     c4.metric("Contexto completo",snapshot["rich_context_trades"])
+
+    st.caption(
+        f"Histórico de pesquisa: {len(research_records)} registro(s) · "
+        f"fonte {str(research_status.get('source','session'))} · "
+        f"branch {str(research_status.get('branch','—'))}"
+    )
+
+    with st.expander("🗃️ Histórico persistente de evidências",expanded=False):
+        history_frame=pd.DataFrame(_research_history_rows(research_records))
+        if history_frame.empty:
+            st.info("Ainda não há evidência operacional registrada nesta sessão/histórico.")
+        else:
+            st.dataframe(history_frame.sort_values("captured_at",ascending=False),width="stretch",hide_index=True)
+            latest=latest_research_evidence()
+            latest_rows=[]
+            for strategy,record in sorted(latest.items()):
+                evidence=dict(record.get("evidence",{}) or {})
+                ladder=dict(evidence.get("evidence_ladder",{}) or {})
+                latest_rows.append({
+                    "strategy":strategy,
+                    "captured_at":record.get("captured_at"),
+                    "source":record.get("source"),
+                    "evidence_state":ladder.get("state"),
+                    "evidence_coverage_pct":ladder.get("evidence_coverage_pct"),
+                })
+            if latest_rows:
+                st.markdown("##### Último registro por operacional")
+                st.dataframe(pd.DataFrame(latest_rows),width="stretch",hide_index=True)
+
+        if st.button(
+            "💾 Persistir evidências da sessão no Runtime",
+            key="atlasquant_admin_persist_research_evidence",
+            disabled=not bool(research_records),
+        ):
+            status=persist_session_research_evidence()
+            if status.get("ok"):
+                if status.get("reason")=="ALREADY_PRESENT":
+                    st.info("As evidências desta sessão já estão persistidas.")
+                elif status.get("reason")=="NO_RECORDS":
+                    st.info("Nenhum registro para persistir.")
+                else:
+                    st.success(
+                        f"Evidência persistida na branch runtime. "
+                        f"Novos registros: {int(status.get('added',0) or 0)}."
+                    )
+            else:
+                st.warning(
+                    "Persistência externa não disponível agora; os registros permanecem na sessão. "
+                    f"Motivo: {status.get('reason','N/D')}."
+                )
+
+    drift_rows=passport_drift_rows(research_records)
+    if drift_rows:
+        st.markdown("#### 📉 Mudança do Passaporte no tempo")
+        st.caption(
+            "Compara os dois últimos registros de cada operacional. Alerta de mudança pede revisão; "
+            "não altera setup, Gate ou peso automaticamente."
+        )
+        drift_frame=pd.DataFrame(drift_rows)
+        st.dataframe(drift_frame,width="stretch",hide_index=True)
+        drifts=latest_passport_drift(research_records)
+        flagged=[x for x in drifts if x.get("review_required")]
+        if flagged:
+            st.warning(
+                f"{len(flagged)} operacional(is) com mudança relevante para revisão humana. "
+                "Isso é diagnóstico de pesquisa, não previsão."
+            )
 
     with st.expander("📚 Matriz Mestre ICT / SMC / Price Action",expanded=False):
         frame=pd.DataFrame(catalog_rows())
@@ -253,6 +409,72 @@ def render_admin_research_panel(
     passport=dict(backtest.get("passport",{}) or {})
     observed=dict(passport.get("observed_metrics",{}) or {})
     coverage=dict(passport.get("coverage",{}) or {})
+
+    st.markdown("#### 🧪 Cruzar Backtest × Paper/Forward × Shadow")
+    st.caption(
+        "O Admin pode anexar o Diário Paper/Forward para completar a escada de evidências. "
+        "O cruzamento não promove o operacional sozinho."
+    )
+    journal_file=st.file_uploader(
+        "Diário Paper/Forward (CSV)",
+        type=["csv"],
+        key="atlasquant_admin_forward_journal_csv",
+    )
+    forward_summaries={}
+    matched_setup=None
+    forward_summary={}
+    if journal_file is not None:
+        try:
+            journal_frame=pd.read_csv(journal_file)
+            forward_summaries=setup_forward_summary(_journal_records_from_frame(journal_frame))
+        except Exception as exc:
+            st.error(f"Diário Paper/Forward inválido: {type(exc).__name__}: {exc}")
+            forward_summaries={}
+        if forward_summaries:
+            matched_setup,forward_summary=_match_forward_summary(
+                backtest.get("strategy"),
+                forward_summaries,
+            )
+            if matched_setup is None:
+                options=sorted(forward_summaries)
+                selected=st.selectbox(
+                    "Relacionar o Passaporte ao setup do diário",
+                    options,
+                    key="atlasquant_admin_forward_setup_link",
+                )
+                matched_setup=selected
+                forward_summary=dict(forward_summaries.get(selected,{}) or {})
+            st.caption(f"Paper/Forward relacionado: {matched_setup}")
+
+    shadow_samples=list(st.session_state.get("atlasquant_shadow_samples",[]) or [])
+    shadow_summary=summarize_shadow(shadow_samples) if shadow_samples else {}
+    diagnostics=dict(backtest.get("research_diagnostics",{}) or {})
+    ladder=fuse_operational_evidence(
+        passport,
+        paper_summary=forward_summary,
+        temporal_status=diagnostics.get("temporal_status"),
+        walk_forward_status=diagnostics.get("walk_forward_status"),
+        friction_status=diagnostics.get("friction_status"),
+        parameter_status=diagnostics.get("parameter_status"),
+        positive_fold_pct=diagnostics.get("positive_fold_pct"),
+        oos_positive_pct=diagnostics.get("oos_positive_pct"),
+        friction_positive_pct=diagnostics.get("friction_positive_pct"),
+        parameter_positive_pct=diagnostics.get("parameter_positive_pct"),
+        shadow_summary=shadow_summary,
+    )
+    st.session_state["atlasquant_last_fused_passport_evidence"]=ladder
+    l1,l2,l3=st.columns(3)
+    l1.metric("Estado da evidência",str(ladder.get("state","—")))
+    l2.metric("Cobertura",f"{float(ladder.get('evidence_coverage_pct',0.0) or 0.0):.0f}%")
+    l3.metric("Revisão humana","Elegível" if ladder.get("eligible_for_human_review") else "Ainda não")
+    ladder_frame=pd.DataFrame(ladder.get("evidence_steps",[]) or [])
+    if not ladder_frame.empty:
+        st.dataframe(ladder_frame,width="stretch",hide_index=True)
+    failures=list(ladder.get("failures",[]) or [])
+    if failures:
+        st.warning("Etapas ainda pendentes: "+" · ".join(str(x) for x in failures))
+    st.caption(ladder.get("interpretation",""))
+
     p1,p2,p3,p4=st.columns(4)
     p1.metric("Operacional",str(backtest.get("strategy") or "—"))
     p2.metric("Trades",int(observed.get("trades",0) or 0))
@@ -303,5 +525,8 @@ __all__=[
     "normalize_weekly_research_csv",
     "behavior_stats_from_frame",
     "behavior_template_csv",
+    "_journal_records_from_frame",
+    "_match_forward_summary",
+    "_research_history_rows",
     "render_admin_research_panel",
 ]

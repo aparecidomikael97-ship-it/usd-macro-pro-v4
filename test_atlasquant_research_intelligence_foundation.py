@@ -20,6 +20,21 @@ from atlasquant_operational_passport import (
 )
 from atlasquant_weekly_profile import analyze_weekly_extremes
 from atlasquant_behavior_shift import BehaviorStats, detect_behavior_shift
+from atlasquant_passport_evidence import EvidenceCriteria, fuse_operational_evidence
+from atlasquant_passport_drift import (
+    compare_passport_records,
+    latest_passport_drift,
+    passport_drift_rows,
+)
+from atlasquant_research_evidence_capture import hydrate_research_evidence
+from atlasquant_research_evidence_store import (
+    evidence_record,
+    latest_evidence_by_strategy,
+    merge_evidence_records,
+    parse_evidence_records,
+    persist_research_evidence,
+    serialize_evidence_records,
+)
 from atlasquant_backtest_intelligence import (
     backtest_intelligence_bundle,
     build_passport_from_backtest,
@@ -403,6 +418,251 @@ class BacktestIntelligenceTests(unittest.TestCase):
         self.assertEqual(out["passport"]["strategy"],"FVG")
         self.assertFalse(out["automatic_execution"])
         self.assertFalse(out["automatic_promotion"])
+
+
+class PassportEvidenceFusionTests(unittest.TestCase):
+    def _passport(self):
+        return {
+            "strategy":"FVG",
+            "state":"TESTING",
+            "observed_metrics":{
+                "trades":120,
+                "expectancy_r":0.22,
+                "profit_factor":1.4,
+                "net_r":26.4,
+                "max_drawdown_r":5.0,
+            },
+            "coverage":{"assets":3,"sessions":3,"regimes":3},
+            "data_quality_pct":94,
+        }
+
+    def test_full_evidence_can_only_become_human_review_candidate(self):
+        paper={
+            "forward_samples":45,
+            "forward_expectancy_r":0.18,
+            "forward_profit_factor":1.3,
+            "forward_max_drawdown_r":4.0,
+            "forward_win_rate_pct":55,
+        }
+        shadow={"samples":120,"eligible_for_manual_review":True}
+        out=fuse_operational_evidence(
+            self._passport(),
+            paper_summary=paper,
+            temporal_status="POSITIVE_ACROSS_FOLDS",
+            walk_forward_status="POSITIVE_ALL_OOS_WINDOWS",
+            friction_status="POSITIVE_ALL_TESTED_FRICTION",
+            parameter_status="POSITIVE_ALL_PREDEFINED_VARIANTS",
+            positive_fold_pct=75,
+            oos_positive_pct=67,
+            friction_positive_pct=75,
+            parameter_positive_pct=70,
+            shadow_summary=shadow,
+            criteria=EvidenceCriteria(require_shadow=True),
+        )
+        self.assertEqual(out["state"],"HUMAN_REVIEW_CANDIDATE")
+        self.assertTrue(out["eligible_for_human_review"])
+        self.assertFalse(out["automatic_promotion"])
+        self.assertFalse(out["automatic_strategy_change"])
+        self.assertFalse(out["real_orders_enabled"])
+        self.assertIn("não mede probabilidade",out["interpretation"].lower())
+
+    def test_good_backtest_without_paper_stays_pending(self):
+        out=fuse_operational_evidence(
+            self._passport(),
+            temporal_status="POSITIVE_ACROSS_FOLDS",
+            walk_forward_status="POSITIVE_ALL_OOS_WINDOWS",
+            friction_status="POSITIVE_ALL_TESTED_FRICTION",
+            parameter_status="POSITIVE_ALL_PREDEFINED_VARIANTS",
+            positive_fold_pct=75,
+            oos_positive_pct=67,
+            friction_positive_pct=75,
+            parameter_positive_pct=70,
+        )
+        self.assertEqual(out["state"],"PAPER_EVIDENCE_PENDING")
+        self.assertFalse(out["eligible_for_human_review"])
+        self.assertIn("paper_sample",out["failures"])
+        self.assertIn("paper_backtest_alignment",out["failures"])
+
+    def test_negative_or_weak_robustness_does_not_count_as_sufficient(self):
+        paper={"forward_samples":40,"forward_expectancy_r":0.18}
+        out=fuse_operational_evidence(
+            self._passport(),
+            paper_summary=paper,
+            temporal_status="MIXED_ACROSS_FOLDS",
+            walk_forward_status="MIXED_OOS_WINDOWS",
+            friction_status="BREAKS_UNDER_TESTED_FRICTION",
+            parameter_status="MIXED_PREDEFINED_VARIANTS",
+            positive_fold_pct=33,
+            oos_positive_pct=33,
+            friction_positive_pct=50,
+            parameter_positive_pct=33,
+        )
+        self.assertFalse(out["checks"]["temporal_diagnostic"])
+        self.assertFalse(out["checks"]["walk_forward_diagnostic"])
+        self.assertFalse(out["checks"]["friction_diagnostic"])
+        self.assertFalse(out["checks"]["parameter_diagnostic"])
+        self.assertFalse(out["eligible_for_human_review"])
+
+    def test_negative_backtest_or_paper_expectancy_cannot_be_review_ready(self):
+        bad_passport=self._passport()
+        bad_passport["observed_metrics"]=dict(bad_passport["observed_metrics"])
+        bad_passport["observed_metrics"]["expectancy_r"]=-0.05
+        paper={"forward_samples":45,"forward_expectancy_r":-0.04}
+        out=fuse_operational_evidence(
+            bad_passport,
+            paper_summary=paper,
+            temporal_status="POSITIVE_ACROSS_FOLDS",
+            walk_forward_status="POSITIVE_ALL_OOS_WINDOWS",
+            friction_status="POSITIVE_ALL_TESTED_FRICTION",
+            parameter_status="POSITIVE_ALL_PREDEFINED_VARIANTS",
+            positive_fold_pct=75,
+            oos_positive_pct=67,
+            friction_positive_pct=75,
+            parameter_positive_pct=70,
+        )
+        self.assertFalse(out["checks"]["backtest_expectancy"])
+        self.assertFalse(out["checks"]["paper_expectancy"])
+        self.assertFalse(out["eligible_for_human_review"])
+
+    def test_paper_gap_is_descriptive_and_can_block_review(self):
+        paper={"forward_samples":50,"forward_expectancy_r":-0.20}
+        out=fuse_operational_evidence(
+            self._passport(),
+            paper_summary=paper,
+            temporal_status="POSITIVE_ACROSS_FOLDS",
+            walk_forward_status="POSITIVE_ALL_OOS_WINDOWS",
+            friction_status="POSITIVE_ALL_TESTED_FRICTION",
+            parameter_status="POSITIVE_ALL_PREDEFINED_VARIANTS",
+            positive_fold_pct=75,
+            oos_positive_pct=67,
+            friction_positive_pct=75,
+            parameter_positive_pct=70,
+        )
+        self.assertEqual(out["state"],"EVIDENCE_GAPS")
+        self.assertFalse(out["checks"]["paper_backtest_alignment"])
+        self.assertAlmostEqual(
+            out["backtest_paper_comparison"]["expectancy_gap_r"],
+            -0.42,
+        )
+
+
+class PassportDriftTests(unittest.TestCase):
+    def _record(self,captured_at,*,expectancy,pf,dd,quality,gap,state="HUMAN_REVIEW_CANDIDATE"):
+        return evidence_record(
+            strategy="FVG",
+            captured_at=captured_at,
+            source="BACKTEST",
+            passport={
+                "strategy":"FVG",
+                "data_quality_pct":quality,
+                "observed_metrics":{
+                    "trades":150,
+                    "expectancy_r":expectancy,
+                    "profit_factor":pf,
+                    "max_drawdown_r":dd,
+                },
+            },
+            evidence={
+                "evidence_ladder":{
+                    "state":state,
+                    "evidence_coverage_pct":100,
+                    "backtest_paper_comparison":{"expectancy_gap_r":gap},
+                }
+            },
+        )
+
+    def test_drift_alerts_on_research_degradation_without_auto_change(self):
+        previous=self._record(
+            "2026-09-19T12:00:00Z",
+            expectancy=0.30,pf=1.6,dd=5,quality=95,gap=-0.03,
+        )
+        current=self._record(
+            "2026-09-20T12:00:00Z",
+            expectancy=0.10,pf=1.2,dd=9,quality=75,gap=-0.22,
+            state="EVIDENCE_GAPS",
+        )
+        out=compare_passport_records(previous,current)
+        codes={x["code"] for x in out["alerts"]}
+        self.assertIn("EXPECTANCY_DROP",codes)
+        self.assertIn("PROFIT_FACTOR_DROP",codes)
+        self.assertIn("DRAWDOWN_INCREASE",codes)
+        self.assertIn("DATA_QUALITY_DROP",codes)
+        self.assertIn("PAPER_GAP_WIDENED",codes)
+        self.assertIn("EVIDENCE_STATE_REGRESSED",codes)
+        self.assertTrue(out["review_required"])
+        self.assertFalse(out["automatic_strategy_change"])
+        self.assertFalse(out["automatic_weight_change"])
+        self.assertFalse(out["automatic_gate_change"])
+        self.assertFalse(out["real_orders_enabled"])
+
+    def test_latest_drift_uses_only_last_two_records_per_strategy(self):
+        a=self._record("2026-09-18T12:00:00Z",expectancy=0.40,pf=1.7,dd=4,quality=95,gap=-0.02)
+        b=self._record("2026-09-19T12:00:00Z",expectancy=0.35,pf=1.6,dd=4.5,quality=94,gap=-0.03)
+        c=self._record("2026-09-20T12:00:00Z",expectancy=0.34,pf=1.58,dd=4.6,quality=93,gap=-0.04)
+        rows=latest_passport_drift([c,a,b])
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]["previous"]["captured_at"],"2026-09-19T12:00:00Z")
+        self.assertEqual(rows[0]["current"]["captured_at"],"2026-09-20T12:00:00Z")
+        self.assertFalse(rows[0]["review_required"])
+        compact=passport_drift_rows([a,b,c])
+        self.assertEqual(compact[0]["strategy"],"FVG")
+
+
+class ResearchEvidenceStoreTests(unittest.TestCase):
+    def test_store_roundtrip_and_deduplication(self):
+        a=evidence_record(
+            strategy="FVG",
+            captured_at="2026-09-20T12:00:00+00:00",
+            source="BACKTEST",
+            pair="EUR/USD",
+            passport={"state":"TESTING"},
+            evidence={"state":"PAPER_EVIDENCE_PENDING"},
+        )
+        raw=serialize_evidence_records([a])
+        parsed=parse_evidence_records(raw)
+        self.assertEqual(parsed[0]["record_id"],a["record_id"])
+        merged,added=merge_evidence_records(parsed,[a])
+        self.assertEqual(added,0)
+        self.assertEqual(len(merged),1)
+
+    def test_latest_evidence_by_strategy_uses_latest_timestamp(self):
+        old=evidence_record(
+            strategy="FVG",captured_at="2026-09-20T10:00:00+00:00",
+            source="BACKTEST",passport={},evidence={},
+        )
+        new=evidence_record(
+            strategy="FVG",captured_at="2026-09-20T11:00:00+00:00",
+            source="BACKTEST",passport={"state":"NEW"},evidence={},
+        )
+        latest=latest_evidence_by_strategy([new,old])
+        self.assertEqual(latest["FVG"]["passport"]["state"],"NEW")
+
+    def test_session_and_remote_evidence_hydrate_without_duplicates(self):
+        a=evidence_record(
+            strategy="FVG",captured_at="2026-09-20T12:00:00Z",
+            source="BACKTEST",passport={},evidence={},
+        )
+        b=evidence_record(
+            strategy="OTE",captured_at="2026-09-20T12:01:00Z",
+            source="BACKTEST",passport={},evidence={},
+        )
+        rows=hydrate_research_evidence([a],[a,b])
+        self.assertEqual(len(rows),2)
+        self.assertEqual({x["strategy"] for x in rows},{"FVG","OTE"})
+
+    def test_store_refuses_runtime_write_to_main_without_network(self):
+        record=evidence_record(
+            strategy="FVG",captured_at="2026-09-20T12:00:00+00:00",
+            source="BACKTEST",passport={},evidence={},
+        )
+        out=persist_research_evidence(
+            [record],
+            repo="owner/repo",
+            branch="main",
+            token="secret",
+        )
+        self.assertFalse(out["ok"])
+        self.assertEqual(out["reason"],"UNSAFE_BRANCH")
 
 
 class PostTradeDiagnosisTests(unittest.TestCase):

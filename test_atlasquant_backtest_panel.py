@@ -252,6 +252,13 @@ class BacktestPanelTests(unittest.TestCase):
         self.assertIn("atlasquant_last_backtest_intelligence",module_source)
         self.assertIn("não inventa uma causa",module_source)
 
+    def test_backtest_captures_evidence_ladder_session_only(self):
+        module_source=inspect.getsource(__import__("atlasquant_backtest_panel"))
+        self.assertIn("Escada de Evidências",module_source)
+        self.assertIn("capture_research_evidence",module_source)
+        self.assertIn("persist=False",module_source)
+        self.assertIn("evidence_ladder",module_source)
+
     def test_backtest_status_is_descriptive_not_trade_authorization(self):
         self.assertEqual(backtest_result_status({"trades":0})["label"],"SEM AMOSTRA")
         self.assertEqual(backtest_result_status({"trades":10,"net_r":4,"max_drawdown_r":1})["label"],"AMOSTRA POSITIVA")
