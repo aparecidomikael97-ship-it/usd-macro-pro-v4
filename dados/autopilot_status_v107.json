@@ -24,7 +24,7 @@
   "twelve_cache_hits": 0,
   "twelve_retry_after": "",
   "version": "V11.0.8_BUDGET_AUTOPILOT",
-  "last_run": "2026-09-20T21:21:37.399994+00:00",
+  "last_run": "2026-09-20T21:44:59.358561+00:00",
   "app_headless_ok": true,
   "app_headless_message": "App headless executado; 8 secret(s) injetado(s) no AppTest.",
   "matrix_generated_at": "2026-09-20T09:19:55.817105+00:00",
@@ -32,7 +32,7 @@
   "market_map_fresh": 7,
   "scanner_ready": true,
   "market_map_ready": true,
-  "operational_readiness": "READY",
+  "operational_readiness": "DEGRADED",
   "news_updated_at": "2026-09-20T21:21:31.094365+00:00",
   "news_unique_stories": 215,
   "validation_rows": 49,
@@ -41,24 +41,24 @@
   "snapshot_stats": {
     "added": 0,
     "frozen": 0,
-    "validated_horizons": 13,
+    "validated_horizons": 0,
     "migrated": 0
   },
-  "twelve_calls_this_run": 14,
-  "twelve_calls_requested_internal": 14,
+  "twelve_calls_this_run": 0,
+  "twelve_calls_requested_internal": 0,
   "twelve_rate_safe": true,
   "twelve_api_budget_limit": 480,
-  "twelve_daily_blocked": false,
-  "twelve_block_type": "",
-  "twelve_daily_block_reason": "",
+  "twelve_daily_blocked": true,
+  "twelve_block_type": "CONTROLE_INDISPONIVEL",
+  "twelve_daily_block_reason": "Orçamento persistido indisponível; nenhuma consulta liberada.",
   "twelve_safe_calls_per_window": 6,
   "twelve_safe_window_seconds": 62.0,
   "forex_market_open": true,
   "errors": [],
-  "healthy": true,
+  "healthy": false,
   "twelve_quota_saver_v111": {
     "enabled": true,
-    "m15_source_pairs_this_run": 7,
+    "m15_source_pairs_this_run": 0,
     "derived_timeframes": [
       "1h",
       "4h"
@@ -80,16 +80,16 @@
     "packs": 7,
     "shadow": {
       "ok": true,
-      "added": 7,
+      "added": 0,
       "samples": 26,
-      "reason": "SAVED",
+      "reason": "ALREADY_PRESENT",
       "error": ""
     },
     "flight_recorder": {
       "ok": true,
-      "added": 7,
+      "added": 0,
       "records": 806,
-      "reason": "SAVED",
+      "reason": "ALREADY_PRESENT",
       "error": ""
     },
     "real_orders": false,
@@ -97,17 +97,17 @@
     "automatic_promotion": false
   },
   "quota_shadow": {
-    "samples": 106,
-    "raw_samples": 106,
+    "samples": 107,
+    "raw_samples": 107,
     "invalid_timestamp_rows": 0,
     "evidence_integrity_ok": true,
-    "market_open_runs": 1,
+    "market_open_runs": 2,
     "min_market_runs": 20,
     "minimum_met": false,
-    "provider_blocked_runs": 0,
-    "provider_block_rate_pct": 0.0,
+    "provider_blocked_runs": 1,
+    "provider_block_rate_pct": 50.0,
     "headless_failed_runs": 0,
-    "avg_actual_http_calls_per_market_run": 14.0,
+    "avg_actual_http_calls_per_market_run": 7.0,
     "max_actual_http_calls_per_market_run": 14,
     "adaptive_plan_fit_all_samples": true,
     "eligible_for_manual_review": false,
@@ -117,148 +117,5 @@
     "sample_added": true,
     "persisted": true,
     "error": ""
-  },
-  "paper_trading_v112": {
-    "enabled": true,
-    "real_orders": false,
-    "trades_total": 0,
-    "pending_entries": 0,
-    "open_positions": 0,
-    "closed_trades": 0,
-    "wins": 0,
-    "losses": 0,
-    "breakeven": 0,
-    "win_rate_pct": 0.0,
-    "net_r": 0.0,
-    "gross_r_before_friction": 0.0,
-    "friction_r": 0.0,
-    "net_r_after_friction": 0.0,
-    "friction_version": "V11.6_PAPER_FRICTION",
-    "avg_r": 0.0,
-    "profit_factor_r": null,
-    "profit_factor_net_r": null,
-    "last_cycle": {
-      "version": "V11.2_PAPER_TRADING",
-      "ran_at": "2026-09-20T21:21:40.348463+00:00",
-      "pending_created": 0,
-      "entries_opened": 0,
-      "trades_closed": 0,
-      "closed_pairs_this_cycle": [],
-      "checklists": {
-        "USD/CHF": {
-          "side": "BUY",
-          "passed": false,
-          "state": "🔴 BLOQUEADO",
-          "hard_blocks": [
-            "H1 está contra o viés"
-          ],
-          "soft_blocks": [
-            "ICT incompleto (52/100)",
-            "Fluxo institucional incompleto (56/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "USD/CAD": {
-          "side": "BUY",
-          "passed": false,
-          "state": "⚪ EM OBSERVAÇÃO",
-          "hard_blocks": [],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ICT incompleto (54/100)",
-            "Fluxo institucional incompleto (59/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "USD/JPY": {
-          "side": "BUY",
-          "passed": false,
-          "state": "⚪ EM OBSERVAÇÃO",
-          "hard_blocks": [],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ICT incompleto (54/100)",
-            "Fluxo institucional incompleto (64/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "NZD/USD": {
-          "side": "SELL",
-          "passed": false,
-          "state": "🔴 BLOQUEADO",
-          "hard_blocks": [
-            "ADR14 muito esticado (172%)"
-          ],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ADR14 em 172%: evitar perseguir preço",
-            "ICT incompleto (64/100)",
-            "Fluxo institucional incompleto (54/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "EUR/USD": {
-          "side": "SELL",
-          "passed": false,
-          "state": "🔴 BLOQUEADO",
-          "hard_blocks": [
-            "H1 está contra o viés"
-          ],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ICT incompleto (34/100)",
-            "Fluxo institucional incompleto (53/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "AUD/USD": {
-          "side": "WAIT",
-          "passed": false,
-          "state": "⚪ AGUARDAR DIREÇÃO",
-          "hard_blocks": [],
-          "soft_blocks": [
-            "ICT incompleto (0/100)",
-            "Fluxo institucional incompleto (0/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "GBP/USD": {
-          "side": "SELL",
-          "passed": false,
-          "state": "🔴 BLOQUEADO",
-          "hard_blocks": [
-            "H1 está contra o viés"
-          ],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ICT incompleto (38/100)",
-            "Fluxo institucional incompleto (63/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        }
-      },
-      "trades_total": 0,
-      "pending_entries": 0,
-      "open_positions": 0,
-      "closed_trades": 0,
-      "wins": 0,
-      "losses": 0,
-      "breakeven": 0,
-      "win_rate_pct": 0.0,
-      "net_r": 0.0,
-      "avg_r": 0.0,
-      "profit_factor_r": null
-    },
-    "errors": []
-  },
-  "setup_audit_v114": {
-    "enabled": true,
-    "audited_trades": 0,
-    "closed_trades": 0,
-    "component_state_rows": 0,
-    "sample_state": "AGUARDANDO AMOSTRA",
-    "real_orders": false,
-    "broker_connection": false,
-    "errors": []
   }
 }
