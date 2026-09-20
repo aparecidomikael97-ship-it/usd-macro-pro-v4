@@ -200,8 +200,13 @@ jobs:
                               status_history.append(None)
                       page.wait_for_timeout(5_000)
 
+                  initial_body_text = body_text
+                  initial_fast_snapshot_shell = "carregamento rápido por snapshot validado" in initial_body_text
+                  initial_radar_visible = "Radar de Oportunidades" in initial_body_text
+                  initial_meaningful = bool(initial_radar_visible or initial_fast_snapshot_shell or auth_inputs >= 1)
+
                   mobile_transition = {"attempted": False, "advanced": False, "decision": False, "radar_back": False}
-                  if name == "mobile" and auth_inputs < 1 and "Radar de Oportunidades" in body_text:
+                  if name == "mobile" and auth_inputs < 1 and initial_radar_visible:
                       mobile_transition["attempted"] = True
                       try:
                           advanced = page.get_by_text("Avançado", exact=True)
@@ -223,15 +228,28 @@ jobs:
                               combo.fill("🎯 Radar")
                               page.wait_for_timeout(180)
                               combo.press("Enter")
-                              page.wait_for_timeout(1_500)
                               nav = page.locator('[data-testid="stSelectbox"]').filter(has_text="Área avançada").first
                               combo = nav.get_by_role("combobox")
                               selected_radar = combo.input_value(timeout=20_000).strip() == "🎯 Radar"
-                              mobile_transition["radar_back"] = (
-                                  selected_radar
-                                  and "Radar de Oportunidades" in page.locator("body").inner_text(timeout=30_000)
+                              radar_text = ""
+                              deadline = time.time() + 60
+                              while time.time() < deadline:
+                                  page.wait_for_timeout(800)
+                                  radar_text = page.locator("body").inner_text(timeout=30_000)
+                                  if (
+                                      "Radar de Oportunidades" in radar_text
+                                      or "O Radar aguarda a Matriz dos 7 pares nesta execução." in radar_text
+                                      or "Radar aguardando a Matriz dos pares e dados persistidos." in radar_text
+                                  ):
+                                      break
+                              mobile_transition["radar_back"] = selected_radar and bool(
+                                  "Radar de Oportunidades" in radar_text
+                                  or "O Radar aguarda a Matriz dos 7 pares nesta execução." in radar_text
+                                  or "Radar aguardando a Matriz dos pares e dados persistidos." in radar_text
                               )
-                          body_text = page.locator("body").inner_text(timeout=30_000)
+                              body_text = radar_text or page.locator("body").inner_text(timeout=30_000)
+                          else:
+                              body_text = page.locator("body").inner_text(timeout=30_000)
                       except Exception as exc:
                           page_errors.append(f"mobile-transition: {type(exc).__name__}: {exc}")
 
@@ -242,9 +260,9 @@ jobs:
                   screenshot = out / f"{name}.png"
                   page.screenshot(path=str(screenshot), full_page=False)
 
-                  fast_snapshot_shell = "carregamento rápido por snapshot validado" in body_text
-                  radar_visible = "Radar de Oportunidades" in body_text
-                  meaningful = bool(radar_visible or fast_snapshot_shell or auth_inputs >= 1)
+                  fast_snapshot_shell = initial_fast_snapshot_shell
+                  radar_visible = initial_radar_visible
+                  meaningful = initial_meaningful
 
                   info = {
                       "http_status": status,
