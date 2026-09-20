@@ -1,6 +1,7 @@
 import unittest
 import pandas as pd
 from ict_execution_v108 import detect_crt, detect_amd, detect_fvg
+from atlasquant_setup_candidates import build_setup_candidates, candidate_rows
 
 class ICTExecutionV108Tests(unittest.TestCase):
     def _df(self, rows, freq="h"):
@@ -24,5 +25,67 @@ class ICTExecutionV108Tests(unittest.TestCase):
         d=self._df([(1,1.01,.99,1),(1,1.02,.995,1.015),(1.03,1.04,1.025,1.035)],"15min")
         x=detect_fvg(d,"BUY")
         self.assertGreaterEqual(x["score"],65)
+
+
+    def test_model_specific_candidates_are_explicit_and_do_not_create_trades(self):
+        pack=build_setup_candidates(
+            pair="EUR/USD",
+            side="BUY",
+            captured_at="2026-09-20T12:00:00Z",
+            ict_snapshot={
+                "crt":{"status":"🟢 CRT CONFIRMADO","score":100,"phase":"DISTRIBUIÇÃO"},
+                "ote":{"status":"🟢 DENTRO DO OTE","score":90,"retracement_pct":70.5},
+                "amd":{"status":"🟢 AMD / PO3 EM DISTRIBUIÇÃO","score":100,"phase":"DISTRIBUIÇÃO"},
+                "fvg":{"status":"🟢 FVG EM TESTE","score":90,"zone_low":1.1,"zone_high":1.2},
+            },
+        )
+        self.assertEqual(pack["candidate_count"],4)
+        self.assertEqual(
+            {x["setup_id"] for x in pack["candidates"]},
+            {"crt","ote","amd-po3","fvg"},
+        )
+        self.assertFalse(pack["setup_inference_from_outcome"])
+        self.assertFalse(pack["automatic_paper_entry"])
+        self.assertFalse(pack["automatic_execution"])
+        for row in pack["candidates"]:
+            self.assertEqual(row["setup_attribution"],"SOURCE_MODEL_EXPLICIT")
+            self.assertFalse(row["paper_trade_created"])
+            self.assertFalse(row["real_orders_enabled"])
+
+    def test_yellow_or_waiting_model_states_are_not_research_candidates(self):
+        pack=build_setup_candidates(
+            pair="EUR/USD",
+            side="BUY",
+            captured_at="2026-09-20T12:00:00Z",
+            ict_snapshot={
+                "crt":{"status":"🟡 MANIPULAÇÃO DETECTADA","score":70,"phase":"MANIPULAÇÃO"},
+                "ote":{"status":"🟡 PRÓXIMO DO OTE","score":65},
+                "amd":{"status":"🟡 AMD EM MANIPULAÇÃO","score":70,"phase":"MANIPULAÇÃO"},
+                "fvg":{"status":"🟡 FVG PRESENTE","score":65},
+            },
+        )
+        self.assertEqual(pack["candidate_count"],0)
+        self.assertEqual(candidate_rows(pack),[])
+        self.assertEqual(len(pack["models"]),4)
+
+    def test_candidate_id_is_deterministic_for_same_point_in_time_evidence(self):
+        args={
+            "pair":"EUR/USD",
+            "side":"BUY",
+            "captured_at":"2026-09-20T12:00:00Z",
+            "ict_snapshot":{"fvg":{"status":"🟢 FVG EM TESTE","score":90,"zone_low":1.1,"zone_high":1.2}},
+        }
+        a=build_setup_candidates(**args)
+        b=build_setup_candidates(**args)
+        self.assertEqual(a["candidates"][0]["candidate_id"],b["candidates"][0]["candidate_id"])
+
+    def test_wait_side_never_becomes_candidate_even_if_component_status_is_green(self):
+        pack=build_setup_candidates(
+            pair="EUR/USD",
+            side="WAIT",
+            captured_at="2026-09-20T12:00:00Z",
+            ict_snapshot={"fvg":{"status":"🟢 FVG EM TESTE","score":90}},
+        )
+        self.assertEqual(pack["candidate_count"],0)
 
 if __name__=="__main__": unittest.main()
