@@ -122,7 +122,7 @@ def can_apply_limit_change(
     current: RiskLimits,
     proposed: RiskLimits,
     *,
-    last_relaxation_at: datetime | None,
+    relaxation_requested_at: datetime | None,
     now: datetime,
     relaxation_cooldown_hours: int = 24,
 ) -> bool:
@@ -131,6 +131,6 @@ def can_apply_limit_change(
         return True
     if relaxation_cooldown_hours <= 0:
         raise ValueError("relaxation_cooldown_hours deve ser positivo")
-    if last_relaxation_at is None:
+    if relaxation_requested_at is None:
         return False
-    return now >= last_relaxation_at + timedelta(hours=relaxation_cooldown_hours)
+    return now >= relaxation_requested_at + timedelta(hours=relaxation_cooldown_hours)
