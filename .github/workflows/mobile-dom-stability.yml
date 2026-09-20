@@ -151,8 +151,10 @@ jobs:
               combo.press("Enter")
               page.wait_for_timeout(900)
               nav=page.locator('[data-testid="stSelectbox"]').filter(has_text="Área avançada").first
-              if label not in nav.inner_text(timeout=20_000):
-                  raise RuntimeError(f"área não selecionada: {label}")
+              combo=nav.get_by_role("combobox")
+              selected=combo.input_value(timeout=20_000).strip()
+              if selected!=label:
+                  raise RuntimeError(f"área não selecionada: esperado={label!r} atual={selected!r}")
               wait_text(page,"ATLASQUANT",timeout=60_000)
 
           with sync_playwright() as p:
