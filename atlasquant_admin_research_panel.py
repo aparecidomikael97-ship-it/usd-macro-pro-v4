@@ -438,6 +438,10 @@ def render_admin_research_panel(
         walk_forward_status=diagnostics.get("walk_forward_status"),
         friction_status=diagnostics.get("friction_status"),
         parameter_status=diagnostics.get("parameter_status"),
+        positive_fold_pct=diagnostics.get("positive_fold_pct"),
+        oos_positive_pct=diagnostics.get("oos_positive_pct"),
+        friction_positive_pct=diagnostics.get("friction_positive_pct"),
+        parameter_positive_pct=diagnostics.get("parameter_positive_pct"),
         shadow_summary=shadow_summary,
     )
     st.session_state["atlasquant_last_fused_passport_evidence"]=ladder
