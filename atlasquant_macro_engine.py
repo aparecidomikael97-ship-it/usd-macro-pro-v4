@@ -289,6 +289,23 @@ def build_structured_macro(
         impact = str(upcoming.get("impacto", upcoming.get("impact", "")) or "")
         risks.append(f"Próximo evento: {name}{' · '+impact if impact else ''}.")
 
+    by_group={str(x.get("group")):float(x.get("balance",0)) for x in groups}
+    strong_pos=[g for g,v in by_group.items() if v>=25]
+    strong_neg=[g for g,v in by_group.items() if v<=-25]
+    macro_conflict=bool(strong_pos and strong_neg)
+    if macro_conflict:
+        risks.append(
+            "Divergência interna no macro: grupos relevantes apontam direções opostas "
+            f"({', '.join(strong_pos[:3])} × {', '.join(strong_neg[:3])})."
+        )
+    if "rates" in by_group:
+        real_side=by_group["rates"]
+        growth_values=[by_group[g] for g in ("growth","activity","labour") if g in by_group]
+        if growth_values:
+            growth_side=sum(growth_values)/len(growth_values)
+            if real_side*growth_side<0 and abs(real_side)>=25 and abs(growth_side)>=20:
+                risks.append("Juros/política e crescimento-emprego divergem; cenário macro está em transição ou conflito.")
+
     nominal_coverage = sum(float(x["weight"]) for x in groups)
     total_weight = sum(GROUP_WEIGHTS.values())
     coverage = 100.0 * nominal_coverage / total_weight if total_weight else 0.0
@@ -305,6 +322,8 @@ def build_structured_macro(
             sum(float(x["quality"]) * float(x["weight"]) for x in groups)
             / max(1e-9, sum(float(x["weight"]) for x in groups))
         )
+        if macro_conflict:
+            quality *= 0.85
         mode = "structured"
         available = True
     elif abs(_finite(legacy_balance)) > 0.01 or _finite(legacy_quality) > 0:
@@ -330,6 +349,7 @@ def build_structured_macro(
         "quality": round(max(0.0, min(100.0, quality)), 1),
         "coverage": round(max(0.0, min(100.0, coverage)), 1),
         "mode": mode,
+        "macro_conflict": bool(macro_conflict),
         "groups": groups,
         "reasons": reasons[:12],
         "risks": risks[:8],
