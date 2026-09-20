@@ -22,7 +22,7 @@ import streamlit as st
 SCHEMA="ATLASQUANT_VOICE_ASSISTANT_V1"
 
 QUESTION_CATEGORIES=(
-    "why","wrong","against","macro","technical","liquidity","event","data","next","overview",
+    "why","wrong","against","macro","geopolitics","technical","liquidity","event","data","next","overview",
 )
 
 
@@ -144,6 +144,13 @@ def assistant_context(
         "macro_research_quality":_safe(r.get("macro_research_quality",0),0),
         "macro_research_coverage":_safe(r.get("macro_research_coverage",0),0),
         "macro_research_mode":_text(r.get("macro_research_mode"),"insufficient"),
+        "geo_research_direction":_text(r.get("geo_research_direction"),"indisponível"),
+        "geo_research_balance":_safe(r.get("geo_research_balance",0),0),
+        "geo_research_quality":_safe(r.get("geo_research_quality",0),0),
+        "geo_research_coverage":_safe(r.get("geo_research_coverage",0),0),
+        "geo_research_regime":_text(r.get("geo_research_regime"),"indisponível"),
+        "geo_research_severity":_text(r.get("geo_research_severity"),"não disponível"),
+        "geo_research_conflict":bool(r.get("geo_research_conflict",False)),
         "data_sufficient":data_sufficient,
         "real_orders_enabled":False,
         "automatic_execution":False,
@@ -190,6 +197,9 @@ def advanced_script(context:Mapping[str,Any])->str:
         f"Fed: tom {_text(c.get('fed_tone'))}, intensidade {_safe(c.get('fed_strength')):+.2f}. "
         f"Macro estruturado: {_text(c.get('macro_research_direction'))}, saldo {_safe(c.get('macro_research_balance')):+.0f}, "
         f"cobertura {_safe(c.get('macro_research_coverage')):.0f}% e qualidade {_safe(c.get('macro_research_quality')):.0f}/100. "
+        f"Geopolítica estruturada: {_text(c.get('geo_research_direction'))}, regime {_text(c.get('geo_research_regime'))}, "
+        f"severidade {_text(c.get('geo_research_severity'))}, cobertura {_safe(c.get('geo_research_coverage')):.0f}% "
+        f"e qualidade {_safe(c.get('geo_research_quality')):.0f}/100. "
         f"Fatores a favor: {support_txt}. Fatores contra ou invalidações: {against_txt}. "
         f"Próximo passo: {_text(c.get('next_action'))}. "
         "A explicação descreve o estado calculado e não executa ordens nem garante resultado."
@@ -204,6 +214,7 @@ def classify_question(question:object)->str:
         ("wrong",("errad","invalid","mudar o vies","muda o vies","chance de estar","probabilidade de estar","quando deixa")),
         ("against",("contra","risco","perigo","pode dar errado","fraqueza","bloque")),
         ("macro",("macro","fed","fomc","dxy","dolar","juros","inflacao","cpi","pce","payroll","pmi","banco central")),
+        ("geopolitics",("geopolit","guerra","conflito","sancao","sanção","tarifa","embargo","cessar fogo","cessar-fogo","ceasefire","risk off","risk-off","diplomacia")),
         ("technical",("tecnic","h4","h1","m15","fvg","order block","breaker","mitigation","mss","choch","bos","ote","fibo","crt","amd")),
         ("liquidity",("liquid","sweep","varred","premium","discount","alvo","target","bsl","ssl")),
         ("event",("noticia","evento","calendario","news","release")),
@@ -251,6 +262,16 @@ def _answer_for_category(category:str, c:Mapping[str,Any], *, beginner:bool=Fals
             f"O tom do Fed está {_text(c.get('fed_tone'))}, com intensidade {_safe(c.get('fed_strength')):+.2f}. "
             f"Notícias: {_text(c.get('news'))}. Evento relevante: {_text(c.get('event'))}. "
             f"O motivo dominante registrado pelo motor é: {_text(c.get('reason'))}."
+        )
+    if category=="geopolitics":
+        conflict=" Há conflito entre histórias independentes." if bool(c.get("geo_research_conflict")) else ""
+        return (
+            f"Na geopolítica de {pair}, o motor está {_text(c.get('geo_research_direction'))}, com saldo "
+            f"{_safe(c.get('geo_research_balance')):+.0f}. O regime está {_text(c.get('geo_research_regime'))}, "
+            f"severidade {_text(c.get('geo_research_severity'))}, cobertura {_safe(c.get('geo_research_coverage')):.0f}% "
+            f"e qualidade {_safe(c.get('geo_research_quality')):.0f}/100.{conflict} "
+            "Essa camada descreve impacto de mercado das evidências disponíveis; não julga atores políticos, "
+            "não prevê resultado eleitoral e não transforma manchete em ordem."
         )
     if category=="technical":
         return (
