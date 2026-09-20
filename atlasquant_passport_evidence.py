@@ -168,41 +168,59 @@ def fuse_operational_evidence(
         ),
     }
 
+    backtest_sufficient=all(
+        checks[name]
+        for name in (
+            "backtest_sample","asset_coverage","session_coverage","regime_coverage",
+            "data_quality","backtest_expectancy","profit_factor","drawdown",
+        )
+    )
+    paper_sufficient=all(
+        checks[name]
+        for name in ("paper_sample","paper_expectancy","paper_backtest_alignment")
+    )
+
     evidence_steps=[
         {
             "step":"BACKTEST",
+            "required":True,
             "available":bt_trades>0,
-            "sufficient":checks["backtest_sample"],
+            "sufficient":backtest_sufficient,
             "detail":f"{bt_trades} trade(s) históricos",
         },
         {
             "step":"TEMPORAL",
+            "required":bool(c.require_temporal),
             "available":_available_status(temporal_status) and fold_pct is not None,
             "sufficient":checks["temporal_diagnostic"],
             "detail":str(temporal_status or "não executado")+" · "+("—" if fold_pct is None else f"{fold_pct:.1f}% folds positivos"),
         },
         {
             "step":"WALK_FORWARD",
+            "required":bool(c.require_walk_forward),
             "available":_available_status(walk_forward_status) and oos_pct is not None,
             "sufficient":checks["walk_forward_diagnostic"],
             "detail":str(walk_forward_status or "não executado")+" · "+("—" if oos_pct is None else f"{oos_pct:.1f}% OOS positivo"),
         },
         {
             "step":"FRICTION",
+            "required":bool(c.require_friction),
             "available":_available_status(friction_status) and friction_pct is not None,
             "sufficient":checks["friction_diagnostic"],
             "detail":str(friction_status or "não executado")+" · "+("—" if friction_pct is None else f"{friction_pct:.1f}% cenários positivos"),
         },
         {
             "step":"PARAMETERS",
+            "required":bool(c.require_parameter),
             "available":_available_status(parameter_status) and parameter_pct is not None,
             "sufficient":checks["parameter_diagnostic"],
             "detail":str(parameter_status or "não executado")+" · "+("—" if parameter_pct is None else f"{parameter_pct:.1f}% variantes positivas"),
         },
         {
             "step":"PAPER_FORWARD",
+            "required":True,
             "available":forward_samples>0,
-            "sufficient":bool(checks["paper_sample"] and checks["paper_backtest_alignment"]),
+            "sufficient":paper_sufficient,
             "detail":(
                 f"{forward_samples} amostra(s) · gap "
                 + ("—" if expectancy_gap is None else f"{expectancy_gap:+.2f}R")
@@ -210,12 +228,17 @@ def fuse_operational_evidence(
         },
         {
             "step":"SHADOW",
+            "required":bool(c.require_shadow),
             "available":_count(shadow.get("samples"))>0,
-            "sufficient":bool(shadow.get("eligible_for_manual_review",False)),
-            "detail":f"{_count(shadow.get('samples'))} amostra(s)",
+            "sufficient":checks["shadow_review"],
+            "detail":(
+                f"{_count(shadow.get('samples'))} amostra(s)"
+                + (" · opcional" if not c.require_shadow else "")
+            ),
         },
         {
             "step":"HUMAN_REVIEW",
+            "required":True,
             "available":False,
             "sufficient":False,
             "detail":"sempre manual; nunca promovido automaticamente",
@@ -235,9 +258,12 @@ def fuse_operational_evidence(
     else:
         state="HUMAN_REVIEW_CANDIDATE"
 
-    available_count=sum(1 for step in evidence_steps[:-1] if step["available"])
-    required_evidence_steps=7
+    machine_steps=[step for step in evidence_steps[:-1] if step.get("required")]
+    required_evidence_steps=max(1,len(machine_steps))
+    available_count=sum(1 for step in machine_steps if step.get("available"))
+    sufficient_count=sum(1 for step in machine_steps if step.get("sufficient"))
     evidence_coverage_pct=round(100.0*available_count/required_evidence_steps,1)
+    evidence_sufficient_pct=round(100.0*sufficient_count/required_evidence_steps,1)
 
     return {
         "schema":SCHEMA,
@@ -247,6 +273,8 @@ def fuse_operational_evidence(
         "failures":failures,
         "evidence_steps":evidence_steps,
         "evidence_coverage_pct":evidence_coverage_pct,
+        "evidence_sufficient_pct":evidence_sufficient_pct,
+        "required_machine_steps":required_evidence_steps,
         "backtest_paper_comparison":comparison,
         "eligible_for_human_review":human_review_ready,
         "automatic_promotion":False,
