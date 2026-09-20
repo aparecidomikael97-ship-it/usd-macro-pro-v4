@@ -15,7 +15,7 @@ from atlasquant_academy import academy_minimum_text_ready
 from atlasquant_academy_media import academy_video_scripts_ready
 from atlasquant_support_center import support_minimum_ready
 from atlasquant_brokers_guide import brokers_guide_minimum_ready, render_brokers_guide
-from atlasquant_voice_readiness import voice_contract_ready
+from atlasquant_voice_readiness import voice_contract_ready, contextual_voice_contract_ready
 from atlasquant_commercial_prep import commercial_prep_audit, commercial_external_blockers
 from atlasquant_billing_contract import billing_contract_ready
 from atlasquant_data_licensing_inventory import data_inventory_ready, data_licensing_status
@@ -42,7 +42,7 @@ def onboarding_steps()->list[dict[str,str]]:
         {"Etapa":"2","Item":"Instalação","Status":"PRONTO — PWA","Descrição":"Android, iOS/iPadOS, Windows, macOS e Linux via PWA."},
         {"Etapa":"3","Item":"Primeiro acesso","Status":"PRONTO","Descrição":"Entrar, revisar viés e qualidade dos dados."},
         {"Etapa":"4","Item":"Academy","Status":"TEXTO + ROTEIROS PRONTOS · VÍDEOS PENDENTES","Descrição":"Trilha textual e roteiros dos vídeos estão prontos; renderização/publicação ainda é externa."},
-        {"Etapa":"5","Item":"Assistente de voz","Status":"INFRA PRONTA · PROVEDOR PENDENTE","Descrição":"Contrato, UX e safety internos prontos; falta configurar um provedor TTS externo."},
+        {"Etapa":"5","Item":"Assistente de voz","Status":"NO APP PRONTO · TTS NEURAL OPCIONAL PENDENTE","Descrição":"Radar e Macro Briefing já falam no dispositivo; modo Avançado responde perguntas contextuais. Provedor neural externo segue separado."},
         {"Etapa":"6","Item":"Corretoras & plataformas","Status":"GUIA INFORMATIVO PRONTO","Descrição":"Compatibilidade, Paper/Demo e segurança documentadas; conexão real continua desativada."},
     ]
 
@@ -76,6 +76,7 @@ def commercial_readiness(access:Mapping[str,Any]|None=None)->dict[str,Any]:
         "academy_ready":False,
         "support_ready":bool(support_minimum_ready()),
         "voice_contract_ready":bool(voice_contract_ready()),
+        "voice_assistant_ready":bool(voice_contract_ready() and contextual_voice_contract_ready()),
         "voice_ready":False,
         "brokers_guide_ready":bool(brokers_guide_minimum_ready()),
         "commercial_prep_ready":bool(prep["internal_prep_ready"]),
@@ -167,7 +168,8 @@ def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
         ("Academy — vídeos renderizados","PENDENTE"),
         ("Central de suporte","PRONTO" if status["support_ready"] else "PENDENTE"),
         ("Assistente de voz — infraestrutura","PRONTA" if status["voice_contract_ready"] else "PENDENTE"),
-        ("Assistente de voz — provedor TTS","PENDENTE"),
+        ("Assistente de voz — no aplicativo","PRONTO" if status["voice_assistant_ready"] else "PENDENTE"),
+        ("Assistente de voz — TTS neural externo","OPCIONAL · PENDENTE"),
         ("Guia de corretoras","PRONTO — INFORMATIVO" if status["brokers_guide_ready"] else "PENDENTE"),
         ("Termos / privacidade / riscos — rascunhos","PRONTOS" if status["legal_drafts_ready"] else "PENDENTE"),
         ("Termos / privacidade / riscos — revisão final","PENDENTE"),
