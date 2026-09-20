@@ -16,6 +16,7 @@ import pandas as pd
 import streamlit as st
 
 from atlasquant_voice_assistant import render_contextual_voice_assistant
+from atlasquant_market_layers import build_market_layers, beginner_layer_summary
 
 SCHEMA="ATLASQUANT_HOME_RADAR_V1"
 
@@ -65,7 +66,7 @@ def _adr_label(value:Any)->str:
     return f"BAIXO · ADR {x:.0f}%"
 
 
-def home_rows_from_packs(packs:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
+def home_rows_from_packs(packs:Sequence[Mapping[str,Any]]|None, *, news_state:Mapping[str,Any]|None=None, macro_context:Mapping[str,Any]|None=None, micro_state:Mapping[str,Any]|None=None)->list[dict[str,Any]]:
     rows=[]
     for raw in list(packs or []):
         p=dict(raw or {})
@@ -76,6 +77,8 @@ def home_rows_from_packs(packs:Sequence[Mapping[str,Any]]|None)->list[dict[str,A
         data=dict(p.get("data_ready",{}) or {})
         strength=dict(p.get("strength",{}) or {})
         blockers=[str(x) for x in list(p.get("blockers",[]) or []) if str(x).strip()]
+        research=build_market_layers(p,news_state=news_state,macro_context=macro_context,micro_state=micro_state)
+        consensus=dict(research.get("consensus",{}) or {})
         rows.append({
             "pair":pair,
             "bias":bias,
@@ -111,6 +114,13 @@ def home_rows_from_packs(packs:Sequence[Mapping[str,Any]]|None)->list[dict[str,A
             "positives":[str(x) for x in list(p.get("positives",[]) or []) if str(x).strip()],
             "hard_blocks":[str(x) for x in list(p.get("hard_blocks",[]) or []) if str(x).strip()],
             "soft_blocks":[str(x) for x in list(p.get("soft_blocks",[]) or []) if str(x).strip()],
+            "research_state":str(consensus.get("research_state") or "AGUARDAR"),
+            "research_direction":str(consensus.get("research_direction") or research.get("research_direction") or "INDISPONÍVEL"),
+            "research_balance":_safe(research.get("research_balance",0)),
+            "research_layers":int(research.get("available_layers",0) or 0),
+            "research_agreement":_safe(consensus.get("agreement_pct",0)),
+            "research_blockers":[str(x) for x in list(consensus.get("blockers",[]) or []) if str(x).strip()],
+            "research_summary":beginner_layer_summary(research),
         })
     rows.sort(key=lambda x:(x["action"]!="NÃO OPERAR",x["priority"],x["data_score"]),reverse=True)
     return rows
@@ -238,8 +248,10 @@ def render_home_radar(
     *,
     experience_mode:str="Iniciante",
     macro_context:Mapping[str,Any]|None=None,
+    news_state:Mapping[str,Any]|None=None,
+    micro_state:Mapping[str,Any]|None=None,
 )->dict[str,Any]:
-    rows=home_rows_from_packs(packs)
+    rows=home_rows_from_packs(packs,news_state=news_state,macro_context=macro_context,micro_state=micro_state)
     summary=home_summary(rows)
     mode="Avançado" if str(experience_mode).casefold().startswith("avan") else "Iniciante"
     st.markdown(HOME_CSS,unsafe_allow_html=True)
@@ -287,6 +299,10 @@ def render_home_radar(
     st.markdown(f"**Resumo:** {row['reason']}")
     st.markdown(f"**Próximo passo:** {row['next_action']}")
     st.caption(
+        f"Motores de pesquisa: {row['research_state']} · {row['research_layers']}/4 camadas · "
+        f"concordância {row['research_agreement']:.0f}% · {row['research_summary']}"
+    )
+    st.caption(
         f"Força relativa Δ {row['strength_diff']:+.1f} pts · H4 {row['h4']} · "
         f"H1 {row['h1']} · M15 {row['m15']} · Gate {row['gate']} · {row['movement']}"
     )
@@ -305,10 +321,13 @@ def render_home_radar(
             "Par":r["pair"],"Ação":r["action"],"Viés":r["bias"],"Prioridade":round(r["priority"],1),
             "Qualidade":round(r["quality"],1),"Dados":round(r["data_score"],1),"H4":r["h4"],"H1":r["h1"],
             "M15":r["m15"],"Gate":r["gate"],"Movimento":r["movement"],"Notícias":r["news"],"Evento":r["event"],
+            "Motores":r["research_state"],"Camadas":f"{r['research_layers']}/4","Consenso %":round(r["research_agreement"],1),
         } for r in rows])
         st.dataframe(adv,width="stretch",hide_index=True)
         if row["blockers"]:
             st.warning("Bloqueios/atenções: "+" · ".join(row["blockers"][:6]))
+        if row["research_blockers"]:
+            st.warning("Bloqueios dos motores de pesquisa: "+" · ".join(row["research_blockers"][:4]))
 
     st.info("O Radar organiza onde olhar primeiro. Ele não envia ordens e não transforma prioridade em probabilidade de lucro.")
     return {
