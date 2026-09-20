@@ -340,7 +340,13 @@ def browser_speech_html(text:object, *, button_label:str="🔊 Ouvir", key:str="
       const chooseVoice=()=>{{
         const voices=window.speechSynthesis.getVoices()||[];
         const compatible=voices.filter(v=>((v.lang||"").toLowerCase().startsWith("pt")));
-        const pool=compatible.length?compatible:voices;
+        const preferred=(voice)=>{{
+          const name=norm(voice.name);
+          return (profile.preferred_terms||[]).some(term=>name.includes(norm(term)));
+        }};
+        const candidates=compatible.filter(preferred);
+        if(!candidates.length && profile.allow_generic_device_fallback!==true) return null;
+        const pool=candidates.length?candidates:compatible;
         return pool.slice().sort((a,b)=>scoreVoice(b)-scoreVoice(a))[0]||null;
       }};
       const configure=(u)=>{{
@@ -360,9 +366,13 @@ def browser_speech_html(text:object, *, button_label:str="🔊 Ouvir", key:str="
         window.speechSynthesis.cancel();
         const u=new SpeechSynthesisUtterance(text);
         const selected=configure(u);
+        if(!selected && profile.strict_fixed_voice===true && profile.allow_generic_device_fallback!==true){{
+          status.textContent="Voz oficial AtlasQuant não disponível neste aparelho. O texto continua disponível.";
+          return;
+        }}
         u.onstart=()=>status.textContent=selected
-          ? "Reproduzindo · "+selected.name+" · voz AtlasQuant grave."
-          : "Reproduzindo · voz AtlasQuant grave.";
+          ? "Reproduzindo · "+selected.name+" · voz oficial AtlasQuant."
+          : "Reproduzindo · voz AtlasQuant.";
         u.onend=()=>status.textContent="Concluído.";
         u.onerror=()=>status.textContent="Falha na reprodução neste dispositivo.";
         window.speechSynthesis.speak(u);
@@ -429,7 +439,13 @@ def browser_mic_assistant_html(context:Mapping[str,Any], *, key:str)->str:
       const chooseVoice=()=>{{
         const voices=window.speechSynthesis.getVoices()||[];
         const compatible=voices.filter(v=>((v.lang||"").toLowerCase().startsWith("pt")));
-        const pool=compatible.length?compatible:voices;
+        const preferred=(voice)=>{{
+          const name=voiceNorm(voice.name);
+          return (profile.preferred_terms||[]).some(term=>name.includes(voiceNorm(term)));
+        }};
+        const candidates=compatible.filter(preferred);
+        if(!candidates.length && profile.allow_generic_device_fallback!==true)return null;
+        const pool=candidates.length?candidates:compatible;
         return pool.slice().sort((a,b)=>voiceScore(b)-voiceScore(a))[0]||null;
       }};
       const speak=(text)=>{{
@@ -441,6 +457,10 @@ def browser_mic_assistant_html(context:Mapping[str,Any], *, key:str)->str:
         u.pitch=Number(profile.pitch||0.88);
         u.volume=Number(profile.volume||1.0);
         const voice=chooseVoice();
+        if(!voice && profile.strict_fixed_voice===true && profile.allow_generic_device_fallback!==true){{
+          heard.textContent="Voz oficial AtlasQuant não disponível neste aparelho. A resposta ficou no texto.";
+          return;
+        }}
         if(voice)u.voice=voice;
         window.speechSynthesis.speak(u);
       }};
@@ -484,7 +504,7 @@ def render_contextual_voice_assistant(
     pair_key=re.sub(r"[^a-zA-Z0-9_-]","_",c["pair"])
 
     st.markdown("### 🎙️ Assistente de Voz")
-    st.caption("Voz padrão AtlasQuant: masculina, mais grave e com preferência por mecanismo natural/neural em português do Brasil.")
+    st.caption("Voz oficial AtlasQuant: masculina, grave e natural. Se ela não estiver disponível, o app mantém o texto e não troca escondido por uma voz genérica.")
     if advanced:
         st.caption("Modo Avançado: explicação detalhada + perguntas contextuais. A resposta usa somente o estado já calculado pelo AtlasQuant.")
     else:
