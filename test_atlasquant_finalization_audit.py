@@ -20,6 +20,13 @@ class AtlasQuantFinalizationAuditTests(unittest.TestCase):
         self.assertFalse(status["automatic_public_launch"])
         self.assertTrue(status["manual_external_completion_required"])
 
+    def test_strategy_safety_invariants_remain_fail_closed(self):
+        status=finalization_audit()
+        self.assertFalse(status["automatic_strategy_changes_enabled"])
+        self.assertFalse(status["automatic_weight_changes_enabled"])
+        self.assertFalse(status["small_sample_auto_promotion_enabled"])
+        self.assertTrue(status["human_strategy_review_required"])
+
     def test_missing_handoff_docs_blocks_internal_completion(self):
         with tempfile.TemporaryDirectory() as td:
             status=finalization_audit(Path(td))
