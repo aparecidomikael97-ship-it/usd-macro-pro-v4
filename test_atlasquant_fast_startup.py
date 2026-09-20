@@ -6,6 +6,7 @@ from atlasquant_fast_startup import (
     snapshot_age_minutes,
     validate_home_snapshot,
     load_home_snapshot,
+    DEFAULT_FAST_TIMEOUT,
 )
 
 
@@ -82,9 +83,10 @@ class FastStartupTests(unittest.TestCase):
     def test_snapshot_loader_timeout_is_bounded_for_fast_boot(self):
         import inspect
         signature=inspect.signature(load_home_snapshot)
-        self.assertEqual(signature.parameters["timeout"].default,4.0)
+        self.assertEqual(signature.parameters["timeout"].default,DEFAULT_FAST_TIMEOUT)
+        self.assertLessEqual(DEFAULT_FAST_TIMEOUT,2.5)
         src=inspect.getsource(load_home_snapshot)
-        self.assertIn("min(float(timeout),8.0)",src)
+        self.assertIn("min(float(timeout),4.0)",src)
         self.assertIn("if not token:",src)
 
     def test_fast_loader_records_non_trading_observability(self):
