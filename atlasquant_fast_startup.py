@@ -14,6 +14,7 @@ import base64
 from datetime import datetime, timezone
 import json
 import math
+import time
 from typing import Any, Mapping
 from urllib.parse import quote
 
@@ -102,13 +103,20 @@ def load_home_snapshot(
     if not repo or "/" not in repo:
         return {}
     timeout=max(1.0,min(float(timeout),8.0))
+    started=time.perf_counter()
 
     raw_url=f"https://raw.githubusercontent.com/{repo}/{quote(branch,safe='')}/{HOME_SNAPSHOT_PATH}"
     try:
         r=requests.get(raw_url,timeout=timeout,headers={"User-Agent":"AtlasQuant-FastBoot/1"})
         if r.ok:
             obj=r.json()
-            return dict(obj) if isinstance(obj,Mapping) else {}
+            out=dict(obj) if isinstance(obj,Mapping) else {}
+            if out:
+                out["_fast_boot_observability"]={
+                    "source":"raw",
+                    "load_ms":round((time.perf_counter()-started)*1000),
+                }
+            return out
     except Exception:
         pass
 
@@ -129,7 +137,13 @@ def load_home_snapshot(
         if not encoded:
             return {}
         obj=json.loads(base64.b64decode(encoded).decode("utf-8"))
-        return dict(obj) if isinstance(obj,Mapping) else {}
+        out=dict(obj) if isinstance(obj,Mapping) else {}
+        if out:
+            out["_fast_boot_observability"]={
+                "source":"api",
+                "load_ms":round((time.perf_counter()-started)*1000),
+            }
+        return out
     except Exception:
         return {}
 
@@ -205,6 +219,14 @@ def render_beginner_shell(
         }
 
     age=float(check["age_minutes"] or 0.0)
+    _obs=dict(snapshot.get("_fast_boot_observability",{}) or {})
+    st.session_state["atlasquant_fast_boot_observability"]={
+        "source":str(_obs.get("source") or "unknown"),
+        "load_ms":int(_finite(_obs.get("load_ms"),0)),
+        "snapshot_age_minutes":round(age,2),
+        "snapshot_valid":True,
+        "mode":"Iniciante",
+    }
     st.markdown(
         """<div style="border:1px solid rgba(137,170,210,.18);border-radius:16px;padding:13px 16px;
         background:linear-gradient(120deg,rgba(17,43,72,.96),rgba(8,25,43,.94));margin:2px 0 10px">
