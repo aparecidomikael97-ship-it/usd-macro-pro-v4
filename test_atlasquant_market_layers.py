@@ -135,6 +135,41 @@ class AtlasQuantMarketLayersTests(unittest.TestCase):
         self.assertIn("ICT readiness",text)
         self.assertIn("Fluxo institucional",text)
 
+    def test_technical_exposes_quarterly_without_changing_operational_contract(self):
+        p=pack(quarterly={
+            "available":True,"quarter_label":"Q2","event":"BSL VARRIDA + RECLAIM",
+            "direction":"VENDA","direction_vote":-1,"side_alignment":"ALINHADO",
+            "quality":90,"phase_hint":"EXPANSÃO / VARREDURA POSSÍVEL",
+        })
+        out=technical_flow_layer(p)
+        text=" ".join(out["reasons"])
+        self.assertIn("Quarterly Q2",text)
+        self.assertIn("não preditivo",text)
+        self.assertFalse(out["decision_effect"])
+
+    def test_technical_intermarket_requires_explicit_available_snapshot(self):
+        p=pack(intermarket={
+            "available":True,"direction":"VENDA","balance":-60,"quality":80,
+            "reasons":["US-DE 2Y spread: VENDA.","risk regime: VENDA."],
+        })
+        out=technical_flow_layer(p)
+        text=" ".join(out["reasons"])
+        self.assertIn("Intermarket:",text)
+        self.assertLess(out["balance"],0)
+        self.assertFalse(out["decision_effect"])
+
+    def test_technical_lists_structure_liquidity_and_session_context(self):
+        p=pack(inst={
+            "structure":{"status":"🟢 BOS CONFIRMADO"},
+            "liquidity":{"status":"🟡 LIQUIDEZ PARCIAL"},
+            "session":{"status":"🟡 AGUARDANDO KILLZONE"},
+        })
+        out=technical_flow_layer(p)
+        text=" ".join(out["reasons"])
+        self.assertIn("BOS/CHOCH",text)
+        self.assertIn("Draw on Liquidity",text)
+        self.assertIn("Sessão/Judas",text)
+
     def test_missing_micro_does_not_become_fake_neutral_confidence(self):
         out=build_market_layers(pack(),news_state=news_state())
         micro=next(x for x in out["layers"] if x["id"]=="micro")
