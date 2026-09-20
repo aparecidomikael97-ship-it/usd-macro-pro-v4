@@ -40,6 +40,17 @@ class LayerConsensusTests(unittest.TestCase):
         self.assertEqual(out["research_state"], "NÃO OPERAR")
         self.assertTrue(any("CONFLITO" in x for x in out["blockers"]))
 
+    def test_layer_specific_research_blocker_fails_closed(self):
+        geo=layer("geopolitics",-20,75)
+        geo["label"]="Geopolítica"
+        geo["research_blockers"]=["EVENTO GEOPOLÍTICO CRÍTICO SEM CORROBORAÇÃO SUFICIENTE."]
+        out=build_layer_consensus({"research_balance":-28,"layers":[
+            layer("macro",-30,85),geo,layer("technical_flow",-25,82)
+        ]})
+        self.assertEqual(out["research_state"],"NÃO OPERAR")
+        self.assertTrue(any("Geopolítica:" in x for x in out["blockers"]))
+        self.assertFalse(out["changes_gate"])
+
     def test_neutral_without_blockers_waits(self):
         out = build_layer_consensus({"research_balance": 8, "layers": [
             layer("macro", 10), layer("technical_flow", 6)
