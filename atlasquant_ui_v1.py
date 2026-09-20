@@ -332,7 +332,7 @@ def navigation_mode_css(mode: object) -> str:
     """Hide advanced tab buttons in beginner mode without changing tab indices."""
     if normalize_experience_mode(mode)=="Avançado":
         return "<style></style>"
-    visible={1,11,12,17,18,20}
+    visible={1,11,12,17,18,20,21}
     hidden=[i for i in range(1,len(NAVIGATION_LABELS)+1) if i not in visible]
     selectors=",".join(
         f'[data-testid="stTabs"] [role="tablist"] > [role="tab"]:nth-child({i})'
@@ -357,7 +357,7 @@ def render_experience_mode_switch() -> str:
     # Avoid injecting mode-dependent tab CSS on every rerun; this keeps the
     # mobile DOM stable while nested tabs elsewhere retain the global theme.
     if mode=="Iniciante":
-        st.caption("Modo Iniciante · Radar, Macro Briefing, Aprender, Conta, Instalar e Suporte.")
+        st.caption("Modo Iniciante · áreas essenciais abertas e recursos Avançados visíveis em prévia bloqueada.")
     else:
         st.caption("Modo Avançado · todas as áreas e diagnósticos disponíveis.")
     return mode
