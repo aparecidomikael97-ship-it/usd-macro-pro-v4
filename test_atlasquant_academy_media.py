@@ -28,6 +28,24 @@ class AtlasQuantAcademyMediaTests(unittest.TestCase):
         self.assertFalse(item["published_video"])
         self.assertFalse(item["trading_side_effects"])
 
+    def test_quarterly_topics_have_video_scripts_and_storyboards(self):
+        quarterly_ids=[
+            "quarterly-theory",
+            "quarterly-multitimeframe",
+            "quarterly-amd",
+            "quarterly-execution",
+        ]
+        for topic_id in quarterly_ids:
+            item=academy_video_script(topic_id)
+            self.assertIsNotNone(item)
+            self.assertTrue(item["script_ready"])
+            self.assertEqual(item["level"],"Avançado")
+            self.assertEqual(len(item["scenes"]),5)
+            self.assertIn("Quarterly",item["title"])
+            self.assertFalse(item["rendered_video"])
+            self.assertFalse(item["published_video"])
+            self.assertFalse(item["trading_side_effects"])
+
     def test_unknown_topic_fails_closed(self):
         self.assertIsNone(academy_video_script("missing-topic"))
 
