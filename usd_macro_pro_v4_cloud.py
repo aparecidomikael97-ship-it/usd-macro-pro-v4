@@ -265,6 +265,8 @@ try:
         operation_focus_html,
         mobile_navigation_hint_html,
         render_stable_navigation,
+        is_page_locked_for_mode,
+        render_locked_advanced_preview,
         decision_strip_html,
         context_strip_html,
     )
@@ -278,6 +280,8 @@ except Exception as _atlasquant_ui_exc:
     operation_focus_html = None
     mobile_navigation_hint_html = None
     render_stable_navigation = None
+    is_page_locked_for_mode = None
+    render_locked_advanced_preview = None
     decision_strip_html = None
     context_strip_html = None
     _ATLASQUANT_UI_IMPORT_ERROR = f"{type(_atlasquant_ui_exc).__name__}: {_atlasquant_ui_exc}"
@@ -315,6 +319,13 @@ try:
 except Exception as _coverage_exc:
     render_coverage_funnel = None
     _ATLASQUANT_COVERAGE_IMPORT_ERROR = f"{type(_coverage_exc).__name__}: {_coverage_exc}"
+
+try:
+    from atlasquant_investment_panel import render_investment_center
+    _ATLASQUANT_INVESTMENT_IMPORT_ERROR = ""
+except Exception as _investment_exc:
+    render_investment_center = None
+    _ATLASQUANT_INVESTMENT_IMPORT_ERROR = f"{type(_investment_exc).__name__}: {_investment_exc}"
 
 MOEDAS = {
     "USD": "Dólar Americano",
@@ -4021,7 +4032,7 @@ def _autopilot_save_inputs_v107():
 _fallback_nav = [
     "🎯 Radar", "🧭 Painel mestre", "💱 Moedas", "🇺🇸 EUA", "🔀 Pares", "🏦 Fed",
     "🗂️ Histórico", "🧪 Backtest", "⚡ Decisão", "🗺️ Market Map", "🎙️ Macro Briefing", "🎓 Aprender",
-    "🧩 Produto", "🛠️ Melhorias", "📰 Notícias", "🤖 Autopilot", "👤 Conta", "📱 Instalar", "💼 Vendas", "🛟 Suporte",
+    "🧩 Produto", "🛠️ Melhorias", "📰 Notícias", "🤖 Autopilot", "👤 Conta", "📱 Instalar", "💼 Vendas", "💰 Investir", "🛟 Suporte",
 ]
 _nav_items = list(navigation_labels()) if navigation_labels is not None else _fallback_nav
 _aq_experience_mode = (
@@ -4055,7 +4066,7 @@ else:
         if str(_aq_experience_mode).casefold().startswith("avan")
         else [
             item for item in _nav_items
-            if item in {"🎯 Radar","🎙️ Macro Briefing","🎓 Aprender","👤 Conta","📱 Instalar","🛟 Suporte"}
+            if item in {"🎯 Radar","🎙️ Macro Briefing","🎓 Aprender","👤 Conta","📱 Instalar","💰 Investir","🛟 Suporte"}
         ]
     )
     _aq_active_page = st.selectbox(
@@ -4063,7 +4074,17 @@ else:
         _aq_allowed_nav,
         key="atlasquant_stable_nav_fallback",
     )
-_aq_active_index = _nav_items.index(_aq_active_page) if _aq_active_page in _nav_items else 0
+_aq_locked_preview = bool(
+    is_page_locked_for_mode is not None
+    and is_page_locked_for_mode(_aq_active_page, _aq_experience_mode)
+)
+if _aq_locked_preview and render_locked_advanced_preview is not None:
+    render_locked_advanced_preview(_aq_active_page)
+_aq_active_index = (
+    -1
+    if _aq_locked_preview
+    else (_nav_items.index(_aq_active_page) if _aq_active_page in _nav_items else 0)
+)
 
 # =========================================================
 # MACRO BRIEFING — apresentação sobre o estado JÁ calculado
@@ -9461,9 +9482,20 @@ if _aq_active_index == 18:
         render_sales_center(_ATLASQUANT_ACCESS)
 
 # =========================================================
-# SUPORTE — SELF-SERVICE SEGURO
+# INVESTIR — PLANEJAMENTO, RENDA E ESTUDO DE LONGO PRAZO
 # =========================================================
 if _aq_active_index == 19:
+    if render_investment_center is None:
+        st.error("Central Investir indisponível neste carregamento.")
+        if _ATLASQUANT_INVESTMENT_IMPORT_ERROR:
+            st.caption("Diagnóstico: "+_ATLASQUANT_INVESTMENT_IMPORT_ERROR)
+    else:
+        render_investment_center(_aq_experience_mode)
+
+# =========================================================
+# SUPORTE — SELF-SERVICE SEGURO
+# =========================================================
+if _aq_active_index == 20:
     if render_support_center is None:
         st.error("Central de suporte indisponível neste carregamento.")
         if _ATLASQUANT_SUPPORT_IMPORT_ERROR:

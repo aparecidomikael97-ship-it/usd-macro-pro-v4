@@ -31,6 +31,7 @@ NAVIGATION_LABELS = (
     "👤 Conta",
     "📱 Instalar",
     "💼 Vendas",
+    "💰 Investir",
     "🛟 Suporte",
 )
 
@@ -39,8 +40,37 @@ NAVIGATION_GROUPS = (
     ("Mercado", ("💱 Moedas", "🇺🇸 EUA", "🔀 Pares", "🏦 Fed", "📰 Notícias")),
     ("Pesquisa", ("🗂️ Histórico", "🧪 Backtest", "🎙️ Macro Briefing", "🎓 Aprender")),
     ("Sistema", ("🤖 Autopilot", "🧩 Produto", "🛠️ Melhorias")),
-    ("Conta", ("👤 Conta", "📱 Instalar", "💼 Vendas", "🛟 Suporte")),
+    ("Conta", ("👤 Conta", "📱 Instalar", "💼 Vendas")),
+    ("Investir", ("💰 Investir",)),
+    ("Suporte", ("🛟 Suporte",)),
 )
+
+BEGINNER_OPEN_AREAS = (
+    "🎯 Radar",
+    "🎙️ Macro Briefing",
+    "🎓 Aprender",
+    "👤 Conta",
+    "📱 Instalar",
+    "💰 Investir",
+    "🛟 Suporte",
+)
+
+ADVANCED_PREVIEW_FEATURES = {
+    "🧭 Painel mestre": ("visão consolidada", "scanner técnico", "qualidade e frescor dos dados"),
+    "💱 Moedas": ("força macro do G8", "comparação entre moedas", "componentes do score"),
+    "🇺🇸 EUA": ("dados macro dos EUA", "surpresas econômicas", "contexto de juros"),
+    "🔀 Pares": ("confluência do par", "timing e calendário", "explicação dos componentes"),
+    "🏦 Fed": ("narrativa do Fed", "tom hawkish/dovish", "impacto contextual no USD"),
+    "🗂️ Histórico": ("leituras anteriores", "comparação temporal", "evidência persistida"),
+    "🧪 Backtest": ("replay dos operacionais", "métricas auditáveis", "comparação por setup"),
+    "⚡ Decisão": ("contexto consolidado", "gates de segurança", "próximo passo operacional"),
+    "🗺️ Market Map": ("mapa de mercado", "relações entre ativos", "contexto intermercado"),
+    "🧩 Produto": ("configuração do produto", "recursos avançados", "controles da plataforma"),
+    "🛠️ Melhorias": ("laboratórios de validação", "estabilidade", "evidências de pesquisa"),
+    "📰 Notícias": ("notícias por moeda", "relevância macro", "leitura contextual"),
+    "🤖 Autopilot": ("monitoramento automático", "estado do runtime", "auditoria do ciclo"),
+    "💼 Vendas": ("onboarding comercial", "planos e acesso", "fluxo de assinatura"),
+}
 
 ATLASQUANT_CSS = r"""
 <style>
@@ -171,8 +201,8 @@ html { scroll-behavior: smooth; }
   border-radius: 13px !important;
 }
 [data-testid="stMetric"] > div { padding: .15rem .2rem; }
-[data-testid="stMetricValue"] { letter-spacing: -.035em; color: var(--aq-text); }
-[data-testid="stMetricLabel"] { color: var(--aq-muted); font-size: .78rem; }
+[data-testid="stMetricValue"], [data-testid="stMetricValue"] * { letter-spacing: -.035em; color: var(--text-color, #111827) !important; font-weight: 800 !important; opacity: 1 !important; }
+[data-testid="stMetricLabel"], [data-testid="stMetricLabel"] * { color: var(--text-color, #111827) !important; font-size: .78rem; font-weight: 650 !important; opacity: .82 !important; }
 [data-testid="stButton"] button {
   border-radius: 10px; min-height: 2.45rem; font-weight: 700;
   border: 1px solid var(--aq-line);
@@ -188,7 +218,16 @@ html { scroll-behavior: smooth; }
 [data-testid="stAlert"] { border-radius: 12px; }
 [data-testid="stTextInput"] input,
 [data-testid="stNumberInput"] input,
+[data-testid="stTextArea"] textarea,
 [data-baseweb="select"] > div { border-radius: 10px !important; }
+[data-testid="stTextInput"] input,
+[data-testid="stNumberInput"] input,
+[data-testid="stTextArea"] textarea {
+  color: var(--text-color, #111827) !important;
+  -webkit-text-fill-color: var(--text-color, #111827) !important;
+  font-weight: 650 !important;
+  opacity: 1 !important;
+}
 [data-testid="stExpander"] {
   border: 1px solid var(--ux-border, var(--aq-line)) !important;
   background: var(--ux-card, rgba(12,26,44,.48)) !important;
@@ -228,6 +267,9 @@ html { scroll-behavior: smooth; }
   background: rgba(79,163,255,.16) !important;
   color: #f4f8ff !important;
 }
+.aq-preview-lock{border:1px solid var(--aq-line);border-radius:18px;padding:20px;margin:8px 0 14px;background:linear-gradient(145deg,rgba(18,38,64,.78),rgba(8,21,38,.88));box-shadow:0 16px 36px rgba(0,0,0,.16)}
+.aq-preview-lock .lock{font-size:1.5rem}.aq-preview-lock h3{margin:.2rem 0 .4rem;color:var(--aq-text)}.aq-preview-lock p{color:var(--aq-muted);margin:.2rem 0 .7rem}
+.aq-preview-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.aq-preview-card{border:1px solid var(--aq-line);border-radius:12px;padding:11px 12px;background:rgba(10,25,44,.66);color:#dceaff;font-size:.76rem}
 @media (max-width: 760px) {
   .stMainBlockContainer { padding-left: .85rem; padding-right: .85rem; padding-top: .7rem; }
   [data-testid="stHorizontalBlock"] { flex-wrap: wrap !important; gap: .55rem !important; }
@@ -260,6 +302,7 @@ html { scroll-behavior: smooth; }
   [data-testid="stTabs"] [role="tablist"] { margin-left:-.25rem; margin-right:-.25rem; border-radius:10px; }
   [data-testid="stTabs"] [role="tab"] { font-size:.74rem; padding-left:.55rem; padding-right:.55rem; min-height:34px; }
   [data-testid="stTabs"] [role="tablist"] { scrollbar-width:none; }
+  .aq-preview-grid{grid-template-columns:1fr}
 }
 </style>
 """
@@ -298,7 +341,7 @@ def navigation_mode_css(mode: object) -> str:
     """Hide advanced tab buttons in beginner mode without changing tab indices."""
     if normalize_experience_mode(mode)=="Avançado":
         return "<style></style>"
-    visible={1,11,12,17,18,20}
+    visible={1,11,12,17,18,20,21}
     hidden=[i for i in range(1,len(NAVIGATION_LABELS)+1) if i not in visible]
     selectors=",".join(
         f'[data-testid="stTabs"] [role="tablist"] > [role="tab"]:nth-child({i})'
@@ -323,7 +366,7 @@ def render_experience_mode_switch() -> str:
     # Avoid injecting mode-dependent tab CSS on every rerun; this keeps the
     # mobile DOM stable while nested tabs elsewhere retain the global theme.
     if mode=="Iniciante":
-        st.caption("Modo Iniciante · Radar, Macro Briefing, Aprender, Conta, Instalar e Suporte.")
+        st.caption("Modo Iniciante · áreas essenciais abertas e recursos Avançados visíveis em prévia bloqueada.")
     else:
         st.caption("Modo Avançado · todas as áreas e diagnósticos disponíveis.")
     return mode
@@ -337,30 +380,75 @@ def navigation_group_for(label: object) -> str:
     return "AtlasQuant"
 
 
+def is_page_locked_for_mode(page: object, mode: object) -> bool:
+    normalized = normalize_experience_mode(mode)
+    return normalized == "Iniciante" and str(page or "") not in set(BEGINNER_OPEN_AREAS)
+
+
+def advanced_preview_model(page: object) -> dict[str, object]:
+    label = str(page or "Área avançada")
+    features = ADVANCED_PREVIEW_FEATURES.get(
+        label,
+        ("diagnóstico avançado", "mais detalhes e evidências", "controles adicionais"),
+    )
+    return {
+        "page": label,
+        "features": tuple(features),
+        "message": (
+            "Prévia do modo Avançado. Os dados e controles reais desta área "
+            "continuam bloqueados enquanto o usuário estiver no modo Iniciante."
+        ),
+    }
+
+
+def render_locked_advanced_preview(page: object) -> dict[str, object]:
+    model = advanced_preview_model(page)
+    cards = "".join(
+        f'<div class="aq-preview-card">{escape(str(item))}</div>'
+        for item in model["features"]
+    )
+    st.markdown(
+        '<div class="aq-preview-lock">'
+        '<div class="lock">🔒</div>'
+        f'<h3>{escape(str(model["page"]))}</h3>'
+        '<p>Veja o que existe nesta área sem liberar os dados do modo Avançado.</p>'
+        f'<div class="aq-preview-grid">{cards}</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+    st.info(model["message"])
+    st.caption(
+        "A prévia serve para conhecer os recursos. Ela não executa motores avançados, "
+        "não expõe dados exclusivos e não envia ordens."
+    )
+    return model
+
+
 def render_stable_navigation(
     items: tuple[str, ...] | list[str],
     *,
     mode: object = "Avançado",
 ) -> str:
-    """Render one stable page selector instead of a 20-tab overflow menu.
+    """Render one stable selector while keeping advanced areas discoverable.
 
-    Streamlit tabs keep every tab body mounted and mobile Chromium adds an
-    overflow popover when the labels do not fit. A single controlled selectbox
-    avoids that high-churn DOM path and lets the app execute only the selected
-    workspace.
+    Beginner mode keeps every destination visible. Advanced-only destinations
+    are marked with a lock and the caller must intercept them before rendering
+    any advanced workspace.
     """
     options=[str(x) for x in list(items or []) if str(x).strip()]
     if not options:
         return ""
     normalized=normalize_experience_mode(mode)
     if normalized=="Iniciante":
-        allowed={"🎯 Radar","🎙️ Macro Briefing","🎓 Aprender","👤 Conta","📱 Instalar","🛟 Suporte"}
-        options=[x for x in options if x in allowed] or [options[0]]
         label="Área"
         key="atlasquant_beginner_area_full"
+        def _format_option(item: str) -> str:
+            return item if item in set(BEGINNER_OPEN_AREAS) else f"🔒 {item} · Avançado"
     else:
         label="Área avançada"
         key="atlasquant_advanced_area"
+        def _format_option(item: str) -> str:
+            return item
 
     current=str(st.session_state.get(key,options[0]) or options[0])
     if current not in options:
@@ -370,13 +458,18 @@ def render_stable_navigation(
         options,
         index=options.index(current),
         key=key,
+        format_func=_format_option,
         help=(
-            "Escolha a área do AtlasQuant. Só a área selecionada é renderizada, "
+            "Escolha a área do AtlasQuant. No modo Iniciante, áreas com cadeado "
+            "abrem apenas uma prévia; no Avançado, os workspaces completos são renderizados, "
             "reduzindo carga e instabilidade de DOM no celular."
         ),
     )
     group=navigation_group_for(selected)
-    st.caption(f"Modo {normalized} · {group} · navegação estável para celular e desktop.")
+    if is_page_locked_for_mode(selected, normalized):
+        st.caption(f"Modo {normalized} · {group} · prévia do recurso Avançado.")
+    else:
+        st.caption(f"Modo {normalized} · {group} · navegação estável para celular e desktop.")
     return str(selected)
 
 

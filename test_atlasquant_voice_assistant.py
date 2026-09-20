@@ -127,6 +127,8 @@ class AtlasQuantVoiceAssistantTests(unittest.TestCase):
         self.assertIn("u.pitch=Number(profile.pitch||0.88)",html)
         self.assertIn("u.rate=Number(profile.rate||0.93)",html)
         self.assertIn("if(voice) u.voice=voice",html)
+        self.assertIn("profile.allow_generic_device_fallback!==true",html)
+        self.assertIn("Voz oficial AtlasQuant não disponível",html)
 
     def test_browser_mic_has_text_safe_context_and_no_order_api(self):
         bad=row()
@@ -146,6 +148,8 @@ class AtlasQuantVoiceAssistantTests(unittest.TestCase):
         self.assertIn("u.pitch=Number(profile.pitch||0.88)",html)
         self.assertIn("u.rate=Number(profile.rate||0.93)",html)
         self.assertIn("if(voice)u.voice=voice",html)
+        self.assertIn("profile.allow_generic_device_fallback!==true",html)
+        self.assertIn("A resposta ficou no texto",html)
 
     def test_missing_context_stays_descriptive_not_invented(self):
         ctx=assistant_context({"pair":"USD/JPY","action":"NÃO OPERAR"})

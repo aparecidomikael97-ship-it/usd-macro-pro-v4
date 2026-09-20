@@ -34,11 +34,12 @@ class AtlasQuantNavigationStabilityTests(unittest.TestCase):
         self.assertGreaterEqual(len(guarded),len(NAVIGATION_LABELS))
 
     def test_stable_navigation_preserves_all_twenty_endpoints(self):
-        self.assertEqual(len(NAVIGATION_LABELS),20)
+        self.assertEqual(len(NAVIGATION_LABELS),21)
         self.assertEqual(NAVIGATION_LABELS[0],"🎯 Radar")
         self.assertEqual(NAVIGATION_LABELS[-1],"🛟 Suporte")
         self.assertIn("⚡ Decisão",NAVIGATION_LABELS)
         self.assertIn("🤖 Autopilot",NAVIGATION_LABELS)
+        self.assertIn("💰 Investir",NAVIGATION_LABELS)
 
     def test_no_javascript_dom_mutation_workaround_was_added(self):
         src=APP.read_text(encoding="utf-8")

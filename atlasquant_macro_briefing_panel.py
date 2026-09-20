@@ -67,8 +67,8 @@ def render_macro_briefing_panel(currency_rows: Sequence[Mapping[str, Any]] | Non
     st.caption("A camada de voz deve ler exatamente este texto; ela não pode gerar sinal ou alterar o diagnóstico.")
     st.markdown("#### 🎧 Voz")
     st.caption(
-        "A leitura pode ser reproduzida agora pela voz do navegador/dispositivo. "
-        "TTS neural continua opcional para áudio externo/baixável; nenhum provedor é chamado automaticamente."
+        "A leitura usa a voz oficial AtlasQuant quando uma voz compatível está disponível. "
+        "Se ela não estiver disponível, o texto permanece visível e o app não troca silenciosamente por voz genérica."
     )
     st.iframe(
         browser_speech_html(
@@ -83,8 +83,8 @@ def render_macro_briefing_panel(currency_rows: Sequence[Mapping[str, Any]] | Non
     profile=voice_profile()
     voice_style=str(profile["external_style"])
     st.caption(
-        "Voz padrão AtlasQuant: masculina/grave. No navegador, o app prioriza uma voz natural/neural "
-        "em português do Brasil; no TTS externo, o estilo fica fixado em deep."
+        "Voz oficial AtlasQuant: masculina/grave. No navegador, somente uma voz compatível com o perfil "
+        "é aceita; no TTS externo, o estilo continua fixado em deep."
     )
     voice_request = VoiceRequest(brief["speech_text"], voice_style).validated()
     st.session_state["aq_macro_brief_voice_request"] = {
