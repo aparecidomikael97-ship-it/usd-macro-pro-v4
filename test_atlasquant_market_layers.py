@@ -60,6 +60,9 @@ class AtlasQuantMarketLayersTests(unittest.TestCase):
         self.assertFalse(out["changes_weights"])
         self.assertFalse(out["real_orders_enabled"])
         self.assertFalse(out["automatic_execution"])
+        self.assertIn("consensus",out)
+        self.assertTrue(out["consensus"]["advisory_only"])
+        self.assertFalse(out["consensus"]["changes_gate"])
 
     def test_macro_uses_existing_relative_strength_not_probability(self):
         out=macro_layer(pack(),macro_context={"fed":{"tom":"Restritivo","forca":0.4},"event":{"disponivel":True,"evento":"PCE","impacto":"ALTO"}})
