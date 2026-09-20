@@ -12,6 +12,7 @@ from typing import Any
 from atlasquant_public_launch_readiness import collect_public_launch_readiness
 from atlasquant_native_packaging import native_packaging_audit
 from atlasquant_commercial_prep import commercial_prep_audit
+from atlasquant_fast_startup import DEFAULT_MAX_AGE_MIN
 
 SCHEMA="ATLASQUANT_FINALIZATION_AUDIT_V1"
 ROOT=Path(__file__).resolve().parent
@@ -43,12 +44,20 @@ def finalization_audit(root:Path|None=None)->dict[str,Any]:
         and not missing_docs
     )
     external_complete=bool(launch.get("external_dependencies_complete"))
+    fast_home_contract={
+        "snapshot_max_age_min":float(DEFAULT_MAX_AGE_MIN),
+        "snapshot_required_for_fast_path":True,
+        "fallback_to_full_app":True,
+        "real_orders_enabled":False,
+        "automatic_execution":False,
+    }
     return {
         "schema":SCHEMA,
         "internal_release_preparation_complete":internal_complete,
         "handoff_docs_complete":not missing_docs,
         "missing_handoff_docs":missing_docs,
         "external_dependencies_complete":external_complete,
+        "fast_home_contract":fast_home_contract,
         "public_launch_ready":bool(internal_complete and external_complete),
         "real_orders_enabled":False,
         "broker_execution_enabled":False,
