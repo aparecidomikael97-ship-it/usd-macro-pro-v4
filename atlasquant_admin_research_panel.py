@@ -141,6 +141,14 @@ def render_admin_research_panel(
     else:
         st.info("O operacional ainda não atingiu o contrato de evidência para revisão humana.")
 
+    causes=pd.DataFrame(backtest.get("cause_summary",[]) or [])
+    if not causes.empty:
+        st.markdown("#### Padrões recorrentes de gain/loss")
+        st.dataframe(causes,width="stretch",hide_index=True)
+        st.caption(
+            "Associações recorrentes ajudam a investigar o operacional, mas não provam causalidade."
+        )
+
     table=pd.DataFrame(backtest.get("diagnosis_table",[]) or [])
     if not table.empty:
         st.markdown("#### Diagnóstico das operações")
