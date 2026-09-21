@@ -240,7 +240,12 @@ st.set_page_config(
 )
 
 # Deployment identity is non-secret observability. Render exposes RENDER_GIT_COMMIT.
-_ATLASQUANT_DEPLOY_COMMIT=str(os.getenv("RENDER_GIT_COMMIT","") or "").strip()
+_ATLASQUANT_DEPLOY_COMMIT=str(
+    os.getenv("RENDER_GIT_COMMIT","")
+    or os.getenv("ATLASQUANT_DEPLOY_COMMIT","")
+    or os.getenv("GIT_COMMIT","")
+    or ""
+).strip()
 if _ATLASQUANT_DEPLOY_COMMIT:
     st.markdown(
         f'<span id="atlasquant-deploy-marker" data-commit="{_ATLASQUANT_DEPLOY_COMMIT}" style="display:none"></span>',
