@@ -20,6 +20,7 @@ import requests
 import streamlit as st
 
 from decision_integrity_v110 import evaluate_decision_integrity
+from atlasquant_session_profiles import session_bucket_from_timestamp, SESSION_LABELS
 from data_readiness_v1101 import (
     assess_pair_data_readiness, display_component_status, premium_discount_operational,
     assess_ict_freshness, display_ict_component_status, TF_LIMITS,
@@ -346,6 +347,15 @@ def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro",weights=
         "executable":decision["executable"],"technical_age":age,"data_ready":data_ready,
         "stale_technical":stale_technical,"sweep_state":sweep_state,"strength":strength,"map_current":map_current,
         "updated_at":mc.get("updated_at"),
+        "active_session_bucket":session_bucket_from_timestamp(
+            mc.get("updated_at") or inst.get("updated_at") or ict.get("updated_at")
+        ),
+        "active_session":SESSION_LABELS.get(
+            session_bucket_from_timestamp(
+                mc.get("updated_at") or inst.get("updated_at") or ict.get("updated_at")
+            ),
+            "Sessão não informada",
+        ),
     }
 
 
