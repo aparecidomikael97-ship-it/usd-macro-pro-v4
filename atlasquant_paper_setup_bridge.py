@@ -20,6 +20,7 @@ from atlasquant_setup_journal import setup_forward_summary, validate_setup_recor
 
 SCHEMA="ATLASQUANT_PAPER_SETUP_BRIDGE_V1"
 PAPER_AUDIT_PATH="dados/paper_setup_audit_v114.csv"
+MODEL_PAPER_PATH="dados/model_paper_trades_v1.csv"
 DEFAULT_MAX_RUNTIME_ROWS=10000
 
 SETUP_ALIASES={
@@ -53,7 +54,7 @@ SETUP_ALIASES={
     "volume profile":"volume-profile",
 }
 
-TRUSTED_ATTRIBUTIONS={"EXPLICIT_INPUT","MANUAL_TAG"}
+TRUSTED_ATTRIBUTIONS={"EXPLICIT_INPUT","MANUAL_TAG","SOURCE_MODEL_EXPLICIT"}
 
 
 def _norm(value:Any)->str:
@@ -176,18 +177,15 @@ def bridge_paper_audit(audit:pd.DataFrame|None)->dict[str,Any]:
 
 
 
-def load_paper_audit_runtime(
+def _load_runtime_csv(
     *,
+    path:str,
     repo:str,
     branch:str,
     token:str,
     timeout:int=15,
     max_rows:int=DEFAULT_MAX_RUNTIME_ROWS,
 )->tuple[pd.DataFrame,dict[str,Any]]:
-    """Read the prospective Paper audit from the dedicated runtime branch.
-
-    Read-only. It never writes runtime data and never falls back to a code branch.
-    """
     try:
         safe=require_runtime_branch(branch)
     except Exception as exc:
@@ -200,7 +198,7 @@ def load_paper_audit_runtime(
         return pd.DataFrame(),{
             "ok":False,"reason":"NOT_CONFIGURED","rows":0,"branch":safe,"error":"",
         }
-    url=f"https://api.github.com/repos/{repo}/contents/{PAPER_AUDIT_PATH}"
+    url=f"https://api.github.com/repos/{repo}/contents/{path}"
     headers={
         "Authorization":f"Bearer {token}",
         "Accept":"application/vnd.github+json",
@@ -215,7 +213,7 @@ def load_paper_audit_runtime(
         )
         if response.status_code==404:
             return pd.DataFrame(),{
-                "ok":True,"reason":"NOT_FOUND","rows":0,"branch":safe,"error":"",
+                "ok":True,"reason":"NOT_FOUND","rows":0,"branch":safe,"path":path,"error":"",
             }
         response.raise_for_status()
         payload=response.json()
@@ -226,13 +224,51 @@ def load_paper_audit_runtime(
             frame=frame.tail(limit).reset_index(drop=True)
         return frame,{
             "ok":True,"reason":"LOADED","rows":int(len(frame)),
-            "branch":safe,"error":"",
+            "branch":safe,"path":path,"error":"",
         }
     except Exception as exc:
         return pd.DataFrame(),{
-            "ok":False,"reason":"IO_ERROR","rows":0,"branch":safe,
+            "ok":False,"reason":"IO_ERROR","rows":0,"branch":safe,"path":path,
             "error":f"{type(exc).__name__}: {exc}",
         }
+
+
+def load_paper_audit_runtime(
+    *,
+    repo:str,
+    branch:str,
+    token:str,
+    timeout:int=15,
+    max_rows:int=DEFAULT_MAX_RUNTIME_ROWS,
+)->tuple[pd.DataFrame,dict[str,Any]]:
+    """Read the prospective generic Paper audit from the runtime branch."""
+    return _load_runtime_csv(
+        path=PAPER_AUDIT_PATH,
+        repo=repo,
+        branch=branch,
+        token=token,
+        timeout=timeout,
+        max_rows=max_rows,
+    )
+
+
+def load_model_paper_runtime(
+    *,
+    repo:str,
+    branch:str,
+    token:str,
+    timeout:int=15,
+    max_rows:int=DEFAULT_MAX_RUNTIME_ROWS,
+)->tuple[pd.DataFrame,dict[str,Any]]:
+    """Read the model-specific Paper ledger from the runtime branch."""
+    return _load_runtime_csv(
+        path=MODEL_PAPER_PATH,
+        repo=repo,
+        branch=branch,
+        token=token,
+        timeout=timeout,
+        max_rows=max_rows,
+    )
 
 
 __all__=[
@@ -240,7 +276,9 @@ __all__=[
     "SETUP_ALIASES",
     "TRUSTED_ATTRIBUTIONS",
     "PAPER_AUDIT_PATH",
+    "MODEL_PAPER_PATH",
     "canonical_setup_id",
     "bridge_paper_audit",
     "load_paper_audit_runtime",
+    "load_model_paper_runtime",
 ]

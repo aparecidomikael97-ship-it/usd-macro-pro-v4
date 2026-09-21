@@ -52,6 +52,13 @@ _EVIDENCE_KEYS={
     "fvg":("status","score","zone_low","zone_high","price"),
 }
 
+_EPISODE_KEYS={
+    "crt":("status","phase","raid_side","anchor_high","anchor_low"),
+    "ote":("status","zone_low","zone_high","swing_low","swing_high"),
+    "amd":("status","phase","acc_high","acc_low","manipulation_side"),
+    "fvg":("status","zone_low","zone_high"),
+}
+
 
 def _finite(value:Any)->float|None:
     try:
@@ -76,6 +83,29 @@ def _clean_evidence(model_key:str,raw:Mapping[str,Any]|None)->dict[str,Any]:
 def _candidate_id(payload:Mapping[str,Any])->str:
     raw=json.dumps(payload,ensure_ascii=False,sort_keys=True,separators=(",",":"),default=str)
     return sha256(raw.encode("utf-8")).hexdigest()[:24]
+
+
+def _episode_id(
+    *,
+    model_key:str,
+    pair:str,
+    side:str,
+    setup_id:str,
+    evidence:Mapping[str,Any],
+)->str:
+    stable={
+        key:evidence.get(key)
+        for key in _EPISODE_KEYS.get(model_key,())
+        if evidence.get(key) not in (None,"")
+    }
+    payload={
+        "pair":pair,
+        "side":side,
+        "setup_id":setup_id,
+        "source_model":model_key.upper(),
+        "stable_evidence":stable,
+    }
+    return _candidate_id(payload)
 
 
 def build_setup_candidates(
@@ -115,6 +145,13 @@ def build_setup_candidates(
         }
         rows.append({
             "candidate_id":_candidate_id(identity),
+            "episode_id":_episode_id(
+                model_key=model_key,
+                pair=pair_name,
+                side=direction,
+                setup_id=spec["setup_id"],
+                evidence=evidence,
+            ),
             "setup_id":spec["setup_id"],
             "setup_label":spec["label"],
             "source_model":model_key.upper(),
@@ -159,6 +196,7 @@ def candidate_rows(pack:Mapping[str,Any]|None)->list[dict[str,Any]]:
         row=dict(raw)
         rows.append({
             "candidate_id":row.get("candidate_id"),
+            "episode_id":row.get("episode_id"),
             "setup_id":row.get("setup_id"),
             "pair":row.get("pair"),
             "side":row.get("side"),

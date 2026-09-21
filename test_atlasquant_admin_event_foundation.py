@@ -18,6 +18,7 @@ from atlasquant_admin_research_panel import (
     behavior_template_csv,
     _journal_records_from_frame,
     _match_forward_summary,
+    _merge_runtime_forward_sources,
     _resolve_forward_evidence,
     _research_history_rows,
 )
@@ -88,6 +89,32 @@ class AdminResearchPanelTests(unittest.TestCase):
         self.assertIsNotNone(recent)
         self.assertEqual(baseline.sample_size,100)
         self.assertEqual(recent.sample_size,30)
+
+    def test_admin_merges_generic_and_model_paper_without_duplicate_forward_records(self):
+        generic={
+            "records":[{
+                "setup_id":"fvg","pair":"EUR/USD","observed_at":"2026-09-20T12:00:00Z",
+                "direction":"BUY","result_r":2.0,"session":"London","regime":"TREND",
+                "entry":1.1,"stop":1.09,"target":1.12,"data_quality":95,
+                "decision_state":"PAPER","hard_blocks":[],"soft_blocks":[],
+            }]
+        }
+        model={
+            "records":[
+                dict(generic["records"][0]),
+                {
+                    "setup_id":"ote","pair":"EUR/USD","observed_at":"2026-09-20T13:00:00Z",
+                    "direction":"BUY","result_r":1.0,"session":"London","regime":"TREND",
+                    "entry":1.1,"stop":1.09,"target":1.12,"data_quality":95,
+                    "decision_state":"PAPER","hard_blocks":[],"soft_blocks":[],
+                },
+            ]
+        }
+        out=_merge_runtime_forward_sources(generic,model)
+        self.assertEqual(out["eligible_records"],2)
+        self.assertEqual(out["summary_by_setup"]["fvg"]["forward_samples"],1)
+        self.assertEqual(out["summary_by_setup"]["ote"]["forward_samples"],1)
+        self.assertFalse(out["setup_inference_used"])
 
     def test_runtime_forward_evidence_never_cross_maps_to_another_setup(self):
         out=_resolve_forward_evidence(

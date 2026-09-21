@@ -16,6 +16,7 @@ import pandas as pd
 
 import autopilot_v107 as base
 import autopilot_quota_guard_v111 as quota
+import autopilot_model_paper_v1 as model_paper
 from paper_friction_v116 import apply_paper_friction, summarize_net
 from paper_trading_v112 import run_paper_cycle, summarize_paper_trades
 
@@ -141,10 +142,14 @@ def main() -> int:
     rc = base.main()
 
     paper_ok, summary, paper_errors = _paper_cycle()
+    model_ok, model_summary, model_errors = model_paper._model_paper_cycle()
     print(json.dumps({
         "paper_trading_v112": summary,
         "paper_ok": paper_ok,
         "paper_errors": paper_errors,
+        "model_paper_v1": model_summary,
+        "model_paper_ok": model_ok,
+        "model_paper_errors": model_errors,
     }, ensure_ascii=False, indent=2, default=str))
 
     # Mantém os códigos estruturais do Autopilot base. Erros de dados Paper ficam
