@@ -11,6 +11,7 @@ from atlasquant_news_nowcast import (
     combine_leading_signals,
 )
 from atlasquant_news_backtest import (
+    monthly_news_scores,
     multiclass_brier,
     simple_month_score,
     walk_forward_news_backtest,
@@ -273,6 +274,17 @@ class AtlasQuantNewsBacktestTests(unittest.TestCase):
         for row in bt["forecasts"]:
             self.assertFalse(row["lookahead_used"])
             self.assertLess(row["captured_at"],row["scheduled_at"])
+
+    def test_monthly_scorecards_expose_hits_without_calling_them_trades(self):
+        bt=walk_forward_news_backtest(
+            self._history(30),
+            min_history=9,min_analogs=3,bandwidth=0.05,alpha=0.2,
+        )
+        rows=monthly_news_scores(bt)
+        self.assertTrue(rows)
+        self.assertEqual(sum(x["samples"] for x in rows),bt["forecast_samples"])
+        self.assertTrue(all(" de " in x["score_text"] for x in rows))
+        self.assertTrue(all("não é taxa de gain" in x["interpretation"].lower() for x in rows))
 
     def test_month_score_is_classification_not_gain_rate(self):
         bt=walk_forward_news_backtest(
