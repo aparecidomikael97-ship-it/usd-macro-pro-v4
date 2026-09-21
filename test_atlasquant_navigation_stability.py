@@ -67,6 +67,13 @@ class AtlasQuantNavigationStabilityTests(unittest.TestCase):
         self.assertIn('matriz_v61=_build_pair_matrix_for_surfaces_v111()',src)
         self.assertIn('_matrix_master_v102 = globals().get("matriz_v61")',src)
 
+    def test_central_matrix_contract_is_seven_unique_fx_pairs(self):
+        src=APP.read_text(encoding="utf-8")
+        self.assertIn('["EUR/USD","GBP/USD","AUD/USD","NZD/USD","USD/JPY","USD/CHF","USD/CAD"]',src)
+        self.assertIn('_df.insert(0,"Ranking",range(1,len(_df)+1))',src)
+        self.assertIn('sort_values(["Índice ranking","Qualidade","Score final"]',src)
+        self.assertIn('"⚪ AGUARDAR CONFIRMAÇÃO"',src)
+
 
 if __name__=="__main__":
     unittest.main()
