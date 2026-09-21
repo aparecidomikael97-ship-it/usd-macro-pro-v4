@@ -44,6 +44,20 @@ class FastStartupTests(unittest.TestCase):
         self.assertFalse(out["real_orders_enabled"])
         self.assertFalse(out["automatic_execution"])
 
+    def test_runtime_timestamp_can_refresh_fast_home_without_rewriting_macro_timestamp(self):
+        s=snapshot(generated_at=(self.now-timedelta(hours=12)).isoformat())
+        s["runtime_generated_at"]=(self.now-timedelta(minutes=8)).isoformat()
+        out=validate_home_snapshot(s,now=self.now,max_age_min=90)
+        self.assertTrue(out["valid"])
+        self.assertAlmostEqual(out["age_minutes"],8.0,places=2)
+
+    def test_stale_runtime_timestamp_still_fails_closed(self):
+        s=snapshot()
+        s["runtime_generated_at"]=(self.now-timedelta(minutes=91)).isoformat()
+        out=validate_home_snapshot(s,now=self.now,max_age_min=90)
+        self.assertFalse(out["valid"])
+        self.assertIn("stale",out["errors"])
+
     def test_stale_snapshot_fails_closed(self):
         old=(self.now-timedelta(minutes=91)).isoformat()
         out=validate_home_snapshot(snapshot(generated_at=old),now=self.now,max_age_min=90)
@@ -85,15 +99,15 @@ class FastStartupTests(unittest.TestCase):
         self.assertEqual(signature.parameters["timeout"].default,4.0)
         src=inspect.getsource(load_home_snapshot)
         self.assertIn("min(float(timeout),8.0)",src)
-        self.assertIn("if not token:",src)
+        self.assertIn("if token:",src)
 
     def test_fast_loader_records_non_trading_observability(self):
         import inspect
         src=inspect.getsource(load_home_snapshot)
         self.assertIn('"_fast_boot_observability"',src)
         self.assertIn('"load_ms"',src)
-        self.assertIn('"source":"raw"',src)
-        self.assertIn('"source":"api"',src)
+        self.assertIn('_with_obs(r.json(),"raw")',src)
+        self.assertIn('_with_obs(obj,"api")',src)
         self.assertNotIn("real_orders_enabled",src)
         self.assertNotIn("automatic_execution",src)
 
