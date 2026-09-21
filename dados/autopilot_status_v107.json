@@ -41,17 +41,17 @@
   "twelve_cache_hits": 0,
   "twelve_retry_after": "",
   "version": "V11.0.8_BUDGET_AUTOPILOT",
-  "last_run": "2026-09-21T20:04:53.331502+00:00",
+  "last_run": "2026-09-21T20:13:14.913141+00:00",
   "app_headless_ok": true,
   "app_headless_message": "App headless executado; 8 secret(s) injetado(s) no AppTest.",
-  "matrix_generated_at": "2026-09-21T20:04:27.323053+00:00",
+  "matrix_generated_at": "2026-09-21T20:12:46.845335+00:00",
   "scanner_fresh": 7,
   "market_map_fresh": 7,
   "scanner_ready": true,
   "market_map_ready": true,
   "operational_readiness": "READY",
-  "news_updated_at": "2026-09-21T19:20:56.918107+00:00",
-  "news_unique_stories": 221,
+  "news_updated_at": "2026-09-21T20:13:08.011513+00:00",
+  "news_unique_stories": 219,
   "validation_rows": 56,
   "validation_pending": 3,
   "validation_complete": 17,
@@ -61,8 +61,8 @@
     "validated_horizons": 0,
     "migrated": 0
   },
-  "twelve_calls_this_run": 3,
-  "twelve_calls_requested_internal": 3,
+  "twelve_calls_this_run": 0,
+  "twelve_calls_requested_internal": 0,
   "twelve_rate_safe": true,
   "twelve_api_budget_limit": 480,
   "twelve_daily_blocked": false,
@@ -75,7 +75,7 @@
   "healthy": true,
   "twelve_quota_saver_v111": {
     "enabled": true,
-    "m15_source_pairs_this_run": 3,
+    "m15_source_pairs_this_run": 0,
     "derived_timeframes": [
       "1h",
       "4h"
@@ -84,6 +84,22 @@
     "strict_complete_groups": true,
     "partial_groups_discarded": true,
     "contiguous_m15_required": true
+  },
+  "research_timeframes": {
+    "path": "dados/atlasquant_research_timeframes_v1.json",
+    "persisted": true,
+    "error": "",
+    "pairs": 7,
+    "derived": [
+      "M30",
+      "W1"
+    ],
+    "completed_source": [
+      "D1"
+    ],
+    "provider_calls_added": false,
+    "real_orders": false,
+    "automatic_execution": false
   },
   "fast_home_snapshot": {
     "path": "dados/atlasquant_home_snapshot_v1.json",
@@ -97,16 +113,16 @@
     "packs": 7,
     "shadow": {
       "ok": true,
-      "added": 3,
+      "added": 0,
       "samples": 206,
-      "reason": "SAVED",
+      "reason": "ALREADY_PRESENT",
       "error": ""
     },
     "flight_recorder": {
       "ok": true,
-      "added": 3,
+      "added": 0,
       "records": 967,
-      "reason": "SAVED",
+      "reason": "ALREADY_PRESENT",
       "error": ""
     },
     "real_orders": false,
@@ -114,17 +130,17 @@
     "automatic_promotion": false
   },
   "quota_shadow": {
-    "samples": 165,
-    "raw_samples": 165,
+    "samples": 166,
+    "raw_samples": 166,
     "invalid_timestamp_rows": 0,
     "evidence_integrity_ok": true,
-    "market_open_runs": 60,
+    "market_open_runs": 61,
     "min_market_runs": 20,
     "minimum_met": true,
     "provider_blocked_runs": 24,
-    "provider_block_rate_pct": 40.0,
+    "provider_block_rate_pct": 39.34,
     "headless_failed_runs": 0,
-    "avg_actual_http_calls_per_market_run": 3.2,
+    "avg_actual_http_calls_per_market_run": 3.15,
     "max_actual_http_calls_per_market_run": 14,
     "adaptive_plan_fit_all_samples": true,
     "eligible_for_manual_review": false,
@@ -134,396 +150,5 @@
     "sample_added": true,
     "persisted": true,
     "error": ""
-  },
-  "paper_trading_v112": {
-    "enabled": true,
-    "real_orders": false,
-    "trades_total": 0,
-    "pending_entries": 0,
-    "open_positions": 0,
-    "closed_trades": 0,
-    "wins": 0,
-    "losses": 0,
-    "breakeven": 0,
-    "win_rate_pct": 0.0,
-    "net_r": 0.0,
-    "gross_r_before_friction": 0.0,
-    "friction_r": 0.0,
-    "net_r_after_friction": 0.0,
-    "friction_version": "V11.6_PAPER_FRICTION",
-    "avg_r": 0.0,
-    "profit_factor_r": null,
-    "profit_factor_net_r": null,
-    "last_cycle": {
-      "version": "V11.2_PAPER_TRADING",
-      "ran_at": "2026-09-21T20:04:57.705779+00:00",
-      "pending_created": 0,
-      "entries_opened": 0,
-      "trades_closed": 0,
-      "closed_pairs_this_cycle": [],
-      "checklists": {
-        "USD/CHF": {
-          "side": "BUY",
-          "passed": false,
-          "state": "🔴 BLOQUEADO",
-          "hard_blocks": [
-            "H4 está contra o viés",
-            "H1 está contra o viés"
-          ],
-          "soft_blocks": [
-            "ICT incompleto (42/100)",
-            "Fluxo institucional incompleto (63/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "USD/CAD": {
-          "side": "BUY",
-          "passed": false,
-          "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
-          "hard_blocks": [],
-          "soft_blocks": [
-            "ADR14 em 98%: evitar perseguir preço",
-            "ICT incompleto (40/100)",
-            "Fluxo institucional incompleto (51/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "USD/JPY": {
-          "side": "BUY",
-          "passed": false,
-          "state": "⚪ EM OBSERVAÇÃO",
-          "hard_blocks": [],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ICT incompleto (33/100)",
-            "Fluxo institucional incompleto (55/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "NZD/USD": {
-          "side": "SELL",
-          "passed": false,
-          "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
-          "hard_blocks": [],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ICT incompleto (40/100)",
-            "Fluxo institucional incompleto (61/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "EUR/USD": {
-          "side": "SELL",
-          "passed": false,
-          "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
-          "hard_blocks": [],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ADR14 em 90%: espaço reduzido",
-            "ICT incompleto (33/100)",
-            "Fluxo institucional incompleto (57/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "AUD/USD": {
-          "side": "WAIT",
-          "passed": false,
-          "state": "⚪ AGUARDAR DIREÇÃO",
-          "hard_blocks": [],
-          "soft_blocks": [
-            "ICT incompleto (0/100)",
-            "Fluxo institucional incompleto (0/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "GBP/USD": {
-          "side": "SELL",
-          "passed": false,
-          "state": "⚪ EM OBSERVAÇÃO",
-          "hard_blocks": [],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ICT incompleto (45/100)",
-            "Fluxo institucional incompleto (61/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        }
-      },
-      "trades_total": 0,
-      "pending_entries": 0,
-      "open_positions": 0,
-      "closed_trades": 0,
-      "wins": 0,
-      "losses": 0,
-      "breakeven": 0,
-      "win_rate_pct": 0.0,
-      "net_r": 0.0,
-      "avg_r": 0.0,
-      "profit_factor_r": null
-    },
-    "errors": []
-  },
-  "model_paper_v1": {
-    "enabled": true,
-    "real_orders": false,
-    "supported_execution_timeframes": [
-      "M15",
-      "H1"
-    ],
-    "exact_execution_frame_required": true,
-    "lower_timeframe_substitution": false,
-    "candidates_total": 25,
-    "blocked_context": 19,
-    "blocked_data": 0,
-    "blocked_timeframe": 6,
-    "pending_entries": 0,
-    "open_positions": 0,
-    "closed_trades": 0,
-    "wins": 0,
-    "losses": 0,
-    "win_rate_pct": 0.0,
-    "net_r": 0.0,
-    "net_r_after_friction": 0.0,
-    "by_setup": {
-      "amd-po3": {
-        "candidates": 9,
-        "blocked_context": 9,
-        "blocked_data": 0,
-        "blocked_timeframe": 0,
-        "pending": 0,
-        "open": 0,
-        "closed": 0,
-        "wins": 0,
-        "losses": 0,
-        "win_rate_pct": 0.0,
-        "net_r": 0.0,
-        "avg_r": 0.0,
-        "profit_factor_r": null,
-        "explicit_source_model_only": true
-      },
-      "crt": {
-        "candidates": 10,
-        "blocked_context": 5,
-        "blocked_data": 0,
-        "blocked_timeframe": 5,
-        "pending": 0,
-        "open": 0,
-        "closed": 0,
-        "wins": 0,
-        "losses": 0,
-        "win_rate_pct": 0.0,
-        "net_r": 0.0,
-        "avg_r": 0.0,
-        "profit_factor_r": null,
-        "explicit_source_model_only": true
-      },
-      "fvg": {
-        "candidates": 4,
-        "blocked_context": 4,
-        "blocked_data": 0,
-        "blocked_timeframe": 0,
-        "pending": 0,
-        "open": 0,
-        "closed": 0,
-        "wins": 0,
-        "losses": 0,
-        "win_rate_pct": 0.0,
-        "net_r": 0.0,
-        "avg_r": 0.0,
-        "profit_factor_r": null,
-        "explicit_source_model_only": true
-      },
-      "ote": {
-        "candidates": 2,
-        "blocked_context": 1,
-        "blocked_data": 0,
-        "blocked_timeframe": 1,
-        "pending": 0,
-        "open": 0,
-        "closed": 0,
-        "wins": 0,
-        "losses": 0,
-        "win_rate_pct": 0.0,
-        "net_r": 0.0,
-        "avg_r": 0.0,
-        "profit_factor_r": null,
-        "explicit_source_model_only": true
-      }
-    },
-    "by_timeframe": {
-      "H1": {
-        "candidates": 12,
-        "blocked_context": 6,
-        "blocked_data": 0,
-        "blocked_timeframe": 6,
-        "pending": 0,
-        "open": 0,
-        "closed": 0,
-        "wins": 0,
-        "losses": 0,
-        "net_r": 0.0
-      },
-      "M15": {
-        "candidates": 13,
-        "blocked_context": 13,
-        "blocked_data": 0,
-        "blocked_timeframe": 0,
-        "pending": 0,
-        "open": 0,
-        "closed": 0,
-        "wins": 0,
-        "losses": 0,
-        "net_r": 0.0
-      }
-    },
-    "by_session": {},
-    "last_cycle": {
-      "version": "ATLASQUANT_MODEL_PAPER_V1",
-      "ran_at": "2026-09-21T20:05:02.464489+00:00",
-      "new_candidates_observed": 0,
-      "new_qualified": 0,
-      "new_blocked": 0,
-      "entries_opened": 0,
-      "trades_closed": 0,
-      "candidates_total": 25,
-      "blocked_context": 19,
-      "blocked_data": 0,
-      "blocked_timeframe": 6,
-      "pending_entries": 0,
-      "open_positions": 0,
-      "closed_trades": 0,
-      "wins": 0,
-      "losses": 0,
-      "breakeven": 0,
-      "win_rate_pct": 0.0,
-      "net_r": 0.0,
-      "avg_r": 0.0,
-      "by_setup": {
-        "amd-po3": {
-          "candidates": 9,
-          "blocked_context": 9,
-          "blocked_data": 0,
-          "blocked_timeframe": 0,
-          "pending": 0,
-          "open": 0,
-          "closed": 0,
-          "wins": 0,
-          "losses": 0,
-          "win_rate_pct": 0.0,
-          "net_r": 0.0,
-          "avg_r": 0.0,
-          "profit_factor_r": null,
-          "explicit_source_model_only": true
-        },
-        "crt": {
-          "candidates": 10,
-          "blocked_context": 5,
-          "blocked_data": 0,
-          "blocked_timeframe": 5,
-          "pending": 0,
-          "open": 0,
-          "closed": 0,
-          "wins": 0,
-          "losses": 0,
-          "win_rate_pct": 0.0,
-          "net_r": 0.0,
-          "avg_r": 0.0,
-          "profit_factor_r": null,
-          "explicit_source_model_only": true
-        },
-        "fvg": {
-          "candidates": 4,
-          "blocked_context": 4,
-          "blocked_data": 0,
-          "blocked_timeframe": 0,
-          "pending": 0,
-          "open": 0,
-          "closed": 0,
-          "wins": 0,
-          "losses": 0,
-          "win_rate_pct": 0.0,
-          "net_r": 0.0,
-          "avg_r": 0.0,
-          "profit_factor_r": null,
-          "explicit_source_model_only": true
-        },
-        "ote": {
-          "candidates": 2,
-          "blocked_context": 1,
-          "blocked_data": 0,
-          "blocked_timeframe": 1,
-          "pending": 0,
-          "open": 0,
-          "closed": 0,
-          "wins": 0,
-          "losses": 0,
-          "win_rate_pct": 0.0,
-          "net_r": 0.0,
-          "avg_r": 0.0,
-          "profit_factor_r": null,
-          "explicit_source_model_only": true
-        }
-      },
-      "by_timeframe": {
-        "H1": {
-          "candidates": 12,
-          "blocked_context": 6,
-          "blocked_data": 0,
-          "blocked_timeframe": 6,
-          "pending": 0,
-          "open": 0,
-          "closed": 0,
-          "wins": 0,
-          "losses": 0,
-          "net_r": 0.0
-        },
-        "M15": {
-          "candidates": 13,
-          "blocked_context": 13,
-          "blocked_data": 0,
-          "blocked_timeframe": 0,
-          "pending": 0,
-          "open": 0,
-          "closed": 0,
-          "wins": 0,
-          "losses": 0,
-          "net_r": 0.0
-        }
-      },
-      "by_session": {},
-      "setup_inference_used": false,
-      "automatic_promotion": false,
-      "automatic_execution": false,
-      "real_orders_enabled": false
-    },
-    "errors": []
-  },
-  "setup_audit_v114": {
-    "enabled": true,
-    "audited_trades": 0,
-    "closed_trades": 0,
-    "component_state_rows": 0,
-    "sample_state": "AGUARDANDO AMOSTRA",
-    "real_orders": false,
-    "broker_connection": false,
-    "errors": []
-  },
-  "news_nowcast_v1": {
-    "enabled": true,
-    "runtime_state": "PROVIDER_ERROR",
-    "snapshots": 0,
-    "events": 0,
-    "closed_events": 0,
-    "with_signals": 0,
-    "with_empirical_distribution": 0,
-    "by_indicator": {},
-    "real_orders": false,
-    "trading_news_enabled": false,
-    "market_reaction_predicted": false,
-    "automatic_weight_change": false,
-    "lookahead_used": false,
-    "errors": [
-      "HTTPError: 401 Client Error: Unauthorized for url: https://eodhd.com/api/economic-events?api_token=6aa5832ada5af784962083&from=2026-05-24&to=2026-10-05&country=US&limit=1000&offset=0&fmt=json"
-    ]
   }
 }
