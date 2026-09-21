@@ -24,6 +24,7 @@ from atlasquant_ote_replay import generate_ote_signals
 from atlasquant_crt_replay import generate_crt_signals
 from atlasquant_amd_replay import generate_amd_signals
 from atlasquant_backtest_context import enrich_signals_point_in_time
+from atlasquant_timeframe_profiles import apply_timeframe_context, timeframe_profile
 
 
 STRATEGY_ORDER = (
@@ -79,12 +80,14 @@ def run_strategy_suite(
     cost_r: float = 0.0,
     slippage_r: float = 0.0,
     context_snapshots: pd.DataFrame | None = None,
+    timeframe: str = "M15",
 ) -> "OrderedDict[str, dict[str, Any]]":
     """Generate + backtest all five strategies without mixing their trades."""
     signals_by_strategy=generate_strategy_signals(candles,pair)
     suite: "OrderedDict[str, dict[str, Any]]"=OrderedDict()
     for strategy in STRATEGY_ORDER:
         signals=list(signals_by_strategy.get(strategy,[]) or [])
+        signals=apply_timeframe_context(signals,timeframe,overwrite=True)
         if isinstance(context_snapshots,pd.DataFrame) and not context_snapshots.empty:
             signals=list(
                 enrich_signals_point_in_time(signals,context_snapshots).get("signals",[])
@@ -99,8 +102,11 @@ def run_strategy_suite(
             slippage_r=float(slippage_r),
             start_after_signal_bar=True,
         )
+        _tf_profile=timeframe_profile(timeframe)
         suite[strategy]={
             "strategy":strategy,
+            "timeframe":_tf_profile["timeframe"],
+            "trading_style":_tf_profile["trading_style"],
             "label":STRATEGY_LABELS[strategy],
             "signals":signals,
             "results":results,
