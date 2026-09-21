@@ -12,6 +12,12 @@ class PairIntelligenceSourceTests(unittest.TestCase):
         src=Path("pair_intelligence_v110.py").read_text(encoding="utf-8")
         self.assertIn('MAJORS=("USD","EUR","GBP","JPY","CHF","CAD","AUD","NZD")',src)
 
+    def test_pair_pack_exposes_session_context_without_changing_direction(self):
+        src=Path("pair_intelligence_v110.py").read_text(encoding="utf-8")
+        self.assertIn('"active_session_bucket"',src)
+        self.assertIn('"active_session"',src)
+        self.assertIn("session_bucket_from_timestamp",src)
+
     def test_no_profit_probability_claim(self):
         src=Path("pair_intelligence_v110.py").read_text(encoding="utf-8")
         self.assertIn("não é probabilidade de lucro",src.lower())
