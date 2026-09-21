@@ -281,6 +281,19 @@ class AutopilotV107Tests(unittest.TestCase):
     def test_home_snapshot_path_is_dedicated_runtime_artifact(self):
         self.assertEqual(a.HOME_SNAPSHOT_PATH,"dados/atlasquant_home_snapshot_v1.json")
 
+    def test_research_timeframe_cache_reuses_collected_data_only(self):
+        from pathlib import Path
+        src=Path("atlasquant_research_timeframes.py").read_text(encoding="utf-8")
+        auto=Path("autopilot_v107.py").read_text(encoding="utf-8")
+        self.assertNotIn("td_fetch(",src)
+        self.assertNotIn("requests.",src)
+        self.assertIn('RESEARCH_TF_CACHE_PATH = "dados/atlasquant_research_timeframes_v1.json"',auto)
+        self.assertIn("build_research_timeframe_cache(",auto)
+        self.assertIn('"provider_calls_added":False',auto)
+        self.assertIn('"real_orders":False',auto)
+        self.assertIn('"automatic_execution":False',auto)
+
+
 
 if __name__=="__main__":
     unittest.main()
