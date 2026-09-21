@@ -14,6 +14,7 @@ import streamlit as st
 from atlasquant_operational_catalog import catalog_rows, catalog_summary
 from atlasquant_weekly_profile import analyze_weekly_extremes
 from atlasquant_behavior_shift import BehaviorStats, detect_behavior_shift
+from atlasquant_news_research_panel import render_news_research_lab
 from atlasquant_passport_evidence import fuse_operational_evidence
 from atlasquant_passport_drift import latest_passport_drift, passport_drift_rows
 from atlasquant_setup_journal import setup_forward_summary
@@ -524,6 +525,15 @@ def render_admin_research_panel(
                 if not changes.empty:
                     st.dataframe(changes,width="stretch",hide_index=True)
                 st.caption(shift.get("interpretation",""))
+
+    with st.expander("📰 Pré-Notícia / Nowcast · backtest dos indicadores",expanded=False):
+        try:
+            render_news_research_lab()
+        except Exception as exc:
+            st.warning(
+                "Laboratório de notícias em modo seguro; nenhuma previsão ou peso foi alterado."
+            )
+            st.caption(f"Diagnóstico News Lab: {type(exc).__name__}: {exc}")
 
     if suite:
         passport_rows=pd.DataFrame(suite.get("passport_rows",[]) or [])
