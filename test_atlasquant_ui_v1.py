@@ -257,11 +257,19 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertGreaterEqual(len(preview["features"]),3)
         self.assertIn("bloqueados",preview["message"])
 
-    def test_metric_and_number_input_contrast_follow_streamlit_text_color(self):
-        self.assertIn("var(--text-color, #111827)",ATLASQUANT_CSS)
+    def test_metric_and_card_contrast_is_explicit_on_dark_surfaces(self):
         self.assertIn('[data-testid="stMetricValue"]',ATLASQUANT_CSS)
+        self.assertIn("color: #f4f8ff !important",ATLASQUANT_CSS)
+        self.assertIn("color: #dbe7f5 !important",ATLASQUANT_CSS)
+        self.assertIn("--aq-muted-strong: #dbe7f5",ATLASQUANT_CSS)
+        self.assertNotIn('stMetricValue"] * { letter-spacing: -.035em; color: var(--text-color, #111827)',ATLASQUANT_CSS)
         self.assertIn("-webkit-text-fill-color",ATLASQUANT_CSS)
-        self.assertIn("font-weight: 800",ATLASQUANT_CSS)
+
+    def test_secondary_card_text_was_not_left_on_low_contrast_palette(self):
+        self.assertIn(".aq-context-strip span{display:block;color:#dbe7f5",ATLASQUANT_CSS)
+        self.assertIn(".aq-preview-card",ATLASQUANT_CSS)
+        self.assertIn("color:#f0f6ff",ATLASQUANT_CSS)
+        self.assertIn("font-weight:700",ATLASQUANT_CSS)
 
     def test_experience_switch_no_longer_injects_mode_dependent_tab_css(self):
         import inspect
