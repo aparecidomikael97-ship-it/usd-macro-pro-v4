@@ -16,35 +16,12 @@
   "setup_attribution_inferred": false,
   "last_cycle": {
     "version": "V11.2_PAPER_TRADING",
-    "ran_at": "2026-09-21T02:55:47.609238+00:00",
+    "ran_at": "2026-09-21T03:23:37.579572+00:00",
     "pending_created": 0,
     "entries_opened": 0,
     "trades_closed": 0,
     "closed_pairs_this_cycle": [],
     "checklists": {
-      "USD/CHF": {
-        "side": "BUY",
-        "passed": false,
-        "state": "🔴 BLOQUEADO",
-        "hard_blocks": [
-          "H1 está contra o viés"
-        ],
-        "soft_blocks": [
-          "ICT incompleto (70/100)",
-          "Fluxo institucional incompleto (64/100)",
-          "M15 ainda não confirmou gatilho"
-        ]
-      },
-      "USD/CAD": {
-        "side": "BUY",
-        "passed": false,
-        "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
-        "hard_blocks": [],
-        "soft_blocks": [
-          "ICT incompleto (40/100)",
-          "Fluxo institucional incompleto (69/100)"
-        ]
-      },
       "USD/JPY": {
         "side": "BUY",
         "passed": false,
@@ -54,9 +31,30 @@
         ],
         "soft_blocks": [
           "Gate ainda não liberou execução",
-          "ICT incompleto (65/100)",
-          "Fluxo institucional incompleto (58/100)",
+          "Fluxo institucional incompleto (60/100)",
           "M15 ainda não confirmou gatilho"
+        ]
+      },
+      "USD/CAD": {
+        "side": "BUY",
+        "passed": false,
+        "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
+        "hard_blocks": [],
+        "soft_blocks": [
+          "Gate ainda não liberou execução",
+          "ICT incompleto (40/100)",
+          "M15 ainda não confirmou gatilho"
+        ]
+      },
+      "USD/CHF": {
+        "side": "BUY",
+        "passed": false,
+        "state": "🔴 BLOQUEADO",
+        "hard_blocks": [
+          "H1 está contra o viés"
+        ],
+        "soft_blocks": [
+          "ICT incompleto (52/100)"
         ]
       },
       "NZD/USD": {
@@ -67,6 +65,7 @@
           "ADR14 muito esticado (172%)"
         ],
         "soft_blocks": [
+          "Gate ainda não liberou execução",
           "ADR14 em 172%: evitar perseguir preço",
           "ICT incompleto (31/100)",
           "Fluxo institucional incompleto (48/100)",
@@ -76,33 +75,32 @@
       "EUR/USD": {
         "side": "SELL",
         "passed": false,
-        "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
+        "state": "🟠 SETUP EM FORMAÇÃO",
         "hard_blocks": [],
         "soft_blocks": [
-          "Gate ainda não liberou execução",
-          "ICT incompleto (58/100)",
-          "Fluxo institucional incompleto (59/100)"
+          "Fluxo institucional incompleto (61/100)"
         ]
       },
       "AUD/USD": {
-        "side": "WAIT",
-        "passed": false,
-        "state": "⚪ AGUARDAR DIREÇÃO",
-        "hard_blocks": [],
-        "soft_blocks": [
-          "ICT incompleto (0/100)",
-          "Fluxo institucional incompleto (0/100)",
-          "M15 ainda não confirmou gatilho"
-        ]
-      },
-      "GBP/USD": {
         "side": "SELL",
         "passed": false,
         "state": "⚪ EM OBSERVAÇÃO",
         "hard_blocks": [],
         "soft_blocks": [
           "Gate ainda não liberou execução",
-          "ICT incompleto (49/100)"
+          "ICT incompleto (40/100)",
+          "Fluxo institucional incompleto (64/100)",
+          "M15 ainda não confirmou gatilho"
+        ]
+      },
+      "GBP/USD": {
+        "side": "SELL",
+        "passed": false,
+        "state": "🟠 SETUP EM FORMAÇÃO",
+        "hard_blocks": [],
+        "soft_blocks": [
+          "Gate ainda não liberou execução",
+          "ICT incompleto (70/100)"
         ]
       }
     },
