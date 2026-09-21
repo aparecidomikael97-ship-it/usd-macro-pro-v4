@@ -64,6 +64,12 @@ def fetch_eodhd_events(
     end_date:str,
     timeout:int=25,
 )->tuple[list[dict[str,Any]],dict[str,Any]]:
+    """Fetch US events with bounded pagination.
+
+    EODHD allows offset up to 1000. We request 1000 rows first and, only when
+    necessary, one second page at offset 1000. If both pages are full we fail
+    closed because the provider window may still be truncated.
+    """
     token=str(token or "").strip()
     if not token:
         return [],{
@@ -71,47 +77,86 @@ def fetch_eodhd_events(
             "reason":"NOT_CONFIGURED",
             "http_status":None,
             "rows":0,
+            "requests":0,
             "error":"CHAVE_EODHD ausente.",
         }
+
+    rows=[]
+    statuses=[]
+    request_count=0
     try:
-        response=requests.get(
-            "https://eodhd.com/api/economic-events",
-            params={
-                "api_token":token,
-                "from":start_date,
-                "to":end_date,
-                "country":"US",
-                "limit":1000,
-                "offset":0,
-                "fmt":"json",
-            },
-            timeout=timeout,
-        )
-        status=int(response.status_code)
-        response.raise_for_status()
-        payload=response.json()
-        if isinstance(payload,dict):
-            message=payload.get("error") or payload.get("message")
-            if message:
-                raise ValueError(str(message))
-            payload=payload.get("data",[])
-        if not isinstance(payload,list):
-            raise ValueError("Formato inesperado no Economic Events.")
-        rows=[dict(x) for x in payload if isinstance(x,dict)]
-        return rows,{
+        for offset in (0,1000):
+            response=requests.get(
+                "https://eodhd.com/api/economic-events",
+                params={
+                    "api_token":token,
+                    "from":start_date,
+                    "to":end_date,
+                    "country":"US",
+                    "limit":1000,
+                    "offset":offset,
+                    "fmt":"json",
+                },
+                timeout=timeout,
+            )
+            request_count+=1
+            statuses.append(int(response.status_code))
+            response.raise_for_status()
+            payload=response.json()
+            if isinstance(payload,dict):
+                message=payload.get("error") or payload.get("message")
+                if message:
+                    raise ValueError(str(message))
+                payload=payload.get("data",[])
+            if not isinstance(payload,list):
+                raise ValueError("Formato inesperado no Economic Events.")
+            page=[dict(x) for x in payload if isinstance(x,dict)]
+            rows.extend(page)
+            if len(page)<1000:
+                break
+
+        if request_count==2 and len(rows)>=2000:
+            return [],{
+                "ok":False,
+                "reason":"TRUNCATED_PROVIDER_DATA",
+                "http_status":statuses[-1] if statuses else None,
+                "rows":len(rows),
+                "requests":request_count,
+                "error":"Janela EODHD excedeu a paginação segura; Nowcast não usa dados potencialmente truncados.",
+            }
+
+        # Stable de-duplication without depending on provider ordering.
+        unique=[]
+        seen=set()
+        for item in rows:
+            key=(
+                str(item.get("type") or ""),
+                str(item.get("comparison") or ""),
+                str(item.get("period") or ""),
+                str(item.get("country") or ""),
+                str(item.get("date") or ""),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            unique.append(item)
+        return unique,{
             "ok":True,
             "reason":"LOADED",
-            "http_status":status,
-            "rows":len(rows),
-            "limit_reached":len(rows)>=1000,
+            "http_status":statuses[-1] if statuses else None,
+            "rows":len(unique),
+            "requests":request_count,
+            "paginated":request_count>1,
+            "limit_reached":False,
             "error":"",
         }
     except Exception as exc:
         return [],{
             "ok":False,
             "reason":"PROVIDER_ERROR",
-            "http_status":getattr(locals().get("response",None),"status_code",None),
+            "http_status":statuses[-1] if statuses else getattr(locals().get("response",None),"status_code",None),
             "rows":0,
+            "requests":request_count,
             "error":f"{type(exc).__name__}: {exc}",
         }
 
