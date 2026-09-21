@@ -85,6 +85,7 @@ def run_strategy_suite(
     slippage_r: float = 0.0,
     context_snapshots: pd.DataFrame | None = None,
     timeframe: str = "M15",
+    require_alignment: bool = False,
 ) -> "OrderedDict[str, dict[str, Any]]":
     """Generate + backtest all five strategies without mixing their trades."""
     signals_by_strategy=generate_strategy_signals(candles,pair)
@@ -105,6 +106,7 @@ def run_strategy_suite(
             cost_r=float(cost_r),
             slippage_r=float(slippage_r),
             start_after_signal_bar=True,
+            require_alignment=bool(require_alignment),
         )
         _tf_profile=timeframe_profile(timeframe)
         suite[strategy]={
@@ -128,6 +130,7 @@ def run_multitimeframe_strategy_suite(
     cost_r: float = 0.0,
     slippage_r: float = 0.0,
     context_snapshots: pd.DataFrame | None = None,
+    require_alignment: bool = True,
 ) -> "OrderedDict[str, OrderedDict[str, dict[str, Any]]]":
     """Run the five setup families independently for each supplied timeframe."""
     out:"OrderedDict[str, OrderedDict[str, dict[str, Any]]]"=OrderedDict()
@@ -147,6 +150,7 @@ def run_multitimeframe_strategy_suite(
             slippage_r=float(slippage_r),
             context_snapshots=context_snapshots,
             timeframe=tf,
+            require_alignment=bool(require_alignment),
         )
     return out
 
