@@ -35,6 +35,13 @@ class AtlasQuantProductionWorkflowContractTests(unittest.TestCase):
         self.assertIn('os.getenv("GIT_COMMIT","")',src)
         self.assertIn('id="atlasquant-deploy-marker"',src)
 
+    def test_browser_smoke_separates_deploy_identity_from_latency_failure(self):
+        text=Path(".github/workflows/production-browser-smoke.yml").read_text(encoding="utf-8")
+        self.assertIn("deploy_identity_ok",text)
+        self.assertIn("deploy_commit == expected_commit",text)
+        self.assertIn("deploy_identity_ok and auth_inputs < 1 and meaningful_ms > 30000",text)
+        self.assertIn("Do not attribute Render deployment wait",text)
+
 
 if __name__=="__main__":
     unittest.main()
