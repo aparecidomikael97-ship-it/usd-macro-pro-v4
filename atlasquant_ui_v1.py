@@ -80,8 +80,8 @@ ATLASQUANT_CSS = r"""
   --aq-panel-2: rgba(18, 38, 64, .74);
   --aq-line: rgba(137, 170, 210, .18);
   --aq-text: #edf4ff;
-  --aq-muted: #c8d6e8;
-  --aq-muted-strong: #dbe7f5;
+  --aq-muted: #e1eaf5;
+  --aq-muted-strong: #f2f6fb;
   --aq-accent: #4fa3ff;
   --aq-accent-2: #6de2c5;
   --aq-good: #42d392;
@@ -141,7 +141,7 @@ html { scroll-behavior: smooth; }
   margin: 0;
 }
 .aq-subtitle {
-  color: var(--aq-muted);
+  color: #e8eef7;
   font-size: .92rem;
   margin-top: 8px;
   max-width: 760px;
@@ -194,8 +194,8 @@ html { scroll-behavior: smooth; }
   border:1px solid var(--aq-line);border-radius:12px;padding:10px 12px;
   background:linear-gradient(180deg,rgba(15,31,52,.78),rgba(9,23,40,.72));
 }
-.aq-context-strip span{display:block;color:#dbe7f5;font-size:.66rem;font-weight:850;letter-spacing:.07em}
-.aq-context-strip strong{display:block;color:#edf4ff;font-size:.82rem;margin-top:3px;overflow-wrap:anywhere}
+.aq-context-strip span{display:block;color:#f2f6fb;font-size:.66rem;font-weight:850;letter-spacing:.07em;text-shadow:0 1px 0 rgba(0,0,0,.22)}
+.aq-context-strip strong{display:block;color:#ffffff;font-size:.82rem;font-weight:800;margin-top:3px;overflow-wrap:anywhere;text-shadow:0 1px 0 rgba(0,0,0,.22)}
 [data-testid="stMetric"] {
   background: linear-gradient(180deg, rgba(17,34,57,.80), rgba(11,25,43,.72));
   border: 1px solid var(--aq-line) !important;
@@ -203,7 +203,7 @@ html { scroll-behavior: smooth; }
 }
 [data-testid="stMetric"] > div { padding: .15rem .2rem; }
 [data-testid="stMetricValue"], [data-testid="stMetricValue"] * { letter-spacing: -.035em; color: #f4f8ff !important; font-weight: 850 !important; opacity: 1 !important; text-shadow: 0 1px 0 rgba(0,0,0,.18); }
-[data-testid="stMetricLabel"], [data-testid="stMetricLabel"] * { color: #dbe7f5 !important; font-size: .82rem; font-weight: 750 !important; opacity: 1 !important; }
+[data-testid="stMetricLabel"], [data-testid="stMetricLabel"] * { color: #f2f6fb !important; font-size: .82rem; font-weight: 800 !important; opacity: 1 !important; text-shadow: 0 1px 0 rgba(0,0,0,.18); }
 [data-testid="stButton"] button {
   border-radius: 10px; min-height: 2.45rem; font-weight: 700;
   border: 1px solid var(--aq-line);
@@ -217,6 +217,19 @@ html { scroll-behavior: smooth; }
   overflow: hidden;
 }
 [data-testid="stAlert"] { border-radius: 12px; }
+[data-testid="stCaptionContainer"],
+[data-testid="stCaptionContainer"] * {
+  color: var(--text-color, #263548) !important;
+  opacity: .88 !important;
+  font-weight: 600 !important;
+}
+[data-testid="stRadio"] label,
+[data-testid="stRadio"] label *,
+[data-testid="stSelectbox"] label,
+[data-testid="stSelectbox"] label * {
+  color: var(--text-color, #182230) !important;
+  opacity: 1 !important;
+}
 [data-testid="stTextInput"] input,
 [data-testid="stNumberInput"] input,
 [data-testid="stTextArea"] textarea,
@@ -237,8 +250,15 @@ html { scroll-behavior: smooth; }
 }
 [data-testid="stExpander"] details > summary {
   background: var(--ux-card, rgba(12,26,44,.48)) !important;
-  color: var(--ux-text, var(--aq-text)) !important;
+  color: var(--ux-text, var(--text-color, #182230)) !important;
   min-height: 2.75rem;
+  font-weight: 700 !important;
+}
+[data-testid="stExpander"] details > summary *,
+[data-testid="stExpander"] summary p,
+[data-testid="stExpander"] summary span {
+  color: inherit !important;
+  opacity: 1 !important;
 }
 [data-testid="stTabs"] [role="tablist"] {
   padding: 5px;

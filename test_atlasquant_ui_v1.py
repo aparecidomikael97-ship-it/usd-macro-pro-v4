@@ -260,16 +260,25 @@ class AtlasQuantUiTests(unittest.TestCase):
     def test_metric_and_card_contrast_is_explicit_on_dark_surfaces(self):
         self.assertIn('[data-testid="stMetricValue"]',ATLASQUANT_CSS)
         self.assertIn("color: #f4f8ff !important",ATLASQUANT_CSS)
-        self.assertIn("color: #dbe7f5 !important",ATLASQUANT_CSS)
-        self.assertIn("--aq-muted-strong: #dbe7f5",ATLASQUANT_CSS)
+        self.assertIn("color: #f2f6fb !important",ATLASQUANT_CSS)
+        self.assertIn("--aq-muted-strong: #f2f6fb",ATLASQUANT_CSS)
         self.assertNotIn('stMetricValue"] * { letter-spacing: -.035em; color: var(--text-color, #111827)',ATLASQUANT_CSS)
         self.assertIn("-webkit-text-fill-color",ATLASQUANT_CSS)
 
     def test_secondary_card_text_was_not_left_on_low_contrast_palette(self):
-        self.assertIn(".aq-context-strip span{display:block;color:#dbe7f5",ATLASQUANT_CSS)
+        self.assertIn(".aq-context-strip span{display:block;color:#f2f6fb",ATLASQUANT_CSS)
         self.assertIn(".aq-preview-card",ATLASQUANT_CSS)
         self.assertIn("color:#f0f6ff",ATLASQUANT_CSS)
         self.assertIn("font-weight:700",ATLASQUANT_CSS)
+
+    def test_caption_and_control_text_has_explicit_readable_contrast(self):
+        self.assertIn('data-testid="stCaptionContainer"',ATLASQUANT_CSS)
+        self.assertIn("opacity: .88 !important",ATLASQUANT_CSS)
+        self.assertIn('data-testid="stRadio"',ATLASQUANT_CSS)
+        self.assertIn('data-testid="stSelectbox"',ATLASQUANT_CSS)
+        self.assertIn('data-testid="stExpander"',ATLASQUANT_CSS)
+        self.assertIn("font-weight: 700 !important",ATLASQUANT_CSS)
+        self.assertIn("color:#ffffff",ATLASQUANT_CSS)
 
     def test_experience_switch_no_longer_injects_mode_dependent_tab_css(self):
         import inspect
@@ -287,6 +296,18 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertLess(switch,nav)
         self.assertIn("_aq_experience_mode",src)
         self.assertIn("render_home_radar",src)
+
+
+    def test_ui_smoke_checks_dark_card_text_contrast(self):
+        from pathlib import Path
+        workflow=Path(".github/workflows/atlasquant-ui-smoke.yml").read_text(encoding="utf-8")
+        self.assertIn("contrast_checks",workflow)
+        self.assertIn('"context_label":".aq-context-strip span"',workflow)
+        self.assertIn('"context_value":".aq-context-strip strong"',workflow)
+        self.assertIn('"focus_detail":".aq-focus-card span"',workflow)
+        self.assertIn("brightness>=200",workflow)
+        self.assertIn("opacity",workflow)
+        self.assertIn("texto de cartões com contraste insuficiente",workflow)
 
 
 if __name__ == "__main__":

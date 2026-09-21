@@ -177,6 +177,36 @@ jobs:
                           break
                       page.wait_for_timeout(2_000)
 
+                  contrast_checks={}
+                  for label,selector in {
+                      "context_label":".aq-context-strip span",
+                      "context_value":".aq-context-strip strong",
+                      "focus_label":".aq-focus-card small",
+                      "focus_detail":".aq-focus-card span",
+                  }.items():
+                      locator=page.locator(selector)
+                      if not locator.count():
+                          contrast_checks[label]={"present":False,"readable":False}
+                          continue
+                      style=locator.first.evaluate(
+                          """el => {
+                              const s=getComputedStyle(el);
+                              return {color:s.color,opacity:parseFloat(s.opacity || "1")};
+                          }"""
+                      )
+                      import re
+                      match=re.search(r"rgba?\((\d+),\s*(\d+),\s*(\d+)",str(style.get("color","")))
+                      rgb=tuple(int(x) for x in match.groups()) if match else (0,0,0)
+                      brightness=sum(rgb)/3.0
+                      readable=brightness>=200 and float(style.get("opacity",1))>=0.95
+                      contrast_checks[label]={
+                          "present":True,
+                          "color":style.get("color"),
+                          "opacity":style.get("opacity"),
+                          "brightness":round(brightness,1),
+                          "readable":readable,
+                      }
+
                   exception_count=page.locator('[data-testid="stException"]').count()
                   viewport_width=page.evaluate("window.innerWidth")
                   document_width=page.evaluate("document.documentElement.scrollWidth")
@@ -194,6 +224,7 @@ jobs:
                       "radar_home":radar_home,
                       "radar_wait":radar_wait,
                       "stable_nav_count":stable_nav_count,
+                      "contrast_checks":contrast_checks,
                       "streamlit_exceptions":exception_count,
                       "viewport_width":viewport_width,
                       "document_width":document_width,
@@ -213,6 +244,9 @@ jobs:
                       )
                   if stable_nav_count<1:
                       failures.append(f"{name}: seletor de área estável não apareceu no modo Iniciante")
+                  bad_contrast=[key for key,value in contrast_checks.items() if not bool(value.get("readable"))]
+                  if bad_contrast:
+                      failures.append(f"{name}: texto de cartões com contraste insuficiente: {','.join(bad_contrast)}")
                   if exception_count:
                       failures.append(f"{name}: {exception_count} stException")
                   if page_errors:
