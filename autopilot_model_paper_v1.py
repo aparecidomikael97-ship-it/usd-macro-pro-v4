@@ -112,6 +112,7 @@ def _model_paper_cycle()->tuple[bool,dict[str,Any],list[str]]:
         "net_r":summary.get("net_r",0.0),
         "net_r_after_friction":summary.get("net_r_after_friction",0.0),
         "by_setup":summary.get("by_setup",{}),
+        "by_timeframe":summary.get("by_timeframe",{}),
         "by_session":summary.get("by_session",{}),
         "last_cycle":cycle,
         "errors":errors[:10],
