@@ -51,3 +51,9 @@ Depois de salvar, disparar um deploy da `main` atual e confirmar no Browser Smok
 
 Secrets continuam fora do Git. Variáveis sensíveis devem permanecer no secret store do
 Render. O Blueprint não deve conter API keys, passwords, tokens ou hashes de usuário.
+
+## Redeploy manual controlado
+
+O workflow `.github/workflows/render-deploy-control.yml` permite um redeploy manual sem expor a URL do Deploy Hook.
+Ele exige o secret GitHub `RENDER_DEPLOY_HOOK_URL`; se o secret estiver ausente, falha fechado e não tenta improvisar outra credencial.
+Após solicitar o deploy, verifica saúde e dispara o Production Browser Smoke, que continua sendo a validação final de identidade.
