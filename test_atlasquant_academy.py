@@ -8,7 +8,9 @@ from atlasquant_advanced_learning import (
 )
 from atlasquant_academy import (
     ACADEMY_TOPICS,
+    ACADEMY_REQUIRED_TOPIC_IDS,
     academy_catalog,
+    academy_coverage_report,
     academy_minimum_text_ready,
     academy_progress,
     academy_search,
@@ -64,9 +66,9 @@ class AtlasQuantAcademyTests(unittest.TestCase):
 
     def test_core_curriculum_contract_covers_macro_technical_and_risk(self):
         required={
-            "macro-foundations","cpi","pce","nfp","pmi-ism","gdp",
-            "central-banks","fomc-dotplot","calendar-surprise","dxy-crossasset",
-            "relative-strength","liquidity-structure","fvg","ote","crt-amd",
+            "macro-foundations","microeconomics-markets","cpi","pce","nfp","pmi-ism","gdp",
+            "central-banks","g8-central-banks","fomc-dotplot","calendar-surprise","dxy-crossasset",
+            "geopolitics-fx","relative-strength","liquidity-structure","fvg","ote","crt-amd",
             "quarterly-theory","quarterly-multitimeframe","quarterly-amd",
             "quarterly-execution","risk","atlasquant-reading",
         }
@@ -75,6 +77,32 @@ class AtlasQuantAcademyTests(unittest.TestCase):
         self.assertIn("Iniciante",{x["level"] for x in ACADEMY_TOPICS})
         self.assertIn("Intermediário",{x["level"] for x in ACADEMY_TOPICS})
         self.assertIn("Avançado",{x["level"] for x in ACADEMY_TOPICS})
+
+    def test_master_backlog_curriculum_has_explicit_micro_geopolitics_and_g8_banks(self):
+        micro=academy_topic("microeconomics-markets")
+        geo=academy_topic("geopolitics-fx")
+        banks=academy_topic("g8-central-banks")
+        self.assertIsNotNone(micro)
+        self.assertIsNotNone(geo)
+        self.assertIsNotNone(banks)
+        joined=" ".join([
+            micro["summary"],micro["watch"],geo["summary"],geo["watch"],
+            banks["summary"],banks["watch"],banks["forex"],
+        ])
+        for term in ("oferta","demanda","geopolítica","ECB","BoE","BoJ","RBA","RBNZ","SNB"):
+            with self.subTest(term=term):
+                self.assertIn(term.casefold(),joined.casefold())
+
+    def test_academy_coverage_report_fails_no_requirement_and_keeps_media_external(self):
+        report=academy_coverage_report()
+        self.assertEqual(report["schema"],"ATLASQUANT_ACADEMY_COVERAGE_V1")
+        self.assertTrue(report["text_ready"])
+        self.assertTrue(report["video_scripts_ready"])
+        self.assertEqual(report["missing_required"],[])
+        self.assertEqual(report["duplicate_ids"],0)
+        self.assertEqual(report["required_topics"],len(ACADEMY_REQUIRED_TOPIC_IDS))
+        self.assertTrue(report["rendered_media_required_externally"])
+        self.assertFalse(report["trading_side_effects"])
 
     def test_advanced_guided_path_has_all_approved_modules(self):
         ids=[x["id"] for x in ADVANCED_MODULES]
