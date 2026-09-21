@@ -67,6 +67,11 @@ from atlasquant_backtest_context import (
 )
 from atlasquant_research_evidence_capture import capture_research_evidence
 from atlasquant_passport_evidence import fuse_operational_evidence
+from atlasquant_timeframe_profiles import (
+    SUPPORTED_EXECUTION_TIMEFRAMES,
+    apply_timeframe_context,
+    timeframe_profile,
+)
 
 
 CANDLE_ALIASES = {
@@ -88,6 +93,8 @@ SIGNAL_ALIASES = {
     "target": ("target", "tp", "take_profit", "takeprofit", "alvo"),
     "source": ("source", "fonte"),
     "notes": ("notes", "observacoes", "observações", "obs"),
+    "timeframe": ("timeframe", "tf", "tempo_grafico", "tempo gráfico", "periodo", "período"),
+    "trading_style": ("trading_style", "estilo", "modalidade"),
     "decision_captured_at": ("decision_captured_at", "captured_at", "snapshot_time"),
     "macro_alignment": ("macro_alignment", "macro", "macro_context"),
     "technical_confirmation": ("technical_confirmation", "technical_ok", "tecnico_confirmado"),
@@ -153,7 +160,7 @@ def normalize_tradingview_candles(df: pd.DataFrame) -> pd.DataFrame:
     return out.drop_duplicates(subset=["datetime"], keep="last").reset_index(drop=True)
 
 
-def normalize_signal_sheet(df: pd.DataFrame, default_pair: str = "") -> pd.DataFrame:
+def normalize_signal_sheet(df: pd.DataFrame, default_pair: str = "", default_timeframe: str = "M15") -> pd.DataFrame:
     out = _rename_aliases(df, SIGNAL_ALIASES)
     required = ["signal_time", "side", "entry", "stop", "target"]
     if not all(c in out.columns for c in required):
@@ -170,6 +177,17 @@ def normalize_signal_sheet(df: pd.DataFrame, default_pair: str = "") -> pd.DataF
         if c not in out.columns:
             out[c] = ""
 
+    _profile=timeframe_profile(default_timeframe)
+    if "timeframe" not in out.columns:
+        out["timeframe"]=_profile["timeframe"]
+    else:
+        out["timeframe"]=out["timeframe"].fillna("").astype(str).str.strip().str.upper()
+        out.loc[out["timeframe"].eq(""),"timeframe"]=_profile["timeframe"]
+    if "trading_style" not in out.columns:
+        out["trading_style"]=""
+    out["trading_style"]=out["trading_style"].fillna("").astype(str).str.strip().str.upper()
+    out.loc[out["trading_style"].eq(""),"trading_style"]=[timeframe_profile(x)["trading_style"] for x in out.loc[out["trading_style"].eq(""),"timeframe"]]
+
     out["signal_time"] = pd.to_datetime(out["signal_time"], utc=True, errors="coerce")
     out["side"] = out["side"].astype(str).str.strip().str.upper()
     side_map = {
@@ -185,7 +203,7 @@ def normalize_signal_sheet(df: pd.DataFrame, default_pair: str = "") -> pd.DataF
         out[c] = pd.to_numeric(out[c], errors="coerce")
 
     cols = [
-        "signal_time", "pair", "setup", "session", "side", "entry", "stop", "target", "source", "notes",
+        "signal_time", "pair", "setup", "session", "timeframe", "trading_style", "side", "entry", "stop", "target", "source", "notes",
         "decision_captured_at", "macro_alignment", "technical_confirmation",
         "liquidity_confirmation", "regime_fit", "regime", "known_high_impact_event",
         "data_quality_pct", "plan_followed", "event_time", "event_label", "event_impact",
@@ -197,7 +215,7 @@ def normalize_signal_sheet(df: pd.DataFrame, default_pair: str = "") -> pd.DataF
 
 def signal_template_csv() -> str:
     fields = [
-        "signal_time", "pair", "setup", "session", "side", "entry", "stop", "target", "source", "notes",
+        "signal_time", "pair", "setup", "session", "timeframe", "trading_style", "side", "entry", "stop", "target", "source", "notes",
         "decision_captured_at", "macro_alignment", "technical_confirmation",
         "liquidity_confirmation", "regime_fit", "regime", "known_high_impact_event",
         "data_quality_pct", "plan_followed", "event_time", "event_label", "event_impact",
@@ -331,6 +349,14 @@ def _render_result_block(
         by_session = summarize_by(results, "session")
         st.markdown("#### Por sessão")
         st.dataframe(by_session, width="stretch", hide_index=True)
+    if "timeframe" in ledger.columns:
+        by_timeframe=summarize_by(results,"timeframe")
+        st.markdown("#### Por timeframe")
+        st.dataframe(by_timeframe,width="stretch",hide_index=True)
+    if "trading_style" in ledger.columns:
+        by_style=summarize_by(results,"trading_style")
+        st.markdown("#### Por modalidade")
+        st.dataframe(by_style,width="stretch",hide_index=True)
 
     strategy_names=[
         str(x.get("setup") or "").strip()
@@ -437,6 +463,15 @@ def _render_result_block(
 
 def render_operational_backtest_panel() -> dict[str, Any]:
     st.markdown("### 🧪 Backtest Operacional — TradingView → AtlasQuant")
+    backtest_timeframe=st.selectbox(
+        "Timeframe do teste",
+        list(SUPPORTED_EXECUTION_TIMEFRAMES),
+        index=0,
+        key="atlasquant_bt_timeframe",
+        help="M15/M30/H1 para intraday/day trade; H4/D1 para swing; W1 para position. O resultado fica separado por timeframe.",
+    )
+    _tf_profile=timeframe_profile(backtest_timeframe)
+    st.caption(f"Perfil desta execução: {_tf_profile['label']} · {backtest_timeframe}. Cada timeframe mantém estatística própria.")
     st.caption(
         "Importe candles OHLC exportados do TradingView. Você pode usar uma planilha "
         "de sinais explícitos ou deixar o AtlasQuant fazer replay automático dos modelos objetivos. "
@@ -507,6 +542,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
         context_snapshots=pd.DataFrame()
 
     def _enrich_with_historical_context(signals):
+        signals=apply_timeframe_context(signals,backtest_timeframe,overwrite=True)
         pack=enrich_signals_point_in_time(signals,context_snapshots)
         if not context_snapshots.empty:
             st.caption(
@@ -589,9 +625,9 @@ def render_operational_backtest_panel() -> dict[str, Any]:
 
     a, b, c, d = st.columns(4)
     with a:
-        max_wait = st.number_input("Máx. candles para entrada", min_value=1, max_value=100, value=8, step=1)
+        max_wait = st.number_input("Máx. candles para entrada", min_value=1, max_value=100, value=int(_tf_profile["max_wait_bars"]), step=1, key=f"atlasquant_bt_wait_{backtest_timeframe}")
     with b:
-        max_hold = st.number_input("Máx. candles em posição", min_value=1, max_value=1000, value=96, step=1)
+        max_hold = st.number_input("Máx. candles em posição", min_value=1, max_value=1000, value=int(_tf_profile["max_hold_bars"]), step=1, key=f"atlasquant_bt_hold_{backtest_timeframe}")
     with c:
         cost_r = st.number_input(
             "Custos totais por trade (R)",
@@ -1135,6 +1171,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                     cost_r=float(cost_r),
                     slippage_r=float(slippage_r),
                     context_snapshots=context_snapshots,
+                    timeframe=backtest_timeframe,
                 )
                 comparison=comparison_frame(
                     suite,
@@ -1741,7 +1778,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
         return {"status": "INVALID_CSV"}
 
     candles = normalize_tradingview_candles(raw_candles)
-    signals = normalize_signal_sheet(raw_signals, default_pair=default_pair)
+    signals = normalize_signal_sheet(raw_signals, default_pair=default_pair, default_timeframe=backtest_timeframe)
     if not signals.empty:
         enriched_manual=enrich_signals_point_in_time(_records(signals),context_snapshots)
         signals=pd.DataFrame(enriched_manual.get("signals",[]) or [])
@@ -1767,7 +1804,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
     pair = unique_pairs[0]
 
     st.caption(
-        f"Pronto para testar {len(signals)} sinal(is) em {len(candles)} candle(s) de {pair}. "
+        f"Pronto para testar {len(signals)} sinal(is) em {len(candles)} candle(s) de {pair} no {backtest_timeframe} ({_tf_profile['label']}). "
         "O candle do sinal não é usado para executar a entrada (proteção anti-look-ahead)."
     )
 
