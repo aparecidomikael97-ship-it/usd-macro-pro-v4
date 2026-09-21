@@ -239,6 +239,14 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+# Deployment identity is non-secret observability. Render exposes RENDER_GIT_COMMIT.
+_ATLASQUANT_DEPLOY_COMMIT=str(os.getenv("RENDER_GIT_COMMIT","") or "").strip()
+if _ATLASQUANT_DEPLOY_COMMIT:
+    st.markdown(
+        f'<span id="atlasquant-deploy-marker" data-commit="{_ATLASQUANT_DEPLOY_COMMIT}" style="display:none"></span>',
+        unsafe_allow_html=True,
+    )
+
 # Optional private-access gate. Disabled by default; when required it fails closed.
 if render_access_gate is not None:
     _ATLASQUANT_ACCESS = render_access_gate()
