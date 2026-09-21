@@ -24,7 +24,11 @@ from atlasquant_ote_replay import generate_ote_signals
 from atlasquant_crt_replay import generate_crt_signals
 from atlasquant_amd_replay import generate_amd_signals
 from atlasquant_backtest_context import enrich_signals_point_in_time
-from atlasquant_timeframe_profiles import apply_timeframe_context, timeframe_profile
+from atlasquant_timeframe_profiles import (
+    SUPPORTED_EXECUTION_TIMEFRAMES,
+    apply_timeframe_context,
+    timeframe_profile,
+)
 
 
 STRATEGY_ORDER = (
@@ -112,6 +116,62 @@ def run_strategy_suite(
             "results":results,
         }
     return suite
+
+
+
+def run_multitimeframe_strategy_suite(
+    candles_by_timeframe: Mapping[str,pd.DataFrame],
+    *,
+    pair: str,
+    max_wait_bars_by_timeframe: Mapping[str,int] | None = None,
+    max_hold_bars_by_timeframe: Mapping[str,int] | None = None,
+    cost_r: float = 0.0,
+    slippage_r: float = 0.0,
+    context_snapshots: pd.DataFrame | None = None,
+) -> "OrderedDict[str, OrderedDict[str, dict[str, Any]]]":
+    """Run the five setup families independently for each supplied timeframe."""
+    out:"OrderedDict[str, OrderedDict[str, dict[str, Any]]]"=OrderedDict()
+    waits=dict(max_wait_bars_by_timeframe or {})
+    holds=dict(max_hold_bars_by_timeframe or {})
+    for tf in SUPPORTED_EXECUTION_TIMEFRAMES:
+        frame=candles_by_timeframe.get(tf)
+        if not isinstance(frame,pd.DataFrame) or frame.empty:
+            continue
+        profile=timeframe_profile(tf)
+        out[tf]=run_strategy_suite(
+            frame,
+            pair=pair,
+            max_wait_bars=int(waits.get(tf,profile["max_wait_bars"])),
+            max_hold_bars=int(holds.get(tf,profile["max_hold_bars"])),
+            cost_r=float(cost_r),
+            slippage_r=float(slippage_r),
+            context_snapshots=context_snapshots,
+            timeframe=tf,
+        )
+    return out
+
+
+def multitimeframe_comparison_frame(
+    suites:Mapping[str,Mapping[str,Mapping[str,Any]]],
+    *,
+    min_trades_for_rank:int=20,
+)->pd.DataFrame:
+    """Concatenate descriptive comparison rows without ranking across timeframes."""
+    parts=[]
+    for tf in SUPPORTED_EXECUTION_TIMEFRAMES:
+        suite=suites.get(tf)
+        if not isinstance(suite,Mapping):
+            continue
+        frame=comparison_frame(suite,min_trades_for_rank=min_trades_for_rank)
+        if frame.empty:
+            continue
+        frame=frame.copy()
+        frame["timeframe"]=tf
+        frame["trading_style"]=timeframe_profile(tf)["trading_style"]
+        parts.append(frame)
+    if not parts:
+        return pd.DataFrame()
+    return pd.concat(parts,ignore_index=True,sort=False)
 
 
 def comparison_frame(
