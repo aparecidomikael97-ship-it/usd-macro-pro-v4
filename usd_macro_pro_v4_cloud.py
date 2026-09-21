@@ -21,6 +21,7 @@ import base64
 import json
 import math
 import os
+import subprocess
 import time
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -239,13 +240,35 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Deployment identity is non-secret observability. Render exposes RENDER_GIT_COMMIT.
-_ATLASQUANT_DEPLOY_COMMIT=str(
-    os.getenv("RENDER_GIT_COMMIT","")
-    or os.getenv("ATLASQUANT_DEPLOY_COMMIT","")
-    or os.getenv("GIT_COMMIT","")
-    or ""
-).strip()
+# Deployment identity is non-secret observability. Prefer platform-provided
+# commit variables; when a host does not expose them, use the immutable git
+# checkout identity if repository metadata is available. Never invent a SHA.
+def _resolve_atlasquant_deploy_commit() -> str:
+    value=str(
+        os.getenv("RENDER_GIT_COMMIT","")
+        or os.getenv("ATLASQUANT_DEPLOY_COMMIT","")
+        or os.getenv("GIT_COMMIT","")
+        or ""
+    ).strip()
+    if value:
+        return value
+    try:
+        probe=subprocess.run(
+            ["git","rev-parse","HEAD"],
+            cwd=str(Path(__file__).resolve().parent),
+            capture_output=True,
+            text=True,
+            timeout=1.5,
+            check=False,
+        )
+        candidate=str(probe.stdout or "").strip()
+        if probe.returncode==0 and re.fullmatch(r"[0-9a-fA-F]{40}",candidate):
+            return candidate.lower()
+    except Exception:
+        pass
+    return ""
+
+_ATLASQUANT_DEPLOY_COMMIT=_resolve_atlasquant_deploy_commit()
 if _ATLASQUANT_DEPLOY_COMMIT:
     st.markdown(
         f'<span id="atlasquant-deploy-marker" data-commit="{_ATLASQUANT_DEPLOY_COMMIT}" style="display:none"></span>',
