@@ -31,5 +31,21 @@ class AtlasQuantPackBuilderContractTests(unittest.TestCase):
         self.assertTrue(callable(m.build_pair_intelligence_packs))
         self.assertTrue(callable(m.load_current_pair_intelligence))
 
+    def test_builder_keeps_matrix_pair_identity_and_never_enables_orders(self):
+        import pandas as pd
+        import pair_intelligence_v110 as m
+        pairs=["EUR/USD","GBP/USD","AUD/USD","NZD/USD","USD/JPY","USD/CHF","USD/CAD"]
+        matrix=pd.DataFrame([{
+            "Par":pair,"Direção":"⚪ AGUARDAR CONFIRMAÇÃO","Dif. macro":0.0,
+            "Score final":50.0,"Qualidade":50.0,"Confluência":"BAIXA",
+            "Índice ranking":50.0,"Ranking":i+1,
+        } for i,pair in enumerate(pairs)])
+        ranking=pd.DataFrame([{"Código":ccy,"Pontuação_Final":50.0} for ccy in ("USD","EUR","GBP","JPY","CHF","CAD","AUD","NZD")])
+        packs=m.build_pair_intelligence_packs(matrix,ranking,scanner_state={},map_state={},news_state={},fed_tone="Neutro")
+        self.assertEqual({p["pair"] for p in packs},set(pairs))
+        self.assertEqual(len(packs),7)
+        self.assertTrue(all(not bool(p.get("real_orders_enabled",False)) for p in packs))
+
+
 if __name__ == "__main__":
     unittest.main()

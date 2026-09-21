@@ -86,6 +86,14 @@ class AtlasQuantHomeRadarTests(unittest.TestCase):
         self.assertEqual(rows[0]["pair"],"AUD/USD")
         self.assertEqual(rows[-1]["pair"],"GBP/USD")
 
+
+    def test_radar_preserves_all_seven_unique_pairs_when_supplied(self):
+        pairs=["EUR/USD","GBP/USD","AUD/USD","NZD/USD","USD/JPY","USD/CHF","USD/CAD"]
+        rows=home_rows_from_packs([_pack(pair=pair,priority=90-i) for i,pair in enumerate(pairs)])
+        self.assertEqual(len(rows),7)
+        self.assertEqual(set(row["pair"] for row in rows),set(pairs))
+        self.assertTrue(all(row["action"] in {"COMPRA","VENDA","NÃO OPERAR"} for row in rows))
+
     def test_summary_is_conservative(self):
         rows=home_rows_from_packs([
             _pack(pair="EUR/USD"),
