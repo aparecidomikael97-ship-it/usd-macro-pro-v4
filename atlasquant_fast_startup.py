@@ -25,6 +25,7 @@ import streamlit as st
 SCHEMA="ATLASQUANT_HOME_SNAPSHOT_V1"
 HOME_SNAPSHOT_PATH="dados/atlasquant_home_snapshot_v1.json"
 DEFAULT_MAX_AGE_MIN=90.0
+DEFAULT_MAX_RUNTIME_AGE_MIN=90.0
 
 
 def _finite(value:Any, default:float=0.0)->float:
@@ -69,10 +70,17 @@ def validate_home_snapshot(
     for key in ("ranking","fed","macro_eua","dados_moedas","usd_detalhado"):
         if not fast.get(key):
             errors.append("fast_boot."+key)
-    age=snapshot_age_minutes(s,now=now)
+    # The Autopilot may refresh decision packs more recently than the slower
+    # macro/input payload. Prefer that real runtime timestamp for Fast Home
+    # freshness; older snapshots remain compatible through generated_at.
+    freshness=dict(s)
+    runtime_generated_at=str(s.get("runtime_generated_at") or "").strip()
+    if runtime_generated_at:
+        freshness["generated_at"]=runtime_generated_at
+    age=snapshot_age_minutes(freshness,now=now)
     if age is None:
         errors.append("generated_at")
-    elif age>float(max_age_min):
+    elif age>float(DEFAULT_MAX_RUNTIME_AGE_MIN if runtime_generated_at else max_age_min):
         errors.append("stale")
     safety=dict(s.get("safety",{}) or {})
     if safety.get("real_orders") is not False:
@@ -294,6 +302,6 @@ def render_beginner_shell(
 
 
 __all__=[
-    "SCHEMA","HOME_SNAPSHOT_PATH","DEFAULT_MAX_AGE_MIN","snapshot_age_minutes",
+    "SCHEMA","HOME_SNAPSHOT_PATH","DEFAULT_MAX_AGE_MIN","DEFAULT_MAX_RUNTIME_AGE_MIN","snapshot_age_minutes",
     "validate_home_snapshot","load_home_snapshot","render_beginner_shell",
 ]
