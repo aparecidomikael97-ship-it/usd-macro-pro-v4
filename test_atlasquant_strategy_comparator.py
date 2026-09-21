@@ -104,6 +104,21 @@ class StrategyComparatorTests(unittest.TestCase):
         self.assertIn("enrich_signals_point_in_time",source)
         self.assertIn("backtest_many",source)
 
+
+    def test_suite_tags_all_strategy_signals_with_selected_timeframe(self):
+        n=80
+        d=pd.DataFrame({
+            "datetime":pd.date_range("2026-09-15T00:00:00Z",periods=n,freq="4h",tz="UTC"),
+            "open":[10.0]*n,"high":[10.1]*n,"low":[9.9]*n,"close":[10.0]*n,
+        })
+        suite=run_strategy_suite(d,pair="EUR/USD",timeframe="H4",max_wait_bars=4,max_hold_bars=8)
+        for key in STRATEGY_ORDER:
+            self.assertEqual(suite[key]["timeframe"],"H4")
+            self.assertEqual(suite[key]["trading_style"],"SWING")
+            for signal in suite[key]["signals"]:
+                self.assertEqual(signal["timeframe"],"H4")
+                self.assertEqual(signal["trading_style"],"SWING")
+
     def test_run_suite_returns_all_five_strategies_even_without_signals(self):
         n=40
         d=pd.DataFrame({
