@@ -94,6 +94,18 @@ class FastStartupTests(unittest.TestCase):
         self.assertIn("schema",out["errors"])
 
 
+
+    def test_invalid_fast_snapshot_does_not_hide_advanced_mode_control(self):
+        from pathlib import Path
+        src=Path("atlasquant_fast_startup.py").read_text(encoding="utf-8")
+        invalid=src.index('if not check["valid"]:')
+        safe_wait=src.index('"page":"SAFE_WAIT"',invalid)
+        block=src[invalid:safe_wait]
+        self.assertIn('mode=st.radio(',block)
+        self.assertIn('["Iniciante","Avançado"]',block)
+        self.assertIn('"handled":False',block)
+        self.assertIn('"mode":"Avançado"',block)
+
     def test_snapshot_loader_timeout_is_bounded_for_fast_boot(self):
         import inspect
         signature=inspect.signature(load_home_snapshot)
