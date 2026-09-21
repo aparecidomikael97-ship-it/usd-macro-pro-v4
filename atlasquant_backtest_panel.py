@@ -95,6 +95,10 @@ SIGNAL_ALIASES = {
     "target": ("target", "tp", "take_profit", "takeprofit", "alvo"),
     "source": ("source", "fonte"),
     "notes": ("notes", "observacoes", "observações", "obs"),
+    "reading_aligned": ("reading_aligned","leitura_alinhada"),
+    "direction_aligned": ("direction_aligned","direcao_alinhada","direção_alinhada"),
+    "filters_aligned": ("filters_aligned","filtros_alinhados"),
+    "trigger_aligned": ("trigger_aligned","gatilho_alinhado","gatilho_confirmado"),
     "timeframe": ("timeframe", "tf", "tempo_grafico", "tempo gráfico", "periodo", "período"),
     "trading_style": ("trading_style", "estilo", "modalidade"),
     "decision_captured_at": ("decision_captured_at", "captured_at", "snapshot_time"),
@@ -208,6 +212,8 @@ def normalize_signal_sheet(df: pd.DataFrame, default_pair: str = "", default_tim
     cols = [
         "signal_time", "pair", "setup", "session", "timeframe", "trading_style", "side", "entry", "stop", "target", "source", "notes",
         "decision_captured_at", "macro_alignment", "technical_confirmation",
+        "reading_aligned", "direction_aligned", "filters_aligned", "trigger_aligned",
+        "reading_aligned", "direction_aligned", "filters_aligned", "trigger_aligned",
         "liquidity_confirmation", "regime_fit", "regime", "known_high_impact_event",
         "data_quality_pct", "plan_followed", "event_time", "event_label", "event_impact",
         "event_known_before_entry",
@@ -303,13 +309,14 @@ def _render_result_block(
         unsafe_allow_html=True,
     )
     st.markdown("#### Resultado")
-    m1, m2, m3, m4, m5 = st.columns(5)
+    m1, m2, m3, m4, m5, m6 = st.columns(6)
     m1.metric("Trades", metrics["trades"])
     m2.metric("Gain", metrics["gains"])
     m3.metric("Loss", metrics["losses"])
     m4.metric("BE", metrics["breakeven"])
     win = metrics["win_rate_pct"]
     m5.metric("Win Rate", "—" if win is None else f"{win:.1f}%")
+    m6.metric("Bloq. alinhamento", int(metrics.get("alignment_blocked",0) or 0))
 
     n1, n2, n3, n4 = st.columns(4)
     n1.metric("Resultado", f"{metrics['net_r']:+.2f}R")
@@ -1182,7 +1189,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                 )
                 st.markdown("#### Comparação geral")
                 display_cols=[
-                    "operacional","timeframe","trading_style","trades","gains","losses","breakeven",
+                    "operacional","timeframe","trading_style","trades","gains","losses","breakeven","alignment_blocked",
                     "win_rate_pct","expectancy_r","net_r","profit_factor",
                     "max_drawdown_r","max_loss_streak","sample_tier",
                     "observed_expectancy_rank",
@@ -1633,7 +1640,8 @@ def render_operational_backtest_panel() -> dict[str, Any]:
     with st.expander("🧭 Matriz multitimeframe — 5 operacionais × M15 a W1", expanded=False):
         st.caption(
             "Permite comparar os mesmos cinco operacionais em M15, M30, H1, H4, D1 e W1. "
-            "Cada timeframe recebe seu próprio CSV nativo; D1 e W1 não são inventados a partir de um M15 curto."
+            "Cada timeframe recebe seu próprio CSV nativo; D1 e W1 não são inventados a partir de um M15 curto. "
+            "Nesta matriz, uma entrada só conta quando leitura, direção, filtros e gatilho estavam alinhados no instante do sinal."
         )
         mt_files={}
         mt_cols=st.columns(3)
@@ -1676,6 +1684,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                 cost_r=float(cost_r),
                 slippage_r=float(slippage_r),
                 context_snapshots=context_snapshots,
+                require_alignment=True,
             )
             _mt_comparison=multitimeframe_comparison_frame(
                 _mt_suites,
@@ -1686,7 +1695,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
             else:
                 _mt_cols=[
                     "timeframe","trading_style","operacional","signals","trades","gains","losses",
-                    "breakeven","win_rate_pct","expectancy_r","net_r","profit_factor",
+                    "breakeven","alignment_blocked","win_rate_pct","expectancy_r","net_r","profit_factor",
                     "max_drawdown_r","sample_tier","observed_expectancy_rank",
                 ]
                 st.dataframe(_mt_comparison.reindex(columns=_mt_cols),width="stretch",hide_index=True)
