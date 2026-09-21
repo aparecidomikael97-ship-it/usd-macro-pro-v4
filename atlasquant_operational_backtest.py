@@ -478,6 +478,7 @@ def summarize_results(records: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
         "losses": losses,
         "breakeven": be,
         "no_trade": len(rows) - len(executed),
+        "alignment_blocked": sum(1 for x in rows if str(x.get("status","")).upper()=="ALIGNMENT_BLOCKED"),
         "win_rate_pct": None if not executed else round(gains / len(executed) * 100.0, 2),
         "net_r": round(sum(rs), 4),
         "average_r": None if not rs else round(sum(rs) / len(rs), 4),
