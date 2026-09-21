@@ -90,6 +90,7 @@ def _model_paper_cycle()->tuple[bool,dict[str,Any],list[str]]:
         "candidates_total":summary.get("candidates_total",0),
         "blocked_context":summary.get("blocked_context",0),
         "blocked_data":summary.get("blocked_data",0),
+        "blocked_timeframe":summary.get("blocked_timeframe",0),
         "pending_entries":summary.get("pending_entries",0),
         "open_positions":summary.get("open_positions",0),
         "closed_trades":summary.get("closed_trades",0),
