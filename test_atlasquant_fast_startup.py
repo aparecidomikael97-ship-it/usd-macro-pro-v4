@@ -106,8 +106,8 @@ class FastStartupTests(unittest.TestCase):
         src=inspect.getsource(load_home_snapshot)
         self.assertIn('"_fast_boot_observability"',src)
         self.assertIn('"load_ms"',src)
-        self.assertIn('"source":"raw"',src)
-        self.assertIn('"source":"api"',src)
+        self.assertIn('_with_obs(r.json(),"raw")',src)
+        self.assertIn('_with_obs(obj,"api")',src)
         self.assertNotIn("real_orders_enabled",src)
         self.assertNotIn("automatic_execution",src)
 
