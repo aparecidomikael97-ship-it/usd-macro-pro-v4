@@ -262,6 +262,23 @@ class OperationalBacktestTests(unittest.TestCase):
         self.assertEqual(out["data_quality_pct"],94)
         self.assertEqual(out["event_label"],"CPI")
 
+
+    def test_timeframe_and_trading_style_are_preserved_in_result_and_ledger(self):
+        d=candles([
+            (10,10.1,9.9,10.0),
+            (10,10.2,9.9,10.0),
+            (10,12.2,9.9,12.0),
+        ])
+        plan={"signal_time":d.iloc[0]["datetime"],"pair":"EUR/USD","setup":"FVG",
+              "timeframe":"H4","trading_style":"SWING","side":"BUY",
+              "entry":10.0,"stop":9.0,"target":12.0}
+        out=backtest_signal(d,plan)
+        self.assertEqual(out["timeframe"],"H4")
+        self.assertEqual(out["trading_style"],"SWING")
+        ledger=ledger_frame([out])
+        self.assertEqual(ledger.iloc[0]["timeframe"],"H4")
+        self.assertEqual(ledger.iloc[0]["trading_style"],"SWING")
+
     def test_mixed_timestamp_formats_are_normalized_without_losing_valid_rows(self):
         d=pd.DataFrame([
             {"datetime":"2026-09-15T00:00:00Z","open":10,"high":10.2,"low":9.8,"close":10},
