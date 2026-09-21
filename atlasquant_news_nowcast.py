@@ -68,6 +68,9 @@ def classify_surprise(actual:Any,consensus:Any,tolerance:Any=0.0)->str:
 
 
 def validate_historical_release(release:HistoricalRelease)->HistoricalRelease:
+    indicator=str(release.indicator or "").strip()
+    if not indicator:
+        raise ValueError("indicator histórico é obrigatório")
     scheduled=_utc(release.scheduled_at)
     captured=_utc(release.captured_at)
     if captured>=scheduled:
@@ -81,7 +84,7 @@ def validate_historical_release(release:HistoricalRelease)->HistoricalRelease:
     if tolerance<0:
         raise ValueError("tolerance não pode ser negativo")
     return HistoricalRelease(
-        indicator=str(release.indicator).strip(),
+        indicator=indicator,
         scheduled_at=scheduled,
         captured_at=captured,
         consensus=consensus,
