@@ -78,6 +78,7 @@ def validate_home_snapshot(
     if runtime_generated_at:
         freshness["generated_at"]=runtime_generated_at
     age=snapshot_age_minutes(freshness,now=now)
+    input_age=snapshot_age_minutes({"generated_at":s.get("generated_at")},now=now)
     if age is None:
         errors.append("generated_at")
     elif age>float(DEFAULT_MAX_RUNTIME_AGE_MIN if runtime_generated_at else max_age_min):
@@ -91,6 +92,7 @@ def validate_home_snapshot(
         "valid":not errors,
         "errors":errors,
         "age_minutes":age,
+        "input_age_minutes":input_age,
         "snapshot":s,
         "real_orders_enabled":False,
         "automatic_execution":False,
@@ -230,6 +232,7 @@ def render_beginner_shell(
         "source":str(_obs.get("source") or "unknown"),
         "load_ms":int(_finite(_obs.get("load_ms"),0)),
         "snapshot_age_minutes":round(age,2),
+        "input_age_minutes":check.get("input_age_minutes"),
         "snapshot_valid":True,
         "mode":"Iniciante",
     }
@@ -243,7 +246,11 @@ def render_beginner_shell(
     )
     c1,c2=st.columns([4,1])
     with c1:
-        st.caption(f"Dados calculados há {age:.0f} min · {environment or 'AtlasQuant'} · Engine {app_version}")
+        input_age=check.get("input_age_minutes")
+        age_label=f"Runtime atualizado há {age:.0f} min"
+        if isinstance(input_age,(int,float)) and input_age>age+1:
+            age_label+=f" · base macro há {float(input_age):.0f} min"
+        st.caption(f"{age_label} · {environment or 'AtlasQuant'} · Engine {app_version}")
     with c2:
         if st.button("↻ Atualizar",key="aq_fast_refresh",width="stretch"):
             load_home_snapshot.clear()
