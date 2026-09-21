@@ -104,7 +104,7 @@ def load_home_snapshot(
     token:str="",
     timeout:float=4.0,
 )->dict[str,Any]:
-    """Read one compact runtime artifact. Public raw URL first; API fallback for private repos."""
+    """Read one compact runtime artifact with a bounded private/public fallback."""
     repo=str(repo or "").strip()
     branch=str(branch or "atlasquant-runtime").strip()
     token=str(token or "").strip()
@@ -113,47 +113,45 @@ def load_home_snapshot(
     timeout=max(1.0,min(float(timeout),8.0))
     started=time.perf_counter()
 
+    def _with_obs(obj:Any, source:str)->dict[str,Any]:
+        out=dict(obj) if isinstance(obj,Mapping) else {}
+        if out:
+            out["_fast_boot_observability"]={
+                "source":source,
+                "load_ms":round((time.perf_counter()-started)*1000),
+            }
+        return out
+
+    if token:
+        try:
+            api=f"https://api.github.com/repos/{repo}/contents/{HOME_SNAPSHOT_PATH}"
+            headers={
+                "Authorization":f"Bearer {token}",
+                "Accept":"application/vnd.github+json",
+                "X-GitHub-Api-Version":"2022-11-28",
+            }
+            r=requests.get(api,headers=headers,params={"ref":branch},timeout=timeout)
+            if r.ok:
+                payload=r.json()
+                encoded=str(payload.get("content") or "")
+                if encoded:
+                    obj=json.loads(base64.b64decode(encoded).decode("utf-8"))
+                    out=_with_obs(obj,"api")
+                    if out:
+                        return out
+        except Exception:
+            pass
+
     raw_url=f"https://raw.githubusercontent.com/{repo}/{quote(branch,safe='')}/{HOME_SNAPSHOT_PATH}"
     try:
         r=requests.get(raw_url,timeout=timeout,headers={"User-Agent":"AtlasQuant-FastBoot/1"})
         if r.ok:
-            obj=r.json()
-            out=dict(obj) if isinstance(obj,Mapping) else {}
+            out=_with_obs(r.json(),"raw")
             if out:
-                out["_fast_boot_observability"]={
-                    "source":"raw",
-                    "load_ms":round((time.perf_counter()-started)*1000),
-                }
-            return out
+                return out
     except Exception:
         pass
-
-    if not token:
-        return {}
-    try:
-        api=f"https://api.github.com/repos/{repo}/contents/{HOME_SNAPSHOT_PATH}"
-        headers={
-            "Authorization":f"Bearer {token}",
-            "Accept":"application/vnd.github+json",
-            "X-GitHub-Api-Version":"2022-11-28",
-        }
-        r=requests.get(api,headers=headers,params={"ref":branch},timeout=timeout)
-        if not r.ok:
-            return {}
-        payload=r.json()
-        encoded=str(payload.get("content") or "")
-        if not encoded:
-            return {}
-        obj=json.loads(base64.b64decode(encoded).decode("utf-8"))
-        out=dict(obj) if isinstance(obj,Mapping) else {}
-        if out:
-            out["_fast_boot_observability"]={
-                "source":"api",
-                "load_ms":round((time.perf_counter()-started)*1000),
-            }
-        return out
-    except Exception:
-        return {}
+    return {}
 
 
 def _brief_rows(snapshot:Mapping[str,Any])->list[dict[str,Any]]:
