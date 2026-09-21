@@ -94,6 +94,7 @@ def evaluate_decision_integrity(
     news_alignment: str = "",
     data_sufficient: bool | None = None,
     data_readiness_score: float | None = None,
+    execution_timeframe: str = "M15",
 ) -> dict[str, Any]:
     side=str(side).upper()
     score=_f(score); quality=_f(quality); rank_index=_f(rank_index)
@@ -111,11 +112,22 @@ def evaluate_decision_integrity(
         data_score = None
     data_ok = _bool_or_none(data_sufficient)
 
-    tech_scores=[_status_score(h4),_status_score(h1),_status_score(m15)]
+    execution_tf=str(execution_timeframe or "M15").strip().upper()
+    supported_tf=execution_tf in {"M15","H1"}
+    if execution_tf=="H1":
+        tech_scores=[_status_score(h4),_status_score(h1)]
+        trigger_status=h1
+        trigger_label="H1"
+    else:
+        tech_scores=[_status_score(h4),_status_score(h1),_status_score(m15)]
+        trigger_status=m15
+        trigger_label="M15"
     tech_avg=float(np.mean(tech_scores))
 
     hard=[]; soft=[]; positives=[]
     macro_wait = side not in ("BUY","SELL")
+    if not supported_tf:
+        hard.append(f"Timeframe de execução ainda não suportado ({execution_tf})")
     if quality < 60:
         hard.append(f"Qualidade de dados baixa ({quality:.0f}%)")
     if data_ok is not True:
@@ -155,12 +167,13 @@ def evaluate_decision_integrity(
         soft.append(f"ICT incompleto ({ict:.0f}/100)")
     if inst < 70:
         soft.append(f"Fluxo institucional incompleto ({inst:.0f}/100)")
-    if _status_score(m15) < 80:
-        soft.append("M15 ainda não confirmou gatilho")
+    if _status_score(trigger_status) < 80:
+        soft.append(f"{trigger_label} ainda não confirmou gatilho")
 
     if score >= 80: positives.append(f"Score Mestre forte ({score:.0f}/100)")
     if quality >= 75: positives.append(f"Qualidade alta ({quality:.0f}%)")
-    if tech_avg >= 85 and data_ok is True: positives.append("H4/H1/M15 fortemente alinhados")
+    if tech_avg >= 85 and data_ok is True:
+        positives.append(("H4/H1 fortemente alinhados" if execution_tf=="H1" else "H4/H1/M15 fortemente alinhados"))
     if ict >= 75: positives.append(f"ICT alinhado ({ict:.0f}/100)")
     if inst >= 75: positives.append(f"Fluxo institucional alinhado ({inst:.0f}/100)")
     if gate_score >= 70 and "WAIT" not in gate_u: positives.append(f"Gate liberado ({gate_score:.0f}/100)")
@@ -177,9 +190,14 @@ def evaluate_decision_integrity(
         penalties += min(12.0,(adr-100)*.6)
     priority=float(np.clip(raw-penalties,0,100))
 
+    technical_execution_ok=(
+        (_status_score(h4)>=80 and _status_score(h1)>=80)
+        if execution_tf=="H1"
+        else (_status_score(h4)>=80 and _status_score(h1)>=80 and _status_score(m15)>=80)
+    )
     executable=(
-        side in ("BUY","SELL") and not hard and
-        _status_score(h4)>=80 and _status_score(h1)>=80 and _status_score(m15)>=80 and
+        supported_tf and side in ("BUY","SELL") and not hard and
+        technical_execution_ok and
         ict>=70 and inst>=70 and gate_score>=65 and "WAIT" not in gate_u and
         event not in ("MAXIMO","ELEVADO","DESCONHECIDO") and adr is not None and adr<95 and
         age is not None and data_ok is True and data_score is not None
@@ -221,5 +239,7 @@ def evaluate_decision_integrity(
         "event_level":event,
         "data_sufficient":data_ok,
         "data_readiness_score":None if data_score is None else round(data_score,1),
+        "execution_timeframe":execution_tf,
+        "trigger_timeframe":trigger_label,
         "note":"Prioridade operacional; não é probabilidade de lucro.",
     }
