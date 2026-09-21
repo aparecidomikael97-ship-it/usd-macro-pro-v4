@@ -187,6 +187,35 @@ class ModelPaperTimeframeSafetyTests(unittest.TestCase):
         self.assertEqual(summary["by_timeframe"]["H1"]["pending"],1)
 
 
+    def test_summary_explains_block_reasons_by_timeframe_and_setup(self):
+        ledger=pd.DataFrame([
+            {
+                "trade_id":"h1","source_timeframe":"H1","setup_id":"crt",
+                "status":"BLOCKED_CONTEXT","result":"","realized_r":None,
+                "context_hard_blocks":"Contexto D1 ausente para execução H1 | Gate bloqueado",
+                "context_soft_blocks":"ICT incompleto (40/100)",
+                "timeframe_alignment_reason":"SOURCE_EQUALS_EXECUTION",
+            },
+            {
+                "trade_id":"h2","source_timeframe":"H1","setup_id":"crt",
+                "status":"BLOCKED_TIMEFRAME","result":"","realized_r":None,
+                "context_hard_blocks":"",
+                "context_soft_blocks":"",
+                "timeframe_alignment_reason":"EXECUTION_FRAME_NOT_AVAILABLE:H4",
+            },
+        ])
+        summary=model.summarize_model_paper(ledger)
+        self.assertEqual(
+            summary["by_timeframe"]["H1"]["hard_block_reasons"]["Contexto D1 ausente para execução H1"],1
+        )
+        self.assertEqual(summary["by_setup"]["crt"]["soft_block_reasons"]["ICT incompleto (40/100)"],1)
+        self.assertEqual(
+            summary["by_timeframe"]["H1"]["timeframe_block_reasons"]["EXECUTION_FRAME_NOT_AVAILABLE:H4"],1
+        )
+        self.assertFalse(summary["automatic_execution"])
+        self.assertFalse(summary["real_orders_enabled"])
+
+
 
 if __name__=="__main__":
     unittest.main()
