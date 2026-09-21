@@ -16,6 +16,13 @@ import pandas as pd
 import streamlit as st
 
 from atlasquant_voice_assistant import browser_speech_html, render_contextual_voice_assistant
+from atlasquant_session_profiles import (
+    SESSION_PROFILES,
+    SESSION_LABELS,
+    extract_session_bucket,
+    prioritize_rows_for_session,
+    session_profile_summary,
+)
 
 SCHEMA="ATLASQUANT_HOME_RADAR_V1"
 
@@ -76,8 +83,11 @@ def home_rows_from_packs(packs:Sequence[Mapping[str,Any]]|None)->list[dict[str,A
         data=dict(p.get("data_ready",{}) or {})
         strength=dict(p.get("strength",{}) or {})
         blockers=[str(x) for x in list(p.get("blockers",[]) or []) if str(x).strip()]
+        session_bucket=extract_session_bucket(p)
         rows.append({
             "pair":pair,
+            "session_bucket":session_bucket,
+            "session_label":SESSION_LABELS.get(session_bucket,SESSION_LABELS["UNKNOWN"]),
             "bias":bias,
             "action":action,
             "priority":max(0.0,min(100.0,_safe(p.get("priority",p.get("unified",0))))),
@@ -144,6 +154,7 @@ def voice_script_for_row(row:Mapping[str,Any])->str:
     h1=str(r.get("h1") or "sem dado")
     m15=str(r.get("m15") or "sem dado")
     event=str(r.get("event") or "normal")
+    session=str(r.get("session_label") or "sessão não informada")
     blockers=[str(x) for x in list(r.get("blockers",[]) or []) if str(x).strip()]
     blocker_text=(" Principais bloqueios: "+"; ".join(blockers[:3])+".") if blockers else ""
     return (
@@ -153,6 +164,7 @@ def voice_script_for_row(row:Mapping[str,Any])->str:
         f"e prontidão dos dados {data_score:.0f} de 100. "
         f"O principal motivo é: {reason}. "
         f"No técnico, H4 está {h4}, H1 está {h1} e M15 está {m15}. "
+        f"A janela de sessão identificada é {session}. "
         f"O risco de evento está classificado como {event}. "
         f"Próximo passo: {next_action}."
         f"{blocker_text} "
@@ -178,7 +190,7 @@ def _card_html(row:Mapping[str,Any])->str:
         <span>{movement}</span>
         <span>Notícias <b>{news}</b></span>
       </div>
-      <div class="aq-home-state">{state}</div>
+      <div class="aq-home-state">{state} · {escape(str(r.get('session_label') or 'Sessão não informada'))}</div>
     </div>"""
 
 
@@ -219,7 +231,6 @@ def render_home_radar(
     macro_context:Mapping[str,Any]|None=None,
 )->dict[str,Any]:
     rows=home_rows_from_packs(packs)
-    summary=home_summary(rows)
     mode="Avançado" if str(experience_mode).casefold().startswith("avan") else "Iniciante"
     st.markdown(HOME_CSS,unsafe_allow_html=True)
     st.markdown(
@@ -232,6 +243,43 @@ def render_home_radar(
     if not rows:
         st.warning("Radar aguardando a Matriz dos pares e dados persistidos.")
         return {"schema":SCHEMA,"rows":0,"mode":mode,"real_orders_enabled":False}
+
+    st.markdown("### 🕒 Meu horário disponível")
+    profile_options=list(SESSION_PROFILES)
+    stored_profile=st.session_state.get("aq_session_profile","Todos os horários")
+    if stored_profile not in profile_options:
+        stored_profile="Todos os horários"
+    profile=st.radio(
+        "Priorizar o Radar para",
+        profile_options,
+        index=profile_options.index(stored_profile),
+        horizontal=True,
+        key="aq_session_profile",
+        help=(
+            "Isto reorganiza onde olhar primeiro conforme seu horário. "
+            "Não muda viés, score, Gate ou execução."
+        ),
+    )
+    rows=prioritize_rows_for_session(rows,profile)
+    session_summary=session_profile_summary(rows,profile)
+    summary=home_summary(rows)
+    if profile!="Todos os horários":
+        if session_summary["matching"]>0:
+            st.success(
+                f"{session_summary['matching']} leitura(s) estão na janela escolhida agora. "
+                "As demais continuam visíveis para comparação."
+            )
+        elif session_summary["unknown"]>0:
+            st.info(
+                "A sessão de algumas leituras ainda não está identificada. "
+                "O AtlasQuant não vai escondê-las nem fingir compatibilidade."
+            )
+        else:
+            st.warning(
+                "O mercado está fora da sua janela escolhida neste snapshot. "
+                "O Radar mantém o contexto visível, mas não força oportunidade fora do seu horário."
+            )
+    st.caption(session_summary["interpretation"])
 
     a,b,c,d=st.columns(4)
     a.metric("Pares avaliados",summary["total"])
@@ -281,7 +329,9 @@ def render_home_radar(
     if mode=="Avançado":
         st.markdown("### Diagnóstico avançado")
         adv=pd.DataFrame([{
-            "Par":r["pair"],"Ação":r["action"],"Viés":r["bias"],"Prioridade":round(r["priority"],1),
+            "Par":r["pair"],"Sessão":r.get("session_label","Sessão não informada"),
+            "Compatível com perfil":r.get("session_match","UNKNOWN"),
+            "Ação":r["action"],"Viés":r["bias"],"Prioridade":round(r["priority"],1),
             "Qualidade":round(r["quality"],1),"Dados":round(r["data_score"],1),"H4":r["h4"],"H1":r["h1"],
             "M15":r["m15"],"Gate":r["gate"],"Movimento":r["movement"],"Notícias":r["news"],"Evento":r["event"],
         } for r in rows])
@@ -296,6 +346,8 @@ def render_home_radar(
         "mode":mode,
         "selected_pair":row["pair"],
         "selected_action":row["action"],
+        "session_profile":profile,
+        "session_summary":session_summary,
         "real_orders_enabled":False,
         "automatic_execution":False,
     }
