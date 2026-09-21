@@ -42,9 +42,18 @@ def _wilson(hits: int, n: int, z: float = 1.96) -> tuple[float | None, float | N
     return max(0.0,center-margin)*100.0, min(1.0,center+margin)*100.0
 
 
+def _bounded_percent(value: Any) -> float | None:
+    if isinstance(value,str):
+        value=value.replace("%","").replace(",",".").strip()
+    x=_finite(value)
+    if x is None or x < 0.0 or x > 100.0:
+        return None
+    return x
+
+
 def _score_band(v: Any) -> str:
-    x=_finite(v)
-    if x is None: return "Sem score"
+    x=_bounded_percent(v)
+    if x is None: return "Sem score válido"
     if x >= 90: return "90+"
     if x >= 80: return "80–89"
     if x >= 70: return "70–79"
@@ -52,13 +61,17 @@ def _score_band(v: Any) -> str:
 
 
 def _quality_band(v: Any) -> str:
-    if isinstance(v,str):
-        v=v.replace("%","").replace(",",".").strip()
-    x=_finite(v)
-    if x is None: return "Sem qualidade"
+    x=_bounded_percent(v)
+    if x is None: return "Sem qualidade válida"
     if x >= 75: return "75%+"
     if x >= 60: return "60–74%"
     return "<60%"
+
+
+def _classified_history(data: pd.DataFrame) -> pd.DataFrame:
+    if not isinstance(data,pd.DataFrame) or data.empty or "classification_valid" not in data.columns:
+        return pd.DataFrame(columns=data.columns if isinstance(data,pd.DataFrame) else None)
+    return data[data["classification_valid"] == True].copy()  # noqa: E712
 
 
 def prepare_performance_history(df: pd.DataFrame, horizon: str = "24h") -> pd.DataFrame:
@@ -80,6 +93,13 @@ def prepare_performance_history(df: pd.DataFrame, horizon: str = "24h") -> pd.Da
     out=out[out[retcol].map(lambda x: bool(pd.notna(x) and math.isfinite(float(x))))].copy()
     if out.empty:
         return out
+    out["score_valid"]=out["score_mestre"].map(lambda x: _bounded_percent(x) is not None)
+    out["quality_valid"]=out["qualidade_num"].map(lambda x: _bounded_percent(x) is not None)
+    out["classification_valid"]=out["score_valid"] & out["quality_valid"]
+    out["evidence_status"]="CLASSIFIED"
+    out.loc[~out["score_valid"] & out["quality_valid"],"evidence_status"]="INVALID_SCORE"
+    out.loc[out["score_valid"] & ~out["quality_valid"],"evidence_status"]="INVALID_QUALITY"
+    out.loc[~out["score_valid"] & ~out["quality_valid"],"evidence_status"]="INVALID_SCORE_QUALITY"
     out["hit"]=out[retcol] > 0
     out["Faixa Score"]=out["score_mestre"].map(_score_band)
     out["Faixa Qualidade"]=out["qualidade_num"].map(_quality_band)
@@ -90,10 +110,15 @@ def prepare_performance_history(df: pd.DataFrame, horizon: str = "24h") -> pd.Da
 
 
 def overall_metrics(df: pd.DataFrame, horizon: str = "24h") -> dict[str, Any]:
-    data=prepare_performance_history(df,horizon)
+    completed=prepare_performance_history(df,horizon)
+    data=_classified_history(completed)
+    completed_samples=int(len(completed))
+    invalid_evidence_samples=int(completed_samples-len(data))
     if data.empty:
         return {
-            "samples":0,"wins":0,"losses":0,"breakeven":0,"hit_rate_pct":None,
+            "samples":0,"completed_samples":completed_samples,
+            "invalid_evidence_samples":invalid_evidence_samples,
+            "wins":0,"losses":0,"breakeven":0,"hit_rate_pct":None,
             "mean_return_pct":None,"median_return_pct":None,"std_return_pct":None,
             "max_drawdown_pct_points":None,"wilson_low_pct":None,"wilson_high_pct":None,
         }
@@ -106,6 +131,8 @@ def overall_metrics(df: pd.DataFrame, horizon: str = "24h") -> dict[str, Any]:
     dd=(running_peak-equity)
     return {
         "samples":int(n),
+        "completed_samples":completed_samples,
+        "invalid_evidence_samples":invalid_evidence_samples,
         "wins":wins,
         "losses":losses,
         "breakeven":be,
@@ -144,7 +171,7 @@ def grouped_metrics(
     min_group_samples: int = 10,
 ) -> pd.DataFrame:
     threshold,threshold_valid=_positive_int(min_group_samples)
-    data=prepare_performance_history(df,horizon)
+    data=_classified_history(prepare_performance_history(df,horizon))
     if not threshold_valid or data.empty or dimension not in data.columns:
         return pd.DataFrame()
     retcol=f"retorno_{str(horizon).lower()}_pct"
@@ -182,8 +209,11 @@ def performance_readiness(
     total_min,total_min_valid=_positive_int(min_total_samples)
     group_min,group_min_valid=_positive_int(min_group_samples)
     thresholds_valid=bool(total_min_valid and group_min_valid)
-    data=prepare_performance_history(df,horizon)
+    completed=prepare_performance_history(df,horizon)
+    data=_classified_history(completed)
     total=int(len(data))
+    completed_total=int(len(completed))
+    invalid_evidence_samples=int(completed_total-total)
     pairs=int(data["par"].nunique()) if not data.empty and "par" in data.columns else 0
     months=int(data["Mês"].nunique()) if not data.empty and "Mês" in data.columns else 0
     per_pair=(data.groupby("par").size() if not data.empty and "par" in data.columns else pd.Series(dtype=int))
@@ -191,6 +221,8 @@ def performance_readiness(
 
     if not thresholds_valid:
         status="BUILDING"; label="PARÂMETROS DE AMOSTRA INVÁLIDOS"
+    elif invalid_evidence_samples > 0:
+        status="EVIDENCE_INVALID"; label="EVIDÊNCIA INVÁLIDA / NÃO CLASSIFICADA"
     elif total < total_min:
         status="BUILDING"; label="AMOSTRA EM FORMAÇÃO"
     elif adequately_sampled_pairs < 2:
@@ -204,6 +236,9 @@ def performance_readiness(
         "status":status,
         "label":label,
         "total_samples":total,
+        "completed_samples":completed_total,
+        "invalid_evidence_samples":invalid_evidence_samples,
+        "evidence_integrity_ok":bool(invalid_evidence_samples == 0),
         "pairs":pairs,
         "months":months,
         "adequately_sampled_pairs":adequately_sampled_pairs,
@@ -235,11 +270,12 @@ def render_performance_lab(
     )
     metrics=overall_metrics(df,horizon)
 
-    c1,c2,c3,c4=st.columns(4)
-    c1.metric("Amostras",metrics["samples"])
-    c2.metric("Taxa observada","—" if metrics["hit_rate_pct"] is None else f"{metrics['hit_rate_pct']:.1f}%")
-    c3.metric("Retorno médio","—" if metrics["mean_return_pct"] is None else f"{metrics['mean_return_pct']:+.3f}%")
-    c4.metric("Estado",readiness["label"])
+    c1,c2,c3,c4,c5=st.columns(5)
+    c1.metric("Amostras válidas",metrics["samples"])
+    c2.metric("Evidência inválida",metrics["invalid_evidence_samples"])
+    c3.metric("Taxa observada","—" if metrics["hit_rate_pct"] is None else f"{metrics['hit_rate_pct']:.1f}%")
+    c4.metric("Retorno médio","—" if metrics["mean_return_pct"] is None else f"{metrics['mean_return_pct']:+.3f}%")
+    c5.metric("Estado",readiness["label"])
 
     if metrics["samples"]:
         st.caption(
@@ -259,7 +295,12 @@ def render_performance_lab(
         else:
             st.dataframe(grouped,width="stretch",hide_index=True)
 
-    if readiness["status"]=="BUILDING":
+    if readiness["status"]=="EVIDENCE_INVALID":
+        st.error(
+            "Há score ou qualidade inválidos. Esses registros ficam sem classificação, "
+            "não entram nas métricas nem na amostra mínima e bloqueiam a revisão até correção."
+        )
+    elif readiness["status"]=="BUILDING":
         st.warning("Amostra ainda pequena. Não alterar pesos, thresholds ou regras com base neste painel.")
     elif readiness["status"] in ("CONCENTRATED","SHORT_WINDOW"):
         st.warning("Amostra existe, mas ainda está concentrada em poucos pares ou em janela temporal curta.")
