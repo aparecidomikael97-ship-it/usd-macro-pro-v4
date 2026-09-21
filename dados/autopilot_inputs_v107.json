@@ -1,6 +1,6 @@
 {
   "version": "V10.7_FAST_BOOT_1",
-  "generated_at": "2026-09-21T13:47:32.390600+00:00",
+  "generated_at": "2026-09-21T14:22:00.664109+00:00",
   "app_version": "11.0.8 — STRENGTH ATTRIBUTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2",
   "pairs": [
     {
@@ -9,7 +9,7 @@
       "Score final": 89.0,
       "Qualidade": 91.0,
       "Confluência": "ALTA",
-      "Dif. macro": 22.0,
+      "Dif. macro": 21.7,
       "Índice ranking": 89.9
     },
     {
@@ -27,7 +27,7 @@
       "Score final": 90.0,
       "Qualidade": 84.0,
       "Confluência": "ALTA",
-      "Dif. macro": 24.9,
+      "Dif. macro": 24.6,
       "Índice ranking": 87.2
     },
     {
@@ -45,7 +45,7 @@
       "Score final": 91.0,
       "Qualidade": 70.0,
       "Confluência": "MODERADA",
-      "Dif. macro": -20.6,
+      "Dif. macro": -20.5,
       "Índice ranking": 82.5
     },
     {
@@ -54,7 +54,7 @@
       "Score final": 55.0,
       "Qualidade": 91.0,
       "Confluência": "BAIXA",
-      "Dif. macro": -20.2,
+      "Dif. macro": -18.8,
       "Índice ranking": 69.4
     },
     {
@@ -63,7 +63,7 @@
       "Score final": 68.0,
       "Qualidade": 70.0,
       "Confluência": "MODERADA",
-      "Dif. macro": -23.3,
+      "Dif. macro": -23.1,
       "Índice ranking": 69.1
     }
   ],
@@ -293,7 +293,7 @@
         "Federal Reserve rate hike reflects new world of sticky inflation and faster growth - AP News",
         "Federal Reserve rate hike reflects new world of sticky inflation and faster growth | National News | 2news.com - KTVN",
         "Federal Reserve rate hike reflects new world of sticky inflation and faster growth - WANE 15",
-        "Federal Reserve rate hike reflects new world of sticky inflation and faster growth - audacy.com",
+        "Federal Reserve rate hike reflects new world of sticky inflation and faster growth - Audacy",
         "Federal Reserve hikes interest rates for first time since 2023 amid stubborn inflation - Fox Business",
         "What to know about US Federal Reserve’s first interest rate hike in 3 years - Al Jazeera",
         "Stubborn inflation sets stage for Federal Reserve to hike interest rates - Fox Business",
@@ -353,9 +353,9 @@
           "explicacao": "Sinal mais restritivo: juros altos por mais tempo tendem a apoiar o dólar."
         },
         {
-          "titulo": "Federal Reserve rate hike reflects new world of sticky inflation and faster growth - audacy.com",
+          "titulo": "Federal Reserve rate hike reflects new world of sticky inflation and faster growth - Audacy",
           "corpo": "Federal Reserve rate hike reflects new world of sticky inflation and faster growth",
-          "fonte": "audacy.com",
+          "fonte": "Audacy",
           "relevancia_pontos": 9,
           "relevancia": "Alta",
           "impacto": 0.75,
@@ -429,7 +429,7 @@
         "juros": 3.63,
         "inflacao": 3.35302,
         "pib": 2.09767,
-        "sentimento": 51.724137931034484,
+        "sentimento": 50.0,
         "fonte": "FRED + transformação anual"
       },
       "EUR": {
@@ -450,7 +450,7 @@
         "juros": 1.45845,
         "inflacao": 2.8,
         "pib": 0.72665,
-        "sentimento": 84.61538461538461,
+        "sentimento": 85.71428571428572,
         "fonte": "FRED + transformação anual + fallback parcial"
       },
       "CHF": {
@@ -471,7 +471,7 @@
         "juros": 4.51,
         "inflacao": 2.7,
         "pib": 2.13764,
-        "sentimento": 69.23076923076923,
+        "sentimento": 75.0,
         "fonte": "FRED + transformação anual + fallback parcial"
       },
       "NZD": {
@@ -491,11 +491,46 @@
     },
     "ranking": [
       {
+        "Código": "BRL",
+        "juros": 13.8,
+        "inflacao": 4.2,
+        "pib": 2.4,
+        "sentimento": 60.0,
+        "fonte": "BCB + validação + fallback parcial",
+        "Moeda": "Real Brasileiro",
+        "juros_reais": 9.5,
+        "n_juros": 100.0,
+        "n_inflacao": 100.0,
+        "n_pib": 83.49591589284022,
+        "n_sentimento": 20.0,
+        "n_emprego": 50.0,
+        "n_atividade": 50.0,
+        "Pontuação_Macro": 69.5,
+        "Influência_Fed": -6.8,
+        "Pontuação_Final": 62.7,
+        "strength_attribution": {
+          "factors": {
+            "Juros / Treasury": 20.0,
+            "Inflação": 15.0,
+            "PIB": 12.524387383926031,
+            "Emprego": 10.0,
+            "Atividade": 10.0,
+            "Sentimento": 2.0
+          },
+          "fed": -6.815675675675677,
+          "other": {
+            "Limite da escala 0–100": 1.4210854715202004e-14
+          },
+          "unrounded_final": 62.70871170825036
+        },
+        "Posição": 1
+      },
+      {
         "Código": "USD",
         "juros": 3.6,
         "inflacao": 3.4,
         "pib": 2.1,
-        "sentimento": 51.7,
+        "sentimento": 50.0,
         "fonte": "FRED + transformação anual",
         "Moeda": "Dólar Americano",
         "juros_reais": 0.3,
@@ -524,41 +559,6 @@
           },
           "unrounded_final": 62.50341141081081
         },
-        "Posição": 1
-      },
-      {
-        "Código": "BRL",
-        "juros": 13.8,
-        "inflacao": 4.2,
-        "pib": 2.4,
-        "sentimento": 60.0,
-        "fonte": "BCB + validação + fallback parcial",
-        "Moeda": "Real Brasileiro",
-        "juros_reais": 9.5,
-        "n_juros": 100.0,
-        "n_inflacao": 100.0,
-        "n_pib": 83.49591589284022,
-        "n_sentimento": 17.14285714285714,
-        "n_emprego": 50.0,
-        "n_atividade": 50.0,
-        "Pontuação_Macro": 69.2,
-        "Influência_Fed": -6.8,
-        "Pontuação_Final": 62.4,
-        "strength_attribution": {
-          "factors": {
-            "Juros / Treasury": 20.0,
-            "Inflação": 15.0,
-            "PIB": 12.524387383926031,
-            "Emprego": 10.0,
-            "Atividade": 10.0,
-            "Sentimento": 1.714285714285714
-          },
-          "fed": -6.815675675675677,
-          "other": {
-            "Limite da escala 0–100": 0.0
-          },
-          "unrounded_final": 62.42299742253607
-        },
         "Posição": 2
       },
       {
@@ -566,19 +566,19 @@
         "juros": 4.5,
         "inflacao": 2.7,
         "pib": 2.1,
-        "sentimento": 69.2,
+        "sentimento": 75.0,
         "fonte": "FRED + transformação anual + fallback parcial",
         "Moeda": "Dólar Australiano",
         "juros_reais": 1.8,
         "n_juros": 28.98896661469615,
         "n_inflacao": 49.66887417218545,
         "n_pib": 70.40481809880697,
-        "n_sentimento": 36.26373626373625,
+        "n_sentimento": 50.0,
         "n_emprego": 50.0,
         "n_atividade": 50.0,
-        "Pontuação_Macro": 47.4,
+        "Pontuação_Macro": 48.8,
         "Influência_Fed": -5.1,
-        "Pontuação_Final": 42.3,
+        "Pontuação_Final": 43.7,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 5.79779332293923,
@@ -586,13 +586,13 @@
             "PIB": 10.560722714821045,
             "Emprego": 10.0,
             "Atividade": 10.0,
-            "Sentimento": 3.626373626373625
+            "Sentimento": 5.0
           },
           "fed": -5.111756756756758,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 42.32346403320496
+          "unrounded_final": 43.697090406831336
         },
         "Posição": 3
       },
@@ -608,12 +608,12 @@
         "n_juros": 5.657886869857563,
         "n_inflacao": 67.10099337748345,
         "n_pib": 46.58676419956989,
-        "n_sentimento": 48.214285714285715,
+        "n_sentimento": 50.0,
         "n_emprego": 50.0,
         "n_atividade": 50.0,
-        "Pontuação_Macro": 43.0,
+        "Pontuação_Macro": 43.2,
         "Influência_Fed": -1.1,
-        "Pontuação_Final": 41.9,
+        "Pontuação_Final": 42.0,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 1.1315773739715127,
@@ -621,13 +621,13 @@
             "PIB": 6.988014629935484,
             "Emprego": 10.0,
             "Atividade": 10.0,
-            "Sentimento": 4.821428571428572
+            "Sentimento": 5.0
           },
           "fed": -1.135945945945946,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 41.870223636012135
+          "unrounded_final": 42.048795064583565
         },
         "Posição": 4
       },
@@ -678,12 +678,12 @@
         "n_juros": 0.8880978333356321,
         "n_inflacao": 0.0,
         "n_pib": 100.0,
-        "n_sentimento": 30.95238095238093,
+        "n_sentimento": 33.333333333333314,
         "n_emprego": 50.0,
         "n_atividade": 50.0,
-        "Pontuação_Macro": 38.3,
+        "Pontuação_Macro": 38.5,
         "Influência_Fed": 2.3,
-        "Pontuação_Final": 40.5,
+        "Pontuação_Final": 40.8,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 0.17761956666712642,
@@ -691,13 +691,13 @@
             "PIB": 15.0,
             "Emprego": 10.0,
             "Atividade": 10.0,
-            "Sentimento": 3.095238095238093
+            "Sentimento": 3.3333333333333317
           },
           "fed": 2.271891891891892,
           "other": {
-            "Limite da escala 0–100": 0.0
+            "Limite da escala 0–100": -7.105427357601002e-15
           },
-          "unrounded_final": 40.54474955379711
+          "unrounded_final": 40.782844791892344
         },
         "Posição": 6
       },
@@ -713,12 +713,12 @@
         "n_juros": 19.698663024131786,
         "n_inflacao": 66.22516556291392,
         "n_pib": 18.629216959148952,
-        "n_sentimento": 30.95238095238093,
+        "n_sentimento": 33.333333333333314,
         "n_emprego": 50.0,
         "n_atividade": 50.0,
-        "Pontuação_Macro": 39.8,
+        "Pontuação_Macro": 40.0,
         "Influência_Fed": -0.6,
-        "Pontuação_Final": 39.2,
+        "Pontuação_Final": 39.4,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 3.9397326048263572,
@@ -726,13 +726,13 @@
             "PIB": 2.794382543872343,
             "Emprego": 10.0,
             "Atividade": 10.0,
-            "Sentimento": 3.095238095238093
+            "Sentimento": 3.3333333333333317
           },
           "fed": -0.567972972972973,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 39.19515510540091
+          "unrounded_final": 39.43325034349614
         },
         "Posição": 7
       },
@@ -741,19 +741,19 @@
         "juros": 1.5,
         "inflacao": 2.8,
         "pib": 0.7,
-        "sentimento": 84.6,
+        "sentimento": 85.7,
         "fonte": "FRED + transformação anual + fallback parcial",
         "Moeda": "Iene Japonês",
         "juros_reais": -1.3,
         "n_juros": 0.0,
         "n_inflacao": 52.980132450331126,
         "n_pib": 0.0,
-        "n_sentimento": 68.13186813186812,
+        "n_sentimento": 71.42857142857144,
         "n_emprego": 50.0,
         "n_atividade": 50.0,
-        "Pontuação_Macro": 34.8,
+        "Pontuação_Macro": 35.1,
         "Influência_Fed": 2.8,
-        "Pontuação_Final": 37.6,
+        "Pontuação_Final": 37.9,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 0.0,
@@ -761,13 +761,13 @@
             "PIB": 0.0,
             "Emprego": 10.0,
             "Atividade": 10.0,
-            "Sentimento": 6.813186813186812
+            "Sentimento": 7.142857142857145
           },
           "fed": 2.8398648648648654,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 37.600071545601345
+          "unrounded_final": 37.92974187527168
         },
         "Posição": 8
       },
