@@ -175,6 +175,7 @@ def evaluate_pair_checklist(
     map_ctx: Mapping[str, Any],
     *,
     now: pd.Timestamp | None = None,
+    execution_timeframe: str = "M15",
 ) -> dict[str, Any]:
     now = pd.Timestamp.now(tz="UTC") if now is None else pd.Timestamp(now)
     now = now.tz_localize("UTC") if now.tzinfo is None else now.tz_convert("UTC")
@@ -186,8 +187,12 @@ def evaluate_pair_checklist(
     m15 = str((tec.get("m15", {}) or {}).get("status", ""))
     ict = dict(tec.get("ict", {}) or {})
     inst = dict(tec.get("institutional", {}) or {})
+    execution_tf=str(execution_timeframe or "M15").strip().upper()
+    fetched_key={"M15":"m15_fetched_at","H1":"h1_fetched_at","H4":"h4_fetched_at"}.get(execution_tf,"")
     technical_age = _age_minutes(
-        (scanner_pair or {}).get("m15_fetched_at") or tec.get("ultima_atualizacao"), now
+        ((scanner_pair or {}).get(fetched_key) if fetched_key else None)
+        or tec.get("ultima_atualizacao"),
+        now,
     )
     map_age = _age_minutes((map_ctx or {}).get("updated_at"), now)
     tec_available = bool(tec.get("dados_disponiveis", tec.get("disponivel", False)))
@@ -215,6 +220,7 @@ def evaluate_pair_checklist(
         technical_age_min=technical_age,
         data_sufficient=data_sufficient,
         data_readiness_score=data_score,
+        execution_timeframe=execution_tf,
     )
     all_clear = bool(
         data_sufficient
@@ -241,6 +247,7 @@ def evaluate_pair_checklist(
     return {
         "pair": pair,
         "side": side,
+        "execution_timeframe": execution_tf,
         "direction": direction,
         "setup_id":setup_id,
         "setup_attribution":"EXPLICIT_INPUT" if setup_id else "UNATTRIBUTED",
@@ -294,11 +301,18 @@ def _active_pairs(trades: pd.DataFrame) -> set[str]:
     return set(trades.loc[mask, "pair"].astype(str))
 
 
-def _make_wait_entry(chk: Mapping[str, Any], frame: pd.DataFrame, *, now: pd.Timestamp) -> dict[str, Any] | None:
+def _make_wait_entry(
+    chk: Mapping[str, Any],
+    frame: pd.DataFrame,
+    *,
+    now: pd.Timestamp,
+    bar_minutes: int = 15,
+) -> dict[str, Any] | None:
     if not chk.get("all_checks_passed") or frame.empty:
         return None
     candle_time = pd.Timestamp(frame.iloc[-1]["datetime"])
-    signal_time = candle_time + pd.Timedelta(minutes=15)
+    bar_minutes=max(1,int(bar_minutes))
+    signal_time = candle_time + pd.Timedelta(minutes=bar_minutes)
     sid = _signal_id(str(chk["pair"]), str(chk["side"]), candle_time)
     row = {c: None for c in PAPER_COLUMNS}
     row.update({
@@ -378,7 +392,14 @@ def _fill_entry(row: pd.Series, frame: pd.DataFrame, *, now: pd.Timestamp) -> di
     return out
 
 
-def _close_open(row: pd.Series, frame: pd.DataFrame, *, now: pd.Timestamp) -> dict[str, Any]:
+def _close_open(
+    row: pd.Series,
+    frame: pd.DataFrame,
+    *,
+    now: pd.Timestamp,
+    bar_minutes: int = 15,
+    max_hold_bars: int = MAX_HOLD_BARS,
+) -> dict[str, Any]:
     out = row.to_dict()
     if str(out.get("status")) != "OPEN" or frame.empty:
         return out
@@ -426,8 +447,15 @@ def _close_open(row: pd.Series, frame: pd.DataFrame, *, now: pd.Timestamp) -> di
         if hit_target:
             exit_idx, exit_price, exit_reason, result = j, target, "TARGET", "WIN"
             break
-        if j >= MAX_HOLD_BARS:
-            exit_idx, exit_price, exit_reason = j, close, "TIME_EXIT_24H"
+        if j >= max(1,int(max_hold_bars)):
+            total_minutes=max(1,int(bar_minutes))*max(1,int(max_hold_bars))
+            if total_minutes % 1440 == 0:
+                exit_label=f"TIME_EXIT_{total_minutes//1440}D"
+            elif total_minutes % 60 == 0:
+                exit_label=f"TIME_EXIT_{total_minutes//60}H"
+            else:
+                exit_label=f"TIME_EXIT_{total_minutes}M"
+            exit_idx, exit_price, exit_reason = j, close, exit_label
             rr = ((exit_price - entry) / risk) if side == "BUY" else ((entry - exit_price) / risk)
             result = "WIN" if rr > 1e-12 else "LOSS" if rr < -1e-12 else "BREAKEVEN"
             break
@@ -445,7 +473,7 @@ def _close_open(row: pd.Series, frame: pd.DataFrame, *, now: pd.Timestamp) -> di
     out.update({
         "status": "CLOSED",
         "result": result,
-        "exit_time": (pd.Timestamp(exit_bar["datetime"]) + pd.Timedelta(minutes=15)).isoformat(),
+        "exit_time": (pd.Timestamp(exit_bar["datetime"]) + pd.Timedelta(minutes=max(1,int(bar_minutes)))).isoformat(),
         "exit_price": xp,
         "exit_reason": exit_reason,
         "realized_r": round(rr, 4),
