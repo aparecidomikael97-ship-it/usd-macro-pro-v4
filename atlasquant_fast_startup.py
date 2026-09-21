@@ -25,6 +25,7 @@ import streamlit as st
 SCHEMA="ATLASQUANT_HOME_SNAPSHOT_V1"
 HOME_SNAPSHOT_PATH="dados/atlasquant_home_snapshot_v1.json"
 DEFAULT_MAX_AGE_MIN=90.0
+DEFAULT_MAX_RUNTIME_AGE_MIN=90.0
 
 
 def _finite(value:Any, default:float=0.0)->float:
@@ -294,6 +295,6 @@ def render_beginner_shell(
 
 
 __all__=[
-    "SCHEMA","HOME_SNAPSHOT_PATH","DEFAULT_MAX_AGE_MIN","snapshot_age_minutes",
+    "SCHEMA","HOME_SNAPSHOT_PATH","DEFAULT_MAX_AGE_MIN","DEFAULT_MAX_RUNTIME_AGE_MIN","snapshot_age_minutes",
     "validate_home_snapshot","load_home_snapshot","render_beginner_shell",
 ]
