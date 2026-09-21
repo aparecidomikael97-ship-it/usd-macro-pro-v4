@@ -419,7 +419,7 @@ jobs:
           if failures:
               raise SystemExit(" | ".join(failures))
           PY
-          python /tmp/atlasquant_browser_smoke.py
+          PYTHONPATH="$GITHUB_WORKSPACE${PYTHONPATH:+:$PYTHONPATH}" python /tmp/atlasquant_browser_smoke.py
 
       - name: Browser smoke summary
         if: always()
