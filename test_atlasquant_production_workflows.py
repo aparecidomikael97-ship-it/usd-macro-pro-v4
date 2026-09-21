@@ -28,5 +28,12 @@ class AtlasQuantProductionWorkflowContractTests(unittest.TestCase):
         self.assertIn("Safety Core monitorado",text)
 
 
+    def test_app_deploy_marker_has_explicit_environment_fallbacks(self):
+        src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        self.assertIn('os.getenv("RENDER_GIT_COMMIT","")',src)
+        self.assertIn('os.getenv("ATLASQUANT_DEPLOY_COMMIT","")',src)
+        self.assertIn('id="atlasquant-deploy-marker"',src)
+
+
 if __name__=="__main__":
     unittest.main()
