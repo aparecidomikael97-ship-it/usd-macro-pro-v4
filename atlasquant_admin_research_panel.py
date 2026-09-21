@@ -17,7 +17,11 @@ from atlasquant_behavior_shift import BehaviorStats, detect_behavior_shift
 from atlasquant_passport_evidence import fuse_operational_evidence
 from atlasquant_passport_drift import latest_passport_drift, passport_drift_rows
 from atlasquant_setup_journal import setup_forward_summary
-from atlasquant_paper_setup_bridge import bridge_paper_audit, load_paper_audit_runtime
+from atlasquant_paper_setup_bridge import (
+    bridge_paper_audit,
+    load_paper_audit_runtime,
+    load_model_paper_runtime,
+)
 from atlasquant_shadow_mode import summarize_shadow
 from atlasquant_research_evidence_capture import (
     SESSION_KEY as RESEARCH_SESSION_KEY,
@@ -190,6 +194,34 @@ def _match_forward_summary(
     return None,{}
 
 
+def _merge_runtime_forward_sources(
+    generic_bridge:Mapping[str,Any]|None,
+    model_bridge:Mapping[str,Any]|None,
+)->dict[str,Any]:
+    records=[]
+    seen=set()
+    for pack in (generic_bridge,model_bridge):
+        for raw in list(dict(pack or {}).get("records",[]) or []):
+            row=dict(raw)
+            key=(
+                str(row.get("setup_id") or ""),
+                str(row.get("pair") or ""),
+                str(row.get("observed_at") or ""),
+                str(row.get("direction") or ""),
+                str(row.get("result_r") or ""),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            records.append(row)
+    return {
+        "records":records,
+        "summary_by_setup":setup_forward_summary(records),
+        "eligible_records":len(records),
+        "setup_inference_used":False,
+    }
+
+
 def _resolve_forward_evidence(
     strategy:object,
     runtime_summaries:Mapping[str,Mapping[str,Any]]|None,
@@ -275,8 +307,12 @@ def render_admin_research_panel(
     paper_audit_key="atlasquant_admin_runtime_paper_setup_audit"
     paper_audit_status_key="atlasquant_admin_runtime_paper_setup_audit_status"
     paper_audit_hydrated_key="atlasquant_admin_runtime_paper_setup_audit_hydrated"
+    model_paper_key="atlasquant_admin_runtime_model_paper"
+    model_paper_status_key="atlasquant_admin_runtime_model_paper_status"
+    model_paper_hydrated_key="atlasquant_admin_runtime_model_paper_hydrated"
+
+    cfg=research_evidence_config()
     if not bool(st.session_state.get(paper_audit_hydrated_key,False)):
-        cfg=research_evidence_config()
         runtime_audit,runtime_status=load_paper_audit_runtime(
             repo=cfg.get("repo",""),
             branch=cfg.get("branch",""),
@@ -286,12 +322,26 @@ def render_admin_research_panel(
         st.session_state[paper_audit_status_key]=runtime_status
         st.session_state[paper_audit_hydrated_key]=True
 
+    if not bool(st.session_state.get(model_paper_hydrated_key,False)):
+        runtime_model,runtime_model_status=load_model_paper_runtime(
+            repo=cfg.get("repo",""),
+            branch=cfg.get("branch",""),
+            token=cfg.get("token",""),
+        )
+        st.session_state[model_paper_key]=runtime_model
+        st.session_state[model_paper_status_key]=runtime_model_status
+        st.session_state[model_paper_hydrated_key]=True
+
     if st.button(
-        "🔄 Atualizar Paper Audit Runtime",
-        key="atlasquant_admin_refresh_paper_setup_audit",
+        "🔄 Atualizar evidências Paper Runtime",
+        key="atlasquant_admin_refresh_paper_evidence",
     ):
-        cfg=research_evidence_config()
         runtime_audit,runtime_status=load_paper_audit_runtime(
+            repo=cfg.get("repo",""),
+            branch=cfg.get("branch",""),
+            token=cfg.get("token",""),
+        )
+        runtime_model,runtime_model_status=load_model_paper_runtime(
             repo=cfg.get("repo",""),
             branch=cfg.get("branch",""),
             token=cfg.get("token",""),
@@ -299,12 +349,22 @@ def render_admin_research_panel(
         st.session_state[paper_audit_key]=runtime_audit
         st.session_state[paper_audit_status_key]=runtime_status
         st.session_state[paper_audit_hydrated_key]=True
+        st.session_state[model_paper_key]=runtime_model
+        st.session_state[model_paper_status_key]=runtime_model_status
+        st.session_state[model_paper_hydrated_key]=True
 
     runtime_audit=st.session_state.get(paper_audit_key,pd.DataFrame())
     if not isinstance(runtime_audit,pd.DataFrame):
         runtime_audit=pd.DataFrame()
     runtime_status=dict(st.session_state.get(paper_audit_status_key,{}) or {})
     runtime_bridge=bridge_paper_audit(runtime_audit)
+
+    runtime_model=st.session_state.get(model_paper_key,pd.DataFrame())
+    if not isinstance(runtime_model,pd.DataFrame):
+        runtime_model=pd.DataFrame()
+    runtime_model_status=dict(st.session_state.get(model_paper_status_key,{}) or {})
+    model_bridge=bridge_paper_audit(runtime_model)
+    combined_runtime_bridge=_merge_runtime_forward_sources(runtime_bridge,model_bridge)
 
     cat=catalog_summary()
     c1,c2,c3,c4=st.columns(4)
@@ -319,12 +379,13 @@ def render_admin_research_panel(
         f"branch {str(research_status.get('branch','—'))}"
     )
 
-    if runtime_status.get("reason")=="LOADED":
+    if runtime_status.get("reason")=="LOADED" or runtime_model_status.get("reason")=="LOADED":
         st.caption(
-            f"Paper Audit Runtime: {int(runtime_bridge.get('eligible_records',0) or 0)} "
-            f"trade(s) com setup explícito elegível(is) de "
-            f"{int(runtime_bridge.get('closed_rows',0) or 0)} fechado(s). "
-            "Nenhum setup é inferido."
+            f"Paper Runtime: {int(combined_runtime_bridge.get('eligible_records',0) or 0)} "
+            "trade(s) explícito(s) elegível(is) para evidência Forward · "
+            f"Model Paper {int(model_bridge.get('eligible_records',0) or 0)} · "
+            f"Paper Audit genérico {int(runtime_bridge.get('eligible_records',0) or 0)}. "
+            "Nenhum setup é inferido pelo resultado."
         )
 
     with st.expander("🗃️ Histórico persistente de evidências",expanded=False):
@@ -492,18 +553,18 @@ def render_admin_research_panel(
         "O Admin pode anexar o Diário Paper/Forward para completar a escada de evidências. "
         "O cruzamento não promove o operacional sozinho."
     )
-    runtime_forward_summaries=dict(runtime_bridge.get("summary_by_setup",{}) or {})
+    runtime_forward_summaries=dict(combined_runtime_bridge.get("summary_by_setup",{}) or {})
 
     if runtime_status.get("reason")=="LOADED":
         if runtime_bridge.get("explicit_rows",0) and not runtime_bridge.get("eligible_records",0):
             st.warning(
-                "O Paper Audit possui tags explícitas, mas ainda faltam campos válidos "
-                "(sessão/regime/preços/qualidade) para virar evidência Forward."
+                "O Paper Audit genérico possui tags explícitas, mas ainda faltam campos válidos "
+                "para virar evidência Forward."
             )
-        elif not runtime_bridge.get("explicit_rows",0):
+        elif not runtime_bridge.get("explicit_rows",0) and not model_bridge.get("eligible_records",0):
             st.info(
-                "O Paper Audit atual ainda não tem setup_id explícito. "
-                "O AtlasQuant não vai adivinhar o operacional pelo FVG/ICT/resultado."
+                "Ainda não há trade Paper explicitamente atribuído a operacional. "
+                "O AtlasQuant não vai adivinhar setup pelo FVG/ICT/resultado."
             )
 
     journal_file=st.file_uploader(
@@ -633,6 +694,7 @@ __all__=[
     "behavior_template_csv",
     "_journal_records_from_frame",
     "_match_forward_summary",
+    "_merge_runtime_forward_sources",
     "_resolve_forward_evidence",
     "_research_history_rows",
     "render_admin_research_panel",
