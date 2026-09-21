@@ -91,6 +91,28 @@ class BacktestPaperComparisonTests(unittest.TestCase):
         self.assertTrue(all(not row["comparable"] for row in rows))
         self.assertTrue(all(not row["real_orders_enabled"] for row in rows))
 
+    def test_impossible_optional_metrics_are_not_propagated(self):
+        result = compare_backtest_paper({
+            "backtest_samples": 100,
+            "forward_samples": 30,
+            "expectancy_r": 0.1,
+            "forward_expectancy_r": 0.08,
+            "profit_factor": -1.0,
+            "forward_profit_factor": float("inf"),
+            "max_drawdown_r": -0.1,
+            "forward_max_drawdown_r": float("nan"),
+            "forward_win_rate_pct": 101.0,
+        })
+        self.assertTrue(result["comparable"])
+        self.assertIsNone(result["backtest_profit_factor"])
+        self.assertIsNone(result["paper_profit_factor"])
+        self.assertIsNone(result["backtest_max_drawdown_r"])
+        self.assertIsNone(result["paper_max_drawdown_r"])
+        self.assertIsNone(result["paper_win_rate_pct"])
+        self.assertTrue(result["manual_review_required"])
+        self.assertFalse(result["automatic_strategy_change"])
+        self.assertFalse(result["automatic_weight_change"])
+        self.assertFalse(result["real_orders_enabled"])
 
     def test_small_samples_never_trigger_automatic_changes_or_real_orders(self):
         for backtest_samples, paper_samples in ((1,1),(2,1),(5,3),(10,5)):
