@@ -203,8 +203,17 @@ def render_beginner_shell(
 
     check=validate_home_snapshot(snapshot)
     if not check["valid"]:
-        # Keep the first paint deterministic instead of falling into the heavy
-        # full application. No market decision is shown from invalid/stale data.
+        mode=st.radio(
+            "Experiência",["Iniciante","Avançado"],index=0,horizontal=True,
+            key="atlasquant_experience_mode",
+            help="Iniciante aguarda snapshot válido. Avançado abre os diagnósticos completos.",
+        )
+        if str(mode).casefold().startswith("avan"):
+            return {
+                "handled":False,"mode":"Avançado","snapshot_valid":False,
+                "errors":check["errors"],"real_orders_enabled":False,
+                "automatic_execution":False,
+            }
         st.markdown("## 🧭 AtlasQuant")
         st.warning("Radar temporariamente aguardando dados válidos.")
         st.caption("O snapshot não passou na validação de frescor/segurança. Nenhuma oportunidade é exibida até a próxima atualização válida.")
