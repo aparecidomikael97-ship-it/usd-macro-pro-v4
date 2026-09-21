@@ -70,6 +70,8 @@ class AntecedentRule:
     surprise_scale:float
     polarity:int=1
     max_age_days:int=75
+    comparison:str|None=None
+    exclude:tuple[str,...]=()
 
 
 @dataclass(frozen=True)
@@ -114,17 +116,17 @@ CPI_ANTECEDENTS=(
     AntecedentRule(
         "PPI",
         ("producer price inflation","producer price index","ppi"),
-        0.70,0.25,+1,45,
+        0.70,0.25,+1,45,"yoy",("core",),
     ),
     AntecedentRule(
         "CORE_PPI",
         ("core producer prices","core producer price index","core ppi"),
-        0.85,0.25,+1,45,
+        0.85,0.25,+1,45,"yoy",(),
     ),
     AntecedentRule(
         "IMPORT_PRICES",
         ("import prices","import price index"),
-        0.45,0.35,+1,45,
+        0.45,0.35,+1,45,None,(),
     ),
 )
 
@@ -132,22 +134,22 @@ PCE_ANTECEDENTS=(
     AntecedentRule(
         "CPI",
         ("inflation rate","consumer price index","cpi"),
-        0.75,0.20,+1,50,
+        0.75,0.20,+1,50,"yoy",("core",),
     ),
     AntecedentRule(
         "CORE_CPI",
         ("core inflation rate","core consumer price index","core cpi"),
-        1.00,0.20,+1,50,
+        1.00,0.20,+1,50,"yoy",(),
     ),
     AntecedentRule(
         "PPI",
         ("producer price inflation","producer price index","ppi"),
-        0.45,0.25,+1,50,
+        0.45,0.25,+1,50,"yoy",("core",),
     ),
     AntecedentRule(
         "CORE_PPI",
         ("core producer prices","core producer price index","core ppi"),
-        0.60,0.25,+1,50,
+        0.60,0.25,+1,50,"yoy",(),
     ),
 )
 
@@ -305,7 +307,9 @@ def _latest_rule_event(
     for event in events:
         if event.actual is None or event.estimate is None:
             continue
-        if not _matches(event.name,rule.aliases):
+        if not _matches(event.name,rule.aliases,rule.exclude):
+            continue
+        if rule.comparison and _norm(event.comparison)!=_norm(rule.comparison):
             continue
         if not definitely_before_capture(event,capture):
             continue
