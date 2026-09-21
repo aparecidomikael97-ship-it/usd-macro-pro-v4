@@ -288,7 +288,14 @@ if _ATLASQUANT_DEPLOY_COMMIT:
 # checked-out code even when RENDER_GIT_COMMIT is unavailable.
 _ATLASQUANT_SOURCE_BUILD=short_source_fingerprint(Path(__file__).resolve().parent,16)
 st.markdown(
-    f'<span id="atlasquant-source-build-marker" data-build="{_ATLASQUANT_SOURCE_BUILD}" style="display:none"></span>',
+    (
+        '<div id="atlasquant-source-build-marker" '
+        f'data-build="{_ATLASQUANT_SOURCE_BUILD}" '
+        'aria-hidden="true" '
+        'style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;'
+        'overflow:hidden;opacity:0;pointer-events:none;">'
+        f'AQBUILD:{_ATLASQUANT_SOURCE_BUILD}</div>'
+    ),
     unsafe_allow_html=True,
 )
 
