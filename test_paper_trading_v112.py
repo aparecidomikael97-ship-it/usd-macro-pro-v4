@@ -105,6 +105,19 @@ class PaperTradingV112SafetyTests(unittest.TestCase):
         self.assertEqual(pd.Timestamp(out["entry_time"]),times[9])
         self.assertAlmostEqual(float(out["entry_price"]),1.10)
 
+
+    def test_wait_entry_can_schedule_next_h1_bar_without_changing_m15_default(self):
+        times=pd.date_range("2026-09-18T00:00:00Z",periods=10,freq="1h")
+        frame=pd.DataFrame([{"datetime":t,"open":1.10,"high":1.11,"low":1.09,"close":1.10} for t in times])
+        chk={"all_checks_passed":True,"pair":"EUR/USD","side":"BUY","score_master":100,"quality":100,"rank_index":1,
+             "h4":"OK","h1":"OK","m15":"SEM GATILHO","ict_readiness":100,"institutional_readiness":100,
+             "gate":"READY","gate_score":100,"adr_used_pct":20,"event_risk":"BAIXO","technical_age_min":0,
+             "map_age_min":0,"data_sufficient":True}
+        h1=p._make_wait_entry(chk,frame.iloc[:9],now=self.now,bar_minutes=60)
+        self.assertEqual(pd.Timestamp(h1["signal_time"]),times[8]+pd.Timedelta(hours=1))
+        m15=p._make_wait_entry(chk,frame.iloc[:9],now=self.now)
+        self.assertEqual(pd.Timestamp(m15["signal_time"]),times[8]+pd.Timedelta(minutes=15))
+
     def test_setup_attribution_is_only_explicit_and_preserves_point_in_time_context(self):
         scanner={"m15_fetched_at":self.now.isoformat(),"tecnico":self.tec}
         input_row={**self.input,"setup_id":"FVG"}
@@ -192,7 +205,7 @@ class PaperTradingV112SafetyTests(unittest.TestCase):
         scanner=self._model_scanner(candidates)
         inputs={"pairs":[{"Par":"EUR/USD","Direção":"COMPRA","Score final":90,"Qualidade":90,"Índice ranking":1}]}
         master={"contexts":{"EUR/USD":{}}}
-        def checklist(pair,row,scanner_pair,map_ctx,now=None):
+        def checklist(pair,row,scanner_pair,map_ctx,now=None,execution_timeframe="M15"):
             return self._model_checklist(row.get("setup_id"),True)
         with patch("atlasquant_model_paper.evaluate_pair_checklist",side_effect=checklist):
             ledger,cycle=mp.run_model_paper_cycle(inputs,scanner,master,now=pd.Timestamp("2026-09-20T12:05:00Z"))

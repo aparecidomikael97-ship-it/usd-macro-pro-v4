@@ -2,10 +2,10 @@
 
 Consumes explicit setup candidates frozen by the source ICT detector. It keeps
 one research episode per model structure/zone and evaluates the global context
-gate at capture time. The current Paper executor has only an M15 execution
-frame; candidates from other source timeframes fail closed instead of being
-silently executed on M15. It never places real orders and never infers a setup
-from outcomes.
+gate at capture time. Paper execution uses the exact source timeframe when that
+frame is explicitly supported and cached (currently M15 and H1). Unsupported
+or missing execution frames fail closed instead of being substituted by M15.
+It never places real orders and never infers a setup from outcomes.
 """
 from __future__ import annotations
 
@@ -91,10 +91,32 @@ def _map_rows(master:Mapping[str,Any]|None)->dict[str,dict[str,Any]]:
     return {str(k).strip().upper():_mapping(v) for k,v in raw.items()}
 
 
-def _m15(scanner_pair:Mapping[str,Any]|None)->pd.DataFrame:
+MODEL_PAPER_EXECUTION_PROFILES={
+    "M15":{"cache_key":"m15","bar_minutes":15,"max_hold_bars":96},
+    "H1":{"cache_key":"h1","bar_minutes":60,"max_hold_bars":48},
+}
+
+
+def _execution_profile(timeframe:Any)->dict[str,Any]|None:
+    tf=str(timeframe or "").strip().upper()
+    profile=MODEL_PAPER_EXECUTION_PROFILES.get(tf)
+    return dict(profile) if isinstance(profile,Mapping) else None
+
+
+def _execution_frame(
+    scanner_pair:Mapping[str,Any]|None,
+    timeframe:Any,
+)->pd.DataFrame:
+    profile=_execution_profile(timeframe)
+    if profile is None:
+        return pd.DataFrame(columns=["datetime","open","high","low","close"])
     tec=_mapping(_mapping(scanner_pair).get("tecnico"))
     cache=_mapping(tec.get("cache_v110"))
-    return normalize_m15(cache.get("m15",[]))
+    return normalize_m15(cache.get(str(profile["cache_key"]),[]))
+
+
+def _m15(scanner_pair:Mapping[str,Any]|None)->pd.DataFrame:
+    return _execution_frame(scanner_pair,"M15")
 
 
 def current_setup_candidates(scanner:Mapping[str,Any]|None)->list[dict[str,Any]]:
@@ -195,11 +217,15 @@ def _block_row(
         "context_hard_blocks":" | ".join(str(x) for x in list(decision.get("hard_blocks",[]) or [])),
         "context_soft_blocks":" | ".join(str(x) for x in list(decision.get("soft_blocks",[]) or [])),
         "candidate_observation":True,
-        "execution_timeframe":"M15" if str(candidate.get("source_timeframe") or "").strip().upper()=="M15" else "",
-        "timeframe_alignment_passed":str(candidate.get("source_timeframe") or "").strip().upper()=="M15",
+        "execution_timeframe":(
+            str(candidate.get("source_timeframe") or "").strip().upper()
+            if _execution_profile(candidate.get("source_timeframe")) is not None
+            else ""
+        ),
+        "timeframe_alignment_passed":_execution_profile(candidate.get("source_timeframe")) is not None,
         "timeframe_alignment_reason":(
             "SOURCE_EQUALS_EXECUTION"
-            if str(candidate.get("source_timeframe") or "").strip().upper()=="M15"
+            if _execution_profile(candidate.get("source_timeframe")) is not None
             else "EXECUTION_FRAME_NOT_AVAILABLE:"+str(candidate.get("source_timeframe") or "").strip().upper()
         ),
     })
@@ -212,8 +238,10 @@ def _qualified_row(
     frame:pd.DataFrame,
     *,
     now:pd.Timestamp,
+    execution_timeframe:str,
+    bar_minutes:int,
 )->dict[str,Any]:
-    base=_make_wait_entry(checklist,frame,now=now)
+    base=_make_wait_entry(checklist,frame,now=now,bar_minutes=bar_minutes)
     if not base:
         return _block_row(candidate,checklist,status="BLOCKED_DATA",now=now)
     captured=_as_utc(candidate.get("captured_at"))
@@ -225,8 +253,10 @@ def _qualified_row(
         "signal_id":str(candidate.get("episode_id") or ""),
         "setup_id":str(candidate.get("setup_id") or "").strip(),
         "setup_attribution":MODEL_ATTRIBUTION,
-        "signal_time":captured.isoformat(),
-        "checklist_note":"Candidato explícito do modelo + contexto global qualificado; Paper de pesquisa aguardando M15 posterior.",
+        "checklist_note":(
+            "Candidato explícito do modelo + contexto global qualificado; "
+            f"Paper de pesquisa aguardando candle {execution_timeframe} posterior."
+        ),
         "engine_version":MODEL_PAPER_VERSION,
         "candidate_id":str(candidate.get("candidate_id") or ""),
         "episode_id":str(candidate.get("episode_id") or ""),
@@ -241,7 +271,7 @@ def _qualified_row(
         "context_hard_blocks":"",
         "context_soft_blocks":"",
         "candidate_observation":True,
-        "execution_timeframe":"M15",
+        "execution_timeframe":execution_timeframe,
         "timeframe_alignment_passed":True,
         "timeframe_alignment_reason":"SOURCE_EQUALS_EXECUTION",
     })
@@ -287,6 +317,28 @@ def summarize_model_paper(frame:pd.DataFrame|None)->dict[str,Any]:
                 "explicit_source_model_only":True,
             }
 
+    by_timeframe={}
+    if not d.empty and "source_timeframe" in d.columns:
+        for timeframe,g in d.groupby(d["source_timeframe"].fillna("").astype(str).str.upper(),dropna=False):
+            tf=str(timeframe).strip() or "(SEM TIMEFRAME)"
+            gc=g[g["status"].astype(str).str.upper().eq("CLOSED")].copy()
+            gr=pd.to_numeric(gc.get("realized_r"),errors="coerce").dropna()
+            gr=gr[gr.map(lambda x:math.isfinite(float(x)))] if len(gr) else gr
+            wins_tf=int((gc["result"].astype(str).str.upper()=="WIN").sum()) if not gc.empty else 0
+            losses_tf=int((gc["result"].astype(str).str.upper()=="LOSS").sum()) if not gc.empty else 0
+            by_timeframe[tf]={
+                "candidates":int(len(g)),
+                "blocked_context":int(g["status"].astype(str).str.upper().eq("BLOCKED_CONTEXT").sum()),
+                "blocked_data":int(g["status"].astype(str).str.upper().eq("BLOCKED_DATA").sum()),
+                "blocked_timeframe":int(g["status"].astype(str).str.upper().eq("BLOCKED_TIMEFRAME").sum()),
+                "pending":int(g["status"].astype(str).str.upper().eq("WAIT_ENTRY").sum()),
+                "open":int(g["status"].astype(str).str.upper().eq("OPEN").sum()),
+                "closed":int(len(gc)),
+                "wins":wins_tf,
+                "losses":losses_tf,
+                "net_r":round(float(gr.sum()) if len(gr) else 0.0,3),
+            }
+
     by_session={}
     if not closed.empty and "active_session" in closed.columns:
         for session,g in closed.groupby(closed["active_session"].fillna("").astype(str),dropna=False):
@@ -317,6 +369,7 @@ def summarize_model_paper(frame:pd.DataFrame|None)->dict[str,Any]:
         "net_r":round(float(rr.sum()) if len(rr) else 0.0,3),
         "avg_r":round(float(rr.mean()) if len(rr) else 0.0,3),
         "by_setup":by_setup,
+        "by_timeframe":by_timeframe,
         "by_session":by_session,
         "setup_inference_used":False,
         "automatic_promotion":False,
@@ -345,26 +398,51 @@ def run_model_paper_cycle(
     if not d.empty:
         updated=[]
         for _,series in d.iterrows():
-            row=series.copy()
+            # Force object dtype before assigning typed Paper metadata. Pandas may
+            # preserve Arrow string dtype from a CSV/Parquet ledger, which rejects
+            # boolean values such as timeframe_alignment_passed=True.
+            row=pd.Series(series.to_dict(),dtype="object")
             status=str(row.get("status") or "").upper()
             if status in {"WAIT_ENTRY","OPEN"}:
                 source_tf=str(row.get("source_timeframe") or "M15").strip().upper()
-                if source_tf!="M15":
+                profile=_execution_profile(source_tf)
+                if profile is None:
                     blocked_row=row.to_dict()
                     blocked_row["status"]="BLOCKED_TIMEFRAME"
                     blocked_row["execution_timeframe"]=""
                     blocked_row["timeframe_alignment_passed"]=False
                     blocked_row["timeframe_alignment_reason"]="EXECUTION_FRAME_NOT_AVAILABLE:"+source_tf
-                    blocked_row["checklist_note"]="Paper preservado sem execução: timeframe de origem não pode usar candles M15 como substituto."
+                    blocked_row["checklist_note"]="Paper preservado sem execução: timeframe de origem ainda não possui executor exato."
                     blocked_row["updated_at"]=now.isoformat()
                     updated.append(blocked_row)
                     continue
-                frame=_m15(scanner_by_pair.get(str(row.get("pair") or "").upper(),{}))
+                frame=_execution_frame(
+                    scanner_by_pair.get(str(row.get("pair") or "").upper(),{}),
+                    source_tf,
+                )
+                if frame.empty:
+                    waiting=row.to_dict()
+                    waiting["execution_timeframe"]=source_tf
+                    waiting["timeframe_alignment_passed"]=False
+                    waiting["timeframe_alignment_reason"]="EXECUTION_FRAME_EMPTY:"+source_tf
+                    waiting["checklist_note"]="Aguardando candles do mesmo timeframe de execução; nenhum timeframe inferior é usado como substituto."
+                    waiting["updated_at"]=now.isoformat()
+                    updated.append(waiting)
+                    continue
+                row["execution_timeframe"]=source_tf
+                row["timeframe_alignment_passed"]=True
+                row["timeframe_alignment_reason"]="SOURCE_EQUALS_EXECUTION"
                 before=status
                 first=_fill_entry(row,frame,now=now)
                 if before=="WAIT_ENTRY" and str(first.get("status") or "").upper()=="OPEN":
                     opened+=1
-                second=_close_open(pd.Series(first),frame,now=now)
+                second=_close_open(
+                    pd.Series(first),
+                    frame,
+                    now=now,
+                    bar_minutes=int(profile["bar_minutes"]),
+                    max_hold_bars=int(profile["max_hold_bars"]),
+                )
                 if str(first.get("status") or "").upper()=="OPEN" and str(second.get("status") or "").upper()=="CLOSED":
                     closed_count+=1
                 updated.append(second)
@@ -388,15 +466,37 @@ def run_model_paper_cycle(
         synthetic=_synthetic_input(base_input,candidate)
         scanner_pair=scanner_by_pair.get(pair,{})
         map_ctx=map_by_pair.get(pair,{})
-        checklist=evaluate_pair_checklist(pair,synthetic,scanner_pair,map_ctx,now=now)
         source_tf=str(candidate.get("source_timeframe") or "").strip().upper()
-        frame=_m15(scanner_pair)
+        profile=_execution_profile(source_tf)
+        checklist=evaluate_pair_checklist(
+            pair,
+            synthetic,
+            scanner_pair,
+            map_ctx,
+            now=now,
+            execution_timeframe=source_tf or "UNSUPPORTED",
+        )
+        frame=_execution_frame(scanner_pair,source_tf)
         observed+=1
-        if source_tf!="M15":
+        if profile is None:
             row=_block_row(candidate,checklist,status="BLOCKED_TIMEFRAME",now=now)
             blocked+=1
+        elif frame.empty:
+            row=_block_row(candidate,checklist,status="BLOCKED_DATA",now=now)
+            row["execution_timeframe"]=source_tf
+            row["timeframe_alignment_passed"]=False
+            row["timeframe_alignment_reason"]="EXECUTION_FRAME_EMPTY:"+source_tf
+            row["checklist_note"]="Candidato alinhado somente pode avançar com candles do mesmo timeframe; frame exato indisponível."
+            blocked+=1
         elif checklist.get("all_checks_passed"):
-            row=_qualified_row(candidate,checklist,frame,now=now)
+            row=_qualified_row(
+                candidate,
+                checklist,
+                frame,
+                now=now,
+                execution_timeframe=source_tf,
+                bar_minutes=int(profile["bar_minutes"]),
+            )
             if str(row.get("status") or "").upper()=="WAIT_ENTRY":
                 qualified+=1
             else:
@@ -427,6 +527,7 @@ __all__=[
     "MODEL_ATTRIBUTION",
     "MODEL_PAPER_COLUMNS",
     "normalize_model_paper",
+    "MODEL_PAPER_EXECUTION_PROFILES",
     "current_setup_candidates",
     "summarize_model_paper",
     "run_model_paper_cycle",
