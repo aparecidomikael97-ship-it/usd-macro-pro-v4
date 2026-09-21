@@ -298,7 +298,39 @@ def aggregate_setup_performance(audit: pd.DataFrame | None) -> pd.DataFrame:
     )
 
 
-def build_summary(audit: pd.DataFrame, performance: pd.DataFrame, *, now: pd.Timestamp | None = None) -> dict[str, Any]:
+def _paper_blocker_summary(status: Mapping[str, Any] | None) -> dict[str, Any]:
+    paper=_mapping(_mapping(status).get("paper_trading_v112"))
+    cycle=_mapping(paper.get("last_cycle"))
+    checklists=_mapping(cycle.get("checklists"))
+    hard: dict[str,int]={}
+    soft: dict[str,int]={}
+    states: dict[str,int]={}
+    passed=0
+    for item in checklists.values():
+        row=_mapping(item)
+        state=str(row.get("state","") or "").strip()
+        if state:
+            states[state]=states.get(state,0)+1
+        if bool(row.get("passed",False)):
+            passed+=1
+        for reason in list(row.get("hard_blocks",[]) or []):
+            key=str(reason or "").strip()
+            if key: hard[key]=hard.get(key,0)+1
+        for reason in list(row.get("soft_blocks",[]) or []):
+            key=str(reason or "").strip()
+            if key: soft[key]=soft.get(key,0)+1
+    return {
+        "pairs_evaluated":len(checklists),
+        "checklists_passed":passed,
+        "hard_block_counts":dict(sorted(hard.items(),key=lambda kv:(-kv[1],kv[0]))),
+        "soft_block_counts":dict(sorted(soft.items(),key=lambda kv:(-kv[1],kv[0]))),
+        "state_counts":dict(sorted(states.items(),key=lambda kv:(-kv[1],kv[0]))),
+        "diagnostic_only":True,
+        "thresholds_changed":False,
+    }
+
+
+def build_summary(audit: pd.DataFrame, performance: pd.DataFrame, *, now: pd.Timestamp | None = None, status: Mapping[str, Any] | None = None) -> dict[str, Any]:
     now = pd.Timestamp.now(tz="UTC") if now is None else pd.Timestamp(now)
     now = now.tz_localize("UTC") if now.tzinfo is None else now.tz_convert("UTC")
     d = _normalize_audit(audit)
@@ -329,6 +361,7 @@ def build_summary(audit: pd.DataFrame, performance: pd.DataFrame, *, now: pd.Tim
         "explicit_setup_closed_trades": int(explicit_setup_closed.sum()) if len(closed) else 0,
         "setup_attribution_inferred": False,
         "component_state_rows": int(len(performance)) if isinstance(performance, pd.DataFrame) else 0,
+        "paper_blockers": _paper_blocker_summary(status),
         "sample_state": _sample_state(int(len(r))),
         "net_r": round(float(r.sum()), 4) if len(r) else 0.0,
         "safety": {
@@ -372,7 +405,9 @@ def _audit_cycle() -> tuple[bool, dict[str, Any], list[str]]:
     now = base.utcnow()
     audit = sync_setup_audit(trades, scanner, existing, market_map=master, now=now)
     performance = aggregate_setup_performance(audit)
-    summary = build_summary(audit, performance, now=now)
+    status_before, _ = base.gh_get_json(base.STATUS_PATH, {})
+    status_before = status_before if isinstance(status_before, dict) else {}
+    summary = build_summary(audit, performance, now=now, status=status_before)
 
     ok1, err1 = base.gh_put_csv(
         AUDIT_CSV_PATH,
@@ -398,8 +433,7 @@ def _audit_cycle() -> tuple[bool, dict[str, Any], list[str]]:
     if not ok3:
         errors.append("Salvar resumo setup: " + str(err3))
 
-    status, _ = base.gh_get_json(base.STATUS_PATH, {})
-    status = status if isinstance(status, dict) else {}
+    status = status_before
     status["setup_audit_v114"] = {
         "enabled": True,
         "audited_trades": summary.get("audited_trades", 0),
