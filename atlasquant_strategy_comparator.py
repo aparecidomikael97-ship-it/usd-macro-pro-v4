@@ -24,6 +24,11 @@ from atlasquant_ote_replay import generate_ote_signals
 from atlasquant_crt_replay import generate_crt_signals
 from atlasquant_amd_replay import generate_amd_signals
 from atlasquant_backtest_context import enrich_signals_point_in_time
+from atlasquant_timeframe_profiles import (
+    SUPPORTED_EXECUTION_TIMEFRAMES,
+    apply_timeframe_context,
+    timeframe_profile,
+)
 
 
 STRATEGY_ORDER = (
@@ -79,12 +84,15 @@ def run_strategy_suite(
     cost_r: float = 0.0,
     slippage_r: float = 0.0,
     context_snapshots: pd.DataFrame | None = None,
+    timeframe: str = "M15",
+    require_alignment: bool = False,
 ) -> "OrderedDict[str, dict[str, Any]]":
     """Generate + backtest all five strategies without mixing their trades."""
     signals_by_strategy=generate_strategy_signals(candles,pair)
     suite: "OrderedDict[str, dict[str, Any]]"=OrderedDict()
     for strategy in STRATEGY_ORDER:
         signals=list(signals_by_strategy.get(strategy,[]) or [])
+        signals=apply_timeframe_context(signals,timeframe,overwrite=True)
         if isinstance(context_snapshots,pd.DataFrame) and not context_snapshots.empty:
             signals=list(
                 enrich_signals_point_in_time(signals,context_snapshots).get("signals",[])
@@ -98,14 +106,76 @@ def run_strategy_suite(
             cost_r=float(cost_r),
             slippage_r=float(slippage_r),
             start_after_signal_bar=True,
+            require_alignment=bool(require_alignment),
         )
+        _tf_profile=timeframe_profile(timeframe)
         suite[strategy]={
             "strategy":strategy,
+            "timeframe":_tf_profile["timeframe"],
+            "trading_style":_tf_profile["trading_style"],
             "label":STRATEGY_LABELS[strategy],
             "signals":signals,
             "results":results,
         }
     return suite
+
+
+
+def run_multitimeframe_strategy_suite(
+    candles_by_timeframe: Mapping[str,pd.DataFrame],
+    *,
+    pair: str,
+    max_wait_bars_by_timeframe: Mapping[str,int] | None = None,
+    max_hold_bars_by_timeframe: Mapping[str,int] | None = None,
+    cost_r: float = 0.0,
+    slippage_r: float = 0.0,
+    context_snapshots: pd.DataFrame | None = None,
+    require_alignment: bool = True,
+) -> "OrderedDict[str, OrderedDict[str, dict[str, Any]]]":
+    """Run the five setup families independently for each supplied timeframe."""
+    out:"OrderedDict[str, OrderedDict[str, dict[str, Any]]]"=OrderedDict()
+    waits=dict(max_wait_bars_by_timeframe or {})
+    holds=dict(max_hold_bars_by_timeframe or {})
+    for tf in SUPPORTED_EXECUTION_TIMEFRAMES:
+        frame=candles_by_timeframe.get(tf)
+        if not isinstance(frame,pd.DataFrame) or frame.empty:
+            continue
+        profile=timeframe_profile(tf)
+        out[tf]=run_strategy_suite(
+            frame,
+            pair=pair,
+            max_wait_bars=int(waits.get(tf,profile["max_wait_bars"])),
+            max_hold_bars=int(holds.get(tf,profile["max_hold_bars"])),
+            cost_r=float(cost_r),
+            slippage_r=float(slippage_r),
+            context_snapshots=context_snapshots,
+            timeframe=tf,
+            require_alignment=bool(require_alignment),
+        )
+    return out
+
+
+def multitimeframe_comparison_frame(
+    suites:Mapping[str,Mapping[str,Mapping[str,Any]]],
+    *,
+    min_trades_for_rank:int=20,
+)->pd.DataFrame:
+    """Concatenate descriptive comparison rows without ranking across timeframes."""
+    parts=[]
+    for tf in SUPPORTED_EXECUTION_TIMEFRAMES:
+        suite=suites.get(tf)
+        if not isinstance(suite,Mapping):
+            continue
+        frame=comparison_frame(suite,min_trades_for_rank=min_trades_for_rank)
+        if frame.empty:
+            continue
+        frame=frame.copy()
+        frame["timeframe"]=tf
+        frame["trading_style"]=timeframe_profile(tf)["trading_style"]
+        parts.append(frame)
+    if not parts:
+        return pd.DataFrame()
+    return pd.concat(parts,ignore_index=True,sort=False)
 
 
 def comparison_frame(
@@ -137,12 +207,15 @@ def comparison_frame(
         rows.append({
             "strategy":strategy,
             "operacional":pack.get("label",STRATEGY_LABELS[strategy]),
+            "timeframe":str(pack.get("timeframe") or ""),
+            "trading_style":str(pack.get("trading_style") or ""),
             "signals":m["signals"],
             "trades":m["trades"],
             "gains":m["gains"],
             "losses":m["losses"],
             "breakeven":m["breakeven"],
             "no_trade":m["no_trade"],
+            "alignment_blocked":m.get("alignment_blocked",0),
             "win_rate_pct":m["win_rate_pct"],
             "expectancy_r":m["expectancy_r"],
             "net_r":m["net_r"],

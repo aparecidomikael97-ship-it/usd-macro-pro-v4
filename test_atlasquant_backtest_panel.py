@@ -103,6 +103,45 @@ class BacktestPanelTests(unittest.TestCase):
         ):
             self.assertIn(field,template)
 
+
+    def test_signal_sheet_supports_execution_timeframe_and_style(self):
+        raw=pd.DataFrame({
+            "signal_time":["2026-09-15T00:00:00Z"],
+            "pair":["EUR/USD"],"side":["BUY"],"entry":[1.10],"stop":[1.09],"target":[1.12],
+            "timeframe":["H4"],
+        })
+        out=normalize_signal_sheet(raw,default_timeframe="M15")
+        self.assertEqual(out.iloc[0]["timeframe"],"H4")
+        self.assertEqual(out.iloc[0]["trading_style"],"SWING")
+
+    def test_panel_exposes_m15_to_weekly_timeframe_selector(self):
+        source=inspect.getsource(render_operational_backtest_panel)
+        self.assertIn("Timeframe do teste",source)
+        self.assertIn("SUPPORTED_EXECUTION_TIMEFRAMES",source)
+        self.assertIn("Por timeframe",inspect.getsource(__import__("atlasquant_backtest_panel")))
+        self.assertIn("timeframe=backtest_timeframe",source)
+
+
+    def test_panel_exposes_full_multitimeframe_matrix(self):
+        source=inspect.getsource(render_operational_backtest_panel)
+        self.assertIn("Matriz multitimeframe — 5 operacionais × M15 a W1",source)
+        self.assertIn("run_multitimeframe_strategy_suite",source)
+        self.assertIn("multitimeframe_comparison_frame",source)
+        self.assertIn("Candles {_tf} (CSV)",source)
+        self.assertIn("Baixar matriz multitimeframe",source)
+
+
+    def test_signal_template_exposes_alignment_contract(self):
+        template=signal_template_csv()
+        for field in ("timeframe","trading_style","reading_aligned","direction_aligned","filters_aligned","trigger_aligned"):
+            self.assertIn(field,template)
+
+    def test_panel_requires_alignment_for_execution_grade_backtests(self):
+        source=inspect.getsource(render_operational_backtest_panel)
+        self.assertIn("require_alignment=True",source)
+        self.assertIn("leitura, direção, filtros e gatilho",source)
+        self.assertIn("Bloq. alinhamento",inspect.getsource(__import__("atlasquant_backtest_panel")))
+
     def test_panel_exposes_automatic_replay(self):
         source=inspect.getsource(render_operational_backtest_panel)
         self.assertIn("Rodar backtest automático",source)

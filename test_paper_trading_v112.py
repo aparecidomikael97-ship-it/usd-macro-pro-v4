@@ -183,7 +183,7 @@ class PaperTradingV112SafetyTests(unittest.TestCase):
             },
             {
                 "candidate_id":"c-ote","episode_id":"e-ote","setup_id":"ote",
-                "source_model":"OTE","source_timeframe":"H1","pair":"EUR/USD",
+                "source_model":"OTE","source_timeframe":"M15","pair":"EUR/USD",
                 "side":"BUY","captured_at":"2026-09-20T12:00:00Z",
                 "status":"🟢 DENTRO DO OTE","score":88,
                 "research_candidate":True,"evidence":{"zone_low":1.09,"zone_high":1.11},
