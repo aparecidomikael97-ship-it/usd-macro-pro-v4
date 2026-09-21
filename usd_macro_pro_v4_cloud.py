@@ -9035,7 +9035,7 @@ if _aq_active_index == 1:
             st.caption(f"Diagnóstico: {_MASTER_V102_IMPORT_ERROR}")
     else:
         try:
-            _matrix_master_v102 = globals().get("_matrix_master_v102")
+            _matrix_master_v102 = globals().get("matriz_v61")
             if not isinstance(_matrix_master_v102,pd.DataFrame) or _matrix_master_v102.empty:
                 st.warning("Painel Mestre aguardando a Matriz dos 7 pares. Nenhuma oportunidade será exibida com dados incompletos.")
                 st.stop()
