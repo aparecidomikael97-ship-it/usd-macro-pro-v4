@@ -398,7 +398,10 @@ def run_model_paper_cycle(
     if not d.empty:
         updated=[]
         for _,series in d.iterrows():
-            row=series.copy()
+            # Force object dtype before assigning typed Paper metadata. Pandas may
+            # preserve Arrow string dtype from a CSV/Parquet ledger, which rejects
+            # boolean values such as timeframe_alignment_passed=True.
+            row=pd.Series(series.to_dict(),dtype="object")
             status=str(row.get("status") or "").upper()
             if status in {"WAIT_ENTRY","OPEN"}:
                 source_tf=str(row.get("source_timeframe") or "M15").strip().upper()
