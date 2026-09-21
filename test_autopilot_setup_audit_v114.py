@@ -1,6 +1,6 @@
 import os
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from io import StringIO
 from contextlib import redirect_stdout
 
@@ -318,6 +318,54 @@ class SetupAuditV114Tests(unittest.TestCase):
             {"last_success_at":"2026-09-20T11:59:59Z"},now=now
         ))
         self.assertTrue(news_runner.should_fetch_provider({},now=now))
+
+    def test_news_provider_paginates_once_when_first_page_is_full(self):
+        first=Mock()
+        first.status_code=200
+        first.raise_for_status.return_value=None
+        first.json.return_value=[
+            {"type":f"Event {i}","date":"2026-09-01 12:00:00","country":"US"}
+            for i in range(1000)
+        ]
+        second=Mock()
+        second.status_code=200
+        second.raise_for_status.return_value=None
+        second.json.return_value=[
+            {"type":"Tail Event","date":"2026-09-02 12:00:00","country":"US"}
+        ]
+        with patch.object(news_runner.requests,"get",side_effect=[first,second]) as get:
+            rows,status=news_runner.fetch_eodhd_events(
+                "token",start_date="2026-06-01",end_date="2026-09-30"
+            )
+        self.assertTrue(status["ok"])
+        self.assertTrue(status["paginated"])
+        self.assertEqual(status["requests"],2)
+        self.assertEqual(len(rows),1001)
+        self.assertEqual(get.call_args_list[0].kwargs["params"]["offset"],0)
+        self.assertEqual(get.call_args_list[1].kwargs["params"]["offset"],1000)
+
+    def test_news_provider_fails_closed_when_two_pages_are_full(self):
+        page=Mock()
+        page.status_code=200
+        page.raise_for_status.return_value=None
+        page.json.return_value=[
+            {"type":f"Event {i}","date":"2026-09-01 12:00:00","country":"US"}
+            for i in range(1000)
+        ]
+        page2=Mock()
+        page2.status_code=200
+        page2.raise_for_status.return_value=None
+        page2.json.return_value=[
+            {"type":f"Tail {i}","date":"2026-09-02 12:00:00","country":"US"}
+            for i in range(1000)
+        ]
+        with patch.object(news_runner.requests,"get",side_effect=[page,page2]):
+            rows,status=news_runner.fetch_eodhd_events(
+                "token",start_date="2026-01-01",end_date="2026-09-30"
+            )
+        self.assertFalse(status["ok"])
+        self.assertEqual(status["reason"],"TRUNCATED_PROVIDER_DATA")
+        self.assertEqual(rows,[])
 
     def test_news_nowcast_missing_optional_provider_fails_closed_without_core_failure(self):
         json_writes=[]
