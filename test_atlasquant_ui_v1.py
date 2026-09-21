@@ -310,5 +310,15 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("texto de cartões com contraste insuficiente",workflow)
 
 
+    def test_desktop_ui_smoke_sweeps_every_primary_workspace(self):
+        from pathlib import Path
+        workflow=Path(".github/workflows/atlasquant-ui-smoke.yml").read_text(encoding="utf-8")
+        self.assertIn("desktop_workspace_trace",workflow)
+        self.assertIn('if name=="desktop" and rendered:',workflow)
+        self.assertIn("for label in sequence:",workflow)
+        self.assertIn("stException",workflow)
+        for label in NAVIGATION_LABELS:
+            self.assertIn(f'"{label}"',workflow)
+
 if __name__ == "__main__":
     unittest.main()
