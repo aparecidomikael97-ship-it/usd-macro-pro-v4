@@ -283,6 +283,23 @@ class SetupAuditV114Tests(unittest.TestCase):
         self.assertFalse(safety["auto_strategy_selection"])
         self.assertFalse(safety["auto_gate_change"])
 
+
+    def test_paper_blockers_are_descriptive_and_never_change_thresholds(self):
+        status={"paper_trading_v112":{"last_cycle":{"checklists":{
+            "EUR/USD":{"passed":False,"state":"🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO","hard_blocks":[],"soft_blocks":["ICT incompleto (42/100)","M15 ainda não confirmou gatilho"]},
+            "USD/JPY":{"passed":False,"state":"⚪ EM OBSERVAÇÃO","hard_blocks":["Gate bloqueado"],"soft_blocks":["M15 ainda não confirmou gatilho"]},
+        }}}}
+        summary=build_summary(pd.DataFrame(),pd.DataFrame(),now=NOW,status=status)
+        blockers=summary["paper_blockers"]
+        self.assertEqual(blockers["pairs_evaluated"],2)
+        self.assertEqual(blockers["checklists_passed"],0)
+        self.assertEqual(blockers["soft_block_counts"]["M15 ainda não confirmou gatilho"],2)
+        self.assertEqual(blockers["hard_block_counts"]["Gate bloqueado"],1)
+        self.assertTrue(blockers["diagnostic_only"])
+        self.assertFalse(blockers["thresholds_changed"])
+        self.assertFalse(summary["safety"]["real_orders"])
+        self.assertFalse(summary["safety"]["auto_gate_change"])
+
     def test_empty_is_safe(self):
         audit = sync_setup_audit(pd.DataFrame(), {}, pd.DataFrame(), now=NOW)
         perf = aggregate_setup_performance(audit)
