@@ -53,7 +53,7 @@ SETUP_ALIASES={
     "volume profile":"volume-profile",
 }
 
-TRUSTED_ATTRIBUTIONS={"EXPLICIT_INPUT","MANUAL_TAG"}
+TRUSTED_ATTRIBUTIONS={"EXPLICIT_INPUT","MANUAL_TAG","SOURCE_MODEL_EXPLICIT"}
 
 
 def _norm(value:Any)->str:
