@@ -65,6 +65,8 @@ class AtlasQuantBasicProLayoutTests(unittest.TestCase):
         self.assertIn(".aq-op-card{min-height:auto;padding:11px 12px",self.src)
         self.assertIn(".aq-op-priority{font-size:1.45rem",self.src)
         self.assertIn(".aq-op-action{font-size:.64rem}",self.src)
+        self.assertIn(".aq-op-small{font-size:.72rem",self.src)
+        self.assertIn("color:#d4e1f0",self.src)
 
 
 if __name__=="__main__":
