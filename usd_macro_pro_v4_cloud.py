@@ -9021,6 +9021,35 @@ if _aq_active_index == 9:
 
 
 # =========================================================
+# MATRIZ CENTRAL — disponível para Radar/Painel independente da aba 4.
+# Reusa somente scores macro já calculados; não dispara providers.
+# =========================================================
+def _build_pair_matrix_for_surfaces_v111():
+    _pairs=["EUR/USD","GBP/USD","AUD/USD","NZD/USD","USD/JPY","USD/CHF","USD/CAD"]
+    _scores=dict(zip(ranking["Código"],ranking["Pontuação_Final"]))
+    _usd=float(st.session_state.get("v77_usd_pos_fomc",usd_detalhado.get("score",50.0)))
+    _rows=[]
+    for _pair in _pairs:
+        _b,_q=_pair.split("/")
+        _sb=_usd if _b=="USD" else float(_scores.get(_b,50.0))
+        _sq=_usd if _q=="USD" else float(_scores.get(_q,50.0))
+        _dif=float(_sb-_sq)
+        _direction="⚪ NEUTRO" if abs(_dif)<6 else (f"🟢 COMPRA {_pair}" if _dif>0 else f"🔴 VENDA {_pair}")
+        _strength=float(np.clip(50.0+abs(_dif)*1.25,0.0,100.0))
+        _quality=float(np.clip(min(float(qualidade_usd),100.0),0.0,100.0))
+        _level="ALTA" if _strength>=68 and _quality>=70 else ("MODERADA" if _strength>=58 and _quality>=50 else "BAIXA")
+        _decision=_direction if _level in ("ALTA","MODERADA") else "⚪ AGUARDAR CONFIRMAÇÃO"
+        _rank=float(np.clip(_strength*0.60+_quality*0.40,0,100))
+        _rows.append({"Par":_pair,"Direção":_decision,"Dif. macro":round(_dif,1),"Score final":round(_strength,0),"Qualidade":round(_quality,0),"Confluência":_level,"Índice ranking":round(_rank,1)})
+    _df=pd.DataFrame(_rows).sort_values(["Índice ranking","Qualidade","Score final"],ascending=False).reset_index(drop=True)
+    _df.insert(0,"Ranking",range(1,len(_df)+1))
+    return _df
+
+if "matriz_v61" not in globals() or not isinstance(globals().get("matriz_v61"),pd.DataFrame) or globals().get("matriz_v61").empty:
+    matriz_v61=_build_pair_matrix_for_surfaces_v111()
+
+
+# =========================================================
 # ABA 1 — V10.2.2 PAINEL MESTRE DE OPORTUNIDADES
 # Consolida Macro + Market Map + Scanner técnico + ADR.
 # Não altera Score Mestre nem históricos oficiais.
@@ -9035,6 +9064,10 @@ if _aq_active_index == 1:
             st.caption(f"Diagnóstico: {_MASTER_V102_IMPORT_ERROR}")
     else:
         try:
+            _matrix_master_v102 = globals().get("matriz_v61")
+            if not isinstance(_matrix_master_v102,pd.DataFrame) or _matrix_master_v102.empty:
+                st.warning("Painel Mestre aguardando a Matriz dos 7 pares. Nenhuma oportunidade será exibida com dados incompletos.")
+                st.stop()
             _macro_context_master_v102 = {
                 "usd_score": float(usd_detalhado.get("score", 50.0)),
                 "usd_components": dict(usd_detalhado.get("componentes", {})),
@@ -9084,7 +9117,7 @@ if _aq_active_index == 1:
                         return 10**9
 
                 _candidates1022 = []
-                for _, _row1022 in matriz_v61.head(7).iterrows():
+                for _, _row1022 in _matrix_master_v102.head(7).iterrows():
                     _pair1022 = str(_row1022["Par"])
                     _raw1022 = _results1022.get(_pair1022, {})
                     _tec1022 = _raw1022.get("tecnico", {}) if isinstance(_raw1022, dict) else {}
@@ -9150,7 +9183,7 @@ if _aq_active_index == 1:
             )
 
             render_master_panel(
-                matriz_v61, ranking, CHAVE_TWELVE_DATA,
+                _matrix_master_v102, ranking, CHAVE_TWELVE_DATA,
                 _macro_context_master_v102, _scanner_state_master_v102,
                 scanner_refresh_cb=_master_refresh_scanner_batch_v1022,
                 scanner_refresh_remaining=_scan_wait_master_v1022,
