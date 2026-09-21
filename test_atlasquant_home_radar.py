@@ -163,6 +163,12 @@ class AtlasQuantHomeRadarTests(unittest.TestCase):
         self.assertIn("ADR 63%",row["movement"])
         self.assertNotIn("probabilidade",row["movement"].casefold())
 
+    def test_home_radar_css_keeps_secondary_text_readable(self):
+        import atlasquant_home_radar as home
+        self.assertIn("color:#d4e1f0",home.HOME_CSS)
+        self.assertIn("color:#e2ebf7",home.HOME_CSS)
+        self.assertNotIn(".aq-home-grid span{color:#9fb0c6",home.HOME_CSS)
+
 
 if __name__=="__main__":
     unittest.main()
