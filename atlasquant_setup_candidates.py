@@ -114,6 +114,7 @@ def build_setup_candidates(
     side:object,
     ict_snapshot:Mapping[str,Any]|None,
     captured_at:object,
+    institutional_snapshot:Mapping[str,Any]|None=None,
 )->dict[str,Any]:
     pair_name=str(pair or "").strip().upper()
     direction=str(side or "").strip().upper()
@@ -169,6 +170,90 @@ def build_setup_candidates(
             "automatic_promotion":False,
             "real_orders_enabled":False,
         })
+
+    institutional=dict(institutional_snapshot or {})
+    structure=dict(institutional.get("structure",{}) or {})
+    order_block=dict(institutional.get("order_block",{}) or {})
+    structure_event=str(structure.get("event") or "").strip().upper()
+    structure_side=str(structure.get("event_side") or "").strip().upper()
+    structure_status=str(structure.get("status") or "").strip()
+    ob_status=str(order_block.get("status") or "").strip()
+    ob_side=str(order_block.get("side") or "").strip().upper()
+    ob_valid=bool(
+        ob_status
+        and "ORDER BLOCK" in ob_status.upper()
+        and "SEM ORDER BLOCK" not in ob_status.upper()
+        and "INVALIDADO" not in ob_status.upper()
+        and not bool(order_block.get("invalidated",False))
+        and ob_side==direction
+    )
+    structure_valid=bool(
+        structure_event in {"BOS","CHOCH"}
+        and structure_side==direction
+        and structure_status.startswith("🟢")
+    )
+    bos_ob_evidence={
+        key:value for key,value in {
+            "structure_status":structure_status,
+            "structure_event":structure_event,
+            "structure_side":structure_side,
+            "structure_level":structure.get("level"),
+            "break_time":structure.get("break_time"),
+            "order_block_status":ob_status,
+            "order_block_side":ob_side,
+            "zone_low":order_block.get("zone_low"),
+            "zone_high":order_block.get("zone_high"),
+            "origin_time":order_block.get("origin_time"),
+            "mitigation_depth_pct":order_block.get("mitigation_depth_pct"),
+        }.items() if value not in (None,"")
+    }
+    bos_confirmed=bool(
+        direction in {"BUY","SELL"}
+        and captured
+        and structure_valid
+        and ob_valid
+    )
+    bos_identity={
+        "pair":pair_name,
+        "side":direction,
+        "setup_id":"bos-choch-ob",
+        "captured_at":captured,
+        "status":f"{structure_event} + {ob_status}".strip(" +"),
+        "evidence":bos_ob_evidence,
+    }
+    bos_episode=_candidate_id({
+        "pair":pair_name,
+        "side":direction,
+        "setup_id":"bos-choch-ob",
+        "structure_event":structure_event,
+        "break_time":structure.get("break_time"),
+        "zone_low":order_block.get("zone_low"),
+        "zone_high":order_block.get("zone_high"),
+        "origin_time":order_block.get("origin_time"),
+    })
+    rows.append({
+        "candidate_id":_candidate_id(bos_identity),
+        "episode_id":bos_episode,
+        "setup_id":"bos-choch-ob",
+        "setup_label":"BOS/CHOCH + Order Block",
+        "source_model":"BOS_CHOCH_OB",
+        "source_timeframe":"M15",
+        "pair":pair_name,
+        "side":direction,
+        "captured_at":captured,
+        "status":bos_identity["status"],
+        "score":min(
+            _finite(structure.get("score")) or 0.0,
+            _finite(order_block.get("score")) or 0.0,
+        ),
+        "research_candidate":bos_confirmed,
+        "setup_attribution":"SOURCE_MODEL_EXPLICIT",
+        "evidence":bos_ob_evidence,
+        "paper_trade_created":False,
+        "automatic_execution":False,
+        "automatic_promotion":False,
+        "real_orders_enabled":False,
+    })
 
     confirmed=[x for x in rows if x["research_candidate"]]
     return {
