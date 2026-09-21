@@ -121,6 +121,15 @@ class BacktestPanelTests(unittest.TestCase):
         self.assertIn("Por timeframe",inspect.getsource(__import__("atlasquant_backtest_panel")))
         self.assertIn("timeframe=backtest_timeframe",source)
 
+
+    def test_panel_exposes_full_multitimeframe_matrix(self):
+        source=inspect.getsource(render_operational_backtest_panel)
+        self.assertIn("Matriz multitimeframe — 5 operacionais × M15 a W1",source)
+        self.assertIn("run_multitimeframe_strategy_suite",source)
+        self.assertIn("multitimeframe_comparison_frame",source)
+        self.assertIn("Candles {_tf} (CSV)",source)
+        self.assertIn("Baixar matriz multitimeframe",source)
+
     def test_panel_exposes_automatic_replay(self):
         source=inspect.getsource(render_operational_backtest_panel)
         self.assertIn("Rodar backtest automático",source)
