@@ -4,6 +4,7 @@ from unittest.mock import patch
 import pandas as pd
 import paper_friction_v116 as f
 import autopilot_paper_v112 as paper_runner
+import autopilot_model_paper_v1 as model_runner
 
 class PaperFrictionV116Tests(unittest.TestCase):
     def test_closed_trade_gets_deterministic_conservative_cost(self):
@@ -101,6 +102,53 @@ class PaperFrictionV116Tests(unittest.TestCase):
         self.assertFalse(summary["safety"]["friction_changes_signal"])
         self.assertFalse(summary["safety"]["friction_changes_result_classification"])
 
+
+
+    def test_model_paper_runner_persists_separate_ledger_without_market_provider_calls(self):
+        ledger=pd.DataFrame([{
+            "trade_id":"e1","signal_id":"e1","pair":"EUR/USD","side":"BUY",
+            "setup_id":"fvg","setup_attribution":"SOURCE_MODEL_EXPLICIT",
+            "status":"CLOSED","result":"WIN","realized_r":2.0,
+            "data_quality_pct":95.0,"d1_regime":"TREND","w1_regime":"EXPANSION",
+            "active_session":"London",
+        }])
+        saved_csv={}
+        saved_json={}
+
+        def fake_get_json(path,default):
+            if path==model_runner.base.STATUS_PATH:
+                return {}, ""
+            return {}, ""
+
+        def fake_get_csv(path):
+            return pd.DataFrame(), ""
+
+        def fake_put_csv(path,frame,message):
+            saved_csv[path]=frame.copy()
+            return True, ""
+
+        def fake_put_json(path,payload,message):
+            saved_json[path]=dict(payload)
+            return True, ""
+
+        with patch.object(model_runner.base,"gh_get_json",side_effect=fake_get_json), \
+             patch.object(model_runner.base,"gh_get_csv",side_effect=fake_get_csv), \
+             patch.object(model_runner.base,"gh_put_csv",side_effect=fake_put_csv), \
+             patch.object(model_runner.base,"gh_put_json",side_effect=fake_put_json), \
+             patch.object(model_runner.base,"utcnow",return_value=pd.Timestamp("2026-09-20T12:00:00Z")), \
+             patch.object(model_runner,"run_model_paper_cycle",return_value=(ledger,{"new_candidates_observed":1})):
+            ok,summary,errors=model_runner._model_paper_cycle()
+
+        self.assertTrue(ok)
+        self.assertEqual(errors,[])
+        self.assertIn(model_runner.MODEL_PAPER_CSV_PATH,saved_csv)
+        self.assertIn(model_runner.MODEL_PAPER_SUMMARY_PATH,saved_json)
+        persisted=saved_csv[model_runner.MODEL_PAPER_CSV_PATH]
+        self.assertAlmostEqual(float(persisted.iloc[0]["net_r"]),2.0-f.DEFAULT_TOTAL_R,places=8)
+        status=saved_json[model_runner.base.STATUS_PATH]["model_paper_v1"]
+        self.assertFalse(status["real_orders"])
+        self.assertIn("by_setup",status)
+        self.assertFalse(summary["safety"]["additional_market_data_calls"])
 
 if __name__=="__main__":
     unittest.main()
