@@ -205,7 +205,7 @@ class PaperTradingV112SafetyTests(unittest.TestCase):
         scanner=self._model_scanner(candidates)
         inputs={"pairs":[{"Par":"EUR/USD","Direção":"COMPRA","Score final":90,"Qualidade":90,"Índice ranking":1}]}
         master={"contexts":{"EUR/USD":{}}}
-        def checklist(pair,row,scanner_pair,map_ctx,now=None):
+        def checklist(pair,row,scanner_pair,map_ctx,now=None,execution_timeframe="M15"):
             return self._model_checklist(row.get("setup_id"),True)
         with patch("atlasquant_model_paper.evaluate_pair_checklist",side_effect=checklist):
             ledger,cycle=mp.run_model_paper_cycle(inputs,scanner,master,now=pd.Timestamp("2026-09-20T12:05:00Z"))
