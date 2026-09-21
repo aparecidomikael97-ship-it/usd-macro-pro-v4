@@ -15,6 +15,11 @@ from atlasquant_news_backtest import (
     simple_month_score,
     walk_forward_news_backtest,
 )
+from atlasquant_news_research_panel import (
+    build_news_research_report,
+    news_history_template_csv,
+    normalize_news_history_csv,
+)
 
 
 class CalendarTests(unittest.TestCase):
@@ -161,6 +166,68 @@ class AtlasQuantNewsNowcastTests(unittest.TestCase):
         self.assertEqual(out["state"],"RESEARCH_ESTIMATE")
         self.assertEqual(out["leading_signals"]["state"],"READY")
         self.assertFalse(out["market_reaction_predicted"])
+
+
+class AtlasQuantNewsResearchPanelTests(unittest.TestCase):
+    def test_template_contains_point_in_time_fields(self):
+        template=news_history_template_csv()
+        for field in (
+            "indicator","scheduled_at","captured_at","consensus",
+            "actual","signal_score","tolerance",
+        ):
+            self.assertIn(field,template)
+
+    def test_normalizer_accepts_aliases_and_rejects_post_release_capture(self):
+        import pandas as pd
+        frame=pd.DataFrame([
+            {
+                "evento":"PAYROLL",
+                "event_time":"2026-09-04T12:30:00Z",
+                "snapshot_time":"2026-09-03T18:00:00Z",
+                "consenso":155,
+                "atual":165,
+                "leading_score":0.5,
+                "tolerancia":5,
+            },
+            {
+                "evento":"PAYROLL",
+                "event_time":"2026-10-02T12:30:00Z",
+                "snapshot_time":"2026-10-02T13:00:00Z",
+                "consenso":150,
+                "atual":149,
+                "leading_score":-0.1,
+                "tolerancia":5,
+            },
+        ])
+        out=normalize_news_history_csv(frame)
+        self.assertEqual(out["accepted"],1)
+        self.assertEqual(out["rejected"],1)
+        self.assertIn("captured_at histórico deve ser anterior",out["errors"][0])
+
+    def test_report_keeps_news_accuracy_separate_from_market_reaction(self):
+        start=datetime(2025,1,1,13,30,tzinfo=timezone.utc)
+        records=[]
+        for i in range(30):
+            score=(-0.8,0.0,0.8)[i%3]
+            surprise=(-1.0,0.0,1.0)[i%3]
+            scheduled=start+timedelta(days=i*3)
+            records.append(HistoricalRelease(
+                indicator="PAYROLL",
+                scheduled_at=scheduled,
+                captured_at=scheduled-timedelta(hours=12),
+                consensus=100,
+                actual=100+surprise,
+                signal_score=score,
+                tolerance=0.1,
+            ))
+        report=build_news_research_report(
+            records,min_history=9,min_analogs=3,bandwidth=0.05
+        )
+        self.assertGreater(report["backtest"]["forecast_samples"],10)
+        self.assertFalse(report["market_reaction_scored"])
+        self.assertFalse(report["real_orders_enabled"])
+        self.assertFalse(report["trading_news_enabled"])
+        self.assertFalse(report["automatic_weight_change"])
 
 
 class AtlasQuantNewsBacktestTests(unittest.TestCase):
