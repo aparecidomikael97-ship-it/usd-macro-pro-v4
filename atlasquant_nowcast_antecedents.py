@@ -291,7 +291,8 @@ def upcoming_targets(
         if not definitely_future_target(event,capture):
             continue
         days=(event.scheduled_at.date()-capture.date()).days
-        if 0<days<=horizon:
+        same_day_exact=days==0 and event.timezone_known and event.scheduled_at>capture
+        if (0<days<=horizon) or same_day_exact:
             out.append((event,rule))
     return sorted(out,key=lambda x:x[0].scheduled_at)
 
