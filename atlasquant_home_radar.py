@@ -2,8 +2,8 @@
 
 This module turns already-computed pair intelligence into a simple home screen.
 It never creates orders, bypasses Safety Core, turns scores into probabilities,
-or calls market-data providers. Voice playback uses the browser/device speech
-engine only after an explicit user click.
+or calls market-data providers. Voice playback uses the fixed server-side neural TTS identity only after an
+explicit user click; browser/device TTS is never used as fallback.
 """
 from __future__ import annotations
 
@@ -15,7 +15,8 @@ from typing import Any, Mapping, Sequence
 import pandas as pd
 import streamlit as st
 
-from atlasquant_voice_assistant import browser_speech_html, render_contextual_voice_assistant
+from atlasquant_voice_assistant import render_contextual_voice_assistant
+from atlasquant_neural_voice_ui import render_neural_voice_player
 from atlasquant_session_profiles import (
     SESSION_PROFILES,
     SESSION_LABELS,
@@ -211,16 +212,11 @@ HOME_CSS="""
 
 
 def render_browser_voice(script:str, *, key:str)->None:
-    """Explicit-click AtlasQuant deep voice playback; no server/provider call is made."""
-    st.iframe(
-        browser_speech_html(
-            script,
-            button_label="🔊 Ouvir análise",
-            key=f"home_{key}",
-        ),
-        height=72,
-        width="stretch",
-        tab_index=0,
+    """Compatibility wrapper for the fixed AtlasQuant neural voice."""
+    render_neural_voice_player(
+        script,
+        button_label="🔊 Ouvir análise com a voz AtlasQuant",
+        key=f"home_{key}",
     )
 
 
