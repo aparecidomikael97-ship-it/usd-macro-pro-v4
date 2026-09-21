@@ -151,9 +151,9 @@ class FastStartupTests(unittest.TestCase):
     def test_advanced_transition_does_not_force_extra_streamlit_rerun(self):
         from pathlib import Path
         src=Path("atlasquant_fast_startup.py").read_text(encoding="utf-8")
-        start=src.index("mode=st.radio(")
-        end=src.index('age=float(check["age_minutes"] or 0.0)',start)
-        block=src[start:end]
+        valid=src.index('    mode=st.radio(',src.index('return {\n            "handled":True'))
+        end=src.index('age=float(check["age_minutes"] or 0.0)',valid)
+        block=src[valid:end]
         self.assertIn('"handled":False',block)
         self.assertIn('"mode":"Avançado"',block)
         self.assertNotIn("st.rerun()",block)
