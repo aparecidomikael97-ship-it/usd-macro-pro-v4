@@ -143,6 +143,8 @@ def comparison_frame(
         rows.append({
             "strategy":strategy,
             "operacional":pack.get("label",STRATEGY_LABELS[strategy]),
+            "timeframe":str(pack.get("timeframe") or ""),
+            "trading_style":str(pack.get("trading_style") or ""),
             "signals":m["signals"],
             "trades":m["trades"],
             "gains":m["gains"],
