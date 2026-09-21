@@ -13,7 +13,11 @@ import pandas as pd
 import streamlit as st
 
 from atlasquant_news_nowcast import HistoricalRelease, validate_historical_release
-from atlasquant_news_backtest import simple_month_score, walk_forward_news_backtest
+from atlasquant_news_backtest import (
+    monthly_news_scores,
+    simple_month_score,
+    walk_forward_news_backtest,
+)
 
 SCHEMA="ATLASQUANT_NEWS_RESEARCH_PANEL_V1"
 
@@ -217,6 +221,15 @@ def render_news_research_lab()->dict[str,Any]:
     x,y=st.columns(2)
     x.metric("Gap confiança × acerto","—" if calibration is None else f"{float(calibration):.1f} p.p.")
     y.metric("Erro numérico médio absoluto","—" if mae is None else f"{float(mae):.3f}")
+
+    monthly=monthly_news_scores(bt)
+    if monthly:
+        st.markdown("#### Resultado por mês")
+        st.dataframe(pd.DataFrame(monthly),width="stretch",hide_index=True)
+        st.caption(
+            "Exemplo de leitura: 8 de 10 = oito releases classificados corretamente "
+            "como acima/em linha/abaixo do consenso. Não significa oito trades vencedores."
+        )
 
     per=bt.get("per_indicator",{}) or {}
     if per:
