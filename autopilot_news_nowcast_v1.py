@@ -11,6 +11,7 @@ from __future__ import annotations
 from datetime import timedelta
 import json
 import os
+import re
 from typing import Any
 
 import pandas as pd
@@ -32,6 +33,28 @@ DEFAULT_FETCH_INTERVAL_MIN=360
 DEFAULT_LOOKBACK_DAYS=120
 DEFAULT_HORIZON_DAYS=7
 
+
+
+def _safe_diagnostic(value:Any,*secrets:str)->str:
+    """Redact credentials from persisted/logged provider diagnostics."""
+    text=str(value or "")
+    for secret in secrets:
+        secret=str(secret or "")
+        if secret:
+            text=text.replace(secret,"[REDACTED]")
+    text=re.sub(
+        r"([?&](?:api_token|apikey|api_key|access_token|token)=)[^&\\s\"']+",
+        r"\\1[REDACTED]",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text=re.sub(
+        r"((?:api_token|apikey|api_key|access_token|token)\\s*[=:]\\s*)[A-Za-z0-9._-]{8,}",
+        r"\\1[REDACTED]",
+        text,
+        flags=re.IGNORECASE,
+    )
+    return text
 
 def _age_minutes(value:Any,now:pd.Timestamp)->float|None:
     if value in (None,""):
@@ -157,7 +180,7 @@ def fetch_eodhd_events(
             "http_status":statuses[-1] if statuses else getattr(locals().get("response",None),"status_code",None),
             "rows":0,
             "requests":request_count,
-            "error":f"{type(exc).__name__}: {exc}",
+            "error":_safe_diagnostic(f"{type(exc).__name__}: {exc}",token),
         }
 
 
@@ -267,7 +290,7 @@ def _news_nowcast_cycle()->tuple[bool,dict[str,Any],list[str]]:
             bandwidth=0.25,
         )
     except Exception as exc:
-        errors.append(f"Nowcast sync: {type(exc).__name__}: {exc}")
+        errors.append(_safe_diagnostic(f"Nowcast sync: {type(exc).__name__}: {exc}",token))
         summary=summarize_live_nowcasts(ledger)
         summary.update({
             "version":VERSION,
@@ -333,6 +356,7 @@ def _news_nowcast_cycle()->tuple[bool,dict[str,Any],list[str]]:
 
 
 def _update_status(summary:dict[str,Any],errors:list[str])->None:
+    errors=[_safe_diagnostic(x) for x in list(errors or [])]
     status,_=base.gh_get_json(base.STATUS_PATH,{})
     status=status if isinstance(status,dict) else {}
     status["news_nowcast_v1"]={
