@@ -1180,7 +1180,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                 )
                 st.markdown("#### Comparação geral")
                 display_cols=[
-                    "operacional","trades","gains","losses","breakeven",
+                    "operacional","timeframe","trading_style","trades","gains","losses","breakeven",
                     "win_rate_pct","expectancy_r","net_r","profit_factor",
                     "max_drawdown_r","max_loss_streak","sample_tier",
                     "observed_expectancy_rank",
@@ -1207,6 +1207,10 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                 if not by_session.empty:
                     st.markdown("#### Comparação por sessão")
                     st.dataframe(by_session,width="stretch",hide_index=True)
+                by_timeframe=breakdown_frame(suite,"timeframe")
+                if not by_timeframe.empty:
+                    st.markdown("#### Comparação por timeframe")
+                    st.dataframe(by_timeframe,width="stretch",hide_index=True)
 
                 stability=temporal_stability_report(
                     suite,
