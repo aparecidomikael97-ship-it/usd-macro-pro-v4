@@ -76,6 +76,25 @@ class MultiTimeframeAlignmentTests(unittest.TestCase):
         self.assertEqual(out["outcome"],"GAIN")
         self.assertEqual(out["net_r"],2.0)
 
+
+    def test_generic_context_fills_macro_while_timeframe_snapshot_controls_alignment(self):
+        context=pd.DataFrame([
+            {
+                "captured_at":"2026-09-14T20:00:00Z","pair":"EUR/USD","timeframe":"",
+                "macro_alignment":1,"regime":"TREND",
+            },
+            {
+                "captured_at":"2026-09-14T21:00:00Z","pair":"EUR/USD","timeframe":"H4",
+                "reading_aligned":True,"direction_aligned":True,
+                "filters_aligned":True,"trigger_aligned":True,
+            },
+        ])
+        row=enrich_signals_point_in_time([self._plan()],context)["signals"][0]
+        self.assertEqual(row["macro_alignment"],1)
+        self.assertEqual(row["regime"],"TREND")
+        self.assertTrue(row["reading_aligned"])
+        self.assertTrue(row["trigger_aligned"])
+
     def test_point_in_time_context_prefers_same_timeframe(self):
         context=pd.DataFrame([
             {
