@@ -153,27 +153,36 @@ jobs:
               return False
 
           def select_area(page,label):
-              nav=page.locator('[data-testid="stSelectbox"]').filter(has_text="Área avançada").first
-              if nav.count()<1:
-                  raise RuntimeError("selectbox Área avançada não encontrado")
-              combo=nav.get_by_role("combobox")
-              try:
-                  current=combo.input_value(timeout=5_000)
-              except Exception:
-                  current=""
-              if current.strip()==label:
-                  return
-              combo.click()
-              combo.fill(label)
-              page.wait_for_timeout(180)
-              combo.press("Enter")
-              page.wait_for_timeout(900)
-              nav=page.locator('[data-testid="stSelectbox"]').filter(has_text="Área avançada").first
-              combo=nav.get_by_role("combobox")
-              selected=combo.input_value(timeout=20_000).strip()
-              if selected!=label:
-                  raise RuntimeError(f"área não selecionada: esperado={label!r} atual={selected!r}")
-              wait_text(page,"ATLASQUANT",timeout=60_000)
+              last_selected=""
+              for attempt in range(1,4):
+                  nav=page.locator('[data-testid="stSelectbox"]').filter(has_text="Área avançada").first
+                  if nav.count()<1:
+                      page.wait_for_timeout(500)
+                      continue
+                  combo=nav.get_by_role("combobox")
+                  try:
+                      current=combo.input_value(timeout=5_000).strip()
+                  except Exception:
+                      current=""
+                  if current==label:
+                      wait_text(page,"ATLASQUANT",timeout=60_000)
+                      return
+                  try:
+                      combo.click()
+                      combo.fill(label)
+                      page.wait_for_timeout(180)
+                      combo.press("Enter")
+                      page.wait_for_timeout(900)
+                      nav=page.locator('[data-testid="stSelectbox"]').filter(has_text="Área avançada").first
+                      combo=nav.get_by_role("combobox")
+                      last_selected=combo.input_value(timeout=20_000).strip()
+                      if last_selected==label:
+                          wait_text(page,"ATLASQUANT",timeout=60_000)
+                          return
+                  except Exception:
+                      last_selected=""
+                  page.wait_for_timeout(700*attempt)
+              raise RuntimeError(f"área não selecionada: esperado={label!r} atual={last_selected!r}")
 
           with sync_playwright() as p:
               browser=p.chromium.launch(headless=True)
