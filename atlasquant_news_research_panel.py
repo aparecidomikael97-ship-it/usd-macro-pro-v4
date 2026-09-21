@@ -84,7 +84,7 @@ def normalize_news_history_csv(frame:pd.DataFrame|None)->dict[str,Any]:
 
     records=[]
     errors=[]
-    for idx,row in df.iterrows():
+    for pos,(_,row) in enumerate(df.iterrows(),start=2):
         try:
             scheduled=pd.to_datetime(row.get("scheduled_at"),utc=True,errors="raise")
             captured=pd.to_datetime(row.get("captured_at"),utc=True,errors="raise")
@@ -105,7 +105,7 @@ def normalize_news_history_csv(frame:pd.DataFrame|None)->dict[str,Any]:
                 unit="" if pd.isna(row.get("unit","")) else str(row.get("unit","")),
             )))
         except Exception as exc:
-            errors.append(f"linha {int(idx)+2}: {type(exc).__name__}: {exc}")
+            errors.append(f"linha {pos}: {type(exc).__name__}: {exc}")
     return {
         "schema":SCHEMA,
         "records":records,
