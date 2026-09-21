@@ -50,6 +50,7 @@ class FastStartupTests(unittest.TestCase):
         out=validate_home_snapshot(s,now=self.now,max_age_min=90)
         self.assertTrue(out["valid"])
         self.assertAlmostEqual(out["age_minutes"],8.0,places=2)
+        self.assertAlmostEqual(out["input_age_minutes"],720.0,places=2)
 
     def test_stale_runtime_timestamp_still_fails_closed(self):
         s=snapshot()
