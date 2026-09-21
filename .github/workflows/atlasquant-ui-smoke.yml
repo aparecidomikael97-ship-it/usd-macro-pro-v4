@@ -195,7 +195,7 @@ jobs:
                           }"""
                       )
                       import re
-                      match=re.search(r"rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)",str(style.get("color","")))
+                      match=re.search(r"rgba?\((\d+),\s*(\d+),\s*(\d+)",str(style.get("color","")))
                       rgb=tuple(int(x) for x in match.groups()) if match else (0,0,0)
                       brightness=sum(rgb)/3.0
                       readable=brightness>=200 and float(style.get("opacity",1))>=0.95
