@@ -304,7 +304,7 @@ def build_summary(audit: pd.DataFrame, performance: pd.DataFrame, *, now: pd.Tim
     closed = d[d["status"].astype(str).str.upper().eq("CLOSED")].copy() if not d.empty else d
     r = pd.to_numeric(closed.get("realized_r"), errors="coerce").dropna() if not closed.empty else pd.Series(dtype=float)
     r = r[r.map(lambda x: math.isfinite(float(x)))] if len(r) else r
-    trusted={"EXPLICIT_INPUT","MANUAL_TAG"}
+    trusted={"EXPLICIT_INPUT","MANUAL_TAG","SOURCE_MODEL_EXPLICIT"}
     if "setup_id" in d.columns and "setup_attribution" in d.columns:
         explicit_setups=(
             d["setup_id"].fillna("").astype(str).str.strip().ne("")
