@@ -25,6 +25,8 @@ REQUIRED_SIGNAL_FIELDS = ("signal_time", "side", "entry", "stop", "target")
 
 OPTIONAL_DIAGNOSTIC_FIELDS = (
     "trade_id",
+    "timeframe",
+    "trading_style",
     "decision_captured_at",
     "macro_alignment",
     "technical_confirmation",
@@ -174,6 +176,8 @@ def backtest_signal(
         "session": str(signal.get("session", "")),
         "source": str(signal.get("source", "ATLASQUANT")),
         "notes": str(signal.get("notes", "")),
+        "timeframe": str(signal.get("timeframe", "") or "").strip().upper(),
+        "trading_style": str(signal.get("trading_style", "") or "").strip().upper(),
     }
     for field in OPTIONAL_DIAGNOSTIC_FIELDS:
         if field in signal and _present(signal.get(field)):
@@ -487,7 +491,7 @@ def ledger_frame(records: Iterable[Mapping[str, Any]]) -> pd.DataFrame:
     if not rows:
         return pd.DataFrame()
     preferred = [
-        "signal_time", "pair", "setup", "session", "side",
+        "signal_time", "pair", "setup", "session", "timeframe", "trading_style", "side",
         "entry", "stop", "target", "entry_time", "exit_time", "exit_price",
         "status", "outcome", "gross_r", "cost_r", "slippage_r", "total_friction_r", "net_r",
         "mfe_r", "mae_r", "bars_waited", "bars_held",
