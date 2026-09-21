@@ -121,6 +121,13 @@ except Exception as _backtest_exc:
     _ATLASQUANT_BACKTEST_IMPORT_ERROR = f"{type(_backtest_exc).__name__}: {_backtest_exc}"
 
 try:
+    from atlasquant_forward_test_panel import render_forward_test_panel
+    _ATLASQUANT_FORWARD_TEST_IMPORT_ERROR = ""
+except Exception as _forward_test_exc:
+    render_forward_test_panel = None
+    _ATLASQUANT_FORWARD_TEST_IMPORT_ERROR = f"{type(_forward_test_exc).__name__}: {_forward_test_exc}"
+
+try:
     from atlasquant_admin_research_panel import render_admin_research_panel
     _ATLASQUANT_ADMIN_RESEARCH_IMPORT_ERROR = ""
 except Exception as _admin_research_exc:
@@ -6801,6 +6808,19 @@ if _aq_active_index == 6:
 # =========================================================
 if _aq_active_index == 7:
     st.subheader("📈 Teste Histórico — Validação do Modelo")
+
+    if render_forward_test_panel is not None:
+        _forward_summary,_forward_source=_github_get_json_v937(
+            "dados/model_paper_summary_v1.json",
+            {},
+        )
+        render_forward_test_panel(
+            _forward_summary if isinstance(_forward_summary,dict) else {},
+            source_label=_forward_source,
+        )
+        st.divider()
+    elif _ATLASQUANT_FORWARD_TEST_IMPORT_ERROR:
+        st.caption("Paper/Forward ao vivo indisponível neste carregamento.")
 
     if render_operational_backtest_panel is not None:
         render_operational_backtest_panel()
