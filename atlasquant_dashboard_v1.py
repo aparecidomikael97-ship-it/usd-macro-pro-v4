@@ -140,7 +140,7 @@ DASHBOARD_CSS = """
 <style>
 .aq-pulse{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:4px 0 16px}
 .aq-pulse>div{padding:13px 14px;border:1px solid rgba(137,170,210,.18);border-radius:13px;background:rgba(11,27,47,.66)}
-.aq-pulse span,.aq-pulse small{display:block;color:#9fb0c6;font-size:.69rem}
+.aq-pulse span,.aq-pulse small{display:block;color:#d4e1f0;font-size:.73rem;font-weight:650}
 .aq-pulse strong{display:block;color:#edf4ff;font-size:1.02rem;margin:3px 0}
 .aq-pulse-kicker{color:#6de2c5!important;font-weight:800;letter-spacing:.08em}
 @media(max-width:760px){.aq-pulse{grid-template-columns:repeat(2,minmax(0,1fr))}.aq-focus-card{min-height:160px}}
@@ -156,9 +156,9 @@ DASHBOARD_CSS = """
 .aq-focus-pair{font-size:1.05rem;font-weight:800;color:#edf4ff}
 .aq-focus-side{font-size:.72rem;font-weight:800;letter-spacing:.08em;color:#dceaff}
 .aq-focus-score{font-size:2rem;font-weight:850;color:#edf4ff;margin-top:12px;line-height:1}
-.aq-focus-score span{font-size:.8rem;color:#9fb0c6;font-weight:650}
-.aq-focus-label{font-size:.7rem;color:#9fb0c6;margin-top:4px}
-.aq-focus-meta{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px;color:#9fb0c6;font-size:.73rem}
+.aq-focus-score span{font-size:.82rem;color:#d4e1f0;font-weight:750}
+.aq-focus-label{font-size:.74rem;color:#d4e1f0;font-weight:700;margin-top:4px}
+.aq-focus-meta{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px;color:#d4e1f0;font-size:.76rem;font-weight:650}
 .aq-focus-meta b{color:#edf4ff}
 .aq-focus-state{margin-top:14px;padding-top:10px;border-top:1px solid rgba(137,170,210,.14);font-size:.75rem;font-weight:750;color:#f2c14e}
 </style>
