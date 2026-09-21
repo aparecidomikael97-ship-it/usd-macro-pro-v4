@@ -27,6 +27,19 @@ from atlasquant_indicator_scenarios import (
     indicator_scenario_guide,
     indicator_spec,
 )
+from atlasquant_nowcast_antecedents import (
+    build_target_antecedents,
+    definitely_future_target,
+    normalize_economic_event,
+    normalize_economic_events,
+    target_catalog,
+    upcoming_targets,
+)
+from atlasquant_live_nowcast import (
+    completed_history,
+    sync_live_nowcasts,
+    summarize_live_nowcasts,
+)
 
 
 class CalendarTests(unittest.TestCase):
@@ -126,6 +139,203 @@ class AtlasQuantIndicatorScenarioTests(unittest.TestCase):
     def test_catalog_has_core_indicator_families(self):
         ids={x["id"] for x in indicator_catalog()}
         self.assertTrue({"cpi","pce","nfp","unemployment","jobless-claims","adp","ppi","pmi-ism","gdp"}.issubset(ids))
+
+
+class AtlasQuantLiveAntecedentTests(unittest.TestCase):
+    def _event(self,name,dt,actual=None,estimate=None,previous=None,comparison=None,period=None):
+        return {
+            "type":name,
+            "date":dt,
+            "actual":actual,
+            "estimate":estimate,
+            "previous":previous,
+            "comparison":comparison,
+            "period":period,
+            "country":"US",
+        }
+
+    def test_naive_provider_time_is_marked_unknown_and_same_day_target_is_blocked(self):
+        raw=self._event(
+            "Nonfarm Payrolls","2026-10-02 12:30:00",
+            actual=None,estimate=150,previous=140,
+        )
+        event=normalize_economic_event(raw)
+        self.assertIsNotNone(event)
+        self.assertFalse(event.timezone_known)
+        same_day=datetime(2026,10,2,8,0,tzinfo=timezone.utc)
+        self.assertFalse(definitely_future_target(event,same_day))
+        next_day=datetime(2026,10,1,20,0,tzinfo=timezone.utc)
+        self.assertTrue(definitely_future_target(event,next_day))
+
+    def test_payroll_antecedents_use_adp_claims_and_ism_with_correct_claims_polarity(self):
+        capture=datetime(2026,10,1,18,0,tzinfo=timezone.utc)
+        rows=normalize_economic_events([
+            self._event("ADP Employment Change","2026-09-30 12:15:00",actual=100,estimate=50,previous=80),
+            self._event("Initial Jobless Claims","2026-09-29 12:30:00",actual=250,estimate=230,previous=225),
+            self._event("ISM Manufacturing Employment","2026-09-28 14:00:00",actual=52,estimate=50,previous=49),
+            self._event("ISM Services Employment","2026-09-27 14:00:00",actual=51,estimate=50,previous=50),
+        ])
+        out=build_target_antecedents("PAYROLL",rows,captured_at=capture)
+        self.assertEqual(out["state"],"READY")
+        self.assertEqual(out["signal_count"],4)
+        by={x["key"]:x for x in out["provenance"]}
+        self.assertGreater(by["ADP"]["direction_score"],0)
+        self.assertLess(by["INITIAL_CLAIMS"]["direction_score"],0)
+        self.assertGreater(by["ISM_MFG_EMPLOYMENT"]["direction_score"],0)
+        self.assertGreater(by["ISM_SERVICES_EMPLOYMENT"]["direction_score"],0)
+        self.assertFalse(out["weights_calibrated"])
+        self.assertFalse(out["automatic_weight_change"])
+        self.assertFalse(out["lookahead_used"])
+
+    def test_pce_does_not_double_count_core_cpi_as_headline_cpi(self):
+        capture=datetime(2026,10,20,18,0,tzinfo=timezone.utc)
+        rows=normalize_economic_events([
+            self._event("Core CPI","2026-10-15 12:30:00",actual=3.3,estimate=3.1,previous=3.2,comparison="yoy"),
+            self._event("CPI","2026-10-15 12:30:00",actual=2.8,estimate=2.7,previous=2.7,comparison="yoy"),
+            self._event("Core PPI","2026-10-16 12:30:00",actual=3.0,estimate=2.8,previous=2.9,comparison="yoy"),
+            self._event("PPI","2026-10-16 12:30:00",actual=2.5,estimate=2.4,previous=2.4,comparison="yoy"),
+        ])
+        out=build_target_antecedents("PCE",rows,captured_at=capture)
+        keys=[x["key"] for x in out["provenance"]]
+        self.assertEqual(keys.count("CPI"),1)
+        self.assertEqual(keys.count("CORE_CPI"),1)
+        self.assertEqual(keys.count("PPI"),1)
+        self.assertEqual(keys.count("CORE_PPI"),1)
+        ids=[x["event_id"] for x in out["provenance"]]
+        self.assertEqual(len(ids),len(set(ids)))
+
+    def test_upcoming_targets_require_consensus_and_no_actual(self):
+        capture=datetime(2026,10,1,12,0,tzinfo=timezone.utc)
+        events=normalize_economic_events([
+            self._event("Nonfarm Payrolls","2026-10-02 12:30:00",actual=None,estimate=150,previous=140),
+            self._event("CPI","2026-10-03 12:30:00",actual=None,estimate=None,previous=2.8,comparison="yoy"),
+            self._event("PCE Price Index","2026-10-04 12:30:00",actual=2.7,estimate=2.6,previous=2.5,comparison="yoy"),
+        ])
+        targets=upcoming_targets(events,captured_at=capture,horizon_days=7)
+        self.assertEqual(len(targets),1)
+        self.assertEqual(targets[0][1].key,"PAYROLL")
+
+    def test_catalog_exposes_payroll_cpi_and_pce_targets(self):
+        targets={x["target"] for x in target_catalog()}
+        self.assertTrue({"PAYROLL","CPI","CORE_CPI","PCE","CORE_PCE"}.issubset(targets))
+
+
+class AtlasQuantLiveNowcastLedgerTests(unittest.TestCase):
+    def _event(self,name,dt,actual=None,estimate=None,previous=None,comparison=None,period=None):
+        return {
+            "type":name,"date":dt,"actual":actual,"estimate":estimate,
+            "previous":previous,"comparison":comparison,"period":period,"country":"US",
+        }
+
+    def _pre_release_events(self,target_actual=None):
+        return [
+            self._event("ADP Employment Change","2026-09-30 12:15:00",actual=100,estimate=50,previous=80),
+            self._event("Initial Jobless Claims","2026-09-29 12:30:00",actual=220,estimate=230,previous=225),
+            self._event("ISM Manufacturing Employment","2026-09-28 14:00:00",actual=52,estimate=50,previous=49),
+            self._event(
+                "Nonfarm Payrolls","2026-10-02 12:30:00",
+                actual=target_actual,estimate=150,previous=140,period="Sep",
+            ),
+        ]
+
+    def test_live_ledger_freezes_one_snapshot_per_event_per_day(self):
+        now=datetime(2026,10,1,12,0,tzinfo=timezone.utc)
+        ledger,cycle=sync_live_nowcasts(
+            self._pre_release_events(),
+            now=now,min_history=5,min_analogs=2,
+        )
+        self.assertEqual(len(ledger),1)
+        self.assertEqual(cycle["new_snapshots"],1)
+        self.assertEqual(ledger.iloc[0]["indicator"],"PAYROLL")
+        self.assertGreater(float(ledger.iloc[0]["signal_count"]),0)
+        self.assertEqual(ledger.iloc[0]["nowcast_state"],"INSUFFICIENT_HISTORY")
+        self.assertFalse(bool(ledger.iloc[0]["lookahead_used"]))
+
+        repeated,cycle2=sync_live_nowcasts(
+            self._pre_release_events(),ledger,now=now+timedelta(hours=4),
+            min_history=5,min_analogs=2,
+        )
+        self.assertEqual(len(repeated),1)
+        self.assertEqual(cycle2["new_snapshots"],0)
+
+    def test_next_day_can_freeze_new_snapshot_for_same_release(self):
+        first,_=sync_live_nowcasts(
+            self._pre_release_events(),
+            now=datetime(2026,9,30,10,0,tzinfo=timezone.utc),
+            min_history=5,min_analogs=2,
+        )
+        second,_=sync_live_nowcasts(
+            self._pre_release_events(),first,
+            now=datetime(2026,10,1,10,0,tzinfo=timezone.utc),
+            min_history=5,min_analogs=2,
+        )
+        self.assertEqual(len(second),2)
+        self.assertEqual(second["event_id"].nunique(),1)
+        self.assertEqual(second["capture_day"].nunique(),2)
+
+    def test_first_observed_actual_closes_all_snapshots_without_rewriting_forecast(self):
+        first,_=sync_live_nowcasts(
+            self._pre_release_events(),
+            now=datetime(2026,9,30,10,0,tzinfo=timezone.utc),
+            min_history=5,min_analogs=2,
+        )
+        second,_=sync_live_nowcasts(
+            self._pre_release_events(),first,
+            now=datetime(2026,10,1,10,0,tzinfo=timezone.utc),
+            min_history=5,min_analogs=2,
+        )
+        original_scores=second["signal_score"].tolist()
+        closed,cycle=sync_live_nowcasts(
+            self._pre_release_events(target_actual=175),second,
+            now=datetime(2026,10,3,10,0,tzinfo=timezone.utc),
+            min_history=5,min_analogs=2,
+        )
+        self.assertEqual(cycle["closed_now"],2)
+        self.assertTrue(all(bool(x) for x in closed["closed"]))
+        self.assertTrue(all(float(x)==175 for x in closed["actual"]))
+        self.assertEqual(closed["signal_score"].tolist(),original_scores)
+        self.assertTrue(all(x=="ABOVE" for x in closed["surprise_class"]))
+
+        revised,cycle2=sync_live_nowcasts(
+            self._pre_release_events(target_actual=180),closed,
+            now=datetime(2026,10,4,10,0,tzinfo=timezone.utc),
+            min_history=5,min_analogs=2,
+        )
+        self.assertEqual(cycle2["closed_now"],0)
+        self.assertTrue(all(float(x)==175 for x in revised["actual"]))
+
+    def test_completed_history_uses_latest_snapshot_only_once_per_release(self):
+        first,_=sync_live_nowcasts(
+            self._pre_release_events(),
+            now=datetime(2026,9,30,10,0,tzinfo=timezone.utc),
+            min_history=5,min_analogs=2,
+        )
+        second,_=sync_live_nowcasts(
+            self._pre_release_events(),first,
+            now=datetime(2026,10,1,10,0,tzinfo=timezone.utc),
+            min_history=5,min_analogs=2,
+        )
+        closed,_=sync_live_nowcasts(
+            self._pre_release_events(target_actual=160),second,
+            now=datetime(2026,10,3,10,0,tzinfo=timezone.utc),
+            min_history=5,min_analogs=2,
+        )
+        history=completed_history(closed)
+        self.assertEqual(len(history),1)
+        self.assertEqual(history[0].indicator,"PAYROLL")
+        self.assertEqual(history[0].captured_at.date(),date(2026,10,1))
+
+    def test_summary_never_claims_price_reaction_or_execution(self):
+        ledger,_=sync_live_nowcasts(
+            self._pre_release_events(),
+            now=datetime(2026,10,1,10,0,tzinfo=timezone.utc),
+            min_history=5,min_analogs=2,
+        )
+        summary=summarize_live_nowcasts(ledger)
+        self.assertFalse(summary["lookahead_used"])
+        self.assertFalse(summary["market_reaction_scored"])
+        self.assertFalse(summary["automatic_execution"])
+        self.assertFalse(summary["automatic_weight_change"])
 
 
 class AtlasQuantNewsNowcastTests(unittest.TestCase):
