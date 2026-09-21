@@ -17,6 +17,7 @@ from typing import Any, Mapping
 import pandas as pd
 
 import autopilot_paper_v112 as paper_runner
+import autopilot_news_nowcast_v1 as news_nowcast_runner
 import autopilot_v107 as base
 
 AUDIT_VERSION = "V11.4_SETUP_AUDIT"
@@ -430,13 +431,17 @@ def _audit_cycle() -> tuple[bool, dict[str, Any], list[str]]:
 def main() -> int:
     rc = paper_runner.main()
     audit_ok, summary, errors = _audit_cycle()
+    news_ok, news_summary, news_errors = news_nowcast_runner._news_nowcast_cycle()
     print(json.dumps({
         "setup_audit_v114": summary,
         "setup_audit_ok": audit_ok,
         "setup_audit_errors": errors,
+        "news_nowcast_v1": news_summary,
+        "news_nowcast_ok": news_ok,
+        "news_nowcast_errors": news_errors,
     }, ensure_ascii=False, indent=2, default=str))
-    # Mantém o retorno estrutural do Autopilot/Paper. Falhas V11.4 ficam no status
-    # para diagnóstico, sem mascarar a coleta principal.
+    # Mantém o retorno estrutural do Autopilot/Paper. Setup Audit e News Nowcast
+    # são sidecars observáveis; não mascaram a coleta principal nem habilitam trade.
     return int(rc)
 
 

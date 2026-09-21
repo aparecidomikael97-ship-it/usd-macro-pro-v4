@@ -528,7 +528,11 @@ def render_admin_research_panel(
 
     with st.expander("📰 Pré-Notícia / Nowcast · backtest dos indicadores",expanded=False):
         try:
-            render_news_research_lab()
+            render_news_research_lab(
+                repo=cfg.get("repo",""),
+                branch=cfg.get("branch",""),
+                token=cfg.get("token",""),
+            )
         except Exception as exc:
             st.warning(
                 "Laboratório de notícias em modo seguro; nenhuma previsão ou peso foi alterado."
