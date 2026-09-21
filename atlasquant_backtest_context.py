@@ -10,6 +10,8 @@ from typing import Any, Iterable, Mapping
 
 import pandas as pd
 
+from atlasquant_timeframe_profiles import normalize_execution_timeframe
+
 SCHEMA="ATLASQUANT_BACKTEST_CONTEXT_V1"
 
 CONTEXT_FIELDS=(
@@ -34,6 +36,7 @@ CONTEXT_FIELDS=(
 _CONTEXT_ALIASES={
     "captured_at":("captured_at","snapshot_time","decision_captured_at","datetime","time"),
     "pair":("pair","par","asset","ativo","symbol","ticker"),
+    "timeframe":("timeframe","tf","tempo_grafico","tempo gráfico","periodo","período"),
     "macro_alignment":("macro_alignment","macro","macro_context"),
     "technical_confirmation":("technical_confirmation","technical_ok","tecnico_confirmado"),
     "liquidity_confirmation":("liquidity_confirmation","liquidity_ok","liquidez_confirmada"),
@@ -84,7 +87,7 @@ def _rename_aliases(frame:pd.DataFrame)->pd.DataFrame:
     return out.rename(columns=rename)
 
 def normalize_context_snapshots(frame:pd.DataFrame|None)->pd.DataFrame:
-    columns=["captured_at","pair",*CONTEXT_FIELDS]
+    columns=["captured_at","pair","timeframe",*CONTEXT_FIELDS]
     if not isinstance(frame,pd.DataFrame) or frame.empty:
         return pd.DataFrame(columns=columns)
     out=_rename_aliases(frame)
@@ -93,6 +96,13 @@ def normalize_context_snapshots(frame:pd.DataFrame|None)->pd.DataFrame:
     out=out.copy()
     out["captured_at"]=pd.to_datetime(out["captured_at"],utc=True,errors="coerce",format="mixed")
     out["pair"]=out["pair"].fillna("").astype(str).str.strip().str.upper()
+    if "timeframe" not in out.columns:
+        out["timeframe"]=""
+    else:
+        out["timeframe"]=out["timeframe"].fillna("").astype(str).str.strip().str.upper()
+        out.loc[out["timeframe"].ne(""),"timeframe"]=[
+            normalize_execution_timeframe(x) for x in out.loc[out["timeframe"].ne(""),"timeframe"]
+        ]
     if "event_time" in out.columns:
         out["event_time"]=pd.to_datetime(out["event_time"],utc=True,errors="coerce",format="mixed")
     for field in CONTEXT_FIELDS:
@@ -100,12 +110,12 @@ def normalize_context_snapshots(frame:pd.DataFrame|None)->pd.DataFrame:
             out[field]=None
     out=out.dropna(subset=["captured_at"])
     out=out[out["pair"].ne("")]
-    out=out.sort_values(["pair","captured_at"],kind="stable")
-    out=out.drop_duplicates(subset=["pair","captured_at"],keep="last")
+    out=out.sort_values(["pair","timeframe","captured_at"],kind="stable")
+    out=out.drop_duplicates(subset=["pair","timeframe","captured_at"],keep="last")
     return out.reindex(columns=columns).reset_index(drop=True)
 
 def context_template_csv()->str:
-    return ",".join(["captured_at","pair",*CONTEXT_FIELDS])+"\n"
+    return ",".join(["captured_at","pair","timeframe",*CONTEXT_FIELDS])+"\n"
 
 def _signal_time(signal:Mapping[str,Any])->pd.Timestamp|None:
     try:
@@ -143,7 +153,11 @@ def enrich_signals_point_in_time(
         if ts is None or not pair:
             enriched.append(row)
             continue
-        candidates=context[(context["pair"]==pair)&(context["captured_at"]<=ts)]
+        signal_tf=str(row.get("timeframe") or "").strip().upper()
+        pair_rows=context[(context["pair"]==pair)&(context["captured_at"]<=ts)]
+        exact=pair_rows[pair_rows["timeframe"].eq(normalize_execution_timeframe(signal_tf))] if signal_tf else pair_rows.iloc[0:0]
+        generic=pair_rows[pair_rows["timeframe"].eq("")]
+        candidates=exact if not exact.empty else generic
         if candidates.empty:
             enriched.append(row)
             continue
