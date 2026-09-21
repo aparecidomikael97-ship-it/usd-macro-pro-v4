@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: atlasquant-private
+    runtime: python
+    branch: main
+    autoDeployTrigger: checksPass
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run usd_macro_pro_v4_cloud.py --server.address 0.0.0.0 --server.port $PORT --server.headless true
+    healthCheckPath: /_stcore/health
