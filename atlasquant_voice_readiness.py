@@ -24,7 +24,7 @@ VOICE_REQUIREMENTS=(
 CONTEXTUAL_REQUIREMENTS=(
     {"id":"context-bound","title":"Contexto do AtlasQuant","detail":"A resposta deve usar apenas o estado já calculado do ativo e não inventar preço, notícia, indicador ou confirmação ausente."},
     {"id":"beginner-advanced","title":"Profundidade por modo","detail":"Iniciante recebe explicação curta; Avançado recebe fatores a favor, contra, invalidação, macro, técnico, liquidez, evento e qualidade."},
-    {"id":"device-speech","title":"Voz no dispositivo","detail":"A reprodução no navegador/celular ocorre somente depois de ação explícita do usuário e não exige chave de provedor."},
+    {"id":"server-neural","title":"Voz neural no servidor","detail":"A reprodução oficial usa áudio neural gerado no servidor; speechSynthesis do navegador não é usado como fallback."},
     {"id":"text-fallback","title":"Fallback em texto","detail":"Se fala ou microfone não estiverem disponíveis, toda explicação permanece acessível por texto."},
     {"id":"question-safety","title":"Perguntas sem efeito operacional","detail":"Perguntas e respostas não alteram score, gate, peso, sinal, estado do motor ou execução."},
 )
@@ -33,7 +33,7 @@ def contextual_voice_requirements()->list[dict[str,str]]:
     return [dict(x) for x in CONTEXTUAL_REQUIREMENTS]
 
 def contextual_voice_contract_ready()->bool:
-    required={"context-bound","beginner-advanced","device-speech","text-fallback","question-safety"}
+    required={"context-bound","beginner-advanced","server-neural","text-fallback","question-safety"}
     ids={str(x["id"]) for x in CONTEXTUAL_REQUIREMENTS}
     return required.issubset(ids) and all(bool(x.get("detail")) for x in CONTEXTUAL_REQUIREMENTS)
 
@@ -53,13 +53,13 @@ def voice_readiness(provider_configured: bool=False)->dict[str,Any]:
         "schema":SCHEMA,
         "contract_ready":contract,
         "contextual_contract_ready":contextual,
-        "in_app_voice_ready":bool(contract and contextual and voice_profile_ready()),
+        "in_app_voice_ready":bool(contract and contextual and voice_profile_ready() and provider),
         "voice_profile_id":VOICE_PROFILE_ID,
         "voice_profile_ready":voice_profile_ready(),
         "provider_configured":provider,
-        "neural_tts_ready":bool(contract and provider),
+        "neural_tts_ready":bool(contract and contextual and voice_profile_ready() and provider),
         # Backward-compatible meaning: external/provider TTS readiness.
-        "voice_ready":bool(contract and provider),
+        "voice_ready":bool(contract and contextual and voice_profile_ready() and provider),
         "automatic_tts":False,
         "microphone_required":False,
         "text_fallback":True,

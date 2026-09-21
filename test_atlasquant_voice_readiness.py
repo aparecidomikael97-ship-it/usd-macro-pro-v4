@@ -16,18 +16,19 @@ class AtlasQuantVoiceReadinessTests(unittest.TestCase):
             {"explicit-provider","exact-transcript","secrets","manual-action","fail-closed","no-trading-side-effect"},
         )
 
-    def test_provider_is_required_only_for_external_neural_tts(self):
+    def test_provider_is_required_for_official_in_app_voice(self):
         pending=voice_readiness(False)
         self.assertTrue(pending["contract_ready"])
         self.assertTrue(pending["contextual_contract_ready"])
-        self.assertTrue(pending["in_app_voice_ready"])
+        self.assertFalse(pending["in_app_voice_ready"])
         self.assertTrue(pending["voice_profile_ready"])
-        self.assertEqual(pending["voice_profile_id"],"atlasquant_ptbr_neural_male_deep_v1")
+        self.assertEqual(pending["voice_profile_id"],"atlasquant_ptbr_fixed_neural_male_v2")
         self.assertFalse(pending["provider_configured"])
         self.assertFalse(pending["neural_tts_ready"])
         self.assertFalse(pending["voice_ready"])
 
         ready=voice_readiness(True)
+        self.assertTrue(ready["in_app_voice_ready"])
         self.assertTrue(ready["voice_ready"])
         self.assertTrue(ready["neural_tts_ready"])
 
@@ -35,8 +36,10 @@ class AtlasQuantVoiceReadinessTests(unittest.TestCase):
         self.assertTrue(contextual_voice_contract_ready())
         self.assertEqual(
             {x["id"] for x in contextual_voice_requirements()},
-            {"context-bound","beginner-advanced","device-speech","text-fallback","question-safety"},
+            {"context-bound","beginner-advanced","server-neural","text-fallback","question-safety"},
         )
+        text=" ".join(x["detail"] for x in contextual_voice_requirements()).casefold()
+        self.assertIn("speechsynthesis",text)
 
     def test_voice_layer_never_changes_trading(self):
         for provider in (False,True):

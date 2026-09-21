@@ -1,44 +1,50 @@
-"""Safe, provider-agnostic TTS contract for AtlasQuant Macro Briefing.
+"""Safe fixed-identity TTS contract for AtlasQuant Macro Briefing.
 
-The adapter never calls a network/provider by itself. It only validates a request
-and accepts audio bytes returned by an explicitly configured external provider.
+This compatibility adapter never selects between cosmetic voice styles. The
+only accepted identity is the official AtlasQuant neural profile.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Callable
 
-from atlasquant_voice_profile import voice_profile
+from atlasquant_voice_profile import VOICE_PROFILE_ID
 
 AudioProvider = Callable[[str, str], bytes]
-DEFAULT_VOICE_STYLE=str(voice_profile()["external_style"])
+DEFAULT_VOICE_STYLE=VOICE_PROFILE_ID
 
 
 @dataclass(frozen=True)
 class VoiceRequest:
-    transcript: str
-    voice: str = DEFAULT_VOICE_STYLE
+    transcript:str
+    voice:str=DEFAULT_VOICE_STYLE
 
-    def validated(self) -> "VoiceRequest":
-        text = str(self.transcript or "").strip()
+    def validated(self)->"VoiceRequest":
+        text=str(self.transcript or "").strip()
         if not text:
             raise ValueError("speech_text vazio")
-        if len(text) > 12000:
+        if len(text)>4096:
             raise ValueError("speech_text excede o limite seguro")
-        voice = str(self.voice or DEFAULT_VOICE_STYLE).strip().lower()
-        if voice not in {"normal", "clear", "fancy", "deep", "crisp", "delicate"}:
-            raise ValueError("voz não permitida")
-        return VoiceRequest(text, voice)
+        identity=str(self.voice or DEFAULT_VOICE_STYLE).strip()
+        if identity!=VOICE_PROFILE_ID:
+            raise ValueError("identidade de voz não permitida")
+        return VoiceRequest(text,VOICE_PROFILE_ID)
 
 
-def generate_voice_audio(request: VoiceRequest, provider: AudioProvider | None = None) -> bytes:
-    """Generate audio only after an explicit caller supplies a provider."""
-    req = request.validated()
+def generate_voice_audio(
+    request:VoiceRequest,
+    provider:AudioProvider|None=None,
+)->bytes:
+    """Generate audio only with the fixed AtlasQuant identity."""
+    req=request.validated()
     if provider is None:
         raise RuntimeError("provedor TTS não configurado")
-    audio = provider(req.transcript, req.voice)
-    if not isinstance(audio, (bytes, bytearray)) or not audio:
+    audio=provider(req.transcript,req.voice)
+    if not isinstance(audio,(bytes,bytearray)) or not audio:
         raise RuntimeError("provedor TTS não retornou áudio válido")
     return bytes(audio)
 
-__all__=["AudioProvider","DEFAULT_VOICE_STYLE","VoiceRequest","generate_voice_audio"]
+
+__all__=[
+    "AudioProvider","DEFAULT_VOICE_STYLE","VoiceRequest","generate_voice_audio",
+]

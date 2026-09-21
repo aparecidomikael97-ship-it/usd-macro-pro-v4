@@ -8,26 +8,33 @@ from __future__ import annotations
 
 from typing import Any
 
-SCHEMA="ATLASQUANT_VOICE_PROFILE_V1"
-VOICE_PROFILE_ID="atlasquant_ptbr_neural_male_deep_v1"
+SCHEMA="ATLASQUANT_VOICE_PROFILE_V2"
+VOICE_PROFILE_ID="atlasquant_ptbr_fixed_neural_male_v2"
 
 _VOICE_PROFILE={
     "schema":SCHEMA,
     "id":VOICE_PROFILE_ID,
-    "label":"AtlasQuant · masculina/grave",
+    "label":"AtlasQuant · voz neural oficial",
     "language":"pt-BR",
-    "external_style":"deep",
-    "rate":0.93,
-    "pitch":0.88,
+    "delivery_mode":"server_neural_tts",
+    "provider":"openai",
+    "model":"gpt-4o-mini-tts",
+    "voice":"cedar",
+    "external_style":"fixed_neural",
+    "style":"masculina, grave, natural e acolhedora",
+    "rate":0.96,
+    "pitch":None,
     "volume":1.0,
-    "quality_terms":["natural","neural","premium","enhanced"],
-    "preferred_terms":["antonio","antônio","fabio","fábio","daniel","ricardo","thiago","male","masculino"],
+    "quality_terms":["natural","neural","fixed","server"],
+    "preferred_terms":[],
     "fallback_terms":[],
     "strict_fixed_voice":True,
     "allow_generic_device_fallback":False,
+    "allow_browser_speech_synthesis":False,
     "fallback_behavior":"text_only",
     "automatic_playback":False,
-    "provider_required":False,
+    "provider_required":True,
+    "ai_generated_disclosure_required":True,
     "trading_side_effects":False,
 }
 
@@ -45,15 +52,20 @@ def voice_profile_ready()->bool:
     return bool(
         p["id"]==VOICE_PROFILE_ID
         and p["language"]=="pt-BR"
-        and p["external_style"]=="deep"
-        and 0.80 <= float(p["pitch"]) < 1.0
-        and 0.85 <= float(p["rate"]) <= 1.0
+        and p["delivery_mode"]=="server_neural_tts"
+        and p["provider"]=="openai"
+        and p["model"]=="gpt-4o-mini-tts"
+        and bool(p["voice"])
         and p["strict_fixed_voice"] is True
+        and p["provider_required"] is True
         and p["allow_generic_device_fallback"] is False
+        and p["allow_browser_speech_synthesis"] is False
         and p["fallback_behavior"]=="text_only"
         and p["automatic_playback"] is False
+        and p["ai_generated_disclosure_required"] is True
         and p["trading_side_effects"] is False
     )
+
 
 
 __all__=["SCHEMA","VOICE_PROFILE_ID","voice_profile","voice_profile_ready"]
