@@ -103,6 +103,24 @@ class BacktestPanelTests(unittest.TestCase):
         ):
             self.assertIn(field,template)
 
+
+    def test_signal_sheet_supports_execution_timeframe_and_style(self):
+        raw=pd.DataFrame({
+            "signal_time":["2026-09-15T00:00:00Z"],
+            "pair":["EUR/USD"],"side":["BUY"],"entry":[1.10],"stop":[1.09],"target":[1.12],
+            "timeframe":["H4"],
+        })
+        out=normalize_signal_sheet(raw,default_timeframe="M15")
+        self.assertEqual(out.iloc[0]["timeframe"],"H4")
+        self.assertEqual(out.iloc[0]["trading_style"],"SWING")
+
+    def test_panel_exposes_m15_to_weekly_timeframe_selector(self):
+        source=inspect.getsource(render_operational_backtest_panel)
+        self.assertIn("Timeframe do teste",source)
+        self.assertIn("SUPPORTED_EXECUTION_TIMEFRAMES",source)
+        self.assertIn("Por timeframe",inspect.getsource(__import__("atlasquant_backtest_panel")))
+        self.assertIn("timeframe=backtest_timeframe",source)
+
     def test_panel_exposes_automatic_replay(self):
         source=inspect.getsource(render_operational_backtest_panel)
         self.assertIn("Rodar backtest automático",source)
