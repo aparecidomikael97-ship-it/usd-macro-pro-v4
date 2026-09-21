@@ -1,9 +1,11 @@
 """AtlasQuant model-specific Paper research ledger.
 
 Consumes explicit setup candidates frozen by the source ICT detector. It keeps
-one research episode per model structure/zone, evaluates the global context
-gate at capture time, and simulates only qualified candidates using cached M15
-candles. It never places real orders and never infers a setup from outcomes.
+one research episode per model structure/zone and evaluates the global context
+gate at capture time. The current Paper executor has only an M15 execution
+frame; candidates from other source timeframes fail closed instead of being
+silently executed on M15. It never places real orders and never infers a setup
+from outcomes.
 """
 from __future__ import annotations
 
@@ -30,11 +32,12 @@ MODEL_EXTRA_COLUMNS=[
     "candidate_captured_at","candidate_status","candidate_score",
     "model_evidence_json","context_gate_passed","context_gate_state",
     "context_hard_blocks","context_soft_blocks","candidate_observation",
+    "execution_timeframe","timeframe_alignment_passed","timeframe_alignment_reason",
 ]
 MODEL_PAPER_COLUMNS=PAPER_COLUMNS+[
     c for c in MODEL_EXTRA_COLUMNS if c not in PAPER_COLUMNS
 ]
-TERMINAL_STATUSES={"CLOSED","BLOCKED_CONTEXT","BLOCKED_DATA"}
+TERMINAL_STATUSES={"CLOSED","BLOCKED_CONTEXT","BLOCKED_DATA","BLOCKED_TIMEFRAME"}
 
 
 def _mapping(value:Any)->dict[str,Any]:
@@ -192,6 +195,13 @@ def _block_row(
         "context_hard_blocks":" | ".join(str(x) for x in list(decision.get("hard_blocks",[]) or [])),
         "context_soft_blocks":" | ".join(str(x) for x in list(decision.get("soft_blocks",[]) or [])),
         "candidate_observation":True,
+        "execution_timeframe":"M15" if str(candidate.get("source_timeframe") or "").strip().upper()=="M15" else "",
+        "timeframe_alignment_passed":str(candidate.get("source_timeframe") or "").strip().upper()=="M15",
+        "timeframe_alignment_reason":(
+            "SOURCE_EQUALS_EXECUTION"
+            if str(candidate.get("source_timeframe") or "").strip().upper()=="M15"
+            else "EXECUTION_FRAME_NOT_AVAILABLE:"+str(candidate.get("source_timeframe") or "").strip().upper()
+        ),
     })
     return row
 
@@ -231,6 +241,9 @@ def _qualified_row(
         "context_hard_blocks":"",
         "context_soft_blocks":"",
         "candidate_observation":True,
+        "execution_timeframe":"M15",
+        "timeframe_alignment_passed":True,
+        "timeframe_alignment_reason":"SOURCE_EQUALS_EXECUTION",
     })
     return base
 
@@ -261,6 +274,7 @@ def summarize_model_paper(frame:pd.DataFrame|None)->dict[str,Any]:
                 "candidates":int(len(g)),
                 "blocked_context":int(g["status"].astype(str).str.upper().eq("BLOCKED_CONTEXT").sum()),
                 "blocked_data":int(g["status"].astype(str).str.upper().eq("BLOCKED_DATA").sum()),
+                "blocked_timeframe":int(g["status"].astype(str).str.upper().eq("BLOCKED_TIMEFRAME").sum()),
                 "pending":int(g["status"].astype(str).str.upper().eq("WAIT_ENTRY").sum()),
                 "open":int(g["status"].astype(str).str.upper().eq("OPEN").sum()),
                 "closed":int(len(gc)),
@@ -292,6 +306,7 @@ def summarize_model_paper(frame:pd.DataFrame|None)->dict[str,Any]:
         "candidates_total":int(len(d)),
         "blocked_context":int(d["status"].astype(str).str.upper().eq("BLOCKED_CONTEXT").sum()) if not d.empty else 0,
         "blocked_data":int(d["status"].astype(str).str.upper().eq("BLOCKED_DATA").sum()) if not d.empty else 0,
+        "blocked_timeframe":int(d["status"].astype(str).str.upper().eq("BLOCKED_TIMEFRAME").sum()) if not d.empty else 0,
         "pending_entries":int(d["status"].astype(str).str.upper().eq("WAIT_ENTRY").sum()) if not d.empty else 0,
         "open_positions":int(d["status"].astype(str).str.upper().eq("OPEN").sum()) if not d.empty else 0,
         "closed_trades":int(len(closed)),
@@ -333,6 +348,17 @@ def run_model_paper_cycle(
             row=series.copy()
             status=str(row.get("status") or "").upper()
             if status in {"WAIT_ENTRY","OPEN"}:
+                source_tf=str(row.get("source_timeframe") or "M15").strip().upper()
+                if source_tf!="M15":
+                    blocked_row=row.to_dict()
+                    blocked_row["status"]="BLOCKED_TIMEFRAME"
+                    blocked_row["execution_timeframe"]=""
+                    blocked_row["timeframe_alignment_passed"]=False
+                    blocked_row["timeframe_alignment_reason"]="EXECUTION_FRAME_NOT_AVAILABLE:"+source_tf
+                    blocked_row["checklist_note"]="Paper preservado sem execução: timeframe de origem não pode usar candles M15 como substituto."
+                    blocked_row["updated_at"]=now.isoformat()
+                    updated.append(blocked_row)
+                    continue
                 frame=_m15(scanner_by_pair.get(str(row.get("pair") or "").upper(),{}))
                 before=status
                 first=_fill_entry(row,frame,now=now)
@@ -363,9 +389,13 @@ def run_model_paper_cycle(
         scanner_pair=scanner_by_pair.get(pair,{})
         map_ctx=map_by_pair.get(pair,{})
         checklist=evaluate_pair_checklist(pair,synthetic,scanner_pair,map_ctx,now=now)
+        source_tf=str(candidate.get("source_timeframe") or "").strip().upper()
         frame=_m15(scanner_pair)
         observed+=1
-        if checklist.get("all_checks_passed"):
+        if source_tf!="M15":
+            row=_block_row(candidate,checklist,status="BLOCKED_TIMEFRAME",now=now)
+            blocked+=1
+        elif checklist.get("all_checks_passed"):
             row=_qualified_row(candidate,checklist,frame,now=now)
             if str(row.get("status") or "").upper()=="WAIT_ENTRY":
                 qualified+=1
