@@ -21,6 +21,8 @@ jobs:
     env:
       APP_URL: "https://atlasquant-private.onrender.com"
     steps:
+      - uses: actions/checkout@v7
+
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
@@ -103,7 +105,6 @@ jobs:
           import os
           import time
           from pathlib import Path
-          import re
           from playwright.sync_api import sync_playwright
           from atlasquant_build_identity import short_source_fingerprint
 
@@ -186,14 +187,12 @@ jobs:
                           current = str(marker.first.get_attribute("data-commit") or "").strip()
                       if current and current not in deploy_seen_commits:
                           deploy_seen_commits.append(current)
-                      try:
-                          wait_body = page.locator("body").inner_text(timeout=30_000)
-                      except Exception:
-                          wait_body = ""
-                      builds = re.findall(r"AQBUILD:([0-9a-fA-F]{16})", wait_body)
-                      if builds:
-                          source_build = str(builds[-1]).lower()
-                          if source_build not in deploy_seen_builds:
+                      build_marker = page.locator("#atlasquant-source-build-marker")
+                      if build_marker.count():
+                          source_build = str(
+                              build_marker.first.get_attribute("data-build") or ""
+                          ).strip().lower()
+                          if source_build and source_build not in deploy_seen_builds:
                               deploy_seen_builds.append(source_build)
                       if source_build == expected_build:
                           break
