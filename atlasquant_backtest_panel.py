@@ -213,7 +213,6 @@ def normalize_signal_sheet(df: pd.DataFrame, default_pair: str = "", default_tim
         "signal_time", "pair", "setup", "session", "timeframe", "trading_style", "side", "entry", "stop", "target", "source", "notes",
         "decision_captured_at", "macro_alignment", "technical_confirmation",
         "reading_aligned", "direction_aligned", "filters_aligned", "trigger_aligned",
-        "reading_aligned", "direction_aligned", "filters_aligned", "trigger_aligned",
         "liquidity_confirmation", "regime_fit", "regime", "known_high_impact_event",
         "data_quality_pct", "plan_followed", "event_time", "event_label", "event_impact",
         "event_known_before_entry",
@@ -226,6 +225,7 @@ def signal_template_csv() -> str:
     fields = [
         "signal_time", "pair", "setup", "session", "timeframe", "trading_style", "side", "entry", "stop", "target", "source", "notes",
         "decision_captured_at", "macro_alignment", "technical_confirmation",
+        "reading_aligned", "direction_aligned", "filters_aligned", "trigger_aligned",
         "liquidity_confirmation", "regime_fit", "regime", "known_high_impact_event",
         "data_quality_pct", "plan_followed", "event_time", "event_label", "event_impact",
         "event_known_before_entry",
