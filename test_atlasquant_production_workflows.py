@@ -34,13 +34,24 @@ class AtlasQuantProductionWorkflowContractTests(unittest.TestCase):
         self.assertIn('os.getenv("ATLASQUANT_DEPLOY_COMMIT","")',src)
         self.assertIn('os.getenv("GIT_COMMIT","")',src)
         self.assertIn('id="atlasquant-deploy-marker"',src)
+        self.assertIn('["git","rev-parse","HEAD"]',src)
+        self.assertIn('re.fullmatch(r"[0-9a-fA-F]{40}",candidate)',src)
 
     def test_browser_smoke_separates_deploy_identity_from_latency_failure(self):
         text=Path(".github/workflows/production-browser-smoke.yml").read_text(encoding="utf-8")
         self.assertIn("deploy_identity_ok",text)
         self.assertIn("deploy_commit == expected_commit",text)
-        self.assertIn("deploy_identity_ok and auth_inputs < 1 and meaningful_ms > 30000",text)
+        self.assertIn("deploy_identity_ok and auth_inputs < 1 and measured_ui_ms is not None and measured_ui_ms > 30000",text)
+        self.assertIn("measured_ui_ms_excluding_deploy_wait",text)
         self.assertIn("Do not attribute Render deployment wait",text)
+
+    def test_browser_smoke_defines_identity_before_reporting_it(self):
+        text=Path(".github/workflows/production-browser-smoke.yml").read_text(encoding="utf-8")
+        assign=text.index("deploy_identity_ok = (not expected_commit) or (deploy_commit == expected_commit)")
+        report=text.index('"deploy_identity_ok": deploy_identity_ok')
+        self.assertLess(assign,report)
+        self.assertIn("measured_ui_ms_excluding_deploy_wait",text)
+        self.assertIn("meaningful_ms) - int(deploy_wait_ms",text)
 
 
 if __name__=="__main__":
