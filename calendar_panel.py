@@ -227,9 +227,9 @@ def render_calendar(releases: dict[str, Any], fetch_dates: Callable[[Any], list[
 
         with st.expander("🎓 Como interpretar anterior, consenso e atual",expanded=False):
             st.markdown(
-                "**Anterior** = última leitura disponível antes do release.  \\n"
-                "**Consenso** = expectativa agregada antes da divulgação.  \\n"
-                "**Atual** = número publicado agora.  \\n"
+                "**Anterior** = última leitura disponível antes do release.  \n"
+                "**Consenso** = expectativa agregada antes da divulgação.  \n"
+                "**Atual** = número publicado agora.  \n"
                 "A surpresa é medida contra o consenso; revisões e componentes também importam."
             )
             event_options=list(dict.fromkeys(str(r.get("Evento","")) for r in selected if str(r.get("Evento","")).strip()))
