@@ -7,6 +7,7 @@ unrendered videos as published.
 from __future__ import annotations
 
 from typing import Any
+import json
 from atlasquant_academy import ACADEMY_TOPICS, academy_topic
 
 SCHEMA="ATLASQUANT_ACADEMY_MEDIA_V1"
@@ -61,6 +62,70 @@ def academy_video_scripts_ready()->bool:
         and all(not x.get("rendered_video") and not x.get("published_video") for x in rows)
     )
 
+def academy_media_manifest()->dict[str,Any]:
+    rows=academy_media_catalog()
+    queue=[]
+    for index,item in enumerate(rows,1):
+        if not item:
+            continue
+        queue.append({
+            "order":index,
+            "topic_id":item["topic_id"],
+            "title":item["title"],
+            "category":item["category"],
+            "level":item["level"],
+            "estimated_seconds":item["estimated_seconds"],
+            "narration":item["narration"],
+            "scenes":item["scenes"],
+            "suggested_filename":f"atlasquant_academy_{index:02d}_{item['topic_id']}.mp4",
+            "status":"SCRIPT_READY_MEDIA_PENDING",
+        })
+    return {
+        "schema":"ATLASQUANT_ACADEMY_PRODUCTION_MANIFEST_V1",
+        "items":queue,
+        "total_items":len(queue),
+        "all_scripts_ready":bool(queue and all(x["status"]=="SCRIPT_READY_MEDIA_PENDING" for x in queue)),
+        "rendered_items":0,
+        "published_items":0,
+        "external_render_required":True,
+        "automatic_publish":False,
+        "trading_side_effects":False,
+    }
+
+
+def academy_media_manifest_json()->str:
+    return json.dumps(academy_media_manifest(),ensure_ascii=False,indent=2,sort_keys=True)
+
+
+def academy_media_bundle_markdown()->str:
+    manifest=academy_media_manifest()
+    lines=[
+        "# AtlasQuant Academy — pacote de produção de vídeos",
+        "",
+        f"Total de roteiros: {manifest['total_items']}",
+        "",
+        "Status: roteiros prontos; mídia ainda não renderizada/publicada.",
+        "",
+    ]
+    for item in manifest["items"]:
+        lines.extend([
+            f"## {item['order']:02d}. {item['title']}",
+            f"- Topic ID: `{item['topic_id']}`",
+            f"- Categoria: {item['category']}",
+            f"- Nível: {item['level']}",
+            f"- Duração estimada: {item['estimated_seconds']}s",
+            f"- Arquivo sugerido: `{item['suggested_filename']}`",
+            "",
+            "### Narração",
+            item["narration"],
+            "",
+            "### Storyboard",
+        ])
+        for scene in item["scenes"]:
+            lines.append(f"{scene['order']}. **{scene['title']}** — {scene['text']}")
+        lines.extend(["","---",""])
+    return "\n".join(lines).strip()+"\n"
+
 def academy_media_readiness()->dict[str,Any]:
     rows=academy_media_catalog()
     scripts=sum(1 for x in rows if x and x.get("script_ready"))
@@ -78,4 +143,8 @@ def academy_media_readiness()->dict[str,Any]:
         "trading_side_effects":False,
     }
 
-__all__=["SCHEMA","academy_video_script","academy_media_catalog","academy_video_scripts_ready","academy_media_readiness"]
+__all__=[
+    "SCHEMA","academy_video_script","academy_media_catalog","academy_video_scripts_ready",
+    "academy_media_manifest","academy_media_manifest_json","academy_media_bundle_markdown",
+    "academy_media_readiness",
+]
