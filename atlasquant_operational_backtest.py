@@ -19,12 +19,16 @@ import math
 
 import pandas as pd
 
+from atlasquant_multitimeframe_alignment import alignment_gate
+
 
 REQUIRED_CANDLE_COLUMNS = ("datetime", "open", "high", "low", "close")
 REQUIRED_SIGNAL_FIELDS = ("signal_time", "side", "entry", "stop", "target")
 
 OPTIONAL_DIAGNOSTIC_FIELDS = (
     "trade_id",
+    "timeframe",
+    "trading_style",
     "decision_captured_at",
     "macro_alignment",
     "technical_confirmation",
@@ -34,6 +38,10 @@ OPTIONAL_DIAGNOSTIC_FIELDS = (
     "known_high_impact_event",
     "data_quality_pct",
     "plan_followed",
+    "reading_aligned",
+    "direction_aligned",
+    "filters_aligned",
+    "trigger_aligned",
     "event_time",
     "event_label",
     "event_impact",
@@ -159,6 +167,7 @@ def backtest_signal(
     cost_r: float = 0.0,
     slippage_r: float = 0.0,
     start_after_signal_bar: bool = True,
+    require_alignment: bool = False,
 ) -> dict[str, Any]:
     """Backtest one explicit plan against OHLC candles.
 
@@ -174,6 +183,8 @@ def backtest_signal(
         "session": str(signal.get("session", "")),
         "source": str(signal.get("source", "ATLASQUANT")),
         "notes": str(signal.get("notes", "")),
+        "timeframe": str(signal.get("timeframe", "") or "").strip().upper(),
+        "trading_style": str(signal.get("trading_style", "") or "").strip().upper(),
     }
     for field in OPTIONAL_DIAGNOSTIC_FIELDS:
         if field in signal and _present(signal.get(field)):
@@ -186,6 +197,23 @@ def backtest_signal(
             "reason": reason,
             "net_r": None,
         }
+
+    if require_alignment:
+        alignment=alignment_gate(
+            signal,
+            timeframe=signal.get("timeframe","M15"),
+            strict=True,
+        )
+        if not alignment["passed"]:
+            return {
+                **base,
+                **plan,
+                "status":"ALIGNMENT_BLOCKED",
+                "outcome":"NO_TRADE",
+                "reason":alignment["reason"],
+                "alignment_gate":alignment,
+                "net_r":None,
+            }
 
     cost=_finite(cost_r)
     slippage=_finite(slippage_r)
@@ -443,6 +471,13 @@ def summarize_results(records: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     gross_profit = sum(x for x in rs if x > 0)
     gross_loss = abs(sum(x for x in rs if x < 0))
     pf = None if gross_loss == 0 else gross_profit / gross_loss
+    alignment_reasons: dict[str,int] = {}
+    for item in rows:
+        if str(item.get("status","")).upper()!="ALIGNMENT_BLOCKED":
+            continue
+        reason=str(item.get("reason","") or "BLOQUEADO").strip()
+        for part in [x for x in reason.split("|") if x]:
+            alignment_reasons[part]=alignment_reasons.get(part,0)+1
     return {
         "signals": len(rows),
         "trades": len(executed),
@@ -450,6 +485,8 @@ def summarize_results(records: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
         "losses": losses,
         "breakeven": be,
         "no_trade": len(rows) - len(executed),
+        "alignment_blocked": sum(1 for x in rows if str(x.get("status","")).upper()=="ALIGNMENT_BLOCKED"),
+        "alignment_block_reasons": dict(sorted(alignment_reasons.items(),key=lambda kv:(-kv[1],kv[0]))),
         "win_rate_pct": None if not executed else round(gains / len(executed) * 100.0, 2),
         "net_r": round(sum(rs), 4),
         "average_r": None if not rs else round(sum(rs) / len(rs), 4),
@@ -487,7 +524,7 @@ def ledger_frame(records: Iterable[Mapping[str, Any]]) -> pd.DataFrame:
     if not rows:
         return pd.DataFrame()
     preferred = [
-        "signal_time", "pair", "setup", "session", "side",
+        "signal_time", "pair", "setup", "session", "timeframe", "trading_style", "side",
         "entry", "stop", "target", "entry_time", "exit_time", "exit_price",
         "status", "outcome", "gross_r", "cost_r", "slippage_r", "total_friction_r", "net_r",
         "mfe_r", "mae_r", "bars_waited", "bars_held",
