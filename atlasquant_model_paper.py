@@ -278,6 +278,16 @@ def _qualified_row(
     return base
 
 
+def _reason_counts(series:pd.Series|None)->dict[str,int]:
+    counts={}
+    if series is None:
+        return counts
+    for raw in series.fillna("").astype(str):
+        for part in [x.strip() for x in raw.split("|") if x.strip()]:
+            counts[part]=counts.get(part,0)+1
+    return dict(sorted(counts.items(),key=lambda kv:(-kv[1],kv[0])))
+
+
 def summarize_model_paper(frame:pd.DataFrame|None)->dict[str,Any]:
     d=normalize_model_paper(frame)
     if d.empty:
@@ -315,6 +325,8 @@ def summarize_model_paper(frame:pd.DataFrame|None)->dict[str,Any]:
                 "avg_r":round(float(gr.mean()) if len(gr) else 0.0,3),
                 "profit_factor_r":None if gross_loss<=0 else round(gross_profit/gross_loss,3),
                 "explicit_source_model_only":True,
+                "hard_block_reasons":_reason_counts(g.get("context_hard_blocks")),
+                "soft_block_reasons":_reason_counts(g.get("context_soft_blocks")),
             }
 
     by_timeframe={}
@@ -337,6 +349,9 @@ def summarize_model_paper(frame:pd.DataFrame|None)->dict[str,Any]:
                 "wins":wins_tf,
                 "losses":losses_tf,
                 "net_r":round(float(gr.sum()) if len(gr) else 0.0,3),
+                "hard_block_reasons":_reason_counts(g.get("context_hard_blocks")),
+                "soft_block_reasons":_reason_counts(g.get("context_soft_blocks")),
+                "timeframe_block_reasons":_reason_counts(g.get("timeframe_alignment_reason")),
             }
 
     by_session={}
@@ -371,6 +386,9 @@ def summarize_model_paper(frame:pd.DataFrame|None)->dict[str,Any]:
         "by_setup":by_setup,
         "by_timeframe":by_timeframe,
         "by_session":by_session,
+        "hard_block_reasons":_reason_counts(d.get("context_hard_blocks")) if not d.empty else {},
+        "soft_block_reasons":_reason_counts(d.get("context_soft_blocks")) if not d.empty else {},
+        "timeframe_block_reasons":_reason_counts(d.get("timeframe_alignment_reason")) if not d.empty else {},
         "setup_inference_used":False,
         "automatic_promotion":False,
         "automatic_execution":False,
