@@ -754,6 +754,20 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
                 "label":"⚪ INSTITUCIONAL INDISPONÍVEL",
                 "error":f"{type(_inst_exc).__name__}: {_inst_exc}",
             }
+
+        # Re-freeze model attribution after the institutional snapshot exists.
+        # This adds BOS/CHOCH + Order Block only when BOTH structure and the
+        # explicit validated OB belong to the macro side. It does not create a
+        # Paper trade here; the Model Paper still applies the global checklist.
+        _ict_final=dict(_tec.get("ict",{}) or {})
+        _ict_final["setup_candidates"]=build_setup_candidates(
+            pair=_pair,
+            side=_side,
+            ict_snapshot=_ict_final,
+            institutional_snapshot=_tec.get("institutional",{}),
+            captured_at=now.isoformat(),
+        )
+        _tec["ict"]=_ict_final
         _old["tecnico"] = _tec
         results[_pair] = _old
 
