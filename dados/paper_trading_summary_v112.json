@@ -16,7 +16,7 @@
   "setup_attribution_inferred": false,
   "last_cycle": {
     "version": "V11.2_PAPER_TRADING",
-    "ran_at": "2026-09-21T09:31:26.847338+00:00",
+    "ran_at": "2026-09-21T09:41:24.470195+00:00",
     "pending_created": 0,
     "entries_opened": 0,
     "trades_closed": 0,
@@ -36,23 +36,11 @@
       "USD/CAD": {
         "side": "BUY",
         "passed": false,
-        "state": "🟠 SETUP EM FORMAÇÃO",
+        "state": "⚪ EM OBSERVAÇÃO",
         "hard_blocks": [],
         "soft_blocks": [
           "ICT incompleto (40/100)",
           "Fluxo institucional incompleto (54/100)"
-        ]
-      },
-      "USD/JPY": {
-        "side": "BUY",
-        "passed": false,
-        "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
-        "hard_blocks": [],
-        "soft_blocks": [
-          "Gate ainda não liberou execução",
-          "ICT incompleto (40/100)",
-          "Fluxo institucional incompleto (55/100)",
-          "M15 ainda não confirmou gatilho"
         ]
       },
       "NZD/USD": {
@@ -69,6 +57,18 @@
           "M15 ainda não confirmou gatilho"
         ]
       },
+      "USD/JPY": {
+        "side": "BUY",
+        "passed": false,
+        "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
+        "hard_blocks": [],
+        "soft_blocks": [
+          "Gate ainda não liberou execução",
+          "ICT incompleto (40/100)",
+          "Fluxo institucional incompleto (55/100)",
+          "M15 ainda não confirmou gatilho"
+        ]
+      },
       "EUR/USD": {
         "side": "SELL",
         "passed": false,
@@ -77,7 +77,6 @@
         "soft_blocks": [
           "Gate ainda não liberou execução",
           "ICT incompleto (33/100)",
-          "Fluxo institucional incompleto (65/100)",
           "M15 ainda não confirmou gatilho"
         ]
       },
@@ -93,14 +92,14 @@
         ]
       },
       "GBP/USD": {
-        "side": "SELL",
+        "side": "WAIT",
         "passed": false,
-        "state": "⚪ EM OBSERVAÇÃO",
+        "state": "⚪ AGUARDAR DIREÇÃO",
         "hard_blocks": [],
         "soft_blocks": [
           "Gate ainda não liberou execução",
-          "ICT incompleto (42/100)",
-          "Fluxo institucional incompleto (50/100)",
+          "ICT incompleto (0/100)",
+          "Fluxo institucional incompleto (0/100)",
           "M15 ainda não confirmou gatilho"
         ]
       }
