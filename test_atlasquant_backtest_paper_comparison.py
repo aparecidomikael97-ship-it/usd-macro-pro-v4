@@ -92,5 +92,41 @@ class BacktestPaperComparisonTests(unittest.TestCase):
         self.assertTrue(all(not row["real_orders_enabled"] for row in rows))
 
 
+    def test_small_samples_never_trigger_automatic_changes_or_real_orders(self):
+        for backtest_samples, paper_samples in ((1,1),(2,1),(5,3),(10,5)):
+            with self.subTest(backtest_samples=backtest_samples,paper_samples=paper_samples):
+                result=compare_backtest_paper({
+                    "backtest_samples":backtest_samples,
+                    "forward_samples":paper_samples,
+                    "expectancy_r":9.0,
+                    "forward_expectancy_r":12.0,
+                    "profit_factor":99.0,
+                    "forward_profit_factor":99.0,
+                    "forward_win_rate_pct":100.0,
+                })
+                self.assertTrue(result["descriptive_only"])
+                self.assertTrue(result["manual_review_required"])
+                self.assertFalse(result["automatic_strategy_change"])
+                self.assertFalse(result["automatic_weight_change"])
+                self.assertFalse(result["real_orders_enabled"])
+
+    def test_extreme_positive_metrics_do_not_override_safety_contract(self):
+        result=compare_backtest_paper({
+            "backtest_samples":100000,
+            "forward_samples":100000,
+            "expectancy_r":1000.0,
+            "forward_expectancy_r":1000.0,
+            "profit_factor":1000.0,
+            "forward_profit_factor":1000.0,
+            "forward_win_rate_pct":100.0,
+        })
+        self.assertTrue(result["comparable"])
+        self.assertTrue(result["descriptive_only"])
+        self.assertTrue(result["manual_review_required"])
+        self.assertFalse(result["automatic_strategy_change"])
+        self.assertFalse(result["automatic_weight_change"])
+        self.assertFalse(result["real_orders_enabled"])
+
+
 if __name__ == "__main__":
     unittest.main()
