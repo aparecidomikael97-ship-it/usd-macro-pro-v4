@@ -222,6 +222,41 @@ def evaluate_pair_checklist(
         data_readiness_score=data_score,
         execution_timeframe=execution_tf,
     )
+
+    # Higher-timeframe reading is part of the execution contract, not a bonus.
+    # H1 entries use H4 as technical context/trigger chain and require D1 bias
+    # to agree with the macro side. Missing/neutral/opposite D1 fails closed.
+    d1_ctx=dict((map_ctx or {}).get("d1",{}) or {})
+    w1_ctx=dict((map_ctx or {}).get("w1",{}) or {})
+    d1_bias=str(d1_ctx.get("bias","") or "").strip().upper()
+    w1_bias=str(w1_ctx.get("bias","") or "").strip().upper()
+    expected_bias="ALTISTA" if side=="BUY" else "BAIXISTA" if side=="SELL" else ""
+    higher_context_required=[]
+    higher_context_aligned=True
+    higher_context_reason="NOT_REQUIRED"
+    if execution_tf=="H1":
+        higher_context_required=["H4","D1"]
+        higher_context_aligned=bool(expected_bias and d1_bias==expected_bias)
+        higher_context_reason=(
+            "H4_D1_ALIGNED"
+            if higher_context_aligned
+            else ("D1_CONTEXT_MISSING" if not d1_bias else f"D1_{d1_bias}_VS_{expected_bias or 'SEM_DIRECAO'}")
+        )
+        if not higher_context_aligned:
+            decision=dict(decision or {})
+            hard=list(decision.get("hard_blocks",[]) or [])
+            message=(
+                "Contexto D1 ausente para execução H1"
+                if not d1_bias
+                else f"Contexto D1 não alinha com execução H1 ({d1_bias} vs {expected_bias or 'SEM DIREÇÃO'})"
+            )
+            if message not in hard:
+                hard.append(message)
+            decision["hard_blocks"]=hard
+            decision["executable"]=False
+            decision["state"]="🔴 BLOQUEADO"
+            decision["next_action"]="Aguardar D1 alinhar com a direção antes de considerar o gatilho H1."
+
     all_clear = bool(
         data_sufficient
         and decision.get("executable")
@@ -248,6 +283,14 @@ def evaluate_pair_checklist(
         "pair": pair,
         "side": side,
         "execution_timeframe": execution_tf,
+        "higher_timeframe_context":{
+            "required":higher_context_required,
+            "expected_bias":expected_bias,
+            "d1_bias":d1_bias,
+            "w1_bias":w1_bias,
+            "aligned":bool(higher_context_aligned),
+            "reason":higher_context_reason,
+        },
         "direction": direction,
         "setup_id":setup_id,
         "setup_attribution":"EXPLICIT_INPUT" if setup_id else "UNATTRIBUTED",
