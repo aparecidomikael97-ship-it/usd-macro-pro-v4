@@ -8,11 +8,16 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
+import base64
+from io import BytesIO
 
 import pandas as pd
+import requests
 import streamlit as st
 
 from atlasquant_news_nowcast import HistoricalRelease, validate_historical_release
+from atlasquant_live_nowcast import normalize_live_ledger, summarize_live_nowcasts
+from atlasquant_runtime_store import require_runtime_branch
 from atlasquant_news_backtest import (
     monthly_news_scores,
     simple_month_score,
@@ -20,6 +25,7 @@ from atlasquant_news_backtest import (
 )
 
 SCHEMA="ATLASQUANT_NEWS_RESEARCH_PANEL_V1"
+LIVE_NOWCAST_PATH="dados/news_nowcast_predictions_v1.csv"
 
 NEWS_HISTORY_COLUMNS=(
     "indicator",
@@ -31,6 +37,94 @@ NEWS_HISTORY_COLUMNS=(
     "tolerance",
     "unit",
 )
+
+
+@st.cache_data(ttl=300,show_spinner=False)
+def load_live_nowcast_runtime(
+    *,
+    repo:str,
+    branch:str,
+    token:str,
+    max_rows:int=5000,
+)->tuple[pd.DataFrame,dict[str,Any]]:
+    try:
+        safe=require_runtime_branch(branch)
+    except Exception as exc:
+        return pd.DataFrame(),{
+            "ok":False,"reason":"UNSAFE_BRANCH","rows":0,"error":str(exc),
+        }
+    repo=str(repo or "").strip()
+    token=str(token or "").strip()
+    if not repo or not token:
+        return pd.DataFrame(),{
+            "ok":False,"reason":"NOT_CONFIGURED","rows":0,
+            "branch":safe,"error":"",
+        }
+    try:
+        response=requests.get(
+            f"https://api.github.com/repos/{repo}/contents/{LIVE_NOWCAST_PATH}",
+            headers={
+                "Authorization":f"Bearer {token}",
+                "Accept":"application/vnd.github+json",
+                "X-GitHub-Api-Version":"2022-11-28",
+            },
+            params={"ref":safe},
+            timeout=15,
+        )
+        if response.status_code==404:
+            return pd.DataFrame(),{
+                "ok":True,"reason":"NOT_FOUND","rows":0,
+                "branch":safe,"path":LIVE_NOWCAST_PATH,"error":"",
+            }
+        response.raise_for_status()
+        payload=response.json()
+        raw=base64.b64decode(payload.get("content",""))
+        frame=pd.read_csv(BytesIO(raw)) if raw else pd.DataFrame()
+        if len(frame)>max(1,int(max_rows)):
+            frame=frame.tail(max(1,int(max_rows))).reset_index(drop=True)
+        frame=normalize_live_ledger(frame)
+        return frame,{
+            "ok":True,"reason":"LOADED","rows":int(len(frame)),
+            "branch":safe,"path":LIVE_NOWCAST_PATH,"error":"",
+        }
+    except Exception as exc:
+        return pd.DataFrame(),{
+            "ok":False,"reason":"IO_ERROR","rows":0,
+            "branch":safe,"path":LIVE_NOWCAST_PATH,
+            "error":f"{type(exc).__name__}: {exc}",
+        }
+
+
+def live_nowcast_table(frame:pd.DataFrame|None)->pd.DataFrame:
+    d=normalize_live_ledger(frame)
+    if d.empty:
+        return pd.DataFrame(columns=[
+            "Indicador","Evento","Release","Capturado","Consenso",
+            "Score antecedentes","Sinais","Estado","Estimativa",
+            "P abaixo","P em linha","P acima","Fechado","Real","Classe",
+        ])
+    d["_captured"]=pd.to_datetime(d["captured_at"],utc=True,errors="coerce")
+    d=d.sort_values("_captured").groupby("event_id",as_index=False).tail(1)
+    rows=[]
+    for _,row in d.sort_values("scheduled_at").iterrows():
+        rows.append({
+            "Indicador":row.get("indicator"),
+            "Evento":row.get("event_name"),
+            "Release":row.get("scheduled_raw_date") or row.get("scheduled_at"),
+            "Capturado":row.get("captured_at"),
+            "Consenso":row.get("consensus"),
+            "Score antecedentes":row.get("signal_score"),
+            "Sinais":row.get("signal_count"),
+            "Estado":row.get("nowcast_state"),
+            "Estimativa":row.get("estimate"),
+            "P abaixo":row.get("p_below"),
+            "P em linha":row.get("p_inline"),
+            "P acima":row.get("p_above"),
+            "Fechado":row.get("closed"),
+            "Real":row.get("actual"),
+            "Classe":row.get("surprise_class"),
+        })
+    return pd.DataFrame(rows)
 
 
 def news_history_template_csv()->str:
@@ -139,7 +233,12 @@ def build_news_research_report(
     }
 
 
-def render_news_research_lab()->dict[str,Any]:
+def render_news_research_lab(
+    *,
+    repo:str="",
+    branch:str="",
+    token:str="",
+)->dict[str,Any]:
     st.markdown("### 📰 Laboratório Pré-Notícia / Nowcast")
     st.caption(
         "Valida se a estimativa ABOVE / INLINE / BELOW do dado econômico funcionaria "
@@ -149,6 +248,32 @@ def render_news_research_lab()->dict[str,Any]:
         "Acertar o dado não significa acertar o candle. Reação do mercado, revisões, "
         "Fed e precificação serão avaliados em uma camada separada."
     )
+
+    runtime_frame,runtime_status=load_live_nowcast_runtime(
+        repo=repo,branch=branch,token=token,
+    )
+    if runtime_status.get("reason")=="LOADED":
+        live_summary=summarize_live_nowcasts(runtime_frame)
+        a,b,c1,d=st.columns(4)
+        a.metric("Snapshots Live",live_summary.get("snapshots",0))
+        b.metric("Releases acompanhados",live_summary.get("events",0))
+        c1.metric("Releases fechados",live_summary.get("closed_events",0))
+        d.metric("Com distribuição empírica",live_summary.get("with_empirical_distribution",0))
+        live_table=live_nowcast_table(runtime_frame)
+        if not live_table.empty:
+            st.markdown("#### Captura prospectiva automática")
+            st.dataframe(live_table,width="stretch",hide_index=True)
+        st.caption(
+            "Live Nowcast é coleta prospectiva. Pesos antecedentes continuam não calibrados "
+            "e nenhuma leitura altera o Radar ou envia ordem automaticamente."
+        )
+    elif runtime_status.get("reason")=="NOT_FOUND":
+        st.info("Live Nowcast ainda não acumulou snapshots na branch runtime.")
+    elif runtime_status.get("reason") not in {"NOT_CONFIGURED",None}:
+        st.caption(
+            "Live Nowcast Runtime indisponível nesta tela: "
+            +str(runtime_status.get("reason"))
+        )
 
     st.download_button(
         "⬇️ Modelo de histórico pré-notícia",
@@ -270,5 +395,6 @@ def render_news_research_lab()->dict[str,Any]:
 __all__=[
     "SCHEMA","NEWS_HISTORY_COLUMNS","news_history_template_csv",
     "normalize_news_history_csv","build_news_research_report",
+    "load_live_nowcast_runtime","live_nowcast_table",
     "render_news_research_lab",
 ]
