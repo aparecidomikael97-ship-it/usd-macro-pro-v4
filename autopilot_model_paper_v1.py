@@ -12,7 +12,7 @@ from typing import Any
 import pandas as pd
 
 import autopilot_v107 as base
-from atlasquant_model_paper import run_model_paper_cycle, summarize_model_paper
+from atlasquant_model_paper import MODEL_PAPER_EXECUTION_PROFILES, run_model_paper_cycle, summarize_model_paper
 from paper_friction_v116 import apply_paper_friction, summarize_net
 
 MODEL_PAPER_CSV_PATH="dados/model_paper_trades_v1.csv"
@@ -64,6 +64,12 @@ def _model_paper_cycle()->tuple[bool,dict[str,Any],list[str]]:
     summary["gross_r_before_friction"]=friction.get("gross_r",0.0)
     summary["friction_r"]=friction.get("friction_r",0.0)
     summary["net_r_after_friction"]=friction.get("net_r",0.0)
+    supported_timeframes=list(MODEL_PAPER_EXECUTION_PROFILES.keys())
+    summary["execution_contract"]={
+        "supported_timeframes":supported_timeframes,
+        "exact_execution_frame_required":True,
+        "lower_timeframe_substitution":False,
+    }
     summary["safety"]={
         "real_orders":False,
         "broker_connection":False,
@@ -72,6 +78,9 @@ def _model_paper_cycle()->tuple[bool,dict[str,Any],list[str]]:
         "setup_inference_from_outcome":False,
         "auto_strategy_selection":False,
         "auto_promotion":False,
+        "supported_execution_timeframes":supported_timeframes,
+        "exact_execution_frame_required":True,
+        "lower_timeframe_substitution":False,
     }
 
     ok2,err2=base.gh_put_json(
@@ -87,6 +96,9 @@ def _model_paper_cycle()->tuple[bool,dict[str,Any],list[str]]:
     status["model_paper_v1"]={
         "enabled":True,
         "real_orders":False,
+        "supported_execution_timeframes":list(MODEL_PAPER_EXECUTION_PROFILES.keys()),
+        "exact_execution_frame_required":True,
+        "lower_timeframe_substitution":False,
         "candidates_total":summary.get("candidates_total",0),
         "blocked_context":summary.get("blocked_context",0),
         "blocked_data":summary.get("blocked_data",0),
