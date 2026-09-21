@@ -13,7 +13,7 @@ SCHEMA="ATLASQUANT_INDICATOR_SCENARIOS_V1"
 
 FIELD_GUIDE={
     "Anterior":"Última leitura publicada disponível antes do novo release. Pode ter revisão posterior.",
-    "Consenso":"Estimativa agregada do mercado/analistas antes da divulgação. É a referência principal para medir surpresa.",
+    "Consenso":"Expectativa/estimativa agregada do mercado e analistas antes da divulgação. É a referência principal para medir surpresa.",
     "Atual":"Número divulgado no novo release. Deve ser lido junto de revisões, componentes e contexto.",
 }
 
