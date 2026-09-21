@@ -102,5 +102,74 @@ class AtlasQuantPerformanceLabTests(unittest.TestCase):
                 self.assertTrue(grouped_metrics(self.frame(),"24h","par",min_group_samples=bad).empty)
 
 
+    def test_invalid_score_or_quality_is_unclassified_and_excluded(self):
+        df=self.frame()
+        df.loc[0,"score_mestre"]=float("inf")
+        df.loc[1,"qualidade"]="bad"
+        out=prepare_performance_history(df,"24h")
+
+        self.assertFalse(bool(out.loc[0,"classification_valid"]))
+        self.assertEqual(out.loc[0,"evidence_status"],"INVALID_SCORE")
+        self.assertEqual(out.loc[0,"Faixa Score"],"Sem score válido")
+
+        self.assertFalse(bool(out.loc[1,"classification_valid"]))
+        self.assertEqual(out.loc[1,"evidence_status"],"INVALID_QUALITY")
+        self.assertEqual(out.loc[1,"Faixa Qualidade"],"Sem qualidade válida")
+
+        m=overall_metrics(df,"24h")
+        self.assertEqual(m["completed_samples"],4)
+        self.assertEqual(m["samples"],2)
+        self.assertEqual(m["invalid_evidence_samples"],2)
+
+        g=grouped_metrics(df,"24h","par",min_group_samples=1)
+        self.assertEqual(int(g["Amostra"].sum()),2)
+
+        r=performance_readiness(df,"24h",min_total_samples=2,min_group_samples=1)
+        self.assertEqual(r["status"],"EVIDENCE_INVALID")
+        self.assertEqual(r["total_samples"],2)
+        self.assertEqual(r["completed_samples"],4)
+        self.assertEqual(r["invalid_evidence_samples"],2)
+        self.assertFalse(r["evidence_integrity_ok"])
+        self.assertFalse(r["auto_model_change_allowed"])
+
+    def test_out_of_range_score_and_quality_fail_closed(self):
+        df=self.frame()
+        df.loc[0,"score_mestre"]=-0.01
+        df.loc[1,"score_mestre"]=100.01
+        df.loc[2,"qualidade"]="-1%"
+        df.loc[3,"qualidade"]="101%"
+
+        out=prepare_performance_history(df,"24h")
+        self.assertFalse(out["classification_valid"].any())
+
+        m=overall_metrics(df,"24h")
+        self.assertEqual(m["samples"],0)
+        self.assertEqual(m["completed_samples"],4)
+        self.assertEqual(m["invalid_evidence_samples"],4)
+        self.assertIsNone(m["hit_rate_pct"])
+
+        r=performance_readiness(df,"24h",min_total_samples=1,min_group_samples=1)
+        self.assertEqual(r["status"],"EVIDENCE_INVALID")
+        self.assertEqual(r["total_samples"],0)
+        self.assertEqual(r["invalid_evidence_samples"],4)
+
+    def test_invalid_evidence_cannot_satisfy_minimum_sample(self):
+        rows=[]
+        for i in range(100):
+            rows.append({
+                "registrado_em":"2026-01-01T00:00:00Z",
+                "par":"EUR/USD",
+                "direcao":"BUY",
+                "score_mestre":80 if i == 0 else None,
+                "qualidade":"80%",
+                "retorno_24h_pct":1.0,
+            })
+        r=performance_readiness(pd.DataFrame(rows),"24h",min_total_samples=100,min_group_samples=30)
+        self.assertEqual(r["total_samples"],1)
+        self.assertEqual(r["completed_samples"],100)
+        self.assertEqual(r["invalid_evidence_samples"],99)
+        self.assertEqual(r["status"],"EVIDENCE_INVALID")
+        self.assertFalse(r["auto_model_change_allowed"])
+
 if __name__=="__main__":
     unittest.main()
