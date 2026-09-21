@@ -2,30 +2,28 @@
   "twelve_budget": {
     "version": 1,
     "day": "2026-09-21",
-    "used": 28,
+    "used": 31,
     "hours": {
       "00": 14,
-      "01": 14
+      "01": 14,
+      "02": 3
     },
     "recent": [
-      1789955210.000639,
-      1789955211.396839,
-      1789955212.795122,
-      1789955214.23074,
-      1789955215.92156,
-      1789955270.972598
+      1789957873.49515,
+      1789957875.013893,
+      1789957876.412019
     ],
     "migration_done": true,
-    "last_reserved_at": "2026-09-21T01:47:50.972598+00:00",
+    "last_reserved_at": "2026-09-21T02:31:16.412019+00:00",
     "limit": 480,
-    "remaining": 452,
+    "remaining": 449,
     "reset_at": "2026-09-22T00:00:00+00:00",
     "pace_ceiling": 68
   },
   "twelve_cache_hits": 0,
   "twelve_retry_after": "",
   "version": "V11.0.8_BUDGET_AUTOPILOT",
-  "last_run": "2026-09-21T02:21:25.911449+00:00",
+  "last_run": "2026-09-21T02:31:37.114799+00:00",
   "app_headless_ok": true,
   "app_headless_message": "App headless executado; 8 secret(s) injetado(s) no AppTest.",
   "matrix_generated_at": "2026-09-20T09:19:55.817105+00:00",
@@ -33,7 +31,7 @@
   "market_map_fresh": 7,
   "scanner_ready": true,
   "market_map_ready": true,
-  "operational_readiness": "DEGRADED",
+  "operational_readiness": "READY",
   "news_updated_at": "2026-09-21T02:21:19.960485+00:00",
   "news_unique_stories": 215,
   "validation_rows": 56,
@@ -45,21 +43,21 @@
     "validated_horizons": 0,
     "migrated": 0
   },
-  "twelve_calls_this_run": 0,
-  "twelve_calls_requested_internal": 0,
+  "twelve_calls_this_run": 3,
+  "twelve_calls_requested_internal": 3,
   "twelve_rate_safe": true,
   "twelve_api_budget_limit": 480,
-  "twelve_daily_blocked": true,
-  "twelve_block_type": "CONTROLE_INDISPONIVEL",
-  "twelve_daily_block_reason": "Orçamento persistido indisponível; nenhuma consulta liberada.",
+  "twelve_daily_blocked": false,
+  "twelve_block_type": "",
+  "twelve_daily_block_reason": "",
   "twelve_safe_calls_per_window": 6,
   "twelve_safe_window_seconds": 62.0,
   "forex_market_open": true,
   "errors": [],
-  "healthy": false,
+  "healthy": true,
   "twelve_quota_saver_v111": {
     "enabled": true,
-    "m15_source_pairs_this_run": 0,
+    "m15_source_pairs_this_run": 3,
     "derived_timeframes": [
       "1h",
       "4h"
@@ -81,16 +79,16 @@
     "packs": 7,
     "shadow": {
       "ok": true,
-      "added": 0,
-      "samples": 64,
-      "reason": "ALREADY_PRESENT",
+      "added": 3,
+      "samples": 67,
+      "reason": "SAVED",
       "error": ""
     },
     "flight_recorder": {
       "ok": true,
-      "added": 0,
-      "records": 838,
-      "reason": "ALREADY_PRESENT",
+      "added": 3,
+      "records": 841,
+      "reason": "SAVED",
       "error": ""
     },
     "real_orders": false,
@@ -98,17 +96,17 @@
     "automatic_promotion": false
   },
   "quota_shadow": {
-    "samples": 121,
-    "raw_samples": 121,
+    "samples": 122,
+    "raw_samples": 122,
     "invalid_timestamp_rows": 0,
     "evidence_integrity_ok": true,
-    "market_open_runs": 16,
+    "market_open_runs": 17,
     "min_market_runs": 20,
     "minimum_met": false,
     "provider_blocked_runs": 6,
-    "provider_block_rate_pct": 37.5,
+    "provider_block_rate_pct": 35.29,
     "headless_failed_runs": 0,
-    "avg_actual_http_calls_per_market_run": 3.69,
+    "avg_actual_http_calls_per_market_run": 3.65,
     "max_actual_http_calls_per_market_run": 14,
     "adaptive_plan_fit_all_samples": true,
     "eligible_for_manual_review": false,
@@ -118,237 +116,5 @@
     "sample_added": true,
     "persisted": true,
     "error": ""
-  },
-  "paper_trading_v112": {
-    "enabled": true,
-    "real_orders": false,
-    "trades_total": 0,
-    "pending_entries": 0,
-    "open_positions": 0,
-    "closed_trades": 0,
-    "wins": 0,
-    "losses": 0,
-    "breakeven": 0,
-    "win_rate_pct": 0.0,
-    "net_r": 0.0,
-    "gross_r_before_friction": 0.0,
-    "friction_r": 0.0,
-    "net_r_after_friction": 0.0,
-    "friction_version": "V11.6_PAPER_FRICTION",
-    "avg_r": 0.0,
-    "profit_factor_r": null,
-    "profit_factor_net_r": null,
-    "last_cycle": {
-      "version": "V11.2_PAPER_TRADING",
-      "ran_at": "2026-09-21T02:21:29.680053+00:00",
-      "pending_created": 0,
-      "entries_opened": 0,
-      "trades_closed": 0,
-      "closed_pairs_this_cycle": [],
-      "checklists": {
-        "USD/CHF": {
-          "side": "BUY",
-          "passed": false,
-          "state": "🔴 BLOQUEADO",
-          "hard_blocks": [
-            "H1 está contra o viés"
-          ],
-          "soft_blocks": [
-            "ICT incompleto (33/100)",
-            "Fluxo institucional incompleto (59/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "USD/CAD": {
-          "side": "BUY",
-          "passed": false,
-          "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
-          "hard_blocks": [],
-          "soft_blocks": [
-            "ICT incompleto (40/100)",
-            "Fluxo institucional incompleto (67/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "USD/JPY": {
-          "side": "BUY",
-          "passed": false,
-          "state": "⚪ EM OBSERVAÇÃO",
-          "hard_blocks": [],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ICT incompleto (42/100)",
-            "Fluxo institucional incompleto (52/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "NZD/USD": {
-          "side": "SELL",
-          "passed": false,
-          "state": "🔴 BLOQUEADO",
-          "hard_blocks": [
-            "ADR14 muito esticado (172%)"
-          ],
-          "soft_blocks": [
-            "ADR14 em 172%: evitar perseguir preço",
-            "ICT incompleto (31/100)",
-            "Fluxo institucional incompleto (55/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "EUR/USD": {
-          "side": "SELL",
-          "passed": false,
-          "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
-          "hard_blocks": [],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ICT incompleto (42/100)",
-            "Fluxo institucional incompleto (59/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "AUD/USD": {
-          "side": "WAIT",
-          "passed": false,
-          "state": "⚪ AGUARDAR DIREÇÃO",
-          "hard_blocks": [],
-          "soft_blocks": [
-            "ICT incompleto (0/100)",
-            "Fluxo institucional incompleto (0/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        },
-        "GBP/USD": {
-          "side": "SELL",
-          "passed": false,
-          "state": "⚪ EM OBSERVAÇÃO",
-          "hard_blocks": [],
-          "soft_blocks": [
-            "Gate ainda não liberou execução",
-            "ICT incompleto (24/100)",
-            "Fluxo institucional incompleto (62/100)",
-            "M15 ainda não confirmou gatilho"
-          ]
-        }
-      },
-      "trades_total": 0,
-      "pending_entries": 0,
-      "open_positions": 0,
-      "closed_trades": 0,
-      "wins": 0,
-      "losses": 0,
-      "breakeven": 0,
-      "win_rate_pct": 0.0,
-      "net_r": 0.0,
-      "avg_r": 0.0,
-      "profit_factor_r": null
-    },
-    "errors": []
-  },
-  "model_paper_v1": {
-    "enabled": true,
-    "real_orders": false,
-    "candidates_total": 2,
-    "blocked_context": 2,
-    "blocked_data": 0,
-    "pending_entries": 0,
-    "open_positions": 0,
-    "closed_trades": 0,
-    "wins": 0,
-    "losses": 0,
-    "win_rate_pct": 0.0,
-    "net_r": 0.0,
-    "net_r_after_friction": 0.0,
-    "by_setup": {
-      "crt": {
-        "candidates": 2,
-        "blocked_context": 2,
-        "blocked_data": 0,
-        "pending": 0,
-        "open": 0,
-        "closed": 0,
-        "wins": 0,
-        "losses": 0,
-        "win_rate_pct": 0.0,
-        "net_r": 0.0,
-        "avg_r": 0.0,
-        "profit_factor_r": null,
-        "explicit_source_model_only": true
-      }
-    },
-    "by_session": {},
-    "last_cycle": {
-      "version": "ATLASQUANT_MODEL_PAPER_V1",
-      "ran_at": "2026-09-21T02:21:34.306727+00:00",
-      "new_candidates_observed": 0,
-      "new_qualified": 0,
-      "new_blocked": 0,
-      "entries_opened": 0,
-      "trades_closed": 0,
-      "candidates_total": 2,
-      "blocked_context": 2,
-      "blocked_data": 0,
-      "pending_entries": 0,
-      "open_positions": 0,
-      "closed_trades": 0,
-      "wins": 0,
-      "losses": 0,
-      "breakeven": 0,
-      "win_rate_pct": 0.0,
-      "net_r": 0.0,
-      "avg_r": 0.0,
-      "by_setup": {
-        "crt": {
-          "candidates": 2,
-          "blocked_context": 2,
-          "blocked_data": 0,
-          "pending": 0,
-          "open": 0,
-          "closed": 0,
-          "wins": 0,
-          "losses": 0,
-          "win_rate_pct": 0.0,
-          "net_r": 0.0,
-          "avg_r": 0.0,
-          "profit_factor_r": null,
-          "explicit_source_model_only": true
-        }
-      },
-      "by_session": {},
-      "setup_inference_used": false,
-      "automatic_promotion": false,
-      "automatic_execution": false,
-      "real_orders_enabled": false
-    },
-    "errors": []
-  },
-  "setup_audit_v114": {
-    "enabled": true,
-    "audited_trades": 0,
-    "closed_trades": 0,
-    "component_state_rows": 0,
-    "sample_state": "AGUARDANDO AMOSTRA",
-    "real_orders": false,
-    "broker_connection": false,
-    "errors": []
-  },
-  "news_nowcast_v1": {
-    "enabled": true,
-    "runtime_state": "PROVIDER_ERROR",
-    "snapshots": 0,
-    "events": 0,
-    "closed_events": 0,
-    "with_signals": 0,
-    "with_empirical_distribution": 0,
-    "by_indicator": {},
-    "real_orders": false,
-    "trading_news_enabled": false,
-    "market_reaction_predicted": false,
-    "automatic_weight_change": false,
-    "lookahead_used": false,
-    "errors": [
-      "HTTPError: 401 Client Error: Unauthorized for url: https://eodhd.com/api/economic-events?api_token=6aa5832ada5af784962083&from=2026-05-24&to=2026-10-05&country=US&limit=1000&offset=0&fmt=json"
-    ]
   }
 }
