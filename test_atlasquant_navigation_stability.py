@@ -59,9 +59,13 @@ class AtlasQuantNavigationStabilityTests(unittest.TestCase):
     def test_radar_and_master_matrix_do_not_depend_on_opening_pair_tab_first(self):
         src=APP.read_text(encoding="utf-8")
         builder=src.index("def _build_pair_matrix_for_surfaces_v111")
+        init=src.index("matriz_v61=_build_pair_matrix_for_surfaces_v111()",builder)
+        market=src.index("# ABA 9 — V10.2 PROFESSIONAL MACRO MARKET MAP")
         master=src.index("# ABA 1 — V10.2.2 PAINEL MESTRE")
         pair_tab=src.index("if _aq_active_index == 4:")
         self.assertGreaterEqual(builder,0)
+        self.assertLess(builder,market)
+        self.assertLess(init,market)
         self.assertLess(builder,master)
         self.assertGreater(pair_tab,-1)
         self.assertIn('matriz_v61=_build_pair_matrix_for_surfaces_v111()',src)
@@ -84,6 +88,14 @@ class AtlasQuantNavigationStabilityTests(unittest.TestCase):
         self.assertIn('_conf["score_confluencia"]',helper)
         self.assertIn('_conf["qualidade_confluencia"]',helper)
         self.assertNotIn("50.0+abs(_dif)*1.25",helper)
+
+    def test_market_map_matrix_exists_before_first_consumer(self):
+        src=APP.read_text(encoding="utf-8")
+        init=src.index("matriz_v61=_build_pair_matrix_for_surfaces_v111()")
+        market=src.index("if _aq_active_index == 9:")
+        render=src.index("render_market_map(matriz_v61",market)
+        self.assertLess(init,market)
+        self.assertLess(init,render)
 
 
 if __name__=="__main__":
