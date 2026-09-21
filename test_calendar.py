@@ -1,5 +1,7 @@
 from datetime import date, datetime, timedelta, timezone
+import base64
 import unittest
+from unittest.mock import Mock, patch
 
 from calendar_core import eod_row, parse_fomc, upcoming, value_text
 from atlasquant_news_nowcast import (
@@ -20,6 +22,8 @@ from atlasquant_news_research_panel import (
     build_news_research_report,
     news_history_template_csv,
     normalize_news_history_csv,
+    load_live_nowcast_runtime,
+    live_nowcast_table,
 )
 from atlasquant_indicator_scenarios import (
     FIELD_GUIDE,
@@ -203,6 +207,23 @@ class AtlasQuantLiveAntecedentTests(unittest.TestCase):
         self.assertEqual(keys.count("CORE_PPI"),1)
         ids=[x["event_id"] for x in out["provenance"]]
         self.assertEqual(len(ids),len(set(ids)))
+
+    def test_same_day_target_requires_explicit_timezone(self):
+        capture=datetime(2026,10,2,12,0,tzinfo=timezone.utc)
+        explicit=normalize_economic_events([
+            self._event(
+                "Nonfarm Payrolls","2026-10-02T13:30:00Z",
+                actual=None,estimate=150,previous=140,
+            )
+        ])
+        naive=normalize_economic_events([
+            self._event(
+                "Nonfarm Payrolls","2026-10-02 13:30:00",
+                actual=None,estimate=150,previous=140,
+            )
+        ])
+        self.assertEqual(len(upcoming_targets(explicit,captured_at=capture,horizon_days=7)),1)
+        self.assertEqual(len(upcoming_targets(naive,captured_at=capture,horizon_days=7)),0)
 
     def test_upcoming_targets_require_consensus_and_no_actual(self):
         capture=datetime(2026,10,1,12,0,tzinfo=timezone.utc)
@@ -458,6 +479,56 @@ class AtlasQuantNewsResearchPanelTests(unittest.TestCase):
         self.assertEqual(out["accepted"],1)
         self.assertEqual(out["rejected"],1)
         self.assertIn("captured_at histórico deve ser anterior",out["errors"][0])
+
+    def test_live_runtime_loader_reads_runtime_csv_and_latest_table_deduplicates_event(self):
+        import pandas as pd
+        raw=pd.DataFrame([
+            {
+                "forecast_id":"f1","event_id":"e1","indicator":"PAYROLL",
+                "event_name":"Nonfarm Payrolls","scheduled_at":"2026-10-02T12:30:00Z",
+                "scheduled_raw_date":"2026-10-02 12:30:00",
+                "captured_at":"2026-09-30T10:00:00Z","capture_day":"2026-09-30",
+                "consensus":150,"signal_score":0.2,"signal_count":2,
+                "nowcast_state":"INSUFFICIENT_HISTORY","closed":False,
+            },
+            {
+                "forecast_id":"f2","event_id":"e1","indicator":"PAYROLL",
+                "event_name":"Nonfarm Payrolls","scheduled_at":"2026-10-02T12:30:00Z",
+                "scheduled_raw_date":"2026-10-02 12:30:00",
+                "captured_at":"2026-10-01T10:00:00Z","capture_day":"2026-10-01",
+                "consensus":150,"signal_score":0.4,"signal_count":3,
+                "nowcast_state":"INSUFFICIENT_HISTORY","closed":False,
+            },
+        ])
+        response=Mock()
+        response.status_code=200
+        response.raise_for_status.return_value=None
+        response.json.return_value={
+            "content":base64.b64encode(raw.to_csv(index=False).encode("utf-8")).decode("ascii")
+        }
+        load_live_nowcast_runtime.clear()
+        with patch("atlasquant_news_research_panel.requests.get",return_value=response):
+            frame,status=load_live_nowcast_runtime(
+                repo="owner/repo",branch="atlasquant-runtime",token="secret"
+            )
+        self.assertTrue(status["ok"])
+        self.assertEqual(status["reason"],"LOADED")
+        self.assertEqual(len(frame),2)
+        table=live_nowcast_table(frame)
+        self.assertEqual(len(table),1)
+        self.assertAlmostEqual(float(table.iloc[0]["Score antecedentes"]),0.4)
+        self.assertEqual(int(table.iloc[0]["Sinais"]),3)
+
+    def test_live_runtime_loader_rejects_unsafe_code_branch_before_network(self):
+        load_live_nowcast_runtime.clear()
+        with patch("atlasquant_news_research_panel.requests.get") as get:
+            frame,status=load_live_nowcast_runtime(
+                repo="owner/repo",branch="main",token="secret"
+            )
+        self.assertTrue(frame.empty)
+        self.assertFalse(status["ok"])
+        self.assertEqual(status["reason"],"UNSAFE_BRANCH")
+        get.assert_not_called()
 
     def test_report_keeps_news_accuracy_separate_from_market_reaction(self):
         start=datetime(2025,1,1,13,30,tzinfo=timezone.utc)
