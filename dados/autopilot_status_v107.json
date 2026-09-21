@@ -283,5 +283,1241 @@
       "profit_factor_r": null
     },
     "errors": []
+  },
+  "model_paper_v1": {
+    "enabled": true,
+    "real_orders": false,
+    "supported_execution_timeframes": [
+      "M15",
+      "H1"
+    ],
+    "exact_execution_frame_required": true,
+    "lower_timeframe_substitution": false,
+    "candidates_total": 32,
+    "blocked_context": 26,
+    "blocked_data": 0,
+    "blocked_timeframe": 6,
+    "pending_entries": 0,
+    "open_positions": 0,
+    "closed_trades": 0,
+    "wins": 0,
+    "losses": 0,
+    "win_rate_pct": 0.0,
+    "net_r": 0.0,
+    "net_r_after_friction": 0.0,
+    "by_setup": {
+      "amd-po3": {
+        "candidates": 13,
+        "blocked_context": 13,
+        "blocked_data": 0,
+        "blocked_timeframe": 0,
+        "pending": 0,
+        "open": 0,
+        "closed": 0,
+        "wins": 0,
+        "losses": 0,
+        "win_rate_pct": 0.0,
+        "net_r": 0.0,
+        "avg_r": 0.0,
+        "profit_factor_r": null,
+        "explicit_source_model_only": true,
+        "hard_block_reasons": {
+          "H1 está contra o viés": 3,
+          "H4 está contra o viés": 1
+        },
+        "soft_block_reasons": {
+          "M15 ainda não confirmou gatilho": 10,
+          "Gate ainda não liberou execução": 9,
+          "ICT incompleto (58/100)": 7,
+          "Fluxo institucional incompleto (64/100)": 2,
+          "ADR14 em 90%: espaço reduzido": 1,
+          "Fluxo institucional incompleto (50/100)": 1,
+          "Fluxo institucional incompleto (52/100)": 1,
+          "Fluxo institucional incompleto (54/100)": 1,
+          "Fluxo institucional incompleto (55/100)": 1,
+          "Fluxo institucional incompleto (59/100)": 1,
+          "Fluxo institucional incompleto (60/100)": 1,
+          "Fluxo institucional incompleto (63/100)": 1,
+          "Fluxo institucional incompleto (68/100)": 1,
+          "Fluxo institucional incompleto (70/100)": 1,
+          "ICT incompleto (49/100)": 1,
+          "ICT incompleto (51/100)": 1
+        }
+      },
+      "crt": {
+        "candidates": 12,
+        "blocked_context": 7,
+        "blocked_data": 0,
+        "blocked_timeframe": 5,
+        "pending": 0,
+        "open": 0,
+        "closed": 0,
+        "wins": 0,
+        "losses": 0,
+        "win_rate_pct": 0.0,
+        "net_r": 0.0,
+        "avg_r": 0.0,
+        "profit_factor_r": null,
+        "explicit_source_model_only": true,
+        "hard_block_reasons": {
+          "H1 está contra o viés": 2,
+          "H4 está contra o viés": 1
+        },
+        "soft_block_reasons": {
+          "ICT incompleto (60/100)": 6,
+          "M15 ainda não confirmou gatilho": 6,
+          "Gate ainda não liberou execução": 5,
+          "Fluxo institucional incompleto (57/100)": 2,
+          "ADR14 em 90%: espaço reduzido": 1,
+          "Fluxo institucional incompleto (54/100)": 1,
+          "Fluxo institucional incompleto (55/100)": 1,
+          "Fluxo institucional incompleto (58/100)": 1,
+          "Fluxo institucional incompleto (61/100)": 1,
+          "Fluxo institucional incompleto (63/100)": 1,
+          "Fluxo institucional incompleto (64/100)": 1,
+          "Fluxo institucional incompleto (68/100)": 1,
+          "ICT incompleto (54/100)": 1,
+          "ICT incompleto (70/100)": 1
+        }
+      },
+      "fvg": {
+        "candidates": 5,
+        "blocked_context": 5,
+        "blocked_data": 0,
+        "blocked_timeframe": 0,
+        "pending": 0,
+        "open": 0,
+        "closed": 0,
+        "wins": 0,
+        "losses": 0,
+        "win_rate_pct": 0.0,
+        "net_r": 0.0,
+        "avg_r": 0.0,
+        "profit_factor_r": null,
+        "explicit_source_model_only": true,
+        "hard_block_reasons": {
+          "H1 está contra o viés": 1,
+          "H4 está contra o viés": 1
+        },
+        "soft_block_reasons": {
+          "ICT incompleto (43/100)": 5,
+          "M15 ainda não confirmou gatilho": 5,
+          "Fluxo institucional incompleto (59/100)": 2,
+          "ADR14 em 98%: evitar perseguir preço": 1,
+          "Fluxo institucional incompleto (63/100)": 1,
+          "Gate ainda não liberou execução": 1
+        }
+      },
+      "ote": {
+        "candidates": 2,
+        "blocked_context": 1,
+        "blocked_data": 0,
+        "blocked_timeframe": 1,
+        "pending": 0,
+        "open": 0,
+        "closed": 0,
+        "wins": 0,
+        "losses": 0,
+        "win_rate_pct": 0.0,
+        "net_r": 0.0,
+        "avg_r": 0.0,
+        "profit_factor_r": null,
+        "explicit_source_model_only": true,
+        "hard_block_reasons": {
+          "H1 está contra o viés": 2
+        },
+        "soft_block_reasons": {
+          "M15 ainda não confirmou gatilho": 2,
+          "Fluxo institucional incompleto (58/100)": 1,
+          "Fluxo institucional incompleto (60/100)": 1,
+          "Gate ainda não liberou execução": 1,
+          "ICT incompleto (58/100)": 1,
+          "ICT incompleto (65/100)": 1
+        }
+      }
+    },
+    "by_timeframe": {
+      "H1": {
+        "candidates": 14,
+        "blocked_context": 8,
+        "blocked_data": 0,
+        "blocked_timeframe": 6,
+        "pending": 0,
+        "open": 0,
+        "closed": 0,
+        "wins": 0,
+        "losses": 0,
+        "net_r": 0.0,
+        "hard_block_reasons": {
+          "H1 está contra o viés": 4,
+          "H4 está contra o viés": 1
+        },
+        "soft_block_reasons": {
+          "M15 ainda não confirmou gatilho": 8,
+          "Gate ainda não liberou execução": 6,
+          "ICT incompleto (60/100)": 6,
+          "Fluxo institucional incompleto (57/100)": 2,
+          "Fluxo institucional incompleto (58/100)": 2,
+          "ADR14 em 90%: espaço reduzido": 1,
+          "Fluxo institucional incompleto (54/100)": 1,
+          "Fluxo institucional incompleto (55/100)": 1,
+          "Fluxo institucional incompleto (60/100)": 1,
+          "Fluxo institucional incompleto (61/100)": 1,
+          "Fluxo institucional incompleto (63/100)": 1,
+          "Fluxo institucional incompleto (64/100)": 1,
+          "Fluxo institucional incompleto (68/100)": 1,
+          "ICT incompleto (54/100)": 1,
+          "ICT incompleto (58/100)": 1,
+          "ICT incompleto (65/100)": 1,
+          "ICT incompleto (70/100)": 1
+        },
+        "timeframe_block_reasons": {
+          "EXECUTION_FRAME_NOT_AVAILABLE:H1": 6,
+          "SOURCE_EQUALS_EXECUTION": 2
+        }
+      },
+      "M15": {
+        "candidates": 18,
+        "blocked_context": 18,
+        "blocked_data": 0,
+        "blocked_timeframe": 0,
+        "pending": 0,
+        "open": 0,
+        "closed": 0,
+        "wins": 0,
+        "losses": 0,
+        "net_r": 0.0,
+        "hard_block_reasons": {
+          "H1 está contra o viés": 4,
+          "H4 está contra o viés": 2
+        },
+        "soft_block_reasons": {
+          "M15 ainda não confirmou gatilho": 15,
+          "Gate ainda não liberou execução": 10,
+          "ICT incompleto (58/100)": 7,
+          "ICT incompleto (43/100)": 5,
+          "Fluxo institucional incompleto (59/100)": 3,
+          "Fluxo institucional incompleto (63/100)": 2,
+          "Fluxo institucional incompleto (64/100)": 2,
+          "ADR14 em 90%: espaço reduzido": 1,
+          "ADR14 em 98%: evitar perseguir preço": 1,
+          "Fluxo institucional incompleto (50/100)": 1,
+          "Fluxo institucional incompleto (52/100)": 1,
+          "Fluxo institucional incompleto (54/100)": 1,
+          "Fluxo institucional incompleto (55/100)": 1,
+          "Fluxo institucional incompleto (60/100)": 1,
+          "Fluxo institucional incompleto (68/100)": 1,
+          "Fluxo institucional incompleto (70/100)": 1,
+          "ICT incompleto (49/100)": 1,
+          "ICT incompleto (51/100)": 1
+        },
+        "timeframe_block_reasons": {
+          "SOURCE_EQUALS_EXECUTION": 11
+        }
+      }
+    },
+    "by_session": {},
+    "timeframe_execution_readiness": {
+      "supported_timeframes": [
+        "M15",
+        "M30",
+        "H1",
+        "H4",
+        "D1",
+        "W1"
+      ],
+      "paper_gate_supported": [
+        "M15",
+        "H1"
+      ],
+      "by_timeframe": {
+        "M15": {
+          "pairs_with_exact_data": 7,
+          "pairs_paper_ready": 7
+        },
+        "M30": {
+          "pairs_with_exact_data": 7,
+          "pairs_paper_ready": 0
+        },
+        "H1": {
+          "pairs_with_exact_data": 7,
+          "pairs_paper_ready": 7
+        },
+        "H4": {
+          "pairs_with_exact_data": 7,
+          "pairs_paper_ready": 0
+        },
+        "D1": {
+          "pairs_with_exact_data": 7,
+          "pairs_paper_ready": 0
+        },
+        "W1": {
+          "pairs_with_exact_data": 7,
+          "pairs_paper_ready": 0
+        }
+      },
+      "by_pair": {
+        "AUD/USD": {
+          "pair": "AUD/USD",
+          "timeframes": {
+            "M15": {
+              "timeframe": "M15",
+              "required_context": [
+                "H1",
+                "H4"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": true,
+              "can_execute_paper": true,
+              "state": "READY",
+              "reasons": [],
+              "real_orders_enabled": false
+            },
+            "M30": {
+              "timeframe": "M30",
+              "required_context": [
+                "H1",
+                "H4"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            },
+            "H1": {
+              "timeframe": "H1",
+              "required_context": [
+                "H4",
+                "D1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": true,
+              "can_execute_paper": true,
+              "state": "READY",
+              "reasons": [],
+              "real_orders_enabled": false
+            },
+            "H4": {
+              "timeframe": "H4",
+              "required_context": [
+                "D1",
+                "W1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            },
+            "D1": {
+              "timeframe": "D1",
+              "required_context": [
+                "W1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            },
+            "W1": {
+              "timeframe": "W1",
+              "required_context": [
+                "W1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            }
+          },
+          "safety": {
+            "alignment_required": true,
+            "direction_required": true,
+            "filters_required": true,
+            "trigger_required": true,
+            "lower_timeframe_substitution": false,
+            "real_orders_enabled": false
+          }
+        },
+        "EUR/USD": {
+          "pair": "EUR/USD",
+          "timeframes": {
+            "M15": {
+              "timeframe": "M15",
+              "required_context": [
+                "H1",
+                "H4"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": true,
+              "can_execute_paper": true,
+              "state": "READY",
+              "reasons": [],
+              "real_orders_enabled": false
+            },
+            "M30": {
+              "timeframe": "M30",
+              "required_context": [
+                "H1",
+                "H4"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            },
+            "H1": {
+              "timeframe": "H1",
+              "required_context": [
+                "H4",
+                "D1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": true,
+              "can_execute_paper": true,
+              "state": "READY",
+              "reasons": [],
+              "real_orders_enabled": false
+            },
+            "H4": {
+              "timeframe": "H4",
+              "required_context": [
+                "D1",
+                "W1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            },
+            "D1": {
+              "timeframe": "D1",
+              "required_context": [
+                "W1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            },
+            "W1": {
+              "timeframe": "W1",
+              "required_context": [
+                "W1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            }
+          },
+          "safety": {
+            "alignment_required": true,
+            "direction_required": true,
+            "filters_required": true,
+            "trigger_required": true,
+            "lower_timeframe_substitution": false,
+            "real_orders_enabled": false
+          }
+        },
+        "GBP/USD": {
+          "pair": "GBP/USD",
+          "timeframes": {
+            "M15": {
+              "timeframe": "M15",
+              "required_context": [
+                "H1",
+                "H4"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": true,
+              "can_execute_paper": true,
+              "state": "READY",
+              "reasons": [],
+              "real_orders_enabled": false
+            },
+            "M30": {
+              "timeframe": "M30",
+              "required_context": [
+                "H1",
+                "H4"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            },
+            "H1": {
+              "timeframe": "H1",
+              "required_context": [
+                "H4",
+                "D1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": true,
+              "can_execute_paper": true,
+              "state": "READY",
+              "reasons": [],
+              "real_orders_enabled": false
+            },
+            "H4": {
+              "timeframe": "H4",
+              "required_context": [
+                "D1",
+                "W1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            },
+            "D1": {
+              "timeframe": "D1",
+              "required_context": [
+                "W1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            },
+            "W1": {
+              "timeframe": "W1",
+              "required_context": [
+                "W1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            }
+          },
+          "safety": {
+            "alignment_required": true,
+            "direction_required": true,
+            "filters_required": true,
+            "trigger_required": true,
+            "lower_timeframe_substitution": false,
+            "real_orders_enabled": false
+          }
+        },
+        "NZD/USD": {
+          "pair": "NZD/USD",
+          "timeframes": {
+            "M15": {
+              "timeframe": "M15",
+              "required_context": [
+                "H1",
+                "H4"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": true,
+              "can_execute_paper": true,
+              "state": "READY",
+              "reasons": [],
+              "real_orders_enabled": false
+            },
+            "M30": {
+              "timeframe": "M30",
+              "required_context": [
+                "H1",
+                "H4"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            },
+            "H1": {
+              "timeframe": "H1",
+              "required_context": [
+                "H4",
+                "D1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": true,
+              "can_execute_paper": true,
+              "state": "READY",
+              "reasons": [],
+              "real_orders_enabled": false
+            },
+            "H4": {
+              "timeframe": "H4",
+              "required_context": [
+                "D1",
+                "W1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            },
+            "D1": {
+              "timeframe": "D1",
+              "required_context": [
+                "W1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            },
+            "W1": {
+              "timeframe": "W1",
+              "required_context": [
+                "W1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            }
+          },
+          "safety": {
+            "alignment_required": true,
+            "direction_required": true,
+            "filters_required": true,
+            "trigger_required": true,
+            "lower_timeframe_substitution": false,
+            "real_orders_enabled": false
+          }
+        },
+        "USD/CAD": {
+          "pair": "USD/CAD",
+          "timeframes": {
+            "M15": {
+              "timeframe": "M15",
+              "required_context": [
+                "H1",
+                "H4"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": true,
+              "can_execute_paper": true,
+              "state": "READY",
+              "reasons": [],
+              "real_orders_enabled": false
+            },
+            "M30": {
+              "timeframe": "M30",
+              "required_context": [
+                "H1",
+                "H4"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            },
+            "H1": {
+              "timeframe": "H1",
+              "required_context": [
+                "H4",
+                "D1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": true,
+              "can_execute_paper": true,
+              "state": "READY",
+              "reasons": [],
+              "real_orders_enabled": false
+            },
+            "H4": {
+              "timeframe": "H4",
+              "required_context": [
+                "D1",
+                "W1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            },
+            "D1": {
+              "timeframe": "D1",
+              "required_context": [
+                "W1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            },
+            "W1": {
+              "timeframe": "W1",
+              "required_context": [
+                "W1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            }
+          },
+          "safety": {
+            "alignment_required": true,
+            "direction_required": true,
+            "filters_required": true,
+            "trigger_required": true,
+            "lower_timeframe_substitution": false,
+            "real_orders_enabled": false
+          }
+        },
+        "USD/CHF": {
+          "pair": "USD/CHF",
+          "timeframes": {
+            "M15": {
+              "timeframe": "M15",
+              "required_context": [
+                "H1",
+                "H4"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": true,
+              "can_execute_paper": true,
+              "state": "READY",
+              "reasons": [],
+              "real_orders_enabled": false
+            },
+            "M30": {
+              "timeframe": "M30",
+              "required_context": [
+                "H1",
+                "H4"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            },
+            "H1": {
+              "timeframe": "H1",
+              "required_context": [
+                "H4",
+                "D1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": true,
+              "can_execute_paper": true,
+              "state": "READY",
+              "reasons": [],
+              "real_orders_enabled": false
+            },
+            "H4": {
+              "timeframe": "H4",
+              "required_context": [
+                "D1",
+                "W1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            },
+            "D1": {
+              "timeframe": "D1",
+              "required_context": [
+                "W1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            },
+            "W1": {
+              "timeframe": "W1",
+              "required_context": [
+                "W1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            }
+          },
+          "safety": {
+            "alignment_required": true,
+            "direction_required": true,
+            "filters_required": true,
+            "trigger_required": true,
+            "lower_timeframe_substitution": false,
+            "real_orders_enabled": false
+          }
+        },
+        "USD/JPY": {
+          "pair": "USD/JPY",
+          "timeframes": {
+            "M15": {
+              "timeframe": "M15",
+              "required_context": [
+                "H1",
+                "H4"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": true,
+              "can_execute_paper": true,
+              "state": "READY",
+              "reasons": [],
+              "real_orders_enabled": false
+            },
+            "M30": {
+              "timeframe": "M30",
+              "required_context": [
+                "H1",
+                "H4"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            },
+            "H1": {
+              "timeframe": "H1",
+              "required_context": [
+                "H4",
+                "D1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": true,
+              "can_execute_paper": true,
+              "state": "READY",
+              "reasons": [],
+              "real_orders_enabled": false
+            },
+            "H4": {
+              "timeframe": "H4",
+              "required_context": [
+                "D1",
+                "W1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            },
+            "D1": {
+              "timeframe": "D1",
+              "required_context": [
+                "W1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            },
+            "W1": {
+              "timeframe": "W1",
+              "required_context": [
+                "W1"
+              ],
+              "exact_execution_data": true,
+              "decision_gate_supported": false,
+              "can_execute_paper": false,
+              "state": "RESEARCH_ONLY",
+              "reasons": [
+                "CONTRATO_DE_GATILHO_AINDA_NAO_IMPLEMENTADO"
+              ],
+              "real_orders_enabled": false
+            }
+          },
+          "safety": {
+            "alignment_required": true,
+            "direction_required": true,
+            "filters_required": true,
+            "trigger_required": true,
+            "lower_timeframe_substitution": false,
+            "real_orders_enabled": false
+          }
+        }
+      },
+      "safety": {
+        "research_only_for_unsupported_timeframes": true,
+        "alignment_required": true,
+        "lower_timeframe_substitution": false,
+        "automatic_execution": false,
+        "real_orders_enabled": false
+      }
+    },
+    "last_cycle": {
+      "version": "ATLASQUANT_MODEL_PAPER_V1",
+      "ran_at": "2026-09-21T23:45:36.834011+00:00",
+      "new_candidates_observed": 0,
+      "new_qualified": 0,
+      "new_blocked": 0,
+      "entries_opened": 0,
+      "trades_closed": 0,
+      "candidates_total": 32,
+      "blocked_context": 26,
+      "blocked_data": 0,
+      "blocked_timeframe": 6,
+      "pending_entries": 0,
+      "open_positions": 0,
+      "closed_trades": 0,
+      "wins": 0,
+      "losses": 0,
+      "breakeven": 0,
+      "win_rate_pct": 0.0,
+      "net_r": 0.0,
+      "avg_r": 0.0,
+      "by_setup": {
+        "amd-po3": {
+          "candidates": 13,
+          "blocked_context": 13,
+          "blocked_data": 0,
+          "blocked_timeframe": 0,
+          "pending": 0,
+          "open": 0,
+          "closed": 0,
+          "wins": 0,
+          "losses": 0,
+          "win_rate_pct": 0.0,
+          "net_r": 0.0,
+          "avg_r": 0.0,
+          "profit_factor_r": null,
+          "explicit_source_model_only": true,
+          "hard_block_reasons": {
+            "H1 está contra o viés": 3,
+            "H4 está contra o viés": 1
+          },
+          "soft_block_reasons": {
+            "M15 ainda não confirmou gatilho": 10,
+            "Gate ainda não liberou execução": 9,
+            "ICT incompleto (58/100)": 7,
+            "Fluxo institucional incompleto (64/100)": 2,
+            "ADR14 em 90%: espaço reduzido": 1,
+            "Fluxo institucional incompleto (50/100)": 1,
+            "Fluxo institucional incompleto (52/100)": 1,
+            "Fluxo institucional incompleto (54/100)": 1,
+            "Fluxo institucional incompleto (55/100)": 1,
+            "Fluxo institucional incompleto (59/100)": 1,
+            "Fluxo institucional incompleto (60/100)": 1,
+            "Fluxo institucional incompleto (63/100)": 1,
+            "Fluxo institucional incompleto (68/100)": 1,
+            "Fluxo institucional incompleto (70/100)": 1,
+            "ICT incompleto (49/100)": 1,
+            "ICT incompleto (51/100)": 1
+          }
+        },
+        "crt": {
+          "candidates": 12,
+          "blocked_context": 7,
+          "blocked_data": 0,
+          "blocked_timeframe": 5,
+          "pending": 0,
+          "open": 0,
+          "closed": 0,
+          "wins": 0,
+          "losses": 0,
+          "win_rate_pct": 0.0,
+          "net_r": 0.0,
+          "avg_r": 0.0,
+          "profit_factor_r": null,
+          "explicit_source_model_only": true,
+          "hard_block_reasons": {
+            "H1 está contra o viés": 2,
+            "H4 está contra o viés": 1
+          },
+          "soft_block_reasons": {
+            "ICT incompleto (60/100)": 6,
+            "M15 ainda não confirmou gatilho": 6,
+            "Gate ainda não liberou execução": 5,
+            "Fluxo institucional incompleto (57/100)": 2,
+            "ADR14 em 90%: espaço reduzido": 1,
+            "Fluxo institucional incompleto (54/100)": 1,
+            "Fluxo institucional incompleto (55/100)": 1,
+            "Fluxo institucional incompleto (58/100)": 1,
+            "Fluxo institucional incompleto (61/100)": 1,
+            "Fluxo institucional incompleto (63/100)": 1,
+            "Fluxo institucional incompleto (64/100)": 1,
+            "Fluxo institucional incompleto (68/100)": 1,
+            "ICT incompleto (54/100)": 1,
+            "ICT incompleto (70/100)": 1
+          }
+        },
+        "fvg": {
+          "candidates": 5,
+          "blocked_context": 5,
+          "blocked_data": 0,
+          "blocked_timeframe": 0,
+          "pending": 0,
+          "open": 0,
+          "closed": 0,
+          "wins": 0,
+          "losses": 0,
+          "win_rate_pct": 0.0,
+          "net_r": 0.0,
+          "avg_r": 0.0,
+          "profit_factor_r": null,
+          "explicit_source_model_only": true,
+          "hard_block_reasons": {
+            "H1 está contra o viés": 1,
+            "H4 está contra o viés": 1
+          },
+          "soft_block_reasons": {
+            "ICT incompleto (43/100)": 5,
+            "M15 ainda não confirmou gatilho": 5,
+            "Fluxo institucional incompleto (59/100)": 2,
+            "ADR14 em 98%: evitar perseguir preço": 1,
+            "Fluxo institucional incompleto (63/100)": 1,
+            "Gate ainda não liberou execução": 1
+          }
+        },
+        "ote": {
+          "candidates": 2,
+          "blocked_context": 1,
+          "blocked_data": 0,
+          "blocked_timeframe": 1,
+          "pending": 0,
+          "open": 0,
+          "closed": 0,
+          "wins": 0,
+          "losses": 0,
+          "win_rate_pct": 0.0,
+          "net_r": 0.0,
+          "avg_r": 0.0,
+          "profit_factor_r": null,
+          "explicit_source_model_only": true,
+          "hard_block_reasons": {
+            "H1 está contra o viés": 2
+          },
+          "soft_block_reasons": {
+            "M15 ainda não confirmou gatilho": 2,
+            "Fluxo institucional incompleto (58/100)": 1,
+            "Fluxo institucional incompleto (60/100)": 1,
+            "Gate ainda não liberou execução": 1,
+            "ICT incompleto (58/100)": 1,
+            "ICT incompleto (65/100)": 1
+          }
+        }
+      },
+      "by_timeframe": {
+        "H1": {
+          "candidates": 14,
+          "blocked_context": 8,
+          "blocked_data": 0,
+          "blocked_timeframe": 6,
+          "pending": 0,
+          "open": 0,
+          "closed": 0,
+          "wins": 0,
+          "losses": 0,
+          "net_r": 0.0,
+          "hard_block_reasons": {
+            "H1 está contra o viés": 4,
+            "H4 está contra o viés": 1
+          },
+          "soft_block_reasons": {
+            "M15 ainda não confirmou gatilho": 8,
+            "Gate ainda não liberou execução": 6,
+            "ICT incompleto (60/100)": 6,
+            "Fluxo institucional incompleto (57/100)": 2,
+            "Fluxo institucional incompleto (58/100)": 2,
+            "ADR14 em 90%: espaço reduzido": 1,
+            "Fluxo institucional incompleto (54/100)": 1,
+            "Fluxo institucional incompleto (55/100)": 1,
+            "Fluxo institucional incompleto (60/100)": 1,
+            "Fluxo institucional incompleto (61/100)": 1,
+            "Fluxo institucional incompleto (63/100)": 1,
+            "Fluxo institucional incompleto (64/100)": 1,
+            "Fluxo institucional incompleto (68/100)": 1,
+            "ICT incompleto (54/100)": 1,
+            "ICT incompleto (58/100)": 1,
+            "ICT incompleto (65/100)": 1,
+            "ICT incompleto (70/100)": 1
+          },
+          "timeframe_block_reasons": {
+            "EXECUTION_FRAME_NOT_AVAILABLE:H1": 6,
+            "SOURCE_EQUALS_EXECUTION": 2
+          }
+        },
+        "M15": {
+          "candidates": 18,
+          "blocked_context": 18,
+          "blocked_data": 0,
+          "blocked_timeframe": 0,
+          "pending": 0,
+          "open": 0,
+          "closed": 0,
+          "wins": 0,
+          "losses": 0,
+          "net_r": 0.0,
+          "hard_block_reasons": {
+            "H1 está contra o viés": 4,
+            "H4 está contra o viés": 2
+          },
+          "soft_block_reasons": {
+            "M15 ainda não confirmou gatilho": 15,
+            "Gate ainda não liberou execução": 10,
+            "ICT incompleto (58/100)": 7,
+            "ICT incompleto (43/100)": 5,
+            "Fluxo institucional incompleto (59/100)": 3,
+            "Fluxo institucional incompleto (63/100)": 2,
+            "Fluxo institucional incompleto (64/100)": 2,
+            "ADR14 em 90%: espaço reduzido": 1,
+            "ADR14 em 98%: evitar perseguir preço": 1,
+            "Fluxo institucional incompleto (50/100)": 1,
+            "Fluxo institucional incompleto (52/100)": 1,
+            "Fluxo institucional incompleto (54/100)": 1,
+            "Fluxo institucional incompleto (55/100)": 1,
+            "Fluxo institucional incompleto (60/100)": 1,
+            "Fluxo institucional incompleto (68/100)": 1,
+            "Fluxo institucional incompleto (70/100)": 1,
+            "ICT incompleto (49/100)": 1,
+            "ICT incompleto (51/100)": 1
+          },
+          "timeframe_block_reasons": {
+            "SOURCE_EQUALS_EXECUTION": 11
+          }
+        }
+      },
+      "by_session": {},
+      "hard_block_reasons": {
+        "H1 está contra o viés": 8,
+        "H4 está contra o viés": 3
+      },
+      "soft_block_reasons": {
+        "M15 ainda não confirmou gatilho": 23,
+        "Gate ainda não liberou execução": 16,
+        "ICT incompleto (58/100)": 8,
+        "ICT incompleto (60/100)": 6,
+        "ICT incompleto (43/100)": 5,
+        "Fluxo institucional incompleto (59/100)": 3,
+        "Fluxo institucional incompleto (63/100)": 3,
+        "Fluxo institucional incompleto (64/100)": 3,
+        "ADR14 em 90%: espaço reduzido": 2,
+        "Fluxo institucional incompleto (54/100)": 2,
+        "Fluxo institucional incompleto (55/100)": 2,
+        "Fluxo institucional incompleto (57/100)": 2,
+        "Fluxo institucional incompleto (58/100)": 2,
+        "Fluxo institucional incompleto (60/100)": 2,
+        "Fluxo institucional incompleto (68/100)": 2,
+        "ADR14 em 98%: evitar perseguir preço": 1,
+        "Fluxo institucional incompleto (50/100)": 1,
+        "Fluxo institucional incompleto (52/100)": 1,
+        "Fluxo institucional incompleto (61/100)": 1,
+        "Fluxo institucional incompleto (70/100)": 1,
+        "ICT incompleto (49/100)": 1,
+        "ICT incompleto (51/100)": 1,
+        "ICT incompleto (54/100)": 1,
+        "ICT incompleto (65/100)": 1,
+        "ICT incompleto (70/100)": 1
+      },
+      "timeframe_block_reasons": {
+        "SOURCE_EQUALS_EXECUTION": 13,
+        "EXECUTION_FRAME_NOT_AVAILABLE:H1": 6
+      },
+      "setup_inference_used": false,
+      "automatic_promotion": false,
+      "automatic_execution": false,
+      "real_orders_enabled": false
+    },
+    "errors": []
   }
 }
