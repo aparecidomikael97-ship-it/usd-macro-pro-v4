@@ -11,6 +11,8 @@ NOW=pd.Timestamp("2026-09-21T09:00:00Z")
 
 def checklist_ready():
     return {
+        "pair":"EUR/USD",
+        "side":"BUY",
         "all_checks_passed":True,
         "decision":{"state":"READY","hard_blocks":[],"soft_blocks":[]},
         "score_master":80.0,
