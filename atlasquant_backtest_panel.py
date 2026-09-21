@@ -330,6 +330,22 @@ def _render_result_block(
             "O motor marcou LOSS por segurança porque a ordem intrabar é desconhecida."
         )
 
+    alignment_reasons=dict(metrics.get("alignment_block_reasons",{}) or {})
+    if alignment_reasons:
+        st.markdown("##### Por que sinais ficaram bloqueados")
+        st.dataframe(
+            pd.DataFrame([
+                {"motivo":reason,"ocorrências":count}
+                for reason,count in alignment_reasons.items()
+            ]),
+            width="stretch",
+            hide_index=True,
+        )
+        st.caption(
+            "Qualquer falha em leitura, direção, filtros ou gatilho impede a entrada. "
+            "Ausência de evidência também bloqueia no modo alinhado."
+        )
+
     st.markdown("#### Diário completo")
     st.dataframe(ledger, width="stretch", hide_index=True)
 
