@@ -68,6 +68,17 @@ class AtlasQuantProductionWorkflowContractTests(unittest.TestCase):
         marker=src.index('id="atlasquant-source-build-marker"')
         fast=src.index("load_home_snapshot(",marker)
         self.assertLess(marker,fast)
+        self.assertIn("AQBUILD:",src)
+        self.assertIn("aria-hidden=\"true\"",src)
+        self.assertNotIn('id="atlasquant-source-build-marker" data-build="{_ATLASQUANT_SOURCE_BUILD}" style="display:none"',src)
+
+    def test_browser_smoke_has_identity_text_fallback_and_bounded_mobile_mode_retry(self):
+        text=Path(".github/workflows/production-browser-smoke.yml").read_text(encoding="utf-8")
+        self.assertIn('re.search(r"AQBUILD:([0-9a-f]{16})"',text)
+        self.assertIn("for mode_attempt in range(1, 4)",text)
+        self.assertIn('[data-testid="stRadio"]',text)
+        self.assertIn("modo Avançado não estabilizou após 3 tentativas",text)
+        self.assertNotIn('get_by_text("Área avançada", exact=True).wait_for(timeout=120_000)',text)
 
 
     def test_browser_smoke_exposes_checkout_modules_to_tmp_runner(self):
