@@ -58,6 +58,20 @@ class ResearchTimeframeCacheTests(unittest.TestCase):
         self.assertEqual(len(out),1)
         self.assertEqual(pd.Timestamp(out.iloc[0]["datetime"]),pd.Timestamp("2026-09-18T00:00:00Z"))
 
+
+    def test_d1_and_w1_exclude_weekend_provider_artifacts(self):
+        rows=[
+            bar("2026-09-18T00:00:00Z",1.0,1.3,.9,1.2),
+            bar("2026-09-19T00:00:00Z",9.0,9.5,8.5,9.1),
+            bar("2026-09-20T00:00:00Z",8.0,8.5,7.5,8.1),
+            bar("2026-09-21T00:00:00Z",1.2,1.4,1.1,1.3),
+        ]
+        d1=completed_d1(rows,now="2026-09-22T16:00:00Z")
+        self.assertTrue(all(pd.Timestamp(x).dayofweek < 5 for x in d1["datetime"]))
+        self.assertNotIn(9.5,set(float(x) for x in d1["high"]))
+        w1=completed_w1_from_d1(rows,now="2026-09-28T16:00:00Z")
+        self.assertTrue(w1.empty or float(w1.iloc[-1]["high"]) < 9.0)
+
     def test_cache_is_research_only_and_adds_no_provider_call_contract(self):
         scanner={"resultados":{"EUR/USD":{"tecnico":{"cache_v110":{"m15":[
             bar("2026-09-21T12:00:00Z"),bar("2026-09-21T12:15:00Z"),

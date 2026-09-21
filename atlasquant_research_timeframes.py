@@ -62,7 +62,12 @@ def completed_d1(records:list[dict[str,Any]]|None,*,now:Any=None)->pd.DataFrame:
     now_ts=pd.Timestamp.now(tz="UTC") if now is None else pd.Timestamp(now)
     now_ts=now_ts.tz_localize("UTC") if now_ts.tzinfo is None else now_ts.tz_convert("UTC")
     today=now_ts.tz_convert(NY_TZ).date()
-    return completed_daily(d,today)
+    closed=completed_daily(d,today)
+    if closed.empty:
+        return closed
+    # Some providers expose tiny Saturday/Sunday synthetic bars. They are not
+    # valid D1 research sessions and would otherwise spill into the next W-FRI.
+    return closed[closed["datetime"].dt.dayofweek < 5].reset_index(drop=True)
 
 
 def completed_w1_from_d1(records:list[dict[str,Any]]|None,*,now:Any=None)->pd.DataFrame:
