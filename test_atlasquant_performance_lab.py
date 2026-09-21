@@ -104,6 +104,7 @@ class AtlasQuantPerformanceLabTests(unittest.TestCase):
 
     def test_invalid_score_or_quality_is_unclassified_and_excluded(self):
         df=self.frame()
+        df["score_mestre"]=df["score_mestre"].astype(float)
         df.loc[0,"score_mestre"]=float("inf")
         df.loc[1,"qualidade"]="bad"
         out=prepare_performance_history(df,"24h")
@@ -134,6 +135,7 @@ class AtlasQuantPerformanceLabTests(unittest.TestCase):
 
     def test_out_of_range_score_and_quality_fail_closed(self):
         df=self.frame()
+        df["score_mestre"]=df["score_mestre"].astype(float)
         df.loc[0,"score_mestre"]=-0.01
         df.loc[1,"score_mestre"]=100.01
         df.loc[2,"qualidade"]="-1%"
