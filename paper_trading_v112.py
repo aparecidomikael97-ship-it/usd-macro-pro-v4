@@ -449,7 +449,9 @@ def _close_open(
             break
         if j >= max(1,int(max_hold_bars)):
             total_minutes=max(1,int(bar_minutes))*max(1,int(max_hold_bars))
-            if total_minutes % 1440 == 0:
+            if int(bar_minutes)==15 and int(max_hold_bars)==MAX_HOLD_BARS:
+                exit_label="TIME_EXIT_24H"
+            elif total_minutes % 1440 == 0:
                 exit_label=f"TIME_EXIT_{total_minutes//1440}D"
             elif total_minutes % 60 == 0:
                 exit_label=f"TIME_EXIT_{total_minutes//60}H"
