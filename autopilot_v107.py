@@ -54,6 +54,7 @@ from atlasquant_shadow_store import persist_shadow_samples
 from atlasquant_flight_recorder_panel import record_from_pack
 from atlasquant_flight_recorder_store import persist_records
 from atlasquant_setup_candidates import build_setup_candidates
+from atlasquant_research_timeframes import build_research_timeframe_cache
 
 from market_map_core_v10 import (
     NY_TZ,
@@ -92,6 +93,7 @@ NEWS_CURRENT_PATH = "dados/currency_news_current_v107.json"
 NEWS_VALIDATION_PATH = "dados/currency_news_validation_v1061.csv"
 QUOTA_SHADOW_PATH = "dados/atlasquant_quota_shadow_v1.json"
 HOME_SNAPSHOT_PATH = "dados/atlasquant_home_snapshot_v1.json"
+RESEARCH_TF_CACHE_PATH = "dados/atlasquant_research_timeframes_v1.json"
 
 M15_EVERY_MIN = 55
 H1_EVERY_MIN = 115
@@ -1350,6 +1352,18 @@ def main() -> int:
     ok,err=gh_put_json(DAILY_CACHE_PATH,daily_cache,"V10.7 Autopilot: cache diário FX")
     if not ok: all_errors.append("Salvar D1 cache: "+err)
 
+    # 3.1 Derived research frames from already-collected data. Zero provider calls.
+    research_tf_cache=build_research_timeframe_cache(
+        scanner,daily_cache,now=utcnow()
+    )
+    research_tf_ok,research_tf_err=gh_put_json(
+        RESEARCH_TF_CACHE_PATH,
+        research_tf_cache,
+        "AtlasQuant: atualiza timeframes derivados de pesquisa",
+    )
+    if not research_tf_ok:
+        all_errors.append("Salvar timeframes de pesquisa: "+str(research_tf_err))
+
     cache_ok,cache_err=gh_put_json(SERIES_PATH,_TD_SERIES,"V11.0.8: cache compartilhado sem duplicar consultas")
     if not cache_ok: all_errors.append("Salvar cache compartilhado: "+cache_err)
 
@@ -1417,6 +1431,18 @@ def main() -> int:
         app_ok,app_msg,inputs,scanner,master,intel,validation,
         all_errors,total_calls,snap_stats
     )
+
+    status["research_timeframes"]={
+        "path":RESEARCH_TF_CACHE_PATH,
+        "persisted":bool(research_tf_ok),
+        "error":str(research_tf_err or ""),
+        "pairs":len(dict(research_tf_cache.get("pairs",{}) or {})),
+        "derived":["M30","W1"],
+        "completed_source":["D1"],
+        "provider_calls_added":False,
+        "real_orders":False,
+        "automatic_execution":False,
+    }
 
     status["fast_home_snapshot"]={
         "path":HOME_SNAPSHOT_PATH,
