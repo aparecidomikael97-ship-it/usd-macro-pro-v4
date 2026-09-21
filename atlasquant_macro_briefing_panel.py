@@ -8,9 +8,8 @@ from typing import Any, Mapping, Sequence
 import streamlit as st
 
 from atlasquant_macro_briefing import build_macro_briefing
-from atlasquant_macro_briefing_voice import VoiceRequest
-from atlasquant_voice_assistant import browser_speech_html
-from atlasquant_voice_profile import VOICE_PROFILE_ID, voice_profile
+from atlasquant_neural_voice_ui import render_neural_voice_player
+from atlasquant_voice_profile import VOICE_PROFILE_ID
 
 
 
@@ -67,48 +66,20 @@ def render_macro_briefing_panel(currency_rows: Sequence[Mapping[str, Any]] | Non
     st.caption("A camada de voz deve ler exatamente este texto; ela não pode gerar sinal ou alterar o diagnóstico.")
     st.markdown("#### 🎧 Voz")
     st.caption(
-        "A leitura usa a voz oficial AtlasQuant quando uma voz compatível está disponível. "
-        "Se ela não estiver disponível, o texto permanece visível e o app não troca silenciosamente por voz genérica."
+        "A narração usa somente a voz neural oficial do AtlasQuant. "
+        "A voz do Google/aparelho não é usada como fallback."
     )
-    st.iframe(
-        browser_speech_html(
-            brief["speech_text"],
-            button_label="🔊 Ouvir briefing agora",
-            key=f"macro_brief_{horizon}",
-        ),
-        height=72,
-        width="stretch",
-        tab_index=0,
+    voice_status=render_neural_voice_player(
+        brief["speech_text"],
+        button_label="🔊 Ouvir briefing com a voz AtlasQuant",
+        key=f"macro_brief_{horizon}",
     )
-    profile=voice_profile()
-    voice_style=str(profile["external_style"])
-    st.caption(
-        "Voz oficial AtlasQuant: masculina/grave. No navegador, somente uma voz compatível com o perfil "
-        "é aceita; no TTS externo, o estilo continua fixado em deep."
-    )
-    voice_request = VoiceRequest(brief["speech_text"], voice_style).validated()
     st.session_state["aq_macro_brief_voice_request"] = {
-        "transcript": voice_request.transcript,
-        "voice": voice_request.voice,
+        "transcript": brief["speech_text"],
         "voice_profile_id": VOICE_PROFILE_ID,
+        "delivery_mode": "server_neural_tts",
+        "configured": bool(voice_status.get("configured")),
     }
-    st.caption("O pedido de áudio só fica preparado; a geração exige ação explícita e provedor TTS configurado.")
-    if st.button("🎙️ Gerar narração", key=f"aq_macro_brief_generate_{horizon}"):
-        st.session_state["aq_macro_brief_voice_generate_requested"] = True
-        st.info(
-            "Pedido de narração registrado. O player só será exibido quando um provedor TTS "
-            "configurado devolver áudio válido."
-        )
-    audio_bytes = st.session_state.get("aq_macro_brief_audio_bytes")
-    if isinstance(audio_bytes, (bytes, bytearray)) and audio_bytes:
-        st.audio(bytes(audio_bytes), format="audio/mp3")
-        st.download_button(
-            "Baixar áudio",
-            data=bytes(audio_bytes),
-            file_name=f"atlasquant_macro_briefing_{horizon}.mp3",
-            mime="audio/mpeg",
-            key=f"aq_macro_brief_audio_download_{horizon}",
-        )
 
     st.download_button(
         "Baixar roteiro da narração",
