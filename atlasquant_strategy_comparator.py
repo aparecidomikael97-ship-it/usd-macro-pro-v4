@@ -215,6 +215,7 @@ def comparison_frame(
             "losses":m["losses"],
             "breakeven":m["breakeven"],
             "no_trade":m["no_trade"],
+            "alignment_blocked":m.get("alignment_blocked",0),
             "win_rate_pct":m["win_rate_pct"],
             "expectancy_r":m["expectancy_r"],
             "net_r":m["net_r"],
