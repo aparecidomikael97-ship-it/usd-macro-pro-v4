@@ -8987,45 +8987,6 @@ if _aq_active_index == 8:
         )
 
 # =========================================================
-# ABA 9 — V10.2 PROFESSIONAL MACRO MARKET MAP (CAMADA OBSERVACIONAL)
-# Não altera o motor base, Score Mestre ou histórico oficial.
-# =========================================================
-if _aq_active_index == 9:
-    if render_market_map is None:
-        st.error(
-            "A camada Professional Market Map V10.2 não pôde ser carregada. "
-            "Confirme que market_map_v10.py e market_map_core_v10.py estão na raiz do repositório."
-        )
-        if _MARKET_MAP_V10_IMPORT_ERROR:
-            st.caption(f"Diagnóstico: {_MARKET_MAP_V10_IMPORT_ERROR}")
-    else:
-        try:
-            _macro_context_v102 = {
-                "usd_score": float(usd_detalhado.get("score", 50.0)),
-                "usd_components": dict(usd_detalhado.get("componentes", {})),
-                "usd_quality": float(qualidade_usd),
-                "fed_tone": str(fed.get("tom", "Neutro")),
-                "fed_strength": float(fed.get("forca", 0.0)),
-                "trend": _score_tendencias_eua(),
-                "surprise_adjustment": float(st.session_state.get("usd_ajuste_surpresas", 0.0)),
-                "event": _proximo_evento_macro_v65(),
-                "fomc_score": (
-                    float(st.session_state.get("v76_fomc_usd_score", 50.0))
-                    if st.session_state.get("v77_fomc_integrado", False) else None
-                ),
-                "fomc_weight": float(st.session_state.get("v77_peso_fomc", 0.0)) * 100.0,
-            }
-            render_market_map(matriz_v61, ranking, CHAVE_TWELVE_DATA, _macro_context_v102)
-        except Exception as _mm_render_exc:
-            st.error(
-                "O Market Map encontrou um erro, mas o motor base continua preservado. "
-                "Envie esta mensagem para diagnóstico."
-            )
-            st.code(f"{type(_mm_render_exc).__name__}: {_mm_render_exc}")
-
-
-
-# =========================================================
 # MATRIZ CENTRAL — disponível para Radar/Painel independente da aba 4.
 # Reusa somente scores macro já calculados; não dispara providers.
 # =========================================================
@@ -9076,6 +9037,46 @@ def _build_pair_matrix_for_surfaces_v111():
 
 if "matriz_v61" not in globals() or not isinstance(globals().get("matriz_v61"),pd.DataFrame) or globals().get("matriz_v61").empty:
     matriz_v61=_build_pair_matrix_for_surfaces_v111()
+
+
+
+# =========================================================
+# ABA 9 — V10.2 PROFESSIONAL MACRO MARKET MAP (CAMADA OBSERVACIONAL)
+# Não altera o motor base, Score Mestre ou histórico oficial.
+# =========================================================
+if _aq_active_index == 9:
+    if render_market_map is None:
+        st.error(
+            "A camada Professional Market Map V10.2 não pôde ser carregada. "
+            "Confirme que market_map_v10.py e market_map_core_v10.py estão na raiz do repositório."
+        )
+        if _MARKET_MAP_V10_IMPORT_ERROR:
+            st.caption(f"Diagnóstico: {_MARKET_MAP_V10_IMPORT_ERROR}")
+    else:
+        try:
+            _macro_context_v102 = {
+                "usd_score": float(usd_detalhado.get("score", 50.0)),
+                "usd_components": dict(usd_detalhado.get("componentes", {})),
+                "usd_quality": float(qualidade_usd),
+                "fed_tone": str(fed.get("tom", "Neutro")),
+                "fed_strength": float(fed.get("forca", 0.0)),
+                "trend": _score_tendencias_eua(),
+                "surprise_adjustment": float(st.session_state.get("usd_ajuste_surpresas", 0.0)),
+                "event": _proximo_evento_macro_v65(),
+                "fomc_score": (
+                    float(st.session_state.get("v76_fomc_usd_score", 50.0))
+                    if st.session_state.get("v77_fomc_integrado", False) else None
+                ),
+                "fomc_weight": float(st.session_state.get("v77_peso_fomc", 0.0)) * 100.0,
+            }
+            render_market_map(matriz_v61, ranking, CHAVE_TWELVE_DATA, _macro_context_v102)
+        except Exception as _mm_render_exc:
+            st.error(
+                "O Market Map encontrou um erro, mas o motor base continua preservado. "
+                "Envie esta mensagem para diagnóstico."
+            )
+            st.code(f"{type(_mm_render_exc).__name__}: {_mm_render_exc}")
+
 
 
 # =========================================================
