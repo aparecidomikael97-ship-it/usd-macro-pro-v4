@@ -309,6 +309,13 @@ jobs:
                   private_home_visible = initial_private_home
                   meaningful = initial_meaningful
 
+                  deploy_identity_ok = (not expected_commit) or (deploy_commit == expected_commit)
+                  measured_ui_ms = (
+                      None
+                      if meaningful_ms is None
+                      else max(0, int(meaningful_ms) - int(deploy_wait_ms or 0))
+                  )
+
                   info = {
                       "http_status": status,
                       "deploy_commit": deploy_commit,
@@ -316,6 +323,7 @@ jobs:
                       "deploy_wait_ms": deploy_wait_ms,
                       "deploy_seen_commits": deploy_seen_commits,
                       "deploy_identity_ok": deploy_identity_ok,
+                      "measured_ui_ms_excluding_deploy_wait": measured_ui_ms,
                       "http_attempts": http_attempts,
                       "http_status_history": status_history,
                       "render_attempts": render_attempts,
@@ -356,11 +364,13 @@ jobs:
                       failures.append(f"{name}: conteúdo útil não apareceu (Home/Radar/Fast Home/login ausentes)")
                   if auth_inputs < 1 and not (radar_visible or fast_snapshot_shell or private_home_visible):
                       failures.append(f"{name}: produção carregou Streamlit, mas não abriu uma Home válida")
-                  deploy_identity_ok = (not expected_commit) or (deploy_commit == expected_commit)
                   if meaningful_ms is None:
                       failures.append(f"{name}: tempo até conteúdo útil não foi medido")
-                  elif deploy_identity_ok and auth_inputs < 1 and meaningful_ms > 30000:
-                      failures.append(f"{name}: Home/Radar demorou {meaningful_ms}ms (>30000ms) após warm-up")
+                  elif deploy_identity_ok and auth_inputs < 1 and measured_ui_ms is not None and measured_ui_ms > 30000:
+                      failures.append(
+                          f"{name}: Home/Radar demorou {measured_ui_ms}ms (>30000ms) "
+                          "descontando a espera do deploy"
+                      )
                   elif (not deploy_identity_ok) and auth_inputs < 1:
                       # Do not attribute Render deployment wait to AtlasQuant startup latency.
                       # The missing/mismatched marker already fails this run independently.
