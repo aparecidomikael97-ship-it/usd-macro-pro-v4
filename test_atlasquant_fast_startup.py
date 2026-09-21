@@ -94,6 +94,17 @@ class FastStartupTests(unittest.TestCase):
         self.assertIn("schema",out["errors"])
 
 
+
+    def test_invalid_fast_snapshot_keeps_advanced_reachable(self):
+        from pathlib import Path
+        src=Path("atlasquant_fast_startup.py").read_text(encoding="utf-8")
+        invalid=src.index('if not check["valid"]:')
+        safe=src.index('"page":"SAFE_WAIT"',invalid)
+        block=src[invalid:safe]
+        self.assertIn('["Iniciante","Avançado"]',block)
+        self.assertIn('"handled":False',block)
+        self.assertIn('"mode":"Avançado"',block)
+
     def test_snapshot_loader_timeout_is_bounded_for_fast_boot(self):
         import inspect
         signature=inspect.signature(load_home_snapshot)
@@ -139,7 +150,8 @@ class FastStartupTests(unittest.TestCase):
     def test_advanced_transition_does_not_force_extra_streamlit_rerun(self):
         from pathlib import Path
         src=Path("atlasquant_fast_startup.py").read_text(encoding="utf-8")
-        start=src.index("mode=st.radio(")
+        valid_anchor='help="Iniciante abre rápido e mostra só o essencial. Avançado libera todos os diagnósticos."'
+        start=src.index(valid_anchor)
         end=src.index('age=float(check["age_minutes"] or 0.0)',start)
         block=src[start:end]
         self.assertIn('"handled":False',block)
