@@ -471,6 +471,13 @@ def summarize_results(records: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     gross_profit = sum(x for x in rs if x > 0)
     gross_loss = abs(sum(x for x in rs if x < 0))
     pf = None if gross_loss == 0 else gross_profit / gross_loss
+    alignment_reasons: dict[str,int] = {}
+    for item in rows:
+        if str(item.get("status","")).upper()!="ALIGNMENT_BLOCKED":
+            continue
+        reason=str(item.get("reason","") or "BLOQUEADO").strip()
+        for part in [x for x in reason.split("|") if x]:
+            alignment_reasons[part]=alignment_reasons.get(part,0)+1
     return {
         "signals": len(rows),
         "trades": len(executed),
@@ -479,6 +486,7 @@ def summarize_results(records: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
         "breakeven": be,
         "no_trade": len(rows) - len(executed),
         "alignment_blocked": sum(1 for x in rows if str(x.get("status","")).upper()=="ALIGNMENT_BLOCKED"),
+        "alignment_block_reasons": dict(sorted(alignment_reasons.items(),key=lambda kv:(-kv[1],kv[0]))),
         "win_rate_pct": None if not executed else round(gains / len(executed) * 100.0, 2),
         "net_r": round(sum(rs), 4),
         "average_r": None if not rs else round(sum(rs) / len(rs), 4),
