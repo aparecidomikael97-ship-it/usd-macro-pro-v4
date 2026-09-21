@@ -344,7 +344,11 @@ def render_academy_panel()->dict[str,Any]:
         completed=[x for x in completed if x!=item["id"]]
     st.session_state["aq_academy_completed"]=list(dict.fromkeys(completed))
 
-    from atlasquant_academy_media import academy_video_script
+    from atlasquant_academy_media import (
+        academy_media_bundle_markdown,
+        academy_media_manifest_json,
+        academy_video_script,
+    )
     media=academy_video_script(item["id"])
     if media:
         with st.expander("🎬 Roteiro do vídeo curto",expanded=False):
@@ -358,6 +362,26 @@ def render_academy_panel()->dict[str,Any]:
                 mime="text/plain",
                 key=f"aq_academy_video_script_{item['id']}",
             )
+    with st.expander("📦 Pacote de produção de todos os vídeos",expanded=False):
+        st.caption(
+            "Exporta todos os roteiros e storyboards em ordem de produção. "
+            "Não marca nenhum vídeo como renderizado ou publicado."
+        )
+        st.download_button(
+            "Baixar manifesto JSON",
+            data=academy_media_manifest_json(),
+            file_name="atlasquant_academy_video_manifest.json",
+            mime="application/json",
+            key="aq_academy_video_manifest_json",
+        )
+        st.download_button(
+            "Baixar pacote Markdown",
+            data=academy_media_bundle_markdown(),
+            file_name="atlasquant_academy_video_bundle.md",
+            mime="text/markdown",
+            key="aq_academy_video_bundle_md",
+        )
+
     coverage=academy_coverage_report()
     st.caption(
         f"Cobertura Academy: {coverage['unique_topics']} aulas · "
