@@ -12,7 +12,7 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-from atlasquant_news_nowcast import HistoricalRelease
+from atlasquant_news_nowcast import HistoricalRelease, validate_historical_release
 from atlasquant_news_backtest import simple_month_score, walk_forward_news_backtest
 
 SCHEMA="ATLASQUANT_NEWS_RESEARCH_PANEL_V1"
@@ -90,7 +90,7 @@ def normalize_news_history_csv(frame:pd.DataFrame|None)->dict[str,Any]:
             tolerance=float(row.get("tolerance",0) if pd.notna(row.get("tolerance",0)) else 0)
             if not str(row.get("indicator") or "").strip():
                 raise ValueError("indicator vazio")
-            records.append(HistoricalRelease(
+            records.append(validate_historical_release(HistoricalRelease(
                 indicator=str(row.get("indicator")).strip(),
                 scheduled_at=scheduled.to_pydatetime(),
                 captured_at=captured.to_pydatetime(),
@@ -99,7 +99,7 @@ def normalize_news_history_csv(frame:pd.DataFrame|None)->dict[str,Any]:
                 signal_score=score,
                 tolerance=tolerance,
                 unit="" if pd.isna(row.get("unit","")) else str(row.get("unit","")),
-            ))
+            )))
         except Exception as exc:
             errors.append(f"linha {int(idx)+2}: {type(exc).__name__}: {exc}")
     return {
