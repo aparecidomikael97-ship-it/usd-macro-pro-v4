@@ -21,6 +21,12 @@ from atlasquant_news_research_panel import (
     news_history_template_csv,
     normalize_news_history_csv,
 )
+from atlasquant_indicator_scenarios import (
+    FIELD_GUIDE,
+    indicator_catalog,
+    indicator_scenario_guide,
+    indicator_spec,
+)
 
 
 class CalendarTests(unittest.TestCase):
@@ -82,6 +88,44 @@ class CalendarTests(unittest.TestCase):
         self.assertEqual(value_text("nan"), "—")
 
 
+
+
+class AtlasQuantIndicatorScenarioTests(unittest.TestCase):
+    def test_previous_consensus_actual_are_explicitly_explained(self):
+        self.assertIn("Anterior",FIELD_GUIDE)
+        self.assertIn("Consenso",FIELD_GUIDE)
+        self.assertIn("Atual",FIELD_GUIDE)
+        self.assertIn("expectativa",FIELD_GUIDE["Consenso"].lower())
+
+    def test_payroll_scenarios_are_specific_and_contextual(self):
+        guide=indicator_scenario_guide("US Non Farm Payrolls")
+        self.assertTrue(guide["recognized"])
+        self.assertEqual(guide["indicator_id"],"nfp")
+        self.assertIn("salários",guide["caveat"].lower())
+        self.assertFalse(guide["price_reaction_guaranteed"])
+        self.assertFalse(guide["automatic_execution"])
+        self.assertIn("consenso",guide["scenarios"]["ABOVE"]["label"].lower())
+
+    def test_unemployment_and_claims_do_not_use_wrong_higher_is_better_rule(self):
+        unemployment=indicator_scenario_guide("Unemployment Rate")
+        claims=indicator_scenario_guide("Initial Jobless Claims")
+        self.assertIn("mais fraco",unemployment["scenarios"]["ABOVE"]["macro_context"].lower())
+        self.assertIn("fragilidade",claims["scenarios"]["ABOVE"]["macro_context"].lower())
+
+    def test_adp_warns_it_is_not_infallible_nfp_forecast(self):
+        guide=indicator_scenario_guide("ADP Employment Change")
+        self.assertTrue(guide["recognized"])
+        self.assertIn("não é uma previsão direta",guide["caveat"].lower())
+
+    def test_unknown_event_fails_closed_without_generic_direction(self):
+        guide=indicator_scenario_guide("Mystery Index")
+        self.assertFalse(guide["recognized"])
+        self.assertEqual(guide["scenarios"],{})
+        self.assertIn("não aplica",guide["interpretation"].lower())
+
+    def test_catalog_has_core_indicator_families(self):
+        ids={x["id"] for x in indicator_catalog()}
+        self.assertTrue({"cpi","pce","nfp","unemployment","jobless-claims","adp","ppi","pmi-ism","gdp"}.issubset(ids))
 
 
 class AtlasQuantNewsNowcastTests(unittest.TestCase):
