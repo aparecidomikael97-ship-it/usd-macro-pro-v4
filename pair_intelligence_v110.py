@@ -369,8 +369,8 @@ def _css():
     
 .aq-reading-order{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:2px 0 12px}
 .aq-reading-order span,.aq-reading-order b{font-size:.68rem;letter-spacing:.04em;border:1px solid rgba(148,163,184,.18);border-radius:999px;padding:5px 8px;background:rgba(15,32,53,.72)}
-.aq-reading-order span{color:#9fb0c5}.aq-reading-order b{color:#dce8f6;margin-left:auto}
-.aq-stage-label{margin:12px 0 5px;color:#91a6bd;font-size:.69rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.aq-reading-order span{color:#d3e0ef;font-weight:700}.aq-reading-order b{color:#f1f6fd;margin-left:auto;font-weight:800}
+.aq-stage-label{margin:12px 0 5px;color:#c7d6e7;font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:760px){.aq-reading-order{gap:5px}.aq-reading-order span,.aq-reading-order b{font-size:.61rem;padding:4px 6px}.aq-reading-order b{width:100%;margin-left:0;text-align:center}.aq-stage-label{margin-top:10px}}
 </style>
     """,unsafe_allow_html=True)
@@ -472,8 +472,8 @@ background:linear-gradient(180deg,rgba(17,34,57,.88),rgba(10,24,41,.82));min-hei
 .aq-op-card.green{border-top:3px solid #42d392}.aq-op-card.yellow{border-top:3px solid #f2c14e}
 .aq-op-card.red{border-top:3px solid #ff6b7a}
 .aq-op-pair{font-size:1.05rem;font-weight:800}.aq-op-action{font-size:.72rem;font-weight:800;letter-spacing:.05em}
-.aq-op-priority{font-size:1.8rem;font-weight:850;margin-top:10px}.aq-op-priority span{font-size:.75rem;color:#9fb0c6}
-.aq-op-small{font-size:.72rem;color:#9fb0c6;margin-top:8px}.aq-op-state{font-size:.76rem;margin-top:11px;font-weight:700}
+.aq-op-priority{font-size:1.8rem;font-weight:850;margin-top:10px}.aq-op-priority span{font-size:.78rem;color:#d4e1f0;font-weight:750}
+.aq-op-small{font-size:.76rem;color:#d4e1f0;font-weight:650;line-height:1.35;margin-top:8px}.aq-op-state{font-size:.76rem;margin-top:11px;font-weight:700}
 @media(max-width:760px){
   .aq-op-card{min-height:auto;padding:11px 12px;margin-bottom:7px}
   .aq-op-priority{font-size:1.45rem;margin-top:6px}
