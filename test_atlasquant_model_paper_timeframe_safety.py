@@ -171,6 +171,20 @@ class ModelPaperTimeframeSafetyTests(unittest.TestCase):
         self.assertEqual(ledger.iloc[0]["execution_timeframe"],"H1")
         self.assertNotEqual(ledger.iloc[0]["status"],"BLOCKED_TIMEFRAME")
 
+    def test_summary_keeps_m15_and_h1_statistics_separate(self):
+        ledger=pd.DataFrame([
+            {"trade_id":"m1","source_timeframe":"M15","setup_id":"fvg","status":"CLOSED","result":"WIN","realized_r":2.0},
+            {"trade_id":"h1","source_timeframe":"H1","setup_id":"crt","status":"BLOCKED_CONTEXT","result":"","realized_r":None},
+            {"trade_id":"h2","source_timeframe":"H1","setup_id":"ote","status":"WAIT_ENTRY","result":"","realized_r":None},
+        ])
+        summary=model.summarize_model_paper(ledger)
+        self.assertEqual(summary["by_timeframe"]["M15"]["closed"],1)
+        self.assertEqual(summary["by_timeframe"]["M15"]["wins"],1)
+        self.assertEqual(summary["by_timeframe"]["M15"]["net_r"],2.0)
+        self.assertEqual(summary["by_timeframe"]["H1"]["blocked_context"],1)
+        self.assertEqual(summary["by_timeframe"]["H1"]["pending"],1)
+
+
 
 if __name__=="__main__":
     unittest.main()
