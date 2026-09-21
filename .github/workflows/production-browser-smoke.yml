@@ -315,6 +315,7 @@ jobs:
                       "deploy_attempts": deploy_attempts,
                       "deploy_wait_ms": deploy_wait_ms,
                       "deploy_seen_commits": deploy_seen_commits,
+                      "deploy_identity_ok": deploy_identity_ok,
                       "http_attempts": http_attempts,
                       "http_status_history": status_history,
                       "render_attempts": render_attempts,
@@ -355,10 +356,15 @@ jobs:
                       failures.append(f"{name}: conteúdo útil não apareceu (Home/Radar/Fast Home/login ausentes)")
                   if auth_inputs < 1 and not (radar_visible or fast_snapshot_shell or private_home_visible):
                       failures.append(f"{name}: produção carregou Streamlit, mas não abriu uma Home válida")
+                  deploy_identity_ok = (not expected_commit) or (deploy_commit == expected_commit)
                   if meaningful_ms is None:
                       failures.append(f"{name}: tempo até conteúdo útil não foi medido")
-                  elif auth_inputs < 1 and meaningful_ms > 30000:
+                  elif deploy_identity_ok and auth_inputs < 1 and meaningful_ms > 30000:
                       failures.append(f"{name}: Home/Radar demorou {meaningful_ms}ms (>30000ms) após warm-up")
+                  elif (not deploy_identity_ok) and auth_inputs < 1:
+                      # Do not attribute Render deployment wait to AtlasQuant startup latency.
+                      # The missing/mismatched marker already fails this run independently.
+                      pass
                   if exception_count:
                       failures.append(f"{name}: {exception_count} stException")
                   if page_errors:
