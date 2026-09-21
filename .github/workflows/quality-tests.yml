@@ -8,6 +8,7 @@ on:
     branches: [main, atlasquant-dev, atlasquant-runtime, atlasquant-runtime-integration, atlasquant-integration, atlasquant-release-final, atlasquant-support-final, atlasquant-support-ui, atlasquant-brokers-guide, atlasquant-voice-readiness, atlasquant-academy-media, atlasquant-commercial-prep, atlasquant-final-release-prep, atlasquant-backup-workflow, atlasquant-home-radar, atlasquant-private-validation, atlasquant-fast-startup, atlasquant-startup-observability, atlasquant-voice-assistant-final, atlasquant-render-fast-home, atlasquant-mobile-dom-stability, atlasquant-natural-deep-voice]
     paths:
       - "*.py"
+      - "render.yaml"
       - "tradingview/**"
       - "docs/**"
       - ".github/workflows/quality-tests.yml"
@@ -180,6 +181,7 @@ jobs:
             test_atlasquant_finalization_audit.py \
             test_atlasquant_release_readiness_workflow.py \
             test_atlasquant_production_workflows.py \
+            test_atlasquant_render_blueprint.py \
             test_atlasquant_build_identity.py \
             test_atlasquant_release_documentation.py \
             test_atlasquant_source_backup_workflow.py \

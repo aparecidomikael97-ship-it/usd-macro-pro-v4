@@ -89,5 +89,18 @@ class AtlasQuantProductionWorkflowContractTests(unittest.TestCase):
 
 
 
+    def test_manual_render_deploy_control_is_fail_closed_and_dispatches_smoke(self):
+        text=Path(".github/workflows/render-deploy-control.yml").read_text(encoding="utf-8")
+        self.assertIn("workflow_dispatch:",text)
+        self.assertIn("actions: write",text)
+        self.assertIn("RENDER_DEPLOY_HOOK_URL",text)
+        self.assertIn("secrets.RENDER_DEPLOY_HOOK_URL",text)
+        self.assertIn("exit 1",text)
+        self.assertIn("curl -fsS",text)
+        self.assertIn("/_stcore/health",text)
+        self.assertIn("gh workflow run production-browser-smoke.yml --ref main",text)
+        self.assertNotIn("contents: write",text)
+
+
 if __name__=="__main__":
     unittest.main()
