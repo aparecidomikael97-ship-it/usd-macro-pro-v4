@@ -68,6 +68,24 @@ class ICTExecutionV108Tests(unittest.TestCase):
         self.assertEqual(candidate_rows(pack),[])
         self.assertEqual(len(pack["models"]),4)
 
+    def test_episode_id_stays_stable_when_only_capture_time_or_price_changes(self):
+        a=build_setup_candidates(
+            pair="EUR/USD",side="BUY",captured_at="2026-09-20T12:00:00Z",
+            ict_snapshot={"fvg":{
+                "status":"🟢 FVG EM TESTE","score":90,
+                "zone_low":1.10,"zone_high":1.11,"price":1.105,
+            }},
+        )
+        b=build_setup_candidates(
+            pair="EUR/USD",side="BUY",captured_at="2026-09-20T12:30:00Z",
+            ict_snapshot={"fvg":{
+                "status":"🟢 FVG EM TESTE","score":92,
+                "zone_low":1.10,"zone_high":1.11,"price":1.108,
+            }},
+        )
+        self.assertNotEqual(a["candidates"][0]["candidate_id"],b["candidates"][0]["candidate_id"])
+        self.assertEqual(a["candidates"][0]["episode_id"],b["candidates"][0]["episode_id"])
+
     def test_candidate_id_is_deterministic_for_same_point_in_time_evidence(self):
         args={
             "pair":"EUR/USD",
