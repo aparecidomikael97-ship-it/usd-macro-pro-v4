@@ -165,8 +165,10 @@ class AtlasQuantHomeRadarTests(unittest.TestCase):
 
     def test_home_radar_css_keeps_secondary_text_readable(self):
         import atlasquant_home_radar as home
-        self.assertIn("color:#d4e1f0",home.HOME_CSS)
-        self.assertIn("color:#e2ebf7",home.HOME_CSS)
+        self.assertIn("color:#eef4fb",home.HOME_CSS)
+        self.assertIn("color:#f4f8fd",home.HOME_CSS)
+        self.assertIn(".aq-home-grid span{color:#eef4fb",home.HOME_CSS)
+        self.assertIn(".aq-home-grid b{color:#ffffff",home.HOME_CSS)
         self.assertNotIn(".aq-home-grid span{color:#9fb0c6",home.HOME_CSS)
 
 
