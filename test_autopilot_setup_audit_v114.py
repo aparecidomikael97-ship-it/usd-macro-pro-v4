@@ -1,3 +1,4 @@
+import os
 import unittest
 from unittest.mock import patch
 from io import StringIO
@@ -5,6 +6,8 @@ from contextlib import redirect_stdout
 
 import pandas as pd
 
+import autopilot_news_nowcast_v1 as news_runner
+import autopilot_setup_audit_v114 as audit_runner
 from autopilot_setup_audit_v114 import (
     aggregate_setup_performance,
     build_summary,
@@ -292,6 +295,44 @@ class SetupAuditV114Tests(unittest.TestCase):
         self.assertFalse(summary["safety"]["real_orders"])
         self.assertFalse(summary["safety"]["auto_strategy_selection"])
 
+
+    def test_main_runs_news_nowcast_sidecar_and_preserves_core_return_code(self):
+        with patch.object(audit_runner.paper_runner,"main",return_value=7) as paper, \
+             patch.object(audit_runner,"_audit_cycle",return_value=(True,{"audited_trades":0},[])) as audit, \
+             patch.object(audit_runner.news_nowcast_runner,"_news_nowcast_cycle",return_value=(True,{"runtime_state":"THROTTLED"},[])) as news:
+            out=StringIO()
+            with redirect_stdout(out):
+                rc=audit_runner.main()
+        self.assertEqual(rc,7)
+        paper.assert_called_once()
+        audit.assert_called_once()
+        news.assert_called_once()
+        self.assertIn("news_nowcast_v1",out.getvalue())
+
+    def test_news_nowcast_provider_throttle_is_six_hours_by_default(self):
+        now=pd.Timestamp("2026-09-20T18:00:00Z")
+        self.assertFalse(news_runner.should_fetch_provider(
+            {"last_success_at":"2026-09-20T13:00:01Z"},now=now
+        ))
+        self.assertTrue(news_runner.should_fetch_provider(
+            {"last_success_at":"2026-09-20T11:59:59Z"},now=now
+        ))
+        self.assertTrue(news_runner.should_fetch_provider({},now=now))
+
+    def test_news_nowcast_missing_optional_provider_fails_closed_without_core_failure(self):
+        json_writes=[]
+        with patch.dict(os.environ,{"CHAVE_EODHD":""},clear=False), \
+             patch.object(news_runner.base,"gh_get_csv",return_value=(pd.DataFrame(),"")), \
+             patch.object(news_runner.base,"gh_get_json",side_effect=[({},""),({},"")]), \
+             patch.object(news_runner.base,"gh_put_json",side_effect=lambda path,obj,message:(json_writes.append((path,obj)) or (True,""))), \
+             patch.object(news_runner.base,"utcnow",return_value=pd.Timestamp("2026-09-20T18:00:00Z")):
+            ok,summary,errors=news_runner._news_nowcast_cycle()
+        self.assertTrue(ok)
+        self.assertEqual(errors,[])
+        self.assertEqual(summary["runtime_state"],"NOT_CONFIGURED")
+        self.assertFalse(summary["safety"]["real_orders"])
+        self.assertFalse(summary["safety"]["market_reaction_predicted"])
+        self.assertTrue(any(path==news_runner.SUMMARY_PATH for path,_ in json_writes))
 
     def test_status_write_failure_is_visible_in_stdout_even_when_status_cannot_persist(self):
         with patch("autopilot_setup_audit_v114.base.gh_get_csv",return_value=(pd.DataFrame(),"")), \
