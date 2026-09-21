@@ -157,20 +157,31 @@ def enrich_signals_point_in_time(
         pair_rows=context[(context["pair"]==pair)&(context["captured_at"]<=ts)]
         exact=pair_rows[pair_rows["timeframe"].eq(normalize_execution_timeframe(signal_tf))] if signal_tf else pair_rows.iloc[0:0]
         generic=pair_rows[pair_rows["timeframe"].eq("")]
-        candidates=exact if not exact.empty else generic
-        if candidates.empty:
+        if exact.empty and generic.empty:
             enriched.append(row)
             continue
-        snap=candidates.iloc[-1]
+        merged={}
+        capture_times=[]
+        if not generic.empty:
+            generic_snap=generic.iloc[-1]
+            merged.update(generic_snap.to_dict())
+            capture_times.append(pd.Timestamp(generic_snap["captured_at"]))
+        if not exact.empty:
+            exact_snap=exact.iloc[-1]
+            for key,value in exact_snap.to_dict().items():
+                if key in {"captured_at","pair","timeframe"} or _has_value(value):
+                    merged[key]=value
+            capture_times.append(pd.Timestamp(exact_snap["captured_at"]))
         matched+=1
-        if not _has_value(row.get("decision_captured_at")):
-            row["decision_captured_at"]=pd.Timestamp(snap["captured_at"]).isoformat()
+        if not _has_value(row.get("decision_captured_at")) and capture_times:
+            row["decision_captured_at"]=max(capture_times).isoformat()
         for field in CONTEXT_FIELDS:
-            # Explicit signal metadata wins over joined context.
+            # Explicit signal metadata wins. Timeframe-specific context overrides
+            # generic pair context, while generic context can fill missing fields.
             if field in row and _has_value(row.get(field)):
                 continue
-            value=snap.get(field)
-            if pd.isna(value):
+            value=merged.get(field)
+            if not _has_value(value):
                 continue
             if isinstance(value,pd.Timestamp):
                 value=value.isoformat()
