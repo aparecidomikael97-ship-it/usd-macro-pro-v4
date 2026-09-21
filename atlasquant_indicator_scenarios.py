@@ -52,7 +52,7 @@ _SPECS=(
         "above":"Criação de empregos acima do consenso sugere mercado de trabalho mais resistente e pode reduzir expectativa de afrouxamento, tudo mais constante.",
         "below":"Criação de empregos abaixo do consenso sugere trabalho mais fraco e pode aumentar expectativa de afrouxamento, tudo mais constante.",
         "inline":"Em linha: salários, desemprego e revisões dos meses anteriores podem dominar a leitura.",
-        "caveat":"Payroll não deve ser lido sozinho; Average Hourly Earnings, unemployment e revisões podem inverter a narrativa.",
+        "caveat":"Payroll não deve ser lido sozinho; salários (Average Hourly Earnings), desemprego e revisões podem inverter a narrativa.",
     },
     {
         "id":"unemployment",
