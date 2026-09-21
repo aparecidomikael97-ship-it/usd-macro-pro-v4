@@ -9182,6 +9182,7 @@ if _aq_active_index == 11:
                 macro_context=_macro_context_ux_v103,
                 source_status=STATUS_FONTE,
                 app_version=APP_VERSION,
+                experience_mode=_aq_experience_mode,
             )
         except Exception as _ux_render_exc:
             st.error("A aba de experiência encontrou um erro, mas o motor operacional continua preservado.")
