@@ -348,6 +348,17 @@ def run_model_paper_cycle(
             row=series.copy()
             status=str(row.get("status") or "").upper()
             if status in {"WAIT_ENTRY","OPEN"}:
+                source_tf=str(row.get("source_timeframe") or "M15").strip().upper()
+                if source_tf!="M15":
+                    blocked_row=row.to_dict()
+                    blocked_row["status"]="BLOCKED_TIMEFRAME"
+                    blocked_row["execution_timeframe"]=""
+                    blocked_row["timeframe_alignment_passed"]=False
+                    blocked_row["timeframe_alignment_reason"]="EXECUTION_FRAME_NOT_AVAILABLE:"+source_tf
+                    blocked_row["checklist_note"]="Paper preservado sem execução: timeframe de origem não pode usar candles M15 como substituto."
+                    blocked_row["updated_at"]=now.isoformat()
+                    updated.append(blocked_row)
+                    continue
                 frame=_m15(scanner_by_pair.get(str(row.get("pair") or "").upper(),{}))
                 before=status
                 first=_fill_entry(row,frame,now=now)
