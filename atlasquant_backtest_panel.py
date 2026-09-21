@@ -183,6 +183,7 @@ def normalize_signal_sheet(df: pd.DataFrame, default_pair: str = "", default_tim
     else:
         out["timeframe"]=out["timeframe"].fillna("").astype(str).str.strip().str.upper()
         out.loc[out["timeframe"].eq(""),"timeframe"]=_profile["timeframe"]
+        out["timeframe"]=[timeframe_profile(x)["timeframe"] for x in out["timeframe"]]
     if "trading_style" not in out.columns:
         out["trading_style"]=""
     out["trading_style"]=out["trading_style"].fillna("").astype(str).str.strip().str.upper()
