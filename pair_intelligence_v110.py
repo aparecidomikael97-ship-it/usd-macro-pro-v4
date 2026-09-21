@@ -477,8 +477,8 @@ background:linear-gradient(180deg,rgba(17,34,57,.88),rgba(10,24,41,.82));min-hei
 @media(max-width:760px){
   .aq-op-card{min-height:auto;padding:11px 12px;margin-bottom:7px}
   .aq-op-priority{font-size:1.45rem;margin-top:6px}
-  .aq-op-small{font-size:.67rem;margin-top:5px}
-  .aq-op-state{font-size:.7rem;margin-top:7px}
+  .aq-op-small{font-size:.72rem;margin-top:5px}
+  .aq-op-state{font-size:.73rem;margin-top:7px}
   .aq-op-action{font-size:.64rem}
 }
 </style>
