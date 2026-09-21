@@ -32,6 +32,7 @@ class AtlasQuantProductionWorkflowContractTests(unittest.TestCase):
         src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
         self.assertIn('os.getenv("RENDER_GIT_COMMIT","")',src)
         self.assertIn('os.getenv("ATLASQUANT_DEPLOY_COMMIT","")',src)
+        self.assertIn('os.getenv("GIT_COMMIT","")',src)
         self.assertIn('id="atlasquant-deploy-marker"',src)
 
 
