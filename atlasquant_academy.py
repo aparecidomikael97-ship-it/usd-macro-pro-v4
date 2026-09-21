@@ -20,6 +20,13 @@ ACADEMY_TOPICS=(
         "pitfall":"Transformar uma regra geral em certeza de movimento imediato.",
     },
     {
+        "id":"microeconomics-markets","category":"Macroeconomia","title":"Microeconomia aplicada ao mercado","level":"Intermediário",
+        "summary":"Microeconomia ajuda a entender decisões de empresas e consumidores, custos, margens, oferta, demanda e transmissão de preços.",
+        "watch":"Oferta e demanda, elasticidade, custos, estoques, margens e como choques setoriais podem aparecer em inflação e atividade.",
+        "forex":"Ela complementa a macro: ajuda a explicar por que um choque de energia, crédito ou consumo pode mudar inflação, crescimento e expectativas de juros.",
+        "pitfall":"Tentar transformar um dado de uma empresa ou setor em direção automática para uma moeda inteira.",
+    },
+    {
         "id":"inflation","category":"Macroeconomia","title":"Inflação","level":"Iniciante",
         "summary":"Inflação mede a velocidade de aumento dos preços; persistência importa tanto quanto o número cheio.",
         "watch":"Tendência, núcleo, consenso e reação do banco central.",
@@ -83,6 +90,13 @@ ACADEMY_TOPICS=(
         "pitfall":"Comparar apenas a taxa atual e ignorar a trajetória esperada.",
     },
     {
+        "id":"g8-central-banks","category":"Bancos centrais","title":"ECB, BoE, BoJ e bancos centrais do G8","level":"Intermediário",
+        "summary":"Além do Fed, ECB, BoE, BoJ, BoC, RBA, RBNZ e SNB moldam o valor relativo das principais moedas.",
+        "watch":"Decisão, guidance, inflação doméstica, crescimento, mercado de trabalho, votação e diferenças de trajetória entre bancos centrais.",
+        "forex":"EUR, GBP, JPY, CAD, AUD, NZD e CHF reagem ao que muda na política esperada de seu banco central em comparação com o outro lado do par.",
+        "pitfall":"Analisar uma moeda só pelo Fed e ignorar o banco central da moeda base ou cotada.",
+    },
+    {
         "id":"hawkish-dovish","category":"Bancos centrais","title":"Hawkish x Dovish","level":"Iniciante",
         "summary":"Hawkish indica maior preocupação com inflação; dovish, maior tolerância a política mais frouxa.",
         "watch":"Mudanças de linguagem em comunicado, ata e coletiva.",
@@ -109,6 +123,13 @@ ACADEMY_TOPICS=(
         "watch":"2Y/10Y, DXY, equities, ouro e correlações que podem mudar por regime.",
         "forex":"Confirmações intermarket aumentam contexto; divergências pedem cautela.",
         "pitfall":"Assumir correlação fixa em todos os regimes.",
+    },
+    {
+        "id":"geopolitics-fx","category":"Intermarket","title":"Geopolítica aplicada ao Forex","level":"Intermediário",
+        "summary":"Conflitos, sanções, eleições, comércio e energia podem alterar risco, inflação, crescimento e fluxos entre moedas.",
+        "watch":"Fato confirmado, fonte, ativos diretamente expostos, energia/commodities, reação de yields e se o efeito é temporário ou muda a narrativa macro.",
+        "forex":"O impacto depende do canal econômico e do regime; moedas de refúgio, commodities e países mais expostos podem reagir de formas diferentes.",
+        "pitfall":"Operar manchete isolada, rumor ou rótulo político sem separar fato, transmissão econômica e reação já precificada.",
     },
     {
         "id":"relative-strength","category":"Forex","title":"Força relativa das 8 moedas","level":"Iniciante",
@@ -232,15 +253,45 @@ def academy_progress(completed_ids: Sequence[object] | None)->dict[str,Any]:
     }
 
 
-def academy_minimum_text_ready()->bool:
-    required={
-        "macro-foundations","inflation","cpi","pce","ppi","nfp","unemployment-wages",
-        "pmi-ism","gdp","central-banks","hawkish-dovish","fomc-dotplot",
-        "calendar-surprise","dxy-crossasset","relative-strength","liquidity-structure",
-        "fvg","ote","quarterly-theory","quarterly-multitimeframe","quarterly-amd","quarterly-execution","crt-amd","risk","atlasquant-reading",
+ACADEMY_REQUIRED_TOPIC_IDS=frozenset({
+    "macro-foundations","microeconomics-markets","inflation","cpi","pce","ppi",
+    "nfp","unemployment-wages","pmi-ism","gdp","central-banks","g8-central-banks",
+    "hawkish-dovish","fomc-dotplot","calendar-surprise","dxy-crossasset",
+    "geopolitics-fx","relative-strength","liquidity-structure","fvg","ote",
+    "quarterly-theory","quarterly-multitimeframe","quarterly-amd",
+    "quarterly-execution","crt-amd","risk","atlasquant-reading",
+})
+
+
+def academy_coverage_report()->dict[str,Any]:
+    ids=[str(x["id"]) for x in ACADEMY_TOPICS]
+    unique=set(ids)
+    missing=sorted(ACADEMY_REQUIRED_TOPIC_IDS-unique)
+    duplicate_count=len(ids)-len(unique)
+    media_ready=False
+    try:
+        # Local import avoids a module cycle during Academy startup.
+        from atlasquant_academy_media import academy_video_scripts_ready
+        media_ready=bool(academy_video_scripts_ready())
+    except Exception:
+        media_ready=False
+    return {
+        "schema":"ATLASQUANT_ACADEMY_COVERAGE_V1",
+        "topics":len(ids),
+        "unique_topics":len(unique),
+        "required_topics":len(ACADEMY_REQUIRED_TOPIC_IDS),
+        "missing_required":missing,
+        "duplicate_ids":duplicate_count,
+        "text_ready":not missing and duplicate_count==0,
+        "video_scripts_ready":media_ready,
+        "rendered_media_required_externally":True,
+        "trading_side_effects":False,
     }
-    ids={str(x["id"]) for x in ACADEMY_TOPICS}
-    return required.issubset(ids) and len(ids)==len(ACADEMY_TOPICS)
+
+
+def academy_minimum_text_ready()->bool:
+    report=academy_coverage_report()
+    return bool(report["text_ready"])
 
 
 def render_academy_panel()->dict[str,Any]:
@@ -307,11 +358,17 @@ def render_academy_panel()->dict[str,Any]:
                 mime="text/plain",
                 key=f"aq_academy_video_script_{item['id']}",
             )
+    coverage=academy_coverage_report()
+    st.caption(
+        f"Cobertura Academy: {coverage['unique_topics']} aulas · "
+        f"{coverage['required_topics']} requisitos curriculares mínimos cobertos."
+    )
     st.info("Roteiros dos vídeos estão preparados; renderização/publicação de mídia continua como etapa externa separada.")
-    return {"visible":len(rows),**academy_progress(completed),"text_ready":academy_minimum_text_ready()}
+    return {"visible":len(rows),**academy_progress(completed),"text_ready":academy_minimum_text_ready(),"coverage":coverage}
 
 
 __all__=[
     "SCHEMA","ACADEMY_TOPICS","academy_catalog","academy_search","academy_topic",
-    "academy_progress","academy_minimum_text_ready","render_academy_panel",
+    "academy_progress","ACADEMY_REQUIRED_TOPIC_IDS","academy_coverage_report",
+    "academy_minimum_text_ready","render_academy_panel",
 ]
