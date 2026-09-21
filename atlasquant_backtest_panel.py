@@ -32,6 +32,8 @@ from atlasquant_strategy_comparator import (
     comparison_frame,
     breakdown_frame,
     combined_ledger,
+    run_multitimeframe_strategy_suite,
+    multitimeframe_comparison_frame,
 )
 from atlasquant_strategy_stability import temporal_stability_report
 from atlasquant_strategy_walkforward import walk_forward_report
@@ -1626,6 +1628,80 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                     "Comparação histórica não garante resultado futuro. Estratégias com poucas "
                     "operações ficam fora do ranking observado para reduzir leitura enganosa de amostra pequena."
                 )
+
+
+    with st.expander("🧭 Matriz multitimeframe — 5 operacionais × M15 a W1", expanded=False):
+        st.caption(
+            "Permite comparar os mesmos cinco operacionais em M15, M30, H1, H4, D1 e W1. "
+            "Cada timeframe recebe seu próprio CSV nativo; D1 e W1 não são inventados a partir de um M15 curto."
+        )
+        mt_files={}
+        mt_cols=st.columns(3)
+        for _idx,_tf in enumerate(SUPPORTED_EXECUTION_TIMEFRAMES):
+            with mt_cols[_idx % 3]:
+                mt_files[_tf]=st.file_uploader(
+                    f"Candles {_tf} (CSV)",
+                    type=["csv"],
+                    key=f"atlasquant_mt_file_{_tf}",
+                )
+        _loaded_mt={}
+        _invalid_mt={}
+        for _tf,_file in mt_files.items():
+            if _file is None:
+                continue
+            try:
+                _raw=read_csv_bytes(_file.getvalue())
+                _frame=normalize_tradingview_candles(_raw)
+            except Exception as _exc:
+                _invalid_mt[_tf]=f"{type(_exc).__name__}: {_exc}"
+                continue
+            if _frame.empty:
+                _invalid_mt[_tf]="CSV sem candles OHLC válidos"
+            else:
+                _loaded_mt[_tf]=_frame
+        if _invalid_mt:
+            st.warning("Timeframes ignorados por CSV inválido: "+", ".join(f"{k}: {v}" for k,v in _invalid_mt.items()))
+        if _loaded_mt:
+            st.caption(
+                "Arquivos prontos: "+", ".join(f"{tf} ({len(df)} candles)" for tf,df in _loaded_mt.items())
+            )
+        if st.button(
+            "🧪 Rodar matriz multitimeframe",
+            key="atlasquant_mt_run",
+            disabled=not bool(_loaded_mt),
+        ):
+            _mt_suites=run_multitimeframe_strategy_suite(
+                _loaded_mt,
+                pair=default_pair,
+                cost_r=float(cost_r),
+                slippage_r=float(slippage_r),
+                context_snapshots=context_snapshots,
+            )
+            _mt_comparison=multitimeframe_comparison_frame(
+                _mt_suites,
+                min_trades_for_rank=int(min_rank_trades),
+            )
+            if _mt_comparison.empty:
+                st.info("Nenhuma amostra executável foi produzida pelos arquivos enviados.")
+            else:
+                _mt_cols=[
+                    "timeframe","trading_style","operacional","signals","trades","gains","losses",
+                    "breakeven","win_rate_pct","expectancy_r","net_r","profit_factor",
+                    "max_drawdown_r","sample_tier","observed_expectancy_rank",
+                ]
+                st.dataframe(_mt_comparison.reindex(columns=_mt_cols),width="stretch",hide_index=True)
+                st.download_button(
+                    "📥 Baixar matriz multitimeframe (CSV)",
+                    data=_mt_comparison.to_csv(index=False),
+                    file_name=f"atlasquant_multitimeframe_{default_pair.replace('/','_')}.csv",
+                    mime="text/csv",
+                    key="atlasquant_mt_export",
+                )
+                st.caption(
+                    "O ranking observado, quando existir, é calculado dentro de cada timeframe e exige amostra mínima. "
+                    "Não existe promoção automática entre timeframes."
+                )
+
 
     with st.expander("🗂️ Histórico local de snapshots", expanded=False):
         st.caption(
