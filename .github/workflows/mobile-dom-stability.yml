@@ -211,6 +211,24 @@ jobs:
                       errors.append("seletor Área avançada não apareceu")
                   assert_clean(page,"advanced-enter",page_errors)
 
+                  # Regression: Radar and Master Panel must work before opening
+                  # the pair-detail workspace. This reproduces the real mobile path.
+                  initial_advanced_text=body(page)
+                  if "O Radar aguarda a Matriz dos 7 pares nesta execução." in initial_advanced_text:
+                      errors.append("Radar ainda depende da aba Pares para criar a Matriz")
+                  try:
+                      select_area(page,"🧭 Painel mestre")
+                      master_text=body(page)
+                      if "NameError" in master_text and "matriz_v61" in master_text:
+                          errors.append("Painel Mestre ainda apresenta NameError de matriz_v61")
+                      if "Painel Mestre aguardando a Matriz dos 7 pares" in master_text:
+                          errors.append("Painel Mestre ainda depende da ordem das abas")
+                      assert_clean(page,"matrix-before-pairs-master",page_errors)
+                      select_area(page,"🎯 Radar")
+                      assert_clean(page,"matrix-before-pairs-radar",page_errors)
+                  except Exception as exc:
+                      errors.append(f"matrix-before-pairs: {type(exc).__name__}: {exc}")
+
                   # Repeatedly cross the workspaces most likely to cause large DOM churn.
                   sequence=[
                       "🎯 Radar",
