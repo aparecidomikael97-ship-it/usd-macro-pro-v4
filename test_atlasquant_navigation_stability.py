@@ -71,7 +71,8 @@ class AtlasQuantNavigationStabilityTests(unittest.TestCase):
         src=APP.read_text(encoding="utf-8")
         self.assertIn('["EUR/USD","GBP/USD","AUD/USD","NZD/USD","USD/JPY","USD/CHF","USD/CAD"]',src)
         self.assertIn('_df.insert(0,"Ranking",range(1,len(_df)+1))',src)
-        self.assertIn('sort_values(["Índice ranking","Qualidade","Score final"]',src)
+        compact="".join(src.split())
+        self.assertIn('sort_values(["Índiceranking","Qualidade","Scorefinal"]',compact)
         self.assertIn('"⚪ AGUARDAR CONFIRMAÇÃO"',src)
 
 
