@@ -82,15 +82,17 @@ Este documento começa exatamente onde a preparação interna termina. Nenhum it
 - geração somente por ação explícita;
 - isolamento total do trading.
 
-**Ação externa necessária**
-- escolher/configurar provedor TTS;
-- armazenar chave no secret store;
-- validar voz, custo, limites e privacidade;
-- conectar retorno de áudio ao player.
+**Ação externa necessária — fazer no computador**
+- criar uma chave da OpenAI Platform para a API; não colar a chave em chat, issue, commit ou print;
+- armazenar `OPENAI_API_KEY` somente no secret store do Render;
+- confirmar no Render os defaults `ATLASQUANT_TTS_MODEL=gpt-4o-mini-tts`, `ATLASQUANT_TTS_VOICE=cedar` e, se desejado, `ATLASQUANT_TTS_SPEED=0.96`;
+- disparar/revisar o deploy após salvar os secrets;
+- validar no aplicativo publicado que a voz é neural masculina pt-BR e que, sem provedor, o produto fica em texto — nunca volta para Google/browser/device TTS;
+- validar custo, limites e privacidade do provedor.
 
 **Evidência de conclusão**
 - áudio real validado sem expor secret;
-- fallback testado;
+- fail-closed testado: indisponibilidade do provedor mantém texto e não usa voz do navegador/dispositivo;
 - `voice_ready` só deve mudar depois disso.
 
 ## 6. Vídeos da Academy
