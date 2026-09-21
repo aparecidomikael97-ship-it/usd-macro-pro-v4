@@ -40,18 +40,35 @@ class AtlasQuantProductionWorkflowContractTests(unittest.TestCase):
     def test_browser_smoke_separates_deploy_identity_from_latency_failure(self):
         text=Path(".github/workflows/production-browser-smoke.yml").read_text(encoding="utf-8")
         self.assertIn("deploy_identity_ok",text)
-        self.assertIn("deploy_commit == expected_commit",text)
+        self.assertIn("source_build == expected_build",text)
+        self.assertIn("atlasquant-source-build-marker",text)
         self.assertIn("deploy_identity_ok and auth_inputs < 1 and measured_ui_ms is not None and measured_ui_ms > 30000",text)
         self.assertIn("measured_ui_ms_excluding_deploy_wait",text)
         self.assertIn("Do not attribute Render deployment wait",text)
 
     def test_browser_smoke_defines_identity_before_reporting_it(self):
         text=Path(".github/workflows/production-browser-smoke.yml").read_text(encoding="utf-8")
-        assign=text.index("deploy_identity_ok = (not expected_commit) or (deploy_commit == expected_commit)")
+        assign=text.index("deploy_identity_ok = bool(source_build and source_build == expected_build)")
         report=text.index('"deploy_identity_ok": deploy_identity_ok')
         self.assertLess(assign,report)
         self.assertIn("measured_ui_ms_excluding_deploy_wait",text)
         self.assertIn("meaningful_ms) - int(deploy_wait_ms",text)
+
+    def test_browser_smoke_uses_source_bundle_identity_when_git_metadata_is_missing(self):
+        text=Path(".github/workflows/production-browser-smoke.yml").read_text(encoding="utf-8")
+        self.assertIn("short_source_fingerprint",text)
+        self.assertIn("expected_source_build",text)
+        self.assertIn("atlasquant-source-build-marker",text)
+        self.assertIn("deploy_seen_builds",text)
+        self.assertIn("source_build != expected_build",text)
+        self.assertIn("uses: actions/checkout@v7",text)
+
+    def test_app_exposes_source_bundle_marker_before_fast_home_can_stop(self):
+        src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        marker=src.index('id="atlasquant-source-build-marker"')
+        fast=src.index("load_home_snapshot(",marker)
+        self.assertLess(marker,fast)
+
 
 
 if __name__=="__main__":

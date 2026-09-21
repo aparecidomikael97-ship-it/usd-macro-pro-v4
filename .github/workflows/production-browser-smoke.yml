@@ -21,6 +21,8 @@ jobs:
     env:
       APP_URL: "https://atlasquant-private.onrender.com"
     steps:
+      - uses: actions/checkout@v7
+
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
@@ -104,6 +106,7 @@ jobs:
           import time
           from pathlib import Path
           from playwright.sync_api import sync_playwright
+          from atlasquant_build_identity import short_source_fingerprint
 
           url = os.environ["APP_URL"]
           out = Path("browser-smoke")
@@ -113,7 +116,13 @@ jobs:
               "desktop": {"viewport": {"width": 1440, "height": 1000}, "is_mobile": False},
               "mobile": {"viewport": {"width": 390, "height": 844}, "is_mobile": True},
           }
-          report = {"url": url, "profiles": {}, "expected_commit": os.environ.get("GITHUB_SHA","")}
+          expected_build = short_source_fingerprint(Path.cwd(),16)
+          report = {
+              "url": url,
+              "profiles": {},
+              "expected_commit": os.environ.get("GITHUB_SHA",""),
+              "expected_source_build": expected_build,
+          }
           expected_commit = str(report["expected_commit"] or "").strip()
           failures = []
 
@@ -163,28 +172,36 @@ jobs:
                       pass
                   page.wait_for_timeout(2_000)
 
-                  # Actions may start before Render has deployed the same commit.
-                  # Wait for the exact production identity before evaluating UI.
+                  # Git metadata is not guaranteed on every Render runtime. Wait for
+                  # the deterministic executable source-bundle identity instead.
                   deploy_wait_started = time.perf_counter()
                   deploy_attempts = 0
                   deploy_seen_commits = []
-                  if expected_commit:
-                      for deploy_attempt in range(1, 19):
-                          deploy_attempts = deploy_attempt
-                          marker = page.locator("#atlasquant-deploy-marker")
-                          current = ""
-                          if marker.count():
-                              current = str(marker.first.get_attribute("data-commit") or "").strip()
-                          if current and current not in deploy_seen_commits:
-                              deploy_seen_commits.append(current)
-                          if current == expected_commit:
-                              break
-                          if deploy_attempt < 18:
-                              page.wait_for_timeout(10_000)
-                              try:
-                                  page.reload(wait_until="domcontentloaded", timeout=180_000)
-                              except Exception:
-                                  pass
+                  deploy_seen_builds = []
+                  source_build = ""
+                  for deploy_attempt in range(1, 19):
+                      deploy_attempts = deploy_attempt
+                      marker = page.locator("#atlasquant-deploy-marker")
+                      current = ""
+                      if marker.count():
+                          current = str(marker.first.get_attribute("data-commit") or "").strip()
+                      if current and current not in deploy_seen_commits:
+                          deploy_seen_commits.append(current)
+                      build_marker = page.locator("#atlasquant-source-build-marker")
+                      if build_marker.count():
+                          source_build = str(
+                              build_marker.first.get_attribute("data-build") or ""
+                          ).strip().lower()
+                          if source_build and source_build not in deploy_seen_builds:
+                              deploy_seen_builds.append(source_build)
+                      if source_build == expected_build:
+                          break
+                      if deploy_attempt < 18:
+                          page.wait_for_timeout(10_000)
+                          try:
+                              page.reload(wait_until="domcontentloaded", timeout=180_000)
+                          except Exception:
+                              pass
                   deploy_wait_ms = round((time.perf_counter()-deploy_wait_started)*1000)
 
                   body_text = ""
@@ -309,7 +326,7 @@ jobs:
                   private_home_visible = initial_private_home
                   meaningful = initial_meaningful
 
-                  deploy_identity_ok = (not expected_commit) or (deploy_commit == expected_commit)
+                  deploy_identity_ok = bool(source_build and source_build == expected_build)
                   measured_ui_ms = (
                       None
                       if meaningful_ms is None
@@ -319,9 +336,12 @@ jobs:
                   info = {
                       "http_status": status,
                       "deploy_commit": deploy_commit,
+                      "source_build": source_build,
+                      "expected_source_build": expected_build,
                       "deploy_attempts": deploy_attempts,
                       "deploy_wait_ms": deploy_wait_ms,
                       "deploy_seen_commits": deploy_seen_commits,
+                      "deploy_seen_builds": deploy_seen_builds,
                       "deploy_identity_ok": deploy_identity_ok,
                       "measured_ui_ms_excluding_deploy_wait": measured_ui_ms,
                       "http_attempts": http_attempts,
@@ -350,10 +370,13 @@ jobs:
                   }
                   report["profiles"][name] = info
 
-                  if expected_commit and deploy_commit and deploy_commit != expected_commit:
-                      failures.append(f"{name}: deploy commit {deploy_commit[:12]} != esperado {expected_commit[:12]}")
-                  if expected_commit and not deploy_commit:
-                      failures.append(f"{name}: marcador de deploy ausente; smoke pode estar vendo versão antiga")
+                  if source_build != expected_build:
+                      failures.append(
+                          f"{name}: source build {source_build or 'AUSENTE'} != esperado {expected_build}"
+                      )
+                  # Git commit remains diagnostic only. The source bundle is the
+                  # authoritative production-code identity when host git metadata
+                  # is unavailable.
                   if status is None or status >= 400:
                       failures.append(f"{name}: HTTP {status}")
                   if streamlit_container < 1:

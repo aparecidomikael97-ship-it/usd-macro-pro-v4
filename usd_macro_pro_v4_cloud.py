@@ -22,6 +22,7 @@ import json
 import math
 import os
 import subprocess
+from atlasquant_build_identity import short_source_fingerprint
 import time
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -274,6 +275,15 @@ if _ATLASQUANT_DEPLOY_COMMIT:
         f'<span id="atlasquant-deploy-marker" data-commit="{_ATLASQUANT_DEPLOY_COMMIT}" style="display:none"></span>',
         unsafe_allow_html=True,
     )
+
+# The source-bundle fingerprint does not depend on Render exposing git metadata.
+# It lets the production smoke prove that the executable app bundle matches the
+# checked-out code even when RENDER_GIT_COMMIT is unavailable.
+_ATLASQUANT_SOURCE_BUILD=short_source_fingerprint(Path(__file__).resolve().parent,16)
+st.markdown(
+    f'<span id="atlasquant-source-build-marker" data-build="{_ATLASQUANT_SOURCE_BUILD}" style="display:none"></span>',
+    unsafe_allow_html=True,
+)
 
 # Optional private-access gate. Disabled by default; when required it fails closed.
 if render_access_gate is not None:
