@@ -56,6 +56,17 @@ class AtlasQuantNavigationStabilityTests(unittest.TestCase):
         for forbidden in ("Score Mestre =","real_orders_enabled=True","automatic_execution=True"):
             self.assertNotIn(forbidden,ui)
 
+    def test_radar_and_master_matrix_do_not_depend_on_opening_pair_tab_first(self):
+        src=APP.read_text(encoding="utf-8")
+        builder=src.index("def _build_pair_matrix_for_surfaces_v111")
+        master=src.index("# ABA 1 — V10.2.2 PAINEL MESTRE")
+        pair_tab=src.index("if _aq_active_index == 4:")
+        self.assertGreaterEqual(builder,0)
+        self.assertLess(builder,master)
+        self.assertGreater(pair_tab,-1)
+        self.assertIn('matriz_v61=_build_pair_matrix_for_surfaces_v111()',src)
+        self.assertIn('_matrix_master_v102 = globals().get("matriz_v61")',src)
+
 
 if __name__=="__main__":
     unittest.main()
