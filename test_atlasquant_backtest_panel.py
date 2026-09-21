@@ -130,6 +130,18 @@ class BacktestPanelTests(unittest.TestCase):
         self.assertIn("Candles {_tf} (CSV)",source)
         self.assertIn("Baixar matriz multitimeframe",source)
 
+
+    def test_signal_template_exposes_alignment_contract(self):
+        template=signal_template_csv()
+        for field in ("timeframe","trading_style","reading_aligned","direction_aligned","filters_aligned","trigger_aligned"):
+            self.assertIn(field,template)
+
+    def test_panel_requires_alignment_for_execution_grade_backtests(self):
+        source=inspect.getsource(render_operational_backtest_panel)
+        self.assertIn("require_alignment=True",source)
+        self.assertIn("leitura, direção, filtros e gatilho",source)
+        self.assertIn("Bloq. alinhamento",inspect.getsource(__import__("atlasquant_backtest_panel")))
+
     def test_panel_exposes_automatic_replay(self):
         source=inspect.getsource(render_operational_backtest_panel)
         self.assertIn("Rodar backtest automático",source)
