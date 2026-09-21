@@ -43,14 +43,14 @@ def _safe_diagnostic(value:Any,*secrets:str)->str:
         if secret:
             text=text.replace(secret,"[REDACTED]")
     text=re.sub(
-        r"([?&](?:api_token|apikey|api_key|access_token|token)=)[^&\\s\"']+",
-        r"\\1[REDACTED]",
+        r"([?&](?:api_token|apikey|api_key|access_token|token)=)[^&\s\"']+",
+        r"\1[REDACTED]",
         text,
         flags=re.IGNORECASE,
     )
     text=re.sub(
-        r"((?:api_token|apikey|api_key|access_token|token)\\s*[=:]\\s*)[A-Za-z0-9._-]{8,}",
-        r"\\1[REDACTED]",
+        r"((?:api_token|apikey|api_key|access_token|token)\s*[=:]\s*)[A-Za-z0-9._-]{8,}",
+        r"\1[REDACTED]",
         text,
         flags=re.IGNORECASE,
     )
