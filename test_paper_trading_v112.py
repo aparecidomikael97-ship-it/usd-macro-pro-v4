@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import patch
 import pandas as pd
 import paper_trading_v112 as p
+import atlasquant_model_paper as mp
 
 class PaperTradingV112SafetyTests(unittest.TestCase):
     def _bars(self,start="2026-09-17T08:00:00Z",n=40,base=1.1000):
@@ -138,6 +139,109 @@ class PaperTradingV112SafetyTests(unittest.TestCase):
             chk=p.evaluate_pair_checklist("EUR/USD",self.input,scanner,self.map,now=self.now)
         self.assertEqual(chk["setup_id"],"")
         self.assertEqual(chk["setup_attribution"],"UNATTRIBUTED")
+
+    def _model_scanner(self,candidates,bars=None):
+        bars=bars or self._bars(start="2026-09-20T07:00:00Z",n=20)
+        return {"resultados":{"EUR/USD":{
+            "m15_fetched_at":bars[-1]["datetime"],
+            "tecnico":{
+                "dados_disponiveis":True,
+                "cache_v110":{"m15":bars},
+                "ict":{"setup_candidates":{"candidates":candidates}},
+            },
+        }}}
+
+    def _model_checklist(self,setup_id,passed=True):
+        return {
+            "pair":"EUR/USD","side":"BUY","setup_id":setup_id,
+            "setup_attribution":"EXPLICIT_INPUT",
+            "all_checks_passed":passed,
+            "decision":{
+                "state":"EXECUTABLE" if passed else "BLOCKED",
+                "hard_blocks":[] if passed else ["EVENT_RISK"],
+                "soft_blocks":[],
+            },
+            "score_master":90.0,"quality":90.0,"rank_index":1.0,
+            "h4":"OK","h1":"OK","m15":"OK",
+            "ict_readiness":90.0,"institutional_readiness":90.0,
+            "gate":"READY","gate_score":90.0,"adr_used_pct":30.0,
+            "event_risk":"NORMAL" if passed else "ALTO",
+            "technical_age_min":0.0,"map_age_min":0.0,
+            "data_sufficient":True,"data_quality_pct":95.0,
+            "d1_regime":"TREND","w1_regime":"EXPANSION",
+            "active_session":"London",
+        }
+
+    def test_model_paper_allows_two_setups_on_same_pair_without_cross_labeling(self):
+        candidates=[
+            {
+                "candidate_id":"c-fvg","episode_id":"e-fvg","setup_id":"fvg",
+                "source_model":"FVG","source_timeframe":"M15","pair":"EUR/USD",
+                "side":"BUY","captured_at":"2026-09-20T12:00:00Z",
+                "status":"🟢 FVG EM TESTE","score":90,
+                "research_candidate":True,"evidence":{"zone_low":1.1,"zone_high":1.11},
+            },
+            {
+                "candidate_id":"c-ote","episode_id":"e-ote","setup_id":"ote",
+                "source_model":"OTE","source_timeframe":"H1","pair":"EUR/USD",
+                "side":"BUY","captured_at":"2026-09-20T12:00:00Z",
+                "status":"🟢 DENTRO DO OTE","score":88,
+                "research_candidate":True,"evidence":{"zone_low":1.09,"zone_high":1.11},
+            },
+        ]
+        scanner=self._model_scanner(candidates)
+        inputs={"pairs":[{"Par":"EUR/USD","Direção":"COMPRA","Score final":90,"Qualidade":90,"Índice ranking":1}]}
+        master={"contexts":{"EUR/USD":{}}}
+        def checklist(pair,row,scanner_pair,map_ctx,now=None):
+            return self._model_checklist(row.get("setup_id"),True)
+        with patch("atlasquant_model_paper.evaluate_pair_checklist",side_effect=checklist):
+            ledger,cycle=mp.run_model_paper_cycle(inputs,scanner,master,now=pd.Timestamp("2026-09-20T12:05:00Z"))
+        self.assertEqual(len(ledger),2)
+        self.assertEqual(set(ledger["setup_id"].astype(str)),{"fvg","ote"})
+        self.assertEqual(set(ledger["setup_attribution"].astype(str)),{"SOURCE_MODEL_EXPLICIT"})
+        self.assertEqual(set(ledger["status"].astype(str)),{"WAIT_ENTRY"})
+        self.assertEqual(cycle["new_qualified"],2)
+        self.assertFalse(cycle["setup_inference_used"])
+
+    def test_model_paper_records_blocked_candidate_instead_of_hiding_it(self):
+        candidate={
+            "candidate_id":"c-fvg","episode_id":"e-fvg","setup_id":"fvg",
+            "source_model":"FVG","source_timeframe":"M15","pair":"EUR/USD",
+            "side":"BUY","captured_at":"2026-09-20T12:00:00Z",
+            "status":"🟢 FVG EM TESTE","score":90,
+            "research_candidate":True,"evidence":{"zone_low":1.1,"zone_high":1.11},
+        }
+        scanner=self._model_scanner([candidate])
+        inputs={"pairs":[{"Par":"EUR/USD","Direção":"COMPRA"}]}
+        with patch("atlasquant_model_paper.evaluate_pair_checklist",return_value=self._model_checklist("fvg",False)):
+            ledger,cycle=mp.run_model_paper_cycle(inputs,scanner,{"contexts":{"EUR/USD":{}}},now=pd.Timestamp("2026-09-20T12:05:00Z"))
+        self.assertEqual(len(ledger),1)
+        self.assertEqual(ledger.iloc[0]["status"],"BLOCKED_CONTEXT")
+        self.assertIn("EVENT_RISK",str(ledger.iloc[0]["context_hard_blocks"]))
+        self.assertEqual(cycle["new_blocked"],1)
+        self.assertEqual(cycle["closed_trades"],0)
+
+    def test_model_paper_deduplicates_repeated_scan_by_episode_id(self):
+        candidate={
+            "candidate_id":"snapshot-1","episode_id":"same-episode","setup_id":"fvg",
+            "source_model":"FVG","source_timeframe":"M15","pair":"EUR/USD",
+            "side":"BUY","captured_at":"2026-09-20T12:00:00Z",
+            "status":"🟢 FVG EM TESTE","score":90,
+            "research_candidate":True,"evidence":{"zone_low":1.1,"zone_high":1.11},
+        }
+        scanner=self._model_scanner([candidate])
+        inputs={"pairs":[{"Par":"EUR/USD","Direção":"COMPRA"}]}
+        with patch("atlasquant_model_paper.evaluate_pair_checklist",return_value=self._model_checklist("fvg",False)):
+            first,_=mp.run_model_paper_cycle(inputs,scanner,{"contexts":{"EUR/USD":{}}},now=pd.Timestamp("2026-09-20T12:05:00Z"))
+            repeated=dict(candidate)
+            repeated["candidate_id"]="snapshot-2"
+            repeated["captured_at"]="2026-09-20T12:30:00Z"
+            second,cycle=mp.run_model_paper_cycle(
+                inputs,self._model_scanner([repeated]),{"contexts":{"EUR/USD":{}}},
+                first,now=pd.Timestamp("2026-09-20T12:35:00Z"),
+            )
+        self.assertEqual(len(second),1)
+        self.assertEqual(cycle["new_candidates_observed"],0)
 
     def test_same_bar_stop_and_target_is_conservative_loss(self):
         frame=pd.DataFrame([{"datetime":"2026-09-18T10:00:00Z","open":1.0,"high":1.3,"low":0.7,"close":1.0}])
