@@ -2,10 +2,10 @@
 
 Consumes explicit setup candidates frozen by the source ICT detector. It keeps
 one research episode per model structure/zone and evaluates the global context
-gate at capture time. The current Paper executor has only an M15 execution
-frame; candidates from other source timeframes fail closed instead of being
-silently executed on M15. It never places real orders and never infers a setup
-from outcomes.
+gate at capture time. Paper execution uses the exact source timeframe when that
+frame is explicitly supported and cached (currently M15 and H1). Unsupported
+or missing execution frames fail closed instead of being substituted by M15.
+It never places real orders and never infers a setup from outcomes.
 """
 from __future__ import annotations
 
@@ -91,10 +91,32 @@ def _map_rows(master:Mapping[str,Any]|None)->dict[str,dict[str,Any]]:
     return {str(k).strip().upper():_mapping(v) for k,v in raw.items()}
 
 
-def _m15(scanner_pair:Mapping[str,Any]|None)->pd.DataFrame:
+MODEL_PAPER_EXECUTION_PROFILES={
+    "M15":{"cache_key":"m15","bar_minutes":15,"max_hold_bars":96},
+    "H1":{"cache_key":"h1","bar_minutes":60,"max_hold_bars":48},
+}
+
+
+def _execution_profile(timeframe:Any)->dict[str,Any]|None:
+    tf=str(timeframe or "").strip().upper()
+    profile=MODEL_PAPER_EXECUTION_PROFILES.get(tf)
+    return dict(profile) if isinstance(profile,Mapping) else None
+
+
+def _execution_frame(
+    scanner_pair:Mapping[str,Any]|None,
+    timeframe:Any,
+)->pd.DataFrame:
+    profile=_execution_profile(timeframe)
+    if profile is None:
+        return pd.DataFrame(columns=["datetime","open","high","low","close"])
     tec=_mapping(_mapping(scanner_pair).get("tecnico"))
     cache=_mapping(tec.get("cache_v110"))
-    return normalize_m15(cache.get("m15",[]))
+    return normalize_m15(cache.get(str(profile["cache_key"]),[]))
+
+
+def _m15(scanner_pair:Mapping[str,Any]|None)->pd.DataFrame:
+    return _execution_frame(scanner_pair,"M15")
 
 
 def current_setup_candidates(scanner:Mapping[str,Any]|None)->list[dict[str,Any]]:
@@ -195,11 +217,15 @@ def _block_row(
         "context_hard_blocks":" | ".join(str(x) for x in list(decision.get("hard_blocks",[]) or [])),
         "context_soft_blocks":" | ".join(str(x) for x in list(decision.get("soft_blocks",[]) or [])),
         "candidate_observation":True,
-        "execution_timeframe":"M15" if str(candidate.get("source_timeframe") or "").strip().upper()=="M15" else "",
-        "timeframe_alignment_passed":str(candidate.get("source_timeframe") or "").strip().upper()=="M15",
+        "execution_timeframe":(
+            str(candidate.get("source_timeframe") or "").strip().upper()
+            if _execution_profile(candidate.get("source_timeframe")) is not None
+            else ""
+        ),
+        "timeframe_alignment_passed":_execution_profile(candidate.get("source_timeframe")) is not None,
         "timeframe_alignment_reason":(
             "SOURCE_EQUALS_EXECUTION"
-            if str(candidate.get("source_timeframe") or "").strip().upper()=="M15"
+            if _execution_profile(candidate.get("source_timeframe")) is not None
             else "EXECUTION_FRAME_NOT_AVAILABLE:"+str(candidate.get("source_timeframe") or "").strip().upper()
         ),
     })
@@ -212,8 +238,10 @@ def _qualified_row(
     frame:pd.DataFrame,
     *,
     now:pd.Timestamp,
+    execution_timeframe:str,
+    bar_minutes:int,
 )->dict[str,Any]:
-    base=_make_wait_entry(checklist,frame,now=now)
+    base=_make_wait_entry(checklist,frame,now=now,bar_minutes=bar_minutes)
     if not base:
         return _block_row(candidate,checklist,status="BLOCKED_DATA",now=now)
     captured=_as_utc(candidate.get("captured_at"))
@@ -225,8 +253,10 @@ def _qualified_row(
         "signal_id":str(candidate.get("episode_id") or ""),
         "setup_id":str(candidate.get("setup_id") or "").strip(),
         "setup_attribution":MODEL_ATTRIBUTION,
-        "signal_time":captured.isoformat(),
-        "checklist_note":"Candidato explícito do modelo + contexto global qualificado; Paper de pesquisa aguardando M15 posterior.",
+        "checklist_note":(
+            "Candidato explícito do modelo + contexto global qualificado; "
+            f"Paper de pesquisa aguardando candle {execution_timeframe} posterior."
+        ),
         "engine_version":MODEL_PAPER_VERSION,
         "candidate_id":str(candidate.get("candidate_id") or ""),
         "episode_id":str(candidate.get("episode_id") or ""),
@@ -241,7 +271,7 @@ def _qualified_row(
         "context_hard_blocks":"",
         "context_soft_blocks":"",
         "candidate_observation":True,
-        "execution_timeframe":"M15",
+        "execution_timeframe":execution_timeframe,
         "timeframe_alignment_passed":True,
         "timeframe_alignment_reason":"SOURCE_EQUALS_EXECUTION",
     })
