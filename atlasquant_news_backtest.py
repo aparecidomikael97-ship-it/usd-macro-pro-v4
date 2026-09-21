@@ -187,6 +187,32 @@ def walk_forward_news_backtest(
     }
 
 
+def monthly_news_scores(backtest:dict[str,Any])->list[dict[str,Any]]:
+    """Group walk-forward forecasts by release month ('8 of 10' style)."""
+    groups={}
+    for raw in list(backtest.get("forecasts",[]) or []):
+        row=dict(raw)
+        stamp=str(row.get("scheduled_at") or "")
+        month=stamp[:7] if len(stamp)>=7 else "UNKNOWN"
+        groups.setdefault(month,[]).append(row)
+    out=[]
+    for month in sorted(groups):
+        rows=groups[month]
+        summary=_summarize_forecasts(rows)
+        out.append({
+            "month":month,
+            "samples":summary["forecast_samples"],
+            "hits":summary["class_hits"],
+            "score_text":f"{summary['class_hits']} de {summary['forecast_samples']}",
+            "class_accuracy_pct":summary["class_accuracy_pct"],
+            "average_brier":summary["average_brier"],
+            "average_top_confidence_pct":summary["average_top_confidence_pct"],
+            "calibration_gap_abs_pct":summary["calibration_gap_abs_pct"],
+            "interpretation":"Acerto da classe do dado; não é taxa de gain.",
+        })
+    return out
+
+
 def simple_month_score(backtest:dict[str,Any])->dict[str,Any]:
     """Human-readable '8 of 10' score without converting it into a trade claim."""
     overall=dict(backtest.get("overall",{}) or {})
@@ -202,5 +228,6 @@ def simple_month_score(backtest:dict[str,Any])->dict[str,Any]:
 
 
 __all__=[
-    "SCHEMA","multiclass_brier","walk_forward_news_backtest","simple_month_score",
+    "SCHEMA","multiclass_brier","walk_forward_news_backtest",
+    "monthly_news_scores","simple_month_score",
 ]
