@@ -317,6 +317,28 @@ def summarize_model_paper(frame:pd.DataFrame|None)->dict[str,Any]:
                 "explicit_source_model_only":True,
             }
 
+    by_timeframe={}
+    if not d.empty and "source_timeframe" in d.columns:
+        for timeframe,g in d.groupby(d["source_timeframe"].fillna("").astype(str).str.upper(),dropna=False):
+            tf=str(timeframe).strip() or "(SEM TIMEFRAME)"
+            gc=g[g["status"].astype(str).str.upper().eq("CLOSED")].copy()
+            gr=pd.to_numeric(gc.get("realized_r"),errors="coerce").dropna()
+            gr=gr[gr.map(lambda x:math.isfinite(float(x)))] if len(gr) else gr
+            wins_tf=int((gc["result"].astype(str).str.upper()=="WIN").sum()) if not gc.empty else 0
+            losses_tf=int((gc["result"].astype(str).str.upper()=="LOSS").sum()) if not gc.empty else 0
+            by_timeframe[tf]={
+                "candidates":int(len(g)),
+                "blocked_context":int(g["status"].astype(str).str.upper().eq("BLOCKED_CONTEXT").sum()),
+                "blocked_data":int(g["status"].astype(str).str.upper().eq("BLOCKED_DATA").sum()),
+                "blocked_timeframe":int(g["status"].astype(str).str.upper().eq("BLOCKED_TIMEFRAME").sum()),
+                "pending":int(g["status"].astype(str).str.upper().eq("WAIT_ENTRY").sum()),
+                "open":int(g["status"].astype(str).str.upper().eq("OPEN").sum()),
+                "closed":int(len(gc)),
+                "wins":wins_tf,
+                "losses":losses_tf,
+                "net_r":round(float(gr.sum()) if len(gr) else 0.0,3),
+            }
+
     by_session={}
     if not closed.empty and "active_session" in closed.columns:
         for session,g in closed.groupby(closed["active_session"].fillna("").astype(str),dropna=False):
@@ -347,6 +369,7 @@ def summarize_model_paper(frame:pd.DataFrame|None)->dict[str,Any]:
         "net_r":round(float(rr.sum()) if len(rr) else 0.0,3),
         "avg_r":round(float(rr.mean()) if len(rr) else 0.0,3),
         "by_setup":by_setup,
+        "by_timeframe":by_timeframe,
         "by_session":by_session,
         "setup_inference_used":False,
         "automatic_promotion":False,
