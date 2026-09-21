@@ -70,6 +70,13 @@ class AtlasQuantProductionWorkflowContractTests(unittest.TestCase):
         self.assertLess(marker,fast)
 
 
+    def test_browser_smoke_exposes_checkout_modules_to_tmp_runner(self):
+        text=Path(".github/workflows/production-browser-smoke.yml").read_text(encoding="utf-8")
+        self.assertIn('PYTHONPATH="$GITHUB_WORKSPACE',text)
+        self.assertIn("python /tmp/atlasquant_browser_smoke.py",text)
+        self.assertIn("from atlasquant_build_identity import short_source_fingerprint",text)
+
+
 
 if __name__=="__main__":
     unittest.main()
