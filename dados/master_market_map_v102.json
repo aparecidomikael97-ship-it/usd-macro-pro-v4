@@ -1,7 +1,7 @@
 {
   "version": "V11.0_INSTITUTIONAL_AUTOPILOT",
   "cursor": 2,
-  "last_batch_ts": 1789983075.289965,
+  "last_batch_ts": 1789983669.3200254,
   "contexts": {
     "USD/CHF": {
       "pair": "USD/CHF",
@@ -3429,13 +3429,13 @@
     },
     "GBP/USD": {
       "pair": "GBP/USD",
-      "updated_at": "2026-09-21T09:22:40.385966+00:00",
-      "candle_m15": "2026-09-21T09:00:00+00:00",
-      "price": 1.33855,
-      "macro_direction": "🔴 VENDA GBP/USD",
-      "macro_score": 68.0,
-      "quality": 70.0,
-      "rank_index": 69.1,
+      "updated_at": "2026-09-21T09:41:01.246842+00:00",
+      "candle_m15": "2026-09-21T09:15:00+00:00",
+      "price": 1.33841,
+      "macro_direction": "⚪ AGUARDAR",
+      "macro_score": 54.0,
+      "quality": 67.0,
+      "rank_index": 59.5,
       "w1": {
         "bias": "ALTISTA",
         "score": 80.0,
@@ -3914,7 +3914,7 @@
       },
       "premium_discount": {
         "zone": "DESCONTO",
-        "position": 25.18891687657387,
+        "position": 24.483627204030757,
         "equilibrium": 1.343475,
         "inside_range": true,
         "expansion_pct": 0.0
@@ -3939,7 +3939,7 @@
         "rejection": "fechou de volta acima do nível"
       },
       "killzone": {
-        "now_ny": "2026-09-21 05:23:49.376093-04:00",
+        "now_ny": "2026-09-21 05:41:08.991366-04:00",
         "active": null,
         "next": {
           "name": "New York AM",
@@ -4025,9 +4025,9 @@
         ]
       },
       "macro_regime": {
-        "side": "BAIXISTA",
-        "weekly_label": "FORTE",
-        "consistency": 100.0,
+        "side": "NEUTRO",
+        "weekly_label": "SEM LADO",
+        "consistency": 50.0,
         "recent_label": "NEUTRO / SEM DADO",
         "event_risk": {
           "level": "NORMAL",
@@ -4037,14 +4037,14 @@
         "components": [
           {
             "name": "Regime macro USD",
-            "ok": true,
-            "detail": "USD 62/100",
+            "ok": null,
+            "detail": "USD 56/100",
             "weight": 25.0
           },
           {
             "name": "Federal Reserve",
-            "ok": true,
-            "detail": "Restritivo",
+            "ok": null,
+            "detail": "Neutro",
             "weight": 20.0
           },
           {
@@ -4060,53 +4060,53 @@
             "weight": 15.0
           }
         ],
-        "macro_score": 68.0,
-        "quality": 70.0
+        "macro_score": 54.0,
+        "quality": 67.0
       },
       "readiness": {
-        "score": 20.0,
+        "score": 18.51851851851852,
         "grade": "WAIT",
         "action": "🔴 NÃO FORÇAR ENTRADA",
         "checks": [
           {
             "name": "Macro forte",
-            "ok": false,
+            "ok": null,
             "weight": 15.0,
-            "detail": "Score 68/100"
+            "detail": "Score 54/100"
           },
           {
             "name": "Qualidade dos dados",
             "ok": false,
             "weight": 15.0,
-            "detail": "70%"
+            "detail": "67%"
           },
           {
             "name": "W1 alinhado",
-            "ok": false,
+            "ok": null,
             "weight": 15.0,
             "detail": "CONFIRMADA"
           },
           {
             "name": "D1 alinhado",
-            "ok": true,
+            "ok": null,
             "weight": 15.0,
             "detail": "PARCIAL · MÉDIAS SEM ESTRUTURA LIMPA"
           },
           {
             "name": "Estrutura W1+D1 limpa",
-            "ok": false,
+            "ok": null,
             "weight": 10.0,
             "detail": "W1 TENDÊNCIA ALTISTA · D1 EXPANSÃO DOS DOIS LADOS"
           },
           {
             "name": "Localização eficiente",
-            "ok": false,
+            "ok": null,
             "weight": 10.0,
             "detail": "DESCONTO"
           },
           {
             "name": "Sweep coerente",
-            "ok": false,
+            "ok": null,
             "weight": 8.0,
             "detail": "SWEEP SSL"
           },
@@ -4126,7 +4126,7 @@
         "hard_conflict": true
       },
       "readiness_grade": "WAIT",
-      "readiness_score": 20.0,
+      "readiness_score": 18.51851851851852,
       "event_risk": "NORMAL",
       "adr": {
         "available": true,
@@ -4139,7 +4139,7 @@
       "adr_used_pct": 39.21396099134959,
       "intraday_opens": {
         "available": true,
-        "current": 1.33855,
+        "current": 1.33841,
         "day_open": 1.33824,
         "week_open": 1.33824,
         "above_day_open": true,
@@ -4863,5 +4863,5 @@
       "autopilot_v107": true
     }
   },
-  "autopilot_updated_at": "2026-09-21T09:31:15.289976+00:00"
+  "autopilot_updated_at": "2026-09-21T09:41:09.320027+00:00"
 }
