@@ -732,6 +732,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                         cost_r=float(cost_r),
                         slippage_r=float(slippage_r),
                         start_after_signal_bar=True,
+                        require_alignment=True,
                     )
                     result=_render_result_block(
                         auto_results,
@@ -740,8 +741,8 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                         generated_signals=auto_signals,
                     )
                     st.caption(
-                        "Resultado automático = pesquisa técnica histórica. "
-                        "Não inclui macro/Fed e não altera o Gate do AtlasQuant."
+                        "Resultado automático com alinhamento obrigatório. Sem evidência point-in-time de "
+                        "leitura, direção, filtros e gatilho, o sinal fica bloqueado e não conta como trade."
                     )
                     return {**result, "mode":"AUTO_REPLAY", "signals":auto_signals}
 
@@ -825,8 +826,8 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                         generated_signals=fvg_signals,
                     )
                     st.caption(
-                        "FVG é medido separadamente do BOS/CHOCH + Order Block. "
-                        "Não inclui macro/Fed e não altera o Gate."
+                        "FVG fica separado dos demais setups e só conta como trade quando leitura, direção, "
+                        "filtros e gatilho estavam alinhados no momento do sinal."
                     )
                     return {**result,"mode":"AUTO_FVG","signals":fvg_signals}
 
@@ -910,8 +911,8 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                         generated_signals=ote_signals,
                     )
                     st.caption(
-                        "OTE é medido separadamente de FVG e BOS/CHOCH + Order Block. "
-                        "Não inclui macro/Fed e não altera o Gate."
+                        "OTE fica separado dos demais setups e só conta como trade com alinhamento completo "
+                        "registrado no contexto histórico point-in-time."
                     )
                     return {**result,"mode":"AUTO_OTE","signals":ote_signals}
 
@@ -982,8 +983,8 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                         generated_signals=crt_signals,
                     )
                     st.caption(
-                        "CRT é medido separadamente de OTE, FVG e BOS/CHOCH + OB. "
-                        "Não inclui macro/Fed e não altera o Gate."
+                        "CRT fica separado dos demais setups e só conta como trade com alinhamento completo "
+                        "registrado no contexto histórico point-in-time."
                     )
                     return {**result,"mode":"AUTO_CRT","signals":crt_signals}
 
@@ -1068,8 +1069,8 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                         generated_signals=amd_signals,
                     )
                     st.caption(
-                        "AMD/PO3 é medido separadamente de CRT, OTE, FVG e BOS/CHOCH + OB. "
-                        "Não inclui macro/Fed e não altera o Gate."
+                        "AMD/PO3 fica separado dos demais setups e só conta como trade com alinhamento completo "
+                        "registrado no contexto histórico point-in-time."
                     )
                     return {**result,"mode":"AUTO_AMD","signals":amd_signals}
 
@@ -1182,6 +1183,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                     slippage_r=float(slippage_r),
                     context_snapshots=context_snapshots,
                     timeframe=backtest_timeframe,
+                    require_alignment=True,
                 )
                 comparison=comparison_frame(
                     suite,
@@ -1909,6 +1911,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
         cost_r=float(cost_r),
         slippage_r=float(slippage_r),
         start_after_signal_bar=True,
+        require_alignment=True,
     )
     result=_render_result_block(results,pair,key_suffix="manual")
     st.caption(
