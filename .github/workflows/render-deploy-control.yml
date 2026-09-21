@@ -1,0 +1,85 @@
+name: AtlasQuant - Render Deploy Control
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Motivo do redeploy manual"
+        required: false
+        default: "Reconciliar produção com a main validada"
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: atlasquant-render-deploy-control
+  cancel-in-progress: false
+
+jobs:
+  redeploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      APP_URL: "https://atlasquant-private.onrender.com"
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Require Render deploy hook
+        shell: bash
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RENDER_DEPLOY_HOOK_URL:-}" ]; then
+            echo "::error::RENDER_DEPLOY_HOOK_URL não está configurado nos GitHub Secrets."
+            echo "Crie um Deploy Hook do serviço atlasquant-private no Render e salve a URL somente como GitHub Secret."
+            exit 1
+          fi
+
+      - name: Trigger Render deploy
+        shell: bash
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          set -euo pipefail
+          curl -fsS --connect-timeout 20 --max-time 60 -X POST "$RENDER_DEPLOY_HOOK_URL" >/tmp/render-deploy-response.txt
+          echo "Deploy solicitado ao Render."
+
+      - name: Wait for healthy service
+        shell: bash
+        run: |
+          set -euo pipefail
+          healthy=0
+          for attempt in $(seq 1 36); do
+            code=$(curl -L -sS --connect-timeout 10 --max-time 30 -o /tmp/render-health.txt -w "%{http_code}" "$APP_URL/_stcore/health" || true)
+            echo "health attempt=$attempt http=$code"
+            if [ "$code" = "200" ]; then
+              healthy=1
+            fi
+            # Health alone may still be the previous instance. Give the deploy
+            # a minimum settling window before dispatching source-identity smoke.
+            if [ "$healthy" = "1" ] && [ "$attempt" -ge 7 ]; then
+              break
+            fi
+            sleep 10
+          done
+          test "$healthy" = "1"
+
+      - name: Dispatch production Browser Smoke
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run production-browser-smoke.yml --ref main
+          echo "Browser Smoke de identidade foi disparado para a main."
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          echo "## AtlasQuant Render Deploy Control" >> "$GITHUB_STEP_SUMMARY"
+          echo "- alvo: atlasquant-private.onrender.com" >> "$GITHUB_STEP_SUMMARY"
+          echo "- branch esperada: main" >> "$GITHUB_STEP_SUMMARY"
+          echo "- validação final: Production Browser Smoke separado" >> "$GITHUB_STEP_SUMMARY"
