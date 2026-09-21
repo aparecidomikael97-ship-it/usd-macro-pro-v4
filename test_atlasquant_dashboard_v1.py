@@ -80,6 +80,12 @@ class AtlasQuantDashboardTests(unittest.TestCase):
         self.assertIn("confirmação técnica obrigatória",html)
 
 
+    def test_dashboard_css_uses_stronger_secondary_contrast(self):
+        from atlasquant_dashboard_v1 import DASHBOARD_CSS
+        self.assertIn("color:#d4e1f0",DASHBOARD_CSS)
+        self.assertIn("font-weight:650",DASHBOARD_CSS)
+        self.assertNotIn(".aq-focus-label{font-size:.7rem;color:#9fb0c6",DASHBOARD_CSS)
+
 
 if __name__ == "__main__":
     unittest.main()
