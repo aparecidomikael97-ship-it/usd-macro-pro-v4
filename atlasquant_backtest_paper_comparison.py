@@ -79,7 +79,9 @@ def compare_backtest_paper(evidence: Mapping[str, Any] | None) -> dict[str, Any]
         and backtest_samples > 0
         and paper_samples > 0
     )
-    comparable = required_metrics_present and samples_present
+    # Supplied-but-invalid optional evidence is corruption, not absence. Keep the
+    # row visible for diagnostics but never label it comparable until repaired.
+    comparable = required_metrics_present and samples_present and not data_quality_issues
     expectancy_gap = None
     expectancy_retention_pct = None
     if comparable:
