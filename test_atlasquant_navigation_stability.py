@@ -74,6 +74,16 @@ class AtlasQuantNavigationStabilityTests(unittest.TestCase):
         self.assertIn('sort_values(["Índice ranking","Qualidade","Score final"]',src)
         self.assertIn('"⚪ AGUARDAR CONFIRMAÇÃO"',src)
 
+    def test_shared_matrix_uses_official_confluence_engine_not_approximation(self):
+        src=APP.read_text(encoding="utf-8")
+        start=src.index("def _build_pair_matrix_for_surfaces_v111")
+        end=src.index('if "matriz_v61" not in globals()',start)
+        helper=src[start:end]
+        self.assertIn("calcular_confluencia_v60(",helper)
+        self.assertIn('_conf["score_confluencia"]',helper)
+        self.assertIn('_conf["qualidade_confluencia"]',helper)
+        self.assertNotIn("50.0+abs(_dif)*1.25",helper)
+
 
 if __name__=="__main__":
     unittest.main()
