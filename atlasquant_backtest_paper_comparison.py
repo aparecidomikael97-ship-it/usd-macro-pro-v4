@@ -32,7 +32,7 @@ def compare_backtest_paper(evidence: Mapping[str, Any] | None) -> dict[str, Any]
     Missing/invalid evidence fails closed to ``comparable=False``.  The output is
     deliberately descriptive: no threshold here can approve a setup.
     """
-    source = dict(evidence or {})
+    source = dict(evidence) if isinstance(evidence, Mapping) else {}
     backtest_samples = _count(source.get("backtest_samples", source.get("trades")))
     paper_samples = _count(source.get("forward_samples"))
     backtest_expectancy = _finite(source.get("expectancy_r"))
@@ -83,8 +83,10 @@ def compare_backtest_paper(evidence: Mapping[str, Any] | None) -> dict[str, Any]
 
 def comparison_rows(evidence_by_setup: Mapping[str, Mapping[str, Any]] | None) -> list[dict[str, Any]]:
     """Build stable rows for a setup-performance panel."""
+    if not isinstance(evidence_by_setup, Mapping):
+        return []
     rows: list[dict[str, Any]] = []
-    for setup_id, evidence in sorted(dict(evidence_by_setup or {}).items()):
+    for setup_id, evidence in sorted(evidence_by_setup.items(), key=lambda item: str(item[0])):
         row = {"setup_id": str(setup_id)}
         row.update(compare_backtest_paper(evidence))
         rows.append(row)
