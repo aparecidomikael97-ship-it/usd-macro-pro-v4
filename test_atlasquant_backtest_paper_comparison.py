@@ -93,7 +93,7 @@ class BacktestPaperComparisonTests(unittest.TestCase):
         self.assertTrue(all(not row["comparable"] for row in rows))
         self.assertTrue(all(not row["real_orders_enabled"] for row in rows))
 
-    def test_impossible_optional_metrics_are_not_propagated(self):
+    def test_impossible_optional_metrics_fail_comparison_closed(self):
         result = compare_backtest_paper({
             "backtest_samples": 100,
             "forward_samples": 30,
@@ -105,7 +105,9 @@ class BacktestPaperComparisonTests(unittest.TestCase):
             "forward_max_drawdown_r": float("nan"),
             "forward_win_rate_pct": 101.0,
         })
-        self.assertTrue(result["comparable"])
+        self.assertFalse(result["comparable"])
+        self.assertIsNone(result["expectancy_gap_r"])
+        self.assertIsNone(result["expectancy_retention_pct"])
         self.assertIsNone(result["backtest_profit_factor"])
         self.assertIsNone(result["paper_profit_factor"])
         self.assertIsNone(result["backtest_max_drawdown_r"])
