@@ -426,6 +426,9 @@ def run_model_paper_cycle(
                     waiting["updated_at"]=now.isoformat()
                     updated.append(waiting)
                     continue
+                row["execution_timeframe"]=source_tf
+                row["timeframe_alignment_passed"]=True
+                row["timeframe_alignment_reason"]="SOURCE_EQUALS_EXECUTION"
                 before=status
                 first=_fill_entry(row,frame,now=now)
                 if before=="WAIT_ENTRY" and str(first.get("status") or "").upper()=="OPEN":
