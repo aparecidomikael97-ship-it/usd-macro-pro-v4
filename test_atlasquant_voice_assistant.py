@@ -112,23 +112,18 @@ class AtlasQuantVoiceAssistantTests(unittest.TestCase):
         self.assertIn("não uma garantia",out["answer"].casefold())
         self.assertFalse(out["real_orders_enabled"])
 
-    def test_browser_speech_escapes_script_breakout_text(self):
+    def test_browser_speech_compatibility_shim_never_invokes_device_tts(self):
         html=browser_speech_html('</script><script>alert("x")</script>',key="x")
         self.assertNotIn('</script><script>alert',html)
-        self.assertIn("\\u003c/script\\u003e",html)
-        self.assertIn("speechSynthesis",html)
+        self.assertNotIn("speechSynthesis",html)
+        self.assertNotIn("SpeechSynthesisUtterance",html)
+        self.assertIn("player neural oficial",html)
 
-    def test_browser_speech_prefers_natural_deep_ptbr_profile(self):
+    def test_browser_speech_shim_explicitly_says_device_voice_is_disabled(self):
         html=browser_speech_html("Teste.",key="profile")
-        self.assertIn("masculina/grave",html)
-        self.assertIn('"pt-BR"',html)
-        self.assertIn('"natural"',html)
-        self.assertIn('"neural"',html)
-        self.assertIn("u.pitch=Number(profile.pitch||0.88)",html)
-        self.assertIn("u.rate=Number(profile.rate||0.93)",html)
-        self.assertIn("if(voice) u.voice=voice",html)
-        self.assertIn("profile.allow_generic_device_fallback!==true",html)
-        self.assertIn("Voz oficial AtlasQuant não disponível",html)
+        self.assertIn("Voz do navegador desativada",html)
+        self.assertIn("player neural oficial",html)
+        self.assertNotIn("Google Português",html)
 
     def test_browser_mic_has_text_safe_context_and_no_order_api(self):
         bad=row()
@@ -137,19 +132,18 @@ class AtlasQuantVoiceAssistantTests(unittest.TestCase):
         html=browser_mic_assistant_html(ctx,key="eurusd")
         self.assertNotIn('</script><script>alert',html)
         self.assertIn("SpeechRecognition",html)
-        self.assertIn("speechSynthesis",html)
+        self.assertNotIn("speechSynthesis",html)
+        self.assertNotIn("SpeechSynthesisUtterance",html)
         self.assertNotIn("fetch(",html)
         self.assertNotIn("XMLHttpRequest",html)
 
-    def test_microphone_answers_use_same_deep_voice_profile(self):
+    def test_microphone_only_recognizes_and_never_speaks_with_device_voice(self):
         ctx=assistant_context(row(),macro_context=macro())
         html=browser_mic_assistant_html(ctx,key="samevoice")
-        self.assertIn('"external_style": "deep"',html)
-        self.assertIn("u.pitch=Number(profile.pitch||0.88)",html)
-        self.assertIn("u.rate=Number(profile.rate||0.93)",html)
-        self.assertIn("if(voice)u.voice=voice",html)
-        self.assertIn("profile.allow_generic_device_fallback!==true",html)
-        self.assertIn("A resposta ficou no texto",html)
+        self.assertIn("SpeechRecognition",html)
+        self.assertIn("player neural",html)
+        self.assertNotIn("speechSynthesis",html)
+        self.assertNotIn("SpeechSynthesisUtterance",html)
 
     def test_missing_context_stays_descriptive_not_invented(self):
         ctx=assistant_context({"pair":"USD/JPY","action":"NÃO OPERAR"})
