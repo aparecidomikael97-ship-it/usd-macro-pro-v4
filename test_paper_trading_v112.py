@@ -106,6 +106,34 @@ class PaperTradingV112SafetyTests(unittest.TestCase):
         self.assertAlmostEqual(float(out["entry_price"]),1.10)
 
 
+
+    def test_h1_execution_requires_d1_context_same_direction(self):
+        scanner={"h1_fetched_at":self.now.isoformat(),"tecnico":self.tec}
+        aligned={**self.map,"d1":{"bias":"ALTISTA"}}
+        with patch("paper_trading_v112.evaluate_decision_integrity",return_value={"executable":True,"hard_blocks":[],"soft_blocks":[]}):
+            chk=p.evaluate_pair_checklist(
+                "EUR/USD",self.input,scanner,aligned,now=self.now,execution_timeframe="H1"
+            )
+        self.assertTrue(chk["all_checks_passed"])
+        self.assertTrue(chk["higher_timeframe_context"]["aligned"])
+        self.assertEqual(chk["higher_timeframe_context"]["required"],["H4","D1"])
+
+    def test_h1_execution_blocks_missing_or_opposite_d1_context(self):
+        scanner={"h1_fetched_at":self.now.isoformat(),"tecnico":self.tec}
+        for d1 in ({},{"d1":{"bias":"BAIXISTA"}},{"d1":{"bias":"NEUTRO"}}):
+            market={**self.map,**d1}
+            with self.subTest(market=market), patch(
+                "paper_trading_v112.evaluate_decision_integrity",
+                return_value={"executable":True,"hard_blocks":[],"soft_blocks":[]},
+            ):
+                chk=p.evaluate_pair_checklist(
+                    "EUR/USD",self.input,scanner,market,now=self.now,execution_timeframe="H1"
+                )
+                self.assertFalse(chk["all_checks_passed"])
+                self.assertFalse(chk["higher_timeframe_context"]["aligned"])
+                self.assertFalse(chk["decision"]["executable"])
+                self.assertTrue(chk["decision"]["hard_blocks"])
+
     def test_wait_entry_can_schedule_next_h1_bar_without_changing_m15_default(self):
         times=pd.date_range("2026-09-18T00:00:00Z",periods=10,freq="1h")
         frame=pd.DataFrame([{"datetime":t,"open":1.10,"high":1.11,"low":1.09,"close":1.10} for t in times])
