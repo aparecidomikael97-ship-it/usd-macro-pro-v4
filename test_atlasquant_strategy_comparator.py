@@ -8,6 +8,8 @@ from atlasquant_strategy_comparator import (
     breakdown_frame,
     combined_ledger,
     run_strategy_suite,
+    run_multitimeframe_strategy_suite,
+    multitimeframe_comparison_frame,
 )
 
 
@@ -118,6 +120,24 @@ class StrategyComparatorTests(unittest.TestCase):
             for signal in suite[key]["signals"]:
                 self.assertEqual(signal["timeframe"],"H4")
                 self.assertEqual(signal["trading_style"],"SWING")
+
+
+    def test_multitimeframe_matrix_keeps_timeframes_separate(self):
+        def frame(freq):
+            n=80
+            return pd.DataFrame({
+                "datetime":pd.date_range("2026-01-01T00:00:00Z",periods=n,freq=freq,tz="UTC"),
+                "open":[10.0]*n,"high":[10.1]*n,"low":[9.9]*n,"close":[10.0]*n,
+            })
+        suites=run_multitimeframe_strategy_suite(
+            {"M30":frame("30min"),"H4":frame("4h"),"W1":frame("7D")},
+            pair="EUR/USD",
+        )
+        self.assertEqual(list(suites.keys()),["M30","H4","W1"])
+        out=multitimeframe_comparison_frame(suites,min_trades_for_rank=20)
+        self.assertEqual(set(out["timeframe"]),{"M30","H4","W1"})
+        self.assertEqual(set(out[out["timeframe"]=="H4"]["trading_style"]),{"SWING"})
+        self.assertEqual(set(out[out["timeframe"]=="W1"]["trading_style"]),{"POSITION"})
 
     def test_run_suite_returns_all_five_strategies_even_without_signals(self):
         n=40
