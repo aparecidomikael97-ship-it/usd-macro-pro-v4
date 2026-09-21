@@ -5,6 +5,13 @@ from atlasquant_home_radar import (
     home_summary,
     voice_script_for_row,
 )
+from atlasquant_session_profiles import (
+    extract_session_bucket,
+    prioritize_rows_for_session,
+    session_bucket_from_timestamp,
+    session_profile_match,
+    session_profile_summary,
+)
 
 
 def _pack(
@@ -90,11 +97,48 @@ class AtlasQuantHomeRadarTests(unittest.TestCase):
         self.assertEqual(summary["actionable"],2)
         self.assertEqual(summary["blocked"],1)
 
+    def test_session_timestamp_classification_is_dst_aware_in_new_york(self):
+        self.assertEqual(session_bucket_from_timestamp("2026-09-20T01:00:00Z"),"ASIA")
+        self.assertEqual(session_bucket_from_timestamp("2026-09-20T07:00:00Z"),"LONDON")
+        self.assertEqual(session_bucket_from_timestamp("2026-09-20T13:00:00Z"),"NEW_YORK")
+        self.assertEqual(session_bucket_from_timestamp("2026-09-20T18:00:00Z"),"AFTER_NEW_YORK")
+
+    def test_radar_preserves_session_from_pack_and_profile_only_reorders(self):
+        asia=_pack(pair="AUD/USD",priority=70)
+        asia["active_session"]="Ásia"
+        ny=_pack(pair="EUR/USD",priority=90)
+        ny["active_session"]="Nova York"
+        rows=home_rows_from_packs([ny,asia])
+        prioritized=prioritize_rows_for_session(rows,"Noite/madrugada · Ásia + Londres")
+        self.assertEqual(prioritized[0]["pair"],"AUD/USD")
+        self.assertEqual(prioritized[0]["session_match"],"MATCH")
+        self.assertEqual(prioritized[1]["session_match"],"OUTSIDE")
+        self.assertEqual(len(prioritized),2)
+
+    def test_unknown_session_is_not_hidden_or_fake_matched(self):
+        rows=home_rows_from_packs([_pack()])
+        self.assertEqual(extract_session_bucket(rows[0]),"UNKNOWN")
+        prioritized=prioritize_rows_for_session(rows,"Dia · Nova York + continuidade")
+        self.assertEqual(len(prioritized),1)
+        self.assertEqual(prioritized[0]["session_match"],"UNKNOWN")
+        summary=session_profile_summary(prioritized,"Dia · Nova York + continuidade")
+        self.assertEqual(summary["unknown"],1)
+        self.assertFalse(summary["real_orders_enabled"])
+
+    def test_session_profile_does_not_change_trade_direction(self):
+        rows=home_rows_from_packs([_pack(direction="🔴 VENDA")])
+        before=rows[0]["action"]
+        after=prioritize_rows_for_session(rows,"Noite/madrugada · Ásia + Londres")[0]
+        self.assertEqual(before,"VENDA")
+        self.assertEqual(after["action"],"VENDA")
+        self.assertEqual(session_profile_match("NEW_YORK","Noite/madrugada · Ásia + Londres"),"OUTSIDE")
+
     def test_voice_explains_reason_risk_and_no_order(self):
         row=home_rows_from_packs([_pack()])[0]
         script=voice_script_for_row(row).casefold()
         self.assertIn("análise do eur/usd",script)
         self.assertIn("próximo passo",script)
+        self.assertIn("sessão",script)
         self.assertIn("não é garantia",script)
         self.assertIn("nem ordem para corretora",script)
 

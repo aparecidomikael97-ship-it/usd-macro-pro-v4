@@ -23,6 +23,11 @@ try:
 except Exception:
     render_academy_panel = None
 
+try:
+    from atlasquant_advanced_learning import render_guided_advanced_learning
+except Exception:
+    render_guided_advanced_learning = None
+
 
 INDICATOR_GUIDE = {
     "Taxa de juros": {
@@ -361,6 +366,7 @@ def render_experience_hub(
     macro_context: Mapping[str, Any] | None = None,
     source_status: Mapping[str, Any] | None = None,
     app_version: str = "",
+    experience_mode: str = "Iniciante",
 ) -> None:
     macro = dict(macro_context or {})
     sources = dict(source_status or {})
@@ -419,6 +425,20 @@ def render_experience_hub(
         _currency_chart(ranking)
 
     with t2:
+        advanced_mode=str(experience_mode or "").casefold().startswith("avan")
+        if advanced_mode:
+            st.markdown(
+                '<div class="ux-card"><div class="ux-accent">🧭 Comece por aqui</div>'
+                '<p>Se você veio apenas da análise técnica, siga a trilha em ordem. '
+                'O objetivo é entender cada camada antes de voltar ao Radar.</p></div>',
+                unsafe_allow_html=True,
+            )
+            if render_guided_advanced_learning is not None:
+                render_guided_advanced_learning()
+                st.divider()
+            else:
+                st.warning("Trilha guiada do Avançado indisponível neste carregamento.")
+
         if render_academy_panel is not None:
             render_academy_panel()
             st.divider()

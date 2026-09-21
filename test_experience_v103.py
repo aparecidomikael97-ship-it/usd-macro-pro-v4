@@ -1,3 +1,4 @@
+import inspect
 import unittest
 import pandas as pd
 
@@ -40,6 +41,14 @@ class ExperienceV103Tests(unittest.TestCase):
         self.assertIn("timing",text)
         self.assertIn("nunca",text)
         self.assertIn("gestão de risco",text)
+
+    def test_experience_hub_accepts_mode_and_wires_guided_advanced_learning(self):
+        import experience_v103 as ux
+        source=inspect.getsource(ux.render_experience_hub)
+        self.assertIn("experience_mode",source)
+        self.assertIn("render_guided_advanced_learning",source)
+        self.assertIn("advanced_mode",source)
+        self.assertIn("Comece por aqui",source)
 
     def test_theme_preferences_fail_safe_to_known_values(self):
         out=experience_theme_summary("INVALID","gigante",1)
