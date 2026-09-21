@@ -379,22 +379,41 @@ def run_model_paper_cycle(
             status=str(row.get("status") or "").upper()
             if status in {"WAIT_ENTRY","OPEN"}:
                 source_tf=str(row.get("source_timeframe") or "M15").strip().upper()
-                if source_tf!="M15":
+                profile=_execution_profile(source_tf)
+                if profile is None:
                     blocked_row=row.to_dict()
                     blocked_row["status"]="BLOCKED_TIMEFRAME"
                     blocked_row["execution_timeframe"]=""
                     blocked_row["timeframe_alignment_passed"]=False
                     blocked_row["timeframe_alignment_reason"]="EXECUTION_FRAME_NOT_AVAILABLE:"+source_tf
-                    blocked_row["checklist_note"]="Paper preservado sem execução: timeframe de origem não pode usar candles M15 como substituto."
+                    blocked_row["checklist_note"]="Paper preservado sem execução: timeframe de origem ainda não possui executor exato."
                     blocked_row["updated_at"]=now.isoformat()
                     updated.append(blocked_row)
                     continue
-                frame=_m15(scanner_by_pair.get(str(row.get("pair") or "").upper(),{}))
+                frame=_execution_frame(
+                    scanner_by_pair.get(str(row.get("pair") or "").upper(),{}),
+                    source_tf,
+                )
+                if frame.empty:
+                    waiting=row.to_dict()
+                    waiting["execution_timeframe"]=source_tf
+                    waiting["timeframe_alignment_passed"]=False
+                    waiting["timeframe_alignment_reason"]="EXECUTION_FRAME_EMPTY:"+source_tf
+                    waiting["checklist_note"]="Aguardando candles do mesmo timeframe de execução; nenhum timeframe inferior é usado como substituto."
+                    waiting["updated_at"]=now.isoformat()
+                    updated.append(waiting)
+                    continue
                 before=status
                 first=_fill_entry(row,frame,now=now)
                 if before=="WAIT_ENTRY" and str(first.get("status") or "").upper()=="OPEN":
                     opened+=1
-                second=_close_open(pd.Series(first),frame,now=now)
+                second=_close_open(
+                    pd.Series(first),
+                    frame,
+                    now=now,
+                    bar_minutes=int(profile["bar_minutes"]),
+                    max_hold_bars=int(profile["max_hold_bars"]),
+                )
                 if str(first.get("status") or "").upper()=="OPEN" and str(second.get("status") or "").upper()=="CLOSED":
                     closed_count+=1
                 updated.append(second)
@@ -418,15 +437,37 @@ def run_model_paper_cycle(
         synthetic=_synthetic_input(base_input,candidate)
         scanner_pair=scanner_by_pair.get(pair,{})
         map_ctx=map_by_pair.get(pair,{})
-        checklist=evaluate_pair_checklist(pair,synthetic,scanner_pair,map_ctx,now=now)
         source_tf=str(candidate.get("source_timeframe") or "").strip().upper()
-        frame=_m15(scanner_pair)
+        profile=_execution_profile(source_tf)
+        checklist=evaluate_pair_checklist(
+            pair,
+            synthetic,
+            scanner_pair,
+            map_ctx,
+            now=now,
+            execution_timeframe=source_tf or "UNSUPPORTED",
+        )
+        frame=_execution_frame(scanner_pair,source_tf)
         observed+=1
-        if source_tf!="M15":
+        if profile is None:
             row=_block_row(candidate,checklist,status="BLOCKED_TIMEFRAME",now=now)
             blocked+=1
+        elif frame.empty:
+            row=_block_row(candidate,checklist,status="BLOCKED_DATA",now=now)
+            row["execution_timeframe"]=source_tf
+            row["timeframe_alignment_passed"]=False
+            row["timeframe_alignment_reason"]="EXECUTION_FRAME_EMPTY:"+source_tf
+            row["checklist_note"]="Candidato alinhado somente pode avançar com candles do mesmo timeframe; frame exato indisponível."
+            blocked+=1
         elif checklist.get("all_checks_passed"):
-            row=_qualified_row(candidate,checklist,frame,now=now)
+            row=_qualified_row(
+                candidate,
+                checklist,
+                frame,
+                now=now,
+                execution_timeframe=source_tf,
+                bar_minutes=int(profile["bar_minutes"]),
+            )
             if str(row.get("status") or "").upper()=="WAIT_ENTRY":
                 qualified+=1
             else:
@@ -457,6 +498,7 @@ __all__=[
     "MODEL_ATTRIBUTION",
     "MODEL_PAPER_COLUMNS",
     "normalize_model_paper",
+    "MODEL_PAPER_EXECUTION_PROFILES",
     "current_setup_candidates",
     "summarize_model_paper",
     "run_model_paper_cycle",
