@@ -280,7 +280,10 @@ if _ATLASQUANT_DEPLOY_COMMIT:
 # It lets the production smoke prove that the executable app bundle matches the
 # checked-out code even when RENDER_GIT_COMMIT is unavailable.
 _ATLASQUANT_SOURCE_BUILD=short_source_fingerprint(Path(__file__).resolve().parent,16)
-st.caption(f"AQBUILD:{_ATLASQUANT_SOURCE_BUILD}")
+st.markdown(
+    f'<span id="atlasquant-source-build-marker" data-build="{_ATLASQUANT_SOURCE_BUILD}" style="display:none"></span>',
+    unsafe_allow_html=True,
+)
 
 # Optional private-access gate. Disabled by default; when required it fails closed.
 if render_access_gate is not None:
