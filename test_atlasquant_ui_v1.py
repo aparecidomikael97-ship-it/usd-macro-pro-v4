@@ -298,5 +298,17 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("render_home_radar",src)
 
 
+    def test_ui_smoke_checks_dark_card_text_contrast(self):
+        from pathlib import Path
+        workflow=Path(".github/workflows/atlasquant-ui-smoke.yml").read_text(encoding="utf-8")
+        self.assertIn("contrast_checks",workflow)
+        self.assertIn('"context_label":".aq-context-strip span"',workflow)
+        self.assertIn('"context_value":".aq-context-strip strong"',workflow)
+        self.assertIn('"focus_detail":".aq-focus-card span"',workflow)
+        self.assertIn("brightness>=200",workflow)
+        self.assertIn("opacity",workflow)
+        self.assertIn("texto de cartões com contraste insuficiente",workflow)
+
+
 if __name__ == "__main__":
     unittest.main()
