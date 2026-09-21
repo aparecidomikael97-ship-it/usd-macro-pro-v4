@@ -1,7 +1,7 @@
 {
   "version": "V11.0_INSTITUTIONAL_AUTOPILOT",
   "cursor": 2,
-  "last_batch_ts": 1789983669.3200254,
+  "last_batch_ts": 1789984039.564424,
   "contexts": {
     "USD/CHF": {
       "pair": "USD/CHF",
@@ -3432,10 +3432,10 @@
       "updated_at": "2026-09-21T09:41:01.246842+00:00",
       "candle_m15": "2026-09-21T09:15:00+00:00",
       "price": 1.33841,
-      "macro_direction": "⚪ AGUARDAR",
-      "macro_score": 54.0,
-      "quality": 67.0,
-      "rank_index": 59.5,
+      "macro_direction": "🔴 VENDA GBP/USD",
+      "macro_score": 68.0,
+      "quality": 70.0,
+      "rank_index": 69.1,
       "w1": {
         "bias": "ALTISTA",
         "score": 80.0,
@@ -3939,7 +3939,7 @@
         "rejection": "fechou de volta acima do nível"
       },
       "killzone": {
-        "now_ny": "2026-09-21 05:41:08.991366-04:00",
+        "now_ny": "2026-09-21 05:47:19.436821-04:00",
         "active": null,
         "next": {
           "name": "New York AM",
@@ -4025,9 +4025,9 @@
         ]
       },
       "macro_regime": {
-        "side": "NEUTRO",
-        "weekly_label": "SEM LADO",
-        "consistency": 50.0,
+        "side": "BAIXISTA",
+        "weekly_label": "FORTE",
+        "consistency": 100.0,
         "recent_label": "NEUTRO / SEM DADO",
         "event_risk": {
           "level": "NORMAL",
@@ -4037,14 +4037,14 @@
         "components": [
           {
             "name": "Regime macro USD",
-            "ok": null,
-            "detail": "USD 56/100",
+            "ok": true,
+            "detail": "USD 62/100",
             "weight": 25.0
           },
           {
             "name": "Federal Reserve",
-            "ok": null,
-            "detail": "Neutro",
+            "ok": true,
+            "detail": "Restritivo",
             "weight": 20.0
           },
           {
@@ -4060,53 +4060,53 @@
             "weight": 15.0
           }
         ],
-        "macro_score": 54.0,
-        "quality": 67.0
+        "macro_score": 68.0,
+        "quality": 70.0
       },
       "readiness": {
-        "score": 18.51851851851852,
+        "score": 20.0,
         "grade": "WAIT",
         "action": "🔴 NÃO FORÇAR ENTRADA",
         "checks": [
           {
             "name": "Macro forte",
-            "ok": null,
+            "ok": false,
             "weight": 15.0,
-            "detail": "Score 54/100"
+            "detail": "Score 68/100"
           },
           {
             "name": "Qualidade dos dados",
             "ok": false,
             "weight": 15.0,
-            "detail": "67%"
+            "detail": "70%"
           },
           {
             "name": "W1 alinhado",
-            "ok": null,
+            "ok": false,
             "weight": 15.0,
             "detail": "CONFIRMADA"
           },
           {
             "name": "D1 alinhado",
-            "ok": null,
+            "ok": true,
             "weight": 15.0,
             "detail": "PARCIAL · MÉDIAS SEM ESTRUTURA LIMPA"
           },
           {
             "name": "Estrutura W1+D1 limpa",
-            "ok": null,
+            "ok": false,
             "weight": 10.0,
             "detail": "W1 TENDÊNCIA ALTISTA · D1 EXPANSÃO DOS DOIS LADOS"
           },
           {
             "name": "Localização eficiente",
-            "ok": null,
+            "ok": false,
             "weight": 10.0,
             "detail": "DESCONTO"
           },
           {
             "name": "Sweep coerente",
-            "ok": null,
+            "ok": false,
             "weight": 8.0,
             "detail": "SWEEP SSL"
           },
@@ -4126,7 +4126,7 @@
         "hard_conflict": true
       },
       "readiness_grade": "WAIT",
-      "readiness_score": 18.51851851851852,
+      "readiness_score": 20.0,
       "event_risk": "NORMAL",
       "adr": {
         "available": true,
@@ -4863,5 +4863,5 @@
       "autopilot_v107": true
     }
   },
-  "autopilot_updated_at": "2026-09-21T09:41:09.320027+00:00"
+  "autopilot_updated_at": "2026-09-21T09:47:19.564424+00:00"
 }
