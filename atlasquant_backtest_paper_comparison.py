@@ -17,6 +17,16 @@ def _finite(value: Any) -> float | None:
     return number if math.isfinite(number) else None
 
 
+def _nonnegative(value: Any) -> float | None:
+    number = _finite(value)
+    return number if number is not None and number >= 0 else None
+
+
+def _percentage(value: Any) -> float | None:
+    number = _finite(value)
+    return number if number is not None and 0 <= number <= 100 else None
+
+
 def _count(value: Any) -> int | None:
     if isinstance(value, bool):
         return None
@@ -37,11 +47,11 @@ def compare_backtest_paper(evidence: Mapping[str, Any] | None) -> dict[str, Any]
     paper_samples = _count(source.get("forward_samples"))
     backtest_expectancy = _finite(source.get("expectancy_r"))
     paper_expectancy = _finite(source.get("forward_expectancy_r"))
-    backtest_pf = _finite(source.get("profit_factor"))
-    paper_pf = _finite(source.get("forward_profit_factor"))
-    backtest_dd = _finite(source.get("max_drawdown_r"))
-    paper_dd = _finite(source.get("forward_max_drawdown_r"))
-    paper_win_rate = _finite(source.get("forward_win_rate_pct"))
+    backtest_pf = _nonnegative(source.get("profit_factor"))
+    paper_pf = _nonnegative(source.get("forward_profit_factor"))
+    backtest_dd = _nonnegative(source.get("max_drawdown_r"))
+    paper_dd = _nonnegative(source.get("forward_max_drawdown_r"))
+    paper_win_rate = _percentage(source.get("forward_win_rate_pct"))
 
     required_metrics_present = all(
         value is not None for value in (backtest_expectancy, paper_expectancy)
