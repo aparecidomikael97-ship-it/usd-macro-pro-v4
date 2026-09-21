@@ -163,6 +163,23 @@ jobs:
                       pass
                   page.wait_for_timeout(2_000)
 
+                  # Actions may start before Render has deployed the same commit.
+                  # Wait for the exact production identity before evaluating UI.
+                  if expected_commit:
+                      for deploy_attempt in range(1, 19):
+                          marker = page.locator("#atlasquant-deploy-marker")
+                          current = ""
+                          if marker.count():
+                              current = str(marker.first.get_attribute("data-commit") or "").strip()
+                          if current == expected_commit:
+                              break
+                          if deploy_attempt < 18:
+                              page.wait_for_timeout(10_000)
+                              try:
+                                  page.reload(wait_until="domcontentloaded", timeout=180_000)
+                              except Exception:
+                                  pass
+
                   body_text = ""
                   page_title = ""
                   streamlit_container = 0
