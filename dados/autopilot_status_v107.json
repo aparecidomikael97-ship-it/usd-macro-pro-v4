@@ -421,5 +421,23 @@
     "real_orders": false,
     "broker_connection": false,
     "errors": []
+  },
+  "news_nowcast_v1": {
+    "enabled": true,
+    "runtime_state": "PROVIDER_ERROR",
+    "snapshots": 0,
+    "events": 0,
+    "closed_events": 0,
+    "with_signals": 0,
+    "with_empirical_distribution": 0,
+    "by_indicator": {},
+    "real_orders": false,
+    "trading_news_enabled": false,
+    "market_reaction_predicted": false,
+    "automatic_weight_change": false,
+    "lookahead_used": false,
+    "errors": [
+      "HTTPError: 401 Client Error: Unauthorized for url: https://eodhd.com/api/economic-events?api_token=6aa5832ada5af784962083&from=2026-05-24&to=2026-10-05&country=US&limit=1000&offset=0&fmt=json"
+    ]
   }
 }
