@@ -279,6 +279,25 @@ class OperationalBacktestTests(unittest.TestCase):
         self.assertEqual(ledger.iloc[0]["timeframe"],"H4")
         self.assertEqual(ledger.iloc[0]["trading_style"],"SWING")
 
+
+    def test_alignment_block_reasons_are_counted_without_becoming_trades(self):
+        d=candles([
+            (10,10.1,9.9,10.0),
+            (10,10.2,9.9,10.0),
+            (10,12.2,9.9,12.0),
+        ])
+        plan={
+            "signal_time":d.iloc[0]["datetime"],"pair":"EUR/USD","timeframe":"H4",
+            "side":"BUY","entry":10.0,"stop":9.0,"target":12.0,
+            "reading_aligned":True,"direction_aligned":True,
+            "filters_aligned":False,"trigger_aligned":True,
+        }
+        row=backtest_signal(d,plan,require_alignment=True)
+        summary=summarize_results([row])
+        self.assertEqual(summary["trades"],0)
+        self.assertEqual(summary["alignment_blocked"],1)
+        self.assertEqual(summary["alignment_block_reasons"]["DESALINHADO:filters_aligned"],1)
+
     def test_mixed_timestamp_formats_are_normalized_without_losing_valid_rows(self):
         d=pd.DataFrame([
             {"datetime":"2026-09-15T00:00:00Z","open":10,"high":10.2,"low":9.8,"close":10},
