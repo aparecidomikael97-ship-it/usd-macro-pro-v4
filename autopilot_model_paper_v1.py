@@ -14,6 +14,7 @@ import pandas as pd
 import autopilot_v107 as base
 from atlasquant_model_paper import MODEL_PAPER_EXECUTION_PROFILES, run_model_paper_cycle, summarize_model_paper
 from paper_friction_v116 import apply_paper_friction, summarize_net
+from atlasquant_timeframe_execution_readiness import RESEARCH_CACHE_PATH, execution_readiness_summary
 
 MODEL_PAPER_CSV_PATH="dados/model_paper_trades_v1.csv"
 MODEL_PAPER_SUMMARY_PATH="dados/model_paper_summary_v1.json"
@@ -31,6 +32,10 @@ def _model_paper_cycle()->tuple[bool,dict[str,Any],list[str]]:
     master,err=base.gh_get_json(base.MASTER_PATH,{})
     if err:
         errors.append("Model Paper Market Map: "+str(err))
+    research_cache,err=base.gh_get_json(RESEARCH_CACHE_PATH,{})
+    if err and "404" not in str(err):
+        errors.append("Model Paper research timeframes: "+str(err))
+    research_cache=research_cache if isinstance(research_cache,dict) else {}
     existing,err=base.gh_get_csv(MODEL_PAPER_CSV_PATH)
     if err:
         if "404" not in str(err):
@@ -64,6 +69,11 @@ def _model_paper_cycle()->tuple[bool,dict[str,Any],list[str]]:
     summary["gross_r_before_friction"]=friction.get("gross_r",0.0)
     summary["friction_r"]=friction.get("friction_r",0.0)
     summary["net_r_after_friction"]=friction.get("net_r",0.0)
+    readiness=execution_readiness_summary(
+        scanner if isinstance(scanner,dict) else {},
+        research_cache,
+    )
+    summary["timeframe_execution_readiness"]=readiness
     supported_timeframes=list(MODEL_PAPER_EXECUTION_PROFILES.keys())
     summary["execution_contract"]={
         "supported_timeframes":supported_timeframes,
@@ -114,6 +124,7 @@ def _model_paper_cycle()->tuple[bool,dict[str,Any],list[str]]:
         "by_setup":summary.get("by_setup",{}),
         "by_timeframe":summary.get("by_timeframe",{}),
         "by_session":summary.get("by_session",{}),
+        "timeframe_execution_readiness":summary.get("timeframe_execution_readiness",{}),
         "last_cycle":cycle,
         "errors":errors[:10],
     }
