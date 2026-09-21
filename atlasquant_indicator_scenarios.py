@@ -84,7 +84,7 @@ _SPECS=(
     {
         "id":"adp",
         "title":"ADP Employment",
-        "aliases":("adp","adp employment"),
+        "aliases":("adp employment change","adp nonfarm employment change","adp employment","adp"),
         "above":"Emprego privado ADP acima do consenso sinaliza atividade de contratação mais forte na própria pesquisa.",
         "below":"ADP abaixo do consenso sinaliza contratação privada mais fraca na própria pesquisa.",
         "inline":"Em linha: outros indicadores de trabalho ganham peso.",
