@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from io import BytesIO
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 import csv
 import io
 import json
@@ -487,8 +487,51 @@ def _render_result_block(
     }
 
 
-def render_operational_backtest_panel() -> dict[str, Any]:
+def paper_forward_rows(summary:Mapping[str,Any]|None)->pd.DataFrame:
+    source=dict(summary or {}) if isinstance(summary,Mapping) else {}
+    rows=[]
+    for tf,raw in dict(source.get("by_timeframe",{}) or {}).items():
+        item=dict(raw or {}) if isinstance(raw,Mapping) else {}
+        rows.append({
+            "timeframe":str(tf),
+            "candidatos":int(item.get("candidates",0) or 0),
+            "bloq_contexto":int(item.get("blocked_context",0) or 0),
+            "bloq_dados":int(item.get("blocked_data",0) or 0),
+            "bloq_timeframe":int(item.get("blocked_timeframe",0) or 0),
+            "pendentes":int(item.get("pending",0) or 0),
+            "abertas":int(item.get("open",0) or 0),
+            "fechadas":int(item.get("closed",0) or 0),
+            "gains":int(item.get("wins",0) or 0),
+            "losses":int(item.get("losses",0) or 0),
+            "net_r":float(item.get("net_r",0.0) or 0.0),
+        })
+    order={tf:i for i,tf in enumerate(SUPPORTED_EXECUTION_TIMEFRAMES)}
+    rows.sort(key=lambda x:(order.get(x["timeframe"],999),x["timeframe"]))
+    return pd.DataFrame(rows)
+
+
+def render_operational_backtest_panel(model_paper_summary:Mapping[str,Any]|None=None, runtime_source:str="") -> dict[str, Any]:
     st.markdown("### 🧪 Backtest Operacional — TradingView → AtlasQuant")
+    _paper_rows=paper_forward_rows(model_paper_summary)
+    with st.expander("📡 Forward/Paper ao vivo por timeframe",expanded=True):
+        if runtime_source:
+            st.caption(f"Fonte: {runtime_source}")
+        if _paper_rows.empty:
+            st.info("Ainda não há resumo persistido do Model Paper para comparar com o Backtest.")
+        else:
+            _summary=dict(model_paper_summary or {})
+            _a,_b,_c,_d=st.columns(4)
+            _a.metric("Candidatos",int(_summary.get("candidates_total",0) or 0))
+            _b.metric("Trades fechados",int(_summary.get("closed_trades",0) or 0))
+            _c.metric("Gain / Loss",f"{int(_summary.get('wins',0) or 0)} / {int(_summary.get('losses',0) or 0)}")
+            _d.metric("Resultado Paper",f"{float(_summary.get('net_r_after_friction',_summary.get('net_r',0.0)) or 0.0):+.2f}R")
+            st.dataframe(_paper_rows,width="stretch",hide_index=True)
+            readiness=dict(_summary.get("timeframe_execution_readiness",{}) or {})
+            supported=list(readiness.get("paper_gate_supported",[]) or dict(_summary.get("execution_contract",{}) or {}).get("supported_timeframes",[]) or [])
+            if supported:
+                st.caption("Paper habilitado somente nos timeframes com contrato completo: "+", ".join(str(x) for x in supported)+". Os demais permanecem pesquisa/fail-closed.")
+            st.caption("Candidato bloqueado não entra em Gain/Loss. Backtest e Paper continuam separados até haver amostra comparável.")
+
     backtest_timeframe=st.selectbox(
         "Timeframe do teste",
         list(SUPPORTED_EXECUTION_TIMEFRAMES),
