@@ -13,6 +13,7 @@ import pandas as pd
 import requests
 
 from calendar_core import MONTHS, TextParser, eod_row, parse_fomc, upcoming, value_text
+from atlasquant_indicator_scenarios import indicator_scenario_guide
 
 try:  # Allows unit tests to import this module even outside Streamlit.
     import streamlit as st
@@ -223,6 +224,35 @@ def render_calendar(releases: dict[str, Any], fetch_dates: Callable[[Any], list[
         if extended:
             columns += ["Anterior", "Consenso", "Realizado"]
         st.dataframe(df[columns], hide_index=True, width="stretch")
+
+        with st.expander("🎓 Como interpretar anterior, consenso e atual",expanded=False):
+            st.markdown(
+                "**Anterior** = última leitura disponível antes do release.  \n"
+                "**Consenso** = expectativa agregada antes da divulgação.  \n"
+                "**Atual** = número publicado agora.  \n"
+                "A surpresa é medida contra o consenso; revisões e componentes também importam."
+            )
+            event_options=list(dict.fromkeys(str(r.get("Evento","")) for r in selected if str(r.get("Evento","")).strip()))
+            if event_options:
+                chosen=st.selectbox(
+                    "Indicador/evento para entender",
+                    event_options,
+                    key=key+"_education_event",
+                )
+                guide=indicator_scenario_guide(chosen)
+                if guide.get("recognized"):
+                    st.markdown(f"#### {guide['title']}")
+                    for scenario in ("ABOVE","INLINE","BELOW"):
+                        item=guide["scenarios"][scenario]
+                        st.markdown(f"**{item['label']}:** {item['macro_context']}")
+                    st.warning("Cuidado: "+str(guide.get("caveat","")))
+                    st.caption(guide["interpretation"])
+                else:
+                    st.info(guide["interpretation"])
+            st.caption(
+                "O AtlasQuant não usa uma regra universal 'acima = sobe'. "
+                "Cada indicador tem lógica própria e a reação depende do contexto."
+            )
 
         with st.expander("Detalhes e cobertura da agenda"):
             st.dataframe(df[["Evento", "Prioridade", "Detalhes"]], hide_index=True, width="stretch")
