@@ -6793,7 +6793,19 @@ if _aq_active_index == 7:
     st.subheader("📈 Teste Histórico — Validação do Modelo")
 
     if render_operational_backtest_panel is not None:
-        render_operational_backtest_panel()
+        _aq_model_paper_summary={}
+        _aq_model_paper_source=""
+        try:
+            _aq_model_paper_summary,_aq_model_paper_source=_github_get_json_v937(
+                "dados/model_paper_summary_v1.json",{}
+            )
+        except Exception as _aq_model_paper_exc:
+            _aq_model_paper_summary={}
+            _aq_model_paper_source=f"runtime indisponível: {type(_aq_model_paper_exc).__name__}"
+        render_operational_backtest_panel(
+            model_paper_summary=_aq_model_paper_summary if isinstance(_aq_model_paper_summary,dict) else {},
+            runtime_source=str(_aq_model_paper_source or ""),
+        )
         st.divider()
     else:
         st.warning("Backtest operacional avançado indisponível neste carregamento.")
