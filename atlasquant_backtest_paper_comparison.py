@@ -36,6 +36,11 @@ def _count(value: Any) -> int | None:
     return int(number)
 
 
+def _invalid_supplied(source: Mapping[str, Any], key: str, normalized: Any) -> bool:
+    """Flag a supplied metric that could not be normalized without guessing."""
+    return key in source and source.get(key) is not None and normalized is None
+
+
 def compare_backtest_paper(evidence: Mapping[str, Any] | None) -> dict[str, Any]:
     """Return descriptive BT × Paper diagnostics without making decisions.
 
@@ -52,6 +57,18 @@ def compare_backtest_paper(evidence: Mapping[str, Any] | None) -> dict[str, Any]
     backtest_dd = _nonnegative(source.get("max_drawdown_r"))
     paper_dd = _nonnegative(source.get("forward_max_drawdown_r"))
     paper_win_rate = _percentage(source.get("forward_win_rate_pct"))
+
+    data_quality_issues: list[str] = []
+    optional_metrics = (
+        ("profit_factor", backtest_pf),
+        ("forward_profit_factor", paper_pf),
+        ("max_drawdown_r", backtest_dd),
+        ("forward_max_drawdown_r", paper_dd),
+        ("forward_win_rate_pct", paper_win_rate),
+    )
+    for key, normalized in optional_metrics:
+        if _invalid_supplied(source, key, normalized):
+            data_quality_issues.append(f"INVALID_{key.upper()}")
 
     required_metrics_present = all(
         value is not None for value in (backtest_expectancy, paper_expectancy)
@@ -82,6 +99,8 @@ def compare_backtest_paper(evidence: Mapping[str, Any] | None) -> dict[str, Any]
         "backtest_max_drawdown_r": backtest_dd,
         "paper_max_drawdown_r": paper_dd,
         "paper_win_rate_pct": paper_win_rate,
+        "data_quality_ok": not data_quality_issues,
+        "data_quality_issues": data_quality_issues,
         "comparable": comparable,
         "descriptive_only": True,
         "manual_review_required": True,

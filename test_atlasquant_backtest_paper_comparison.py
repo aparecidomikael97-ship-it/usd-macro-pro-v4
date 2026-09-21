@@ -19,6 +19,8 @@ class BacktestPaperComparisonTests(unittest.TestCase):
         self.assertTrue(result["comparable"])
         self.assertEqual(result["expectancy_gap_r"], -0.08)
         self.assertEqual(result["expectancy_retention_pct"], 60.0)
+        self.assertTrue(result["data_quality_ok"])
+        self.assertEqual(result["data_quality_issues"], [])
         self.assertTrue(result["descriptive_only"])
         self.assertTrue(result["manual_review_required"])
         self.assertFalse(result["automatic_strategy_change"])
@@ -109,10 +111,29 @@ class BacktestPaperComparisonTests(unittest.TestCase):
         self.assertIsNone(result["backtest_max_drawdown_r"])
         self.assertIsNone(result["paper_max_drawdown_r"])
         self.assertIsNone(result["paper_win_rate_pct"])
+        self.assertFalse(result["data_quality_ok"])
+        self.assertEqual(result["data_quality_issues"], [
+            "INVALID_PROFIT_FACTOR",
+            "INVALID_FORWARD_PROFIT_FACTOR",
+            "INVALID_MAX_DRAWDOWN_R",
+            "INVALID_FORWARD_MAX_DRAWDOWN_R",
+            "INVALID_FORWARD_WIN_RATE_PCT",
+        ])
         self.assertTrue(result["manual_review_required"])
         self.assertFalse(result["automatic_strategy_change"])
         self.assertFalse(result["automatic_weight_change"])
         self.assertFalse(result["real_orders_enabled"])
+
+    def test_missing_optional_metrics_are_not_reported_as_corrupt(self):
+        result = compare_backtest_paper({
+            "backtest_samples": 100,
+            "forward_samples": 30,
+            "expectancy_r": 0.1,
+            "forward_expectancy_r": 0.08,
+        })
+        self.assertTrue(result["comparable"])
+        self.assertTrue(result["data_quality_ok"])
+        self.assertEqual(result["data_quality_issues"], [])
 
     def test_small_samples_never_trigger_automatic_changes_or_real_orders(self):
         for backtest_samples, paper_samples in ((1,1),(2,1),(5,3),(10,5)):
