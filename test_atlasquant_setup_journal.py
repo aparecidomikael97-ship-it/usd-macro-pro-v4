@@ -12,6 +12,7 @@ from atlasquant_paper_setup_bridge import (
     bridge_paper_audit,
     canonical_setup_id,
     load_paper_audit_runtime,
+    load_model_paper_runtime,
 )
 
 
@@ -139,6 +140,22 @@ class AtlasQuantSetupJournalTests(unittest.TestCase):
         self.assertEqual(out["excluded"]["UNKNOWN_SETUP_ID"],1)
         self.assertEqual(out["excluded"]["MISSING_DATA_QUALITY"],1)
 
+    def test_source_model_explicit_trade_is_valid_forward_evidence(self):
+        import pandas as pd
+        audit=pd.DataFrame([{
+            "trade_id":"model-1","setup_id":"fvg",
+            "setup_attribution":"SOURCE_MODEL_EXPLICIT",
+            "pair":"EUR/USD","status":"CLOSED","side":"BUY",
+            "signal_time":"2026-09-20T12:00:00Z",
+            "active_session":"London","d1_regime":"TREND",
+            "entry_price":1.10,"stop_price":1.09,"target_price":1.12,
+            "realized_r":2.0,"data_quality_pct":95,
+        }])
+        out=bridge_paper_audit(audit)
+        self.assertEqual(out["eligible_records"],1)
+        self.assertEqual(out["summary_by_setup"]["fvg"]["forward_samples"],1)
+        self.assertFalse(out["setup_inference_used"])
+
     def test_runtime_loader_rejects_code_branch_before_network(self):
         with patch("atlasquant_paper_setup_bridge.requests.get") as get:
             frame,status=load_paper_audit_runtime(
@@ -147,6 +164,27 @@ class AtlasQuantSetupJournalTests(unittest.TestCase):
         self.assertTrue(frame.empty)
         self.assertEqual(status["reason"],"UNSAFE_BRANCH")
         get.assert_not_called()
+
+    def test_model_paper_runtime_loader_uses_model_ledger_path(self):
+        csv=(
+            "trade_id,setup_id,setup_attribution,pair,status,side,signal_time,"
+            "active_session,d1_regime,entry_price,stop_price,target_price,"
+            "realized_r,data_quality_pct\n"
+            "e1,fvg,SOURCE_MODEL_EXPLICIT,EUR/USD,CLOSED,BUY,2026-09-20T12:00:00Z,"
+            "London,TREND,1.10,1.09,1.12,2.0,95\n"
+        )
+        response=Mock()
+        response.status_code=200
+        response.json.return_value={"content":base64.b64encode(csv.encode("utf-8")).decode("ascii")}
+        response.raise_for_status.return_value=None
+        with patch("atlasquant_paper_setup_bridge.requests.get",return_value=response) as get:
+            frame,status=load_model_paper_runtime(
+                repo="owner/repo",branch="atlasquant-runtime",token="secret"
+            )
+        self.assertTrue(status["ok"])
+        self.assertEqual(len(frame),1)
+        called_url=get.call_args.args[0]
+        self.assertIn("model_paper_trades_v1.csv",called_url)
 
     def test_runtime_loader_reads_csv_from_safe_runtime_branch(self):
         csv=(
