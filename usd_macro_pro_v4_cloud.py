@@ -9035,6 +9035,10 @@ if _aq_active_index == 1:
             st.caption(f"Diagnóstico: {_MASTER_V102_IMPORT_ERROR}")
     else:
         try:
+            _matrix_master_v102 = globals().get("_matrix_master_v102")
+            if not isinstance(_matrix_master_v102,pd.DataFrame) or _matrix_master_v102.empty:
+                st.warning("Painel Mestre aguardando a Matriz dos 7 pares. Nenhuma oportunidade será exibida com dados incompletos.")
+                st.stop()
             _macro_context_master_v102 = {
                 "usd_score": float(usd_detalhado.get("score", 50.0)),
                 "usd_components": dict(usd_detalhado.get("componentes", {})),
@@ -9084,7 +9088,7 @@ if _aq_active_index == 1:
                         return 10**9
 
                 _candidates1022 = []
-                for _, _row1022 in matriz_v61.head(7).iterrows():
+                for _, _row1022 in _matrix_master_v102.head(7).iterrows():
                     _pair1022 = str(_row1022["Par"])
                     _raw1022 = _results1022.get(_pair1022, {})
                     _tec1022 = _raw1022.get("tecnico", {}) if isinstance(_raw1022, dict) else {}
@@ -9150,7 +9154,7 @@ if _aq_active_index == 1:
             )
 
             render_master_panel(
-                matriz_v61, ranking, CHAVE_TWELVE_DATA,
+                _matrix_master_v102, ranking, CHAVE_TWELVE_DATA,
                 _macro_context_master_v102, _scanner_state_master_v102,
                 scanner_refresh_cb=_master_refresh_scanner_batch_v1022,
                 scanner_refresh_remaining=_scan_wait_master_v1022,
