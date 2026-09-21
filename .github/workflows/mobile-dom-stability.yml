@@ -102,11 +102,23 @@ jobs:
               text=body(page)
               exception_count=page.locator('[data-testid="stException"]').count()
               dom_text_error=("NotFoundError" in text or "removeChild" in text)
+              visible_error_signatures=[
+                  "Traceback (most recent call last)",
+                  "NameError:",
+                  "UnboundLocalError:",
+                  "AttributeError:",
+                  "KeyError:",
+                  "ModuleNotFoundError:",
+                  "O Painel Mestre encontrou um erro",
+                  "encontrou um erro, mas o motor base continua preservado",
+              ]
+              visible_errors=[sig for sig in visible_error_signatures if sig in text]
               recent=[x for x in page_errors if "NotFoundError" in x or "removeChild" in x]
               trace.append({
                   "label":label,
                   "stException":exception_count,
                   "notfound_in_body":dom_text_error,
+                  "visible_error_signatures":visible_errors,
                   "page_errors":page_errors[-5:],
                   "body_chars":len(text),
               })
@@ -114,6 +126,8 @@ jobs:
                   errors.append(f"{label}: {exception_count} stException")
               if dom_text_error:
                   errors.append(f"{label}: NotFoundError/removeChild visível")
+              if visible_errors:
+                  errors.append(f"{label}: erro visível: {', '.join(visible_errors)}")
               if recent:
                   errors.append(f"{label}: pageerror removeChild/NotFoundError")
 
@@ -319,14 +333,27 @@ jobs:
                       metric_sample=metrics.first.evaluate(
                           "(el)=>({color:getComputedStyle(el).color,fontWeight:getComputedStyle(el).fontWeight})"
                       )
+                  card_samples={}
+                  for selector in (".aq-home-grid span",".aq-home-state",".aq-focus-card span"):
+                      node=visual_page.locator(selector).first
+                      if node.count():
+                          card_samples[selector]=node.evaluate(
+                              "(el)=>({color:getComputedStyle(el).color,fontWeight:getComputedStyle(el).fontWeight,fontSize:getComputedStyle(el).fontSize})"
+                          )
                   width_reports.append({
                       "width":width,
                       "viewport_width":viewport_w,
                       "document_width":document_w,
                       "horizontal_overflow_px":visual_overflow,
                       "metric_style":metric_sample,
+                      "card_text_styles":card_samples,
                       "page_errors":visual_errors[-5:],
                   })
+                  if isinstance(metric_sample,dict) and metric_sample.get("color")=="rgb(17, 24, 39)":
+                      errors.append(f"visual-{width}: texto de métrica escuro sobre card escuro")
+                  for selector,style in card_samples.items():
+                      if style.get("color") in {"rgb(159, 176, 198)","rgb(145, 166, 189)"}:
+                          errors.append(f"visual-{width}: contraste antigo ainda ativo em {selector}")
                   if visual_overflow>8:
                       errors.append(f"visual-{width}: overflow horizontal {visual_overflow}px")
                   if visual_errors:

@@ -198,13 +198,13 @@ def _card_html(row:Mapping[str,Any])->str:
 HOME_CSS="""
 <style>
 .aq-home-hero{border:1px solid rgba(137,170,210,.18);border-radius:18px;padding:18px 20px;margin:3px 0 14px;background:linear-gradient(120deg,rgba(18,47,79,.94),rgba(8,25,43,.94) 62%,rgba(12,52,55,.78))}
-.aq-home-hero small{color:#6de2c5;font-weight:850;letter-spacing:.12em}.aq-home-hero h2{color:#edf4ff;margin:.25rem 0 .3rem;font-size:1.55rem}.aq-home-hero p{color:#9fb0c6;margin:0;max-width:820px}
+.aq-home-hero small{color:#6de2c5;font-weight:850;letter-spacing:.12em}.aq-home-hero h2{color:#edf4ff;margin:.25rem 0 .3rem;font-size:1.55rem}.aq-home-hero p{color:#d1deed;margin:0;max-width:820px;font-weight:600}
 .aq-home-card{border:1px solid rgba(137,170,210,.18);border-radius:15px;padding:14px 15px;min-height:184px;background:linear-gradient(180deg,rgba(17,34,57,.9),rgba(10,24,41,.84));margin-bottom:7px}
 .aq-home-card.buy{border-top:3px solid #42d392}.aq-home-card.sell{border-top:3px solid #ff6b7a}.aq-home-card.wait{border-top:3px solid #9fb0c6}
 .aq-home-top{display:flex;justify-content:space-between;gap:8px;align-items:center}.aq-home-top strong{font-size:1.04rem;color:#edf4ff}.aq-home-top span{font-size:.74rem;font-weight:850;color:#dceaff}
-.aq-home-score{font-size:1.9rem;font-weight:850;color:#edf4ff;margin-top:10px}.aq-home-score small{font-size:.68rem;color:#9fb0c6;margin-left:4px}
-.aq-home-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px 9px;margin-top:10px}.aq-home-grid span{color:#9fb0c6;font-size:.69rem}.aq-home-grid b{color:#edf4ff}
-.aq-home-state{border-top:1px solid rgba(137,170,210,.14);margin-top:10px;padding-top:9px;color:#c6d5e8;font-size:.7rem}
+.aq-home-score{font-size:1.9rem;font-weight:850;color:#edf4ff;margin-top:10px}.aq-home-score small{font-size:.72rem;color:#d4e1f0;font-weight:750;margin-left:4px}
+.aq-home-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px 9px;margin-top:10px}.aq-home-grid span{color:#d4e1f0;font-size:.73rem;font-weight:650}.aq-home-grid b{color:#edf4ff}
+.aq-home-state{border-top:1px solid rgba(137,170,210,.18);margin-top:10px;padding-top:9px;color:#e2ebf7;font-size:.74rem;font-weight:700;line-height:1.35}
 .aq-home-detail{border:1px solid rgba(137,170,210,.18);border-radius:15px;padding:14px 16px;background:rgba(10,26,44,.68);margin-top:8px}
 @media(max-width:760px){.aq-home-hero{padding:14px 15px}.aq-home-hero h2{font-size:1.3rem}.aq-home-card{min-height:165px}.aq-home-grid{grid-template-columns:1fr}.aq-home-top{align-items:flex-start}}
 </style>
