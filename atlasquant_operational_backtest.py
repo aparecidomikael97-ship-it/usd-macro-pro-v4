@@ -19,6 +19,8 @@ import math
 
 import pandas as pd
 
+from atlasquant_multitimeframe_alignment import alignment_gate
+
 
 REQUIRED_CANDLE_COLUMNS = ("datetime", "open", "high", "low", "close")
 REQUIRED_SIGNAL_FIELDS = ("signal_time", "side", "entry", "stop", "target")
@@ -36,6 +38,10 @@ OPTIONAL_DIAGNOSTIC_FIELDS = (
     "known_high_impact_event",
     "data_quality_pct",
     "plan_followed",
+    "reading_aligned",
+    "direction_aligned",
+    "filters_aligned",
+    "trigger_aligned",
     "event_time",
     "event_label",
     "event_impact",
@@ -161,6 +167,7 @@ def backtest_signal(
     cost_r: float = 0.0,
     slippage_r: float = 0.0,
     start_after_signal_bar: bool = True,
+    require_alignment: bool = False,
 ) -> dict[str, Any]:
     """Backtest one explicit plan against OHLC candles.
 
@@ -190,6 +197,23 @@ def backtest_signal(
             "reason": reason,
             "net_r": None,
         }
+
+    if require_alignment:
+        alignment=alignment_gate(
+            signal,
+            timeframe=signal.get("timeframe","M15"),
+            strict=True,
+        )
+        if not alignment["passed"]:
+            return {
+                **base,
+                **plan,
+                "status":"ALIGNMENT_BLOCKED",
+                "outcome":"NO_TRADE",
+                "reason":alignment["reason"],
+                "alignment_gate":alignment,
+                "net_r":None,
+            }
 
     cost=_finite(cost_r)
     slippage=_finite(slippage_r)
