@@ -49,6 +49,11 @@ from atlasquant_quota_shadow import (
     summarize_quota_shadow,
 )
 from pair_intelligence_v110 import build_pair_intelligence_packs
+from atlasquant_signal_lifecycle import (
+    SIGNAL_LIFECYCLE_PATH,
+    advance_signal_lifecycle,
+    annotate_packs_with_lifecycle,
+)
 from atlasquant_shadow_capture import build_shadow_batch
 from atlasquant_shadow_store import persist_shadow_samples
 from atlasquant_flight_recorder_panel import record_from_pack
@@ -1292,6 +1297,7 @@ def build_home_snapshot_payload(
     master: Mapping[str,Any] | None,
     intel: Mapping[str,Any] | None,
     *,
+    signal_lifecycle: Mapping[str,Any] | None = None,
     now: pd.Timestamp | None = None,
 ) -> dict[str,Any]:
     """Compact already-computed state for fast interactive startup."""
@@ -1308,6 +1314,7 @@ def build_home_snapshot_payload(
         "engine_version":"V11.0.8 / AtlasQuant Runtime",
         "inputs":src,
         "packs":[dict(x) for x in list(packs or []) if isinstance(x,Mapping)],
+        "signal_lifecycle":dict(signal_lifecycle or {}),
         "runtime":{
             "market_open":bool(forex_market_likely_open(current)),
             "scanner_pairs":len(dict(scanner_map.get("resultados",{}) or {})),
@@ -1401,6 +1408,34 @@ def main() -> int:
             matrix,ranking,scanner_state=scanner,map_state=master,
             news_state=intel or {},fed_tone=fed_tone,weights=inputs.get("weights") if isinstance(inputs,Mapping) else None,
         )
+
+        # 6.0 Signal lifecycle: observational transition log. The first run
+        # establishes a baseline; subsequent runs preserve the exact moment
+        # POSSIBLE -> CONFIRMED / EXPIRED / BLOCKED transitions are observed.
+        lifecycle_previous,lifecycle_read_err=gh_get_json(
+            SIGNAL_LIFECYCLE_PATH,
+            {"schema":"ATLASQUANT_SIGNAL_LIFECYCLE_V1","pairs":{},"transitions":[]},
+        )
+        lifecycle_state=advance_signal_lifecycle(
+            lifecycle_previous if not lifecycle_read_err else {},
+            packs,
+            now=utcnow(),
+        )
+        lifecycle_ok=False
+        lifecycle_write_err=""
+        if not lifecycle_read_err:
+            lifecycle_ok,lifecycle_write_err=gh_put_json(
+                SIGNAL_LIFECYCLE_PATH,
+                lifecycle_state,
+                "AtlasQuant: atualiza ciclo auditável dos sinais",
+            )
+        packs=annotate_packs_with_lifecycle(
+            packs,
+            lifecycle_state,
+            now=utcnow(),
+            timezone="UTC",
+        )
+
         engine_version="V11.0.8 / AtlasQuant Runtime"
         shadow_status,flight_status,evidence_errors=persist_decision_evidence(
             packs,engine_version=engine_version,repo=REPO,branch=BRANCH,token=TOKEN,
@@ -1408,6 +1443,10 @@ def main() -> int:
         all_errors.extend(evidence_errors)
     except Exception as evidence_exc:
         packs=[]
+        lifecycle_state={"schema":"ATLASQUANT_SIGNAL_LIFECYCLE_V1","pairs":{},"transitions":[]}
+        lifecycle_read_err=""
+        lifecycle_write_err=""
+        lifecycle_ok=False
         err=f"{type(evidence_exc).__name__}: {evidence_exc}"
         shadow_status={"ok":False,"added":0,"samples":0,"reason":"PACK_BUILD_EXCEPTION","error":err}
         flight_status={"ok":False,"added":0,"records":0,"reason":"PACK_BUILD_EXCEPTION","error":err}
@@ -1416,7 +1455,9 @@ def main() -> int:
     # 6.1 Compact startup snapshot — one read for the interactive beginner Home.
     # It contains only already-computed state; no provider call, gate change or execution.
     home_snapshot=build_home_snapshot_payload(
-        inputs,packs,scanner,master,intel,now=utcnow()
+        inputs,packs,scanner,master,intel,
+        signal_lifecycle=lifecycle_state,
+        now=utcnow(),
     )
     home_ok,home_err=gh_put_json(
         HOME_SNAPSHOT_PATH,
@@ -1449,6 +1490,18 @@ def main() -> int:
         "persisted":bool(home_ok),
         "error":str(home_err or ""),
         "packs":len(packs),
+        "real_orders":False,
+        "automatic_execution":False,
+    }
+
+    status["signal_lifecycle"]={
+        "path":SIGNAL_LIFECYCLE_PATH,
+        "pairs":len(dict((lifecycle_state or {}).get("pairs",{}) or {})),
+        "transitions":len(list((lifecycle_state or {}).get("transitions",[]) or [])),
+        "persisted":bool(lifecycle_ok),
+        "error":str(lifecycle_read_err or lifecycle_write_err or ""),
+        "timezone":"UTC",
+        "m15_freshness_policy":"uses data_readiness_v1101.TF_LIMITS",
         "real_orders":False,
         "automatic_execution":False,
     }
