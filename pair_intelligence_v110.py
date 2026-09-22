@@ -40,6 +40,10 @@ from atlasquant_next_event import render_next_event
 from atlasquant_flight_recorder_panel import render_flight_recorder, capture_flight_recorder
 from atlasquant_runtime_store import resolve_runtime_branch
 from atlasquant_shadow_capture import capture_shadow_batch
+from atlasquant_signal_lifecycle import (
+    SIGNAL_LIFECYCLE_PATH,
+    annotate_packs_with_lifecycle,
+)
 
 try:
     from currency_news_v107 import pair_news_table
@@ -252,6 +256,12 @@ def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro",weights=
     data_ready=assess_pair_data_readiness(raw_sc,mapctx,expected_direction=str(row.get("Direção","")))
     ict_fresh=assess_ict_freshness(data_ready)
     age=(data_ready.get("timeframes",{}).get("m15",{}) or {}).get("age_minutes")
+    technical_timestamp=raw_sc.get("m15_fetched_at",raw_sc.get("processado_em"))
+    technical_timestamp_source=(
+        "m15_fetched_at" if raw_sc.get("m15_fetched_at") else
+        "processado_em" if raw_sc.get("processado_em") not in (None,"",0,0.0) else
+        "UNPROVEN"
+    )
     strength=build_strength_breakdown(ranking,base,quote,weights)
 
     mc=_map_normalize(mapctx,pair)
@@ -345,6 +355,9 @@ def _reason_pack(pair,row,ranking,scanner,mapctx,news,fed_tone="Neutro",weights=
         "up":up,"down":down,"reason":reason,"next_action":decision["next_action"],"target":target,
         "hard_blocks":decision["hard_blocks"],"soft_blocks":decision["soft_blocks"],"positives":decision["positives"],
         "executable":decision["executable"],"technical_age":age,"data_ready":data_ready,
+        "technical_timestamp":technical_timestamp,
+        "technical_timestamp_source":technical_timestamp_source,
+        "scanner_processed_at":raw_sc.get("processado_em"),
         "stale_technical":stale_technical,"sweep_state":sweep_state,"strength":strength,"map_current":map_current,
         "updated_at":mc.get("updated_at"),
         "active_session_bucket":session_bucket_from_timestamp(
@@ -548,11 +561,13 @@ def load_current_pair_intelligence(matrix:pd.DataFrame, ranking:pd.DataFrame, *,
     mmap,map_error=_read_json(MAP_PATH,token,repo,branch)
     news_state,news_error=_read_json(NEWS_PATH,token,repo,branch)
     auto,auto_error=_read_json(AUTO_PATH,token,repo,branch)
+    lifecycle,lifecycle_error=_read_json(SIGNAL_LIFECYCLE_PATH,token,repo,branch)
     fed_tone=str((fed or {}).get("tom",(fed or {}).get("tone","Neutro")))
     packs=build_pair_intelligence_packs(
         matrix, ranking, scanner_state=scanner, map_state=mmap,
         news_state=news_state, fed_tone=fed_tone, weights=weights,
     )
+    packs=annotate_packs_with_lifecycle(packs,lifecycle,timezone="UTC")
     return {
         "packs":packs,
         "scanner":scanner,
@@ -564,6 +579,7 @@ def load_current_pair_intelligence(matrix:pd.DataFrame, ranking:pd.DataFrame, *,
             "market_map":map_error,
             "news":news_error,
             "auto":auto_error,
+            "signal_lifecycle":lifecycle_error,
         },
         "runtime_branch":branch,
         "real_orders_enabled":False,
@@ -586,6 +602,13 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
         packs=list(_runtime.get("packs",[]) or [])
         auto=dict(_runtime.get("auto",{}) or {})
     if not packs: st.warning("Nenhum dos 7 pares foi encontrado na Matriz."); return
+    # Fast Home/runtime snapshots can contain packs serialized earlier. Recompute
+    # current expiry from the auditable technical timestamp before presenting them.
+    packs=annotate_packs_with_lifecycle(
+        packs,
+        _runtime.get("signal_lifecycle",{}) if isinstance(_runtime,Mapping) else {},
+        timezone="UTC",
+    )
 
     opctx=select_operational_context(packs)
     best=opctx.get("best") or packs[0]
