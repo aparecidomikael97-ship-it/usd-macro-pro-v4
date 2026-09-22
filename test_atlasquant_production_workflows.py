@@ -14,7 +14,9 @@ class AtlasQuantProductionWorkflowContractTests(unittest.TestCase):
 
     def test_browser_smoke_keeps_fast_home_and_safety_contract(self):
         text=Path(".github/workflows/production-browser-smoke.yml").read_text(encoding="utf-8")
-        self.assertIn("branches: [main, atlasquant-integration]",text)
+        self.assertIn("workflow_dispatch:",text)
+        self.assertIn("schedule:",text)
+        self.assertNotIn("branches: [main, atlasquant-integration]",text)
         self.assertIn("contents: read",text)
         self.assertNotIn("contents: write",text)
         self.assertIn("ATLASQUANT_HOME_SNAPSHOT_V1",text)
@@ -27,6 +29,28 @@ class AtlasQuantProductionWorkflowContractTests(unittest.TestCase):
         self.assertIn("MARKET INTELLIGENCE PLATFORM",text)
         self.assertIn("Safety Core monitorado",text)
 
+
+    def test_browser_smoke_does_not_block_render_checks_pass_deploy(self):
+        browser=Path(".github/workflows/production-browser-smoke.yml").read_text(encoding="utf-8")
+        render=Path("render.yaml").read_text(encoding="utf-8")
+        self.assertIn("autoDeployTrigger: checksPass",render)
+        trigger=browser.split("permissions:",1)[0]
+        self.assertNotIn("\n  push:",trigger)
+        self.assertIn("workflow_dispatch:",trigger)
+        self.assertIn("schedule:",trigger)
+
+    def test_mobile_browser_smoke_ignores_transient_pointer_overlay_but_keeps_state_assertion(self):
+        text=Path(".github/workflows/production-browser-smoke.yml").read_text(encoding="utf-8")
+        self.assertIn("advanced.first.click(force=True)",text)
+        self.assertIn("transição móvel Iniciante→Avançado→Decisão→Radar incompleta",text)
+        self.assertIn("mobile_transition",text)
+
+    def test_local_ui_smoke_verifies_build_marker_in_real_dom(self):
+        text=Path(".github/workflows/atlasquant-ui-smoke.yml").read_text(encoding="utf-8")
+        self.assertIn("short_source_fingerprint",text)
+        self.assertIn("#atlasquant-source-build-marker",text)
+        self.assertIn("build_identity_ok",text)
+        self.assertIn("marcador de build ausente/incorreto",text)
 
     def test_app_deploy_marker_has_explicit_environment_fallbacks(self):
         src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
