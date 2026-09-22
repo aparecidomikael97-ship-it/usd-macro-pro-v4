@@ -19,7 +19,7 @@ class AtlasQuantCentralPairMatrixIntegrationTests(unittest.TestCase):
         self.assertIn("_aq_pair_matrix_result = build_pair_matrix(",self.src)
         self.assertNotIn("_build_pair_matrix_for_surfaces_v111",self.src)
         self.assertIn("matriz_v61 = pd.DataFrame()",self.src)
-        self.assertIn("matriz_v61 = _aq_pair_matrix_result["matrix"].copy()",self.src)
+        self.assertIn('matriz_v61 = _aq_pair_matrix_result["matrix"].copy()',self.src)
 
     def test_pair_workspace_reuses_shared_usd_context(self):
         pair=self.src.index("# ABA 3 — PARES")
