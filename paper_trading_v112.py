@@ -624,6 +624,9 @@ def _cancel_wait_entries_for_gain_lock(
     d = normalize_trades(trades)
     if d.empty:
         return d, 0
+    # CSV/Parquet may infer all-empty metadata columns as float64. Risk-lock
+    # cancellation writes text timestamps/notes, so force object dtype first.
+    d = d.astype("object")
     mask = d["status"].astype(str) == "WAIT_ENTRY"
     count = int(mask.sum())
     if not count:
