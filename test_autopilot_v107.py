@@ -278,6 +278,31 @@ class AutopilotV107Tests(unittest.TestCase):
         self.assertFalse(out["safety"]["real_orders"])
 
 
+    def test_home_snapshot_can_carry_signal_lifecycle_without_enabling_orders(self):
+        now=pd.Timestamp("2026-09-18T12:00:00Z")
+        lifecycle={"schema":"ATLASQUANT_SIGNAL_LIFECYCLE_V1","pairs":{"EUR/USD":{"status_code":"CONFIRMED"}}}
+        out=a.build_home_snapshot_payload(
+            {},[{"pair":"EUR/USD"}],{}, {}, {},
+            signal_lifecycle=lifecycle,now=now,
+        )
+        self.assertEqual(out["signal_lifecycle"],lifecycle)
+        self.assertFalse(out["safety"]["real_orders"])
+        self.assertFalse(out["safety"]["automatic_execution"])
+
+    def test_autopilot_persists_signal_lifecycle_before_home_snapshot(self):
+        from pathlib import Path
+        src=Path("autopilot_v107.py").read_text(encoding="utf-8")
+        lifecycle=src.index("advance_signal_lifecycle(")
+        persist=src.index("gh_put_json(\n                SIGNAL_LIFECYCLE_PATH",lifecycle)
+        annotate=src.index("annotate_packs_with_lifecycle(",persist)
+        home=src.index("build_home_snapshot_payload(",annotate)
+        self.assertLess(lifecycle,persist)
+        self.assertLess(persist,annotate)
+        self.assertLess(annotate,home)
+        lifecycle_src=Path("atlasquant_signal_lifecycle.py").read_text(encoding="utf-8")
+        self.assertIn('"real_orders_enabled":False',lifecycle_src)
+        self.assertIn('"automatic_execution":False',lifecycle_src)
+
     def test_home_snapshot_path_is_dedicated_runtime_artifact(self):
         self.assertEqual(a.HOME_SNAPSHOT_PATH,"dados/atlasquant_home_snapshot_v1.json")
 

@@ -18,6 +18,15 @@ class PairIntelligenceSourceTests(unittest.TestCase):
         self.assertIn('"active_session"',src)
         self.assertIn("session_bucket_from_timestamp",src)
 
+    def test_pair_pack_carries_auditable_technical_timestamp_and_lifecycle(self):
+        src=Path("pair_intelligence_v110.py").read_text(encoding="utf-8")
+        self.assertIn('"technical_timestamp"',src)
+        self.assertIn('"technical_timestamp_source"',src)
+        self.assertIn("SIGNAL_LIFECYCLE_PATH",src)
+        self.assertIn("annotate_packs_with_lifecycle",src)
+        self.assertIn('"Status temporal"',src)
+        self.assertIn('"Hora leitura"',src)
+
     def test_no_profit_probability_claim(self):
         src=Path("pair_intelligence_v110.py").read_text(encoding="utf-8")
         self.assertIn("não é probabilidade de lucro",src.lower())

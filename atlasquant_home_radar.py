@@ -17,6 +17,7 @@ import streamlit as st
 
 from atlasquant_voice_assistant import render_contextual_voice_assistant
 from atlasquant_neural_voice_ui import render_neural_voice_player
+from atlasquant_signal_lifecycle import derive_signal_view, format_signal_time
 from atlasquant_session_profiles import (
     SESSION_PROFILES,
     SESSION_LABELS,
@@ -85,6 +86,20 @@ def home_rows_from_packs(packs:Sequence[Mapping[str,Any]]|None)->list[dict[str,A
         strength=dict(p.get("strength",{}) or {})
         blockers=[str(x) for x in list(p.get("blockers",[]) or []) if str(x).strip()]
         session_bucket=extract_session_bucket(p)
+        signal=dict(p.get("signal_lifecycle",{}) or {})
+        if not signal:
+            signal=derive_signal_view(p,timezone="UTC")
+        signal_code=str(signal.get("status_code") or "UNVERIFIED")
+        signal_side=str(signal.get("side") or ("BUY" if bias=="COMPRA" else "SELL" if bias=="VENDA" else "WAIT"))
+        signal_action="COMPRA" if signal_side=="BUY" else "VENDA" if signal_side=="SELL" else "AGUARDAR"
+        signal_headline={
+            "CONFIRMED":f"{signal_action} CONFIRMADA",
+            "POSSIBLE":f"POSSÍVEL {signal_action}",
+            "EXPIRED":f"{signal_action} EXPIRADA",
+            "BLOCKED":f"{signal_action} BLOQUEADA",
+            "UNVERIFIED":f"{signal_action} SEM HORÁRIO — NÃO ENTRAR",
+            "NO_SIGNAL":"AGUARDAR",
+        }.get(signal_code,str(signal.get("status_label") or "AGUARDAR"))
         rows.append({
             "pair":pair,
             "session_bucket":session_bucket,
@@ -109,6 +124,18 @@ def home_rows_from_packs(packs:Sequence[Mapping[str,Any]]|None)->list[dict[str,A
             "news":str(p.get("news_align") or "—"),
             "movement":_adr_label(p.get("adr")),
             "blockers":blockers,
+            "signal":signal,
+            "signal_status_code":signal_code,
+            "signal_status_label":str(signal.get("status_label") or "SEM STATUS"),
+            "signal_headline":signal_headline,
+            "signal_reference_at":str(signal.get("reference_at") or ""),
+            "signal_reference_display":str(signal.get("reference_display") or "horário não comprovado"),
+            "signal_confirmed_at":str(signal.get("confirmed_at") or ""),
+            "signal_observed_at":str(signal.get("observed_at") or ""),
+            "signal_valid_until":str(signal.get("valid_until") or ""),
+            "signal_age_minutes":signal.get("age_minutes"),
+            "signal_remaining_minutes":signal.get("remaining_minutes"),
+            "signal_timezone":str(signal.get("timezone") or "UTC"),
             "target":str(p.get("target") or "—"),
             "w1":str(p.get("w1") or "—"),
             "d1":str(p.get("d1") or "—"),
@@ -158,9 +185,14 @@ def voice_script_for_row(row:Mapping[str,Any])->str:
     session=str(r.get("session_label") or "sessão não informada")
     blockers=[str(x) for x in list(r.get("blockers",[]) or []) if str(x).strip()]
     blocker_text=(" Principais bloqueios: "+"; ".join(blockers[:3])+".") if blockers else ""
+    signal_headline=str(r.get("signal_headline") or "sem status de sinal")
+    signal_reference=str(r.get("signal_reference_display") or "horário não comprovado")
+    signal_age=r.get("signal_age_minutes")
+    signal_age_text=(" idade da leitura não comprovada." if signal_age is None else f" leitura com {float(signal_age):.0f} minutos.")
     return (
         f"Análise do {pair}. "
         f"O viés atual é {bias}. A orientação da tela é {action}. "
+        f"Status temporal: {signal_headline}, referência {signal_reference};{signal_age_text} "
         f"A prioridade interna está em {priority:.0f} de 100, com qualidade {quality:.0f} de 100 "
         f"e prontidão dos dados {data_score:.0f} de 100. "
         f"O principal motivo é: {reason}. "
@@ -182,8 +214,20 @@ def _card_html(row:Mapping[str,Any])->str:
     state=escape(str(r.get("state") or "—"))
     movement=escape(str(r.get("movement") or "N/D"))
     news=escape(str(r.get("news") or "—"))
+    signal_headline=escape(str(r.get("signal_headline") or "AGUARDAR"))
+    signal_reference=escape(str(r.get("signal_reference_display") or "horário não comprovado"))
+    signal_age=r.get("signal_age_minutes")
+    signal_remaining=r.get("signal_remaining_minutes")
+    age_text="idade N/D" if signal_age is None else f"há {float(signal_age):.0f} min"
+    validity_text=(
+        "revalidar agora"
+        if str(r.get("signal_status_code")) in {"EXPIRED","UNVERIFIED","BLOCKED"}
+        else ("validade técnica ≤ "+f"{float(signal_remaining):.0f} min" if signal_remaining is not None else "validade N/D")
+    )
     return f"""<div class="aq-home-card {tone}">
       <div class="aq-home-top"><strong>{pair}</strong><span>{icon} {escape(action)}</span></div>
+      <div class="aq-home-signal">{signal_headline}</div>
+      <div class="aq-home-time">{signal_reference} · {escape(age_text)} · {escape(validity_text)}</div>
       <div class="aq-home-score">{_safe(r.get('priority',0)):.0f}<small>/100 prioridade</small></div>
       <div class="aq-home-grid">
         <span>Dados <b>{_safe(r.get('data_score',0)):.0f}</b></span>
@@ -205,6 +249,8 @@ HOME_CSS="""
 .aq-home-score{font-size:1.9rem;font-weight:900;color:#ffffff;margin-top:10px}.aq-home-score small{font-size:.72rem;color:#eef4fb;font-weight:800;margin-left:4px}
 .aq-home-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px 9px;margin-top:10px}.aq-home-grid span{color:#eef4fb;font-size:.73rem;font-weight:700}.aq-home-grid b{color:#ffffff;font-weight:850}
 .aq-home-state{border-top:1px solid rgba(137,170,210,.24);margin-top:10px;padding-top:9px;color:#f4f8fd;font-size:.74rem;font-weight:750;line-height:1.35}
+.aq-home-signal{margin-top:9px;color:#ffffff;font-size:.82rem;font-weight:900;letter-spacing:.025em}
+.aq-home-time{margin-top:3px;color:#eef4fb;font-size:.70rem;font-weight:700;line-height:1.35}
 .aq-home-detail{border:1px solid rgba(137,170,210,.18);border-radius:15px;padding:14px 16px;background:rgba(10,26,44,.68);margin-top:8px}
 @media(max-width:760px){.aq-home-hero{padding:14px 15px}.aq-home-hero h2{font-size:1.3rem}.aq-home-card{min-height:165px}.aq-home-grid{grid-template-columns:1fr}.aq-home-top{align-items:flex-start}}
 </style>
@@ -307,6 +353,17 @@ def render_home_radar(
     x2.metric("Ação agora",row["action"])
     x3.metric("Prioridade",f"{row['priority']:.0f}/100")
     x4.metric("Dados",f"{row['data_score']:.0f}/100")
+    st.markdown(f"**Status temporal:** {row['signal_headline']}")
+    _signal_detail = row["signal_reference_display"]
+    if row.get("signal_age_minutes") is not None:
+        _signal_detail += f" · há {float(row['signal_age_minutes']):.0f} min"
+    if row.get("signal_confirmed_at"):
+        _signal_detail += " · confirmação registrada em " + format_signal_time(row["signal_confirmed_at"],row["signal_timezone"])
+    if row.get("signal_valid_until"):
+        _signal_detail += " · limite técnico de frescor até " + format_signal_time(row["signal_valid_until"],row["signal_timezone"])
+    st.caption(_signal_detail)
+    if row["signal_status_code"] in {"EXPIRED","UNVERIFIED","BLOCKED"}:
+        st.warning("Esta leitura não deve ser tratada como entrada atual. É obrigatória nova validação.")
     st.markdown(f"**Resumo:** {row['reason']}")
     st.markdown(f"**Próximo passo:** {row['next_action']}")
     st.caption(
@@ -329,7 +386,9 @@ def render_home_radar(
             "Compatível com perfil":r.get("session_match","UNKNOWN"),
             "Ação":r["action"],"Viés":r["bias"],"Prioridade":round(r["priority"],1),
             "Qualidade":round(r["quality"],1),"Dados":round(r["data_score"],1),"H4":r["h4"],"H1":r["h1"],
-            "M15":r["m15"],"Gate":r["gate"],"Movimento":r["movement"],"Notícias":r["news"],"Evento":r["event"],
+            "M15":r["m15"],"Gate":r["gate"],"Status temporal":r["signal_headline"],
+            "Hora leitura":r["signal_reference_display"],"Idade min":r["signal_age_minutes"],
+            "Movimento":r["movement"],"Notícias":r["news"],"Evento":r["event"],
         } for r in rows])
         st.dataframe(adv,width="stretch",hide_index=True)
         if row["blockers"]:
