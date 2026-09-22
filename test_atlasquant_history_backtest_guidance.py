@@ -43,6 +43,27 @@ class AtlasQuantHistoryBacktestGuidanceTests(unittest.TestCase):
         self.assertIn("Não é Backtest",model["not_this"])
         self.assertFalse(model["trading_side_effects"])
 
+    def test_main_history_no_longer_points_to_nonexistent_classification_tab(self):
+        from pathlib import Path
+        src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        history_start=src.index("# ABA 5 — HISTÓRICO DE FORÇA E DIREÇÃO")
+        history_end=src.index("# ABA 6 — TESTE HISTÓRICO",history_start)
+        block=src[history_start:history_end]
+        self.assertIn("render_history_workspace(historico)",block)
+        self.assertIn("Ela não é Backtest",block)
+        self.assertNotIn("🏆 Classificação",block)
+
+    def test_main_backtest_starts_with_didactic_intro_before_advanced_panels(self):
+        from pathlib import Path
+        src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        start=src.index("if _aq_active_index == 7:")
+        intro=src.index("render_backtest_intro()",start)
+        forward=src.index("render_forward_test_panel(",intro)
+        operational=src.index("render_operational_backtest_panel()",forward)
+        self.assertLess(intro,forward)
+        self.assertLess(forward,operational)
+        self.assertIn("não promove estratégia automaticamente",src[start:forward].casefold())
+
     def test_backtest_help_teaches_risk_metrics_and_sample_limits(self):
         model=backtest_help_model()
         joined=" ".join(
