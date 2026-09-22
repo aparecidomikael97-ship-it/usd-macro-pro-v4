@@ -54,6 +54,33 @@ class NewsNowcastSecretRedactionTests(unittest.TestCase):
         self.assertGreater(policy["retry_after_min"],0)
         self.assertFalse(n.should_fetch_provider(state,now=now))
 
+    def test_legacy_provider_error_with_401_is_normalized_without_refetch(self):
+        now=n.pd.Timestamp("2026-09-22T19:30:00Z")
+        state={
+            "last_attempt_at":(now-n.pd.Timedelta(minutes=20)).isoformat(),
+            "last_provider_status":{
+                "reason":"PROVIDER_ERROR",
+                "http_status":401,
+                "requests":1,
+            },
+        }
+        policy=n.provider_fetch_policy(state,now=now)
+        self.assertFalse(policy["fetch"])
+        self.assertEqual(policy["runtime_state"],"AUTH_COOLDOWN")
+        self.assertEqual(policy["reason"],"AUTH_ERROR")
+        self.assertGreater(policy["retry_after_min"],300)
+
+    def test_legacy_provider_error_with_429_is_normalized_to_rate_limit(self):
+        now=n.pd.Timestamp("2026-09-22T19:30:00Z")
+        state={
+            "last_attempt_at":(now-n.pd.Timedelta(minutes=10)).isoformat(),
+            "last_provider_status":{"reason":"PROVIDER_ERROR","http_status":429},
+        }
+        policy=n.provider_fetch_policy(state,now=now)
+        self.assertFalse(policy["fetch"])
+        self.assertEqual(policy["runtime_state"],"RATE_LIMIT_COOLDOWN")
+        self.assertEqual(policy["reason"],"RATE_LIMITED")
+
     def test_auth_error_retries_after_cooldown(self):
         now=n.pd.Timestamp("2026-09-22T19:00:00Z")
         state={
