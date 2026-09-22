@@ -381,6 +381,22 @@ except Exception as _home_radar_exc:
 
 
 try:
+    from atlasquant_pair_matrix_core import (
+        PAIR_MATRIX_PAIRS,
+        build_pair_matrix,
+        resolve_pair_usd_context,
+    )
+    _ATLASQUANT_PAIR_MATRIX_IMPORT_ERROR = ""
+except Exception as _pair_matrix_exc:
+    PAIR_MATRIX_PAIRS = (
+        "EUR/USD","GBP/USD","AUD/USD","NZD/USD","USD/JPY","USD/CHF","USD/CAD",
+    )
+    build_pair_matrix = None
+    resolve_pair_usd_context = None
+    _ATLASQUANT_PAIR_MATRIX_IMPORT_ERROR = f"{type(_pair_matrix_exc).__name__}: {_pair_matrix_exc}"
+
+
+try:
     from atlasquant_coverage_funnel import render_coverage_funnel
     _ATLASQUANT_COVERAGE_IMPORT_ERROR = ""
 except Exception as _coverage_exc:
@@ -6203,6 +6219,102 @@ _sincronizar_anteriores_v711()
 
 
 # =========================================================
+# MATRIZ CENTRAL DOS 7 PARES — V11.2
+# Fonte única para Radar, Painel Mestre, Pares, Decisão, Market Map,
+# Notícias e Autopilot. Falha fechado: matriz inválida fica vazia.
+# =========================================================
+_AQ_MATRIX_CONSUMER_INDICES = {0, 1, 4, 8, 9, 14}
+_aq_matrix_required = bool(
+    _aq_active_index in _AQ_MATRIX_CONSUMER_INDICES
+    or os.getenv("USD_MACRO_AUTOPILOT", "") == "1"
+)
+_aq_pair_context = {
+    "usd_base": float(usd_detalhado.get("score", 50.0)),
+    "usd_before_fomc": float(st.session_state.get(
+        "usd_score_ajustado_surpresas",
+        usd_detalhado.get("score", 50.0),
+    )),
+    "usd_for_pairs": float(st.session_state.get(
+        "usd_score_ajustado_surpresas",
+        usd_detalhado.get("score", 50.0),
+    )),
+    "surprise_adjustment": float(st.session_state.get("usd_ajuste_surpresas", 0.0)),
+    "fomc_score": float(st.session_state.get("v76_fomc_usd_score", 50.0)),
+    "fomc_active": bool(st.session_state.get("v76_fomc_auto_ativo", False)),
+    "fomc_post_release_active": bool(st.session_state.get("v69_fomc_surprise_ativo", False)),
+    "fomc_weight": 0.0,
+    "fomc_integrated": False,
+    "event": {},
+}
+_aq_pair_matrix_result = {
+    "ready": False,
+    "reason": "matriz não solicitada nesta área",
+    "missing_codes": [],
+    "matrix": pd.DataFrame(),
+    "pairs_expected": 7,
+    "pairs_built": 0,
+    "trading_side_effects": False,
+}
+matriz_v61 = pd.DataFrame()
+
+if _aq_matrix_required:
+    if build_pair_matrix is None or resolve_pair_usd_context is None:
+        _aq_pair_matrix_result["reason"] = (
+            "módulo da Matriz Central indisponível: " + _ATLASQUANT_PAIR_MATRIX_IMPORT_ERROR
+        )
+    else:
+        try:
+            _aq_next_event = _proximo_evento_macro_v65()
+        except Exception:
+            _aq_next_event = {}
+        try:
+            _aq_pair_context = resolve_pair_usd_context(
+                usd_base=usd_detalhado.get("score", 50.0),
+                surprise_adjusted_usd=st.session_state.get(
+                    "usd_score_ajustado_surpresas",
+                    usd_detalhado.get("score", 50.0),
+                ),
+                surprise_adjustment=st.session_state.get("usd_ajuste_surpresas", 0.0),
+                fomc_score=st.session_state.get("v76_fomc_usd_score", 50.0),
+                fomc_active=st.session_state.get("v76_fomc_auto_ativo", False),
+                fomc_post_release_active=st.session_state.get("v69_fomc_surprise_ativo", False),
+                next_event=_aq_next_event,
+            )
+            st.session_state["v77_usd_antes_fomc"] = float(_aq_pair_context["usd_before_fomc"])
+            st.session_state["v77_usd_pos_fomc"] = float(_aq_pair_context["usd_for_pairs"])
+            st.session_state["v77_peso_fomc"] = float(_aq_pair_context["fomc_weight"])
+            st.session_state["v77_fomc_integrado"] = bool(_aq_pair_context["fomc_integrated"])
+
+            _aq_pair_matrix_result = build_pair_matrix(
+                ranking=ranking,
+                usd_context=_aq_pair_context,
+                fed_tone=fed.get("tom", "Neutro"),
+                confluence_fn=calcular_confluencia_v60,
+            )
+            if bool(_aq_pair_matrix_result.get("ready", False)):
+                matriz_v61 = _aq_pair_matrix_result["matrix"].copy()
+        except Exception as _aq_matrix_exc:
+            _aq_pair_matrix_result = {
+                "ready": False,
+                "reason": f"falha na Matriz Central: {type(_aq_matrix_exc).__name__}",
+                "missing_codes": [],
+                "matrix": pd.DataFrame(),
+                "pairs_expected": 7,
+                "pairs_built": 0,
+                "trading_side_effects": False,
+            }
+            matriz_v61 = pd.DataFrame()
+
+st.session_state["atlasquant_pair_matrix_status"] = {
+    "ready": bool(_aq_pair_matrix_result.get("ready", False)),
+    "reason": str(_aq_pair_matrix_result.get("reason", "")),
+    "pairs_expected": int(_aq_pair_matrix_result.get("pairs_expected", 7) or 7),
+    "pairs_built": int(_aq_pair_matrix_result.get("pairs_built", 0) or 0),
+    "missing_codes": list(_aq_pair_matrix_result.get("missing_codes", []) or []),
+}
+
+
+# =========================================================
 # ABA 3 — PARES
 # =========================================================
 if _aq_active_index == 4:
@@ -6210,51 +6322,18 @@ if _aq_active_index == 4:
 
     st.subheader("💱 Painel de Decisão — V7.8")
 
-    usd_base = float(usd_detalhado["score"])
-    usd_ajustado = float(st.session_state.get("usd_score_ajustado_surpresas", usd_base))
-    ajuste = float(st.session_state.get("usd_ajuste_surpresas", 0.0))
+    # Usa exatamente o mesmo contexto USD já resolvido pela Matriz Central.
+    # Assim Radar, Painel Mestre, Pares e demais superfícies não divergem.
+    usd_base = float(_aq_pair_context["usd_base"])
+    usd_antes_fomc_v77 = float(_aq_pair_context["usd_before_fomc"])
+    usd_ajustado = float(_aq_pair_context["usd_for_pairs"])
+    ajuste = float(_aq_pair_context["surprise_adjustment"])
     confirmacao = st.session_state.get("usd_confirmacao_surpresas", "Sem previsões preenchidas")
-
-    # =====================================================
-    # V7.7 — CONECTOR FOMC -> USD -> PARES
-    # O FOMC pré-release NÃO substitui o macro principal.
-    # Ele faz um blend conservador e crescente conforme a reunião se aproxima.
-    # Se o FOMC pós-release V6.9 estiver ativo, o pré-release é desligado
-    # para evitar dupla contagem.
-    # =====================================================
-    usd_antes_fomc_v77 = float(usd_ajustado)
-    fomc_score_v77 = float(st.session_state.get("v76_fomc_usd_score", 50.0))
-    fomc_ativo_v77 = bool(st.session_state.get("v76_fomc_auto_ativo", False))
-    fomc_pos_release_v77 = bool(st.session_state.get("v69_fomc_surprise_ativo", False))
-    peso_fomc_v77 = 0.0
-    evento_v77 = _proximo_evento_macro_v65()
-
-    if (
-        fomc_ativo_v77
-        and not fomc_pos_release_v77
-        and isinstance(evento_v77, dict)
-        and evento_v77.get("disponivel", False)
-        and "fomc" in _normalizar_texto_v73(evento_v77.get("evento", ""))
-    ):
-        dias_v77 = int(evento_v77.get("dias", 999))
-        if dias_v77 <= 2:
-            peso_fomc_v77 = 0.25
-        elif dias_v77 <= 7:
-            peso_fomc_v77 = 0.20
-        elif dias_v77 <= 14:
-            peso_fomc_v77 = 0.12
-        else:
-            peso_fomc_v77 = 0.06
-
-        usd_ajustado = (
-            (1.0 - peso_fomc_v77) * usd_ajustado
-            + peso_fomc_v77 * fomc_score_v77
-        )
-
-    st.session_state["v77_usd_antes_fomc"] = float(usd_antes_fomc_v77)
-    st.session_state["v77_usd_pos_fomc"] = float(usd_ajustado)
-    st.session_state["v77_peso_fomc"] = float(peso_fomc_v77)
-    st.session_state["v77_fomc_integrado"] = bool(peso_fomc_v77 > 0)
+    fomc_score_v77 = float(_aq_pair_context["fomc_score"])
+    fomc_ativo_v77 = bool(_aq_pair_context["fomc_active"])
+    fomc_pos_release_v77 = bool(_aq_pair_context["fomc_post_release_active"])
+    peso_fomc_v77 = float(_aq_pair_context["fomc_weight"])
+    evento_v77 = dict(_aq_pair_context.get("event", {}) or {})
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("USD macro base", f"{usd_base:.0f}/100")
@@ -6534,67 +6613,21 @@ if _aq_active_index == 4:
         "usado na análise individual."
     )
 
-    pares_matriz = ["EUR/USD","GBP/USD","AUD/USD","NZD/USD","USD/JPY","USD/CHF","USD/CAD"]
+    pares_matriz = list(PAIR_MATRIX_PAIRS)
     scores_ranking = dict(zip(ranking["Código"], ranking["Pontuação_Final"]))
-    linhas_matriz = []
-
-    for par_m in pares_matriz:
-        b, q = par_m.split("/")
-        sb = usd_ajustado if b == "USD" else float(scores_ranking.get(b, 50.0))
-        sq = usd_ajustado if q == "USD" else float(scores_ranking.get(q, 50.0))
-        dif_m = float(sb - sq)
-
-        if abs(dif_m) < 6:
-            direcao_m = "⚪ NEUTRO"
-        elif dif_m > 0:
-            direcao_m = f"🟢 COMPRA {par_m}"
-        else:
-            direcao_m = f"🔴 VENDA {par_m}"
-
-        conf_m = calcular_confluencia_v60(
-            b, q, dif_m, usd_ajustado, ajuste,
-            fed.get("tom", "Neutro"), ranking
+    if not bool(_aq_pair_matrix_result.get("ready", False)):
+        st.warning(
+            "Matriz indisponível, aguardando dados completos. "
+            "Nenhuma oportunidade será criada enquanto a integridade não estiver válida."
         )
-
-        score_m = float(conf_m["score_confluencia"])
-        qualidade_m = float(conf_m["qualidade_confluencia"])
-        nivel_m = str(conf_m["nivel"])
-
-        # Regra operacional conservadora: sem direção ou baixa cobertura => aguardar.
-        if abs(dif_m) < 6 or score_m < 58 or qualidade_m < 50:
-            decisao_m = "⚪ AGUARDAR"
-            nivel_exibido = "BAIXA"
-        elif nivel_m == "ALTA":
-            decisao_m = direcao_m
-            nivel_exibido = "ALTA"
-        elif nivel_m == "MODERADA":
-            decisao_m = direcao_m
-            nivel_exibido = "MODERADA"
-        else:
-            decisao_m = "⚪ AGUARDAR CONFIRMAÇÃO"
-            nivel_exibido = "BAIXA"
-
-        # Ranking composto: premia confluência + qualidade, sem chamar de probabilidade.
-        indice_rank = float(np.clip(
-            score_m * 0.60 + qualidade_m * 0.40, 0, 100
-        ))
-
-        linhas_matriz.append({
-            "Par": par_m,
-            "Direção": decisao_m,
-            "Dif. macro": round(dif_m, 1),
-            "Score final": round(score_m, 0),
-            "Qualidade": round(qualidade_m, 0),
-            "Confluência": nivel_exibido,
-            "Índice ranking": round(indice_rank, 1),
-        })
-
-    matriz_v61 = pd.DataFrame(linhas_matriz).sort_values(
-        ["Índice ranking", "Qualidade", "Score final"],
-        ascending=False
-    ).reset_index(drop=True)
-
-    matriz_v61.insert(0, "Ranking", range(1, len(matriz_v61) + 1))
+        _aq_matrix_reason = str(_aq_pair_matrix_result.get("reason", "dados incompletos"))
+        st.caption("Diagnóstico da Matriz Central: " + _aq_matrix_reason)
+        linhas_matriz = []
+    else:
+        linhas_matriz = (
+            matriz_v61.drop(columns=["Ranking"], errors="ignore")
+            .to_dict("records")
+        )
 
     # =====================================================
     # V8.7.3 — COLETA HISTÓRICA MULTIPARES ATÔMICA
@@ -6629,7 +6662,9 @@ if _aq_active_index == 4:
     _matriz_por_par_v873 = {str(r["Par"]): r for r in linhas_matriz}
 
     for _par_v873 in pares_matriz:
-        _r873 = _matriz_por_par_v873[_par_v873]
+        _r873 = _matriz_por_par_v873.get(_par_v873)
+        if not isinstance(_r873, dict):
+            continue
         _dec873 = str(_r873["Direção"]).upper()
 
         # A decisão final da Matriz manda.
@@ -9047,57 +9082,11 @@ if _aq_active_index == 8:
         )
 
 # =========================================================
-# MATRIZ CENTRAL — disponível para Radar/Painel independente da aba 4.
-# Reusa somente scores macro já calculados; não dispara providers.
+# MATRIZ CENTRAL — já resolvida antes das superfícies consumidoras.
+# Não reconstruir por aba: uma única fonte evita divergência e NameError.
 # =========================================================
-def _build_pair_matrix_for_surfaces_v111():
-    """Build the shared 7-pair matrix with the official confluence engine."""
-    _pairs=["EUR/USD","GBP/USD","AUD/USD","NZD/USD","USD/JPY","USD/CHF","USD/CAD"]
-    _scores=dict(zip(ranking["Código"],ranking["Pontuação_Final"]))
-    _usd_base=float(usd_detalhado.get("score",50.0))
-    _usd=float(st.session_state.get("v77_usd_pos_fomc",st.session_state.get("usd_score_ajustado_surpresas",_usd_base)))
-    _adjustment=float(st.session_state.get("usd_ajuste_surpresas",0.0))
-    _rows=[]
-    for _pair in _pairs:
-        _b,_q=_pair.split("/")
-        _sb=_usd if _b=="USD" else float(_scores.get(_b,50.0))
-        _sq=_usd if _q=="USD" else float(_scores.get(_q,50.0))
-        _dif=float(_sb-_sq)
-        _direction="⚪ NEUTRO" if abs(_dif)<6 else (f"🟢 COMPRA {_pair}" if _dif>0 else f"🔴 VENDA {_pair}")
-        _conf=calcular_confluencia_v60(
-            _b,_q,_dif,_usd,_adjustment,
-            fed.get("tom","Neutro"),ranking
-        )
-        _score=float(_conf["score_confluencia"])
-        _quality=float(_conf["qualidade_confluencia"])
-        _level=str(_conf["nivel"])
-        if abs(_dif)<6 or _score<58 or _quality<50:
-            _decision="⚪ AGUARDAR"
-            _display_level="BAIXA"
-        elif _level=="ALTA":
-            _decision=_direction
-            _display_level="ALTA"
-        elif _level=="MODERADA":
-            _decision=_direction
-            _display_level="MODERADA"
-        else:
-            _decision="⚪ AGUARDAR CONFIRMAÇÃO"
-            _display_level="BAIXA"
-        _rank=float(np.clip(_score*0.60+_quality*0.40,0,100))
-        _rows.append({
-            "Par":_pair,"Direção":_decision,"Dif. macro":round(_dif,1),
-            "Score final":round(_score,0),"Qualidade":round(_quality,0),
-            "Confluência":_display_level,"Índice ranking":round(_rank,1),
-        })
-    _df=pd.DataFrame(_rows).sort_values(
-        ["Índice ranking","Qualidade","Score final"],ascending=False
-    ).reset_index(drop=True)
-    _df.insert(0,"Ranking",range(1,len(_df)+1))
-    return _df
-
-if "matriz_v61" not in globals() or not isinstance(globals().get("matriz_v61"),pd.DataFrame) or globals().get("matriz_v61").empty:
-    matriz_v61=_build_pair_matrix_for_surfaces_v111()
-
+if _aq_matrix_required and not isinstance(matriz_v61, pd.DataFrame):
+    matriz_v61 = pd.DataFrame()
 
 
 # =========================================================
