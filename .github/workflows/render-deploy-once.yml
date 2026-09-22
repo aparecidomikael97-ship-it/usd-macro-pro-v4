@@ -1,0 +1,68 @@
+name: AtlasQuant - One Shot Render Deploy
+
+on:
+  push:
+    branches: [atlasquant-production-deploy-once]
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: atlasquant-one-shot-render-deploy
+  cancel-in-progress: false
+
+jobs:
+  redeploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      APP_URL: "https://atlasquant-private.onrender.com"
+    steps:
+      - uses: actions/checkout@v7
+      - name: Require Render deploy hook
+        shell: bash
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RENDER_DEPLOY_HOOK_URL:-}" ]; then
+            echo "::error::RENDER_DEPLOY_HOOK_URL não configurado."
+            exit 1
+          fi
+      - name: Trigger validated main deploy
+        shell: bash
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          set -euo pipefail
+          curl -fsS --connect-timeout 20 --max-time 60 -X POST "$RENDER_DEPLOY_HOOK_URL" >/tmp/render-deploy-response.txt
+          echo "Deploy solicitado ao Render sem expor o hook."
+      - name: Wait for service settle
+        shell: bash
+        run: |
+          set -euo pipefail
+          healthy=0
+          for attempt in $(seq 1 36); do
+            code=$(curl -L -sS --connect-timeout 10 --max-time 30 -o /tmp/render-health.txt -w "%{http_code}" "$APP_URL/_stcore/health" || true)
+            echo "health attempt=$attempt http=$code"
+            if [ "$code" = "200" ]; then healthy=1; fi
+            if [ "$healthy" = "1" ] && [ "$attempt" -ge 9 ]; then break; fi
+            sleep 10
+          done
+          test "$healthy" = "1"
+      - name: Dispatch official Production Browser Smoke
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run production-browser-smoke.yml --ref main
+          echo "Production Browser Smoke oficial disparado para main."
+      - name: Summary
+        if: always()
+        run: |
+          echo "## One Shot Render Deploy" >> "$GITHUB_STEP_SUMMARY"
+          echo "- source: main validada" >> "$GITHUB_STEP_SUMMARY"
+          echo "- target: atlasquant-private.onrender.com" >> "$GITHUB_STEP_SUMMARY"
+          echo "- final validation: Production Browser Smoke" >> "$GITHUB_STEP_SUMMARY"
