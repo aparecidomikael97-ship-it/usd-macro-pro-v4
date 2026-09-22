@@ -459,6 +459,7 @@ def atlasquant_operational_card(pack: Mapping[str, Any]) -> dict[str, Any]:
         light, action = "RED", "NÃO OPERAR"
     else:
         light, action = "YELLOW", "AGUARDAR CONFIRMAÇÃO"
+    signal=dict(p.get("signal_lifecycle",{}) or {})
     return {
         "pair": str(p.get("pair", "—")),
         "direction": str(p.get("direction", "⚪ AGUARDAR")),
@@ -471,6 +472,10 @@ def atlasquant_operational_card(pack: Mapping[str, Any]) -> dict[str, Any]:
         "m15": str(p.get("m15", "—")),
         "gate": str(p.get("gate", "—")),
         "reason": str(p.get("reason", "—")),
+        "signal_status":str(signal.get("status_label") or "SEM STATUS"),
+        "signal_reference":str(signal.get("reference_display") or "horário não comprovado"),
+        "signal_age":signal.get("age_minutes"),
+        "signal_remaining":signal.get("remaining_minutes"),
     }
 
 
@@ -486,7 +491,8 @@ background:linear-gradient(180deg,rgba(17,34,57,.88),rgba(10,24,41,.82));min-hei
 .aq-op-card.red{border-top:3px solid #ff6b7a}
 .aq-op-pair{font-size:1.05rem;font-weight:800}.aq-op-action{font-size:.72rem;font-weight:800;letter-spacing:.05em}
 .aq-op-priority{font-size:1.8rem;font-weight:850;margin-top:10px}.aq-op-priority span{font-size:.78rem;color:#d4e1f0;font-weight:750}
-.aq-op-small{font-size:.76rem;color:#d4e1f0;font-weight:650;line-height:1.35;margin-top:8px}.aq-op-state{font-size:.76rem;margin-top:11px;font-weight:700}
+.aq-op-small{font-size:.76rem;color:#eef4fb;font-weight:700;line-height:1.35;margin-top:8px}.aq-op-state{font-size:.76rem;margin-top:11px;font-weight:700}
+.aq-op-time{font-size:.70rem;color:#f4f8fd;font-weight:750;line-height:1.35;margin-top:6px}
 @media(max-width:760px){
   .aq-op-card{min-height:auto;padding:11px 12px;margin-bottom:7px}
   .aq-op-priority{font-size:1.45rem;margin-top:6px}
@@ -510,6 +516,11 @@ background:linear-gradient(180deg,rgba(17,34,57,.88),rgba(10,24,41,.82));min-hei
             m15 = escape(card["m15"])
             gate = escape(card["gate"])
             icon = icons.get(card["traffic_light"], "⚪")
+            _sig_age=("idade N/D" if card.get("signal_age") is None else f"há {float(card['signal_age']):.0f} min")
+            _sig_remaining=(
+                "" if card.get("signal_remaining") is None
+                else f" · validade técnica ≤ {float(card['signal_remaining']):.0f} min"
+            )
             st.markdown(f"""
 <div class="aq-op-card {tone}">
   <div style="display:flex;justify-content:space-between;gap:8px">
@@ -518,6 +529,7 @@ background:linear-gradient(180deg,rgba(17,34,57,.88),rgba(10,24,41,.82));min-hei
   <div class="aq-op-priority">{card['priority']:.0f}<span>/100 prioridade</span></div>
   <div class="aq-op-small">Dados {card['data_score']:.0f}/100 · Qualidade {card['quality']:.0f}/100</div>
   <div class="aq-op-small">M15 {m15} · Gate {gate}</div>
+  <div class="aq-op-time">{escape(card['signal_status'])}<br>{escape(card['signal_reference'])} · {escape(_sig_age)}{escape(_sig_remaining)}</div>
   <div class="aq-op-state">{direction}<br>{state}</div>
 </div>
 """, unsafe_allow_html=True)
@@ -537,6 +549,8 @@ def atlasquant_basic_table(packs: list[Mapping[str, Any]]) -> pd.DataFrame:
             "Pronto?":"SIM" if bool(dr.get("sufficient",False)) else "NÃO",
             "M15":str(p.get("m15","—")),
             "Gate":str(p.get("gate","—")),
+            "Status temporal":str((p.get("signal_lifecycle",{}) or {}).get("status_label","SEM STATUS")),
+            "Hora da leitura":str((p.get("signal_lifecycle",{}) or {}).get("reference_display","horário não comprovado")),
         })
     return pd.DataFrame(rows)
 
@@ -704,12 +718,15 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
 
     st.markdown("### 🏁 Mesa de decisão — 7 pares")
     executive=pd.DataFrame([{
-        "Par":p["pair"],"Decisão final":p["state"],"Direção":p["direction"],"Prioridade":p["priority"],"Score Mestre":p["score"],"Qualidade %":p["quality"],
+        "Par":p["pair"],"Decisão final":p["state"],"Direção":p["direction"],
+        "Status temporal":str((p.get("signal_lifecycle",{}) or {}).get("status_label","SEM STATUS")),
+        "Hora leitura":str((p.get("signal_lifecycle",{}) or {}).get("reference_display","horário não comprovado")),
+        "Prioridade":p["priority"],"Score Mestre":p["score"],"Qualidade %":p["quality"],
         "Força base":(p.get("strength",{}) or {}).get("base_score"),"Força cotada":(p.get("strength",{}) or {}).get("quote_score"),"Δ força pts":(p.get("strength",{}) or {}).get("difference"),
         "Dados?":"SIM" if (p.get("data_ready",{}) or {}).get("sufficient") else "NÃO","Data Score":round(_safe((p.get("data_ready",{}) or {}).get("score",0)),0),
         "ICT":round(p["ict_read"],0) if (p.get("ict_fresh",{}) or {}).get("ready") else "N/D","Institucional":round(p["inst_read"],0) if (p.get("data_ready",{}) or {}).get("institutional_data_ready") else "N/D","H4":p["h4"],"H1":p["h1"],"M15":p["m15"],"Gate":p["gate"],"ADR %":round(p["adr"],0) if p["adr"] is not None else None,"Evento":p["event"],"Motivo":p["reason"]
     } for p in packs])
-    overview=executive[["Par","Decisão final","Direção","Prioridade","Δ força pts","Dados?","M15","Gate"]]
+    overview=executive[["Par","Decisão final","Direção","Status temporal","Hora leitura","Prioridade","Δ força pts","Dados?","M15","Gate"]]
     st.dataframe(overview,width="stretch",hide_index=True,height=285)
     with st.expander("Matriz completa e comparação de prioridades"):
         st.dataframe(executive,width="stretch",hide_index=True,height=330)
