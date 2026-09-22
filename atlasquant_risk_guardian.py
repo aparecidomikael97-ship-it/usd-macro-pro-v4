@@ -70,6 +70,28 @@ def validate_limits(limits: RiskLimits) -> RiskLimits:
     return limits
 
 
+def daily_gain_lock(gains_today: int, max_daily_gains: int = 2) -> tuple[bool, str]:
+    """Return a fail-closed daily profit-preservation lock.
+
+    This small helper is unit-agnostic so Paper/Forward can share the exact same
+    rule without pretending simulated R is a cash bankroll.
+    """
+    if isinstance(gains_today, bool) or isinstance(max_daily_gains, bool):
+        raise ValueError("contagens de gains devem ser inteiras")
+    try:
+        gains = int(gains_today)
+        limit = int(max_daily_gains)
+    except Exception as exc:
+        raise ValueError("contagens de gains devem ser inteiras") from exc
+    if gains < 0 or limit <= 0:
+        raise ValueError("gains_today deve ser >= 0 e max_daily_gains > 0")
+    locked = gains >= limit
+    return locked, (
+        "meta de gains do dia atingida; preservar capital"
+        if locked else ""
+    )
+
+
 def evaluate_risk_guard(
     limits: RiskLimits,
     state: RiskState,
@@ -92,8 +114,12 @@ def evaluate_risk_guard(
         reasons.append("limite de perda diária atingido")
     if state.trades_today >= limits.max_trades_per_day:
         reasons.append("limite de operações do dia atingido")
-    if state.gains_today >= limits.max_daily_gains:
-        reasons.append("meta de gains do dia atingida; preservar capital")
+    gain_locked, gain_reason = daily_gain_lock(
+        state.gains_today,
+        limits.max_daily_gains,
+    )
+    if gain_locked:
+        reasons.append(gain_reason)
     if state.consecutive_losses >= limits.max_consecutive_losses:
         reasons.append("limite de perdas consecutivas atingido")
     if state.open_exposure > limits.max_open_exposure:
