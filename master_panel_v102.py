@@ -423,8 +423,12 @@ def _integrated_state(direction: str, context: Mapping[str, Any] | None, tech: M
         return "🟡 ESTICADO", "O range diário já consumiu cerca de 110%+ do ADR14; evitar perseguir preço."
     if grade in {"A+", "A"} and h4 == "GREEN" and h1 == "GREEN" and m15 == "GREEN":
         return "🟢 EXECUTÁVEL", "Macro + Market Map + H4/H1 + M15 estão alinhados."
-    if grade in {"A+", "A", "B"} and h4 == "GREEN" and h1 == "GREEN" and m15 in {"YELLOW", "UNKNOWN", "RED"}:
-        return "🟡 QUASE PRONTO", "Contexto e H4/H1 estão alinhados; falta confirmação M15 limpa."
+    if h4 == "GREEN" and h1 == "GREEN" and m15 == "RED":
+        return "🔴 GATILHO CONTRA", "M15 está contra o contexto; não tratar como quase pronto e aguardar novo gatilho."
+    if grade in {"A+", "A", "B"} and h4 == "GREEN" and h1 == "GREEN" and m15 == "YELLOW":
+        return "🟡 QUASE PRONTO", "Contexto e H4/H1 estão alinhados; M15 ainda aguarda confirmação limpa."
+    if h4 == "GREEN" and h1 == "GREEN" and m15 == "UNKNOWN":
+        return "⚪ AGUARDAR GATILHO", "Contexto e H4/H1 estão alinhados, mas M15 ainda não possui gatilho comprovado."
     return "⚪ AGUARDAR", "Confluência ainda não é suficiente para execução seletiva."
 
 
