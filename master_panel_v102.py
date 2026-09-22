@@ -246,20 +246,81 @@ def _status_kind(status: Any) -> str:
     return "UNKNOWN"
 
 
-def _minutes_since(value: Any) -> float | None:
+def _timestamp_utc(value: Any) -> pd.Timestamp | None:
     if value in (None, "", 0, 0.0):
         return None
     try:
-        if isinstance(value, (int, float)) or (isinstance(value, str) and value.replace('.', '', 1).isdigit()):
+        if isinstance(value, (int, float)) or (
+            isinstance(value, str) and value.replace(".", "", 1).isdigit()
+        ):
             ts = pd.Timestamp(float(value), unit="s", tz="UTC")
         else:
             ts = pd.Timestamp(value)
             ts = ts.tz_localize("UTC") if ts.tzinfo is None else ts.tz_convert("UTC")
-        age = float((pd.Timestamp.now(tz="UTC") - ts).total_seconds() / 60.0)
-        # Future timestamps are invalid evidence, not fresh evidence.
-        return None if age < 0 else age
+        return pd.Timestamp(ts)
     except Exception:
         return None
+
+
+def _minutes_since(value: Any) -> float | None:
+    ts = _timestamp_utc(value)
+    if ts is None:
+        return None
+    age = float((pd.Timestamp.now(tz="UTC") - ts).total_seconds() / 60.0)
+    # Future timestamps are invalid evidence, not fresh evidence.
+    return None if age < 0 else age
+
+
+def _format_reference_utc(value: Any) -> str:
+    ts = _timestamp_utc(value)
+    if ts is None:
+        return "HORÁRIO NÃO COMPROVADO"
+    return ts.strftime("%d/%m/%Y %H:%M UTC")
+
+
+def _technical_temporal_status(tech: Mapping[str, Any]) -> dict[str, Any]:
+    """Explain freshness without turning a macro bias into an entry instruction."""
+    available = bool(tech.get("available", False))
+    age = tech.get("age_minutes")
+    reference = str(tech.get("updated_at") or "")
+    ts = _timestamp_utc(reference)
+
+    if not available:
+        code, label = "NO_DATA", "SEM DADO — REVALIDAR"
+    elif ts is None or age is None:
+        code, label = "UNVERIFIED", "HORÁRIO NÃO COMPROVADO — REVALIDAR"
+    elif not bool(tech.get("fresh", False)):
+        code, label = "EXPIRED", "EXPIRADA — REVALIDAR"
+    else:
+        code, label = "CURRENT", "ATUAL"
+
+    valid_until = ""
+    valid_until_display = "—"
+    if ts is not None:
+        valid_until_ts = ts + pd.Timedelta(minutes=60)
+        valid_until = valid_until_ts.isoformat()
+        valid_until_display = valid_until_ts.strftime("%d/%m/%Y %H:%M UTC")
+
+    return {
+        "code": code,
+        "label": label,
+        "reference_at": reference if ts is not None else "",
+        "reference_display": _format_reference_utc(reference),
+        "age_minutes": age,
+        "valid_until": valid_until,
+        "valid_until_display": valid_until_display,
+        "requires_revalidation": code != "CURRENT",
+    }
+
+
+def _execution_display(state: Any, temporal: Mapping[str, Any]) -> str:
+    """Presentation-only authorization label; it never changes the engine gate."""
+    if (
+        str(state or "").startswith("🟢 EXECUTÁVEL")
+        and str(temporal.get("code") or "") == "CURRENT"
+    ):
+        return "✅ AUTORIZADA PELO ESTADO ATUAL"
+    return "⛔ NÃO AUTORIZADA"
 
 
 def _context_fresh(context: Mapping[str, Any] | None, current_direction: str, max_minutes: float = 45.0) -> tuple[bool, str]:
@@ -300,7 +361,7 @@ def _scanner_for_pair(scanner_state: Mapping[str, Any] | None, pair: str) -> dic
     available = bool(tec.get("disponivel", False))
     # Freshness must be positively proven by a valid timestamp. Missing or
     # future-dated timestamps fail closed instead of being treated as fresh.
-    fresh = available and age is not None and age < 60.0
+    fresh = available and age is not None and age <= 60.0
 
     return {
         "available": available,
@@ -313,6 +374,7 @@ def _scanner_for_pair(scanner_state: Mapping[str, Any] | None, pair: str) -> dic
         "age_minutes": age,
         "fresh": fresh,
         "freshness_source": "m15_fetched_at" if raw.get("m15_fetched_at") else "processado_em",
+        "reference_display": _format_reference_utc(fresh_ts),
     }
 
 
@@ -409,6 +471,8 @@ def build_master_rows(matrix: pd.DataFrame, contexts: Mapping[str, Any], scanner
         ctx = dict((contexts or {}).get(pair, {}) or {})
         tech = _scanner_for_pair(scanner_state, pair)
         state, reason = _integrated_state(direction, ctx if ctx else None, tech)
+        temporal = _technical_temporal_status(tech)
+        authorization = _execution_display(state, temporal)
         ready = _safe_float(ctx.get("readiness_score", 0)) if ctx else 0.0
         tech_score = _technical_score(tech) if tech.get("available") else 0.0
         integrated = 0.45 * macro_score + 0.35 * ready + 0.20 * tech_score
@@ -419,6 +483,7 @@ def build_master_rows(matrix: pd.DataFrame, contexts: Mapping[str, Any], scanner
         rows.append({
             "Par": pair,
             "Viés": direction.replace("🟢 ", "").replace("🔴 ", "").replace("⚪ ", ""),
+            "Viés macro": direction.replace("🟢 ", "").replace("🔴 ", "").replace("⚪ ", ""),
             "Score": macro_score,
             "Qualidade": quality,
             "W1": ctx.get("w1_bias", "—") if ctx else "—",
@@ -435,6 +500,10 @@ def build_master_rows(matrix: pd.DataFrame, contexts: Mapping[str, Any], scanner
             "H1": tech.get("h1", "—"),
             "M15": tech.get("m15", "—"),
             "Técnica atualizada": "—" if tech.get("age_minutes") is None else f"{float(tech.get('age_minutes')):.0f} min",
+            "Hora da leitura": temporal["reference_display"],
+            "Status temporal": temporal["label"],
+            "Validade técnica": temporal["valid_until_display"],
+            "Autorização": authorization,
             "Estado": state,
             "Motivo": reason,
             "Índice Integrado": round(float(np.clip(integrated, 0, 100)), 1),
@@ -462,7 +531,8 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
     st.subheader("🧠 Painel Mestre de Oportunidades — V10.7.4")
     st.caption(
         "Decisão Automática + Macro Market Map + H4/H1/M15 + ADR14 em uma única visão dos 7 pares. "
-        "O painel serve para priorização; não transforma índice em probabilidade de lucro."
+        "O painel serve para priorização; não transforma índice em probabilidade de lucro. "
+        "**Viés macro não é entrada:** execução só aparece autorizada quando o estado operacional e a validade temporal estão atuais."
     )
     st.info(
         "🎯 Novo filtro de volatilidade: ADR14 mede quanto do range diário médio já foi consumido. "
@@ -609,15 +679,23 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
     with st.container(border=True):
         b1, b2, b3 = st.columns(3)
         b1.metric("Par", str(best["Par"]))
-        b2.metric("Viés", str(best["Viés"]))
-        b3.metric("Estado", str(best["Estado"]))
+        b2.metric("Viés macro", str(best["Viés macro"]))
+        b3.metric("Estado operacional", str(best["Estado"]))
         b4, b5 = st.columns(2)
         b4.metric("Índice integrado", f"{float(best['Índice Integrado']):.1f}/100")
         b5.metric("Gate", str(best["Gate"]))
         st.caption(
-            f"Leitura completa: {best['Par']} · {best['Viés']} · {best['Estado']} · "
+            f"Leitura completa: {best['Par']} · viés macro {best['Viés macro']} · {best['Estado']} · "
+            f"{best['Status temporal']} · referência {best['Hora da leitura']} · "
             f"Índice {float(best['Índice Integrado']):.1f}/100 · Gate {best['Gate']}"
         )
+        if str(best["Autorização"]).startswith("✅"):
+            st.success(str(best["Autorização"]))
+        else:
+            st.warning(
+                f"{best['Autorização']} · não trate o viés macro como entrada atual. "
+                "Aguarde/revalide filtros, gatilho e horário."
+            )
     best_reason = str(best["Motivo"])
     if str(best["Estado"]).startswith("🟢"):
         st.success(best_reason)
@@ -642,13 +720,17 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
                 "**ADR14:** quanto do range diário médio já foi usado.\n\n"
                 "**Liquidez alvo:** BSL/SSL ainda relevante no lado do viés.\n\n"
                 "**H4/H1/M15:** confirmação técnica top-down.\n\n"
+                "**Status temporal / Hora da leitura:** mostram se a evidência técnica ainda é atual e quando foi observada.\n\n"
+                "**Autorização:** só fica autorizada quando o estado operacional está EXECUTÁVEL e a leitura técnica está atual.\n\n"
                 "**Índice Integrado:** ranking operacional; NÃO é probabilidade de gain."
             )
 
     st.markdown("### 🌐 Ranking dos 7 pares")
     show = df[[
-        "Par", "Viés", "Score", "Qualidade", "W1", "D1", "Gate",
-        "ADR usado %", "Liquidez alvo", "H4", "H1", "M15", "Técnica atualizada", "Estado", "Índice Integrado", "Market Map atualizado"
+        "Par", "Viés macro", "Score", "Qualidade", "W1", "D1", "Gate",
+        "ADR usado %", "Liquidez alvo", "H4", "H1", "M15",
+        "Hora da leitura", "Status temporal", "Validade técnica", "Autorização",
+        "Estado", "Índice Integrado", "Market Map atualizado"
     ]].copy()
     show["Score"] = pd.to_numeric(show["Score"], errors="coerce").round(0)
     show["Qualidade"] = pd.to_numeric(show["Qualidade"], errors="coerce").round(0)
@@ -665,7 +747,7 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
     ctx = dict(contexts.get(chosen, {}) or {})
     tech = _scanner_for_pair(scanner_state, chosen)
     d1, d2, d3, d4 = st.columns(4)
-    d1.metric("Direção preferencial", str(detail["Viés"]))
+    d1.metric("Viés macro", str(detail["Viés macro"]))
     d2.metric("Market Map", f"{ctx.get('readiness_grade','—')} · {_safe_float(ctx.get('readiness_score',0)):.0f}/100" if ctx else "—")
     d3.metric("ADR14 usado", f"{_safe_float(ctx.get('adr_used_pct',0)):.1f}%" if ctx.get("adr_used_pct") is not None else "—")
     d4.metric("Risco de evento", str(ctx.get("event_risk", "—")) if ctx else "—")
@@ -691,8 +773,18 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
     st.markdown(
         f"**Técnica:** H4 {tech.get('h4','—')} · H1 {tech.get('h1','—')} · M15 {tech.get('m15','—')}."
     )
+    _temporal_detail = _technical_temporal_status(tech)
+    st.markdown(
+        f"**Tempo da leitura:** {_temporal_detail['label']} · "
+        f"{_temporal_detail['reference_display']} · validade técnica até {_temporal_detail['valid_until_display']}."
+    )
+    if _temporal_detail["requires_revalidation"]:
+        st.warning(
+            "A leitura técnica precisa ser revalidada. O viés macro pode continuar existindo, "
+            "mas não deve ser interpretado como uma entrada atual."
+        )
 
-    side = macro_side(str(detail["Viés"]))
+    side = macro_side(str(detail["Viés macro"]))
     if side == "ALTISTA":
         alt = "Cenário alternativo vendedor só ganha prioridade se W1/D1 perderem a estrutura de alta e o motor macro também deixar de favorecer compra."
     elif side == "BAIXISTA":
