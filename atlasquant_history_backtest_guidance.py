@@ -247,18 +247,12 @@ def render_backtest_intro()->dict[str,Any]:
 
     with st.expander("📌 Como interpretar os resultados",expanded=False):
         st.markdown(
-            "**Operações** = quantidade realmente simulada.  
-"
-            "**Taxa de acerto** = proporção de gains, mas não basta sozinha.  
-"
-            "**Expectativa em R** = resultado médio por operação medido em unidades de risco.  
-"
-            "**Drawdown** = queda acumulada a partir de um pico.  
-"
-            "**MFE/MAE** = quanto o preço andou a favor/contra durante a operação.  
-"
-            "**Profit Factor** = ganhos brutos divididos pelas perdas brutas, quando definido.  
-"
+            "**Operações** = quantidade realmente simulada.  \\n"
+            "**Taxa de acerto** = proporção de gains, mas não basta sozinha.  \\n"
+            "**Expectativa em R** = resultado médio por operação medido em unidades de risco.  \\n"
+            "**Drawdown** = queda acumulada a partir de um pico.  \\n"
+            "**MFE/MAE** = quanto o preço andou a favor/contra durante a operação.  \\n"
+            "**Profit Factor** = ganhos brutos divididos pelas perdas brutas, quando definido.  \\n"
             "**Custos/Slippage** = fricção que aproxima a simulação do mercado real."
         )
         for warning in model["warnings"]:
