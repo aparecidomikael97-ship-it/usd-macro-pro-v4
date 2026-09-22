@@ -10,7 +10,7 @@ class AtlasQuantCentralPairMatrixIntegrationTests(unittest.TestCase):
         central=self.src.index("# MATRIZ CENTRAL DOS 7 PARES — V11.2")
         pair_page=self.src.index("# ABA 3 — PARES",central)
         decision=self.src.index("# V9.1 — CENTRAL DE DECISÃO AUTOMÁTICA",pair_page)
-        master=self.src.index("# ABA 10 — V10.2 PAINEL MESTRE",decision)
+        master=self.src.index("# ABA 1 — V10.2.2 PAINEL MESTRE DE OPORTUNIDADES",decision)
         self.assertLess(central,pair_page)
         self.assertLess(central,decision)
         self.assertLess(central,master)
