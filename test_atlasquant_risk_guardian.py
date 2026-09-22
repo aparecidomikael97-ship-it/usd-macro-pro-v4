@@ -35,6 +35,12 @@ class AtlasQuantRiskGuardianTests(unittest.TestCase):
         self.assertIn("preservar capital",reason)
         self.assertTrue(daily_gain_lock(3)[0])
 
+    def test_daily_gain_lock_rejects_fractional_counts(self):
+        for gains,limit in ((1.5,2),(1,2.5),("1.5",2)):
+            with self.subTest(gains=gains,limit=limit):
+                with self.assertRaises(ValueError):
+                    daily_gain_lock(gains,limit)
+
     def test_daily_gain_lock_helper_rejects_invalid_counts(self):
         for gains,limit in ((-1,2),(0,0),(True,2),(1,False)):
             with self.subTest(gains=gains,limit=limit):
