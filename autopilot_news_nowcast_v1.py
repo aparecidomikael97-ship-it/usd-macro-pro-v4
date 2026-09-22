@@ -97,6 +97,20 @@ def provider_fetch_policy(
 
     last_status=dict(state.get("last_provider_status") or {})
     reason=str(last_status.get("reason") or "").upper().strip()
+    # Backward-compatible normalization: older runtimes stored every HTTP
+    # failure as PROVIDER_ERROR. Use the persisted status code to recover the
+    # precise class without issuing a new provider request.
+    try:
+        persisted_http=int(last_status.get("http_status")) if last_status.get("http_status") is not None else None
+    except Exception:
+        persisted_http=None
+    if reason in {"","PROVIDER_ERROR"}:
+        if persisted_http in {401,403}:
+            reason="AUTH_ERROR"
+        elif persisted_http==429:
+            reason="RATE_LIMITED"
+        elif persisted_http is not None and persisted_http>=500:
+            reason="PROVIDER_UNAVAILABLE"
     attempt_age=_age_minutes(state.get("last_attempt_at"),now)
     retry_min={
         "AUTH_ERROR":DEFAULT_AUTH_RETRY_MIN,
@@ -317,7 +331,12 @@ def _news_nowcast_cycle()->tuple[bool,dict[str,Any],list[str]]:
             "provider_fetch_interval_min":DEFAULT_FETCH_INTERVAL_MIN,
             "provider_retry_reason":fetch_policy.get("reason"),
             "provider_retry_after_min":fetch_policy.get("retry_after_min",0),
-            "provider_status":dict(state.get("last_provider_status") or {}),
+            "provider_status":{
+                **dict(state.get("last_provider_status") or {}),
+                "original_reason":dict(state.get("last_provider_status") or {}).get("reason"),
+                "reason":fetch_policy.get("reason")
+                or dict(state.get("last_provider_status") or {}).get("reason"),
+            },
             "safety":{
                 "real_orders":False,
                 "trading_news_enabled":False,
