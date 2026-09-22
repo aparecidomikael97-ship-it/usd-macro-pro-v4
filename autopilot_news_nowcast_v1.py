@@ -30,6 +30,9 @@ SUMMARY_PATH="dados/news_nowcast_summary_v1.json"
 PROVIDER_STATE_PATH="dados/news_nowcast_provider_state_v1.json"
 
 DEFAULT_FETCH_INTERVAL_MIN=360
+DEFAULT_AUTH_RETRY_MIN=360
+DEFAULT_RATE_LIMIT_RETRY_MIN=60
+DEFAULT_PROVIDER_ERROR_RETRY_MIN=60
 DEFAULT_LOOKBACK_DAYS=120
 DEFAULT_HORIZON_DAYS=7
 
@@ -69,15 +72,90 @@ def _age_minutes(value:Any,now:pd.Timestamp)->float|None:
         return None
 
 
+def provider_fetch_policy(
+    state:dict[str,Any]|None,
+    *,
+    now:pd.Timestamp,
+    interval_minutes:int=DEFAULT_FETCH_INTERVAL_MIN,
+)->dict[str,Any]:
+    """Return a fail-closed provider retry decision.
+
+    A successful cache obeys the normal refresh interval. Authentication,
+    rate-limit and provider failures use their own cooldowns so the Autopilot
+    does not hammer an endpoint that already rejected the previous request.
+    """
+    state=dict(state or {})
+    success_age=_age_minutes(state.get("last_success_at"),now)
+    normal_interval=max(60,int(interval_minutes))
+    if success_age is not None and success_age<normal_interval:
+        return {
+            "fetch":False,
+            "runtime_state":"THROTTLED",
+            "reason":"SUCCESS_CACHE_FRESH",
+            "retry_after_min":max(0,int(normal_interval-success_age)),
+        }
+
+    last_status=dict(state.get("last_provider_status") or {})
+    reason=str(last_status.get("reason") or "").upper().strip()
+    attempt_age=_age_minutes(state.get("last_attempt_at"),now)
+    retry_min={
+        "AUTH_ERROR":DEFAULT_AUTH_RETRY_MIN,
+        "RATE_LIMITED":DEFAULT_RATE_LIMIT_RETRY_MIN,
+        "PROVIDER_UNAVAILABLE":DEFAULT_PROVIDER_ERROR_RETRY_MIN,
+        "NETWORK_ERROR":DEFAULT_PROVIDER_ERROR_RETRY_MIN,
+        "PROVIDER_ERROR":DEFAULT_PROVIDER_ERROR_RETRY_MIN,
+        "PROVIDER_PAYLOAD_ERROR":DEFAULT_PROVIDER_ERROR_RETRY_MIN,
+    }.get(reason)
+
+    if retry_min is not None and attempt_age is not None and attempt_age<retry_min:
+        runtime_state={
+            "AUTH_ERROR":"AUTH_COOLDOWN",
+            "RATE_LIMITED":"RATE_LIMIT_COOLDOWN",
+        }.get(reason,"PROVIDER_COOLDOWN")
+        return {
+            "fetch":False,
+            "runtime_state":runtime_state,
+            "reason":reason,
+            "retry_after_min":max(0,int(retry_min-attempt_age)),
+        }
+
+    return {
+        "fetch":True,
+        "runtime_state":"FETCH_ALLOWED",
+        "reason":"DUE",
+        "retry_after_min":0,
+    }
+
+
 def should_fetch_provider(
     state:dict[str,Any]|None,
     *,
     now:pd.Timestamp,
     interval_minutes:int=DEFAULT_FETCH_INTERVAL_MIN,
 )->bool:
-    state=dict(state or {})
-    age=_age_minutes(state.get("last_success_at"),now)
-    return age is None or age>=max(60,int(interval_minutes))
+    return bool(provider_fetch_policy(
+        state,
+        now=now,
+        interval_minutes=interval_minutes,
+    ).get("fetch"))
+
+
+def _provider_error_reason(http_status:Any,exc:Exception)->str:
+    try:
+        status=int(http_status) if http_status is not None else None
+    except Exception:
+        status=None
+    if status in {401,403}:
+        return "AUTH_ERROR"
+    if status==429:
+        return "RATE_LIMITED"
+    if status is not None and status>=500:
+        return "PROVIDER_UNAVAILABLE"
+    if isinstance(exc,(requests.Timeout,requests.ConnectionError)):
+        return "NETWORK_ERROR"
+    if isinstance(exc,(ValueError,TypeError)):
+        return "PROVIDER_PAYLOAD_ERROR"
+    return "PROVIDER_ERROR"
 
 
 def fetch_eodhd_events(
@@ -174,10 +252,15 @@ def fetch_eodhd_events(
             "error":"",
         }
     except Exception as exc:
+        http_status=(
+            statuses[-1]
+            if statuses
+            else getattr(locals().get("response",None),"status_code",None)
+        )
         return [],{
             "ok":False,
-            "reason":"PROVIDER_ERROR",
-            "http_status":statuses[-1] if statuses else getattr(locals().get("response",None),"status_code",None),
+            "reason":_provider_error_reason(http_status,exc),
+            "http_status":http_status,
             "rows":0,
             "requests":request_count,
             "error":_safe_diagnostic(f"{type(exc).__name__}: {exc}",token),
@@ -222,17 +305,22 @@ def _news_nowcast_cycle()->tuple[bool,dict[str,Any],list[str]]:
         _update_status(summary,errors)
         return True,summary,errors
 
-    if not should_fetch_provider(state,now=now):
+    fetch_policy=provider_fetch_policy(state,now=now)
+    if not fetch_policy.get("fetch"):
         summary=summarize_live_nowcasts(ledger)
         summary.update({
             "version":VERSION,
-            "runtime_state":"THROTTLED",
+            "runtime_state":fetch_policy.get("runtime_state","THROTTLED"),
             "provider":"EODHD Economic Events",
             "last_cycle_at":now.isoformat(),
             "provider_last_success_at":state.get("last_success_at"),
             "provider_fetch_interval_min":DEFAULT_FETCH_INTERVAL_MIN,
+            "provider_retry_reason":fetch_policy.get("reason"),
+            "provider_retry_after_min":fetch_policy.get("retry_after_min",0),
+            "provider_status":dict(state.get("last_provider_status") or {}),
             "safety":{
                 "real_orders":False,
+                "trading_news_enabled":False,
                 "market_reaction_predicted":False,
                 "automatic_weight_change":False,
                 "lookahead_used":False,
@@ -265,11 +353,16 @@ def _news_nowcast_cycle()->tuple[bool,dict[str,Any],list[str]]:
         summary=summarize_live_nowcasts(ledger)
         summary.update({
             "version":VERSION,
-            "runtime_state":"PROVIDER_ERROR",
+            "runtime_state":str(provider.get("reason") or "PROVIDER_ERROR"),
             "provider_status":provider,
             "last_cycle_at":now.isoformat(),
+            "provider_retry_after_min":{
+                "AUTH_ERROR":DEFAULT_AUTH_RETRY_MIN,
+                "RATE_LIMITED":DEFAULT_RATE_LIMIT_RETRY_MIN,
+            }.get(str(provider.get("reason") or "").upper(),DEFAULT_PROVIDER_ERROR_RETRY_MIN),
             "safety":{
                 "real_orders":False,
+                "trading_news_enabled":False,
                 "market_reaction_predicted":False,
                 "automatic_weight_change":False,
                 "lookahead_used":False,
@@ -368,6 +461,9 @@ def _update_status(summary:dict[str,Any],errors:list[str])->None:
         "with_signals":summary.get("with_signals",0),
         "with_empirical_distribution":summary.get("with_empirical_distribution",0),
         "by_indicator":summary.get("by_indicator",{}),
+        "provider_status":summary.get("provider_status",{}),
+        "provider_retry_reason":summary.get("provider_retry_reason"),
+        "provider_retry_after_min":summary.get("provider_retry_after_min",0),
         "real_orders":False,
         "trading_news_enabled":False,
         "market_reaction_predicted":False,
