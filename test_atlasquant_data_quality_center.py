@@ -39,6 +39,40 @@ class AtlasQuantDataConfidenceTests(unittest.TestCase):
         self.assertEqual(s["missing_age_pairs"],1)
         self.assertEqual(s["oldest_age_min"],30.0)
 
+    def test_nowcast_auth_issue_is_visible_without_changing_core_data_status(self):
+        packs=[self.pack() for _ in range(5)]
+        auto={
+            "app_headless_ok":True,
+            "twelve_daily_blocked":False,
+            "news_nowcast_v1":{
+                "runtime_state":"AUTH_COOLDOWN",
+                "provider_retry_reason":"AUTH_ERROR",
+                "provider_retry_after_min":210,
+                "provider_status":{"reason":"AUTH_ERROR","http_status":401},
+            },
+        }
+        s=build_data_confidence(packs,auto)
+        self.assertEqual(s["status"],"GREEN")
+        self.assertTrue(s["news_auth_issue"])
+        self.assertEqual(s["news_provider_reason"],"AUTH_ERROR")
+        self.assertEqual(s["news_retry_after_min"],210)
+
+    def test_nowcast_rate_limit_is_diagnostic_only(self):
+        packs=[self.pack() for _ in range(5)]
+        auto={
+            "app_headless_ok":True,
+            "twelve_daily_blocked":False,
+            "news_nowcast_v1":{
+                "runtime_state":"RATE_LIMIT_COOLDOWN",
+                "provider_retry_reason":"RATE_LIMITED",
+                "provider_retry_after_min":40,
+            },
+        }
+        s=build_data_confidence(packs,auto)
+        self.assertEqual(s["status"],"GREEN")
+        self.assertFalse(s["news_auth_issue"])
+        self.assertEqual(s["news_provider_reason"],"RATE_LIMITED")
+
     def test_event_risk_is_visible_but_not_signal(self):
         packs=[self.pack(event="ALTO FOMC"),self.pack(event="NORMAL")]
         s=build_data_confidence(packs,{"app_headless_ok":True})
