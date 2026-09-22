@@ -68,6 +68,29 @@ class MasterPanelTests(unittest.TestCase):
         state, _ = _integrated_state('COMPRA USD/CHF', ctx, tech)
         self.assertEqual(state, '🔴 CONFLITO')
 
+    def test_m15_red_is_not_called_quase_pronto(self):
+        ctx=self.contexts()["USD/CHF"]
+        tech={"available":True,"fresh":True,"age_minutes":5,
+              "h4":"🟢 CONFIRMA","h1":"🟢 CONFIRMA","m15":"🔴 CONTRA"}
+        state,reason=_integrated_state("COMPRA USD/CHF",ctx,tech)
+        self.assertEqual(state,"🔴 GATILHO CONTRA")
+        self.assertIn("não tratar como quase pronto",reason)
+
+    def test_m15_unknown_waits_for_proven_trigger(self):
+        ctx=self.contexts()["USD/CHF"]
+        tech={"available":True,"fresh":True,"age_minutes":5,
+              "h4":"🟢 CONFIRMA","h1":"🟢 CONFIRMA","m15":"—"}
+        state,reason=_integrated_state("COMPRA USD/CHF",ctx,tech)
+        self.assertEqual(state,"⚪ AGUARDAR GATILHO")
+        self.assertIn("gatilho comprovado",reason)
+
+    def test_only_yellow_m15_can_be_quase_pronto(self):
+        ctx=self.contexts()["USD/CHF"]
+        tech={"available":True,"fresh":True,"age_minutes":5,
+              "h4":"🟢 CONFIRMA","h1":"🟢 CONFIRMA","m15":"🟡 AGUARDAR GATILHO"}
+        state,_=_integrated_state("COMPRA USD/CHF",ctx,tech)
+        self.assertEqual(state,"🟡 QUASE PRONTO")
+
     def test_technical_score_is_bounded(self):
         self.assertEqual(_technical_score({'h4':'🟢 CONFIRMA','h1':'🟢 CONFIRMA','m15':'🟢 CONFIRMA'}), 100.0)
         self.assertGreaterEqual(_technical_score({'h4':'—','h1':'—','m15':'—'}), 0.0)
