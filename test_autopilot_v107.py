@@ -299,7 +299,9 @@ class AutopilotV107Tests(unittest.TestCase):
         self.assertLess(lifecycle,persist)
         self.assertLess(persist,annotate)
         self.assertLess(annotate,home)
-        self.assertIn('"real_orders":False',src[lifecycle:home])
+        lifecycle_src=Path("atlasquant_signal_lifecycle.py").read_text(encoding="utf-8")
+        self.assertIn('"real_orders_enabled":False',lifecycle_src)
+        self.assertIn('"automatic_execution":False',lifecycle_src)
 
     def test_home_snapshot_path_is_dedicated_runtime_artifact(self):
         self.assertEqual(a.HOME_SNAPSHOT_PATH,"dados/atlasquant_home_snapshot_v1.json")
