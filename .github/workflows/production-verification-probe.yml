@@ -1,0 +1,141 @@
+name: AtlasQuant - One Shot Production Verification
+
+on:
+  push:
+    branches: [atlasquant-production-verification]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      APP_URL: "https://atlasquant-private.onrender.com"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install browser
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Verify deployed source and UI
+        shell: bash
+        run: |
+          cat > /tmp/verify_atlasquant.py <<'PY'
+          import json, os, re, time
+          from pathlib import Path
+          from playwright.sync_api import sync_playwright
+          from atlasquant_build_identity import short_source_fingerprint
+
+          url=os.environ["APP_URL"]
+          expected=short_source_fingerprint(Path.cwd(),16)
+          out=Path("production-verification")
+          out.mkdir(exist_ok=True)
+          report={"url":url,"expected_source_build":expected,"profiles":{}}
+          failures=[]
+
+          with sync_playwright() as p:
+              browser=p.chromium.launch(headless=True)
+              for name,opts in {
+                  "desktop":{"viewport":{"width":1440,"height":1000},"is_mobile":False},
+                  "mobile":{"viewport":{"width":390,"height":844},"is_mobile":True},
+              }.items():
+                  context=browser.new_context(**opts)
+                  page=context.new_page()
+                  page_errors=[]
+                  page.on("pageerror",lambda exc: page_errors.append(str(exc)))
+                  response=page.goto(url,wait_until="domcontentloaded",timeout=180000)
+                  http=response.status if response else None
+                  page.locator('[data-testid="stAppViewContainer"]').wait_for(timeout=90000)
+                  source_build=""
+                  seen=[]
+                  attempts=0
+                  for attempt in range(1,31):
+                      attempts=attempt
+                      marker=page.locator("#atlasquant-source-build-marker")
+                      if marker.count():
+                          source_build=str(marker.first.get_attribute("data-build") or "").strip().lower()
+                      if not source_build:
+                          m=re.search(r"AQBUILD:([0-9a-f]{16})",page.content(),re.I)
+                          if m: source_build=m.group(1).lower()
+                      if source_build and source_build not in seen: seen.append(source_build)
+                      if source_build==expected: break
+                      page.wait_for_timeout(10000)
+                      page.reload(wait_until="domcontentloaded",timeout=180000)
+
+                  body=page.locator("body").inner_text(timeout=30000)
+                  auth_inputs=page.locator('[data-testid="stTextInput"]').count()
+                  meaningful=("Radar de Oportunidades" in body or "MARKET INTELLIGENCE PLATFORM" in body or auth_inputs>=1)
+                  exceptions=page.locator('[data-testid="stException"]').count()
+                  vw=page.evaluate("window.innerWidth")
+                  dw=page.evaluate("document.documentElement.scrollWidth")
+                  overflow=max(0,int(dw)-int(vw))
+                  transition={"attempted":False,"advanced":False,"decision":False,"radar_back":False}
+
+                  if name=="mobile" and auth_inputs<1 and "Radar de Oportunidades" in body:
+                      transition["attempted"]=True
+                      try:
+                          advanced=page.locator('[data-testid="stRadio"]').get_by_text("Avançado",exact=True)
+                          if advanced.count():
+                              advanced.first.click(force=True)
+                              deadline=time.time()+45
+                              while time.time()<deadline:
+                                  if page.locator('[data-testid="stSelectbox"]').filter(has_text="Área avançada").count():
+                                      transition["advanced"]=True; break
+                                  page.wait_for_timeout(700)
+                              if transition["advanced"]:
+                                  nav=page.locator('[data-testid="stSelectbox"]').filter(has_text="Área avançada").first
+                                  combo=nav.get_by_role("combobox")
+                                  combo.click(); combo.fill("⚡ Decisão"); combo.press("Enter"); page.wait_for_timeout(1500)
+                                  nav=page.locator('[data-testid="stSelectbox"]').filter(has_text="Área avançada").first
+                                  combo=nav.get_by_role("combobox")
+                                  transition["decision"]=combo.input_value(timeout=20000).strip()=="⚡ Decisão"
+                                  combo.click(); combo.fill("🎯 Radar"); combo.press("Enter")
+                                  deadline=time.time()+45
+                                  while time.time()<deadline:
+                                      page.wait_for_timeout(700)
+                                      nav=page.locator('[data-testid="stSelectbox"]').filter(has_text="Área avançada").first
+                                      combo=nav.get_by_role("combobox")
+                                      selected=combo.input_value(timeout=10000).strip()=="🎯 Radar"
+                                      txt=page.locator("body").inner_text(timeout=30000)
+                                      if selected and ("Radar de Oportunidades" in txt or "Radar aguardando" in txt):
+                                          transition["radar_back"]=True; break
+                      except Exception as exc:
+                          page_errors.append(f"mobile-transition: {type(exc).__name__}: {exc}")
+
+                  info={
+                      "http":http,"source_build":source_build,"seen_builds":seen,"attempts":attempts,
+                      "build_ok":source_build==expected,"meaningful":meaningful,"auth_inputs":auth_inputs,
+                      "exceptions":exceptions,"page_errors":page_errors[-10:],"overflow_px":overflow,
+                      "mobile_transition":transition,
+                  }
+                  report["profiles"][name]=info
+                  page.screenshot(path=str(out/f"{name}.png"),full_page=False)
+                  if http is None or http>=400: failures.append(f"{name}: HTTP {http}")
+                  if source_build!=expected: failures.append(f"{name}: build {source_build or 'AUSENTE'} != {expected}")
+                  if not meaningful: failures.append(f"{name}: home/login não ficou útil")
+                  if exceptions: failures.append(f"{name}: {exceptions} stException")
+                  if page_errors: failures.append(f"{name}: {len(page_errors)} pageerror")
+                  if overflow>8: failures.append(f"{name}: overflow {overflow}px")
+                  if transition["attempted"] and not all(transition[k] for k in ("advanced","decision","radar_back")):
+                      failures.append(f"{name}: transição mobile incompleta")
+                  context.close()
+              browser.close()
+
+          (out/"report.json").write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding="utf-8")
+          print(json.dumps(report,ensure_ascii=False,indent=2))
+          if failures: raise SystemExit(" | ".join(failures))
+          PY
+          PYTHONPATH="$GITHUB_WORKSPACE${PYTHONPATH:+:$PYTHONPATH}" python /tmp/verify_atlasquant.py
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: atlasquant-one-shot-production-verification
+          path: production-verification/
+          if-no-files-found: warn
+          retention-days: 14
