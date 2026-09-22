@@ -123,15 +123,17 @@ jobs:
           import time
           from pathlib import Path
           from playwright.sync_api import sync_playwright
+          from atlasquant_build_identity import short_source_fingerprint
 
           url="http://127.0.0.1:8501"
+          expected_build=short_source_fingerprint(Path.cwd(),16)
           out=Path("ui-smoke")
           out.mkdir(exist_ok=True)
           profiles={
               "desktop":{"viewport":{"width":1440,"height":1000},"is_mobile":False},
               "mobile":{"viewport":{"width":390,"height":844},"is_mobile":True},
           }
-          report={"url":url,"profiles":{}}
+          report={"url":url,"expected_source_build":expected_build,"profiles":{}}
           failures=[]
 
           def select_area(page,label):
@@ -269,6 +271,14 @@ jobs:
                           break
                       page.wait_for_timeout(2_000)
 
+                  build_marker=page.locator("#atlasquant-source-build-marker")
+                  source_build=""
+                  if build_marker.count():
+                      source_build=str(
+                          build_marker.first.get_attribute("data-build") or ""
+                      ).strip().lower()
+                  build_identity_ok=bool(source_build and source_build==expected_build)
+
                   contrast_checks={}
                   for label,selector in {
                       "context_label":".aq-context-strip span",
@@ -376,6 +386,8 @@ jobs:
                       "radar_home":radar_home,
                       "radar_wait":radar_wait,
                       "stable_nav_count":stable_nav_count,
+                      "source_build":source_build,
+                      "build_identity_ok":build_identity_ok,
                       "contrast_checks":contrast_checks,
                       "metric_contrast":metric_contrast,
                       "desktop_workspace_trace":desktop_workspace_trace,
@@ -398,6 +410,11 @@ jobs:
                       )
                   if stable_nav_count<1:
                       failures.append(f"{name}: seletor de área estável não apareceu no modo Iniciante")
+                  if not build_identity_ok:
+                      failures.append(
+                          f"{name}: marcador de build ausente/incorreto "
+                          f"(atual={source_build or 'AUSENTE'}, esperado={expected_build})"
+                      )
                   bad_contrast=[key for key,value in contrast_checks.items() if not bool(value.get("readable"))]
                   if bad_contrast:
                       failures.append(f"{name}: texto de cartões com contraste insuficiente: {','.join(bad_contrast)}")
