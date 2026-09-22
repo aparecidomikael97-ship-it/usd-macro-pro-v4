@@ -694,6 +694,16 @@ def run_paper_cycle(
             if before != "WAIT_ENTRY":
                 rows.append(row.to_dict())
                 continue
+            if daily_gain_locked:
+                cancelled = row.to_dict()
+                cancelled["status"] = "CANCELLED_RISK_LOCK"
+                cancelled["updated_at"] = now.isoformat()
+                cancelled["checklist_note"] = "Risk Guardian: " + str(
+                    daily_gain_reason or "meta diária de gains atingida"
+                )
+                pending_cancelled_by_gain_lock += 1
+                rows.append(cancelled)
+                continue
 
             upd = _fill_entry(row, frame, now=now)
             if str(upd.get("status")) == "OPEN":
