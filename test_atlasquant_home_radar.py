@@ -25,6 +25,10 @@ def _pack(
     quality=76,
     data_score=88,
 ):
+    upper=direction.upper()
+    signal_side="BUY" if "COMPRA" in upper else "SELL" if "VENDA" in upper else "WAIT"
+    signal_code="POSSIBLE" if signal_side in {"BUY","SELL"} else "NO_SIGNAL"
+    signal_action="COMPRA" if signal_side=="BUY" else "VENDA" if signal_side=="SELL" else "AGUARDAR"
     return {
         "pair":pair,
         "direction":direction,
@@ -56,6 +60,19 @@ def _pack(
         "positives":["estrutura coerente"],
         "hard_blocks":[],
         "soft_blocks":["M15 ainda aguarda gatilho"],
+        "signal_lifecycle":{
+            "status_code":signal_code,
+            "status_label":("POSSÍVEL — AGUARDANDO GATILHO" if signal_code=="POSSIBLE" else "SEM SINAL / AGUARDAR"),
+            "side":signal_side,
+            "reference_at":"2026-09-21T14:00:00Z" if signal_side!="WAIT" else "",
+            "reference_display":"21/09/2026 14:00 UTC" if signal_side!="WAIT" else "horário não comprovado",
+            "age_minutes":12.0 if signal_side!="WAIT" else None,
+            "remaining_minutes":48.0 if signal_side!="WAIT" else None,
+            "timezone":"UTC",
+            "confirmed_at":"",
+            "observed_at":"2026-09-21T14:00:00Z" if signal_side!="WAIT" else "",
+            "valid_until":"2026-09-21T15:00:00Z" if signal_side!="WAIT" else "",
+        },
     }
 
 
@@ -140,6 +157,35 @@ class AtlasQuantHomeRadarTests(unittest.TestCase):
         self.assertEqual(before,"VENDA")
         self.assertEqual(after["action"],"VENDA")
         self.assertEqual(session_profile_match("NEW_YORK","Noite/madrugada · Ásia + Londres"),"OUTSIDE")
+
+    def test_signal_status_time_age_and_validity_are_preserved_for_display(self):
+        row=home_rows_from_packs([_pack()])[0]
+        self.assertEqual(row["signal_status_code"],"POSSIBLE")
+        self.assertEqual(row["signal_headline"],"POSSÍVEL COMPRA")
+        self.assertEqual(row["signal_reference_display"],"21/09/2026 14:00 UTC")
+        self.assertEqual(row["signal_age_minutes"],12.0)
+        self.assertEqual(row["signal_remaining_minutes"],48.0)
+        self.assertIn("UTC",row["signal_reference_display"])
+
+    def test_expired_signal_is_visibly_expired_not_current_buy(self):
+        p=_pack()
+        p["signal_lifecycle"].update({
+            "status_code":"EXPIRED",
+            "status_label":"EXPIRADA — REVALIDAR",
+            "age_minutes":75.0,
+            "remaining_minutes":0.0,
+        })
+        row=home_rows_from_packs([p])[0]
+        self.assertEqual(row["bias"],"COMPRA")
+        self.assertEqual(row["signal_headline"],"COMPRA EXPIRADA")
+        self.assertEqual(row["signal_status_code"],"EXPIRED")
+
+    def test_voice_mentions_temporal_status_and_reference(self):
+        row=home_rows_from_packs([_pack()])[0]
+        script=voice_script_for_row(row)
+        self.assertIn("Status temporal",script)
+        self.assertIn("POSSÍVEL COMPRA",script)
+        self.assertIn("21/09/2026 14:00 UTC",script)
 
     def test_voice_explains_reason_risk_and_no_order(self):
         row=home_rows_from_packs([_pack()])[0]
