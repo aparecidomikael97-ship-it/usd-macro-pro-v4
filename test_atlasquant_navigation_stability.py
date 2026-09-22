@@ -58,44 +58,51 @@ class AtlasQuantNavigationStabilityTests(unittest.TestCase):
 
     def test_radar_and_master_matrix_do_not_depend_on_opening_pair_tab_first(self):
         src=APP.read_text(encoding="utf-8")
-        builder=src.index("def _build_pair_matrix_for_surfaces_v111")
-        init=src.index("matriz_v61=_build_pair_matrix_for_surfaces_v111()",builder)
-        market=src.index("# ABA 9 — V10.2 PROFESSIONAL MACRO MARKET MAP")
-        master=src.index("# ABA 1 — V10.2.2 PAINEL MESTRE")
-        pair_tab=src.index("if _aq_active_index == 4:")
-        self.assertGreaterEqual(builder,0)
-        self.assertLess(builder,market)
+        central=src.index("# MATRIZ CENTRAL DOS 7 PARES — V11.2")
+        init=src.index("_aq_pair_matrix_result = build_pair_matrix(",central)
+        pair_tab=src.index("if _aq_active_index == 4:",central)
+        market=src.index("# ABA 9 — V10.2 PROFESSIONAL MACRO MARKET MAP",pair_tab)
+        master=src.index("# ABA 1 — V10.2.2 PAINEL MESTRE DE OPORTUNIDADES",market)
+        self.assertLess(central,pair_tab)
+        self.assertLess(init,pair_tab)
         self.assertLess(init,market)
-        self.assertLess(builder,master)
-        self.assertGreater(pair_tab,-1)
-        self.assertIn('matriz_v61=_build_pair_matrix_for_surfaces_v111()',src)
+        self.assertLess(init,master)
         self.assertIn('_matrix_master_v102 = globals().get("matriz_v61")',src)
+        self.assertNotIn("_build_pair_matrix_for_surfaces_v111",src)
 
     def test_central_matrix_contract_is_seven_unique_fx_pairs(self):
-        src=APP.read_text(encoding="utf-8")
-        self.assertIn('["EUR/USD","GBP/USD","AUD/USD","NZD/USD","USD/JPY","USD/CHF","USD/CAD"]',src)
-        self.assertIn('_df.insert(0,"Ranking",range(1,len(_df)+1))',src)
-        compact="".join(src.split())
+        core=Path("atlasquant_pair_matrix_core.py").read_text(encoding="utf-8")
+        for pair in ("EUR/USD","GBP/USD","AUD/USD","NZD/USD","USD/JPY","USD/CHF","USD/CAD"):
+            self.assertIn(f'"{pair}"',core)
+        self.assertIn('matrix.insert(0,"Ranking",range(1,len(matrix)+1))',core)
+        compact="".join(core.split())
         self.assertIn('sort_values(["Índiceranking","Qualidade","Scorefinal"]',compact)
-        self.assertIn('"⚪ AGUARDAR CONFIRMAÇÃO"',src)
+        self.assertIn('"⚪AGUARDARCONFIRMAÇÃO"',compact)
 
     def test_shared_matrix_uses_official_confluence_engine_not_approximation(self):
         src=APP.read_text(encoding="utf-8")
-        start=src.index("def _build_pair_matrix_for_surfaces_v111")
-        end=src.index('if "matriz_v61" not in globals()',start)
-        helper=src[start:end]
-        self.assertIn("calcular_confluencia_v60(",helper)
-        self.assertIn('_conf["score_confluencia"]',helper)
-        self.assertIn('_conf["qualidade_confluencia"]',helper)
-        self.assertNotIn("50.0+abs(_dif)*1.25",helper)
+        core=Path("atlasquant_pair_matrix_core.py").read_text(encoding="utf-8")
+        self.assertIn("confluence_fn=calcular_confluencia_v60",src)
+        self.assertIn("confluence_fn(",core)
+        self.assertIn('conf.get("score_confluencia")',core)
+        self.assertIn('conf.get("qualidade_confluencia")',core)
+        self.assertNotIn("50.0+abs(_dif)*1.25",src+core)
 
     def test_market_map_matrix_exists_before_first_consumer(self):
         src=APP.read_text(encoding="utf-8")
-        init=src.index("matriz_v61=_build_pair_matrix_for_surfaces_v111()")
+        init=src.index("_aq_pair_matrix_result = build_pair_matrix(")
         market=src.index("if _aq_active_index == 9:")
         render=src.index("render_market_map(matriz_v61",market)
         self.assertLess(init,market)
         self.assertLess(init,render)
+
+    def test_decision_shared_aliases_exist_before_decision_workspace(self):
+        src=APP.read_text(encoding="utf-8")
+        aliases=src.index("scores_ranking = dict(zip(ranking")
+        decision=src.index("# V9.1 — CENTRAL DE DECISÃO AUTOMÁTICA")
+        self.assertLess(aliases,decision)
+        self.assertIn('usd_ajustado = float(_aq_pair_context["usd_for_pairs"])',src[:decision])
+        self.assertIn('ajuste = float(_aq_pair_context["surprise_adjustment"])',src[:decision])
 
 
 if __name__=="__main__":
