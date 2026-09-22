@@ -6257,6 +6257,12 @@ _aq_pair_matrix_result = {
 }
 matriz_v61 = pd.DataFrame()
 
+# Compatibilidade explícita para módulos legados que ainda consomem estes
+# nomes no escopo global. Eles agora vêm da mesma fonte central em toda aba.
+scores_ranking = dict(zip(ranking["Código"], ranking["Pontuação_Final"]))
+usd_ajustado = float(_aq_pair_context["usd_for_pairs"])
+ajuste = float(_aq_pair_context["surprise_adjustment"])
+
 if _aq_matrix_required:
     if build_pair_matrix is None or resolve_pair_usd_context is None:
         _aq_pair_matrix_result["reason"] = (
@@ -6291,6 +6297,10 @@ if _aq_matrix_required:
                 fed_tone=fed.get("tom", "Neutro"),
                 confluence_fn=calcular_confluencia_v60,
             )
+            # Atualiza também os aliases compartilhados após resolver FOMC.
+            usd_ajustado = float(_aq_pair_context["usd_for_pairs"])
+            ajuste = float(_aq_pair_context["surprise_adjustment"])
+            scores_ranking = dict(zip(ranking["Código"], ranking["Pontuação_Final"]))
             if bool(_aq_pair_matrix_result.get("ready", False)):
                 matriz_v61 = _aq_pair_matrix_result["matrix"].copy()
         except Exception as _aq_matrix_exc:
