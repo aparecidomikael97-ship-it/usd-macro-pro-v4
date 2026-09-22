@@ -231,7 +231,9 @@ def run_dev_preflight(
         and "contents: write" not in production_health
         and "contents: write" not in production_browser
         and "branches: [main]" in production_health
-        and "branches: [main, atlasquant-integration]" in production_browser
+        and "workflow_dispatch:" in production_browser
+        and "schedule:" in production_browser
+        and "\n  push:" not in production_browser.split("permissions:",1)[0]
         and "Warm production service" in production_browser
         and "_stcore/health" in production_health
         and "_stcore/health" in production_browser
@@ -239,7 +241,7 @@ def run_dev_preflight(
         and 'page.reload(wait_until="domcontentloaded"' in production_browser
         and 'page.on("pageerror"' in production_browser
         and "actions/upload-artifact@v7" in production_browser,
-        "Health permanece main-scoped; browser smoke é read-only, resiliente a cold start e preserva evidência diagnóstica.",
+        "Health permanece main-scoped; browser smoke é pós-deploy/manual+agendado, read-only, resiliente a cold start e preserva evidência diagnóstica sem bloquear o deploy.",
     ))
 
     checks.append(_check(
