@@ -15,6 +15,7 @@ from typing import Any, Mapping
 
 import pandas as pd
 
+from atlasquant_risk_guardian import daily_gain_lock
 from paper_trading_v112 import (
     PAPER_COLUMNS,
     TARGET_R,
@@ -37,7 +38,7 @@ MODEL_EXTRA_COLUMNS=[
 MODEL_PAPER_COLUMNS=PAPER_COLUMNS+[
     c for c in MODEL_EXTRA_COLUMNS if c not in PAPER_COLUMNS
 ]
-TERMINAL_STATUSES={"CLOSED","BLOCKED_CONTEXT","BLOCKED_DATA","BLOCKED_TIMEFRAME"}
+TERMINAL_STATUSES={"CLOSED","BLOCKED_CONTEXT","BLOCKED_DATA","BLOCKED_TIMEFRAME","BLOCKED_RISK"}
 
 
 def _mapping(value:Any)->dict[str,Any]:
@@ -288,6 +289,62 @@ def _reason_counts(series:pd.Series|None)->dict[str,int]:
     return dict(sorted(counts.items(),key=lambda kv:(-kv[1],kv[0])))
 
 
+def _daily_closed_wins(frame:pd.DataFrame|None,now:pd.Timestamp)->int:
+    d=normalize_model_paper(frame)
+    if d.empty:
+        return 0
+    closed=d[
+        d["status"].astype(str).str.upper().eq("CLOSED")
+        & d["result"].astype(str).str.upper().eq("WIN")
+    ].copy()
+    if closed.empty:
+        return 0
+    exits=pd.to_datetime(closed["exit_time"],utc=True,errors="coerce")
+    day=pd.Timestamp(now).tz_convert("UTC").date()
+    return int(sum(pd.notna(ts) and pd.Timestamp(ts).date()==day for ts in exits))
+
+
+def _risk_block_existing(
+    row:Mapping[str,Any],
+    *,
+    now:pd.Timestamp,
+    reason:str,
+)->dict[str,Any]:
+    out=dict(row or {})
+    existing=str(out.get("context_hard_blocks") or "").strip()
+    hard=" | ".join(x for x in (existing,str(reason or "").strip()) if x)
+    out.update({
+        "status":"BLOCKED_RISK",
+        "checklist_passed":False,
+        "checklist_note":"Risk Guardian: "+str(reason or "meta diária de gains atingida"),
+        "context_gate_passed":False,
+        "context_gate_state":"DAILY_GAIN_LOCK",
+        "context_hard_blocks":hard,
+        "updated_at":now.isoformat(),
+    })
+    return out
+
+
+def _risk_block_candidate(
+    candidate:Mapping[str,Any],
+    checklist:Mapping[str,Any]|None,
+    *,
+    now:pd.Timestamp,
+    reason:str,
+)->dict[str,Any]:
+    out=_block_row(candidate,checklist,status="BLOCKED_RISK",now=now)
+    existing=str(out.get("context_hard_blocks") or "").strip()
+    hard=" | ".join(x for x in (existing,str(reason or "").strip()) if x)
+    out.update({
+        "checklist_passed":False,
+        "checklist_note":"Risk Guardian: "+str(reason or "meta diária de gains atingida"),
+        "context_gate_passed":False,
+        "context_gate_state":"DAILY_GAIN_LOCK",
+        "context_hard_blocks":hard,
+    })
+    return out
+
+
 def summarize_model_paper(frame:pd.DataFrame|None)->dict[str,Any]:
     d=normalize_model_paper(frame)
     if d.empty:
@@ -315,6 +372,7 @@ def summarize_model_paper(frame:pd.DataFrame|None)->dict[str,Any]:
                 "blocked_context":int(g["status"].astype(str).str.upper().eq("BLOCKED_CONTEXT").sum()),
                 "blocked_data":int(g["status"].astype(str).str.upper().eq("BLOCKED_DATA").sum()),
                 "blocked_timeframe":int(g["status"].astype(str).str.upper().eq("BLOCKED_TIMEFRAME").sum()),
+                "blocked_risk":int(g["status"].astype(str).str.upper().eq("BLOCKED_RISK").sum()),
                 "pending":int(g["status"].astype(str).str.upper().eq("WAIT_ENTRY").sum()),
                 "open":int(g["status"].astype(str).str.upper().eq("OPEN").sum()),
                 "closed":int(len(gc)),
@@ -343,6 +401,7 @@ def summarize_model_paper(frame:pd.DataFrame|None)->dict[str,Any]:
                 "blocked_context":int(g["status"].astype(str).str.upper().eq("BLOCKED_CONTEXT").sum()),
                 "blocked_data":int(g["status"].astype(str).str.upper().eq("BLOCKED_DATA").sum()),
                 "blocked_timeframe":int(g["status"].astype(str).str.upper().eq("BLOCKED_TIMEFRAME").sum()),
+                "blocked_risk":int(g["status"].astype(str).str.upper().eq("BLOCKED_RISK").sum()),
                 "pending":int(g["status"].astype(str).str.upper().eq("WAIT_ENTRY").sum()),
                 "open":int(g["status"].astype(str).str.upper().eq("OPEN").sum()),
                 "closed":int(len(gc)),
@@ -374,6 +433,7 @@ def summarize_model_paper(frame:pd.DataFrame|None)->dict[str,Any]:
         "blocked_context":int(d["status"].astype(str).str.upper().eq("BLOCKED_CONTEXT").sum()) if not d.empty else 0,
         "blocked_data":int(d["status"].astype(str).str.upper().eq("BLOCKED_DATA").sum()) if not d.empty else 0,
         "blocked_timeframe":int(d["status"].astype(str).str.upper().eq("BLOCKED_TIMEFRAME").sum()) if not d.empty else 0,
+        "blocked_risk":int(d["status"].astype(str).str.upper().eq("BLOCKED_RISK").sum()) if not d.empty else 0,
         "pending_entries":int(d["status"].astype(str).str.upper().eq("WAIT_ENTRY").sum()) if not d.empty else 0,
         "open_positions":int(d["status"].astype(str).str.upper().eq("OPEN").sum()) if not d.empty else 0,
         "closed_trades":int(len(closed)),
@@ -413,59 +473,133 @@ def run_model_paper_cycle(
 
     opened=0
     closed_count=0
+
+    # Fase 1: posições OPEN podem fechar naturalmente antes de qualquer nova
+    # WAIT_ENTRY abrir. Assim, um segundo gain realizado no ciclo trava novas
+    # entradas sem encerrar à força posições que já estavam abertas.
     if not d.empty:
         updated=[]
         for _,series in d.iterrows():
-            # Force object dtype before assigning typed Paper metadata. Pandas may
-            # preserve Arrow string dtype from a CSV/Parquet ledger, which rejects
-            # boolean values such as timeframe_alignment_passed=True.
             row=pd.Series(series.to_dict(),dtype="object")
             status=str(row.get("status") or "").upper()
-            if status in {"WAIT_ENTRY","OPEN"}:
-                source_tf=str(row.get("source_timeframe") or "M15").strip().upper()
-                profile=_execution_profile(source_tf)
-                if profile is None:
-                    blocked_row=row.to_dict()
-                    blocked_row["status"]="BLOCKED_TIMEFRAME"
-                    blocked_row["execution_timeframe"]=""
-                    blocked_row["timeframe_alignment_passed"]=False
-                    blocked_row["timeframe_alignment_reason"]="EXECUTION_FRAME_NOT_AVAILABLE:"+source_tf
-                    blocked_row["checklist_note"]="Paper preservado sem execução: timeframe de origem ainda não possui executor exato."
-                    blocked_row["updated_at"]=now.isoformat()
-                    updated.append(blocked_row)
-                    continue
-                frame=_execution_frame(
-                    scanner_by_pair.get(str(row.get("pair") or "").upper(),{}),
-                    source_tf,
-                )
-                if frame.empty:
-                    waiting=row.to_dict()
-                    waiting["execution_timeframe"]=source_tf
-                    waiting["timeframe_alignment_passed"]=False
-                    waiting["timeframe_alignment_reason"]="EXECUTION_FRAME_EMPTY:"+source_tf
-                    waiting["checklist_note"]="Aguardando candles do mesmo timeframe de execução; nenhum timeframe inferior é usado como substituto."
-                    waiting["updated_at"]=now.isoformat()
-                    updated.append(waiting)
-                    continue
-                row["execution_timeframe"]=source_tf
-                row["timeframe_alignment_passed"]=True
-                row["timeframe_alignment_reason"]="SOURCE_EQUALS_EXECUTION"
-                before=status
-                first=_fill_entry(row,frame,now=now)
-                if before=="WAIT_ENTRY" and str(first.get("status") or "").upper()=="OPEN":
-                    opened+=1
-                second=_close_open(
-                    pd.Series(first),
-                    frame,
-                    now=now,
-                    bar_minutes=int(profile["bar_minutes"]),
-                    max_hold_bars=int(profile["max_hold_bars"]),
-                )
-                if str(first.get("status") or "").upper()=="OPEN" and str(second.get("status") or "").upper()=="CLOSED":
-                    closed_count+=1
-                updated.append(second)
-            else:
+            if status!="OPEN":
                 updated.append(row.to_dict())
+                continue
+
+            source_tf=str(row.get("source_timeframe") or "M15").strip().upper()
+            profile=_execution_profile(source_tf)
+            if profile is None:
+                blocked_row=row.to_dict()
+                blocked_row["status"]="BLOCKED_TIMEFRAME"
+                blocked_row["execution_timeframe"]=""
+                blocked_row["timeframe_alignment_passed"]=False
+                blocked_row["timeframe_alignment_reason"]="EXECUTION_FRAME_NOT_AVAILABLE:"+source_tf
+                blocked_row["checklist_note"]="Paper preservado sem execução: timeframe de origem ainda não possui executor exato."
+                blocked_row["updated_at"]=now.isoformat()
+                updated.append(blocked_row)
+                continue
+
+            frame=_execution_frame(
+                scanner_by_pair.get(str(row.get("pair") or "").upper(),{}),
+                source_tf,
+            )
+            if frame.empty:
+                waiting=row.to_dict()
+                waiting["execution_timeframe"]=source_tf
+                waiting["timeframe_alignment_passed"]=False
+                waiting["timeframe_alignment_reason"]="EXECUTION_FRAME_EMPTY:"+source_tf
+                waiting["checklist_note"]="Aguardando candles do mesmo timeframe de execução; nenhum timeframe inferior é usado como substituto."
+                waiting["updated_at"]=now.isoformat()
+                updated.append(waiting)
+                continue
+
+            row["execution_timeframe"]=source_tf
+            row["timeframe_alignment_passed"]=True
+            row["timeframe_alignment_reason"]="SOURCE_EQUALS_EXECUTION"
+            second=_close_open(
+                row,
+                frame,
+                now=now,
+                bar_minutes=int(profile["bar_minutes"]),
+                max_hold_bars=int(profile["max_hold_bars"]),
+            )
+            if str(second.get("status") or "").upper()=="CLOSED":
+                closed_count+=1
+            updated.append(second)
+        d=normalize_model_paper(pd.DataFrame(updated))
+
+    wins_today=_daily_closed_wins(d,now)
+    daily_gain_locked,daily_gain_reason=daily_gain_lock(wins_today,2)
+
+    # Fase 2: WAIT_ENTRY só abre se a meta de 2 gains ainda não foi atingida.
+    if not d.empty:
+        updated=[]
+        for _,series in d.iterrows():
+            row=pd.Series(series.to_dict(),dtype="object")
+            status=str(row.get("status") or "").upper()
+            if status!="WAIT_ENTRY":
+                updated.append(row.to_dict())
+                continue
+
+            if daily_gain_locked:
+                updated.append(_risk_block_existing(
+                    row.to_dict(),now=now,reason=daily_gain_reason
+                ))
+                continue
+
+            source_tf=str(row.get("source_timeframe") or "M15").strip().upper()
+            profile=_execution_profile(source_tf)
+            if profile is None:
+                blocked_row=row.to_dict()
+                blocked_row["status"]="BLOCKED_TIMEFRAME"
+                blocked_row["execution_timeframe"]=""
+                blocked_row["timeframe_alignment_passed"]=False
+                blocked_row["timeframe_alignment_reason"]="EXECUTION_FRAME_NOT_AVAILABLE:"+source_tf
+                blocked_row["checklist_note"]="Paper preservado sem execução: timeframe de origem ainda não possui executor exato."
+                blocked_row["updated_at"]=now.isoformat()
+                updated.append(blocked_row)
+                continue
+
+            frame=_execution_frame(
+                scanner_by_pair.get(str(row.get("pair") or "").upper(),{}),
+                source_tf,
+            )
+            if frame.empty:
+                waiting=row.to_dict()
+                waiting["execution_timeframe"]=source_tf
+                waiting["timeframe_alignment_passed"]=False
+                waiting["timeframe_alignment_reason"]="EXECUTION_FRAME_EMPTY:"+source_tf
+                waiting["checklist_note"]="Aguardando candles do mesmo timeframe de execução; nenhum timeframe inferior é usado como substituto."
+                waiting["updated_at"]=now.isoformat()
+                updated.append(waiting)
+                continue
+
+            row["execution_timeframe"]=source_tf
+            row["timeframe_alignment_passed"]=True
+            row["timeframe_alignment_reason"]="SOURCE_EQUALS_EXECUTION"
+            first=_fill_entry(row,frame,now=now)
+            if str(first.get("status") or "").upper()=="OPEN":
+                opened+=1
+            second=_close_open(
+                pd.Series(first,dtype="object"),
+                frame,
+                now=now,
+                bar_minutes=int(profile["bar_minutes"]),
+                max_hold_bars=int(profile["max_hold_bars"]),
+            )
+            if (
+                str(first.get("status") or "").upper()=="OPEN"
+                and str(second.get("status") or "").upper()=="CLOSED"
+            ):
+                closed_count+=1
+                if str(second.get("result") or "").upper()=="WIN":
+                    exit_ts=_as_utc(second.get("exit_time"))
+                    if exit_ts is not None and exit_ts.date()==now.date():
+                        wins_today+=1
+                        daily_gain_locked,daily_gain_reason=daily_gain_lock(
+                            wins_today,2
+                        )
+            updated.append(second)
         d=normalize_model_paper(pd.DataFrame(updated))
 
     existing_episodes=set(
@@ -496,7 +630,12 @@ def run_model_paper_cycle(
         )
         frame=_execution_frame(scanner_pair,source_tf)
         observed+=1
-        if profile is None:
+        if daily_gain_locked:
+            row=_risk_block_candidate(
+                candidate,checklist,now=now,reason=daily_gain_reason
+            )
+            blocked+=1
+        elif profile is None:
             row=_block_row(candidate,checklist,status="BLOCKED_TIMEFRAME",now=now)
             blocked+=1
         elif frame.empty:
@@ -535,6 +674,9 @@ def run_model_paper_cycle(
         "new_blocked":blocked,
         "entries_opened":opened,
         "trades_closed":closed_count,
+        "wins_today":int(wins_today),
+        "daily_gain_lock":bool(daily_gain_locked),
+        "daily_gain_lock_reason":str(daily_gain_reason or ""),
         **summary,
     }
     return d,cycle
