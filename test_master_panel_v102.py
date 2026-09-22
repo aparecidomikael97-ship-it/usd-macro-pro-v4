@@ -12,7 +12,14 @@ except Exception:
     st.secrets = {}
     sys.modules['streamlit'] = st
 
-from master_panel_v102 import build_master_rows, _technical_score, _integrated_state, _scanner_for_pair
+from master_panel_v102 import (
+    build_master_rows,
+    _technical_score,
+    _integrated_state,
+    _scanner_for_pair,
+    _technical_temporal_status,
+    _execution_display,
+)
 
 
 class MasterPanelTests(unittest.TestCase):
@@ -83,6 +90,65 @@ class MasterPanelTests(unittest.TestCase):
         self.assertTrue(info['fresh'])
         self.assertLess(info['age_minutes'], 45)
 
+
+    def test_current_scanner_has_absolute_reference_and_current_status(self):
+        now=pd.Timestamp.now(tz="UTC")
+        scanner={"resultados":{"USD/CHF":{
+            "m15_fetched_at":(now-pd.Timedelta(minutes=10)).isoformat(),
+            "tecnico":{"disponivel":True,"h4":{"status":"🟢 CONFIRMA"},"h1":{"status":"🟢 CONFIRMA"},"m15":{"status":"🟢 CONFIRMA"}},
+        }}}
+        info=_scanner_for_pair(scanner,"USD/CHF")
+        temporal=_technical_temporal_status(info)
+        self.assertTrue(info["fresh"])
+        self.assertEqual(temporal["code"],"CURRENT")
+        self.assertEqual(temporal["label"],"ATUAL")
+        self.assertIn("UTC",temporal["reference_display"])
+        self.assertIn("UTC",temporal["valid_until_display"])
+        self.assertFalse(temporal["requires_revalidation"])
+
+    def test_stale_scanner_is_expired_and_never_authorized(self):
+        now=pd.Timestamp.now(tz="UTC")
+        scanner={"resultados":{"USD/CHF":{
+            "m15_fetched_at":(now-pd.Timedelta(minutes=61)).isoformat(),
+            "tecnico":{"disponivel":True,"h4":{"status":"🟢 CONFIRMA"},"h1":{"status":"🟢 CONFIRMA"},"m15":{"status":"🟢 CONFIRMA"}},
+        }}}
+        info=_scanner_for_pair(scanner,"USD/CHF")
+        temporal=_technical_temporal_status(info)
+        self.assertFalse(info["fresh"])
+        self.assertEqual(temporal["code"],"EXPIRED")
+        self.assertIn("EXPIRADA",temporal["label"])
+        self.assertEqual(_execution_display("🟢 EXECUTÁVEL",temporal),"⛔ NÃO AUTORIZADA")
+
+    def test_missing_timestamp_is_unverified_fail_closed(self):
+        scanner={"resultados":{"USD/CHF":{
+            "tecnico":{"disponivel":True,"h4":{"status":"🟢 CONFIRMA"},"h1":{"status":"🟢 CONFIRMA"},"m15":{"status":"🟢 CONFIRMA"}},
+        }}}
+        info=_scanner_for_pair(scanner,"USD/CHF")
+        temporal=_technical_temporal_status(info)
+        self.assertFalse(info["fresh"])
+        self.assertEqual(temporal["code"],"UNVERIFIED")
+        self.assertEqual(temporal["reference_display"],"HORÁRIO NÃO COMPROVADO")
+        self.assertTrue(temporal["requires_revalidation"])
+
+    def test_master_rows_separate_macro_bias_from_entry_authorization(self):
+        rows=build_master_rows(self.matrix(),self.contexts(),self.scanner(True))
+        usd=next(r for r in rows if r["Par"]=="USD/CHF")
+        self.assertEqual(usd["Viés macro"],"COMPRA USD/CHF")
+        self.assertEqual(usd["Estado"],"🟢 EXECUTÁVEL")
+        self.assertEqual(usd["Status temporal"],"ATUAL")
+        self.assertIn("UTC",usd["Hora da leitura"])
+        self.assertTrue(usd["Autorização"].startswith("✅"))
+
+    def test_master_panel_ui_explicitly_says_macro_bias_is_not_entry(self):
+        from pathlib import Path
+        src=Path("master_panel_v102.py").read_text(encoding="utf-8")
+        self.assertIn("Viés macro não é entrada",src)
+        self.assertIn('b2.metric("Viés macro"',src)
+        self.assertIn('b3.metric("Estado operacional"',src)
+        self.assertIn('"Hora da leitura"',src)
+        self.assertIn('"Status temporal"',src)
+        self.assertIn('"Autorização"',src)
+        self.assertIn("não deve ser interpretado como uma entrada atual",src)
 
     def test_master_overview_state_is_descriptive_and_fail_closed(self):
         from master_panel_v102 import master_overview_state
