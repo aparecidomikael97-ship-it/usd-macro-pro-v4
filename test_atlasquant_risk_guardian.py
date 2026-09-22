@@ -5,6 +5,7 @@ from atlasquant_risk_guardian import (
     RiskLimits,
     RiskState,
     can_apply_limit_change,
+    daily_gain_lock,
     evaluate_risk_guard,
     limits_are_tighter_or_equal,
     validate_limits,
@@ -26,6 +27,20 @@ def limits(**overrides):
 
 
 class AtlasQuantRiskGuardianTests(unittest.TestCase):
+    def test_daily_gain_lock_helper_is_fail_closed_at_two(self):
+        self.assertEqual(daily_gain_lock(0),(False,""))
+        self.assertEqual(daily_gain_lock(1),(False,""))
+        locked,reason=daily_gain_lock(2)
+        self.assertTrue(locked)
+        self.assertIn("preservar capital",reason)
+        self.assertTrue(daily_gain_lock(3)[0])
+
+    def test_daily_gain_lock_helper_rejects_invalid_counts(self):
+        for gains,limit in ((-1,2),(0,0),(True,2),(1,False)):
+            with self.subTest(gains=gains,limit=limit):
+                with self.assertRaises(ValueError):
+                    daily_gain_lock(gains,limit)
+
     def test_default_two_gain_rule_locks_third_trade(self):
         out=evaluate_risk_guard(
             limits(),
