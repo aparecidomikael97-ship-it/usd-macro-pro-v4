@@ -16,7 +16,7 @@
   "setup_attribution_inferred": false,
   "last_cycle": {
     "version": "V11.2_PAPER_TRADING",
-    "ran_at": "2026-09-22T08:23:32.827742+00:00",
+    "ran_at": "2026-09-22T08:49:32.951403+00:00",
     "pending_created": 0,
     "entries_opened": 0,
     "trades_closed": 0,
@@ -32,7 +32,6 @@
         ],
         "soft_blocks": [
           "ICT incompleto (33/100)",
-          "Fluxo institucional incompleto (58/100)",
           "M15 ainda não confirmou gatilho"
         ]
       },
@@ -42,7 +41,7 @@
         "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
         "hard_blocks": [],
         "soft_blocks": [
-          "ICT incompleto (55/100)",
+          "ICT incompleto (40/100)",
           "M15 ainda não confirmou gatilho"
         ]
       },
@@ -53,8 +52,8 @@
         "hard_blocks": [],
         "soft_blocks": [
           "Gate ainda não liberou execução",
-          "ICT incompleto (60/100)",
-          "Fluxo institucional incompleto (68/100)",
+          "ICT incompleto (33/100)",
+          "Fluxo institucional incompleto (66/100)",
           "M15 ainda não confirmou gatilho"
         ]
       },
@@ -66,19 +65,23 @@
           "H1 está contra o viés"
         ],
         "soft_blocks": [
-          "ICT incompleto (52/100)",
+          "ICT incompleto (40/100)",
           "M15 ainda não confirmou gatilho"
         ]
       },
       "EUR/USD": {
         "side": "SELL",
         "passed": false,
-        "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
-        "hard_blocks": [],
+        "state": "🔴 BLOQUEADO",
+        "hard_blocks": [
+          "ADR14 muito esticado (117%)"
+        ],
         "soft_blocks": [
           "Gate ainda não liberou execução",
+          "ADR14 em 117%: evitar perseguir preço",
           "ICT incompleto (60/100)",
-          "Fluxo institucional incompleto (65/100)"
+          "Fluxo institucional incompleto (65/100)",
+          "M15 ainda não confirmou gatilho"
         ]
       },
       "AUD/USD": {
@@ -87,6 +90,7 @@
         "state": "⚪ AGUARDAR DIREÇÃO",
         "hard_blocks": [],
         "soft_blocks": [
+          "ADR14 em 96%: evitar perseguir preço",
           "ICT incompleto (0/100)",
           "Fluxo institucional incompleto (0/100)",
           "M15 ainda não confirmou gatilho"
@@ -97,12 +101,14 @@
         "passed": false,
         "state": "🔴 BLOQUEADO",
         "hard_blocks": [
-          "H1 está contra o viés"
+          "ADR14 muito esticado (123%)"
         ],
         "soft_blocks": [
           "Gate ainda não liberou execução",
-          "ICT incompleto (47/100)",
-          "Fluxo institucional incompleto (59/100)"
+          "ADR14 em 123%: evitar perseguir preço",
+          "ICT incompleto (40/100)",
+          "Fluxo institucional incompleto (65/100)",
+          "M15 ainda não confirmou gatilho"
         ]
       }
     },
