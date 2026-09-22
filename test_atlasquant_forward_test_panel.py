@@ -11,20 +11,20 @@ class ForwardTestPanelTests(unittest.TestCase):
             "closed_trades":1,
             "by_timeframe":{
                 "M15":{
-                    "candidates":3,"blocked_context":2,"blocked_data":0,"blocked_timeframe":0,
+                    "candidates":3,"blocked_context":1,"blocked_data":0,"blocked_timeframe":0,"blocked_risk":1,
                     "pending":0,"open":0,"closed":1,"wins":1,"losses":0,"net_r":1.4,
                     "hard_block_reasons":{"Gate bloqueado":2},
                     "soft_block_reasons":{"M15 sem gatilho":1},
                     "timeframe_block_reasons":{"SOURCE_EQUALS_EXECUTION":3},
                 },
                 "H1":{
-                    "candidates":2,"blocked_context":1,"blocked_data":0,"blocked_timeframe":1,
+                    "candidates":2,"blocked_context":1,"blocked_data":0,"blocked_timeframe":1,"blocked_risk":0,
                     "pending":0,"open":0,"closed":0,"wins":0,"losses":0,"net_r":0.0,
                     "timeframe_block_reasons":{"EXECUTION_FRAME_NOT_AVAILABLE:H1":1},
                 },
             },
             "by_setup":{
-                "fvg":{"candidates":3,"blocked_context":2,"blocked_timeframe":0,"pending":0,"open":0,"closed":1,"wins":1,"losses":0,"win_rate_pct":100.0,"net_r":1.4}
+                "fvg":{"candidates":3,"blocked_context":1,"blocked_timeframe":0,"blocked_risk":1,"pending":0,"open":0,"closed":1,"wins":1,"losses":0,"win_rate_pct":100.0,"net_r":1.4}
             },
             "timeframe_execution_readiness":{
                 "by_timeframe":{
@@ -52,6 +52,13 @@ class ForwardTestPanelTests(unittest.TestCase):
         self.assertIn("Gate bloqueado",m15["Principais bloqueios"])
         self.assertNotIn("SOURCE_EQUALS_EXECUTION",m15["Principais bloqueios"])
         self.assertIn("EXECUTION_FRAME_NOT_AVAILABLE:H1",h1["Principais bloqueios"])
+
+    def test_daily_gain_risk_blocks_are_visible_in_forward_tables(self):
+        rows=forward_timeframe_rows(self.sample())
+        m15=next(r for r in rows if r["Timeframe"]=="M15")
+        self.assertEqual(m15["Bloq. risco"],1)
+        setups=forward_setup_rows(self.sample())
+        self.assertEqual(setups[0]["Bloq. risco"],1)
 
     def test_setup_rows_keep_forward_results_separate(self):
         rows=forward_setup_rows(self.sample())

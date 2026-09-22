@@ -262,6 +262,81 @@ class PaperTradingV112SafetyTests(unittest.TestCase):
         self.assertEqual(cycle["new_blocked"],1)
         self.assertEqual(cycle["closed_trades"],0)
 
+    def test_model_paper_blocks_new_forward_candidate_after_two_daily_wins(self):
+        now=pd.Timestamp("2026-09-22T15:00:00Z")
+        ledger=pd.DataFrame([
+            {
+                "trade_id":"w1","signal_id":"w1","episode_id":"w1",
+                "pair":"EUR/USD","setup_id":"fvg","source_timeframe":"M15",
+                "status":"CLOSED","result":"WIN",
+                "exit_time":(now-pd.Timedelta(hours=2)).isoformat(),"realized_r":2.0,
+            },
+            {
+                "trade_id":"w2","signal_id":"w2","episode_id":"w2",
+                "pair":"GBP/USD","setup_id":"ote","source_timeframe":"M15",
+                "status":"CLOSED","result":"WIN",
+                "exit_time":(now-pd.Timedelta(hours=1)).isoformat(),"realized_r":2.0,
+            },
+        ])
+        candidate={
+            "candidate_id":"risk-candidate","episode_id":"risk-episode","setup_id":"fvg",
+            "source_model":"FVG","source_timeframe":"M15","pair":"EUR/USD",
+            "side":"BUY","captured_at":now.isoformat(),
+            "status":"🟢 FVG EM TESTE","score":91,
+            "research_candidate":True,"evidence":{"zone_low":1.1,"zone_high":1.11},
+        }
+        scanner=self._model_scanner([candidate])
+        inputs={"pairs":[{"Par":"EUR/USD","Direção":"COMPRA","Score final":90,"Qualidade":90,"Índice ranking":1}]}
+        with patch(
+            "atlasquant_model_paper.evaluate_pair_checklist",
+            return_value=self._model_checklist("fvg",True),
+        ):
+            out,cycle=mp.run_model_paper_cycle(
+                inputs,scanner,{"contexts":{"EUR/USD":{}}},
+                ledger,now=now,
+            )
+        risk=out[out["episode_id"].astype(str)=="risk-episode"].iloc[0]
+        self.assertEqual(risk["status"],"BLOCKED_RISK")
+        self.assertEqual(risk["context_gate_state"],"DAILY_GAIN_LOCK")
+        self.assertIn("preservar capital",str(risk["context_hard_blocks"]))
+        self.assertTrue(cycle["daily_gain_lock"])
+        self.assertEqual(cycle["wins_today"],2)
+        self.assertEqual(cycle["blocked_risk"],1)
+        self.assertEqual(cycle["new_qualified"],0)
+
+    def test_model_paper_two_gains_cancel_existing_pending_forward_entry(self):
+        now=pd.Timestamp("2026-09-22T15:00:00Z")
+        ledger=pd.DataFrame([
+            {
+                "trade_id":"w1","signal_id":"w1","episode_id":"w1",
+                "pair":"EUR/USD","setup_id":"fvg","source_timeframe":"M15",
+                "status":"CLOSED","result":"WIN",
+                "exit_time":(now-pd.Timedelta(hours=2)).isoformat(),"realized_r":2.0,
+            },
+            {
+                "trade_id":"w2","signal_id":"w2","episode_id":"w2",
+                "pair":"GBP/USD","setup_id":"ote","source_timeframe":"M15",
+                "status":"CLOSED","result":"WIN",
+                "exit_time":(now-pd.Timedelta(hours=1)).isoformat(),"realized_r":2.0,
+            },
+            {
+                "trade_id":"p3","signal_id":"p3","episode_id":"p3",
+                "pair":"USD/JPY","setup_id":"crt","source_timeframe":"M15",
+                "status":"WAIT_ENTRY","result":"",
+                "signal_time":(now-pd.Timedelta(minutes=15)).isoformat(),
+            },
+        ])
+        out,cycle=mp.run_model_paper_cycle(
+            {"pairs":[]},{"resultados":{}},{"contexts":{}},
+            ledger,now=now,
+        )
+        pending=out[out["episode_id"].astype(str)=="p3"].iloc[0]
+        self.assertEqual(pending["status"],"BLOCKED_RISK")
+        self.assertFalse(bool(pending["checklist_passed"]))
+        self.assertTrue(cycle["daily_gain_lock"])
+        self.assertEqual(cycle["entries_opened"],0)
+        self.assertEqual(cycle["blocked_risk"],1)
+
     def test_model_paper_deduplicates_repeated_scan_by_episode_id(self):
         candidate={
             "candidate_id":"snapshot-1","episode_id":"same-episode","setup_id":"fvg",
@@ -403,6 +478,78 @@ class PaperTradingV112SafetyTests(unittest.TestCase):
         self.assertEqual(trades3.iloc[0]["result"],"WIN")
         self.assertAlmostEqual(float(trades3.iloc[0]["realized_r"]),2.0,places=6)
         self.assertEqual(cycle3["trades_closed"],1)
+
+    def test_two_closed_wins_today_cancel_third_pending_trade(self):
+        now=pd.Timestamp("2026-09-22T15:00:00Z")
+        trades=pd.DataFrame([
+            {"trade_id":"w1","signal_id":"w1","pair":"EUR/USD","status":"CLOSED","result":"WIN",
+             "exit_time":(now-pd.Timedelta(hours=2)).isoformat(),"realized_r":2.0},
+            {"trade_id":"w2","signal_id":"w2","pair":"USD/JPY","status":"CLOSED","result":"WIN",
+             "exit_time":(now-pd.Timedelta(hours=1)).isoformat(),"realized_r":2.0},
+            {"trade_id":"p3","signal_id":"p3","pair":"GBP/USD","status":"WAIT_ENTRY","result":"",
+             "signal_time":(now-pd.Timedelta(minutes=15)).isoformat()},
+        ])
+        out,cycle=p.run_paper_cycle(
+            {"pairs":[]},{"resultados":{}},{"contexts":{}},trades,now=now
+        )
+        pending=out[out["trade_id"].astype(str)=="p3"].iloc[0]
+        self.assertEqual(pending["status"],"CANCELLED_RISK_LOCK")
+        self.assertTrue(cycle["daily_gain_lock"])
+        self.assertEqual(cycle["wins_today"],2)
+        self.assertEqual(cycle["entries_opened"],0)
+        self.assertEqual(cycle["pending_cancelled_by_gain_lock"],1)
+        self.assertIn("preservar capital",cycle["daily_gain_lock_reason"])
+
+    def test_gain_lock_resets_by_utc_day(self):
+        now=pd.Timestamp("2026-09-22T15:00:00Z")
+        previous=now-pd.Timedelta(days=1)
+        trades=pd.DataFrame([
+            {"trade_id":"w1","signal_id":"w1","pair":"EUR/USD","status":"CLOSED","result":"WIN",
+             "exit_time":(previous-pd.Timedelta(hours=2)).isoformat(),"realized_r":2.0},
+            {"trade_id":"w2","signal_id":"w2","pair":"USD/JPY","status":"CLOSED","result":"WIN",
+             "exit_time":(previous-pd.Timedelta(hours=1)).isoformat(),"realized_r":2.0},
+            {"trade_id":"p3","signal_id":"p3","pair":"GBP/USD","status":"WAIT_ENTRY","result":"",
+             "signal_time":(now-pd.Timedelta(minutes=15)).isoformat()},
+        ])
+        out,cycle=p.run_paper_cycle(
+            {"pairs":[]},{"resultados":{}},{"contexts":{}},trades,now=now
+        )
+        pending=out[out["trade_id"].astype(str)=="p3"].iloc[0]
+        self.assertEqual(pending["status"],"WAIT_ENTRY")
+        self.assertFalse(cycle["daily_gain_lock"])
+        self.assertEqual(cycle["wins_today"],0)
+
+    def test_second_gain_closed_this_cycle_locks_later_pending_trade(self):
+        now=pd.Timestamp("2026-09-22T15:00:00Z")
+        trades=pd.DataFrame([
+            {"trade_id":"w1","signal_id":"w1","pair":"EUR/USD","status":"CLOSED","result":"WIN",
+             "exit_time":(now-pd.Timedelta(hours=2)).isoformat(),"realized_r":2.0},
+            {"trade_id":"open2","signal_id":"open2","pair":"USD/JPY","status":"OPEN","result":"",
+             "entry_time":(now-pd.Timedelta(hours=1)).isoformat(),
+             "entry_price":1.0,"stop_price":0.9,"target_price":1.2,"risk_distance":0.1,"side":"BUY"},
+            {"trade_id":"p3","signal_id":"p3","pair":"GBP/USD","status":"WAIT_ENTRY","result":"",
+             "signal_time":(now-pd.Timedelta(minutes=15)).isoformat()},
+        ])
+
+        def close_second(row,frame,now,**kwargs):
+            out=row.to_dict()
+            out.update({
+                "status":"CLOSED","result":"WIN","exit_time":now.isoformat(),
+                "exit_price":1.2,"realized_r":2.0,"updated_at":now.isoformat(),
+            })
+            return out
+
+        with patch("paper_trading_v112._close_open",side_effect=close_second):
+            out,cycle=p.run_paper_cycle(
+                {"pairs":[]},{"resultados":{}},{"contexts":{}},trades,now=now
+            )
+
+        pending=out[out["trade_id"].astype(str)=="p3"].iloc[0]
+        self.assertEqual(pending["status"],"CANCELLED_RISK_LOCK")
+        self.assertTrue(cycle["daily_gain_lock"])
+        self.assertEqual(cycle["wins_today"],2)
+        self.assertEqual(cycle["trades_closed"],1)
+        self.assertEqual(cycle["pending_cancelled_by_gain_lock"],1)
 
     def test_high_adr_soft_block_prevents_simulation(self):
         now=pd.Timestamp("2026-09-17T18:00:00Z")

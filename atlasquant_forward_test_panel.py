@@ -45,6 +45,7 @@ def forward_timeframe_rows(summary:Mapping[str,Any]|None)->list[dict[str,Any]]:
             "Bloq. contexto":int(obs.get("blocked_context",0) or 0),
             "Bloq. dados":int(obs.get("blocked_data",0) or 0),
             "Bloq. timeframe":int(obs.get("blocked_timeframe",0) or 0),
+            "Bloq. risco":int(obs.get("blocked_risk",0) or 0),
             "Pendentes":int(obs.get("pending",0) or 0),
             "Abertos":int(obs.get("open",0) or 0),
             "Fechados":int(obs.get("closed",0) or 0),
@@ -66,6 +67,7 @@ def forward_setup_rows(summary:Mapping[str,Any]|None)->list[dict[str,Any]]:
             "Candidatos":int(obs.get("candidates",0) or 0),
             "Bloq. contexto":int(obs.get("blocked_context",0) or 0),
             "Bloq. timeframe":int(obs.get("blocked_timeframe",0) or 0),
+            "Bloq. risco":int(obs.get("blocked_risk",0) or 0),
             "Pendentes":int(obs.get("pending",0) or 0),
             "Abertos":int(obs.get("open",0) or 0),
             "Fechados":int(obs.get("closed",0) or 0),
@@ -87,7 +89,8 @@ def render_forward_test_panel(
     st.caption(
         "Resultados prospectivos do mercado real, separados do Backtest histórico. "
         "Só contam operações que passaram leitura, direção, filtros e gatilho; "
-        "timeframe inferior nunca substitui o timeframe de execução."
+        "timeframe inferior nunca substitui o timeframe de execução. "
+        "Depois de 2 wins no mesmo dia UTC, novas entradas ficam bloqueadas pelo Risk Guardian."
     )
     if not src:
         st.info("Resumo do Paper/Forward ainda não disponível neste carregamento.")
@@ -95,7 +98,13 @@ def render_forward_test_panel(
 
     c1,c2,c3,c4,c5=st.columns(5)
     c1.metric("Candidatos",int(src.get("candidates_total",0) or 0))
-    c2.metric("Bloqueados",int(src.get("blocked_context",0) or 0)+int(src.get("blocked_data",0) or 0)+int(src.get("blocked_timeframe",0) or 0))
+    c2.metric(
+        "Bloqueados",
+        int(src.get("blocked_context",0) or 0)
+        +int(src.get("blocked_data",0) or 0)
+        +int(src.get("blocked_timeframe",0) or 0)
+        +int(src.get("blocked_risk",0) or 0),
+    )
     c3.metric("Abertos",int(src.get("open_positions",0) or 0))
     c4.metric("Fechados",int(src.get("closed_trades",0) or 0))
     c5.metric("Net R",f"{float(src.get('net_r_after_friction',src.get('net_r',0.0)) or 0.0):+.2f}R")

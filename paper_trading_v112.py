@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 
 from decision_integrity_v110 import evaluate_decision_integrity
+from atlasquant_risk_guardian import daily_gain_lock
 
 PAPER_VERSION = "V11.2_PAPER_TRADING"
 PAPER_COLUMNS = [
@@ -598,6 +599,45 @@ def summarize_paper_trades(trades: pd.DataFrame) -> dict[str, Any]:
     }
 
 
+def _daily_closed_wins(trades: pd.DataFrame, now: pd.Timestamp) -> int:
+    """Count only wins whose audited exit timestamp belongs to the UTC paper day."""
+    d = normalize_trades(trades)
+    if d.empty:
+        return 0
+    closed = d[
+        (d["status"].astype(str) == "CLOSED")
+        & (d["result"].astype(str) == "WIN")
+    ].copy()
+    if closed.empty:
+        return 0
+    exits = pd.to_datetime(closed["exit_time"], utc=True, errors="coerce")
+    day = pd.Timestamp(now).tz_convert("UTC").date()
+    return int(sum(pd.notna(ts) and pd.Timestamp(ts).date() == day for ts in exits))
+
+
+def _cancel_wait_entries_for_gain_lock(
+    trades: pd.DataFrame,
+    *,
+    now: pd.Timestamp,
+    reason: str,
+) -> tuple[pd.DataFrame, int]:
+    d = normalize_trades(trades)
+    if d.empty:
+        return d, 0
+    # CSV/Parquet may infer all-empty metadata columns as float64. Risk-lock
+    # cancellation writes text timestamps/notes, so force object dtype first.
+    d = d.astype("object")
+    mask = d["status"].astype(str) == "WAIT_ENTRY"
+    count = int(mask.sum())
+    if not count:
+        return d, 0
+    d.loc[mask, "status"] = "CANCELLED_RISK_LOCK"
+    d.loc[mask, "updated_at"] = now.isoformat()
+    note = "Risk Guardian: " + str(reason or "meta diária de gains atingida")
+    d.loc[mask, "checklist_note"] = note
+    return normalize_trades(d), count
+
+
 def run_paper_cycle(
     inputs: Mapping[str, Any],
     scanner: Mapping[str, Any],
@@ -615,27 +655,85 @@ def run_paper_cycle(
     opened = 0
     closed = 0
     pending_created = 0
+    pending_cancelled_by_gain_lock = 0
     closed_pairs_this_cycle: set[str] = set()
 
-    # Primeiro atualiza operações existentes. Um par que fecha nesta mesma rodada
-    # não pode ser rearmado imediatamente com o mesmo estado persistente.
+    # Fase 1: fecha posições que já estavam abertas ANTES de permitir qualquer
+    # nova entrada pendente. Assim, o segundo gain do dia trava a terceira
+    # operação antes que um WAIT_ENTRY antigo possa virar OPEN no mesmo ciclo.
     if not d.empty:
         rows = []
         for _, row in d.iterrows():
             pair = str(row.get("pair", ""))
             frame = _m15_frame(scanner_by_pair.get(pair, {}))
             before = str(row.get("status", ""))
-            upd = _fill_entry(row, frame, now=now)
-            if before == "WAIT_ENTRY" and str(upd.get("status")) == "OPEN":
-                opened += 1
-            upd_series = pd.Series(upd)
-            before2 = str(upd_series.get("status", ""))
-            upd2 = _close_open(upd_series, frame, now=now)
-            if before2 == "OPEN" and str(upd2.get("status")) == "CLOSED":
-                closed += 1
-                closed_pairs_this_cycle.add(pair)
-            rows.append(upd2)
+            if before == "OPEN":
+                upd = _close_open(row, frame, now=now)
+                if str(upd.get("status")) == "CLOSED":
+                    closed += 1
+                    closed_pairs_this_cycle.add(pair)
+            else:
+                upd = row.to_dict()
+            rows.append(upd)
         d = normalize_trades(pd.DataFrame(rows))
+
+    wins_today = _daily_closed_wins(d, now)
+    daily_gain_locked, daily_gain_reason = daily_gain_lock(wins_today, 2)
+
+    # Fase 2: só depois do fechamento auditado decide se WAIT_ENTRY pode abrir.
+    # Se 2 gains já foram realizados hoje, pendências são canceladas, não abertas.
+    if daily_gain_locked:
+        d, pending_cancelled_by_gain_lock = _cancel_wait_entries_for_gain_lock(
+            d,
+            now=now,
+            reason=daily_gain_reason,
+        )
+    elif not d.empty:
+        rows = []
+        for _, row in d.iterrows():
+            pair = str(row.get("pair", ""))
+            frame = _m15_frame(scanner_by_pair.get(pair, {}))
+            before = str(row.get("status", ""))
+            if before != "WAIT_ENTRY":
+                rows.append(row.to_dict())
+                continue
+            if daily_gain_locked:
+                cancelled = row.to_dict()
+                cancelled["status"] = "CANCELLED_RISK_LOCK"
+                cancelled["updated_at"] = now.isoformat()
+                cancelled["checklist_note"] = "Risk Guardian: " + str(
+                    daily_gain_reason or "meta diária de gains atingida"
+                )
+                pending_cancelled_by_gain_lock += 1
+                rows.append(cancelled)
+                continue
+
+            upd = _fill_entry(row, frame, now=now)
+            if str(upd.get("status")) == "OPEN":
+                opened += 1
+                upd2 = _close_open(pd.Series(upd), frame, now=now)
+                if str(upd2.get("status")) == "CLOSED":
+                    closed += 1
+                    closed_pairs_this_cycle.add(pair)
+                    if str(upd2.get("result")) == "WIN":
+                        exit_ts = _as_utc(upd2.get("exit_time"))
+                        if exit_ts is not None and exit_ts.date() == now.date():
+                            wins_today += 1
+                            daily_gain_locked, daily_gain_reason = daily_gain_lock(
+                                wins_today, 2
+                            )
+                rows.append(upd2)
+            else:
+                rows.append(upd)
+
+        d = normalize_trades(pd.DataFrame(rows))
+        if daily_gain_locked:
+            d, cancelled_now = _cancel_wait_entries_for_gain_lock(
+                d,
+                now=now,
+                reason=daily_gain_reason,
+            )
+            pending_cancelled_by_gain_lock += cancelled_now
 
     active_pairs = _active_pairs(d)
     existing_signals = set(d["signal_id"].astype(str)) if not d.empty else set()
@@ -646,13 +744,24 @@ def run_paper_cycle(
         scanner_pair = scanner_by_pair.get(pair, {})
         map_ctx = map_by_pair.get(pair, {})
         chk = evaluate_pair_checklist(pair, input_row, scanner_pair, map_ctx, now=now)
+        _hard_blocks = list(chk["decision"].get("hard_blocks", []) or [])
+        _passed = bool(chk["all_checks_passed"])
+        _state = str(chk["decision"].get("state", ""))
+        if daily_gain_locked:
+            if daily_gain_reason and daily_gain_reason not in _hard_blocks:
+                _hard_blocks.append(daily_gain_reason)
+            _passed = False
+            _state = "🔒 DAILY GAIN LOCK"
         checklist_states[pair] = {
             "side": chk["side"],
-            "passed": bool(chk["all_checks_passed"]),
-            "state": str(chk["decision"].get("state", "")),
-            "hard_blocks": list(chk["decision"].get("hard_blocks", []) or []),
+            "passed": _passed,
+            "state": _state,
+            "hard_blocks": _hard_blocks,
             "soft_blocks": list(chk["decision"].get("soft_blocks", []) or []),
+            "daily_gain_lock": bool(daily_gain_locked),
         }
+        if daily_gain_locked:
+            continue
         if pair in active_pairs or pair in closed_pairs_this_cycle:
             continue
         frame = _m15_frame(scanner_pair)
@@ -670,8 +779,12 @@ def run_paper_cycle(
         "version": PAPER_VERSION,
         "ran_at": now.isoformat(),
         "pending_created": pending_created,
+        "pending_cancelled_by_gain_lock": pending_cancelled_by_gain_lock,
         "entries_opened": opened,
         "trades_closed": closed,
+        "wins_today": int(wins_today),
+        "daily_gain_lock": bool(daily_gain_locked),
+        "daily_gain_lock_reason": str(daily_gain_reason or ""),
         "closed_pairs_this_cycle": sorted(closed_pairs_this_cycle),
         "checklists": checklist_states,
         **{k: summary[k] for k in (

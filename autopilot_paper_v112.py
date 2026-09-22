@@ -82,6 +82,8 @@ def _paper_cycle() -> tuple[bool, dict, list[str]]:
         "stop_model": "1.0 ATR M15 pré-entrada",
         "target_model": "2R",
         "same_candle_stop_and_target": "LOSS conservador",
+        "daily_gain_lock": "2 wins UTC no dia bloqueiam novas entradas",
+        "daily_gain_lock_max_wins": 2,
         "max_hold": "96 candles M15 / 24h",
         "friction_model": "V11.6 fixed conservative research friction",
         "friction_changes_signal": False,

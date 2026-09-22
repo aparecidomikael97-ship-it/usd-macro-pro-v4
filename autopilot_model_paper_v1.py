@@ -79,6 +79,8 @@ def _model_paper_cycle()->tuple[bool,dict[str,Any],list[str]]:
         "supported_timeframes":supported_timeframes,
         "exact_execution_frame_required":True,
         "lower_timeframe_substitution":False,
+        "daily_gain_lock":"2 wins UTC no dia bloqueiam novas entradas",
+        "daily_gain_lock_max_wins":2,
     }
     summary["safety"]={
         "real_orders":False,
@@ -113,6 +115,7 @@ def _model_paper_cycle()->tuple[bool,dict[str,Any],list[str]]:
         "blocked_context":summary.get("blocked_context",0),
         "blocked_data":summary.get("blocked_data",0),
         "blocked_timeframe":summary.get("blocked_timeframe",0),
+        "blocked_risk":summary.get("blocked_risk",0),
         "pending_entries":summary.get("pending_entries",0),
         "open_positions":summary.get("open_positions",0),
         "closed_trades":summary.get("closed_trades",0),
