@@ -440,7 +440,7 @@ jobs:
           if failures:
               raise SystemExit(" | ".join(failures))
           PY
-          python /tmp/atlasquant_ui_smoke.py
+          PYTHONPATH="$GITHUB_WORKSPACE${PYTHONPATH:+:$PYTHONPATH}" python /tmp/atlasquant_ui_smoke.py
 
       - name: Preserve Streamlit log
         if: always()
