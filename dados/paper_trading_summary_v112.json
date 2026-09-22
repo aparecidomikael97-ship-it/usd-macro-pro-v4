@@ -16,7 +16,7 @@
   "setup_attribution_inferred": false,
   "last_cycle": {
     "version": "V11.2_PAPER_TRADING",
-    "ran_at": "2026-09-22T19:29:19.192244+00:00",
+    "ran_at": "2026-09-22T19:45:58.824249+00:00",
     "pending_created": 0,
     "pending_cancelled_by_gain_lock": 0,
     "entries_opened": 0,
@@ -56,6 +56,19 @@
         ],
         "daily_gain_lock": false
       },
+      "USD/JPY": {
+        "side": "BUY",
+        "passed": false,
+        "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
+        "hard_blocks": [],
+        "soft_blocks": [
+          "Gate ainda não liberou execução",
+          "ICT incompleto (34/100)",
+          "Fluxo institucional incompleto (56/100)",
+          "M15 ainda não confirmou gatilho"
+        ],
+        "daily_gain_lock": false
+      },
       "NZD/USD": {
         "side": "SELL",
         "passed": false,
@@ -68,19 +81,6 @@
           "ADR14 em 86%: espaço reduzido",
           "ICT incompleto (48/100)",
           "Fluxo institucional incompleto (55/100)",
-          "M15 ainda não confirmou gatilho"
-        ],
-        "daily_gain_lock": false
-      },
-      "USD/JPY": {
-        "side": "BUY",
-        "passed": false,
-        "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
-        "hard_blocks": [],
-        "soft_blocks": [
-          "Gate ainda não liberou execução",
-          "ICT incompleto (34/100)",
-          "Fluxo institucional incompleto (56/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -101,22 +101,6 @@
         ],
         "daily_gain_lock": false
       },
-      "GBP/USD": {
-        "side": "WAIT",
-        "passed": false,
-        "state": "⚪ AGUARDAR DIREÇÃO",
-        "hard_blocks": [
-          "ADR14 muito esticado (136%)"
-        ],
-        "soft_blocks": [
-          "Gate ainda não liberou execução",
-          "ADR14 em 136%: evitar perseguir preço",
-          "ICT incompleto (0/100)",
-          "Fluxo institucional incompleto (0/100)",
-          "M15 ainda não confirmou gatilho"
-        ],
-        "daily_gain_lock": false
-      },
       "AUD/USD": {
         "side": "WAIT",
         "passed": false,
@@ -126,6 +110,23 @@
           "ADR14 em 96%: evitar perseguir preço",
           "ICT incompleto (0/100)",
           "Fluxo institucional incompleto (0/100)",
+          "M15 ainda não confirmou gatilho"
+        ],
+        "daily_gain_lock": false
+      },
+      "GBP/USD": {
+        "side": "SELL",
+        "passed": false,
+        "state": "🔴 BLOQUEADO",
+        "hard_blocks": [
+          "Dados técnicos insuficientes (0/100)",
+          "ADR14 muito esticado (136%)"
+        ],
+        "soft_blocks": [
+          "Gate ainda não liberou execução",
+          "ADR14 em 136%: evitar perseguir preço",
+          "ICT incompleto (0/100)",
+          "Fluxo institucional incompleto (44/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
