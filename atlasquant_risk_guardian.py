@@ -19,6 +19,7 @@ class RiskLimits:
     max_trades_per_day: int
     max_consecutive_losses: int
     max_open_exposure: float
+    max_daily_gains: int = 2
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,7 @@ class RiskState:
     trades_today: int = 0
     consecutive_losses: int = 0
     open_exposure: float = 0.0
+    gains_today: int = 0
 
 
 @dataclass(frozen=True)
@@ -59,7 +61,11 @@ def validate_limits(limits: RiskLimits) -> RiskLimits:
         raise ValueError("max_daily_loss não pode exceder bankroll")
     if limits.max_loss_per_trade > limits.max_daily_loss:
         raise ValueError("max_loss_per_trade não pode exceder max_daily_loss")
-    if limits.max_trades_per_day <= 0 or limits.max_consecutive_losses <= 0:
+    if (
+        limits.max_trades_per_day <= 0
+        or limits.max_consecutive_losses <= 0
+        or limits.max_daily_gains <= 0
+    ):
         raise ValueError("limites de contagem devem ser positivos")
     return limits
 
@@ -86,6 +92,8 @@ def evaluate_risk_guard(
         reasons.append("limite de perda diária atingido")
     if state.trades_today >= limits.max_trades_per_day:
         reasons.append("limite de operações do dia atingido")
+    if state.gains_today >= limits.max_daily_gains:
+        reasons.append("meta de gains do dia atingida; preservar capital")
     if state.consecutive_losses >= limits.max_consecutive_losses:
         reasons.append("limite de perdas consecutivas atingido")
     if state.open_exposure > limits.max_open_exposure:
@@ -115,6 +123,7 @@ def limits_are_tighter_or_equal(current: RiskLimits, proposed: RiskLimits) -> bo
         and proposed.max_trades_per_day <= current.max_trades_per_day
         and proposed.max_consecutive_losses <= current.max_consecutive_losses
         and proposed.max_open_exposure <= current.max_open_exposure
+        and proposed.max_daily_gains <= current.max_daily_gains
     )
 
 
