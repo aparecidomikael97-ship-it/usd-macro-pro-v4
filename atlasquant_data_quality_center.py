@@ -61,6 +61,19 @@ def build_data_confidence(
     ready_ratio=(ready/total) if total else 0.0
     process_ok=bool(auto.get("app_headless_ok", False))
     source_blocked=bool(auto.get("twelve_daily_blocked", False))
+    news_nowcast=dict(auto.get("news_nowcast_v1", {}) or {})
+    news_runtime_state=str(news_nowcast.get("runtime_state", "") or "").upper()
+    news_provider_status=dict(news_nowcast.get("provider_status", {}) or {})
+    news_provider_reason=str(
+        news_nowcast.get("provider_retry_reason")
+        or news_provider_status.get("reason")
+        or ""
+    ).upper()
+    news_retry_after=max(0,int(news_nowcast.get("provider_retry_after_min",0) or 0))
+    news_auth_issue=(
+        news_runtime_state in {"AUTH_ERROR","AUTH_COOLDOWN"}
+        or news_provider_reason=="AUTH_ERROR"
+    )
 
     if total == 0 or ready == 0:
         status="RED"; label="DADOS INSUFICIENTES"
@@ -86,6 +99,10 @@ def build_data_confidence(
         "source_blocked": source_blocked,
         "source_block_type": str(auto.get("twelve_block_type", "") or ""),
         "budget": dict(auto.get("twelve_budget", {}) or {}),
+        "news_nowcast_state":news_runtime_state,
+        "news_provider_reason":news_provider_reason,
+        "news_retry_after_min":news_retry_after,
+        "news_auth_issue":bool(news_auth_issue),
     }
 
 
@@ -139,12 +156,36 @@ def render_data_confidence(
     if details:
         st.caption(" · ".join(details))
 
-    p1,p2=st.columns(2)
+    p1,p2,p3=st.columns(3)
     p1.write("**Autopilot:** " + ("🟢 saudável" if s["process_ok"] else "🔴 sem confirmação saudável"))
     if s["source_blocked"]:
         p2.write("**Twelve Data:** 🟠 bloqueio/orçamento registrado")
     else:
         p2.write("**Twelve Data:** 🟢 sem bloqueio registrado")
+
+    news_state=str(s.get("news_nowcast_state") or "")
+    news_reason=str(s.get("news_provider_reason") or "")
+    retry=int(s.get("news_retry_after_min",0) or 0)
+    if s.get("news_auth_issue"):
+        retry_txt=f" · retry ~{retry} min" if retry>0 else ""
+        p3.write("**Nowcast EODHD:** 🔴 credencial não autorizada"+retry_txt)
+    elif news_state in {"RATE_LIMITED","RATE_LIMIT_COOLDOWN"} or news_reason=="RATE_LIMITED":
+        retry_txt=f" · retry ~{retry} min" if retry>0 else ""
+        p3.write("**Nowcast EODHD:** 🟠 limite temporário"+retry_txt)
+    elif news_state in {"CAPTURED","THROTTLED"}:
+        p3.write("**Nowcast EODHD:** 🟢 disponível/cacheado")
+    elif news_state=="NOT_CONFIGURED":
+        p3.write("**Nowcast EODHD:** ⚪ não configurado")
+    elif news_state:
+        p3.write("**Nowcast EODHD:** 🟡 "+news_state)
+    else:
+        p3.write("**Nowcast EODHD:** ⚪ sem status")
+
+    if s.get("news_auth_issue") or news_state in {"RATE_LIMITED","RATE_LIMIT_COOLDOWN","PROVIDER_ERROR","PROVIDER_COOLDOWN"}:
+        st.caption(
+            "Nowcast econômico está fail-closed: erro de provider não cria previsão, "
+            "não altera peso e não libera execução."
+        )
 
     budget=s["budget"]
     if budget and not budget.get("error"):

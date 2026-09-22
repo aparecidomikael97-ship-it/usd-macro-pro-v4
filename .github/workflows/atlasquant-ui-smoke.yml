@@ -10,6 +10,7 @@ on:
       - "atlasquant_dashboard_v1.py"
       - "atlasquant_home_radar.py"
       - "master_panel_v102.py"
+      - "atlasquant_data_quality_center.py"
       - "atlasquant_forward_test_panel.py"
       - "atlasquant_fast_startup.py"
       - "atlasquant_sales_center.py"
@@ -38,6 +39,7 @@ on:
       - "atlasquant_dashboard_v1.py"
       - "atlasquant_home_radar.py"
       - "master_panel_v102.py"
+      - "atlasquant_data_quality_center.py"
       - "atlasquant_forward_test_panel.py"
       - "atlasquant_fast_startup.py"
       - "atlasquant_setup_validation.py"
@@ -193,42 +195,58 @@ jobs:
               return (hi+0.05)/(lo+0.05)
 
           def metric_contrast_report(page):
-              values=page.locator('[data-testid="stMetricValue"]')
-              samples=[]
-              for idx in range(min(values.count(),16)):
-                  node=values.nth(idx)
-                  style=node.evaluate(
-                      """el => {
-                          const value=getComputedStyle(el);
-                          const card=el.closest('[data-testid="stMetric"]');
-                          const box=card ? getComputedStyle(card) : null;
-                          return {
-                              color:value.color,
-                              opacity:parseFloat(value.opacity || "1"),
-                              background:box ? box.backgroundColor : "",
-                              text:(el.innerText || "").trim().slice(0,80),
-                          };
-                      }"""
-                  )
-                  ratio=_contrast_ratio(style.get("color"),style.get("background"))
-                  samples.append({
-                      **style,
-                      "contrast_ratio":None if ratio is None else round(ratio,2),
-                      "readable":bool(
-                          ratio is not None
-                          and ratio>=4.5
-                          and float(style.get("opacity",1))>=0.95
-                      ),
-                  })
+              # Streamlit replaces metric nodes during reruns. Read the whole
+              # metric set atomically instead of evaluating one locator at a
+              # time, and retry transient DOM replacement without hiding a
+              # persistent measurement failure.
+              last_error=""
+              for attempt in range(1,4):
+                  try:
+                      raw=page.locator('[data-testid="stMetricValue"]').evaluate_all(
+                          """nodes => nodes.slice(0,16).map(el => {
+                              const value=getComputedStyle(el);
+                              const card=el.closest('[data-testid="stMetric"]');
+                              const box=card ? getComputedStyle(card) : null;
+                              return {
+                                  color:value.color,
+                                  opacity:parseFloat(value.opacity || "1"),
+                                  background:box ? box.backgroundColor : "",
+                                  text:(el.innerText || "").trim().slice(0,80),
+                              };
+                          })"""
+                      )
+                      samples=[]
+                      for style in list(raw or []):
+                          ratio=_contrast_ratio(style.get("color"),style.get("background"))
+                          samples.append({
+                              **style,
+                              "contrast_ratio":None if ratio is None else round(ratio,2),
+                              "readable":bool(
+                                  ratio is not None
+                                  and ratio>=4.5
+                                  and float(style.get("opacity",1))>=0.95
+                              ),
+                          })
+                      return {
+                          "count":len(samples),
+                          "samples":samples,
+                          "min_ratio":(
+                              min(x["contrast_ratio"] for x in samples if x["contrast_ratio"] is not None)
+                              if any(x["contrast_ratio"] is not None for x in samples)
+                              else None
+                          ),
+                          "all_readable":all(x["readable"] for x in samples) if samples else True,
+                          "measurement_error":"",
+                      }
+                  except Exception as exc:
+                      last_error=f"{type(exc).__name__}: {exc}"
+                      page.wait_for_timeout(350*attempt)
               return {
-                  "count":len(samples),
-                  "samples":samples,
-                  "min_ratio":(
-                      min(x["contrast_ratio"] for x in samples if x["contrast_ratio"] is not None)
-                      if any(x["contrast_ratio"] is not None for x in samples)
-                      else None
-                  ),
-                  "all_readable":all(x["readable"] for x in samples) if samples else True,
+                  "count":0,
+                  "samples":[],
+                  "min_ratio":None,
+                  "all_readable":False,
+                  "measurement_error":last_error or "metric contrast measurement failed",
               }
 
           with sync_playwright() as p:
@@ -363,6 +381,12 @@ jobs:
                                   if new_page_errors:
                                       failures.append(f"desktop: {label} gerou {new_page_errors} pageerror")
                                       break
+                                  if area_metric_contrast.get("measurement_error"):
+                                      failures.append(
+                                          f"desktop: {label} não permitiu medir contraste após retries: "
+                                          f"{area_metric_contrast['measurement_error']}"
+                                      )
+                                      break
                                   if not area_metric_contrast["all_readable"]:
                                       failures.append(
                                           f"desktop: {label} tem número de métrica com contraste < 4.5:1 "
@@ -422,7 +446,12 @@ jobs:
                   bad_contrast=[key for key,value in contrast_checks.items() if not bool(value.get("readable"))]
                   if bad_contrast:
                       failures.append(f"{name}: texto de cartões com contraste insuficiente: {','.join(bad_contrast)}")
-                  if not metric_contrast["all_readable"]:
+                  if metric_contrast.get("measurement_error"):
+                      failures.append(
+                          f"{name}: não foi possível medir contraste após retries: "
+                          f"{metric_contrast['measurement_error']}"
+                      )
+                  elif not metric_contrast["all_readable"]:
                       failures.append(
                           f"{name}: número de métrica com contraste < 4.5:1 "
                           f"(mínimo={metric_contrast['min_ratio']})"
