@@ -1,7 +1,7 @@
 {
   "version": "ATLASQUANT_MODEL_PAPER_V1",
-  "candidates_total": 38,
-  "blocked_context": 32,
+  "candidates_total": 39,
+  "blocked_context": 33,
   "blocked_data": 0,
   "blocked_timeframe": 6,
   "pending_entries": 0,
@@ -129,8 +129,8 @@
       }
     },
     "ote": {
-      "candidates": 2,
-      "blocked_context": 1,
+      "candidates": 3,
+      "blocked_context": 2,
       "blocked_data": 0,
       "blocked_timeframe": 1,
       "pending": 0,
@@ -144,13 +144,17 @@
       "profit_factor_r": null,
       "explicit_source_model_only": true,
       "hard_block_reasons": {
-        "H1 está contra o viés": 2
+        "H1 está contra o viés": 3
       },
       "soft_block_reasons": {
+        "Gate ainda não liberou execução": 2,
         "M15 ainda não confirmou gatilho": 2,
+        "ADR14 em 108%: evitar perseguir preço": 1,
         "Fluxo institucional incompleto (58/100)": 1,
         "Fluxo institucional incompleto (60/100)": 1,
-        "Gate ainda não liberou execução": 1,
+        "Fluxo institucional incompleto (67/100)": 1,
+        "H1 ainda não confirmou gatilho": 1,
+        "ICT incompleto (46/100)": 1,
         "ICT incompleto (58/100)": 1,
         "ICT incompleto (65/100)": 1
       }
@@ -158,8 +162,8 @@
   },
   "by_timeframe": {
     "H1": {
-      "candidates": 16,
-      "blocked_context": 10,
+      "candidates": 17,
+      "blocked_context": 11,
       "blocked_data": 0,
       "blocked_timeframe": 6,
       "pending": 0,
@@ -169,18 +173,20 @@
       "losses": 0,
       "net_r": 0.0,
       "hard_block_reasons": {
-        "H1 está contra o viés": 4,
+        "H1 está contra o viés": 5,
         "Contexto D1 não alinha com execução H1 (NEUTRO vs ALTISTA)": 1,
         "H4 está contra o viés": 1
       },
       "soft_block_reasons": {
+        "Gate ainda não liberou execução": 8,
         "M15 ainda não confirmou gatilho": 8,
-        "Gate ainda não liberou execução": 7,
         "ICT incompleto (60/100)": 7,
         "Fluxo institucional incompleto (57/100)": 2,
         "Fluxo institucional incompleto (58/100)": 2,
         "Fluxo institucional incompleto (60/100)": 2,
+        "H1 ainda não confirmou gatilho": 2,
         "ICT incompleto (54/100)": 2,
+        "ADR14 em 108%: evitar perseguir preço": 1,
         "ADR14 em 90%: espaço reduzido": 1,
         "ADR14 em 98%: evitar perseguir preço": 1,
         "Fluxo institucional incompleto (49/100)": 1,
@@ -189,15 +195,16 @@
         "Fluxo institucional incompleto (61/100)": 1,
         "Fluxo institucional incompleto (63/100)": 1,
         "Fluxo institucional incompleto (64/100)": 1,
+        "Fluxo institucional incompleto (67/100)": 1,
         "Fluxo institucional incompleto (68/100)": 1,
-        "H1 ainda não confirmou gatilho": 1,
+        "ICT incompleto (46/100)": 1,
         "ICT incompleto (58/100)": 1,
         "ICT incompleto (65/100)": 1,
         "ICT incompleto (70/100)": 1
       },
       "timeframe_block_reasons": {
         "EXECUTION_FRAME_NOT_AVAILABLE:H1": 6,
-        "SOURCE_EQUALS_EXECUTION": 4
+        "SOURCE_EQUALS_EXECUTION": 5
       }
     },
     "M15": {
@@ -246,13 +253,13 @@
   },
   "by_session": {},
   "hard_block_reasons": {
-    "H1 está contra o viés": 8,
+    "H1 está contra o viés": 9,
     "H4 está contra o viés": 3,
     "Contexto D1 não alinha com execução H1 (NEUTRO vs ALTISTA)": 1
   },
   "soft_block_reasons": {
     "M15 ainda não confirmou gatilho": 26,
-    "Gate ainda não liberou execução": 19,
+    "Gate ainda não liberou execução": 20,
     "ICT incompleto (58/100)": 9,
     "ICT incompleto (60/100)": 7,
     "ICT incompleto (43/100)": 5,
@@ -269,21 +276,24 @@
     "Fluxo institucional incompleto (57/100)": 2,
     "Fluxo institucional incompleto (58/100)": 2,
     "Fluxo institucional incompleto (68/100)": 2,
+    "H1 ainda não confirmou gatilho": 2,
     "ICT incompleto (54/100)": 2,
     "ICT incompleto (61/100)": 2,
     "ICT incompleto (70/100)": 2,
+    "ADR14 em 108%: evitar perseguir preço": 1,
     "Fluxo institucional incompleto (49/100)": 1,
     "Fluxo institucional incompleto (50/100)": 1,
     "Fluxo institucional incompleto (52/100)": 1,
     "Fluxo institucional incompleto (61/100)": 1,
+    "Fluxo institucional incompleto (67/100)": 1,
     "Fluxo institucional incompleto (70/100)": 1,
-    "H1 ainda não confirmou gatilho": 1,
+    "ICT incompleto (46/100)": 1,
     "ICT incompleto (49/100)": 1,
     "ICT incompleto (51/100)": 1,
     "ICT incompleto (65/100)": 1
   },
   "timeframe_block_reasons": {
-    "SOURCE_EQUALS_EXECUTION": 19,
+    "SOURCE_EQUALS_EXECUTION": 20,
     "EXECUTION_FRAME_NOT_AVAILABLE:H1": 6
   },
   "setup_inference_used": false,
@@ -292,14 +302,14 @@
   "real_orders_enabled": false,
   "last_cycle": {
     "version": "ATLASQUANT_MODEL_PAPER_V1",
-    "ran_at": "2026-09-22T03:22:03.354288+00:00",
-    "new_candidates_observed": 0,
+    "ran_at": "2026-09-22T03:49:37.002580+00:00",
+    "new_candidates_observed": 1,
     "new_qualified": 0,
-    "new_blocked": 0,
+    "new_blocked": 1,
     "entries_opened": 0,
     "trades_closed": 0,
-    "candidates_total": 38,
-    "blocked_context": 32,
+    "candidates_total": 39,
+    "blocked_context": 33,
     "blocked_data": 0,
     "blocked_timeframe": 6,
     "pending_entries": 0,
@@ -427,8 +437,8 @@
         }
       },
       "ote": {
-        "candidates": 2,
-        "blocked_context": 1,
+        "candidates": 3,
+        "blocked_context": 2,
         "blocked_data": 0,
         "blocked_timeframe": 1,
         "pending": 0,
@@ -442,13 +452,17 @@
         "profit_factor_r": null,
         "explicit_source_model_only": true,
         "hard_block_reasons": {
-          "H1 está contra o viés": 2
+          "H1 está contra o viés": 3
         },
         "soft_block_reasons": {
+          "Gate ainda não liberou execução": 2,
           "M15 ainda não confirmou gatilho": 2,
+          "ADR14 em 108%: evitar perseguir preço": 1,
           "Fluxo institucional incompleto (58/100)": 1,
           "Fluxo institucional incompleto (60/100)": 1,
-          "Gate ainda não liberou execução": 1,
+          "Fluxo institucional incompleto (67/100)": 1,
+          "H1 ainda não confirmou gatilho": 1,
+          "ICT incompleto (46/100)": 1,
           "ICT incompleto (58/100)": 1,
           "ICT incompleto (65/100)": 1
         }
@@ -456,8 +470,8 @@
     },
     "by_timeframe": {
       "H1": {
-        "candidates": 16,
-        "blocked_context": 10,
+        "candidates": 17,
+        "blocked_context": 11,
         "blocked_data": 0,
         "blocked_timeframe": 6,
         "pending": 0,
@@ -467,18 +481,20 @@
         "losses": 0,
         "net_r": 0.0,
         "hard_block_reasons": {
-          "H1 está contra o viés": 4,
+          "H1 está contra o viés": 5,
           "Contexto D1 não alinha com execução H1 (NEUTRO vs ALTISTA)": 1,
           "H4 está contra o viés": 1
         },
         "soft_block_reasons": {
+          "Gate ainda não liberou execução": 8,
           "M15 ainda não confirmou gatilho": 8,
-          "Gate ainda não liberou execução": 7,
           "ICT incompleto (60/100)": 7,
           "Fluxo institucional incompleto (57/100)": 2,
           "Fluxo institucional incompleto (58/100)": 2,
           "Fluxo institucional incompleto (60/100)": 2,
+          "H1 ainda não confirmou gatilho": 2,
           "ICT incompleto (54/100)": 2,
+          "ADR14 em 108%: evitar perseguir preço": 1,
           "ADR14 em 90%: espaço reduzido": 1,
           "ADR14 em 98%: evitar perseguir preço": 1,
           "Fluxo institucional incompleto (49/100)": 1,
@@ -487,15 +503,16 @@
           "Fluxo institucional incompleto (61/100)": 1,
           "Fluxo institucional incompleto (63/100)": 1,
           "Fluxo institucional incompleto (64/100)": 1,
+          "Fluxo institucional incompleto (67/100)": 1,
           "Fluxo institucional incompleto (68/100)": 1,
-          "H1 ainda não confirmou gatilho": 1,
+          "ICT incompleto (46/100)": 1,
           "ICT incompleto (58/100)": 1,
           "ICT incompleto (65/100)": 1,
           "ICT incompleto (70/100)": 1
         },
         "timeframe_block_reasons": {
           "EXECUTION_FRAME_NOT_AVAILABLE:H1": 6,
-          "SOURCE_EQUALS_EXECUTION": 4
+          "SOURCE_EQUALS_EXECUTION": 5
         }
       },
       "M15": {
@@ -544,13 +561,13 @@
     },
     "by_session": {},
     "hard_block_reasons": {
-      "H1 está contra o viés": 8,
+      "H1 está contra o viés": 9,
       "H4 está contra o viés": 3,
       "Contexto D1 não alinha com execução H1 (NEUTRO vs ALTISTA)": 1
     },
     "soft_block_reasons": {
       "M15 ainda não confirmou gatilho": 26,
-      "Gate ainda não liberou execução": 19,
+      "Gate ainda não liberou execução": 20,
       "ICT incompleto (58/100)": 9,
       "ICT incompleto (60/100)": 7,
       "ICT incompleto (43/100)": 5,
@@ -567,21 +584,24 @@
       "Fluxo institucional incompleto (57/100)": 2,
       "Fluxo institucional incompleto (58/100)": 2,
       "Fluxo institucional incompleto (68/100)": 2,
+      "H1 ainda não confirmou gatilho": 2,
       "ICT incompleto (54/100)": 2,
       "ICT incompleto (61/100)": 2,
       "ICT incompleto (70/100)": 2,
+      "ADR14 em 108%: evitar perseguir preço": 1,
       "Fluxo institucional incompleto (49/100)": 1,
       "Fluxo institucional incompleto (50/100)": 1,
       "Fluxo institucional incompleto (52/100)": 1,
       "Fluxo institucional incompleto (61/100)": 1,
+      "Fluxo institucional incompleto (67/100)": 1,
       "Fluxo institucional incompleto (70/100)": 1,
-      "H1 ainda não confirmou gatilho": 1,
+      "ICT incompleto (46/100)": 1,
       "ICT incompleto (49/100)": 1,
       "ICT incompleto (51/100)": 1,
       "ICT incompleto (65/100)": 1
     },
     "timeframe_block_reasons": {
-      "SOURCE_EQUALS_EXECUTION": 19,
+      "SOURCE_EQUALS_EXECUTION": 20,
       "EXECUTION_FRAME_NOT_AVAILABLE:H1": 6
     },
     "setup_inference_used": false,
