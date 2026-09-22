@@ -79,8 +79,17 @@ def daily_gain_lock(gains_today: int, max_daily_gains: int = 2) -> tuple[bool, s
     if isinstance(gains_today, bool) or isinstance(max_daily_gains, bool):
         raise ValueError("contagens de gains devem ser inteiras")
     try:
-        gains = int(gains_today)
-        limit = int(max_daily_gains)
+        gains_raw=float(gains_today)
+        limit_raw=float(max_daily_gains)
+        if (
+            not isfinite(gains_raw)
+            or not isfinite(limit_raw)
+            or not gains_raw.is_integer()
+            or not limit_raw.is_integer()
+        ):
+            raise ValueError
+        gains=int(gains_raw)
+        limit=int(limit_raw)
     except Exception as exc:
         raise ValueError("contagens de gains devem ser inteiras") from exc
     if gains < 0 or limit <= 0:
