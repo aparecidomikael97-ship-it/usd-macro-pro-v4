@@ -16,10 +16,14 @@
   "setup_attribution_inferred": false,
   "last_cycle": {
     "version": "V11.2_PAPER_TRADING",
-    "ran_at": "2026-09-22T18:50:06.772928+00:00",
+    "ran_at": "2026-09-22T19:14:41.982237+00:00",
     "pending_created": 0,
+    "pending_cancelled_by_gain_lock": 0,
     "entries_opened": 0,
     "trades_closed": 0,
+    "wins_today": 0,
+    "daily_gain_lock": false,
+    "daily_gain_lock_reason": "",
     "closed_pairs_this_cycle": [],
     "checklists": {
       "USD/CHF": {
@@ -34,7 +38,8 @@
           "ICT incompleto (33/100)",
           "Fluxo institucional incompleto (58/100)",
           "M15 ainda não confirmou gatilho"
-        ]
+        ],
+        "daily_gain_lock": false
       },
       "USD/CAD": {
         "side": "BUY",
@@ -48,7 +53,8 @@
           "ICT incompleto (33/100)",
           "Fluxo institucional incompleto (52/100)",
           "M15 ainda não confirmou gatilho"
-        ]
+        ],
+        "daily_gain_lock": false
       },
       "USD/JPY": {
         "side": "BUY",
@@ -60,7 +66,8 @@
           "ICT incompleto (31/100)",
           "Fluxo institucional incompleto (56/100)",
           "M15 ainda não confirmou gatilho"
-        ]
+        ],
+        "daily_gain_lock": false
       },
       "NZD/USD": {
         "side": "SELL",
@@ -75,7 +82,8 @@
           "ICT incompleto (48/100)",
           "Fluxo institucional incompleto (55/100)",
           "M15 ainda não confirmou gatilho"
-        ]
+        ],
+        "daily_gain_lock": false
       },
       "EUR/USD": {
         "side": "SELL",
@@ -90,7 +98,8 @@
           "ICT incompleto (40/100)",
           "Fluxo institucional incompleto (47/100)",
           "M15 ainda não confirmou gatilho"
-        ]
+        ],
+        "daily_gain_lock": false
       },
       "AUD/USD": {
         "side": "WAIT",
@@ -102,7 +111,8 @@
           "ICT incompleto (0/100)",
           "Fluxo institucional incompleto (0/100)",
           "M15 ainda não confirmou gatilho"
-        ]
+        ],
+        "daily_gain_lock": false
       },
       "GBP/USD": {
         "side": "SELL",
@@ -117,7 +127,8 @@
           "ICT incompleto (40/100)",
           "Fluxo institucional incompleto (42/100)",
           "M15 ainda não confirmou gatilho"
-        ]
+        ],
+        "daily_gain_lock": false
       }
     },
     "trades_total": 0,
@@ -165,6 +176,8 @@
     "stop_model": "1.0 ATR M15 pré-entrada",
     "target_model": "2R",
     "same_candle_stop_and_target": "LOSS conservador",
+    "daily_gain_lock": "2 wins UTC no dia bloqueiam novas entradas",
+    "daily_gain_lock_max_wins": 2,
     "max_hold": "96 candles M15 / 24h",
     "friction_model": "V11.6 fixed conservative research friction",
     "friction_changes_signal": false,
