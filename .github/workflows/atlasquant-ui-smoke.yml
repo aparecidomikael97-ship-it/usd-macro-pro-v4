@@ -164,6 +164,67 @@ jobs:
                   page.wait_for_timeout(500*attempt)
               return False
 
+          def _rgb(value):
+              import re
+              match=re.search(r"rgba?\((\d+),\s*(\d+),\s*(\d+)",str(value or ""))
+              return tuple(int(x) for x in match.groups()) if match else None
+
+          def _relative_luminance(rgb):
+              if rgb is None:
+                  return None
+              values=[]
+              for channel in rgb:
+                  c=channel/255.0
+                  values.append(c/12.92 if c<=0.04045 else ((c+0.055)/1.055)**2.4)
+              return 0.2126*values[0]+0.7152*values[1]+0.0722*values[2]
+
+          def _contrast_ratio(fg,bg):
+              lf=_relative_luminance(_rgb(fg))
+              lb=_relative_luminance(_rgb(bg))
+              if lf is None or lb is None:
+                  return None
+              hi=max(lf,lb); lo=min(lf,lb)
+              return (hi+0.05)/(lo+0.05)
+
+          def metric_contrast_report(page):
+              values=page.locator('[data-testid="stMetricValue"]')
+              samples=[]
+              for idx in range(min(values.count(),16)):
+                  node=values.nth(idx)
+                  style=node.evaluate(
+                      """el => {
+                          const value=getComputedStyle(el);
+                          const card=el.closest('[data-testid="stMetric"]');
+                          const box=card ? getComputedStyle(card) : null;
+                          return {
+                              color:value.color,
+                              opacity:parseFloat(value.opacity || "1"),
+                              background:box ? box.backgroundColor : "",
+                              text:(el.innerText || "").trim().slice(0,80),
+                          };
+                      }"""
+                  )
+                  ratio=_contrast_ratio(style.get("color"),style.get("background"))
+                  samples.append({
+                      **style,
+                      "contrast_ratio":None if ratio is None else round(ratio,2),
+                      "readable":bool(
+                          ratio is not None
+                          and ratio>=4.5
+                          and float(style.get("opacity",1))>=0.95
+                      ),
+                  })
+              return {
+                  "count":len(samples),
+                  "samples":samples,
+                  "min_ratio":(
+                      min(x["contrast_ratio"] for x in samples if x["contrast_ratio"] is not None)
+                      if any(x["contrast_ratio"] is not None for x in samples)
+                      else None
+                  ),
+                  "all_readable":all(x["readable"] for x in samples) if samples else True,
+              }
+
           with sync_playwright() as p:
               browser=p.chromium.launch(headless=True)
               for name,cfg in profiles.items():
@@ -238,6 +299,8 @@ jobs:
                           "readable":readable,
                       }
 
+                  metric_contrast=metric_contrast_report(page)
+
                   desktop_workspace_trace=[]
                   if name=="desktop" and rendered:
                       try:
@@ -267,11 +330,15 @@ jobs:
                                   page.wait_for_timeout(350)
                                   exception_now=page.locator('[data-testid="stException"]').count()
                                   new_page_errors=max(0,len(page_errors)-before_errors)
+                                  area_metric_contrast=metric_contrast_report(page)
                                   desktop_workspace_trace.append({
                                       "area":label,
                                       "selected":selected,
                                       "streamlit_exceptions":exception_now,
                                       "new_page_errors":new_page_errors,
+                                      "metric_count":area_metric_contrast["count"],
+                                      "metric_min_contrast":area_metric_contrast["min_ratio"],
+                                      "metric_contrast_ok":area_metric_contrast["all_readable"],
                                   })
                                   if not selected:
                                       failures.append(f"desktop: área não selecionada: {label}")
@@ -281,6 +348,12 @@ jobs:
                                       break
                                   if new_page_errors:
                                       failures.append(f"desktop: {label} gerou {new_page_errors} pageerror")
+                                      break
+                                  if not area_metric_contrast["all_readable"]:
+                                      failures.append(
+                                          f"desktop: {label} tem número de métrica com contraste < 4.5:1 "
+                                          f"(mínimo={area_metric_contrast['min_ratio']})"
+                                      )
                                       break
                               select_area(page,"🎯 Radar")
                       except Exception as exc:
@@ -304,6 +377,7 @@ jobs:
                       "radar_wait":radar_wait,
                       "stable_nav_count":stable_nav_count,
                       "contrast_checks":contrast_checks,
+                      "metric_contrast":metric_contrast,
                       "desktop_workspace_trace":desktop_workspace_trace,
                       "streamlit_exceptions":exception_count,
                       "viewport_width":viewport_width,
@@ -327,6 +401,11 @@ jobs:
                   bad_contrast=[key for key,value in contrast_checks.items() if not bool(value.get("readable"))]
                   if bad_contrast:
                       failures.append(f"{name}: texto de cartões com contraste insuficiente: {','.join(bad_contrast)}")
+                  if not metric_contrast["all_readable"]:
+                      failures.append(
+                          f"{name}: número de métrica com contraste < 4.5:1 "
+                          f"(mínimo={metric_contrast['min_ratio']})"
+                      )
                   if exception_count:
                       failures.append(f"{name}: {exception_count} stException")
                   if page_errors:

@@ -196,14 +196,37 @@ html { scroll-behavior: smooth; }
 }
 .aq-context-strip span{display:block;color:#f2f6fb;font-size:.66rem;font-weight:850;letter-spacing:.07em;text-shadow:0 1px 0 rgba(0,0,0,.22)}
 .aq-context-strip strong{display:block;color:#ffffff;font-size:.82rem;font-weight:800;margin-top:3px;overflow-wrap:anywhere;text-shadow:0 1px 0 rgba(0,0,0,.22)}
-[data-testid="stMetric"] {
-  background: linear-gradient(180deg, rgba(17,34,57,.80), rgba(11,25,43,.72));
-  border: 1px solid var(--aq-line) !important;
+.stApp [data-testid="stMetric"] {
+  background-color: #10233a !important;
+  background-image: linear-gradient(180deg, rgba(17,34,57,.96), rgba(11,25,43,.96)) !important;
+  border: 1px solid rgba(163,190,222,.28) !important;
   border-radius: 13px !important;
+  color-scheme: dark;
 }
-[data-testid="stMetric"] > div { padding: .15rem .2rem; }
-[data-testid="stMetricValue"], [data-testid="stMetricValue"] * { letter-spacing: -.035em; color: #f4f8ff !important; font-weight: 850 !important; opacity: 1 !important; text-shadow: 0 1px 0 rgba(0,0,0,.18); }
-[data-testid="stMetricLabel"], [data-testid="stMetricLabel"] * { color: #f2f6fb !important; font-size: .82rem; font-weight: 800 !important; opacity: 1 !important; text-shadow: 0 1px 0 rgba(0,0,0,.18); }
+.stApp [data-testid="stMetric"] > div { padding: .15rem .2rem; }
+.stApp [data-testid="stMetricValue"],
+.stApp [data-testid="stMetricValue"] * {
+  letter-spacing: -.035em;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  font-weight: 900 !important;
+  opacity: 1 !important;
+  text-shadow: 0 1px 1px rgba(0,0,0,.30);
+}
+.stApp [data-testid="stMetricLabel"],
+.stApp [data-testid="stMetricLabel"] * {
+  color: #f2f6fb !important;
+  -webkit-text-fill-color: #f2f6fb !important;
+  font-size: .82rem;
+  font-weight: 800 !important;
+  opacity: 1 !important;
+  text-shadow: 0 1px 1px rgba(0,0,0,.28);
+}
+.stApp [data-testid="stMetricDelta"],
+.stApp [data-testid="stMetricDelta"] * {
+  opacity: 1 !important;
+  font-weight: 800 !important;
+}
 [data-testid="stButton"] button {
   border-radius: 10px; min-height: 2.45rem; font-weight: 700;
   border: 1px solid var(--aq-line);
