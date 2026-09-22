@@ -259,11 +259,19 @@ class AtlasQuantUiTests(unittest.TestCase):
 
     def test_metric_and_card_contrast_is_explicit_on_dark_surfaces(self):
         self.assertIn('[data-testid="stMetricValue"]',ATLASQUANT_CSS)
-        self.assertIn("color: #f4f8ff !important",ATLASQUANT_CSS)
+        self.assertIn("color: #ffffff !important",ATLASQUANT_CSS)
         self.assertIn("color: #f2f6fb !important",ATLASQUANT_CSS)
         self.assertIn("--aq-muted-strong: #f2f6fb",ATLASQUANT_CSS)
         self.assertNotIn('stMetricValue"] * { letter-spacing: -.035em; color: var(--text-color, #111827)',ATLASQUANT_CSS)
         self.assertIn("-webkit-text-fill-color",ATLASQUANT_CSS)
+
+    def test_native_metric_cards_force_opaque_dark_background_and_white_values(self):
+        self.assertIn('background-color: #10233a !important',ATLASQUANT_CSS)
+        self.assertIn('background-image: linear-gradient',ATLASQUANT_CSS)
+        self.assertIn('-webkit-text-fill-color: #ffffff !important',ATLASQUANT_CSS)
+        self.assertIn('font-weight: 900 !important',ATLASQUANT_CSS)
+        self.assertIn('color-scheme: dark',ATLASQUANT_CSS)
+        self.assertIn('.stApp [data-testid="stMetric"]',ATLASQUANT_CSS)
 
     def test_secondary_card_text_was_not_left_on_low_contrast_palette(self):
         self.assertIn(".aq-context-strip span{display:block;color:#f2f6fb",ATLASQUANT_CSS)
@@ -309,6 +317,16 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("opacity",workflow)
         self.assertIn("texto de cartões com contraste insuficiente",workflow)
 
+
+    def test_ui_smoke_measures_metric_contrast_ratio_not_only_color_name(self):
+        from pathlib import Path
+        workflow=Path(".github/workflows/atlasquant-ui-smoke.yml").read_text(encoding="utf-8")
+        self.assertIn("metric_contrast_report",workflow)
+        self.assertIn("_contrast_ratio",workflow)
+        self.assertIn("ratio>=4.5",workflow)
+        self.assertIn("metric_min_contrast",workflow)
+        self.assertIn("metric_contrast_ok",workflow)
+        self.assertIn("número de métrica com contraste < 4.5:1",workflow)
 
     def test_desktop_ui_smoke_sweeps_every_primary_workspace(self):
         from pathlib import Path
