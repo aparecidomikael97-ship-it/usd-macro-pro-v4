@@ -93,6 +93,8 @@ def _model_paper_cycle()->tuple[bool,dict[str,Any],list[str]]:
         "supported_execution_timeframes":supported_timeframes,
         "exact_execution_frame_required":True,
         "lower_timeframe_substitution":False,
+        "daily_gain_lock":"2 wins UTC no dia bloqueiam novas entradas",
+        "daily_gain_lock_max_wins":2,
     }
 
     ok2,err2=base.gh_put_json(
