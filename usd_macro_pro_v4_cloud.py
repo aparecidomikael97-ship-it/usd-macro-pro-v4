@@ -121,6 +121,19 @@ except Exception as _backtest_exc:
     _ATLASQUANT_BACKTEST_IMPORT_ERROR = f"{type(_backtest_exc).__name__}: {_backtest_exc}"
 
 try:
+    from atlasquant_history_backtest_guidance import (
+        render_backtest_intro,
+        render_history_workspace,
+    )
+    _ATLASQUANT_HISTORY_GUIDANCE_IMPORT_ERROR = ""
+except Exception as _history_guidance_exc:
+    render_backtest_intro = None
+    render_history_workspace = None
+    _ATLASQUANT_HISTORY_GUIDANCE_IMPORT_ERROR = (
+        f"{type(_history_guidance_exc).__name__}: {_history_guidance_exc}"
+    )
+
+try:
     from atlasquant_forward_test_panel import render_forward_test_panel
     _ATLASQUANT_FORWARD_TEST_IMPORT_ERROR = ""
 except Exception as _forward_test_exc:
@@ -6844,22 +6857,39 @@ if _aq_active_index == 5:
     )
 
 # =========================================================
-# ABA 5 — HISTÓRICO
+# ABA 5 — HISTÓRICO DE FORÇA E DIREÇÃO
 # =========================================================
 if _aq_active_index == 6:
-    st.subheader("Histórico das classificações")
-    st.caption("No Streamlit Community Cloud, arquivos locais podem desaparecer após reinicialização ou novo deploy. Para histórico permanente, use um banco externo.")
     historico = carregar_snapshots()
-    if historico.empty:
-        st.info("Ainda não há histórico. Salve um registro na aba 🏆 Classificação.")
+    if render_history_workspace is not None:
+        render_history_workspace(historico)
     else:
-        st.dataframe(historico.sort_values("data", ascending=False), width="stretch")
+        st.subheader("🗂️ Histórico de Força e Direção")
+        st.info(
+            "Esta aba acompanha como a força das moedas mudou com o tempo. "
+            "Ela não é Backtest."
+        )
+        if historico.empty:
+            st.warning("Ainda não há histórico suficiente para comparação.")
+        else:
+            st.dataframe(historico.sort_values("data", ascending=False), width="stretch")
+        if _ATLASQUANT_HISTORY_GUIDANCE_IMPORT_ERROR:
+            st.caption(_ATLASQUANT_HISTORY_GUIDANCE_IMPORT_ERROR)
 
 # =========================================================
 # ABA 6 — TESTE HISTÓRICO
 # =========================================================
 if _aq_active_index == 7:
-    st.subheader("📈 Teste Histórico — Validação do Modelo")
+    if render_backtest_intro is not None:
+        render_backtest_intro()
+    else:
+        st.subheader("🧪 Backtest — Validação Histórica do Operacional")
+        st.info(
+            "Backtest simula regras passadas para medir evidência histórica. "
+            "Não prevê o futuro e não promove estratégia automaticamente."
+        )
+        if _ATLASQUANT_HISTORY_GUIDANCE_IMPORT_ERROR:
+            st.caption(_ATLASQUANT_HISTORY_GUIDANCE_IMPORT_ERROR)
 
     if render_forward_test_panel is not None:
         _forward_summary,_forward_source=_github_get_json_v937(
