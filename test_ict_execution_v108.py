@@ -66,7 +66,8 @@ class ICTExecutionV108Tests(unittest.TestCase):
         )
         self.assertEqual(pack["candidate_count"],0)
         self.assertEqual(candidate_rows(pack),[])
-        self.assertEqual(len(pack["models"]),4)
+        self.assertEqual(len(pack["models"]),5)
+        self.assertIn("bos-choch-ob",{row["setup_id"] for row in pack["models"]})
 
     def test_episode_id_stays_stable_when_only_capture_time_or_price_changes(self):
         a=build_setup_candidates(
