@@ -10,11 +10,11 @@ def system_health(components:Mapping[str,Any]|None,*,now:datetime|None=None)->di
  for name in required:
   row=dict(src.get(name,{}) or {}); state=str(row.get("state","UNKNOWN")).upper()
   if state=="UNKNOWN": state="HALTED" if name in CRITICAL else "PROTECTED"; reasons.append(f"{name.upper()}_UNKNOWN")
-  if row.get("healthy") is False: state="HALTED" if name in CRITICAL else "PROTECTED"; reasons.append(f"{name.upper()}_UNHEALTHY")
+  if row.get("healthy") is not True: state="HALTED" if name in CRITICAL else "PROTECTED"; reasons.append(f"{name.upper()}_UNHEALTHY")
   sev=SEVERITY.get(state,2); level=max(level,sev); detail[name]={"state":state,"healthy":row.get("healthy"),"reason":row.get("reason"),"last_ok":row.get("last_ok")}
   if sev>=2 and f"{name.upper()}_UNHEALTHY" not in reasons: reasons.append(f"{name.upper()}_{state}")
  state=("NORMAL","CAUTION","PROTECTED","HALTED")[level]
  return {"state":state,"new_entries_allowed":state=="NORMAL","paper_new_entries_allowed":state=="NORMAL",
          "management_allowed":True,"management_mode":"SAFE_ONLY" if state!="NORMAL" else "NORMAL",
-         "reasons":reasons,"components":detail,"checked_at":(now or datetime.now(timezone.utc)).isoformat(),
+         "reasons":reasons,"components":detail,"checked_at":((now or datetime.now(timezone.utc)).replace(tzinfo=timezone.utc) if (now or datetime.now(timezone.utc)).tzinfo is None else (now or datetime.now(timezone.utc)).astimezone(timezone.utc)).isoformat(),
          "real_orders_enabled":False,"production_promotion_allowed":False}
