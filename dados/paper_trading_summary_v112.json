@@ -16,7 +16,7 @@
   "setup_attribution_inferred": false,
   "last_cycle": {
     "version": "V11.2_PAPER_TRADING",
-    "ran_at": "2026-09-23T12:26:52.259389+00:00",
+    "ran_at": "2026-09-23T12:53:03.550936+00:00",
     "pending_created": 0,
     "pending_cancelled_by_gain_lock": 0,
     "entries_opened": 0,
@@ -29,23 +29,23 @@
       "USD/CHF": {
         "side": "BUY",
         "passed": false,
-        "state": "⚪ EM OBSERVAÇÃO",
+        "state": "🟠 SETUP EM FORMAÇÃO",
         "hard_blocks": [],
         "soft_blocks": [
-          "ICT incompleto (33/100)",
-          "Fluxo institucional incompleto (58/100)",
-          "M15 ainda não confirmou gatilho"
+          "ICT incompleto (40/100)",
+          "Fluxo institucional incompleto (65/100)"
         ],
         "daily_gain_lock": false
       },
       "USD/CAD": {
         "side": "BUY",
         "passed": false,
-        "state": "🟠 SETUP EM FORMAÇÃO",
+        "state": "⚪ EM OBSERVAÇÃO",
         "hard_blocks": [],
         "soft_blocks": [
-          "ICT incompleto (70/100)",
-          "Fluxo institucional incompleto (66/100)"
+          "ICT incompleto (33/100)",
+          "Fluxo institucional incompleto (64/100)",
+          "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
       },
@@ -57,7 +57,8 @@
         "soft_blocks": [
           "Gate ainda não liberou execução",
           "ICT incompleto (40/100)",
-          "Fluxo institucional incompleto (62/100)"
+          "Fluxo institucional incompleto (62/100)",
+          "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
       },
@@ -76,12 +77,11 @@
       "EUR/USD": {
         "side": "SELL",
         "passed": false,
-        "state": "⚪ EM OBSERVAÇÃO",
+        "state": "🟠 SETUP EM FORMAÇÃO",
         "hard_blocks": [],
         "soft_blocks": [
           "Gate ainda não liberou execução",
-          "ICT incompleto (40/100)",
-          "Fluxo institucional incompleto (68/100)"
+          "ICT incompleto (40/100)"
         ],
         "daily_gain_lock": false
       },
@@ -90,10 +90,10 @@
         "passed": false,
         "state": "⚪ AGUARDAR DIREÇÃO",
         "hard_blocks": [
-          "ADR14 muito esticado (126%)"
+          "ADR14 muito esticado (135%)"
         ],
         "soft_blocks": [
-          "ADR14 em 126%: evitar perseguir preço",
+          "ADR14 em 135%: evitar perseguir preço",
           "ICT incompleto (0/100)",
           "Fluxo institucional incompleto (0/100)",
           "M15 ainda não confirmou gatilho"
@@ -103,11 +103,13 @@
       "GBP/USD": {
         "side": "SELL",
         "passed": false,
-        "state": "⚪ EM OBSERVAÇÃO",
-        "hard_blocks": [],
+        "state": "🔴 BLOQUEADO",
+        "hard_blocks": [
+          "ADR14 muito esticado (116%)"
+        ],
         "soft_blocks": [
           "Gate ainda não liberou execução",
-          "ADR14 em 95%: evitar perseguir preço",
+          "ADR14 em 116%: evitar perseguir preço",
           "ICT incompleto (40/100)",
           "Fluxo institucional incompleto (63/100)"
         ],
