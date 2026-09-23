@@ -4230,6 +4230,7 @@ if render_admin_voice_assistant is not None and str((_ATLASQUANT_ACCESS or {}).g
             connections=st.session_state.get("atlasquant_aion_connections",{}),
             general_ai_adapter=_aq_general_ai_adapter,
             web_research_adapter=_aq_web_research_adapter,
+            runtime_status=_aq_aion_runtime.get("status",{}),
         )
     except Exception as _aq_admin_voice_render_exc:
         st.caption(
