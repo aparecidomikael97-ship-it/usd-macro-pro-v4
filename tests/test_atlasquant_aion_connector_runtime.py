@@ -42,8 +42,9 @@ def test_write_action_requires_exact_approval():
  with pytest.raises(PermissionError):
   adapter(provider="spotify",action_class="WRITE",payload={"question":"toque x"})
 
- pending=build_pending_action(provider="spotify",action_class="WRITE",payload={"question":"toque x"},now=NOW)
- approved=approve_pending_action(pending,approved_by="Mikael",now=NOW+timedelta(seconds=1))
+ now=datetime.now(timezone.utc)
+ pending=build_pending_action(provider="spotify",action_class="WRITE",payload={"question":"toque x"},now=now)
+ approved=approve_pending_action(pending,approved_by="Mikael",now=now)
  out=adapter(provider="spotify",action_class="WRITE",payload={"question":"toque x"},approved_action=approved)
  assert out["ok"] and out["action_class"]=="WRITE"
 
@@ -52,8 +53,9 @@ def test_changed_payload_is_rejected_after_approval():
   env={"AION_CONNECTOR_GATEWAY_URL":"https://aion.example.com/connectors"},
   request_post=lambda *a,**k:Resp(200,{"ok":True}),
  )
- pending=build_pending_action(provider="youtube",action_class="PUBLISH",payload={"title":"A"},now=NOW)
- approved=approve_pending_action(pending,approved_by="Mikael",now=NOW+timedelta(seconds=1))
+ now=datetime.now(timezone.utc)
+ pending=build_pending_action(provider="youtube",action_class="PUBLISH",payload={"title":"A"},now=now)
+ approved=approve_pending_action(pending,approved_by="Mikael",now=now)
  with pytest.raises(PermissionError):
   adapter(provider="youtube",action_class="PUBLISH",payload={"title":"B"},approved_action=approved)
 
