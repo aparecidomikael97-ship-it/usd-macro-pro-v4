@@ -9,13 +9,13 @@ def admin(state="NORMAL",entries=True):
 
 def test_voice_profile_is_original_ptbr_and_never_authorizes_orders():
  p=admin_voice_profile()
- assert p["language"]=="pt-BR" and p["voice_identity"]=="ORIGINAL_ATLASQUANT"
+ assert p["assistant_name"]=="AION" and p["language"]=="pt-BR" and p["voice_identity"]=="ORIGINAL_AION_ATLAS_CODE"
  assert p["imitates_public_figure_or_character"] is False
  assert p["voice_can_authorize_orders"] is False and p["real_orders_enabled"] is False
 
 def test_opening_briefing_greets_by_daypart_and_is_ptbr():
  r=build_admin_voice_briefing(admin(),user_name="Mikael",now=datetime(2026,9,23,8,tzinfo=timezone.utc))
- assert r["spoken_text"].startswith("Bom dia, Mikael.")
+ assert r["spoken_text"].startswith("Bom dia, Mikael. Aqui é o AION.")
  assert r["language"]=="pt-BR" and r["auto_play_on_admin_open"] is True
 
 def test_protected_system_is_spoken_as_blocked_not_released():
@@ -42,5 +42,5 @@ def test_high_score_never_turns_voice_into_order_authorization():
 def test_timezone_controls_daypart_instead_of_server_utc():
  r=build_admin_voice_briefing(admin(),user_name="Mikael",
  now=datetime(2026,9,23,15,tzinfo=timezone.utc),timezone_name="America/Cuiaba")
- assert r["spoken_text"].startswith("Bom dia, Mikael.")
+ assert r["spoken_text"].startswith("Bom dia, Mikael. Aqui é o AION.")
  assert r["timezone"]=="America/Cuiaba"
