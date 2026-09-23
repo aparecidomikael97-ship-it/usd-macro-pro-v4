@@ -2,7 +2,7 @@ from atlasquant_paper_store_health import paper_store_health
 from atlasquant_system_health import system_health
 
 def row():
- return {"paper_request_id":"P1","opportunity_id":"O1","status":"OPEN","environment":"PAPER"}
+ return {"paper_request_id":"P1","opportunity_id":"O1","risk_auth_id":"RA1","status":"WAIT_ENTRY","environment":"PAPER","real_orders_enabled":False}
 
 def components(paper):
  good={"state":"NORMAL","healthy":True}
