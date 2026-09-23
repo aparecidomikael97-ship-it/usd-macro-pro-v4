@@ -44,7 +44,7 @@ jobs:
 
       - name: Run quality suite
         run: |
-          python -m unittest -q \
+          python -m pytest -q \
             test_engine.py \
             test_calendar.py \
             test_market_map_v10.py \
