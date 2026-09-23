@@ -296,6 +296,28 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertNotIn("st.tabs(",src)
         self.assertIn("atlasquant_view_mode",src)
 
+    def test_advanced_radar_pair_intelligence_is_fault_isolated(self):
+        from pathlib import Path
+        src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        call=src.rindex("render_pair_intelligence_v110(")
+        before=src[max(0,call-500):call]
+        after=src[call:call+1800]
+        self.assertIn("try:",before)
+        self.assertIn("except Exception as _aq_pair_intel_exc:",after)
+        self.assertIn("aq_radar_advanced_error",after)
+        self.assertIn("PAIR_INTELLIGENCE_RUNTIME",after)
+        self.assertIn("nenhuma permissão operacional foi ampliada",after)
+        self.assertNotIn("st.exception(",after)
+
+    def test_advanced_radar_diagnostic_does_not_echo_raw_exception_message(self):
+        from pathlib import Path
+        src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        start=src.rindex("except Exception as _aq_pair_intel_exc:")
+        block=src[start:start+1600]
+        self.assertIn('"type": type(_aq_pair_intel_exc).__name__',block)
+        self.assertNotIn("str(_aq_pair_intel_exc)",block)
+        self.assertNotIn("repr(_aq_pair_intel_exc)",block)
+
     def test_main_wires_global_experience_switch_before_stable_navigation(self):
         from pathlib import Path
         src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
