@@ -49,7 +49,8 @@ def render_admin_voice_assistant(access:Mapping[str,Any]|None,admin_state:Mappin
                                  macro_summary:Sequence[Any]|None=None,opportunities:Sequence[Mapping[str,Any]]|None=None,
                                  important_alerts:Sequence[Any]|None=None,paper_summary:Mapping[str,Any]|None=None,
                                  timezone_name:str|None=None,connections:Mapping[str,Any]|None=None,
-                                 general_ai_adapter:Any=None,web_research_adapter:Any=None)->dict[str,Any]|None:
+                                 general_ai_adapter:Any=None,web_research_adapter:Any=None,
+                                 runtime_status:Mapping[str,Any]|None=None)->dict[str,Any]|None:
     if not _is_admin(access):
         return None
     tz_name=str(timezone_name or os.getenv("ATLASQUANT_TIMEZONE","America/Sao_Paulo") or "America/Sao_Paulo")
@@ -58,6 +59,16 @@ def render_admin_voice_assistant(access:Mapping[str,Any]|None,admin_state:Mappin
         opportunities=opportunities,important_alerts=important_alerts)
     st.markdown("### 🗣️ AION · Assistente Inteligente do Administrador")
     st.caption("AION · Assistente de Voz Inteligente do Atlas Code · Português do Brasil")
+    _runtime=dict(runtime_status or {})
+    _connections=dict(connections or {})
+    _general_ready=bool(general_ai_adapter is not None or _runtime.get("general_ai_configured"))
+    _research_ready=bool(web_research_adapter is not None or _runtime.get("web_research_configured"))
+    st.caption(
+        "Núcleo geral: "+("conectado" if _general_ready else "aguardando conexão")
+        +" · Pesquisa web: "+("conectada" if _research_ready else "aguardando conexão")
+        +" · YouTube: "+("conectado" if _connections.get("youtube") else "não conectado")
+        +" · Spotify: "+("conectado" if _connections.get("spotify") else "não conectado")
+    )
     st.info(briefing["spoken_text"])
     already=bool(st.session_state.get(SESSION_SPOKEN_KEY,False))
     components.html(_speech_html(briefing["spoken_text"],autoplay=not already),height=52)
