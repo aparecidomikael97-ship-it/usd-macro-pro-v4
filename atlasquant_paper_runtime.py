@@ -25,12 +25,23 @@ def recover_paper_state(snapshot:Mapping[str,Any]|None, *, current_market:Mappin
     recovered=[]
     if not reasons:
         market=dict(current_market or {})
+        seen=set()
         for row in s.get("active",[]) or []:
-            r=dict(row); pair=str(r.get("pair",""))
+            r=dict(row); pair=str(r.get("pair","")); rid=str(r.get("paper_request_id","")).strip()
+            if not rid or rid in seen:
+                reasons.append("PAPER_REQUEST_ID_MISSING_OR_DUPLICATE"); continue
+            seen.add(rid)
             if pair not in market:
                 r["recovery_state"]="AWAITING_MARKET_RECONCILIATION"
             else:
-                r["recovery_state"]="RECOVERED"
-                r["reconciled_price"]=market[pair]
+                m=market[pair]
+                if isinstance(m,Mapping):
+                    if m.get("fresh") is not True or m.get("valid") is not True:
+                        r["recovery_state"]="AWAITING_VALID_MARKET_DATA"
+                    else:
+                        r["recovery_state"]="RECOVERED"; r["reconciled_price"]=m.get("price")
+                else:
+                    r["recovery_state"]="AWAITING_VALID_MARKET_DATA"
             recovered.append(r)
+    if reasons: recovered=[]
     return {"ok":not reasons,"reasons":reasons,"trades":recovered,"environment":"PAPER","real_orders_enabled":False}
