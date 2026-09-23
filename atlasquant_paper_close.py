@@ -4,6 +4,7 @@ from datetime import datetime,timezone
 from typing import Any,Mapping,Sequence
 import math
 from atlasquant_result_store import attach_result
+from atlasquant_evidence_ledger import append_evidence
 
 CLOSABLE={"OPEN","MANAGING"}
 OUTCOMES={"WIN","LOSS","BREAKEVEN"}
@@ -68,3 +69,26 @@ def close_paper_trade(trade:Mapping[str,Any],decision:Mapping[str,Any],existing_
     result["paper_request_id"]=t["paper_request_id"]; result["risk_auth_id"]=t.get("risk_auth_id"); result["status"]="CLOSED"
     result["real_orders_enabled"]=False
     return {"state":"CLOSED","closed":True,"result":result,"reasons":[],"real_orders_enabled":False}
+
+
+def close_and_append_paper_result(trade:Mapping[str,Any],decision:Mapping[str,Any],evidence_ledger:Sequence[Mapping[str,Any]]|None,
+                                  *,realized_r:float,spread_cost_r:float=0,slippage_cost_r:float=0,
+                                  mae_r:float|None=None,mfe_r:float|None=None,outcome:str|None=None,closed_at:Any=None)->dict[str,Any]:
+    """Finalize one Paper trade and atomically validate its append contract."""
+    ledger=[dict(x) for x in (evidence_ledger or [])]
+    rid=str(decision.get("record_id","")).strip()
+    parents=[x for x in ledger if str(x.get("record_id","")).strip()==rid and str(x.get("record_type","")).upper()=="DECISION"]
+    if len(parents)!=1:
+        return {"state":"REJECTED","closed":False,"appended":False,"ledger":ledger,
+                "reasons":["DECISION_NOT_PERSISTED_UNIQUELY"],"real_orders_enabled":False}
+    finalized=close_paper_trade(trade,decision,[x for x in ledger if str(x.get("record_type","")).upper()=="RESULT"],
+                                realized_r=realized_r,spread_cost_r=spread_cost_r,slippage_cost_r=slippage_cost_r,
+                                mae_r=mae_r,mfe_r=mfe_r,outcome=outcome,closed_at=closed_at)
+    if not finalized.get("closed"):
+        return {**finalized,"appended":False,"ledger":ledger}
+    app=append_evidence(ledger,finalized["result"])
+    if not app.get("appended"):
+        return {"state":app["state"],"closed":True,"appended":False,"result":finalized["result"],
+                "ledger":ledger,"reasons":app["reasons"],"real_orders_enabled":False}
+    return {"state":"CLOSED_AND_APPENDED","closed":True,"appended":True,"result":finalized["result"],
+            "ledger":app["ledger"],"reasons":[],"real_orders_enabled":False}
