@@ -29,7 +29,7 @@ def test_happy_path_gate_risk_paper_result_restart_metrics():
  closed=close_paper_trade(opened["trade"],pack["audit_record"],realized_r=2,spread_cost_r=.1,slippage_cost_r=.05,closed_at=NOW+timedelta(hours=1))
  assert closed["closed"]; result=closed["result"]
  assert abs(result["net_r"]-1.85)<1e-9 and result["environment"]=="PAPER"
- snap=paper_state_snapshot([{"pair":"EUR/USD","status":"OPEN","paper_request_id":"P-E2E","opportunity_id":"O-E2E"}],created_at=NOW.isoformat())
+ snap=paper_state_snapshot([opened["trade"]],created_at=NOW.isoformat())
  rec=recover_paper_state(snap,current_market={"EUR/USD":{"price":1.18,"fresh":True,"valid":True}})
  assert rec["ok"] and rec["trades"][0]["recovery_state"]=="RECOVERED"
  daily=reconcile_day([{"state":"PAPER_ACCEPTED"}],[{"environment":"PAPER","status":"CLOSED","net_r":result["net_r"]}])
