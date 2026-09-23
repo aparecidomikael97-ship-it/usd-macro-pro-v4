@@ -14,7 +14,7 @@ PASS_GATES={"DATA":"PASS","DIRECTION":"PASS_LONG","MACRO":"ALIGNED_LONG","STRATE
 def req(**kw):
  d=dict(opportunity_id="O1",pair="EUR/USD",strategy_version="AMD-1",requested_trade_risk=5,requested_exposure=5,
  structural_stop_valid=True,rr_after_costs=2,spread_ok=True,slippage_ok=True,liquidity_ok=True,volatility_ok=True,
- news_clear=True,data_fresh=True,opportunity_state="TRIGGERED")
+ news_clear=True,data_fresh=True,opportunity_state="TRIGGERED",direction="SELL",entry_price=1.1,stop_price=1.2)
  d.update(kw); return RiskRequest(**d)
 
 def auth(**kw):
