@@ -27,6 +27,7 @@ from atlasquant_session_profiles import (
 )
 
 SCHEMA="ATLASQUANT_HOME_RADAR_V1"
+RADAR_VISIBLE_LIMIT=10
 
 
 def _safe(value:Any, default:float=0.0)->float:
@@ -329,9 +330,13 @@ def render_home_radar(
     c.metric("Não operar",summary["blocked"])
     d.metric("Melhor leitura",summary["best_pair"])
 
-    top_n=3 if mode=="Iniciante" else min(5,len(rows))
+    top_n=min(RADAR_VISIBLE_LIMIT,len(rows))
     top=rows[:top_n]
-    st.markdown("### Agora")
+    st.markdown("### Top 10 em observação")
+    st.caption(
+        "O Radar mostra até 10 ativos que merecem atenção no snapshot atual. "
+        "Estar no Top 10 não significa entrada autorizada."
+    )
     cols=st.columns(min(3,len(top)))
     for idx,row in enumerate(top):
         with cols[idx%len(cols)]:
