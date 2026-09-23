@@ -68,6 +68,22 @@ class AtlasQuantSignalLifecycleTests(unittest.TestCase):
         self.assertEqual(view["status_code"],"BLOCKED")
         self.assertIn("NÃO ENTRAR",view["status_label"])
 
+    def test_malformed_nested_payload_is_unverified_not_exception(self):
+        bad={
+            "pair":"EUR/USD",
+            "side":"BUY",
+            "state":"🟢 EXECUTÁVEL",
+            "executable":True,
+            "data_ready":"corrupted",
+            "technical_timestamp":"",
+        }
+        view=derive_signal_view(bad,now=NOW)
+        self.assertEqual(view["status_code"],"UNVERIFIED")
+        self.assertFalse(view["is_current_confirmation"])
+        annotated=annotate_packs_with_lifecycle([None,"bad",bad],{},now=NOW)
+        self.assertEqual(len(annotated),1)
+        self.assertEqual(annotated[0]["signal_lifecycle"]["status_code"],"UNVERIFIED")
+
     def test_lifecycle_records_first_confirmation_transition(self):
         first=advance_signal_lifecycle({},[pack(age=10)],now=NOW)
         row=first["pairs"]["EUR/USD"]
