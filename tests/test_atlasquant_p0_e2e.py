@@ -4,6 +4,7 @@ from atlasquant_risk_authorization import RiskRequest,authorize_risk
 from atlasquant_risk_guardian import RiskLimits,RiskState
 from atlasquant_paper_authorization_bridge import authorized_paper_audit
 from atlasquant_paper_close import close_paper_trade
+from atlasquant_paper_entry import activate_paper_entry
 from atlasquant_paper_runtime import paper_state_snapshot,recover_paper_state
 from atlasquant_paper_reconciliation import reconcile_day
 
@@ -21,9 +22,11 @@ def test_happy_path_gate_risk_paper_result_restart_metrics():
  auth=authorize_risk(request(),L,S,now=NOW)
  pack=authorized_paper_audit(O,auth,now=NOW)
  assert auth["approved"] and pack["paper_request"]["accepted"]
- trade={"paper_request_id":pack["paper_request"]["paper_request_id"],"opportunity_id":"O-E2E","pair":"EUR/USD","strategy_version":"AMD-1",
- "risk_auth_id":auth["risk_auth_id"],"status":"OPEN","environment":"PAPER","real_orders_enabled":False}
- closed=close_paper_trade(trade,pack["audit_record"],realized_r=2,spread_cost_r=.1,slippage_cost_r=.05,closed_at=NOW+timedelta(hours=1))
+ waiting={"paper_request_id":pack["paper_request"]["paper_request_id"],"opportunity_id":"O-E2E","pair":"EUR/USD","strategy_version":"AMD-1",
+ "risk_auth_id":auth["risk_auth_id"],"status":"WAIT_ENTRY","environment":"PAPER","real_orders_enabled":False}
+ opened=activate_paper_entry(waiting,auth,{"price":1.18,"fresh":True,"valid":True},now=NOW)
+ assert opened["opened"]
+ closed=close_paper_trade(opened["trade"],pack["audit_record"],realized_r=2,spread_cost_r=.1,slippage_cost_r=.05,closed_at=NOW+timedelta(hours=1))
  assert closed["closed"]; result=closed["result"]
  assert abs(result["net_r"]-1.85)<1e-9 and result["environment"]=="PAPER"
  snap=paper_state_snapshot([{"pair":"EUR/USD","status":"OPEN","paper_request_id":"P-E2E","opportunity_id":"O-E2E"}],created_at=NOW.isoformat())
