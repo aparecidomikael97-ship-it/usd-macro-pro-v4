@@ -48,7 +48,8 @@ def test_explicit_risk_block_never_appears_preparing():
 def test_radar_macro_policy_is_row_specific():
  g=dict(PASS_GATES);g["MACRO"]="NEUTRAL"
  base={"pair":"EUR/USD","bias":"COMPRA","quality":90,"data_score":95,"data_ready":True,"signal_status_code":"CONFIRMED","risk_gate":"APPROVED","gates":g}
- assert not build_radar_views([{**base,"macro_policy":"WAIT"}])["TOP_AGORA"][0]["executable"]
+ wait=build_radar_views([{**base,"macro_policy":"WAIT"}])
+ assert not wait["TOP_AGORA"][0]["executable"] and wait["TOP_PREPARANDO"][0]["pair"]=="EUR/USD"
  assert build_radar_views([{**base,"macro_policy":"PASS"}])["TOP_AGORA"][0]["executable"]
 
 def test_wait_entry_restart_requires_current_authorization():
