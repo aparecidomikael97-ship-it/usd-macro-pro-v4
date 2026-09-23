@@ -1,7 +1,7 @@
 """P0 Quality Gate. Executed evidence is required; runtime health cannot be hidden."""
 from __future__ import annotations
 from typing import Any,Mapping
-CRITICAL=("instrument_registry","scanner_28","data_health","gate_chain","risk","paper","result_store","restart_recovery")
+CRITICAL=("instrument_registry","scanner_28","data_health","gate_chain","risk","system_health","paper","paper_entry","paper_close","paper_store_integrity","result_store","evidence_ledger","restart_recovery")
 def quality_gate(checks:Mapping[str,Any]|None,*,system_health:Mapping[str,Any]|None=None)->dict[str,Any]:
  src=dict(checks or {});rows=[];blocked=[];pending=[]
  for name in CRITICAL:
