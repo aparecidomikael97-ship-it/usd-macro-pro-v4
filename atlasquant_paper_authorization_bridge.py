@@ -2,6 +2,7 @@
 from __future__ import annotations
 from datetime import datetime,timezone
 from typing import Any,Mapping
+from atlasquant_paper_audit_bridge import audit_paper_decision
 import hashlib
 
 def paper_request_from_authorization(auth:Mapping[str,Any], *, now:datetime|None=None)->dict[str,Any]:
@@ -21,3 +22,10 @@ def paper_request_from_authorization(auth:Mapping[str,Any], *, now:datetime|None
             "strategy_version":a.get("strategy_version"),"max_risk":a.get("max_authorized_risk",0),
             "max_exposure":a.get("max_authorized_exposure",0),"environment":"PAPER",
             "real_orders_enabled":False,"reasons":reasons}
+
+
+def authorized_paper_audit(opportunity:Mapping[str,Any], auth:Mapping[str,Any], *, now:datetime|None=None)->dict[str,Any]:
+    """Build Paper request and its immutable audit decision in one deterministic step."""
+    paper=paper_request_from_authorization(auth,now=now)
+    audit=audit_paper_decision(opportunity,auth,paper)
+    return {"paper_request":paper,"audit_record":audit,"real_orders_enabled":False}
