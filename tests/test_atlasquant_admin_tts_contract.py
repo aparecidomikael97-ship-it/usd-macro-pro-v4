@@ -3,8 +3,8 @@ from atlasquant_admin_tts_contract import build_admin_tts_request,validate_admin
 
 def test_request_is_original_ptbr_and_non_operational():
  r=build_admin_tts_request("Bom dia, Mikael. Sistema normal.")
- assert r["language"]=="pt-BR" and r["profile_id"]=="ATLAS_VOICE_PT_BR_V1"
- assert r["style"]["identity"]=="ORIGINAL_ATLASQUANT" and r["imitate_person_or_character"] is False
+ assert r["language"]=="pt-BR" and r["profile_id"]=="AION_VOICE_PT_BR_V1"
+ assert r["style"]["identity"]=="ORIGINAL_AION_ATLAS_CODE" and r["imitate_person_or_character"] is False
  assert r["voice_can_authorize_orders"] is False and r["real_orders_enabled"] is False
 
 def test_request_is_deterministic_for_same_text_and_mode():
