@@ -38,6 +38,11 @@ def _safe(value:Any, default:float=0.0)->float:
         return float(default)
 
 
+def _mapping(value:Any)->dict[str,Any]:
+    """Normalize persisted/runtime payloads without crashing the Radar."""
+    return dict(value) if isinstance(value,Mapping) else {}
+
+
 def _bias(direction:object)->str:
     raw=str(direction or "").upper()
     if "COMPRA" in raw or "BUY" in raw:
@@ -48,7 +53,7 @@ def _bias(direction:object)->str:
 
 
 def _blocked(pack:Mapping[str,Any])->bool:
-    data=dict(pack.get("data_ready",{}) or {})
+    data=_mapping(pack.get("data_ready"))
     state=str(pack.get("state","")).upper()
     gate=str(pack.get("gate","")).upper()
     if not bool(data.get("sufficient",False)):
@@ -78,16 +83,18 @@ def _adr_label(value:Any)->str:
 def home_rows_from_packs(packs:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     rows=[]
     for raw in list(packs or []):
-        p=dict(raw or {})
-        pair=str(p.get("pair") or "—")
+        if not isinstance(raw,Mapping):
+            continue
+        p=dict(raw)
+        pair=str(p.get("pair") or "—").strip() or "—"
         bias=_bias(p.get("direction",p.get("side")))
         blocked=_blocked(p)
         action="NÃO OPERAR" if blocked or bias=="NEUTRO" else bias
-        data=dict(p.get("data_ready",{}) or {})
-        strength=dict(p.get("strength",{}) or {})
+        data=_mapping(p.get("data_ready"))
+        strength=_mapping(p.get("strength"))
         blockers=[str(x) for x in list(p.get("blockers",[]) or []) if str(x).strip()]
         session_bucket=extract_session_bucket(p)
-        signal=dict(p.get("signal_lifecycle",{}) or {})
+        signal=_mapping(p.get("signal_lifecycle"))
         if not signal:
             signal=derive_signal_view(p,timezone="UTC")
         signal_code=str(signal.get("status_code") or "UNVERIFIED")
