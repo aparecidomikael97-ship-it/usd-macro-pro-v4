@@ -5,7 +5,7 @@ from typing import Any,Mapping
 from atlasquant_paper_audit_bridge import audit_paper_decision
 import hashlib
 
-def paper_request_from_authorization(auth:Mapping[str,Any], *, now:datetime|None=None)->dict[str,Any]:
+def paper_request_from_authorization(auth:Mapping[str,Any], *, now:datetime|None=None, opportunity_id:str|None=None, strategy_version:str|None=None, requested_risk:float|None=None, requested_exposure:float|None=None)->dict[str,Any]:
     a=dict(auth or {}); current=now or datetime.now(timezone.utc); reasons=[]
     if a.get("approved") is not True or str(a.get("risk_gate","")).upper()!="APPROVED": reasons.append("RISK_NOT_APPROVED")
     if not str(a.get("risk_auth_id") or "").strip(): reasons.append("RISK_AUTH_ID_MISSING")
@@ -15,6 +15,12 @@ def paper_request_from_authorization(auth:Mapping[str,Any], *, now:datetime|None
         if current>=expiry: reasons.append("RISK_AUTH_EXPIRED")
     except Exception: reasons.append("RISK_AUTH_EXPIRY_INVALID")
     if a.get("real_orders_enabled") is not False: reasons.append("LIVE_FLAG_NOT_EXPLICITLY_DISABLED")
+    if opportunity_id is not None and str(a.get("opportunity_id"))!=str(opportunity_id): reasons.append("RISK_AUTH_OPPORTUNITY_MISMATCH")
+    if strategy_version is not None and str(a.get("strategy_version"))!=str(strategy_version): reasons.append("RISK_AUTH_STRATEGY_MISMATCH")
+    try:
+        if requested_risk is not None and float(requested_risk)>float(a.get("max_authorized_risk",0)): reasons.append("RISK_AUTH_RISK_EXCEEDED")
+        if requested_exposure is not None and float(requested_exposure)>float(a.get("max_authorized_exposure",0)): reasons.append("RISK_AUTH_EXPOSURE_EXCEEDED")
+    except Exception: reasons.append("RISK_AUTH_LIMIT_INVALID")
     ok=not reasons
     seed=f"{a.get('risk_auth_id')}|{a.get('opportunity_id')}|{a.get('strategy_version')}"
     return {"accepted":ok,"paper_request_id":"PAPER-"+hashlib.sha256(seed.encode()).hexdigest()[:20] if ok else None,
@@ -26,6 +32,7 @@ def paper_request_from_authorization(auth:Mapping[str,Any], *, now:datetime|None
 
 def authorized_paper_audit(opportunity:Mapping[str,Any], auth:Mapping[str,Any], *, now:datetime|None=None)->dict[str,Any]:
     """Build Paper request and its immutable audit decision in one deterministic step."""
-    paper=paper_request_from_authorization(auth,now=now)
+    paper=paper_request_from_authorization(auth,now=now,opportunity_id=str(opportunity.get("opportunity_id","")),strategy_version=str(opportunity.get("strategy_version","")),
+        requested_risk=opportunity.get("requested_risk"),requested_exposure=opportunity.get("requested_exposure"))
     audit=audit_paper_decision(opportunity,auth,paper)
     return {"paper_request":paper,"audit_record":audit,"real_orders_enabled":False}
