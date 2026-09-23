@@ -24,10 +24,21 @@ def decision_record(*,opportunity_id:str,environment:str,pair:str,direction:str,
  payload["record_id"]=_hash("DEC-",payload); return payload
 def attach_result(decision:Mapping[str,Any],*,outcome:str,realized_r:float,mae_r:float|None=None,mfe_r:float|None=None,spread_cost_r:float=0,slippage_cost_r:float=0,closed_at:Any=None)->dict[str,Any]:
  d=dict(decision)
- if d.get("record_type")!="DECISION": raise ValueError("result requires decision record")
+ if d.get("record_type")!="DECISION" or d.get("immutable_evidence") is not True: raise ValueError("result requires immutable decision record")
+ if not str(d.get("record_id","")).startswith("DEC-"): raise ValueError("invalid decision record id")
  vals=[realized_r,spread_cost_r,slippage_cost_r]+([mae_r] if mae_r is not None else [])+([mfe_r] if mfe_r is not None else [])
  if not all(math.isfinite(float(x)) for x in vals): raise ValueError("non-finite result")
- base={k:v for k,v in d.items() if k!="record_id"}; base.update({"record_type":"RESULT","decision_record_id":d["record_id"],"outcome":str(outcome).upper(),"realized_r":float(realized_r),"spread_cost_r":float(spread_cost_r),"slippage_cost_r":float(slippage_cost_r),"net_r":float(realized_r)-float(spread_cost_r)-float(slippage_cost_r),"mae_r":mae_r,"mfe_r":mfe_r,"closed_at":_iso(closed_at)})
+ spread=float(spread_cost_r); slip=float(slippage_cost_r); realized=float(realized_r)
+ if spread<0 or slip<0: raise ValueError("costs must be non-negative")
+ net=realized-spread-slip
+ expected="BREAKEVEN" if abs(net)<1e-12 else ("WIN" if net>0 else "LOSS")
+ actual=str(outcome).upper()
+ if actual not in {"WIN","LOSS","BREAKEVEN"}: raise ValueError("invalid outcome")
+ if actual!=expected: raise ValueError("outcome inconsistent with net_r")
+ closed=_iso(closed_at)
+ if closed<_iso(d.get("timestamp")): raise ValueError("result closes before decision")
+ base={k:v for k,v in d.items() if k!="record_id"}; base.update({"record_type":"RESULT","decision_record_id":d["record_id"],"outcome":actual,"realized_r":realized,"spread_cost_r":spread,"slippage_cost_r":slip,"net_r":net,"mae_r":mae_r,"mfe_r":mfe_r,"closed_at":closed,"status":"CLOSED"})
+ if str(base.get("environment","")).upper()=="PAPER": base["real_orders_enabled"]=False
  base["record_id"]=_hash("RES-",base); return base
 def rejected_record(**kwargs)->dict[str,Any]:
  d=decision_record(**kwargs); base={k:v for k,v in d.items() if k!="record_id"}; base["record_type"]="REJECTED_OPPORTUNITY"; base["record_id"]=_hash("REJ-",base); return base
