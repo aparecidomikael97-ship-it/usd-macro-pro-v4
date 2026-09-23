@@ -4,6 +4,7 @@ from datetime import datetime,timezone,date
 from typing import Any,Mapping,Sequence
 from atlasquant_paper_evidence_audit import audit_paper_results
 from atlasquant_paper_reconciliation import reconcile_day
+from atlasquant_instrument_registry import normalize_fx_symbol
 
 def _day(v:Any)->str|None:
     try:
@@ -17,7 +18,10 @@ def build_paper_report(results:Sequence[Mapping[str,Any]]|None,*,day:str|date|No
                        strategy_version:str|None=None,session:str|None=None,min_sample:int=30)->dict[str,Any]:
     raw=[dict(x) for x in (results or [])]
     target_day=str(day) if day is not None else None
-    selected=[]; filter_reasons=[]
+    selected=[]; filter_reasons=[]; pair_symbol=None
+    if pair is not None:
+        try: pair_symbol=normalize_fx_symbol(str(pair))
+        except Exception: filter_reasons.append("PAIR_FILTER_INVALID")
     for r in raw:
         if str(r.get("environment","")).upper()!="PAPER":
             continue
@@ -26,7 +30,12 @@ def build_paper_report(results:Sequence[Mapping[str,Any]]|None,*,day:str|date|No
             if rd is None:
                 filter_reasons.append("CLOSED_AT_INVALID_FOR_DAY_FILTER");continue
             if rd!=target_day: continue
-        if pair is not None and str(r.get("pair","")).upper()!=str(pair).upper(): continue
+        if pair is not None:
+            if pair_symbol is None: continue
+            try: row_symbol=normalize_fx_symbol(str(r.get("pair","")))
+            except Exception:
+                filter_reasons.append("RESULT_PAIR_INVALID");continue
+            if row_symbol!=pair_symbol: continue
         if strategy_version is not None and str(r.get("strategy_version",""))!=str(strategy_version): continue
         if session is not None and str(r.get("session","")).upper()!=str(session).upper(): continue
         selected.append(r)
