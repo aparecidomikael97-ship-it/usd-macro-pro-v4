@@ -2,8 +2,9 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
-from typing import Any, Mapping
+from typing import Any
 from uuid import uuid4
+import math
 from atlasquant_risk_guardian import RiskLimits,RiskState,evaluate_risk_guard
 
 @dataclass(frozen=True)
@@ -13,17 +14,31 @@ class RiskRequest:
     structural_stop_valid:bool; rr_after_costs:float|None
     spread_ok:bool; slippage_ok:bool; liquidity_ok:bool; volatility_ok:bool
     news_clear:bool; data_fresh:bool; opportunity_state:str
-    cluster_limit_ok:bool=True; correlation_limit_ok:bool=True
-    portfolio_lock_ok:bool=True
+    cluster_limit_ok:bool=True; correlation_limit_ok:bool=True; portfolio_lock_ok:bool=True
+    direction:str|None=None; entry_price:float|None=None; stop_price:float|None=None
 
-def authorize_risk(req:RiskRequest, limits:RiskLimits, state:RiskState, *,
-                   min_rr:float=1.0, now:datetime|None=None, ttl_minutes:int=5)->dict[str,Any]:
+def _finite_positive(v:Any)->bool:
+    try: return math.isfinite(float(v)) and float(v)>0
+    except Exception: return False
+
+def _geometry_ok(req:RiskRequest)->bool:
+    if req.entry_price is None and req.stop_price is None and req.direction is None: return bool(req.structural_stop_valid)
+    if not (_finite_positive(req.entry_price) and _finite_positive(req.stop_price)): return False
+    d=str(req.direction or "").upper()
+    if d in {"BUY","LONG","COMPRA"}: return float(req.stop_price)<float(req.entry_price)
+    if d in {"SELL","SHORT","VENDA"}: return float(req.stop_price)>float(req.entry_price)
+    return False
+
+def authorize_risk(req:RiskRequest, limits:RiskLimits, state:RiskState, *, min_rr:float=1.0,
+                   now:datetime|None=None, ttl_minutes:int=5)->dict[str,Any]:
     reasons=[]
-    if not req.opportunity_id.strip(): reasons.append("OPPORTUNITY_ID_MISSING")
-    if not req.strategy_version.strip(): reasons.append("STRATEGY_VERSION_MISSING")
-    if not req.structural_stop_valid: reasons.append("STRUCTURAL_STOP_INVALID")
-    if req.rr_after_costs is None: reasons.append("RR_MISSING")
+    if not str(req.opportunity_id).strip(): reasons.append("OPPORTUNITY_ID_MISSING")
+    if not str(req.strategy_version).strip(): reasons.append("STRATEGY_VERSION_MISSING")
+    if not req.structural_stop_valid or not _geometry_ok(req): reasons.append("STRUCTURAL_STOP_INVALID")
+    if req.rr_after_costs is None or not _finite_positive(req.rr_after_costs): reasons.append("RR_INVALID")
     elif float(req.rr_after_costs)<float(min_rr): reasons.append("RR_INSUFFICIENT")
+    if not _finite_positive(req.requested_trade_risk): reasons.append("TRADE_RISK_INVALID")
+    if not _finite_positive(req.requested_exposure): reasons.append("EXPOSURE_INVALID")
     for ok,code in ((req.spread_ok,"SPREAD_TOO_HIGH"),(req.slippage_ok,"SLIPPAGE_GUARD"),
                     (req.liquidity_ok,"LIQUIDITY_GUARD"),(req.volatility_ok,"VOLATILITY_GUARD"),
                     (req.news_clear,"NEWS_LOCK"),(req.data_fresh,"DATA_STALE"),
@@ -32,17 +47,21 @@ def authorize_risk(req:RiskRequest, limits:RiskLimits, state:RiskState, *,
         if ok is not True: reasons.append(code)
     if str(req.opportunity_state).upper()!="TRIGGERED": reasons.append("OPPORTUNITY_NOT_TRIGGERED")
     try:
+        ttl=int(ttl_minutes)
+        if ttl<1 or ttl>60: raise ValueError
+    except Exception:
+        ttl=0; reasons.append("AUTH_TTL_INVALID")
+    try:
         guard=evaluate_risk_guard(limits,state,requested_trade_risk=req.requested_trade_risk,requested_exposure=req.requested_exposure)
         reasons.extend(f"GUARD:{x}" for x in guard.reasons)
-    except Exception as exc:
+    except Exception:
         reasons.append("RISK_ENGINE_ERROR")
-        guard=None
-    approved=not reasons
-    current=now or datetime.now(timezone.utc)
-    auth_id=f"RISK-{uuid4().hex}" if approved else None
+    approved=not reasons; current=now or datetime.now(timezone.utc)
     return {"risk_gate":"APPROVED" if approved else "BLOCKED","approved":approved,
-            "risk_auth_id":auth_id,"expires_at":(current+timedelta(minutes=max(1,int(ttl_minutes)))).isoformat() if approved else None,
+            "risk_auth_id":f"RISK-{uuid4().hex}" if approved else None,"issued_at":current.isoformat(),
+            "expires_at":(current+timedelta(minutes=ttl)).isoformat() if approved else None,
             "opportunity_id":req.opportunity_id,"pair":req.pair,"strategy_version":req.strategy_version,
+            "direction":req.direction,"entry_price":req.entry_price,"stop_price":req.stop_price,
             "max_authorized_risk":req.requested_trade_risk if approved else 0.0,
             "max_authorized_exposure":req.requested_exposure if approved else 0.0,
             "reasons":reasons,"real_orders_enabled":False,"fail_closed":True}
