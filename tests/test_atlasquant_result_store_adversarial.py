@@ -11,3 +11,14 @@ def test_invalid_scores_fail(field,value):
 def test_invalid_pair_or_direction_fail():
  with pytest.raises(ValueError): decision_record(**{**BASE,"pair":"USD/BRL"})
  with pytest.raises(ValueError): decision_record(**{**BASE,"direction":"SIDEWAYS"})
+
+def test_negative_cost_and_outcome_mismatch_fail():
+ d=decision_record(**BASE)
+ with pytest.raises(ValueError): attach_result(d,outcome="WIN",realized_r=1,spread_cost_r=-.1)
+ with pytest.raises(ValueError): attach_result(d,outcome="WIN",realized_r=-1)
+def test_result_status_and_paper_live_flag_are_explicit():
+ d=decision_record(**BASE); r=attach_result(d,outcome="WIN",realized_r=1)
+ assert r["status"]=="CLOSED" and r["real_orders_enabled"] is False and r["closed_at_inferred"] is True
+def test_result_cannot_close_before_decision():
+ d=decision_record(**BASE)
+ with pytest.raises(ValueError): attach_result(d,outcome="WIN",realized_r=1,closed_at="2026-09-23T11:59:59+00:00")
