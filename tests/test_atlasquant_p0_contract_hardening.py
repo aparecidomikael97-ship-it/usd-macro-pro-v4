@@ -2,7 +2,7 @@ import math
 from datetime import datetime,timezone,timedelta
 from atlasquant_risk_authorization import RiskRequest,authorize_risk
 from atlasquant_risk_guardian import RiskLimits,RiskState
-from atlasquant_paper_authorization_bridge import paper_request_from_authorization
+from atlasquant_paper_authorization_bridge import paper_request_from_authorization,paper_request_id_for_authorization
 from atlasquant_opportunity_ranking import build_rankings
 from atlasquant_radar_views import build_radar_views
 from atlasquant_paper_runtime import paper_state_snapshot,recover_paper_state
@@ -20,7 +20,7 @@ def req(**kw):
 def auth(**kw):
  d={"approved":True,"risk_gate":"APPROVED","risk_auth_id":"R1","expires_at":(NOW+timedelta(minutes=5)).isoformat(),
  "real_orders_enabled":False,"opportunity_id":"O1","pair":"EUR/USD","strategy_version":"AMD-1",
- "max_authorized_risk":5,"max_authorized_exposure":5}
+ "max_authorized_risk":5,"max_authorized_exposure":5,"direction":"SELL","stop_price":1.2}
  d.update(kw);return d
 
 def test_risk_rejects_unsupported_pair_and_invalid_min_rr():
@@ -53,7 +53,7 @@ def test_radar_macro_policy_is_row_specific():
  assert build_radar_views([{**base,"macro_policy":"PASS"}])["TOP_AGORA"][0]["executable"]
 
 def test_wait_entry_restart_requires_current_authorization():
- row={"pair":"EUR/USD","status":"WAIT_ENTRY","paper_request_id":"P1","opportunity_id":"O1","risk_auth_id":"R1","strategy_version":"AMD-1"}
+ row={"pair":"EUR/USD","status":"WAIT_ENTRY","paper_request_id":paper_request_id_for_authorization(auth()),"opportunity_id":"O1","risk_auth_id":"R1","strategy_version":"AMD-1","environment":"PAPER","real_orders_enabled":False}
  s=paper_state_snapshot([row],created_at=NOW.isoformat()); market={"EUR/USD":{"price":1.1,"fresh":True,"valid":True}}
  r=recover_paper_state(s,current_market=market,now=NOW)
  assert r["trades"][0]["recovery_state"]=="REAUTHORIZATION_REQUIRED" and r["trades"][0]["entry_authorized"] is False
@@ -61,10 +61,10 @@ def test_wait_entry_restart_requires_current_authorization():
  assert r2["trades"][0]["recovery_state"]=="RECOVERED" and r2["trades"][0]["entry_authorized"] is True
 
 def test_expired_auth_cannot_reopen_wait_entry_but_open_is_management_only():
- wait={"pair":"EUR/USD","status":"WAIT_ENTRY","paper_request_id":"P1","opportunity_id":"O1","risk_auth_id":"R1","strategy_version":"AMD-1"}
+ wait={"pair":"EUR/USD","status":"WAIT_ENTRY","paper_request_id":paper_request_id_for_authorization(auth()),"opportunity_id":"O1","risk_auth_id":"R1","strategy_version":"AMD-1","environment":"PAPER","real_orders_enabled":False}
  s=paper_state_snapshot([wait]);market={"EUR/USD":{"price":1.1,"fresh":True,"valid":True}}
  expired=auth(expires_at=(NOW-timedelta(seconds=1)).isoformat())
  assert recover_paper_state(s,current_market=market,current_authorizations={"R1":expired},now=NOW)["trades"][0]["recovery_state"]=="REAUTHORIZATION_REQUIRED"
- opened={**wait,"status":"OPEN"}
+ opened={**wait,"status":"OPEN","entry_event_id":"E1","entry_price":1.1,"stop_price":1.2,"opened_at":NOW.isoformat(),"direction":"SELL"}
  s2=paper_state_snapshot([opened]);r=recover_paper_state(s2,current_market=market,now=NOW)
  assert r["trades"][0]["recovery_state"]=="RECOVERED" and r["trades"][0]["management_only"] is True
