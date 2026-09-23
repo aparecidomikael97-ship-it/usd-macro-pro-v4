@@ -102,6 +102,10 @@ def _technical_reference(pack: Mapping[str,Any])->tuple[str,str]:
     return "","UNPROVEN"
 
 
+def _mapping(value:Any)->dict[str,Any]:
+    return dict(value) if isinstance(value,Mapping) else {}
+
+
 def derive_signal_view(
     pack: Mapping[str,Any],
     *,
@@ -109,13 +113,14 @@ def derive_signal_view(
     timezone: str = "UTC",
 )->dict[str,Any]:
     """Classify the current reading without inventing an entry signal."""
-    p=dict(pack or {})
+    p=_mapping(pack)
     ref,ref_source=_technical_reference(p)
     age=_age_minutes(ref,now)
     side=_side(p)
     state=str(p.get("state") or "").upper()
-    data=dict(p.get("data_ready",{}) or {})
-    m15=dict((data.get("timeframes",{}) or {}).get("m15",{}) or {})
+    data=_mapping(p.get("data_ready"))
+    timeframes=_mapping(data.get("timeframes"))
+    m15=_mapping(timeframes.get("m15"))
     stale=bool(p.get("stale_technical")) or (age is not None and age > M15_FRESH_MINUTES)
     if m15 and not bool(m15.get("fresh",False)):
         stale=True
@@ -200,7 +205,9 @@ def advance_signal_lifecycle(
     transitions=list(prior.get("transitions",[]) or [])
 
     for raw in list(packs or []):
-        p=dict(raw or {})
+        if not isinstance(raw,Mapping):
+            continue
+        p=dict(raw)
         pair=str(p.get("pair") or "").strip()
         if not pair:
             continue
@@ -282,7 +289,9 @@ def annotate_packs_with_lifecycle(
     states=dict((lifecycle or {}).get("pairs",{}) or {})
     out=[]
     for raw in list(packs or []):
-        p=dict(raw or {})
+        if not isinstance(raw,Mapping):
+            continue
+        p=dict(raw)
         pair=str(p.get("pair") or "")
         current=derive_signal_view(p,now=now,timezone=timezone)
         persisted=dict(states.get(pair,{}) or {})
