@@ -10,7 +10,7 @@ def trade(**kw):
 
 def auth(**kw):
  d={"approved":True,"risk_gate":"APPROVED","risk_auth_id":"RA1","opportunity_id":"O1","pair":"EUR/USD","strategy_version":"AMD-1",
- "expires_at":(NOW+timedelta(minutes=5)).isoformat(),"real_orders_enabled":False,"fail_closed":True,"max_authorized_risk":5,"max_authorized_exposure":5,"direction":"BUY","stop_price":1.17};d.update(kw);return d
+ "expires_at":(NOW+timedelta(minutes=5)).isoformat(),"real_orders_enabled":False,"fail_closed":True,"execution_grade":True,"max_authorized_risk":5,"max_authorized_exposure":5,"direction":"BUY","stop_price":1.17};d.update(kw);return d
 
 def market(**kw):
  d={"price":1.18,"fresh":True,"valid":True};d.update(kw);return d
