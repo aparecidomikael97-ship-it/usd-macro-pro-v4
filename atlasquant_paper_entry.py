@@ -47,6 +47,13 @@ def activate_paper_entry(waiting_trade:Mapping[str,Any],auth:Mapping[str,Any],ma
     if m.get("valid") is not True: reasons.append("MARKET_DATA_INVALID")
     price=m.get("price")
     if not _positive(price): reasons.append("ENTRY_PRICE_INVALID")
+    direction=str(a.get("direction","")).upper()
+    stop=a.get("stop_price")
+    if direction not in {"BUY","LONG","COMPRA","SELL","SHORT","VENDA"}: reasons.append("DIRECTION_INVALID")
+    if not _positive(stop): reasons.append("STRUCTURAL_STOP_PRICE_INVALID")
+    if _positive(price) and _positive(stop):
+        if direction in {"BUY","LONG","COMPRA"} and not float(stop)<float(price): reasons.append("STOP_GEOMETRY_INVALID")
+        if direction in {"SELL","SHORT","VENDA"} and not float(stop)>float(price): reasons.append("STOP_GEOMETRY_INVALID")
     if reasons:
         return {"state":"REJECTED","opened":False,"trade":t,"reasons":list(dict.fromkeys(reasons)),"real_orders_enabled":False}
     rid=str(t.get("paper_request_id","")).strip()
@@ -54,7 +61,7 @@ def activate_paper_entry(waiting_trade:Mapping[str,Any],auth:Mapping[str,Any],ma
         return {"state":"REJECTED","opened":False,"trade":t,"reasons":["PAPER_REQUEST_ID_MISSING"],"real_orders_enabled":False}
     seed=f"{rid}|{a.get('risk_auth_id')}|ENTRY"
     out=dict(t)
-    out.update({"status":"OPEN","entry_price":float(price),"opened_at":current.isoformat(),
+    out.update({"status":"OPEN","entry_price":float(price),"stop_price":float(stop),"direction":direction,"opened_at":current.isoformat(),
                 "entry_event_id":"PENTRY-"+hashlib.sha256(seed.encode()).hexdigest()[:20],
                 "entry_authorized":True,"environment":"PAPER","real_orders_enabled":False})
     return {"state":"OPENED","opened":True,"trade":out,"reasons":[],"real_orders_enabled":False}
