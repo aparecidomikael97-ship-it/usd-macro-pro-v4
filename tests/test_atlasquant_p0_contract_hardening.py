@@ -20,7 +20,7 @@ def req(**kw):
 def auth(**kw):
  d={"approved":True,"risk_gate":"APPROVED","risk_auth_id":"R1","expires_at":(NOW+timedelta(minutes=5)).isoformat(),
  "real_orders_enabled":False,"opportunity_id":"O1","pair":"EUR/USD","strategy_version":"AMD-1",
- "max_authorized_risk":5,"max_authorized_exposure":5,"direction":"SELL","stop_price":1.2,"fail_closed":True}
+ "max_authorized_risk":5,"max_authorized_exposure":5,"direction":"SELL","entry_price":1.1,"stop_price":1.2,"fail_closed":True}
  d.update(kw);return d
 
 def test_risk_rejects_unsupported_pair_and_invalid_min_rr():
