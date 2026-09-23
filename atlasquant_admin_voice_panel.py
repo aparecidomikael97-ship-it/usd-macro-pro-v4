@@ -50,8 +50,8 @@ def render_admin_voice_assistant(access:Mapping[str,Any]|None,admin_state:Mappin
     briefing=build_admin_voice_briefing(dict(admin_state or {}),user_name=user_name,timezone_name=tz_name,
         changes_since_last_login=changes_since_last_login,macro_summary=macro_summary,
         opportunities=opportunities,important_alerts=important_alerts)
-    st.markdown("### 🗣️ Assistente do Administrador")
-    st.caption("AtlasQuant Voice · Português do Brasil · identidade oficial em preparação")
+    st.markdown("### 🗣️ AION · Assistente Inteligente do Administrador")
+    st.caption("AION · Assistente de Voz Inteligente do Atlas Code · Português do Brasil")
     st.info(briefing["spoken_text"])
     already=bool(st.session_state.get(SESSION_SPOKEN_KEY,False))
     components.html(_speech_html(briefing["spoken_text"],autoplay=not already),height=52)
@@ -59,9 +59,9 @@ def render_admin_voice_assistant(access:Mapping[str,Any]|None,admin_state:Mappin
 
     with st.expander("💬 Conversar com o assistente",expanded=False):
         q=st.text_input(
-            "Pergunte sobre sistema, mudanças, macro, Radar, Paper ou release",
+            "Pergunte qualquer coisa. AION usa o AtlasQuant quando o assunto é o sistema e pesquisa quando houver adaptador disponível.",
             key="atlasquant_admin_voice_question",
-            placeholder="Ex.: O que mudou desde meu último acesso?",
+            placeholder="Ex.: O que mudou no AtlasQuant? Ou: pesquise uma notícia atual para mim.",
         )
         if q:
             reply=answer_admin_question(
@@ -75,5 +75,5 @@ def render_admin_voice_assistant(access:Mapping[str,Any]|None,admin_state:Mappin
             st.write(reply["answer"])
             components.html(_speech_html(reply["answer"],autoplay=False),height=52)
 
-    st.caption("DEV: reprodução usa a voz PT-BR disponível no navegador. A voz original AtlasQuant será conectada pelo adaptador TTS oficial.")
+    st.caption("DEV: reprodução usa a voz PT-BR disponível no navegador. A voz original AION será conectada pelo adaptador TTS oficial.")
     return briefing
