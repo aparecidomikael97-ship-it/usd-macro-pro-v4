@@ -52,7 +52,7 @@ def _bias(direction:object)->str:
 
 
 def _blocked(pack:Mapping[str,Any])->bool:
-    data=dict(pack.get("data_ready",{}) or {})
+    data=_mapping(pack.get("data_ready"))
     state=str(pack.get("state","")).upper()
     gate=str(pack.get("gate","")).upper()
     if not bool(data.get("sufficient",False)):
