@@ -707,7 +707,11 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     c1.metric("Melhor contexto",opctx.get("label",best["pair"])); c2.metric("Prioridade",f"{best['priority']:.1f}/100"); c3.metric("Mais forte (G8)",strongest); c4.metric("Mais fraca (G8)",weakest)
     st.info(opctx.get("state",best["state"]) if no_trade else best["state"])
     if no_trade:
-        st.error("🚫 NENHUM SETUP EXECUTÁVEL AGORA — os vieses macro continuam visíveis, mas nenhum dos 7 pares passou pelos hard gates/frescor.")
+        st.warning(
+            "🚫 NENHUM SETUP EXECUTÁVEL AGORA — os vieses macro continuam visíveis, "
+            "mas nenhum dos 7 pares passou pelos hard gates/frescor. "
+            "Isto é estado de mercado, não erro do sistema."
+        )
     st.caption("Saúde do processo x prontidão dos dados")
     h1,h2,h3=st.columns(3)
     h1.metric("Dados técnicos suficientes",f"{data_ok}/7")
@@ -776,7 +780,14 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     if _diff>0:
         st.success(f"🟢 {_base_sel} está {_diff:.1f} pts acima de {_quote_sel}. Em força relativa, isso favorece {pair} para CIMA — ainda sujeito aos demais gates.")
     elif _diff<0:
-        st.error(f"🔴 {_quote_sel} está {abs(_diff):.1f} pts acima de {_base_sel}. Em força relativa, isso favorece {pair} para BAIXO — ainda sujeito aos demais gates.")
+        st.markdown(
+            f"""<div style="border:1px solid rgba(255,107,122,.36);border-radius:12px;
+            padding:10px 12px;background:rgba(255,107,122,.08);font-weight:700">
+            🔴 {_quote_sel} está {abs(_diff):.1f} pts acima de {_base_sel}. Em força relativa,
+            isso favorece {pair} para BAIXO — ainda sujeito aos demais gates.
+            </div>""",
+            unsafe_allow_html=True,
+        )
     else:
         st.info("⚪ As duas moedas estão equilibradas na força relativa do modelo.")
 
@@ -817,7 +828,10 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     if _dr.get("sufficient"):
         st.success(f"✅ SIM — {_dr.get('label','')} · {_safe(_dr.get('score',0)):.0f}/100")
     else:
-        st.error(f"❌ NÃO — {_dr.get('label','')} · {_safe(_dr.get('score',0)):.0f}/100")
+        st.warning(
+            f"⛔ DADOS INSUFICIENTES — {_dr.get('label','')} · "
+            f"{_safe(_dr.get('score',0)):.0f}/100 · bloqueio operacional, não erro do sistema."
+        )
         if _dr.get("missing"):
             st.caption("Faltando: " + " · ".join(_dr.get("missing",[])[:6]))
     _tf=_dr.get("timeframes",{}) or {}
@@ -829,7 +843,11 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     st.caption("Limites de frescor: M15 ≤60 min (aviso até 90) · H1 ≤150 min (aviso até 210) · H4 ≤360 min (aviso até 480).")
 
     if p["hard_blocks"]:
-        st.error("**Bloqueios duros:** " + " · ".join(p["hard_blocks"]))
+        st.warning(
+            "**⛔ Bloqueios duros — não executar:** "
+            + " · ".join(p["hard_blocks"])
+            + " · estado de proteção, não erro do sistema."
+        )
     elif p["soft_blocks"]:
         st.warning("**Faltando antes da execução:** " + " · ".join(p["soft_blocks"]))
     else:
@@ -902,9 +920,12 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
 
     st.markdown("### 🎯 Plano objetivo")
     msg=f"**Decisão:** {p['state']} · **Direção:** {p['direction']} · **Motivo dominante:** {p['reason']} · **Próximo passo:** {p['next_action']}"
-    if p["state"].startswith("🟢"): st.success(msg)
-    elif p["state"].startswith("🔴"): st.error(msg)
-    else: st.warning(msg)
+    if p["state"].startswith("🟢"):
+        st.success(msg)
+    elif p["state"].startswith("🔴"):
+        st.warning("⛔ BLOQUEIO OPERACIONAL — " + msg + " · não é erro do sistema.")
+    else:
+        st.warning(msg)
 
     with st.expander("📚 Como ler o V11.0.8"):
         st.markdown("""
