@@ -221,11 +221,22 @@ class CollectorTests(unittest.TestCase):
 
 
     def test_unsupported_pair_or_interval_never_reserves_or_calls_provider(self):
-        for pair,interval in (("EUR/JPY","15min"),("EUR/USD","30min")):
+        for pair,interval in (("USD/BRL","15min"),("EUR/USD","30min")):
             with self.subTest(pair=pair,interval=interval), patch.object(ap.requests,'get',side_effect=AssertionError('must not call')):
                 d,e=ap.td_fetch(pair,interval,100)
                 self.assertTrue(d.empty); self.assertTrue(e)
         self.assertEqual(self.store.writes,0)
+
+    def test_all_28_canonical_pairs_are_collector_eligible(self):
+        from atlasquant_instrument_registry import FX_28
+        for symbol in FX_28:
+            pair=f"{symbol[:3]}/{symbol[3:]}"
+            with self.subTest(pair=pair), patch.object(ap.requests,'get',return_value=self.response()) as get:
+                # Reset in-memory cache so eligibility, not cache reuse, is exercised.
+                ap._TD_SERIES={'series':{}}
+                d,e=ap.td_fetch(pair,'15min',100)
+                self.assertFalse(d.empty, msg=e)
+                self.assertEqual(get.call_count,1)
 
     def test_generic_provider_error_does_not_trip_quota_circuit(self):
         response=self.response(200,{'status':'error','message':'invalid symbol'})
