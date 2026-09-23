@@ -2,7 +2,10 @@ import unittest
 
 from atlasquant_academy import ACADEMY_TOPICS
 from atlasquant_academy_media import (
+    academy_media_bundle_markdown,
     academy_media_catalog,
+    academy_media_manifest,
+    academy_media_manifest_json,
     academy_media_readiness,
     academy_video_script,
     academy_video_scripts_ready,
@@ -45,6 +48,32 @@ class AtlasQuantAcademyMediaTests(unittest.TestCase):
             self.assertFalse(item["rendered_video"])
             self.assertFalse(item["published_video"])
             self.assertFalse(item["trading_side_effects"])
+
+    def test_production_manifest_covers_every_topic_without_fake_publish(self):
+        manifest=academy_media_manifest()
+        self.assertEqual(manifest["schema"],"ATLASQUANT_ACADEMY_PRODUCTION_MANIFEST_V1")
+        self.assertEqual(manifest["total_items"],len(ACADEMY_TOPICS))
+        self.assertTrue(manifest["all_scripts_ready"])
+        self.assertEqual(manifest["rendered_items"],0)
+        self.assertEqual(manifest["published_items"],0)
+        self.assertTrue(manifest["external_render_required"])
+        self.assertFalse(manifest["automatic_publish"])
+        self.assertFalse(manifest["trading_side_effects"])
+        self.assertEqual(
+            [x["topic_id"] for x in manifest["items"]],
+            [x["id"] for x in ACADEMY_TOPICS],
+        )
+        self.assertTrue(all(x["suggested_filename"].endswith(".mp4") for x in manifest["items"]))
+        self.assertTrue(all(x["status"]=="SCRIPT_READY_MEDIA_PENDING" for x in manifest["items"]))
+
+    def test_production_bundle_exports_json_and_markdown(self):
+        raw=academy_media_manifest_json()
+        md=academy_media_bundle_markdown()
+        self.assertIn("ATLASQUANT_ACADEMY_PRODUCTION_MANIFEST_V1",raw)
+        self.assertIn("# AtlasQuant Academy",md)
+        self.assertIn("### Narração",md)
+        self.assertIn("### Storyboard",md)
+        self.assertIn("mídia ainda não renderizada/publicada",md)
 
     def test_unknown_topic_fails_closed(self):
         self.assertIsNone(academy_video_script("missing-topic"))
