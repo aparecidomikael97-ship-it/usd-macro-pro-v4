@@ -9,6 +9,7 @@ import base64
 import streamlit as st
 import streamlit.components.v1 as components
 from atlasquant_admin_voice_briefing import build_admin_voice_briefing
+from atlasquant_admin_voice_qa import answer_admin_question
 
 SESSION_SPOKEN_KEY="atlasquant_admin_voice_spoken"
 
@@ -40,7 +41,7 @@ if(auto) setTimeout(speak,350);
 def render_admin_voice_assistant(access:Mapping[str,Any]|None,admin_state:Mapping[str,Any]|None, *,
                                  user_name:str="Mikael",changes_since_last_login:Sequence[Any]|None=None,
                                  macro_summary:Sequence[Any]|None=None,opportunities:Sequence[Mapping[str,Any]]|None=None,
-                                 important_alerts:Sequence[Any]|None=None)->dict[str,Any]|None:
+                                 important_alerts:Sequence[Any]|None=None,paper_summary:Mapping[str,Any]|None=None)->dict[str,Any]|None:
     if not _is_admin(access):
         return None
     briefing=build_admin_voice_briefing(dict(admin_state or {}),user_name=user_name,
@@ -52,5 +53,24 @@ def render_admin_voice_assistant(access:Mapping[str,Any]|None,admin_state:Mappin
     already=bool(st.session_state.get(SESSION_SPOKEN_KEY,False))
     components.html(_speech_html(briefing["spoken_text"],autoplay=not already),height=52)
     if not already:st.session_state[SESSION_SPOKEN_KEY]=True
+
+    with st.expander("💬 Conversar com o assistente",expanded=False):
+        q=st.text_input(
+            "Pergunte sobre sistema, mudanças, macro, Radar, Paper ou release",
+            key="atlasquant_admin_voice_question",
+            placeholder="Ex.: O que mudou desde meu último acesso?",
+        )
+        if q:
+            reply=answer_admin_question(
+                q,
+                admin_state=admin_state,
+                changes=changes_since_last_login,
+                macro_summary=macro_summary,
+                opportunities=opportunities,
+                paper_summary=paper_summary,
+            )
+            st.write(reply["answer"])
+            components.html(_speech_html(reply["answer"],autoplay=False),height=52)
+
     st.caption("DEV: reprodução usa a voz PT-BR disponível no navegador. A voz original AtlasQuant será conectada pelo adaptador TTS oficial.")
     return briefing
