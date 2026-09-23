@@ -54,7 +54,7 @@ def build_admin_voice_briefing(admin_state:Mapping[str,Any],*,user_name:str="Mik
     else:current=current.astimezone(tz)
     system=str(state.get("system_state","UNKNOWN")).upper()
     if system not in SAFE_STATES:system="UNKNOWN"
-    name=_clean_name(user_name);parts=[f"{_greeting(current.hour)}, {name}. Vou te atualizar sobre o AtlasQuant."]
+    name=_clean_name(user_name);parts=[f"{_greeting(current.hour)}, {name}. Aqui é o AION. Vou te atualizar sobre o AtlasQuant."]
     banner=str(state.get("banner","")).strip()
     release=str(state.get("release_state","NOT_READY")).upper()
     if system=="NORMAL":
@@ -83,11 +83,11 @@ def build_admin_voice_briefing(admin_state:Mapping[str,Any],*,user_name:str="Mik
 
     if state.get("new_entries_allowed") is not True:
         parts.append("Neste momento, o assistente não considera novas entradas autorizadas.")
-    parts.append("Eu posso explicar qualquer um desses pontos em mais detalhes.")
+    parts.append("Se quiser, pode me perguntar sobre o sistema, mercado ou qualquer outro assunto.")
     spoken=" ".join(parts)
     priority="IMPORTANT_ALERT" if system in {"PROTECTED","HALTED","UNKNOWN"} or alerts else "SYSTEM_UPDATE"
     return {
-        "profile":admin_voice_profile(),
+        "assistant_name":"AION","profile":admin_voice_profile(),
         "language":"pt-BR",
         "mode":priority,
         "system_state":system,
