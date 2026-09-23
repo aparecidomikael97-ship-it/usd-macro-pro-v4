@@ -26,7 +26,7 @@ def test_happy_path_gate_risk_paper_result_restart_metrics():
  snap=paper_state_snapshot([{"pair":"EUR/USD","status":"OPEN","paper_request_id":"P-E2E","opportunity_id":"O-E2E"}],created_at=NOW.isoformat())
  rec=recover_paper_state(snap,current_market={"EUR/USD":{"price":1.18,"fresh":True,"valid":True}})
  assert rec["ok"] and rec["trades"][0]["recovery_state"]=="RECOVERED"
- daily=reconcile_day([{"state":"PAPER_ACCEPTED"}],[{"status":"CLOSED","net_r":result["net_r"]}])
+ daily=reconcile_day([{"state":"PAPER_ACCEPTED"}],[{"environment":"PAPER","status":"CLOSED","net_r":result["net_r"]}])
  assert daily["net_r"]==1.85 and daily["environment"]=="PAPER"
 
 def test_news_lock_never_reaches_authorized_paper():
