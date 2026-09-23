@@ -9753,15 +9753,54 @@ if _aq_active_index == 0:
                 st.caption(f"Coverage Funnel em modo compatível: {_ATLASQUANT_COVERAGE_IMPORT_ERROR}")
 
             if render_pair_intelligence_v110 is None:
-                st.error("A Central Institucional V11.0.8 não pôde ser carregada.")
+                st.warning(
+                    "Central Institucional indisponível neste carregamento; "
+                    "o Radar principal continua seguro."
+                )
                 if _PAIR_INTEL_V110_IMPORT_ERROR:
                     st.caption(f"Diagnóstico: {_PAIR_INTEL_V110_IMPORT_ERROR}")
             else:
-                render_pair_intelligence_v110(
-                    matriz_v61,
-                    ranking,
-                    fed=fed,
-                    macro_context=_macro_v108,
-                    weights=PESOS,
-                    runtime_snapshot=_aq_runtime_snapshot,
-                )
+                try:
+                    render_pair_intelligence_v110(
+                        matriz_v61,
+                        ranking,
+                        fed=fed,
+                        macro_context=_macro_v108,
+                        weights=PESOS,
+                        runtime_snapshot=_aq_runtime_snapshot,
+                    )
+                except Exception as _aq_pair_intel_exc:
+                    st.warning(
+                        "Diagnóstico institucional avançado entrou em modo seguro. "
+                        "O Radar principal continua disponível e nenhuma permissão operacional foi ampliada."
+                    )
+                    st.caption(
+                        "Falha isolada no diagnóstico avançado: "
+                        + type(_aq_pair_intel_exc).__name__
+                    )
+                    _fallback_packs=list((_aq_runtime_snapshot or {}).get("packs",[]) or [])
+                    if _fallback_packs:
+                        _fallback_rows=[]
+                        for _p in _fallback_packs[:10]:
+                            if not isinstance(_p,dict):
+                                continue
+                            _raw_dr=_p.get("data_ready",{})
+                            _dr=dict(_raw_dr) if isinstance(_raw_dr,dict) else {}
+                            try:
+                                _pri=float(_p.get("priority",0) or 0)
+                            except Exception:
+                                _pri=0.0
+                            try:
+                                _dscore=float(_dr.get("score",0) or 0)
+                            except Exception:
+                                _dscore=0.0
+                            _fallback_rows.append({
+                                "Par":str(_p.get("pair","—")),
+                                "Direção":str(_p.get("direction","⚪ AGUARDAR")),
+                                "Estado":str(_p.get("state","⚪ AGUARDAR")),
+                                "Prioridade":round(_pri,1),
+                                "Dados":round(_dscore,1),
+                                "Gate":str(_p.get("gate","—")),
+                            })
+                        if _fallback_rows:
+                            st.dataframe(pd.DataFrame(_fallback_rows),hide_index=True,width="stretch")
