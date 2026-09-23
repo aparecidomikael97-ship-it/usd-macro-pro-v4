@@ -35,9 +35,10 @@ def attach_result(decision:Mapping[str,Any],*,outcome:str,realized_r:float,mae_r
  actual=str(outcome).upper()
  if actual not in {"WIN","LOSS","BREAKEVEN"}: raise ValueError("invalid outcome")
  if actual!=expected: raise ValueError("outcome inconsistent with net_r")
- closed=_iso(closed_at)
+ closed_inferred=closed_at is None
+ closed=_iso(closed_at if closed_at is not None else d.get("timestamp"))
  if closed<_iso(d.get("timestamp")): raise ValueError("result closes before decision")
- base={k:v for k,v in d.items() if k!="record_id"}; base.update({"record_type":"RESULT","decision_record_id":d["record_id"],"outcome":actual,"realized_r":realized,"spread_cost_r":spread,"slippage_cost_r":slip,"net_r":net,"mae_r":mae_r,"mfe_r":mfe_r,"closed_at":closed,"status":"CLOSED"})
+ base={k:v for k,v in d.items() if k!="record_id"}; base.update({"record_type":"RESULT","decision_record_id":d["record_id"],"outcome":actual,"realized_r":realized,"spread_cost_r":spread,"slippage_cost_r":slip,"net_r":net,"mae_r":mae_r,"mfe_r":mfe_r,"closed_at":closed,"closed_at_inferred":closed_inferred,"status":"CLOSED"})
  if str(base.get("environment","")).upper()=="PAPER": base["real_orders_enabled"]=False
  base["record_id"]=_hash("RES-",base); return base
 def rejected_record(**kwargs)->dict[str,Any]:
