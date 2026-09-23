@@ -227,10 +227,41 @@ html { scroll-behavior: smooth; }
   opacity: 1 !important;
   font-weight: 800 !important;
 }
-[data-testid="stButton"] button {
-  border-radius: 10px; min-height: 2.45rem; font-weight: 700;
-  border: 1px solid var(--aq-line);
+/* High-contrast controls: fixes washed-out text inside cards, buttons and selectors. */
+.stApp [data-testid="stButton"] button,
+.stApp [data-testid="stButton"] button *,
+.stApp [data-testid="stDownloadButton"] button,
+.stApp [data-testid="stDownloadButton"] button * {
+  color:#f8fbff !important;
+  -webkit-text-fill-color:#f8fbff !important;
+  opacity:1 !important;
+  font-weight:800 !important;
 }
+[data-testid="stButton"] button {
+  border-radius: 10px; min-height: 2.45rem; font-weight: 800;
+  border: 1px solid rgba(174,202,235,.34);
+  background:rgba(17,38,64,.92);
+}
+.stApp [data-baseweb="select"] > div,
+.stApp [data-baseweb="select"] span,
+.stApp [data-baseweb="select"] input,
+.stApp [role="listbox"],
+.stApp [role="option"] {
+  color:#f8fbff !important;
+  -webkit-text-fill-color:#f8fbff !important;
+  opacity:1 !important;
+  font-weight:700 !important;
+}
+.stApp [data-baseweb="select"] > div {background:#10233a !important;border-color:rgba(174,202,235,.34) !important;}
+.stApp [role="listbox"] {background:#10233a !important;}
+.stApp [role="option"]:hover {background:#183a61 !important;}
+.stApp [data-testid="stRadio"] label,
+.stApp [data-testid="stRadio"] label *,
+.stApp [data-testid="stCheckbox"] label,
+.stApp [data-testid="stCheckbox"] label * {
+  color:#f2f6fb !important;-webkit-text-fill-color:#f2f6fb !important;opacity:1 !important;
+}
+
 [data-testid="stButton"] button[kind="primary"] {
   box-shadow: 0 8px 24px rgba(79,163,255,.16);
 }
