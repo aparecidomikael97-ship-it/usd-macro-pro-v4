@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import Any,Mapping
 import hashlib
 
-VOICE_CONTRACT_VERSION="ATLASQUANT_ADMIN_TTS_V1"
+VOICE_CONTRACT_VERSION="AION_ADMIN_TTS_V1"
 
 def build_admin_tts_request(text:str,*,mode:str="SYSTEM_UPDATE")->dict[str,Any]:
     clean=" ".join(str(text or "").strip().split())
@@ -19,12 +19,12 @@ def build_admin_tts_request(text:str,*,mode:str="SYSTEM_UPDATE")->dict[str,Any]:
     return {
         "schema":VOICE_CONTRACT_VERSION,
         "request_id":request_id,
-        "profile_id":"ATLAS_VOICE_PT_BR_V1",
+        "profile_id":"AION_VOICE_PT_BR_V1",
         "language":"pt-BR",
         "text":clean,
         "mode":m,
         "style":{
-            "identity":"ORIGINAL_ATLASQUANT",
+            "identity":"ORIGINAL_AION_ATLAS_CODE",
             "presentation":"masculina",
             "delivery":"calma, sofisticada, comunicativa, objetiva e levemente futurista",
             "pronunciation":"Português natural do Brasil",
