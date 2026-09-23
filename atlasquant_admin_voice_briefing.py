@@ -5,6 +5,7 @@ voice can explain and alert, but never authorizes orders or bypasses gates.
 """
 from __future__ import annotations
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from typing import Any,Mapping,Sequence
 from atlasquant_admin_voice_profile import admin_voice_profile
 
@@ -39,14 +40,18 @@ def _opportunity_sentence(rows:Sequence[Mapping[str,Any]]|None)->str|None:
     if preparing:return f"Não há entrada liberada agora. Estou acompanhando {', '.join(preparing[:3])} em preparação."
     return None
 
-def build_admin_voice_briefing(admin_state:Mapping[str,Any],*,user_name:str="Mikael",now:datetime|None=None,
+def build_admin_voice_briefing(admin_state:Mapping[str,Any],*,user_name:str="Mikael",now:datetime|None=None,timezone_name:str="America/Sao_Paulo",
                                changes_since_last_login:Sequence[Any]|None=None,
                                macro_summary:Sequence[Any]|None=None,
                                opportunities:Sequence[Mapping[str,Any]]|None=None,
                                important_alerts:Sequence[Any]|None=None,
                                max_changes:int=4,max_macro:int=3)->dict[str,Any]:
-    state=dict(admin_state or {});current=now or datetime.now(timezone.utc)
-    if current.tzinfo is None:current=current.replace(tzinfo=timezone.utc)
+    state=dict(admin_state or {})
+    try:tz=ZoneInfo(str(timezone_name or "America/Sao_Paulo"))
+    except Exception:tz=timezone.utc
+    current=now or datetime.now(tz)
+    if current.tzinfo is None:current=current.replace(tzinfo=tz)
+    else:current=current.astimezone(tz)
     system=str(state.get("system_state","UNKNOWN")).upper()
     if system not in SAFE_STATES:system="UNKNOWN"
     name=_clean_name(user_name);parts=[f"{_greeting(current.hour)}, {name}. Vou te atualizar sobre o AtlasQuant."]
@@ -92,5 +97,5 @@ def build_admin_voice_briefing(admin_state:Mapping[str,Any],*,user_name:str="Mik
         "auto_play_on_admin_open":True,
         "voice_can_authorize_orders":False,
         "real_orders_enabled":False,
-        "source_of_truth":"ADMIN_MISSION_CONTROL",
+        "source_of_truth":"ADMIN_MISSION_CONTROL","timezone":str(timezone_name),
     }
