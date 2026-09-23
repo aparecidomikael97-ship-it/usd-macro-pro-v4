@@ -60,7 +60,9 @@ def paper_request_from_authorization(auth:Mapping[str,Any], *, now:datetime|None
     request_id=paper_request_id_for_authorization(a)
     return {"accepted":ok,"paper_request_id":request_id if ok else None,
             "risk_auth_id":a.get("risk_auth_id"),"opportunity_id":a.get("opportunity_id"),"pair":auth_pair or a.get("pair"),
-            "strategy_version":a.get("strategy_version"),"max_risk":max_risk if _positive(max_risk) else 0,
+            "strategy_version":a.get("strategy_version"),"direction":a.get("direction"),"authorized_entry_price":a.get("entry_price"),
+            "authorized_stop_price":a.get("stop_price"),"auth_expires_at":a.get("expires_at"),
+            "max_risk":max_risk if _positive(max_risk) else 0,
             "max_exposure":max_exp if _positive(max_exp) else 0,"environment":"PAPER",
             "real_orders_enabled":False,"reasons":reasons}
 
