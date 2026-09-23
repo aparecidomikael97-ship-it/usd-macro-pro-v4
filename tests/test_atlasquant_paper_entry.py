@@ -38,9 +38,16 @@ def test_invalid_entry_price_blocks():
  assert "ENTRY_PRICE_INVALID" in activate_paper_entry(trade(),auth(),market(price=float("nan")),now=NOW)["reasons"]
 
 def test_already_open_entry_event_is_idempotent():
- t=trade(status="OPEN",entry_event_id="PENTRY-X")
+ first=activate_paper_entry(trade(),auth(),market(),now=NOW)
+ t=first["trade"]
+ r=activate_paper_entry(t,auth(),market(fresh=False),system_state="PROTECTED",now=NOW+timedelta(minutes=20))
+ assert r["state"]=="ALREADY_OPEN" and not r["opened"] and r["trade"]["entry_event_id"]==t["entry_event_id"]
+
+def test_forged_already_open_entry_event_is_rejected():
+ first=activate_paper_entry(trade(),auth(),market(),now=NOW)
+ t={**first["trade"],"entry_event_id":"PENTRY-FORGED"}
  r=activate_paper_entry(t,auth(),market(),now=NOW)
- assert r["state"]=="ALREADY_OPEN" and not r["opened"] and r["trade"]["entry_event_id"]=="PENTRY-X"
+ assert r["state"]=="REJECTED" and "ENTRY_EVENT_ID_INVALID" in r["reasons"]
 
 def test_missing_or_wrong_stop_geometry_blocks_entry():
  assert "STRUCTURAL_STOP_PRICE_INVALID" in activate_paper_entry(trade(),auth(stop_price=None),market(),now=NOW)["reasons"]
