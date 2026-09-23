@@ -119,6 +119,27 @@ class AtlasQuantHomeRadarTests(unittest.TestCase):
         self.assertEqual(set(row["pair"] for row in rows),set(pairs))
         self.assertTrue(all(row["action"] in {"COMPRA","VENDA","NÃO OPERAR"} for row in rows))
 
+    def test_malformed_runtime_rows_fail_closed_without_crashing(self):
+        rows=home_rows_from_packs([
+            None,
+            "corrupted-row",
+            123,
+            {
+                "pair":"EUR/USD",
+                "direction":"COMPRA",
+                "state":"🟢 EXECUTÁVEL",
+                "gate":"A",
+                "data_ready":"invalid",
+                "strength":"invalid",
+                "signal_lifecycle":"invalid",
+            },
+        ])
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]["pair"],"EUR/USD")
+        self.assertEqual(rows[0]["action"],"NÃO OPERAR")
+        self.assertEqual(rows[0]["data_score"],0.0)
+        self.assertFalse(rows[0]["data_ready"])
+
     def test_summary_is_conservative(self):
         rows=home_rows_from_packs([
             _pack(pair="EUR/USD"),
