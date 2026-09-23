@@ -13,3 +13,18 @@ def test_normal_state_without_explicit_healthy_is_not_trusted():
 def test_naive_health_clock_is_emitted_as_utc():
  from datetime import datetime
  r=system_health(good(),now=datetime(2026,9,23,12));assert r["checked_at"].endswith("+00:00")
+
+def test_freshness_can_protect_stale_market_and_halt_stale_risk():
+ from datetime import datetime,timezone,timedelta
+ now=datetime(2026,9,23,12,tzinfo=timezone.utc);x=good()
+ for row in x.values():row["last_ok"]=(now-timedelta(seconds=10)).isoformat()
+ x["market_data"]["last_ok"]=(now-timedelta(seconds=61)).isoformat()
+ r=system_health(x,now=now,max_age_seconds=60);assert r["state"]=="PROTECTED" and "MARKET_DATA_HEARTBEAT_STALE" in r["reasons"]
+ x=good()
+ for row in x.values():row["last_ok"]=(now-timedelta(seconds=10)).isoformat()
+ x["risk"]["last_ok"]=(now-timedelta(seconds=61)).isoformat()
+ r=system_health(x,now=now,max_age_seconds=60);assert r["state"]=="HALTED" and "RISK_HEARTBEAT_STALE" in r["reasons"]
+
+def test_invalid_freshness_config_fails_closed():
+ r=system_health(good(),max_age_seconds=0)
+ assert r["state"]=="HALTED" and "HEALTH_FRESHNESS_CONFIG_INVALID" in r["reasons"]
