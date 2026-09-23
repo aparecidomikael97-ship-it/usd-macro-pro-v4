@@ -8,7 +8,7 @@ def audit_paper_decision(opportunity:Mapping[str,Any],risk:Mapping[str,Any],pape
     accepted=bool(p.get("accepted",False))
     env="PAPER"
     gates=dict(o.get("gates",{}) or {})
-    risk_snapshot={k:r.get(k) for k in ("risk_gate","approved","risk_auth_id","reasons","expires_at","max_authorized_risk","max_authorized_exposure")}
+    risk_snapshot={k:r.get(k) for k in ("risk_gate","approved","risk_auth_id","reasons","issued_at","expires_at","max_authorized_risk","max_authorized_exposure","direction","entry_price","stop_price","fail_closed","real_orders_enabled")}
     builder=decision_record if accepted else rejected_record
     row=builder(opportunity_id=str(o.get("opportunity_id","")),environment=env,pair=str(o.get("pair","")),
         direction=str(o.get("direction","")),strategy_version=str(o.get("strategy_version","")),
