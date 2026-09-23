@@ -15,3 +15,24 @@ def test_scorecards_separate_strategy_pair_session():
  rows=[trade(1),trade(-1,pair="GBP/USD",strategy="FVG1",session="NEW_YORK")]
  s=scorecards(rows,min_sample=1)
  assert set(s["strategy_version"])=={"AMD1","FVG1"} and set(s["pair"])=={"EUR/USD","GBP/USD"} and set(s["session"])=={"LONDON","NEW_YORK"}
+
+def test_duplicate_result_id_is_not_double_counted():
+ x=trade(1);x["record_id"]="RES-X";x["decision_record_id"]="DEC-X"
+ r=reconcile_day([], [x,dict(x)])
+ assert r["closed"]==1 and r["net_r"]==1 and not r["integrity_ok"]
+ assert any("DUPLICATE_RESULT_RECORD" in z for z in r["integrity_reasons"])
+
+def test_two_results_for_same_decision_are_not_double_counted():
+ a=trade(1);a["record_id"]="RES-A";a["decision_record_id"]="DEC-X"
+ b=trade(-5);b["record_id"]="RES-B";b["decision_record_id"]="DEC-X"
+ r=reconcile_day([], [a,b])
+ assert r["closed"]==1 and r["net_r"]==1 and any("MULTIPLE_RESULTS_FOR_DECISION" in z for z in r["integrity_reasons"])
+
+def test_explicit_arithmetic_tamper_is_excluded():
+ x=trade(1,realized_r=1.5);x["spread_cost_r"]=.1;x["slippage_cost_r"]=.1
+ r=reconcile_day([], [x])
+ assert r["closed"]==0 and r["net_r"]==0 and any("ARITHMETIC_MISMATCH" in z for z in r["integrity_reasons"])
+
+def test_invalid_min_sample_does_not_silently_truncate():
+ r=reconcile_day([], [trade(1)],min_sample=2.5)
+ assert r["minimum_sample"]==30 and "MIN_SAMPLE_INVALID" in r["integrity_reasons"]
