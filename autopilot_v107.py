@@ -759,6 +759,20 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
                 "label":"⚪ INSTITUCIONAL INDISPONÍVEL",
                 "error":f"{type(_inst_exc).__name__}: {_inst_exc}",
             }
+
+        # Re-freeze attribution only after the institutional snapshot exists.
+        # This may add BOS/CHOCH + Order Block as a research candidate, but it
+        # never creates a Paper trade here and never widens execution gates.
+        _ict_final=dict(_tec.get("ict",{}) or {})
+        _ict_final["setup_candidates"]=build_setup_candidates(
+            pair=_pair,
+            side=_side,
+            ict_snapshot=_ict_final,
+            captured_at=now.isoformat(),
+            institutional_snapshot=_tec.get("institutional",{}),
+        )
+        _tec["ict"]=_ict_final
+
         _old["tecnico"] = _tec
         results[_pair] = _old
 
