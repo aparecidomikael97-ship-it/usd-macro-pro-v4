@@ -7,6 +7,7 @@ from datetime import datetime,timezone
 from typing import Any,Mapping
 import hashlib,math
 from atlasquant_instrument_registry import normalize_fx_symbol
+from atlasquant_paper_authorization_bridge import paper_request_id_for_authorization
 
 def _utc(value:datetime|None)->datetime:
     d=value or datetime.now(timezone.utc)
@@ -59,6 +60,9 @@ def activate_paper_entry(waiting_trade:Mapping[str,Any],auth:Mapping[str,Any],ma
     rid=str(t.get("paper_request_id","")).strip()
     if not rid:
         return {"state":"REJECTED","opened":False,"trade":t,"reasons":["PAPER_REQUEST_ID_MISSING"],"real_orders_enabled":False}
+    expected_request=paper_request_id_for_authorization(a)
+    if not expected_request or rid!=expected_request:
+        return {"state":"REJECTED","opened":False,"trade":t,"reasons":["PAPER_REQUEST_ID_AUTH_MISMATCH"],"real_orders_enabled":False}
     seed=f"{rid}|{a.get('risk_auth_id')}|ENTRY"
     out=dict(t)
     out.update({"status":"OPEN","entry_price":float(price),"stop_price":float(stop),"direction":direction,"opened_at":current.isoformat(),
