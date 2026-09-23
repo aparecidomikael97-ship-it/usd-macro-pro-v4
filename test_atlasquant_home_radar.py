@@ -4,6 +4,7 @@ from atlasquant_home_radar import (
     home_rows_from_packs,
     home_summary,
     voice_script_for_row,
+    RADAR_VISIBLE_LIMIT,
 )
 from atlasquant_session_profiles import (
     extract_session_bucket,
@@ -103,6 +104,13 @@ class AtlasQuantHomeRadarTests(unittest.TestCase):
         self.assertEqual(rows[0]["pair"],"AUD/USD")
         self.assertEqual(rows[-1]["pair"],"GBP/USD")
 
+
+    def test_radar_visible_limit_matches_approved_top_ten(self):
+        self.assertEqual(RADAR_VISIBLE_LIMIT,10)
+        source=__import__("pathlib").Path("atlasquant_home_radar.py").read_text(encoding="utf-8")
+        self.assertIn("top_n=min(RADAR_VISIBLE_LIMIT,len(rows))",source)
+        self.assertIn("Top 10 em observação",source)
+        self.assertIn("não significa entrada autorizada",source)
 
     def test_radar_preserves_all_seven_unique_pairs_when_supplied(self):
         pairs=["EUR/USD","GBP/USD","AUD/USD","NZD/USD","USD/JPY","USD/CHF","USD/CAD"]
