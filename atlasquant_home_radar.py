@@ -37,6 +37,11 @@ def _safe(value:Any, default:float=0.0)->float:
         return float(default)
 
 
+def _mapping(value:Any)->dict[str,Any]:
+    """Normalize persisted/runtime objects without letting malformed rows crash Radar."""
+    return dict(value) if isinstance(value,Mapping) else {}
+
+
 def _bias(direction:object)->str:
     raw=str(direction or "").upper()
     if "COMPRA" in raw or "BUY" in raw:
@@ -77,16 +82,18 @@ def _adr_label(value:Any)->str:
 def home_rows_from_packs(packs:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     rows=[]
     for raw in list(packs or []):
-        p=dict(raw or {})
-        pair=str(p.get("pair") or "—")
+        if not isinstance(raw,Mapping):
+            continue
+        p=dict(raw)
+        pair=str(p.get("pair") or "—").strip() or "—"
         bias=_bias(p.get("direction",p.get("side")))
         blocked=_blocked(p)
         action="NÃO OPERAR" if blocked or bias=="NEUTRO" else bias
-        data=dict(p.get("data_ready",{}) or {})
-        strength=dict(p.get("strength",{}) or {})
+        data=_mapping(p.get("data_ready"))
+        strength=_mapping(p.get("strength"))
         blockers=[str(x) for x in list(p.get("blockers",[]) or []) if str(x).strip()]
         session_bucket=extract_session_bucket(p)
-        signal=dict(p.get("signal_lifecycle",{}) or {})
+        signal=_mapping(p.get("signal_lifecycle"))
         if not signal:
             signal=derive_signal_view(p,timezone="UTC")
         signal_code=str(signal.get("status_code") or "UNVERIFIED")
@@ -329,9 +336,16 @@ def render_home_radar(
     c.metric("Não operar",summary["blocked"])
     d.metric("Melhor leitura",summary["best_pair"])
 
-    top_n=3 if mode=="Iniciante" else min(5,len(rows))
+    # Product decision: Radar is a visible watchlist, not a search box.
+    # Show up to the 10 best contexts in both modes; fewer only when the
+    # upstream universe itself has fewer than 10 audited assets.
+    top_n=min(10,len(rows))
     top=rows[:top_n]
-    st.markdown("### Agora")
+    st.markdown("### 🔟 Melhores ativos para observar agora")
+    st.caption(
+        "São prioridades de observação, não dez entradas. Se nenhum contexto passar os gates, "
+        "o Radar mostra NÃO OPERAR em vez de forçar oportunidade."
+    )
     cols=st.columns(min(3,len(top)))
     for idx,row in enumerate(top):
         with cols[idx%len(cols)]:
