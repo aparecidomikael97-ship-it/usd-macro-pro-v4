@@ -111,6 +111,32 @@ class AtlasQuantHomeRadarTests(unittest.TestCase):
         self.assertEqual(set(row["pair"] for row in rows),set(pairs))
         self.assertTrue(all(row["action"] in {"COMPRA","VENDA","NÃO OPERAR"} for row in rows))
 
+    def test_malformed_runtime_rows_do_not_crash_radar_adapter(self):
+        rows=home_rows_from_packs([
+            None,
+            "corrupted-row",
+            123,
+            {"pair":"EUR/USD","direction":"COMPRA","data_ready":"invalid","strength":"invalid"},
+        ])
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]["pair"],"EUR/USD")
+        self.assertEqual(rows[0]["action"],"NÃO OPERAR")
+        self.assertEqual(rows[0]["data_score"],0.0)
+
+    def test_radar_product_contract_is_top_ten_watchlist(self):
+        from pathlib import Path
+        src=Path("atlasquant_home_radar.py").read_text(encoding="utf-8")
+        self.assertIn("top_n=min(10,len(rows))",src)
+        self.assertIn("Melhores ativos para observar agora",src)
+        self.assertIn("não dez entradas",src)
+
+    def test_advanced_pair_panel_isolated_from_main_radar(self):
+        from pathlib import Path
+        src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        self.assertIn("except Exception as _aq_pair_intel_exc",src)
+        self.assertIn("O Radar principal continua disponível",src)
+        self.assertIn("_fallback_rows",src)
+
     def test_summary_is_conservative(self):
         rows=home_rows_from_packs([
             _pack(pair="EUR/USD"),
