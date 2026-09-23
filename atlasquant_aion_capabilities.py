@@ -29,7 +29,7 @@ CAPABILITIES={
     "external_platform_connectors":True,
     "youtube_connector":True,
     "spotify_connector":True,
-    "oauth_connection_manager":True,
+    "oauth_connection_manager":True,\n    "social_media_command_center":True,\n    "instagram_connector":True,\n    "tiktok_connector":True,\n    "content_creation_pipeline":True,\n    "approval_gated_publishing":True,\n    "social_analytics":True,
     "direct_order_authorization":False,
     "bypass_gate_or_risk":False,
     "automatic_production_promotion":False,
