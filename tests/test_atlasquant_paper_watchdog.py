@@ -9,3 +9,11 @@ def test_market_failure_protects_without_live_fallback():
  c["market_data"]["healthy"]=False
  r=paper_watchdog(c)
  assert r["state"]=="PROTECTED" and r["real_orders_enabled"] is False
+
+def test_watchdog_can_enforce_freshness_without_live_fallback():
+ from datetime import datetime,timezone,timedelta
+ now=datetime(2026,9,23,12,tzinfo=timezone.utc)
+ c={x:{"healthy":True,"last_ok":(now-timedelta(seconds=5)).isoformat()} for x in ("market_data","scanner","risk","result_store","paper_store")}
+ c["market_data"]["last_ok"]=(now-timedelta(seconds=90)).isoformat()
+ r=paper_watchdog(c,now=now,max_age_seconds=60)
+ assert r["state"]=="PROTECTED" and not r["new_paper_entries_allowed"] and r["real_orders_enabled"] is False
