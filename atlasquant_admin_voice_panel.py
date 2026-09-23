@@ -18,6 +18,8 @@ SESSION_SPOKEN_KEY="atlasquant_admin_voice_spoken"
 SESSION_MEMORY_KEY="atlasquant_aion_memory"
 SESSION_PENDING_ACTION_KEY="atlasquant_aion_pending_action"
 SESSION_APPROVED_ACTION_KEY="atlasquant_aion_approved_action"
+SESSION_LAST_REPLY_KEY="atlasquant_aion_last_reply"
+SESSION_LAST_EXECUTION_KEY="atlasquant_aion_last_connector_execution"
 
 def _is_admin(access:Mapping[str,Any]|None)->bool:
     a=dict(access or {})
@@ -50,7 +52,7 @@ def render_admin_voice_assistant(access:Mapping[str,Any]|None,admin_state:Mappin
                                  important_alerts:Sequence[Any]|None=None,paper_summary:Mapping[str,Any]|None=None,
                                  timezone_name:str|None=None,connections:Mapping[str,Any]|None=None,
                                  general_ai_adapter:Any=None,web_research_adapter:Any=None,
-                                 runtime_status:Mapping[str,Any]|None=None)->dict[str,Any]|None:
+                                 connector_adapter:Any=None,runtime_status:Mapping[str,Any]|None=None)->dict[str,Any]|None:
     if not _is_admin(access):
         return None
     tz_name=str(timezone_name or os.getenv("ATLASQUANT_TIMEZONE","America/Sao_Paulo") or "America/Sao_Paulo")
@@ -79,12 +81,15 @@ def render_admin_voice_assistant(access:Mapping[str,Any]|None,admin_state:Mappin
             "Pergunte sobre o AtlasQuant, mercado ou assuntos gerais. "
             "Perguntas atuais usam pesquisa quando o adaptador estiver conectado."
         )
-        q=st.text_input(
-            "Pergunte qualquer coisa",
-            key="atlasquant_admin_voice_question",
-            placeholder="Ex.: Como está o AtlasQuant? Ou: pesquise uma notícia atual para mim.",
-        )
-        if q:
+        with st.form("atlasquant_aion_chat_form",clear_on_submit=True):
+            q=st.text_input(
+                "Pergunte qualquer coisa",
+                key="atlasquant_admin_voice_question",
+                placeholder="Ex.: Como está o AtlasQuant? Ou: pesquise uma notícia atual para mim.",
+            )
+            ask=st.form_submit_button("Perguntar ao AION",type="primary")
+
+        if ask and str(q or "").strip():
             history=list(st.session_state.get(SESSION_MEMORY_KEY,[]) or [])
             try:
                 history=append_memory(history,role="user",text=q,metadata={"surface":"ADMIN_VOICE"})
@@ -101,6 +106,7 @@ def render_admin_voice_assistant(access:Mapping[str,Any]|None,admin_state:Mappin
                 connections=connections,
                 general_ai_adapter=general_ai_adapter,
                 web_research_adapter=web_research_adapter,
+                connector_adapter=connector_adapter,
             )
             answer=str(reply.get("answer") or "Não consegui responder com segurança.")
             try:
@@ -111,9 +117,16 @@ def render_admin_voice_assistant(access:Mapping[str,Any]|None,admin_state:Mappin
             except Exception:
                 pass
             st.session_state[SESSION_MEMORY_KEY]=history
+            st.session_state[SESSION_LAST_REPLY_KEY]=dict(reply)
+            pending=reply.get("pending_action")
+            if isinstance(pending,dict):
+                st.session_state[SESSION_PENDING_ACTION_KEY]=dict(pending)
+
+        reply=st.session_state.get(SESSION_LAST_REPLY_KEY)
+        if isinstance(reply,dict):
+            answer=str(reply.get("answer") or "Não consegui responder com segurança.")
             st.write(answer)
             components.html(_speech_html(answer,autoplay=False),height=52)
-
             sources=list(reply.get("sources",[]) or [])
             if sources:
                 st.markdown("**Fontes consultadas**")
@@ -123,32 +136,57 @@ def render_admin_voice_assistant(access:Mapping[str,Any]|None,admin_state:Mappin
                     if url.startswith(("https://","http://")):
                         st.markdown(f"- [{title}]({url})")
 
-            pending=reply.get("pending_action")
-            if isinstance(pending,dict):
-                st.session_state[SESSION_PENDING_ACTION_KEY]=pending
-                st.warning(
-                    "Ação externa preparada, mas ainda não executada. "
-                    "Confirme somente se quiser autorizar exatamente esta ação."
-                )
-                c1,c2=st.columns(2)
-                if c1.button("✅ Confirmar ação externa",key="atlasquant_aion_confirm_external"):
-                    try:
-                        approved=approve_pending_action(
-                            pending,
-                            approved_by=str(user_name or "Administrador"),
-                        )
-                    except Exception as exc:
-                        st.error(f"Não foi possível aprovar: {type(exc).__name__}.")
-                    else:
-                        st.session_state[SESSION_APPROVED_ACTION_KEY]=approved
+        pending=st.session_state.get(SESSION_PENDING_ACTION_KEY)
+        if isinstance(pending,dict):
+            st.warning(
+                "Ação externa preparada, mas ainda não executada. "
+                "Confirme somente se quiser autorizar exatamente esta ação."
+            )
+            c1,c2=st.columns(2)
+            if c1.button("✅ Confirmar ação externa",key="atlasquant_aion_confirm_external"):
+                try:
+                    approved=approve_pending_action(
+                        pending,
+                        approved_by=str(user_name or "Administrador"),
+                    )
+                except Exception as exc:
+                    st.error(f"Não foi possível aprovar: {type(exc).__name__}.")
+                else:
+                    st.session_state[SESSION_APPROVED_ACTION_KEY]=approved
+                    if connector_adapter is None:
                         st.session_state.pop(SESSION_PENDING_ACTION_KEY,None)
                         st.success(
-                            "Ação aprovada para o adaptador da plataforma. "
-                            "Nenhuma execução foi simulada ou presumida."
+                            "Ação aprovada, mas o adaptador da plataforma ainda não está conectado. "
+                            "Nenhuma execução foi presumida."
                         )
-                if c2.button("Cancelar",key="atlasquant_aion_cancel_external"):
-                    st.session_state.pop(SESSION_PENDING_ACTION_KEY,None)
-                    st.info("Ação cancelada.")
+                    else:
+                        try:
+                            execution=connector_adapter(
+                                provider=str(approved.get("provider") or ""),
+                                action_class=str(approved.get("action_class") or ""),
+                                payload=dict(approved.get("payload",{}) or {}),
+                                approved_action=approved,
+                            )
+                        except Exception as exc:
+                            st.error(
+                                "A ação foi aprovada, mas a plataforma não confirmou a execução: "
+                                f"{type(exc).__name__}."
+                            )
+                        else:
+                            completed=dict(approved)
+                            completed["executed"]=True
+                            st.session_state[SESSION_APPROVED_ACTION_KEY]=completed
+                            st.session_state[SESSION_LAST_EXECUTION_KEY]=dict(execution or {})
+                            st.session_state.pop(SESSION_PENDING_ACTION_KEY,None)
+                            result_text=str(
+                                dict(execution or {}).get("answer")
+                                or dict(execution or {}).get("summary")
+                                or "A plataforma confirmou a execução da ação autorizada."
+                            )
+                            st.success(result_text)
+            if c2.button("Cancelar",key="atlasquant_aion_cancel_external"):
+                st.session_state.pop(SESSION_PENDING_ACTION_KEY,None)
+                st.info("Ação cancelada.")
 
     st.caption("DEV: reprodução usa a voz PT-BR disponível no navegador. A voz original AION será conectada pelo adaptador TTS oficial.")
     return briefing
