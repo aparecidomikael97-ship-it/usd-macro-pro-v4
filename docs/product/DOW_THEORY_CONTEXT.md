@@ -39,3 +39,23 @@ maior e a correção/estrutura secundária está alinhada?**
 - até essa validação, entra como contexto observável e auditável.
 
 Esta decisão permanece fixa até alteração explícita do escopo.
+
+
+## Implementação de dados W1/D1/H4/H1
+
+A camada observacional usa apenas candles fechados já disponíveis no AtlasQuant:
+
+- W1: derivado de D1 concluído;
+- D1: candle diário concluído do cache/provider;
+- H4 e H1: cache técnico existente/validado.
+
+A leitura estrutural usa pivôs confirmados sem olhar candles futuros. Se qualquer
+histórico necessário estiver ausente ou insuficiente, o estado permanece
+UNKNOWN/INSUFFICIENT_DATA.
+
+Nesta fase, o mapa Dow:
+- não altera Quality Score;
+- não altera ranking;
+- não altera Gate;
+- não habilita execução;
+- serve para observação e formação de amostra para o experimento com/sem alinhamento Dow.
