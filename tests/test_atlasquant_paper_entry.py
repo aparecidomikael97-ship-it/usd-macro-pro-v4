@@ -1,10 +1,11 @@
 from datetime import datetime,timezone,timedelta
 from atlasquant_paper_entry import activate_paper_entry
+from atlasquant_paper_authorization_bridge import paper_request_id_for_authorization
 
 NOW=datetime(2026,9,23,12,tzinfo=timezone.utc)
 
 def trade(**kw):
- d={"paper_request_id":"P1","opportunity_id":"O1","pair":"EUR/USD","strategy_version":"AMD-1","risk_auth_id":"RA1",
+ d={"paper_request_id":paper_request_id_for_authorization(auth()),"opportunity_id":"O1","pair":"EUR/USD","strategy_version":"AMD-1","risk_auth_id":"RA1",
  "status":"WAIT_ENTRY","environment":"PAPER","real_orders_enabled":False};d.update(kw);return d
 
 def auth(**kw):
@@ -44,3 +45,7 @@ def test_already_open_entry_event_is_idempotent():
 def test_missing_or_wrong_stop_geometry_blocks_entry():
  assert "STRUCTURAL_STOP_PRICE_INVALID" in activate_paper_entry(trade(),auth(stop_price=None),market(),now=NOW)["reasons"]
  assert "STOP_GEOMETRY_INVALID" in activate_paper_entry(trade(),auth(direction="BUY",stop_price=1.19),market(),now=NOW)["reasons"]
+
+def test_forged_paper_request_id_never_opens():
+ r=activate_paper_entry(trade(paper_request_id="PAPER-FORGED"),auth(),market(),now=NOW)
+ assert not r["opened"] and "PAPER_REQUEST_ID_AUTH_MISMATCH" in r["reasons"]
