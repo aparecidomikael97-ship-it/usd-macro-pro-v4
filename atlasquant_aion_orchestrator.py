@@ -38,6 +38,7 @@ def answer_aion(
     connections:Mapping[str,Any]|None=None,
     general_ai_adapter:Adapter|None=None,
     web_research_adapter:Adapter|None=None,
+    connector_adapter:Adapter|None=None,
 )->dict[str,Any]:
     q=" ".join(str(question or "").strip().split())
     if not q:
@@ -74,10 +75,36 @@ def answer_aion(
                 "confirmation_required":True,
                 "real_orders_enabled":False,"voice_can_authorize_orders":False,
             }
+        if connector_adapter is None:
+            return {
+                "ok":False,"route":"EXTERNAL_PLATFORM_ADAPTER_UNAVAILABLE",
+                "answer":f"O conector {provider} está autorizado na conta, mas o adaptador de execução ainda não está conectado ao runtime do AION.",
+                "sources":[],"platform":platform,"confirmation_required":False,
+                "real_orders_enabled":False,"voice_can_authorize_orders":False,
+            }
+        try:
+            raw=connector_adapter(
+                provider=str(provider),
+                action_class="READ",
+                payload={"question":q},
+            )
+        except Exception as exc:
+            return {
+                "ok":False,"route":"EXTERNAL_PLATFORM_ERROR",
+                "answer":f"Não consegui consultar {provider} agora. O AION não vai fingir que a consulta foi concluída.",
+                "sources":[],"platform":platform,"adapter_error":type(exc).__name__,
+                "confirmation_required":False,
+                "real_orders_enabled":False,"voice_can_authorize_orders":False,
+            }
+        data=dict(raw or {}) if isinstance(raw,Mapping) else {}
+        answer=" ".join(str(data.get("answer") or data.get("summary") or "").strip().split())
+        if not answer:
+            answer=f"Consulta em {provider} concluída pelo adaptador. Os dados estruturados ficaram disponíveis para o AION."
         return {
-            "ok":True,"route":"EXTERNAL_PLATFORM_READ",
-            "answer":f"O conector {provider} está autorizado para leitura. A execução será feita pelo adaptador da plataforma quando ele estiver conectado ao runtime.",
-            "sources":[],"platform":platform,"confirmation_required":False,
+            "ok":bool(data.get("ok",True)),"route":"EXTERNAL_PLATFORM_READ",
+            "answer":answer,"sources":list(data.get("sources",[]) or []),
+            "platform":platform,"connector_result":data,"confirmation_required":False,
+            "source_of_truth":"EXTERNAL_PLATFORM",
             "real_orders_enabled":False,"voice_can_authorize_orders":False,
         }
 
