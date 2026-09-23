@@ -1,6 +1,6 @@
 {
   "version": "V10.7_FAST_BOOT_1",
-  "generated_at": "2026-09-23T22:20:39.711153+00:00",
+  "generated_at": "2026-09-23T22:45:22.449398+00:00",
   "app_version": "11.0.8 — STRENGTH ATTRIBUTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2",
   "pairs": [
     {
@@ -54,7 +54,7 @@
       "Score final": 55.0,
       "Qualidade": 91.0,
       "Confluência": "BAIXA",
-      "Dif. macro": -18.9,
+      "Dif. macro": -17.8,
       "Índice ranking": 69.4
     },
     {
@@ -68,10 +68,10 @@
     }
   ],
   "macro_context": {
-    "usd_score": 62.27752490769231,
+    "usd_score": 62.2698326,
     "usd_quality": 90.0,
     "fed_tone": "Restritivo",
-    "fed_strength": 0.5807692307692309,
+    "fed_strength": 0.5800000000000001,
     "trend": {
       "score": 53.0,
       "CPI": {
@@ -286,11 +286,12 @@
     },
     "fed": {
       "tom": "Restritivo",
-      "forca": 0.5807692307692309,
+      "forca": 0.5800000000000001,
       "titulos": [
         "Federal Reserve interest rate hike may trigger another brutal move for US Treasury yields - Yahoo Finance",
         "Federal Reserve official says inflation persistence led her to support interest rate hike - AP News",
         "Federal Reserve official says inflation persistence led her to support interest rate hike - kare11.com",
+        "Federal Reserve official says inflation persistence led her to support interest rate hike - Oskaloosa Herald",
         "Federal Reserve rate hike reflects new world of sticky inflation and faster growth - AP News",
         "Federal Reserve May Need More Rate Hikes as US Inflation Stays High - Межа. Новини України.",
         "What to know about US Federal Reserve’s first interest rate hike in 3 years - Al Jazeera",
@@ -298,8 +299,7 @@
         "In the News: Tyler Schipper on the Federal Reserve’s Interest Rate Hike - Newsroom | University of St. Thomas",
         "Trump blasts Federal Reserve over interest rate hike - KTVU",
         "How the first Federal Reserve interest rate hike in years impacts you - WALB",
-        "President Trump criticizes the Federal Reserve following interest rate hike - cbs8.com",
-        "How the first Federal Reserve interest rate hike in years impacts you - WRDW"
+        "President Trump criticizes the Federal Reserve following interest rate hike - cbs8.com"
       ],
       "analisadas": [
         {
@@ -326,6 +326,16 @@
           "titulo": "Federal Reserve official says inflation persistence led her to support interest rate hike - kare11.com",
           "corpo": "Federal Reserve official says inflation persistence led her to support interest rate hike",
           "fonte": "kare11.com",
+          "relevancia_pontos": 12,
+          "relevancia": "Alta",
+          "impacto": 0.55,
+          "direcao": "🟢 Favorável ao USD",
+          "explicacao": "Sinal mais restritivo: juros altos por mais tempo tendem a apoiar o dólar."
+        },
+        {
+          "titulo": "Federal Reserve official says inflation persistence led her to support interest rate hike - Oskaloosa Herald",
+          "corpo": "Federal Reserve official says inflation persistence led her to support interest rate hike",
+          "fonte": "Oskaloosa Herald",
           "relevancia_pontos": 12,
           "relevancia": "Alta",
           "impacto": 0.55,
@@ -411,16 +421,6 @@
           "impacto": 0.55,
           "direcao": "🟢 Favorável ao USD",
           "explicacao": "Sinal mais restritivo: juros altos por mais tempo tendem a apoiar o dólar."
-        },
-        {
-          "titulo": "How the first Federal Reserve interest rate hike in years impacts you - WRDW",
-          "corpo": "How the first Federal Reserve interest rate hike in years impacts you",
-          "fonte": "WRDW",
-          "relevancia_pontos": 9,
-          "relevancia": "Alta",
-          "impacto": 0.55,
-          "direcao": "🟢 Favorável ao USD",
-          "explicacao": "Sinal mais restritivo: juros altos por mais tempo tendem a apoiar o dólar."
         }
       ]
     },
@@ -429,7 +429,7 @@
         "juros": 3.63,
         "inflacao": 3.35302,
         "pib": 2.09767,
-        "sentimento": 55.55555555555556,
+        "sentimento": 60.0,
         "fonte": "FRED + transformação anual"
       },
       "EUR": {
@@ -471,7 +471,7 @@
         "juros": 4.51,
         "inflacao": 2.7,
         "pib": 2.13764,
-        "sentimento": 71.42857142857143,
+        "sentimento": 76.92307692307692,
         "fonte": "FRED + transformação anual + fallback parcial"
       },
       "NZD": {
@@ -517,11 +517,11 @@
             "Atividade": 10.0,
             "Sentimento": 6.363636363636363
           },
-          "fed": -6.2723076923076935,
+          "fed": -6.264,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 67.61571605525471
+          "unrounded_final": 67.6240237475624
         },
         "Posição": 1
       },
@@ -530,14 +530,14 @@
         "juros": 3.6,
         "inflacao": 3.4,
         "pib": 2.1,
-        "sentimento": 55.6,
+        "sentimento": 60.0,
         "fonte": "FRED + transformação anual",
         "Moeda": "Dólar Americano",
         "juros_reais": 0.3,
         "n_juros": 64.832,
         "n_inflacao": 64.53347,
         "n_pib": 68.41041659389954,
-        "n_sentimento": 11.111111111111114,
+        "n_sentimento": 20.0,
         "n_emprego": 55.400000000000006,
         "n_atividade": 45.0,
         "Pontuação_Macro": 59.4,
@@ -552,14 +552,49 @@
             "Atividade": 5.3999999999999995,
             "Sentimento": 0.0
           },
-          "fed": 15.80769230769231,
+          "fed": 15.8,
           "other": {
             "Índice amplo USD": 3.9221280000000003,
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 62.27752490769231
+          "unrounded_final": 62.2698326
         },
         "Posição": 2
+      },
+      {
+        "Código": "AUD",
+        "juros": 4.5,
+        "inflacao": 2.7,
+        "pib": 2.1,
+        "sentimento": 76.9,
+        "fonte": "FRED + transformação anual + fallback parcial",
+        "Moeda": "Dólar Australiano",
+        "juros_reais": 1.8,
+        "n_juros": 28.98896661469615,
+        "n_inflacao": 49.66887417218545,
+        "n_pib": 70.40481809880697,
+        "n_sentimento": 53.84615384615385,
+        "n_emprego": 50.0,
+        "n_atividade": 50.0,
+        "Pontuação_Macro": 49.2,
+        "Influência_Fed": -4.7,
+        "Pontuação_Final": 44.5,
+        "strength_attribution": {
+          "factors": {
+            "Juros / Treasury": 5.79779332293923,
+            "Inflação": 7.450331125827817,
+            "PIB": 10.560722714821045,
+            "Emprego": 10.0,
+            "Atividade": 10.0,
+            "Sentimento": 5.384615384615385
+          },
+          "fed": -4.698000000000001,
+          "other": {
+            "Limite da escala 0–100": 0.0
+          },
+          "unrounded_final": 44.49546254820348
+        },
+        "Posição": 3
       },
       {
         "Código": "EUR",
@@ -588,46 +623,11 @@
             "Atividade": 10.0,
             "Sentimento": 6.666666666666666
           },
-          "fed": -1.0453846153846158,
+          "fed": -1.0440000000000003,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 43.806023061811565
-        },
-        "Posição": 3
-      },
-      {
-        "Código": "AUD",
-        "juros": 4.5,
-        "inflacao": 2.7,
-        "pib": 2.1,
-        "sentimento": 71.4,
-        "fonte": "FRED + transformação anual + fallback parcial",
-        "Moeda": "Dólar Australiano",
-        "juros_reais": 1.8,
-        "n_juros": 28.98896661469615,
-        "n_inflacao": 49.66887417218545,
-        "n_pib": 70.40481809880697,
-        "n_sentimento": 42.85714285714286,
-        "n_emprego": 50.0,
-        "n_atividade": 50.0,
-        "Pontuação_Macro": 48.1,
-        "Influência_Fed": -4.7,
-        "Pontuação_Final": 43.4,
-        "strength_attribution": {
-          "factors": {
-            "Juros / Treasury": 5.79779332293923,
-            "Inflação": 7.450331125827817,
-            "PIB": 10.560722714821045,
-            "Emprego": 10.0,
-            "Atividade": 10.0,
-            "Sentimento": 4.2857142857142865
-          },
-          "fed": -4.704230769230771,
-          "other": {
-            "Limite da escala 0–100": 0.0
-          },
-          "unrounded_final": 43.39033068007161
+          "unrounded_final": 43.80740767719618
         },
         "Posição": 4
       },
@@ -658,11 +658,11 @@
             "Atividade": 10.0,
             "Sentimento": 10.0
           },
-          "fed": -4.704230769230771,
+          "fed": -4.698000000000001,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 41.64045507097021
+          "unrounded_final": 41.64668584020098
         },
         "Posição": 5
       },
@@ -693,11 +693,11 @@
             "Atividade": 10.0,
             "Sentimento": 3.3333333333333317
           },
-          "fed": 2.0907692307692316,
+          "fed": 2.0880000000000005,
           "other": {
             "Limite da escala 0–100": -7.105427357601002e-15
           },
-          "unrounded_final": 40.60172213076969
+          "unrounded_final": 40.598952900000455
         },
         "Posição": 6
       },
@@ -728,11 +728,11 @@
             "Atividade": 10.0,
             "Sentimento": 7.142857142857145
           },
-          "fed": 2.6134615384615394,
+          "fed": 2.6100000000000003,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 37.70333854886836
+          "unrounded_final": 37.699877010406816
         },
         "Posição": 7
       },
@@ -763,11 +763,11 @@
             "Atividade": 10.0,
             "Sentimento": 0.0
           },
-          "fed": -0.5226923076923079,
+          "fed": -0.5220000000000001,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 36.14519767544348
+          "unrounded_final": 36.14588998313579
         },
         "Posição": 8
       },
@@ -798,23 +798,23 @@
             "Atividade": 10.0,
             "Sentimento": 2.0
           },
-          "fed": -3.1361538461538467,
+          "fed": -3.132,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 29.76183379117265
+          "unrounded_final": 29.765987637326493
         },
         "Posição": 9
       }
     ],
     "usd_detalhado": {
-      "score": 62.27752490769231,
+      "score": 62.2698326,
       "componentes": {
         "Inflação": 64.53347,
         "Emprego": 55.400000000000006,
         "Atividade": 45.0,
         "Juros / Treasury 2Y": 64.832,
-        "Federal Reserve": 79.03846153846155,
+        "Federal Reserve": 79.0,
         "Índice amplo USD": 49.0266
       },
       "pesos": {
