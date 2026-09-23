@@ -4196,6 +4196,9 @@ if render_admin_voice_assistant is not None and str((_ATLASQUANT_ACCESS or {}).g
             important_alerts=st.session_state.get("atlasquant_admin_voice_alerts",[]),
             paper_summary=st.session_state.get("atlasquant_admin_paper_summary",{}),
             timezone_name=os.getenv("ATLASQUANT_TIMEZONE","America/Sao_Paulo"),
+            connections=st.session_state.get("atlasquant_aion_connections",{}),
+            general_ai_adapter=st.session_state.get("atlasquant_aion_general_ai_adapter"),
+            web_research_adapter=st.session_state.get("atlasquant_aion_web_research_adapter"),
         )
     except Exception as _aq_admin_voice_render_exc:
         st.caption(
