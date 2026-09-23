@@ -262,3 +262,28 @@ class AtlasQuantHomeVoiceContextTests(unittest.TestCase):
         self.assertEqual(row["inst_read"],81)
         self.assertIn("H4 confirma compra",row["up"])
         self.assertIn("M15 ainda aguarda gatilho",row["soft_blocks"])
+
+class AtlasQuantDowRadarContextTests(unittest.TestCase):
+    def test_dow_context_is_visible_but_does_not_change_priority_or_action(self):
+        p=_pack(priority=82,quality=76)
+        p["dow_context"]={
+            "status":"CONFIRMED_CONTEXT",
+            "primary_trend":"BULLISH",
+            "secondary_trend":"BULLISH",
+            "aligned":True,
+        }
+        row=home_rows_from_packs([p])[0]
+        self.assertEqual(row["dow_status"],"CONFIRMED_CONTEXT")
+        self.assertEqual(row["dow_primary"],"BULLISH")
+        self.assertEqual(row["dow_secondary"],"BULLISH")
+        self.assertTrue(row["dow_aligned"])
+        self.assertEqual(row["priority"],82)
+        self.assertEqual(row["quality"],76)
+        self.assertEqual(row["action"],"COMPRA")
+
+    def test_missing_dow_is_explicit_and_does_not_fake_confirmation(self):
+        row=home_rows_from_packs([_pack()])[0]
+        self.assertEqual(row["dow_status"],"NOT_AVAILABLE")
+        self.assertEqual(row["dow_primary"],"UNKNOWN")
+        self.assertEqual(row["dow_secondary"],"UNKNOWN")
+        self.assertFalse(row["dow_aligned"])
