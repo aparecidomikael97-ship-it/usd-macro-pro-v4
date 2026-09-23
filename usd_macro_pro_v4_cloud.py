@@ -9757,11 +9757,34 @@ if _aq_active_index == 0:
                 if _PAIR_INTEL_V110_IMPORT_ERROR:
                     st.caption(f"Diagnóstico: {_PAIR_INTEL_V110_IMPORT_ERROR}")
             else:
-                render_pair_intelligence_v110(
-                    matriz_v61,
-                    ranking,
-                    fed=fed,
-                    macro_context=_macro_v108,
-                    weights=PESOS,
-                    runtime_snapshot=_aq_runtime_snapshot,
-                )
+                try:
+                    render_pair_intelligence_v110(
+                        matriz_v61,
+                        ranking,
+                        fed=fed,
+                        macro_context=_macro_v108,
+                        weights=PESOS,
+                        runtime_snapshot=_aq_runtime_snapshot,
+                    )
+                    st.session_state.pop("aq_radar_advanced_error", None)
+                except Exception as _aq_pair_intel_exc:
+                    # Fault boundary: one advanced diagnostic must never take
+                    # down the primary Radar or widen execution permissions.
+                    _aq_pair_intel_error = {
+                        "module": "pair_intelligence_v110",
+                        "type": type(_aq_pair_intel_exc).__name__,
+                    }
+                    st.session_state["aq_radar_advanced_error"] = _aq_pair_intel_error
+                    print(
+                        "ATLASQUANT_RADAR_ADVANCED_ERROR "
+                        + json.dumps(_aq_pair_intel_error, ensure_ascii=False)
+                    )
+                    st.warning(
+                        "Diagnóstico institucional avançado temporariamente indisponível. "
+                        "O Radar principal continua em modo seguro e nenhuma permissão operacional foi ampliada."
+                    )
+                    st.caption(
+                        "Código de diagnóstico: PAIR_INTELLIGENCE_RUNTIME · "
+                        f"{_aq_pair_intel_error['type']}"
+                    )
+
