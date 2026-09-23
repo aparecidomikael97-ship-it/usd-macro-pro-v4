@@ -156,6 +156,13 @@ except Exception as _admin_voice_exc:
     admin_mission_control = None
     _ATLASQUANT_ADMIN_VOICE_IMPORT_ERROR = f"{type(_admin_voice_exc).__name__}: {_admin_voice_exc}"
 
+try:
+    from atlasquant_aion_runtime_gateway import build_runtime_adapters
+    _ATLASQUANT_AION_RUNTIME_IMPORT_ERROR = ""
+except Exception as _aion_runtime_exc:
+    build_runtime_adapters = None
+    _ATLASQUANT_AION_RUNTIME_IMPORT_ERROR = f"{type(_aion_runtime_exc).__name__}: {_aion_runtime_exc}"
+
 
 try:
     from atlasquant_stability_lab import render_stability_lab
@@ -4186,6 +4193,30 @@ if render_admin_voice_assistant is not None and str((_ATLASQUANT_ACCESS or {}).g
             or "Mikael"
         ).strip()
 
+        _aq_aion_runtime = (
+            build_runtime_adapters()
+            if build_runtime_adapters is not None
+            else {
+                "status":{
+                    "environment":str(os.getenv("ATLASQUANT_ENV","DEV") or "DEV"),
+                    "general_ai_configured":False,
+                    "web_research_configured":False,
+                    "credentials_exposed":False,
+                },
+                "general_ai_adapter":None,
+                "web_research_adapter":None,
+            }
+        )
+        st.session_state["atlasquant_aion_runtime_status"]=dict(_aq_aion_runtime.get("status",{}) or {})
+        _aq_general_ai_adapter=(
+            st.session_state.get("atlasquant_aion_general_ai_adapter")
+            or _aq_aion_runtime.get("general_ai_adapter")
+        )
+        _aq_web_research_adapter=(
+            st.session_state.get("atlasquant_aion_web_research_adapter")
+            or _aq_aion_runtime.get("web_research_adapter")
+        )
+
         render_admin_voice_assistant(
             _ATLASQUANT_ACCESS,
             _aq_voice_admin_state,
@@ -4197,8 +4228,8 @@ if render_admin_voice_assistant is not None and str((_ATLASQUANT_ACCESS or {}).g
             paper_summary=st.session_state.get("atlasquant_admin_paper_summary",{}),
             timezone_name=os.getenv("ATLASQUANT_TIMEZONE","America/Sao_Paulo"),
             connections=st.session_state.get("atlasquant_aion_connections",{}),
-            general_ai_adapter=st.session_state.get("atlasquant_aion_general_ai_adapter"),
-            web_research_adapter=st.session_state.get("atlasquant_aion_web_research_adapter"),
+            general_ai_adapter=_aq_general_ai_adapter,
+            web_research_adapter=_aq_web_research_adapter,
         )
     except Exception as _aq_admin_voice_render_exc:
         st.caption(
