@@ -134,3 +134,62 @@ Exemplos desejados:
 - “AION, adicione este compromisso ao calendário” — com confirmação antes da escrita.
 
 YouTube e Spotify entram como conectores prioritários do ecossistema AION.
+
+
+## Central de Redes Sociais
+
+AION também assume a função de **copiloto de conteúdo e mídia social** do
+AtlasQuant, começando por:
+
+- Instagram;
+- YouTube;
+- TikTok.
+
+O objetivo é concentrar criação, revisão, publicação autorizada e análise de
+desempenho em um único fluxo administrativo.
+
+### Fluxo de conteúdo
+
+1. AION recebe a ideia ou identifica uma pauta.
+2. Pesquisa contexto e referências quando necessário.
+3. Propõe roteiro, formato e objetivo.
+4. Prepara ou coordena edição do vídeo/imagem.
+5. Gera versões específicas por plataforma, incluindo título, descrição,
+   legenda, hashtags, thumbnail/capa e cortes.
+6. Mostra o material ao administrador em **preview**.
+7. O administrador aprova ou pede alterações.
+8. Somente depois da aprovação AION pode chamar o conector de publicação.
+9. A publicação e seu resultado ficam registrados em auditoria.
+
+Qualquer alteração no conteúdo depois da aprovação invalida a autorização e
+exige nova revisão.
+
+### Inteligência de audiência
+
+AION deve acompanhar, quando as APIs/permissões disponibilizarem:
+
+- seguidores/inscritos;
+- visualizações e alcance;
+- tempo de exibição;
+- curtidas, comentários, compartilhamentos e salvamentos;
+- crescimento por período;
+- desempenho por vídeo/post;
+- retenção e engajamento quando disponíveis;
+- horários e formatos de melhor desempenho;
+- comparação entre plataformas.
+
+Os números devem vir da fonte conectada e carregar data/hora de captura. AION
+não inventa métricas ausentes.
+
+### Papel editorial do AION
+
+AION pode sugerir pauta, calendário editorial, reaproveitamento de conteúdo,
+testes de títulos/capas, cortes curtos de vídeos longos e respostas para
+comentários. Ele deve preservar a identidade da marca AtlasQuant e separar
+conteúdo educacional de promessa de desempenho financeiro.
+
+### Aprovação e segurança
+
+Publicar, editar conteúdo já publicado, responder em nome da marca, excluir
+conteúdo ou executar ação equivalente exige autorização e trilha de auditoria.
+AION pode preparar tudo sozinho, mas **publicação final continua approval-gated**.
