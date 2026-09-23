@@ -163,6 +163,14 @@ except Exception as _aion_runtime_exc:
     build_runtime_adapters = None
     _ATLASQUANT_AION_RUNTIME_IMPORT_ERROR = f"{type(_aion_runtime_exc).__name__}: {_aion_runtime_exc}"
 
+try:
+    from atlasquant_aion_connector_runtime import build_connector_adapter, connector_runtime_status
+    _ATLASQUANT_AION_CONNECTOR_IMPORT_ERROR = ""
+except Exception as _aion_connector_exc:
+    build_connector_adapter = None
+    connector_runtime_status = None
+    _ATLASQUANT_AION_CONNECTOR_IMPORT_ERROR = f"{type(_aion_connector_exc).__name__}: {_aion_connector_exc}"
+
 
 try:
     from atlasquant_stability_lab import render_stability_lab
@@ -4207,7 +4215,20 @@ if render_admin_voice_assistant is not None and str((_ATLASQUANT_ACCESS or {}).g
                 "web_research_adapter":None,
             }
         )
-        st.session_state["atlasquant_aion_runtime_status"]=dict(_aq_aion_runtime.get("status",{}) or {})
+        _aq_aion_runtime_status=dict(_aq_aion_runtime.get("status",{}) or {})
+        _aq_connector_adapter=(
+            st.session_state.get("atlasquant_aion_connector_adapter")
+            or (build_connector_adapter() if build_connector_adapter is not None else None)
+        )
+        _aq_connector_status=(
+            connector_runtime_status()
+            if connector_runtime_status is not None
+            else {"gateway_configured":False,"credentials_exposed":False}
+        )
+        _aq_aion_runtime_status["connector_gateway_configured"]=bool(
+            _aq_connector_status.get("gateway_configured")
+        )
+        st.session_state["atlasquant_aion_runtime_status"]=_aq_aion_runtime_status
         _aq_general_ai_adapter=(
             st.session_state.get("atlasquant_aion_general_ai_adapter")
             or _aq_aion_runtime.get("general_ai_adapter")
@@ -4230,7 +4251,8 @@ if render_admin_voice_assistant is not None and str((_ATLASQUANT_ACCESS or {}).g
             connections=st.session_state.get("atlasquant_aion_connections",{}),
             general_ai_adapter=_aq_general_ai_adapter,
             web_research_adapter=_aq_web_research_adapter,
-            runtime_status=_aq_aion_runtime.get("status",{}),
+            connector_adapter=_aq_connector_adapter,
+            runtime_status=_aq_aion_runtime_status,
         )
     except Exception as _aq_admin_voice_render_exc:
         st.caption(
