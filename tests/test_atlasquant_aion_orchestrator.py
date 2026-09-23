@@ -38,3 +38,24 @@ def test_connected_spotify_write_returns_pending_approval_not_execution():
  assert r["confirmation_required"] is True
  assert r["pending_action"]["state"]=="PENDING_APPROVAL"
  assert r["voice_can_authorize_orders"] is False and r["real_orders_enabled"] is False
+
+
+def test_connected_youtube_read_uses_connector_adapter():
+ def connector(**kwargs):
+  assert kwargs["provider"]=="youtube" and kwargs["action_class"]=="READ"
+  return {"ok":True,"answer":"Encontrei 3 vídeos relevantes."}
+ r=answer_aion(
+  "AION, procure no YouTube macroeconomia",
+  connections={"youtube":True},
+  connector_adapter=connector,
+ )
+ assert r["route"]=="EXTERNAL_PLATFORM_READ" and r["ok"]
+ assert "3 vídeos" in r["answer"] and r["source_of_truth"]=="EXTERNAL_PLATFORM"
+
+def test_connected_platform_without_runtime_adapter_is_not_faked():
+ r=answer_aion(
+  "AION, procure no YouTube macroeconomia",
+  connections={"youtube":True},
+ )
+ assert r["route"]=="EXTERNAL_PLATFORM_ADAPTER_UNAVAILABLE" and not r["ok"]
+ assert "ainda não está conectado" in r["answer"]
