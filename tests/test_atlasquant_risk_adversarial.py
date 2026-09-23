@@ -5,7 +5,7 @@ from atlasquant_risk_guardian import RiskLimits,RiskState
 from atlasquant_paper_authorization_bridge import paper_request_from_authorization
 L=RiskLimits(1000,30,10,5,2,20,2); S=RiskState(); NOW=datetime(2026,9,23,12,tzinfo=timezone.utc)
 def req(**kw):
- d=dict(opportunity_id="O1",pair="EUR/USD",strategy_version="AMD-1",requested_trade_risk=5,requested_exposure=5,structural_stop_valid=True,rr_after_costs=2,spread_ok=True,slippage_ok=True,liquidity_ok=True,volatility_ok=True,news_clear=True,data_fresh=True,opportunity_state="TRIGGERED")
+ d=dict(opportunity_id="O1",pair="EUR/USD",strategy_version="AMD-1",requested_trade_risk=5,requested_exposure=5,structural_stop_valid=True,rr_after_costs=2,spread_ok=True,slippage_ok=True,liquidity_ok=True,volatility_ok=True,news_clear=True,data_fresh=True,opportunity_state="TRIGGERED",direction="SELL",entry_price=1.1,stop_price=1.2)
  d.update(kw); return RiskRequest(**d)
 def test_nan_rr_fails_closed(): assert not authorize_risk(req(rr_after_costs=math.nan),L,S,now=NOW)["approved"]
 def test_long_stop_must_be_below_entry():
