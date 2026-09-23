@@ -12,3 +12,9 @@ def test_duplicate_ledger_requires_recovery():
 def test_watchdog_blocks_new_paper(): assert orchestrate_paper(O,A,[],watchdog_state="PROTECTED",now=NOW)["state"]=="REJECTED"
 def test_expired_auth_rejected():
  a=dict(A);a["expires_at"]="2026-09-23T11:59:00+00:00";assert not orchestrate_paper(O,a,[],now=NOW)["accepted"]
+
+def test_wait_entry_persists_authorized_risk_context():
+ x=orchestrate_paper(O,A,[],now=NOW)
+ t=x["paper_trade"]
+ assert t["direction"]=="SELL" and t["authorized_entry_price"]==1.18 and t["authorized_stop_price"]==1.19
+ assert t["max_risk"]==5 and t["max_exposure"]==5 and t["real_orders_enabled"] is False
