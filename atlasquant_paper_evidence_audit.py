@@ -42,7 +42,7 @@ def audit_paper_results(rows:Sequence[Mapping[str,Any]]|None)->dict[str,Any]:
         for value,count in seen.items():
             if count>1: reasons.append(f"DUPLICATE_{label}:{value}")
     reasons=list(dict.fromkeys(reasons)); ok=not reasons
-    return {"ok":ok,"state":"NORMAL" if ok else "PROTECTED","new_entries_allowed":ok,
+    return {"ok":ok,"healthy":ok,"state":"NORMAL" if ok else "PROTECTED","new_entries_allowed":ok,
             "management_allowed":True,"management_mode":"NORMAL" if ok else "SAFE_ONLY",
             "result_count":len(data),"valid_result_rows":len(valid),"reasons":reasons,
             "real_orders_enabled":False}
