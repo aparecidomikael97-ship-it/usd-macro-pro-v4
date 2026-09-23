@@ -62,6 +62,9 @@ def activate_paper_entry(waiting_trade:Mapping[str,Any],auth:Mapping[str,Any],ma
     if status!="WAIT_ENTRY": reasons.append("TRADE_NOT_WAIT_ENTRY")
     if str(system_state).upper()!="NORMAL": reasons.append("SYSTEM_HEALTH_NOT_NORMAL")
     if a.get("approved") is not True or str(a.get("risk_gate","")).upper()!="APPROVED": reasons.append("RISK_NOT_APPROVED")
+    if a.get("fail_closed") is not True: reasons.append("RISK_AUTH_CONTRACT_INVALID")
+    if not _positive(a.get("max_authorized_risk")): reasons.append("AUTHORIZED_RISK_INVALID")
+    if not _positive(a.get("max_authorized_exposure")): reasons.append("AUTHORIZED_EXPOSURE_INVALID")
     if a.get("real_orders_enabled") is not False: reasons.append("AUTH_LIVE_FLAG_INVALID")
     try:
         exp=datetime.fromisoformat(str(a.get("expires_at")).replace("Z","+00:00"))
