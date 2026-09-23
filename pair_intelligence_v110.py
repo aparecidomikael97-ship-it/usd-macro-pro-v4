@@ -824,7 +824,10 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     if _dr.get("sufficient"):
         st.success(f"✅ SIM — {_dr.get('label','')} · {_safe(_dr.get('score',0)):.0f}/100")
     else:
-        st.error(f"❌ NÃO — {_dr.get('label','')} · {_safe(_dr.get('score',0)):.0f}/100")
+        st.warning(
+            f"⛔ DADOS INSUFICIENTES — {_dr.get('label','')} · "
+            f"{_safe(_dr.get('score',0)):.0f}/100 · bloqueio operacional, não erro do sistema."
+        )
         if _dr.get("missing"):
             st.caption("Faltando: " + " · ".join(_dr.get("missing",[])[:6]))
     _tf=_dr.get("timeframes",{}) or {}
@@ -836,7 +839,11 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     st.caption("Limites de frescor: M15 ≤60 min (aviso até 90) · H1 ≤150 min (aviso até 210) · H4 ≤360 min (aviso até 480).")
 
     if p["hard_blocks"]:
-        st.error("**Bloqueios duros:** " + " · ".join(p["hard_blocks"]))
+        st.warning(
+            "**⛔ Bloqueios duros — não executar:** "
+            + " · ".join(p["hard_blocks"])
+            + " · estado de proteção, não erro do sistema."
+        )
     elif p["soft_blocks"]:
         st.warning("**Faltando antes da execução:** " + " · ".join(p["soft_blocks"]))
     else:
@@ -909,9 +916,12 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
 
     st.markdown("### 🎯 Plano objetivo")
     msg=f"**Decisão:** {p['state']} · **Direção:** {p['direction']} · **Motivo dominante:** {p['reason']} · **Próximo passo:** {p['next_action']}"
-    if p["state"].startswith("🟢"): st.success(msg)
-    elif p["state"].startswith("🔴"): st.error(msg)
-    else: st.warning(msg)
+    if p["state"].startswith("🟢"):
+        st.success(msg)
+    elif p["state"].startswith("🔴"):
+        st.warning("⛔ BLOQUEIO OPERACIONAL — " + msg + " · não é erro do sistema.")
+    else:
+        st.warning(msg)
 
     with st.expander("📚 Como ler o V11.0.8"):
         st.markdown("""
