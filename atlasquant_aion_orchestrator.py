@@ -11,6 +11,7 @@ from typing import Any,Callable,Mapping,Sequence
 from atlasquant_aion_capabilities import route_aion_query
 from atlasquant_aion_platform_intent import evaluate_platform_intent
 from atlasquant_aion_research_contract import validate_research_response,research_unavailable_message
+from atlasquant_aion_action_approval import build_pending_action
 from atlasquant_admin_voice_qa import answer_admin_question
 
 Adapter=Callable[...,Any]
@@ -61,10 +62,16 @@ def answer_aion(
                 "real_orders_enabled":False,"voice_can_authorize_orders":False,
             }
         if platform.get("confirmation_required"):
+            pending=build_pending_action(
+                provider=str(provider),
+                action_class=str(platform.get("action_class") or "WRITE"),
+                payload={"question":q},
+            )
             return {
                 "ok":True,"route":"EXTERNAL_PLATFORM_CONFIRMATION",
                 "answer":f"Posso preparar essa ação em {provider}, mas preciso da sua confirmação antes de executar.",
-                "sources":[],"platform":platform,"confirmation_required":True,
+                "sources":[],"platform":platform,"pending_action":pending,
+                "confirmation_required":True,
                 "real_orders_enabled":False,"voice_can_authorize_orders":False,
             }
         return {
