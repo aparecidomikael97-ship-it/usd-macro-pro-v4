@@ -38,7 +38,7 @@ def paper_request_from_authorization(auth:Mapping[str,Any], *, now:datetime|None
         if current>=expiry: reasons.append("RISK_AUTH_EXPIRED")
     except Exception: reasons.append("RISK_AUTH_EXPIRY_INVALID")
     if a.get("real_orders_enabled") is not False: reasons.append("LIVE_FLAG_NOT_EXPLICITLY_DISABLED")
-    if a.get("fail_closed") is not True: reasons.append("RISK_AUTH_CONTRACT_INVALID")
+    if a.get("fail_closed") is not True or a.get("execution_grade") is not True: reasons.append("RISK_AUTH_CONTRACT_INVALID")
     if opportunity_id is not None and str(a.get("opportunity_id"))!=str(opportunity_id): reasons.append("RISK_AUTH_OPPORTUNITY_MISMATCH")
     if strategy_version is not None and str(a.get("strategy_version"))!=str(strategy_version): reasons.append("RISK_AUTH_STRATEGY_MISMATCH")
     auth_pair=_pair(a.get("pair"))
