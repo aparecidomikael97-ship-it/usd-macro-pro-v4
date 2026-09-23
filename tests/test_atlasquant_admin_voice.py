@@ -38,3 +38,9 @@ def test_high_score_never_turns_voice_into_order_authorization():
  opportunities=[{"pair":"GBP/USD","quality_score":100,"executable":True,"operational_status":"LIBERADO PELO MODELO"}])
  assert r["voice_can_authorize_orders"] is False and r["real_orders_enabled"] is False
  assert "não considera novas entradas autorizadas" in r["spoken_text"]
+
+def test_timezone_controls_daypart_instead_of_server_utc():
+ r=build_admin_voice_briefing(admin(),user_name="Mikael",
+ now=datetime(2026,9,23,15,tzinfo=timezone.utc),timezone_name="America/Cuiaba")
+ assert r["spoken_text"].startswith("Bom dia, Mikael.")
+ assert r["timezone"]=="America/Cuiaba"
