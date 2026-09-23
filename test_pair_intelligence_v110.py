@@ -27,6 +27,14 @@ class PairIntelligenceSourceTests(unittest.TestCase):
         self.assertIn('"Status temporal"',src)
         self.assertIn('"Hora leitura"',src)
 
+    def test_operational_blocks_are_not_streamlit_system_errors(self):
+        src=Path("pair_intelligence_v110.py").read_text(encoding="utf-8")
+        self.assertNotIn('st.error("🚫 NENHUM SETUP EXECUTÁVEL AGORA',src)
+        self.assertNotIn('st.error(f"❌ NÃO —',src)
+        self.assertNotIn('st.error("**Bloqueios duros:**',src)
+        self.assertIn("não erro do sistema",src)
+        self.assertIn("BLOQUEIO OPERACIONAL",src)
+
     def test_no_profit_probability_claim(self):
         src=Path("pair_intelligence_v110.py").read_text(encoding="utf-8")
         self.assertIn("não é probabilidade de lucro",src.lower())
