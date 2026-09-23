@@ -86,8 +86,9 @@ class AtlasQuantAcademyTests(unittest.TestCase):
         self.assertIsNotNone(geo)
         self.assertIsNotNone(banks)
         joined=" ".join([
-            micro["summary"],micro["watch"],geo["summary"],geo["watch"],
-            banks["summary"],banks["watch"],banks["forex"],
+            micro["title"],micro["summary"],micro["watch"],
+            geo["title"],geo["summary"],geo["watch"],
+            banks["title"],banks["summary"],banks["watch"],banks["forex"],
         ]).casefold()
         for term in ("oferta","demanda","geopolítica","ecb","boe","boj","rba","rbnz","snb"):
             with self.subTest(term=term):
