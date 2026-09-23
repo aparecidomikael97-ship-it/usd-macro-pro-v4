@@ -9,6 +9,10 @@ def _state(v:Any)->str:return str(v or "").strip().upper().replace(" ","_")
 def evaluate_gate_chain(gates:Mapping[str,Any]|None,*,macro_policy:str="WAIT")->dict[str,Any]:
  src={str(k).upper():_state(v) for k,v in dict(gates or {}).items()}; decisions=[]; hard=[]; waits=[]
  policy=_state(macro_policy)
+ if policy not in {"PASS","WAIT","BLOCK"}:
+  policy_invalid=True; policy="WAIT"
+ else:
+  policy_invalid=False
  for name in ORDER:
   state=src.get(name,"")
   if not state: hard.append(f"{name}_GATE_UNKNOWN"); decisions.append({"gate":name,"state":"UNKNOWN","decision":"BLOCK"}); continue
@@ -21,7 +25,9 @@ def evaluate_gate_chain(gates:Mapping[str,Any]|None,*,macro_policy:str="WAIT")->
   elif state in PASS_VALUES or state.startswith("PASS_"): decision="PASS"
   else: waits.append(f"{name}:{state}"); decision="WAIT"
   decisions.append({"gate":name,"state":state,"decision":decision})
+ if policy_invalid: hard.append("MACRO_POLICY_INVALID")
  return {"overall":"BLOCKED" if hard else ("WAIT" if waits else "PASS"),"hard_blocks":hard,"waits":waits,
-         "decisions":decisions,"all_critical_known":not any(d["state"]=="UNKNOWN" for d in decisions),"macro_policy":policy}
+         "decisions":decisions,"all_critical_known":not any(d["state"]=="UNKNOWN" for d in decisions),"macro_policy":policy,
+         "macro_policy_valid":not policy_invalid}
 def execution_gate_passed(result:Mapping[str,Any])->bool:
  return str(result.get("overall","")).upper()=="PASS" and bool(result.get("all_critical_known",False))
