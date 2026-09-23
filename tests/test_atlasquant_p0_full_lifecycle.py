@@ -37,7 +37,7 @@ def test_full_p0_paper_lifecycle_is_auditable_and_never_live():
  assert led["appended"]
  final=close_and_append_paper_result(opened["trade"],decision,led["ledger"],realized_r=2,spread_cost_r=.1,slippage_cost_r=.05,
  closed_at=NOW+timedelta(hours=1))
- assert final["closed"] and final["appended"] and final["result"]["net_r"]==1.85
+ assert final["closed"] and final["appended"] and abs(final["result"]["net_r"]-1.85)<1e-9
  assert validate_evidence_ledger(final["ledger"])["ok"]
  assert audit_paper_results([final["result"]])["ok"]
 
