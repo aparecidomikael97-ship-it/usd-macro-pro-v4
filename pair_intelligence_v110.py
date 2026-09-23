@@ -707,7 +707,7 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     c1.metric("Melhor contexto",opctx.get("label",best["pair"])); c2.metric("Prioridade",f"{best['priority']:.1f}/100"); c3.metric("Mais forte (G8)",strongest); c4.metric("Mais fraca (G8)",weakest)
     st.info(opctx.get("state",best["state"]) if no_trade else best["state"])
     if no_trade:
-        st.error("🚫 NENHUM SETUP EXECUTÁVEL AGORA — os vieses macro continuam visíveis, mas nenhum dos 7 pares passou pelos hard gates/frescor.")
+        st.warning("🚫 NENHUM SETUP EXECUTÁVEL AGORA — os vieses macro continuam visíveis, mas nenhum dos 7 pares passou pelos hard gates/frescor. Isto é estado de mercado, não erro do sistema.")
     st.caption("Saúde do processo x prontidão dos dados")
     h1,h2,h3=st.columns(3)
     h1.metric("Dados técnicos suficientes",f"{data_ok}/7")
@@ -776,7 +776,14 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     if _diff>0:
         st.success(f"🟢 {_base_sel} está {_diff:.1f} pts acima de {_quote_sel}. Em força relativa, isso favorece {pair} para CIMA — ainda sujeito aos demais gates.")
     elif _diff<0:
-        st.error(f"🔴 {_quote_sel} está {abs(_diff):.1f} pts acima de {_base_sel}. Em força relativa, isso favorece {pair} para BAIXO — ainda sujeito aos demais gates.")
+        st.markdown(
+            f"""<div style="border:1px solid rgba(255,107,122,.36);border-radius:12px;
+            padding:10px 12px;background:rgba(255,107,122,.08);font-weight:700">
+            🔴 {_quote_sel} está {abs(_diff):.1f} pts acima de {_base_sel}. Em força relativa,
+            isso favorece {pair} para BAIXO — ainda sujeito aos demais gates.
+            </div>""",
+            unsafe_allow_html=True,
+        )
     else:
         st.info("⚪ As duas moedas estão equilibradas na força relativa do modelo.")
 
