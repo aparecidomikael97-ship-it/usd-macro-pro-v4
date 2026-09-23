@@ -2,6 +2,7 @@
 from __future__ import annotations
 from typing import Any, Mapping, Sequence
 from atlasquant_opportunity_ranking import build_rankings
+from atlasquant_gate_chain import evaluate_gate_chain, execution_gate_passed
 
 def _trigger(row:Mapping[str,Any])->str:
     code=str(row.get("signal_status_code","")).upper()
@@ -17,12 +18,19 @@ def ranking_input_from_home(row:Mapping[str,Any])->dict[str,Any]:
     if risk not in {"APPROVED","CONSTRAINED","BLOCKED"}:
         risk="BLOCKED"
         blocks.append("RISK_GATE_AINDA_NAO_INTEGRADO")
-    gates={"LEGACY_GATE":gate or "WAIT"}
+    supplied=dict(r.get("gates",{}) or {})
+    gates=supplied if supplied else {"LEGACY_GATE":gate or "WAIT"}
+    authoritative=evaluate_gate_chain(gates) if supplied else None
     maturity=float(r.get("priority",0) or 0)
+    if authoritative is not None and not execution_gate_passed(authoritative):
+        blocks.extend(authoritative.get("hard_blocks",[]) or [])
+        if authoritative.get("overall")=="WAIT":
+            blocks.append("GATE_CHAIN_WAIT")
     return {
         "pair":r.get("pair"),"direction":r.get("bias"),"quality_score":r.get("quality",0),
         "confidence":r.get("data_score",0),"data_ready":data_ready,"trigger":_trigger(r),
         "risk_gate":risk,"hard_blocks":blocks,"gates":gates,"maturity":maturity,
+        "authoritative_gate_chain":authoritative,
         "session_bucket":r.get("session_bucket"),"reason":r.get("reason"),
         "next_action":r.get("next_action"),"source_row":r,
     }
