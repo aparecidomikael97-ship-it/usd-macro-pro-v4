@@ -10,9 +10,14 @@ import base64
 import streamlit as st
 import streamlit.components.v1 as components
 from atlasquant_admin_voice_briefing import build_admin_voice_briefing
-from atlasquant_admin_voice_qa import answer_admin_question
+from atlasquant_aion_orchestrator import answer_aion
+from atlasquant_aion_memory import append_memory,memory_context
+from atlasquant_aion_action_approval import approve_pending_action
 
 SESSION_SPOKEN_KEY="atlasquant_admin_voice_spoken"
+SESSION_MEMORY_KEY="atlasquant_aion_memory"
+SESSION_PENDING_ACTION_KEY="atlasquant_aion_pending_action"
+SESSION_APPROVED_ACTION_KEY="atlasquant_aion_approved_action"
 
 def _is_admin(access:Mapping[str,Any]|None)->bool:
     a=dict(access or {})
@@ -43,7 +48,8 @@ def render_admin_voice_assistant(access:Mapping[str,Any]|None,admin_state:Mappin
                                  user_name:str="Mikael",changes_since_last_login:Sequence[Any]|None=None,
                                  macro_summary:Sequence[Any]|None=None,opportunities:Sequence[Mapping[str,Any]]|None=None,
                                  important_alerts:Sequence[Any]|None=None,paper_summary:Mapping[str,Any]|None=None,
-                                 timezone_name:str|None=None)->dict[str,Any]|None:
+                                 timezone_name:str|None=None,connections:Mapping[str,Any]|None=None,
+                                 general_ai_adapter:Any=None,web_research_adapter:Any=None)->dict[str,Any]|None:
     if not _is_admin(access):
         return None
     tz_name=str(timezone_name or os.getenv("ATLASQUANT_TIMEZONE","America/Sao_Paulo") or "America/Sao_Paulo")
@@ -57,23 +63,81 @@ def render_admin_voice_assistant(access:Mapping[str,Any]|None,admin_state:Mappin
     components.html(_speech_html(briefing["spoken_text"],autoplay=not already),height=52)
     if not already:st.session_state[SESSION_SPOKEN_KEY]=True
 
-    with st.expander("💬 Conversar com o assistente",expanded=False):
+    with st.expander("💬 Conversar com o AION",expanded=False):
+        st.caption(
+            "Pergunte sobre o AtlasQuant, mercado ou assuntos gerais. "
+            "Perguntas atuais usam pesquisa quando o adaptador estiver conectado."
+        )
         q=st.text_input(
-            "Pergunte qualquer coisa. AION usa o AtlasQuant quando o assunto é o sistema e pesquisa quando houver adaptador disponível.",
+            "Pergunte qualquer coisa",
             key="atlasquant_admin_voice_question",
-            placeholder="Ex.: O que mudou no AtlasQuant? Ou: pesquise uma notícia atual para mim.",
+            placeholder="Ex.: Como está o AtlasQuant? Ou: pesquise uma notícia atual para mim.",
         )
         if q:
-            reply=answer_admin_question(
+            history=list(st.session_state.get(SESSION_MEMORY_KEY,[]) or [])
+            try:
+                history=append_memory(history,role="user",text=q,metadata={"surface":"ADMIN_VOICE"})
+            except Exception:
+                history=list(history)[-20:]
+            reply=answer_aion(
                 q,
                 admin_state=admin_state,
                 changes=changes_since_last_login,
                 macro_summary=macro_summary,
                 opportunities=opportunities,
                 paper_summary=paper_summary,
+                memory=memory_context(history),
+                connections=connections,
+                general_ai_adapter=general_ai_adapter,
+                web_research_adapter=web_research_adapter,
             )
-            st.write(reply["answer"])
-            components.html(_speech_html(reply["answer"],autoplay=False),height=52)
+            answer=str(reply.get("answer") or "Não consegui responder com segurança.")
+            try:
+                history=append_memory(
+                    history,role="assistant",text=answer,
+                    metadata={"route":reply.get("route"),"source_of_truth":reply.get("source_of_truth")},
+                )
+            except Exception:
+                pass
+            st.session_state[SESSION_MEMORY_KEY]=history
+            st.write(answer)
+            components.html(_speech_html(answer,autoplay=False),height=52)
+
+            sources=list(reply.get("sources",[]) or [])
+            if sources:
+                st.markdown("**Fontes consultadas**")
+                for source in sources[:8]:
+                    title=str(source.get("title") or source.get("url") or "Fonte")
+                    url=str(source.get("url") or "")
+                    if url.startswith(("https://","http://")):
+                        st.markdown(f"- [{title}]({url})")
+
+            pending=reply.get("pending_action")
+            if isinstance(pending,dict):
+                st.session_state[SESSION_PENDING_ACTION_KEY]=pending
+                st.warning(
+                    "Ação externa preparada, mas ainda não executada. "
+                    "Confirme somente se quiser autorizar exatamente esta ação."
+                )
+                c1,c2=st.columns(2)
+                if c1.button("✅ Confirmar ação externa",key="atlasquant_aion_confirm_external"):
+                    try:
+                        approved=approve_pending_action(
+                            pending,
+                            approved_by=str(user_name or "Administrador"),
+                        )
+                    except Exception as exc:
+                        st.error(f"Não foi possível aprovar: {type(exc).__name__}.")
+                    else:
+                        st.session_state[SESSION_APPROVED_ACTION_KEY]=approved
+                        st.session_state.pop(SESSION_PENDING_ACTION_KEY,None)
+                        st.success(
+                            "Ação aprovada para o adaptador da plataforma. "
+                            "Nenhuma execução foi simulada ou presumida."
+                        )
+                if c2.button("Cancelar",key="atlasquant_aion_cancel_external"):
+                    st.session_state.pop(SESSION_PENDING_ACTION_KEY,None)
+                    st.info("Ação cancelada.")
 
     st.caption("DEV: reprodução usa a voz PT-BR disponível no navegador. A voz original AION será conectada pelo adaptador TTS oficial.")
     return briefing
