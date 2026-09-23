@@ -22,7 +22,8 @@ def ranking_input_from_home(row:Mapping[str,Any], *, system_state:str="NORMAL")-
         blocks.append("RISK_GATE_AINDA_NAO_INTEGRADO")
     supplied=dict(r.get("gates",{}) or {})
     gates=supplied if supplied else {"LEGACY_GATE":gate or "WAIT"}
-    authoritative=evaluate_gate_chain(gates) if supplied else None
+    macro_policy=str(r.get("macro_policy","WAIT"))
+    authoritative=evaluate_gate_chain(gates,macro_policy=macro_policy) if supplied else None
     maturity=float(r.get("priority",0) or 0)
     if authoritative is not None and not execution_gate_passed(authoritative):
         blocks.extend(authoritative.get("hard_blocks",[]) or [])
@@ -31,7 +32,7 @@ def ranking_input_from_home(row:Mapping[str,Any], *, system_state:str="NORMAL")-
     return {
         "pair":r.get("pair"),"direction":r.get("bias"),"quality_score":r.get("quality",0),
         "confidence":r.get("data_score",0),"data_ready":data_ready,"trigger":_trigger(r),
-        "risk_gate":risk,"hard_blocks":blocks,"gates":gates,"maturity":maturity,
+        "risk_gate":risk,"hard_blocks":blocks,"gates":gates,"macro_policy":macro_policy,"maturity":maturity,
         "authoritative_gate_chain":authoritative,
         "session_bucket":r.get("session_bucket"),"reason":r.get("reason"),
         "next_action":r.get("next_action"),"system_state":sys,"source_row":r,
