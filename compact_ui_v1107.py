@@ -13,7 +13,9 @@ h4 {font-size:1rem!important;}
 [data-testid="stMetricValue"], [data-testid="stMetricValue"] * {font-size:1.4rem!important;line-height:1.25;color:var(--aq-text,#f4f8ff)!important;font-weight:850!important;opacity:1!important;}
 [data-testid="stMetricValue"] > div {white-space:normal!important;overflow:visible!important;text-overflow:clip!important;overflow-wrap:anywhere;}
 [data-testid="stMetricLabel"], [data-testid="stMetricLabel"] * {font-size:.82rem!important;color:var(--aq-muted-strong,#dbe7f5)!important;font-weight:750!important;opacity:1!important;}
-[data-testid="stNumberInput"] input,[data-testid="stTextInput"] input,[data-testid="stTextArea"] textarea {color:var(--text-color,#111827)!important;-webkit-text-fill-color:var(--text-color,#111827)!important;font-weight:650!important;opacity:1!important;}
+[data-testid="stNumberInput"] input,[data-testid="stTextInput"] input,[data-testid="stTextArea"] textarea {color:#f8fbff!important;-webkit-text-fill-color:#f8fbff!important;background:#10233a!important;font-weight:700!important;opacity:1!important;}
+[data-testid="stNumberInput"] label,[data-testid="stTextInput"] label,[data-testid="stTextArea"] label {color:#f2f6fb!important;font-weight:750!important;opacity:1!important;}
+[data-baseweb="select"]>div,[data-baseweb="select"] span {color:#f8fbff!important;-webkit-text-fill-color:#f8fbff!important;background:#10233a!important;opacity:1!important;}
 [data-testid="stAlert"] {padding:.65rem .85rem;border-radius:9px;}
 [data-testid="stAlert"] p {font-size:.88rem;}
 [role="tablist"] {gap:4px;flex-wrap:wrap!important;height:auto!important;overflow:visible!important;}

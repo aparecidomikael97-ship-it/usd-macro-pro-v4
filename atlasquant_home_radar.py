@@ -98,6 +98,11 @@ def home_rows_from_packs(packs:Sequence[Mapping[str,Any]]|None)->list[dict[str,A
         if not signal:
             signal=derive_signal_view(p,timezone="UTC")
         signal_code=str(signal.get("status_code") or "UNVERIFIED")
+        dow=_mapping(p.get("dow_context"))
+        dow_status=str(dow.get("status") or p.get("dow_status") or "NOT_AVAILABLE")
+        dow_primary=str(dow.get("primary_trend") or p.get("dow_primary") or "UNKNOWN")
+        dow_secondary=str(dow.get("secondary_trend") or p.get("dow_secondary") or "UNKNOWN")
+        dow_aligned=bool(dow.get("aligned",p.get("dow_aligned",False)))
         signal_side=str(signal.get("side") or ("BUY" if bias=="COMPRA" else "SELL" if bias=="VENDA" else "WAIT"))
         signal_action="COMPRA" if signal_side=="BUY" else "VENDA" if signal_side=="SELL" else "AGUARDAR"
         signal_headline={
@@ -127,6 +132,10 @@ def home_rows_from_packs(packs:Sequence[Mapping[str,Any]]|None)->list[dict[str,A
             "h4":str(p.get("h4") or "—"),
             "h1":str(p.get("h1") or "—"),
             "m15":str(p.get("m15") or "—"),
+            "dow_status":dow_status,
+            "dow_primary":dow_primary,
+            "dow_secondary":dow_secondary,
+            "dow_aligned":dow_aligned,
             "gate":str(p.get("gate") or "—"),
             "event":str(p.get("event") or "NORMAL"),
             "news":str(p.get("news_align") or "—"),
@@ -380,7 +389,8 @@ def render_home_radar(
     st.markdown(f"**Próximo passo:** {row['next_action']}")
     st.caption(
         f"Força relativa Δ {row['strength_diff']:+.1f} pts · H4 {row['h4']} · "
-        f"H1 {row['h1']} · M15 {row['m15']} · Gate {row['gate']} · {row['movement']}"
+        f"H1 {row['h1']} · M15 {row['m15']} · Dow {row['dow_status']} "
+        f"({row['dow_primary']} / {row['dow_secondary']}) · Gate {row['gate']} · {row['movement']}"
     )
     st.markdown('</div>',unsafe_allow_html=True)
 
@@ -398,7 +408,9 @@ def render_home_radar(
             "Compatível com perfil":r.get("session_match","UNKNOWN"),
             "Ação":r["action"],"Viés":r["bias"],"Prioridade":round(r["priority"],1),
             "Qualidade":round(r["quality"],1),"Dados":round(r["data_score"],1),"H4":r["h4"],"H1":r["h1"],
-            "M15":r["m15"],"Gate":r["gate"],"Status temporal":r["signal_headline"],
+            "M15":r["m15"],"Dow":r.get("dow_status","NOT_AVAILABLE"),
+            "Dow primária":r.get("dow_primary","UNKNOWN"),"Dow secundária":r.get("dow_secondary","UNKNOWN"),
+            "Gate":r["gate"],"Status temporal":r["signal_headline"],
             "Hora leitura":r["signal_reference_display"],"Idade min":r["signal_age_minutes"],
             "Movimento":r["movement"],"Notícias":r["news"],"Evento":r["event"],
         } for r in rows])

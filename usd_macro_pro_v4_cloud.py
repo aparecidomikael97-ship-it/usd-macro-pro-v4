@@ -147,6 +147,30 @@ except Exception as _admin_research_exc:
     render_admin_research_panel = None
     _ATLASQUANT_ADMIN_RESEARCH_IMPORT_ERROR = f"{type(_admin_research_exc).__name__}: {_admin_research_exc}"
 
+try:
+    from atlasquant_admin_voice_panel import render_admin_voice_assistant
+    from atlasquant_admin_mission_control import admin_mission_control
+    _ATLASQUANT_ADMIN_VOICE_IMPORT_ERROR = ""
+except Exception as _admin_voice_exc:
+    render_admin_voice_assistant = None
+    admin_mission_control = None
+    _ATLASQUANT_ADMIN_VOICE_IMPORT_ERROR = f"{type(_admin_voice_exc).__name__}: {_admin_voice_exc}"
+
+try:
+    from atlasquant_aion_runtime_gateway import build_runtime_adapters
+    _ATLASQUANT_AION_RUNTIME_IMPORT_ERROR = ""
+except Exception as _aion_runtime_exc:
+    build_runtime_adapters = None
+    _ATLASQUANT_AION_RUNTIME_IMPORT_ERROR = f"{type(_aion_runtime_exc).__name__}: {_aion_runtime_exc}"
+
+try:
+    from atlasquant_aion_connector_runtime import build_connector_adapter, connector_runtime_status
+    _ATLASQUANT_AION_CONNECTOR_IMPORT_ERROR = ""
+except Exception as _aion_connector_exc:
+    build_connector_adapter = None
+    connector_runtime_status = None
+    _ATLASQUANT_AION_CONNECTOR_IMPORT_ERROR = f"{type(_aion_connector_exc).__name__}: {_aion_connector_exc}"
+
 
 try:
     from atlasquant_stability_lab import render_stability_lab
@@ -4124,6 +4148,117 @@ def _autopilot_save_inputs_v107():
     except Exception as exc:
         return False, f"{type(exc).__name__}: {exc}"
 
+
+# =========================================================
+# ADMIN VOICE — atualização automática no acesso do Administrador
+# Fail-closed: sem evidência autoritativa, comunica UNKNOWN/NOT_READY.
+# Não autoriza ordens e não altera Gate/Risk/System Health.
+# =========================================================
+if render_admin_voice_assistant is not None and str((_ATLASQUANT_ACCESS or {}).get("role","")).upper()=="ADMIN":
+    try:
+        _aq_voice_health = st.session_state.get("atlasquant_system_health")
+        _aq_voice_quality = st.session_state.get("atlasquant_quality_gate")
+        if isinstance(_aq_voice_health, dict) and isinstance(_aq_voice_quality, dict) and admin_mission_control is not None:
+            _aq_voice_admin_state = admin_mission_control(
+                _aq_voice_health,
+                _aq_voice_quality,
+                environment=str(os.getenv("ATLASQUANT_ENV","DEV") or "DEV"),
+            )
+        else:
+            _aq_voice_admin_state = {
+                "system_state":"UNKNOWN",
+                "release_state":"NOT_READY",
+                "new_entries_allowed":False,
+                "management_mode":"SAFE_ONLY",
+                "banner":"STATUS OPERACIONAL AINDA SEM EVIDÊNCIA CONSOLIDADA",
+                "health_reasons":["RUNTIME_HEALTH_EVIDENCE_NOT_CONNECTED"],
+                "production_promotion_allowed":False,
+                "real_orders_enabled":False,
+            }
+
+        _aq_voice_macro = []
+        try:
+            if isinstance(ranking,pd.DataFrame) and not ranking.empty and {"Código","Pontuação_Final"}.issubset(ranking.columns):
+                _aq_voice_rank = ranking.sort_values("Pontuação_Final",ascending=False).head(2)
+                for _, _vr in _aq_voice_rank.iterrows():
+                    _aq_voice_macro.append(
+                        f"{str(_vr.get('Código','')).upper()} com força relativa {float(_vr.get('Pontuação_Final',0)):.0f} de 100"
+                    )
+        except Exception:
+            _aq_voice_macro = []
+        try:
+            _aq_fed_tone = str((fed or {}).get("tom","")).strip()
+            if _aq_fed_tone:
+                _aq_voice_macro.append(f"Federal Reserve com tom {_aq_fed_tone}")
+        except Exception:
+            pass
+
+        _aq_voice_session = dict((_ATLASQUANT_ACCESS or {}).get("session") or {})
+        _aq_voice_name = str(
+            _aq_voice_session.get("display_name")
+            or _aq_voice_session.get("name")
+            or _aq_voice_session.get("username")
+            or "Mikael"
+        ).strip()
+
+        _aq_aion_runtime = (
+            build_runtime_adapters()
+            if build_runtime_adapters is not None
+            else {
+                "status":{
+                    "environment":str(os.getenv("ATLASQUANT_ENV","DEV") or "DEV"),
+                    "general_ai_configured":False,
+                    "web_research_configured":False,
+                    "credentials_exposed":False,
+                },
+                "general_ai_adapter":None,
+                "web_research_adapter":None,
+            }
+        )
+        _aq_aion_runtime_status=dict(_aq_aion_runtime.get("status",{}) or {})
+        _aq_connector_adapter=(
+            st.session_state.get("atlasquant_aion_connector_adapter")
+            or (build_connector_adapter() if build_connector_adapter is not None else None)
+        )
+        _aq_connector_status=(
+            connector_runtime_status()
+            if connector_runtime_status is not None
+            else {"gateway_configured":False,"credentials_exposed":False}
+        )
+        _aq_aion_runtime_status["connector_gateway_configured"]=bool(
+            _aq_connector_status.get("gateway_configured")
+        )
+        st.session_state["atlasquant_aion_runtime_status"]=_aq_aion_runtime_status
+        _aq_general_ai_adapter=(
+            st.session_state.get("atlasquant_aion_general_ai_adapter")
+            or _aq_aion_runtime.get("general_ai_adapter")
+        )
+        _aq_web_research_adapter=(
+            st.session_state.get("atlasquant_aion_web_research_adapter")
+            or _aq_aion_runtime.get("web_research_adapter")
+        )
+
+        render_admin_voice_assistant(
+            _ATLASQUANT_ACCESS,
+            _aq_voice_admin_state,
+            user_name=_aq_voice_name,
+            changes_since_last_login=st.session_state.get("atlasquant_admin_changes_since_last_login",[]),
+            macro_summary=_aq_voice_macro,
+            opportunities=st.session_state.get("atlasquant_admin_voice_opportunities",[]),
+            important_alerts=st.session_state.get("atlasquant_admin_voice_alerts",[]),
+            paper_summary=st.session_state.get("atlasquant_admin_paper_summary",{}),
+            timezone_name=os.getenv("ATLASQUANT_TIMEZONE","America/Sao_Paulo"),
+            connections=st.session_state.get("atlasquant_aion_connections",{}),
+            general_ai_adapter=_aq_general_ai_adapter,
+            web_research_adapter=_aq_web_research_adapter,
+            connector_adapter=_aq_connector_adapter,
+            runtime_status=_aq_aion_runtime_status,
+        )
+    except Exception as _aq_admin_voice_render_exc:
+        st.caption(
+            "Assistente de voz do Administrador em modo seguro: "
+            f"{type(_aq_admin_voice_render_exc).__name__}: {_aq_admin_voice_render_exc}"
+        )
 
 _fallback_nav = [
     "🎯 Radar", "🧭 Painel mestre", "💱 Moedas", "🇺🇸 EUA", "🔀 Pares", "🏦 Fed",

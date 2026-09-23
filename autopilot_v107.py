@@ -60,6 +60,9 @@ from atlasquant_flight_recorder_panel import record_from_pack
 from atlasquant_flight_recorder_store import persist_records
 from atlasquant_setup_candidates import build_setup_candidates
 from atlasquant_research_timeframes import build_research_timeframe_cache
+from atlasquant_instrument_registry import FX_28, normalize_fx_symbol
+from atlasquant_scanner_scheduler import build_scan_plan, plan_summary
+from atlasquant_timeframe_resampler import derive_from_m15, resampling_readiness
 
 from market_map_core_v10 import (
     NY_TZ,
@@ -355,8 +358,13 @@ def _td_initialize():
 
 def td_fetch(pair: str, interval: str, outputsize: int) -> tuple[pd.DataFrame, str]:
     global _TD_DAILY_BLOCKED, _TD_DAILY_BLOCK_REASON, _TD_BLOCK_TYPE, _TD_HTTP_CALLS, _TD_CACHE_HITS, _TD_STOP_UNTIL
-    if pair not in PAIR_ORDER or interval not in ('15min','1h','4h','1day'):
-        return pd.DataFrame(), "Consulta fora dos sete pares/intervalos previstos."
+    try:
+        canonical = normalize_fx_symbol(pair)
+        pair = f"{canonical[:3]}/{canonical[3:]}"
+    except ValueError:
+        return pd.DataFrame(), "Consulta fora do universo canônico de 28 pares."
+    if interval not in ('15min','1h','4h','1day'):
+        return pd.DataFrame(), "Intervalo fora do contrato de coleta."
     try:
         requested=int(outputsize)
         if requested <= 0 or requested > 5000: raise ValueError()
@@ -582,7 +590,16 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
         return state, m15_frames, errors, calls
 
     # Oldest M15 first avoids starving the last symbols when pacing defers a run.
-    ordered_pairs=sorted(PAIR_ORDER, key=lambda p: minutes_since((fetches.get(p,{}) or {}).get('m15')) if minutes_since((fetches.get(p,{}) or {}).get('m15')) is not None else 10**9, reverse=True)
+    strength_rows={}
+    for _p,_row in pmap.items():
+        try:
+            strength_rows[_p]=float(_row.get("Índice ranking",_row.get("Índice operacional",_row.get("Score final",0))) or 0)
+        except Exception:
+            continue
+    scan_jobs=build_scan_plan(fetches,strength_rows,now=now.to_pydatetime(),active_count=3)
+    ordered_pairs=[j.display_pair for j in scan_jobs]
+    auto_meta["p0_scan_plan"]=plan_summary(scan_jobs)
+    auto_meta["p0_scan_plan"]["execution_expansion_enabled"]=False
     for pair in ordered_pairs:
         row = pmap.get(pair, {})
         direction = str(row.get("Direção", row.get("Direcao", "⚪ AGUARDAR")))
@@ -594,7 +611,8 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
 
         direction_changed = bool(old_dir and old_dir != direction)
         priority = _is_priority_pair_v1075(pair, pmap)
-        m15_every = PRIORITY_M15_EVERY_MIN if priority else M15_EVERY_MIN
+        _job=next((j for j in scan_jobs if j.display_pair==pair),None)
+        m15_every = int(_job.cadence_minutes) if _job is not None else (PRIORITY_M15_EVERY_MIN if priority else M15_EVERY_MIN)
         h1_every = PRIORITY_H1_EVERY_MIN if priority else H1_EVERY_MIN
 
         due_m15 = direction_changed or (
@@ -629,9 +647,10 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
         }
 
         interval_specs = []
-        if due_m15: interval_specs.append(("m15","15min",500))
-        if due_h1: interval_specs.append(("h1","1h",100))
-        if due_h4: interval_specs.append(("h4","4h",100))
+        _legacy_pair = pair in PAIR_ORDER
+        if due_m15: interval_specs.append(("m15","15min",1200 if not _legacy_pair else 500))
+        if _legacy_pair and due_h1: interval_specs.append(("h1","1h",100))
+        if _legacy_pair and due_h4: interval_specs.append(("h4","4h",100))
 
         ok_any = False
         fetched_at = now.isoformat()
@@ -685,7 +704,7 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
                 old["h4_fetched_at"] = fetched_at
                 tec["cache_v110"]["h4"] = _serialize_tf_cache(closed,100)
 
-        # If M15 wasn't due, still try to make it available for market-map/validation
+        # P0: derive H1/H4 for non-legacy crosses from complete M15 buckets only.\n        # Research data is produced now; execution remains disabled pending validation.\n        if not _legacy_pair:\n            _m15_for_derive=m15_frames.get(pair)\n            if _m15_for_derive is None or _m15_for_derive.empty:\n                _cached_m15,_cached_err=read_series(_TD_SERIES,pair,"15min",1200,history=True)\n                if not _cached_err:\n                    _m15_for_derive=_cached_m15\n            if _m15_for_derive is not None and not _m15_for_derive.empty:\n                _h1d=derive_from_m15(_m15_for_derive,"1h")\n                _h4d=derive_from_m15(_m15_for_derive,"4h")\n                _ready=resampling_readiness(_m15_for_derive)\n                tec["p0_resampling"]={**_ready,"execution_grade":False}\n                if len(_h1d)>=60:\n                    tec["h1"]=analyze_h1(_h1d,side)\n                    tec["cache_v110"]["h1"]=_serialize_tf_cache(_h1d,80)\n                if len(_h4d)>=60:\n                    tec["h4"]=analyze_h4(_h4d,side)\n                    tec["cache_v110"]["h4"]=_serialize_tf_cache(_h4d,100)\n            tec["p0_execution_expansion_enabled"]=False\n\n        # If M15 wasn't due, still try to make it available for market-map/validation
         # from one fresh fetch only when needed by those modules.
         if pair not in m15_frames and due_m15 is False:
             cached,cache_err=read_series(_TD_SERIES,pair,"15min",500)
@@ -733,7 +752,7 @@ def scanner_update(inputs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
 
     # V11.0 — calcula a camada institucional para TODOS os pares usando cache
     # persistido. Não consome API e permite SMT entre pares correlacionados.
-    for _pair in PAIR_ORDER:
+    for _pair in tuple(f"{s[:3]}/{s[3:]}" for s in FX_28):
         _row = pmap.get(_pair, {})
         _direction = str(_row.get("Direção", _row.get("Direcao", "⚪ AGUARDAR")))
         _side = macro_side(_direction)

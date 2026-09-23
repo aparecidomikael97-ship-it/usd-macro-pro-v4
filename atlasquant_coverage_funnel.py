@@ -12,12 +12,18 @@ import pandas as pd
 import streamlit as st
 
 from atlasquant_dashboard_v1 import build_g8_radar
+from atlasquant_instrument_registry import FX_28, normalize_fx_symbol
 
 
 DEFAULT_OPERATIONAL_PAIRS=(
     "EUR/USD","GBP/USD","AUD/USD","NZD/USD",
     "USD/JPY","USD/CHF","USD/CAD",
 )
+
+def canonical_fx_universe() -> tuple[str, ...]:
+    """Return the P0 canonical 28-pair universe in display form."""
+    return tuple(f"{s[:3]}/{s[3:]}" for s in FX_28)
+
 
 
 def build_coverage_matrix(
@@ -27,15 +33,24 @@ def build_coverage_matrix(
     neutral_band: float = 5.0,
 ) -> pd.DataFrame:
     radar=build_g8_radar(ranking,neutral_band=neutral_band).copy()
-    supported={
-        str(x).strip().upper() for x in (operational_pairs or ())
-        if str(x).strip()
-    }
+    supported=set()
+    for value in (operational_pairs or ()):
+        try:
+            supported.add(normalize_fx_symbol(str(value)))
+        except ValueError:
+            continue
+
+    def _is_supported(value: Any) -> bool:
+        try:
+            return normalize_fx_symbol(str(value)) in supported
+        except ValueError:
+            return False
+
     radar["Cobertura operacional"]=radar["Par"].map(
-        lambda p: "PIPELINE COMPLETO" if str(p).upper() in supported else "RADAR MACRO"
+        lambda p: "PIPELINE COMPLETO" if _is_supported(p) else "RADAR MACRO"
     )
     radar["Pode receber status executável?"]=radar["Par"].map(
-        lambda p: "SIM" if str(p).upper() in supported else "NÃO"
+        lambda p: "SIM" if _is_supported(p) else "NÃO"
     )
     return radar
 

@@ -4,10 +4,15 @@ on:
   workflow_dispatch:
   pull_request:
     branches: [main]
-  push:
-    branches: [main, atlasquant-dev, atlasquant-runtime, atlasquant-runtime-integration, atlasquant-integration, atlasquant-release-final, atlasquant-support-final, atlasquant-support-ui, atlasquant-brokers-guide, atlasquant-voice-readiness, atlasquant-academy-media, atlasquant-commercial-prep, atlasquant-final-release-prep, atlasquant-backup-workflow, atlasquant-home-radar, atlasquant-private-validation, atlasquant-fast-startup, atlasquant-startup-observability, atlasquant-voice-assistant-final, atlasquant-render-fast-home, atlasquant-mobile-dom-stability, atlasquant-natural-deep-voice]
     paths:
       - "*.py"
+      - "tests/**"
+      - ".github/workflows/quality-tests.yml"
+  push:
+    branches: [main, atlasquant/p0-28fx-foundation, atlasquant-dev, atlasquant-runtime, atlasquant-runtime-integration, atlasquant-integration, atlasquant-release-final, atlasquant-support-final, atlasquant-support-ui, atlasquant-brokers-guide, atlasquant-voice-readiness, atlasquant-academy-media, atlasquant-commercial-prep, atlasquant-final-release-prep, atlasquant-backup-workflow, atlasquant-home-radar, atlasquant-private-validation, atlasquant-fast-startup, atlasquant-startup-observability, atlasquant-voice-assistant-final, atlasquant-render-fast-home, atlasquant-mobile-dom-stability, atlasquant-natural-deep-voice]
+    paths:
+      - "*.py"
+      - "tests/**"
       - "render.yaml"
       - "tradingview/**"
       - "docs/**"
@@ -33,14 +38,14 @@ jobs:
       - name: Install test dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install streamlit pandas numpy requests altair pyarrow
+          pip install pytest streamlit pandas numpy requests altair pyarrow
       - name: Compile Python sources
         run: |
           python -m compileall -q .
 
       - name: Run quality suite
         run: |
-          python -m unittest -q \
+          python -m pytest -q \
             test_engine.py \
             test_calendar.py \
             test_market_map_v10.py \
@@ -203,4 +208,71 @@ jobs:
             test_atlasquant_admin_event_foundation.py \
             test_atlasquant_research_intelligence_foundation.py \
             test_quality_workflow_coverage.py \
-            test_streamlit_width_compat.py
+            test_streamlit_width_compat.py \
+            tests/test_atlasquant_instrument_registry.py \
+            tests/test_atlasquant_scanner_coverage.py \
+            tests/test_atlasquant_legacy_scanner_adapter.py \
+            tests/test_atlasquant_timeframe_resampler.py \
+            tests/test_atlasquant_scanner_scheduler.py \
+            tests/test_atlasquant_fx_registry_parity.py \
+            tests/test_atlasquant_autopilot_28_contract.py \
+            tests/test_atlasquant_data_health.py \
+            tests/test_atlasquant_budget_28_planning.py \
+            tests/test_atlasquant_opportunity_ranking.py \
+            tests/test_atlasquant_radar_views.py \
+            tests/test_atlasquant_gate_chain.py \
+            tests/test_atlasquant_risk_authorization.py \
+            tests/test_atlasquant_fx_exposure.py \
+            tests/test_atlasquant_risk_locks.py \
+            tests/test_atlasquant_paper_authorization_bridge.py \
+            tests/test_atlasquant_result_store.py \
+            tests/test_atlasquant_paper_audit_bridge.py \
+            tests/test_atlasquant_paper_runtime.py \
+            tests/test_atlasquant_paper_reconciliation.py \
+            tests/test_atlasquant_paper_watchdog.py \
+            tests/test_atlasquant_p0_e2e.py \
+            tests/test_atlasquant_quality_gate.py \
+            tests/test_atlasquant_risk_adversarial.py \
+            tests/test_atlasquant_macro_gate_policy.py \
+            tests/test_atlasquant_result_store_adversarial.py \
+            tests/test_atlasquant_fx_exposure_adversarial.py \
+            tests/test_atlasquant_paper_orchestrator.py \
+            tests/test_atlasquant_paper_ledger_reconciliation.py \
+            tests/test_atlasquant_paper_metrics_adversarial.py \
+            tests/test_atlasquant_evidence_isolation.py \
+            tests/test_atlasquant_system_health.py \
+            tests/test_atlasquant_risk_locks_adversarial.py \
+            tests/test_atlasquant_radar_system_health.py \
+            tests/test_atlasquant_quality_runtime_health.py \
+            tests/test_atlasquant_admin_mission_control.py \
+            tests/test_atlasquant_p0_contract_hardening.py \
+            tests/test_atlasquant_gate_data_adversarial.py \
+            tests/test_atlasquant_paper_close.py \
+            tests/test_atlasquant_paper_evidence_audit.py \
+            tests/test_atlasquant_paper_store_health.py \
+            tests/test_atlasquant_evidence_ledger.py \
+            tests/test_atlasquant_paper_report.py \
+            tests/test_atlasquant_paper_entry.py \
+            tests/test_atlasquant_paper_state_audit.py \
+            tests/test_atlasquant_health_hysteresis.py \
+            tests/test_atlasquant_p0_full_lifecycle.py \
+            tests/test_atlasquant_admin_voice.py \
+            tests/test_atlasquant_admin_tts_contract.py \
+            tests/test_atlasquant_aion_capabilities.py \
+            tests/test_atlasquant_aion_connectors.py \
+            tests/test_atlasquant_dow_context.py \
+            tests/test_atlasquant_dow_experiment.py \
+            tests/test_atlasquant_dow_cache_builder.py \
+            tests/test_atlasquant_dow_evidence_bridge.py \
+            tests/test_atlasquant_dow_segment_analysis.py \
+            tests/test_atlasquant_dow_runtime.py \
+            tests/test_atlasquant_aion_social_media.py \
+            tests/test_atlasquant_aion_interface_contract.py \
+            tests/test_atlasquant_aion_memory.py \
+            tests/test_atlasquant_aion_research_contract.py \
+            tests/test_atlasquant_aion_platform_intent.py \
+            tests/test_atlasquant_aion_action_approval.py \
+            tests/test_atlasquant_aion_orchestrator.py \
+            tests/test_atlasquant_aion_runtime_gateway.py \
+            tests/test_atlasquant_aion_connector_runtime.py \
+            tests/test_atlasquant_admin_voice_qa.py
