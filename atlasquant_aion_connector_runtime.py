@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 import os
 
 from atlasquant_aion_action_approval import validate_adapter_execution
+from atlasquant_aion_connectors import sanitize_connector_context
 
 BLOCKED_ACTIONS={"MONEY","TRADING","SECURITY"}
 WRITE_LIKE={"WRITE","PUBLISH","SEND","DELETE","ACCOUNT_CHANGE"}
@@ -110,10 +111,7 @@ def build_connector_adapter(*,env:Mapping[str,Any]|None=None,
         data=response.json()
         if not isinstance(data,Mapping):
             raise RuntimeError("AION_CONNECTOR_RESPONSE_INVALID")
-        out=dict(data)
-        out.pop("access_token",None)
-        out.pop("refresh_token",None)
-        out.pop("authorization",None)
+        out=sanitize_connector_context(dict(data))
         out.update({
             "provider":p,
             "action_class":action,
