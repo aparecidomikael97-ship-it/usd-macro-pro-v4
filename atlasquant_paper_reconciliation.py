@@ -40,13 +40,17 @@ def reconcile_day(opportunities:Sequence[Mapping[str,Any]]|None,trades:Sequence[
  closed=_dedupe_closed([x for x in tr if _closed(x)],reasons)
  rs=[];gross=[];costs=[];mae=[];mfe=[];valid_closed=0
  for i,x in enumerate(closed):
-  v=_finite(x.get("net_r",x.get("realized_r")));realized=_finite(x.get("realized_r",v))
+  v=_finite(x.get("net_r",x.get("realized_r")))
   c1=_finite(x.get("spread_cost_r",0));c2=_finite(x.get("slippage_cost_r",0))
-  if v is None or realized is None:
+  if v is None:
    reasons.append(f"CLOSED_RESULT_R_INVALID:{i}");continue
   if c1 is None or c2 is None or c1<0 or c2<0:
    reasons.append(f"CLOSED_RESULT_COST_INVALID:{i}");continue
-  if "net_r" in x and abs(v-(realized-c1-c2))>1e-9:
+  has_realized="realized_r" in x
+  realized=_finite(x.get("realized_r")) if has_realized else v+c1+c2
+  if realized is None:
+   reasons.append(f"CLOSED_RESULT_R_INVALID:{i}");continue
+  if "net_r" in x and has_realized and abs(v-(realized-c1-c2))>1e-9:
    reasons.append(f"CLOSED_RESULT_ARITHMETIC_MISMATCH:{i}");continue
   rs.append(v);gross.append(realized);costs.append(c1+c2);valid_closed+=1
   a=_finite(x.get("mae_r"));f=_finite(x.get("mfe_r"))
