@@ -98,3 +98,39 @@ auditoria.
 
 Esta especificação é parte fixa do escopo do AtlasQuant até decisão explícita
 em contrário.
+
+
+## Conexões com plataformas externas
+
+AION deve possuir um **Hub de Conectores** para serviços externos, começando por:
+
+- YouTube;
+- Spotify;
+- Google Calendar;
+- Gmail;
+- Google Drive;
+
+e podendo receber novos conectores depois.
+
+As conexões devem usar autorização do próprio usuário, preferencialmente OAuth,
+com escopos mínimos. Tokens e segredos nunca devem ser colocados em prompt,
+resposta de voz ou contexto exposto ao modelo.
+
+### Política de ações externas
+
+- leitura e consulta podem ser automatizadas quando a conexão e a permissão permitirem;
+- ações de escrita, publicação, envio, alteração ou exclusão exigem confirmação;
+- dinheiro, operações de trading e mudanças críticas nunca podem ser autorizados
+  apenas pela voz do AION;
+- toda ação externa deve gerar trilha de auditoria;
+- se o conector estiver indisponível, AION informa isso em vez de fingir que executou.
+
+Exemplos desejados:
+
+- “AION, procure esse vídeo no YouTube”;
+- “AION, encontre conteúdos sobre macroeconomia”;
+- “AION, pesquise uma música no Spotify”;
+- “AION, mostre minhas playlists”;
+- “AION, adicione este compromisso ao calendário” — com confirmação antes da escrita.
+
+YouTube e Spotify entram como conectores prioritários do ecossistema AION.
