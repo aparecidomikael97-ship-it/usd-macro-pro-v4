@@ -32,7 +32,8 @@ def paper_state_snapshot(trades:Sequence[Mapping[str,Any]]|None, *, created_at:A
 def _entry_auth_ok(row:Mapping[str,Any],auth:Mapping[str,Any]|None,current:datetime)->bool:
     a=dict(auth or {})
     if a.get("approved") is not True or str(a.get("risk_gate","")).upper()!="APPROVED": return False
-    if a.get("real_orders_enabled") is not False: return False
+    if a.get("real_orders_enabled") is not False or a.get("fail_closed") is not True: return False
+    if not _positive(a.get("max_authorized_risk")) or not _positive(a.get("max_authorized_exposure")): return False
     if str(a.get("risk_auth_id",""))!=str(row.get("risk_auth_id","")): return False
     if str(a.get("opportunity_id",""))!=str(row.get("opportunity_id","")): return False
     if str(a.get("strategy_version",""))!=str(row.get("strategy_version","")): return False
