@@ -19,6 +19,13 @@ def _pair(value:Any)->str|None:
         s=normalize_fx_symbol(str(value)); return f"{s[:3]}/{s[3:]}"
     except Exception: return None
 
+def paper_request_id_for_authorization(auth:Mapping[str,Any])->str|None:
+    a=dict(auth or {});pair=_pair(a.get("pair"))
+    if not str(a.get("risk_auth_id") or "").strip() or not str(a.get("opportunity_id") or "").strip() or not str(a.get("strategy_version") or "").strip() or pair is None:
+        return None
+    seed=f"{a.get('risk_auth_id')}|{a.get('opportunity_id')}|{a.get('strategy_version')}|{pair}"
+    return "PAPER-"+hashlib.sha256(seed.encode()).hexdigest()[:20]
+
 def paper_request_from_authorization(auth:Mapping[str,Any], *, now:datetime|None=None, opportunity_id:str|None=None,
                                      strategy_version:str|None=None, pair:str|None=None,
                                      requested_risk:float|None=None, requested_exposure:float|None=None)->dict[str,Any]:
@@ -49,8 +56,8 @@ def paper_request_from_authorization(auth:Mapping[str,Any], *, now:datetime|None
         if not _positive(requested_exposure): reasons.append("REQUESTED_EXPOSURE_INVALID")
         elif _positive(max_exp) and float(requested_exposure)>float(max_exp): reasons.append("RISK_AUTH_EXPOSURE_EXCEEDED")
     ok=not reasons
-    seed=f"{a.get('risk_auth_id')}|{a.get('opportunity_id')}|{a.get('strategy_version')}|{auth_pair}"
-    return {"accepted":ok,"paper_request_id":"PAPER-"+hashlib.sha256(seed.encode()).hexdigest()[:20] if ok else None,
+    request_id=paper_request_id_for_authorization(a)
+    return {"accepted":ok,"paper_request_id":request_id if ok else None,
             "risk_auth_id":a.get("risk_auth_id"),"opportunity_id":a.get("opportunity_id"),"pair":auth_pair or a.get("pair"),
             "strategy_version":a.get("strategy_version"),"max_risk":max_risk if _positive(max_risk) else 0,
             "max_exposure":max_exp if _positive(max_exp) else 0,"environment":"PAPER",
