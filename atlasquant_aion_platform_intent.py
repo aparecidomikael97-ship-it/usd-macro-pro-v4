@@ -4,8 +4,8 @@ from typing import Any,Mapping
 from atlasquant_aion_connectors import connector_action_policy
 
 PROVIDER_TERMS={
-    "youtube":("youtube","vídeo","video","canal"),
-    "spotify":("spotify","playlist","música","musica","álbum","album"),
+    "youtube":("youtube","youtube music"),
+    "spotify":("spotify",),
     "google_calendar":("calendar","calendário","calendario","agenda","compromisso"),
     "gmail":("gmail","e-mail","email","mensagem"),
     "google_drive":("drive","google drive","arquivo","documento"),
