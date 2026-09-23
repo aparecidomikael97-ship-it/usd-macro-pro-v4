@@ -9,7 +9,7 @@ def trade(**kw):
 
 def auth(**kw):
  d={"approved":True,"risk_gate":"APPROVED","risk_auth_id":"RA1","opportunity_id":"O1","pair":"EUR/USD","strategy_version":"AMD-1",
- "expires_at":(NOW+timedelta(minutes=5)).isoformat(),"real_orders_enabled":False};d.update(kw);return d
+ "expires_at":(NOW+timedelta(minutes=5)).isoformat(),"real_orders_enabled":False,"direction":"BUY","stop_price":1.17};d.update(kw);return d
 
 def market(**kw):
  d={"price":1.18,"fresh":True,"valid":True};d.update(kw);return d
@@ -40,3 +40,7 @@ def test_already_open_entry_event_is_idempotent():
  t=trade(status="OPEN",entry_event_id="PENTRY-X")
  r=activate_paper_entry(t,auth(),market(),now=NOW)
  assert r["state"]=="ALREADY_OPEN" and not r["opened"] and r["trade"]["entry_event_id"]=="PENTRY-X"
+
+def test_missing_or_wrong_stop_geometry_blocks_entry():
+ assert "STRUCTURAL_STOP_PRICE_INVALID" in activate_paper_entry(trade(),auth(stop_price=None),market(),now=NOW)["reasons"]
+ assert "STOP_GEOMETRY_INVALID" in activate_paper_entry(trade(),auth(direction="BUY",stop_price=1.19),market(),now=NOW)["reasons"]
