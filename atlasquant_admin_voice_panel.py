@@ -5,6 +5,7 @@ the original AtlasQuant PT-BR production voice provider is not yet connected.
 """
 from __future__ import annotations
 from typing import Any,Mapping,Sequence
+import os
 import base64
 import streamlit as st
 import streamlit.components.v1 as components
@@ -41,10 +42,12 @@ if(auto) setTimeout(speak,350);
 def render_admin_voice_assistant(access:Mapping[str,Any]|None,admin_state:Mapping[str,Any]|None, *,
                                  user_name:str="Mikael",changes_since_last_login:Sequence[Any]|None=None,
                                  macro_summary:Sequence[Any]|None=None,opportunities:Sequence[Mapping[str,Any]]|None=None,
-                                 important_alerts:Sequence[Any]|None=None,paper_summary:Mapping[str,Any]|None=None)->dict[str,Any]|None:
+                                 important_alerts:Sequence[Any]|None=None,paper_summary:Mapping[str,Any]|None=None,
+                                 timezone_name:str|None=None)->dict[str,Any]|None:
     if not _is_admin(access):
         return None
-    briefing=build_admin_voice_briefing(dict(admin_state or {}),user_name=user_name,
+    tz_name=str(timezone_name or os.getenv("ATLASQUANT_TIMEZONE","America/Sao_Paulo") or "America/Sao_Paulo")
+    briefing=build_admin_voice_briefing(dict(admin_state or {}),user_name=user_name,timezone_name=tz_name,
         changes_since_last_login=changes_since_last_login,macro_summary=macro_summary,
         opportunities=opportunities,important_alerts=important_alerts)
     st.markdown("### 🗣️ Assistente do Administrador")
