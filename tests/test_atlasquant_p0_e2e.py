@@ -14,7 +14,7 @@ G={"DATA":"PASS","DIRECTION":"PASS_SHORT","MACRO":"ALIGNED_SHORT","STRATEGY":"TR
 O={"opportunity_id":"O-E2E","pair":"EUR/USD","direction":"SELL","strategy_version":"AMD-1","score_version":"AQ_SCORE_1","risk_version":"AQ_RISK_1","quality_score":91,"confidence":93,"gates":G,"timestamp":NOW.isoformat()}
 
 def request(**kw):
- d=dict(opportunity_id="O-E2E",pair="EUR/USD",strategy_version="AMD-1",requested_trade_risk=5,requested_exposure=5,structural_stop_valid=True,rr_after_costs=2,spread_ok=True,slippage_ok=True,liquidity_ok=True,volatility_ok=True,news_clear=True,data_fresh=True,opportunity_state="TRIGGERED")
+ d=dict(opportunity_id="O-E2E",pair="EUR/USD",strategy_version="AMD-1",requested_trade_risk=5,requested_exposure=5,structural_stop_valid=True,rr_after_costs=2,spread_ok=True,slippage_ok=True,liquidity_ok=True,volatility_ok=True,news_clear=True,data_fresh=True,opportunity_state="TRIGGERED",direction="SELL",entry_price=1.18,stop_price=1.19)
  d.update(kw); return RiskRequest(**d)
 
 def test_happy_path_gate_risk_paper_result_restart_metrics():
