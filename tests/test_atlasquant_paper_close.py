@@ -1,5 +1,5 @@
 from datetime import datetime,timezone,timedelta
-from atlasquant_paper_close import close_paper_trade
+from atlasquant_paper_close import close_paper_trade,close_and_append_paper_result
 from atlasquant_result_store import decision_record
 
 NOW=datetime(2026,9,23,12,tzinfo=timezone.utc)
@@ -44,3 +44,14 @@ def test_close_is_idempotent_and_duplicate_evidence_requires_recovery():
 def test_close_before_decision_is_rejected():
  r=close_paper_trade(trade(),decision(),realized_r=1,closed_at=NOW-timedelta(seconds=1))
  assert not r["closed"] and "CLOSED_BEFORE_DECISION" in r["reasons"]
+
+def test_close_and_append_requires_persisted_unique_decision():
+ d=decision();t=trade()
+ x=close_and_append_paper_result(t,d,[],realized_r=1,closed_at=NOW+timedelta(hours=1))
+ assert x["state"]=="REJECTED" and not x["appended"] and "DECISION_NOT_PERSISTED_UNIQUELY" in x["reasons"]
+
+def test_close_and_append_produces_two_row_decision_result_ledger():
+ d=decision();t=trade()
+ x=close_and_append_paper_result(t,d,[d],realized_r=1,spread_cost_r=.1,closed_at=NOW+timedelta(hours=1))
+ assert x["state"]=="CLOSED_AND_APPENDED" and x["appended"] and len(x["ledger"])==2
+ assert x["ledger"][1]["decision_record_id"]==d["record_id"]
