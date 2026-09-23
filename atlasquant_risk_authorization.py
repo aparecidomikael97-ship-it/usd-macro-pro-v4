@@ -14,6 +14,7 @@ class RiskRequest:
     spread_ok:bool; slippage_ok:bool; liquidity_ok:bool; volatility_ok:bool
     news_clear:bool; data_fresh:bool; opportunity_state:str
     cluster_limit_ok:bool=True; correlation_limit_ok:bool=True
+    portfolio_lock_ok:bool=True
 
 def authorize_risk(req:RiskRequest, limits:RiskLimits, state:RiskState, *,
                    min_rr:float=1.0, now:datetime|None=None, ttl_minutes:int=5)->dict[str,Any]:
@@ -26,7 +27,8 @@ def authorize_risk(req:RiskRequest, limits:RiskLimits, state:RiskState, *,
     for ok,code in ((req.spread_ok,"SPREAD_TOO_HIGH"),(req.slippage_ok,"SLIPPAGE_GUARD"),
                     (req.liquidity_ok,"LIQUIDITY_GUARD"),(req.volatility_ok,"VOLATILITY_GUARD"),
                     (req.news_clear,"NEWS_LOCK"),(req.data_fresh,"DATA_STALE"),
-                    (req.cluster_limit_ok,"RISK_CLUSTER_LIMIT"),(req.correlation_limit_ok,"CORRELATION_LIMIT")):
+                    (req.cluster_limit_ok,"RISK_CLUSTER_LIMIT"),(req.correlation_limit_ok,"CORRELATION_LIMIT"),
+                    (req.portfolio_lock_ok,"PORTFOLIO_RISK_LOCK")):
         if ok is not True: reasons.append(code)
     if str(req.opportunity_state).upper()!="TRIGGERED": reasons.append("OPPORTUNITY_NOT_TRIGGERED")
     try:
