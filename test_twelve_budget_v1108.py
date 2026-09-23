@@ -229,10 +229,12 @@ class CollectorTests(unittest.TestCase):
 
     def test_all_28_canonical_pairs_are_collector_eligible(self):
         from atlasquant_instrument_registry import FX_28
+        # Eligibility is a symbol-contract test, not a quota-throughput test.
+        # Give every pair an isolated budget so the real minute gate remains intact.
         for symbol in FX_28:
             pair=f"{symbol[:3]}/{symbol[3:]}"
-            with self.subTest(pair=pair), patch.object(ap.requests,'get',return_value=self.response()) as get:
-                # Reset in-memory cache so eligibility, not cache reuse, is exercised.
+            isolated_store=Store(); isolated_budget=Budget(isolated_store)
+            with self.subTest(pair=pair), patch.object(ap,'_TD_BUDGET',isolated_budget), patch.object(ap.requests,'get',return_value=self.response()) as get:
                 ap._TD_SERIES={'series':{}}
                 d,e=ap.td_fetch(pair,'15min',100)
                 self.assertFalse(d.empty, msg=e)
