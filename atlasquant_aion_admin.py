@@ -38,6 +38,7 @@ from atlasquant_aion_memory import (
     save_runtime_checkpoint,
     search_canonical_memory,
     update_business_checkpoint,
+    update_entitlements_checkpoint,
     update_operating_checkpoint,
     update_promotions_checkpoint,
     update_studio_checkpoint,
@@ -99,6 +100,14 @@ from atlasquant_aion_promotions import (
     new_campaign,
     promotions_summary,
     upsert_campaign,
+)
+from atlasquant_aion_entitlements import (
+    SOURCE_KINDS as ENTITLEMENT_SOURCE_KINDS,
+    approve_entitlement_request,
+    entitlement_activation_preflight,
+    entitlement_summary,
+    new_entitlement_request,
+    upsert_entitlement,
 )
 
 try:
@@ -1382,6 +1391,196 @@ def _render_promotions(
         + (
             "HABILITADA POR FLAG, mas ainda exige Guardian e provedor/registro real."
             if flags.get("promotion_activation")
+            else "DESLIGADA por feature flag."
+        )
+    )
+
+    st.divider()
+    st.markdown("### 🔐 Registro de Entitlements")
+    st.caption(
+        "Entitlement é o direito comercial de acesso, separado do login, do perfil USER/SALES/ADMIN, "
+        "do pagamento e do cupom. Criar ou aprovar uma solicitação NÃO altera conta nem libera acesso."
+    )
+    entitlement_block = (
+        checkpoint.get("entitlements")
+        if isinstance(checkpoint.get("entitlements"), Mapping)
+        else {}
+    )
+    entitlements = list(entitlement_block.get("records", []) or [])
+    ent_summary = entitlement_summary(entitlements)
+
+    e1,e2,e3,e4 = st.columns(4)
+    e1.metric("Solicitações", ent_summary["records"])
+    e2.metric("Aprovadas", ent_summary["approved"])
+    e3.metric("Ativas confirmadas", ent_summary["active_confirmed"])
+    e4.metric("Efetivas agora", ent_summary["effective_now"])
+
+    with st.form("aion_entitlement_request_form", clear_on_submit=True):
+        subject_ref = st.text_input(
+            "Referência do cliente/conta",
+            placeholder="ex.: cliente.01 ou customer_ref",
+        )
+        scope = st.text_input(
+            "Escopo do direito",
+            value="APP_ACCESS",
+            help="Identificador técnico, sem definir preço ou plano comercial.",
+        )
+        source_kind = st.selectbox(
+            "Origem da solicitação",
+            list(ENTITLEMENT_SOURCE_KINDS),
+        )
+        source_ref = st.text_input(
+            "Referência externa opcional",
+            placeholder="ID de evento, campanha ou pedido — se existir",
+        )
+        ent_starts_at = st.text_input(
+            "Início ISO opcional",
+            key="aion_entitlement_starts_at",
+            placeholder="2026-10-01T00:00:00-04:00",
+        )
+        ent_expires_at = st.text_input(
+            "Expiração ISO opcional",
+            key="aion_entitlement_expires_at",
+            placeholder="2026-11-01T00:00:00-04:00",
+        )
+        ent_note = st.text_area(
+            "Nota administrativa",
+            key="aion_entitlement_note",
+            placeholder="Motivo da solicitação. Não use este campo como prova de pagamento.",
+        )
+        create_entitlement = st.form_submit_button(
+            "Criar solicitação de entitlement",
+            type="primary",
+        )
+
+    if create_entitlement:
+        try:
+            item = new_entitlement_request(
+                subject_ref,
+                scope=scope,
+                source_kind=source_kind,
+                source_ref=source_ref,
+                starts_at=ent_starts_at,
+                expires_at=ent_expires_at,
+                note=ent_note,
+            )
+            entitlements = upsert_entitlement(entitlements, item)
+            updated = update_entitlements_checkpoint(
+                checkpoint,
+                records=entitlements,
+                dirty=True,
+            )
+            updated = _record_working_event(
+                updated,
+                "entitlement_request_created",
+                f"Entitlement solicitado: {item['entitlement_id']}",
+                evidence={
+                    "entitlement_id": item["entitlement_id"],
+                    "subject_ref": item["subject_ref"],
+                    "scope": item["scope"],
+                    "source_kind": item["source"]["kind"],
+                    "account_registry_changed": False,
+                    "role_changed": False,
+                },
+            )
+            _set_working_checkpoint(updated, dirty=True)
+            st.success(
+                "Solicitação criada. Nenhuma conta, perfil, pagamento ou acesso foi alterado."
+            )
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Não foi possível criar a solicitação: {type(exc).__name__}")
+
+    if entitlements:
+        ent_rows=[]
+        for item in entitlements:
+            evidence=item.get("provider_evidence") or {}
+            ent_rows.append({
+                "ID":item.get("entitlement_id"),
+                "Cliente/conta":item.get("subject_ref"),
+                "Escopo":item.get("scope"),
+                "Origem":(item.get("source") or {}).get("kind"),
+                "Status":item.get("status"),
+                "Aprovado":bool((item.get("approval") or {}).get("approved",False)),
+                "Evidência externa":bool(evidence.get("confirmed",False)),
+            })
+        st.dataframe(ent_rows,width="stretch",hide_index=True)
+        entitlement_id = st.selectbox(
+            "Entitlement selecionado",
+            [str(x.get("entitlement_id")) for x in entitlements],
+            key="aion_selected_entitlement",
+        )
+        selected_entitlement = next(
+            (x for x in entitlements if str(x.get("entitlement_id")) == entitlement_id),
+            None,
+        )
+        if isinstance(selected_entitlement, Mapping):
+            st.write(
+                f"**{selected_entitlement.get('subject_ref')}** · "
+                f"{selected_entitlement.get('scope')} · "
+                f"status **{selected_entitlement.get('status')}**."
+            )
+            if st.button(
+                "✅ Aprovar solicitação de entitlement",
+                key="aion_entitlement_approve",
+            ):
+                try:
+                    approved_entitlement = approve_entitlement_request(
+                        selected_entitlement,
+                        access,
+                    )
+                    entitlements = upsert_entitlement(
+                        entitlements,
+                        approved_entitlement,
+                    )
+                    updated = update_entitlements_checkpoint(
+                        checkpoint,
+                        records=entitlements,
+                        dirty=True,
+                    )
+                    updated = _record_working_event(
+                        updated,
+                        "entitlement_request_approved",
+                        f"Entitlement aprovado: {approved_entitlement['entitlement_id']}",
+                        evidence={
+                            "entitlement_id": approved_entitlement["entitlement_id"],
+                            "account_registry_changed": False,
+                            "role_changed": False,
+                            "executes_entitlement": False,
+                        },
+                    )
+                    _set_working_checkpoint(updated, dirty=True)
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Aprovação não registrada: {type(exc).__name__}")
+
+            explicit_preflight = st.checkbox(
+                "Aprovo somente o preflight deste entitlement (não libera acesso)",
+                key=f"aion_entitlement_preflight_{entitlement_id}",
+            )
+            ent_preflight = entitlement_activation_preflight(
+                selected_entitlement,
+                access,
+                feature_flags=flags,
+                approved=bool(explicit_preflight),
+            )
+            st.caption(
+                f"Entitlement: {'ELEGÍVEL PARA CONECTOR' if ent_preflight['allowed'] else 'BLOQUEADO'} · "
+                f"{ent_preflight['reason']}"
+            )
+            st.info(
+                "Mesmo quando o preflight ficar elegível, esta tela não altera ATLASQUANT_USERS_JSON, "
+                "não muda USER/SALES/ADMIN e não cria acesso efetivo. "
+                "ACTIVE_CONFIRMED exige evidência concreta de um futuro registro/provedor."
+            )
+    else:
+        st.info("Nenhuma solicitação de entitlement registrada.")
+
+    st.warning(
+        "Ativação real de entitlement está "
+        + (
+            "HABILITADA POR FLAG para preflight, mas ainda não existe conector que conceda acesso."
+            if flags.get("entitlement_activation")
             else "DESLIGADA por feature flag."
         )
     )

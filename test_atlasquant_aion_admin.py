@@ -129,6 +129,18 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("não ativa acesso real", src)
         self.assertIn("Ativas confirmadas", src)
 
+    def test_entitlement_registry_is_persistent_separate_and_fail_closed(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("new_entitlement_request(", src)
+        self.assertIn("update_entitlements_checkpoint(", src)
+        self.assertIn("approve_entitlement_request(", src)
+        self.assertIn("entitlement_activation_preflight(", src)
+        self.assertIn("Registro de Entitlements", src)
+        self.assertIn("não altera conta nem libera acesso", src.lower())
+        self.assertIn("não muda USER/SALES/ADMIN", src)
+        self.assertIn("ACTIVE_CONFIRMED exige evidência concreta", src)
+        self.assertIn("entitlement_activation", src)
+
     def test_business_panel_labels_unconnected_sales_as_unconfirmed(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("não representam vendas confirmadas", src)

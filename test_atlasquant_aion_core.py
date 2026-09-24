@@ -83,6 +83,34 @@ class AtlasQuantAionCoreTests(unittest.TestCase):
             )["allowed"]
         )
 
+    def test_entitlement_activation_is_double_locked_by_flag_and_approval(self):
+        admin = {"role": "ADMIN"}
+        self.assertFalse(
+            guardian_decision(
+                "activate_entitlement",
+                admin,
+                approved=True,
+                feature_flags={"entitlement_activation": False},
+            )["allowed"]
+        )
+        self.assertFalse(
+            guardian_decision(
+                "activate_entitlement",
+                admin,
+                approved=False,
+                feature_flags={"entitlement_activation": True},
+            )["allowed"]
+        )
+        result = guardian_decision(
+            "activate_entitlement",
+            admin,
+            approved=True,
+            feature_flags={"entitlement_activation": True},
+        )
+        self.assertTrue(result["allowed"])
+        self.assertEqual(result["risk"], "FINANCIAL")
+        self.assertEqual(result["feature_flag"], "entitlement_activation")
+
     def test_mission_plan_is_non_executing_and_checkpoint_oriented(self):
         plan = mission_plan("corrigir interface do administrador")
         self.assertEqual(plan["domain"], "development")

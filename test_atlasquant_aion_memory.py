@@ -16,6 +16,7 @@ from atlasquant_aion_memory import (
     save_runtime_checkpoint,
     search_canonical_memory,
     update_business_checkpoint,
+    update_entitlements_checkpoint,
     update_operating_checkpoint,
     update_promotions_checkpoint,
     update_studio_checkpoint,
@@ -82,9 +83,9 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("approved_foundation", cp)
         self.assertTrue(checkpoint_digest(cp))
 
-    def test_checkpoint_v4_has_operating_studio_business_and_promotions_memory(self):
+    def test_checkpoint_v5_has_operating_studio_business_promotions_and_entitlements_memory(self):
         cp=default_checkpoint()
-        self.assertGreaterEqual(cp["checkpoint_version"],4)
+        self.assertGreaterEqual(cp["checkpoint_version"],5)
         self.assertIn("operating",cp)
         self.assertEqual(cp["operating"]["tasks"],[])
         self.assertEqual(cp["operating"]["events"],[])
@@ -93,15 +94,17 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertEqual(cp["business"]["products"],[])
         self.assertEqual(cp["promotions"]["campaigns"],[])
         self.assertEqual(cp["promotions"]["redemptions"],[])
+        self.assertEqual(cp["entitlements"]["records"],[])
 
     def test_older_checkpoint_is_upgraded_without_claiming_persistence(self):
         old={"checkpoint_version":1,"project":"AtlasQuant"}
         upgraded=ensure_operating_checkpoint(old)
-        self.assertEqual(upgraded["checkpoint_version"],4)
+        self.assertEqual(upgraded["checkpoint_version"],5)
         self.assertIn("operating",upgraded)
         self.assertIn("studio",upgraded)
         self.assertIn("business",upgraded)
         self.assertIn("promotions",upgraded)
+        self.assertIn("entitlements",upgraded)
         changed=update_operating_checkpoint(upgraded,tasks=[],events=[],dirty=True)
         self.assertTrue(changed["operating"]["dirty"])
         self.assertTrue(changed["operating"]["task_digest"])
@@ -153,6 +156,28 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertFalse(stored["code"]["plaintext_stored"])
         self.assertEqual(stored["code"]["sha256"],"a"*64)
         self.assertNotIn("AQ-",str(stored))
+
+    def test_entitlement_update_marks_checkpoint_dirty_and_keeps_registry_separate(self):
+        cp=default_checkpoint()
+        changed=update_entitlements_checkpoint(
+            cp,
+            records=[{
+                "subject_ref":"cliente.01",
+                "scope":"APP_ACCESS",
+                "source":{"kind":"MANUAL_GRANT","ref":""},
+                "status":"DRAFT",
+                "created_at":"2026-09-24T12:00:00Z",
+            }],
+            dirty=True,
+        )
+        self.assertEqual(len(changed["entitlements"]["records"]),1)
+        self.assertTrue(changed["entitlements"]["digest"])
+        self.assertTrue(changed["operating"]["dirty"])
+        row=changed["entitlements"]["records"][0]
+        self.assertFalse(row["effects"]["account_registry_changed"])
+        self.assertFalse(row["effects"]["role_changed"])
+        self.assertFalse(row["effects"]["payment_executed"])
+        self.assertFalse(row["effects"]["trading_permission_changed"])
 
     def test_source_digest_ignores_volatile_checkpoint_timestamps(self):
         a=default_checkpoint()

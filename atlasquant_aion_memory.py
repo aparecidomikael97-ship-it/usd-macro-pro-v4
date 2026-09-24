@@ -30,6 +30,7 @@ from atlasquant_aion_model_router import normalize_budget
 from atlasquant_aion_studio import normalize_projects, studio_digest
 from atlasquant_aion_business import normalize_products, business_digest
 from atlasquant_aion_promotions import normalize_campaigns, promotion_digest
+from atlasquant_aion_entitlements import normalize_entitlements, entitlement_digest
 
 SCHEMA = "ATLASQUANT_AION_MEMORY_V1"
 RUNTIME_PATH = "dados/aion/checkpoint_master.json"
@@ -224,7 +225,7 @@ def search_canonical_memory(
 def default_checkpoint() -> dict[str, Any]:
     return {
         "schema": SCHEMA,
-        "checkpoint_version": 4,
+        "checkpoint_version": 5,
         "created_at": _now(),
         "updated_at": _now(),
         "project": "AtlasQuant",
@@ -276,6 +277,10 @@ def default_checkpoint() -> dict[str, Any]:
             "campaigns": [],
             "redemptions": [],
             "digest": promotion_digest([], []),
+        },
+        "entitlements": {
+            "records": [],
+            "digest": entitlement_digest([]),
         },
     }
 
@@ -338,12 +343,23 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
         "digest": promotion_digest(promo_campaigns, promo_redemptions),
     }
 
+    entitlements = payload.get("entitlements")
+    if not isinstance(entitlements, Mapping):
+        entitlements = {}
+    entitlement_rows = normalize_entitlements(
+        entitlements.get("records") if isinstance(entitlements, Mapping) else []
+    )
+    payload["entitlements"] = {
+        "records": entitlement_rows,
+        "digest": entitlement_digest(entitlement_rows),
+    }
+
     operating = payload.get("operating")
     if not isinstance(operating, Mapping):
         operating = {}
     tasks = normalize_queue(operating.get("tasks") if isinstance(operating, Mapping) else [])
     events = normalize_events(operating.get("events") if isinstance(operating, Mapping) else [])
-    payload["checkpoint_version"] = max(4, int(payload.get("checkpoint_version") or 1))
+    payload["checkpoint_version"] = max(5, int(payload.get("checkpoint_version") or 1))
     payload["operating"] = {
         "tasks": tasks,
         "events": events,
@@ -432,6 +448,23 @@ def update_promotions_checkpoint(
         "campaigns": rows,
         "redemptions": redemption_rows,
         "digest": promotion_digest(rows, redemption_rows),
+    }
+    payload["operating"]["dirty"] = bool(dirty)
+    payload["updated_at"] = _now()
+    return payload
+
+
+def update_entitlements_checkpoint(
+    checkpoint: Mapping[str, Any] | None,
+    *,
+    records: Any,
+    dirty: bool = True,
+) -> dict[str, Any]:
+    payload = ensure_operating_checkpoint(checkpoint)
+    rows = normalize_entitlements(records)
+    payload["entitlements"] = {
+        "records": rows,
+        "digest": entitlement_digest(rows),
     }
     payload["operating"]["dirty"] = bool(dirty)
     payload["updated_at"] = _now()
