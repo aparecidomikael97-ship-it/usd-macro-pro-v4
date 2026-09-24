@@ -181,6 +181,11 @@ html { scroll-behavior: smooth; }
 .aq-focus-card strong{display:block;color:var(--aq-text);font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .aq-section-divider{height:1px;background:linear-gradient(90deg,transparent,var(--aq-line),transparent);margin:10px 0 12px}
 .aq-mobile-hint{display:none;color:var(--aq-muted);font-size:.62rem;text-align:center;margin:-3px 0 6px}
+.aq-mode-strip{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin:2px 0 10px;padding:8px 10px;border:1px solid var(--aq-line);border-radius:12px;background:rgba(9,23,40,.64)}
+.aq-mode-strip strong{color:var(--aq-text);font-size:.72rem}
+.aq-mode-chip{border:1px solid rgba(148,183,225,.20);border-radius:999px;padding:4px 8px;color:#eef5ff;background:rgba(13,33,56,.82);font-size:.66rem;font-weight:750}
+.aq-mode-chip.lock{color:#ffd56b}
+.aq-mode-chip.open{color:#73f1da}
 .aq-nav-groups{display:flex;gap:7px;align-items:center;overflow-x:auto;scrollbar-width:none;margin:2px 0 9px;padding:2px 1px}
 .aq-nav-groups::-webkit-scrollbar{display:none}
 .aq-nav-group{flex:0 0 auto;border:1px solid var(--aq-line);border-radius:999px;padding:5px 9px;background:rgba(10,25,44,.56)}
@@ -359,6 +364,9 @@ html { scroll-behavior: smooth; }
   .aq-nav-group{padding:5px 8px}
   .aq-focus-main,.aq-focus-card{padding:9px 10px}
   .aq-mobile-hint{display:block}
+  .aq-mode-strip{padding:7px 8px;gap:6px}
+  .aq-mode-strip strong{width:100%;font-size:.68rem}
+  .aq-mode-chip{font-size:.62rem;padding:4px 7px}
   .aq-section-divider{margin:7px 0 9px}
   [data-testid="stSidebar"] { min-width: 280px; }
   [data-testid="stTabs"] [role="tablist"] { margin-left:-.25rem; margin-right:-.25rem; border-radius:10px; }
@@ -397,6 +405,31 @@ def navigation_labels() -> tuple[str, ...]:
 def normalize_experience_mode(value: object) -> str:
     raw=str(value or "").strip().casefold()
     return "Avançado" if raw.startswith("avan") or raw in {"pro","advanced"} else "Iniciante"
+
+
+def experience_mode_overview_html(mode: object) -> str:
+    """Compact, presentation-only explanation of what each experience exposes."""
+    normalized=normalize_experience_mode(mode)
+    total=len(NAVIGATION_LABELS)
+    beginner_open=len(BEGINNER_OPEN_AREAS)
+    if normalized=="Iniciante":
+        locked=max(0,total-beginner_open)
+        return (
+            '<div class="aq-mode-strip">'
+            '<strong>Modo Iniciante</strong>'
+            f'<span class="aq-mode-chip open">{beginner_open} áreas essenciais abertas</span>'
+            f'<span class="aq-mode-chip lock">🔒 {locked} áreas em prévia</span>'
+            '<span class="aq-mode-chip">sem executar workspace avançado</span>'
+            '</div>'
+        )
+    return (
+        '<div class="aq-mode-strip">'
+        '<strong>Modo Avançado</strong>'
+        f'<span class="aq-mode-chip open">{total} áreas públicas disponíveis</span>'
+        '<span class="aq-mode-chip">diagnósticos completos</span>'
+        '<span class="aq-mode-chip lock">Safety Core preservado</span>'
+        '</div>'
+    )
 
 
 def navigation_mode_css(mode: object) -> str:
