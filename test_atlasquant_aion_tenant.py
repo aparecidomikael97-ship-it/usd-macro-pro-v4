@@ -115,7 +115,7 @@ class AtlasQuantAionTenantTests(unittest.TestCase):
 
     def test_tenant_actions_remain_local_and_forbidden_admin_actions_are_denied(self):
         ent=self._confirmed_entitlement()
-        allowed=tenant_action_decision(self.user,[ent],action="academy_help")
+        allowed=tenant_action_decision("academy_help",self.user,[ent])
         self.assertTrue(allowed["allowed"])
         self.assertFalse(allowed["executes_external_action"])
         for action in (
@@ -123,7 +123,7 @@ class AtlasQuantAionTenantTests(unittest.TestCase):
             "deploy_production","real_trade",
         ):
             self.assertFalse(
-                tenant_action_decision(self.user,[ent],action=action)["allowed"]
+                tenant_action_decision(action,self.user,[ent])["allowed"]
             )
 
     def test_domains_are_small_and_do_not_include_admin_workspaces(self):
