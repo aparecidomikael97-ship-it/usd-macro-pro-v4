@@ -14,7 +14,7 @@ Isso preserva o desenho do Render:
 
 `autoDeployTrigger: checksPass`
 
-Depois que o workflow **AtlasQuant - Mobile DOM Stability** termina com sucesso para um push na `main`, o Browser Smoke é iniciado por `workflow_run`.
+Depois que o workflow **Quality tests** termina com sucesso para um push na `main`, o Browser Smoke é iniciado por `workflow_run`.
 
 Assim:
 
@@ -55,7 +55,7 @@ O workflow:
 - não executa ordem;
 - não altera Safety Core;
 - não bloqueia o deploy `checksPass` como um check de push;
-- só encadeia automaticamente quando Mobile DOM terminou com sucesso em um push da `main`.
+- só encadeia automaticamente quando Quality tests terminou com sucesso em um push da `main`.
 
 Execuções manuais e agendadas continuam disponíveis.
 
