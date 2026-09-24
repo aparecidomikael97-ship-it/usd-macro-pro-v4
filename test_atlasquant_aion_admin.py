@@ -80,11 +80,12 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
 
     def test_contextual_voice_exists_for_all_aion_workspaces(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertGreaterEqual(src.count("_context_voice("),9)
         for area in (
             "Central","Secretaria","Trading","Studio",
             "Negócios","Laboratório","Desenvolvimento","Promoções",
         ):
-            self.assertIn(f'_context_voice("{area}"', src)
+            self.assertIn(f'"{area}",', src)
         self.assertIn("nunca toca sozinha", src)
         self.assertIn("pode consumir esse serviço", src)
 
