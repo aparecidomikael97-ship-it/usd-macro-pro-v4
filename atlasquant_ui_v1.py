@@ -242,27 +242,45 @@ html { scroll-behavior: smooth; }
 [data-testid="stAlert"] { border-radius: 12px; }
 [data-testid="stCaptionContainer"],
 [data-testid="stCaptionContainer"] * {
-  color: var(--text-color, #263548) !important;
-  opacity: .88 !important;
-  font-weight: 600 !important;
+  color: var(--aq-muted-strong) !important;
+  -webkit-text-fill-color: var(--aq-muted-strong) !important;
+  opacity: 1 !important;
+  font-weight: 650 !important;
 }
 [data-testid="stRadio"] label,
 [data-testid="stRadio"] label *,
 [data-testid="stSelectbox"] label,
-[data-testid="stSelectbox"] label * {
-  color: var(--text-color, #182230) !important;
+[data-testid="stSelectbox"] label *,
+[data-testid="stCheckbox"] label,
+[data-testid="stCheckbox"] label * {
+  color: var(--aq-text) !important;
+  -webkit-text-fill-color: var(--aq-text) !important;
   opacity: 1 !important;
+  font-weight: 700 !important;
 }
 [data-testid="stTextInput"] input,
 [data-testid="stNumberInput"] input,
 [data-testid="stTextArea"] textarea,
-[data-baseweb="select"] > div { border-radius: 10px !important; }
+[data-baseweb="select"] > div {
+  border-radius: 10px !important;
+  border-color: rgba(163,190,222,.34) !important;
+}
 [data-testid="stTextInput"] input,
 [data-testid="stNumberInput"] input,
-[data-testid="stTextArea"] textarea {
-  color: var(--text-color, #111827) !important;
-  -webkit-text-fill-color: var(--text-color, #111827) !important;
-  font-weight: 650 !important;
+[data-testid="stTextArea"] textarea,
+[data-baseweb="select"] > div,
+[data-baseweb="select"] input {
+  background: #0d2138 !important;
+  color: #f8fbff !important;
+  -webkit-text-fill-color: #f8fbff !important;
+  font-weight: 700 !important;
+  opacity: 1 !important;
+}
+[data-baseweb="select"] svg { fill: #f2f6fb !important; }
+[data-testid="stButton"] button,
+[data-testid="stButton"] button * {
+  color: #f8fbff !important;
+  -webkit-text-fill-color: #f8fbff !important;
   opacity: 1 !important;
 }
 [data-testid="stExpander"] {
@@ -273,7 +291,7 @@ html { scroll-behavior: smooth; }
 }
 [data-testid="stExpander"] details > summary {
   background: var(--ux-card, rgba(12,26,44,.48)) !important;
-  color: var(--ux-text, var(--text-color, #182230)) !important;
+  color: var(--ux-text, var(--aq-text)) !important;
   min-height: 2.75rem;
   font-weight: 700 !important;
 }
