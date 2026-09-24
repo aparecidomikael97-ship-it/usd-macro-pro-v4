@@ -35,6 +35,7 @@ from atlasquant_aion_memory import (
     ensure_operating_checkpoint,
     load_runtime_checkpoint,
     merged_checkpoint,
+    runtime_write_preflight,
     save_runtime_checkpoint,
     search_canonical_memory,
     update_business_checkpoint,
@@ -1342,11 +1343,21 @@ def _render_development(
             st.rerun()
 
     cfg = _runtime_config()
+    persistence_preflight = runtime_write_preflight(runtime_result)
+    persistence_blocked = bool(conflict or not persistence_preflight.get("allowed"))
+    if not persistence_preflight.get("allowed"):
+        st.caption(
+            "Persistência bloqueada em modo seguro: "
+            f"{persistence_preflight.get('reason','estado runtime não confirmado')}."
+        )
     if st.button(
         "💾 Salvar Checkpoint Mestre no runtime",
         key="aion_save_checkpoint",
-        disabled=conflict,
-        help="A escrita ocorre apenas no branch de runtime e este clique conta como aprovação explícita.",
+        disabled=persistence_blocked,
+        help=(
+            "A escrita ocorre apenas no branch de runtime, exige estado seguro do runtime "
+            "e este clique conta como aprovação explícita."
+        ),
     ):
         decision = guardian_decision(
             "save_checkpoint",
@@ -1361,19 +1372,20 @@ def _render_development(
                 deepcopy(checkpoint),
                 cfg,
                 approved=True,
-                expected_sha=str(runtime_result.get("sha") or ""),
+                expected_sha=str(persistence_preflight.get("expected_sha") or ""),
             )
-            if result.get("saved"):
-                saved_checkpoint = ensure_operating_checkpoint(checkpoint)
+            if result.get("saved") and result.get("verified"):
+                saved_checkpoint = ensure_operating_checkpoint(result.get("checkpoint"))
                 saved_checkpoint["operating"]["dirty"] = False
                 _set_working_checkpoint(saved_checkpoint, dirty=False)
                 st.session_state[_WORKING_SOURCE_KEY] = checkpoint_source_digest(saved_checkpoint)
-                st.success("Checkpoint Mestre salvo e confirmado no runtime.")
+                st.success("Checkpoint Mestre salvo, relido e confirmado no runtime.")
                 st.session_state["aion_checkpoint_save_result"] = result
             else:
                 st.warning(
-                    "Checkpoint não foi confirmado como salvo. "
-                    f"Estado: {result.get('status')} · motivo: {result.get('reason','não informado')}."
+                    "Checkpoint não foi confirmado como persistido. "
+                    f"Estado: {result.get('status')} · motivo: {result.get('reason','não informado')}. "
+                    "As alterações locais continuam marcadas como pendentes."
                 )
 
     st.markdown("#### Camada de Verdade")
