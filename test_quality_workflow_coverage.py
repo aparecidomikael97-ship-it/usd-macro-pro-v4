@@ -71,8 +71,8 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
         src=(ROOT/".github"/"workflows"/"production-build-identity.yml").read_text(encoding="utf-8")
         trigger=src.split("permissions:",1)[0]
         self.assertIn("workflow_dispatch:",trigger)
-        self.assertIn("push:",trigger)
-        self.assertIn("branches: [main]",trigger)
+        self.assertIn("schedule:",trigger)
+        self.assertNotIn("\n  push:",trigger)
         self.assertIn("permissions:\n  contents: read",src)
         self.assertNotIn("contents: write",src)
         self.assertNotIn("GITHUB_TOKEN_HISTORICO",src)

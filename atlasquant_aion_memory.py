@@ -27,6 +27,8 @@ from atlasquant_runtime_store import resolve_runtime_branch, require_runtime_bra
 from atlasquant_aion_operations import normalize_queue, queue_digest
 from atlasquant_aion_observability import normalize_events, events_digest
 from atlasquant_aion_model_router import normalize_budget
+from atlasquant_aion_studio import normalize_projects, studio_digest
+from atlasquant_aion_business import normalize_products, business_digest
 
 SCHEMA = "ATLASQUANT_AION_MEMORY_V1"
 RUNTIME_PATH = "dados/aion/checkpoint_master.json"
@@ -220,7 +222,7 @@ def search_canonical_memory(
 def default_checkpoint() -> dict[str, Any]:
     return {
         "schema": SCHEMA,
-        "checkpoint_version": 2,
+        "checkpoint_version": 3,
         "created_at": _now(),
         "updated_at": _now(),
         "project": "AtlasQuant",
@@ -235,8 +237,8 @@ def default_checkpoint() -> dict[str, Any]:
         "areas": {
             "central": "FOUNDATION",
             "trading": "CONNECTED_READ_ONLY",
-            "studio": "PLANNED_FEATURE_FLAG_OFF",
-            "business": "PLANNED_FEATURE_FLAG_OFF",
+            "studio": "WORKSPACE_READY_EXTERNAL_PUBLISH_OFF",
+            "business": "WORKSPACE_READY_EXTERNAL_PUBLISH_OFF",
             "laboratory": "CONNECTED_SAFE",
             "secretary": "FOUNDATION",
             "development": "FOUNDATION",
@@ -260,6 +262,14 @@ def default_checkpoint() -> dict[str, Any]:
             "event_digest": events_digest([]),
             "dirty": False,
         },
+        "studio": {
+            "projects": [],
+            "digest": studio_digest([]),
+        },
+        "business": {
+            "products": [],
+            "digest": business_digest([]),
+        },
     }
 
 
@@ -276,12 +286,34 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
         aion.get("model_budget") if isinstance(aion.get("model_budget"), Mapping) else {}
     )
 
+    studio = payload.get("studio")
+    if not isinstance(studio, Mapping):
+        studio = {}
+    studio_projects = normalize_projects(
+        studio.get("projects") if isinstance(studio, Mapping) else []
+    )
+    payload["studio"] = {
+        "projects": studio_projects,
+        "digest": studio_digest(studio_projects),
+    }
+
+    business = payload.get("business")
+    if not isinstance(business, Mapping):
+        business = {}
+    business_products = normalize_products(
+        business.get("products") if isinstance(business, Mapping) else []
+    )
+    payload["business"] = {
+        "products": business_products,
+        "digest": business_digest(business_products),
+    }
+
     operating = payload.get("operating")
     if not isinstance(operating, Mapping):
         operating = {}
     tasks = normalize_queue(operating.get("tasks") if isinstance(operating, Mapping) else [])
     events = normalize_events(operating.get("events") if isinstance(operating, Mapping) else [])
-    payload["checkpoint_version"] = max(2, int(payload.get("checkpoint_version") or 1))
+    payload["checkpoint_version"] = max(3, int(payload.get("checkpoint_version") or 1))
     payload["operating"] = {
         "tasks": tasks,
         "events": events,
@@ -311,6 +343,40 @@ def update_operating_checkpoint(
         "event_digest": events_digest(event_rows),
         "dirty": bool(dirty),
     }
+    payload["updated_at"] = _now()
+    return payload
+
+
+def update_studio_checkpoint(
+    checkpoint: Mapping[str, Any] | None,
+    *,
+    projects: Any,
+    dirty: bool = True,
+) -> dict[str, Any]:
+    payload = ensure_operating_checkpoint(checkpoint)
+    rows = normalize_projects(projects)
+    payload["studio"] = {
+        "projects": rows,
+        "digest": studio_digest(rows),
+    }
+    payload["operating"]["dirty"] = bool(dirty)
+    payload["updated_at"] = _now()
+    return payload
+
+
+def update_business_checkpoint(
+    checkpoint: Mapping[str, Any] | None,
+    *,
+    products: Any,
+    dirty: bool = True,
+) -> dict[str, Any]:
+    payload = ensure_operating_checkpoint(checkpoint)
+    rows = normalize_products(products)
+    payload["business"] = {
+        "products": rows,
+        "digest": business_digest(rows),
+    }
+    payload["operating"]["dirty"] = bool(dirty)
     payload["updated_at"] = _now()
     return payload
 
