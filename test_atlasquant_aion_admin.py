@@ -78,6 +78,26 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn('st.session_state["aion_last_route"] = route',src)
         self.assertIn("Roteamento:",src)
 
+    def test_contextual_voice_exists_for_all_aion_workspaces(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        for area in (
+            "Central","Secretaria","Trading","Studio",
+            "Negócios","Laboratório","Desenvolvimento","Promoções",
+        ):
+            self.assertIn(f'_context_voice("{area}"', src)
+        self.assertIn("nunca toca sozinha", src)
+        self.assertIn("pode consumir esse serviço", src)
+
+    def test_external_model_path_is_opt_in_and_cost_guarded(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Usar inteligência externa nesta pergunta", src)
+        self.assertIn("Aprovo esta solicitação externa dentro do teto informado", src)
+        self.assertIn("execute_openai_answer(", src)
+        self.assertIn("estimated_request_cost_usd=estimated_cost", src)
+        self.assertIn("record_model_spend_estimate(", src)
+        self.assertIn("MODEL_OUTPUT_UNVERIFIED", Path("atlasquant_aion_provider.py").read_text(encoding="utf-8"))
+        self.assertIn("nenhuma chamada paga será feita", src)
+
     def test_business_panel_labels_unconnected_sales_as_unconfirmed(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("não representam vendas confirmadas", src)
