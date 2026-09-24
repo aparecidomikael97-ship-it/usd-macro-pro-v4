@@ -355,6 +355,34 @@ jobs:
                           "readable":readable,
                       }
 
+                  light_surface_checks={}
+                  for label,text_value in {
+                      "experience_beginner":"Iniciante",
+                      "experience_advanced":"Avançado",
+                  }.items():
+                      locator=page.get_by_text(text_value,exact=True)
+                      if not locator.count():
+                          light_surface_checks[label]={"present":False,"readable":False}
+                          continue
+                      style=locator.first.evaluate(
+                          """el => {
+                              const s=getComputedStyle(el);
+                              return {color:s.color,opacity:parseFloat(s.opacity || "1")};
+                          }"""
+                      )
+                      import re
+                      match=re.search(r"rgba?\((\d+),\s*(\d+),\s*(\d+)",str(style.get("color","")))
+                      rgb=tuple(int(x) for x in match.groups()) if match else (255,255,255)
+                      brightness=sum(rgb)/3.0
+                      readable=brightness<=110 and float(style.get("opacity",1))>=0.95
+                      light_surface_checks[label]={
+                          "present":True,
+                          "color":style.get("color"),
+                          "opacity":style.get("opacity"),
+                          "brightness":round(brightness,1),
+                          "readable":readable,
+                      }
+
                   metric_contrast=metric_contrast_report(page)
 
                   desktop_workspace_trace=[]
@@ -441,6 +469,7 @@ jobs:
                       "source_build":source_build,
                       "build_identity_ok":build_identity_ok,
                       "contrast_checks":contrast_checks,
+                      "light_surface_checks":light_surface_checks,
                       "metric_contrast":metric_contrast,
                       "desktop_workspace_trace":desktop_workspace_trace,
                       "streamlit_exceptions":exception_count,
@@ -470,6 +499,14 @@ jobs:
                   bad_contrast=[key for key,value in contrast_checks.items() if not bool(value.get("readable"))]
                   if bad_contrast:
                       failures.append(f"{name}: texto de cartões com contraste insuficiente: {','.join(bad_contrast)}")
+                  bad_light_surface=[
+                      key for key,value in light_surface_checks.items()
+                      if not bool(value.get("readable"))
+                  ]
+                  if bad_light_surface:
+                      failures.append(
+                          f"{name}: texto de controle claro sobre fundo claro: {','.join(bad_light_surface)}"
+                      )
                   if metric_contrast.get("measurement_error"):
                       failures.append(
                           f"{name}: não foi possível medir contraste após retries: "
