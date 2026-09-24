@@ -9,6 +9,7 @@ truthful status with provenance.
 """
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -495,4 +496,17 @@ def merged_checkpoint(
 
 def checkpoint_digest(checkpoint: Mapping[str, Any] | None) -> str:
     raw = json.dumps(dict(checkpoint or {}), ensure_ascii=False, sort_keys=True, default=str)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+
+def checkpoint_source_digest(checkpoint: Mapping[str, Any] | None) -> str:
+    """Stable digest for conflict detection, ignoring volatile timestamps/dirty flag."""
+    payload = ensure_operating_checkpoint(checkpoint)
+    payload = deepcopy(payload)
+    payload.pop("created_at", None)
+    payload.pop("updated_at", None)
+    operating = payload.get("operating")
+    if isinstance(operating, dict):
+        operating["dirty"] = False
+    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
