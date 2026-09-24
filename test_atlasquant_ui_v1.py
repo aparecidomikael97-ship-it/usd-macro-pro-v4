@@ -66,10 +66,12 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn('ATLASQUANT', html)
 
 
-    def test_dark_interface_controls_keep_high_contrast_text(self):
+    def test_native_controls_follow_canvas_and_sidebar_contrast(self):
         css=ATLASQUANT_CSS
+        self.assertIn('color: #334155 !important;',css)
+        self.assertIn('color: #182230 !important;',css)
+        self.assertIn('[data-testid="stSidebar"] [data-testid="stRadio"] label',css)
         self.assertIn('color: var(--aq-muted-strong) !important;',css)
-        self.assertIn('color: var(--aq-text) !important;',css)
         self.assertIn('background: #0d2138 !important;',css)
         self.assertIn('color: #f8fbff !important;',css)
         self.assertNotIn('var(--text-color, #263548)',css)
