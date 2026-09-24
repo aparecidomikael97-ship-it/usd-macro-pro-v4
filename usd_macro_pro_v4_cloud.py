@@ -149,6 +149,14 @@ except Exception as _admin_research_exc:
 
 
 try:
+    from atlasquant_aion_admin import render_aion_admin_console
+    _ATLASQUANT_AION_IMPORT_ERROR = ""
+except Exception as _aion_exc:
+    render_aion_admin_console = None
+    _ATLASQUANT_AION_IMPORT_ERROR = f"{type(_aion_exc).__name__}: {_aion_exc}"
+
+
+try:
     from atlasquant_stability_lab import render_stability_lab
     _ATLASQUANT_STABILITY_IMPORT_ERROR = ""
 except Exception as _stability_exc:
@@ -4131,6 +4139,11 @@ _fallback_nav = [
     "🧩 Produto", "🛠️ Melhorias", "📰 Notícias", "🤖 Autopilot", "👤 Conta", "📱 Instalar", "💼 Vendas", "💰 Investir", "🛟 Suporte",
 ]
 _nav_items = list(navigation_labels()) if navigation_labels is not None else _fallback_nav
+# AION oficial é um workspace administrativo privado. Ele é anexado ao fim para
+# preservar todos os índices históricos da navegação pública/operacional.
+if str(_ATLASQUANT_ACCESS.get("role") or "").upper() == "ADMIN":
+    _nav_items.append("🧠 AION")
+
 _aq_experience_mode = (
     render_experience_mode_switch()
     if render_experience_mode_switch is not None
@@ -9681,6 +9694,39 @@ if _aq_active_index == 20:
             st.caption("Diagnóstico: "+_ATLASQUANT_SUPPORT_IMPORT_ERROR)
     else:
         render_support_center()
+
+# =========================================================
+# AION OFICIAL — ADMINISTRADOR / COMMAND CENTER
+# Índice 21 existe somente em sessão ADMIN e é anexado ao fim
+# para não deslocar nenhum workspace legado.
+# =========================================================
+if _aq_active_index == 21:
+    if str(_ATLASQUANT_ACCESS.get("role") or "").upper() != "ADMIN":
+        st.error("AION oficial do administrador está bloqueado para esta sessão.")
+    elif render_aion_admin_console is None:
+        st.error("AION Admin indisponível neste carregamento.")
+        if _ATLASQUANT_AION_IMPORT_ERROR:
+            st.caption("Diagnóstico AION: "+_ATLASQUANT_AION_IMPORT_ERROR)
+    else:
+        _aion_market_context = {
+            "fresh_confirmed": False,
+            "summary": "",
+        }
+        _aion_system_context = {
+            "source_build": _ATLASQUANT_SOURCE_BUILD,
+            "environment": ATLASQUANT_ENVIRONMENT,
+            "app_version": APP_VERSION,
+            "market_status": "não confirmado nesta tela",
+        }
+        try:
+            render_aion_admin_console(
+                _ATLASQUANT_ACCESS,
+                market_context=_aion_market_context,
+                system_context=_aion_system_context,
+            )
+        except Exception as _aion_render_exc:
+            st.warning("AION entrou em modo seguro; nenhuma permissão externa foi ampliada.")
+            st.caption(f"Diagnóstico AION: {type(_aion_render_exc).__name__}")
 
 # No modo GitHub Actions/AppTest, persiste a Matriz atual para o runner background.
 if os.getenv("USD_MACRO_AUTOPILOT", "") == "1":
