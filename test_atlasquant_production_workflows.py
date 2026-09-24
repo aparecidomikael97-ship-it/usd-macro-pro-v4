@@ -39,6 +39,28 @@ class AtlasQuantProductionWorkflowContractTests(unittest.TestCase):
         self.assertIn("workflow_dispatch:",trigger)
         self.assertIn("schedule:",trigger)
 
+    def test_browser_smoke_auto_follows_successful_main_mobile_validation_without_becoming_push_check(self):
+        text=Path(".github/workflows/production-browser-smoke.yml").read_text(encoding="utf-8")
+        trigger=text.split("permissions:",1)[0]
+        self.assertIn("workflow_run:",trigger)
+        self.assertIn('workflows: ["AtlasQuant - Mobile DOM Stability"]',trigger)
+        self.assertIn("types: [completed]",trigger)
+        self.assertIn("branches: [main]",trigger)
+        self.assertNotIn("\n  push:",trigger)
+        self.assertIn("github.event.workflow_run.conclusion == 'success'",text)
+        self.assertIn("github.event.workflow_run.event == 'push'",text)
+        self.assertIn("github.event.workflow_run.head_branch == 'main'",text)
+
+    def test_browser_smoke_checks_out_exact_triggering_commit_and_allows_render_settle_window(self):
+        text=Path(".github/workflows/production-browser-smoke.yml").read_text(encoding="utf-8")
+        self.assertIn("TARGET_SHA:",text)
+        self.assertIn("github.event.workflow_run.head_sha",text)
+        self.assertIn("ref: ${{ env.TARGET_SHA }}",text)
+        self.assertIn('os.environ.get("TARGET_SHA","")',text)
+        self.assertIn("for deploy_attempt in range(1, 37)",text)
+        self.assertIn("if deploy_attempt < 36:",text)
+        self.assertIn("timeout-minutes: 20",text)
+
     def test_mobile_browser_smoke_ignores_transient_pointer_overlay_but_keeps_state_assertion(self):
         text=Path(".github/workflows/production-browser-smoke.yml").read_text(encoding="utf-8")
         self.assertIn("advanced.first.click(force=True)",text)
