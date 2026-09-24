@@ -555,6 +555,40 @@ def load_runtime_checkpoint(
         }
 
 
+def runtime_write_preflight(runtime_result: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Fail closed unless runtime state is safe for create/update persistence."""
+    result = dict(runtime_result or {})
+    status = str(result.get("status") or "UNKNOWN").upper()
+    sha = str(result.get("sha") or "").strip()
+    if status == "CONFIRMED":
+        if not sha:
+            return {
+                "allowed": False,
+                "mode": "BLOCKED",
+                "reason": "Runtime confirmado sem SHA; atualização bloqueada para evitar sobrescrita.",
+                "expected_sha": "",
+            }
+        return {
+            "allowed": True,
+            "mode": "UPDATE",
+            "reason": "Runtime confirmado com SHA para escrita condicional.",
+            "expected_sha": sha,
+        }
+    if status == "NOT_FOUND":
+        return {
+            "allowed": True,
+            "mode": "CREATE",
+            "reason": "Checkpoint não existe; criação inicial permitida após aprovação.",
+            "expected_sha": "",
+        }
+    return {
+        "allowed": False,
+        "mode": "BLOCKED",
+        "reason": f"Estado runtime {status} não permite escrita segura.",
+        "expected_sha": "",
+    }
+
+
 def save_runtime_checkpoint(
     checkpoint: Mapping[str, Any],
     config: RuntimeConfig | None = None,
@@ -563,13 +597,14 @@ def save_runtime_checkpoint(
     expected_sha: str = "",
     timeout: float = 15.0,
 ) -> dict[str, Any]:
-    """Persist a checkpoint only after explicit administrator approval."""
+    """Persist only after approval and confirm persistence with read-after-write."""
     cfg = config or config_from_mapping()
     if not approved:
         return {
             "schema": SCHEMA,
             "status": "BLOCKED",
             "saved": False,
+            "verified": False,
             "reason": "Explicit administrator approval required.",
             "checked_at": _now(),
         }
@@ -580,6 +615,7 @@ def save_runtime_checkpoint(
             "schema": SCHEMA,
             "status": "BLOCKED",
             "saved": False,
+            "verified": False,
             "reason": f"unsafe runtime branch: {type(exc).__name__}",
             "checked_at": _now(),
         }
@@ -588,21 +624,28 @@ def save_runtime_checkpoint(
             "schema": SCHEMA,
             "status": "UNAVAILABLE",
             "saved": False,
+            "verified": False,
             "reason": "GitHub runtime credentials not configured.",
             "checked_at": _now(),
         }
-    payload = dict(checkpoint or {})
+
+    payload = ensure_operating_checkpoint(checkpoint)
+    payload = deepcopy(payload)
     payload["schema"] = SCHEMA
     payload["updated_at"] = _now()
+    payload["operating"]["dirty"] = False
+    expected_digest = checkpoint_source_digest(payload)
     raw = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True, default=str).encode("utf-8")
     if len(raw) > MAX_RUNTIME_BYTES:
         return {
             "schema": SCHEMA,
             "status": "BLOCKED",
             "saved": False,
+            "verified": False,
             "reason": "Checkpoint exceeds size limit.",
             "checked_at": _now(),
         }
+
     body: dict[str, Any] = {
         "message": "AION: atualizar Checkpoint Mestre",
         "content": base64.b64encode(raw).decode("ascii"),
@@ -610,6 +653,7 @@ def save_runtime_checkpoint(
     }
     if str(expected_sha or "").strip():
         body["sha"] = str(expected_sha).strip()
+
     try:
         response = requests.put(
             _contents_url(cfg),
@@ -617,15 +661,61 @@ def save_runtime_checkpoint(
             json=body,
             timeout=timeout,
         )
+        if response.status_code in {409, 422}:
+            return {
+                "schema": SCHEMA,
+                "status": "CONFLICT",
+                "saved": False,
+                "verified": False,
+                "reason": "Runtime mudou ou a escrita condicional não corresponde ao SHA esperado.",
+                "checked_at": _now(),
+            }
         response.raise_for_status()
         obj = response.json()
         content = obj.get("content") if isinstance(obj, dict) else {}
+        write_sha = str((content or {}).get("sha") or "").strip()
+
+        verification = load_runtime_checkpoint(cfg, timeout=timeout)
+        if verification.get("status") != "CONFIRMED":
+            return {
+                "schema": SCHEMA,
+                "status": "UNVERIFIED",
+                "saved": False,
+                "verified": False,
+                "write_accepted": True,
+                "sha": write_sha,
+                "reason": "GitHub aceitou a escrita, mas a leitura de confirmação não foi concluída.",
+                "checked_at": _now(),
+            }
+
+        verified_checkpoint = ensure_operating_checkpoint(verification.get("checkpoint"))
+        actual_digest = checkpoint_source_digest(verified_checkpoint)
+        read_sha = str(verification.get("sha") or "").strip()
+        sha_matches = bool(write_sha and read_sha and write_sha == read_sha)
+        digest_matches = bool(actual_digest == expected_digest)
+        if not sha_matches or not digest_matches:
+            return {
+                "schema": SCHEMA,
+                "status": "CONFLICT",
+                "saved": False,
+                "verified": False,
+                "write_accepted": True,
+                "sha": read_sha or write_sha,
+                "expected_digest": expected_digest,
+                "actual_digest": actual_digest,
+                "reason": "Leitura de confirmação divergiu do conteúdo gravado.",
+                "checked_at": _now(),
+            }
+
         return {
             "schema": SCHEMA,
             "status": "CONFIRMED",
             "saved": True,
+            "verified": True,
             "source": f"GitHub:{cfg.branch}:{cfg.path}",
-            "sha": str((content or {}).get("sha") or ""),
+            "sha": read_sha,
+            "checkpoint": verified_checkpoint,
+            "digest": actual_digest,
             "checked_at": _now(),
         }
     except Exception as exc:
@@ -633,10 +723,10 @@ def save_runtime_checkpoint(
             "schema": SCHEMA,
             "status": "ERROR",
             "saved": False,
+            "verified": False,
             "reason": type(exc).__name__,
             "checked_at": _now(),
         }
-
 
 def merged_checkpoint(
     runtime_result: Mapping[str, Any] | None,
