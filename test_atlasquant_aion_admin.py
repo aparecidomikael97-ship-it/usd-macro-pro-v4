@@ -211,5 +211,20 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("integrações de pedidos não estiverem conectadas", src)
 
 
+    def test_workspace_dispatch_is_fault_isolated_and_does_not_echo_raw_exception(self):
+        from pathlib import Path
+        src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        start=src.index("workspace_error_type =")
+        end=src.index('with st.expander("Política Custo Zero")',start)
+        block=src[start:end]
+        self.assertIn("try:",block)
+        self.assertIn("except Exception as exc:",block)
+        self.assertIn("type(exc).__name__",block)
+        self.assertIn("erro isolado",block)
+        self.assertIn("Nenhuma permissão operacional foi ampliada",block)
+        self.assertNotIn("str(exc)",block)
+        self.assertNotIn("repr(exc)",block)
+        self.assertNotIn("st.exception(",block)
+
 if __name__ == "__main__":
     unittest.main()

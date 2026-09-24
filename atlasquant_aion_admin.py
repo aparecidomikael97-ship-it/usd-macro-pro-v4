@@ -1863,26 +1863,38 @@ def render_aion_admin_console(
     )
     st.caption("AION Admin · navegação estável · uma área por vez · Guardian permanece ativo.")
 
-    if selected_workspace == "🧠 Central":
-        _render_central(access_map, checkpoint, runtime_result, memory_summary, flags, system, status_board, approval_inbox)
-    elif selected_workspace == "🗂️ Secretaria":
-        _render_secretary(access_map, checkpoint, flags, system, market, status_board, approval_inbox)
-    elif selected_workspace == "📈 Trading":
-        _render_trading(market)
-    elif selected_workspace == "🎬 Studio":
-        _render_studio(access_map, checkpoint, flags)
-    elif selected_workspace == "💼 Negócios":
-        _render_business(access_map, checkpoint, flags)
-    elif selected_workspace == "🧪 Laboratório":
-        _render_laboratory(access_map, checkpoint, flags)
-    elif selected_workspace == "🛠️ Desenvolvimento":
-        _render_development(access_map, checkpoint, source_checkpoint, runtime_result, flags)
-    elif selected_workspace == "🎟️ Promoções":
-        _render_promotions(
-            access_map,
-            checkpoint,
-            flags,
-            account_entitlement_audit,
+    workspace_error_type = ""
+    try:
+        if selected_workspace == "🧠 Central":
+            _render_central(access_map, checkpoint, runtime_result, memory_summary, flags, system, status_board, approval_inbox)
+        elif selected_workspace == "🗂️ Secretaria":
+            _render_secretary(access_map, checkpoint, flags, system, market, status_board, approval_inbox)
+        elif selected_workspace == "📈 Trading":
+            _render_trading(market)
+        elif selected_workspace == "🎬 Studio":
+            _render_studio(access_map, checkpoint, flags)
+        elif selected_workspace == "💼 Negócios":
+            _render_business(access_map, checkpoint, flags)
+        elif selected_workspace == "🧪 Laboratório":
+            _render_laboratory(access_map, checkpoint, flags)
+        elif selected_workspace == "🛠️ Desenvolvimento":
+            _render_development(access_map, checkpoint, source_checkpoint, runtime_result, flags)
+        elif selected_workspace == "🎟️ Promoções":
+            _render_promotions(
+                access_map,
+                checkpoint,
+                flags,
+                account_entitlement_audit,
+            )
+    except Exception as exc:
+        workspace_error_type = type(exc).__name__
+        st.error(
+            "Esta área do AION encontrou um erro isolado. "
+            "A Central e as demais áreas continuam disponíveis."
+        )
+        st.caption(
+            f"Diagnóstico seguro: {workspace_error_type}. "
+            "Nenhuma permissão operacional foi ampliada e nenhuma ação externa foi executada."
         )
 
     with st.expander("Política Custo Zero"):
@@ -1906,6 +1918,9 @@ def render_aion_admin_console(
         "approval_inbox_total": int(approval_inbox.get("total") or 0),
         "approval_inbox_has_pending": bool(approval_inbox.get("has_pending")),
         "commercial_access_audit_needs_review": audit_requires_review(account_entitlement_audit),
+        "selected_workspace": selected_workspace,
+        "workspace_status": "ERROR_ISOLATED" if workspace_error_type else "OK",
+        "workspace_error_type": workspace_error_type,
         "real_orders_enabled": False,
     }
 
