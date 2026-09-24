@@ -53,6 +53,14 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn('_set_working_checkpoint(saved_checkpoint, dirty=False)', block)
         self.assertIn("Checkpoint Mestre salvo e confirmado no runtime.", block)
 
+    def test_dirty_checkpoint_detects_runtime_conflict_before_save(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("_WORKING_CONFLICT_KEY", src)
+        self.assertIn("Conflito detectado:", src)
+        self.assertIn("disabled=conflict", src)
+        self.assertIn("não vai sobrescrever a versão nova automaticamente", src)
+        self.assertIn("Descartar alterações locais e recarregar runtime", src)
+
     def test_business_panel_labels_unconnected_sales_as_unconfirmed(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("não representam vendas confirmadas", src)
