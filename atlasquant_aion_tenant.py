@@ -342,6 +342,55 @@ def tenant_policy_snapshot()->dict[str,Any]:
     }
 
 
+def tenant_readiness_summary(
+    entitlements:Sequence[Mapping[str,Any]]|None,
+    *,
+    now:datetime|None=None,
+)->dict[str,Any]:
+    """Summarize future personal-AION readiness without provisioning anything."""
+    rows=normalize_entitlements(entitlements)
+    personal=[
+        row for row in rows
+        if str(row.get("scope") or "").strip().upper()==PERSONAL_SCOPE
+    ]
+    effective=[]
+    by_subject:dict[str,int]={}
+    for row in personal:
+        result=entitlement_effective(row,now=now)
+        if not result["effective"]:
+            continue
+        effective.append(row)
+        subject=str(row.get("subject_ref") or "").strip().casefold()
+        if subject:
+            by_subject[subject]=by_subject.get(subject,0)+1
+
+    duplicate_subjects=sorted(
+        subject for subject,count in by_subject.items()
+        if count>1
+    )
+    policy=tenant_policy_snapshot()
+    return {
+        "schema":SCHEMA,
+        "personal_scope":PERSONAL_SCOPE,
+        "personal_entitlements":len(personal),
+        "effective_confirmed":len(effective),
+        "effective_subjects":len(by_subject),
+        "duplicate_effective_subjects":duplicate_subjects,
+        "subscriber_shell_enabled":False,
+        "persistent_tenant_runtime_confirmed":False,
+        "automatic_provisioning":False,
+        "admin_memory_inherited":bool(policy["admin_memory_inherited"]),
+        "project_docs_inherited":bool(policy["project_docs_inherited"]),
+        "cross_tenant_access":bool(policy["cross_tenant_access"]),
+        "external_provider_auto_enabled":bool(policy["external_provider_enabled_by_default"]),
+        "billing_auto_enabled":bool(policy["billing_enabled"]),
+        "real_trading_enabled":bool(policy["real_trading_enabled"]),
+        "requires_confirmed_entitlement":bool(policy["requires_confirmed_entitlement"]),
+        "readiness_only":True,
+        "executes_action":False,
+    }
+
+
 def tenant_prompt_contract(access:Mapping[str,Any]|None)->dict[str,Any]:
     ns=tenant_namespace(access)
     if not ns["ready"]:
@@ -374,5 +423,5 @@ __all__=[
     "matching_personal_entitlements","personal_aion_eligibility",
     "tenant_domain_allowed","tenant_action_decision","tenant_memory_seed",
     "sanitize_tenant_memory","cross_tenant_access_allowed","tenant_policy_snapshot",
-    "tenant_prompt_contract",
+    "tenant_readiness_summary","tenant_prompt_contract",
 ]

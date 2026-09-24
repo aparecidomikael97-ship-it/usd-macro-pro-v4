@@ -122,6 +122,10 @@ from atlasquant_aion_approval_inbox import (
     collect_approval_inbox,
     approval_rows,
 )
+from atlasquant_aion_tenant import (
+    tenant_policy_snapshot,
+    tenant_readiness_summary,
+)
 
 try:
     from atlasquant_neural_voice_ui import render_neural_voice_player
@@ -1739,6 +1743,45 @@ def _render_promotions(
     st.caption(
         "Enforcement: DESLIGADO · autenticação alterada: NÃO · provisionamento automático: NÃO · "
         "revogação automática: NÃO."
+    )
+
+    st.divider()
+    st.markdown("#### 🧩 AION pessoal · isolamento por assinante")
+    tenant_ready = tenant_readiness_summary(entitlements)
+    tenant_policy = tenant_policy_snapshot()
+
+    t1,t2,t3,t4 = st.columns(4)
+    t1.metric("AION_PERSONAL", tenant_ready["personal_entitlements"])
+    t2.metric("Ativos confirmados", tenant_ready["effective_confirmed"])
+    t3.metric("Assinantes elegíveis", tenant_ready["effective_subjects"])
+    t4.metric("Cross-tenant", "BLOQUEADO")
+
+    duplicate_subjects = tenant_ready.get("duplicate_effective_subjects") or []
+    if duplicate_subjects:
+        st.warning(
+            f"{len(duplicate_subjects)} referência(s) possuem mais de um entitlement AION_PERSONAL efetivo. "
+            "Revisar duplicidade antes de qualquer ativação futura."
+        )
+
+    st.info(
+        "Meu AION ainda NÃO está ativado para assinantes nesta tela. "
+        "Este painel apenas audita a prontidão do isolamento; não cria tenant, não grava memória pessoal "
+        "e não provisiona acesso."
+    )
+    readiness_rows=[
+        {"Controle":"Entitlement AION_PERSONAL confirmado","Estado":f"{tenant_ready['effective_confirmed']} efetivo(s)"},
+        {"Controle":"Memória ADMIN herdada","Estado":"NÃO" if not tenant_policy["admin_memory_inherited"] else "REVISAR"},
+        {"Controle":"Documentos privados do projeto herdados","Estado":"NÃO" if not tenant_policy["project_docs_inherited"] else "REVISAR"},
+        {"Controle":"Acesso a outro tenant","Estado":"BLOQUEADO" if not tenant_policy["cross_tenant_access"] else "REVISAR"},
+        {"Controle":"Persistência pessoal em produção","Estado":"NÃO CONFIRMADA"},
+        {"Controle":"Provedor externo automático","Estado":"DESLIGADO" if not tenant_policy["external_provider_enabled_by_default"] else "REVISAR"},
+        {"Controle":"Cobrança automática","Estado":"DESLIGADA" if not tenant_policy["billing_enabled"] else "REVISAR"},
+        {"Controle":"Trading real","Estado":"BLOQUEADO" if not tenant_policy["real_trading_enabled"] else "REVISAR"},
+    ]
+    st.dataframe(readiness_rows,width="stretch",hide_index=True)
+    st.caption(
+        "Prontidão somente leitura · subscriber shell: DESLIGADO · persistência runtime pessoal: NÃO CONFIRMADA · "
+        "provisionamento automático: NÃO."
     )
 
 
