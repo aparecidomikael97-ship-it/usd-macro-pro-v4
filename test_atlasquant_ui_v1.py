@@ -66,15 +66,27 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn('ATLASQUANT', html)
 
 
-    def test_dark_interface_controls_keep_high_contrast_text(self):
+    def test_native_controls_follow_canvas_and_sidebar_contrast(self):
         css=ATLASQUANT_CSS
+        self.assertIn('color: #334155 !important;',css)
+        self.assertIn('color: #182230 !important;',css)
+        self.assertIn('[data-testid="stSidebar"] [data-testid="stRadio"] label',css)
         self.assertIn('color: var(--aq-muted-strong) !important;',css)
-        self.assertIn('color: var(--aq-text) !important;',css)
         self.assertIn('background: #0d2138 !important;',css)
         self.assertIn('color: #f8fbff !important;',css)
         self.assertNotIn('var(--text-color, #263548)',css)
         self.assertNotIn('var(--text-color, #182230)',css)
         self.assertNotIn('var(--text-color, #111827)',css)
+
+    def test_light_canvas_controls_use_dark_text_while_sidebar_stays_light(self):
+        css=ATLASQUANT_CSS
+        self.assertIn("color: #334155 !important;",css)
+        self.assertIn("color: #182230 !important;",css)
+        self.assertIn('[data-testid="stSidebar"] [data-testid="stCaptionContainer"]',css)
+        self.assertIn("color: var(--aq-muted-strong) !important;",css)
+        self.assertIn('button[kind="primary"]',css)
+        self.assertIn("color: #f8fbff !important;",css)
+
 
     def test_theme_has_responsive_mobile_and_consistent_controls(self):
         from atlasquant_ui_v1 import ATLASQUANT_CSS

@@ -247,8 +247,8 @@ html { scroll-behavior: smooth; }
 [data-testid="stAlert"] { border-radius: 12px; }
 [data-testid="stCaptionContainer"],
 [data-testid="stCaptionContainer"] * {
-  color: var(--aq-muted-strong) !important;
-  -webkit-text-fill-color: var(--aq-muted-strong) !important;
+  color: #334155 !important;
+  -webkit-text-fill-color: #334155 !important;
   opacity: 1 !important;
   font-weight: 650 !important;
 }
@@ -258,10 +258,21 @@ html { scroll-behavior: smooth; }
 [data-testid="stSelectbox"] label *,
 [data-testid="stCheckbox"] label,
 [data-testid="stCheckbox"] label * {
-  color: var(--aq-text) !important;
-  -webkit-text-fill-color: var(--aq-text) !important;
+  color: #182230 !important;
+  -webkit-text-fill-color: #182230 !important;
   opacity: 1 !important;
-  font-weight: 700 !important;
+  font-weight: 750 !important;
+}
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"],
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] *,
+[data-testid="stSidebar"] [data-testid="stRadio"] label,
+[data-testid="stSidebar"] [data-testid="stRadio"] label *,
+[data-testid="stSidebar"] [data-testid="stSelectbox"] label,
+[data-testid="stSidebar"] [data-testid="stSelectbox"] label *,
+[data-testid="stSidebar"] [data-testid="stCheckbox"] label,
+[data-testid="stSidebar"] [data-testid="stCheckbox"] label * {
+  color: var(--aq-muted-strong) !important;
+  -webkit-text-fill-color: var(--aq-muted-strong) !important;
 }
 [data-testid="stTextInput"] input,
 [data-testid="stNumberInput"] input,
@@ -284,9 +295,14 @@ html { scroll-behavior: smooth; }
 [data-baseweb="select"] svg { fill: #f2f6fb !important; }
 [data-testid="stButton"] button,
 [data-testid="stButton"] button * {
+  color: #182230 !important;
+  -webkit-text-fill-color: #182230 !important;
+  opacity: 1 !important;
+}
+[data-testid="stButton"] button[kind="primary"],
+[data-testid="stButton"] button[kind="primary"] * {
   color: #f8fbff !important;
   -webkit-text-fill-color: #f8fbff !important;
-  opacity: 1 !important;
 }
 [data-testid="stExpander"] {
   border: 1px solid var(--ux-border, var(--aq-line)) !important;
