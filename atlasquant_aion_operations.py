@@ -99,9 +99,13 @@ def new_task(
         "estimated_monthly_cost_usd":round(cost,4),
         "approval":{
             "required":False,
+            "attempted":False,
             "approved":False,
             "approved_at":"",
             "approved_by":"",
+            "guardian_allowed":False,
+            "cost_allowed":False,
+            "feature_flag":"",
         },
         "created_at":created,
         "updated_at":created,
@@ -135,9 +139,13 @@ def normalize_task(task:Mapping[str,Any])->dict[str,Any]:
     if isinstance(approval,Mapping):
         normalized["approval"]={
             "required":bool(approval.get("required",False)),
+            "attempted":bool(approval.get("attempted",False)),
             "approved":bool(approval.get("approved",False)),
             "approved_at":_clean_text(approval.get("approved_at"),80),
             "approved_by":_clean_text(approval.get("approved_by"),80),
+            "guardian_allowed":bool(approval.get("guardian_allowed",False)),
+            "cost_allowed":bool(approval.get("cost_allowed",False)),
+            "feature_flag":_clean_text(approval.get("feature_flag"),80),
         }
     return normalized
 
@@ -250,19 +258,25 @@ def approve_task(
             approved=True,
             feature_flags=feature_flags,
         )
+        approval_valid=bool(guardian["allowed"] and cost["allowed"])
         task["approval"]={
             "required":True,
-            "approved":True,
-            "approved_at":_now(),
-            "approved_by":username,
+            "attempted":True,
+            "approved":approval_valid,
+            "approved_at":_now() if approval_valid else "",
+            "approved_by":username if approval_valid else "",
+            "guardian_allowed":bool(guardian["allowed"]),
+            "cost_allowed":bool(cost["allowed"]),
+            "feature_flag":str(guardian.get("feature_flag") or ""),
         }
         task["updated_at"]=_now()
-        task["status"]="TODO" if guardian["allowed"] and cost["allowed"] else "BLOCKED"
+        task["status"]="TODO" if approval_valid else "BLOCKED"
         task["approval_decision"]={
             "guardian_allowed":bool(guardian["allowed"]),
             "guardian_reason":str(guardian["reason"]),
             "cost_allowed":bool(cost["allowed"]),
             "feature_flag":str(guardian.get("feature_flag") or ""),
+            "approval_valid":approval_valid,
         }
     if not found:
         raise ValueError("task not found")
