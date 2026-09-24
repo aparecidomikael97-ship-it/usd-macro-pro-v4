@@ -86,6 +86,13 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
         self.assertIn("actions/setup-python@v7",src)
         self.assertIn("actions/upload-artifact@v7",src)
 
+    def test_quality_push_paths_cover_render_deploy_reconciliation(self):
+        src=WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn('"deploy/**"',src)
+        self.assertIn('".github/workflows/render-deploy-control.yml"',src)
+        self.assertIn('".github/workflows/production-build-identity.yml"',src)
+        self.assertIn('".github/workflows/production-browser-smoke.yml"',src)
+
     def test_integration_ui_smoke_is_local_read_only_and_mobile_aware(self):
         src=(ROOT/".github"/"workflows"/"atlasquant-ui-smoke.yml").read_text(encoding="utf-8")
         self.assertIn("atlasquant-integration",src)
