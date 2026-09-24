@@ -179,6 +179,21 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn('"approval_inbox_total"', src)
         self.assertIn('"approval_inbox_has_pending"', src)
 
+    def test_personal_aion_readiness_panel_is_visible_but_non_provisioning(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("tenant_readiness_summary(", src)
+        self.assertIn("tenant_policy_snapshot(", src)
+        self.assertIn("AION pessoal · isolamento por assinante", src)
+        self.assertIn("Meu AION ainda NÃO está ativado", src)
+        self.assertIn("não cria tenant", src)
+        self.assertIn("não grava memória pessoal", src)
+        self.assertIn("não provisiona acesso", src)
+        self.assertIn("Persistência pessoal em produção", src)
+        self.assertIn("NÃO CONFIRMADA", src)
+        self.assertIn("Provedor externo automático", src)
+        self.assertIn("Cobrança automática", src)
+        self.assertIn("Trading real", src)
+
     def test_business_panel_labels_unconnected_sales_as_unconfirmed(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("não representam vendas confirmadas", src)
