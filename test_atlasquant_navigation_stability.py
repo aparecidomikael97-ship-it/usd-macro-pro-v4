@@ -102,6 +102,39 @@ class AtlasQuantNavigationStabilityTests(unittest.TestCase):
         self.assertIn('_matrix_master_v102 = globals().get("matriz_v61")',src)
         self.assertNotIn("_build_pair_matrix_for_surfaces_v111",src)
 
+    def test_matrix_can_fail_over_to_validated_runtime_snapshot_before_surfaces(self):
+        src=APP.read_text(encoding="utf-8")
+        live=src.index("_aq_pair_matrix_result = build_pair_matrix(")
+        fallback=src.index("validated_snapshot_pair_matrix(",live)
+        status=src.index('st.session_state["atlasquant_pair_matrix_status"]',fallback)
+        radar=src.index("# ABA 1 — CENTRAL INSTITUCIONAL DOS 7 PARES",status)
+        self.assertLess(live,fallback)
+        self.assertLess(fallback,status)
+        self.assertLess(status,radar)
+        block=src[fallback:status]
+        self.assertIn('"source": "runtime_snapshot"',block)
+        self.assertIn('"live_ready": False',block)
+        self.assertIn('"trading_side_effects": False',block)
+
+    def test_radar_reuses_snapshot_packs_when_live_matrix_is_unavailable(self):
+        src=APP.read_text(encoding="utf-8")
+        radar=src.index("# ABA 1 — CENTRAL INSTITUCIONAL DOS 7 PARES")
+        block=src[radar:radar+9000]
+        self.assertIn('_aq_radar_uses_runtime_fallback',block)
+        self.assertIn('"packs": list(_aq_saved_snapshot.get("packs", []) or [])',block)
+        self.assertIn("Radar em continuidade segura por snapshot runtime validado",block)
+        self.assertIn("A Matriz ao vivo será priorizada assim que voltar",block)
+
+    def test_master_panel_snapshot_fallback_keeps_operational_gate_closed(self):
+        src=APP.read_text(encoding="utf-8")
+        master=src.index("# ABA 1 — V10.2.2 PAINEL MESTRE DE OPORTUNIDADES")
+        block=src[master:master+11000]
+        self.assertIn('_aq_master_uses_runtime_fallback',block)
+        self.assertIn('_scanner_state_master_v102 = {}',block)
+        self.assertIn('None if _aq_master_uses_runtime_fallback',block)
+        self.assertIn("Autorizações operacionais permanecem bloqueadas",block)
+        self.assertIn('atlasquant_master_panel_error',block)
+
     def test_central_matrix_contract_is_seven_unique_fx_pairs(self):
         core=Path("atlasquant_pair_matrix_core.py").read_text(encoding="utf-8")
         for pair in ("EUR/USD","GBP/USD","AUD/USD","NZD/USD","USD/JPY","USD/CHF","USD/CAD"):

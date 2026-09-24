@@ -26,6 +26,7 @@ SCHEMA="ATLASQUANT_HOME_SNAPSHOT_V1"
 HOME_SNAPSHOT_PATH="dados/atlasquant_home_snapshot_v1.json"
 DEFAULT_MAX_AGE_MIN=90.0
 DEFAULT_MAX_RUNTIME_AGE_MIN=90.0
+EXPECTED_FX_PAIRS=("EUR/USD","GBP/USD","AUD/USD","NZD/USD","USD/JPY","USD/CHF","USD/CAD")
 
 
 def _finite(value:Any, default:float=0.0)->float:
@@ -94,6 +95,108 @@ def validate_home_snapshot(
         "age_minutes":age,
         "input_age_minutes":input_age,
         "snapshot":s,
+        "real_orders_enabled":False,
+        "automatic_execution":False,
+    }
+
+
+def validated_snapshot_pair_matrix(
+    snapshot:Mapping[str,Any]|None,
+    *,
+    max_age_min:float=DEFAULT_MAX_AGE_MIN,
+    now:datetime|None=None,
+)->dict[str,Any]:
+    """Build a fail-closed 7-pair matrix from a validated runtime snapshot.
+
+    This fallback is presentation/data-continuity only. It never enables real
+    orders or automatic execution, and invalid/stale snapshots are rejected.
+    """
+    check=validate_home_snapshot(snapshot,max_age_min=max_age_min,now=now)
+    empty=pd.DataFrame()
+    if not check["valid"]:
+        return {
+            "ready":False,
+            "reason":"snapshot inválido: "+",".join(check["errors"]),
+            "matrix":empty,
+            "source":"runtime_snapshot",
+            "age_minutes":check.get("age_minutes"),
+            "real_orders_enabled":False,
+            "automatic_execution":False,
+        }
+
+    s=dict(check["snapshot"] or {})
+    inputs=dict(s.get("inputs",{}) or {})
+    raw_pairs=inputs.get("pairs")
+    if not isinstance(raw_pairs,list) or not raw_pairs:
+        return {
+            "ready":False,"reason":"snapshot sem inputs.pairs","matrix":empty,
+            "source":"runtime_snapshot","age_minutes":check.get("age_minutes"),
+            "real_orders_enabled":False,"automatic_execution":False,
+        }
+
+    rows=[]
+    seen=set()
+    required={"Par","Direção","Score final","Qualidade"}
+    for raw in raw_pairs:
+        if not isinstance(raw,Mapping):
+            return {
+                "ready":False,"reason":"linha de par inválida","matrix":empty,
+                "source":"runtime_snapshot","age_minutes":check.get("age_minutes"),
+                "real_orders_enabled":False,"automatic_execution":False,
+            }
+        row=dict(raw)
+        if not required.issubset(row):
+            return {
+                "ready":False,"reason":"colunas obrigatórias ausentes","matrix":empty,
+                "source":"runtime_snapshot","age_minutes":check.get("age_minutes"),
+                "real_orders_enabled":False,"automatic_execution":False,
+            }
+        pair=str(row.get("Par") or "").strip().upper()
+        direction=str(row.get("Direção") or "").strip()
+        if pair not in EXPECTED_FX_PAIRS or pair in seen or not direction:
+            return {
+                "ready":False,"reason":"universo/duplicidade de pares inválido","matrix":empty,
+                "source":"runtime_snapshot","age_minutes":check.get("age_minutes"),
+                "real_orders_enabled":False,"automatic_execution":False,
+            }
+        try:
+            score=float(row.get("Score final"))
+            quality=float(row.get("Qualidade"))
+        except Exception:
+            return {
+                "ready":False,"reason":"score/qualidade inválidos","matrix":empty,
+                "source":"runtime_snapshot","age_minutes":check.get("age_minutes"),
+                "real_orders_enabled":False,"automatic_execution":False,
+            }
+        if not (math.isfinite(score) and math.isfinite(quality)):
+            return {
+                "ready":False,"reason":"score/qualidade não finitos","matrix":empty,
+                "source":"runtime_snapshot","age_minutes":check.get("age_minutes"),
+                "real_orders_enabled":False,"automatic_execution":False,
+            }
+        row["Par"]=pair
+        row["Direção"]=direction
+        row["Score final"]=score
+        row["Qualidade"]=quality
+        rows.append(row)
+        seen.add(pair)
+
+    if len(rows)!=len(EXPECTED_FX_PAIRS) or seen!=set(EXPECTED_FX_PAIRS):
+        return {
+            "ready":False,"reason":"snapshot não contém os 7 pares oficiais","matrix":empty,
+            "source":"runtime_snapshot","age_minutes":check.get("age_minutes"),
+            "real_orders_enabled":False,"automatic_execution":False,
+        }
+
+    matrix=pd.DataFrame(rows)
+    if "Ranking" not in matrix.columns:
+        matrix.insert(0,"Ranking",range(1,len(matrix)+1))
+    return {
+        "ready":True,
+        "reason":"snapshot runtime validado",
+        "matrix":matrix,
+        "source":"runtime_snapshot",
+        "age_minutes":check.get("age_minutes"),
         "real_orders_enabled":False,
         "automatic_execution":False,
     }
@@ -333,5 +436,5 @@ def render_beginner_shell(
 
 __all__=[
     "SCHEMA","HOME_SNAPSHOT_PATH","DEFAULT_MAX_AGE_MIN","DEFAULT_MAX_RUNTIME_AGE_MIN","snapshot_age_minutes",
-    "validate_home_snapshot","load_home_snapshot","render_beginner_shell",
+    "validate_home_snapshot","validated_snapshot_pair_matrix","EXPECTED_FX_PAIRS","load_home_snapshot","render_beginner_shell",
 ]

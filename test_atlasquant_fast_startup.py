@@ -5,6 +5,8 @@ from atlasquant_fast_startup import (
     SCHEMA,
     snapshot_age_minutes,
     validate_home_snapshot,
+    validated_snapshot_pair_matrix,
+    EXPECTED_FX_PAIRS,
     load_home_snapshot,
 )
 
@@ -17,6 +19,10 @@ def snapshot(*, generated_at=None, real_orders=False, automatic_execution=False)
         "generated_at":generated_at,
         "packs":[{"pair":"EUR/USD","direction":"VENDA"}],
         "inputs":{
+            "pairs":[
+                {"Par":pair,"Direção":("VENDA "+pair if pair.endswith("/USD") else "COMPRA "+pair),"Score final":80-i,"Qualidade":85-i,"Índice ranking":90-i}
+                for i,pair in enumerate(EXPECTED_FX_PAIRS)
+            ],
             "fast_boot":{
                 "ranking":[{"Código":"USD","Pontuação_Final":60}],
                 "fed":{"tom":"Restritivo","forca":0.4},
@@ -94,6 +100,26 @@ class FastStartupTests(unittest.TestCase):
         self.assertIn("schema",out["errors"])
 
 
+
+
+    def test_validated_snapshot_pair_matrix_recovers_all_seven_pairs(self):
+        out=validated_snapshot_pair_matrix(snapshot(),now=self.now,max_age_min=90)
+        self.assertTrue(out["ready"])
+        self.assertEqual(out["source"],"runtime_snapshot")
+        self.assertEqual(len(out["matrix"]),7)
+        self.assertEqual(set(out["matrix"]["Par"]),set(EXPECTED_FX_PAIRS))
+        self.assertIn("Ranking",out["matrix"].columns)
+        self.assertFalse(out["real_orders_enabled"])
+        self.assertFalse(out["automatic_execution"])
+
+    def test_snapshot_pair_matrix_rejects_stale_or_incomplete_runtime(self):
+        stale=snapshot(generated_at=(self.now-timedelta(minutes=91)).isoformat())
+        self.assertFalse(validated_snapshot_pair_matrix(stale,now=self.now,max_age_min=90)["ready"])
+        incomplete=snapshot()
+        incomplete["inputs"]["pairs"]=incomplete["inputs"]["pairs"][:-1]
+        out=validated_snapshot_pair_matrix(incomplete,now=self.now,max_age_min=90)
+        self.assertFalse(out["ready"])
+        self.assertIn("7 pares",out["reason"])
 
     def test_invalid_fast_snapshot_keeps_advanced_reachable(self):
         from pathlib import Path
