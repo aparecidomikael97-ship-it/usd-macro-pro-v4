@@ -143,11 +143,19 @@ class AtlasQuantProductionWorkflowContractTests(unittest.TestCase):
 
 
 
-    def test_manual_render_deploy_control_is_fail_closed_and_dispatches_smoke(self):
+    def test_render_deploy_control_is_fail_closed_and_only_pushes_from_reconcile_trigger(self):
         text=Path(".github/workflows/render-deploy-control.yml").read_text(encoding="utf-8")
         trigger=text.split("permissions:",1)[0]
         self.assertIn("workflow_dispatch:",trigger)
-        self.assertNotIn("\n  push:",trigger)
+        self.assertIn("\n  push:",trigger)
+        self.assertIn("branches:",trigger)
+        self.assertIn("- main",trigger)
+        self.assertIn("paths:",trigger)
+        self.assertIn('".github/render-reconcile.trigger"',trigger)
+        # The recovery path must stay narrowly scoped: ordinary source pushes
+        # must not bypass Render/GitHub release controls.
+        self.assertNotIn('"usd_macro_pro_v4_cloud.py"',trigger)
+        self.assertNotIn('"**"',trigger)
         self.assertIn("actions: write",text)
         self.assertIn("RENDER_DEPLOY_HOOK_URL",text)
         self.assertIn("secrets.RENDER_DEPLOY_HOOK_URL",text)
