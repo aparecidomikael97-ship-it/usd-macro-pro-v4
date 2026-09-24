@@ -26,6 +26,7 @@ import requests
 from atlasquant_runtime_store import resolve_runtime_branch, require_runtime_branch
 from atlasquant_aion_operations import normalize_queue, queue_digest
 from atlasquant_aion_observability import normalize_events, events_digest
+from atlasquant_aion_model_router import normalize_budget
 
 SCHEMA = "ATLASQUANT_AION_MEMORY_V1"
 RUNTIME_PATH = "dados/aion/checkpoint_master.json"
@@ -229,6 +230,7 @@ def default_checkpoint() -> dict[str, Any]:
             "truth_policy": "never_invent",
             "cost_mode": "ZERO_COST_DEFAULT",
             "real_trading": False,
+            "model_budget": normalize_budget({}),
         },
         "areas": {
             "central": "FOUNDATION",
@@ -266,6 +268,14 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
     payload = dict(checkpoint or {})
     if not payload:
         payload = default_checkpoint()
+    aion = payload.get("aion")
+    if not isinstance(aion, dict):
+        aion = {}
+        payload["aion"] = aion
+    aion["model_budget"] = normalize_budget(
+        aion.get("model_budget") if isinstance(aion.get("model_budget"), Mapping) else {}
+    )
+
     operating = payload.get("operating")
     if not isinstance(operating, Mapping):
         operating = {}

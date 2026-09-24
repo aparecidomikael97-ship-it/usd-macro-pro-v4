@@ -61,6 +61,23 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("não vai sobrescrever a versão nova automaticamente", src)
         self.assertIn("Descartar alterações locais e recarregar runtime", src)
 
+    def test_laboratory_exposes_budget_router_without_enabling_billing(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Roteador de inteligência / orçamento", src)
+        self.assertIn("Teto mensal máximo para IA externa (USD)", src)
+        self.assertIn("Permitir solicitações pagas dentro do teto", src)
+        self.assertIn("set_budget_policy(", src)
+        self.assertIn("route_intelligence(", src)
+        self.assertIn("Definir teto não gera cobrança", src)
+
+    def test_central_records_router_decision_before_local_answer(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        route=src.index("route = route_intelligence(")
+        answer=src.index("answer = local_answer(",route)
+        self.assertLess(route,answer)
+        self.assertIn('st.session_state["aion_last_route"] = route',src)
+        self.assertIn("Roteamento:",src)
+
     def test_business_panel_labels_unconnected_sales_as_unconfirmed(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("não representam vendas confirmadas", src)
