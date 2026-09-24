@@ -30,11 +30,30 @@ from atlasquant_aion_memory import (
     canonical_memory_summary,
     checkpoint_digest,
     config_from_mapping,
+    ensure_operating_checkpoint,
     load_runtime_checkpoint,
     merged_checkpoint,
     save_runtime_checkpoint,
     search_canonical_memory,
+    update_operating_checkpoint,
 )
+from atlasquant_aion_operations import (
+    ACTIONS,
+    PRIORITIES,
+    STATUSES,
+    approve_task,
+    approval_requirement,
+    new_task,
+    queue_summary,
+    transition_task,
+    upsert_task,
+)
+from atlasquant_aion_observability import (
+    append_event,
+    new_event,
+    observability_summary,
+)
+from atlasquant_aion_secretary import executive_briefing
 
 try:
     from atlasquant_neural_voice_ui import render_neural_voice_player
@@ -42,6 +61,9 @@ except Exception:
     render_neural_voice_player = None
 
 SCHEMA = "ATLASQUANT_AION_ADMIN_V1"
+_WORKING_CHECKPOINT_KEY = "aion_working_checkpoint_v2"
+_WORKING_SOURCE_KEY = "aion_working_checkpoint_source_digest"
+_WORKING_DIRTY_KEY = "aion_working_checkpoint_dirty"
 
 AION_ADMIN_CSS = r"""
 <style>
@@ -172,6 +194,51 @@ def _render_header(
     )
 
 
+def _working_checkpoint(source: Mapping[str, Any]) -> dict[str, Any]:
+    seed = ensure_operating_checkpoint(source)
+    source_digest = checkpoint_digest(seed)
+    current = st.session_state.get(_WORKING_CHECKPOINT_KEY)
+    dirty = bool(st.session_state.get(_WORKING_DIRTY_KEY, False))
+    known_source = str(st.session_state.get(_WORKING_SOURCE_KEY) or "")
+    if not isinstance(current, Mapping) or (known_source != source_digest and not dirty):
+        st.session_state[_WORKING_CHECKPOINT_KEY] = deepcopy(seed)
+        st.session_state[_WORKING_SOURCE_KEY] = source_digest
+        st.session_state[_WORKING_DIRTY_KEY] = False
+    return ensure_operating_checkpoint(st.session_state[_WORKING_CHECKPOINT_KEY])
+
+
+def _set_working_checkpoint(checkpoint: Mapping[str, Any], *, dirty: bool = True) -> dict[str, Any]:
+    payload = ensure_operating_checkpoint(checkpoint)
+    payload["operating"]["dirty"] = bool(dirty)
+    st.session_state[_WORKING_CHECKPOINT_KEY] = payload
+    st.session_state[_WORKING_DIRTY_KEY] = bool(dirty)
+    return payload
+
+
+def _record_working_event(
+    checkpoint: Mapping[str, Any],
+    event_type: str,
+    message: str,
+    *,
+    severity: str = "INFO",
+    evidence: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    payload = ensure_operating_checkpoint(checkpoint)
+    operating = payload["operating"]
+    events = append_event(
+        operating.get("events", []),
+        new_event(
+            event_type,
+            message,
+            severity=severity,
+            source="AION_ADMIN",
+            truth_state="CONFIRMED",
+            evidence=evidence or {},
+        ),
+    )
+    return update_operating_checkpoint(payload, events=events, dirty=True)
+
+
 def _safe_market_state(market_context: Mapping[str, Any]) -> tuple[str, str]:
     fresh = bool(market_context.get("fresh_confirmed", False))
     summary = str(market_context.get("summary") or "").strip()
@@ -212,10 +279,13 @@ def _render_central(
 ) -> None:
     st.markdown("### 🧠 Central AION")
     pending = checkpoint.get("pending") if isinstance(checkpoint.get("pending"), list) else []
+    operating = checkpoint.get("operating") if isinstance(checkpoint.get("operating"), Mapping) else {}
+    tasks = operating.get("tasks", []) if isinstance(operating, Mapping) else []
+    summary = queue_summary(tasks)
     cols = st.columns(4)
     cols[0].metric("Versão AION", AION_VERSION)
-    cols[1].metric("Pendências registradas", len(pending))
-    cols[2].metric("Flags externas ligadas", sum(1 for v in flags.values() if v))
+    cols[1].metric("Tarefas ativas", summary["active"])
+    cols[2].metric("Aguardando aprovação", summary["waiting_approval"])
     cols[3].metric("Ordens reais", "BLOQUEADAS")
 
     st.markdown("#### Briefing de entrada")
@@ -274,6 +344,142 @@ def _render_central(
         "AION consolida tarefas, pendências e aprovações. Agenda, e-mail e clientes externos "
         "só entram como confirmados quando a fonte correspondente estiver conectada."
     )
+    if bool(st.session_state.get(_WORKING_DIRTY_KEY, False)):
+        st.warning("Há alterações locais no Checkpoint Mestre aguardando salvamento no runtime.")
+
+
+def _render_secretary(
+    access: Mapping[str, Any],
+    checkpoint: Mapping[str, Any],
+    flags: Mapping[str, bool],
+    system_context: Mapping[str, Any],
+    market_context: Mapping[str, Any],
+) -> None:
+    st.markdown("### 🗂️ Secretaria AION")
+    operating = checkpoint.get("operating") if isinstance(checkpoint.get("operating"), Mapping) else {}
+    tasks = list(operating.get("tasks", []) or [])
+    events = list(operating.get("events", []) or [])
+    summary = queue_summary(tasks)
+    obs = observability_summary(events)
+    brief = executive_briefing(
+        tasks=tasks,
+        events=events,
+        system_context=system_context,
+        market_context=market_context,
+        clients_context={"truth_state":"UNKNOWN"},
+        content_context={"truth_state":"UNKNOWN"},
+    )
+
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("Ativas", summary["active"])
+    c2.metric("Aprovação", summary["waiting_approval"])
+    c3.metric("Bloqueadas", summary["blocked"])
+    c4.metric("Alertas", obs["by_severity"]["WARNING"] + obs["by_severity"]["ERROR"] + obs["by_severity"]["CRITICAL"])
+
+    st.markdown("#### Briefing executivo")
+    st.write(brief["system"]["message"])
+    st.write(brief["market"]["message"])
+    st.write(brief["clients"]["message"])
+    st.write(brief["content"]["message"])
+
+    st.markdown("#### Nova tarefa")
+    with st.form("aion_secretary_new_task", clear_on_submit=True):
+        title = st.text_input("Tarefa")
+        cdom,cprio = st.columns(2)
+        domain = cdom.selectbox(
+            "Área",
+            ["central","trading","studio","business","laboratory","secretary","development","promotions"],
+        )
+        priority = cprio.selectbox("Prioridade", list(PRIORITIES), index=2)
+        action = st.selectbox("Tipo de ação", list(ACTIONS), index=0)
+        note = st.text_area("Observação", max_chars=1200)
+        cost = st.number_input("Custo mensal estimado (USD)", min_value=0.0, value=0.0, step=1.0)
+        submit = st.form_submit_button("Adicionar à fila", type="primary")
+    if submit:
+        try:
+            task = new_task(
+                title,
+                domain=domain,
+                priority=priority,
+                action=action,
+                note=note,
+                estimated_monthly_cost_usd=cost,
+                source=str(access.get("username") or "ADMIN"),
+            )
+            requirement = approval_requirement(task, access, feature_flags=flags)
+            if requirement["required"]:
+                task["status"] = "WAITING_APPROVAL"
+                task["approval"]["required"] = True
+            tasks = upsert_task(tasks, task)
+            updated = update_operating_checkpoint(checkpoint, tasks=tasks, events=events, dirty=True)
+            updated = _record_working_event(
+                updated,
+                "task_created",
+                f"Tarefa criada: {task['title']}",
+                evidence={"task_id":task["task_id"],"action":task["action"],"priority":task["priority"]},
+            )
+            _set_working_checkpoint(updated, dirty=True)
+            st.success("Tarefa adicionada à memória operacional local.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Não foi possível criar a tarefa: {type(exc).__name__}")
+
+    if tasks:
+        rows = [{
+            "ID":x.get("task_id"),
+            "Prioridade":x.get("priority"),
+            "Status":x.get("status"),
+            "Área":x.get("domain"),
+            "Ação":x.get("action"),
+            "Tarefa":x.get("title"),
+            "Custo USD":x.get("estimated_monthly_cost_usd"),
+        } for x in tasks]
+        st.dataframe(rows, width="stretch", hide_index=True)
+
+        options=[str(x.get("task_id")) for x in tasks]
+        selected_id=st.selectbox("Tarefa selecionada", options, key="aion_secretary_selected_task")
+        selected=next((x for x in tasks if str(x.get("task_id"))==selected_id),None)
+        if isinstance(selected,Mapping):
+            st.caption(
+                f"{selected.get('priority')} · {selected.get('status')} · {selected.get('domain')} · "
+                f"ação {selected.get('action')}"
+            )
+            b1,b2,b3,b4=st.columns(4)
+            if b1.button("▶️ Iniciar", key="aion_task_start"):
+                tasks=transition_task(tasks,selected_id,"IN_PROGRESS")
+                updated=update_operating_checkpoint(checkpoint,tasks=tasks,events=events,dirty=True)
+                _set_working_checkpoint(_record_working_event(updated,"task_started",f"Tarefa iniciada: {selected_id}",evidence={"task_id":selected_id}),dirty=True)
+                st.rerun()
+            if b2.button("✅ Aprovar", key="aion_task_approve"):
+                try:
+                    tasks=approve_task(tasks,selected_id,access,feature_flags=flags)
+                    updated=update_operating_checkpoint(checkpoint,tasks=tasks,events=events,dirty=True)
+                    _set_working_checkpoint(_record_working_event(updated,"task_approved",f"Aprovação registrada: {selected_id}",evidence={"task_id":selected_id}),dirty=True)
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Aprovação não registrada: {type(exc).__name__}")
+            if b3.button("✔️ Concluir", key="aion_task_done"):
+                tasks=transition_task(tasks,selected_id,"DONE")
+                updated=update_operating_checkpoint(checkpoint,tasks=tasks,events=events,dirty=True)
+                _set_working_checkpoint(_record_working_event(updated,"task_done",f"Tarefa concluída manualmente: {selected_id}",evidence={"task_id":selected_id}),dirty=True)
+                st.rerun()
+            if b4.button("⛔ Cancelar", key="aion_task_cancel"):
+                tasks=transition_task(tasks,selected_id,"CANCELED")
+                updated=update_operating_checkpoint(checkpoint,tasks=tasks,events=events,dirty=True)
+                _set_working_checkpoint(_record_working_event(updated,"task_canceled",f"Tarefa cancelada: {selected_id}",severity="NOTICE",evidence={"task_id":selected_id}),dirty=True)
+                st.rerun()
+    else:
+        st.info("A fila operacional do AION está vazia.")
+
+    with st.expander("Observabilidade / auditoria"):
+        st.caption(
+            f"Eventos: {obs['total']} · warnings {obs['by_severity']['WARNING']} · "
+            f"errors {obs['by_severity']['ERROR']} · críticos {obs['by_severity']['CRITICAL']}"
+        )
+        if events:
+            st.dataframe(list(reversed(events[-30:])), width="stretch", hide_index=True)
+        else:
+            st.write("Nenhum evento operacional registrado nesta memória.")
 
 
 def _render_trading(market_context: Mapping[str, Any]) -> None:
@@ -424,6 +630,10 @@ def _render_development(
                 expected_sha=str(runtime_result.get("sha") or ""),
             )
             if result.get("saved"):
+                saved_checkpoint = ensure_operating_checkpoint(checkpoint)
+                saved_checkpoint["operating"]["dirty"] = False
+                _set_working_checkpoint(saved_checkpoint, dirty=False)
+                st.session_state[_WORKING_SOURCE_KEY] = checkpoint_digest(saved_checkpoint)
                 st.success("Checkpoint Mestre salvo e confirmado no runtime.")
                 st.session_state["aion_checkpoint_save_result"] = result
             else:
@@ -491,7 +701,7 @@ def render_aion_admin_console(
     cfg = _runtime_config()
     runtime_result = load_runtime_checkpoint(cfg, timeout=6.0)
     merged = merged_checkpoint(runtime_result)
-    checkpoint = merged["checkpoint"]
+    checkpoint = _working_checkpoint(merged["checkpoint"])
 
     _render_header(
         access_map,
@@ -503,6 +713,7 @@ def render_aion_admin_console(
 
     tabs = st.tabs([
         "🧠 Central",
+        "🗂️ Secretaria",
         "📈 Trading",
         "🎬 Studio",
         "💼 Negócios",
@@ -513,16 +724,18 @@ def render_aion_admin_console(
     with tabs[0]:
         _render_central(access_map, checkpoint, runtime_result, memory_summary, flags, system)
     with tabs[1]:
-        _render_trading(market)
+        _render_secretary(access_map, checkpoint, flags, system, market)
     with tabs[2]:
-        _render_studio(flags)
+        _render_trading(market)
     with tabs[3]:
-        _render_business(flags)
+        _render_studio(flags)
     with tabs[4]:
-        _render_laboratory(flags)
+        _render_business(flags)
     with tabs[5]:
-        _render_development(access_map, checkpoint, runtime_result, flags)
+        _render_laboratory(flags)
     with tabs[6]:
+        _render_development(access_map, checkpoint, runtime_result, flags)
+    with tabs[7]:
         _render_promotions(flags)
 
     with st.expander("Política Custo Zero"):
@@ -538,6 +751,8 @@ def render_aion_admin_console(
         "provider_state": provider.get("state"),
         "feature_flags": flags,
         "checkpoint_digest": checkpoint_digest(checkpoint),
+        "checkpoint_dirty": bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
+        "task_summary": queue_summary((checkpoint.get("operating") or {}).get("tasks", [])),
         "real_orders_enabled": False,
     }
 
