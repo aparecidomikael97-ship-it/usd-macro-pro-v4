@@ -60,6 +60,8 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         cp = default_checkpoint()
         self.assertFalse(cp["aion"]["real_trading"])
         self.assertEqual(cp["aion"]["cost_mode"], "ZERO_COST_DEFAULT")
+        self.assertFalse(cp["aion"]["model_budget"]["allow_paid"])
+        self.assertEqual(cp["aion"]["model_budget"]["monthly_limit_usd"],0.0)
         self.assertIn("approved_foundation", cp)
         self.assertTrue(checkpoint_digest(cp))
 
