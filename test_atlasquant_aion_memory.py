@@ -135,7 +135,10 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         )
         self.assertEqual(len(changed["promotions"]["campaigns"]),1)
         self.assertTrue(changed["operating"]["dirty"])
-        self.assertNotIn("plaintext",str(changed["promotions"]["campaigns"][0]).lower())
+        stored=changed["promotions"]["campaigns"][0]
+        self.assertFalse(stored["code"]["plaintext_stored"])
+        self.assertEqual(stored["code"]["sha256"],"a"*64)
+        self.assertNotIn("AQ-",str(stored))
 
     def test_source_digest_ignores_volatile_checkpoint_timestamps(self):
         a=default_checkpoint()
