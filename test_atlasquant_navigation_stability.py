@@ -56,6 +56,38 @@ class AtlasQuantNavigationStabilityTests(unittest.TestCase):
         for forbidden in ("Score Mestre =","real_orders_enabled=True","automatic_execution=True"):
             self.assertNotIn(forbidden,ui)
 
+    def test_legacy_workspaces_are_fault_isolated_from_full_interface(self):
+        src=APP.read_text(encoding="utf-8")
+        contracts=(
+            ("render_macro_briefing_panel(", "Diagnóstico Macro Briefing"),
+            ("render_history_workspace(", "Diagnóstico Histórico"),
+            ("render_backtest_intro()", "Diagnóstico Backtest"),
+            ("render_forward_test_panel(", "Diagnóstico Forward"),
+            ("render_operational_backtest_panel()", "Diagnóstico Backtest operacional"),
+            ("render_autopilot_v107()", "Diagnóstico Autopilot"),
+            ("render_account_portal(", "Diagnóstico Conta"),
+            ("render_platform_center()", "Diagnóstico Instalação"),
+            ("render_sales_center(", "Diagnóstico Vendas"),
+            ("render_investment_center(", "Diagnóstico Investir"),
+            ("render_support_center()", "Diagnóstico Suporte"),
+        )
+        for renderer, diagnostic in contracts:
+            call=src.index(renderer)
+            window=src[max(0,call-500):call+900]
+            self.assertIn("try:",window,renderer)
+            self.assertIn("except Exception as",window,renderer)
+            self.assertIn(diagnostic,window,renderer)
+
+    def test_fault_isolation_never_expands_sensitive_permissions(self):
+        src=APP.read_text(encoding="utf-8")
+        for forbidden in (
+            "real_orders_enabled=True",
+            "automatic_execution=True",
+            "billing_enabled=True",
+            "external_publish_enabled=True",
+        ):
+            self.assertNotIn(forbidden,src)
+
     def test_radar_and_master_matrix_do_not_depend_on_opening_pair_tab_first(self):
         src=APP.read_text(encoding="utf-8")
         central=src.index("# MATRIZ CENTRAL DOS 7 PARES — V11.2")
