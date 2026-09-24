@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from atlasquant_aion_admin import AION_ADMIN_CSS
+from atlasquant_aion_admin import AION_ADMIN_CSS, AION_WORKSPACES
 
 
 class AtlasQuantAionAdminTests(unittest.TestCase):
@@ -12,6 +12,17 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("prefers-reduced-motion", AION_ADMIN_CSS)
         self.assertNotIn("MutationObserver", AION_ADMIN_CSS)
         self.assertNotIn("document.querySelector", AION_ADMIN_CSS)
+
+    def test_admin_uses_stable_single_workspace_navigation(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertEqual(len(AION_WORKSPACES),8)
+        self.assertIn('st.selectbox(',src)
+        self.assertIn('"Área AION"',src)
+        self.assertIn('key="aion_admin_workspace"',src)
+        self.assertNotIn("tabs = st.tabs(",src)
+        self.assertIn("uma área por vez",src)
+        for label in AION_WORKSPACES:
+            self.assertIn(f'selected_workspace == "{label}"',src)
 
     def test_admin_console_requires_admin_and_keeps_external_actions_guarded(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
