@@ -64,6 +64,7 @@ SCHEMA = "ATLASQUANT_AION_ADMIN_V1"
 _WORKING_CHECKPOINT_KEY = "aion_working_checkpoint_v2"
 _WORKING_SOURCE_KEY = "aion_working_checkpoint_source_digest"
 _WORKING_DIRTY_KEY = "aion_working_checkpoint_dirty"
+_WORKING_CONFLICT_KEY = "aion_working_checkpoint_conflict"
 
 AION_ADMIN_CSS = r"""
 <style>
@@ -204,6 +205,11 @@ def _working_checkpoint(source: Mapping[str, Any]) -> dict[str, Any]:
         st.session_state[_WORKING_CHECKPOINT_KEY] = deepcopy(seed)
         st.session_state[_WORKING_SOURCE_KEY] = source_digest
         st.session_state[_WORKING_DIRTY_KEY] = False
+        st.session_state[_WORKING_CONFLICT_KEY] = False
+    else:
+        st.session_state[_WORKING_CONFLICT_KEY] = bool(
+            dirty and known_source and known_source != source_digest
+        )
     return ensure_operating_checkpoint(st.session_state[_WORKING_CHECKPOINT_KEY])
 
 
@@ -586,6 +592,7 @@ def _render_laboratory(flags: Mapping[str, bool]) -> None:
 def _render_development(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
+    source_checkpoint: Mapping[str, Any],
     runtime_result: Mapping[str, Any],
     flags: Mapping[str, bool],
 ) -> None:
@@ -606,12 +613,25 @@ def _render_development(
     st.markdown("#### Checkpoint Mestre")
     st.caption(
         f"Proveniência ativa: {runtime_result.get('source') or runtime_result.get('status')}. "
-        f"Digest atual: {checkpoint_digest(checkpoint)}."
+        f"Digest local: {checkpoint_digest(checkpoint)}."
     )
+    conflict = bool(st.session_state.get(_WORKING_CONFLICT_KEY, False))
+    if conflict:
+        st.error(
+            "Conflito detectado: o Checkpoint Mestre do runtime mudou enquanto existem alterações locais. "
+            "O AION não vai sobrescrever a versão nova automaticamente."
+        )
+        if st.button("↩️ Descartar alterações locais e recarregar runtime", key="aion_reload_runtime_checkpoint"):
+            _set_working_checkpoint(source_checkpoint, dirty=False)
+            st.session_state[_WORKING_SOURCE_KEY] = checkpoint_digest(source_checkpoint)
+            st.session_state[_WORKING_CONFLICT_KEY] = False
+            st.rerun()
+
     cfg = _runtime_config()
     if st.button(
         "💾 Salvar Checkpoint Mestre no runtime",
         key="aion_save_checkpoint",
+        disabled=conflict,
         help="A escrita ocorre apenas no branch de runtime e este clique conta como aprovação explícita.",
     ):
         decision = guardian_decision(
@@ -701,7 +721,8 @@ def render_aion_admin_console(
     cfg = _runtime_config()
     runtime_result = load_runtime_checkpoint(cfg, timeout=6.0)
     merged = merged_checkpoint(runtime_result)
-    checkpoint = _working_checkpoint(merged["checkpoint"])
+    source_checkpoint = merged["checkpoint"]
+    checkpoint = _working_checkpoint(source_checkpoint)
 
     _render_header(
         access_map,
@@ -734,7 +755,7 @@ def render_aion_admin_console(
     with tabs[5]:
         _render_laboratory(flags)
     with tabs[6]:
-        _render_development(access_map, checkpoint, runtime_result, flags)
+        _render_development(access_map, checkpoint, source_checkpoint, runtime_result, flags)
     with tabs[7]:
         _render_promotions(flags)
 
@@ -752,6 +773,7 @@ def render_aion_admin_console(
         "feature_flags": flags,
         "checkpoint_digest": checkpoint_digest(checkpoint),
         "checkpoint_dirty": bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
+        "checkpoint_conflict": bool(st.session_state.get(_WORKING_CONFLICT_KEY, False)),
         "task_summary": queue_summary((checkpoint.get("operating") or {}).get("tasks", [])),
         "real_orders_enabled": False,
     }
