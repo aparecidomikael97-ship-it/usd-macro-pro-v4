@@ -109,6 +109,10 @@ from atlasquant_aion_entitlements import (
     new_entitlement_request,
     upsert_entitlement,
 )
+from atlasquant_aion_status_board import (
+    build_master_status_board,
+    status_rows,
+)
 
 try:
     from atlasquant_neural_voice_ui import render_neural_voice_player
@@ -359,6 +363,23 @@ def _render_executive_grid(
     )
 
 
+def _render_master_status(board: Mapping[str, Any]) -> None:
+    counts = board.get("counts") if isinstance(board.get("counts"), Mapping) else {}
+    st.markdown("#### Painel Mestre de Estado")
+    st.caption(
+        "CONFIRMADO exige evidência desta execução. BLOQUEADO é uma proteção/flag. "
+        "DEPENDÊNCIA EXTERNA exige conector/prova. DESCONHECIDO não é tratado como pronto."
+    )
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("Confirmados", int(counts.get("CONFIRMED") or 0))
+    c2.metric("Bloqueados", int(counts.get("BLOCKED") or 0))
+    c3.metric("Dependência externa", int(counts.get("EXTERNAL_DEPENDENCY") or 0))
+    c4.metric("Desconhecidos", int(counts.get("UNKNOWN") or 0))
+    rows = status_rows(board)
+    if rows:
+        st.dataframe(rows, width="stretch", hide_index=True)
+
+
 def _render_central(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
@@ -366,6 +387,7 @@ def _render_central(
     memory_summary: Mapping[str, Any],
     flags: Mapping[str, bool],
     system_context: Mapping[str, Any],
+    status_board: Mapping[str, Any],
 ) -> None:
     st.markdown("### 🧠 Central AION")
     pending = checkpoint.get("pending") if isinstance(checkpoint.get("pending"), list) else []
@@ -388,6 +410,8 @@ def _render_central(
         st.markdown("**Próximas pendências registradas:**")
         for item in pending[:8]:
             st.markdown(f"- {item}")
+
+    _render_master_status(status_board)
 
     st.markdown("#### Pergunte ao AION")
     question = st.text_input(
@@ -565,6 +589,7 @@ def _render_secretary(
     flags: Mapping[str, bool],
     system_context: Mapping[str, Any],
     market_context: Mapping[str, Any],
+    status_board: Mapping[str, Any],
 ) -> None:
     st.markdown("### 🗂️ Secretaria AION")
     operating = checkpoint.get("operating") if isinstance(checkpoint.get("operating"), Mapping) else {}
@@ -592,6 +617,18 @@ def _render_secretary(
     st.write(brief["market"]["message"])
     st.write(brief["clients"]["message"])
     st.write(brief["content"]["message"])
+    attention = status_board.get("attention") if isinstance(status_board.get("attention"), list) else []
+    with st.expander("Pendências do Painel Mestre", expanded=False):
+        if attention:
+            for item in attention[:10]:
+                st.markdown(
+                    f"- **{item.get('state')} · {item.get('label')}** — "
+                    f"{item.get('detail')}"
+                )
+                if item.get("next_action"):
+                    st.caption("Próxima ação: " + str(item.get("next_action")))
+        else:
+            st.write("Nenhuma pendência foi fornecida pelo Painel Mestre nesta execução.")
     _context_voice(
         "Secretaria",
         (
@@ -1606,13 +1643,22 @@ def render_aion_admin_console(
         }
 
     flags = feature_flag_snapshot(_flag_overrides())
-    provider = provider_status(feature_flags=flags)
+    provider = provider_status(feature_flags=flags, env=_provider_env())
     memory_summary = canonical_memory_summary()
     cfg = _runtime_config()
     runtime_result = load_runtime_checkpoint(cfg, timeout=6.0)
     merged = merged_checkpoint(runtime_result)
     source_checkpoint = merged["checkpoint"]
     checkpoint = _working_checkpoint(source_checkpoint)
+    status_board = build_master_status_board(
+        checkpoint=checkpoint,
+        runtime_result=runtime_result,
+        provider=provider,
+        feature_flags=flags,
+        system_context=system,
+        market_context=market,
+        working_dirty=bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
+    )
 
     _render_header(
         access_map,
@@ -1633,9 +1679,9 @@ def render_aion_admin_console(
         "🎟️ Promoções",
     ])
     with tabs[0]:
-        _render_central(access_map, checkpoint, runtime_result, memory_summary, flags, system)
+        _render_central(access_map, checkpoint, runtime_result, memory_summary, flags, system, status_board)
     with tabs[1]:
-        _render_secretary(access_map, checkpoint, flags, system, market)
+        _render_secretary(access_map, checkpoint, flags, system, market, status_board)
     with tabs[2]:
         _render_trading(market)
     with tabs[3]:
@@ -1665,6 +1711,8 @@ def render_aion_admin_console(
         "checkpoint_dirty": bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
         "checkpoint_conflict": bool(st.session_state.get(_WORKING_CONFLICT_KEY, False)),
         "task_summary": queue_summary((checkpoint.get("operating") or {}).get("tasks", [])),
+        "status_board_counts": status_board.get("counts"),
+        "status_board_has_unresolved": bool(status_board.get("has_unresolved")),
         "real_orders_enabled": False,
     }
 
