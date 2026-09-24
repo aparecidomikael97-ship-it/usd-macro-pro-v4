@@ -141,6 +141,17 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("ACTIVE_CONFIRMED exige evidência concreta", src)
         self.assertIn("entitlement_activation", src)
 
+    def test_master_status_board_is_visible_and_truth_labeled(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("build_master_status_board(", src)
+        self.assertIn("status_rows(", src)
+        self.assertIn("Painel Mestre de Estado", src)
+        self.assertIn("CONFIRMADO exige evidência desta execução", src)
+        self.assertIn("DEPENDÊNCIA EXTERNA exige conector/prova", src)
+        self.assertIn("Pendências do Painel Mestre", src)
+        self.assertIn('"status_board_counts"', src)
+        self.assertIn('"status_board_has_unresolved"', src)
+
     def test_business_panel_labels_unconnected_sales_as_unconfirmed(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("não representam vendas confirmadas", src)
