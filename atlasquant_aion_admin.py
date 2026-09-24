@@ -109,6 +109,10 @@ from atlasquant_aion_entitlements import (
     new_entitlement_request,
     upsert_entitlement,
 )
+from atlasquant_aion_tenant import (
+    PERSONAL_SCOPE as AION_PERSONAL_SCOPE,
+    tenant_policy_snapshot,
+)
 
 try:
     from atlasquant_neural_voice_ui import render_neural_voice_player
@@ -1583,6 +1587,45 @@ def _render_promotions(
             if flags.get("entitlement_activation")
             else "DESLIGADA por feature flag."
         )
+    )
+
+    st.divider()
+    st.markdown("### 🧩 AION pessoal · isolamento por assinante")
+    tenant_policy = tenant_policy_snapshot()
+    personal_rows = [
+        x for x in entitlements
+        if str(x.get("scope") or "").upper() == AION_PERSONAL_SCOPE
+    ]
+    personal_confirmed = sum(
+        1 for x in personal_rows
+        if str(x.get("status") or "").upper() == "ACTIVE_CONFIRMED"
+        and bool((x.get("provider_evidence") or {}).get("confirmed", False))
+    )
+    p1,p2,p3,p4 = st.columns(4)
+    p1.metric("Escopo", AION_PERSONAL_SCOPE)
+    p2.metric("Entitlements pessoais", len(personal_rows))
+    p3.metric("Ativos confirmados", personal_confirmed)
+    p4.metric("Cross-tenant", "BLOQUEADO")
+
+    st.caption(
+        "Esta camada prepara o futuro Meu AION sem abrir o AION oficial do administrador. "
+        "A memória do ADMIN, documentos privados do projeto e memória de outros clientes não são herdados."
+    )
+    isolation_rows = [
+        {"Regra":"Memória ADMIN herdada","Estado":"NÃO"},
+        {"Regra":"Documentos privados herdados","Estado":"NÃO"},
+        {"Regra":"Leitura de outro assinante","Estado":"BLOQUEADA"},
+        {"Regra":"Modelo externo automático","Estado":"DESLIGADO"},
+        {"Regra":"Cobrança automática","Estado":"DESLIGADA"},
+        {"Regra":"Trading real","Estado":"BLOQUEADO"},
+        {"Regra":"Entitlement confirmado AION_PERSONAL","Estado":"OBRIGATÓRIO"},
+        {"Regra":"Namespace vinculado à credencial","Estado":"SIM"},
+    ]
+    st.dataframe(isolation_rows, width="stretch", hide_index=True)
+    st.info(
+        "O Meu AION ainda não está exposto ao assinante nesta versão. "
+        "Primeiro estamos validando isolamento, entitlement e memória separada. "
+        "Nenhum cliente recebeu AION pessoal automaticamente."
     )
 
 
