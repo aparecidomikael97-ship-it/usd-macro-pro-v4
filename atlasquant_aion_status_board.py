@@ -95,6 +95,7 @@ def build_master_status_board(
     feature_flags:Mapping[str,Any]|None=None,
     system_context:Mapping[str,Any]|None=None,
     market_context:Mapping[str,Any]|None=None,
+    account_entitlement_audit:Mapping[str,Any]|None=None,
     working_dirty:bool=False,
 )->dict[str,Any]:
     cp=dict(checkpoint or {})
@@ -103,6 +104,7 @@ def build_master_status_board(
     flags=dict(feature_flags or {})
     system=dict(system_context or {})
     market=dict(market_context or {})
+    commercial_audit=dict(account_entitlement_audit or {})
 
     items=[]
 
@@ -251,6 +253,70 @@ def build_master_status_board(
         ),
         source="Checkpoint Mestre v5",
         next_action="Migrar/carregar Checkpoint v5 antes de administrar direitos de acesso." if not entitlement_loaded else "",
+    ))
+
+    audit_schema=str(commercial_audit.get("schema") or "")
+    audit_available=audit_schema=="ATLASQUANT_ENTITLEMENT_ACCOUNT_AUDIT_V1"
+    audit_accounts=int(commercial_audit.get("accounts_total") or 0) if audit_available else 0
+    audit_users=int(commercial_audit.get("active_user_accounts") or 0) if audit_available else 0
+    audit_missing=int(commercial_audit.get("user_accounts_without_effective_entitlement") or 0) if audit_available else 0
+    audit_duplicates=int(commercial_audit.get("duplicate_effective_user_accounts") or 0) if audit_available else 0
+    audit_orphans=int(commercial_audit.get("orphan_effective_entitlements") or 0) if audit_available else 0
+    audit_issues=audit_missing+audit_duplicates+audit_orphans
+
+    if not audit_available:
+        commercial_state="UNKNOWN"
+        commercial_detail="A execução não forneceu a auditoria Conta × Entitlement."
+        commercial_next="Calcular a auditoria usando o registro de contas e o Checkpoint Mestre atual."
+    elif runtime_status!="CONFIRMED":
+        commercial_state="UNKNOWN"
+        commercial_detail=(
+            "A auditoria foi calculada, mas o Checkpoint Mestre runtime não está confirmado; "
+            "não é seguro afirmar reconciliação comercial."
+        )
+        commercial_next="Confirmar o Checkpoint runtime antes de considerar direitos comerciais reconciliados."
+    elif working_dirty:
+        commercial_state="BLOCKED"
+        commercial_detail=(
+            "A auditoria usa alterações locais ainda não confirmadas como persistidas no runtime."
+        )
+        commercial_next="Revisar e salvar o Checkpoint Mestre antes de fechar a reconciliação comercial."
+    elif audit_orphans>0:
+        commercial_state="BLOCKED"
+        commercial_detail=(
+            f"{audit_orphans} entitlement(s) APP_ACCESS efetivo(s) não possuem conta correspondente. "
+            "Nenhuma conta foi criada automaticamente."
+        )
+        commercial_next="Revisar referências órfãs sem provisionamento automático."
+    elif audit_users<=0:
+        commercial_state="UNKNOWN"
+        commercial_detail=(
+            f"Registro possui {audit_accounts} conta(s), mas nenhuma conta USER ativa para validar acesso comercial."
+        )
+        commercial_next="Não inferir clientes ativos; aguardar população USER configurada e evidência aplicável."
+    elif audit_issues>0:
+        commercial_state="BLOCKED"
+        commercial_detail=(
+            f"Auditoria encontrou {audit_missing} USER sem direito efetivo, "
+            f"{audit_duplicates} com duplicidade e {audit_orphans} entitlement(s) órfão(s)."
+        )
+        commercial_next="Revisar divergências manualmente; enforcement continua desligado."
+    else:
+        commercial_state="CONFIRMED"
+        commercial_detail=(
+            f"{audit_users} conta(s) USER ativa(s) foram reconciliadas sem divergência com APP_ACCESS "
+            "na evidência atual. Isso não prova pagamento nem habilita enforcement."
+        )
+        commercial_next=""
+
+    items.append(_item(
+        "commercial_access_audit",
+        "Auditoria comercial Conta × Entitlement",
+        area="promotions",
+        state=commercial_state,
+        detail=commercial_detail,
+        source="configured user registry + entitlement audit + runtime checkpoint",
+        next_action=commercial_next,
     ))
 
     counts={state:0 for state in STATES}

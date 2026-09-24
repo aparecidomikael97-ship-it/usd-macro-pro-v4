@@ -151,6 +151,13 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("provisionamento automático: NÃO", src)
         self.assertIn("revogação automática: NÃO", src)
 
+    def test_account_entitlement_audit_is_shared_with_master_status_board(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("account_entitlement_audit = audit_account_entitlements(", src)
+        self.assertIn("account_entitlement_audit=account_entitlement_audit", src)
+        self.assertIn("account_entitlement_audit,", src)
+        self.assertIn('"commercial_access_audit_needs_review"', src)
+
     def test_master_status_board_is_visible_and_truth_labeled(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("build_master_status_board(", src)
