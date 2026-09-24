@@ -24,7 +24,6 @@ from atlasquant_runtime_store import evaluate_runtime_branch, require_runtime_br
 from atlasquant_aion_tenant import (
     personal_aion_eligibility,
     sanitize_tenant_memory,
-    tenant_memory_seed,
     tenant_namespace,
     tenant_runtime_path,
 )
@@ -90,6 +89,17 @@ def tenant_store_target(
         "reason":"OK",
         **target.as_dict(),
     }
+
+
+def _foreign_tenant_memory(
+    memory:Mapping[str,Any]|None,
+    access:Mapping[str,Any]|None,
+)->bool:
+    ns=tenant_namespace(access)
+    if not ns["ready"] or not isinstance(memory,Mapping):
+        return False
+    raw_tenant=str(memory.get("tenant_id") or "").strip()
+    return bool(raw_tenant and raw_tenant!=str(ns["tenant_id"]))
 
 
 def tenant_memory_source_digest(
@@ -182,6 +192,16 @@ def prepare_tenant_write(
             "schema":SCHEMA,
             "allowed":False,
             "reason":target["reason"],
+            "target":target,
+            "executes_network":False,
+            "executes_write":False,
+            "approved":bool(approved),
+        }
+    if _foreign_tenant_memory(memory,access):
+        return {
+            "schema":SCHEMA,
+            "allowed":False,
+            "reason":"FOREIGN_TENANT_MEMORY_REJECTED",
             "target":target,
             "executes_network":False,
             "executes_write":False,
@@ -281,6 +301,8 @@ def tenant_memory_change_summary(
     after:Mapping[str,Any]|None,
     access:Mapping[str,Any]|None,
 )->dict[str,Any]:
+    before_foreign=_foreign_tenant_memory(before,access)
+    after_foreign=_foreign_tenant_memory(after,access)
     a=sanitize_tenant_memory(before,access)
     b=sanitize_tenant_memory(after,access)
     a_profile=a.get("profile") if isinstance(a.get("profile"),Mapping) else {}
@@ -299,7 +321,7 @@ def tenant_memory_change_summary(
         "before_digest":tenant_memory_source_digest(a,access),
         "after_digest":tenant_memory_source_digest(b,access),
         "contains_admin_memory":False,
-        "contains_other_tenant_memory":False,
+        "contains_other_tenant_memory":bool(before_foreign or after_foreign),
     }
 
 
