@@ -39,11 +39,11 @@ class AtlasQuantProductionWorkflowContractTests(unittest.TestCase):
         self.assertIn("workflow_dispatch:",trigger)
         self.assertIn("schedule:",trigger)
 
-    def test_browser_smoke_auto_follows_successful_main_mobile_validation_without_becoming_push_check(self):
+    def test_browser_smoke_auto_follows_successful_main_quality_validation_without_becoming_push_check(self):
         text=Path(".github/workflows/production-browser-smoke.yml").read_text(encoding="utf-8")
         trigger=text.split("permissions:",1)[0]
         self.assertIn("workflow_run:",trigger)
-        self.assertIn('workflows: ["AtlasQuant - Mobile DOM Stability"]',trigger)
+        self.assertIn('workflows: ["Quality tests"]',trigger)
         self.assertIn("types: [completed]",trigger)
         self.assertIn("branches: [main]",trigger)
         self.assertNotIn("\n  push:",trigger)
