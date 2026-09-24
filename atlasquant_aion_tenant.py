@@ -324,6 +324,24 @@ def cross_tenant_access_allowed(
     )
 
 
+def tenant_policy_snapshot()->dict[str,Any]:
+    return {
+        "schema":SCHEMA,
+        "personal_scope":PERSONAL_SCOPE,
+        "allowed_roles":sorted(ALLOWED_ROLES),
+        "allowed_domains":list(TENANT_DOMAINS),
+        "admin_only_domains":sorted(ADMIN_ONLY_DOMAINS),
+        "admin_memory_inherited":False,
+        "project_docs_inherited":False,
+        "cross_tenant_access":False,
+        "external_provider_enabled_by_default":False,
+        "billing_enabled":False,
+        "real_trading_enabled":False,
+        "requires_confirmed_entitlement":True,
+        "credential_bound_namespace":True,
+    }
+
+
 def tenant_prompt_contract(access:Mapping[str,Any]|None)->dict[str,Any]:
     ns=tenant_namespace(access)
     if not ns["ready"]:
@@ -355,5 +373,6 @@ __all__=[
     "authenticated_subject","tenant_namespace","tenant_runtime_path",
     "matching_personal_entitlements","personal_aion_eligibility",
     "tenant_domain_allowed","tenant_action_decision","tenant_memory_seed",
-    "sanitize_tenant_memory","cross_tenant_access_allowed","tenant_prompt_contract",
+    "sanitize_tenant_memory","cross_tenant_access_allowed","tenant_policy_snapshot",
+    "tenant_prompt_contract",
 ]
