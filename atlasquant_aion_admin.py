@@ -551,6 +551,15 @@ def _render_secretary(
     st.write(brief["market"]["message"])
     st.write(brief["clients"]["message"])
     st.write(brief["content"]["message"])
+    _context_voice(
+        "Secretaria",
+        (
+            f"Bem-vindo à Secretaria AION. Existem {summary['active']} tarefas ativas, "
+            f"{summary['waiting_approval']} aguardando aprovação e {summary['blocked']} bloqueadas. "
+            "Mercado, clientes e conteúdo só são anunciados quando a fonte está confirmada."
+        ),
+        key="aion_secretary_voice",
+    )
 
     st.markdown("#### Nova tarefa")
     with st.form("aion_secretary_new_task", clear_on_submit=True):
@@ -662,12 +671,28 @@ def _render_trading(market_context: Mapping[str, Any]) -> None:
         "- AION não habilita corretora nem execução real.\n"
         "- Backtest/Paper/Forward continuam separados de produção real."
     )
+    _context_voice(
+        "Trading",
+        (
+            "Bem-vindo ao Trading do AION. Aqui eu explico Radar, Macro e evidências já calculadas. "
+            f"O estado de mercado nesta tela é {market_truth}. Ordens reais permanecem bloqueadas."
+        ),
+        key="aion_trading_voice",
+    )
 
 
 def _render_studio(flags: Mapping[str, bool]) -> None:
     st.markdown("### 🎬 AION Studio")
     st.write(
         "Pipeline preparado para **ideia → roteiro → imagem/capa → vídeo → legenda → revisão → publicação**."
+    )
+    _context_voice(
+        "Studio",
+        (
+            "Bem-vindo ao AION Studio. Aqui organizamos ideias, roteiros, imagens, vídeos, legendas e capas. "
+            "Publicação externa só acontece depois de integração e aprovação."
+        ),
+        key="aion_studio_voice",
     )
     c1, c2, c3 = st.columns(3)
     c1.metric("Instagram", "PREPARAR")
@@ -702,6 +727,14 @@ def _render_business(flags: Mapping[str, bool]) -> None:
     st.write(
         "Área separada do trading para pesquisa de produtos, tendências, fornecedores, margem, "
         "estoque, anúncios e acompanhamento de receita."
+    )
+    _context_voice(
+        "Negócios",
+        (
+            "Bem-vindo ao AION Negócios. Esta área fica separada do trading e ajuda a organizar "
+            "produtos, tendências, fornecedores, margem, receita e a meta de sustentar os custos do AtlasQuant."
+        ),
+        key="aion_business_voice",
     )
     cost = st.number_input(
         "Custo mensal alvo do ecossistema (USD)",
@@ -742,6 +775,14 @@ def _render_laboratory(
     st.write(
         "Toda novidade nasce aqui, com isolamento, teste, evidência e rollback antes de qualquer promoção."
     )
+    _context_voice(
+        "Laboratório",
+        (
+            "Bem-vindo ao Laboratório AION. Toda novidade passa por Sandbox, teste, evidência e rollback "
+            "antes de avançar. Feature flags externas começam desligadas."
+        ),
+        key="aion_laboratory_voice",
+    )
     st.markdown("#### Feature Flags externas")
     rows = [
         {"feature": key, "enabled": bool(value), "default": "OFF"}
@@ -758,11 +799,12 @@ def _render_laboratory(
 
     st.markdown("#### Roteador de inteligência / orçamento")
     current_budget = normalize_budget((checkpoint.get("aion") or {}).get("model_budget", {}))
-    provider = provider_status(feature_flags=flags)
-    c1,c2,c3 = st.columns(3)
+    provider = provider_status(feature_flags=flags, env=_provider_env())
+    c1,c2,c3,c4 = st.columns(4)
     c1.metric("Rota atual", provider.get("state","UNKNOWN"))
     c2.metric("Teto mensal", f"US$ {current_budget['monthly_limit_usd']:.2f}")
-    c3.metric("Saldo aprovado", f"US$ {current_budget['remaining_usd']:.2f}")
+    c3.metric("Uso estimado", f"US$ {current_budget['spent_usd_estimate']:.4f}")
+    c4.metric("Saldo estimado", f"US$ {current_budget['remaining_usd']:.4f}")
     st.caption(
         "Definir teto não gera cobrança. Mesmo com teto positivo, cada solicitação paga continua "
         "exigindo aprovação explícita e um cliente externo realmente implementado."
@@ -823,6 +865,14 @@ def _render_development(
     flags: Mapping[str, bool],
 ) -> None:
     st.markdown("### 🛠️ AION Desenvolvedor")
+    _context_voice(
+        "Desenvolvimento",
+        (
+            "Bem-vindo ao AION Desenvolvedor. As missões de código seguem branch ou Sandbox, testes, "
+            "checkpoint, revisão e Guardian. Mudanças críticas não são publicadas silenciosamente."
+        ),
+        key="aion_development_voice",
+    )
     objective = st.text_area(
         "Missão de desenvolvimento",
         key="aion_dev_mission",
@@ -896,6 +946,14 @@ def _render_development(
 def _render_promotions(flags: Mapping[str, bool]) -> None:
     st.markdown("### 🎟️ Assinaturas & Promoções")
     st.caption("Primeira etapa: criar rascunho auditável. Ativação real continua desligada.")
+    _context_voice(
+        "Promoções",
+        (
+            "Bem-vindo a Assinaturas e Promoções. Aqui preparamos cupons, períodos gratuitos e descontos. "
+            "Ativação real continua dependente do provedor comercial e de aprovação."
+        ),
+        key="aion_promotions_voice",
+    )
     name = st.text_input("Nome da campanha", key="aion_promo_name")
     kind = st.selectbox(
         "Benefício",
