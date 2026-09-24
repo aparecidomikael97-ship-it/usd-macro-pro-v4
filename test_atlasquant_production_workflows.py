@@ -39,22 +39,20 @@ class AtlasQuantProductionWorkflowContractTests(unittest.TestCase):
         self.assertIn("workflow_dispatch:",trigger)
         self.assertIn("schedule:",trigger)
 
-    def test_browser_smoke_auto_follows_successful_main_quality_validation_without_becoming_push_check(self):
+    def test_browser_smoke_is_post_deploy_observer_not_quality_workflow_gate(self):
         text=Path(".github/workflows/production-browser-smoke.yml").read_text(encoding="utf-8")
         trigger=text.split("permissions:",1)[0]
-        self.assertIn("workflow_run:",trigger)
-        self.assertIn('workflows: ["Quality tests"]',trigger)
-        self.assertIn("types: [completed]",trigger)
-        self.assertIn("branches: [main]",trigger)
+        self.assertIn("workflow_dispatch:",trigger)
+        self.assertIn("schedule:",trigger)
+        self.assertNotIn("workflow_run:",trigger)
         self.assertNotIn("\n  push:",trigger)
-        self.assertIn("github.event.workflow_run.conclusion == 'success'",text)
-        self.assertIn("github.event.workflow_run.event == 'push'",text)
-        self.assertIn("github.event.workflow_run.head_branch == 'main'",text)
+        self.assertNotIn("github.event.workflow_run",text)
 
-    def test_browser_smoke_checks_out_exact_triggering_commit_and_allows_render_settle_window(self):
+    def test_browser_smoke_checks_out_selected_revision_and_allows_render_settle_window(self):
         text=Path(".github/workflows/production-browser-smoke.yml").read_text(encoding="utf-8")
         self.assertIn("TARGET_SHA:",text)
-        self.assertIn("github.event.workflow_run.head_sha",text)
+        self.assertIn("github.sha",text)
+        self.assertNotIn("github.event.workflow_run.head_sha",text)
         self.assertIn("ref: ${{ env.TARGET_SHA }}",text)
         self.assertIn('os.environ.get("TARGET_SHA","")',text)
         self.assertIn("for deploy_attempt in range(1, 37)",text)
