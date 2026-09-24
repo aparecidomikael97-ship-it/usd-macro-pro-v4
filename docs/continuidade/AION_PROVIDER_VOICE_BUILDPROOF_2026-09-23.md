@@ -8,7 +8,7 @@ Fechar o próximo bloco do AION sem ativar custos automaticamente:
 2. manter Custo Zero como padrão;
 3. exigir aprovação por solicitação paga;
 4. adicionar voz contextual opcional em todas as áreas do AION;
-5. provar automaticamente qual bundle de código chegou à produção depois de cada merge em `main`.
+5. provar automaticamente qual bundle de código está em produção sem bloquear o deploy protegido por checks.
 
 ## Adaptador de inteligência externa
 
@@ -129,9 +129,9 @@ Criado workflow:
 
 `.github/workflows/production-build-identity.yml`
 
-Ele roda após push em `main` e:
+Ele roda por agenda periódica ou acionamento manual, fora do conjunto de checks que libera o deploy do Render, e:
 
-1. calcula o fingerprint exato do bundle esperado;
+1. calcula o fingerprint exato da `main` atual;
 2. abre a produção com Chromium;
 3. espera o deploy;
 4. lê `#atlasquant-source-build-marker`;
@@ -166,4 +166,10 @@ Este bloco só pode entrar na `main` com:
 - Mobile DOM verde;
 - revisão do diff.
 
-Depois do merge, o novo Production Build Identity deve provar o fingerprint exato em produção antes de chamar o deploy de validado.
+Depois do merge, o Production Build Identity deve provar o fingerprint exato em produção antes de chamar o deploy de validado.
+
+### Correção do gatilho
+
+A primeira versão do workflow foi ligada diretamente ao `push` de `main`. Isso criou uma dependência circular com o Render configurado em `autoDeployTrigger: checksPass`: o Render aguardava os checks terminarem, enquanto o Build Identity aguardava o Render publicar o código novo.
+
+A correção remove o Build Identity do `push`. Ele passa a ser observador pós-deploy por agenda/manual, sem fazer parte do gate que o Render precisa ver como concluído.
