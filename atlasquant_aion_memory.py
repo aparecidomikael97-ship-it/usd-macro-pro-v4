@@ -29,6 +29,7 @@ from atlasquant_aion_observability import normalize_events, events_digest
 from atlasquant_aion_model_router import normalize_budget
 from atlasquant_aion_studio import normalize_projects, studio_digest
 from atlasquant_aion_business import normalize_products, business_digest
+from atlasquant_aion_promotions import normalize_campaigns, promotion_digest
 
 SCHEMA = "ATLASQUANT_AION_MEMORY_V1"
 RUNTIME_PATH = "dados/aion/checkpoint_master.json"
@@ -222,7 +223,7 @@ def search_canonical_memory(
 def default_checkpoint() -> dict[str, Any]:
     return {
         "schema": SCHEMA,
-        "checkpoint_version": 3,
+        "checkpoint_version": 4,
         "created_at": _now(),
         "updated_at": _now(),
         "project": "AtlasQuant",
@@ -242,7 +243,7 @@ def default_checkpoint() -> dict[str, Any]:
             "laboratory": "CONNECTED_SAFE",
             "secretary": "FOUNDATION",
             "development": "FOUNDATION",
-            "promotions": "PLANNED_FEATURE_FLAG_OFF",
+            "promotions": "WORKSPACE_READY_PROVIDER_ACTIVATION_OFF",
         },
         "approved_foundation": list(APPROVED_AION_FOUNDATION),
         "pending": [
@@ -269,6 +270,11 @@ def default_checkpoint() -> dict[str, Any]:
         "business": {
             "products": [],
             "digest": business_digest([]),
+        },
+        "promotions": {
+            "campaigns": [],
+            "redemptions": [],
+            "digest": promotion_digest([], []),
         },
     }
 
@@ -308,12 +314,35 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
         "digest": business_digest(business_products),
     }
 
+    promotions = payload.get("promotions")
+    if not isinstance(promotions, Mapping):
+        promotions = {}
+    promo_campaigns = normalize_campaigns(
+        promotions.get("campaigns") if isinstance(promotions, Mapping) else []
+    )
+    raw_redemptions = (
+        promotions.get("redemptions", [])
+        if isinstance(promotions, Mapping)
+        else []
+    )
+    if not isinstance(raw_redemptions, (list, tuple)):
+        raw_redemptions = []
+    promo_redemptions = [
+        dict(x) for x in list(raw_redemptions)[:2000]
+        if isinstance(x, Mapping)
+    ]
+    payload["promotions"] = {
+        "campaigns": promo_campaigns,
+        "redemptions": promo_redemptions,
+        "digest": promotion_digest(promo_campaigns, promo_redemptions),
+    }
+
     operating = payload.get("operating")
     if not isinstance(operating, Mapping):
         operating = {}
     tasks = normalize_queue(operating.get("tasks") if isinstance(operating, Mapping) else [])
     events = normalize_events(operating.get("events") if isinstance(operating, Mapping) else [])
-    payload["checkpoint_version"] = max(3, int(payload.get("checkpoint_version") or 1))
+    payload["checkpoint_version"] = max(4, int(payload.get("checkpoint_version") or 1))
     payload["operating"] = {
         "tasks": tasks,
         "events": events,
@@ -375,6 +404,33 @@ def update_business_checkpoint(
     payload["business"] = {
         "products": rows,
         "digest": business_digest(rows),
+    }
+    payload["operating"]["dirty"] = bool(dirty)
+    payload["updated_at"] = _now()
+    return payload
+
+
+def update_promotions_checkpoint(
+    checkpoint: Mapping[str, Any] | None,
+    *,
+    campaigns: Any,
+    redemptions: Any = None,
+    dirty: bool = True,
+) -> dict[str, Any]:
+    payload = ensure_operating_checkpoint(checkpoint)
+    rows = normalize_campaigns(campaigns)
+    current = payload.get("promotions") if isinstance(payload.get("promotions"), Mapping) else {}
+    raw_redemptions = current.get("redemptions", []) if redemptions is None else redemptions
+    if not isinstance(raw_redemptions, (list, tuple)):
+        raw_redemptions = []
+    redemption_rows = [
+        dict(x) for x in list(raw_redemptions)[:2000]
+        if isinstance(x, Mapping)
+    ]
+    payload["promotions"] = {
+        "campaigns": rows,
+        "redemptions": redemption_rows,
+        "digest": promotion_digest(rows, redemption_rows),
     }
     payload["operating"]["dirty"] = bool(dirty)
     payload["updated_at"] = _now()

@@ -39,6 +39,7 @@ from atlasquant_aion_memory import (
     search_canonical_memory,
     update_business_checkpoint,
     update_operating_checkpoint,
+    update_promotions_checkpoint,
     update_studio_checkpoint,
 )
 from atlasquant_aion_operations import (
@@ -90,6 +91,14 @@ from atlasquant_aion_business import (
     new_product_candidate,
     trend_assessment,
     upsert_product,
+)
+from atlasquant_aion_promotions import (
+    BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
+    activation_preflight,
+    approve_campaign,
+    new_campaign,
+    promotions_summary,
+    upsert_campaign,
 )
 
 try:
@@ -1197,42 +1206,186 @@ def _render_development(
         st.markdown(f"- {item}")
 
 
-def _render_promotions(flags: Mapping[str, bool]) -> None:
+def _render_promotions(
+    access: Mapping[str, Any],
+    checkpoint: Mapping[str, Any],
+    flags: Mapping[str, bool],
+) -> None:
     st.markdown("### 🎟️ Assinaturas & Promoções")
-    st.caption("Primeira etapa: criar rascunho auditável. Ativação real continua desligada.")
+    st.caption(
+        "Campanhas e códigos ficam persistidos no Checkpoint Mestre. "
+        "O código completo é mostrado somente na criação; o checkpoint guarda apenas hash + últimos 4 caracteres."
+    )
     _context_voice(
         "Promoções",
         (
-            "Bem-vindo a Assinaturas e Promoções. Aqui preparamos cupons, períodos gratuitos e descontos. "
-            "Ativação real continua dependente do provedor comercial e de aprovação."
+            "Bem-vindo a Assinaturas e Promoções. Aqui preparamos períodos gratuitos, cupons e descontos "
+            "com limite de uso e auditoria. Criar ou aprovar um código não concede acesso automaticamente."
         ),
         key="aion_promotions_voice",
     )
-    name = st.text_input("Nome da campanha", key="aion_promo_name")
-    kind = st.selectbox(
-        "Benefício",
-        ["7 dias grátis", "30 dias grátis", "Desconto percentual", "Desconto fixo"],
-        key="aion_promo_kind",
-    )
-    max_uses = st.number_input(
-        "Limite de usos", min_value=1, max_value=100000, value=100, step=1, key="aion_promo_uses"
-    )
-    if st.button("Gerar rascunho de promoção", key="aion_promo_draft"):
-        st.session_state["aion_promo_draft_result"] = {
-            "campaign": name.strip() or "Campanha sem nome",
-            "benefit": kind,
-            "max_uses": int(max_uses),
-            "status": "DRAFT_ONLY",
-            "activation_enabled": bool(flags.get("promotion_activation", False)),
-            "payment_provider_enabled": bool(flags.get("payment_provider", False)),
-        }
-    draft = st.session_state.get("aion_promo_draft_result")
-    if isinstance(draft, Mapping):
-        st.json(dict(draft))
+
+    promo = checkpoint.get("promotions") if isinstance(checkpoint.get("promotions"), Mapping) else {}
+    campaigns = list(promo.get("campaigns", []) or [])
+    redemptions = list(promo.get("redemptions", []) or [])
+    summary = promotions_summary(campaigns, redemptions)
+
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("Campanhas", summary["campaigns"])
+    c2.metric("Aprovadas", summary["approved"])
+    c3.metric("Ativas confirmadas", summary["active"])
+    c4.metric("Resgates confirmados", summary["confirmed_redemptions"])
+
+    st.markdown("#### Criar campanha")
+    benefit_labels = {
+        "TRIAL_DAYS": "Período grátis (dias)",
+        "PERCENT_OFF": "Desconto percentual",
+        "FIXED_DISCOUNT": "Desconto fixo",
+    }
+    with st.form("aion_promo_campaign_form", clear_on_submit=True):
+        name = st.text_input("Nome da campanha")
+        benefit_type = st.selectbox(
+            "Tipo de benefício",
+            list(PROMO_BENEFIT_TYPES),
+            format_func=lambda x: benefit_labels.get(x, x),
+        )
+        if benefit_type == "TRIAL_DAYS":
+            benefit_value = st.number_input("Dias grátis", min_value=1, max_value=365, value=7, step=1)
+        elif benefit_type == "PERCENT_OFF":
+            benefit_value = st.number_input("Desconto (%)", min_value=1.0, max_value=100.0, value=10.0, step=1.0)
+        else:
+            benefit_value = st.number_input("Desconto fixo", min_value=0.01, value=10.0, step=1.0)
+        max_uses = st.number_input("Limite máximo de usos", min_value=1, max_value=1000000, value=100, step=1)
+        starts_at = st.text_input("Início ISO opcional", placeholder="2026-10-01T00:00:00-04:00")
+        expires_at = st.text_input("Expiração ISO opcional", placeholder="2026-10-31T23:59:59-04:00")
+        create_campaign = st.form_submit_button("Gerar campanha e código", type="primary")
+
+    if create_campaign:
+        try:
+            campaign, plain_code = new_campaign(
+                name,
+                benefit_type=benefit_type,
+                benefit_value=benefit_value,
+                max_uses=max_uses,
+                starts_at=starts_at,
+                expires_at=expires_at,
+                source=str(access.get("username") or "ADMIN"),
+            )
+            campaigns = upsert_campaign(campaigns, campaign)
+            updated = update_promotions_checkpoint(
+                checkpoint,
+                campaigns=campaigns,
+                redemptions=redemptions,
+                dirty=True,
+            )
+            updated = _record_working_event(
+                updated,
+                "promotion_campaign_created",
+                f"Campanha criada: {campaign['name']}",
+                evidence={
+                    "campaign_id": campaign["campaign_id"],
+                    "benefit_type": campaign["benefit"]["type"],
+                    "max_uses": campaign["limits"]["max_uses"],
+                    "code_last4": campaign["code"]["last4"],
+                },
+            )
+            _set_working_checkpoint(updated, dirty=True)
+            st.session_state["aion_last_plain_promo_code"] = {
+                "campaign_id": campaign["campaign_id"],
+                "code": plain_code,
+            }
+            st.success("Campanha criada. Copie o código abaixo agora; ele não será persistido em texto puro.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Não foi possível criar a campanha: {type(exc).__name__}")
+
+    last_code = st.session_state.get("aion_last_plain_promo_code")
+    if isinstance(last_code, Mapping):
+        st.markdown("#### Código recém-gerado · exibição única da sessão")
+        st.code(str(last_code.get("code") or ""))
+        st.caption(
+            f"Campanha {last_code.get('campaign_id')}. "
+            "O Checkpoint Mestre armazena somente o hash do código; perder este texto exige criar outro código/campanha."
+        )
+        if st.button("Ocultar código da sessão", key="aion_hide_plain_promo_code"):
+            st.session_state.pop("aion_last_plain_promo_code", None)
+            st.rerun()
+
+    if campaigns:
+        rows = []
+        for campaign in campaigns:
+            benefit = campaign.get("benefit") or {}
+            rows.append({
+                "ID": campaign.get("campaign_id"),
+                "Status": campaign.get("status"),
+                "Campanha": campaign.get("name"),
+                "Benefício": f"{benefit.get('type')} · {benefit.get('value')}",
+                "Código": "••••" + str((campaign.get("code") or {}).get("last4") or ""),
+                "Usos": f"{(campaign.get('limits') or {}).get('confirmed_uses',0)}/{(campaign.get('limits') or {}).get('max_uses',0)}",
+                "Aprovada": bool((campaign.get("approval") or {}).get("approved",False)),
+                "Ativa confirmada": bool((campaign.get("provider_activation") or {}).get("confirmed",False)),
+            })
+        st.dataframe(rows, width="stretch", hide_index=True)
+        selected_id = st.selectbox(
+            "Campanha selecionada",
+            [str(c.get("campaign_id")) for c in campaigns],
+            key="aion_selected_promo_campaign",
+        )
+        selected = next((c for c in campaigns if str(c.get("campaign_id")) == selected_id), None)
+        if isinstance(selected, Mapping):
+            benefit = selected.get("benefit") or {}
+            st.write(
+                f"**{selected.get('name')}** · {benefit.get('type')} = {benefit.get('value')} · "
+                f"status **{selected.get('status')}**."
+            )
+            if st.button("✅ Aprovar campanha", key="aion_promo_approve"):
+                try:
+                    approved = approve_campaign(selected, access)
+                    campaigns = upsert_campaign(campaigns, approved)
+                    updated = update_promotions_checkpoint(
+                        checkpoint,
+                        campaigns=campaigns,
+                        redemptions=redemptions,
+                        dirty=True,
+                    )
+                    updated = _record_working_event(
+                        updated,
+                        "promotion_campaign_approved",
+                        f"Campanha aprovada: {approved['campaign_id']}",
+                        evidence={"campaign_id":approved["campaign_id"]},
+                    )
+                    _set_working_checkpoint(updated, dirty=True)
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Aprovação não registrada: {type(exc).__name__}")
+
+            preflight = activation_preflight(
+                selected,
+                access,
+                feature_flags=flags,
+                approved=False,
+            )
+            st.caption(
+                f"Ativação comercial: {'ELEGÍVEL PARA CONECTOR' if preflight['allowed'] else 'BLOQUEADA'} · "
+                f"{preflight['reason']}"
+            )
+            if bool((selected.get("approval") or {}).get("approved",False)) and flags.get("promotion_activation"):
+                st.info(
+                    "A feature flag de promoção está ligada, mas esta tela ainda não ativa acesso real. "
+                    "Status ACTIVE só será aceito quando um provedor/registro de assinaturas devolver evidência confirmada."
+                )
+    else:
+        st.info("Nenhuma campanha registrada.")
+
     st.warning(
-        "Ativação automática está "
-        + ("LIGADA por configuração." if flags.get("promotion_activation") else "DESLIGADA por feature flag.")
+        "Ativação real de promoção está "
+        + (
+            "HABILITADA POR FLAG, mas ainda exige Guardian e provedor/registro real."
+            if flags.get("promotion_activation")
+            else "DESLIGADA por feature flag."
+        )
     )
+
 
 
 def render_aion_admin_console(
@@ -1295,7 +1448,7 @@ def render_aion_admin_console(
     with tabs[6]:
         _render_development(access_map, checkpoint, source_checkpoint, runtime_result, flags)
     with tabs[7]:
-        _render_promotions(flags)
+        _render_promotions(access_map, checkpoint, flags)
 
     with st.expander("Política Custo Zero"):
         for item in ZERO_COST_RULES:

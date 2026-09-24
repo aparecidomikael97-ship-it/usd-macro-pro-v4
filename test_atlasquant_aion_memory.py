@@ -17,6 +17,7 @@ from atlasquant_aion_memory import (
     search_canonical_memory,
     update_business_checkpoint,
     update_operating_checkpoint,
+    update_promotions_checkpoint,
     update_studio_checkpoint,
 )
 
@@ -67,23 +68,26 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("approved_foundation", cp)
         self.assertTrue(checkpoint_digest(cp))
 
-    def test_checkpoint_v3_has_operating_studio_and_business_memory(self):
+    def test_checkpoint_v4_has_operating_studio_business_and_promotions_memory(self):
         cp=default_checkpoint()
-        self.assertGreaterEqual(cp["checkpoint_version"],3)
+        self.assertGreaterEqual(cp["checkpoint_version"],4)
         self.assertIn("operating",cp)
         self.assertEqual(cp["operating"]["tasks"],[])
         self.assertEqual(cp["operating"]["events"],[])
         self.assertFalse(cp["operating"]["dirty"])
         self.assertEqual(cp["studio"]["projects"],[])
         self.assertEqual(cp["business"]["products"],[])
+        self.assertEqual(cp["promotions"]["campaigns"],[])
+        self.assertEqual(cp["promotions"]["redemptions"],[])
 
     def test_older_checkpoint_is_upgraded_without_claiming_persistence(self):
         old={"checkpoint_version":1,"project":"AtlasQuant"}
         upgraded=ensure_operating_checkpoint(old)
-        self.assertEqual(upgraded["checkpoint_version"],3)
+        self.assertEqual(upgraded["checkpoint_version"],4)
         self.assertIn("operating",upgraded)
         self.assertIn("studio",upgraded)
         self.assertIn("business",upgraded)
+        self.assertIn("promotions",upgraded)
         changed=update_operating_checkpoint(upgraded,tasks=[],events=[],dirty=True)
         self.assertTrue(changed["operating"]["dirty"])
         self.assertTrue(changed["operating"]["task_digest"])
@@ -114,6 +118,27 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertEqual(len(business["business"]["products"]),1)
         self.assertTrue(business["studio"]["digest"])
         self.assertTrue(business["business"]["digest"])
+
+    def test_promotions_update_marks_checkpoint_dirty_without_plaintext_code(self):
+        cp=default_checkpoint()
+        changed=update_promotions_checkpoint(
+            cp,
+            campaigns=[{
+                "name":"Semana grátis",
+                "benefit":{"type":"TRIAL_DAYS","value":7},
+                "code":{"sha256":"a"*64,"last4":"TEST"},
+                "limits":{"max_uses":10,"confirmed_uses":0},
+                "created_at":"2026-09-23T20:02:00Z",
+            }],
+            redemptions=[],
+            dirty=True,
+        )
+        self.assertEqual(len(changed["promotions"]["campaigns"]),1)
+        self.assertTrue(changed["operating"]["dirty"])
+        stored=changed["promotions"]["campaigns"][0]
+        self.assertFalse(stored["code"]["plaintext_stored"])
+        self.assertEqual(stored["code"]["sha256"],"a"*64)
+        self.assertNotIn("AQ-",str(stored))
 
     def test_source_digest_ignores_volatile_checkpoint_timestamps(self):
         a=default_checkpoint()
