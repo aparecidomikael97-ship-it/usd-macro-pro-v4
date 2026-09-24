@@ -15,6 +15,7 @@ from atlasquant_aion_tenant import (
     tenant_domain_allowed,
     tenant_memory_seed,
     tenant_namespace,
+    tenant_policy_snapshot,
     tenant_prompt_contract,
     tenant_runtime_path,
 )
@@ -160,6 +161,18 @@ class AtlasQuantAionTenantTests(unittest.TestCase):
         other=tenant_namespace(self.other)["tenant_id"]
         self.assertTrue(cross_tenant_access_allowed(self.user,own))
         self.assertFalse(cross_tenant_access_allowed(self.user,other))
+
+    def test_policy_snapshot_keeps_personal_aion_fail_closed(self):
+        policy=tenant_policy_snapshot()
+        self.assertEqual(policy["personal_scope"],"AION_PERSONAL")
+        self.assertFalse(policy["admin_memory_inherited"])
+        self.assertFalse(policy["project_docs_inherited"])
+        self.assertFalse(policy["cross_tenant_access"])
+        self.assertFalse(policy["external_provider_enabled_by_default"])
+        self.assertFalse(policy["billing_enabled"])
+        self.assertFalse(policy["real_trading_enabled"])
+        self.assertTrue(policy["requires_confirmed_entitlement"])
+        self.assertTrue(policy["credential_bound_namespace"])
 
     def test_prompt_contract_explicitly_denies_admin_other_tenant_and_real_trade(self):
         contract=tenant_prompt_contract(self.user)
