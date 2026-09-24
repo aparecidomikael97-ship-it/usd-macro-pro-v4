@@ -29,6 +29,7 @@ from atlasquant_aion_gateway import local_answer, provider_status
 from atlasquant_aion_memory import (
     canonical_memory_summary,
     checkpoint_digest,
+    checkpoint_source_digest,
     config_from_mapping,
     ensure_operating_checkpoint,
     load_runtime_checkpoint,
@@ -197,7 +198,7 @@ def _render_header(
 
 def _working_checkpoint(source: Mapping[str, Any]) -> dict[str, Any]:
     seed = ensure_operating_checkpoint(source)
-    source_digest = checkpoint_digest(seed)
+    source_digest = checkpoint_source_digest(seed)
     current = st.session_state.get(_WORKING_CHECKPOINT_KEY)
     dirty = bool(st.session_state.get(_WORKING_DIRTY_KEY, False))
     known_source = str(st.session_state.get(_WORKING_SOURCE_KEY) or "")
@@ -623,7 +624,7 @@ def _render_development(
         )
         if st.button("↩️ Descartar alterações locais e recarregar runtime", key="aion_reload_runtime_checkpoint"):
             _set_working_checkpoint(source_checkpoint, dirty=False)
-            st.session_state[_WORKING_SOURCE_KEY] = checkpoint_digest(source_checkpoint)
+            st.session_state[_WORKING_SOURCE_KEY] = checkpoint_source_digest(source_checkpoint)
             st.session_state[_WORKING_CONFLICT_KEY] = False
             st.rerun()
 
@@ -653,7 +654,7 @@ def _render_development(
                 saved_checkpoint = ensure_operating_checkpoint(checkpoint)
                 saved_checkpoint["operating"]["dirty"] = False
                 _set_working_checkpoint(saved_checkpoint, dirty=False)
-                st.session_state[_WORKING_SOURCE_KEY] = checkpoint_digest(saved_checkpoint)
+                st.session_state[_WORKING_SOURCE_KEY] = checkpoint_source_digest(saved_checkpoint)
                 st.success("Checkpoint Mestre salvo e confirmado no runtime.")
                 st.session_state["aion_checkpoint_save_result"] = result
             else:
