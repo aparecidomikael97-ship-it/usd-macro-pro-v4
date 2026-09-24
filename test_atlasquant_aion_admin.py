@@ -61,8 +61,19 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         success = src.index('if result.get("saved"):')
         block = src[success:success+700]
+        self.assertIn('result.get("saved") and result.get("verified")', block)
         self.assertIn('_set_working_checkpoint(saved_checkpoint, dirty=False)', block)
-        self.assertIn("Checkpoint Mestre salvo e confirmado no runtime.", block)
+        self.assertIn("Checkpoint Mestre salvo, relido e confirmado no runtime.", block)
+
+    def test_checkpoint_persistence_preflight_fails_closed_before_save_button(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("runtime_write_preflight(runtime_result)",src)
+        self.assertIn("persistence_blocked = bool(conflict or not persistence_preflight.get(\"allowed\"))",src)
+        self.assertIn("disabled=persistence_blocked",src)
+        self.assertIn("As alterações locais continuam marcadas como pendentes.",src)
+        self.assertIn("result.get(\"saved\") and result.get(\"verified\")",src)
+        self.assertIn("result.get(\"checkpoint\")",src)
+
 
     def test_dirty_checkpoint_detects_runtime_conflict_before_save(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
