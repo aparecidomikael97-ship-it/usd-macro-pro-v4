@@ -226,5 +226,36 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertNotIn("repr(exc)",block)
         self.assertNotIn("st.exception(",block)
 
+    def test_foundation_fallbacks_are_unknown_read_only_and_hide_raw_messages(self):
+        from pathlib import Path
+        src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("def _unknown_account_entitlement_audit",src)
+        self.assertIn("def _unknown_status_board",src)
+        self.assertIn("def _unknown_approval_inbox",src)
+        self.assertIn('"truth_state": "UNKNOWN"',src)
+        self.assertIn('"state": "UNKNOWN"',src)
+        self.assertIn('"automatic_approval": False',src)
+        self.assertIn('"real_orders_enabled": False',src)
+        self.assertIn('"foundation_status": "DEGRADED_SAFE"',src)
+        start=src.index("foundation_diagnostics:")
+        end=src.index("selected_workspace = st.selectbox",start)
+        block=src[start:end]
+        self.assertIn("except Exception as exc:",block)
+        self.assertIn("type(exc).__name__",block)
+        self.assertNotIn("str(exc)",block)
+        self.assertNotIn("repr(exc)",block)
+        self.assertNotIn("st.exception(",block)
+
+    def test_unknown_approval_inbox_never_claims_zero_pending_is_confirmed(self):
+        from pathlib import Path
+        src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        start=src.index("def _render_approval_inbox")
+        end=src.index("def _render_central",start)
+        block=src[start:end]
+        self.assertIn('get("status") or "CONFIRMED"',block)
+        self.assertIn('"UNKNOWN"',block)
+        self.assertIn("não pôde ser confirmada",block)
+        self.assertIn("Nenhuma ausência de item",block)
+
 if __name__ == "__main__":
     unittest.main()
