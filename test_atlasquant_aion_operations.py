@@ -29,7 +29,53 @@ class AtlasQuantAionOperationsTests(unittest.TestCase):
         self.assertTrue(req["required"])
         queue=approve_task([task],task["task_id"],self.admin,feature_flags={"social_publish":False})
         self.assertEqual(queue[0]["status"],"BLOCKED")
+        self.assertTrue(queue[0]["approval"]["attempted"])
+        self.assertFalse(queue[0]["approval"]["approved"])
+        decision_after_flag_change=executable_decision(
+            queue[0],
+            self.admin,
+            feature_flags={"social_publish":True},
+        )
+        self.assertFalse(decision_after_flag_change["allowed"])
+        queue=approve_task(
+            queue,
+            task["task_id"],
+            self.admin,
+            feature_flags={"social_publish":True},
+        )
         self.assertTrue(queue[0]["approval"]["approved"])
+
+    def test_blocked_approval_cannot_be_reused_after_feature_flag_changes(self):
+        task=new_task("Publicar catálogo",domain="business",action="publish_marketplace")
+        queue=approve_task(
+            [task],
+            task["task_id"],
+            self.admin,
+            feature_flags={"marketplace_publish":False},
+        )
+        self.assertFalse(queue[0]["approval"]["approved"])
+        self.assertFalse(
+            executable_decision(
+                queue[0],
+                self.admin,
+                feature_flags={"marketplace_publish":True},
+            )["allowed"]
+        )
+        queue=approve_task(
+            queue,
+            task["task_id"],
+            self.admin,
+            feature_flags={"marketplace_publish":True},
+        )
+        self.assertTrue(queue[0]["approval"]["approved"])
+        self.assertTrue(
+            executable_decision(
+                queue[0],
+                self.admin,
+                feature_flags={"marketplace_publish":True},
+            )["allowed"]
+        )
+
 
     def test_approval_never_executes_action(self):
         task=new_task("Publicar vídeo",domain="studio",action="publish_social")
@@ -44,6 +90,8 @@ class AtlasQuantAionOperationsTests(unittest.TestCase):
         decision=executable_decision(queue[0],self.admin,feature_flags={"real_broker_execution":True})
         self.assertFalse(decision["allowed"])
         self.assertEqual(queue[0]["status"],"BLOCKED")
+        self.assertTrue(queue[0]["approval"]["attempted"])
+        self.assertFalse(queue[0]["approval"]["approved"])
 
     def test_positive_cost_requires_explicit_approval(self):
         task=new_task("Usar serviço pago",action="read",estimated_monthly_cost_usd=25)
