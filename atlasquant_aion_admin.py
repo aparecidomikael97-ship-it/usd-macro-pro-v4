@@ -364,6 +364,73 @@ def _safe_market_state(market_context: Mapping[str, Any]) -> tuple[str, str]:
     return "Sem leitura fresca confirmada nesta tela.", "NÃO CONFIRMADO"
 
 
+def _unknown_account_entitlement_audit(error_type: str) -> dict[str, Any]:
+    return {
+        "schema": "ATLASQUANT_ENTITLEMENT_ACCOUNT_AUDIT_V1",
+        "truth_state": "UNKNOWN",
+        "reason": str(error_type or "UNKNOWN")[:120],
+        "scope": "APP_ACCESS",
+        "accounts_total": 0,
+        "active_user_accounts": 0,
+        "effective_user_accounts": 0,
+        "user_accounts_without_effective_entitlement": 0,
+        "duplicate_effective_user_accounts": 0,
+        "orphan_effective_entitlements": 0,
+        "account_rows": [],
+        "orphan_rows": [],
+        "enforcement_enabled": False,
+        "authentication_changed": False,
+        "automatic_provisioning": False,
+        "automatic_revocation": False,
+        "real_trading_changed": False,
+    }
+
+
+def _unknown_status_board(error_type: str) -> dict[str, Any]:
+    item = {
+        "id": "aion_foundation_degraded",
+        "label": "Painel Mestre de Estado",
+        "area": "central",
+        "state": "UNKNOWN",
+        "detail": "Painel Mestre indisponível nesta execução; nenhum estado positivo foi inferido.",
+        "source": f"AION safe fallback · {str(error_type or 'UNKNOWN')[:120]}",
+        "next_action": "Recarregar a área e revisar a camada auxiliar antes de qualquer ação sensível.",
+        "executes_action": False,
+    }
+    return {
+        "schema": "ATLASQUANT_AION_MASTER_STATUS_V1",
+        "states": ["CONFIRMED", "BLOCKED", "EXTERNAL_DEPENDENCY", "UNKNOWN"],
+        "items": [item],
+        "counts": {
+            "CONFIRMED": 0,
+            "BLOCKED": 0,
+            "EXTERNAL_DEPENDENCY": 0,
+            "UNKNOWN": 1,
+        },
+        "attention": [item],
+        "has_unresolved": True,
+        "real_orders_enabled": False,
+        "automatic_external_actions": False,
+    }
+
+
+def _unknown_approval_inbox(error_type: str) -> dict[str, Any]:
+    return {
+        "schema": "ATLASQUANT_AION_APPROVAL_INBOX_V1",
+        "status": "UNKNOWN",
+        "reason": str(error_type or "UNKNOWN")[:120],
+        "items": [],
+        "total": 0,
+        "by_kind": {},
+        "by_priority": {},
+        "has_pending": False,
+        "next_items": [],
+        "automatic_approval": False,
+        "executes_action": False,
+        "real_orders_enabled": False,
+    }
+
+
 def _render_executive_grid(
     memory_summary: Mapping[str, Any],
     runtime_result: Mapping[str, Any],
@@ -409,6 +476,12 @@ def _render_approval_inbox(inbox: Mapping[str, Any]) -> None:
         "Somente itens que realmente chegaram a um estágio de decisão aparecem aqui. "
         "Esta visão não aprova nem executa ações; a decisão continua explícita na área de origem."
     )
+    if str(inbox.get("status") or "CONFIRMED").upper() == "UNKNOWN":
+        st.warning(
+            "A Central de Aprovações não pôde ser confirmada nesta execução. "
+            "Nenhuma ausência de item será tratada como prova de que não há aprovações pendentes."
+        )
+        return
     by_kind = inbox.get("by_kind") if isinstance(inbox.get("by_kind"), Mapping) else {}
     by_priority = inbox.get("by_priority") if isinstance(inbox.get("by_priority"), Mapping) else {}
     c1,c2,c3,c4 = st.columns(4)
@@ -1828,21 +1901,55 @@ def render_aion_admin_console(
         else {}
     )
     entitlement_records = list(entitlement_section.get("records", []) or [])
-    account_entitlement_audit = audit_account_entitlements(
-        configured_users(),
-        entitlement_records,
-    )
-    status_board = build_master_status_board(
-        checkpoint=checkpoint,
-        runtime_result=runtime_result,
-        provider=provider,
-        feature_flags=flags,
-        system_context=system,
-        market_context=market,
-        account_entitlement_audit=account_entitlement_audit,
-        working_dirty=bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
-    )
-    approval_inbox = collect_approval_inbox(checkpoint)
+    foundation_diagnostics: list[dict[str, str]] = []
+
+    try:
+        configured_account_rows = configured_users()
+    except Exception as exc:
+        configured_account_rows = {}
+        foundation_diagnostics.append({
+            "component": "account_registry",
+            "error_type": type(exc).__name__,
+        })
+
+    try:
+        account_entitlement_audit = audit_account_entitlements(
+            configured_account_rows,
+            entitlement_records,
+        )
+    except Exception as exc:
+        account_entitlement_audit = _unknown_account_entitlement_audit(type(exc).__name__)
+        foundation_diagnostics.append({
+            "component": "account_entitlement_audit",
+            "error_type": type(exc).__name__,
+        })
+
+    try:
+        status_board = build_master_status_board(
+            checkpoint=checkpoint,
+            runtime_result=runtime_result,
+            provider=provider,
+            feature_flags=flags,
+            system_context=system,
+            market_context=market,
+            account_entitlement_audit=account_entitlement_audit,
+            working_dirty=bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
+        )
+    except Exception as exc:
+        status_board = _unknown_status_board(type(exc).__name__)
+        foundation_diagnostics.append({
+            "component": "master_status_board",
+            "error_type": type(exc).__name__,
+        })
+
+    try:
+        approval_inbox = collect_approval_inbox(checkpoint)
+    except Exception as exc:
+        approval_inbox = _unknown_approval_inbox(type(exc).__name__)
+        foundation_diagnostics.append({
+            "component": "approval_inbox",
+            "error_type": type(exc).__name__,
+        })
 
     _render_header(
         access_map,
@@ -1851,6 +1958,20 @@ def render_aion_admin_console(
         system,
     )
     _render_executive_grid(memory_summary, runtime_result, provider, market)
+
+    if foundation_diagnostics:
+        degraded = ", ".join(
+            f"{item['component']} ({item['error_type']})"
+            for item in foundation_diagnostics
+        )
+        st.warning(
+            "AION abriu em modo degradado seguro nas camadas auxiliares: "
+            f"{degraded}. Nenhum estado ausente foi tratado como confirmado."
+        )
+        st.caption(
+            "Somente o tipo do erro é exibido; mensagens internas não são expostas. "
+            "Nenhuma ação externa, permissão ou trading real foi habilitado pelo fallback."
+        )
 
     selected_workspace = st.selectbox(
         "Área AION",
@@ -1918,6 +2039,8 @@ def render_aion_admin_console(
         "approval_inbox_total": int(approval_inbox.get("total") or 0),
         "approval_inbox_has_pending": bool(approval_inbox.get("has_pending")),
         "commercial_access_audit_needs_review": audit_requires_review(account_entitlement_audit),
+        "foundation_status": "DEGRADED_SAFE" if foundation_diagnostics else "OK",
+        "foundation_diagnostics": foundation_diagnostics,
         "selected_workspace": selected_workspace,
         "workspace_status": "ERROR_ISOLATED" if workspace_error_type else "OK",
         "workspace_error_type": workspace_error_type,
