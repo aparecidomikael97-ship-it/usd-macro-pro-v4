@@ -3,7 +3,7 @@ name: AtlasQuant - Production Browser Smoke
 on:
   workflow_dispatch:
   workflow_run:
-    workflows: ["AtlasQuant - Mobile DOM Stability"]
+    workflows: ["Quality tests"]
     types: [completed]
     branches: [main]
   schedule:
