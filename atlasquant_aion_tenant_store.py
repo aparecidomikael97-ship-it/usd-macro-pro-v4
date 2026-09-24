@@ -260,9 +260,25 @@ def accept_loaded_memory(
             "target":plan["target"],
         }
     ns=tenant_namespace(access)
-    raw=dict(raw_memory or {})
-    raw_tenant=str(raw.get("tenant_id") or "")
-    if raw_tenant and raw_tenant!=ns["tenant_id"]:
+    if not isinstance(raw_memory,Mapping):
+        return {
+            "schema":SCHEMA,
+            "accepted":False,
+            "reason":"INVALID_TENANT_MEMORY",
+            "memory":None,
+            "target":plan["target"],
+        }
+    raw=dict(raw_memory)
+    raw_tenant=str(raw.get("tenant_id") or "").strip()
+    if not raw_tenant:
+        return {
+            "schema":SCHEMA,
+            "accepted":False,
+            "reason":"TENANT_ID_MISSING",
+            "memory":None,
+            "target":plan["target"],
+        }
+    if raw_tenant!=ns["tenant_id"]:
         return {
             "schema":SCHEMA,
             "accepted":False,
