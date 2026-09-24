@@ -16,7 +16,7 @@
   "setup_attribution_inferred": false,
   "last_cycle": {
     "version": "V11.2_PAPER_TRADING",
-    "ran_at": "2026-09-24T08:24:12.025406+00:00",
+    "ran_at": "2026-09-24T08:50:08.068220+00:00",
     "pending_created": 0,
     "pending_cancelled_by_gain_lock": 0,
     "entries_opened": 0,
@@ -29,11 +29,14 @@
       "USD/CHF": {
         "side": "BUY",
         "passed": false,
-        "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
-        "hard_blocks": [],
+        "state": "🔴 BLOQUEADO",
+        "hard_blocks": [
+          "ADR14 muito esticado (132%)"
+        ],
         "soft_blocks": [
-          "ADR14 em 108%: evitar perseguir preço",
-          "ICT incompleto (63/100)"
+          "ADR14 em 132%: evitar perseguir preço",
+          "Fluxo institucional incompleto (68/100)",
+          "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
       },
@@ -43,7 +46,7 @@
         "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
         "hard_blocks": [],
         "soft_blocks": [
-          "ICT incompleto (63/100)",
+          "ICT incompleto (64/100)",
           "Fluxo institucional incompleto (62/100)",
           "M15 ainda não confirmou gatilho"
         ],
@@ -56,8 +59,8 @@
         "hard_blocks": [],
         "soft_blocks": [
           "Gate ainda não liberou execução",
-          "ICT incompleto (60/100)",
-          "Fluxo institucional incompleto (60/100)",
+          "ICT incompleto (40/100)",
+          "Fluxo institucional incompleto (55/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -69,8 +72,8 @@
         "hard_blocks": [],
         "soft_blocks": [
           "Gate ainda não liberou execução",
-          "ICT incompleto (43/100)",
-          "Fluxo institucional incompleto (48/100)",
+          "ICT incompleto (70/100)",
+          "Fluxo institucional incompleto (51/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -81,7 +84,8 @@
         "state": "⚪ EM OBSERVAÇÃO",
         "hard_blocks": [],
         "soft_blocks": [
-          "ICT incompleto (42/100)",
+          "ICT incompleto (60/100)",
+          "Fluxo institucional incompleto (55/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -105,8 +109,8 @@
         "hard_blocks": [],
         "soft_blocks": [
           "Gate ainda não liberou execução",
-          "ICT incompleto (42/100)",
-          "Fluxo institucional incompleto (62/100)",
+          "ICT incompleto (63/100)",
+          "Fluxo institucional incompleto (64/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
