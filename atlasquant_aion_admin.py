@@ -118,6 +118,10 @@ from atlasquant_aion_status_board import (
     build_master_status_board,
     status_rows,
 )
+from atlasquant_aion_approval_inbox import (
+    collect_approval_inbox,
+    approval_rows,
+)
 
 try:
     from atlasquant_neural_voice_ui import render_neural_voice_player
@@ -385,6 +389,30 @@ def _render_master_status(board: Mapping[str, Any]) -> None:
         st.dataframe(rows, width="stretch", hide_index=True)
 
 
+def _render_approval_inbox(inbox: Mapping[str, Any]) -> None:
+    st.markdown("#### Central de Aprovações")
+    st.caption(
+        "Somente itens que realmente chegaram a um estágio de decisão aparecem aqui. "
+        "Esta visão não aprova nem executa ações; a decisão continua explícita na área de origem."
+    )
+    by_kind = inbox.get("by_kind") if isinstance(inbox.get("by_kind"), Mapping) else {}
+    by_priority = inbox.get("by_priority") if isinstance(inbox.get("by_priority"), Mapping) else {}
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("Pendentes", int(inbox.get("total") or 0))
+    c2.metric("P0", int(by_priority.get("P0") or 0))
+    c3.metric("P1", int(by_priority.get("P1") or 0))
+    c4.metric("Tarefas", int(by_kind.get("TASK") or 0))
+    rows = approval_rows(inbox)
+    if rows:
+        st.dataframe(rows, width="stretch", hide_index=True)
+        st.info(
+            "Para aprovar, abra a área indicada no item. "
+            "A Central não transforma visibilidade em autorização automática."
+        )
+    else:
+        st.success("Nenhum item chegou a um estágio que exija aprovação administrativa nesta memória.")
+
+
 def _render_central(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
@@ -393,6 +421,7 @@ def _render_central(
     flags: Mapping[str, bool],
     system_context: Mapping[str, Any],
     status_board: Mapping[str, Any],
+    approval_inbox: Mapping[str, Any],
 ) -> None:
     st.markdown("### 🧠 Central AION")
     pending = checkpoint.get("pending") if isinstance(checkpoint.get("pending"), list) else []
@@ -417,6 +446,7 @@ def _render_central(
             st.markdown(f"- {item}")
 
     _render_master_status(status_board)
+    _render_approval_inbox(approval_inbox)
 
     st.markdown("#### Pergunte ao AION")
     question = st.text_input(
@@ -595,6 +625,7 @@ def _render_secretary(
     system_context: Mapping[str, Any],
     market_context: Mapping[str, Any],
     status_board: Mapping[str, Any],
+    approval_inbox: Mapping[str, Any],
 ) -> None:
     st.markdown("### 🗂️ Secretaria AION")
     operating = checkpoint.get("operating") if isinstance(checkpoint.get("operating"), Mapping) else {}
@@ -622,6 +653,12 @@ def _render_secretary(
     st.write(brief["market"]["message"])
     st.write(brief["clients"]["message"])
     st.write(brief["content"]["message"])
+    if bool(approval_inbox.get("has_pending")):
+        st.warning(
+            f"Central de Aprovações: {int(approval_inbox.get('total') or 0)} item(ns) aguardam decisão administrativa."
+        )
+    else:
+        st.caption("Central de Aprovações: nenhuma decisão pendente nesta memória.")
     attention = status_board.get("attention") if isinstance(status_board.get("attention"), list) else []
     with st.expander("Pendências do Painel Mestre", expanded=False):
         if attention:
@@ -1738,6 +1775,7 @@ def render_aion_admin_console(
         market_context=market,
         working_dirty=bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
     )
+    approval_inbox = collect_approval_inbox(checkpoint)
 
     _render_header(
         access_map,
@@ -1758,9 +1796,9 @@ def render_aion_admin_console(
         "🎟️ Promoções",
     ])
     with tabs[0]:
-        _render_central(access_map, checkpoint, runtime_result, memory_summary, flags, system, status_board)
+        _render_central(access_map, checkpoint, runtime_result, memory_summary, flags, system, status_board, approval_inbox)
     with tabs[1]:
-        _render_secretary(access_map, checkpoint, flags, system, market, status_board)
+        _render_secretary(access_map, checkpoint, flags, system, market, status_board, approval_inbox)
     with tabs[2]:
         _render_trading(market)
     with tabs[3]:
@@ -1792,6 +1830,8 @@ def render_aion_admin_console(
         "task_summary": queue_summary((checkpoint.get("operating") or {}).get("tasks", [])),
         "status_board_counts": status_board.get("counts"),
         "status_board_has_unresolved": bool(status_board.get("has_unresolved")),
+        "approval_inbox_total": int(approval_inbox.get("total") or 0),
+        "approval_inbox_has_pending": bool(approval_inbox.get("has_pending")),
         "real_orders_enabled": False,
     }
 

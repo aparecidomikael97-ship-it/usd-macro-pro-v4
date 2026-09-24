@@ -162,6 +162,16 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn('"status_board_counts"', src)
         self.assertIn('"status_board_has_unresolved"', src)
 
+    def test_unified_approval_inbox_is_visible_without_auto_approval(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("collect_approval_inbox(", src)
+        self.assertIn("approval_rows(", src)
+        self.assertIn("Central de Aprovações", src)
+        self.assertIn("não aprova nem executa ações", src)
+        self.assertIn("área indicada no item", src)
+        self.assertIn('"approval_inbox_total"', src)
+        self.assertIn('"approval_inbox_has_pending"', src)
+
     def test_business_panel_labels_unconnected_sales_as_unconfirmed(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("não representam vendas confirmadas", src)
