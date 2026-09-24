@@ -27,7 +27,11 @@ _USERNAME_RE=re.compile(r"^[a-z0-9][a-z0-9._-]{2,63}$")
 ROLE_PERMISSIONS={
     "USER":frozenset({"app:read"}),
     "SALES":frozenset({"app:read","sales:read"}),
-    "ADMIN":frozenset({"app:read","sales:read","admin:read","admin:manage_users"}),
+    "ADMIN":frozenset({
+        "app:read","sales:read","admin:read","admin:manage_users",
+        "aion:admin","aion:checkpoint","aion:development",
+        "aion:approve_publish","aion:approve_cost",
+    }),
 }
 
 @dataclass(frozen=True)
