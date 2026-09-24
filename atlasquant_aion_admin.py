@@ -109,6 +109,11 @@ from atlasquant_aion_entitlements import (
     new_entitlement_request,
     upsert_entitlement,
 )
+from atlasquant_access_panel import configured_users
+from atlasquant_entitlement_account_audit import (
+    audit_account_entitlements,
+    audit_requires_review,
+)
 
 try:
     from atlasquant_neural_voice_ui import render_neural_voice_player
@@ -1583,6 +1588,80 @@ def _render_promotions(
             if flags.get("entitlement_activation")
             else "DESLIGADA por feature flag."
         )
+    )
+
+    st.markdown("#### Auditoria Conta × Entitlement · somente leitura")
+    st.caption(
+        "Esta auditoria compara contas USER com entitlements APP_ACCESS confirmados. "
+        "ADMIN e SALES são perfis internos e ficam isentos desta expectativa comercial. "
+        "O resultado não participa do login e não revoga nem concede acesso."
+    )
+    account_audit = audit_account_entitlements(
+        configured_users(),
+        entitlements,
+    )
+    a1,a2,a3,a4 = st.columns(4)
+    a1.metric("USER ativos", account_audit["active_user_accounts"])
+    a2.metric("Com direito efetivo", account_audit["effective_user_accounts"])
+    a3.metric(
+        "Sem direito efetivo",
+        account_audit["user_accounts_without_effective_entitlement"],
+    )
+    a4.metric(
+        "Entitlements órfãos",
+        account_audit["orphan_effective_entitlements"],
+    )
+
+    if account_audit["account_rows"]:
+        audit_rows=[]
+        labels={
+            "ENTITLEMENT_EFFECTIVE":"OK · direito confirmado",
+            "NO_EFFECTIVE_ENTITLEMENT":"REVISAR · sem direito confirmado",
+            "DUPLICATE_EFFECTIVE_ENTITLEMENTS":"REVISAR · duplicidade",
+            "INTERNAL_ROLE_EXEMPT":"INTERNO · isento",
+            "ACCOUNT_INACTIVE":"CONTA INATIVA",
+        }
+        for row in account_audit["account_rows"]:
+            audit_rows.append({
+                "Conta":row["username"],
+                "Perfil":row["role"],
+                "Conta ativa":row["account_active"],
+                "Entitlements efetivos":row["effective_entitlements"],
+                "Auditoria":labels.get(row["state"],row["state"]),
+            })
+        st.dataframe(audit_rows,width="stretch",hide_index=True)
+    else:
+        st.info(
+            "Nenhuma conta segura configurada foi encontrada para a auditoria. "
+            "Isso não é tratado como cliente confirmado."
+        )
+
+    if account_audit["orphan_rows"]:
+        with st.expander("Entitlements efetivos sem conta correspondente",expanded=False):
+            st.dataframe(
+                [{
+                    "Entitlement":row["entitlement_id"],
+                    "Referência":row["subject_ref"],
+                    "Escopo":row["scope"],
+                    "Estado":row["state"],
+                } for row in account_audit["orphan_rows"]],
+                width="stretch",
+                hide_index=True,
+            )
+
+    if audit_requires_review(account_audit):
+        st.warning(
+            "A auditoria encontrou divergências para revisão administrativa. "
+            "Nenhuma correção automática foi executada."
+        )
+    else:
+        st.success(
+            "Auditoria sem divergências comerciais detectadas no escopo APP_ACCESS. "
+            "Enforcement continua desligado."
+        )
+    st.caption(
+        "Enforcement: DESLIGADO · autenticação alterada: NÃO · provisionamento automático: NÃO · "
+        "revogação automática: NÃO."
     )
 
 
