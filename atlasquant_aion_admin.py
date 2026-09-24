@@ -8,6 +8,7 @@ already active.
 from __future__ import annotations
 
 from copy import deepcopy
+from datetime import datetime, timezone
 from html import escape
 from typing import Any, Mapping
 import os
@@ -55,6 +56,11 @@ from atlasquant_aion_observability import (
     observability_summary,
 )
 from atlasquant_aion_secretary import executive_briefing
+from atlasquant_aion_model_router import (
+    normalize_budget,
+    route_intelligence,
+    set_budget_policy,
+)
 
 try:
     from atlasquant_neural_voice_ui import render_neural_voice_player
@@ -314,6 +320,16 @@ def _render_central(
     )
     if st.button("Analisar com AION", key="aion_admin_ask", type="primary", width="stretch"):
         hits = search_canonical_memory(question)
+        provider = provider_status(feature_flags=flags)
+        budget = normalize_budget((checkpoint.get("aion") or {}).get("model_budget", {}))
+        route = route_intelligence(
+            question,
+            provider_state=provider.get("state"),
+            external_feature_enabled=bool(flags.get("external_llm", False)),
+            budget=budget,
+            estimated_request_cost_usd=0.0,
+            request_approved=False,
+        )
         answer = local_answer(
             question,
             checkpoint=checkpoint,
@@ -321,7 +337,15 @@ def _render_central(
             system_context=dict(system_context),
             feature_flags=flags,
         )
+        st.session_state["aion_last_route"] = route
         st.session_state["aion_last_answer"] = answer
+
+    route = st.session_state.get("aion_last_route")
+    if isinstance(route, Mapping):
+        st.caption(
+            f"Roteamento: {route.get('lane')} · complexidade {route.get('complexity')} · "
+            f"{route.get('reason')}"
+        )
 
     answer = st.session_state.get("aion_last_answer")
     if isinstance(answer, Mapping):
@@ -570,7 +594,11 @@ def _render_business(flags: Mapping[str, bool]) -> None:
     )
 
 
-def _render_laboratory(flags: Mapping[str, bool]) -> None:
+def _render_laboratory(
+    access: Mapping[str, Any],
+    checkpoint: Mapping[str, Any],
+    flags: Mapping[str, bool],
+) -> None:
     st.markdown("### 🧪 Laboratório / Sandbox")
     st.write(
         "Toda novidade nasce aqui, com isolamento, teste, evidência e rollback antes de qualquer promoção."
@@ -588,6 +616,64 @@ def _render_laboratory(flags: Mapping[str, bool]) -> None:
             f"{action}: {'PERMITIDO' if decision['allowed'] else 'BLOQUEADO'} · "
             f"{decision['risk']} · {decision['reason']}"
         )
+
+    st.markdown("#### Roteador de inteligência / orçamento")
+    current_budget = normalize_budget((checkpoint.get("aion") or {}).get("model_budget", {}))
+    provider = provider_status(feature_flags=flags)
+    c1,c2,c3 = st.columns(3)
+    c1.metric("Rota atual", provider.get("state","UNKNOWN"))
+    c2.metric("Teto mensal", f"US$ {current_budget['monthly_limit_usd']:.2f}")
+    c3.metric("Saldo aprovado", f"US$ {current_budget['remaining_usd']:.2f}")
+    st.caption(
+        "Definir teto não gera cobrança. Mesmo com teto positivo, cada solicitação paga continua "
+        "exigindo aprovação explícita e um cliente externo realmente implementado."
+    )
+    with st.form("aion_model_budget_form"):
+        monthly_limit = st.number_input(
+            "Teto mensal máximo para IA externa (USD)",
+            min_value=0.0,
+            value=float(current_budget["monthly_limit_usd"]),
+            step=1.0,
+        )
+        allow_paid = st.checkbox(
+            "Permitir solicitações pagas dentro do teto",
+            value=bool(current_budget["allow_paid"]),
+        )
+        save_budget = st.form_submit_button("Salvar política de orçamento")
+    if save_budget:
+        updated = set_budget_policy(
+            checkpoint,
+            monthly_limit_usd=monthly_limit,
+            allow_paid=allow_paid,
+            approved_by=str(access.get("username") or "ADMIN"),
+            approved_at=datetime.now(timezone.utc).isoformat(),
+        )
+        updated = update_operating_checkpoint(updated, dirty=True)
+        updated = _record_working_event(
+            updated,
+            "model_budget_policy_updated",
+            "Política de orçamento da IA atualizada pelo administrador.",
+            evidence={
+                "monthly_limit_usd": monthly_limit,
+                "allow_paid": allow_paid,
+                "external_feature_enabled": bool(flags.get("external_llm", False)),
+            },
+        )
+        _set_working_checkpoint(updated, dirty=True)
+        st.success("Política de orçamento atualizada localmente; salve o Checkpoint Mestre para persistir.")
+        st.rerun()
+
+    preview = route_intelligence(
+        "análise complexa de arquitetura do AtlasQuant",
+        provider_state=provider.get("state"),
+        external_feature_enabled=bool(flags.get("external_llm", False)),
+        budget=current_budget,
+        estimated_request_cost_usd=0.01,
+        request_approved=False,
+    )
+    st.caption(
+        f"Teste do roteador: {preview['lane']} · {preview['complexity']} · {preview['reason']}"
+    )
 
 
 def _render_development(
@@ -754,7 +840,7 @@ def render_aion_admin_console(
     with tabs[4]:
         _render_business(flags)
     with tabs[5]:
-        _render_laboratory(flags)
+        _render_laboratory(access_map, checkpoint, flags)
     with tabs[6]:
         _render_development(access_map, checkpoint, source_checkpoint, runtime_result, flags)
     with tabs[7]:
