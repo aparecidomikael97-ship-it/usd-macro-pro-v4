@@ -37,7 +37,9 @@ from atlasquant_aion_memory import (
     merged_checkpoint,
     save_runtime_checkpoint,
     search_canonical_memory,
+    update_business_checkpoint,
     update_operating_checkpoint,
+    update_studio_checkpoint,
 )
 from atlasquant_aion_operations import (
     ACTIONS,
@@ -67,6 +69,27 @@ from atlasquant_aion_provider import (
     estimate_request_cost,
     execute_openai_answer,
     provider_config,
+)
+from atlasquant_aion_studio import (
+    FORMATS as STUDIO_FORMATS,
+    PLATFORMS as STUDIO_PLATFORMS,
+    approve_project,
+    new_content_project,
+    publication_preflight,
+    script_blueprint,
+    studio_summary,
+    upsert_project,
+)
+from atlasquant_aion_business import (
+    CHANNELS as BUSINESS_CHANNELS,
+    TRUTH_STATES as BUSINESS_TRUTH_STATES,
+    approve_product,
+    business_summary,
+    coverage_snapshot,
+    marketplace_preflight,
+    new_product_candidate,
+    trend_assessment,
+    upsert_product,
 )
 
 try:
@@ -681,48 +704,148 @@ def _render_trading(market_context: Mapping[str, Any]) -> None:
     )
 
 
-def _render_studio(flags: Mapping[str, bool]) -> None:
+def _render_studio(
+    access: Mapping[str, Any],
+    checkpoint: Mapping[str, Any],
+    flags: Mapping[str, bool],
+) -> None:
     st.markdown("### 🎬 AION Studio")
     st.write(
-        "Pipeline preparado para **ideia → roteiro → imagem/capa → vídeo → legenda → revisão → publicação**."
+        "Pipeline persistente para **ideia → roteiro → imagem/capa → vídeo → revisão → aprovação → publicação**."
     )
     _context_voice(
         "Studio",
         (
             "Bem-vindo ao AION Studio. Aqui organizamos ideias, roteiros, imagens, vídeos, legendas e capas. "
-            "Publicação externa só acontece depois de integração e aprovação."
+            "Todo conteúdo fica registrado no Checkpoint Mestre e publicação externa exige aprovação."
         ),
         key="aion_studio_voice",
     )
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Instagram", "PREPARAR")
-    c2.metric("TikTok", "PREPARAR")
-    c3.metric("YouTube", "PREPARAR")
-    publish = flags.get("social_publish", False)
+
+    studio = checkpoint.get("studio") if isinstance(checkpoint.get("studio"), Mapping) else {}
+    projects = list(studio.get("projects", []) or [])
+    summary = studio_summary(projects)
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("Projetos", summary["total"])
+    c2.metric("Em revisão", summary["in_review"])
+    c3.metric("Aprovados", summary["approved"])
+    c4.metric("Publicados confirmados", summary["published"])
+
+    publish = bool(flags.get("social_publish", False))
     st.warning(
-        "Publicação automática está " + ("LIGADA por configuração." if publish else "DESLIGADA por feature flag.")
+        "Publicação automática está "
+        + ("HABILITADA POR FLAG, mas ainda depende do Guardian e de integração real." if publish else "DESLIGADA por feature flag.")
     )
-    idea = st.text_area(
-        "Ideia de conteúdo",
-        key="aion_studio_idea",
-        placeholder="Ex.: vídeo de 60 segundos mostrando como o Radar organiza as melhores oportunidades.",
-    )
-    if st.button("Criar briefing de produção", key="aion_studio_brief"):
-        route = route_context(idea)
-        st.session_state["aion_studio_briefing"] = {
-            "tema": idea.strip(),
-            "formato": "vertical 9:16 + adaptação 16:9",
-            "duracao": "60–70s",
-            "etapas": ["gancho", "demonstração", "prova/explicação", "CTA"],
-            "dominio": route["domain"],
-            "publicacao_automatica": False,
-        }
-    brief = st.session_state.get("aion_studio_briefing")
-    if isinstance(brief, Mapping):
-        st.json(dict(brief))
+
+    st.markdown("#### Novo projeto de conteúdo")
+    with st.form("aion_studio_new_project", clear_on_submit=True):
+        title = st.text_input("Título / ideia")
+        objective = st.text_area("Objetivo do conteúdo", max_chars=1200)
+        platforms = st.multiselect(
+            "Canais",
+            list(STUDIO_PLATFORMS),
+            default=["Instagram","TikTok"],
+        )
+        cfmt,cdur = st.columns(2)
+        ratio = cfmt.selectbox("Formato", list(STUDIO_FORMATS), index=0)
+        duration = cdur.number_input("Duração alvo (segundos)", min_value=10, max_value=600, value=60, step=5)
+        audience = st.text_input("Público")
+        cta = st.text_input("CTA")
+        create_project = st.form_submit_button("Criar projeto no Studio", type="primary")
+    if create_project:
+        try:
+            project = new_content_project(
+                title,
+                objective=objective,
+                platforms=platforms,
+                format_ratio=ratio,
+                duration_seconds=duration,
+                audience=audience,
+                cta=cta,
+                source=str(access.get("username") or "ADMIN"),
+            )
+            projects = upsert_project(projects, project)
+            updated = update_studio_checkpoint(checkpoint, projects=projects, dirty=True)
+            updated = _record_working_event(
+                updated,
+                "studio_project_created",
+                f"Projeto de conteúdo criado: {project['title']}",
+                evidence={
+                    "content_id":project["content_id"],
+                    "platforms":",".join(project["platforms"]),
+                    "status":project["status"],
+                },
+            )
+            _set_working_checkpoint(updated, dirty=True)
+            st.success("Projeto salvo na memória de trabalho do AION Studio.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Não foi possível criar o projeto: {type(exc).__name__}")
+
+    if projects:
+        rows=[{
+            "ID":p.get("content_id"),
+            "Status":p.get("status"),
+            "Título":p.get("title"),
+            "Canais":", ".join(p.get("platforms",[])),
+            "Formato":p.get("format_ratio"),
+            "Duração":p.get("duration_seconds"),
+            "Aprovado":bool((p.get("approval") or {}).get("approved",False)),
+            "Publicado":bool((p.get("publication") or {}).get("executed",False)),
+        } for p in projects]
+        st.dataframe(rows, width="stretch", hide_index=True)
+        selected_id=st.selectbox(
+            "Projeto selecionado",
+            [str(p.get("content_id")) for p in projects],
+            key="aion_studio_selected_project",
+        )
+        selected=next((p for p in projects if str(p.get("content_id"))==selected_id),None)
+        if isinstance(selected, Mapping):
+            blueprint=script_blueprint(selected)
+            with st.expander("Roteiro-base / storyboard", expanded=True):
+                st.write(f"**{blueprint['title']} · {blueprint['total_seconds']}s**")
+                for segment in blueprint["segments"]:
+                    st.markdown(
+                        f"- **{segment['name']} ({segment['seconds']}s):** {segment['instruction']}"
+                    )
+                st.caption("Roteiro-base determinístico; não afirma resultados nem recursos inexistentes.")
+
+            p1,p2=st.columns(2)
+            if p1.button("✅ Aprovar conteúdo", key="aion_studio_approve"):
+                try:
+                    approved=approve_project(selected,access)
+                    projects=upsert_project(projects,approved)
+                    updated=update_studio_checkpoint(checkpoint,projects=projects,dirty=True)
+                    updated=_record_working_event(
+                        updated,
+                        "studio_project_approved",
+                        f"Conteúdo aprovado: {approved['content_id']}",
+                        evidence={"content_id":approved["content_id"]},
+                    )
+                    _set_working_checkpoint(updated,dirty=True)
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Aprovação não registrada: {type(exc).__name__}")
+
+            preflight=publication_preflight(
+                selected,
+                access,
+                feature_flags=flags,
+                approved=False,
+            )
+            if preflight["allowed"]:
+                st.success("Pré-requisitos de publicação disponíveis; execução ainda não ocorre nesta tela.")
+            else:
+                st.caption(f"Publicação: BLOQUEADA · {preflight['reason']}")
+    else:
+        st.info("Nenhum projeto de conteúdo registrado no Studio.")
 
 
-def _render_business(flags: Mapping[str, bool]) -> None:
+def _render_business(
+    access: Mapping[str, Any],
+    checkpoint: Mapping[str, Any],
+    flags: Mapping[str, bool],
+) -> None:
     st.markdown("### 💼 AION Negócios")
     st.write(
         "Área separada do trading para pesquisa de produtos, tendências, fornecedores, margem, "
@@ -731,11 +854,17 @@ def _render_business(flags: Mapping[str, bool]) -> None:
     _context_voice(
         "Negócios",
         (
-            "Bem-vindo ao AION Negócios. Esta área fica separada do trading e ajuda a organizar "
-            "produtos, tendências, fornecedores, margem, receita e a meta de sustentar os custos do AtlasQuant."
+            "Bem-vindo ao AION Negócios. Aqui pesquisamos candidatos de produto, registramos evidências "
+            "e calculamos margem. Nenhum produto é chamado de tendência ou mais vendido sem fonte confirmada."
         ),
         key="aion_business_voice",
     )
+
+    business = checkpoint.get("business") if isinstance(checkpoint.get("business"), Mapping) else {}
+    products = list(business.get("products", []) or [])
+    summary = business_summary(products)
+
+    st.markdown("#### Sustentabilidade do AtlasQuant")
     cost = st.number_input(
         "Custo mensal alvo do ecossistema (USD)",
         min_value=0.0,
@@ -750,19 +879,144 @@ def _render_business(flags: Mapping[str, bool]) -> None:
         step=10.0,
         key="aion_business_revenue",
     )
-    coverage = 0.0 if cost <= 0 else min(999.0, (revenue / cost) * 100.0)
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Custo alvo", f"US$ {cost:,.2f}")
-    c2.metric("Lucro informado", f"US$ {revenue:,.2f}")
-    c3.metric("Cobertura", "N/D" if cost <= 0 else f"{coverage:.1f}%")
-    st.progress(0 if cost <= 0 else min(100, int(round(coverage))))
+    coverage=coverage_snapshot(cost,revenue)
+    c1,c2,c3,c4=st.columns(4)
+    c1.metric("Produtos pesquisados",summary["total"])
+    c2.metric("Margem positiva",summary["positive_margin_candidates"])
+    c3.metric("Tendências confirmadas",summary["confirmed_trends"])
+    c4.metric("Cobertura", "N/D" if coverage["coverage_pct"] is None else f"{coverage['coverage_pct']:.1f}%")
+    st.progress(0 if coverage["coverage_pct"] is None else min(100,int(round(coverage["coverage_pct"]))))
     st.caption(
-        "Valores acima são informados pelo administrador nesta tela; não representam vendas confirmadas "
-        "do Mercado Livre/TikTok Shop enquanto essas integrações não estiverem conectadas."
+        "Custos e lucros acima são informados pelo administrador; não representam vendas confirmadas "
+        "do Mercado Livre/TikTok Shop enquanto integrações de pedidos não estiverem conectadas."
     )
+
+    st.markdown("#### Candidato de produto")
+    with st.form("aion_business_new_product", clear_on_submit=True):
+        name=st.text_input("Produto")
+        channel=st.selectbox("Canal",list(BUSINESS_CHANNELS))
+        supplier=st.text_input("Fornecedor / referência")
+        ev1,ev2=st.columns(2)
+        evidence_source=ev1.text_input("Fonte da pesquisa")
+        evidence_truth=ev2.selectbox("Estado da evidência",list(BUSINESS_TRUTH_STATES),index=3)
+        evidence_url=st.text_input("URL / referência da fonte")
+        trend_note=st.text_area(
+            "O que a fonte mostra sobre tendência/demanda",
+            max_chars=1200,
+            help="Se a fonte não confirmar, use UNKNOWN/INFERENCE/HYPOTHESIS.",
+        )
+        cprice,ccost=st.columns(2)
+        sale_price=cprice.number_input("Preço de venda estimado (R$)",min_value=0.0,value=0.0,step=1.0)
+        unit_cost=ccost.number_input("Custo unitário (R$)",min_value=0.0,value=0.0,step=1.0)
+        cfee,cship,ctax=st.columns(3)
+        fee=cfee.number_input("Taxa plataforma (%)",min_value=0.0,max_value=100.0,value=0.0,step=0.5)
+        shipping=cship.number_input("Frete/custo logístico (R$)",min_value=0.0,value=0.0,step=1.0)
+        tax=ctax.number_input("Impostos estimados (%)",min_value=0.0,max_value=100.0,value=0.0,step=0.5)
+        other=st.number_input("Outros custos por unidade (R$)",min_value=0.0,value=0.0,step=1.0)
+        create_product=st.form_submit_button("Adicionar à pesquisa de produtos",type="primary")
+    if create_product:
+        try:
+            product=new_product_candidate(
+                name,
+                channel=channel,
+                evidence_source=evidence_source,
+                evidence_url=evidence_url,
+                evidence_truth=evidence_truth,
+                trend_note=trend_note,
+                supplier=supplier,
+                sale_price=sale_price,
+                unit_cost=unit_cost,
+                platform_fee_pct=fee,
+                shipping_cost=shipping,
+                tax_pct=tax,
+                other_cost=other,
+                source=str(access.get("username") or "ADMIN"),
+            )
+            products=upsert_product(products,product)
+            updated=update_business_checkpoint(checkpoint,products=products,dirty=True)
+            updated=_record_working_event(
+                updated,
+                "business_product_added",
+                f"Produto adicionado à pesquisa: {product['name']}",
+                evidence={
+                    "product_id":product["product_id"],
+                    "channel":product["channel"],
+                    "truth_state":product["research"]["truth_state"],
+                },
+            )
+            _set_working_checkpoint(updated,dirty=True)
+            st.success("Produto salvo na memória de trabalho de Negócios.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Não foi possível salvar o produto: {type(exc).__name__}")
+
+    if products:
+        rows=[]
+        for product in products:
+            econ=product.get("economics") or {}
+            trend=trend_assessment(product)
+            rows.append({
+                "ID":product.get("product_id"),
+                "Status":product.get("status"),
+                "Produto":product.get("name"),
+                "Canal":product.get("channel"),
+                "Evidência":(product.get("research") or {}).get("truth_state"),
+                "Tendência confirmada":trend.get("can_call_trending"),
+                "Lucro/unid. R$":econ.get("net_profit"),
+                "Margem %":econ.get("net_margin_pct"),
+            })
+        st.dataframe(rows,width="stretch",hide_index=True)
+        selected_id=st.selectbox(
+            "Produto selecionado",
+            [str(p.get("product_id")) for p in products],
+            key="aion_business_selected_product",
+        )
+        selected=next((p for p in products if str(p.get("product_id"))==selected_id),None)
+        if isinstance(selected,Mapping):
+            trend=trend_assessment(selected)
+            econ=selected.get("economics") or {}
+            st.write(
+                f"**Economia unitária:** lucro R$ {float(econ.get('net_profit') or 0):.2f} · "
+                f"margem {float(econ.get('net_margin_pct') or 0):.2f}% · "
+                f"ROI sobre custo {float(econ.get('roi_on_unit_cost_pct') or 0):.2f}%."
+            )
+            if trend["can_call_trending"]:
+                st.success(f"Tendência confirmada pela fonte registrada: {trend['message']}")
+            else:
+                st.warning(trend["message"])
+
+            if st.button("✅ Aprovar produto para próxima etapa",key="aion_business_approve"):
+                try:
+                    approved=approve_product(selected,access)
+                    products=upsert_product(products,approved)
+                    updated=update_business_checkpoint(checkpoint,products=products,dirty=True)
+                    updated=_record_working_event(
+                        updated,
+                        "business_product_approved",
+                        f"Produto aprovado para próxima etapa: {approved['product_id']}",
+                        evidence={"product_id":approved["product_id"]},
+                    )
+                    _set_working_checkpoint(updated,dirty=True)
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Aprovação não registrada: {type(exc).__name__}")
+
+            preflight=marketplace_preflight(
+                selected,
+                access,
+                feature_flags=flags,
+                approved=False,
+            )
+            st.caption(
+                f"Marketplace: {'PRONTO PARA CONECTOR' if preflight['allowed'] else 'BLOQUEADO'} · "
+                f"{preflight['reason']}"
+            )
+    else:
+        st.info("Nenhum candidato de produto registrado.")
+
     st.warning(
         "Publicação em marketplace está "
-        + ("LIGADA por configuração." if flags.get("marketplace_publish") else "DESLIGADA por feature flag.")
+        + ("HABILITADA POR FLAG, mas ainda exige Guardian e conector real." if flags.get("marketplace_publish") else "DESLIGADA por feature flag.")
     )
 
 
@@ -1033,9 +1287,9 @@ def render_aion_admin_console(
     with tabs[2]:
         _render_trading(market)
     with tabs[3]:
-        _render_studio(flags)
+        _render_studio(access_map, checkpoint, flags)
     with tabs[4]:
-        _render_business(flags)
+        _render_business(access_map, checkpoint, flags)
     with tabs[5]:
         _render_laboratory(access_map, checkpoint, flags)
     with tabs[6]:
