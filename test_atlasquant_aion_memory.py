@@ -31,6 +31,9 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("negócios", joined)
         self.assertIn("checkpoint", joined)
         self.assertIn("execução real", joined)
+        self.assertIn("tô no computador", joined)
+        self.assertIn("render", joined)
+        self.assertIn("build identity", joined)
 
     def test_canonical_loader_reads_project_files_and_foundation(self):
         with tempfile.TemporaryDirectory() as td:
@@ -45,6 +48,17 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
             summary = canonical_memory_summary(root)
             self.assertEqual(summary["status"], "CONFIRMED")
             self.assertGreaterEqual(summary["document_count"], 3)
+
+    def test_continuity_loader_includes_home_pc_render_priority_checkpoint(self):
+        docs = canonical_documents(Path(__file__).resolve().parent)
+        paths = {d["path"] for d in docs}
+        expected = "docs/continuidade/PRIORIDADE_RENDER_AO_CHEGAR_EM_CASA_2026-09-24.md"
+        self.assertIn(expected, paths)
+        hits = search_canonical_memory(
+            "tô no computador Render Deploy Hook",
+            base_dir=Path(__file__).resolve().parent,
+        )
+        self.assertTrue(any(h["path"] == expected for h in hits))
 
     def test_memory_search_returns_provenance(self):
         with tempfile.TemporaryDirectory() as td:
