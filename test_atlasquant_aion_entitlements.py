@@ -11,6 +11,17 @@ from atlasquant_aion_entitlements import (
     normalize_entitlement,
     upsert_entitlement,
 )
+from atlasquant_aion_tenant import (
+    PERSONAL_SCOPE,
+    cross_tenant_access_allowed,
+    personal_aion_eligibility,
+    sanitize_tenant_memory,
+    tenant_action_decision,
+    tenant_memory_seed,
+    tenant_namespace,
+    tenant_policy_snapshot,
+    tenant_prompt_contract,
+)
 
 
 class AtlasQuantAionEntitlementsTests(unittest.TestCase):
@@ -131,6 +142,112 @@ class AtlasQuantAionEntitlementsTests(unittest.TestCase):
         self.assertEqual(summary["records"],2)
         self.assertEqual(summary["approved"],1)
         self.assertEqual(summary["active_confirmed"],0)
+
+
+class AtlasQuantAionTenantIsolationContractTests(unittest.TestCase):
+    def setUp(self):
+        self.user={
+            "session":{
+                "username":"cliente.01",
+                "role":"USER",
+                "credential_fingerprint":"a"*24,
+            },
+            "role":"USER",
+        }
+        self.other={
+            "session":{
+                "username":"cliente.02",
+                "role":"USER",
+                "credential_fingerprint":"b"*24,
+            },
+            "role":"USER",
+        }
+
+    def _confirmed_personal(self, username="cliente.01"):
+        item=new_entitlement_request(
+            username,
+            scope=PERSONAL_SCOPE,
+            source_kind="MANUAL_GRANT",
+            created_at="2026-09-24T12:00:00Z",
+        )
+        item=approve_entitlement_request(item,{"role":"ADMIN","username":"admin"})
+        return mark_entitlement_from_provider_evidence(
+            item,
+            {"confirmed":True,"provider":"subscription_registry","external_id":"aion-1"},
+        )
+
+    def test_login_alone_never_grants_personal_aion(self):
+        result=personal_aion_eligibility(self.user,[])
+        self.assertFalse(result["eligible"])
+        self.assertEqual(result["reason"],"AION_PERSONAL_ENTITLEMENT_REQUIRED")
+        self.assertFalse(result["admin_memory_access"])
+        self.assertFalse(result["other_tenant_access"])
+
+    def test_confirmed_matching_entitlement_grants_only_personal_eligibility(self):
+        result=personal_aion_eligibility(self.user,[self._confirmed_personal()])
+        self.assertTrue(result["eligible"])
+        self.assertFalse(result["provider_enabled"])
+        self.assertFalse(result["real_trading_enabled"])
+
+    def test_cross_user_entitlement_and_cross_tenant_memory_are_blocked(self):
+        self.assertFalse(
+            personal_aion_eligibility(
+                self.user,[self._confirmed_personal("cliente.02")]
+            )["eligible"]
+        )
+        own=tenant_namespace(self.user)["tenant_id"]
+        other=tenant_namespace(self.other)["tenant_id"]
+        self.assertTrue(cross_tenant_access_allowed(self.user,own))
+        self.assertFalse(cross_tenant_access_allowed(self.user,other))
+
+    def test_credential_rotation_changes_namespace(self):
+        first=tenant_namespace(self.user)["tenant_id"]
+        rotated={
+            "session":{
+                "username":"cliente.01",
+                "role":"USER",
+                "credential_fingerprint":"d"*24,
+            }
+        }
+        second=tenant_namespace(rotated)["tenant_id"]
+        self.assertNotEqual(first,second)
+
+    def test_foreign_memory_is_discarded_not_merged(self):
+        foreign=tenant_memory_seed(self.other)
+        foreign["profile"]["display_name"]="Outro Cliente"
+        foreign["conversation_notes"]=[{"text":"segredo estrangeiro","truth_state":"CONFIRMED"}]
+        sanitized=sanitize_tenant_memory(foreign,self.user)
+        self.assertEqual(sanitized["tenant_id"],tenant_namespace(self.user)["tenant_id"])
+        self.assertEqual(sanitized["profile"]["display_name"],"")
+        self.assertEqual(sanitized["conversation_notes"],[])
+
+    def test_admin_financial_external_and_real_trade_actions_are_denied(self):
+        ent=self._confirmed_personal()
+        self.assertTrue(
+            tenant_action_decision("academy_help",self.user,[ent])["allowed"]
+        )
+        for action in (
+            "read_admin_memory","read_other_tenant","manage_users",
+            "approve_cost","charge_customer","deploy_production","real_trade",
+        ):
+            self.assertFalse(
+                tenant_action_decision(action,self.user,[ent])["allowed"]
+            )
+
+    def test_policy_and_prompt_contract_are_fail_closed(self):
+        policy=tenant_policy_snapshot()
+        self.assertEqual(policy["personal_scope"],"AION_PERSONAL")
+        self.assertFalse(policy["admin_memory_inherited"])
+        self.assertFalse(policy["project_docs_inherited"])
+        self.assertFalse(policy["cross_tenant_access"])
+        self.assertFalse(policy["external_provider_enabled_by_default"])
+        self.assertFalse(policy["billing_enabled"])
+        self.assertFalse(policy["real_trading_enabled"])
+        contract=tenant_prompt_contract(self.user)
+        joined=" ".join(contract["system_rules"]).lower()
+        self.assertIn("aion admin",joined)
+        self.assertIn("outro tenant",joined)
+        self.assertIn("trading real",joined)
 
 
 if __name__=="__main__":
