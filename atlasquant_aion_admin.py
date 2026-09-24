@@ -1298,6 +1298,7 @@ def _render_promotions(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
     flags: Mapping[str, bool],
+    account_entitlement_audit: Mapping[str, Any] | None = None,
 ) -> None:
     st.markdown("### 🎟️ Assinaturas & Promoções")
     st.caption(
@@ -1670,10 +1671,12 @@ def _render_promotions(
         "ADMIN e SALES são perfis internos e ficam isentos desta expectativa comercial. "
         "O resultado não participa do login e não revoga nem concede acesso."
     )
-    account_audit = audit_account_entitlements(
-        configured_users(),
-        entitlements,
-    )
+    account_audit = dict(account_entitlement_audit or {})
+    if account_audit.get("schema") != "ATLASQUANT_ENTITLEMENT_ACCOUNT_AUDIT_V1":
+        account_audit = audit_account_entitlements(
+            configured_users(),
+            entitlements,
+        )
     a1,a2,a3,a4 = st.columns(4)
     a1.metric("USER ativos", account_audit["active_user_accounts"])
     a2.metric("Com direito efetivo", account_audit["effective_user_accounts"])
@@ -1766,6 +1769,16 @@ def render_aion_admin_console(
     merged = merged_checkpoint(runtime_result)
     source_checkpoint = merged["checkpoint"]
     checkpoint = _working_checkpoint(source_checkpoint)
+    entitlement_section = (
+        checkpoint.get("entitlements")
+        if isinstance(checkpoint.get("entitlements"), Mapping)
+        else {}
+    )
+    entitlement_records = list(entitlement_section.get("records", []) or [])
+    account_entitlement_audit = audit_account_entitlements(
+        configured_users(),
+        entitlement_records,
+    )
     status_board = build_master_status_board(
         checkpoint=checkpoint,
         runtime_result=runtime_result,
@@ -1773,6 +1786,7 @@ def render_aion_admin_console(
         feature_flags=flags,
         system_context=system,
         market_context=market,
+        account_entitlement_audit=account_entitlement_audit,
         working_dirty=bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
     )
     approval_inbox = collect_approval_inbox(checkpoint)
@@ -1810,7 +1824,12 @@ def render_aion_admin_console(
     with tabs[6]:
         _render_development(access_map, checkpoint, source_checkpoint, runtime_result, flags)
     with tabs[7]:
-        _render_promotions(access_map, checkpoint, flags)
+        _render_promotions(
+            access_map,
+            checkpoint,
+            flags,
+            account_entitlement_audit,
+        )
 
     with st.expander("Política Custo Zero"):
         for item in ZERO_COST_RULES:
@@ -1832,6 +1851,7 @@ def render_aion_admin_console(
         "status_board_has_unresolved": bool(status_board.get("has_unresolved")),
         "approval_inbox_total": int(approval_inbox.get("total") or 0),
         "approval_inbox_has_pending": bool(approval_inbox.get("has_pending")),
+        "commercial_access_audit_needs_review": audit_requires_review(account_entitlement_audit),
         "real_orders_enabled": False,
     }
 
