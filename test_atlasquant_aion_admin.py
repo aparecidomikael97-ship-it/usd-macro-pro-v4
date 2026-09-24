@@ -152,6 +152,15 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn('"status_board_counts"', src)
         self.assertIn('"status_board_has_unresolved"', src)
 
+    def test_personal_aion_isolation_is_visible_but_not_exposed_to_subscriber(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("AION pessoal · isolamento por assinante", src)
+        self.assertIn("AION_PERSONAL", src)
+        self.assertIn("Cross-tenant", src)
+        self.assertIn("BLOQUEADO", src)
+        self.assertIn("não está exposto ao assinante nesta versão", src)
+        self.assertIn("Nenhum cliente recebeu AION pessoal automaticamente", src)
+
     def test_business_panel_labels_unconnected_sales_as_unconfirmed(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("não representam vendas confirmadas", src)
