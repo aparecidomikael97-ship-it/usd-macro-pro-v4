@@ -141,6 +141,16 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("ACTIVE_CONFIRMED exige evidência concreta", src)
         self.assertIn("entitlement_activation", src)
 
+    def test_account_entitlement_audit_is_read_only_and_visible_to_admin(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("audit_account_entitlements(", src)
+        self.assertIn("Auditoria Conta × Entitlement", src)
+        self.assertIn("somente leitura", src)
+        self.assertIn("não revoga nem concede acesso", src)
+        self.assertIn("Enforcement: DESLIGADO", src)
+        self.assertIn("provisionamento automático: NÃO", src)
+        self.assertIn("revogação automática: NÃO", src)
+
     def test_business_panel_labels_unconnected_sales_as_unconfirmed(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("não representam vendas confirmadas", src)
