@@ -75,6 +75,15 @@ jobs:
           gh workflow run production-browser-smoke.yml --ref main
           echo "Browser Smoke de identidade foi disparado para a main."
 
+      - name: Dispatch production Build Identity
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run production-build-identity.yml --ref main
+          echo "Build Identity exato foi disparado para a main."
+
       - name: Summary
         if: always()
         shell: bash
@@ -82,4 +91,5 @@ jobs:
           echo "## AtlasQuant Render Deploy Control" >> "$GITHUB_STEP_SUMMARY"
           echo "- alvo: atlasquant-private.onrender.com" >> "$GITHUB_STEP_SUMMARY"
           echo "- branch esperada: main" >> "$GITHUB_STEP_SUMMARY"
-          echo "- validação final: Production Browser Smoke separado" >> "$GITHUB_STEP_SUMMARY"
+          echo "- validação final: Production Browser Smoke + Production Build Identity" >> "$GITHUB_STEP_SUMMARY"
+          echo "- critério de conclusão: saúde 200 + fingerprint exato + smoke de navegador verde" >> "$GITHUB_STEP_SUMMARY"

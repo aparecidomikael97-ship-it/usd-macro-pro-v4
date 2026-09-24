@@ -145,6 +145,9 @@ class AtlasQuantProductionWorkflowContractTests(unittest.TestCase):
         self.assertIn("curl -fsS",text)
         self.assertIn("/_stcore/health",text)
         self.assertIn("gh workflow run production-browser-smoke.yml --ref main",text)
+        self.assertIn("gh workflow run production-build-identity.yml --ref main",text)
+        self.assertIn("Production Browser Smoke + Production Build Identity",text)
+        self.assertIn("fingerprint exato",text)
         self.assertNotIn("contents: write",text)
 
     def test_quality_runs_for_deploy_control_and_redeploy_request_changes(self):
