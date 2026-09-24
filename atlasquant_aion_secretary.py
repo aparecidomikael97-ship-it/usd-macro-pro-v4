@@ -32,9 +32,9 @@ def executive_briefing(
     event_summary=observability_summary(events)
     system=dict(system_context or {})
 
-    market_ok,market=dict(_confirmed_payload(market_context))
-    clients_ok,clients=dict(_confirmed_payload(clients_context))
-    content_ok,content=dict(_confirmed_payload(content_context))
+    market_ok, market = _confirmed_payload(market_context)
+    clients_ok, clients = _confirmed_payload(clients_context)
+    content_ok, content = _confirmed_payload(content_context)
 
     system_state=str(system.get("truth_state") or "UNKNOWN").upper()
     system_confirmed=system_state=="CONFIRMED"
