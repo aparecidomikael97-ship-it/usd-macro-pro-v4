@@ -142,6 +142,7 @@ AION_WORKSPACES = (
     "💼 Negócios",
     "🧪 Laboratório",
     "🛠️ Desenvolvimento",
+    "🔐 Assinaturas",
     "🎟️ Promoções",
 )
 _WORKING_CHECKPOINT_KEY = "aion_working_checkpoint_v2"
@@ -1574,11 +1575,27 @@ def _render_promotions(
         )
     )
 
-    st.divider()
-    st.markdown("### 🔐 Registro de Entitlements")
+
+
+
+def _render_entitlements(
+    access: Mapping[str, Any],
+    checkpoint: Mapping[str, Any],
+    flags: Mapping[str, bool],
+    account_entitlement_audit: Mapping[str, Any] | None = None,
+) -> None:
+    st.markdown("### 🔐 Assinaturas & Entitlements")
     st.caption(
-        "Entitlement é o direito comercial de acesso, separado do login, do perfil USER/SALES/ADMIN, "
-        "do pagamento e do cupom. Criar ou aprovar uma solicitação NÃO altera conta nem libera acesso."
+        "Área comercial de direitos de acesso. Entitlement é separado do login, do perfil USER/SALES/ADMIN, "
+        "do pagamento, do cupom e de Promoções. Criar ou aprovar uma solicitação NÃO altera conta nem libera acesso."
+    )
+    _context_voice(
+        "Assinaturas",
+        (
+            "Bem-vindo a Assinaturas e Entitlements. Aqui o AION separa o direito comercial de acesso "
+            "de login, perfil, pagamento e cupom. Nenhuma solicitação libera acesso automaticamente."
+        ),
+        key="aion_entitlements_voice",
     )
     entitlement_block = (
         checkpoint.get("entitlements")
@@ -2012,12 +2029,18 @@ def render_aion_admin_console(
             _render_laboratory(access_map, checkpoint, flags)
         elif selected_workspace == "🛠️ Desenvolvimento":
             _render_development(access_map, checkpoint, source_checkpoint, runtime_result, flags)
+        elif selected_workspace == "🔐 Assinaturas":
+            _render_entitlements(
+                access_map,
+                checkpoint,
+                flags,
+                account_entitlement_audit,
+            )
         elif selected_workspace == "🎟️ Promoções":
             _render_promotions(
                 access_map,
                 checkpoint,
                 flags,
-                account_entitlement_audit,
             )
     except Exception as exc:
         workspace_error_type = type(exc).__name__
