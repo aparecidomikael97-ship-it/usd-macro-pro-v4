@@ -2,6 +2,10 @@ name: AtlasQuant - Production Browser Smoke
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["AtlasQuant - Mobile DOM Stability"]
+    types: [completed]
+    branches: [main]
   schedule:
     - cron: "41 12 * * *"
 
@@ -14,12 +18,22 @@ concurrency:
 
 jobs:
   browser-smoke:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main'
+      )
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       APP_URL: "https://atlasquant-private.onrender.com"
+      TARGET_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TARGET_SHA }}
 
       - uses: actions/setup-python@v7
         with:
@@ -119,7 +133,7 @@ jobs:
           report = {
               "url": url,
               "profiles": {},
-              "expected_commit": os.environ.get("GITHUB_SHA",""),
+              "expected_commit": os.environ.get("TARGET_SHA","") or os.environ.get("GITHUB_SHA",""),
               "expected_source_build": expected_build,
           }
           expected_commit = str(report["expected_commit"] or "").strip()
@@ -178,7 +192,7 @@ jobs:
                   deploy_seen_commits = []
                   deploy_seen_builds = []
                   source_build = ""
-                  for deploy_attempt in range(1, 19):
+                  for deploy_attempt in range(1, 37):
                       deploy_attempts = deploy_attempt
                       marker = page.locator("#atlasquant-deploy-marker")
                       current = ""
@@ -203,7 +217,7 @@ jobs:
                           deploy_seen_builds.append(source_build)
                       if source_build == expected_build:
                           break
-                      if deploy_attempt < 18:
+                      if deploy_attempt < 36:
                           page.wait_for_timeout(10_000)
                           try:
                               page.reload(wait_until="domcontentloaded", timeout=180_000)
