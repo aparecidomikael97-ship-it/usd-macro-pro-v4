@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from unittest.mock import MagicMock, patch
 from pathlib import Path
 
 from atlasquant_aion_memory import (
@@ -13,6 +14,7 @@ from atlasquant_aion_memory import (
     ensure_operating_checkpoint,
     load_runtime_checkpoint,
     merged_checkpoint,
+    runtime_write_preflight,
     save_runtime_checkpoint,
     search_canonical_memory,
     update_business_checkpoint,
@@ -188,6 +190,80 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         b["updated_at"]="2026-09-24T00:00:00+00:00"
         b["operating"]["dirty"]=True
         self.assertEqual(checkpoint_source_digest(a),checkpoint_source_digest(b))
+
+    def test_runtime_write_preflight_fails_closed_on_uncertain_state(self):
+        for status in ("UNAVAILABLE","ERROR","BLOCKED","UNKNOWN"):
+            result=runtime_write_preflight({"status":status})
+            self.assertFalse(result["allowed"])
+            self.assertEqual(result["mode"],"BLOCKED")
+        missing_sha=runtime_write_preflight({"status":"CONFIRMED","sha":""})
+        self.assertFalse(missing_sha["allowed"])
+        create=runtime_write_preflight({"status":"NOT_FOUND"})
+        self.assertTrue(create["allowed"])
+        self.assertEqual(create["mode"],"CREATE")
+        update=runtime_write_preflight({"status":"CONFIRMED","sha":"abc123"})
+        self.assertTrue(update["allowed"])
+        self.assertEqual(update["mode"],"UPDATE")
+        self.assertEqual(update["expected_sha"],"abc123")
+
+    def test_verified_save_persists_clean_checkpoint_and_requires_readback_match(self):
+        cfg=RuntimeConfig(token="x",repo="owner/repo",branch="atlasquant-runtime")
+        cp=default_checkpoint()
+        cp["operating"]["dirty"]=True
+
+        put=MagicMock()
+        put.status_code=200
+        put.raise_for_status.return_value=None
+        put.json.return_value={"content":{"sha":"newsha"}}
+
+        verified=ensure_operating_checkpoint(cp)
+        verified["operating"]["dirty"]=False
+        with patch("atlasquant_aion_memory.requests.put",return_value=put) as put_call, patch(
+            "atlasquant_aion_memory.load_runtime_checkpoint",
+            return_value={
+                "status":"CONFIRMED",
+                "sha":"newsha",
+                "checkpoint":verified,
+                "source":"GitHub:atlasquant-runtime:dados/aion/checkpoint_master.json",
+            },
+        ):
+            result=save_runtime_checkpoint(cp,cfg,approved=True,expected_sha="oldsha")
+
+        self.assertTrue(result["saved"])
+        self.assertTrue(result["verified"])
+        self.assertEqual(result["status"],"CONFIRMED")
+        self.assertFalse(result["checkpoint"]["operating"]["dirty"])
+        body=put_call.call_args.kwargs["json"]
+        import base64, json
+        written=json.loads(base64.b64decode(body["content"]).decode("utf-8"))
+        self.assertFalse(written["operating"]["dirty"])
+        self.assertEqual(body["sha"],"oldsha")
+
+    def test_save_reports_conflict_when_conditional_write_is_rejected(self):
+        cfg=RuntimeConfig(token="x",repo="owner/repo",branch="atlasquant-runtime")
+        put=MagicMock()
+        put.status_code=409
+        with patch("atlasquant_aion_memory.requests.put",return_value=put):
+            result=save_runtime_checkpoint(default_checkpoint(),cfg,approved=True,expected_sha="stale")
+        self.assertEqual(result["status"],"CONFLICT")
+        self.assertFalse(result["saved"])
+        self.assertFalse(result["verified"])
+
+    def test_save_never_claims_confirmed_when_readback_cannot_be_verified(self):
+        cfg=RuntimeConfig(token="x",repo="owner/repo",branch="atlasquant-runtime")
+        put=MagicMock()
+        put.status_code=200
+        put.raise_for_status.return_value=None
+        put.json.return_value={"content":{"sha":"newsha"}}
+        with patch("atlasquant_aion_memory.requests.put",return_value=put), patch(
+            "atlasquant_aion_memory.load_runtime_checkpoint",
+            return_value={"status":"ERROR","sha":"","checkpoint":None},
+        ):
+            result=save_runtime_checkpoint(default_checkpoint(),cfg,approved=True)
+        self.assertEqual(result["status"],"UNVERIFIED")
+        self.assertFalse(result["saved"])
+        self.assertFalse(result["verified"])
+        self.assertTrue(result["write_accepted"])
 
     def test_runtime_load_is_truthful_when_credentials_missing(self):
         cfg = RuntimeConfig(token="", repo="", branch="atlasquant-runtime")
