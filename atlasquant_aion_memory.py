@@ -320,10 +320,15 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
     promo_campaigns = normalize_campaigns(
         promotions.get("campaigns") if isinstance(promotions, Mapping) else []
     )
+    raw_redemptions = (
+        promotions.get("redemptions", [])
+        if isinstance(promotions, Mapping)
+        else []
+    )
+    if not isinstance(raw_redemptions, (list, tuple)):
+        raw_redemptions = []
     promo_redemptions = [
-        dict(x) for x in list(
-            promotions.get("redemptions") if isinstance(promotions, Mapping) else []
-        )[:2000]
+        dict(x) for x in list(raw_redemptions)[:2000]
         if isinstance(x, Mapping)
     ]
     payload["promotions"] = {
@@ -415,10 +420,11 @@ def update_promotions_checkpoint(
     payload = ensure_operating_checkpoint(checkpoint)
     rows = normalize_campaigns(campaigns)
     current = payload.get("promotions") if isinstance(payload.get("promotions"), Mapping) else {}
+    raw_redemptions = current.get("redemptions", []) if redemptions is None else redemptions
+    if not isinstance(raw_redemptions, (list, tuple)):
+        raw_redemptions = []
     redemption_rows = [
-        dict(x) for x in list(
-            current.get("redemptions", []) if redemptions is None else redemptions
-        )[:2000]
+        dict(x) for x in list(raw_redemptions)[:2000]
         if isinstance(x, Mapping)
     ]
     payload["promotions"] = {
