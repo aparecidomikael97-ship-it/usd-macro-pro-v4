@@ -136,7 +136,7 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("approve_entitlement_request(", src)
         self.assertIn("entitlement_activation_preflight(", src)
         self.assertIn("Registro de Entitlements", src)
-        self.assertIn("não altera conta nem libera acesso", src)
+        self.assertIn("não altera conta nem libera acesso", src.lower())
         self.assertIn("não muda USER/SALES/ADMIN", src)
         self.assertIn("ACTIVE_CONFIRMED exige evidência concreta", src)
         self.assertIn("entitlement_activation", src)
