@@ -30,8 +30,10 @@ st.write("AION_RUNTIME_OK",result["allowed"],result["real_orders_enabled"])
         app=AppTest.from_string(script)
         app.run(timeout=45)
         self.assertEqual(len(app.exception),0)
-        self.assertGreaterEqual(len(app.button),4)
+        self.assertGreaterEqual(len(app.button),1)
         self.assertGreaterEqual(len(app.metric),8)
+        self.assertGreaterEqual(len(app.selectbox),1)
+        self.assertEqual(str(app.selectbox[0].value),"🧠 Central")
 
     def test_non_admin_console_fails_closed(self):
         script = r'''
