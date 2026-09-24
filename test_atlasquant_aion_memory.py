@@ -8,6 +8,7 @@ from atlasquant_aion_memory import (
     canonical_documents,
     canonical_memory_summary,
     checkpoint_digest,
+    checkpoint_source_digest,
     default_checkpoint,
     ensure_operating_checkpoint,
     load_runtime_checkpoint,
@@ -79,6 +80,16 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertTrue(changed["operating"]["dirty"])
         self.assertTrue(changed["operating"]["task_digest"])
         self.assertTrue(changed["operating"]["event_digest"])
+
+    def test_source_digest_ignores_volatile_checkpoint_timestamps(self):
+        a=default_checkpoint()
+        b=default_checkpoint()
+        a["created_at"]="2026-09-23T00:00:00+00:00"
+        a["updated_at"]="2026-09-23T00:00:00+00:00"
+        b["created_at"]="2026-09-24T00:00:00+00:00"
+        b["updated_at"]="2026-09-24T00:00:00+00:00"
+        b["operating"]["dirty"]=True
+        self.assertEqual(checkpoint_source_digest(a),checkpoint_source_digest(b))
 
     def test_runtime_load_is_truthful_when_credentials_missing(self):
         cfg = RuntimeConfig(token="", repo="", branch="atlasquant-runtime")
