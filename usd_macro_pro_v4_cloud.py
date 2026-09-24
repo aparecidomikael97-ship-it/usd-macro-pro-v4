@@ -6352,12 +6352,51 @@ if _aq_matrix_required:
             }
             matriz_v61 = pd.DataFrame()
 
+# Continuidade segura: se a Matriz ao vivo falhar na sessão interativa,
+# reaproveita somente um snapshot runtime que passe pelos mesmos gates de
+# frescor/segurança. Nunca é usado para habilitar ordens ou execução automática.
+if _aq_matrix_required and (
+    not bool(_aq_pair_matrix_result.get("ready", False))
+    or not isinstance(matriz_v61, pd.DataFrame)
+    or matriz_v61.empty
+):
+    try:
+        from atlasquant_fast_startup import validated_snapshot_pair_matrix
+        _aq_snapshot_matrix_result = validated_snapshot_pair_matrix(
+            globals().get("_fast_snapshot")
+        )
+        if bool(_aq_snapshot_matrix_result.get("ready", False)):
+            matriz_v61 = _aq_snapshot_matrix_result["matrix"].copy()
+            _aq_pair_matrix_result = {
+                "ready": True,
+                "live_ready": False,
+                "source": "runtime_snapshot",
+                "reason": "Matriz ao vivo indisponível; snapshot runtime validado em uso.",
+                "missing_codes": [],
+                "matrix": matriz_v61.copy(),
+                "pairs_expected": 7,
+                "pairs_built": int(len(matriz_v61)),
+                "fallback_age_minutes": _aq_snapshot_matrix_result.get("age_minutes"),
+                "trading_side_effects": False,
+            }
+    except Exception as _aq_snapshot_matrix_exc:
+        st.session_state["atlasquant_matrix_fallback_error"] = type(
+            _aq_snapshot_matrix_exc
+        ).__name__
+elif bool(_aq_pair_matrix_result.get("ready", False)):
+    _aq_pair_matrix_result.setdefault("live_ready", True)
+    _aq_pair_matrix_result.setdefault("source", "live")
+
+
 st.session_state["atlasquant_pair_matrix_status"] = {
     "ready": bool(_aq_pair_matrix_result.get("ready", False)),
     "reason": str(_aq_pair_matrix_result.get("reason", "")),
     "pairs_expected": int(_aq_pair_matrix_result.get("pairs_expected", 7) or 7),
     "pairs_built": int(_aq_pair_matrix_result.get("pairs_built", 0) or 0),
     "missing_codes": list(_aq_pair_matrix_result.get("missing_codes", []) or []),
+    "source": str(_aq_pair_matrix_result.get("source", "none")),
+    "live_ready": bool(_aq_pair_matrix_result.get("live_ready", False)),
+    "fallback_age_minutes": _aq_pair_matrix_result.get("fallback_age_minutes"),
 }
 
 
@@ -9243,6 +9282,23 @@ if _aq_active_index == 1:
                 "fomc_weight": float(st.session_state.get("v77_peso_fomc", 0.0)) * 100.0,
             }
             _scanner_state_master_v102 = _scanner_load_v934()
+            _aq_master_uses_runtime_fallback = (
+                str(_aq_pair_matrix_result.get("source") or "") == "runtime_snapshot"
+            )
+            if _aq_master_uses_runtime_fallback:
+                # Snapshot mantém o painel visível, mas o gate operacional fica
+                # deliberadamente fechado até a Matriz ao vivo ser reconstruída.
+                _scanner_state_master_v102 = {}
+                _aq_fallback_age = _aq_pair_matrix_result.get("fallback_age_minutes")
+                _aq_age_txt = (
+                    f" · idade {_aq_fallback_age:.0f} min"
+                    if isinstance(_aq_fallback_age, (int, float)) else ""
+                )
+                st.warning(
+                    "Painel Mestre em continuidade segura por snapshot runtime validado"
+                    + _aq_age_txt
+                    + ". Autorizações operacionais permanecem bloqueadas até a Matriz ao vivo voltar."
+                )
 
             # -------------------------------------------------
             # V10.2.2 — Atualização técnica direta pelo Painel
@@ -9344,14 +9400,25 @@ if _aq_active_index == 1:
             render_master_panel(
                 _matrix_master_v102, ranking, CHAVE_TWELVE_DATA,
                 _macro_context_master_v102, _scanner_state_master_v102,
-                scanner_refresh_cb=_master_refresh_scanner_batch_v1022,
-                scanner_refresh_remaining=_scan_wait_master_v1022,
+                scanner_refresh_cb=(
+                    None if _aq_master_uses_runtime_fallback
+                    else _master_refresh_scanner_batch_v1022
+                ),
+                scanner_refresh_remaining=(
+                    0 if _aq_master_uses_runtime_fallback
+                    else _scan_wait_master_v1022
+                ),
             )
         except Exception as _master_render_exc:
-            st.error(
-                "O Painel Mestre encontrou um erro, mas o motor base continua preservado."
+            st.session_state["atlasquant_master_panel_error"] = {
+                "type": type(_master_render_exc).__name__,
+            }
+            st.warning(
+                "Painel Mestre entrou em modo seguro; o restante do AtlasQuant continua disponível."
             )
-            st.code(f"{type(_master_render_exc).__name__}: {_master_render_exc}")
+            st.caption(
+                f"Diagnóstico Painel Mestre: {type(_master_render_exc).__name__}"
+            )
 
 # =========================================================
 # ABA 10 — V10.3 EXPERIÊNCIA, EDUCAÇÃO E PERSONALIZAÇÃO
@@ -9808,7 +9875,26 @@ if _aq_active_index == 0:
             _macro_v108["event"] = {}
 
         _aq_runtime_snapshot = {}
-        if load_current_pair_intelligence is not None:
+        _aq_radar_uses_runtime_fallback = (
+            str(_aq_pair_matrix_result.get("source") or "") == "runtime_snapshot"
+        )
+        if _aq_radar_uses_runtime_fallback:
+            _aq_saved_snapshot = globals().get("_fast_snapshot")
+            if isinstance(_aq_saved_snapshot, dict):
+                _aq_runtime_snapshot = {
+                    "packs": list(_aq_saved_snapshot.get("packs", []) or [])
+                }
+            _aq_fallback_age = _aq_pair_matrix_result.get("fallback_age_minutes")
+            _aq_age_txt = (
+                f" · idade {_aq_fallback_age:.0f} min"
+                if isinstance(_aq_fallback_age, (int, float)) else ""
+            )
+            st.info(
+                "Radar em continuidade segura por snapshot runtime validado"
+                + _aq_age_txt
+                + ". A Matriz ao vivo será priorizada assim que voltar."
+            )
+        elif load_current_pair_intelligence is not None:
             try:
                 _aq_runtime_snapshot = load_current_pair_intelligence(
                     matriz_v61, ranking, fed=fed, weights=PESOS
@@ -9825,7 +9911,7 @@ if _aq_active_index == 0:
                 )
             except Exception as _aq_home_exc:
                 st.warning("Radar principal em modo seguro; nenhuma permissão operacional foi ampliada.")
-                st.caption(f"Diagnóstico Home Radar: {type(_aq_home_exc).__name__}: {_aq_home_exc}")
+                st.caption(f"Diagnóstico Home Radar: {type(_aq_home_exc).__name__}")
         elif _ATLASQUANT_HOME_RADAR_IMPORT_ERROR:
             st.caption(f"Home Radar indisponível: {_ATLASQUANT_HOME_RADAR_IMPORT_ERROR}")
 
