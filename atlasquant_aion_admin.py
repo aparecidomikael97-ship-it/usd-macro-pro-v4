@@ -8,6 +8,7 @@ already active.
 from __future__ import annotations
 
 from copy import deepcopy
+from html import escape
 from typing import Any, Mapping
 import os
 
@@ -143,9 +144,9 @@ def _render_header(
     provider_state: str,
     system_context: Mapping[str, Any],
 ) -> None:
-    name = _display_name(access)
-    build = str(system_context.get("source_build") or "não confirmado")
-    env = str(system_context.get("environment") or "LOCAL")
+    name = escape(_display_name(access))
+    build = escape(str(system_context.get("source_build") or "não confirmado"))
+    env = escape(str(system_context.get("environment") or "LOCAL"))
     st.markdown(AION_ADMIN_CSS, unsafe_allow_html=True)
     st.markdown(
         f"""
