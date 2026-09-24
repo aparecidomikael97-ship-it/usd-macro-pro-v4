@@ -66,6 +66,11 @@ class AtlasQuantAccessControlTests(unittest.TestCase):
         self.assertTrue(has_permission(sales,"sales:read"))
         self.assertFalse(has_permission(sales,"admin:read"))
         self.assertTrue(has_permission(admin,"admin:manage_users"))
+        self.assertTrue(has_permission(admin,"aion:admin"))
+        self.assertTrue(has_permission(admin,"aion:checkpoint"))
+        self.assertTrue(has_permission(admin,"aion:development"))
+        self.assertTrue(has_permission(admin,"aion:approve_publish"))
+        self.assertTrue(has_permission(admin,"aion:approve_cost"))
 
     def test_sales_cannot_manage_users_or_read_admin(self):
         sales={"role":"SALES"}
@@ -77,7 +82,11 @@ class AtlasQuantAccessControlTests(unittest.TestCase):
     def test_user_cannot_access_sales_or_admin_permissions(self):
         user={"role":"USER"}
         self.assertTrue(has_permission(user,"app:read"))
-        for permission in ("sales:read","admin:read","admin:manage_users"):
+        for permission in (
+            "sales:read","admin:read","admin:manage_users",
+            "aion:admin","aion:checkpoint","aion:development",
+            "aion:approve_publish","aion:approve_cost",
+        ):
             self.assertFalse(has_permission(user,permission))
 
     def test_unknown_permission_is_denied_for_every_role(self):
