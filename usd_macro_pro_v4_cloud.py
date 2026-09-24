@@ -4238,7 +4238,11 @@ if _aq_active_index == 10:
             "data_ready": True,
             "quality": "valid",
         }]
-        render_macro_briefing_panel(_brief_rows, _brief_events, _brief_banks)
+        try:
+            render_macro_briefing_panel(_brief_rows, _brief_events, _brief_banks)
+        except Exception as _brief_render_exc:
+            st.warning("Macro Briefing entrou em modo seguro; o restante do AtlasQuant continua disponível.")
+            st.caption(f"Diagnóstico Macro Briefing: {type(_brief_render_exc).__name__}")
 
 
 # =========================================================
@@ -6875,7 +6879,11 @@ if _aq_active_index == 5:
 if _aq_active_index == 6:
     historico = carregar_snapshots()
     if render_history_workspace is not None:
-        render_history_workspace(historico)
+        try:
+            render_history_workspace(historico)
+        except Exception as _history_render_exc:
+            st.warning("Histórico entrou em modo seguro; os dados e demais áreas continuam preservados.")
+            st.caption(f"Diagnóstico Histórico: {type(_history_render_exc).__name__}")
     else:
         st.subheader("🗂️ Histórico de Força e Direção")
         st.info(
@@ -6894,7 +6902,11 @@ if _aq_active_index == 6:
 # =========================================================
 if _aq_active_index == 7:
     if render_backtest_intro is not None:
-        render_backtest_intro()
+        try:
+            render_backtest_intro()
+        except Exception as _backtest_intro_exc:
+            st.warning("Introdução do Backtest indisponível neste carregamento; a validação permanece bloqueada.")
+            st.caption(f"Diagnóstico Backtest: {type(_backtest_intro_exc).__name__}")
     else:
         st.subheader("🧪 Backtest — Validação Histórica do Operacional")
         st.info(
@@ -6909,16 +6921,24 @@ if _aq_active_index == 7:
             "dados/model_paper_summary_v1.json",
             {},
         )
-        render_forward_test_panel(
-            _forward_summary if isinstance(_forward_summary,dict) else {},
-            source_label=_forward_source,
-        )
+        try:
+            render_forward_test_panel(
+                _forward_summary if isinstance(_forward_summary,dict) else {},
+                source_label=_forward_source,
+            )
+        except Exception as _forward_render_exc:
+            st.warning("Paper/Forward entrou em modo seguro; nenhuma execução foi ampliada.")
+            st.caption(f"Diagnóstico Forward: {type(_forward_render_exc).__name__}")
         st.divider()
     elif _ATLASQUANT_FORWARD_TEST_IMPORT_ERROR:
         st.caption("Paper/Forward ao vivo indisponível neste carregamento.")
 
     if render_operational_backtest_panel is not None:
-        render_operational_backtest_panel()
+        try:
+            render_operational_backtest_panel()
+        except Exception as _operational_backtest_exc:
+            st.warning("Backtest operacional entrou em modo seguro; nenhum resultado foi promovido.")
+            st.caption(f"Diagnóstico Backtest operacional: {type(_operational_backtest_exc).__name__}")
         st.divider()
     else:
         st.warning("Backtest operacional avançado indisponível neste carregamento.")
@@ -9638,7 +9658,11 @@ if _aq_active_index == 15:
         if _AUTOPILOT_V107_IMPORT_ERROR:
             st.caption(f"Diagnóstico: {_AUTOPILOT_V107_IMPORT_ERROR}")
     else:
-        render_autopilot_v107()
+        try:
+            render_autopilot_v107()
+        except Exception as _autopilot_render_exc:
+            st.warning("Autopilot entrou em modo seguro; o motor não recebeu novas permissões.")
+            st.caption(f"Diagnóstico Autopilot: {type(_autopilot_render_exc).__name__}")
 
 # =========================================================
 # CONTA — USER / SALES / ADMIN
@@ -9649,7 +9673,11 @@ if _aq_active_index == 16:
         if _ATLASQUANT_ACCOUNT_PORTAL_IMPORT_ERROR:
             st.caption("Diagnóstico: "+_ATLASQUANT_ACCOUNT_PORTAL_IMPORT_ERROR)
     else:
-        render_account_portal(_ATLASQUANT_ACCESS)
+        try:
+            render_account_portal(_ATLASQUANT_ACCESS)
+        except Exception as _account_render_exc:
+            st.warning("Conta entrou em modo seguro; nenhuma permissão foi alterada.")
+            st.caption(f"Diagnóstico Conta: {type(_account_render_exc).__name__}")
 
 # =========================================================
 # INSTALAÇÃO / DISTRIBUIÇÃO MULTIPLATAFORMA
@@ -9660,7 +9688,11 @@ if _aq_active_index == 17:
         if _ATLASQUANT_PLATFORM_IMPORT_ERROR:
             st.caption("Diagnóstico: "+_ATLASQUANT_PLATFORM_IMPORT_ERROR)
     else:
-        render_platform_center()
+        try:
+            render_platform_center()
+        except Exception as _platform_render_exc:
+            st.warning("Central de instalação entrou em modo seguro; nenhuma instalação foi iniciada.")
+            st.caption(f"Diagnóstico Instalação: {type(_platform_render_exc).__name__}")
 
 # =========================================================
 # VENDAS / ONBOARDING COMERCIAL
@@ -9671,7 +9703,11 @@ if _aq_active_index == 18:
         if _ATLASQUANT_SALES_IMPORT_ERROR:
             st.caption("Diagnóstico: "+_ATLASQUANT_SALES_IMPORT_ERROR)
     else:
-        render_sales_center(_ATLASQUANT_ACCESS)
+        try:
+            render_sales_center(_ATLASQUANT_ACCESS)
+        except Exception as _sales_render_exc:
+            st.warning("Portal comercial entrou em modo seguro; nenhuma cobrança ou assinatura foi ativada.")
+            st.caption(f"Diagnóstico Vendas: {type(_sales_render_exc).__name__}")
 
 # =========================================================
 # INVESTIR — PLANEJAMENTO, RENDA E ESTUDO DE LONGO PRAZO
@@ -9682,7 +9718,11 @@ if _aq_active_index == 19:
         if _ATLASQUANT_INVESTMENT_IMPORT_ERROR:
             st.caption("Diagnóstico: "+_ATLASQUANT_INVESTMENT_IMPORT_ERROR)
     else:
-        render_investment_center(_aq_experience_mode)
+        try:
+            render_investment_center(_aq_experience_mode)
+        except Exception as _investment_render_exc:
+            st.warning("Central Investir entrou em modo seguro; nenhuma ação financeira foi executada.")
+            st.caption(f"Diagnóstico Investir: {type(_investment_render_exc).__name__}")
 
 # =========================================================
 # SUPORTE — SELF-SERVICE SEGURO
@@ -9693,7 +9733,11 @@ if _aq_active_index == 20:
         if _ATLASQUANT_SUPPORT_IMPORT_ERROR:
             st.caption("Diagnóstico: "+_ATLASQUANT_SUPPORT_IMPORT_ERROR)
     else:
-        render_support_center()
+        try:
+            render_support_center()
+        except Exception as _support_render_exc:
+            st.warning("Suporte entrou em modo seguro; as demais áreas continuam disponíveis.")
+            st.caption(f"Diagnóstico Suporte: {type(_support_render_exc).__name__}")
 
 # =========================================================
 # AION OFICIAL — ADMINISTRADOR / COMMAND CENTER
