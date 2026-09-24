@@ -360,5 +360,18 @@ class AtlasQuantUiTests(unittest.TestCase):
         for label in NAVIGATION_LABELS:
             self.assertIn(f'"{label}"',workflow)
 
+    def test_final_dark_theme_controls_keep_high_contrast_text(self):
+        css=ATLASQUANT_CSS
+        self.assertIn('background: #122944 !important;',css)
+        self.assertIn('color: #f7fbff !important;',css)
+        self.assertIn('background: #0d2138 !important;',css)
+        self.assertIn('color: #f2f6fb !important;',css)
+        self.assertIn('color: #dbe7f5 !important;',css)
+        self.assertIn('[data-testid="stCheckbox"] label',css)
+        self.assertIn('[data-testid="stToggle"] label',css)
+        self.assertNotIn('color: var(--text-color, #182230) !important;',css)
+        self.assertNotIn('color: var(--text-color, #111827) !important;',css)
+
+
 if __name__ == "__main__":
     unittest.main()
