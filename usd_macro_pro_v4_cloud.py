@@ -350,6 +350,7 @@ try:
         navigation_labels,
         navigation_groups_html,
         render_experience_mode_switch,
+        experience_mode_overview_html,
         operation_focus_html,
         mobile_navigation_hint_html,
         render_stable_navigation,
@@ -365,6 +366,7 @@ except Exception as _atlasquant_ui_exc:
     navigation_labels = None
     navigation_groups_html = None
     render_experience_mode_switch = None
+    experience_mode_overview_html = None
     operation_focus_html = None
     mobile_navigation_hint_html = None
     render_stable_navigation = None
@@ -4149,6 +4151,11 @@ _aq_experience_mode = (
     if render_experience_mode_switch is not None
     else "Iniciante"
 )
+if experience_mode_overview_html is not None:
+    st.markdown(
+        experience_mode_overview_html(_aq_experience_mode),
+        unsafe_allow_html=True,
+    )
 if operation_focus_html is not None:
     st.markdown(
         operation_focus_html(

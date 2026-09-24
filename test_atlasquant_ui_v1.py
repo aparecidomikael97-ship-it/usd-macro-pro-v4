@@ -1,6 +1,6 @@
 import unittest
 
-from atlasquant_ui_v1 import UI_VERSION, ATLASQUANT_CSS, NAVIGATION_LABELS, NAVIGATION_GROUPS, BEGINNER_OPEN_AREAS, hero_html, navigation_labels, navigation_groups, navigation_groups_html, navigation_group_for, operation_focus_html, score_semantics, section_title_html, state_badge_html, decision_strip_html, context_strip_html, normalize_experience_mode, navigation_mode_css, is_page_locked_for_mode, advanced_preview_model
+from atlasquant_ui_v1 import UI_VERSION, ATLASQUANT_CSS, NAVIGATION_LABELS, NAVIGATION_GROUPS, BEGINNER_OPEN_AREAS, hero_html, navigation_labels, navigation_groups, navigation_groups_html, navigation_group_for, operation_focus_html, score_semantics, section_title_html, state_badge_html, decision_strip_html, context_strip_html, normalize_experience_mode, experience_mode_overview_html, navigation_mode_css, is_page_locked_for_mode, advanced_preview_model
 
 
 class AtlasQuantUiTests(unittest.TestCase):
@@ -242,6 +242,26 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("if r.status_code == 404:",fn)
         self.assertIn("return default",fn)
         self.assertIn("r.raise_for_status()",fn)
+
+    def test_experience_overview_makes_beginner_and_advanced_scope_explicit(self):
+        beginner=experience_mode_overview_html("Iniciante")
+        advanced=experience_mode_overview_html("Avançado")
+        self.assertIn("Modo Iniciante",beginner)
+        self.assertIn(f"{len(BEGINNER_OPEN_AREAS)} áreas essenciais abertas",beginner)
+        self.assertIn("áreas em prévia",beginner)
+        self.assertIn("sem executar workspace avançado",beginner)
+        self.assertIn("Modo Avançado",advanced)
+        self.assertIn(f"{len(NAVIGATION_LABELS)} áreas públicas disponíveis",advanced)
+        self.assertIn("Safety Core preservado",advanced)
+        self.assertIn("aq-mode-strip",ATLASQUANT_CSS)
+        self.assertIn("aq-mode-chip",ATLASQUANT_CSS)
+
+    def test_main_renders_experience_overview_before_workspace_selector(self):
+        from pathlib import Path
+        src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        overview=src.index("experience_mode_overview_html(_aq_experience_mode)")
+        nav=src.index("render_stable_navigation(",overview)
+        self.assertLess(overview,nav)
 
     def test_beginner_mode_hides_advanced_tab_buttons_without_changing_indices(self):
         self.assertEqual(normalize_experience_mode("iniciante"),"Iniciante")
