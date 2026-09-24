@@ -57,13 +57,14 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("_record_working_event(", src)
         self.assertIn("Observabilidade / auditoria", src)
 
-    def test_checkpoint_save_clears_dirty_only_after_confirmed_save(self):
+    def test_checkpoint_save_clears_dirty_only_after_verified_readback(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
-        success = src.index('if result.get("saved"):')
-        block = src[success:success+700]
-        self.assertIn('result.get("saved") and result.get("verified")', block)
+        success = src.index('if result.get("saved") and result.get("verified"):')
+        block = src[success:success+950]
+        self.assertIn('saved_checkpoint = ensure_operating_checkpoint(result.get("checkpoint"))', block)
         self.assertIn('_set_working_checkpoint(saved_checkpoint, dirty=False)', block)
         self.assertIn("Checkpoint Mestre salvo, relido e confirmado no runtime.", block)
+        self.assertIn("As alterações locais continuam marcadas como pendentes.",src)
 
     def test_checkpoint_persistence_preflight_fails_closed_before_save_button(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
@@ -79,7 +80,8 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("_WORKING_CONFLICT_KEY", src)
         self.assertIn("Conflito detectado:", src)
-        self.assertIn("disabled=conflict", src)
+        self.assertIn("persistence_blocked = bool(conflict or not persistence_preflight.get(\"allowed\"))", src)
+        self.assertIn("disabled=persistence_blocked", src)
         self.assertIn("não vai sobrescrever a versão nova automaticamente", src)
         self.assertIn("Descartar alterações locais e recarregar runtime", src)
 
