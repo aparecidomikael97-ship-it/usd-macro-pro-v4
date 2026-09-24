@@ -15,7 +15,9 @@ from atlasquant_aion_memory import (
     merged_checkpoint,
     save_runtime_checkpoint,
     search_canonical_memory,
+    update_business_checkpoint,
     update_operating_checkpoint,
+    update_studio_checkpoint,
 )
 
 
@@ -65,23 +67,53 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("approved_foundation", cp)
         self.assertTrue(checkpoint_digest(cp))
 
-    def test_checkpoint_v2_has_operating_memory(self):
+    def test_checkpoint_v3_has_operating_studio_and_business_memory(self):
         cp=default_checkpoint()
-        self.assertGreaterEqual(cp["checkpoint_version"],2)
+        self.assertGreaterEqual(cp["checkpoint_version"],3)
         self.assertIn("operating",cp)
         self.assertEqual(cp["operating"]["tasks"],[])
         self.assertEqual(cp["operating"]["events"],[])
         self.assertFalse(cp["operating"]["dirty"])
+        self.assertEqual(cp["studio"]["projects"],[])
+        self.assertEqual(cp["business"]["products"],[])
 
     def test_older_checkpoint_is_upgraded_without_claiming_persistence(self):
         old={"checkpoint_version":1,"project":"AtlasQuant"}
         upgraded=ensure_operating_checkpoint(old)
-        self.assertEqual(upgraded["checkpoint_version"],2)
+        self.assertEqual(upgraded["checkpoint_version"],3)
         self.assertIn("operating",upgraded)
+        self.assertIn("studio",upgraded)
+        self.assertIn("business",upgraded)
         changed=update_operating_checkpoint(upgraded,tasks=[],events=[],dirty=True)
         self.assertTrue(changed["operating"]["dirty"])
         self.assertTrue(changed["operating"]["task_digest"])
         self.assertTrue(changed["operating"]["event_digest"])
+
+    def test_studio_and_business_updates_mark_checkpoint_dirty(self):
+        cp=default_checkpoint()
+        studio=update_studio_checkpoint(
+            cp,
+            projects=[{
+                "title":"Vídeo teste",
+                "platforms":["Instagram"],
+                "created_at":"2026-09-23T20:00:00Z",
+            }],
+            dirty=True,
+        )
+        self.assertEqual(len(studio["studio"]["projects"]),1)
+        self.assertTrue(studio["operating"]["dirty"])
+        business=update_business_checkpoint(
+            studio,
+            products=[{
+                "name":"Produto teste",
+                "channel":"Mercado Livre",
+                "created_at":"2026-09-23T20:01:00Z",
+            }],
+            dirty=True,
+        )
+        self.assertEqual(len(business["business"]["products"]),1)
+        self.assertTrue(business["studio"]["digest"])
+        self.assertTrue(business["business"]["digest"])
 
     def test_source_digest_ignores_volatile_checkpoint_timestamps(self):
         a=default_checkpoint()
