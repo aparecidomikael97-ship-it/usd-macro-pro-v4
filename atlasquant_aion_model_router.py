@@ -54,13 +54,17 @@ def normalize_budget(raw:Mapping[str,Any]|None)->dict[str,Any]:
         except Exception:
             return 0.0
     limit=_num("monthly_limit_usd")
-    spent=min(_num("spent_usd"),limit) if limit>0 else 0.0
+    spent=_num("spent_usd_estimate")
+    if spent<=0:
+        spent=_num("spent_usd")
     return {
         "schema":SCHEMA,
         "allow_paid":bool(data.get("allow_paid",False)),
         "monthly_limit_usd":round(limit,4),
         "spent_usd":round(spent,4),
+        "spent_usd_estimate":round(spent,4),
         "remaining_usd":round(max(0.0,limit-spent),4),
+        "spend_is_estimate":True,
         "approved_by":str(data.get("approved_by") or "")[:80],
         "approved_at":str(data.get("approved_at") or "")[:80],
     }
@@ -158,6 +162,33 @@ def route_intelligence(
     }
 
 
+def record_model_spend_estimate(
+    checkpoint:Mapping[str,Any],
+    amount_usd:Any,
+)->dict[str,Any]:
+    """Track estimated provider usage cost without claiming provider billing."""
+    payload=deepcopy(dict(checkpoint or {}))
+    aion=payload.get("aion")
+    if not isinstance(aion,dict):
+        aion={}
+        payload["aion"]=aion
+    current=normalize_budget(
+        aion.get("model_budget") if isinstance(aion.get("model_budget"),Mapping) else {}
+    )
+    try:
+        amount=max(0.0,float(amount_usd or 0))
+    except Exception:
+        amount=0.0
+    current["spent_usd_estimate"]=round(current["spent_usd_estimate"]+amount,6)
+    current["spent_usd"]=current["spent_usd_estimate"]
+    current["remaining_usd"]=round(
+        max(0.0,current["monthly_limit_usd"]-current["spent_usd_estimate"]),6
+    )
+    current["spend_is_estimate"]=True
+    aion["model_budget"]=current
+    return payload
+
+
 def set_budget_policy(
     checkpoint:Mapping[str,Any],
     *,
@@ -174,8 +205,11 @@ def set_budget_policy(
         payload["aion"]=aion
     policy=normalize_budget({
         "monthly_limit_usd":monthly_limit_usd,
-        "spent_usd":(aion.get("model_budget") or {}).get("spent_usd",0)
-            if isinstance(aion.get("model_budget"),Mapping) else 0,
+        "spent_usd_estimate":(
+            (aion.get("model_budget") or {}).get("spent_usd_estimate",
+                (aion.get("model_budget") or {}).get("spent_usd",0))
+            if isinstance(aion.get("model_budget"),Mapping) else 0
+        ),
         "allow_paid":bool(allow_paid),
         "approved_by":str(approved_by or ""),
         "approved_at":str(approved_at or ""),
