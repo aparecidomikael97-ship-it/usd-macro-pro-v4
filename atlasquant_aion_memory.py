@@ -60,6 +60,7 @@ APPROVED_AION_FOUNDATION = (
     "Interface deve ser futurística/premium com 3D/glass/microinterações, mas manter contraste, acessibilidade, velocidade e adaptação mobile.",
     "Assistente de voz deve ser contextual por área e opcional; não deve falar automaticamente sem controle do usuário.",
     "Fase futura: cada assinante poderá ter AION pessoal isolado; o AION oficial do administrador mantém privilégios superiores.",
+    "AION pessoal nunca herda memória canônica do ADMIN, documentos privados do projeto ou memória de outro assinante; elegibilidade exige entitlement AION_PERSONAL confirmado.",
     "Memória do AION deve carregar os registros canônicos do projeto desde 15/09/2026 e continuar com checkpoints versionados.",
     "Execução real em corretora continua bloqueada; backtest/paper/forward e pesquisa não equivalem a autorização real.",
     "Gatilho operacional aprovado: quando o administrador disser 'tô no computador', priorizar a reconciliação do Render, configurar o Deploy Hook com segurança e validar Build Identity + Browser Smoke antes de retomar novos blocos.",
