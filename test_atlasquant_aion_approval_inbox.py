@@ -85,7 +85,7 @@ class AtlasQuantAionApprovalInboxTests(unittest.TestCase):
     def test_entitlement_reason_never_claims_access_was_granted(self):
         inbox=collect_approval_inbox(self.checkpoint())
         item=next(x for x in inbox["items"] if x["kind"]=="ENTITLEMENT")
-        self.assertIn("não concede acesso automaticamente",item["reason"].lower())
+        self.assertIn("não altera conta nem concede acesso automaticamente",item["reason"].lower())
         self.assertFalse(item["approved"])
 
     def test_presentation_rows_do_not_add_actions(self):
