@@ -39,8 +39,9 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
         self.assertIn("branches: [main]",health)
         trigger=browser.split("permissions:",1)[0]
         self.assertIn("workflow_dispatch:",trigger)
+        self.assertIn("push:",trigger)
+        self.assertIn("branches: [main]",trigger)
         self.assertIn("schedule:",trigger)
-        self.assertNotIn("\n  push:",trigger)
         self.assertNotIn("workflow_run:",trigger)
         self.assertIn("actions/setup-python@v7",browser)
         self.assertIn("actions/upload-artifact@v7",browser)
