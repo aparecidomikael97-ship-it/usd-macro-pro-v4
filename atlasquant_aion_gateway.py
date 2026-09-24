@@ -30,15 +30,20 @@ def provider_status(
     external_enabled = bool(flags.get("external_llm", False))
     if external_requested and not external_enabled:
         state = "BLOCKED_BY_FEATURE_FLAG"
+        route_enabled = False
     elif external_requested:
-        state = "CONFIGURED_EXTERNAL"
+        # The feature flag may reserve the lane, but this foundation has no
+        # external model client yet. Never call it "configured" prematurely.
+        state = "EXTERNAL_ROUTE_NOT_IMPLEMENTED"
+        route_enabled = False
     else:
         state = "ZERO_COST_LOCAL"
+        route_enabled = False
     return {
         "schema": SCHEMA,
         "provider": provider or "offline",
         "state": state,
-        "external_enabled": bool(external_requested and external_enabled),
+        "external_enabled": route_enabled,
         "cost_mode": "ZERO_COST_DEFAULT",
         "automatic_billing": False,
     }
