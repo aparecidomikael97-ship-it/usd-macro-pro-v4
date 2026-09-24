@@ -34,6 +34,21 @@ jobs:
           python -m pip install playwright
           python -m playwright install --with-deps chromium
 
+      - name: Warm production service
+        shell: bash
+        run: |
+          set -euo pipefail
+          code="000"
+          for attempt in 1 2 3 4 5; do
+            code=$(curl -L -sS --connect-timeout 20 --max-time 180 -o /tmp/atlasquant-health.txt -w "%{http_code}" "$APP_URL/_stcore/health" || true)
+            echo "warm attempt=$attempt http=$code"
+            if [ "$code" = "200" ]; then
+              break
+            fi
+            sleep 15
+          done
+          test "$code" = "200"
+
       - name: Wait for exact production source build
         shell: bash
         run: |
@@ -59,20 +74,36 @@ jobs:
               "seen_builds":[],
               "matched":False,
               "http_statuses":[],
+              "app_container_seen":False,
           }
 
           with sync_playwright() as p:
               browser=p.chromium.launch(headless=True)
               page=browser.new_page(viewport={"width":1280,"height":800})
+
               for attempt in range(1,37):
                   report["attempts"]=attempt
                   status=None
                   try:
-                      response=page.goto(url,wait_until="domcontentloaded",timeout=180_000)
+                      if attempt == 1:
+                          response=page.goto(url,wait_until="domcontentloaded",timeout=180_000)
+                      else:
+                          response=page.reload(wait_until="domcontentloaded",timeout=180_000)
                       status=response.status if response else None
                   except Exception:
                       status=None
                   report["http_statuses"].append(status)
+
+                  # Streamlit serves an HTML shell first and hydrates the Python
+                  # output later over its runtime channel. Checking immediately
+                  # after DOMContentLoaded can therefore produce a false
+                  # "marker absent" even while production is healthy.
+                  try:
+                      page.locator('[data-testid="stAppViewContainer"]').wait_for(timeout=90_000)
+                      report["app_container_seen"]=True
+                  except Exception:
+                      pass
+                  page.wait_for_timeout(2_000)
 
                   source_build=""
                   try:
@@ -95,7 +126,8 @@ jobs:
                       report["matched"]=True
                       break
                   if attempt<36:
-                      time.sleep(10)
+                      page.wait_for_timeout(10_000)
+
               page.screenshot(path=str(out/"production.png"),full_page=False)
               browser.close()
 
@@ -107,7 +139,8 @@ jobs:
           if not report["matched"]:
               raise SystemExit(
                   "Production source build did not match expected build "
-                  f"{expected}; seen={report['seen_builds']}"
+                  f"{expected}; seen={report['seen_builds']}; "
+                  f"app_container_seen={report['app_container_seen']}"
               )
           PY
 
@@ -126,6 +159,7 @@ jobs:
           print(f"- GitHub SHA: `{r['github_sha']}`")
           print(f"- Match: **{r['matched']}**")
           print(f"- Attempts: {r['attempts']}")
+          print(f"- Streamlit app container seen: {r.get('app_container_seen',False)}")
           print(f"- Seen builds: {', '.join(r['seen_builds']) or 'none'}")
           PY
           fi
