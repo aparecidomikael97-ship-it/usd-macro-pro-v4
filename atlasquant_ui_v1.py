@@ -228,11 +228,25 @@ html { scroll-behavior: smooth; }
   font-weight: 800 !important;
 }
 [data-testid="stButton"] button {
-  border-radius: 10px; min-height: 2.45rem; font-weight: 700;
-  border: 1px solid var(--aq-line);
+  border-radius: 10px; min-height: 2.45rem; font-weight: 800;
+  border: 1px solid rgba(163,190,222,.30);
+  background: #122944 !important;
+  color: #f7fbff !important;
+}
+[data-testid="stButton"] button *,
+[data-testid="stDownloadButton"] button * {
+  color: inherit !important;
+  -webkit-text-fill-color: currentColor !important;
+  opacity: 1 !important;
+}
+[data-testid="stButton"] button:hover {
+  background: #183657 !important;
+  border-color: rgba(126,183,244,.52) !important;
 }
 [data-testid="stButton"] button[kind="primary"] {
-  box-shadow: 0 8px 24px rgba(79,163,255,.16);
+  background: #1769aa !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 24px rgba(79,163,255,.20);
 }
 [data-testid="stDataFrame"] {
   border: 1px solid var(--aq-line);
@@ -242,16 +256,23 @@ html { scroll-behavior: smooth; }
 [data-testid="stAlert"] { border-radius: 12px; }
 [data-testid="stCaptionContainer"],
 [data-testid="stCaptionContainer"] * {
-  color: var(--text-color, #263548) !important;
-  opacity: .88 !important;
-  font-weight: 600 !important;
+  color: #dbe7f5 !important;
+  -webkit-text-fill-color: #dbe7f5 !important;
+  opacity: 1 !important;
+  font-weight: 650 !important;
 }
 [data-testid="stRadio"] label,
 [data-testid="stRadio"] label *,
 [data-testid="stSelectbox"] label,
-[data-testid="stSelectbox"] label * {
-  color: var(--text-color, #182230) !important;
+[data-testid="stSelectbox"] label *,
+[data-testid="stCheckbox"] label,
+[data-testid="stCheckbox"] label *,
+[data-testid="stToggle"] label,
+[data-testid="stToggle"] label * {
+  color: #f2f6fb !important;
+  -webkit-text-fill-color: #f2f6fb !important;
   opacity: 1 !important;
+  font-weight: 700 !important;
 }
 [data-testid="stTextInput"] input,
 [data-testid="stNumberInput"] input,
@@ -259,10 +280,20 @@ html { scroll-behavior: smooth; }
 [data-baseweb="select"] > div { border-radius: 10px !important; }
 [data-testid="stTextInput"] input,
 [data-testid="stNumberInput"] input,
-[data-testid="stTextArea"] textarea {
-  color: var(--text-color, #111827) !important;
-  -webkit-text-fill-color: var(--text-color, #111827) !important;
-  font-weight: 650 !important;
+[data-testid="stTextArea"] textarea,
+[data-baseweb="select"] > div {
+  background: #0d2138 !important;
+  color: #f7fbff !important;
+  -webkit-text-fill-color: #f7fbff !important;
+  border-color: rgba(163,190,222,.30) !important;
+  font-weight: 700 !important;
+  opacity: 1 !important;
+}
+[data-baseweb="select"] *,
+[data-testid="stTextInput"] input::placeholder,
+[data-testid="stTextArea"] textarea::placeholder {
+  color: #d6e3f2 !important;
+  -webkit-text-fill-color: #d6e3f2 !important;
   opacity: 1 !important;
 }
 [data-testid="stExpander"] {
@@ -273,9 +304,10 @@ html { scroll-behavior: smooth; }
 }
 [data-testid="stExpander"] details > summary {
   background: var(--ux-card, rgba(12,26,44,.48)) !important;
-  color: var(--ux-text, var(--text-color, #182230)) !important;
+  color: #f2f6fb !important;
+  -webkit-text-fill-color: #f2f6fb !important;
   min-height: 2.75rem;
-  font-weight: 700 !important;
+  font-weight: 800 !important;
 }
 [data-testid="stExpander"] details > summary *,
 [data-testid="stExpander"] summary p,

@@ -281,11 +281,13 @@ class AtlasQuantUiTests(unittest.TestCase):
 
     def test_caption_and_control_text_has_explicit_readable_contrast(self):
         self.assertIn('data-testid="stCaptionContainer"',ATLASQUANT_CSS)
-        self.assertIn("opacity: .88 !important",ATLASQUANT_CSS)
+        self.assertIn("opacity: 1 !important",ATLASQUANT_CSS)
+        self.assertIn("color: #dbe7f5 !important",ATLASQUANT_CSS)
         self.assertIn('data-testid="stRadio"',ATLASQUANT_CSS)
         self.assertIn('data-testid="stSelectbox"',ATLASQUANT_CSS)
         self.assertIn('data-testid="stExpander"',ATLASQUANT_CSS)
         self.assertIn("font-weight: 700 !important",ATLASQUANT_CSS)
+        self.assertIn("color: #f2f6fb !important",ATLASQUANT_CSS)
         self.assertIn("color:#ffffff",ATLASQUANT_CSS)
 
     def test_experience_switch_no_longer_injects_mode_dependent_tab_css(self):
@@ -359,6 +361,19 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("stException",workflow)
         for label in NAVIGATION_LABELS:
             self.assertIn(f'"{label}"',workflow)
+
+    def test_final_dark_theme_controls_keep_high_contrast_text(self):
+        css=ATLASQUANT_CSS
+        self.assertIn('background: #122944 !important;',css)
+        self.assertIn('color: #f7fbff !important;',css)
+        self.assertIn('background: #0d2138 !important;',css)
+        self.assertIn('color: #f2f6fb !important;',css)
+        self.assertIn('color: #dbe7f5 !important;',css)
+        self.assertIn('[data-testid="stCheckbox"] label',css)
+        self.assertIn('[data-testid="stToggle"] label',css)
+        self.assertNotIn('color: var(--text-color, #182230) !important;',css)
+        self.assertNotIn('color: var(--text-color, #111827) !important;',css)
+
 
 if __name__ == "__main__":
     unittest.main()
