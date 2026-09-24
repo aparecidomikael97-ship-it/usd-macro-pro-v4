@@ -58,8 +58,15 @@ from atlasquant_aion_observability import (
 from atlasquant_aion_secretary import executive_briefing
 from atlasquant_aion_model_router import (
     normalize_budget,
+    record_model_spend_estimate,
     route_intelligence,
     set_budget_policy,
+)
+from atlasquant_aion_provider import (
+    build_provider_prompt,
+    estimate_request_cost,
+    execute_openai_answer,
+    provider_config,
 )
 
 try:
@@ -128,6 +135,35 @@ def _secret(name: str, default: str = "") -> str:
     except Exception:
         value = os.getenv(name, default)
     return str(value or default).strip()
+
+
+def _provider_env() -> dict[str, str]:
+    names = (
+        "AION_MODEL_PROVIDER",
+        "OPENAI_API_KEY",
+        "AION_OPENAI_FAST_MODEL",
+        "AION_OPENAI_REASONING_MODEL",
+        "AION_OPENAI_INPUT_USD_PER_MTOK",
+        "AION_OPENAI_OUTPUT_USD_PER_MTOK",
+        "AION_OPENAI_MAX_OUTPUT_TOKENS",
+        "AION_OPENAI_TIMEOUT_SECONDS",
+    )
+    return {name: _secret(name) for name in names}
+
+
+def _context_voice(area: str, transcript: str, *, key: str) -> None:
+    if render_neural_voice_player is None:
+        return
+    with st.expander(f"🔊 Assistente de voz · {area}", expanded=False):
+        st.caption(
+            "A voz é opcional e nunca toca sozinha. Se houver provedor de voz pago configurado, "
+            "o clique para gerar áudio pode consumir esse serviço."
+        )
+        render_neural_voice_player(
+            transcript,
+            key=key,
+            button_label=f"🔊 Ouvir AION · {area}",
+        )
 
 
 def _runtime_config():
@@ -318,25 +354,133 @@ def _render_central(
         key="aion_admin_question",
         placeholder="Ex.: AION, onde paramos no sistema? / como está o Studio? / o que falta validar?",
     )
+
+    provider_env = _provider_env()
+    provider = provider_status(feature_flags=flags, env=provider_env)
+    budget = normalize_budget((checkpoint.get("aion") or {}).get("model_budget", {}))
+    hits_preview = search_canonical_memory(question) if question.strip() else []
+    domain_preview = route_context(question).get("domain") if question.strip() else "central"
+    prompt_preview = build_provider_prompt(
+        question,
+        domain=domain_preview,
+        memory_hits=hits_preview,
+        system_context=system_context,
+    ) if question.strip() else ""
+    estimate = estimate_request_cost(
+        prompt_preview,
+        config=provider_config(provider_env),
+    ) if prompt_preview else {
+        "estimable": False,
+        "estimated_max_cost_usd": None,
+        "state": "NO_PROMPT",
+    }
+
+    external_ready = bool(
+        provider.get("state") == "EXTERNAL_READY"
+        and flags.get("external_llm", False)
+        and budget.get("allow_paid", False)
+        and estimate.get("estimable", False)
+    )
+    use_external = st.checkbox(
+        "Usar inteligência externa nesta pergunta",
+        value=False,
+        disabled=not external_ready,
+        key="aion_use_external_model",
+        help=(
+            "Só fica disponível quando feature flag, provedor, preços e orçamento estão configurados. "
+            "Desmarcado = resposta local/custo zero."
+        ),
+    )
+    approve_external = False
+    if use_external:
+        estimated_cost = estimate.get("estimated_max_cost_usd")
+        st.warning(
+            f"Custo máximo estimado desta solicitação: US$ {float(estimated_cost or 0):.6f}. "
+            "É uma estimativa técnica; a cobrança real pertence ao provedor."
+        )
+        approve_external = st.checkbox(
+            "Aprovo esta solicitação externa dentro do teto informado",
+            value=False,
+            key="aion_external_request_approval",
+        )
+    elif provider.get("state") != "ZERO_COST_LOCAL":
+        st.caption(
+            f"IA externa: {provider.get('state')} · "
+            "nenhuma chamada paga será feita sem configuração e aprovação."
+        )
+
     if st.button("Analisar com AION", key="aion_admin_ask", type="primary", width="stretch"):
         hits = search_canonical_memory(question)
-        provider = provider_status(feature_flags=flags)
-        budget = normalize_budget((checkpoint.get("aion") or {}).get("model_budget", {}))
+        estimated_cost = float(estimate.get("estimated_max_cost_usd") or 0.0)
         route = route_intelligence(
             question,
             provider_state=provider.get("state"),
             external_feature_enabled=bool(flags.get("external_llm", False)),
             budget=budget,
-            estimated_request_cost_usd=0.0,
-            request_approved=False,
+            estimated_request_cost_usd=estimated_cost,
+            request_approved=bool(use_external and approve_external),
         )
-        answer = local_answer(
-            question,
-            checkpoint=checkpoint,
-            memory_hits=hits,
-            system_context=dict(system_context),
-            feature_flags=flags,
-        )
+
+        answer = None
+        if use_external and approve_external and str(route.get("lane") or "").startswith("EXTERNAL_"):
+            prompt = build_provider_prompt(
+                question,
+                domain=route_context(question).get("domain"),
+                memory_hits=hits,
+                system_context=system_context,
+            )
+            external = execute_openai_answer(
+                prompt,
+                lane=route.get("lane"),
+                budget=budget,
+                external_feature_enabled=bool(flags.get("external_llm", False)),
+                request_approved=True,
+                values=provider_env,
+            )
+            st.session_state["aion_last_external_state"] = external
+            if external.get("state") == "ANSWER_READY":
+                answer = {
+                    "schema": "ATLASQUANT_AION_EXTERNAL_ANSWER_V1",
+                    "answer": external.get("answer"),
+                    "domain": route_context(question).get("domain"),
+                    "provider": provider,
+                    "evidence": hits,
+                    "truth_state": external.get("truth_state"),
+                    "executes_action": False,
+                    "real_orders_enabled": False,
+                }
+                usage = external.get("usage") if isinstance(external.get("usage"), Mapping) else {}
+                tracked_cost = usage.get("actual_cost_usd_estimate")
+                if tracked_cost is None:
+                    tracked_cost = estimated_cost
+                updated = record_model_spend_estimate(checkpoint, tracked_cost)
+                updated = update_operating_checkpoint(updated, dirty=True)
+                updated = _record_working_event(
+                    updated,
+                    "external_model_answer",
+                    "AION recebeu uma resposta de modelo externo para uma consulta aprovada.",
+                    evidence={
+                        "lane": route.get("lane"),
+                        "model": external.get("model"),
+                        "tracked_cost_usd_estimate": tracked_cost,
+                        "truth_state": external.get("truth_state"),
+                    },
+                )
+                _set_working_checkpoint(updated, dirty=True)
+            else:
+                st.warning(
+                    "A chamada externa não foi concluída. "
+                    f"Estado: {external.get('state')} · motivo: {external.get('reason','não informado')}."
+                )
+
+        if answer is None:
+            answer = local_answer(
+                question,
+                checkpoint=checkpoint,
+                memory_hits=hits,
+                system_context=dict(system_context),
+                feature_flags=flags,
+            )
         st.session_state["aion_last_route"] = route
         st.session_state["aion_last_answer"] = answer
 
@@ -358,17 +502,12 @@ def _render_central(
                     st.caption(f"{hit.get('path')} · score {hit.get('score')}")
                     st.write(hit.get("excerpt"))
 
-    if render_neural_voice_player is not None:
-        spoken = (
-            f"Bem-vindo à Central AION. A prioridade atual é "
-            f"{(checkpoint.get('aion') or {}).get('priority','revisar o checkpoint')}. "
-            "AION está em modo custo zero e ordens reais continuam bloqueadas."
-        )
-        render_neural_voice_player(
-            spoken,
-            key="aion_admin_welcome_voice",
-            button_label="🔊 Ouvir briefing do AION",
-        )
+    spoken = (
+        f"Bem-vindo à Central AION. A prioridade atual é "
+        f"{(checkpoint.get('aion') or {}).get('priority','revisar o checkpoint')}. "
+        "O AION trabalha com regra da verdade, custo controlado e ordens reais bloqueadas."
+    )
+    _context_voice("Central", spoken, key="aion_admin_welcome_voice")
 
     st.markdown("#### Secretaria executiva")
     st.caption(
@@ -412,6 +551,15 @@ def _render_secretary(
     st.write(brief["market"]["message"])
     st.write(brief["clients"]["message"])
     st.write(brief["content"]["message"])
+    _context_voice(
+        "Secretaria",
+        (
+            f"Bem-vindo à Secretaria AION. Existem {summary['active']} tarefas ativas, "
+            f"{summary['waiting_approval']} aguardando aprovação e {summary['blocked']} bloqueadas. "
+            "Mercado, clientes e conteúdo só são anunciados quando a fonte está confirmada."
+        ),
+        key="aion_secretary_voice",
+    )
 
     st.markdown("#### Nova tarefa")
     with st.form("aion_secretary_new_task", clear_on_submit=True):
@@ -523,12 +671,28 @@ def _render_trading(market_context: Mapping[str, Any]) -> None:
         "- AION não habilita corretora nem execução real.\n"
         "- Backtest/Paper/Forward continuam separados de produção real."
     )
+    _context_voice(
+        "Trading",
+        (
+            "Bem-vindo ao Trading do AION. Aqui eu explico Radar, Macro e evidências já calculadas. "
+            f"O estado de mercado nesta tela é {market_truth}. Ordens reais permanecem bloqueadas."
+        ),
+        key="aion_trading_voice",
+    )
 
 
 def _render_studio(flags: Mapping[str, bool]) -> None:
     st.markdown("### 🎬 AION Studio")
     st.write(
         "Pipeline preparado para **ideia → roteiro → imagem/capa → vídeo → legenda → revisão → publicação**."
+    )
+    _context_voice(
+        "Studio",
+        (
+            "Bem-vindo ao AION Studio. Aqui organizamos ideias, roteiros, imagens, vídeos, legendas e capas. "
+            "Publicação externa só acontece depois de integração e aprovação."
+        ),
+        key="aion_studio_voice",
     )
     c1, c2, c3 = st.columns(3)
     c1.metric("Instagram", "PREPARAR")
@@ -563,6 +727,14 @@ def _render_business(flags: Mapping[str, bool]) -> None:
     st.write(
         "Área separada do trading para pesquisa de produtos, tendências, fornecedores, margem, "
         "estoque, anúncios e acompanhamento de receita."
+    )
+    _context_voice(
+        "Negócios",
+        (
+            "Bem-vindo ao AION Negócios. Esta área fica separada do trading e ajuda a organizar "
+            "produtos, tendências, fornecedores, margem, receita e a meta de sustentar os custos do AtlasQuant."
+        ),
+        key="aion_business_voice",
     )
     cost = st.number_input(
         "Custo mensal alvo do ecossistema (USD)",
@@ -603,6 +775,14 @@ def _render_laboratory(
     st.write(
         "Toda novidade nasce aqui, com isolamento, teste, evidência e rollback antes de qualquer promoção."
     )
+    _context_voice(
+        "Laboratório",
+        (
+            "Bem-vindo ao Laboratório AION. Toda novidade passa por Sandbox, teste, evidência e rollback "
+            "antes de avançar. Feature flags externas começam desligadas."
+        ),
+        key="aion_laboratory_voice",
+    )
     st.markdown("#### Feature Flags externas")
     rows = [
         {"feature": key, "enabled": bool(value), "default": "OFF"}
@@ -619,11 +799,12 @@ def _render_laboratory(
 
     st.markdown("#### Roteador de inteligência / orçamento")
     current_budget = normalize_budget((checkpoint.get("aion") or {}).get("model_budget", {}))
-    provider = provider_status(feature_flags=flags)
-    c1,c2,c3 = st.columns(3)
+    provider = provider_status(feature_flags=flags, env=_provider_env())
+    c1,c2,c3,c4 = st.columns(4)
     c1.metric("Rota atual", provider.get("state","UNKNOWN"))
     c2.metric("Teto mensal", f"US$ {current_budget['monthly_limit_usd']:.2f}")
-    c3.metric("Saldo aprovado", f"US$ {current_budget['remaining_usd']:.2f}")
+    c3.metric("Uso estimado", f"US$ {current_budget['spent_usd_estimate']:.4f}")
+    c4.metric("Saldo estimado", f"US$ {current_budget['remaining_usd']:.4f}")
     st.caption(
         "Definir teto não gera cobrança. Mesmo com teto positivo, cada solicitação paga continua "
         "exigindo aprovação explícita e um cliente externo realmente implementado."
@@ -684,6 +865,14 @@ def _render_development(
     flags: Mapping[str, bool],
 ) -> None:
     st.markdown("### 🛠️ AION Desenvolvedor")
+    _context_voice(
+        "Desenvolvimento",
+        (
+            "Bem-vindo ao AION Desenvolvedor. As missões de código seguem branch ou Sandbox, testes, "
+            "checkpoint, revisão e Guardian. Mudanças críticas não são publicadas silenciosamente."
+        ),
+        key="aion_development_voice",
+    )
     objective = st.text_area(
         "Missão de desenvolvimento",
         key="aion_dev_mission",
@@ -757,6 +946,14 @@ def _render_development(
 def _render_promotions(flags: Mapping[str, bool]) -> None:
     st.markdown("### 🎟️ Assinaturas & Promoções")
     st.caption("Primeira etapa: criar rascunho auditável. Ativação real continua desligada.")
+    _context_voice(
+        "Promoções",
+        (
+            "Bem-vindo a Assinaturas e Promoções. Aqui preparamos cupons, períodos gratuitos e descontos. "
+            "Ativação real continua dependente do provedor comercial e de aprovação."
+        ),
+        key="aion_promotions_voice",
+    )
     name = st.text_input("Nome da campanha", key="aion_promo_name")
     kind = st.selectbox(
         "Benefício",

@@ -5,6 +5,7 @@ from atlasquant_aion_model_router import (
     classify_complexity,
     normalize_budget,
     privacy_sensitive,
+    record_model_spend_estimate,
     route_intelligence,
     set_budget_policy,
 )
@@ -71,6 +72,19 @@ class AtlasQuantAionModelRouterTests(unittest.TestCase):
         decision=budget_decision(budget,1,request_approved=True)
         self.assertFalse(decision["allowed"])
         self.assertEqual(decision["budget"]["remaining_usd"],0.5)
+
+    def test_record_spend_is_estimate_and_does_not_hide_overage(self):
+        cp={"aion":{"model_budget":{
+            "allow_paid":True,
+            "monthly_limit_usd":1,
+            "spent_usd_estimate":0.9,
+        }}}
+        changed=record_model_spend_estimate(cp,0.3)
+        budget=changed["aion"]["model_budget"]
+        self.assertEqual(budget["spent_usd_estimate"],1.2)
+        self.assertEqual(budget["remaining_usd"],0.0)
+        self.assertTrue(budget["spend_is_estimate"])
+        self.assertEqual(cp["aion"]["model_budget"]["spent_usd_estimate"],0.9)
 
     def test_set_budget_policy_only_changes_checkpoint_copy(self):
         original={"aion":{"real_trading":False}}

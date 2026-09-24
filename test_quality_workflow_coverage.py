@@ -16,7 +16,7 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
 
     def test_core_workflows_use_current_node24_action_generation(self):
         workflow_dir=ROOT/".github"/"workflows"
-        names=("quality-tests.yml","autopilot-v107.yml","atlasquant-checkpoint.yml","coleta_automatica.yml","atlasquant-integration-gate.yml","atlasquant-source-parity.yml","atlasquant-ui-smoke.yml")
+        names=("quality-tests.yml","autopilot-v107.yml","atlasquant-checkpoint.yml","coleta_automatica.yml","atlasquant-integration-gate.yml","atlasquant-source-parity.yml","atlasquant-ui-smoke.yml","production-build-identity.yml")
         joined="\n".join((workflow_dir/name).read_text(encoding="utf-8") for name in names)
         self.assertNotIn("actions/checkout@v4",joined)
         self.assertNotIn("actions/setup-python@v5",joined)
@@ -66,6 +66,24 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
         self.assertIn("if not rendered:",browser)
         self.assertNotIn("body vazio/curto",browser)
 
+
+    def test_production_build_identity_is_read_only_and_exact_source_based(self):
+        src=(ROOT/".github"/"workflows"/"production-build-identity.yml").read_text(encoding="utf-8")
+        trigger=src.split("permissions:",1)[0]
+        self.assertIn("workflow_dispatch:",trigger)
+        self.assertIn("push:",trigger)
+        self.assertIn("branches: [main]",trigger)
+        self.assertIn("permissions:\n  contents: read",src)
+        self.assertNotIn("contents: write",src)
+        self.assertNotIn("GITHUB_TOKEN_HISTORICO",src)
+        self.assertNotIn("secrets.",src)
+        self.assertIn("short_source_fingerprint",src)
+        self.assertIn("#atlasquant-source-build-marker",src)
+        self.assertIn("AQBUILD:",src)
+        self.assertIn("source_build==expected",src)
+        self.assertIn("actions/checkout@v7",src)
+        self.assertIn("actions/setup-python@v7",src)
+        self.assertIn("actions/upload-artifact@v7",src)
 
     def test_integration_ui_smoke_is_local_read_only_and_mobile_aware(self):
         src=(ROOT/".github"/"workflows"/"atlasquant-ui-smoke.yml").read_text(encoding="utf-8")

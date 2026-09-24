@@ -10,6 +10,7 @@ from typing import Any, Mapping, Sequence
 import os
 
 from atlasquant_aion_core import feature_flag_snapshot, route_context
+from atlasquant_aion_provider import provider_configuration_status
 
 SCHEMA = "ATLASQUANT_AION_GATEWAY_V1"
 
@@ -19,31 +20,33 @@ def provider_status(
     feature_flags: Mapping[str, Any] | None = None,
     env: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    values = dict(env or {})
     flags = feature_flag_snapshot(feature_flags)
-    provider = str(
-        values.get("AION_MODEL_PROVIDER")
-        or os.getenv("AION_MODEL_PROVIDER", "")
-        or "offline"
-    ).strip().lower()
-    external_requested = provider not in {"", "offline", "local", "zero-cost"}
-    external_enabled = bool(flags.get("external_llm", False))
-    if external_requested and not external_enabled:
-        state = "BLOCKED_BY_FEATURE_FLAG"
-        route_enabled = False
-    elif external_requested:
-        # The feature flag may reserve the lane, but this foundation has no
-        # external model client yet. Never call it "configured" prematurely.
-        state = "EXTERNAL_ROUTE_NOT_IMPLEMENTED"
-        route_enabled = False
-    else:
+    config = provider_configuration_status(env)
+    external_requested = str(config.get("provider") or "").casefold() not in {
+        "", "offline", "local", "zero-cost"
+    }
+    feature_enabled = bool(flags.get("external_llm", False))
+
+    if not external_requested:
         state = "ZERO_COST_LOCAL"
         route_enabled = False
+    elif not feature_enabled:
+        state = "BLOCKED_BY_FEATURE_FLAG"
+        route_enabled = False
+    elif bool(config.get("ready")):
+        state = "EXTERNAL_READY"
+        route_enabled = True
+    else:
+        state = str(config.get("state") or "CONFIG_INCOMPLETE")
+        route_enabled = False
+
     return {
         "schema": SCHEMA,
-        "provider": provider or "offline",
+        "provider": config.get("provider") or "offline",
         "state": state,
         "external_enabled": route_enabled,
+        "feature_enabled": feature_enabled,
+        "provider_configuration": config,
         "cost_mode": "ZERO_COST_DEFAULT",
         "automatic_billing": False,
     }
