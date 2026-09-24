@@ -180,15 +180,36 @@ def build_personal_aion_shell(
     market=_market_truth(market_context)
 
     if ready:
+        expected_tenant_id=str(ns.get("tenant_id") or "")
+        provided_memory=isinstance(tenant_memory,Mapping)
+        provided_tenant_id=(
+            str(tenant_memory.get("tenant_id") or "").strip()
+            if provided_memory else ""
+        )
+        own_memory_provided=bool(
+            provided_memory
+            and provided_tenant_id
+            and provided_tenant_id==expected_tenant_id
+        )
+        foreign_or_unbound_memory=bool(
+            provided_memory and not own_memory_provided
+        )
         memory=(
             sanitize_tenant_memory(tenant_memory,access)
-            if isinstance(tenant_memory,Mapping)
+            if own_memory_provided
             else tenant_memory_seed(access)
         )
         memory_state={
             "available_in_shell":True,
             "persistence_confirmed":False,
-            "source":"provided-own-tenant-memory" if isinstance(tenant_memory,Mapping) else "ephemeral-seed",
+            "source":(
+                "provided-own-tenant-memory"
+                if own_memory_provided
+                else "foreign-or-unbound-rejected-ephemeral-seed"
+                if foreign_or_unbound_memory
+                else "ephemeral-seed"
+            ),
+            "input_memory_rejected":foreign_or_unbound_memory,
             "digest":tenant_memory_source_digest(memory,access),
             "profile_present":bool((memory.get("profile") or {}).get("display_name")),
             "notes":len(memory.get("conversation_notes") or []),
@@ -209,6 +230,7 @@ def build_personal_aion_shell(
             "available_in_shell":False,
             "persistence_confirmed":False,
             "source":"none",
+            "input_memory_rejected":False,
             "digest":"",
             "profile_present":False,
             "notes":0,
@@ -279,6 +301,7 @@ def personal_prompt_packet(
     question:Any,
     shell:Mapping[str,Any]|None,
     *,
+    access:Mapping[str,Any]|None=None,
     own_memory:Mapping[str,Any]|None=None,
 )->dict[str,Any]:
     state=dict(shell or {})
@@ -297,17 +320,18 @@ def personal_prompt_packet(
         route_name="central"
 
     safe_memory={}
-    if isinstance(own_memory,Mapping):
-        # Memory contents are accepted only if they already belong to this tenant.
+    if isinstance(own_memory,Mapping) and isinstance(access,Mapping):
+        # Memory contents are accepted only if they already belong to this tenant,
+        # then they are normalized again before entering a future prompt packet.
         if str(own_memory.get("tenant_id") or "")==str(tenant.get("tenant_id") or ""):
-            safe_memory={
-                "profile":dict(own_memory.get("profile") or {})
-                if isinstance(own_memory.get("profile"),Mapping) else {},
-                "conversation_notes":list(own_memory.get("conversation_notes") or [])[:50],
-                "academy_progress":dict(own_memory.get("academy_progress") or {})
-                if isinstance(own_memory.get("academy_progress"),Mapping) else {},
-                "watchlist":list(own_memory.get("watchlist") or [])[:100],
-            }
+            sanitized=sanitize_tenant_memory(own_memory,access)
+            if str(sanitized.get("tenant_id") or "")==str(tenant.get("tenant_id") or ""):
+                safe_memory={
+                    "profile":dict(sanitized.get("profile") or {}),
+                    "conversation_notes":list(sanitized.get("conversation_notes") or [])[:50],
+                    "academy_progress":dict(sanitized.get("academy_progress") or {}),
+                    "watchlist":list(sanitized.get("watchlist") or [])[:100],
+                }
 
     contract={
         "truth_rules":[
