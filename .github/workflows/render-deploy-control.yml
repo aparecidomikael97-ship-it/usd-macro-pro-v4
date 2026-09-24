@@ -7,10 +7,6 @@ on:
         description: "Motivo do redeploy manual"
         required: false
         default: "Reconciliar produção com a main validada"
-  push:
-    branches: [main]
-    paths:
-      - "deploy/render-redeploy-request.txt"
 
 permissions:
   contents: read
