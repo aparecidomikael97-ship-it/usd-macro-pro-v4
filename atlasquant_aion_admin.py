@@ -133,6 +133,16 @@ except Exception:
     render_neural_voice_player = None
 
 SCHEMA = "ATLASQUANT_AION_ADMIN_V1"
+AION_WORKSPACES = (
+    "🧠 Central",
+    "🗂️ Secretaria",
+    "📈 Trading",
+    "🎬 Studio",
+    "💼 Negócios",
+    "🧪 Laboratório",
+    "🛠️ Desenvolvimento",
+    "🎟️ Promoções",
+)
 _WORKING_CHECKPOINT_KEY = "aion_working_checkpoint_v2"
 _WORKING_SOURCE_KEY = "aion_working_checkpoint_source_digest"
 _WORKING_DIRTY_KEY = "aion_working_checkpoint_dirty"
@@ -1842,31 +1852,32 @@ def render_aion_admin_console(
     )
     _render_executive_grid(memory_summary, runtime_result, provider, market)
 
-    tabs = st.tabs([
-        "🧠 Central",
-        "🗂️ Secretaria",
-        "📈 Trading",
-        "🎬 Studio",
-        "💼 Negócios",
-        "🧪 Laboratório",
-        "🛠️ Desenvolvimento",
-        "🎟️ Promoções",
-    ])
-    with tabs[0]:
+    selected_workspace = st.selectbox(
+        "Área AION",
+        AION_WORKSPACES,
+        key="aion_admin_workspace",
+        help=(
+            "Carrega uma área administrativa por vez. Isso reduz a carga da interface "
+            "e evita montar workspaces não selecionados no celular."
+        ),
+    )
+    st.caption("AION Admin · navegação estável · uma área por vez · Guardian permanece ativo.")
+
+    if selected_workspace == "🧠 Central":
         _render_central(access_map, checkpoint, runtime_result, memory_summary, flags, system, status_board, approval_inbox)
-    with tabs[1]:
+    elif selected_workspace == "🗂️ Secretaria":
         _render_secretary(access_map, checkpoint, flags, system, market, status_board, approval_inbox)
-    with tabs[2]:
+    elif selected_workspace == "📈 Trading":
         _render_trading(market)
-    with tabs[3]:
+    elif selected_workspace == "🎬 Studio":
         _render_studio(access_map, checkpoint, flags)
-    with tabs[4]:
+    elif selected_workspace == "💼 Negócios":
         _render_business(access_map, checkpoint, flags)
-    with tabs[5]:
+    elif selected_workspace == "🧪 Laboratório":
         _render_laboratory(access_map, checkpoint, flags)
-    with tabs[6]:
+    elif selected_workspace == "🛠️ Desenvolvimento":
         _render_development(access_map, checkpoint, source_checkpoint, runtime_result, flags)
-    with tabs[7]:
+    elif selected_workspace == "🎟️ Promoções":
         _render_promotions(
             access_map,
             checkpoint,
@@ -1899,4 +1910,4 @@ def render_aion_admin_console(
     }
 
 
-__all__ = ["SCHEMA", "render_aion_admin_console", "AION_ADMIN_CSS"]
+__all__ = ["SCHEMA", "AION_WORKSPACES", "render_aion_admin_console", "AION_ADMIN_CSS"]
