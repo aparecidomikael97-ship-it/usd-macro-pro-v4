@@ -135,7 +135,9 @@ class AtlasQuantProductionWorkflowContractTests(unittest.TestCase):
 
     def test_manual_render_deploy_control_is_fail_closed_and_dispatches_smoke(self):
         text=Path(".github/workflows/render-deploy-control.yml").read_text(encoding="utf-8")
-        self.assertIn("workflow_dispatch:",text)
+        trigger=text.split("permissions:",1)[0]
+        self.assertIn("workflow_dispatch:",trigger)
+        self.assertNotIn("\n  push:",trigger)
         self.assertIn("actions: write",text)
         self.assertIn("RENDER_DEPLOY_HOOK_URL",text)
         self.assertIn("secrets.RENDER_DEPLOY_HOOK_URL",text)
@@ -144,6 +146,12 @@ class AtlasQuantProductionWorkflowContractTests(unittest.TestCase):
         self.assertIn("/_stcore/health",text)
         self.assertIn("gh workflow run production-browser-smoke.yml --ref main",text)
         self.assertNotIn("contents: write",text)
+
+    def test_quality_runs_for_deploy_control_and_redeploy_request_changes(self):
+        text=Path(".github/workflows/quality-tests.yml").read_text(encoding="utf-8")
+        self.assertIn('"deploy/**"',text)
+        self.assertIn('".github/workflows/render-deploy-control.yml"',text)
+        self.assertIn('".github/workflows/production-build-identity.yml"',text)
 
 
 if __name__=="__main__":
