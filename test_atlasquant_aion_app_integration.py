@@ -41,6 +41,15 @@ class AtlasQuantAionAppIntegrationTests(unittest.TestCase):
         self.assertIn("render_aion_admin_console = None", src)
         self.assertIn("_ATLASQUANT_AION_IMPORT_ERROR", src)
 
+    def test_aion_system_identity_is_truth_labeled_but_market_is_not_invented(self):
+        src = APP.read_text(encoding="utf-8")
+        start = src.index("if _aq_active_index == 21:")
+        block = src[start:start+3000]
+        self.assertIn('"truth_state": "CONFIRMED"', block)
+        self.assertIn('"source_build": _ATLASQUANT_SOURCE_BUILD', block)
+        self.assertIn('"fresh_confirmed": False', block)
+        self.assertIn('"summary": ""', block)
+
     def test_aion_does_not_replace_existing_public_support_handler(self):
         src = APP.read_text(encoding="utf-8")
         support = src.index("if _aq_active_index == 20:")

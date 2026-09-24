@@ -9713,6 +9713,7 @@ if _aq_active_index == 21:
             "summary": "",
         }
         _aion_system_context = {
+            "truth_state": "CONFIRMED",
             "source_build": _ATLASQUANT_SOURCE_BUILD,
             "environment": ATLASQUANT_ENVIRONMENT,
             "app_version": APP_VERSION,

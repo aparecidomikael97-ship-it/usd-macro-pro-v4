@@ -8,11 +8,14 @@ from atlasquant_aion_memory import (
     canonical_documents,
     canonical_memory_summary,
     checkpoint_digest,
+    checkpoint_source_digest,
     default_checkpoint,
+    ensure_operating_checkpoint,
     load_runtime_checkpoint,
     merged_checkpoint,
     save_runtime_checkpoint,
     search_canonical_memory,
+    update_operating_checkpoint,
 )
 
 
@@ -59,6 +62,34 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertEqual(cp["aion"]["cost_mode"], "ZERO_COST_DEFAULT")
         self.assertIn("approved_foundation", cp)
         self.assertTrue(checkpoint_digest(cp))
+
+    def test_checkpoint_v2_has_operating_memory(self):
+        cp=default_checkpoint()
+        self.assertGreaterEqual(cp["checkpoint_version"],2)
+        self.assertIn("operating",cp)
+        self.assertEqual(cp["operating"]["tasks"],[])
+        self.assertEqual(cp["operating"]["events"],[])
+        self.assertFalse(cp["operating"]["dirty"])
+
+    def test_older_checkpoint_is_upgraded_without_claiming_persistence(self):
+        old={"checkpoint_version":1,"project":"AtlasQuant"}
+        upgraded=ensure_operating_checkpoint(old)
+        self.assertEqual(upgraded["checkpoint_version"],2)
+        self.assertIn("operating",upgraded)
+        changed=update_operating_checkpoint(upgraded,tasks=[],events=[],dirty=True)
+        self.assertTrue(changed["operating"]["dirty"])
+        self.assertTrue(changed["operating"]["task_digest"])
+        self.assertTrue(changed["operating"]["event_digest"])
+
+    def test_source_digest_ignores_volatile_checkpoint_timestamps(self):
+        a=default_checkpoint()
+        b=default_checkpoint()
+        a["created_at"]="2026-09-23T00:00:00+00:00"
+        a["updated_at"]="2026-09-23T00:00:00+00:00"
+        b["created_at"]="2026-09-24T00:00:00+00:00"
+        b["updated_at"]="2026-09-24T00:00:00+00:00"
+        b["operating"]["dirty"]=True
+        self.assertEqual(checkpoint_source_digest(a),checkpoint_source_digest(b))
 
     def test_runtime_load_is_truthful_when_credentials_missing(self):
         cfg = RuntimeConfig(token="", repo="", branch="atlasquant-runtime")

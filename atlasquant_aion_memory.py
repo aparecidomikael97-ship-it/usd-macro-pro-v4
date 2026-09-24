@@ -9,6 +9,7 @@ truthful status with provenance.
 """
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,6 +24,8 @@ import unicodedata
 import requests
 
 from atlasquant_runtime_store import resolve_runtime_branch, require_runtime_branch
+from atlasquant_aion_operations import normalize_queue, queue_digest
+from atlasquant_aion_observability import normalize_events, events_digest
 
 SCHEMA = "ATLASQUANT_AION_MEMORY_V1"
 RUNTIME_PATH = "dados/aion/checkpoint_master.json"
@@ -216,7 +219,7 @@ def search_canonical_memory(
 def default_checkpoint() -> dict[str, Any]:
     return {
         "schema": SCHEMA,
-        "checkpoint_version": 1,
+        "checkpoint_version": 2,
         "created_at": _now(),
         "updated_at": _now(),
         "project": "AtlasQuant",
@@ -248,7 +251,58 @@ def default_checkpoint() -> dict[str, Any]:
             "canonical_sources": list(CANONICAL_FILES),
             "conversation_seed": "approved project decisions consolidated on 2026-09-23",
         },
+        "operating": {
+            "tasks": [],
+            "events": [],
+            "task_digest": queue_digest([]),
+            "event_digest": events_digest([]),
+            "dirty": False,
+        },
     }
+
+
+def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Upgrade older checkpoints in memory without inventing persisted state."""
+    payload = dict(checkpoint or {})
+    if not payload:
+        payload = default_checkpoint()
+    operating = payload.get("operating")
+    if not isinstance(operating, Mapping):
+        operating = {}
+    tasks = normalize_queue(operating.get("tasks") if isinstance(operating, Mapping) else [])
+    events = normalize_events(operating.get("events") if isinstance(operating, Mapping) else [])
+    payload["checkpoint_version"] = max(2, int(payload.get("checkpoint_version") or 1))
+    payload["operating"] = {
+        "tasks": tasks,
+        "events": events,
+        "task_digest": queue_digest(tasks),
+        "event_digest": events_digest(events),
+        "dirty": bool((operating or {}).get("dirty", False)),
+    }
+    return payload
+
+
+def update_operating_checkpoint(
+    checkpoint: Mapping[str, Any] | None,
+    *,
+    tasks: Any = None,
+    events: Any = None,
+    dirty: bool = True,
+) -> dict[str, Any]:
+    """Return a normalized checkpoint with task/event operating memory."""
+    payload = ensure_operating_checkpoint(checkpoint)
+    current = payload["operating"]
+    task_rows = normalize_queue(current["tasks"] if tasks is None else tasks)
+    event_rows = normalize_events(current["events"] if events is None else events)
+    payload["operating"] = {
+        "tasks": task_rows,
+        "events": event_rows,
+        "task_digest": queue_digest(task_rows),
+        "event_digest": events_digest(event_rows),
+        "dirty": bool(dirty),
+    }
+    payload["updated_at"] = _now()
+    return payload
 
 
 def _headers(token: str) -> dict[str, str]:
@@ -428,12 +482,12 @@ def merged_checkpoint(
     result = dict(runtime_result or {})
     if result.get("status") == "CONFIRMED" and isinstance(result.get("checkpoint"), Mapping):
         return {
-            "checkpoint": dict(result["checkpoint"]),
+            "checkpoint": ensure_operating_checkpoint(result["checkpoint"]),
             "provenance": result.get("source", "runtime"),
             "runtime_confirmed": True,
         }
     return {
-        "checkpoint": default_checkpoint(),
+        "checkpoint": ensure_operating_checkpoint(default_checkpoint()),
         "provenance": "static-seed",
         "runtime_confirmed": False,
         "runtime_status": result.get("status", "UNAVAILABLE"),
@@ -442,4 +496,17 @@ def merged_checkpoint(
 
 def checkpoint_digest(checkpoint: Mapping[str, Any] | None) -> str:
     raw = json.dumps(dict(checkpoint or {}), ensure_ascii=False, sort_keys=True, default=str)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+
+def checkpoint_source_digest(checkpoint: Mapping[str, Any] | None) -> str:
+    """Stable digest for conflict detection, ignoring volatile timestamps/dirty flag."""
+    payload = ensure_operating_checkpoint(checkpoint)
+    payload = deepcopy(payload)
+    payload.pop("created_at", None)
+    payload.pop("updated_at", None)
+    operating = payload.get("operating")
+    if isinstance(operating, dict):
+        operating["dirty"] = False
+    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
