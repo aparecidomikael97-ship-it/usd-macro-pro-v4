@@ -121,7 +121,7 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
     def test_business_panel_labels_unconnected_sales_as_unconfirmed(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("não representam vendas confirmadas", src)
-        self.assertIn("integrações não estiverem conectadas", src)
+        self.assertIn("integrações de pedidos não estiverem conectadas", src)
 
 
 if __name__ == "__main__":
