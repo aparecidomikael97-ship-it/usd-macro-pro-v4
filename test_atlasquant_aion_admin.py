@@ -118,6 +118,17 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("Tendências confirmadas", src)
         self.assertIn("Nenhum produto é chamado de tendência ou mais vendido sem fonte confirmada.", src)
 
+    def test_promotions_workspace_is_persistent_copy_once_and_provider_guarded(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("new_campaign(", src)
+        self.assertIn("update_promotions_checkpoint(", src)
+        self.assertIn("approve_campaign(", src)
+        self.assertIn("activation_preflight(", src)
+        self.assertIn("exibição única da sessão", src)
+        self.assertIn("hash do código", src)
+        self.assertIn("não ativa acesso real", src)
+        self.assertIn("Ativas confirmadas", src)
+
     def test_business_panel_labels_unconnected_sales_as_unconfirmed(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("não representam vendas confirmadas", src)
