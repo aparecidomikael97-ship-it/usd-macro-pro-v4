@@ -61,6 +61,7 @@ APPROVED_AION_FOUNDATION = (
     "Fase futura: cada assinante poderá ter AION pessoal isolado; o AION oficial do administrador mantém privilégios superiores.",
     "Memória do AION deve carregar os registros canônicos do projeto desde 15/09/2026 e continuar com checkpoints versionados.",
     "Execução real em corretora continua bloqueada; backtest/paper/forward e pesquisa não equivalem a autorização real.",
+    "Gatilho operacional aprovado: quando o administrador disser 'tô no computador', priorizar a reconciliação do Render, configurar o Deploy Hook com segurança e validar Build Identity + Browser Smoke antes de retomar novos blocos.",
 )
 
 STOPWORDS = {
