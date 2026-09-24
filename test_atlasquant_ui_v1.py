@@ -281,11 +281,13 @@ class AtlasQuantUiTests(unittest.TestCase):
 
     def test_caption_and_control_text_has_explicit_readable_contrast(self):
         self.assertIn('data-testid="stCaptionContainer"',ATLASQUANT_CSS)
-        self.assertIn("opacity: .88 !important",ATLASQUANT_CSS)
+        self.assertIn("opacity: 1 !important",ATLASQUANT_CSS)
+        self.assertIn("color: #dbe7f5 !important",ATLASQUANT_CSS)
         self.assertIn('data-testid="stRadio"',ATLASQUANT_CSS)
         self.assertIn('data-testid="stSelectbox"',ATLASQUANT_CSS)
         self.assertIn('data-testid="stExpander"',ATLASQUANT_CSS)
         self.assertIn("font-weight: 700 !important",ATLASQUANT_CSS)
+        self.assertIn("color: #f2f6fb !important",ATLASQUANT_CSS)
         self.assertIn("color:#ffffff",ATLASQUANT_CSS)
 
     def test_experience_switch_no_longer_injects_mode_dependent_tab_css(self):
