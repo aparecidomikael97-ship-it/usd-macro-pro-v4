@@ -99,6 +99,25 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("MODEL_OUTPUT_UNVERIFIED", Path("atlasquant_aion_provider.py").read_text(encoding="utf-8"))
         self.assertIn("nenhuma chamada paga será feita", src)
 
+    def test_studio_is_persistent_and_publication_stays_guarded(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("new_content_project(", src)
+        self.assertIn("update_studio_checkpoint(", src)
+        self.assertIn("approve_project(", src)
+        self.assertIn("script_blueprint(", src)
+        self.assertIn("publication_preflight(", src)
+        self.assertIn("Publicados confirmados", src)
+        self.assertIn("execução ainda não ocorre nesta tela", src)
+
+    def test_business_is_persistent_evidence_based_and_marketplace_guarded(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("new_product_candidate(", src)
+        self.assertIn("update_business_checkpoint(", src)
+        self.assertIn("trend_assessment(", src)
+        self.assertIn("marketplace_preflight(", src)
+        self.assertIn("Tendências confirmadas", src)
+        self.assertIn("Nenhum produto é chamado de tendência ou mais vendido sem fonte confirmada.", src)
+
     def test_business_panel_labels_unconnected_sales_as_unconfirmed(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("não representam vendas confirmadas", src)
