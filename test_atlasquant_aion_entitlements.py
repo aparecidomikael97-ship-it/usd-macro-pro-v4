@@ -32,6 +32,14 @@ from atlasquant_aion_tenant_store import (
     tenant_store_policy,
     tenant_store_target,
 )
+from atlasquant_aion_personal_shell import (
+    build_personal_aion_shell,
+    personal_capability_matrix,
+    personal_prompt_packet,
+    personal_route,
+    personal_shell_policy,
+    personal_shell_summary,
+)
 
 
 class AtlasQuantAionEntitlementsTests(unittest.TestCase):
@@ -416,6 +424,204 @@ class AtlasQuantAionTenantStoreContractTests(unittest.TestCase):
         )
         self.assertFalse(payload["privacy"]["admin_memory_inherited"])
         self.assertFalse(payload["privacy"]["other_tenant_memory_visible"])
+
+
+class AtlasQuantAionPersonalShellContractTests(unittest.TestCase):
+    def setUp(self):
+        self.user={
+            "session":{
+                "username":"cliente.01",
+                "role":"USER",
+                "credential_fingerprint":"a"*24,
+            },
+            "role":"USER",
+        }
+        self.other={
+            "session":{
+                "username":"cliente.02",
+                "role":"USER",
+                "credential_fingerprint":"b"*24,
+            },
+            "role":"USER",
+        }
+        request=new_entitlement_request(
+            "cliente.01",
+            scope=PERSONAL_SCOPE,
+            source_kind="MANUAL_GRANT",
+            created_at="2026-09-24T12:00:00Z",
+        )
+        request=approve_entitlement_request(
+            request,
+            {"role":"ADMIN","username":"admin"},
+        )
+        self.entitlement=mark_entitlement_from_provider_evidence(
+            request,
+            {"confirmed":True,"provider":"subscription_registry","external_id":"aion-shell-1"},
+        )
+
+    def test_shell_locks_auth_before_entitlement(self):
+        shell=build_personal_aion_shell(
+            {"role":"ADMIN","username":"admin"},
+            [self.entitlement],
+        )
+        self.assertEqual(shell["state"],"LOCKED_AUTH")
+        self.assertFalse(shell["ready"])
+        self.assertFalse(shell["subscriber_ui_exposed"])
+        self.assertFalse(shell["executes_provider_call"])
+        self.assertFalse(shell["real_orders_enabled"])
+
+    def test_shell_locks_authenticated_user_without_personal_entitlement(self):
+        shell=build_personal_aion_shell(self.user,[])
+        self.assertEqual(shell["state"],"LOCKED_ENTITLEMENT")
+        self.assertFalse(shell["ready"])
+        self.assertFalse(shell["memory"]["available_in_shell"])
+        self.assertFalse(shell["policy"]["admin_memory_access"])
+        self.assertFalse(shell["policy"]["other_tenant_access"])
+
+    def test_confirmed_entitlement_makes_local_shell_ready_only(self):
+        shell=build_personal_aion_shell(self.user,[self.entitlement])
+        self.assertEqual(shell["state"],"READY_LOCAL")
+        self.assertTrue(shell["ready"])
+        self.assertTrue(shell["memory"]["available_in_shell"])
+        self.assertFalse(shell["memory"]["persistence_confirmed"])
+        self.assertTrue(shell["persistence"]["load_plan_allowed"])
+        self.assertFalse(shell["persistence"]["network_io_implemented"])
+        self.assertFalse(shell["persistence"]["persistence_confirmed"])
+        self.assertFalse(shell["policy"]["external_provider_enabled"])
+        self.assertFalse(shell["policy"]["billing"])
+        self.assertFalse(shell["policy"]["admin"])
+        self.assertFalse(shell["policy"]["real_trading"])
+
+    def test_market_is_unknown_without_fresh_confirmation(self):
+        stale=build_personal_aion_shell(
+            self.user,
+            [self.entitlement],
+            market_context={"summary":"USD forte","fresh_confirmed":False},
+        )
+        self.assertEqual(stale["market"]["truth_state"],"UNKNOWN")
+        self.assertFalse(stale["market"]["fresh_confirmed"])
+        self.assertNotEqual(stale["market"]["summary"],"USD forte")
+
+        fresh=build_personal_aion_shell(
+            self.user,
+            [self.entitlement],
+            market_context={
+                "summary":"USD forte neste contexto confirmado",
+                "fresh_confirmed":True,
+                "source":"runtime-test",
+            },
+        )
+        self.assertEqual(fresh["market"]["truth_state"],"CONFIRMED")
+        self.assertTrue(fresh["market"]["fresh_confirmed"])
+        self.assertIn("USD forte",fresh["market"]["summary"])
+
+    def test_foreign_or_unbound_memory_is_rejected_and_replaced_by_clean_seed(self):
+        foreign=tenant_memory_seed(self.other)
+        foreign["profile"]["display_name"]="Outro Cliente"
+        foreign["conversation_notes"]=[{"text":"segredo de outro cliente","truth_state":"CONFIRMED"}]
+        shell=build_personal_aion_shell(
+            self.user,
+            [self.entitlement],
+            tenant_memory=foreign,
+        )
+        self.assertTrue(shell["ready"])
+        self.assertTrue(shell["memory"]["input_memory_rejected"])
+        self.assertEqual(
+            shell["memory"]["source"],
+            "foreign-or-unbound-rejected-ephemeral-seed",
+        )
+        self.assertFalse(shell["memory"]["profile_present"])
+        self.assertEqual(shell["memory"]["notes"],0)
+        self.assertFalse(shell["memory"]["other_tenant_memory_visible"])
+
+    def test_own_memory_is_sanitized_and_prompt_packet_is_local_only(self):
+        own=tenant_memory_seed(self.user)
+        own["profile"]["display_name"]="Cliente Um"
+        own["watchlist"]=["eurusd","EURUSD","../../secret"]
+        own["conversation_notes"]=[
+            {"text":"prefiro explicações simples","truth_state":"CONFIRMED"},
+        ]
+        shell=build_personal_aion_shell(
+            self.user,
+            [self.entitlement],
+            tenant_memory=own,
+        )
+        self.assertFalse(shell["memory"]["input_memory_rejected"])
+        self.assertEqual(shell["memory"]["source"],"provided-own-tenant-memory")
+        packet=personal_prompt_packet(
+            "explique o CPI",
+            shell,
+            access=self.user,
+            own_memory=own,
+        )
+        self.assertTrue(packet["ready"])
+        self.assertEqual(packet["route"],"academy")
+        self.assertEqual(packet["tenant_id"],tenant_namespace(self.user)["tenant_id"])
+        self.assertEqual(packet["own_memory"]["profile"]["display_name"],"Cliente Um")
+        self.assertFalse(packet["executes_provider_call"])
+        self.assertFalse(packet["executes_external_action"])
+        self.assertFalse(packet["contract"]["admin_memory_access"])
+        self.assertFalse(packet["contract"]["other_tenant_access"])
+        self.assertFalse(packet["contract"]["external_provider_enabled"])
+        self.assertFalse(packet["contract"]["real_trading_enabled"])
+
+    def test_foreign_memory_never_enters_prompt_packet(self):
+        shell=build_personal_aion_shell(self.user,[self.entitlement])
+        foreign=tenant_memory_seed(self.other)
+        foreign["conversation_notes"]=[
+            {"text":"não pode aparecer","truth_state":"CONFIRMED"},
+        ]
+        packet=personal_prompt_packet(
+            "olá",
+            shell,
+            access=self.user,
+            own_memory=foreign,
+        )
+        self.assertTrue(packet["ready"])
+        self.assertEqual(packet["own_memory"],{})
+
+    def test_personal_routes_never_route_to_admin_workspaces(self):
+        cases={
+            "como está o forex e o dólar":"trading",
+            "me ensina CPI e indicador":"academy",
+            "me ajuda com um erro na plataforma":"support",
+            "como está minha conta e assinatura":"account",
+            "bom dia":"central",
+        }
+        for query,expected in cases.items():
+            route=personal_route(query)
+            self.assertEqual(route["route"],expected)
+            self.assertFalse(route["admin_route_available"])
+            self.assertFalse(route["executes_action"])
+
+    def test_capability_matrix_has_no_external_or_real_trading_action(self):
+        rows=personal_capability_matrix(self.user,[self.entitlement])
+        self.assertGreaterEqual(len(rows),5)
+        self.assertTrue(all(row["available"] for row in rows))
+        self.assertTrue(all(not row["external_action"] for row in rows))
+        self.assertTrue(all(not row["real_trading"] for row in rows))
+        self.assertNotIn("development",{row["domain"] for row in rows})
+        self.assertNotIn("promotions",{row["domain"] for row in rows})
+
+    def test_shell_policy_and_summary_do_not_overclaim_release(self):
+        policy=personal_shell_policy()
+        self.assertFalse(policy["subscriber_ui_exposed"])
+        self.assertFalse(policy["provider_calls_implemented"])
+        self.assertFalse(policy["external_provider_enabled_by_default"])
+        self.assertFalse(policy["admin_memory_access"])
+        self.assertFalse(policy["project_docs_access"])
+        self.assertFalse(policy["other_tenant_access"])
+        self.assertFalse(policy["billing"])
+        self.assertFalse(policy["external_publish"])
+        self.assertFalse(policy["real_trading"])
+
+        shell=build_personal_aion_shell(self.user,[self.entitlement])
+        summary=personal_shell_summary(shell)
+        self.assertTrue(summary["ready"])
+        self.assertFalse(summary["persistence_confirmed"])
+        self.assertFalse(summary["subscriber_ui_exposed"])
+        self.assertFalse(summary["external_provider_enabled"])
+        self.assertFalse(summary["real_orders_enabled"])
 
 
 if __name__=="__main__":
