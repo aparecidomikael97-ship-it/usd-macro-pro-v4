@@ -179,6 +179,18 @@ class AutopilotV107Tests(unittest.TestCase):
         self.assertIn("import json", text[:2500])
 
 
+    def test_event_journal_reuses_news_and_never_adds_provider_calls_or_delivery(self):
+        from pathlib import Path
+        text=Path("autopilot_v107.py").read_text(encoding="utf-8")
+        self.assertIn("AION_LIVE_EVENT_JOURNAL_PATH",text)
+        self.assertIn("live_event_snapshot(",text)
+        self.assertIn("build_runtime_journal(",text)
+        self.assertIn("news_payload=intel",text)
+        self.assertIn('"provider_calls_added":False',text)
+        self.assertIn('"external_delivery_allowed":False',text)
+        self.assertIn('"real_orders":False',text)
+        self.assertIn('"continuous_24h_confirmed"',text)
+
     def test_operational_readiness_requires_both_scanner_and_market_map(self):
         now=pd.Timestamp("2026-09-18T12:00:00Z")
         fresh=(now-pd.Timedelta(minutes=10)).isoformat()
