@@ -73,6 +73,38 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertEqual(rows[1]["area"],"🔐 Assinaturas")
         self.assertIn("nenhuma aprovação é automática",rows[0]["next_action"])
 
+    def test_surface_health_enters_next_action_queue_without_auto_repair(self):
+        surfaces={
+            "items":[
+                {
+                    "id":"advanced_radar",
+                    "label":"Radar avançado / Central Institucional",
+                    "state":"DEGRADED",
+                    "next_action":"Reabrir Radar avançado no build atual.",
+                },
+                {
+                    "id":"master_panel",
+                    "label":"Painel Mestre",
+                    "state":"STALE_BUILD",
+                    "next_action":"Abrir Painel Mestre novamente no build atual.",
+                },
+                {
+                    "id":"home_radar",
+                    "label":"Radar principal",
+                    "state":"OK",
+                    "next_action":"Nenhuma ação.",
+                },
+            ]
+        }
+        rows=_attention_queue({},{"status":"CONFIRMED"},surfaces,limit=8)
+        self.assertEqual(len(rows),2)
+        self.assertEqual(rows[0]["source"],"TELA")
+        self.assertEqual(rows[0]["priority"],"P1")
+        self.assertEqual(rows[0]["state"],"DEGRADED")
+        self.assertEqual(rows[1]["state"],"STALE_BUILD")
+        self.assertEqual(rows[1]["priority"],"P2")
+        self.assertNotIn("Radar principal",[row["item"] for row in rows])
+
     def test_central_critical_surface_health_is_truthful_and_read_only(self):
         system={
             "critical_surfaces":{
@@ -81,26 +113,32 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
                         "id":"home_radar",
                         "label":"Radar principal",
                         "state":"OK",
+                        "build_id":"build-a",
+                        "current_build":"build-a",
                         "error_type":"",
-                        "detail":"Renderização concluída nesta sessão.",
+                        "next_action":"Nenhuma ação imediata.",
                     },
                     {
                         "id":"advanced_radar",
                         "label":"Radar avançado / Central Institucional",
-                        "state":"DEGRADED",
-                        "error_type":"RuntimeError",
-                        "detail":"Falha isolada.",
+                        "state":"STALE_BUILD",
+                        "build_id":"build-old",
+                        "current_build":"build-a",
+                        "error_type":"",
+                        "next_action":"Abrir novamente no build atual.",
                     },
                 ],
-                "counts":{"OK":1,"DEGRADED":1,"UNAVAILABLE":0,"UNKNOWN":1},
+                "counts":{"OK":1,"DEGRADED":0,"UNAVAILABLE":0,"STALE_BUILD":1,"UNKNOWN":1},
                 "has_unresolved":True,
                 "all_ok":False,
             }
         }
         rows=_critical_surface_rows(system)
         self.assertEqual(rows[0]["Estado"],"OK")
-        self.assertEqual(rows[1]["Estado"],"DEGRADED")
-        self.assertEqual(rows[1]["Diagnóstico"],"RuntimeError")
+        self.assertEqual(rows[1]["Estado"],"STALE_BUILD")
+        self.assertEqual(rows[1]["Build observado"],"build-old")
+        self.assertEqual(rows[1]["Build atual"],"build-a")
+        self.assertIn("build atual",rows[1]["Próxima ação"])
         src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("Saúde das telas críticas",src)
         self.assertIn("_render_critical_surface_health(system_context)",src)
@@ -114,7 +152,8 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("Fila consolidada de atenção",src)
         self.assertIn("não aprova",src)
         self.assertIn("não provisiona acesso",src)
-        self.assertIn("_render_attention_queue(status_board, approval_inbox)",src)
+        self.assertIn("critical_surfaces",src)
+        self.assertIn('"source": "TELA"',src)
 
     def test_central_memory_guardian_posture_is_read_only_and_fail_closed(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
