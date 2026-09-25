@@ -1240,11 +1240,17 @@ def _render_reliability_governance(system_context: Mapping[str, Any] | None) -> 
 
     conflicts = int(reconciliation.get("conflict_count") or 0)
     critical_conflicts = int(reconciliation.get("critical_conflict_count") or 0)
+    advisory_bad = int(data.get("advisory_bad_sources") or 0)
     r1,r2,r3,r4 = st.columns(4)
     r1.metric("Conflitos de fonte", conflicts)
     r2.metric("Conflitos críticos", critical_conflicts)
     r3.metric("Rollback", str(rollback.get("state") or "STANDBY"))
     r4.metric("Ordens reais", "BLOQUEADAS")
+    if advisory_bad:
+        st.caption(
+            f"{advisory_bad} fonte(s) LOW/MEDIUM estão em aviso. "
+            "Elas continuam visíveis, mas não derrubam sozinhas a postura crítica do sistema."
+        )
 
     if str(degraded.get("state") or "").upper()=="FAIL_CLOSED":
         st.error(
