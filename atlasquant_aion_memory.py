@@ -84,6 +84,12 @@ APPROVED_AION_FOUNDATION = (
     "Cost Guardian deve manter custo zero como padrão e proibir upgrade, cobrança ou fallback pago automático sem teto e aprovação explícita.",
     "Rollback é sempre consultivo nesta camada: incidentes podem recomendar revisão, mas rollback/deploy automáticos permanecem proibidos.",
     "Proteção da memória exige integridade, SHA/escrita condicional e aprovação explícita; conflito ou digest divergente deve bloquear sobrescrita.",
+    "Source Mesh deve transformar somente evidências já produzidas pelo AtlasQuant em observações auditáveis; ele não pode inventar saúde, frescor, quota ou proveniência.",
+    "Fonte configurada não equivale a fonte saudável; credencial presente não prova disponibilidade nem dado atual.",
+    "Fallback/valor de segurança deve permanecer identificado como fallback e nunca ser promovido a observação ao vivo confirmada.",
+    "Mercado LIVE_CONFIRMED exige simultaneamente Matriz ao vivo, Autopilot, scanner técnico, market map e Twelve Data confirmados/saudáveis com mercado aberto.",
+    "Matriz por runtime snapshot pode sustentar continuidade visual, mas não confirma mercado ao vivo nem autorização operacional.",
+    "Narrativa derivada de notícias/RSS é inferência quando não é comunicado oficial; o AION deve preservar essa distinção.",
     "Execução real em corretora continua bloqueada; backtest/paper/forward e pesquisa não equivalem a autorização real.",
     "Gatilho operacional aprovado: quando o administrador disser 'tô no computador', priorizar a reconciliação do Render, configurar o Deploy Hook com segurança e validar Build Identity + Browser Smoke antes de retomar novos blocos.",
 )
