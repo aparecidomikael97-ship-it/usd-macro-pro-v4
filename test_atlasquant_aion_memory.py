@@ -36,6 +36,7 @@ from atlasquant_aion_memory import (
     update_dev_fusion_checkpoint,
     update_release_confidence_checkpoint,
     update_resilience_checkpoint,
+    update_epistemic_memory_checkpoint,
     update_wisdom_checkpoint,
     update_live_event_journal_checkpoint,
     update_operating_checkpoint,
@@ -152,7 +153,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("creative fusion studio", joined)
         self.assertIn("motor universal de performance", joined)
         self.assertEqual(upgraded["aion"]["foundation_revision"], FOUNDATION_REVISION)
-        self.assertGreaterEqual(upgraded["checkpoint_version"], 14)
+        self.assertGreaterEqual(upgraded["checkpoint_version"], 15)
 
     def test_default_checkpoint_is_safe_and_has_no_real_trading(self):
         cp = default_checkpoint()
@@ -212,6 +213,11 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertTrue(cp["resilience"]["digest"])
         self.assertFalse(cp["resilience"]["external_ai_root_authority"])
         self.assertFalse(cp["resilience"]["real_trading_enabled"])
+        self.assertIn("epistemic_memory",cp)
+        self.assertEqual(cp["epistemic_memory"]["records"],[])
+        self.assertEqual(cp["epistemic_memory"]["decision_replays"],[])
+        self.assertTrue(cp["epistemic_memory"]["digest"])
+        self.assertFalse(cp["epistemic_memory"]["photographic_memory_claimed"])
         self.assertEqual(cp["live_event_journal"]["events"],[])
         self.assertEqual(cp["live_event_journal"]["heartbeats"],[])
         self.assertTrue(cp["live_event_journal"]["digest"])
@@ -220,7 +226,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
     def test_older_checkpoint_is_upgraded_without_claiming_persistence(self):
         old={"checkpoint_version":1,"project":"AtlasQuant"}
         upgraded=ensure_operating_checkpoint(old)
-        self.assertEqual(upgraded["checkpoint_version"],14)
+        self.assertEqual(upgraded["checkpoint_version"],15)
         self.assertIn("operating",upgraded)
         self.assertIn("studio",upgraded)
         self.assertIn("business",upgraded)
@@ -239,6 +245,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("dev_fusion",upgraded)
         self.assertIn("release_confidence",upgraded)
         self.assertIn("resilience",upgraded)
+        self.assertIn("epistemic_memory",upgraded)
         self.assertIn("live_event_journal",upgraded)
         self.assertIn("subscriptions",upgraded["areas"])
         changed=update_operating_checkpoint(upgraded,tasks=[],events=[],dirty=True)
@@ -464,6 +471,58 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertEqual(cp["resilience"]["safe_mode"]["mode"],"DEGRADED_READ_ONLY")
         self.assertEqual(checkpoint_integrity_report(cp)["state"],"CONFIRMED")
 
+    def test_checkpoint_v15_epistemic_memory_roundtrip(self):
+        cp=default_checkpoint()
+        state=dict(cp["epistemic_memory"])
+        state["records"]=[{
+            "memory_id":"MEM-TEST",
+            "layer":"SEMANTIC",
+            "subject":"policy",
+            "claim":"Confirmed claim",
+            "truth_state":"CONFIRMED",
+            "source_ref":"official:policy",
+            "source_version":"v1",
+            "evidence_refs":["evidence:1"],
+            "observed_at":"2026-09-25T10:00:00+00:00",
+            "review_due_at":"2026-10-01T00:00:00+00:00",
+            "created_at":"2026-09-25T10:01:00+00:00",
+        }]
+        state["decision_replays"]=[{
+            "replay_id":"REPLAY-TEST",
+            "decision_id":"DEC-1",
+            "decided_at":"2026-09-25T10:05:00+00:00",
+            "domain":"development",
+            "decision_summary":"Decision with exact references.",
+            "model_version":"AION-v15",
+            "rule_version":"policy-v1",
+            "memory_record_ids":["MEM-TEST"],
+            "evidence_refs":["evidence:1"],
+            "data_snapshot_refs":["snapshot:1"],
+            "context_digest":"ctx1",
+            "created_at":"2026-09-25T10:06:00+00:00",
+        }]
+        cp=update_epistemic_memory_checkpoint(cp,epistemic_memory=state,dirty=True)
+        self.assertEqual(cp["epistemic_memory"]["records"][0]["truth_state"],"CONFIRMED")
+        self.assertEqual(cp["epistemic_memory"]["decision_replays"][0]["state"],"COMPLETE_REFERENCE_SET")
+        self.assertEqual(checkpoint_integrity_report(cp)["state"],"CONFIRMED")
+
+    def test_checkpoint_v15_downgrades_fake_confirmed_memory(self):
+        cp=default_checkpoint()
+        state=dict(cp["epistemic_memory"])
+        state["records"]=[{
+            "memory_id":"MEM-FAKE",
+            "layer":"SEMANTIC",
+            "subject":"policy",
+            "claim":"Unsupported confirmed claim",
+            "truth_state":"CONFIRMED",
+            "source_ref":"",
+            "source_version":"",
+            "evidence_refs":[],
+            "created_at":"2026-09-25T10:00:00+00:00",
+        }]
+        cp=update_epistemic_memory_checkpoint(cp,epistemic_memory=state,dirty=True)
+        self.assertEqual(cp["epistemic_memory"]["records"][0]["truth_state"],"UNKNOWN")
+
     def test_integrity_report_confirms_v7_and_detects_tampering(self):
         cp=default_checkpoint()
         report=checkpoint_integrity_report(cp)
@@ -493,7 +552,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         })
         self.assertTrue(preflight["allowed"])
         self.assertEqual(preflight["mode"],"UPDATE_MIGRATION")
-        self.assertIn("V14",preflight["reason"])
+        self.assertIn("V15",preflight["reason"])
 
     def test_integrity_mismatch_blocks_runtime_write_preflight(self):
         tampered=default_checkpoint()
