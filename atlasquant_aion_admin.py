@@ -44,6 +44,7 @@ from atlasquant_aion_memory import (
     update_entitlements_checkpoint,
     update_continuity_checkpoint,
     update_learning_checkpoint,
+    update_live_event_journal_checkpoint,
     update_operating_checkpoint,
     update_promotions_checkpoint,
     update_studio_checkpoint,
@@ -171,6 +172,11 @@ from atlasquant_aion_intelligence import (
     simulate_macro_scenario,
 )
 from atlasquant_aion_reliability import reliability_snapshot
+from atlasquant_aion_event_journal import (
+    continuity_summary as live_event_continuity_summary,
+    merge_events as merge_live_event_journal_events,
+    normalize_heartbeats as normalize_live_event_heartbeats,
+)
 from atlasquant_aion_learning import (
     CAUSE_TAGS as LEARNING_CAUSE_TAGS,
     FORECAST_TYPES as LEARNING_FORECAST_TYPES,
@@ -1307,7 +1313,12 @@ def _render_reliability_governance(system_context: Mapping[str, Any] | None) -> 
     )
 
 
-def _render_live_event_intelligence(system_context: Mapping[str, Any] | None) -> None:
+def _render_live_event_intelligence(
+    checkpoint: Mapping[str, Any],
+    system_context: Mapping[str, Any] | None,
+    *,
+    allow_memory_sync: bool = True,
+) -> None:
     system = dict(system_context or {})
     live = (
         system.get("live_event_intelligence")
@@ -1329,6 +1340,21 @@ def _render_live_event_intelligence(system_context: Mapping[str, Any] | None) ->
     c3.metric("Alertas", int(live.get("alert_count") or 0))
     c4.metric("Urgentes p/ revisão", int(live.get("urgent_review_count") or 0))
 
+    background_state = str(live.get("background_watch_state") or "NOT_STARTED")
+    heartbeat_count = int(live.get("background_heartbeat_count") or 0)
+    coverage = live.get("background_coverage_minutes")
+    max_gap = live.get("background_max_gap_minutes")
+    b1,b2,b3,b4 = st.columns(4)
+    b1.metric("Watch background", background_state)
+    b2.metric("Heartbeats", heartbeat_count)
+    b3.metric(
+        "Cobertura",
+        "—" if coverage is None else f"{float(coverage)/60.0:.1f} h",
+    )
+    b4.metric(
+        "Maior lacuna",
+        "—" if max_gap is None else f"{float(max_gap):.0f} min",
+    )
     source_state = str(live.get("news_source_state") or "UNKNOWN")
     age = live.get("news_payload_age_minutes")
     age_text = "—" if age is None else f"{float(age):.0f} min"
@@ -1337,10 +1363,15 @@ def _render_live_event_intelligence(system_context: Mapping[str, Any] | None) ->
         f"notícias frescas classificadas: {int(live.get('fresh_news_events') or 0)}."
     )
 
-    if not bool(live.get("continuous_runtime_confirmed", False)):
+    if bool(live.get("continuous_runtime_confirmed", False)):
+        st.success(
+            "Continuidade de background por ~24h confirmada pelos heartbeats persistidos do runtime. "
+            "Isso confirma o ciclo observado, não garante disponibilidade futura."
+        )
+    else:
         st.info(
-            "Motor de alerta preparado, mas monitoramento 24/7 contínuo ainda NÃO está confirmado "
-            "nesta execução/produção. Nenhuma notificação externa foi enviada automaticamente."
+            "Motor de alerta preparado, mas monitoramento 24/7 contínuo ainda NÃO está confirmado. "
+            "A prova exige aproximadamente 24h de heartbeats persistidos, densidade mínima e sem lacunas excessivas."
         )
 
     top = [
@@ -1352,7 +1383,6 @@ def _render_live_event_intelligence(system_context: Mapping[str, Any] | None) ->
             "Nenhum evento fresco atingiu o limiar de alerta nesta leitura. "
             "Fonte stale ou indisponível não gera breaking alert."
         )
-        return
 
     for idx,item in enumerate(top[:5]):
         level = str(item.get("alert_level") or "WATCH")
@@ -1387,6 +1417,77 @@ def _render_live_event_intelligence(system_context: Mapping[str, Any] | None) ->
                 "Isto é hipótese de transmissão de mercado, não previsão garantida nem sinal de trade. "
                 "Preço, contexto e fontes adicionais precisam confirmar a leitura."
             )
+
+    journal_count = int(live.get("journal_event_count") or 0)
+    delivery_count = int(live.get("delivery_candidate_count") or 0)
+    st.caption(
+        f"Histórico runtime deduplicado: {journal_count} evento(s) · "
+        f"fila interna de entrega futura: {delivery_count} candidato(s). "
+        "Canal externo conectado: NÃO."
+    )
+
+    memory = (
+        checkpoint.get("live_event_journal")
+        if isinstance(checkpoint.get("live_event_journal"), Mapping)
+        else {}
+    )
+    memory_events = list(memory.get("events", []) or [])
+    memory_heartbeats = list(memory.get("heartbeats", []) or [])
+    memory_watch = live_event_continuity_summary(memory_heartbeats)
+    st.caption(
+        f"Checkpoint Mestre: {len(memory_events)} evento(s) · "
+        f"{len(memory_heartbeats)} heartbeat(s) · estado {memory_watch.get('state','NOT_STARTED')}."
+    )
+
+    if allow_memory_sync and st.button(
+        "Sincronizar histórico de eventos com o Checkpoint Mestre",
+        key="aion_live_event_journal_sync",
+        width="stretch",
+    ):
+        runtime_events = [
+            dict(x) for x in list(live.get("journal_events", []) or [])
+            if isinstance(x, Mapping)
+        ]
+        runtime_heartbeats = [
+            dict(x) for x in list(live.get("journal_heartbeats", []) or [])
+            if isinstance(x, Mapping)
+        ]
+        merged_events = merge_live_event_journal_events(
+            memory_events,
+            runtime_events,
+            observed_at=datetime.now(timezone.utc).isoformat(),
+        )
+        heartbeat_rows = normalize_live_event_heartbeats(
+            memory_heartbeats + runtime_heartbeats
+        )
+        updated = update_live_event_journal_checkpoint(
+            checkpoint,
+            events=merged_events,
+            heartbeats=heartbeat_rows,
+            dirty=True,
+        )
+        updated = _record_working_event(
+            updated,
+            "live_event_journal_synced",
+            "Histórico Live Event sincronizado com o Checkpoint Mestre.",
+            evidence={
+                "events":len(merged_events),
+                "heartbeats":len(heartbeat_rows),
+                "external_delivery_allowed":False,
+                "real_orders_enabled":False,
+            },
+        )
+        _set_working_checkpoint(updated, dirty=True)
+        st.success(
+            "Histórico sincronizado na memória de trabalho. "
+            "Salve o Checkpoint Mestre para persistir."
+        )
+        st.rerun()
+
+    st.caption(
+        "Fila externa: DESLIGADA · notificação automática: NÃO · "
+        "autorização de trade: NÃO · ordens reais: BLOQUEADAS."
+    )
 
 
 def _render_learning_pulse(checkpoint: Mapping[str, Any]) -> None:
@@ -1759,7 +1860,7 @@ def _render_central(
     )
     _render_executive_pulse(executive_snapshot)
     _render_commander_intelligence(checkpoint, system_context, executive_snapshot)
-    _render_live_event_intelligence(system_context)
+    _render_live_event_intelligence(checkpoint, system_context, allow_memory_sync=True)
     _render_learning_pulse(checkpoint)
     _render_reliability_governance(system_context)
     _render_release_gate(system_context)
@@ -2193,7 +2294,10 @@ def _render_secretary(
             st.write("Nenhum evento operacional registrado nesta memória.")
 
 
-def _render_trading(market_context: Mapping[str, Any]) -> None:
+def _render_trading(
+    market_context: Mapping[str, Any],
+    system_context: Mapping[str, Any] | None = None,
+) -> None:
     st.markdown("### 📈 Trading · leitura segura")
     market_text, market_truth = _safe_market_state(market_context)
     st.info(f"Estado: {market_truth} — {market_text}")
@@ -2211,6 +2315,8 @@ def _render_trading(market_context: Mapping[str, Any]) -> None:
         ),
         key="aion_trading_voice",
     )
+
+    _render_live_event_intelligence({}, system_context, allow_memory_sync=False)
 
     st.markdown("#### 🧪 Simulador de Cenários Macro")
     st.caption(
@@ -4349,7 +4455,7 @@ def render_aion_admin_console(
         elif selected_workspace == "🗂️ Secretaria":
             _render_secretary(access_map, checkpoint, flags, system, market, status_board, approval_inbox)
         elif selected_workspace == "📈 Trading":
-            _render_trading(market)
+            _render_trading(market, system)
         elif selected_workspace == "🎬 Studio":
             _render_studio(access_map, checkpoint, flags)
         elif selected_workspace == "💼 Negócios":
@@ -4437,6 +4543,18 @@ def render_aion_admin_console(
         "approval_inbox_total": int(approval_inbox.get("total") or 0),
         "approval_inbox_has_pending": bool(approval_inbox.get("has_pending")),
         "commercial_access_audit_needs_review": audit_requires_review(account_entitlement_audit),
+        "live_event_background_state": str(
+            ((system.get("live_event_intelligence") or {}) if isinstance(system.get("live_event_intelligence"), Mapping) else {}).get("background_watch_state")
+            or "UNKNOWN"
+        ),
+        "live_event_continuous_24h_confirmed": bool(
+            ((system.get("live_event_intelligence") or {}) if isinstance(system.get("live_event_intelligence"), Mapping) else {}).get("continuous_runtime_confirmed", False)
+        ),
+        "live_event_journal_count": int(
+            ((system.get("live_event_intelligence") or {}) if isinstance(system.get("live_event_intelligence"), Mapping) else {}).get("journal_event_count")
+            or 0
+        ),
+        "live_event_external_delivery_allowed": False,
         "foundation_status": "DEGRADED_SAFE" if foundation_diagnostics else "OK",
         "foundation_diagnostics": foundation_diagnostics,
         "selected_workspace": selected_workspace,

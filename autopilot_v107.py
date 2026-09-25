@@ -60,6 +60,8 @@ from atlasquant_flight_recorder_panel import record_from_pack
 from atlasquant_flight_recorder_store import persist_records
 from atlasquant_setup_candidates import build_setup_candidates
 from atlasquant_research_timeframes import build_research_timeframe_cache
+from atlasquant_aion_live_events import live_event_snapshot
+from atlasquant_aion_event_journal import build_runtime_journal
 
 from market_map_core_v10 import (
     NY_TZ,
@@ -99,6 +101,7 @@ NEWS_VALIDATION_PATH = "dados/currency_news_validation_v1061.csv"
 QUOTA_SHADOW_PATH = "dados/atlasquant_quota_shadow_v1.json"
 HOME_SNAPSHOT_PATH = "dados/atlasquant_home_snapshot_v1.json"
 RESEARCH_TF_CACHE_PATH = "dados/atlasquant_research_timeframes_v1.json"
+AION_LIVE_EVENT_JOURNAL_PATH = "dados/aion_live_event_journal_v1.json"
 
 M15_EVERY_MIN = 55
 H1_EVERY_MIN = 115
@@ -1396,9 +1399,96 @@ def main() -> int:
     # 4. Global news. Hourly-ish cache.
     intel,news_errors=get_news()
     all_errors.extend(news_errors)
+    news_persisted=False
+    news_write_error=""
     if intel:
-        ok,err=gh_put_json(NEWS_CURRENT_PATH,intel,"V10.7 Autopilot: notícias globais")
-        if not ok: all_errors.append("Salvar notícias: "+err)
+        news_persisted,news_write_error=gh_put_json(
+            NEWS_CURRENT_PATH,
+            intel,
+            "V10.7 Autopilot: notícias globais",
+        )
+        if not news_persisted:
+            all_errors.append("Salvar notícias: "+news_write_error)
+
+    # 4.1 Live Event Journal — observational background memory only.
+    # Reuses the exact news snapshot already collected above. No extra provider
+    # request, notification channel, score mutation or market execution.
+    event_journal_status={
+        "path":AION_LIVE_EVENT_JOURNAL_PATH,
+        "persisted":False,
+        "error":"",
+        "events":0,
+        "heartbeats":0,
+        "watch_state":"UNKNOWN",
+        "continuous_24h_confirmed":False,
+        "delivery_candidates":0,
+        "provider_calls_added":False,
+        "external_delivery_allowed":False,
+        "real_orders":False,
+        "automatic_execution":False,
+    }
+    try:
+        prior_journal,journal_read_error=gh_get_json(
+            AION_LIVE_EVENT_JOURNAL_PATH,
+            {
+                "schema":"ATLASQUANT_AION_EVENT_JOURNAL_V1",
+                "events":[],
+                "heartbeats":[],
+            },
+        )
+        event_now=utcnow().to_pydatetime()
+        event_live=live_event_snapshot(
+            news_payload=intel if isinstance(intel,Mapping) else {},
+            news_provenance=(
+                f"GitHub:{BRANCH}:{NEWS_CURRENT_PATH}"
+                if news_persisted
+                else "Autopilot runtime / news persistence unconfirmed"
+            ),
+            next_event=None,
+            reliability=None,
+            now=event_now,
+        )
+        event_journal=build_runtime_journal(
+            prior_journal if not journal_read_error else {},
+            event_live,
+            observed_at=event_now.isoformat(),
+            now=event_now,
+        )
+        journal_ok=False
+        journal_write_error=""
+        if not journal_read_error:
+            journal_ok,journal_write_error=gh_put_json(
+                AION_LIVE_EVENT_JOURNAL_PATH,
+                event_journal,
+                "AtlasQuant AION: atualiza histórico auditável de eventos",
+            )
+        continuity=(
+            event_journal.get("continuity")
+            if isinstance(event_journal.get("continuity"),Mapping)
+            else {}
+        )
+        event_journal_status={
+            "path":AION_LIVE_EVENT_JOURNAL_PATH,
+            "persisted":bool(journal_ok),
+            "error":str(journal_read_error or journal_write_error or ""),
+            "events":int(event_journal.get("event_count") or 0),
+            "heartbeats":int(continuity.get("heartbeat_count") or 0),
+            "watch_state":str(continuity.get("state") or "UNKNOWN"),
+            "continuous_24h_confirmed":bool(
+                continuity.get("continuous_24h_confirmed",False)
+            ),
+            "delivery_candidates":int(
+                event_journal.get("delivery_candidate_count") or 0
+            ),
+            "provider_calls_added":False,
+            "external_delivery_allowed":False,
+            "real_orders":False,
+            "automatic_execution":False,
+        }
+    except Exception as event_journal_exc:
+        event_journal_status["error"]=(
+            f"{type(event_journal_exc).__name__}: {event_journal_exc}"
+        )
 
     pmap = pair_input_map(inputs)
     matrix = pd.DataFrame(list(pmap.values()))
@@ -1486,6 +1576,8 @@ def main() -> int:
         app_ok,app_msg,inputs,scanner,master,intel,validation,
         all_errors,total_calls,snap_stats
     )
+
+    status["aion_live_event_journal"]=dict(event_journal_status)
 
     status["research_timeframes"]={
         "path":RESEARCH_TF_CACHE_PATH,

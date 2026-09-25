@@ -51,6 +51,7 @@ from atlasquant_publication_truth import publication_truth
 from atlasquant_release_gate import release_gate
 from atlasquant_aion_source_mesh import source_mesh_snapshot
 from atlasquant_aion_live_events import live_event_snapshot
+from atlasquant_aion_event_journal import overlay_journal
 import re
 
 # V10 — camada observacional profissional. O try/except evita derrubar
@@ -9955,6 +9956,18 @@ def _build_aion_source_runtime_context():
         news_source = "news runtime unavailable: " + type(news_exc).__name__
 
     try:
+        event_journal, event_journal_source = _github_get_json_v937(
+            "dados/aion_live_event_journal_v1.json",
+            {},
+        )
+    except Exception as event_journal_exc:
+        event_journal = {}
+        event_journal_source = (
+            "live event journal unavailable: "
+            + type(event_journal_exc).__name__
+        )
+
+    try:
         next_event = _proximo_evento_macro_v65()
     except Exception:
         next_event = {"disponivel": False}
@@ -10008,6 +10021,14 @@ def _build_aion_source_runtime_context():
         news_provenance=news_source,
         next_event=next_event,
     )
+    event_intelligence = overlay_journal(
+        event_intelligence,
+        event_journal if isinstance(event_journal, dict) else {},
+    )
+    event_intelligence["background_journal_provenance"] = event_journal_source
+    event_intelligence["background_journal_confirmed"] = str(
+        event_journal_source or ""
+    ).startswith("GitHub:")
     return mesh, market_context, event_intelligence
 
 

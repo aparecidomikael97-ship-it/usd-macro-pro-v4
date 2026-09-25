@@ -22,6 +22,7 @@ from atlasquant_aion_memory import (
     update_entitlements_checkpoint,
     update_continuity_checkpoint,
     update_learning_checkpoint,
+    update_live_event_journal_checkpoint,
     update_operating_checkpoint,
     update_promotions_checkpoint,
     update_studio_checkpoint,
@@ -121,6 +122,9 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertEqual(cp["learning"]["experiments"],[])
         self.assertEqual(cp["learning"]["research_refs"],[])
         self.assertTrue(cp["learning"]["digest"])
+        self.assertEqual(cp["live_event_journal"]["events"],[])
+        self.assertEqual(cp["live_event_journal"]["heartbeats"],[])
+        self.assertTrue(cp["live_event_journal"]["digest"])
         self.assertIn("subscriptions",cp["areas"])
 
     def test_older_checkpoint_is_upgraded_without_claiming_persistence(self):
@@ -134,6 +138,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("entitlements",upgraded)
         self.assertIn("continuity",upgraded)
         self.assertIn("learning",upgraded)
+        self.assertIn("live_event_journal",upgraded)
         self.assertIn("subscriptions",upgraded["areas"])
         changed=update_operating_checkpoint(upgraded,tasks=[],events=[],dirty=True)
         self.assertTrue(changed["operating"]["dirty"])
@@ -240,6 +245,47 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         report=checkpoint_integrity_report(tampered)
         self.assertEqual(report["state"],"MISMATCH")
         self.assertIn("learning",report["mismatches"])
+
+    def test_live_event_journal_update_is_integrity_checked(self):
+        cp=default_checkpoint()
+        changed=update_live_event_journal_checkpoint(
+            cp,
+            events=[{
+                "event_id":"EVT-1",
+                "headline":"Reported event",
+                "kind":"NEWS_REPORT",
+                "category":"GEOPOLITICAL_ESCALATION",
+                "truth_state":"INFERENCE",
+                "urgency_score":80,
+                "alert_level":"URGENT_REVIEW",
+            }],
+            heartbeats=[{
+                "observed_at":"2026-09-25T10:00:00+00:00",
+                "source_state":"FRESH",
+                "event_count":1,
+                "alert_count":1,
+            }],
+            dirty=True,
+        )
+        self.assertEqual(len(changed["live_event_journal"]["events"]),1)
+        self.assertEqual(len(changed["live_event_journal"]["heartbeats"]),1)
+        self.assertTrue(changed["live_event_journal"]["digest"])
+        self.assertTrue(changed["operating"]["dirty"])
+        self.assertEqual(checkpoint_integrity_report(changed)["state"],"CONFIRMED")
+
+        tampered=default_checkpoint()
+        tampered["live_event_journal"]["digest"]="wrong"
+        report=checkpoint_integrity_report(tampered)
+        self.assertEqual(report["state"],"MISMATCH")
+        self.assertIn("live_event_journal",report["mismatches"])
+
+    def test_legacy_checkpoint_without_live_event_journal_requires_safe_migration(self):
+        legacy=default_checkpoint()
+        legacy.pop("live_event_journal",None)
+        report=checkpoint_integrity_report(legacy)
+        self.assertEqual(report["state"],"MIGRATION_REQUIRED")
+        self.assertTrue(report["write_safe"])
+        self.assertTrue(any("live_event_journal" in x for x in report["migration_items"]))
 
     def test_legacy_checkpoint_without_learning_requires_safe_migration(self):
         legacy=default_checkpoint()

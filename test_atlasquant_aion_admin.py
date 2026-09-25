@@ -649,6 +649,26 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn('"live_event_alerts"',src)
         self.assertIn('"live_event_24x7_confirmed"',src)
 
+    def test_live_event_panel_shows_background_watch_and_checkpoint_sync(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Watch background",src)
+        self.assertIn("Heartbeats",src)
+        self.assertIn("Maior lacuna",src)
+        self.assertIn("aproximadamente 24h de heartbeats persistidos",src)
+        self.assertIn("Histórico runtime deduplicado",src)
+        self.assertIn("fila interna de entrega futura",src)
+        self.assertIn("Sincronizar histórico de eventos com o Checkpoint Mestre",src)
+        self.assertIn("update_live_event_journal_checkpoint(",src)
+        self.assertIn("live_event_journal_synced",src)
+        self.assertIn("Fila externa: DESLIGADA",src)
+        self.assertIn('"live_event_continuous_24h_confirmed"',src)
+        self.assertIn('"live_event_external_delivery_allowed": False',src)
+
+    def test_trading_reads_live_event_panel_without_memory_write_control(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("_render_trading(market, system)",src)
+        self.assertIn("_render_live_event_intelligence({}, system_context, allow_memory_sync=False)",src)
+
     def test_business_panel_labels_unconnected_sales_as_unconfirmed(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("não representam vendas confirmadas", src)
