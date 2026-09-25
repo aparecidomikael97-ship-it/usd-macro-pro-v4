@@ -180,6 +180,11 @@ from atlasquant_aion_fortress import (
     proof_of_safety,
     source_authority,
 )
+from atlasquant_aion_portable import (
+    central_entry_contract,
+    portable_core_summary,
+)
+from atlasquant_aion_vault import vault_summary
 from atlasquant_aion_cognitive_orchestrator import orchestrator_snapshot
 from atlasquant_aion_event_journal import (
     continuity_summary as live_event_continuity_summary,
@@ -885,6 +890,27 @@ def _render_memory_security_posture(
     c3.metric("Guardian bloqueando agora", int(posture.get("blocked_now") or 0))
     c4.metric("Escrita runtime", "ELEGÍVEL" if preflight.get("allowed") else "BLOQUEADA")
 
+    portable = portable_core_summary(
+        checkpoint.get("portable_core")
+        if isinstance(checkpoint.get("portable_core"), Mapping)
+        else {}
+    )
+    vault = vault_summary(
+        checkpoint.get("vault")
+        if isinstance(checkpoint.get("vault"), Mapping)
+        else {}
+    )
+    entry = central_entry_contract(authenticated_admin=is_admin(access))
+    p1,p2,p3,p4 = st.columns(4)
+    p1.metric("AION Portable", f"{int(portable.get('workspaces') or 0)} workspaces")
+    p2.metric("Conectores prontos", int(portable.get("ready_connectors") or 0))
+    p3.metric("Vault", "SEGURO" if vault.get("policy_ok") else "BLOQUEADO")
+    p4.metric("Entrada única", "PRONTA" if entry.get("allowed") else "BLOQUEADA")
+    st.caption(
+        "AtlasQuant é um workspace do AION. O Vault armazena referências e integridade, "
+        "não senha/token em texto puro. Entrada única exige sessão ADMIN."
+    )
+
     persisted_state = str(persisted.get("state") or "UNKNOWN").upper()
     if persisted_state == "MISMATCH":
         st.error(
@@ -925,6 +951,28 @@ def _render_memory_security_posture(
                 "A matriz é calculada com approved=False. Ela nunca reutiliza esta visualização "
                 "como autorização para publicar, cobrar, fazer deploy, gravar segredo ou operar."
             )
+
+    with st.expander("AION Portable Core & Vault", expanded=False):
+        st.markdown("**Workspaces registrados:**")
+        for item in list(
+            ((checkpoint.get("portable_core") or {}) if isinstance(checkpoint.get("portable_core"), Mapping) else {}).get("workspaces", [])
+            or []
+        )[:20]:
+            if isinstance(item, Mapping):
+                st.caption(
+                    f"{item.get('label')} · {item.get('kind')} · {item.get('state')} · "
+                    f"contexto isolado: {'SIM' if item.get('isolated_context') else 'NÃO'}"
+                )
+        st.markdown("**Política do Vault:**")
+        st.caption(
+            f"Entradas: {int(vault.get('entries') or 0)} · "
+            f"backend: {vault.get('backend_state','NOT_CONFIGURED')} · "
+            f"segredo em texto puro: {'SIM — BLOQUEAR' if vault.get('plaintext_secrets_present') else 'NÃO'}."
+        )
+        st.caption(
+            "O próprio AION não pode apagar o Vault, ampliar permissão ou transformar referência "
+            "de segredo em valor exportável."
+        )
 
 
 def _render_security_incident_center(
@@ -4865,6 +4913,20 @@ def render_aion_admin_console(
         ),
         "checkpoint_dirty": bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
         "checkpoint_conflict": bool(st.session_state.get(_WORKING_CONFLICT_KEY, False)),
+        "portable_core_workspaces": int(
+            portable_core_summary(
+                checkpoint.get("portable_core")
+                if isinstance(checkpoint.get("portable_core"), Mapping)
+                else {}
+            ).get("workspaces") or 0
+        ),
+        "vault_policy_ok": bool(
+            vault_summary(
+                checkpoint.get("vault")
+                if isinstance(checkpoint.get("vault"), Mapping)
+                else {}
+            ).get("policy_ok", False)
+        ),
         "task_summary": queue_summary((checkpoint.get("operating") or {}).get("tasks", [])),
         "status_board_counts": status_board.get("counts"),
         "status_board_has_unresolved": bool(status_board.get("has_unresolved")),
