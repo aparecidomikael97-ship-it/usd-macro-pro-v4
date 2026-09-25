@@ -40,6 +40,12 @@ from atlasquant_surface_health import (
     mark_surface_ok,
     surface_health_snapshot,
 )
+from atlasquant_navigation_bridge import (
+    complete_surface_revalidation,
+    consume_navigation_request,
+    request_return_to_aion,
+    revalidation_result,
+)
 import re
 
 # V10 — camada observacional profissional. O try/except evita derrubar
@@ -4152,6 +4158,51 @@ _nav_items = list(navigation_labels()) if navigation_labels is not None else _fa
 # preservar todos os índices históricos da navegação pública/operacional.
 if str(_ATLASQUANT_ACCESS.get("role") or "").upper() == "ADMIN":
     _nav_items.append("🧠 AION")
+
+# Guided AION navigation is consumed before the Streamlit navigation widgets
+# are instantiated. This avoids mutating widget-backed session state after
+# creation in the same rerun.
+_aq_guided_navigation = consume_navigation_request(
+    st.session_state,
+    available_pages=_nav_items,
+)
+if isinstance(_aq_guided_navigation, dict) and _aq_guided_navigation.get("state") == "NAVIGATION_BLOCKED":
+    st.warning(
+        "A revalidação guiada não encontrou a área solicitada neste carregamento. "
+        "Nenhuma ação foi executada."
+    )
+
+
+def _aq_complete_guided_revalidation(surface, *, succeeded, error_type=""):
+    result = complete_surface_revalidation(
+        st.session_state,
+        surface,
+        build_id=_ATLASQUANT_SOURCE_BUILD,
+        succeeded=bool(succeeded),
+        error_type=error_type,
+    )
+    if not isinstance(result, dict):
+        return None
+    state = str(result.get("state") or "UNKNOWN")
+    label = str(result.get("label") or surface)
+    if state == "CONFIRMED_OK":
+        st.success(
+            f"🧪 Revalidação AION concluída: {label} renderizou no build atual."
+        )
+    else:
+        st.warning(
+            f"🧪 Revalidação AION concluída com estado {state}: {label}. "
+            "O resultado não será tratado como saudável."
+        )
+    if "🧠 AION" in _nav_items and st.button(
+        "↩️ Voltar para a Central AION",
+        key=f"aq_guided_return_{surface}",
+        width="stretch",
+    ):
+        request_return_to_aion(st.session_state)
+        st.rerun()
+    return result
+
 
 _aq_experience_mode = (
     render_experience_mode_switch()
@@ -9433,6 +9484,10 @@ if _aq_active_index == 1:
                 "master_panel",
                 build_id=_ATLASQUANT_SOURCE_BUILD,
             )
+            _aq_complete_guided_revalidation(
+                "master_panel",
+                succeeded=True,
+            )
             st.session_state.pop("atlasquant_master_panel_error", None)
         except Exception as _master_render_exc:
             st.session_state["atlasquant_master_panel_error"] = {
@@ -9443,6 +9498,11 @@ if _aq_active_index == 1:
                 "master_panel",
                 _master_render_exc,
                 build_id=_ATLASQUANT_SOURCE_BUILD,
+            )
+            _aq_complete_guided_revalidation(
+                "master_panel",
+                succeeded=False,
+                error_type=type(_master_render_exc).__name__,
             )
             st.warning(
                 "Painel Mestre entrou em modo seguro; o restante do AtlasQuant continua disponível."
@@ -9871,6 +9931,7 @@ if _aq_active_index == 21:
                 st.session_state,
                 current_build=_ATLASQUANT_SOURCE_BUILD,
             ),
+            "guided_revalidation": revalidation_result(st.session_state) or {},
         }
         try:
             render_aion_admin_console(
@@ -9949,12 +10010,21 @@ if _aq_active_index == 0:
                     "home_radar",
                     build_id=_ATLASQUANT_SOURCE_BUILD,
                 )
+                _aq_complete_guided_revalidation(
+                    "home_radar",
+                    succeeded=True,
+                )
             except Exception as _aq_home_exc:
                 mark_surface_error(
                     st.session_state,
                     "home_radar",
                     _aq_home_exc,
                     build_id=_ATLASQUANT_SOURCE_BUILD,
+                )
+                _aq_complete_guided_revalidation(
+                    "home_radar",
+                    succeeded=False,
+                    error_type=type(_aq_home_exc).__name__,
                 )
                 st.warning("Radar principal em modo seguro; nenhuma permissão operacional foi ampliada.")
                 st.caption(f"Diagnóstico Home Radar: {type(_aq_home_exc).__name__}")
@@ -10015,6 +10085,10 @@ if _aq_active_index == 0:
                         "advanced_radar",
                         build_id=_ATLASQUANT_SOURCE_BUILD,
                     )
+                    _aq_complete_guided_revalidation(
+                        "advanced_radar",
+                        succeeded=True,
+                    )
                     st.session_state.pop("aq_radar_advanced_error", None)
                 except Exception as _aq_pair_intel_exc:
                     # Fault boundary: one advanced diagnostic must never take
@@ -10029,6 +10103,11 @@ if _aq_active_index == 0:
                         "advanced_radar",
                         _aq_pair_intel_error,
                         build_id=_ATLASQUANT_SOURCE_BUILD,
+                    )
+                    _aq_complete_guided_revalidation(
+                        "advanced_radar",
+                        succeeded=False,
+                        error_type=type(_aq_pair_intel_exc).__name__,
                     )
                     print(
                         "ATLASQUANT_RADAR_ADVANCED_ERROR "
