@@ -155,6 +155,10 @@ from atlasquant_aion_incident_center import (
     incident_center_rows,
     incident_response_plan,
 )
+from atlasquant_aion_executive_pulse import (
+    compact_attention_rows,
+    executive_pulse,
+)
 
 try:
     from atlasquant_neural_voice_ui import render_neural_voice_player
@@ -177,6 +181,7 @@ _WORKING_CHECKPOINT_KEY = "aion_working_checkpoint_v2"
 _WORKING_SOURCE_KEY = "aion_working_checkpoint_source_digest"
 _WORKING_DIRTY_KEY = "aion_working_checkpoint_dirty"
 _WORKING_CONFLICT_KEY = "aion_working_checkpoint_conflict"
+_AION_WORKSPACE_JUMP_KEY = "aion_admin_workspace_jump"
 
 AION_ADMIN_CSS = r"""
 <style>
@@ -228,13 +233,37 @@ AION_ADMIN_CSS = r"""
 .aion-state.info{color:#b9d8ff;background:rgba(52,92,145,.25);border:1px solid rgba(137,190,255,.24)}
 .aion-state.warn{color:#ffd56b;background:rgba(132,91,20,.24);border:1px solid rgba(255,213,107,.26)}
 .aion-state.blocked{color:#ffc2c2;background:rgba(120,45,55,.24);border:1px solid rgba(255,160,170,.24)}
+.aion-pulse{border:1px solid rgba(132,207,255,.28);border-radius:18px;padding:15px 16px;margin:8px 0 14px;background:linear-gradient(145deg,rgba(10,28,50,.96),rgba(8,20,37,.97));box-shadow:0 12px 34px rgba(0,0,0,.16)}
+.aion-pulse-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.aion-pulse-kicker{color:#9fb8d7;font-size:.68rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+.aion-pulse-title{color:#fff;font-size:1rem;font-weight:950;line-height:1.25;margin-top:3px;overflow-wrap:anywhere}
+.aion-pulse-detail{color:#e2edf9;font-size:.78rem;line-height:1.45;margin-top:7px}
+.aion-pulse-next{color:#dffbf5;font-size:.78rem;line-height:1.45;margin-top:8px}
+.aion-pulse-badge{border-radius:999px;padding:5px 9px;font-size:.66rem;font-weight:950;letter-spacing:.06em;white-space:nowrap;border:1px solid rgba(255,255,255,.16)}
+.aion-pulse-badge.critical{color:#ffd6d6;background:rgba(132,38,52,.34)}
+.aion-pulse-badge.attention{color:#ffe7a3;background:rgba(130,89,18,.32)}
+.aion-pulse-badge.review{color:#cde7ff;background:rgba(45,87,133,.33)}
+.aion-pulse-badge.controlled{color:#bff8e9;background:rgba(32,111,94,.3)}
+.aion-pulse-badge.unknown{color:#e6eaf0;background:rgba(83,92,108,.32)}
+.aion-pulse-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:12px}
+.aion-pulse-stat{border:1px solid rgba(137,187,225,.18);border-radius:12px;padding:9px 10px;background:rgba(13,34,58,.72);min-width:0}
+.aion-pulse-stat small{display:block;color:#c3d5e9;font-size:.63rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase}
+.aion-pulse-stat strong{display:block;color:#fff;font-size:.86rem;margin-top:3px;overflow-wrap:anywhere}
+.aion-card small,.aion-workspace-card p{color:#d8e6f5}
+.aion-card span{color:#e2ebf6;font-size:.76rem}
+.aion-workspace-card p{font-size:.76rem}
 @media (prefers-reduced-motion:reduce){.aion-orb{animation:none!important}}
 @media(max-width:760px){
  .aion-shell{padding:18px 16px;border-radius:18px}.aion-orb{width:58px;height:58px;right:16px;top:20px}
  .aion-sub{padding-right:64px;font-size:.8rem}.aion-grid{grid-template-columns:1fr 1fr}.aion-card{padding:11px 12px}
  .aion-workspace-grid{grid-template-columns:1fr 1fr}.aion-workspace-card{min-height:98px;padding:10px 11px}
+ .aion-pulse-grid{grid-template-columns:1fr 1fr}.aion-pulse{padding:13px 12px}.aion-pulse-top{gap:8px}
 }
-@media(max-width:430px){.aion-workspace-grid{grid-template-columns:1fr}}
+@media(max-width:430px){
+ .aion-workspace-grid{grid-template-columns:1fr}
+ .aion-pulse-grid{grid-template-columns:1fr}
+ .aion-pulse-top{display:block}.aion-pulse-badge{display:inline-block;margin-top:8px}
+}
 
 </style>
 """
@@ -923,6 +952,52 @@ def _render_continuity_center(
         st.markdown("**Próximos passos registrados:**")
         for item in next_steps[:8]:
             st.markdown(f"- {item}")
+
+
+def _render_executive_pulse(snapshot: Mapping[str, Any]) -> None:
+    posture = str(snapshot.get("posture") or "UNKNOWN").upper()
+    primary = snapshot.get("primary") if isinstance(snapshot.get("primary"), Mapping) else {}
+    badge_class = posture.casefold() if posture.casefold() in {"critical","attention","review","controlled","unknown"} else "unknown"
+    title = escape(str(primary.get("title") or "Sem prioridade definida"))
+    detail = escape(str(primary.get("detail") or ""))
+    next_action = escape(str(primary.get("next_action") or ""))
+    area = escape(str(primary.get("area") or "🧠 Central"))
+    st.markdown(
+        f"""
+<div class="aion-pulse">
+  <div class="aion-pulse-top">
+    <div>
+      <div class="aion-pulse-kicker">Pulso Executivo AION · {area}</div>
+      <div class="aion-pulse-title">{title}</div>
+      <div class="aion-pulse-detail">{detail}</div>
+      <div class="aion-pulse-next"><strong>Próxima ação segura:</strong> {next_action}</div>
+    </div>
+    <span class="aion-pulse-badge {badge_class}">{escape(posture)}</span>
+  </div>
+  <div class="aion-pulse-grid">
+    <div class="aion-pulse-stat"><small>Runtime</small><strong>{escape(str(snapshot.get("runtime_status") or "UNKNOWN"))}</strong></div>
+    <div class="aion-pulse-stat"><small>Integridade</small><strong>{escape(str(snapshot.get("integrity_state") or "UNKNOWN"))}</strong></div>
+    <div class="aion-pulse-stat"><small>Aprovações</small><strong>{int(snapshot.get("approval_count") or 0)}</strong></div>
+    <div class="aion-pulse-stat"><small>Incidentes</small><strong>{int(snapshot.get("incident_count") or 0)}</strong></div>
+    <div class="aion-pulse-stat"><small>Missões ativas</small><strong>{int(snapshot.get("active_missions") or 0)}</strong></div>
+  </div>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+    recommended = str(snapshot.get("recommended_workspace") or "")
+    if recommended in AION_WORKSPACES and recommended != "🧠 Central":
+        if st.button(
+            f"↗️ Abrir área recomendada · {recommended}",
+            key="aion_open_recommended_workspace",
+            width="stretch",
+        ):
+            st.session_state[_AION_WORKSPACE_JUMP_KEY] = recommended
+            st.rerun()
+    rows = compact_attention_rows(snapshot)
+    if len(rows) > 1:
+        with st.expander("Outros itens priorizados", expanded=False):
+            st.dataframe(rows, width="stretch", hide_index=True)
 
 
 def _render_master_status(board: Mapping[str, Any]) -> None:
