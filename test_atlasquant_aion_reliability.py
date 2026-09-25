@@ -28,6 +28,7 @@ class AtlasQuantAionReliabilityTests(unittest.TestCase):
         self.assertTrue(out["has_conflict"])
         self.assertTrue(out["has_critical_conflict"])
         self.assertEqual(out["conflict_count"],1)
+        self.assertEqual(out["source_counts"]["CONFLICT"],2)
         self.assertFalse(out["executes_action"])
 
     def test_stale_source_degrades_without_becoming_conflict(self):
