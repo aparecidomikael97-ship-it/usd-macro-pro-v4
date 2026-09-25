@@ -430,7 +430,7 @@ def render_beginner_shell(
         render_platform_center()
     elif page=="💰 Investir":
         from atlasquant_investment_panel import render_investment_center
-        render_investment_center()
+        render_investment_center("Iniciante")
     else:
         from atlasquant_support_center import render_support_center
         render_support_center()
