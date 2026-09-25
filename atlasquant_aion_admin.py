@@ -3001,6 +3001,18 @@ def render_aion_admin_console(
         "incident_center_rollback_review": bool(
             incident_snapshot.get("rollback_review_recommended", False)
         ),
+        "continuity_active_missions": int(
+            continuity_summary(
+                list(((checkpoint.get("continuity") or {}) if isinstance(checkpoint.get("continuity"), Mapping) else {}).get("missions", []) or []),
+                list(((checkpoint.get("continuity") or {}) if isinstance(checkpoint.get("continuity"), Mapping) else {}).get("handoffs", []) or []),
+            ).get("active_missions") or 0
+        ),
+        "continuity_handoff_count": int(
+            continuity_summary(
+                list(((checkpoint.get("continuity") or {}) if isinstance(checkpoint.get("continuity"), Mapping) else {}).get("missions", []) or []),
+                list(((checkpoint.get("continuity") or {}) if isinstance(checkpoint.get("continuity"), Mapping) else {}).get("handoffs", []) or []),
+            ).get("handoff_count") or 0
+        ),
         "checkpoint_dirty": bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
         "checkpoint_conflict": bool(st.session_state.get(_WORKING_CONFLICT_KEY, False)),
         "task_summary": queue_summary((checkpoint.get("operating") or {}).get("tasks", [])),
