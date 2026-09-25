@@ -135,6 +135,55 @@ class AtlasQuantAionExecutivePulseTests(unittest.TestCase):
         self.assertTrue(out["interface_validation_complete"])
         self.assertEqual(out["interface_validation_confirmed"],3)
 
+    def test_publication_mismatch_becomes_p1_attention(self):
+        out=executive_pulse(
+            runtime_result={"status":"CONFIRMED","integrity":{"state":"CONFIRMED"}},
+            publication_truth={
+                "state":"RUNTIME_BEHIND_OR_DIVERGED",
+                "main_match":"MISMATCH",
+                "production_verification":"UNKNOWN",
+                "can_claim_latest_main_live":False,
+                "next_action":"Revisar deploy.",
+            },
+        )
+        self.assertEqual(out["posture"],"ATTENTION")
+        self.assertEqual(out["primary"]["priority"],"P1")
+        self.assertIn("main",out["primary"]["title"].lower())
+        self.assertEqual(out["publication_main_match"],"MISMATCH")
+        self.assertFalse(out["can_claim_latest_main_live"])
+
+    def test_unverified_publication_is_review_not_live_claim(self):
+        out=executive_pulse(
+            runtime_result={"status":"CONFIRMED","integrity":{"state":"CONFIRMED"}},
+            publication_truth={
+                "state":"MAIN_MATCH_PRODUCTION_UNVERIFIED",
+                "main_match":"MATCH",
+                "production_verification":"UNKNOWN",
+                "can_claim_latest_main_live":False,
+                "next_action":"Validar produção.",
+            },
+        )
+        self.assertEqual(out["posture"],"REVIEW")
+        self.assertEqual(out["primary"]["priority"],"P2")
+        self.assertIn("não confirmada",out["primary"]["title"].lower())
+        self.assertEqual(out["publication_state"],"MAIN_MATCH_PRODUCTION_UNVERIFIED")
+        self.assertFalse(out["can_claim_latest_main_live"])
+
+    def test_verified_publication_adds_no_attention_by_itself(self):
+        out=executive_pulse(
+            runtime_result={"status":"CONFIRMED","integrity":{"state":"CONFIRMED"}},
+            status_board={"has_unresolved":False},
+            publication_truth={
+                "state":"PRODUCTION_VERIFIED",
+                "main_match":"MATCH",
+                "production_verification":"VERIFIED",
+                "can_claim_latest_main_live":True,
+            },
+        )
+        self.assertEqual(out["posture"],"CONTROLLED")
+        self.assertTrue(out["can_claim_latest_main_live"])
+        self.assertEqual(out["production_verification"],"VERIFIED")
+
     def test_compact_rows_are_presentation_only(self):
         out=executive_pulse(
             runtime_result={"status":"CONFIRMED","integrity":{"state":"CONFIRMED"}},
