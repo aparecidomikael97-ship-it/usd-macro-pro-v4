@@ -33,10 +33,10 @@ class AtlasQuantAionSourceMeshRuntimeTests(unittest.TestCase):
 
     def test_live_market_context_comes_only_from_mesh_confirmation(self):
         self.assertIn(
-            '_aion_market_live = bool(_aion_source_mesh.get("market_live_confirmed", False))',
+            'market_live = bool(mesh.get("market_live_confirmed", False))',
             self.src,
         )
-        self.assertIn('"fresh_confirmed": _aion_market_live',self.src)
+        self.assertIn('"fresh_confirmed": market_live',self.src)
         self.assertIn('"source_mesh": _aion_source_mesh',self.src)
         self.assertIn('"source_observations": list(_aion_source_mesh.get("observations", []) or [])',self.src)
 
