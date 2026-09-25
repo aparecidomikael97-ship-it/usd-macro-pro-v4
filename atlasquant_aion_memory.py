@@ -103,6 +103,12 @@ APPROVED_AION_FOUNDATION = (
     "Monitoramento 24/7 só pode ser declarado quando houver runtime contínuo comprovado; motor preparado ou código mesclado não prova vigilância contínua em produção.",
     "Prova de monitoramento contínuo exige heartbeats persistidos cobrindo aproximadamente 24 horas, com densidade mínima e sem lacunas excessivas; poucos ciclos recentes não bastam.",
     "Live Event Journal deve preservar histórico deduplicado, primeiro/último avistamento, recorrência e pico de urgência sem reclassificar o evento por conta própria.",
+    "Cognitive Orchestrator deve dividir perguntas complexas entre especialistas por domínio, reunir requisitos de evidência e exigir uma etapa Critic antes da síntese.",
+    "Deep Research do AION deve decompor a pergunta, buscar evidência primária/canônica, cruzar fontes independentes, preservar contradições e só então sintetizar.",
+    "Critic deve verificar proveniência, frescor, independência, contradições, suporte de afirmações factuais e alegações de ação externa antes de aceitar uma resposta forte.",
+    "O AION não deve expor chain-of-thought/raciocínio privado; deve mostrar conclusão, evidências, conflitos, lacunas, estado de verdade e justificativa verificável.",
+    "Conselho de Especialistas organiza responsabilidades; especialistas não são permissão para inventar dados nem substituir evidência real.",
+    "Orquestração cognitiva é custo zero/local por padrão e não executa web, modelo externo, publicação, deploy, pagamento ou trading sozinha.",
     "Execução real em corretora continua bloqueada; backtest/paper/forward e pesquisa não equivalem a autorização real.",
     "Gatilho operacional aprovado: quando o administrador disser 'tô no computador', priorizar a reconciliação do Render, configurar o Deploy Hook com segurança e validar Build Identity + Browser Smoke antes de retomar novos blocos.",
 )
