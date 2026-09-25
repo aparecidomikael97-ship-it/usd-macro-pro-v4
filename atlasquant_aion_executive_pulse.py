@@ -59,6 +59,7 @@ def executive_pulse(
     incident_snapshot:Mapping[str,Any]|None=None,
     status_board:Mapping[str,Any]|None=None,
     continuity_summary:Mapping[str,Any]|None=None,
+    interface_validation:Mapping[str,Any]|None=None,
     checkpoint_dirty:bool=False,
     checkpoint_conflict:bool=False,
     foundation_diagnostics:Sequence[Mapping[str,Any]]|None=None,
@@ -68,6 +69,7 @@ def executive_pulse(
     incidents=dict(incident_snapshot or {})
     board=dict(status_board or {})
     continuity=dict(continuity_summary or {})
+    validation=dict(interface_validation or {})
     diagnostics=[dict(x) for x in list(foundation_diagnostics or []) if isinstance(x,Mapping)]
 
     candidates=[]
@@ -149,6 +151,33 @@ def executive_pulse(
             high.get("detail") or "Há um incidente de alta severidade.",
             "Revisar o Centro de Segurança antes de avançar em mudanças sensíveis.",
             high.get("source") or "incident_center",
+        ))
+
+    validation_state=str(validation.get("state") or "").upper()
+    if validation_state=="ATTENTION":
+        candidates.append(_attention(
+            "P1","development",
+            "Validação da interface com falha confirmada",
+            (
+                f"{int(validation.get('confirmed') or 0)}/{int(validation.get('total') or 3)} "
+                "telas críticas confirmadas no build atual; existe falha observada."
+            ),
+            validation.get("next_action")
+            or "Usar a revalidação guiada do AION na próxima tela crítica pendente.",
+            "interface_validation",
+        ))
+    elif validation_state in {"NOT_STARTED","IN_PROGRESS","UNKNOWN"}:
+        progress=f"{int(validation.get('confirmed') or 0)}/{int(validation.get('total') or 3)}"
+        candidates.append(_attention(
+            "P2","development",
+            "Validação do build incompleta",
+            (
+                f"Progresso das telas críticas: {progress}. "
+                "Tela ainda não observada não é tratada como falha."
+            ),
+            validation.get("next_action")
+            or "Validar as telas críticas no build atual pelo fluxo guiado do AION.",
+            "interface_validation",
         ))
 
     if checkpoint_dirty:
@@ -234,6 +263,11 @@ def executive_pulse(
         "checkpoint_dirty":bool(checkpoint_dirty),
         "checkpoint_conflict":bool(checkpoint_conflict),
         "degraded_components":len(diagnostics),
+        "interface_validation_state":validation_state or "NONE",
+        "interface_validation_confirmed":int(validation.get("confirmed") or 0),
+        "interface_validation_total":int(validation.get("total") or 0),
+        "interface_validation_remaining":int(validation.get("remaining") or 0),
+        "interface_validation_complete":bool(validation.get("all_confirmed_current_build",False)),
         "recommended_workspace":primary["area"],
         "executes_action":False,
         "real_orders_enabled":False,
