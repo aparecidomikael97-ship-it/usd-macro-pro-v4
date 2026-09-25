@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from atlasquant_surface_health import (
     mark_surface_error,
@@ -38,6 +39,16 @@ class AtlasQuantSurfaceHealthTests(unittest.TestCase):
         advanced = next(x for x in snap["items"] if x["id"] == "advanced_radar")
         self.assertEqual(advanced["state"], "UNAVAILABLE")
         self.assertEqual(advanced["error_type"], "ImportError")
+
+    def test_main_runtime_records_and_clears_critical_surface_failures(self):
+        src = Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        self.assertIn('mark_surface_ok(st.session_state, "home_radar")', src)
+        self.assertIn('mark_surface_error(st.session_state, "home_radar"', src)
+        self.assertIn('mark_surface_ok(st.session_state, "advanced_radar")', src)
+        self.assertIn('mark_surface_error(\n                        st.session_state,\n                        "advanced_radar"', src)
+        self.assertIn('mark_surface_ok(st.session_state, "master_panel")', src)
+        self.assertIn('st.session_state.pop("atlasquant_master_panel_error", None)', src)
+        self.assertIn('"critical_surfaces": surface_health_snapshot(st.session_state)', src)
 
     def test_all_ok_requires_every_critical_surface_observed_ok(self):
         state = {}
