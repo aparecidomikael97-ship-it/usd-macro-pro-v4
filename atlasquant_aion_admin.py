@@ -172,6 +172,7 @@ from atlasquant_aion_intelligence import (
     simulate_macro_scenario,
 )
 from atlasquant_aion_reliability import reliability_snapshot
+from atlasquant_aion_cognitive_orchestrator import orchestrator_snapshot
 from atlasquant_aion_event_journal import (
     continuity_summary as live_event_continuity_summary,
     merge_events as merge_live_event_journal_events,
@@ -1922,6 +1923,38 @@ def _render_central(
     budget = normalize_budget((checkpoint.get("aion") or {}).get("model_budget", {}))
     hits_preview = search_canonical_memory(question) if question.strip() else []
     domain_preview = route_context(question).get("domain") if question.strip() else "central"
+    cognitive_preview = orchestrator_snapshot(
+        question,
+        domain_hint=domain_preview,
+        memory_hits=hits_preview,
+        system_context=system_context,
+    ) if question.strip() else {}
+    if cognitive_preview:
+        selected = [
+            x for x in list((cognitive_preview.get("routing") or {}).get("selected", []) or [])
+            if isinstance(x, Mapping)
+        ]
+        with st.expander("🧠 Conselho Cognitivo · especialistas + Critic", expanded=False):
+            c1,c2,c3 = st.columns(3)
+            c1.metric("Especialistas", int((cognitive_preview.get("routing") or {}).get("selected_count") or 0))
+            c2.metric("Readiness", str(cognitive_preview.get("readiness") or "UNKNOWN"))
+            c3.metric("Critic", "OBRIGATÓRIO" if bool((cognitive_preview.get("critic_gate") or {}).get("required", True)) else "NÃO")
+            if selected:
+                st.markdown("**Especialistas selecionados:** " + " · ".join(str(x.get("name") or x.get("id")) for x in selected))
+            blockers = list((cognitive_preview.get("research_plan") or {}).get("blockers", []) or [])
+            if blockers:
+                for blocker in blockers:
+                    st.warning(str(blocker))
+            stages = list((cognitive_preview.get("research_plan") or {}).get("steps", []) or [])
+            if stages:
+                st.dataframe([
+                    {"Etapa":row.get("stage"),"Regra":row.get("instruction")}
+                    for row in stages if isinstance(row, Mapping)
+                ], width="stretch", hide_index=True)
+            st.caption(
+                "O AION não mostra raciocínio privado/chain-of-thought. Ele mostra conclusão, evidências, "
+                "conflitos, lacunas e justificativa verificável."
+            )
     prompt_preview = build_provider_prompt(
         question,
         domain=domain_preview,
@@ -2057,6 +2090,20 @@ def _render_central(
     if isinstance(answer, Mapping):
         st.markdown("#### Resposta AION")
         st.write(str(answer.get("answer", "")))
+        cognitive_answer = answer.get("cognitive_orchestrator")
+        if isinstance(cognitive_answer, Mapping):
+            routing = (
+                cognitive_answer.get("routing")
+                if isinstance(cognitive_answer.get("routing"), Mapping)
+                else {}
+            )
+            selected_names = [
+                str(x.get("name") or "")
+                for x in list(routing.get("selected", []) or [])
+                if isinstance(x, Mapping) and str(x.get("name") or "").strip()
+            ]
+            if selected_names:
+                st.caption("Conselho usado: " + " · ".join(selected_names[:5]) + " · Critic: obrigatório")
         evidence = answer.get("evidence")
         if isinstance(evidence, list) and evidence:
             with st.expander("Evidências da memória"):
