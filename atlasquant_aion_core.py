@@ -259,6 +259,7 @@ _ACTION_RISK = {
     "search": GuardianRisk.READ,
     "draft": GuardianRisk.DRAFT,
     "save_checkpoint": GuardianRisk.WRITE,
+    "restore_checkpoint": GuardianRisk.WRITE,
     "write_runtime": GuardianRisk.WRITE,
     "publish_social": GuardianRisk.PUBLISH,
     "publish_marketplace": GuardianRisk.PUBLISH,
@@ -376,6 +377,7 @@ def guardian_posture(
     """
     actions = (
         "save_checkpoint",
+        "restore_checkpoint",
         "publish_social",
         "publish_marketplace",
         "activate_promotion",
