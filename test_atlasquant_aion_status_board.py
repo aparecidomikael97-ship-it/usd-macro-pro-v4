@@ -143,6 +143,12 @@ class AtlasQuantAionMasterStatusBoardTests(unittest.TestCase):
         )
         self.assertEqual(self.by_id(board,"external_llm")["state"],"CONFIRMED")
 
+    def test_entitlement_states_route_to_subscriptions_workspace(self):
+        board=self.base(feature_flags={"entitlement_activation":False})
+        self.assertEqual(self.by_id(board,"entitlement_activation")["area"],"subscriptions")
+        self.assertEqual(self.by_id(board,"entitlement_registry")["area"],"subscriptions")
+        self.assertEqual(self.by_id(board,"commercial_access_audit")["area"],"subscriptions")
+
     def test_status_rows_are_presentation_only(self):
         board=self.base()
         rows=status_rows(board)

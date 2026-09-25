@@ -88,6 +88,11 @@ class AtlasQuantAionApprovalInboxTests(unittest.TestCase):
         self.assertIn("não altera conta nem concede acesso automaticamente",item["reason"].lower())
         self.assertFalse(item["approved"])
 
+    def test_entitlement_approval_routes_to_subscriptions_workspace(self):
+        inbox=collect_approval_inbox(self.checkpoint())
+        item=next(x for x in inbox["items"] if x["kind"]=="ENTITLEMENT")
+        self.assertEqual(item["area"],"subscriptions")
+
     def test_presentation_rows_do_not_add_actions(self):
         inbox=collect_approval_inbox(self.checkpoint())
         rows=approval_rows(inbox)

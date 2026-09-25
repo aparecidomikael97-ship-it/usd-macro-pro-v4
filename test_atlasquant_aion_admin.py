@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from atlasquant_aion_admin import AION_ADMIN_CSS, AION_WORKSPACES
+from atlasquant_aion_admin import AION_ADMIN_CSS, AION_WORKSPACES, _attention_queue
 
 
 class AtlasQuantAionAdminTests(unittest.TestCase):
@@ -39,6 +39,42 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn(".aion-workspace-grid", AION_ADMIN_CSS)
         self.assertIn("@media(max-width:430px)", AION_ADMIN_CSS)
         self.assertIn("grid-template-columns:1fr", AION_ADMIN_CSS)
+
+    def test_central_attention_queue_prioritizes_approvals_and_maps_area(self):
+        board={
+            "attention":[
+                {
+                    "area":"subscriptions",
+                    "label":"Auditoria comercial",
+                    "state":"UNKNOWN",
+                    "next_action":"Confirmar runtime.",
+                }
+            ]
+        }
+        inbox={
+            "status":"CONFIRMED",
+            "next_items":[
+                {
+                    "priority":"P0",
+                    "area":"studio",
+                    "title":"Publicar vídeo",
+                    "status":"WAITING_APPROVAL",
+                }
+            ],
+        }
+        rows=_attention_queue(board,inbox,limit=8)
+        self.assertEqual(rows[0]["source"],"APROVAÇÃO")
+        self.assertEqual(rows[0]["area"],"🎬 Studio")
+        self.assertEqual(rows[1]["area"],"🔐 Assinaturas")
+        self.assertIn("nenhuma aprovação é automática",rows[0]["next_action"])
+
+    def test_central_next_action_is_read_only(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Próxima Ação AION",src)
+        self.assertIn("Fila consolidada de atenção",src)
+        self.assertIn("não aprova",src)
+        self.assertIn("não provisiona acesso",src)
+        self.assertIn("_render_attention_queue(status_board, approval_inbox)",src)
 
     def test_admin_console_requires_admin_and_keeps_external_actions_guarded(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")

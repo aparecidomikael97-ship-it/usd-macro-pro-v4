@@ -202,7 +202,7 @@ def build_master_status_board(
         ("marketplace_orders","Pedidos de marketplace","business","Conectar fonte de pedidos antes de afirmar vendas."),
         ("payment_provider","Pagamento/assinatura","promotions","Conectar provedor e validar eventos assinados; não conceder acesso automaticamente."),
         ("promotion_activation","Ativação de promoções","promotions","Conectar registro/provedor e exigir evidência de ativação."),
-        ("entitlement_activation","Ativação de entitlements","promotions","Conectar registro de assinaturas e exigir evidência externa confirmada."),
+        ("entitlement_activation","Ativação de entitlements","subscriptions","Conectar registro de assinaturas e exigir evidência externa confirmada."),
         ("production_deploy","Deploy de produção","development","Usar mecanismo de deploy aprovado e validar identidade exata do build."),
     )
     for key,label,area,next_action in external_specs:
@@ -244,7 +244,7 @@ def build_master_status_board(
     items.append(_item(
         "entitlement_registry",
         "Registro local de entitlements",
-        area="promotions",
+        area="subscriptions",
         state="CONFIRMED" if entitlement_loaded else "UNKNOWN",
         detail=(
             "Estrutura de entitlements está presente no Checkpoint; isso não significa acesso comercial ativo."
@@ -312,7 +312,7 @@ def build_master_status_board(
     items.append(_item(
         "commercial_access_audit",
         "Auditoria comercial Conta × Entitlement",
-        area="promotions",
+        area="subscriptions",
         state=commercial_state,
         detail=commercial_detail,
         source="configured user registry + entitlement audit + runtime checkpoint",
