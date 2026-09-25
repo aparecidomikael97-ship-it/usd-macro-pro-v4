@@ -39,6 +39,14 @@ def _refs(values:Sequence[Any]|None,limit:int=100)->list[str]:
     return out
 
 
+def _safe_int(value:Any,default:int=0,minimum:int=0,maximum:int=10000)->int:
+    try:
+        out=int(value)
+    except Exception:
+        out=int(default)
+    return max(minimum,min(maximum,out))
+
+
 def _digest(value:Any,length:int=20)->str:
     raw=json.dumps(value,ensure_ascii=False,sort_keys=True,default=str)
     return sha256(raw.encode("utf-8")).hexdigest()[:length]
@@ -124,7 +132,7 @@ def normalize_pipeline(raw:Mapping[str,Any])->dict[str,Any]:
             "actor_ref":_clean(raw_stage.get("actor_ref"),160),
             "evidence_refs":_refs(raw_stage.get("evidence_refs") if isinstance(raw_stage.get("evidence_refs"),(list,tuple)) else []),
             "summary":_clean(raw_stage.get("summary"),1200),
-            "critical_findings":max(0,min(int(raw_stage.get("critical_findings") or 0),10000)),
+            "critical_findings":_safe_int(raw_stage.get("critical_findings")),
             "updated_at":_clean(raw_stage.get("updated_at"),80),
             "executes_action":False,
         }
@@ -178,7 +186,7 @@ def record_stage(
                 "actor_ref":actor,
                 "evidence_refs":refs,
                 "summary":_clean(summary,1200),
-                "critical_findings":max(0,min(int(critical_findings or 0),10000)),
+                "critical_findings":_safe_int(critical_findings),
                 "updated_at":str(changed_at or _now()),
                 "executes_action":False,
             })
@@ -209,7 +217,7 @@ def evaluate_pipeline(pipeline:Mapping[str,Any])->dict[str,Any]:
     for row in stages:
         if row.get("state") in {"FAIL","BLOCKED"}:
             blockers.append(f"{row.get('stage')}_{row.get('state')}")
-        if int(row.get("critical_findings") or 0)>0:
+        if _safe_int(row.get("critical_findings"))>0:
             blockers.append(f"{row.get('stage')}_CRITICAL_FINDINGS")
 
     review_ready=bool(
