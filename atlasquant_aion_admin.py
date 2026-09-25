@@ -43,6 +43,7 @@ from atlasquant_aion_memory import (
     update_business_checkpoint,
     update_entitlements_checkpoint,
     update_continuity_checkpoint,
+    update_learning_checkpoint,
     update_operating_checkpoint,
     update_promotions_checkpoint,
     update_studio_checkpoint,
@@ -168,6 +169,21 @@ from atlasquant_aion_intelligence import (
     evidence_confidence,
     scenario_events,
     simulate_macro_scenario,
+)
+from atlasquant_aion_learning import (
+    CAUSE_TAGS as LEARNING_CAUSE_TAGS,
+    FORECAST_TYPES as LEARNING_FORECAST_TYPES,
+    RESEARCH_KINDS as LEARNING_RESEARCH_KINDS,
+    confidence_calibration,
+    error_pattern_summary,
+    evaluate_learning_experiment,
+    learning_summary,
+    new_learning_episode,
+    new_learning_experiment,
+    new_research_reference,
+    settle_learning_episode,
+    upsert_learning_episode,
+    upsert_learning_experiment,
 )
 
 try:
@@ -2329,6 +2345,354 @@ def _render_laboratory(
         ),
         key="aion_laboratory_voice",
     )
+
+    learning = checkpoint.get("learning") if isinstance(checkpoint.get("learning"), Mapping) else {}
+    episodes = list(learning.get("episodes", []) or [])
+    experiments = list(learning.get("experiments", []) or [])
+    research_refs = list(learning.get("research_refs", []) or [])
+    learning_state = learning_summary(episodes, experiments, research_refs)
+    calibration_state = confidence_calibration(episodes)
+    error_state = error_pattern_summary(episodes)
+
+    st.markdown("#### 🧠 Aprendizado Controlado AION")
+    st.caption(
+        "Ciclo: registrar previsão → observar resultado → medir erro/acerto → revisar causa → "
+        "calibrar confiança → testar Challenger fora da amostra → Shadow Mode → revisão humana. "
+        "Nada altera peso, regra ou produção automaticamente."
+    )
+    l1,l2,l3,l4 = st.columns(4)
+    l1.metric("Episódios", int(learning_state.get("episodes") or 0))
+    l2.metric("Em aberto", int(learning_state.get("open_episodes") or 0))
+    l3.metric("Erros observados", int(learning_state.get("errors") or 0))
+    l4.metric(
+        "Gap de calibração",
+        "—" if learning_state.get("calibration_gap_pct") is None
+        else f"{float(learning_state.get('calibration_gap_pct')):.1f}%",
+    )
+    st.caption(
+        f"Calibração: {learning_state.get('calibration_state','INSUFFICIENT')} · "
+        f"evidências de pesquisa referenciadas: {int(learning_state.get('research_references') or 0)} · "
+        f"candidatos para revisão humana: {int(learning_state.get('human_review_candidates') or 0)}."
+    )
+
+    with st.expander("Registrar previsão / decisão para aprender depois", expanded=False):
+        with st.form("aion_learning_new_episode", clear_on_submit=True):
+            subject = st.text_input("Assunto", placeholder="Ex.: reação do USD ao Payroll")
+            forecast_type = st.selectbox(
+                "Tipo",
+                list(LEARNING_FORECAST_TYPES),
+                key="aion_learning_forecast_type",
+            )
+            prediction = st.text_input("Previsão / categoria", placeholder="Ex.: USD_UP")
+            confidence_pct = st.slider(
+                "Confiança da previsão (não é probabilidade de lucro)",
+                0, 100, 50,
+            )
+            model_version = st.text_input("Versão do modelo / regra", value="AION")
+            context_note = st.text_area("Contexto registrado", max_chars=1200)
+            refs_text = st.text_input(
+                "Referências de evidência (separadas por vírgula)",
+                placeholder="calendar:event-1, backtest:snapshot-3",
+            )
+            numeric_prediction = None
+            numeric_tolerance = None
+            if forecast_type == "NUMERIC":
+                n1,n2 = st.columns(2)
+                numeric_prediction = n1.number_input(
+                    "Valor previsto", value=0.0, step=0.1,
+                )
+                numeric_tolerance = n2.number_input(
+                    "Tolerância para considerar acerto", min_value=0.0, value=0.0, step=0.1,
+                )
+            create_episode = st.form_submit_button("Registrar episódio", type="primary")
+        if create_episode:
+            try:
+                episode = new_learning_episode(
+                    subject,
+                    forecast_type=forecast_type,
+                    prediction=prediction,
+                    confidence_pct=confidence_pct,
+                    model_version=model_version,
+                    evidence_refs=[x.strip() for x in refs_text.split(",") if x.strip()],
+                    context_note=context_note,
+                    numeric_prediction=numeric_prediction,
+                    numeric_tolerance=numeric_tolerance,
+                    source=str(access.get("username") or "ADMIN"),
+                )
+                episodes = upsert_learning_episode(episodes, episode)
+                updated = update_learning_checkpoint(
+                    checkpoint,
+                    episodes=episodes,
+                    experiments=experiments,
+                    research_refs=research_refs,
+                    dirty=True,
+                )
+                updated = _record_working_event(
+                    updated,
+                    "learning_episode_registered",
+                    f"Episódio de aprendizado registrado: {episode['subject']}",
+                    evidence={
+                        "episode_id":episode["episode_id"],
+                        "forecast_type":episode["forecast_type"],
+                        "automatic_rule_change":False,
+                    },
+                )
+                _set_working_checkpoint(updated, dirty=True)
+                st.success("Episódio registrado na memória de trabalho. Salve o Checkpoint Mestre para persistir.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Não foi possível registrar o episódio: {type(exc).__name__}")
+
+    open_episodes = [
+        item for item in episodes
+        if isinstance(item, Mapping) and str(item.get("state") or "").upper()=="OPEN"
+    ]
+    if open_episodes:
+        with st.expander("Registrar resultado real / fechar episódio", expanded=False):
+            episode_options = {
+                f"{item.get('episode_id')} · {item.get('subject')}": item
+                for item in open_episodes
+            }
+            selected_label = st.selectbox(
+                "Episódio em aberto",
+                list(episode_options.keys()),
+                key="aion_learning_settle_episode",
+            )
+            selected_episode = episode_options[selected_label]
+            with st.form("aion_learning_settle_form"):
+                actual_outcome = st.text_input(
+                    "Resultado real / categoria observada",
+                    placeholder="Ex.: USD_DOWN",
+                )
+                actual_numeric = None
+                if str(selected_episode.get("forecast_type") or "")=="NUMERIC":
+                    actual_numeric = st.number_input(
+                        "Valor real observado", value=0.0, step=0.1,
+                    )
+                cause = st.selectbox(
+                    "Causa do erro, se houver",
+                    list(LEARNING_CAUSE_TAGS),
+                    index=list(LEARNING_CAUSE_TAGS).index("UNKNOWN"),
+                )
+                cause_confirmed = st.checkbox(
+                    "A causa acima tem evidência confirmada",
+                    value=False,
+                    help="Sem esta confirmação o AION guarda a causa como hipótese/desconhecida, não como fato.",
+                )
+                outcome_note = st.text_area("Observação do resultado", max_chars=1200)
+                settle_episode = st.form_submit_button("Fechar episódio", type="primary")
+            if settle_episode:
+                try:
+                    settled = settle_learning_episode(
+                        selected_episode,
+                        actual_outcome=actual_outcome,
+                        actual_numeric=actual_numeric,
+                        error_cause=cause,
+                        error_cause_confirmed=cause_confirmed,
+                        outcome_note=outcome_note,
+                    )
+                    episodes = upsert_learning_episode(episodes, settled)
+                    updated = update_learning_checkpoint(
+                        checkpoint,
+                        episodes=episodes,
+                        experiments=experiments,
+                        research_refs=research_refs,
+                        dirty=True,
+                    )
+                    updated = _record_working_event(
+                        updated,
+                        "learning_episode_settled",
+                        f"Episódio de aprendizado fechado: {settled['subject']}",
+                        evidence={
+                            "episode_id":settled["episode_id"],
+                            "evaluation":settled["evaluation"],
+                            "error_cause_truth":settled["error_cause_truth"],
+                            "automatic_weight_change":False,
+                        },
+                    )
+                    _set_working_checkpoint(updated, dirty=True)
+                    st.success("Resultado registrado sem alterar regras ou pesos automaticamente.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Não foi possível fechar o episódio: {type(exc).__name__}")
+
+    with st.expander("Registrar evidência de Backtest / Paper / Shadow", expanded=False):
+        with st.form("aion_learning_research_ref", clear_on_submit=True):
+            research_kind = st.selectbox("Tipo de evidência", list(LEARNING_RESEARCH_KINDS))
+            research_ref_id = st.text_input(
+                "ID / referência", placeholder="Ex.: snapshot-id ou arquivo/relatório",
+            )
+            research_strategy = st.text_input("Operacional / estratégia")
+            research_summary_text = st.text_area("Resumo da evidência", max_chars=1000)
+            save_research = st.form_submit_button("Vincular evidência")
+        if save_research:
+            try:
+                ref = new_research_reference(
+                    research_kind,
+                    research_ref_id,
+                    strategy=research_strategy,
+                    summary=research_summary_text,
+                )
+                known_ids = {str(x.get("research_id") or "") for x in research_refs if isinstance(x, Mapping)}
+                if ref["research_id"] not in known_ids:
+                    research_refs.append(ref)
+                updated = update_learning_checkpoint(
+                    checkpoint,
+                    episodes=episodes,
+                    experiments=experiments,
+                    research_refs=research_refs,
+                    dirty=True,
+                )
+                _set_working_checkpoint(updated, dirty=True)
+                st.success("Evidência vinculada por referência; nenhum resultado de pesquisa alterou o gate ao vivo.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Não foi possível vincular a evidência: {type(exc).__name__}")
+
+    with st.expander("Champion × Challenger · promoção controlada", expanded=False):
+        st.caption(
+            "O Challenger nunca substitui o Champion automaticamente. Primeiro precisa de OOS, "
+            "não degradação, Shadow Mode e depois revisão humana."
+        )
+        with st.form("aion_learning_new_experiment", clear_on_submit=True):
+            champion_version = st.text_input("Champion atual")
+            challenger_version = st.text_input("Challenger")
+            rationale = st.text_area("Hipótese de melhoria", max_chars=1200)
+            create_experiment = st.form_submit_button("Criar experimento")
+        if create_experiment:
+            try:
+                experiment = new_learning_experiment(
+                    champion_version,
+                    challenger_version,
+                    rationale=rationale,
+                )
+                experiments = upsert_learning_experiment(experiments, experiment)
+                updated = update_learning_checkpoint(
+                    checkpoint,
+                    episodes=episodes,
+                    experiments=experiments,
+                    research_refs=research_refs,
+                    dirty=True,
+                )
+                _set_working_checkpoint(updated, dirty=True)
+                st.success("Challenger registrado como hipótese. Produção não foi alterada.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Não foi possível criar o experimento: {type(exc).__name__}")
+
+        if experiments:
+            exp_options = {
+                f"{item.get('experiment_id')} · {item.get('champion_version')} → {item.get('challenger_version')}": item
+                for item in experiments if isinstance(item, Mapping)
+            }
+            selected_exp_label = st.selectbox(
+                "Experimento",
+                list(exp_options.keys()),
+                key="aion_learning_experiment_selected",
+            )
+            selected_exp = exp_options[selected_exp_label]
+            with st.form("aion_learning_evaluate_experiment"):
+                st.markdown("**Métricas fora da amostra / Shadow**")
+                c1,c2 = st.columns(2)
+                champ_exp = c1.number_input("Champion · expectancy R", value=0.0, step=0.01)
+                chall_exp = c2.number_input("Challenger · expectancy R", value=0.0, step=0.01)
+                c3,c4 = st.columns(2)
+                champ_dd = c3.number_input("Champion · drawdown R", min_value=0.0, value=0.0, step=0.1)
+                chall_dd = c4.number_input("Challenger · drawdown R", min_value=0.0, value=0.0, step=0.1)
+                c5,c6 = st.columns(2)
+                champ_cal = c5.number_input("Champion · erro calibração %", min_value=0.0, value=0.0, step=0.5)
+                chall_cal = c6.number_input("Challenger · erro calibração %", min_value=0.0, value=0.0, step=0.5)
+                c7,c8 = st.columns(2)
+                champ_false = c7.number_input("Champion · falso alerta %", min_value=0.0, value=0.0, step=0.5)
+                chall_false = c8.number_input("Challenger · falso alerta %", min_value=0.0, value=0.0, step=0.5)
+                oos_samples = st.number_input("Amostras OOS do Challenger", min_value=0, value=0, step=10)
+                shadow_eligible = st.checkbox("Shadow elegível para revisão manual", value=False)
+                critical_mismatches = st.number_input("Divergências críticas no Shadow", min_value=0, value=0, step=1)
+                evaluate_experiment = st.form_submit_button("Avaliar Challenger")
+            if evaluate_experiment:
+                evaluated = evaluate_learning_experiment(
+                    selected_exp,
+                    champion_metrics={
+                        "expectancy_r":champ_exp,
+                        "max_drawdown_r":champ_dd,
+                        "calibration_error_pct":champ_cal,
+                        "false_alert_rate_pct":champ_false,
+                    },
+                    challenger_metrics={
+                        "oos_samples":oos_samples,
+                        "expectancy_r":chall_exp,
+                        "max_drawdown_r":chall_dd,
+                        "calibration_error_pct":chall_cal,
+                        "false_alert_rate_pct":chall_false,
+                    },
+                    shadow_summary={
+                        "eligible_for_manual_review":shadow_eligible,
+                        "critical_mismatches":critical_mismatches,
+                    },
+                )
+                experiments = upsert_learning_experiment(experiments, evaluated)
+                updated = update_learning_checkpoint(
+                    checkpoint,
+                    episodes=episodes,
+                    experiments=experiments,
+                    research_refs=research_refs,
+                    dirty=True,
+                )
+                _set_working_checkpoint(updated, dirty=True)
+                state = str(evaluated.get("state") or "UNKNOWN")
+                if state=="HUMAN_REVIEW_CANDIDATE":
+                    st.success("Challenger atingiu critérios mínimos para REVISÃO HUMANA. Promoção automática continua proibida.")
+                else:
+                    st.warning(f"Challenger permaneceu em {state}. Champion continua oficial.")
+                st.rerun()
+
+    if episodes:
+        with st.expander("Diário de aprendizado", expanded=False):
+            st.dataframe([
+                {
+                    "ID":item.get("episode_id"),
+                    "Estado":item.get("state"),
+                    "Assunto":item.get("subject"),
+                    "Tipo":item.get("forecast_type"),
+                    "Previsão":item.get("prediction"),
+                    "Confiança":item.get("forecast_confidence_pct"),
+                    "Resultado":item.get("actual_outcome"),
+                    "Avaliação":item.get("evaluation"),
+                    "Causa":item.get("error_cause"),
+                    "Causa confirmada":item.get("error_cause_truth"),
+                    "Versão":item.get("model_version"),
+                }
+                for item in reversed(episodes[-200:]) if isinstance(item, Mapping)
+            ], width="stretch", hide_index=True)
+
+    if calibration_state.get("samples"):
+        with st.expander("Calibração da confiança", expanded=False):
+            st.dataframe([
+                {
+                    "Faixa":row.get("band"),
+                    "Amostras":row.get("samples"),
+                    "Confiança média %":row.get("average_confidence_pct"),
+                    "Acerto observado %":row.get("observed_accuracy_pct"),
+                    "Gap %":row.get("absolute_calibration_gap_pct"),
+                }
+                for row in list(calibration_state.get("bands") or [])
+            ], width="stretch", hide_index=True)
+            st.caption(
+                "Auto-recalibração de pesos: DESATIVADA. A taxa observada não é probabilidade de lucro futuro."
+            )
+
+    confirmed_causes = error_state.get("confirmed_cause_counts") if isinstance(error_state.get("confirmed_cause_counts"), Mapping) else {}
+    if confirmed_causes:
+        st.caption(
+            "Causas de erro confirmadas mais recorrentes: "
+            + " · ".join(f"{k}: {v}" for k,v in list(confirmed_causes.items())[:6])
+        )
+    if int(error_state.get("errors_without_confirmed_cause") or 0):
+        st.info(
+            f"{int(error_state.get('errors_without_confirmed_cause') or 0)} erro(s) ainda sem causa confirmada. "
+            "O AION não inventará causalidade para preencher essa lacuna."
+        )
+
     st.markdown("#### Feature Flags externas")
     rows = [
         {"feature": key, "enabled": bool(value), "default": "OFF"}
@@ -3776,6 +4140,28 @@ def render_aion_admin_console(
         "release_gate_next_stage": str(
             release_gate_state.get("next_stage") or ""
         ),
+        "learning_episodes": int(
+            learning_summary(
+                list(((checkpoint.get("learning") or {}) if isinstance(checkpoint.get("learning"), Mapping) else {}).get("episodes", []) or []),
+                list(((checkpoint.get("learning") or {}) if isinstance(checkpoint.get("learning"), Mapping) else {}).get("experiments", []) or []),
+                list(((checkpoint.get("learning") or {}) if isinstance(checkpoint.get("learning"), Mapping) else {}).get("research_refs", []) or []),
+            ).get("episodes") or 0
+        ),
+        "learning_open_episodes": int(
+            learning_summary(
+                list(((checkpoint.get("learning") or {}) if isinstance(checkpoint.get("learning"), Mapping) else {}).get("episodes", []) or []),
+                list(((checkpoint.get("learning") or {}) if isinstance(checkpoint.get("learning"), Mapping) else {}).get("experiments", []) or []),
+                list(((checkpoint.get("learning") or {}) if isinstance(checkpoint.get("learning"), Mapping) else {}).get("research_refs", []) or []),
+            ).get("open_episodes") or 0
+        ),
+        "learning_human_review_candidates": int(
+            learning_summary(
+                list(((checkpoint.get("learning") or {}) if isinstance(checkpoint.get("learning"), Mapping) else {}).get("episodes", []) or []),
+                list(((checkpoint.get("learning") or {}) if isinstance(checkpoint.get("learning"), Mapping) else {}).get("experiments", []) or []),
+                list(((checkpoint.get("learning") or {}) if isinstance(checkpoint.get("learning"), Mapping) else {}).get("research_refs", []) or []),
+            ).get("human_review_candidates") or 0
+        ),
+        "learning_automatic_changes": False,
         "commander_posture": str(commander_snapshot.get("posture") or "UNKNOWN"),
         "commander_objective": str(commander_snapshot.get("objective") or ""),
         "commander_next_action": str(commander_snapshot.get("next_action") or ""),
