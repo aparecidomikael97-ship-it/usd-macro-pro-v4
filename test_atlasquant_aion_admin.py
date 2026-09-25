@@ -24,6 +24,22 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         for label in AION_WORKSPACES:
             self.assertIn(f'selected_workspace == "{label}"',src)
 
+    def test_central_operations_map_covers_all_nine_workspaces_without_actions(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("def _workspace_overview_items(", src)
+        self.assertIn("def _render_workspace_overview(", src)
+        self.assertIn("Mapa Operacional AION", src)
+        for label in AION_WORKSPACES:
+            self.assertIn(f'"name": "{label}"', src)
+        self.assertIn("O mapa é somente leitura", src)
+        self.assertIn("não aprova, publica, cobra, provisiona acesso nem envia ordens", src)
+        self.assertIn('state": "REAL BLOQUEADO"', src)
+
+    def test_central_operations_map_has_mobile_layout(self):
+        self.assertIn(".aion-workspace-grid", AION_ADMIN_CSS)
+        self.assertIn("@media(max-width:430px)", AION_ADMIN_CSS)
+        self.assertIn("grid-template-columns:1fr", AION_ADMIN_CSS)
+
     def test_admin_console_requires_admin_and_keeps_external_actions_guarded(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("if not is_admin(access_map):", src)
