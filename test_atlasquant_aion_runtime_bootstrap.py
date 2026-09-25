@@ -27,6 +27,15 @@ class AtlasQuantAionRuntimeBootstrapTests(unittest.TestCase):
         self.assertIn("contents: write",src)
         self.assertNotIn("branch='main'",src)
 
+    def test_existing_checkpoint_bootstrap_is_migration_aware_and_never_writes_existing_state(self):
+        src=Path(".github/workflows/aion-runtime-checkpoint-bootstrap.yml").read_text(encoding="utf-8")
+        existing=src.split('if gh api "$API_PATH?ref=atlasquant-runtime"',1)[1].split("else\n            CONTENT=",1)[0]
+        self.assertIn("atlasquant_aion_runtime_migrate.py",existing)
+        self.assertIn("--output /tmp/runtime_migration_candidate.json",existing)
+        self.assertIn("bootstrap.py --verify /tmp/runtime_migration_candidate.json",existing)
+        self.assertIn("delegated to the migration workflow",existing)
+        self.assertNotIn("gh api --method PUT",existing)
+
     def test_write_and_verify_roundtrip(self):
         with tempfile.TemporaryDirectory() as td:
             path=Path(td)/"checkpoint_master.json"
