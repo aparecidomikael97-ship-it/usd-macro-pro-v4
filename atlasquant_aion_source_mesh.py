@@ -168,7 +168,8 @@ def calendar_observations(
 ) -> list[dict[str, Any]]:
     event = dict(next_event or {})
     available = bool(event.get("disponivel", False))
-    source = _clean(event.get("fonte"), 180) or "economic_calendar"
+    raw_source = _clean(event.get("fonte"), 180)
+    source = raw_source or "economic_calendar"
     impact = _clean(event.get("impacto"), 80).upper()
     value = {
         "evento": _clean(event.get("evento"), 180),
@@ -182,7 +183,7 @@ def calendar_observations(
         source=source,
         claim="economic_calendar_next_event",
         value=value,
-        truth_state="CONFIRMED" if available and bool(source) else "UNKNOWN",
+        truth_state="CONFIRMED" if available and bool(raw_source) else "UNKNOWN",
         available=available,
         healthy=available,
         criticality=criticality,
