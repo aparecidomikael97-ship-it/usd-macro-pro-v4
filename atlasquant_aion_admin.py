@@ -654,6 +654,7 @@ def _aion_area_label(area: Any) -> str:
 def _attention_queue(
     status_board: Mapping[str, Any] | None,
     approval_inbox: Mapping[str, Any] | None,
+    critical_surfaces: Mapping[str, Any] | None = None,
     *,
     limit: int = 8,
 ) -> list[dict[str, str]]:
@@ -671,6 +672,26 @@ def _attention_queue(
                 "state": str(item.get("status") or "WAITING_APPROVAL"),
                 "next_action": "Revisar na área indicada; nenhuma aprovação é automática.",
             })
+
+    surface_snapshot = dict(critical_surfaces or {})
+    for item in list(surface_snapshot.get("items", []) or []):
+        if not isinstance(item, Mapping):
+            continue
+        state = str(item.get("state") or "UNKNOWN").upper()
+        if state == "OK":
+            continue
+        priority = "P1" if state in {"DEGRADED", "UNAVAILABLE"} else "P2"
+        rows.append({
+            "priority": priority,
+            "source": "TELA",
+            "area": "🛠️ Desenvolvimento",
+            "item": str(item.get("label") or item.get("id") or "Tela crítica"),
+            "state": state,
+            "next_action": str(
+                item.get("next_action")
+                or "Revalidar a tela no build atual antes de concluir que está saudável."
+            ),
+        })
 
     board = dict(status_board or {})
     for item in list(board.get("attention", []) or []):
@@ -718,13 +739,18 @@ def _attention_queue(
 def _render_attention_queue(
     status_board: Mapping[str, Any],
     approval_inbox: Mapping[str, Any],
+    critical_surfaces: Mapping[str, Any] | None = None,
 ) -> None:
     st.markdown("#### Próxima Ação AION")
     st.caption(
         "Fila consolidada de atenção. Ela orienta o administrador, mas não aprova, "
         "não publica, não cobra, não provisiona acesso e não executa trading."
     )
-    rows = _attention_queue(status_board, approval_inbox)
+    rows = _attention_queue(
+        status_board,
+        approval_inbox,
+        critical_surfaces,
+    )
     if not rows:
         st.success(
             "Nenhuma ação administrativa imediata foi identificada nas evidências atuais. "
@@ -1060,13 +1086,15 @@ def _critical_surface_rows(system_context: Mapping[str, Any] | None) -> list[dic
         if not isinstance(item, Mapping):
             continue
         state = str(item.get("state") or "UNKNOWN").upper()
-        if state not in {"OK", "DEGRADED", "UNAVAILABLE", "UNKNOWN"}:
+        if state not in {"OK", "DEGRADED", "UNAVAILABLE", "STALE_BUILD", "UNKNOWN"}:
             state = "UNKNOWN"
         rows.append({
             "Tela": str(item.get("label") or item.get("id") or "Tela não identificada"),
             "Estado": state,
+            "Build observado": str(item.get("build_id") or "—"),
+            "Build atual": str(item.get("current_build") or "—"),
             "Diagnóstico": str(item.get("error_type") or "—"),
-            "Detalhe": str(item.get("detail") or "Sem detalhe confirmado."),
+            "Próxima ação": str(item.get("next_action") or "Revalidar a tela."),
         })
     return rows
 
@@ -1086,8 +1114,11 @@ def _render_critical_surface_health(system_context: Mapping[str, Any] | None) ->
     counts = snapshot.get("counts") if isinstance(snapshot.get("counts"), Mapping) else {}
     c1,c2,c3,c4 = st.columns(4)
     c1.metric("OK", int(counts.get("OK") or 0))
-    c2.metric("Degradadas", int(counts.get("DEGRADED") or 0))
-    c3.metric("Indisponíveis", int(counts.get("UNAVAILABLE") or 0))
+    c2.metric(
+        "Com problema",
+        int(counts.get("DEGRADED") or 0) + int(counts.get("UNAVAILABLE") or 0),
+    )
+    c3.metric("Build antigo", int(counts.get("STALE_BUILD") or 0))
     c4.metric("Não observadas", int(counts.get("UNKNOWN") or 0))
 
     rows = _critical_surface_rows(system)
@@ -1107,8 +1138,8 @@ def _render_critical_surface_health(system_context: Mapping[str, Any] | None) ->
         )
     else:
         st.warning(
-            "Existe tela degradada, indisponível ou ainda não observada nesta sessão. "
-            "O AION mantém o estado como pendente até nova evidência de renderização bem-sucedida."
+            "Existe tela degradada, indisponível, ligada a build antigo ou ainda não observada. "
+            "O AION mantém o estado como pendente até nova evidência no build atual."
         )
 
 
@@ -1149,7 +1180,11 @@ def _render_central(
 
     if view_mode == "Completo":
         _render_workspace_overview(checkpoint, runtime_result)
-        _render_attention_queue(status_board, approval_inbox)
+        _render_attention_queue(
+            status_board,
+            approval_inbox,
+            (system_context.get("critical_surfaces") if isinstance(system_context, Mapping) else None),
+        )
         _render_memory_security_posture(access, checkpoint, runtime_result, flags)
         _render_security_incident_center(incident_snapshot)
         _render_continuity_center(checkpoint)
@@ -1158,7 +1193,11 @@ def _render_central(
             "Modo Essencial ativo: detalhes técnicos ficam ocultos para reduzir carga e rolagem. "
             "Nenhuma evidência ou proteção é desativada."
         )
-        _render_attention_queue(status_board, approval_inbox)
+        _render_attention_queue(
+            status_board,
+            approval_inbox,
+            (system_context.get("critical_surfaces") if isinstance(system_context, Mapping) else None),
+        )
         _render_continuity_center(checkpoint)
         if int(incident_snapshot.get("total") or 0) > 0 or bool(
             incident_snapshot.get("rollback_review_recommended")

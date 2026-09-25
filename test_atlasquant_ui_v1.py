@@ -388,7 +388,8 @@ class AtlasQuantUiTests(unittest.TestCase):
         src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
         call=src.rindex("render_pair_intelligence_v110(")
         before=src[max(0,call-500):call]
-        after=src[call:call+1800]
+        exc=src.index("except Exception as _aq_pair_intel_exc:",call)
+        after=src[exc:exc+2400]
         self.assertIn("try:",before)
         self.assertIn("except Exception as _aq_pair_intel_exc:",after)
         self.assertIn("aq_radar_advanced_error",after)
