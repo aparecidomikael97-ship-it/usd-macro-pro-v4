@@ -139,6 +139,11 @@ from atlasquant_aion_tenant_privacy import (
     tenant_privacy_policy_snapshot,
     tenant_privacy_readiness,
 )
+from atlasquant_aion_incident_center import (
+    collect_incidents,
+    incident_center_rows,
+    incident_response_plan,
+)
 
 try:
     from atlasquant_neural_voice_ui import render_neural_voice_player
@@ -779,6 +784,77 @@ def _render_memory_security_posture(
             )
 
 
+def _render_security_incident_center(
+    snapshot: Mapping[str, Any],
+) -> None:
+    st.markdown("#### 🛡️ Centro de Segurança & Incidentes")
+    st.caption(
+        "Consolida somente sinais explícitos desta execução e eventos do Checkpoint. "
+        "O painel não faz contenção, rollback, rotação de segredo, alteração de conta ou trading."
+    )
+    counts = snapshot.get("counts") if isinstance(snapshot.get("counts"), Mapping) else {}
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("Incidentes", int(snapshot.get("total") or 0))
+    c2.metric("Críticos", int(counts.get("CRITICAL") or 0))
+    c3.metric("Altos", int(counts.get("HIGH") or 0))
+    c4.metric(
+        "Rollback",
+        "REVISAR" if snapshot.get("rollback_review_recommended") else "SEM SINAL CONFIRMADO",
+    )
+
+    rows = incident_center_rows(snapshot)
+    if not rows:
+        st.success(
+            "Nenhum incidente explícito foi consolidado nesta execução. "
+            "Isso não prova que produção/infraestrutura externa estejam saudáveis."
+        )
+        return
+
+    st.dataframe(rows,width="stretch",hide_index=True)
+
+    incidents=[
+        dict(item)
+        for item in list(snapshot.get("incidents",[]) or [])
+        if isinstance(item,Mapping)
+    ]
+    incident_ids=[str(item.get("incident_id") or "") for item in incidents]
+    labels={
+        str(item.get("incident_id") or ""):
+        f"{item.get('severity')} · {item.get('title')} · {str(item.get('incident_id') or '')[:10]}"
+        for item in incidents
+    }
+    selected_id=st.selectbox(
+        "Incidente para revisar",
+        incident_ids,
+        format_func=lambda value: labels.get(value,value),
+        key="aion_incident_review_selected",
+    )
+    selected=next(
+        (item for item in incidents if str(item.get("incident_id") or "")==selected_id),
+        None,
+    )
+    if isinstance(selected,Mapping):
+        st.write(f"**Origem:** {selected.get('source')} · **Evidência:** {selected.get('evidence_state')}")
+        st.caption(str(selected.get("detail") or ""))
+        plan=incident_response_plan(selected)
+        with st.expander("Plano de resposta seguro",expanded=False):
+            for idx,step in enumerate(plan.get("steps",[]),start=1):
+                st.markdown(f"{idx}. {step}")
+            st.caption(
+                "Plano somente leitura · revisão humana obrigatória · rollback automático: NÃO · "
+                "rotação automática de segredo: NÃO · trading real: BLOQUEADO."
+            )
+
+    if snapshot.get("rollback_review_recommended"):
+        reasons=list(snapshot.get("rollback_reasons",[]) or [])
+        st.warning(
+            "Há sinal confirmado para **revisão humana de rollback**. "
+            "Isso não dispara rollback automaticamente."
+        )
+        for reason in reasons[:8]:
+            st.markdown(f"- {reason}")
+
+
 def _render_master_status(board: Mapping[str, Any]) -> None:
     counts = board.get("counts") if isinstance(board.get("counts"), Mapping) else {}
     st.markdown("#### Painel Mestre de Estado")
@@ -835,6 +911,7 @@ def _render_central(
     system_context: Mapping[str, Any],
     status_board: Mapping[str, Any],
     approval_inbox: Mapping[str, Any],
+    incident_snapshot: Mapping[str, Any],
 ) -> None:
     st.markdown("### 🧠 Central AION")
     pending = checkpoint.get("pending") if isinstance(checkpoint.get("pending"), list) else []
@@ -850,6 +927,7 @@ def _render_central(
     _render_workspace_overview(checkpoint, runtime_result)
     _render_attention_queue(status_board, approval_inbox)
     _render_memory_security_posture(access, checkpoint, runtime_result, flags)
+    _render_security_incident_center(incident_snapshot)
 
     st.markdown("#### Briefing de entrada")
     st.write(
@@ -1538,6 +1616,7 @@ def _render_laboratory(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
     flags: Mapping[str, bool],
+    incident_snapshot: Mapping[str, Any] | None = None,
 ) -> None:
     st.markdown("### 🧪 Laboratório / Sandbox")
     st.write(
@@ -1563,6 +1642,19 @@ def _render_laboratory(
         st.caption(
             f"{action}: {'PERMITIDO' if decision['allowed'] else 'BLOQUEADO'} · "
             f"{decision['risk']} · {decision['reason']}"
+        )
+
+    st.markdown("#### Segurança / resposta a incidente")
+    incident_data=dict(incident_snapshot or {})
+    st.caption(
+        f"Incidentes consolidados: {int(incident_data.get('total') or 0)} · "
+        f"severidade máxima: {incident_data.get('highest_severity','INFO')} · "
+        f"rollback automático: NÃO."
+    )
+    if incident_data.get("has_critical"):
+        st.warning(
+            "Há incidente crítico consolidado. O Laboratório permanece fail-closed; "
+            "nenhuma feature externa é ativada como tentativa de diagnóstico."
         )
 
     st.markdown("#### Roteador de inteligência / orçamento")
@@ -2503,6 +2595,36 @@ def render_aion_admin_console(
             "error_type": type(exc).__name__,
         })
 
+    try:
+        incident_snapshot = collect_incidents(
+            checkpoint=checkpoint,
+            runtime_result=runtime_result,
+            system_context=system,
+            account_audit=account_entitlement_audit,
+        )
+    except Exception as exc:
+        incident_snapshot = {
+            "schema":"ATLASQUANT_AION_INCIDENT_CENTER_V1",
+            "incidents":[],
+            "total":0,
+            "counts":{"INFO":0,"LOW":0,"MEDIUM":0,"HIGH":0,"CRITICAL":0},
+            "highest_severity":"UNKNOWN",
+            "has_critical":False,
+            "rollback_review_recommended":False,
+            "rollback_reasons":[],
+            "automatic_containment":False,
+            "automatic_rollback":False,
+            "automatic_secret_rotation":False,
+            "automatic_account_mutation":False,
+            "real_orders_enabled":False,
+            "executes_action":False,
+            "truth_state":"UNKNOWN",
+        }
+        foundation_diagnostics.append({
+            "component":"incident_center",
+            "error_type":type(exc).__name__,
+        })
+
     _render_header(
         access_map,
         str(runtime_result.get("status") or "UNKNOWN"),
@@ -2539,7 +2661,10 @@ def render_aion_admin_console(
     workspace_error_type = ""
     try:
         if selected_workspace == "🧠 Central":
-            _render_central(access_map, checkpoint, runtime_result, memory_summary, flags, system, status_board, approval_inbox)
+            _render_central(
+                access_map, checkpoint, runtime_result, memory_summary, flags,
+                system, status_board, approval_inbox, incident_snapshot,
+            )
         elif selected_workspace == "🗂️ Secretaria":
             _render_secretary(access_map, checkpoint, flags, system, market, status_board, approval_inbox)
         elif selected_workspace == "📈 Trading":
@@ -2549,7 +2674,7 @@ def render_aion_admin_console(
         elif selected_workspace == "💼 Negócios":
             _render_business(access_map, checkpoint, flags)
         elif selected_workspace == "🧪 Laboratório":
-            _render_laboratory(access_map, checkpoint, flags)
+            _render_laboratory(access_map, checkpoint, flags, incident_snapshot)
         elif selected_workspace == "🛠️ Desenvolvimento":
             _render_development(access_map, checkpoint, source_checkpoint, runtime_result, flags)
         elif selected_workspace == "🔐 Assinaturas":
@@ -2598,6 +2723,11 @@ def render_aion_admin_console(
         ),
         "tenant_privacy_contract_ready": bool(
             tenant_privacy_readiness().get("policy_defined", False)
+        ),
+        "incident_center_total": int(incident_snapshot.get("total") or 0),
+        "incident_center_has_critical": bool(incident_snapshot.get("has_critical", False)),
+        "incident_center_rollback_review": bool(
+            incident_snapshot.get("rollback_review_recommended", False)
         ),
         "checkpoint_dirty": bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
         "checkpoint_conflict": bool(st.session_state.get(_WORKING_CONFLICT_KEY, False)),
