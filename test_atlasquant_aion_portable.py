@@ -30,8 +30,19 @@ class AtlasQuantAionPortableTests(unittest.TestCase):
             scopes=["read_repo"],
         )
         self.assertFalse(connector["enabled"])
+        self.assertFalse(connector["activation_approved"])
         self.assertTrue(connector["requires_guardian"])
         self.assertFalse(connector["may_expand_own_permissions"])
+
+    def test_connector_rejects_obvious_secret_value_in_secret_refs(self):
+        with self.assertRaises(ValueError):
+            new_connector(
+                "bad-github",
+                label="Bad",
+                protocol="MCP",
+                workspace_id="development",
+                secret_refs=["ghp_this_is_a_value"],
+            )
 
     def test_unknown_connector_workspace_is_dropped(self):
         raw = default_portable_core()
