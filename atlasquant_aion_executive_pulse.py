@@ -63,6 +63,7 @@ def executive_pulse(
     publication_truth:Mapping[str,Any]|None=None,
     release_gate_snapshot:Mapping[str,Any]|None=None,
     reliability_snapshot:Mapping[str,Any]|None=None,
+    live_event_snapshot:Mapping[str,Any]|None=None,
     checkpoint_dirty:bool=False,
     checkpoint_conflict:bool=False,
     foundation_diagnostics:Sequence[Mapping[str,Any]]|None=None,
@@ -76,6 +77,7 @@ def executive_pulse(
     publication=dict(publication_truth or {})
     release_gate=dict(release_gate_snapshot or {})
     reliability=dict(reliability_snapshot or {})
+    live_events=dict(live_event_snapshot or {})
     diagnostics=[dict(x) for x in list(foundation_diagnostics or []) if isinstance(x,Mapping)]
 
     candidates=[]
@@ -197,6 +199,35 @@ def executive_pulse(
             f"Estado de custo/quota: {cost_state}. Fallback pago automático permanece desligado.",
             "Revisar orçamento e quota; preferir rota gratuita/local quando aplicável.",
             "cost_guardian",
+        ))
+
+    live_event_state=str(live_events.get("state") or "").upper()
+    live_event_alerts=int(live_events.get("alert_count") or 0)
+    live_event_urgent=int(live_events.get("urgent_review_count") or 0)
+    top_alerts=[
+        dict(x) for x in list(live_events.get("top_alerts",[]) or [])
+        if isinstance(x,Mapping)
+    ]
+    if live_event_urgent>0 and live_event_state=="WATCHING":
+        top=top_alerts[0] if top_alerts else {}
+        candidates.append(_attention(
+            "P1","trading",
+            "Evento de mercado urgente para revisão",
+            (
+                f"{live_event_urgent} evento(s) fresco(s) atingiram URGENT_REVIEW. "
+                f"Topo: {str(top.get('headline') or 'evento sem título')[:180]}. "
+                "Impacto permanece hipótese, não sinal."
+            ),
+            "Abrir Live Event Intelligence, revisar fontes e confirmar reação de preço/contexto antes de qualquer leitura operacional.",
+            "live_event_intelligence",
+        ))
+    elif live_event_alerts>0 and live_event_state in {"WATCHING","SCHEDULE_ONLY"}:
+        candidates.append(_attention(
+            "P2","trading",
+            "Eventos de mercado em observação",
+            f"{live_event_alerts} evento(s) estão em WATCH/HIGH_REVIEW nesta leitura.",
+            "Revisar o radar de eventos; nenhuma notificação ou ação de mercado é automática.",
+            "live_event_intelligence",
         ))
 
     release_gate_state=str(release_gate.get("state") or "").upper()
@@ -379,6 +410,9 @@ def executive_pulse(
         "reliability_posture":reliability_posture or "NONE",
         "degraded_mode_state":degraded_state or "NONE",
         "cost_guardian_state":cost_state or "NONE",
+        "live_event_state":live_event_state or "NONE",
+        "live_event_alert_count":live_event_alerts,
+        "live_event_urgent_review":live_event_urgent,
         "recommended_workspace":primary["area"],
         "executes_action":False,
         "real_orders_enabled":False,

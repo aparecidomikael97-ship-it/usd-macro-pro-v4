@@ -90,6 +90,12 @@ APPROVED_AION_FOUNDATION = (
     "Mercado LIVE_CONFIRMED exige simultaneamente Matriz ao vivo, Autopilot, scanner técnico, market map e Twelve Data confirmados/saudáveis com mercado aberto.",
     "Matriz por runtime snapshot pode sustentar continuidade visual, mas não confirma mercado ao vivo nem autorização operacional.",
     "Narrativa derivada de notícias/RSS é inferência quando não é comunicado oficial; o AION deve preservar essa distinção.",
+    "Live Event Intelligence deve deduplicar eventos, medir frescor/urgência e separar notícia reportada, agenda confirmada e impacto hipotético.",
+    "Manchete de notícia é evidência de reportagem e não confirmação automática de que o evento real descrito ocorreu exatamente como informado.",
+    "Fonte stale não pode gerar breaking alert; calendário sem proveniência explícita não pode gerar alerta confirmado.",
+    "Impactos de evento sobre moedas, índices, yields, ouro, petróleo e outros canais permanecem HYPOTHESIS até confirmação por dados/preço/contexto.",
+    "Evento urgente pode entrar no Pulso Executivo para revisão, mas não autoriza entrada, saída, aumento de posição ou execução automática.",
+    "Monitoramento 24/7 só pode ser declarado quando houver runtime contínuo comprovado; motor preparado ou código mesclado não prova vigilância contínua em produção.",
     "Execução real em corretora continua bloqueada; backtest/paper/forward e pesquisa não equivalem a autorização real.",
     "Gatilho operacional aprovado: quando o administrador disser 'tô no computador', priorizar a reconciliação do Render, configurar o Deploy Hook com segurança e validar Build Identity + Browser Smoke antes de retomar novos blocos.",
 )
