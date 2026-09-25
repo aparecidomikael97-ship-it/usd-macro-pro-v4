@@ -99,6 +99,32 @@ class AtlasQuantAionResilienceTests(unittest.TestCase):
         self.assertEqual(out["mode"],"EMERGENCY_STOP_RECOMMENDED")
         self.assertFalse(out["automatic_destructive_action"])
 
+    def test_persisted_fake_healthy_states_are_recomputed(self):
+        state=normalize_resilience({
+            "watchdogs":[{
+                "component":"agent",
+                "state":"HEALTHY",
+                "heartbeat_age_seconds":1,
+                "stale_after_seconds":300,
+                "repeated_action_count":5,
+                "loop_limit":5,
+                "unhandled_error_count":0,
+                "error_limit":3,
+            }],
+            "circuit_breakers":[{
+                "component":"provider",
+                "state":"CLOSED",
+                "previous_state":"CLOSED",
+                "consecutive_failures":3,
+                "error_rate_pct":0,
+                "critical_signal":False,
+                "recovery_probe_passed":False,
+            }],
+        })
+        self.assertEqual(state["watchdogs"][0]["state"],"ISOLATE_RECOMMENDED")
+        self.assertEqual(state["circuit_breakers"][0]["state"],"OPEN")
+        self.assertEqual(state["safe_mode"]["mode"],"DEGRADED_READ_ONLY")
+
     def test_normalization_never_restores_non_delegable_capabilities(self):
         state=normalize_resilience({
             "delegations":[{
