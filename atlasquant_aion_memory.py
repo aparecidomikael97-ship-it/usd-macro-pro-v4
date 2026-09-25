@@ -72,6 +72,18 @@ from atlasquant_aion_evaluation_lab import (
     normalize_evaluation_lab,
     evaluation_lab_digest,
 )
+from atlasquant_aion_digital_twin import (
+    normalize_digital_twins,
+    digital_twins_digest,
+)
+from atlasquant_aion_dev_fusion import (
+    normalize_pipelines as normalize_dev_fusion_pipelines,
+    dev_fusion_digest,
+)
+from atlasquant_aion_release_confidence import (
+    normalize_release_confidence_records,
+    release_confidence_digest,
+)
 from atlasquant_aion_event_journal import (
     normalize_events as normalize_live_event_journal_events,
     normalize_heartbeats as normalize_live_event_heartbeats,
@@ -342,7 +354,7 @@ def search_canonical_memory(
 def default_checkpoint() -> dict[str, Any]:
     return {
         "schema": SCHEMA,
-        "checkpoint_version": 12,
+        "checkpoint_version": 13,
         "created_at": _now(),
         "updated_at": _now(),
         "project": "AtlasQuant",
@@ -423,6 +435,18 @@ def default_checkpoint() -> dict[str, Any]:
             "real_trading_enabled": False,
         },
         "evaluation_lab": default_evaluation_lab(),
+        "digital_twins": {
+            "records": [],
+            "digest": digital_twins_digest([]),
+        },
+        "dev_fusion": {
+            "pipelines": [],
+            "digest": dev_fusion_digest([]),
+        },
+        "release_confidence": {
+            "records": [],
+            "digest": release_confidence_digest([]),
+        },
         "live_event_journal": {
             "events": [],
             "heartbeats": [],
@@ -620,6 +644,45 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
         else {}
     )
 
+    twins_raw = (
+        payload.get("digital_twins")
+        if isinstance(payload.get("digital_twins"), Mapping)
+        else {}
+    )
+    twin_rows = normalize_digital_twins(
+        twins_raw.get("records") if isinstance(twins_raw, Mapping) else []
+    )
+    payload["digital_twins"] = {
+        "records": twin_rows,
+        "digest": digital_twins_digest(twin_rows),
+    }
+
+    dev_fusion_raw = (
+        payload.get("dev_fusion")
+        if isinstance(payload.get("dev_fusion"), Mapping)
+        else {}
+    )
+    pipeline_rows = normalize_dev_fusion_pipelines(
+        dev_fusion_raw.get("pipelines") if isinstance(dev_fusion_raw, Mapping) else []
+    )
+    payload["dev_fusion"] = {
+        "pipelines": pipeline_rows,
+        "digest": dev_fusion_digest(pipeline_rows),
+    }
+
+    confidence_raw = (
+        payload.get("release_confidence")
+        if isinstance(payload.get("release_confidence"), Mapping)
+        else {}
+    )
+    confidence_rows = normalize_release_confidence_records(
+        confidence_raw.get("records") if isinstance(confidence_raw, Mapping) else []
+    )
+    payload["release_confidence"] = {
+        "records": confidence_rows,
+        "digest": release_confidence_digest(confidence_rows),
+    }
+
     live_event_journal = (
         payload.get("live_event_journal")
         if isinstance(payload.get("live_event_journal"), Mapping)
@@ -642,7 +705,7 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
         operating = {}
     tasks = normalize_queue(operating.get("tasks") if isinstance(operating, Mapping) else [])
     events = normalize_events(operating.get("events") if isinstance(operating, Mapping) else [])
-    payload["checkpoint_version"] = max(12, int(payload.get("checkpoint_version") or 1))
+    payload["checkpoint_version"] = max(13, int(payload.get("checkpoint_version") or 1))
     payload["operating"] = {
         "tasks": tasks,
         "events": events,
@@ -952,6 +1015,60 @@ def update_evaluation_lab_checkpoint(
     return payload
 
 
+def update_digital_twins_checkpoint(
+    checkpoint: Mapping[str, Any] | None,
+    *,
+    records: Any,
+    dirty: bool = True,
+) -> dict[str, Any]:
+    """Persist Digital Twin simulation manifests; never touches production."""
+    payload = ensure_operating_checkpoint(checkpoint)
+    rows = normalize_digital_twins(records)
+    payload["digital_twins"] = {
+        "records": rows,
+        "digest": digital_twins_digest(rows),
+    }
+    payload["operating"]["dirty"] = bool(dirty)
+    payload["updated_at"] = _now()
+    return payload
+
+
+def update_dev_fusion_checkpoint(
+    checkpoint: Mapping[str, Any] | None,
+    *,
+    pipelines: Any,
+    dirty: bool = True,
+) -> dict[str, Any]:
+    """Persist Dev Fusion evidence only; never merges or deploys."""
+    payload = ensure_operating_checkpoint(checkpoint)
+    rows = normalize_dev_fusion_pipelines(pipelines)
+    payload["dev_fusion"] = {
+        "pipelines": rows,
+        "digest": dev_fusion_digest(rows),
+    }
+    payload["operating"]["dirty"] = bool(dirty)
+    payload["updated_at"] = _now()
+    return payload
+
+
+def update_release_confidence_checkpoint(
+    checkpoint: Mapping[str, Any] | None,
+    *,
+    records: Any,
+    dirty: bool = True,
+) -> dict[str, Any]:
+    """Persist recomputed evidence coverage; this is not deployment authorization."""
+    payload = ensure_operating_checkpoint(checkpoint)
+    rows = normalize_release_confidence_records(records)
+    payload["release_confidence"] = {
+        "records": rows,
+        "digest": release_confidence_digest(rows),
+    }
+    payload["operating"]["dirty"] = bool(dirty)
+    payload["updated_at"] = _now()
+    return payload
+
+
 def update_live_event_journal_checkpoint(
     checkpoint: Mapping[str, Any] | None,
     *,
@@ -1125,7 +1242,7 @@ def runtime_write_preflight(runtime_result: Mapping[str, Any] | None) -> dict[st
             "allowed": True,
             "mode": "UPDATE_MIGRATION" if migration else "UPDATE",
             "reason": (
-                "Runtime confirmado com SHA; migração estrutural V12 será aplicada na escrita condicional."
+                "Runtime confirmado com SHA; migração estrutural V13 será aplicada na escrita condicional."
                 if migration else
                 "Runtime confirmado com SHA e integridade compatível para escrita condicional."
             ),
@@ -1314,7 +1431,7 @@ def checkpoint_integrity_report(
 ) -> dict[str, Any]:
     """Verify persisted component digests before normalization mutates them.
 
-    Missing V12 structure is reported as MIGRATION_REQUIRED rather than corruption.
+    Missing V13 structure is reported as MIGRATION_REQUIRED rather than corruption.
     A present-but-wrong digest is a MISMATCH and should fail closed for writes.
     """
     if not isinstance(checkpoint, Mapping):
@@ -1504,6 +1621,48 @@ def checkpoint_integrity_report(
         eval_state.get("digest"),
     )
 
+    twins_raw = (
+        raw.get("digital_twins")
+        if isinstance(raw.get("digital_twins"), Mapping)
+        else {}
+    )
+    twin_rows = normalize_digital_twins(
+        twins_raw.get("records") if isinstance(twins_raw, Mapping) else []
+    )
+    add_check(
+        "digital_twins",
+        twins_raw.get("digest"),
+        digital_twins_digest(twin_rows),
+    )
+
+    dev_fusion_raw = (
+        raw.get("dev_fusion")
+        if isinstance(raw.get("dev_fusion"), Mapping)
+        else {}
+    )
+    pipeline_rows = normalize_dev_fusion_pipelines(
+        dev_fusion_raw.get("pipelines") if isinstance(dev_fusion_raw, Mapping) else []
+    )
+    add_check(
+        "dev_fusion",
+        dev_fusion_raw.get("digest"),
+        dev_fusion_digest(pipeline_rows),
+    )
+
+    confidence_raw = (
+        raw.get("release_confidence")
+        if isinstance(raw.get("release_confidence"), Mapping)
+        else {}
+    )
+    confidence_rows = normalize_release_confidence_records(
+        confidence_raw.get("records") if isinstance(confidence_raw, Mapping) else []
+    )
+    add_check(
+        "release_confidence",
+        confidence_raw.get("digest"),
+        release_confidence_digest(confidence_rows),
+    )
+
     live_event_journal = (
         raw.get("live_event_journal")
         if isinstance(raw.get("live_event_journal"), Mapping)
@@ -1524,8 +1683,8 @@ def checkpoint_integrity_report(
     raw_areas = raw.get("areas") if isinstance(raw.get("areas"), Mapping) else {}
     if "subscriptions" not in raw_areas:
         migration_items.append("areas.subscriptions ausente")
-    if version < 12:
-        migration_items.append(f"checkpoint_version {version} < 12")
+    if version < 13:
+        migration_items.append(f"checkpoint_version {version} < 13")
     if "continuity" not in raw:
         migration_items.append("continuity ausente")
     if "learning" not in raw:
@@ -1544,6 +1703,12 @@ def checkpoint_integrity_report(
         migration_items.append("knowledge_graph ausente")
     if "evaluation_lab" not in raw:
         migration_items.append("evaluation_lab ausente")
+    if "digital_twins" not in raw:
+        migration_items.append("digital_twins ausente")
+    if "dev_fusion" not in raw:
+        migration_items.append("dev_fusion ausente")
+    if "release_confidence" not in raw:
+        migration_items.append("release_confidence ausente")
     if "live_event_journal" not in raw:
         migration_items.append("live_event_journal ausente")
 
