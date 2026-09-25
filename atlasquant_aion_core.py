@@ -34,6 +34,7 @@ DOMAINS = (
     "laboratory",
     "secretary",
     "development",
+    "subscriptions",
     "promotions",
 )
 
@@ -187,9 +188,13 @@ def route_context(text: object) -> dict[str, Any]:
             "mercado livre", "tiktok shop", "produto", "fornecedor", "estoque",
             "margem", "venda", "negocio", "receita", "lucro",
         )),
+        ("subscriptions", (
+            "assinatura", "mensalidade", "entitlement", "entitlements",
+            "direito de acesso", "acesso comercial", "plano de acesso",
+        )),
         ("promotions", (
             "promoc", "cupom", "codigo promocional", "gratuito", "dias gratis",
-            "assinatura", "mensalidade", "desconto",
+            "desconto", "trial",
         )),
         ("laboratory", (
             "laboratorio", "sandbox", "backtest", "forward test", "teste",
@@ -357,6 +362,57 @@ def guardian_decision(
         requires,
         flag,
     ).as_dict()
+
+
+def guardian_posture(
+    access: Mapping[str, Any] | None,
+    *,
+    feature_flags: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Read-only snapshot of sensitive AION action posture.
+
+    It never approves an action. Every sensitive action is evaluated with
+    approved=False so the snapshot cannot be used as an authorization token.
+    """
+    actions = (
+        "save_checkpoint",
+        "publish_social",
+        "publish_marketplace",
+        "activate_promotion",
+        "activate_entitlement",
+        "charge_customer",
+        "deploy_production",
+        "merge_main",
+        "write_secret",
+        "real_trade",
+    )
+    rows = []
+    for action in actions:
+        decision = guardian_decision(
+            action,
+            access,
+            approved=False,
+            feature_flags=feature_flags,
+        )
+        rows.append({
+            "action": action,
+            "risk": decision.get("risk"),
+            "allowed_now": bool(decision.get("allowed", False)),
+            "requires_explicit_approval": bool(
+                decision.get("requires_explicit_approval", True)
+            ),
+            "feature_flag": str(decision.get("feature_flag") or ""),
+            "reason": str(decision.get("reason") or ""),
+        })
+    return {
+        "schema": SCHEMA,
+        "admin": is_admin(access),
+        "actions": rows,
+        "allowed_now": sum(1 for row in rows if row["allowed_now"]),
+        "blocked_now": sum(1 for row in rows if not row["allowed_now"]),
+        "real_trading_enabled": False,
+        "executes_action": False,
+    }
 
 
 def mission_plan(objective: object, *, domain: str | None = None) -> dict[str, Any]:
