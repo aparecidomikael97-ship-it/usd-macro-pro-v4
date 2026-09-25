@@ -369,6 +369,50 @@ def continuity_summary(
     }
 
 
+def continuity_briefing(
+    missions:Sequence[Mapping[str,Any]]|None,
+    handoffs:Sequence[Mapping[str,Any]]|None,
+    *,
+    tasks:Sequence[Mapping[str,Any]]|None=None,
+    events:Sequence[Mapping[str,Any]]|None=None,
+    checkpoint_digest:Any="",
+)->dict[str,Any]:
+    """Return the best available continuity view without inventing progress."""
+    summary=continuity_summary(missions,handoffs)
+    latest=summary.get("latest_handoff")
+    if isinstance(latest,Mapping):
+        handoff=deepcopy(dict(latest))
+        source="PERSISTED_HANDOFF"
+    else:
+        handoff=build_session_handoff(
+            missions,
+            tasks=tasks,
+            events=events,
+            checkpoint_digest=checkpoint_digest,
+            source="AION_SYNTHESIS",
+        )
+        source="SYNTHESIZED_FROM_CHECKPOINT"
+
+    current=summary.get("current_mission") if isinstance(summary.get("current_mission"),Mapping) else None
+    focus=str(handoff.get("current_focus") or (current or {}).get("title") or "")
+    next_steps=[str(x) for x in list(handoff.get("next_steps") or [])[:8]]
+    blockers=[str(x) for x in list(handoff.get("blockers") or [])[:8]]
+    completed=[str(x) for x in list(handoff.get("completed") or [])[:8]]
+    return {
+        "schema":SCHEMA,
+        "source":source,
+        "current_focus":focus,
+        "next_steps":next_steps,
+        "blockers":blockers,
+        "recent_completed":completed,
+        "latest_handoff_id":str(handoff.get("handoff_id") or ""),
+        "latest_handoff_at":str(handoff.get("created_at") or ""),
+        "mission_summary":summary,
+        "truth_state":"CONFIRMED_CHECKPOINT_STATE",
+        "executes_action":False,
+    }
+
+
 def continuity_digest(
     missions:Sequence[Mapping[str,Any]]|None,
     handoffs:Sequence[Mapping[str,Any]]|None,
@@ -385,5 +429,5 @@ __all__=[
     "SCHEMA","MISSION_STATUSES","ACTIVE_STATUSES",
     "new_mission","normalize_mission","normalize_missions","upsert_mission",
     "transition_mission","normalize_handoff","normalize_handoffs",
-    "build_session_handoff","append_handoff","continuity_summary","continuity_digest",
+    "build_session_handoff","append_handoff","continuity_summary","continuity_briefing","continuity_digest",
 ]
