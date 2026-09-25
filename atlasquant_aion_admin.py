@@ -1153,6 +1153,41 @@ def _render_commander_intelligence(
             )
 
 
+def _render_learning_pulse(checkpoint: Mapping[str, Any]) -> None:
+    learning = checkpoint.get("learning") if isinstance(checkpoint.get("learning"), Mapping) else {}
+    episodes = list(learning.get("episodes", []) or [])
+    experiments = list(learning.get("experiments", []) or [])
+    research_refs = list(learning.get("research_refs", []) or [])
+    summary = learning_summary(episodes, experiments, research_refs)
+    st.markdown("#### 🧠 Evolução Controlada")
+    st.caption(
+        "O AION melhora medindo previsões e resultados, não mudando regras sozinho. "
+        "Toda promoção continua dependente de evidência e revisão humana."
+    )
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("Aprendizados", int(summary.get("episodes") or 0))
+    c2.metric("Resultados fechados", int(summary.get("settled_episodes") or 0))
+    c3.metric("Pesquisa vinculada", int(summary.get("research_references") or 0))
+    c4.metric("Challengers p/ revisão", int(summary.get("human_review_candidates") or 0))
+    match_rate = summary.get("observed_match_rate_pct")
+    gap = summary.get("calibration_gap_pct")
+    st.caption(
+        "Acerto observado: "
+        + ("—" if match_rate is None else f"{float(match_rate):.1f}%")
+        + " · gap de calibração: "
+        + ("—" if gap is None else f"{float(gap):.1f}%")
+        + f" · estado: {summary.get('calibration_state','INSUFFICIENT')}."
+    )
+    if int(summary.get("errors_without_confirmed_cause") or 0):
+        st.info(
+            f"{int(summary.get('errors_without_confirmed_cause') or 0)} erro(s) ainda sem causa confirmada. "
+            "Eles permanecem como lacuna de conhecimento, não como explicação inventada."
+        )
+    st.caption(
+        "Autoajuste de pesos: DESATIVADO · promoção automática: DESATIVADA · trading real: BLOQUEADO."
+    )
+
+
 def _render_master_status(board: Mapping[str, Any]) -> None:
     counts = board.get("counts") if isinstance(board.get("counts"), Mapping) else {}
     st.markdown("#### Painel Mestre de Estado")
@@ -1488,6 +1523,7 @@ def _render_central(
     )
     _render_executive_pulse(executive_snapshot)
     _render_commander_intelligence(checkpoint, system_context, executive_snapshot)
+    _render_learning_pulse(checkpoint)
     _render_release_gate(system_context)
     _render_publication_truth(system_context)
     _render_critical_surface_health(system_context)
