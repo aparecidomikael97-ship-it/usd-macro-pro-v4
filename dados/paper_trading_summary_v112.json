@@ -16,7 +16,7 @@
   "setup_attribution_inferred": false,
   "last_cycle": {
     "version": "V11.2_PAPER_TRADING",
-    "ran_at": "2026-09-25T03:49:12.416709+00:00",
+    "ran_at": "2026-09-25T04:23:44.558756+00:00",
     "pending_created": 0,
     "pending_cancelled_by_gain_lock": 0,
     "entries_opened": 0,
@@ -54,6 +54,19 @@
         ],
         "daily_gain_lock": false
       },
+      "NZD/USD": {
+        "side": "SELL",
+        "passed": false,
+        "state": "⚪ EM OBSERVAÇÃO",
+        "hard_blocks": [],
+        "soft_blocks": [
+          "Gate ainda não liberou execução",
+          "ICT incompleto (43/100)",
+          "Fluxo institucional incompleto (58/100)",
+          "M15 ainda não confirmou gatilho"
+        ],
+        "daily_gain_lock": false
+      },
       "USD/JPY": {
         "side": "BUY",
         "passed": false,
@@ -64,19 +77,6 @@
           "ADR14 em 106%: evitar perseguir preço",
           "ICT incompleto (33/100)",
           "Fluxo institucional incompleto (55/100)",
-          "M15 ainda não confirmou gatilho"
-        ],
-        "daily_gain_lock": false
-      },
-      "NZD/USD": {
-        "side": "SELL",
-        "passed": false,
-        "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
-        "hard_blocks": [],
-        "soft_blocks": [
-          "Gate ainda não liberou execução",
-          "ICT incompleto (43/100)",
-          "Fluxo institucional incompleto (58/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -108,15 +108,17 @@
         "daily_gain_lock": false
       },
       "GBP/USD": {
-        "side": "SELL",
+        "side": "WAIT",
         "passed": false,
-        "state": "⚪ EM OBSERVAÇÃO",
-        "hard_blocks": [],
+        "state": "⚪ AGUARDAR DIREÇÃO",
+        "hard_blocks": [
+          "Dados técnicos insuficientes (0/100)"
+        ],
         "soft_blocks": [
           "Gate ainda não liberou execução",
           "ADR14 em 92%: espaço reduzido",
-          "ICT incompleto (40/100)",
-          "Fluxo institucional incompleto (67/100)",
+          "ICT incompleto (0/100)",
+          "Fluxo institucional incompleto (0/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
