@@ -174,6 +174,7 @@ from atlasquant_aion_intelligence import (
 )
 from atlasquant_aion_reliability import reliability_snapshot
 from atlasquant_aion_cognitive_orchestrator import orchestrator_snapshot
+from atlasquant_aion_capability_planner import plan_agentic_mission
 from atlasquant_aion_event_journal import (
     continuity_summary as live_event_continuity_summary,
     merge_events as merge_live_event_journal_events,
@@ -1993,6 +1994,47 @@ def _render_central(
                 "O AION não mostra raciocínio privado/chain-of-thought. Ele mostra conclusão, evidências, "
                 "conflitos, lacunas e justificativa verificável."
             )
+    capability_plan_preview = plan_agentic_mission(
+        question,
+        access=access,
+        feature_flags=flags,
+        system_context=system_context,
+    ) if question.strip() else {}
+    if capability_plan_preview:
+        with st.expander("🧭 Planejador Agentivo · capacidades + gates", expanded=False):
+            p1,p2,p3,p4 = st.columns(4)
+            p1.metric("Estado", str(capability_plan_preview.get("readiness") or "UNKNOWN"))
+            p2.metric("Local agora", int(capability_plan_preview.get("available_local") or 0))
+            p3.metric("Aprovações", int(capability_plan_preview.get("approval_gates") or 0))
+            p4.metric("Bloqueios/deps", int(capability_plan_preview.get("blockers") or 0))
+            stages = [
+                row for row in list(capability_plan_preview.get("stages", []) or [])
+                if isinstance(row, Mapping)
+            ]
+            if stages:
+                st.dataframe([
+                    {
+                        "Etapa":row.get("order"),
+                        "Capacidade":row.get("label"),
+                        "Estado":row.get("state"),
+                        "Aprovação": "SIM" if row.get("requires_explicit_approval") else "NÃO",
+                        "Evidência":", ".join(row.get("evidence_requirements") or []),
+                        "Motivo":row.get("reason"),
+                    }
+                    for row in stages
+                ], width="stretch", hide_index=True)
+            next_stage = capability_plan_preview.get("next_safe_stage")
+            if isinstance(next_stage, Mapping):
+                st.caption(
+                    "Próxima etapa segura de planejamento: "
+                    + str(next_stage.get("label") or next_stage.get("capability_id"))
+                    + "."
+                )
+            st.caption(
+                "O plano não concede aprovação e não executa ferramenta, conector, deploy, "
+                "publicação, pagamento ou ordem real."
+            )
+
     prompt_preview = build_provider_prompt(
         question,
         domain=domain_preview,
