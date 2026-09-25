@@ -5,8 +5,10 @@ import unittest
 
 from atlasquant_aion_learning import new_learning_episode, settle_learning_episode
 from atlasquant_aion_memory import (
+    checkpoint_integrity_report,
     default_checkpoint,
     ensure_operating_checkpoint,
+    runtime_write_preflight,
     update_wisdom_checkpoint,
 )
 from atlasquant_aion_wisdom import (
@@ -120,6 +122,28 @@ class AtlasQuantAionWisdomTests(unittest.TestCase):
         self.assertEqual(old_hit["original_truth_state"], "CONFIRMED")
         self.assertEqual(old_hit["review_state"], "DUE")
         self.assertFalse(old_hit["current_market_fact"])
+
+    def test_wisdom_digest_tampering_fails_closed_and_v7_migrates_safely(self):
+        tampered = default_checkpoint()
+        tampered["wisdom"]["digest"] = "wrong-digest"
+        report = checkpoint_integrity_report(tampered)
+        self.assertEqual(report["state"], "MISMATCH")
+        self.assertIn("wisdom", report["mismatches"])
+        preflight = runtime_write_preflight({
+            "status": "CONFIRMED",
+            "sha": "abc123",
+            "checkpoint": tampered,
+        })
+        self.assertFalse(preflight["allowed"])
+        self.assertEqual(preflight["mode"], "BLOCKED")
+
+        legacy = default_checkpoint()
+        legacy["checkpoint_version"] = 7
+        legacy.pop("wisdom", None)
+        migration = checkpoint_integrity_report(legacy)
+        self.assertEqual(migration["state"], "MIGRATION_REQUIRED")
+        self.assertTrue(migration["write_safe"])
+        self.assertTrue(any("wisdom" in x for x in migration["migration_items"]))
 
     def test_upsert_digest_search_and_checkpoint_integration(self):
         first = new_wisdom_entry(
