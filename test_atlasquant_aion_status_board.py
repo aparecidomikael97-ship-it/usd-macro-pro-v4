@@ -10,7 +10,10 @@ class AtlasQuantAionMasterStatusBoardTests(unittest.TestCase):
                 "operating":{"tasks":[]},
                 "entitlements":{"records":[]},
             },
-            "runtime_result":{"status":"CONFIRMED"},
+            "runtime_result":{
+                "status":"CONFIRMED",
+                "integrity":{"state":"CONFIRMED","matched":6,"total":6},
+            },
             "provider":{"state":"ZERO_COST_LOCAL"},
             "feature_flags":{},
             "system_context":{
@@ -146,8 +149,39 @@ class AtlasQuantAionMasterStatusBoardTests(unittest.TestCase):
     def test_entitlement_states_route_to_subscriptions_workspace(self):
         board=self.base(feature_flags={"entitlement_activation":False})
         self.assertEqual(self.by_id(board,"entitlement_activation")["area"],"subscriptions")
+        self.assertEqual(self.by_id(board,"payment_provider")["area"],"subscriptions")
         self.assertEqual(self.by_id(board,"entitlement_registry")["area"],"subscriptions")
         self.assertEqual(self.by_id(board,"commercial_access_audit")["area"],"subscriptions")
+
+    def test_checkpoint_integrity_mismatch_is_blocked_and_actionable(self):
+        board=self.base(runtime_result={
+            "status":"CONFIRMED",
+            "integrity":{
+                "state":"MISMATCH",
+                "mismatches":["studio"],
+                "matched":5,
+                "total":6,
+            },
+        })
+        item=self.by_id(board,"checkpoint_integrity")
+        self.assertEqual(item["state"],"BLOCKED")
+        self.assertIn("studio",item["detail"])
+        self.assertIn("Não sobrescrever",item["next_action"])
+
+    def test_checkpoint_v6_migration_is_visible_without_claiming_corruption(self):
+        board=self.base(runtime_result={
+            "status":"CONFIRMED",
+            "integrity":{
+                "state":"MIGRATION_REQUIRED",
+                "migration_items":["checkpoint_version 5 < 6"],
+                "matched":6,
+                "total":6,
+            },
+        })
+        item=self.by_id(board,"checkpoint_integrity")
+        self.assertEqual(item["state"],"BLOCKED")
+        self.assertIn("migração",item["detail"].lower())
+        self.assertIn("V6",item["next_action"])
 
     def test_status_rows_are_presentation_only(self):
         board=self.base()
