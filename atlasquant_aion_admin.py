@@ -198,6 +198,7 @@ from atlasquant_aion_resilience import (
     watchdog,
 )
 from atlasquant_aion_memory_reliability import memory_reliability_summary
+from atlasquant_aion_data_decision_fabric import data_decision_fabric_summary, derive_checkpoint_fabric_events
 from atlasquant_aion_portable import (
     central_entry_contract,
     portable_core_summary,
@@ -3724,6 +3725,26 @@ def _render_laboratory(
         f"Decision snapshots/replay: {int(memory_health.get('decision_snapshots') or 0)} · "
         "memória nunca autoriza ação, não amplia permissão e lembrança vencida/contraditória "
         "não pode ser promovida silenciosamente a fato atual."
+    )
+
+    fabric_raw = (
+        checkpoint.get("data_decision_fabric")
+        if isinstance(checkpoint.get("data_decision_fabric"), Mapping)
+        else {}
+    )
+    fabric_health = data_decision_fabric_summary(
+        fabric_raw,
+        derived_events=derive_checkpoint_fabric_events(checkpoint),
+    )
+    st.markdown("#### 🕸️ Data & Decision Fabric")
+    df1,df2,df3,df4 = st.columns(4)
+    df1.metric("Eventos ativos", int(fabric_health.get("active_events") or 0))
+    df2.metric("Conflitos", int(fabric_health.get("conflicts") or 0))
+    df3.metric("Decisões", int(fabric_health.get("decisions") or 0))
+    df4.metric("Revisão humana", int(fabric_health.get("human_review_candidates") or 0))
+    st.caption(
+        "Linguagem transversal: evidência → hipótese → teste → risco → decisão → resultado. "
+        "A Fabric não executa ação e não transforma evidência em autorização."
     )
 
     external_worker_preview = agent_firewall(
