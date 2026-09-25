@@ -173,6 +173,13 @@ from atlasquant_aion_intelligence import (
     simulate_macro_scenario,
 )
 from atlasquant_aion_reliability import reliability_snapshot
+from atlasquant_aion_fortress import (
+    cyber_immune_plan,
+    emergency_cutoff_posture,
+    instruction_boundary,
+    proof_of_safety,
+    source_authority,
+)
 from atlasquant_aion_cognitive_orchestrator import orchestrator_snapshot
 from atlasquant_aion_event_journal import (
     continuity_summary as live_event_continuity_summary,
@@ -886,7 +893,7 @@ def _render_memory_security_posture(
         )
     elif persisted_state == "MIGRATION_REQUIRED":
         st.warning(
-            "Checkpoint persistido requer migração estrutural para V7. "
+            "Checkpoint persistido requer migração estrutural para a versão canônica atual. "
             "A migração só poderá ser salva por escrita condicional e aprovação explícita."
         )
     elif persisted_state == "CONFIRMED":
@@ -3347,6 +3354,51 @@ def _render_laboratory(
             f"{decision['risk']} · {decision['reason']}"
         )
 
+    st.markdown("#### 🛡️ Fortaleza & Soberania")
+    external_ai = source_authority("EXTERNAL_AI")
+    web_instruction = instruction_boundary(
+        "WEB",
+        contains_action_instruction=True,
+    )
+    admin_source = source_authority(
+        "ADMIN",
+        authenticated_admin=is_admin(access),
+    )
+    safety_preview = proof_of_safety(
+        "deploy_production",
+        access,
+        approved=False,
+        feature_flags=flags,
+        source_kind="ADMIN",
+        authenticated_admin=is_admin(access),
+        scope="Prévia de deploy — nenhuma execução nesta tela.",
+        artifacts=[],
+        tests=[],
+        rollback_plan="",
+        uncertainty_pct=100,
+        impact="CRITICAL",
+        reversible=False,
+        external_side_effects=True,
+    )
+    f1,f2,f3,f4 = st.columns(4)
+    f1.metric("Outra IA", "CONTEÚDO" if not external_ai.get("can_issue_action") else "AUTORIDADE")
+    f2.metric("Instrução web", str(web_instruction.get("state") or "UNKNOWN"))
+    f3.metric("Admin autenticado", str(admin_source.get("authority") or "UNKNOWN"))
+    f4.metric("Proof of Safety", str(safety_preview.get("state") or "UNKNOWN"))
+    st.caption(
+        "Site, documento, e-mail, tool output ou outra IA não ganham autoridade para comandar ferramentas. "
+        "A origem é uma barreira determinística fora do modelo; o Guardian continua sendo obrigatório."
+    )
+    with st.expander("Ver bloqueios da prévia de segurança", expanded=False):
+        blockers = list(safety_preview.get("blockers") or [])
+        if blockers:
+            for item in blockers:
+                st.markdown(f"- {item}")
+        st.caption(
+            "Esta prévia usa approved=False, incerteza alta e nenhum teste/rollback. "
+            "Ela demonstra fail-closed e não pode ser reutilizada como autorização."
+        )
+
     st.markdown("#### Segurança / resposta a incidente")
     incident_data=dict(incident_snapshot or {})
     st.caption(
@@ -3359,6 +3411,22 @@ def _render_laboratory(
             "Há incidente crítico consolidado. O Laboratório permanece fail-closed; "
             "nenhuma feature externa é ativada como tentativa de diagnóstico."
         )
+
+    emergency = emergency_cutoff_posture(
+        critical_incident=bool(incident_data.get("has_critical", False)),
+        policy_integrity_ok=None,
+        permission_integrity_ok=None,
+        secret_exposure_confirmed=False,
+    )
+    cyber = cyber_immune_plan(
+        [],
+        antivirus_or_edr_present=None,
+    )
+    st.caption(
+        f"Kill-switch advisory: {emergency.get('state')} · "
+        f"Cyber Immune: {cyber.get('posture')} · "
+        "contenção automática: NÃO · antivírus/EDR não é desativado pelo AION."
+    )
 
     st.markdown("#### Roteador de inteligência / orçamento")
     current_budget = normalize_budget((checkpoint.get("aion") or {}).get("model_budget", {}))
