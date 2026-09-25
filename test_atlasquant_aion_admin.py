@@ -627,6 +627,17 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn('system["reliability"] = preliminary_reliability',src)
         self.assertIn('system["reliability"] = final_reliability',src)
 
+    def test_source_mesh_is_visible_inside_reliability_central(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Data Guardian + Source Mesh",src)
+        self.assertIn("Mercado ao vivo confirmado pelo Source Mesh",src)
+        self.assertIn("Snapshot/fallback pode manter contexto",src)
+        self.assertIn('"Família":row.get("family")',src)
+        self.assertIn('"source_mesh_state"',src)
+        self.assertIn('"source_mesh_live_confirmed"',src)
+        self.assertIn('"source_mesh_observations"',src)
+        self.assertIn('"source_mesh_fallbacks"',src)
+
     def test_business_panel_labels_unconnected_sales_as_unconfirmed(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("não representam vendas confirmadas", src)
