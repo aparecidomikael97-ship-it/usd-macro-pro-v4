@@ -137,6 +137,8 @@ def reconcile_sources(
                 "sources": sorted({x["source"] for x in fresh_confirmed}),
                 "distinct_values": len(values),
             })
+            for row in fresh_confirmed:
+                row["state"] = "CONFLICT"
 
         if conflict:
             state = "CONFLICT"
