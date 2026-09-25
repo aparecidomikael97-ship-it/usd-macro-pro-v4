@@ -1,12 +1,24 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 import scripts.aion_runtime_bootstrap as bootstrap
 
 
 class AtlasQuantAionRuntimeBootstrapWorkflowTests(unittest.TestCase):
+    def test_workflow_is_main_triggered_runtime_only_and_uses_ephemeral_token(self):
+        src=Path(".github/workflows/aion-runtime-bootstrap.yml").read_text(encoding="utf-8")
+        self.assertIn("branches:",src)
+        self.assertIn("- main",src)
+        self.assertIn("permissions:",src)
+        self.assertIn("contents: write",src)
+        self.assertIn("GITHUB_DATA_BRANCH: atlasquant-runtime",src)
+        self.assertIn("GITHUB_TOKEN_HISTORICO: ${{ github.token }}",src)
+        self.assertIn("python scripts/aion_runtime_bootstrap.py",src)
+        self.assertNotIn("GITHUB_TOKEN_HISTORICO: sk-",src)
+
     @patch.object(bootstrap, "runtime_configuration_status")
     @patch.object(bootstrap, "load_runtime_checkpoint")
     @patch.object(bootstrap, "save_runtime_checkpoint")
