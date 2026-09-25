@@ -498,6 +498,15 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("Checkpoint Mestre salvo, relido e confirmado no runtime.", block)
         self.assertIn("As alterações locais continuam marcadas como pendentes.",src)
 
+    def test_checkpoint_runtime_status_distinguishes_public_read_from_write_credential(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("runtime_configuration_status(",src)
+        self.assertIn("Runtime · leitura",src)
+        self.assertIn("Runtime · escrita",src)
+        self.assertIn("READ_ONLY_PUBLIC",Path("atlasquant_aion_memory.py").read_text(encoding="utf-8"))
+        self.assertIn("Leitura pública do Checkpoint pode funcionar sem token",src)
+        self.assertIn("nenhum segredo é exibido",src)
+
     def test_checkpoint_persistence_preflight_fails_closed_before_save_button(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("runtime_write_preflight(runtime_result)",src)
