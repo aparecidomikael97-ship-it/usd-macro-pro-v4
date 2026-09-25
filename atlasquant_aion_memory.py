@@ -42,6 +42,11 @@ from atlasquant_aion_learning import (
     normalize_research_references,
     learning_digest,
 )
+from atlasquant_aion_event_intelligence import (
+    normalize_event_journal,
+    normalize_alert_journal,
+    event_intelligence_digest,
+)
 
 SCHEMA = "ATLASQUANT_AION_MEMORY_V1"
 RUNTIME_PATH = "dados/aion/checkpoint_master.json"
@@ -90,6 +95,10 @@ APPROVED_AION_FOUNDATION = (
     "Mercado LIVE_CONFIRMED exige simultaneamente Matriz ao vivo, Autopilot, scanner técnico, market map e Twelve Data confirmados/saudáveis com mercado aberto.",
     "Matriz por runtime snapshot pode sustentar continuidade visual, mas não confirma mercado ao vivo nem autorização operacional.",
     "Narrativa derivada de notícias/RSS é inferência quando não é comunicado oficial; o AION deve preservar essa distinção.",
+    "Event Intelligence deve separar reportagem observada, fato confirmado, inferência de classificação e hipótese de impacto; uma manchete de terceiro nunca pode virar fato confirmado só porque apareceu no feed.",
+    "Evento crítico e fresco pode gerar alerta interno de revisão, mas notificação externa exige canal realmente conectado e continua bloqueada até integração e aprovação.",
+    "Impacto de notícia deve ser expresso como mecanismo/hipótese por ativo, com invalidadores; nunca como certeza, sinal ou probabilidade de lucro.",
+    "Eventos e alertas relevantes devem ser deduplicados e registrados em memória auditável para aprendizado posterior, sem alterar pesos ou regras automaticamente.",
     "Execução real em corretora continua bloqueada; backtest/paper/forward e pesquisa não equivalem a autorização real.",
     "Gatilho operacional aprovado: quando o administrador disser 'tô no computador', priorizar a reconciliação do Render, configurar o Deploy Hook com segurança e validar Build Identity + Browser Smoke antes de retomar novos blocos.",
 )
@@ -325,6 +334,11 @@ def default_checkpoint() -> dict[str, Any]:
             "research_refs": [],
             "digest": learning_digest([], [], []),
         },
+        "event_intelligence": {
+            "events": [],
+            "alerts": [],
+            "digest": event_intelligence_digest([], []),
+        },
     }
 
 
@@ -441,6 +455,21 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
             learning_experiments,
             learning_research,
         ),
+    }
+
+    event_intelligence = payload.get("event_intelligence")
+    if not isinstance(event_intelligence, Mapping):
+        event_intelligence = {}
+    event_rows = normalize_event_journal(
+        event_intelligence.get("events") if isinstance(event_intelligence, Mapping) else []
+    )
+    alert_rows = normalize_alert_journal(
+        event_intelligence.get("alerts") if isinstance(event_intelligence, Mapping) else []
+    )
+    payload["event_intelligence"] = {
+        "events": event_rows,
+        "alerts": alert_rows,
+        "digest": event_intelligence_digest(event_rows, alert_rows),
     }
 
     operating = payload.get("operating")
@@ -593,6 +622,36 @@ def update_learning_checkpoint(
             experiment_rows,
             research_rows,
         ),
+    }
+    payload["operating"]["dirty"] = bool(dirty)
+    payload["updated_at"] = _now()
+    return payload
+
+
+def update_event_intelligence_checkpoint(
+    checkpoint: Mapping[str, Any] | None,
+    *,
+    events: Any = None,
+    alerts: Any = None,
+    dirty: bool = True,
+) -> dict[str, Any]:
+    """Persist compact event/alert journals without changing trading state."""
+    payload = ensure_operating_checkpoint(checkpoint)
+    current = (
+        payload.get("event_intelligence")
+        if isinstance(payload.get("event_intelligence"), Mapping)
+        else {}
+    )
+    event_rows = normalize_event_journal(
+        current.get("events", []) if events is None else events
+    )
+    alert_rows = normalize_alert_journal(
+        current.get("alerts", []) if alerts is None else alerts
+    )
+    payload["event_intelligence"] = {
+        "events": event_rows,
+        "alerts": alert_rows,
+        "digest": event_intelligence_digest(event_rows, alert_rows),
     }
     payload["operating"]["dirty"] = bool(dirty)
     payload["updated_at"] = _now()
@@ -1045,6 +1104,27 @@ def checkpoint_integrity_report(
         ),
     )
 
+    event_intelligence = (
+        raw.get("event_intelligence")
+        if isinstance(raw.get("event_intelligence"), Mapping)
+        else {}
+    )
+    event_rows = normalize_event_journal(
+        event_intelligence.get("events")
+        if isinstance(event_intelligence, Mapping)
+        else []
+    )
+    alert_rows = normalize_alert_journal(
+        event_intelligence.get("alerts")
+        if isinstance(event_intelligence, Mapping)
+        else []
+    )
+    add_check(
+        "event_intelligence",
+        event_intelligence.get("digest"),
+        event_intelligence_digest(event_rows, alert_rows),
+    )
+
     raw_areas = raw.get("areas") if isinstance(raw.get("areas"), Mapping) else {}
     if "subscriptions" not in raw_areas:
         migration_items.append("areas.subscriptions ausente")
@@ -1054,6 +1134,8 @@ def checkpoint_integrity_report(
         migration_items.append("continuity ausente")
     if "learning" not in raw:
         migration_items.append("learning ausente")
+    if "event_intelligence" not in raw:
+        migration_items.append("event_intelligence ausente")
 
     if mismatches:
         state = "MISMATCH"
