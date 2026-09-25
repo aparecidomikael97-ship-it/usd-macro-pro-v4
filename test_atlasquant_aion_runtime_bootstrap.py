@@ -13,9 +13,9 @@ from atlasquant_aion_runtime_bootstrap import (
 
 
 class AtlasQuantAionRuntimeBootstrapTests(unittest.TestCase):
-    def test_bootstrap_checkpoint_is_v13_clean_and_safe(self):
+    def test_bootstrap_checkpoint_is_v14_clean_and_safe(self):
         cp=canonical_bootstrap_checkpoint()
-        self.assertGreaterEqual(cp["checkpoint_version"],13)
+        self.assertGreaterEqual(cp["checkpoint_version"],14)
         self.assertFalse(cp["operating"]["dirty"])
         self.assertFalse(cp["aion"]["real_trading"])
         self.assertIn("release_confidence",cp)
