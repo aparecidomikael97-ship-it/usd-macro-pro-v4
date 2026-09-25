@@ -10,6 +10,7 @@ from typing import Any, Mapping, Sequence
 import os
 
 from atlasquant_aion_core import feature_flag_snapshot, route_context
+from atlasquant_aion_continuity import continuity_briefing
 from atlasquant_aion_provider import provider_configuration_status
 
 SCHEMA = "ATLASQUANT_AION_GATEWAY_V1"
@@ -101,9 +102,53 @@ def local_answer(
     hits = [dict(x) for x in list(memory_hits or [])[:5] if isinstance(x, Mapping)]
     system = dict(system_context or {})
     provider = provider_status(feature_flags=feature_flags)
+    cp = dict(checkpoint or {})
+    continuity = cp.get("continuity") if isinstance(cp.get("continuity"), Mapping) else {}
+    operating = cp.get("operating") if isinstance(cp.get("operating"), Mapping) else {}
+    continuity_view = continuity_briefing(
+        list(continuity.get("missions", []) or []),
+        list(continuity.get("handoffs", []) or []),
+        tasks=list(operating.get("tasks", []) or []),
+        events=list(operating.get("events", []) or []),
+    )
+    q_fold = q.casefold()
+    asks_continuity = any(term in q_fold for term in (
+        "onde paramos",
+        "onde parou",
+        "retomar",
+        "continuidade",
+        "próximo bloco",
+        "proximo bloco",
+        "o que ficou pendente",
+        "o que falta",
+    ))
 
     if not q:
         answer = "Escreva uma pergunta ou missão para o AION."
+    elif asks_continuity:
+        focus = str(continuity_view.get("current_focus") or "").strip()
+        next_steps = list(continuity_view.get("next_steps") or [])
+        blockers = list(continuity_view.get("blockers") or [])
+        completed = list(continuity_view.get("recent_completed") or [])
+        source = str(continuity_view.get("source") or "UNKNOWN")
+        parts = []
+        if focus:
+            parts.append(f"No Checkpoint carregado, o foco atual é: {focus}.")
+        else:
+            parts.append("O Checkpoint carregado não tem uma missão ativa registrada.")
+        if next_steps:
+            parts.append("Próximo passo registrado: " + str(next_steps[0]) + ".")
+        if blockers:
+            parts.append("Há bloqueio registrado: " + str(blockers[0]) + ".")
+        if completed:
+            parts.append("Conclusão recente: " + str(completed[0]) + ".")
+        parts.append(
+            "Fonte de continuidade: último handoff persistido."
+            if source == "PERSISTED_HANDOFF"
+            else "Fonte de continuidade: síntese do estado estruturado atual do Checkpoint."
+        )
+        parts.append("Nenhum próximo passo é executado automaticamente por esta resposta.")
+        answer = " ".join(parts)
     elif route["domain"] == "development":
         answer = (
             "Entendi como Desenvolvimento. "
