@@ -91,7 +91,7 @@ from atlasquant_aion_event_journal import (
 )
 
 SCHEMA = "ATLASQUANT_AION_MEMORY_V1"
-FOUNDATION_REVISION = "2026-09-25-nextgen-v1"
+FOUNDATION_REVISION = "2026-09-25-complete-v2"
 RUNTIME_PATH = "dados/aion/checkpoint_master.json"
 DEFAULT_RUNTIME_REPO = "aparecidomikael97-ship-it/usd-macro-pro-v4"
 MAX_DOC_BYTES = 1_500_000
@@ -195,6 +195,16 @@ APPROVED_AION_FOUNDATION = (
     "Pós-trade RCA é obrigatório para operação encerrada relevante: distinguir falha de processo de variância normal; causa só pode ser confirmada com evidência e qualquer ajuste operacional exige teste/backtest/forward e validação antes de promoção.",
     "Regra mestre de stop e alvo: Stop Loss nasce da invalidação objetiva da tese/estrutura e risco; Take Profit usa estrutura/liquidez/volatilidade e relação risco-retorno; regras são específicas por setup e validadas em backtest; se a relação não fecha, a operação é bloqueada.",
     "Liquidez deve ser tratada como evidência estrutural contextual, não certeza: identificar pools/varreduras/zonas somente com critérios explícitos e preservar incerteza quando houver ambiguidade.",
+    "Área de Investimentos deve operar como radar auditável de longo prazo: ações, dividendos, fundamentos, crescimento, valuation por cenários, comparador, riscos, memória de tese e monitoramento contínuo; oportunidade nunca equivale a promessa de valorização.",
+    "Radar de dividendos deve distinguir sustentabilidade de distribuição, recorrência versus evento extraordinário, geração de caixa e deterioração fundamental; yield alto isolado nunca é critério suficiente.",
+    "Fundos Imobiliários exigem módulo próprio: vacância, contratos, indexadores, concentração, vencimentos, risco de crédito, tipo de fundo, qualidade de gestão, emissões, fatos relevantes, relatórios gerenciais, valor patrimonial/econômico, benchmark e pares.",
+    "FIIs devem ter detector de deterioração precoce, teste de estresse, revisão de tese, proteção contra overfitting, auditoria de decisão e motor de carteira para evitar que ativo isolado aparentemente bom piore concentração/risco do portfólio.",
+    "Robustez transversal é requisito: Trading, Investimentos, Studio, Negócios, Afiliados e demais áreas devem compartilhar memória, evidência, validação, testes, auditoria, pós-análise e melhoria controlada compatíveis com o risco de cada domínio.",
+    "Motor de Receita para vendas, afiliados e tráfego pago deve otimizar lucro líquido e não faturamento bruto; deve medir atribuição, CAC, LTV, margem, retenção, CRM, fraude, custo por campanha e risco de escala.",
+    "Negócios deve manter radar de produtos/ofertas e testes controlados de criativos/canais; escala de campanha depende de evidência e limites de custo, e compra de mídia/impulsionamento continua exigindo aprovação explícita.",
+    "Radar de Tendências deve buscar sinais recentes de demanda, validar antes de agir, preparar criativos/ofertas rapidamente e detectar perda de força; objetivo é reduzir atraso de reação, nunca prometer ser sempre o primeiro.",
+    "Conteúdo/campanha de tendência pode ser pesquisado, roteirizado e preparado automaticamente, mas publicação, gasto, impulsionamento e alteração comercial externa continuam sujeitos a aprovação e Guardian.",
+    "Resolução Científica de Problemas inclui curiosidade controlada: lacunas relevantes podem gerar tarefas de pesquisa/aprendizado, mas nunca ampliar autoridade, alterar produção ou consumir serviço pago sem política e aprovação.",
     "Hierarquia técnica oficial não segue ordem de salvamento: 1) persistência runtime do Checkpoint, 2) soberania e resiliência, 3) confiabilidade de memória + Epistemic Core, 4) Data/Decision Fabric, 5) observabilidade/autodiagnóstico, 6) avaliação e melhoria controlada, 7) maior autonomia dos módulos.",
     "Gatilho operacional aprovado: quando o administrador disser 'tô no computador', priorizar a reconciliação do Render, configurar o Deploy Hook com segurança e validar Build Identity + Browser Smoke antes de retomar novos blocos.",
 )
@@ -277,6 +287,45 @@ def config_from_mapping(values: Mapping[str, Any] | None = None) -> RuntimeConfi
     ).strip()
     branch = resolve_runtime_branch(explicit, legacy)
     return RuntimeConfig(token=token, repo=repo, branch=branch)
+
+
+def runtime_configuration_diagnostic(
+    config: RuntimeConfig | None = None,
+) -> dict[str, Any]:
+    """Describe runtime persistence readiness without exposing secret values."""
+    cfg = config or config_from_mapping()
+    missing: list[str] = []
+    if not cfg.token:
+        missing.append("GITHUB_TOKEN_HISTORICO")
+    if not cfg.repo:
+        missing.append("GITHUB_REPO_HISTORICO")
+    if not cfg.branch:
+        missing.append("GITHUB_DATA_BRANCH")
+    try:
+        safe_branch = require_runtime_branch(cfg.branch)
+        branch_safe = True
+        branch_reason = "Dedicated runtime-data branch."
+    except Exception as exc:
+        safe_branch = str(cfg.branch or "")
+        branch_safe = False
+        branch_reason = f"Unsafe runtime branch: {type(exc).__name__}"
+    return {
+        "schema": SCHEMA,
+        "ready": bool(cfg.ready and branch_safe),
+        "repo_configured": bool(cfg.repo),
+        "token_configured": bool(cfg.token),
+        "branch": safe_branch,
+        "branch_safe": branch_safe,
+        "path": cfg.path,
+        "missing": missing,
+        "reason": (
+            "Runtime persistence configuration ready."
+            if cfg.ready and branch_safe
+            else branch_reason if not branch_safe
+            else "Runtime persistence configuration incomplete."
+        ),
+        "secret_values_exposed": False,
+    }
 
 
 def _safe_read(path: Path) -> str:
@@ -380,7 +429,7 @@ def search_canonical_memory(
 def default_checkpoint() -> dict[str, Any]:
     return {
         "schema": SCHEMA,
-        "checkpoint_version": 13,
+        "checkpoint_version": 14,
         "created_at": _now(),
         "updated_at": _now(),
         "project": "AtlasQuant",
@@ -731,7 +780,7 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
         operating = {}
     tasks = normalize_queue(operating.get("tasks") if isinstance(operating, Mapping) else [])
     events = normalize_events(operating.get("events") if isinstance(operating, Mapping) else [])
-    payload["checkpoint_version"] = max(13, int(payload.get("checkpoint_version") or 1))
+    payload["checkpoint_version"] = max(14, int(payload.get("checkpoint_version") or 1))
     payload["operating"] = {
         "tasks": tasks,
         "events": events,
@@ -1299,7 +1348,7 @@ def runtime_write_preflight(runtime_result: Mapping[str, Any] | None) -> dict[st
             "allowed": True,
             "mode": "UPDATE_MIGRATION" if migration else "UPDATE",
             "reason": (
-                "Runtime confirmado com SHA; migração estrutural V13 será aplicada na escrita condicional."
+                "Runtime confirmado com SHA; migração estrutural V14 será aplicada na escrita condicional."
                 if migration else
                 "Runtime confirmado com SHA e integridade compatível para escrita condicional."
             ),
@@ -1488,7 +1537,7 @@ def checkpoint_integrity_report(
 ) -> dict[str, Any]:
     """Verify persisted component digests before normalization mutates them.
 
-    Missing V13 structure is reported as MIGRATION_REQUIRED rather than corruption.
+    Missing V14 structure is reported as MIGRATION_REQUIRED rather than corruption.
     A present-but-wrong digest is a MISMATCH and should fail closed for writes.
     """
     if not isinstance(checkpoint, Mapping):
@@ -1740,8 +1789,8 @@ def checkpoint_integrity_report(
     raw_areas = raw.get("areas") if isinstance(raw.get("areas"), Mapping) else {}
     if "subscriptions" not in raw_areas:
         migration_items.append("areas.subscriptions ausente")
-    if version < 13:
-        migration_items.append(f"checkpoint_version {version} < 13")
+    if version < 14:
+        migration_items.append(f"checkpoint_version {version} < 14")
     if "continuity" not in raw:
         migration_items.append("continuity ausente")
     if "learning" not in raw:
