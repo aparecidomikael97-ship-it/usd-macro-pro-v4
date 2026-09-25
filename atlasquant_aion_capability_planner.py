@@ -251,7 +251,7 @@ def capability_state(
             feature_flags=flags,
         )
         if bool(decision.get("allowed", False)):
-            state = "AVAILABLE_LOCAL" if local else "APPROVAL_REQUIRED"
+            state = "AVAILABLE_LOCAL"
             reason = str(decision.get("reason") or "")
             requires_approval = bool(decision.get("requires_explicit_approval", False))
         elif bool(decision.get("requires_explicit_approval", False)) and str(decision.get("risk") or "") != "REAL_TRADING":
