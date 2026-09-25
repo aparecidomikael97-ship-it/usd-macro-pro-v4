@@ -118,6 +118,21 @@ class AtlasQuantAionProviderTests(unittest.TestCase):
         self.assertIn("impact=HYPOTHESIS",prompt)
         self.assertIn("nunca autorização/sinal de trade",prompt)
 
+    def test_prompt_contains_cognitive_council_critic_and_no_chain_of_thought_rule(self):
+        prompt=build_provider_prompt(
+            "Pesquise CPI e impacto no Forex",
+            domain="trading",
+            memory_hits=[{"path":"macro.md","excerpt":"CPI"}],
+            system_context={
+                "source_mesh":{"market_live_confirmed":True},
+                "reliability":{"degraded_mode":{"state":"NORMAL"}},
+            },
+        )
+        self.assertIn("Conselho Cognitivo:",prompt)
+        self.assertIn("Critic obrigatório: True",prompt)
+        self.assertIn("Não exponha chain-of-thought",prompt)
+        self.assertIn("proveniência, frescor, independência, contradições",prompt)
+
     def test_external_call_is_blocked_without_explicit_approval(self):
         session=_FakeSession(_FakeResponse())
         result=execute_openai_answer(
