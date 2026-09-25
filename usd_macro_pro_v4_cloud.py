@@ -35,6 +35,11 @@ import requests
 import streamlit as st
 from twelve_cache_v1108 import cached_series, clear_shared_cache
 from atlasquant_runtime_store import resolve_runtime_branch
+from atlasquant_surface_health import (
+    mark_surface_error,
+    mark_surface_ok,
+    surface_health_snapshot,
+)
 import re
 
 # V10 — camada observacional profissional. O try/except evita derrubar
@@ -9261,6 +9266,12 @@ if _aq_active_index == 9:
 # =========================================================
 if _aq_active_index == 1:
     if render_master_panel is None:
+        mark_surface_error(
+            st.session_state,
+            "master_panel",
+            _MASTER_V102_IMPORT_ERROR or "IMPORT_UNAVAILABLE",
+            unavailable=True,
+        )
         st.error(
             "O Painel Mestre V10.2 não pôde ser carregado. "
             "Confirme que master_panel_v102.py está na raiz do repositório."
@@ -9416,10 +9427,17 @@ if _aq_active_index == 1:
                     else _scan_wait_master_v1022
                 ),
             )
+            mark_surface_ok(st.session_state, "master_panel")
+            st.session_state.pop("atlasquant_master_panel_error", None)
         except Exception as _master_render_exc:
             st.session_state["atlasquant_master_panel_error"] = {
                 "type": type(_master_render_exc).__name__,
             }
+            mark_surface_error(
+                st.session_state,
+                "master_panel",
+                _master_render_exc,
+            )
             st.warning(
                 "Painel Mestre entrou em modo seguro; o restante do AtlasQuant continua disponível."
             )
@@ -9843,6 +9861,7 @@ if _aq_active_index == 21:
             "environment": ATLASQUANT_ENVIRONMENT,
             "app_version": APP_VERSION,
             "market_status": "não confirmado nesta tela",
+            "critical_surfaces": surface_health_snapshot(st.session_state),
         }
         try:
             render_aion_admin_console(
@@ -9916,10 +9935,18 @@ if _aq_active_index == 0:
                     experience_mode=_aq_experience_mode,
                     macro_context=_macro_v108,
                 )
+                mark_surface_ok(st.session_state, "home_radar")
             except Exception as _aq_home_exc:
+                mark_surface_error(st.session_state, "home_radar", _aq_home_exc)
                 st.warning("Radar principal em modo seguro; nenhuma permissão operacional foi ampliada.")
                 st.caption(f"Diagnóstico Home Radar: {type(_aq_home_exc).__name__}")
         elif _ATLASQUANT_HOME_RADAR_IMPORT_ERROR:
+            mark_surface_error(
+                st.session_state,
+                "home_radar",
+                _ATLASQUANT_HOME_RADAR_IMPORT_ERROR,
+                unavailable=True,
+            )
             st.caption(f"Home Radar indisponível: {_ATLASQUANT_HOME_RADAR_IMPORT_ERROR}")
 
         if str(_aq_experience_mode) == "Avançado":
@@ -9944,6 +9971,12 @@ if _aq_active_index == 0:
                 st.caption(f"Coverage Funnel em modo compatível: {_ATLASQUANT_COVERAGE_IMPORT_ERROR}")
 
             if render_pair_intelligence_v110 is None:
+                mark_surface_error(
+                    st.session_state,
+                    "advanced_radar",
+                    _PAIR_INTEL_V110_IMPORT_ERROR or "IMPORT_UNAVAILABLE",
+                    unavailable=True,
+                )
                 st.error("A Central Institucional V11.0.8 não pôde ser carregada.")
                 if _PAIR_INTEL_V110_IMPORT_ERROR:
                     st.caption(f"Diagnóstico: {_PAIR_INTEL_V110_IMPORT_ERROR}")
@@ -9957,6 +9990,7 @@ if _aq_active_index == 0:
                         weights=PESOS,
                         runtime_snapshot=_aq_runtime_snapshot,
                     )
+                    mark_surface_ok(st.session_state, "advanced_radar")
                     st.session_state.pop("aq_radar_advanced_error", None)
                 except Exception as _aq_pair_intel_exc:
                     # Fault boundary: one advanced diagnostic must never take
@@ -9966,6 +10000,11 @@ if _aq_active_index == 0:
                         "type": type(_aq_pair_intel_exc).__name__,
                     }
                     st.session_state["aq_radar_advanced_error"] = _aq_pair_intel_error
+                    mark_surface_error(
+                        st.session_state,
+                        "advanced_radar",
+                        _aq_pair_intel_error,
+                    )
                     print(
                         "ATLASQUANT_RADAR_ADVANCED_ERROR "
                         + json.dumps(_aq_pair_intel_error, ensure_ascii=False)

@@ -1047,6 +1047,71 @@ def _render_approval_inbox(inbox: Mapping[str, Any]) -> None:
         st.success("Nenhum item chegou a um estágio que exija aprovação administrativa nesta memória.")
 
 
+
+def _critical_surface_rows(system_context: Mapping[str, Any] | None) -> list[dict[str, str]]:
+    system = dict(system_context or {})
+    snapshot = (
+        system.get("critical_surfaces")
+        if isinstance(system.get("critical_surfaces"), Mapping)
+        else {}
+    )
+    rows: list[dict[str, str]] = []
+    for item in list(snapshot.get("items", []) or []):
+        if not isinstance(item, Mapping):
+            continue
+        state = str(item.get("state") or "UNKNOWN").upper()
+        if state not in {"OK", "DEGRADED", "UNAVAILABLE", "UNKNOWN"}:
+            state = "UNKNOWN"
+        rows.append({
+            "Tela": str(item.get("label") or item.get("id") or "Tela não identificada"),
+            "Estado": state,
+            "Diagnóstico": str(item.get("error_type") or "—"),
+            "Detalhe": str(item.get("detail") or "Sem detalhe confirmado."),
+        })
+    return rows
+
+
+def _render_critical_surface_health(system_context: Mapping[str, Any] | None) -> None:
+    st.markdown("#### Saúde das telas críticas")
+    st.caption(
+        "Estado observado nesta sessão para Radar principal, Radar avançado/Central Institucional "
+        "e Painel Mestre. É diagnóstico de interface, não sinal de trade nem autorização operacional."
+    )
+    system = dict(system_context or {})
+    snapshot = (
+        system.get("critical_surfaces")
+        if isinstance(system.get("critical_surfaces"), Mapping)
+        else {}
+    )
+    counts = snapshot.get("counts") if isinstance(snapshot.get("counts"), Mapping) else {}
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("OK", int(counts.get("OK") or 0))
+    c2.metric("Degradadas", int(counts.get("DEGRADED") or 0))
+    c3.metric("Indisponíveis", int(counts.get("UNAVAILABLE") or 0))
+    c4.metric("Não observadas", int(counts.get("UNKNOWN") or 0))
+
+    rows = _critical_surface_rows(system)
+    if rows:
+        st.dataframe(rows, width="stretch", hide_index=True)
+    else:
+        st.warning(
+            "A saúde das telas críticas ainda não foi informada por esta execução. "
+            "O AION não assume que as telas estão saudáveis."
+        )
+        return
+
+    if bool(snapshot.get("all_ok", False)):
+        st.success(
+            "As três telas críticas foram observadas como OK nesta sessão. "
+            "Isso não substitui a validação do deploy de produção."
+        )
+    else:
+        st.warning(
+            "Existe tela degradada, indisponível ou ainda não observada nesta sessão. "
+            "O AION mantém o estado como pendente até nova evidência de renderização bem-sucedida."
+        )
+
+
 def _render_central(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
@@ -1080,6 +1145,7 @@ def _render_central(
         ),
     )
     _render_executive_pulse(executive_snapshot)
+    _render_critical_surface_health(system_context)
 
     if view_mode == "Completo":
         _render_workspace_overview(checkpoint, runtime_result)
@@ -3192,6 +3258,13 @@ def render_aion_admin_console(
         "selected_workspace": selected_workspace,
         "workspace_status": "ERROR_ISOLATED" if workspace_error_type else "OK",
         "workspace_error_type": workspace_error_type,
+        "critical_surface_counts": (
+            ((system.get("critical_surfaces") or {}) if isinstance(system.get("critical_surfaces"), Mapping) else {}).get("counts")
+            or {}
+        ),
+        "critical_surfaces_have_unresolved": bool(
+            ((system.get("critical_surfaces") or {}) if isinstance(system.get("critical_surfaces"), Mapping) else {}).get("has_unresolved", True)
+        ),
         "real_orders_enabled": False,
     }
 
