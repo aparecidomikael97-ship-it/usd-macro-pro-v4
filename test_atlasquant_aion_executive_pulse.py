@@ -310,6 +310,52 @@ class AtlasQuantAionExecutivePulseTests(unittest.TestCase):
         self.assertEqual(out["cost_guardian_state"],"WARNING")
         self.assertFalse(out["executes_action"])
 
+    def test_fresh_urgent_event_becomes_p1_attention_without_trade_signal(self):
+        out=executive_pulse(
+            runtime_result={"status":"CONFIRMED","integrity":{"state":"CONFIRMED"}},
+            status_board={"has_unresolved":False},
+            reliability_snapshot={
+                "posture":"CONTROLLED",
+                "degraded_mode":{"state":"NORMAL"},
+                "cost_guardian":{"state":"ZERO_COST"},
+            },
+            live_event_snapshot={
+                "state":"WATCHING",
+                "alert_count":2,
+                "urgent_review_count":1,
+                "top_alerts":[{
+                    "headline":"Reported military strike near energy route",
+                    "truth_state":"INFERENCE",
+                    "impact_truth_state":"HYPOTHESIS",
+                }],
+            },
+        )
+        self.assertEqual(out["primary"]["priority"],"P1")
+        self.assertEqual(out["primary"]["source"],"live_event_intelligence")
+        self.assertEqual(out["live_event_state"],"WATCHING")
+        self.assertEqual(out["live_event_urgent_review"],1)
+        self.assertFalse(out["executes_action"])
+        self.assertFalse(out["real_orders_enabled"])
+
+    def test_stale_event_source_does_not_create_event_attention(self):
+        out=executive_pulse(
+            runtime_result={"status":"CONFIRMED","integrity":{"state":"CONFIRMED"}},
+            status_board={"has_unresolved":False},
+            reliability_snapshot={
+                "posture":"CONTROLLED",
+                "degraded_mode":{"state":"NORMAL"},
+                "cost_guardian":{"state":"ZERO_COST"},
+            },
+            live_event_snapshot={
+                "state":"STALE_OR_UNAVAILABLE",
+                "alert_count":0,
+                "urgent_review_count":0,
+                "top_alerts":[],
+            },
+        )
+        self.assertNotEqual(out["primary"]["source"],"live_event_intelligence")
+        self.assertEqual(out["live_event_alert_count"],0)
+
     def test_compact_rows_are_presentation_only(self):
         out=executive_pulse(
             runtime_result={"status":"CONFIRMED","integrity":{"state":"CONFIRMED"}},
