@@ -117,8 +117,43 @@ def release_confidence(
     }
 
 
+def normalize_release_confidence(raw:Mapping[str,Any])->dict[str,Any]:
+    """Recompute state from evidence; never trust a persisted readiness label."""
+    item=dict(raw or {})
+    return release_confidence(
+        candidate_ref=item.get("candidate_ref"),
+        dimensions=item.get("dimensions")
+        if isinstance(item.get("dimensions"),(list,tuple))
+        else [],
+    )
+
+
+def normalize_release_confidence_records(
+    rows:Sequence[Mapping[str,Any]]|None,
+)->list[dict[str,Any]]:
+    out=[]
+    seen=set()
+    for raw in list(rows or [])[-300:]:
+        if not isinstance(raw,Mapping):
+            continue
+        try:
+            item=normalize_release_confidence(raw)
+        except Exception:
+            continue
+        key=(item["candidate_ref"],item["digest"])
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(item)
+    return out
+
+
+def release_confidence_digest(rows:Sequence[Mapping[str,Any]]|None)->str:
+    return _digest(normalize_release_confidence_records(rows),24)
+
+
 def release_confidence_summary(rows:Sequence[Mapping[str,Any]]|None)->dict[str,Any]:
-    items=[dict(x) for x in list(rows or [])[-300:] if isinstance(x,Mapping)]
+    items=normalize_release_confidence_records(rows)
     return {
         "schema":SCHEMA,
         "records":len(items),
@@ -128,8 +163,8 @@ def release_confidence_summary(rows:Sequence[Mapping[str,Any]]|None)->dict[str,A
         "merge_allowed":False,
         "deploy_allowed":False,
         "real_trading_enabled":False,
-        "digest":_digest(items,24),
+        "digest":release_confidence_digest(items),
     }
 
 
-__all__=["SCHEMA","DIMENSIONS","evidence_dimension","release_confidence","release_confidence_summary"]
+__all__=["SCHEMA","DIMENSIONS","evidence_dimension","release_confidence","normalize_release_confidence","normalize_release_confidence_records","release_confidence_digest","release_confidence_summary"]
