@@ -36,6 +36,12 @@ from atlasquant_aion_continuity import (
     normalize_handoffs,
     continuity_digest,
 )
+from atlasquant_aion_learning import (
+    normalize_learning_episodes,
+    normalize_learning_experiments,
+    normalize_research_references,
+    learning_digest,
+)
 
 SCHEMA = "ATLASQUANT_AION_MEMORY_V1"
 RUNTIME_PATH = "dados/aion/checkpoint_master.json"
@@ -295,6 +301,12 @@ def default_checkpoint() -> dict[str, Any]:
             "handoffs": [],
             "digest": continuity_digest([], []),
         },
+        "learning": {
+            "episodes": [],
+            "experiments": [],
+            "research_refs": [],
+            "digest": learning_digest([], [], []),
+        },
     }
 
 
@@ -388,6 +400,29 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
         "missions": mission_rows,
         "handoffs": handoff_rows,
         "digest": continuity_digest(mission_rows, handoff_rows),
+    }
+
+    learning = payload.get("learning")
+    if not isinstance(learning, Mapping):
+        learning = {}
+    learning_episodes = normalize_learning_episodes(
+        learning.get("episodes") if isinstance(learning, Mapping) else []
+    )
+    learning_experiments = normalize_learning_experiments(
+        learning.get("experiments") if isinstance(learning, Mapping) else []
+    )
+    learning_research = normalize_research_references(
+        learning.get("research_refs") if isinstance(learning, Mapping) else []
+    )
+    payload["learning"] = {
+        "episodes": learning_episodes,
+        "experiments": learning_experiments,
+        "research_refs": learning_research,
+        "digest": learning_digest(
+            learning_episodes,
+            learning_experiments,
+            learning_research,
+        ),
     }
 
     operating = payload.get("operating")
@@ -501,6 +536,45 @@ def update_entitlements_checkpoint(
     payload["entitlements"] = {
         "records": rows,
         "digest": entitlement_digest(rows),
+    }
+    payload["operating"]["dirty"] = bool(dirty)
+    payload["updated_at"] = _now()
+    return payload
+
+
+def update_learning_checkpoint(
+    checkpoint: Mapping[str, Any] | None,
+    *,
+    episodes: Any = None,
+    experiments: Any = None,
+    research_refs: Any = None,
+    dirty: bool = True,
+) -> dict[str, Any]:
+    """Return a normalized checkpoint with controlled-learning memory.
+
+    Learning writes only update the Checkpoint memory. They never change live
+    market weights, strategy rules, production deployment or broker execution.
+    """
+    payload = ensure_operating_checkpoint(checkpoint)
+    current = payload.get("learning") if isinstance(payload.get("learning"), Mapping) else {}
+    episode_rows = normalize_learning_episodes(
+        current.get("episodes", []) if episodes is None else episodes
+    )
+    experiment_rows = normalize_learning_experiments(
+        current.get("experiments", []) if experiments is None else experiments
+    )
+    research_rows = normalize_research_references(
+        current.get("research_refs", []) if research_refs is None else research_refs
+    )
+    payload["learning"] = {
+        "episodes": episode_rows,
+        "experiments": experiment_rows,
+        "research_refs": research_rows,
+        "digest": learning_digest(
+            episode_rows,
+            experiment_rows,
+            research_rows,
+        ),
     }
     payload["operating"]["dirty"] = bool(dirty)
     payload["updated_at"] = _now()
@@ -933,6 +1007,26 @@ def checkpoint_integrity_report(
         continuity_digest(mission_rows, handoff_rows),
     )
 
+    learning = raw.get("learning") if isinstance(raw.get("learning"), Mapping) else {}
+    learning_episodes = normalize_learning_episodes(
+        learning.get("episodes") if isinstance(learning, Mapping) else []
+    )
+    learning_experiments = normalize_learning_experiments(
+        learning.get("experiments") if isinstance(learning, Mapping) else []
+    )
+    learning_research = normalize_research_references(
+        learning.get("research_refs") if isinstance(learning, Mapping) else []
+    )
+    add_check(
+        "learning",
+        learning.get("digest"),
+        learning_digest(
+            learning_episodes,
+            learning_experiments,
+            learning_research,
+        ),
+    )
+
     raw_areas = raw.get("areas") if isinstance(raw.get("areas"), Mapping) else {}
     if "subscriptions" not in raw_areas:
         migration_items.append("areas.subscriptions ausente")
@@ -940,6 +1034,8 @@ def checkpoint_integrity_report(
         migration_items.append(f"checkpoint_version {version} < 7")
     if "continuity" not in raw:
         migration_items.append("continuity ausente")
+    if "learning" not in raw:
+        migration_items.append("learning ausente")
 
     if mismatches:
         state = "MISMATCH"
