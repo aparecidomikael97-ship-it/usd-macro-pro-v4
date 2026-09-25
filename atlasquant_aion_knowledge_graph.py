@@ -116,7 +116,9 @@ def new_edge(
         raise ValueError("unsupported graph relation")
     truth=_truth(truth_state)
     refs=_refs(evidence_refs)
-    if rel=="CAUSED_BY" and (truth!="CONFIRMED" or not refs):
+    if truth=="CONFIRMED" and not refs:
+        raise ValueError("confirmed graph edge requires evidence refs")
+    if rel=="CAUSED_BY" and truth!="CONFIRMED":
         raise ValueError("causal edge requires confirmed truth and evidence refs")
     eid="edge:"+_stable({"s":source,"r":rel,"t":target},24)
     return {
