@@ -145,6 +145,9 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("não sinal de trade nem autorização operacional",src)
         self.assertIn('"critical_surface_counts"',src)
         self.assertIn('"critical_surfaces_have_unresolved"',src)
+        self.assertIn("interface_validation_mission(snapshot)",src)
+        self.assertIn("Missão de validação deste build",src)
+        self.assertIn("Validação da interface no build atual",src)
 
     def test_central_next_action_is_read_only(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
@@ -230,6 +233,19 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn('st.session_state["aion_admin_workspace"] = jump_request',src)
         self.assertIn('"executive_posture"',src)
         self.assertIn('"executive_primary_area"',src)
+
+    def test_executive_pulse_surfaces_interface_validation_progress(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("interface_validation_mission(",src)
+        self.assertIn("interface_validation=interface_validation_state",src)
+        self.assertIn("Telas do build",src)
+        self.assertIn('"interface_validation_state"',src)
+        self.assertIn('"interface_validation_confirmed"',src)
+        self.assertIn('"interface_validation_complete"',src)
+        self.assertIn(
+            ".aion-pulse-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr))",
+            AION_ADMIN_CSS,
+        )
 
     def test_admin_mobile_contrast_is_stronger_and_single_column_at_small_width(self):
         self.assertIn(".aion-pulse-grid",AION_ADMIN_CSS)
