@@ -48,7 +48,7 @@ APPROVED_AION_FOUNDATION = (
     "Prioridade: Interface + Modo Administrador + Central AION + Memória/Checkpoint + Segurança antes de novo refinamento operacional.",
     "AION oficial é assistente central do administrador: secretário, desenvolvedor, orquestrador, Guardian e memória persistente.",
     "AION deve atualizar o administrador sobre sistema, pendências, mercado quando houver dados frescos, clientes quando houver fonte confirmada e conteúdos aguardando aprovação.",
-    "AION deve separar contextos: Trading, Studio, Negócios, Laboratório, Secretaria/Agenda, Desenvolvimento e Promoções.",
+    "AION deve separar contextos: Trading, Studio, Negócios, Laboratório, Secretaria/Agenda, Desenvolvimento, Assinaturas e Promoções.",
     "AION Studio deve preparar vídeos, imagens, roteiros, capas, legendas e conteúdo para Instagram, TikTok e YouTube; publicação externa permanece condicionada a aprovação e integração.",
     "AION Negócios deve apoiar pesquisa de produtos, tendências, margem, fornecedores e vendas em canais como Mercado Livre e TikTok Shop, isolado do núcleo de trading.",
     "Receita da área Negócios pode ser acompanhada contra custos do AtlasQuant para buscar sustentabilidade financeira do ecossistema.",
@@ -64,6 +64,18 @@ APPROVED_AION_FOUNDATION = (
     "Execução real em corretora continua bloqueada; backtest/paper/forward e pesquisa não equivalem a autorização real.",
     "Gatilho operacional aprovado: quando o administrador disser 'tô no computador', priorizar a reconciliação do Render, configurar o Deploy Hook com segurança e validar Build Identity + Browser Smoke antes de retomar novos blocos.",
 )
+
+DEFAULT_AREA_STATES = {
+    "central": "FOUNDATION",
+    "trading": "CONNECTED_READ_ONLY",
+    "studio": "WORKSPACE_READY_EXTERNAL_PUBLISH_OFF",
+    "business": "WORKSPACE_READY_EXTERNAL_PUBLISH_OFF",
+    "laboratory": "CONNECTED_SAFE",
+    "secretary": "FOUNDATION",
+    "development": "FOUNDATION",
+    "subscriptions": "WORKSPACE_READY_PROVIDER_ACTIVATION_OFF",
+    "promotions": "WORKSPACE_READY_PROVIDER_ACTIVATION_OFF",
+}
 
 STOPWORDS = {
     "a","o","as","os","de","da","do","das","dos","e","em","um","uma","para","por",
@@ -225,7 +237,7 @@ def search_canonical_memory(
 def default_checkpoint() -> dict[str, Any]:
     return {
         "schema": SCHEMA,
-        "checkpoint_version": 5,
+        "checkpoint_version": 6,
         "created_at": _now(),
         "updated_at": _now(),
         "project": "AtlasQuant",
@@ -237,16 +249,7 @@ def default_checkpoint() -> dict[str, Any]:
             "real_trading": False,
             "model_budget": normalize_budget({}),
         },
-        "areas": {
-            "central": "FOUNDATION",
-            "trading": "CONNECTED_READ_ONLY",
-            "studio": "WORKSPACE_READY_EXTERNAL_PUBLISH_OFF",
-            "business": "WORKSPACE_READY_EXTERNAL_PUBLISH_OFF",
-            "laboratory": "CONNECTED_SAFE",
-            "secretary": "FOUNDATION",
-            "development": "FOUNDATION",
-            "promotions": "WORKSPACE_READY_PROVIDER_ACTIVATION_OFF",
-        },
+        "areas": dict(DEFAULT_AREA_STATES),
         "approved_foundation": list(APPROVED_AION_FOUNDATION),
         "pending": [
             "Validar AION em produção privada.",
@@ -290,6 +293,14 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
     payload = dict(checkpoint or {})
     if not payload:
         payload = default_checkpoint()
+
+    raw_areas = payload.get("areas") if isinstance(payload.get("areas"), Mapping) else {}
+    merged_areas = dict(DEFAULT_AREA_STATES)
+    for key, value in dict(raw_areas or {}).items():
+        normalized_key = str(key or "").strip()
+        if normalized_key:
+            merged_areas[normalized_key] = str(value or "UNKNOWN")
+    payload["areas"] = merged_areas
     aion = payload.get("aion")
     if not isinstance(aion, dict):
         aion = {}
@@ -359,7 +370,7 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
         operating = {}
     tasks = normalize_queue(operating.get("tasks") if isinstance(operating, Mapping) else [])
     events = normalize_events(operating.get("events") if isinstance(operating, Mapping) else [])
-    payload["checkpoint_version"] = max(5, int(payload.get("checkpoint_version") or 1))
+    payload["checkpoint_version"] = max(6, int(payload.get("checkpoint_version") or 1))
     payload["operating"] = {
         "tasks": tasks,
         "events": events,
@@ -534,6 +545,7 @@ def load_runtime_checkpoint(
         payload = json.loads(raw)
         if not isinstance(payload, dict):
             raise ValueError("checkpoint is not an object")
+        integrity = checkpoint_integrity_report(payload)
         return {
             "schema": SCHEMA,
             "status": "CONFIRMED",
@@ -541,6 +553,7 @@ def load_runtime_checkpoint(
             "checkpoint": payload,
             "sha": str(obj.get("sha") or ""),
             "reason": "",
+            "integrity": integrity,
             "checked_at": _now(),
         }
     except Exception as exc:
@@ -568,11 +581,26 @@ def runtime_write_preflight(runtime_result: Mapping[str, Any] | None) -> dict[st
                 "reason": "Runtime confirmado sem SHA; atualização bloqueada para evitar sobrescrita.",
                 "expected_sha": "",
             }
+        integrity = checkpoint_integrity_report(result.get("checkpoint"))
+        if integrity.get("state") == "MISMATCH":
+            return {
+                "allowed": False,
+                "mode": "BLOCKED",
+                "reason": "Integridade do Checkpoint divergiu; escrita bloqueada até revisão.",
+                "expected_sha": sha,
+                "integrity_state": "MISMATCH",
+            }
+        migration = integrity.get("state") == "MIGRATION_REQUIRED"
         return {
             "allowed": True,
-            "mode": "UPDATE",
-            "reason": "Runtime confirmado com SHA para escrita condicional.",
+            "mode": "UPDATE_MIGRATION" if migration else "UPDATE",
+            "reason": (
+                "Runtime confirmado com SHA; migração estrutural V6 será aplicada na escrita condicional."
+                if migration else
+                "Runtime confirmado com SHA e integridade compatível para escrita condicional."
+            ),
             "expected_sha": sha,
+            "integrity_state": integrity.get("state"),
         }
     if status == "NOT_FOUND":
         return {
@@ -716,6 +744,7 @@ def save_runtime_checkpoint(
             "sha": read_sha,
             "checkpoint": verified_checkpoint,
             "digest": actual_digest,
+            "integrity": checkpoint_integrity_report(verified_checkpoint),
             "checked_at": _now(),
         }
     except Exception as exc:
@@ -747,6 +776,118 @@ def merged_checkpoint(
         "provenance": "static-seed",
         "runtime_confirmed": False,
         "runtime_status": result.get("status", "UNAVAILABLE"),
+    }
+
+
+def checkpoint_integrity_report(
+    checkpoint: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Verify persisted component digests before normalization mutates them.
+
+    Missing V6 structure is reported as MIGRATION_REQUIRED rather than corruption.
+    A present-but-wrong digest is a MISMATCH and should fail closed for writes.
+    """
+    if not isinstance(checkpoint, Mapping):
+        return {
+            "schema": SCHEMA,
+            "state": "UNKNOWN",
+            "checkpoint_version": 0,
+            "checks": [],
+            "mismatches": [],
+            "migration_items": ["checkpoint ausente ou inválido"],
+            "write_safe": False,
+        }
+
+    raw = dict(checkpoint)
+    try:
+        version = int(raw.get("checkpoint_version") or 1)
+    except Exception:
+        version = 1
+
+    checks: list[dict[str, Any]] = []
+    mismatches: list[str] = []
+    migration_items: list[str] = []
+
+    def add_check(name: str, stored: Any, expected: str) -> None:
+        stored_text = str(stored or "").strip()
+        if not stored_text:
+            migration_items.append(f"{name}: digest ausente")
+            checks.append({
+                "component": name,
+                "state": "MISSING",
+                "stored": "",
+                "expected": expected,
+            })
+            return
+        match = stored_text == expected
+        checks.append({
+            "component": name,
+            "state": "MATCH" if match else "MISMATCH",
+            "stored": stored_text,
+            "expected": expected,
+        })
+        if not match:
+            mismatches.append(name)
+
+    operating = raw.get("operating") if isinstance(raw.get("operating"), Mapping) else {}
+    tasks = normalize_queue(operating.get("tasks") if isinstance(operating, Mapping) else [])
+    events = normalize_events(operating.get("events") if isinstance(operating, Mapping) else [])
+    add_check("operating.tasks", operating.get("task_digest"), queue_digest(tasks))
+    add_check("operating.events", operating.get("event_digest"), events_digest(events))
+
+    studio = raw.get("studio") if isinstance(raw.get("studio"), Mapping) else {}
+    projects = normalize_projects(studio.get("projects") if isinstance(studio, Mapping) else [])
+    add_check("studio", studio.get("digest"), studio_digest(projects))
+
+    business = raw.get("business") if isinstance(raw.get("business"), Mapping) else {}
+    products = normalize_products(business.get("products") if isinstance(business, Mapping) else [])
+    add_check("business", business.get("digest"), business_digest(products))
+
+    promotions = raw.get("promotions") if isinstance(raw.get("promotions"), Mapping) else {}
+    campaigns = normalize_campaigns(promotions.get("campaigns") if isinstance(promotions, Mapping) else [])
+    redemptions_raw = promotions.get("redemptions", []) if isinstance(promotions, Mapping) else []
+    if not isinstance(redemptions_raw, (list, tuple)):
+        redemptions_raw = []
+    redemptions = [dict(x) for x in list(redemptions_raw)[:2000] if isinstance(x, Mapping)]
+    add_check(
+        "promotions",
+        promotions.get("digest"),
+        promotion_digest(campaigns, redemptions),
+    )
+
+    entitlements = raw.get("entitlements") if isinstance(raw.get("entitlements"), Mapping) else {}
+    entitlement_rows = normalize_entitlements(
+        entitlements.get("records") if isinstance(entitlements, Mapping) else []
+    )
+    add_check(
+        "entitlements",
+        entitlements.get("digest"),
+        entitlement_digest(entitlement_rows),
+    )
+
+    raw_areas = raw.get("areas") if isinstance(raw.get("areas"), Mapping) else {}
+    if "subscriptions" not in raw_areas:
+        migration_items.append("areas.subscriptions ausente")
+    if version < 6:
+        migration_items.append(f"checkpoint_version {version} < 6")
+
+    if mismatches:
+        state = "MISMATCH"
+    elif migration_items:
+        state = "MIGRATION_REQUIRED"
+    else:
+        state = "CONFIRMED"
+
+    return {
+        "schema": SCHEMA,
+        "state": state,
+        "checkpoint_version": version,
+        "checks": checks,
+        "matched": sum(1 for item in checks if item["state"] == "MATCH"),
+        "total": len(checks),
+        "mismatches": mismatches,
+        "migration_items": migration_items,
+        "write_safe": state in {"CONFIRMED", "MIGRATION_REQUIRED"},
     }
 
 
