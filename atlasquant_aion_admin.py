@@ -160,6 +160,10 @@ from atlasquant_aion_executive_pulse import (
     executive_pulse,
 )
 from atlasquant_navigation_bridge import request_surface_revalidation
+from atlasquant_aion_validation_center import (
+    validation_center_rows,
+    validation_center_snapshot,
+)
 
 try:
     from atlasquant_neural_voice_ui import render_neural_voice_player
@@ -1100,6 +1104,69 @@ def _critical_surface_rows(system_context: Mapping[str, Any] | None) -> list[dic
     return rows
 
 
+def _render_validation_center(
+    system_context: Mapping[str, Any] | None,
+    runtime_result: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    runtime = dict(runtime_result or {})
+    snapshot = validation_center_snapshot(
+        system_context,
+        runtime_status=runtime.get("status"),
+    )
+    st.markdown("#### Centro de Validação")
+    st.caption(
+        "Este quadro separa evidência do build atual, validação local da sessão e produção. "
+        "Validação local nunca é tratada como prova de que o deploy publicado está saudável."
+    )
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("Build atual", str(snapshot.get("current_build") or "NÃO CONFIRMADO"))
+    c2.metric(
+        "Telas críticas",
+        f"{int(snapshot.get('critical_confirmed') or 0)}/{int(snapshot.get('critical_total') or 3)}",
+    )
+    c3.metric(
+        "Sessão local",
+        "VALIDADA" if snapshot.get("local_session_validated") else "PENDENTE",
+    )
+    c4.metric(
+        "Produção",
+        "CONFIRMADA" if snapshot.get("production_confirmed") else "NÃO CONFIRMADA",
+    )
+
+    if snapshot.get("local_session_validated"):
+        st.success(
+            "Build e três telas críticas têm evidência desta sessão no mesmo build. "
+            "Isso confirma somente a sessão local observada."
+        )
+    else:
+        st.warning(
+            "A sessão local ainda não possui evidência completa no build atual. "
+            "O AION mantém a validação pendente."
+        )
+
+    if snapshot.get("production_confirmed"):
+        st.success("Há evidência explícita de produção para este mesmo build.")
+    else:
+        st.info(
+            "Produção continua NÃO CONFIRMADA. O AION não promove automaticamente "
+            "evidência local para estado de produção."
+        )
+
+    with st.expander("Ver checklist de evidências", expanded=False):
+        rows = validation_center_rows(snapshot)
+        if rows:
+            st.dataframe(rows, width="stretch", hide_index=True)
+        if snapshot.get("next_actions"):
+            st.markdown("**Próximas validações:**")
+            for action in list(snapshot.get("next_actions") or [])[:8]:
+                st.markdown(f"- {action}")
+        st.caption(
+            "Este centro é somente leitura. Deploy, rollback, mudança de permissão e ordens reais "
+            "não são executados por este quadro."
+        )
+    return snapshot
+
+
 def _render_critical_surface_health(system_context: Mapping[str, Any] | None) -> None:
     st.markdown("#### Saúde das telas críticas")
     st.caption(
@@ -1229,6 +1296,7 @@ def _render_central(
         ),
     )
     _render_executive_pulse(executive_snapshot)
+    _validation_snapshot = _render_validation_center(system_context, runtime_result)
     _render_critical_surface_health(system_context)
 
     if view_mode == "Completo":
@@ -3360,6 +3428,10 @@ def render_aion_admin_console(
         "guided_revalidation_state": str(
             ((system.get("guided_revalidation") or {}) if isinstance(system.get("guided_revalidation"), Mapping) else {}).get("state")
             or "NONE"
+        ),
+        "validation_center": validation_center_snapshot(
+            system,
+            runtime_status=runtime_result.get("status"),
         ),
         "real_orders_enabled": False,
     }
