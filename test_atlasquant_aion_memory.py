@@ -150,8 +150,13 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("aion portable core", joined)
         self.assertIn("creative fusion studio", joined)
         self.assertIn("motor universal de performance", joined)
+        self.assertIn("fundos imobiliários", joined)
+        self.assertIn("motor de receita", joined)
+        self.assertIn("lucro líquido", joined)
+        self.assertIn("radar de tendências", joined)
+        self.assertIn("curiosidade controlada", joined)
         self.assertEqual(upgraded["aion"]["foundation_revision"], FOUNDATION_REVISION)
-        self.assertGreaterEqual(upgraded["checkpoint_version"], 13)
+        self.assertGreaterEqual(upgraded["checkpoint_version"], 14)
 
     def test_default_checkpoint_is_safe_and_has_no_real_trading(self):
         cp = default_checkpoint()
@@ -215,7 +220,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
     def test_older_checkpoint_is_upgraded_without_claiming_persistence(self):
         old={"checkpoint_version":1,"project":"AtlasQuant"}
         upgraded=ensure_operating_checkpoint(old)
-        self.assertEqual(upgraded["checkpoint_version"],13)
+        self.assertEqual(upgraded["checkpoint_version"],14)
         self.assertIn("operating",upgraded)
         self.assertIn("studio",upgraded)
         self.assertIn("business",upgraded)
@@ -456,7 +461,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         })
         self.assertTrue(preflight["allowed"])
         self.assertEqual(preflight["mode"],"UPDATE_MIGRATION")
-        self.assertIn("V13",preflight["reason"])
+        self.assertIn("V14",preflight["reason"])
 
     def test_integrity_mismatch_blocks_runtime_write_preflight(self):
         tampered=default_checkpoint()
@@ -750,6 +755,8 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertTrue(status["read_ready"])
         self.assertFalse(status["write_ready"])
         self.assertEqual(status["mode"],"READ_ONLY_PUBLIC")
+        self.assertIn("GITHUB_TOKEN_HISTORICO",status["missing_for_write"])
+        self.assertIn("write credential",status["reason"].lower())
         self.assertFalse(status["secret_exposed"])
 
     def test_runtime_public_read_does_not_require_write_token(self):
