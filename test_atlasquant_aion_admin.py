@@ -1,7 +1,12 @@
 import unittest
 from pathlib import Path
 
-from atlasquant_aion_admin import AION_ADMIN_CSS, AION_WORKSPACES, _attention_queue
+from atlasquant_aion_admin import (
+    AION_ADMIN_CSS,
+    AION_WORKSPACES,
+    _attention_queue,
+    _critical_surface_rows,
+)
 
 
 class AtlasQuantAionAdminTests(unittest.TestCase):
@@ -67,6 +72,41 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertEqual(rows[0]["area"],"🎬 Studio")
         self.assertEqual(rows[1]["area"],"🔐 Assinaturas")
         self.assertIn("nenhuma aprovação é automática",rows[0]["next_action"])
+
+    def test_central_critical_surface_health_is_truthful_and_read_only(self):
+        system={
+            "critical_surfaces":{
+                "items":[
+                    {
+                        "id":"home_radar",
+                        "label":"Radar principal",
+                        "state":"OK",
+                        "error_type":"",
+                        "detail":"Renderização concluída nesta sessão.",
+                    },
+                    {
+                        "id":"advanced_radar",
+                        "label":"Radar avançado / Central Institucional",
+                        "state":"DEGRADED",
+                        "error_type":"RuntimeError",
+                        "detail":"Falha isolada.",
+                    },
+                ],
+                "counts":{"OK":1,"DEGRADED":1,"UNAVAILABLE":0,"UNKNOWN":1},
+                "has_unresolved":True,
+                "all_ok":False,
+            }
+        }
+        rows=_critical_surface_rows(system)
+        self.assertEqual(rows[0]["Estado"],"OK")
+        self.assertEqual(rows[1]["Estado"],"DEGRADED")
+        self.assertEqual(rows[1]["Diagnóstico"],"RuntimeError")
+        src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Saúde das telas críticas",src)
+        self.assertIn("_render_critical_surface_health(system_context)",src)
+        self.assertIn("não sinal de trade nem autorização operacional",src)
+        self.assertIn('"critical_surface_counts"',src)
+        self.assertIn('"critical_surfaces_have_unresolved"',src)
 
     def test_central_next_action_is_read_only(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
