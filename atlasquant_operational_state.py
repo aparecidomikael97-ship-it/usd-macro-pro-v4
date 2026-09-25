@@ -146,7 +146,10 @@ def operational_presentation(
     )
     tone=str(op["tone"])
     state_label=str(op["state"])
-    if bool(op["authorized"]) and not final_authorized:
+    if bool(freshness["requires_revalidation"]) and state_label!="BLOQUEADO":
+        tone="warn"
+        state_label="REVALIDAR"
+    elif bool(op["authorized"]) and not final_authorized:
         tone="warn"
         state_label="REVALIDAR"
 
