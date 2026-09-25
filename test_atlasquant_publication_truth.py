@@ -78,6 +78,16 @@ class AtlasQuantPublicationTruthTests(unittest.TestCase):
         self.assertTrue(out["can_claim_latest_main_live"])
         self.assertFalse(out["can_claim_interface_validated"])
 
+    def test_main_app_passes_runtime_main_and_production_identities_to_aion(self):
+        from pathlib import Path
+        src = Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        self.assertIn("publication_truth(", src)
+        self.assertIn("runtime_commit=_ATLASQUANT_DEPLOY_COMMIT", src)
+        self.assertIn('ATLASQUANT_EXPECTED_MAIN_COMMIT', src)
+        self.assertIn('ATLASQUANT_PRODUCTION_VERIFIED_COMMIT', src)
+        self.assertIn('"publication_truth": _aion_publication_truth', src)
+        self.assertIn('"interface_validation": _aion_interface_validation', src)
+
     def test_malformed_commit_is_ignored(self):
         out = publication_truth(
             runtime_commit="not-a-sha",
