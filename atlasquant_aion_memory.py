@@ -89,6 +89,11 @@ from atlasquant_aion_resilience import (
     normalize_resilience,
     resilience_digest,
 )
+from atlasquant_aion_memory_reliability import (
+    default_memory_reliability,
+    normalize_memory_reliability,
+    memory_reliability_digest,
+)
 from atlasquant_aion_event_journal import (
     normalize_events as normalize_live_event_journal_events,
     normalize_heartbeats as normalize_live_event_heartbeats,
@@ -395,7 +400,7 @@ def search_canonical_memory(
 def default_checkpoint() -> dict[str, Any]:
     return {
         "schema": SCHEMA,
-        "checkpoint_version": 14,
+        "checkpoint_version": 15,
         "created_at": _now(),
         "updated_at": _now(),
         "project": "AtlasQuant",
@@ -488,6 +493,7 @@ def default_checkpoint() -> dict[str, Any]:
             "digest": release_confidence_digest([]),
         },
         "resilience": default_resilience(),
+        "memory_reliability": default_memory_reliability(),
         "live_event_journal": {
             "events": [],
             "heartbeats": [],
@@ -738,6 +744,12 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
         else {}
     )
 
+    payload["memory_reliability"] = normalize_memory_reliability(
+        payload.get("memory_reliability")
+        if isinstance(payload.get("memory_reliability"), Mapping)
+        else {}
+    )
+
     live_event_journal = (
         payload.get("live_event_journal")
         if isinstance(payload.get("live_event_journal"), Mapping)
@@ -760,7 +772,7 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
         operating = {}
     tasks = normalize_queue(operating.get("tasks") if isinstance(operating, Mapping) else [])
     events = normalize_events(operating.get("events") if isinstance(operating, Mapping) else [])
-    payload["checkpoint_version"] = max(14, int(payload.get("checkpoint_version") or 1))
+    payload["checkpoint_version"] = max(15, int(payload.get("checkpoint_version") or 1))
     payload["operating"] = {
         "tasks": tasks,
         "events": events,
@@ -1138,6 +1150,20 @@ def update_resilience_checkpoint(
     return payload
 
 
+def update_memory_reliability_checkpoint(
+    checkpoint: Mapping[str, Any] | None,
+    *,
+    memory_reliability: Mapping[str, Any],
+    dirty: bool = True,
+) -> dict[str, Any]:
+    """Persist reviewed memory evidence/replay receipts; never grants action authority."""
+    payload = ensure_operating_checkpoint(checkpoint)
+    payload["memory_reliability"] = normalize_memory_reliability(memory_reliability)
+    payload["operating"]["dirty"] = bool(dirty)
+    payload["updated_at"] = _now()
+    return payload
+
+
 def update_live_event_journal_checkpoint(
     checkpoint: Mapping[str, Any] | None,
     *,
@@ -1342,7 +1368,7 @@ def runtime_write_preflight(runtime_result: Mapping[str, Any] | None) -> dict[st
             "allowed": True,
             "mode": "UPDATE_MIGRATION" if migration else "UPDATE",
             "reason": (
-                "Runtime confirmado com SHA; migração estrutural V14 será aplicada na escrita condicional."
+                "Runtime confirmado com SHA; migração estrutural V15 será aplicada na escrita condicional."
                 if migration else
                 "Runtime confirmado com SHA e integridade compatível para escrita condicional."
             ),
@@ -1531,7 +1557,7 @@ def checkpoint_integrity_report(
 ) -> dict[str, Any]:
     """Verify persisted component digests before normalization mutates them.
 
-    Missing V14 structure is reported as MIGRATION_REQUIRED rather than corruption.
+    Missing V15 structure is reported as MIGRATION_REQUIRED rather than corruption.
     A present-but-wrong digest is a MISMATCH and should fail closed for writes.
     """
     if not isinstance(checkpoint, Mapping):
@@ -1775,6 +1801,18 @@ def checkpoint_integrity_report(
         resilience_state.get("digest"),
     )
 
+    memory_reliability_raw = (
+        raw.get("memory_reliability")
+        if isinstance(raw.get("memory_reliability"), Mapping)
+        else {}
+    )
+    memory_reliability_state = normalize_memory_reliability(memory_reliability_raw)
+    add_check(
+        "memory_reliability",
+        memory_reliability_raw.get("digest"),
+        memory_reliability_state.get("digest"),
+    )
+
     live_event_journal = (
         raw.get("live_event_journal")
         if isinstance(raw.get("live_event_journal"), Mapping)
@@ -1795,8 +1833,8 @@ def checkpoint_integrity_report(
     raw_areas = raw.get("areas") if isinstance(raw.get("areas"), Mapping) else {}
     if "subscriptions" not in raw_areas:
         migration_items.append("areas.subscriptions ausente")
-    if version < 14:
-        migration_items.append(f"checkpoint_version {version} < 14")
+    if version < 15:
+        migration_items.append(f"checkpoint_version {version} < 15")
     if "continuity" not in raw:
         migration_items.append("continuity ausente")
     if "learning" not in raw:
@@ -1823,6 +1861,8 @@ def checkpoint_integrity_report(
         migration_items.append("release_confidence ausente")
     if "resilience" not in raw:
         migration_items.append("resilience ausente")
+    if "memory_reliability" not in raw:
+        migration_items.append("memory_reliability ausente")
     if "live_event_journal" not in raw:
         migration_items.append("live_event_journal ausente")
 

@@ -10,10 +10,10 @@ from atlasquant_aion_runtime_migrate import migrate_checkpoint
 
 
 class AtlasQuantAionRuntimeMigrationTests(unittest.TestCase):
-    def test_v13_shape_migrates_to_current_v14_and_preserves_data(self):
+    def test_v14_shape_migrates_to_current_v15_and_preserves_data(self):
         cp=default_checkpoint()
-        cp["checkpoint_version"]=13
-        cp.pop("resilience",None)
+        cp["checkpoint_version"]=14
+        cp.pop("memory_reliability",None)
         cp["pending"].append("PENDENCIA-PRESERVADA")
         with tempfile.TemporaryDirectory() as td:
             source=Path(td)/"before.json"
@@ -22,8 +22,8 @@ class AtlasQuantAionRuntimeMigrationTests(unittest.TestCase):
             out=migrate_checkpoint(source,target)
             migrated=json.loads(target.read_text(encoding="utf-8"))
         self.assertEqual(out["status"],"CONFIRMED")
-        self.assertGreaterEqual(out["after_version"],14)
-        self.assertIn("resilience",migrated)
+        self.assertGreaterEqual(out["after_version"],15)
+        self.assertIn("memory_reliability",migrated)
         self.assertIn("PENDENCIA-PRESERVADA",migrated["pending"])
         self.assertFalse(migrated["aion"]["real_trading"])
 

@@ -183,6 +183,20 @@ class AtlasQuantAionGatewayTests(unittest.TestCase):
         self.assertIn("Conselho cognitivo selecionado",result["answer"])
         self.assertFalse(result["executes_action"])
 
+    def test_local_answer_exposes_epistemic_gate_for_memory(self):
+        result=local_answer(
+            "o que ficou aprovado?",
+            checkpoint={"aion":{"priority":"AION"}},
+            memory_hits=[{
+                "path":"docs/decision.md",
+                "excerpt":"Decisão aprovada.",
+                "sha256":"a"*64,
+            }],
+        )
+        self.assertEqual(result["epistemic_state"],"SUPPORTED")
+        self.assertFalse(result["memory_action_authorized"])
+        self.assertFalse(result["epistemic_core"]["action_authorized"])
+
     def test_local_answer_does_not_invent_fresh_market_state(self):
         result = local_answer(
             "como está o radar forex agora?",

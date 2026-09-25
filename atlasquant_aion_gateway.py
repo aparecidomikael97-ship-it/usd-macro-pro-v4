@@ -14,6 +14,7 @@ from atlasquant_aion_continuity import continuity_briefing
 from atlasquant_aion_provider import provider_configuration_status
 from atlasquant_aion_intelligence import evidence_audit, evidence_confidence
 from atlasquant_aion_cognitive_orchestrator import orchestrator_snapshot
+from atlasquant_aion_memory_reliability import assess_canonical_memory_hits
 
 SCHEMA = "ATLASQUANT_AION_GATEWAY_V1"
 
@@ -102,6 +103,7 @@ def local_answer(
     q = str(question or "").strip()
     route = route_context(q)
     hits = [dict(x) for x in list(memory_hits or [])[:5] if isinstance(x, Mapping)]
+    epistemic = assess_canonical_memory_hits(q, hits)
     system = dict(system_context or {})
     provider = provider_status(feature_flags=feature_flags)
     cp = dict(checkpoint or {})
@@ -306,6 +308,11 @@ def local_answer(
         })
     response_audit = evidence_audit(response_evidence)
     response_confidence = evidence_confidence(response_audit)
+    if epistemic.get("state") in {"VERIFY_REQUIRED","CONFLICT","RESEARCH_REQUIRED","INSUFFICIENT_EVIDENCE"} and hits:
+        answer += (
+            " O Epistemic Core não considerou toda a memória recuperada suficiente para afirmação forte; "
+            "ela fica condicionada a nova verificação antes de uso sensível."
+        )
 
     return {
         "schema": SCHEMA,
@@ -315,6 +322,9 @@ def local_answer(
         "evidence": hits,
         "evidence_audit": response_audit,
         "evidence_confidence": response_confidence,
+        "epistemic_core": epistemic,
+        "epistemic_state": str(epistemic.get("state") or "UNKNOWN"),
+        "memory_action_authorized": False,
         "truth_state": "CONFIRMED_LOCAL_CONTRACT",
         "confidence_basis": "EVIDENCE_QUALITY_NOT_PROFIT_PROBABILITY",
         "reliability_posture": reliability_posture or "UNKNOWN",
