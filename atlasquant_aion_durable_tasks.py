@@ -43,6 +43,14 @@ def _refs(values:Sequence[Any]|None,limit:int=50)->list[str]:
     return out
 
 
+def _int(value:Any,default:int=0,minimum:int=0,maximum:int=1_000_000)->int:
+    try:
+        parsed=int(value)
+    except Exception:
+        parsed=int(default)
+    return max(minimum,min(maximum,parsed))
+
+
 def _digest(value:Any)->str:
     raw=json.dumps(value,ensure_ascii=False,sort_keys=True,default=str)
     return sha256(raw.encode("utf-8")).hexdigest()[:24]
@@ -77,7 +85,7 @@ def normalize_step(raw:Mapping[str,Any],index:int)->dict[str,Any]:
         ),
         "result_note":_clean(item.get("result_note")),
         "blocker":_clean(item.get("blocker")),
-        "attempts":max(0,min(int(item.get("attempts") or 0),1000)),
+        "attempts":_int(item.get("attempts"),0,0,1000),
         "started_at":_clean(item.get("started_at"),80),
         "completed_at":_clean(item.get("completed_at"),80),
         "executes_action":False,
@@ -161,10 +169,10 @@ def normalize_durable_task(raw:Mapping[str,Any])->dict[str,Any]:
     state=_clean(item.get("state"),40).upper()
     base["state"]=state if state in TASK_STATES else "PLANNED"
     steps=base["steps"]
-    cursor=max(0,min(int(item.get("cursor") or 0),len(steps)))
+    cursor=_int(item.get("cursor"),0,0,len(steps))
     base["cursor"]=cursor
-    base["revision"]=max(1,int(item.get("revision") or 1))
-    base["resume_generation"]=max(0,int(item.get("resume_generation") or 0))
+    base["revision"]=_int(item.get("revision"),1,1,1_000_000)
+    base["resume_generation"]=_int(item.get("resume_generation"),0,0,1_000_000)
     base["artifacts"]=_refs(
         item.get("artifacts") if isinstance(item.get("artifacts"),(list,tuple)) else []
     )
@@ -263,23 +271,25 @@ def update_step(
     while cursor<len(item["steps"]) and item["steps"][cursor]["state"] in TERMINAL_STEP_STATES:
         cursor+=1
     item["cursor"]=cursor
-    blockers=[
-        x for x in item["steps"]
-        if x["state"] in {"BLOCKED","FAILED","WAITING_APPROVAL"}
-    ]
     if cursor>=len(item["steps"]):
         item["state"]="DONE"
         item["next_action"]=""
         item["blocker"]=""
-    elif blockers:
-        first=blockers[0]
-        item["state"]="WAITING_APPROVAL" if first["state"]=="WAITING_APPROVAL" else "BLOCKED"
-        item["next_action"]=first["title"]
-        item["blocker"]=first["blocker"]
     else:
-        item["state"]="RUNNING" if any(x["state"]=="RUNNING" for x in item["steps"]) else "PAUSED"
-        item["next_action"]=item["steps"][cursor]["title"]
-        item["blocker"]=""
+        current=item["steps"][cursor]
+        if current["state"]=="WAITING_APPROVAL":
+            item["state"]="WAITING_APPROVAL"
+            item["blocker"]=current["blocker"]
+        elif current["state"] in {"BLOCKED","FAILED"}:
+            item["state"]="BLOCKED"
+            item["blocker"]=current["blocker"]
+        elif current["state"]=="RUNNING":
+            item["state"]="RUNNING"
+            item["blocker"]=""
+        else:
+            item["state"]="PAUSED"
+            item["blocker"]=""
+        item["next_action"]=current["title"]
     item["updated_at"]=changed
     return item
 
@@ -362,7 +372,9 @@ def record_resume(
     item["resume_generation"]+=1
     item["revision"]+=1
     item["checkpoint_digest"]=_clean(checkpoint_digest,100) or item["checkpoint_digest"]
-    item["state"]="PAUSED"
+    # Resumption records continuity only. It must not clear an approval/blocker.
+    if item["state"] not in {"WAITING_APPROVAL","BLOCKED"}:
+        item["state"]="PAUSED"
     item["updated_at"]=str(changed_at or _now())
     return item
 
