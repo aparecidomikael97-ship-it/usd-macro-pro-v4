@@ -73,6 +73,16 @@ explícitos já registrados.
 
 ## Evaluation Lab
 
+Regras adicionais de evidência:
+
+- baseline e candidate precisam ter resultado booleano em cada caso avaliado;
+- cada caso precisa de referência de evidência;
+- métricas comparativas exigem evidência geral da execução;
+- um rótulo persistido como HUMAN_REVIEW_CANDIDATE nunca é confiado cegamente: o estado é recalculado a partir dos casos, métricas e evidências;
+- falta de baseline, caso, métrica ou evidência resulta em NEED_MORE_EVIDENCE;
+- nenhuma dessas avaliações promove ou publica uma versão.
+
+
 O Evaluation Lab é o gate genérico de não-regressão do AION.
 
 A suite padrão cobre inicialmente:
