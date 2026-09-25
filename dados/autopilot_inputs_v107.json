@@ -1,6 +1,6 @@
 {
   "version": "V10.7_FAST_BOOT_1",
-  "generated_at": "2026-09-25T21:20:52.546396+00:00",
+  "generated_at": "2026-09-25T21:47:09.923245+00:00",
   "app_version": "11.0.8 — STRENGTH ATTRIBUTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2",
   "pairs": [
     {
@@ -9,7 +9,7 @@
       "Score final": 89.0,
       "Qualidade": 91.0,
       "Confluência": "ALTA",
-      "Dif. macro": 15.0,
+      "Dif. macro": 14.9,
       "Índice ranking": 89.9
     },
     {
@@ -18,7 +18,7 @@
       "Score final": 89.0,
       "Qualidade": 91.0,
       "Confluência": "ALTA",
-      "Dif. macro": 29.1,
+      "Dif. macro": 28.9,
       "Índice ranking": 89.9
     },
     {
@@ -27,7 +27,7 @@
       "Score final": 90.0,
       "Qualidade": 84.0,
       "Confluência": "ALTA",
-      "Dif. macro": 26.2,
+      "Dif. macro": 26.1,
       "Índice ranking": 87.2
     },
     {
@@ -36,7 +36,7 @@
       "Score final": 84.0,
       "Qualidade": 91.0,
       "Confluência": "ALTA",
-      "Dif. macro": -20.1,
+      "Dif. macro": -19.9,
       "Índice ranking": 87.1
     },
     {
@@ -45,7 +45,7 @@
       "Score final": 91.0,
       "Qualidade": 70.0,
       "Confluência": "MODERADA",
-      "Dif. macro": -18.9,
+      "Dif. macro": -18.8,
       "Índice ranking": 82.5
     },
     {
@@ -54,7 +54,7 @@
       "Score final": 55.0,
       "Qualidade": 91.0,
       "Confluência": "BAIXA",
-      "Dif. macro": -18.8,
+      "Dif. macro": -18.6,
       "Índice ranking": 69.4
     },
     {
@@ -63,15 +63,15 @@
       "Score final": 68.0,
       "Qualidade": 70.0,
       "Confluência": "MODERADA",
-      "Dif. macro": -25.9,
+      "Dif. macro": -25.8,
       "Índice ranking": 69.1
     }
   ],
   "macro_context": {
-    "usd_score": 62.09097279417476,
+    "usd_score": 61.98943186605504,
     "usd_quality": 90.0,
     "fed_tone": "Restritivo",
-    "fed_strength": 0.5344660194174757,
+    "fed_strength": 0.5243119266055046,
     "trend": {
       "score": 53.0,
       "CPI": {
@@ -286,9 +286,10 @@
     },
     "fed": {
       "tom": "Restritivo",
-      "forca": 0.5344660194174757,
+      "forca": 0.5243119266055046,
       "titulos": [
         "Federal Reserve official says inflation persistence led her to support interest rate hike - kare11.com",
+        "Federal Reserve official says inflation persistence led her to support interest rate hike - sun-sentinel.com",
         "Federal Reserve official says inflation persistence led her to support interest rate hike - Fox 59",
         "Federal Reserve rate hike reflects new world of sticky inflation and faster growth - AP News",
         "Fed’s Barr says future interest rate hikes ‘likely’ needed to tame inflation - The Hill",
@@ -298,14 +299,23 @@
         "Federal Reserve hikes interest rates amid inflation concerns - Fox News",
         "Why Hike | Tom Barkin | Inflation | Employment - Federal Reserve Bank of Richmond",
         "'This could be something more substantial': Wall Street braces for more Fed rate hikes - Yahoo Finance",
-        "EXCLUSIVE: Fed's Musalem says more rate hikes likely needed to quell inflation - Reuters",
-        "Fed's Barr says more rate hikes are needed to bring down inflation - Yahoo Finance"
+        "EXCLUSIVE: Fed's Musalem says more rate hikes likely needed to quell inflation - Reuters"
       ],
       "analisadas": [
         {
           "titulo": "Federal Reserve official says inflation persistence led her to support interest rate hike - kare11.com",
           "corpo": "Federal Reserve official says inflation persistence led her to support interest rate hike",
           "fonte": "kare11.com",
+          "relevancia_pontos": 12,
+          "relevancia": "Alta",
+          "impacto": 0.55,
+          "direcao": "🟢 Favorável ao USD",
+          "explicacao": "Sinal mais restritivo: juros altos por mais tempo tendem a apoiar o dólar."
+        },
+        {
+          "titulo": "Federal Reserve official says inflation persistence led her to support interest rate hike - sun-sentinel.com",
+          "corpo": "Federal Reserve official says inflation persistence led her to support interest rate hike",
+          "fonte": "sun-sentinel.com",
           "relevancia_pontos": 12,
           "relevancia": "Alta",
           "impacto": 0.55,
@@ -411,16 +421,6 @@
           "impacto": 0.75,
           "direcao": "🟢 Favorável ao USD",
           "explicacao": "Sinal mais restritivo: juros altos por mais tempo tendem a apoiar o dólar."
-        },
-        {
-          "titulo": "Fed's Barr says more rate hikes are needed to bring down inflation - Yahoo Finance",
-          "corpo": "Fed's Barr says more rate hikes are needed to bring down inflation",
-          "fonte": "Yahoo Finance",
-          "relevancia_pontos": 6,
-          "relevancia": "Alta",
-          "impacto": 0.75,
-          "direcao": "🟢 Favorável ao USD",
-          "explicacao": "Sinal mais restritivo: juros altos por mais tempo tendem a apoiar o dólar."
         }
       ]
     },
@@ -429,7 +429,7 @@
         "juros": 3.63,
         "inflacao": 3.35302,
         "pib": 2.09767,
-        "sentimento": 68.0,
+        "sentimento": 66.66666666666666,
         "fonte": "FRED + transformação anual"
       },
       "EUR": {
@@ -485,7 +485,7 @@
         "juros": 13.75,
         "inflacao": 4.22,
         "pib": 2.4,
-        "sentimento": 73.33333333333333,
+        "sentimento": 68.75,
         "fonte": "BCB + validação + fallback parcial"
       }
     },
@@ -495,19 +495,19 @@
         "juros": 13.8,
         "inflacao": 4.2,
         "pib": 2.4,
-        "sentimento": 73.3,
+        "sentimento": 68.8,
         "fonte": "BCB + validação + fallback parcial",
         "Moeda": "Real Brasileiro",
         "juros_reais": 9.5,
         "n_juros": 100.0,
         "n_inflacao": 100.0,
         "n_pib": 83.49591589284022,
-        "n_sentimento": 46.66666666666666,
+        "n_sentimento": 37.5,
         "n_emprego": 50.0,
         "n_atividade": 50.0,
-        "Pontuação_Macro": 72.2,
-        "Influência_Fed": -5.8,
-        "Pontuação_Final": 66.4,
+        "Pontuação_Macro": 71.3,
+        "Influência_Fed": -5.7,
+        "Pontuação_Final": 65.6,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 20.0,
@@ -515,13 +515,13 @@
             "PIB": 12.524387383926031,
             "Emprego": 10.0,
             "Atividade": 10.0,
-            "Sentimento": 4.666666666666666
+            "Sentimento": 3.75
           },
-          "fed": -5.772233009708738,
+          "fed": -5.66256880733945,
           "other": {
             "Limite da escala 0–100": 1.4210854715202004e-14
           },
-          "unrounded_final": 66.41882104088397
+          "unrounded_final": 65.61181857658659
         },
         "Posição": 1
       },
@@ -530,19 +530,19 @@
         "juros": 3.6,
         "inflacao": 3.4,
         "pib": 2.1,
-        "sentimento": 68.0,
+        "sentimento": 66.7,
         "fonte": "FRED + transformação anual",
         "Moeda": "Dólar Americano",
         "juros_reais": 0.3,
         "n_juros": 65.984,
         "n_inflacao": 64.53347,
         "n_pib": 68.41041659389954,
-        "n_sentimento": 36.0,
+        "n_sentimento": 33.333333333333314,
         "n_emprego": 55.400000000000006,
         "n_atividade": 45.0,
         "Pontuação_Macro": 59.8,
-        "Influência_Fed": 26.7,
-        "Pontuação_Final": 62.1,
+        "Influência_Fed": 26.2,
+        "Pontuação_Final": 62.0,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 15.836159999999998,
@@ -552,12 +552,12 @@
             "Atividade": 5.3999999999999995,
             "Sentimento": 0.0
           },
-          "fed": 15.34466019417476,
+          "fed": 15.243119266055047,
           "other": {
             "Índice amplo USD": 3.9221280000000003,
-            "Limite da escala 0–100": 7.105427357601002e-15
+            "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 62.09097279417476
+          "unrounded_final": 61.98943186605504
         },
         "Posição": 2
       },
@@ -588,11 +588,11 @@
             "Atividade": 10.0,
             "Sentimento": 10.0
           },
-          "fed": 1.9240776699029127,
+          "fed": 1.8875229357798167,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 47.10169723657004
+          "unrounded_final": 47.06514250244694
         },
         "Posição": 3
       },
@@ -612,8 +612,8 @@
         "n_emprego": 50.0,
         "n_atividade": 50.0,
         "Pontuação_Macro": 47.7,
-        "Influência_Fed": -4.3,
-        "Pontuação_Final": 43.3,
+        "Influência_Fed": -4.2,
+        "Pontuação_Final": 43.4,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 5.79779332293923,
@@ -623,11 +623,11 @@
             "Atividade": 10.0,
             "Sentimento": 3.8461538461538454
           },
-          "fed": -4.329174757281554,
+          "fed": -4.246926605504587,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 43.32582625246038
+          "unrounded_final": 43.408074404237354
         },
         "Posição": 4
       },
@@ -647,7 +647,7 @@
         "n_emprego": 50.0,
         "n_atividade": 50.0,
         "Pontuação_Macro": 44.2,
-        "Influência_Fed": -1.0,
+        "Influência_Fed": -0.9,
         "Pontuação_Final": 43.2,
         "strength_attribution": {
           "factors": {
@@ -658,11 +658,11 @@
             "Atividade": 10.0,
             "Sentimento": 6.0
           },
-          "fed": -0.9620388349514564,
+          "fed": -0.9437614678899083,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 43.22270217557806
+          "unrounded_final": 43.24097954263961
         },
         "Posição": 5
       },
@@ -682,8 +682,8 @@
         "n_emprego": 50.0,
         "n_atividade": 50.0,
         "Pontuação_Macro": 46.3,
-        "Influência_Fed": -4.3,
-        "Pontuação_Final": 42.0,
+        "Influência_Fed": -4.2,
+        "Pontuação_Final": 42.1,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 3.351040100077725,
@@ -693,11 +693,11 @@
             "Atividade": 10.0,
             "Sentimento": 10.0
           },
-          "fed": -4.329174757281554,
+          "fed": -4.246926605504587,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 42.015511082919424
+          "unrounded_final": 42.0977592346964
         },
         "Posição": 6
       },
@@ -728,11 +728,11 @@
             "Atividade": 10.0,
             "Sentimento": 0.0
           },
-          "fed": -0.4810194174757282,
+          "fed": -0.47188073394495417,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 36.18687056566006
+          "unrounded_final": 36.19600924919083
         },
         "Posição": 7
       },
@@ -763,11 +763,11 @@
             "Atividade": 10.0,
             "Sentimento": 5.555555555555555
           },
-          "fed": 2.405097087378641,
+          "fed": 2.3594036697247707,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 35.90767251048387
+          "unrounded_final": 35.86197909283
         },
         "Posição": 8
       },
@@ -787,8 +787,8 @@
         "n_emprego": 50.0,
         "n_atividade": 50.0,
         "Pontuação_Macro": 35.9,
-        "Influência_Fed": -2.9,
-        "Pontuação_Final": 33.0,
+        "Influência_Fed": -2.8,
+        "Pontuação_Final": 33.1,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 2.431208061407986,
@@ -798,23 +798,23 @@
             "Atividade": 10.0,
             "Sentimento": 5.0
           },
-          "fed": -2.886116504854369,
+          "fed": -2.831284403669725,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 33.01187113247212
+          "unrounded_final": 33.06670323365677
         },
         "Posição": 9
       }
     ],
     "usd_detalhado": {
-      "score": 62.09097279417476,
+      "score": 61.98943186605504,
       "componentes": {
         "Inflação": 64.53347,
         "Emprego": 55.400000000000006,
         "Atividade": 45.0,
         "Juros / Treasury 2Y": 65.984,
-        "Federal Reserve": 76.7233009708738,
+        "Federal Reserve": 76.21559633027523,
         "Índice amplo USD": 49.0266
       },
       "pesos": {
