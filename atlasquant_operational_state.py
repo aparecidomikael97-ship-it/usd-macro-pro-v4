@@ -177,6 +177,8 @@ def operational_strip_html(model:Mapping[str,Any]|None)->str:
     tone=str(m.get("tone") or "neutral")
     if tone not in {"good","warn","bad","info","neutral"}:
         tone="neutral"
+    quality_text="N/D" if m.get("quality") is None else f"{_finite(m.get('quality'),0):.0f}/100"
+    data_text="N/D" if m.get("data_score") is None else f"{_finite(m.get('data_score'),0):.0f}/100"
     return (
         f'<div class="aq-op-spine {tone}">'
         '<div class="aq-op-spine-head">'
@@ -186,8 +188,8 @@ def operational_strip_html(model:Mapping[str,Any]|None)->str:
         '</div>'
         '<div class="aq-op-spine-grid">'
         f'<div><small>Frescor</small><strong>{escape(str(m.get("freshness") or "N/D"))}</strong><em>{escape(str(m.get("reference") or ""))}</em></div>'
-        f'<div><small>Qualidade</small><strong>{("N/D" if m.get("quality") is None else f"{_finite(m.get(chr(113)+chr(117)+chr(97)+chr(108)+chr(105)+chr(116)+chr(121)),0):.0f}/100")}</strong><em>score descritivo</em></div>'
-        f'<div><small>Dados</small><strong>{("N/D" if m.get("data_score") is None else f"{_finite(m.get(chr(100)+chr(97)+chr(116)+chr(97)+chr(95)+chr(115)+chr(99)+chr(111)+chr(114)+chr(101)),0):.0f}/100")}</strong><em>prontidão da evidência</em></div>'
+        f'<div><small>Qualidade</small><strong>{quality_text}</strong><em>score descritivo</em></div>'
+        f'<div><small>Dados</small><strong>{data_text}</strong><em>prontidão da evidência</em></div>'
         f'<div><small>Fonte</small><strong>{escape(str(m.get("evidence_source") or "não confirmada"))}</strong><em>camada apresentada</em></div>'
         '</div>'
         f'<div class="aq-op-spine-next"><b>Próximo passo:</b> {escape(str(m.get("next_action") or "Aguardar confirmação válida."))}</div>'
