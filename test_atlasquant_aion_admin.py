@@ -105,6 +105,68 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertEqual(rows[1]["priority"],"P2")
         self.assertNotIn("Radar principal",[row["item"] for row in rows])
 
+    def test_release_gate_replaces_duplicate_surface_items_in_next_action_queue(self):
+        surfaces={
+            "items":[
+                {
+                    "id":"advanced_radar",
+                    "label":"Radar avançado / Central Institucional",
+                    "state":"DEGRADED",
+                    "next_action":"Reabrir Radar avançado.",
+                },
+                {
+                    "id":"master_panel",
+                    "label":"Painel Mestre",
+                    "state":"STALE_BUILD",
+                    "next_action":"Reabrir Painel Mestre.",
+                },
+            ]
+        }
+        gate={
+            "state":"BLOCKED",
+            "confirmed_stages":1,
+            "total_stages":4,
+            "next_label":"Telas críticas",
+            "next_action":"Revalidar Painel Mestre.",
+            "release_claim_allowed":False,
+        }
+        rows=_attention_queue(
+            {},
+            {"status":"CONFIRMED"},
+            surfaces,
+            gate,
+            limit=8,
+        )
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]["source"],"RELEASE GATE")
+        self.assertEqual(rows[0]["priority"],"P1")
+        self.assertEqual(rows[0]["state"],"BLOCKED")
+        self.assertEqual(rows[0]["item"],"Telas críticas")
+        self.assertNotIn("TELA",[row["source"] for row in rows])
+
+    def test_complete_release_gate_suppresses_surface_attention_without_fake_issue(self):
+        rows=_attention_queue(
+            {},
+            {"status":"CONFIRMED"},
+            {
+                "items":[
+                    {
+                        "id":"master_panel",
+                        "label":"Painel Mestre",
+                        "state":"DEGRADED",
+                    }
+                ]
+            },
+            {
+                "state":"COMPLETE",
+                "confirmed_stages":4,
+                "total_stages":4,
+                "release_claim_allowed":True,
+            },
+            limit=8,
+        )
+        self.assertEqual(rows,[])
+
     def test_central_critical_surface_health_is_truthful_and_read_only(self):
         system={
             "critical_surfaces":{
@@ -157,6 +219,9 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("não provisiona acesso",src)
         self.assertIn("critical_surfaces",src)
         self.assertIn('"source": "TELA"',src)
+        self.assertIn('"source": "RELEASE GATE"',src)
+        self.assertIn("release_gate_snapshot",src)
+        self.assertIn("release_gate_snapshot=release_gate_state",src)
 
     def test_central_memory_guardian_posture_is_read_only_and_fail_closed(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
