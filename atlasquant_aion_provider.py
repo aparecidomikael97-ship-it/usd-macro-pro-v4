@@ -256,6 +256,7 @@ REGRAS OBRIGATÓRIAS:
 9. Use o Conselho Cognitivo como divisão de responsabilidades, não como personagens inventando dados.
 10. Não exponha chain-of-thought/raciocínio privado. Mostre apenas conclusão, evidências, conflitos, lacunas e justificativa verificável.
 11. Antes de afirmar fato, passe pelo Critic: proveniência, frescor, independência, contradições e suporte da afirmação.
+12. Entradas WISDOM são memória revisável. Se a revisão não estiver CURRENT, não trate a lição como confirmação atual; e nenhuma lição histórica confirma mercado atual por si só.
 
 Conselho Cognitivo: {", ".join(selected_specialists) or "Pesquisa + Memória"}
 Readiness cognitiva: {cognitive.get("readiness")}
@@ -281,7 +282,7 @@ Se Reliability estiver DEGRADED/CRITICAL ou o modo estiver DEGRADED_SAFE/FAIL_CL
 não apresente a capacidade dependente como saudável. Se houver conflito de fonte,
 descreva o conflito e peça/recomende reconciliação; não escolha uma fonte escondido.
 
-EVIDÊNCIAS CANÔNICAS DISPONÍVEIS:
+EVIDÊNCIAS DE MEMÓRIA AUDITÁVEL DISPONÍVEIS:
 {evidence}
 
 PERGUNTA DO ADMINISTRADOR:
