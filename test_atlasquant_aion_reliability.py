@@ -59,6 +59,21 @@ class AtlasQuantAionReliabilityTests(unittest.TestCase):
         self.assertEqual(out["state"],"FAIL_CLOSED")
         self.assertFalse(out["allows_live_market_authorization"])
 
+    def test_reliability_preserves_source_family_metadata(self):
+        out=reconcile_sources([
+            {
+                "source":"FRED · CPIAUCSL",
+                "claim":"macro:ipc_anual",
+                "value":3.0,
+                "truth_state":"CONFIRMED",
+                "available":True,
+                "healthy":True,
+                "criticality":"HIGH",
+                "family":"macro_fred",
+            }
+        ])
+        self.assertEqual(out["observations"][0]["family"],"macro_fred")
+
     def test_cost_guardian_preserves_zero_cost_default(self):
         out = cost_guardian_snapshot(
             {"allow_paid":False,"monthly_limit_usd":0,"spent_usd_estimate":0},
