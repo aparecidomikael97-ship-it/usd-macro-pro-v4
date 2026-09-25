@@ -45,6 +45,13 @@ class AtlasQuantAionDevFusionTests(unittest.TestCase):
         self.assertFalse(p["production_change_allowed"])
         self.assertEqual(dev_fusion_summary([p])["human_review_candidates"],1)
 
+    def test_malformed_critical_findings_fail_safe_to_zero_not_crash(self):
+        p=self._pipeline()
+        p["stages"][1]["critical_findings"]="bad"
+        from atlasquant_aion_dev_fusion import normalize_pipeline
+        out=normalize_pipeline(p)
+        self.assertEqual(out["stages"][1]["critical_findings"],0)
+
     def test_critical_finding_blocks_pipeline(self):
         p=self._pipeline()
         p=record_stage(
