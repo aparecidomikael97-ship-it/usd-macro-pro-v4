@@ -96,7 +96,7 @@ from atlasquant_aion_event_journal import (
 )
 
 SCHEMA = "ATLASQUANT_AION_MEMORY_V1"
-FOUNDATION_REVISION = "2026-09-25-nextgen-v1"
+FOUNDATION_REVISION = "2026-09-25-complete-v2"
 RUNTIME_PATH = "dados/aion/checkpoint_master.json"
 DEFAULT_RUNTIME_REPO = "aparecidomikael97-ship-it/usd-macro-pro-v4"
 MAX_DOC_BYTES = 1_500_000
@@ -200,6 +200,16 @@ APPROVED_AION_FOUNDATION = (
     "Pós-trade RCA é obrigatório para operação encerrada relevante: distinguir falha de processo de variância normal; causa só pode ser confirmada com evidência e qualquer ajuste operacional exige teste/backtest/forward e validação antes de promoção.",
     "Regra mestre de stop e alvo: Stop Loss nasce da invalidação objetiva da tese/estrutura e risco; Take Profit usa estrutura/liquidez/volatilidade e relação risco-retorno; regras são específicas por setup e validadas em backtest; se a relação não fecha, a operação é bloqueada.",
     "Liquidez deve ser tratada como evidência estrutural contextual, não certeza: identificar pools/varreduras/zonas somente com critérios explícitos e preservar incerteza quando houver ambiguidade.",
+    "Área de Investimentos deve operar como radar auditável de longo prazo: ações, dividendos, fundamentos, crescimento, valuation por cenários, comparador, riscos, memória de tese e monitoramento contínuo; oportunidade nunca equivale a promessa de valorização.",
+    "Radar de dividendos deve distinguir sustentabilidade de distribuição, recorrência versus evento extraordinário, geração de caixa e deterioração fundamental; yield alto isolado nunca é critério suficiente.",
+    "Fundos Imobiliários exigem módulo próprio: vacância, contratos, indexadores, concentração, vencimentos, risco de crédito, tipo de fundo, qualidade de gestão, emissões, fatos relevantes, relatórios gerenciais, valor patrimonial/econômico, benchmark e pares.",
+    "FIIs devem ter detector de deterioração precoce, teste de estresse, revisão de tese, proteção contra overfitting, auditoria de decisão e motor de carteira para evitar que ativo isolado aparentemente bom piore concentração/risco do portfólio.",
+    "Robustez transversal é requisito: Trading, Investimentos, Studio, Negócios, Afiliados e demais áreas devem compartilhar memória, evidência, validação, testes, auditoria, pós-análise e melhoria controlada compatíveis com o risco de cada domínio.",
+    "Motor de Receita para vendas, afiliados e tráfego pago deve otimizar lucro líquido e não faturamento bruto; deve medir atribuição, CAC, LTV, margem, retenção, CRM, fraude, custo por campanha e risco de escala.",
+    "Negócios deve manter radar de produtos/ofertas e testes controlados de criativos/canais; escala de campanha depende de evidência e limites de custo, e compra de mídia/impulsionamento continua exigindo aprovação explícita.",
+    "Radar de Tendências deve buscar sinais recentes de demanda, validar antes de agir, preparar criativos/ofertas rapidamente e detectar perda de força; objetivo é reduzir atraso de reação, nunca prometer ser sempre o primeiro.",
+    "Conteúdo/campanha de tendência pode ser pesquisado, roteirizado e preparado automaticamente, mas publicação, gasto, impulsionamento e alteração comercial externa continuam sujeitos a aprovação e Guardian.",
+    "Resolução Científica de Problemas inclui curiosidade controlada: lacunas relevantes podem gerar tarefas de pesquisa/aprendizado, mas nunca ampliar autoridade, alterar produção ou consumir serviço pago sem política e aprovação.",
     "Hierarquia técnica oficial não segue ordem de salvamento: 1) persistência runtime do Checkpoint, 2) soberania e resiliência, 3) confiabilidade de memória + Epistemic Core, 4) Data/Decision Fabric, 5) observabilidade/autodiagnóstico, 6) avaliação e melhoria controlada, 7) maior autonomia dos módulos.",
     "Gatilho operacional aprovado: quando o administrador disser 'tô no computador', priorizar a reconciliação do Render, configurar o Deploy Hook com segurança e validar Build Identity + Browser Smoke antes de retomar novos blocos.",
 )
@@ -404,7 +414,6 @@ def default_checkpoint() -> dict[str, Any]:
             "Validar AION em produção privada.",
             "Configurar provedor de modelo externo somente se aprovado e necessário.",
             "Configurar integrações sociais/marketplaces somente atrás de feature flags.",
-            "Validar persistência runtime do Checkpoint Mestre.",
         ],
         "evidence": {
             "canonical_sources": list(CANONICAL_FILES),
@@ -501,6 +510,14 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
     payload["approved_foundation"] = list(dict.fromkeys(
         list(APPROVED_AION_FOUNDATION) + preserved_foundation
     ))
+
+    raw_pending = payload.get("pending")
+    if isinstance(raw_pending, (list, tuple)):
+        completed_pending = {"Validar persistência runtime do Checkpoint Mestre."}
+        payload["pending"] = [
+            str(x).strip() for x in raw_pending
+            if str(x).strip() and str(x).strip() not in completed_pending
+        ]
 
     raw_areas = payload.get("areas") if isinstance(payload.get("areas"), Mapping) else {}
     merged_areas = dict(DEFAULT_AREA_STATES)

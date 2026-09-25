@@ -31,7 +31,7 @@ jobs:
       - name: Install project dependencies
         run: python -m pip install -r requirements.txt
 
-      - name: Generate canonical V13 checkpoint
+      - name: Generate canonical V14 checkpoint
         run: |
           python atlasquant_aion_runtime_bootstrap.py --output /tmp/checkpoint_master.json
           python atlasquant_aion_runtime_bootstrap.py --verify /tmp/checkpoint_master.json
@@ -58,7 +58,7 @@ jobs:
             echo "Checkpoint Mestre already exists and is integrity-confirmed; no overwrite performed."
           else
             CONTENT="$(base64 -w0 /tmp/checkpoint_master.json)"
-            gh api --method PUT "$API_PATH"               -f message='AION: bootstrap Checkpoint Mestre V13'               -f content="$CONTENT"               -f branch='atlasquant-runtime' >/tmp/runtime_write.json
+            gh api --method PUT "$API_PATH"               -f message='AION: bootstrap Checkpoint Mestre V14'               -f content="$CONTENT"               -f branch='atlasquant-runtime' >/tmp/runtime_write.json
             gh api "$API_PATH?ref=atlasquant-runtime" --jq '.content'               | tr -d '\n' | base64 -d >/tmp/runtime_readback.json
             python atlasquant_aion_runtime_bootstrap.py --verify /tmp/runtime_readback.json
             echo "Checkpoint Mestre created and verified on atlasquant-runtime."
