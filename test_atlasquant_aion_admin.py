@@ -15,7 +15,7 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
 
     def test_admin_uses_stable_single_workspace_navigation(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
-        self.assertEqual(len(AION_WORKSPACES),8)
+        self.assertEqual(len(AION_WORKSPACES),9)
         self.assertIn('st.selectbox(',src)
         self.assertIn('"Área AION"',src)
         self.assertIn('key="aion_admin_workspace"',src)
@@ -43,6 +43,7 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
             "💼 Negócios",
             "🧪 Laboratório",
             "🛠️ Desenvolvimento",
+            "🔐 Assinaturas",
             "🎟️ Promoções",
         ):
             self.assertIn(label, src)
@@ -107,7 +108,7 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertGreaterEqual(src.count("_context_voice("),9)
         for area in (
             "Central","Secretaria","Trading","Studio",
-            "Negócios","Laboratório","Desenvolvimento","Promoções",
+            "Negócios","Laboratório","Desenvolvimento","Assinaturas","Promoções",
         ):
             self.assertIn(f'"{area}",', src)
         self.assertIn("nunca toca sozinha", src)
@@ -159,7 +160,7 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("update_entitlements_checkpoint(", src)
         self.assertIn("approve_entitlement_request(", src)
         self.assertIn("entitlement_activation_preflight(", src)
-        self.assertIn("Registro de Entitlements", src)
+        self.assertIn("Assinaturas & Entitlements", src)
         self.assertIn("não altera conta nem libera acesso", src.lower())
         self.assertIn("não muda USER/SALES/ADMIN", src)
         self.assertIn("ACTIVE_CONFIRMED exige evidência concreta", src)
