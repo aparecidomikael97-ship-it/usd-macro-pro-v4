@@ -350,6 +350,28 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("O que pode invalidar ou inverter esse cenário", src)
         self.assertIn("precisa confirmar o dado divulgado", src)
 
+    def test_central_exposes_controlled_learning_progress_without_auto_changes(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("🧠 Evolução Controlada",src)
+        self.assertIn("Aprendizado Controlado AION",src)
+        self.assertIn("registrar previsão → observar resultado",src)
+        self.assertIn("new_learning_episode(",src)
+        self.assertIn("settle_learning_episode(",src)
+        self.assertIn("new_research_reference(",src)
+        self.assertIn("Champion × Challenger · promoção controlada",src)
+        self.assertIn("evaluate_learning_experiment(",src)
+        self.assertIn("Autoajuste de pesos: DESATIVADO",src)
+        self.assertIn("promoção automática: DESATIVADA",src)
+        self.assertIn('"learning_automatic_changes": False',src)
+
+    def test_learning_memory_write_uses_checkpoint_helper_and_working_dirty_state(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("update_learning_checkpoint(",src)
+        self.assertIn("learning_episode_registered",src)
+        self.assertIn("learning_episode_settled",src)
+        self.assertIn("_set_working_checkpoint(updated, dirty=True)",src)
+        self.assertIn("Salve o Checkpoint Mestre para persistir",src)
+
     def test_admin_mobile_contrast_is_stronger_and_single_column_at_small_width(self):
         self.assertIn(".aion-pulse-grid",AION_ADMIN_CSS)
         self.assertIn("@media(max-width:430px)",AION_ADMIN_CSS)
