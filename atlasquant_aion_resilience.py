@@ -322,8 +322,11 @@ def circuit_breaker(
         "schema":SCHEMA,
         "component":name,
         "state":state,
+        "previous_state":prev,
         "consecutive_failures":failures,
         "error_rate_pct":round(error_rate,2),
+        "critical_signal":bool(critical_signal),
+        "recovery_probe_passed":bool(recovery_probe_passed),
         "reasons":reasons,
         "sensitive_calls_allowed":state=="CLOSED",
         "automatic_restart":False,
@@ -367,8 +370,11 @@ def watchdog(
         "state":state,
         "signals":signals,
         "heartbeat_age_seconds":round(age,2),
+        "stale_after_seconds":round(stale,2),
         "repeated_action_count":repeated,
+        "loop_limit":loop_max,
         "unhandled_error_count":errors,
+        "error_limit":error_max,
         "recommended_action":(
             "ISOLATE_AND_REVIEW" if state=="ISOLATE_RECOMMENDED"
             else "READ_ONLY_DIAGNOSTIC" if state=="DEGRADED"
@@ -410,6 +416,18 @@ def resource_governor(
         "schema":SCHEMA,
         "component":_clean(component,160),
         "state":state,
+        "limits":{
+            "calls":pairs["calls"][1],
+            "tokens":pairs["tokens"][1],
+            "wall_seconds":pairs["wall_seconds"][1],
+            "memory_mb":pairs["memory_mb"][1],
+        },
+        "used":{
+            "calls":max(0.0,pairs["calls"][0]),
+            "tokens":max(0.0,pairs["tokens"][0]),
+            "wall_seconds":max(0.0,pairs["wall_seconds"][0]),
+            "memory_mb":max(0.0,pairs["memory_mb"][0]),
+        },
         "usage_pct":{k:round(v*100,2) for k,v in ratios.items()},
         "max_usage_pct":round(max_ratio*100,2),
         "allow_new_sensitive_work":state=="WITHIN_BUDGET",
@@ -522,9 +540,48 @@ def default_resilience()->dict[str,Any]:
 def normalize_resilience(raw:Mapping[str,Any]|None)->dict[str,Any]:
     item=dict(raw or {})
     delegations=normalize_delegations(item.get("delegations") if isinstance(item.get("delegations"),(list,tuple)) else [])
-    watchdogs=[dict(x) for x in list(item.get("watchdogs") or [])[:500] if isinstance(x,Mapping)]
-    breakers=[dict(x) for x in list(item.get("circuit_breakers") or [])[:500] if isinstance(x,Mapping)]
-    governors=[dict(x) for x in list(item.get("resource_governors") or [])[:500] if isinstance(x,Mapping)]
+    watchdogs=[]
+    for raw in list(item.get("watchdogs") or [])[:500]:
+        if not isinstance(raw,Mapping):
+            continue
+        watchdogs.append(watchdog(
+            raw.get("component"),
+            heartbeat_age_seconds=raw.get("heartbeat_age_seconds",1e9),
+            stale_after_seconds=raw.get("stale_after_seconds",300),
+            repeated_action_count=raw.get("repeated_action_count",0),
+            loop_limit=raw.get("loop_limit",5),
+            unhandled_error_count=raw.get("unhandled_error_count",0),
+            error_limit=raw.get("error_limit",3),
+        ))
+    breakers=[]
+    for raw in list(item.get("circuit_breakers") or [])[:500]:
+        if not isinstance(raw,Mapping):
+            continue
+        breakers.append(circuit_breaker(
+            raw.get("component"),
+            previous_state=raw.get("previous_state","CLOSED"),
+            consecutive_failures=raw.get("consecutive_failures",0),
+            error_rate_pct=raw.get("error_rate_pct",0),
+            critical_signal=bool(raw.get("critical_signal",False)),
+            recovery_probe_passed=bool(raw.get("recovery_probe_passed",False)),
+        ))
+    governors=[]
+    for raw in list(item.get("resource_governors") or [])[:500]:
+        if not isinstance(raw,Mapping):
+            continue
+        limits=raw.get("limits") if isinstance(raw.get("limits"),Mapping) else {}
+        used=raw.get("used") if isinstance(raw.get("used"),Mapping) else {}
+        governors.append(resource_governor(
+            raw.get("component"),
+            call_limit=limits.get("calls",100),
+            calls_used=used.get("calls",0),
+            token_limit=limits.get("tokens",100000),
+            tokens_used=used.get("tokens",0),
+            wall_seconds_limit=limits.get("wall_seconds",300),
+            wall_seconds_used=used.get("wall_seconds",0),
+            memory_mb_limit=limits.get("memory_mb",1024),
+            memory_mb_used=used.get("memory_mb",0),
+        ))
     open_circuits=sum(1 for x in breakers if str(x.get("state") or "").upper()=="OPEN")
     isolates=sum(1 for x in watchdogs if str(x.get("state") or "").upper()=="ISOLATE_RECOMMENDED")
     safe=safe_mode_posture(
