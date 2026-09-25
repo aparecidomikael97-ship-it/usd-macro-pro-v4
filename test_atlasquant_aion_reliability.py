@@ -43,6 +43,32 @@ class AtlasQuantAionReliabilityTests(unittest.TestCase):
         self.assertFalse(out["reconciliation"]["has_conflict"])
         self.assertFalse(out["allows_strong_claims"])
 
+    def test_medium_inference_is_advisory_not_global_degradation(self):
+        out=data_guardian_snapshot([
+            {
+                "source":"Fed Narrative RSS",
+                "claim":"fed_narrative_runtime",
+                "value":{"tom":"Neutro"},
+                "truth_state":"INFERENCE",
+                "available":True,
+                "healthy":True,
+                "criticality":"MEDIUM",
+            },
+            {
+                "source":"critical-feed",
+                "claim":"market_core",
+                "value":"ok",
+                "truth_state":"CONFIRMED",
+                "available":True,
+                "healthy":True,
+                "criticality":"HIGH",
+            },
+        ])
+        self.assertEqual(out["state"],"CONTROLLED")
+        self.assertEqual(out["critical_bad_sources"],0)
+        self.assertEqual(out["advisory_bad_sources"],1)
+        self.assertTrue(out["allows_strong_claims"])
+
     def test_critical_conflict_fails_closed(self):
         out = data_guardian_snapshot([
             {
