@@ -83,6 +83,58 @@ class AtlasQuantAionExecutivePulseTests(unittest.TestCase):
         self.assertEqual(out["posture"],"CONTROLLED")
         self.assertIn("não substitui validação externa",out["primary"]["next_action"].lower())
 
+    def test_confirmed_interface_failure_becomes_p1_attention(self):
+        out=executive_pulse(
+            runtime_result={"status":"CONFIRMED","integrity":{"state":"CONFIRMED"}},
+            interface_validation={
+                "state":"ATTENTION",
+                "confirmed":1,
+                "total":3,
+                "remaining":2,
+                "next_action":"Revalidar Painel Mestre.",
+                "all_confirmed_current_build":False,
+            },
+        )
+        self.assertEqual(out["posture"],"ATTENTION")
+        self.assertEqual(out["primary"]["priority"],"P1")
+        self.assertIn("interface",out["primary"]["title"].lower())
+        self.assertEqual(out["interface_validation_confirmed"],1)
+        self.assertEqual(out["interface_validation_remaining"],2)
+        self.assertFalse(out["interface_validation_complete"])
+
+    def test_incomplete_interface_validation_is_review_not_failure(self):
+        out=executive_pulse(
+            runtime_result={"status":"CONFIRMED","integrity":{"state":"CONFIRMED"}},
+            interface_validation={
+                "state":"IN_PROGRESS",
+                "confirmed":2,
+                "total":3,
+                "remaining":1,
+                "next_action":"Validar Radar avançado.",
+                "all_confirmed_current_build":False,
+            },
+        )
+        self.assertEqual(out["posture"],"REVIEW")
+        self.assertEqual(out["primary"]["priority"],"P2")
+        self.assertIn("incompleta",out["primary"]["title"].lower())
+        self.assertIn("não é tratada como falha",out["primary"]["detail"])
+
+    def test_complete_interface_validation_adds_no_attention_by_itself(self):
+        out=executive_pulse(
+            runtime_result={"status":"CONFIRMED","integrity":{"state":"CONFIRMED"}},
+            status_board={"has_unresolved":False},
+            interface_validation={
+                "state":"COMPLETE",
+                "confirmed":3,
+                "total":3,
+                "remaining":0,
+                "all_confirmed_current_build":True,
+            },
+        )
+        self.assertEqual(out["posture"],"CONTROLLED")
+        self.assertTrue(out["interface_validation_complete"])
+        self.assertEqual(out["interface_validation_confirmed"],3)
+
     def test_compact_rows_are_presentation_only(self):
         out=executive_pulse(
             runtime_result={"status":"CONFIRMED","integrity":{"state":"CONFIRMED"}},
