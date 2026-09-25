@@ -72,6 +72,15 @@ class AtlasQuantAionVaultTests(unittest.TestCase):
         self.assertEqual(exported["entries"][0]["locator_ref"], "GITHUB_TOKEN_HISTORICO")
         self.assertNotIn("secret_value", exported["entries"][0])
 
+    def test_persisted_backend_connected_claim_is_not_treated_as_verified(self):
+        state = normalize_vault({
+            "entries": [],
+            "backend_connected": True,
+            "backend_state": "READY",
+        })
+        self.assertFalse(state["backend_connected"])
+        self.assertEqual(state["backend_state"], "NOT_VERIFIED")
+
     def test_top_level_secret_like_field_marks_policy_violation(self):
         state = normalize_vault({
             "entries": [],
