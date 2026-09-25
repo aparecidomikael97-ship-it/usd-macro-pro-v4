@@ -197,6 +197,20 @@ class AtlasQuantAionGatewayTests(unittest.TestCase):
         self.assertFalse(result["memory_action_authorized"])
         self.assertFalse(result["epistemic_core"]["action_authorized"])
 
+    def test_local_answer_exposes_data_decision_fabric_contract(self):
+        result=local_answer(
+            "estado das decisoes",
+            checkpoint={
+                "aion":{"priority":"AION"},
+                "data_decision_fabric":{"events":[],"decisions":[]},
+            },
+        )
+        self.assertIn("data_decision_fabric",result)
+        self.assertEqual(result["fabric_conflicts"],0)
+        self.assertEqual(result["fabric_human_review_candidates"],0)
+        self.assertFalse(result["executes_action"])
+        self.assertFalse(result["real_orders_enabled"])
+
     def test_local_answer_does_not_invent_fresh_market_state(self):
         result = local_answer(
             "como está o radar forex agora?",
