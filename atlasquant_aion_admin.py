@@ -199,6 +199,7 @@ from atlasquant_aion_wisdom import (
     candidate_from_learning_episode,
     new_wisdom_entry,
     upsert_wisdom_entry,
+    wisdom_evidence_hits,
     wisdom_review_state,
     wisdom_summary,
 )
@@ -1500,22 +1501,50 @@ def _render_live_event_intelligence(
     )
 
 
+def _aion_memory_hits(
+    question: Any,
+    checkpoint: Mapping[str, Any] | None,
+    *,
+    limit: int = 8,
+) -> list[dict[str, Any]]:
+    """Combine canonical project memory with reviewed Wisdom Journal evidence."""
+    q = str(question or "").strip()
+    if not q:
+        return []
+    canonical = [
+        dict(x) for x in search_canonical_memory(q, limit=max(1, min(limit, 5)))
+        if isinstance(x, Mapping)
+    ]
+    cp = dict(checkpoint or {})
+    wisdom = cp.get("wisdom") if isinstance(cp.get("wisdom"), Mapping) else {}
+    knowledge = wisdom_evidence_hits(
+        q,
+        list(wisdom.get("entries", []) or []),
+        limit=max(1, min(limit, 4)),
+    )
+    combined = canonical + knowledge
+    return combined[: max(1, min(int(limit or 8), 12))]
+
+
 def _render_learning_pulse(checkpoint: Mapping[str, Any]) -> None:
     learning = checkpoint.get("learning") if isinstance(checkpoint.get("learning"), Mapping) else {}
     episodes = list(learning.get("episodes", []) or [])
     experiments = list(learning.get("experiments", []) or [])
     research_refs = list(learning.get("research_refs", []) or [])
     summary = learning_summary(episodes, experiments, research_refs)
+    wisdom = checkpoint.get("wisdom") if isinstance(checkpoint.get("wisdom"), Mapping) else {}
+    wisdom_state = wisdom_summary(list(wisdom.get("entries", []) or []))
     st.markdown("#### 🧠 Evolução Controlada")
     st.caption(
         "O AION melhora medindo previsões e resultados, não mudando regras sozinho. "
         "Toda promoção continua dependente de evidência e revisão humana."
     )
-    c1,c2,c3,c4 = st.columns(4)
+    c1,c2,c3,c4,c5 = st.columns(5)
     c1.metric("Aprendizados", int(summary.get("episodes") or 0))
     c2.metric("Resultados fechados", int(summary.get("settled_episodes") or 0))
     c3.metric("Pesquisa vinculada", int(summary.get("research_references") or 0))
-    c4.metric("Challengers p/ revisão", int(summary.get("human_review_candidates") or 0))
+    c4.metric("Sabedoria ativa", int(wisdom_state.get("active") or 0))
+    c5.metric("Challengers p/ revisão", int(summary.get("human_review_candidates") or 0))
     match_rate = summary.get("observed_match_rate_pct")
     gap = summary.get("calibration_gap_pct")
     st.caption(
@@ -1930,7 +1959,7 @@ def _render_central(
     provider_env = _provider_env()
     provider = provider_status(feature_flags=flags, env=provider_env)
     budget = normalize_budget((checkpoint.get("aion") or {}).get("model_budget", {}))
-    hits_preview = search_canonical_memory(question) if question.strip() else []
+    hits_preview = _aion_memory_hits(question, checkpoint) if question.strip() else []
     domain_preview = route_context(question).get("domain") if question.strip() else "central"
     cognitive_preview = orchestrator_snapshot(
         question,
@@ -2014,7 +2043,7 @@ def _render_central(
         )
 
     if st.button("Analisar com AION", key="aion_admin_ask", type="primary", width="stretch"):
-        hits = search_canonical_memory(question)
+        hits = _aion_memory_hits(question, checkpoint)
         estimated_cost = float(estimate.get("estimated_max_cost_usd") or 0.0)
         route = route_intelligence(
             question,
@@ -2117,7 +2146,12 @@ def _render_central(
         if isinstance(evidence, list) and evidence:
             with st.expander("Evidências da memória"):
                 for hit in evidence:
-                    st.caption(f"{hit.get('path')} · score {hit.get('score')}")
+                    review = str(hit.get("review_state") or "").strip()
+                    suffix = f" · revisão {review}" if review else ""
+                    st.caption(
+                        f"{hit.get('path')} · verdade {hit.get('kind') or hit.get('truth_state') or 'UNKNOWN'}"
+                        f" · score {hit.get('score')}{suffix}"
+                    )
                     st.write(hit.get("excerpt"))
 
     spoken = (
