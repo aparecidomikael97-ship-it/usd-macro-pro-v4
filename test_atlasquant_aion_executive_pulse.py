@@ -280,6 +280,36 @@ class AtlasQuantAionExecutivePulseTests(unittest.TestCase):
             [],
         )
 
+    def test_reliability_fail_closed_becomes_p0_when_no_incident_preempts_it(self):
+        out=executive_pulse(
+            runtime_result={"status":"CONFIRMED","integrity":{"state":"CONFIRMED"}},
+            status_board={"has_unresolved":False},
+            reliability_snapshot={
+                "posture":"CRITICAL",
+                "degraded_mode":{"state":"FAIL_CLOSED"},
+                "cost_guardian":{"state":"ZERO_COST"},
+            },
+        )
+        self.assertEqual(out["posture"],"CRITICAL")
+        self.assertEqual(out["primary"]["source"],"reliability_governance")
+        self.assertEqual(out["reliability_posture"],"CRITICAL")
+        self.assertEqual(out["degraded_mode_state"],"FAIL_CLOSED")
+
+    def test_cost_warning_is_review_and_does_not_execute(self):
+        out=executive_pulse(
+            runtime_result={"status":"CONFIRMED","integrity":{"state":"CONFIRMED"}},
+            status_board={"has_unresolved":False},
+            reliability_snapshot={
+                "posture":"CONTROLLED",
+                "degraded_mode":{"state":"NORMAL"},
+                "cost_guardian":{"state":"WARNING"},
+            },
+        )
+        self.assertEqual(out["posture"],"REVIEW")
+        self.assertEqual(out["primary"]["source"],"cost_guardian")
+        self.assertEqual(out["cost_guardian_state"],"WARNING")
+        self.assertFalse(out["executes_action"])
+
     def test_compact_rows_are_presentation_only(self):
         out=executive_pulse(
             runtime_result={"status":"CONFIRMED","integrity":{"state":"CONFIRMED"}},

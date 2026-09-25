@@ -604,6 +604,29 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("Nenhum dado pessoal é criado, exportado ou excluído por este painel.",src)
         self.assertIn('"tenant_privacy_contract_ready"',src)
 
+    def test_reliability_governance_panel_is_visible_and_fail_closed(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("🛡️ Reliability & Governance",src)
+        self.assertIn("reliability_snapshot(",src)
+        self.assertIn("Data Guardian",src)
+        self.assertIn("Cost Guardian",src)
+        self.assertIn("FAIL-CLOSED",src)
+        self.assertIn("não escolhe uma delas silenciosamente",src)
+        self.assertIn("Failover automático: NÃO",src)
+        self.assertIn("rollback automático: NÃO",src)
+        self.assertIn('"reliability_automatic_repair": False',src)
+        self.assertIn('"reliability_automatic_rollback": False',src)
+
+    def test_reliability_is_computed_before_and_after_incident_collection(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        incident = src.index("incident_snapshot = collect_incidents(")
+        preliminary = src.rfind("preliminary_reliability = reliability_snapshot(",0,incident)
+        final = src.index("final_reliability = reliability_snapshot(",incident)
+        self.assertGreater(preliminary,0)
+        self.assertGreater(final,incident)
+        self.assertIn('system["reliability"] = preliminary_reliability',src)
+        self.assertIn('system["reliability"] = final_reliability',src)
+
     def test_business_panel_labels_unconnected_sales_as_unconfirmed(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("não representam vendas confirmadas", src)

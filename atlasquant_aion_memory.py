@@ -78,6 +78,12 @@ APPROVED_AION_FOUNDATION = (
     "Backtest, Paper, Forward, Shadow, OOS e calibração entram como evidência de pesquisa referenciada na memória; não alteram gates ao vivo automaticamente.",
     "Champion permanece oficial até que Challenger passe por fora da amostra, não degradação, Shadow Mode e revisão humana; promoção automática é proibida.",
     "Aprender mais não significa mudar mais: hipótese nova deve ser testada antes de qualquer alteração de regra, peso, modelo ou produção.",
+    "Reliability Guardian deve reconciliar fontes e preservar divergências; duas fontes confirmadas em conflito não podem ser resolvidas silenciosamente pelo AION.",
+    "Frescor, disponibilidade, qualidade, identidade da fonte e criticidade devem ser tratados separadamente; dado stale ou indisponível não pode ser promovido a confirmado.",
+    "Modo degradado e fail-closed devem reduzir capacidades sensíveis sem impedir explicação, diagnóstico e organização segura de evidências.",
+    "Cost Guardian deve manter custo zero como padrão e proibir upgrade, cobrança ou fallback pago automático sem teto e aprovação explícita.",
+    "Rollback é sempre consultivo nesta camada: incidentes podem recomendar revisão, mas rollback/deploy automáticos permanecem proibidos.",
+    "Proteção da memória exige integridade, SHA/escrita condicional e aprovação explícita; conflito ou digest divergente deve bloquear sobrescrita.",
     "Execução real em corretora continua bloqueada; backtest/paper/forward e pesquisa não equivalem a autorização real.",
     "Gatilho operacional aprovado: quando o administrador disser 'tô no computador', priorizar a reconciliação do Render, configurar o Deploy Hook com segurança e validar Build Identity + Browser Smoke antes de retomar novos blocos.",
 )

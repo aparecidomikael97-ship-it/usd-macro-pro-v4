@@ -194,6 +194,41 @@ def local_answer(
             "Laboratório, Secretaria, Desenvolvimento ou Promoções."
         )
 
+    reliability = system.get("reliability") if isinstance(system.get("reliability"), Mapping) else {}
+    degraded = (
+        reliability.get("degraded_mode")
+        if isinstance(reliability.get("degraded_mode"), Mapping)
+        else {}
+    )
+    data_guardian = (
+        reliability.get("data_guardian")
+        if isinstance(reliability.get("data_guardian"), Mapping)
+        else {}
+    )
+    reconciliation = (
+        data_guardian.get("reconciliation")
+        if isinstance(data_guardian.get("reconciliation"), Mapping)
+        else {}
+    )
+    reliability_posture = str(reliability.get("posture") or "").upper()
+    degraded_state = str(degraded.get("state") or "").upper()
+    source_conflicts = int(reconciliation.get("conflict_count") or 0)
+    if source_conflicts:
+        answer += (
+            f" Reliability Guardian registra {source_conflicts} conflito(s) de fonte; "
+            "não vou escolher uma versão silenciosamente antes da reconciliação."
+        )
+    if degraded_state == "FAIL_CLOSED":
+        answer += (
+            " O AION está em FAIL-CLOSED para capacidades sensíveis nesta execução; "
+            "posso explicar e organizar evidências, mas não promover o estado dependente como saudável."
+        )
+    elif degraded_state == "DEGRADED_SAFE":
+        answer += (
+            " O AION está em modo degradado seguro nesta execução; estados ausentes ou frágeis "
+            "continuam não confirmados."
+        )
+
     if hits:
         answer += f" Encontrei {len(hits)} referência(s) na memória canônica para apoiar a resposta."
     if provider["state"] == "ZERO_COST_LOCAL":
@@ -238,6 +273,9 @@ def local_answer(
         "evidence_confidence": response_confidence,
         "truth_state": "CONFIRMED_LOCAL_CONTRACT",
         "confidence_basis": "EVIDENCE_QUALITY_NOT_PROFIT_PROBABILITY",
+        "reliability_posture": reliability_posture or "UNKNOWN",
+        "degraded_mode_state": degraded_state or "UNKNOWN",
+        "source_conflicts": source_conflicts,
         "executes_action": False,
         "real_orders_enabled": False,
     }

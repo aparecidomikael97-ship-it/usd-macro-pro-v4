@@ -62,6 +62,7 @@ def executive_pulse(
     interface_validation:Mapping[str,Any]|None=None,
     publication_truth:Mapping[str,Any]|None=None,
     release_gate_snapshot:Mapping[str,Any]|None=None,
+    reliability_snapshot:Mapping[str,Any]|None=None,
     checkpoint_dirty:bool=False,
     checkpoint_conflict:bool=False,
     foundation_diagnostics:Sequence[Mapping[str,Any]]|None=None,
@@ -74,6 +75,7 @@ def executive_pulse(
     validation=dict(interface_validation or {})
     publication=dict(publication_truth or {})
     release_gate=dict(release_gate_snapshot or {})
+    reliability=dict(reliability_snapshot or {})
     diagnostics=[dict(x) for x in list(foundation_diagnostics or []) if isinstance(x,Mapping)]
 
     candidates=[]
@@ -155,6 +157,46 @@ def executive_pulse(
             high.get("detail") or "Há um incidente de alta severidade.",
             "Revisar o Centro de Segurança antes de avançar em mudanças sensíveis.",
             high.get("source") or "incident_center",
+        ))
+
+    reliability_posture=str(reliability.get("posture") or "").upper()
+    degraded_mode=(
+        reliability.get("degraded_mode")
+        if isinstance(reliability.get("degraded_mode"),Mapping)
+        else {}
+    )
+    degraded_state=str(degraded_mode.get("state") or "").upper()
+    cost_guardian=(
+        reliability.get("cost_guardian")
+        if isinstance(reliability.get("cost_guardian"),Mapping)
+        else {}
+    )
+    cost_state=str(cost_guardian.get("state") or "").upper()
+    if reliability_posture=="CRITICAL" and not critical:
+        candidates.append(_attention(
+            "P0","laboratory",
+            "Reliability Guardian em fail-closed",
+            "A camada de governança detectou condição crítica e restringiu capacidades sensíveis.",
+            "Abrir Reliability & Governance, preservar evidências e reconciliar a causa antes de avançar.",
+            "reliability_governance",
+        ))
+    elif reliability_posture=="DEGRADED" and not high:
+        candidates.append(_attention(
+            "P1" if degraded_state=="FAIL_CLOSED" else "P2",
+            "laboratory",
+            "AION em modo degradado governado",
+            f"Estado de confiabilidade: {degraded_state or 'DEGRADED_SAFE'}.",
+            "Revisar fontes, memória e gates antes de depender de capacidades degradadas.",
+            "reliability_governance",
+        ))
+
+    if cost_state in {"WARNING","BLOCKED_LIMIT"}:
+        candidates.append(_attention(
+            "P2","laboratory",
+            "Cost Guardian requer revisão",
+            f"Estado de custo/quota: {cost_state}. Fallback pago automático permanece desligado.",
+            "Revisar orçamento e quota; preferir rota gratuita/local quando aplicável.",
+            "cost_guardian",
         ))
 
     release_gate_state=str(release_gate.get("state") or "").upper()
@@ -334,6 +376,9 @@ def executive_pulse(
         "release_gate_total_stages":int(release_gate.get("total_stages") or 0),
         "release_gate_next_stage":str(release_gate.get("next_stage") or ""),
         "release_gate_claim_allowed":bool(release_gate.get("release_claim_allowed",False)),
+        "reliability_posture":reliability_posture or "NONE",
+        "degraded_mode_state":degraded_state or "NONE",
+        "cost_guardian_state":cost_state or "NONE",
         "recommended_workspace":primary["area"],
         "executes_action":False,
         "real_orders_enabled":False,

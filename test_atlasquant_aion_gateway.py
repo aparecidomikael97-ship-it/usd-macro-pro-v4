@@ -123,6 +123,27 @@ class AtlasQuantAionGatewayTests(unittest.TestCase):
         )
         self.assertFalse(result["executes_action"])
 
+    def test_local_answer_discloses_fail_closed_reliability(self):
+        result = local_answer(
+            "como está o sistema?",
+            checkpoint={"aion":{"priority":"AION"}},
+            system_context={
+                "reliability":{
+                    "posture":"CRITICAL",
+                    "degraded_mode":{"state":"FAIL_CLOSED"},
+                    "data_guardian":{
+                        "reconciliation":{"conflict_count":2}
+                    },
+                }
+            },
+        )
+        self.assertEqual(result["reliability_posture"],"CRITICAL")
+        self.assertEqual(result["degraded_mode_state"],"FAIL_CLOSED")
+        self.assertEqual(result["source_conflicts"],2)
+        self.assertIn("não vou escolher uma versão silenciosamente",result["answer"])
+        self.assertIn("FAIL-CLOSED",result["answer"])
+        self.assertFalse(result["executes_action"])
+
     def test_local_answer_does_not_invent_fresh_market_state(self):
         result = local_answer(
             "como está o radar forex agora?",

@@ -170,6 +170,7 @@ from atlasquant_aion_intelligence import (
     scenario_events,
     simulate_macro_scenario,
 )
+from atlasquant_aion_reliability import reliability_snapshot
 from atlasquant_aion_learning import (
     CAUSE_TAGS as LEARNING_CAUSE_TAGS,
     FORECAST_TYPES as LEARNING_FORECAST_TYPES,
@@ -1153,6 +1154,121 @@ def _render_commander_intelligence(
             )
 
 
+def _render_reliability_governance(system_context: Mapping[str, Any] | None) -> None:
+    system = dict(system_context or {})
+    reliability = (
+        system.get("reliability")
+        if isinstance(system.get("reliability"), Mapping)
+        else {}
+    )
+    st.markdown("#### 🛡️ Reliability & Governance")
+    st.caption(
+        "Data Guardian + reconciliação de fontes + Cost Guardian + proteção da memória + "
+        "modo degradado + rollback consultivo. Nenhuma correção, compra, deploy ou rollback é automático."
+    )
+    if not reliability:
+        st.warning("Camada de confiabilidade não confirmada nesta execução.")
+        return
+
+    data = (
+        reliability.get("data_guardian")
+        if isinstance(reliability.get("data_guardian"), Mapping)
+        else {}
+    )
+    cost = (
+        reliability.get("cost_guardian")
+        if isinstance(reliability.get("cost_guardian"), Mapping)
+        else {}
+    )
+    memory = (
+        reliability.get("memory_protection")
+        if isinstance(reliability.get("memory_protection"), Mapping)
+        else {}
+    )
+    degraded = (
+        reliability.get("degraded_mode")
+        if isinstance(reliability.get("degraded_mode"), Mapping)
+        else {}
+    )
+    rollback = (
+        reliability.get("rollback_governance")
+        if isinstance(reliability.get("rollback_governance"), Mapping)
+        else {}
+    )
+    reconciliation = (
+        data.get("reconciliation")
+        if isinstance(data.get("reconciliation"), Mapping)
+        else {}
+    )
+
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("Postura", str(reliability.get("posture") or "UNKNOWN"))
+    c2.metric("Modo", str(degraded.get("state") or "UNKNOWN"))
+    c3.metric("Memória", str(memory.get("state") or "UNKNOWN"))
+    c4.metric("Custo", str(cost.get("state") or "UNKNOWN"))
+
+    conflicts = int(reconciliation.get("conflict_count") or 0)
+    critical_conflicts = int(reconciliation.get("critical_conflict_count") or 0)
+    r1,r2,r3,r4 = st.columns(4)
+    r1.metric("Conflitos de fonte", conflicts)
+    r2.metric("Conflitos críticos", critical_conflicts)
+    r3.metric("Rollback", str(rollback.get("state") or "STANDBY"))
+    r4.metric("Ordens reais", "BLOQUEADAS")
+
+    if str(degraded.get("state") or "").upper()=="FAIL_CLOSED":
+        st.error(
+            "Reliability Guardian em FAIL-CLOSED: capacidades sensíveis permanecem bloqueadas "
+            "até que a evidência crítica seja reconciliada."
+        )
+    elif str(degraded.get("state") or "").upper()=="DEGRADED_SAFE":
+        st.warning(
+            "Modo degradado seguro ativo. O AION pode explicar e organizar evidências, "
+            "mas não deve promover estados não confirmados."
+        )
+    else:
+        st.success(
+            "Nenhum bloqueio crítico foi consolidado por esta camada. "
+            "Isso não substitui validação externa nem autorização operacional."
+        )
+
+    if conflicts:
+        st.warning(
+            "Há fontes confirmadas divergentes. O AION não escolhe uma delas silenciosamente; "
+            "a afirmação permanece em CONFLICT até reconciliação verificável."
+        )
+
+    observations = [
+        row for row in list(reconciliation.get("observations") or [])
+        if isinstance(row, Mapping)
+    ]
+    if observations:
+        with st.expander("Fontes e evidências observadas", expanded=False):
+            st.dataframe([
+                {
+                    "Fonte":row.get("source"),
+                    "Afirmação":row.get("claim"),
+                    "Estado":row.get("state"),
+                    "Verdade":row.get("truth_state"),
+                    "Criticidade":row.get("criticality"),
+                    "Idade min":row.get("age_minutes"),
+                    "Máx. min":row.get("max_age_minutes"),
+                    "Quota %":row.get("quota_remaining_pct"),
+                }
+                for row in observations
+            ], width="stretch", hide_index=True)
+
+    actions = [str(x) for x in list(reliability.get("next_actions") or []) if str(x).strip()]
+    if actions:
+        st.markdown("**Próximas ações seguras:**")
+        for action in actions[:8]:
+            st.markdown(f"- {action}")
+
+    st.caption(
+        "Failover automático: NÃO · reparo automático: NÃO · rollback automático: NÃO · "
+        "fallback pago automático: NÃO."
+    )
+
+
 def _render_learning_pulse(checkpoint: Mapping[str, Any]) -> None:
     learning = checkpoint.get("learning") if isinstance(checkpoint.get("learning"), Mapping) else {}
     episodes = list(learning.get("episodes", []) or [])
@@ -1524,6 +1640,7 @@ def _render_central(
     _render_executive_pulse(executive_snapshot)
     _render_commander_intelligence(checkpoint, system_context, executive_snapshot)
     _render_learning_pulse(checkpoint)
+    _render_reliability_governance(system_context)
     _render_release_gate(system_context)
     _render_publication_truth(system_context)
     _render_critical_surface_health(system_context)
@@ -3844,6 +3961,45 @@ def render_aion_admin_console(
             "error_type": type(exc).__name__,
         })
 
+    reliability_budget = normalize_budget(
+        (checkpoint.get("aion") or {}).get("model_budget", {})
+        if isinstance(checkpoint.get("aion"), Mapping)
+        else {}
+    )
+    try:
+        preliminary_reliability = reliability_snapshot(
+            system_context=system,
+            market_context=market,
+            provider_status=provider,
+            runtime_result=runtime_result,
+            budget=reliability_budget,
+            incident_snapshot={},
+            checkpoint_dirty=bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
+            checkpoint_conflict=bool(st.session_state.get(_WORKING_CONFLICT_KEY, False)),
+        )
+    except Exception as exc:
+        preliminary_reliability = {
+            "schema":"ATLASQUANT_AION_RELIABILITY_GOVERNANCE_V1",
+            "posture":"UNKNOWN",
+            "data_guardian":{"state":"UNKNOWN","reconciliation":{"observations":[],"conflict_count":0,"critical_conflict_count":0}},
+            "cost_guardian":{"state":"UNKNOWN","automatic_billing":False,"automatic_upgrade":False},
+            "memory_protection":{"state":"UNKNOWN","write_safe_precondition":False},
+            "rollback_governance":{"state":"STANDBY","automatic_rollback":False},
+            "degraded_mode":{"state":"DEGRADED_SAFE","can_authorize_market_action":False,"real_orders_enabled":False},
+            "next_actions":["Revisar a camada Reliability & Governance."],
+            "automatic_failover":False,
+            "automatic_repair":False,
+            "automatic_rollback":False,
+            "automatic_paid_fallback":False,
+            "real_orders_enabled":False,
+            "executes_action":False,
+        }
+        foundation_diagnostics.append({
+            "component":"reliability_governance_preflight",
+            "error_type":type(exc).__name__,
+        })
+    system["reliability"] = preliminary_reliability
+
     try:
         incident_snapshot = collect_incidents(
             checkpoint=checkpoint,
@@ -3873,6 +4029,25 @@ def render_aion_admin_console(
             "component":"incident_center",
             "error_type":type(exc).__name__,
         })
+
+    try:
+        final_reliability = reliability_snapshot(
+            system_context=system,
+            market_context=market,
+            provider_status=provider,
+            runtime_result=runtime_result,
+            budget=reliability_budget,
+            incident_snapshot=incident_snapshot,
+            checkpoint_dirty=bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
+            checkpoint_conflict=bool(st.session_state.get(_WORKING_CONFLICT_KEY, False)),
+        )
+    except Exception as exc:
+        final_reliability = preliminary_reliability
+        foundation_diagnostics.append({
+            "component":"reliability_governance_final",
+            "error_type":type(exc).__name__,
+        })
+    system["reliability"] = final_reliability
 
     continuity_section = (
         checkpoint.get("continuity")
@@ -3915,6 +4090,7 @@ def render_aion_admin_console(
             interface_validation=interface_validation_state,
             publication_truth=publication_state,
             release_gate_snapshot=release_gate_state,
+            reliability_snapshot=final_reliability,
             checkpoint_dirty=bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
             checkpoint_conflict=bool(st.session_state.get(_WORKING_CONFLICT_KEY, False)),
             foundation_diagnostics=foundation_diagnostics,
@@ -4198,6 +4374,25 @@ def render_aion_admin_console(
             ).get("human_review_candidates") or 0
         ),
         "learning_automatic_changes": False,
+        "reliability_posture": str(final_reliability.get("posture") or "UNKNOWN"),
+        "reliability_degraded_mode": str(
+            ((final_reliability.get("degraded_mode") or {}) if isinstance(final_reliability.get("degraded_mode"), Mapping) else {}).get("state")
+            or "UNKNOWN"
+        ),
+        "reliability_source_conflicts": int(
+            ((((final_reliability.get("data_guardian") or {}) if isinstance(final_reliability.get("data_guardian"), Mapping) else {}).get("reconciliation") or {}) if isinstance(((final_reliability.get("data_guardian") or {}) if isinstance(final_reliability.get("data_guardian"), Mapping) else {}).get("reconciliation"), Mapping) else {}).get("conflict_count")
+            or 0
+        ),
+        "reliability_memory_state": str(
+            ((final_reliability.get("memory_protection") or {}) if isinstance(final_reliability.get("memory_protection"), Mapping) else {}).get("state")
+            or "UNKNOWN"
+        ),
+        "reliability_cost_state": str(
+            ((final_reliability.get("cost_guardian") or {}) if isinstance(final_reliability.get("cost_guardian"), Mapping) else {}).get("state")
+            or "UNKNOWN"
+        ),
+        "reliability_automatic_repair": False,
+        "reliability_automatic_rollback": False,
         "commander_posture": str(commander_snapshot.get("posture") or "UNKNOWN"),
         "commander_objective": str(commander_snapshot.get("objective") or ""),
         "commander_next_action": str(commander_snapshot.get("next_action") or ""),

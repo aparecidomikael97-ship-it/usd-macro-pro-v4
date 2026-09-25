@@ -43,6 +43,9 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("aprendizado controlado", joined)
         self.assertIn("champion", joined)
         self.assertIn("promoção automática", joined)
+        self.assertIn("reliability guardian", joined)
+        self.assertIn("fallback pago automático", joined)
+        self.assertIn("rollback", joined)
 
     def test_canonical_loader_reads_project_files_and_foundation(self):
         with tempfile.TemporaryDirectory() as td:

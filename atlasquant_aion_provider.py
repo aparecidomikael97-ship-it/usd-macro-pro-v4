@@ -187,6 +187,25 @@ def build_provider_prompt(
     evidence="\n".join(_evidence_lines(memory_hits)) or "- Nenhuma evidência canônica fornecida."
     source_build=redact_text(system.get("source_build"))[:80] or "não confirmado"
     environment=redact_text(system.get("environment"))[:80] or "não confirmado"
+    reliability=system.get("reliability") if isinstance(system.get("reliability"),Mapping) else {}
+    degraded=(
+        reliability.get("degraded_mode")
+        if isinstance(reliability.get("degraded_mode"),Mapping)
+        else {}
+    )
+    data_guardian=(
+        reliability.get("data_guardian")
+        if isinstance(reliability.get("data_guardian"),Mapping)
+        else {}
+    )
+    reconciliation=(
+        data_guardian.get("reconciliation")
+        if isinstance(data_guardian.get("reconciliation"),Mapping)
+        else {}
+    )
+    reliability_posture=redact_text(reliability.get("posture"))[:40] or "não confirmado"
+    degraded_state=redact_text(degraded.get("state"))[:40] or "não confirmado"
+    source_conflicts=int(reconciliation.get("conflict_count") or 0)
     prompt=f"""Você é o AION do AtlasQuant, assistente do administrador.
 
 REGRAS OBRIGATÓRIAS:
@@ -202,6 +221,13 @@ REGRAS OBRIGATÓRIAS:
 Contexto roteado: {redact_text(domain)[:80]}
 Build informado pelo app: {source_build}
 Ambiente informado pelo app: {environment}
+Reliability posture: {reliability_posture}
+Modo degradado: {degraded_state}
+Conflitos de fonte confirmados: {source_conflicts}
+
+Se Reliability estiver DEGRADED/CRITICAL ou o modo estiver DEGRADED_SAFE/FAIL_CLOSED,
+não apresente a capacidade dependente como saudável. Se houver conflito de fonte,
+descreva o conflito e peça/recomende reconciliação; não escolha uma fonte escondido.
 
 EVIDÊNCIAS CANÔNICAS DISPONÍVEIS:
 {evidence}

@@ -31,6 +31,8 @@ INCIDENT_KINDS=(
     "ACCOUNT_ACCESS",
     "OBSERVABILITY",
     "PRODUCTION_IDENTITY",
+    "SOURCE_RELIABILITY",
+    "COST_GOVERNANCE",
 )
 
 _SEVERITY_RANK={name:idx for idx,name in enumerate(SEVERITIES)}
@@ -210,6 +212,54 @@ def collect_incidents(
             response_key="production_identity",
         ))
 
+    reliability=system.get("reliability") if isinstance(system.get("reliability"),Mapping) else {}
+    data_guardian=(
+        reliability.get("data_guardian")
+        if isinstance(reliability.get("data_guardian"),Mapping)
+        else {}
+    )
+    reconciliation=(
+        data_guardian.get("reconciliation")
+        if isinstance(data_guardian.get("reconciliation"),Mapping)
+        else {}
+    )
+    critical_conflicts=int(reconciliation.get("critical_conflict_count") or 0)
+    conflicts=int(reconciliation.get("conflict_count") or 0)
+    if critical_conflicts>0:
+        incidents.append(_row(
+            "SOURCE_RELIABILITY","CRITICAL",
+            "Conflito crítico entre fontes confirmadas",
+            (
+                f"{critical_conflicts} conflito(s) crítico(s) entre fontes confirmadas. "
+                "O AION mantém a afirmação em conflito e não escolhe silenciosamente uma fonte."
+            ),
+            source="system_context.reliability.data_guardian",
+            response_key="source_reliability",
+        ))
+    elif conflicts>0:
+        incidents.append(_row(
+            "SOURCE_RELIABILITY","HIGH",
+            "Fontes confirmadas divergem",
+            f"{conflicts} conflito(s) de fonte exigem reconciliação antes de afirmação forte.",
+            source="system_context.reliability.data_guardian",
+            response_key="source_reliability",
+        ))
+
+    cost_guardian=(
+        reliability.get("cost_guardian")
+        if isinstance(reliability.get("cost_guardian"),Mapping)
+        else {}
+    )
+    cost_state=str(cost_guardian.get("state") or "").upper()
+    if cost_state=="BLOCKED_LIMIT":
+        incidents.append(_row(
+            "COST_GOVERNANCE","MEDIUM",
+            "Limite de custo atingido",
+            "O Cost Guardian indica que o teto aprovado foi atingido; fallback pago automático permanece proibido.",
+            source="system_context.reliability.cost_guardian",
+            response_key="cost_governance",
+        ))
+
     if audit:
         review=(
             int(audit.get("user_accounts_without_effective_entitlement") or 0)
@@ -329,6 +379,16 @@ def incident_response_plan(incident:Mapping[str,Any]|None)->dict[str,Any]:
             "Não tratar HTTP 200/health isolado como prova de código atual.",
             "Confirmar fingerprint/build identity contra a fonte esperada.",
             "Só depois validar comportamento funcional na produção.",
+        ],
+        "source_reliability":[
+            "Preservar os valores divergentes e as fontes que os forneceram.",
+            "Revalidar frescor, identidade e qualidade de cada fonte antes de escolher qualquer valor.",
+            "Manter a afirmação dependente em UNKNOWN/CONFLICT até haver reconciliação verificável.",
+        ],
+        "cost_governance":[
+            "Manter fallback pago automático desligado.",
+            "Revisar consumo estimado, quota e teto aprovado antes de nova solicitação paga.",
+            "Preferir rota gratuita/local quando ela puder cumprir a tarefa com segurança.",
         ],
         "generic":[
             "Classificar o componente afetado e reunir evidências adicionais.",
