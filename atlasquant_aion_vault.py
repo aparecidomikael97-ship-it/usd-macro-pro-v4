@@ -223,6 +223,14 @@ def normalize_vault(raw: Mapping[str, Any] | None) -> dict[str, Any]:
     # Reject unknown top-level fields that look like secret values. This does
     # not claim perfect DLP; it blocks the most dangerous accidental pattern.
     hits = _forbidden_hits({k: v for k, v in item.items() if k not in {"entries"}})
+    prior_hits = [
+        _clean(x, 300)
+        for x in list(item.get("forbidden_field_hits") or [])
+        if _clean(x, 300)
+    ] if isinstance(item.get("forbidden_field_hits"), (list, tuple)) else []
+    if bool(item.get("plaintext_secrets_present", False)) and not prior_hits:
+        prior_hits = ["$.previous_plaintext_secret_policy_violation"]
+    hits = list(dict.fromkeys(hits + prior_hits))
     entries = normalize_vault_entries(
         item.get("entries") if isinstance(item.get("entries"), (list, tuple)) else []
     )
