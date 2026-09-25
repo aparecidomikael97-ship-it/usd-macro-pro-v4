@@ -46,6 +46,8 @@ from atlasquant_navigation_bridge import (
     request_return_to_aion,
     revalidation_result,
 )
+from atlasquant_interface_validation import interface_validation_mission
+from atlasquant_publication_truth import publication_truth
 import re
 
 # V10 — camada observacional profissional. O try/except evita derrubar
@@ -9937,16 +9939,32 @@ if _aq_active_index == 21:
             "fresh_confirmed": False,
             "summary": "",
         }
+        _aion_critical_surfaces = surface_health_snapshot(
+            st.session_state,
+            current_build=_ATLASQUANT_SOURCE_BUILD,
+        )
+        _aion_interface_validation = interface_validation_mission(
+            _aion_critical_surfaces
+        )
+        _aion_publication_truth = publication_truth(
+            environment=ATLASQUANT_ENVIRONMENT,
+            source_build=_ATLASQUANT_SOURCE_BUILD,
+            runtime_commit=_ATLASQUANT_DEPLOY_COMMIT,
+            expected_main_commit=_config_value("ATLASQUANT_EXPECTED_MAIN_COMMIT"),
+            production_verified_commit=_config_value(
+                "ATLASQUANT_PRODUCTION_VERIFIED_COMMIT"
+            ),
+            interface_validation=_aion_interface_validation,
+        )
         _aion_system_context = {
             "truth_state": "CONFIRMED",
             "source_build": _ATLASQUANT_SOURCE_BUILD,
             "environment": ATLASQUANT_ENVIRONMENT,
             "app_version": APP_VERSION,
             "market_status": "não confirmado nesta tela",
-            "critical_surfaces": surface_health_snapshot(
-                st.session_state,
-                current_build=_ATLASQUANT_SOURCE_BUILD,
-            ),
+            "critical_surfaces": _aion_critical_surfaces,
+            "interface_validation": _aion_interface_validation,
+            "publication_truth": _aion_publication_truth,
             "guided_revalidation": revalidation_result(st.session_state) or {},
         }
         try:

@@ -233,6 +233,13 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn('st.session_state["aion_admin_workspace"] = jump_request',src)
         self.assertIn('"executive_posture"',src)
         self.assertIn('"executive_primary_area"',src)
+        self.assertIn("_render_publication_truth(system_context)",src)
+        self.assertIn("Estado de publicação",src)
+        self.assertIn("Merge no GitHub não é tratado como prova",src)
+        self.assertIn('"publication_state"',src)
+        self.assertIn('"publication_main_match"',src)
+        self.assertIn('"production_verification"',src)
+        self.assertIn('"can_claim_latest_main_live"',src)
 
     def test_executive_pulse_surfaces_interface_validation_progress(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")

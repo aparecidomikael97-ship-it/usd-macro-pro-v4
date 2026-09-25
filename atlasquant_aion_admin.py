@@ -1102,6 +1102,56 @@ def _critical_surface_rows(system_context: Mapping[str, Any] | None) -> list[dic
     return rows
 
 
+def _short_commit(value: Any) -> str:
+    raw = str(value or "").strip()
+    return raw[:8] if raw else "—"
+
+
+def _render_publication_truth(system_context: Mapping[str, Any] | None) -> None:
+    system = dict(system_context or {})
+    publication = (
+        system.get("publication_truth")
+        if isinstance(system.get("publication_truth"), Mapping)
+        else {}
+    )
+    st.markdown("#### Estado de publicação")
+    st.caption(
+        "Separa código em execução, identidade da main e validação de produção. "
+        "Merge no GitHub não é tratado como prova de que o Render já está atualizado."
+    )
+    if not publication:
+        st.warning(
+            "Não há evidência de publicação disponível nesta execução. "
+            "O AION mantém produção como não confirmada."
+        )
+        return
+
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("Estado", str(publication.get("state") or "UNKNOWN"))
+    c2.metric("Runtime", _short_commit(publication.get("runtime_commit")))
+    c3.metric("Main esperada", _short_commit(publication.get("expected_main_commit")))
+    c4.metric("Produção", str(publication.get("production_verification") or "UNKNOWN"))
+
+    main_match = str(publication.get("main_match") or "UNKNOWN")
+    can_claim_live = bool(publication.get("can_claim_latest_main_live", False))
+    if can_claim_live:
+        st.success(
+            "Há identidade suficiente para afirmar que o runtime corresponde à main esperada "
+            "e que a produção foi explicitamente validada."
+        )
+    elif main_match == "MISMATCH":
+        st.error(
+            "O commit em execução diverge da main esperada. "
+            "AION não considera esta versão atualizada."
+        )
+    else:
+        st.warning(
+            "A versão em execução ainda não tem prova suficiente para ser chamada de "
+            "última main validada em produção."
+        )
+    st.caption(str(publication.get("next_action") or ""))
+
+
 def _render_critical_surface_health(system_context: Mapping[str, Any] | None) -> None:
     st.markdown("#### Saúde das telas críticas")
     st.caption(
@@ -1250,6 +1300,7 @@ def _render_central(
         ),
     )
     _render_executive_pulse(executive_snapshot)
+    _render_publication_truth(system_context)
     _render_critical_surface_health(system_context)
 
     if view_mode == "Completo":
@@ -3185,9 +3236,18 @@ def render_aion_admin_console(
         list(continuity_section.get("missions", []) or []),
         list(continuity_section.get("handoffs", []) or []),
     )
-    interface_validation_state = interface_validation_mission(
-        system.get("critical_surfaces")
-        if isinstance(system.get("critical_surfaces"), Mapping)
+    interface_validation_state = (
+        dict(system.get("interface_validation"))
+        if isinstance(system.get("interface_validation"), Mapping)
+        else interface_validation_mission(
+            system.get("critical_surfaces")
+            if isinstance(system.get("critical_surfaces"), Mapping)
+            else {}
+        )
+    )
+    publication_state = (
+        dict(system.get("publication_truth"))
+        if isinstance(system.get("publication_truth"), Mapping)
         else {}
     )
     try:
@@ -3198,6 +3258,7 @@ def render_aion_admin_console(
             status_board=status_board,
             continuity_summary=continuity_state,
             interface_validation=interface_validation_state,
+            publication_truth=publication_state,
             checkpoint_dirty=bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
             checkpoint_conflict=bool(st.session_state.get(_WORKING_CONFLICT_KEY, False)),
             foundation_diagnostics=foundation_diagnostics,
@@ -3231,6 +3292,10 @@ def render_aion_admin_console(
             "interface_validation_total":int(interface_validation_state.get("total") or 3),
             "interface_validation_remaining":int(interface_validation_state.get("remaining") or 3),
             "interface_validation_complete":bool(interface_validation_state.get("all_confirmed_current_build",False)),
+            "publication_state":str(publication_state.get("state") or "UNKNOWN"),
+            "publication_main_match":str(publication_state.get("main_match") or "UNKNOWN"),
+            "production_verification":str(publication_state.get("production_verification") or "UNKNOWN"),
+            "can_claim_latest_main_live":bool(publication_state.get("can_claim_latest_main_live",False)),
             "recommended_workspace":"🛠️ Desenvolvimento",
             "executes_action":False,
             "real_orders_enabled":False,
@@ -3399,6 +3464,14 @@ def render_aion_admin_console(
         "interface_validation_remaining": int(interface_validation_state.get("remaining") or 3),
         "interface_validation_complete": bool(
             interface_validation_state.get("all_confirmed_current_build", False)
+        ),
+        "publication_state": str(publication_state.get("state") or "UNKNOWN"),
+        "publication_main_match": str(publication_state.get("main_match") or "UNKNOWN"),
+        "production_verification": str(
+            publication_state.get("production_verification") or "UNKNOWN"
+        ),
+        "can_claim_latest_main_live": bool(
+            publication_state.get("can_claim_latest_main_live", False)
         ),
         "real_orders_enabled": False,
     }

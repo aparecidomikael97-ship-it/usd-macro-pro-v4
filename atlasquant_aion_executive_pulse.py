@@ -60,6 +60,7 @@ def executive_pulse(
     status_board:Mapping[str,Any]|None=None,
     continuity_summary:Mapping[str,Any]|None=None,
     interface_validation:Mapping[str,Any]|None=None,
+    publication_truth:Mapping[str,Any]|None=None,
     checkpoint_dirty:bool=False,
     checkpoint_conflict:bool=False,
     foundation_diagnostics:Sequence[Mapping[str,Any]]|None=None,
@@ -70,6 +71,7 @@ def executive_pulse(
     board=dict(status_board or {})
     continuity=dict(continuity_summary or {})
     validation=dict(interface_validation or {})
+    publication=dict(publication_truth or {})
     diagnostics=[dict(x) for x in list(foundation_diagnostics or []) if isinstance(x,Mapping)]
 
     candidates=[]
@@ -151,6 +153,31 @@ def executive_pulse(
             high.get("detail") or "Há um incidente de alta severidade.",
             "Revisar o Centro de Segurança antes de avançar em mudanças sensíveis.",
             high.get("source") or "incident_center",
+        ))
+
+    publication_state=str(publication.get("state") or "").upper()
+    if publication_state=="RUNTIME_BEHIND_OR_DIVERGED":
+        candidates.append(_attention(
+            "P1","development",
+            "Runtime diverge da main esperada",
+            "O commit em execução não coincide com a identidade da main informada.",
+            publication.get("next_action")
+            or "Revisar o deploy antes de afirmar que a versão atual está publicada.",
+            "publication_truth",
+        ))
+    elif publication_state in {
+        "UNKNOWN",
+        "SOURCE_BUNDLE_IDENTIFIED",
+        "RUNTIME_IDENTIFIED_MAIN_UNKNOWN",
+        "MAIN_MATCH_PRODUCTION_UNVERIFIED",
+    }:
+        candidates.append(_attention(
+            "P2","development",
+            "Publicação ainda não confirmada",
+            "Não há evidência suficiente para afirmar que a versão atual da main está validada em produção.",
+            publication.get("next_action")
+            or "Confirmar identidade do runtime, main e produção antes de declarar o deploy atual.",
+            "publication_truth",
         ))
 
     validation_state=str(validation.get("state") or "").upper()
@@ -268,6 +295,10 @@ def executive_pulse(
         "interface_validation_total":int(validation.get("total") or 0),
         "interface_validation_remaining":int(validation.get("remaining") or 0),
         "interface_validation_complete":bool(validation.get("all_confirmed_current_build",False)),
+        "publication_state":publication_state or "NONE",
+        "publication_main_match":str(publication.get("main_match") or "UNKNOWN"),
+        "production_verification":str(publication.get("production_verification") or "UNKNOWN"),
+        "can_claim_latest_main_live":bool(publication.get("can_claim_latest_main_live",False)),
         "recommended_workspace":primary["area"],
         "executes_action":False,
         "real_orders_enabled":False,
