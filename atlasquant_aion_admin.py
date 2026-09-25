@@ -1057,6 +1057,7 @@ def _render_central(
     status_board: Mapping[str, Any],
     approval_inbox: Mapping[str, Any],
     incident_snapshot: Mapping[str, Any],
+    executive_snapshot: Mapping[str, Any],
 ) -> None:
     st.markdown("### 🧠 Central AION")
     pending = checkpoint.get("pending") if isinstance(checkpoint.get("pending"), list) else []
@@ -1069,11 +1070,34 @@ def _render_central(
     cols[2].metric("Aguardando aprovação", summary["waiting_approval"])
     cols[3].metric("Ordens reais", "BLOQUEADAS")
 
-    _render_workspace_overview(checkpoint, runtime_result)
-    _render_attention_queue(status_board, approval_inbox)
-    _render_memory_security_posture(access, checkpoint, runtime_result, flags)
-    _render_security_incident_center(incident_snapshot)
-    _render_continuity_center(checkpoint)
+    view_mode = st.selectbox(
+        "Visualização da Central",
+        ("Essencial", "Completo"),
+        key="aion_central_view_mode",
+        help=(
+            "Essencial prioriza o que exige atenção e reduz a rolagem no celular. "
+            "Completo mostra todos os painéis técnicos."
+        ),
+    )
+    _render_executive_pulse(executive_snapshot)
+
+    if view_mode == "Completo":
+        _render_workspace_overview(checkpoint, runtime_result)
+        _render_attention_queue(status_board, approval_inbox)
+        _render_memory_security_posture(access, checkpoint, runtime_result, flags)
+        _render_security_incident_center(incident_snapshot)
+        _render_continuity_center(checkpoint)
+    else:
+        st.caption(
+            "Modo Essencial ativo: detalhes técnicos ficam ocultos para reduzir carga e rolagem. "
+            "Nenhuma evidência ou proteção é desativada."
+        )
+        _render_attention_queue(status_board, approval_inbox)
+        _render_continuity_center(checkpoint)
+        if int(incident_snapshot.get("total") or 0) > 0 or bool(
+            incident_snapshot.get("rollback_review_recommended")
+        ):
+            _render_security_incident_center(incident_snapshot)
 
     st.markdown("#### Briefing de entrada")
     st.write(
@@ -1081,13 +1105,14 @@ def _render_central(
         f"Checkpoint: **{checkpoint_digest(checkpoint)}**. "
         f"Runtime: **{runtime_result.get('status','UNKNOWN')}**."
     )
-    if pending:
+    if pending and view_mode == "Completo":
         st.markdown("**Próximas pendências registradas:**")
         for item in pending[:8]:
             st.markdown(f"- {item}")
 
-    _render_master_status(status_board)
-    _render_approval_inbox(approval_inbox)
+    if view_mode == "Completo":
+        _render_master_status(status_board)
+        _render_approval_inbox(approval_inbox)
 
     st.markdown("#### Pergunte ao AION")
     question = st.text_input(
@@ -2972,6 +2997,59 @@ def render_aion_admin_console(
             "error_type":type(exc).__name__,
         })
 
+    continuity_section = (
+        checkpoint.get("continuity")
+        if isinstance(checkpoint.get("continuity"), Mapping)
+        else {}
+    )
+    continuity_state = continuity_summary(
+        list(continuity_section.get("missions", []) or []),
+        list(continuity_section.get("handoffs", []) or []),
+    )
+    try:
+        executive_snapshot = executive_pulse(
+            runtime_result=runtime_result,
+            approval_inbox=approval_inbox,
+            incident_snapshot=incident_snapshot,
+            status_board=status_board,
+            continuity_summary=continuity_state,
+            checkpoint_dirty=bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
+            checkpoint_conflict=bool(st.session_state.get(_WORKING_CONFLICT_KEY, False)),
+            foundation_diagnostics=foundation_diagnostics,
+        )
+    except Exception as exc:
+        executive_snapshot = {
+            "schema":"ATLASQUANT_AION_EXECUTIVE_PULSE_V1",
+            "posture":"UNKNOWN",
+            "primary":{
+                "priority":"P2",
+                "area":"🛠️ Desenvolvimento",
+                "title":"Pulso Executivo indisponível",
+                "detail":"A priorização executiva não pôde ser confirmada nesta execução.",
+                "next_action":"Usar a Próxima Ação AION e o Painel Mestre até revisar esta camada.",
+                "source":"safe_fallback",
+            },
+            "attention_items":[],
+            "attention_count":0,
+            "runtime_status":str(runtime_result.get("status") or "UNKNOWN"),
+            "integrity_state":"UNKNOWN",
+            "approval_count":int(approval_inbox.get("total") or 0),
+            "incident_count":int(incident_snapshot.get("total") or 0),
+            "critical_incidents":0,
+            "active_missions":int(continuity_state.get("active_missions") or 0),
+            "blocked_missions":int(continuity_state.get("blocked_missions") or 0),
+            "checkpoint_dirty":bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
+            "checkpoint_conflict":bool(st.session_state.get(_WORKING_CONFLICT_KEY, False)),
+            "degraded_components":len(foundation_diagnostics),
+            "recommended_workspace":"🛠️ Desenvolvimento",
+            "executes_action":False,
+            "real_orders_enabled":False,
+        }
+        foundation_diagnostics.append({
+            "component":"executive_pulse",
+            "error_type":type(exc).__name__,
+        })
+
     _render_header(
         access_map,
         str(runtime_result.get("status") or "UNKNOWN"),
@@ -2994,6 +3072,10 @@ def render_aion_admin_console(
             "Nenhuma ação externa, permissão ou trading real foi habilitado pelo fallback."
         )
 
+    jump_request = st.session_state.pop(_AION_WORKSPACE_JUMP_KEY, None)
+    if jump_request in AION_WORKSPACES:
+        st.session_state["aion_admin_workspace"] = jump_request
+
     selected_workspace = st.selectbox(
         "Área AION",
         AION_WORKSPACES,
@@ -3011,6 +3093,7 @@ def render_aion_admin_console(
             _render_central(
                 access_map, checkpoint, runtime_result, memory_summary, flags,
                 system, status_board, approval_inbox, incident_snapshot,
+                executive_snapshot,
             )
         elif selected_workspace == "🗂️ Secretaria":
             _render_secretary(access_map, checkpoint, flags, system, market, status_board, approval_inbox)
@@ -3076,6 +3159,13 @@ def render_aion_admin_console(
         "incident_center_rollback_review": bool(
             incident_snapshot.get("rollback_review_recommended", False)
         ),
+        "executive_posture": str(executive_snapshot.get("posture") or "UNKNOWN"),
+        "executive_primary_area": str(
+            ((executive_snapshot.get("primary") or {}) if isinstance(executive_snapshot.get("primary"), Mapping) else {}).get("area")
+            or "🧠 Central"
+        ),
+        "executive_attention_count": int(executive_snapshot.get("attention_count") or 0),
+        "central_view_mode": str(st.session_state.get("aion_central_view_mode") or "Essencial"),
         "continuity_active_missions": int(
             continuity_summary(
                 list(((checkpoint.get("continuity") or {}) if isinstance(checkpoint.get("continuity"), Mapping) else {}).get("missions", []) or []),
