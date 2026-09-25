@@ -105,6 +105,10 @@ def consume_revalidation_request(
         session_state["atlasquant_advanced_area"] = target["page"]
     else:
         session_state["atlasquant_beginner_area_full"] = target["page"]
+    # The fallback selector uses a separate stable key when atlasquant_ui_v1
+    # cannot be imported. Setting it here keeps guided recovery available in
+    # degraded presentation mode as well.
+    session_state["atlasquant_stable_nav_fallback"] = target["page"]
 
     active = {
         "schema": SCHEMA,
@@ -204,6 +208,7 @@ def consume_navigation_request(
             return None
         session_state["atlasquant_experience_mode"] = "Avançado"
         session_state["atlasquant_advanced_area"] = "🧠 AION"
+        session_state["atlasquant_stable_nav_fallback"] = "🧠 AION"
         return dict(raw)
     return consume_revalidation_request(
         session_state,
