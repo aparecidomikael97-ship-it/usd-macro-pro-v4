@@ -184,6 +184,9 @@ def new_eval_suite(
     }
 
 
+DEFAULT_CORE_SUITE_CREATED_AT="2026-09-25T00:00:00+00:00"
+
+
 def default_core_suite()->dict[str,Any]:
     return new_eval_suite(
         "AION Core Non-Regression",
@@ -207,6 +210,7 @@ def default_core_suite()->dict[str,Any]:
             new_metric_policy("estimated_cost_usd_per_100_tasks",direction="LOWER_BETTER",min_improvement=0.01,max_regression=0.0),
         ],
         min_evaluated_cases=5,
+        created_at=DEFAULT_CORE_SUITE_CREATED_AT,
     )
 
 
