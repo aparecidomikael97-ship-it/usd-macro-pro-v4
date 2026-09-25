@@ -20,6 +20,16 @@ class AtlasQuantAionLiveEventRuntimeTests(unittest.TestCase):
         self.assertIn("next_event=next_event",self.src)
         self.assertIn("return mesh, market_context, event_intelligence",self.src)
 
+    def test_app_overlays_persisted_background_journal(self):
+        self.assertIn(
+            "from atlasquant_aion_event_journal import overlay_journal",
+            self.src,
+        )
+        self.assertIn('"dados/aion_live_event_journal_v1.json"',self.src)
+        self.assertIn("event_intelligence = overlay_journal(",self.src)
+        self.assertIn('"background_journal_provenance"',self.src)
+        self.assertIn('"background_journal_confirmed"',self.src)
+
     def test_aion_system_context_receives_live_event_snapshot(self):
         self.assertIn("_aion_live_events",self.src)
         self.assertIn('"live_event_intelligence": _aion_live_events',self.src)
