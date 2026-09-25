@@ -42,6 +42,7 @@ from atlasquant_aion_memory import (
     search_canonical_memory,
     update_business_checkpoint,
     update_entitlements_checkpoint,
+    update_continuity_checkpoint,
     update_operating_checkpoint,
     update_promotions_checkpoint,
     update_studio_checkpoint,
@@ -51,6 +52,16 @@ from atlasquant_aion_recovery import (
     load_checkpoint_revision,
     recovery_preflight,
     restore_checkpoint_revision,
+)
+from atlasquant_aion_continuity import (
+    MISSION_STATUSES,
+    append_handoff,
+    build_session_handoff,
+    continuity_briefing,
+    continuity_summary,
+    new_mission,
+    transition_mission,
+    upsert_mission,
 )
 from atlasquant_aion_operations import (
     ACTIONS,
@@ -855,6 +866,65 @@ def _render_security_incident_center(
             st.markdown(f"- {reason}")
 
 
+def _render_continuity_center(
+    checkpoint: Mapping[str, Any],
+) -> None:
+    continuity = checkpoint.get("continuity") if isinstance(checkpoint.get("continuity"), Mapping) else {}
+    missions = list(continuity.get("missions", []) or [])
+    handoffs = list(continuity.get("handoffs", []) or [])
+    operating = checkpoint.get("operating") if isinstance(checkpoint.get("operating"), Mapping) else {}
+    briefing = continuity_briefing(
+        missions,
+        handoffs,
+        tasks=list(operating.get("tasks", []) or []),
+        events=list(operating.get("events", []) or []),
+        checkpoint_digest=checkpoint_digest(checkpoint),
+    )
+    summary = briefing.get("mission_summary") if isinstance(briefing.get("mission_summary"), Mapping) else {}
+
+    st.markdown("#### 🧭 Continuidade & Handoff")
+    st.caption(
+        "Visão derivada do Checkpoint Mestre carregado nesta sessão. "
+        "Handoff persistido tem prioridade; na ausência dele, o AION sintetiza somente a partir de missões/tarefas registradas."
+    )
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("Missões ativas", int(summary.get("active_missions") or 0))
+    c2.metric("Concluídas", int(summary.get("done_missions") or 0))
+    c3.metric("Bloqueadas", int(summary.get("blocked_missions") or 0))
+    c4.metric("Handoffs", int(summary.get("handoff_count") or 0))
+
+    source = str(briefing.get("source") or "UNKNOWN")
+    if source == "PERSISTED_HANDOFF":
+        st.success("Continuidade baseada no último handoff registrado no Checkpoint.")
+    else:
+        st.info(
+            "Ainda não há handoff persistido; a visão abaixo foi sintetizada do estado estruturado atual. "
+            "Ela não inventa etapas concluídas."
+        )
+
+    focus = str(briefing.get("current_focus") or "").strip()
+    if focus:
+        st.write(f"**Onde paramos:** {focus}")
+    else:
+        st.write("**Onde paramos:** nenhuma missão ativa registrada no Checkpoint.")
+
+    completed = list(briefing.get("recent_completed") or [])
+    blockers = list(briefing.get("blockers") or [])
+    next_steps = list(briefing.get("next_steps") or [])
+    if completed:
+        with st.expander("Últimas conclusões", expanded=False):
+            for item in completed[:8]:
+                st.markdown(f"- {item}")
+    if blockers:
+        with st.expander("Bloqueios registrados", expanded=False):
+            for item in blockers[:8]:
+                st.markdown(f"- {item}")
+    if next_steps:
+        st.markdown("**Próximos passos registrados:**")
+        for item in next_steps[:8]:
+            st.markdown(f"- {item}")
+
+
 def _render_master_status(board: Mapping[str, Any]) -> None:
     counts = board.get("counts") if isinstance(board.get("counts"), Mapping) else {}
     st.markdown("#### Painel Mestre de Estado")
@@ -928,6 +998,7 @@ def _render_central(
     _render_attention_queue(status_board, approval_inbox)
     _render_memory_security_posture(access, checkpoint, runtime_result, flags)
     _render_security_incident_center(incident_snapshot)
+    _render_continuity_center(checkpoint)
 
     st.markdown("#### Briefing de entrada")
     st.write(
