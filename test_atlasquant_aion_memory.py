@@ -23,6 +23,8 @@ from atlasquant_aion_memory import (
     update_entitlements_checkpoint,
     update_continuity_checkpoint,
     update_learning_checkpoint,
+    update_portable_core_checkpoint,
+    update_vault_checkpoint,
     update_wisdom_checkpoint,
     update_live_event_journal_checkpoint,
     update_operating_checkpoint,
@@ -131,7 +133,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("creative fusion studio", joined)
         self.assertIn("motor universal de performance", joined)
         self.assertEqual(upgraded["aion"]["foundation_revision"], FOUNDATION_REVISION)
-        self.assertGreaterEqual(upgraded["checkpoint_version"], 9)
+        self.assertGreaterEqual(upgraded["checkpoint_version"], 10)
 
     def test_default_checkpoint_is_safe_and_has_no_real_trading(self):
         cp = default_checkpoint()
@@ -163,6 +165,11 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertTrue(cp["learning"]["digest"])
         self.assertEqual(cp["wisdom"]["entries"],[])
         self.assertTrue(cp["wisdom"]["digest"])
+        self.assertIn("portable_core",cp)
+        self.assertTrue(cp["portable_core"]["digest"])
+        self.assertIn("vault",cp)
+        self.assertTrue(cp["vault"]["digest"])
+        self.assertFalse(cp["vault"]["plaintext_secrets_present"])
         self.assertEqual(cp["live_event_journal"]["events"],[])
         self.assertEqual(cp["live_event_journal"]["heartbeats"],[])
         self.assertTrue(cp["live_event_journal"]["digest"])
@@ -171,7 +178,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
     def test_older_checkpoint_is_upgraded_without_claiming_persistence(self):
         old={"checkpoint_version":1,"project":"AtlasQuant"}
         upgraded=ensure_operating_checkpoint(old)
-        self.assertEqual(upgraded["checkpoint_version"],9)
+        self.assertEqual(upgraded["checkpoint_version"],10)
         self.assertIn("operating",upgraded)
         self.assertIn("studio",upgraded)
         self.assertIn("business",upgraded)
@@ -180,12 +187,51 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("continuity",upgraded)
         self.assertIn("learning",upgraded)
         self.assertIn("wisdom",upgraded)
+        self.assertIn("portable_core",upgraded)
+        self.assertIn("vault",upgraded)
         self.assertIn("live_event_journal",upgraded)
         self.assertIn("subscriptions",upgraded["areas"])
         changed=update_operating_checkpoint(upgraded,tasks=[],events=[],dirty=True)
         self.assertTrue(changed["operating"]["dirty"])
         self.assertTrue(changed["operating"]["task_digest"])
         self.assertTrue(changed["operating"]["event_digest"])
+
+    def test_checkpoint_v10_portable_core_and_vault_roundtrip(self):
+        cp=default_checkpoint()
+        portable=dict(cp["portable_core"])
+        portable["connectors"]=[{
+            "connector_id":"github-dev",
+            "label":"GitHub Dev",
+            "protocol":"MCP",
+            "workspace_id":"development",
+            "state":"DISABLED",
+            "scopes":["read_repo"],
+            "secret_refs":["GITHUB_TOKEN_HISTORICO"],
+        }]
+        cp=update_portable_core_checkpoint(cp,portable_core=portable,dirty=True)
+        self.assertEqual(cp["portable_core"]["connectors"][0]["connector_id"],"github-dev")
+
+        vault=dict(cp["vault"])
+        vault["entries"]=[{
+            "entry_id":"checkpoint-backup",
+            "kind":"CHECKPOINT_BACKUP",
+            "backend":"RUNTIME_DATA",
+            "locator_ref":"dados/aion/checkpoint_master.json",
+            "state":"ACTIVE",
+            "content_digest":"abc123",
+            "version":"v10",
+            "metadata":{},
+        }]
+        cp=update_vault_checkpoint(cp,vault=vault,dirty=True)
+        self.assertEqual(cp["vault"]["entries"][0]["entry_id"],"checkpoint-backup")
+        self.assertEqual(checkpoint_integrity_report(cp)["state"],"CONFIRMED")
+
+    def test_vault_checkpoint_rejects_plaintext_secret_like_top_level_field(self):
+        cp=default_checkpoint()
+        bad=dict(cp["vault"])
+        bad["token"]="plaintext-is-forbidden"
+        with self.assertRaises(ValueError):
+            update_vault_checkpoint(cp,vault=bad,dirty=True)
 
     def test_integrity_report_confirms_v7_and_detects_tampering(self):
         cp=default_checkpoint()
@@ -216,7 +262,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         })
         self.assertTrue(preflight["allowed"])
         self.assertEqual(preflight["mode"],"UPDATE_MIGRATION")
-        self.assertIn("V9",preflight["reason"])
+        self.assertIn("V10",preflight["reason"])
 
     def test_integrity_mismatch_blocks_runtime_write_preflight(self):
         tampered=default_checkpoint()
