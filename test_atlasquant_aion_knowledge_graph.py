@@ -15,6 +15,13 @@ class AtlasQuantAionKnowledgeGraphTests(unittest.TestCase):
                 truth_state="CONFIRMED",evidence_refs=[],
             )
 
+    def test_any_confirmed_relationship_requires_evidence(self):
+        with self.assertRaises(ValueError):
+            new_edge(
+                "lesson:abc","CONTRADICTS","lesson:def",
+                truth_state="CONFIRMED",evidence_refs=[],
+            )
+
     def test_unconfirmed_causality_is_rejected(self):
         with self.assertRaises(ValueError):
             new_edge(
