@@ -197,6 +197,7 @@ from atlasquant_aion_resilience import (
     safe_mode_posture,
     watchdog,
 )
+from atlasquant_aion_memory_reliability import memory_reliability_summary
 from atlasquant_aion_portable import (
     central_entry_contract,
     portable_core_summary,
@@ -3707,6 +3708,23 @@ def _render_laboratory(
     rr2.metric("Delegações ativas", int(resilience_state.get("active_delegations") or 0))
     rr3.metric("Circuitos abertos", int(resilience_state.get("open_circuits") or 0))
     rr4.metric("Isolamento recomendado", int(resilience_state.get("isolate_recommendations") or 0))
+
+    memory_health = memory_reliability_summary(
+        checkpoint.get("memory_reliability")
+        if isinstance(checkpoint.get("memory_reliability"), Mapping)
+        else {}
+    )
+    st.markdown("#### 🧠 Confiabilidade da memória · Epistemic Core")
+    mr1,mr2,mr3,mr4 = st.columns(4)
+    mr1.metric("Memórias confirmadas", int(memory_health.get("current_confirmed") or 0))
+    mr2.metric("Reverificar", int(memory_health.get("verify_required") or 0))
+    mr3.metric("Expiradas", int(memory_health.get("expired") or 0))
+    mr4.metric("Conflitos", int(memory_health.get("conflicts") or 0))
+    st.caption(
+        f"Decision snapshots/replay: {int(memory_health.get('decision_snapshots') or 0)} · "
+        "memória nunca autoriza ação, não amplia permissão e lembrança vencida/contraditória "
+        "não pode ser promovida silenciosamente a fato atual."
+    )
 
     external_worker_preview = agent_firewall(
         source_kind="EXTERNAL_AI",
