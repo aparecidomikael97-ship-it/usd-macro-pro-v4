@@ -41,6 +41,17 @@ class AtlasQuantAionCapabilityPlannerTests(unittest.TestCase):
         self.assertEqual(market["state"], "EVIDENCE_REQUIRED")
         self.assertEqual(plan["readiness"], "BLOCKED_OR_DEPENDENT")
 
+    def test_confirmed_live_market_read_is_available_without_action_approval(self):
+        plan = plan_agentic_mission(
+            "analise o forex agora",
+            access=self.admin,
+            system_context={"source_mesh":{"market_live_confirmed":True}},
+        )
+        market = [x for x in plan["stages"] if x["capability_id"]=="market_snapshot"][0]
+        self.assertEqual(market["state"], "AVAILABLE_LOCAL")
+        self.assertFalse(market["requires_explicit_approval"])
+        self.assertFalse(market["executes_action"])
+
     def test_deploy_plan_exposes_feature_and_approval_gate_without_action(self):
         plan = plan_agentic_mission(
             "corrigir a interface e fazer deploy no Render",
