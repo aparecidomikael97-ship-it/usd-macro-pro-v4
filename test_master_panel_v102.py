@@ -19,6 +19,7 @@ from master_panel_v102 import (
     _scanner_for_pair,
     _technical_temporal_status,
     _execution_display,
+    master_operational_model,
 )
 
 
@@ -161,6 +162,40 @@ class MasterPanelTests(unittest.TestCase):
         self.assertEqual(usd["Status temporal"],"ATUAL")
         self.assertIn("UTC",usd["Hora da leitura"])
         self.assertTrue(usd["Autorização"].startswith("✅"))
+
+    def test_master_shared_operational_state_authorizes_only_current_explicit_state(self):
+        rows=build_master_rows(self.matrix(),self.contexts(),self.scanner(True))
+        usd=next(r for r in rows if r["Par"]=="USD/CHF")
+        model=master_operational_model(usd)
+        self.assertTrue(model["authorized"])
+        self.assertEqual(model["freshness_code"],"CURRENT")
+        self.assertEqual(model["authorization"],"AUTORIZADA PELO ESTADO ATUAL")
+        self.assertFalse(model["real_orders_enabled"])
+        self.assertIn("Painel Mestre",model["evidence_source"])
+
+    def test_master_shared_operational_state_downgrades_expired_authorization(self):
+        row={
+            "Par":"USD/CHF",
+            "Viés macro":"COMPRA USD/CHF",
+            "Estado":"🟢 EXECUTÁVEL",
+            "Qualidade":84,
+            "Status temporal":"EXPIRADA — REVALIDAR",
+            "Hora da leitura":"24/09/2026 18:00 UTC",
+            "Autorização":"✅ AUTORIZADA PELO ESTADO ATUAL",
+            "Motivo":"scanner antigo",
+        }
+        model=master_operational_model(row)
+        self.assertFalse(model["authorized"])
+        self.assertEqual(model["state"],"REVALIDAR")
+        self.assertEqual(model["authorization"],"NÃO AUTORIZADA")
+
+    def test_master_ui_renders_shared_spine_without_changing_engine_fields(self):
+        from pathlib import Path
+        src=Path("master_panel_v102.py").read_text(encoding="utf-8")
+        self.assertIn("operational_strip_html(_master_operational)",src)
+        self.assertIn("não altera Gate, Índice Integrado, técnica ou autorização",src)
+        self.assertIn('"Gate": ctx.get("readiness_grade"',src)
+        self.assertIn('"Índice Integrado": round',src)
 
     def test_master_panel_ui_explicitly_says_macro_bias_is_not_entry(self):
         from pathlib import Path

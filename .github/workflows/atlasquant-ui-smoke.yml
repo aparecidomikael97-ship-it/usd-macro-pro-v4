@@ -219,11 +219,12 @@ jobs:
               return (hi+0.05)/(lo+0.05)
 
           def metric_contrast_report(page):
-              # Streamlit replaces metric nodes during reruns. Read the whole
-              # metric set atomically instead of evaluating one locator at a
-              # time, and retry transient DOM replacement without hiding a
-              # persistent measurement failure.
+              # Streamlit replaces/fades metric nodes during reruns. Read the
+              # whole set atomically and retry both DOM replacement and a
+              # transient unreadable/transparent frame. Persistent low contrast
+              # still fails after the final attempt.
               last_error=""
+              last_report=None
               for attempt in range(1,4):
                   try:
                       raw=page.locator('[data-testid="stMetricValue"]').evaluate_all(
@@ -251,7 +252,7 @@ jobs:
                                   and float(style.get("opacity",1))>=0.95
                               ),
                           })
-                      return {
+                      last_report={
                           "count":len(samples),
                           "samples":samples,
                           "min_ratio":(
@@ -262,9 +263,14 @@ jobs:
                           "all_readable":all(x["readable"] for x in samples) if samples else True,
                           "measurement_error":"",
                       }
+                      if last_report["all_readable"] or attempt>=3:
+                          return last_report
+                      page.wait_for_timeout(350*attempt)
                   except Exception as exc:
                       last_error=f"{type(exc).__name__}: {exc}"
                       page.wait_for_timeout(350*attempt)
+              if last_report is not None:
+                  return last_report
               return {
                   "count":0,
                   "samples":[],

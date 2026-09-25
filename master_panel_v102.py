@@ -24,6 +24,11 @@ import requests
 import streamlit as st
 from twelve_cache_v1108 import cached_series, clear_shared_cache
 from atlasquant_runtime_store import resolve_runtime_branch
+from atlasquant_operational_state import (
+    OPERATIONAL_SPINE_CSS,
+    operational_presentation,
+    operational_strip_html,
+)
 
 from market_map_core_v10 import (
     NY_TZ,
@@ -518,6 +523,28 @@ def build_master_rows(matrix: pd.DataFrame, contexts: Mapping[str, Any], scanner
 
 
 
+def master_operational_model(row: Mapping[str, Any] | None) -> dict[str, Any]:
+    r=dict(row or {})
+    authorized=str(r.get("Autorização") or "").startswith("✅")
+    next_action=(
+        "Continuar pelo fluxo operacional de risco/gestão. Esta faixa não envia ordem."
+        if authorized
+        else str(r.get("Motivo") or "Revalidar filtros, gatilho e horário antes de qualquer entrada.")
+    )
+    return operational_presentation(
+        pair=r.get("Par"),
+        bias=r.get("Viés macro",r.get("Viés")),
+        state=r.get("Estado"),
+        quality=r.get("Qualidade"),
+        data_score=None,
+        temporal_label=r.get("Status temporal"),
+        reference_display=r.get("Hora da leitura"),
+        authorized=authorized,
+        evidence_source="Painel Mestre · Matriz + Market Map + Scanner",
+        next_action=next_action,
+    )
+
+
 def master_overview_state(*, pairs: int, processed: int, scanner_fresh: int) -> dict[str,str]:
     try: p=max(0,int(pairs)); m=max(0,int(processed)); s=max(0,int(scanner_fresh))
     except Exception: return {"label":"REVISAR","detail":"Estado operacional inválido"}
@@ -532,6 +559,7 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
                         scanner_state: Mapping[str, Any] | None = None,
                         scanner_refresh_cb: Callable[[], tuple[bool, str]] | None = None,
                         scanner_refresh_remaining: int = 0) -> None:
+    st.markdown(OPERATIONAL_SPINE_CSS,unsafe_allow_html=True)
     st.subheader("🧠 Painel Mestre de Oportunidades — V10.7.4")
     st.caption(
         "Decisão Automática + Macro Market Map + H4/H1/M15 + ADR14 em uma única visão dos 7 pares. "
@@ -679,6 +707,15 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
     df = pd.DataFrame(rows).sort_values(["_rank", "Índice Integrado", "Score"], ascending=[False, False, False], kind="stable")
 
     best = df.iloc[0]
+    _master_operational=master_operational_model(best.to_dict())
+    st.markdown(
+        operational_strip_html(_master_operational),
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        "Esta faixa usa exatamente o estado já calculado pelo Painel Mestre. "
+        "Ela não altera Gate, Índice Integrado, técnica ou autorização."
+    )
     st.markdown("### 🏆 Melhor contexto consolidado agora")
     with st.container(border=True):
         b1, b2, b3 = st.columns(3)

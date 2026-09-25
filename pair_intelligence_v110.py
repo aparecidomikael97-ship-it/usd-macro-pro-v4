@@ -44,6 +44,11 @@ from atlasquant_signal_lifecycle import (
     SIGNAL_LIFECYCLE_PATH,
     annotate_packs_with_lifecycle,
 )
+from atlasquant_operational_state import (
+    OPERATIONAL_SPINE_CSS,
+    operational_presentation,
+    operational_strip_html,
+)
 
 try:
     from currency_news_v107 import pair_news_table
@@ -447,6 +452,49 @@ def _stack_rows(p:Mapping[str,Any])->pd.DataFrame:
     return pd.DataFrame(rows,columns=["Camada","Leitura","Estado","Score"])
 
 
+def decision_operational_model(
+    pack: Mapping[str, Any] | None,
+    safety_result: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    p=dict(pack or {})
+    safety=dict(safety_result or {})
+    signal=dict(p.get("signal_lifecycle",{}) or {})
+    signal_code=str(signal.get("status_code") or "UNVERIFIED").upper()
+    reference=str(signal.get("reference_display") or "")
+    age=signal.get("age_minutes")
+    if signal_code=="EXPIRED":
+        temporal_code="EXPIRED"
+    elif signal_code in {"UNVERIFIED","BLOCKED","NO_SIGNAL"} or not reference or age is None:
+        temporal_code="UNVERIFIED"
+    elif signal_code in {"CONFIRMED","POSSIBLE"}:
+        temporal_code="CURRENT"
+    else:
+        temporal_code="UNKNOWN"
+
+    dr=dict(p.get("data_ready",{}) or {})
+    safety_green=str(safety.get("traffic_light") or "").upper()=="GREEN"
+    authorized=bool(p.get("executable",False)) and bool(dr.get("sufficient",False)) and safety_green
+    next_action=str(p.get("next_action") or "Aguardar confirmação válida.")
+    if authorized:
+        next_action=(
+            "Estado alinhado sem veto adicional do Safety Core. "
+            "Ainda confirme risco/gestão; esta tela não envia ordem real."
+        )
+    return operational_presentation(
+        pair=p.get("pair"),
+        bias=p.get("direction"),
+        state=p.get("state"),
+        quality=p.get("quality"),
+        data_score=dr.get("score"),
+        temporal_code=temporal_code,
+        temporal_label=signal.get("status_label"),
+        reference_display=reference,
+        authorized=authorized,
+        evidence_source="Decisão · pack institucional + Safety Core",
+        next_action=next_action,
+    )
+
+
 def atlasquant_operational_card(pack: Mapping[str, Any]) -> dict[str, Any]:
     """Presentation state derived only from already-audited institutional output."""
     p = dict(pack or {})
@@ -602,6 +650,7 @@ def load_current_pair_intelligence(matrix:pd.DataFrame, ranking:pd.DataFrame, *,
 
 def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:Mapping[str,Any]|None=None,macro_context:Mapping[str,Any]|None=None,weights:Mapping[str,float]|None=None,runtime_snapshot:Mapping[str,Any]|None=None):
     _css()
+    st.markdown(OPERATIONAL_SPINE_CSS,unsafe_allow_html=True)
     st.markdown("## Central institucional")
     st.caption("7 pares · Leia de cima para baixo: decisão → proteção → plano → detalhes. Prioridade não é probabilidade de lucro.")
     if matrix is None or matrix.empty:
@@ -645,11 +694,20 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
         render_regime_detector(best, capture_result=_regime_result)
 
     st.markdown('<div class="aq-stage-label">02 · Proteção operacional</div>', unsafe_allow_html=True)
-    render_safety_core(
+    _safety_result = render_safety_core(
         best,
         auto,
         regime_supported_override=_regime_result.get("supported"),
         major_event_minutes_override=_event_result.get("safety_minutes"),
+    )
+    _decision_operational = decision_operational_model(best, _safety_result)
+    st.markdown(
+        operational_strip_html(_decision_operational),
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        "A faixa consolida o estado já calculado pelo motor + Safety Core. "
+        "Mesmo quando autorizada pelo estado atual, ordens reais continuam fora desta camada."
     )
     _render_atlasquant_operational_cards(packs)
 

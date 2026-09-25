@@ -3,6 +3,7 @@ import unittest
 from atlasquant_home_radar import (
     home_rows_from_packs,
     home_summary,
+    radar_operational_model,
     voice_script_for_row,
     RADAR_VISIBLE_LIMIT,
 )
@@ -186,6 +187,39 @@ class AtlasQuantHomeRadarTests(unittest.TestCase):
         self.assertEqual(before,"VENDA")
         self.assertEqual(after["action"],"VENDA")
         self.assertEqual(session_profile_match("NEW_YORK","Noite/madrugada · Ásia + Londres"),"OUTSIDE")
+
+    def test_radar_shared_operational_state_never_authorizes_entry(self):
+        row=home_rows_from_packs([_pack()])[0]
+        model=radar_operational_model(row)
+        self.assertEqual(model["pair"],"EUR/USD")
+        self.assertEqual(model["bias"],"COMPRA")
+        self.assertEqual(model["freshness_code"],"CURRENT")
+        self.assertEqual(model["authorization"],"NÃO AUTORIZADA")
+        self.assertFalse(model["authorized"])
+        self.assertFalse(model["real_orders_enabled"])
+        self.assertIn("Radar",model["evidence_source"])
+
+    def test_radar_expired_signal_requires_revalidation_in_shared_state(self):
+        p=_pack()
+        p["signal_lifecycle"].update({
+            "status_code":"EXPIRED",
+            "status_label":"EXPIRADA — REVALIDAR",
+            "age_minutes":75.0,
+        })
+        row=home_rows_from_packs([p])[0]
+        model=radar_operational_model(row)
+        self.assertEqual(model["state"],"REVALIDAR")
+        self.assertTrue(model["requires_revalidation"])
+        self.assertFalse(model["authorized"])
+
+    def test_radar_ui_renders_shared_spine_before_detailed_metrics(self):
+        from pathlib import Path
+        src=Path("atlasquant_home_radar.py").read_text(encoding="utf-8")
+        selected=src.index('row=next(r for r in rows if r["pair"]==selected)')
+        spine=src.index("operational_strip_html(_operational_model)",selected)
+        details=src.index('st.markdown("### Por que está assim?")',spine)
+        self.assertLess(spine,details)
+        self.assertIn("esta tela não é o gate final de entrada",src)
 
     def test_signal_status_time_age_and_validity_are_preserved_for_display(self):
         row=home_rows_from_packs([_pack()])[0]
