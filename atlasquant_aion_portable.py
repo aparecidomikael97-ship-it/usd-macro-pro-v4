@@ -165,6 +165,9 @@ def new_connector(
     refs: list[str] = []
     for ref in list(secret_refs or [])[:30]:
         text = _clean(ref, 160)
+        lowered = text.casefold()
+        if lowered.startswith(("sk-", "ghp_", "github_pat_", "bearer ")) or "-----begin private key-----" in lowered:
+            raise ValueError("secret value detected where connector secret reference was expected")
         if text and text not in refs:
             refs.append(text)
 
@@ -177,7 +180,9 @@ def new_connector(
         "scopes": scope_rows,
         "secret_refs": refs,
         "external_side_effects": bool(external_side_effects),
-        "enabled": normalized_state == "READY",
+        "configuration_ready": normalized_state == "READY",
+        "enabled": False,
+        "activation_approved": False,
         "requires_guardian": True,
         "requires_proof_of_safety_for_sensitive_actions": True,
         "may_expand_own_permissions": False,
