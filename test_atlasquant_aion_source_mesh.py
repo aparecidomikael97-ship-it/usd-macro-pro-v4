@@ -125,6 +125,31 @@ class AtlasQuantAionSourceMeshTests(unittest.TestCase):
         self.assertEqual(row["criticality"],"CRITICAL")
         self.assertEqual(row["age_minutes"],15.0)
 
+    def test_runtime_snapshot_never_becomes_live_market_confirmation(self):
+        out=source_mesh_snapshot(
+            macro_us={"_auditoria":[]},
+            next_event={"disponivel":False},
+            autopilot_status={
+                "last_run":"2026-09-25T08:30:00+00:00",
+                "healthy":True,
+                "forex_market_open":True,
+                "scanner_fresh":7,
+                "scanner_ready":True,
+                "market_map_fresh":7,
+                "market_map_ready":True,
+                "twelve_daily_blocked":False,
+                "twelve_rate_safe":True,
+            },
+            autopilot_provenance="GitHub:atlasquant-runtime",
+            pair_matrix_status={
+                "ready":True,"live_ready":False,"source":"runtime_snapshot",
+                "pairs_expected":7,"pairs_built":7,"fallback_age_minutes":10,
+            },
+            now=NOW,
+        )
+        self.assertFalse(out["market_live_confirmed"])
+        self.assertEqual(out["market_state"],"UNCONFIRMED")
+
     def test_source_mesh_is_read_only_and_combines_runtime_families(self):
         out=source_mesh_snapshot(
             macro_us={"_auditoria":[]},
@@ -148,6 +173,8 @@ class AtlasQuantAionSourceMeshTests(unittest.TestCase):
         self.assertGreaterEqual(out["observation_count"],6)
         self.assertIn("autopilot",out["families"])
         self.assertIn("decision_core",out["families"])
+        self.assertEqual(out["market_state"],"LIVE_CONFIRMED")
+        self.assertTrue(out["market_live_confirmed"])
         self.assertFalse(out["performs_network_request"])
         self.assertFalse(out["changes_market_scores"])
         self.assertFalse(out["automatic_source_switch"])
