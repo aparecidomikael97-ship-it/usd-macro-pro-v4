@@ -25,6 +25,8 @@ from atlasquant_aion_memory import (
     update_learning_checkpoint,
     update_portable_core_checkpoint,
     update_vault_checkpoint,
+    update_tool_hub_checkpoint,
+    update_durable_tasks_checkpoint,
     update_wisdom_checkpoint,
     update_live_event_journal_checkpoint,
     update_operating_checkpoint,
@@ -133,7 +135,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("creative fusion studio", joined)
         self.assertIn("motor universal de performance", joined)
         self.assertEqual(upgraded["aion"]["foundation_revision"], FOUNDATION_REVISION)
-        self.assertGreaterEqual(upgraded["checkpoint_version"], 10)
+        self.assertGreaterEqual(upgraded["checkpoint_version"], 11)
 
     def test_default_checkpoint_is_safe_and_has_no_real_trading(self):
         cp = default_checkpoint()
@@ -170,6 +172,11 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("vault",cp)
         self.assertTrue(cp["vault"]["digest"])
         self.assertFalse(cp["vault"]["plaintext_secrets_present"])
+        self.assertIn("tool_hub",cp)
+        self.assertTrue(cp["tool_hub"]["digest"])
+        self.assertIn("durable_tasks",cp)
+        self.assertEqual(cp["durable_tasks"]["records"],[])
+        self.assertTrue(cp["durable_tasks"]["digest"])
         self.assertEqual(cp["live_event_journal"]["events"],[])
         self.assertEqual(cp["live_event_journal"]["heartbeats"],[])
         self.assertTrue(cp["live_event_journal"]["digest"])
@@ -178,7 +185,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
     def test_older_checkpoint_is_upgraded_without_claiming_persistence(self):
         old={"checkpoint_version":1,"project":"AtlasQuant"}
         upgraded=ensure_operating_checkpoint(old)
-        self.assertEqual(upgraded["checkpoint_version"],10)
+        self.assertEqual(upgraded["checkpoint_version"],11)
         self.assertIn("operating",upgraded)
         self.assertIn("studio",upgraded)
         self.assertIn("business",upgraded)
@@ -189,6 +196,8 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("wisdom",upgraded)
         self.assertIn("portable_core",upgraded)
         self.assertIn("vault",upgraded)
+        self.assertIn("tool_hub",upgraded)
+        self.assertIn("durable_tasks",upgraded)
         self.assertIn("live_event_journal",upgraded)
         self.assertIn("subscriptions",upgraded["areas"])
         changed=update_operating_checkpoint(upgraded,tasks=[],events=[],dirty=True)
@@ -233,6 +242,39 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             update_vault_checkpoint(cp,vault=bad,dirty=True)
 
+    def test_checkpoint_v11_tool_hub_and_durable_tasks_roundtrip(self):
+        cp=default_checkpoint()
+        hub=dict(cp["tool_hub"])
+        hub["tools"]=list(hub["tools"])+[{
+            "tool_id":"dev.local.inspect",
+            "label":"Inspect local",
+            "workspace_id":"development",
+            "connector_id":"",
+            "kind":"READ",
+            "guardian_action":"read",
+            "state":"LOCAL_READY",
+            "required_scopes":["repo:read"],
+            "external_side_effects":False,
+        }]
+        cp=update_tool_hub_checkpoint(cp,tool_hub=hub,dirty=True)
+        self.assertTrue(any(x["tool_id"]=="dev.local.inspect" for x in cp["tool_hub"]["tools"]))
+
+        records=[{
+            "durable_task_id":"DUR-TEST",
+            "title":"Retomar bloco",
+            "objective":"Preservar cursor.",
+            "domain":"development",
+            "state":"PAUSED",
+            "steps":[{"step_id":"S001","title":"Validar","state":"PENDING"}],
+            "cursor":0,
+            "revision":1,
+            "checkpoint_digest":"cp",
+            "created_at":"2026-09-25T16:00:00+00:00",
+        }]
+        cp=update_durable_tasks_checkpoint(cp,records=records,dirty=True)
+        self.assertEqual(cp["durable_tasks"]["records"][0]["durable_task_id"],"DUR-TEST")
+        self.assertEqual(checkpoint_integrity_report(cp)["state"],"CONFIRMED")
+
     def test_integrity_report_confirms_v7_and_detects_tampering(self):
         cp=default_checkpoint()
         report=checkpoint_integrity_report(cp)
@@ -262,7 +304,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         })
         self.assertTrue(preflight["allowed"])
         self.assertEqual(preflight["mode"],"UPDATE_MIGRATION")
-        self.assertIn("V10",preflight["reason"])
+        self.assertIn("V11",preflight["reason"])
 
     def test_integrity_mismatch_blocks_runtime_write_preflight(self):
         tampered=default_checkpoint()

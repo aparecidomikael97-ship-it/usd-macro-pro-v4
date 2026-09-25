@@ -45,6 +45,8 @@ from atlasquant_aion_memory import (
     update_continuity_checkpoint,
     update_learning_checkpoint,
     update_wisdom_checkpoint,
+    update_tool_hub_checkpoint,
+    update_durable_tasks_checkpoint,
     update_live_event_journal_checkpoint,
     update_operating_checkpoint,
     update_promotions_checkpoint,
@@ -185,6 +187,17 @@ from atlasquant_aion_portable import (
     portable_core_summary,
 )
 from atlasquant_aion_vault import vault_summary
+from atlasquant_aion_tool_hub import (
+    plan_tool_call,
+    tool_hub_summary,
+)
+from atlasquant_aion_durable_tasks import (
+    durable_tasks_summary,
+    new_durable_task,
+    prepare_resume,
+    record_resume,
+    upsert_durable_task,
+)
 from atlasquant_aion_cognitive_orchestrator import orchestrator_snapshot
 from atlasquant_aion_event_journal import (
     continuity_summary as live_event_continuity_summary,
@@ -3715,6 +3728,189 @@ def _render_development(
                 except Exception as exc:
                     st.error(f"Não foi possível atualizar a missão: {type(exc).__name__}")
 
+    st.markdown("#### 🔌 Tool Hub / MCP + Tarefas Duráveis")
+    tool_hub = checkpoint.get("tool_hub") if isinstance(checkpoint.get("tool_hub"), Mapping) else {}
+    portable_core = checkpoint.get("portable_core") if isinstance(checkpoint.get("portable_core"), Mapping) else {}
+    durable_section = checkpoint.get("durable_tasks") if isinstance(checkpoint.get("durable_tasks"), Mapping) else {}
+    durable_records = list(durable_section.get("records", []) or [])
+    hub_state = tool_hub_summary(tool_hub, portable_core)
+    durable_state = durable_tasks_summary(durable_records)
+
+    th1,th2,th3,th4 = st.columns(4)
+    th1.metric("Ferramentas registradas", int(hub_state.get("tools") or 0))
+    th2.metric("Locais prontas", int(hub_state.get("local_ready") or 0))
+    th3.metric("Tarefas retomáveis", int(durable_state.get("resumable") or 0))
+    th4.metric("Aguardando aprovação", int(durable_state.get("waiting_approval") or 0))
+    st.caption(
+        "Tool Hub organiza NATIVE/API/MCP/FILE/WEBHOOK, mas não chama ferramenta nesta tela. "
+        "Retomar uma tarefa restaura contexto/cursor; não executa o próximo passo automaticamente."
+    )
+
+    tools = [
+        dict(item) for item in list(tool_hub.get("tools", []) or [])
+        if isinstance(item, Mapping)
+    ]
+    if tools:
+        with st.expander("Catálogo do Tool Hub", expanded=False):
+            st.dataframe([
+                {
+                    "Tool":item.get("tool_id"),
+                    "Workspace":item.get("workspace_id"),
+                    "Conector":item.get("connector_id") or "local",
+                    "Tipo":item.get("kind"),
+                    "Estado":item.get("state"),
+                    "Efeito externo":"SIM" if item.get("external_side_effects") else "NÃO",
+                }
+                for item in tools
+            ], width="stretch", hide_index=True)
+            tool_ids=[str(item.get("tool_id") or "") for item in tools if str(item.get("tool_id") or "")]
+            if tool_ids:
+                selected_tool=st.selectbox(
+                    "Ferramenta para pré-voo (não executa)",
+                    tool_ids,
+                    key="aion_tool_hub_preview_tool",
+                )
+                if st.button("Ver pré-voo do Tool Hub", key="aion_tool_hub_preview"):
+                    preview=plan_tool_call(
+                        selected_tool,
+                        hub=tool_hub,
+                        portable_core=portable_core,
+                        access=access,
+                        source_kind="ADMIN",
+                        authenticated_admin=is_admin(access),
+                        approved=False,
+                        feature_flags=flags,
+                        scope="Pré-voo consultivo na Central de Desenvolvimento.",
+                        uncertainty_pct=10,
+                        impact="LOW",
+                        reversible=True,
+                    )
+                    st.session_state["aion_tool_hub_preview_result"]=preview
+                preview=st.session_state.get("aion_tool_hub_preview_result")
+                if isinstance(preview, Mapping):
+                    st.caption(
+                        f"Estado: {preview.get('state')} · tool_called: {preview.get('tool_called',False)} · "
+                        f"connector_called: {preview.get('connector_called',False)}."
+                    )
+                    for blocker in list(preview.get("blockers") or [])[:8]:
+                        st.markdown(f"- {blocker}")
+
+    with st.expander("Registrar tarefa durável", expanded=False):
+        with st.form("aion_durable_task_new", clear_on_submit=True):
+            durable_title=st.text_input("Título da tarefa durável")
+            durable_objective=st.text_area("Objetivo", max_chars=1400)
+            durable_steps_text=st.text_area(
+                "Passos — um por linha",
+                value="Especificar\nImplementar em Sandbox\nRodar testes\nRevisar evidências",
+                max_chars=3000,
+            )
+            create_durable=st.form_submit_button("Registrar tarefa durável", type="primary")
+        if create_durable:
+            try:
+                step_titles=[x.strip() for x in durable_steps_text.splitlines() if x.strip()]
+                step_rows=[
+                    {
+                        "step_id":f"S{idx:03d}",
+                        "title":title,
+                        "state":"PENDING",
+                        "guardian_action":"read",
+                        "requires_approval":False,
+                    }
+                    for idx,title in enumerate(step_titles,start=1)
+                ]
+                durable=new_durable_task(
+                    durable_title,
+                    objective=durable_objective,
+                    domain="development",
+                    steps=step_rows,
+                    checkpoint_digest=checkpoint_source_digest(source_checkpoint),
+                    source=str(access.get("username") or "ADMIN"),
+                )
+                durable_records=upsert_durable_task(durable_records,durable)
+                updated=update_durable_tasks_checkpoint(
+                    checkpoint,
+                    records=durable_records,
+                    dirty=True,
+                )
+                updated=_record_working_event(
+                    updated,
+                    "durable_task_registered",
+                    f"Tarefa durável registrada: {durable['title']}",
+                    evidence={
+                        "durable_task_id":durable["durable_task_id"],
+                        "steps":len(durable["steps"]),
+                        "automatic_resume_executes":False,
+                    },
+                )
+                _set_working_checkpoint(updated,dirty=True)
+                st.success("Tarefa durável registrada no Checkpoint de trabalho.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Não foi possível registrar a tarefa durável: {type(exc).__name__}")
+
+    if durable_records:
+        with st.expander("Retomar tarefa durável", expanded=False):
+            durable_options={
+                f"{item.get('durable_task_id')} · {item.get('title')}":item
+                for item in durable_records
+                if isinstance(item,Mapping)
+            }
+            durable_label=st.selectbox(
+                "Tarefa",
+                list(durable_options.keys()),
+                key="aion_durable_resume_selected",
+            )
+            selected_durable=durable_options[durable_label]
+            if st.button("Preparar retomada",key="aion_durable_prepare_resume"):
+                resume=prepare_resume(
+                    selected_durable,
+                    expected_revision=selected_durable.get("revision"),
+                    checkpoint_digest=checkpoint_source_digest(source_checkpoint),
+                )
+                st.session_state["aion_durable_resume_preview"]=resume
+            resume=st.session_state.get("aion_durable_resume_preview")
+            if isinstance(resume,Mapping):
+                st.write(
+                    f"**Retomada:** {resume.get('state')} · cursor {resume.get('cursor')} · "
+                    f"revisão {resume.get('revision')}"
+                )
+                next_step=resume.get("next_step")
+                if isinstance(next_step,Mapping):
+                    st.info(
+                        f"Próximo passo registrado: **{next_step.get('title')}** · "
+                        f"estado {next_step.get('state')}."
+                    )
+                for blocker in list(resume.get("blockers") or [])[:8]:
+                    st.warning(str(blocker))
+                st.caption("Retomada restaura estado; execução automática: NÃO.")
+            if st.button("Registrar evento de retomada",key="aion_durable_record_resume"):
+                try:
+                    resumed=record_resume(
+                        selected_durable,
+                        checkpoint_digest=checkpoint_source_digest(source_checkpoint),
+                    )
+                    durable_records=upsert_durable_task(durable_records,resumed)
+                    updated=update_durable_tasks_checkpoint(
+                        checkpoint,
+                        records=durable_records,
+                        dirty=True,
+                    )
+                    updated=_record_working_event(
+                        updated,
+                        "durable_task_resumed",
+                        f"Contexto de tarefa durável retomado: {resumed['durable_task_id']}",
+                        evidence={
+                            "durable_task_id":resumed["durable_task_id"],
+                            "resume_generation":resumed["resume_generation"],
+                            "automatic_execution":False,
+                        },
+                    )
+                    _set_working_checkpoint(updated,dirty=True)
+                    st.success("Retomada registrada como estado; nenhum passo foi executado.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Não foi possível registrar a retomada: {type(exc).__name__}")
+
     st.markdown("#### Checkpoint Mestre")
     st.caption(
         f"Proveniência ativa: {runtime_result.get('source') or runtime_result.get('status')}. "
@@ -4913,6 +5109,24 @@ def render_aion_admin_console(
         ),
         "checkpoint_dirty": bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
         "checkpoint_conflict": bool(st.session_state.get(_WORKING_CONFLICT_KEY, False)),
+        "tool_hub_tools": int(
+            tool_hub_summary(
+                checkpoint.get("tool_hub")
+                if isinstance(checkpoint.get("tool_hub"), Mapping)
+                else {},
+                checkpoint.get("portable_core")
+                if isinstance(checkpoint.get("portable_core"), Mapping)
+                else {},
+            ).get("tools") or 0
+        ),
+        "durable_tasks_resumable": int(
+            durable_tasks_summary(
+                list(
+                    ((checkpoint.get("durable_tasks") or {}) if isinstance(checkpoint.get("durable_tasks"), Mapping) else {}).get("records", [])
+                    or []
+                )
+            ).get("resumable") or 0
+        ),
         "portable_core_workspaces": int(
             portable_core_summary(
                 checkpoint.get("portable_core")

@@ -295,6 +295,19 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn('"continuity_active_missions"',src)
         self.assertIn('"continuity_handoff_count"',src)
 
+    def test_development_exposes_tool_hub_and_durable_resume_without_auto_execution(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Tool Hub / MCP + Tarefas Duráveis",src)
+        self.assertIn("tool_hub_summary(",src)
+        self.assertIn("plan_tool_call(",src)
+        self.assertIn("new_durable_task(",src)
+        self.assertIn("prepare_resume(",src)
+        self.assertIn("record_resume(",src)
+        self.assertIn("update_durable_tasks_checkpoint(",src)
+        self.assertIn("Retomada restaura estado; execução automática: NÃO.",src)
+        self.assertIn('"tool_hub_tools"',src)
+        self.assertIn('"durable_tasks_resumable"',src)
+
     def test_development_persists_structured_missions_without_executing_them(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("Missões persistentes",src)
