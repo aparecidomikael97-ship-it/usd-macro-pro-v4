@@ -46,8 +46,10 @@ jobs:
       - name: Verify and migrate current runtime checkpoint
         run: |
           set -euo pipefail
-          python atlasquant_aion_runtime_bootstrap.py --verify /tmp/runtime_before.json
+          # The migration helper verifies the source checkpoint and accepts
+          # only CONFIRMED or MIGRATION_REQUIRED. MISMATCH/UNKNOWN/dirty fail closed.
           python atlasquant_aion_runtime_migrate.py             --input /tmp/runtime_before.json             --output /tmp/runtime_after.json
+          # The migrated output must satisfy the strict current-schema verifier.
           python atlasquant_aion_runtime_bootstrap.py --verify /tmp/runtime_after.json
 
       - name: Conditionally persist migration
