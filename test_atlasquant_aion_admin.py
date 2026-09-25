@@ -689,6 +689,13 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("_render_trading(market, system)",src)
         self.assertIn("_render_live_event_intelligence({}, system_context, allow_memory_sync=False)",src)
 
+    def test_agentic_capability_planner_is_visible_without_auto_execution(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("🧭 Planejador Agentivo · capacidades + gates", src)
+        self.assertIn("plan_agentic_mission(", src)
+        self.assertIn("O plano não concede aprovação", src)
+        self.assertIn("não executa ferramenta, conector, deploy", src)
+
     def test_cognitive_orchestrator_preview_is_visible_in_aion_question_flow(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("orchestrator_snapshot(",src)
