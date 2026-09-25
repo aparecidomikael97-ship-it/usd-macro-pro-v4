@@ -582,13 +582,18 @@ def runtime_write_preflight(runtime_result: Mapping[str, Any] | None) -> dict[st
                 "expected_sha": "",
             }
         integrity = checkpoint_integrity_report(result.get("checkpoint"))
-        if integrity.get("state") == "MISMATCH":
+        if integrity.get("state") in {"MISMATCH", "UNKNOWN"}:
+            state = str(integrity.get("state") or "UNKNOWN")
             return {
                 "allowed": False,
                 "mode": "BLOCKED",
-                "reason": "Integridade do Checkpoint divergiu; escrita bloqueada até revisão.",
+                "reason": (
+                    "Integridade do Checkpoint divergiu; escrita bloqueada até revisão."
+                    if state == "MISMATCH" else
+                    "Integridade do Checkpoint não pôde ser verificada; escrita bloqueada."
+                ),
                 "expected_sha": sha,
-                "integrity_state": "MISMATCH",
+                "integrity_state": state,
             }
         migration = integrity.get("state") == "MIGRATION_REQUIRED"
         return {
