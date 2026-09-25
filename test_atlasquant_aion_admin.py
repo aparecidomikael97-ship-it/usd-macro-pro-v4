@@ -329,6 +329,27 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
             AION_ADMIN_CSS,
         )
 
+    def test_central_exposes_commander_auditor_and_evidence_confidence(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("🧭 Modo Comandante", src)
+        self.assertIn("AION Auditor · Evidências", src)
+        self.assertIn("Confiança da evidência", src)
+        self.assertIn("não probabilidade de lucro", src)
+        self.assertIn("commander_briefing(", src)
+        self.assertIn('"commander_posture"', src)
+        self.assertIn('"commander_evidence_confidence"', src)
+        self.assertIn('"commander_executes_action": False', src)
+
+    def test_trading_exposes_hypothesis_only_macro_scenario_simulator(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Simulador de Cenários Macro", src)
+        self.assertIn("simulate_macro_scenario(", src)
+        self.assertIn("scenario_events()", src)
+        self.assertIn("Não é previsão ao vivo", src)
+        self.assertIn("Sinal de trade", src)
+        self.assertIn("O que pode invalidar ou inverter esse cenário", src)
+        self.assertIn("precisa confirmar o dado divulgado", src)
+
     def test_admin_mobile_contrast_is_stronger_and_single_column_at_small_width(self):
         self.assertIn(".aion-pulse-grid",AION_ADMIN_CSS)
         self.assertIn("@media(max-width:430px)",AION_ADMIN_CSS)

@@ -12,6 +12,7 @@ import os
 from atlasquant_aion_core import feature_flag_snapshot, route_context
 from atlasquant_aion_continuity import continuity_briefing
 from atlasquant_aion_provider import provider_configuration_status
+from atlasquant_aion_intelligence import evidence_audit, evidence_confidence
 
 SCHEMA = "ATLASQUANT_AION_GATEWAY_V1"
 
@@ -198,13 +199,45 @@ def local_answer(
     if provider["state"] == "ZERO_COST_LOCAL":
         answer += " O modo atual é local e custo zero; um modelo externo mais potente ainda não foi ativado."
 
+    response_evidence = [{
+        "claim":"route",
+        "kind":"CONFIRMED",
+        "source":"aion_local_router",
+        "value":route["domain"],
+        "note":"Roteamento determinístico local.",
+    }]
+    system_truth = str(system.get("truth_state") or "UNKNOWN").upper()
+    response_evidence.append({
+        "claim":"system_context",
+        "kind":system_truth if system_truth in {"CONFIRMED","INFERENCE","HYPOTHESIS","UNKNOWN"} else "UNKNOWN",
+        "source":"system_context",
+        "value":system.get("source_build") or system.get("market_status") or "UNKNOWN",
+        "note":"Contexto fornecido pelo aplicativo; ausência não é promovida.",
+    })
+    for index, hit in enumerate(hits):
+        kind = str(hit.get("kind") or hit.get("truth_state") or "UNKNOWN").upper()
+        if kind not in {"CONFIRMED","INFERENCE","HYPOTHESIS","UNKNOWN"}:
+            kind = "UNKNOWN"
+        response_evidence.append({
+            "claim":str(hit.get("title") or hit.get("path") or f"memory_hit_{index+1}"),
+            "kind":kind,
+            "source":str(hit.get("source") or hit.get("path") or "canonical_memory"),
+            "value":str(hit.get("excerpt") or hit.get("content") or "")[:500],
+            "note":"Referência recuperada da memória canônica.",
+        })
+    response_audit = evidence_audit(response_evidence)
+    response_confidence = evidence_confidence(response_audit)
+
     return {
         "schema": SCHEMA,
         "answer": answer,
         "domain": route["domain"],
         "provider": provider,
         "evidence": hits,
+        "evidence_audit": response_audit,
+        "evidence_confidence": response_confidence,
         "truth_state": "CONFIRMED_LOCAL_CONTRACT",
+        "confidence_basis": "EVIDENCE_QUALITY_NOT_PROFIT_PROBABILITY",
         "executes_action": False,
         "real_orders_enabled": False,
     }

@@ -162,6 +162,13 @@ from atlasquant_aion_executive_pulse import (
 from atlasquant_navigation_bridge import request_surface_revalidation
 from atlasquant_interface_validation import interface_validation_mission
 from atlasquant_release_gate import release_gate, release_gate_rows
+from atlasquant_aion_intelligence import (
+    commander_briefing,
+    evidence_audit,
+    evidence_confidence,
+    scenario_events,
+    simulate_macro_scenario,
+)
 
 try:
     from atlasquant_neural_voice_ui import render_neural_voice_player
@@ -1056,6 +1063,80 @@ def _render_executive_pulse(snapshot: Mapping[str, Any]) -> None:
             st.dataframe(rows, width="stretch", hide_index=True)
 
 
+def _render_commander_intelligence(
+    checkpoint: Mapping[str, Any],
+    system_context: Mapping[str, Any],
+    executive_snapshot: Mapping[str, Any],
+) -> None:
+    snapshot = (
+        system_context.get("commander_snapshot")
+        if isinstance(system_context.get("commander_snapshot"), Mapping)
+        else commander_briefing(
+            checkpoint=checkpoint,
+            system_context=system_context,
+            executive_snapshot=executive_snapshot,
+        )
+    )
+    audit = snapshot.get("audit") if isinstance(snapshot.get("audit"), Mapping) else {}
+    confidence = (
+        snapshot.get("evidence_confidence")
+        if isinstance(snapshot.get("evidence_confidence"), Mapping)
+        else {}
+    )
+
+    st.markdown("#### 🧭 Modo Comandante")
+    st.caption(
+        "Organiza missão, bloqueios e próxima ação usando somente evidência disponível. "
+        "Não executa reparo, deploy, publicação nem trading."
+    )
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("Postura", str(snapshot.get("posture") or "UNKNOWN"))
+    c2.metric("Missões ativas", int(snapshot.get("active_missions") or 0))
+    c3.metric("Gate", str(snapshot.get("release_gate_state") or "UNKNOWN"))
+    c4.metric(
+        "Confiança da evidência",
+        f"{int(confidence.get('score') or 0)}/100",
+        delta=str(confidence.get("label") or "SEM_EVIDENCIA"),
+    )
+    st.info(
+        f"**Objetivo atual:** {snapshot.get('objective') or 'não confirmado'}\n\n"
+        f"**Próxima ação:** {snapshot.get('next_action') or 'não confirmada'}"
+    )
+    blockers = list(snapshot.get("blockers") or [])
+    if blockers:
+        st.warning("Bloqueios confirmados: " + " · ".join(str(x) for x in blockers[:4]))
+
+    with st.expander("🔎 AION Auditor · Evidências", expanded=False):
+        counts = audit.get("counts") if isinstance(audit.get("counts"), Mapping) else {}
+        a1,a2,a3,a4 = st.columns(4)
+        a1.metric("Confirmadas", int(counts.get("CONFIRMED") or 0))
+        a2.metric("Inferências", int(counts.get("INFERENCE") or 0))
+        a3.metric("Hipóteses", int(counts.get("HYPOTHESIS") or 0))
+        a4.metric("Desconhecidas", int(counts.get("UNKNOWN") or 0))
+        st.caption(
+            f"Fontes independentes: {int(audit.get('independent_sources') or 0)} · "
+            f"conflitos: {int(audit.get('conflict_count') or 0)} · "
+            "o score acima mede qualidade da evidência, não probabilidade de lucro."
+        )
+        rows = []
+        for row in list(audit.get("rows", []) or []):
+            if not isinstance(row, Mapping):
+                continue
+            rows.append({
+                "Afirmação": str(row.get("claim") or ""),
+                "Estado": str(row.get("kind") or "UNKNOWN"),
+                "Fonte": str(row.get("source") or "unknown"),
+                "Valor": str(row.get("value") or ""),
+            })
+        if rows:
+            st.dataframe(rows, width="stretch", hide_index=True)
+        if int(audit.get("conflict_count") or 0):
+            st.error(
+                "O Auditor encontrou evidências confirmadas conflitantes. "
+                "A confiança é automaticamente limitada e o AION não escolhe um lado escondido."
+            )
+
+
 def _render_master_status(board: Mapping[str, Any]) -> None:
     counts = board.get("counts") if isinstance(board.get("counts"), Mapping) else {}
     st.markdown("#### Painel Mestre de Estado")
@@ -1390,6 +1471,7 @@ def _render_central(
         ),
     )
     _render_executive_pulse(executive_snapshot)
+    _render_commander_intelligence(checkpoint, system_context, executive_snapshot)
     _render_release_gate(system_context)
     _render_publication_truth(system_context)
     _render_critical_surface_health(system_context)
@@ -1838,6 +1920,78 @@ def _render_trading(market_context: Mapping[str, Any]) -> None:
             f"O estado de mercado nesta tela é {market_truth}. Ordens reais permanecem bloqueadas."
         ),
         key="aion_trading_voice",
+    )
+
+    st.markdown("#### 🧪 Simulador de Cenários Macro")
+    st.caption(
+        "Simula mecanismos possíveis a partir de uma surpresa hipotética. "
+        "Não é previsão ao vivo, não é sinal e não representa probabilidade de lucro."
+    )
+    c_event,c_surprise = st.columns(2)
+    event = c_event.selectbox(
+        "Evento",
+        scenario_events(),
+        format_func=lambda x: {
+            "CPI":"CPI / inflação",
+            "PCE":"PCE",
+            "PAYROLL":"Payroll / NFP",
+            "FOMC":"FOMC / Fed",
+            "GEOPOLITICAL_RISK":"Risco geopolítico",
+        }.get(x,x),
+        key="aion_macro_scenario_event",
+    )
+    surprise = c_surprise.selectbox(
+        "Hipótese",
+        ("ABOVE","BELOW"),
+        format_func=lambda x: (
+            "Acima / mais forte / hawkish / escalada"
+            if x=="ABOVE"
+            else "Abaixo / mais fraco / dovish / desescalada"
+        ),
+        key="aion_macro_scenario_surprise",
+    )
+
+    live_evidence = [{
+        "claim":"market_context",
+        "kind":"CONFIRMED" if bool(market_context.get("fresh_confirmed",False)) else "UNKNOWN",
+        "source":"market_context",
+        "value":market_text,
+        "note":"Contexto fornecido à tela Trading.",
+    }]
+    scenario = simulate_macro_scenario(
+        event,
+        surprise,
+        evidence=live_evidence,
+    )
+    sc_conf = (
+        scenario.get("evidence_confidence")
+        if isinstance(scenario.get("evidence_confidence"), Mapping)
+        else {}
+    )
+    s1,s2,s3 = st.columns(3)
+    s1.metric("Estado", str(scenario.get("scenario_truth_kind") or "UNKNOWN"))
+    s2.metric("Evidência ao vivo", f"{int(sc_conf.get('score') or 0)}/100")
+    s3.metric("Sinal de trade", "NÃO")
+    st.write(f"**Cenário:** {scenario.get('headline') or 'não mapeado'}")
+    channels = list(scenario.get("channels") or [])
+    if channels:
+        st.dataframe([
+            {
+                "Ativo/canal":row.get("asset"),
+                "Possível reação":row.get("direction"),
+                "Mecanismo":row.get("mechanism"),
+                "Estado":row.get("truth_kind"),
+            }
+            for row in channels if isinstance(row, Mapping)
+        ], width="stretch", hide_index=True)
+    invalidators = list(scenario.get("invalidators") or [])
+    if invalidators:
+        with st.expander("O que pode invalidar ou inverter esse cenário"):
+            for item in invalidators:
+                st.markdown(f"- {item}")
+    st.warning(
+        "Antes de usar este cenário em leitura real, o AION precisa confirmar o dado divulgado, "
+        "consenso, revisões, componentes internos, preço e contexto atual."
     )
 
 
@@ -3412,6 +3566,38 @@ def render_aion_admin_console(
             "error_type":type(exc).__name__,
         })
 
+    try:
+        commander_snapshot = commander_briefing(
+            checkpoint=checkpoint,
+            system_context=system,
+            executive_snapshot=executive_snapshot,
+        )
+    except Exception as exc:
+        commander_snapshot = {
+            "schema":"ATLASQUANT_AION_OPERATIONAL_INTELLIGENCE_V1",
+            "mode":"COMMANDER",
+            "posture":"UNKNOWN",
+            "objective":"Não confirmado.",
+            "next_action":"Revisar a camada de inteligência operacional.",
+            "blockers":[],
+            "active_missions":0,
+            "release_gate_state":"UNKNOWN",
+            "publication_state":"UNKNOWN",
+            "executive_priority":"P2",
+            "executive_area":"🛠️ Desenvolvimento",
+            "audit":{"status":"UNKNOWN","counts":{},"rows":[],"independent_sources":0,"conflict_count":0},
+            "evidence_confidence":{"score":0,"label":"SEM_EVIDENCIA","is_profit_probability":False},
+            "executes_action":False,
+            "automatic_repair":False,
+            "automatic_deploy":False,
+            "real_orders_enabled":False,
+        }
+        foundation_diagnostics.append({
+            "component":"aion_operational_intelligence",
+            "error_type":type(exc).__name__,
+        })
+    system["commander_snapshot"] = commander_snapshot
+
     _render_header(
         access_map,
         str(runtime_result.get("status") or "UNKNOWN"),
@@ -3590,6 +3776,18 @@ def render_aion_admin_console(
         "release_gate_next_stage": str(
             release_gate_state.get("next_stage") or ""
         ),
+        "commander_posture": str(commander_snapshot.get("posture") or "UNKNOWN"),
+        "commander_objective": str(commander_snapshot.get("objective") or ""),
+        "commander_next_action": str(commander_snapshot.get("next_action") or ""),
+        "commander_evidence_confidence": int(
+            ((commander_snapshot.get("evidence_confidence") or {}) if isinstance(commander_snapshot.get("evidence_confidence"), Mapping) else {}).get("score")
+            or 0
+        ),
+        "commander_evidence_label": str(
+            ((commander_snapshot.get("evidence_confidence") or {}) if isinstance(commander_snapshot.get("evidence_confidence"), Mapping) else {}).get("label")
+            or "SEM_EVIDENCIA"
+        ),
+        "commander_executes_action": False,
         "real_orders_enabled": False,
     }
 
