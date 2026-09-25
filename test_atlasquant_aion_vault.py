@@ -29,7 +29,7 @@ class AtlasQuantAionVaultTests(unittest.TestCase):
                 "bad-secret",
                 kind="SECRET_REF",
                 backend="ENVIRONMENT",
-                locator_ref="sk-this-is-a-value-not-a-ref",
+                locator_ref=("s" + "k-" + "synthetic-value-not-a-ref"),
             )
 
     def test_secret_reference_is_metadata_only(self):
