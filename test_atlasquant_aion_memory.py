@@ -50,6 +50,10 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("fallback", joined)
         self.assertIn("live_confirmed", joined)
         self.assertIn("runtime snapshot", joined)
+        self.assertIn("live event intelligence", joined)
+        self.assertIn("breaking alert", joined)
+        self.assertIn("hypothesis", joined)
+        self.assertIn("24/7", joined)
 
     def test_canonical_loader_reads_project_files_and_foundation(self):
         with tempfile.TemporaryDirectory() as td:
