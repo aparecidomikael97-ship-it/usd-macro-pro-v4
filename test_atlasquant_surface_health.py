@@ -27,6 +27,17 @@ class AtlasQuantSurfaceHealthTests(unittest.TestCase):
         self.assertEqual(home["state"], "OK")
         self.assertEqual(home["error_type"], "")
 
+    def test_runtime_exception_exposes_type_not_message(self):
+        state = {}
+        mark_surface_error(
+            state,
+            "home_radar",
+            RuntimeError("secret/path detail must not reach the UI"),
+        )
+        home = surface_health_snapshot(state)["items"][0]
+        self.assertEqual(home["error_type"], "RuntimeError")
+        self.assertNotIn("secret", home["error_type"])
+
     def test_unavailable_is_distinct_from_runtime_degraded(self):
         state = {}
         mark_surface_error(
