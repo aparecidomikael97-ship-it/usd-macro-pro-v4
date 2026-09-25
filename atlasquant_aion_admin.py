@@ -44,6 +44,7 @@ from atlasquant_aion_memory import (
     update_entitlements_checkpoint,
     update_continuity_checkpoint,
     update_learning_checkpoint,
+    update_event_intelligence_checkpoint,
     update_operating_checkpoint,
     update_promotions_checkpoint,
     update_studio_checkpoint,
@@ -171,6 +172,12 @@ from atlasquant_aion_intelligence import (
     simulate_macro_scenario,
 )
 from atlasquant_aion_reliability import reliability_snapshot
+from atlasquant_aion_event_intelligence import (
+    event_intelligence_summary,
+    govern_event_alerts,
+    merge_alert_journal,
+    merge_event_journal,
+)
 from atlasquant_aion_learning import (
     CAUSE_TAGS as LEARNING_CAUSE_TAGS,
     FORECAST_TYPES as LEARNING_FORECAST_TYPES,
@@ -1307,6 +1314,191 @@ def _render_reliability_governance(system_context: Mapping[str, Any] | None) -> 
     )
 
 
+def _render_event_intelligence(
+    checkpoint: Mapping[str, Any],
+    system_context: Mapping[str, Any] | None,
+    *,
+    allow_memory_sync: bool,
+) -> None:
+    system = dict(system_context or {})
+    snapshot = (
+        system.get("event_intelligence")
+        if isinstance(system.get("event_intelligence"), Mapping)
+        else {}
+    )
+    st.markdown("#### 🌐 AION Event Intelligence")
+    st.caption(
+        "Notícia/evento → verdade da fonte → classificação inferida → hipóteses de impacto → "
+        "alerta interno governado. Não é sinal e não autoriza trade."
+    )
+    if not snapshot:
+        st.info("Event Intelligence não foi confirmado nesta execução.")
+        return
+
+    events = [
+        dict(x) for x in list(snapshot.get("events", []) or [])
+        if isinstance(x, Mapping)
+    ]
+    alerts = [
+        dict(x) for x in list(snapshot.get("alerts", []) or [])
+        if isinstance(x, Mapping)
+    ]
+    memory = (
+        checkpoint.get("event_intelligence")
+        if isinstance(checkpoint.get("event_intelligence"), Mapping)
+        else {}
+    )
+    memory_summary = event_intelligence_summary(
+        list(memory.get("events", []) or []),
+        list(memory.get("alerts", []) or []),
+    )
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("Eventos atuais", int(snapshot.get("event_count") or len(events)))
+    c2.metric("Alertas ativos", int(snapshot.get("active_alerts") or 0))
+    c3.metric("Urgentes internos", int(snapshot.get("urgent_alerts") or 0))
+    c4.metric("Memória", int(memory_summary.get("events") or 0))
+
+    bg = str(snapshot.get("background_updated_at") or "")
+    bg_ok = bool(snapshot.get("background_persisted", False))
+    st.caption(
+        "Background Autopilot: "
+        + ("persistência confirmada" if bg_ok else "persistência não confirmada")
+        + (f" · atualização {bg}" if bg else "")
+        + " · push externo: NÃO CONECTADO."
+    )
+
+    top_alert = (
+        snapshot.get("top_alert")
+        if isinstance(snapshot.get("top_alert"), Mapping)
+        else {}
+    )
+    if top_alert:
+        event_id = str(top_alert.get("event_id") or "")
+        top_event = next(
+            (x for x in events if str(x.get("event_id") or "") == event_id),
+            {},
+        )
+        state = str(top_alert.get("state") or "NONE")
+        headline = str(top_event.get("headline") or "Evento sem título confirmado.")
+        truth = str(top_event.get("event_truth") or top_alert.get("event_truth") or "UNKNOWN")
+        source = str(top_event.get("source") or "fonte não confirmada")
+        message = (
+            f"**{state}** · {headline}\n\n"
+            f"Verdade do evento: **{truth}** · Fonte: **{source}** · "
+            f"Severidade: **{int(top_alert.get('severity_score') or 0)}/100**."
+        )
+        if state == "URGENT_INTERNAL":
+            st.warning(message)
+        elif state in {"REVIEW_INTERNAL", "HOLD"}:
+            st.info(message)
+        else:
+            st.caption(message)
+
+        impact = (
+            top_event.get("impact")
+            if isinstance(top_event.get("impact"), Mapping)
+            else {}
+        )
+        channels = [
+            dict(x) for x in list(impact.get("channels", []) or [])
+            if isinstance(x, Mapping)
+        ]
+        if channels:
+            with st.expander("Hipóteses de impacto do evento", expanded=True):
+                st.dataframe([
+                    {
+                        "Ativo/canal": row.get("asset"),
+                        "Efeito possível": row.get("possible_effect"),
+                        "Mecanismo": row.get("mechanism"),
+                        "Estado": row.get("truth_state"),
+                    }
+                    for row in channels
+                ], width="stretch", hide_index=True)
+                invalidators = list(impact.get("invalidators", []) or [])
+                if invalidators:
+                    st.caption(
+                        "Pode invalidar/inverter: "
+                        + " · ".join(str(x) for x in invalidators[:5])
+                    )
+                st.caption(
+                    "Todos os impactos acima são HIPÓTESES. "
+                    "Nenhum deles é previsão, ordem ou probabilidade de lucro."
+                )
+
+    if events:
+        with st.expander("Eventos atuais e proveniência", expanded=False):
+            st.dataframe([
+                {
+                    "Evento": row.get("headline"),
+                    "Categoria": row.get("category"),
+                    "Verdade": row.get("event_truth"),
+                    "Relato": row.get("report_truth"),
+                    "Fonte": row.get("source"),
+                    "Moedas": ", ".join(str(x) for x in list(row.get("currencies") or [])),
+                    "Idade min": row.get("age_minutes"),
+                    "Severidade": row.get("severity_score"),
+                }
+                for row in events[:40]
+            ], width="stretch", hide_index=True)
+
+    journal_summary = (
+        snapshot.get("journal_summary")
+        if isinstance(snapshot.get("journal_summary"), Mapping)
+        else {}
+    )
+    if journal_summary:
+        st.caption(
+            f"Diário runtime: {int(journal_summary.get('events') or 0)} eventos · "
+            f"{int(journal_summary.get('alerts') or 0)} alertas · "
+            f"{int(journal_summary.get('urgent') or 0)} urgentes históricos."
+        )
+
+    if allow_memory_sync:
+        if st.button(
+            "Registrar Event Intelligence no Checkpoint Mestre",
+            key="aion_event_intelligence_sync",
+            width="stretch",
+        ):
+            incoming_events = list(snapshot.get("journal_events") or events)
+            incoming_alerts = list(snapshot.get("journal_alerts") or alerts)
+            merged_events = merge_event_journal(
+                list(memory.get("events", []) or []),
+                incoming_events,
+            )
+            merged_alerts = merge_alert_journal(
+                list(memory.get("alerts", []) or []),
+                incoming_alerts,
+            )
+            updated = update_event_intelligence_checkpoint(
+                checkpoint,
+                events=merged_events,
+                alerts=merged_alerts,
+                dirty=True,
+            )
+            updated = _record_working_event(
+                updated,
+                "event_intelligence_synced",
+                "Event Intelligence sincronizado com o Checkpoint Mestre.",
+                evidence={
+                    "events": len(merged_events),
+                    "alerts": len(merged_alerts),
+                    "external_notification_allowed": False,
+                    "market_action_authorized": False,
+                },
+            )
+            _set_working_checkpoint(updated, dirty=True)
+            st.success(
+                "Diário sincronizado na memória de trabalho. "
+                "Salve o Checkpoint Mestre para persistir a alteração."
+            )
+            st.rerun()
+
+    st.caption(
+        "Notificação externa automática: DESLIGADA · canal externo: NÃO CONECTADO · "
+        "ordens reais: BLOQUEADAS."
+    )
+
+
 def _render_learning_pulse(checkpoint: Mapping[str, Any]) -> None:
     learning = checkpoint.get("learning") if isinstance(checkpoint.get("learning"), Mapping) else {}
     episodes = list(learning.get("episodes", []) or [])
@@ -1679,6 +1871,7 @@ def _render_central(
     _render_commander_intelligence(checkpoint, system_context, executive_snapshot)
     _render_learning_pulse(checkpoint)
     _render_reliability_governance(system_context)
+    _render_event_intelligence(checkpoint, system_context, allow_memory_sync=True)
     _render_release_gate(system_context)
     _render_publication_truth(system_context)
     _render_critical_surface_health(system_context)
@@ -2110,7 +2303,10 @@ def _render_secretary(
             st.write("Nenhum evento operacional registrado nesta memória.")
 
 
-def _render_trading(market_context: Mapping[str, Any]) -> None:
+def _render_trading(
+    market_context: Mapping[str, Any],
+    system_context: Mapping[str, Any] | None = None,
+) -> None:
     st.markdown("### 📈 Trading · leitura segura")
     market_text, market_truth = _safe_market_state(market_context)
     st.info(f"Estado: {market_truth} — {market_text}")
@@ -2128,6 +2324,8 @@ def _render_trading(market_context: Mapping[str, Any]) -> None:
         ),
         key="aion_trading_voice",
     )
+
+    _render_event_intelligence({}, system_context, allow_memory_sync=False)
 
     st.markdown("#### 🧪 Simulador de Cenários Macro")
     st.caption(
@@ -4087,6 +4285,25 @@ def render_aion_admin_console(
         })
     system["reliability"] = final_reliability
 
+    event_intelligence_state = (
+        dict(system.get("event_intelligence"))
+        if isinstance(system.get("event_intelligence"), Mapping)
+        else {}
+    )
+    if event_intelligence_state:
+        try:
+            governed_events = govern_event_alerts(
+                list(event_intelligence_state.get("events", []) or []),
+                reliability=final_reliability,
+            )
+            event_intelligence_state.update(governed_events)
+            system["event_intelligence"] = event_intelligence_state
+        except Exception as exc:
+            foundation_diagnostics.append({
+                "component":"event_intelligence_governance",
+                "error_type":type(exc).__name__,
+            })
+
     continuity_section = (
         checkpoint.get("continuity")
         if isinstance(checkpoint.get("continuity"), Mapping)
@@ -4129,6 +4346,7 @@ def render_aion_admin_console(
             publication_truth=publication_state,
             release_gate_snapshot=release_gate_state,
             reliability_snapshot=final_reliability,
+            event_intelligence_snapshot=event_intelligence_state,
             checkpoint_dirty=bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
             checkpoint_conflict=bool(st.session_state.get(_WORKING_CONFLICT_KEY, False)),
             foundation_diagnostics=foundation_diagnostics,
@@ -4171,6 +4389,9 @@ def render_aion_admin_console(
             "release_gate_total_stages":int(release_gate_state.get("total_stages") or 4),
             "release_gate_next_stage":str(release_gate_state.get("next_stage") or ""),
             "release_gate_claim_allowed":bool(release_gate_state.get("release_claim_allowed",False)),
+            "event_alert_state":"UNKNOWN",
+            "event_active_alerts":0,
+            "event_urgent_alerts":0,
             "recommended_workspace":"🛠️ Desenvolvimento",
             "executes_action":False,
             "real_orders_enabled":False,
@@ -4261,7 +4482,7 @@ def render_aion_admin_console(
         elif selected_workspace == "🗂️ Secretaria":
             _render_secretary(access_map, checkpoint, flags, system, market, status_board, approval_inbox)
         elif selected_workspace == "📈 Trading":
-            _render_trading(market)
+            _render_trading(market, system)
         elif selected_workspace == "🎬 Studio":
             _render_studio(access_map, checkpoint, flags)
         elif selected_workspace == "💼 Negócios":
@@ -4446,6 +4667,19 @@ def render_aion_admin_console(
             ((system.get("source_mesh") or {}) if isinstance(system.get("source_mesh"), Mapping) else {}).get("fallback_or_unavailable")
             or 0
         ),
+        "event_intelligence_events": int(
+            ((system.get("event_intelligence") or {}) if isinstance(system.get("event_intelligence"), Mapping) else {}).get("event_count")
+            or 0
+        ),
+        "event_intelligence_active_alerts": int(
+            ((system.get("event_intelligence") or {}) if isinstance(system.get("event_intelligence"), Mapping) else {}).get("active_alerts")
+            or 0
+        ),
+        "event_intelligence_urgent_alerts": int(
+            ((system.get("event_intelligence") or {}) if isinstance(system.get("event_intelligence"), Mapping) else {}).get("urgent_alerts")
+            or 0
+        ),
+        "event_intelligence_external_notifications": False,
         "commander_posture": str(commander_snapshot.get("posture") or "UNKNOWN"),
         "commander_objective": str(commander_snapshot.get("objective") or ""),
         "commander_next_action": str(commander_snapshot.get("next_action") or ""),
