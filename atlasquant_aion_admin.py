@@ -1307,6 +1307,88 @@ def _render_reliability_governance(system_context: Mapping[str, Any] | None) -> 
     )
 
 
+def _render_live_event_intelligence(system_context: Mapping[str, Any] | None) -> None:
+    system = dict(system_context or {})
+    live = (
+        system.get("live_event_intelligence")
+        if isinstance(system.get("live_event_intelligence"), Mapping)
+        else {}
+    )
+    st.markdown("#### 🌐 AION Live Event Intelligence")
+    st.caption(
+        "Radar de eventos macro/notícias/geopolítica a partir das fontes já disponíveis no AtlasQuant. "
+        "Manchete observada não vira fato confirmado automaticamente; impacto de mercado é sempre hipótese."
+    )
+    if not live:
+        st.warning("Live Event Intelligence não foi confirmado nesta execução.")
+        return
+
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("Estado", str(live.get("state") or "UNKNOWN"))
+    c2.metric("Eventos", int(live.get("event_count") or 0))
+    c3.metric("Alertas", int(live.get("alert_count") or 0))
+    c4.metric("Urgentes p/ revisão", int(live.get("urgent_review_count") or 0))
+
+    source_state = str(live.get("news_source_state") or "UNKNOWN")
+    age = live.get("news_payload_age_minutes")
+    age_text = "—" if age is None else f"{float(age):.0f} min"
+    st.caption(
+        f"Fonte de notícias: {source_state} · idade do snapshot: {age_text} · "
+        f"notícias frescas classificadas: {int(live.get('fresh_news_events') or 0)}."
+    )
+
+    if not bool(live.get("continuous_runtime_confirmed", False)):
+        st.info(
+            "Motor de alerta preparado, mas monitoramento 24/7 contínuo ainda NÃO está confirmado "
+            "nesta execução/produção. Nenhuma notificação externa foi enviada automaticamente."
+        )
+
+    top = [
+        item for item in list(live.get("top_alerts", []) or [])
+        if isinstance(item, Mapping)
+    ]
+    if not top:
+        st.caption(
+            "Nenhum evento fresco atingiu o limiar de alerta nesta leitura. "
+            "Fonte stale ou indisponível não gera breaking alert."
+        )
+        return
+
+    for idx,item in enumerate(top[:5]):
+        level = str(item.get("alert_level") or "WATCH")
+        headline = str(item.get("headline") or "Evento sem título")
+        truth = str(item.get("truth_state") or "UNKNOWN")
+        urgency = int(item.get("urgency_score") or 0)
+        category = str(item.get("category") or "OTHER")
+        if level == "URGENT_REVIEW":
+            st.warning(f"**{level} · {urgency}/100 · {category}** — {headline}")
+        else:
+            st.info(f"**{level} · {urgency}/100 · {category}** — {headline}")
+        st.caption(
+            f"Verdade do evento: {truth} · fontes: {int(item.get('source_count') or 0)} · "
+            f"moedas relacionadas: {', '.join(item.get('currencies') or []) or 'não mapeadas'}."
+        )
+        with st.expander(f"Impacto hipotético · evento {idx+1}", expanded=False):
+            channels = [
+                row for row in list(item.get("impact_channels", []) or [])
+                if isinstance(row, Mapping)
+            ]
+            if channels:
+                st.dataframe([
+                    {
+                        "Ativo/canal":row.get("asset"),
+                        "Possível reação":row.get("direction"),
+                        "Mecanismo":row.get("mechanism"),
+                        "Estado":row.get("truth_state"),
+                    }
+                    for row in channels
+                ], width="stretch", hide_index=True)
+            st.caption(
+                "Isto é hipótese de transmissão de mercado, não previsão garantida nem sinal de trade. "
+                "Preço, contexto e fontes adicionais precisam confirmar a leitura."
+            )
+
+
 def _render_learning_pulse(checkpoint: Mapping[str, Any]) -> None:
     learning = checkpoint.get("learning") if isinstance(checkpoint.get("learning"), Mapping) else {}
     episodes = list(learning.get("episodes", []) or [])
@@ -1677,6 +1759,7 @@ def _render_central(
     )
     _render_executive_pulse(executive_snapshot)
     _render_commander_intelligence(checkpoint, system_context, executive_snapshot)
+    _render_live_event_intelligence(system_context)
     _render_learning_pulse(checkpoint)
     _render_reliability_governance(system_context)
     _render_release_gate(system_context)
@@ -4129,6 +4212,11 @@ def render_aion_admin_console(
             publication_truth=publication_state,
             release_gate_snapshot=release_gate_state,
             reliability_snapshot=final_reliability,
+            live_event_snapshot=(
+                system.get("live_event_intelligence")
+                if isinstance(system.get("live_event_intelligence"), Mapping)
+                else {}
+            ),
             checkpoint_dirty=bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
             checkpoint_conflict=bool(st.session_state.get(_WORKING_CONFLICT_KEY, False)),
             foundation_diagnostics=foundation_diagnostics,
@@ -4445,6 +4533,21 @@ def render_aion_admin_console(
         "source_mesh_fallbacks": int(
             ((system.get("source_mesh") or {}) if isinstance(system.get("source_mesh"), Mapping) else {}).get("fallback_or_unavailable")
             or 0
+        ),
+        "live_event_state": str(
+            ((system.get("live_event_intelligence") or {}) if isinstance(system.get("live_event_intelligence"), Mapping) else {}).get("state")
+            or "UNKNOWN"
+        ),
+        "live_event_alerts": int(
+            ((system.get("live_event_intelligence") or {}) if isinstance(system.get("live_event_intelligence"), Mapping) else {}).get("alert_count")
+            or 0
+        ),
+        "live_event_urgent_review": int(
+            ((system.get("live_event_intelligence") or {}) if isinstance(system.get("live_event_intelligence"), Mapping) else {}).get("urgent_review_count")
+            or 0
+        ),
+        "live_event_24x7_confirmed": bool(
+            ((system.get("live_event_intelligence") or {}) if isinstance(system.get("live_event_intelligence"), Mapping) else {}).get("continuous_runtime_confirmed", False)
         ),
         "commander_posture": str(commander_snapshot.get("posture") or "UNKNOWN"),
         "commander_objective": str(commander_snapshot.get("objective") or ""),
