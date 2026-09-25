@@ -8,6 +8,7 @@ from atlasquant_aion_memory import (
     FOUNDATION_REVISION,
     RuntimeConfig,
     canonical_documents,
+    config_from_mapping,
     canonical_memory_summary,
     checkpoint_digest,
     checkpoint_integrity_report,
@@ -17,6 +18,7 @@ from atlasquant_aion_memory import (
     load_runtime_checkpoint,
     merged_checkpoint,
     runtime_write_preflight,
+    runtime_configuration_status,
     save_runtime_checkpoint,
     search_canonical_memory,
     update_business_checkpoint,
@@ -88,6 +90,14 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("digital twin", joined)
         self.assertIn("proof of safety", joined)
         self.assertIn("salvar, amarrar", joined)
+        self.assertIn("memory fabric", joined)
+        self.assertIn("epistemic core", joined)
+        self.assertIn("resolução científica de problemas", joined)
+        self.assertIn("firewall de agentes", joined)
+        self.assertIn("cofre pessoal de documentos", joined)
+        self.assertIn("pós-trade rca", joined)
+        self.assertIn("regra mestre de stop e alvo", joined)
+        self.assertIn("hierarquia técnica oficial", joined)
 
     def test_canonical_loader_reads_project_files_and_foundation(self):
         with tempfile.TemporaryDirectory() as td:
@@ -728,6 +738,40 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertFalse(result["saved"])
         self.assertFalse(result["verified"])
         self.assertTrue(result["write_accepted"])
+
+    def test_runtime_config_defaults_to_project_repo_and_public_read_mode(self):
+        cfg=config_from_mapping({
+            "GITHUB_TOKEN_HISTORICO":"",
+            "GITHUB_REPO_HISTORICO":"",
+            "GITHUB_DATA_BRANCH":"atlasquant-runtime",
+        })
+        self.assertEqual(cfg.repo,"aparecidomikael97-ship-it/usd-macro-pro-v4")
+        status=runtime_configuration_status(cfg)
+        self.assertTrue(status["read_ready"])
+        self.assertFalse(status["write_ready"])
+        self.assertEqual(status["mode"],"READ_ONLY_PUBLIC")
+        self.assertFalse(status["secret_exposed"])
+
+    def test_runtime_public_read_does_not_require_write_token(self):
+        cfg=RuntimeConfig(token="",repo="owner/repo",branch="atlasquant-runtime")
+        cp=default_checkpoint()
+        import base64, json
+        encoded=base64.b64encode(json.dumps(cp).encode("utf-8")).decode("ascii")
+        get=MagicMock()
+        get.status_code=200
+        get.raise_for_status.return_value=None
+        get.json.return_value={"content":encoded,"sha":"publicsha"}
+        with patch("atlasquant_aion_memory.requests.get",return_value=get) as get_call:
+            result=load_runtime_checkpoint(cfg)
+        self.assertEqual(result["status"],"CONFIRMED")
+        self.assertEqual(result["sha"],"publicsha")
+        self.assertNotIn("Authorization",get_call.call_args.kwargs["headers"])
+
+    def test_runtime_write_without_token_remains_unavailable(self):
+        cfg=RuntimeConfig(token="",repo="owner/repo",branch="atlasquant-runtime")
+        result=save_runtime_checkpoint(default_checkpoint(),cfg,approved=True)
+        self.assertEqual(result["status"],"UNAVAILABLE")
+        self.assertIn("write credential",result["reason"].lower())
 
     def test_runtime_load_is_truthful_when_credentials_missing(self):
         cfg = RuntimeConfig(token="", repo="", branch="atlasquant-runtime")

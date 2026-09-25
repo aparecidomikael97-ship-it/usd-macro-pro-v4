@@ -1,0 +1,65 @@
+name: AION Runtime Checkpoint Bootstrap
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/aion-runtime-checkpoint-bootstrap.yml"
+      - "atlasquant_aion_runtime_bootstrap.py"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: aion-runtime-checkpoint-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout canonical main
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install project dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Generate canonical V13 checkpoint
+        run: |
+          python atlasquant_aion_runtime_bootstrap.py --output /tmp/checkpoint_master.json
+          python atlasquant_aion_runtime_bootstrap.py --verify /tmp/checkpoint_master.json
+
+      - name: Ensure dedicated runtime branch exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! gh api "repos/${GITHUB_REPOSITORY}/branches/atlasquant-runtime" >/dev/null 2>&1; then
+            MAIN_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')"
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs"               -f ref='refs/heads/atlasquant-runtime'               -f sha="$MAIN_SHA" >/dev/null
+          fi
+
+      - name: Create or verify Checkpoint Mestre
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          API_PATH="repos/${GITHUB_REPOSITORY}/contents/dados/aion/checkpoint_master.json"
+          if gh api "$API_PATH?ref=atlasquant-runtime" >/tmp/runtime_meta.json 2>/dev/null; then
+            gh api "$API_PATH?ref=atlasquant-runtime" --jq '.content'               | tr -d '\n' | base64 -d >/tmp/runtime_readback.json
+            python atlasquant_aion_runtime_bootstrap.py --verify /tmp/runtime_readback.json
+            echo "Checkpoint Mestre already exists and is integrity-confirmed; no overwrite performed."
+          else
+            CONTENT="$(base64 -w0 /tmp/checkpoint_master.json)"
+            gh api --method PUT "$API_PATH"               -f message='AION: bootstrap Checkpoint Mestre V13'               -f content="$CONTENT"               -f branch='atlasquant-runtime' >/tmp/runtime_write.json
+            gh api "$API_PATH?ref=atlasquant-runtime" --jq '.content'               | tr -d '\n' | base64 -d >/tmp/runtime_readback.json
+            python atlasquant_aion_runtime_bootstrap.py --verify /tmp/runtime_readback.json
+            echo "Checkpoint Mestre created and verified on atlasquant-runtime."
+          fi

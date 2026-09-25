@@ -38,6 +38,7 @@ from atlasquant_aion_memory import (
     load_runtime_checkpoint,
     merged_checkpoint,
     runtime_write_preflight,
+    runtime_configuration_status,
     save_runtime_checkpoint,
     search_canonical_memory,
     update_business_checkpoint,
@@ -4401,9 +4402,19 @@ def _render_development(
                 )
 
     st.markdown("#### Checkpoint Mestre")
+    cfg = _runtime_config()
+    runtime_cfg_state = runtime_configuration_status(cfg)
     st.caption(
         f"Proveniência ativa: {runtime_result.get('source') or runtime_result.get('status')}. "
         f"Digest local: {checkpoint_digest(checkpoint)}."
+    )
+    rp1,rp2,rp3 = st.columns(3)
+    rp1.metric("Runtime · leitura", "PRONTA" if runtime_cfg_state.get("read_ready") else "BLOQUEADA")
+    rp2.metric("Runtime · escrita", "PRONTA" if runtime_cfg_state.get("write_ready") else "SEM CREDENCIAL")
+    rp3.metric("Modo", str(runtime_cfg_state.get("mode") or "UNAVAILABLE"))
+    st.caption(
+        "Leitura pública do Checkpoint pode funcionar sem token. Escrita continua exigindo credencial "
+        "e aprovação explícita; nenhum segredo é exibido nesta tela."
     )
     conflict = bool(st.session_state.get(_WORKING_CONFLICT_KEY, False))
     if conflict:
@@ -4417,7 +4428,6 @@ def _render_development(
             st.session_state[_WORKING_CONFLICT_KEY] = False
             st.rerun()
 
-    cfg = _runtime_config()
     persistence_preflight = runtime_write_preflight(runtime_result)
     persistence_blocked = bool(conflict or not persistence_preflight.get("allowed"))
     if not persistence_preflight.get("allowed"):
