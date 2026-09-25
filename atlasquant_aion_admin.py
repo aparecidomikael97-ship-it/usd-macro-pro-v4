@@ -46,6 +46,12 @@ from atlasquant_aion_memory import (
     update_promotions_checkpoint,
     update_studio_checkpoint,
 )
+from atlasquant_aion_recovery import (
+    list_checkpoint_revisions,
+    load_checkpoint_revision,
+    recovery_preflight,
+    restore_checkpoint_revision,
+)
 from atlasquant_aion_operations import (
     ACTIONS,
     PRIORITIES,
@@ -1707,6 +1713,154 @@ def _render_development(
                     "As alterações locais continuam marcadas como pendentes."
                 )
 
+    st.divider()
+    st.markdown("#### Recuperação / Rollback do Checkpoint")
+    st.caption(
+        "Usa o histórico versionado do Checkpoint no branch de runtime. "
+        "Listar e pré-visualizar são somente leitura. Restaurar exige revisão íntegra, "
+        "SHA atual, confirmação explícita e Guardian."
+    )
+
+    if st.button(
+        "🔎 Carregar histórico de recuperação",
+        key="aion_checkpoint_history_load",
+        width="stretch",
+    ):
+        st.session_state["aion_checkpoint_history"] = list_checkpoint_revisions(
+            cfg,
+            limit=12,
+        )
+        st.session_state.pop("aion_recovery_candidate", None)
+
+    history = st.session_state.get("aion_checkpoint_history")
+    if isinstance(history, Mapping):
+        history_status = str(history.get("status") or "UNKNOWN")
+        items = [
+            dict(item)
+            for item in list(history.get("items", []) or [])
+            if isinstance(item, Mapping)
+        ]
+        if history_status == "CONFIRMED":
+            if items:
+                st.dataframe(
+                    [{
+                        "Revisão": item.get("short_revision"),
+                        "Data": item.get("created_at"),
+                        "Mensagem": item.get("message"),
+                    } for item in items],
+                    width="stretch",
+                    hide_index=True,
+                )
+                revisions = [str(item.get("revision") or "") for item in items]
+                labels = {
+                    str(item.get("revision") or ""):
+                    f"{item.get('short_revision')} · {item.get('created_at') or 'sem data'} · {item.get('message') or 'sem mensagem'}"
+                    for item in items
+                }
+                selected_revision = st.selectbox(
+                    "Revisão para pré-visualizar",
+                    revisions,
+                    format_func=lambda value: labels.get(value, value),
+                    key="aion_recovery_revision",
+                )
+                if st.button(
+                    "👁️ Pré-visualizar revisão",
+                    key="aion_recovery_preview",
+                ):
+                    st.session_state["aion_recovery_candidate"] = load_checkpoint_revision(
+                        selected_revision,
+                        cfg,
+                    )
+            else:
+                st.info("Nenhuma revisão histórica do Checkpoint foi retornada.")
+        else:
+            st.warning(
+                "Histórico de recuperação não confirmado. "
+                f"Estado: {history_status} · motivo: {history.get('reason','não informado')}."
+            )
+
+    candidate = st.session_state.get("aion_recovery_candidate")
+    if isinstance(candidate, Mapping):
+        candidate_status = str(candidate.get("status") or "UNKNOWN")
+        if candidate_status != "CONFIRMED":
+            st.warning(
+                "A revisão selecionada não pôde ser confirmada. "
+                f"Estado: {candidate_status} · motivo: {candidate.get('reason','não informado')}."
+            )
+        else:
+            integrity = (
+                candidate.get("integrity")
+                if isinstance(candidate.get("integrity"), Mapping)
+                else {}
+            )
+            preview_preflight = recovery_preflight(runtime_result, candidate)
+            rc1,rc2,rc3 = st.columns(3)
+            rc1.metric("Revisão", str(candidate.get("revision") or "")[:10])
+            rc2.metric("Integridade", str(integrity.get("state") or "UNKNOWN"))
+            rc3.metric("Digest", str(candidate.get("digest") or "")[:16])
+
+            local_dirty = bool(st.session_state.get(_WORKING_DIRTY_KEY, False))
+            if local_dirty:
+                st.warning(
+                    "Há alterações locais ainda não persistidas. "
+                    "Salve ou descarte essas alterações antes de restaurar uma revisão histórica."
+                )
+            elif not preview_preflight.get("allowed"):
+                st.warning(
+                    "Restauração bloqueada em modo seguro: "
+                    f"{preview_preflight.get('reason','preflight não confirmado')}."
+                )
+            else:
+                st.warning(
+                    "A restauração substituirá o Checkpoint runtime atual por esta revisão histórica "
+                    "através de escrita condicional no SHA atual. Não existe restauração automática."
+                )
+                confirm_restore = st.checkbox(
+                    "Confirmo que revisei esta versão e quero restaurar o Checkpoint Mestre",
+                    value=False,
+                    key="aion_recovery_explicit_approval",
+                )
+                if st.button(
+                    "↩️ Restaurar revisão selecionada",
+                    key="aion_recovery_restore",
+                    type="primary",
+                    disabled=not bool(confirm_restore),
+                    width="stretch",
+                ):
+                    decision = guardian_decision(
+                        "restore_checkpoint",
+                        access,
+                        approved=True,
+                        feature_flags=flags,
+                    )
+                    if not decision["allowed"]:
+                        st.error(decision["reason"])
+                    else:
+                        result = restore_checkpoint_revision(
+                            candidate,
+                            runtime_result,
+                            cfg,
+                            approved=True,
+                        )
+                        if result.get("saved") and result.get("verified"):
+                            restored = ensure_operating_checkpoint(result.get("checkpoint"))
+                            restored["operating"]["dirty"] = False
+                            _set_working_checkpoint(restored, dirty=False)
+                            st.session_state[_WORKING_SOURCE_KEY] = checkpoint_source_digest(restored)
+                            st.session_state[_WORKING_CONFLICT_KEY] = False
+                            st.session_state["aion_checkpoint_recovery_result"] = result
+                            st.session_state.pop("aion_recovery_candidate", None)
+                            st.success(
+                                "Checkpoint restaurado, relido e verificado. "
+                                "O evento de recuperação foi registrado na auditoria."
+                            )
+                            st.rerun()
+                        else:
+                            st.error(
+                                "A recuperação não foi confirmada. "
+                                f"Estado: {result.get('status')} · motivo: {result.get('reason','não informado')}."
+                            )
+
     st.markdown("#### Camada de Verdade")
     for item in TRUTH_RULES:
         st.markdown(f"- {item}")
@@ -1718,7 +1872,7 @@ def _render_promotions(
     flags: Mapping[str, bool],
     account_entitlement_audit: Mapping[str, Any] | None = None,
 ) -> None:
-    st.markdown("### 🎟️ Assinaturas & Promoções")
+    st.markdown("### 🎟️ Promoções")
     st.caption(
         "Campanhas e códigos ficam persistidos no Checkpoint Mestre. "
         "O código completo é mostrado somente na criação; o checkpoint guarda apenas hash + últimos 4 caracteres."
@@ -1726,7 +1880,7 @@ def _render_promotions(
     _context_voice(
         "Promoções",
         (
-            "Bem-vindo a Assinaturas e Promoções. Aqui preparamos períodos gratuitos, cupons e descontos "
+            "Bem-vindo a Promoções. Aqui preparamos períodos gratuitos, cupons e descontos "
             "com limite de uso e auditoria. Criar ou aprovar um código não concede acesso automaticamente."
         ),
         key="aion_promotions_voice",
