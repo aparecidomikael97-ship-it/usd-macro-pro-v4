@@ -85,6 +85,7 @@ class AtlasQuantAionEvaluationLabTests(unittest.TestCase):
             suite,baseline_version="AION-1",candidate_version="AION-2",
             case_results=full_case_results(suite,regress_critical=True),
             baseline_metrics=baseline_metrics(),candidate_metrics=candidate_metrics(),
+            evidence_refs=["ci:critical-case-regression"],
         )
         out=evaluate_run(suite,run)
         self.assertEqual(out["state"],"REJECTED_FOR_NOW")
@@ -98,6 +99,7 @@ class AtlasQuantAionEvaluationLabTests(unittest.TestCase):
             suite,baseline_version="AION-1",candidate_version="AION-2",
             case_results=full_case_results(suite),
             baseline_metrics=baseline_metrics(),candidate_metrics=metrics,
+            evidence_refs=["ci:safety-metric-regression"],
         )
         out=evaluate_run(suite,run)
         self.assertEqual(out["state"],"REJECTED_FOR_NOW")
