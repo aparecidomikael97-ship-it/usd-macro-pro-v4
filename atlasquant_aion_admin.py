@@ -658,6 +658,7 @@ def _attention_queue(
     status_board: Mapping[str, Any] | None,
     approval_inbox: Mapping[str, Any] | None,
     critical_surfaces: Mapping[str, Any] | None = None,
+    release_gate_snapshot: Mapping[str, Any] | None = None,
     *,
     limit: int = 8,
 ) -> list[dict[str, str]]:
@@ -676,25 +677,48 @@ def _attention_queue(
                 "next_action": "Revisar na área indicada; nenhuma aprovação é automática.",
             })
 
-    surface_snapshot = dict(critical_surfaces or {})
-    for item in list(surface_snapshot.get("items", []) or []):
-        if not isinstance(item, Mapping):
-            continue
-        state = str(item.get("state") or "UNKNOWN").upper()
-        if state == "OK":
-            continue
-        priority = "P1" if state in {"DEGRADED", "UNAVAILABLE"} else "P2"
+    gate = dict(release_gate_snapshot or {})
+    gate_state = str(gate.get("state") or "").upper()
+    gate_available = bool(gate_state)
+    if gate_available and gate_state != "COMPLETE":
         rows.append({
-            "priority": priority,
-            "source": "TELA",
+            "priority": "P1" if gate_state == "BLOCKED" else "P2",
+            "source": "RELEASE GATE",
             "area": "🛠️ Desenvolvimento",
-            "item": str(item.get("label") or item.get("id") or "Tela crítica"),
-            "state": state,
+            "item": str(
+                gate.get("next_label")
+                or "Gate de liberação AION"
+            ),
+            "state": gate_state,
             "next_action": str(
-                item.get("next_action")
-                or "Revalidar a tela no build atual antes de concluir que está saudável."
+                gate.get("next_action")
+                or "Revisar a próxima etapa do Gate de liberação AION."
             ),
         })
+
+    # Compatibility fallback for callers that still provide only surface health.
+    # When the unified release gate exists, individual surface alerts remain in
+    # the diagnostic panel instead of duplicating the administrative queue.
+    if not gate_available:
+        surface_snapshot = dict(critical_surfaces or {})
+        for item in list(surface_snapshot.get("items", []) or []):
+            if not isinstance(item, Mapping):
+                continue
+            state = str(item.get("state") or "UNKNOWN").upper()
+            if state == "OK":
+                continue
+            priority = "P1" if state in {"DEGRADED", "UNAVAILABLE"} else "P2"
+            rows.append({
+                "priority": priority,
+                "source": "TELA",
+                "area": "🛠️ Desenvolvimento",
+                "item": str(item.get("label") or item.get("id") or "Tela crítica"),
+                "state": state,
+                "next_action": str(
+                    item.get("next_action")
+                    or "Revalidar a tela no build atual antes de concluir que está saudável."
+                ),
+            })
 
     board = dict(status_board or {})
     for item in list(board.get("attention", []) or []):
@@ -743,6 +767,7 @@ def _render_attention_queue(
     status_board: Mapping[str, Any],
     approval_inbox: Mapping[str, Any],
     critical_surfaces: Mapping[str, Any] | None = None,
+    release_gate_snapshot: Mapping[str, Any] | None = None,
 ) -> None:
     st.markdown("#### Próxima Ação AION")
     st.caption(
@@ -753,6 +778,7 @@ def _render_attention_queue(
         status_board,
         approval_inbox,
         critical_surfaces,
+        release_gate_snapshot,
     )
     if not rows:
         st.success(
@@ -1374,6 +1400,7 @@ def _render_central(
             status_board,
             approval_inbox,
             (system_context.get("critical_surfaces") if isinstance(system_context, Mapping) else None),
+            (system_context.get("release_gate") if isinstance(system_context, Mapping) else None),
         )
         _render_memory_security_posture(access, checkpoint, runtime_result, flags)
         _render_security_incident_center(incident_snapshot)
@@ -1387,6 +1414,7 @@ def _render_central(
             status_board,
             approval_inbox,
             (system_context.get("critical_surfaces") if isinstance(system_context, Mapping) else None),
+            (system_context.get("release_gate") if isinstance(system_context, Mapping) else None),
         )
         _render_continuity_center(checkpoint)
         if int(incident_snapshot.get("total") or 0) > 0 or bool(
@@ -3332,6 +3360,7 @@ def render_aion_admin_console(
             continuity_summary=continuity_state,
             interface_validation=interface_validation_state,
             publication_truth=publication_state,
+            release_gate_snapshot=release_gate_state,
             checkpoint_dirty=bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
             checkpoint_conflict=bool(st.session_state.get(_WORKING_CONFLICT_KEY, False)),
             foundation_diagnostics=foundation_diagnostics,
@@ -3369,6 +3398,11 @@ def render_aion_admin_console(
             "publication_main_match":str(publication_state.get("main_match") or "UNKNOWN"),
             "production_verification":str(publication_state.get("production_verification") or "UNKNOWN"),
             "can_claim_latest_main_live":bool(publication_state.get("can_claim_latest_main_live",False)),
+            "release_gate_state":str(release_gate_state.get("state") or "UNKNOWN"),
+            "release_gate_confirmed_stages":int(release_gate_state.get("confirmed_stages") or 0),
+            "release_gate_total_stages":int(release_gate_state.get("total_stages") or 4),
+            "release_gate_next_stage":str(release_gate_state.get("next_stage") or ""),
+            "release_gate_claim_allowed":bool(release_gate_state.get("release_claim_allowed",False)),
             "recommended_workspace":"🛠️ Desenvolvimento",
             "executes_action":False,
             "real_orders_enabled":False,
