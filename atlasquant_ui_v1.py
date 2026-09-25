@@ -186,6 +186,16 @@ html { scroll-behavior: smooth; }
 .aq-mode-chip{border:1px solid rgba(148,183,225,.20);border-radius:999px;padding:4px 8px;color:#eef5ff;background:rgba(13,33,56,.82);font-size:.66rem;font-weight:750}
 .aq-mode-chip.lock{color:#ffd56b}
 .aq-mode-chip.open{color:#73f1da}
+.aq-compass{border:1px solid rgba(124,188,229,.24);border-radius:15px;padding:12px 13px;margin:8px 0 11px;background:linear-gradient(145deg,rgba(15,36,60,.9),rgba(8,23,41,.9))}
+.aq-compass-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.aq-compass-kicker{color:#a9c9e8;font-size:.64rem;font-weight:900;letter-spacing:.1em;text-transform:uppercase}
+.aq-compass-title{color:#fff;font-size:.92rem;font-weight:900;line-height:1.25;margin-top:3px}
+.aq-compass-badge{border:1px solid rgba(148,183,225,.26);border-radius:999px;padding:4px 8px;background:rgba(11,30,51,.78);color:#f4f8ff;font-size:.63rem;font-weight:850;white-space:nowrap}
+.aq-compass-grid{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:7px;margin-top:9px}
+.aq-compass-card{border:1px solid rgba(137,177,214,.16);border-radius:11px;padding:8px 9px;background:rgba(9,25,44,.66);min-width:0}
+.aq-compass-card small{display:block;color:#dce8f5;font-size:.61rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase}
+.aq-compass-card strong{display:block;color:#fff;font-size:.76rem;line-height:1.32;margin-top:3px;overflow-wrap:anywhere}
+.aq-compass-card span{display:block;color:#d8e5f3;font-size:.69rem;line-height:1.35;margin-top:3px}
 .aq-nav-groups{display:flex;gap:7px;align-items:center;overflow-x:auto;scrollbar-width:none;margin:2px 0 9px;padding:2px 1px}
 .aq-nav-groups::-webkit-scrollbar{display:none}
 .aq-nav-group{flex:0 0 auto;border:1px solid var(--aq-line);border-radius:999px;padding:5px 9px;background:rgba(10,25,44,.56)}
@@ -383,12 +393,23 @@ html { scroll-behavior: smooth; }
   .aq-mode-strip{padding:7px 8px;gap:6px}
   .aq-mode-strip strong{width:100%;font-size:.68rem}
   .aq-mode-chip{font-size:.62rem;padding:4px 7px}
+  .aq-compass{padding:10px 10px;margin:7px 0 9px}
+  .aq-compass-grid{grid-template-columns:1fr 1fr}
+  .aq-compass-grid .wide{grid-column:1/-1}
+  .aq-compass-card strong{font-size:.73rem}
+  .aq-compass-card span{font-size:.67rem}
   .aq-section-divider{margin:7px 0 9px}
   [data-testid="stSidebar"] { min-width: 280px; }
   [data-testid="stTabs"] [role="tablist"] { margin-left:-.25rem; margin-right:-.25rem; border-radius:10px; }
   [data-testid="stTabs"] [role="tab"] { font-size:.74rem; padding-left:.55rem; padding-right:.55rem; min-height:34px; }
   [data-testid="stTabs"] [role="tablist"] { scrollbar-width:none; }
   .aq-preview-grid{grid-template-columns:1fr}
+}
+@media (max-width: 430px) {
+  .aq-compass-top{display:block}
+  .aq-compass-badge{display:inline-block;margin-top:6px}
+  .aq-compass-grid{grid-template-columns:1fr}
+  .aq-compass-grid .wide{grid-column:auto}
 }
 </style>
 """
@@ -445,6 +466,116 @@ def experience_mode_overview_html(mode: object) -> str:
         '<span class="aq-mode-chip">diagnósticos completos</span>'
         '<span class="aq-mode-chip lock">Safety Core preservado</span>'
         '</div>'
+    )
+
+
+def _experience_page_alias(page: object) -> str:
+    label=str(page or "").strip()
+    aliases={
+        "🎙️ Macro":"🎙️ Macro Briefing",
+        "SAFE_WAIT":"🎯 Radar",
+    }
+    return aliases.get(label,label)
+
+
+def experience_compass_model(mode: object, page: object) -> dict[str, object]:
+    """Explain what the current experience/page is for without changing behavior."""
+    normalized=normalize_experience_mode(mode)
+    label=_experience_page_alias(page) or "🎯 Radar"
+    group=navigation_group_for(label)
+    locked=is_page_locked_for_mode(label,normalized)
+
+    group_guidance={
+        "Operação":{
+            "purpose":"Ler direção, qualidade, proteção e próximo passo operacional.",
+            "beginner":"Comece pelo Radar; só avance quando a leitura estiver clara.",
+            "advanced":"Fluxo recomendado: Radar → Painel mestre → Decisão.",
+        },
+        "Mercado":{
+            "purpose":"Entender as forças macro que sustentam ou enfraquecem a leitura.",
+            "beginner":"Use o Macro Briefing para contexto; detalhes ficam em prévia.",
+            "advanced":"Cruze moedas, EUA, pares, Fed e notícias sem tratar score como probabilidade.",
+        },
+        "Pesquisa":{
+            "purpose":"Estudar, validar e revisar evidências antes de confiar em um operacional.",
+            "beginner":"Aprender está aberto; histórico/backtest avançados ficam em prévia.",
+            "advanced":"Use histórico e backtest para evidência, não para prometer resultado futuro.",
+        },
+        "Sistema":{
+            "purpose":"Acompanhar automação, produto e laboratórios sem ampliar permissões.",
+            "beginner":"Recursos do sistema ficam visíveis em prévia para você entender o que existe.",
+            "advanced":"Diagnósticos completos continuam fail-closed e auditáveis.",
+        },
+        "Conta":{
+            "purpose":"Gerenciar acesso, instalação e informações comerciais da plataforma.",
+            "beginner":"Conta e Instalar ficam disponíveis sem abrir diagnósticos de mercado.",
+            "advanced":"Use controles comerciais separados das permissões operacionais.",
+        },
+        "Investir":{
+            "purpose":"Acessar a área educativa de investimentos sem misturar com execução de trade.",
+            "beginner":"Área aberta no Iniciante; conteúdo não envia ordens.",
+            "advanced":"Continua separada do motor de execução e dos sinais operacionais.",
+        },
+        "Suporte":{
+            "purpose":"Resolver dúvidas de uso e acesso sem alterar o motor.",
+            "beginner":"Use quando precisar de orientação sobre a plataforma.",
+            "advanced":"Suporte permanece separado de diagnósticos e execução.",
+        },
+        "AtlasQuant":{
+            "purpose":"Orientar a navegação atual do AtlasQuant.",
+            "beginner":"Use Radar, Macro, Aprender, Conta, Instalar, Investir ou Suporte.",
+            "advanced":"Escolha a área completa de acordo com sua tarefa.",
+        },
+    }
+    guide=group_guidance.get(group,group_guidance["AtlasQuant"])
+
+    if locked:
+        state="PRÉVIA AVANÇADA"
+        next_step="Volte ao Radar/Macro ou mude conscientemente para Avançado para abrir este workspace."
+        detail="A prévia não executa o workspace avançado."
+    elif normalized=="Iniciante":
+        state="ESSENCIAL"
+        next_step=str(guide["beginner"])
+        detail="Leitura simplificada; ordens reais continuam bloqueadas."
+    else:
+        state="COMPLETO"
+        next_step=str(guide["advanced"])
+        detail="Diagnóstico completo; proteções e gates continuam valendo."
+
+    return {
+        "mode":normalized,
+        "page":label,
+        "group":group,
+        "locked":locked,
+        "state":state,
+        "purpose":str(guide["purpose"]),
+        "next_step":next_step,
+        "detail":detail,
+        "real_orders_enabled":False,
+        "automatic_execution":False,
+    }
+
+
+def experience_compass_html(mode: object, page: object) -> str:
+    model=experience_compass_model(mode,page)
+    locked=" · 🔒" if bool(model["locked"]) else ""
+    return (
+        '<div class="aq-compass">'
+        '<div class="aq-compass-top"><div>'
+        f'<div class="aq-compass-kicker">Você está em · {escape(str(model["group"]))}</div>'
+        f'<div class="aq-compass-title">{escape(str(model["page"]))}</div>'
+        '</div>'
+        f'<span class="aq-compass-badge">{escape(str(model["mode"]))} · {escape(str(model["state"]))}{locked}</span>'
+        '</div>'
+        '<div class="aq-compass-grid">'
+        '<div class="aq-compass-card wide"><small>Para que serve</small>'
+        f'<strong>{escape(str(model["purpose"]))}</strong>'
+        f'<span>{escape(str(model["detail"]))}</span></div>'
+        '<div class="aq-compass-card"><small>Próximo caminho</small>'
+        f'<strong>{escape(str(model["next_step"]))}</strong></div>'
+        '<div class="aq-compass-card"><small>Proteção</small>'
+        '<strong>Ordens reais bloqueadas</strong><span>O modo de interface não vira autorização operacional.</span></div>'
+        '</div></div>'
     )
 
 

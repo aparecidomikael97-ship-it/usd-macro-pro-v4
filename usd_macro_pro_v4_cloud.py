@@ -351,6 +351,7 @@ try:
         navigation_groups_html,
         render_experience_mode_switch,
         experience_mode_overview_html,
+        experience_compass_html,
         operation_focus_html,
         mobile_navigation_hint_html,
         render_stable_navigation,
@@ -367,6 +368,7 @@ except Exception as _atlasquant_ui_exc:
     navigation_groups_html = None
     render_experience_mode_switch = None
     experience_mode_overview_html = None
+    experience_compass_html = None
     operation_focus_html = None
     mobile_navigation_hint_html = None
     render_stable_navigation = None
@@ -4194,6 +4196,11 @@ _aq_locked_preview = bool(
     is_page_locked_for_mode is not None
     and is_page_locked_for_mode(_aq_active_page, _aq_experience_mode)
 )
+if experience_compass_html is not None:
+    st.markdown(
+        experience_compass_html(_aq_experience_mode, _aq_active_page),
+        unsafe_allow_html=True,
+    )
 if _aq_locked_preview and render_locked_advanced_preview is not None:
     render_locked_advanced_preview(_aq_active_page)
 _aq_active_index = (

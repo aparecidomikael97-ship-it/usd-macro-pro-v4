@@ -22,6 +22,11 @@ import pandas as pd
 import requests
 import streamlit as st
 
+try:
+    from atlasquant_ui_v1 import experience_compass_html
+except Exception:
+    experience_compass_html = None
+
 SCHEMA="ATLASQUANT_HOME_SNAPSHOT_V1"
 HOME_SNAPSHOT_PATH="dados/atlasquant_home_snapshot_v1.json"
 DEFAULT_MAX_AGE_MIN=90.0
@@ -384,8 +389,13 @@ def render_beginner_shell(
             load_home_snapshot.clear()
             st.rerun()
 
-    pages=["🎯 Radar","🎙️ Macro","🎓 Aprender","👤 Conta","📱 Instalar","🛟 Suporte"]
+    pages=["🎯 Radar","🎙️ Macro","🎓 Aprender","👤 Conta","📱 Instalar","💰 Investir","🛟 Suporte"]
     page=st.radio("Área",pages,horizontal=True,key="aq_beginner_page",label_visibility="collapsed")
+    if experience_compass_html is not None:
+        st.markdown(
+            experience_compass_html("Iniciante", page),
+            unsafe_allow_html=True,
+        )
 
     if page=="🎯 Radar":
         from atlasquant_home_radar import render_home_radar
@@ -418,6 +428,9 @@ def render_beginner_shell(
     elif page=="📱 Instalar":
         from atlasquant_platform_center import render_platform_center
         render_platform_center()
+    elif page=="💰 Investir":
+        from atlasquant_investment_panel import render_investment_center
+        render_investment_center("Iniciante")
     else:
         from atlasquant_support_center import render_support_center
         render_support_center()
