@@ -49,6 +49,7 @@ from atlasquant_navigation_bridge import (
 from atlasquant_interface_validation import interface_validation_mission
 from atlasquant_publication_truth import publication_truth
 from atlasquant_release_gate import release_gate
+from atlasquant_aion_source_mesh import source_mesh_snapshot
 import re
 
 # V10 — camada observacional profissional. O try/except evita derrubar
@@ -9928,6 +9929,82 @@ if _aq_active_index == 20:
 # Índice 21 existe somente em sessão ADMIN e é anexado ao fim
 # para não deslocar nenhum workspace legado.
 # =========================================================
+def _build_aion_source_runtime_context():
+    """Assemble AION source evidence from already-existing AtlasQuant runtime state.
+
+    The helper reuses existing runtime readers and never promotes fallback/snapshot
+    evidence to live market confirmation on its own.
+    """
+    try:
+        autopilot_status, autopilot_source = _github_get_json_v937(
+            "dados/autopilot_status_v107.json",
+            {},
+        )
+    except Exception as status_exc:
+        autopilot_status = {}
+        autopilot_source = "runtime status unavailable: " + type(status_exc).__name__
+
+    try:
+        news_payload, news_source = _github_get_json_v937(
+            "dados/currency_news_current_v107.json",
+            {},
+        )
+    except Exception as news_exc:
+        news_payload = {}
+        news_source = "news runtime unavailable: " + type(news_exc).__name__
+
+    try:
+        next_event = _proximo_evento_macro_v65()
+    except Exception:
+        next_event = {"disponivel": False}
+
+    pair_matrix_status = dict(
+        st.session_state.get("atlasquant_pair_matrix_status", {}) or {}
+    )
+    fed_headlines = len(list(fed.get("analisadas", []) or []))
+    fed_observation = {
+        "source": "Fed Narrative RSS",
+        "claim": "fed_narrative_runtime",
+        "value": {
+            "tom": str(fed.get("tom", "Neutro")),
+            "forca": float(fed.get("forca", 0.0) or 0.0),
+            "headlines": fed_headlines,
+        },
+        "truth_state": "INFERENCE" if fed_headlines > 0 else "UNKNOWN",
+        "available": fed_headlines > 0,
+        "healthy": fed_headlines > 0,
+        "criticality": "MEDIUM",
+        "family": "news",
+        "detail": (
+            "Leitura heurística de narrativa; não é comunicado oficial nem fato de mercado."
+        ),
+    }
+
+    mesh = source_mesh_snapshot(
+        macro_us=macro_eua if isinstance(macro_eua, dict) else {},
+        next_event=next_event,
+        autopilot_status=autopilot_status if isinstance(autopilot_status, dict) else {},
+        autopilot_provenance=autopilot_source,
+        persisted_news=news_payload if isinstance(news_payload, dict) else {},
+        news_provenance=news_source,
+        pair_matrix_status=pair_matrix_status,
+        extra_observations=[fed_observation],
+    )
+    market_live = bool(mesh.get("market_live_confirmed", False))
+    market_state = str(mesh.get("market_state") or "UNKNOWN")
+    market_context = {
+        "fresh_confirmed": market_live,
+        "summary": (
+            "Matriz ao vivo + Autopilot + scanner/mapa + Twelve Data confirmados e frescos."
+            if market_live
+            else f"Leitura ao vivo não confirmada pelo Source Mesh ({market_state})."
+        ),
+        "source_mesh_state": market_state,
+        "source_observations": int(mesh.get("observation_count") or 0),
+    }
+    return mesh, market_context
+
+
 if _aq_active_index == 21:
     if str(_ATLASQUANT_ACCESS.get("role") or "").upper() != "ADMIN":
         st.error("AION oficial do administrador está bloqueado para esta sessão.")
@@ -9936,10 +10013,7 @@ if _aq_active_index == 21:
         if _ATLASQUANT_AION_IMPORT_ERROR:
             st.caption("Diagnóstico AION: "+_ATLASQUANT_AION_IMPORT_ERROR)
     else:
-        _aion_market_context = {
-            "fresh_confirmed": False,
-            "summary": "",
-        }
+        _aion_source_mesh, _aion_market_context = _build_aion_source_runtime_context()
         _aion_critical_surfaces = surface_health_snapshot(
             st.session_state,
             current_build=_ATLASQUANT_SOURCE_BUILD,
@@ -9966,7 +10040,9 @@ if _aq_active_index == 21:
             "source_build": _ATLASQUANT_SOURCE_BUILD,
             "environment": ATLASQUANT_ENVIRONMENT,
             "app_version": APP_VERSION,
-            "market_status": "não confirmado nesta tela",
+            "market_status": _aion_market_context["summary"],
+            "source_mesh": _aion_source_mesh,
+            "source_observations": list(_aion_source_mesh.get("observations", []) or []),
             "critical_surfaces": _aion_critical_surfaces,
             "interface_validation": _aion_interface_validation,
             "publication_truth": _aion_publication_truth,

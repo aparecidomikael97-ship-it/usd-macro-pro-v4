@@ -1163,9 +1163,40 @@ def _render_reliability_governance(system_context: Mapping[str, Any] | None) -> 
     )
     st.markdown("#### 🛡️ Reliability & Governance")
     st.caption(
-        "Data Guardian + reconciliação de fontes + Cost Guardian + proteção da memória + "
+        "Data Guardian + Source Mesh + reconciliação de fontes + Cost Guardian + proteção da memória + "
         "modo degradado + rollback consultivo. Nenhuma correção, compra, deploy ou rollback é automático."
     )
+    source_mesh = (
+        system.get("source_mesh")
+        if isinstance(system.get("source_mesh"), Mapping)
+        else {}
+    )
+    if source_mesh:
+        m1,m2,m3,m4 = st.columns(4)
+        m1.metric("Source Mesh", str(source_mesh.get("market_state") or "UNKNOWN"))
+        m2.metric("Observações", int(source_mesh.get("observation_count") or 0))
+        m3.metric("Confirmadas", int(source_mesh.get("confirmed_observations") or 0))
+        m4.metric("Fallback/indisp.", int(source_mesh.get("fallback_or_unavailable") or 0))
+        families = (
+            source_mesh.get("families")
+            if isinstance(source_mesh.get("families"), Mapping)
+            else {}
+        )
+        if families:
+            st.caption(
+                "Famílias observadas: "
+                + " · ".join(f"{name}: {count}" for name,count in sorted(families.items()))
+            )
+        if bool(source_mesh.get("market_live_confirmed", False)):
+            st.success(
+                "Mercado ao vivo confirmado pelo Source Mesh: Matriz ao vivo + Autopilot + "
+                "scanner/mapa + Twelve Data passaram juntos."
+            )
+        else:
+            st.info(
+                "Mercado ao vivo NÃO foi confirmado pelo Source Mesh nesta execução. "
+                "Snapshot/fallback pode manter contexto, mas não vira evidência ao vivo."
+            )
     if not reliability:
         st.warning("Camada de confiabilidade não confirmada nesta execução.")
         return
@@ -1209,11 +1240,17 @@ def _render_reliability_governance(system_context: Mapping[str, Any] | None) -> 
 
     conflicts = int(reconciliation.get("conflict_count") or 0)
     critical_conflicts = int(reconciliation.get("critical_conflict_count") or 0)
+    advisory_bad = int(data.get("advisory_bad_sources") or 0)
     r1,r2,r3,r4 = st.columns(4)
     r1.metric("Conflitos de fonte", conflicts)
     r2.metric("Conflitos críticos", critical_conflicts)
     r3.metric("Rollback", str(rollback.get("state") or "STANDBY"))
     r4.metric("Ordens reais", "BLOQUEADAS")
+    if advisory_bad:
+        st.caption(
+            f"{advisory_bad} fonte(s) LOW/MEDIUM estão em aviso. "
+            "Elas continuam visíveis, mas não derrubam sozinhas a postura crítica do sistema."
+        )
 
     if str(degraded.get("state") or "").upper()=="FAIL_CLOSED":
         st.error(
@@ -1245,6 +1282,7 @@ def _render_reliability_governance(system_context: Mapping[str, Any] | None) -> 
         with st.expander("Fontes e evidências observadas", expanded=False):
             st.dataframe([
                 {
+                    "Família":row.get("family"),
                     "Fonte":row.get("source"),
                     "Afirmação":row.get("claim"),
                     "Estado":row.get("state"),
@@ -4393,6 +4431,21 @@ def render_aion_admin_console(
         ),
         "reliability_automatic_repair": False,
         "reliability_automatic_rollback": False,
+        "source_mesh_state": str(
+            ((system.get("source_mesh") or {}) if isinstance(system.get("source_mesh"), Mapping) else {}).get("market_state")
+            or "UNKNOWN"
+        ),
+        "source_mesh_live_confirmed": bool(
+            ((system.get("source_mesh") or {}) if isinstance(system.get("source_mesh"), Mapping) else {}).get("market_live_confirmed", False)
+        ),
+        "source_mesh_observations": int(
+            ((system.get("source_mesh") or {}) if isinstance(system.get("source_mesh"), Mapping) else {}).get("observation_count")
+            or 0
+        ),
+        "source_mesh_fallbacks": int(
+            ((system.get("source_mesh") or {}) if isinstance(system.get("source_mesh"), Mapping) else {}).get("fallback_or_unavailable")
+            or 0
+        ),
         "commander_posture": str(commander_snapshot.get("posture") or "UNKNOWN"),
         "commander_objective": str(commander_snapshot.get("objective") or ""),
         "commander_next_action": str(commander_snapshot.get("next_action") or ""),
