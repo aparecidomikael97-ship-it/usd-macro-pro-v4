@@ -5,6 +5,7 @@ from pathlib import Path
 
 from atlasquant_aion_memory import (
     APPROVED_AION_FOUNDATION,
+    FOUNDATION_REVISION,
     RuntimeConfig,
     canonical_documents,
     canonical_memory_summary,
@@ -60,6 +61,23 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("breaking alert", joined)
         self.assertIn("hypothesis", joined)
         self.assertIn("24/7", joined)
+        self.assertIn("policy engine", joined)
+        self.assertIn("prompt injection", joined)
+        self.assertIn("portable core", joined)
+        self.assertIn("aion vault", joined)
+        self.assertIn("autonomy budget", joined)
+        self.assertIn("falsification engine", joined)
+        self.assertIn("motor universal de performance", joined)
+        self.assertIn("codex", joined)
+        self.assertIn("cursor", joined)
+        self.assertIn("claude code", joined)
+        self.assertIn("dev fusion engine", joined)
+        self.assertIn("elite developer stack", joined)
+        self.assertIn("creative fusion studio", joined)
+        self.assertIn("antivírus", joined)
+        self.assertIn("digital twin", joined)
+        self.assertIn("proof of safety", joined)
+        self.assertIn("salvar, amarrar", joined)
 
     def test_canonical_loader_reads_project_files_and_foundation(self):
         with tempfile.TemporaryDirectory() as td:
@@ -70,7 +88,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
             paths = {d["path"] for d in docs}
             self.assertIn("CONTEXTO_DO_PROJETO.md", paths)
             self.assertIn("HISTORICO_DE_ALTERACOES.md", paths)
-            self.assertIn("AION_APPROVED_FOUNDATION_2026-09-23", paths)
+            self.assertIn("AION_APPROVED_FOUNDATION_2026-09-25", paths)
             summary = canonical_memory_summary(root)
             self.assertEqual(summary["status"], "CONFIRMED")
             self.assertGreaterEqual(summary["document_count"], 3)
@@ -98,6 +116,22 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
             self.assertIn("path", hits[0])
             self.assertIn("excerpt", hits[0])
             self.assertIn("sha256", hits[0])
+
+    def test_checkpoint_merges_current_approved_foundation_without_losing_legacy_items(self):
+        old = {
+            "checkpoint_version": 8,
+            "project": "AtlasQuant",
+            "approved_foundation": ["Regra legada preservada."],
+            "aion": {},
+        }
+        upgraded = ensure_operating_checkpoint(old)
+        joined = " ".join(upgraded["approved_foundation"]).lower()
+        self.assertIn("regra legada preservada", joined)
+        self.assertIn("aion portable core", joined)
+        self.assertIn("creative fusion studio", joined)
+        self.assertIn("motor universal de performance", joined)
+        self.assertEqual(upgraded["aion"]["foundation_revision"], FOUNDATION_REVISION)
+        self.assertGreaterEqual(upgraded["checkpoint_version"], 9)
 
     def test_default_checkpoint_is_safe_and_has_no_real_trading(self):
         cp = default_checkpoint()
@@ -137,7 +171,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
     def test_older_checkpoint_is_upgraded_without_claiming_persistence(self):
         old={"checkpoint_version":1,"project":"AtlasQuant"}
         upgraded=ensure_operating_checkpoint(old)
-        self.assertEqual(upgraded["checkpoint_version"],8)
+        self.assertEqual(upgraded["checkpoint_version"],9)
         self.assertIn("operating",upgraded)
         self.assertIn("studio",upgraded)
         self.assertIn("business",upgraded)
@@ -182,7 +216,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         })
         self.assertTrue(preflight["allowed"])
         self.assertEqual(preflight["mode"],"UPDATE_MIGRATION")
-        self.assertIn("V8",preflight["reason"])
+        self.assertIn("V9",preflight["reason"])
 
     def test_integrity_mismatch_blocks_runtime_write_preflight(self):
         tampered=default_checkpoint()
