@@ -201,11 +201,9 @@ def executive_pulse(
                 "executive_pulse",
             ))
 
-    candidates.sort(key=lambda x:(
-        PRIORITY_RANK.get(x["priority"],9),
-        x["area"],
-        x["title"],
-    ))
+    # Python sort is stable: for equal priority, preserve the safety-rule
+    # insertion order above (conflict/integrity/critical before lower-level cues).
+    candidates.sort(key=lambda x:PRIORITY_RANK.get(x["priority"],9))
     primary=candidates[0]
 
     if primary["priority"]=="P0":
