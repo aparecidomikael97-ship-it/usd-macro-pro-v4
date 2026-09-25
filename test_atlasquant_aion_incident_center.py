@@ -154,6 +154,44 @@ class AtlasQuantAionIncidentCenterTests(unittest.TestCase):
         self.assertIn("CRITICAL",sevs)
         self.assertTrue(any(x["kind"]=="SECRET_EXPOSURE" for x in out["incidents"]))
 
+    def test_critical_source_conflict_becomes_critical_incident(self):
+        out=collect_incidents(
+            checkpoint=default_checkpoint(),
+            system_context={
+                "reliability":{
+                    "data_guardian":{
+                        "reconciliation":{
+                            "conflict_count":2,
+                            "critical_conflict_count":1,
+                        }
+                    },
+                    "cost_guardian":{"state":"ZERO_COST"},
+                }
+            },
+        )
+        row=next(x for x in out["incidents"] if x["kind"]=="SOURCE_RELIABILITY")
+        self.assertEqual(row["severity"],"CRITICAL")
+        self.assertIn("não escolhe silenciosamente",row["detail"])
+        plan=incident_response_plan(row)
+        joined=" ".join(plan["steps"])
+        self.assertIn("Preservar os valores divergentes",joined)
+        self.assertFalse(plan["automatic_rollback"])
+
+    def test_cost_limit_is_medium_and_never_triggers_paid_fallback(self):
+        out=collect_incidents(
+            checkpoint=default_checkpoint(),
+            system_context={
+                "reliability":{
+                    "data_guardian":{"reconciliation":{"conflict_count":0,"critical_conflict_count":0}},
+                    "cost_guardian":{"state":"BLOCKED_LIMIT"},
+                }
+            },
+        )
+        row=next(x for x in out["incidents"] if x["kind"]=="COST_GOVERNANCE")
+        self.assertEqual(row["severity"],"MEDIUM")
+        plan=incident_response_plan(row)
+        self.assertIn("fallback pago automático desligado"," ".join(plan["steps"]).lower())
+
     def test_rows_are_presentation_only(self):
         out=collect_incidents(
             checkpoint=default_checkpoint(),
