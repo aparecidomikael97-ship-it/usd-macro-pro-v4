@@ -206,6 +206,26 @@ def build_provider_prompt(
     reliability_posture=redact_text(reliability.get("posture"))[:40] or "não confirmado"
     degraded_state=redact_text(degraded.get("state"))[:40] or "não confirmado"
     source_conflicts=int(reconciliation.get("conflict_count") or 0)
+    live_events=(
+        system.get("live_event_intelligence")
+        if isinstance(system.get("live_event_intelligence"),Mapping)
+        else {}
+    )
+    live_event_state=redact_text(live_events.get("state"))[:40] or "não confirmado"
+    live_event_alerts=int(live_events.get("alert_count") or 0)
+    live_event_urgent=int(live_events.get("urgent_review_count") or 0)
+    top_event=""
+    top_alerts=[
+        x for x in list(live_events.get("top_alerts",[]) or [])
+        if isinstance(x,Mapping)
+    ]
+    if top_alerts:
+        top=top_alerts[0]
+        top_event=(
+            f"{redact_text(top.get('headline'))[:240]} | "
+            f"truth={redact_text(top.get('truth_state'))[:30]} | "
+            f"impact={redact_text(top.get('impact_truth_state'))[:30]}"
+        )
     prompt=f"""Você é o AION do AtlasQuant, assistente do administrador.
 
 REGRAS OBRIGATÓRIAS:
@@ -224,6 +244,14 @@ Ambiente informado pelo app: {environment}
 Reliability posture: {reliability_posture}
 Modo degradado: {degraded_state}
 Conflitos de fonte confirmados: {source_conflicts}
+Live Event Intelligence: {live_event_state}
+Alertas de evento: {live_event_alerts}
+Urgentes para revisão: {live_event_urgent}
+Evento no topo: {top_event or "nenhum evento fresco fornecido"}
+
+Se houver evento de notícia, trate a manchete como evidência de reportagem (INFERENCE/UNKNOWN)
+a menos que a própria evidência fornecida confirme o fato. Impactos de mercado do Event Intelligence
+são HYPOTHESIS e nunca autorização/sinal de trade.
 
 Se Reliability estiver DEGRADED/CRITICAL ou o modo estiver DEGRADED_SAFE/FAIL_CLOSED,
 não apresente a capacidade dependente como saudável. Se houver conflito de fonte,
