@@ -63,6 +63,7 @@ def executive_pulse(
     publication_truth:Mapping[str,Any]|None=None,
     release_gate_snapshot:Mapping[str,Any]|None=None,
     reliability_snapshot:Mapping[str,Any]|None=None,
+    event_intelligence_snapshot:Mapping[str,Any]|None=None,
     checkpoint_dirty:bool=False,
     checkpoint_conflict:bool=False,
     foundation_diagnostics:Sequence[Mapping[str,Any]]|None=None,
@@ -76,6 +77,7 @@ def executive_pulse(
     publication=dict(publication_truth or {})
     release_gate=dict(release_gate_snapshot or {})
     reliability=dict(reliability_snapshot or {})
+    event_intelligence=dict(event_intelligence_snapshot or {})
     diagnostics=[dict(x) for x in list(foundation_diagnostics or []) if isinstance(x,Mapping)]
 
     candidates=[]
@@ -157,6 +159,43 @@ def executive_pulse(
             high.get("detail") or "Há um incidente de alta severidade.",
             "Revisar o Centro de Segurança antes de avançar em mudanças sensíveis.",
             high.get("source") or "incident_center",
+        ))
+
+    top_event_alert=(
+        event_intelligence.get("top_alert")
+        if isinstance(event_intelligence.get("top_alert"),Mapping)
+        else {}
+    )
+    event_alert_state=str(top_event_alert.get("state") or "").upper()
+    if event_alert_state=="URGENT_INTERNAL":
+        event_id=str(top_event_alert.get("event_id") or "")
+        event_rows=[
+            dict(x) for x in list(event_intelligence.get("events",[]) or [])
+            if isinstance(x,Mapping)
+        ]
+        event_row=next((x for x in event_rows if str(x.get("event_id") or "")==event_id),{})
+        candidates.append(_attention(
+            "P1","trading",
+            "Evento de mercado requer revisão imediata",
+            str(event_row.get("headline") or top_event_alert.get("reason") or "Evento crítico/fresco detectado."),
+            "Abrir Event Intelligence, confirmar a fonte/fato e revisar hipóteses de impacto. Nenhuma ordem é automática.",
+            "aion_event_intelligence",
+        ))
+    elif event_alert_state in {"REVIEW_INTERNAL","HOLD"}:
+        candidates.append(_attention(
+            "P2","trading",
+            "Evento relevante aguardando confirmação",
+            str(top_event_alert.get("reason") or "Há evento relevante em revisão interna."),
+            "Revisar fonte, verdade do evento e impacto antes de usar a informação em qualquer leitura.",
+            "aion_event_intelligence",
+        ))
+    elif event_alert_state=="WATCH":
+        candidates.append(_attention(
+            "P3","trading",
+            "Event Intelligence em observação",
+            "Há evento recente abaixo do gate de urgência.",
+            "Acompanhar a evolução sem promover hipótese a fato ou sinal.",
+            "aion_event_intelligence",
         ))
 
     reliability_posture=str(reliability.get("posture") or "").upper()
@@ -379,6 +418,9 @@ def executive_pulse(
         "reliability_posture":reliability_posture or "NONE",
         "degraded_mode_state":degraded_state or "NONE",
         "cost_guardian_state":cost_state or "NONE",
+        "event_alert_state":event_alert_state or "NONE",
+        "event_active_alerts":int(event_intelligence.get("active_alerts") or 0),
+        "event_urgent_alerts":int(event_intelligence.get("urgent_alerts") or 0),
         "recommended_workspace":primary["area"],
         "executes_action":False,
         "real_orders_enabled":False,
