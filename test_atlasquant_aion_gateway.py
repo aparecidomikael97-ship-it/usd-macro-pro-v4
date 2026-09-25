@@ -144,6 +144,35 @@ class AtlasQuantAionGatewayTests(unittest.TestCase):
         self.assertIn("FAIL-CLOSED",result["answer"])
         self.assertFalse(result["executes_action"])
 
+    def test_local_answer_reports_event_truth_without_turning_impact_into_signal(self):
+        result=local_answer(
+            "o que aconteceu no mercado?",
+            checkpoint={"aion":{"priority":"AION"}},
+            system_context={
+                "event_intelligence":{
+                    "active_alerts":1,
+                    "urgent_alerts":0,
+                    "top_alert":{
+                        "state":"REVIEW_INTERNAL",
+                        "event_id":"EVT-1",
+                        "event_truth":"UNKNOWN",
+                    },
+                    "events":[{
+                        "event_id":"EVT-1",
+                        "headline":"Relato de ataque ainda não confirmado por fonte oficial.",
+                        "event_truth":"UNKNOWN",
+                    }],
+                }
+            },
+        )
+        self.assertEqual(result["event_alert_state"],"REVIEW_INTERNAL")
+        self.assertEqual(result["event_active_alerts"],1)
+        self.assertEqual(result["event_urgent_alerts"],0)
+        self.assertIn("Verdade do evento: UNKNOWN",result["answer"])
+        self.assertIn("hipóteses, não sinais",result["answer"])
+        self.assertFalse(result["event_external_notifications"])
+        self.assertFalse(result["real_orders_enabled"])
+
     def test_local_answer_does_not_invent_fresh_market_state(self):
         result = local_answer(
             "como está o radar forex agora?",
