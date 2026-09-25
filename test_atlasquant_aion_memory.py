@@ -151,8 +151,27 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("aion portable core", joined)
         self.assertIn("creative fusion studio", joined)
         self.assertIn("motor universal de performance", joined)
+        self.assertIn("fundos imobiliários", joined)
+        self.assertIn("motor de receita", joined)
+        self.assertIn("lucro líquido", joined)
+        self.assertIn("radar de tendências", joined)
+        self.assertIn("curiosidade controlada", joined)
         self.assertEqual(upgraded["aion"]["foundation_revision"], FOUNDATION_REVISION)
         self.assertGreaterEqual(upgraded["checkpoint_version"], 14)
+
+    def test_completed_runtime_validation_is_removed_from_pending_without_losing_other_items(self):
+        old={
+            "checkpoint_version":14,
+            "project":"AtlasQuant",
+            "pending":[
+                "Validar persistência runtime do Checkpoint Mestre.",
+                "Pendência customizada preservada.",
+            ],
+        }
+        upgraded=ensure_operating_checkpoint(old)
+        self.assertNotIn("Validar persistência runtime do Checkpoint Mestre.",upgraded["pending"])
+        self.assertIn("Pendência customizada preservada.",upgraded["pending"])
+        self.assertNotIn("Validar persistência runtime do Checkpoint Mestre.",default_checkpoint()["pending"])
 
     def test_default_checkpoint_is_safe_and_has_no_real_trading(self):
         cp = default_checkpoint()
