@@ -1,0 +1,74 @@
+name: AION Runtime Checkpoint Migration
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "atlasquant_aion_memory.py"
+      - "atlasquant_aion_resilience.py"
+      - "atlasquant_aion_runtime_migrate.py"
+      - ".github/workflows/aion-runtime-checkpoint-migrate.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: aion-runtime-checkpoint-migration
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout canonical main
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install project dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Read current runtime checkpoint
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          API_PATH="repos/${GITHUB_REPOSITORY}/contents/dados/aion/checkpoint_master.json"
+          gh api "$API_PATH?ref=atlasquant-runtime" >/tmp/runtime_meta.json
+          jq -r '.content' /tmp/runtime_meta.json | tr -d '\n' | base64 -d >/tmp/runtime_before.json
+          jq -r '.sha' /tmp/runtime_meta.json >/tmp/runtime_sha.txt
+
+      - name: Verify and migrate current runtime checkpoint
+        run: |
+          set -euo pipefail
+          python atlasquant_aion_runtime_bootstrap.py --verify /tmp/runtime_before.json
+          python atlasquant_aion_runtime_migrate.py             --input /tmp/runtime_before.json             --output /tmp/runtime_after.json
+          python atlasquant_aion_runtime_bootstrap.py --verify /tmp/runtime_after.json
+
+      - name: Conditionally persist migration
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if cmp -s /tmp/runtime_before.json /tmp/runtime_after.json; then
+            echo "Runtime checkpoint already matches canonical schema."
+            exit 0
+          fi
+          API_PATH="repos/${GITHUB_REPOSITORY}/contents/dados/aion/checkpoint_master.json"
+          CURRENT_SHA="$(cat /tmp/runtime_sha.txt)"
+          CONTENT="$(base64 -w0 /tmp/runtime_after.json)"
+          gh api --method PUT "$API_PATH"             -f message='AION: migrar Checkpoint Mestre para schema atual'             -f content="$CONTENT"             -f branch='atlasquant-runtime'             -f sha="$CURRENT_SHA" >/tmp/runtime_write.json
+
+      - name: Read back and verify migration
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          API_PATH="repos/${GITHUB_REPOSITORY}/contents/dados/aion/checkpoint_master.json"
+          gh api "$API_PATH?ref=atlasquant-runtime" --jq '.content'             | tr -d '\n' | base64 -d >/tmp/runtime_readback.json
+          python atlasquant_aion_runtime_bootstrap.py --verify /tmp/runtime_readback.json
