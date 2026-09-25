@@ -61,6 +61,15 @@ class AtlasQuantAionSourceMeshTests(unittest.TestCase):
         self.assertFalse(row["available"])
         self.assertFalse(row["healthy"])
 
+    def test_calendar_requires_explicit_source_to_be_confirmed(self):
+        row=calendar_observations({
+            "disponivel":True,
+            "evento":"CPI",
+            "impacto":"MÁXIMO",
+        })[0]
+        self.assertEqual(row["truth_state"],"UNKNOWN")
+        self.assertTrue(row["available"])
+
     def test_autopilot_maps_twelve_quota_and_news_nowcast(self):
         rows=autopilot_observations({
             "version":"V11",
