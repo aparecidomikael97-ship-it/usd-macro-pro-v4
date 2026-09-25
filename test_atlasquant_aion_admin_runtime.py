@@ -35,6 +35,46 @@ st.write("AION_RUNTIME_OK",result["allowed"],result["real_orders_enabled"])
         self.assertGreaterEqual(len(app.selectbox),1)
         self.assertEqual(str(app.selectbox[0].value),"🧠 Central")
 
+    def test_subscriptions_and_promotions_are_separate_admin_workspaces(self):
+        from atlasquant_aion_admin import AION_WORKSPACES
+        self.assertIn("🔐 Assinaturas",AION_WORKSPACES)
+        self.assertIn("🎟️ Promoções",AION_WORKSPACES)
+        self.assertNotEqual(
+            AION_WORKSPACES.index("🔐 Assinaturas"),
+            AION_WORKSPACES.index("🎟️ Promoções"),
+        )
+
+    def test_subscriptions_workspace_renders_without_mounting_promotion_form(self):
+        script = r"""
+import os
+os.environ["GITHUB_TOKEN_HISTORICO"]=""
+os.environ["GITHUB_REPO_HISTORICO"]=""
+os.environ["GITHUB_DATA_BRANCH"]="atlasquant-runtime"
+os.environ["AION_MODEL_PROVIDER"]="offline"
+from atlasquant_aion_admin import render_aion_admin_console
+render_aion_admin_console(
+    {"role":"ADMIN","username":"admin.test"},
+    market_context={"fresh_confirmed":False,"summary":""},
+    system_context={
+        "truth_state":"CONFIRMED",
+        "source_build":"test-build",
+        "environment":"LOCAL",
+        "app_version":"test",
+        "market_status":"não confirmado nesta tela",
+    },
+)
+"""
+        app=AppTest.from_string(script)
+        app.run(timeout=45)
+        self.assertEqual(len(app.exception),0)
+        app.selectbox[0].set_value("🔐 Assinaturas").run(timeout=45)
+        self.assertEqual(len(app.exception),0)
+        page_text=" ".join(str(x.value) for group in (
+            app.markdown, app.caption, app.info, app.warning, app.success
+        ) for x in group)
+        self.assertIn("Assinaturas & Entitlements",page_text)
+        self.assertNotIn("Criar campanha",page_text)
+
     def test_selected_workspace_failure_is_isolated_without_raw_exception_message(self):
         script = r'''
 import os
