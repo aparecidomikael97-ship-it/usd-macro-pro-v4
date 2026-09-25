@@ -237,7 +237,7 @@ def build_master_status_board(
         ("social_publish","Publicação em redes sociais","studio","Conectar provedor social e validar publicação com aprovação explícita."),
         ("marketplace_publish","Publicação em marketplace","business","Conectar marketplace e validar publicação com aprovação explícita."),
         ("marketplace_orders","Pedidos de marketplace","business","Conectar fonte de pedidos antes de afirmar vendas."),
-        ("payment_provider","Pagamento/assinatura","promotions","Conectar provedor e validar eventos assinados; não conceder acesso automaticamente."),
+        ("payment_provider","Pagamento/assinatura","subscriptions","Conectar provedor e validar eventos assinados; não conceder acesso automaticamente."),
         ("promotion_activation","Ativação de promoções","promotions","Conectar registro/provedor e exigir evidência de ativação."),
         ("entitlement_activation","Ativação de entitlements","subscriptions","Conectar registro de assinaturas e exigir evidência externa confirmada."),
         ("production_deploy","Deploy de produção","development","Usar mecanismo de deploy aprovado e validar identidade exata do build."),
