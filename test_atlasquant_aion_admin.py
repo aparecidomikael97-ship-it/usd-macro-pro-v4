@@ -106,6 +106,34 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("rollback automático: NÃO",src)
         self.assertIn("nenhuma feature externa é ativada como tentativa de diagnóstico",src)
 
+    def test_central_exposes_checkpoint_v7_continuity_and_handoff(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Continuidade & Handoff",src)
+        self.assertIn("continuity_briefing(",src)
+        self.assertIn("Onde paramos:",src)
+        self.assertIn("último handoff registrado no Checkpoint",src)
+        self.assertIn('"continuity_active_missions"',src)
+        self.assertIn('"continuity_handoff_count"',src)
+
+    def test_development_persists_structured_missions_without_executing_them(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Missões persistentes",src)
+        self.assertIn("new_mission(",src)
+        self.assertIn("upsert_mission(",src)
+        self.assertIn("transition_mission(",src)
+        self.assertIn("update_continuity_checkpoint(",src)
+        self.assertIn("mission_registered",src)
+        self.assertIn("mission_updated",src)
+
+    def test_secretary_registers_handoff_only_in_working_checkpoint_until_saved(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Handoff da sessão",src)
+        self.assertIn("build_session_handoff(",src)
+        self.assertIn("append_handoff(",src)
+        self.assertIn("Registrar handoff no Checkpoint",src)
+        self.assertIn("persistência definitiva ainda exige salvar o Checkpoint",src)
+        self.assertIn("session_handoff_recorded",src)
+
     def test_admin_console_requires_admin_and_keeps_external_actions_guarded(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("if not is_admin(access_map):", src)
