@@ -167,6 +167,22 @@ class AtlasQuantAionGatewayTests(unittest.TestCase):
         self.assertIn("hipótese, não sinal de trade",result["answer"])
         self.assertFalse(result["executes_action"])
 
+    def test_local_answer_exposes_cognitive_specialists_and_critic(self):
+        result=local_answer(
+            "Analise CPI, Forex e confirme as fontes antes de responder.",
+            checkpoint={"aion":{"priority":"AION"}},
+            memory_hits=[{"path":"macro.md","excerpt":"CPI"}],
+            system_context={
+                "source_mesh":{"market_live_confirmed":True},
+                "reliability":{"degraded_mode":{"state":"NORMAL"}},
+            },
+        )
+        self.assertIn("cognitive_orchestrator",result)
+        self.assertGreaterEqual(result["cognitive_specialists"],2)
+        self.assertTrue(result["critic_required"])
+        self.assertIn("Conselho cognitivo selecionado",result["answer"])
+        self.assertFalse(result["executes_action"])
+
     def test_local_answer_does_not_invent_fresh_market_state(self):
         result = local_answer(
             "como está o radar forex agora?",
