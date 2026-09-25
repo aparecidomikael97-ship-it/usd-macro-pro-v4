@@ -395,6 +395,7 @@ def scheduled_event(
     else:
         urgency=25
     truth="CONFIRMED" if source else "UNKNOWN"
+    schedule_fresh=bool(source)
     return {
         "event_id":_event_id("calendar",name,event.get("data_txt") or event.get("data")),
         "kind":"SCHEDULED_MACRO",
@@ -402,8 +403,8 @@ def scheduled_event(
         "headline":name,
         "reported_at":_clean(event.get("data_txt") or event.get("data"),120),
         "age_minutes":None,
-        "source_snapshot_fresh":True,
-        "fresh":True,
+        "source_snapshot_fresh":schedule_fresh,
+        "fresh":schedule_fresh,
         "truth_state":truth,
         "truth_note":"Agenda confirmada somente quando há proveniência explícita; reação de mercado continua hipotética.",
         "sources":[source] if source else [],
@@ -413,7 +414,7 @@ def scheduled_event(
         "theme":_clean(event.get("tipo"),120),
         "upstream_direction_notes":[],
         "urgency_score":int(urgency),
-        "alert_level":_alert_level(int(urgency),fresh=True,category="SCHEDULED_MACRO"),
+        "alert_level":_alert_level(int(urgency),fresh=schedule_fresh,category="SCHEDULED_MACRO"),
         "impact_channels":_impact_channels("SCHEDULED_MACRO"),
         "impact_truth_state":"HYPOTHESIS",
         "link":"",
