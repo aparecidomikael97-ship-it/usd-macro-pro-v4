@@ -68,12 +68,24 @@ class AtlasQuantAionDurableTasksTests(unittest.TestCase):
 
     def test_waiting_approval_is_persisted_not_bypassed(self):
         task=self._task()
+        task=update_step(task,"spec","DONE")
+        task=update_step(task,"test","DONE")
         task=update_step(task,"merge","WAITING_APPROVAL",blocker="Aprovação necessária.")
         self.assertEqual(task["state"],"WAITING_APPROVAL")
         view=prepare_resume(task,expected_revision=task["revision"],checkpoint_digest="cp-a")
         self.assertEqual(view["state"],"RESUME_READY")
         self.assertEqual(view["task_state"],"WAITING_APPROVAL")
+        self.assertEqual(view["next_step"]["step_id"],"merge")
         self.assertFalse(view["executes_action"])
+        resumed=record_resume(task,checkpoint_digest="cp-a")
+        self.assertEqual(resumed["state"],"WAITING_APPROVAL")
+
+    def test_future_blocker_does_not_skip_current_cursor(self):
+        task=self._task()
+        task=update_step(task,"merge","BLOCKED",blocker="Ainda não.")
+        self.assertEqual(task["cursor"],0)
+        self.assertEqual(task["next_action"],"Especificar")
+        self.assertEqual(task["state"],"PAUSED")
 
     def test_record_resume_only_changes_state_metadata(self):
         task=self._task()
@@ -81,6 +93,16 @@ class AtlasQuantAionDurableTasksTests(unittest.TestCase):
         self.assertEqual(resumed["resume_generation"],1)
         self.assertEqual(resumed["state"],"PAUSED")
         self.assertFalse(resumed["automatic_resume_executes"])
+
+    def test_invalid_numeric_metadata_normalizes_fail_safe(self):
+        task=self._task()
+        task["cursor"]="not-a-number"
+        task["revision"]="bad"
+        task["resume_generation"]="bad"
+        task["steps"][0]["attempts"]="bad"
+        view=prepare_resume(task,checkpoint_digest="cp-a")
+        self.assertEqual(view["cursor"],0)
+        self.assertEqual(view["revision"],1)
 
     def test_summary_and_digest_are_deterministic(self):
         task=self._task()
