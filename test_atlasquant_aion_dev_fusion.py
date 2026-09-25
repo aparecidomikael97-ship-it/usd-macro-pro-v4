@@ -29,6 +29,22 @@ class AtlasQuantAionDevFusionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             record_stage(p,"BREAK",state="PASS",actor_ref="reviewer",evidence_refs=["redteam:1"])
 
+    def test_evaluation_pass_requires_run_id(self):
+        p=self._pipeline()
+        with self.assertRaises(ValueError):
+            record_stage(
+                p,"EVALUATE",state="PASS",actor_ref="evaluator",
+                evidence_refs=["eval:1"],
+            )
+
+    def test_release_review_cannot_pass_out_of_order(self):
+        p=self._pipeline()
+        with self.assertRaises(ValueError):
+            record_stage(
+                p,"RELEASE_REVIEW",state="PASS",actor_ref="admin",
+                evidence_refs=["approval:1"],
+            )
+
     def test_pipeline_reaches_human_review_not_deploy(self):
         p=self._pipeline()
         p=record_stage(p,"PLAN",state="PASS",actor_ref="planner",evidence_refs=["plan:1"])
@@ -44,6 +60,12 @@ class AtlasQuantAionDevFusionTests(unittest.TestCase):
         self.assertFalse(p["automatic_deploy"])
         self.assertFalse(p["production_change_allowed"])
         self.assertEqual(dev_fusion_summary([p])["human_review_candidates"],1)
+        p=record_stage(
+            p,"RELEASE_REVIEW",state="PASS",actor_ref="admin",
+            evidence_refs=["approval:1"],
+        )
+        self.assertEqual(p["state"],"DONE")
+        self.assertFalse(p["automatic_deploy"])
 
     def test_malformed_critical_findings_fail_safe_to_zero_not_crash(self):
         p=self._pipeline()
