@@ -72,6 +72,12 @@ APPROVED_AION_FOUNDATION = (
     "Assistente de voz deve ser contextual por área e opcional; não deve falar automaticamente sem controle do usuário.",
     "Fase futura: cada assinante poderá ter AION pessoal isolado; o AION oficial do administrador mantém privilégios superiores.",
     "Memória do AION deve carregar os registros canônicos do projeto desde 15/09/2026 e continuar com checkpoints versionados.",
+    "Aprendizado Controlado é obrigatório: previsão/decisão deve poder ser registrada com versão, evidência, confiança e contexto; depois deve ser comparada ao resultado real.",
+    "Erro só recebe causa confirmada quando houver evidência explícita; sem evidência a causa permanece desconhecida e o AION não inventa causalidade.",
+    "Confiança deve ser calibrada contra resultados observados, mas taxa histórica e confiança nunca equivalem a probabilidade de lucro futuro.",
+    "Backtest, Paper, Forward, Shadow, OOS e calibração entram como evidência de pesquisa referenciada na memória; não alteram gates ao vivo automaticamente.",
+    "Champion permanece oficial até que Challenger passe por fora da amostra, não degradação, Shadow Mode e revisão humana; promoção automática é proibida.",
+    "Aprender mais não significa mudar mais: hipótese nova deve ser testada antes de qualquer alteração de regra, peso, modelo ou produção.",
     "Execução real em corretora continua bloqueada; backtest/paper/forward e pesquisa não equivalem a autorização real.",
     "Gatilho operacional aprovado: quando o administrador disser 'tô no computador', priorizar a reconciliação do Render, configurar o Deploy Hook com segurança e validar Build Identity + Browser Smoke antes de retomar novos blocos.",
 )
