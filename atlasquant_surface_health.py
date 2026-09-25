@@ -19,10 +19,16 @@ _STATE_KEY = "atlasquant_critical_surface_health"
 
 
 def _safe_error_type(value: Any) -> str:
+    if isinstance(value, BaseException):
+        return type(value).__name__[:120]
     if isinstance(value, Mapping):
         value = value.get("error_type") or value.get("type") or value.get("reason")
     raw = str(value or "").strip()
-    return raw[:120] if raw else ""
+    if not raw:
+        return ""
+    # Keep only the diagnostic class/code. Messages can contain provider,
+    # path or credential-adjacent details that do not belong in the UI.
+    return raw.split(":", 1)[0].strip()[:120]
 
 
 def mark_surface_ok(
