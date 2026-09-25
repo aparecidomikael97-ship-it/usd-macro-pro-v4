@@ -134,6 +134,32 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("persistência definitiva ainda exige salvar o Checkpoint",src)
         self.assertIn("session_handoff_recorded",src)
 
+    def test_central_has_essential_and_complete_modes_for_mobile_use(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Visualização da Central",src)
+        self.assertIn('("Essencial", "Completo")',src)
+        self.assertIn("Modo Essencial ativo",src)
+        self.assertIn("reduzir carga e rolagem",src)
+        self.assertIn("_render_executive_pulse(executive_snapshot)",src)
+        self.assertIn('"central_view_mode"',src)
+
+    def test_executive_pulse_can_jump_to_recommended_workspace_safely(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Pulso Executivo AION",src)
+        self.assertIn("Abrir área recomendada",src)
+        self.assertIn("_AION_WORKSPACE_JUMP_KEY",src)
+        self.assertIn('st.session_state["aion_admin_workspace"] = jump_request',src)
+        self.assertIn('"executive_posture"',src)
+        self.assertIn('"executive_primary_area"',src)
+
+    def test_admin_mobile_contrast_is_stronger_and_single_column_at_small_width(self):
+        self.assertIn(".aion-pulse-grid",AION_ADMIN_CSS)
+        self.assertIn("@media(max-width:430px)",AION_ADMIN_CSS)
+        self.assertIn(".aion-pulse-grid{grid-template-columns:1fr}",AION_ADMIN_CSS)
+        self.assertIn("color:#e2ebf6",AION_ADMIN_CSS)
+        self.assertIn("color:#d8e6f5",AION_ADMIN_CSS)
+        self.assertIn("font-size:.76rem",AION_ADMIN_CSS)
+
     def test_admin_console_requires_admin_and_keeps_external_actions_guarded(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("if not is_admin(access_map):", src)
