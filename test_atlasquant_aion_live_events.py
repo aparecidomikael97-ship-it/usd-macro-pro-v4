@@ -110,6 +110,8 @@ class AtlasQuantAionLiveEventTests(unittest.TestCase):
             "dias":0,
         })
         self.assertEqual(unknown["truth_state"],"UNKNOWN")
+        self.assertFalse(unknown["fresh"])
+        self.assertEqual(unknown["alert_level"],"NONE")
 
     def test_live_snapshot_never_claims_continuous_runtime(self):
         out=live_event_snapshot(
