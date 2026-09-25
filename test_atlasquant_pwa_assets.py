@@ -39,6 +39,8 @@ class AtlasQuantPWAAssetsTests(unittest.TestCase):
         self.assertIn('rel="manifest"',src)
         self.assertIn('navigator.serviceWorker.register("./sw.js")',src)
         self.assertIn("atlasquant-private.onrender.com",src)
+        self.assertIn("?aion=1",src)
+        self.assertIn("Abrir AION / AtlasQuant",src)
         self.assertIn('rel="noopener"',src)
 
 if __name__=="__main__":
