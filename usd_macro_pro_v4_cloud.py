@@ -9324,6 +9324,11 @@ if _aq_active_index == 1:
             build_id=_ATLASQUANT_SOURCE_BUILD,
             unavailable=True,
         )
+        _aq_complete_guided_revalidation(
+            "master_panel",
+            succeeded=False,
+            error_type="IMPORT_UNAVAILABLE",
+        )
         st.error(
             "O Painel Mestre V10.2 não pôde ser carregado. "
             "Confirme que master_panel_v102.py está na raiz do repositório."
@@ -9334,6 +9339,17 @@ if _aq_active_index == 1:
         try:
             _matrix_master_v102 = globals().get("matriz_v61")
             if not isinstance(_matrix_master_v102,pd.DataFrame) or _matrix_master_v102.empty:
+                mark_surface_error(
+                    st.session_state,
+                    "master_panel",
+                    "PAIR_MATRIX_UNAVAILABLE",
+                    build_id=_ATLASQUANT_SOURCE_BUILD,
+                )
+                _aq_complete_guided_revalidation(
+                    "master_panel",
+                    succeeded=False,
+                    error_type="PAIR_MATRIX_UNAVAILABLE",
+                )
                 st.warning("Painel Mestre aguardando a Matriz dos 7 pares. Nenhuma oportunidade será exibida com dados incompletos.")
                 st.stop()
             _macro_context_master_v102 = {
@@ -9955,6 +9971,28 @@ if os.getenv("USD_MACRO_AUTOPILOT", "") == "1":
 # =========================================================
 if _aq_active_index == 0:
     if "matriz_v61" not in globals() or matriz_v61 is None or matriz_v61.empty:
+        mark_surface_error(
+            st.session_state,
+            "home_radar",
+            "PAIR_MATRIX_UNAVAILABLE",
+            build_id=_ATLASQUANT_SOURCE_BUILD,
+        )
+        mark_surface_error(
+            st.session_state,
+            "advanced_radar",
+            "PAIR_MATRIX_UNAVAILABLE",
+            build_id=_ATLASQUANT_SOURCE_BUILD,
+        )
+        _aq_complete_guided_revalidation(
+            "home_radar",
+            succeeded=False,
+            error_type="PAIR_MATRIX_UNAVAILABLE",
+        )
+        _aq_complete_guided_revalidation(
+            "advanced_radar",
+            succeeded=False,
+            error_type="PAIR_MATRIX_UNAVAILABLE",
+        )
         st.warning("O Radar aguarda a Matriz dos 7 pares nesta execução.")
     else:
         _macro_v108 = {
@@ -10036,6 +10074,11 @@ if _aq_active_index == 0:
                 build_id=_ATLASQUANT_SOURCE_BUILD,
                 unavailable=True,
             )
+            _aq_complete_guided_revalidation(
+                "home_radar",
+                succeeded=False,
+                error_type="IMPORT_UNAVAILABLE",
+            )
             st.caption(f"Home Radar indisponível: {_ATLASQUANT_HOME_RADAR_IMPORT_ERROR}")
 
         if str(_aq_experience_mode) == "Avançado":
@@ -10066,6 +10109,11 @@ if _aq_active_index == 0:
                     _PAIR_INTEL_V110_IMPORT_ERROR or "IMPORT_UNAVAILABLE",
                     build_id=_ATLASQUANT_SOURCE_BUILD,
                     unavailable=True,
+                )
+                _aq_complete_guided_revalidation(
+                    "advanced_radar",
+                    succeeded=False,
+                    error_type="IMPORT_UNAVAILABLE",
                 )
                 st.error("A Central Institucional V11.0.8 não pôde ser carregada.")
                 if _PAIR_INTEL_V110_IMPORT_ERROR:
