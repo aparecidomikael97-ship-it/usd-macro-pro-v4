@@ -1,0 +1,54 @@
+name: AION Runtime Bootstrap
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "atlasquant_aion_memory.py"
+      - "atlasquant_aion_*.py"
+      - "atlasquant_runtime_store.py"
+      - "scripts/aion_runtime_bootstrap.py"
+      - ".github/workflows/aion-runtime-bootstrap.yml"
+      - "docs/continuidade/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: aion-runtime-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      GITHUB_TOKEN_HISTORICO: ${{ github.token }}
+      GITHUB_REPO_HISTORICO: ${{ github.repository }}
+      GITHUB_DATA_BRANCH: atlasquant-runtime
+    steps:
+      - name: Checkout canonical main
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install bootstrap dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install streamlit pandas numpy requests altair pyarrow
+
+      - name: Bootstrap or verify AION runtime checkpoint
+        run: |
+          python scripts/aion_runtime_bootstrap.py
+
+      - name: Runtime bootstrap summary
+        if: always()
+        run: |
+          echo "AION runtime bootstrap completed with fail-closed verification."
