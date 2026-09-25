@@ -6,6 +6,7 @@ from atlasquant_aion_admin import (
     AION_WORKSPACES,
     _attention_queue,
     _critical_surface_rows,
+    _render_validation_center,
 )
 
 
@@ -104,6 +105,15 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertEqual(rows[1]["state"],"STALE_BUILD")
         self.assertEqual(rows[1]["priority"],"P2")
         self.assertNotIn("Radar principal",[row["item"] for row in rows])
+
+    def test_central_validation_center_keeps_local_and_production_separate(self):
+        src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Centro de Validação",src)
+        self.assertIn("Produção continua NÃO CONFIRMADA",src)
+        self.assertIn("Validação local nunca é tratada como prova",src)
+        self.assertIn("_render_validation_center(system_context, runtime_result)",src)
+        self.assertIn('"validation_center": validation_center_snapshot(',src)
+        self.assertNotIn("deploy_allowed=True",src)
 
     def test_central_critical_surface_health_is_truthful_and_read_only(self):
         system={
