@@ -27,6 +27,9 @@ from atlasquant_aion_memory import (
     update_vault_checkpoint,
     update_tool_hub_checkpoint,
     update_durable_tasks_checkpoint,
+    update_knowledge_graph_checkpoint,
+    synchronize_knowledge_graph_checkpoint,
+    update_evaluation_lab_checkpoint,
     update_wisdom_checkpoint,
     update_live_event_journal_checkpoint,
     update_operating_checkpoint,
@@ -135,7 +138,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("creative fusion studio", joined)
         self.assertIn("motor universal de performance", joined)
         self.assertEqual(upgraded["aion"]["foundation_revision"], FOUNDATION_REVISION)
-        self.assertGreaterEqual(upgraded["checkpoint_version"], 11)
+        self.assertGreaterEqual(upgraded["checkpoint_version"], 12)
 
     def test_default_checkpoint_is_safe_and_has_no_real_trading(self):
         cp = default_checkpoint()
@@ -177,6 +180,11 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("durable_tasks",cp)
         self.assertEqual(cp["durable_tasks"]["records"],[])
         self.assertTrue(cp["durable_tasks"]["digest"])
+        self.assertIn("knowledge_graph",cp)
+        self.assertTrue(cp["knowledge_graph"]["digest"])
+        self.assertIn("evaluation_lab",cp)
+        self.assertTrue(cp["evaluation_lab"]["digest"])
+        self.assertFalse(cp["evaluation_lab"]["automatic_promotion"])
         self.assertEqual(cp["live_event_journal"]["events"],[])
         self.assertEqual(cp["live_event_journal"]["heartbeats"],[])
         self.assertTrue(cp["live_event_journal"]["digest"])
@@ -185,7 +193,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
     def test_older_checkpoint_is_upgraded_without_claiming_persistence(self):
         old={"checkpoint_version":1,"project":"AtlasQuant"}
         upgraded=ensure_operating_checkpoint(old)
-        self.assertEqual(upgraded["checkpoint_version"],11)
+        self.assertEqual(upgraded["checkpoint_version"],12)
         self.assertIn("operating",upgraded)
         self.assertIn("studio",upgraded)
         self.assertIn("business",upgraded)
@@ -198,6 +206,8 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("vault",upgraded)
         self.assertIn("tool_hub",upgraded)
         self.assertIn("durable_tasks",upgraded)
+        self.assertIn("knowledge_graph",upgraded)
+        self.assertIn("evaluation_lab",upgraded)
         self.assertIn("live_event_journal",upgraded)
         self.assertIn("subscriptions",upgraded["areas"])
         changed=update_operating_checkpoint(upgraded,tasks=[],events=[],dirty=True)
@@ -275,6 +285,72 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertEqual(cp["durable_tasks"]["records"][0]["durable_task_id"],"DUR-TEST")
         self.assertEqual(checkpoint_integrity_report(cp)["state"],"CONFIRMED")
 
+    def test_learning_and_wisdom_writes_refresh_explicit_graph_links(self):
+        cp=default_checkpoint()
+        episode={
+            "episode_id":"LEARN-GRAPH-1",
+            "subject":"Payroll surprise",
+            "state":"SETTLED",
+            "domain":"trading",
+            "forecast_type":"CATEGORICAL",
+            "prediction":"USD_UP",
+            "forecast_confidence_pct":70,
+            "model_version":"AION",
+            "evidence_refs":["calendar:payroll-1"],
+            "created_at":"2026-09-25T12:00:00+00:00",
+            "actual_outcome":"USD_UP",
+            "evaluation":"MATCH",
+            "correct":True,
+            "error_cause":"UNKNOWN",
+            "error_cause_truth":"UNKNOWN",
+        }
+        cp=update_learning_checkpoint(cp,episodes=[episode],dirty=True)
+        self.assertTrue(any(
+            x["node_id"]=="episode:learn-graph-1"
+            for x in cp["knowledge_graph"]["nodes"]
+        ))
+
+        wisdom_entry={
+            "wisdom_id":"WIS-GRAPH-1",
+            "state":"ACTIVE",
+            "topic":"Payroll reaction",
+            "domain":"trading",
+            "insight":"Resultado registrado com evidência.",
+            "truth_state":"CONFIRMED",
+            "confidence_pct":80,
+            "evidence_refs":["calendar:payroll-1"],
+            "applies_to":["USD"],
+            "source_episode_ids":["LEARN-GRAPH-1"],
+            "created_at":"2026-09-25T12:30:00+00:00",
+            "created_by":"ADMIN",
+        }
+        cp=update_wisdom_checkpoint(cp,entries=[wisdom_entry],dirty=True)
+        relations={x["relation"] for x in cp["knowledge_graph"]["edges"]}
+        self.assertIn("DERIVED_FROM",relations)
+        self.assertIn("SUPPORTED_BY",relations)
+
+    def test_checkpoint_v12_graph_and_eval_lab_roundtrip(self):
+        cp=default_checkpoint()
+        graph={
+            "nodes":[{
+                "node_id":"component:guardian",
+                "node_type":"COMPONENT",
+                "label":"Guardian",
+                "truth_state":"UNKNOWN",
+            }],
+            "edges":[],
+        }
+        cp=update_knowledge_graph_checkpoint(cp,graph=graph,dirty=True)
+        self.assertTrue(any(x["node_id"]=="component:guardian" for x in cp["knowledge_graph"]["nodes"]))
+
+        cp=synchronize_knowledge_graph_checkpoint(cp,dirty=True)
+        self.assertTrue(cp["knowledge_graph"]["digest"])
+
+        lab=dict(cp["evaluation_lab"])
+        cp=update_evaluation_lab_checkpoint(cp,evaluation_lab=lab,dirty=True)
+        self.assertFalse(cp["evaluation_lab"]["automatic_promotion"])
+        self.assertEqual(checkpoint_integrity_report(cp)["state"],"CONFIRMED")
+
     def test_integrity_report_confirms_v7_and_detects_tampering(self):
         cp=default_checkpoint()
         report=checkpoint_integrity_report(cp)
@@ -304,7 +380,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         })
         self.assertTrue(preflight["allowed"])
         self.assertEqual(preflight["mode"],"UPDATE_MIGRATION")
-        self.assertIn("V11",preflight["reason"])
+        self.assertIn("V12",preflight["reason"])
 
     def test_integrity_mismatch_blocks_runtime_write_preflight(self):
         tampered=default_checkpoint()

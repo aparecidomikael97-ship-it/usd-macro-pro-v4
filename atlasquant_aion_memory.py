@@ -62,6 +62,16 @@ from atlasquant_aion_durable_tasks import (
     normalize_durable_tasks,
     durable_tasks_digest,
 )
+from atlasquant_aion_knowledge_graph import (
+    normalize_knowledge_graph,
+    synchronize_knowledge_graph,
+    knowledge_graph_digest,
+)
+from atlasquant_aion_evaluation_lab import (
+    default_evaluation_lab,
+    normalize_evaluation_lab,
+    evaluation_lab_digest,
+)
 from atlasquant_aion_event_journal import (
     normalize_events as normalize_live_event_journal_events,
     normalize_heartbeats as normalize_live_event_heartbeats,
@@ -332,7 +342,7 @@ def search_canonical_memory(
 def default_checkpoint() -> dict[str, Any]:
     return {
         "schema": SCHEMA,
-        "checkpoint_version": 11,
+        "checkpoint_version": 12,
         "created_at": _now(),
         "updated_at": _now(),
         "project": "AtlasQuant",
@@ -403,6 +413,16 @@ def default_checkpoint() -> dict[str, Any]:
             "records": [],
             "digest": durable_tasks_digest([]),
         },
+        "knowledge_graph": {
+            "nodes": [],
+            "edges": [],
+            "digest": knowledge_graph_digest([], []),
+            "semantic_inference_automatic": False,
+            "causality_inferred_automatically": False,
+            "automatic_rule_change": False,
+            "real_trading_enabled": False,
+        },
+        "evaluation_lab": default_evaluation_lab(),
         "live_event_journal": {
             "events": [],
             "heartbeats": [],
@@ -581,6 +601,25 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
         "digest": durable_tasks_digest(durable_rows),
     }
 
+    graph_existing = normalize_knowledge_graph(
+        payload.get("knowledge_graph")
+        if isinstance(payload.get("knowledge_graph"), Mapping)
+        else {}
+    )
+    payload["knowledge_graph"] = synchronize_knowledge_graph(
+        graph_existing,
+        wisdom_entries=wisdom_entries,
+        learning_episodes=learning_episodes,
+        experiments=learning_experiments,
+        research_refs=learning_research,
+    )
+
+    payload["evaluation_lab"] = normalize_evaluation_lab(
+        payload.get("evaluation_lab")
+        if isinstance(payload.get("evaluation_lab"), Mapping)
+        else {}
+    )
+
     live_event_journal = (
         payload.get("live_event_journal")
         if isinstance(payload.get("live_event_journal"), Mapping)
@@ -603,7 +642,7 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
         operating = {}
     tasks = normalize_queue(operating.get("tasks") if isinstance(operating, Mapping) else [])
     events = normalize_events(operating.get("events") if isinstance(operating, Mapping) else [])
-    payload["checkpoint_version"] = max(11, int(payload.get("checkpoint_version") or 1))
+    payload["checkpoint_version"] = max(12, int(payload.get("checkpoint_version") or 1))
     payload["operating"] = {
         "tasks": tasks,
         "events": events,
@@ -749,6 +788,16 @@ def update_learning_checkpoint(
             research_rows,
         ),
     }
+    wisdom = payload.get("wisdom") if isinstance(payload.get("wisdom"), Mapping) else {}
+    payload["knowledge_graph"] = synchronize_knowledge_graph(
+        payload.get("knowledge_graph")
+        if isinstance(payload.get("knowledge_graph"), Mapping)
+        else {},
+        wisdom_entries=wisdom.get("entries", []),
+        learning_episodes=episode_rows,
+        experiments=experiment_rows,
+        research_refs=research_rows,
+    )
     payload["operating"]["dirty"] = bool(dirty)
     payload["updated_at"] = _now()
     return payload
@@ -774,6 +823,16 @@ def update_wisdom_checkpoint(
         "entries": rows,
         "digest": wisdom_digest(rows),
     }
+    learning = payload.get("learning") if isinstance(payload.get("learning"), Mapping) else {}
+    payload["knowledge_graph"] = synchronize_knowledge_graph(
+        payload.get("knowledge_graph")
+        if isinstance(payload.get("knowledge_graph"), Mapping)
+        else {},
+        wisdom_entries=rows,
+        learning_episodes=learning.get("episodes", []),
+        experiments=learning.get("experiments", []),
+        research_refs=learning.get("research_refs", []),
+    )
     payload["operating"]["dirty"] = bool(dirty)
     payload["updated_at"] = _now()
     return payload
@@ -837,6 +896,57 @@ def update_durable_tasks_checkpoint(
         "records": rows,
         "digest": durable_tasks_digest(rows),
     }
+    payload["operating"]["dirty"] = bool(dirty)
+    payload["updated_at"] = _now()
+    return payload
+
+
+def update_knowledge_graph_checkpoint(
+    checkpoint: Mapping[str, Any] | None,
+    *,
+    graph: Mapping[str, Any],
+    dirty: bool = True,
+) -> dict[str, Any]:
+    """Persist graph state; normalization never invents semantic/causal links."""
+    payload = ensure_operating_checkpoint(checkpoint)
+    payload["knowledge_graph"] = normalize_knowledge_graph(graph)
+    payload["operating"]["dirty"] = bool(dirty)
+    payload["updated_at"] = _now()
+    return payload
+
+
+def synchronize_knowledge_graph_checkpoint(
+    checkpoint: Mapping[str, Any] | None,
+    *,
+    dirty: bool = True,
+) -> dict[str, Any]:
+    """Rebuild explicit structural links from learning/wisdom checkpoint fields."""
+    payload = ensure_operating_checkpoint(checkpoint)
+    learning = payload.get("learning") if isinstance(payload.get("learning"), Mapping) else {}
+    wisdom = payload.get("wisdom") if isinstance(payload.get("wisdom"), Mapping) else {}
+    payload["knowledge_graph"] = synchronize_knowledge_graph(
+        payload.get("knowledge_graph")
+        if isinstance(payload.get("knowledge_graph"), Mapping)
+        else {},
+        wisdom_entries=wisdom.get("entries", []),
+        learning_episodes=learning.get("episodes", []),
+        experiments=learning.get("experiments", []),
+        research_refs=learning.get("research_refs", []),
+    )
+    payload["operating"]["dirty"] = bool(dirty)
+    payload["updated_at"] = _now()
+    return payload
+
+
+def update_evaluation_lab_checkpoint(
+    checkpoint: Mapping[str, Any] | None,
+    *,
+    evaluation_lab: Mapping[str, Any],
+    dirty: bool = True,
+) -> dict[str, Any]:
+    """Persist evaluation evidence; never promotes/deploys a candidate."""
+    payload = ensure_operating_checkpoint(checkpoint)
+    payload["evaluation_lab"] = normalize_evaluation_lab(evaluation_lab)
     payload["operating"]["dirty"] = bool(dirty)
     payload["updated_at"] = _now()
     return payload
@@ -1015,7 +1125,7 @@ def runtime_write_preflight(runtime_result: Mapping[str, Any] | None) -> dict[st
             "allowed": True,
             "mode": "UPDATE_MIGRATION" if migration else "UPDATE",
             "reason": (
-                "Runtime confirmado com SHA; migração estrutural V11 será aplicada na escrita condicional."
+                "Runtime confirmado com SHA; migração estrutural V12 será aplicada na escrita condicional."
                 if migration else
                 "Runtime confirmado com SHA e integridade compatível para escrita condicional."
             ),
@@ -1204,7 +1314,7 @@ def checkpoint_integrity_report(
 ) -> dict[str, Any]:
     """Verify persisted component digests before normalization mutates them.
 
-    Missing V11 structure is reported as MIGRATION_REQUIRED rather than corruption.
+    Missing V12 structure is reported as MIGRATION_REQUIRED rather than corruption.
     A present-but-wrong digest is a MISMATCH and should fail closed for writes.
     """
     if not isinstance(checkpoint, Mapping):
@@ -1370,6 +1480,30 @@ def checkpoint_integrity_report(
         durable_tasks_digest(durable_rows),
     )
 
+    graph_raw = (
+        raw.get("knowledge_graph")
+        if isinstance(raw.get("knowledge_graph"), Mapping)
+        else {}
+    )
+    graph_state = normalize_knowledge_graph(graph_raw)
+    add_check(
+        "knowledge_graph",
+        graph_raw.get("digest"),
+        graph_state.get("digest"),
+    )
+
+    eval_raw = (
+        raw.get("evaluation_lab")
+        if isinstance(raw.get("evaluation_lab"), Mapping)
+        else {}
+    )
+    eval_state = normalize_evaluation_lab(eval_raw)
+    add_check(
+        "evaluation_lab",
+        eval_raw.get("digest"),
+        eval_state.get("digest"),
+    )
+
     live_event_journal = (
         raw.get("live_event_journal")
         if isinstance(raw.get("live_event_journal"), Mapping)
@@ -1390,8 +1524,8 @@ def checkpoint_integrity_report(
     raw_areas = raw.get("areas") if isinstance(raw.get("areas"), Mapping) else {}
     if "subscriptions" not in raw_areas:
         migration_items.append("areas.subscriptions ausente")
-    if version < 11:
-        migration_items.append(f"checkpoint_version {version} < 11")
+    if version < 12:
+        migration_items.append(f"checkpoint_version {version} < 12")
     if "continuity" not in raw:
         migration_items.append("continuity ausente")
     if "learning" not in raw:
@@ -1406,6 +1540,10 @@ def checkpoint_integrity_report(
         migration_items.append("tool_hub ausente")
     if "durable_tasks" not in raw:
         migration_items.append("durable_tasks ausente")
+    if "knowledge_graph" not in raw:
+        migration_items.append("knowledge_graph ausente")
+    if "evaluation_lab" not in raw:
+        migration_items.append("evaluation_lab ausente")
     if "live_event_journal" not in raw:
         migration_items.append("live_event_journal ausente")
 

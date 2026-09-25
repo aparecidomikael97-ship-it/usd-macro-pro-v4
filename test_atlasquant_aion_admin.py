@@ -394,6 +394,19 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("O que pode invalidar ou inverter esse cenário", src)
         self.assertIn("precisa confirmar o dado divulgado", src)
 
+    def test_laboratory_exposes_knowledge_graph_and_evaluation_lab_without_auto_promotion(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Knowledge Graph + Evaluation Lab",src)
+        self.assertIn("knowledge_graph_summary(",src)
+        self.assertIn("graph_neighborhood(",src)
+        self.assertIn("synchronize_knowledge_graph_checkpoint(",src)
+        self.assertIn("evaluation_lab_summary(",src)
+        self.assertIn("new_eval_run(",src)
+        self.assertIn("evaluate_run(",src)
+        self.assertIn("Promoção automática: NÃO",src)
+        self.assertIn('"knowledge_graph_nodes"',src)
+        self.assertIn('"evaluation_lab_candidates"',src)
+
     def test_central_exposes_controlled_learning_progress_without_auto_changes(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("🧠 Evolução Controlada",src)
