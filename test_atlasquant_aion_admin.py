@@ -240,6 +240,14 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn('"publication_main_match"',src)
         self.assertIn('"production_verification"',src)
         self.assertIn('"can_claim_latest_main_live"',src)
+        self.assertIn("_render_release_gate(system_context)",src)
+        self.assertIn("Gate de liberação AION",src)
+        self.assertIn("Quatro provas independentes",src)
+        self.assertIn("Deploy automático: BLOQUEADO",src)
+        self.assertIn('"release_gate_state"',src)
+        self.assertIn('"release_gate_progress_pct"',src)
+        self.assertIn('"release_gate_claim_allowed"',src)
+        self.assertIn('"release_gate_next_stage"',src)
 
     def test_executive_pulse_surfaces_interface_validation_progress(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")

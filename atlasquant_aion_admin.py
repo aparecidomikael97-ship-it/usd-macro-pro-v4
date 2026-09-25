@@ -161,6 +161,7 @@ from atlasquant_aion_executive_pulse import (
 )
 from atlasquant_navigation_bridge import request_surface_revalidation
 from atlasquant_interface_validation import interface_validation_mission
+from atlasquant_release_gate import release_gate, release_gate_rows
 
 try:
     from atlasquant_neural_voice_ui import render_neural_voice_player
@@ -1107,6 +1108,69 @@ def _short_commit(value: Any) -> str:
     return raw[:8] if raw else "—"
 
 
+def _render_release_gate(system_context: Mapping[str, Any] | None) -> None:
+    system = dict(system_context or {})
+    gate = (
+        system.get("release_gate")
+        if isinstance(system.get("release_gate"), Mapping)
+        else release_gate(
+            publication_truth=(
+                system.get("publication_truth")
+                if isinstance(system.get("publication_truth"), Mapping)
+                else {}
+            ),
+            interface_validation=(
+                system.get("interface_validation")
+                if isinstance(system.get("interface_validation"), Mapping)
+                else {}
+            ),
+        )
+    )
+
+    st.markdown("#### Gate de liberação AION")
+    st.caption(
+        "Quatro provas independentes: código/bundle, telas críticas, runtime × main e produção. "
+        "Uma etapa não confirma a seguinte e este painel não executa deploy."
+    )
+    c1,c2,c3 = st.columns(3)
+    c1.metric("Gate", str(gate.get("state") or "UNKNOWN"))
+    c2.metric(
+        "Etapas confirmadas",
+        f"{int(gate.get('confirmed_stages') or 0)}/{int(gate.get('total_stages') or 4)}",
+    )
+    c3.metric("Liberação", "CONFIRMADA" if gate.get("release_claim_allowed") else "PENDENTE")
+
+    st.progress(
+        min(1.0, max(0.0, float(gate.get("progress_pct") or 0.0) / 100.0)),
+        text=f"Progresso do gate · {float(gate.get('progress_pct') or 0.0):.1f}%",
+    )
+
+    rows = release_gate_rows(gate)
+    if rows:
+        st.dataframe(rows, width="stretch", hide_index=True)
+
+    gate_state = str(gate.get("state") or "UNKNOWN").upper()
+    if gate_state == "COMPLETE" and gate.get("release_claim_allowed"):
+        st.success(
+            "As quatro etapas possuem evidência suficiente para a afirmação de liberação. "
+            "Isso não dispara nenhuma ação externa."
+        )
+    elif gate_state == "BLOCKED":
+        st.error(
+            f"Gate bloqueado em **{gate.get('next_label') or 'etapa não identificada'}**. "
+            f"{gate.get('next_action') or ''}"
+        )
+    else:
+        st.warning(
+            f"Gate ainda não concluído. Próxima etapa: **{gate.get('next_label') or 'não confirmada'}**. "
+            f"{gate.get('next_action') or ''}"
+        )
+    st.caption(
+        "Deploy automático: BLOQUEADO · ordens reais: BLOQUEADAS · "
+        "qualquer ação no Render continua exigindo fluxo separado."
+    )
+
+
 def _render_publication_truth(system_context: Mapping[str, Any] | None) -> None:
     system = dict(system_context or {})
     publication = (
@@ -1300,6 +1364,7 @@ def _render_central(
         ),
     )
     _render_executive_pulse(executive_snapshot)
+    _render_release_gate(system_context)
     _render_publication_truth(system_context)
     _render_critical_surface_health(system_context)
 
@@ -3250,6 +3315,14 @@ def render_aion_admin_console(
         if isinstance(system.get("publication_truth"), Mapping)
         else {}
     )
+    release_gate_state = (
+        dict(system.get("release_gate"))
+        if isinstance(system.get("release_gate"), Mapping)
+        else release_gate(
+            publication_truth=publication_state,
+            interface_validation=interface_validation_state,
+        )
+    )
     try:
         executive_snapshot = executive_pulse(
             runtime_result=runtime_result,
@@ -3472,6 +3545,16 @@ def render_aion_admin_console(
         ),
         "can_claim_latest_main_live": bool(
             publication_state.get("can_claim_latest_main_live", False)
+        ),
+        "release_gate_state": str(release_gate_state.get("state") or "UNKNOWN"),
+        "release_gate_progress_pct": float(
+            release_gate_state.get("progress_pct") or 0.0
+        ),
+        "release_gate_claim_allowed": bool(
+            release_gate_state.get("release_claim_allowed", False)
+        ),
+        "release_gate_next_stage": str(
+            release_gate_state.get("next_stage") or ""
         ),
         "real_orders_enabled": False,
     }

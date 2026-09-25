@@ -48,6 +48,7 @@ from atlasquant_navigation_bridge import (
 )
 from atlasquant_interface_validation import interface_validation_mission
 from atlasquant_publication_truth import publication_truth
+from atlasquant_release_gate import release_gate
 import re
 
 # V10 — camada observacional profissional. O try/except evita derrubar
@@ -9956,6 +9957,10 @@ if _aq_active_index == 21:
             ),
             interface_validation=_aion_interface_validation,
         )
+        _aion_release_gate = release_gate(
+            publication_truth=_aion_publication_truth,
+            interface_validation=_aion_interface_validation,
+        )
         _aion_system_context = {
             "truth_state": "CONFIRMED",
             "source_build": _ATLASQUANT_SOURCE_BUILD,
@@ -9965,6 +9970,7 @@ if _aq_active_index == 21:
             "critical_surfaces": _aion_critical_surfaces,
             "interface_validation": _aion_interface_validation,
             "publication_truth": _aion_publication_truth,
+            "release_gate": _aion_release_gate,
             "guided_revalidation": revalidation_result(st.session_state) or {},
         }
         try:
