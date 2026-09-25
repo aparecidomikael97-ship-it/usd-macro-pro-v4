@@ -101,6 +101,28 @@ class AtlasQuantAionGatewayTests(unittest.TestCase):
         self.assertIn("Conectar Render",result["answer"])
         self.assertIn("último handoff persistido",result["answer"])
 
+    def test_local_answer_exposes_audited_evidence_confidence(self):
+        result = local_answer(
+            "como está o radar forex?",
+            checkpoint={"aion":{"priority":"AION"}},
+            system_context={
+                "truth_state":"CONFIRMED",
+                "source_build":"build-a",
+                "market_status":"não confirmado nesta tela",
+            },
+        )
+        self.assertIn("evidence_audit", result)
+        self.assertIn("evidence_confidence", result)
+        self.assertEqual(
+            result["confidence_basis"],
+            "EVIDENCE_QUALITY_NOT_PROFIT_PROBABILITY",
+        )
+        self.assertFalse(result["evidence_confidence"]["is_profit_probability"])
+        self.assertFalse(
+            result["evidence_confidence"]["is_market_outcome_probability"]
+        )
+        self.assertFalse(result["executes_action"])
+
     def test_local_answer_does_not_invent_fresh_market_state(self):
         result = local_answer(
             "como está o radar forex agora?",
