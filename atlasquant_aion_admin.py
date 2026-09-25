@@ -3068,6 +3068,7 @@ def render_aion_admin_console(
             f"{degraded}. Nenhum estado ausente foi tratado como confirmado."
         )
         st.caption(
+            "A leitura completa dessas camadas não pôde ser confirmada nesta execução. "
             "Somente o tipo do erro é exibido; mensagens internas não são expostas. "
             "Nenhuma ação externa, permissão ou trading real foi habilitado pelo fallback."
         )
