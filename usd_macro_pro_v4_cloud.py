@@ -50,6 +50,7 @@ from atlasquant_interface_validation import interface_validation_mission
 from atlasquant_publication_truth import publication_truth
 from atlasquant_release_gate import release_gate
 from atlasquant_aion_source_mesh import source_mesh_snapshot
+from atlasquant_aion_live_events import live_event_snapshot
 import re
 
 # V10 — camada observacional profissional. O try/except evita derrubar
@@ -10002,7 +10003,12 @@ def _build_aion_source_runtime_context():
         "source_mesh_state": market_state,
         "source_observations": int(mesh.get("observation_count") or 0),
     }
-    return mesh, market_context
+    event_intelligence = live_event_snapshot(
+        news_payload=news_payload if isinstance(news_payload, dict) else {},
+        news_provenance=news_source,
+        next_event=next_event,
+    )
+    return mesh, market_context, event_intelligence
 
 
 if _aq_active_index == 21:
@@ -10013,7 +10019,11 @@ if _aq_active_index == 21:
         if _ATLASQUANT_AION_IMPORT_ERROR:
             st.caption("Diagnóstico AION: "+_ATLASQUANT_AION_IMPORT_ERROR)
     else:
-        _aion_source_mesh, _aion_market_context = _build_aion_source_runtime_context()
+        (
+            _aion_source_mesh,
+            _aion_market_context,
+            _aion_live_events,
+        ) = _build_aion_source_runtime_context()
         _aion_critical_surfaces = surface_health_snapshot(
             st.session_state,
             current_build=_ATLASQUANT_SOURCE_BUILD,
@@ -10043,6 +10053,7 @@ if _aq_active_index == 21:
             "market_status": _aion_market_context["summary"],
             "source_mesh": _aion_source_mesh,
             "source_observations": list(_aion_source_mesh.get("observations", []) or []),
+            "live_event_intelligence": _aion_live_events,
             "critical_surfaces": _aion_critical_surfaces,
             "interface_validation": _aion_interface_validation,
             "publication_truth": _aion_publication_truth,
