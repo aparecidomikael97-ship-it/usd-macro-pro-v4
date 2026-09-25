@@ -22,6 +22,7 @@ from atlasquant_aion_core import (
     TRUTH_RULES,
     feature_flag_snapshot,
     guardian_decision,
+    guardian_posture,
     is_admin,
     mission_plan,
     route_context,
@@ -30,6 +31,7 @@ from atlasquant_aion_gateway import local_answer, provider_status
 from atlasquant_aion_memory import (
     canonical_memory_summary,
     checkpoint_digest,
+    checkpoint_integrity_report,
     checkpoint_source_digest,
     config_from_mapping,
     ensure_operating_checkpoint,
@@ -694,6 +696,79 @@ def _render_attention_queue(
     )
 
 
+def _render_memory_security_posture(
+    access: Mapping[str, Any],
+    checkpoint: Mapping[str, Any],
+    runtime_result: Mapping[str, Any],
+    flags: Mapping[str, bool],
+) -> None:
+    st.markdown("#### Memória & Guardian")
+    st.caption(
+        "Auditoria somente leitura da integridade do Checkpoint e da postura de segurança. "
+        "Este painel não serve como aprovação para nenhuma ação sensível."
+    )
+
+    persisted = (
+        runtime_result.get("integrity")
+        if isinstance(runtime_result.get("integrity"), Mapping)
+        else {"state": "UNKNOWN", "matched": 0, "total": 0}
+    )
+    working = checkpoint_integrity_report(checkpoint)
+    preflight = runtime_write_preflight(runtime_result)
+    posture = guardian_posture(access, feature_flags=flags)
+
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("Integridade runtime", str(persisted.get("state") or "UNKNOWN"))
+    c2.metric(
+        "Memória de trabalho",
+        str(working.get("state") or "UNKNOWN"),
+        delta=f"V{int(working.get('checkpoint_version') or 0)}",
+    )
+    c3.metric("Guardian bloqueando agora", int(posture.get("blocked_now") or 0))
+    c4.metric("Escrita runtime", "ELEGÍVEL" if preflight.get("allowed") else "BLOQUEADA")
+
+    persisted_state = str(persisted.get("state") or "UNKNOWN").upper()
+    if persisted_state == "MISMATCH":
+        st.error(
+            "Divergência de digest detectada no Checkpoint persistido. "
+            "A escrita fica bloqueada até revisão; o AION não sobrescreve esse estado automaticamente."
+        )
+    elif persisted_state == "MIGRATION_REQUIRED":
+        st.warning(
+            "Checkpoint persistido requer migração estrutural para V6. "
+            "A migração só poderá ser salva por escrita condicional e aprovação explícita."
+        )
+    elif persisted_state == "CONFIRMED":
+        st.success(
+            f"Integridade persistida confirmada em "
+            f"{int(persisted.get('matched') or 0)}/{int(persisted.get('total') or 0)} componentes."
+        )
+    else:
+        st.info(
+            "Integridade persistida ainda não está confirmada nesta execução. "
+            "A memória local não será tratada como prova de persistência."
+        )
+
+    rows = []
+    for item in list(posture.get("actions", []) or []):
+        if not isinstance(item, Mapping):
+            continue
+        rows.append({
+            "Ação sensível": item.get("action"),
+            "Risco": item.get("risk"),
+            "Estado agora": "PERMITIDA" if item.get("allowed_now") else "BLOQUEADA",
+            "Flag": item.get("feature_flag") or "—",
+            "Motivo": item.get("reason"),
+        })
+    if rows:
+        with st.expander("Matriz Guardian · ações sensíveis", expanded=False):
+            st.dataframe(rows, width="stretch", hide_index=True)
+            st.caption(
+                "A matriz é calculada com approved=False. Ela nunca reutiliza esta visualização "
+                "como autorização para publicar, cobrar, fazer deploy, gravar segredo ou operar."
+            )
+
+
 def _render_master_status(board: Mapping[str, Any]) -> None:
     counts = board.get("counts") if isinstance(board.get("counts"), Mapping) else {}
     st.markdown("#### Painel Mestre de Estado")
@@ -764,6 +839,7 @@ def _render_central(
 
     _render_workspace_overview(checkpoint, runtime_result)
     _render_attention_queue(status_board, approval_inbox)
+    _render_memory_security_posture(access, checkpoint, runtime_result, flags)
 
     st.markdown("#### Briefing de entrada")
     st.write(
@@ -2308,6 +2384,13 @@ def render_aion_admin_console(
         "provider_state": provider.get("state"),
         "feature_flags": flags,
         "checkpoint_digest": checkpoint_digest(checkpoint),
+        "checkpoint_integrity_state": str(
+            ((runtime_result.get("integrity") or {}) if isinstance(runtime_result.get("integrity"), Mapping) else {}).get("state")
+            or "UNKNOWN"
+        ),
+        "guardian_blocked_now": int(
+            guardian_posture(access_map, feature_flags=flags).get("blocked_now") or 0
+        ),
         "checkpoint_dirty": bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
         "checkpoint_conflict": bool(st.session_state.get(_WORKING_CONFLICT_KEY, False)),
         "task_summary": queue_summary((checkpoint.get("operating") or {}).get("tasks", [])),

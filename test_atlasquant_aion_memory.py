@@ -9,6 +9,7 @@ from atlasquant_aion_memory import (
     canonical_documents,
     canonical_memory_summary,
     checkpoint_digest,
+    checkpoint_integrity_report,
     checkpoint_source_digest,
     default_checkpoint,
     ensure_operating_checkpoint,
@@ -85,9 +86,9 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("approved_foundation", cp)
         self.assertTrue(checkpoint_digest(cp))
 
-    def test_checkpoint_v5_has_operating_studio_business_promotions_and_entitlements_memory(self):
+    def test_checkpoint_v6_has_operating_studio_business_subscriptions_and_promotions_memory(self):
         cp=default_checkpoint()
-        self.assertGreaterEqual(cp["checkpoint_version"],5)
+        self.assertGreaterEqual(cp["checkpoint_version"],6)
         self.assertIn("operating",cp)
         self.assertEqual(cp["operating"]["tasks"],[])
         self.assertEqual(cp["operating"]["events"],[])
@@ -97,20 +98,63 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertEqual(cp["promotions"]["campaigns"],[])
         self.assertEqual(cp["promotions"]["redemptions"],[])
         self.assertEqual(cp["entitlements"]["records"],[])
+        self.assertIn("subscriptions",cp["areas"])
 
     def test_older_checkpoint_is_upgraded_without_claiming_persistence(self):
         old={"checkpoint_version":1,"project":"AtlasQuant"}
         upgraded=ensure_operating_checkpoint(old)
-        self.assertEqual(upgraded["checkpoint_version"],5)
+        self.assertEqual(upgraded["checkpoint_version"],6)
         self.assertIn("operating",upgraded)
         self.assertIn("studio",upgraded)
         self.assertIn("business",upgraded)
         self.assertIn("promotions",upgraded)
         self.assertIn("entitlements",upgraded)
+        self.assertIn("subscriptions",upgraded["areas"])
         changed=update_operating_checkpoint(upgraded,tasks=[],events=[],dirty=True)
         self.assertTrue(changed["operating"]["dirty"])
         self.assertTrue(changed["operating"]["task_digest"])
         self.assertTrue(changed["operating"]["event_digest"])
+
+    def test_integrity_report_confirms_v6_and_detects_tampering(self):
+        cp=default_checkpoint()
+        report=checkpoint_integrity_report(cp)
+        self.assertEqual(report["state"],"CONFIRMED")
+        self.assertTrue(report["write_safe"])
+        self.assertEqual(report["matched"],report["total"])
+
+        tampered=default_checkpoint()
+        tampered["studio"]["digest"]="deadbeef"
+        report=checkpoint_integrity_report(tampered)
+        self.assertEqual(report["state"],"MISMATCH")
+        self.assertFalse(report["write_safe"])
+        self.assertIn("studio",report["mismatches"])
+
+    def test_integrity_report_marks_legacy_checkpoint_for_safe_v6_migration(self):
+        legacy=default_checkpoint()
+        legacy["checkpoint_version"]=5
+        legacy["areas"].pop("subscriptions",None)
+        report=checkpoint_integrity_report(legacy)
+        self.assertEqual(report["state"],"MIGRATION_REQUIRED")
+        self.assertTrue(report["write_safe"])
+        preflight=runtime_write_preflight({
+            "status":"CONFIRMED",
+            "sha":"legacysha",
+            "checkpoint":legacy,
+        })
+        self.assertTrue(preflight["allowed"])
+        self.assertEqual(preflight["mode"],"UPDATE_MIGRATION")
+
+    def test_integrity_mismatch_blocks_runtime_write_preflight(self):
+        tampered=default_checkpoint()
+        tampered["business"]["digest"]="wrong"
+        preflight=runtime_write_preflight({
+            "status":"CONFIRMED",
+            "sha":"abc123",
+            "checkpoint":tampered,
+        })
+        self.assertFalse(preflight["allowed"])
+        self.assertEqual(preflight["mode"],"BLOCKED")
+        self.assertEqual(preflight["integrity_state"],"MISMATCH")
 
     def test_studio_and_business_updates_mark_checkpoint_dirty(self):
         cp=default_checkpoint()
@@ -201,7 +245,16 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         create=runtime_write_preflight({"status":"NOT_FOUND"})
         self.assertTrue(create["allowed"])
         self.assertEqual(create["mode"],"CREATE")
-        update=runtime_write_preflight({"status":"CONFIRMED","sha":"abc123"})
+        no_checkpoint=runtime_write_preflight({"status":"CONFIRMED","sha":"abc123"})
+        self.assertFalse(no_checkpoint["allowed"])
+        self.assertEqual(no_checkpoint["integrity_state"],"UNKNOWN")
+
+        current=default_checkpoint()
+        update=runtime_write_preflight({
+            "status":"CONFIRMED",
+            "sha":"abc123",
+            "checkpoint":current,
+        })
         self.assertTrue(update["allowed"])
         self.assertEqual(update["mode"],"UPDATE")
         self.assertEqual(update["expected_sha"],"abc123")

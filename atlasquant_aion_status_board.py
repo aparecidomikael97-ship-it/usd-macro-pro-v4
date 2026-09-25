@@ -146,6 +146,43 @@ def build_master_status_board(
         next_action="Validar credenciais/branch de runtime sem gravar segredo no código." if cp_state!="CONFIRMED" else "",
     ))
 
+    runtime_integrity = runtime.get("integrity") if isinstance(runtime.get("integrity"), Mapping) else {}
+    integrity_state = str(runtime_integrity.get("state") or "UNKNOWN").upper()
+    if runtime_status != "CONFIRMED":
+        mem_state = "UNKNOWN"
+        mem_detail = "Integridade persistida não pode ser confirmada sem Checkpoint runtime confirmado."
+        mem_next = "Confirmar o runtime antes de confiar na integridade persistida."
+    elif integrity_state == "CONFIRMED":
+        mem_state = "CONFIRMED"
+        mem_detail = (
+            f"Digests persistidos conferem em {int(runtime_integrity.get('matched') or 0)}/"
+            f"{int(runtime_integrity.get('total') or 0)} componentes."
+        )
+        mem_next = ""
+    elif integrity_state == "MIGRATION_REQUIRED":
+        mem_state = "BLOCKED"
+        mem_detail = "Checkpoint íntegro o suficiente para migração, mas ainda requer estrutura V6."
+        mem_next = "Salvar a migração V6 por escrita condicional, com aprovação explícita."
+    elif integrity_state == "MISMATCH":
+        mem_state = "BLOCKED"
+        mismatches = ", ".join(str(x) for x in list(runtime_integrity.get("mismatches", []) or [])[:6])
+        mem_detail = "Divergência de digest detectada" + (f": {mismatches}." if mismatches else ".")
+        mem_next = "Não sobrescrever; revisar a origem da divergência antes de qualquer escrita."
+    else:
+        mem_state = "UNKNOWN"
+        mem_detail = "Relatório de integridade persistida não está disponível nesta execução."
+        mem_next = "Recarregar o Checkpoint e validar digests antes de escrever."
+
+    items.append(_item(
+        "checkpoint_integrity",
+        "Integridade do Checkpoint Mestre",
+        area="memory",
+        state=mem_state,
+        detail=mem_detail,
+        source="runtime_result.integrity",
+        next_action=mem_next,
+    ))
+
     items.append(_item(
         "working_checkpoint",
         "Alterações locais do Checkpoint",
@@ -200,7 +237,7 @@ def build_master_status_board(
         ("social_publish","Publicação em redes sociais","studio","Conectar provedor social e validar publicação com aprovação explícita."),
         ("marketplace_publish","Publicação em marketplace","business","Conectar marketplace e validar publicação com aprovação explícita."),
         ("marketplace_orders","Pedidos de marketplace","business","Conectar fonte de pedidos antes de afirmar vendas."),
-        ("payment_provider","Pagamento/assinatura","promotions","Conectar provedor e validar eventos assinados; não conceder acesso automaticamente."),
+        ("payment_provider","Pagamento/assinatura","subscriptions","Conectar provedor e validar eventos assinados; não conceder acesso automaticamente."),
         ("promotion_activation","Ativação de promoções","promotions","Conectar registro/provedor e exigir evidência de ativação."),
         ("entitlement_activation","Ativação de entitlements","subscriptions","Conectar registro de assinaturas e exigir evidência externa confirmada."),
         ("production_deploy","Deploy de produção","development","Usar mecanismo de deploy aprovado e validar identidade exata do build."),
