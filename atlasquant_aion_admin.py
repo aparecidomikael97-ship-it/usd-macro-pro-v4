@@ -44,6 +44,7 @@ from atlasquant_aion_memory import (
     update_entitlements_checkpoint,
     update_continuity_checkpoint,
     update_learning_checkpoint,
+    update_wisdom_checkpoint,
     update_live_event_journal_checkpoint,
     update_operating_checkpoint,
     update_promotions_checkpoint,
@@ -192,6 +193,15 @@ from atlasquant_aion_learning import (
     settle_learning_episode,
     upsert_learning_episode,
     upsert_learning_experiment,
+)
+from atlasquant_aion_wisdom import (
+    TRUTH_STATES as WISDOM_TRUTH_STATES,
+    candidate_from_learning_episode,
+    new_wisdom_entry,
+    upsert_wisdom_entry,
+    wisdom_evidence_hits,
+    wisdom_review_state,
+    wisdom_summary,
 )
 
 try:
@@ -1491,22 +1501,50 @@ def _render_live_event_intelligence(
     )
 
 
+def _aion_memory_hits(
+    question: Any,
+    checkpoint: Mapping[str, Any] | None,
+    *,
+    limit: int = 8,
+) -> list[dict[str, Any]]:
+    """Combine canonical project memory with reviewed Wisdom Journal evidence."""
+    q = str(question or "").strip()
+    if not q:
+        return []
+    canonical = [
+        dict(x) for x in search_canonical_memory(q, limit=max(1, min(limit, 5)))
+        if isinstance(x, Mapping)
+    ]
+    cp = dict(checkpoint or {})
+    wisdom = cp.get("wisdom") if isinstance(cp.get("wisdom"), Mapping) else {}
+    knowledge = wisdom_evidence_hits(
+        q,
+        list(wisdom.get("entries", []) or []),
+        limit=max(1, min(limit, 4)),
+    )
+    combined = canonical + knowledge
+    return combined[: max(1, min(int(limit or 8), 12))]
+
+
 def _render_learning_pulse(checkpoint: Mapping[str, Any]) -> None:
     learning = checkpoint.get("learning") if isinstance(checkpoint.get("learning"), Mapping) else {}
     episodes = list(learning.get("episodes", []) or [])
     experiments = list(learning.get("experiments", []) or [])
     research_refs = list(learning.get("research_refs", []) or [])
     summary = learning_summary(episodes, experiments, research_refs)
+    wisdom = checkpoint.get("wisdom") if isinstance(checkpoint.get("wisdom"), Mapping) else {}
+    wisdom_state = wisdom_summary(list(wisdom.get("entries", []) or []))
     st.markdown("#### 🧠 Evolução Controlada")
     st.caption(
         "O AION melhora medindo previsões e resultados, não mudando regras sozinho. "
         "Toda promoção continua dependente de evidência e revisão humana."
     )
-    c1,c2,c3,c4 = st.columns(4)
+    c1,c2,c3,c4,c5 = st.columns(5)
     c1.metric("Aprendizados", int(summary.get("episodes") or 0))
     c2.metric("Resultados fechados", int(summary.get("settled_episodes") or 0))
     c3.metric("Pesquisa vinculada", int(summary.get("research_references") or 0))
-    c4.metric("Challengers p/ revisão", int(summary.get("human_review_candidates") or 0))
+    c4.metric("Sabedoria ativa", int(wisdom_state.get("active") or 0))
+    c5.metric("Challengers p/ revisão", int(summary.get("human_review_candidates") or 0))
     match_rate = summary.get("observed_match_rate_pct")
     gap = summary.get("calibration_gap_pct")
     st.caption(
@@ -1921,7 +1959,7 @@ def _render_central(
     provider_env = _provider_env()
     provider = provider_status(feature_flags=flags, env=provider_env)
     budget = normalize_budget((checkpoint.get("aion") or {}).get("model_budget", {}))
-    hits_preview = search_canonical_memory(question) if question.strip() else []
+    hits_preview = _aion_memory_hits(question, checkpoint) if question.strip() else []
     domain_preview = route_context(question).get("domain") if question.strip() else "central"
     cognitive_preview = orchestrator_snapshot(
         question,
@@ -2005,7 +2043,7 @@ def _render_central(
         )
 
     if st.button("Analisar com AION", key="aion_admin_ask", type="primary", width="stretch"):
-        hits = search_canonical_memory(question)
+        hits = _aion_memory_hits(question, checkpoint)
         estimated_cost = float(estimate.get("estimated_max_cost_usd") or 0.0)
         route = route_intelligence(
             question,
@@ -2108,7 +2146,12 @@ def _render_central(
         if isinstance(evidence, list) and evidence:
             with st.expander("Evidências da memória"):
                 for hit in evidence:
-                    st.caption(f"{hit.get('path')} · score {hit.get('score')}")
+                    review = str(hit.get("review_state") or "").strip()
+                    suffix = f" · revisão {review}" if review else ""
+                    st.caption(
+                        f"{hit.get('path')} · verdade {hit.get('kind') or hit.get('truth_state') or 'UNKNOWN'}"
+                        f" · score {hit.get('score')}{suffix}"
+                    )
                     st.write(hit.get("excerpt"))
 
     spoken = (
@@ -2780,6 +2823,9 @@ def _render_laboratory(
     learning_state = learning_summary(episodes, experiments, research_refs)
     calibration_state = confidence_calibration(episodes)
     error_state = error_pattern_summary(episodes)
+    wisdom = checkpoint.get("wisdom") if isinstance(checkpoint.get("wisdom"), Mapping) else {}
+    wisdom_entries = list(wisdom.get("entries", []) or [])
+    wisdom_state = wisdom_summary(wisdom_entries)
 
     st.markdown("#### 🧠 Aprendizado Controlado AION")
     st.caption(
@@ -3119,6 +3165,173 @@ def _render_laboratory(
             f"{int(error_state.get('errors_without_confirmed_cause') or 0)} erro(s) ainda sem causa confirmada. "
             "O AION não inventará causalidade para preencher essa lacuna."
         )
+
+    st.markdown("#### 📚 Diário de Sabedoria AION")
+    st.caption(
+        "Transforma experiência revisada em conhecimento auditável: o que foi aprendido, "
+        "origem, estado de verdade, confiança, aplicação e quando precisa ser revisado. "
+        "Sabedoria não altera regra, peso ou produção automaticamente."
+    )
+    w1,w2,w3,w4 = st.columns(4)
+    w1.metric("Lições", int(wisdom_state.get("entries") or 0))
+    w2.metric("Ativas", int(wisdom_state.get("active") or 0))
+    w3.metric(
+        "Confirmadas",
+        int((wisdom_state.get("by_truth_state") or {}).get("CONFIRMED") or 0),
+    )
+    w4.metric("Revisão vencida", int(wisdom_state.get("review_due") or 0))
+
+    with st.expander("Registrar uma lição revisada", expanded=False):
+        with st.form("aion_wisdom_new_entry", clear_on_submit=True):
+            wisdom_topic = st.text_input("Tema da lição")
+            wisdom_domain = st.text_input("Domínio", value="general")
+            wisdom_insight = st.text_area("O que foi aprendido", max_chars=1400)
+            wisdom_truth = st.selectbox(
+                "Estado de verdade",
+                list(WISDOM_TRUTH_STATES),
+                index=list(WISDOM_TRUTH_STATES).index("HYPOTHESIS"),
+            )
+            wisdom_confidence = st.slider(
+                "Confiança no conhecimento (não é probabilidade de lucro)",
+                0, 100, 50,
+                key="aion_wisdom_confidence",
+            )
+            wisdom_refs_text = st.text_input(
+                "Referências de evidência (separadas por vírgula)",
+                placeholder="repo:test-123, calendar:cpi-1",
+            )
+            wisdom_applies_text = st.text_input(
+                "Aplica-se a (separado por vírgula)",
+                placeholder="USD, macro, CPI",
+            )
+            wisdom_review_due = st.text_input(
+                "Revisar em (ISO opcional)",
+                placeholder="2026-12-31T00:00:00+00:00",
+            )
+            wisdom_validation_note = st.text_area(
+                "Nota de validação",
+                max_chars=1200,
+            )
+            save_wisdom = st.form_submit_button("Registrar no Diário de Sabedoria", type="primary")
+        if save_wisdom:
+            try:
+                entry = new_wisdom_entry(
+                    wisdom_topic,
+                    wisdom_insight,
+                    domain=wisdom_domain,
+                    truth_state=wisdom_truth,
+                    confidence_pct=wisdom_confidence,
+                    evidence_refs=[x.strip() for x in wisdom_refs_text.split(",") if x.strip()],
+                    applies_to=[x.strip() for x in wisdom_applies_text.split(",") if x.strip()],
+                    validation_note=wisdom_validation_note,
+                    validated_at=datetime.now(timezone.utc).isoformat(),
+                    review_due_at=wisdom_review_due,
+                    created_by=str(access.get("username") or "ADMIN"),
+                )
+                wisdom_entries = upsert_wisdom_entry(wisdom_entries, entry)
+                updated = update_wisdom_checkpoint(
+                    checkpoint,
+                    entries=wisdom_entries,
+                    dirty=True,
+                )
+                updated = _record_working_event(
+                    updated,
+                    "wisdom_entry_registered",
+                    f"Lição registrada no Diário de Sabedoria: {entry['topic']}",
+                    evidence={
+                        "wisdom_id":entry["wisdom_id"],
+                        "truth_state":entry["truth_state"],
+                        "manual_review_required":True,
+                        "automatic_rule_change":False,
+                    },
+                )
+                _set_working_checkpoint(updated, dirty=True)
+                st.success(
+                    "Lição registrada na memória de trabalho. "
+                    "Salve o Checkpoint Mestre para persistir."
+                )
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Não foi possível registrar a lição: {type(exc).__name__}")
+
+    settled_for_wisdom = [
+        item for item in episodes
+        if isinstance(item, Mapping) and str(item.get("state") or "").upper()=="SETTLED"
+    ]
+    if settled_for_wisdom:
+        with st.expander("Propor sabedoria a partir de um episódio fechado", expanded=False):
+            wisdom_episode_options = {
+                f"{item.get('episode_id')} · {item.get('subject')}": item
+                for item in settled_for_wisdom[-200:]
+            }
+            wisdom_episode_label = st.selectbox(
+                "Episódio SETTLED",
+                list(wisdom_episode_options.keys()),
+                key="aion_wisdom_episode_candidate",
+            )
+            wisdom_candidate_due = st.text_input(
+                "Revisar candidato em (ISO opcional)",
+                placeholder="2026-12-31T00:00:00+00:00",
+                key="aion_wisdom_candidate_due",
+            )
+            if st.button(
+                "Criar candidato de sabedoria",
+                key="aion_wisdom_candidate_create",
+                width="stretch",
+            ):
+                try:
+                    candidate = candidate_from_learning_episode(
+                        wisdom_episode_options[wisdom_episode_label],
+                        created_by=str(access.get("username") or "ADMIN"),
+                        review_due_at=wisdom_candidate_due,
+                    )
+                    wisdom_entries = upsert_wisdom_entry(wisdom_entries, candidate)
+                    updated = update_wisdom_checkpoint(
+                        checkpoint,
+                        entries=wisdom_entries,
+                        dirty=True,
+                    )
+                    updated = _record_working_event(
+                        updated,
+                        "wisdom_candidate_created",
+                        f"Candidato de sabedoria criado: {candidate['topic']}",
+                        evidence={
+                            "wisdom_id":candidate["wisdom_id"],
+                            "truth_state":candidate["truth_state"],
+                            "source_episode_ids":candidate["source_episode_ids"],
+                            "automatic_promotion":False,
+                        },
+                    )
+                    _set_working_checkpoint(updated, dirty=True)
+                    st.success(
+                        "Candidato criado. Ele não foi promovido a CONFIRMED automaticamente."
+                    )
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Não foi possível criar o candidato: {type(exc).__name__}")
+
+    if wisdom_entries:
+        with st.expander("Ver Diário de Sabedoria", expanded=False):
+            st.dataframe([
+                {
+                    "ID":item.get("wisdom_id"),
+                    "Estado":item.get("state"),
+                    "Tema":item.get("topic"),
+                    "Domínio":item.get("domain"),
+                    "Verdade":item.get("truth_state"),
+                    "Confiança":item.get("confidence_pct"),
+                    "Revisão":wisdom_review_state(item),
+                    "Revisar em":item.get("review_due_at") or "—",
+                    "Origem":", ".join(item.get("source_episode_ids") or []) or "manual",
+                    "Evidências":len(item.get("evidence_refs") or []),
+                }
+                for item in reversed(wisdom_entries[-300:])
+                if isinstance(item, Mapping)
+            ], width="stretch", hide_index=True)
+    st.caption(
+        "Confirmação automática: NÃO · alteração de regra/peso: NÃO · "
+        "promoção automática: NÃO · trading real: BLOQUEADO."
+    )
 
     st.markdown("#### Feature Flags externas")
     rows = [

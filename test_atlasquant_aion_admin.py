@@ -6,10 +6,30 @@ from atlasquant_aion_admin import (
     AION_WORKSPACES,
     _attention_queue,
     _critical_surface_rows,
+    _aion_memory_hits,
 )
+from atlasquant_aion_wisdom import new_wisdom_entry
 
 
 class AtlasQuantAionAdminTests(unittest.TestCase):
+    def test_central_memory_search_includes_reviewed_wisdom(self):
+        entry = new_wisdom_entry(
+            "lesson_unique_abc",
+            "Conhecimento auditável do Diário de Sabedoria.",
+            truth_state="INFERENCE",
+            evidence_refs=["test:wisdom"],
+            review_due_at="2026-12-31T00:00:00+00:00",
+            created_at="2026-09-25T12:00:00+00:00",
+        )
+        hits = _aion_memory_hits(
+            "lesson_unique_abc",
+            {"wisdom":{"entries":[entry]}},
+        )
+        wisdom_hits = [x for x in hits if str(x.get("path") or "").startswith("WISDOM:")]
+        self.assertTrue(wisdom_hits)
+        self.assertEqual(wisdom_hits[0]["kind"], "INFERENCE")
+        self.assertEqual(wisdom_hits[0]["source"], "aion_wisdom_journal")
+
     def test_futuristic_ui_is_css_only_and_mobile_safe(self):
         self.assertIn("perspective", AION_ADMIN_CSS)
         self.assertIn("radial-gradient", AION_ADMIN_CSS)

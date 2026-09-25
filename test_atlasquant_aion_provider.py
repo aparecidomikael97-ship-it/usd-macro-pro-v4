@@ -132,6 +132,9 @@ class AtlasQuantAionProviderTests(unittest.TestCase):
         self.assertIn("Critic obrigatório: True",prompt)
         self.assertIn("Não exponha chain-of-thought",prompt)
         self.assertIn("proveniência, frescor, independência, contradições",prompt)
+        self.assertIn("Entradas WISDOM são memória revisável",prompt)
+        self.assertIn("não trate a lição como confirmação atual",prompt)
+        self.assertIn("EVIDÊNCIAS DE MEMÓRIA AUDITÁVEL DISPONÍVEIS",prompt)
 
     def test_external_call_is_blocked_without_explicit_approval(self):
         session=_FakeSession(_FakeResponse())

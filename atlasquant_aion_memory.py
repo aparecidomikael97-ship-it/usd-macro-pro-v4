@@ -42,6 +42,10 @@ from atlasquant_aion_learning import (
     normalize_research_references,
     learning_digest,
 )
+from atlasquant_aion_wisdom import (
+    normalize_wisdom_entries,
+    wisdom_digest,
+)
 from atlasquant_aion_event_journal import (
     normalize_events as normalize_live_event_journal_events,
     normalize_heartbeats as normalize_live_event_heartbeats,
@@ -109,6 +113,9 @@ APPROVED_AION_FOUNDATION = (
     "O AION não deve expor chain-of-thought/raciocínio privado; deve mostrar conclusão, evidências, conflitos, lacunas, estado de verdade e justificativa verificável.",
     "Conselho de Especialistas organiza responsabilidades; especialistas não são permissão para inventar dados nem substituir evidência real.",
     "Orquestração cognitiva é custo zero/local por padrão e não executa web, modelo externo, publicação, deploy, pagamento ou trading sozinha.",
+    "Diário de Sabedoria deve separar experiência de conhecimento: registrar o que foi aprendido, origem, estado de verdade, confiança, aplicação, validação e prazo de revisão.",
+    "Conhecimento CONFIRMED no Diário de Sabedoria exige evidência referenciada; sem evidência deve permanecer INFERENCE, HYPOTHESIS ou UNKNOWN.",
+    "Episódio SETTLED pode gerar candidato de sabedoria, mas confirmação, promoção e mudança operacional continuam dependentes de revisão humana.",
     "Execução real em corretora continua bloqueada; backtest/paper/forward e pesquisa não equivalem a autorização real.",
     "Gatilho operacional aprovado: quando o administrador disser 'tô no computador', priorizar a reconciliação do Render, configurar o Deploy Hook com segurança e validar Build Identity + Browser Smoke antes de retomar novos blocos.",
 )
@@ -285,7 +292,7 @@ def search_canonical_memory(
 def default_checkpoint() -> dict[str, Any]:
     return {
         "schema": SCHEMA,
-        "checkpoint_version": 7,
+        "checkpoint_version": 8,
         "created_at": _now(),
         "updated_at": _now(),
         "project": "AtlasQuant",
@@ -343,6 +350,10 @@ def default_checkpoint() -> dict[str, Any]:
             "experiments": [],
             "research_refs": [],
             "digest": learning_digest([], [], []),
+        },
+        "wisdom": {
+            "entries": [],
+            "digest": wisdom_digest([]),
         },
         "live_event_journal": {
             "events": [],
@@ -467,6 +478,17 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
         ),
     }
 
+    wisdom = payload.get("wisdom")
+    if not isinstance(wisdom, Mapping):
+        wisdom = {}
+    wisdom_entries = normalize_wisdom_entries(
+        wisdom.get("entries") if isinstance(wisdom, Mapping) else []
+    )
+    payload["wisdom"] = {
+        "entries": wisdom_entries,
+        "digest": wisdom_digest(wisdom_entries),
+    }
+
     live_event_journal = (
         payload.get("live_event_journal")
         if isinstance(payload.get("live_event_journal"), Mapping)
@@ -489,7 +511,7 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
         operating = {}
     tasks = normalize_queue(operating.get("tasks") if isinstance(operating, Mapping) else [])
     events = normalize_events(operating.get("events") if isinstance(operating, Mapping) else [])
-    payload["checkpoint_version"] = max(7, int(payload.get("checkpoint_version") or 1))
+    payload["checkpoint_version"] = max(8, int(payload.get("checkpoint_version") or 1))
     payload["operating"] = {
         "tasks": tasks,
         "events": events,
@@ -634,6 +656,31 @@ def update_learning_checkpoint(
             experiment_rows,
             research_rows,
         ),
+    }
+    payload["operating"]["dirty"] = bool(dirty)
+    payload["updated_at"] = _now()
+    return payload
+
+
+def update_wisdom_checkpoint(
+    checkpoint: Mapping[str, Any] | None,
+    *,
+    entries: Any = None,
+    dirty: bool = True,
+) -> dict[str, Any]:
+    """Return a normalized checkpoint with reviewed Wisdom Journal memory.
+
+    Wisdom persistence never changes live strategy rules, weights, deployment,
+    feature flags or broker execution.
+    """
+    payload = ensure_operating_checkpoint(checkpoint)
+    current = payload.get("wisdom") if isinstance(payload.get("wisdom"), Mapping) else {}
+    rows = normalize_wisdom_entries(
+        current.get("entries", []) if entries is None else entries
+    )
+    payload["wisdom"] = {
+        "entries": rows,
+        "digest": wisdom_digest(rows),
     }
     payload["operating"]["dirty"] = bool(dirty)
     payload["updated_at"] = _now()
@@ -813,7 +860,7 @@ def runtime_write_preflight(runtime_result: Mapping[str, Any] | None) -> dict[st
             "allowed": True,
             "mode": "UPDATE_MIGRATION" if migration else "UPDATE",
             "reason": (
-                "Runtime confirmado com SHA; migração estrutural V7 será aplicada na escrita condicional."
+                "Runtime confirmado com SHA; migração estrutural V8 será aplicada na escrita condicional."
                 if migration else
                 "Runtime confirmado com SHA e integridade compatível para escrita condicional."
             ),
@@ -1002,7 +1049,7 @@ def checkpoint_integrity_report(
 ) -> dict[str, Any]:
     """Verify persisted component digests before normalization mutates them.
 
-    Missing V7 structure is reported as MIGRATION_REQUIRED rather than corruption.
+    Missing V8 structure is reported as MIGRATION_REQUIRED rather than corruption.
     A present-but-wrong digest is a MISMATCH and should fail closed for writes.
     """
     if not isinstance(checkpoint, Mapping):
@@ -1116,6 +1163,16 @@ def checkpoint_integrity_report(
         ),
     )
 
+    wisdom = raw.get("wisdom") if isinstance(raw.get("wisdom"), Mapping) else {}
+    wisdom_entries = normalize_wisdom_entries(
+        wisdom.get("entries") if isinstance(wisdom, Mapping) else []
+    )
+    add_check(
+        "wisdom",
+        wisdom.get("digest"),
+        wisdom_digest(wisdom_entries),
+    )
+
     live_event_journal = (
         raw.get("live_event_journal")
         if isinstance(raw.get("live_event_journal"), Mapping)
@@ -1136,12 +1193,14 @@ def checkpoint_integrity_report(
     raw_areas = raw.get("areas") if isinstance(raw.get("areas"), Mapping) else {}
     if "subscriptions" not in raw_areas:
         migration_items.append("areas.subscriptions ausente")
-    if version < 7:
-        migration_items.append(f"checkpoint_version {version} < 7")
+    if version < 8:
+        migration_items.append(f"checkpoint_version {version} < 8")
     if "continuity" not in raw:
         migration_items.append("continuity ausente")
     if "learning" not in raw:
         migration_items.append("learning ausente")
+    if "wisdom" not in raw:
+        migration_items.append("wisdom ausente")
     if "live_event_journal" not in raw:
         migration_items.append("live_event_journal ausente")
 
