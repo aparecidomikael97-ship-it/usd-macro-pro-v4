@@ -1,6 +1,6 @@
 import unittest
 
-from atlasquant_ui_v1 import UI_VERSION, ATLASQUANT_CSS, NAVIGATION_LABELS, NAVIGATION_GROUPS, BEGINNER_OPEN_AREAS, hero_html, navigation_labels, navigation_groups, navigation_groups_html, navigation_group_for, operation_focus_html, score_semantics, section_title_html, state_badge_html, decision_strip_html, context_strip_html, normalize_experience_mode, experience_mode_overview_html, navigation_mode_css, is_page_locked_for_mode, advanced_preview_model
+from atlasquant_ui_v1 import UI_VERSION, ATLASQUANT_CSS, NAVIGATION_LABELS, NAVIGATION_GROUPS, BEGINNER_OPEN_AREAS, hero_html, navigation_labels, navigation_groups, navigation_groups_html, navigation_group_for, operation_focus_html, score_semantics, section_title_html, state_badge_html, decision_strip_html, context_strip_html, normalize_experience_mode, experience_mode_overview_html, navigation_mode_css, is_page_locked_for_mode, advanced_preview_model, experience_compass_model, experience_compass_html
 
 
 class AtlasQuantUiTests(unittest.TestCase):
@@ -254,6 +254,52 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("if r.status_code == 404:",fn)
         self.assertIn("return default",fn)
         self.assertIn("r.raise_for_status()",fn)
+
+    def test_experience_compass_explains_current_area_without_execution(self):
+        beginner=experience_compass_model("Iniciante","🎯 Radar")
+        self.assertEqual(beginner["mode"],"Iniciante")
+        self.assertEqual(beginner["group"],"Operação")
+        self.assertFalse(beginner["locked"])
+        self.assertEqual(beginner["state"],"ESSENCIAL")
+        self.assertFalse(beginner["real_orders_enabled"])
+        self.assertFalse(beginner["automatic_execution"])
+
+        advanced=experience_compass_model("Avançado","🧭 Painel mestre")
+        self.assertEqual(advanced["mode"],"Avançado")
+        self.assertEqual(advanced["state"],"COMPLETO")
+        self.assertIn("Radar",advanced["next_step"])
+
+    def test_experience_compass_marks_advanced_preview_locked_in_beginner(self):
+        model=experience_compass_model("Iniciante","🧪 Backtest")
+        self.assertTrue(model["locked"])
+        self.assertEqual(model["state"],"PRÉVIA AVANÇADA")
+        self.assertIn("não executa",model["detail"].lower())
+        html=experience_compass_html("Iniciante","🧪 Backtest")
+        self.assertIn("PRÉVIA AVANÇADA",html)
+        self.assertIn("🔒",html)
+        self.assertIn("Ordens reais bloqueadas",html)
+
+    def test_experience_compass_normalizes_fast_beginner_macro_alias(self):
+        model=experience_compass_model("Iniciante","🎙️ Macro")
+        self.assertEqual(model["page"],"🎙️ Macro Briefing")
+        self.assertEqual(model["group"],"Pesquisa")
+        self.assertFalse(model["locked"])
+
+    def test_experience_compass_is_mobile_responsive_and_readable(self):
+        self.assertIn(".aq-compass-grid",ATLASQUANT_CSS)
+        self.assertIn("@media (max-width: 430px)",ATLASQUANT_CSS)
+        self.assertIn(".aq-compass-grid{grid-template-columns:1fr}",ATLASQUANT_CSS)
+        self.assertIn("color:#dce8f5",ATLASQUANT_CSS)
+        self.assertIn("color:#d8e5f3",ATLASQUANT_CSS)
+
+    def test_full_app_renders_compass_after_navigation_selection(self):
+        from pathlib import Path
+        src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        nav=src.index("render_stable_navigation(")
+        compass=src.index("experience_compass_html(_aq_experience_mode, _aq_active_page)",nav)
+        preview=src.index("render_locked_advanced_preview(_aq_active_page)",compass)
+        self.assertLess(nav,compass)
+        self.assertLess(compass,preview)
 
     def test_experience_overview_makes_beginner_and_advanced_scope_explicit(self):
         beginner=experience_mode_overview_html("Iniciante")
