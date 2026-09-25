@@ -300,6 +300,17 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("Cobrança automática", src)
         self.assertIn("Trading real", src)
 
+    def test_subscriptions_shows_privacy_lifecycle_readiness_without_activation(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Privacidade & ciclo de vida do AION pessoal",src)
+        self.assertIn("tenant_privacy_readiness()",src)
+        self.assertIn("tenant_privacy_policy_snapshot()",src)
+        self.assertIn("Exclusão automática",src)
+        self.assertIn("Persistência pessoal",src)
+        self.assertIn("Compliance legal afirmado",src)
+        self.assertIn("Nenhum dado pessoal é criado, exportado ou excluído por este painel.",src)
+        self.assertIn('"tenant_privacy_contract_ready"',src)
+
     def test_business_panel_labels_unconnected_sales_as_unconfirmed(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("não representam vendas confirmadas", src)

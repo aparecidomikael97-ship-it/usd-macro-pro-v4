@@ -135,6 +135,10 @@ from atlasquant_aion_tenant import (
     tenant_policy_snapshot,
     tenant_readiness_summary,
 )
+from atlasquant_aion_tenant_privacy import (
+    tenant_privacy_policy_snapshot,
+    tenant_privacy_readiness,
+)
 
 try:
     from atlasquant_neural_voice_ui import render_neural_voice_player
@@ -2368,6 +2372,53 @@ def _render_entitlements(
         "provisionamento automático: NÃO."
     )
 
+    st.markdown("#### 🛡️ Privacidade & ciclo de vida do AION pessoal")
+    privacy_ready = tenant_privacy_readiness()
+    privacy_policy = tenant_privacy_policy_snapshot()
+    p1,p2,p3,p4 = st.columns(4)
+    p1.metric("Classes pessoais permitidas", privacy_ready["allowed_data_classes"])
+    p2.metric("Exportação", "CONTRATO PRONTO")
+    p3.metric("Exclusão", "PLANO MANUAL")
+    p4.metric("Exclusão automática", "DESLIGADA")
+
+    st.caption(
+        "Estas regras são controles técnicos internos de privacidade e ciclo de vida. "
+        "As janelas abaixo são defaults de revisão do produto, não certificação jurídica/compliance."
+    )
+    class_rows = []
+    review_days = privacy_policy.get("retention_review_days") or {}
+    for item in privacy_policy.get("personal_data_classes") or []:
+        key = str(item.get("key") or "")
+        class_rows.append({
+            "Classe": item.get("label"),
+            "Finalidade": item.get("purpose"),
+            "Sensibilidade": item.get("sensitivity"),
+            "Revisão interna": (
+                f"{int(review_days.get(key))} dias"
+                if review_days.get(key) is not None
+                else "sem janela definida"
+            ),
+        })
+    if class_rows:
+        st.dataframe(class_rows,width="stretch",hide_index=True)
+
+    privacy_controls = [
+        {"Controle":"Memória ADMIN no tenant","Estado":"BLOQUEADA"},
+        {"Controle":"Documentos privados do projeto","Estado":"BLOQUEADOS"},
+        {"Controle":"Cópia cross-tenant","Estado":"BLOQUEADA"},
+        {"Controle":"Exportação automática","Estado":"DESLIGADA"},
+        {"Controle":"Exclusão automática","Estado":"DESLIGADA"},
+        {"Controle":"Limpeza após rotação de credencial","Estado":"REVISÃO MANUAL"},
+        {"Controle":"Persistência pessoal","Estado":"AINDA DESLIGADA"},
+        {"Controle":"Compliance legal afirmado","Estado":"NÃO"},
+    ]
+    st.dataframe(privacy_controls,width="stretch",hide_index=True)
+    st.info(
+        "Quando o AION pessoal for ativado no futuro, exportação e exclusão deverão operar somente "
+        "no namespace do próprio assinante, com confirmação de identidade e auditoria. "
+        "Nenhum dado pessoal é criado, exportado ou excluído por este painel."
+    )
+
 
 
 def render_aion_admin_console(
@@ -2544,6 +2595,9 @@ def render_aion_admin_console(
         ),
         "guardian_blocked_now": int(
             guardian_posture(access_map, feature_flags=flags).get("blocked_now") or 0
+        ),
+        "tenant_privacy_contract_ready": bool(
+            tenant_privacy_readiness().get("policy_defined", False)
         ),
         "checkpoint_dirty": bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
         "checkpoint_conflict": bool(st.session_state.get(_WORKING_CONFLICT_KEY, False)),
