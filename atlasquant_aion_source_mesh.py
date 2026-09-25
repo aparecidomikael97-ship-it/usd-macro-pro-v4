@@ -513,6 +513,35 @@ def source_mesh_snapshot(
         if row.get("available") is False or "fallback" in _clean(row.get("detail")).casefold():
             fallbacks += 1
 
+    by_claim = {
+        str(row.get("claim") or ""): row
+        for row in rows
+        if isinstance(row, Mapping)
+    }
+    auto = by_claim.get("autopilot_cycle_health", {})
+    twelve = by_claim.get("twelve_data_runtime", {})
+    scanner = by_claim.get("technical_scanner_freshness", {})
+    market_map = by_claim.get("market_map_freshness", {})
+    pair_matrix = by_claim.get("pair_matrix_readiness", {})
+    market_open = bool(dict(autopilot_status or {}).get("forex_market_open", False))
+    live_components = (auto, twelve, scanner, market_map, pair_matrix)
+    live_truth_confirmed = all(
+        str(item.get("truth_state") or "").upper() == "CONFIRMED"
+        for item in live_components
+    )
+    live_healthy = all(item.get("healthy") is True for item in live_components)
+    market_live_confirmed = bool(market_open and live_truth_confirmed and live_healthy)
+    if market_live_confirmed:
+        market_state = "LIVE_CONFIRMED"
+    elif not market_open and str(auto.get("truth_state") or "").upper() == "CONFIRMED":
+        market_state = "MARKET_CLOSED"
+    elif any(item.get("available") is False for item in live_components):
+        market_state = "DEGRADED"
+    elif rows:
+        market_state = "UNCONFIRMED"
+    else:
+        market_state = "UNKNOWN"
+
     return {
         "schema": SCHEMA,
         "observations": rows,
@@ -521,6 +550,12 @@ def source_mesh_snapshot(
         "unknown_observations": unknown,
         "fallback_or_unavailable": fallbacks,
         "families": family_counts,
+        "market_state": market_state,
+        "market_open": market_open,
+        "market_live_confirmed": market_live_confirmed,
+        "market_live_rule": (
+            "Requires confirmed and healthy Autopilot, Twelve Data, scanner, market map and live Pair Matrix while market is open."
+        ),
         "performs_network_request": False,
         "changes_market_scores": False,
         "automatic_source_switch": False,
