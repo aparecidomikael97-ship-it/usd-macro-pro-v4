@@ -295,6 +295,57 @@ class AtlasQuantAionExecutivePulseTests(unittest.TestCase):
         self.assertEqual(out["reliability_posture"],"CRITICAL")
         self.assertEqual(out["degraded_mode_state"],"FAIL_CLOSED")
 
+    def test_urgent_internal_market_event_becomes_p1_trading_review(self):
+        out=executive_pulse(
+            runtime_result={"status":"CONFIRMED","integrity":{"state":"CONFIRMED"}},
+            status_board={"has_unresolved":False},
+            event_intelligence_snapshot={
+                "active_alerts":1,
+                "urgent_alerts":1,
+                "top_alert":{
+                    "state":"URGENT_INTERNAL",
+                    "event_id":"EVT-1",
+                    "reason":"Evento crítico/fresco.",
+                },
+                "events":[{
+                    "event_id":"EVT-1",
+                    "headline":"Escalada geopolítica confirmada por fonte oficial.",
+                    "event_truth":"CONFIRMED",
+                }],
+            },
+        )
+        self.assertEqual(out["posture"],"ATTENTION")
+        self.assertEqual(out["primary"]["priority"],"P1")
+        self.assertEqual(out["primary"]["area"],"📈 Trading")
+        self.assertEqual(out["primary"]["source"],"aion_event_intelligence")
+        self.assertEqual(out["event_alert_state"],"URGENT_INTERNAL")
+        self.assertEqual(out["event_active_alerts"],1)
+        self.assertEqual(out["event_urgent_alerts"],1)
+        self.assertIn("Nenhuma ordem é automática",out["primary"]["next_action"])
+        self.assertFalse(out["executes_action"])
+
+    def test_event_review_never_preempts_fail_closed_reliability(self):
+        out=executive_pulse(
+            runtime_result={"status":"CONFIRMED","integrity":{"state":"CONFIRMED"}},
+            reliability_snapshot={
+                "posture":"CRITICAL",
+                "degraded_mode":{"state":"FAIL_CLOSED"},
+                "cost_guardian":{"state":"ZERO_COST"},
+            },
+            event_intelligence_snapshot={
+                "active_alerts":1,
+                "top_alert":{
+                    "state":"REVIEW_INTERNAL",
+                    "event_id":"EVT-2",
+                    "reason":"Revisar fonte.",
+                },
+                "events":[{"event_id":"EVT-2","headline":"Evento não confirmado."}],
+            },
+        )
+        self.assertEqual(out["primary"]["source"],"reliability_governance")
+        self.assertEqual(out["primary"]["priority"],"P0")
+        self.assertEqual(out["event_alert_state"],"REVIEW_INTERNAL")
+
     def test_cost_warning_is_review_and_does_not_execute(self):
         out=executive_pulse(
             runtime_result={"status":"CONFIRMED","integrity":{"state":"CONFIRMED"}},
