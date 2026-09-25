@@ -178,6 +178,12 @@ def record_stage(
         prior={x for x in (builder.get("actor_ref"),reviewer.get("actor_ref")) if x}
         if actor in prior:
             raise ValueError("breaker must be independent from builder/reviewer")
+    if name=="EVALUATE" and next_state=="PASS":
+        run_ref=_clean(evaluation_run_id,140) or _clean(item.get("evaluation_run_id"),140)
+        if not run_ref:
+            raise ValueError("evaluation PASS requires Evaluation Lab run id")
+    if name=="RELEASE_REVIEW" and next_state=="PASS" and item.get("state")!="HUMAN_REVIEW_CANDIDATE":
+        raise ValueError("release review cannot pass before all prior gates")
 
     for row in item["stages"]:
         if row["stage"]==name:
@@ -203,6 +209,7 @@ def evaluate_pipeline(pipeline:Mapping[str,Any])->dict[str,Any]:
     if not stages:
         return item
     blockers=[]
+    plan=next((x for x in stages if x.get("stage")=="PLAN"),{})
     builder=next((x for x in stages if x.get("stage")=="BUILD"),{})
     reviewer=next((x for x in stages if x.get("stage")=="REVIEW"),{})
     breaker=next((x for x in stages if x.get("stage")=="BREAK"),{})
@@ -221,16 +228,19 @@ def evaluate_pipeline(pipeline:Mapping[str,Any])->dict[str,Any]:
             blockers.append(f"{row.get('stage')}_CRITICAL_FINDINGS")
 
     review_ready=bool(
-        builder.get("state")=="PASS"
+        plan.get("state")=="PASS"
+        and builder.get("state")=="PASS"
         and reviewer.get("state")=="PASS"
         and breaker.get("state")=="PASS"
         and evaluator.get("state")=="PASS"
         and item.get("evaluation_run_id")
         and not blockers
     )
+    if release.get("state")=="PASS" and not review_ready:
+        blockers.append("RELEASE_REVIEW_OUT_OF_ORDER")
     if blockers:
         state="BLOCKED"
-    elif release.get("state")=="PASS":
+    elif release.get("state")=="PASS" and review_ready:
         state="DONE"
     elif review_ready and release.get("state") in {"PENDING","WAITING_HUMAN"}:
         state="HUMAN_REVIEW_CANDIDATE"
