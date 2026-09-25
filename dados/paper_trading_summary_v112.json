@@ -16,7 +16,7 @@
   "setup_attribution_inferred": false,
   "last_cycle": {
     "version": "V11.2_PAPER_TRADING",
-    "ran_at": "2026-09-25T18:48:49.941164+00:00",
+    "ran_at": "2026-09-25T19:20:34.008138+00:00",
     "pending_created": 0,
     "pending_cancelled_by_gain_lock": 0,
     "entries_opened": 0,
@@ -29,10 +29,10 @@
       "USD/CHF": {
         "side": "BUY",
         "passed": false,
-        "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
+        "state": "⚪ EM OBSERVAÇÃO",
         "hard_blocks": [],
         "soft_blocks": [
-          "ICT incompleto (40/100)",
+          "ICT incompleto (33/100)",
           "Fluxo institucional incompleto (60/100)",
           "M15 ainda não confirmou gatilho"
         ],
@@ -44,8 +44,8 @@
         "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
         "hard_blocks": [],
         "soft_blocks": [
-          "ICT incompleto (40/100)",
-          "Fluxo institucional incompleto (66/100)",
+          "ICT incompleto (33/100)",
+          "Fluxo institucional incompleto (62/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -55,14 +55,15 @@
         "passed": false,
         "state": "🔴 BLOQUEADO",
         "hard_blocks": [
+          "H4 está contra o viés",
           "H1 está contra o viés",
           "ADR14 muito esticado (133%)"
         ],
         "soft_blocks": [
           "Gate ainda não liberou execução",
           "ADR14 em 133%: evitar perseguir preço",
-          "ICT incompleto (52/100)",
-          "Fluxo institucional incompleto (55/100)",
+          "ICT incompleto (45/100)",
+          "Fluxo institucional incompleto (53/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -73,8 +74,8 @@
         "state": "⚪ EM OBSERVAÇÃO",
         "hard_blocks": [],
         "soft_blocks": [
-          "ICT incompleto (40/100)",
-          "Fluxo institucional incompleto (68/100)",
+          "ICT incompleto (42/100)",
+          "Fluxo institucional incompleto (62/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -87,7 +88,7 @@
         "soft_blocks": [
           "ADR14 em 98%: evitar perseguir preço",
           "ICT incompleto (61/100)",
-          "Fluxo institucional incompleto (58/100)",
+          "Fluxo institucional incompleto (50/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -107,8 +108,10 @@
       "GBP/USD": {
         "side": "SELL",
         "passed": false,
-        "state": "⚪ EM OBSERVAÇÃO",
-        "hard_blocks": [],
+        "state": "🔴 BLOQUEADO",
+        "hard_blocks": [
+          "H1 está contra o viés"
+        ],
         "soft_blocks": [
           "Gate ainda não liberou execução",
           "ADR14 em 96%: evitar perseguir preço",
