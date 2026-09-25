@@ -1163,9 +1163,40 @@ def _render_reliability_governance(system_context: Mapping[str, Any] | None) -> 
     )
     st.markdown("#### 🛡️ Reliability & Governance")
     st.caption(
-        "Data Guardian + reconciliação de fontes + Cost Guardian + proteção da memória + "
+        "Data Guardian + Source Mesh + reconciliação de fontes + Cost Guardian + proteção da memória + "
         "modo degradado + rollback consultivo. Nenhuma correção, compra, deploy ou rollback é automático."
     )
+    source_mesh = (
+        system.get("source_mesh")
+        if isinstance(system.get("source_mesh"), Mapping)
+        else {}
+    )
+    if source_mesh:
+        m1,m2,m3,m4 = st.columns(4)
+        m1.metric("Source Mesh", str(source_mesh.get("market_state") or "UNKNOWN"))
+        m2.metric("Observações", int(source_mesh.get("observation_count") or 0))
+        m3.metric("Confirmadas", int(source_mesh.get("confirmed_observations") or 0))
+        m4.metric("Fallback/indisp.", int(source_mesh.get("fallback_or_unavailable") or 0))
+        families = (
+            source_mesh.get("families")
+            if isinstance(source_mesh.get("families"), Mapping)
+            else {}
+        )
+        if families:
+            st.caption(
+                "Famílias observadas: "
+                + " · ".join(f"{name}: {count}" for name,count in sorted(families.items()))
+            )
+        if bool(source_mesh.get("market_live_confirmed", False)):
+            st.success(
+                "Mercado ao vivo confirmado pelo Source Mesh: Matriz ao vivo + Autopilot + "
+                "scanner/mapa + Twelve Data passaram juntos."
+            )
+        else:
+            st.info(
+                "Mercado ao vivo NÃO foi confirmado pelo Source Mesh nesta execução. "
+                "Snapshot/fallback pode manter contexto, mas não vira evidência ao vivo."
+            )
     if not reliability:
         st.warning("Camada de confiabilidade não confirmada nesta execução.")
         return
@@ -1245,6 +1276,7 @@ def _render_reliability_governance(system_context: Mapping[str, Any] | None) -> 
         with st.expander("Fontes e evidências observadas", expanded=False):
             st.dataframe([
                 {
+                    "Família":row.get("family"),
                     "Fonte":row.get("source"),
                     "Afirmação":row.get("claim"),
                     "Estado":row.get("state"),
