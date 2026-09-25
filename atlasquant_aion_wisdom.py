@@ -408,6 +408,53 @@ def search_wisdom(
     return [dict(item) for _, item in scored[: max(1, min(int(limit or 8), 50))]]
 
 
+def wisdom_evidence_hits(
+    query: Any,
+    entries: Sequence[Mapping[str, Any]] | None,
+    *,
+    limit: int = 5,
+    now: str | None = None,
+) -> list[dict[str, Any]]:
+    """Return Wisdom Journal matches in the common AION evidence-hit shape.
+
+    A CONFIRMED lesson is only emitted as CONFIRMED evidence while its review
+    state is CURRENT. If review is DUE/UNKNOWN, it remains retrievable but is
+    downgraded to INFERENCE so historical validation is never confused with
+    current freshness.
+    """
+    rows = search_wisdom(query, entries, limit=limit, include_retired=False)
+    out: list[dict[str, Any]] = []
+    for index, item in enumerate(rows):
+        review = wisdom_review_state(item, now=now)
+        original_truth = str(item.get("truth_state") or "UNKNOWN").upper()
+        effective_truth = original_truth
+        if original_truth == "CONFIRMED" and review != "CURRENT":
+            effective_truth = "INFERENCE"
+        refs = list(item.get("evidence_refs") or [])
+        excerpt = (
+            f"[wisdom truth={original_truth}; review={review}; "
+            f"confidence={float(item.get('confidence_pct') or 0):.1f}%] "
+            f"{item.get('topic')}: {item.get('insight')}"
+        )
+        out.append({
+            "path": f"WISDOM:{item.get('wisdom_id')}",
+            "title": str(item.get("topic") or "Wisdom Journal"),
+            "excerpt": excerpt[:1400],
+            "score": max(1, len(rows) - index),
+            "kind": effective_truth,
+            "truth_state": effective_truth,
+            "original_truth_state": original_truth,
+            "review_state": review,
+            "confidence_pct": float(item.get("confidence_pct") or 0),
+            "source": "aion_wisdom_journal",
+            "source_refs": refs,
+            "wisdom_id": item.get("wisdom_id"),
+            "knowledge_memory": True,
+            "current_market_fact": False,
+        })
+    return out
+
+
 def wisdom_summary(
     entries: Sequence[Mapping[str, Any]] | None,
     *,
@@ -463,6 +510,7 @@ __all__ = [
     "wisdom_review_state",
     "candidate_from_learning_episode",
     "search_wisdom",
+    "wisdom_evidence_hits",
     "wisdom_summary",
     "wisdom_digest",
 ]
