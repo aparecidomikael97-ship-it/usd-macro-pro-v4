@@ -190,11 +190,24 @@ AION_ADMIN_CSS = r"""
 .aion-truth{border-left:3px solid #73f1da;border-radius:10px;padding:10px 12px;background:rgba(27,69,73,.28);color:#e9fffb;font-size:.78rem;margin:8px 0 14px}
 .aion-panel{border:1px solid rgba(126,177,218,.18);border-radius:16px;padding:14px 15px;background:rgba(9,24,43,.62);margin:8px 0 12px}
 .aion-panel h4{color:#fff;margin:.1rem 0 .5rem}.aion-panel p{color:#dce7f5;margin:.2rem 0;font-size:.82rem}
+.aion-workspace-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:9px 0 16px}
+.aion-workspace-card{border:1px solid rgba(126,177,218,.2);border-radius:15px;padding:12px 13px;background:rgba(8,24,43,.72);min-height:104px}
+.aion-workspace-card .top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.aion-workspace-card strong{color:#fff;font-size:.88rem;line-height:1.2}
+.aion-workspace-card p{color:#cbd9e9;font-size:.72rem;line-height:1.38;margin:7px 0 0}
+.aion-state{border-radius:999px;padding:3px 7px;font-size:.61rem;font-weight:900;letter-spacing:.05em;white-space:nowrap}
+.aion-state.ok{color:#73f1da;background:rgba(34,112,99,.25);border:1px solid rgba(115,241,218,.26)}
+.aion-state.info{color:#b9d8ff;background:rgba(52,92,145,.25);border:1px solid rgba(137,190,255,.24)}
+.aion-state.warn{color:#ffd56b;background:rgba(132,91,20,.24);border:1px solid rgba(255,213,107,.26)}
+.aion-state.blocked{color:#ffc2c2;background:rgba(120,45,55,.24);border:1px solid rgba(255,160,170,.24)}
 @media (prefers-reduced-motion:reduce){.aion-orb{animation:none!important}}
 @media(max-width:760px){
  .aion-shell{padding:18px 16px;border-radius:18px}.aion-orb{width:58px;height:58px;right:16px;top:20px}
  .aion-sub{padding-right:64px;font-size:.8rem}.aion-grid{grid-template-columns:1fr 1fr}.aion-card{padding:11px 12px}
+ .aion-workspace-grid{grid-template-columns:1fr 1fr}.aion-workspace-card{min-height:98px;padding:10px 11px}
 }
+@media(max-width:430px){.aion-workspace-grid{grid-template-columns:1fr}}
+
 </style>
 """
 
@@ -455,6 +468,111 @@ def _render_executive_grid(
     )
 
 
+
+def _workspace_overview_items(
+    checkpoint: Mapping[str, Any],
+    runtime_result: Mapping[str, Any],
+) -> list[dict[str, str]]:
+    operating = checkpoint.get("operating") if isinstance(checkpoint.get("operating"), Mapping) else {}
+    tasks = list(operating.get("tasks", []) or [])
+    task_summary = queue_summary(tasks)
+
+    studio = checkpoint.get("studio") if isinstance(checkpoint.get("studio"), Mapping) else {}
+    business = checkpoint.get("business") if isinstance(checkpoint.get("business"), Mapping) else {}
+    promotions = checkpoint.get("promotions") if isinstance(checkpoint.get("promotions"), Mapping) else {}
+    entitlements = checkpoint.get("entitlements") if isinstance(checkpoint.get("entitlements"), Mapping) else {}
+
+    projects = list(studio.get("projects", []) or [])
+    products = list(business.get("products", []) or [])
+    campaigns = list(promotions.get("campaigns", []) or [])
+    records = list(entitlements.get("records", []) or [])
+    runtime_status = str(runtime_result.get("status") or "UNKNOWN").upper()
+
+    runtime_tone = "ok" if runtime_status == "CONFIRMED" else "warn"
+    return [
+        {
+            "name": "🧠 Central",
+            "state": "ATIVA",
+            "tone": "ok",
+            "detail": "Comando, memória, estado mestre e perguntas ao AION.",
+        },
+        {
+            "name": "🗂️ Secretaria",
+            "state": f"{int(task_summary.get('active') or 0)} ATIVAS",
+            "tone": "info",
+            "detail": "Tarefas, pendências, aprovações e briefing executivo.",
+        },
+        {
+            "name": "📈 Trading",
+            "state": "REAL BLOQUEADO",
+            "tone": "blocked",
+            "detail": "Leitura e contexto podem existir; ordens reais continuam bloqueadas.",
+        },
+        {
+            "name": "🎬 Studio",
+            "state": f"{len(projects)} PROJETOS",
+            "tone": "info",
+            "detail": "Conteúdo, roteiros e preparação de publicação com aprovação.",
+        },
+        {
+            "name": "💼 Negócios",
+            "state": f"{len(products)} CANDIDATOS",
+            "tone": "info",
+            "detail": "Produtos, margem, fornecedores e evidências de tendência.",
+        },
+        {
+            "name": "🧪 Laboratório",
+            "state": "GUARDIAN ATIVO",
+            "tone": "ok",
+            "detail": "Sandbox, feature flags, orçamento e testes antes de promoção.",
+        },
+        {
+            "name": "🛠️ Desenvolvimento",
+            "state": runtime_status,
+            "tone": runtime_tone,
+            "detail": "Missões de código e Checkpoint Mestre com persistência verificada.",
+        },
+        {
+            "name": "🔐 Assinaturas",
+            "state": f"{len(records)} REGISTROS",
+            "tone": "info",
+            "detail": "Entitlements, auditoria de acesso e isolamento por assinante.",
+        },
+        {
+            "name": "🎟️ Promoções",
+            "state": f"{len(campaigns)} CAMPANHAS",
+            "tone": "info",
+            "detail": "Cupons, trials e descontos separados do direito de acesso.",
+        },
+    ]
+
+
+def _render_workspace_overview(
+    checkpoint: Mapping[str, Any],
+    runtime_result: Mapping[str, Any],
+) -> None:
+    st.markdown("#### Mapa Operacional AION")
+    st.caption(
+        "Visão rápida das 9 áreas administrativas. O mapa é somente leitura: "
+        "não aprova, publica, cobra, provisiona acesso nem envia ordens."
+    )
+    cards = []
+    for item in _workspace_overview_items(checkpoint, runtime_result):
+        cards.append(
+            '<div class="aion-workspace-card">'
+            '<div class="top">'
+            f'<strong>{escape(item["name"])}</strong>'
+            f'<span class="aion-state {escape(item["tone"])}">{escape(item["state"])}</span>'
+            '</div>'
+            f'<p>{escape(item["detail"])}</p>'
+            '</div>'
+        )
+    st.markdown(
+        '<div class="aion-workspace-grid">' + "".join(cards) + "</div>",
+        unsafe_allow_html=True,
+    )
+
+
 def _render_master_status(board: Mapping[str, Any]) -> None:
     counts = board.get("counts") if isinstance(board.get("counts"), Mapping) else {}
     st.markdown("#### Painel Mestre de Estado")
@@ -522,6 +640,8 @@ def _render_central(
     cols[1].metric("Tarefas ativas", summary["active"])
     cols[2].metric("Aguardando aprovação", summary["waiting_approval"])
     cols[3].metric("Ordens reais", "BLOQUEADAS")
+
+    _render_workspace_overview(checkpoint, runtime_result)
 
     st.markdown("#### Briefing de entrada")
     st.write(
