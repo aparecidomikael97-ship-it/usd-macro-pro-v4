@@ -256,7 +256,7 @@ def canonical_documents(base_dir: str | Path | None = None) -> list[dict[str, An
 
     foundation = "\n".join(f"- {item}" for item in APPROVED_AION_FOUNDATION)
     docs.append({
-        "path": "AION_APPROVED_FOUNDATION_2026-09-23",
+        "path": "AION_APPROVED_FOUNDATION_2026-09-25",
         "text": foundation,
         "sha256": hashlib.sha256(foundation.encode("utf-8")).hexdigest(),
         "chars": len(foundation),
@@ -339,7 +339,7 @@ def default_checkpoint() -> dict[str, Any]:
         ],
         "evidence": {
             "canonical_sources": list(CANONICAL_FILES),
-            "conversation_seed": "approved project decisions consolidated on 2026-09-23",
+            "conversation_seed": "approved project decisions consolidated through 2026-09-25",
         },
         "operating": {
             "tasks": [],
