@@ -557,6 +557,30 @@ def structured_calendar_event(
     return _compact_event(item)|{"impact":item["impact"]}
 
 
+def govern_event_alerts(
+    events:Sequence[Mapping[str,Any]]|None,
+    *,
+    reliability:Mapping[str,Any]|None=None,
+)->dict[str,Any]:
+    event_rows=[dict(x) for x in list(events or []) if isinstance(x,Mapping)]
+    alerts=[_alert_for_event(event,reliability=reliability) for event in event_rows]
+    active=[x for x in alerts if x["state"]!="NONE"]
+    rank={"URGENT_INTERNAL":0,"REVIEW_INTERNAL":1,"HOLD":2,"WATCH":3,"NONE":4}
+    active.sort(key=lambda x:(rank.get(x["state"],9),-int(x["severity_score"])))
+    return {
+        "alerts":alerts,
+        "active_alerts":len(active),
+        "urgent_alerts":sum(1 for x in active if x["state"]=="URGENT_INTERNAL"),
+        "review_alerts":sum(1 for x in active if x["state"]=="REVIEW_INTERNAL"),
+        "watch_alerts":sum(1 for x in active if x["state"]=="WATCH"),
+        "hold_alerts":sum(1 for x in active if x["state"]=="HOLD"),
+        "top_alert":active[0] if active else None,
+        "external_notification_allowed":False,
+        "market_action_authorized":False,
+        "real_orders_enabled":False,
+    }
+
+
 def build_event_intelligence(
     *,
     news_payload:Mapping[str,Any]|None=None,
@@ -577,11 +601,8 @@ def build_event_intelligence(
     if calendar is not None:
         events=[calendar]+[x for x in events if x.get("event_id")!=calendar.get("event_id")]
 
-    alerts=[_alert_for_event(event,reliability=reliability) for event in events]
-    active=[x for x in alerts if x["state"]!="NONE"]
-    rank={"URGENT_INTERNAL":0,"REVIEW_INTERNAL":1,"HOLD":2,"WATCH":3,"NONE":4}
-    active.sort(key=lambda x:(rank.get(x["state"],9),-int(x["severity_score"])))
-    top=active[0] if active else None
+    governed=govern_event_alerts(events,reliability=reliability)
+    alerts=list(governed["alerts"])
     category_counts:dict[str,int]={}
     truth_counts:dict[str,int]={}
     for event in events:
@@ -594,14 +615,14 @@ def build_event_intelligence(
         "events":events,
         "alerts":alerts,
         "event_count":len(events),
-        "active_alerts":len(active),
-        "urgent_alerts":sum(1 for x in active if x["state"]=="URGENT_INTERNAL"),
-        "review_alerts":sum(1 for x in active if x["state"]=="REVIEW_INTERNAL"),
-        "watch_alerts":sum(1 for x in active if x["state"]=="WATCH"),
-        "hold_alerts":sum(1 for x in active if x["state"]=="HOLD"),
+        "active_alerts":governed["active_alerts"],
+        "urgent_alerts":governed["urgent_alerts"],
+        "review_alerts":governed["review_alerts"],
+        "watch_alerts":governed["watch_alerts"],
+        "hold_alerts":governed["hold_alerts"],
         "category_counts":category_counts,
         "truth_counts":truth_counts,
-        "top_alert":top,
+        "top_alert":governed["top_alert"],
         "external_notification_channel_connected":False,
         "external_notification_allowed":False,
         "background_ready":True,
@@ -756,7 +777,7 @@ __all__=[
     "SCHEMA","CATEGORIES","ALERT_STATES",
     "classify_event_text","impact_hypotheses",
     "extract_currency_news_events","structured_calendar_event",
-    "build_event_intelligence","normalize_event_journal",
+    "build_event_intelligence","govern_event_alerts","normalize_event_journal",
     "normalize_alert_journal","merge_event_journal","merge_alert_journal",
     "event_intelligence_digest","event_intelligence_summary",
 ]
