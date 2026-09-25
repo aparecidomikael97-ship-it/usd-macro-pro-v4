@@ -25,7 +25,7 @@ class AtlasQuantAionSourceMeshRuntimeTests(unittest.TestCase):
         self.assertIn("_github_get_json_v937(",self.src)
 
     def test_aion_source_mesh_uses_existing_macro_calendar_and_pair_matrix_evidence(self):
-        self.assertIn("_aion_source_mesh = source_mesh_snapshot(",self.src)
+        self.assertIn("mesh = source_mesh_snapshot(",self.src)
         self.assertIn("macro_us=macro_eua",self.src)
         self.assertIn("next_event=_aion_next_event",self.src)
         self.assertIn("pair_matrix_status=_aion_pair_matrix_status",self.src)
@@ -42,8 +42,10 @@ class AtlasQuantAionSourceMeshRuntimeTests(unittest.TestCase):
 
     def test_fed_news_is_explicitly_inference_not_official_fact(self):
         self.assertIn('"source": "Fed Narrative RSS"',self.src)
-        self.assertIn('"truth_state": (',self.src)
-        self.assertIn('"INFERENCE"',self.src)
+        self.assertIn(
+            '"truth_state": "INFERENCE" if fed_headlines > 0 else "UNKNOWN"',
+            self.src,
+        )
         self.assertIn(
             "Leitura heurística de narrativa; não é comunicado oficial nem fato de mercado.",
             self.src,
