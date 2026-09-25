@@ -133,8 +133,8 @@ def operational_presentation(
         temporal_label=temporal_label,
         reference_display=reference_display,
     )
-    q=max(0.0,min(100.0,_finite(quality,0)))
-    data=max(0.0,min(100.0,_finite(data_score,0)))
+    q=None if quality is None else max(0.0,min(100.0,_finite(quality,0)))
+    data=None if data_score is None else max(0.0,min(100.0,_finite(data_score,0)))
 
     # Authorization must also have current freshness. This is presentation-only;
     # callers should already enforce the actual engine gate independently.
@@ -186,8 +186,8 @@ def operational_strip_html(model:Mapping[str,Any]|None)->str:
         '</div>'
         '<div class="aq-op-spine-grid">'
         f'<div><small>Frescor</small><strong>{escape(str(m.get("freshness") or "N/D"))}</strong><em>{escape(str(m.get("reference") or ""))}</em></div>'
-        f'<div><small>Qualidade</small><strong>{_finite(m.get("quality"),0):.0f}/100</strong><em>score descritivo</em></div>'
-        f'<div><small>Dados</small><strong>{_finite(m.get("data_score"),0):.0f}/100</strong><em>prontidão da evidência</em></div>'
+        f'<div><small>Qualidade</small><strong>{("N/D" if m.get("quality") is None else f"{_finite(m.get(chr(113)+chr(117)+chr(97)+chr(108)+chr(105)+chr(116)+chr(121)),0):.0f}/100")}</strong><em>score descritivo</em></div>'
+        f'<div><small>Dados</small><strong>{("N/D" if m.get("data_score") is None else f"{_finite(m.get(chr(100)+chr(97)+chr(116)+chr(97)+chr(95)+chr(115)+chr(99)+chr(111)+chr(114)+chr(101)),0):.0f}/100")}</strong><em>prontidão da evidência</em></div>'
         f'<div><small>Fonte</small><strong>{escape(str(m.get("evidence_source") or "não confirmada"))}</strong><em>camada apresentada</em></div>'
         '</div>'
         f'<div class="aq-op-spine-next"><b>Próximo passo:</b> {escape(str(m.get("next_action") or "Aguardar confirmação válida."))}</div>'
