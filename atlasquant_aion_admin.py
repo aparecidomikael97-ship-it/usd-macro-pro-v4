@@ -761,7 +761,7 @@ def _render_memory_security_posture(
         )
     elif persisted_state == "MIGRATION_REQUIRED":
         st.warning(
-            "Checkpoint persistido requer migração estrutural para V6. "
+            "Checkpoint persistido requer migração estrutural para V7. "
             "A migração só poderá ser salva por escrita condicional e aprovação explícita."
         )
     elif persisted_state == "CONFIRMED":
