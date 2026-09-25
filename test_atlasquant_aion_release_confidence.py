@@ -3,6 +3,7 @@ import unittest
 
 from atlasquant_aion_release_confidence import (
     DIMENSIONS, evidence_dimension, release_confidence,
+    normalize_release_confidence,
 )
 
 
@@ -36,6 +37,16 @@ class AtlasQuantAionReleaseConfidenceTests(unittest.TestCase):
         )
         out=release_confidence(candidate_ref="candidate@abc",dimensions=rows)
         self.assertEqual(out["state"],"BLOCKED")
+        self.assertFalse(out["deploy_allowed"])
+
+    def test_persisted_fake_ready_state_is_recomputed(self):
+        fake={
+            "candidate_ref":"candidate@abc",
+            "state":"HUMAN_REVIEW_READY",
+            "dimensions":[],
+        }
+        out=normalize_release_confidence(fake)
+        self.assertEqual(out["state"],"NEEDS_EVIDENCE")
         self.assertFalse(out["deploy_allowed"])
 
     def test_confirmed_without_evidence_is_not_confirmed(self):
