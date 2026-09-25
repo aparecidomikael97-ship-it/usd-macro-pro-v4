@@ -22,6 +22,7 @@ from atlasquant_aion_memory import (
     update_entitlements_checkpoint,
     update_continuity_checkpoint,
     update_learning_checkpoint,
+    update_wisdom_checkpoint,
     update_live_event_journal_checkpoint,
     update_operating_checkpoint,
     update_promotions_checkpoint,
@@ -126,6 +127,8 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertEqual(cp["learning"]["experiments"],[])
         self.assertEqual(cp["learning"]["research_refs"],[])
         self.assertTrue(cp["learning"]["digest"])
+        self.assertEqual(cp["wisdom"]["entries"],[])
+        self.assertTrue(cp["wisdom"]["digest"])
         self.assertEqual(cp["live_event_journal"]["events"],[])
         self.assertEqual(cp["live_event_journal"]["heartbeats"],[])
         self.assertTrue(cp["live_event_journal"]["digest"])
@@ -134,7 +137,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
     def test_older_checkpoint_is_upgraded_without_claiming_persistence(self):
         old={"checkpoint_version":1,"project":"AtlasQuant"}
         upgraded=ensure_operating_checkpoint(old)
-        self.assertEqual(upgraded["checkpoint_version"],7)
+        self.assertEqual(upgraded["checkpoint_version"],8)
         self.assertIn("operating",upgraded)
         self.assertIn("studio",upgraded)
         self.assertIn("business",upgraded)
@@ -142,6 +145,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("entitlements",upgraded)
         self.assertIn("continuity",upgraded)
         self.assertIn("learning",upgraded)
+        self.assertIn("wisdom",upgraded)
         self.assertIn("live_event_journal",upgraded)
         self.assertIn("subscriptions",upgraded["areas"])
         changed=update_operating_checkpoint(upgraded,tasks=[],events=[],dirty=True)
@@ -178,7 +182,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         })
         self.assertTrue(preflight["allowed"])
         self.assertEqual(preflight["mode"],"UPDATE_MIGRATION")
-        self.assertIn("V7",preflight["reason"])
+        self.assertIn("V8",preflight["reason"])
 
     def test_integrity_mismatch_blocks_runtime_write_preflight(self):
         tampered=default_checkpoint()
