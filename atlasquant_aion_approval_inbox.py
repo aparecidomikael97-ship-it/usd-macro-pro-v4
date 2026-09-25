@@ -151,7 +151,7 @@ def collect_approval_inbox(
                 "ENTITLEMENT",
                 entitlement.get("entitlement_id"),
                 f"{entitlement.get('subject_ref')} · {entitlement.get('scope')}",
-                area="promotions",
+                area="subscriptions",
                 status="DRAFT",
                 reason=(
                     "Solicitação de direito de acesso ainda não aprovada. "
