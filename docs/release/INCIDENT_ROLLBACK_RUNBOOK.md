@@ -54,6 +54,27 @@ Se um secret for exposto:
 4. emitir novo secret pelo canal autorizado;
 5. não reutilizar o valor comprometido.
 
+## Centro AION de Segurança & Incidentes
+
+A Central AION pode consolidar sinais explícitos de:
+- divergência de integridade do Checkpoint;
+- falha de boot/health quando esses sinais forem fornecidos e confirmados;
+- erro crítico do motor;
+- exposição confirmada de segredo;
+- divergência Conta × Entitlement;
+- eventos WARNING/ERROR/CRITICAL do Checkpoint;
+- identidade de produção divergente ou desatualizada.
+
+O Centro é **somente leitura**:
+- não contém automaticamente;
+- não faz rollback automaticamente;
+- não gira segredo automaticamente;
+- não altera conta/entitlement automaticamente;
+- não ativa feature flag;
+- não executa ordem real.
+
+Quando houver evidência suficiente, o Centro pode marcar **revisão humana de rollback** e apresentar o plano seguro deste runbook. A execução continua separada, autorizada e auditável.
+
 ## Encerramento
 
 Um incidente só é encerrado depois de:
