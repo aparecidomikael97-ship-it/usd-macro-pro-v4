@@ -280,6 +280,15 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn('"incident_center_has_critical"',src)
         self.assertIn('"incident_center_rollback_review"',src)
 
+    def test_laboratory_exposes_data_decision_fabric_as_read_only_decision_support(self):
+        src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Data & Decision Fabric",src)
+        self.assertIn("data_decision_fabric_summary(",src)
+        self.assertIn("derive_checkpoint_fabric_events(",src)
+        self.assertIn("não transforma evidência em autorização",src)
+        self.assertIn("Eventos ativos",src)
+        self.assertIn("Revisão humana",src)
+
     def test_laboratory_exposes_resilience_kernel_without_granting_external_ai_authority(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("Authority Kernel · Agent Firewall · Resilience",src)
