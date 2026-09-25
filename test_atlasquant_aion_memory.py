@@ -21,6 +21,7 @@ from atlasquant_aion_memory import (
     update_business_checkpoint,
     update_entitlements_checkpoint,
     update_continuity_checkpoint,
+    update_learning_checkpoint,
     update_operating_checkpoint,
     update_promotions_checkpoint,
     update_studio_checkpoint,
@@ -39,6 +40,9 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("tô no computador", joined)
         self.assertIn("render", joined)
         self.assertIn("build identity", joined)
+        self.assertIn("aprendizado controlado", joined)
+        self.assertIn("champion", joined)
+        self.assertIn("promoção automática", joined)
 
     def test_canonical_loader_reads_project_files_and_foundation(self):
         with tempfile.TemporaryDirectory() as td:
@@ -102,6 +106,10 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertEqual(cp["continuity"]["missions"],[])
         self.assertEqual(cp["continuity"]["handoffs"],[])
         self.assertTrue(cp["continuity"]["digest"])
+        self.assertEqual(cp["learning"]["episodes"],[])
+        self.assertEqual(cp["learning"]["experiments"],[])
+        self.assertEqual(cp["learning"]["research_refs"],[])
+        self.assertTrue(cp["learning"]["digest"])
         self.assertIn("subscriptions",cp["areas"])
 
     def test_older_checkpoint_is_upgraded_without_claiming_persistence(self):
@@ -114,6 +122,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("promotions",upgraded)
         self.assertIn("entitlements",upgraded)
         self.assertIn("continuity",upgraded)
+        self.assertIn("learning",upgraded)
         self.assertIn("subscriptions",upgraded["areas"])
         changed=update_operating_checkpoint(upgraded,tasks=[],events=[],dirty=True)
         self.assertTrue(changed["operating"]["dirty"])
@@ -187,6 +196,47 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         report=checkpoint_integrity_report(tampered)
         self.assertEqual(report["state"],"MISMATCH")
         self.assertIn("continuity",report["mismatches"])
+
+    def test_learning_update_is_integrity_checked_and_marks_checkpoint_dirty(self):
+        cp=default_checkpoint()
+        changed=update_learning_checkpoint(
+            cp,
+            episodes=[{
+                "subject":"Payroll reaction",
+                "forecast_type":"DIRECTIONAL",
+                "prediction":"USD_UP",
+                "forecast_confidence_pct":70,
+                "model_version":"aion-v1",
+                "created_at":"2026-09-24T20:00:00+00:00",
+            }],
+            experiments=[],
+            research_refs=[{
+                "kind":"BACKTEST",
+                "ref_id":"snapshot-1",
+                "summary":"Research only",
+                "created_at":"2026-09-24T20:01:00+00:00",
+            }],
+            dirty=True,
+        )
+        self.assertEqual(len(changed["learning"]["episodes"]),1)
+        self.assertEqual(len(changed["learning"]["research_refs"]),1)
+        self.assertTrue(changed["learning"]["digest"])
+        self.assertTrue(changed["operating"]["dirty"])
+        self.assertEqual(checkpoint_integrity_report(changed)["state"],"CONFIRMED")
+
+        tampered=default_checkpoint()
+        tampered["learning"]["digest"]="wrong"
+        report=checkpoint_integrity_report(tampered)
+        self.assertEqual(report["state"],"MISMATCH")
+        self.assertIn("learning",report["mismatches"])
+
+    def test_legacy_checkpoint_without_learning_requires_safe_migration(self):
+        legacy=default_checkpoint()
+        legacy.pop("learning",None)
+        report=checkpoint_integrity_report(legacy)
+        self.assertEqual(report["state"],"MIGRATION_REQUIRED")
+        self.assertTrue(report["write_safe"])
+        self.assertTrue(any("learning" in x for x in report["migration_items"]))
 
     def test_studio_and_business_updates_mark_checkpoint_dirty(self):
         cp=default_checkpoint()
