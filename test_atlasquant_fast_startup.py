@@ -159,6 +159,27 @@ class FastStartupTests(unittest.TestCase):
         self.assertIn('"snapshot_valid":True',block)
         self.assertIn('"mode":"Iniciante"',block)
 
+    def test_fast_beginner_menu_matches_all_open_beginner_destinations(self):
+        from pathlib import Path
+        src=Path("atlasquant_fast_startup.py").read_text(encoding="utf-8")
+        self.assertIn('"💰 Investir"',src)
+        self.assertIn('render_investment_center("Iniciante")',src)
+        self.assertIn('experience_compass_html("Iniciante", page)',src)
+        pages=src.index('pages=["🎯 Radar"')
+        compass=src.index('experience_compass_html("Iniciante", page)',pages)
+        radar=src.index('if page=="🎯 Radar":',compass)
+        self.assertLess(pages,compass)
+        self.assertLess(compass,radar)
+
+    def test_fast_beginner_compass_never_expands_trading_permissions(self):
+        from pathlib import Path
+        src=Path("atlasquant_fast_startup.py").read_text(encoding="utf-8")
+        start=src.index('experience_compass_html("Iniciante", page)')
+        block=src[start:start+2800]
+        self.assertNotIn("real_orders_enabled=True",block)
+        self.assertNotIn("automatic_execution=True",block)
+        self.assertIn('st.caption("Modo Iniciante não conecta corretora e não envia ordens reais.")',src)
+
     def test_main_attempts_fast_shell_before_heavy_provider_boot(self):
         from pathlib import Path
         src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
