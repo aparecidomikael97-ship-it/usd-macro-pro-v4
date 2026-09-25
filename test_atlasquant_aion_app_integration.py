@@ -27,11 +27,12 @@ class AtlasQuantAionAppIntegrationTests(unittest.TestCase):
     def test_aion_workspace_has_dedicated_index_and_admin_guard(self):
         src = APP.read_text(encoding="utf-8")
         start = src.index("if _aq_active_index == 21:")
-        block = src[start:start + 2600]
+        end = src.index("# No modo GitHub Actions/AppTest", start)
+        block = src[start:end]
         self.assertIn('!= "ADMIN"', block)
+        self.assertIn("_build_aion_source_runtime_context()", block)
         self.assertIn("render_aion_admin_console(", block)
-        self.assertIn('"fresh_confirmed": False', block)
-        self.assertIn('"market_status": "não confirmado nesta tela"', block)
+        self.assertIn('"market_status": _aion_market_context["summary"]', block)
         self.assertIn("except Exception as _aion_render_exc:", block)
         self.assertIn("nenhuma permissão externa foi ampliada", block)
 
@@ -43,12 +44,17 @@ class AtlasQuantAionAppIntegrationTests(unittest.TestCase):
 
     def test_aion_system_identity_is_truth_labeled_but_market_is_not_invented(self):
         src = APP.read_text(encoding="utf-8")
-        start = src.index("if _aq_active_index == 21:")
-        block = src[start:start+3000]
+        helper_start = src.index("def _build_aion_source_runtime_context():")
+        block_start = src.index("if _aq_active_index == 21:", helper_start)
+        helper = src[helper_start:block_start]
+        end = src.index("# No modo GitHub Actions/AppTest", block_start)
+        block = src[block_start:end]
         self.assertIn('"truth_state": "CONFIRMED"', block)
         self.assertIn('"source_build": _ATLASQUANT_SOURCE_BUILD', block)
-        self.assertIn('"fresh_confirmed": False', block)
-        self.assertIn('"summary": ""', block)
+        self.assertIn('"fresh_confirmed": market_live', helper)
+        self.assertIn('market_live = bool(mesh.get("market_live_confirmed", False))', helper)
+        self.assertIn("Leitura ao vivo não confirmada pelo Source Mesh", helper)
+        self.assertIn('"source_mesh": _aion_source_mesh', block)
 
     def test_aion_does_not_replace_existing_public_support_handler(self):
         src = APP.read_text(encoding="utf-8")
