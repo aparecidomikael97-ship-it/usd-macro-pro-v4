@@ -93,6 +93,7 @@ from atlasquant_aion_event_journal import (
 SCHEMA = "ATLASQUANT_AION_MEMORY_V1"
 FOUNDATION_REVISION = "2026-09-25-nextgen-v1"
 RUNTIME_PATH = "dados/aion/checkpoint_master.json"
+DEFAULT_RUNTIME_REPO = "aparecidomikael97-ship-it/usd-macro-pro-v4"
 MAX_DOC_BYTES = 1_500_000
 MAX_RUNTIME_BYTES = 2_000_000
 MAX_SEARCH_RESULTS = 8
@@ -179,6 +180,22 @@ APPROVED_AION_FOUNDATION = (
     "Creative Fusion Studio deve cobrir oferta/público, conceito, roteiro, storyboard, imagens, vídeo, voz, música licenciada quando aplicável, legendas, adaptação por plataforma e revisão de qualidade/direitos/claims.",
     "Conteúdo pode ser produzido e preparado automaticamente, mas publicação, impulsionamento, compra de mídia ou gasto exigem aprovação explícita do administrador.",
     "Execução real em corretora continua bloqueada; backtest/paper/forward e pesquisa não equivalem a autorização real.",
+    "Memory Fabric é obrigatória: memória de trabalho, episódica, semântica, procedural e ledger de decisões versionado; compressão de contexto, busca híbrida e replay devem preservar proveniência e estado de verdade.",
+    "Confiabilidade da memória é núcleo essencial: lembrança usada em decisão precisa ser válida, versionada, consistente, auditável e revalidável; persistência runtime confirmada é pré-requisito para chamar a memória de fotográfica.",
+    "Epistemic Core/metacognição é obrigatório: antes de responder ou agir, AION deve distinguir o que sabe, o que não sabe e o que precisa ser checado; lacuna não pode ser preenchida por invenção.",
+    "Resolução Científica de Problemas é obrigatória: diante de impasse, formular hipóteses, testar em Sandbox, pesquisar alternativas, detectar loops, mudar de abordagem e registrar lacunas para aprendizado controlado.",
+    "Núcleo de soberania e resiliência é obrigatório: kernel de autoridade, firewall de agentes, sandbox real, watchdogs/autocura, circuit breakers, cotas de recurso, secure recovery, snapshots, rollback confiável e modo degradado.",
+    "Nenhuma IA externa recebe autoridade sobre o AION; IAs externas podem ser orquestradas como ferramentas delegadas dentro de escopo, permissões, Sandbox, Guardian e aprovação aplicável.",
+    "Architecture Guardian, autodiagnóstico/RCA, governador de desempenho/custo/gargalos, Skill Composer controlado e painel de sabedoria fazem parte da evolução do AION sem furar os gates.",
+    "Data & Event Fabric e Decision Engine unificados são pilares transversais: Trading, Studio, Negócios e Desenvolvimento devem compartilhar fluxo evidência→hipótese→teste→risco→decisão→resultado→aprendizado, com cache/processamento incremental quando seguro.",
+    "Observabilidade transversal deve detectar lentidão, inconsistência, falha de módulo, consumo anormal e degradação, preservando evidência e causa desconhecida quando não houver confirmação.",
+    "Creative Fusion Studio deve priorizar motores locais/gratuitos como ComfyUI e FFmpeg quando adequados, com integrações premium opcionais como Runway/Firefly somente após custo e aprovação; Diretor Criativo revisa qualidade antes de apresentar ao administrador.",
+    "Cofre Pessoal de Documentos é requisito aprovado: contas, comprovantes e arquivos pessoais devem ser indexáveis e recuperáveis pelo AION com isolamento, autorização, proveniência e sem alegar criptografia até existir backend criptográfico comprovado.",
+    "Memória cognitiva para trading deve permitir replay do estado decisório: reconstruir exatamente dados, contexto, checklist, regime, tese, stop, alvo, resultado e evidências disponíveis no momento da operação.",
+    "Pós-trade RCA é obrigatório para operação encerrada relevante: distinguir falha de processo de variância normal; causa só pode ser confirmada com evidência e qualquer ajuste operacional exige teste/backtest/forward e validação antes de promoção.",
+    "Regra mestre de stop e alvo: Stop Loss nasce da invalidação objetiva da tese/estrutura e risco; Take Profit usa estrutura/liquidez/volatilidade e relação risco-retorno; regras são específicas por setup e validadas em backtest; se a relação não fecha, a operação é bloqueada.",
+    "Liquidez deve ser tratada como evidência estrutural contextual, não certeza: identificar pools/varreduras/zonas somente com critérios explícitos e preservar incerteza quando houver ambiguidade.",
+    "Hierarquia técnica oficial não segue ordem de salvamento: 1) persistência runtime do Checkpoint, 2) soberania e resiliência, 3) confiabilidade de memória + Epistemic Core, 4) Data/Decision Fabric, 5) observabilidade/autodiagnóstico, 6) avaliação e melhoria controlada, 7) maior autonomia dos módulos.",
     "Gatilho operacional aprovado: quando o administrador disser 'tô no computador', priorizar a reconciliação do Render, configurar o Deploy Hook com segurança e validar Build Identity + Browser Smoke antes de retomar novos blocos.",
 )
 
@@ -209,8 +226,17 @@ class RuntimeConfig:
     path: str = RUNTIME_PATH
 
     @property
-    def ready(self) -> bool:
+    def read_ready(self) -> bool:
+        return bool(self.repo and self.branch)
+
+    @property
+    def write_ready(self) -> bool:
         return bool(self.token and self.repo and self.branch)
+
+    @property
+    def ready(self) -> bool:
+        """Backward-compatible alias for write readiness."""
+        return self.write_ready
 
 
 def _now() -> str:
@@ -237,7 +263,7 @@ def config_from_mapping(values: Mapping[str, Any] | None = None) -> RuntimeConfi
     repo = str(
         cfg.get("GITHUB_REPO_HISTORICO")
         or os.getenv("GITHUB_REPO_HISTORICO", "")
-        or ""
+        or DEFAULT_RUNTIME_REPO
     ).strip()
     explicit = str(
         cfg.get("GITHUB_DATA_BRANCH")
@@ -1125,10 +1151,41 @@ def update_continuity_checkpoint(
 
 
 def _headers(token: str) -> dict[str, str]:
-    return {
-        "Authorization": f"Bearer {token}",
+    headers = {
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
+    }
+    clean_token = str(token or "").strip()
+    if clean_token:
+        headers["Authorization"] = f"Bearer {clean_token}"
+    return headers
+
+
+def runtime_configuration_status(
+    config: RuntimeConfig | None = None,
+) -> dict[str, Any]:
+    """Describe runtime capability without exposing credential values."""
+    cfg = config or config_from_mapping()
+    branch_safe = True
+    try:
+        require_runtime_branch(cfg.branch)
+    except Exception:
+        branch_safe = False
+    return {
+        "schema": SCHEMA,
+        "repo_configured": bool(cfg.repo),
+        "branch_configured": bool(cfg.branch),
+        "branch_safe": branch_safe,
+        "path": cfg.path,
+        "read_ready": bool(cfg.read_ready and branch_safe),
+        "write_ready": bool(cfg.write_ready and branch_safe),
+        "write_credential_configured": bool(cfg.token),
+        "mode": (
+            "READ_WRITE" if cfg.write_ready and branch_safe
+            else "READ_ONLY_PUBLIC" if cfg.read_ready and branch_safe
+            else "UNAVAILABLE"
+        ),
+        "secret_exposed": False,
     }
 
 
@@ -1153,13 +1210,13 @@ def load_runtime_checkpoint(
             "reason": f"unsafe runtime branch: {type(exc).__name__}",
             "checked_at": _now(),
         }
-    if not cfg.ready:
+    if not cfg.read_ready:
         return {
             "schema": SCHEMA,
             "status": "UNAVAILABLE",
             "source": "runtime",
             "checkpoint": None,
-            "reason": "GitHub runtime credentials not configured.",
+            "reason": "GitHub runtime repository/branch not configured.",
             "checked_at": _now(),
         }
     try:
@@ -1294,13 +1351,13 @@ def save_runtime_checkpoint(
             "reason": f"unsafe runtime branch: {type(exc).__name__}",
             "checked_at": _now(),
         }
-    if not cfg.ready:
+    if not cfg.write_ready:
         return {
             "schema": SCHEMA,
             "status": "UNAVAILABLE",
             "saved": False,
             "verified": False,
-            "reason": "GitHub runtime credentials not configured.",
+            "reason": "GitHub runtime write credential not configured.",
             "checked_at": _now(),
         }
 
