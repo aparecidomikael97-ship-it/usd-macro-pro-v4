@@ -4165,6 +4165,26 @@ _nav_items = list(navigation_labels()) if navigation_labels is not None else _fa
 if str(_ATLASQUANT_ACCESS.get("role") or "").upper() == "ADMIN":
     _nav_items.append("🧠 AION")
 
+# AION Portable Core — single-link entry contract.
+# The same private app can be opened with ?aion=1. This only requests the AION
+# workspace after an ADMIN session is already authenticated; it never bypasses
+# login, role checks, Guardian, feature flags or workspace isolation.
+if (
+    str(_ATLASQUANT_ACCESS.get("role") or "").upper() == "ADMIN"
+    and not bool(st.session_state.get("_aion_direct_link_consumed", False))
+):
+    try:
+        _aion_direct_raw = st.query_params.get("aion", "")
+        if isinstance(_aion_direct_raw, (list, tuple)):
+            _aion_direct_raw = _aion_direct_raw[0] if _aion_direct_raw else ""
+        if str(_aion_direct_raw or "").strip().casefold() in {"1", "true", "sim", "central"}:
+            request_return_to_aion(st.session_state)
+            st.session_state["_aion_direct_link_consumed"] = True
+    except Exception:
+        # Query parameters are convenience routing only. Failure must never
+        # affect authentication, Guardian or the regular AtlasQuant navigation.
+        pass
+
 # Guided AION navigation is consumed before the Streamlit navigation widgets
 # are instantiated. This avoids mutating widget-backed session state after
 # creation in the same rerun.

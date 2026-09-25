@@ -46,6 +46,14 @@ from atlasquant_aion_wisdom import (
     normalize_wisdom_entries,
     wisdom_digest,
 )
+from atlasquant_aion_portable import (
+    default_portable_core,
+    normalize_portable_core,
+)
+from atlasquant_aion_vault import (
+    default_vault,
+    normalize_vault,
+)
 from atlasquant_aion_event_journal import (
     normalize_events as normalize_live_event_journal_events,
     normalize_heartbeats as normalize_live_event_heartbeats,
@@ -316,7 +324,7 @@ def search_canonical_memory(
 def default_checkpoint() -> dict[str, Any]:
     return {
         "schema": SCHEMA,
-        "checkpoint_version": 9,
+        "checkpoint_version": 10,
         "created_at": _now(),
         "updated_at": _now(),
         "project": "AtlasQuant",
@@ -380,6 +388,8 @@ def default_checkpoint() -> dict[str, Any]:
             "entries": [],
             "digest": wisdom_digest([]),
         },
+        "portable_core": default_portable_core(),
+        "vault": default_vault(),
         "live_event_journal": {
             "events": [],
             "heartbeats": [],
@@ -524,6 +534,20 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
         "digest": wisdom_digest(wisdom_entries),
     }
 
+    portable_core = normalize_portable_core(
+        payload.get("portable_core")
+        if isinstance(payload.get("portable_core"), Mapping)
+        else {}
+    )
+    payload["portable_core"] = portable_core
+
+    vault = normalize_vault(
+        payload.get("vault")
+        if isinstance(payload.get("vault"), Mapping)
+        else {}
+    )
+    payload["vault"] = vault
+
     live_event_journal = (
         payload.get("live_event_journal")
         if isinstance(payload.get("live_event_journal"), Mapping)
@@ -546,7 +570,7 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
         operating = {}
     tasks = normalize_queue(operating.get("tasks") if isinstance(operating, Mapping) else [])
     events = normalize_events(operating.get("events") if isinstance(operating, Mapping) else [])
-    payload["checkpoint_version"] = max(9, int(payload.get("checkpoint_version") or 1))
+    payload["checkpoint_version"] = max(10, int(payload.get("checkpoint_version") or 1))
     payload["operating"] = {
         "tasks": tasks,
         "events": events,
@@ -717,6 +741,37 @@ def update_wisdom_checkpoint(
         "entries": rows,
         "digest": wisdom_digest(rows),
     }
+    payload["operating"]["dirty"] = bool(dirty)
+    payload["updated_at"] = _now()
+    return payload
+
+
+def update_portable_core_checkpoint(
+    checkpoint: Mapping[str, Any] | None,
+    *,
+    portable_core: Mapping[str, Any],
+    dirty: bool = True,
+) -> dict[str, Any]:
+    """Persist portable workspace/connector registry without activating connectors."""
+    payload = ensure_operating_checkpoint(checkpoint)
+    payload["portable_core"] = normalize_portable_core(portable_core)
+    payload["operating"]["dirty"] = bool(dirty)
+    payload["updated_at"] = _now()
+    return payload
+
+
+def update_vault_checkpoint(
+    checkpoint: Mapping[str, Any] | None,
+    *,
+    vault: Mapping[str, Any],
+    dirty: bool = True,
+) -> dict[str, Any]:
+    """Persist Vault metadata/references only; plaintext secrets remain forbidden."""
+    payload = ensure_operating_checkpoint(checkpoint)
+    normalized = normalize_vault(vault)
+    if normalized.get("plaintext_secrets_present"):
+        raise ValueError("vault contains forbidden plaintext secret-like fields")
+    payload["vault"] = normalized
     payload["operating"]["dirty"] = bool(dirty)
     payload["updated_at"] = _now()
     return payload
@@ -895,7 +950,7 @@ def runtime_write_preflight(runtime_result: Mapping[str, Any] | None) -> dict[st
             "allowed": True,
             "mode": "UPDATE_MIGRATION" if migration else "UPDATE",
             "reason": (
-                "Runtime confirmado com SHA; migração estrutural V9 será aplicada na escrita condicional."
+                "Runtime confirmado com SHA; migração estrutural V10 será aplicada na escrita condicional."
                 if migration else
                 "Runtime confirmado com SHA e integridade compatível para escrita condicional."
             ),
@@ -1084,7 +1139,7 @@ def checkpoint_integrity_report(
 ) -> dict[str, Any]:
     """Verify persisted component digests before normalization mutates them.
 
-    Missing V9 structure is reported as MIGRATION_REQUIRED rather than corruption.
+    Missing V10 structure is reported as MIGRATION_REQUIRED rather than corruption.
     A present-but-wrong digest is a MISMATCH and should fail closed for writes.
     """
     if not isinstance(checkpoint, Mapping):
@@ -1208,6 +1263,26 @@ def checkpoint_integrity_report(
         wisdom_digest(wisdom_entries),
     )
 
+    portable_core_raw = (
+        raw.get("portable_core")
+        if isinstance(raw.get("portable_core"), Mapping)
+        else {}
+    )
+    portable_core = normalize_portable_core(portable_core_raw)
+    add_check(
+        "portable_core",
+        portable_core_raw.get("digest"),
+        portable_core.get("digest"),
+    )
+
+    vault_raw = raw.get("vault") if isinstance(raw.get("vault"), Mapping) else {}
+    vault = normalize_vault(vault_raw)
+    add_check(
+        "vault",
+        vault_raw.get("digest"),
+        vault.get("digest"),
+    )
+
     live_event_journal = (
         raw.get("live_event_journal")
         if isinstance(raw.get("live_event_journal"), Mapping)
@@ -1228,14 +1303,18 @@ def checkpoint_integrity_report(
     raw_areas = raw.get("areas") if isinstance(raw.get("areas"), Mapping) else {}
     if "subscriptions" not in raw_areas:
         migration_items.append("areas.subscriptions ausente")
-    if version < 9:
-        migration_items.append(f"checkpoint_version {version} < 9")
+    if version < 10:
+        migration_items.append(f"checkpoint_version {version} < 10")
     if "continuity" not in raw:
         migration_items.append("continuity ausente")
     if "learning" not in raw:
         migration_items.append("learning ausente")
     if "wisdom" not in raw:
         migration_items.append("wisdom ausente")
+    if "portable_core" not in raw:
+        migration_items.append("portable_core ausente")
+    if "vault" not in raw:
+        migration_items.append("vault ausente")
     if "live_event_journal" not in raw:
         migration_items.append("live_event_journal ausente")
 

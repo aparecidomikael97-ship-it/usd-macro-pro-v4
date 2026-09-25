@@ -256,6 +256,17 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn('"checkpoint_integrity_state"',src)
         self.assertIn('"guardian_blocked_now"',src)
 
+    def test_central_exposes_portable_core_and_vault_without_plaintext_secrets(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("AION Portable", src)
+        self.assertIn("AION Portable Core & Vault", src)
+        self.assertIn("portable_core_summary(", src)
+        self.assertIn("vault_summary(", src)
+        self.assertIn("Entrada única", src)
+        self.assertIn("não senha/token em texto puro", src)
+        self.assertIn('"portable_core_workspaces"', src)
+        self.assertIn('"vault_policy_ok"', src)
+
     def test_central_exposes_read_only_security_incident_center(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("Centro de Segurança & Incidentes",src)
