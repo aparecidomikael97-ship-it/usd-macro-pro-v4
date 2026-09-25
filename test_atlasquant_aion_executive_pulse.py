@@ -184,6 +184,102 @@ class AtlasQuantAionExecutivePulseTests(unittest.TestCase):
         self.assertTrue(out["can_claim_latest_main_live"])
         self.assertEqual(out["production_verification"],"VERIFIED")
 
+    def test_release_gate_becomes_single_readiness_attention_source(self):
+        out=executive_pulse(
+            runtime_result={"status":"CONFIRMED","integrity":{"state":"CONFIRMED"}},
+            interface_validation={
+                "state":"ATTENTION",
+                "confirmed":1,
+                "total":3,
+                "remaining":2,
+                "next_action":"Revalidar Painel Mestre.",
+            },
+            publication_truth={
+                "state":"RUNTIME_BEHIND_OR_DIVERGED",
+                "main_match":"MISMATCH",
+                "production_verification":"UNKNOWN",
+                "can_claim_latest_main_live":False,
+            },
+            release_gate_snapshot={
+                "state":"BLOCKED",
+                "confirmed_stages":1,
+                "total_stages":4,
+                "next_stage":"critical_interface",
+                "next_action":"Revalidar Painel Mestre.",
+                "release_claim_allowed":False,
+            },
+        )
+        release_items=[
+            item for item in out["attention_items"]
+            if item.get("source")=="release_gate"
+        ]
+        legacy_items=[
+            item for item in out["attention_items"]
+            if item.get("source") in {"publication_truth","interface_validation"}
+        ]
+        self.assertEqual(len(release_items),1)
+        self.assertEqual(legacy_items,[])
+        self.assertEqual(out["primary"]["title"],"Gate de liberação bloqueado")
+        self.assertEqual(out["primary"]["priority"],"P1")
+        self.assertEqual(out["release_gate_state"],"BLOCKED")
+        self.assertEqual(out["release_gate_confirmed_stages"],1)
+        self.assertFalse(out["release_gate_claim_allowed"])
+
+    def test_pending_release_gate_is_p2_and_suppresses_legacy_readiness_items(self):
+        out=executive_pulse(
+            runtime_result={"status":"CONFIRMED","integrity":{"state":"CONFIRMED"}},
+            interface_validation={
+                "state":"IN_PROGRESS",
+                "confirmed":2,
+                "total":3,
+            },
+            publication_truth={
+                "state":"MAIN_MATCH_PRODUCTION_UNVERIFIED",
+                "main_match":"MATCH",
+                "production_verification":"UNKNOWN",
+                "can_claim_latest_main_live":False,
+            },
+            release_gate_snapshot={
+                "state":"VERIFY_PRODUCTION",
+                "confirmed_stages":3,
+                "total_stages":4,
+                "next_stage":"production",
+                "next_action":"Validar produção.",
+                "release_claim_allowed":False,
+            },
+        )
+        self.assertEqual(out["posture"],"REVIEW")
+        self.assertEqual(out["primary"]["priority"],"P2")
+        self.assertEqual(out["primary"]["source"],"release_gate")
+        self.assertEqual(out["release_gate_next_stage"],"production")
+        self.assertEqual(
+            [x for x in out["attention_items"] if x.get("source")=="publication_truth"],
+            [],
+        )
+        self.assertEqual(
+            [x for x in out["attention_items"] if x.get("source")=="interface_validation"],
+            [],
+        )
+
+    def test_complete_release_gate_adds_no_readiness_attention(self):
+        out=executive_pulse(
+            runtime_result={"status":"CONFIRMED","integrity":{"state":"CONFIRMED"}},
+            status_board={"has_unresolved":False},
+            release_gate_snapshot={
+                "state":"COMPLETE",
+                "confirmed_stages":4,
+                "total_stages":4,
+                "next_stage":"",
+                "release_claim_allowed":True,
+            },
+        )
+        self.assertEqual(out["posture"],"CONTROLLED")
+        self.assertTrue(out["release_gate_claim_allowed"])
+        self.assertEqual(
+            [x for x in out["attention_items"] if x.get("source")=="release_gate"],
+            [],
+        )
+
     def test_compact_rows_are_presentation_only(self):
         out=executive_pulse(
             runtime_result={"status":"CONFIRMED","integrity":{"state":"CONFIRMED"}},

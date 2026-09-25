@@ -61,6 +61,7 @@ def executive_pulse(
     continuity_summary:Mapping[str,Any]|None=None,
     interface_validation:Mapping[str,Any]|None=None,
     publication_truth:Mapping[str,Any]|None=None,
+    release_gate_snapshot:Mapping[str,Any]|None=None,
     checkpoint_dirty:bool=False,
     checkpoint_conflict:bool=False,
     foundation_diagnostics:Sequence[Mapping[str,Any]]|None=None,
@@ -72,6 +73,7 @@ def executive_pulse(
     continuity=dict(continuity_summary or {})
     validation=dict(interface_validation or {})
     publication=dict(publication_truth or {})
+    release_gate=dict(release_gate_snapshot or {})
     diagnostics=[dict(x) for x in list(foundation_diagnostics or []) if isinstance(x,Mapping)]
 
     candidates=[]
@@ -155,57 +157,85 @@ def executive_pulse(
             high.get("source") or "incident_center",
         ))
 
-    publication_state=str(publication.get("state") or "").upper()
-    if publication_state=="RUNTIME_BEHIND_OR_DIVERGED":
+    release_gate_state=str(release_gate.get("state") or "").upper()
+    release_gate_available=bool(release_gate_state)
+    if release_gate_available and release_gate_state!="COMPLETE":
+        gate_priority="P1" if release_gate_state=="BLOCKED" else "P2"
+        gate_title=(
+            "Gate de liberação bloqueado"
+            if release_gate_state=="BLOCKED"
+            else "Gate de liberação pendente"
+        )
         candidates.append(_attention(
-            "P1","development",
-            "Runtime diverge da main esperada",
-            "O commit em execução não coincide com a identidade da main informada.",
-            publication.get("next_action")
-            or "Revisar o deploy antes de afirmar que a versão atual está publicada.",
-            "publication_truth",
-        ))
-    elif publication_state in {
-        "UNKNOWN",
-        "SOURCE_BUNDLE_IDENTIFIED",
-        "RUNTIME_IDENTIFIED_MAIN_UNKNOWN",
-        "MAIN_MATCH_PRODUCTION_UNVERIFIED",
-    }:
-        candidates.append(_attention(
-            "P2","development",
-            "Publicação ainda não confirmada",
-            "Não há evidência suficiente para afirmar que a versão atual da main está validada em produção.",
-            publication.get("next_action")
-            or "Confirmar identidade do runtime, main e produção antes de declarar o deploy atual.",
-            "publication_truth",
+            gate_priority,
+            "development",
+            gate_title,
+            (
+                f"{int(release_gate.get('confirmed_stages') or 0)}/"
+                f"{int(release_gate.get('total_stages') or 4)} etapas confirmadas. "
+                f"Estado: {release_gate_state}."
+            ),
+            release_gate.get("next_action")
+            or "Revisar a próxima etapa do Gate de liberação AION.",
+            "release_gate",
         ))
 
+    publication_state=str(publication.get("state") or "").upper()
     validation_state=str(validation.get("state") or "").upper()
-    if validation_state=="ATTENTION":
-        candidates.append(_attention(
-            "P1","development",
-            "Validação da interface com falha confirmada",
-            (
-                f"{int(validation.get('confirmed') or 0)}/{int(validation.get('total') or 3)} "
-                "telas críticas confirmadas no build atual; existe falha observada."
-            ),
-            validation.get("next_action")
-            or "Usar a revalidação guiada do AION na próxima tela crítica pendente.",
-            "interface_validation",
-        ))
-    elif validation_state in {"NOT_STARTED","IN_PROGRESS","UNKNOWN"}:
-        progress=f"{int(validation.get('confirmed') or 0)}/{int(validation.get('total') or 3)}"
-        candidates.append(_attention(
-            "P2","development",
-            "Validação do build incompleta",
-            (
-                f"Progresso das telas críticas: {progress}. "
-                "Tela ainda não observada não é tratada como falha."
-            ),
-            validation.get("next_action")
-            or "Validar as telas críticas no build atual pelo fluxo guiado do AION.",
-            "interface_validation",
-        ))
+
+    # Compatibility fallback: older callers may not yet provide the unified
+    # Release Gate. When it is present, it is the single administrative source
+    # for build/publication readiness and prevents duplicate attention items.
+    if not release_gate_available:
+        if publication_state=="RUNTIME_BEHIND_OR_DIVERGED":
+            candidates.append(_attention(
+                "P1","development",
+                "Runtime diverge da main esperada",
+                "O commit em execução não coincide com a identidade da main informada.",
+                publication.get("next_action")
+                or "Revisar o deploy antes de afirmar que a versão atual está publicada.",
+                "publication_truth",
+            ))
+        elif publication_state in {
+            "UNKNOWN",
+            "SOURCE_BUNDLE_IDENTIFIED",
+            "RUNTIME_IDENTIFIED_MAIN_UNKNOWN",
+            "MAIN_MATCH_PRODUCTION_UNVERIFIED",
+        }:
+            candidates.append(_attention(
+                "P2","development",
+                "Publicação ainda não confirmada",
+                "Não há evidência suficiente para afirmar que a versão atual da main está validada em produção.",
+                publication.get("next_action")
+                or "Confirmar identidade do runtime, main e produção antes de declarar o deploy atual.",
+                "publication_truth",
+            ))
+
+        if validation_state=="ATTENTION":
+            candidates.append(_attention(
+                "P1","development",
+                "Validação da interface com falha confirmada",
+                (
+                    f"{int(validation.get('confirmed') or 0)}/{int(validation.get('total') or 3)} "
+                    "telas críticas confirmadas no build atual; existe falha observada."
+                ),
+                validation.get("next_action")
+                or "Usar a revalidação guiada do AION na próxima tela crítica pendente.",
+                "interface_validation",
+            ))
+        elif validation_state in {"NOT_STARTED","IN_PROGRESS","UNKNOWN"}:
+            progress=f"{int(validation.get('confirmed') or 0)}/{int(validation.get('total') or 3)}"
+            candidates.append(_attention(
+                "P2","development",
+                "Validação do build incompleta",
+                (
+                    f"Progresso das telas críticas: {progress}. "
+                    "Tela ainda não observada não é tratada como falha."
+                ),
+                validation.get("next_action")
+                or "Validar as telas críticas no build atual pelo fluxo guiado do AION.",
+                "interface_validation",
+            ))
 
     if checkpoint_dirty:
         candidates.append(_attention(
@@ -299,6 +329,11 @@ def executive_pulse(
         "publication_main_match":str(publication.get("main_match") or "UNKNOWN"),
         "production_verification":str(publication.get("production_verification") or "UNKNOWN"),
         "can_claim_latest_main_live":bool(publication.get("can_claim_latest_main_live",False)),
+        "release_gate_state":release_gate_state or "NONE",
+        "release_gate_confirmed_stages":int(release_gate.get("confirmed_stages") or 0),
+        "release_gate_total_stages":int(release_gate.get("total_stages") or 0),
+        "release_gate_next_stage":str(release_gate.get("next_stage") or ""),
+        "release_gate_claim_allowed":bool(release_gate.get("release_claim_allowed",False)),
         "recommended_workspace":primary["area"],
         "executes_action":False,
         "real_orders_enabled":False,
