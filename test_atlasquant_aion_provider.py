@@ -74,6 +74,27 @@ class AtlasQuantAionProviderTests(unittest.TestCase):
         self.assertNotIn("abcdefghijklmnopqrstuvwxyz",prompt)
         self.assertIn("[REDACTED]",prompt)
 
+    def test_prompt_carries_reliability_and_source_conflict_state(self):
+        prompt=build_provider_prompt(
+            "analise o sistema",
+            domain="central",
+            system_context={
+                "source_build":"abc",
+                "environment":"LOCAL",
+                "reliability":{
+                    "posture":"DEGRADED",
+                    "degraded_mode":{"state":"DEGRADED_SAFE"},
+                    "data_guardian":{
+                        "reconciliation":{"conflict_count":3}
+                    },
+                },
+            },
+        )
+        self.assertIn("Reliability posture: DEGRADED",prompt)
+        self.assertIn("Modo degradado: DEGRADED_SAFE",prompt)
+        self.assertIn("Conflitos de fonte confirmados: 3",prompt)
+        self.assertIn("não escolha uma fonte escondido",prompt)
+
     def test_external_call_is_blocked_without_explicit_approval(self):
         session=_FakeSession(_FakeResponse())
         result=execute_openai_answer(
