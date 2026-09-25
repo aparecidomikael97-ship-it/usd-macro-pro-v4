@@ -161,8 +161,8 @@ def build_master_status_board(
         mem_next = ""
     elif integrity_state == "MIGRATION_REQUIRED":
         mem_state = "BLOCKED"
-        mem_detail = "Checkpoint íntegro o suficiente para migração, mas ainda requer estrutura V6."
-        mem_next = "Salvar a migração V6 por escrita condicional, com aprovação explícita."
+        mem_detail = "Checkpoint íntegro o suficiente para migração, mas ainda requer estrutura V7."
+        mem_next = "Salvar a migração V7 por escrita condicional, com aprovação explícita."
     elif integrity_state == "MISMATCH":
         mem_state = "BLOCKED"
         mismatches = ", ".join(str(x) for x in list(runtime_integrity.get("mismatches", []) or [])[:6])
@@ -195,6 +195,37 @@ def build_master_status_board(
         ),
         source="AION session working state",
         next_action="Salvar no branch de runtime com aprovação explícita." if working_dirty else "",
+    ))
+
+    continuity_section = cp.get("continuity") if isinstance(cp.get("continuity"), Mapping) else {}
+    continuity_loaded = (
+        isinstance(continuity_section.get("missions"), list)
+        and isinstance(continuity_section.get("handoffs"), list)
+    )
+    if runtime_status == "CONFIRMED" and integrity_state == "CONFIRMED" and continuity_loaded:
+        continuity_state = "CONFIRMED"
+        continuity_detail = (
+            f"Checkpoint V7 contém {len(continuity_section.get('missions', []))} missão(ões) e "
+            f"{len(continuity_section.get('handoffs', []))} handoff(s) estruturados."
+        )
+        continuity_next = ""
+    elif integrity_state == "MIGRATION_REQUIRED":
+        continuity_state = "BLOCKED"
+        continuity_detail = "Continuidade V7 ainda não foi confirmada no Checkpoint persistido."
+        continuity_next = "Aplicar e salvar a migração V7 com escrita condicional e aprovação explícita."
+    else:
+        continuity_state = "UNKNOWN"
+        continuity_detail = "A continuidade entre sessões não está confirmada como persistida nesta execução."
+        continuity_next = "Confirmar runtime + integridade V7 antes de confiar no handoff persistido."
+
+    items.append(_item(
+        "mission_continuity",
+        "Continuidade de missões / handoff",
+        area="secretary",
+        state=continuity_state,
+        detail=continuity_detail,
+        source="Checkpoint Mestre / continuity",
+        next_action=continuity_next,
     ))
 
     market_ok=bool(market.get("fresh_confirmed",False) and _text(market.get("summary"),800))
@@ -288,8 +319,8 @@ def build_master_status_board(
             if entitlement_loaded else
             "Estrutura de entitlements não foi confirmada no Checkpoint desta execução."
         ),
-        source="Checkpoint Mestre v5",
-        next_action="Migrar/carregar Checkpoint v5 antes de administrar direitos de acesso." if not entitlement_loaded else "",
+        source="Checkpoint Mestre V7 / entitlements",
+        next_action="Migrar/carregar o Checkpoint atual antes de administrar direitos de acesso." if not entitlement_loaded else "",
     ))
 
     audit_schema=str(commercial_audit.get("schema") or "")

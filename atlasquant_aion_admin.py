@@ -42,6 +42,7 @@ from atlasquant_aion_memory import (
     search_canonical_memory,
     update_business_checkpoint,
     update_entitlements_checkpoint,
+    update_continuity_checkpoint,
     update_operating_checkpoint,
     update_promotions_checkpoint,
     update_studio_checkpoint,
@@ -51,6 +52,16 @@ from atlasquant_aion_recovery import (
     load_checkpoint_revision,
     recovery_preflight,
     restore_checkpoint_revision,
+)
+from atlasquant_aion_continuity import (
+    MISSION_STATUSES,
+    append_handoff,
+    build_session_handoff,
+    continuity_briefing,
+    continuity_summary,
+    new_mission,
+    transition_mission,
+    upsert_mission,
 )
 from atlasquant_aion_operations import (
     ACTIONS,
@@ -750,7 +761,7 @@ def _render_memory_security_posture(
         )
     elif persisted_state == "MIGRATION_REQUIRED":
         st.warning(
-            "Checkpoint persistido requer migração estrutural para V6. "
+            "Checkpoint persistido requer migração estrutural para V7. "
             "A migração só poderá ser salva por escrita condicional e aprovação explícita."
         )
     elif persisted_state == "CONFIRMED":
@@ -855,6 +866,65 @@ def _render_security_incident_center(
             st.markdown(f"- {reason}")
 
 
+def _render_continuity_center(
+    checkpoint: Mapping[str, Any],
+) -> None:
+    continuity = checkpoint.get("continuity") if isinstance(checkpoint.get("continuity"), Mapping) else {}
+    missions = list(continuity.get("missions", []) or [])
+    handoffs = list(continuity.get("handoffs", []) or [])
+    operating = checkpoint.get("operating") if isinstance(checkpoint.get("operating"), Mapping) else {}
+    briefing = continuity_briefing(
+        missions,
+        handoffs,
+        tasks=list(operating.get("tasks", []) or []),
+        events=list(operating.get("events", []) or []),
+        checkpoint_digest=checkpoint_digest(checkpoint),
+    )
+    summary = briefing.get("mission_summary") if isinstance(briefing.get("mission_summary"), Mapping) else {}
+
+    st.markdown("#### 🧭 Continuidade & Handoff")
+    st.caption(
+        "Visão derivada do Checkpoint Mestre carregado nesta sessão. "
+        "Handoff persistido tem prioridade; na ausência dele, o AION sintetiza somente a partir de missões/tarefas registradas."
+    )
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("Missões ativas", int(summary.get("active_missions") or 0))
+    c2.metric("Concluídas", int(summary.get("done_missions") or 0))
+    c3.metric("Bloqueadas", int(summary.get("blocked_missions") or 0))
+    c4.metric("Handoffs", int(summary.get("handoff_count") or 0))
+
+    source = str(briefing.get("source") or "UNKNOWN")
+    if source == "PERSISTED_HANDOFF":
+        st.success("Continuidade baseada no último handoff registrado no Checkpoint.")
+    else:
+        st.info(
+            "Ainda não há handoff persistido; a visão abaixo foi sintetizada do estado estruturado atual. "
+            "Ela não inventa etapas concluídas."
+        )
+
+    focus = str(briefing.get("current_focus") or "").strip()
+    if focus:
+        st.write(f"**Onde paramos:** {focus}")
+    else:
+        st.write("**Onde paramos:** nenhuma missão ativa registrada no Checkpoint.")
+
+    completed = list(briefing.get("recent_completed") or [])
+    blockers = list(briefing.get("blockers") or [])
+    next_steps = list(briefing.get("next_steps") or [])
+    if completed:
+        with st.expander("Últimas conclusões", expanded=False):
+            for item in completed[:8]:
+                st.markdown(f"- {item}")
+    if blockers:
+        with st.expander("Bloqueios registrados", expanded=False):
+            for item in blockers[:8]:
+                st.markdown(f"- {item}")
+    if next_steps:
+        st.markdown("**Próximos passos registrados:**")
+        for item in next_steps[:8]:
+            st.markdown(f"- {item}")
+
+
 def _render_master_status(board: Mapping[str, Any]) -> None:
     counts = board.get("counts") if isinstance(board.get("counts"), Mapping) else {}
     st.markdown("#### Painel Mestre de Estado")
@@ -928,6 +998,7 @@ def _render_central(
     _render_attention_queue(status_board, approval_inbox)
     _render_memory_security_posture(access, checkpoint, runtime_result, flags)
     _render_security_incident_center(incident_snapshot)
+    _render_continuity_center(checkpoint)
 
     st.markdown("#### Briefing de entrada")
     st.write(
@@ -1182,7 +1253,7 @@ def _render_secretary(
         cdom,cprio = st.columns(2)
         domain = cdom.selectbox(
             "Área",
-            ["central","trading","studio","business","laboratory","secretary","development","promotions"],
+            ["central","trading","studio","business","laboratory","secretary","development","subscriptions","promotions"],
         )
         priority = cprio.selectbox("Prioridade", list(PRIORITIES), index=2)
         action = st.selectbox("Tipo de ação", list(ACTIONS), index=0)
@@ -1264,6 +1335,57 @@ def _render_secretary(
                 st.rerun()
     else:
         st.info("A fila operacional do AION está vazia.")
+
+    st.markdown("#### Handoff da sessão")
+    continuity = checkpoint.get("continuity") if isinstance(checkpoint.get("continuity"), Mapping) else {}
+    missions = list(continuity.get("missions", []) or [])
+    handoffs = list(continuity.get("handoffs", []) or [])
+    handoff_preview = build_session_handoff(
+        missions,
+        tasks=tasks,
+        events=events,
+        checkpoint_digest=checkpoint_digest(checkpoint),
+        source=str(access.get("username") or "ADMIN"),
+    )
+    st.caption(
+        "O preview é montado apenas com o estado registrado no Checkpoint. "
+        "Registrar o handoff grava a continuidade na memória de trabalho; persistência definitiva ainda exige salvar o Checkpoint."
+    )
+    h1,h2,h3 = st.columns(3)
+    h1.metric("Foco", str(handoff_preview.get("current_focus") or "sem missão ativa")[:80])
+    h2.metric("Bloqueios", len(list(handoff_preview.get("blockers") or [])))
+    h3.metric("Próximos passos", len(list(handoff_preview.get("next_steps") or [])))
+    if handoff_preview.get("next_steps"):
+        st.markdown("**Próximos passos do handoff:**")
+        for item in list(handoff_preview.get("next_steps") or [])[:8]:
+            st.markdown(f"- {item}")
+
+    if st.button(
+        "📌 Registrar handoff no Checkpoint",
+        key="aion_register_session_handoff",
+        width="stretch",
+    ):
+        updated_handoffs = append_handoff(handoffs, handoff_preview)
+        updated = update_continuity_checkpoint(
+            checkpoint,
+            missions=missions,
+            handoffs=updated_handoffs,
+            dirty=True,
+        )
+        updated = _record_working_event(
+            updated,
+            "session_handoff_recorded",
+            "Handoff estruturado da sessão registrado na memória de trabalho.",
+            evidence={
+                "handoff_id":handoff_preview.get("handoff_id"),
+                "current_focus":handoff_preview.get("current_focus"),
+                "next_steps":len(list(handoff_preview.get("next_steps") or [])),
+                "automatic_execution":False,
+            },
+        )
+        _set_working_checkpoint(updated, dirty=True)
+        st.success("Handoff registrado localmente. Salve o Checkpoint Mestre para persistir entre sessões.")
+        st.rerun()
 
     with st.expander("Observabilidade / auditoria"):
         st.caption(
@@ -1745,6 +1867,156 @@ def _render_development(
         st.write(f"**Missão:** {plan.get('mission_id')} · domínio {plan.get('domain')}")
         for idx, step in enumerate(plan.get("steps", []), start=1):
             st.markdown(f"{idx}. {step}")
+
+    st.markdown("#### Missões persistentes")
+    continuity = checkpoint.get("continuity") if isinstance(checkpoint.get("continuity"), Mapping) else {}
+    missions = list(continuity.get("missions", []) or [])
+    handoffs = list(continuity.get("handoffs", []) or [])
+    mission_summary = continuity_summary(missions, handoffs)
+    mc1,mc2,mc3,mc4 = st.columns(4)
+    mc1.metric("Total", mission_summary["total_missions"])
+    mc2.metric("Ativas", mission_summary["active_missions"])
+    mc3.metric("Bloqueadas", mission_summary["blocked_missions"])
+    mc4.metric("Concluídas", mission_summary["done_missions"])
+
+    with st.form("aion_persistent_mission_form", clear_on_submit=True):
+        mission_title = st.text_input("Título da missão persistente")
+        mission_domain = st.selectbox(
+            "Área da missão",
+            ["central","trading","studio","business","laboratory","secretary","development","subscriptions","promotions"],
+            index=6,
+        )
+        mission_objective = st.text_area("Objetivo / escopo", max_chars=1600)
+        mission_next = st.text_area("Próxima ação registrada", max_chars=1600)
+        create_mission = st.form_submit_button("Registrar missão no Checkpoint", type="primary")
+
+    if create_mission:
+        try:
+            mission = new_mission(
+                mission_title,
+                domain=mission_domain,
+                objective=mission_objective,
+                next_action=mission_next,
+                source=str(access.get("username") or "ADMIN"),
+            )
+            missions = upsert_mission(missions, mission)
+            updated = update_continuity_checkpoint(
+                checkpoint,
+                missions=missions,
+                handoffs=handoffs,
+                dirty=True,
+            )
+            updated = _record_working_event(
+                updated,
+                "mission_registered",
+                f"Missão persistente registrada: {mission['title']}",
+                evidence={
+                    "mission_id":mission["mission_id"],
+                    "domain":mission["domain"],
+                    "status":mission["status"],
+                },
+            )
+            _set_working_checkpoint(updated, dirty=True)
+            st.success("Missão registrada na memória de trabalho do AION.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Não foi possível registrar a missão: {type(exc).__name__}")
+
+    if missions:
+        st.dataframe(
+            [{
+                "ID":item.get("mission_id"),
+                "Status":item.get("status"),
+                "Área":item.get("domain"),
+                "Missão":item.get("title"),
+                "Próxima ação":item.get("next_action"),
+                "Atualizada":item.get("updated_at"),
+            } for item in reversed(missions[-80:])],
+            width="stretch",
+            hide_index=True,
+        )
+        mission_ids=[str(item.get("mission_id") or "") for item in missions]
+        selected_mission_id=st.selectbox(
+            "Missão selecionada",
+            mission_ids,
+            key="aion_persistent_mission_selected",
+        )
+        selected_mission=next(
+            (item for item in missions if str(item.get("mission_id") or "")==selected_mission_id),
+            None,
+        )
+        if isinstance(selected_mission, Mapping):
+            status_index = list(MISSION_STATUSES).index(
+                str(selected_mission.get("status") or "PLANNED")
+                if str(selected_mission.get("status") or "PLANNED") in MISSION_STATUSES
+                else "PLANNED"
+            )
+            next_status = st.selectbox(
+                "Novo estado da missão",
+                list(MISSION_STATUSES),
+                index=status_index,
+                key="aion_persistent_mission_status",
+            )
+            mission_outcome = st.text_area(
+                "Resultado / conclusão registrada",
+                value=str(selected_mission.get("outcome") or ""),
+                key="aion_persistent_mission_outcome",
+                max_chars=1600,
+            )
+            mission_blocker = st.text_area(
+                "Bloqueio registrado",
+                value=str(selected_mission.get("blocker") or ""),
+                key="aion_persistent_mission_blocker",
+                max_chars=1600,
+            )
+            mission_next_action = st.text_area(
+                "Próxima ação",
+                value=str(selected_mission.get("next_action") or ""),
+                key="aion_persistent_mission_next",
+                max_chars=1600,
+            )
+            evidence_text = st.text_input(
+                "Referências de evidência (separadas por vírgula)",
+                value=", ".join(list(selected_mission.get("evidence_refs") or [])),
+                key="aion_persistent_mission_evidence",
+            )
+            if st.button(
+                "Atualizar missão persistente",
+                key="aion_persistent_mission_update",
+                width="stretch",
+            ):
+                try:
+                    evidence_refs=[x.strip() for x in evidence_text.split(",") if x.strip()]
+                    missions = transition_mission(
+                        missions,
+                        selected_mission_id,
+                        next_status,
+                        outcome=mission_outcome,
+                        blocker=mission_blocker,
+                        next_action=mission_next_action,
+                        evidence_refs=evidence_refs,
+                    )
+                    updated = update_continuity_checkpoint(
+                        checkpoint,
+                        missions=missions,
+                        handoffs=handoffs,
+                        dirty=True,
+                    )
+                    updated = _record_working_event(
+                        updated,
+                        "mission_updated",
+                        f"Missão persistente atualizada: {selected_mission_id}",
+                        evidence={
+                            "mission_id":selected_mission_id,
+                            "status":next_status,
+                            "automatic_execution":False,
+                        },
+                    )
+                    _set_working_checkpoint(updated, dirty=True)
+                    st.success("Missão atualizada localmente no Checkpoint.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Não foi possível atualizar a missão: {type(exc).__name__}")
 
     st.markdown("#### Checkpoint Mestre")
     st.caption(
@@ -2728,6 +3000,18 @@ def render_aion_admin_console(
         "incident_center_has_critical": bool(incident_snapshot.get("has_critical", False)),
         "incident_center_rollback_review": bool(
             incident_snapshot.get("rollback_review_recommended", False)
+        ),
+        "continuity_active_missions": int(
+            continuity_summary(
+                list(((checkpoint.get("continuity") or {}) if isinstance(checkpoint.get("continuity"), Mapping) else {}).get("missions", []) or []),
+                list(((checkpoint.get("continuity") or {}) if isinstance(checkpoint.get("continuity"), Mapping) else {}).get("handoffs", []) or []),
+            ).get("active_missions") or 0
+        ),
+        "continuity_handoff_count": int(
+            continuity_summary(
+                list(((checkpoint.get("continuity") or {}) if isinstance(checkpoint.get("continuity"), Mapping) else {}).get("missions", []) or []),
+                list(((checkpoint.get("continuity") or {}) if isinstance(checkpoint.get("continuity"), Mapping) else {}).get("handoffs", []) or []),
+            ).get("handoff_count") or 0
         ),
         "checkpoint_dirty": bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
         "checkpoint_conflict": bool(st.session_state.get(_WORKING_CONFLICT_KEY, False)),

@@ -44,6 +44,63 @@ class AtlasQuantAionGatewayTests(unittest.TestCase):
         self.assertEqual(route["domain"], "development")
         self.assertFalse(route["executes_action"])
 
+    def test_local_answer_uses_checkpoint_continuity_for_where_we_stopped(self):
+        result = local_answer(
+            "onde paramos no sistema?",
+            checkpoint={
+                "continuity":{
+                    "missions":[{
+                        "mission_id":"MIS-1",
+                        "title":"Fechar interface AION",
+                        "domain":"development",
+                        "status":"IN_PROGRESS",
+                        "objective":"",
+                        "outcome":"",
+                        "blocker":"",
+                        "next_action":"Rodar testes mobile.",
+                        "evidence_refs":[],
+                        "created_at":"2026-09-24T20:00:00+00:00",
+                        "updated_at":"2026-09-24T20:10:00+00:00",
+                        "started_at":"2026-09-24T20:10:00+00:00",
+                        "completed_at":"",
+                        "source":"ADMIN",
+                    }],
+                    "handoffs":[],
+                },
+                "operating":{"tasks":[],"events":[]},
+            },
+        )
+        self.assertIn("Fechar interface AION",result["answer"])
+        self.assertIn("Rodar testes mobile",result["answer"])
+        self.assertIn("síntese do estado estruturado",result["answer"])
+        self.assertIn("Nenhum próximo passo é executado automaticamente",result["answer"])
+        self.assertFalse(result["executes_action"])
+
+    def test_persisted_handoff_is_identified_as_continuity_source(self):
+        result = local_answer(
+            "qual o próximo bloco?",
+            checkpoint={
+                "continuity":{
+                    "missions":[],
+                    "handoffs":[{
+                        "handoff_id":"HOF-1",
+                        "created_at":"2026-09-24T21:00:00+00:00",
+                        "current_focus":"Publicar versão atual",
+                        "completed":["Guardian fechado"],
+                        "blockers":["Render não conectado"],
+                        "next_steps":["Conectar Render"],
+                        "evidence_refs":[],
+                        "checkpoint_digest":"abc",
+                        "source":"ADMIN",
+                    }],
+                },
+                "operating":{"tasks":[],"events":[]},
+            },
+        )
+        self.assertIn("Publicar versão atual",result["answer"])
+        self.assertIn("Conectar Render",result["answer"])
+        self.assertIn("último handoff persistido",result["answer"])
+
     def test_local_answer_does_not_invent_fresh_market_state(self):
         result = local_answer(
             "como está o radar forex agora?",

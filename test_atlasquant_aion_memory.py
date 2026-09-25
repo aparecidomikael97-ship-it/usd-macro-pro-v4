@@ -20,6 +20,7 @@ from atlasquant_aion_memory import (
     search_canonical_memory,
     update_business_checkpoint,
     update_entitlements_checkpoint,
+    update_continuity_checkpoint,
     update_operating_checkpoint,
     update_promotions_checkpoint,
     update_studio_checkpoint,
@@ -86,9 +87,9 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("approved_foundation", cp)
         self.assertTrue(checkpoint_digest(cp))
 
-    def test_checkpoint_v6_has_operating_studio_business_subscriptions_and_promotions_memory(self):
+    def test_checkpoint_v7_has_operating_continuity_and_commercial_memory(self):
         cp=default_checkpoint()
-        self.assertGreaterEqual(cp["checkpoint_version"],6)
+        self.assertGreaterEqual(cp["checkpoint_version"],7)
         self.assertIn("operating",cp)
         self.assertEqual(cp["operating"]["tasks"],[])
         self.assertEqual(cp["operating"]["events"],[])
@@ -98,24 +99,28 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertEqual(cp["promotions"]["campaigns"],[])
         self.assertEqual(cp["promotions"]["redemptions"],[])
         self.assertEqual(cp["entitlements"]["records"],[])
+        self.assertEqual(cp["continuity"]["missions"],[])
+        self.assertEqual(cp["continuity"]["handoffs"],[])
+        self.assertTrue(cp["continuity"]["digest"])
         self.assertIn("subscriptions",cp["areas"])
 
     def test_older_checkpoint_is_upgraded_without_claiming_persistence(self):
         old={"checkpoint_version":1,"project":"AtlasQuant"}
         upgraded=ensure_operating_checkpoint(old)
-        self.assertEqual(upgraded["checkpoint_version"],6)
+        self.assertEqual(upgraded["checkpoint_version"],7)
         self.assertIn("operating",upgraded)
         self.assertIn("studio",upgraded)
         self.assertIn("business",upgraded)
         self.assertIn("promotions",upgraded)
         self.assertIn("entitlements",upgraded)
+        self.assertIn("continuity",upgraded)
         self.assertIn("subscriptions",upgraded["areas"])
         changed=update_operating_checkpoint(upgraded,tasks=[],events=[],dirty=True)
         self.assertTrue(changed["operating"]["dirty"])
         self.assertTrue(changed["operating"]["task_digest"])
         self.assertTrue(changed["operating"]["event_digest"])
 
-    def test_integrity_report_confirms_v6_and_detects_tampering(self):
+    def test_integrity_report_confirms_v7_and_detects_tampering(self):
         cp=default_checkpoint()
         report=checkpoint_integrity_report(cp)
         self.assertEqual(report["state"],"CONFIRMED")
@@ -129,13 +134,14 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertFalse(report["write_safe"])
         self.assertIn("studio",report["mismatches"])
 
-    def test_integrity_report_marks_legacy_checkpoint_for_safe_v6_migration(self):
+    def test_integrity_report_marks_legacy_v6_checkpoint_for_safe_v7_migration(self):
         legacy=default_checkpoint()
-        legacy["checkpoint_version"]=5
-        legacy["areas"].pop("subscriptions",None)
+        legacy["checkpoint_version"]=6
+        legacy.pop("continuity",None)
         report=checkpoint_integrity_report(legacy)
         self.assertEqual(report["state"],"MIGRATION_REQUIRED")
         self.assertTrue(report["write_safe"])
+        self.assertTrue(any("continuity" in x for x in report["migration_items"]))
         preflight=runtime_write_preflight({
             "status":"CONFIRMED",
             "sha":"legacysha",
@@ -143,6 +149,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         })
         self.assertTrue(preflight["allowed"])
         self.assertEqual(preflight["mode"],"UPDATE_MIGRATION")
+        self.assertIn("V7",preflight["reason"])
 
     def test_integrity_mismatch_blocks_runtime_write_preflight(self):
         tampered=default_checkpoint()
@@ -155,6 +162,31 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertFalse(preflight["allowed"])
         self.assertEqual(preflight["mode"],"BLOCKED")
         self.assertEqual(preflight["integrity_state"],"MISMATCH")
+
+    def test_continuity_update_marks_checkpoint_dirty_and_is_integrity_checked(self):
+        cp=default_checkpoint()
+        changed=update_continuity_checkpoint(
+            cp,
+            missions=[{
+                "title":"Missão teste",
+                "domain":"development",
+                "status":"PLANNED",
+                "next_action":"Rodar testes",
+                "created_at":"2026-09-24T20:00:00+00:00",
+            }],
+            handoffs=[],
+            dirty=True,
+        )
+        self.assertEqual(len(changed["continuity"]["missions"]),1)
+        self.assertTrue(changed["continuity"]["digest"])
+        self.assertTrue(changed["operating"]["dirty"])
+        self.assertEqual(checkpoint_integrity_report(changed)["state"],"CONFIRMED")
+
+        tampered=default_checkpoint()
+        tampered["continuity"]["digest"]="wrong"
+        report=checkpoint_integrity_report(tampered)
+        self.assertEqual(report["state"],"MISMATCH")
+        self.assertIn("continuity",report["mismatches"])
 
     def test_studio_and_business_updates_mark_checkpoint_dirty(self):
         cp=default_checkpoint()
