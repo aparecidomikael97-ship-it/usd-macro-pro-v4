@@ -27,9 +27,9 @@ class AtlasQuantAionSourceMeshRuntimeTests(unittest.TestCase):
     def test_aion_source_mesh_uses_existing_macro_calendar_and_pair_matrix_evidence(self):
         self.assertIn("mesh = source_mesh_snapshot(",self.src)
         self.assertIn("macro_us=macro_eua",self.src)
-        self.assertIn("next_event=_aion_next_event",self.src)
-        self.assertIn("pair_matrix_status=_aion_pair_matrix_status",self.src)
-        self.assertIn("autopilot_status=",self.src)
+        self.assertIn("next_event=next_event",self.src)
+        self.assertIn("pair_matrix_status=pair_matrix_status",self.src)
+        self.assertIn("autopilot_status=autopilot_status",self.src)
 
     def test_live_market_context_comes_only_from_mesh_confirmation(self):
         self.assertIn(
