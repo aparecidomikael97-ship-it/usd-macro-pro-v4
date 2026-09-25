@@ -860,7 +860,7 @@ def runtime_write_preflight(runtime_result: Mapping[str, Any] | None) -> dict[st
             "allowed": True,
             "mode": "UPDATE_MIGRATION" if migration else "UPDATE",
             "reason": (
-                "Runtime confirmado com SHA; migração estrutural V7 será aplicada na escrita condicional."
+                "Runtime confirmado com SHA; migração estrutural V8 será aplicada na escrita condicional."
                 if migration else
                 "Runtime confirmado com SHA e integridade compatível para escrita condicional."
             ),
@@ -1049,7 +1049,7 @@ def checkpoint_integrity_report(
 ) -> dict[str, Any]:
     """Verify persisted component digests before normalization mutates them.
 
-    Missing V7 structure is reported as MIGRATION_REQUIRED rather than corruption.
+    Missing V8 structure is reported as MIGRATION_REQUIRED rather than corruption.
     A present-but-wrong digest is a MISMATCH and should fail closed for writes.
     """
     if not isinstance(checkpoint, Mapping):
@@ -1163,6 +1163,16 @@ def checkpoint_integrity_report(
         ),
     )
 
+    wisdom = raw.get("wisdom") if isinstance(raw.get("wisdom"), Mapping) else {}
+    wisdom_entries = normalize_wisdom_entries(
+        wisdom.get("entries") if isinstance(wisdom, Mapping) else []
+    )
+    add_check(
+        "wisdom",
+        wisdom.get("digest"),
+        wisdom_digest(wisdom_entries),
+    )
+
     live_event_journal = (
         raw.get("live_event_journal")
         if isinstance(raw.get("live_event_journal"), Mapping)
@@ -1183,12 +1193,14 @@ def checkpoint_integrity_report(
     raw_areas = raw.get("areas") if isinstance(raw.get("areas"), Mapping) else {}
     if "subscriptions" not in raw_areas:
         migration_items.append("areas.subscriptions ausente")
-    if version < 7:
-        migration_items.append(f"checkpoint_version {version} < 7")
+    if version < 8:
+        migration_items.append(f"checkpoint_version {version} < 8")
     if "continuity" not in raw:
         migration_items.append("continuity ausente")
     if "learning" not in raw:
         migration_items.append("learning ausente")
+    if "wisdom" not in raw:
+        migration_items.append("wisdom ausente")
     if "live_event_journal" not in raw:
         migration_items.append("live_event_journal ausente")
 
