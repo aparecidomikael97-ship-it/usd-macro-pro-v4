@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-import pytest
-
 from atlasquant_aion_learning import new_learning_episode, settle_learning_episode
 from atlasquant_aion_memory import default_checkpoint, ensure_operating_checkpoint, update_wisdom_checkpoint
 from atlasquant_aion_wisdom import (
@@ -19,13 +17,16 @@ from atlasquant_aion_wisdom import (
 
 
 def test_confirmed_wisdom_requires_evidence():
-    with pytest.raises(ValueError):
+    try:
         new_wisdom_entry(
             "Fonte",
             "Afirmação forte",
             truth_state="CONFIRMED",
             confidence_pct=90,
         )
+    except ValueError:
+        return
+    raise AssertionError("CONFIRMED wisdom without evidence must be rejected")
 
 
 def test_normalizer_downgrades_unsupported_confirmed_claim():
