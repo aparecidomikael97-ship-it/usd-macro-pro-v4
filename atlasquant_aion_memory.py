@@ -54,6 +54,14 @@ from atlasquant_aion_vault import (
     default_vault,
     normalize_vault,
 )
+from atlasquant_aion_tool_hub import (
+    default_tool_hub,
+    normalize_tool_hub,
+)
+from atlasquant_aion_durable_tasks import (
+    normalize_durable_tasks,
+    durable_tasks_digest,
+)
 from atlasquant_aion_event_journal import (
     normalize_events as normalize_live_event_journal_events,
     normalize_heartbeats as normalize_live_event_heartbeats,
@@ -324,7 +332,7 @@ def search_canonical_memory(
 def default_checkpoint() -> dict[str, Any]:
     return {
         "schema": SCHEMA,
-        "checkpoint_version": 10,
+        "checkpoint_version": 11,
         "created_at": _now(),
         "updated_at": _now(),
         "project": "AtlasQuant",
@@ -390,6 +398,11 @@ def default_checkpoint() -> dict[str, Any]:
         },
         "portable_core": default_portable_core(),
         "vault": default_vault(),
+        "tool_hub": default_tool_hub(),
+        "durable_tasks": {
+            "records": [],
+            "digest": durable_tasks_digest([]),
+        },
         "live_event_journal": {
             "events": [],
             "heartbeats": [],
@@ -548,6 +561,26 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
     )
     payload["vault"] = vault
 
+    tool_hub = normalize_tool_hub(
+        payload.get("tool_hub")
+        if isinstance(payload.get("tool_hub"), Mapping)
+        else {}
+    )
+    payload["tool_hub"] = tool_hub
+
+    durable = (
+        payload.get("durable_tasks")
+        if isinstance(payload.get("durable_tasks"), Mapping)
+        else {}
+    )
+    durable_rows = normalize_durable_tasks(
+        durable.get("records") if isinstance(durable, Mapping) else []
+    )
+    payload["durable_tasks"] = {
+        "records": durable_rows,
+        "digest": durable_tasks_digest(durable_rows),
+    }
+
     live_event_journal = (
         payload.get("live_event_journal")
         if isinstance(payload.get("live_event_journal"), Mapping)
@@ -570,7 +603,7 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
         operating = {}
     tasks = normalize_queue(operating.get("tasks") if isinstance(operating, Mapping) else [])
     events = normalize_events(operating.get("events") if isinstance(operating, Mapping) else [])
-    payload["checkpoint_version"] = max(10, int(payload.get("checkpoint_version") or 1))
+    payload["checkpoint_version"] = max(11, int(payload.get("checkpoint_version") or 1))
     payload["operating"] = {
         "tasks": tasks,
         "events": events,
@@ -777,6 +810,38 @@ def update_vault_checkpoint(
     return payload
 
 
+def update_tool_hub_checkpoint(
+    checkpoint: Mapping[str, Any] | None,
+    *,
+    tool_hub: Mapping[str, Any],
+    dirty: bool = True,
+) -> dict[str, Any]:
+    """Persist Tool Hub registry only; this does not activate/call tools."""
+    payload = ensure_operating_checkpoint(checkpoint)
+    payload["tool_hub"] = normalize_tool_hub(tool_hub)
+    payload["operating"]["dirty"] = bool(dirty)
+    payload["updated_at"] = _now()
+    return payload
+
+
+def update_durable_tasks_checkpoint(
+    checkpoint: Mapping[str, Any] | None,
+    *,
+    records: Any,
+    dirty: bool = True,
+) -> dict[str, Any]:
+    """Persist resumable task state; persistence never resumes execution."""
+    payload = ensure_operating_checkpoint(checkpoint)
+    rows = normalize_durable_tasks(records)
+    payload["durable_tasks"] = {
+        "records": rows,
+        "digest": durable_tasks_digest(rows),
+    }
+    payload["operating"]["dirty"] = bool(dirty)
+    payload["updated_at"] = _now()
+    return payload
+
+
 def update_live_event_journal_checkpoint(
     checkpoint: Mapping[str, Any] | None,
     *,
@@ -950,7 +1015,7 @@ def runtime_write_preflight(runtime_result: Mapping[str, Any] | None) -> dict[st
             "allowed": True,
             "mode": "UPDATE_MIGRATION" if migration else "UPDATE",
             "reason": (
-                "Runtime confirmado com SHA; migração estrutural V10 será aplicada na escrita condicional."
+                "Runtime confirmado com SHA; migração estrutural V11 será aplicada na escrita condicional."
                 if migration else
                 "Runtime confirmado com SHA e integridade compatível para escrita condicional."
             ),
@@ -1139,7 +1204,7 @@ def checkpoint_integrity_report(
 ) -> dict[str, Any]:
     """Verify persisted component digests before normalization mutates them.
 
-    Missing V10 structure is reported as MIGRATION_REQUIRED rather than corruption.
+    Missing V11 structure is reported as MIGRATION_REQUIRED rather than corruption.
     A present-but-wrong digest is a MISMATCH and should fail closed for writes.
     """
     if not isinstance(checkpoint, Mapping):
@@ -1283,6 +1348,28 @@ def checkpoint_integrity_report(
         vault.get("digest"),
     )
 
+    tool_hub_raw = raw.get("tool_hub") if isinstance(raw.get("tool_hub"), Mapping) else {}
+    tool_hub = normalize_tool_hub(tool_hub_raw)
+    add_check(
+        "tool_hub",
+        tool_hub_raw.get("digest"),
+        tool_hub.get("digest"),
+    )
+
+    durable_raw = (
+        raw.get("durable_tasks")
+        if isinstance(raw.get("durable_tasks"), Mapping)
+        else {}
+    )
+    durable_rows = normalize_durable_tasks(
+        durable_raw.get("records") if isinstance(durable_raw, Mapping) else []
+    )
+    add_check(
+        "durable_tasks",
+        durable_raw.get("digest"),
+        durable_tasks_digest(durable_rows),
+    )
+
     live_event_journal = (
         raw.get("live_event_journal")
         if isinstance(raw.get("live_event_journal"), Mapping)
@@ -1303,8 +1390,8 @@ def checkpoint_integrity_report(
     raw_areas = raw.get("areas") if isinstance(raw.get("areas"), Mapping) else {}
     if "subscriptions" not in raw_areas:
         migration_items.append("areas.subscriptions ausente")
-    if version < 10:
-        migration_items.append(f"checkpoint_version {version} < 10")
+    if version < 11:
+        migration_items.append(f"checkpoint_version {version} < 11")
     if "continuity" not in raw:
         migration_items.append("continuity ausente")
     if "learning" not in raw:
@@ -1315,6 +1402,10 @@ def checkpoint_integrity_report(
         migration_items.append("portable_core ausente")
     if "vault" not in raw:
         migration_items.append("vault ausente")
+    if "tool_hub" not in raw:
+        migration_items.append("tool_hub ausente")
+    if "durable_tasks" not in raw:
+        migration_items.append("durable_tasks ausente")
     if "live_event_journal" not in raw:
         migration_items.append("live_event_journal ausente")
 
