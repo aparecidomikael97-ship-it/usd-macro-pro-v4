@@ -18,6 +18,11 @@ import streamlit as st
 from atlasquant_voice_assistant import render_contextual_voice_assistant
 from atlasquant_neural_voice_ui import render_neural_voice_player
 from atlasquant_signal_lifecycle import derive_signal_view, format_signal_time
+from atlasquant_operational_state import (
+    OPERATIONAL_SPINE_CSS,
+    operational_presentation,
+    operational_strip_html,
+)
 from atlasquant_session_profiles import (
     SESSION_PROFILES,
     SESSION_LABELS,
@@ -157,6 +162,12 @@ def home_rows_from_packs(packs:Sequence[Mapping[str,Any]]|None)->list[dict[str,A
             "positives":[str(x) for x in list(p.get("positives",[]) or []) if str(x).strip()],
             "hard_blocks":[str(x) for x in list(p.get("hard_blocks",[]) or []) if str(x).strip()],
             "soft_blocks":[str(x) for x in list(p.get("soft_blocks",[]) or []) if str(x).strip()],
+            "evidence_source":str(
+                p.get("evidence_source")
+                or p.get("source")
+                or p.get("runtime_source")
+                or "Radar / pack institucional"
+            ),
         })
     rows.sort(key=lambda x:(x["action"]!="NÃO OPERAR",x["priority"],x["data_score"]),reverse=True)
     return rows
@@ -174,6 +185,39 @@ def home_summary(rows:Sequence[Mapping[str,Any]]|None)->dict[str,Any]:
         "best_pair":str((best or {}).get("pair") or "—"),
         "best_action":str((best or {}).get("action") or "NÃO OPERAR"),
     }
+
+
+def radar_operational_model(row:Mapping[str,Any]|None)->dict[str,Any]:
+    r=dict(row or {})
+    signal_code=str(r.get("signal_status_code") or "UNVERIFIED").upper()
+    reference=str(r.get("signal_reference_display") or "")
+    age=r.get("signal_age_minutes")
+    if signal_code=="EXPIRED":
+        temporal_code="EXPIRED"
+    elif signal_code in {"UNVERIFIED","BLOCKED","NO_SIGNAL"} or not reference or age is None:
+        temporal_code="UNVERIFIED"
+    elif signal_code in {"CONFIRMED","POSSIBLE"}:
+        temporal_code="CURRENT"
+    else:
+        temporal_code="UNKNOWN"
+    state=(
+        "NÃO OPERAR"
+        if str(r.get("action") or "")=="NÃO OPERAR"
+        else str(r.get("state") or "OBSERVAÇÃO")
+    )
+    return operational_presentation(
+        pair=r.get("pair"),
+        bias=r.get("bias"),
+        state=state,
+        quality=r.get("quality"),
+        data_score=r.get("data_score"),
+        temporal_code=temporal_code,
+        temporal_label=r.get("signal_status_label"),
+        reference_display=reference,
+        authorized=False,
+        evidence_source=r.get("evidence_source") or "Radar / pack institucional",
+        next_action=r.get("next_action") or "Aguardar confirmação válida.",
+    )
 
 
 def voice_script_for_row(row:Mapping[str,Any])->str:
@@ -283,6 +327,7 @@ def render_home_radar(
     rows=home_rows_from_packs(packs)
     mode="Avançado" if str(experience_mode).casefold().startswith("avan") else "Iniciante"
     st.markdown(HOME_CSS,unsafe_allow_html=True)
+    st.markdown(OPERATIONAL_SPINE_CSS,unsafe_allow_html=True)
     st.markdown(
         """<div class="aq-home-hero"><small>TELA PRINCIPAL</small>
         <h2>🎯 Radar de Oportunidades</h2>
@@ -357,6 +402,16 @@ def render_home_radar(
         st.session_state["aq_home_pair"]=options[0]
     selected=st.selectbox("Ativo para análise detalhada",options,key="aq_home_pair")
     row=next(r for r in rows if r["pair"]==selected)
+
+    _operational_model=radar_operational_model(row)
+    st.markdown(
+        operational_strip_html(_operational_model),
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        "No Radar, compra/venda é viés de análise. A faixa compartilhada permanece "
+        "NÃO AUTORIZADA porque esta tela não é o gate final de entrada."
+    )
 
     st.markdown("### Por que está assim?")
     st.markdown('<div class="aq-home-detail">',unsafe_allow_html=True)
