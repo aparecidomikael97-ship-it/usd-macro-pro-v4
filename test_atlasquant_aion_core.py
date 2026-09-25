@@ -134,6 +134,15 @@ class AtlasQuantAionCoreTests(unittest.TestCase):
         self.assertEqual(posture["blocked_now"],len(posture["actions"]))
         self.assertTrue(all(not row["allowed_now"] for row in posture["actions"]))
 
+    def test_checkpoint_restore_is_write_risk_and_requires_explicit_approval(self):
+        admin={"role":"ADMIN"}
+        user={"role":"USER"}
+        self.assertFalse(guardian_decision("restore_checkpoint",user,approved=True)["allowed"])
+        self.assertFalse(guardian_decision("restore_checkpoint",admin,approved=False)["allowed"])
+        result=guardian_decision("restore_checkpoint",admin,approved=True)
+        self.assertTrue(result["allowed"])
+        self.assertEqual(result["risk"],"WRITE")
+
     def test_mission_plan_is_non_executing_and_checkpoint_oriented(self):
         plan = mission_plan("corrigir interface do administrador")
         self.assertEqual(plan["domain"], "development")
