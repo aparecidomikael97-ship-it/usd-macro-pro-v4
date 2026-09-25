@@ -159,6 +159,7 @@ from atlasquant_aion_executive_pulse import (
     compact_attention_rows,
     executive_pulse,
 )
+from atlasquant_navigation_bridge import request_surface_revalidation
 
 try:
     from atlasquant_neural_voice_ui import render_neural_voice_player
@@ -1141,6 +1142,58 @@ def _render_critical_surface_health(system_context: Mapping[str, Any] | None) ->
             "Existe tela degradada, indisponível, ligada a build antigo ou ainda não observada. "
             "O AION mantém o estado como pendente até nova evidência no build atual."
         )
+
+    unresolved = [
+        item for item in list(snapshot.get("items", []) or [])
+        if isinstance(item, Mapping)
+        and str(item.get("state") or "UNKNOWN").upper() != "OK"
+    ]
+    if unresolved:
+        st.markdown("**Revalidação guiada**")
+        st.caption(
+            "Cada botão apenas registra um pedido de navegação. A tela é aberta no próximo ciclo "
+            "e precisa renderizar no build atual para virar evidência nova."
+        )
+        build_id = str(system.get("source_build") or snapshot.get("current_build") or "")
+        for item in unresolved:
+            surface = str(item.get("id") or "")
+            label = str(item.get("label") or surface or "Tela crítica")
+            state = str(item.get("state") or "UNKNOWN").upper()
+            if st.button(
+                f"🧪 Revalidar · {label} · {state}",
+                key=f"aion_revalidate_surface_{surface}",
+                width="stretch",
+            ):
+                try:
+                    request_surface_revalidation(
+                        st.session_state,
+                        surface,
+                        build_id=build_id,
+                    )
+                    st.rerun()
+                except Exception as exc:
+                    st.warning(
+                        "Não foi possível registrar a navegação de revalidação. "
+                        f"Diagnóstico: {type(exc).__name__}."
+                    )
+
+    last_result = (
+        system.get("guided_revalidation")
+        if isinstance(system.get("guided_revalidation"), Mapping)
+        else {}
+    )
+    if last_result:
+        result_state = str(last_result.get("state") or "UNKNOWN")
+        label = str(last_result.get("label") or last_result.get("surface") or "tela")
+        if result_state == "CONFIRMED_OK":
+            st.success(
+                f"Última revalidação guiada: {label} confirmado no build atual."
+            )
+        elif result_state in {"CONFIRMED_ERROR", "BUILD_CHANGED", "NAVIGATION_BLOCKED"}:
+            st.warning(
+                f"Última revalidação guiada: {label} terminou em {result_state}. "
+                "O AION não trata esse resultado como saudável."
+            )
 
 
 def _render_central(
@@ -3303,6 +3356,10 @@ def render_aion_admin_console(
         ),
         "critical_surfaces_have_unresolved": bool(
             ((system.get("critical_surfaces") or {}) if isinstance(system.get("critical_surfaces"), Mapping) else {}).get("has_unresolved", True)
+        ),
+        "guided_revalidation_state": str(
+            ((system.get("guided_revalidation") or {}) if isinstance(system.get("guided_revalidation"), Mapping) else {}).get("state")
+            or "NONE"
         ),
         "real_orders_enabled": False,
     }
