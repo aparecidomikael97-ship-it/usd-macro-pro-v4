@@ -222,6 +222,8 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn('"source": "RELEASE GATE"',src)
         self.assertIn("release_gate_snapshot",src)
         self.assertIn("release_gate_snapshot=release_gate_state",src)
+        self.assertIn('system_context.get("release_gate")',src)
+        self.assertIn('"source": "RELEASE GATE"',src)
 
     def test_central_memory_guardian_posture_is_read_only_and_fail_closed(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
