@@ -45,6 +45,7 @@ class AtlasQuantNavigationBridgeTests(unittest.TestCase):
         self.assertEqual(active["state"], "NAVIGATED")
         self.assertEqual(state["atlasquant_experience_mode"], "Avançado")
         self.assertEqual(state["atlasquant_advanced_area"], "🎯 Radar")
+        self.assertEqual(state["atlasquant_stable_nav_fallback"], "🎯 Radar")
         self.assertEqual(active_revalidation(state)["surface"], "advanced_radar")
 
     def test_missing_target_fails_closed(self):
@@ -114,6 +115,28 @@ class AtlasQuantNavigationBridgeTests(unittest.TestCase):
         self.assertEqual(result["state"], "RETURN_REQUESTED")
         self.assertEqual(state["atlasquant_experience_mode"], "Avançado")
         self.assertEqual(state["atlasquant_advanced_area"], "🧠 AION")
+        self.assertEqual(state["atlasquant_stable_nav_fallback"], "🧠 AION")
+
+
+    def test_main_app_consumes_request_before_navigation_widgets_and_reports_result(self):
+        from pathlib import Path
+        src = Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        append_aion = src.index('_nav_items.append("🧠 AION")')
+        consume = src.index("consume_navigation_request(", append_aion)
+        mode_widget = src.index("render_experience_mode_switch()", consume)
+        self.assertLess(consume, mode_widget)
+        self.assertIn("_aq_complete_guided_revalidation(", src)
+        self.assertIn("request_return_to_aion(st.session_state)", src)
+        self.assertIn('"guided_revalidation": revalidation_result(st.session_state) or {}', src)
+
+    def test_aion_surface_panel_only_requests_navigation_on_explicit_button(self):
+        from pathlib import Path
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Revalidação guiada", src)
+        self.assertIn("aion_revalidate_surface_", src)
+        self.assertIn("request_surface_revalidation(", src)
+        self.assertIn("Cada botão apenas registra um pedido de navegação", src)
+        self.assertIn('"guided_revalidation_state"', src)
 
 
 if __name__ == "__main__":
