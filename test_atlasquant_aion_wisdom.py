@@ -16,6 +16,7 @@ from atlasquant_aion_wisdom import (
     search_wisdom,
     upsert_wisdom_entry,
     wisdom_digest,
+    wisdom_evidence_hits,
     wisdom_review_state,
     wisdom_summary,
 )
@@ -92,6 +93,33 @@ class AtlasQuantAionWisdomTests(unittest.TestCase):
         summary = wisdom_summary([due, current], now=now.isoformat())
         self.assertEqual(summary["review_due"], 1)
         self.assertEqual(summary["by_truth_state"]["CONFIRMED"], 1)
+
+    def test_wisdom_evidence_downgrades_confirmed_when_review_not_current(self):
+        current = new_wisdom_entry(
+            "Regra da verdade",
+            "Não promover ausência de evidência a fato.",
+            truth_state="CONFIRMED",
+            evidence_refs=["repo:truth-test"],
+            review_due_at="2026-12-31T00:00:00+00:00",
+            created_at="2026-09-20T00:00:00+00:00",
+        )
+        overdue = new_wisdom_entry(
+            "Fonte antiga",
+            "Lição historicamente validada que precisa revisão.",
+            truth_state="CONFIRMED",
+            evidence_refs=["docs:old-source"],
+            review_due_at="2026-09-01T00:00:00+00:00",
+            created_at="2026-08-01T00:00:00+00:00",
+        )
+        now = "2026-09-25T15:00:00+00:00"
+        current_hit = wisdom_evidence_hits("verdade", [current], now=now)[0]
+        old_hit = wisdom_evidence_hits("fonte antiga", [overdue], now=now)[0]
+        self.assertEqual(current_hit["kind"], "CONFIRMED")
+        self.assertEqual(current_hit["review_state"], "CURRENT")
+        self.assertEqual(old_hit["kind"], "INFERENCE")
+        self.assertEqual(old_hit["original_truth_state"], "CONFIRMED")
+        self.assertEqual(old_hit["review_state"], "DUE")
+        self.assertFalse(old_hit["current_market_fact"])
 
     def test_upsert_digest_search_and_checkpoint_integration(self):
         first = new_wisdom_entry(
