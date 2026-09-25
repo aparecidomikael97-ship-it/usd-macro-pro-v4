@@ -788,6 +788,16 @@ def update_learning_checkpoint(
             research_rows,
         ),
     }
+    wisdom = payload.get("wisdom") if isinstance(payload.get("wisdom"), Mapping) else {}
+    payload["knowledge_graph"] = synchronize_knowledge_graph(
+        payload.get("knowledge_graph")
+        if isinstance(payload.get("knowledge_graph"), Mapping)
+        else {},
+        wisdom_entries=wisdom.get("entries", []),
+        learning_episodes=episode_rows,
+        experiments=experiment_rows,
+        research_refs=research_rows,
+    )
     payload["operating"]["dirty"] = bool(dirty)
     payload["updated_at"] = _now()
     return payload
@@ -813,6 +823,16 @@ def update_wisdom_checkpoint(
         "entries": rows,
         "digest": wisdom_digest(rows),
     }
+    learning = payload.get("learning") if isinstance(payload.get("learning"), Mapping) else {}
+    payload["knowledge_graph"] = synchronize_knowledge_graph(
+        payload.get("knowledge_graph")
+        if isinstance(payload.get("knowledge_graph"), Mapping)
+        else {},
+        wisdom_entries=rows,
+        learning_episodes=learning.get("episodes", []),
+        experiments=learning.get("experiments", []),
+        research_refs=learning.get("research_refs", []),
+    )
     payload["operating"]["dirty"] = bool(dirty)
     payload["updated_at"] = _now()
     return payload
