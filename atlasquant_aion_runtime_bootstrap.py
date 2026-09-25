@@ -63,8 +63,8 @@ def verify_checkpoint(path: str | Path) -> dict[str, Any]:
         raise ValueError(f"checkpoint integrity not confirmed: {integrity.get('state')}")
     normalized = ensure_operating_checkpoint(payload)
     version = int(normalized.get("checkpoint_version") or 0)
-    if version < 13:
-        raise ValueError("checkpoint version is older than V13")
+    if version < 14:
+        raise ValueError("checkpoint version is older than V14")
     if bool(normalized.get("aion", {}).get("real_trading", False)):
         raise ValueError("real trading must remain disabled")
     return {
