@@ -274,7 +274,7 @@ def local_answer(
     if research_blockers:
         answer += " Antes de uma conclusão forte, falta resolver: " + str(research_blockers[0])
     if hits:
-        answer += f" Encontrei {len(hits)} referência(s) na memória canônica para apoiar a resposta."
+        answer += f" Encontrei {len(hits)} referência(s) na memória auditável para apoiar a resposta."
     if provider["state"] == "ZERO_COST_LOCAL":
         answer += " O modo atual é local e custo zero; um modelo externo mais potente ainda não foi ativado."
 
@@ -302,7 +302,7 @@ def local_answer(
             "kind":kind,
             "source":str(hit.get("source") or hit.get("path") or "canonical_memory"),
             "value":str(hit.get("excerpt") or hit.get("content") or "")[:500],
-            "note":"Referência recuperada da memória canônica.",
+            "note":"Referência recuperada da memória auditável; estado de verdade e frescor devem ser preservados.",
         })
     response_audit = evidence_audit(response_evidence)
     response_confidence = evidence_confidence(response_audit)
