@@ -22,6 +22,7 @@ from atlasquant_aion_memory import (
     update_entitlements_checkpoint,
     update_continuity_checkpoint,
     update_learning_checkpoint,
+    update_event_intelligence_checkpoint,
     update_operating_checkpoint,
     update_promotions_checkpoint,
     update_studio_checkpoint,
@@ -50,6 +51,9 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("fallback", joined)
         self.assertIn("live_confirmed", joined)
         self.assertIn("runtime snapshot", joined)
+        self.assertIn("event intelligence", joined)
+        self.assertIn("alerta interno", joined)
+        self.assertIn("notificação externa", joined)
 
     def test_canonical_loader_reads_project_files_and_foundation(self):
         with tempfile.TemporaryDirectory() as td:
@@ -117,6 +121,9 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertEqual(cp["learning"]["experiments"],[])
         self.assertEqual(cp["learning"]["research_refs"],[])
         self.assertTrue(cp["learning"]["digest"])
+        self.assertEqual(cp["event_intelligence"]["events"],[])
+        self.assertEqual(cp["event_intelligence"]["alerts"],[])
+        self.assertTrue(cp["event_intelligence"]["digest"])
         self.assertIn("subscriptions",cp["areas"])
 
     def test_older_checkpoint_is_upgraded_without_claiming_persistence(self):
@@ -130,6 +137,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("entitlements",upgraded)
         self.assertIn("continuity",upgraded)
         self.assertIn("learning",upgraded)
+        self.assertIn("event_intelligence",upgraded)
         self.assertIn("subscriptions",upgraded["areas"])
         changed=update_operating_checkpoint(upgraded,tasks=[],events=[],dirty=True)
         self.assertTrue(changed["operating"]["dirty"])
@@ -236,6 +244,49 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         report=checkpoint_integrity_report(tampered)
         self.assertEqual(report["state"],"MISMATCH")
         self.assertIn("learning",report["mismatches"])
+
+    def test_event_intelligence_update_is_integrity_checked(self):
+        cp=default_checkpoint()
+        changed=update_event_intelligence_checkpoint(
+            cp,
+            events=[{
+                "event_id":"EVT-1",
+                "headline":"Geopolitical event",
+                "source":"wire.example",
+                "category":"GEOPOLITICAL_ESCALATION",
+                "event_truth":"UNKNOWN",
+                "severity_score":90,
+            }],
+            alerts=[{
+                "alert_id":"ALT-1",
+                "event_id":"EVT-1",
+                "state":"REVIEW_INTERNAL",
+                "reason":"Requires confirmation.",
+                "severity_score":90,
+                "event_truth":"UNKNOWN",
+                "requires_human_review":True,
+            }],
+            dirty=True,
+        )
+        self.assertEqual(len(changed["event_intelligence"]["events"]),1)
+        self.assertEqual(len(changed["event_intelligence"]["alerts"]),1)
+        self.assertTrue(changed["event_intelligence"]["digest"])
+        self.assertTrue(changed["operating"]["dirty"])
+        self.assertEqual(checkpoint_integrity_report(changed)["state"],"CONFIRMED")
+
+        tampered=default_checkpoint()
+        tampered["event_intelligence"]["digest"]="wrong"
+        report=checkpoint_integrity_report(tampered)
+        self.assertEqual(report["state"],"MISMATCH")
+        self.assertIn("event_intelligence",report["mismatches"])
+
+    def test_legacy_checkpoint_without_event_intelligence_requires_safe_migration(self):
+        legacy=default_checkpoint()
+        legacy.pop("event_intelligence",None)
+        report=checkpoint_integrity_report(legacy)
+        self.assertEqual(report["state"],"MIGRATION_REQUIRED")
+        self.assertTrue(report["write_safe"])
+        self.assertTrue(any("event_intelligence" in x for x in report["migration_items"]))
 
     def test_legacy_checkpoint_without_learning_requires_safe_migration(self):
         legacy=default_checkpoint()
