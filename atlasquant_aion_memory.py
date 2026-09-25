@@ -42,6 +42,11 @@ from atlasquant_aion_learning import (
     normalize_research_references,
     learning_digest,
 )
+from atlasquant_aion_event_journal import (
+    normalize_events as normalize_live_event_journal_events,
+    normalize_heartbeats as normalize_live_event_heartbeats,
+    journal_digest as live_event_journal_digest,
+)
 
 SCHEMA = "ATLASQUANT_AION_MEMORY_V1"
 RUNTIME_PATH = "dados/aion/checkpoint_master.json"
@@ -96,6 +101,8 @@ APPROVED_AION_FOUNDATION = (
     "Impactos de evento sobre moedas, índices, yields, ouro, petróleo e outros canais permanecem HYPOTHESIS até confirmação por dados/preço/contexto.",
     "Evento urgente pode entrar no Pulso Executivo para revisão, mas não autoriza entrada, saída, aumento de posição ou execução automática.",
     "Monitoramento 24/7 só pode ser declarado quando houver runtime contínuo comprovado; motor preparado ou código mesclado não prova vigilância contínua em produção.",
+    "Prova de monitoramento contínuo exige heartbeats persistidos cobrindo aproximadamente 24 horas, com densidade mínima e sem lacunas excessivas; poucos ciclos recentes não bastam.",
+    "Live Event Journal deve preservar histórico deduplicado, primeiro/último avistamento, recorrência e pico de urgência sem reclassificar o evento por conta própria.",
     "Execução real em corretora continua bloqueada; backtest/paper/forward e pesquisa não equivalem a autorização real.",
     "Gatilho operacional aprovado: quando o administrador disser 'tô no computador', priorizar a reconciliação do Render, configurar o Deploy Hook com segurança e validar Build Identity + Browser Smoke antes de retomar novos blocos.",
 )
@@ -331,6 +338,11 @@ def default_checkpoint() -> dict[str, Any]:
             "research_refs": [],
             "digest": learning_digest([], [], []),
         },
+        "live_event_journal": {
+            "events": [],
+            "heartbeats": [],
+            "digest": live_event_journal_digest([], []),
+        },
     }
 
 
@@ -447,6 +459,23 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
             learning_experiments,
             learning_research,
         ),
+    }
+
+    live_event_journal = (
+        payload.get("live_event_journal")
+        if isinstance(payload.get("live_event_journal"), Mapping)
+        else {}
+    )
+    journal_events = normalize_live_event_journal_events(
+        live_event_journal.get("events", [])
+    )
+    journal_heartbeats = normalize_live_event_heartbeats(
+        live_event_journal.get("heartbeats", [])
+    )
+    payload["live_event_journal"] = {
+        "events": journal_events,
+        "heartbeats": journal_heartbeats,
+        "digest": live_event_journal_digest(journal_events, journal_heartbeats),
     }
 
     operating = payload.get("operating")
@@ -599,6 +628,36 @@ def update_learning_checkpoint(
             experiment_rows,
             research_rows,
         ),
+    }
+    payload["operating"]["dirty"] = bool(dirty)
+    payload["updated_at"] = _now()
+    return payload
+
+
+def update_live_event_journal_checkpoint(
+    checkpoint: Mapping[str, Any] | None,
+    *,
+    events: Any = None,
+    heartbeats: Any = None,
+    dirty: bool = True,
+) -> dict[str, Any]:
+    """Persist a compact event/watch history without changing market state."""
+    payload = ensure_operating_checkpoint(checkpoint)
+    current = (
+        payload.get("live_event_journal")
+        if isinstance(payload.get("live_event_journal"), Mapping)
+        else {}
+    )
+    event_rows = normalize_live_event_journal_events(
+        current.get("events", []) if events is None else events
+    )
+    heartbeat_rows = normalize_live_event_heartbeats(
+        current.get("heartbeats", []) if heartbeats is None else heartbeats
+    )
+    payload["live_event_journal"] = {
+        "events": event_rows,
+        "heartbeats": heartbeat_rows,
+        "digest": live_event_journal_digest(event_rows, heartbeat_rows),
     }
     payload["operating"]["dirty"] = bool(dirty)
     payload["updated_at"] = _now()
@@ -1051,6 +1110,23 @@ def checkpoint_integrity_report(
         ),
     )
 
+    live_event_journal = (
+        raw.get("live_event_journal")
+        if isinstance(raw.get("live_event_journal"), Mapping)
+        else {}
+    )
+    journal_events = normalize_live_event_journal_events(
+        live_event_journal.get("events", [])
+    )
+    journal_heartbeats = normalize_live_event_heartbeats(
+        live_event_journal.get("heartbeats", [])
+    )
+    add_check(
+        "live_event_journal",
+        live_event_journal.get("digest"),
+        live_event_journal_digest(journal_events, journal_heartbeats),
+    )
+
     raw_areas = raw.get("areas") if isinstance(raw.get("areas"), Mapping) else {}
     if "subscriptions" not in raw_areas:
         migration_items.append("areas.subscriptions ausente")
@@ -1060,6 +1136,8 @@ def checkpoint_integrity_report(
         migration_items.append("continuity ausente")
     if "learning" not in raw:
         migration_items.append("learning ausente")
+    if "live_event_journal" not in raw:
+        migration_items.append("live_event_journal ausente")
 
     if mismatches:
         state = "MISMATCH"
