@@ -54,8 +54,14 @@ jobs:
           API_PATH="repos/${GITHUB_REPOSITORY}/contents/dados/aion/checkpoint_master.json"
           if gh api "$API_PATH?ref=atlasquant-runtime" >/tmp/runtime_meta.json 2>/dev/null; then
             gh api "$API_PATH?ref=atlasquant-runtime" --jq '.content'               | tr -d '\n' | base64 -d >/tmp/runtime_readback.json
-            python atlasquant_aion_runtime_bootstrap.py --verify /tmp/runtime_readback.json
-            echo "Checkpoint Mestre already exists and is integrity-confirmed; no overwrite performed."
+            # Existing runtime may be on the previous schema while the migration
+            # workflow is running in parallel. Validate that it is write-safe by
+            # simulating migration locally; do not overwrite it here.
+            python atlasquant_aion_runtime_migrate.py \
+              --input /tmp/runtime_readback.json \
+              --output /tmp/runtime_candidate.json
+            python atlasquant_aion_runtime_bootstrap.py --verify /tmp/runtime_candidate.json
+            echo "Checkpoint Mestre exists and is write-safe; migration workflow owns persistence."
           else
             CONTENT="$(base64 -w0 /tmp/checkpoint_master.json)"
             gh api --method PUT "$API_PATH"               -f message='AION: bootstrap Checkpoint Mestre V15'               -f content="$CONTENT"               -f branch='atlasquant-runtime' >/tmp/runtime_write.json
