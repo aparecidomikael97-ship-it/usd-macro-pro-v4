@@ -206,6 +206,30 @@ def build_provider_prompt(
     reliability_posture=redact_text(reliability.get("posture"))[:40] or "não confirmado"
     degraded_state=redact_text(degraded.get("state"))[:40] or "não confirmado"
     source_conflicts=int(reconciliation.get("conflict_count") or 0)
+    event_intelligence=(
+        system.get("event_intelligence")
+        if isinstance(system.get("event_intelligence"),Mapping)
+        else {}
+    )
+    top_event_alert=(
+        event_intelligence.get("top_alert")
+        if isinstance(event_intelligence.get("top_alert"),Mapping)
+        else {}
+    )
+    event_alert_state=redact_text(top_event_alert.get("state"))[:40] or "NONE"
+    event_id=redact_text(top_event_alert.get("event_id"))[:100]
+    event_rows=[
+        dict(x) for x in list(event_intelligence.get("events",[]) or [])
+        if isinstance(x,Mapping)
+    ]
+    event_row=next(
+        (x for x in event_rows if redact_text(x.get("event_id"))[:100]==event_id),
+        {},
+    )
+    event_headline=redact_text(event_row.get("headline"))[:500] or "não confirmado"
+    event_truth=redact_text(
+        event_row.get("event_truth") or top_event_alert.get("event_truth")
+    )[:40] or "UNKNOWN"
     prompt=f"""Você é o AION do AtlasQuant, assistente do administrador.
 
 REGRAS OBRIGATÓRIAS:
@@ -224,7 +248,12 @@ Ambiente informado pelo app: {environment}
 Reliability posture: {reliability_posture}
 Modo degradado: {degraded_state}
 Conflitos de fonte confirmados: {source_conflicts}
+Event Intelligence: {event_alert_state}
+Evento principal: {event_headline}
+Verdade do evento: {event_truth}
 
+Se houver evento, diferencie reportagem observada de fato confirmado. Classificação
+de categoria é inferência; impactos por ativo são hipóteses e nunca sinal/probabilidade de lucro.
 Se Reliability estiver DEGRADED/CRITICAL ou o modo estiver DEGRADED_SAFE/FAIL_CLOSED,
 não apresente a capacidade dependente como saudável. Se houver conflito de fonte,
 descreva o conflito e peça/recomende reconciliação; não escolha uma fonte escondido.
