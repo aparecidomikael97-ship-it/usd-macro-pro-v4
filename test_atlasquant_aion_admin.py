@@ -669,6 +669,15 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("_render_trading(market, system)",src)
         self.assertIn("_render_live_event_intelligence({}, system_context, allow_memory_sync=False)",src)
 
+    def test_cognitive_orchestrator_preview_is_visible_in_aion_question_flow(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("orchestrator_snapshot(",src)
+        self.assertIn("🧠 Conselho Cognitivo · especialistas + Critic",src)
+        self.assertIn("Especialistas selecionados",src)
+        self.assertIn("Critic",src)
+        self.assertIn("O AION não mostra raciocínio privado/chain-of-thought",src)
+        self.assertIn("Conselho usado:",src)
+
     def test_business_panel_labels_unconnected_sales_as_unconfirmed(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("não representam vendas confirmadas", src)
