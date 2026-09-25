@@ -280,6 +280,20 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn('"incident_center_has_critical"',src)
         self.assertIn('"incident_center_rollback_review"',src)
 
+    def test_laboratory_exposes_resilience_kernel_without_granting_external_ai_authority(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Authority Kernel · Agent Firewall · Resilience",src)
+        self.assertIn("agent_firewall(",src)
+        self.assertIn("watchdog(",src)
+        self.assertIn("resource_governor(",src)
+        self.assertIn("circuit_breaker(",src)
+        self.assertIn("safe_mode_posture(",src)
+        self.assertIn("IA externa tentando controlar tool",src)
+        self.assertIn("não recebe autoridade raiz",src)
+        self.assertIn("kill, delete, deploy",src)
+        self.assertIn('"resilience_safe_mode"',src)
+        self.assertIn('"resilience_open_circuits"',src)
+
     def test_laboratory_shows_incident_posture_without_enabling_features(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("Segurança / resposta a incidente",src)

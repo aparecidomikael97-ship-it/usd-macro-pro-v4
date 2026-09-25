@@ -189,6 +189,14 @@ from atlasquant_aion_fortress import (
     proof_of_safety,
     source_authority,
 )
+from atlasquant_aion_resilience import (
+    agent_firewall,
+    circuit_breaker,
+    resilience_summary,
+    resource_governor,
+    safe_mode_posture,
+    watchdog,
+)
 from atlasquant_aion_portable import (
     central_entry_contract,
     portable_core_summary,
@@ -3688,6 +3696,60 @@ def _render_laboratory(
         "Site, documento, e-mail, tool output ou outra IA não ganham autoridade para comandar ferramentas. "
         "A origem é uma barreira determinística fora do modelo; o Guardian continua sendo obrigatório."
     )
+
+    resilience_state = resilience_summary(
+        checkpoint.get("resilience")
+        if isinstance(checkpoint.get("resilience"), Mapping)
+        else {}
+    )
+    rr1,rr2,rr3,rr4 = st.columns(4)
+    rr1.metric("Safe Mode", str(resilience_state.get("safe_mode") or "UNKNOWN"))
+    rr2.metric("Delegações ativas", int(resilience_state.get("active_delegations") or 0))
+    rr3.metric("Circuitos abertos", int(resilience_state.get("open_circuits") or 0))
+    rr4.metric("Isolamento recomendado", int(resilience_state.get("isolate_recommendations") or 0))
+
+    external_worker_preview = agent_firewall(
+        source_kind="EXTERNAL_AI",
+        requested_capability="READ_CONTEXT",
+        workspace_id="development",
+        delegation={
+            "state":"ACTIVE",
+            "workspace_id":"development",
+            "granted_capabilities":["READ_CONTEXT"],
+        },
+    )
+    loop_preview = watchdog(
+        "preview-agent",
+        heartbeat_age_seconds=5,
+        repeated_action_count=5,
+        loop_limit=5,
+    )
+    budget_preview = resource_governor(
+        "preview-research",
+        call_limit=10,
+        calls_used=10,
+    )
+    circuit_preview = circuit_breaker(
+        "preview-provider",
+        consecutive_failures=3,
+    )
+    safe_preview = safe_mode_posture(
+        open_circuits=1 if circuit_preview.get("state")=="OPEN" else 0,
+        isolate_recommendations=1 if loop_preview.get("state")=="ISOLATE_RECOMMENDED" else 0,
+    )
+    with st.expander("Authority Kernel · Agent Firewall · Resilience", expanded=False):
+        st.caption(
+            f"IA externa tentando controlar tool: {external_worker_preview.get('state')} · "
+            f"watchdog de loop: {loop_preview.get('state')} · "
+            f"resource governor: {budget_preview.get('state')} · "
+            f"circuit breaker: {circuit_preview.get('state')} · "
+            f"safe mode resultante: {safe_preview.get('mode')}."
+        )
+        st.caption(
+            "Outra IA pode produzir conteúdo como worker delegado, mas não recebe autoridade raiz nem "
+            "controle direto de tools. Watchdog/circuit breaker são posturas determinísticas; "
+            "kill, delete, deploy, mudança de política e expansão de permissão continuam automação proibida."
+        )
     with st.expander("Ver bloqueios da prévia de segurança", expanded=False):
         blockers = list(safety_preview.get("blockers") or [])
         if blockers:
@@ -5663,6 +5725,20 @@ def render_aion_admin_console(
                     or []
                 )
             ).get("resumable") or 0
+        ),
+        "resilience_safe_mode": str(
+            resilience_summary(
+                checkpoint.get("resilience")
+                if isinstance(checkpoint.get("resilience"), Mapping)
+                else {}
+            ).get("safe_mode") or "UNKNOWN"
+        ),
+        "resilience_open_circuits": int(
+            resilience_summary(
+                checkpoint.get("resilience")
+                if isinstance(checkpoint.get("resilience"), Mapping)
+                else {}
+            ).get("open_circuits") or 0
         ),
         "portable_core_workspaces": int(
             portable_core_summary(

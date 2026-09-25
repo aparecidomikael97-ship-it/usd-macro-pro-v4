@@ -84,6 +84,11 @@ from atlasquant_aion_release_confidence import (
     normalize_release_confidence_records,
     release_confidence_digest,
 )
+from atlasquant_aion_resilience import (
+    default_resilience,
+    normalize_resilience,
+    resilience_digest,
+)
 from atlasquant_aion_event_journal import (
     normalize_events as normalize_live_event_journal_events,
     normalize_heartbeats as normalize_live_event_heartbeats,
@@ -380,7 +385,7 @@ def search_canonical_memory(
 def default_checkpoint() -> dict[str, Any]:
     return {
         "schema": SCHEMA,
-        "checkpoint_version": 13,
+        "checkpoint_version": 14,
         "created_at": _now(),
         "updated_at": _now(),
         "project": "AtlasQuant",
@@ -473,6 +478,7 @@ def default_checkpoint() -> dict[str, Any]:
             "records": [],
             "digest": release_confidence_digest([]),
         },
+        "resilience": default_resilience(),
         "live_event_journal": {
             "events": [],
             "heartbeats": [],
@@ -709,6 +715,12 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
         "digest": release_confidence_digest(confidence_rows),
     }
 
+    payload["resilience"] = normalize_resilience(
+        payload.get("resilience")
+        if isinstance(payload.get("resilience"), Mapping)
+        else {}
+    )
+
     live_event_journal = (
         payload.get("live_event_journal")
         if isinstance(payload.get("live_event_journal"), Mapping)
@@ -731,7 +743,7 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
         operating = {}
     tasks = normalize_queue(operating.get("tasks") if isinstance(operating, Mapping) else [])
     events = normalize_events(operating.get("events") if isinstance(operating, Mapping) else [])
-    payload["checkpoint_version"] = max(13, int(payload.get("checkpoint_version") or 1))
+    payload["checkpoint_version"] = max(14, int(payload.get("checkpoint_version") or 1))
     payload["operating"] = {
         "tasks": tasks,
         "events": events,
@@ -1095,6 +1107,20 @@ def update_release_confidence_checkpoint(
     return payload
 
 
+def update_resilience_checkpoint(
+    checkpoint: Mapping[str, Any] | None,
+    *,
+    resilience: Mapping[str, Any],
+    dirty: bool = True,
+) -> dict[str, Any]:
+    """Persist resilience evidence/state; never executes isolation or kill actions."""
+    payload = ensure_operating_checkpoint(checkpoint)
+    payload["resilience"] = normalize_resilience(resilience)
+    payload["operating"]["dirty"] = bool(dirty)
+    payload["updated_at"] = _now()
+    return payload
+
+
 def update_live_event_journal_checkpoint(
     checkpoint: Mapping[str, Any] | None,
     *,
@@ -1299,7 +1325,7 @@ def runtime_write_preflight(runtime_result: Mapping[str, Any] | None) -> dict[st
             "allowed": True,
             "mode": "UPDATE_MIGRATION" if migration else "UPDATE",
             "reason": (
-                "Runtime confirmado com SHA; migração estrutural V13 será aplicada na escrita condicional."
+                "Runtime confirmado com SHA; migração estrutural V14 será aplicada na escrita condicional."
                 if migration else
                 "Runtime confirmado com SHA e integridade compatível para escrita condicional."
             ),
@@ -1488,7 +1514,7 @@ def checkpoint_integrity_report(
 ) -> dict[str, Any]:
     """Verify persisted component digests before normalization mutates them.
 
-    Missing V13 structure is reported as MIGRATION_REQUIRED rather than corruption.
+    Missing V14 structure is reported as MIGRATION_REQUIRED rather than corruption.
     A present-but-wrong digest is a MISMATCH and should fail closed for writes.
     """
     if not isinstance(checkpoint, Mapping):
@@ -1720,6 +1746,18 @@ def checkpoint_integrity_report(
         release_confidence_digest(confidence_rows),
     )
 
+    resilience_raw = (
+        raw.get("resilience")
+        if isinstance(raw.get("resilience"), Mapping)
+        else {}
+    )
+    resilience_state = normalize_resilience(resilience_raw)
+    add_check(
+        "resilience",
+        resilience_raw.get("digest"),
+        resilience_state.get("digest"),
+    )
+
     live_event_journal = (
         raw.get("live_event_journal")
         if isinstance(raw.get("live_event_journal"), Mapping)
@@ -1740,8 +1778,8 @@ def checkpoint_integrity_report(
     raw_areas = raw.get("areas") if isinstance(raw.get("areas"), Mapping) else {}
     if "subscriptions" not in raw_areas:
         migration_items.append("areas.subscriptions ausente")
-    if version < 13:
-        migration_items.append(f"checkpoint_version {version} < 13")
+    if version < 14:
+        migration_items.append(f"checkpoint_version {version} < 14")
     if "continuity" not in raw:
         migration_items.append("continuity ausente")
     if "learning" not in raw:
@@ -1766,6 +1804,8 @@ def checkpoint_integrity_report(
         migration_items.append("dev_fusion ausente")
     if "release_confidence" not in raw:
         migration_items.append("release_confidence ausente")
+    if "resilience" not in raw:
+        migration_items.append("resilience ausente")
     if "live_event_journal" not in raw:
         migration_items.append("live_event_journal ausente")
 
