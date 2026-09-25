@@ -638,6 +638,28 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn('"source_mesh_observations"',src)
         self.assertIn('"source_mesh_fallbacks"',src)
 
+    def test_event_intelligence_is_visible_in_central_and_trading_without_external_push(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("🌐 AION Event Intelligence",src)
+        self.assertIn("govern_event_alerts(",src)
+        self.assertIn("_render_event_intelligence(checkpoint, system_context, allow_memory_sync=True)",src)
+        self.assertIn("_render_event_intelligence({}, system_context, allow_memory_sync=False)",src)
+        self.assertIn("Hipóteses de impacto do evento",src)
+        self.assertIn("Todos os impactos acima são HIPÓTESES",src)
+        self.assertIn("push externo: NÃO CONECTADO",src)
+        self.assertIn("Notificação externa automática: DESLIGADA",src)
+        self.assertIn('"event_intelligence_external_notifications": False',src)
+
+    def test_event_intelligence_memory_sync_is_explicit_and_checkpoint_guarded(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Registrar Event Intelligence no Checkpoint Mestre",src)
+        self.assertIn("update_event_intelligence_checkpoint(",src)
+        self.assertIn("merge_event_journal(",src)
+        self.assertIn("merge_alert_journal(",src)
+        self.assertIn("event_intelligence_synced",src)
+        self.assertIn("_set_working_checkpoint(updated, dirty=True)",src)
+        self.assertIn("Salve o Checkpoint Mestre para persistir a alteração",src)
+
     def test_business_panel_labels_unconnected_sales_as_unconfirmed(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("não representam vendas confirmadas", src)
