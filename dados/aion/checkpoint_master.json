@@ -137,7 +137,7 @@
     "digest": "4f53cda18c2baa0c",
     "products": []
   },
-  "checkpoint_version": 14,
+  "checkpoint_version": 15,
   "continuity": {
     "digest": "f652dfa4d8649b5f",
     "handoffs": [],
@@ -311,6 +311,28 @@
     "digest": "3248f2575d5d13e620bb558a",
     "events": [],
     "heartbeats": []
+  },
+  "memory_reliability": {
+    "action_authorized": false,
+    "decision_snapshots": [],
+    "digest": "299dd543d371a644292e30dc",
+    "policy": {
+      "automatic_rule_change": false,
+      "confirmed_requires_content_digest": true,
+      "confirmed_requires_provenance": true,
+      "contradiction_fails_closed": true,
+      "expired_confirmed_downgrades_to": "INFERENCE",
+      "historical_memory_never_confirms_live_market": true,
+      "memory_never_authorizes_action": true,
+      "memory_never_expands_permissions": true,
+      "real_trading_enabled": false,
+      "schema": "ATLASQUANT_AION_MEMORY_RELIABILITY_V1",
+      "sensitive_action_requires_current_confirmed": true,
+      "superseded_memory_blocked": true
+    },
+    "real_trading_enabled": false,
+    "reviews": [],
+    "schema": "ATLASQUANT_AION_MEMORY_RELIABILITY_V1"
   },
   "operating": {
     "dirty": false,
