@@ -47,6 +47,9 @@ from atlasquant_aion_memory import (
     update_wisdom_checkpoint,
     update_tool_hub_checkpoint,
     update_durable_tasks_checkpoint,
+    update_knowledge_graph_checkpoint,
+    synchronize_knowledge_graph_checkpoint,
+    update_evaluation_lab_checkpoint,
     update_live_event_journal_checkpoint,
     update_operating_checkpoint,
     update_promotions_checkpoint,
@@ -197,6 +200,16 @@ from atlasquant_aion_durable_tasks import (
     prepare_resume,
     record_resume,
     upsert_durable_task,
+)
+from atlasquant_aion_knowledge_graph import (
+    graph_neighborhood,
+    knowledge_graph_summary,
+)
+from atlasquant_aion_evaluation_lab import (
+    evaluate_run,
+    evaluation_lab_summary,
+    new_eval_run,
+    upsert_run,
 )
 from atlasquant_aion_cognitive_orchestrator import orchestrator_snapshot
 from atlasquant_aion_event_journal import (
@@ -2895,6 +2908,208 @@ def _render_laboratory(
     wisdom_entries = list(wisdom.get("entries", []) or [])
     wisdom_state = wisdom_summary(wisdom_entries)
 
+    graph = checkpoint.get("knowledge_graph") if isinstance(checkpoint.get("knowledge_graph"), Mapping) else {}
+    graph_state = knowledge_graph_summary(graph)
+    eval_lab = checkpoint.get("evaluation_lab") if isinstance(checkpoint.get("evaluation_lab"), Mapping) else {}
+    eval_state = evaluation_lab_summary(eval_lab)
+
+    st.markdown("#### 🕸️ Knowledge Graph + Evaluation Lab")
+    st.caption(
+        "O grafo organiza relações explícitas entre lições, episódios, evidências e versões. "
+        "O Evaluation Lab exige evidência e não-regressão antes de uma versão sequer virar candidata à revisão humana."
+    )
+    kg1,kg2,kg3,kg4 = st.columns(4)
+    kg1.metric("Nós de conhecimento", int(graph_state.get("nodes") or 0))
+    kg2.metric("Relações", int(graph_state.get("edges") or 0))
+    kg3.metric("Suites de avaliação", int(eval_state.get("suites") or 0))
+    kg4.metric("Candidatos à revisão", int(eval_state.get("human_review_candidates") or 0))
+
+    if st.button(
+        "Sincronizar Knowledge Graph com memória registrada",
+        key="aion_graph_sync",
+        width="stretch",
+    ):
+        updated=synchronize_knowledge_graph_checkpoint(checkpoint,dirty=True)
+        updated=_record_working_event(
+            updated,
+            "knowledge_graph_synchronized",
+            "Knowledge Graph sincronizado a partir de relações explícitas do Checkpoint.",
+            evidence={
+                "semantic_inference_automatic":False,
+                "causality_inferred_automatically":False,
+            },
+        )
+        _set_working_checkpoint(updated,dirty=True)
+        st.success("Grafo sincronizado na memória de trabalho; nenhuma relação sem fonte explícita foi criada.")
+        st.rerun()
+
+    with st.expander("Consultar Knowledge Graph", expanded=False):
+        graph_query=st.text_input(
+            "Buscar nó/relação",
+            key="aion_graph_query",
+            placeholder="Ex.: Payroll, Guardian, Liquidity",
+        )
+        if graph_query.strip():
+            neighborhood=graph_neighborhood(graph,graph_query,limit=25)
+            st.caption(
+                f"Nós encontrados: {int(neighborhood.get('matched_nodes') or 0)} · "
+                "consulta somente leitura."
+            )
+            if neighborhood.get("nodes"):
+                st.dataframe([
+                    {
+                        "Tipo":item.get("node_type"),
+                        "Nó":item.get("label"),
+                        "Verdade":item.get("truth_state"),
+                        "Domínio":item.get("domain"),
+                        "ID":item.get("node_id"),
+                    }
+                    for item in neighborhood.get("nodes",[])
+                    if isinstance(item,Mapping)
+                ],width="stretch",hide_index=True)
+            if neighborhood.get("edges"):
+                st.dataframe([
+                    {
+                        "Origem":item.get("source_id"),
+                        "Relação":item.get("relation"),
+                        "Destino":item.get("target_id"),
+                        "Verdade":item.get("truth_state"),
+                    }
+                    for item in neighborhood.get("edges",[])
+                    if isinstance(item,Mapping)
+                ],width="stretch",hide_index=True)
+
+    suites=[
+        dict(item) for item in list(eval_lab.get("suites",[]) or [])
+        if isinstance(item,Mapping)
+    ]
+    eval_runs=[
+        dict(item) for item in list(eval_lab.get("runs",[]) or [])
+        if isinstance(item,Mapping)
+    ]
+    with st.expander("Evaluation Lab · não-regressão", expanded=False):
+        st.caption(
+            "Uma nova versão não é considerada melhor por opinião. Sem casos, métricas e evidências, "
+            "o estado permanece NEED_MORE_EVIDENCE. Promoção automática: NÃO."
+        )
+        if suites:
+            suite_map={
+                f"{item.get('name')} · {item.get('suite_id')}":item
+                for item in suites
+            }
+            suite_label=st.selectbox(
+                "Suite",
+                list(suite_map.keys()),
+                key="aion_eval_suite_selected",
+            )
+            selected_suite=suite_map[suite_label]
+            st.dataframe([
+                {
+                    "Caso":case.get("title"),
+                    "Categoria":case.get("category"),
+                    "Criticidade":case.get("criticality"),
+                    "ID":case.get("case_id"),
+                }
+                for case in list(selected_suite.get("cases",[]) or [])
+                if isinstance(case,Mapping)
+            ],width="stretch",hide_index=True)
+
+            with st.form("aion_eval_new_run",clear_on_submit=True):
+                baseline_version=st.text_input("Versão atual / baseline",value="AION-CURRENT")
+                candidate_version=st.text_input("Versão candidata",placeholder="Ex.: AION-VNEXT")
+                create_eval_run=st.form_submit_button("Registrar avaliação planejada")
+            if create_eval_run:
+                try:
+                    run=new_eval_run(
+                        selected_suite,
+                        baseline_version=baseline_version,
+                        candidate_version=candidate_version,
+                        case_results=[],
+                        baseline_metrics={},
+                        candidate_metrics={},
+                        evidence_refs=[],
+                    )
+                    eval_runs=upsert_run(eval_runs,run)
+                    lab_updated=dict(eval_lab)
+                    lab_updated["runs"]=eval_runs
+                    updated=update_evaluation_lab_checkpoint(
+                        checkpoint,evaluation_lab=lab_updated,dirty=True,
+                    )
+                    updated=_record_working_event(
+                        updated,
+                        "evaluation_run_registered",
+                        f"Avaliação planejada registrada: {run['run_id']}",
+                        evidence={
+                            "run_id":run["run_id"],
+                            "baseline":run["baseline_version"],
+                            "candidate":run["candidate_version"],
+                            "automatic_promotion":False,
+                        },
+                    )
+                    _set_working_checkpoint(updated,dirty=True)
+                    st.success("Avaliação planejada registrada; ainda sem evidência suficiente.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Não foi possível registrar a avaliação: {type(exc).__name__}")
+
+        if eval_runs:
+            st.dataframe([
+                {
+                    "Run":item.get("run_id"),
+                    "Baseline":item.get("baseline_version"),
+                    "Candidato":item.get("candidate_version"),
+                    "Estado":item.get("state"),
+                    "Revisão humana":"SIM" if item.get("requires_human_review",True) else "NÃO",
+                }
+                for item in reversed(eval_runs[-80:])
+            ],width="stretch",hide_index=True)
+            run_map={
+                f"{item.get('run_id')} · {item.get('candidate_version')}":item
+                for item in eval_runs
+            }
+            selected_run_label=st.selectbox(
+                "Avaliação para reprocessar evidências já registradas",
+                list(run_map.keys()),
+                key="aion_eval_run_selected",
+            )
+            selected_run=run_map[selected_run_label]
+            suite_for_run=next(
+                (item for item in suites if str(item.get("suite_id") or "")==str(selected_run.get("suite_id") or "")),
+                None,
+            )
+            if isinstance(suite_for_run,Mapping) and st.button(
+                "Avaliar evidências registradas",
+                key="aion_eval_run_evaluate",
+                width="stretch",
+            ):
+                try:
+                    evaluated=evaluate_run(suite_for_run,selected_run)
+                    eval_runs=upsert_run(eval_runs,evaluated)
+                    lab_updated=dict(eval_lab)
+                    lab_updated["runs"]=eval_runs
+                    updated=update_evaluation_lab_checkpoint(
+                        checkpoint,evaluation_lab=lab_updated,dirty=True,
+                    )
+                    updated=_record_working_event(
+                        updated,
+                        "evaluation_run_evaluated",
+                        f"Evaluation Lab processou: {evaluated['run_id']}",
+                        evidence={
+                            "run_id":evaluated["run_id"],
+                            "state":evaluated["state"],
+                            "automatic_promotion":False,
+                            "production_change_allowed":False,
+                        },
+                    )
+                    _set_working_checkpoint(updated,dirty=True)
+                    st.success(
+                        f"Evaluation Lab: {evaluated['state']}. "
+                        "Nenhuma promoção ou deploy foi executado."
+                    )
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"A avaliação não pôde ser processada: {type(exc).__name__}")
+
     st.markdown("#### 🧠 Aprendizado Controlado AION")
     st.caption(
         "Ciclo: registrar previsão → observar resultado → medir erro/acerto → revisar causa → "
@@ -5109,6 +5324,20 @@ def render_aion_admin_console(
         ),
         "checkpoint_dirty": bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
         "checkpoint_conflict": bool(st.session_state.get(_WORKING_CONFLICT_KEY, False)),
+        "knowledge_graph_nodes": int(
+            knowledge_graph_summary(
+                checkpoint.get("knowledge_graph")
+                if isinstance(checkpoint.get("knowledge_graph"), Mapping)
+                else {}
+            ).get("nodes") or 0
+        ),
+        "evaluation_lab_candidates": int(
+            evaluation_lab_summary(
+                checkpoint.get("evaluation_lab")
+                if isinstance(checkpoint.get("evaluation_lab"), Mapping)
+                else {}
+            ).get("human_review_candidates") or 0
+        ),
         "tool_hub_tools": int(
             tool_hub_summary(
                 checkpoint.get("tool_hub")
