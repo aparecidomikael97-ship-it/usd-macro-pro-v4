@@ -50,6 +50,12 @@ from atlasquant_interface_validation import interface_validation_mission
 from atlasquant_publication_truth import publication_truth
 from atlasquant_release_gate import release_gate
 from atlasquant_aion_source_mesh import source_mesh_snapshot
+from atlasquant_aion_event_intelligence import (
+    build_event_intelligence,
+    event_intelligence_summary,
+    merge_alert_journal,
+    merge_event_journal,
+)
 import re
 
 # V10 — camada observacional profissional. O try/except evita derrubar
@@ -9954,6 +9960,18 @@ def _build_aion_source_runtime_context():
         news_source = "news runtime unavailable: " + type(news_exc).__name__
 
     try:
+        event_runtime, event_runtime_source = _github_get_json_v937(
+            "dados/aion_event_intelligence_v1.json",
+            {},
+        )
+    except Exception as event_runtime_exc:
+        event_runtime = {}
+        event_runtime_source = (
+            "event intelligence runtime unavailable: "
+            + type(event_runtime_exc).__name__
+        )
+
+    try:
         next_event = _proximo_evento_macro_v65()
     except Exception:
         next_event = {"disponivel": False}
@@ -10002,7 +10020,44 @@ def _build_aion_source_runtime_context():
         "source_mesh_state": market_state,
         "source_observations": int(mesh.get("observation_count") or 0),
     }
-    return mesh, market_context
+
+    event_current = build_event_intelligence(
+        news_payload=news_payload if isinstance(news_payload, dict) else {},
+        news_provenance=news_source,
+        next_event=next_event if isinstance(next_event, dict) else {},
+        reliability=None,
+        max_age_hours=24.0,
+    )
+    event_history = merge_event_journal(
+        (event_runtime or {}).get("events", [])
+        if isinstance(event_runtime, dict)
+        else [],
+        event_current.get("events", []),
+        observed_at=event_current.get("generated_at"),
+    )
+    alert_history = merge_alert_journal(
+        (event_runtime or {}).get("alerts", [])
+        if isinstance(event_runtime, dict)
+        else [],
+        event_current.get("alerts", []),
+        observed_at=event_current.get("generated_at"),
+    )
+    event_current["journal_events"] = event_history
+    event_current["journal_alerts"] = alert_history
+    event_current["journal_summary"] = event_intelligence_summary(
+        event_history,
+        alert_history,
+    )
+    event_current["background_updated_at"] = (
+        str((event_runtime or {}).get("updated_at") or "")
+        if isinstance(event_runtime, dict)
+        else ""
+    )
+    event_current["background_provenance"] = event_runtime_source
+    event_current["background_persisted"] = str(
+        event_runtime_source or ""
+    ).startswith("GitHub:")
+    return mesh, market_context, event_current
 
 
 if _aq_active_index == 21:
@@ -10013,7 +10068,11 @@ if _aq_active_index == 21:
         if _ATLASQUANT_AION_IMPORT_ERROR:
             st.caption("Diagnóstico AION: "+_ATLASQUANT_AION_IMPORT_ERROR)
     else:
-        _aion_source_mesh, _aion_market_context = _build_aion_source_runtime_context()
+        (
+            _aion_source_mesh,
+            _aion_market_context,
+            _aion_event_intelligence,
+        ) = _build_aion_source_runtime_context()
         _aion_critical_surfaces = surface_health_snapshot(
             st.session_state,
             current_build=_ATLASQUANT_SOURCE_BUILD,
@@ -10043,6 +10102,7 @@ if _aq_active_index == 21:
             "market_status": _aion_market_context["summary"],
             "source_mesh": _aion_source_mesh,
             "source_observations": list(_aion_source_mesh.get("observations", []) or []),
+            "event_intelligence": _aion_event_intelligence,
             "critical_surfaces": _aion_critical_surfaces,
             "interface_validation": _aion_interface_validation,
             "publication_truth": _aion_publication_truth,
