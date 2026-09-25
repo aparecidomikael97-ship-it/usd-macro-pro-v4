@@ -15,6 +15,7 @@ from atlasquant_aion_provider import provider_configuration_status
 from atlasquant_aion_intelligence import evidence_audit, evidence_confidence
 from atlasquant_aion_cognitive_orchestrator import orchestrator_snapshot
 from atlasquant_aion_memory_reliability import assess_canonical_memory_hits
+from atlasquant_aion_data_decision_fabric import data_decision_fabric_summary, derive_checkpoint_fabric_events
 
 SCHEMA = "ATLASQUANT_AION_GATEWAY_V1"
 
@@ -107,6 +108,9 @@ def local_answer(
     system = dict(system_context or {})
     provider = provider_status(feature_flags=feature_flags)
     cp = dict(checkpoint or {})
+    fabric_raw = cp.get("data_decision_fabric") if isinstance(cp.get("data_decision_fabric"), Mapping) else {}
+    fabric_derived = derive_checkpoint_fabric_events(cp)
+    fabric = data_decision_fabric_summary(fabric_raw, derived_events=fabric_derived)
     continuity = cp.get("continuity") if isinstance(cp.get("continuity"), Mapping) else {}
     operating = cp.get("operating") if isinstance(cp.get("operating"), Mapping) else {}
     continuity_view = continuity_briefing(
@@ -277,6 +281,10 @@ def local_answer(
         answer += " Antes de uma conclusão forte, falta resolver: " + str(research_blockers[0])
     if hits:
         answer += f" Encontrei {len(hits)} referência(s) na memória auditável para apoiar a resposta."
+    if int(fabric.get("conflicts") or 0)>0:
+        answer += f" A Data & Decision Fabric registra {int(fabric.get('conflicts') or 0)} conflito(s) de evidência; nenhuma versão é escolhida silenciosamente."
+    if int(fabric.get("human_review_candidates") or 0)>0:
+        answer += f" Existem {int(fabric.get('human_review_candidates') or 0)} decisão(ões) aguardando revisão humana; isso não autoriza execução."
     if provider["state"] == "ZERO_COST_LOCAL":
         answer += " O modo atual é local e custo zero; um modelo externo mais potente ainda não foi ativado."
 
@@ -324,6 +332,9 @@ def local_answer(
         "evidence_confidence": response_confidence,
         "epistemic_core": epistemic,
         "epistemic_state": str(epistemic.get("state") or "UNKNOWN"),
+        "data_decision_fabric": fabric,
+        "fabric_conflicts": int(fabric.get("conflicts") or 0),
+        "fabric_human_review_candidates": int(fabric.get("human_review_candidates") or 0),
         "memory_action_authorized": False,
         "truth_state": "CONFIRMED_LOCAL_CONTRACT",
         "confidence_basis": "EVIDENCE_QUALITY_NOT_PROFIT_PROBABILITY",
