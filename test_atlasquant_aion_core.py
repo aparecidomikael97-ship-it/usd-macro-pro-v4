@@ -6,6 +6,7 @@ from atlasquant_aion_core import (
     cost_guard,
     feature_flag_snapshot,
     guardian_decision,
+    guardian_posture,
     mission_plan,
     route_context,
     truth_record,
@@ -21,6 +22,7 @@ class AtlasQuantAionCoreTests(unittest.TestCase):
             "qual nossa agenda e pendências": "secretary",
             "corrija a interface e abra um pull request": "development",
             "crie um cupom de 7 dias grátis": "promotions",
+            "como está minha assinatura e entitlement": "subscriptions",
             "como está o radar forex": "trading",
         }
         for text, expected in cases.items():
@@ -110,6 +112,27 @@ class AtlasQuantAionCoreTests(unittest.TestCase):
         self.assertTrue(result["allowed"])
         self.assertEqual(result["risk"], "FINANCIAL")
         self.assertEqual(result["feature_flag"], "entitlement_activation")
+
+    def test_guardian_posture_never_grants_sensitive_actions_by_visualization(self):
+        admin={"role":"ADMIN"}
+        posture=guardian_posture(
+            admin,
+            feature_flags={
+                "social_publish":True,
+                "marketplace_publish":True,
+                "payment_provider":True,
+                "production_deploy":True,
+                "auto_merge":True,
+                "entitlement_activation":True,
+                "promotion_activation":True,
+                "real_broker_execution":True,
+            },
+        )
+        self.assertFalse(posture["executes_action"])
+        self.assertFalse(posture["real_trading_enabled"])
+        self.assertEqual(posture["allowed_now"],0)
+        self.assertEqual(posture["blocked_now"],len(posture["actions"]))
+        self.assertTrue(all(not row["allowed_now"] for row in posture["actions"]))
 
     def test_mission_plan_is_non_executing_and_checkpoint_oriented(self):
         plan = mission_plan("corrigir interface do administrador")
