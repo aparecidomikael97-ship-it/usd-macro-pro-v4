@@ -294,6 +294,15 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn('"resilience_safe_mode"',src)
         self.assertIn('"resilience_open_circuits"',src)
 
+    def test_laboratory_exposes_memory_reliability_without_granting_authority(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Confiabilidade da memória · Epistemic Core",src)
+        self.assertIn("memory_reliability_summary(",src)
+        self.assertIn("Memórias confirmadas",src)
+        self.assertIn("Reverificar",src)
+        self.assertIn("Decision snapshots/replay",src)
+        self.assertIn("memória nunca autoriza ação",src)
+
     def test_laboratory_shows_incident_posture_without_enabling_features(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("Segurança / resposta a incidente",src)
