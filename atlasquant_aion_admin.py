@@ -160,6 +160,7 @@ from atlasquant_aion_executive_pulse import (
     executive_pulse,
 )
 from atlasquant_navigation_bridge import request_surface_revalidation
+from atlasquant_interface_validation import interface_validation_mission
 
 try:
     from atlasquant_neural_voice_ui import render_neural_voice_player
@@ -246,7 +247,7 @@ AION_ADMIN_CSS = r"""
 .aion-pulse-badge.review{color:#cde7ff;background:rgba(45,87,133,.33)}
 .aion-pulse-badge.controlled{color:#bff8e9;background:rgba(32,111,94,.3)}
 .aion-pulse-badge.unknown{color:#e6eaf0;background:rgba(83,92,108,.32)}
-.aion-pulse-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:12px}
+.aion-pulse-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-top:12px}
 .aion-pulse-stat{border:1px solid rgba(137,187,225,.18);border-radius:12px;padding:9px 10px;background:rgba(13,34,58,.72);min-width:0}
 .aion-pulse-stat small{display:block;color:#c3d5e9;font-size:.63rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase}
 .aion-pulse-stat strong{display:block;color:#fff;font-size:.86rem;margin-top:3px;overflow-wrap:anywhere}
@@ -1007,6 +1008,7 @@ def _render_executive_pulse(snapshot: Mapping[str, Any]) -> None:
     <div class="aion-pulse-stat"><small>Aprovações</small><strong>{int(snapshot.get("approval_count") or 0)}</strong></div>
     <div class="aion-pulse-stat"><small>Incidentes</small><strong>{int(snapshot.get("incident_count") or 0)}</strong></div>
     <div class="aion-pulse-stat"><small>Missões ativas</small><strong>{int(snapshot.get("active_missions") or 0)}</strong></div>
+    <div class="aion-pulse-stat"><small>Telas do build</small><strong>{int(snapshot.get("interface_validation_confirmed") or 0)}/{int(snapshot.get("interface_validation_total") or 3)}</strong></div>
   </div>
 </div>
         """,
@@ -1112,6 +1114,7 @@ def _render_critical_surface_health(system_context: Mapping[str, Any] | None) ->
         if isinstance(system.get("critical_surfaces"), Mapping)
         else {}
     )
+    mission = interface_validation_mission(snapshot)
     counts = snapshot.get("counts") if isinstance(snapshot.get("counts"), Mapping) else {}
     c1,c2,c3,c4 = st.columns(4)
     c1.metric("OK", int(counts.get("OK") or 0))
@@ -1121,6 +1124,24 @@ def _render_critical_surface_health(system_context: Mapping[str, Any] | None) ->
     )
     c3.metric("Build antigo", int(counts.get("STALE_BUILD") or 0))
     c4.metric("Não observadas", int(counts.get("UNKNOWN") or 0))
+
+    st.caption(
+        f"Missão de validação deste build: {int(mission.get('confirmed') or 0)}/"
+        f"{int(mission.get('total') or 3)} telas confirmadas · "
+        f"estado {str(mission.get('state') or 'UNKNOWN')}."
+    )
+    st.progress(
+        min(1.0, max(0.0, float(mission.get("progress_pct") or 0.0) / 100.0)),
+        text=(
+            "Validação da interface no build atual · "
+            f"{float(mission.get('progress_pct') or 0.0):.1f}%"
+        ),
+    )
+    if mission.get("next_label") and not mission.get("all_confirmed_current_build"):
+        st.info(
+            f"Próxima tela da missão: **{mission.get('next_label')}** — "
+            f"{mission.get('next_action') or 'revalidar no build atual.'}"
+        )
 
     rows = _critical_surface_rows(system)
     if rows:
@@ -3164,6 +3185,11 @@ def render_aion_admin_console(
         list(continuity_section.get("missions", []) or []),
         list(continuity_section.get("handoffs", []) or []),
     )
+    interface_validation_state = interface_validation_mission(
+        system.get("critical_surfaces")
+        if isinstance(system.get("critical_surfaces"), Mapping)
+        else {}
+    )
     try:
         executive_snapshot = executive_pulse(
             runtime_result=runtime_result,
@@ -3171,6 +3197,7 @@ def render_aion_admin_console(
             incident_snapshot=incident_snapshot,
             status_board=status_board,
             continuity_summary=continuity_state,
+            interface_validation=interface_validation_state,
             checkpoint_dirty=bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
             checkpoint_conflict=bool(st.session_state.get(_WORKING_CONFLICT_KEY, False)),
             foundation_diagnostics=foundation_diagnostics,
@@ -3199,6 +3226,11 @@ def render_aion_admin_console(
             "checkpoint_dirty":bool(st.session_state.get(_WORKING_DIRTY_KEY, False)),
             "checkpoint_conflict":bool(st.session_state.get(_WORKING_CONFLICT_KEY, False)),
             "degraded_components":len(foundation_diagnostics),
+            "interface_validation_state":str(interface_validation_state.get("state") or "UNKNOWN"),
+            "interface_validation_confirmed":int(interface_validation_state.get("confirmed") or 0),
+            "interface_validation_total":int(interface_validation_state.get("total") or 3),
+            "interface_validation_remaining":int(interface_validation_state.get("remaining") or 3),
+            "interface_validation_complete":bool(interface_validation_state.get("all_confirmed_current_build",False)),
             "recommended_workspace":"🛠️ Desenvolvimento",
             "executes_action":False,
             "real_orders_enabled":False,
@@ -3360,6 +3392,13 @@ def render_aion_admin_console(
         "guided_revalidation_state": str(
             ((system.get("guided_revalidation") or {}) if isinstance(system.get("guided_revalidation"), Mapping) else {}).get("state")
             or "NONE"
+        ),
+        "interface_validation_state": str(interface_validation_state.get("state") or "UNKNOWN"),
+        "interface_validation_confirmed": int(interface_validation_state.get("confirmed") or 0),
+        "interface_validation_total": int(interface_validation_state.get("total") or 3),
+        "interface_validation_remaining": int(interface_validation_state.get("remaining") or 3),
+        "interface_validation_complete": bool(
+            interface_validation_state.get("all_confirmed_current_build", False)
         ),
         "real_orders_enabled": False,
     }
