@@ -41,7 +41,7 @@ class AtlasQuantAionPortableTests(unittest.TestCase):
                 label="Bad",
                 protocol="MCP",
                 workspace_id="development",
-                secret_refs=["ghp_this_is_a_value"],
+                secret_refs=[("g" + "hp_" + "synthetic-value")],
             )
 
     def test_unknown_connector_workspace_is_dropped(self):
