@@ -213,6 +213,14 @@ def local_answer(
     reliability_posture = str(reliability.get("posture") or "").upper()
     degraded_state = str(degraded.get("state") or "").upper()
     source_conflicts = int(reconciliation.get("conflict_count") or 0)
+    live_events = (
+        system.get("live_event_intelligence")
+        if isinstance(system.get("live_event_intelligence"), Mapping)
+        else {}
+    )
+    live_event_state = str(live_events.get("state") or "").upper()
+    live_event_alerts = int(live_events.get("alert_count") or 0)
+    live_event_urgent = int(live_events.get("urgent_review_count") or 0)
     if source_conflicts:
         answer += (
             f" Reliability Guardian registra {source_conflicts} conflito(s) de fonte; "
@@ -227,6 +235,25 @@ def local_answer(
         answer += (
             " O AION está em modo degradado seguro nesta execução; estados ausentes ou frágeis "
             "continuam não confirmados."
+        )
+
+    if live_event_urgent > 0 and live_event_state == "WATCHING":
+        top_alerts = [
+            x for x in list(live_events.get("top_alerts", []) or [])
+            if isinstance(x, Mapping)
+        ]
+        top = top_alerts[0] if top_alerts else {}
+        headline = str(top.get("headline") or "evento sem título")[:220]
+        truth = str(top.get("truth_state") or "UNKNOWN")
+        answer += (
+            f" Live Event Intelligence registra {live_event_urgent} evento(s) urgente(s) para revisão. "
+            f"Topo: {headline} [verdade: {truth}]. "
+            "O impacto de mercado associado permanece hipótese, não sinal de trade."
+        )
+    elif live_event_alerts > 0:
+        answer += (
+            f" Live Event Intelligence mantém {live_event_alerts} evento(s) em observação; "
+            "nenhuma notificação externa ou ação de mercado é automática."
         )
 
     if hits:
@@ -276,6 +303,9 @@ def local_answer(
         "reliability_posture": reliability_posture or "UNKNOWN",
         "degraded_mode_state": degraded_state or "UNKNOWN",
         "source_conflicts": source_conflicts,
+        "live_event_state": live_event_state or "UNKNOWN",
+        "live_event_alerts": live_event_alerts,
+        "live_event_urgent_review": live_event_urgent,
         "executes_action": False,
         "real_orders_enabled": False,
     }
