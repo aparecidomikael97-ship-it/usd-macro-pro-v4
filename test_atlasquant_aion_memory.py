@@ -285,6 +285,50 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertEqual(cp["durable_tasks"]["records"][0]["durable_task_id"],"DUR-TEST")
         self.assertEqual(checkpoint_integrity_report(cp)["state"],"CONFIRMED")
 
+    def test_learning_and_wisdom_writes_refresh_explicit_graph_links(self):
+        cp=default_checkpoint()
+        episode={
+            "episode_id":"LEARN-GRAPH-1",
+            "subject":"Payroll surprise",
+            "state":"SETTLED",
+            "domain":"trading",
+            "forecast_type":"CATEGORICAL",
+            "prediction":"USD_UP",
+            "forecast_confidence_pct":70,
+            "model_version":"AION",
+            "evidence_refs":["calendar:payroll-1"],
+            "created_at":"2026-09-25T12:00:00+00:00",
+            "actual_outcome":"USD_UP",
+            "evaluation":"MATCH",
+            "correct":True,
+            "error_cause":"UNKNOWN",
+            "error_cause_truth":"UNKNOWN",
+        }
+        cp=update_learning_checkpoint(cp,episodes=[episode],dirty=True)
+        self.assertTrue(any(
+            x["node_id"]=="episode:learn-graph-1"
+            for x in cp["knowledge_graph"]["nodes"]
+        ))
+
+        wisdom_entry={
+            "wisdom_id":"WIS-GRAPH-1",
+            "state":"ACTIVE",
+            "topic":"Payroll reaction",
+            "domain":"trading",
+            "insight":"Resultado registrado com evidência.",
+            "truth_state":"CONFIRMED",
+            "confidence_pct":80,
+            "evidence_refs":["calendar:payroll-1"],
+            "applies_to":["USD"],
+            "source_episode_ids":["LEARN-GRAPH-1"],
+            "created_at":"2026-09-25T12:30:00+00:00",
+            "created_by":"ADMIN",
+        }
+        cp=update_wisdom_checkpoint(cp,entries=[wisdom_entry],dirty=True)
+        relations={x["relation"] for x in cp["knowledge_graph"]["edges"]}
+        self.assertIn("DERIVED_FROM",relations)
+        self.assertIn("SUPPORTED_BY",relations)
+
     def test_checkpoint_v12_graph_and_eval_lab_roundtrip(self):
         cp=default_checkpoint()
         graph={
