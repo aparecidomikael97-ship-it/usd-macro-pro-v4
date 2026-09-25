@@ -87,6 +87,25 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn('"checkpoint_integrity_state"',src)
         self.assertIn('"guardian_blocked_now"',src)
 
+    def test_central_exposes_read_only_security_incident_center(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Centro de Segurança & Incidentes",src)
+        self.assertIn("collect_incidents(",src)
+        self.assertIn("incident_center_rows(snapshot)",src)
+        self.assertIn("incident_response_plan(selected)",src)
+        self.assertIn("Rollback",src)
+        self.assertIn("Isso não dispara rollback automaticamente.",src)
+        self.assertIn("rotação automática de segredo: NÃO",src)
+        self.assertIn('"incident_center_total"',src)
+        self.assertIn('"incident_center_has_critical"',src)
+        self.assertIn('"incident_center_rollback_review"',src)
+
+    def test_laboratory_shows_incident_posture_without_enabling_features(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Segurança / resposta a incidente",src)
+        self.assertIn("rollback automático: NÃO",src)
+        self.assertIn("nenhuma feature externa é ativada como tentativa de diagnóstico",src)
+
     def test_admin_console_requires_admin_and_keeps_external_actions_guarded(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("if not is_admin(access_map):", src)
