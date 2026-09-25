@@ -95,6 +95,29 @@ class AtlasQuantAionProviderTests(unittest.TestCase):
         self.assertIn("Conflitos de fonte confirmados: 3",prompt)
         self.assertIn("não escolha uma fonte escondido",prompt)
 
+    def test_prompt_carries_live_event_truth_and_hypothesis_contract(self):
+        prompt=build_provider_prompt(
+            "o que aconteceu no mercado?",
+            domain="trading",
+            system_context={
+                "live_event_intelligence":{
+                    "state":"WATCHING",
+                    "alert_count":2,
+                    "urgent_review_count":1,
+                    "top_alerts":[{
+                        "headline":"Reported military strike near energy route",
+                        "truth_state":"INFERENCE",
+                        "impact_truth_state":"HYPOTHESIS",
+                    }],
+                },
+            },
+        )
+        self.assertIn("Live Event Intelligence: WATCHING",prompt)
+        self.assertIn("Urgentes para revisão: 1",prompt)
+        self.assertIn("truth=INFERENCE",prompt)
+        self.assertIn("impact=HYPOTHESIS",prompt)
+        self.assertIn("nunca autorização/sinal de trade",prompt)
+
     def test_external_call_is_blocked_without_explicit_approval(self):
         session=_FakeSession(_FakeResponse())
         result=execute_openai_answer(
