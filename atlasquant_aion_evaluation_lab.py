@@ -363,7 +363,12 @@ def evaluate_run(
 
     for cid,case in cases.items():
         result=result_map.get(cid)
-        if not result or not isinstance(result.get("candidate_pass"),bool) or not result.get("evidence_refs"):
+        if (
+            not result
+            or not isinstance(result.get("baseline_pass"),bool)
+            or not isinstance(result.get("candidate_pass"),bool)
+            or not result.get("evidence_refs")
+        ):
             missing.append(cid)
             continue
         b=result.get("baseline_pass")
@@ -397,6 +402,12 @@ def evaluate_run(
         for policy in suite_state["metric_policies"]
     ]
     metric_missing=[x["metric"] for x in metric_checks if x["state"]=="MISSING"]
+    run_evidence=_refs(
+        item.get("evidence_refs")
+        if isinstance(item.get("evidence_refs"),(list,tuple))
+        else []
+    )
+    metric_evidence_missing=bool(metric_checks and not run_evidence)
     for check in metric_checks:
         if check["improved"]:
             improvements+=1
@@ -411,7 +422,7 @@ def evaluate_run(
         baseline_rate is not None and candidate_rate is not None and candidate_rate>=baseline_rate
     )
 
-    if not enough_cases or missing or metric_missing:
+    if not enough_cases or missing or metric_missing or metric_evidence_missing:
         state="NEED_MORE_EVIDENCE"
     elif critical_regressions or not pass_rate_nonregression:
         state="REJECTED_FOR_NOW"
@@ -426,6 +437,8 @@ def evaluate_run(
         "suite_cases":len(cases),
         "missing_case_ids":missing,
         "missing_metrics":metric_missing,
+        "metric_evidence_missing":metric_evidence_missing,
+        "run_evidence_refs":run_evidence,
         "baseline_pass_rate_pct":None if baseline_rate is None else round(baseline_rate,2),
         "candidate_pass_rate_pct":None if candidate_rate is None else round(candidate_rate,2),
         "pass_rate_nonregression":pass_rate_nonregression,
@@ -525,7 +538,31 @@ def normalize_evaluation_lab(raw:Mapping[str,Any]|None)->dict[str,Any]:
     suites=normalize_suites(item.get("suites") if isinstance(item.get("suites"),(list,tuple)) else [])
     if not suites:
         suites=[default_core_suite()]
-    runs=normalize_runs(item.get("runs") if isinstance(item.get("runs"),(list,tuple)) else [])
+    suite_map={x["suite_id"]:x for x in suites}
+    runs=[]
+    for raw_run in normalize_runs(item.get("runs") if isinstance(item.get("runs"),(list,tuple)) else []):
+        suite=suite_map.get(raw_run.get("suite_id"))
+        if suite is None:
+            continue
+        if raw_run.get("state")!="PLANNED" or raw_run.get("evaluation"):
+            try:
+                raw_run=evaluate_run(
+                    suite,
+                    raw_run,
+                    evaluated_at=raw_run.get("evaluated_at") or raw_run.get("created_at") or DEFAULT_CORE_SUITE_CREATED_AT,
+                )
+            except Exception:
+                raw_run=normalize_run(raw_run)
+                raw_run["state"]="NEED_MORE_EVIDENCE"
+                raw_run["evaluation"]={
+                    "state":"NEED_MORE_EVIDENCE",
+                    "reason":"RECOMPUTE_FAILED",
+                    "automatic_promotion":False,
+                    "production_change_allowed":False,
+                    "requires_human_review":True,
+                }
+        runs.append(raw_run)
+    runs=normalize_runs(runs)
     return {
         "schema":SCHEMA,
         "suites":suites,
