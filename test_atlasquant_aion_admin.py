@@ -638,6 +638,17 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn('"source_mesh_observations"',src)
         self.assertIn('"source_mesh_fallbacks"',src)
 
+    def test_central_exposes_live_event_intelligence_truthfully(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("AION Live Event Intelligence",src)
+        self.assertIn("Manchete observada não vira fato confirmado automaticamente",src)
+        self.assertIn("monitoramento 24/7 contínuo ainda NÃO está confirmado",src)
+        self.assertIn("Fonte stale ou indisponível não gera breaking alert",src)
+        self.assertIn("Impacto hipotético",src)
+        self.assertIn('"live_event_state"',src)
+        self.assertIn('"live_event_alerts"',src)
+        self.assertIn('"live_event_24x7_confirmed"',src)
+
     def test_business_panel_labels_unconnected_sales_as_unconfirmed(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("não representam vendas confirmadas", src)
