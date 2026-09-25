@@ -376,6 +376,10 @@ def overlay_journal(
         dict(x) for x in list(data.get("events") or [])[-MAX_EVENTS:]
         if isinstance(x,Mapping)
     ]
+    live["journal_heartbeats"]=[
+        dict(x) for x in list(data.get("heartbeats") or [])[-MAX_HEARTBEATS:]
+        if isinstance(x,Mapping)
+    ]
     live["delivery_queue"]=[
         dict(x) for x in list(data.get("delivery_queue") or [])[:MAX_DELIVERY_CANDIDATES]
         if isinstance(x,Mapping)
