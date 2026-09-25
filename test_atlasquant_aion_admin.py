@@ -76,6 +76,17 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("não provisiona acesso",src)
         self.assertIn("_render_attention_queue(status_board, approval_inbox)",src)
 
+    def test_central_memory_guardian_posture_is_read_only_and_fail_closed(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Memória & Guardian",src)
+        self.assertIn("checkpoint_integrity_report(checkpoint)",src)
+        self.assertIn("guardian_posture(access, feature_flags=flags)",src)
+        self.assertIn("runtime_write_preflight(runtime_result)",src)
+        self.assertIn("A matriz é calculada com approved=False",src)
+        self.assertIn("não sobrescreve esse estado automaticamente",src)
+        self.assertIn('"checkpoint_integrity_state"',src)
+        self.assertIn('"guardian_blocked_now"',src)
+
     def test_admin_console_requires_admin_and_keeps_external_actions_guarded(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("if not is_admin(access_map):", src)
