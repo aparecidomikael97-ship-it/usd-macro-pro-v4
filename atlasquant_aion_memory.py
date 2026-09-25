@@ -289,45 +289,6 @@ def config_from_mapping(values: Mapping[str, Any] | None = None) -> RuntimeConfi
     return RuntimeConfig(token=token, repo=repo, branch=branch)
 
 
-def runtime_configuration_diagnostic(
-    config: RuntimeConfig | None = None,
-) -> dict[str, Any]:
-    """Describe runtime persistence readiness without exposing secret values."""
-    cfg = config or config_from_mapping()
-    missing: list[str] = []
-    if not cfg.token:
-        missing.append("GITHUB_TOKEN_HISTORICO")
-    if not cfg.repo:
-        missing.append("GITHUB_REPO_HISTORICO")
-    if not cfg.branch:
-        missing.append("GITHUB_DATA_BRANCH")
-    try:
-        safe_branch = require_runtime_branch(cfg.branch)
-        branch_safe = True
-        branch_reason = "Dedicated runtime-data branch."
-    except Exception as exc:
-        safe_branch = str(cfg.branch or "")
-        branch_safe = False
-        branch_reason = f"Unsafe runtime branch: {type(exc).__name__}"
-    return {
-        "schema": SCHEMA,
-        "ready": bool(cfg.ready and branch_safe),
-        "repo_configured": bool(cfg.repo),
-        "token_configured": bool(cfg.token),
-        "branch": safe_branch,
-        "branch_safe": branch_safe,
-        "path": cfg.path,
-        "missing": missing,
-        "reason": (
-            "Runtime persistence configuration ready."
-            if cfg.ready and branch_safe
-            else branch_reason if not branch_safe
-            else "Runtime persistence configuration incomplete."
-        ),
-        "secret_values_exposed": False,
-    }
-
-
 def _safe_read(path: Path) -> str:
     try:
         if not path.is_file():
@@ -1215,24 +1176,46 @@ def runtime_configuration_status(
 ) -> dict[str, Any]:
     """Describe runtime capability without exposing credential values."""
     cfg = config or config_from_mapping()
+    missing: list[str] = []
+    if not cfg.repo:
+        missing.append("GITHUB_REPO_HISTORICO")
+    if not cfg.branch:
+        missing.append("GITHUB_DATA_BRANCH")
+    if not cfg.token:
+        missing.append("GITHUB_TOKEN_HISTORICO")
     branch_safe = True
+    branch_reason = "Dedicated runtime-data branch."
     try:
         require_runtime_branch(cfg.branch)
-    except Exception:
+    except Exception as exc:
         branch_safe = False
+        branch_reason = f"Unsafe runtime branch: {type(exc).__name__}"
+    read_ready = bool(cfg.read_ready and branch_safe)
+    write_ready = bool(cfg.write_ready and branch_safe)
+    mode = (
+        "READ_WRITE" if write_ready
+        else "READ_ONLY_PUBLIC" if read_ready
+        else "UNAVAILABLE"
+    )
     return {
         "schema": SCHEMA,
         "repo_configured": bool(cfg.repo),
         "branch_configured": bool(cfg.branch),
+        "branch": str(cfg.branch or ""),
         "branch_safe": branch_safe,
         "path": cfg.path,
-        "read_ready": bool(cfg.read_ready and branch_safe),
-        "write_ready": bool(cfg.write_ready and branch_safe),
+        "read_ready": read_ready,
+        "write_ready": write_ready,
         "write_credential_configured": bool(cfg.token),
-        "mode": (
-            "READ_WRITE" if cfg.write_ready and branch_safe
-            else "READ_ONLY_PUBLIC" if cfg.read_ready and branch_safe
-            else "UNAVAILABLE"
+        "missing_for_write": missing,
+        "mode": mode,
+        "reason": (
+            "Runtime persistence configuration ready for read/write."
+            if write_ready else
+            "Runtime checkpoint can be read from the public repository, but write credential is not configured."
+            if read_ready else
+            branch_reason if not branch_safe else
+            "Runtime persistence configuration incomplete."
         ),
         "secret_exposed": False,
     }
