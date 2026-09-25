@@ -42,6 +42,61 @@ class PairIntelligenceSourceTests(unittest.TestCase):
 
 
 
+class AtlasQuantSharedDecisionStateTests(unittest.TestCase):
+    def pack(self):
+        return {
+            "pair":"EUR/USD",
+            "direction":"COMPRA EUR/USD",
+            "state":"🟢 EXECUTÁVEL",
+            "executable":True,
+            "quality":86,
+            "data_ready":{"sufficient":True,"score":90},
+            "next_action":"Validar risco.",
+            "signal_lifecycle":{
+                "status_code":"CONFIRMED",
+                "status_label":"CONFIRMADA",
+                "reference_display":"24/09/2026 21:00 UTC",
+                "age_minutes":5.0,
+            },
+        }
+
+    def test_decision_state_requires_green_safety_for_presentational_authorization(self):
+        import pair_intelligence_v110 as m
+        green=m.decision_operational_model(self.pack(),{"traffic_light":"GREEN"})
+        self.assertTrue(green["authorized"])
+        self.assertEqual(green["freshness_code"],"CURRENT")
+        self.assertFalse(green["real_orders_enabled"])
+
+        red=m.decision_operational_model(self.pack(),{"traffic_light":"RED"})
+        self.assertFalse(red["authorized"])
+        self.assertEqual(red["authorization"],"NÃO AUTORIZADA")
+
+    def test_decision_state_requires_sufficient_data_and_current_time(self):
+        import pair_intelligence_v110 as m
+        p=self.pack()
+        p["data_ready"]["sufficient"]=False
+        self.assertFalse(m.decision_operational_model(p,{"traffic_light":"GREEN"})["authorized"])
+
+        p=self.pack()
+        p["signal_lifecycle"].update({
+            "status_code":"EXPIRED",
+            "status_label":"EXPIRADA — REVALIDAR",
+            "age_minutes":70.0,
+        })
+        model=m.decision_operational_model(p,{"traffic_light":"GREEN"})
+        self.assertFalse(model["authorized"])
+        self.assertEqual(model["state"],"REVALIDAR")
+
+    def test_decision_renders_shared_spine_after_safety_core(self):
+        src=Path("pair_intelligence_v110.py").read_text(encoding="utf-8")
+        safety=src.index("_safety_result = render_safety_core(")
+        spine=src.index("operational_strip_html(_decision_operational)",safety)
+        cards=src.index("_render_atlasquant_operational_cards(packs)",spine)
+        self.assertLess(safety,spine)
+        self.assertLess(spine,cards)
+        self.assertIn("ordens reais continuam fora desta camada",src)
+
+
 class AtlasQuantPackBuilderContractTests(unittest.TestCase):
     def test_builder_is_exposed_for_background_runtime(self):
         import pair_intelligence_v110 as m
