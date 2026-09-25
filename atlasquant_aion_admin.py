@@ -573,6 +573,127 @@ def _render_workspace_overview(
     )
 
 
+
+_AION_AREA_LABELS = {
+    "central": "🧠 Central",
+    "secretary": "🗂️ Secretaria",
+    "trading": "📈 Trading",
+    "studio": "🎬 Studio",
+    "business": "💼 Negócios",
+    "laboratory": "🧪 Laboratório",
+    "development": "🛠️ Desenvolvimento",
+    "subscriptions": "🔐 Assinaturas",
+    "promotions": "🎟️ Promoções",
+    "memory": "🛠️ Desenvolvimento",
+    "system": "🛠️ Desenvolvimento",
+}
+
+
+def _aion_area_label(area: Any) -> str:
+    raw = str(area or "central").strip().casefold()
+    return _AION_AREA_LABELS.get(raw, str(area or "🧠 Central"))
+
+
+def _attention_queue(
+    status_board: Mapping[str, Any] | None,
+    approval_inbox: Mapping[str, Any] | None,
+    *,
+    limit: int = 8,
+) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    inbox = dict(approval_inbox or {})
+    if str(inbox.get("status") or "CONFIRMED").upper() != "UNKNOWN":
+        for item in list(inbox.get("next_items", []) or []):
+            if not isinstance(item, Mapping):
+                continue
+            rows.append({
+                "priority": str(item.get("priority") or "P2"),
+                "source": "APROVAÇÃO",
+                "area": _aion_area_label(item.get("area")),
+                "item": str(item.get("title") or item.get("item_id") or "Item sem título"),
+                "state": str(item.get("status") or "WAITING_APPROVAL"),
+                "next_action": "Revisar na área indicada; nenhuma aprovação é automática.",
+            })
+
+    board = dict(status_board or {})
+    for item in list(board.get("attention", []) or []):
+        if not isinstance(item, Mapping):
+            continue
+        next_action = str(item.get("next_action") or "").strip()
+        if not next_action:
+            continue
+        state = str(item.get("state") or "UNKNOWN").upper()
+        priority = "P1" if state == "UNKNOWN" else ("P2" if state == "EXTERNAL_DEPENDENCY" else "P3")
+        rows.append({
+            "priority": priority,
+            "source": "ESTADO",
+            "area": _aion_area_label(item.get("area")),
+            "item": str(item.get("label") or item.get("id") or "Estado sem rótulo"),
+            "state": state,
+            "next_action": next_action,
+        })
+
+    rank = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
+    rows.sort(key=lambda row: (
+        rank.get(str(row.get("priority") or "P3"), 9),
+        0 if row.get("source") == "APROVAÇÃO" else 1,
+        str(row.get("area") or ""),
+        str(row.get("item") or ""),
+    ))
+
+    deduped: list[dict[str, str]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for row in rows:
+        key = (
+            str(row.get("source") or ""),
+            str(row.get("area") or ""),
+            str(row.get("item") or ""),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(row)
+        if len(deduped) >= max(1, int(limit)):
+            break
+    return deduped
+
+
+def _render_attention_queue(
+    status_board: Mapping[str, Any],
+    approval_inbox: Mapping[str, Any],
+) -> None:
+    st.markdown("#### Próxima Ação AION")
+    st.caption(
+        "Fila consolidada de atenção. Ela orienta o administrador, mas não aprova, "
+        "não publica, não cobra, não provisiona acesso e não executa trading."
+    )
+    rows = _attention_queue(status_board, approval_inbox)
+    if not rows:
+        st.success(
+            "Nenhuma ação administrativa imediata foi identificada nas evidências atuais. "
+            "Isso não substitui validação externa de produção."
+        )
+        return
+
+    first = rows[0]
+    st.info(
+        f"**{first['priority']} · {first['area']} · {first['item']}** — "
+        f"{first['next_action']}"
+    )
+    st.dataframe(
+        [{
+            "Prioridade": row["priority"],
+            "Origem": row["source"],
+            "Área": row["area"],
+            "Item": row["item"],
+            "Estado": row["state"],
+            "Próxima ação segura": row["next_action"],
+        } for row in rows],
+        width="stretch",
+        hide_index=True,
+    )
+
+
 def _render_master_status(board: Mapping[str, Any]) -> None:
     counts = board.get("counts") if isinstance(board.get("counts"), Mapping) else {}
     st.markdown("#### Painel Mestre de Estado")
@@ -642,6 +763,7 @@ def _render_central(
     cols[3].metric("Ordens reais", "BLOQUEADAS")
 
     _render_workspace_overview(checkpoint, runtime_result)
+    _render_attention_queue(status_board, approval_inbox)
 
     st.markdown("#### Briefing de entrada")
     st.write(
