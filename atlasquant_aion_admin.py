@@ -4425,6 +4425,21 @@ def render_aion_admin_console(
         ),
         "reliability_automatic_repair": False,
         "reliability_automatic_rollback": False,
+        "source_mesh_state": str(
+            ((system.get("source_mesh") or {}) if isinstance(system.get("source_mesh"), Mapping) else {}).get("market_state")
+            or "UNKNOWN"
+        ),
+        "source_mesh_live_confirmed": bool(
+            ((system.get("source_mesh") or {}) if isinstance(system.get("source_mesh"), Mapping) else {}).get("market_live_confirmed", False)
+        ),
+        "source_mesh_observations": int(
+            ((system.get("source_mesh") or {}) if isinstance(system.get("source_mesh"), Mapping) else {}).get("observation_count")
+            or 0
+        ),
+        "source_mesh_fallbacks": int(
+            ((system.get("source_mesh") or {}) if isinstance(system.get("source_mesh"), Mapping) else {}).get("fallback_or_unavailable")
+            or 0
+        ),
         "commander_posture": str(commander_snapshot.get("posture") or "UNKNOWN"),
         "commander_objective": str(commander_snapshot.get("objective") or ""),
         "commander_next_action": str(commander_snapshot.get("next_action") or ""),
