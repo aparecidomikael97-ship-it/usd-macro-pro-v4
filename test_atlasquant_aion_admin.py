@@ -295,6 +295,24 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn('"continuity_active_missions"',src)
         self.assertIn('"continuity_handoff_count"',src)
 
+    def test_development_exposes_digital_twin_dev_fusion_and_release_confidence_without_deploy(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Digital Twin + Dev Fusion + Release Confidence",src)
+        self.assertIn("new_digital_twin(",src)
+        self.assertIn("record_twin_observation(",src)
+        self.assertIn("new_dev_fusion_pipeline(",src)
+        self.assertIn("record_dev_fusion_stage(",src)
+        self.assertIn("release_confidence(",src)
+        self.assertIn("não é probabilidade",src)
+        self.assertIn("merge automático: NÃO",src)
+        self.assertIn("deploy automático: NÃO",src)
+        self.assertIn("update_digital_twins_checkpoint(",src)
+        self.assertIn("update_dev_fusion_checkpoint(",src)
+        self.assertIn("update_release_confidence_checkpoint(",src)
+        self.assertIn('"digital_twins_total"',src)
+        self.assertIn('"dev_fusion_candidates"',src)
+        self.assertIn('"release_confidence_ready"',src)
+
     def test_development_exposes_tool_hub_and_durable_resume_without_auto_execution(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("Tool Hub / MCP + Tarefas Duráveis",src)

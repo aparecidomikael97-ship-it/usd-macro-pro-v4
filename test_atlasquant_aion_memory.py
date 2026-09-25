@@ -30,6 +30,9 @@ from atlasquant_aion_memory import (
     update_knowledge_graph_checkpoint,
     synchronize_knowledge_graph_checkpoint,
     update_evaluation_lab_checkpoint,
+    update_digital_twins_checkpoint,
+    update_dev_fusion_checkpoint,
+    update_release_confidence_checkpoint,
     update_wisdom_checkpoint,
     update_live_event_journal_checkpoint,
     update_operating_checkpoint,
@@ -138,7 +141,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("creative fusion studio", joined)
         self.assertIn("motor universal de performance", joined)
         self.assertEqual(upgraded["aion"]["foundation_revision"], FOUNDATION_REVISION)
-        self.assertGreaterEqual(upgraded["checkpoint_version"], 12)
+        self.assertGreaterEqual(upgraded["checkpoint_version"], 13)
 
     def test_default_checkpoint_is_safe_and_has_no_real_trading(self):
         cp = default_checkpoint()
@@ -185,6 +188,15 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("evaluation_lab",cp)
         self.assertTrue(cp["evaluation_lab"]["digest"])
         self.assertFalse(cp["evaluation_lab"]["automatic_promotion"])
+        self.assertIn("digital_twins",cp)
+        self.assertEqual(cp["digital_twins"]["records"],[])
+        self.assertTrue(cp["digital_twins"]["digest"])
+        self.assertIn("dev_fusion",cp)
+        self.assertEqual(cp["dev_fusion"]["pipelines"],[])
+        self.assertTrue(cp["dev_fusion"]["digest"])
+        self.assertIn("release_confidence",cp)
+        self.assertEqual(cp["release_confidence"]["records"],[])
+        self.assertTrue(cp["release_confidence"]["digest"])
         self.assertEqual(cp["live_event_journal"]["events"],[])
         self.assertEqual(cp["live_event_journal"]["heartbeats"],[])
         self.assertTrue(cp["live_event_journal"]["digest"])
@@ -193,7 +205,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
     def test_older_checkpoint_is_upgraded_without_claiming_persistence(self):
         old={"checkpoint_version":1,"project":"AtlasQuant"}
         upgraded=ensure_operating_checkpoint(old)
-        self.assertEqual(upgraded["checkpoint_version"],12)
+        self.assertEqual(upgraded["checkpoint_version"],13)
         self.assertIn("operating",upgraded)
         self.assertIn("studio",upgraded)
         self.assertIn("business",upgraded)
@@ -208,6 +220,9 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("durable_tasks",upgraded)
         self.assertIn("knowledge_graph",upgraded)
         self.assertIn("evaluation_lab",upgraded)
+        self.assertIn("digital_twins",upgraded)
+        self.assertIn("dev_fusion",upgraded)
+        self.assertIn("release_confidence",upgraded)
         self.assertIn("live_event_journal",upgraded)
         self.assertIn("subscriptions",upgraded["areas"])
         changed=update_operating_checkpoint(upgraded,tasks=[],events=[],dirty=True)
@@ -351,6 +366,57 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertFalse(cp["evaluation_lab"]["automatic_promotion"])
         self.assertEqual(checkpoint_integrity_report(cp)["state"],"CONFIRMED")
 
+    def test_checkpoint_v13_dev_fusion_roundtrip(self):
+        cp=default_checkpoint()
+        twin={
+            "twin_id":"TWIN-MEM-1",
+            "title":"Twin memória",
+            "baseline_ref":"main@a",
+            "candidate_ref":"branch@b",
+            "scope":["atlasquant_aion_memory.py"],
+            "dependencies":[],
+            "expected_impacts":["memory"],
+            "rollback_plan":"Reverter commit.",
+            "observations":[{
+                "observation_id":"OBS-1",
+                "area":"tests",
+                "claim":"Suite verde",
+                "impact":"HIGH",
+                "baseline_value":"old",
+                "candidate_value":"new",
+                "uncertainty_pct":0,
+                "evidence_refs":["ci:1"],
+                "critical_blocker":False,
+            }],
+            "created_by":"ADMIN",
+            "created_at":"2026-09-25T18:00:00+00:00",
+        }
+        cp=update_digital_twins_checkpoint(cp,records=[twin],dirty=True)
+        self.assertEqual(cp["digital_twins"]["records"][0]["state"],"READY_FOR_EVALUATION")
+
+        pipeline={
+            "pipeline_id":"DEVF-MEM-1",
+            "title":"Pipeline memória",
+            "twin_id":"TWIN-MEM-1",
+            "baseline_ref":"main@a",
+            "candidate_ref":"branch@b",
+            "evaluation_run_id":"",
+            "stages":[],
+            "created_by":"ADMIN",
+            "created_at":"2026-09-25T18:00:00+00:00",
+        }
+        cp=update_dev_fusion_checkpoint(cp,pipelines=[pipeline],dirty=True)
+        self.assertEqual(len(cp["dev_fusion"]["pipelines"]),1)
+
+        confidence={
+            "candidate_ref":"branch@b",
+            "state":"HUMAN_REVIEW_READY",
+            "dimensions":[],
+        }
+        cp=update_release_confidence_checkpoint(cp,records=[confidence],dirty=True)
+        self.assertEqual(cp["release_confidence"]["records"][0]["state"],"NEEDS_EVIDENCE")
+        self.assertEqual(checkpoint_integrity_report(cp)["state"],"CONFIRMED")
+
     def test_integrity_report_confirms_v7_and_detects_tampering(self):
         cp=default_checkpoint()
         report=checkpoint_integrity_report(cp)
@@ -380,7 +446,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         })
         self.assertTrue(preflight["allowed"])
         self.assertEqual(preflight["mode"],"UPDATE_MIGRATION")
-        self.assertIn("V12",preflight["reason"])
+        self.assertIn("V13",preflight["reason"])
 
     def test_integrity_mismatch_blocks_runtime_write_preflight(self):
         tampered=default_checkpoint()

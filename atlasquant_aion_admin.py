@@ -50,6 +50,9 @@ from atlasquant_aion_memory import (
     update_knowledge_graph_checkpoint,
     synchronize_knowledge_graph_checkpoint,
     update_evaluation_lab_checkpoint,
+    update_digital_twins_checkpoint,
+    update_dev_fusion_checkpoint,
+    update_release_confidence_checkpoint,
     update_live_event_journal_checkpoint,
     update_operating_checkpoint,
     update_promotions_checkpoint,
@@ -210,6 +213,25 @@ from atlasquant_aion_evaluation_lab import (
     evaluation_lab_summary,
     new_eval_run,
     upsert_run,
+)
+from atlasquant_aion_digital_twin import (
+    digital_twin_summary,
+    new_digital_twin,
+    record_twin_observation,
+    upsert_digital_twin,
+)
+from atlasquant_aion_dev_fusion import (
+    STAGES as DEV_FUSION_STAGES,
+    dev_fusion_summary,
+    new_dev_fusion_pipeline,
+    record_stage as record_dev_fusion_stage,
+    upsert_pipeline,
+)
+from atlasquant_aion_release_confidence import (
+    DIMENSIONS as RELEASE_CONFIDENCE_DIMENSIONS,
+    evidence_dimension,
+    release_confidence,
+    release_confidence_summary,
 )
 from atlasquant_aion_cognitive_orchestrator import orchestrator_snapshot
 from atlasquant_aion_event_journal import (
@@ -4126,6 +4148,258 @@ def _render_development(
                 except Exception as exc:
                     st.error(f"Não foi possível registrar a retomada: {type(exc).__name__}")
 
+    st.markdown("#### 🧬 Digital Twin + Dev Fusion + Release Confidence")
+    digital_section = checkpoint.get("digital_twins") if isinstance(checkpoint.get("digital_twins"), Mapping) else {}
+    twin_records = list(digital_section.get("records", []) or [])
+    fusion_section = checkpoint.get("dev_fusion") if isinstance(checkpoint.get("dev_fusion"), Mapping) else {}
+    fusion_pipelines = list(fusion_section.get("pipelines", []) or [])
+    confidence_section = checkpoint.get("release_confidence") if isinstance(checkpoint.get("release_confidence"), Mapping) else {}
+    confidence_records = list(confidence_section.get("records", []) or [])
+    twin_state = digital_twin_summary(twin_records)
+    fusion_state = dev_fusion_summary(fusion_pipelines)
+    confidence_state = release_confidence_summary(confidence_records)
+
+    df1,df2,df3,df4 = st.columns(4)
+    df1.metric("Digital Twins", int(twin_state.get("twins") or 0))
+    df2.metric("Twins prontos p/ avaliação", int(twin_state.get("ready_for_evaluation") or 0))
+    df3.metric("Dev Fusion · revisão humana", int(fusion_state.get("human_review_candidates") or 0))
+    df4.metric("Release Confidence · revisão", int(confidence_state.get("human_review_ready") or 0))
+    st.caption(
+        "Digital Twin simula e registra evidência. Dev Fusion separa Builder, Reviewer e Breaker. "
+        "Release Confidence mede cobertura de evidência; não é probabilidade e nunca autoriza merge/deploy."
+    )
+
+    with st.expander("Criar Digital Twin", expanded=False):
+        with st.form("aion_digital_twin_new", clear_on_submit=True):
+            twin_title = st.text_input("Título da mudança")
+            twin_baseline = st.text_input("Baseline", placeholder="Ex.: main@sha")
+            twin_candidate = st.text_input("Candidato", placeholder="Ex.: branch@sha")
+            twin_scope_text = st.text_area("Escopo — um item por linha", max_chars=2500)
+            twin_dependencies_text = st.text_area("Dependências — uma por linha", max_chars=2500)
+            twin_impacts_text = st.text_area("Impactos esperados — um por linha", max_chars=2500)
+            twin_rollback = st.text_area("Plano de rollback", max_chars=1800)
+            create_twin = st.form_submit_button("Registrar Digital Twin")
+        if create_twin:
+            try:
+                twin = new_digital_twin(
+                    twin_title,
+                    baseline_ref=twin_baseline,
+                    candidate_ref=twin_candidate,
+                    scope=[x.strip() for x in twin_scope_text.splitlines() if x.strip()],
+                    dependencies=[x.strip() for x in twin_dependencies_text.splitlines() if x.strip()],
+                    expected_impacts=[x.strip() for x in twin_impacts_text.splitlines() if x.strip()],
+                    rollback_plan=twin_rollback,
+                    created_by=str(access.get("username") or "ADMIN"),
+                )
+                twin_records = upsert_digital_twin(twin_records, twin)
+                updated = update_digital_twins_checkpoint(checkpoint, records=twin_records, dirty=True)
+                updated = _record_working_event(
+                    updated,
+                    "digital_twin_registered",
+                    f"Digital Twin registrado: {twin['twin_id']}",
+                    evidence={"twin_id":twin["twin_id"],"production_touched":False},
+                )
+                _set_working_checkpoint(updated, dirty=True)
+                st.success("Digital Twin registrado. Produção não foi tocada.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Não foi possível registrar o Digital Twin: {type(exc).__name__}")
+
+    selected_twin = None
+    if twin_records:
+        twin_options = {
+            f"{item.get('twin_id')} · {item.get('title')} · {item.get('state')}":item
+            for item in twin_records if isinstance(item, Mapping)
+        }
+        twin_label = st.selectbox("Digital Twin ativo", list(twin_options.keys()), key="aion_dev_twin_selected")
+        selected_twin = twin_options[twin_label]
+        st.caption(
+            f"Baseline: {selected_twin.get('baseline_ref')} · Candidato: {selected_twin.get('candidate_ref')} · "
+            f"Estado: {selected_twin.get('state')}."
+        )
+        for blocker in list(selected_twin.get("blockers") or [])[:8]:
+            st.warning(str(blocker))
+
+        with st.expander("Registrar observação do Digital Twin", expanded=False):
+            with st.form("aion_digital_twin_observation", clear_on_submit=True):
+                obs_area = st.text_input("Área", value="tests")
+                obs_claim = st.text_area("Observação / claim", max_chars=900)
+                obs_impact = st.selectbox("Impacto", ["LOW","MEDIUM","HIGH","CRITICAL"], index=1)
+                obs_baseline = st.text_input("Valor baseline")
+                obs_candidate = st.text_input("Valor candidato")
+                obs_uncertainty = st.number_input("Incerteza %", min_value=0.0, max_value=100.0, value=10.0, step=1.0)
+                obs_evidence = st.text_area("Referências de evidência — uma por linha", max_chars=2200)
+                obs_critical = st.checkbox("Esta evidência confirma bloqueio crítico", value=False)
+                save_observation = st.form_submit_button("Registrar observação")
+            if save_observation:
+                try:
+                    changed = record_twin_observation(
+                        selected_twin,
+                        area=obs_area,
+                        claim=obs_claim,
+                        impact=obs_impact,
+                        baseline_value=obs_baseline,
+                        candidate_value=obs_candidate,
+                        uncertainty_pct=obs_uncertainty,
+                        evidence_refs=[x.strip() for x in obs_evidence.splitlines() if x.strip()],
+                        critical_blocker=bool(obs_critical),
+                    )
+                    twin_records = upsert_digital_twin(twin_records, changed)
+                    updated = update_digital_twins_checkpoint(checkpoint, records=twin_records, dirty=True)
+                    _set_working_checkpoint(updated, dirty=True)
+                    st.success(f"Observação registrada. Twin: {changed['state']}.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Não foi possível registrar a observação: {type(exc).__name__}")
+
+        if st.button("Criar pipeline Dev Fusion deste Twin", key="aion_dev_fusion_create"):
+            try:
+                pipeline = new_dev_fusion_pipeline(
+                    f"Pipeline · {selected_twin.get('title')}",
+                    twin_id=selected_twin.get("twin_id"),
+                    baseline_ref=selected_twin.get("baseline_ref"),
+                    candidate_ref=selected_twin.get("candidate_ref"),
+                    created_by=str(access.get("username") or "ADMIN"),
+                )
+                fusion_pipelines = upsert_pipeline(fusion_pipelines, pipeline)
+                updated = update_dev_fusion_checkpoint(checkpoint, pipelines=fusion_pipelines, dirty=True)
+                _set_working_checkpoint(updated, dirty=True)
+                st.success("Pipeline Dev Fusion registrado; nenhuma ferramenta foi executada.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Não foi possível criar o pipeline: {type(exc).__name__}")
+
+    selected_pipeline = None
+    if fusion_pipelines:
+        pipeline_options = {
+            f"{item.get('pipeline_id')} · {item.get('candidate_ref')} · {item.get('state')}":item
+            for item in fusion_pipelines if isinstance(item, Mapping)
+        }
+        pipeline_label = st.selectbox("Pipeline Dev Fusion", list(pipeline_options.keys()), key="aion_dev_fusion_selected")
+        selected_pipeline = pipeline_options[pipeline_label]
+        st.caption(
+            f"Estado: {selected_pipeline.get('state')} · merge automático: NÃO · deploy automático: NÃO."
+        )
+        with st.expander("Registrar evidência de etapa Dev Fusion", expanded=False):
+            with st.form("aion_dev_fusion_stage", clear_on_submit=True):
+                fusion_stage = st.selectbox("Etapa", list(DEV_FUSION_STAGES))
+                fusion_stage_state = st.selectbox("Estado", ["RUNNING","PASS","FAIL","BLOCKED","WAITING_HUMAN"])
+                fusion_actor = st.text_input("Ator / agente responsável", placeholder="Ex.: reviewer-independent")
+                fusion_evidence = st.text_area("Evidências — uma por linha", max_chars=2400)
+                fusion_summary_text = st.text_area("Resumo da etapa", max_chars=1200)
+                fusion_critical = st.number_input("Achados críticos", min_value=0, value=0, step=1)
+                eval_run_ref = st.text_input("Evaluation Run ID (somente etapa EVALUATE)")
+                save_fusion_stage = st.form_submit_button("Registrar etapa")
+            if save_fusion_stage:
+                try:
+                    changed = record_dev_fusion_stage(
+                        selected_pipeline,
+                        fusion_stage,
+                        state=fusion_stage_state,
+                        actor_ref=fusion_actor,
+                        evidence_refs=[x.strip() for x in fusion_evidence.splitlines() if x.strip()],
+                        summary=fusion_summary_text,
+                        critical_findings=fusion_critical,
+                        evaluation_run_id=eval_run_ref,
+                    )
+                    fusion_pipelines = upsert_pipeline(fusion_pipelines, changed)
+                    updated = update_dev_fusion_checkpoint(checkpoint, pipelines=fusion_pipelines, dirty=True)
+                    _set_working_checkpoint(updated, dirty=True)
+                    st.success(f"Etapa registrada. Pipeline: {changed['state']}.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Etapa recusada em modo seguro: {type(exc).__name__}")
+
+        if st.button("Calcular Release Confidence consultivo", key="aion_release_confidence_preview"):
+            pipeline = selected_pipeline
+            twin = next(
+                (x for x in twin_records if isinstance(x,Mapping) and x.get("twin_id")==pipeline.get("twin_id")),
+                None,
+            )
+            eval_lab = checkpoint.get("evaluation_lab") if isinstance(checkpoint.get("evaluation_lab"), Mapping) else {}
+            eval_run = next(
+                (
+                    x for x in list(eval_lab.get("runs",[]) or [])
+                    if isinstance(x,Mapping) and x.get("run_id")==pipeline.get("evaluation_run_id")
+                ),
+                None,
+            )
+            twin_refs = [
+                ref
+                for obs in list((twin or {}).get("observations",[]) or [])
+                if isinstance(obs,Mapping)
+                for ref in list(obs.get("evidence_refs",[]) or [])
+            ]
+            fusion_refs = [
+                ref
+                for stage in list(pipeline.get("stages",[]) or [])
+                if isinstance(stage,Mapping)
+                for ref in list(stage.get("evidence_refs",[]) or [])
+            ]
+            eval_refs = list((eval_run or {}).get("evidence_refs",[]) or []) if isinstance(eval_run,Mapping) else []
+            dimensions = [
+                evidence_dimension(
+                    "DIGITAL_TWIN",
+                    confirmed=bool(twin and twin.get("state")=="READY_FOR_EVALUATION"),
+                    evidence_refs=twin_refs,
+                    blocker=bool(twin and twin.get("state")=="BLOCKED"),
+                    detail="Digital Twin deve estar pronto para avaliação.",
+                ),
+                evidence_dimension(
+                    "DEV_FUSION",
+                    confirmed=bool(pipeline.get("state") in {"HUMAN_REVIEW_CANDIDATE","DONE"}),
+                    evidence_refs=fusion_refs,
+                    blocker=bool(pipeline.get("state")=="BLOCKED"),
+                    detail="Builder, Reviewer, Breaker e Evaluation precisam de evidência independente.",
+                ),
+                evidence_dimension(
+                    "EVALUATION",
+                    confirmed=bool(isinstance(eval_run,Mapping) and eval_run.get("state")=="HUMAN_REVIEW_CANDIDATE"),
+                    evidence_refs=eval_refs,
+                    blocker=bool(isinstance(eval_run,Mapping) and eval_run.get("state")=="REJECTED_FOR_NOW"),
+                    detail="Evaluation Lab precisa chegar apenas a HUMAN_REVIEW_CANDIDATE.",
+                ),
+                evidence_dimension("QUALITY",confirmed=False,evidence_refs=[],detail="CI verificado ainda não foi anexado a este snapshot."),
+                evidence_dimension("RELEASE_GATE",confirmed=False,evidence_refs=[],detail="Release Gate de produção não é inferido nesta tela."),
+                evidence_dimension(
+                    "ROLLBACK",
+                    confirmed=False,
+                    evidence_refs=[],
+                    detail="Plano existe no Twin, mas prova de rollback ensaiado ainda precisa de evidência.",
+                ),
+            ]
+            confidence = release_confidence(
+                candidate_ref=pipeline.get("candidate_ref"),
+                dimensions=dimensions,
+            )
+            confidence_records = [
+                x for x in confidence_records
+                if not (isinstance(x,Mapping) and x.get("candidate_ref")==confidence.get("candidate_ref"))
+            ] + [confidence]
+            updated = update_release_confidence_checkpoint(
+                checkpoint,
+                records=confidence_records,
+                dirty=True,
+            )
+            _set_working_checkpoint(updated, dirty=True)
+            st.session_state["aion_release_confidence_preview_result"] = confidence
+            st.rerun()
+
+    confidence_preview = st.session_state.get("aion_release_confidence_preview_result")
+    if isinstance(confidence_preview, Mapping):
+        st.write(
+            f"**Release Confidence:** {confidence_preview.get('state')} · "
+            f"cobertura de evidência {confidence_preview.get('evidence_coverage_pct')}%."
+        )
+        st.caption("Cobertura de evidência não é probabilidade de sucesso e não autoriza merge/deploy.")
+        for row in list(confidence_preview.get("dimensions") or []):
+            if isinstance(row,Mapping):
+                st.markdown(
+                    f"- {row.get('dimension')}: "
+                    f"{'CONFIRMADA' if row.get('confirmed') else 'PENDENTE'}"
+                    + (" · BLOQUEIO" if row.get("blocker") else "")
+                )
+
     st.markdown("#### Checkpoint Mestre")
     st.caption(
         f"Proveniência ativa: {runtime_result.get('source') or runtime_result.get('status')}. "
@@ -5337,6 +5611,30 @@ def render_aion_admin_console(
                 if isinstance(checkpoint.get("evaluation_lab"), Mapping)
                 else {}
             ).get("human_review_candidates") or 0
+        ),
+        "digital_twins_total": int(
+            digital_twin_summary(
+                list(
+                    ((checkpoint.get("digital_twins") or {}) if isinstance(checkpoint.get("digital_twins"), Mapping) else {}).get("records", [])
+                    or []
+                )
+            ).get("twins") or 0
+        ),
+        "dev_fusion_candidates": int(
+            dev_fusion_summary(
+                list(
+                    ((checkpoint.get("dev_fusion") or {}) if isinstance(checkpoint.get("dev_fusion"), Mapping) else {}).get("pipelines", [])
+                    or []
+                )
+            ).get("human_review_candidates") or 0
+        ),
+        "release_confidence_ready": int(
+            release_confidence_summary(
+                list(
+                    ((checkpoint.get("release_confidence") or {}) if isinstance(checkpoint.get("release_confidence"), Mapping) else {}).get("records", [])
+                    or []
+                )
+            ).get("human_review_ready") or 0
         ),
         "tool_hub_tools": int(
             tool_hub_summary(
