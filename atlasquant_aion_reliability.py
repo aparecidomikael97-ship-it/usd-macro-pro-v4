@@ -201,6 +201,11 @@ def data_guardian_snapshot(
         if row["criticality"] in {"HIGH", "CRITICAL"}
         and row["state"] in {"STALE", "DEGRADED", "UNAVAILABLE", "UNKNOWN"}
     ]
+    advisory_bad = [
+        row for row in rows
+        if row["criticality"] in {"LOW", "MEDIUM"}
+        and row["state"] in {"STALE", "DEGRADED", "UNAVAILABLE", "UNKNOWN"}
+    ]
     if reconciled["has_critical_conflict"]:
         state = "FAIL_CLOSED"
     elif critical_bad:
@@ -208,8 +213,6 @@ def data_guardian_snapshot(
     elif not rows:
         state = "UNKNOWN"
     elif reconciled["has_conflict"]:
-        state = "DEGRADED_SAFE"
-    elif any(row["state"] != "OK" for row in rows):
         state = "DEGRADED_SAFE"
     else:
         state = "CONTROLLED"
@@ -229,6 +232,7 @@ def data_guardian_snapshot(
         "state": state,
         "reconciliation": reconciled,
         "critical_bad_sources": len(critical_bad),
+        "advisory_bad_sources": len(advisory_bad),
         "next_actions": next_actions,
         "allows_strong_claims": state == "CONTROLLED",
         "allows_live_market_authorization": False,
