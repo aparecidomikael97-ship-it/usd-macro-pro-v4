@@ -10,7 +10,7 @@ from atlasquant_aion_runtime_migrate import migrate_checkpoint
 
 
 class AtlasQuantAionRuntimeMigrationTests(unittest.TestCase):
-    def test_v14_shape_migrates_to_current_v15_and_preserves_data(self):
+    def test_v14_shape_migrates_to_current_v16_and_preserves_data(self):
         cp=default_checkpoint()
         cp["checkpoint_version"]=14
         cp.pop("memory_reliability",None)
@@ -22,9 +22,28 @@ class AtlasQuantAionRuntimeMigrationTests(unittest.TestCase):
             out=migrate_checkpoint(source,target)
             migrated=json.loads(target.read_text(encoding="utf-8"))
         self.assertEqual(out["status"],"CONFIRMED")
-        self.assertGreaterEqual(out["after_version"],15)
+        self.assertGreaterEqual(out["after_version"],16)
         self.assertIn("memory_reliability",migrated)
         self.assertIn("PENDENCIA-PRESERVADA",migrated["pending"])
+        self.assertFalse(migrated["aion"]["real_trading"])
+
+    def test_v15_shape_without_data_decision_fabric_migrates_to_v16(self):
+        cp=default_checkpoint()
+        cp["checkpoint_version"]=15
+        cp.pop("data_decision_fabric",None)
+        cp["pending"].append("PENDENCIA-V15-PRESERVADA")
+        with tempfile.TemporaryDirectory() as td:
+            source=Path(td)/"before-v15.json"
+            target=Path(td)/"after-v16.json"
+            source.write_text(json.dumps(cp),encoding="utf-8")
+            out=migrate_checkpoint(source,target)
+            migrated=json.loads(target.read_text(encoding="utf-8"))
+        self.assertEqual(out["status"],"CONFIRMED")
+        self.assertGreaterEqual(out["after_version"],16)
+        self.assertIn("data_decision_fabric",migrated)
+        self.assertTrue(migrated["data_decision_fabric"]["digest"])
+        self.assertFalse(migrated["data_decision_fabric"]["automatic_execution"])
+        self.assertIn("PENDENCIA-V15-PRESERVADA",migrated["pending"])
         self.assertFalse(migrated["aion"]["real_trading"])
 
     def test_dirty_persisted_checkpoint_blocks_automatic_migration(self):
