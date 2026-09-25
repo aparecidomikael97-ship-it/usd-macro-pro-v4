@@ -319,8 +319,8 @@ def build_master_status_board(
             if entitlement_loaded else
             "Estrutura de entitlements não foi confirmada no Checkpoint desta execução."
         ),
-        source="Checkpoint Mestre v5",
-        next_action="Migrar/carregar Checkpoint v5 antes de administrar direitos de acesso." if not entitlement_loaded else "",
+        source="Checkpoint Mestre V7 / entitlements",
+        next_action="Migrar/carregar o Checkpoint atual antes de administrar direitos de acesso." if not entitlement_loaded else "",
     ))
 
     audit_schema=str(commercial_audit.get("schema") or "")
