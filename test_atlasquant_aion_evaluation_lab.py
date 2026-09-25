@@ -50,6 +50,13 @@ def candidate_metrics():
 
 
 class AtlasQuantAionEvaluationLabTests(unittest.TestCase):
+    def test_default_suite_is_deterministic_across_calls(self):
+        a=default_core_suite()
+        b=default_core_suite()
+        self.assertEqual(a["suite_id"],b["suite_id"])
+        self.assertEqual(a["created_at"],b["created_at"])
+        self.assertEqual(default_evaluation_lab()["digest"],default_evaluation_lab()["digest"])
+
     def test_default_lab_never_auto_promotes(self):
         summary=evaluation_lab_summary(default_evaluation_lab())
         self.assertGreaterEqual(summary["suites"],1)
