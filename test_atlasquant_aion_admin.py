@@ -149,6 +149,24 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("não vai sobrescrever a versão nova automaticamente", src)
         self.assertIn("Descartar alterações locais e recarregar runtime", src)
 
+    def test_development_exposes_guarded_versioned_checkpoint_recovery(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Recuperação / Rollback do Checkpoint",src)
+        self.assertIn("list_checkpoint_revisions(",src)
+        self.assertIn("load_checkpoint_revision(",src)
+        self.assertIn("recovery_preflight(runtime_result, candidate)",src)
+        self.assertIn('"restore_checkpoint"',src)
+        self.assertIn("restore_checkpoint_revision(",src)
+        self.assertIn("Confirmo que revisei esta versão",src)
+        self.assertIn("Não existe restauração automática.",src)
+        self.assertIn("Há alterações locais ainda não persistidas",src)
+        self.assertIn("checkpoint_recovery_restored",Path("atlasquant_aion_recovery.py").read_text(encoding="utf-8"))
+
+    def test_promotions_heading_no_longer_mixes_subscriptions_workspace(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn('st.markdown("### 🎟️ Promoções")',src)
+        self.assertNotIn('st.markdown("### 🎟️ Assinaturas & Promoções")',src)
+
     def test_laboratory_exposes_budget_router_without_enabling_billing(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("Roteador de inteligência / orçamento", src)
