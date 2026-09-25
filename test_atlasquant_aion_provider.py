@@ -95,6 +95,31 @@ class AtlasQuantAionProviderTests(unittest.TestCase):
         self.assertIn("Conflitos de fonte confirmados: 3",prompt)
         self.assertIn("não escolha uma fonte escondido",prompt)
 
+    def test_prompt_carries_event_truth_and_preserves_hypothesis_boundary(self):
+        prompt=build_provider_prompt(
+            "qual o impacto?",
+            domain="trading",
+            system_context={
+                "event_intelligence":{
+                    "top_alert":{
+                        "state":"REVIEW_INTERNAL",
+                        "event_id":"EVT-9",
+                        "event_truth":"UNKNOWN",
+                    },
+                    "events":[{
+                        "event_id":"EVT-9",
+                        "headline":"Relato de escalada geopolítica",
+                        "event_truth":"UNKNOWN",
+                    }],
+                },
+            },
+        )
+        self.assertIn("Event Intelligence: REVIEW_INTERNAL",prompt)
+        self.assertIn("Evento principal: Relato de escalada geopolítica",prompt)
+        self.assertIn("Verdade do evento: UNKNOWN",prompt)
+        self.assertIn("Classificação",prompt)
+        self.assertIn("impactos por ativo são hipóteses",prompt)
+
     def test_external_call_is_blocked_without_explicit_approval(self):
         session=_FakeSession(_FakeResponse())
         result=execute_openai_answer(
