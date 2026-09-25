@@ -60,6 +60,12 @@ from atlasquant_flight_recorder_panel import record_from_pack
 from atlasquant_flight_recorder_store import persist_records
 from atlasquant_setup_candidates import build_setup_candidates
 from atlasquant_research_timeframes import build_research_timeframe_cache
+from atlasquant_aion_event_intelligence import (
+    build_event_intelligence,
+    event_intelligence_summary,
+    merge_alert_journal,
+    merge_event_journal,
+)
 
 from market_map_core_v10 import (
     NY_TZ,
@@ -99,6 +105,7 @@ NEWS_VALIDATION_PATH = "dados/currency_news_validation_v1061.csv"
 QUOTA_SHADOW_PATH = "dados/atlasquant_quota_shadow_v1.json"
 HOME_SNAPSHOT_PATH = "dados/atlasquant_home_snapshot_v1.json"
 RESEARCH_TF_CACHE_PATH = "dados/atlasquant_research_timeframes_v1.json"
+AION_EVENT_INTELLIGENCE_PATH = "dados/aion_event_intelligence_v1.json"
 
 M15_EVERY_MIN = 55
 H1_EVERY_MIN = 115
@@ -1396,9 +1403,101 @@ def main() -> int:
     # 4. Global news. Hourly-ish cache.
     intel,news_errors=get_news()
     all_errors.extend(news_errors)
+    news_persisted=False
+    news_write_err=""
     if intel:
-        ok,err=gh_put_json(NEWS_CURRENT_PATH,intel,"V10.7 Autopilot: notícias globais")
-        if not ok: all_errors.append("Salvar notícias: "+err)
+        news_persisted,news_write_err=gh_put_json(
+            NEWS_CURRENT_PATH,
+            intel,
+            "V10.7 Autopilot: notícias globais",
+        )
+        if not news_persisted:
+            all_errors.append("Salvar notícias: "+news_write_err)
+
+    # 4.1 AION Event Intelligence — background/internal only.
+    # It consumes the news snapshot already obtained above, performs no extra
+    # provider call and never sends an external notification or market order.
+    event_runtime={
+        "schema":"ATLASQUANT_AION_EVENT_INTELLIGENCE_V1",
+        "events":[],
+        "alerts":[],
+        "summary":{},
+        "persisted":False,
+        "error":"",
+        "external_notification_allowed":False,
+        "real_orders_enabled":False,
+    }
+    try:
+        event_previous,event_read_err=gh_get_json(
+            AION_EVENT_INTELLIGENCE_PATH,
+            {"events":[],"alerts":[]},
+        )
+        news_provenance=(
+            f"GitHub:{BRANCH}:{NEWS_CURRENT_PATH}"
+            if news_persisted
+            else "Autopilot runtime / persistence unconfirmed"
+        )
+        event_current=build_event_intelligence(
+            news_payload=intel if isinstance(intel,Mapping) else {},
+            news_provenance=news_provenance,
+            reliability=None,
+            now=utcnow().to_pydatetime(),
+            max_age_hours=24.0,
+        )
+        event_rows=merge_event_journal(
+            (event_previous or {}).get("events",[]) if isinstance(event_previous,Mapping) else [],
+            event_current.get("events",[]),
+            observed_at=event_current.get("generated_at"),
+        )
+        alert_rows=merge_alert_journal(
+            (event_previous or {}).get("alerts",[]) if isinstance(event_previous,Mapping) else [],
+            event_current.get("alerts",[]),
+            observed_at=event_current.get("generated_at"),
+        )
+        event_summary=event_intelligence_summary(event_rows,alert_rows)
+        event_payload={
+            "schema":"ATLASQUANT_AION_EVENT_INTELLIGENCE_V1",
+            "updated_at":event_current.get("generated_at"),
+            "current":{
+                "event_count":event_current.get("event_count",0),
+                "active_alerts":event_current.get("active_alerts",0),
+                "urgent_alerts":event_current.get("urgent_alerts",0),
+                "review_alerts":event_current.get("review_alerts",0),
+                "watch_alerts":event_current.get("watch_alerts",0),
+                "top_alert":event_current.get("top_alert"),
+            },
+            "events":event_rows,
+            "alerts":alert_rows,
+            "summary":event_summary,
+            "source_news_persisted":bool(news_persisted),
+            "performs_extra_provider_request":False,
+            "external_notification_allowed":False,
+            "market_action_authorized":False,
+            "real_orders_enabled":False,
+        }
+        event_ok=False
+        event_write_err=""
+        if not event_read_err:
+            event_ok,event_write_err=gh_put_json(
+                AION_EVENT_INTELLIGENCE_PATH,
+                event_payload,
+                "AtlasQuant AION: atualiza inteligência auditável de eventos",
+            )
+        event_runtime={
+            **event_payload,
+            "persisted":bool(event_ok),
+            "error":str(event_read_err or event_write_err or ""),
+        }
+        if event_read_err:
+            all_errors.append("Ler Event Intelligence: "+str(event_read_err))
+        elif not event_ok:
+            all_errors.append("Salvar Event Intelligence: "+str(event_write_err))
+    except Exception as event_exc:
+        event_runtime={
+            **event_runtime,
+            "error":f"{type(event_exc).__name__}: {event_exc}",
+        }
+        all_errors.append("Event Intelligence: "+event_runtime["error"])
 
     pmap = pair_input_map(inputs)
     matrix = pd.DataFrame(list(pmap.values()))
@@ -1486,6 +1585,19 @@ def main() -> int:
         app_ok,app_msg,inputs,scanner,master,intel,validation,
         all_errors,total_calls,snap_stats
     )
+
+    status["aion_event_intelligence"]={
+        "path":AION_EVENT_INTELLIGENCE_PATH,
+        "persisted":bool(event_runtime.get("persisted",False)),
+        "error":str(event_runtime.get("error") or ""),
+        "events":int(((event_runtime.get("summary") or {}) if isinstance(event_runtime.get("summary"),Mapping) else {}).get("events") or 0),
+        "alerts":int(((event_runtime.get("summary") or {}) if isinstance(event_runtime.get("summary"),Mapping) else {}).get("alerts") or 0),
+        "urgent":int(((event_runtime.get("summary") or {}) if isinstance(event_runtime.get("summary"),Mapping) else {}).get("urgent") or 0),
+        "external_notification_allowed":False,
+        "performs_extra_provider_request":False,
+        "real_orders":False,
+        "automatic_execution":False,
+    }
 
     status["research_timeframes"]={
         "path":RESEARCH_TF_CACHE_PATH,
