@@ -108,6 +108,15 @@ class AtlasQuantReleaseGateTests(unittest.TestCase):
         self.assertFalse(out["automatic_deploy"])
         self.assertFalse(out["real_orders_enabled"])
 
+    def test_main_runtime_exposes_release_gate_to_aion_context(self):
+        from pathlib import Path
+        src = Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        self.assertIn("from atlasquant_release_gate import release_gate", src)
+        self.assertIn("_aion_release_gate = release_gate(", src)
+        self.assertIn("publication_truth=_aion_publication_truth", src)
+        self.assertIn("interface_validation=_aion_interface_validation", src)
+        self.assertIn('"release_gate": _aion_release_gate', src)
+
     def test_rows_are_presentation_only(self):
         out = release_gate(
             publication_truth=publication(),
