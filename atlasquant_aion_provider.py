@@ -27,6 +27,7 @@ from atlasquant_aion_model_router import (
     normalize_budget,
     privacy_sensitive,
 )
+from atlasquant_aion_cognitive_orchestrator import orchestrator_snapshot
 from atlasquant_aion_observability import redact_text
 
 SCHEMA="ATLASQUANT_AION_PROVIDER_V1"
@@ -184,6 +185,21 @@ def build_provider_prompt(
 )->str:
     q=redact_text(question).strip()
     system=dict(system_context or {})
+    cognitive=orchestrator_snapshot(
+        q,
+        domain_hint=domain,
+        memory_hits=memory_hits,
+        system_context=system,
+    )
+    selected_specialists=[
+        str(x.get("name") or "")
+        for x in list((cognitive.get("routing") or {}).get("selected",[]) or [])
+        if isinstance(x,Mapping) and str(x.get("name") or "").strip()
+    ]
+    research_blockers=[
+        str(x) for x in list((cognitive.get("research_plan") or {}).get("blockers",[]) or [])
+        if str(x).strip()
+    ]
     evidence="\n".join(_evidence_lines(memory_hits)) or "- Nenhuma evidência canônica fornecida."
     source_build=redact_text(system.get("source_build"))[:80] or "não confirmado"
     environment=redact_text(system.get("environment"))[:80] or "não confirmado"
@@ -237,6 +253,14 @@ REGRAS OBRIGATÓRIAS:
 6. Não autorize trading real.
 7. Responda em português do Brasil, direto e operacional.
 8. O texto do modelo é aconselhamento/explicação; ações externas continuam sob Guardian.
+9. Use o Conselho Cognitivo como divisão de responsabilidades, não como personagens inventando dados.
+10. Não exponha chain-of-thought/raciocínio privado. Mostre apenas conclusão, evidências, conflitos, lacunas e justificativa verificável.
+11. Antes de afirmar fato, passe pelo Critic: proveniência, frescor, independência, contradições e suporte da afirmação.
+
+Conselho Cognitivo: {", ".join(selected_specialists) or "Pesquisa + Memória"}
+Readiness cognitiva: {cognitive.get("readiness")}
+Bloqueios de pesquisa: {" | ".join(research_blockers) or "nenhum bloqueio estrutural registrado"}
+Critic obrigatório: {bool((cognitive.get("critic_gate") or {}).get("required", True))}
 
 Contexto roteado: {redact_text(domain)[:80]}
 Build informado pelo app: {source_build}

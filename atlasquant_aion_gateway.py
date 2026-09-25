@@ -13,6 +13,7 @@ from atlasquant_aion_core import feature_flag_snapshot, route_context
 from atlasquant_aion_continuity import continuity_briefing
 from atlasquant_aion_provider import provider_configuration_status
 from atlasquant_aion_intelligence import evidence_audit, evidence_confidence
+from atlasquant_aion_cognitive_orchestrator import orchestrator_snapshot
 
 SCHEMA = "ATLASQUANT_AION_GATEWAY_V1"
 
@@ -194,6 +195,12 @@ def local_answer(
             "Laboratório, Secretaria, Desenvolvimento ou Promoções."
         )
 
+    cognitive = orchestrator_snapshot(
+        q,
+        domain_hint=route["domain"],
+        memory_hits=hits,
+        system_context=system,
+    )
     reliability = system.get("reliability") if isinstance(system.get("reliability"), Mapping) else {}
     degraded = (
         reliability.get("degraded_mode")
@@ -256,6 +263,16 @@ def local_answer(
             "nenhuma notificação externa ou ação de mercado é automática."
         )
 
+    selected_names = [
+        str(x.get("name") or "")
+        for x in list((cognitive.get("routing") or {}).get("selected", []) or [])
+        if isinstance(x, Mapping) and str(x.get("name") or "").strip()
+    ]
+    research_blockers = list((cognitive.get("research_plan") or {}).get("blockers", []) or [])
+    if selected_names:
+        answer += " Conselho cognitivo selecionado: " + ", ".join(selected_names[:5]) + "."
+    if research_blockers:
+        answer += " Antes de uma conclusão forte, falta resolver: " + str(research_blockers[0])
     if hits:
         answer += f" Encontrei {len(hits)} referência(s) na memória canônica para apoiar a resposta."
     if provider["state"] == "ZERO_COST_LOCAL":
@@ -303,6 +320,10 @@ def local_answer(
         "reliability_posture": reliability_posture or "UNKNOWN",
         "degraded_mode_state": degraded_state or "UNKNOWN",
         "source_conflicts": source_conflicts,
+        "cognitive_orchestrator": cognitive,
+        "cognitive_readiness": str(cognitive.get("readiness") or "UNKNOWN"),
+        "cognitive_specialists": int((cognitive.get("routing") or {}).get("selected_count") or 0),
+        "critic_required": bool((cognitive.get("critic_gate") or {}).get("required", True)),
         "live_event_state": live_event_state or "UNKNOWN",
         "live_event_alerts": live_event_alerts,
         "live_event_urgent_review": live_event_urgent,
