@@ -37,6 +37,7 @@ from atlasquant_aion_memory import (
     update_release_confidence_checkpoint,
     update_resilience_checkpoint,
     update_memory_reliability_checkpoint,
+    update_data_decision_fabric_checkpoint,
     update_wisdom_checkpoint,
     update_live_event_journal_checkpoint,
     update_operating_checkpoint,
@@ -158,7 +159,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("radar de tendências", joined)
         self.assertIn("curiosidade controlada", joined)
         self.assertEqual(upgraded["aion"]["foundation_revision"], FOUNDATION_REVISION)
-        self.assertGreaterEqual(upgraded["checkpoint_version"], 15)
+        self.assertGreaterEqual(upgraded["checkpoint_version"], 16)
 
     def test_completed_runtime_validation_is_removed_from_pending_without_losing_other_items(self):
         old={
@@ -235,6 +236,9 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("memory_reliability",cp)
         self.assertTrue(cp["memory_reliability"]["digest"])
         self.assertTrue(cp["memory_reliability"]["policy"]["memory_never_authorizes_action"])
+        self.assertIn("data_decision_fabric",cp)
+        self.assertTrue(cp["data_decision_fabric"]["digest"])
+        self.assertFalse(cp["data_decision_fabric"]["automatic_execution"])
         self.assertEqual(cp["live_event_journal"]["events"],[])
         self.assertEqual(cp["live_event_journal"]["heartbeats"],[])
         self.assertTrue(cp["live_event_journal"]["digest"])
@@ -243,7 +247,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
     def test_older_checkpoint_is_upgraded_without_claiming_persistence(self):
         old={"checkpoint_version":1,"project":"AtlasQuant"}
         upgraded=ensure_operating_checkpoint(old)
-        self.assertEqual(upgraded["checkpoint_version"],15)
+        self.assertEqual(upgraded["checkpoint_version"],16)
         self.assertIn("operating",upgraded)
         self.assertIn("studio",upgraded)
         self.assertIn("business",upgraded)
@@ -263,6 +267,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertIn("release_confidence",upgraded)
         self.assertIn("resilience",upgraded)
         self.assertIn("memory_reliability",upgraded)
+        self.assertIn("data_decision_fabric",upgraded)
         self.assertIn("live_event_journal",upgraded)
         self.assertIn("subscriptions",upgraded["areas"])
         changed=update_operating_checkpoint(upgraded,tasks=[],events=[],dirty=True)
@@ -530,6 +535,60 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertTrue(report["write_safe"])
         self.assertTrue(any("memory_reliability" in x for x in report["migration_items"]))
 
+    def test_checkpoint_v16_data_decision_fabric_roundtrip_and_integrity(self):
+        cp=default_checkpoint()
+        fabric=dict(cp["data_decision_fabric"])
+        fabric["events"]=[{
+            "label":"Qualidade CI",
+            "domain":"development",
+            "event_type":"EVIDENCE",
+            "truth_state":"CONFIRMED",
+            "source_ref":"ci:quality",
+            "claim_key":"release.tests",
+            "value_summary":"PASS",
+            "value_digest":"abc",
+            "evidence_refs":["run:123"],
+            "observed_at":"2026-09-25T23:00:00+00:00",
+            "event_id":"FAB-MEM-1",
+        }]
+        fabric["decisions"]=[{
+            "decision_id":"DEC-MEM-1",
+            "domain":"development",
+            "objective":"Revisar release",
+            "hypothesis":"Sem regressão",
+            "required_claim_keys":["release.tests"],
+            "evidence_event_ids":["FAB-MEM-1"],
+            "test_refs":["ci:run:123"],
+            "risk_level":"HIGH",
+            "impact":"HIGH",
+            "reversible":True,
+            "rollback_plan":"Reverter commit.",
+            "requires_test":True,
+            "sensitive_action":True,
+            "created_by":"ADMIN",
+            "created_at":"2026-09-25T23:00:00+00:00",
+        }]
+        cp=update_data_decision_fabric_checkpoint(cp,data_decision_fabric=fabric,dirty=True)
+        self.assertEqual(len(cp["data_decision_fabric"]["events"]),1)
+        self.assertEqual(len(cp["data_decision_fabric"]["decisions"]),1)
+        self.assertFalse(cp["data_decision_fabric"]["automatic_execution"])
+        self.assertEqual(checkpoint_integrity_report(cp)["state"],"CONFIRMED")
+
+        tampered=default_checkpoint()
+        tampered["data_decision_fabric"]["digest"]="wrong"
+        report=checkpoint_integrity_report(tampered)
+        self.assertEqual(report["state"],"MISMATCH")
+        self.assertIn("data_decision_fabric",report["mismatches"])
+
+    def test_v15_checkpoint_without_data_decision_fabric_requires_v16_migration(self):
+        legacy=default_checkpoint()
+        legacy["checkpoint_version"]=15
+        legacy.pop("data_decision_fabric",None)
+        report=checkpoint_integrity_report(legacy)
+        self.assertEqual(report["state"],"MIGRATION_REQUIRED")
+        self.assertTrue(report["write_safe"])
+        self.assertTrue(any("data_decision_fabric" in x for x in report["migration_items"]))
+
     def test_integrity_report_confirms_v7_and_detects_tampering(self):
         cp=default_checkpoint()
         report=checkpoint_integrity_report(cp)
@@ -559,7 +618,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         })
         self.assertTrue(preflight["allowed"])
         self.assertEqual(preflight["mode"],"UPDATE_MIGRATION")
-        self.assertIn("V15",preflight["reason"])
+        self.assertIn("V16",preflight["reason"])
 
     def test_integrity_mismatch_blocks_runtime_write_preflight(self):
         tampered=default_checkpoint()

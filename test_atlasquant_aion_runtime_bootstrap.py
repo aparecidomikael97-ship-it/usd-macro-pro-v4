@@ -13,16 +13,16 @@ from atlasquant_aion_runtime_bootstrap import (
 
 
 class AtlasQuantAionRuntimeBootstrapTests(unittest.TestCase):
-    def test_bootstrap_checkpoint_is_v15_clean_and_safe(self):
+    def test_bootstrap_checkpoint_is_v16_clean_and_safe(self):
         cp=canonical_bootstrap_checkpoint()
-        self.assertGreaterEqual(cp["checkpoint_version"],15)
+        self.assertGreaterEqual(cp["checkpoint_version"],16)
         self.assertFalse(cp["operating"]["dirty"])
         self.assertFalse(cp["aion"]["real_trading"])
         self.assertIn("release_confidence",cp)
 
     def test_runtime_bootstrap_workflow_is_v14_and_runtime_branch_only(self):
         src=Path(".github/workflows/aion-runtime-checkpoint-bootstrap.yml").read_text(encoding="utf-8")
-        self.assertIn("Generate canonical V15 checkpoint",src)
+        self.assertIn("Generate canonical V16 checkpoint",src)
         self.assertIn("branch='atlasquant-runtime'",src)
         self.assertIn("contents: write",src)
         self.assertNotIn("branch='main'",src)
