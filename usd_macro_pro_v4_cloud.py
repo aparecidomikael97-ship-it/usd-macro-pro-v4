@@ -9270,6 +9270,7 @@ if _aq_active_index == 1:
             st.session_state,
             "master_panel",
             _MASTER_V102_IMPORT_ERROR or "IMPORT_UNAVAILABLE",
+            build_id=_ATLASQUANT_SOURCE_BUILD,
             unavailable=True,
         )
         st.error(
@@ -9427,7 +9428,11 @@ if _aq_active_index == 1:
                     else _scan_wait_master_v1022
                 ),
             )
-            mark_surface_ok(st.session_state, "master_panel")
+            mark_surface_ok(
+                st.session_state,
+                "master_panel",
+                build_id=_ATLASQUANT_SOURCE_BUILD,
+            )
             st.session_state.pop("atlasquant_master_panel_error", None)
         except Exception as _master_render_exc:
             st.session_state["atlasquant_master_panel_error"] = {
@@ -9437,6 +9442,7 @@ if _aq_active_index == 1:
                 st.session_state,
                 "master_panel",
                 _master_render_exc,
+                build_id=_ATLASQUANT_SOURCE_BUILD,
             )
             st.warning(
                 "Painel Mestre entrou em modo seguro; o restante do AtlasQuant continua disponível."
@@ -9861,7 +9867,10 @@ if _aq_active_index == 21:
             "environment": ATLASQUANT_ENVIRONMENT,
             "app_version": APP_VERSION,
             "market_status": "não confirmado nesta tela",
-            "critical_surfaces": surface_health_snapshot(st.session_state),
+            "critical_surfaces": surface_health_snapshot(
+                st.session_state,
+                current_build=_ATLASQUANT_SOURCE_BUILD,
+            ),
         }
         try:
             render_aion_admin_console(
@@ -9935,9 +9944,18 @@ if _aq_active_index == 0:
                     experience_mode=_aq_experience_mode,
                     macro_context=_macro_v108,
                 )
-                mark_surface_ok(st.session_state, "home_radar")
+                mark_surface_ok(
+                    st.session_state,
+                    "home_radar",
+                    build_id=_ATLASQUANT_SOURCE_BUILD,
+                )
             except Exception as _aq_home_exc:
-                mark_surface_error(st.session_state, "home_radar", _aq_home_exc)
+                mark_surface_error(
+                    st.session_state,
+                    "home_radar",
+                    _aq_home_exc,
+                    build_id=_ATLASQUANT_SOURCE_BUILD,
+                )
                 st.warning("Radar principal em modo seguro; nenhuma permissão operacional foi ampliada.")
                 st.caption(f"Diagnóstico Home Radar: {type(_aq_home_exc).__name__}")
         elif _ATLASQUANT_HOME_RADAR_IMPORT_ERROR:
@@ -9945,6 +9963,7 @@ if _aq_active_index == 0:
                 st.session_state,
                 "home_radar",
                 _ATLASQUANT_HOME_RADAR_IMPORT_ERROR,
+                build_id=_ATLASQUANT_SOURCE_BUILD,
                 unavailable=True,
             )
             st.caption(f"Home Radar indisponível: {_ATLASQUANT_HOME_RADAR_IMPORT_ERROR}")
@@ -9975,6 +9994,7 @@ if _aq_active_index == 0:
                     st.session_state,
                     "advanced_radar",
                     _PAIR_INTEL_V110_IMPORT_ERROR or "IMPORT_UNAVAILABLE",
+                    build_id=_ATLASQUANT_SOURCE_BUILD,
                     unavailable=True,
                 )
                 st.error("A Central Institucional V11.0.8 não pôde ser carregada.")
@@ -9990,7 +10010,11 @@ if _aq_active_index == 0:
                         weights=PESOS,
                         runtime_snapshot=_aq_runtime_snapshot,
                     )
-                    mark_surface_ok(st.session_state, "advanced_radar")
+                    mark_surface_ok(
+                        st.session_state,
+                        "advanced_radar",
+                        build_id=_ATLASQUANT_SOURCE_BUILD,
+                    )
                     st.session_state.pop("aq_radar_advanced_error", None)
                 except Exception as _aq_pair_intel_exc:
                     # Fault boundary: one advanced diagnostic must never take
@@ -10004,6 +10028,7 @@ if _aq_active_index == 0:
                         st.session_state,
                         "advanced_radar",
                         _aq_pair_intel_error,
+                        build_id=_ATLASQUANT_SOURCE_BUILD,
                     )
                     print(
                         "ATLASQUANT_RADAR_ADVANCED_ERROR "
