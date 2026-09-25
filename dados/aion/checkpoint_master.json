@@ -127,7 +127,7 @@
     "digest": "4f53cda18c2baa0c",
     "products": []
   },
-  "checkpoint_version": 13,
+  "checkpoint_version": 14,
   "continuity": {
     "digest": "f652dfa4d8649b5f",
     "handoffs": [],
@@ -411,6 +411,30 @@
   "release_confidence": {
     "digest": "4f53cda18c2baa0c0354bb5f",
     "records": []
+  },
+  "resilience": {
+    "automatic_destructive_action": false,
+    "circuit_breakers": [],
+    "delegations": [],
+    "digest": "d1b56d223501d5026d33af8f",
+    "external_ai_root_authority": false,
+    "real_trading_enabled": false,
+    "resource_governors": [],
+    "safe_mode": {
+      "automatic_destructive_action": false,
+      "diagnostics_allowed": true,
+      "executes_action": false,
+      "external_side_effects_allowed": false,
+      "mode": "NORMAL",
+      "read_allowed": true,
+      "real_trading_enabled": false,
+      "reasons": [],
+      "requires_independent_controller_for_kill_switch": true,
+      "schema": "ATLASQUANT_AION_RESILIENCE_V1",
+      "sensitive_tools_allowed": true
+    },
+    "schema": "ATLASQUANT_AION_RESILIENCE_V1",
+    "watchdogs": []
   },
   "schema": "ATLASQUANT_AION_MEMORY_V1",
   "studio": {
