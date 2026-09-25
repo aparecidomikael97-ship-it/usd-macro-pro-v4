@@ -9,10 +9,11 @@ class AtlasQuantAionMasterStatusBoardTests(unittest.TestCase):
             "checkpoint":{
                 "operating":{"tasks":[]},
                 "entitlements":{"records":[]},
+                "continuity":{"missions":[],"handoffs":[]},
             },
             "runtime_result":{
                 "status":"CONFIRMED",
-                "integrity":{"state":"CONFIRMED","matched":6,"total":6},
+                "integrity":{"state":"CONFIRMED","matched":7,"total":7},
             },
             "provider":{"state":"ZERO_COST_LOCAL"},
             "feature_flags":{},
@@ -168,20 +169,37 @@ class AtlasQuantAionMasterStatusBoardTests(unittest.TestCase):
         self.assertIn("studio",item["detail"])
         self.assertIn("Não sobrescrever",item["next_action"])
 
-    def test_checkpoint_v6_migration_is_visible_without_claiming_corruption(self):
+    def test_checkpoint_v7_migration_is_visible_without_claiming_corruption(self):
         board=self.base(runtime_result={
             "status":"CONFIRMED",
             "integrity":{
                 "state":"MIGRATION_REQUIRED",
-                "migration_items":["checkpoint_version 5 < 6"],
+                "migration_items":["checkpoint_version 6 < 7","continuity ausente"],
                 "matched":6,
-                "total":6,
+                "total":7,
             },
         })
         item=self.by_id(board,"checkpoint_integrity")
         self.assertEqual(item["state"],"BLOCKED")
         self.assertIn("migração",item["detail"].lower())
-        self.assertIn("V6",item["next_action"])
+        self.assertIn("V7",item["next_action"])
+
+    def test_v7_continuity_is_confirmed_only_with_runtime_integrity(self):
+        board=self.base()
+        item=self.by_id(board,"mission_continuity")
+        self.assertEqual(item["state"],"CONFIRMED")
+        self.assertIn("Checkpoint V7",item["detail"])
+
+        board=self.base(runtime_result={
+            "status":"CONFIRMED",
+            "integrity":{
+                "state":"MIGRATION_REQUIRED",
+                "migration_items":["continuity ausente"],
+            },
+        })
+        item=self.by_id(board,"mission_continuity")
+        self.assertEqual(item["state"],"BLOCKED")
+        self.assertIn("migração V7",item["next_action"])
 
     def test_status_rows_are_presentation_only(self):
         board=self.base()
