@@ -194,6 +194,41 @@ def local_answer(
             "Laboratório, Secretaria, Desenvolvimento ou Promoções."
         )
 
+    event_intelligence = (
+        system.get("event_intelligence")
+        if isinstance(system.get("event_intelligence"), Mapping)
+        else {}
+    )
+    top_event_alert = (
+        event_intelligence.get("top_alert")
+        if isinstance(event_intelligence.get("top_alert"), Mapping)
+        else {}
+    )
+    event_alert_state = str(top_event_alert.get("state") or "").upper()
+    event_rows = [
+        dict(x) for x in list(event_intelligence.get("events", []) or [])
+        if isinstance(x, Mapping)
+    ]
+    top_event = {}
+    if top_event_alert:
+        event_id = str(top_event_alert.get("event_id") or "")
+        top_event = next(
+            (x for x in event_rows if str(x.get("event_id") or "") == event_id),
+            {},
+        )
+    if event_alert_state in {"URGENT_INTERNAL","REVIEW_INTERNAL","HOLD","WATCH"}:
+        event_headline = str(top_event.get("headline") or "evento sem título confirmado")
+        event_truth = str(
+            top_event.get("event_truth")
+            or top_event_alert.get("event_truth")
+            or "UNKNOWN"
+        )
+        answer += (
+            f" Event Intelligence: {event_alert_state}; {event_headline}. "
+            f"Verdade do evento: {event_truth}. "
+            "Impactos associados permanecem hipóteses, não sinais."
+        )
+
     reliability = system.get("reliability") if isinstance(system.get("reliability"), Mapping) else {}
     degraded = (
         reliability.get("degraded_mode")
@@ -276,6 +311,10 @@ def local_answer(
         "reliability_posture": reliability_posture or "UNKNOWN",
         "degraded_mode_state": degraded_state or "UNKNOWN",
         "source_conflicts": source_conflicts,
+        "event_alert_state": event_alert_state or "NONE",
+        "event_active_alerts": int(event_intelligence.get("active_alerts") or 0),
+        "event_urgent_alerts": int(event_intelligence.get("urgent_alerts") or 0),
+        "event_external_notifications": False,
         "executes_action": False,
         "real_orders_enabled": False,
     }
