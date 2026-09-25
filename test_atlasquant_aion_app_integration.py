@@ -24,6 +24,18 @@ class AtlasQuantAionAppIntegrationTests(unittest.TestCase):
         self.assertLess(role_check, append)
         self.assertLess(append, active_index)
 
+    def test_single_link_aion_query_never_bypasses_admin_role(self):
+        src = APP.read_text(encoding="utf-8")
+        nav = src.index("# AION Portable Core — single-link entry contract.")
+        consume = src.index("consume_navigation_request(", nav)
+        block = src[nav:consume]
+        self.assertIn('str(_ATLASQUANT_ACCESS.get("role") or "").upper() == "ADMIN"', block)
+        self.assertIn('st.query_params.get("aion", "")', block)
+        self.assertIn("request_return_to_aion(st.session_state)", block)
+        self.assertIn("_aion_direct_link_consumed", block)
+        self.assertIn("never", block.lower())
+        self.assertLess(nav, consume)
+
     def test_aion_workspace_has_dedicated_index_and_admin_guard(self):
         src = APP.read_text(encoding="utf-8")
         start = src.index("if _aq_active_index == 21:")
