@@ -94,6 +94,7 @@ def normalize_source_observation(raw: Mapping[str, Any]) -> dict[str, Any]:
         "detail": _clean(item.get("detail") or item.get("note"), 700),
         "cost_state": _upper(item.get("cost_state") or "UNKNOWN"),
         "quota_remaining_pct": _finite(item.get("quota_remaining_pct")),
+        "family": _clean(item.get("family") or "runtime", 80).lower() or "runtime",
         "executes_action": False,
     }
 
