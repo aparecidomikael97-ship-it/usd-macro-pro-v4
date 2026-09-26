@@ -379,6 +379,18 @@ def render_beginner_shell(
             "automatic_execution":False,
         }
 
+    _fast_pages=["🎯 Radar","🎙️ Macro","🎓 Aprender","👤 Conta","📱 Instalar","💰 Investir","🛟 Suporte"]
+    try:
+        from atlasquant_premium_shell import consume_premium_navigation, render_premium_catalog
+        consume_premium_navigation(
+            st.session_state,
+            mode="Iniciante",
+            available_pages=_fast_pages,
+            fast=True,
+        )
+    except Exception:
+        render_premium_catalog = None
+
     age=float(check["age_minutes"] or 0.0)
     _obs=dict(snapshot.get("_fast_boot_observability",{}) or {})
     st.session_state["atlasquant_fast_boot_observability"]={
@@ -410,7 +422,14 @@ def render_beginner_shell(
             load_home_snapshot.clear()
             st.rerun()
 
-    pages=["🎯 Radar","🎙️ Macro","🎓 Aprender","👤 Conta","📱 Instalar","💰 Investir","🛟 Suporte"]
+    pages=_fast_pages
+    if render_premium_catalog is not None:
+        render_premium_catalog(
+            mode="Iniciante",
+            available_pages=pages,
+            fast=True,
+            active_page=str(st.session_state.get("aq_beginner_page") or "🎯 Radar"),
+        )
     page=st.radio("Área",pages,horizontal=True,key="aq_beginner_page",label_visibility="collapsed")
     if experience_compass_html is not None:
         st.markdown(

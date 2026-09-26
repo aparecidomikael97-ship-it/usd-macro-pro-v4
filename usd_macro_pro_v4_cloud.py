@@ -395,6 +395,15 @@ except Exception as _atlasquant_ui_exc:
     context_strip_html = None
     _ATLASQUANT_UI_IMPORT_ERROR = f"{type(_atlasquant_ui_exc).__name__}: {_atlasquant_ui_exc}"
 
+try:
+    from atlasquant_premium_shell import (
+        consume_premium_navigation,
+        render_premium_catalog,
+    )
+except Exception:
+    consume_premium_navigation = None
+    render_premium_catalog = None
+
 
 try:
     from atlasquant_macro_briefing_panel import render_macro_briefing_panel
@@ -4278,6 +4287,26 @@ if navigation_groups_html is not None:
     st.markdown(navigation_groups_html(), unsafe_allow_html=True)
 if mobile_navigation_hint_html is not None:
     st.markdown(mobile_navigation_hint_html(), unsafe_allow_html=True)
+
+if consume_premium_navigation is not None:
+    consume_premium_navigation(
+        st.session_state,
+        mode=_aq_experience_mode,
+        available_pages=_nav_items,
+        fast=False,
+    )
+if render_premium_catalog is not None:
+    _aq_nav_key = (
+        "atlasquant_advanced_area"
+        if str(_aq_experience_mode).casefold().startswith("avan")
+        else "atlasquant_beginner_area_full"
+    )
+    render_premium_catalog(
+        mode=_aq_experience_mode,
+        available_pages=_nav_items,
+        fast=False,
+        active_page=str(st.session_state.get(_aq_nav_key) or "🎯 Radar"),
+    )
 
 if render_stable_navigation is not None:
     _aq_active_page = render_stable_navigation(

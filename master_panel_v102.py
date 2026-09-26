@@ -562,6 +562,13 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
                         scanner_refresh_remaining: int = 0) -> None:
     st.markdown(OPERATIONAL_SPINE_CSS,unsafe_allow_html=True)
     st.subheader("🧠 Painel Mestre de Oportunidades — V10.7.4")
+    try:
+        from atlasquant_premium_shell import PREMIUM_CSS, master_command_html
+        st.markdown(PREMIUM_CSS, unsafe_allow_html=True)
+        _universe_n = 0 if matrix is None or getattr(matrix, "empty", True) else min(7, len(matrix))
+        st.markdown(master_command_html(operational_count=_universe_n), unsafe_allow_html=True)
+    except Exception:
+        pass
     st.caption(
         "Decisão Automática + Macro Market Map + H4/H1/M15 + ADR14 em uma única visão dos 7 pares. "
         "O painel serve para priorização; não transforma índice em probabilidade de lucro. "
