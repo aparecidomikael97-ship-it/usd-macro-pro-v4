@@ -411,6 +411,31 @@ html { scroll-behavior: smooth; }
   .aq-compass-grid{grid-template-columns:1fr}
   .aq-compass-grid .wide{grid-column:auto}
 }
+.stApp [data-testid="stMarkdownContainer"] p,
+.stApp h1, .stApp h2, .stApp h3, .stApp h4,
+.stApp [data-testid="stCaptionContainer"],
+.stApp [data-testid="stCaptionContainer"] *,
+.stApp [data-testid="stRadio"] label,
+.stApp [data-testid="stRadio"] label *,
+.stApp [data-testid="stSelectbox"] label,
+.stApp [data-testid="stSelectbox"] label *,
+.stApp [data-testid="stCheckbox"] label,
+.stApp [data-testid="stCheckbox"] label * {
+  color: #e8eef7 !important;
+  -webkit-text-fill-color: #e8eef7 !important;
+}
+.stApp [data-testid="stAlert"] [data-testid="stMarkdownContainer"] p,
+.stApp [data-testid="stAlert"] p {
+  color: inherit !important;
+  -webkit-text-fill-color: inherit !important;
+}
+.stApp [data-testid="stButton"] button:not([kind="primary"]),
+.stApp [data-testid="stButton"] button:not([kind="primary"]) * {
+  color: #f4f8ff !important;
+  -webkit-text-fill-color: #f4f8ff !important;
+  background: #16324f !important;
+  border-color: rgba(163,190,222,.45) !important;
+}
 </style>
 """
 
@@ -594,6 +619,12 @@ def navigation_mode_css(mode: object) -> str:
 
 def render_experience_mode_switch() -> str:
     current=normalize_experience_mode(st.session_state.get("atlasquant_experience_mode","Iniciante"))
+    # The fast beginner shell may already have mounted this radio in the same
+    # run. Creating it again crashes the switch into Modo Avançado.
+    if st.session_state.get("_aq_experience_switch_mounted"):
+        mode=current
+        st.session_state["atlasquant_view_mode"]="Básico" if mode=="Iniciante" else "Pro"
+        return mode
     mode=st.radio(
         "Experiência",
         ["Iniciante","Avançado"],

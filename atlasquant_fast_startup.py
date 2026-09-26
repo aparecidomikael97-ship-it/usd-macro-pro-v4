@@ -297,6 +297,23 @@ def _brief_events(snapshot:Mapping[str,Any])->list[dict[str,Any]]:
     }]
 
 
+def _render_beginner_chrome(app_version:str, environment:str)->None:
+    """Show the shared AtlasQuant surface before the fast shell stops the script."""
+    try:
+        from atlasquant_ui_v1 import (
+            apply_atlasquant_theme,
+            experience_mode_overview_html,
+            mobile_navigation_hint_html,
+            render_atlasquant_header,
+        )
+        apply_atlasquant_theme()
+        render_atlasquant_header(app_version or "AtlasQuant", environment or "LOCAL")
+        st.markdown(experience_mode_overview_html("Iniciante"), unsafe_allow_html=True)
+        st.markdown(mobile_navigation_hint_html(), unsafe_allow_html=True)
+    except Exception:
+        st.markdown("## 🧭 AtlasQuant")
+
+
 def render_beginner_shell(
     snapshot:Mapping[str,Any],
     *,
@@ -316,12 +333,14 @@ def render_beginner_shell(
             key="atlasquant_experience_mode",
             help="Iniciante aguarda snapshot válido. Avançado abre os diagnósticos completos.",
         )
+        st.session_state["_aq_experience_switch_mounted"] = True
         if str(mode).casefold().startswith("avan"):
             return {
                 "handled":False,"mode":"Avançado","snapshot_valid":False,
                 "errors":check["errors"],"real_orders_enabled":False,
                 "automatic_execution":False,
             }
+        _render_beginner_chrome(app_version, environment)
         st.markdown("## 🧭 AtlasQuant")
         st.warning("Radar temporariamente aguardando dados válidos.")
         st.caption("O snapshot não passou na validação de frescor/segurança. Nenhuma oportunidade é exibida até a próxima atualização válida.")
@@ -346,6 +365,7 @@ def render_beginner_shell(
         key="atlasquant_experience_mode",
         help="Iniciante abre rápido e mostra só o essencial. Avançado libera todos os diagnósticos.",
     )
+    st.session_state["_aq_experience_switch_mounted"] = True
     if str(mode).casefold().startswith("avan"):
         # The widget interaction already updates session state. Continue into the
         # full app in this same run instead of forcing a second React/Streamlit
@@ -369,11 +389,12 @@ def render_beginner_shell(
         "snapshot_valid":True,
         "mode":"Iniciante",
     }
+    _render_beginner_chrome(app_version, environment)
     st.markdown(
         """<div style="border:1px solid rgba(137,170,210,.18);border-radius:16px;padding:13px 16px;
         background:linear-gradient(120deg,rgba(17,43,72,.96),rgba(8,25,43,.94));margin:2px 0 10px">
         <strong style="font-size:1.15rem">🧭 AtlasQuant</strong><br>
-        <span style="opacity:.72;font-size:.78rem">Modo Iniciante · carregamento rápido por snapshot validado</span>
+        <span style="color:#e7eef8;font-size:.82rem;font-weight:700">Modo Iniciante · carregamento rápido por snapshot validado</span>
         </div>""",
         unsafe_allow_html=True,
     )
@@ -407,6 +428,11 @@ def render_beginner_shell(
             list(snapshot.get("packs",[]) or []),
             experience_mode="Iniciante",
             macro_context=_macro,
+            ranking=list(_fast.get("ranking",[]) or []),
+            separate_observations={
+                "indices": list(_fast.get("indices",[]) or []),
+                "cryptos": list(_fast.get("cryptos",[]) or []),
+            },
         )
     elif page=="🎙️ Macro":
         from atlasquant_macro_briefing_panel import render_macro_briefing_panel

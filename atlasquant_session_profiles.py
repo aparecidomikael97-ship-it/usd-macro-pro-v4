@@ -18,6 +18,14 @@ SESSION_PROFILES={
     "Dia · Nova York + continuidade":("NEW_YORK","AFTER_NEW_YORK"),
 }
 
+# User-facing Radar filters. They only alias the profiles above.
+SESSION_FILTERS=(
+    ("Ambos","Todos os horários"),
+    ("Noite","Noite/madrugada · Ásia + Londres"),
+    ("Dia","Dia · Nova York + continuidade"),
+)
+SESSION_FILTER_OPTIONS=tuple(label for label,_profile in SESSION_FILTERS)
+
 SESSION_LABELS={
     "ASIA":"Ásia",
     "LONDON":"Londres",
@@ -113,9 +121,28 @@ def extract_session_bucket(pack:Mapping[str,Any]|None)->str:
     return "UNKNOWN"
 
 
-def normalize_session_profile(value:Any)->str:
+def profile_for_filter(value:Any)->str:
+    """Map Dia / Noite / Ambos, and the legacy labels, to one session profile."""
     raw=str(value or "").strip()
-    return raw if raw in SESSION_PROFILES else "Todos os horários"
+    if raw in SESSION_PROFILES:
+        return raw
+    folded=raw.casefold()
+    for label, profile in SESSION_FILTERS:
+        if folded==label.casefold() or folded==profile.casefold():
+            return profile
+    return "Todos os horários"
+
+
+def filter_label_for_profile(value:Any)->str:
+    profile=profile_for_filter(value)
+    for label, candidate in SESSION_FILTERS:
+        if candidate==profile:
+            return label
+    return "Ambos"
+
+
+def normalize_session_profile(value:Any)->str:
+    return profile_for_filter(value)
 
 
 def session_profile_match(bucket:Any, profile:Any)->str:
@@ -177,9 +204,10 @@ def session_profile_summary(
 
 
 __all__=[
-    "SESSION_PROFILES","SESSION_LABELS",
+    "SESSION_PROFILES","SESSION_LABELS","SESSION_FILTERS","SESSION_FILTER_OPTIONS",
     "session_bucket_from_label","session_bucket_from_timestamp",
     "extract_session_bucket","normalize_session_profile",
+    "profile_for_filter","filter_label_for_profile",
     "session_profile_match","prioritize_rows_for_session",
     "session_profile_summary",
 ]
