@@ -436,6 +436,82 @@ html { scroll-behavior: smooth; }
   background: #16324f !important;
   border-color: rgba(163,190,222,.45) !important;
 }
+/* Experience chips: Streamlit renders each option as label[data-testid="stRadioOption"].
+   These rules outrank the light canvas text so Iniciante/Avançado stay dark on a light chip
+   (>= 4.5:1) in normal, hover, focus and selected states. */
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"],
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"] *,
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"] [data-testid="stMarkdownContainer"] p {
+  color: #182230 !important;
+  -webkit-text-fill-color: #182230 !important;
+  opacity: 1 !important;
+  font-weight: 750 !important;
+}
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"] {
+  background: #f4f7fb !important;
+  border-radius: 10px !important;
+  box-shadow: inset 0 0 0 1px #d5deea !important;
+}
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"]:hover,
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"]:hover *,
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"]:hover [data-testid="stMarkdownContainer"] p,
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"][data-hovered],
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"][data-hovered] *,
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"][data-hovered] [data-testid="stMarkdownContainer"] p {
+  color: #101820 !important;
+  -webkit-text-fill-color: #101820 !important;
+}
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"]:hover,
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"][data-hovered] {
+  background: #e8eef6 !important;
+}
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"]:focus-within,
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"]:focus-within *,
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"]:focus-within [data-testid="stMarkdownContainer"] p,
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"][data-focused],
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"][data-focused] *,
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"][data-focused] [data-testid="stMarkdownContainer"] p,
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"][data-focus-visible],
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"][data-focus-visible] *,
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"][data-focus-visible] [data-testid="stMarkdownContainer"] p {
+  color: #101820 !important;
+  -webkit-text-fill-color: #101820 !important;
+}
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"]:focus-within,
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"][data-focused],
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"][data-focus-visible] {
+  background: #e8eef6 !important;
+  outline: 2px solid #1d4e89 !important;
+  outline-offset: 2px !important;
+}
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"][data-selected],
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"][data-selected] *,
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"][data-selected] [data-testid="stMarkdownContainer"] p,
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"]:has(input:checked),
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"]:has(input:checked) *,
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"]:has(input:checked) [data-testid="stMarkdownContainer"] p {
+  color: #0e1726 !important;
+  -webkit-text-fill-color: #0e1726 !important;
+}
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"][data-selected],
+.stApp [data-testid="stRadio"] [data-testid="stRadioOption"]:has(input:checked) {
+  background: #d9e6f5 !important;
+  box-shadow: inset 0 0 0 1px #24527f !important;
+}
+.stApp [data-testid="stSidebar"] [data-testid="stRadio"] [data-testid="stRadioOption"],
+.stApp [data-testid="stSidebar"] [data-testid="stRadio"] [data-testid="stRadioOption"] *,
+.stApp [data-testid="stSidebar"] [data-testid="stRadio"] [data-testid="stRadioOption"]:hover,
+.stApp [data-testid="stSidebar"] [data-testid="stRadio"] [data-testid="stRadioOption"]:hover *,
+.stApp [data-testid="stSidebar"] [data-testid="stRadio"] [data-testid="stRadioOption"]:focus-within,
+.stApp [data-testid="stSidebar"] [data-testid="stRadio"] [data-testid="stRadioOption"]:focus-within *,
+.stApp [data-testid="stSidebar"] [data-testid="stRadio"] [data-testid="stRadioOption"][data-selected],
+.stApp [data-testid="stSidebar"] [data-testid="stRadio"] [data-testid="stRadioOption"][data-selected] * {
+  color: var(--aq-muted-strong) !important;
+  -webkit-text-fill-color: var(--aq-muted-strong) !important;
+  background: #10233a !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
 </style>
 """
 
