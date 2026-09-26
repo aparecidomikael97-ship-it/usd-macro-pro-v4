@@ -24,11 +24,19 @@ from atlasquant_operational_state import (
     operational_strip_html,
 )
 from atlasquant_session_profiles import (
-    SESSION_PROFILES,
+    SESSION_FILTER_OPTIONS,
     SESSION_LABELS,
     extract_session_bucket,
+    filter_label_for_profile,
     prioritize_rows_for_session,
+    profile_for_filter,
     session_profile_summary,
+)
+from atlasquant_radar_board import (
+    compose_fx_board,
+    crypto_ranking,
+    highlight_top_fx,
+    index_ranking,
 )
 
 SCHEMA="ATLASQUANT_HOME_RADAR_V1"
@@ -304,7 +312,12 @@ HOME_CSS="""
 .aq-home-signal{margin-top:9px;color:#ffffff;font-size:.82rem;font-weight:900;letter-spacing:.025em}
 .aq-home-time{margin-top:3px;color:#eef4fb;font-size:.70rem;font-weight:700;line-height:1.35}
 .aq-home-detail{border:1px solid rgba(137,170,210,.18);border-radius:15px;padding:14px 16px;background:rgba(10,26,44,.68);margin-top:8px}
-@media(max-width:760px){.aq-home-hero{padding:14px 15px}.aq-home-hero h2{font-size:1.3rem}.aq-home-card{min-height:165px}.aq-home-grid{grid-template-columns:1fr}.aq-home-top{align-items:flex-start}}
+.aq-rank-board{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;margin:8px 0 14px}
+.aq-rank-card{border:1px solid rgba(163,190,222,.34);border-radius:12px;padding:11px 12px;background:#10233a;color:#f7fbff;min-height:108px}
+.aq-rank-card strong{display:block;color:#ffffff;font-size:.98rem}
+.aq-rank-card em{display:block;margin-top:2px;color:#d7e6f6;font-style:normal;font-size:.75rem;font-weight:750}
+.aq-rank-card span{display:block;margin-top:6px;color:#eef4fb;font-size:.78rem;font-weight:700;line-height:1.35}
+@media(max-width:760px){.aq-home-hero{padding:14px 15px}.aq-home-hero h2{font-size:1.3rem}.aq-home-card{min-height:0}.aq-home-grid{grid-template-columns:1fr}.aq-home-top{align-items:flex-start}.aq-rank-board{grid-template-columns:1fr}}
 </style>
 """
 
@@ -318,13 +331,39 @@ def render_browser_voice(script:str, *, key:str)->None:
     )
 
 
+def _separate_board_html(title:str, rows:Sequence[Mapping[str,Any]])->str:
+    cards=[]
+    for row in list(rows or []):
+        score=row.get("score")
+        score_text="sem score ao vivo" if score is None else f"{float(score):.0f}/100 observação"
+        cards.append(
+            '<div class="aq-rank-card">'
+            f'<strong>{escape(str(row.get("rank") or "—"))}. {escape(str(row.get("symbol") or "—"))}</strong>'
+            f'<em>{escape(str(row.get("name") or ""))}</em>'
+            f'<span>{escape(str(row.get("action") or "NÃO OPERAR"))} · {escape(str(row.get("state") or ""))}</span>'
+            f'<span>{escape(score_text)}</span>'
+            '</div>'
+        )
+    return (
+        f'<h3 style="color:#ffffff;margin:8px 0 4px">{escape(title)}</h3>'
+        '<div class="aq-rank-board">' + "".join(cards) + "</div>"
+    )
+
+
 def render_home_radar(
     packs:Sequence[Mapping[str,Any]]|None,
     *,
     experience_mode:str="Iniciante",
     macro_context:Mapping[str,Any]|None=None,
+    ranking:Any=None,
+    separate_observations:Mapping[str,Any]|None=None,
 )->dict[str,Any]:
-    rows=home_rows_from_packs(packs)
+    pack_rows=home_rows_from_packs(packs)
+    board=compose_fx_board(pack_rows, ranking)
+    rows=list(board["rows"])
+    observations=dict(separate_observations or {})
+    indices=index_ranking(observations.get("indices"))
+    cryptos=crypto_ranking(observations.get("cryptos"))
     mode="Avançado" if str(experience_mode).casefold().startswith("avan") else "Iniciante"
     st.markdown(HOME_CSS,unsafe_allow_html=True)
     st.markdown(OPERATIONAL_SPINE_CSS,unsafe_allow_html=True)
@@ -340,21 +379,25 @@ def render_home_radar(
         return {"schema":SCHEMA,"rows":0,"mode":mode,"real_orders_enabled":False}
 
     st.markdown("### 🕒 Meu horário disponível")
-    profile_options=list(SESSION_PROFILES)
-    stored_profile=st.session_state.get("aq_session_profile","Todos os horários")
+    profile_options=list(SESSION_FILTER_OPTIONS)
+    stored_profile=filter_label_for_profile(st.session_state.get("aq_session_profile","Ambos"))
     if stored_profile not in profile_options:
-        stored_profile="Todos os horários"
-    profile=st.radio(
+        stored_profile="Ambos"
+    if st.session_state.get("aq_session_profile")!=stored_profile:
+        st.session_state["aq_session_profile"]=stored_profile
+    profile_label=st.radio(
         "Priorizar o Radar para",
         profile_options,
         index=profile_options.index(stored_profile),
         horizontal=True,
         key="aq_session_profile",
         help=(
-            "Isto reorganiza onde olhar primeiro conforme seu horário. "
-            "Não muda viés, score, Gate ou execução."
+            "Ambos mostra o dia inteiro. Noite prioriza Ásia e Londres. "
+            "Dia prioriza Nova York e a continuidade. "
+            "O filtro só reorganiza a atenção: não muda viés, score, Gate ou execução."
         ),
     )
+    profile=profile_for_filter(profile_label)
     rows=prioritize_rows_for_session(rows,profile)
     session_summary=session_profile_summary(rows,profile)
     summary=home_summary(rows)
@@ -377,17 +420,22 @@ def render_home_radar(
     st.caption(session_summary["interpretation"])
 
     a,b,c,d=st.columns(4)
-    a.metric("Pares avaliados",summary["total"])
+    a.metric("Forex monitorados",f"{board['monitored']}/28")
     b.metric("Com contexto",summary["actionable"])
     c.metric("Não operar",summary["blocked"])
     d.metric("Melhor leitura",summary["best_pair"])
+    st.caption(
+        f"{board['monitored']} pares Forex monitorados · "
+        f"leitura institucional {board['institutional']} · radar macro {board['macro_only']} · "
+        f"sem leitura {board['missing']}. Índices e criptos ficam em rankings separados."
+    )
 
     top_n=min(RADAR_VISIBLE_LIMIT,len(rows))
-    top=rows[:top_n]
+    top=highlight_top_fx(rows, top_n)
     st.markdown("### Top 10 em observação")
     st.caption(
-        "O Radar mostra até 10 ativos que merecem atenção no snapshot atual. "
-        "Estar no Top 10 não significa entrada autorizada."
+        "O Radar mostra até 10 ativos Forex que merecem atenção no snapshot atual. "
+        "O destaque é dinâmico e não significa entrada autorizada."
     )
     cols=st.columns(min(3,len(top)))
     for idx,row in enumerate(top):
@@ -395,6 +443,36 @@ def render_home_radar(
             st.markdown(_card_html(row),unsafe_allow_html=True)
             if st.button(f"Ver por que · {row['pair']}",key=f"aq_home_open_{row['pair'].replace('/','_')}",width="stretch"):
                 st.session_state["aq_home_pair"]=row["pair"]
+
+    st.markdown("### Rankings separados")
+    st.caption(
+        "Índices e criptos não entram no TOP 10 Forex e não herdam pesos do universo de moedas. "
+        "Sem motor próprio validado, a ação permanece NÃO OPERAR."
+    )
+    st.markdown(_separate_board_html("Ranking de índices", indices), unsafe_allow_html=True)
+    st.markdown(_separate_board_html("Ranking de criptos", cryptos), unsafe_allow_html=True)
+    if mode=="Avançado":
+        st.dataframe(
+            pd.DataFrame([{
+                "Classe":"Índice",
+                "Ativo":row["symbol"],
+                "Nome":row["name"],
+                "Rank":row["rank"],
+                "Ação":row["action"],
+                "Estado":row["state"],
+                "Score":row["score"],
+            } for row in indices] + [{
+                "Classe":"Cripto",
+                "Ativo":row["symbol"],
+                "Nome":row["name"],
+                "Rank":row["rank"],
+                "Ação":row["action"],
+                "Estado":row["state"],
+                "Score":row["score"],
+            } for row in cryptos]),
+            width="stretch",
+            hide_index=True,
+        )
 
     options=[r["pair"] for r in rows]
     stored=st.session_state.get("aq_home_pair")
@@ -469,7 +547,12 @@ def render_home_radar(
         "selected_pair":row["pair"],
         "selected_action":row["action"],
         "session_profile":profile,
+        "session_filter":profile_label,
         "session_summary":session_summary,
+        "fx_monitored":board["monitored"],
+        "fx_top":[row["pair"] for row in top],
+        "indices":[row["symbol"] for row in indices],
+        "cryptos":[row["symbol"] for row in cryptos],
         "real_orders_enabled":False,
         "automatic_execution":False,
     }

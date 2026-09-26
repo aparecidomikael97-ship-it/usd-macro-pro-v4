@@ -2072,6 +2072,30 @@ def metricas_backtest(hist):
 # =========================================================
 # Em uso interativo, tenta abrir a Home a partir de um único snapshot já
 # calculado pelo Autopilot. O run headless continua sempre completo.
+# Guided navigation is consumed here as well: the fast shell calls st.stop()
+# and would otherwise hide Radar Avançado, Painel Mestre and the AION link.
+if (
+    str(_ATLASQUANT_ACCESS.get("role") or "").upper() == "ADMIN"
+    and not bool(st.session_state.get("_aion_direct_link_consumed", False))
+):
+    try:
+        _aion_direct_raw = st.query_params.get("aion", "")
+        if isinstance(_aion_direct_raw, (list, tuple)):
+            _aion_direct_raw = _aion_direct_raw[0] if _aion_direct_raw else ""
+        if str(_aion_direct_raw or "").strip().casefold() in {"1", "true", "sim", "central"}:
+            request_return_to_aion(st.session_state)
+            st.session_state["_aion_direct_link_consumed"] = True
+    except Exception:
+        pass
+_aq_early_pages = list(navigation_labels()) if navigation_labels is not None else []
+if str(_ATLASQUANT_ACCESS.get("role") or "").upper() == "ADMIN" and "🧠 AION" not in _aq_early_pages:
+    _aq_early_pages.append("🧠 AION")
+if _aq_early_pages:
+    try:
+        consume_navigation_request(st.session_state, available_pages=_aq_early_pages)
+    except Exception:
+        pass
+st.session_state["_aq_experience_switch_mounted"] = False
 if os.getenv("USD_MACRO_AUTOPILOT", "") != "1" and not _ATLASQUANT_OFFLINE_SMOKE:
     try:
         from atlasquant_fast_startup import load_home_snapshot, render_beginner_shell
@@ -9377,160 +9401,160 @@ if _aq_active_index == 1:
                     error_type="PAIR_MATRIX_UNAVAILABLE",
                 )
                 st.warning("Painel Mestre aguardando a Matriz dos 7 pares. Nenhuma oportunidade será exibida com dados incompletos.")
-                st.stop()
-            _macro_context_master_v102 = {
-                "usd_score": float(usd_detalhado.get("score", 50.0)),
-                "usd_components": dict(usd_detalhado.get("componentes", {})),
-                "usd_quality": float(qualidade_usd),
-                "fed_tone": str(fed.get("tom", "Neutro")),
-                "fed_strength": float(fed.get("forca", 0.0)),
-                "trend": _score_tendencias_eua(),
-                "surprise_adjustment": float(st.session_state.get("usd_ajuste_surpresas", 0.0)),
-                "event": _proximo_evento_macro_v65(),
-                "fomc_score": (
-                    float(st.session_state.get("v76_fomc_usd_score", 50.0))
-                    if st.session_state.get("v77_fomc_integrado", False) else None
-                ),
-                "fomc_weight": float(st.session_state.get("v77_peso_fomc", 0.0)) * 100.0,
-            }
-            _scanner_state_master_v102 = _scanner_load_v934()
-            _aq_master_uses_runtime_fallback = (
-                str(_aq_pair_matrix_result.get("source") or "") == "runtime_snapshot"
-            )
-            if _aq_master_uses_runtime_fallback:
-                # Snapshot mantém o painel visível, mas o gate operacional fica
-                # deliberadamente fechado até a Matriz ao vivo ser reconstruída.
-                _scanner_state_master_v102 = {}
-                _aq_fallback_age = _aq_pair_matrix_result.get("fallback_age_minutes")
-                _aq_age_txt = (
-                    f" · idade {_aq_fallback_age:.0f} min"
-                    if isinstance(_aq_fallback_age, (int, float)) else ""
+            else:
+                _macro_context_master_v102 = {
+                    "usd_score": float(usd_detalhado.get("score", 50.0)),
+                    "usd_components": dict(usd_detalhado.get("componentes", {})),
+                    "usd_quality": float(qualidade_usd),
+                    "fed_tone": str(fed.get("tom", "Neutro")),
+                    "fed_strength": float(fed.get("forca", 0.0)),
+                    "trend": _score_tendencias_eua(),
+                    "surprise_adjustment": float(st.session_state.get("usd_ajuste_surpresas", 0.0)),
+                    "event": _proximo_evento_macro_v65(),
+                    "fomc_score": (
+                        float(st.session_state.get("v76_fomc_usd_score", 50.0))
+                        if st.session_state.get("v77_fomc_integrado", False) else None
+                    ),
+                    "fomc_weight": float(st.session_state.get("v77_peso_fomc", 0.0)) * 100.0,
+                }
+                _scanner_state_master_v102 = _scanner_load_v934()
+                _aq_master_uses_runtime_fallback = (
+                    str(_aq_pair_matrix_result.get("source") or "") == "runtime_snapshot"
                 )
-                st.warning(
-                    "Painel Mestre em continuidade segura por snapshot runtime validado"
-                    + _aq_age_txt
-                    + ". Autorizações operacionais permanecem bloqueadas até a Matriz ao vivo voltar."
-                )
+                if _aq_master_uses_runtime_fallback:
+                    # Snapshot mantém o painel visível, mas o gate operacional fica
+                    # deliberadamente fechado até a Matriz ao vivo ser reconstruída.
+                    _scanner_state_master_v102 = {}
+                    _aq_fallback_age = _aq_pair_matrix_result.get("fallback_age_minutes")
+                    _aq_age_txt = (
+                        f" · idade {_aq_fallback_age:.0f} min"
+                        if isinstance(_aq_fallback_age, (int, float)) else ""
+                    )
+                    st.warning(
+                        "Painel Mestre em continuidade segura por snapshot runtime validado"
+                        + _aq_age_txt
+                        + ". Autorizações operacionais permanecem bloqueadas até a Matriz ao vivo voltar."
+                    )
 
-            # -------------------------------------------------
-            # V10.2.2 — Atualização técnica direta pelo Painel
-            # Mestre. Atualiza no máximo 2 pares por clique.
-            # -------------------------------------------------
-            def _master_refresh_scanner_batch_v1022():
-                if not CHAVE_TWELVE_DATA:
-                    return False, "CHAVE_TWELVE_DATA ausente."
+                # -------------------------------------------------
+                # V10.2.2 — Atualização técnica direta pelo Painel
+                # Mestre. Atualiza no máximo 2 pares por clique.
+                # -------------------------------------------------
+                def _master_refresh_scanner_batch_v1022():
+                    if not CHAVE_TWELVE_DATA:
+                        return False, "CHAVE_TWELVE_DATA ausente."
 
-                _state1022 = _scanner_load_v934()
-                _results1022 = dict(_state1022.get("resultados", {}) or {})
-                _last1022 = float(_state1022.get("ultimo_processamento_ts", 0.0) or 0.0)
-                _wait1022 = max(0, int(61 - (time.time() - _last1022))) if _last1022 else 0
-                if _wait1022 > 0:
-                    return False, f"Aguarde ~{_wait1022}s antes de nova atualização técnica."
+                    _state1022 = _scanner_load_v934()
+                    _results1022 = dict(_state1022.get("resultados", {}) or {})
+                    _last1022 = float(_state1022.get("ultimo_processamento_ts", 0.0) or 0.0)
+                    _wait1022 = max(0, int(61 - (time.time() - _last1022))) if _last1022 else 0
+                    if _wait1022 > 0:
+                        return False, f"Aguarde ~{_wait1022}s antes de nova atualização técnica."
 
-                def _age_result1022(_raw):
-                    try:
-                        _stamp = _raw.get("processado_em")
-                        if _stamp in (None, ""):
+                    def _age_result1022(_raw):
+                        try:
+                            _stamp = _raw.get("processado_em")
+                            if _stamp in (None, ""):
+                                return 10**9
+                            if isinstance(_stamp, (int, float)):
+                                return max(0.0, (time.time() - float(_stamp)) / 60.0)
+                            _ts = pd.Timestamp(_stamp)
+                            if _ts.tzinfo is None:
+                                _ts = _ts.tz_localize("UTC")
+                            else:
+                                _ts = _ts.tz_convert("UTC")
+                            return max(0.0, (pd.Timestamp.now(tz="UTC") - _ts).total_seconds() / 60.0)
+                        except Exception:
                             return 10**9
-                        if isinstance(_stamp, (int, float)):
-                            return max(0.0, (time.time() - float(_stamp)) / 60.0)
-                        _ts = pd.Timestamp(_stamp)
-                        if _ts.tzinfo is None:
-                            _ts = _ts.tz_localize("UTC")
-                        else:
-                            _ts = _ts.tz_convert("UTC")
-                        return max(0.0, (pd.Timestamp.now(tz="UTC") - _ts).total_seconds() / 60.0)
-                    except Exception:
-                        return 10**9
 
-                _candidates1022 = []
-                for _, _row1022 in _matrix_master_v102.head(7).iterrows():
-                    _pair1022 = str(_row1022["Par"])
-                    _raw1022 = _results1022.get(_pair1022, {})
-                    _tec1022 = _raw1022.get("tecnico", {}) if isinstance(_raw1022, dict) else {}
-                    _available1022 = bool(_tec1022.get("disponivel", False))
-                    _age1022 = _age_result1022(_raw1022 if isinstance(_raw1022, dict) else {})
-                    if (not _available1022) or _age1022 > 45.0:
-                        _candidates1022.append((_age1022, _pair1022, str(_row1022["Direção"])))
+                    _candidates1022 = []
+                    for _, _row1022 in _matrix_master_v102.head(7).iterrows():
+                        _pair1022 = str(_row1022["Par"])
+                        _raw1022 = _results1022.get(_pair1022, {})
+                        _tec1022 = _raw1022.get("tecnico", {}) if isinstance(_raw1022, dict) else {}
+                        _available1022 = bool(_tec1022.get("disponivel", False))
+                        _age1022 = _age_result1022(_raw1022 if isinstance(_raw1022, dict) else {})
+                        if (not _available1022) or _age1022 > 45.0:
+                            _candidates1022.append((_age1022, _pair1022, str(_row1022["Direção"])))
 
-                if not _candidates1022:
-                    return True, "Os 7 pares já possuem técnica atual (≤45 min)."
+                    if not _candidates1022:
+                        return True, "Os 7 pares já possuem técnica atual (≤45 min)."
 
-                # Mais antigos/ausentes primeiro.
-                _candidates1022.sort(key=lambda x: x[0], reverse=True)
-                _batch1022 = _candidates1022[:2]
-                _updated1022 = []
-                _errors1022 = []
+                    # Mais antigos/ausentes primeiro.
+                    _candidates1022.sort(key=lambda x: x[0], reverse=True)
+                    _batch1022 = _candidates1022[:2]
+                    _updated1022 = []
+                    _errors1022 = []
 
-                for _, _pair1022, _dir1022 in _batch1022:
-                    try:
-                        _td_time_series_v92.clear()
-                    except Exception:
-                        pass
+                    for _, _pair1022, _dir1022 in _batch1022:
+                        try:
+                            _td_time_series_v92.clear()
+                        except Exception:
+                            pass
 
-                    try:
-                        _tec1022 = _pacote_tecnico_v92(_pair1022, _dir1022)
-                        _timing1022 = globals().get("_timing91", "🟡 ATENÇÃO")
-                        _dec1022, _txt1022 = _decisao_tecnica_final_v92(
-                            _tec1022, _timing1022, _dir1022
-                        )
-                        _results1022[_pair1022] = {
-                            "tecnico": _tec_to_json_v934(_tec1022),
-                            "decisao": _dec1022,
-                            "texto": _txt1022,
-                            "processado_em": time.time(),
-                            "tentativa_v1022": True,
-                            "versao_tentativa": "V10.2.2",
-                        }
-                        _updated1022.append(_pair1022)
-                    except Exception as _exc1022:
-                        _errors1022.append(f"{_pair1022}: {type(_exc1022).__name__}")
+                        try:
+                            _tec1022 = _pacote_tecnico_v92(_pair1022, _dir1022)
+                            _timing1022 = globals().get("_timing91", "🟡 ATENÇÃO")
+                            _dec1022, _txt1022 = _decisao_tecnica_final_v92(
+                                _tec1022, _timing1022, _dir1022
+                            )
+                            _results1022[_pair1022] = {
+                                "tecnico": _tec_to_json_v934(_tec1022),
+                                "decisao": _dec1022,
+                                "texto": _txt1022,
+                                "processado_em": time.time(),
+                                "tentativa_v1022": True,
+                                "versao_tentativa": "V10.2.2",
+                            }
+                            _updated1022.append(_pair1022)
+                        except Exception as _exc1022:
+                            _errors1022.append(f"{_pair1022}: {type(_exc1022).__name__}")
 
-                _state1022["resultados"] = _results1022
-                _state1022["ultimo_processamento_ts"] = time.time()
-                _ok1022, _err1022 = _scanner_save_v934(_state1022)
-                if not _ok1022:
-                    return False, f"Falha ao salvar scanner: {_err1022}"
+                    _state1022["resultados"] = _results1022
+                    _state1022["ultimo_processamento_ts"] = time.time()
+                    _ok1022, _err1022 = _scanner_save_v934(_state1022)
+                    if not _ok1022:
+                        return False, f"Falha ao salvar scanner: {_err1022}"
 
-                _msg1022 = (
-                    "Scanner atualizado para: " + ", ".join(_updated1022)
-                    if _updated1022 else
-                    "Nenhum par pôde ser atualizado."
+                    _msg1022 = (
+                        "Scanner atualizado para: " + ", ".join(_updated1022)
+                        if _updated1022 else
+                        "Nenhum par pôde ser atualizado."
+                    )
+                    if _errors1022:
+                        _msg1022 += " | Falhas: " + " ; ".join(_errors1022)
+                    return bool(_updated1022), _msg1022
+
+                _last_scan_ts_master_v1022 = float(
+                    _scanner_state_master_v102.get("ultimo_processamento_ts", 0.0) or 0.0
                 )
-                if _errors1022:
-                    _msg1022 += " | Falhas: " + " ; ".join(_errors1022)
-                return bool(_updated1022), _msg1022
+                _scan_wait_master_v1022 = (
+                    max(0, int(61 - (time.time() - _last_scan_ts_master_v1022)))
+                    if _last_scan_ts_master_v1022 else 0
+                )
 
-            _last_scan_ts_master_v1022 = float(
-                _scanner_state_master_v102.get("ultimo_processamento_ts", 0.0) or 0.0
-            )
-            _scan_wait_master_v1022 = (
-                max(0, int(61 - (time.time() - _last_scan_ts_master_v1022)))
-                if _last_scan_ts_master_v1022 else 0
-            )
-
-            render_master_panel(
-                _matrix_master_v102, ranking, CHAVE_TWELVE_DATA,
-                _macro_context_master_v102, _scanner_state_master_v102,
-                scanner_refresh_cb=(
-                    None if _aq_master_uses_runtime_fallback
-                    else _master_refresh_scanner_batch_v1022
-                ),
-                scanner_refresh_remaining=(
-                    0 if _aq_master_uses_runtime_fallback
-                    else _scan_wait_master_v1022
-                ),
-            )
-            mark_surface_ok(
-                st.session_state,
-                "master_panel",
-                build_id=_ATLASQUANT_SOURCE_BUILD,
-            )
-            _aq_complete_guided_revalidation(
-                "master_panel",
-                succeeded=True,
-            )
-            st.session_state.pop("atlasquant_master_panel_error", None)
+                render_master_panel(
+                    _matrix_master_v102, ranking, CHAVE_TWELVE_DATA,
+                    _macro_context_master_v102, _scanner_state_master_v102,
+                    scanner_refresh_cb=(
+                        None if _aq_master_uses_runtime_fallback
+                        else _master_refresh_scanner_batch_v1022
+                    ),
+                    scanner_refresh_remaining=(
+                        0 if _aq_master_uses_runtime_fallback
+                        else _scan_wait_master_v1022
+                    ),
+                )
+                mark_surface_ok(
+                    st.session_state,
+                    "master_panel",
+                    build_id=_ATLASQUANT_SOURCE_BUILD,
+                )
+                _aq_complete_guided_revalidation(
+                    "master_panel",
+                    succeeded=True,
+                )
+                st.session_state.pop("atlasquant_master_panel_error", None)
         except Exception as _master_render_exc:
             st.session_state["atlasquant_master_panel_error"] = {
                 "type": type(_master_render_exc).__name__,
@@ -10194,6 +10218,7 @@ if _aq_active_index == 0:
                     _aq_runtime_snapshot.get("packs", []),
                     experience_mode=_aq_experience_mode,
                     macro_context=_macro_v108,
+                    ranking=ranking,
                 )
                 mark_surface_ok(
                     st.session_state,
@@ -10238,7 +10263,7 @@ if _aq_active_index == 0:
             st.markdown("## Diagnóstico avançado")
             if render_g8_radar is not None:
                 try:
-                    render_g8_radar(ranking, neutral_band=5.0, top_n=8)
+                    render_g8_radar(ranking, neutral_band=5.0, top_n=10)
                 except Exception as _aq_radar_exc:
                     st.warning("Radar G8 temporariamente indisponível; motor operacional preservado.")
                     st.caption(f"Diagnóstico Radar G8: {type(_aq_radar_exc).__name__}")

@@ -119,19 +119,19 @@ def focus_card_html(row: dict[str, Any]) -> str:
         base = quote = diff = intensity = 0.0
     side_class = "buy" if side == "COMPRA" else "sell" if side == "VENDA" else "neutral"
     return f"""
-<div class="aq-focus-card {side_class}">
-  <div class="aq-focus-top">
-    <span class="aq-focus-pair">{pair}</span>
-    <span class="aq-focus-side">{side}</span>
+<div class="aq-g8-card {side_class}">
+  <div class="aq-g8-top">
+    <span class="aq-g8-pair">{pair}</span>
+    <span class="aq-g8-side">{side}</span>
   </div>
-  <div class="aq-focus-score">{intensity:.0f}<span>/100</span></div>
-  <div class="aq-focus-label">intensidade relativa</div>
-  <div class="aq-focus-meta">
+  <div class="aq-g8-score">{intensity:.0f}<span>/100</span></div>
+  <div class="aq-g8-label">intensidade relativa</div>
+  <div class="aq-g8-meta">
     <span>Base <b>{base:.1f}</b></span>
     <span>Cotada <b>{quote:.1f}</b></span>
     <span>Dif. <b>{diff:+.1f}</b></span>
   </div>
-  <div class="aq-focus-state">🟡 {state}</div>
+  <div class="aq-g8-state">🟡 {state}</div>
 </div>
 """
 
@@ -143,24 +143,24 @@ DASHBOARD_CSS = """
 .aq-pulse span,.aq-pulse small{display:block;color:#d4e1f0;font-size:.73rem;font-weight:650}
 .aq-pulse strong{display:block;color:#edf4ff;font-size:1.02rem;margin:3px 0}
 .aq-pulse-kicker{color:#6de2c5!important;font-weight:800;letter-spacing:.08em}
-@media(max-width:760px){.aq-pulse{grid-template-columns:repeat(2,minmax(0,1fr))}.aq-focus-card{min-height:160px}}
-.aq-focus-card{
+@media(max-width:760px){.aq-pulse{grid-template-columns:repeat(2,minmax(0,1fr))}.aq-g8-card{min-height:160px}}
+.aq-g8-card{
   border:1px solid rgba(137,170,210,.18); border-radius:15px; padding:16px 17px;
   min-height:178px; background:linear-gradient(180deg,rgba(17,34,57,.88),rgba(10,24,41,.82));
   box-shadow:0 12px 30px rgba(0,0,0,.12); margin-bottom:8px;
 }
-.aq-focus-card.buy{border-top:3px solid #42d392}
-.aq-focus-card.sell{border-top:3px solid #ff6b7a}
-.aq-focus-card.neutral{border-top:3px solid #9fb0c6}
-.aq-focus-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.aq-focus-pair{font-size:1.05rem;font-weight:800;color:#edf4ff}
-.aq-focus-side{font-size:.72rem;font-weight:800;letter-spacing:.08em;color:#dceaff}
-.aq-focus-score{font-size:2rem;font-weight:850;color:#edf4ff;margin-top:12px;line-height:1}
-.aq-focus-score span{font-size:.82rem;color:#d4e1f0;font-weight:750}
-.aq-focus-label{font-size:.74rem;color:#d4e1f0;font-weight:700;margin-top:4px}
-.aq-focus-meta{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px;color:#d4e1f0;font-size:.76rem;font-weight:650}
-.aq-focus-meta b{color:#edf4ff}
-.aq-focus-state{margin-top:14px;padding-top:10px;border-top:1px solid rgba(137,170,210,.14);font-size:.75rem;font-weight:750;color:#f2c14e}
+.aq-g8-card.buy{border-top:3px solid #42d392}
+.aq-g8-card.sell{border-top:3px solid #ff6b7a}
+.aq-g8-card.neutral{border-top:3px solid #9fb0c6}
+.aq-g8-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.aq-g8-pair{font-size:1.05rem;font-weight:800;color:#edf4ff}
+.aq-g8-side{font-size:.72rem;font-weight:800;letter-spacing:.08em;color:#dceaff}
+.aq-g8-score{font-size:2rem;font-weight:850;color:#edf4ff;margin-top:12px;line-height:1}
+.aq-g8-score span{font-size:.82rem;color:#d4e1f0;font-weight:750}
+.aq-g8-label{font-size:.74rem;color:#d4e1f0;font-weight:700;margin-top:4px}
+.aq-g8-meta{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px;color:#d4e1f0;font-size:.76rem;font-weight:650}
+.aq-g8-meta b{color:#edf4ff}
+.aq-g8-state{margin-top:14px;padding-top:10px;border-top:1px solid rgba(137,170,210,.14);font-size:.75rem;font-weight:750;color:#f2c14e}
 </style>
 """
 
@@ -210,6 +210,10 @@ def render_g8_radar(ranking: pd.DataFrame, neutral_band: float = 5.0, top_n: int
     c4.metric("Maior desequilíbrio", summary["top_pair"] or "—")
 
     shown = radar.head(max(1, int(top_n))).copy()
+    st.caption(
+        f"Universo monitorado: {len(radar)} pares Forex. "
+        f"O destaque mostra os {len(shown)} primeiros por intensidade relativa e não autoriza entrada."
+    )
     st.dataframe(shown, width="stretch", hide_index=True)
 
     if mode == "Pro":

@@ -10,6 +10,7 @@ O Índice Integrado é apenas um ranking operacional. Não é probabilidade de l
 """
 from __future__ import annotations
 
+from html import escape
 import base64
 import json
 import os
@@ -594,10 +595,10 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
     top4.metric("Modo", "SELETIVO")
     overview=master_overview_state(pairs=len(pairs),processed=processed,scanner_fresh=_scanner_fresh_v1022)
     st.markdown(
-        f"""<div style="padding:11px 13px;border:1px solid rgba(137,170,210,.18);border-radius:12px;margin:4px 0 13px">
-        <strong>PAINEL MESTRE · {overview['label']}</strong>
-        <span style="margin-left:8px;opacity:.72;font-size:.78rem">{overview['detail']}</span>
-        <span style="float:right;opacity:.68;font-size:.72rem">Ranking ≠ probabilidade de lucro</span></div>""",
+        f"""<div style="padding:12px 14px;border:1px solid rgba(163,190,222,.38);border-radius:12px;margin:4px 0 13px;background:#10233a;color:#f7fbff">
+        <strong style="color:#ffffff">PAINEL MESTRE · {escape(overview['label'])}</strong>
+        <span style="display:block;margin-top:4px;color:#e7eef8;font-size:.84rem;font-weight:700">{escape(overview['detail'])}</span>
+        <span style="display:block;margin-top:4px;color:#d7e6f6;font-size:.76rem;font-weight:700">Ranking ≠ probabilidade de lucro</span></div>""",
         unsafe_allow_html=True,
     )
 
