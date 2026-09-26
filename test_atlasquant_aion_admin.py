@@ -785,6 +785,15 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("_render_trading(market, system)",src)
         self.assertIn("_render_live_event_intelligence({}, system_context, allow_memory_sync=False)",src)
 
+    def test_central_validation_center_keeps_local_and_production_separate(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Centro de Validação", src)
+        self.assertIn("Produção continua NÃO CONFIRMADA", src)
+        self.assertIn("Validação local nunca é tratada como prova", src)
+        self.assertIn("_render_validation_center(system_context, runtime_result)", src)
+        self.assertIn('"validation_center": validation_center_snapshot(', src)
+        self.assertNotIn("deploy_allowed=True", src)
+
     def test_agentic_capability_planner_is_visible_without_auto_execution(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("🧭 Planejador Agentivo · capacidades + gates", src)
