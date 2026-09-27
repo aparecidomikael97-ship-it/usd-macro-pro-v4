@@ -1,0 +1,291 @@
+"""Safe traceability map for AION local Tool Hub evidence.
+
+This module never executes a tool, reads a connector, inspects raw result
+payloads, mutates checkpoint state, calls a provider, publishes, deploys or
+trades. It maps already-produced local execution envelopes to deterministic,
+sanitized evidence references.
+
+Trace IDs are derived only from execution metadata. Raw tool result content is
+excluded from both the ID seed and traceability output.
+"""
+from __future__ import annotations
+
+from hashlib import sha256
+from typing import Any, Mapping, Sequence
+
+from atlasquant_aion_observability import redact_text
+
+SCHEMA = "ATLASQUANT_AION_LOCAL_TRACEABILITY_V1"
+MAX_RECORDS = 8
+MAX_BLOCKERS = 6
+MAX_CONFLICTS = 8
+
+SOURCE_CATALOG = {
+    "aion.memory.search": {
+        "source_key": "canonical_memory",
+        "source_label": "Memória canônica",
+        "source_path": "atlasquant_aion_memory.search_canonical_memory",
+        "derived": False,
+    },
+    "aion.memory.recall": {
+        "source_key": "layered_memory",
+        "source_label": "Memória em camadas",
+        "source_path": "atlasquant_aion_memory_layers.recall",
+        "derived": False,
+    },
+    "aion.checkpoint.inspect": {
+        "source_key": "checkpoint_master",
+        "source_label": "Checkpoint Mestre",
+        "source_path": "checkpoint.local_metadata",
+        "derived": False,
+    },
+    "aion.status.read": {
+        "source_key": "master_status_board",
+        "source_label": "Painel Mestre local",
+        "source_path": "atlasquant_aion_status_board.build_master_status_board",
+        "derived": True,
+    },
+    "aion.tasks.summary": {
+        "source_key": "operating_tasks",
+        "source_label": "Fila local de tarefas",
+        "source_path": "checkpoint.operating.tasks",
+        "derived": False,
+    },
+    "aion.missions.summary": {
+        "source_key": "continuity_missions",
+        "source_label": "Missões de continuidade",
+        "source_path": "checkpoint.continuity.missions",
+        "derived": False,
+    },
+    "aion.durable.summary": {
+        "source_key": "durable_tasks",
+        "source_label": "Tarefas duráveis",
+        "source_path": "checkpoint.durable_tasks.records",
+        "derived": False,
+    },
+    "aion.approvals.summary": {
+        "source_key": "approval_inbox",
+        "source_label": "Caixa local de aprovações",
+        "source_path": "atlasquant_aion_approval_inbox.collect_approval_inbox",
+        "derived": True,
+    },
+    "aion.events.summary": {
+        "source_key": "operating_events",
+        "source_label": "Eventos operacionais locais",
+        "source_path": "checkpoint.operating.events",
+        "derived": False,
+    },
+    "aion.specialists.snapshot": {
+        "source_key": "specialist_snapshot",
+        "source_label": "Snapshot local do especialista",
+        "source_path": "atlasquant_aion_specialist_session.read_loaded_specialist_snapshot",
+        "derived": True,
+    },
+    "aion.secretary.draft_brief": {
+        "source_key": "secretary_draft",
+        "source_label": "Briefing local da Secretaria",
+        "source_path": "atlasquant_aion_secretary.executive_briefing",
+        "derived": True,
+    },
+}
+
+
+def _mapping(value: Any) -> dict[str, Any]:
+    return dict(value) if isinstance(value, Mapping) else {}
+
+
+def _clean(value: Any, limit: int = 160) -> str:
+    return " ".join(redact_text(value).split())[:limit]
+
+
+def _trace_id(envelope: Mapping[str, Any], index: int) -> str:
+    seed = "|".join((
+        _clean(envelope.get("tool_id"), 96),
+        _clean(envelope.get("request_id"), 80),
+        _clean(envelope.get("workspace_id"), 64),
+        _clean(envelope.get("kind"), 30),
+        str(index),
+    ))
+    return "LCL-EV-" + sha256(seed.encode("utf-8")).hexdigest()[:12].upper()
+
+
+def _safe_security(envelope: Mapping[str, Any]) -> tuple[bool, list[str]]:
+    security = _mapping(envelope.get("security"))
+    issues = []
+    for key in (
+        "network_called",
+        "connector_called",
+        "external_side_effects",
+        "permissions_expanded",
+        "secrets_included",
+    ):
+        if security.get(key) is not False:
+            issues.append(key.upper() + "_NOT_FALSE")
+    for key in (
+        "executes_action",
+        "external_action_executed",
+        "real_orders_enabled",
+        "tool_output_is_authority",
+    ):
+        if envelope.get(key) is not False:
+            issues.append(key.upper() + "_NOT_FALSE")
+    provenance = _mapping(envelope.get("provenance"))
+    if provenance.get("local_only") is not True:
+        issues.append("LOCAL_ONLY_NOT_TRUE")
+    return not issues, issues
+
+
+def _synthesis_by_tool(synthesis: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    out = {}
+    for item in list(synthesis.get("items") or [])[:MAX_RECORDS]:
+        if not isinstance(item, Mapping):
+            continue
+        tool_id = _clean(item.get("tool_id"), 96)
+        if tool_id and tool_id not in out:
+            out[tool_id] = dict(item)
+    return out
+
+
+def build_local_traceability(
+    tool_results: Sequence[Mapping[str, Any]] | None,
+    *,
+    synthesis: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Build sanitized provenance references from local execution metadata only."""
+    rows = [
+        dict(item)
+        for item in list(tool_results or [])[:MAX_RECORDS]
+        if isinstance(item, Mapping)
+    ]
+    syn = _mapping(synthesis)
+    syn_by_tool = _synthesis_by_tool(syn)
+    syn_conflicts = [
+        _clean(item, 180)
+        for item in list(syn.get("conflicts") or [])[:MAX_CONFLICTS]
+        if _clean(item, 180)
+    ]
+
+    records = []
+    confirmed_content_refs = []
+    unknown_refs = []
+    conflict_refs = []
+    execution_refs = []
+    security_issues = []
+
+    for index, envelope in enumerate(rows, start=1):
+        tool_id = _clean(envelope.get("tool_id") or f"tool_{index}", 96)
+        trace_id = _trace_id(envelope, index)
+        source = dict(SOURCE_CATALOG.get(tool_id) or {
+            "source_key": "unknown_local_source",
+            "source_label": "Origem local não catalogada",
+            "source_path": "unknown",
+            "derived": True,
+        })
+        syn_item = syn_by_tool.get(tool_id, {})
+        truth = _mapping(envelope.get("truth"))
+        preflight = _mapping(envelope.get("preflight"))
+        provenance = _mapping(envelope.get("provenance"))
+        safe, issues = _safe_security(envelope)
+
+        truth_status = _clean(
+            syn_item.get("truth_status") or truth.get("status") or "UNKNOWN", 40
+        ).upper()
+        freshness = _clean(
+            syn_item.get("freshness") or truth.get("freshness") or "UNVERIFIED", 40
+        ).upper()
+        state = _clean(envelope.get("state") or "UNKNOWN", 40).upper()
+        execution_confirmed = bool(
+            syn_item.get("execution_confirmed", state == "SUCCESS" and safe)
+        )
+        content_confirmed = bool(syn_item.get("content_confirmed", False))
+        blockers = [
+            _clean(item, 100)
+            for item in list(preflight.get("blockers") or [])[:MAX_BLOCKERS]
+            if _clean(item, 100)
+        ]
+        item_conflicts = [
+            conflict for conflict in syn_conflicts
+            if tool_id and conflict.startswith(tool_id + ":")
+        ]
+
+        record = {
+            "trace_id": trace_id,
+            "tool_id": tool_id,
+            "workspace_id": _clean(envelope.get("workspace_id"), 64),
+            "kind": _clean(envelope.get("kind"), 30).upper(),
+            "source_key": source["source_key"],
+            "source_label": source["source_label"],
+            "source_path": source["source_path"],
+            "derived": bool(source["derived"]),
+            "execution_state": state,
+            "preflight_state": _clean(preflight.get("state") or "UNKNOWN", 40).upper(),
+            "truth_status": truth_status,
+            "freshness": freshness,
+            "execution_confirmed": execution_confirmed,
+            "content_confirmed": content_confirmed,
+            "blockers": blockers,
+            "conflicts": item_conflicts[:MAX_CONFLICTS],
+            "source_module": _clean(provenance.get("source_module"), 100),
+            "source_function": _clean(provenance.get("source_function"), 100),
+            "input_scope": _clean(provenance.get("input_scope") or "local", 40),
+            "local_only": provenance.get("local_only") is True,
+            "security_state": "SAFE_LOCAL" if safe else "BLOCK",
+            "security_issues": issues,
+            "authority": False,
+        }
+        records.append(record)
+
+        if execution_confirmed:
+            execution_refs.append(trace_id)
+        if content_confirmed:
+            confirmed_content_refs.append(trace_id)
+        else:
+            unknown_refs.append(trace_id)
+        if item_conflicts:
+            conflict_refs.append(trace_id)
+        if not safe:
+            security_issues.append({"trace_id": trace_id, "issues": issues})
+
+    if security_issues:
+        state = "SECURITY_BLOCK"
+    elif conflict_refs:
+        state = "CONFLICT"
+    elif records and confirmed_content_refs and unknown_refs:
+        state = "PARTIAL"
+    elif records:
+        state = "TRACED"
+    else:
+        state = "NO_EVIDENCE"
+
+    return {
+        "schema": SCHEMA,
+        "state": state,
+        "records": records,
+        "record_count": len(records),
+        "execution_refs": execution_refs,
+        "confirmed_content_refs": confirmed_content_refs,
+        "unknown_refs": unknown_refs,
+        "conflict_refs": conflict_refs,
+        "source_keys": sorted({str(row["source_key"]) for row in records}),
+        "security": {
+            "state": "BLOCK" if security_issues else "SAFE_LOCAL",
+            "issues": security_issues,
+            "network_called": False if not security_issues else None,
+            "connector_called": False if not security_issues else None,
+            "external_side_effects": False if not security_issues else None,
+        },
+        "raw_result_included": False,
+        "tool_output_is_authority": False,
+        "executes_action": False,
+        "external_action_executed": False,
+        "real_orders_enabled": False,
+        "private_chain_of_thought_exposed": False,
+    }
+
+
+__all__ = [
+    "SCHEMA",
+    "MAX_RECORDS",
+    "SOURCE_CATALOG",
+    "build_local_traceability",
+]
