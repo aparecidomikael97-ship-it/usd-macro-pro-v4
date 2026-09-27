@@ -36,6 +36,14 @@ class AtlasQuantSetupValidationTests(unittest.TestCase):
         self.assertTrue({"bos-choch-ob","fvg","ote","crt","amd-po3"}.issubset(ids))
         self.assertTrue({"breaker-mitigation","session-liquidity-mss","opening-range","volume-profile"}.issubset(ids))
 
+    def test_undefined_ppr_is_listed_but_can_never_be_review_ready(self):
+        ppr=next(x for x in setup_catalog() if x["id"]=="ppr")
+        self.assertEqual(ppr["status"],"PESQUISA")
+        self.assertTrue(ppr["definition_pending"])
+        result=evaluate_setup_for_review("ppr",evidence())
+        self.assertFalse(result["review_ready"])
+        self.assertTrue(any("definição objetiva" in x for x in result["blockers"]))
+
     def test_clear_candidate_can_be_ready_only_for_human_review(self):
         result=evaluate_setup_for_review("session-liquidity-mss",evidence())
         self.assertTrue(result["review_ready"])

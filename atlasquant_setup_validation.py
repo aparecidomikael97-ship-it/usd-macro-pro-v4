@@ -100,6 +100,15 @@ SETUP_CATALOG=(
         "status":"PESQUISA",
         "notes":"Bloqueado para promoção até documentar fonte/metodologia; spot FX não tem volume centralizado.",
     },
+    {
+        "id":"ppr",
+        "name":"PPR (definição pendente)",
+        "family":"ICT/SMC",
+        "complexity":"AVANÇADO",
+        "status":"PESQUISA",
+        "definition_pending":True,
+        "notes":"Sigla pedida para o Laboratório, sem regra objetiva documentada no projeto. Sem backtest até a definição ser escrita e congelada.",
+    },
 )
 
 
@@ -203,6 +212,9 @@ def evaluate_setup_for_review(
 
     if not ev["rules_frozen_before_evaluation"]:
         blockers.append("Regras do setup não estavam congeladas antes da avaliação")
+
+    if setup and setup.get("definition_pending"):
+        blockers.append("Setup sem definição objetiva documentada; nenhum resultado pode ser atribuído a ele")
 
     if setup and setup["id"]=="volume-profile" and not ev["source_methodology_verified"]:
         blockers.append("Volume Profile exige fonte/metodologia de volume documentada")
