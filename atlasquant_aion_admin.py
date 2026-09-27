@@ -216,9 +216,11 @@ from atlasquant_aion_portable import (
 )
 from atlasquant_aion_vault import vault_summary
 from atlasquant_aion_tool_hub import (
+    normalize_tool_hub,
     plan_tool_call,
     tool_hub_summary,
 )
+from atlasquant_aion_local_executor import local_allowlist
 from atlasquant_aion_durable_tasks import (
     durable_tasks_summary,
     new_durable_task,
@@ -4420,6 +4422,33 @@ def _render_development(
     st.caption(
         "Tool Hub organiza NATIVE/API/MCP/FILE/WEBHOOK, mas não chama ferramenta nesta tela. "
         "Retomar uma tarefa restaura contexto/cursor; não executa o próximo passo automaticamente."
+    )
+    local_catalog = local_allowlist()
+    local_ids = {item["tool_id"] for item in local_catalog}
+    registered = normalize_tool_hub(tool_hub)["tools"]
+    phase_tools = [
+        item for item in registered
+        if item["tool_id"] in local_ids
+        and item["state"] == "LOCAL_READY"
+        and not item["connector_id"]
+        and item["kind"] in {"READ", "SEARCH", "DRAFT"}
+    ]
+    kind_counts = {kind: sum(1 for item in phase_tools if item["kind"] == kind) for kind in ("READ", "SEARCH", "DRAFT")}
+    last_local_tool = str(st.session_state.get("aion_local_tool_last_id") or "").strip()
+    st.markdown("##### Tool Hub local")
+    lc1, lc2, lc3 = st.columns(3)
+    lc1.metric("Registradas", len(registered))
+    lc2.metric("Local ready", int(hub_state.get("local_ready") or 0))
+    lc3.metric("Executáveis nesta fase", len(phase_tools))
+    st.caption(
+        "READ {read} · SEARCH {search} · DRAFT {draft}. "
+        "Último tool_id: {last}. Efeitos externos: nenhum. "
+        "Esta seção não executa ferramenta.".format(
+            read=kind_counts["READ"],
+            search=kind_counts["SEARCH"],
+            draft=kind_counts["DRAFT"],
+            last=last_local_tool or "nenhum",
+        )
     )
 
     tools = [
