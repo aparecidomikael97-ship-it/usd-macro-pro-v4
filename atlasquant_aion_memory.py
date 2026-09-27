@@ -108,6 +108,10 @@ from atlasquant_aion_persona_memory import (
     default_persona_memory,
     normalize_persona_memory,
 )
+from atlasquant_aion_memory_layers import (
+    default_memory_layers,
+    normalize_memory_layers,
+)
 
 SCHEMA = "ATLASQUANT_AION_MEMORY_V1"
 FOUNDATION_REVISION = "2026-09-25-complete-v2"
@@ -409,7 +413,7 @@ def search_canonical_memory(
 def default_checkpoint() -> dict[str, Any]:
     return {
         "schema": SCHEMA,
-        "checkpoint_version": 17,
+        "checkpoint_version": 18,
         "created_at": _now(),
         "updated_at": _now(),
         "project": "AtlasQuant",
@@ -441,6 +445,7 @@ def default_checkpoint() -> dict[str, Any]:
             "dirty": False,
         },
         "persona_memory": default_persona_memory(),
+        "memory_layers": default_memory_layers(),
         "studio": {
             "projects": [],
             "digest": studio_digest([]),
@@ -519,6 +524,7 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
     if not payload:
         payload = default_checkpoint()
     payload["persona_memory"] = normalize_persona_memory(payload.get("persona_memory"))
+    payload["memory_layers"] = normalize_memory_layers(payload.get("memory_layers"))
 
     raw_foundation = payload.get("approved_foundation")
     preserved_foundation = [
@@ -790,7 +796,7 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
         operating = {}
     tasks = normalize_queue(operating.get("tasks") if isinstance(operating, Mapping) else [])
     events = normalize_events(operating.get("events") if isinstance(operating, Mapping) else [])
-    payload["checkpoint_version"] = max(17, int(payload.get("checkpoint_version") or 1))
+    payload["checkpoint_version"] = max(18, int(payload.get("checkpoint_version") or 1))
     payload["operating"] = {
         "tasks": tasks,
         "events": events,
