@@ -77,6 +77,31 @@ class PlanningTests(unittest.TestCase):
             self.assertEqual(out["tool_id"], "")
             self.assertFalse(out["executes_tool"])
 
+    def test_memory_match_uses_word_boundaries_not_substrings(self):
+        for question in ("deslembrado", "lembranca", "uma deslembrada qualquer"):
+            single = plan_local_command(question)
+            bundle = plan_local_bundle(question)
+            self.assertEqual(single["state"], "NO_MATCH", question)
+            self.assertNotIn("aion.memory.search", bundle.get("tool_ids", []), question)
+
+        positive = plan_local_command("você lembra onde paramos?")
+        self.assertEqual(positive["state"], "READY")
+        self.assertEqual(positive["tool_id"], "aion.memory.search")
+
+    def test_additional_sensitive_phrases_are_explicitly_blocked(self):
+        for question in (
+            "cobrar cliente agora",
+            "fazer pagamento",
+            "enviar ordem real",
+            "publicação imediata",
+        ):
+            single = plan_local_command(question)
+            bundle = plan_local_bundle(question)
+            self.assertEqual(single["state"], "BLOCKED_INTENT", question)
+            self.assertEqual(bundle["state"], "BLOCKED_INTENT", question)
+            self.assertEqual(single["tool_id"], "")
+            self.assertEqual(bundle["selected_count"], 0)
+
     def test_unmatched_question_does_not_guess_a_tool(self):
         out = plan_local_command("explique isso com cuidado")
         self.assertEqual(out["state"], "NO_MATCH")

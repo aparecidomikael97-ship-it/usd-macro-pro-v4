@@ -22,13 +22,13 @@ _SECRET_PATTERNS=(
     re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{20,}\b"),
     re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}\b"),
     re.compile(r"\bsk-[A-Za-z0-9_-]{16,}\b"),
-    re.compile(r"(?i)\b(password|passwd|token|api[_-]?key|authorization|secret|cookie|credential|bearer)[\"']?\s*[:=]\s*(?:\"[^\"]*\"|'[^']*'|[^\s,;}]+)"),
+    re.compile(r"(?i)\b(password|passwd|senha|token|api[_-]?key|chave(?:[_ -]?de)?[_ -]?api|authorization|autorizacao|secret|segredo|cookie|credential|credencial|bearer)[\"']?\s*[:=]\s*(?:\"[^\"]*\"|'[^']*'|[^\s,;}]+)"),
 )
 
 # Substring families after letters-only normalization. Compound names such as
 # client_secret and session_token match; bare "key" does not, so primary_key stays.
 _SECRET_KEY=re.compile(
-    r"password|passwd|token|apikey|privatekey|accesskey|authorization|secret|cookie|credential|bearer",
+    r"password|passwd|senha|token|apikey|chavedeapi|privatekey|accesskey|authorization|autorizacao|secret|segredo|cookie|credential|credencial|bearer",
     re.I,
 )
 

@@ -235,6 +235,42 @@ class ExecutionTests(unittest.TestCase):
         self.assertEqual(out["truth"]["status"], "UNKNOWN")
         self.assertTrue(out["security"]["sanitized"])
 
+    def test_senha_is_removed_before_handler_and_from_result(self):
+        seen = {}
+
+        def capture(arguments, runtime):
+            del runtime
+            seen["arguments"] = arguments
+            return {
+                "truth_state": "UNKNOWN",
+                "senha": "deveria-sumir",
+                "note": "senha=segredo-retornado",
+            }
+
+        original = executor._HANDLERS["aion.memory.search"]
+        executor._HANDLERS["aion.memory.search"] = capture
+        try:
+            out = _call("aion.memory.search", arguments={
+                "query": "aion",
+                "senha": "segredo-entrada",
+                "nested": {
+                    "senha_admin": "segredo-aninhado",
+                    "note": "senha=segredo-textual",
+                },
+            })
+        finally:
+            executor._HANDLERS["aion.memory.search"] = original
+
+        rendered_args = str(seen["arguments"])
+        rendered_out = str(out["result"])
+        self.assertNotIn("senha", seen["arguments"])
+        self.assertNotIn("senha_admin", seen["arguments"]["nested"])
+        self.assertNotIn("segredo-entrada", rendered_args)
+        self.assertNotIn("segredo-aninhado", rendered_args)
+        self.assertNotIn("segredo-textual", rendered_args)
+        self.assertNotIn("deveria-sumir", rendered_out)
+        self.assertNotIn("segredo-retornado", rendered_out)
+
     def test_handler_exception_is_a_closed_error(self):
         def boom(arguments, runtime):
             del arguments, runtime

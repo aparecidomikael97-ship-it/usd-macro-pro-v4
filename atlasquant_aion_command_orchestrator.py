@@ -83,6 +83,10 @@ _SENSITIVE_ACTION_PATTERNS = (
     re.compile(r"\b(compre|comprar|venda|vender)\b.{0,60}\b(real|mercado|ativo|forex|acao|acoes|cripto)\b"),
     re.compile(r"\b(ative|ativar)\b.{0,60}\b(api paga|cobranca|assinatura|pagamento)\b"),
     re.compile(r"\b(mostre|mostrar|leia|ler|revele|revelar)\b.{0,50}\b(senha|token|secret|segredo|api key|chave de api)\b"),
+    re.compile(r"\b(cobrar|cobre)\b.{0,40}\b(cliente|usuario|assinante)\b"),
+    re.compile(r"\b(fazer|efetuar|realizar)\s+(o\s+|a\s+)?pagamento\b"),
+    re.compile(r"\b(enviar|mande|mandar|disparar)\b.{0,40}\bordem\b.{0,20}\b(real|mercado)\b"),
+    re.compile(r"\bpublicacao\b.{0,30}\b(imediata|agora|externa|instagram|youtube|tiktok)\b"),
 )
 
 _SPECIALIST_HINTS = (
@@ -133,6 +137,16 @@ def command_catalog() -> tuple[dict[str, str], ...]:
     return tuple(out)
 
 
+def _phrase_position(text: str, phrase: str) -> int:
+    """Return a whole-phrase match position, never a substring inside another word."""
+    parts = [re.escape(part) for part in phrase.split() if part]
+    if not parts:
+        return -1
+    pattern = re.compile(r"(?<!\w)" + r"\s+".join(parts) + r"(?!\w)")
+    match = pattern.search(text)
+    return match.start() if match else -1
+
+
 def _candidate_tools(text: str) -> list[dict[str, Any]]:
     catalog = _catalog_map()
     candidates = []
@@ -140,10 +154,11 @@ def _candidate_tools(text: str) -> list[dict[str, Any]]:
         item = catalog.get(tool_id)
         if not item or item.get("kind") not in SAFE_KINDS:
             continue
-        matched = [phrase for phrase in phrases if phrase in text]
+        positions_by_phrase = [(phrase, _phrase_position(text, phrase)) for phrase in phrases]
+        matched = [phrase for phrase, position in positions_by_phrase if position >= 0]
         if not matched:
             continue
-        positions = [text.find(phrase) for phrase in matched if text.find(phrase) >= 0]
+        positions = [position for _phrase, position in positions_by_phrase if position >= 0]
         position = min(positions) if positions else 999999
         candidates.append({
             "tool_id": tool_id,
