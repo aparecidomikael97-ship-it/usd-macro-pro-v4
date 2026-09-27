@@ -24,10 +24,13 @@ class AtlasQuantAionObservabilityTests(unittest.TestCase):
         self.assertTrue(is_secret_key("senha_admin"))
         self.assertTrue(is_secret_key("chave_de_api"))
         self.assertTrue(is_secret_key("segredo"))
-        cleaned=redact_text("senha=minha-senha segredo=oculto chave_de_api=valorprivado")
+        self.assertTrue(is_secret_key("autorização"))
+        self.assertTrue(is_secret_key("autorização_admin"))
+        cleaned=redact_text("senha=minha-senha segredo=oculto chave_de_api=valorprivado autorização=credencial-pt")
         self.assertNotIn("minha-senha",cleaned)
         self.assertNotIn("oculto",cleaned)
         self.assertNotIn("valorprivado",cleaned)
+        self.assertNotIn("credencial-pt",cleaned)
 
     def test_event_evidence_is_redacted(self):
         event=new_event(
