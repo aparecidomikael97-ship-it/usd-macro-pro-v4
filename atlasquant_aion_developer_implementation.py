@@ -340,6 +340,8 @@ def prepare_implementation_readiness(
         raise ValueError("implementation source scope is empty")
     if not list(test_contract.get("candidate_tests") or []):
         raise ValueError("implementation test candidates are required")
+    if test_contract.get("test_deletion_allowed") is not False or test_contract.get("test_weakening_allowed") is not False:
+        raise ValueError("test deletion or weakening must remain forbidden")
 
     mandatory = {str(x) for x in list(test_contract.get("mandatory_gates") or [])}
     required = {
@@ -442,6 +444,12 @@ def approve_implementation_session(
         raise ValueError("change-specific rollback plan is empty")
     if not list(readiness.get("readiness_refs") or []):
         raise ValueError("readiness evidence required before approval")
+
+    test_contract = envelope.get("test_contract") if isinstance(envelope.get("test_contract"), Mapping) else {}
+    if not list(test_contract.get("candidate_tests") or []):
+        raise ValueError("implementation test candidates are required")
+    if test_contract.get("test_deletion_allowed") is not False or test_contract.get("test_weakening_allowed") is not False:
+        raise ValueError("test deletion or weakening must remain forbidden")
 
     if approved is not True:
         raise ValueError("explicit human implementation approval required")

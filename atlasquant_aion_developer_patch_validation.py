@@ -44,6 +44,18 @@ _SECRET_PATH_PARTS = frozenset({
     ".env", "secrets.toml", "credentials", "credential", "private_key",
     "private-key", "id_rsa", "id_ed25519",
 })
+_TEST_DISABLE_RE = re.compile(
+    r"(?i)("
+    r"unittest\.skip|"
+    r"unittest\.expectedfailure|"
+    r"pytest\.mark\.skip|"
+    r"pytest\.mark\.xfail|"
+    r"pytest\.skip\s*\(|"
+    r"\.skiptest\s*\(|"
+    r"\bexpectedfailure\b|"
+    r"\bxfail\b"
+    r")"
+)
 
 
 def _clean(value: Any, limit: int = 1200) -> str:
@@ -218,6 +230,8 @@ def validate_patch(
             if _line_has_secret(line[1:]):
                 current["secret_additions"] += 1
                 added_secret_count += 1
+            if _is_test_path(str(current["path"])) and _TEST_DISABLE_RE.search(line[1:]):
+                current["blockers"].append("TEST_DELETION_OR_WEAKENING_NOT_ALLOWED")
         elif line.startswith("-") and not line.startswith("---"):
             current["deleted_lines"] += 1
 

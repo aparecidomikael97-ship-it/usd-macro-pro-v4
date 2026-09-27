@@ -37,6 +37,11 @@ _HARDENED_INVARIANTS={
     "workflow.envelope_includes_workflow",
     "release.notes_ready",
     "payload.excess_files_not_rejected",
+    "identity.format_characters",
+    "branch.nested_refs_and_aliases",
+    "release.deployment_and_deploy_scripts",
+    "tests.added_skip_or_expected_failure",
+    "tests.recomputed_manifest_still_blocks_weakening",
 }
 
 
@@ -48,10 +53,10 @@ class AionDeveloperAdversarialAuditorTests(unittest.TestCase):
     def test_report_shape_is_deterministic_and_unscored(self):
         report=self.report
         self.assertEqual(report["schema"],SCHEMA)
-        self.assertEqual(report["cases_total"],57)
+        self.assertEqual(report["cases_total"],62)
         self.assertEqual(
             report["gap_count"]+report["blocked_by_design_count"]+report["pass_count"],
-            57,
+            62,
         )
         self.assertNotIn("score",report)
         self.assertNotIn("security_score",report)

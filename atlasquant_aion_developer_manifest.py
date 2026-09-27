@@ -32,17 +32,33 @@ def stable_digest(value: Any, *, prefix: str = "", length: int = 24) -> str:
 
 
 def canonical_identity(value: Any) -> str:
+    """NFKC plus casefold, without format or control characters.
+
+    Invisible characters such as zero-width spaces, BOM, soft hyphen and ZWNJ
+    must not create a second actor from the same logical identity.
+    """
     normalized=unicodedata.normalize("NFKC",clean(value,160))
-    return " ".join(normalized.split()).casefold()
+    visible="".join(
+        ch for ch in normalized
+        if unicodedata.category(ch) not in {"Cf","Cc"}
+    )
+    return " ".join(visible.split()).casefold()
 
 
 def normalize_ref(value: Any, limit: int = 240) -> str:
     return unicodedata.normalize("NFKC",clean(value,limit))
 
 
+def _reserved_branch_segment(part: str) -> bool:
+    token=part.casefold()
+    while token.endswith(".git"):
+        token=token[:-4]
+    return token in _RESERVED_BRANCH_ROOTS
+
+
 def validate_isolated_branch(value: Any) -> str:
     branch=normalize_ref(value,240)
-    if branch.startswith("refs/heads/"):
+    while branch.startswith("refs/heads/"):
         branch=branch[len("refs/heads/"):]
     lower=branch.casefold()
     if not branch or lower.startswith("refs/remotes/") or lower.startswith("origin/"):
@@ -56,7 +72,7 @@ def validate_isolated_branch(value: Any) -> str:
     parts=branch.split("/")
     if any(not part or part in {".",".."} or part.endswith(".lock") for part in parts):
         raise ValueError("invalid isolated branch")
-    if parts[0].casefold() in _RESERVED_BRANCH_ROOTS:
+    if any(_reserved_branch_segment(part) for part in parts):
         raise ValueError("production/main branch family is forbidden")
     return branch
 
@@ -176,10 +192,14 @@ def authorization_manifest_id(envelope: Mapping[str,Any], authorization: Mapping
 
 def release_sensitive_path(path: Any) -> bool:
     value=clean(path,500).replace("\\","/").lower()
+    parts=[part for part in value.split("/") if part]
     return (
         value.startswith(".github/workflows/")
         or value.startswith("docs/release/")
         or value.startswith("deploy/")
+        or value.startswith("deployment/")
+        or value.startswith("release/")
+        or any(part in {"deploy","deployment","release"} for part in parts)
         or value in {"render.yaml","render.yml"}
         or "production" in value
         or "release" in value

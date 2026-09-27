@@ -32,7 +32,14 @@ from atlasquant_aion_developer_intelligence import (
     build_development_plan,
     scan_repository,
 )
+from atlasquant_aion_developer_manifest import (
+    canonical_identity,
+    implementation_base_manifest_id,
+    implementation_readiness_manifest_id,
+    release_sensitive_path,
+)
 from atlasquant_aion_developer_package import build_developer_package
+from atlasquant_aion_developer_patch_validation import validate_patch
 
 SCHEMA = "ATLASQUANT_AION_DEVELOPER_ADVERSARIAL_AUDIT_V1"
 CLASSIFICATIONS = ("PASS", "GAP", "BLOCKED_BY_DESIGN")
@@ -1087,6 +1094,151 @@ def _secrets_and_limits(world: _World) -> list[dict[str, str]]:
     return findings
 
 
+def _residual_surface(world: _World) -> list[dict[str, str]]:
+    findings = []
+    pairs = (
+        ("Alice", "Alice\u200b"),
+        ("Alice", "Alice\ufeff"),
+        ("Alice", "Al\u00adice"),
+        ("builder", "bui\u200clder"),
+    )
+    distinct = [right for left, right in pairs if canonical_identity(left) != canonical_identity(right)]
+    findings.append(_finding(
+        "identity.format_characters",
+        "atlasquant_aion_developer_manifest",
+        "Caracteres de formato invisivel ainda separam atores: " + ", ".join(repr(item) for item in distinct) + "."
+        if distinct else
+        "Zero-width, BOM, hifen suave e ZWNJ nao criam ator independente.",
+        "GAP" if distinct else "BLOCKED_BY_DESIGN",
+        "CRITICAL" if distinct else "",
+    ))
+
+    nested = (
+        "refs/heads/refs/heads/main",
+        "refs/heads/refs/heads/production",
+        "heads/main",
+        "main.git",
+        "production.git",
+    )
+    accepted_branches = []
+    for branch in nested:
+        status, _result = _invoke(lambda branch=branch: build_developer_package(
+            "pedido",
+            world.snapshot,
+            branch=branch,
+            baseline_ref="base@a",
+            candidate_ref=f"{branch}@c",
+            created_at=_CREATED,
+        ))
+        if status == "ACCEPT":
+            accepted_branches.append(branch)
+    findings.append(_finding(
+        "branch.nested_refs_and_aliases",
+        "atlasquant_aion_developer_manifest",
+        "Aliases aninhados aceitos: " + ", ".join(accepted_branches) + "."
+        if accepted_branches else
+        "refs/heads repetido, heads/main e sufixo .git da familia protegida sao rejeitados.",
+        "GAP" if accepted_branches else "BLOCKED_BY_DESIGN",
+        "HIGH" if accepted_branches else "",
+    ))
+
+    release_paths = ("deployment/app.yaml", "scripts/deploy/go.sh", "docs/deployment/notes.md")
+    exposed = [path for path in release_paths if not release_sensitive_path(path)]
+    findings.append(_finding(
+        "release.deployment_and_deploy_scripts",
+        "atlasquant_aion_developer_manifest",
+        "Superficies de deploy ainda fora da politica: " + ", ".join(exposed) + "."
+        if exposed else
+        "deployment/, scripts/deploy/ e docs/deployment/ exigem revisao de release.",
+        "GAP" if exposed else "BLOCKED_BY_DESIGN",
+        "HIGH" if exposed else "",
+    ))
+
+    skip_marker = "@" + "unittest." + "skip" + "('bypass')"
+    disable_marker = "@" + "unittest." + "expected" + "Failure"
+    patch = (
+        "diff --git a/test_module.py b/test_module.py\n"
+        "--- a/test_module.py\n+++ b/test_module.py\n"
+        "@@ -1,2 +1,3 @@\n def test_guard():\n"
+        "+    " + skip_marker + "\n"
+        "+    " + disable_marker + "\n"
+        "     assert guard()\n"
+    )
+    request = {
+        "schema": "ATLASQUANT_AION_DEVELOPER_BUILDER_SANDBOX_REQUEST_V1",
+        "request_id": "DEVBUILD-AUDIT",
+        "state": "READY_FOR_BUILDER_SANDBOX",
+        "branch_contract": {
+            "branch": "cursor/safe",
+            "baseline_ref": "base@a",
+            "candidate_ref": "cursor/safe@c",
+        },
+        "scope": {
+            "requested_files": ["test_module.py"],
+            "authorized_files": ["test_module.py"],
+        },
+        "blockers": [],
+        "execution_authorized": False,
+        "executor_attached": False,
+    }
+    preflight = {
+        "schema": "ATLASQUANT_AION_DEVELOPER_SANDBOX_PREFLIGHT_V1",
+        "preflight_id": "DEVPREF-AUDIT",
+        "builder_request_id": "DEVBUILD-AUDIT",
+        "state": "READY_FOR_EXECUTOR_DESIGN_REVIEW",
+        "preflight_passed": True,
+        "execution_authorized": False,
+        "executor_attached": False,
+    }
+    status, validated = _invoke(lambda: validate_patch(
+        request, preflight, patch, baseline_ref="base@a", candidate_ref="cursor/safe@c",
+    ))
+    skip_blocked = (
+        status == "ACCEPT"
+        and isinstance(validated, Mapping)
+        and validated.get("state") == "BLOCKED"
+        and "TEST_DELETION_OR_WEAKENING_NOT_ALLOWED" in list(validated.get("blockers") or [])
+    )
+    findings.append(_finding(
+        "tests.added_skip_or_expected_failure",
+        "atlasquant_aion_developer_patch_validation",
+        "Patch que so adiciona skip ou marcador de falha esperada em teste fica BLOCKED."
+        if skip_blocked else
+        "Patch que adiciona skip ou marcador de falha esperada em teste nao fica BLOCKED.",
+        "BLOCKED_BY_DESIGN" if skip_blocked else "GAP",
+        "" if skip_blocked else "HIGH",
+    ))
+
+    weakened = deepcopy(world.ready)
+    weakened["test_contract"] = deepcopy(weakened["test_contract"])
+    weakened["test_contract"]["candidate_tests"] = []
+    weakened["test_contract"]["test_deletion_allowed"] = True
+    weakened["test_contract"]["test_weakening_allowed"] = True
+    weakened["envelope_manifest_id"] = implementation_base_manifest_id(weakened)
+    weakened["readiness_manifest_id"] = implementation_readiness_manifest_id(weakened)
+    status, approved = _invoke(lambda: approve_implementation_session(
+        weakened,
+        approved=True,
+        approver_actor="human-approver",
+        approval_refs=["approval:1"],
+    ))
+    authorized = (
+        status == "ACCEPT"
+        and isinstance(approved, Mapping)
+        and approved.get("implementation_authorized") is True
+    )
+    findings.append(_finding(
+        "tests.recomputed_manifest_still_blocks_weakening",
+        "atlasquant_aion_developer_implementation",
+        "Recalcular o manifesto nao autoriza remocao de testes nem test_deletion_allowed."
+        if not authorized else
+        "Recalcular o manifesto autorizou um envelope sem testes.",
+        "BLOCKED_BY_DESIGN" if not authorized else "GAP",
+        "" if not authorized else "HIGH",
+    ))
+    return findings
+
+
 def audit_developer_chain() -> dict[str, Any]:
     """Inspect the local Developer contracts and return a deterministic report."""
     world = _World()
@@ -1101,6 +1253,7 @@ def audit_developer_chain() -> dict[str, Any]:
         findings.extend(_rollback_and_tests(world))
         findings.extend(_workflow_release_authority(world))
         findings.extend(_secrets_and_limits(world))
+        findings.extend(_residual_surface(world))
     finally:
         world.close()
 

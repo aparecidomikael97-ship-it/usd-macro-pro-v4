@@ -249,6 +249,8 @@ def build_builder_sandbox_request(
         if isinstance(implementation.get("test_contract"), Mapping)
         else {}
     )
+    if test_contract.get("test_deletion_allowed") is not False or test_contract.get("test_weakening_allowed") is not False:
+        raise ValueError("test deletion or weakening must remain forbidden")
     candidate_tests = _unique(test_contract.get("candidate_tests"), 120)
     mandatory_gates = _unique(test_contract.get("mandatory_gates"), 40)
     if not candidate_tests:
