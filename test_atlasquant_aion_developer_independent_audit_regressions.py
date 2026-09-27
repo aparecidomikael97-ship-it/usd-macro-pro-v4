@@ -10,6 +10,7 @@ from atlasquant_aion_developer_content_attestation import attestation_for_docume
 from atlasquant_aion_developer_manifest import (
     REQUIRED_MANDATORY_GATES,
     bind_builder_request_lineage,
+    structural_request_roles,
 )
 from atlasquant_aion_developer_patch_validation import validate_patch
 from atlasquant_aion_developer_runner_contract import (
@@ -28,6 +29,7 @@ def _builder(tests, gates=None):
     return bind_builder_request_lineage({
         "schema": "ATLASQUANT_AION_DEVELOPER_BUILDER_SANDBOX_REQUEST_V1",
         "state": "READY_FOR_BUILDER_SANDBOX",
+        "roles": structural_request_roles(),
         "lineage": {
             "snapshot_digest": "REPO-FIXTURE",
             "implementation_envelope_id": "DEVIMPL-FIXTURE",
@@ -133,6 +135,7 @@ def _preflight_request(path):
     return bind_builder_request_lineage({
         "schema": "ATLASQUANT_AION_DEVELOPER_BUILDER_SANDBOX_REQUEST_V1",
         "state": "READY_FOR_BUILDER_SANDBOX",
+        "roles": structural_request_roles(),
         "lineage": {
             "snapshot_digest": "REPO-FIXTURE",
             "implementation_envelope_id": "DEVIMPL-FIXTURE",

@@ -84,12 +84,16 @@ class AionDeveloperBuilderSandboxTests(unittest.TestCase):
             reviewer_actor="reviewer-b",
             breaker_actor="breaker-c",
             readiness_refs=["ready:scope", "ready:rollback"],
+            builder_principal_id="prn_builder01",
+            reviewer_principal_id="prn_reviewer1",
+            breaker_principal_id="prn_breaker01",
         )
         approved = approve_implementation_session(
             ready,
             approved=True,
             approver_actor="human-approver",
             approval_refs=["approval:implementation"],
+            approver_principal_id="prn_approver1",
         )
         return tmp, snapshot, approved
 
@@ -172,7 +176,7 @@ class AionDeveloperBuilderSandboxTests(unittest.TestCase):
         try:
             changed = dict(implementation)
             changed["readiness"] = dict(implementation["readiness"])
-            changed["readiness"]["reviewer_actor"] = "reviewer-z"
+            changed["readiness"]["reviewer_principal_id"] = "prn_otherrev"
             with self.assertRaises(ValueError):
                 build_builder_sandbox_request(
                     snapshot,
@@ -181,6 +185,18 @@ class AionDeveloperBuilderSandboxTests(unittest.TestCase):
                     baseline_ref="main@a",
                     candidate_ref="cursor/admin-fix@b",
                 )
+            labeled = dict(implementation)
+            labeled["readiness"] = dict(implementation["readiness"])
+            labeled["readiness"]["reviewer_actor"] = "reviewer-z"
+            relabeled = build_builder_sandbox_request(
+                snapshot,
+                labeled,
+                branch="cursor/admin-fix",
+                baseline_ref="main@a",
+                candidate_ref="cursor/admin-fix@b",
+            )
+            self.assertEqual(relabeled["roles"]["reviewer_principal_id"], "prn_reviewer1")
+            self.assertEqual(relabeled["roles"]["reviewer_actor"], "reviewer-z")
         finally:
             tmp.cleanup()
 

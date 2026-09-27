@@ -26,7 +26,6 @@ from atlasquant_aion_observability import redact_text
 from atlasquant_aion_developer_manifest import (
     assert_required_mandatory_gates,
     authorization_manifest_id,
-    canonical_identity,
     expected_builder_request_id,
     implementation_base_manifest_id,
     implementation_readiness_manifest_id,
@@ -36,6 +35,12 @@ from atlasquant_aion_developer_manifest import (
     test_contract_manifest_id,
     validate_candidate_ref,
     validate_isolated_branch,
+)
+from atlasquant_aion_developer_principal_identity import (
+    AUTHORIZATION_PRINCIPAL_FIELDS,
+    READINESS_PRINCIPAL_FIELDS,
+    require_distinct_principal_ids,
+    require_principal_id,
 )
 
 SCHEMA = "ATLASQUANT_AION_DEVELOPER_BUILDER_SANDBOX_REQUEST_V1"
@@ -50,10 +55,6 @@ _FORBIDDEN_BRANCHES = {
 
 def _clean(value: Any, limit: int = 1200) -> str:
     return " ".join(redact_text(value).replace("\x00", "").split())[:limit]
-
-
-def _identity_key(value: Any) -> str:
-    return canonical_identity(value)
 
 
 def _normalize_ref(value: Any, limit: int = 240) -> str:
@@ -128,7 +129,7 @@ def build_builder_sandbox_request(
         else {}
     )
     if auth.get("schema") != AUTH_SCHEMA:
-        raise ValueError("implementation authorization schema missing")
+        raise ValueError("legacy or missing authorization schema is not principal-bound")
     if auth.get("human_approved") is not True:
         raise ValueError("human implementation approval required")
     if int(auth.get("trust_level") or -1) != REQUESTED_TRUST_LEVEL:
@@ -164,22 +165,21 @@ def build_builder_sandbox_request(
         str(readiness.get("reviewer_actor") or ""),
         str(readiness.get("breaker_actor") or ""),
     ]
-    identity_keys = [
-        _identity_key(actors[0]),
-        _identity_key(actors[1]),
-        _identity_key(actors[2]),
-    ]
     if readiness.get("roles_independent") is not True:
         raise ValueError("independent developer roles required")
-    if any(not actor for actor in actors) or len(set(identity_keys)) != 3:
+    if any(not actor for actor in actors):
         raise ValueError("developer role separation is invalid")
-    authorized_identity_keys = [
-        str(auth.get("builder_identity_key") or ""),
-        str(auth.get("reviewer_identity_key") or ""),
-        str(auth.get("breaker_identity_key") or ""),
-    ]
-    if authorized_identity_keys != identity_keys:
-        raise ValueError("authorized developer identity mismatch")
+    readiness_principals = require_distinct_principal_ids(readiness, READINESS_PRINCIPAL_FIELDS)
+    authorized_principals = require_distinct_principal_ids(auth, AUTHORIZATION_PRINCIPAL_FIELDS)
+    for field in READINESS_PRINCIPAL_FIELDS:
+        if authorized_principals[field] != readiness_principals[field]:
+            raise ValueError("builder request principal differs from authorization")
+    approver_principal = require_principal_id(
+        authorized_principals["approver_principal_id"],
+        "approver_principal_id",
+    )
+    if approver_principal in set(readiness_principals.values()):
+        raise ValueError("approver principal is not independent")
 
     branch_name = _validate_branch(branch)
     baseline = _normalize_ref(baseline_ref, 240)
@@ -280,6 +280,11 @@ def build_builder_sandbox_request(
             "builder_actor": actors[0],
             "reviewer_actor": actors[1],
             "breaker_actor": actors[2],
+            "approver_actor": str(auth.get("approver_actor") or ""),
+            "builder_principal_id": readiness_principals["builder_principal_id"],
+            "reviewer_principal_id": readiness_principals["reviewer_principal_id"],
+            "breaker_principal_id": readiness_principals["breaker_principal_id"],
+            "approver_principal_id": approver_principal,
             "roles_independent": True,
         },
         "scope": {

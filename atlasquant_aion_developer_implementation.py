@@ -34,10 +34,15 @@ from atlasquant_aion_developer_manifest import (
     implementation_readiness_manifest_id,
     require_string_sequence,
 )
+from atlasquant_aion_developer_principal_identity import (
+    READINESS_PRINCIPAL_FIELDS,
+    require_distinct_principal_ids,
+    require_principal_id,
+)
 from atlasquant_aion_workspaces import developer_step_allowed, developer_trust_policy
 
 SCHEMA = "ATLASQUANT_AION_DEVELOPER_IMPLEMENTATION_ENVELOPE_V1"
-AUTH_SCHEMA = "ATLASQUANT_AION_DEVELOPER_IMPLEMENTATION_AUTH_V1"
+AUTH_SCHEMA = "ATLASQUANT_AION_DEVELOPER_IMPLEMENTATION_AUTH_V2"
 REQUESTED_TRUST_LEVEL = 2
 
 
@@ -300,8 +305,15 @@ def prepare_implementation_readiness(
     reviewer_actor: Any,
     breaker_actor: Any,
     readiness_refs: Sequence[Any] | None,
+    builder_principal_id: Any = None,
+    reviewer_principal_id: Any = None,
+    breaker_principal_id: Any = None,
 ) -> dict[str, Any]:
-    """Record readiness prerequisites in-session; never execute implementation."""
+    """Record readiness prerequisites in-session; never execute implementation.
+
+    Role separation uses principal ids only. Actor strings are stored as
+    display labels and do not decide independence.
+    """
     if envelope.get("schema") != SCHEMA:
         raise ValueError("invalid implementation envelope")
     if str(envelope.get("state") or "") != "WAITING_HUMAN_IMPLEMENTATION_APPROVAL":
@@ -319,13 +331,19 @@ def prepare_implementation_readiness(
         raise ValueError("change-specific rollback plan required")
     if not builder or not reviewer or not breaker:
         raise ValueError("builder, reviewer and breaker identities are required")
+    principals = require_distinct_principal_ids(
+        {
+            "builder_principal_id": builder_principal_id,
+            "reviewer_principal_id": reviewer_principal_id,
+            "breaker_principal_id": breaker_principal_id,
+        },
+        READINESS_PRINCIPAL_FIELDS,
+    )
     identity_keys = [
         _identity_key(builder),
         _identity_key(reviewer),
         _identity_key(breaker),
     ]
-    if any(not key for key in identity_keys) or len(set(identity_keys)) != 3:
-        raise ValueError("builder, reviewer and breaker must be independent actors")
     if not refs:
         raise ValueError("implementation readiness evidence required")
 
@@ -346,6 +364,9 @@ def prepare_implementation_readiness(
         "builder_actor": builder,
         "reviewer_actor": reviewer,
         "breaker_actor": breaker,
+        "builder_principal_id": principals["builder_principal_id"],
+        "reviewer_principal_id": principals["reviewer_principal_id"],
+        "breaker_principal_id": principals["breaker_principal_id"],
         "builder_identity_key": identity_keys[0],
         "reviewer_identity_key": identity_keys[1],
         "breaker_identity_key": identity_keys[2],
@@ -386,8 +407,13 @@ def approve_implementation_session(
     approved: bool,
     approver_actor: Any,
     approval_refs: Sequence[Any] | None,
+    approver_principal_id: Any = None,
 ) -> dict[str, Any]:
-    """Record session-only level-2 approval; still do not execute implementation."""
+    """Record session-only level-2 approval; still do not execute implementation.
+
+    The approver principal must differ from the builder, reviewer and breaker
+    principals. The approver display is a label and is not identity.
+    """
     if envelope.get("schema") != SCHEMA:
         raise ValueError("invalid implementation envelope")
     if str(envelope.get("state") or "") != "READY_FOR_HUMAN_IMPLEMENTATION_APPROVAL":
@@ -405,24 +431,16 @@ def approve_implementation_session(
         str(readiness.get("reviewer_actor") or ""),
         str(readiness.get("breaker_actor") or ""),
     ]
+    principals = require_distinct_principal_ids(readiness, READINESS_PRINCIPAL_FIELDS)
     identity_keys = [
         _identity_key(actors[0]),
         _identity_key(actors[1]),
         _identity_key(actors[2]),
     ]
-    stored_identity_keys = [
-        str(readiness.get("builder_identity_key") or ""),
-        str(readiness.get("reviewer_identity_key") or ""),
-        str(readiness.get("breaker_identity_key") or ""),
-    ]
     if readiness.get("roles_independent") is not True:
         raise ValueError("independent developer roles required")
     if any(not actor_name for actor_name in actors):
         raise ValueError("developer role identity missing")
-    if len(set(identity_keys)) != 3:
-        raise ValueError("builder, reviewer and breaker are not independent")
-    if stored_identity_keys != identity_keys:
-        raise ValueError("developer role identity normalization mismatch")
     if rollback_contract.get("recorded_for_this_change") is not True:
         raise ValueError("change-specific rollback must be recorded")
     if not str(rollback_contract.get("change_specific_plan") or ""):
@@ -444,9 +462,10 @@ def approve_implementation_session(
 
     actor = _clean(approver_actor, 160)
     refs = _list(approval_refs, 40)
+    approver_principal = require_principal_id(approver_principal_id, "approver_principal_id")
     if not actor:
         raise ValueError("implementation approver identity required")
-    if _identity_key(actor) in set(identity_keys):
+    if approver_principal in set(principals.values()):
         raise ValueError("implementation approver must be independent from builder/reviewer/breaker")
     if not refs:
         raise ValueError("implementation approval evidence required")
@@ -459,6 +478,7 @@ def approve_implementation_session(
         "authorization_id": "",
         "trust_level": REQUESTED_TRUST_LEVEL,
         "approver_actor": actor,
+        "approver_principal_id": approver_principal,
         "approval_refs": refs,
         "human_approved": True,
         "scope_expansion_allowed": False,
@@ -469,6 +489,9 @@ def approve_implementation_session(
         "builder_actor": actors[0],
         "reviewer_actor": actors[1],
         "breaker_actor": actors[2],
+        "builder_principal_id": principals["builder_principal_id"],
+        "reviewer_principal_id": principals["reviewer_principal_id"],
+        "breaker_principal_id": principals["breaker_principal_id"],
         "builder_identity_key": identity_keys[0],
         "reviewer_identity_key": identity_keys[1],
         "breaker_identity_key": identity_keys[2],

@@ -15,10 +15,19 @@ import unicodedata
 from typing import Any, Mapping
 
 from atlasquant_aion_developer_manifest import require_string_sequence, stable_digest
-from atlasquant_aion_developer_principal_identity import require_principal_id
+from atlasquant_aion_developer_principal_identity import (
+    assert_attestor_independent,
+    require_principal_id,
+)
 
-SCHEMA = "ATLASQUANT_AION_DEVELOPER_CONTENT_ATTESTATION_V1"
+SCHEMA = "ATLASQUANT_AION_DEVELOPER_CONTENT_ATTESTATION_V2"
 VERIFICATION_METHOD = "STRUCTURAL_MANIFEST_V1"
+GIT_OBJECT_SOURCE_SYNTHETIC = "SYNTHETIC_FIXTURE"
+GIT_OBJECT_SOURCE_PROBE = "EXTERNAL_PROBE"
+_GIT_OBJECT_SOURCES = frozenset({
+    GIT_OBJECT_SOURCE_SYNTHETIC,
+    GIT_OBJECT_SOURCE_PROBE,
+})
 
 _GIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 _BINDING_FIELDS = (
@@ -35,6 +44,7 @@ _BINDING_FIELDS = (
     "candidate_tree_sha",
     "verification_method",
     "verification_evidence_refs",
+    "git_object_source",
     "attestor_principal_id",
 )
 _SHA_FIELDS = (
@@ -64,11 +74,18 @@ _CLAIM_FLAGS = (
 )
 
 # Synthetic placeholders for contract fixtures whose documents do not carry
-# git object ids. They are not observations of a repository.
+# git object ids. They are accepted only as SYNTHETIC_FIXTURE claims. They
+# are not observations of a repository and this module never reads git objects.
 STRUCTURAL_BASELINE_COMMIT_SHA = "a" * 40
 STRUCTURAL_CANDIDATE_COMMIT_SHA = "b" * 40
 STRUCTURAL_BASELINE_TREE_SHA = "c" * 40
 STRUCTURAL_CANDIDATE_TREE_SHA = "d" * 40
+_PLACEHOLDER_SHAS = frozenset({
+    STRUCTURAL_BASELINE_COMMIT_SHA,
+    STRUCTURAL_CANDIDATE_COMMIT_SHA,
+    STRUCTURAL_BASELINE_TREE_SHA,
+    STRUCTURAL_CANDIDATE_TREE_SHA,
+})
 DEFAULT_ATTESTOR_PRINCIPAL_ID = "prn_attestor1"
 
 
@@ -139,6 +156,17 @@ def _validated_binding(payload: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError("verification evidence refs are required")
     binding["verification_method"] = VERIFICATION_METHOD
     binding["verification_evidence_refs"] = evidence
+    source = payload.get("git_object_source")
+    if source not in _GIT_OBJECT_SOURCES:
+        raise ValueError("git_object_source is missing or not allowlisted")
+    placeholders = [field for field in _SHA_FIELDS if binding[field] in _PLACEHOLDER_SHAS]
+    if source == GIT_OBJECT_SOURCE_PROBE:
+        if placeholders:
+            raise ValueError("synthetic placeholder sha cannot be claimed as an external probe")
+        raise ValueError("EXTERNAL_PROBE has no implemented git object probe")
+    if source != GIT_OBJECT_SOURCE_SYNTHETIC:
+        raise ValueError("git_object_source is missing or not allowlisted")
+    binding["git_object_source"] = GIT_OBJECT_SOURCE_SYNTHETIC
     binding["attestor_principal_id"] = require_principal_id(
         payload.get("attestor_principal_id"),
         "attestor_principal_id",
@@ -223,6 +251,12 @@ def assert_content_attestation_matches(
         raise ValueError("content attestation baseline ref mismatch")
     if binding["candidate_ref"] != str(revision.get("candidate_ref") or ""):
         raise ValueError("content attestation candidate ref mismatch")
+    roles = (
+        builder_request.get("roles")
+        if isinstance(builder_request.get("roles"), Mapping)
+        else {}
+    )
+    assert_attestor_independent(binding["attestor_principal_id"], roles)
     return binding
 
 
@@ -257,6 +291,7 @@ def attestation_for_documents(
         "candidate_tree_sha": STRUCTURAL_CANDIDATE_TREE_SHA,
         "verification_method": VERIFICATION_METHOD,
         "verification_evidence_refs": ["evidence:structural:1"],
+        "git_object_source": GIT_OBJECT_SOURCE_SYNTHETIC,
         "attestor_principal_id": DEFAULT_ATTESTOR_PRINCIPAL_ID,
     }
     payload.update(overrides)
@@ -266,6 +301,8 @@ def attestation_for_documents(
 __all__ = [
     "SCHEMA",
     "VERIFICATION_METHOD",
+    "GIT_OBJECT_SOURCE_SYNTHETIC",
+    "GIT_OBJECT_SOURCE_PROBE",
     "STRUCTURAL_BASELINE_COMMIT_SHA",
     "STRUCTURAL_CANDIDATE_COMMIT_SHA",
     "STRUCTURAL_BASELINE_TREE_SHA",

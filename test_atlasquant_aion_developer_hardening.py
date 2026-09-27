@@ -211,6 +211,9 @@ class AionDeveloperHardeningRegressionTests(unittest.TestCase):
                 envelope, rollback_plan="Reverter a mudanca.",
                 builder_actor="builder-a", reviewer_actor="reviewer-b", breaker_actor="breaker-c",
                 readiness_refs=["ready:1"],
+                builder_principal_id="prn_builder01",
+                reviewer_principal_id="prn_reviewer1",
+                breaker_principal_id="prn_breaker01",
             )
             weakened = deepcopy(ready)
             weakened["test_contract"] = deepcopy(weakened["test_contract"])
@@ -223,6 +226,7 @@ class AionDeveloperHardeningRegressionTests(unittest.TestCase):
                 approve_implementation_session(
                     weakened, approved=True, approver_actor="human-approver",
                     approval_refs=["approval:1"],
+                    approver_principal_id="prn_approver1",
                 )
         finally:
             tmp.cleanup()

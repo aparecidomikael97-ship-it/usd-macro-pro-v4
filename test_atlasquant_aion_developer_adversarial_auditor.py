@@ -142,6 +142,33 @@ _HARDENED_INVARIANTS={
     "command_policy.fixed_environment_stale",
     "command_policy.validated_plan_stale",
     "runner_policy.chained_boundary_stale",
+    "principal.integration_missing_builder",
+    "principal.integration_missing_reviewer",
+    "principal.integration_missing_breaker",
+    "principal.integration_malformed",
+    "principal.integration_same_id_different_display",
+    "principal.integration_cyrillic_same_id",
+    "principal.integration_same_display_distinct_ids",
+    "principal.integration_approver_is_builder",
+    "principal.integration_approver_is_reviewer",
+    "principal.integration_approver_is_breaker",
+    "principal.integration_mutate_after_readiness",
+    "principal.integration_mutate_after_authorization",
+    "principal.integration_request_differs_from_authorization",
+    "principal.integration_legacy_authorization",
+    "principal.integration_display_does_not_change_id",
+    "principal.integration_principal_changes_id",
+    "provenance.placeholder_synthetic",
+    "provenance.placeholder_external_probe",
+    "provenance.real_sha_stays_synthetic",
+    "provenance.external_probe_without_probe",
+    "provenance.source_mutated_after_id",
+    "provenance.stolen_source",
+    "provenance.caller_verified_true",
+    "provenance.invalid_source",
+    "provenance.missing_source",
+    "provenance.legacy_without_source",
+    "principal.integration_attestor_collides",
 }
 
 
@@ -153,10 +180,10 @@ class AionDeveloperAdversarialAuditorTests(unittest.TestCase):
     def test_report_shape_is_deterministic_and_unscored(self):
         report=self.report
         self.assertEqual(report["schema"],SCHEMA)
-        self.assertEqual(report["cases_total"],162)
+        self.assertEqual(report["cases_total"],189)
         self.assertEqual(
             report["gap_count"]+report["blocked_by_design_count"]+report["pass_count"],
-            162,
+            189,
         )
         self.assertFalse(report["symlink_physical_boundary_verified"])
         self.assertFalse(report["hardlink_physical_boundary_verified"])

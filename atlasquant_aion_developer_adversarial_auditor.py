@@ -34,11 +34,13 @@ from atlasquant_aion_developer_intelligence import (
 )
 from atlasquant_aion_developer_manifest import (
     REQUIRED_MANDATORY_GATES,
+    authorization_manifest_id,
     bind_builder_request_lineage,
     canonical_identity,
     implementation_base_manifest_id,
     implementation_readiness_manifest_id,
     release_sensitive_path,
+    structural_request_roles,
 )
 from atlasquant_aion_developer_command_policy import (
     assert_command_policy_integrity,
@@ -49,7 +51,12 @@ from atlasquant_aion_developer_executable_pinning import (
     build_executable_pinning_spec,
     build_os_sandbox_design_review,
 )
-from atlasquant_aion_developer_content_attestation import attestation_for_documents
+from atlasquant_aion_developer_content_attestation import (
+    GIT_OBJECT_SOURCE_PROBE,
+    GIT_OBJECT_SOURCE_SYNTHETIC,
+    attestation_for_documents,
+    build_content_attestation,
+)
 from atlasquant_aion_developer_executable_pinning import build_executable_pinning_spec
 from atlasquant_aion_developer_principal_identity import (
     assert_independent_principals,
@@ -164,7 +171,7 @@ class _World:
             self.snapshot, self.package, self.confirmed,
         )
         self.ready = self._ready(self.envelope, "builder-a", "reviewer-b", "breaker-c", "Reverter a mudanca logica.")
-        self.approved = self._approve(self.ready, "human-approver")
+        self.approved = self._approve(self.ready, "human-approver", approver_principal_id="prn_approver1")
 
     def close(self) -> None:
         self._tmp.cleanup()
@@ -212,7 +219,14 @@ class _World:
         reviewer: str,
         breaker: str,
         rollback: str,
+        *,
+        bind_principals: bool = True,
     ) -> dict[str, Any]:
+        principals = {
+            "builder_principal_id": "prn_builder01",
+            "reviewer_principal_id": "prn_reviewer1",
+            "breaker_principal_id": "prn_breaker01",
+        } if bind_principals else {}
         return prepare_implementation_readiness(
             envelope,
             rollback_plan=rollback,
@@ -220,14 +234,23 @@ class _World:
             reviewer_actor=reviewer,
             breaker_actor=breaker,
             readiness_refs=["ready:scope"],
+            builder_principal_id=principals.get("builder_principal_id"),
+            reviewer_principal_id=principals.get("reviewer_principal_id"),
+            breaker_principal_id=principals.get("breaker_principal_id"),
         )
 
-    def _approve(self, ready: Mapping[str, Any], approver: str) -> dict[str, Any]:
+    def _approve(
+        self,
+        ready: Mapping[str, Any],
+        approver: str,
+        approver_principal_id: Any = None,
+    ) -> dict[str, Any]:
         return approve_implementation_session(
             ready,
             approved=True,
             approver_actor=approver,
             approval_refs=["approval:implementation"],
+            approver_principal_id=approver_principal_id,
         )
 
     def sandbox(self, implementation: Mapping[str, Any] | None = None, **kwargs: Any) -> dict[str, Any]:
@@ -277,7 +300,7 @@ class _World:
         )
         envelope = build_implementation_envelope(self.snapshot, package, confirmed)
         ready = self._ready(envelope, "builder-a", "reviewer-b", "breaker-c", "Reverter a mudanca logica.")
-        approved = self._approve(ready, "human-approver")
+        approved = self._approve(ready, "human-approver", approver_principal_id="prn_approver1")
         request = build_builder_sandbox_request(
             self.snapshot,
             approved,
@@ -709,6 +732,7 @@ def _identities(world: _World) -> list[dict[str, str]]:
     def _reach(builder: str, reviewer: str, breaker: str) -> str:
         status, ready = _invoke(lambda: world._ready(
             world.envelope, builder, reviewer, breaker, "Reverter a mudanca logica.",
+            bind_principals=False,
         ))
         if status == "REJECT":
             return "REJECT"
@@ -829,7 +853,9 @@ def _authorization(world: _World) -> list[dict[str, str]]:
         "GAP" if stolen_ok else "BLOCKED_BY_DESIGN",
         "HIGH" if stolen_ok else "",
     ))
-    status, approved = _invoke(lambda: world._approve(world.ready, "builder-a"))
+    status, approved = _invoke(lambda: world._approve(
+        world.ready, "builder-a", approver_principal_id="prn_builder01",
+    ))
     self_approved = (
         status == "ACCEPT"
         and isinstance(approved, Mapping)
@@ -881,7 +907,9 @@ def _rollback_and_tests(world: _World) -> list[dict[str, str]]:
     weak["test_contract"]["candidate_tests"] = []
     weak["test_contract"]["test_deletion_allowed"] = True
     weak["test_contract"]["test_weakening_allowed"] = True
-    status, approved = _invoke(lambda: world._approve(weak, "human-approver"))
+    status, approved = _invoke(lambda: world._approve(
+        weak, "human-approver", approver_principal_id="prn_approver1",
+    ))
     weakened = (
         status == "ACCEPT"
         and isinstance(approved, Mapping)
@@ -1271,6 +1299,7 @@ def _sealed_runner_request(tests, gates=None):
     return bind_builder_request_lineage({
         "schema": "ATLASQUANT_AION_DEVELOPER_BUILDER_SANDBOX_REQUEST_V1",
         "state": "READY_FOR_BUILDER_SANDBOX",
+        "roles": structural_request_roles(),
         "lineage": {
             "snapshot_digest": "REPO-FIXTURE",
             "implementation_envelope_id": "DEVIMPL-FIXTURE",
@@ -1586,6 +1615,7 @@ def _contract_gap_surface(_world: _World) -> list[dict[str, str]]:
             bind_builder_request_lineage({
                 "schema": "ATLASQUANT_AION_DEVELOPER_BUILDER_SANDBOX_REQUEST_V1",
                 "state": "READY_FOR_BUILDER_SANDBOX",
+                "roles": structural_request_roles(),
                 "lineage": {
                     "snapshot_digest": "REPO-FIXTURE",
                     "implementation_envelope_id": "DEVIMPL-FIXTURE",
@@ -2883,6 +2913,369 @@ def _runner_policy_integrity_surface(_world: _World) -> list[dict[str, str]]:
     return findings
 
 
+def _principal_provenance_surface(world: _World) -> list[dict[str, str]]:
+    """Principal ids authorize roles. Synthetic SHAs are not observations."""
+    findings: list[dict[str, str]] = []
+
+    def _prepare(**overrides: Any) -> dict[str, Any]:
+        params: dict[str, Any] = {
+            "rollback_plan": "Reverter a mudanca logica.",
+            "builder_actor": "Alice",
+            "reviewer_actor": "Bob",
+            "breaker_actor": "Cara",
+            "readiness_refs": ["ready:1"],
+            "builder_principal_id": "prn_builder01",
+            "reviewer_principal_id": "prn_reviewer1",
+            "breaker_principal_id": "prn_breaker01",
+        }
+        params.update(overrides)
+        return prepare_implementation_readiness(world.envelope, **params)
+
+    findings.append(_blocked(
+        "principal.integration_missing_builder",
+        "atlasquant_aion_developer_implementation",
+        "Readiness sem builder_principal_id e rejeitada.",
+        lambda: _prepare(builder_principal_id=None),
+    ))
+    findings.append(_blocked(
+        "principal.integration_missing_reviewer",
+        "atlasquant_aion_developer_implementation",
+        "Readiness sem reviewer_principal_id e rejeitada.",
+        lambda: _prepare(reviewer_principal_id=None),
+    ))
+    findings.append(_blocked(
+        "principal.integration_missing_breaker",
+        "atlasquant_aion_developer_implementation",
+        "Readiness sem breaker_principal_id e rejeitada.",
+        lambda: _prepare(breaker_principal_id=None),
+    ))
+    findings.append(_blocked(
+        "principal.integration_malformed",
+        "atlasquant_aion_developer_implementation",
+        "principal_id malformado e rejeitado na readiness.",
+        lambda: _prepare(builder_principal_id="not-a-principal"),
+    ))
+    findings.append(_blocked(
+        "principal.integration_same_id_different_display",
+        "atlasquant_aion_developer_implementation",
+        "O mesmo principal com displays diferentes nao separa builder e reviewer.",
+        lambda: _prepare(
+            builder_actor="Alice",
+            reviewer_actor="Bob",
+            builder_principal_id="prn_shared001",
+            reviewer_principal_id="prn_shared001",
+        ),
+    ))
+    findings.append(_blocked(
+        "principal.integration_cyrillic_same_id",
+        "atlasquant_aion_developer_implementation",
+        "Display latino e cirilico com o mesmo principal_id colidem.",
+        lambda: _prepare(
+            builder_actor="Alice",
+            reviewer_actor="\u0410lice",
+            builder_principal_id="prn_shared001",
+            reviewer_principal_id="prn_shared001",
+        ),
+    ))
+    status, distinct = _invoke(lambda: _prepare(
+        builder_actor="Alice",
+        reviewer_actor="Alice",
+        breaker_actor="Alice",
+    ))
+    distinct_closed = (
+        status == "ACCEPT"
+        and isinstance(distinct, Mapping)
+        and (distinct.get("readiness") or {}).get("roles_independent") is True
+        and (distinct.get("readiness") or {}).get("builder_principal_id")
+        != (distinct.get("readiness") or {}).get("reviewer_principal_id")
+    )
+    findings.append(_finding(
+        "principal.integration_same_display_distinct_ids",
+        "atlasquant_aion_developer_implementation",
+        "Displays identicos com principals diferentes permanecem atores distintos."
+        if distinct_closed else
+        "Displays identicos ainda decidem a identidade.",
+        "BLOCKED_BY_DESIGN" if distinct_closed else "GAP",
+        "" if distinct_closed else "HIGH",
+    ))
+    findings.append(_blocked(
+        "principal.integration_approver_is_builder",
+        "atlasquant_aion_developer_implementation",
+        "approver_principal_id igual ao builder e rejeitado.",
+        lambda: world._approve(world.ready, "other-label", approver_principal_id="prn_builder01"),
+    ))
+    findings.append(_blocked(
+        "principal.integration_approver_is_reviewer",
+        "atlasquant_aion_developer_implementation",
+        "approver_principal_id igual ao reviewer e rejeitado.",
+        lambda: world._approve(world.ready, "Alice", approver_principal_id="prn_reviewer1"),
+    ))
+    findings.append(_blocked(
+        "principal.integration_approver_is_breaker",
+        "atlasquant_aion_developer_implementation",
+        "approver_principal_id igual ao breaker e rejeitado.",
+        lambda: world._approve(world.ready, "human-approver", approver_principal_id="prn_breaker01"),
+    ))
+    mutated_ready = deepcopy(world.ready)
+    mutated_ready["readiness"] = dict(mutated_ready["readiness"])
+    mutated_ready["readiness"]["builder_principal_id"] = "prn_otherbld"
+    findings.append(_blocked(
+        "principal.integration_mutate_after_readiness",
+        "atlasquant_aion_developer_implementation",
+        "Mutar principal_id depois do readiness_manifest_id e rejeitado.",
+        lambda: world._approve(mutated_ready, "human-approver", approver_principal_id="prn_approver1"),
+    ))
+    mutated_auth = deepcopy(world.approved)
+    mutated_auth["authorization"] = dict(mutated_auth["authorization"])
+    mutated_auth["authorization"]["approver_principal_id"] = "prn_otherapp"
+    findings.append(_blocked(
+        "principal.integration_mutate_after_authorization",
+        "atlasquant_aion_developer_builder_sandbox",
+        "Mutar principal_id depois do authorization_id e rejeitado.",
+        lambda: world.sandbox(mutated_auth),
+    ))
+    rebound = deepcopy(world.approved)
+    rebound_auth = dict(rebound["authorization"])
+    rebound_auth["builder_principal_id"] = "prn_otherbld"
+    rebound_auth["authorization_id"] = authorization_manifest_id(rebound, rebound_auth)
+    rebound["authorization"] = rebound_auth
+    findings.append(_blocked(
+        "principal.integration_request_differs_from_authorization",
+        "atlasquant_aion_developer_builder_sandbox",
+        "Builder Request com principal diferente do autorizado e rejeitado.",
+        lambda: world.sandbox(rebound),
+    ))
+    legacy = deepcopy(world.approved)
+    legacy_auth = dict(legacy["authorization"])
+    legacy_auth["schema"] = "ATLASQUANT_AION_DEVELOPER_IMPLEMENTATION_AUTH_V1"
+    for field in (
+        "builder_principal_id",
+        "reviewer_principal_id",
+        "breaker_principal_id",
+        "approver_principal_id",
+    ):
+        legacy_auth.pop(field, None)
+    legacy["authorization"] = legacy_auth
+    findings.append(_blocked(
+        "principal.integration_legacy_authorization",
+        "atlasquant_aion_developer_builder_sandbox",
+        "Autorizacao antiga sem principal ids falha fechada.",
+        lambda: world.sandbox(legacy),
+    ))
+    relabeled = deepcopy(world.ready)
+    relabeled["readiness"] = dict(relabeled["readiness"])
+    relabeled["readiness"]["builder_actor"] = "Completely Different"
+    display_closed = (
+        implementation_readiness_manifest_id(relabeled) == world.ready["readiness_manifest_id"]
+    )
+    findings.append(_finding(
+        "principal.integration_display_does_not_change_id",
+        "atlasquant_aion_developer_manifest",
+        "Mudar somente o display mantendo os principal ids nao altera o manifesto."
+        if display_closed else
+        "O display ainda altera a identidade do manifesto.",
+        "BLOCKED_BY_DESIGN" if display_closed else "GAP",
+        "" if display_closed else "HIGH",
+    ))
+    rekeyed = deepcopy(world.ready)
+    rekeyed["readiness"] = dict(rekeyed["readiness"])
+    rekeyed["readiness"]["builder_principal_id"] = "prn_otherbld"
+    rekey_closed = (
+        implementation_readiness_manifest_id(rekeyed) != world.ready["readiness_manifest_id"]
+    )
+    findings.append(_finding(
+        "principal.integration_principal_changes_id",
+        "atlasquant_aion_developer_manifest",
+        "Mudar o principal_id mantendo o display altera o manifesto."
+        if rekey_closed else
+        "Mudar o principal_id nao altera o manifesto.",
+        "BLOCKED_BY_DESIGN" if rekey_closed else "GAP",
+        "" if rekey_closed else "HIGH",
+    ))
+
+    def _payload(**overrides: Any) -> dict[str, Any]:
+        payload = {
+            "builder_request_id": "DEVBUILD-AUDITPROVENANCE1",
+            "test_contract_manifest_id": "DEVTEST-AUDITPROVENANCE1",
+            "preflight_id": "DEVPREF-AUDITPROVENANCE1",
+            "patch_validation_id": "DEVPATCHVAL-1",
+            "patch_digest": "DEVPATCH-ABC",
+            "baseline_ref": "main@aaa",
+            "candidate_ref": "cursor/fix@bbb",
+            "baseline_commit_sha": "a" * 40,
+            "candidate_commit_sha": "b" * 40,
+            "baseline_tree_sha": "c" * 40,
+            "candidate_tree_sha": "d" * 40,
+            "verification_method": "STRUCTURAL_MANIFEST_V1",
+            "verification_evidence_refs": ["evidence:structural:1"],
+            "git_object_source": GIT_OBJECT_SOURCE_SYNTHETIC,
+            "attestor_principal_id": "prn_attestor1",
+        }
+        payload.update(overrides)
+        return payload
+
+    status, synthetic = _invoke(lambda: build_content_attestation(_payload()))
+    synthetic_closed = (
+        status == "ACCEPT"
+        and isinstance(synthetic, Mapping)
+        and synthetic.get("git_object_source") == GIT_OBJECT_SOURCE_SYNTHETIC
+        and synthetic.get("content_binding_structurally_bound") is True
+        and synthetic.get("content_binding_independently_verified") is False
+        and synthetic.get("state") != "READY_FOR_EXECUTION"
+    )
+    findings.append(_finding(
+        "provenance.placeholder_synthetic",
+        "atlasquant_aion_developer_content_attestation",
+        "Placeholder com SYNTHETIC_FIXTURE fica so estruturalmente ligado."
+        if synthetic_closed else
+        "Placeholder sintetico foi tratado como objeto Git observado.",
+        "BLOCKED_BY_DESIGN" if synthetic_closed else "GAP",
+        "" if synthetic_closed else "HIGH",
+    ))
+    findings.append(_blocked(
+        "provenance.placeholder_external_probe",
+        "atlasquant_aion_developer_content_attestation",
+        "Placeholder com EXTERNAL_PROBE e rejeitado.",
+        lambda: build_content_attestation(_payload(git_object_source=GIT_OBJECT_SOURCE_PROBE)),
+    ))
+    real_shas = {
+        "baseline_commit_sha": "ab" * 20,
+        "candidate_commit_sha": "cd" * 20,
+        "baseline_tree_sha": "ef" * 20,
+        "candidate_tree_sha": "12" * 20,
+    }
+    status, claimed = _invoke(lambda: build_content_attestation(_payload(**real_shas)))
+    claimed_closed = (
+        status == "ACCEPT"
+        and isinstance(claimed, Mapping)
+        and claimed.get("git_object_source") == GIT_OBJECT_SOURCE_SYNTHETIC
+        and claimed.get("content_binding_independently_verified") is False
+    )
+    findings.append(_finding(
+        "provenance.real_sha_stays_synthetic",
+        "atlasquant_aion_developer_content_attestation",
+        "SHA com formato real e SYNTHETIC_FIXTURE continua um claim sintetico."
+        if claimed_closed else
+        "SHA com formato real foi promovido a observacao.",
+        "BLOCKED_BY_DESIGN" if claimed_closed else "GAP",
+        "" if claimed_closed else "HIGH",
+    ))
+    findings.append(_blocked(
+        "provenance.external_probe_without_probe",
+        "atlasquant_aion_developer_content_attestation",
+        "EXTERNAL_PROBE sem probe real e rejeitado.",
+        lambda: build_content_attestation(_payload(
+            **real_shas,
+            git_object_source=GIT_OBJECT_SOURCE_PROBE,
+            verification_evidence_refs=["evidence:probe:claimed"],
+        )),
+    ))
+    sealed = build_content_attestation(_payload())
+    mutated_source = dict(sealed)
+    mutated_source["git_object_source"] = GIT_OBJECT_SOURCE_PROBE
+    findings.append(_blocked(
+        "provenance.source_mutated_after_id",
+        "atlasquant_aion_developer_content_attestation",
+        "Mutar git_object_source depois do attestation id e rejeitado.",
+        lambda: build_content_attestation(mutated_source),
+    ))
+    builder = _sealed_runner_request(["test_module.py"])
+    preflight = _sealed_preflight(builder)
+    patch = {
+        "schema": "ATLASQUANT_AION_DEVELOPER_PATCH_VALIDATION_V1",
+        "validation_id": "DEVPATCHVAL-1",
+        "state": "READY_FOR_PATCH_REVIEW",
+        "builder_request_id": builder["request_id"],
+        "preflight_id": preflight["preflight_id"],
+        "patch_digest": "DEVPATCH-ABC",
+        "revision_binding": {
+            "baseline_ref": "main@aaa",
+            "candidate_ref": "cursor/fix@bbb",
+            "refs_match_approved_request": True,
+            "revision_content_verified": True,
+        },
+        "blockers": [],
+        "patch_applied": False,
+        "execution_authorized": False,
+        "executor_attached": False,
+    }
+    original = attestation_for_documents(builder, preflight, patch)
+    stolen = dict(original)
+    stolen["git_object_source"] = GIT_OBJECT_SOURCE_PROBE
+    findings.append(_blocked(
+        "provenance.stolen_source",
+        "atlasquant_aion_developer_runner_contract",
+        "Attestation com source alterado e id antigo e rejeitada.",
+        lambda: build_runner_contract(
+            builder,
+            preflight,
+            patch,
+            content_attestation=stolen,
+            human_patch_reviewed=True,
+            human_patch_reviewer="reviewer-1",
+            human_patch_review_refs=["review:patch:1"],
+        ),
+    ))
+    findings.append(_blocked(
+        "provenance.caller_verified_true",
+        "atlasquant_aion_developer_content_attestation",
+        "content_binding_independently_verified=True do caller e rejeitado.",
+        lambda: build_content_attestation(_payload(content_binding_independently_verified=True)),
+    ))
+    findings.append(_blocked(
+        "provenance.invalid_source",
+        "atlasquant_aion_developer_content_attestation",
+        "git_object_source arbitrario e rejeitado.",
+        lambda: build_content_attestation(_payload(git_object_source="OBSERVED")),
+    ))
+    missing = _payload()
+    missing.pop("git_object_source")
+    findings.append(_blocked(
+        "provenance.missing_source",
+        "atlasquant_aion_developer_content_attestation",
+        "git_object_source ausente e rejeitado.",
+        lambda: build_content_attestation(missing),
+    ))
+    legacy_attestation = dict(original)
+    legacy_attestation.pop("git_object_source")
+    legacy_attestation["schema"] = "ATLASQUANT_AION_DEVELOPER_CONTENT_ATTESTATION_V1"
+    findings.append(_blocked(
+        "provenance.legacy_without_source",
+        "atlasquant_aion_developer_runner_contract",
+        "Attestation legada sem proveniencia de SHA e rejeitada.",
+        lambda: build_runner_contract(
+            builder,
+            preflight,
+            patch,
+            content_attestation=legacy_attestation,
+            human_patch_reviewed=True,
+            human_patch_reviewer="reviewer-1",
+            human_patch_review_refs=["review:patch:1"],
+        ),
+    ))
+    collided = attestation_for_documents(
+        builder,
+        preflight,
+        patch,
+        attestor_principal_id=builder["roles"]["builder_principal_id"],
+    )
+    findings.append(_blocked(
+        "principal.integration_attestor_collides",
+        "atlasquant_aion_developer_content_attestation",
+        "attestor_principal_id igual a um papel anterior e rejeitado.",
+        lambda: build_runner_contract(
+            builder,
+            preflight,
+            patch,
+            content_attestation=collided,
+            human_patch_reviewed=True,
+            human_patch_reviewer="reviewer-1",
+            human_patch_review_refs=["review:patch:1"],
+        ),
+    ))
+    return findings
+
+
 def audit_developer_chain() -> dict[str, Any]:
     """Inspect the local Developer contracts and return a deterministic report."""
     world = _World()
@@ -2903,6 +3296,7 @@ def audit_developer_chain() -> dict[str, Any]:
         findings.extend(_resource_budget_surface(world))
         findings.extend(_attestation_pinning_surface(world))
         findings.extend(_runner_policy_integrity_surface(world))
+        findings.extend(_principal_provenance_surface(world))
     finally:
         world.close()
 

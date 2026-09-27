@@ -20,6 +20,13 @@ from atlasquant_aion_developer_implementation import (
 from atlasquant_aion_developer_intelligence import scan_repository
 from atlasquant_aion_developer_package import build_developer_package
 
+_ROLE_IDS = {
+    "builder_principal_id": "prn_builder01",
+    "reviewer_principal_id": "prn_reviewer1",
+    "breaker_principal_id": "prn_breaker01",
+}
+_APPROVER_ID = "prn_approver1"
+
 
 class AionDeveloperImplementationEnvelopeTests(unittest.TestCase):
     def _fixture(self):
@@ -148,15 +155,18 @@ class AionDeveloperImplementationEnvelopeTests(unittest.TestCase):
                 prepare_implementation_readiness(
                     envelope,
                     rollback_plan="Reverter a mudança lógica.",
-                    builder_actor="same",
-                    reviewer_actor="same",
+                    builder_actor="Alice",
+                    reviewer_actor="Bob",
                     breaker_actor="breaker",
+                    builder_principal_id="prn_builder01",
+                    reviewer_principal_id="prn_builder01",
+                    breaker_principal_id="prn_breaker01",
                     readiness_refs=["ready:1"],
                 )
         finally:
             tmp.cleanup()
 
-    def test_role_independence_uses_canonical_identity(self):
+    def test_role_independence_uses_principal_ids_not_display(self):
         tmp, snapshot, package, correction, confirmed = self._fixture()
         try:
             envelope = build_implementation_envelope(snapshot, package, confirmed)
@@ -165,21 +175,29 @@ class AionDeveloperImplementationEnvelopeTests(unittest.TestCase):
                     envelope,
                     rollback_plan="Reverter a mudança lógica.",
                     builder_actor="Builder Alpha",
-                    reviewer_actor=" builder alpha ",
+                    reviewer_actor="Reviewer Beta",
                     breaker_actor="Breaker",
+                    builder_principal_id="prn_builder01",
+                    reviewer_principal_id="prn_builder01",
+                    breaker_principal_id="prn_breaker01",
                     readiness_refs=["ready:1"],
                 )
-            with self.assertRaises(ValueError):
-                prepare_implementation_readiness(
-                    envelope,
-                    rollback_plan="Reverter a mudança lógica.",
-                    builder_actor="Builder",
-                    reviewer_actor="Ｂｕｉｌｄｅｒ",
-                    breaker_actor="Breaker",
-                    readiness_refs=["ready:1"],
-                )
+            ready = prepare_implementation_readiness(
+                envelope,
+                rollback_plan="Reverter a mudança lógica.",
+                builder_actor="Builder",
+                reviewer_actor="Ｂｕｉｌｄｅｒ",
+                breaker_actor="Breaker",
+                builder_principal_id="prn_builder01",
+                reviewer_principal_id="prn_reviewer1",
+                breaker_principal_id="prn_breaker01",
+                readiness_refs=["ready:1"],
+            )
         finally:
             tmp.cleanup()
+        self.assertTrue(ready["readiness"]["roles_independent"])
+        self.assertEqual(ready["readiness"]["builder_principal_id"], "prn_builder01")
+        self.assertEqual(ready["readiness"]["reviewer_principal_id"], "prn_reviewer1")
 
     def test_readiness_still_does_not_execute(self):
         tmp, snapshot, package, correction, confirmed = self._fixture()
@@ -191,6 +209,9 @@ class AionDeveloperImplementationEnvelopeTests(unittest.TestCase):
                 builder_actor="builder",
                 reviewer_actor="reviewer",
                 breaker_actor="breaker",
+                builder_principal_id="prn_builder01",
+                reviewer_principal_id="prn_reviewer1",
+                breaker_principal_id="prn_breaker01",
                 readiness_refs=["ready:scope", "ready:rollback"],
             )
         finally:
@@ -212,6 +233,9 @@ class AionDeveloperImplementationEnvelopeTests(unittest.TestCase):
                 builder_actor="builder",
                 reviewer_actor="reviewer",
                 breaker_actor="breaker",
+                builder_principal_id="prn_builder01",
+                reviewer_principal_id="prn_reviewer1",
+                breaker_principal_id="prn_breaker01",
                 readiness_refs=["ready:1"],
             )
             with self.assertRaises(ValueError):
@@ -220,6 +244,7 @@ class AionDeveloperImplementationEnvelopeTests(unittest.TestCase):
                     approved=False,
                     approver_actor="admin",
                     approval_refs=["approval:1"],
+                    approver_principal_id="prn_approver1",
                 )
         finally:
             tmp.cleanup()
@@ -234,6 +259,9 @@ class AionDeveloperImplementationEnvelopeTests(unittest.TestCase):
                 builder_actor="builder",
                 reviewer_actor="reviewer",
                 breaker_actor="breaker",
+                builder_principal_id="prn_builder01",
+                reviewer_principal_id="prn_reviewer1",
+                breaker_principal_id="prn_breaker01",
                 readiness_refs=["ready:1"],
             )
             approved = approve_implementation_session(
@@ -241,6 +269,7 @@ class AionDeveloperImplementationEnvelopeTests(unittest.TestCase):
                 approved=True,
                 approver_actor="human-approver",
                 approval_refs=["approval:1"],
+                approver_principal_id="prn_approver1",
             )
         finally:
             tmp.cleanup()
@@ -270,6 +299,9 @@ class AionDeveloperImplementationEnvelopeTests(unittest.TestCase):
             ready = prepare_implementation_readiness(
                 envelope,rollback_plan="Reverter mudança.",
                 builder_actor="builder",reviewer_actor="reviewer",breaker_actor="breaker",
+                builder_principal_id="prn_builder01",
+                reviewer_principal_id="prn_reviewer1",
+                breaker_principal_id="prn_breaker01",
                 readiness_refs=["ready:1"],
             )
             changed = dict(ready)
@@ -279,6 +311,7 @@ class AionDeveloperImplementationEnvelopeTests(unittest.TestCase):
                 approve_implementation_session(
                     changed,approved=True,approver_actor="human-approver",
                     approval_refs=["approval:1"],
+                    approver_principal_id="prn_approver1",
                 )
             changed2 = dict(ready)
             changed2["test_contract"] = dict(ready["test_contract"])
@@ -287,6 +320,7 @@ class AionDeveloperImplementationEnvelopeTests(unittest.TestCase):
                 approve_implementation_session(
                     changed2,approved=True,approver_actor="human-approver",
                     approval_refs=["approval:1"],
+                    approver_principal_id="prn_approver1",
                 )
         finally:
             tmp.cleanup()
@@ -298,12 +332,16 @@ class AionDeveloperImplementationEnvelopeTests(unittest.TestCase):
             ready = prepare_implementation_readiness(
                 envelope,rollback_plan="Reverter mudança.",
                 builder_actor="builder",reviewer_actor="reviewer",breaker_actor="breaker",
+                builder_principal_id="prn_builder01",
+                reviewer_principal_id="prn_reviewer1",
+                breaker_principal_id="prn_breaker01",
                 readiness_refs=["ready:1"],
             )
             with self.assertRaises(ValueError):
                 approve_implementation_session(
-                    ready,approved=True,approver_actor=" BUILDER ",
+                    ready,approved=True,approver_actor="someone-else",
                     approval_refs=["approval:1"],
+                    approver_principal_id="prn_builder01",
                 )
         finally:
             tmp.cleanup()

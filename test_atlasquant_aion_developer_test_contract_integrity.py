@@ -107,12 +107,16 @@ def _chain():
         reviewer_actor="reviewer-b",
         breaker_actor="breaker-c",
         readiness_refs=["ready:1"],
+        builder_principal_id="prn_builder01",
+        reviewer_principal_id="prn_reviewer1",
+        breaker_principal_id="prn_breaker01",
     )
     approved = approve_implementation_session(
         ready,
         approved=True,
         approver_actor="human-approver",
         approval_refs=["approval:1"],
+        approver_principal_id="prn_approver1",
     )
     request = build_builder_sandbox_request(
         snapshot,

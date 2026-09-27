@@ -14,6 +14,12 @@ import unicodedata
 from typing import Any, Mapping, Sequence
 
 from atlasquant_aion_observability import redact_text
+from atlasquant_aion_developer_principal_identity import (
+    AUTHORIZATION_PRINCIPAL_FIELDS,
+    PRINCIPAL_BINDING_VERSION,
+    READINESS_PRINCIPAL_FIELDS,
+    require_principal_id,
+)
 
 SCHEMA = "ATLASQUANT_AION_DEVELOPER_MANIFEST_V1"
 SNAPSHOT_MANIFEST_VERSION = 2
@@ -160,10 +166,28 @@ def implementation_base_manifest_id(envelope: Mapping[str,Any]) -> str:
 
 
 def implementation_readiness_manifest_id(envelope: Mapping[str,Any]) -> str:
+    """Digest readiness authority. Display actors are not inputs.
+
+    A legacy readiness document without principal ids fails closed here
+    instead of hashing as equivalent to the principal-binding schema.
+    """
     rollback=envelope.get("rollback_contract") if isinstance(envelope.get("rollback_contract"),Mapping) else {}
+    readiness=envelope.get("readiness") if isinstance(envelope.get("readiness"),Mapping) else {}
+    principals={
+        field: require_principal_id(readiness.get(field), field)
+        for field in READINESS_PRINCIPAL_FIELDS
+    }
     return stable_digest({
+        "principal_binding": PRINCIPAL_BINDING_VERSION,
         "base_manifest_id":implementation_base_manifest_id(envelope),
-        "readiness":envelope.get("readiness"),
+        "builder_principal_id":principals["builder_principal_id"],
+        "reviewer_principal_id":principals["reviewer_principal_id"],
+        "breaker_principal_id":principals["breaker_principal_id"],
+        "readiness_refs":list(readiness.get("readiness_refs") or []),
+        "roles_independent":readiness.get("roles_independent"),
+        "scope_reviewed":readiness.get("scope_reviewed"),
+        "tests_selected":readiness.get("tests_selected"),
+        "rollback_recorded":readiness.get("rollback_recorded"),
         "rollback":{
             "recorded_for_this_change":rollback.get("recorded_for_this_change"),
             "change_specific_plan":rollback.get("change_specific_plan"),
@@ -172,10 +196,22 @@ def implementation_readiness_manifest_id(envelope: Mapping[str,Any]) -> str:
 
 
 def authorization_manifest_id(envelope: Mapping[str,Any], authorization: Mapping[str,Any]) -> str:
+    """Digest authorization authority. Display actors are not inputs.
+
+    Missing principal ids raise. They are not coerced into the previous
+    identity-key digest.
+    """
+    if not isinstance(authorization, Mapping):
+        raise ValueError("implementation authorization must be an object")
+    principals={
+        field: require_principal_id(authorization.get(field), field)
+        for field in AUTHORIZATION_PRINCIPAL_FIELDS
+    }
     return stable_digest({
+        "principal_binding": PRINCIPAL_BINDING_VERSION,
         "readiness_manifest_id":implementation_readiness_manifest_id(envelope),
         "trust_level":authorization.get("trust_level"),
-        "approver_actor":authorization.get("approver_actor"),
+        "approver_principal_id":principals["approver_principal_id"],
         "approval_refs":list(authorization.get("approval_refs") or []),
         "human_approved":authorization.get("human_approved"),
         "scope_expansion_allowed":authorization.get("scope_expansion_allowed"),
@@ -183,11 +219,21 @@ def authorization_manifest_id(envelope: Mapping[str,Any], authorization: Mapping
         "deploy_allowed":authorization.get("deploy_allowed"),
         "production_allowed":authorization.get("production_allowed"),
         "real_trading_allowed":authorization.get("real_trading_allowed"),
-        "builder_identity_key":authorization.get("builder_identity_key"),
-        "reviewer_identity_key":authorization.get("reviewer_identity_key"),
-        "breaker_identity_key":authorization.get("breaker_identity_key"),
+        "builder_principal_id":principals["builder_principal_id"],
+        "reviewer_principal_id":principals["reviewer_principal_id"],
+        "breaker_principal_id":principals["breaker_principal_id"],
         "rollback_recorded":authorization.get("rollback_recorded"),
     },prefix="DEVAUTH-",length=18)
+
+
+def structural_request_roles() -> dict[str, str]:
+    """Distinct fixture principals. Not derived from a display label."""
+    return {
+        "builder_principal_id": "prn_builder01",
+        "reviewer_principal_id": "prn_reviewer1",
+        "breaker_principal_id": "prn_breaker01",
+        "approver_principal_id": "prn_approver1",
+    }
 
 
 REQUIRED_MANDATORY_GATES = (
@@ -247,7 +293,13 @@ def expected_builder_request_id(request: Mapping[str, Any]) -> str:
     branch = request.get("branch_contract") if isinstance(request.get("branch_contract"), Mapping) else {}
     scope = request.get("scope") if isinstance(request.get("scope"), Mapping) else {}
     contract = request.get("test_contract") if isinstance(request.get("test_contract"), Mapping) else {}
+    roles = request.get("roles") if isinstance(request.get("roles"), Mapping) else {}
+    principals = {
+        field: require_principal_id(roles.get(field), field)
+        for field in AUTHORIZATION_PRINCIPAL_FIELDS
+    }
     seed = {
+        "principal_binding": PRINCIPAL_BINDING_VERSION,
         "snapshot_digest": str(lineage.get("snapshot_digest") or ""),
         "envelope_id": str(lineage.get("implementation_envelope_id") or ""),
         "authorization_id": str(lineage.get("implementation_authorization_id") or ""),
@@ -257,6 +309,10 @@ def expected_builder_request_id(request: Mapping[str, Any]) -> str:
         "files": require_string_sequence(scope.get("requested_files"), "requested_files"),
         "authorized_files": require_string_sequence(scope.get("authorized_files"), "authorized_files"),
         "test_contract_manifest_id": test_contract_manifest_id(contract),
+        "builder_principal_id": principals["builder_principal_id"],
+        "reviewer_principal_id": principals["reviewer_principal_id"],
+        "breaker_principal_id": principals["breaker_principal_id"],
+        "approver_principal_id": principals["approver_principal_id"],
     }
     return "DEVBUILD-" + stable_digest(seed, length=18)
 
@@ -303,7 +359,7 @@ __all__=[
     "validate_candidate_ref","snapshot_digest_from_rows",
     "validate_snapshot_integrity","correction_manifest_id",
     "implementation_base_manifest_id","implementation_readiness_manifest_id",
-    "authorization_manifest_id","REQUIRED_MANDATORY_GATES",
+    "authorization_manifest_id","structural_request_roles","REQUIRED_MANDATORY_GATES",
     "require_string_sequence","assert_required_mandatory_gates",
     "test_contract_manifest_id","expected_builder_request_id",
     "assert_builder_request_lineage","bind_builder_request_lineage",

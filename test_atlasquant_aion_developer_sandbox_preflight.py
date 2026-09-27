@@ -6,6 +6,7 @@ import unittest
 from atlasquant_aion_developer_manifest import (
     REQUIRED_MANDATORY_GATES,
     bind_builder_request_lineage,
+    structural_request_roles,
 )
 from atlasquant_aion_developer_sandbox_preflight import (
     ALLOWED_COMMAND_POLICY,
@@ -18,6 +19,7 @@ def _request():
     return bind_builder_request_lineage({
         "schema": "ATLASQUANT_AION_DEVELOPER_BUILDER_SANDBOX_REQUEST_V1",
         "state": "READY_FOR_BUILDER_SANDBOX",
+        "roles": structural_request_roles(),
         "lineage": {
             "snapshot_digest": "REPO-FIXTURE",
             "implementation_envelope_id": "DEVIMPL-FIXTURE",
