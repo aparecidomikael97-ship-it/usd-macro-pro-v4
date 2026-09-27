@@ -5636,8 +5636,15 @@ def _render_developer_intelligence() -> None:
                 key="aion_developer_command_policy_prepare",
             ):
                 try:
+                    stored_attestation = st.session_state.get("aion_developer_content_attestation")
                     command_policy = build_developer_command_policy_contract(
                         runner_contract,
+                        builder_request=builder_request,
+                        preflight=preflight,
+                        patch_validation=patch_validation,
+                        content_attestation=(
+                            stored_attestation if isinstance(stored_attestation, Mapping) else None
+                        ),
                     )
                     st.session_state["aion_developer_command_policy"] = command_policy
                 except Exception as exc:

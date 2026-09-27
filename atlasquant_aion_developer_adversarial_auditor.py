@@ -45,6 +45,7 @@ from atlasquant_aion_developer_manifest import (
 from atlasquant_aion_developer_command_policy import (
     _bind_command_policy_ids,
     assert_command_policy_integrity,
+    assert_command_policy_provenance,
     assert_runner_policy_boundary,
     build_command_policy_contract,
     expected_command_policy_payload,
@@ -1372,10 +1373,8 @@ def _sealed_preflight(builder):
     return preflight
 
 
-def _runner_probe(tests, gates=None):
-    builder = _sealed_runner_request(tests, gates)
-    preflight = _sealed_preflight(builder)
-    patch = {
+def _sealed_patch(builder, preflight):
+    return {
         "schema": "ATLASQUANT_AION_DEVELOPER_PATCH_VALIDATION_V1",
         "validation_id": "DEVPATCHVAL-1",
         "state": "READY_FOR_PATCH_REVIEW",
@@ -1393,15 +1392,28 @@ def _runner_probe(tests, gates=None):
         "execution_authorized": False,
         "executor_attached": False,
     }
-    return build_runner_contract(
+
+
+def _runner_bundle(tests, gates=None):
+    builder = _sealed_runner_request(tests, gates)
+    preflight = _sealed_preflight(builder)
+    patch = _sealed_patch(builder, preflight)
+    attestation = attestation_for_documents(builder, preflight, patch)
+    runner = build_runner_contract(
         builder,
         preflight,
         patch,
-        content_attestation=attestation_for_documents(builder, preflight, patch),
+        content_attestation=attestation,
         human_patch_reviewed=True,
         human_patch_reviewer="reviewer-1",
         human_patch_review_refs=["review:patch:1"],
     )
+    return runner, builder, preflight, patch, attestation
+
+
+def _runner_probe(tests, gates=None):
+    runner, _builder, _preflight, _patch, _attestation = _runner_bundle(tests, gates)
+    return runner
 
 
 def _state_closed(result: Any, blocker: str) -> bool:
@@ -2596,8 +2608,14 @@ def _attestation_pinning_surface(_world: _World) -> list[dict[str, str]]:
 def _runner_policy_integrity_surface(_world: _World) -> list[dict[str, str]]:
     """A sealed runner or command policy must not survive with a stale id."""
     findings: list[dict[str, str]] = []
-    runner = _runner_probe(["test_module.py"])
-    policy = build_command_policy_contract(runner)
+    runner, builder, preflight, patch, attestation = _runner_bundle(["test_module.py"])
+    upstream = {
+        "builder_request": builder,
+        "preflight": preflight,
+        "patch_validation": patch,
+        "content_attestation": attestation,
+    }
+    policy = build_command_policy_contract(runner, **upstream)
     ready = (
         runner.get("state") == "READY_FOR_RUNNER_DESIGN_REVIEW"
         and policy.get("state") == "READY_FOR_EXECUTABLE_PINNING_REVIEW"
@@ -3299,8 +3317,14 @@ def _self_reseal_surface(_world: _World) -> list[dict[str, str]]:
     contract the constructor would emit.
     """
     findings: list[dict[str, str]] = []
-    runner = _runner_probe(["test_module.py"])
-    policy = build_command_policy_contract(runner)
+    runner, builder, preflight, patch, attestation = _runner_bundle(["test_module.py"])
+    upstream = {
+        "builder_request": builder,
+        "preflight": preflight,
+        "patch_validation": patch,
+        "content_attestation": attestation,
+    }
+    policy = build_command_policy_contract(runner, **upstream)
 
     def _closed(invariant_id: str, description: str, fn: Callable[[], Any]) -> None:
         status, _result = _invoke(fn)
@@ -3460,21 +3484,22 @@ def _self_reseal_surface(_world: _World) -> list[dict[str, str]]:
         mutated_runner["resource_budget"] = dict(mutated_runner["resource_budget"])
         mutated_runner["resource_budget"]["runtime_seconds"] = 600
         _bind_runner_contract_ids(mutated_runner)
-        rebuilt = build_command_policy_contract(mutated_runner)
-        legitimate = (
-            mutated_runner.get("runner_contract_id") != runner.get("runner_contract_id")
-            and rebuilt.get("state") == "READY_FOR_EXECUTABLE_PINNING_REVIEW"
-            and rebuilt.get("resource_budget", {}).get("runtime_seconds") == 600
-            and rebuilt.get("execution_authorized") is False
-        )
-        if not legitimate:
-            return {"state": "LEGITIMATE_REBUILD_FAILED"}
-        assert_runner_policy_boundary(mutated_runner, rebuilt)
-        return assert_runner_policy_boundary(mutated_runner, policy)
+        if mutated_runner.get("runner_contract_id") == runner.get("runner_contract_id"):
+            return {"state": "NOT_RESEALED"}
+        withheld = build_command_policy_contract(mutated_runner)
+        if withheld.get("state") == "READY_FOR_EXECUTABLE_PINNING_REVIEW":
+            return {"state": "READY_WITHOUT_PROVENANCE"}
+        try:
+            build_command_policy_contract(mutated_runner, **upstream)
+        except (TypeError, ValueError):
+            pass
+        else:
+            return {"state": "ORIGINAL_UPSTREAM_ACCEPTED"}
+        return assert_runner_policy_boundary(mutated_runner, policy, **upstream)
 
     _closed(
         "self_reseal.runner_budget_old_policy",
-        "SELF_RESEAL: budget 600 legitimo gera policy nova e a policy antiga e rejeitada.",
+        "SELF_RESEAL: budget 600 resealed contra o upstream original nao fica READY e a policy antiga e rejeitada.",
         _budget_old_policy,
     )
 
@@ -3565,8 +3590,8 @@ def _self_reseal_surface(_world: _World) -> list[dict[str, str]]:
         _policy_attack(_extra_key),
     )
 
-    status, _result = _invoke(lambda: assert_runner_policy_boundary(runner, policy))
-    expected = expected_command_policy_payload(runner)
+    status, _result = _invoke(lambda: assert_runner_policy_boundary(runner, policy, **upstream))
+    expected = expected_command_policy_payload(runner, **upstream)
     semantic = (
         status == "ACCEPT"
         and policy.get("state") == "READY_FOR_EXECUTABLE_PINNING_REVIEW"
@@ -3632,7 +3657,13 @@ def _upstream_provenance_surface(_world: _World) -> list[dict[str, str]]:
         human_patch_reviewer="reviewer-1",
         human_patch_review_refs=["review:patch:1"],
     )
-    policy = build_command_policy_contract(runner)
+    policy = build_command_policy_contract(
+        runner,
+        builder_request=builder,
+        preflight=preflight,
+        patch_validation=patch,
+        content_attestation=attestation,
+    )
 
     def _closed(invariant_id: str, description: str, fn: Callable[[], Any]) -> None:
         status, _result = _invoke(fn)
@@ -3958,7 +3989,14 @@ def _upstream_provenance_surface(_world: _World) -> list[dict[str, str]]:
     )
 
     status, _result = _invoke(lambda: _provenance(runner))
-    boundary_status, _boundary = _invoke(lambda: assert_runner_policy_boundary(runner, policy))
+    boundary_status, _boundary = _invoke(lambda: assert_runner_policy_boundary(
+        runner,
+        policy,
+        builder_request=builder,
+        preflight=preflight,
+        patch_validation=patch,
+        content_attestation=attestation,
+    ))
     legitimate = (
         status == "ACCEPT"
         and boundary_status == "ACCEPT"
@@ -3981,6 +4019,255 @@ def _upstream_provenance_surface(_world: _World) -> list[dict[str, str]]:
         "" if legitimate else "HIGH",
     ))
     return findings
+
+
+def _policy_provenance_surface(_world: _World) -> list[dict[str, str]]:
+    """A ready command policy must be derived from upstream documents.
+
+    STRUCTURAL PROVENANCE means those documents agree. It does not establish
+    an independent root of trust. A caller boolean is not an input.
+    """
+    findings: list[dict[str, str]] = []
+    runner, builder, preflight, patch, attestation = _runner_bundle(["test_module.py"])
+    upstream = {
+        "builder_request": builder,
+        "preflight": preflight,
+        "patch_validation": patch,
+        "content_attestation": attestation,
+    }
+    policy = build_command_policy_contract(runner, **upstream)
+
+    def _reject(invariant_id: str, description: str, fn: Callable[[], Any]) -> None:
+        status, _result = _invoke(fn)
+        closed = status == "REJECT"
+        findings.append(_finding(
+            invariant_id,
+            "atlasquant_aion_developer_command_policy",
+            description if closed else description + " A policy foi aceita.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    withheld = build_command_policy_contract(runner)
+    missing_closed = (
+        withheld.get("state") == "BLOCKED"
+        and "UPSTREAM_PROVENANCE_REQUIRED" in list(withheld.get("blockers") or [])
+        and withheld.get("upstream_provenance_structurally_verified") is False
+        and withheld.get("upstream_provenance_independently_verified") is False
+        and withheld.get("upstream_provenance_binding_id") == ""
+        and withheld.get("execution_authorized") is False
+    )
+    findings.append(_finding(
+        "policy_provenance.missing_upstream",
+        "atlasquant_aion_developer_command_policy",
+        "POLICY_PROVENANCE: runner canonico sem upstream nao emite policy READY."
+        if missing_closed else
+        "Runner canonico sem upstream ainda emite policy READY.",
+        "BLOCKED_BY_DESIGN" if missing_closed else "GAP",
+        "" if missing_closed else "HIGH",
+    ))
+    _reject(
+        "policy_provenance.caller_structural_true",
+        "POLICY_PROVENANCE: booleano structural do caller sem documentos e rejeitado.",
+        lambda: build_command_policy_contract(
+            runner,
+            upstream_provenance_structurally_verified=True,
+        ),
+    )
+    _reject(
+        "policy_provenance.independent_true",
+        "POLICY_PROVENANCE: independent verification true com id novo e rejeitado.",
+        lambda: assert_command_policy_integrity(_reseal_independent(policy)),
+    )
+
+    def _false_lineage() -> Any:
+        mutated = deepcopy(runner)
+        mutated["lineage"]["builder_request_id"] = "DEVBUILD-OTHERREQUEST1"
+        _bind_runner_contract_ids(mutated)
+        if mutated.get("runner_contract_id") == runner.get("runner_contract_id"):
+            return {"state": "NOT_RESEALED"}
+        return build_command_policy_contract(mutated, **upstream)
+
+    _reject(
+        "policy_provenance.false_lineage",
+        "POLICY_PROVENANCE: lineage falsa com upstream original e rejeitada.",
+        _false_lineage,
+    )
+
+    other = deepcopy(builder)
+    other["lineage"] = dict(other["lineage"])
+    other["lineage"]["snapshot_digest"] = "REPO-OTHER"
+    other = bind_builder_request_lineage(other)
+    other_preflight = _sealed_preflight(other)
+    other_patch = _sealed_patch(other, other_preflight)
+    other_attestation = attestation_for_documents(other, other_preflight, other_patch)
+    other_runner = build_runner_contract(
+        other,
+        other_preflight,
+        other_patch,
+        content_attestation=other_attestation,
+        human_patch_reviewed=True,
+        human_patch_reviewer="reviewer-1",
+        human_patch_review_refs=["review:patch:1"],
+    )
+    _reject(
+        "policy_provenance.different_upstream",
+        "POLICY_PROVENANCE: runner legitimo com upstream diferente e rejeitado.",
+        lambda: build_command_policy_contract(
+            runner,
+            builder_request=other,
+            preflight=other_preflight,
+            patch_validation=other_patch,
+            content_attestation=other_attestation,
+        ),
+    )
+    _reject(
+        "policy_provenance.bundle_swap",
+        "POLICY_PROVENANCE: policy do bundle A com runner e upstream B e rejeitada.",
+        lambda: assert_command_policy_provenance(
+            policy,
+            other_runner,
+            other,
+            other_preflight,
+            other_patch,
+            other_attestation,
+        ),
+    )
+
+    def _claim() -> Any:
+        mutated = deepcopy(policy)
+        mutated["upstream_provenance_binding_id"] = "DEVPROV-" + ("A" * 18)
+        _bind_command_policy_ids(mutated)
+        if mutated.get("command_policy_id") == policy.get("command_policy_id"):
+            return {"state": "NOT_RESEALED"}
+        return assert_command_policy_provenance(
+            mutated, runner, builder, preflight, patch, attestation,
+        )
+
+    _reject(
+        "policy_provenance.structural_claim_reseal",
+        "POLICY_PROVENANCE: claim estrutural resealed sem reconstrucao e rejeitado.",
+        _claim,
+    )
+
+    def _ready_blocker() -> Any:
+        mutated = deepcopy(withheld)
+        mutated["state"] = "READY_FOR_EXECUTABLE_PINNING_REVIEW"
+        mutated["validated_command_plan"] = deepcopy(policy["validated_command_plan"])
+        _bind_command_policy_ids(mutated)
+        return assert_command_policy_integrity(mutated)
+
+    _reject(
+        "policy_provenance.ready_with_provenance_blocker",
+        "POLICY_PROVENANCE: state READY com blocker de proveniencia e rejeitado.",
+        _ready_blocker,
+    )
+
+    def _removed() -> Any:
+        mutated = deepcopy(withheld)
+        mutated["state"] = "READY_FOR_EXECUTABLE_PINNING_REVIEW"
+        mutated["blockers"] = []
+        mutated["upstream_provenance_structurally_verified"] = True
+        mutated["upstream_provenance_binding_id"] = "DEVPROV-" + ("B" * 18)
+        mutated["validated_command_plan"] = deepcopy(policy["validated_command_plan"])
+        _bind_command_policy_ids(mutated)
+        return assert_command_policy_provenance(
+            mutated, runner, builder, preflight, patch, attestation,
+        )
+
+    _reject(
+        "policy_provenance.blocker_removed",
+        "POLICY_PROVENANCE: blocker de proveniencia removido e resealed e rejeitado.",
+        _removed,
+    )
+
+    def _structural_false() -> Any:
+        mutated = deepcopy(policy)
+        mutated["upstream_provenance_structurally_verified"] = False
+        mutated["upstream_provenance_binding_id"] = ""
+        _bind_command_policy_ids(mutated)
+        return assert_command_policy_integrity(mutated)
+
+    _reject(
+        "policy_provenance.structural_false_not_ready",
+        "POLICY_PROVENANCE: structural false nao permanece READY.",
+        _structural_false,
+    )
+
+    status, _result = _invoke(lambda: assert_command_policy_provenance(
+        policy, runner, builder, preflight, patch, attestation,
+    ))
+    environment = build_environment_contract()
+    pinning = build_executable_pinning_spec([
+        {
+            "logical_name": "python",
+            "absolute_path": "/usr/bin/python3",
+            "sha256": "ab" * 32,
+            "file_size_bytes": 128,
+            "version_claim": "claim-only",
+            "verification_evidence_refs": ["evidence:pin:python"],
+        },
+        {
+            "logical_name": "git",
+            "absolute_path": "/usr/bin/git",
+            "sha256": "cd" * 32,
+            "file_size_bytes": 128,
+            "version_claim": "claim-only",
+            "verification_evidence_refs": ["evidence:pin:git"],
+        },
+    ])
+    sandbox_status, sandbox = _invoke(lambda: build_os_sandbox_design_review(
+        policy,
+        pinning,
+        attestation,
+        environment,
+        runner_contract=runner,
+        builder_request=builder,
+        preflight=preflight,
+        patch_validation=patch,
+    ))
+    legitimate = (
+        status == "ACCEPT"
+        and sandbox_status == "ACCEPT"
+        and isinstance(sandbox, Mapping)
+        and sandbox.get("state") == "READY_FOR_OS_SANDBOX_DESIGN_REVIEW"
+        and policy.get("state") == "READY_FOR_EXECUTABLE_PINNING_REVIEW"
+        and list(policy.get("blockers") or []) == []
+        and policy.get("upstream_provenance_structurally_verified") is True
+        and policy.get("upstream_provenance_independently_verified") is False
+        and policy.get("execution_authorized") is False
+        and sandbox.get("execution_authorized") is False
+    )
+    findings.append(_finding(
+        "policy_provenance.legitimate",
+        "atlasquant_aion_developer_command_policy",
+        "POLICY_PROVENANCE: cadeia com documentos upstream concorda e fica estruturalmente ligada."
+        if legitimate else
+        "Cadeia com documentos upstream nao produziu a policy estrutural esperada.",
+        "PASS" if legitimate else "GAP",
+        "" if legitimate else "HIGH",
+    ))
+    cross_bound = (
+        legitimate
+        and policy.get("upstream_provenance_independently_verified") is False
+        and sandbox.get("content_binding_independently_verified") is False
+    )
+    findings.append(_finding(
+        "policy_provenance.cross_bound_not_independent",
+        "atlasquant_aion_developer_command_policy",
+        "POLICY_PROVENANCE: documentos consistentes ficam estruturalmente ligados e independent verification permanece false."
+        if cross_bound else
+        "Documentos consistentes alegaram root of trust independente.",
+        "PASS" if cross_bound else "GAP",
+        "" if cross_bound else "HIGH",
+    ))
+    return findings
+
+
+def _reseal_independent(policy: Mapping[str, Any]) -> dict[str, Any]:
+    mutated = deepcopy(policy)
+    mutated["upstream_provenance_independently_verified"] = True
+    return _bind_command_policy_ids(mutated)
 
 
 def audit_developer_chain() -> dict[str, Any]:
@@ -4006,6 +4293,7 @@ def audit_developer_chain() -> dict[str, Any]:
         findings.extend(_principal_provenance_surface(world))
         findings.extend(_self_reseal_surface(world))
         findings.extend(_upstream_provenance_surface(world))
+        findings.extend(_policy_provenance_surface(world))
     finally:
         world.close()
 

@@ -240,21 +240,25 @@ def build_os_sandbox_design_review(
     """Bundle the contracts for design review. This does not authorize execution.
 
     The runner is checked against the upstream documents, then the command
-    policy is checked against that runner. A ready label with blockers, or a
-    digest that was recomputed after a mutation, fails closed. This does not
+    policy is checked against that runner. A ready label requires a derived
+    structural provenance claim. Independent root-of-trust verification stays
+    false. A digest recomputed after a mutation fails closed. This does not
     create an operating-system sandbox.
     """
-    from atlasquant_aion_developer_command_policy import assert_runner_policy_boundary
-    from atlasquant_aion_developer_runner_contract import assert_runner_provenance
+    from atlasquant_aion_developer_command_policy import assert_command_policy_provenance
 
-    assert_runner_provenance(
+    assert_command_policy_provenance(
+        command_policy,
         runner_contract,
         builder_request,
         preflight,
         patch_validation,
         attestation,
     )
-    assert_runner_policy_boundary(runner_contract, command_policy)
+    if command_policy.get("upstream_provenance_structurally_verified") is not True:
+        raise ValueError("command policy structural provenance was not derived")
+    if command_policy.get("upstream_provenance_independently_verified") is not False:
+        raise ValueError("independent root of trust is not established")
     if runner_contract.get("state") != "READY_FOR_RUNNER_DESIGN_REVIEW":
         raise ValueError("runner is not ready for design review")
     if list(runner_contract.get("blockers") or []) != []:

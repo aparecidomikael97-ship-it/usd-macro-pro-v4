@@ -576,7 +576,13 @@ class AttestationPinningContractTests(unittest.TestCase):
 
     def test_design_review_bundle_never_authorizes_execution(self):
         runner = self._run(self.attestation)
-        policy = build_command_policy_contract(runner)
+        policy = build_command_policy_contract(
+            runner,
+            builder_request=self.builder,
+            preflight=self.preflight,
+            patch_validation=self.patch,
+            content_attestation=self.attestation,
+        )
         pinning = build_executable_pinning_spec(_pins())
         environment = build_environment_contract()
         review = build_os_sandbox_design_review(

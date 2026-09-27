@@ -52,7 +52,13 @@ class UpstreamProvenanceTests(unittest.TestCase):
         self.patch = _patch(self.builder, self.preflight)
         self.attestation = attestation_for_documents(self.builder, self.preflight, self.patch)
         self.runner = self._runner()
-        self.policy = build_command_policy_contract(self.runner)
+        self.policy = build_command_policy_contract(
+            self.runner,
+            builder_request=self.builder,
+            preflight=self.preflight,
+            patch_validation=self.patch,
+            content_attestation=self.attestation,
+        )
         self.assertEqual(self.runner["state"], "READY_FOR_RUNNER_DESIGN_REVIEW")
         self.assertEqual(self.runner["blockers"], [])
         self.assertEqual(self.policy["state"], "READY_FOR_EXECUTABLE_PINNING_REVIEW")
@@ -309,7 +315,14 @@ class UpstreamProvenanceTests(unittest.TestCase):
     def test_legitimate_upstream_chain_passes(self):
         assert_runner_contract_integrity(self.runner)
         self._provenance(self.runner)
-        assert_runner_policy_boundary(self.runner, self.policy)
+        assert_runner_policy_boundary(
+            self.runner,
+            self.policy,
+            builder_request=self.builder,
+            preflight=self.preflight,
+            patch_validation=self.patch,
+            content_attestation=self.attestation,
+        )
         review = build_os_sandbox_design_review(
             self.policy,
             build_executable_pinning_spec(_pins()),

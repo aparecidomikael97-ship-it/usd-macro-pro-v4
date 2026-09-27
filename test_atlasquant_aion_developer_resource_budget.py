@@ -251,7 +251,32 @@ class ResourceBudgetTypeTests(unittest.TestCase):
         preflight = _preflight(request, runtime_seconds=1)
         runner = _runner(request, preflight)
         self.assertEqual(runner["state"], "READY_FOR_RUNNER_DESIGN_REVIEW")
-        policy = build_command_policy_contract(runner)
+        branch = request["branch_contract"]
+        patch = {
+            "schema": "ATLASQUANT_AION_DEVELOPER_PATCH_VALIDATION_V1",
+            "validation_id": "DEVPATCHVAL-1",
+            "state": "READY_FOR_PATCH_REVIEW",
+            "builder_request_id": request["request_id"],
+            "preflight_id": preflight["preflight_id"],
+            "patch_digest": "DEVPATCH-ABC",
+            "revision_binding": {
+                "baseline_ref": branch["baseline_ref"],
+                "candidate_ref": branch["candidate_ref"],
+                "refs_match_approved_request": True,
+                "revision_content_verified": True,
+            },
+            "blockers": [],
+            "patch_applied": False,
+            "execution_authorized": False,
+            "executor_attached": False,
+        }
+        policy = build_command_policy_contract(
+            runner,
+            builder_request=request,
+            preflight=preflight,
+            patch_validation=patch,
+            content_attestation=attestation_for_documents(request, preflight, patch),
+        )
         self.assertEqual(policy["state"], "READY_FOR_EXECUTABLE_PINNING_REVIEW")
         _assert_closed(self, runner)
         _assert_closed(self, policy)

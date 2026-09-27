@@ -74,8 +74,14 @@ class RunnerPolicyIntegrityTests(unittest.TestCase):
             human_patch_reviewer="reviewer-1",
             human_patch_review_refs=["review:patch:1"],
         )
-        self.policy = build_command_policy_contract(self.runner)
         self.attestation = attestation
+        self.policy = build_command_policy_contract(
+            self.runner,
+            builder_request=builder,
+            preflight=preflight,
+            patch_validation=patch,
+            content_attestation=attestation,
+        )
         self.assertEqual(self.runner["state"], "READY_FOR_RUNNER_DESIGN_REVIEW")
         self.assertEqual(self.policy["state"], "READY_FOR_EXECUTABLE_PINNING_REVIEW")
         self.assertEqual(self.runner["resource_budget"]["runtime_seconds"], 900)
@@ -95,10 +101,20 @@ class RunnerPolicyIntegrityTests(unittest.TestCase):
         resealed = deepcopy(self.runner)
         resealed["resource_budget"]["runtime_seconds"] = 600
         _bind_runner_contract_ids(resealed)
-        accepted = build_command_policy_contract(resealed)
-        self.assertEqual(accepted["state"], "READY_FOR_EXECUTABLE_PINNING_REVIEW")
-        self.assertEqual(accepted["resource_budget"]["runtime_seconds"], 600)
-        self.assertFalse(accepted["execution_authorized"])
+        withheld = build_command_policy_contract(resealed)
+        self.assertEqual(withheld["state"], "BLOCKED")
+        self.assertIn("UPSTREAM_PROVENANCE_REQUIRED", withheld["blockers"])
+        self.assertIs(withheld["upstream_provenance_structurally_verified"], False)
+        self.assertIs(withheld["upstream_provenance_independently_verified"], False)
+        self.assertFalse(withheld["execution_authorized"])
+        with self.assertRaises(ValueError):
+            build_command_policy_contract(
+                resealed,
+                builder_request=self.builder,
+                preflight=self.preflight,
+                patch_validation=self.patch,
+                content_attestation=self.attestation,
+            )
 
     def test_memory_change_keeps_old_id_and_is_rejected(self):
         self._stale(lambda runner: runner["resource_budget"].__setitem__("memory_mb", 256))

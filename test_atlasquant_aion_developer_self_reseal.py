@@ -43,6 +43,10 @@ class SelfResealBoundaryTests(unittest.TestCase):
         preflight = _preflight(builder)
         patch = _patch(builder, preflight)
         attestation = attestation_for_documents(builder, preflight, patch)
+        self.builder = builder
+        self.preflight = preflight
+        self.patch = patch
+        self.attestation = attestation
         self.runner = build_runner_contract(
             builder,
             preflight,
@@ -52,10 +56,20 @@ class SelfResealBoundaryTests(unittest.TestCase):
             human_patch_reviewer="reviewer-1",
             human_patch_review_refs=["review:patch:1"],
         )
-        self.policy = build_command_policy_contract(self.runner)
+        self.policy = build_command_policy_contract(self.runner, **self._upstream())
         self.assertEqual(self.runner["state"], "READY_FOR_RUNNER_DESIGN_REVIEW")
         self.assertEqual(self.policy["state"], "READY_FOR_EXECUTABLE_PINNING_REVIEW")
         self.assertFalse(self.policy["execution_authorized"])
+        self.assertIs(self.policy["upstream_provenance_structurally_verified"], True)
+        self.assertIs(self.policy["upstream_provenance_independently_verified"], False)
+
+    def _upstream(self):
+        return {
+            "builder_request": self.builder,
+            "preflight": self.preflight,
+            "patch_validation": self.patch,
+            "content_attestation": self.attestation,
+        }
 
     def _reject_resealed_policy(self, mutate):
         mutated = deepcopy(self.policy)
@@ -157,12 +171,13 @@ class SelfResealBoundaryTests(unittest.TestCase):
         mutated_runner["resource_budget"]["runtime_seconds"] = 600
         _bind_runner_contract_ids(mutated_runner)
         rebuilt = build_command_policy_contract(mutated_runner)
-        self.assertEqual(rebuilt["state"], "READY_FOR_EXECUTABLE_PINNING_REVIEW")
-        self.assertEqual(rebuilt["resource_budget"]["runtime_seconds"], 600)
-        self.assertFalse(rebuilt["execution_authorized"])
-        assert_runner_policy_boundary(mutated_runner, rebuilt)
+        self.assertEqual(rebuilt["state"], "BLOCKED")
+        self.assertIn("UPSTREAM_PROVENANCE_REQUIRED", rebuilt["blockers"])
+        self.assertIs(rebuilt["upstream_provenance_structurally_verified"], False)
         with self.assertRaises(ValueError):
-            assert_runner_policy_boundary(mutated_runner, self.policy)
+            build_command_policy_contract(mutated_runner, **self._upstream())
+        with self.assertRaises(ValueError):
+            assert_runner_policy_boundary(mutated_runner, self.policy, **self._upstream())
 
     def test_joint_reseal_of_runner_and_policy_is_rejected(self):
         mutated_runner = deepcopy(self.runner)
@@ -240,9 +255,9 @@ class SelfResealBoundaryTests(unittest.TestCase):
         self._reject_resealed_policy(mutate)
 
     def test_constructor_document_still_passes(self):
-        expected = expected_command_policy_payload(self.runner)
+        expected = expected_command_policy_payload(self.runner, **self._upstream())
         assert_command_policy_integrity(self.policy)
-        assert_runner_policy_boundary(self.runner, self.policy)
+        assert_runner_policy_boundary(self.runner, self.policy, **self._upstream())
         assert_runner_contract_integrity(self.runner)
         self.assertEqual(self.policy["resource_budget"], self.runner["resource_budget"])
         self.assertEqual(self.policy["validated_command_plan"], expected["validated_command_plan"])

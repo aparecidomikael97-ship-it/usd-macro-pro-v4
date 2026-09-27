@@ -109,7 +109,12 @@ class AionDeveloperCommandPolicyTests(unittest.TestCase):
     def test_exact_plan_is_only_ready_for_executable_pinning_review(self):
         out = build_command_policy_contract(_runner())
         self.assertEqual(out["schema"], SCHEMA)
-        self.assertEqual(out["state"], "READY_FOR_EXECUTABLE_PINNING_REVIEW")
+        self.assertEqual(out["state"], "BLOCKED")
+        self.assertIn("UPSTREAM_PROVENANCE_REQUIRED", out["blockers"])
+        self.assertIs(out["upstream_provenance_structurally_verified"], False)
+        self.assertIs(out["upstream_provenance_independently_verified"], False)
+        self.assertEqual(out["upstream_provenance_binding_id"], "")
+        self.assertEqual(out["validated_command_plan"], [])
         self.assertEqual(out["allowlist_policy"]["mode"], "EXACT_ARGV_TEMPLATES")
         self.assertFalse(out["allowlist_policy"]["shell_allowed"])
         self.assertFalse(out["allowlist_policy"]["network_allowed"])
@@ -122,10 +127,7 @@ class AionDeveloperCommandPolicyTests(unittest.TestCase):
         self.assertTrue(out["allowlist_policy"]["EXECUTABLE_DIGEST_REQUIRED"])
         self.assertFalse(out["allowlist_policy"]["PARENT_ENV_INHERITANCE"])
         self.assertFalse(out["compile_step_executable"])
-        self.assertEqual(
-            out["validated_command_plan"][0]["pycache_prefix"],
-            "<SANDBOX_EPHEMERAL_PYCACHE>",
-        )
+        self.assertNotEqual(out["state"], "READY_FOR_EXECUTABLE_PINNING_REVIEW")
 
     def test_executable_substitution_is_blocked(self):
         runner = _runner()

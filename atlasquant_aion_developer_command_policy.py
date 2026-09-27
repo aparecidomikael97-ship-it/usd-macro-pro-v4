@@ -4,13 +4,28 @@ Validates the Runner Contract command plan against exact argv templates. It
 does not resolve executables or run any command. Passing this contract means
 only that the command *description* matches the approved design.
 
+Four distinct checks are used, and they are not interchangeable:
+
+INTERNAL INTEGRITY: the digest matches the bytes of this document.
+LOCAL SEMANTICS: fields follow the canonical plan, budget, environment and flags.
+STRUCTURAL PROVENANCE: the builder request, preflight, patch validation,
+content attestation and runner agree with each other and with this policy.
+This is a deterministic cross-document comparison. It does not establish an
+independent root of trust.
+INDEPENDENT ROOT OF TRUST: not implemented. Documents can be constructed
+together. ``upstream_provenance_independently_verified`` stays false.
+
+A caller boolean cannot make a policy ready. ``READY_FOR_EXECUTABLE_PINNING_REVIEW``
+is emitted only after ``assert_runner_provenance`` accepts the supplied documents.
+
 Important: Python test execution still executes repository code. Therefore this
 contract explicitly requires OS sandbox proof and executable pinning before any
 future execution path can be designed.
 
 No shell, subprocess, filesystem write, network, secret access, test execution,
 commit, push, merge, deploy, publication, production change or real trading
-occurs in this module.
+occurs in this module. No signature, PKI, KMS, HSM or remote attestation is
+created here.
 """
 from __future__ import annotations
 
@@ -27,6 +42,7 @@ from atlasquant_aion_developer_runner_contract import (
     SCHEMA as RUNNER_SCHEMA,
     _assert_runner_digest,
     assert_runner_contract_integrity,
+    assert_runner_provenance,
 )
 from atlasquant_aion_developer_sandbox_preflight import validate_resource_budget
 
@@ -80,6 +96,7 @@ _POLICY_FALSE_FLAGS = (
     "production_change_allowed",
     "real_trading_enabled",
     "tool_output_is_authority",
+    "upstream_provenance_independently_verified",
 )
 _POLICY_TRUE_FLAGS = (
     "absolute_executable_required",
@@ -245,6 +262,7 @@ def _assert_policy_semantics(policy: Mapping[str, Any]) -> None:
     if policy.get("validated_command_plan") != _canonical_command_plan():
         raise ValueError("validated command plan is not the canonical template")
     _assert_policy_state(policy)
+    _assert_policy_provenance_claims(policy)
 
 
 def _assert_policy_state(policy: Mapping[str, Any]) -> None:
@@ -258,6 +276,32 @@ def _assert_policy_state(policy: Mapping[str, Any]) -> None:
         raise ValueError("blocked command policy must name blockers")
 
 
+def _assert_policy_provenance_claims(policy: Mapping[str, Any]) -> None:
+    """Local shape of the provenance claims. This does not recompute them.
+
+    A true structural claim still has to be derived again from the upstream
+    documents. An independent root of trust is not a field a document can set.
+    """
+    structural = policy.get("upstream_provenance_structurally_verified")
+    independent = policy.get("upstream_provenance_independently_verified")
+    binding = policy.get("upstream_provenance_binding_id")
+    if independent is not False:
+        raise ValueError("independent root of trust is not established")
+    if not isinstance(structural, bool):
+        raise ValueError("structural provenance claim must be a boolean")
+    if not isinstance(binding, str):
+        raise ValueError("structural provenance binding must be a string")
+    if structural is True:
+        if not binding.startswith("DEVPROV-") or len(binding) != len("DEVPROV-") + 18:
+            raise ValueError("structural provenance binding was not derived")
+        if "UPSTREAM_PROVENANCE_REQUIRED" in list(policy.get("blockers") or []):
+            raise ValueError("structural provenance claim contradicts its blocker")
+    elif binding != "":
+        raise ValueError("unverified policy cannot carry a provenance binding")
+    if policy.get("state") == "READY_FOR_EXECUTABLE_PINNING_REVIEW" and structural is not True:
+        raise ValueError("ready command policy requires structural provenance")
+
+
 def command_policy_manifest(policy: Mapping[str, Any]) -> dict[str, Any]:
     """Fields that define the accepted command-policy decision. Ids are not inputs.
 
@@ -265,6 +309,11 @@ def command_policy_manifest(policy: Mapping[str, Any]) -> dict[str, Any]:
     They are not authority fields and are intentionally outside this digest.
     ``state`` and ``blockers`` are authority fields: a blocked policy cannot
     be relabeled ready while keeping the same id.
+    ``upstream_provenance_structurally_verified`` records a cross-document
+    comparison. ``upstream_provenance_independently_verified`` is not an
+    authority that this module can grant, and it stays false.
+    ``upstream_provenance_binding_id`` names the documents that were compared.
+    It is not an external attestation.
     """
     if not isinstance(policy, Mapping):
         raise ValueError("command policy must be an object")
@@ -274,6 +323,13 @@ def command_policy_manifest(policy: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "state": policy.get("state"),
         "blockers": list(blockers) if isinstance(blockers, (list, tuple)) else blockers,
+        "upstream_provenance_structurally_verified": policy.get(
+            "upstream_provenance_structurally_verified"
+        ),
+        "upstream_provenance_independently_verified": policy.get(
+            "upstream_provenance_independently_verified"
+        ),
+        "upstream_provenance_binding_id": policy.get("upstream_provenance_binding_id"),
         "runner_contract_id": policy.get("runner_contract_id"),
         "runner_contract_manifest_id": policy.get("runner_contract_manifest_id"),
         "validated_command_plan": policy.get("validated_command_plan"),
@@ -453,22 +509,143 @@ def _classify_command_policy(
     return list(dict.fromkeys(blockers)), validated_budget
 
 
-def expected_command_policy_state_and_blockers(
+def _provenance_binding_id(
     runner_contract: Mapping[str, Any],
-) -> tuple[str, list[str]]:
-    """State the constructor would seal. The supplied policy id is not an input."""
-    blockers, _validated = _classify_command_policy(runner_contract)
-    if (
+    builder_request: Mapping[str, Any],
+    preflight: Mapping[str, Any],
+    patch_validation: Mapping[str, Any],
+    content_attestation: Mapping[str, Any],
+) -> str:
+    """Name the documents that were compared. This is not an external attestation."""
+    return stable_digest(
+        {
+            "builder_request_id": builder_request.get("request_id"),
+            "preflight_id": preflight.get("preflight_id"),
+            "patch_validation_id": patch_validation.get("validation_id"),
+            "content_attestation_id": content_attestation.get("content_attestation_id"),
+            "runner_contract_id": runner_contract.get("runner_contract_id"),
+        },
+        prefix="DEVPROV-",
+        length=18,
+    )
+
+
+def _structural_provenance(
+    runner_contract: Mapping[str, Any],
+    builder_request: Mapping[str, Any] | None,
+    preflight: Mapping[str, Any] | None,
+    patch_validation: Mapping[str, Any] | None,
+    content_attestation: Mapping[str, Any] | None,
+) -> tuple[bool, str, list[str]]:
+    """Cross-check the runner against upstream documents.
+
+    Missing documents are not a passed comparison. Supplied documents that
+    disagree raise. Neither result is an independent root of trust.
+    """
+    documents = (builder_request, preflight, patch_validation, content_attestation)
+    if any(not isinstance(document, Mapping) for document in documents):
+        return False, "", ["UPSTREAM_PROVENANCE_REQUIRED"]
+    assert_runner_provenance(
+        runner_contract,
+        builder_request,
+        preflight,
+        patch_validation,
+        content_attestation,
+    )
+    return True, _provenance_binding_id(
+        runner_contract,
+        builder_request,
+        preflight,
+        patch_validation,
+        content_attestation,
+    ), []
+
+
+def _command_policy_decision(
+    runner_contract: Mapping[str, Any],
+    *,
+    builder_request: Mapping[str, Any] | None = None,
+    preflight: Mapping[str, Any] | None = None,
+    patch_validation: Mapping[str, Any] | None = None,
+    content_attestation: Mapping[str, Any] | None = None,
+    requested_environment: Mapping[str, Any] | None = None,
+    path_lookup_allowed: bool = False,
+    parent_environment_inheritance: bool = False,
+    absolute_executable_required: bool = True,
+    executable_digest_required: bool = True,
+    require_ready_runner: bool = False,
+) -> dict[str, Any]:
+    """State, blockers and structural claim the constructor would seal."""
+    blockers, validated_budget = _classify_command_policy(
+        runner_contract,
+        requested_environment=requested_environment,
+        path_lookup_allowed=path_lookup_allowed,
+        parent_environment_inheritance=parent_environment_inheritance,
+        absolute_executable_required=absolute_executable_required,
+        executable_digest_required=executable_digest_required,
+    )
+    if not require_ready_runner and (
         runner_contract.get("state") != "READY_FOR_RUNNER_DESIGN_REVIEW"
         or list(runner_contract.get("blockers") or [])
     ):
         blockers = ["RUNNER_CONTRACT_NOT_READY", *blockers]
-        blockers = list(dict.fromkeys(blockers))
+    structural, binding, provenance_blockers = _structural_provenance(
+        runner_contract,
+        builder_request,
+        preflight,
+        patch_validation,
+        content_attestation,
+    )
+    blockers = list(dict.fromkeys([*blockers, *provenance_blockers]))
+    if not structural:
+        binding = ""
     state = "READY_FOR_EXECUTABLE_PINNING_REVIEW" if not blockers else "BLOCKED"
-    return state, blockers
+    if state == "READY_FOR_EXECUTABLE_PINNING_REVIEW" and structural is not True:
+        blockers = ["UPSTREAM_PROVENANCE_REQUIRED"]
+        state = "BLOCKED"
+        structural = False
+        binding = ""
+    return {
+        "state": state,
+        "blockers": blockers,
+        "validated_budget": validated_budget,
+        "structural": structural is True and state == "READY_FOR_EXECUTABLE_PINNING_REVIEW",
+        "binding": binding if state == "READY_FOR_EXECUTABLE_PINNING_REVIEW" else "",
+        "independent": False,
+    }
 
 
-def expected_command_policy_payload(runner_contract: Mapping[str, Any]) -> dict[str, Any]:
+def expected_command_policy_state_and_blockers(
+    runner_contract: Mapping[str, Any],
+    *,
+    builder_request: Mapping[str, Any] | None = None,
+    preflight: Mapping[str, Any] | None = None,
+    patch_validation: Mapping[str, Any] | None = None,
+    content_attestation: Mapping[str, Any] | None = None,
+) -> tuple[str, list[str]]:
+    """State the constructor would seal. The supplied policy id is not an input.
+
+    READY requires a passed structural comparison. A missing comparison adds
+    ``UPSTREAM_PROVENANCE_REQUIRED`` and stays BLOCKED.
+    """
+    decision = _command_policy_decision(
+        runner_contract,
+        builder_request=builder_request,
+        preflight=preflight,
+        patch_validation=patch_validation,
+        content_attestation=content_attestation,
+    )
+    return decision["state"], list(decision["blockers"])
+
+
+def expected_command_policy_payload(
+    runner_contract: Mapping[str, Any],
+    *,
+    builder_request: Mapping[str, Any] | None = None,
+    preflight: Mapping[str, Any] | None = None,
+    patch_validation: Mapping[str, Any] | None = None,
+    content_attestation: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     """Security fields a constructor would seal for this runner.
 
     The supplied command_policy_id is not an input. The command plan is the
@@ -481,10 +658,20 @@ def expected_command_policy_payload(runner_contract: Mapping[str, Any]) -> dict[
     )
     if blockers or not isinstance(budget, Mapping) or dict(budget) != validated:
         raise ValueError("runner resource budget is not canonical")
-    state, policy_blockers = expected_command_policy_state_and_blockers(runner_contract)
+    decision = _command_policy_decision(
+        runner_contract,
+        builder_request=builder_request,
+        preflight=preflight,
+        patch_validation=patch_validation,
+        content_attestation=content_attestation,
+    )
+    policy_blockers = list(decision["blockers"])
     return {
-        "state": state,
+        "state": decision["state"],
         "blockers": policy_blockers,
+        "upstream_provenance_structurally_verified": decision["structural"],
+        "upstream_provenance_independently_verified": False,
+        "upstream_provenance_binding_id": decision["binding"],
         "resource_budget": validated,
         "validated_command_plan": (
             _canonical_command_plan() if not policy_blockers else []
@@ -524,6 +711,9 @@ def expected_command_policy_payload(runner_contract: Mapping[str, Any]) -> dict[
 _BOUNDARY_FIELDS = (
     "state",
     "blockers",
+    "upstream_provenance_structurally_verified",
+    "upstream_provenance_independently_verified",
+    "upstream_provenance_binding_id",
     "resource_budget",
     "validated_command_plan",
     "runner_contract_id",
@@ -561,16 +751,28 @@ _BOUNDARY_FIELDS = (
 def assert_runner_policy_boundary(
     runner_contract: Mapping[str, Any],
     command_policy: Mapping[str, Any],
+    *,
+    builder_request: Mapping[str, Any] | None = None,
+    preflight: Mapping[str, Any] | None = None,
+    patch_validation: Mapping[str, Any] | None = None,
+    content_attestation: Mapping[str, Any] | None = None,
 ) -> None:
     """Reject a pair that is only internally consistent.
 
     The runner is revalidated, the policy is revalidated, and the policy's
     security fields are compared with the payload derived from the runner.
-    A recomputed digest on either document is not authority.
+    A recomputed digest on either document is not authority. Structural
+    provenance is derived only when the upstream documents are supplied here.
     """
     assert_runner_contract_integrity(runner_contract)
     assert_command_policy_integrity(command_policy)
-    expected = expected_command_policy_payload(runner_contract)
+    expected = expected_command_policy_payload(
+        runner_contract,
+        builder_request=builder_request,
+        preflight=preflight,
+        patch_validation=patch_validation,
+        content_attestation=content_attestation,
+    )
     for field in _BOUNDARY_FIELDS:
         if command_policy.get(field) != expected[field]:
             raise ValueError(
@@ -578,16 +780,91 @@ def assert_runner_policy_boundary(
             )
 
 
+def assert_command_policy_provenance(
+    command_policy: Mapping[str, Any],
+    runner_contract: Mapping[str, Any],
+    builder_request: Mapping[str, Any],
+    preflight: Mapping[str, Any],
+    patch_validation: Mapping[str, Any],
+    content_attestation: Mapping[str, Any],
+) -> None:
+    """Reject a policy whose id matches but whose provenance was not derived.
+
+    The runner is compared with the upstream documents, then the policy is
+    compared with the runner. The structural claim and the binding id must
+    match that comparison. ``upstream_provenance_independently_verified``
+    stays false: agreement among these documents is not an external root of trust.
+    """
+    assert_runner_provenance(
+        runner_contract,
+        builder_request,
+        preflight,
+        patch_validation,
+        content_attestation,
+    )
+    assert_runner_policy_boundary(
+        runner_contract,
+        command_policy,
+        builder_request=builder_request,
+        preflight=preflight,
+        patch_validation=patch_validation,
+        content_attestation=content_attestation,
+    )
+    if command_policy.get("upstream_provenance_structurally_verified") is not True:
+        raise ValueError("structural provenance claim was not derived")
+    if command_policy.get("upstream_provenance_independently_verified") is not False:
+        raise ValueError("independent root of trust is not established")
+    state, blockers = expected_command_policy_state_and_blockers(
+        runner_contract,
+        builder_request=builder_request,
+        preflight=preflight,
+        patch_validation=patch_validation,
+        content_attestation=content_attestation,
+    )
+    if command_policy.get("state") != state:
+        raise ValueError("command policy state was not derived from provenance")
+    if list(command_policy.get("blockers") or []) != blockers:
+        raise ValueError("command policy blockers were not derived from provenance")
+    if state == "READY_FOR_EXECUTABLE_PINNING_REVIEW" and blockers:
+        raise ValueError("ready command policy cannot carry blockers")
+
+
+def _reject_caller_provenance_claim(
+    upstream_provenance_structurally_verified: Any,
+    upstream_provenance_independently_verified: Any,
+) -> None:
+    if (
+        upstream_provenance_structurally_verified is not None
+        or upstream_provenance_independently_verified is not None
+    ):
+        raise ValueError("caller cannot assert upstream provenance")
+
+
 def build_command_policy_contract(
     runner_contract: Mapping[str, Any],
     *,
+    builder_request: Mapping[str, Any] | None = None,
+    preflight: Mapping[str, Any] | None = None,
+    patch_validation: Mapping[str, Any] | None = None,
+    content_attestation: Mapping[str, Any] | None = None,
     requested_environment: Mapping[str, Any] | None = None,
     path_lookup_allowed: bool = False,
     parent_environment_inheritance: bool = False,
     absolute_executable_required: bool = True,
     executable_digest_required: bool = True,
+    upstream_provenance_structurally_verified: Any = None,
+    upstream_provenance_independently_verified: Any = None,
 ) -> dict[str, Any]:
-    """Validate exact command templates without resolving or executing them."""
+    """Validate exact command templates without resolving or executing them.
+
+    READY is sealed only after the runner's structural provenance passes.
+    The two provenance fields on the result are derived here. Arguments of
+    the same name are rejected instead of being copied.
+    """
+    _reject_caller_provenance_claim(
+        upstream_provenance_structurally_verified,
+        upstream_provenance_independently_verified,
+    )
     if runner_contract.get("schema") != RUNNER_SCHEMA:
         raise ValueError("invalid Runner Contract")
     if str(runner_contract.get("state") or "") != "READY_FOR_RUNNER_DESIGN_REVIEW":
@@ -595,20 +872,30 @@ def build_command_policy_contract(
     if list(runner_contract.get("blockers") or []):
         raise ValueError("runner contract still has blockers")
     runner_manifest_id = _assert_runner_digest(runner_contract)
-    blockers, validated_budget = _classify_command_policy(
+    decision = _command_policy_decision(
         runner_contract,
+        builder_request=builder_request,
+        preflight=preflight,
+        patch_validation=patch_validation,
+        content_attestation=content_attestation,
         requested_environment=requested_environment,
         path_lookup_allowed=path_lookup_allowed,
         parent_environment_inheritance=parent_environment_inheritance,
         absolute_executable_required=absolute_executable_required,
         executable_digest_required=executable_digest_required,
+        require_ready_runner=True,
     )
+    blockers = list(decision["blockers"])
+    validated_budget = decision["validated_budget"]
     fixed_environment = dict(FIXED_ENVIRONMENT)
-    state = "READY_FOR_EXECUTABLE_PINNING_REVIEW" if not blockers else "BLOCKED"
+    state = decision["state"]
 
     return _bind_command_policy_ids({
         "schema": SCHEMA,
         "state": state,
+        "upstream_provenance_structurally_verified": decision["structural"],
+        "upstream_provenance_independently_verified": False,
+        "upstream_provenance_binding_id": decision["binding"],
         "runner_contract_id": str(runner_contract.get("runner_contract_id") or ""),
         "runner_contract_manifest_id": runner_manifest_id,
         "allowlist_policy": {
@@ -685,5 +972,6 @@ __all__ = [
     "expected_command_policy_state_and_blockers",
     "expected_command_policy_payload",
     "assert_runner_policy_boundary",
+    "assert_command_policy_provenance",
     "build_command_policy_contract",
 ]
