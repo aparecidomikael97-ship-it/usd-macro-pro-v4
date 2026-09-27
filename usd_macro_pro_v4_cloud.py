@@ -179,6 +179,19 @@ except Exception as _aion_exc:
     render_aion_admin_console = None
     _ATLASQUANT_AION_IMPORT_ERROR = f"{type(_aion_exc).__name__}: {_aion_exc}"
 
+try:
+    from atlasquant_aion_session_memory import (
+        adapt_loaded_memory_to_specialist_snapshot,
+        collect_resident_specialist_inputs,
+    )
+    _ATLASQUANT_AION_SESSION_MEMORY_IMPORT_ERROR = ""
+except Exception as _aion_session_memory_exc:
+    adapt_loaded_memory_to_specialist_snapshot = None
+    collect_resident_specialist_inputs = None
+    _ATLASQUANT_AION_SESSION_MEMORY_IMPORT_ERROR = (
+        f"{type(_aion_session_memory_exc).__name__}: {_aion_session_memory_exc}"
+    )
+
 
 try:
     from atlasquant_stability_lab import render_stability_lab
@@ -10345,11 +10358,25 @@ if _aq_active_index == 21:
             "release_gate": _aion_release_gate,
             "guided_revalidation": revalidation_result(st.session_state) or {},
         }
+        _aion_specialist_snapshot = None
+        if (
+            adapt_loaded_memory_to_specialist_snapshot is not None
+            and collect_resident_specialist_inputs is not None
+        ):
+            try:
+                # Resident memory only. Do not call the source-runtime helper,
+                # GitHub, calendar, or market loaders to fill this snapshot.
+                _aion_specialist_snapshot = adapt_loaded_memory_to_specialist_snapshot(
+                    collect_resident_specialist_inputs(st.session_state, globals())
+                )
+            except Exception:
+                _aion_specialist_snapshot = None
         try:
             render_aion_admin_console(
                 _ATLASQUANT_ACCESS,
                 market_context=_aion_market_context,
                 system_context=_aion_system_context,
+                specialist_snapshot=_aion_specialist_snapshot,
             )
         except Exception as _aion_render_exc:
             st.warning("AION entrou em modo seguro; nenhuma permissão externa foi ampliada.")

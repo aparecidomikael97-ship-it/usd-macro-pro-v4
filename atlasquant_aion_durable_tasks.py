@@ -12,6 +12,9 @@ from hashlib import sha256
 from typing import Any, Mapping, Sequence
 import json
 
+from atlasquant_aion_core import guardian_decision
+from atlasquant_aion_observability import append_event, new_event, normalize_events, redact_text
+
 SCHEMA="ATLASQUANT_AION_DURABLE_TASKS_V1"
 MAX_TASKS=300
 MAX_STEPS=80
@@ -22,6 +25,79 @@ STEP_STATES=(
     "PENDING","READY","RUNNING","WAITING_APPROVAL","BLOCKED","DONE","SKIPPED","FAILED",
 )
 TERMINAL_STEP_STATES=frozenset({"DONE","SKIPPED"})
+TERMINAL_TASK_STATES=frozenset({"DONE","CANCELED"})
+# PLANNED may be paused/blocked while preparing work; resumption never runs it.
+TASK_TRANSITIONS={
+    "PLANNED": {"RUNNING","PAUSED","WAITING_APPROVAL","BLOCKED","CANCELED"},
+    "RUNNING": {"PAUSED","WAITING_APPROVAL","BLOCKED","DONE","CANCELED"},
+    "PAUSED": {"RUNNING","WAITING_APPROVAL","BLOCKED","CANCELED"},
+    "WAITING_APPROVAL": {"RUNNING","BLOCKED","CANCELED"},
+    "BLOCKED": {"PAUSED","RUNNING","CANCELED"},
+    "DONE": set(), "CANCELED": set(),
+}
+STEP_TRANSITIONS={
+    "PENDING": {"READY","RUNNING","WAITING_APPROVAL","BLOCKED","SKIPPED"},
+    "READY": {"RUNNING","WAITING_APPROVAL","BLOCKED","SKIPPED"},
+    "RUNNING": {"WAITING_APPROVAL","BLOCKED","DONE","FAILED"},
+    "WAITING_APPROVAL": {"READY","RUNNING","BLOCKED"},
+    "BLOCKED": {"READY","RUNNING"},
+    "FAILED": {"RUNNING"},
+    "DONE": set(), "SKIPPED": set(),
+}
+
+
+class DurableTaskError(ValueError):
+    """Compatible ValueError carrying a structured, non-secret failure result."""
+    def __init__(self, code:str, task:Mapping[str,Any]|None=None):
+        super().__init__(code)
+        item=dict(task or {})
+        self.result={"status":"CONFLICT" if code.startswith("REVISION") else "BLOCKED",
+                     "error_code":code,"task_id":item.get("durable_task_id",""),
+                     "correlation_id":item.get("correlation_id",""),"executes_action":False}
+
+
+def validate_transition(previous:str, target:str, *, step:bool=False,
+                        unblock_reason:Any="", approved:bool=False, retry:bool=False)->None:
+    policy=STEP_TRANSITIONS if step else TASK_TRANSITIONS
+    if previous not in policy or target not in policy:
+        raise DurableTaskError("INVALID_STATE")
+    if previous==target:
+        return
+    if target not in policy[previous]:
+        raise DurableTaskError("INVALID_TRANSITION")
+    if previous=="BLOCKED" and target!="CANCELED" and not _clean(unblock_reason):
+        raise DurableTaskError("UNBLOCK_REQUIRED")
+    if previous=="WAITING_APPROVAL" and target in {"READY","RUNNING"} and not approved:
+        raise DurableTaskError("APPROVAL_REQUIRED")
+    if previous=="FAILED" and not retry:
+        raise DurableTaskError("RETRY_REQUIRED")
+
+
+def _check_revision(item:Mapping[str,Any], expected_revision:Any)->None:
+    if expected_revision is None:
+        return  # Legacy callers retain their pure/offline API.
+    if isinstance(expected_revision,bool) or not str(expected_revision).isdigit():
+        raise DurableTaskError("REVISION_INVALID",item)
+    if int(expected_revision)!=item["revision"]:
+        raise DurableTaskError("REVISION_CONFLICT",item)
+
+
+def _audit(item:dict[str,Any], event_type:str, previous:str, changed:str, **metadata:Any)->None:
+    correlation=item.setdefault("correlation_id",item["mission_id"] or item["durable_task_id"])
+    event=new_event(event_type,event_type,created_at=changed,source="AION_DURABLE_TASK",
+                    evidence={"task_id":item["durable_task_id"],"mission_id":item["mission_id"],
+                              "correlation_id":correlation,"previous_state":previous,
+                              "new_state":item["state"],"action":event_type,"result":"RECORDED",
+                              "revision":item["revision"],"metadata":metadata})
+    item["audit_events"]=append_event(item.get("audit_events",[]),event)
+
+
+def _guard_step(step:Mapping[str,Any], access:Mapping[str,Any]|None, approved:bool)->None:
+    decision=guardian_decision(step["guardian_action"],access,approved=approved)
+    if not decision["allowed"]:
+        raise DurableTaskError("GUARDIAN_DENIED")
+    if (step["requires_approval"] or step["external_side_effects"]) and not approved:
+        raise DurableTaskError("APPROVAL_REQUIRED")
 
 
 def _now()->str:
@@ -29,7 +105,7 @@ def _now()->str:
 
 
 def _clean(value:Any,limit:int=1400)->str:
-    return " ".join(str(value or "").replace("\x00","").split())[:limit]
+    return " ".join(redact_text(value).replace("\x00","").split())[:limit]
 
 
 def _refs(values:Sequence[Any]|None,limit:int=50)->list[str]:
@@ -66,7 +142,7 @@ def normalize_step(raw:Mapping[str,Any],index:int)->dict[str,Any]:
     state=_clean(item.get("state"),40).upper()
     if state not in STEP_STATES:
         state="PENDING"
-    return {
+    result={
         "step_id":sid,
         "title":_clean(item.get("title"),300) or f"Passo {index+1}",
         "state":state,
@@ -90,6 +166,12 @@ def normalize_step(raw:Mapping[str,Any],index:int)->dict[str,Any]:
         "completed_at":_clean(item.get("completed_at"),80),
         "executes_action":False,
     }
+    for key in ("correlation_id","last_error","idempotency_key"):
+        if key in item:
+            result[key]=_clean(item[key])
+    if "max_attempts" in item:
+        result["max_attempts"]=_int(item["max_attempts"],3,1,1000)
+    return result
 
 
 def normalize_steps(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
@@ -122,7 +204,7 @@ def new_durable_task(
         raise ValueError("durable task title required")
     created=str(created_at or _now())
     step_rows=normalize_steps(steps)
-    return {
+    item={
         "schema":SCHEMA,
         "durable_task_id":_task_id(title_clean,created),
         "title":title_clean,
@@ -145,6 +227,10 @@ def new_durable_task(
         "automatic_resume_executes":False,
         "real_trading_enabled":False,
     }
+    _audit(item,"TASK_CREATED","",created)
+    for step in item["steps"]:
+        step["correlation_id"]=item["correlation_id"]
+    return item
 
 
 def normalize_durable_task(raw:Mapping[str,Any])->dict[str,Any]:
@@ -166,6 +252,17 @@ def normalize_durable_task(raw:Mapping[str,Any])->dict[str,Any]:
     supplied=_clean(item.get("durable_task_id"),80)
     if supplied:
         base["durable_task_id"]=supplied
+    # Do not invent fields when reading legacy V17 records: keep their digests.
+    base["steps"]=normalize_steps(item.get("steps",[]))
+    for key in ("correlation_id","canceled_at"):
+        if key in item:
+            base[key]=_clean(item[key])
+        else:
+            base.pop(key,None)
+    if "audit_events" in item:
+        base["audit_events"]=normalize_events(item["audit_events"])
+    else:
+        base.pop("audit_events",None)
     state=_clean(item.get("state"),40).upper()
     base["state"]=state if state in TASK_STATES else "PLANNED"
     steps=base["steps"]
@@ -206,11 +303,19 @@ def normalize_durable_tasks(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str
 def upsert_durable_task(
     rows:Sequence[Mapping[str,Any]]|None,
     task:Mapping[str,Any],
+    *, expected_revision:Any=None,
 )->list[dict[str,Any]]:
     current=normalize_durable_tasks(rows)
     item=normalize_durable_task(task)
     for idx,row in enumerate(current):
         if row["durable_task_id"]==item["durable_task_id"]:
+            _check_revision(row,expected_revision)
+            if item==row:
+                return current
+            if item["revision"]<=row["revision"]:
+                raise DurableTaskError("REVISION_CONFLICT",row)
+            if row["state"] in TERMINAL_TASK_STATES and item["state"]!=row["state"]:
+                raise DurableTaskError("TASK_TERMINAL",row)
             current[idx]=item
             return current
     if len(current)>=MAX_TASKS:
@@ -229,9 +334,20 @@ def update_step(
     artifact_refs:Sequence[Any]|None=None,
     evidence_refs:Sequence[Any]|None=None,
     changed_at:str|None=None,
+    expected_revision:Any=None,
+    access:Mapping[str,Any]|None=None,
+    approved:bool=False,
+    unblock_reason:Any="",
+    retry:bool=False,
+    idempotency_key:Any="",
 )->dict[str,Any]:
     """Update recorded state only. It does not perform the step."""
     item=normalize_durable_task(task)
+    _check_revision(item,expected_revision)
+    if item["state"] in TERMINAL_TASK_STATES:
+        raise DurableTaskError("TASK_TERMINAL",item)
+    previous_task_state=item["state"]
+    original_cursor=item["cursor"]
     target=_clean(step_id,80)
     next_state=_clean(state,40).upper()
     if next_state not in STEP_STATES:
@@ -243,7 +359,38 @@ def update_step(
             continue
         found=True
         previous=step["state"]
+        validate_transition(previous,next_state,step=True,unblock_reason=unblock_reason,
+                            approved=approved,retry=retry)
+        if previous==next_state:
+            if retry and (not step.get("idempotency_key") or step["idempotency_key"]!=_clean(idempotency_key)):
+                raise DurableTaskError("IDEMPOTENCY_CONFLICT",item)
+            return item
+        if next_state in {"RUNNING","DONE","SKIPPED"}:
+            if item["cursor"]>=len(item["steps"]) or step is not item["steps"][item["cursor"]]:
+                raise DurableTaskError("STEP_OUT_OF_ORDER",item)
+            if item["state"]=="BLOCKED" and not _clean(unblock_reason):
+                raise DurableTaskError("UNBLOCK_REQUIRED",item)
+            if item["state"]=="WAITING_APPROVAL" and not approved:
+                raise DurableTaskError("APPROVAL_REQUIRED",item)
+            if next_state in {"RUNNING","DONE"}:
+                _guard_step(step,access,approved)
+        if retry:
+            if previous!="FAILED" or next_state!="RUNNING":
+                raise DurableTaskError("RETRY_INVALID",item)
+            # Retry is local-only and must name an idempotent operation.
+            if step["external_side_effects"] or step["guardian_action"] not in {"read","search","summarize","draft"}:
+                raise DurableTaskError("RETRY_UNSAFE",item)
+            if not _clean(idempotency_key):
+                raise DurableTaskError("IDEMPOTENCY_KEY_REQUIRED",item)
+            if step.get("idempotency_key") and step["idempotency_key"]!=_clean(idempotency_key):
+                raise DurableTaskError("IDEMPOTENCY_CONFLICT",item)
+            if step["attempts"]>=step.get("max_attempts",3):
+                raise DurableTaskError("RETRY_LIMIT",item)
+            step["idempotency_key"]=_clean(idempotency_key)
         step["state"]=next_state
+        step["correlation_id"]=item.get("correlation_id") or item["mission_id"] or item["durable_task_id"]
+        if next_state=="FAILED":
+            step["last_error"]=_clean(blocker or result_note or "STEP_FAILED")
         if next_state=="RUNNING":
             step["attempts"]+=1
             if not step["started_at"]:
@@ -264,8 +411,16 @@ def update_step(
             step["blocker"]=""
         if previous!=next_state:
             item["revision"]+=1
+        _audit(item,"STEP_RETRIED" if retry else "STEP_STATE_CHANGED",previous_task_state,
+               changed,step_id=step["step_id"],previous_state=previous,new_state=next_state,
+               attempts=step["attempts"],error_code=step.get("last_error", ""))
     if not found:
         raise ValueError("durable step not found")
+
+    # Annotating a future step cannot release the current task's suspension.
+    if original_cursor<len(item["steps"]) and item["steps"][original_cursor]["step_id"]!=target:
+        item["updated_at"]=changed
+        return item
 
     cursor=0
     while cursor<len(item["steps"]) and item["steps"][cursor]["state"] in TERMINAL_STEP_STATES:
@@ -290,8 +445,69 @@ def update_step(
             item["state"]="PAUSED"
             item["blocker"]=""
         item["next_action"]=current["title"]
+    if previous_task_state in {"WAITING_APPROVAL","BLOCKED"} and next_state not in {"RUNNING","DONE"}:
+        item["state"]=previous_task_state
+        item["blocker"]=_clean(task.get("blocker"))
     item["updated_at"]=changed
+    event_type={"RUNNING":"TASK_STARTED","DONE":"TASK_COMPLETED",
+                "WAITING_APPROVAL":"TASK_WAITING_APPROVAL","BLOCKED":"TASK_BLOCKED",
+                "PAUSED":"TASK_PAUSED"}.get(item["state"],"TASK_UPDATED")
+    if next_state=="FAILED":
+        event_type="TASK_FAILED"
+    _audit(item,event_type,previous_task_state,changed,step_id=target)
     return item
+
+
+def transition_durable_task(task:Mapping[str,Any], state:Any, *,
+                            expected_revision:Any=None, access:Mapping[str,Any]|None=None,
+                            approved:bool=False, unblock_reason:Any="",
+                            changed_at:str|None=None)->dict[str,Any]:
+    item=normalize_durable_task(task)
+    _check_revision(item,expected_revision)
+    previous=item["state"]
+    target=_clean(state,40).upper()
+    validate_transition(previous,target,unblock_reason=unblock_reason,approved=approved)
+    if previous==target:
+        return item
+    current=item["steps"][item["cursor"]] if item["cursor"]<len(item["steps"]) else None
+    if target=="RUNNING":
+        if current and current["state"] in {"BLOCKED","FAILED","WAITING_APPROVAL"}:
+            raise DurableTaskError("STEP_REQUIRES_TRANSITION",item)
+        _guard_step(current or {"guardian_action":"read","requires_approval":False,
+                               "external_side_effects":False},access,approved)
+    if target=="DONE" and any(s["state"] not in TERMINAL_STEP_STATES for s in item["steps"]):
+        raise DurableTaskError("STEPS_INCOMPLETE",item)
+    changed=str(changed_at or _now())
+    item["state"]=target
+    item["revision"]+=1
+    item["updated_at"]=changed
+    if previous=="BLOCKED" and target in {"RUNNING","PAUSED"}:
+        item["blocker"]=""
+    if target in TERMINAL_TASK_STATES:
+        item["next_action"]=""
+    if target=="CANCELED":
+        item["canceled_at"]=changed
+    event_type={"RUNNING":"TASK_STARTED","PAUSED":"TASK_PAUSED",
+                "WAITING_APPROVAL":"TASK_WAITING_APPROVAL","BLOCKED":"TASK_BLOCKED",
+                "DONE":"TASK_COMPLETED","CANCELED":"TASK_CANCELED"}[target]
+    _audit(item,event_type,previous,changed,unblock_reason=_clean(unblock_reason))
+    return item
+
+
+def cancel_durable_task(task:Mapping[str,Any], *, expected_revision:Any=None,
+                        changed_at:str|None=None)->dict[str,Any]:
+    """Cancel the record, preserving steps, artifacts, evidence and history."""
+    return transition_durable_task(task,"CANCELED",expected_revision=expected_revision,
+                                   changed_at=changed_at)
+
+
+def retry_step(task:Mapping[str,Any], step_id:Any, *, expected_revision:Any=None,
+               access:Mapping[str,Any]|None=None, approved:bool=False,
+               idempotency_key:Any="", changed_at:str|None=None)->dict[str,Any]:
+    return update_step(task,step_id,"RUNNING",expected_revision=expected_revision,
+                       access=access,approved=approved,retry=True,
+                       unblock_reason="Explicit retry of failed local step",
+                       idempotency_key=idempotency_key,changed_at=changed_at)
 
 
 def pause_durable_task(
@@ -301,18 +517,26 @@ def pause_durable_task(
     blocker:Any=None,
     checkpoint_digest:Any=None,
     changed_at:str|None=None,
+    expected_revision:Any=None,
 )->dict[str,Any]:
     item=normalize_durable_task(task)
-    if item["state"] not in {"DONE","CANCELED"}:
-        item["state"]="BLOCKED" if blocker else "PAUSED"
+    _check_revision(item,expected_revision)
+    previous=item["state"]
+    if previous in TERMINAL_TASK_STATES:
+        raise DurableTaskError("TASK_TERMINAL",item)
+    # Pause does not release either an approval or an unresolved blocker.
+    target=previous if previous in {"WAITING_APPROVAL","BLOCKED"} else "BLOCKED" if blocker else "PAUSED"
+    validate_transition(previous,target)
+    item["state"]=target
     if next_action is not None:
         item["next_action"]=_clean(next_action,500)
-    if blocker is not None:
+    if blocker is not None and (blocker or previous not in {"WAITING_APPROVAL","BLOCKED"}):
         item["blocker"]=_clean(blocker)
     if checkpoint_digest is not None:
         item["checkpoint_digest"]=_clean(checkpoint_digest,100)
     item["revision"]+=1
     item["updated_at"]=str(changed_at or _now())
+    _audit(item,"TASK_PAUSED" if target=="PAUSED" else "TASK_"+target,previous,item["updated_at"])
     return item
 
 
@@ -327,15 +551,15 @@ def prepare_resume(
     blockers=[]
     if item["state"] in {"DONE","CANCELED"}:
         blockers.append("TASK_TERMINAL")
-    if expected_revision is not None:
-        try:
-            if int(expected_revision)!=int(item["revision"]):
-                blockers.append("REVISION_CONFLICT")
-        except Exception:
-            blockers.append("REVISION_INVALID")
+    try:
+        _check_revision(item,expected_revision)
+    except DurableTaskError as exc:
+        blockers.append(exc.result["error_code"])
     expected_digest=_clean(item.get("checkpoint_digest"),100)
     observed_digest=_clean(checkpoint_digest,100)
-    if expected_digest and observed_digest and expected_digest!=observed_digest:
+    if expected_digest and not observed_digest:
+        blockers.append("CHECKPOINT_REQUIRED")
+    elif expected_digest and expected_digest!=observed_digest:
         blockers.append("CHECKPOINT_CHANGED")
     step=(
         deepcopy(item["steps"][item["cursor"]])
@@ -345,6 +569,12 @@ def prepare_resume(
     return {
         "schema":SCHEMA,
         "durable_task_id":item["durable_task_id"],
+        "mission_id":item["mission_id"],
+        "correlation_id":item.get("correlation_id") or item["mission_id"] or item["durable_task_id"],
+        "checkpoint_digest":item["checkpoint_digest"],
+        "resume_generation":item["resume_generation"],
+        "task_blocker":item["blocker"],
+        "approval_pending":item["state"]=="WAITING_APPROVAL" or bool(step and step["requires_approval"]),
         "state":"BLOCK" if blockers else "RESUME_READY",
         "task_state":item["state"],
         "revision":item["revision"],
@@ -365,10 +595,13 @@ def record_resume(
     *,
     checkpoint_digest:Any="",
     changed_at:str|None=None,
+    expected_revision:Any=None,
 )->dict[str,Any]:
     item=normalize_durable_task(task)
-    if item["state"] in {"DONE","CANCELED"}:
-        raise ValueError("terminal durable task cannot resume")
+    view=prepare_resume(item,expected_revision=expected_revision,checkpoint_digest=checkpoint_digest)
+    if view["state"]=="BLOCK":
+        raise DurableTaskError(view["blockers"][0],item)
+    previous=item["state"]
     item["resume_generation"]+=1
     item["revision"]+=1
     item["checkpoint_digest"]=_clean(checkpoint_digest,100) or item["checkpoint_digest"]
@@ -376,6 +609,7 @@ def record_resume(
     if item["state"] not in {"WAITING_APPROVAL","BLOCKED"}:
         item["state"]="PAUSED"
     item["updated_at"]=str(changed_at or _now())
+    _audit(item,"TASK_RESUMED",previous,item["updated_at"],resume_generation=item["resume_generation"])
     return item
 
 
@@ -413,4 +647,6 @@ __all__=[
     "new_durable_task","normalize_durable_task","normalize_durable_tasks",
     "upsert_durable_task","update_step","pause_durable_task","prepare_resume",
     "record_resume","durable_tasks_digest","durable_tasks_summary",
+    "transition_durable_task","cancel_durable_task","retry_step","DurableTaskError",
+    "validate_transition",
 ]

@@ -80,6 +80,7 @@ from atlasquant_aion_continuity import (
     continuity_briefing,
     continuity_summary,
     new_mission,
+    prepare_mission_transition,
     transition_mission,
     upsert_mission,
 )
@@ -255,6 +256,16 @@ from atlasquant_aion_release_confidence import (
     release_confidence_summary,
 )
 from atlasquant_aion_cognitive_orchestrator import orchestrator_snapshot
+from atlasquant_aion_orchestrator import (
+    build_aion_result,
+    orchestrate as orchestrate_aion_core,
+    present_validated_answer,
+)
+from atlasquant_aion_specialists import plan_specialist_dispatch
+from atlasquant_aion_specialist_evidence import read_specialist_evidence
+from atlasquant_aion_specialist_session import loaded_session_from_checkpoint
+from atlasquant_aion_session_memory import evidence_scope_label
+from atlasquant_aion_memory_layers import memory_layer_summary
 from atlasquant_aion_event_journal import (
     continuity_summary as live_event_continuity_summary,
     merge_events as merge_live_event_journal_events,
@@ -2025,6 +2036,7 @@ def _render_central(
     approval_inbox: Mapping[str, Any],
     incident_snapshot: Mapping[str, Any],
     executive_snapshot: Mapping[str, Any],
+    specialist_snapshot: Mapping[str, Any] | None = None,
 ) -> None:
     st.markdown("### 🧠 Central AION")
     pending = checkpoint.get("pending") if isinstance(checkpoint.get("pending"), list) else []
@@ -2036,6 +2048,24 @@ def _render_central(
     cols[1].metric("Tarefas ativas", summary["active"])
     cols[2].metric("Aguardando aprovação", summary["waiting_approval"])
     cols[3].metric("Ordens reais", "BLOQUEADAS")
+    layered_memory = memory_layer_summary(
+        checkpoint.get("memory_layers")
+        if isinstance(checkpoint.get("memory_layers"), Mapping)
+        else None
+    )
+    st.markdown(
+        """<div style="padding:12px 14px;border:1px solid rgba(79,163,255,.35);
+        border-radius:12px;background:linear-gradient(135deg,rgba(12,31,54,.94),rgba(8,20,36,.96));
+        margin:4px 0 14px"><strong style="color:#f8fbff">AION ONLINE · ORQUESTRAÇÃO SEGURA</strong>
+        <span style="display:block;color:#d7e6f6;font-size:.8rem;margin-top:4px">
+        Capability Registry + Truth Gate + Guardian + Critic ativos · execução externa e ordens reais bloqueadas
+        </span></div>""",
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        f"Memória em camadas: {layered_memory['active']} entrada(s) ativa(s) · "
+        f"digest {layered_memory['digest']} · acesso entre personas automático: NÃO."
+    )
 
     with st.expander("Personas AION e onde cada uma trabalha"):
         for item in AION_PERSONAS:
@@ -2150,6 +2180,85 @@ def _render_central(
                 "O AION não mostra raciocínio privado/chain-of-thought. Ele mostra conclusão, evidências, "
                 "conflitos, lacunas e justificativa verificável."
             )
+    access_session = access.get("session") if isinstance(access.get("session"), Mapping) else {}
+    access_role = str(access.get("role") or access_session.get("role") or "USER").upper()
+    core_preview = orchestrate_aion_core(
+        question,
+        context={
+            "role": access_role,
+            "persona": "admin",
+            "experience_mode": "ADVANCED" if view_mode == "Completo" else "BEGINNER",
+            "domain_hint": domain_preview,
+        },
+    ) if question.strip() else {}
+    if core_preview:
+        dispatch_preview = plan_specialist_dispatch(core_preview)
+        selected_capability = dict(core_preview.get("selected_capability") or {})
+        truth_preview = dict(core_preview.get("truth") or {})
+        decision_preview = dict(core_preview.get("decision") or {})
+        with st.expander("⚙️ Orquestração AION · plano e gates", expanded=False):
+            o1, o2, o3, o4 = st.columns(4)
+            o1.metric("Especialista", str(selected_capability.get("specialist") or "core").upper())
+            o2.metric("Capability", str(selected_capability.get("capability_id") or "UNKNOWN"))
+            o3.metric("Verdade", str(truth_preview.get("status") or "UNKNOWN"))
+            o4.metric("Decisão", str(decision_preview.get("state") or "BLOCKED"))
+            if specialist_snapshot is None:
+                specialist_session = loaded_session_from_checkpoint(checkpoint)
+            else:
+                specialist_session = specialist_snapshot
+            local_evidence = read_specialist_evidence(
+                dispatch_preview.get("specialist"),
+                session=specialist_session,
+            )
+            evidence_conflicts = [
+                str(item.get("claim") or "conflito")
+                for item in list(local_evidence.get("conflicts") or [])
+                if isinstance(item, Mapping)
+            ]
+            st.caption(
+                f"Dispatch {dispatch_preview.get('state')} · risco "
+                f"{(core_preview.get('risk') or {}).get('level', 'UNKNOWN')} · "
+                "Builder → Critic → Validator · nenhuma ação é executada nesta prévia."
+            )
+            st.caption(
+                "Leitura local do especialista: "
+                + str(local_evidence.get("summary") or "sem leitura")
+                + " Verdade da resposta: "
+                + str(local_evidence.get("answer_truth") or "UNKNOWN")
+                + ". Esta leitura não responde à pergunta."
+            )
+            st.caption(
+                "Snapshot "
+                + str(local_evidence.get("origin") or "SESSION")
+                + " · observed_at "
+                + str(local_evidence.get("observed_at") or "não informado")
+                + " · freshness "
+                + str(local_evidence.get("freshness") or "UNVERIFIED")
+                + " · truth_state "
+                + str(local_evidence.get("truth_state") or "UNKNOWN")
+                + " · input_state "
+                + str(local_evidence.get("input_state") or "ABSENT")
+                + " · conflicts "
+                + ("nenhum" if not evidence_conflicts else " · ".join(evidence_conflicts))
+                + " · evidência observada "
+                + evidence_scope_label(local_evidence)
+                + " · answers_user_question "
+                + ("NÃO" if not local_evidence.get("answers_user_question") else "SIM")
+                + "."
+            )
+            blockers = list(decision_preview.get("blockers") or [])
+            if blockers:
+                st.warning("Bloqueios: " + " · ".join(str(x) for x in blockers))
+            if view_mode == "Completo":
+                st.dataframe([
+                    {
+                        "Etapa": row.get("stage"),
+                        "Estado": row.get("status"),
+                        "Executa ação": row.get("executes_action"),
+                    }
+                    for row in list((core_preview.get("plan") or {}).get("steps", []) or [])
+                    if isinstance(row, Mapping)
+                ], hide_index=True, width="stretch")
     prompt_preview = build_provider_prompt(
         question,
         domain=domain_preview,
@@ -2202,6 +2311,16 @@ def _render_central(
     if st.button("Analisar com AION", key="aion_admin_ask", type="primary", width="stretch"):
         hits = _aion_memory_hits(question, checkpoint)
         estimated_cost = float(estimate.get("estimated_max_cost_usd") or 0.0)
+        core_orchestration = orchestrate_aion_core(
+            question,
+            context={
+                "role": access_role,
+                "persona": "admin",
+                "experience_mode": "ADVANCED" if view_mode == "Completo" else "BEGINNER",
+                "domain_hint": domain_preview,
+            },
+        )
+        st.session_state["aion_last_core_orchestration"] = core_orchestration
         route = route_intelligence(
             question,
             provider_state=provider.get("state"),
@@ -2271,8 +2390,15 @@ def _render_central(
                 system_context=dict(system_context),
                 feature_flags=flags,
             )
+        unified_result = build_aion_result(
+            core_orchestration,
+            answer=answer.get("answer", ""),
+            evidence=answer.get("evidence") if isinstance(answer.get("evidence"), list) else hits,
+            provider_state=route.get("lane"),
+        )
         st.session_state["aion_last_route"] = route
         st.session_state["aion_last_answer"] = answer
+        st.session_state["aion_last_unified_result"] = unified_result
 
     route = st.session_state.get("aion_last_route")
     if isinstance(route, Mapping):
@@ -2284,7 +2410,29 @@ def _render_central(
     answer = st.session_state.get("aion_last_answer")
     if isinstance(answer, Mapping):
         st.markdown("#### Resposta AION")
-        st.write(str(answer.get("answer", "")))
+        unified_result = st.session_state.get("aion_last_unified_result")
+        validation = {}
+        evidence_count = 0
+        if isinstance(unified_result, Mapping):
+            evidence_count = int(unified_result.get("evidence_count") or 0)
+            if isinstance(unified_result.get("validation"), Mapping):
+                validation = unified_result.get("validation")
+        presentation = present_validated_answer(validation, answer=answer.get("answer", ""))
+        if presentation["display"] == "ANSWER":
+            st.write(presentation["text"])
+        elif presentation["display"] == "BLOCK":
+            st.error(presentation["notice"])
+            if presentation["issues"]:
+                st.caption("Motivo: " + ", ".join(presentation["issues"]))
+        else:
+            st.warning(presentation["notice"])
+            if presentation["issues"]:
+                st.caption("Pendências: " + ", ".join(presentation["issues"]))
+        st.caption(
+            f"Validação: {presentation['state']} · "
+            f"verdade {presentation['truth_status']} · "
+            f"{evidence_count} evidência(s)"
+        )
         cognitive_answer = answer.get("cognitive_orchestrator")
         if isinstance(cognitive_answer, Mapping):
             routing = (
@@ -4182,6 +4330,23 @@ def _render_development(
                 value=", ".join(list(selected_mission.get("evidence_refs") or [])),
                 key="aion_persistent_mission_evidence",
             )
+            previous_status = str(selected_mission.get("status") or "PLANNED")
+            approval_explicit = False
+            unblock_text = ""
+            if previous_status == "WAITING_APPROVAL" and next_status == "IN_PROGRESS":
+                if "aion_persistent_mission_approve" not in st.session_state:
+                    st.session_state["aion_persistent_mission_approve"] = False
+                approval_explicit = bool(st.checkbox(
+                    "Aprovo explicitamente a retomada desta missão",
+                    key="aion_persistent_mission_approve",
+                ))
+            if previous_status == "BLOCKED" and next_status == "IN_PROGRESS":
+                if "aion_persistent_mission_unblock" not in st.session_state:
+                    st.session_state["aion_persistent_mission_unblock"] = ""
+                unblock_text = str(st.text_input(
+                    "Motivo do desbloqueio",
+                    key="aion_persistent_mission_unblock",
+                ) or "")
             if st.button(
                 "Atualizar missão persistente",
                 key="aion_persistent_mission_update",
@@ -4189,6 +4354,16 @@ def _render_development(
             ):
                 try:
                     evidence_refs=[x.strip() for x in evidence_text.split(",") if x.strip()]
+                    prepared = prepare_mission_transition(
+                        previous_status,
+                        next_status,
+                        approved=approval_explicit,
+                        unblock_reason=unblock_text,
+                        actor=str(access.get("username") or access.get("role") or "ADMIN"),
+                        changed_at=datetime.now(timezone.utc).isoformat(),
+                        evidence_refs=evidence_refs,
+                        mission_id=selected_mission_id,
+                    )
                     missions = transition_mission(
                         missions,
                         selected_mission_id,
@@ -4196,7 +4371,10 @@ def _render_development(
                         outcome=mission_outcome,
                         blocker=mission_blocker,
                         next_action=mission_next_action,
-                        evidence_refs=evidence_refs,
+                        evidence_refs=prepared["evidence_refs"],
+                        changed_at=prepared["changed_at"],
+                        approved=prepared["approved"],
+                        unblock_reason=prepared["unblock_reason"],
                     )
                     updated = update_continuity_checkpoint(
                         checkpoint,
@@ -4211,6 +4389,10 @@ def _render_development(
                         evidence={
                             "mission_id":selected_mission_id,
                             "status":next_status,
+                            "actor":prepared["actor"],
+                            "approved":prepared["approved"],
+                            "unblock_reason":prepared["unblock_reason"],
+                            "changed_at":prepared["changed_at"],
                             "automatic_execution":False,
                         },
                     )
@@ -4218,7 +4400,9 @@ def _render_development(
                     st.success("Missão atualizada localmente no Checkpoint.")
                     st.rerun()
                 except Exception as exc:
-                    st.error(f"Não foi possível atualizar a missão: {type(exc).__name__}")
+                    st.error(
+                        f"Não foi possível atualizar a missão: {type(exc).__name__}: {exc}"
+                    )
 
     st.markdown("#### 🔌 Tool Hub / MCP + Tarefas Duráveis")
     tool_hub = checkpoint.get("tool_hub") if isinstance(checkpoint.get("tool_hub"), Mapping) else {}
@@ -4377,8 +4561,11 @@ def _render_development(
                 st.caption("Retomada restaura estado; execução automática: NÃO.")
             if st.button("Registrar evento de retomada",key="aion_durable_record_resume"):
                 try:
+                    if not isinstance(resume,Mapping) or resume.get("durable_task_id")!=selected_durable.get("durable_task_id"):
+                        raise ValueError("Prepare a retomada da tarefa selecionada primeiro.")
                     resumed=record_resume(
                         selected_durable,
+                        expected_revision=resume.get("revision"),
                         checkpoint_digest=checkpoint_source_digest(source_checkpoint),
                     )
                     durable_records=upsert_durable_task(durable_records,resumed)
@@ -5436,6 +5623,7 @@ def render_aion_admin_console(
     *,
     market_context: Mapping[str, Any] | None = None,
     system_context: Mapping[str, Any] | None = None,
+    specialist_snapshot: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     access_map = dict(access or {})
     market = dict(market_context or {})
@@ -5777,6 +5965,7 @@ def render_aion_admin_console(
                 access_map, checkpoint, runtime_result, memory_summary, flags,
                 system, status_board, approval_inbox, incident_snapshot,
                 executive_snapshot,
+                specialist_snapshot=specialist_snapshot,
             )
         elif selected_workspace == "🗂️ Secretaria":
             _render_secretary(access_map, checkpoint, flags, system, market, status_board, approval_inbox)

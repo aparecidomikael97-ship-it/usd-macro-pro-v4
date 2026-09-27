@@ -20,6 +20,63 @@ MISSION_STATUSES=(
     "PLANNED","IN_PROGRESS","WAITING_APPROVAL","BLOCKED","DONE","CANCELED",
 )
 ACTIVE_STATUSES=frozenset({"PLANNED","IN_PROGRESS","WAITING_APPROVAL","BLOCKED"})
+MISSION_TRANSITIONS={
+    "PLANNED":{"IN_PROGRESS","WAITING_APPROVAL","BLOCKED","CANCELED"},
+    "IN_PROGRESS":{"WAITING_APPROVAL","BLOCKED","DONE","CANCELED"},
+    "WAITING_APPROVAL":{"IN_PROGRESS","BLOCKED","CANCELED"},
+    "BLOCKED":{"IN_PROGRESS","CANCELED"},
+    "DONE":set(),
+    "CANCELED":set(),
+}
+
+
+class MissionTransitionError(ValueError):
+    """Structured continuity error; recording state never executes mission work."""
+    def __init__(self, code:str, *, mission_id:Any="", previous:Any="", target:Any=""):
+        super().__init__(code)
+        self.result={
+            "status":"BLOCKED",
+            "error_code":str(code),
+            "mission_id":_clean(mission_id,64) if "_clean" in globals() else str(mission_id or "")[:64],
+            "previous_state":str(previous or ""),
+            "target_state":str(target or ""),
+            "executes_action":False,
+        }
+
+
+def validate_mission_transition(
+    previous:Any,
+    target:Any,
+    *,
+    mission_id:Any="",
+    approved:bool=False,
+    unblock_reason:Any="",
+)->None:
+    before=_status(previous)
+    after=_status(target)
+    if before==after:
+        return
+    if after not in MISSION_TRANSITIONS.get(before,set()):
+        raise MissionTransitionError(
+            "INVALID_MISSION_TRANSITION",
+            mission_id=mission_id,
+            previous=before,
+            target=after,
+        )
+    if before=="WAITING_APPROVAL" and after=="IN_PROGRESS" and not approved:
+        raise MissionTransitionError(
+            "MISSION_APPROVAL_REQUIRED",
+            mission_id=mission_id,
+            previous=before,
+            target=after,
+        )
+    if before=="BLOCKED" and after=="IN_PROGRESS" and not _clean(unblock_reason):
+        raise MissionTransitionError(
+            "MISSION_UNBLOCK_REQUIRED",
+            mission_id=mission_id,
+            previous=before,
+            target=after,
+        )
 
 
 def _now()->str:
@@ -155,6 +212,54 @@ def upsert_mission(
     return rows
 
 
+def prepare_mission_transition(
+    previous:Any,
+    target:Any,
+    *,
+    approved:bool=False,
+    unblock_reason:Any="",
+    actor:Any="",
+    changed_at:str|None=None,
+    evidence_refs:Sequence[Any]|None=None,
+    mission_id:Any="",
+)->dict[str,Any]:
+    """Caller contract for an explicit admin transition.
+
+    Approval and the unblock reason are forwarded only when the caller supplied
+    them for the transition that requires them. This never invents either one.
+    """
+    before=_status(previous)
+    after=_status(target)
+    when=str(changed_at or _now())
+    who=_clean(actor,80) or "UNKNOWN"
+    reason=_clean(unblock_reason)
+    forwarded_approved=False
+    forwarded_reason=""
+    audit_refs:list[str]=[]
+    if before=="WAITING_APPROVAL" and after=="IN_PROGRESS" and approved is True:
+        forwarded_approved=True
+        audit_refs.append(f"aprovacao:{who}@{when}")
+    if before=="BLOCKED" and after=="IN_PROGRESS" and reason:
+        forwarded_reason=reason
+        audit_refs.append(f"desbloqueio:{who}:{reason}")
+    validate_mission_transition(
+        before,
+        after,
+        mission_id=mission_id,
+        approved=forwarded_approved,
+        unblock_reason=forwarded_reason,
+    )
+    return {
+        "approved":forwarded_approved,
+        "unblock_reason":forwarded_reason,
+        "audit_refs":audit_refs,
+        "evidence_refs":_refs(list(evidence_refs or [])+audit_refs),
+        "actor":who,
+        "changed_at":when,
+        "executes_action":False,
+    }
+
+
 def transition_mission(
     missions:Sequence[Mapping[str,Any]]|None,
     mission_id:Any,
@@ -165,6 +270,8 @@ def transition_mission(
     next_action:Any=None,
     evidence_refs:Sequence[Any]|None=None,
     changed_at:str|None=None,
+    approved:bool=False,
+    unblock_reason:Any="",
 )->list[dict[str,Any]]:
     rows=normalize_missions(missions)
     target=_clean(mission_id,64)
@@ -176,6 +283,13 @@ def transition_mission(
             continue
         found=True
         previous=item["status"]
+        validate_mission_transition(
+            previous,
+            next_status,
+            mission_id=item["mission_id"],
+            approved=approved,
+            unblock_reason=unblock_reason,
+        )
         item["status"]=next_status
         if previous=="PLANNED" and next_status=="IN_PROGRESS" and not item["started_at"]:
             item["started_at"]=changed
@@ -183,7 +297,9 @@ def transition_mission(
             item["completed_at"]=changed
             if not item["started_at"]:
                 item["started_at"]=changed
-        elif next_status not in {"DONE","CANCELED"}:
+        elif next_status=="CANCELED":
+            item["completed_at"]=changed
+        else:
             item["completed_at"]=""
         if outcome is not None:
             item["outcome"]=_clean(outcome)
@@ -196,6 +312,10 @@ def transition_mission(
         if next_status!="BLOCKED" and blocker is None:
             # Do not preserve a stale blocker after a deliberate non-blocked transition.
             item["blocker"]=""
+        if previous=="BLOCKED" and next_status=="IN_PROGRESS":
+            item["blocker"]=""
+        if next_status in {"DONE","CANCELED"} and next_action is None:
+            item["next_action"]=""
         item["updated_at"]=changed
     if not found:
         raise ValueError("mission not found")
@@ -413,6 +533,37 @@ def continuity_briefing(
     }
 
 
+def mission_task_consistency(missions, tasks)->dict[str,Any]:
+    """Report cross-model divergence without changing legacy mission states."""
+    from atlasquant_aion_durable_tasks import normalize_durable_tasks
+
+    by_id={m["mission_id"]:m for m in normalize_missions(missions)}
+    compatible={
+        "PLANNED":{"PLANNED"},
+        "IN_PROGRESS":{"PLANNED","RUNNING","PAUSED","WAITING_APPROVAL","BLOCKED","DONE","CANCELED"},
+        "WAITING_APPROVAL":{"WAITING_APPROVAL","PAUSED","DONE","CANCELED"},
+        "BLOCKED":{"BLOCKED","PAUSED","DONE","CANCELED"},
+        "DONE":{"DONE","CANCELED"},
+        "CANCELED":{"CANCELED","DONE"},
+    }
+    issues=[]
+    for task in normalize_durable_tasks(tasks):
+        mid=task["mission_id"]
+        if not mid:
+            continue  # Legacy standalone tasks remain supported.
+        mission=by_id.get(mid)
+        code="MISSION_NOT_FOUND" if mission is None else (
+            "MISSION_TASK_STATE_MISMATCH" if task["state"] not in compatible[mission["status"]] else ""
+        )
+        if code:
+            issues.append({"error_code":code,"mission_id":mid,
+                           "task_id":task["durable_task_id"],"task_state":task["state"],
+                           "mission_state":mission["status"] if mission else "UNKNOWN",
+                           "correlation_id":task.get("correlation_id") or mid})
+    return {"state":"INCONSISTENT" if issues else "CONSISTENT","issues":issues,
+            "executes_action":False}
+
+
 def continuity_digest(
     missions:Sequence[Mapping[str,Any]]|None,
     handoffs:Sequence[Mapping[str,Any]]|None,
@@ -426,8 +577,10 @@ def continuity_digest(
 
 
 __all__=[
-    "SCHEMA","MISSION_STATUSES","ACTIVE_STATUSES",
+    "SCHEMA","MISSION_STATUSES","ACTIVE_STATUSES","MISSION_TRANSITIONS",
+    "MissionTransitionError","validate_mission_transition","prepare_mission_transition",
     "new_mission","normalize_mission","normalize_missions","upsert_mission",
     "transition_mission","normalize_handoff","normalize_handoffs",
-    "build_session_handoff","append_handoff","continuity_summary","continuity_briefing","continuity_digest",
+    "build_session_handoff","append_handoff","continuity_summary","continuity_briefing",
+    "mission_task_consistency","continuity_digest",
 ]

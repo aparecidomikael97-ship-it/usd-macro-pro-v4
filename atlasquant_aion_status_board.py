@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import Any, Mapping, Sequence
 
 from atlasquant_aion_operations import queue_summary
+from atlasquant_aion_durable_tasks import durable_tasks_summary
 
 SCHEMA="ATLASQUANT_AION_MASTER_STATUS_V1"
 STATES=("CONFIRMED","BLOCKED","EXTERNAL_DEPENDENCY","UNKNOWN")
@@ -226,6 +227,59 @@ def build_master_status_board(
         detail=continuity_detail,
         source="Checkpoint Mestre / continuity",
         next_action=continuity_next,
+    ))
+
+    durable_section = cp.get("durable_tasks")
+    durable_loaded = (
+        isinstance(durable_section, Mapping)
+        and isinstance(durable_section.get("records"), list)
+    )
+    durable_summary = durable_tasks_summary(
+        durable_section.get("records", []) if durable_loaded else []
+    )
+    durable_waiting = int(durable_summary.get("waiting_approval") or 0)
+    durable_blocked = int(durable_summary.get("blocked") or 0)
+    durable_resumable = int(durable_summary.get("resumable") or 0)
+    durable_done = int(durable_summary.get("done") or 0)
+
+    if not durable_loaded:
+        durable_state = "UNKNOWN"
+        durable_detail = "Estrutura de tarefas duráveis não foi confirmada no Checkpoint desta execução."
+        durable_next = "Carregar/migrar a seção durable_tasks antes de afirmar continuidade operacional."
+    elif durable_waiting or durable_blocked:
+        durable_state = "BLOCKED"
+        durable_detail = (
+            f"Tarefas duráveis: {durable_resumable} retomável(is), "
+            f"{durable_waiting} aguardando aprovação, {durable_blocked} bloqueada(s) "
+            f"e {durable_done} concluída(s)."
+        )
+        durable_next = (
+            "Revisar bloqueios e aprovações; retomada restaura contexto, "
+            "mas não autoriza nem executa o próximo passo."
+        )
+    elif runtime_status != "CONFIRMED" or integrity_state != "CONFIRMED":
+        durable_state = "UNKNOWN"
+        durable_detail = (
+            f"A estrutura local contém {durable_resumable} tarefa(s) retomável(is) e "
+            f"{durable_done} concluída(s), mas a persistência runtime íntegra não está confirmada."
+        )
+        durable_next = "Confirmar runtime + integridade antes de confiar em retomada entre sessões."
+    else:
+        durable_state = "CONFIRMED"
+        durable_detail = (
+            f"Tarefas duráveis estruturadas: {durable_resumable} retomável(is), "
+            f"{durable_done} concluída(s), sem bloqueio ou aprovação pendente."
+        )
+        durable_next = ""
+
+    items.append(_item(
+        "durable_task_continuity",
+        "Continuidade de tarefas duráveis",
+        area="development",
+        state=durable_state,
+        detail=durable_detail,
+        source="Checkpoint Mestre / durable_tasks + runtime integrity",
+        next_action=durable_next,
     ))
 
     market_ok=bool(market.get("fresh_confirmed",False) and _text(market.get("summary"),800))
