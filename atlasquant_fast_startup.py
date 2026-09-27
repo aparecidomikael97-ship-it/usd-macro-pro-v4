@@ -402,6 +402,11 @@ def render_beginner_shell(
         "mode":"Iniciante",
     }
     _render_beginner_chrome(app_version, environment)
+    try:
+        from atlasquant_voice_assistant import render_top_voice_access
+        render_top_voice_access(st.session_state, pages=_fast_pages, fast=True)
+    except Exception:
+        pass
     st.markdown(
         """<div style="border:1px solid rgba(137,170,210,.18);border-radius:16px;padding:13px 16px;
         background:linear-gradient(120deg,rgba(17,43,72,.96),rgba(8,25,43,.94));margin:2px 0 10px">

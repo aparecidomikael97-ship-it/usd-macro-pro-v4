@@ -32,7 +32,7 @@ def render_macro_briefing_panel(currency_rows: Sequence[Mapping[str, Any]] | Non
     ui_status=briefing_status(brief)
     st.markdown(
         f"""<div style="padding:11px 13px;border:1px solid rgba(137,170,210,.18);border-radius:12px;margin:4px 0 13px">
-        <strong>{ui_status['label']}</strong><br><span style="opacity:.74;font-size:.78rem">{ui_status['detail']}</span>
+        <strong>{ui_status['label']}</strong><br><span style="opacity:1;color:#e7eef8;font-size:.78rem">{ui_status['detail']}</span>
         </div>""", unsafe_allow_html=True,
     )
     if not brief["data_sufficient"]:

@@ -47,3 +47,5 @@ O clique só grava `atlasquant_premium_nav_target`. Quem aplica o destino, antes
 - Radar segue com 28 pares, Top 10 e filtros. O movimento é um ponto CSS, sem vídeo.
 - Painel Mestre continua na matriz atual (`head(7)`). O texto deixa claro que esse universo não é o Radar de 28 pares.
 - Iniciante ganha uma faixa com ativo, viés, confiança, operar ou não, risco, notícia e próximo passo, lida dos campos que o Radar já calculou.
+- Aviso, erro e sucesso usam texto `#1a1406` sobre fundo claro. Expander, rankings e Safety Core ficam com texto claro sobre fundo escuro. A voz e a central AION ficam no topo.
+- Modo Avançado pinta na hora um snapshot já validado e mostra data e idade. Snapshot vencido não entra como dado atual. A coleta ao vivo continua no caminho existente, em paralelo e sem inventar número.

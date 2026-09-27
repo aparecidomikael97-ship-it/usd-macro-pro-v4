@@ -192,11 +192,11 @@ def _theme_css(theme: str, font_scale: str, reduced_motion: bool) -> str:
     scale = {"Normal": 1.0, "Grande": 1.10, "Muito grande": 1.20}.get(font_scale, 1.0)
 
     if theme == "Escuro":
-        bg, card, text, muted, border, accent = "#0b1220", "#111c2e", "#eef5ff", "#a8b4c7", "#263955", "#4ea1ff"
+        bg, card, text, muted, border, accent = "#0b1220", "#111c2e", "#eef5ff", "#d7e4f2", "#263955", "#4ea1ff"
     elif theme == "Alto contraste":
         bg, card, text, muted, border, accent = "#000000", "#080808", "#ffffff", "#ffffff", "#ffffff", "#00e5ff"
     else:
-        bg, card, text, muted, border, accent = "#f5f8fc", "#ffffff", "#132238", "#5f6f82", "#dbe4ee", "#1565c0"
+        bg, card, text, muted, border, accent = "#f5f8fc", "#ffffff", "#132238", "#243044", "#dbe4ee", "#1565c0"
 
     motion = "*, *::before, *::after {animation: none !important; transition: none !important; scroll-behavior: auto !important;}" if reduced_motion else ""
 

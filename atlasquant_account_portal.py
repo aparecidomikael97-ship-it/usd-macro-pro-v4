@@ -192,8 +192,8 @@ def render_account_portal(access:Mapping[str,Any]|None)->dict[str,Any]:
     st.markdown(
         f"""<div style="padding:11px 13px;border:1px solid rgba(137,170,210,.18);border-radius:12px;margin:4px 0 13px">
         <strong>CONTA · {visual['label']}</strong>
-        <span style="margin-left:8px;opacity:.74;font-size:.78rem">{visual['detail']}</span>
-        <span style="float:right;opacity:.68;font-size:.72rem">Trading real desativado</span></div>""",
+        <span style="margin-left:8px;opacity:1;color:#e7eef8;font-size:.78rem">{visual['detail']}</span>
+        <span style="float:right;opacity:1;color:#d7e4f2;font-size:.72rem">Trading real desativado</span></div>""",
         unsafe_allow_html=True,
     )
     st.subheader("👤 Conta & Acesso")

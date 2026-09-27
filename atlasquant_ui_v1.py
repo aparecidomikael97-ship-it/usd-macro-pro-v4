@@ -188,7 +188,7 @@ html { scroll-behavior: smooth; }
 .aq-mode-chip.open{color:#73f1da}
 .aq-compass{border:1px solid rgba(124,188,229,.24);border-radius:15px;padding:12px 13px;margin:8px 0 11px;background:linear-gradient(145deg,rgba(15,36,60,.9),rgba(8,23,41,.9))}
 .aq-compass-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
-.aq-compass-kicker{color:#a9c9e8;font-size:.64rem;font-weight:900;letter-spacing:.1em;text-transform:uppercase}
+.aq-compass-kicker{color:#d7e4f2;font-size:.64rem;font-weight:900;letter-spacing:.1em;text-transform:uppercase}
 .aq-compass-title{color:#fff;font-size:.92rem;font-weight:900;line-height:1.25;margin-top:3px}
 .aq-compass-badge{border:1px solid rgba(148,183,225,.26);border-radius:999px;padding:4px 8px;background:rgba(11,30,51,.78);color:#f4f8ff;font-size:.63rem;font-weight:850;white-space:nowrap}
 .aq-compass-grid{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:7px;margin-top:9px}
@@ -424,10 +424,20 @@ html { scroll-behavior: smooth; }
   color: #e8eef7 !important;
   -webkit-text-fill-color: #e8eef7 !important;
 }
+.stApp [data-testid="stAlert"] {
+  background: #fff6d8 !important;
+  border: 1px solid #8a6412 !important;
+  color: #1a1406 !important;
+}
 .stApp [data-testid="stAlert"] [data-testid="stMarkdownContainer"] p,
-.stApp [data-testid="stAlert"] p {
-  color: inherit !important;
-  -webkit-text-fill-color: inherit !important;
+.stApp [data-testid="stAlert"] p,
+.stApp [data-testid="stAlert"] li,
+.stApp [data-testid="stAlert"] span,
+.stApp [data-testid="stAlert"] strong {
+  color: #1a1406 !important;
+  -webkit-text-fill-color: #1a1406 !important;
+  opacity: 1 !important;
+  font-weight: 750 !important;
 }
 .stApp [data-testid="stButton"] button:not([kind="primary"]),
 .stApp [data-testid="stButton"] button:not([kind="primary"]) * {
@@ -511,6 +521,51 @@ html { scroll-behavior: smooth; }
   background: #10233a !important;
   box-shadow: none !important;
   outline: none !important;
+}
+.stApp [data-testid="stExpander"] {
+  background: #102338 !important;
+  border: 1px solid rgba(198,214,232,.4) !important;
+}
+.stApp [data-testid="stExpander"] details > summary,
+.stApp [data-testid="stExpander"] details > summary *,
+.stApp [data-testid="stExpander"] summary p,
+.stApp [data-testid="stExpander"] summary span {
+  color: #f5f8fc !important;
+  -webkit-text-fill-color: #f5f8fc !important;
+  opacity: 1 !important;
+  font-weight: 750 !important;
+}
+.stApp [data-testid="stExpander"] [data-testid="stMarkdownContainer"] p {
+  color: #e7eef8 !important;
+  -webkit-text-fill-color: #e7eef8 !important;
+  opacity: 1 !important;
+}
+.stApp input:disabled,
+.stApp textarea:disabled,
+.stApp [aria-disabled="true"] {
+  color: #d7e4f2 !important;
+  -webkit-text-fill-color: #d7e4f2 !important;
+  opacity: 1 !important;
+}
+.aq-boot-banner{background:#fff6d8;color:#1a1406 !important;border:1px solid #8a6412;border-radius:12px;padding:10px 12px;margin:8px 0 12px;font-size:.92rem;font-weight:750;line-height:1.45}
+.aq-boot-banner strong{color:#1a1406 !important}
+.aq-boot-live{background:#102338;color:#f5f8fc !important;border-color:rgba(198,214,232,.4)}
+.aq-boot-live strong{color:#f5f8fc !important}
+.stApp [data-testid="stTabs"] [role="tab"] {
+  color: #f4f8ff !important;
+  -webkit-text-fill-color: #f4f8ff !important;
+  opacity: 1 !important;
+}
+.stApp [data-testid="stExpander"] [data-testid="stAlert"] [data-testid="stMarkdownContainer"] p,
+.stApp [data-testid="stAlert"] [data-testid="stMarkdownContainer"] p,
+.stApp [data-testid="stAlert"] p,
+.stApp [data-testid="stAlert"] li,
+.stApp [data-testid="stAlert"] span,
+.stApp [data-testid="stAlert"] strong {
+  color: #1a1406 !important;
+  -webkit-text-fill-color: #1a1406 !important;
+  opacity: 1 !important;
+  font-weight: 750 !important;
 }
 </style>
 """
