@@ -295,20 +295,24 @@ def _theme_css(theme: str, font_scale: str, reduced_motion: bool) -> str:
 
 
 
+# The AtlasQuant surface forces light text on dark panels. A light canvas makes
+# that text unreadable, so only dark themes are offered.
+THEME_CHOICES = ("Escuro", "Alto contraste")
+
+
 def experience_theme_summary(theme: str, font_scale: str, reduced_motion: bool) -> dict[str,Any]:
-    allowed={"Claro","Escuro","Alto contraste"}
-    safe_theme=theme if theme in allowed else "Claro"
+    safe_theme=theme if theme in THEME_CHOICES else "Escuro"
     safe_font=font_scale if font_scale in {"Normal","Grande","Muito grande"} else "Normal"
     return {"theme":safe_theme,"font_scale":safe_font,"reduced_motion":bool(reduced_motion),"responsive":True}
 
 
 def render_experience_controls() -> dict[str, Any]:
     with st.sidebar.expander("🎨 Aparência & acessibilidade", expanded=False):
+        if st.session_state.get("ux103_theme") not in THEME_CHOICES:
+            st.session_state["ux103_theme"] = "Escuro"
         theme = st.selectbox(
             "Tema do aplicativo",
-            ["Claro", "Escuro", "Alto contraste"],
-            index=["Claro", "Escuro", "Alto contraste"].index(st.session_state.get("ux103_theme", "Claro"))
-            if st.session_state.get("ux103_theme", "Claro") in ["Claro", "Escuro", "Alto contraste"] else 0,
+            list(THEME_CHOICES),
             key="ux103_theme",
             help="Muda apenas a apresentação. Não altera cálculos ou sinais.",
         )
