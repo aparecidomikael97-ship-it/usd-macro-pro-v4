@@ -154,11 +154,31 @@ class ExecutionTests(unittest.TestCase):
     def test_safe_single_command_delegates_with_approval_false(self):
         spy = Mock(return_value={
             "state": "SUCCESS",
+            "tool_id": "aion.tasks.summary",
+            "workspace_id": "administration",
+            "kind": "READ",
+            "contract_fingerprint": local_contract_fingerprint(),
+            "request_id": "single-test",
             "result": {"total": 3, "active": 2, "waiting_approval": 1, "blocked": 0},
+            "truth": {"status": "UNKNOWN", "freshness": "UNVERIFIED"},
             "preflight": {"state": "READY_FOR_EXECUTOR", "blockers": []},
-            "security": {"external_side_effects": False},
+            "provenance": {
+                "source_module": "atlasquant_aion_local_executor",
+                "source_function": "_test",
+                "input_scope": "local",
+                "local_only": True,
+            },
+            "security": {
+                "network_called": False,
+                "connector_called": False,
+                "external_side_effects": False,
+                "permissions_expanded": False,
+                "secrets_included": False,
+            },
+            "executes_action": False,
             "external_action_executed": False,
             "real_orders_enabled": False,
+            "tool_output_is_authority": False,
         })
         original = command.execute_local_tool
         command.execute_local_tool = spy
@@ -297,11 +317,31 @@ class ExecutionTests(unittest.TestCase):
     def test_multi_read_stops_on_first_blocked_preflight(self):
         blocked = {
             "state": "BLOCKED",
+            "tool_id": "aion.tasks.summary",
+            "workspace_id": "administration",
+            "kind": "READ",
+            "contract_fingerprint": local_contract_fingerprint(),
+            "request_id": "blocked-test",
             "result": None,
+            "truth": {"status": "UNKNOWN", "freshness": "UNVERIFIED"},
             "preflight": {"state": "BLOCK", "blockers": ["GUARDIAN_DENIED"]},
-            "security": {"network_called": False, "connector_called": False},
+            "provenance": {
+                "source_module": "atlasquant_aion_local_executor",
+                "source_function": "",
+                "input_scope": "local",
+                "local_only": True,
+            },
+            "security": {
+                "network_called": False,
+                "connector_called": False,
+                "external_side_effects": False,
+                "permissions_expanded": False,
+                "secrets_included": False,
+            },
+            "executes_action": False,
             "external_action_executed": False,
             "real_orders_enabled": False,
+            "tool_output_is_authority": False,
         }
         spy = Mock(return_value=blocked)
         original = command.execute_local_tool
