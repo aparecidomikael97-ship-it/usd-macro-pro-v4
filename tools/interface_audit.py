@@ -58,12 +58,17 @@ def _wait_idle(page, timeout_s=120.0):
 
 
 def _login(page, base, user, password):
+    started = time.perf_counter()
     page.goto(base, wait_until="domcontentloaded")
+    page.get_by_label("Usuário").wait_for(timeout=120000)
+    form_ms = round((time.perf_counter() - started) * 1000)
     page.get_by_label("Usuário").fill(user)
     page.get_by_label("Senha").fill(password)
+    started = time.perf_counter()
     page.get_by_role("button", name="Entrar").click()
     page.wait_for_selector("#aq-account-identity", timeout=120000)
     _wait_idle(page)
+    return {"login_form_ms": form_ms, "login_to_shell_ms": round((time.perf_counter() - started) * 1000)}
 
 
 def _combobox(page, label):
@@ -109,7 +114,7 @@ def run(base, user, password, out_dir, viewports):
         browser = p.chromium.launch()
         for name, vp in viewports.items():
             page = browser.new_page(viewport=vp)
-            _login(page, base, user, password)
+            report[f"{name}_login"] = _login(page, base, user, password)
             rows = []
             for area in [o.inner_text().strip() for o in page.locator('[data-testid="stRadio"]').nth(1).locator('[data-testid="stRadioOption"]').all()] or []:
                 started = time.perf_counter()
@@ -164,7 +169,7 @@ def main():
         viewports.pop("mobile")
     report = run(args.base, args.user, password, args.out, viewports)
     for name, rows in report["viewports"].items():
-        print(f"== {name} (mediana {report.get(name + '_median_ms')} ms)")
+        print(f"== {name} (mediana {report.get(name + '_median_ms')} ms) login {report.get(name + '_login')}")
         for r in rows:
             flags = []
             if r.get("exceptions"):
