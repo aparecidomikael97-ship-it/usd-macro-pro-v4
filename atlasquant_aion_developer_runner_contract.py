@@ -5,8 +5,11 @@ Patch Validation result. It emits an immutable *plan description* for a future
 isolated runner. It never executes the plan.
 
 READY means only READY_FOR_RUNNER_DESIGN_REVIEW. It does not mean execution is
-authorized. If patch content is not bound to the approved revision or the patch
-has not been explicitly reviewed by a human, the simulator fails closed.
+authorized. Promotion requires a structural Content Attestation Contract.
+content_binding_verified and a free-form content_binding_ref are not evidence.
+Independent verification stays false because no external probe runs here. If
+the attestation does not match the sealed lineage, or the patch has not been
+explicitly reviewed by a human, the simulator fails closed.
 
 No shell, subprocess, filesystem write, network, secret mount, test execution,
 commit, merge, deploy, publication, production change or real trading occurs.
@@ -19,6 +22,10 @@ import unicodedata
 from typing import Any, Mapping, Sequence
 
 from atlasquant_aion_developer_builder_sandbox import SCHEMA as BUILDER_SCHEMA
+from atlasquant_aion_developer_content_attestation import (
+    assert_content_attestation_matches,
+)
+from atlasquant_aion_developer_executable_pinning import SANDBOX_EPHEMERAL_PYCACHE
 from atlasquant_aion_developer_patch_validation import SCHEMA as PATCH_SCHEMA
 from atlasquant_aion_developer_manifest import (
     assert_builder_request_lineage,
@@ -111,8 +118,7 @@ def build_runner_contract(
     preflight: Mapping[str, Any],
     patch_validation: Mapping[str, Any],
     *,
-    content_binding_verified: bool,
-    content_binding_ref: Any,
+    content_attestation: Mapping[str, Any] | None = None,
     human_patch_reviewed: bool,
     human_patch_reviewer: Any,
     human_patch_review_refs: Sequence[Any] | None,
@@ -198,13 +204,21 @@ def build_runner_contract(
         raise ValueError("patch candidate differs from builder request")
 
     blockers: list[str] = []
-    binding_ref = _clean(content_binding_ref, 240)
-    if content_binding_verified is not True:
-        blockers.append("REVISION_CONTENT_BINDING_REQUIRED")
+    attestation_id = ""
+    structurally_bound = False
+    if content_attestation is None:
+        blockers.append("CONTENT_ATTESTATION_REQUIRED")
+    else:
+        assert_content_attestation_matches(
+            content_attestation,
+            builder_request,
+            preflight,
+            patch_validation,
+        )
+        structurally_bound = True
+        attestation_id = str(content_attestation.get("content_attestation_id") or "")
     if revision.get("revision_content_verified") is not True:
         blockers.append("PATCH_VALIDATOR_CONTENT_BINDING_NOT_VERIFIED")
-    if not binding_ref:
-        blockers.append("CONTENT_BINDING_REF_REQUIRED")
 
     reviewer = _clean(human_patch_reviewer, 160)
     raw_review_refs = require_string_sequence(human_patch_review_refs, "human_patch_review_refs")
@@ -270,6 +284,9 @@ def build_runner_contract(
             "cwd": "<ISOLATED_WORKTREE>",
             "network": False,
             "writes_repo": False,
+            "writes_repository": False,
+            "may_write_ephemeral_cache": True,
+            "pycache_prefix": SANDBOX_EPHEMERAL_PYCACHE,
         },
         {
             "step": "RUN_TARGETED_TESTS",
@@ -296,7 +313,7 @@ def build_runner_contract(
         "preflight_id": preflight.get("preflight_id"),
         "patch_validation_id": patch_validation.get("validation_id"),
         "patch_digest": patch_validation.get("patch_digest"),
-        "binding_ref": binding_ref,
+        "content_attestation_id": attestation_id,
         "reviewer": reviewer,
         "review_refs": review_refs,
         "tests": tests,
@@ -311,7 +328,9 @@ def build_runner_contract(
             "preflight_id": str(preflight.get("preflight_id") or ""),
             "patch_validation_id": str(patch_validation.get("validation_id") or ""),
             "patch_digest": str(patch_validation.get("patch_digest") or ""),
-            "content_binding_ref": binding_ref,
+            "content_attestation_id": attestation_id,
+            "content_binding_structurally_bound": structurally_bound,
+            "content_binding_independently_verified": False,
         },
         "review": {
             "human_patch_reviewed": bool(human_patch_reviewed),
@@ -332,6 +351,14 @@ def build_runner_contract(
         "repo_write_allowed": False,
         "blockers": blockers,
         "runner_design_review_required": True,
+        "content_binding_structurally_bound": structurally_bound,
+        "content_binding_independently_verified": False,
+        "path_lookup_allowed": False,
+        "parent_environment_inheritance": False,
+        "caller_environment_overrides_allowed": False,
+        "executable_pinning_verified": False,
+        "os_sandbox_verified": False,
+        "child_process_policy_verified": False,
         "symlink_physical_boundary_verified": False,
         "hardlink_physical_boundary_verified": False,
         "execution_authorized": False,

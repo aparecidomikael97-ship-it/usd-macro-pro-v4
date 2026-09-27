@@ -5512,16 +5512,9 @@ def _render_developer_intelligence() -> None:
                     "Este formulário não executa comandos. Ele apenas verifica se existe informação "
                     "suficiente para descrever um runner isolado e revisável."
                 )
-                content_binding_verified = st.checkbox(
-                    "Existe verificação externa do conteúdo exato da revisão",
-                    key="aion_developer_runner_content_binding_verified",
-                    value=False,
-                )
-                content_binding_ref = st.text_input(
-                    "Referência do content binding",
-                    key="aion_developer_runner_content_binding_ref",
-                    max_chars=240,
-                    placeholder="Ex.: tree:<sha256> ou artifact:<id>.",
+                st.caption(
+                    "content_binding_verified não é prova. O runner exige um Content "
+                    "Attestation Contract, e um checkbox não o substitui."
                 )
                 human_patch_reviewed = st.checkbox(
                     "O patch exato foi revisado por uma pessoa independente",
@@ -5547,8 +5540,7 @@ def _render_developer_intelligence() -> None:
                             builder_request,
                             preflight,
                             patch_validation,
-                            content_binding_verified=content_binding_verified,
-                            content_binding_ref=content_binding_ref,
+                            content_attestation=None,
                             human_patch_reviewed=human_patch_reviewed,
                             human_patch_reviewer=human_patch_reviewer,
                             human_patch_review_refs=[

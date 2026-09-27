@@ -41,6 +41,13 @@ from atlasquant_aion_developer_manifest import (
     release_sensitive_path,
 )
 from atlasquant_aion_developer_command_policy import build_command_policy_contract
+from atlasquant_aion_developer_content_attestation import attestation_for_documents
+from atlasquant_aion_developer_executable_pinning import build_executable_pinning_spec
+from atlasquant_aion_developer_principal_identity import (
+    assert_independent_principals,
+    classify_actor_pair,
+    require_principal_id,
+)
 from atlasquant_aion_developer_package import build_developer_package
 from atlasquant_aion_developer_patch_validation import validate_patch
 from atlasquant_aion_developer_runner_contract import (
@@ -1345,8 +1352,7 @@ def _runner_probe(tests, gates=None):
         builder,
         preflight,
         patch,
-        content_binding_verified=True,
-        content_binding_ref="tree:123",
+        content_attestation=attestation_for_documents(builder, preflight, patch),
         human_patch_reviewed=True,
         human_patch_reviewer="reviewer-1",
         human_patch_review_refs=["review:patch:1"],
@@ -1398,6 +1404,16 @@ def _patch_probe(patch: str):
 
 
 def _command_probe(**overrides):
+    policy_keys = (
+        "requested_environment",
+        "path_lookup_allowed",
+        "parent_environment_inheritance",
+        "absolute_executable_required",
+        "executable_digest_required",
+    )
+    policy_kwargs = {key: overrides.pop(key) for key in policy_keys if key in overrides}
+    pycache_prefix = overrides.pop("pycache_prefix", None)
+    drop_cache_policy = overrides.pop("drop_cache_policy", False)
     runner = {
         "schema": "ATLASQUANT_AION_DEVELOPER_RUNNER_CONTRACT_V1",
         "runner_contract_id": "DEVRUN-1",
@@ -1417,6 +1433,9 @@ def _command_probe(**overrides):
                 "cwd": "<ISOLATED_WORKTREE>",
                 "network": False,
                 "writes_repo": False,
+                "writes_repository": False,
+                "may_write_ephemeral_cache": True,
+                "pycache_prefix": "<SANDBOX_EPHEMERAL_PYCACHE>",
             },
             {
                 "step": "RUN_TARGETED_TESTS",
@@ -1465,7 +1484,15 @@ def _command_probe(**overrides):
     if "budget_key" in overrides:
         runner["resource_budget"] = dict(runner["resource_budget"])
         runner["resource_budget"][overrides["budget_key"]] = overrides["budget_value"]
-    return build_command_policy_contract(runner)
+    if pycache_prefix is not None or drop_cache_policy:
+        runner["command_plan"] = [dict(row) for row in runner["command_plan"]]
+        if drop_cache_policy:
+            runner["command_plan"][0].pop("writes_repository", None)
+            runner["command_plan"][0].pop("may_write_ephemeral_cache", None)
+            runner["command_plan"][0].pop("pycache_prefix", None)
+        else:
+            runner["command_plan"][0]["pycache_prefix"] = pycache_prefix
+    return build_command_policy_contract(runner, **policy_kwargs)
 
 
 def _contract_gap_surface(_world: _World) -> list[dict[str, str]]:
@@ -1759,8 +1786,7 @@ def _runner_from_pair(request: Mapping[str, Any], preflight: Mapping[str, Any], 
         "executor_attached": False,
     }
     args = {
-        "content_binding_verified": True,
-        "content_binding_ref": "tree:123",
+        "content_attestation": attestation_for_documents(request, preflight, patch),
         "human_patch_reviewed": True,
         "human_patch_reviewer": "reviewer-independent",
         "human_patch_review_refs": ["review:patch:1"],
@@ -2117,6 +2143,380 @@ def _resource_budget_surface(_world: _World) -> list[dict[str, str]]:
     return findings
 
 
+def _distinct_roles() -> dict[str, str]:
+    return {
+        "builder_principal_id": "prn_builder01",
+        "reviewer_principal_id": "prn_reviewer1",
+        "breaker_principal_id": "prn_breaker01",
+        "approver_principal_id": "prn_approver1",
+        "attestor_principal_id": "prn_attestor1",
+    }
+
+
+def _pin_claim(name: str, path: str, digest: str) -> dict[str, Any]:
+    return {
+        "logical_name": name,
+        "absolute_path": path,
+        "sha256": digest,
+        "file_size_bytes": 128,
+        "version_claim": "claim-only",
+        "verification_evidence_refs": ["evidence:pin:" + name],
+    }
+
+
+def _attestation_pinning_surface(_world: _World) -> list[dict[str, str]]:
+    """Fail closed on forged attestation, principal collisions and unpinning."""
+    findings: list[dict[str, str]] = []
+    builder = _sealed_runner_request(["test_module.py"])
+    preflight = _sealed_preflight(builder)
+    patch = {
+        "schema": "ATLASQUANT_AION_DEVELOPER_PATCH_VALIDATION_V1",
+        "validation_id": "DEVPATCHVAL-1",
+        "state": "READY_FOR_PATCH_REVIEW",
+        "builder_request_id": builder["request_id"],
+        "preflight_id": preflight["preflight_id"],
+        "patch_digest": "DEVPATCH-ABC",
+        "revision_binding": {
+            "baseline_ref": "main@aaa",
+            "candidate_ref": "cursor/fix@bbb",
+            "refs_match_approved_request": True,
+            "revision_content_verified": True,
+        },
+        "blockers": [],
+        "patch_applied": False,
+        "execution_authorized": False,
+        "executor_attached": False,
+    }
+    good = attestation_for_documents(builder, preflight, patch)
+    pins = [
+        _pin_claim("python", "/usr/bin/python3", "ab" * 32),
+        _pin_claim("git", "/usr/bin/git", "cd" * 32),
+    ]
+
+    def _run(attestation: Any, patch_doc: Mapping[str, Any] = patch) -> dict[str, Any]:
+        return build_runner_contract(
+            builder,
+            preflight,
+            patch_doc,
+            content_attestation=attestation,
+            human_patch_reviewed=True,
+            human_patch_reviewer="reviewer-1",
+            human_patch_review_refs=["review:patch:1"],
+        )
+
+    def _reject(invariant_id: str, module: str, description: str, fn: Callable[[], Any]) -> None:
+        status, _result = _invoke(fn)
+        closed = status == "REJECT"
+        findings.append(_finding(
+            invariant_id,
+            module,
+            description if closed else description + " Aceito.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    def _policy(invariant_id: str, description: str, fn: Callable[[], Any], blocker: str) -> None:
+        status, result = _invoke(fn)
+        closed = (
+            status == "ACCEPT"
+            and _state_closed(result, blocker)
+            and isinstance(result, Mapping)
+            and result.get("executable_pinning_verified") is False
+            and result.get("state") != "READY_FOR_EXECUTION"
+        )
+        findings.append(_finding(
+            invariant_id,
+            "atlasquant_aion_developer_command_policy",
+            description if closed else description + " A politica aceitou o desvio.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    forged = {
+        "schema": "ATLASQUANT_AION_DEVELOPER_CONTENT_ATTESTATION_V1",
+        "content_attestation_id": "DEVATT-" + ("F" * 18),
+        "content_binding_structurally_bound": True,
+        "content_binding_independently_verified": False,
+        "content_binding_verified": True,
+        "builder_request_id": builder["request_id"],
+        "test_contract_manifest_id": builder["test_contract_manifest_id"],
+        "preflight_id": preflight["preflight_id"],
+        "patch_validation_id": patch["validation_id"],
+        "patch_digest": patch["patch_digest"],
+        "baseline_ref": "main@aaa",
+        "candidate_ref": "cursor/fix@bbb",
+        "baseline_commit_sha": "a" * 40,
+        "candidate_commit_sha": "b" * 40,
+        "baseline_tree_sha": "c" * 40,
+        "candidate_tree_sha": "d" * 40,
+        "verification_method": "STRUCTURAL_MANIFEST_V1",
+        "verification_evidence_refs": ["evidence:forged:1"],
+        "attestor_principal_id": "prn_attestor1",
+    }
+    _reject(
+        "attestation.forged",
+        "atlasquant_aion_developer_content_attestation",
+        "Attestation forjada com content_binding_verified e id inventado e rejeitada.",
+        lambda: _run(forged),
+    )
+    other = attestation_for_documents(
+        builder,
+        preflight,
+        patch,
+        verification_evidence_refs=["evidence:other:1"],
+    )
+    stolen = dict(good)
+    stolen["content_attestation_id"] = other["content_attestation_id"]
+    _reject(
+        "attestation.stolen_id",
+        "atlasquant_aion_developer_content_attestation",
+        "content_attestation_id copiado de outra attestation e rejeitado.",
+        lambda: _run(stolen),
+    )
+
+    def _mutate(field: str, value: Any) -> dict[str, Any]:
+        mutated = dict(good)
+        mutated[field] = value
+        return mutated
+
+    _reject(
+        "attestation.patch_digest_mutated",
+        "atlasquant_aion_developer_runner_contract",
+        "patch_digest alterado depois da attestation e rejeitado.",
+        lambda: _run(_mutate("patch_digest", "DEVPATCH-MUTATED")),
+    )
+    _reject(
+        "attestation.candidate_sha_mutated",
+        "atlasquant_aion_developer_runner_contract",
+        "SHA do commit candidato alterado depois da attestation e rejeitado.",
+        lambda: _run(_mutate("candidate_commit_sha", "e" * 40)),
+    )
+    _reject(
+        "attestation.baseline_sha_mutated",
+        "atlasquant_aion_developer_runner_contract",
+        "SHA do commit baseline alterado depois da attestation e rejeitado.",
+        lambda: _run(_mutate("baseline_commit_sha", "f" * 40)),
+    )
+    _reject(
+        "attestation.tree_sha_mutated",
+        "atlasquant_aion_developer_runner_contract",
+        "SHA de tree alterado depois da attestation e rejeitado.",
+        lambda: _run(_mutate("candidate_tree_sha", "9" * 40)),
+    )
+    _reject(
+        "attestation.request_id_mismatch",
+        "atlasquant_aion_developer_runner_contract",
+        "Attestation de outro builder_request_id e rejeitada.",
+        lambda: _run(attestation_for_documents(
+            builder, preflight, patch, builder_request_id="DEVBUILD-OTHERREQUEST1",
+        )),
+    )
+    _reject(
+        "attestation.preflight_id_mismatch",
+        "atlasquant_aion_developer_runner_contract",
+        "Attestation de outro preflight_id e rejeitada.",
+        lambda: _run(attestation_for_documents(
+            builder, preflight, patch, preflight_id="DEVPREF-OTHERREQUEST01",
+        )),
+    )
+    _reject(
+        "attestation.validation_id_mismatch",
+        "atlasquant_aion_developer_runner_contract",
+        "Attestation de outro validation_id e rejeitada.",
+        lambda: _run(attestation_for_documents(
+            builder, preflight, patch, patch_validation_id="DEVPATCHVAL-OTHER",
+        )),
+    )
+    replay_patch = dict(patch)
+    replay_patch["patch_digest"] = "DEVPATCH-OTHER"
+    replay_patch["validation_id"] = "DEVPATCHVAL-2"
+    _reject(
+        "attestation.replay_other_patch",
+        "atlasquant_aion_developer_runner_contract",
+        "Attestation de um patch reapresentada em outro patch e rejeitada.",
+        lambda: _run(good, replay_patch),
+    )
+    collided = _distinct_roles()
+    collided["attestor_principal_id"] = collided["builder_principal_id"]
+    _reject(
+        "principal.duplicate_ids",
+        "atlasquant_aion_developer_principal_identity",
+        "O mesmo principal_id em dois papeis e rejeitado.",
+        lambda: assert_independent_principals(collided),
+    )
+    cyrillic_display = "\u0410lice"
+    same_principal = classify_actor_pair(
+        {"display_actor": "Alice", "principal_id": "prn_attestor1"},
+        {"display_actor": cyrillic_display, "principal_id": "prn_attestor1"},
+    ) == "SAME_PRINCIPAL"
+    distinct_labels = classify_actor_pair(
+        {"display_actor": "Alice", "principal_id": "prn_builder01"},
+        {"display_actor": "Alice", "principal_id": "prn_reviewer1"},
+    ) == "DISTINCT_PRINCIPALS"
+    role_status, _role_result = _invoke(lambda: assert_independent_principals({
+        **_distinct_roles(),
+        "builder_principal_id": "prn_attestor1",
+        "attestor_principal_id": "prn_attestor1",
+    }))
+    display_closed = same_principal and distinct_labels and role_status == "REJECT"
+    findings.append(_finding(
+        "principal.same_id_distinct_display",
+        "atlasquant_aion_developer_principal_identity",
+        "O mesmo principal_id com displays latino e cirilico e o mesmo ator e nao separa papeis."
+        if display_closed else
+        "Displays parecidos ainda separam papeis ou displays iguais foram fundidos.",
+        "BLOCKED_BY_DESIGN" if display_closed else "GAP",
+        "" if display_closed else "HIGH",
+    ))
+    _reject(
+        "principal.empty",
+        "atlasquant_aion_developer_principal_identity",
+        "principal_id vazio e rejeitado.",
+        lambda: require_principal_id(""),
+    )
+    _reject(
+        "principal.control_or_invisible",
+        "atlasquant_aion_developer_principal_identity",
+        "principal_id com controle ou caractere invisivel e rejeitado.",
+        lambda: require_principal_id("prn_builder01" + "\u200b"),
+    )
+    _reject(
+        "pinning.relative_path",
+        "atlasquant_aion_developer_executable_pinning",
+        "Caminho relativo de executavel e rejeitado.",
+        lambda: build_executable_pinning_spec([
+            _pin_claim("python", "usr/bin/python3", "ab" * 32),
+            pins[1],
+        ]),
+    )
+    _reject(
+        "pinning.malformed_sha256",
+        "atlasquant_aion_developer_executable_pinning",
+        "SHA-256 malformado e rejeitado.",
+        lambda: build_executable_pinning_spec([
+            _pin_claim("python", "/usr/bin/python3", "AB" * 32),
+            pins[1],
+        ]),
+    )
+    _reject(
+        "pinning.extra_executable",
+        "atlasquant_aion_developer_executable_pinning",
+        "Executavel extra fora de python e git e rejeitado.",
+        lambda: build_executable_pinning_spec(pins + [
+            _pin_claim("bash", "/usr/bin/bash", "ef" * 32),
+        ]),
+    )
+    _reject(
+        "pinning.python_without_git",
+        "atlasquant_aion_developer_executable_pinning",
+        "Pin somente de python, sem git, e rejeitado.",
+        lambda: build_executable_pinning_spec([pins[0]]),
+    )
+    _policy(
+        "command.path_lookup_enabled",
+        "PATH lookup habilitado fica BLOCKED.",
+        lambda: _command_probe(path_lookup_allowed=True),
+        "PATH_LOOKUP_NOT_ALLOWED",
+    )
+    _policy(
+        "command.caller_environment_override",
+        "Override de ambiente do caller fica BLOCKED.",
+        lambda: _command_probe(requested_environment={"CUSTOM": "1"}),
+        "CALLER_ENVIRONMENT_OVERRIDES_NOT_ALLOWED",
+    )
+    _policy(
+        "command.pythonpath_injection",
+        "PYTHONPATH injetado fica BLOCKED.",
+        lambda: _command_probe(requested_environment={"PYTHONPATH": "/tmp/injected"}),
+        "INHERITED_ENVIRONMENT_KEY_NOT_ALLOWED",
+    )
+    _policy(
+        "command.pythonstartup_injection",
+        "PYTHONSTARTUP injetado fica BLOCKED.",
+        lambda: _command_probe(requested_environment={"PYTHONSTARTUP": "/tmp/startup.py"}),
+        "INHERITED_ENVIRONMENT_KEY_NOT_ALLOWED",
+    )
+    _policy(
+        "command.home_injection",
+        "HOME injetado fica BLOCKED.",
+        lambda: _command_probe(requested_environment={"HOME": "/tmp/home"}),
+        "INHERITED_ENVIRONMENT_KEY_NOT_ALLOWED",
+    )
+    _policy(
+        "command.git_config_injection",
+        "GIT_CONFIG injetado fica BLOCKED.",
+        lambda: _command_probe(requested_environment={"GIT_CONFIG": "/tmp/gitconfig"}),
+        "INHERITED_ENVIRONMENT_KEY_NOT_ALLOWED",
+    )
+    _policy(
+        "command.pycache_inside_worktree",
+        "pycache dentro da worktree fica BLOCKED.",
+        lambda: _command_probe(pycache_prefix="<ISOLATED_WORKTREE>/__pycache__"),
+        "PYCACHE_INSIDE_WORKTREE",
+    )
+    _policy(
+        "command.pycache_inside_repository",
+        "pycache dentro do repositorio fica BLOCKED.",
+        lambda: _command_probe(pycache_prefix="<REPOSITORY_ROOT>/__pycache__"),
+        "PYCACHE_INSIDE_REPOSITORY",
+    )
+    _reject(
+        "pinning.fake_verified_true",
+        "atlasquant_aion_developer_executable_pinning",
+        "executable_pinning_verified=True sem probe e rejeitado.",
+        lambda: build_executable_pinning_spec(pins, executable_pinning_verified=True),
+    )
+    status, result = _invoke(lambda: build_runner_contract(
+        builder,
+        preflight,
+        patch,
+        content_attestation=None,
+        human_patch_reviewed=True,
+        human_patch_reviewer="reviewer-1",
+        human_patch_review_refs=["review:patch:1"],
+    ))
+    boolean_status, _boolean = _invoke(lambda: build_runner_contract(
+        builder,
+        preflight,
+        patch,
+        content_binding_verified=True,
+        content_binding_ref="tree:123",
+        human_patch_reviewed=True,
+        human_patch_reviewer="reviewer-1",
+        human_patch_review_refs=["review:patch:1"],
+    ))
+    boolean_closed = (
+        status == "ACCEPT"
+        and _state_closed(result, "CONTENT_ATTESTATION_REQUIRED")
+        and isinstance(result, Mapping)
+        and result.get("content_binding_structurally_bound") is False
+        and result.get("content_binding_independently_verified") is False
+        and boolean_status == "REJECT"
+    )
+    findings.append(_finding(
+        "runner.boolean_binding_without_attestation",
+        "atlasquant_aion_developer_runner_contract",
+        "content_binding_verified=True sem attestation nao promove o runner."
+        if boolean_closed else
+        "Um booleano de content binding ainda promove o runner.",
+        "BLOCKED_BY_DESIGN" if boolean_closed else "GAP",
+        "" if boolean_closed else "HIGH",
+    ))
+    _policy(
+        "command.compileall_without_cache_policy",
+        "compileall com writes_repo falso e sem politica de cache fica BLOCKED.",
+        lambda: _command_probe(drop_cache_policy=True),
+        "COMPILEALL_CACHE_POLICY_REQUIRED",
+    )
+    _reject(
+        "attestation.mutated_after_seal",
+        "atlasquant_aion_developer_content_attestation",
+        "Payload alterado depois da attestation, mantendo o id, e rejeitado.",
+        lambda: _run(_mutate("verification_evidence_refs", ["evidence:mutated:1"])),
+    )
+    return findings
+
+
 def audit_developer_chain() -> dict[str, Any]:
     """Inspect the local Developer contracts and return a deterministic report."""
     world = _World()
@@ -2135,6 +2535,7 @@ def audit_developer_chain() -> dict[str, Any]:
         findings.extend(_contract_gap_surface(world))
         findings.extend(_test_contract_integrity_surface(world))
         findings.extend(_resource_budget_surface(world))
+        findings.extend(_attestation_pinning_surface(world))
     finally:
         world.close()
 

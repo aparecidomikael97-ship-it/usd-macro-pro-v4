@@ -29,6 +29,9 @@ def _runner():
                 "cwd": "<ISOLATED_WORKTREE>",
                 "network": False,
                 "writes_repo": False,
+                "writes_repository": False,
+                "may_write_ephemeral_cache": True,
+                "pycache_prefix": "<SANDBOX_EPHEMERAL_PYCACHE>",
             },
             {
                 "step": "RUN_TARGETED_TESTS",
@@ -83,6 +86,15 @@ class AionDeveloperCommandPolicyTests(unittest.TestCase):
         self.assertFalse(out["executable_pinning_verified"])
         self.assertFalse(out["os_sandbox_verified"])
         self.assertFalse(out["execution_authorized"])
+        self.assertFalse(out["allowlist_policy"]["PATH_LOOKUP_ALLOWED"])
+        self.assertTrue(out["allowlist_policy"]["ABSOLUTE_EXECUTABLE_REQUIRED"])
+        self.assertTrue(out["allowlist_policy"]["EXECUTABLE_DIGEST_REQUIRED"])
+        self.assertFalse(out["allowlist_policy"]["PARENT_ENV_INHERITANCE"])
+        self.assertFalse(out["compile_step_executable"])
+        self.assertEqual(
+            out["validated_command_plan"][0]["pycache_prefix"],
+            "<SANDBOX_EPHEMERAL_PYCACHE>",
+        )
 
     def test_executable_substitution_is_blocked(self):
         runner = _runner()

@@ -6,6 +6,7 @@ import json
 import unittest
 
 from atlasquant_aion_developer_command_policy import build_command_policy_contract
+from atlasquant_aion_developer_content_attestation import attestation_for_documents
 from atlasquant_aion_developer_manifest import (
     REQUIRED_MANDATORY_GATES,
     bind_builder_request_lineage,
@@ -115,12 +116,12 @@ def _patch_doc(builder, preflight):
 def _runner(tests, gates=None):
     builder = _builder(tests, gates)
     preflight = _preflight_doc(builder)
+    patch = _patch_doc(builder, preflight)
     return build_runner_contract(
         builder,
         preflight,
-        _patch_doc(builder, preflight),
-        content_binding_verified=True,
-        content_binding_ref="tree:123",
+        patch,
+        content_attestation=attestation_for_documents(builder, preflight, patch),
         human_patch_reviewed=True,
         human_patch_reviewer="reviewer-1",
         human_patch_review_refs=["review:patch:1"],
@@ -241,6 +242,9 @@ def _command_runner():
                 "cwd": "<ISOLATED_WORKTREE>",
                 "network": False,
                 "writes_repo": False,
+                "writes_repository": False,
+                "may_write_ephemeral_cache": True,
+                "pycache_prefix": "<SANDBOX_EPHEMERAL_PYCACHE>",
             },
             {
                 "step": "RUN_TARGETED_TESTS",

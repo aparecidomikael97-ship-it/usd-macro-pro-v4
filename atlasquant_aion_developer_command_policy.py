@@ -19,6 +19,11 @@ import json
 import re
 from typing import Any, Mapping
 
+from atlasquant_aion_developer_executable_pinning import (
+    FORBIDDEN_INHERITED_ENVIRONMENT,
+    FIXED_ENVIRONMENT,
+    SANDBOX_EPHEMERAL_PYCACHE,
+)
 from atlasquant_aion_developer_runner_contract import SCHEMA as RUNNER_SCHEMA
 from atlasquant_aion_developer_sandbox_preflight import validate_resource_budget
 
@@ -62,7 +67,7 @@ def _digest(value: Any, length: int = 18) -> str:
 
 def _canonical_step(expected: tuple[str, str, tuple[str, ...]]) -> dict[str, Any]:
     name, executable, argv = expected
-    return {
+    row = {
         "step": name,
         "executable": executable,
         "argv": list(argv),
@@ -71,6 +76,27 @@ def _canonical_step(expected: tuple[str, str, tuple[str, ...]]) -> dict[str, Any
         "network": False,
         "writes_repo": False,
     }
+    if name == "COMPILE_CHANGED_SCOPE":
+        row["writes_repository"] = False
+        row["may_write_ephemeral_cache"] = True
+        row["pycache_prefix"] = SANDBOX_EPHEMERAL_PYCACHE
+    return row
+
+
+def _pycache_location_blockers(prefix: Any) -> list[str]:
+    if not isinstance(prefix, str):
+        return []
+    if "<ISOLATED_WORKTREE>" in prefix:
+        return ["PYCACHE_INSIDE_WORKTREE"]
+    if (
+        "<REPOSITORY_ROOT>" in prefix
+        or "__pycache__" in prefix
+        or "/repository/" in prefix
+        or prefix == "repository"
+        or prefix.casefold().startswith("repository/")
+    ):
+        return ["PYCACHE_INSIDE_REPOSITORY"]
+    return []
 
 
 def _validate_step(row: Mapping[str, Any], expected: tuple[str, str, tuple[str, ...]]) -> list[str]:
@@ -104,6 +130,17 @@ def _validate_step(row: Mapping[str, Any], expected: tuple[str, str, tuple[str, 
         blockers.append(f"REPO_WRITE_MUST_BE_FALSE:{expected_name}")
     if row.get("cwd") != "<ISOLATED_WORKTREE>":
         blockers.append(f"CWD_MUST_BE_ISOLATED_WORKTREE:{expected_name}")
+    if expected_name == "COMPILE_CHANGED_SCOPE":
+        if row.get("writes_repository", False) is not False:
+            blockers.append("COMPILE_WRITES_REPOSITORY")
+        prefix = row.get("pycache_prefix")
+        location = _pycache_location_blockers(prefix)
+        if location:
+            blockers.extend(location)
+        elif row.get("may_write_ephemeral_cache") is not True or prefix != SANDBOX_EPHEMERAL_PYCACHE:
+            blockers.append("COMPILEALL_CACHE_POLICY_REQUIRED")
+    else:
+        blockers.extend(_pycache_location_blockers(row.get("pycache_prefix")))
     return blockers
 
 
@@ -111,6 +148,10 @@ def build_command_policy_contract(
     runner_contract: Mapping[str, Any],
     *,
     requested_environment: Mapping[str, Any] | None = None,
+    path_lookup_allowed: bool = False,
+    parent_environment_inheritance: bool = False,
+    absolute_executable_required: bool = True,
+    executable_digest_required: bool = True,
 ) -> dict[str, Any]:
     """Validate exact command templates without resolving or executing them."""
     if runner_contract.get("schema") != RUNNER_SCHEMA:
@@ -148,6 +189,10 @@ def build_command_policy_contract(
         raise ValueError("secrets must remain forbidden")
     if runner_contract.get("repo_write_allowed") is not False:
         raise ValueError("repository writes must remain forbidden")
+    if runner_contract.get("executable_pinning_verified") is True:
+        raise ValueError("a runner executable path or verified flag is not a pin")
+    if runner_contract.get("content_binding_independently_verified") is True:
+        raise ValueError("independent content verification cannot be claimed")
 
     raw_plan = list(runner_contract.get("command_plan") or [])
     blockers: list[str] = []
@@ -183,19 +228,27 @@ def build_command_policy_contract(
     ):
         blockers.append("COMMAND_PLAN_EXCEEDS_RESOURCE_BUDGET")
 
+    if path_lookup_allowed is not False or runner_contract.get("path_lookup_allowed") is True:
+        blockers.append("PATH_LOOKUP_NOT_ALLOWED")
+    if (
+        parent_environment_inheritance is not False
+        or runner_contract.get("parent_environment_inheritance") is True
+    ):
+        blockers.append("PARENT_ENVIRONMENT_INHERITANCE_NOT_ALLOWED")
+    if absolute_executable_required is not True:
+        blockers.append("ABSOLUTE_EXECUTABLE_REQUIRED")
+    if executable_digest_required is not True:
+        blockers.append("EXECUTABLE_DIGEST_REQUIRED")
+
     requested_env = dict(requested_environment or {})
-    if requested_env:
+    if requested_env or runner_contract.get("caller_environment_overrides_allowed") is True:
         blockers.append("CALLER_ENVIRONMENT_OVERRIDES_NOT_ALLOWED")
     if any(_SECRET_ENV_RE.search(str(key)) for key in requested_env):
         blockers.append("SECRET_LIKE_ENVIRONMENT_KEY_NOT_ALLOWED")
+    if any(str(key).casefold() in FORBIDDEN_INHERITED_ENVIRONMENT for key in requested_env):
+        blockers.append("INHERITED_ENVIRONMENT_KEY_NOT_ALLOWED")
 
-    fixed_environment = {
-        "PYTHONDONTWRITEBYTECODE": "1",
-        "PYTHONNOUSERSITE": "1",
-        "PYTHONHASHSEED": "0",
-        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
-        "PIP_DISABLE_PIP_VERSION_CHECK": "1",
-    }
+    fixed_environment = dict(FIXED_ENVIRONMENT)
 
     blockers = list(dict.fromkeys(blockers))
     state = "READY_FOR_EXECUTABLE_PINNING_REVIEW" if not blockers else "BLOCKED"
@@ -219,6 +272,10 @@ def build_command_policy_contract(
             "shell_allowed": False,
             "network_allowed": False,
             "repo_write_allowed": False,
+            "PATH_LOOKUP_ALLOWED": False,
+            "ABSOLUTE_EXECUTABLE_REQUIRED": True,
+            "EXECUTABLE_DIGEST_REQUIRED": True,
+            "PARENT_ENV_INHERITANCE": False,
         },
         "validated_command_plan": [
             _canonical_step(expected) for expected in _EXPECTED_STEPS
@@ -227,6 +284,7 @@ def build_command_policy_contract(
         "hazards": [
             "RUN_TARGETED_TESTS executes repository Python code.",
             "Executable names are not yet bound to absolute paths or SHA-256 digests.",
+            "A runner executable path is not a pin. Resolved commands must come from the pinning contract.",
             "An allowlist does not replace operating-system sandbox isolation.",
             "Python imports, unittest discovery and repository code may create subprocesses unless OS policy blocks them.",
         ],
@@ -240,6 +298,11 @@ def build_command_policy_contract(
             "PROVE_CHILD_PROCESS_LIMITS",
             "PROVE_TIMEOUT_MEMORY_DISK_OUTPUT_LIMITS",
         ],
+        "compile_step_executable": False,
+        "path_lookup_allowed": False,
+        "absolute_executable_required": True,
+        "executable_digest_required": True,
+        "parent_environment_inheritance": False,
         "executable_pinning_verified": False,
         "os_sandbox_verified": False,
         "child_process_policy_verified": False,

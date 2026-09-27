@@ -81,6 +81,36 @@ _HARDENED_INVARIANTS={
     "budget.recompute_rejects_true",
     "budget.runner_revalidates_exact_int",
     "budget.command_policy_revalidates_exact_int",
+    "attestation.forged",
+    "attestation.stolen_id",
+    "attestation.patch_digest_mutated",
+    "attestation.candidate_sha_mutated",
+    "attestation.baseline_sha_mutated",
+    "attestation.tree_sha_mutated",
+    "attestation.request_id_mismatch",
+    "attestation.preflight_id_mismatch",
+    "attestation.validation_id_mismatch",
+    "attestation.replay_other_patch",
+    "principal.duplicate_ids",
+    "principal.same_id_distinct_display",
+    "principal.empty",
+    "principal.control_or_invisible",
+    "pinning.relative_path",
+    "pinning.malformed_sha256",
+    "pinning.extra_executable",
+    "pinning.python_without_git",
+    "command.path_lookup_enabled",
+    "command.caller_environment_override",
+    "command.pythonpath_injection",
+    "command.pythonstartup_injection",
+    "command.home_injection",
+    "command.git_config_injection",
+    "command.pycache_inside_worktree",
+    "command.pycache_inside_repository",
+    "pinning.fake_verified_true",
+    "runner.boolean_binding_without_attestation",
+    "command.compileall_without_cache_policy",
+    "attestation.mutated_after_seal",
 }
 
 
@@ -92,10 +122,10 @@ class AionDeveloperAdversarialAuditorTests(unittest.TestCase):
     def test_report_shape_is_deterministic_and_unscored(self):
         report=self.report
         self.assertEqual(report["schema"],SCHEMA)
-        self.assertEqual(report["cases_total"],101)
+        self.assertEqual(report["cases_total"],131)
         self.assertEqual(
             report["gap_count"]+report["blocked_by_design_count"]+report["pass_count"],
-            101,
+            131,
         )
         self.assertFalse(report["symlink_physical_boundary_verified"])
         self.assertFalse(report["hardlink_physical_boundary_verified"])

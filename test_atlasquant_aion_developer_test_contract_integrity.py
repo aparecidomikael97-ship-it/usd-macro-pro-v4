@@ -12,6 +12,7 @@ import tempfile
 import unittest
 
 from atlasquant_aion_developer_builder_sandbox import build_builder_sandbox_request
+from atlasquant_aion_developer_content_attestation import attestation_for_documents
 from atlasquant_aion_developer_correction import build_correction_plan
 from atlasquant_aion_developer_diagnostics import diagnose_failure
 from atlasquant_aion_developer_evidence_gate import (
@@ -157,8 +158,7 @@ def _runner(request, preflight, **overrides):
         "executor_attached": False,
     }
     args = {
-        "content_binding_verified": True,
-        "content_binding_ref": "tree:123",
+        "content_attestation": attestation_for_documents(request, preflight, patch),
         "human_patch_reviewed": True,
         "human_patch_reviewer": "reviewer-independent",
         "human_patch_review_refs": ["review:patch:1"],

@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 import unittest
 
+from atlasquant_aion_developer_content_attestation import attestation_for_documents
 from atlasquant_aion_developer_manifest import (
     REQUIRED_MANDATORY_GATES,
     bind_builder_request_lineage,
@@ -96,9 +97,9 @@ def _patch(builder, preflight, *, content_verified=False):
 def _run(builder=None, preflight=None, patch=None, **overrides):
     builder = builder or _builder()
     preflight = preflight or _preflight(builder)
+    patch = patch or _patch(builder, preflight, content_verified=True)
     args = {
-        "content_binding_verified": True,
-        "content_binding_ref": "tree:123",
+        "content_attestation": attestation_for_documents(builder, preflight, patch),
         "human_patch_reviewed": True,
         "human_patch_reviewer": "reviewer-1",
         "human_patch_review_refs": ["review:patch:1"],
@@ -107,7 +108,7 @@ def _run(builder=None, preflight=None, patch=None, **overrides):
     return build_runner_contract(
         builder,
         preflight,
-        patch or _patch(builder, preflight, content_verified=True),
+        patch,
         **args,
     )
 
@@ -126,6 +127,9 @@ class AionDeveloperRunnerContractTests(unittest.TestCase):
         self.assertFalse(out["executor_attached"])
         self.assertFalse(out["commands_executed"])
         self.assertFalse(out["runs_tests"])
+        self.assertTrue(out["content_binding_structurally_bound"])
+        self.assertFalse(out["content_binding_independently_verified"])
+        self.assertTrue(out["runner_contract_id"].startswith("DEVRUN-"))
 
     def test_unverified_patch_content_blocks(self):
         builder = _builder()
@@ -140,10 +144,14 @@ class AionDeveloperRunnerContractTests(unittest.TestCase):
         self.assertFalse(out["execution_authorized"])
 
     def test_missing_external_content_binding_blocks(self):
-        out = _run(content_binding_verified=False, content_binding_ref="")
+        out = _run(content_attestation=None)
         self.assertEqual(out["state"], "BLOCKED")
-        self.assertIn("REVISION_CONTENT_BINDING_REQUIRED", out["blockers"])
-        self.assertIn("CONTENT_BINDING_REF_REQUIRED", out["blockers"])
+        self.assertIn("CONTENT_ATTESTATION_REQUIRED", out["blockers"])
+        self.assertFalse(out["content_binding_structurally_bound"])
+        self.assertFalse(out["content_binding_independently_verified"])
+        self.assertFalse(out["execution_authorized"])
+        with self.assertRaises(TypeError):
+            _run(content_binding_verified=True, content_binding_ref="tree:123")
 
     def test_human_patch_review_is_required(self):
         out = _run(
@@ -185,6 +193,10 @@ class AionDeveloperRunnerContractTests(unittest.TestCase):
             self.assertFalse(step["writes_repo"])
             self.assertEqual(step["cwd"], "<ISOLATED_WORKTREE>")
             self.assertIsInstance(step["argv"], list)
+        compile_step = out["command_plan"][0]
+        self.assertFalse(compile_step["writes_repository"])
+        self.assertTrue(compile_step["may_write_ephemeral_cache"])
+        self.assertEqual(compile_step["pycache_prefix"], "<SANDBOX_EPHEMERAL_PYCACHE>")
 
     def test_unsafe_test_target_blocks_contract(self):
         builder = _builder(candidate_tests=["../outside_test.py"])
