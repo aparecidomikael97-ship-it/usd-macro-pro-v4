@@ -115,6 +115,7 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
     def test_developer_builder_sandbox_request_is_bounded_and_non_executing(self):
         src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("Builder Sandbox Request · branch isolada",src)
+        self.assertIn("revision_contract",src)
         self.assertIn('key="aion_developer_builder_prepare"',src)
         self.assertIn("build_developer_builder_sandbox_request(",src)
         self.assertIn("main permitido: NÃO",src)

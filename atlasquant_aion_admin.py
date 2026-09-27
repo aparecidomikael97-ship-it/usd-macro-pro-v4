@@ -5293,7 +5293,14 @@ def _render_developer_intelligence() -> None:
             sandbox_candidate = st.text_input(
                 "Candidate ref",
                 key="aion_developer_builder_candidate",
-                value=f"{str(plan_meta.get('branch') or 'cursor/aion-builder-sandbox')}@candidate",
+                value=str(
+                    (
+                        implementation.get("revision_contract")
+                        if isinstance(implementation.get("revision_contract"), Mapping)
+                        else {}
+                    ).get("candidate_ref")
+                    or f"{str(plan_meta.get('branch') or 'cursor/aion-builder-sandbox')}@candidate"
+                ),
                 max_chars=240,
             )
             sandbox_files = st.multiselect(
