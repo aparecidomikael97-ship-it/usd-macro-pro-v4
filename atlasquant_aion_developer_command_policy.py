@@ -33,9 +33,9 @@ import re
 from typing import Any, Mapping
 
 from atlasquant_aion_developer_executable_pinning import (
-    FORBIDDEN_INHERITED_ENVIRONMENT,
     FIXED_ENVIRONMENT,
     SANDBOX_EPHEMERAL_PYCACHE,
+    forbidden_inherited_environment_key,
 )
 from atlasquant_aion_developer_manifest import stable_digest
 from atlasquant_aion_developer_runner_contract import (
@@ -219,8 +219,7 @@ def _assert_environment_exact(value: Any, label: str) -> None:
     if not isinstance(value, Mapping):
         raise ValueError(f"{label} must be an object")
     for key in value:
-        folded = str(key).casefold()
-        if folded in FORBIDDEN_INHERITED_ENVIRONMENT or folded.startswith("git_config"):
+        if forbidden_inherited_environment_key(key):
             raise ValueError(f"{label} contains a forbidden environment key")
     if dict(value) != dict(FIXED_ENVIRONMENT):
         raise ValueError(f"{label} is not the canonical fixed environment")
@@ -504,7 +503,7 @@ def _classify_command_policy(
         blockers.append("CALLER_ENVIRONMENT_OVERRIDES_NOT_ALLOWED")
     if any(_SECRET_ENV_RE.search(str(key)) for key in requested_env):
         blockers.append("SECRET_LIKE_ENVIRONMENT_KEY_NOT_ALLOWED")
-    if any(str(key).casefold() in FORBIDDEN_INHERITED_ENVIRONMENT for key in requested_env):
+    if any(forbidden_inherited_environment_key(key) for key in requested_env):
         blockers.append("INHERITED_ENVIRONMENT_KEY_NOT_ALLOWED")
     return list(dict.fromkeys(blockers)), validated_budget
 

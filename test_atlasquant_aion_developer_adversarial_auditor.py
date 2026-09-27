@@ -224,6 +224,34 @@ _HARDENED_INVARIANTS={
     "policy_provenance.structural_false_not_ready",
     "policy_provenance.legitimate",
     "policy_provenance.cross_bound_not_independent",
+    "os_sandbox.missing_provenance",
+    "os_sandbox.structural_false",
+    "os_sandbox.independent_true",
+    "os_sandbox.fake_pinning_verified",
+    "os_sandbox.path_lookup",
+    "os_sandbox.parent_environment",
+    "os_sandbox.caller_environment",
+    "os_sandbox.secrets_mounted",
+    "os_sandbox.network_allowed",
+    "os_sandbox.network_isolation_claim",
+    "os_sandbox.shell_allowed",
+    "os_sandbox.child_process_allow",
+    "os_sandbox.repo_write",
+    "os_sandbox.filesystem_isolation_claim",
+    "os_sandbox.symlink_claim",
+    "os_sandbox.hardlink_claim",
+    "os_sandbox.verified_claim",
+    "os_sandbox.resource_limits_claim",
+    "os_sandbox.budget_escape",
+    "os_sandbox.platform_adapter_claim",
+    "os_sandbox.cleared_physical_proof",
+    "os_sandbox.stale_ready_id",
+    "os_sandbox.reseal_promotion",
+    "os_sandbox.swapped_environment",
+    "os_sandbox.swapped_pinning",
+    "os_sandbox.bundle_swap",
+    "os_sandbox.extra_authority",
+    "os_sandbox.legitimate",
 }
 
 
@@ -235,10 +263,10 @@ class AionDeveloperAdversarialAuditorTests(unittest.TestCase):
     def test_report_shape_is_deterministic_and_unscored(self):
         report=self.report
         self.assertEqual(report["schema"],SCHEMA)
-        self.assertEqual(report["cases_total"],244)
+        self.assertEqual(report["cases_total"],272)
         self.assertEqual(
             report["gap_count"]+report["blocked_by_design_count"]+report["pass_count"],
-            244,
+            272,
         )
         self.assertFalse(report["symlink_physical_boundary_verified"])
         self.assertFalse(report["hardlink_physical_boundary_verified"])

@@ -50,6 +50,14 @@ from atlasquant_aion_developer_command_policy import (
     build_command_policy_contract,
     expected_command_policy_payload,
 )
+from atlasquant_aion_developer_os_sandbox_contract import (
+    PHYSICAL_PROOF_BLOCKERS,
+    READY_STATE as OS_SANDBOX_READY_STATE,
+    _bind_os_sandbox_ids,
+    assert_os_sandbox_contract,
+    assert_os_sandbox_contract_integrity,
+    build_os_sandbox_contract,
+)
 from atlasquant_aion_developer_executable_pinning import (
     FIXED_ENVIRONMENT,
     build_environment_contract,
@@ -4264,6 +4272,465 @@ def _policy_provenance_surface(_world: _World) -> list[dict[str, str]]:
     return findings
 
 
+def _os_sandbox_design_surface(_world: _World) -> list[dict[str, str]]:
+    """OS sandbox design is a data contract. Physical proof is not a result.
+
+    READY_FOR_OS_SANDBOX_PROBE_DESIGN means the probe checklist is described.
+    It does not mean a process, filesystem, or network boundary exists.
+    """
+    findings: list[dict[str, str]] = []
+    runner, builder, preflight, patch, attestation = _runner_bundle(["test_module.py"])
+    policy = build_command_policy_contract(
+        runner,
+        builder_request=builder,
+        preflight=preflight,
+        patch_validation=patch,
+        content_attestation=attestation,
+    )
+
+    def _pins(python_digest: str = "ab" * 32) -> list[dict[str, Any]]:
+        return [
+            {
+                "logical_name": "python",
+                "absolute_path": "/usr/bin/python3",
+                "sha256": python_digest,
+                "file_size_bytes": 128,
+                "version_claim": "claim-only",
+                "verification_evidence_refs": ["evidence:pin:python"],
+            },
+            {
+                "logical_name": "git",
+                "absolute_path": "/usr/bin/git",
+                "sha256": "cd" * 32,
+                "file_size_bytes": 128,
+                "version_claim": "claim-only",
+                "verification_evidence_refs": ["evidence:pin:git"],
+            },
+        ]
+
+    environment = build_environment_contract()
+    pinning = build_executable_pinning_spec(_pins())
+    contract = build_os_sandbox_contract(
+        policy,
+        runner,
+        builder,
+        preflight,
+        patch,
+        attestation,
+        pinning,
+        environment,
+    )
+
+    def _reject(invariant_id: str, description: str, fn: Callable[[], Any]) -> None:
+        status, _result = _invoke(fn)
+        closed = status == "REJECT"
+        findings.append(_finding(
+            invariant_id,
+            "atlasquant_aion_developer_os_sandbox_contract",
+            description if closed else description + " O contrato foi aceito.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    def _closed_state(
+        invariant_id: str,
+        description: str,
+        fn: Callable[[], Any],
+        blocker: str,
+    ) -> None:
+        status, result = _invoke(fn)
+        closed = status == "ACCEPT" and _state_closed(result, blocker)
+        findings.append(_finding(
+            invariant_id,
+            "atlasquant_aion_developer_os_sandbox_contract",
+            description if closed else description + " O desenho nao ficou BLOCKED.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    withheld = build_command_policy_contract(runner)
+    _reject(
+        "os_sandbox.missing_provenance",
+        "SANDBOX_FAKE_VERIFICATION_CLAIM: policy sem proveniencia nao abre o contrato de sandbox.",
+        lambda: build_os_sandbox_contract(
+            withheld, runner, builder, preflight, patch, attestation, pinning, environment,
+        ),
+    )
+
+    def _structural_false() -> Any:
+        mutated = deepcopy(policy)
+        mutated["upstream_provenance_structurally_verified"] = False
+        mutated["upstream_provenance_binding_id"] = ""
+        mutated["state"] = "BLOCKED"
+        mutated["blockers"] = ["UPSTREAM_PROVENANCE_REQUIRED"]
+        _bind_command_policy_ids(mutated)
+        return build_os_sandbox_contract(
+            mutated, runner, builder, preflight, patch, attestation, pinning, environment,
+        )
+
+    _reject(
+        "os_sandbox.structural_false",
+        "SANDBOX_FAKE_VERIFICATION_CLAIM: proveniencia estrutural false nao abre o contrato.",
+        _structural_false,
+    )
+
+    def _independent() -> Any:
+        mutated = deepcopy(policy)
+        mutated["upstream_provenance_independently_verified"] = True
+        _bind_command_policy_ids(mutated)
+        return build_os_sandbox_contract(
+            mutated, runner, builder, preflight, patch, attestation, pinning, environment,
+        )
+
+    _reject(
+        "os_sandbox.independent_true",
+        "SANDBOX_FAKE_VERIFICATION_CLAIM: root of trust independente e rejeitado.",
+        _independent,
+    )
+    _reject(
+        "os_sandbox.fake_pinning_verified",
+        "SANDBOX_FAKE_VERIFICATION_CLAIM: executable_pinning_verified true e rejeitado.",
+        lambda: build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning, environment,
+            executable_pinning_verified=True,
+        ),
+    )
+    _closed_state(
+        "os_sandbox.path_lookup",
+        "SANDBOX_ENVIRONMENT_INHERITANCE: path lookup pedido fica BLOCKED e a flag permanece false.",
+        lambda: build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning,
+            build_environment_contract(path_lookup_allowed=True),
+        ),
+        "PATH_LOOKUP_NOT_ALLOWED",
+    )
+    _closed_state(
+        "os_sandbox.parent_environment",
+        "SANDBOX_ENVIRONMENT_INHERITANCE: heranca do ambiente pai fica BLOCKED.",
+        lambda: build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning,
+            build_environment_contract(inherit_parent_environment=True),
+        ),
+        "PARENT_ENVIRONMENT_INHERITANCE_NOT_ALLOWED",
+    )
+    _closed_state(
+        "os_sandbox.caller_environment",
+        "SANDBOX_ENVIRONMENT_INHERITANCE: override do caller fica BLOCKED.",
+        lambda: build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning,
+            build_environment_contract(caller_environment={"CUSTOM": "1"}),
+        ),
+        "CALLER_ENVIRONMENT_OVERRIDES_NOT_ALLOWED",
+    )
+
+    def _secrets() -> Any:
+        mutated = deepcopy(preflight)
+        mutated["environment_contract"] = dict(mutated["environment_contract"])
+        mutated["environment_contract"]["secrets_mounted"] = True
+        return build_os_sandbox_contract(
+            policy, runner, builder, mutated, patch, attestation, pinning, environment,
+        )
+
+    _reject(
+        "os_sandbox.secrets_mounted",
+        "SANDBOX_ENVIRONMENT_INHERITANCE: secrets montados sao rejeitados.",
+        _secrets,
+    )
+    _reject(
+        "os_sandbox.network_allowed",
+        "SANDBOX_NETWORK_ESCAPE: network_allowed true e rejeitado.",
+        lambda: build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning, environment,
+            network_allowed=True,
+        ),
+    )
+
+    def _network_claim() -> Any:
+        mutated = deepcopy(contract)
+        mutated["network_isolation_verified"] = True
+        _bind_os_sandbox_ids(mutated)
+        return assert_os_sandbox_contract_integrity(mutated)
+
+    _reject(
+        "os_sandbox.network_isolation_claim",
+        "SANDBOX_NETWORK_ESCAPE: network_isolation_verified true e rejeitado.",
+        _network_claim,
+    )
+    _reject(
+        "os_sandbox.shell_allowed",
+        "SANDBOX_CHILD_PROCESS_ESCAPE: shell_allowed true e rejeitado.",
+        lambda: build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning, environment,
+            shell_allowed=True,
+        ),
+    )
+
+    def _child_allow() -> Any:
+        mutated = deepcopy(contract)
+        mutated["child_process_policy"] = "ALLOW"
+        _bind_os_sandbox_ids(mutated)
+        return assert_os_sandbox_contract_integrity(mutated)
+
+    _reject(
+        "os_sandbox.child_process_allow",
+        "SANDBOX_CHILD_PROCESS_ESCAPE: child process ALLOW e rejeitado.",
+        _child_allow,
+    )
+    _reject(
+        "os_sandbox.repo_write",
+        "SANDBOX_FILESYSTEM_ESCAPE: escrita no repositorio e rejeitada.",
+        lambda: build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning, environment,
+            repo_write_allowed=True,
+        ),
+    )
+
+    def _filesystem_claim() -> Any:
+        mutated = deepcopy(contract)
+        mutated["filesystem_isolation_verified"] = True
+        _bind_os_sandbox_ids(mutated)
+        return assert_os_sandbox_contract_integrity(mutated)
+
+    _reject(
+        "os_sandbox.filesystem_isolation_claim",
+        "SANDBOX_FILESYSTEM_ESCAPE: filesystem_isolation_verified true e rejeitado.",
+        _filesystem_claim,
+    )
+
+    def _symlink_claim() -> Any:
+        mutated = deepcopy(contract)
+        mutated["symlink_physical_boundary_verified"] = True
+        _bind_os_sandbox_ids(mutated)
+        return assert_os_sandbox_contract_integrity(mutated)
+
+    _reject(
+        "os_sandbox.symlink_claim",
+        "SANDBOX_SYMLINK_ESCAPE: symlink_physical_boundary_verified true e rejeitado.",
+        _symlink_claim,
+    )
+
+    def _hardlink_claim() -> Any:
+        mutated = deepcopy(contract)
+        mutated["hardlink_physical_boundary_verified"] = True
+        _bind_os_sandbox_ids(mutated)
+        return assert_os_sandbox_contract_integrity(mutated)
+
+    _reject(
+        "os_sandbox.hardlink_claim",
+        "SANDBOX_HARDLINK_ESCAPE: hardlink_physical_boundary_verified true e rejeitado.",
+        _hardlink_claim,
+    )
+    _reject(
+        "os_sandbox.verified_claim",
+        "SANDBOX_FAKE_VERIFICATION_CLAIM: os_sandbox_verified true e rejeitado.",
+        lambda: build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning, environment,
+            os_sandbox_verified=True,
+        ),
+    )
+    _reject(
+        "os_sandbox.resource_limits_claim",
+        "SANDBOX_RESOURCE_BUDGET_ESCAPE: resource_limits_verified true e rejeitado.",
+        lambda: build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning, environment,
+            resource_limits_verified=True,
+        ),
+    )
+
+    def _budget_escape() -> Any:
+        mutated = deepcopy(policy)
+        mutated["resource_budget"] = dict(mutated["resource_budget"])
+        mutated["resource_budget"]["max_commands"] = 1
+        _bind_command_policy_ids(mutated)
+        return build_os_sandbox_contract(
+            mutated, runner, builder, preflight, patch, attestation, pinning, environment,
+        )
+
+    budget_status, budget_result = _invoke(_budget_escape)
+    budget_closed = budget_status == "REJECT" or (
+        budget_status == "ACCEPT" and _state_closed(budget_result, "RESOURCE_BUDGET_MISMATCH")
+    )
+    findings.append(_finding(
+        "os_sandbox.budget_escape",
+        "atlasquant_aion_developer_os_sandbox_contract",
+        "SANDBOX_RESOURCE_BUDGET_ESCAPE: orcamento divergente nao vira READY."
+        if budget_closed else
+        "Orcamento divergente abriu um contrato READY.",
+        "BLOCKED_BY_DESIGN" if budget_closed else "GAP",
+        "" if budget_closed else "HIGH",
+    ))
+    _reject(
+        "os_sandbox.platform_adapter_claim",
+        "SANDBOX_FAKE_VERIFICATION_CLAIM: platform_adapter_verified true e rejeitado.",
+        lambda: build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning, environment,
+            platform_adapter_verified=True,
+        ),
+    )
+
+    def _clear_physical() -> Any:
+        mutated = deepcopy(contract)
+        mutated["physical_proof_blockers"] = []
+        _bind_os_sandbox_ids(mutated)
+        return assert_os_sandbox_contract_integrity(mutated)
+
+    _reject(
+        "os_sandbox.cleared_physical_proof",
+        "SANDBOX_FAKE_VERIFICATION_CLAIM: limpar a lista de prova fisica nao e um probe passado.",
+        _clear_physical,
+    )
+
+    def _stale_ready() -> Any:
+        blocked = build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning,
+            build_environment_contract(path_lookup_allowed=True),
+        )
+        promoted = deepcopy(blocked)
+        promoted["state"] = OS_SANDBOX_READY_STATE
+        promoted["blockers"] = []
+        return assert_os_sandbox_contract_integrity(promoted)
+
+    _reject(
+        "os_sandbox.stale_ready_id",
+        "SANDBOX_STATE_PROMOTION: BLOCKED para READY com o mesmo id e rejeitado.",
+        _stale_ready,
+    )
+
+    def _reseal_promotion() -> Any:
+        bad_environment = build_environment_contract(path_lookup_allowed=True)
+        blocked = build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning, bad_environment,
+        )
+        promoted = deepcopy(blocked)
+        promoted["state"] = OS_SANDBOX_READY_STATE
+        promoted["blockers"] = []
+        _bind_os_sandbox_ids(promoted)
+        return assert_os_sandbox_contract(
+            promoted, policy, runner, builder, preflight, patch, attestation, pinning, bad_environment,
+        )
+
+    _reject(
+        "os_sandbox.reseal_promotion",
+        "SANDBOX_STATE_PROMOTION: reseal de BLOCKED para READY ainda reconstrui blockers.",
+        _reseal_promotion,
+    )
+    _reject(
+        "os_sandbox.swapped_environment",
+        "SANDBOX_ENVIRONMENT_INHERITANCE: environment contract trocado e rejeitado.",
+        lambda: assert_os_sandbox_contract(
+            contract, policy, runner, builder, preflight, patch, attestation, pinning,
+            build_environment_contract(path_lookup_allowed=True),
+        ),
+    )
+    _reject(
+        "os_sandbox.swapped_pinning",
+        "SANDBOX_FAKE_VERIFICATION_CLAIM: pinning spec trocado e rejeitado.",
+        lambda: assert_os_sandbox_contract(
+            contract, policy, runner, builder, preflight, patch, attestation,
+            build_executable_pinning_spec(_pins("ef" * 32)),
+            environment,
+        ),
+    )
+
+    other = deepcopy(builder)
+    other["lineage"] = dict(other["lineage"])
+    other["lineage"]["snapshot_digest"] = "REPO-OTHER"
+    other = bind_builder_request_lineage(other)
+    other_preflight = _sealed_preflight(other)
+    other_patch = _sealed_patch(other, other_preflight)
+    other_attestation = attestation_for_documents(other, other_preflight, other_patch)
+    other_runner = build_runner_contract(
+        other,
+        other_preflight,
+        other_patch,
+        content_attestation=other_attestation,
+        human_patch_reviewed=True,
+        human_patch_reviewer="reviewer-1",
+        human_patch_review_refs=["review:patch:1"],
+    )
+    other_policy = build_command_policy_contract(
+        other_runner,
+        builder_request=other,
+        preflight=other_preflight,
+        patch_validation=other_patch,
+        content_attestation=other_attestation,
+    )
+    _reject(
+        "os_sandbox.bundle_swap",
+        "SANDBOX_STATE_PROMOTION: contrato do bundle A com runner e policy B e rejeitado.",
+        lambda: assert_os_sandbox_contract(
+            contract,
+            other_policy,
+            other_runner,
+            other,
+            other_preflight,
+            other_patch,
+            other_attestation,
+            pinning,
+            environment,
+        ),
+    )
+
+    def _extra_authority() -> Any:
+        mutated = deepcopy(contract)
+        mutated["sandbox_escape_allowed"] = True
+        return assert_os_sandbox_contract_integrity(mutated)
+
+    _reject(
+        "os_sandbox.extra_authority",
+        "SANDBOX_STATE_PROMOTION: campo extra de autoridade true e rejeitado.",
+        _extra_authority,
+    )
+
+    physical_flags = (
+        "executable_pinning_verified",
+        "os_sandbox_verified",
+        "child_process_policy_verified",
+        "filesystem_isolation_verified",
+        "network_isolation_verified",
+        "resource_limits_verified",
+        "environment_isolation_verified",
+        "output_limits_verified",
+        "symlink_physical_boundary_verified",
+        "hardlink_physical_boundary_verified",
+        "platform_adapter_verified",
+        "content_binding_independently_verified",
+        "upstream_provenance_independently_verified",
+        "execution_authorized",
+        "subprocess_called",
+        "network_called",
+        "writes_files",
+        "runs_tests",
+    )
+    integrity_status, _integrity = _invoke(
+        lambda: assert_os_sandbox_contract(
+            contract, policy, runner, builder, preflight, patch, attestation, pinning, environment,
+        )
+    )
+    legitimate = (
+        integrity_status == "ACCEPT"
+        and contract.get("state") == OS_SANDBOX_READY_STATE
+        and list(contract.get("blockers") or []) == []
+        and list(contract.get("physical_proof_blockers") or []) == list(PHYSICAL_PROOF_BLOCKERS)
+        and contract.get("sandbox_contract_is_data_only") is True
+        and contract.get("child_process_policy") == "DENY_BY_DEFAULT"
+        and contract.get("network_default") == "DENY"
+        and contract.get("source_tree_mode") == "READ_ONLY"
+        and contract.get("platform_adapter") == "UNRESOLVED"
+        and all(contract.get(field) is False for field in physical_flags)
+    )
+    findings.append(_finding(
+        "os_sandbox.legitimate",
+        "atlasquant_aion_developer_os_sandbox_contract",
+        "OS_SANDBOX_DESIGN: cadeia data-only fecha READY_FOR_OS_SANDBOX_PROBE_DESIGN com toda verificacao fisica false."
+        if legitimate else
+        "A cadeia data-only alegou prova fisica ou nao fechou o desenho.",
+        "PASS" if legitimate else "GAP",
+        "" if legitimate else "HIGH",
+    ))
+    return findings
+
+
 def _reseal_independent(policy: Mapping[str, Any]) -> dict[str, Any]:
     mutated = deepcopy(policy)
     mutated["upstream_provenance_independently_verified"] = True
@@ -4294,6 +4761,7 @@ def audit_developer_chain() -> dict[str, Any]:
         findings.extend(_self_reseal_surface(world))
         findings.extend(_upstream_provenance_surface(world))
         findings.extend(_policy_provenance_surface(world))
+        findings.extend(_os_sandbox_design_surface(world))
     finally:
         world.close()
 

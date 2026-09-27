@@ -5,8 +5,13 @@ binary, so executable_pinning_verified stays false even when the spec is
 complete. /tmp/python, a symlink, an arbitrary absolute path and a
 caller-supplied digest are claims, not proof.
 
-The maximum bundle state is READY_FOR_OS_SANDBOX_DESIGN_REVIEW.
-READY_FOR_EXECUTION is not produced.
+Physical executable paths follow this POSIX pinning contract. Windows drive
+and UNC paths are rejected here. A Windows adapter is future work, not a
+verified platform.
+
+``build_os_sandbox_design_review`` is a compatibility projection. Readiness is
+decided only by the OS sandbox security contract. This module does not keep a
+second state machine. READY_FOR_EXECUTION is not produced.
 """
 from __future__ import annotations
 
@@ -79,8 +84,23 @@ def _strict_token(value: Any, field: str, limit: int = 240) -> str:
     return value
 
 
+def forbidden_inherited_environment_key(key: Any) -> bool:
+    """True for an exact forbidden name or any git_config* key.
+
+    ``GIT_CONFIG_COUNT``, ``GIT_CONFIG_KEY_0`` and ``GIT_CONFIG_VALUE_0`` are
+    covered by the prefix. Matching is case-insensitive and does not read the
+    process environment.
+    """
+    folded = str(key).casefold()
+    return folded in FORBIDDEN_INHERITED_ENVIRONMENT or folded.startswith("git_config")
+
+
 def require_absolute_path(value: Any, field: str = "absolute_path") -> str:
-    """Require an explicit absolute path. Relative and PATH lookups fail."""
+    """Require an explicit POSIX absolute path. Relative and PATH lookups fail.
+
+    Backslash, drive-letter and UNC forms are rejected. That is the current
+    pinning contract, not verified Windows path support.
+    """
     text = _strict_token(value, field, 500)
     if "\\" in text or text.startswith("~") or not text.startswith("/") or text.startswith("//"):
         raise ValueError(f"{field} must be an explicit absolute path")
@@ -96,9 +116,22 @@ def _reject_true_claims(payload: Mapping[str, Any], label: str) -> None:
             raise ValueError(f"{label} cannot claim {key}")
 
 
+_PIN_FIELDS = frozenset({
+    "logical_name",
+    "absolute_path",
+    "sha256",
+    "file_size_bytes",
+    "version_claim",
+    "verification_evidence_refs",
+})
+PINNING_READY_STATE = "READY_FOR_EXECUTABLE_PINNING_PROBE"
+
+
 def _validated_pin(pin: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(pin, Mapping):
         raise ValueError("executable pin must be an object")
+    if set(pin) != _PIN_FIELDS:
+        raise ValueError("executable pin fields are not the closed pin schema")
     logical_name = pin.get("logical_name")
     if logical_name not in ALLOWED_LOGICAL_EXECUTABLES:
         raise ValueError("logical executable is not allowlisted")
@@ -124,6 +157,112 @@ def _validated_pin(pin: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def executable_pinning_manifest(spec: Mapping[str, Any]) -> dict[str, Any]:
+    """Authority fields for a pinning spec, including state and completeness.
+
+    The id is not part of the manifest. A caller-supplied digest is not proof
+    that a binary was read.
+    """
+    pins = spec.get("pins")
+    rows: list[dict[str, Any]] = []
+    if isinstance(pins, (list, tuple)) and not isinstance(pins, (str, bytes, bytearray)):
+        for pin in pins:
+            if not isinstance(pin, Mapping):
+                rows.append({"invalid": True})
+                continue
+            evidence = pin.get("verification_evidence_refs")
+            rows.append({
+                "logical_name": pin.get("logical_name"),
+                "absolute_path": pin.get("absolute_path"),
+                "sha256": pin.get("sha256"),
+                "file_size_bytes": pin.get("file_size_bytes"),
+                "version_claim": pin.get("version_claim"),
+                "verification_evidence_refs": (
+                    list(evidence) if isinstance(evidence, (list, tuple)) else evidence
+                ),
+            })
+    return {
+        "schema": spec.get("schema"),
+        "state": spec.get("state"),
+        "pinning_spec_complete": spec.get("pinning_spec_complete"),
+        "pins": rows,
+        "logical_executables": list(spec.get("logical_executables") or []),
+        "path_lookup_allowed": spec.get("path_lookup_allowed"),
+        "absolute_executable_required": spec.get("absolute_executable_required"),
+        "executable_digest_required": spec.get("executable_digest_required"),
+        "caller_supplied_digest_is_proof": spec.get("caller_supplied_digest_is_proof"),
+        "executable_pinning_verified": spec.get("executable_pinning_verified"),
+        "os_sandbox_verified": spec.get("os_sandbox_verified"),
+        "child_process_policy_verified": spec.get("child_process_policy_verified"),
+        "symlink_physical_boundary_verified": spec.get("symlink_physical_boundary_verified"),
+        "hardlink_physical_boundary_verified": spec.get("hardlink_physical_boundary_verified"),
+        "execution_authorized": spec.get("execution_authorized"),
+    }
+
+
+def expected_pinning_spec_id(spec: Mapping[str, Any]) -> str:
+    """Recompute the pinning id. State and completeness are inside this digest."""
+    return stable_digest(executable_pinning_manifest(spec), prefix="DEVPIN-", length=18)
+
+
+def assert_executable_pinning_spec_integrity(spec: Mapping[str, Any]) -> str:
+    """Revalidate a pinning spec. State and completeness are not trusted alone."""
+    if not isinstance(spec, Mapping):
+        raise ValueError("pinning spec must be an object")
+    if spec.get("schema") != SCHEMA:
+        raise ValueError("invalid pinning spec")
+    _reject_true_claims(spec, "pinning spec")
+    pins = spec.get("pins")
+    if isinstance(pins, (str, bytes, bytearray)) or not isinstance(pins, (list, tuple)):
+        raise ValueError("pins must be an explicit list or tuple")
+    validated = [_validated_pin(pin) for pin in pins]
+    names = [pin["logical_name"] for pin in validated]
+    if len(names) != len(set(names)) or set(names) != set(ALLOWED_LOGICAL_EXECUTABLES):
+        raise ValueError("python and git pins are both required and no extra executable is allowed")
+    ordered = [dict(pin) for pin in sorted(validated, key=lambda pin: pin["logical_name"])]
+    if [dict(pin) for pin in pins] != ordered:
+        raise ValueError("pins are not the canonical ordered pin set")
+    if spec.get("state") != PINNING_READY_STATE:
+        raise ValueError("pinning spec state was not reconstructed")
+    if spec.get("pinning_spec_complete") is not True:
+        raise ValueError("pinning spec completeness was not reconstructed")
+    if list(spec.get("logical_executables") or []) != list(ALLOWED_LOGICAL_EXECUTABLES):
+        raise ValueError("logical executables are not the allowlist")
+    if spec.get("path_lookup_allowed") is not False:
+        raise ValueError("pinning spec cannot allow path lookup")
+    if spec.get("absolute_executable_required") is not True:
+        raise ValueError("absolute executable must stay required")
+    if spec.get("executable_digest_required") is not True:
+        raise ValueError("executable digest must stay required")
+    if spec.get("caller_supplied_digest_is_proof") is not False:
+        raise ValueError("caller digest is not proof")
+    for field in (
+        "executable_pinning_verified",
+        "os_sandbox_verified",
+        "child_process_policy_verified",
+        "symlink_physical_boundary_verified",
+        "hardlink_physical_boundary_verified",
+        "execution_authorized",
+        "executor_attached",
+        "commands_executed",
+        "writes_files",
+        "runs_tests",
+        "network_called",
+        "subprocess_called",
+        "automatic_commit",
+        "automatic_merge",
+        "automatic_deploy",
+        "production_change_allowed",
+        "real_trading_enabled",
+    ):
+        if spec.get(field) is not False:
+            raise ValueError(f"pinning spec flag {field} is not false")
+    spec_id = expected_pinning_spec_id(spec)
+    if spec.get("pinning_spec_id") != spec_id:
+        raise ValueError("pinning spec id mismatch")
+    return spec_id
+
+
 def build_executable_pinning_spec(
     pins: Sequence[Any],
     *,
@@ -142,13 +281,9 @@ def build_executable_pinning_spec(
     if set(names) != set(ALLOWED_LOGICAL_EXECUTABLES):
         raise ValueError("python and git pins are both required and no extra executable is allowed")
     ordered = tuple(sorted(validated, key=lambda pin: pin["logical_name"]))
-    spec_id = stable_digest(list(ordered), prefix="DEVPIN-", length=18)
-    if pinning_spec_id is not None and pinning_spec_id != spec_id:
-        raise ValueError("pinning spec id mismatch")
-    return {
+    document = {
         "schema": SCHEMA,
-        "pinning_spec_id": spec_id,
-        "state": "READY_FOR_EXECUTABLE_PINNING_PROBE",
+        "state": PINNING_READY_STATE,
         "pins": [dict(pin) for pin in ordered],
         "logical_executables": list(ALLOWED_LOGICAL_EXECUTABLES),
         "pinning_spec_complete": True,
@@ -174,6 +309,11 @@ def build_executable_pinning_spec(
         "production_change_allowed": False,
         "real_trading_enabled": False,
     }
+    spec_id = expected_pinning_spec_id(document)
+    if pinning_spec_id is not None and pinning_spec_id != spec_id:
+        raise ValueError("pinning spec id mismatch")
+    document["pinning_spec_id"] = spec_id
+    return document
 
 
 def build_environment_contract(
@@ -197,10 +337,19 @@ def build_environment_contract(
     supplied = dict(caller_environment or {})
     if supplied:
         blockers.append("CALLER_ENVIRONMENT_NOT_ALLOWED")
-    if any(str(key).casefold() in FORBIDDEN_INHERITED_ENVIRONMENT for key in supplied):
+    rejected = sorted({
+        str(key).casefold()
+        for key in supplied
+        if forbidden_inherited_environment_key(key)
+    })
+    if rejected:
         blockers.append("INHERITED_ENVIRONMENT_KEY_NOT_ALLOWED")
     if fixed_environment is not None and dict(fixed_environment) != FIXED_ENVIRONMENT:
         blockers.append("FIXED_ENVIRONMENT_MISMATCH")
+    elif isinstance(fixed_environment, Mapping) and any(
+        forbidden_inherited_environment_key(key) for key in fixed_environment
+    ):
+        blockers.append("INHERITED_ENVIRONMENT_KEY_NOT_ALLOWED")
     blockers = list(dict.fromkeys(blockers))
     return {
         "schema": ENVIRONMENT_SCHEMA,
@@ -210,6 +359,7 @@ def build_environment_contract(
         "caller_environment_overrides_allowed": False,
         "fixed_environment": dict(FIXED_ENVIRONMENT),
         "caller_environment_accepted": False,
+        "rejected_environment_keys": rejected,
         "blockers": blockers,
         "execution_authorized": False,
         "executor_attached": False,
@@ -226,6 +376,50 @@ def build_environment_contract(
     }
 
 
+def sealed_environment_blockers(environment: Mapping[str, Any]) -> list[str]:
+    """Recompute environment design blockers without trusting the state label.
+
+    ``ENVIRONMENT_DECLARED`` is not authority. A cleared blocker list still
+    fails when rejected keys or a non-canonical fixed environment remain.
+    """
+    if not isinstance(environment, Mapping):
+        return ["ENVIRONMENT_CONTRACT_INVALID"]
+    blockers: list[str] = []
+    if environment.get("schema") != ENVIRONMENT_SCHEMA:
+        blockers.append("ENVIRONMENT_CONTRACT_INVALID")
+    if environment.get("inherit_parent_environment") is not False:
+        blockers.append("PARENT_ENVIRONMENT_INHERITANCE_NOT_ALLOWED")
+    if environment.get("path_lookup_allowed") is not False:
+        blockers.append("PATH_LOOKUP_NOT_ALLOWED")
+    if (
+        environment.get("caller_environment_overrides_allowed") is not False
+        or environment.get("caller_environment_accepted") is not False
+    ):
+        blockers.append("CALLER_ENVIRONMENT_OVERRIDES_NOT_ALLOWED")
+    fixed = environment.get("fixed_environment")
+    if not isinstance(fixed, Mapping) or dict(fixed) != dict(FIXED_ENVIRONMENT):
+        blockers.append("FIXED_ENVIRONMENT_MISMATCH")
+    elif any(forbidden_inherited_environment_key(key) for key in fixed):
+        blockers.append("INHERITED_ENVIRONMENT_KEY_NOT_ALLOWED")
+    rejected = environment.get("rejected_environment_keys")
+    if not isinstance(rejected, list) or any(type(item) is not str for item in rejected):
+        blockers.append("ENVIRONMENT_CONTRACT_INVALID")
+    elif rejected:
+        blockers.append("INHERITED_ENVIRONMENT_KEY_NOT_ALLOWED")
+    declared = environment.get("blockers")
+    if not isinstance(declared, list):
+        blockers.append("ENVIRONMENT_CONTRACT_INVALID")
+    else:
+        for item in declared:
+            if item == "CALLER_ENVIRONMENT_NOT_ALLOWED":
+                item = "CALLER_ENVIRONMENT_OVERRIDES_NOT_ALLOWED"
+            if item not in blockers:
+                blockers.append(item)
+    if environment.get("state") != "ENVIRONMENT_DECLARED" and not blockers:
+        blockers.append("ENVIRONMENT_CONTRACT_NOT_DECLARED")
+    return list(dict.fromkeys(blockers))
+
+
 def build_os_sandbox_design_review(
     command_policy: Mapping[str, Any],
     pinning_spec: Mapping[str, Any],
@@ -237,62 +431,38 @@ def build_os_sandbox_design_review(
     preflight: Mapping[str, Any],
     patch_validation: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """Bundle the contracts for design review. This does not authorize execution.
+    """Project the canonical OS sandbox contract into the design-review schema.
 
-    The runner is checked against the upstream documents, then the command
-    policy is checked against that runner. A ready label requires a derived
-    structural provenance claim. Independent root-of-trust verification stays
-    false. A digest recomputed after a mutation fails closed. This does not
-    create an operating-system sandbox.
+    Readiness is the contract state. This function does not classify pinning,
+    environment, or provenance a second time. ``READY_FOR_OS_SANDBOX_DESIGN_REVIEW``
+    is emitted only when that contract is ``READY_FOR_OS_SANDBOX_PROBE_DESIGN``.
+    Physical verification stays false. No sandbox is created.
     """
-    from atlasquant_aion_developer_command_policy import assert_command_policy_provenance
+    from atlasquant_aion_developer_os_sandbox_contract import (
+        READY_STATE,
+        build_os_sandbox_contract,
+    )
 
-    assert_command_policy_provenance(
+    contract = build_os_sandbox_contract(
         command_policy,
         runner_contract,
         builder_request,
         preflight,
         patch_validation,
         attestation,
+        pinning_spec,
+        environment_contract,
     )
-    if command_policy.get("upstream_provenance_structurally_verified") is not True:
-        raise ValueError("command policy structural provenance was not derived")
-    if command_policy.get("upstream_provenance_independently_verified") is not False:
-        raise ValueError("independent root of trust is not established")
-    if runner_contract.get("state") != "READY_FOR_RUNNER_DESIGN_REVIEW":
-        raise ValueError("runner is not ready for design review")
-    if list(runner_contract.get("blockers") or []) != []:
-        raise ValueError("runner blockers must be empty")
-    if command_policy.get("state") != "READY_FOR_EXECUTABLE_PINNING_REVIEW":
-        raise ValueError("command policy is not ready for design review")
-    if list(command_policy.get("blockers") or []) != []:
-        raise ValueError("command policy blockers must be empty")
-    for label, document in (
-        ("command policy", command_policy),
-        ("pinning spec", pinning_spec),
-        ("content attestation", attestation),
-        ("environment contract", environment_contract),
-    ):
-        if not isinstance(document, Mapping):
-            raise ValueError(f"{label} must be an object")
-        _reject_true_claims(document, label)
     ready = (
-        command_policy.get("state") == "READY_FOR_EXECUTABLE_PINNING_REVIEW"
-        and command_policy.get("executable_pinning_verified") is False
-        and pinning_spec.get("state") == "READY_FOR_EXECUTABLE_PINNING_PROBE"
-        and pinning_spec.get("pinning_spec_complete") is True
-        and pinning_spec.get("executable_pinning_verified") is False
-        and attestation.get("content_binding_structurally_bound") is True
-        and attestation.get("content_binding_independently_verified") is False
-        and environment_contract.get("state") == "ENVIRONMENT_DECLARED"
-        and environment_contract.get("inherit_parent_environment") is False
-        and environment_contract.get("path_lookup_allowed") is False
-        and environment_contract.get("caller_environment_overrides_allowed") is False
-        and list(environment_contract.get("blockers") or []) == []
+        contract.get("state") == READY_STATE
+        and list(contract.get("blockers") or []) == []
     )
     return {
         "schema": OS_SANDBOX_SCHEMA,
         "state": "READY_FOR_OS_SANDBOX_DESIGN_REVIEW" if ready else "BLOCKED",
+        "canonical_schema": contract.get("schema"),
+        "canonical_os_sandbox_state": contract.get("state"),
+        "canonical_os_sandbox_contract_id": contract.get("os_sandbox_contract_id"),
         "pinning_spec_complete": pinning_spec.get("pinning_spec_complete") is True,
         "content_binding_structurally_bound": attestation.get("content_binding_structurally_bound") is True,
         "content_binding_independently_verified": False,
@@ -302,6 +472,7 @@ def build_os_sandbox_design_review(
         "symlink_physical_boundary_verified": False,
         "hardlink_physical_boundary_verified": False,
         "compile_step_executable": False,
+        "platform_adapter_verified": False,
         **_CLOSED_FLAGS,
     }
 
@@ -314,8 +485,14 @@ __all__ = [
     "ALLOWED_LOGICAL_EXECUTABLES",
     "FORBIDDEN_INHERITED_ENVIRONMENT",
     "FIXED_ENVIRONMENT",
+    "PINNING_READY_STATE",
     "require_absolute_path",
+    "forbidden_inherited_environment_key",
+    "executable_pinning_manifest",
+    "expected_pinning_spec_id",
+    "assert_executable_pinning_spec_integrity",
     "build_executable_pinning_spec",
     "build_environment_contract",
+    "sealed_environment_blockers",
     "build_os_sandbox_design_review",
 ]
