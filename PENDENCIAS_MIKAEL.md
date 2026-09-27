@@ -32,6 +32,13 @@ trabalho local.
   aviso de acesso restrito ou ser ocultado. A autorização SALES/ADMIN permanece
   obrigatória independentemente da escolha visual.
 
+## Investimentos
+
+- **Feed e escopo de produtos:** escolher uma fonte autorizada para taxas,
+  prazos, liquidez, risco, custos e rentabilidade líquida, além dos mercados e
+  tipos de produto que devem entrar na comparação. Até lá, o comparador mostra
+  `SEM PRODUTOS CONFIRMADOS` e não cria recomendações.
+
 ## Serviços externos e publicação
 
 - Contas, tokens e decisões de provedores para vídeo, transcrição, voz,
