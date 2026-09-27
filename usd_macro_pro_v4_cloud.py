@@ -4355,6 +4355,17 @@ _fallback_nav = [
     "🧩 Produto", "🛠️ Melhorias", "📰 Notícias", "🤖 Autopilot", "👤 Conta", "📱 Instalar", "💼 Vendas", "💰 Investir", "🛟 Suporte",
 ]
 _nav_items = list(navigation_labels()) if navigation_labels is not None else _fallback_nav
+try:
+    from atlasquant_sales_visibility import sales_menu_policy
+    _aq_sales_nav = sales_menu_policy(
+        _ATLASQUANT_ACCESS,
+        os.getenv("ATLASQUANT_SALES_MENU_POLICY", "VISIBLE_LOCKED"),
+    )
+    if not _aq_sales_nav["visible"]:
+        _nav_items = [item for item in _nav_items if item != "💼 Vendas"]
+except Exception:
+    # Preserve the existing visible-but-authorized-at-page behavior on any error.
+    pass
 # AION oficial é um workspace administrativo privado. Ele é anexado ao fim para
 # preservar todos os índices históricos da navegação pública/operacional.
 if str(_ATLASQUANT_ACCESS.get("role") or "").upper() == "ADMIN":
