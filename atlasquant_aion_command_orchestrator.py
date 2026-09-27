@@ -17,6 +17,7 @@ import unicodedata
 from typing import Any, Mapping
 
 from atlasquant_aion_local_executor import execute_local_tool, local_allowlist
+from atlasquant_aion_local_synthesis import synthesize_local_tool_results
 from atlasquant_aion_portable import default_portable_core
 from atlasquant_aion_tool_hub import default_tool_hub
 
@@ -407,6 +408,7 @@ def orchestrate_local_command(
             "summary": "Pedido de ação sensível permanece bloqueado nesta camada.",
             "tool_result": None,
             "tool_results": [],
+            "synthesis": synthesize_local_tool_results([]),
         }
 
     if not is_multi:
@@ -434,12 +436,14 @@ def orchestrate_local_command(
             base["summary"] = ""
             base["tool_result"] = None
             base["tool_results"] = []
+            base["synthesis"] = synthesize_local_tool_results([])
             return base
         if not execute:
             base["state"] = "PLANNED"
             base["summary"] = "Ferramenta local selecionada, mas o handler não foi executado nesta prévia."
             base["tool_result"] = None
             base["tool_results"] = []
+            base["synthesis"] = synthesize_local_tool_results([])
             return base
 
         runtime = dict(runtime_context or {})
@@ -459,9 +463,11 @@ def orchestrate_local_command(
         base["handler_executed"] = execution.get("state") == "SUCCESS"
         base["handlers_executed"] = 1 if base["handler_executed"] else 0
         base["state"] = str(execution.get("state") or "ERROR")
-        base["summary"] = _result_summary(plan["tool_id"], execution)
+        synthesis = synthesize_local_tool_results([execution])
+        base["summary"] = _result_summary(plan["tool_id"], execution) + " Síntese: " + str(synthesis.get("summary") or "")
         base["tool_result"] = execution
         base["tool_results"] = [execution]
+        base["synthesis"] = synthesis
         return base
 
     selected = list(bundle_plan.get("selected") or [])
@@ -488,6 +494,7 @@ def orchestrate_local_command(
         base["summary"] = f"{len(selected)} ferramentas locais READ/SEARCH selecionadas; nenhuma executada nesta prévia."
         base["tool_result"] = None
         base["tool_results"] = []
+        base["synthesis"] = synthesize_local_tool_results([])
         return base
 
     runtime = dict(runtime_context or {})
@@ -521,9 +528,11 @@ def orchestrate_local_command(
     base["handler_executed"] = successful > 0
     base["handlers_executed"] = successful
     base["state"] = final_state
-    base["summary"] = " ".join(summaries)
+    synthesis = synthesize_local_tool_results(results)
+    base["summary"] = " ".join(summaries) + " Síntese: " + str(synthesis.get("summary") or "")
     base["tool_result"] = results[-1] if results else None
     base["tool_results"] = results
+    base["synthesis"] = synthesis
     base["stopped_early"] = len(results) < len(selected)
     return base
 

@@ -2518,6 +2518,16 @@ def _render_central(
                 if isinstance(local_result.get("truth"), Mapping)
                 else {}
             )
+            local_synthesis = (
+                local_tool_call.get("synthesis")
+                if isinstance(local_tool_call.get("synthesis"), Mapping)
+                else {}
+            )
+            synthesis_truth = (
+                local_synthesis.get("truth")
+                if isinstance(local_synthesis.get("truth"), Mapping)
+                else {}
+            )
             local_ids = list(local_tool_call.get("tool_ids") or [])
             if not local_ids and local_tool_call.get("tool_id"):
                 local_ids = [str(local_tool_call.get("tool_id"))]
@@ -2530,10 +2540,23 @@ def _render_central(
                 + str(local_tool_call.get("state") or "UNKNOWN")
                 + " · handlers executados "
                 + str(int(local_tool_call.get("handlers_executed") or 0))
-                + " · verdade final "
-                + str(local_truth.get("status") or "UNKNOWN")
+                + " · verdade agregada "
+                + str(synthesis_truth.get("status") or local_truth.get("status") or "UNKNOWN")
+                + " · conteúdo confirmado "
+                + str(int(local_synthesis.get("content_confirmed_count") or 0))
+                + "/"
+                + str(int(local_synthesis.get("tool_count") or len(local_ids)))
+                + " · conflitos "
+                + str(len(list(local_synthesis.get("conflicts") or [])))
                 + " · efeitos externos: nenhum."
             )
+            if local_synthesis:
+                st.caption(
+                    "Síntese local: "
+                    + str(local_synthesis.get("summary") or "")
+                    + " Próximo passo: "
+                    + str(local_synthesis.get("next_step") or "")
+                )
         cognitive_answer = answer.get("cognitive_orchestrator")
         if isinstance(cognitive_answer, Mapping):
             routing = (
