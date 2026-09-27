@@ -8,6 +8,7 @@ from atlasquant_aion_admin import (
     _critical_surface_rows,
     _aion_memory_hits,
     _local_contract_snapshot,
+    _developer_intelligence_summary,
 )
 from atlasquant_aion_wisdom import new_wisdom_entry
 
@@ -60,6 +61,40 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("O mapa é somente leitura", src)
         self.assertIn("não aprova, publica, cobra, provisiona acesso nem envia ordens", src)
         self.assertIn('state": "REAL BLOQUEADO"', src)
+
+    def test_developer_intelligence_summary_is_passive(self):
+        summary=_developer_intelligence_summary({
+            "snapshot_digest":"REPO-ABC",
+            "file_count":20,
+            "category_counts":{"MODULE":7,"TEST":9,"WORKFLOW":2},
+            "risk_counts":{"AUTHORITY":2,"RELEASE":1},
+            "syntax_errors":1,
+            "truncated":False,
+            "content_included":False,
+            "writes_files":False,
+            "network_called":False,
+            "subprocess_called":False,
+        })
+        self.assertEqual(summary["state"],"READY")
+        self.assertEqual(summary["modules"],7)
+        self.assertEqual(summary["tests"],9)
+        self.assertEqual(summary["workflows"],2)
+        self.assertEqual(summary["risk_surfaces"],3)
+        self.assertFalse(summary["content_included"])
+        self.assertFalse(summary["writes_files"])
+        self.assertFalse(summary["network_called"])
+        self.assertFalse(summary["subprocess_called"])
+
+    def test_developer_intelligence_scan_is_opt_in(self):
+        src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Developer Intelligence · mapa estrutural",src)
+        self.assertIn("Mapear repositório local",src)
+        self.assertIn('key="aion_developer_intelligence_scan"',src)
+        button_pos=src.index('if st.button(\n        "Mapear repositório local"')
+        scan_pos=src.index("snapshot = scan_developer_repository(project_root)",button_pos)
+        self.assertGreater(scan_pos,button_pos)
+        self.assertIn("coverage é heurística, não prova de correção",src)
+        self.assertIn("não edita, não commita, não faz merge, não faz deploy",src)
 
     def test_local_contract_snapshot_is_passive_and_closed(self):
         snapshot=_local_contract_snapshot()

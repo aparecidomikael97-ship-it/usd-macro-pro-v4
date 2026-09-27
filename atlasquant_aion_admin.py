@@ -10,6 +10,7 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import datetime, timezone
 from html import escape
+from pathlib import Path
 from typing import Any, Mapping
 import os
 
@@ -253,6 +254,10 @@ from atlasquant_aion_dev_fusion import (
     new_dev_fusion_pipeline,
     record_stage as record_dev_fusion_stage,
     upsert_pipeline,
+)
+from atlasquant_aion_developer_intelligence import (
+    build_development_plan as build_developer_intelligence_plan,
+    scan_repository as scan_developer_repository,
 )
 from atlasquant_aion_release_confidence import (
     DIMENSIONS as RELEASE_CONFIDENCE_DIMENSIONS,
@@ -4554,6 +4559,155 @@ def _render_laboratory(
     )
 
 
+def _developer_intelligence_summary(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
+    item = dict(snapshot or {})
+    counts = item.get("category_counts") if isinstance(item.get("category_counts"), Mapping) else {}
+    risks = item.get("risk_counts") if isinstance(item.get("risk_counts"), Mapping) else {}
+    return {
+        "state": "READY" if str(item.get("snapshot_digest") or "") else "NOT_SCANNED",
+        "snapshot_digest": str(item.get("snapshot_digest") or ""),
+        "files": int(item.get("file_count") or 0),
+        "modules": int(counts.get("MODULE") or 0),
+        "tests": int(counts.get("TEST") or 0),
+        "workflows": int(counts.get("WORKFLOW") or 0),
+        "syntax_errors": int(item.get("syntax_errors") or 0),
+        "risk_surfaces": sum(int(value or 0) for value in risks.values()),
+        "truncated": bool(item.get("truncated", False)),
+        "content_included": bool(item.get("content_included", False)),
+        "writes_files": bool(item.get("writes_files", False)),
+        "network_called": bool(item.get("network_called", False)),
+        "subprocess_called": bool(item.get("subprocess_called", False)),
+    }
+
+
+def _render_developer_intelligence() -> None:
+    st.markdown("#### 🧭 Developer Intelligence · mapa estrutural")
+    st.caption(
+        "Diagnóstico local somente leitura. Abrir a aba não inicia scan. "
+        "O scanner não executa módulos, não segue symlink, não lê .env/secrets conhecidos, "
+        "não chama rede e não escreve arquivos."
+    )
+
+    snapshot = (
+        st.session_state.get("aion_developer_repo_snapshot")
+        if isinstance(st.session_state.get("aion_developer_repo_snapshot"), Mapping)
+        else None
+    )
+    if st.button(
+        "Mapear repositório local",
+        key="aion_developer_intelligence_scan",
+        help="Lê apenas metadados estruturais e AST de arquivos permitidos. Nenhum código do repositório é executado.",
+    ):
+        try:
+            project_root = Path(__file__).resolve().parent
+            snapshot = scan_developer_repository(project_root)
+            st.session_state["aion_developer_repo_snapshot"] = snapshot
+        except Exception as exc:
+            st.error(f"Scan estrutural falhou de forma isolada: {type(exc).__name__}")
+            snapshot = None
+
+    summary = _developer_intelligence_summary(snapshot)
+    d1,d2,d3,d4,d5 = st.columns(5)
+    d1.metric("Snapshot", summary["state"])
+    d2.metric("Módulos", summary["modules"])
+    d3.metric("Testes", summary["tests"])
+    d4.metric("Workflows", summary["workflows"])
+    d5.metric("Syntax errors", summary["syntax_errors"])
+
+    if summary["state"] != "READY":
+        st.info("Nenhum snapshot estrutural foi criado nesta sessão. O scan continua opt-in.")
+        return
+
+    st.caption(
+        f"Digest {summary['snapshot_digest']} · arquivos {summary['files']} · "
+        f"superfícies de risco {summary['risk_surfaces']} · "
+        f"truncado {'SIM' if summary['truncated'] else 'NÃO'}."
+    )
+    if (
+        summary["content_included"]
+        or summary["writes_files"]
+        or summary["network_called"]
+        or summary["subprocess_called"]
+    ):
+        st.error("Snapshot recusado: invariantes read-only não foram preservadas.")
+        return
+
+    risk_counts = snapshot.get("risk_counts") if isinstance(snapshot.get("risk_counts"), Mapping) else {}
+    if risk_counts:
+        st.dataframe(
+            [{"Superfície": key, "Arquivos": int(value or 0)} for key,value in sorted(risk_counts.items())],
+            width="stretch",
+            hide_index=True,
+        )
+
+    with st.expander("Planejar mudança com o mapa atual", expanded=False):
+        dev_request = st.text_area(
+            "Objetivo técnico",
+            key="aion_developer_intelligence_request",
+            max_chars=1200,
+            placeholder="Ex.: corrigir o painel sem alterar autoridade do Tool Hub.",
+        )
+        changed_text = st.text_area(
+            "Arquivos candidatos — um por linha",
+            key="aion_developer_intelligence_changed_paths",
+            max_chars=5000,
+            placeholder="atlasquant_aion_admin.py\ntest_atlasquant_aion_admin.py",
+        )
+        branch_label = st.text_input(
+            "Branch de trabalho (rótulo)",
+            key="aion_developer_intelligence_branch",
+            value="working-copy",
+        )
+        baseline_label = st.text_input(
+            "Baseline ref (rótulo)",
+            key="aion_developer_intelligence_baseline",
+            value=str(snapshot.get("snapshot_digest") or "snapshot-current"),
+        )
+        if st.button("Montar plano estrutural", key="aion_developer_intelligence_plan"):
+            try:
+                changed_paths = [line.strip() for line in changed_text.splitlines() if line.strip()]
+                plan = build_developer_intelligence_plan(
+                    dev_request,
+                    snapshot,
+                    branch=branch_label,
+                    baseline_ref=baseline_label,
+                    changed_paths=changed_paths,
+                )
+                st.session_state["aion_developer_intelligence_plan_result"] = plan
+            except Exception as exc:
+                st.error(f"Plano estrutural recusado: {type(exc).__name__}")
+
+    plan = (
+        st.session_state.get("aion_developer_intelligence_plan_result")
+        if isinstance(st.session_state.get("aion_developer_intelligence_plan_result"), Mapping)
+        else None
+    )
+    if not isinstance(plan, Mapping):
+        return
+
+    p1,p2,p3 = st.columns(3)
+    p1.metric("Arquivos impactados", len(list(plan.get("impacted_files") or [])))
+    p2.metric("Testes prováveis", len(list(plan.get("recommended_tests") or [])))
+    p3.metric("Sem teste provável", len(list(plan.get("unmatched_code") or [])))
+    st.caption(
+        f"Plano {plan.get('plan_id')} · análise somente leitura · "
+        "coverage é heurística, não prova de correção."
+    )
+    if plan.get("risk_tags"):
+        st.markdown("**Superfícies sensíveis:** " + " · ".join(str(x) for x in list(plan.get("risk_tags") or [])))
+    if plan.get("recommended_tests"):
+        st.markdown("**Testes sugeridos:**")
+        for item in list(plan.get("recommended_tests") or [])[:30]:
+            st.markdown(f"- {item}")
+    if plan.get("unmatched_code"):
+        st.warning(
+            "Arquivos Python sem teste provável: "
+            + ", ".join(str(x) for x in list(plan.get("unmatched_code") or [])[:20])
+        )
+    st.caption(
+        "Este plano não edita, não commita, não faz merge, não faz deploy e não habilita produção/trading."
+    )
+
 def _render_development(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
@@ -4578,6 +4732,7 @@ def _render_development(
         ),
         key="aion_development_voice",
     )
+    _render_developer_intelligence()
     with st.expander("Política de confiança e rollback do AION Desenvolvedor"):
         policy = developer_trust_policy()
         for row in policy["levels"]:
