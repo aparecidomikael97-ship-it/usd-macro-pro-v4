@@ -112,6 +112,21 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         readiness_pos=src.index('"Registrar prontidão da implementação"')
         approval_pos=src.index('"Registrar autorização de implementação na sessão"')
         self.assertLess(readiness_pos,approval_pos)
+    def test_developer_patch_validation_ui_is_read_only_and_clears_raw_diff(self):
+        src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Sandbox Preflight · contrato declarativo",src)
+        self.assertIn("não prova que um ambiente real já foi criado",src)
+        self.assertIn("build_developer_sandbox_preflight(",src)
+        self.assertIn("Patch Validator · diff read-only",src)
+        self.assertIn("clear_on_submit=True",src)
+        self.assertIn("Validar patch sem aplicar",src)
+        self.assertIn("validate_developer_patch(",src)
+        self.assertIn("Patch Validation · somente leitura",src)
+        self.assertIn("Isto não autoriza aplicar, testar, commitar, mergear ou publicar",src)
+        self.assertIn("patch_text_included=False",src)
+        self.assertIn("execution_authorized=False",src)
+        self.assertIn("writes_files=False",src)
+
     def test_developer_builder_sandbox_request_is_bounded_and_non_executing(self):
         src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("Builder Sandbox Request · branch isolada",src)

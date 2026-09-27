@@ -275,6 +275,11 @@ from atlasquant_aion_developer_implementation import (
     prepare_implementation_readiness as prepare_developer_implementation_readiness,
 )
 from atlasquant_aion_developer_builder_sandbox import build_builder_sandbox_request as build_developer_builder_sandbox_request
+from atlasquant_aion_developer_sandbox_preflight import (
+    ALLOWED_COMMAND_POLICY as DEVELOPER_SANDBOX_COMMAND_POLICY,
+    build_sandbox_preflight as build_developer_sandbox_preflight,
+)
+from atlasquant_aion_developer_patch_validation import validate_patch as validate_developer_patch
 from atlasquant_aion_release_confidence import (
     DIMENSIONS as RELEASE_CONFIDENCE_DIMENSIONS,
     evidence_dimension,
@@ -5368,6 +5373,135 @@ def _render_developer_intelligence() -> None:
         st.caption(
             "Builder Sandbox Request é planejamento: patch_generated=False, writes_files=False, "
             "automatic_commit=False, automatic_merge=False e automatic_deploy=False."
+        )
+
+        if builder_request.get("state") == "READY_FOR_BUILDER_SANDBOX":
+            with st.expander("Sandbox Preflight · contrato declarativo", expanded=False):
+                st.caption(
+                    "Isto descreve as condições exigidas para um futuro sandbox; "
+                    "não prova que um ambiente real já foi criado."
+                )
+                preflight_environment_id = st.text_input(
+                    "ID lógico do ambiente isolado",
+                    value="aion-builder-design-only",
+                    key="aion_developer_sandbox_environment_id",
+                    max_chars=160,
+                )
+                if st.button(
+                    "Preparar contrato declarativo de sandbox",
+                    key="aion_developer_sandbox_preflight_prepare",
+                ):
+                    try:
+                        preflight = build_developer_sandbox_preflight(
+                            builder_request,
+                            environment_kind="ISOLATED_WORKTREE",
+                            environment_id=preflight_environment_id,
+                            isolated_worktree=True,
+                            repository_root_bound=True,
+                            network_disabled=True,
+                            secrets_mounted=False,
+                            command_policy=DEVELOPER_SANDBOX_COMMAND_POLICY,
+                        )
+                        st.session_state["aion_developer_sandbox_preflight"] = preflight
+                    except Exception as exc:
+                        st.error(f"Sandbox preflight recusado: {type(exc).__name__}")
+
+    preflight = (
+        st.session_state.get("aion_developer_sandbox_preflight")
+        if isinstance(st.session_state.get("aion_developer_sandbox_preflight"), Mapping)
+        else None
+    )
+    if isinstance(preflight, Mapping):
+        st.markdown("##### Sandbox Preflight · design only")
+        p1,p2,p3 = st.columns(3)
+        p1.metric("Estado", str(preflight.get("state") or "UNKNOWN"))
+        p2.metric("Executor", "LIGADO" if preflight.get("executor_attached") else "NÃO LIGADO")
+        p3.metric("Execução", "AUTORIZADA" if preflight.get("execution_authorized") else "BLOQUEADA")
+        st.caption(
+            "Preflight declarativo: não executa comandos, não cria worktree e não comprova isolamento real."
+        )
+
+    if (
+        isinstance(builder_request, Mapping)
+        and isinstance(preflight, Mapping)
+        and preflight.get("state") == "READY_FOR_EXECUTOR_DESIGN_REVIEW"
+    ):
+        with st.expander("Patch Validator · diff read-only", expanded=False):
+            st.caption(
+                "Cole somente um unified diff que você pretende revisar. "
+                "O formulário limpa o texto após envio; o resultado não armazena o patch bruto."
+            )
+            with st.form("aion_developer_patch_validation_form", clear_on_submit=True):
+                patch_text = st.text_area(
+                    "Unified diff não confiável",
+                    key="aion_developer_patch_text",
+                    max_chars=500000,
+                    height=220,
+                    placeholder="diff --git a/arquivo.py b/arquivo.py ...",
+                )
+                validate_patch_submit = st.form_submit_button(
+                    "Validar patch sem aplicar",
+                    type="primary",
+                )
+            if validate_patch_submit:
+                try:
+                    branch_contract = (
+                        builder_request.get("branch_contract")
+                        if isinstance(builder_request.get("branch_contract"), Mapping)
+                        else {}
+                    )
+                    patch_validation = validate_developer_patch(
+                        builder_request,
+                        preflight,
+                        patch_text,
+                        baseline_ref=branch_contract.get("baseline_ref"),
+                        candidate_ref=branch_contract.get("candidate_ref"),
+                    )
+                    st.session_state["aion_developer_patch_validation"] = patch_validation
+                except Exception as exc:
+                    st.error(f"Patch recusado: {type(exc).__name__}")
+
+    patch_validation = (
+        st.session_state.get("aion_developer_patch_validation")
+        if isinstance(st.session_state.get("aion_developer_patch_validation"), Mapping)
+        else None
+    )
+    if isinstance(patch_validation, Mapping):
+        st.markdown("##### Patch Validation · somente leitura")
+        v1,v2,v3,v4 = st.columns(4)
+        v1.metric("Estado", str(patch_validation.get("state") or "UNKNOWN"))
+        v2.metric("Arquivos", int(patch_validation.get("file_count") or 0))
+        v3.metric("Linhas alteradas", int(patch_validation.get("changed_lines") or 0))
+        v4.metric("Patch aplicado", "SIM" if patch_validation.get("patch_applied") else "NÃO")
+        if patch_validation.get("blockers"):
+            st.warning(
+                "Patch bloqueado: "
+                + " · ".join(str(x) for x in list(patch_validation.get("blockers") or []))
+            )
+        else:
+            st.success(
+                "Diff compatível com o escopo para revisão humana. "
+                "Isto não autoriza aplicar, testar, commitar, mergear ou publicar."
+            )
+        if patch_validation.get("files"):
+            st.dataframe(
+                [
+                    {
+                        "Arquivo": row.get("path"),
+                        "Operação": row.get("operation"),
+                        "+": row.get("added_lines"),
+                        "-": row.get("deleted_lines"),
+                        "Blockers": " · ".join(str(x) for x in list(row.get("blockers") or [])),
+                    }
+                    for row in list(patch_validation.get("files") or [])
+                    if isinstance(row, Mapping)
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+        st.caption(
+            f"{patch_validation.get('patch_digest')} · patch_text_included=False · "
+            "execution_authorized=False · writes_files=False."
         )
 
 def _render_development(
