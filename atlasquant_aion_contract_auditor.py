@@ -1132,14 +1132,21 @@ def _audit_traceability() -> list[dict[str, str]]:
             "SOURCE_CATALOG divergiu das 11 ferramentas locais.",
         ))
 
-    def envelope(*, result=None, truth="UNKNOWN", freshness="UNVERIFIED", network_called=False):
+    def envelope(
+        *,
+        result=None,
+        truth="UNKNOWN",
+        freshness="UNVERIFIED",
+        network_called=False,
+        contract_fingerprint=None,
+    ):
         return {
             "schema": RESULT_SCHEMA,
             "request_id": "contract-trace",
             "tool_id": "aion.tasks.summary",
             "workspace_id": "administration",
             "kind": "READ",
-            "contract_fingerprint": local_contract_fingerprint(),
+            "contract_fingerprint": contract_fingerprint or local_contract_fingerprint(),
             "state": "SUCCESS",
             "result": result or {},
             "truncated": False,
@@ -1219,6 +1226,24 @@ def _audit_traceability() -> list[dict[str, str]]:
         findings.append(_finding(
             "trace.security", "atlasquant_aion_local_traceability",
             "Rastreabilidade não falhou fechada para network_called=True.",
+        ))
+
+    mixed = [
+        envelope(contract_fingerprint="AION-LCL-" + ("A" * 16)),
+        envelope(contract_fingerprint="AION-LCL-" + ("B" * 16)),
+    ]
+    mixed_trace = build_local_traceability(
+        mixed,
+        synthesis=synthesize_local_tool_results(mixed),
+    )
+    if (
+        mixed_trace.get("state") != "SECURITY_BLOCK"
+        or mixed_trace.get("contract_consistent") is not False
+        or mixed_trace.get("contract_mismatch") is not True
+    ):
+        findings.append(_finding(
+            "trace.contract_mismatch", "atlasquant_aion_local_traceability",
+            "Bundle com fingerprints diferentes não falhou fechado.",
         ))
     return findings
 

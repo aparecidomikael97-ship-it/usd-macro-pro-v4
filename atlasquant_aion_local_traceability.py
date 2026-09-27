@@ -157,6 +157,14 @@ def _clean(value: Any, limit: int = 160) -> str:
     return " ".join(redact_text(value).split())[:limit]
 
 
+def _valid_contract_fingerprint(value: Any) -> bool:
+    text = str(value or "")
+    if not text.startswith("AION-LCL-") or len(text) != 25:
+        return False
+    suffix = text[9:]
+    return len(suffix) == 16 and all(ch in "0123456789ABCDEF" for ch in suffix)
+
+
 def _trace_id(envelope: Mapping[str, Any], index: int) -> str:
     seed = "|".join((
         _clean(envelope.get("tool_id"), 96),
@@ -191,6 +199,8 @@ def _safe_security(envelope: Mapping[str, Any]) -> tuple[bool, list[str]]:
     provenance = _mapping(envelope.get("provenance"))
     if provenance.get("local_only") is not True:
         issues.append("LOCAL_ONLY_NOT_TRUE")
+    if not _valid_contract_fingerprint(envelope.get("contract_fingerprint")):
+        issues.append("CONTRACT_FINGERPRINT_INVALID")
     return not issues, issues
 
 
@@ -310,6 +320,17 @@ def build_local_traceability(
         if not safe:
             security_issues.append({"trace_id": trace_id, "issues": issues})
 
+    unique_fingerprints = sorted(set(fingerprints))
+    contract_consistent = (
+        len(rows) == len(fingerprints)
+        and len(unique_fingerprints) <= 1
+    )
+    if len(unique_fingerprints) > 1:
+        security_issues.append({
+            "trace_id": "BUNDLE",
+            "issues": ["CONTRACT_FINGERPRINT_MISMATCH"],
+        })
+
     if security_issues:
         state = "SECURITY_BLOCK"
     elif conflict_refs:
@@ -331,8 +352,9 @@ def build_local_traceability(
         "unknown_refs": unknown_refs,
         "conflict_refs": conflict_refs,
         "source_keys": sorted({str(row["source_key"]) for row in records}),
-        "contract_fingerprints": sorted(set(fingerprints)),
-        "contract_consistent": len(set(fingerprints)) <= 1,
+        "contract_fingerprints": unique_fingerprints,
+        "contract_consistent": contract_consistent,
+        "contract_mismatch": len(unique_fingerprints) > 1,
         "security": {
             "state": "BLOCK" if security_issues else "SAFE_LOCAL",
             "issues": security_issues,

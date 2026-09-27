@@ -12,6 +12,7 @@ from atlasquant_aion_command_orchestrator import (
     plan_local_bundle,
     plan_local_command,
 )
+from atlasquant_aion_local_traceability import local_contract_fingerprint
 from atlasquant_aion_memory import default_checkpoint
 
 
@@ -189,6 +190,7 @@ class ExecutionTests(unittest.TestCase):
                 "tool_id": tool_id,
                 "workspace_id": "central",
                 "kind": "SEARCH" if tool_id == "aion.memory.search" else "READ",
+                "contract_fingerprint": local_contract_fingerprint(),
                 "request_id": str(kwargs.get("request_id") or ""),
                 "result": {"canonical_count": 1} if tool_id == "aion.memory.search" else {
                     "total": 2, "active": 1, "waiting_approval": 0, "blocked": 0
@@ -239,6 +241,58 @@ class ExecutionTests(unittest.TestCase):
         self.assertEqual(out["traceability"]["record_count"], 2)
         self.assertEqual(len(out["traceability"]["execution_refs"]), 2)
         self.assertFalse(out["traceability"]["tool_output_is_authority"])
+
+    def test_multi_read_blocks_mixed_contract_fingerprints(self):
+        calls = {"n": 0}
+
+        def mixed(tool_id, **kwargs):
+            calls["n"] += 1
+            return {
+                "state": "SUCCESS",
+                "tool_id": tool_id,
+                "workspace_id": "central",
+                "kind": "SEARCH" if tool_id == "aion.memory.search" else "READ",
+                "contract_fingerprint": "AION-LCL-" + (("A" if calls["n"] == 1 else "B") * 16),
+                "request_id": str(kwargs.get("request_id") or ""),
+                "result": {"truth_state": "UNKNOWN"},
+                "truth": {"status": "UNKNOWN", "freshness": "UNVERIFIED"},
+                "preflight": {"state": "READY_FOR_EXECUTOR", "blockers": []},
+                "provenance": {
+                    "source_module": "atlasquant_aion_local_executor",
+                    "source_function": "_test",
+                    "input_scope": "local",
+                    "local_only": True,
+                },
+                "security": {
+                    "network_called": False,
+                    "connector_called": False,
+                    "external_side_effects": False,
+                    "permissions_expanded": False,
+                    "secrets_included": False,
+                },
+                "executes_action": False,
+                "external_action_executed": False,
+                "real_orders_enabled": False,
+                "tool_output_is_authority": False,
+            }
+
+        spy = Mock(side_effect=mixed)
+        original = command.execute_local_tool
+        command.execute_local_tool = spy
+        try:
+            out = orchestrate_local_command(
+                "onde paramos e o que falta?",
+                execute=True,
+                runtime_context={"checkpoint": default_checkpoint()},
+                access=ADMIN,
+                authenticated_admin=True,
+            )
+        finally:
+            command.execute_local_tool = original
+        self.assertEqual(out["state"], "SECURITY_BLOCK")
+        self.assertEqual(out["traceability"]["state"], "SECURITY_BLOCK")
+        self.assertFalse(out["traceability"]["contract_consistent"])
+        self.assertFalse(out["executive_response"]["safe_to_display"])
 
     def test_multi_read_stops_on_first_blocked_preflight(self):
         blocked = {

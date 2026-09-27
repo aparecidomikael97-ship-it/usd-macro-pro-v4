@@ -101,13 +101,31 @@ def compose_local_executive_response(
             reason += " · " + " · ".join(blockers)
         unknown.append(f"{line} [{reason}]{reference}")
 
-    security_state = _clean(security.get("state") or "UNKNOWN", 40).upper()
-    if security_state == "BLOCK":
+    synthesis_security_state = _clean(security.get("state") or "UNKNOWN", 40).upper()
+    trace_security = _mapping(trace.get("security"))
+    trace_security_state = _clean(trace_security.get("state") or "UNKNOWN", 40).upper()
+    trace_contract_consistent = trace.get("contract_consistent")
+    trace_blocked = (
+        trace_security_state == "BLOCK"
+        or trace_contract_consistent is False
+    )
+    security_state = "BLOCK" if synthesis_security_state == "BLOCK" or trace_blocked else synthesis_security_state
+
+    if synthesis_security_state == "BLOCK":
         conflicts.insert(0, "Invariante de segurança violada; o conteúdo local não deve ser usado.")
+    if trace_blocked:
+        conflicts.insert(
+            0,
+            "Rastreabilidade bloqueada: evidências sem selo válido ou produzidas sob contratos locais diferentes.",
+        )
 
     aggregate_truth = _clean(truth.get("status") or "UNKNOWN", 40).upper()
     aggregate_freshness = _clean(truth.get("freshness") or "UNVERIFIED", 40).upper()
     next_step = _clean(syn.get("next_step") or "Nenhum próximo passo confirmado.", MAX_TEXT)
+    if trace_blocked:
+        aggregate_truth = "UNKNOWN"
+        aggregate_freshness = "UNVERIFIED"
+        next_step = "Reexecutar a leitura sob um único contrato local válido antes de usar o conteúdo."
 
     if security_state == "BLOCK":
         posture = "SECURITY_BLOCK"
@@ -128,6 +146,9 @@ def compose_local_executive_response(
     known = known[:MAX_LINES]
     unknown = unknown[:MAX_LINES]
     conflicts = conflicts[:MAX_LINES]
+    if security_state == "BLOCK":
+        known = []
+        unknown = []
 
     sections = {
         "known": known,

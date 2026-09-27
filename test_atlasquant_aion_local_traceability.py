@@ -115,6 +115,37 @@ class LocalTraceabilityTests(unittest.TestCase):
         self.assertEqual(out["security"]["state"], "BLOCK")
         self.assertFalse(out["external_action_executed"])
 
+    def test_missing_contract_fingerprint_fails_closed(self):
+        item = _envelope("aion.tasks.summary")
+        item.pop("contract_fingerprint")
+        out = build_local_traceability([item], synthesis=_synthesis("aion.tasks.summary"))
+        self.assertEqual(out["state"], "SECURITY_BLOCK")
+        self.assertEqual(out["security"]["state"], "BLOCK")
+        self.assertFalse(out["contract_consistent"])
+        self.assertIn(
+            "CONTRACT_FINGERPRINT_INVALID",
+            out["records"][0]["security_issues"],
+        )
+
+    def test_mixed_contract_fingerprints_fail_closed(self):
+        first = _envelope("aion.memory.search")
+        second = _envelope("aion.tasks.summary")
+        first["contract_fingerprint"] = "AION-LCL-" + ("A" * 16)
+        second["contract_fingerprint"] = "AION-LCL-" + ("B" * 16)
+        synthesis = {
+            "items": [
+                {"tool_id": "aion.memory.search", "state": "SUCCESS", "truth_status": "UNKNOWN", "freshness": "UNVERIFIED", "execution_confirmed": True, "content_confirmed": False, "blockers": []},
+                {"tool_id": "aion.tasks.summary", "state": "SUCCESS", "truth_status": "UNKNOWN", "freshness": "UNVERIFIED", "execution_confirmed": True, "content_confirmed": False, "blockers": []},
+            ],
+            "conflicts": [],
+        }
+        out = build_local_traceability([first, second], synthesis=synthesis)
+        self.assertEqual(out["state"], "SECURITY_BLOCK")
+        self.assertFalse(out["contract_consistent"])
+        self.assertTrue(out["contract_mismatch"])
+        self.assertEqual(len(out["contract_fingerprints"]), 2)
+        self.assertEqual(out["security"]["state"], "BLOCK")
+
     def test_executive_response_references_trace_ids(self):
         synthesis = _synthesis("aion.tasks.summary")
         trace = build_local_traceability([_envelope("aion.tasks.summary")], synthesis=synthesis)

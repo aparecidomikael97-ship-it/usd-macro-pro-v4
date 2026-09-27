@@ -127,6 +127,48 @@ class LocalExecutiveResponseTests(unittest.TestCase):
         self.assertFalse(out["external_action_executed"])
         self.assertFalse(out["real_orders_enabled"])
 
+    def test_traceability_contract_mismatch_blocks_content_rendering(self):
+        syn = _synthesis(
+            truth="CONFIRMED",
+            freshness="FRESH",
+            items=[{
+                "tool_id": "aion.tasks.summary",
+                "state": "SUCCESS",
+                "truth_status": "CONFIRMED",
+                "freshness": "FRESH",
+                "execution_confirmed": True,
+                "content_confirmed": True,
+                "blockers": [],
+            }],
+        )
+        trace = {
+            "state": "SECURITY_BLOCK",
+            "contract_consistent": False,
+            "contract_mismatch": True,
+            "security": {"state": "BLOCK"},
+            "records": [{
+                "trace_id": "LCL-EV-ABC123",
+                "tool_id": "aion.tasks.summary",
+                "source_label": "Fila local de tarefas",
+            }],
+            "confirmed_content_refs": ["LCL-EV-ABC123"],
+            "unknown_refs": [],
+            "conflict_refs": [],
+            "execution_refs": ["LCL-EV-ABC123"],
+        }
+        out = compose_local_executive_response(
+            syn,
+            summaries=["CONTEUDO-NAO-DEVE-SER-EXIBIDO"],
+            traceability=trace,
+        )
+        self.assertEqual(out["posture"], "SECURITY_BLOCK")
+        self.assertFalse(out["safe_to_display"])
+        self.assertEqual(out["truth"]["status"], "UNKNOWN")
+        self.assertEqual(out["sections"]["known"], [])
+        self.assertEqual(out["sections"]["unknown"], [])
+        self.assertNotIn("CONTEUDO-NAO-DEVE-SER-EXIBIDO", out["plain_text"])
+        self.assertIn("contratos locais diferentes", out["plain_text"])
+
     def test_traceability_reference_is_rendered_without_promoting_truth(self):
         syn = _synthesis(items=[{
             "tool_id": "aion.tasks.summary",

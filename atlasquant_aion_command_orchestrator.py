@@ -487,6 +487,9 @@ def orchestrate_local_command(
         base["synthesis"] = synthesis
         traceability = build_local_traceability([execution], synthesis=synthesis)
         base["traceability"] = traceability
+        if traceability.get("state") == "SECURITY_BLOCK":
+            base["state"] = "SECURITY_BLOCK"
+            base["summary"] = "Leitura local bloqueada por inconsistência no contrato de evidência."
         base["executive_response"] = compose_local_executive_response(
             synthesis,
             summaries=[_result_summary(plan["tool_id"], execution)],
@@ -559,6 +562,9 @@ def orchestrate_local_command(
     base["synthesis"] = synthesis
     traceability = build_local_traceability(results, synthesis=synthesis)
     base["traceability"] = traceability
+    if traceability.get("state") == "SECURITY_BLOCK":
+        base["state"] = "SECURITY_BLOCK"
+        base["summary"] = "Bundle local bloqueado por inconsistência no contrato de evidência."
     base["executive_response"] = compose_local_executive_response(
         synthesis,
         summaries=summaries,
