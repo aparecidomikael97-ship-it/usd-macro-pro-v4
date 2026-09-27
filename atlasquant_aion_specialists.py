@@ -9,23 +9,12 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from atlasquant_aion_capabilities import CapabilityRegistry, default_registry
+from atlasquant_aion_ecosystem import specialist_modules
 
 SCHEMA = "ATLASQUANT_AION_SPECIALISTS_V1"
 
-SPECIALIST_MODULES = {
-    "core": "atlasquant_aion_gateway.local_answer",
-    "dev": "atlasquant_aion_developer_engine",
-    "research": "atlasquant_aion_cognitive_orchestrator",
-    "market": "atlasquant_radar_board",
-    "macro": "atlasquant_macro_briefing",
-    "ict": "atlasquant_lab_matrix",
-    "risk": "atlasquant_aion_fortress",
-    "lab": "atlasquant_research_evidence_capture",
-    "invest": "atlasquant_investment_ecosystem",
-    "business": "atlasquant_aion_business",
-    "studio": "atlasquant_content_pipeline",
-    "admin": "atlasquant_aion_admin",
-}
+# Generated from the canonical ecosystem registry. Dispatch still does not execute tools.
+SPECIALIST_MODULES = specialist_modules()
 
 
 def specialist_catalog(registry: CapabilityRegistry | None = None) -> dict[str, Any]:

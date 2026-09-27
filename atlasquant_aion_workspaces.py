@@ -10,70 +10,16 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Mapping
 
 from atlasquant_aion_core import guardian_decision, is_admin
+from atlasquant_aion_ecosystem import persona_capability_map, persona_catalog
 
 SCHEMA = "ATLASQUANT_AION_WORKSPACES_V1"
 
 BRT = timezone(timedelta(hours=-3), "BRT")
 
-AION_PERSONAS: tuple[dict[str, Any], ...] = (
-    {
-        "id": "trader",
-        "title": "AION Trader",
-        "workspace": "📈 Trading",
-        "domain": "trading",
-        "purpose": "Ler Radar, macro e pares com a proveniência de cada dado. Nunca envia ordens.",
-        "actions": ("read", "summarize", "search", "draft"),
-    },
-    {
-        "id": "admin",
-        "title": "AION Administrador",
-        "workspace": "🗂️ Secretaria",
-        "domain": "secretary",
-        "purpose": "Resumo do dia, pendências, aprovações e estado do sistema.",
-        "actions": ("read", "summarize", "search", "draft", "save_checkpoint", "restore_checkpoint"),
-    },
-    {
-        "id": "developer",
-        "title": "AION Desenvolvedor",
-        "workspace": "🛠️ Desenvolvimento",
-        "domain": "development",
-        "purpose": "Planejar missões de código em branch, com testes e revisão humana.",
-        "actions": ("read", "summarize", "search", "draft", "save_checkpoint"),
-    },
-    {
-        "id": "video",
-        "title": "AION Vídeo",
-        "workspace": "🎬 Studio",
-        "domain": "studio",
-        "purpose": "Roteiros e rascunhos de vídeo. Publicação exige aprovação e feature flag.",
-        "actions": ("read", "summarize", "search", "draft", "publish_social"),
-    },
-    {
-        "id": "business",
-        "title": "AION Negócios",
-        "workspace": "💼 Negócios",
-        "domain": "business",
-        "purpose": "Produtos, margens e marketplaces em modo rascunho.",
-        "actions": ("read", "summarize", "search", "draft", "publish_marketplace"),
-    },
-    {
-        "id": "laboratory",
-        "title": "AION Laboratório",
-        "workspace": "🧪 Laboratório",
-        "domain": "laboratory",
-        "purpose": "Experimentos e backtests somente com dados reais registrados.",
-        "actions": ("read", "summarize", "search", "draft", "write_runtime"),
-    },
-)
-
-PERSONA_CAPABILITIES: dict[str, tuple[str, ...]] = {
-    "trader": ("radar", "macro", "pairs", "calendar", "pre_news", "technical_context", "risk"),
-    "admin": ("system_status", "incidents", "pending", "checks", "degraded_sources", "tasks", "checkpoint"),
-    "developer": ("code", "logs", "tests", "errors", "patch_plan", "rollback"),
-    "video": ("script", "storyboard", "scenes", "narration", "captions", "thumbnail", "formats", "approval_queue"),
-    "business": ("catalog", "suppliers", "economics", "fees", "cac", "ltv", "funnel", "tracking", "reports"),
-    "laboratory": ("matrix", "evidence", "history", "comparisons", "setups", "assets", "timeframes", "styles"),
-}
+# Projected from the canonical ecosystem registry. Public keys stay id, title,
+# workspace, domain, purpose and actions.
+AION_PERSONAS: tuple[dict[str, Any], ...] = persona_catalog()
+PERSONA_CAPABILITIES: dict[str, tuple[str, ...]] = persona_capability_map()
 
 # Actions no workspace may request, whatever the Guardian flags say.
 NEVER_FROM_WORKSPACE = frozenset({
