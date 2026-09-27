@@ -10,6 +10,7 @@ class AtlasQuantAionMasterStatusBoardTests(unittest.TestCase):
                 "operating":{"tasks":[]},
                 "entitlements":{"records":[]},
                 "continuity":{"missions":[],"handoffs":[]},
+                "durable_tasks":{"records":[]},
             },
             "runtime_result":{
                 "status":"CONFIRMED",
@@ -200,6 +201,64 @@ class AtlasQuantAionMasterStatusBoardTests(unittest.TestCase):
         item=self.by_id(board,"mission_continuity")
         self.assertEqual(item["state"],"BLOCKED")
         self.assertIn("migração V7",item["next_action"])
+
+    def test_durable_task_continuity_is_confirmed_when_runtime_is_clean(self):
+        board=self.base()
+        item=self.by_id(board,"durable_task_continuity")
+        self.assertEqual(item["state"],"CONFIRMED")
+        self.assertIn("sem bloqueio",item["detail"])
+        self.assertEqual(item["area"],"development")
+
+    def test_durable_task_blocker_is_visible_and_does_not_claim_resume_execution(self):
+        checkpoint={
+            "operating":{"tasks":[]},
+            "entitlements":{"records":[]},
+            "continuity":{"missions":[],"handoffs":[]},
+            "durable_tasks":{
+                "records":[{
+                    "durable_task_id":"DUR-TEST",
+                    "title":"Revisar AION",
+                    "objective":"Validar continuidade",
+                    "domain":"development",
+                    "state":"BLOCKED",
+                    "steps":[{
+                        "step_id":"S001",
+                        "title":"Revisar bloqueio",
+                        "state":"BLOCKED",
+                        "blocker":"Aprovação necessária",
+                    }],
+                    "cursor":0,
+                    "revision":2,
+                    "blocker":"Aprovação necessária",
+                    "next_action":"Revisar bloqueio",
+                    "created_at":"2026-09-27T00:00:00+00:00",
+                    "updated_at":"2026-09-27T00:01:00+00:00",
+                }],
+            },
+        }
+        board=self.base(checkpoint=checkpoint)
+        item=self.by_id(board,"durable_task_continuity")
+        self.assertEqual(item["state"],"BLOCKED")
+        self.assertIn("1 bloqueada",item["detail"])
+        self.assertIn("não autoriza",item["next_action"])
+        self.assertFalse(item["executes_action"])
+
+    def test_durable_task_structure_without_confirmed_runtime_stays_unknown(self):
+        board=self.base(runtime_result={"status":"UNAVAILABLE"})
+        item=self.by_id(board,"durable_task_continuity")
+        self.assertEqual(item["state"],"UNKNOWN")
+        self.assertIn("persistência runtime",item["detail"])
+
+    def test_missing_durable_task_structure_stays_unknown(self):
+        checkpoint={
+            "operating":{"tasks":[]},
+            "entitlements":{"records":[]},
+            "continuity":{"missions":[],"handoffs":[]},
+        }
+        board=self.base(checkpoint=checkpoint)
+        item=self.by_id(board,"durable_task_continuity")
+        self.assertEqual(item["state"],"UNKNOWN")
+        self.assertIn("não foi confirmada",item["detail"])
 
     def test_status_rows_are_presentation_only(self):
         board=self.base()
