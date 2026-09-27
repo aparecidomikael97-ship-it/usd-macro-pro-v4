@@ -35,7 +35,10 @@ Adicione o adapter correspondente em `SPECIALIST_MODULES`, dentro de
 `atlasquant_aion_specialist_evidence.py`. Reutilize módulos existentes. O
 especialista não recebe permissão própria e não pode executar fora do Guardian.
 A leitura local marca `answer_truth=UNKNOWN` e não transforma contrato de código
-em fato de mercado.
+em fato de mercado. Se a capability for consumir sessão, use
+`atlasquant_aion_specialist_session.py` e passe apenas o snapshot já carregado.
+Não busque rede para preencher ausência, não promova dado stale a fato atual e
+não escolha um lado de um conflito.
 
 Se ainda não houver implementação:
 

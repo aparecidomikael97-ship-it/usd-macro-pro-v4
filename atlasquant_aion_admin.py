@@ -261,6 +261,7 @@ from atlasquant_aion_orchestrator import (
 )
 from atlasquant_aion_specialists import plan_specialist_dispatch
 from atlasquant_aion_specialist_evidence import read_specialist_evidence
+from atlasquant_aion_specialist_session import loaded_session_from_checkpoint
 from atlasquant_aion_memory_layers import memory_layer_summary
 from atlasquant_aion_event_journal import (
     continuity_summary as live_event_continuity_summary,
@@ -2197,7 +2198,15 @@ def _render_central(
             o2.metric("Capability", str(selected_capability.get("capability_id") or "UNKNOWN"))
             o3.metric("Verdade", str(truth_preview.get("status") or "UNKNOWN"))
             o4.metric("Decisão", str(decision_preview.get("state") or "BLOCKED"))
-            local_evidence = read_specialist_evidence(dispatch_preview.get("specialist"))
+            local_evidence = read_specialist_evidence(
+                dispatch_preview.get("specialist"),
+                session=loaded_session_from_checkpoint(checkpoint),
+            )
+            evidence_conflicts = [
+                str(item.get("claim") or "conflito")
+                for item in list(local_evidence.get("conflicts") or [])
+                if isinstance(item, Mapping)
+            ]
             st.caption(
                 f"Dispatch {dispatch_preview.get('state')} · risco "
                 f"{(core_preview.get('risk') or {}).get('level', 'UNKNOWN')} · "
@@ -2209,6 +2218,21 @@ def _render_central(
                 + " Verdade da resposta: "
                 + str(local_evidence.get("answer_truth") or "UNKNOWN")
                 + ". Esta leitura não responde à pergunta."
+            )
+            st.caption(
+                "Snapshot "
+                + str(local_evidence.get("origin") or "SESSION")
+                + " · observed_at "
+                + str(local_evidence.get("observed_at") or "não informado")
+                + " · freshness "
+                + str(local_evidence.get("freshness") or "UNVERIFIED")
+                + " · truth_state "
+                + str(local_evidence.get("truth_state") or "UNKNOWN")
+                + " · conflicts "
+                + ("nenhum" if not evidence_conflicts else " · ".join(evidence_conflicts))
+                + " · answers_user_question "
+                + ("SIM" if local_evidence.get("answers_user_question") else "NÃO")
+                + "."
             )
             blockers = list(decision_preview.get("blockers") or [])
             if blockers:

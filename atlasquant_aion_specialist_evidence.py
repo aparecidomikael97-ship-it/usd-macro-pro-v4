@@ -465,8 +465,21 @@ _READERS = {
 }
 
 
-def read_specialist_evidence(specialist: Any) -> dict[str, Any]:
-    """Return a local specialist snapshot. Unknown specialists fail closed."""
+def read_specialist_evidence(
+    specialist: Any,
+    session: Any = None,
+    *,
+    now: Any = None,
+) -> dict[str, Any]:
+    """Return a local specialist snapshot. Unknown specialists fail closed.
+
+    Without ``session`` the reader keeps the local-contract behavior. With a
+    session, it reads only an already loaded snapshot and does not fetch.
+    """
+    if session is not None:
+        from atlasquant_aion_specialist_session import read_loaded_specialist_snapshot
+
+        return read_loaded_specialist_snapshot(specialist, session, now=now)
     key = str(specialist or "").strip().lower()
     reader = _READERS.get(key)
     if reader is None:

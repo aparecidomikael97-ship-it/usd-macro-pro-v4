@@ -190,6 +190,22 @@ somente o que a consulta local contém:
 `answer_truth` permanece `UNKNOWN`. Um contrato de código confirmado não vira
 resposta da pergunta, cotação, recomendação ou ordem.
 
+## Snapshot de sessão já carregado
+
+`build_specialist_session_snapshot()` aceita somente evidência que o chamador
+já tem em memória: scanner persistido, Radar, briefing macro, calendário da
+sessão, pesquisa já carregada, backtest registrado, checkpoint administrativo
+e estado local de Studio, Negócios ou Investimentos.
+
+A leitura não busca web, feed, calendário remoto, GitHub, banco, API de mercado
+nem modelo externo. Cada especialista distingue entrada ausente, presente porém
+stale, conflitante ou válida. Snapshot ausente mantém `answer_truth=UNKNOWN`.
+Dado stale não vira fato atual. Conflito permanece explícito, sem lado escolhido.
+
+A Central mostra origem (`SESSION`, `CHECKPOINT`, `PERSISTED_SCANNER`,
+`RESEARCH_EVIDENCE` ou equivalente), `observed_at`, freshness, `truth_state`,
+conflicts e `answers_user_question`. O Guardian continua dono de `real_trade`.
+
 ## Limites atuais
 
 - o Core planeja e valida; não é executor universal;

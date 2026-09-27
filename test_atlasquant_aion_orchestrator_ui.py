@@ -19,6 +19,12 @@ class AionOrchestratorUiIntegrationTests(unittest.TestCase):
         self.assertIn("read_specialist_evidence(", source)
         self.assertIn("Leitura local do especialista", source)
         self.assertIn("Esta leitura não responde à pergunta.", source)
+        self.assertIn("loaded_session_from_checkpoint(checkpoint)", source)
+        self.assertIn("observed_at", source)
+        self.assertIn("freshness", source)
+        self.assertIn("truth_state", source)
+        self.assertIn("conflicts", source)
+        self.assertIn("answers_user_question", source)
         self.assertIn("acesso entre personas automático: NÃO", source)
         self.assertIn('cols[3].metric("Ordens reais", "BLOQUEADAS")', source)
 
