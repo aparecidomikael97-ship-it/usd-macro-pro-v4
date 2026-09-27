@@ -38,6 +38,9 @@ do scanner não configurada e bloqueios de setups não congelados.
 - Cabeçalho do AION: lia `access["username"]`, mas em produção o usuário fica em
   `access["session"]`; sem `AION_ADMIN_DISPLAY_NAME` aparecia "Administrador".
 - Ordenação do Radar por sessão não quebra mais com prioridade não numérica.
+- Erros de fonte da atualização em segundo plano passam por `redact_text`
+  antes de irem para a tela: exceções de requisição podem conter a URL com
+  `api_key`. Também aplicado na #244.
 
 ## AION Central (`atlasquant_aion_workspaces.py`)
 
