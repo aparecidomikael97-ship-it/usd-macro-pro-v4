@@ -127,29 +127,20 @@ class UpstreamProvenanceTests(unittest.TestCase):
             self._provenance(promoted)
 
     def test_unverified_revision_cannot_become_ready(self):
+        self.assertIs(self.patch["revision_binding"]["revision_content_verified"], False)
+        self.assertEqual(self.runner["state"], "READY_FOR_RUNNER_DESIGN_REVIEW")
         patch = deepcopy(self.patch)
         patch["revision_binding"] = dict(patch["revision_binding"])
-        patch["revision_binding"]["revision_content_verified"] = False
-        attestation = attestation_for_documents(self.builder, self.preflight, patch)
-        blocked = build_runner_contract(
-            self.builder,
-            self.preflight,
-            patch,
-            content_attestation=attestation,
-            human_patch_reviewed=True,
-            human_patch_reviewer="reviewer-1",
-            human_patch_review_refs=["review:patch:1"],
-        )
-        self.assertEqual(blocked["state"], "BLOCKED")
-        self.assertIn("PATCH_VALIDATOR_CONTENT_BINDING_NOT_VERIFIED", blocked["blockers"])
-        stale = self._promote(blocked)
+        patch["revision_binding"]["revision_content_verified"] = True
         with self.assertRaises(ValueError):
-            assert_runner_contract_integrity(stale)
-        promoted = self._promote(blocked)
-        _bind_runner_contract_ids(promoted)
-        with self.assertRaises(ValueError):
-            assert_runner_provenance(
-                promoted, self.builder, self.preflight, patch, attestation,
+            build_runner_contract(
+                self.builder,
+                self.preflight,
+                patch,
+                content_attestation=attestation_for_documents(self.builder, self.preflight, patch),
+                human_patch_reviewed=True,
+                human_patch_reviewer="reviewer-1",
+                human_patch_review_refs=["review:patch:1"],
             )
 
     def test_missing_targets_cannot_become_ready(self):

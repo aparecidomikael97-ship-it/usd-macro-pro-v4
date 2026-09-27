@@ -3,45 +3,40 @@ from __future__ import annotations
 from copy import deepcopy
 import unittest
 
+from atlasquant_aion_developer_builder_sandbox import structural_builder_sandbox_request
+from atlasquant_aion_developer_manifest import bind_builder_request_lineage
 from atlasquant_aion_developer_patch_validation import SCHEMA, validate_patch
+from atlasquant_aion_developer_sandbox_preflight import build_sandbox_preflight
 
 
 def _request():
-    return {
-        "schema": "ATLASQUANT_AION_DEVELOPER_BUILDER_SANDBOX_REQUEST_V1",
-        "request_id": "DEVBUILD-1",
-        "state": "READY_FOR_BUILDER_SANDBOX",
-        "branch_contract": {
-            "branch": "cursor/safe",
-            "baseline_ref": "main@a",
-            "candidate_ref": "cursor/safe@b",
-        },
-        "scope": {
-            "requested_files": ["module.py", "test_module.py", "requirements.txt", "docs/release/NOTES.md"],
-            "authorized_files": ["module.py", "test_module.py", "requirements.txt", "docs/release/NOTES.md"],
-        },
-        "blockers": [],
-        "execution_authorized": False,
-        "executor_attached": False,
-    }
+    return structural_builder_sandbox_request(
+        branch="cursor/safe",
+        baseline_ref="main@a",
+        candidate_ref="cursor/safe@b",
+        requested_files=("module.py", "test_module.py", "requirements.txt"),
+        candidate_tests=("test_module.py",),
+    )
 
 
-def _preflight():
-    return {
-        "schema": "ATLASQUANT_AION_DEVELOPER_SANDBOX_PREFLIGHT_V1",
-        "preflight_id": "DEVPREF-1",
-        "builder_request_id": "DEVBUILD-1",
-        "state": "READY_FOR_EXECUTOR_DESIGN_REVIEW",
-        "preflight_passed": True,
-        "execution_authorized": False,
-        "executor_attached": False,
-    }
+def _preflight(request=None):
+    return build_sandbox_preflight(
+        request or _request(),
+        environment_kind="ISOLATED_WORKTREE",
+        environment_id="sandbox-001",
+        isolated_worktree=True,
+        repository_root_bound=True,
+        network_disabled=True,
+        secrets_mounted=False,
+        command_policy="ALLOWLIST_ONLY",
+    )
 
 
 def _validate(patch, request=None, preflight=None, **kwargs):
+    request = request or _request()
     return validate_patch(
-        request or _request(),
-        preflight or _preflight(),
+        request,
+        preflight or _preflight(request),
         patch,
         baseline_ref=kwargs.get("baseline_ref", "main@a"),
         candidate_ref=kwargs.get("candidate_ref", "cursor/safe@b"),
@@ -180,13 +175,14 @@ class AionDeveloperPatchValidationTests(unittest.TestCase):
         request["scope"] = deepcopy(request["scope"])
         request["scope"]["requested_files"] = ["module.py", "Ｍodule.py"]
         request["scope"]["authorized_files"] = ["module.py", "Ｍodule.py"]
+        request = bind_builder_request_lineage(request)
         patch = (
             "diff --git a/module.py b/module.py\n--- a/module.py\n+++ b/module.py\n"
             "@@ -1 +1 @@\n-a=1\n+a=2\n"
             "diff --git a/Ｍodule.py b/Ｍodule.py\n--- a/Ｍodule.py\n+++ b/Ｍodule.py\n"
             "@@ -1 +1 @@\n-b=1\n+b=2\n"
         )
-        out = _validate(patch, request=request)
+        out = _validate(patch, request=request, preflight=_preflight(request))
         self.assertEqual(out["state"], "BLOCKED")
         self.assertIn("CANONICAL_PATH_COLLISION", out["blockers"])
 

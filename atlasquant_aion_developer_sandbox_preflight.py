@@ -16,15 +16,13 @@ import re
 import unicodedata
 from typing import Any, Mapping
 
-from atlasquant_aion_developer_builder_sandbox import SCHEMA as BUILDER_REQUEST_SCHEMA
-from atlasquant_aion_developer_manifest import (
-    assert_builder_request_lineage,
-    assert_required_mandatory_gates,
-    require_string_sequence,
-)
+from atlasquant_aion_developer_builder_sandbox import assert_builder_sandbox_request_integrity
+from atlasquant_aion_developer_manifest import require_string_sequence
 from atlasquant_aion_observability import redact_text
 
 SCHEMA = "ATLASQUANT_AION_DEVELOPER_SANDBOX_PREFLIGHT_V1"
+READY_STATE = "READY_FOR_EXECUTOR_DESIGN_REVIEW"
+BLOCKED_STATE = "BLOCKED"
 
 MIN_RUNTIME_SECONDS = 1
 MAX_RUNTIME_SECONDS = 900
@@ -119,8 +117,96 @@ def validate_resource_budget(budget: Mapping[str, Any] | None) -> tuple[dict[str
     return validated, blockers
 
 
+_ENV_KEYS = frozenset({
+    "environment_kind",
+    "environment_id",
+    "isolated_worktree",
+    "repository_root_bound",
+    "network_disabled",
+    "secrets_mounted",
+    "command_policy",
+})
+_SCOPE_KEYS = frozenset({
+    "requested_files",
+    "scope_expansion_allowed",
+    "new_file_allowed",
+    "delete_file_allowed",
+    "rename_file_allowed",
+})
+_BUDGET_KEYS = frozenset(field for field, _low, _high, _blocker in _BUDGET_FIELDS)
+_FALSE_FLAGS = (
+    "symlink_physical_boundary_verified",
+    "hardlink_physical_boundary_verified",
+    "execution_authorized",
+    "executor_attached",
+    "commands_executed",
+    "writes_files",
+    "runs_tests",
+    "network_called",
+    "subprocess_called",
+    "automatic_commit",
+    "automatic_merge",
+    "automatic_deploy",
+    "production_change_allowed",
+    "real_trading_enabled",
+    "tool_output_is_authority",
+)
+_FUTURE_REQUIREMENTS = (
+    "Command allowlist must be explicit and immutable per run.",
+    "Working directory must remain inside the isolated worktree.",
+    "No network or mounted secrets.",
+    "All writes, if ever enabled later, must remain inside requested_files.",
+    "Every command/result must emit bounded audit evidence.",
+    "Budget exhaustion must fail closed.",
+    "Executor design review is separate from execution authorization.",
+    "Physical symlink and hardlink boundaries are not verified by this contract.",
+)
+_CONTRACT_KEYS = frozenset({
+    "schema",
+    "preflight_id",
+    "state",
+    "builder_request_id",
+    "test_contract_manifest_id",
+    "environment_contract",
+    "resource_budget",
+    "scope",
+    "blockers",
+    "future_executor_requirements",
+    "preflight_passed",
+    "executor_design_review_required",
+}) | frozenset(_FALSE_FLAGS)
+
+
+def _reject_closed(document: Mapping[str, Any], allowed: frozenset[str], label: str) -> None:
+    unknown = sorted(set(document) - allowed)
+    if unknown:
+        raise ValueError(f"unknown {label} field {unknown[0]}")
+    missing = sorted(allowed - set(document))
+    if missing:
+        raise ValueError(f"{label} is missing {missing[0]}")
+
+
+def _environment_blockers(env: Mapping[str, Any]) -> list[str]:
+    blockers: list[str] = []
+    if env.get("isolated_worktree") is not True:
+        blockers.append("ISOLATED_WORKTREE_REQUIRED")
+    if env.get("repository_root_bound") is not True:
+        blockers.append("REPOSITORY_ROOT_BOUNDARY_REQUIRED")
+    if env.get("network_disabled") is not True:
+        blockers.append("NETWORK_MUST_BE_DISABLED")
+    if env.get("secrets_mounted") is not False:
+        blockers.append("SECRETS_MUST_NOT_BE_MOUNTED")
+    if env.get("command_policy") != ALLOWED_COMMAND_POLICY:
+        blockers.append("COMMAND_POLICY_MUST_BE_ALLOWLIST_ONLY")
+    return blockers
+
+
 def expected_preflight_id(preflight: Mapping[str, Any]) -> str:
-    """Recompute the preflight id, including the bound test-contract manifest."""
+    """Recompute the preflight id from the sealed semantic fields.
+
+    State, blockers, environment booleans and authority flags enter the
+    digest. Recomputing the id does not make a contradictory document ready.
+    """
     env = (
         preflight.get("environment_contract")
         if isinstance(preflight.get("environment_contract"), Mapping)
@@ -133,14 +219,27 @@ def expected_preflight_id(preflight: Mapping[str, Any]) -> str:
     )
     scope = preflight.get("scope") if isinstance(preflight.get("scope"), Mapping) else {}
     validated_budget, _range_blockers = validate_resource_budget(budget)
+    blockers = preflight.get("blockers")
     seed = {
         "request_id": str(preflight.get("builder_request_id") or ""),
         "environment": str(env.get("environment_kind") or ""),
         "environment_id": str(env.get("environment_id") or ""),
+        "isolated_worktree": env.get("isolated_worktree"),
+        "repository_root_bound": env.get("repository_root_bound"),
+        "network_disabled": env.get("network_disabled"),
+        "secrets_mounted": env.get("secrets_mounted"),
         "files": require_string_sequence(scope.get("requested_files"), "requested_files"),
+        "scope_expansion_allowed": scope.get("scope_expansion_allowed"),
+        "new_file_allowed": scope.get("new_file_allowed"),
+        "delete_file_allowed": scope.get("delete_file_allowed"),
+        "rename_file_allowed": scope.get("rename_file_allowed"),
         "policy": str(env.get("command_policy") or ""),
         "budgets": validated_budget,
         "test_contract_manifest_id": str(preflight.get("test_contract_manifest_id") or ""),
+        "state": preflight.get("state"),
+        "blockers": list(blockers) if isinstance(blockers, list) else blockers,
+        "preflight_passed": preflight.get("preflight_passed"),
+        **{field: preflight.get(field) for field in _FALSE_FLAGS},
     }
     return "DEVPREF-" + _digest(seed)
 
@@ -172,71 +271,20 @@ def build_sandbox_preflight(
     max_commands: int = MAX_COMMANDS,
 ) -> dict[str, Any]:
     """Validate a future sandbox boundary without authorizing execution."""
-    if builder_request.get("schema") != BUILDER_REQUEST_SCHEMA:
-        raise ValueError("invalid Builder Sandbox Request")
-    if str(builder_request.get("state") or "") != "READY_FOR_BUILDER_SANDBOX":
+    manifest_id = assert_builder_sandbox_request_integrity(builder_request)
+    if builder_request.get("state") != "READY_FOR_BUILDER_SANDBOX":
         raise ValueError("builder request is not ready")
-    if list(builder_request.get("blockers") or []):
-        raise ValueError("builder request still has blockers")
-    if builder_request.get("execution_authorized") is not False:
-        raise ValueError("builder request unexpectedly authorizes execution")
-    if builder_request.get("executor_attached") is not False:
-        raise ValueError("builder request already has an executor attached")
-    if builder_request.get("writes_files") is not False:
-        raise ValueError("builder request unexpectedly writes files")
-
-    branch = (
-        builder_request.get("branch_contract")
-        if isinstance(builder_request.get("branch_contract"), Mapping)
-        else {}
-    )
-    if branch.get("candidate_bound_to_branch") is not True:
-        raise ValueError("candidate ref is not bound to isolated branch")
-    if branch.get("main_branch_allowed") is not False:
-        raise ValueError("main branch authority must remain blocked")
-    if branch.get("force_push_allowed") is not False:
-        raise ValueError("force push must remain blocked")
-    if branch.get("history_rewrite_allowed") is not False:
-        raise ValueError("history rewrite must remain blocked")
-
-    scope = (
-        builder_request.get("scope")
-        if isinstance(builder_request.get("scope"), Mapping)
-        else {}
-    )
+    scope = builder_request.get("scope") if isinstance(builder_request.get("scope"), Mapping) else {}
     requested = _canonical_scope_paths(
         require_string_sequence(scope.get("requested_files"), "requested_files"),
         label="requested",
     )
-    authorized = set(_canonical_scope_paths(
-        require_string_sequence(scope.get("authorized_files"), "authorized_files"),
-        label="authorized",
-    ))
-    if not requested:
-        raise ValueError("requested file scope is empty")
-    if any(path not in authorized for path in requested):
-        raise ValueError("requested files exceed authorized scope")
-    if scope.get("scope_expansion_allowed") is not False:
-        raise ValueError("scope expansion must remain blocked")
-    for flag in ("new_file_allowed", "delete_file_allowed", "rename_file_allowed"):
-        if scope.get(flag) is not False:
-            raise ValueError(f"{flag} must remain false")
-
-    manifest_id = assert_builder_request_lineage(builder_request)
-    tests = (
-        builder_request.get("test_contract")
-        if isinstance(builder_request.get("test_contract"), Mapping)
-        else {}
-    )
+    if requested != list(scope.get("requested_files") or []):
+        raise ValueError("builder requested files are not canonical")
+    tests = builder_request.get("test_contract") if isinstance(builder_request.get("test_contract"), Mapping) else {}
     candidate_tests = require_string_sequence(tests.get("candidate_tests"), "candidate_tests")
-    mandatory_gates = require_string_sequence(tests.get("mandatory_gates"), "mandatory_gates")
     if not candidate_tests:
         raise ValueError("candidate tests are required")
-    assert_required_mandatory_gates(mandatory_gates)
-    if tests.get("test_deletion_allowed") is not False:
-        raise ValueError("test deletion must remain blocked")
-    if tests.get("test_weakening_allowed") is not False:
-        raise ValueError("test weakening must remain blocked")
 
     environment = _clean(environment_kind, 80).upper()
     env_id = _clean(environment_id, 160)
@@ -246,28 +294,24 @@ def build_sandbox_preflight(
     if not env_id:
         raise ValueError("sandbox environment id required")
 
-    blockers: list[str] = []
-    if isolated_worktree is not True:
-        blockers.append("ISOLATED_WORKTREE_REQUIRED")
-    if repository_root_bound is not True:
-        blockers.append("REPOSITORY_ROOT_BOUNDARY_REQUIRED")
-    if network_disabled is not True:
-        blockers.append("NETWORK_MUST_BE_DISABLED")
-    if secrets_mounted is not False:
-        blockers.append("SECRETS_MUST_NOT_BE_MOUNTED")
-    if policy != ALLOWED_COMMAND_POLICY:
-        blockers.append("COMMAND_POLICY_MUST_BE_ALLOWLIST_ONLY")
-
+    environment_contract = {
+        "environment_kind": environment,
+        "environment_id": env_id,
+        "isolated_worktree": isolated_worktree is True,
+        "repository_root_bound": repository_root_bound is True,
+        "network_disabled": network_disabled is True,
+        "secrets_mounted": secrets_mounted is True,
+        "command_policy": policy,
+    }
     budgets, budget_blockers = validate_resource_budget({
         "runtime_seconds": runtime_seconds,
         "memory_mb": memory_mb,
         "output_bytes": output_bytes,
         "max_commands": max_commands,
     })
-    blockers.extend(budget_blockers)
-
+    blockers = _environment_blockers(environment_contract) + budget_blockers
     blockers = list(dict.fromkeys(blockers))
-    state = "READY_FOR_EXECUTOR_DESIGN_REVIEW" if not blockers else "BLOCKED"
+    state = READY_STATE if not blockers else BLOCKED_STATE
 
     out = {
         "schema": SCHEMA,
@@ -275,15 +319,7 @@ def build_sandbox_preflight(
         "state": state,
         "builder_request_id": str(builder_request.get("request_id") or ""),
         "test_contract_manifest_id": manifest_id,
-        "environment_contract": {
-            "environment_kind": environment,
-            "environment_id": env_id,
-            "isolated_worktree": bool(isolated_worktree),
-            "repository_root_bound": bool(repository_root_bound),
-            "network_disabled": bool(network_disabled),
-            "secrets_mounted": bool(secrets_mounted),
-            "command_policy": policy,
-        },
+        "environment_contract": environment_contract,
         "resource_budget": budgets,
         "scope": {
             "requested_files": requested,
@@ -293,36 +329,88 @@ def build_sandbox_preflight(
             "rename_file_allowed": False,
         },
         "blockers": blockers,
-        "future_executor_requirements": [
-            "Command allowlist must be explicit and immutable per run.",
-            "Working directory must remain inside the isolated worktree.",
-            "No network or mounted secrets.",
-            "All writes, if ever enabled later, must remain inside requested_files.",
-            "Every command/result must emit bounded audit evidence.",
-            "Budget exhaustion must fail closed.",
-            "Executor design review is separate from execution authorization.",
-            "Physical symlink and hardlink boundaries are not verified by this contract.",
-        ],
-        "symlink_physical_boundary_verified": False,
-        "hardlink_physical_boundary_verified": False,
+        "future_executor_requirements": list(_FUTURE_REQUIREMENTS),
         "preflight_passed": not blockers,
         "executor_design_review_required": True,
-        "execution_authorized": False,
-        "executor_attached": False,
-        "commands_executed": False,
-        "writes_files": False,
-        "runs_tests": False,
-        "network_called": False,
-        "subprocess_called": False,
-        "automatic_commit": False,
-        "automatic_merge": False,
-        "automatic_deploy": False,
-        "production_change_allowed": False,
-        "real_trading_enabled": False,
-        "tool_output_is_authority": False,
+        **{field: False for field in _FALSE_FLAGS},
     }
     out["preflight_id"] = expected_preflight_id(out)
+    assert_sandbox_preflight_integrity(out, builder_request)
     return out
+
+
+def assert_sandbox_preflight_integrity(
+    preflight: Mapping[str, Any],
+    builder_request: Mapping[str, Any],
+) -> str:
+    """Rebuild the preflight decision against the builder document.
+
+    ``requested_files`` must equal the builder scope. A recomputed preflight
+    id does not authorize a swapped scope or a contradictory environment.
+    """
+    manifest_id = assert_builder_sandbox_request_integrity(builder_request)
+    if not isinstance(preflight, Mapping):
+        raise ValueError("sandbox preflight must be an object")
+    if preflight.get("schema") != SCHEMA:
+        raise ValueError("invalid Sandbox Preflight")
+    _reject_closed(preflight, _CONTRACT_KEYS, "sandbox preflight")
+    for field in _FALSE_FLAGS:
+        if preflight.get(field) is not False:
+            raise ValueError(f"sandbox preflight cannot claim {field}")
+    if preflight.get("executor_design_review_required") is not True:
+        raise ValueError("executor design review remains required")
+    if list(preflight.get("future_executor_requirements") or []) != list(_FUTURE_REQUIREMENTS):
+        raise ValueError("future executor requirements are not canonical")
+    if preflight.get("builder_request_id") != builder_request.get("request_id"):
+        raise ValueError("preflight lineage mismatch")
+    if preflight.get("test_contract_manifest_id") != manifest_id:
+        raise ValueError("preflight test contract mismatch")
+    env = preflight.get("environment_contract")
+    if not isinstance(env, Mapping):
+        raise ValueError("preflight environment contract must be an object")
+    _reject_closed(env, _ENV_KEYS, "preflight environment")
+    if env.get("environment_kind") not in ALLOWED_ENVIRONMENT_KINDS:
+        raise ValueError("unsupported sandbox environment kind")
+    if not isinstance(env.get("environment_id"), str) or not env.get("environment_id"):
+        raise ValueError("sandbox environment id required")
+    budget = preflight.get("resource_budget")
+    if not isinstance(budget, Mapping):
+        raise ValueError("resource budget must be an object")
+    _reject_closed(budget, _BUDGET_KEYS, "preflight resource budget")
+    validated_budget, budget_blockers = validate_resource_budget(budget)
+    if dict(budget) != validated_budget:
+        raise ValueError("preflight resource budget was not canonical")
+    scope = preflight.get("scope")
+    if not isinstance(scope, Mapping):
+        raise ValueError("preflight scope must be an object")
+    _reject_closed(scope, _SCOPE_KEYS, "preflight scope")
+    builder_scope = builder_request.get("scope") if isinstance(builder_request.get("scope"), Mapping) else {}
+    requested = _canonical_scope_paths(
+        require_string_sequence(builder_scope.get("requested_files"), "requested_files"),
+        label="requested",
+    )
+    if require_string_sequence(scope.get("requested_files"), "requested_files") != requested:
+        raise ValueError("preflight scope was not derived from the builder request")
+    for flag in ("scope_expansion_allowed", "new_file_allowed", "delete_file_allowed", "rename_file_allowed"):
+        if scope.get(flag) is not False:
+            raise ValueError(f"preflight {flag} must remain false")
+    derived = list(dict.fromkeys(_environment_blockers(env) + budget_blockers))
+    blockers = preflight.get("blockers")
+    if not isinstance(blockers, list) or blockers != derived:
+        raise ValueError("preflight blockers were not derived")
+    ready = not derived
+    if preflight.get("preflight_passed") is not ready:
+        raise ValueError("preflight_passed was not derived")
+    state = preflight.get("state")
+    if ready:
+        if state != READY_STATE:
+            raise ValueError("ready preflight state was not derived")
+    else:
+        if state != BLOCKED_STATE:
+            raise ValueError("blocked preflight state was not derived")
+    if preflight.get("preflight_id") != expected_preflight_id(preflight):
+        raise ValueError("preflight id mismatch")
+    return str(preflight.get("preflight_id"))
 
 
 __all__ = [
@@ -339,6 +427,8 @@ __all__ = [
     "ALLOWED_ENVIRONMENT_KINDS",
     "canonical_repository_relative_path",
     "validate_resource_budget",
+    "READY_STATE",
     "expected_preflight_id",
+    "assert_sandbox_preflight_integrity",
     "build_sandbox_preflight",
 ]

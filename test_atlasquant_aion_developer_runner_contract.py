@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 import unittest
 
+from atlasquant_aion_developer_builder_sandbox import structural_builder_sandbox_request
 from atlasquant_aion_developer_content_attestation import attestation_for_documents
 from atlasquant_aion_developer_manifest import (
     REQUIRED_MANDATORY_GATES,
@@ -13,6 +14,7 @@ from atlasquant_aion_developer_runner_contract import (
     SCHEMA,
     build_runner_contract,
 )
+from atlasquant_aion_developer_patch_validation import canonical_patch_document
 from atlasquant_aion_developer_sandbox_preflight import (
     ALLOWED_COMMAND_POLICY,
     build_sandbox_preflight,
@@ -21,45 +23,12 @@ from atlasquant_aion_developer_sandbox_preflight import (
 
 
 def _builder(**contract_overrides):
-    contract = {
-        "candidate_tests": ["test_module.py"],
-        "mandatory_gates": list(REQUIRED_MANDATORY_GATES),
-        "test_deletion_allowed": False,
-        "test_weakening_allowed": False,
-    }
-    contract.update(contract_overrides)
-    return bind_builder_request_lineage({
-        "schema": "ATLASQUANT_AION_DEVELOPER_BUILDER_SANDBOX_REQUEST_V1",
-        "state": "READY_FOR_BUILDER_SANDBOX",
-        "roles": structural_request_roles(),
-        "lineage": {
-            "snapshot_digest": "REPO-FIXTURE",
-            "implementation_envelope_id": "DEVIMPL-FIXTURE",
-            "implementation_authorization_id": "DEVAUTH-FIXTURE",
-        },
-        "branch_contract": {
-            "branch": "cursor/fix",
-            "baseline_ref": "main@aaa",
-            "candidate_ref": "cursor/fix@bbb",
-            "candidate_bound_to_branch": True,
-            "main_branch_allowed": False,
-            "force_push_allowed": False,
-            "history_rewrite_allowed": False,
-        },
-        "scope": {
-            "requested_files": ["test_module.py"],
-            "authorized_files": ["test_module.py"],
-            "scope_expansion_allowed": False,
-            "new_file_allowed": False,
-            "delete_file_allowed": False,
-            "rename_file_allowed": False,
-        },
-        "test_contract": contract,
-        "blockers": [],
-        "execution_authorized": False,
-        "executor_attached": False,
-        "writes_files": False,
-    })
+    tests = contract_overrides.get("candidate_tests", ["test_module.py"])
+    gates = contract_overrides.get("mandatory_gates", list(REQUIRED_MANDATORY_GATES))
+    return structural_builder_sandbox_request(
+        candidate_tests=list(tests),
+        mandatory_gates=list(gates),
+    )
 
 
 def _preflight(builder=None):
@@ -76,30 +45,16 @@ def _preflight(builder=None):
 
 
 def _patch(builder, preflight, *, content_verified=False):
-    return {
-        "schema": "ATLASQUANT_AION_DEVELOPER_PATCH_VALIDATION_V1",
-        "validation_id": "DEVPATCHVAL-1",
-        "state": "READY_FOR_PATCH_REVIEW",
-        "builder_request_id": builder["request_id"],
-        "preflight_id": preflight["preflight_id"],
-        "patch_digest": "DEVPATCH-ABC",
-        "revision_binding": {
-            "baseline_ref": "main@aaa",
-            "candidate_ref": "cursor/fix@bbb",
-            "refs_match_approved_request": True,
-            "revision_content_verified": content_verified,
-        },
-        "blockers": [],
-        "patch_applied": False,
-        "execution_authorized": False,
-        "executor_attached": False,
-    }
+    document = canonical_patch_document(builder, preflight)
+    if content_verified:
+        document["revision_binding"]["revision_content_verified"] = True
+    return document
 
 
 def _run(builder=None, preflight=None, patch=None, **overrides):
     builder = builder or _builder()
     preflight = preflight or _preflight(builder)
-    patch = patch or _patch(builder, preflight, content_verified=True)
+    patch = patch or _patch(builder, preflight)
     args = {
         "content_attestation": attestation_for_documents(builder, preflight, patch),
         "human_patch_reviewed": True,
@@ -133,17 +88,15 @@ class AionDeveloperRunnerContractTests(unittest.TestCase):
         self.assertFalse(out["content_binding_independently_verified"])
         self.assertTrue(out["runner_contract_id"].startswith("DEVRUN-"))
 
-    def test_unverified_patch_content_blocks(self):
+    def test_revision_content_verified_true_is_rejected(self):
         builder = _builder()
         preflight = _preflight(builder)
-        out = _run(
-            builder=builder,
-            preflight=preflight,
-            patch=_patch(builder, preflight, content_verified=False),
-        )
-        self.assertEqual(out["state"], "BLOCKED")
-        self.assertIn("PATCH_VALIDATOR_CONTENT_BINDING_NOT_VERIFIED", out["blockers"])
-        self.assertFalse(out["execution_authorized"])
+        with self.assertRaises(ValueError):
+            _run(
+                builder=builder,
+                preflight=preflight,
+                patch=_patch(builder, preflight, content_verified=True),
+            )
 
     def test_missing_external_content_binding_blocks(self):
         out = _run(content_attestation=None)
@@ -169,19 +122,20 @@ class AionDeveloperRunnerContractTests(unittest.TestCase):
     def test_lineage_mismatch_fails_closed(self):
         builder = _builder()
         preflight = _preflight(builder)
-        preflight["builder_request_id"] = "OTHER"
+        patch = _patch(builder, preflight)
+        bad_preflight = deepcopy(preflight)
+        bad_preflight["builder_request_id"] = "OTHER"
         with self.assertRaises(ValueError):
-            _run(builder=builder, preflight=preflight)
-
-        patch = _patch(builder, preflight, content_verified=True)
-        patch["preflight_id"] = "OTHER"
+            _run(builder=builder, preflight=bad_preflight, patch=patch)
+        bad_patch = deepcopy(patch)
+        bad_patch["preflight_id"] = "OTHER"
         with self.assertRaises(ValueError):
-            _run(builder=builder, patch=patch)
+            _run(builder=builder, preflight=preflight, patch=bad_patch)
 
     def test_revision_ref_drift_fails_closed(self):
         builder = _builder()
         preflight = _preflight(builder)
-        patch = _patch(builder, preflight, content_verified=True)
+        patch = _patch(builder, preflight)
         patch["revision_binding"] = deepcopy(patch["revision_binding"])
         patch["revision_binding"]["candidate_ref"] = "cursor/other@bbb"
         with self.assertRaises(ValueError):
@@ -212,9 +166,8 @@ class AionDeveloperRunnerContractTests(unittest.TestCase):
         preflight["resource_budget"] = dict(preflight["resource_budget"])
         preflight["resource_budget"]["runtime_seconds"] = 0
         preflight["preflight_id"] = expected_preflight_id(preflight)
-        out = _run(builder=builder, preflight=preflight)
-        self.assertEqual(out["state"], "BLOCKED")
-        self.assertIn("RUNTIME_BUDGET_OUT_OF_RANGE", out["blockers"])
+        with self.assertRaises(ValueError):
+            _run(builder=builder, preflight=preflight)
 
     def test_never_executes_or_mutates(self):
         out = _run()

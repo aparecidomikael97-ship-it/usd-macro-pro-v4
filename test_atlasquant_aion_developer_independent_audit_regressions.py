@@ -7,12 +7,13 @@ import unittest
 
 from atlasquant_aion_developer_command_policy import build_command_policy_contract
 from atlasquant_aion_developer_content_attestation import attestation_for_documents
+from atlasquant_aion_developer_builder_sandbox import structural_builder_sandbox_request
 from atlasquant_aion_developer_manifest import (
     REQUIRED_MANDATORY_GATES,
     bind_builder_request_lineage,
     structural_request_roles,
 )
-from atlasquant_aion_developer_patch_validation import validate_patch
+from atlasquant_aion_developer_patch_validation import canonical_patch_document, validate_patch
 from atlasquant_aion_developer_runner_contract import (
     MAX_MANDATORY_GATES,
     MAX_TEST_TARGETS,
@@ -26,94 +27,28 @@ from atlasquant_aion_developer_sandbox_preflight import (
 
 
 def _builder(tests, gates=None):
-    return bind_builder_request_lineage({
-        "schema": "ATLASQUANT_AION_DEVELOPER_BUILDER_SANDBOX_REQUEST_V1",
-        "state": "READY_FOR_BUILDER_SANDBOX",
-        "roles": structural_request_roles(),
-        "lineage": {
-            "snapshot_digest": "REPO-FIXTURE",
-            "implementation_envelope_id": "DEVIMPL-FIXTURE",
-            "implementation_authorization_id": "DEVAUTH-FIXTURE",
-        },
-        "branch_contract": {
-            "branch": "cursor/fix",
-            "baseline_ref": "main@aaa",
-            "candidate_ref": "cursor/fix@bbb",
-            "candidate_bound_to_branch": True,
-            "main_branch_allowed": False,
-            "force_push_allowed": False,
-            "history_rewrite_allowed": False,
-        },
-        "scope": {
-            "requested_files": ["test_module.py"],
-            "authorized_files": ["test_module.py"],
-            "scope_expansion_allowed": False,
-            "new_file_allowed": False,
-            "delete_file_allowed": False,
-            "rename_file_allowed": False,
-        },
-        "test_contract": {
-            "candidate_tests": list(tests),
-            "mandatory_gates": list(gates) if gates is not None else list(REQUIRED_MANDATORY_GATES),
-            "test_deletion_allowed": False,
-            "test_weakening_allowed": False,
-        },
-        "blockers": [],
-        "execution_authorized": False,
-        "executor_attached": False,
-        "writes_files": False,
-    })
+    return structural_builder_sandbox_request(
+        candidate_tests=list(tests),
+        mandatory_gates=list(gates) if gates is not None else list(REQUIRED_MANDATORY_GATES),
+        requested_files=("test_module.py",),
+    )
 
 
 def _preflight_doc(builder):
-    preflight = {
-        "schema": "ATLASQUANT_AION_DEVELOPER_SANDBOX_PREFLIGHT_V1",
-        "state": "READY_FOR_EXECUTOR_DESIGN_REVIEW",
-        "builder_request_id": builder["request_id"],
-        "test_contract_manifest_id": builder["test_contract_manifest_id"],
-        "preflight_passed": True,
-        "environment_contract": {
-            "environment_kind": "ISOLATED_WORKTREE",
-            "environment_id": "sandbox-001",
-            "isolated_worktree": True,
-            "repository_root_bound": True,
-            "network_disabled": True,
-            "secrets_mounted": False,
-            "command_policy": "ALLOWLIST_ONLY",
-        },
-        "resource_budget": {
-            "runtime_seconds": 900,
-            "memory_mb": 2048,
-            "output_bytes": 2_000_000,
-            "max_commands": 24,
-        },
-        "scope": {"requested_files": ["test_module.py"]},
-        "execution_authorized": False,
-        "executor_attached": False,
-    }
-    preflight["preflight_id"] = expected_preflight_id(preflight)
-    return preflight
+    return build_sandbox_preflight(
+        builder,
+        environment_kind="ISOLATED_WORKTREE",
+        environment_id="sandbox-001",
+        isolated_worktree=True,
+        repository_root_bound=True,
+        network_disabled=True,
+        secrets_mounted=False,
+        command_policy="ALLOWLIST_ONLY",
+    )
 
 
 def _patch_doc(builder, preflight):
-    return {
-        "schema": "ATLASQUANT_AION_DEVELOPER_PATCH_VALIDATION_V1",
-        "validation_id": "DEVPATCHVAL-1",
-        "state": "READY_FOR_PATCH_REVIEW",
-        "builder_request_id": builder["request_id"],
-        "preflight_id": preflight["preflight_id"],
-        "patch_digest": "DEVPATCH-ABC",
-        "revision_binding": {
-            "baseline_ref": "main@aaa",
-            "candidate_ref": "cursor/fix@bbb",
-            "refs_match_approved_request": True,
-            "revision_content_verified": True,
-        },
-        "blockers": [],
-        "patch_applied": False,
-        "execution_authorized": False,
-        "executor_attached": False,
-    }
+    return canonical_patch_document(builder, preflight)
 
 
 def _runner(tests, gates=None):
@@ -132,43 +67,14 @@ def _runner(tests, gates=None):
 
 
 def _preflight_request(path):
-    return bind_builder_request_lineage({
-        "schema": "ATLASQUANT_AION_DEVELOPER_BUILDER_SANDBOX_REQUEST_V1",
-        "state": "READY_FOR_BUILDER_SANDBOX",
-        "roles": structural_request_roles(),
-        "lineage": {
-            "snapshot_digest": "REPO-FIXTURE",
-            "implementation_envelope_id": "DEVIMPL-FIXTURE",
-            "implementation_authorization_id": "DEVAUTH-FIXTURE",
-        },
-        "branch_contract": {
-            "branch": "cursor/sandbox",
-            "baseline_ref": "main@a",
-            "candidate_ref": "cursor/sandbox@b",
-            "candidate_bound_to_branch": True,
-            "main_branch_allowed": False,
-            "force_push_allowed": False,
-            "history_rewrite_allowed": False,
-        },
-        "scope": {
-            "requested_files": [path],
-            "authorized_files": [path],
-            "scope_expansion_allowed": False,
-            "new_file_allowed": False,
-            "delete_file_allowed": False,
-            "rename_file_allowed": False,
-        },
-        "test_contract": {
-            "candidate_tests": ["test_module.py"],
-            "mandatory_gates": list(REQUIRED_MANDATORY_GATES),
-            "test_deletion_allowed": False,
-            "test_weakening_allowed": False,
-        },
-        "blockers": [],
-        "execution_authorized": False,
-        "executor_attached": False,
-        "writes_files": False,
-    })
+    return structural_builder_sandbox_request(
+        branch="cursor/sandbox",
+        baseline_ref="main@a",
+        candidate_ref="cursor/sandbox@b",
+        requested_files=(path,),
+        authorized_files=(path,),
+        candidate_tests=("test_module.py",),
+    )
 
 
 def _call_preflight(path):
@@ -185,35 +91,26 @@ def _call_preflight(path):
 
 
 def _patch_request():
-    return {
-        "schema": "ATLASQUANT_AION_DEVELOPER_BUILDER_SANDBOX_REQUEST_V1",
-        "request_id": "DEVBUILD-1",
-        "state": "READY_FOR_BUILDER_SANDBOX",
-        "branch_contract": {
-            "branch": "cursor/safe",
-            "baseline_ref": "main@a",
-            "candidate_ref": "cursor/safe@b",
-        },
-        "scope": {
-            "requested_files": ["module.py", "test_module.py"],
-            "authorized_files": ["module.py", "test_module.py"],
-        },
-        "blockers": [],
-        "execution_authorized": False,
-        "executor_attached": False,
-    }
+    return structural_builder_sandbox_request(
+        branch="cursor/safe",
+        baseline_ref="main@a",
+        candidate_ref="cursor/safe@b",
+        requested_files=("module.py", "test_module.py"),
+        candidate_tests=("test_module.py",),
+    )
 
 
 def _patch_preflight():
-    return {
-        "schema": "ATLASQUANT_AION_DEVELOPER_SANDBOX_PREFLIGHT_V1",
-        "preflight_id": "DEVPREF-1",
-        "builder_request_id": "DEVBUILD-1",
-        "state": "READY_FOR_EXECUTOR_DESIGN_REVIEW",
-        "preflight_passed": True,
-        "execution_authorized": False,
-        "executor_attached": False,
-    }
+    return build_sandbox_preflight(
+        _patch_request(),
+        environment_kind="ISOLATED_WORKTREE",
+        environment_id="sandbox-001",
+        isolated_worktree=True,
+        repository_root_bound=True,
+        network_disabled=True,
+        secrets_mounted=False,
+        command_policy="ALLOWLIST_ONLY",
+    )
 
 
 def _validate(patch):
@@ -534,7 +431,9 @@ class IndependentAuditContractGapTests(unittest.TestCase):
         self.assertEqual(out["tests"]["targets"], [])
         gates = _runner(
             ["test_module.py"],
-            gates=[f"GATE_{index}" for index in range(MAX_MANDATORY_GATES + 1)],
+            gates=list(REQUIRED_MANDATORY_GATES) + [
+                f"GATE_{index}" for index in range(MAX_MANDATORY_GATES - len(REQUIRED_MANDATORY_GATES) + 1)
+            ],
         )
         self.assertEqual(gates["state"], "BLOCKED")
         self.assertIn("MANDATORY_GATE_LIMIT_EXCEEDED", gates["blockers"])

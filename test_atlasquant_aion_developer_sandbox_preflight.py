@@ -3,11 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 import unittest
 
-from atlasquant_aion_developer_manifest import (
-    REQUIRED_MANDATORY_GATES,
-    bind_builder_request_lineage,
-    structural_request_roles,
-)
+from atlasquant_aion_developer_builder_sandbox import structural_builder_sandbox_request
 from atlasquant_aion_developer_sandbox_preflight import (
     ALLOWED_COMMAND_POLICY,
     SCHEMA,
@@ -16,44 +12,13 @@ from atlasquant_aion_developer_sandbox_preflight import (
 
 
 def _request():
-    return bind_builder_request_lineage({
-        "schema": "ATLASQUANT_AION_DEVELOPER_BUILDER_SANDBOX_REQUEST_V1",
-        "state": "READY_FOR_BUILDER_SANDBOX",
-        "roles": structural_request_roles(),
-        "lineage": {
-            "snapshot_digest": "REPO-FIXTURE",
-            "implementation_envelope_id": "DEVIMPL-FIXTURE",
-            "implementation_authorization_id": "DEVAUTH-FIXTURE",
-        },
-        "branch_contract": {
-            "branch": "cursor/sandbox",
-            "baseline_ref": "main@a",
-            "candidate_ref": "cursor/sandbox@b",
-            "candidate_bound_to_branch": True,
-            "main_branch_allowed": False,
-            "force_push_allowed": False,
-            "history_rewrite_allowed": False,
-        },
-        "scope": {
-            "requested_files": ["module.py", "test_module.py"],
-            "authorized_files": ["module.py", "test_module.py"],
-            "scope_expansion_allowed": False,
-            "new_file_allowed": False,
-            "delete_file_allowed": False,
-            "rename_file_allowed": False,
-        },
-        "test_contract": {
-            "candidate_tests": ["test_module.py"],
-            "mandatory_gates": list(REQUIRED_MANDATORY_GATES),
-            "test_deletion_allowed": False,
-            "test_weakening_allowed": False,
-            "tests_executed": False,
-        },
-        "blockers": [],
-        "execution_authorized": False,
-        "executor_attached": False,
-        "writes_files": False,
-    })
+    return structural_builder_sandbox_request(
+        branch="cursor/sandbox",
+        baseline_ref="main@a",
+        candidate_ref="cursor/sandbox@b",
+        requested_files=("module.py", "test_module.py"),
+        candidate_tests=("test_module.py",),
+    )
 
 
 def _preflight(request=None, **overrides):

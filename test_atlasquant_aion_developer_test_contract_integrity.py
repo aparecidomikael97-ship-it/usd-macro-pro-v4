@@ -31,6 +31,7 @@ from atlasquant_aion_developer_manifest import (
     expected_builder_request_id,
 )
 from atlasquant_aion_developer_package import build_developer_package
+from atlasquant_aion_developer_patch_validation import canonical_patch_document
 from atlasquant_aion_developer_runner_contract import build_runner_contract
 from atlasquant_aion_developer_sandbox_preflight import (
     build_sandbox_preflight,
@@ -142,25 +143,7 @@ def _preflight(request):
 
 
 def _runner(request, preflight, **overrides):
-    branch = request["branch_contract"]
-    patch = {
-        "schema": "ATLASQUANT_AION_DEVELOPER_PATCH_VALIDATION_V1",
-        "validation_id": "DEVPATCHVAL-1",
-        "state": "READY_FOR_PATCH_REVIEW",
-        "builder_request_id": request["request_id"],
-        "preflight_id": preflight["preflight_id"],
-        "patch_digest": "DEVPATCH-ABC",
-        "revision_binding": {
-            "baseline_ref": branch["baseline_ref"],
-            "candidate_ref": branch["candidate_ref"],
-            "refs_match_approved_request": True,
-            "revision_content_verified": True,
-        },
-        "blockers": [],
-        "patch_applied": False,
-        "execution_authorized": False,
-        "executor_attached": False,
-    }
+    patch = canonical_patch_document(request, preflight)
     args = {
         "content_attestation": attestation_for_documents(request, preflight, patch),
         "human_patch_reviewed": True,

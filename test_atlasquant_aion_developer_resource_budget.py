@@ -6,11 +6,9 @@ import unittest
 
 from atlasquant_aion_developer_command_policy import build_command_policy_contract
 from atlasquant_aion_developer_content_attestation import attestation_for_documents
-from atlasquant_aion_developer_manifest import (
-    REQUIRED_MANDATORY_GATES,
-    bind_builder_request_lineage,
-    structural_request_roles,
-)
+from atlasquant_aion_developer_builder_sandbox import structural_builder_sandbox_request
+from atlasquant_aion_developer_manifest import REQUIRED_MANDATORY_GATES
+from atlasquant_aion_developer_patch_validation import canonical_patch_document
 from atlasquant_aion_developer_runner_contract import (
     _bind_runner_contract_ids,
     build_runner_contract,
@@ -72,43 +70,7 @@ _CLOSED = (
 
 
 def _request():
-    return bind_builder_request_lineage({
-        "schema": "ATLASQUANT_AION_DEVELOPER_BUILDER_SANDBOX_REQUEST_V1",
-        "state": "READY_FOR_BUILDER_SANDBOX",
-        "roles": structural_request_roles(),
-        "lineage": {
-            "snapshot_digest": "REPO-FIXTURE",
-            "implementation_envelope_id": "DEVIMPL-FIXTURE",
-            "implementation_authorization_id": "DEVAUTH-FIXTURE",
-        },
-        "branch_contract": {
-            "branch": "cursor/fix",
-            "baseline_ref": "main@aaa",
-            "candidate_ref": "cursor/fix@bbb",
-            "candidate_bound_to_branch": True,
-            "main_branch_allowed": False,
-            "force_push_allowed": False,
-            "history_rewrite_allowed": False,
-        },
-        "scope": {
-            "requested_files": ["test_module.py"],
-            "authorized_files": ["test_module.py"],
-            "scope_expansion_allowed": False,
-            "new_file_allowed": False,
-            "delete_file_allowed": False,
-            "rename_file_allowed": False,
-        },
-        "test_contract": {
-            "candidate_tests": ["test_module.py"],
-            "mandatory_gates": list(REQUIRED_MANDATORY_GATES),
-            "test_deletion_allowed": False,
-            "test_weakening_allowed": False,
-        },
-        "blockers": [],
-        "execution_authorized": False,
-        "executor_attached": False,
-        "writes_files": False,
-    })
+    return structural_builder_sandbox_request()
 
 
 def _preflight(request=None, **budget):
@@ -130,25 +92,7 @@ def _preflight(request=None, **budget):
 
 
 def _runner(request, preflight):
-    branch = request["branch_contract"]
-    patch = {
-        "schema": "ATLASQUANT_AION_DEVELOPER_PATCH_VALIDATION_V1",
-        "validation_id": "DEVPATCHVAL-1",
-        "state": "READY_FOR_PATCH_REVIEW",
-        "builder_request_id": request["request_id"],
-        "preflight_id": preflight["preflight_id"],
-        "patch_digest": "DEVPATCH-ABC",
-        "revision_binding": {
-            "baseline_ref": branch["baseline_ref"],
-            "candidate_ref": branch["candidate_ref"],
-            "refs_match_approved_request": True,
-            "revision_content_verified": True,
-        },
-        "blockers": [],
-        "patch_applied": False,
-        "execution_authorized": False,
-        "executor_attached": False,
-    }
+    patch = canonical_patch_document(request, preflight)
     return build_runner_contract(
         request,
         preflight,
@@ -251,25 +195,7 @@ class ResourceBudgetTypeTests(unittest.TestCase):
         preflight = _preflight(request, runtime_seconds=1)
         runner = _runner(request, preflight)
         self.assertEqual(runner["state"], "READY_FOR_RUNNER_DESIGN_REVIEW")
-        branch = request["branch_contract"]
-        patch = {
-            "schema": "ATLASQUANT_AION_DEVELOPER_PATCH_VALIDATION_V1",
-            "validation_id": "DEVPATCHVAL-1",
-            "state": "READY_FOR_PATCH_REVIEW",
-            "builder_request_id": request["request_id"],
-            "preflight_id": preflight["preflight_id"],
-            "patch_digest": "DEVPATCH-ABC",
-            "revision_binding": {
-                "baseline_ref": branch["baseline_ref"],
-                "candidate_ref": branch["candidate_ref"],
-                "refs_match_approved_request": True,
-                "revision_content_verified": True,
-            },
-            "blockers": [],
-            "patch_applied": False,
-            "execution_authorized": False,
-            "executor_attached": False,
-        }
+        patch = canonical_patch_document(request, preflight)
         policy = build_command_policy_contract(
             runner,
             builder_request=request,
@@ -301,12 +227,12 @@ class ResourceBudgetTypeTests(unittest.TestCase):
                     mutated = deepcopy(preflight)
                     mutated["resource_budget"] = dict(mutated["resource_budget"])
                     mutated["resource_budget"][field] = spec[label]
+                    mutated["state"] = "BLOCKED"
+                    mutated["preflight_passed"] = False
+                    mutated["blockers"] = [spec["blocker"]]
                     mutated["preflight_id"] = expected_preflight_id(mutated)
-                    out = _runner(request, mutated)
-                    self.assertEqual(out["state"], "BLOCKED")
-                    self.assertIn(spec["blocker"], out["blockers"])
-                    self.assertIs(type(out["resource_budget"][field]), int)
-                    _assert_closed(self, out)
+                    with self.assertRaises(ValueError):
+                        _runner(request, mutated)
                 with self.subTest(boundary="command_policy_range", field=field, label=label):
                     mutated_runner = deepcopy(runner)
                     mutated_runner["resource_budget"] = dict(mutated_runner["resource_budget"])

@@ -27,7 +27,9 @@ from atlasquant_aion_developer_manifest import (
     validate_isolated_branch,
 )
 from atlasquant_aion_developer_package import build_developer_package
+from atlasquant_aion_developer_builder_sandbox import structural_builder_sandbox_request
 from atlasquant_aion_developer_patch_validation import validate_patch
+from atlasquant_aion_developer_sandbox_preflight import build_sandbox_preflight
 
 
 class AionDeveloperHardeningRegressionTests(unittest.TestCase):
@@ -119,32 +121,22 @@ class AionDeveloperHardeningRegressionTests(unittest.TestCase):
         self.assertFalse(release_sensitive_path("atlasquant_aion_admin.py"))
 
     def test_added_skip_or_expected_failure_blocks_patch_review(self):
-        request = {
-            "schema": "ATLASQUANT_AION_DEVELOPER_BUILDER_SANDBOX_REQUEST_V1",
-            "request_id": "DEVBUILD-1",
-            "state": "READY_FOR_BUILDER_SANDBOX",
-            "branch_contract": {
-                "branch": "cursor/safe",
-                "baseline_ref": "base@a",
-                "candidate_ref": "cursor/safe@c",
-            },
-            "scope": {
-                "requested_files": ["test_module.py"],
-                "authorized_files": ["test_module.py"],
-            },
-            "blockers": [],
-            "execution_authorized": False,
-            "executor_attached": False,
-        }
-        preflight = {
-            "schema": "ATLASQUANT_AION_DEVELOPER_SANDBOX_PREFLIGHT_V1",
-            "preflight_id": "DEVPREF-1",
-            "builder_request_id": "DEVBUILD-1",
-            "state": "READY_FOR_EXECUTOR_DESIGN_REVIEW",
-            "preflight_passed": True,
-            "execution_authorized": False,
-            "executor_attached": False,
-        }
+        request = structural_builder_sandbox_request(
+            branch="cursor/safe",
+            baseline_ref="base@a",
+            candidate_ref="cursor/safe@c",
+            requested_files=("test_module.py",),
+        )
+        preflight = build_sandbox_preflight(
+            request,
+            environment_kind="ISOLATED_WORKTREE",
+            environment_id="sandbox-001",
+            isolated_worktree=True,
+            repository_root_bound=True,
+            network_disabled=True,
+            secrets_mounted=False,
+            command_policy="ALLOWLIST_ONLY",
+        )
         patches = (
             "+@unittest.skip('bypass')\n",
             "+@unittest.expectedFailure\n",
