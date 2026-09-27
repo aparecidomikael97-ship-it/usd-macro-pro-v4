@@ -15,6 +15,7 @@ from atlasquant_aion_developer_command_policy import (
 )
 from atlasquant_aion_developer_content_attestation import attestation_for_documents
 from atlasquant_aion_developer_executable_pinning import (
+    assert_environment_contract_integrity,
     assert_executable_pinning_spec_integrity,
     build_environment_contract,
     build_executable_pinning_spec,
@@ -33,6 +34,7 @@ from atlasquant_aion_developer_os_sandbox_contract import (
     assert_os_sandbox_contract_integrity,
     build_os_sandbox_contract,
     expected_os_sandbox_state_and_blockers,
+    os_sandbox_manifest,
 )
 from atlasquant_aion_developer_runner_contract import build_runner_contract
 from test_atlasquant_aion_developer_attestation_pinning import (
@@ -555,3 +557,85 @@ class OsSandboxSecurityContractTests(unittest.TestCase):
             require_absolute_path(r"C:\Python\python.exe")
         with self.assertRaises(ValueError):
             require_absolute_path("//server/share/python.exe")
+
+    def test_pinning_unknown_authority_fields_are_rejected(self):
+        for field in (
+            "safe",
+            "trusted",
+            "execution_ready",
+            "allow_spawn",
+            "allow_network",
+            "allow_write",
+            "sandbox_verified",
+            "ready_for_execution",
+        ):
+            mutated = deepcopy(self.pinning)
+            mutated[field] = True
+            self.assertEqual(mutated["pinning_spec_id"], self.pinning["pinning_spec_id"])
+            with self.assertRaises(ValueError):
+                assert_executable_pinning_spec_integrity(mutated)
+            with self.assertRaises(ValueError):
+                self._build(pinning_spec=mutated)
+
+    def test_environment_unknown_authority_fields_are_rejected(self):
+        for field in (
+            "safe",
+            "trusted",
+            "execution_ready",
+            "allow_spawn",
+            "allow_network",
+            "allow_write",
+        ):
+            mutated = deepcopy(self.environment)
+            mutated[field] = True
+            with self.assertRaises(ValueError):
+                assert_environment_contract_integrity(mutated)
+            with self.assertRaises(ValueError):
+                self._build(environment_contract=mutated)
+
+    def test_canonical_pinning_and_environment_pass_closed_schema(self):
+        self.assertEqual(
+            assert_executable_pinning_spec_integrity(self.pinning),
+            self.pinning["pinning_spec_id"],
+        )
+        self.assertEqual(assert_environment_contract_integrity(self.environment), [])
+        self.assertEqual(self.pinning["state"], "READY_FOR_EXECUTABLE_PINNING_PROBE")
+        self.assertIs(self.pinning["pinning_spec_complete"], True)
+        self.assertEqual(self.environment["state"], "ENVIRONMENT_DECLARED")
+        self.assertEqual(self.environment["blockers"], [])
+
+    def test_git_config_prefix_variants_stay_blocked(self):
+        for key in (
+            "GIT_CONFIG_COUNT",
+            "Git_Config_Count",
+            "GIT_CONFIG_KEY_0",
+            "GIT_CONFIG_VALUE_0",
+            "git_config_evil",
+            "GIT_CONFIG_GLOBAL",
+            "GIT_CONFIG_SYSTEM",
+        ):
+            environment = build_environment_contract(caller_environment={key: "1"})
+            self.assertEqual(environment["state"], "BLOCKED", key)
+            self.assertIn("INHERITED_ENVIRONMENT_KEY_NOT_ALLOWED", environment["blockers"], key)
+            self.assertIn(key.casefold(), environment["rejected_environment_keys"], key)
+            derived = assert_environment_contract_integrity(environment)
+            self.assertIn("INHERITED_ENVIRONMENT_KEY_NOT_ALLOWED", derived, key)
+            out = self._build(environment_contract=environment)
+            self.assertEqual(out["state"], "BLOCKED", key)
+
+    def test_hazards_stay_outside_the_authority_digest(self):
+        mutated = deepcopy(self.contract)
+        mutated["hazards"] = ["informational commentary only"]
+        assert_os_sandbox_contract_integrity(mutated)
+        self.assertEqual(mutated["os_sandbox_contract_id"], self.contract["os_sandbox_contract_id"])
+        self.assertNotIn("hazards", os_sandbox_manifest(mutated))
+
+    def test_closed_schemas_keep_probe_design_ready_and_flags_false(self):
+        assert_executable_pinning_spec_integrity(self.pinning)
+        self.assertEqual(assert_environment_contract_integrity(self.environment), [])
+        self.assertEqual(self.contract["state"], READY_STATE)
+        self._assert_physical_flags_false(self.contract)
+        review = self._review()
+        self.assertEqual(review["state"], "READY_FOR_OS_SANDBOX_DESIGN_REVIEW")
+        self.assertEqual(review["canonical_os_sandbox_state"], READY_STATE)
+        self.assertNotEqual(review["state"], "READY_FOR_EXECUTION")

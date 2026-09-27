@@ -205,12 +205,57 @@ def expected_pinning_spec_id(spec: Mapping[str, Any]) -> str:
     return stable_digest(executable_pinning_manifest(spec), prefix="DEVPIN-", length=18)
 
 
+_PINNING_SPEC_KEYS = frozenset({
+    "schema",
+    "pinning_spec_id",
+    "state",
+    "pins",
+    "logical_executables",
+    "pinning_spec_complete",
+    "path_lookup_allowed",
+    "absolute_executable_required",
+    "executable_digest_required",
+    "caller_supplied_digest_is_proof",
+    "executable_pinning_verified",
+    "os_sandbox_verified",
+    "child_process_policy_verified",
+    "symlink_physical_boundary_verified",
+    "hardlink_physical_boundary_verified",
+    "execution_authorized",
+    "executor_attached",
+    "commands_executed",
+    "writes_files",
+    "runs_tests",
+    "network_called",
+    "subprocess_called",
+    "automatic_commit",
+    "automatic_merge",
+    "automatic_deploy",
+    "production_change_allowed",
+    "real_trading_enabled",
+})
+
+
+def _reject_unknown_keys(document: Mapping[str, Any], allowed: frozenset[str], label: str) -> None:
+    unknown = sorted(set(document) - allowed)
+    if unknown:
+        raise ValueError(f"unknown {label} field {unknown[0]}")
+    missing = sorted(allowed - set(document))
+    if missing:
+        raise ValueError(f"{label} is missing {missing[0]}")
+
+
 def assert_executable_pinning_spec_integrity(spec: Mapping[str, Any]) -> str:
-    """Revalidate a pinning spec. State and completeness are not trusted alone."""
+    """Revalidate a pinning spec. State and completeness are not trusted alone.
+
+    Unknown top-level keys are rejected. They are not ignored, and a matching
+    pin digest does not make an extra field harmless.
+    """
     if not isinstance(spec, Mapping):
         raise ValueError("pinning spec must be an object")
     if spec.get("schema") != SCHEMA:
         raise ValueError("invalid pinning spec")
+    _reject_unknown_keys(spec, _PINNING_SPEC_KEYS, "pinning spec")
     _reject_true_claims(spec, "pinning spec")
     pins = spec.get("pins")
     if isinstance(pins, (str, bytes, bytearray)) or not isinstance(pins, (list, tuple)):
@@ -313,7 +358,53 @@ def build_executable_pinning_spec(
     if pinning_spec_id is not None and pinning_spec_id != spec_id:
         raise ValueError("pinning spec id mismatch")
     document["pinning_spec_id"] = spec_id
+    if set(document) != _PINNING_SPEC_KEYS:
+        raise ValueError("pinning spec constructor drifted from the closed schema")
     return document
+
+
+_ENVIRONMENT_CONTRACT_KEYS = frozenset({
+    "schema",
+    "state",
+    "inherit_parent_environment",
+    "path_lookup_allowed",
+    "caller_environment_overrides_allowed",
+    "fixed_environment",
+    "caller_environment_accepted",
+    "rejected_environment_keys",
+    "blockers",
+    "execution_authorized",
+    "executor_attached",
+    "commands_executed",
+    "writes_files",
+    "runs_tests",
+    "network_called",
+    "subprocess_called",
+    "automatic_commit",
+    "automatic_merge",
+    "automatic_deploy",
+    "production_change_allowed",
+    "real_trading_enabled",
+})
+_ENVIRONMENT_CLOSED_FLAGS = (
+    "inherit_parent_environment",
+    "path_lookup_allowed",
+    "caller_environment_overrides_allowed",
+    "caller_environment_accepted",
+    "execution_authorized",
+    "executor_attached",
+    "commands_executed",
+    "writes_files",
+    "runs_tests",
+    "network_called",
+    "subprocess_called",
+    "automatic_commit",
+    "automatic_merge",
+    "automatic_deploy",
+    "production_change_allowed",
+    "real_trading_enabled",
+)
+_ENVIRONMENT_STATES = frozenset({"ENVIRONMENT_DECLARED", "BLOCKED"})
 
 
 def build_environment_contract(
@@ -351,7 +442,7 @@ def build_environment_contract(
     ):
         blockers.append("INHERITED_ENVIRONMENT_KEY_NOT_ALLOWED")
     blockers = list(dict.fromkeys(blockers))
-    return {
+    document = {
         "schema": ENVIRONMENT_SCHEMA,
         "state": "ENVIRONMENT_DECLARED" if not blockers else "BLOCKED",
         "inherit_parent_environment": False,
@@ -374,6 +465,9 @@ def build_environment_contract(
         "production_change_allowed": False,
         "real_trading_enabled": False,
     }
+    if set(document) != _ENVIRONMENT_CONTRACT_KEYS:
+        raise ValueError("environment contract constructor drifted from the closed schema")
+    return document
 
 
 def sealed_environment_blockers(environment: Mapping[str, Any]) -> list[str]:
@@ -418,6 +512,51 @@ def sealed_environment_blockers(environment: Mapping[str, Any]) -> list[str]:
     if environment.get("state") != "ENVIRONMENT_DECLARED" and not blockers:
         blockers.append("ENVIRONMENT_CONTRACT_NOT_DECLARED")
     return list(dict.fromkeys(blockers))
+
+
+def assert_environment_contract_integrity(environment: Mapping[str, Any]) -> list[str]:
+    """Revalidate an environment contract. The state label is not authority.
+
+    Unknown top-level keys and true execution claims raise. A canonical
+    ``ENVIRONMENT_DECLARED`` document returns an empty blocker list. A
+    contradictory ready label does not erase derived blockers: those blockers
+    are returned so the consumer stays ``BLOCKED``. This function does not
+    read the process environment.
+    """
+    if not isinstance(environment, Mapping):
+        raise ValueError("environment contract must be an object")
+    if environment.get("schema") != ENVIRONMENT_SCHEMA:
+        raise ValueError("invalid environment contract")
+    _reject_unknown_keys(environment, _ENVIRONMENT_CONTRACT_KEYS, "environment contract")
+    for field in _ENVIRONMENT_CLOSED_FLAGS:
+        if environment.get(field) is True:
+            raise ValueError(f"environment contract cannot claim {field}")
+        if environment.get(field) is not False:
+            raise ValueError(f"environment contract flag {field} is not false")
+    fixed = environment.get("fixed_environment")
+    if not isinstance(fixed, Mapping) or dict(fixed) != dict(FIXED_ENVIRONMENT):
+        raise ValueError("fixed environment is not the canonical map")
+    if any(forbidden_inherited_environment_key(key) for key in fixed):
+        raise ValueError("fixed environment contains a forbidden key")
+    rejected = environment.get("rejected_environment_keys")
+    if not isinstance(rejected, list) or any(type(item) is not str for item in rejected):
+        raise ValueError("rejected environment keys must be a list of strings")
+    if any(not forbidden_inherited_environment_key(item) for item in rejected):
+        raise ValueError("rejected environment keys must be forbidden names")
+    stored = environment.get("blockers")
+    if not isinstance(stored, list):
+        raise ValueError("environment blockers must be a list")
+    state = environment.get("state")
+    if state not in _ENVIRONMENT_STATES:
+        raise ValueError("environment state is not an accepted design state")
+    derived = sealed_environment_blockers(environment)
+    if state == "ENVIRONMENT_DECLARED" and not derived and stored == []:
+        return []
+    if state == "BLOCKED" and not derived:
+        raise ValueError("blocked environment contract must name blockers")
+    if not derived:
+        raise ValueError("environment state was not derived from blockers")
+    return derived
 
 
 def build_os_sandbox_design_review(
@@ -494,5 +633,6 @@ __all__ = [
     "build_executable_pinning_spec",
     "build_environment_contract",
     "sealed_environment_blockers",
+    "assert_environment_contract_integrity",
     "build_os_sandbox_design_review",
 ]

@@ -44,8 +44,8 @@ from atlasquant_aion_developer_executable_pinning import (
     ALLOWED_LOGICAL_EXECUTABLES,
     FIXED_ENVIRONMENT,
     SANDBOX_EPHEMERAL_PYCACHE,
+    assert_environment_contract_integrity,
     assert_executable_pinning_spec_integrity,
-    sealed_environment_blockers,
 )
 from atlasquant_aion_developer_manifest import stable_digest
 from atlasquant_aion_developer_sandbox_preflight import validate_resource_budget
@@ -312,7 +312,7 @@ def _contractual_blockers(
         or allowlist.get("repo_write_allowed") is True
     ):
         blockers.append("REPO_WRITE_NOT_ALLOWED")
-    blockers.extend(sealed_environment_blockers(environment_contract))
+    blockers.extend(assert_environment_contract_integrity(environment_contract))
     preflight_env = (
         preflight.get("environment_contract")
         if isinstance(preflight.get("environment_contract"), Mapping)
@@ -398,6 +398,10 @@ def _design_view(
 
 def os_sandbox_manifest(contract: Mapping[str, Any]) -> dict[str, Any]:
     """Authority fields. Informational hazards are outside this digest.
+
+    ``hazards`` is an allowed top-level field. It is commentary. It is not an
+    authority field, it is not part of this manifest, and changing it does not
+    change the contract id.
 
     ``state`` and ``blockers`` are the design decision. ``physical_proof_blockers``
     and ``required_before_future_execution`` record absent physical proof.
