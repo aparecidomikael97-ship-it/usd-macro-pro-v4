@@ -454,6 +454,16 @@ html { scroll-behavior: smooth; }
   background: #1d4e89 !important;
   border-color: #8eb7e8 !important;
 }
+/* Multiselect tags default to white on primaryColor #4fa3ff (2.6:1). */
+.stApp [data-testid="stMultiSelectTagsContainer"] [data-tag] {
+  background: #1d4e89 !important;
+  border: 1px solid #8eb7e8 !important;
+}
+.stApp [data-testid="stMultiSelectTagsContainer"] [data-tag],
+.stApp [data-testid="stMultiSelectTagsContainer"] [data-tag] * {
+  color: #f8fbff !important;
+  -webkit-text-fill-color: #f8fbff !important;
+}
 /* Experience chips: Streamlit renders each option as label[data-testid="stRadioOption"].
    These rules outrank the light canvas text so Iniciante/Avançado stay dark on a light chip
    (>= 4.5:1) in normal, hover, focus and selected states. */

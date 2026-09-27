@@ -375,6 +375,12 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn('data-testid="stSelectbox"',ATLASQUANT_CSS)
         self.assertIn('data-testid="stCheckbox"',ATLASQUANT_CSS)
 
+    def test_multiselect_tags_are_not_white_on_primary_blue(self):
+        start=ATLASQUANT_CSS.index('[data-testid="stMultiSelectTagsContainer"] [data-tag] {')
+        block=ATLASQUANT_CSS[start:start+400]
+        self.assertIn("background: #1d4e89 !important;",block)
+        self.assertIn("color: #f8fbff !important;",ATLASQUANT_CSS[start:start+700])
+
     def test_experience_switch_no_longer_injects_mode_dependent_tab_css(self):
         import inspect
         from atlasquant_ui_v1 import render_experience_mode_switch
