@@ -2192,6 +2192,11 @@ if _aq_use_live_memory:
     dados_moedas = dict(_aq_warm_result["dados_moedas"])
     ranking = calcular_ranking(dados_moedas, macro_eua, fed)
     usd_detalhado = score_usd_detalhado(macro_eua, fed)
+    _aq_live_status = _aq_warm_result.get("status_fonte")
+    if isinstance(_aq_live_status, dict) and _aq_live_status:
+        STATUS_FONTE.update(_aq_live_status)
+    else:
+        STATUS_FONTE["Fontes"] = "⚠️ estado de cada fonte não confirmado nesta atualização"
     if _aq_warm_status == "retained":
         _aq_refresh_note = "pacote anterior mantido; " + str(_aq_warm.get("error") or "fonte sem detalhe")
     else:
@@ -2201,6 +2206,7 @@ if _aq_use_live_memory:
         "state": "LIVE_REFRESH",
         "generated_at": str(_aq_warm.get("finished_at") or ""),
         "refresh_status": _aq_refresh_note,
+        "degraded_sources": [k for k, v in STATUS_FONTE.items() if str(v).startswith("⚠️")],
         "real_orders_enabled": False,
         "automatic_execution": False,
     }
@@ -2219,7 +2225,8 @@ elif bool(_aq_boot.get("use_cache")) and not _aq_force_live:
             "macro_eua": carregar_macro_eua,
             "fed": carregar_narrativa_fed,
             "dados_moedas": carregar_dados_moedas,
-        }, timeouts={"macro_eua": 25.0, "fed": 25.0, "dados_moedas": 50.0})
+        }, timeouts={"macro_eua": 25.0, "fed": 25.0, "dados_moedas": 50.0},
+            status_snapshot=lambda _status=STATUS_FONTE: dict(_status))
         _aq_boot["refresh_status"] = "em andamento" if _aq_started == "running" else str(_aq_started)
     elif _aq_warm_status == "failed":
         _aq_boot["refresh_status"] = (
@@ -2241,7 +2248,7 @@ else:
             "macro_eua": macro_eua,
             "fed": fed,
             "dados_moedas": dados_moedas,
-        })
+        }, status_fonte=dict(STATUS_FONTE))
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
 st.session_state["atlasquant_advanced_boot"] = {
     "state": str(_aq_boot.get("state") or ""),
@@ -2249,6 +2256,7 @@ st.session_state["atlasquant_advanced_boot"] = {
     "runtime_generated_at": str(_aq_boot.get("runtime_generated_at") or ""),
     "age_minutes": _aq_boot.get("age_minutes"),
     "refresh_status": str(_aq_boot.get("refresh_status") or ""),
+    "degraded_sources": list(_aq_boot.get("degraded_sources") or []),
     "real_orders_enabled": False,
     "automatic_execution": False,
 }

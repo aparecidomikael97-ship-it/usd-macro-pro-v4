@@ -326,6 +326,55 @@ class AdvancedBootTests(unittest.TestCase):
         self.assertEqual(stale["state"], STALE_REJECTED)
         self.assertFalse(stale["use_cache"])
 
+    def test_refresh_carries_the_source_status_of_that_exact_read(self):
+        reset_live_refresh_for_tests()
+        status = {}
+
+        def macro():
+            status["EUA"] = "⚠️ Valores de segurança"
+            return {"juros": 4.0}
+
+        def loader():
+            return {"x": 1}
+
+        start_live_refresh(
+            {"macro_eua": macro, "fed": loader, "dados_moedas": loader},
+            status_snapshot=lambda: dict(status),
+        )
+        self.assertTrue(self._wait_status("ready"))
+        warm = peek_live_refresh()
+        self.assertEqual(warm["result"]["status_fonte"], {"EUA": "⚠️ Valores de segurança"})
+
+    def test_broken_status_snapshot_does_not_block_or_invent_provenance(self):
+        reset_live_refresh_for_tests()
+
+        def loader():
+            return {"x": 1}
+
+        def broken():
+            raise RuntimeError("no status")
+
+        start_live_refresh({"macro_eua": loader, "fed": loader, "dados_moedas": loader}, status_snapshot=broken)
+        self.assertTrue(self._wait_status("ready"))
+        self.assertNotIn("status_fonte", peek_live_refresh()["result"])
+
+    def test_entrypoint_restores_status_line_after_background_swap(self):
+        src = Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        self.assertIn("status_snapshot=lambda _status=STATUS_FONTE: dict(_status)", src)
+        self.assertIn('_aq_live_status = _aq_warm_result.get("status_fonte")', src)
+        self.assertIn("estado de cada fonte não confirmado nesta atualização", src)
+        self.assertIn("}, status_fonte=dict(STATUS_FONTE))", src)
+        self.assertIn('"degraded_sources": list(_aq_boot.get("degraded_sources") or [])', src)
+
+    def test_success_banner_names_degraded_sources(self):
+        clean = provenance_banner_html({"state": LIVE_REFRESH, "refresh_status": "concluída"})
+        self.assertNotIn("valores de segurança", clean)
+        partial = provenance_banner_html({
+            "state": LIVE_REFRESH, "refresh_status": "concluída", "degraded_sources": ["EUA", "<b>USD"],
+        })
+        self.assertIn("Fontes com fallback ou valores de segurança: EUA, &lt;b&gt;USD.", partial)
+        self.assertIn("Ordens reais continuam bloqueadas", partial)
+
     def _wait_status(self, expected: str) -> bool:
         for _ in range(40):
             if peek_live_refresh()["status"] == expected:
