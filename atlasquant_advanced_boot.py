@@ -68,8 +68,23 @@ def peek_live_refresh() -> dict[str, Any]:
         }
 
 
-def publish_live_refresh(result: Mapping[str, Any], *, finished_at: str = "") -> None:
-    """Remember a successful live read so the next rerun does not block again."""
+def _clean_status(raw: Any) -> dict[str, str]:
+    if not isinstance(raw, Mapping):
+        return {}
+    return {str(k)[:40]: str(v)[:160] for k, v in raw.items() if str(k).strip()}
+
+
+def publish_live_refresh(
+    result: Mapping[str, Any],
+    *,
+    finished_at: str = "",
+    status_fonte: Mapping[str, Any] | None = None,
+) -> None:
+    """Remember a successful live read so the next rerun does not block again.
+
+    ``status_fonte`` travels with the package so the provenance line shown next
+    to the data describes that exact read (for example, safety values without FRED).
+    """
     payload = {
         "macro_eua": dict(result.get("macro_eua") or {}),
         "fed": dict(result.get("fed") or {}),
@@ -77,6 +92,9 @@ def publish_live_refresh(result: Mapping[str, Any], *, finished_at: str = "") ->
     }
     if not payload["macro_eua"] or not payload["fed"] or not payload["dados_moedas"]:
         return
+    status = _clean_status(status_fonte)
+    if status:
+        payload["status_fonte"] = status
     with _LOCK:
         _WARM["status"] = "ready"
         _WARM["result"] = payload
@@ -204,8 +222,12 @@ def start_live_refresh(
     force: bool = False,
     timeout_s: float | None = None,
     timeouts: Mapping[str, float] | None = None,
+    status_snapshot: Callable[[], Mapping[str, Any]] | None = None,
 ) -> str:
     """Refresh sources off the UI thread. A failed attempt keeps the last good package.
+
+    ``status_snapshot`` is read after the loaders finish, because loaders record
+    their source status in the globals of the rerun that started the job.
 
     The three loaders run together. One exception, timeout or empty payload does
     not erase a package that already passed validation, and it does not fill
@@ -233,7 +255,13 @@ def start_live_refresh(
                 "error": f"atualização: {type(exc).__name__}: {exc}",
             }
         if outcome["publishable"] and isinstance(outcome.get("payload"), Mapping):
-            publish_live_refresh(outcome["payload"])
+            status: Mapping[str, Any] | None = None
+            if status_snapshot is not None:
+                try:
+                    status = status_snapshot()
+                except Exception:
+                    status = None
+            publish_live_refresh(outcome["payload"], status_fonte=status)
             with _LOCK:
                 _WARM["sources"] = dict(outcome["sources"])
                 _WARM["error"] = ""
@@ -366,10 +394,17 @@ def provenance_banner_html(decision: Mapping[str, Any] | None) -> str:
             )
         finished = escape(str(item.get("generated_at") or item.get("runtime_generated_at") or ""))
         when = f" · concluída em {finished}" if finished else ""
+        degraded = [str(x) for x in list(item.get("degraded_sources") or []) if str(x).strip()]
+        partial = (
+            " Fontes com fallback ou valores de segurança: "
+            + escape(", ".join(degraded[:12]))
+            + ". Veja Fontes/estado."
+            if degraded else ""
+        )
         return (
             '<div class="aq-boot-banner aq-boot-live" role="status">'
             "<strong>Fontes atualizadas.</strong> "
-            f"Esta leitura substituiu o snapshot em cache{when}. "
+            f"Esta leitura substituiu o snapshot em cache{when}.{partial} "
             "Ordens reais continuam bloqueadas."
             "</div>"
         )
