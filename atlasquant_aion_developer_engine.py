@@ -12,6 +12,7 @@ from typing import Any, Mapping, Sequence
 import json
 
 from atlasquant_aion_observability import redact_text
+from atlasquant_aion_developer_manifest import canonical_identity, validate_isolated_branch
 
 SCHEMA = "ATLASQUANT_AION_DEVELOPER_ENGINE_V1"
 PHASES = ("REQUEST", "PLAN", "IMPLEMENT", "TEST", "REVIEW", "RELEASE")
@@ -67,7 +68,7 @@ def new_development_workflow(
     created_at: str | None = None,
 ) -> dict[str, Any]:
     request_text = _clean(request, 1200)
-    branch_text = _clean(branch, 180)
+    branch_text = validate_isolated_branch(branch)
     baseline = _clean(baseline_ref, 180)
     if not request_text or not branch_text or not baseline:
         raise ValueError("request, branch and baseline are required")
@@ -129,13 +130,29 @@ def record_phase(
     if len(phases) != len(PHASES):
         raise ValueError("invalid workflow phases")
     index = _phase_index(name)
-    if phase_state == "PASS" and index > 0:
+    if index > 0 and phase_state != "PENDING":
         prior = phases[index - 1]
         if str(prior.get("state")) != "PASS":
-            raise ValueError("development phases must pass in order")
+            raise ValueError("development phases must advance in order")
+
+    existing = phases[index]
+    downstream = phases[index + 1:]
+    downstream_progressed = any(str(row.get("state") or "PENDING") != "PENDING" for row in downstream)
+    if downstream_progressed and (
+        str(existing.get("state") or "") != phase_state
+        or str(existing.get("actor") or "") != actor_text
+        or str(existing.get("summary") or "") != _clean(summary, 1200)
+        or list(existing.get("evidence_refs") or []) != refs
+    ):
+        raise ValueError("earlier phase cannot change after downstream progress")
+
     if name == "REVIEW":
         implement_actor = next((x.get("actor") for x in phases if x.get("phase") == "IMPLEMENT"), "")
-        if actor_text and implement_actor and actor_text == implement_actor:
+        if (
+            actor_text
+            and implement_actor
+            and canonical_identity(actor_text) == canonical_identity(implement_actor)
+        ):
             raise ValueError("reviewer must be independent from builder")
     phases[index] = {
         "phase": name,
@@ -180,8 +197,9 @@ def record_test_attempt(
         "error_type": _clean(error_type, 120),
         "hypothesis": _clean(hypothesis, 1000),
         "cause": _clean(cause, 1000),
-        "cause_truth": "CONFIRMED" if test_state == "FAIL" and _clean(cause) else "UNKNOWN",
-        "evidence_refs": _list(evidence_refs),
+        "cause_truth": "UNKNOWN",
+        "cause_source": "UNVERIFIED_TEST_ATTEMPT",
+        "evidence_refs": refs,
         "created_at": _now(),
     }
     attempts.append(attempt)
@@ -208,9 +226,21 @@ def record_adversarial_review(
     item = deepcopy(dict(workflow or {}))
     phases = list(item.get("phases") or [])
     builder = next((str(x.get("actor") or "") for x in phases if x.get("phase") == "IMPLEMENT"), "")
+    reviewer = next((str(x.get("actor") or "") for x in phases if x.get("phase") == "REVIEW"), "")
     critic = _clean(critic_actor, 120)
-    if not critic or (builder and critic == builder):
-        raise ValueError("adversarial critic must be independent from builder")
+    refs = _list(evidence_refs)
+    if not critic:
+        raise ValueError("adversarial critic identity required")
+    critic_key = canonical_identity(critic)
+    independent_from = {
+        canonical_identity(value)
+        for value in (builder, reviewer)
+        if value
+    }
+    if critic_key in independent_from:
+        raise ValueError("adversarial critic must be independent from builder/reviewer")
+    if not refs:
+        raise ValueError("adversarial review requires evidence")
     normalized_findings = []
     for raw in list(findings or [])[:100]:
         if not isinstance(raw, Mapping):
@@ -232,7 +262,7 @@ def record_adversarial_review(
         "critic_independent": True,
         "required_checks": list(ADVERSARIAL_CHECKS),
         "findings": normalized_findings,
-        "evidence_refs": _list(evidence_refs),
+        "evidence_refs": refs,
     }
     if critical_open:
         item["status"] = "BLOCKED"
@@ -256,6 +286,7 @@ def definition_of_done(
     checks = {
         "plan_passed": phases.get("PLAN") == "PASS",
         "implementation_passed": phases.get("IMPLEMENT") == "PASS",
+        "test_phase_passed": phases.get("TEST") == "PASS",
         "tests_passed": bool(tests and tests[-1].get("state") == "PASS"),
         "review_passed": phases.get("REVIEW") == "PASS",
         "adversarial_review_passed": review.get("state") == "PASS",
