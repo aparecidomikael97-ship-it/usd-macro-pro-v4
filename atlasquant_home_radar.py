@@ -284,12 +284,16 @@ def _card_html(row:Mapping[str,Any])->str:
         if str(r.get("signal_status_code")) in {"EXPIRED","UNVERIFIED","BLOCKED"}
         else ("validade técnica ≤ "+f"{float(signal_remaining):.0f} min" if signal_remaining is not None else "validade N/D")
     )
+    confidence=escape(str(r.get("confidence") or "NÃO CONFIRMADA"))
+    risk="BLOQUEADO" if action=="NÃO OPERAR" else escape(str(r.get("event") or "NÃO CONFIRMADO"))
     return f"""<div class="aq-home-card {tone}">
       <div class="aq-home-top"><strong>{pair}</strong><span>{icon} {escape(action)}</span></div>
       <div class="aq-home-signal">{signal_headline}</div>
       <div class="aq-home-time">{signal_reference} · {escape(age_text)} · {escape(validity_text)}</div>
       <div class="aq-home-score">{_safe(r.get('priority',0)):.0f}<small>/100 prioridade</small></div>
       <div class="aq-home-grid">
+        <span>Confiança <b>{confidence}</b></span>
+        <span>Risco <b>{risk}</b></span>
         <span>Dados <b>{_safe(r.get('data_score',0)):.0f}</b></span>
         <span>Qualidade <b>{_safe(r.get('quality',0)):.0f}</b></span>
         <span>{movement}</span>
@@ -547,9 +551,17 @@ def render_home_radar(
     if mode=="Avançado":
         st.markdown("### Diagnóstico avançado")
         adv=pd.DataFrame([{
+            **({
+                "Técnico":(r.get("score_components") or {}).get("technical"),
+                "Macro":(r.get("score_components") or {}).get("macro"),
+                "Componente sessão":(r.get("score_components") or {}).get("session"),
+                "Componente qualidade":(r.get("score_components") or {}).get("quality"),
+            } if isinstance(r.get("score_components"),Mapping) else {}),
             "Par":r["pair"],"Sessão":r.get("session_label","Sessão não informada"),
             "Compatível com perfil":r.get("session_match","UNKNOWN"),
             "Ação":r["action"],"Viés":r["bias"],"Prioridade":round(r["priority"],1),
+            "Confiança":r.get("confidence","NÃO CONFIRMADA"),
+            "Proveniência":r.get("provenance_state","NÃO CONFIRMADA"),
             "Qualidade":round(r["quality"],1),"Dados":round(r["data_score"],1),"H4":r["h4"],"H1":r["h1"],
             "M15":r["m15"],"Gate":r["gate"],"Status temporal":r["signal_headline"],
             "Hora leitura":r["signal_reference_display"],"Idade min":r["signal_age_minutes"],

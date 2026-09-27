@@ -12,6 +12,7 @@ from atlasquant_radar_board import (
     crypto_ranking,
     highlight_top_fx,
     index_ranking,
+    rank_fx_population,
     strengths_from_records,
 )
 from atlasquant_session_profiles import (
@@ -81,7 +82,50 @@ class AtlasQuantRadarBoardTests(unittest.TestCase):
         self.assertTrue(all(row["pair"] in OFFICIAL_PAIRS for row in top))
         reshuffled = sorted(board["rows"], key=lambda row: row["priority"])
         other = highlight_top_fx(reshuffled, 10)
-        self.assertNotEqual([row["pair"] for row in top], [row["pair"] for row in other])
+        self.assertEqual([row["pair"] for row in top], [row["pair"] for row in other])
+        self.assertEqual(
+            [row["pair"] for row in top],
+            [row["pair"] for row in rank_fx_population(board["rows"])[:10]],
+        )
+        self.assertEqual(len({row["pair"] for row in top}), 10)
+
+    def test_duplicate_and_unknown_inputs_never_remove_official_pairs(self):
+        records = [
+            _pack("EUR/USD", 80),
+            _pack("EUR/USD", 99),
+            _pack("USD/XXX", 100),
+            {"pair": "", "priority": 100},
+        ]
+        board = compose_fx_board(records, None)
+        self.assertEqual(len(board["rows"]), 28)
+        self.assertEqual(len({row["pair"] for row in board["rows"]}), 28)
+        self.assertEqual(set(row["pair"] for row in board["rows"]), set(OFFICIAL_PAIRS))
+        eurusd = next(row for row in board["rows"] if row["pair"] == "EUR/USD")
+        self.assertEqual(eurusd["priority"], 80)
+
+    def test_absent_technical_source_never_becomes_artificial_confidence(self):
+        board = compose_fx_board([], _ranking())
+        self.assertEqual(len(board["rows"]), 28)
+        for row in board["rows"]:
+            self.assertFalse(row["data_ready"])
+            self.assertEqual(row["action"], "NÃO OPERAR")
+            self.assertEqual(row["confidence"], "BAIXA")
+            self.assertIsNone(row["score_components"]["technical"])
+            self.assertEqual(row["pipeline"]["technical"], "SEM DADOS")
+            self.assertFalse(row["real_orders_enabled"])
+            self.assertFalse(row["automatic_execution"])
+
+    def test_pipeline_components_are_explicit_and_never_authorize_orders(self):
+        ready = _pack("EUR/USD", 88)
+        ready.update({"data_ready": True, "strength_diff": 20, "h4": "BUY", "h1": "BUY", "m15": "BUY"})
+        row = next(r for r in compose_fx_board([ready], _ranking())["rows"] if r["pair"] == "EUR/USD")
+        self.assertEqual(row["pipeline"]["data"], "CONFIRMADO")
+        self.assertEqual(row["pipeline"]["technical"], "CONFIRMADO")
+        self.assertEqual(row["pipeline"]["macro"], "CONFIRMADO")
+        self.assertEqual(row["confidence"], "ALTA")
+        self.assertEqual(row["score_components"]["technical"], 88)
+        self.assertFalse(row["real_orders_enabled"])
+        self.assertFalse(row["automatic_execution"])
 
     def test_indices_and_cryptos_stay_in_separate_rankings(self):
         indices = index_ranking([
