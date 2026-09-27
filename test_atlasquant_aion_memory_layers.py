@@ -1,6 +1,11 @@
 import unittest
 
-from atlasquant_aion_memory import default_checkpoint, ensure_operating_checkpoint
+from atlasquant_aion_memory import (
+    checkpoint_integrity_report,
+    default_checkpoint,
+    ensure_operating_checkpoint,
+)
+from atlasquant_aion_persona_memory import append_persona_entry
 from atlasquant_aion_memory_layers import (
     default_memory_layers,
     memory_layer_summary,
@@ -72,6 +77,31 @@ class AionMemoryLayersTests(unittest.TestCase):
         self.assertEqual(upgraded["project"], "AtlasQuant")
         self.assertEqual(upgraded["pending"], ["x"])
         self.assertEqual(upgraded["memory_layers"]["schema"], "ATLASQUANT_AION_MEMORY_LAYERS_V1")
+
+    def test_checkpoint_integrity_covers_layered_and_persona_memory(self):
+        checkpoint = default_checkpoint()
+        self.assertEqual(checkpoint_integrity_report(checkpoint)["state"], "CONFIRMED")
+        checkpoint["memory_layers"]["entries"].append({
+            "layer": "project",
+            "content": "tampered",
+            "origin": "unknown",
+            "category": "test",
+        })
+        report = checkpoint_integrity_report(checkpoint)
+        self.assertEqual(report["state"], "MISMATCH")
+        self.assertIn("memory_layers", report["mismatches"])
+
+        persona_checkpoint = default_checkpoint()
+        persona_checkpoint["persona_memory"] = append_persona_entry(
+            persona_checkpoint["persona_memory"],
+            "developer",
+            kind="decision",
+            message="valid entry",
+        )
+        persona_checkpoint["persona_memory"]["personas"]["developer"]["entries"][0]["message"] = "tampered"
+        persona_report = checkpoint_integrity_report(persona_checkpoint)
+        self.assertEqual(persona_report["state"], "MISMATCH")
+        self.assertIn("persona_memory", persona_report["mismatches"])
 
 
 if __name__ == "__main__":

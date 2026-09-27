@@ -255,7 +255,10 @@ from atlasquant_aion_release_confidence import (
     release_confidence_summary,
 )
 from atlasquant_aion_cognitive_orchestrator import orchestrator_snapshot
-from atlasquant_aion_orchestrator import orchestrate as orchestrate_aion_core
+from atlasquant_aion_orchestrator import (
+    build_aion_result,
+    orchestrate as orchestrate_aion_core,
+)
 from atlasquant_aion_specialists import plan_specialist_dispatch
 from atlasquant_aion_memory_layers import memory_layer_summary
 from atlasquant_aion_event_journal import (
@@ -2263,7 +2266,7 @@ def _render_central(
     if st.button("Analisar com AION", key="aion_admin_ask", type="primary", width="stretch"):
         hits = _aion_memory_hits(question, checkpoint)
         estimated_cost = float(estimate.get("estimated_max_cost_usd") or 0.0)
-        st.session_state["aion_last_core_orchestration"] = orchestrate_aion_core(
+        core_orchestration = orchestrate_aion_core(
             question,
             context={
                 "role": access_role,
@@ -2272,6 +2275,7 @@ def _render_central(
                 "domain_hint": domain_preview,
             },
         )
+        st.session_state["aion_last_core_orchestration"] = core_orchestration
         route = route_intelligence(
             question,
             provider_state=provider.get("state"),
@@ -2341,8 +2345,15 @@ def _render_central(
                 system_context=dict(system_context),
                 feature_flags=flags,
             )
+        unified_result = build_aion_result(
+            core_orchestration,
+            answer=answer.get("answer", ""),
+            evidence=answer.get("evidence") if isinstance(answer.get("evidence"), list) else hits,
+            provider_state=route.get("lane"),
+        )
         st.session_state["aion_last_route"] = route
         st.session_state["aion_last_answer"] = answer
+        st.session_state["aion_last_unified_result"] = unified_result
 
     route = st.session_state.get("aion_last_route")
     if isinstance(route, Mapping):
@@ -2355,6 +2366,18 @@ def _render_central(
     if isinstance(answer, Mapping):
         st.markdown("#### Resposta AION")
         st.write(str(answer.get("answer", "")))
+        unified_result = st.session_state.get("aion_last_unified_result")
+        if isinstance(unified_result, Mapping):
+            validation = (
+                unified_result.get("validation")
+                if isinstance(unified_result.get("validation"), Mapping)
+                else {}
+            )
+            st.caption(
+                f"Validação: {validation.get('state', 'REVISE')} · "
+                f"verdade {validation.get('truth_state', 'UNKNOWN')} · "
+                f"{unified_result.get('evidence_count', 0)} evidência(s)"
+            )
         cognitive_answer = answer.get("cognitive_orchestrator")
         if isinstance(cognitive_answer, Mapping):
             routing = (

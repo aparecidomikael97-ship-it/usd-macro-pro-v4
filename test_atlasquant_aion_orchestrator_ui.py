@@ -10,6 +10,8 @@ class AionOrchestratorUiIntegrationTests(unittest.TestCase):
         self.assertIn("plan_specialist_dispatch(core_preview)", source)
         self.assertIn("Capability Registry + Truth Gate + Guardian + Critic", source)
         self.assertIn("Builder → Critic → Validator", source)
+        self.assertIn("build_aion_result(", source)
+        self.assertIn('st.session_state["aion_last_unified_result"]', source)
 
     def test_ui_does_not_claim_execution_or_cross_persona_memory(self):
         source = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")

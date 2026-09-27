@@ -296,7 +296,57 @@ def validate_specialist_result(
     }
 
 
+def build_aion_result(
+    orchestration: Mapping[str, Any],
+    *,
+    answer: Any,
+    evidence: Sequence[Mapping[str, Any]] | None = None,
+    provider_state: Any = "LOCAL_DETERMINISTIC",
+) -> dict[str, Any]:
+    """Build one result envelope for local or external response paths."""
+    normalized_evidence = []
+    for index, raw in enumerate(list(evidence or [])[:100]):
+        if not isinstance(raw, Mapping):
+            continue
+        normalized_evidence.append({
+            "claim": raw.get("claim") or raw.get("title") or raw.get("path") or f"evidence_{index + 1}",
+            "value": raw.get("value", raw.get("excerpt", raw.get("content"))),
+            "truth_state": raw.get("truth_state") or raw.get("kind") or "UNKNOWN",
+            "source": raw.get("source") or raw.get("path") or "",
+            "source_ref": raw.get("source_ref") or raw.get("path") or "",
+            "source_tier": raw.get("source_tier") or "UNKNOWN",
+            "timestamp": raw.get("timestamp") or raw.get("updated_at") or "",
+            "ttl_seconds": raw.get("ttl_seconds"),
+            # Canonical project documents are stable until versioned again.
+            "time_sensitive": bool(raw.get("time_sensitive", False)),
+        })
+    validation = validate_specialist_result(orchestration, {
+        "response": answer,
+        "evidence": normalized_evidence,
+        "claims_external_action": False,
+    })
+    task = dict(orchestration.get("task") or {})
+    return {
+        "schema": "ATLASQUANT_AION_RESULT_V1",
+        "request_id": str((orchestration.get("context") or {}).get("request_id") or ""),
+        "task_id": str(task.get("task_id") or ""),
+        "domain": str(task.get("domain") or "central"),
+        "capability_id": str(task.get("capability_id") or "unknown"),
+        "answer": _clean(answer, 8000),
+        "provider_state": _clean(provider_state, 80),
+        "validation": validation,
+        "truth": validation["truth"],
+        "status": validation["state"],
+        "evidence_count": len(normalized_evidence),
+        "private_chain_of_thought_exposed": False,
+        "external_action_executed": False,
+        "automatic_memory_write": False,
+        "automatic_learning_change": False,
+        "real_orders_enabled": False,
+    }
+
+
 __all__ = [
     "SCHEMA", "AionContext", "AionTask", "normalize_context", "classify_risk",
-    "orchestrate", "validate_specialist_result",
+    "orchestrate", "validate_specialist_result", "build_aion_result",
 ]

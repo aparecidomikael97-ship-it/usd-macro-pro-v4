@@ -1595,7 +1595,7 @@ def checkpoint_integrity_report(
 ) -> dict[str, Any]:
     """Verify persisted component digests before normalization mutates them.
 
-    Missing V16 structure is reported as MIGRATION_REQUIRED rather than corruption.
+    Missing versioned structure is reported as MIGRATION_REQUIRED rather than corruption.
     A present-but-wrong digest is a MISMATCH and should fail closed for writes.
     """
     if not isinstance(checkpoint, Mapping):
@@ -1645,6 +1645,30 @@ def checkpoint_integrity_report(
     events = normalize_events(operating.get("events") if isinstance(operating, Mapping) else [])
     add_check("operating.tasks", operating.get("task_digest"), queue_digest(tasks))
     add_check("operating.events", operating.get("event_digest"), events_digest(events))
+
+    persona_memory_raw = (
+        raw.get("persona_memory")
+        if isinstance(raw.get("persona_memory"), Mapping)
+        else {}
+    )
+    persona_memory_state = normalize_persona_memory(persona_memory_raw)
+    add_check(
+        "persona_memory",
+        persona_memory_raw.get("digest"),
+        persona_memory_state.get("digest"),
+    )
+
+    memory_layers_raw = (
+        raw.get("memory_layers")
+        if isinstance(raw.get("memory_layers"), Mapping)
+        else {}
+    )
+    memory_layers_state = normalize_memory_layers(memory_layers_raw)
+    add_check(
+        "memory_layers",
+        memory_layers_raw.get("digest"),
+        memory_layers_state.get("digest"),
+    )
 
     studio = raw.get("studio") if isinstance(raw.get("studio"), Mapping) else {}
     projects = normalize_projects(studio.get("projects") if isinstance(studio, Mapping) else [])
@@ -1883,8 +1907,12 @@ def checkpoint_integrity_report(
     raw_areas = raw.get("areas") if isinstance(raw.get("areas"), Mapping) else {}
     if "subscriptions" not in raw_areas:
         migration_items.append("areas.subscriptions ausente")
-    if version < 16:
-        migration_items.append(f"checkpoint_version {version} < 16")
+    if version < 18:
+        migration_items.append(f"checkpoint_version {version} < 18")
+    if "persona_memory" not in raw:
+        migration_items.append("persona_memory ausente")
+    if "memory_layers" not in raw:
+        migration_items.append("memory_layers ausente")
     if "continuity" not in raw:
         migration_items.append("continuity ausente")
     if "learning" not in raw:

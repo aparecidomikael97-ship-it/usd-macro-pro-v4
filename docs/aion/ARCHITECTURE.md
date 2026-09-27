@@ -46,6 +46,12 @@ Interaction
 `READY` significa que o preflight não encontrou bloqueio; não significa que uma
 ferramenta foi chamada.
 
+Respostas locais e externas convergem em `ATLASQUANT_AION_RESULT_V1` por
+`build_aion_result()`. O envelope preserva `request_id`, `task_id`, capability,
+lane do provedor, contagem de evidências e o parecer do Validator/Truth Gate. Uma
+resposta sem evidência confirmada permanece `REVISE`; o envelope nunca autoriza
+ação externa, escrita automática de memória ou ordem real.
+
 ## Capability Registry
 
 `atlasquant_aion_capabilities.py` registra:

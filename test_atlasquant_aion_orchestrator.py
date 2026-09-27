@@ -2,7 +2,11 @@ import unittest
 from datetime import datetime, timedelta, timezone
 
 from atlasquant_aion_capabilities import CapabilityRegistry, default_registry
-from atlasquant_aion_orchestrator import orchestrate, validate_specialist_result
+from atlasquant_aion_orchestrator import (
+    build_aion_result,
+    orchestrate,
+    validate_specialist_result,
+)
 from atlasquant_aion_truth import assess_truth
 
 
@@ -167,6 +171,27 @@ class CentralOrchestratorTests(unittest.TestCase):
         validated = validate_specialist_result(preflight, {"response": "Sem fonte"})
         self.assertEqual(validated["state"], "REVISE")
         self.assertIn("RESULT_WITHOUT_CONFIRMED_EVIDENCE", validated["issues"])
+
+    def test_unified_result_validates_local_and_external_paths(self):
+        preflight = orchestrate("Explique a arquitetura do projeto")
+        result = build_aion_result(
+            preflight,
+            answer="A arquitetura está documentada.",
+            evidence=[{
+                "claim": "architecture",
+                "value": "documented",
+                "truth_state": "CONFIRMED",
+                "source": "docs/aion/ARCHITECTURE.md",
+                "source_tier": "PRIMARY",
+                "time_sensitive": False,
+            }],
+            provider_state="LOCAL_DETERMINISTIC",
+        )
+        self.assertEqual(result["schema"], "ATLASQUANT_AION_RESULT_V1")
+        self.assertEqual(result["provider_state"], "LOCAL_DETERMINISTIC")
+        self.assertEqual(result["status"], "PASS")
+        self.assertFalse(result["external_action_executed"])
+        self.assertFalse(result["automatic_memory_write"])
 
 
 if __name__ == "__main__":
