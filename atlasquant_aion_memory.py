@@ -1042,10 +1042,28 @@ def update_durable_tasks_checkpoint(
     *,
     records: Any,
     dirty: bool = True,
+    expected_checkpoint_digest: str | None = None,
 ) -> dict[str, Any]:
     """Persist resumable task state; persistence never resumes execution."""
+    if expected_checkpoint_digest is not None and checkpoint_source_digest(checkpoint)!=expected_checkpoint_digest:
+        from atlasquant_aion_durable_tasks import DurableTaskError
+        raise DurableTaskError("REVISION_CHECKPOINT_CONFLICT")
     payload = ensure_operating_checkpoint(checkpoint)
     rows = normalize_durable_tasks(records)
+    from atlasquant_aion_continuity import mission_task_consistency
+    from atlasquant_aion_durable_tasks import DurableTaskError
+    previous={row["durable_task_id"]:row for row in payload["durable_tasks"]["records"]}
+    for row in rows:
+        old=previous.get(row["durable_task_id"])
+        if old and row!=old and row["revision"]<=old["revision"]:
+            raise DurableTaskError("REVISION_CONFLICT",old)
+        if old and old["state"] in {"DONE","CANCELED"} and row["state"]!=old["state"]:
+            raise DurableTaskError("TASK_TERMINAL",old)
+    report=mission_task_consistency(payload["continuity"]["missions"],rows)
+    if report["state"]!="CONSISTENT":
+        error=DurableTaskError("MISSION_TASK_INCONSISTENT")
+        error.result["issues"]=report["issues"]
+        raise error
     payload["durable_tasks"] = {
         "records": rows,
         "digest": durable_tasks_digest(rows),
