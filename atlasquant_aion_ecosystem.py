@@ -463,12 +463,14 @@ def ecosystem_integrity_report(
 
     capability_ids = [capability_id for capability_id, _specialist in pairs]
     known_capabilities = {item for item in capability_ids if item}
+    owner_by_capability: dict[str, str] = {}
     if len(capability_ids) != len(set(capability_ids)):
         errors.append("capability duplicada")
     for capability_id, specialist in pairs:
         if not capability_id:
             errors.append("capability ausente")
             continue
+        owner_by_capability.setdefault(capability_id, specialist)
         if specialist not in known_specialists:
             errors.append(f"specialist ausente: {specialist} ({capability_id})")
 
@@ -493,12 +495,16 @@ def ecosystem_integrity_report(
         for specialist_id in _seq(area.get("specialist_ids")):
             if specialist_id not in known_specialists:
                 errors.append(f"specialist ausente: {specialist_id}")
+        area_specialists = set(_seq(area.get("specialist_ids")))
         area_capabilities = _seq(area.get("capability_ids"))
         for capability_id in area_capabilities:
             if capability_id not in known_capabilities:
                 errors.append(f"capability ausente: {capability_id}")
-            else:
-                assigned.add(capability_id)
+                continue
+            assigned.add(capability_id)
+            owner = owner_by_capability.get(capability_id, "")
+            if owner not in area_specialists:
+                errors.append(f"specialist fora da área: {owner} ({capability_id})")
         actions = {item.casefold() for item in _seq(area.get("allowed_actions"))}
         blocked = sorted(actions & FORBIDDEN_ACTIONS)
         if blocked:
@@ -515,9 +521,20 @@ def ecosystem_integrity_report(
     for area_id in sorted({item for item in area_ids if item and area_ids.count(item) > 1}):
         errors.append(f"área duplicada: {area_id}")
 
+    official = set(OFFICIAL_AREA_IDS)
+    observed = {area_id for area_id in area_ids if area_id}
+    if len(areas) != len(OFFICIAL_AREA_IDS):
+        errors.append(f"contagem de áreas inválida: {len(areas)}")
     for area_id in OFFICIAL_AREA_IDS:
-        if area_id not in by_area:
+        if area_id not in observed:
             errors.append(f"área ausente: {area_id}")
+    for area_id in sorted(observed - official):
+        errors.append(f"área desconhecida: {area_id}")
+    if registry is not None:
+        if registry.get("external_action_authority") is not False:
+            errors.append("external_action_authority do registry inválido")
+        if registry.get("real_trading_enabled") is not False:
+            errors.append("real_trading_enabled do registry inválido")
     for area_id, required in REQUIRED_AREA_CAPABILITIES.items():
         present = set(_seq((by_area.get(area_id) or {}).get("capability_ids")))
         for capability_id in required:

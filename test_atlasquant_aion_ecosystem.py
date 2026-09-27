@@ -212,6 +212,64 @@ class EcosystemIntegrityFailureTests(unittest.TestCase):
         self.assertEqual(report["state"], "INVALID")
         self.assertTrue(any(error.startswith("persona duplicada:") for error in report["errors"]))
 
+    def test_unknown_ninth_area_is_invalid(self):
+        registry = ecosystem_registry()
+        registry["areas"].append({
+            "area_id": "archive",
+            "workspace_id": "archive",
+            "persona_id": "archive",
+            "entry_key": "archive",
+            "specialist_ids": (),
+            "capability_ids": (),
+            "allowed_actions": ("read",),
+            "external_action_authority": False,
+            "real_trading_enabled": False,
+        })
+        report = ecosystem_integrity_report(registry)
+        self.assertEqual(report["state"], "INVALID")
+        self.assertEqual(report["areas"], 9)
+        self.assertTrue(any(error == "área desconhecida: archive" for error in report["errors"]))
+        self.assertTrue(any(error.startswith("contagem de áreas inválida:") for error in report["errors"]))
+        self.assertIs(report["real_trading_enabled"], False)
+        self.assertIs(report["external_action_authority"], False)
+
+    def test_capability_specialist_must_belong_to_the_same_area(self):
+        registry = ecosystem_registry()
+        central = next(area for area in registry["areas"] if area["area_id"] == "central")
+        self.assertNotIn("market", central["specialist_ids"])
+        central["capability_ids"] = tuple(central["capability_ids"]) + ("market.explain",)
+        report = ecosystem_integrity_report(registry)
+        self.assertEqual(report["state"], "INVALID")
+        self.assertTrue(any(
+            error == "specialist fora da área: market (market.explain)"
+            for error in report["errors"]
+        ))
+        shared = ecosystem_integrity_report()
+        self.assertEqual(shared["state"], "VALID")
+        for area in ecosystem_registry()["areas"]:
+            if "research.synthesize" in area["capability_ids"]:
+                self.assertIn("research", area["specialist_ids"])
+            if "risk.assess" in area["capability_ids"]:
+                self.assertIn("risk", area["specialist_ids"])
+
+    def test_registry_external_action_authority_true_is_invalid(self):
+        registry = ecosystem_registry()
+        registry["external_action_authority"] = True
+        report = ecosystem_integrity_report(registry)
+        self.assertEqual(report["state"], "INVALID")
+        self.assertIn("external_action_authority do registry inválido", report["errors"])
+        self.assertIs(report["external_action_authority"], False)
+        self.assertIs(report["real_trading_enabled"], False)
+
+    def test_registry_real_trading_enabled_true_is_invalid(self):
+        registry = ecosystem_registry()
+        registry["real_trading_enabled"] = True
+        report = ecosystem_integrity_report(registry)
+        self.assertEqual(report["state"], "INVALID")
+        self.assertIn("real_trading_enabled do registry inválido", report["errors"])
+        self.assertIs(report["external_action_authority"], False)
+        self.assertIs(report["real_trading_enabled"], False)
+
 
 if __name__ == "__main__":
     unittest.main()
