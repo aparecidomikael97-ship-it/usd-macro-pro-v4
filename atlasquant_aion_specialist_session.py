@@ -298,7 +298,13 @@ def _envelope(
     })
 
 
-def _absent(specialist: str, summary: str, observations: Mapping[str, Any] | None = None) -> dict[str, Any]:
+def _absent(
+    specialist: str,
+    summary: str,
+    observations: Mapping[str, Any] | None = None,
+    snapshot: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    parent = _mapping(snapshot)
     assessment = _assess([], None)
     return _envelope(
         specialist,
@@ -306,8 +312,8 @@ def _absent(specialist: str, summary: str, observations: Mapping[str, Any] | Non
         summary=summary,
         observations=observations or {},
         claims=[],
-        origin="",
-        observed_at="",
+        origin=str(parent.get("origin") or ""),
+        observed_at=str(parent.get("observed_at") or ""),
         assessment=assessment,
         conflicts=[],
         input_state="ABSENT",
@@ -422,6 +428,7 @@ def _market(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, Any]
             "Scanner persistido e Radar não estão neste snapshot. Ausência não é cotação, "
             "preço nem TOP 10.",
             {"ranking_valid": False, "price_invented": False, "profit_probability": False},
+            snapshot,
         )
     active = scanner if scanner.get("present") else radar
     origin = str(active.get("origin") or "PERSISTED_SCANNER")
@@ -583,6 +590,7 @@ def _macro(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, Any]:
             "macro",
             "Nenhuma linha ou evento macro foi fornecido neste snapshot.",
             {"state": briefing["state"], "data_sufficient": False, "live_calendar_consulted": False},
+            snapshot,
         )
     active = macro if macro.get("present") else calendar
     origin = str(active.get("origin") or "SESSION")
@@ -709,6 +717,7 @@ def _ict(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, Any]:
                 "runs_backtest": False,
                 "fabricated_values": False,
             },
+            snapshot,
         )
     origin = str(view.get("origin") or "SESSION")
     observed_at = str(view.get("observed_at") or "")
@@ -757,6 +766,7 @@ def _research(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, An
             "research",
             "Evidência de pesquisa não está carregada neste snapshot. Busca web e modelo externo não foram chamados.",
             {"records_loaded": 0, "web_research_executed": False, "external_model_executed": False},
+            snapshot,
         )
     payload = view.get("payload")
     records = payload if isinstance(payload, list) else list(_mapping(payload).get("records") or [])
@@ -809,6 +819,7 @@ def _admin(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, Any]:
                 "production_inferred_from_empty": False,
                 "automatic_approval": False,
             },
+            snapshot,
         )
     payload = view.get("payload")
     body = _mapping(payload)
@@ -857,6 +868,7 @@ def _studio(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, Any]
             "studio",
             "Estado local de Studio não foi fornecido. Ausência não significa provedor desconfigurado.",
             {"providers_inferred": False, "publishing_executed": False},
+            snapshot,
         )
     body = _mapping(view.get("payload"))
     providers = body.get("providers") if isinstance(body.get("providers"), Mapping) else {}
@@ -914,6 +926,7 @@ def _business(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, An
             "business",
             "Catálogo local de negócios não foi fornecido. Ausência não afirma produção vazia.",
             {"catalog_supplied": False, "production_inferred_from_empty": False, "publication_executed": False},
+            snapshot,
         )
     body = _mapping(view.get("payload"))
     products = body.get("products") if "products" in body else body.get("rows")
@@ -959,6 +972,7 @@ def _invest(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, Any]
             "invest",
             "Nenhum produto de investimento foi fornecido neste snapshot.",
             {"rows": 0, "personalized_recommendation": False, "automatic_orders": False},
+            snapshot,
         )
     body = _mapping(view.get("payload"))
     records = body.get("records", body.get("rows"))
@@ -1000,6 +1014,7 @@ def _risk(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, Any]:
             "risk",
             "Nenhum incidente ou postura foi fornecida neste snapshot. Isso não confirma um incidente.",
             {"incident_confirmed": False, "posture_inferred": False, "automatic_cutoff": False},
+            snapshot,
         )
     body = _mapping(view.get("payload"))
     origin = str(view.get("origin") or "SESSION")
@@ -1045,6 +1060,7 @@ def _dev(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, Any]:
                 "automatic_deploy": False,
                 "repository_mutated": False,
             },
+            snapshot,
         )
     body = _mapping(view.get("payload"))
     workflow = body.get("workflow") if isinstance(body.get("workflow"), Mapping) else body
@@ -1102,6 +1118,7 @@ def _lab(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, Any]:
                 "ppr_blocked": "ppr" in blocked,
                 "runs_backtest": False,
             },
+            snapshot,
         )
     rows = _rows_from_slice(view.get("payload"))
     matrix = lab_matrix(rows)
@@ -1145,7 +1162,7 @@ def _lab(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, Any]:
 
 
 def _core(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, Any]:
-    del snapshot, now
+    del now
     denied = guardian_decision("real_trade", {"role": "ADMIN"}, approved=True)
     assessment = _assess([{
         "claim": "real_trade_guardian",
@@ -1179,8 +1196,8 @@ def _core(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, Any]:
             "source_tier": "PRIMARY",
             "time_sensitive": False,
         }],
-        origin="SESSION",
-        observed_at="",
+        origin=str(_mapping(snapshot).get("origin") or "SESSION"),
+        observed_at=str(_mapping(snapshot).get("observed_at") or ""),
         assessment=assessment,
         conflicts=[],
         input_state="VALID",

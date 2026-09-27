@@ -52,7 +52,15 @@ class SpecialistSessionSnapshotTests(unittest.TestCase):
         absent = read_specialist_evidence("macro", session=fresh_session(), now=NOW)
         self.assertEqual(absent["answer_truth"], "UNKNOWN")
         self.assertEqual(absent["input_state"], "ABSENT")
+        self.assertEqual(absent["origin"], "SESSION")
         self.assertEqual(absent["observations"]["state"], "DADOS INSUFICIENTES")
+        checkpoint = read_specialist_evidence(
+            "market",
+            session=fresh_session(origin="CHECKPOINT"),
+            now=NOW,
+        )
+        self.assertEqual(checkpoint["origin"], "CHECKPOINT")
+        self.assertEqual(checkpoint["answer_truth"], "UNKNOWN")
 
     def test_valid_scanner_is_readable_without_price_or_top10(self):
         raw = complete_result()
