@@ -85,6 +85,18 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertFalse(summary["network_called"])
         self.assertFalse(summary["subprocess_called"])
 
+    def test_developer_package_is_human_gated_and_session_only(self):
+        src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Preparar pacote Developer Engine + Dev Fusion",src)
+        self.assertIn('key="aion_developer_intelligence_package"',src)
+        self.assertIn("build_developer_package(",src)
+        self.assertIn("Pacote Developer Engine + Dev Fusion",src)
+        self.assertIn("não persiste Checkpoint",src)
+        self.assertIn("não aprova PLAN/BUILD/REVIEW/RELEASE automaticamente",src)
+        button_pos=src.index('"Preparar pacote Developer Engine + Dev Fusion"')
+        package_pos=src.index("package = build_developer_package(",button_pos)
+        self.assertGreater(package_pos,button_pos)
+
     def test_developer_intelligence_scan_is_opt_in(self):
         src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("Developer Intelligence · mapa estrutural",src)

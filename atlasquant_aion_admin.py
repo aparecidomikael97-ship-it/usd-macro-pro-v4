@@ -259,6 +259,7 @@ from atlasquant_aion_developer_intelligence import (
     build_development_plan as build_developer_intelligence_plan,
     scan_repository as scan_developer_repository,
 )
+from atlasquant_aion_developer_package import build_developer_package
 from atlasquant_aion_release_confidence import (
     DIMENSIONS as RELEASE_CONFIDENCE_DIMENSIONS,
     evidence_dimension,
@@ -4706,6 +4707,75 @@ def _render_developer_intelligence() -> None:
         )
     st.caption(
         "Este plano não edita, não commita, não faz merge, não faz deploy e não habilita produção/trading."
+    )
+
+    if st.button(
+        "Preparar pacote Developer Engine + Dev Fusion",
+        key="aion_developer_intelligence_package",
+    ):
+        try:
+            package = build_developer_package(
+                plan.get("request"),
+                snapshot,
+                branch=plan.get("branch"),
+                baseline_ref=plan.get("baseline_ref"),
+                candidate_ref=plan.get("branch"),
+                changed_paths=list(plan.get("impacted_files") or []),
+                requested_by="AION_ADMIN_SESSION",
+            )
+            st.session_state["aion_developer_package_result"] = package
+        except Exception as exc:
+            st.error(f"Pacote de desenvolvimento recusado: {type(exc).__name__}")
+
+    package = (
+        st.session_state.get("aion_developer_package_result")
+        if isinstance(st.session_state.get("aion_developer_package_result"), Mapping)
+        else None
+    )
+    if not isinstance(package, Mapping):
+        return
+
+    workflow = package.get("developer_workflow") if isinstance(package.get("developer_workflow"), Mapping) else {}
+    twin = package.get("digital_twin") if isinstance(package.get("digital_twin"), Mapping) else {}
+    fusion = package.get("dev_fusion") if isinstance(package.get("dev_fusion"), Mapping) else {}
+    strategy = package.get("test_strategy") if isinstance(package.get("test_strategy"), Mapping) else {}
+
+    st.markdown("##### Pacote Developer Engine + Dev Fusion")
+    x1,x2,x3,x4 = st.columns(4)
+    x1.metric("Pacote", str(package.get("state") or "UNKNOWN"))
+    x2.metric("Workflow", str(workflow.get("status") or "UNKNOWN"))
+    x3.metric("Digital Twin", str(twin.get("state") or "UNKNOWN"))
+    x4.metric("Dev Fusion", str(fusion.get("state") or "UNKNOWN"))
+    st.caption(
+        f"{package.get('package_id')} · workflow {workflow.get('workflow_id')} · "
+        f"twin {twin.get('twin_id')} · pipeline {fusion.get('pipeline_id')}."
+    )
+
+    gates = [dict(item) for item in list(package.get("gates") or []) if isinstance(item, Mapping)]
+    if gates:
+        st.dataframe(
+            [{
+                "Gate": item.get("gate"),
+                "Estado": item.get("state"),
+                "Regra": item.get("detail"),
+            } for item in gates],
+            width="stretch",
+            hide_index=True,
+        )
+
+    required_tests = list(strategy.get("required_test_candidates") or [])
+    if required_tests:
+        st.markdown("**Candidatos de teste exigidos pelo pacote:**")
+        for item in required_tests[:40]:
+            st.markdown(f"- `{item}`")
+    if package.get("gaps"):
+        st.warning(
+            "Gaps para revisão: "
+            + " · ".join(str(x) for x in list(package.get("gaps") or []))
+        )
+    st.caption(
+        "O pacote fica apenas na sessão: não persiste Checkpoint, não executa testes, "
+        "não edita arquivos e não aprova PLAN/BUILD/REVIEW/RELEASE automaticamente."
     )
 
 def _render_development(
