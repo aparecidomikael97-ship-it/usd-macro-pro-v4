@@ -187,14 +187,31 @@ class ExecutionTests(unittest.TestCase):
             return {
                 "state": "SUCCESS",
                 "tool_id": tool_id,
+                "workspace_id": "central",
+                "kind": "SEARCH" if tool_id == "aion.memory.search" else "READ",
+                "request_id": str(kwargs.get("request_id") or ""),
                 "result": {"canonical_count": 1} if tool_id == "aion.memory.search" else {
                     "total": 2, "active": 1, "waiting_approval": 0, "blocked": 0
                 },
-                "truth": {"status": "UNKNOWN"},
+                "truth": {"status": "UNKNOWN", "freshness": "UNVERIFIED"},
                 "preflight": {"state": "READY_FOR_EXECUTOR", "blockers": []},
-                "security": {"network_called": False, "connector_called": False},
+                "provenance": {
+                    "source_module": "atlasquant_aion_local_executor",
+                    "source_function": "_test",
+                    "input_scope": "local",
+                    "local_only": True,
+                },
+                "security": {
+                    "network_called": False,
+                    "connector_called": False,
+                    "external_side_effects": False,
+                    "permissions_expanded": False,
+                    "secrets_included": False,
+                },
+                "executes_action": False,
                 "external_action_executed": False,
                 "real_orders_enabled": False,
+                "tool_output_is_authority": False,
             }
         spy = Mock(side_effect=ok)
         original = command.execute_local_tool
