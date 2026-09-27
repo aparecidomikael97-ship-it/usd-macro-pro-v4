@@ -28,7 +28,22 @@ TRADING_STYLE_LABELS = {
 SETUP_FAMILIES = ("ICT/SMC", "Sessões", "Volume")
 
 CELL_STATES = ("SEM_EVIDENCIA", "EVIDENCIA_INCOMPLETA", "EVIDENCIA_REGISTRADA", "BLOQUEADO")
-_METRICS = ("samples", "expectancy_r", "profit_factor", "max_drawdown_r")
+_METRICS = (
+    "samples", "win_rate_pct", "expectancy_r", "profit_factor",
+    "max_drawdown_r", "net_result",
+)
+
+_STRATEGY_TO_SETUP = {
+    "BOS_CHOCH_OB": "bos-choch-ob",
+    "BOS/CHOCH + ORDER BLOCK": "bos-choch-ob",
+    "FVG": "fvg",
+    "OTE": "ote",
+    "OTE / FIBONACCI": "ote",
+    "CRT": "crt",
+    "AMD": "amd-po3",
+    "AMD_PO3": "amd-po3",
+    "BREAKER": "breaker-mitigation",
+}
 
 
 def _finite(value: Any) -> float | None:
@@ -81,6 +96,11 @@ def _cell(timeframe: str, setup: Mapping[str, Any], evidence: Mapping[str, Any] 
         "family": str(setup["family"]),
         "metrics": {name: None for name in _METRICS},
         "source": "",
+        "asset": "",
+        "period_start": "",
+        "period_end": "",
+        "rules_version": "",
+        "executed_at": "",
         "real_orders_enabled": False,
     }
     if setup.get("definition_pending"):
@@ -97,6 +117,11 @@ def _cell(timeframe: str, setup: Mapping[str, Any], evidence: Mapping[str, Any] 
         **base,
         "metrics": metrics,
         "source": source,
+        "asset": str(evidence.get("asset") or "").strip()[:32],
+        "period_start": str(evidence.get("period_start") or "").strip()[:64],
+        "period_end": str(evidence.get("period_end") or "").strip()[:64],
+        "rules_version": str(evidence.get("rules_version") or "").strip()[:80],
+        "executed_at": str(evidence.get("executed_at") or "").strip()[:64],
         "state": "EVIDENCIA_REGISTRADA" if complete else "EVIDENCIA_INCOMPLETA",
         "reason": (
             "Métricas registradas com fonte. Isto não é recomendação nem probabilidade de lucro."
@@ -104,6 +129,43 @@ def _cell(timeframe: str, setup: Mapping[str, Any], evidence: Mapping[str, Any] 
             "Registro parcial: métricas ou fonte ausentes ficam vazias, sem estimativa."
         ),
     }
+
+
+def evidence_rows_from_research_records(
+    records: Iterable[Mapping[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    """Adapt only explicit persisted/session evidence fields into matrix rows."""
+    rows: list[dict[str, Any]] = []
+    for raw in list(records or []):
+        if not isinstance(raw, Mapping):
+            continue
+        strategy = str(raw.get("strategy") or "").strip()
+        setup_id = _STRATEGY_TO_SETUP.get(strategy.upper(), strategy.casefold())
+        if setup_id not in set(_setup_ids()):
+            continue
+        evidence = raw.get("evidence") if isinstance(raw.get("evidence"), Mapping) else {}
+        passport = raw.get("passport") if isinstance(raw.get("passport"), Mapping) else {}
+        observed = passport.get("observed_metrics") if isinstance(passport.get("observed_metrics"), Mapping) else {}
+        timeframe = str(evidence.get("timeframe") or passport.get("timeframe") or "").strip()
+        if not timeframe:
+            continue
+        rows.append({
+            "setup_id": setup_id,
+            "timeframe": timeframe,
+            "asset": str(raw.get("pair") or ""),
+            "samples": evidence.get("trades", evidence.get("executed_trades", observed.get("trades"))),
+            "win_rate_pct": evidence.get("win_rate_pct", observed.get("win_rate_pct")),
+            "expectancy_r": evidence.get("expectancy_r", observed.get("expectancy_r")),
+            "profit_factor": evidence.get("profit_factor", observed.get("profit_factor")),
+            "max_drawdown_r": evidence.get("max_drawdown_r", observed.get("max_drawdown_r")),
+            "net_result": evidence.get("net_r", observed.get("net_r")),
+            "period_start": evidence.get("period_start"),
+            "period_end": evidence.get("period_end"),
+            "rules_version": evidence.get("rules_version"),
+            "executed_at": raw.get("captured_at"),
+            "source": str(raw.get("source") or ""),
+        })
+    return rows
 
 
 def lab_matrix(evidence_rows: Iterable[Mapping[str, Any]] | None = None) -> dict[str, Any]:
@@ -139,5 +201,6 @@ __all__ = [
     "SETUP_FAMILIES",
     "TRADING_STYLES",
     "cells_for_style",
+    "evidence_rows_from_research_records",
     "lab_matrix",
 ]

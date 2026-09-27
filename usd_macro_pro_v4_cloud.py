@@ -138,6 +138,13 @@ except Exception as _backtest_exc:
     _ATLASQUANT_BACKTEST_IMPORT_ERROR = f"{type(_backtest_exc).__name__}: {_backtest_exc}"
 
 try:
+    from atlasquant_lab_matrix_panel import render_lab_matrix_panel
+    _ATLASQUANT_LAB_MATRIX_IMPORT_ERROR = ""
+except Exception as _lab_matrix_exc:
+    render_lab_matrix_panel = None
+    _ATLASQUANT_LAB_MATRIX_IMPORT_ERROR = f"{type(_lab_matrix_exc).__name__}: {_lab_matrix_exc}"
+
+try:
     from atlasquant_history_backtest_guidance import (
         render_backtest_intro,
         render_history_workspace,
@@ -7263,6 +7270,18 @@ if _aq_active_index == 7:
         )
         if _ATLASQUANT_HISTORY_GUIDANCE_IMPORT_ERROR:
             st.caption(_ATLASQUANT_HISTORY_GUIDANCE_IMPORT_ERROR)
+
+    if render_lab_matrix_panel is not None:
+        try:
+            render_lab_matrix_panel()
+        except Exception as _lab_matrix_render_exc:
+            st.warning("Matriz do Laboratório entrou em modo seguro; nenhuma evidência foi inferida.")
+            st.caption(f"Diagnóstico Laboratório: {type(_lab_matrix_render_exc).__name__}")
+        st.divider()
+    else:
+        st.warning("Matriz do Laboratório indisponível neste carregamento.")
+        if _ATLASQUANT_LAB_MATRIX_IMPORT_ERROR:
+            st.caption(_ATLASQUANT_LAB_MATRIX_IMPORT_ERROR)
 
     if render_forward_test_panel is not None:
         _forward_summary,_forward_source=_github_get_json_v937(
