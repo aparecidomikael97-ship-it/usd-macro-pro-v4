@@ -1,0 +1,198 @@
+import unittest
+from datetime import datetime, timedelta, timezone
+
+from atlasquant_aion_capabilities import CapabilityRegistry, default_registry
+from atlasquant_aion_orchestrator import (
+    build_aion_result,
+    orchestrate,
+    validate_specialist_result,
+)
+from atlasquant_aion_truth import assess_truth
+
+
+NOW = datetime(2026, 9, 27, 5, 0, tzinfo=timezone.utc)
+
+
+class CapabilityRegistryTests(unittest.TestCase):
+    def test_registry_routes_from_declared_metadata(self):
+        routed = default_registry().route(
+            "Compare CPI, juros e impacto macro no dólar",
+            domain_hint="macro",
+        )
+        self.assertEqual(routed[0]["capability_id"], "macro.explain")
+        self.assertIn("cpi", routed[0]["matched_metadata"])
+
+    def test_custom_capability_routes_without_router_code_change(self):
+        registry = CapabilityRegistry([])
+        registry.register({
+            "capability_id": "support.triage",
+            "specialist": "support",
+            "domains": ["support"],
+            "description": "Triagem de atendimento e dúvidas.",
+            "inputs": ["question"],
+            "outputs": ["triage"],
+            "allowed_roles": ["USER"],
+            "aliases": ["atendimento", "duvida"],
+        })
+        self.assertEqual(
+            registry.route("Preciso de atendimento para uma dúvida")[0]["capability_id"],
+            "support.triage",
+        )
+
+    def test_invalid_and_duplicate_capabilities_fail_closed(self):
+        registry = CapabilityRegistry([])
+        with self.assertRaises(ValueError):
+            registry.register({"capability_id": "../bad", "specialist": "x"})
+        valid = {
+            "capability_id": "test.safe", "specialist": "test",
+            "inputs": [], "outputs": [], "allowed_roles": ["ADMIN"],
+        }
+        registry.register(valid)
+        with self.assertRaises(ValueError):
+            registry.register(valid)
+
+
+class TruthAssessmentTests(unittest.TestCase):
+    def test_missing_source_and_timestamp_downgrade_confirmation(self):
+        out = assess_truth([{
+            "claim": "market",
+            "truth_state": "CONFIRMED",
+            "value": "open",
+            "time_sensitive": True,
+        }], now=NOW)
+        self.assertEqual(out["status"], "UNKNOWN")
+        self.assertIn("CONFIRMATION_DOWNGRADED", out["records"][0]["issues"])
+
+    def test_stale_data_never_looks_current(self):
+        out = assess_truth([{
+            "claim": "price",
+            "truth_state": "CONFIRMED",
+            "value": 1.2,
+            "source": "provider",
+            "timestamp": (NOW - timedelta(minutes=10)).isoformat(),
+            "ttl_seconds": 60,
+        }], now=NOW)
+        self.assertEqual(out["freshness"], "STALE")
+        self.assertEqual(out["status"], "UNKNOWN")
+
+    def test_conflicting_confirmed_sources_are_not_arbitrarily_resolved(self):
+        timestamp = NOW.isoformat()
+        out = assess_truth([
+            {"claim": "rate", "truth_state": "CONFIRMED", "value": 4, "source": "official-a", "timestamp": timestamp, "ttl_seconds": 600},
+            {"claim": "rate", "truth_state": "CONFIRMED", "value": 5, "source": "official-b", "timestamp": timestamp, "ttl_seconds": 600},
+        ], now=NOW)
+        self.assertEqual(out["conflict_state"], "CONFLICT")
+        self.assertEqual(out["status"], "UNKNOWN")
+        self.assertLessEqual(out["confidence"]["score"], 30)
+
+
+class CentralOrchestratorTests(unittest.TestCase):
+    def test_core_to_specialist_to_validator_flow(self):
+        preflight = orchestrate(
+            "Explique o contexto do Radar Forex",
+            context={"role": "USER", "experience_mode": "BEGINNER", "domain_hint": "market"},
+        )
+        self.assertEqual(preflight["selected_capability"]["specialist"], "market")
+        self.assertEqual(preflight["decision"]["state"], "READY")
+        self.assertTrue(preflight["critic_required"])
+        validated = validate_specialist_result(preflight, {
+            "response": "Contexto observado.",
+            "evidence": [{
+                "claim": "radar",
+                "truth_state": "CONFIRMED",
+                "value": "available",
+                "source": "AtlasQuant Radar",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "ttl_seconds": 3600,
+            }],
+        })
+        self.assertEqual(validated["state"], "PASS")
+
+    def test_user_cannot_use_admin_or_developer_capability(self):
+        for capability in ("admin.status", "development.inspect"):
+            out = orchestrate(
+                "status",
+                context={"role": "USER"},
+                requested_capability=capability,
+            )
+            self.assertEqual(out["decision"]["state"], "BLOCKED")
+            self.assertIn("PERMISSION_DENIED", out["decision"]["blockers"])
+
+    def test_unknown_capability_and_unavailable_tool_fail_closed(self):
+        out = orchestrate(
+            "execute ferramenta desconhecida",
+            context={"role": "ADMIN"},
+            requested_capability="unknown.tool",
+        )
+        self.assertEqual(out["decision"]["state"], "BLOCKED")
+        self.assertIn("INVALID_CAPABILITY", out["decision"]["blockers"])
+
+    def test_critical_action_needs_approval_and_real_trade_stays_blocked(self):
+        out = orchestrate(
+            "envie uma ordem real",
+            context={"role": "ADMIN"},
+            requested_capability="market.explain",
+            requested_action="real_trade",
+            approved=True,
+            feature_flags={"real_broker_execution": True},
+        )
+        self.assertEqual(out["decision"]["state"], "BLOCKED")
+        self.assertIn("REAL_TRADING_BLOCKED", out["decision"]["blockers"])
+        self.assertFalse(out["real_orders_enabled"])
+
+    def test_capability_flags_control_specialists_but_never_enable_external_or_real_trade(self):
+        out = orchestrate(
+            "inspecione código",
+            context={"role": "ADMIN"},
+            requested_capability="development.inspect",
+            feature_flags={
+                "AION_DEV_ENABLED": False,
+                "AION_EXTERNAL_ACTIONS_ENABLED": True,
+                "REAL_TRADING_ENABLED": True,
+            },
+        )
+        self.assertEqual(out["decision"]["state"], "BLOCKED")
+        self.assertIn("CAPABILITY_FLAG_DISABLED", out["decision"]["blockers"])
+        self.assertFalse(out["feature_flags"]["AION_EXTERNAL_ACTIONS_ENABLED"])
+        self.assertFalse(out["feature_flags"]["REAL_TRADING_ENABLED"])
+
+    def test_beginner_and_advanced_share_logic_but_change_presentation(self):
+        beginner = orchestrate("Explique o mercado", context={"role": "USER", "experience_mode": "BEGINNER"})
+        advanced = orchestrate("Explique o mercado", context={"role": "USER", "experience_mode": "ADVANCED"})
+        self.assertEqual(
+            beginner["selected_capability"]["capability_id"],
+            advanced["selected_capability"]["capability_id"],
+        )
+        self.assertTrue(beginner["presentation"]["technical_details_hidden"])
+        self.assertFalse(advanced["presentation"]["technical_details_hidden"])
+
+    def test_missing_specialist_evidence_is_revised(self):
+        preflight = orchestrate("pesquise", context={"role": "USER"})
+        validated = validate_specialist_result(preflight, {"response": "Sem fonte"})
+        self.assertEqual(validated["state"], "REVISE")
+        self.assertIn("RESULT_WITHOUT_CONFIRMED_EVIDENCE", validated["issues"])
+
+    def test_unified_result_validates_local_and_external_paths(self):
+        preflight = orchestrate("Explique a arquitetura do projeto")
+        result = build_aion_result(
+            preflight,
+            answer="A arquitetura está documentada.",
+            evidence=[{
+                "claim": "architecture",
+                "value": "documented",
+                "truth_state": "CONFIRMED",
+                "source": "docs/aion/ARCHITECTURE.md",
+                "source_tier": "PRIMARY",
+                "time_sensitive": False,
+            }],
+            provider_state="LOCAL_DETERMINISTIC",
+        )
+        self.assertEqual(result["schema"], "ATLASQUANT_AION_RESULT_V1")
+        self.assertEqual(result["provider_state"], "LOCAL_DETERMINISTIC")
+        self.assertEqual(result["status"], "PASS")
+        self.assertFalse(result["external_action_executed"])
+        self.assertFalse(result["automatic_memory_write"])
+
+
+if __name__ == "__main__":
+    unittest.main()
