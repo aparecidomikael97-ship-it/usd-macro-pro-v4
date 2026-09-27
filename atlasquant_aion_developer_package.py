@@ -23,7 +23,10 @@ from atlasquant_aion_developer_intelligence import (
     build_development_plan,
     validate_snapshot_integrity,
 )
-from atlasquant_aion_developer_manifest import validate_candidate_ref
+from atlasquant_aion_developer_manifest import (
+    validate_candidate_ref,
+    validate_isolated_branch,
+)
 from atlasquant_aion_digital_twin import new_digital_twin
 from atlasquant_aion_dev_fusion import new_dev_fusion_pipeline
 from atlasquant_aion_observability import redact_text
@@ -136,7 +139,7 @@ def build_developer_package(
     """Create a human-gated planning package; never execute or persist it."""
     _validate_snapshot(snapshot)
     request_text = _clean(request, 1200)
-    branch_text = _clean(branch, 240)
+    branch_text = validate_isolated_branch(branch)
     baseline = _clean(baseline_ref, 240)
     candidate = _clean(candidate_ref, 240)
     requester = _clean(requested_by, 120) or "AION_ANALYSIS"

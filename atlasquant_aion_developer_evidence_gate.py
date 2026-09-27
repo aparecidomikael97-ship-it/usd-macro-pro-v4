@@ -17,6 +17,7 @@ from typing import Any, Mapping, Sequence
 
 from atlasquant_aion_developer_correction import SCHEMA as CORRECTION_SCHEMA
 from atlasquant_aion_observability import redact_text
+from atlasquant_aion_developer_manifest import correction_manifest_id
 
 SCHEMA = "ATLASQUANT_AION_DEVELOPER_EVIDENCE_GATE_V1"
 CONFIRMATION_SCHEMA = "ATLASQUANT_AION_DEVELOPER_CAUSE_CONFIRMATION_V1"
@@ -88,6 +89,7 @@ def evaluate_evidence_promotion(
     if not expected_diagnostic or supplied_diagnostic != expected_diagnostic:
         raise ValueError("diagnostic lineage mismatch")
 
+    correction_manifest = correction_manifest_id(correction)
     hypothesis = _clean(hypothesis_label, 160)
     if hypothesis not in _hypothesis_labels(correction):
         raise ValueError("hypothesis is not part of correction plan")
@@ -127,6 +129,7 @@ def evaluate_evidence_promotion(
     state = "READY_FOR_HUMAN_CAUSE_REVIEW" if not blockers else "INSUFFICIENT_EVIDENCE"
     gate_seed = {
         "correction_id": correction.get("correction_id"),
+        "correction_manifest_id": correction_manifest,
         "hypothesis": hypothesis,
         "test": test,
         "before": before,
@@ -139,6 +142,7 @@ def evaluate_evidence_promotion(
         "gate_id": "DEVGATE-" + _digest(gate_seed),
         "state": state,
         "correction_id": str(correction.get("correction_id") or ""),
+        "correction_manifest_id": correction_manifest,
         "lineage": {
             "snapshot_digest": expected_snapshot,
             "diagnostic_id": expected_diagnostic,
@@ -197,6 +201,9 @@ def confirm_root_cause_human_review(
         raise ValueError("evidence gate is not ready for human review")
     if str(gate.get("correction_id") or "") != str(correction.get("correction_id") or ""):
         raise ValueError("gate correction lineage mismatch")
+    current_manifest = correction_manifest_id(correction)
+    if str(gate.get("correction_manifest_id") or "") != current_manifest:
+        raise ValueError("gate correction manifest mismatch")
     if approved is not True:
         raise ValueError("explicit human approval required")
 
@@ -227,6 +234,7 @@ def confirm_root_cause_human_review(
         "hypothesis_label": label,
         "reviewer_actor": actor,
         "gate_id": str(gate.get("gate_id") or ""),
+        "correction_manifest_id": current_manifest,
         "evidence_refs": refs,
         "human_approved": True,
         "source": "HUMAN_REVIEW",

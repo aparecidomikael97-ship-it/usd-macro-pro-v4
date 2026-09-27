@@ -18,9 +18,19 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from atlasquant_aion_developer_correction import SCHEMA as CORRECTION_SCHEMA
-from atlasquant_aion_developer_intelligence import SCHEMA as INTELLIGENCE_SCHEMA
+from atlasquant_aion_developer_intelligence import (
+    SCHEMA as INTELLIGENCE_SCHEMA,
+    validate_snapshot_integrity,
+)
 from atlasquant_aion_developer_package import SCHEMA as PACKAGE_SCHEMA
 from atlasquant_aion_observability import redact_text
+from atlasquant_aion_developer_manifest import (
+    authorization_manifest_id,
+    canonical_identity,
+    correction_manifest_id,
+    implementation_base_manifest_id,
+    implementation_readiness_manifest_id,
+)
 from atlasquant_aion_workspaces import developer_step_allowed, developer_trust_policy
 
 SCHEMA = "ATLASQUANT_AION_DEVELOPER_IMPLEMENTATION_ENVELOPE_V1"
@@ -34,8 +44,7 @@ def _clean(value: Any, limit: int = 1200) -> str:
 
 def _identity_key(value: Any) -> str:
     """Canonical comparison key for role separation; display value stays unchanged."""
-    normalized = unicodedata.normalize("NFKC", _clean(value, 160))
-    return " ".join(normalized.split()).casefold()
+    return canonical_identity(value)
 
 
 def _list(values: Sequence[Any] | None, limit: int = 100) -> list[str]:
@@ -94,6 +103,9 @@ def build_implementation_envelope(
     snapshot_digest = str(snapshot.get("snapshot_digest") or "")
     if not snapshot_digest:
         raise ValueError("snapshot digest required")
+    validate_snapshot_integrity(snapshot)
+    if bool(snapshot.get("truncated")):
+        raise ValueError("truncated snapshot cannot authorize implementation")
     if any(bool(snapshot.get(key)) for key in (
         "content_included",
         "executes_repository_code",
@@ -137,6 +149,8 @@ def build_implementation_envelope(
         raise ValueError("root-cause reviewer identity required")
     if not list(confirmed.get("evidence_refs") or []):
         raise ValueError("root-cause review evidence required")
+    if str(confirmed.get("correction_manifest_id") or "") != correction_manifest_id(correction):
+        raise ValueError("root-cause confirmation no longer matches correction manifest")
 
     policy = developer_trust_policy()
     if int(policy.get("max_autonomous_level") or -1) >= REQUESTED_TRUST_LEVEL:
@@ -151,6 +165,8 @@ def build_implementation_envelope(
     ]
     if not source_scope:
         raise ValueError("implementation source scope is empty")
+    if any(str(known[path].get("category") or "") == "WORKFLOW" for path in source_scope):
+        raise ValueError("workflow changes require separate release workflow")
 
     tests = _list(correction.get("test_candidates"), 100)
     test_scope = []
@@ -180,16 +196,21 @@ def build_implementation_envelope(
     if _ui_sensitive(editable_scope, risk_tags):
         mandatory_gates.extend(["UI_SMOKE", "MOBILE_DOM"])
 
+    revision = package.get("revision_contract") if isinstance(package.get("revision_contract"), Mapping) else {}
+    if not str(revision.get("branch") or "") or not str(revision.get("baseline_ref") or "") or not str(revision.get("candidate_ref") or ""):
+        raise ValueError("package revision contract missing")
+
     envelope_seed = {
         "snapshot_digest": snapshot_digest,
         "package_id": package.get("package_id"),
         "correction_id": correction.get("correction_id"),
         "cause_confirmation": confirmed.get("confirmation_id"),
+        "revision_contract": revision,
         "scope": editable_scope,
         "tests": tests,
     }
 
-    return {
+    out = {
         "schema": SCHEMA,
         "envelope_id": "DEVIMPL-" + _digest(envelope_seed),
         "state": "WAITING_HUMAN_IMPLEMENTATION_APPROVAL",
@@ -208,6 +229,11 @@ def build_implementation_envelope(
             "package_id": str(package.get("package_id") or ""),
             "correction_id": str(correction.get("correction_id") or ""),
             "cause_confirmation_id": str(confirmed.get("confirmation_id") or ""),
+        },
+        "revision_contract": {
+            "branch": str(revision.get("branch") or ""),
+            "baseline_ref": str(revision.get("baseline_ref") or ""),
+            "candidate_ref": str(revision.get("candidate_ref") or ""),
         },
         "scope": {
             "source_files": source_scope,
@@ -267,6 +293,8 @@ def build_implementation_envelope(
         "real_trading_enabled": False,
         "tool_output_is_authority": False,
     }
+    out["envelope_manifest_id"] = implementation_base_manifest_id(out)
+    return out
 
 
 def prepare_implementation_readiness(
@@ -283,6 +311,8 @@ def prepare_implementation_readiness(
         raise ValueError("invalid implementation envelope")
     if str(envelope.get("state") or "") != "WAITING_HUMAN_IMPLEMENTATION_APPROVAL":
         raise ValueError("implementation envelope is not awaiting readiness")
+    if str(envelope.get("envelope_manifest_id") or "") != implementation_base_manifest_id(envelope):
+        raise ValueError("implementation envelope manifest mismatch")
 
     rollback = _clean(rollback_plan, 2400)
     builder = _clean(builder_actor, 160)
@@ -359,6 +389,7 @@ def prepare_implementation_readiness(
     out["production_change_allowed"] = False
     out["real_trading_enabled"] = False
     out["tool_output_is_authority"] = False
+    out["readiness_manifest_id"] = implementation_readiness_manifest_id(out)
     return out
 
 
@@ -376,6 +407,10 @@ def approve_implementation_session(
         raise ValueError("implementation envelope is not ready for approval")
     if int(envelope.get("requested_trust_level") or -1) != REQUESTED_TRUST_LEVEL:
         raise ValueError("unexpected requested developer trust level")
+    if str(envelope.get("envelope_manifest_id") or "") != implementation_base_manifest_id(envelope):
+        raise ValueError("implementation envelope manifest mismatch")
+    if str(envelope.get("readiness_manifest_id") or "") != implementation_readiness_manifest_id(envelope):
+        raise ValueError("implementation readiness manifest mismatch")
     readiness = envelope.get("readiness") if isinstance(envelope.get("readiness"), Mapping) else {}
     rollback_contract = envelope.get("rollback_contract") if isinstance(envelope.get("rollback_contract"), Mapping) else {}
     actors = [
@@ -415,20 +450,17 @@ def approve_implementation_session(
     refs = _list(approval_refs, 40)
     if not actor:
         raise ValueError("implementation approver identity required")
+    if _identity_key(actor) in set(identity_keys):
+        raise ValueError("implementation approver must be independent from builder/reviewer/breaker")
     if not refs:
         raise ValueError("implementation approval evidence required")
     if not developer_step_allowed(REQUESTED_TRUST_LEVEL, human_approved=True):
         raise ValueError("developer trust policy denied approved level 2")
 
     out = deepcopy(dict(envelope))
-    auth_seed = {
-        "envelope_id": envelope.get("envelope_id"),
-        "actor": actor,
-        "refs": refs,
-    }
-    out["authorization"] = {
+    authorization = {
         "schema": AUTH_SCHEMA,
-        "authorization_id": "DEVAUTH-" + _digest(auth_seed),
+        "authorization_id": "",
         "trust_level": REQUESTED_TRUST_LEVEL,
         "approver_actor": actor,
         "approval_refs": refs,
@@ -445,7 +477,10 @@ def approve_implementation_session(
         "reviewer_identity_key": identity_keys[1],
         "breaker_identity_key": identity_keys[2],
         "rollback_recorded": True,
+        "authorized_readiness_manifest_id": str(envelope.get("readiness_manifest_id") or ""),
     }
+    authorization["authorization_id"] = authorization_manifest_id(envelope, authorization)
+    out["authorization"] = authorization
     out["state"] = "IMPLEMENTATION_AUTHORIZED_SESSION_ONLY"
     out["implementation_authorized"] = True
     out["execution_authorized"] = False
