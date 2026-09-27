@@ -30,6 +30,7 @@ from atlasquant_operational_state import (
     operational_presentation,
     operational_strip_html,
 )
+from atlasquant_master_market import build_executive_market_snapshot
 
 from market_map_core_v10 import (
     NY_TZ,
@@ -555,17 +556,118 @@ def master_overview_state(*, pairs: int, processed: int, scanner_fresh: int) -> 
     return {"label":"COBERTURA PARCIAL","detail":f"Market Map {min(m,p)}/{p} · Scanner atual {min(s,p)}/{p}"}
 
 
+def _render_executive_market(snapshot: Mapping[str, Any]) -> None:
+    forex = dict(snapshot.get("forex", {}) or {})
+    alignment = dict(snapshot.get("alignment", {}) or {})
+    opportunities = dict(snapshot.get("opportunities", {}) or {})
+    event = dict(snapshot.get("event", {}) or {})
+    dxy = dict(snapshot.get("dxy", {}) or {})
+
+    st.markdown("### 🛰️ Visão executiva do mercado")
+    st.caption(str(snapshot.get("disclaimer") or ""))
+    e1, e2, e3, e4 = st.columns(4)
+    e1.metric("Radar Forex", f"{int(forex.get('monitored') or 0)}/28")
+    e2.metric("Alinhamentos", int(alignment.get("aligned") or 0))
+    e3.metric("Divergências", int(alignment.get("divergent") or 0))
+    e4.metric(
+        "Fontes em atenção",
+        int(snapshot.get("fallback_count") or 0) + int(snapshot.get("unavailable_source_count") or 0),
+    )
+
+    left, right = st.columns([1.25, 1])
+    with left:
+        st.markdown("#### Forex · TOP 10 da população de 28")
+        top_rows = []
+        for rank, row in enumerate(list(forex.get("top", []) or []), start=1):
+            top_rows.append({
+                "#": rank,
+                "Par": row.get("pair", "—"),
+                "Direção": row.get("bias", "NEUTRO"),
+                "Confiança": row.get("confidence", "NÃO CONFIRMADA"),
+                "Estado": row.get("state", "SEM DADOS"),
+                "Sessão": row.get("session_label", "Sessão não informada"),
+                "Estudo": row.get("pipeline", {}).get("ranking", "BLOQUEADO PARA ESTUDO"),
+            })
+        st.dataframe(pd.DataFrame(top_rows), hide_index=True, width="stretch")
+        st.caption(
+            "O TOP 10 deriva da mesma população dos 28 pares. Pares sem evidência continuam "
+            "visíveis como SEM DADOS e nunca ganham confiança artificial."
+        )
+    with right:
+        st.markdown("#### DXY, evento e pré-notícia")
+        st.metric(
+            "DXY",
+            str(dxy.get("state") or "SEM LEITURA AO VIVO"),
+            delta="ranking próprio · não reutiliza score Forex",
+            delta_color="off",
+        )
+        st.markdown(f"**Evento:** {escape(str(event.get('title') or 'SEM DADOS'))}")
+        st.caption(
+            f"Estado {event.get('state', 'SEM DADOS')} · referência "
+            f"{event.get('reference', 'HORÁRIO NÃO COMPROVADO')} · "
+            f"pré-notícia {event.get('pre_news', 'BLOQUEADO')}."
+        )
+        if str(event.get("pre_news")) == "BLOQUEADO":
+            st.warning(str(event.get("reason") or "Pré-notícia bloqueado por falta de evidência."))
+        else:
+            st.info(str(event.get("reason") or "Revisão manual necessária."))
+
+        released = list(opportunities.get("released_for_study", []) or [])
+        blocked = list(opportunities.get("blocked", []) or [])
+        st.markdown("#### Oportunidades")
+        st.success(f"{len(released)} liberada(s) somente para estudo")
+        st.warning(f"{len(blocked)} bloqueada(s) ou aguardando revalidação")
+        st.caption("Liberação para estudo nunca habilita ordem real.")
+
+    st.markdown("#### Contexto por domínio")
+    st.dataframe(
+        pd.DataFrame(list(snapshot.get("domains", []) or [])),
+        hide_index=True,
+        width="stretch",
+    )
+
+    with st.expander("📡 Estado das fontes, índices e criptos", expanded=False):
+        sources = list(snapshot.get("sources", []) or [])
+        if sources:
+            st.dataframe(pd.DataFrame(sources), hide_index=True, width="stretch")
+        else:
+            st.warning("Estado das fontes não foi fornecido; disponibilidade permanece não confirmada.")
+        i1, i2 = st.columns(2)
+        with i1:
+            st.markdown("**Índices — ranking separado**")
+            st.dataframe(pd.DataFrame(list(snapshot.get("indices", []) or [])), hide_index=True, width="stretch")
+        with i2:
+            st.markdown("**Criptos — ranking separado**")
+            st.dataframe(pd.DataFrame(list(snapshot.get("cryptos", []) or [])), hide_index=True, width="stretch")
+
+
 def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: str,
                         macro_context: Mapping[str, Any] | None = None,
                         scanner_state: Mapping[str, Any] | None = None,
                         scanner_refresh_cb: Callable[[], tuple[bool, str]] | None = None,
-                        scanner_refresh_remaining: int = 0) -> None:
+                        scanner_refresh_remaining: int = 0,
+                        source_status: Mapping[str, Any] | None = None) -> None:
     st.markdown(OPERATIONAL_SPINE_CSS,unsafe_allow_html=True)
     st.subheader("🧠 Painel Mestre de Oportunidades — V10.7.4")
     try:
-        from atlasquant_premium_shell import PREMIUM_CSS, master_command_html
+        from atlasquant_premium_shell import PREMIUM_CSS, cockpit_header_html, master_command_html
         st.markdown(PREMIUM_CSS, unsafe_allow_html=True)
         _universe_n = 0 if matrix is None or getattr(matrix, "empty", True) else min(7, len(matrix))
+        st.markdown(
+            cockpit_header_html(
+                "Painel Mestre · Visão Executiva",
+                "Alinhamento, divergência, risco e cobertura em uma leitura única. "
+                "Informação ausente permanece indisponível e nenhuma faixa executa ordens.",
+                eyebrow="MARKET COMMAND · EXECUTIVE VIEW",
+                telemetry={
+                    "UNIVERSO": _universe_n,
+                    "MARKET MAP": "PERSISTIDO",
+                    "SAFETY CORE": "ATIVO",
+                    "EXECUÇÃO": "BLOQUEADA",
+                },
+            ),
+            unsafe_allow_html=True,
+        )
         st.markdown(master_command_html(operational_count=_universe_n), unsafe_allow_html=True)
     except Exception:
         pass
@@ -713,6 +815,13 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
         st.warning("Ainda não há linhas para consolidar.")
         return
     df = pd.DataFrame(rows).sort_values(["_rank", "Índice Integrado", "Score"], ascending=[False, False, False], kind="stable")
+    executive_snapshot = build_executive_market_snapshot(
+        ranking=ranking,
+        master_rows=rows,
+        macro_context=macro_context,
+        source_status=source_status,
+    )
+    _render_executive_market(executive_snapshot)
 
     best = df.iloc[0]
     _master_operational=master_operational_model(best.to_dict())

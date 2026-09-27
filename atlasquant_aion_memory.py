@@ -104,6 +104,10 @@ from atlasquant_aion_event_journal import (
     normalize_heartbeats as normalize_live_event_heartbeats,
     journal_digest as live_event_journal_digest,
 )
+from atlasquant_aion_persona_memory import (
+    default_persona_memory,
+    normalize_persona_memory,
+)
 
 SCHEMA = "ATLASQUANT_AION_MEMORY_V1"
 FOUNDATION_REVISION = "2026-09-25-complete-v2"
@@ -405,7 +409,7 @@ def search_canonical_memory(
 def default_checkpoint() -> dict[str, Any]:
     return {
         "schema": SCHEMA,
-        "checkpoint_version": 16,
+        "checkpoint_version": 17,
         "created_at": _now(),
         "updated_at": _now(),
         "project": "AtlasQuant",
@@ -436,6 +440,7 @@ def default_checkpoint() -> dict[str, Any]:
             "event_digest": events_digest([]),
             "dirty": False,
         },
+        "persona_memory": default_persona_memory(),
         "studio": {
             "projects": [],
             "digest": studio_digest([]),
@@ -513,6 +518,7 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
     payload = dict(checkpoint or {})
     if not payload:
         payload = default_checkpoint()
+    payload["persona_memory"] = normalize_persona_memory(payload.get("persona_memory"))
 
     raw_foundation = payload.get("approved_foundation")
     preserved_foundation = [
@@ -784,7 +790,7 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
         operating = {}
     tasks = normalize_queue(operating.get("tasks") if isinstance(operating, Mapping) else [])
     events = normalize_events(operating.get("events") if isinstance(operating, Mapping) else [])
-    payload["checkpoint_version"] = max(16, int(payload.get("checkpoint_version") or 1))
+    payload["checkpoint_version"] = max(17, int(payload.get("checkpoint_version") or 1))
     payload["operating"] = {
         "tasks": tasks,
         "events": events,
@@ -1940,5 +1946,8 @@ def checkpoint_source_digest(checkpoint: Mapping[str, Any] | None) -> str:
     operating = payload.get("operating")
     if isinstance(operating, dict):
         operating["dirty"] = False
+    persona_memory = payload.get("persona_memory")
+    if isinstance(persona_memory, dict):
+        persona_memory.pop("updated_at", None)
     raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]

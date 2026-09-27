@@ -6,6 +6,7 @@ from atlasquant_premium_shell import (
     PREMIUM_CSS,
     PREMIUM_MODULES,
     catalog_is_home,
+    cockpit_header_html,
     alert_card_html,
     beginner_attention_html,
     consume_premium_navigation,
@@ -36,6 +37,15 @@ class PremiumShellTests(unittest.TestCase):
         for item in PREMIUM_MODULES:
             self.assertIn(item["page"], known)
             self.assertNotIn("real_orders_enabled\": True", item["summary"])
+
+    def test_fast_shell_targets_exist_in_the_fast_shell(self):
+        import ast
+        import re
+        src = Path("atlasquant_fast_startup.py").read_text(encoding="utf-8")
+        fast_pages = set(ast.literal_eval(re.search(r"_fast_pages=(\[[^\]]+\])", src).group(1)))
+        for item in PREMIUM_MODULES:
+            if item.get("fast_page"):
+                self.assertIn(item["fast_page"], fast_pages, item["id"])
 
     def test_cards_escape_text_and_announce_click_and_lock(self):
         sample = dict(PREMIUM_MODULES[0])
@@ -102,6 +112,9 @@ class PremiumShellTests(unittest.TestCase):
 
     def test_design_system_keeps_contrast_motion_and_small_screens(self):
         self.assertIn("prefers-reduced-motion", PREMIUM_CSS)
+        self.assertIn(".aq-cockpit-head", PREMIUM_CSS)
+        self.assertIn('[data-testid="stMetric"]', PREMIUM_CSS)
+        self.assertIn('[data-testid="stDataFrame"]', PREMIUM_CSS)
         self.assertIn("overflow-x:hidden", PREMIUM_CSS)
         self.assertIn("grid-template-columns:1fr", PREMIUM_CSS)
         self.assertIn("#f5f8fc", PREMIUM_CSS)
@@ -120,6 +133,13 @@ class PremiumShellTests(unittest.TestCase):
         self.assertTrue(catalog_is_home("🎯 Radar"))
         self.assertTrue(catalog_is_home(""))
         self.assertFalse(catalog_is_home("🧭 Painel mestre"))
+
+    def test_cockpit_header_escapes_copy_and_telemetry(self):
+        html = cockpit_header_html("<Radar>", "x & y", telemetry={"ORDENS": "<BLOQUEADAS>"})
+        self.assertIn("&lt;Radar&gt;", html)
+        self.assertIn("x &amp; y", html)
+        self.assertIn("&lt;BLOQUEADAS&gt;", html)
+        self.assertIn("aq-cockpit-telemetry", html)
 
     def test_app_wires_catalog_without_removing_stable_navigation(self):
         cloud = Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")

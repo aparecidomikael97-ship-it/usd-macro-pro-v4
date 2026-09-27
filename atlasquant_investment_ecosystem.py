@@ -8,12 +8,14 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from math import isfinite
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 SIMULATION_NOTICE = (
     "Simulação educacional: rentabilidade, dividendos e valorização futuros "
     "não são garantidos. Compare cenários, riscos, liquidez, custos e impostos."
 )
+
+INVESTMENT_COMPARISON_SCHEMA = "ATLASQUANT_INVESTMENT_COMPARISON_V1"
 
 
 def _finite(name: str, value: float) -> float:
@@ -307,5 +309,45 @@ def growth_watch_snapshot(
         "interpretation": (
             "Indicador para priorizar estudo e acompanhamento de longo prazo; "
             "não é previsão de preço nem recomendação de compra."
+        ),
+    }
+
+
+def investment_product_comparison(
+    records: Sequence[Mapping[str, Any]] | None,
+) -> Dict[str, object]:
+    """Normalize proven product observations without ranking or filling gaps."""
+    rows: List[Dict[str, object]] = []
+    for raw in list(records or []):
+        if not isinstance(raw, Mapping):
+            continue
+        source = str(raw.get("source") or raw.get("fonte") or "").strip()
+        timestamp = str(raw.get("timestamp") or raw.get("updated_at") or "").strip()
+        confirmed = bool(source and timestamp)
+        rows.append({
+            "Produto": str(raw.get("product") or raw.get("produto") or "NÃO INFORMADO"),
+            "Classe": str(raw.get("asset_class") or raw.get("classe") or "NÃO INFORMADA"),
+            "Emissor": str(raw.get("issuer") or raw.get("emissor") or "NÃO INFORMADO"),
+            "Taxa bruta": raw.get("gross_return", raw.get("taxa_bruta")),
+            "Rentabilidade líquida": raw.get("net_return", raw.get("rentabilidade_liquida")),
+            "Prazo": raw.get("term", raw.get("prazo")),
+            "Liquidez": raw.get("liquidity", raw.get("liquidez")),
+            "Risco": raw.get("risk", raw.get("risco")),
+            "Custos": raw.get("costs", raw.get("custos")),
+            "Fonte": source or "FONTE AUSENTE",
+            "Timestamp": timestamp or "HORÁRIO NÃO COMPROVADO",
+            "Estado": "CONFIRMADO" if confirmed else "NÃO CONFIRMADO",
+        })
+    return {
+        "schema": INVESTMENT_COMPARISON_SCHEMA,
+        "rows": rows,
+        "confirmed": sum(row["Estado"] == "CONFIRMADO" for row in rows),
+        "unconfirmed": sum(row["Estado"] != "CONFIRMADO" for row in rows),
+        "state": "CONFIRMADO" if rows and all(row["Estado"] == "CONFIRMADO" for row in rows) else "NÃO CONFIRMADO",
+        "personalized_recommendation": False,
+        "automatic_orders": False,
+        "notice": (
+            "Comparação descritiva, não recomendação personalizada. Campos ausentes não são "
+            "estimados; rentabilidade líquida só aparece quando fornecida pela fonte."
         ),
     }

@@ -5,7 +5,7 @@ scenario-based: it does not place orders, recommend assets or promise returns.
 """
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Any, Iterable, Mapping, Sequence
 
 import pandas as pd
 import streamlit as st
@@ -16,6 +16,7 @@ from atlasquant_investment_ecosystem import (
     SIMULATION_NOTICE,
     dividend_quality_snapshot,
     growth_watch_snapshot,
+    investment_product_comparison,
     project_compound,
     project_income_asset,
     required_capital_for_monthly_income,
@@ -32,7 +33,7 @@ def _mode(value: object) -> str:
 def investment_sections(experience_mode: object = "Iniciante") -> tuple[str, ...]:
     base = ("Planejador", "Renda", "Comece com pouco")
     if _mode(experience_mode) == "Avançado":
-        return base + ("Qualidade da renda", "Radar de crescimento")
+        return base + ("Comparador", "Qualidade da renda", "Radar de crescimento")
     return base
 
 
@@ -83,6 +84,27 @@ def _projection_frame(result: dict[str, object], value_key: str) -> pd.DataFrame
         "cash_income_paid": "Renda recebida",
     }
     return frame.rename(columns={k: v for k, v in rename.items() if k in frame.columns})
+
+
+def _render_product_comparison(
+    product_records: Sequence[Mapping[str, Any]] | None,
+) -> dict[str, object]:
+    st.markdown("### 🏦 Comparador de produtos")
+    st.caption(
+        "Taxa, prazo, liquidez, risco, custos e rentabilidade líquida aparecem somente "
+        "quando vierem de uma fonte identificada."
+    )
+    snapshot = investment_product_comparison(product_records)
+    rows = list(snapshot["rows"])
+    if rows:
+        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    else:
+        st.warning(
+            "SEM PRODUTOS CONFIRMADOS — nenhum feed de produtos foi fornecido. "
+            "O AtlasQuant não cria taxas, prazos ou rentabilidades de exemplo."
+        )
+    st.info(str(snapshot["notice"]))
+    return snapshot
 
 
 def _render_planner() -> dict[str, object]:
@@ -410,7 +432,10 @@ def _render_growth_lab() -> dict[str, object]:
     return snapshot
 
 
-def render_investment_center(experience_mode: object = "Iniciante") -> dict[str, object]:
+def render_investment_center(
+    experience_mode: object = "Iniciante",
+    product_records: Sequence[Mapping[str, Any]] | None = None,
+) -> dict[str, object]:
     mode = _mode(experience_mode)
     st.markdown("## 💰 Investir")
     st.write(
@@ -437,7 +462,9 @@ def render_investment_center(experience_mode: object = "Iniciante") -> dict[str,
     )
 
     result: dict[str, object] = {"mode": mode, "section": selected, "automatic_orders": False}
-    if selected == "Planejador":
+    if selected == "Comparador":
+        result["comparison"] = _render_product_comparison(product_records)
+    elif selected == "Planejador":
         result["projection"] = _render_planner()
     elif selected == "Renda":
         result["income"] = _render_income()

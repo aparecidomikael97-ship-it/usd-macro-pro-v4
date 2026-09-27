@@ -148,6 +148,23 @@ def _base_fx_row(pair: str) -> dict[str, Any]:
         "evidence_source": "Radar / universo Forex 28",
         "real_orders_enabled": False,
         "automatic_execution": False,
+        "confidence": "NÃO CONFIRMADA",
+        "provenance_state": "SEM DADOS",
+        "score_components": {
+            "technical": None,
+            "macro": None,
+            "session": None,
+            "quality": None,
+        },
+        "pipeline": {
+            "data": "SEM DADOS",
+            "technical": "BLOQUEADO",
+            "macro": "BLOQUEADO",
+            "session": "NÃO CONFIRMADA",
+            "quality": "SEM DADOS",
+            "score": "BLOQUEADO",
+            "ranking": "MONITORADO",
+        },
     }
 
 
@@ -174,7 +191,66 @@ def _macro_fx_row(view: Any) -> dict[str, Any]:
         "blockers": ["Pipeline institucional completo ainda não cobre este par."],
         "hard_blocks": ["Radar macro não autoriza execução."],
         "evidence_source": "Radar / força relativa G8",
+        "confidence": "BAIXA",
+        "provenance_state": "MACRO CONFIRMADO · TÉCNICA AUSENTE",
+        "score_components": {
+            "technical": None,
+            "macro": max(0.0, min(100.0, intensity)),
+            "session": None,
+            "quality": None,
+        },
+        "pipeline": {
+            "data": "MACRO DISPONÍVEL",
+            "technical": "SEM DADOS",
+            "macro": "CONFIRMADO",
+            "session": "NÃO CONFIRMADA",
+            "quality": "PARCIAL",
+            "score": "SOMENTE MACRO",
+            "ranking": "BLOQUEADO PARA ESTUDO",
+        },
     })
+    return row
+
+
+def _normalized_institutional_row(raw: Mapping[str, Any], pair: str) -> dict[str, Any]:
+    """Normalize one pre-computed technical record without trusting its action flags."""
+    row = _base_fx_row(pair)
+    row.update(dict(raw))
+    row["pair"] = pair
+    row["asset_class"] = "FX"
+    row["coverage"] = str(raw.get("coverage") or "institucional")
+    row["real_orders_enabled"] = False
+    row["automatic_execution"] = False
+
+    technical = _finite(row.get("priority"))
+    quality = _finite(row.get("data_score", row.get("quality")))
+    ready = bool(row.get("data_ready")) and technical is not None and quality is not None
+    session = str(row.get("session_bucket") or "UNKNOWN").upper()
+    macro = _finite(row.get("strength_diff"))
+    if not ready:
+        row["action"] = "NÃO OPERAR"
+        row["confidence"] = "NÃO CONFIRMADA"
+        row["state"] = "SEM DADOS" if quality is None else "BLOQUEADO"
+    else:
+        row["confidence"] = "ALTA" if quality >= 80 else "MODERADA" if quality >= 60 else "BAIXA"
+    row["provenance_state"] = (
+        "CONFIRMADA" if ready else "INCOMPLETA · NÃO CONFIRMADA"
+    )
+    row["score_components"] = {
+        "technical": technical if ready else None,
+        "macro": abs(macro) if macro is not None else None,
+        "session": 100.0 if session != "UNKNOWN" else None,
+        "quality": quality if ready else None,
+    }
+    row["pipeline"] = {
+        "data": "CONFIRMADO" if ready else "SEM DADOS",
+        "technical": "CONFIRMADO" if ready else "BLOQUEADO",
+        "macro": "CONFIRMADO" if macro is not None else "NÃO CONFIRMADO",
+        "session": "CONFIRMADA" if session != "UNKNOWN" else "NÃO CONFIRMADA",
+        "quality": "CONFIRMADA" if quality is not None else "SEM DADOS",
+        "score": "CALCULADO" if ready else "BLOQUEADO",
+        "ranking": "ELEGÍVEL PARA ESTUDO" if ready else "BLOQUEADO PARA ESTUDO",
+    }
     return row
 
 
@@ -190,13 +266,7 @@ def compose_fx_board(
         pair = str(raw.get("pair") or "").strip().upper()
         if pair not in OFFICIAL_PAIRS or pair in by_pair:
             continue
-        row = dict(raw)
-        row["pair"] = pair
-        row["asset_class"] = "FX"
-        row["coverage"] = str(row.get("coverage") or "institucional")
-        row["real_orders_enabled"] = False
-        row["automatic_execution"] = False
-        by_pair[pair] = row
+        by_pair[pair] = _normalized_institutional_row(raw, pair)
 
     macro_ready = False
     strengths = strengths_from_records(ranking)
@@ -228,6 +298,25 @@ def compose_fx_board(
     }
 
 
+def rank_fx_population(rows: Sequence[Mapping[str, Any]] | None) -> list[dict[str, Any]]:
+    """Rank exactly the supplied FX population; invalid values sort last safely."""
+    selected = [
+        dict(row) for row in list(rows or [])
+        if str(dict(row).get("asset_class") or "FX").upper() == "FX"
+    ]
+    selected.sort(
+        key=lambda row: (
+            {"MATCH": 0, "UNKNOWN": 1, "OUTSIDE": 2}.get(str(row.get("session_match") or "UNKNOWN"), 1),
+            0 if bool(row.get("data_ready")) else 1,
+            0 if str(row.get("action") or "").upper() not in {"", "NÃO OPERAR", "NAO OPERAR"} else 1,
+            -(_finite(row.get("priority")) or 0.0),
+            -(_finite(row.get("data_score")) or 0.0),
+            str(row.get("pair") or ""),
+        )
+    )
+    return selected
+
+
 def highlight_top_fx(rows: Sequence[Mapping[str, Any]] | None, limit: int = TOP_FX_LIMIT) -> list[dict[str, Any]]:
     try:
         size = int(limit)
@@ -236,7 +325,7 @@ def highlight_top_fx(rows: Sequence[Mapping[str, Any]] | None, limit: int = TOP_
     if isinstance(limit, bool) or size < 0:
         size = 0
     size = min(size, TOP_FX_LIMIT)
-    selected = [dict(row) for row in list(rows or []) if str(dict(row).get("asset_class") or "FX") == "FX"]
+    selected = rank_fx_population(rows)
     return selected[:size]
 
 
@@ -299,6 +388,7 @@ __all__ = [
     "CRYPTO_UNIVERSE",
     "strengths_from_records",
     "compose_fx_board",
+    "rank_fx_population",
     "highlight_top_fx",
     "index_ranking",
     "crypto_ranking",

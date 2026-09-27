@@ -38,6 +38,7 @@ from atlasquant_radar_board import (
     highlight_top_fx,
     index_ranking,
 )
+from atlasquant_premium_shell import PREMIUM_CSS, cockpit_header_html
 
 SCHEMA="ATLASQUANT_HOME_RADAR_V1"
 RADAR_VISIBLE_LIMIT=10
@@ -284,12 +285,16 @@ def _card_html(row:Mapping[str,Any])->str:
         if str(r.get("signal_status_code")) in {"EXPIRED","UNVERIFIED","BLOCKED"}
         else ("validade técnica ≤ "+f"{float(signal_remaining):.0f} min" if signal_remaining is not None else "validade N/D")
     )
+    confidence=escape(str(r.get("confidence") or "NÃO CONFIRMADA"))
+    risk="BLOQUEADO" if action=="NÃO OPERAR" else escape(str(r.get("event") or "NÃO CONFIRMADO"))
     return f"""<div class="aq-home-card {tone}">
       <div class="aq-home-top"><strong>{pair}</strong><span>{icon} {escape(action)}</span></div>
       <div class="aq-home-signal">{signal_headline}</div>
       <div class="aq-home-time">{signal_reference} · {escape(age_text)} · {escape(validity_text)}</div>
       <div class="aq-home-score">{_safe(r.get('priority',0)):.0f}<small>/100 prioridade</small></div>
       <div class="aq-home-grid">
+        <span>Confiança <b>{confidence}</b></span>
+        <span>Risco <b>{risk}</b></span>
         <span>Dados <b>{_safe(r.get('data_score',0)):.0f}</b></span>
         <span>Qualidade <b>{_safe(r.get('quality',0)):.0f}</b></span>
         <span>{movement}</span>
@@ -372,14 +377,22 @@ def render_home_radar(
     indices=index_ranking(observations.get("indices"))
     cryptos=crypto_ranking(observations.get("cryptos"))
     mode="Avançado" if str(experience_mode).casefold().startswith("avan") else "Iniciante"
+    st.markdown(PREMIUM_CSS,unsafe_allow_html=True)
     st.markdown(HOME_CSS,unsafe_allow_html=True)
     st.markdown(OPERATIONAL_SPINE_CSS,unsafe_allow_html=True)
     st.markdown(
-        """<div class="aq-home-hero"><small>TELA PRINCIPAL</small>
-        <h2>🎯 Radar de Oportunidades</h2>
-        <p>Bata o olho, veja onde há contexto e abra o ativo para entender o porquê. 
-        Compra/Venda é viés de análise; dados insuficientes ou gates bloqueados viram NÃO OPERAR.</p>
-        <div class="aq-radar-live"><span class="aq-radar-dot"></span><span>Observação ativa do snapshot · sem nova coleta</span></div></div>""",
+        cockpit_header_html(
+            "Radar de Oportunidades",
+            "Os 28 cruzamentos G8 passam pelo mesmo pipeline. Compra/Venda é viés de análise; "
+            "fonte insuficiente vira NÃO CONFIRMADO ou BLOQUEADO.",
+            eyebrow="FOREX RADAR · G8 UNIVERSE",
+            telemetry={
+                "MONITORADOS": f"{board['monitored']}/28",
+                "TÉCNICA": board["institutional"],
+                "MACRO": board["macro_only"],
+                "ORDENS": "BLOQUEADAS",
+            },
+        ),
         unsafe_allow_html=True,
     )
     if not rows:
@@ -452,14 +465,15 @@ def render_home_radar(
     st.caption(
         f"{board['monitored']} pares Forex monitorados · "
         f"leitura institucional {board['institutional']} · radar macro {board['macro_only']} · "
-        f"sem leitura {board['missing']}. Índices e criptos ficam em rankings separados."
+        f"sem leitura {board['missing']}. O pipeline avalia os 28 sem exigir seleção individual; "
+        "pares sem técnica/proveniência ficam bloqueados. Índices e criptos ficam em rankings separados."
     )
 
     top_n=min(RADAR_VISIBLE_LIMIT,len(rows))
     top=highlight_top_fx(rows, top_n)
     if mode=="Iniciante" and top:
         try:
-            from atlasquant_premium_shell import PREMIUM_CSS, beginner_attention_html
+            from atlasquant_premium_shell import beginner_attention_html
             st.markdown(PREMIUM_CSS, unsafe_allow_html=True)
             st.markdown(beginner_attention_html(top[0]), unsafe_allow_html=True)
         except Exception:
@@ -547,9 +561,17 @@ def render_home_radar(
     if mode=="Avançado":
         st.markdown("### Diagnóstico avançado")
         adv=pd.DataFrame([{
+            **({
+                "Técnico":(r.get("score_components") or {}).get("technical"),
+                "Macro":(r.get("score_components") or {}).get("macro"),
+                "Componente sessão":(r.get("score_components") or {}).get("session"),
+                "Componente qualidade":(r.get("score_components") or {}).get("quality"),
+            } if isinstance(r.get("score_components"),Mapping) else {}),
             "Par":r["pair"],"Sessão":r.get("session_label","Sessão não informada"),
             "Compatível com perfil":r.get("session_match","UNKNOWN"),
             "Ação":r["action"],"Viés":r["bias"],"Prioridade":round(r["priority"],1),
+            "Confiança":r.get("confidence","NÃO CONFIRMADA"),
+            "Proveniência":r.get("provenance_state","NÃO CONFIRMADA"),
             "Qualidade":round(r["quality"],1),"Dados":round(r["data_score"],1),"H4":r["h4"],"H1":r["h1"],
             "M15":r["m15"],"Gate":r["gate"],"Status temporal":r["signal_headline"],
             "Hora leitura":r["signal_reference_display"],"Idade min":r["signal_age_minutes"],

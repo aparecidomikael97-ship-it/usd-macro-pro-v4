@@ -247,7 +247,12 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
     def test_older_checkpoint_is_upgraded_without_claiming_persistence(self):
         old={"checkpoint_version":1,"project":"AtlasQuant"}
         upgraded=ensure_operating_checkpoint(old)
-        self.assertEqual(upgraded["checkpoint_version"],16)
+        self.assertEqual(upgraded["checkpoint_version"],17)
+        self.assertIn("persona_memory",upgraded)
+        self.assertEqual(
+            set(upgraded["persona_memory"]["personas"]),
+            {"trader","admin","developer","video","business","laboratory"},
+        )
         self.assertIn("operating",upgraded)
         self.assertIn("studio",upgraded)
         self.assertIn("business",upgraded)

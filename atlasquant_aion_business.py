@@ -36,6 +36,16 @@ def _num(value:Any)->float:
         return 0.0
 
 
+def _optional_num(value:Any)->float|None:
+    if value is None or isinstance(value,bool) or str(value).strip()=="":
+        return None
+    try:
+        number=float(value)
+    except Exception:
+        return None
+    return number if number>=0 else None
+
+
 def _truth(value:Any)->str:
     state=str(value or "UNKNOWN").strip().upper()
     return state if state in TRUTH_STATES else "UNKNOWN"
@@ -361,6 +371,66 @@ def coverage_snapshot(system_cost_usd:Any,net_profit_sales_usd:Any)->dict[str,An
     }
 
 
+def funnel_snapshot(
+    *,
+    visits:Any=None,
+    leads:Any=None,
+    checkouts:Any=None,
+    orders:Any=None,
+    source:Any="",
+)->dict[str,Any]:
+    values={name:_optional_num(value) for name,value in {
+        "visits":visits,"leads":leads,"checkouts":checkouts,"orders":orders,
+    }.items()}
+    present=[values[key] for key in ("visits","leads","checkouts","orders") if values[key] is not None]
+    monotonic=all(a>=b for a,b in zip(present,present[1:])) if len(present)>=2 else False
+    confirmed=bool(str(source or "").strip() and len(present)==4 and monotonic)
+    def rate(numerator:str,denominator:str)->float|None:
+        n,d=values[numerator],values[denominator]
+        return None if n is None or d in (None,0) else round(n/d*100.0,2)
+    return {
+        "schema":SCHEMA,
+        **values,
+        "lead_rate_pct":rate("leads","visits"),
+        "checkout_rate_pct":rate("checkouts","leads"),
+        "order_rate_pct":rate("orders","visits"),
+        "source":_text(source,220),
+        "truth_state":"CONFIRMED" if confirmed else "UNKNOWN",
+        "state":"READY" if confirmed else "NOT_CONFIGURED",
+        "automatic_campaign":False,
+        "paid_action":False,
+    }
+
+
+def customer_economics(
+    *,
+    marketing_cost:Any=None,
+    acquired_customers:Any=None,
+    gross_profit_per_order:Any=None,
+    average_orders_per_customer:Any=None,
+    source:Any="",
+)->dict[str,Any]:
+    cost=_optional_num(marketing_cost)
+    customers=_optional_num(acquired_customers)
+    profit=_optional_num(gross_profit_per_order)
+    orders=_optional_num(average_orders_per_customer)
+    cac=None if cost is None or customers in (None,0) else round(cost/customers,2)
+    ltv=None if profit is None or orders is None else round(profit*orders,2)
+    ratio=None if cac in (None,0) or ltv is None else round(ltv/cac,2)
+    confirmed=bool(str(source or "").strip() and None not in (cac,ltv))
+    return {
+        "schema":SCHEMA,
+        "cac":cac,
+        "ltv":ltv,
+        "ltv_cac_ratio":ratio,
+        "source":_text(source,220),
+        "truth_state":"CONFIRMED" if confirmed else "UNKNOWN",
+        "state":"READY" if confirmed else "NOT_CONFIGURED",
+        "personalized_recommendation":False,
+        "paid_action":False,
+    }
+
+
 def business_digest(rows:Sequence[Mapping[str,Any]]|None)->str:
     raw=json.dumps(normalize_products(rows),ensure_ascii=False,sort_keys=True,default=str)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
@@ -387,5 +457,6 @@ __all__=[
     "SCHEMA","CHANNELS","STATUSES","TRUTH_STATES","unit_economics",
     "new_product_candidate","normalize_product","normalize_products","upsert_product",
     "trend_assessment","approve_product","marketplace_preflight",
-    "mark_listing_live_from_evidence","coverage_snapshot","business_digest","business_summary",
+    "mark_listing_live_from_evidence","coverage_snapshot","funnel_snapshot",
+    "customer_economics","business_digest","business_summary",
 ]

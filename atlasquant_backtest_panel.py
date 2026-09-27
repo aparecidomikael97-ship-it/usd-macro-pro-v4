@@ -402,12 +402,32 @@ def _render_result_block(
         walk_forward_status=None,
     )
     intelligence["evidence_ladder"]=session_evidence
+    _timeframes=sorted({
+        str(row.get("timeframe") or "").strip().upper()
+        for row in results if str(row.get("timeframe") or "").strip()
+    })
+    _times=sorted({
+        str(row.get(key) or "").strip()
+        for row in results
+        for key in ("signal_time","entry_time","exit_time")
+        if str(row.get(key) or "").strip()
+    })
     capture_research_evidence(
         strategy=strategy_name,
         source="BACKTEST_SESSION",
         passport=intelligence.get("passport",{}),
         evidence={
             "executed_trades":intelligence.get("executed_trades",0),
+            "trades":metrics.get("trades"),
+            "win_rate_pct":metrics.get("win_rate_pct"),
+            "expectancy_r":metrics.get("expectancy_r"),
+            "profit_factor":metrics.get("profit_factor"),
+            "max_drawdown_r":metrics.get("max_drawdown_r"),
+            "net_r":metrics.get("net_r"),
+            "timeframe":_timeframes[0] if len(_timeframes)==1 else "",
+            "period_start":_times[0] if _times else "",
+            "period_end":_times[-1] if _times else "",
+            "rules_version":str(key_suffix),
             "rich_context_pct":intelligence.get("rich_context_pct"),
             "cause_summary":intelligence.get("cause_summary",[]),
             "evidence_ladder":session_evidence,

@@ -138,6 +138,13 @@ except Exception as _backtest_exc:
     _ATLASQUANT_BACKTEST_IMPORT_ERROR = f"{type(_backtest_exc).__name__}: {_backtest_exc}"
 
 try:
+    from atlasquant_lab_matrix_panel import render_lab_matrix_panel
+    _ATLASQUANT_LAB_MATRIX_IMPORT_ERROR = ""
+except Exception as _lab_matrix_exc:
+    render_lab_matrix_panel = None
+    _ATLASQUANT_LAB_MATRIX_IMPORT_ERROR = f"{type(_lab_matrix_exc).__name__}: {_lab_matrix_exc}"
+
+try:
     from atlasquant_history_backtest_guidance import (
         render_backtest_intro,
         render_history_workspace,
@@ -4348,6 +4355,17 @@ _fallback_nav = [
     "🧩 Produto", "🛠️ Melhorias", "📰 Notícias", "🤖 Autopilot", "👤 Conta", "📱 Instalar", "💼 Vendas", "💰 Investir", "🛟 Suporte",
 ]
 _nav_items = list(navigation_labels()) if navigation_labels is not None else _fallback_nav
+try:
+    from atlasquant_sales_visibility import sales_menu_policy
+    _aq_sales_nav = sales_menu_policy(
+        _ATLASQUANT_ACCESS,
+        os.getenv("ATLASQUANT_SALES_MENU_POLICY", "VISIBLE_LOCKED"),
+    )
+    if not _aq_sales_nav["visible"]:
+        _nav_items = [item for item in _nav_items if item != "💼 Vendas"]
+except Exception:
+    # Preserve the existing visible-but-authorized-at-page behavior on any error.
+    pass
 # AION oficial é um workspace administrativo privado. Ele é anexado ao fim para
 # preservar todos os índices históricos da navegação pública/operacional.
 if str(_ATLASQUANT_ACCESS.get("role") or "").upper() == "ADMIN":
@@ -7264,6 +7282,18 @@ if _aq_active_index == 7:
         if _ATLASQUANT_HISTORY_GUIDANCE_IMPORT_ERROR:
             st.caption(_ATLASQUANT_HISTORY_GUIDANCE_IMPORT_ERROR)
 
+    if render_lab_matrix_panel is not None:
+        try:
+            render_lab_matrix_panel()
+        except Exception as _lab_matrix_render_exc:
+            st.warning("Matriz do Laboratório entrou em modo seguro; nenhuma evidência foi inferida.")
+            st.caption(f"Diagnóstico Laboratório: {type(_lab_matrix_render_exc).__name__}")
+        st.divider()
+    else:
+        st.warning("Matriz do Laboratório indisponível neste carregamento.")
+        if _ATLASQUANT_LAB_MATRIX_IMPORT_ERROR:
+            st.caption(_ATLASQUANT_LAB_MATRIX_IMPORT_ERROR)
+
     if render_forward_test_panel is not None:
         _forward_summary,_forward_source=_github_get_json_v937(
             "dados/model_paper_summary_v1.json",
@@ -9733,6 +9763,7 @@ if _aq_active_index == 1:
                         0 if _aq_master_uses_runtime_fallback
                         else _scan_wait_master_v1022
                     ),
+                    source_status=STATUS_FONTE,
                 )
                 mark_surface_ok(
                     st.session_state,
