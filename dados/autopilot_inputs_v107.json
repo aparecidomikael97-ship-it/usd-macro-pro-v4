@@ -1,6 +1,6 @@
 {
   "version": "V10.7_FAST_BOOT_1",
-  "generated_at": "2026-09-27T21:20:08.247826+00:00",
+  "generated_at": "2026-09-27T21:45:12.246680+00:00",
   "app_version": "11.0.8 — STRENGTH ATTRIBUTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2",
   "pairs": [
     {
@@ -18,7 +18,7 @@
       "Score final": 89.0,
       "Qualidade": 91.0,
       "Confluência": "ALTA",
-      "Dif. macro": 30.9,
+      "Dif. macro": 29.7,
       "Índice ranking": 89.9
     },
     {
@@ -296,7 +296,7 @@
         "Fed's Barr says more rate hikes are needed to bring down inflation - Yahoo Finance",
         "EXCLUSIVE: Fed's Musalem says more rate hikes likely needed to quell inflation - Reuters",
         "Dollar hits two-month high as traders bet on more Fed rate hikes - The Journal Record",
-        "Fed’s Barr Says More Rate Hikes Likely Needed to Return Inflation to Target - WSJ",
+        "Fed’s Barr Says More Rate Hikes Likely Needed to Return Inflation to Target - wsj.com",
         "Bond yields surge as Federal Reserve signals rate hikes - Fox Business",
         "Higher interest rates squeeze younger and lower-income households. 'A rate hike is a blunt tool,' says expert - CNBC",
         "Fed rate hike cycles have a history of denting US stock prices - Reuters"
@@ -383,9 +383,9 @@
           "explicacao": "Sinal mais restritivo: juros altos por mais tempo tendem a apoiar o dólar."
         },
         {
-          "titulo": "Fed’s Barr Says More Rate Hikes Likely Needed to Return Inflation to Target - WSJ",
+          "titulo": "Fed’s Barr Says More Rate Hikes Likely Needed to Return Inflation to Target - wsj.com",
           "corpo": "Fed’s Barr Says More Rate Hikes Likely Needed to Return Inflation to Target",
-          "fonte": "WSJ",
+          "fonte": "wsj.com",
           "relevancia_pontos": 6,
           "relevancia": "Alta",
           "impacto": 0.75,
@@ -429,7 +429,7 @@
         "juros": 3.63,
         "inflacao": 3.35302,
         "pib": 2.09767,
-        "sentimento": 73.91304347826087,
+        "sentimento": 70.0,
         "fonte": "FRED + transformação anual"
       },
       "EUR": {
@@ -464,7 +464,7 @@
         "juros": 2.28,
         "inflacao": 2.3,
         "pib": 1.1279,
-        "sentimento": 66.66666666666666,
+        "sentimento": 75.0,
         "fonte": "FRED + transformação anual + fallback parcial"
       },
       "AUD": {
@@ -530,14 +530,14 @@
         "juros": 3.6,
         "inflacao": 3.4,
         "pib": 2.1,
-        "sentimento": 73.9,
+        "sentimento": 70.0,
         "fonte": "FRED + transformação anual",
         "Moeda": "Dólar Americano",
         "juros_reais": 0.3,
         "n_juros": 65.984,
         "n_inflacao": 64.53347,
         "n_pib": 68.41041659389954,
-        "n_sentimento": 60.86956521739132,
+        "n_sentimento": 55.00000000000001,
         "n_emprego": 55.400000000000006,
         "n_atividade": 45.0,
         "Pontuação_Macro": 59.8,
@@ -702,6 +702,41 @@
         "Posição": 6
       },
       {
+        "Código": "CAD",
+        "juros": 2.3,
+        "inflacao": 2.3,
+        "pib": 1.1,
+        "sentimento": 75.0,
+        "fonte": "FRED + transformação anual + fallback parcial",
+        "Moeda": "Dólar Canadense",
+        "juros_reais": -0.0,
+        "n_juros": 12.15604030703993,
+        "n_inflacao": 36.42384105960265,
+        "n_pib": 20.021356113187398,
+        "n_sentimento": 62.5,
+        "n_emprego": 50.0,
+        "n_atividade": 50.0,
+        "Pontuação_Macro": 37.1,
+        "Influência_Fed": -3.5,
+        "Pontuação_Final": 33.6,
+        "strength_attribution": {
+          "factors": {
+            "Juros / Treasury": 2.431208061407986,
+            "Inflação": 5.4635761589403975,
+            "PIB": 3.0032034169781094,
+            "Emprego": 10.0,
+            "Atividade": 10.0,
+            "Sentimento": 6.25
+          },
+          "fed": -3.5274193548387096,
+          "other": {
+            "Limite da escala 0–100": 0.0
+          },
+          "unrounded_final": 33.62056828248778
+        },
+        "Posição": 7
+      },
+      {
         "Código": "NZD",
         "juros": 3.0,
         "inflacao": 2.5,
@@ -733,41 +768,6 @@
             "Limite da escala 0–100": 0.0
           },
           "unrounded_final": 33.55355680794292
-        },
-        "Posição": 7
-      },
-      {
-        "Código": "CAD",
-        "juros": 2.3,
-        "inflacao": 2.3,
-        "pib": 1.1,
-        "sentimento": 66.7,
-        "fonte": "FRED + transformação anual + fallback parcial",
-        "Moeda": "Dólar Canadense",
-        "juros_reais": -0.0,
-        "n_juros": 12.15604030703993,
-        "n_inflacao": 36.42384105960265,
-        "n_pib": 20.021356113187398,
-        "n_sentimento": 49.999999999999986,
-        "n_emprego": 50.0,
-        "n_atividade": 50.0,
-        "Pontuação_Macro": 35.9,
-        "Influência_Fed": -3.5,
-        "Pontuação_Final": 32.4,
-        "strength_attribution": {
-          "factors": {
-            "Juros / Treasury": 2.431208061407986,
-            "Inflação": 5.4635761589403975,
-            "PIB": 3.0032034169781094,
-            "Emprego": 10.0,
-            "Atividade": 10.0,
-            "Sentimento": 4.999999999999999
-          },
-          "fed": -3.5274193548387096,
-          "other": {
-            "Limite da escala 0–100": 0.0
-          },
-          "unrounded_final": 32.37056828248778
         },
         "Posição": 8
       },
