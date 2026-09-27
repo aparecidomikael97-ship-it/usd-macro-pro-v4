@@ -31,9 +31,9 @@ def _mode(value: object) -> str:
 
 
 def investment_sections(experience_mode: object = "Iniciante") -> tuple[str, ...]:
-    base = ("Comparador", "Planejador", "Renda", "Comece com pouco")
+    base = ("Planejador", "Renda", "Comece com pouco")
     if _mode(experience_mode) == "Avançado":
-        return base + ("Qualidade da renda", "Radar de crescimento")
+        return base + ("Comparador", "Qualidade da renda", "Radar de crescimento")
     return base
 
 

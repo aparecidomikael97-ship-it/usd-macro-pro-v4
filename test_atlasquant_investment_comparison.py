@@ -42,8 +42,8 @@ class InvestmentComparisonTests(unittest.TestCase):
         self.assertEqual(snapshot["confirmed"], 1)
         self.assertEqual(snapshot["rows"][0]["Rentabilidade líquida"], "valor líquido fornecido")
 
-    def test_comparator_is_visible_in_both_experience_modes(self):
-        self.assertIn("Comparador", investment_sections("Iniciante"))
+    def test_comparator_is_advanced_without_changing_beginner_journey(self):
+        self.assertNotIn("Comparador", investment_sections("Iniciante"))
         self.assertIn("Comparador", investment_sections("Avançado"))
 
 
