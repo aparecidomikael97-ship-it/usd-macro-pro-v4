@@ -18,6 +18,8 @@ from typing import Any, Mapping, Sequence
 import json
 import re
 
+from atlasquant_aion_ecosystem import portable_workspaces
+
 SCHEMA = "ATLASQUANT_AION_PORTABLE_CORE_V1"
 PORTABLE_CORE_VERSION = "1.0"
 
@@ -26,62 +28,8 @@ CONNECTOR_PROTOCOLS = ("NATIVE", "API", "MCP", "FILE", "WEBHOOK")
 CONNECTOR_STATES = ("DISABLED", "CONFIGURED", "READY", "DEGRADED")
 _ALLOWED_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{1,63}$")
 
-DEFAULT_WORKSPACES = (
-    {
-        "workspace_id": "central",
-        "label": "AION Central",
-        "kind": "CORE",
-        "state": "ACTIVE_LOCAL",
-        "isolated_context": True,
-        "admin_only": True,
-        "entry_key": "central",
-    },
-    {
-        "workspace_id": "atlasquant",
-        "label": "AtlasQuant",
-        "kind": "TRADING_PLATFORM",
-        "state": "ACTIVE_LOCAL",
-        "isolated_context": True,
-        "admin_only": False,
-        "entry_key": "atlasquant",
-    },
-    {
-        "workspace_id": "studio",
-        "label": "Studio",
-        "kind": "CREATIVE",
-        "state": "READY",
-        "isolated_context": True,
-        "admin_only": True,
-        "entry_key": "studio",
-    },
-    {
-        "workspace_id": "business",
-        "label": "Negócios",
-        "kind": "BUSINESS",
-        "state": "READY",
-        "isolated_context": True,
-        "admin_only": True,
-        "entry_key": "business",
-    },
-    {
-        "workspace_id": "development",
-        "label": "Desenvolvimento",
-        "kind": "DEVELOPMENT",
-        "state": "READY",
-        "isolated_context": True,
-        "admin_only": True,
-        "entry_key": "development",
-    },
-    {
-        "workspace_id": "administration",
-        "label": "Administração",
-        "kind": "ADMIN",
-        "state": "READY",
-        "isolated_context": True,
-        "admin_only": True,
-        "entry_key": "administration",
-    },
-)
+# Projected from the canonical ecosystem registry. Public keys stay the portable shape.
+DEFAULT_WORKSPACES = portable_workspaces()
 
 
 def _clean(value: Any, limit: int = 300) -> str:

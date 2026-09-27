@@ -21,14 +21,17 @@ USER = {"role": "USER", "session": {"username": "cliente", "role": "USER"}}
 
 
 class PersonaTests(unittest.TestCase):
-    def test_six_personas_map_to_existing_console_workspaces(self):
+    def test_personas_map_to_existing_console_workspaces(self):
         from atlasquant_aion_admin import AION_WORKSPACES
         self.assertEqual(
             [p["id"] for p in AION_PERSONAS],
-            ["trader", "admin", "developer", "video", "business", "laboratory"],
+            ["trader", "admin", "developer", "video", "business", "laboratory", "investments", "central"],
         )
         for item in AION_PERSONAS:
-            self.assertIn(item["workspace"], AION_WORKSPACES)
+            if item["id"] == "investments":
+                self.assertEqual(item["workspace"], "Investimentos")
+            else:
+                self.assertIn(item["workspace"], AION_WORKSPACES)
             self.assertEqual(persona_for_workspace(item["workspace"])["id"], item["id"])
 
     def test_context_keys_are_isolated_per_persona(self):
