@@ -1,6 +1,7 @@
 """Convergence regressions for Checkpoint Mestre V18 and Astra durable hardening."""
 from copy import deepcopy
 import json
+import os
 import subprocess
 import unittest
 from pathlib import Path
@@ -40,6 +41,69 @@ ADMIN = {"role": "ADMIN"}
 NOW = "2026-09-27T08:00:00+00:00"
 CANONICAL_MAIN = "571f9a49e83d8696e3ff13a56b62745da34cc69b"
 ROOT = Path(__file__).resolve().parent
+
+
+def _git(args):
+    return subprocess.run(
+        ["git", *args],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+        env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
+    )
+
+
+def _commit_exists(revision):
+    if not revision:
+        return False
+    return _git(["rev-parse", "--verify", "--quiet", f"{revision}^{{commit}}"]).returncode == 0
+
+
+def _repository_is_shallow():
+    result = _git(["rev-parse", "--is-shallow-repository"])
+    return result.returncode == 0 and result.stdout.strip() == "true"
+
+
+def _production_base():
+    """Resolve main without requiring a historical SHA in the local clone.
+
+    A full checkout already has origin/main. A shallow Actions checkout does
+    not, so fetch only that branch tip. The tree diff does not need the
+    commits in between.
+    """
+    base_ref = os.environ.get("GITHUB_BASE_REF", "").strip()
+    candidates = []
+    if base_ref:
+        candidates.append(f"origin/{base_ref}")
+    candidates.extend(["origin/main", "main"])
+    for name in candidates:
+        if _commit_exists(name):
+            return name
+    ref = base_ref or "main"
+    destination = f"refs/remotes/origin/{ref}"
+    fetched = _git([
+        "fetch", "--depth", "1", "origin",
+        f"refs/heads/{ref}:{destination}",
+    ])
+    candidate = f"origin/{ref}"
+    if fetched.returncode == 0 and _commit_exists(candidate):
+        return candidate
+    detail = (fetched.stderr or fetched.stdout or "git fetch falhou").strip()
+    raise AssertionError(
+        "Não foi possível obter a base main para a comparação de produção.\n" + detail
+    )
+
+
+def _forbidden_production_paths(paths):
+    forbidden = []
+    for line in paths:
+        path = line.strip()
+        if not path:
+            continue
+        if path == "render.yaml" or path.startswith("deploy/") or "secret" in path.lower():
+            forbidden.append(path)
+    return forbidden
 
 
 def _task(**step_fields):
@@ -262,24 +326,23 @@ class AionConvergenceTests(unittest.TestCase):
         self.assertIn("durable_task_continuity", (ROOT / "atlasquant_aion_status_board.py").read_text(encoding="utf-8"))
 
     def test_main_and_production_surfaces_stay_untouched(self):
-        ancestor = subprocess.run(
-            ["git", "merge-base", "--is-ancestor", CANONICAL_MAIN, "origin/main"],
-            cwd=ROOT,
-            check=False,
-        )
-        self.assertEqual(ancestor.returncode, 0)
-        diff = subprocess.check_output(
-            ["git", "diff", "--name-only", "origin/main"],
-            cwd=ROOT,
-            text=True,
-        )
-        forbidden = [
-            line for line in diff.splitlines()
-            if line == "render.yaml"
-            or line.startswith("deploy/")
-            or "secret" in line.lower()
-        ]
-        self.assertEqual(forbidden, [])
+        base_ref = os.environ.get("GITHUB_BASE_REF", "").strip()
+        if base_ref:
+            self.assertEqual(base_ref, "main")
+        base = _production_base()
+        # Ancestry of the pinned base is enforced only when this clone can
+        # actually walk that history. Shallow CI does not have the object.
+        if _commit_exists(CANONICAL_MAIN) and not _repository_is_shallow():
+            ancestor = _git(["merge-base", "--is-ancestor", CANONICAL_MAIN, base])
+            self.assertEqual(
+                ancestor.returncode,
+                0,
+                "A base main não contém mais o commit canônico da convergência.\n"
+                + ancestor.stderr,
+            )
+        diff = _git(["diff", "--name-only", base])
+        self.assertEqual(diff.returncode, 0, diff.stderr)
+        self.assertEqual(_forbidden_production_paths(diff.stdout.splitlines()), [])
         checkpoint = default_checkpoint()
         self.assertFalse(checkpoint["aion"]["real_trading"])
         self.assertFalse(guardian_decision("deploy_production", ADMIN, approved=True)["allowed"])
