@@ -1,7 +1,9 @@
 import unittest
+from copy import deepcopy
 
 from atlasquant_aion_local_response import compose_local_executive_response
-from atlasquant_aion_local_traceability import SOURCE_CATALOG, build_local_traceability
+from atlasquant_aion_local_traceability import SOURCE_CATALOG, build_local_traceability, local_contract_fingerprint
+from atlasquant_aion_tool_hub import default_tool_hub
 
 
 def _envelope(tool_id, *, request_id="req-1", state="SUCCESS", truth="UNKNOWN", freshness="UNVERIFIED", result=None):
@@ -10,6 +12,7 @@ def _envelope(tool_id, *, request_id="req-1", state="SUCCESS", truth="UNKNOWN", 
         "request_id": request_id,
         "workspace_id": "administration",
         "kind": "READ",
+        "contract_fingerprint": local_contract_fingerprint(),
         "state": state,
         "result": result or {},
         "preflight": {"state": "READY_FOR_EXECUTOR" if state == "SUCCESS" else "BLOCK", "blockers": [] if state == "SUCCESS" else ["GUARDIAN_DENIED"]},
@@ -42,6 +45,19 @@ class LocalTraceabilityTests(unittest.TestCase):
         self.assertEqual(len(SOURCE_CATALOG), 11)
         self.assertEqual(len(set(SOURCE_CATALOG)), 11)
 
+    def test_contract_fingerprint_is_deterministic_and_detects_contract_drift(self):
+        hub = default_tool_hub()
+        first = local_contract_fingerprint(hub)
+        again = local_contract_fingerprint(deepcopy(hub))
+        self.assertEqual(first, again)
+        self.assertRegex(first, r"^AION-LCL-[0-9A-F]{16}$")
+
+        mutated = deepcopy(hub)
+        for tool in mutated["tools"]:
+            if tool["tool_id"] == "aion.tasks.summary":
+                tool["required_scopes"] = ["tasks:read", "unexpected:scope"]
+        self.assertNotEqual(first, local_contract_fingerprint(mutated))
+
     def test_trace_id_is_deterministic_and_excludes_result_payload(self):
         first = _envelope("aion.tasks.summary", result={"senha": "primeiro-segredo"})
         second = _envelope("aion.tasks.summary", result={"senha": "outro-segredo"})
@@ -59,6 +75,8 @@ class LocalTraceabilityTests(unittest.TestCase):
         self.assertEqual(row["source_key"], "canonical_memory")
         self.assertEqual(row["source_label"], "Memória canônica")
         self.assertTrue(row["local_only"])
+        self.assertRegex(row["contract_fingerprint"], r"^AION-LCL-[0-9A-F]{16}$")
+        self.assertTrue(out["contract_consistent"])
         self.assertFalse(row["authority"])
 
     def test_unknown_truth_is_not_promoted(self):

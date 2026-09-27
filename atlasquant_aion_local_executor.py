@@ -26,6 +26,7 @@ from atlasquant_aion_secretary import executive_briefing
 from atlasquant_aion_specialist_session import read_loaded_specialist_snapshot
 from atlasquant_aion_status_board import build_master_status_board
 from atlasquant_aion_tool_hub import default_tool_hub, plan_tool_call
+from atlasquant_aion_local_traceability import local_contract_fingerprint
 
 SCHEMA = "ATLASQUANT_AION_LOCAL_TOOL_RESULT_V1"
 ALLOWED_KINDS = frozenset({"READ", "SEARCH", "DRAFT"})
@@ -147,6 +148,7 @@ def _envelope(
     preflight_state: str,
     blockers: list[str],
     source_function: str,
+    contract_fingerprint: str,
     error_type: str = "",
     message: str = "",
 ) -> dict[str, Any]:
@@ -156,6 +158,7 @@ def _envelope(
         "tool_id": tool_id,
         "workspace_id": workspace_id,
         "kind": kind,
+        "contract_fingerprint": contract_fingerprint,
         "state": state,
         "result": result,
         "truncated": truncated,
@@ -437,9 +440,11 @@ def execute_local_tool(
         clean_arguments = {}
     if not isinstance(clean_runtime, Mapping):
         clean_runtime = {}
+    effective_hub = hub if hub is not None else default_tool_hub()
+    contract_fingerprint = local_contract_fingerprint(effective_hub)
     plan = plan_tool_call(
         key,
-        hub=hub if hub is not None else default_tool_hub(),
+        hub=effective_hub,
         portable_core=portable_core if portable_core is not None else default_portable_core(),
         access=access,
         source_kind=source_kind,
@@ -463,6 +468,7 @@ def execute_local_tool(
         "tool_id": key,
         "workspace_id": workspace_id,
         "kind": kind,
+        "contract_fingerprint": contract_fingerprint,
         "preflight_state": preflight_state,
         "blockers": blockers,
     }

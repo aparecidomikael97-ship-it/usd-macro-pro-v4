@@ -173,6 +173,7 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(write["state"], "BLOCKED")
         self.assertFalse(spy.called)
         for out in (missing, disabled, external, untrusted, guardian, write):
+            self.assertRegex(out["contract_fingerprint"], r"^AION-LCL-[0-9A-F]{16}$")
             self.assertFalse(out["external_action_executed"])
             self.assertFalse(out["security"]["network_called"])
             self.assertFalse(out["real_orders_enabled"])
@@ -189,6 +190,7 @@ class ExecutionTests(unittest.TestCase):
         })
         self.assertEqual(search["state"], "SUCCESS")
         self.assertEqual(search["schema"], SCHEMA)
+        self.assertRegex(search["contract_fingerprint"], r"^AION-LCL-[0-9A-F]{16}$")
         self.assertGreaterEqual(search["result"]["canonical_count"], 1)
         self.assertNotIn("layered", search["result"])
         self.assertEqual(search["truth"]["status"], "UNKNOWN")

@@ -223,7 +223,7 @@ from atlasquant_aion_tool_hub import (
     tool_hub_summary,
 )
 from atlasquant_aion_local_executor import local_allowlist
-from atlasquant_aion_local_traceability import SOURCE_CATALOG
+from atlasquant_aion_local_traceability import SOURCE_CATALOG, local_contract_fingerprint
 from atlasquant_aion_durable_tasks import (
     durable_tasks_summary,
     new_durable_task,
@@ -851,6 +851,7 @@ def _local_contract_snapshot() -> dict[str, Any]:
         "registry_tools": len(tools),
         "local_tools": len(local_ids),
         "trace_sources": len(trace_ids),
+        "contract_fingerprint": local_contract_fingerprint(hub),
         "kind_counts": kind_counts,
         "write_in_allowlist": write_id in local_ids,
         "full_audit_executed": False,
@@ -882,7 +883,8 @@ def _render_local_contract_health() -> None:
         f"READ {int(kinds.get('READ') or 0)} · "
         f"SEARCH {int(kinds.get('SEARCH') or 0)} · "
         f"DRAFT {int(kinds.get('DRAFT') or 0)} · "
-        f"registry total {int(snapshot.get('registry_tools') or 0)}."
+        f"registry total {int(snapshot.get('registry_tools') or 0)}. "
+        f"Selo: {str(snapshot.get('contract_fingerprint') or 'UNKNOWN')}."
     )
     if snapshot.get("state") == "PASS":
         st.success(

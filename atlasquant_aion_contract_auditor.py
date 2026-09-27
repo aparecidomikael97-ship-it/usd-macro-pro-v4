@@ -31,7 +31,7 @@ from atlasquant_aion_ecosystem import OFFICIAL_AREA_IDS
 from atlasquant_aion_local_executor import execute_local_tool, local_allowlist
 from atlasquant_aion_local_response import compose_local_executive_response
 from atlasquant_aion_local_synthesis import synthesize_local_tool_results
-from atlasquant_aion_local_traceability import SOURCE_CATALOG, build_local_traceability
+from atlasquant_aion_local_traceability import SOURCE_CATALOG, build_local_traceability, local_contract_fingerprint
 from atlasquant_aion_memory import default_checkpoint
 from atlasquant_aion_memory_layers import remember
 from atlasquant_aion_observability import is_secret_key, redact_text
@@ -49,7 +49,7 @@ RESULT_SCHEMA = "ATLASQUANT_AION_LOCAL_TOOL_RESULT_V1"
 SAFE_KINDS = frozenset({"READ", "SEARCH", "DRAFT"})
 FORBIDDEN_KINDS = frozenset({"WRITE", "PUBLISH", "PRODUCTION", "SECRETS", "FINANCIAL"})
 ENVELOPE_FIELDS = (
-    "schema", "request_id", "tool_id", "workspace_id", "kind", "state", "result",
+    "schema", "request_id", "tool_id", "workspace_id", "kind", "contract_fingerprint", "state", "result",
     "truncated", "preflight", "provenance", "truth", "security", "executes_action",
     "external_action_executed", "real_orders_enabled", "tool_output_is_authority",
 )
@@ -982,6 +982,12 @@ def _audit_envelope(envelope: Mapping[str, Any]) -> list[dict[str, str]]:
             "envelope.schema", "atlasquant_aion_local_executor",
             f"Schema divergente: {envelope.get('schema')}.",
         ))
+    fingerprint = str(envelope.get("contract_fingerprint") or "")
+    if not re.fullmatch(r"AION-LCL-[0-9A-F]{16}", fingerprint):
+        findings.append(_finding(
+            "envelope.contract_fingerprint", "atlasquant_aion_local_executor",
+            "Envelope sem selo válido do contrato local.",
+        ))
     if envelope.get("state") not in RESULT_STATES:
         findings.append(_finding(
             "envelope.state", "atlasquant_aion_local_executor",
@@ -1133,6 +1139,7 @@ def _audit_traceability() -> list[dict[str, str]]:
             "tool_id": "aion.tasks.summary",
             "workspace_id": "administration",
             "kind": "READ",
+            "contract_fingerprint": local_contract_fingerprint(),
             "state": "SUCCESS",
             "result": result or {},
             "truncated": False,
@@ -1174,6 +1181,11 @@ def _audit_traceability() -> list[dict[str, str]]:
 
     row = records[0]
     other_rows = list(traced_again.get("records") or [])
+    if not re.fullmatch(r"AION-LCL-[0-9A-F]{16}", str(row.get("contract_fingerprint") or "")):
+        findings.append(_finding(
+            "trace.contract_fingerprint", "atlasquant_aion_local_traceability",
+            "Rastreabilidade não preservou o selo do contrato local.",
+        ))
     if not str(row.get("trace_id") or "").startswith("LCL-EV-"):
         findings.append(_finding(
             "trace.id", "atlasquant_aion_local_traceability",

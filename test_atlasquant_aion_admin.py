@@ -68,6 +68,7 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertEqual(snapshot["registry_tools"],12)
         self.assertEqual(snapshot["local_tools"],11)
         self.assertEqual(snapshot["trace_sources"],11)
+        self.assertRegex(snapshot["contract_fingerprint"],r"^AION-LCL-[0-9A-F]{16}$")
         self.assertFalse(snapshot["write_in_allowlist"])
         self.assertFalse(snapshot["full_audit_executed"])
         self.assertFalse(snapshot["executes_action"])

@@ -11,9 +11,11 @@ excluded from both the ID seed and traceability output.
 from __future__ import annotations
 
 from hashlib import sha256
+import json
 from typing import Any, Mapping, Sequence
 
 from atlasquant_aion_observability import redact_text
+from atlasquant_aion_tool_hub import default_tool_hub
 
 SCHEMA = "ATLASQUANT_AION_LOCAL_TRACEABILITY_V1"
 MAX_RECORDS = 8
@@ -88,6 +90,63 @@ SOURCE_CATALOG = {
         "derived": True,
     },
 }
+
+CONTRACT_FINGERPRINT_SCHEMA = "ATLASQUANT_AION_LOCAL_CONTRACT_FINGERPRINT_V1"
+WRITE_TOOL_ID = "aion.checkpoint.prepare_save"
+
+
+def local_contract_fingerprint(
+    hub: Mapping[str, Any] | None = None,
+    *,
+    source_catalog: Mapping[str, Mapping[str, Any]] | None = None,
+) -> str:
+    """Return a deterministic fingerprint of the local authority/provenance contract."""
+    catalog = dict(source_catalog or SOURCE_CATALOG)
+    hub_map = dict(hub) if isinstance(hub, Mapping) else default_tool_hub()
+    rows = []
+    for item in list(hub_map.get("tools") or []):
+        if not isinstance(item, Mapping):
+            continue
+        tool_id = str(item.get("tool_id") or "")
+        if tool_id not in catalog and tool_id != WRITE_TOOL_ID:
+            continue
+        rows.append({
+            "tool_id": tool_id,
+            "workspace_id": str(item.get("workspace_id") or ""),
+            "kind": str(item.get("kind") or ""),
+            "guardian_action": str(item.get("guardian_action") or ""),
+            "state": str(item.get("state") or ""),
+            "connector_id": str(item.get("connector_id") or ""),
+            "required_scopes": sorted(str(x) for x in list(item.get("required_scopes") or [])),
+            "external_side_effects": bool(item.get("external_side_effects", False)),
+        })
+    rows.sort(key=lambda item: item["tool_id"])
+
+    sources = []
+    for tool_id in sorted(catalog):
+        source = catalog.get(tool_id)
+        if not isinstance(source, Mapping):
+            source = {}
+        sources.append({
+            "tool_id": str(tool_id),
+            "source_key": str(source.get("source_key") or ""),
+            "source_path": str(source.get("source_path") or ""),
+            "derived": bool(source.get("derived", False)),
+        })
+
+    payload = {
+        "schema": CONTRACT_FINGERPRINT_SCHEMA,
+        "write_tool_id": WRITE_TOOL_ID,
+        "tools": rows,
+        "sources": sources,
+    }
+    canonical = json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return "AION-LCL-" + sha256(canonical.encode("utf-8")).hexdigest()[:16].upper()
 
 
 def _mapping(value: Any) -> dict[str, Any]:
@@ -171,10 +230,14 @@ def build_local_traceability(
     conflict_refs = []
     execution_refs = []
     security_issues = []
+    fingerprints: list[str] = []
 
     for index, envelope in enumerate(rows, start=1):
         tool_id = _clean(envelope.get("tool_id") or f"tool_{index}", 96)
         trace_id = _trace_id(envelope, index)
+        contract_fingerprint = _clean(envelope.get("contract_fingerprint"), 40)
+        if contract_fingerprint:
+            fingerprints.append(contract_fingerprint)
         source = dict(SOURCE_CATALOG.get(tool_id) or {
             "source_key": "unknown_local_source",
             "source_label": "Origem local não catalogada",
@@ -210,6 +273,7 @@ def build_local_traceability(
 
         record = {
             "trace_id": trace_id,
+            "contract_fingerprint": contract_fingerprint,
             "tool_id": tool_id,
             "workspace_id": _clean(envelope.get("workspace_id"), 64),
             "kind": _clean(envelope.get("kind"), 30).upper(),
@@ -267,6 +331,8 @@ def build_local_traceability(
         "unknown_refs": unknown_refs,
         "conflict_refs": conflict_refs,
         "source_keys": sorted({str(row["source_key"]) for row in records}),
+        "contract_fingerprints": sorted(set(fingerprints)),
+        "contract_consistent": len(set(fingerprints)) <= 1,
         "security": {
             "state": "BLOCK" if security_issues else "SAFE_LOCAL",
             "issues": security_issues,
@@ -287,5 +353,7 @@ __all__ = [
     "SCHEMA",
     "MAX_RECORDS",
     "SOURCE_CATALOG",
+    "CONTRACT_FINGERPRINT_SCHEMA",
+    "local_contract_fingerprint",
     "build_local_traceability",
 ]
