@@ -273,6 +273,11 @@ _HARDENED_INVARIANTS={
     "upstream_patch.secret_recorded",
     "upstream_patch.secret_promotion_stale",
     "upstream_patch.secret_promotion_reseal",
+    "upstream_patch.mode_blocker_stripped",
+    "upstream_patch.secret_facts_zeroed",
+    "upstream_patch.negative_counter",
+    "upstream_patch.counter_cancellation",
+    "upstream_builder.max_files_resealed",
     "upstream_builder.forbidden_branch_reseal",
     "upstream_preflight.extra_blocker_kept_id",
     "upstream_preflight.extra_blocker_resealed",
@@ -296,10 +301,10 @@ class AionDeveloperAdversarialAuditorTests(unittest.TestCase):
     def test_report_shape_is_deterministic_and_unscored(self):
         report=self.report
         self.assertEqual(report["schema"],SCHEMA)
-        self.assertEqual(report["cases_total"],305)
+        self.assertEqual(report["cases_total"],310)
         self.assertEqual(
             report["gap_count"]+report["blocked_by_design_count"]+report["pass_count"],
-            305,
+            310,
         )
         self.assertFalse(report["symlink_physical_boundary_verified"])
         self.assertFalse(report["hardlink_physical_boundary_verified"])

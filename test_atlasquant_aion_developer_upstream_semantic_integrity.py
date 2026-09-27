@@ -9,6 +9,9 @@ from copy import deepcopy
 import unittest
 
 from atlasquant_aion_developer_builder_sandbox import (
+    MAX_CANDIDATE_TESTS,
+    MAX_FILES,
+    MAX_MANDATORY_GATES,
     READY_STATE as BUILDER_READY,
     assert_builder_sandbox_request_integrity,
     structural_builder_sandbox_request,
@@ -29,9 +32,12 @@ from atlasquant_aion_developer_os_sandbox_probe_result import (
     build_probe_result_contract,
 )
 from atlasquant_aion_developer_patch_validation import (
+    EXPECTED_STRUCTURAL_LIMITATION,
     READY_STATE as PATCH_READY,
+    SOURCE_BOUND_PROOF_BLOCKER,
     assert_patch_validation_integrity,
     canonical_patch_document,
+    expected_patch_validation_id,
     validate_patch,
 )
 from atlasquant_aion_developer_runner_contract import (
@@ -110,6 +116,27 @@ def _secret_patch(secret):
         "diff --git a/module.py b/module.py\n"
         "--- a/module.py\n+++ b/module.py\n"
         "@@ -1 +1 @@\n-x=1\n+api_key=" + secret + "\n"
+    )
+
+
+def _mode_patch():
+    return (
+        "diff --git a/module.py b/module.py\n"
+        "old mode 100644\n"
+        "new mode 100755\n"
+        "--- a/module.py\n"
+        "+++ b/module.py\n"
+        "@@ -1 +1 @@\n"
+        "-x=1\n"
+        "+x=2\n"
+    )
+
+
+def _safe_patch():
+    return (
+        "diff --git a/module.py b/module.py\n"
+        "--- a/module.py\n+++ b/module.py\n"
+        "@@ -1 +1 @@\n-x=1\n+x=2\n"
     )
 
 
@@ -310,6 +337,219 @@ class UpstreamSemanticIntegrityTests(unittest.TestCase):
             for field in _AUTHORITY_FIELDS:
                 if field in document:
                     self.assertIs(document[field], False, field)
+
+    def _refs(self):
+        return {"baseline_ref": "main@a", "candidate_ref": "cursor/safe@b"}
+
+    def _assert_consumers_reject(self, forged, message):
+        with self.assertRaisesRegex(ValueError, message):
+            assert_patch_validation_integrity(forged, self.builder, self.preflight)
+        runner, policy, sandbox, _result, clean = self._chain()
+        attestation = attestation_for_documents(self.builder, self.preflight, clean)
+        review = dict(
+            human_patch_reviewed=True,
+            human_patch_reviewer="reviewer-1",
+            human_patch_review_refs=["review:patch:1"],
+        )
+        with self.assertRaisesRegex(ValueError, message):
+            build_runner_contract(
+                self.builder, self.preflight, forged,
+                content_attestation=attestation, **review,
+            )
+        with self.assertRaisesRegex(ValueError, message):
+            build_command_policy_contract(
+                runner,
+                builder_request=self.builder,
+                preflight=self.preflight,
+                patch_validation=forged,
+                content_attestation=attestation,
+            )
+        pinning = build_executable_pinning_spec(_pins())
+        environment = build_environment_contract()
+        with self.assertRaisesRegex(ValueError, message):
+            build_os_sandbox_contract(
+                policy, runner, self.builder, self.preflight, forged,
+                attestation, pinning, environment,
+            )
+        with self.assertRaisesRegex(ValueError, message):
+            build_probe_result_contract(
+                sandbox, policy, runner, self.builder, self.preflight, forged,
+                attestation, pinning, environment,
+            )
+
+    def test_mode_change_cannot_be_stripped_under_the_old_id(self):
+        blocked = validate_patch(self.builder, self.preflight, _mode_patch(), **self._refs())
+        self.assertEqual(blocked["state"], "BLOCKED")
+        self.assertIn("FILE_MODE_CHANGE_NOT_ALLOWED", blocked["blockers"])
+        self.assertIs(blocked["files"][0]["mode_changed"], True)
+        self.assertIs(blocked["revision_binding"]["revision_content_verified"], False)
+        self.assertIs(blocked["source_bound_proof_required_before_physical_execution"], True)
+        self.assertEqual(blocked["validation_id"], expected_patch_validation_id(blocked))
+        self.assertIn("STRUCTURAL_CONSISTENCY", EXPECTED_STRUCTURAL_LIMITATION)
+        self.assertIn("NOT_INDEPENDENT_SOURCE_PROOF", EXPECTED_STRUCTURAL_LIMITATION)
+
+        forged = deepcopy(blocked)
+        summary = dict(forged["files"][0])
+        summary["blockers"] = [
+            item for item in summary["blockers"] if item != "FILE_MODE_CHANGE_NOT_ALLOWED"
+        ]
+        forged["files"] = [summary]
+        forged["blockers"] = [
+            item for item in forged["blockers"] if item != "FILE_MODE_CHANGE_NOT_ALLOWED"
+        ]
+        forged["state"] = "READY_FOR_PATCH_REVIEW"
+        self.assertIs(forged["revision_binding"]["revision_content_verified"], False)
+        self.assertEqual(forged["validation_id"], blocked["validation_id"])
+        self.assertEqual(forged["patch_digest"], blocked["patch_digest"])
+        self._assert_consumers_reject(forged, "patch file blockers were not derived from the file facts")
+
+        cleared = deepcopy(forged)
+        cleared["files"] = [dict(cleared["files"][0])]
+        cleared["files"][0]["mode_changed"] = False
+        with self.assertRaisesRegex(ValueError, "patch validation id mismatch"):
+            assert_patch_validation_integrity(cleared, self.builder, self.preflight)
+        resealed = deepcopy(cleared)
+        resealed["validation_id"] = expected_patch_validation_id(resealed)
+        assert_patch_validation_integrity(resealed, self.builder, self.preflight)
+        self.assertEqual(resealed["patch_digest"], blocked["patch_digest"])
+        self.assertIs(resealed["revision_binding"]["revision_content_verified"], False)
+        self.assertIs(resealed["source_bound_proof_required_before_physical_execution"], True)
+        self.assertIs(resealed["content_binding_requires_external_verification"], True)
+        self.assertFalse(resealed["execution_authorized"])
+        self.assertNotEqual(SOURCE_BOUND_PROOF_BLOCKER, "")
+
+    def test_secret_counter_clear_keeps_revision_unverified_and_rejects_old_id(self):
+        secret = "super-secret-value"
+        blocked = validate_patch(
+            self.builder, self.preflight, _secret_patch(secret), **self._refs(),
+        )
+        self.assertEqual(blocked["state"], "BLOCKED")
+        self.assertIn("SECRET_LIKE_ADDITION_NOT_ALLOWED", blocked["blockers"])
+        self.assertGreater(blocked["secret_like_additions"], 0)
+        self.assertIs(blocked["revision_binding"]["revision_content_verified"], False)
+
+        forged = deepcopy(blocked)
+        summary = dict(forged["files"][0])
+        summary["secret_additions"] = 0
+        summary["blockers"] = [
+            item for item in summary["blockers"] if item != "SECRET_LIKE_ADDITION_NOT_ALLOWED"
+        ]
+        forged["files"] = [summary]
+        forged["secret_like_additions"] = 0
+        forged["blockers"] = [
+            item for item in forged["blockers"] if item != "SECRET_LIKE_ADDITION_NOT_ALLOWED"
+        ]
+        forged["state"] = "READY_FOR_PATCH_REVIEW"
+        self.assertIs(forged["revision_binding"]["revision_content_verified"], False)
+        self.assertEqual(forged["validation_id"], blocked["validation_id"])
+        self._assert_consumers_reject(forged, "patch validation id mismatch")
+
+    def test_negative_counters_and_cancellation_are_rejected(self):
+        clean = validate_patch(self.builder, self.preflight, _safe_patch(), **self._refs())
+        counters = (
+            "added_lines",
+            "deleted_lines",
+            "secret_additions",
+            "hunk_count",
+            "file_count",
+            "changed_lines",
+            "secret_like_additions",
+            "patch_bytes",
+            "patch_lines",
+        )
+        for field in counters:
+            with self.subTest(field=field):
+                forged = deepcopy(clean)
+                if field in {"added_lines", "deleted_lines", "secret_additions", "hunk_count"}:
+                    forged["files"] = [dict(forged["files"][0])]
+                    forged["files"][0][field] = -1
+                else:
+                    forged[field] = -1
+                forged["validation_id"] = expected_patch_validation_id(forged)
+                with self.assertRaisesRegex(ValueError, "nonnegative"):
+                    assert_patch_validation_integrity(forged, self.builder, self.preflight)
+
+        cancelled = deepcopy(clean)
+        summary = dict(cancelled["files"][0])
+        summary["added_lines"] = 1001
+        summary["deleted_lines"] = -1001
+        summary["blockers"] = []
+        cancelled["files"] = [summary]
+        cancelled["changed_lines"] = 0
+        cancelled["blockers"] = []
+        cancelled["state"] = "READY_FOR_PATCH_REVIEW"
+        cancelled["validation_id"] = expected_patch_validation_id(cancelled)
+        with self.assertRaisesRegex(ValueError, "nonnegative"):
+            assert_patch_validation_integrity(cancelled, self.builder, self.preflight)
+
+        overflow = deepcopy(clean)
+        summary = dict(overflow["files"][0])
+        summary["added_lines"] = 1
+        summary["secret_additions"] = 2
+        summary["blockers"] = ["SECRET_LIKE_ADDITION_NOT_ALLOWED"]
+        overflow["files"] = [summary]
+        overflow["secret_like_additions"] = 2
+        overflow["validation_id"] = expected_patch_validation_id(overflow)
+        with self.assertRaisesRegex(ValueError, "secret_additions exceed added_lines"):
+            assert_patch_validation_integrity(overflow, self.builder, self.preflight)
+
+    def test_builder_file_cap_holds_after_request_id_reseal(self):
+        files = tuple(f"module_{index}.py" for index in range(MAX_FILES))
+        accepted = structural_builder_sandbox_request(
+            branch="cursor/safe",
+            baseline_ref="main@a",
+            candidate_ref="cursor/safe@b",
+            requested_files=files,
+            candidate_tests=("module_0.py",),
+        )
+        self.assertEqual(len(accepted["scope"]["requested_files"]), MAX_FILES)
+        self.assertEqual(len(accepted["scope"]["authorized_files"]), MAX_FILES)
+        assert_builder_sandbox_request_integrity(accepted)
+        resealed = bind_builder_request_lineage(deepcopy(accepted))
+        assert_builder_sandbox_request_integrity(resealed)
+
+        with self.assertRaisesRegex(ValueError, "file limit"):
+            structural_builder_sandbox_request(
+                branch="cursor/safe",
+                baseline_ref="main@a",
+                candidate_ref="cursor/safe@b",
+                requested_files=files + ("extra.py",),
+                candidate_tests=("module_0.py",),
+            )
+
+        forged = deepcopy(accepted)
+        forged["scope"] = dict(forged["scope"])
+        forged["scope"]["requested_files"] = list(files) + ["extra.py"]
+        forged["scope"]["authorized_files"] = list(forged["scope"]["requested_files"])
+        forged = bind_builder_request_lineage(forged)
+        with self.assertRaisesRegex(ValueError, "builder request exceeds file limit"):
+            assert_builder_sandbox_request_integrity(forged)
+
+        authorized = deepcopy(accepted)
+        authorized["scope"] = dict(authorized["scope"])
+        authorized["scope"]["authorized_files"] = list(files) + ["extra.py"]
+        authorized = bind_builder_request_lineage(authorized)
+        with self.assertRaisesRegex(ValueError, "authorized file scope exceeds builder limit"):
+            assert_builder_sandbox_request_integrity(authorized)
+
+        tests = deepcopy(accepted)
+        tests["test_contract"] = dict(tests["test_contract"])
+        tests["test_contract"]["candidate_tests"] = [
+            f"test_{index}.py" for index in range(MAX_CANDIDATE_TESTS + 1)
+        ]
+        tests = bind_builder_request_lineage(tests)
+        with self.assertRaisesRegex(ValueError, "candidate tests exceed builder limit"):
+            assert_builder_sandbox_request_integrity(tests)
+
+        gates = deepcopy(accepted)
+        gates["test_contract"] = dict(gates["test_contract"])
+        gate_names = list(gates["test_contract"]["mandatory_gates"])
+        while len(gate_names) <= MAX_MANDATORY_GATES:
+            gate_names.append(f"GATE_{len(gate_names)}")
+        gates["test_contract"]["mandatory_gates"] = gate_names
+        gates = bind_builder_request_lineage(gates)
+        with self.assertRaisesRegex(ValueError, "mandatory gates exceed builder limit"):
+            assert_builder_sandbox_request_integrity(gates)
 
     def test_closed_schema_rejects_missing_builder_field(self):
         forged = deepcopy(self.builder)

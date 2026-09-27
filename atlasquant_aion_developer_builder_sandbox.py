@@ -49,6 +49,8 @@ SCHEMA = "ATLASQUANT_AION_DEVELOPER_BUILDER_SANDBOX_REQUEST_V1"
 READY_STATE = "READY_FOR_BUILDER_SANDBOX"
 BLOCKED_STATE = "BLOCKED"
 MAX_FILES = 80
+MAX_CANDIDATE_TESTS = 120
+MAX_MANDATORY_GATES = 40
 _RELEASE_BLOCKER = "RELEASE_SURFACE_REQUIRES_SEPARATE_RELEASE_REVIEW"
 _MISSING_TESTS_BLOCKER = "TEST_CANDIDATES_MISSING"
 _KNOWN_BLOCKERS = frozenset({_RELEASE_BLOCKER, _MISSING_TESTS_BLOCKER})
@@ -143,6 +145,30 @@ def _clean(value: Any, limit: int = 1200) -> str:
 
 def _normalize_ref(value: Any, limit: int = 240) -> str:
     return normalize_ref(value, limit)
+
+
+def enforce_builder_collection_limits(
+    requested_files: Sequence[Any],
+    authorized_files: Sequence[Any],
+    candidate_tests: Sequence[Any],
+    mandatory_gates: Sequence[Any],
+    source_files: Sequence[Any] | None = None,
+) -> None:
+    """Apply the constructor caps to a stored or raw collection.
+
+    ``_unique`` truncates, so the integrity boundary must see the length the
+    document actually carries. Source files exist only on the constructor
+    input and are checked when that sequence is supplied.
+    """
+    if len(requested_files) > MAX_FILES:
+        raise ValueError("builder request exceeds file limit")
+    source_count = 0 if source_files is None else len(source_files)
+    if len(authorized_files) > MAX_FILES or source_count > MAX_FILES:
+        raise ValueError("authorized file scope exceeds builder limit")
+    if len(candidate_tests) > MAX_CANDIDATE_TESTS:
+        raise ValueError("candidate tests exceed builder limit")
+    if len(mandatory_gates) > MAX_MANDATORY_GATES:
+        raise ValueError("mandatory gates exceed builder limit")
 
 
 def _unique(values: Sequence[Any] | None, limit: int = MAX_FILES) -> list[str]:
@@ -314,19 +340,30 @@ def build_builder_sandbox_request(
     )
     raw_editable = require_string_sequence(scope.get("editable_files"), "authorized_files")
     raw_source = require_string_sequence(scope.get("source_files"), "source_files")
-    if len(raw_editable) > MAX_FILES or len(raw_source) > MAX_FILES:
-        raise ValueError("authorized file scope exceeds builder limit")
+    if requested_files is None:
+        raw_requested = list(raw_editable)
+    else:
+        raw_requested = require_string_sequence(requested_files, "requested_files")
+    test_contract = (
+        implementation.get("test_contract")
+        if isinstance(implementation.get("test_contract"), Mapping)
+        else {}
+    )
+    if test_contract.get("test_deletion_allowed") is not False or test_contract.get("test_weakening_allowed") is not False:
+        raise ValueError("test deletion or weakening must remain forbidden")
+    raw_candidate_tests = require_string_sequence(test_contract.get("candidate_tests"), "candidate_tests")
+    raw_gates = require_string_sequence(test_contract.get("mandatory_gates"), "mandatory_gates")
+    enforce_builder_collection_limits(
+        raw_requested,
+        raw_editable,
+        raw_candidate_tests,
+        raw_gates,
+        source_files=raw_source,
+    )
     editable = _unique(raw_editable, MAX_FILES)
     source_files = set(_unique(raw_source, MAX_FILES))
     if not editable or not source_files:
         raise ValueError("authorized editable scope is empty")
-
-    if requested_files is None:
-        raw_requested = list(editable)
-    else:
-        raw_requested = require_string_sequence(requested_files, "requested_files")
-    if len(raw_requested) > MAX_FILES:
-        raise ValueError("builder request exceeds file limit")
     requested = _unique(raw_requested, MAX_FILES)
     if not requested:
         raise ValueError("builder request files are empty")
@@ -346,21 +383,8 @@ def build_builder_sandbox_request(
     if release_files:
         blockers.append("RELEASE_SURFACE_REQUIRES_SEPARATE_RELEASE_REVIEW")
 
-    test_contract = (
-        implementation.get("test_contract")
-        if isinstance(implementation.get("test_contract"), Mapping)
-        else {}
-    )
-    if test_contract.get("test_deletion_allowed") is not False or test_contract.get("test_weakening_allowed") is not False:
-        raise ValueError("test deletion or weakening must remain forbidden")
-    raw_candidate_tests = require_string_sequence(test_contract.get("candidate_tests"), "candidate_tests")
-    raw_gates = require_string_sequence(test_contract.get("mandatory_gates"), "mandatory_gates")
-    if len(raw_candidate_tests) > 120:
-        raise ValueError("candidate tests exceed builder limit")
-    if len(raw_gates) > 40:
-        raise ValueError("mandatory gates exceed builder limit")
-    candidate_tests = _unique(raw_candidate_tests, 120)
-    mandatory_gates = _unique(raw_gates, 40)
+    candidate_tests = _unique(raw_candidate_tests, MAX_CANDIDATE_TESTS)
+    mandatory_gates = _unique(raw_gates, MAX_MANDATORY_GATES)
     if not candidate_tests:
         blockers.append("TEST_CANDIDATES_MISSING")
     assert_required_mandatory_gates(mandatory_gates)
@@ -500,6 +524,12 @@ def assert_builder_sandbox_request_integrity(request: Mapping[str, Any]) -> str:
     _reject_closed(tests, _TEST_KEYS, "builder test contract")
     candidate_tests = require_string_sequence(tests.get("candidate_tests"), "candidate_tests")
     mandatory_gates = require_string_sequence(tests.get("mandatory_gates"), "mandatory_gates")
+    enforce_builder_collection_limits(
+        requested,
+        authorized,
+        candidate_tests,
+        mandatory_gates,
+    )
     if tests.get("test_deletion_allowed") is not False:
         raise ValueError("test deletion must remain blocked")
     if tests.get("test_weakening_allowed") is not False:
@@ -610,6 +640,9 @@ __all__ = [
     "SCHEMA",
     "READY_STATE",
     "MAX_FILES",
+    "MAX_CANDIDATE_TESTS",
+    "MAX_MANDATORY_GATES",
+    "enforce_builder_collection_limits",
     "build_builder_sandbox_request",
     "assert_builder_sandbox_request_integrity",
     "structural_builder_sandbox_request",

@@ -429,17 +429,14 @@ class IndependentAuditContractGapTests(unittest.TestCase):
         self.assertEqual(out["state"], "BLOCKED")
         self.assertIn("TEST_TARGET_LIMIT_EXCEEDED", out["blockers"])
         self.assertEqual(out["tests"]["targets"], [])
-        gates = _runner(
-            ["test_module.py"],
-            gates=list(REQUIRED_MANDATORY_GATES) + [
-                f"GATE_{index}" for index in range(MAX_MANDATORY_GATES - len(REQUIRED_MANDATORY_GATES) + 1)
-            ],
-        )
-        self.assertEqual(gates["state"], "BLOCKED")
-        self.assertIn("MANDATORY_GATE_LIMIT_EXCEEDED", gates["blockers"])
-        self.assertEqual(gates["tests"]["mandatory_gates"], [])
+        with self.assertRaisesRegex(ValueError, "mandatory gates exceed builder limit"):
+            _runner(
+                ["test_module.py"],
+                gates=list(REQUIRED_MANDATORY_GATES) + [
+                    f"GATE_{index}" for index in range(MAX_MANDATORY_GATES - len(REQUIRED_MANDATORY_GATES) + 1)
+                ],
+            )
         _closed(out)
-        _closed(gates)
 
 
 if __name__ == "__main__":

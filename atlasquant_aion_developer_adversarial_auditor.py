@@ -91,6 +91,7 @@ from atlasquant_aion_developer_package import build_developer_package
 from atlasquant_aion_developer_patch_validation import (
     assert_patch_validation_integrity,
     canonical_patch_document,
+    expected_patch_validation_id,
     validate_patch,
 )
 from atlasquant_aion_developer_runner_contract import (
@@ -1705,7 +1706,9 @@ def _contract_gap_surface(_world: _World) -> list[dict[str, str]]:
         ],
     ))
     excess_closed = status == "ACCEPT" and _state_closed(result, "TEST_TARGET_LIMIT_EXCEEDED")
-    gate_closed = gate_status == "ACCEPT" and _state_closed(gate_result, "MANDATORY_GATE_LIMIT_EXCEEDED")
+    gate_closed = gate_status == "REJECT" or (
+        gate_status == "ACCEPT" and _state_closed(gate_result, "MANDATORY_GATE_LIMIT_EXCEEDED")
+    )
     findings.append(_finding(
         "runner.excessive_test_targets",
         "atlasquant_aion_developer_runner_contract",
@@ -4952,6 +4955,126 @@ def _upstream_semantic_surface(_world: _World) -> list[dict[str, str]]:
         "atlasquant_aion_developer_patch_validation",
         "UPSTREAM_PATCH_SEMANTIC_INTEGRITY: reseal do validation_id nao apaga o segredo no resumo.",
         lambda: _promote_secret(True),
+    )
+
+    def _mode_document():
+        return validate_patch(
+            secret_request,
+            secret_preflight,
+            (
+                "diff --git a/module.py b/module.py\n"
+                "old mode 100644\n"
+                "new mode 100755\n"
+                "--- a/module.py\n"
+                "+++ b/module.py\n"
+                "@@ -1 +1 @@\n"
+                "-x=1\n"
+                "+x=2\n"
+            ),
+            baseline_ref="main@a",
+            candidate_ref="cursor/safe@b",
+        )
+
+    def _strip_mode() -> Any:
+        blocked = _mode_document()
+        if blocked.get("state") != "BLOCKED" or "FILE_MODE_CHANGE_NOT_ALLOWED" not in list(blocked.get("blockers") or []):
+            return {"state": "NOT_RECORDED"}
+        if blocked.get("revision_binding", {}).get("revision_content_verified") is not False:
+            return {"state": "VERIFIED"}
+        forged = deepcopy(blocked)
+        summary = dict(forged["files"][0])
+        summary["blockers"] = [
+            item for item in summary["blockers"] if item != "FILE_MODE_CHANGE_NOT_ALLOWED"
+        ]
+        forged["files"] = [summary]
+        forged["blockers"] = [
+            item for item in forged["blockers"] if item != "FILE_MODE_CHANGE_NOT_ALLOWED"
+        ]
+        forged["state"] = "READY_FOR_PATCH_REVIEW"
+        return assert_patch_validation_integrity(forged, secret_request, secret_preflight)
+
+    _reject(
+        "upstream_patch.mode_blocker_stripped",
+        "atlasquant_aion_developer_patch_validation",
+        "PATCH_MODE_BLOCKER_STRIPPED: mode 100644/100755 sem o blocker, com id antigo e revision_content_verified false, e rejeitado.",
+        _strip_mode,
+    )
+
+    def _zero_secret() -> Any:
+        if not secret_closed:
+            return {"state": "NOT_RECORDED"}
+        forged = deepcopy(blocked_patch)
+        summary = dict(forged["files"][0])
+        summary["secret_additions"] = 0
+        summary["blockers"] = [
+            item for item in summary["blockers"] if item != "SECRET_LIKE_ADDITION_NOT_ALLOWED"
+        ]
+        forged["files"] = [summary]
+        forged["secret_like_additions"] = 0
+        forged["blockers"] = [
+            item for item in forged["blockers"] if item != "SECRET_LIKE_ADDITION_NOT_ALLOWED"
+        ]
+        forged["state"] = "READY_FOR_PATCH_REVIEW"
+        return assert_patch_validation_integrity(forged, secret_request, secret_preflight)
+
+    _reject(
+        "upstream_patch.secret_facts_zeroed",
+        "atlasquant_aion_developer_patch_validation",
+        "PATCH_SECRET_FACTS_ZEROED: zerar secret_additions e secret_like_additions com id antigo e revision_content_verified false e rejeitado.",
+        _zero_secret,
+    )
+
+    def _negative_counter() -> Any:
+        forged = deepcopy(blocked_patch if secret_closed else _mode_document())
+        summary = dict(forged["files"][0])
+        summary["deleted_lines"] = -1
+        forged["files"] = [summary]
+        forged["validation_id"] = expected_patch_validation_id(forged)
+        return assert_patch_validation_integrity(forged, secret_request, secret_preflight)
+
+    _reject(
+        "upstream_patch.negative_counter",
+        "atlasquant_aion_developer_patch_validation",
+        "PATCH_NEGATIVE_COUNTER: deleted_lines negativo continua rejeitado depois do reseal do validation_id.",
+        _negative_counter,
+    )
+
+    def _cancel_counters() -> Any:
+        forged = deepcopy(blocked_patch if secret_closed else _mode_document())
+        summary = dict(forged["files"][0])
+        summary["added_lines"] = 1001
+        summary["deleted_lines"] = -1001
+        summary["secret_additions"] = 0
+        summary["blockers"] = []
+        forged["files"] = [summary]
+        forged["changed_lines"] = 0
+        forged["secret_like_additions"] = 0
+        forged["blockers"] = []
+        forged["state"] = "READY_FOR_PATCH_REVIEW"
+        forged["validation_id"] = expected_patch_validation_id(forged)
+        return assert_patch_validation_integrity(forged, secret_request, secret_preflight)
+
+    _reject(
+        "upstream_patch.counter_cancellation",
+        "atlasquant_aion_developer_patch_validation",
+        "PATCH_COUNTER_CANCELLATION: added_lines 1001 e deleted_lines -1001 com changed_lines 0 e rejeitado depois do reseal.",
+        _cancel_counters,
+    )
+
+    def _max_files() -> Any:
+        forged = deepcopy(secret_request)
+        names = [f"module_{index}.py" for index in range(81)]
+        forged["scope"] = dict(forged["scope"])
+        forged["scope"]["requested_files"] = names
+        forged["scope"]["authorized_files"] = names
+        forged = bind_builder_request_lineage(forged)
+        return assert_builder_sandbox_request_integrity(forged)
+
+    _reject(
+        "upstream_builder.max_files_resealed",
+        "atlasquant_aion_developer_builder_sandbox",
+        "BUILDER_MAX_FILES_RESEALED: 81 arquivos com request_id recalculado continuam rejeitados.",
+        _max_files,
     )
 
     builder = _sealed_runner_request(["test_module.py"])

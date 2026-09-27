@@ -185,6 +185,7 @@ class AionDeveloperPatchValidationTests(unittest.TestCase):
         out = _validate(patch, request=request, preflight=_preflight(request))
         self.assertEqual(out["state"], "BLOCKED")
         self.assertIn("CANONICAL_PATH_COLLISION", out["blockers"])
+        self.assertTrue(any(row["canonical_path_collision"] is True for row in out["files"]))
 
     def test_patch_budget_fails_closed(self):
         patch = (
@@ -195,6 +196,90 @@ class AionDeveloperPatchValidationTests(unittest.TestCase):
         out = _validate(patch)
         self.assertEqual(out["state"], "BLOCKED")
         self.assertIn("PER_FILE_CHANGE_BUDGET_EXCEEDED", out["blockers"])
+
+    def test_parser_facts_survive_for_every_preserved_cause(self):
+        cases = (
+            (
+                "diff --git a/module.py b/module.py\nold mode 100644\nnew mode 100755\n"
+                "--- a/module.py\n+++ b/module.py\n@@ -1 +1 @@\n-x=1\n+x=2\n",
+                "mode_changed",
+                "FILE_MODE_CHANGE_NOT_ALLOWED",
+            ),
+            (
+                "diff --git a/module.py b/module.py\nGIT binary patch\nliteral 1\nA\n",
+                "binary_patch",
+                "BINARY_PATCH_NOT_ALLOWED",
+            ),
+            (
+                "diff --git a/module.py b/module.py\n--- a/module.py\n--- a/module.py\n"
+                "+++ b/module.py\n@@ -1 +1 @@\n-x=1\n+x=2\n",
+                "header_duplicate",
+                "DIFF_HEADER_DUPLICATE",
+            ),
+            (
+                "diff --git a/module.py b/module.py\n",
+                "header_missing",
+                "DIFF_HEADER_MISSING",
+            ),
+            (
+                "diff --git a/module.py b/module.py\n--- a/other.py\n+++ b/module.py\n"
+                "@@ -1 +1 @@\n-x=1\n+x=2\n",
+                "header_path_mismatch",
+                "DIFF_HEADER_PATH_MISMATCH",
+            ),
+            (
+                "diff --git a/module.py b/module.py\n@@ -1 +1 @@\n--- a/module.py\n+++ b/module.py\n",
+                "header_out_of_order",
+                "DIFF_HEADER_OUT_OF_ORDER",
+            ),
+            (
+                "diff --git a/module.py b/module.py\n--- a/module.py\n+++ b/module.py\n@@ bad\n",
+                "hunk_invalid",
+                "DIFF_HUNK_INVALID",
+            ),
+            (
+                "diff --git a/module.py b/test_module.py\n--- a/module.py\n+++ b/test_module.py\n"
+                "@@ -1 +1 @@\n-x=1\n+x=2\n",
+                "path_changed",
+                "PATH_CHANGE_OR_RENAME_NOT_ALLOWED",
+            ),
+            (
+                "diff --git a/test_module.py b/test_module.py\n--- a/test_module.py\n+++ b/test_module.py\n"
+                "@@ -1 +1 @@\n-x=1\n+def test_added():\n",
+                "additive_test_neutralization",
+                "TEST_ADDITIVE_NEUTRALIZATION_REQUIRES_SEPARATE_REVIEW",
+            ),
+            (
+                "diff --git a/module.py b/module.py\nnew file mode 100644\n--- /dev/null\n"
+                "+++ b/module.py\n@@ -0,0 +1 @@\n+x=1\n",
+                "creates_file",
+                "NEW_FILE_NOT_ALLOWED",
+            ),
+            (
+                "diff --git a/module.py b/module.py\ndeleted file mode 100644\n--- a/module.py\n"
+                "+++ /dev/null\n@@ -1 +0,0 @@\n-x=1\n",
+                "deletes_file",
+                "DELETE_FILE_NOT_ALLOWED",
+            ),
+            (
+                "diff --git a/module.py b/test_module.py\nsimilarity index 100%\n"
+                "rename from module.py\nrename to test_module.py\n",
+                "renames_or_copies",
+                "RENAME_OR_COPY_NOT_ALLOWED",
+            ),
+            (
+                "diff --git a/test_module.py b/test_module.py\n--- a/test_module.py\n+++ b/test_module.py\n"
+                "@@ -1 +1 @@\n-x=1\n+pytest.mark.skip\n",
+                "test_disable_marker",
+                "TEST_DELETION_OR_WEAKENING_NOT_ALLOWED",
+            ),
+        )
+        for patch, fact, blocker in cases:
+            with self.subTest(blocker=blocker):
+                out = _validate(patch)
+                self.assertIs(out["files"][0][fact], True)
+                self.assertIn(blocker, out["files"][0]["blockers"])
+                self.assertIn(blocker, out["blockers"])
 
     def test_validator_never_executes_or_writes(self):
         patch = (
