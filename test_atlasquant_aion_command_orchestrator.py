@@ -219,6 +219,9 @@ class ExecutionTests(unittest.TestCase):
         )
         self.assertTrue(all(call.kwargs["approved"] is False for call in spy.call_args_list))
         self.assertFalse(out["stopped_early"])
+        self.assertEqual(out["traceability"]["record_count"], 2)
+        self.assertEqual(len(out["traceability"]["execution_refs"]), 2)
+        self.assertFalse(out["traceability"]["tool_output_is_authority"])
 
     def test_multi_read_stops_on_first_blocked_preflight(self):
         blocked = {

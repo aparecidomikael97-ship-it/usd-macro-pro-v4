@@ -127,6 +127,39 @@ class LocalExecutiveResponseTests(unittest.TestCase):
         self.assertFalse(out["external_action_executed"])
         self.assertFalse(out["real_orders_enabled"])
 
+    def test_traceability_reference_is_rendered_without_promoting_truth(self):
+        syn = _synthesis(items=[{
+            "tool_id": "aion.tasks.summary",
+            "state": "SUCCESS",
+            "truth_status": "UNKNOWN",
+            "freshness": "UNVERIFIED",
+            "execution_confirmed": True,
+            "content_confirmed": False,
+            "blockers": [],
+        }])
+        trace = {
+            "state": "TRACED",
+            "records": [{
+                "trace_id": "LCL-EV-ABC123",
+                "tool_id": "aion.tasks.summary",
+                "source_label": "Fila local de tarefas",
+            }],
+            "confirmed_content_refs": [],
+            "unknown_refs": ["LCL-EV-ABC123"],
+            "conflict_refs": [],
+            "execution_refs": ["LCL-EV-ABC123"],
+        }
+        out = compose_local_executive_response(
+            syn,
+            summaries=["Tarefas: total 2."],
+            traceability=trace,
+        )
+        self.assertIn("LCL-EV-ABC123", out["sections"]["unknown"][0])
+        self.assertEqual(out["evidence_refs"]["unknown"], ["LCL-EV-ABC123"])
+        self.assertEqual(out["traceability_state"], "TRACED")
+        self.assertEqual(out["truth"]["status"], "UNKNOWN")
+        self.assertFalse(out["tool_output_is_authority"])
+
 
 if __name__ == "__main__":
     unittest.main()
