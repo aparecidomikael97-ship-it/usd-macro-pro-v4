@@ -13,6 +13,7 @@ from __future__ import annotations
 from copy import deepcopy
 from hashlib import sha256
 import json
+import unicodedata
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -29,6 +30,12 @@ REQUESTED_TRUST_LEVEL = 2
 
 def _clean(value: Any, limit: int = 1200) -> str:
     return " ".join(redact_text(value).replace("\x00", "").split())[:limit]
+
+
+def _identity_key(value: Any) -> str:
+    """Canonical comparison key for role separation; display value stays unchanged."""
+    normalized = unicodedata.normalize("NFKC", _clean(value, 160))
+    return " ".join(normalized.split()).casefold()
 
 
 def _list(values: Sequence[Any] | None, limit: int = 100) -> list[str]:
@@ -287,7 +294,12 @@ def prepare_implementation_readiness(
         raise ValueError("change-specific rollback plan required")
     if not builder or not reviewer or not breaker:
         raise ValueError("builder, reviewer and breaker identities are required")
-    if len({builder, reviewer, breaker}) != 3:
+    identity_keys = [
+        _identity_key(builder),
+        _identity_key(reviewer),
+        _identity_key(breaker),
+    ]
+    if any(not key for key in identity_keys) or len(set(identity_keys)) != 3:
         raise ValueError("builder, reviewer and breaker must be independent actors")
     if not refs:
         raise ValueError("implementation readiness evidence required")
@@ -317,6 +329,9 @@ def prepare_implementation_readiness(
         "builder_actor": builder,
         "reviewer_actor": reviewer,
         "breaker_actor": breaker,
+        "builder_identity_key": identity_keys[0],
+        "reviewer_identity_key": identity_keys[1],
+        "breaker_identity_key": identity_keys[2],
         "roles_independent": True,
         "readiness_refs": refs,
         "scope_reviewed": True,
@@ -368,10 +383,24 @@ def approve_implementation_session(
         str(readiness.get("reviewer_actor") or ""),
         str(readiness.get("breaker_actor") or ""),
     ]
+    identity_keys = [
+        _identity_key(actors[0]),
+        _identity_key(actors[1]),
+        _identity_key(actors[2]),
+    ]
+    stored_identity_keys = [
+        str(readiness.get("builder_identity_key") or ""),
+        str(readiness.get("reviewer_identity_key") or ""),
+        str(readiness.get("breaker_identity_key") or ""),
+    ]
     if readiness.get("roles_independent") is not True:
         raise ValueError("independent developer roles required")
-    if any(not actor_name for actor_name in actors) or len(set(actors)) != 3:
+    if any(not actor_name for actor_name in actors):
+        raise ValueError("developer role identity missing")
+    if len(set(identity_keys)) != 3:
         raise ValueError("builder, reviewer and breaker are not independent")
+    if stored_identity_keys != identity_keys:
+        raise ValueError("developer role identity normalization mismatch")
     if rollback_contract.get("recorded_for_this_change") is not True:
         raise ValueError("change-specific rollback must be recorded")
     if not str(rollback_contract.get("change_specific_plan") or ""):
@@ -412,6 +441,9 @@ def approve_implementation_session(
         "builder_actor": actors[0],
         "reviewer_actor": actors[1],
         "breaker_actor": actors[2],
+        "builder_identity_key": identity_keys[0],
+        "reviewer_identity_key": identity_keys[1],
+        "breaker_identity_key": identity_keys[2],
         "rollback_recorded": True,
     }
     out["state"] = "IMPLEMENTATION_AUTHORIZED_SESSION_ONLY"

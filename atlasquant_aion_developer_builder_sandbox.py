@@ -12,6 +12,7 @@ from __future__ import annotations
 from hashlib import sha256
 import json
 import re
+import unicodedata
 from typing import Any, Mapping, Sequence
 
 from atlasquant_aion_developer_implementation import (
@@ -34,6 +35,15 @@ _FORBIDDEN_BRANCHES = {
 
 def _clean(value: Any, limit: int = 1200) -> str:
     return " ".join(redact_text(value).replace("\x00", "").split())[:limit]
+
+
+def _identity_key(value: Any) -> str:
+    normalized = unicodedata.normalize("NFKC", _clean(value, 160))
+    return " ".join(normalized.split()).casefold()
+
+
+def _normalize_ref(value: Any, limit: int = 240) -> str:
+    return unicodedata.normalize("NFKC", _clean(value, limit))
 
 
 def _unique(values: Sequence[Any] | None, limit: int = MAX_FILES) -> list[str]:
@@ -59,8 +69,8 @@ def _digest(value: Any, length: int = 18) -> str:
 
 
 def _validate_branch(value: Any) -> str:
-    branch = _clean(value, 240)
-    lower = branch.lower()
+    branch = _normalize_ref(value, 240)
+    lower = branch.casefold()
     if not branch or lower in _FORBIDDEN_BRANCHES:
         raise ValueError("isolated non-main branch required")
     if branch.startswith("/") or branch.endswith("/") or "//" in branch:
@@ -68,6 +78,25 @@ def _validate_branch(value: Any) -> str:
     if ".." in branch or not _BRANCH_RE.fullmatch(branch):
         raise ValueError("invalid isolated branch")
     return branch
+
+
+def _validate_candidate_ref(value: Any, branch: str) -> str:
+    candidate = _normalize_ref(value, 240)
+    if not candidate:
+        raise ValueError("candidate_ref required")
+    normalized_branch = _normalize_ref(branch, 240)
+    allowed_roots = [
+        normalized_branch,
+        f"refs/heads/{normalized_branch}",
+    ]
+    candidate_key = candidate.casefold()
+    if not any(
+        candidate_key == root.casefold()
+        or candidate_key.startswith((root + "@").casefold())
+        for root in allowed_roots
+    ):
+        raise ValueError("candidate_ref must be bound to isolated branch")
+    return candidate
 
 
 def build_builder_sandbox_request(
@@ -144,17 +173,27 @@ def build_builder_sandbox_request(
         str(readiness.get("reviewer_actor") or ""),
         str(readiness.get("breaker_actor") or ""),
     ]
+    identity_keys = [
+        _identity_key(actors[0]),
+        _identity_key(actors[1]),
+        _identity_key(actors[2]),
+    ]
     if readiness.get("roles_independent") is not True:
         raise ValueError("independent developer roles required")
-    if any(not actor for actor in actors) or len(set(actors)) != 3:
+    if any(not actor for actor in actors) or len(set(identity_keys)) != 3:
         raise ValueError("developer role separation is invalid")
-    if str(auth.get("builder_actor") or "") != actors[0]:
-        raise ValueError("authorized builder identity mismatch")
+    authorized_identity_keys = [
+        str(auth.get("builder_identity_key") or ""),
+        str(auth.get("reviewer_identity_key") or ""),
+        str(auth.get("breaker_identity_key") or ""),
+    ]
+    if authorized_identity_keys != identity_keys:
+        raise ValueError("authorized developer identity mismatch")
 
     branch_name = _validate_branch(branch)
-    baseline = _clean(baseline_ref, 240)
-    candidate = _clean(candidate_ref, 240)
-    if not baseline or not candidate or baseline == candidate:
+    baseline = _normalize_ref(baseline_ref, 240)
+    candidate = _validate_candidate_ref(candidate_ref, branch_name)
+    if not baseline or baseline.casefold() == candidate.casefold():
         raise ValueError("distinct baseline_ref and candidate_ref are required")
 
     known = {
@@ -229,6 +268,7 @@ def build_builder_sandbox_request(
             "branch": branch_name,
             "baseline_ref": baseline,
             "candidate_ref": candidate,
+            "candidate_bound_to_branch": True,
             "main_branch_allowed": False,
             "force_push_allowed": False,
             "history_rewrite_allowed": False,

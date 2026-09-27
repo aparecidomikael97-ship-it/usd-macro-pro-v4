@@ -110,6 +110,7 @@ class AionDeveloperBuilderSandboxTests(unittest.TestCase):
         self.assertEqual(out["state"], "READY_FOR_BUILDER_SANDBOX")
         self.assertEqual(out["roles"]["builder_actor"], "builder-a")
         self.assertTrue(out["roles"]["roles_independent"])
+        self.assertTrue(out["branch_contract"]["candidate_bound_to_branch"])
         self.assertFalse(out["branch_contract"]["main_branch_allowed"])
         self.assertFalse(out["scope"]["scope_expansion_allowed"])
         self.assertFalse(out["execution_authorized"])
@@ -126,6 +127,59 @@ class AionDeveloperBuilderSandboxTests(unittest.TestCase):
                     branch="main",
                     baseline_ref="main@a",
                     candidate_ref="main@c",
+                )
+        finally:
+            tmp.cleanup()
+
+    def test_unicode_main_branch_is_rejected(self):
+        tmp, snapshot, implementation = self._fixture()
+        try:
+            with self.assertRaises(ValueError):
+                build_builder_sandbox_request(
+                    snapshot,
+                    implementation,
+                    branch="ｍａｉｎ",
+                    baseline_ref="main@a",
+                    candidate_ref="ｍａｉｎ@c",
+                )
+        finally:
+            tmp.cleanup()
+
+    def test_candidate_ref_must_be_bound_to_isolated_branch(self):
+        tmp, snapshot, implementation = self._fixture()
+        try:
+            with self.assertRaises(ValueError):
+                build_builder_sandbox_request(
+                    snapshot,
+                    implementation,
+                    branch="cursor/admin-fix",
+                    baseline_ref="main@a",
+                    candidate_ref="cursor/other-branch@c",
+                )
+            out = build_builder_sandbox_request(
+                snapshot,
+                implementation,
+                branch="cursor/admin-fix",
+                baseline_ref="main@a",
+                candidate_ref="refs/heads/cursor/admin-fix@c",
+            )
+        finally:
+            tmp.cleanup()
+        self.assertTrue(out["branch_contract"]["candidate_bound_to_branch"])
+
+    def test_authorized_role_identity_tampering_is_rejected(self):
+        tmp, snapshot, implementation = self._fixture()
+        try:
+            changed = dict(implementation)
+            changed["readiness"] = dict(implementation["readiness"])
+            changed["readiness"]["reviewer_actor"] = " REVIEWER-B "
+            with self.assertRaises(ValueError):
+                build_builder_sandbox_request(
+                    snapshot,
+                    changed,
+                    branch="cursor/admin-fix",
+                    baseline_ref="main@a",
+                    candidate_ref="cursor/admin-fix@c",
                 )
         finally:
             tmp.cleanup()

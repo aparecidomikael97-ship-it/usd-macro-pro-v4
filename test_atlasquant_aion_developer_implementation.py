@@ -156,6 +156,31 @@ class AionDeveloperImplementationEnvelopeTests(unittest.TestCase):
         finally:
             tmp.cleanup()
 
+    def test_role_independence_uses_canonical_identity(self):
+        tmp, snapshot, package, correction, confirmed = self._fixture()
+        try:
+            envelope = build_implementation_envelope(snapshot, package, confirmed)
+            with self.assertRaises(ValueError):
+                prepare_implementation_readiness(
+                    envelope,
+                    rollback_plan="Reverter a mudança lógica.",
+                    builder_actor="Builder Alpha",
+                    reviewer_actor=" builder alpha ",
+                    breaker_actor="Breaker",
+                    readiness_refs=["ready:1"],
+                )
+            with self.assertRaises(ValueError):
+                prepare_implementation_readiness(
+                    envelope,
+                    rollback_plan="Reverter a mudança lógica.",
+                    builder_actor="Builder",
+                    reviewer_actor="Ｂｕｉｌｄｅｒ",
+                    breaker_actor="Breaker",
+                    readiness_refs=["ready:1"],
+                )
+        finally:
+            tmp.cleanup()
+
     def test_readiness_still_does_not_execute(self):
         tmp, snapshot, package, correction, confirmed = self._fixture()
         try:
@@ -226,6 +251,9 @@ class AionDeveloperImplementationEnvelopeTests(unittest.TestCase):
         self.assertEqual(approved["authorization"]["builder_actor"], "builder")
         self.assertEqual(approved["authorization"]["reviewer_actor"], "reviewer")
         self.assertEqual(approved["authorization"]["breaker_actor"], "breaker")
+        self.assertEqual(approved["authorization"]["builder_identity_key"], "builder")
+        self.assertEqual(approved["authorization"]["reviewer_identity_key"], "reviewer")
+        self.assertEqual(approved["authorization"]["breaker_identity_key"], "breaker")
         self.assertTrue(approved["authorization"]["rollback_recorded"])
         self.assertFalse(approved["authorization"]["merge_main_allowed"])
         self.assertFalse(approved["authorization"]["deploy_allowed"])
