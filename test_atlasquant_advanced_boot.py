@@ -366,6 +366,19 @@ class AdvancedBootTests(unittest.TestCase):
         self.assertIn("}, status_fonte=dict(STATUS_FONTE))", src)
         self.assertIn('"degraded_sources": list(_aq_boot.get("degraded_sources") or [])', src)
 
+    def test_loader_errors_never_expose_api_keys(self):
+        def leaky():
+            raise RuntimeError("GET https://api.stlouisfed.org/fred?series_id=X&api_key=abcdef123456&file_type=json")
+
+        def ok():
+            return {"x": 1}
+
+        outcome = collect_source_refresh({"macro_eua": leaky, "fed": ok, "dados_moedas": ok})
+        self.assertFalse(outcome["publishable"])
+        self.assertNotIn("abcdef123456", outcome["error"])
+        self.assertNotIn("abcdef123456", outcome["sources"]["macro_eua"]["detail"])
+        self.assertIn("[REDACTED]", outcome["error"])
+
     def test_success_banner_names_degraded_sources(self):
         clean = provenance_banner_html({"state": LIVE_REFRESH, "refresh_status": "concluída"})
         self.assertNotIn("valores de segurança", clean)

@@ -18,6 +18,7 @@ from typing import Any, Callable, Mapping
 
 import pandas as pd
 
+from atlasquant_aion_observability import redact_text
 from atlasquant_fast_startup import validate_home_snapshot
 
 CACHED_SNAPSHOT = "CACHED_SNAPSHOT"
@@ -133,7 +134,8 @@ def _call_loader(loader: Callable[[], Any]) -> tuple[str, Any]:
     try:
         value = loader()
     except Exception as exc:
-        return "failed", f"{type(exc).__name__}: {exc}"
+        # Request errors can carry the full URL, including api_key query params.
+        return "failed", redact_text(f"{type(exc).__name__}: {exc}")[:300]
     if not isinstance(value, Mapping) or len(value) == 0:
         return "empty", "retorno vazio" if value in ({}, None) else "retorno inválido"
     return "ok", dict(value)
@@ -252,7 +254,7 @@ def start_live_refresh(
                 "publishable": False,
                 "payload": None,
                 "sources": {},
-                "error": f"atualização: {type(exc).__name__}: {exc}",
+                "error": redact_text(f"atualização: {type(exc).__name__}: {exc}")[:300],
             }
         if outcome["publishable"] and isinstance(outcome.get("payload"), Mapping):
             status: Mapping[str, Any] | None = None
