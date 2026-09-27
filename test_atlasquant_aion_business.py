@@ -4,6 +4,8 @@ from atlasquant_aion_business import (
     approve_product,
     business_summary,
     coverage_snapshot,
+    customer_economics,
+    funnel_snapshot,
     marketplace_preflight,
     mark_listing_live_from_evidence,
     new_product_candidate,
@@ -40,6 +42,32 @@ class AtlasQuantAionBusinessTests(unittest.TestCase):
         trend=trend_assessment(product)
         self.assertFalse(trend["can_call_trending"])
         self.assertIn("não confirmada",trend["message"])
+
+    def test_funnel_never_fills_missing_data_or_starts_campaign(self):
+        empty=funnel_snapshot()
+        self.assertEqual(empty["state"],"NOT_CONFIGURED")
+        self.assertIsNone(empty["order_rate_pct"])
+        self.assertFalse(empty["automatic_campaign"])
+        confirmed=funnel_snapshot(visits=1000,leads=100,checkouts=25,orders=10,source="analytics export")
+        self.assertEqual(confirmed["truth_state"],"CONFIRMED")
+        self.assertEqual(confirmed["order_rate_pct"],1.0)
+        invalid=funnel_snapshot(visits=10,leads=20,checkouts=2,orders=1,source="x")
+        self.assertEqual(invalid["truth_state"],"UNKNOWN")
+
+    def test_cac_and_ltv_require_real_inputs_and_source(self):
+        empty=customer_economics()
+        self.assertIsNone(empty["cac"])
+        self.assertIsNone(empty["ltv"])
+        self.assertEqual(empty["state"],"NOT_CONFIGURED")
+        result=customer_economics(
+            marketing_cost=100,acquired_customers=10,
+            gross_profit_per_order=20,average_orders_per_customer=3,
+            source="campaign export",
+        )
+        self.assertEqual(result["cac"],10.0)
+        self.assertEqual(result["ltv"],60.0)
+        self.assertEqual(result["ltv_cac_ratio"],6.0)
+        self.assertFalse(result["paid_action"])
 
     def test_confirmed_source_can_support_trend_claim(self):
         product=new_product_candidate(

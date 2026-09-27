@@ -66,6 +66,15 @@ AION_PERSONAS: tuple[dict[str, Any], ...] = (
     },
 )
 
+PERSONA_CAPABILITIES: dict[str, tuple[str, ...]] = {
+    "trader": ("radar", "macro", "pairs", "calendar", "pre_news", "technical_context", "risk"),
+    "admin": ("system_status", "incidents", "pending", "checks", "degraded_sources", "tasks", "checkpoint"),
+    "developer": ("code", "logs", "tests", "errors", "patch_plan", "rollback"),
+    "video": ("script", "storyboard", "scenes", "narration", "captions", "thumbnail", "formats", "approval_queue"),
+    "business": ("catalog", "suppliers", "economics", "fees", "cac", "ltv", "funnel", "tracking", "reports"),
+    "laboratory": ("matrix", "evidence", "history", "comparisons", "setups", "assets", "timeframes", "styles"),
+}
+
 # Actions no workspace may request, whatever the Guardian flags say.
 NEVER_FROM_WORKSPACE = frozenset({
     "real_trade",
@@ -129,6 +138,44 @@ def authorize_workspace_action(
         "layer": "guardian",
         "risk": decision.get("risk"),
         "requires_explicit_approval": bool(decision.get("requires_explicit_approval", True)),
+    }
+
+
+def capability_snapshot(
+    persona_id: object,
+    availability: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Declare connected/absent capabilities from explicit runtime evidence."""
+    item = persona(persona_id)
+    if item is None:
+        return {
+            "schema": SCHEMA, "persona": "", "state": "BLOCKED",
+            "capabilities": [], "executes_action": False,
+        }
+    supplied = dict(availability or {})
+    rows = []
+    for capability in PERSONA_CAPABILITIES[item["id"]]:
+        raw = supplied.get(capability)
+        if isinstance(raw, Mapping):
+            confirmed = str(raw.get("truth_state") or "").upper() == "CONFIRMED"
+            source = str(raw.get("source") or "")
+        else:
+            confirmed = raw is True
+            source = ""
+        rows.append({
+            "capability": capability,
+            "state": "CONNECTED" if confirmed else "UNAVAILABLE",
+            "source": source,
+        })
+    return {
+        "schema": SCHEMA,
+        "persona": item["id"],
+        "state": "CONNECTED" if any(row["state"] == "CONNECTED" for row in rows) else "UNAVAILABLE",
+        "capabilities": rows,
+        "connected": sum(row["state"] == "CONNECTED" for row in rows),
+        "total": len(rows),
+        "executes_action": False,
+        "real_orders_enabled": False,
     }
 
 
@@ -242,10 +289,12 @@ __all__ = [
     "admin_brief_lines",
     "admin_greeting",
     "authorize_workspace_action",
+    "capability_snapshot",
     "developer_step_allowed",
     "developer_trust_policy",
     "greeting_for",
     "persona",
     "persona_for_workspace",
+    "PERSONA_CAPABILITIES",
     "workspace_context_key",
 ]

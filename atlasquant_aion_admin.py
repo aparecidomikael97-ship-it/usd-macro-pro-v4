@@ -32,8 +32,10 @@ from atlasquant_aion_workspaces import (
     AION_PERSONAS,
     admin_brief_lines,
     admin_greeting,
+    capability_snapshot,
     developer_trust_policy,
 )
+from atlasquant_content_pipeline import content_job, provider_readiness
 from atlasquant_aion_memory import (
     canonical_memory_summary,
     checkpoint_digest,
@@ -126,6 +128,8 @@ from atlasquant_aion_business import (
     approve_product,
     business_summary,
     coverage_snapshot,
+    customer_economics,
+    funnel_snapshot,
     marketplace_preflight,
     new_product_candidate,
     trend_assessment,
@@ -510,6 +514,18 @@ def _render_admin_brief(access: Mapping[str, Any], executive_snapshot: Mapping[s
         f'<ul style="margin:6px 0 0 18px;padding:0">{items}</ul></div>',
         unsafe_allow_html=True,
     )
+
+
+def _render_persona_capabilities(persona_id: str, availability: Mapping[str, Any]) -> None:
+    snapshot = capability_snapshot(persona_id, availability)
+    connected = [row["capability"] for row in snapshot["capabilities"] if row["state"] == "CONNECTED"]
+    unavailable = [row["capability"] for row in snapshot["capabilities"] if row["state"] != "CONNECTED"]
+    st.caption(
+        f"Capacidades conectadas: {snapshot.get('connected', 0)}/{snapshot.get('total', 0)} · "
+        + (", ".join(connected) if connected else "nenhuma fonte confirmada")
+    )
+    if unavailable:
+        st.caption("Não configurado/indisponível nesta execução: " + ", ".join(unavailable) + ".")
 
 
 def _working_checkpoint(source: Mapping[str, Any]) -> dict[str, Any]:
@@ -2321,6 +2337,15 @@ def _render_secretary(
     approval_inbox: Mapping[str, Any],
 ) -> None:
     st.markdown("### 🗂️ Secretaria AION")
+    _render_persona_capabilities("admin", {
+        "system_status": bool(status_board),
+        "incidents": isinstance(system_context.get("reliability"), Mapping),
+        "pending": isinstance(checkpoint.get("pending"), list),
+        "checks": bool(system_context.get("source_build")),
+        "degraded_sources": isinstance(system_context.get("source_mesh"), Mapping),
+        "tasks": isinstance((checkpoint.get("operating") or {}).get("tasks"), list),
+        "checkpoint": bool(checkpoint),
+    })
     operating = checkpoint.get("operating") if isinstance(checkpoint.get("operating"), Mapping) else {}
     tasks = list(operating.get("tasks", []) or [])
     events = list(operating.get("events", []) or [])
@@ -2530,6 +2555,15 @@ def _render_trading(
     system_context: Mapping[str, Any] | None = None,
 ) -> None:
     st.markdown("### 📈 Trading · leitura segura")
+    _render_persona_capabilities("trader", {
+        "radar": bool(market_context.get("fresh_confirmed", False)),
+        "macro": bool(market_context.get("fresh_confirmed", False)),
+        "pairs": bool(market_context.get("fresh_confirmed", False)),
+        "calendar": isinstance((system_context or {}).get("live_event_intelligence"), Mapping),
+        "pre_news": isinstance((system_context or {}).get("live_event_intelligence"), Mapping),
+        "technical_context": bool(market_context.get("technical_confirmed", False)),
+        "risk": isinstance((system_context or {}).get("reliability"), Mapping),
+    })
     market_text, market_truth = _safe_market_state(market_context)
     st.info(f"Estado: {market_truth} — {market_text}")
     st.markdown(
@@ -2628,6 +2662,16 @@ def _render_studio(
     flags: Mapping[str, bool],
 ) -> None:
     st.markdown("### 🎬 AION Studio")
+    _render_persona_capabilities("video", {
+        "script": True,
+        "storyboard": True,
+        "scenes": True,
+        "narration": False,
+        "captions": False,
+        "thumbnail": False,
+        "formats": True,
+        "approval_queue": True,
+    })
     st.write(
         "Pipeline persistente para **ideia → roteiro → imagem/capa → vídeo → revisão → aprovação → publicação**."
     )
@@ -2654,6 +2698,16 @@ def _render_studio(
         "Publicação automática está "
         + ("HABILITADA POR FLAG, mas ainda depende do Guardian e de integração real." if publish else "DESLIGADA por feature flag.")
     )
+    media = provider_readiness()
+    with st.expander("Providers de mídia, clipagem e voz"):
+        st.dataframe([
+            {"Capacidade": name, "Estado": item["state"]}
+            for name, item in media["providers"].items()
+        ], width="stretch", hide_index=True)
+        st.caption(
+            "Sem credencial/provider: NÃO CONFIGURADO. Voz de Mikael também exige consentimento e amostra autorizada. "
+            "Nenhum conteúdo é baixado, renderizado ou publicado nesta tela."
+        )
 
     st.markdown("#### Novo projeto de conteúdo")
     with st.form("aion_studio_new_project", clear_on_submit=True):
@@ -2720,6 +2774,13 @@ def _render_studio(
         selected=next((p for p in projects if str(p.get("content_id"))==selected_id),None)
         if isinstance(selected, Mapping):
             blueprint=script_blueprint(selected)
+            pipeline=content_job(
+                selected.get("title") or "Conteúdo sem título",
+                source_reference=(selected.get("research") or {}).get("source","")
+                if isinstance(selected.get("research"),Mapping) else "",
+                rights_state="UNKNOWN",
+                formats=list(selected.get("platforms") or []),
+            )
             with st.expander("Roteiro-base / storyboard", expanded=True):
                 st.write(f"**{blueprint['title']} · {blueprint['total_seconds']}s**")
                 for segment in blueprint["segments"]:
@@ -2727,6 +2788,12 @@ def _render_studio(
                         f"- **{segment['name']} ({segment['seconds']}s):** {segment['instruction']}"
                     )
                 st.caption("Roteiro-base determinístico; não afirma resultados nem recursos inexistentes.")
+            with st.expander("Clipagem, formatos e fila de aprovação"):
+                st.dataframe(pipeline["variants"], width="stretch", hide_index=True)
+                st.warning(
+                    "Direitos de uso: REVISÃO OBRIGATÓRIA. Transcrição, cortes, legendas, thumbnail "
+                    "e metadados estão preparados como etapas, mas nenhum provider foi executado."
+                )
 
             p1,p2=st.columns(2)
             if p1.button("✅ Aprovar conteúdo", key="aion_studio_approve"):
@@ -2765,6 +2832,17 @@ def _render_business(
     flags: Mapping[str, bool],
 ) -> None:
     st.markdown("### 💼 AION Negócios")
+    _render_persona_capabilities("business", {
+        "catalog": True,
+        "suppliers": True,
+        "economics": True,
+        "fees": True,
+        "cac": False,
+        "ltv": False,
+        "funnel": False,
+        "tracking": False,
+        "reports": True,
+    })
     st.write(
         "Área separada do trading para pesquisa de produtos, tendências, fornecedores, margem, "
         "estoque, anúncios e acompanhamento de receita."
@@ -2808,6 +2886,20 @@ def _render_business(
         "Custos e lucros acima são informados pelo administrador; não representam vendas confirmadas "
         "do Mercado Livre/TikTok Shop enquanto integrações de pedidos não estiverem conectadas."
     )
+    with st.expander("Funil, CAC, LTV, afiliados e tracking"):
+        funnel=funnel_snapshot()
+        customers=customer_economics()
+        st.dataframe([
+            {"Indicador":"Visitas → pedidos","Valor":"N/D","Estado":funnel["state"]},
+            {"Indicador":"CAC","Valor":"N/D" if customers["cac"] is None else customers["cac"],"Estado":customers["state"]},
+            {"Indicador":"LTV","Valor":"N/D" if customers["ltv"] is None else customers["ltv"],"Estado":customers["state"]},
+            {"Indicador":"Afiliados/comissões","Valor":"N/D","Estado":"NOT_CONFIGURED"},
+            {"Indicador":"Tracking de campanha","Valor":"N/D","Estado":"NOT_CONFIGURED"},
+        ],width="stretch",hide_index=True)
+        st.caption(
+            "Modelos de dados prontos; sem export de analytics/marketplace os indicadores permanecem N/D. "
+            "Nenhuma campanha, gasto, comissão ou publicação é executada."
+        )
 
     st.markdown("#### Candidato de produto")
     with st.form("aion_business_new_product", clear_on_submit=True):
@@ -2945,6 +3037,16 @@ def _render_laboratory(
     incident_snapshot: Mapping[str, Any] | None = None,
 ) -> None:
     st.markdown("### 🧪 Laboratório / Sandbox")
+    _render_persona_capabilities("laboratory", {
+        "matrix": True,
+        "evidence": True,
+        "history": True,
+        "comparisons": True,
+        "setups": True,
+        "assets": True,
+        "timeframes": True,
+        "styles": True,
+    })
     st.write(
         "Toda novidade nasce aqui, com isolamento, teste, evidência e rollback antes de qualquer promoção."
     )
@@ -2956,6 +3058,12 @@ def _render_laboratory(
         ),
         key="aion_laboratory_voice",
     )
+    try:
+        from atlasquant_lab_matrix_panel import render_lab_matrix_panel
+        render_lab_matrix_panel()
+    except Exception as exc:
+        st.warning("Matriz de evidências indisponível; nenhum resultado foi inferido.")
+        st.caption(f"Diagnóstico seguro: {type(exc).__name__}")
 
     learning = checkpoint.get("learning") if isinstance(checkpoint.get("learning"), Mapping) else {}
     episodes = list(learning.get("episodes", []) or [])
@@ -3923,6 +4031,14 @@ def _render_development(
     flags: Mapping[str, bool],
 ) -> None:
     st.markdown("### 🛠️ AION Desenvolvedor")
+    _render_persona_capabilities("developer", {
+        "code": True,
+        "logs": bool(runtime_result),
+        "tests": isinstance((checkpoint.get("operating") or {}).get("events"), list),
+        "errors": bool(runtime_result),
+        "patch_plan": True,
+        "rollback": True,
+    })
     _context_voice(
         "Desenvolvimento",
         (

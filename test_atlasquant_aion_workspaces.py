@@ -8,6 +8,7 @@ from atlasquant_aion_workspaces import (
     admin_brief_lines,
     admin_greeting,
     authorize_workspace_action,
+    capability_snapshot,
     developer_step_allowed,
     developer_trust_policy,
     greeting_for,
@@ -43,6 +44,22 @@ class PersonaTests(unittest.TestCase):
     def test_no_persona_scope_contains_forbidden_actions(self):
         for item in AION_PERSONAS:
             self.assertFalse(set(item["actions"]) & NEVER_FROM_WORKSPACE, item["id"])
+
+    def test_capabilities_are_connected_only_with_explicit_runtime_evidence(self):
+        snapshot = capability_snapshot("trader", {
+            "radar": {"truth_state": "CONFIRMED", "source": "atlasquant_radar_board"},
+            "macro": True,
+            "risk": False,
+        })
+        self.assertEqual(snapshot["persona"], "trader")
+        self.assertEqual(snapshot["connected"], 2)
+        self.assertFalse(snapshot["executes_action"])
+        self.assertFalse(snapshot["real_orders_enabled"])
+        states = {row["capability"]: row["state"] for row in snapshot["capabilities"]}
+        self.assertEqual(states["radar"], "CONNECTED")
+        self.assertEqual(states["risk"], "UNAVAILABLE")
+        self.assertEqual(states["calendar"], "UNAVAILABLE")
+        self.assertEqual(capability_snapshot("root", {})["state"], "BLOCKED")
 
 
 class AuthorizationTests(unittest.TestCase):
