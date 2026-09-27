@@ -58,6 +58,13 @@ from atlasquant_aion_developer_os_sandbox_contract import (
     assert_os_sandbox_contract_integrity,
     build_os_sandbox_contract,
 )
+from atlasquant_aion_developer_os_sandbox_probe_result import (
+    READY_STATE as PROBE_RESULT_READY_STATE,
+    _bind_probe_result_ids,
+    assert_probe_result,
+    assert_probe_result_integrity,
+    build_probe_result_contract,
+)
 from atlasquant_aion_developer_executable_pinning import (
     FIXED_ENVIRONMENT,
     build_environment_contract,
@@ -4731,6 +4738,316 @@ def _os_sandbox_design_surface(_world: _World) -> list[dict[str, str]]:
     return findings
 
 
+def _probe_result_design_surface(_world: _World) -> list[dict[str, str]]:
+    """The probe result is a data contract. No physical measurement is a pass."""
+    findings: list[dict[str, str]] = []
+    runner, builder, preflight, patch, attestation = _runner_bundle(["test_module.py"])
+    policy = build_command_policy_contract(
+        runner,
+        builder_request=builder,
+        preflight=preflight,
+        patch_validation=patch,
+        content_attestation=attestation,
+    )
+    environment = build_environment_contract()
+    pinning = build_executable_pinning_spec([
+        {
+            "logical_name": "python",
+            "absolute_path": "/usr/bin/python3",
+            "sha256": "ab" * 32,
+            "file_size_bytes": 128,
+            "version_claim": "claim-only",
+            "verification_evidence_refs": ["evidence:pin:python"],
+        },
+        {
+            "logical_name": "git",
+            "absolute_path": "/usr/bin/git",
+            "sha256": "cd" * 32,
+            "file_size_bytes": 128,
+            "version_claim": "claim-only",
+            "verification_evidence_refs": ["evidence:pin:git"],
+        },
+    ])
+    sandbox = build_os_sandbox_contract(
+        policy, runner, builder, preflight, patch, attestation, pinning, environment,
+    )
+    result = build_probe_result_contract(
+        sandbox, policy, runner, builder, preflight, patch, attestation, pinning, environment,
+    )
+
+    def _reject(invariant_id: str, description: str, fn: Callable[[], Any]) -> None:
+        status, _ignored = _invoke(fn)
+        closed = status == "REJECT"
+        findings.append(_finding(
+            invariant_id,
+            "atlasquant_aion_developer_os_sandbox_probe_result",
+            description if closed else description + " O resultado foi aceito.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    def _verified() -> Any:
+        mutated = deepcopy(result)
+        mutated["measurements"][0]["verified"] = True
+        _bind_probe_result_ids(mutated)
+        return assert_probe_result_integrity(mutated)
+
+    _reject(
+        "probe_result.verified_true",
+        "PROBE_FALSE_VERIFICATION: measurement verified true e rejeitado.",
+        _verified,
+    )
+    _reject(
+        "probe_result.physical_probe_passed",
+        "PROBE_FALSE_VERIFICATION: physical_probe_passed true e rejeitado.",
+        lambda: build_probe_result_contract(
+            sandbox, policy, runner, builder, preflight, patch, attestation, pinning, environment,
+            physical_probe_passed=True,
+        ),
+    )
+    _reject(
+        "probe_result.execution_authorized",
+        "PROBE_FALSE_VERIFICATION: execution_authorized true e rejeitado.",
+        lambda: build_probe_result_contract(
+            sandbox, policy, runner, builder, preflight, patch, attestation, pinning, environment,
+            execution_authorized=True,
+        ),
+    )
+
+    def _execution_state() -> Any:
+        mutated = deepcopy(result)
+        mutated["state"] = "READY_FOR_EXECUTION"
+        _bind_probe_result_ids(mutated)
+        return assert_probe_result_integrity(mutated)
+
+    _reject(
+        "probe_result.ready_for_execution",
+        "PROBE_STATE_PROMOTION: READY_FOR_EXECUTION e rejeitado.",
+        _execution_state,
+    )
+
+    def _stale_promotion() -> Any:
+        bad_environment = build_environment_contract(path_lookup_allowed=True)
+        bad_sandbox = build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning, bad_environment,
+        )
+        blocked = build_probe_result_contract(
+            bad_sandbox, policy, runner, builder, preflight, patch, attestation, pinning, bad_environment,
+        )
+        promoted = deepcopy(blocked)
+        promoted["state"] = PROBE_RESULT_READY_STATE
+        promoted["blockers"] = []
+        return assert_probe_result_integrity(promoted)
+
+    _reject(
+        "probe_result.stale_promotion",
+        "PROBE_STATE_PROMOTION: BLOCKED para ready com o mesmo id e rejeitado.",
+        _stale_promotion,
+    )
+
+    def _reseal_promotion() -> Any:
+        bad_environment = build_environment_contract(path_lookup_allowed=True)
+        bad_sandbox = build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning, bad_environment,
+        )
+        blocked = build_probe_result_contract(
+            bad_sandbox, policy, runner, builder, preflight, patch, attestation, pinning, bad_environment,
+        )
+        promoted = deepcopy(blocked)
+        promoted["state"] = PROBE_RESULT_READY_STATE
+        promoted["blockers"] = []
+        _bind_probe_result_ids(promoted)
+        return assert_probe_result(
+            promoted, bad_sandbox, policy, runner, builder, preflight, patch, attestation,
+            pinning, bad_environment,
+        )
+
+    _reject(
+        "probe_result.reseal_promotion",
+        "PROBE_STATE_PROMOTION: reseal de BLOCKED para ready ainda reconstrui o blocker.",
+        _reseal_promotion,
+    )
+
+    def _stale_binding() -> Any:
+        mutated = deepcopy(result)
+        mutated["os_sandbox_contract_id"] = "DEVOS-STALECONTRACT01"
+        return assert_probe_result_integrity(mutated)
+
+    _reject(
+        "probe_result.stale_binding",
+        "PROBE_STALE_BINDING: os_sandbox_contract_id alterado com o id antigo e rejeitado.",
+        _stale_binding,
+    )
+
+    other = deepcopy(builder)
+    other["lineage"] = dict(other["lineage"])
+    other["lineage"]["snapshot_digest"] = "REPO-OTHER"
+    other = bind_builder_request_lineage(other)
+    other_preflight = _sealed_preflight(other)
+    other_patch = _sealed_patch(other, other_preflight)
+    other_attestation = attestation_for_documents(other, other_preflight, other_patch)
+    other_runner = build_runner_contract(
+        other,
+        other_preflight,
+        other_patch,
+        content_attestation=other_attestation,
+        human_patch_reviewed=True,
+        human_patch_reviewer="reviewer-1",
+        human_patch_review_refs=["review:patch:1"],
+    )
+    other_policy = build_command_policy_contract(
+        other_runner,
+        builder_request=other,
+        preflight=other_preflight,
+        patch_validation=other_patch,
+        content_attestation=other_attestation,
+    )
+    other_sandbox = build_os_sandbox_contract(
+        other_policy, other_runner, other, other_preflight, other_patch, other_attestation,
+        pinning, environment,
+    )
+    _reject(
+        "probe_result.bundle_swap",
+        "PROBE_STALE_BINDING: resultado do bundle A com sandbox B e rejeitado.",
+        lambda: assert_probe_result(
+            result, other_sandbox, other_policy, other_runner, other, other_preflight,
+            other_patch, other_attestation, pinning, environment,
+        ),
+    )
+
+    def _forged_count() -> Any:
+        mutated = deepcopy(result)
+        mutated["coverage"]["required_verified"] = 1
+        _bind_probe_result_ids(mutated)
+        return assert_probe_result_integrity(mutated)
+
+    _reject(
+        "probe_result.forged_verified_count",
+        "PROBE_COVERAGE_FORGERY: required_verified maior que zero e rejeitado.",
+        _forged_count,
+    )
+
+    def _forged_satisfied() -> Any:
+        mutated = deepcopy(result)
+        mutated["physical_proof_satisfied"] = ["EXECUTABLE_PINNING_PROOF_REQUIRED"]
+        _bind_probe_result_ids(mutated)
+        return assert_probe_result_integrity(mutated)
+
+    _reject(
+        "probe_result.forged_satisfied",
+        "PROBE_COVERAGE_FORGERY: physical_proof_satisfied preenchido e rejeitado.",
+        _forged_satisfied,
+    )
+
+    def _cleared_missing() -> Any:
+        mutated = deepcopy(result)
+        mutated["coverage"]["missing"] = []
+        mutated["missing_requirements"] = []
+        _bind_probe_result_ids(mutated)
+        return assert_probe_result_integrity(mutated)
+
+    _reject(
+        "probe_result.cleared_missing",
+        "PROBE_COVERAGE_FORGERY: lista missing esvaziada e rejeitada.",
+        _cleared_missing,
+    )
+    _reject(
+        "probe_result.unknown_authority",
+        "PROBE_UNKNOWN_AUTHORITY: campo safe true e rejeitado.",
+        lambda: assert_probe_result_integrity({**deepcopy(result), "safe": True}),
+    )
+
+    def _unknown_measurement() -> Any:
+        mutated = deepcopy(result)
+        mutated["measurements"][0]["safe"] = True
+        _bind_probe_result_ids(mutated)
+        return assert_probe_result_integrity(mutated)
+
+    _reject(
+        "probe_result.unknown_measurement",
+        "PROBE_UNKNOWN_AUTHORITY: campo desconhecido no measurement e rejeitado.",
+        _unknown_measurement,
+    )
+
+    def _unknown_evidence() -> Any:
+        mutated = deepcopy(result)
+        mutated["measurements"][0]["evidence"]["trusted"] = True
+        _bind_probe_result_ids(mutated)
+        return assert_probe_result_integrity(mutated)
+
+    _reject(
+        "probe_result.unknown_evidence",
+        "PROBE_EVIDENCE_FORGERY: campo desconhecido na evidence e rejeitado.",
+        _unknown_evidence,
+    )
+    _reject(
+        "probe_result.independent_true",
+        "PROBE_ROOT_OF_TRUST_CLAIM: independently_verified true e rejeitado.",
+        lambda: build_probe_result_contract(
+            sandbox, policy, runner, builder, preflight, patch, attestation, pinning, environment,
+            independently_verified=True,
+        ),
+    )
+    _reject(
+        "probe_result.unsupported_platform",
+        "PROBE_PLATFORM_CONFUSION: plataforma UNSUPPORTED nao pode ser verificada.",
+        lambda: build_probe_result_contract(
+            sandbox, policy, runner, builder, preflight, patch, attestation, pinning, environment,
+            platform="UNSUPPORTED",
+        ),
+    )
+
+    def _ambiguous() -> Any:
+        mutated = deepcopy(result)
+        mutated["measurements"][0]["observed_value"] = "PASS"
+        _bind_probe_result_ids(mutated)
+        return assert_probe_result_integrity(mutated)
+
+    _reject(
+        "probe_result.ambiguous_observation",
+        "PROBE_FALSE_VERIFICATION: observacao ambigua nao pode ser PASS.",
+        _ambiguous,
+    )
+
+    status, _checked = _invoke(lambda: assert_probe_result(
+        result, sandbox, policy, runner, builder, preflight, patch, attestation, pinning, environment,
+    ))
+    physical_flags = (
+        "execution_authorized",
+        "physical_probe_passed",
+        "physical_proof_verified",
+        "platform_verified",
+        "independently_verified",
+        "os_sandbox_verified",
+        "executable_pinning_verified",
+    )
+    measurements_unverified = all(
+        item.get("verified") is False
+        and item.get("evidence", {}).get("evidence_is_physical") is False
+        for item in result.get("measurements") or []
+    )
+    legitimate = (
+        status == "ACCEPT"
+        and result.get("state") == PROBE_RESULT_READY_STATE
+        and list(result.get("blockers") or []) == []
+        and result.get("coverage", {}).get("required_verified") == 0
+        and result.get("probe_result_is_data_only") is True
+        and result.get("upstream_contract_independently_verified") is False
+        and measurements_unverified
+        and all(result.get(field) is False for field in physical_flags)
+    )
+    findings.append(_finding(
+        "probe_result.legitimate",
+        "atlasquant_aion_developer_os_sandbox_probe_result",
+        "OS_SANDBOX_PROBE_RESULT_DESIGN: contrato data-only fecha o formato com nenhuma medicao verificada."
+        if legitimate else
+        "O contrato de resultado alegou medicao fisica ou nao fechou o formato.",
+        "PASS" if legitimate else "GAP",
+        "" if legitimate else "HIGH",
+    ))
+    return findings
+
+
 def _reseal_independent(policy: Mapping[str, Any]) -> dict[str, Any]:
     mutated = deepcopy(policy)
     mutated["upstream_provenance_independently_verified"] = True
@@ -4762,6 +5079,7 @@ def audit_developer_chain() -> dict[str, Any]:
         findings.extend(_upstream_provenance_surface(world))
         findings.extend(_policy_provenance_surface(world))
         findings.extend(_os_sandbox_design_surface(world))
+        findings.extend(_probe_result_design_surface(world))
     finally:
         world.close()
 
