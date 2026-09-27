@@ -18,12 +18,35 @@ SEVERITIES=("INFO","NOTICE","WARNING","ERROR","CRITICAL")
 TRUTH_STATES=("CONFIRMED","INFERENCE","HYPOTHESIS","UNKNOWN")
 
 _SECRET_PATTERNS=(
-    re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{12,}"),
+    re.compile(r"(?i)\bBearer\s+[^\s,;\"']+"),
     re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{20,}\b"),
     re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}\b"),
     re.compile(r"\bsk-[A-Za-z0-9_-]{16,}\b"),
-    re.compile(r"(?i)(api[_-]?key|token|secret|password)\s*[:=]\s*[^\s,;]{6,}"),
+    re.compile(r"(?i)\b(password|passwd|token|api[_-]?key|authorization|secret|cookie|credential|bearer)[\"']?\s*[:=]\s*(?:\"[^\"]*\"|'[^']*'|[^\s,;}]+)"),
 )
+
+_SECRET_KEY=re.compile(r"password|passwd|token|apikey|authorization|secret|cookie|credential|bearer",re.I)
+
+
+def sanitize_metadata(value:Any, *, _depth:int=0)->Any:
+    """Redact structured evidence before serialization, including short secrets."""
+    if _depth>=12:
+        return "[TRUNCATED]"
+    if isinstance(value,Mapping):
+        return {
+            redact_text(key)[:80]: (
+                "[REDACTED]" if _SECRET_KEY.search(re.sub(r"[^a-z]","",str(key).lower()))
+                else sanitize_metadata(item,_depth=_depth+1)
+            )
+            for key,item in list(value.items())[:100]
+        }
+    if isinstance(value,(list,tuple)):
+        return [sanitize_metadata(item,_depth=_depth+1) for item in value[:100]]
+    if isinstance(value,str):
+        return redact_text(value)
+    if value is None or isinstance(value,(bool,int,float)):
+        return value
+    return redact_text(value)
 
 
 def _now()->str:
@@ -62,8 +85,9 @@ def new_event(
     message_clean=redact_text(message).strip()[:1200]
     evidence_clean={}
     if isinstance(evidence,Mapping):
-        for key,value in list(evidence.items())[:20]:
-            evidence_clean[redact_text(key)[:80]]=redact_text(value)[:700]
+        for key,value in list(sanitize_metadata(evidence).items())[:20]:
+            # Preserve the historical scalar representation for V17 digests.
+            evidence_clean[key]=value if isinstance(value,(dict,list)) else redact_text(value)[:700]
     seed=json.dumps(
         [event_type_clean,message_clean,created,evidence_clean],
         ensure_ascii=False,sort_keys=True,default=str,

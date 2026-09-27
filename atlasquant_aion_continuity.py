@@ -413,6 +413,37 @@ def continuity_briefing(
     }
 
 
+def mission_task_consistency(missions, tasks)->dict[str,Any]:
+    """Report cross-model divergence without changing legacy mission states."""
+    from atlasquant_aion_durable_tasks import normalize_durable_tasks
+
+    by_id={m["mission_id"]:m for m in normalize_missions(missions)}
+    compatible={
+        "PLANNED":{"PLANNED"},
+        "IN_PROGRESS":{"PLANNED","RUNNING","PAUSED","WAITING_APPROVAL","BLOCKED","DONE","CANCELED"},
+        "WAITING_APPROVAL":{"WAITING_APPROVAL","PAUSED","DONE","CANCELED"},
+        "BLOCKED":{"BLOCKED","PAUSED","DONE","CANCELED"},
+        "DONE":{"DONE","CANCELED"},
+        "CANCELED":{"CANCELED","DONE"},
+    }
+    issues=[]
+    for task in normalize_durable_tasks(tasks):
+        mid=task["mission_id"]
+        if not mid:
+            continue  # Legacy standalone tasks remain supported.
+        mission=by_id.get(mid)
+        code="MISSION_NOT_FOUND" if mission is None else (
+            "MISSION_TASK_STATE_MISMATCH" if task["state"] not in compatible[mission["status"]] else ""
+        )
+        if code:
+            issues.append({"error_code":code,"mission_id":mid,
+                           "task_id":task["durable_task_id"],"task_state":task["state"],
+                           "mission_state":mission["status"] if mission else "UNKNOWN",
+                           "correlation_id":task.get("correlation_id") or mid})
+    return {"state":"INCONSISTENT" if issues else "CONSISTENT","issues":issues,
+            "executes_action":False}
+
+
 def continuity_digest(
     missions:Sequence[Mapping[str,Any]]|None,
     handoffs:Sequence[Mapping[str,Any]]|None,

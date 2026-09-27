@@ -4377,8 +4377,11 @@ def _render_development(
                 st.caption("Retomada restaura estado; execução automática: NÃO.")
             if st.button("Registrar evento de retomada",key="aion_durable_record_resume"):
                 try:
+                    if not isinstance(resume,Mapping) or resume.get("durable_task_id")!=selected_durable.get("durable_task_id"):
+                        raise ValueError("Prepare a retomada da tarefa selecionada primeiro.")
                     resumed=record_resume(
                         selected_durable,
+                        expected_revision=resume.get("revision"),
                         checkpoint_digest=checkpoint_source_digest(source_checkpoint),
                     )
                     durable_records=upsert_durable_task(durable_records,resumed)

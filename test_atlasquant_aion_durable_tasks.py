@@ -13,6 +13,10 @@ from atlasquant_aion_durable_tasks import (
 
 
 class AtlasQuantAionDurableTasksTests(unittest.TestCase):
+    def _finish(self,task,step_id,**kwargs):
+        task=update_step(task,step_id,"RUNNING",access={"role":"ADMIN"},approved=True)
+        return update_step(task,step_id,"DONE",access={"role":"ADMIN"},approved=True,**kwargs)
+
     def _task(self):
         return new_durable_task(
             "Portable Core",
@@ -28,7 +32,7 @@ class AtlasQuantAionDurableTasksTests(unittest.TestCase):
 
     def test_resume_restores_cursor_without_executing(self):
         task=self._task()
-        task=update_step(task,"spec","DONE",result_note="Spec pronta.")
+        task=self._finish(task,"spec",result_note="Spec pronta.")
         task=pause_durable_task(task,checkpoint_digest="cp-a")
         view=prepare_resume(
             task,
@@ -58,18 +62,18 @@ class AtlasQuantAionDurableTasksTests(unittest.TestCase):
 
     def test_completed_steps_advance_cursor_and_done_state(self):
         task=self._task()
-        task=update_step(task,"spec","DONE")
+        task=self._finish(task,"spec")
         self.assertEqual(task["cursor"],1)
-        task=update_step(task,"test","DONE")
+        task=self._finish(task,"test")
         self.assertEqual(task["cursor"],2)
-        task=update_step(task,"merge","DONE")
+        task=self._finish(task,"merge")
         self.assertEqual(task["state"],"DONE")
         self.assertEqual(task["cursor"],3)
 
     def test_waiting_approval_is_persisted_not_bypassed(self):
         task=self._task()
-        task=update_step(task,"spec","DONE")
-        task=update_step(task,"test","DONE")
+        task=self._finish(task,"spec")
+        task=self._finish(task,"test")
         task=update_step(task,"merge","WAITING_APPROVAL",blocker="Aprovação necessária.")
         self.assertEqual(task["state"],"WAITING_APPROVAL")
         view=prepare_resume(task,expected_revision=task["revision"],checkpoint_digest="cp-a")
@@ -85,7 +89,7 @@ class AtlasQuantAionDurableTasksTests(unittest.TestCase):
         task=update_step(task,"merge","BLOCKED",blocker="Ainda não.")
         self.assertEqual(task["cursor"],0)
         self.assertEqual(task["next_action"],"Especificar")
-        self.assertEqual(task["state"],"PAUSED")
+        self.assertEqual(task["state"],"PLANNED")
 
     def test_record_resume_only_changes_state_metadata(self):
         task=self._task()
