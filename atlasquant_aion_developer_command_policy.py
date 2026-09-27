@@ -20,16 +20,7 @@ import re
 from typing import Any, Mapping
 
 from atlasquant_aion_developer_runner_contract import SCHEMA as RUNNER_SCHEMA
-from atlasquant_aion_developer_sandbox_preflight import (
-    MAX_COMMANDS,
-    MAX_MEMORY_MB,
-    MAX_OUTPUT_BYTES,
-    MAX_RUNTIME_SECONDS,
-    MIN_COMMANDS,
-    MIN_MEMORY_MB,
-    MIN_OUTPUT_BYTES,
-    MIN_RUNTIME_SECONDS,
-)
+from atlasquant_aion_developer_sandbox_preflight import validate_resource_budget
 
 SCHEMA = "ATLASQUANT_AION_DEVELOPER_COMMAND_POLICY_V1"
 
@@ -116,10 +107,6 @@ def _validate_step(row: Mapping[str, Any], expected: tuple[str, str, tuple[str, 
     return blockers
 
 
-def _budget_in_range(value: Any, low: int, high: int) -> bool:
-    return isinstance(value, int) and not isinstance(value, bool) and low <= value <= high
-
-
 def build_command_policy_contract(
     runner_contract: Mapping[str, Any],
     *,
@@ -186,18 +173,14 @@ def build_command_policy_contract(
     budget = (
         runner_contract.get("resource_budget")
         if isinstance(runner_contract.get("resource_budget"), Mapping)
-        else {}
+        else None
     )
-    if not _budget_in_range(budget.get("runtime_seconds"), MIN_RUNTIME_SECONDS, MAX_RUNTIME_SECONDS):
-        blockers.append("RUNTIME_BUDGET_OUT_OF_RANGE")
-    if not _budget_in_range(budget.get("memory_mb"), MIN_MEMORY_MB, MAX_MEMORY_MB):
-        blockers.append("MEMORY_BUDGET_OUT_OF_RANGE")
-    if not _budget_in_range(budget.get("output_bytes"), MIN_OUTPUT_BYTES, MAX_OUTPUT_BYTES):
-        blockers.append("OUTPUT_BUDGET_OUT_OF_RANGE")
-    command_budget = budget.get("max_commands")
-    if not _budget_in_range(command_budget, MIN_COMMANDS, MAX_COMMANDS):
-        blockers.append("COMMAND_BUDGET_OUT_OF_RANGE")
-    elif command_budget < len(_EXPECTED_STEPS):
+    validated_budget, budget_blockers = validate_resource_budget(budget)
+    blockers.extend(budget_blockers)
+    if (
+        "COMMAND_BUDGET_OUT_OF_RANGE" not in budget_blockers
+        and validated_budget["max_commands"] < len(_EXPECTED_STEPS)
+    ):
         blockers.append("COMMAND_PLAN_EXCEEDS_RESOURCE_BUDGET")
 
     requested_env = dict(requested_environment or {})

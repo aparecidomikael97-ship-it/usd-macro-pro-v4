@@ -30,6 +30,7 @@ from atlasquant_aion_developer_sandbox_preflight import (
     SCHEMA as PREFLIGHT_SCHEMA,
     canonical_repository_relative_path,
     expected_preflight_id,
+    validate_resource_budget,
 )
 from atlasquant_aion_observability import redact_text
 
@@ -252,12 +253,10 @@ def build_runner_contract(
     budget = (
         preflight.get("resource_budget")
         if isinstance(preflight.get("resource_budget"), Mapping)
-        else {}
+        else None
     )
-    if not all(int(budget.get(key) or 0) > 0 for key in (
-        "runtime_seconds", "memory_mb", "output_bytes", "max_commands"
-    )):
-        blockers.append("INVALID_RESOURCE_BUDGET")
+    validated_budget, budget_blockers = validate_resource_budget(budget)
+    blockers.extend(budget_blockers)
 
     blockers = list(dict.fromkeys(blockers))
     state = "READY_FOR_RUNNER_DESIGN_REVIEW" if not blockers else "BLOCKED"
@@ -324,7 +323,7 @@ def build_runner_contract(
             "mandatory_gates": gates,
             "tests_executed": False,
         },
-        "resource_budget": dict(budget),
+        "resource_budget": validated_budget,
         "command_plan": command_plan,
         "command_plan_is_data_only": True,
         "shell_allowed": False,

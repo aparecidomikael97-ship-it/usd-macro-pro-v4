@@ -200,7 +200,7 @@ class AionDeveloperRunnerContractTests(unittest.TestCase):
         preflight["preflight_id"] = expected_preflight_id(preflight)
         out = _run(builder=builder, preflight=preflight)
         self.assertEqual(out["state"], "BLOCKED")
-        self.assertIn("INVALID_RESOURCE_BUDGET", out["blockers"])
+        self.assertIn("RUNTIME_BUDGET_OUT_OF_RANGE", out["blockers"])
 
     def test_never_executes_or_mutates(self):
         out = _run()

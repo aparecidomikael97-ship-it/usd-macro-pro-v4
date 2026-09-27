@@ -68,6 +68,19 @@ _HARDENED_INVARIANTS={
     "test_contract.mandatory_gates_string",
     "test_contract.review_refs_string",
     "test_contract.non_string_elements",
+    "budget.runtime_true_initial",
+    "budget.runtime_false_initial",
+    "budget.runtime_numeric_string",
+    "budget.runtime_integral_float",
+    "budget.runtime_fractional_float",
+    "budget.runtime_none",
+    "budget.max_commands_true_initial",
+    "budget.runtime_list_and_dict",
+    "budget.runtime_mutated_to_true_keeps_id",
+    "budget.max_commands_mutated_to_true_keeps_id",
+    "budget.recompute_rejects_true",
+    "budget.runner_revalidates_exact_int",
+    "budget.command_policy_revalidates_exact_int",
 }
 
 
@@ -79,10 +92,10 @@ class AionDeveloperAdversarialAuditorTests(unittest.TestCase):
     def test_report_shape_is_deterministic_and_unscored(self):
         report=self.report
         self.assertEqual(report["schema"],SCHEMA)
-        self.assertEqual(report["cases_total"],88)
+        self.assertEqual(report["cases_total"],101)
         self.assertEqual(
             report["gap_count"]+report["blocked_by_design_count"]+report["pass_count"],
-            88,
+            101,
         )
         self.assertFalse(report["symlink_physical_boundary_verified"])
         self.assertFalse(report["hardlink_physical_boundary_verified"])

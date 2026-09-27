@@ -90,6 +90,35 @@ def _safe_relative_path(value: Any) -> bool:
     return canonical_repository_relative_path(value) is not None
 
 
+_BUDGET_FIELDS = (
+    ("runtime_seconds", MIN_RUNTIME_SECONDS, MAX_RUNTIME_SECONDS, "RUNTIME_BUDGET_OUT_OF_RANGE"),
+    ("memory_mb", MIN_MEMORY_MB, MAX_MEMORY_MB, "MEMORY_BUDGET_OUT_OF_RANGE"),
+    ("output_bytes", MIN_OUTPUT_BYTES, MAX_OUTPUT_BYTES, "OUTPUT_BUDGET_OUT_OF_RANGE"),
+    ("max_commands", MIN_COMMANDS, MAX_COMMANDS, "COMMAND_BUDGET_OUT_OF_RANGE"),
+)
+
+
+def validate_resource_budget(budget: Mapping[str, Any] | None) -> tuple[dict[str, int], list[str]]:
+    """Return exact ints and official range blockers.
+
+    ``type(value) is int`` is required. ``bool`` is a subclass of ``int`` and
+    is rejected, as are strings, floats and every other representation. This
+    function does not coerce values, so ``True`` and ``1`` cannot share a digest.
+    """
+    if not isinstance(budget, Mapping):
+        raise ValueError("resource budget must be an object")
+    validated: dict[str, int] = {}
+    blockers: list[str] = []
+    for field, low, high, blocker in _BUDGET_FIELDS:
+        value = budget.get(field)
+        if type(value) is not int:
+            raise ValueError(f"{field} must be an exact int")
+        validated[field] = value
+        if value < low or value > high:
+            blockers.append(blocker)
+    return validated, blockers
+
+
 def expected_preflight_id(preflight: Mapping[str, Any]) -> str:
     """Recompute the preflight id, including the bound test-contract manifest."""
     env = (
@@ -100,21 +129,17 @@ def expected_preflight_id(preflight: Mapping[str, Any]) -> str:
     budget = (
         preflight.get("resource_budget")
         if isinstance(preflight.get("resource_budget"), Mapping)
-        else {}
+        else None
     )
     scope = preflight.get("scope") if isinstance(preflight.get("scope"), Mapping) else {}
+    validated_budget, _range_blockers = validate_resource_budget(budget)
     seed = {
         "request_id": str(preflight.get("builder_request_id") or ""),
         "environment": str(env.get("environment_kind") or ""),
         "environment_id": str(env.get("environment_id") or ""),
         "files": require_string_sequence(scope.get("requested_files"), "requested_files"),
         "policy": str(env.get("command_policy") or ""),
-        "budgets": {
-            "runtime_seconds": int(budget.get("runtime_seconds")),
-            "memory_mb": int(budget.get("memory_mb")),
-            "output_bytes": int(budget.get("output_bytes")),
-            "max_commands": int(budget.get("max_commands")),
-        },
+        "budgets": validated_budget,
         "test_contract_manifest_id": str(preflight.get("test_contract_manifest_id") or ""),
     }
     return "DEVPREF-" + _digest(seed)
@@ -233,20 +258,13 @@ def build_sandbox_preflight(
     if policy != ALLOWED_COMMAND_POLICY:
         blockers.append("COMMAND_POLICY_MUST_BE_ALLOWLIST_ONLY")
 
-    budgets = {
-        "runtime_seconds": int(runtime_seconds),
-        "memory_mb": int(memory_mb),
-        "output_bytes": int(output_bytes),
-        "max_commands": int(max_commands),
-    }
-    if budgets["runtime_seconds"] < MIN_RUNTIME_SECONDS or budgets["runtime_seconds"] > MAX_RUNTIME_SECONDS:
-        blockers.append("RUNTIME_BUDGET_OUT_OF_RANGE")
-    if budgets["memory_mb"] < MIN_MEMORY_MB or budgets["memory_mb"] > MAX_MEMORY_MB:
-        blockers.append("MEMORY_BUDGET_OUT_OF_RANGE")
-    if budgets["output_bytes"] < MIN_OUTPUT_BYTES or budgets["output_bytes"] > MAX_OUTPUT_BYTES:
-        blockers.append("OUTPUT_BUDGET_OUT_OF_RANGE")
-    if budgets["max_commands"] < MIN_COMMANDS or budgets["max_commands"] > MAX_COMMANDS:
-        blockers.append("COMMAND_BUDGET_OUT_OF_RANGE")
+    budgets, budget_blockers = validate_resource_budget({
+        "runtime_seconds": runtime_seconds,
+        "memory_mb": memory_mb,
+        "output_bytes": output_bytes,
+        "max_commands": max_commands,
+    })
+    blockers.extend(budget_blockers)
 
     blockers = list(dict.fromkeys(blockers))
     state = "READY_FOR_EXECUTOR_DESIGN_REVIEW" if not blockers else "BLOCKED"
@@ -320,6 +338,7 @@ __all__ = [
     "ALLOWED_COMMAND_POLICY",
     "ALLOWED_ENVIRONMENT_KINDS",
     "canonical_repository_relative_path",
+    "validate_resource_budget",
     "expected_preflight_id",
     "build_sandbox_preflight",
 ]

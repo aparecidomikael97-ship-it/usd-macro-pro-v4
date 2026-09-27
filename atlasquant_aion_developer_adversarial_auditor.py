@@ -1942,6 +1942,181 @@ def _test_contract_integrity_surface(world: _World) -> list[dict[str, str]]:
     return findings
 
 
+def _resource_budget_surface(_world: _World) -> list[dict[str, str]]:
+    """Reject bool, string and float budgets before they can share an int digest."""
+    findings: list[dict[str, str]] = []
+
+    def _preflight_for(request: Mapping[str, Any], **overrides: Any) -> dict[str, Any]:
+        kwargs = {
+            "environment_kind": "ISOLATED_WORKTREE",
+            "environment_id": "sandbox-001",
+            "isolated_worktree": True,
+            "repository_root_bound": True,
+            "network_disabled": True,
+            "secrets_mounted": False,
+            "command_policy": "ALLOWLIST_ONLY",
+            "runtime_seconds": 900,
+            "memory_mb": 2048,
+            "output_bytes": 2_000_000,
+            "max_commands": 24,
+        }
+        kwargs.update(overrides)
+        return build_sandbox_preflight(request, **kwargs)
+
+    def _record(invariant_id: str, module: str, description: str, closed: bool) -> None:
+        findings.append(_finding(
+            invariant_id,
+            module,
+            description if closed else description + " A coercao de tipo ainda foi aceita.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    def _initial(field: str, value: Any) -> bool:
+        status, result = _invoke(lambda: _preflight_for(_sealed_runner_request(["test_module.py"]), **{field: value}))
+        if status != "REJECT" or not isinstance(result, BaseException):
+            return False
+        if isinstance(result, Mapping):
+            budget = result.get("resource_budget")
+            if isinstance(budget, Mapping) and budget.get(field) == value:
+                return False
+        return True
+
+    for invariant_id, value, description in (
+        ("budget.runtime_true_initial", True, "runtime_seconds True nao vira 1 nem gera preflight pronto."),
+        ("budget.runtime_false_initial", False, "runtime_seconds False nao vira 0."),
+        ("budget.runtime_numeric_string", "900", "runtime_seconds string numerica nao vira inteiro."),
+        ("budget.runtime_integral_float", 1.0, "runtime_seconds 1.0 nao e intercambiavel com 1."),
+        ("budget.runtime_fractional_float", 1.9, "runtime_seconds 1.9 nao e truncado para 1."),
+        ("budget.runtime_none", None, "runtime_seconds ausente ou None e rejeitado."),
+    ):
+        _record(
+            invariant_id,
+            "atlasquant_aion_developer_sandbox_preflight",
+            description,
+            _initial("runtime_seconds", value),
+        )
+    _record(
+        "budget.max_commands_true_initial",
+        "atlasquant_aion_developer_sandbox_preflight",
+        "max_commands True nao gera preflight valido.",
+        _initial("max_commands", True),
+    )
+    _record(
+        "budget.runtime_list_and_dict",
+        "atlasquant_aion_developer_sandbox_preflight",
+        "Lista ou dict no budget e rejeitado.",
+        _initial("runtime_seconds", []) and _initial("runtime_seconds", {}),
+    )
+
+    try:
+        request = _sealed_runner_request(["test_module.py"])
+        preflight = _preflight_for(request, runtime_seconds=1, max_commands=1)
+        runner = _runner_from_pair(request, preflight)
+        ready = (
+            preflight.get("state") == "READY_FOR_EXECUTOR_DESIGN_REVIEW"
+            and runner.get("state") == "READY_FOR_RUNNER_DESIGN_REVIEW"
+            and preflight.get("execution_authorized") is False
+            and runner.get("execution_authorized") is False
+            and type(preflight["resource_budget"]["runtime_seconds"]) is int
+            and preflight["resource_budget"]["runtime_seconds"] == 1
+            and preflight["resource_budget"]["max_commands"] == 1
+        )
+    except (TypeError, ValueError):
+        request, preflight, runner = {}, {}, {}
+        ready = False
+
+    def _mutate(document: Mapping[str, Any], field: str, value: Any) -> dict[str, Any]:
+        mutated = deepcopy(dict(document))
+        mutated["resource_budget"] = dict(mutated.get("resource_budget") or {})
+        mutated["resource_budget"][field] = value
+        return mutated
+
+    runtime_mutated = _mutate(preflight, "runtime_seconds", True) if ready else {}
+    runtime_id_status, _runtime_id = _invoke(lambda: expected_preflight_id(runtime_mutated)) if ready else ("REJECT", None)
+    runtime_run_status, _runtime_run = (
+        _invoke(lambda: _runner_from_pair(request, runtime_mutated)) if ready else ("REJECT", None)
+    )
+    _record(
+        "budget.runtime_mutated_to_true_keeps_id",
+        "atlasquant_aion_developer_runner_contract",
+        "Mutar runtime_seconds para True e manter preflight_id falha na revalidacao.",
+        ready
+        and runtime_mutated.get("preflight_id") == preflight.get("preflight_id")
+        and runtime_id_status == "REJECT"
+        and runtime_run_status == "REJECT",
+    )
+
+    commands_mutated = _mutate(preflight, "max_commands", True) if ready else {}
+    commands_id_status, _commands_id = _invoke(lambda: expected_preflight_id(commands_mutated)) if ready else ("REJECT", None)
+    commands_run_status, _commands_run = (
+        _invoke(lambda: _runner_from_pair(request, commands_mutated)) if ready else ("REJECT", None)
+    )
+    _record(
+        "budget.max_commands_mutated_to_true_keeps_id",
+        "atlasquant_aion_developer_runner_contract",
+        "Mutar max_commands para True e manter preflight_id falha na revalidacao.",
+        ready
+        and commands_mutated.get("preflight_id") == preflight.get("preflight_id")
+        and commands_id_status == "REJECT"
+        and commands_run_status == "REJECT",
+    )
+
+    recompute_status, recompute_result = (
+        _invoke(lambda: expected_preflight_id(runtime_mutated)) if ready else ("REJECT", None)
+    )
+    _record(
+        "budget.recompute_rejects_true",
+        "atlasquant_aion_developer_sandbox_preflight",
+        "Recalcular preflight_id com runtime_seconds True continua rejeitado.",
+        ready and recompute_status == "REJECT" and not isinstance(recompute_result, str),
+    )
+
+    try:
+        wide_request = _sealed_runner_request(["test_module.py"])
+        wide = _preflight_for(wide_request)
+        wide_runner = _runner_from_pair(wide_request, wide)
+        wide_ready = (
+            wide.get("state") == "READY_FOR_EXECUTOR_DESIGN_REVIEW"
+            and wide_runner.get("state") == "READY_FOR_RUNNER_DESIGN_REVIEW"
+            and wide_runner.get("commands_executed") is False
+        )
+    except (TypeError, ValueError):
+        wide_request, wide, wide_runner = {}, {}, {}
+        wide_ready = False
+
+    runner_closed = False
+    if wide_ready:
+        runner_closed = True
+        for field, value in (("runtime_seconds", "900"), ("runtime_seconds", 1.9), ("max_commands", True)):
+            mutated = _mutate(wide, field, value)
+            status, _result = _invoke(lambda mutated=mutated: _runner_from_pair(wide_request, mutated))
+            if status != "REJECT":
+                runner_closed = False
+    _record(
+        "budget.runner_revalidates_exact_int",
+        "atlasquant_aion_developer_runner_contract",
+        "Runner revalida o budget e rejeita string, float e bool.",
+        runner_closed,
+    )
+
+    policy_closed = False
+    if wide_ready:
+        policy_closed = True
+        for field, value in (("runtime_seconds", True), ("max_commands", True), ("output_bytes", "2000000")):
+            mutated = _mutate(wide_runner, field, value)
+            status, _result = _invoke(lambda mutated=mutated: build_command_policy_contract(mutated))
+            if status != "REJECT":
+                policy_closed = False
+    _record(
+        "budget.command_policy_revalidates_exact_int",
+        "atlasquant_aion_developer_command_policy",
+        "Command policy revalida o budget e rejeita bool e string.",
+        policy_closed,
+    )
+    return findings
+
+
 def audit_developer_chain() -> dict[str, Any]:
     """Inspect the local Developer contracts and return a deterministic report."""
     world = _World()
@@ -1959,6 +2134,7 @@ def audit_developer_chain() -> dict[str, Any]:
         findings.extend(_residual_surface(world))
         findings.extend(_contract_gap_surface(world))
         findings.extend(_test_contract_integrity_surface(world))
+        findings.extend(_resource_budget_surface(world))
     finally:
         world.close()
 
