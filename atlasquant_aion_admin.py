@@ -80,6 +80,7 @@ from atlasquant_aion_continuity import (
     continuity_briefing,
     continuity_summary,
     new_mission,
+    prepare_mission_transition,
     transition_mission,
     upsert_mission,
 )
@@ -258,6 +259,7 @@ from atlasquant_aion_cognitive_orchestrator import orchestrator_snapshot
 from atlasquant_aion_orchestrator import (
     build_aion_result,
     orchestrate as orchestrate_aion_core,
+    present_validated_answer,
 )
 from atlasquant_aion_specialists import plan_specialist_dispatch
 from atlasquant_aion_specialist_evidence import read_specialist_evidence
@@ -2408,19 +2410,29 @@ def _render_central(
     answer = st.session_state.get("aion_last_answer")
     if isinstance(answer, Mapping):
         st.markdown("#### Resposta AION")
-        st.write(str(answer.get("answer", "")))
         unified_result = st.session_state.get("aion_last_unified_result")
+        validation = {}
+        evidence_count = 0
         if isinstance(unified_result, Mapping):
-            validation = (
-                unified_result.get("validation")
-                if isinstance(unified_result.get("validation"), Mapping)
-                else {}
-            )
-            st.caption(
-                f"Validação: {validation.get('state', 'REVISE')} · "
-                f"verdade {validation.get('truth_state', 'UNKNOWN')} · "
-                f"{unified_result.get('evidence_count', 0)} evidência(s)"
-            )
+            evidence_count = int(unified_result.get("evidence_count") or 0)
+            if isinstance(unified_result.get("validation"), Mapping):
+                validation = unified_result.get("validation")
+        presentation = present_validated_answer(validation, answer=answer.get("answer", ""))
+        if presentation["display"] == "ANSWER":
+            st.write(presentation["text"])
+        elif presentation["display"] == "BLOCK":
+            st.error(presentation["notice"])
+            if presentation["issues"]:
+                st.caption("Motivo: " + ", ".join(presentation["issues"]))
+        else:
+            st.warning(presentation["notice"])
+            if presentation["issues"]:
+                st.caption("Pendências: " + ", ".join(presentation["issues"]))
+        st.caption(
+            f"Validação: {presentation['state']} · "
+            f"verdade {presentation['truth_status']} · "
+            f"{evidence_count} evidência(s)"
+        )
         cognitive_answer = answer.get("cognitive_orchestrator")
         if isinstance(cognitive_answer, Mapping):
             routing = (
@@ -4318,6 +4330,23 @@ def _render_development(
                 value=", ".join(list(selected_mission.get("evidence_refs") or [])),
                 key="aion_persistent_mission_evidence",
             )
+            previous_status = str(selected_mission.get("status") or "PLANNED")
+            approval_explicit = False
+            unblock_text = ""
+            if previous_status == "WAITING_APPROVAL" and next_status == "IN_PROGRESS":
+                if "aion_persistent_mission_approve" not in st.session_state:
+                    st.session_state["aion_persistent_mission_approve"] = False
+                approval_explicit = bool(st.checkbox(
+                    "Aprovo explicitamente a retomada desta missão",
+                    key="aion_persistent_mission_approve",
+                ))
+            if previous_status == "BLOCKED" and next_status == "IN_PROGRESS":
+                if "aion_persistent_mission_unblock" not in st.session_state:
+                    st.session_state["aion_persistent_mission_unblock"] = ""
+                unblock_text = str(st.text_input(
+                    "Motivo do desbloqueio",
+                    key="aion_persistent_mission_unblock",
+                ) or "")
             if st.button(
                 "Atualizar missão persistente",
                 key="aion_persistent_mission_update",
@@ -4325,6 +4354,16 @@ def _render_development(
             ):
                 try:
                     evidence_refs=[x.strip() for x in evidence_text.split(",") if x.strip()]
+                    prepared = prepare_mission_transition(
+                        previous_status,
+                        next_status,
+                        approved=approval_explicit,
+                        unblock_reason=unblock_text,
+                        actor=str(access.get("username") or access.get("role") or "ADMIN"),
+                        changed_at=datetime.now(timezone.utc).isoformat(),
+                        evidence_refs=evidence_refs,
+                        mission_id=selected_mission_id,
+                    )
                     missions = transition_mission(
                         missions,
                         selected_mission_id,
@@ -4332,7 +4371,10 @@ def _render_development(
                         outcome=mission_outcome,
                         blocker=mission_blocker,
                         next_action=mission_next_action,
-                        evidence_refs=evidence_refs,
+                        evidence_refs=prepared["evidence_refs"],
+                        changed_at=prepared["changed_at"],
+                        approved=prepared["approved"],
+                        unblock_reason=prepared["unblock_reason"],
                     )
                     updated = update_continuity_checkpoint(
                         checkpoint,
@@ -4347,6 +4389,10 @@ def _render_development(
                         evidence={
                             "mission_id":selected_mission_id,
                             "status":next_status,
+                            "actor":prepared["actor"],
+                            "approved":prepared["approved"],
+                            "unblock_reason":prepared["unblock_reason"],
+                            "changed_at":prepared["changed_at"],
                             "automatic_execution":False,
                         },
                     )
@@ -4354,7 +4400,9 @@ def _render_development(
                     st.success("Missão atualizada localmente no Checkpoint.")
                     st.rerun()
                 except Exception as exc:
-                    st.error(f"Não foi possível atualizar a missão: {type(exc).__name__}")
+                    st.error(
+                        f"Não foi possível atualizar a missão: {type(exc).__name__}: {exc}"
+                    )
 
     st.markdown("#### 🔌 Tool Hub / MCP + Tarefas Duráveis")
     tool_hub = checkpoint.get("tool_hub") if isinstance(checkpoint.get("tool_hub"), Mapping) else {}

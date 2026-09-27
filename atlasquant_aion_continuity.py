@@ -212,6 +212,54 @@ def upsert_mission(
     return rows
 
 
+def prepare_mission_transition(
+    previous:Any,
+    target:Any,
+    *,
+    approved:bool=False,
+    unblock_reason:Any="",
+    actor:Any="",
+    changed_at:str|None=None,
+    evidence_refs:Sequence[Any]|None=None,
+    mission_id:Any="",
+)->dict[str,Any]:
+    """Caller contract for an explicit admin transition.
+
+    Approval and the unblock reason are forwarded only when the caller supplied
+    them for the transition that requires them. This never invents either one.
+    """
+    before=_status(previous)
+    after=_status(target)
+    when=str(changed_at or _now())
+    who=_clean(actor,80) or "UNKNOWN"
+    reason=_clean(unblock_reason)
+    forwarded_approved=False
+    forwarded_reason=""
+    audit_refs:list[str]=[]
+    if before=="WAITING_APPROVAL" and after=="IN_PROGRESS" and approved is True:
+        forwarded_approved=True
+        audit_refs.append(f"aprovacao:{who}@{when}")
+    if before=="BLOCKED" and after=="IN_PROGRESS" and reason:
+        forwarded_reason=reason
+        audit_refs.append(f"desbloqueio:{who}:{reason}")
+    validate_mission_transition(
+        before,
+        after,
+        mission_id=mission_id,
+        approved=forwarded_approved,
+        unblock_reason=forwarded_reason,
+    )
+    return {
+        "approved":forwarded_approved,
+        "unblock_reason":forwarded_reason,
+        "audit_refs":audit_refs,
+        "evidence_refs":_refs(list(evidence_refs or [])+audit_refs),
+        "actor":who,
+        "changed_at":when,
+        "executes_action":False,
+    }
+
+
 def transition_mission(
     missions:Sequence[Mapping[str,Any]]|None,
     mission_id:Any,
@@ -530,7 +578,7 @@ def continuity_digest(
 
 __all__=[
     "SCHEMA","MISSION_STATUSES","ACTIVE_STATUSES","MISSION_TRANSITIONS",
-    "MissionTransitionError","validate_mission_transition",
+    "MissionTransitionError","validate_mission_transition","prepare_mission_transition",
     "new_mission","normalize_mission","normalize_missions","upsert_mission",
     "transition_mission","normalize_handoff","normalize_handoffs",
     "build_session_handoff","append_handoff","continuity_summary","continuity_briefing",

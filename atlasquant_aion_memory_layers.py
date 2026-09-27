@@ -168,6 +168,19 @@ def remember(
     })
 
 
+def _valid_until(value: Any) -> datetime | None:
+    text = _clean(value, 80)
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except Exception:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
 def recall(
     memory: Mapping[str, Any] | None,
     *,
@@ -175,12 +188,19 @@ def recall(
     persona: Any = "",
     tags: Sequence[Any] | None = None,
     include_superseded: bool = False,
+    include_expired: bool = False,
     limit: int = 50,
+    now: datetime | None = None,
 ) -> list[dict[str, Any]]:
     state = normalize_memory_layers(memory)
     selected_layers = {str(x).lower() for x in list(layers or LAYERS)}
     requested_persona = _clean(persona, 80).lower()
     requested_tags = {_clean(x, 80).lower() for x in list(tags or []) if _clean(x, 80)}
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    else:
+        current = current.astimezone(timezone.utc)
     out = []
     for row in reversed(state["entries"]):
         if row["layer"] not in selected_layers:
@@ -192,7 +212,16 @@ def recall(
             continue
         if requested_tags and not requested_tags.intersection(row["tags"]):
             continue
-        out.append(dict(row))
+        deadline = _valid_until(row.get("valid_until"))
+        expired = deadline is not None and deadline <= current
+        if expired and not include_expired:
+            continue
+        item = dict(row)
+        if expired:
+            item["status"] = "EXPIRED"
+            if item.get("truth_state") == "CONFIRMED":
+                item["truth_state"] = "UNKNOWN"
+        out.append(item)
         if len(out) >= max(1, min(int(limit), 200)):
             break
     return out

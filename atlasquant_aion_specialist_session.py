@@ -13,6 +13,7 @@ from atlasquant_aion_approval_inbox import collect_approval_inbox
 from atlasquant_aion_business import business_summary
 from atlasquant_aion_core import guardian_decision
 from atlasquant_aion_developer_engine import definition_of_done
+from atlasquant_aion_observability import redact_text
 from atlasquant_aion_specialists import SPECIALIST_MODULES
 from atlasquant_aion_truth import assess_truth
 from atlasquant_content_pipeline import provider_readiness
@@ -48,9 +49,9 @@ _SLICE_ORIGIN = {
     "invest": "LOCAL_STATE",
 }
 _SECRET_KEYS = {
-    "token", "password", "secret", "authorization", "api_key", "apikey",
-    "github_token", "github_token_historico", "access_token", "refresh_token",
-    "bearer",
+    "token", "password", "passwd", "secret", "authorization", "apikey",
+    "githubtoken", "githubtokenhistorico", "accesstoken", "refreshtoken",
+    "bearer", "cookie", "credential",
 }
 _PRICE_KEYS = {"price", "preco", "bid", "ask", "close", "open", "mid"}
 _PROVIDER_FLAGS = (
@@ -80,22 +81,28 @@ def _ttl(value: Any) -> float | None:
     return number
 
 
+def _is_secret_key(key: Any) -> bool:
+    name = "".join(ch for ch in str(key).strip().lower() if ch.isalnum())
+    return name in _SECRET_KEYS
+
+
 def _strip_secrets(value: Any, depth: int = 0) -> Any:
-    if depth > 8:
+    if depth > 24:
         return None
     if isinstance(value, Mapping):
         cleaned = {}
         for key, item in value.items():
-            name = str(key).strip().lower()
-            if name in _SECRET_KEYS:
+            if _is_secret_key(key):
                 continue
             cleaned[str(key)] = _strip_secrets(item, depth + 1)
         return cleaned
     if isinstance(value, (list, tuple)):
         return [_strip_secrets(item, depth + 1) for item in list(value)[:300]]
-    if isinstance(value, (str, int, float, bool)) or value is None:
+    if isinstance(value, str):
+        return redact_text(value)
+    if isinstance(value, (int, float, bool)) or value is None:
         return value
-    return _text(value, 200)
+    return redact_text(_text(value, 200))
 
 
 def _mapping(value: Any) -> dict[str, Any]:
@@ -171,10 +178,15 @@ def build_specialist_session_snapshot(
     builder does not fetch a clock from the network.
     """
     del now
-    if not isinstance(raw, Mapping) or raw.get("schema") == SCHEMA and isinstance(raw.get("slices"), Mapping):
+    if not isinstance(raw, Mapping):
+        raw = None
+    if raw is None or raw.get("schema") == SCHEMA and isinstance(raw.get("slices"), Mapping):
         if isinstance(raw, Mapping) and raw.get("schema") == SCHEMA and isinstance(raw.get("slices"), Mapping):
-            snapshot = dict(raw)
+            sanitized = _strip_secrets(raw)
+            snapshot = dict(sanitized) if isinstance(sanitized, Mapping) else {}
+            snapshot["schema"] = SCHEMA
             snapshot["network_called"] = False
+            snapshot["provider_called"] = False
             snapshot["secrets_included"] = False
             return snapshot
         return {
@@ -419,6 +431,24 @@ def _ranking(payload: Any) -> tuple[list[dict[str, Any]] | None, list[dict[str, 
     return cleaned, conflicts, bool(cleaned)
 
 
+def _slice_is_current(slice_body: Mapping[str, Any], now: datetime | None, marker: str) -> tuple[bool, dict[str, Any]]:
+    """Judge one slice with its own clock. Never borrows another slice's TTL."""
+    claim = _clock_claim(
+        str(slice_body.get("origin") or ""),
+        str(slice_body.get("observed_at") or ""),
+        slice_body.get("ttl_seconds"),
+        marker,
+    )
+    claim["claim"] = marker
+    assessment = _assess([claim], now)
+    current = (
+        assessment.get("status") == "CONFIRMED"
+        and assessment.get("freshness") == "FRESH"
+        and assessment.get("conflict_state") != "CONFLICT"
+    )
+    return current, assessment
+
+
 def _market(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, Any]:
     scanner = _mapping(snapshot.get("slices")).get("scanner") or {}
     radar = _mapping(snapshot.get("slices")).get("radar") or {}
@@ -430,10 +460,6 @@ def _market(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, Any]
             {"ranking_valid": False, "price_invented": False, "profit_probability": False},
             snapshot,
         )
-    active = scanner if scanner.get("present") else radar
-    origin = str(active.get("origin") or "PERSISTED_SCANNER")
-    observed_at = str(active.get("observed_at") or "")
-    ttl = active.get("ttl_seconds")
     chosen, conflicts = _scanner_bundle(scanner.get("payload") if scanner.get("present") else {})
     ranking, ranking_conflicts, ranking_well_formed = _ranking(
         radar.get("payload") if radar.get("present") else scanner.get("payload")
@@ -456,12 +482,28 @@ def _market(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, Any]
             observed.append(item)
         else:
             stale_pairs.append({"pair": pair, "queue_status": row.get("status")})
-    top_10 = [row["pair"] for row in ranking] if ranking_well_formed and ranking and len(ranking) == 10 else None
-    content_value = {
-        "observed_pairs": [row["pair"] for row in observed],
-        "ranking_pairs": [row["pair"] for row in ranking] if ranking_well_formed and ranking else [],
-    }
+    scanner_current = False
+    radar_current = False
+    scanner_assessment: dict[str, Any] = {"status": "UNKNOWN", "freshness": "UNVERIFIED", "stale_count": 0, "conflict_state": "NONE"}
+    radar_assessment = dict(scanner_assessment)
+    if scanner.get("present"):
+        scanner_current, scanner_assessment = _slice_is_current(scanner, now, "scanner.snapshot")
+    if radar.get("present"):
+        radar_current, radar_assessment = _slice_is_current(radar, now, "radar.ranking")
+    if not scanner_current:
+        for row in observed:
+            stale_pairs.append({"pair": row["pair"], "queue_status": row.get("queue_status")})
+        observed = []
+    ranking_clock_current = radar_current if radar.get("present") else scanner_current
+    ranking_current = bool(
+        ranking_well_formed and ranking and not ranking_conflicts and ranking_clock_current
+    )
+    scanner_usable = bool(observed) and not conflicts
     if conflicts:
+        clock = scanner if scanner.get("present") else radar
+        origin = str(clock.get("origin") or "")
+        observed_at = str(clock.get("observed_at") or "")
+        ttl = clock.get("ttl_seconds")
         claims = []
         for conflict in conflicts[:4]:
             for value in list(conflict.get("values") or [])[:2]:
@@ -472,32 +514,78 @@ def _market(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, Any]
                 _clock_claim(origin, observed_at, ttl, "side-a"),
                 _clock_claim(origin, observed_at, ttl, "side-b"),
             ]
+            claims[0]["claim"] = "market.conflict"
+            claims[1]["claim"] = "market.conflict"
+        assessment = _assess(claims, now)
+        input_state = "CONFLICTING"
     else:
-        claims = [_clock_claim(origin, observed_at, ttl, content_value)]
-    assessment = _assess(claims, now)
-    usable_content = bool(observed) or bool(ranking_well_formed and ranking and not conflicts)
-    if not usable_content and assessment.get("status") == "CONFIRMED":
-        assessment = dict(assessment)
-        assessment["status"] = "UNKNOWN"
-    input_state = _input_state(True, assessment, conflicts)
-    if stale_pairs and not observed and not conflicts:
-        input_state = "STALE"
-        assessment = dict(assessment)
-        assessment["freshness"] = "STALE"
-        assessment["status"] = "UNKNOWN"
-        assessment["stale_count"] = max(1, int(assessment.get("stale_count") or 0))
+        claims = []
+        if scanner_usable:
+            claims.append(_clock_claim(
+                str(scanner.get("origin") or ""),
+                str(scanner.get("observed_at") or ""),
+                scanner.get("ttl_seconds"),
+                {"observed_pairs": [row["pair"] for row in observed]},
+            ))
+            claims[-1]["claim"] = "scanner.snapshot"
+        if ranking_current:
+            clock = radar if radar.get("present") else scanner
+            claims.append(_clock_claim(
+                str(clock.get("origin") or ""),
+                str(clock.get("observed_at") or ""),
+                clock.get("ttl_seconds"),
+                {"ranking_pairs": [row["pair"] for row in ranking or []]},
+            ))
+            claims[-1]["claim"] = "radar.ranking"
+        if claims:
+            assessment = _assess(claims, now)
+            input_state = "VALID"
+        elif scanner.get("present") and scanner_assessment.get("freshness") == "STALE":
+            assessment = dict(scanner_assessment)
+            assessment["freshness"] = "STALE"
+            assessment["status"] = "UNKNOWN"
+            assessment["stale_count"] = max(1, int(assessment.get("stale_count") or 0))
+            input_state = "STALE"
+            origin = str(scanner.get("origin") or "")
+            observed_at = str(scanner.get("observed_at") or "")
+        elif radar.get("present") and radar_assessment.get("freshness") == "STALE":
+            assessment = dict(radar_assessment)
+            assessment["freshness"] = "STALE"
+            assessment["status"] = "UNKNOWN"
+            assessment["stale_count"] = max(1, int(assessment.get("stale_count") or 0))
+            input_state = "STALE"
+            origin = str(radar.get("origin") or "")
+            observed_at = str(radar.get("observed_at") or "")
+        else:
+            assessment = _assess([], now)
+            input_state = "UNVERIFIED"
+            origin = str((scanner or radar).get("origin") or "")
+            observed_at = str((scanner or radar).get("observed_at") or "")
+    if input_state == "VALID":
+        if scanner_usable:
+            origin = str(scanner.get("origin") or "")
+            observed_at = str(scanner.get("observed_at") or "")
+        else:
+            clock = radar if radar.get("present") else scanner
+            origin = str(clock.get("origin") or "")
+            observed_at = str(clock.get("observed_at") or "")
+    elif input_state == "CONFLICTING":
+        pass
+    top_10 = [row["pair"] for row in ranking] if ranking_current and ranking and len(ranking) == 10 else None
     observations: dict[str, Any] = {
-        "observed_pairs": observed if input_state == "VALID" else [],
+        "observed_pairs": observed if input_state == "VALID" and scanner_usable else [],
         "not_current_pairs": stale_pairs,
         "pairs_absent_from_snapshot": len(OFFICIAL_PAIRS) - len(chosen),
         "absence_is_not_a_market_fact": True,
-        "ranking_valid": bool(top_10),
+        "ranking_valid": bool(top_10) and input_state == "VALID",
         "price_invented": False,
         "profit_probability": False,
         "score_is_profit_probability": False,
         "live_feed_consulted": False,
+        "scanner_clock_current": bool(scanner_current),
+        "radar_clock_current": bool(radar_current),
     }
-    if input_state == "VALID" and ranking_well_formed and ranking and not conflicts:
+    if input_state == "VALID" and ranking_current:
         observations["observed_ranking"] = ranking
     if top_10 and input_state == "VALID":
         observations["top_10"] = top_10
@@ -511,17 +599,21 @@ def _market(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, Any]
             "O snapshot de mercado contém leituras conflitantes. Nenhum lado foi escolhido "
             "e nenhum TOP 10 foi criado a partir do conflito."
         )
-    elif input_state == "VALID":
+    elif input_state == "VALID" and scanner_usable:
         summary = (
             f"Scanner observado: {len(observed)} par(es) fresco(s) no conteúdo já carregado. "
             "Isto descreve o registro; não é preço nem probabilidade de lucro."
+        )
+    elif input_state == "VALID":
+        summary = (
+            "Ranking do Radar observado com o relógio do próprio Radar. "
+            "Isto não é preço nem probabilidade de lucro."
         )
     else:
         summary = (
             "O snapshot de mercado não contém leitura fresca utilizável. "
             "Ausência ou incompletude não vira cotação nem TOP 10."
         )
-        input_state = "UNVERIFIED" if input_state == "VALID" else input_state
     return _envelope(
         "market",
         state=input_state,

@@ -11,6 +11,7 @@ from atlasquant_aion_observability import redact_text
 SCHEMA = "ATLASQUANT_AION_TRUTH_ASSESSMENT_V1"
 TRUTH_STATES = ("CONFIRMED", "INFERENCE", "HYPOTHESIS", "UNKNOWN")
 FRESHNESS_STATES = ("FRESH", "STALE", "UNVERIFIED", "NOT_APPLICABLE")
+FUTURE_TOLERANCE_SECONDS = 120
 SOURCE_TIERS = {
     "PRIMARY": 1,
     "OFFICIAL_DOCUMENTATION": 2,
@@ -53,6 +54,16 @@ def _stable(value: Any) -> str:
         return repr(value)
 
 
+def _claim_identity(value: Any) -> str:
+    return " ".join(str(value or "").casefold().split())
+
+
+def _sensitivity(item: Mapping[str, Any]) -> str:
+    if "time_sensitive" not in item:
+        return "UNKNOWN"
+    return "TEMPORAL" if bool(item.get("time_sensitive")) else "STABLE"
+
+
 def normalize_evidence_record(
     raw: Mapping[str, Any],
     *,
@@ -70,14 +81,24 @@ def normalize_evidence_record(
     ttl = _finite(item.get("ttl_seconds"))
     ttl = None if ttl is None or ttl < 0 else ttl
     current = now or _now()
-    age = None if observed is None else max(0.0, (current - observed).total_seconds())
-    if not bool(item.get("time_sensitive", True)):
+    sensitivity = _sensitivity(item)
+    future = False
+    if observed is None:
+        age = None
+    else:
+        delta = (current - observed).total_seconds()
+        if delta < -FUTURE_TOLERANCE_SECONDS:
+            future = True
+            age = None
+        else:
+            age = max(0.0, delta)
+    if sensitivity == "STABLE":
         freshness = "NOT_APPLICABLE"
         stale = False
-    elif observed is None:
+    elif future:
         freshness = "UNVERIFIED"
         stale = False
-    elif ttl is None:
+    elif observed is None or ttl is None:
         freshness = "UNVERIFIED"
         stale = False
     elif age is not None and age > ttl:
@@ -91,8 +112,14 @@ def normalize_evidence_record(
     issues: list[str] = []
     if not source:
         issues.append("SOURCE_MISSING")
-    if bool(item.get("time_sensitive", True)) and observed is None:
+    if sensitivity == "TEMPORAL" and observed is None:
         issues.append("TIMESTAMP_MISSING")
+    if sensitivity == "TEMPORAL" and observed is not None and ttl is None and not future:
+        issues.append("TTL_MISSING")
+    if sensitivity == "UNKNOWN" and freshness == "UNVERIFIED":
+        issues.append("FRESHNESS_UNPROVEN")
+    if future:
+        issues.append("TIMESTAMP_IN_FUTURE")
     if stale:
         issues.append("DATA_STALE")
     if truth == "CONFIRMED" and issues:
@@ -126,11 +153,13 @@ def assess_truth(
         for item in list(evidence or [])
         if isinstance(item, Mapping)
     ]
-    values = {
-        _stable(row["value"]) for row in rows
-        if row["truth_state"] == "CONFIRMED"
-    }
-    conflict = len(values) > 1
+    grouped: dict[str, set[str]] = {}
+    for row in rows:
+        if row["truth_state"] != "CONFIRMED":
+            continue
+        grouped.setdefault(_claim_identity(row["claim"]), set()).add(_stable(row["value"]))
+    conflict_claims = sorted(claim for claim, vals in grouped.items() if len(vals) > 1)
+    conflict = bool(conflict_claims)
     stale_count = sum(1 for row in rows if row["stale"])
     confirmed = sum(1 for row in rows if row["truth_state"] == "CONFIRMED")
     inference = sum(1 for row in rows if row["truth_state"] == "INFERENCE")
@@ -175,6 +204,7 @@ def assess_truth(
         "status": status,
         "confidence": {"score": round(quality, 1), "label": label, "basis": "EVIDENCE_QUALITY"},
         "conflict_state": conflict_state,
+        "conflict_claims": conflict_claims,
         "freshness": "STALE" if stale_count else "FRESH" if rows and all(
             row["freshness"] in {"FRESH", "NOT_APPLICABLE"} for row in rows
         ) else "UNVERIFIED",
@@ -193,5 +223,5 @@ def assess_truth(
 
 __all__ = [
     "SCHEMA", "TRUTH_STATES", "FRESHNESS_STATES", "SOURCE_TIERS",
-    "normalize_evidence_record", "assess_truth",
+    "normalize_evidence_record", "assess_truth", "FUTURE_TOLERANCE_SECONDS",
 ]

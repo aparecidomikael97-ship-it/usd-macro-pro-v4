@@ -266,6 +266,135 @@ def orchestrate(
     return result
 
 
+_EXTERNAL_ACTION_MARKERS = (
+    "ordem real executada",
+    "ordem real enviada",
+    "real trade executed",
+    "executed a real trade",
+    "deploy em produção realizado",
+    "deploy em producao realizado",
+    "deployed to production",
+    "cobrança efetuada",
+    "cobranca efetuada",
+    "charged the customer",
+    "publiquei em produção",
+    "publiquei em producao",
+)
+_ACTION_CLAIM_NAMES = ("real_trade", "deploy_production", "external_action", "charge_customer")
+_DENIED_ACTION_VALUES = {
+    "", "false", "0", "denied", "blocked", "não", "nao", "none", "null", "no",
+}
+
+
+def _text_asserts_external_action(value: Any) -> bool:
+    folded = " ".join(str(value or "").casefold().split())
+    return any(marker in folded for marker in _EXTERNAL_ACTION_MARKERS)
+
+
+def _mapping_asserts_external_action(item: Mapping[str, Any]) -> bool:
+    claim = " ".join(str(item.get("claim") or "").casefold().replace("-", " ").split())
+    claim_token = claim.replace(" ", "_")
+    named = any(name in claim_token for name in _ACTION_CLAIM_NAMES)
+    value = item.get("value", item.get("excerpt", item.get("content")))
+    if isinstance(value, bool):
+        affirmed = value is True
+    else:
+        text = " ".join(str(value or "").casefold().split())
+        affirmed = text not in _DENIED_ACTION_VALUES
+    if named and affirmed:
+        return True
+    for key in ("value", "excerpt", "content", "claim", "response"):
+        if isinstance(item.get(key), str) and _text_asserts_external_action(item.get(key)):
+            return True
+    return False
+
+
+def classify_external_action_claim(answer: Any, evidence: Any = None) -> str:
+    """Return ASSERTED, NOT_ASSERTED, or UNKNOWN.
+
+    Classification never authorizes an external action. An unscannable answer
+    stays UNKNOWN instead of being reported as a verified absence.
+    """
+    asserted = False
+    answer_known = isinstance(answer, str) or answer is None
+    if isinstance(answer, str) and _text_asserts_external_action(answer):
+        asserted = True
+    if isinstance(evidence, (list, tuple)):
+        for item in list(evidence):
+            if isinstance(item, str) and _text_asserts_external_action(item):
+                asserted = True
+            elif isinstance(item, Mapping) and _mapping_asserts_external_action(item):
+                asserted = True
+    elif evidence is not None:
+        answer_known = False
+    if asserted:
+        return "ASSERTED"
+    if not answer_known:
+        return "UNKNOWN"
+    return "NOT_ASSERTED"
+
+
+def validation_truth_status(validation: Mapping[str, Any] | None) -> str:
+    """Read the truth contract. `truth.status` is authoritative."""
+    payload = validation if isinstance(validation, Mapping) else {}
+    truth = payload.get("truth") if isinstance(payload.get("truth"), Mapping) else {}
+    status = truth.get("status")
+    if status not in (None, ""):
+        return str(status)
+    legacy = payload.get("truth_state")
+    return str(legacy or "UNKNOWN")
+
+
+def present_validated_answer(
+    validation: Mapping[str, Any] | None,
+    *,
+    answer: Any = "",
+) -> dict[str, Any]:
+    """Decide what may be shown. Only PASS is a validated answer."""
+    payload = validation if isinstance(validation, Mapping) else {}
+    state = str(payload.get("state") or "REVISE")
+    truth_status = validation_truth_status(payload)
+    issues = [str(item) for item in list(payload.get("issues") or [])]
+    if state == "PASS":
+        body = payload.get("response")
+        if body in (None, ""):
+            body = answer
+        return {
+            "display": "ANSWER",
+            "state": "PASS",
+            "truth_status": truth_status,
+            "text": str(body or ""),
+            "notice": "",
+            "issues": issues,
+            "validated": True,
+            "executes_action": False,
+            "real_orders_enabled": False,
+        }
+    if state == "BLOCK":
+        return {
+            "display": "BLOCK",
+            "state": "BLOCK",
+            "truth_status": truth_status,
+            "text": "",
+            "notice": "Resposta bloqueada. O conteúdo não é apresentado como resposta válida.",
+            "issues": issues,
+            "validated": False,
+            "executes_action": False,
+            "real_orders_enabled": False,
+        }
+    return {
+        "display": "REVISE",
+        "state": "REVISE",
+        "truth_status": truth_status,
+        "text": "",
+        "notice": "Revisão necessária. O conteúdo não é apresentado como resposta validada.",
+        "issues": issues,
+        "validated": False,
+        "executes_action": False,
+        "real_orders_enabled": False,
+    }
+
+
 def validate_specialist_result(
     orchestration: Mapping[str, Any],
     specialist_result: Mapping[str, Any] | None,
@@ -274,6 +403,16 @@ def validate_specialist_result(
     result = dict(specialist_result or {})
     evidence = result.get("evidence") if isinstance(result.get("evidence"), (list, tuple)) else []
     truth = assess_truth(evidence)
+    scanned = classify_external_action_claim(result.get("response"), evidence)
+    supplied = str(result.get("external_action_claim_state") or "").upper()
+    if result.get("claims_external_action") is True:
+        supplied = "ASSERTED"
+    if scanned == "ASSERTED" or supplied == "ASSERTED":
+        claim_state = "ASSERTED"
+    elif scanned == "UNKNOWN" or supplied == "UNKNOWN":
+        claim_state = "UNKNOWN"
+    else:
+        claim_state = "NOT_ASSERTED"
     issues: list[str] = []
     if not result:
         issues.append("SPECIALIST_RESULT_MISSING")
@@ -281,8 +420,10 @@ def validate_specialist_result(
         issues.append("RESULT_WITHOUT_CONFIRMED_EVIDENCE")
     if truth["conflict_state"] == "CONFLICT":
         issues.append("SOURCE_CONFLICT")
-    if bool(result.get("claims_external_action")) and not result.get("action_evidence"):
+    if claim_state == "ASSERTED" and not result.get("action_evidence"):
         issues.append("ACTION_CLAIM_WITHOUT_EVIDENCE")
+    elif claim_state == "UNKNOWN":
+        issues.append("EXTERNAL_ACTION_CLAIM_UNVERIFIED")
     return {
         "schema": SCHEMA,
         "task_id": str((base.get("task") or {}).get("task_id") or ""),
@@ -290,6 +431,8 @@ def validate_specialist_result(
         "issues": issues,
         "truth": truth,
         "response": _clean(result.get("response"), 4000),
+        "external_action_claim_state": claim_state,
+        "claims_external_action": True if claim_state == "ASSERTED" else False if claim_state == "NOT_ASSERTED" else None,
         "private_chain_of_thought_exposed": False,
         "executes_action": False,
         "real_orders_enabled": False,
@@ -308,7 +451,7 @@ def build_aion_result(
     for index, raw in enumerate(list(evidence or [])[:100]):
         if not isinstance(raw, Mapping):
             continue
-        normalized_evidence.append({
+        record = {
             "claim": raw.get("claim") or raw.get("title") or raw.get("path") or f"evidence_{index + 1}",
             "value": raw.get("value", raw.get("excerpt", raw.get("content"))),
             "truth_state": raw.get("truth_state") or raw.get("kind") or "UNKNOWN",
@@ -317,13 +460,15 @@ def build_aion_result(
             "source_tier": raw.get("source_tier") or "UNKNOWN",
             "timestamp": raw.get("timestamp") or raw.get("updated_at") or "",
             "ttl_seconds": raw.get("ttl_seconds"),
-            # Canonical project documents are stable until versioned again.
-            "time_sensitive": bool(raw.get("time_sensitive", False)),
-        })
+        }
+        if "time_sensitive" in raw:
+            record["time_sensitive"] = bool(raw.get("time_sensitive"))
+        normalized_evidence.append(record)
+    claim_state = classify_external_action_claim(answer, list(evidence or []))
     validation = validate_specialist_result(orchestration, {
         "response": answer,
         "evidence": normalized_evidence,
-        "claims_external_action": False,
+        "external_action_claim_state": claim_state,
     })
     task = dict(orchestration.get("task") or {})
     return {
@@ -337,6 +482,9 @@ def build_aion_result(
         "validation": validation,
         "truth": validation["truth"],
         "status": validation["state"],
+        "external_action_claim_state": validation["external_action_claim_state"],
+        "claims_external_action": validation["claims_external_action"],
+        "answer_presentation": present_validated_answer(validation, answer=answer),
         "evidence_count": len(normalized_evidence),
         "private_chain_of_thought_exposed": False,
         "external_action_executed": False,
@@ -349,4 +497,5 @@ def build_aion_result(
 __all__ = [
     "SCHEMA", "AionContext", "AionTask", "normalize_context", "classify_risk",
     "orchestrate", "validate_specialist_result", "build_aion_result",
+    "classify_external_action_claim", "validation_truth_status", "present_validated_answer",
 ]
