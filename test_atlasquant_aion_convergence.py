@@ -1,10 +1,8 @@
 """Convergence regressions for Checkpoint Mestre V18 and Astra durable hardening."""
 from copy import deepcopy
 import json
-import socket
 import subprocess
 import unittest
-import urllib.request
 from pathlib import Path
 from unittest import mock
 
@@ -216,8 +214,6 @@ class AionConvergenceTests(unittest.TestCase):
         self.assertFalse(absent["network_called"])
         self.assertFalse(core["observations"]["real_trade_allowed"])
         self.assertFalse(core["answers_user_question"])
-        self.assertIs(socket.create_connection, socket.create_connection)
-        self.assertIs(urllib.request.urlopen, urllib.request.urlopen)
 
     def test_status_board_and_admin_keep_both_stacks(self):
         board = build_master_status_board(
