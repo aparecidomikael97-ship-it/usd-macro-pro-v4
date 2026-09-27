@@ -31,8 +31,11 @@ side effect ou dependência externa.
 ## 2. Conecte um especialista real
 
 Adicione o adapter correspondente em `SPECIALIST_MODULES`, dentro de
-`atlasquant_aion_specialists.py`. Reutilize módulos existentes. O especialista
-não recebe permissão própria e não pode executar fora do Guardian.
+`atlasquant_aion_specialists.py`, e uma leitura pura em
+`atlasquant_aion_specialist_evidence.py`. Reutilize módulos existentes. O
+especialista não recebe permissão própria e não pode executar fora do Guardian.
+A leitura local marca `answer_truth=UNKNOWN` e não transforma contrato de código
+em fato de mercado.
 
 Se ainda não houver implementação:
 

@@ -167,11 +167,33 @@ A Central AION mostra:
 - plano técnico apenas no modo Completo.
 
 O modo Essencial usa o mesmo Core, mas reduz detalhes. A integração preserva o
-redesign atual.
+redesign atual. A prévia também mostra a leitura local do especialista
+selecionado.
+
+## Leitura local dos especialistas
+
+`read_specialist_evidence()` reutiliza funções puras já existentes. Ela descreve
+somente o que a consulta local contém:
+
+- contrato do universo Forex e fila sem pacote persistido;
+- briefing macro sem linhas de entrada;
+- matriz ICT/SMC sem evidência registrada, com PPR bloqueado;
+- postura de risco quando a integridade não foi comprovada;
+- evidência remota de laboratório não carregada, sem ler credencial;
+- comparador de investimentos e catálogo de negócios vazios;
+- providers de conteúdo não configurados;
+- workflow de desenvolvimento incompleto e sem merge/deploy;
+- plano de pesquisa não executado;
+- inbox administrativa sem checkpoint;
+- Guardian negando `real_trade` mesmo com aprovação.
+
+`answer_truth` permanece `UNKNOWN`. Um contrato de código confirmado não vira
+resposta da pergunta, cotação, recomendação ou ordem.
 
 ## Limites atuais
 
 - o Core planeja e valida; não é executor universal;
+- a leitura local não consulta feed, calendário ao vivo nem store remoto;
 - pesquisa web e modelos externos continuam condicionados a providers;
 - métricas administrativas externas continuam desconhecidas sem integração;
 - memória runtime só pode ser declarada persistida após confirmação do store;

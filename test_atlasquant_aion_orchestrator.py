@@ -102,7 +102,7 @@ class CentralOrchestratorTests(unittest.TestCase):
                 "truth_state": "CONFIRMED",
                 "value": "available",
                 "source": "AtlasQuant Radar",
-                "timestamp": NOW.isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "ttl_seconds": 3600,
             }],
         })

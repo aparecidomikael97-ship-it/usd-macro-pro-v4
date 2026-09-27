@@ -260,6 +260,7 @@ from atlasquant_aion_orchestrator import (
     orchestrate as orchestrate_aion_core,
 )
 from atlasquant_aion_specialists import plan_specialist_dispatch
+from atlasquant_aion_specialist_evidence import read_specialist_evidence
 from atlasquant_aion_memory_layers import memory_layer_summary
 from atlasquant_aion_event_journal import (
     continuity_summary as live_event_continuity_summary,
@@ -2196,10 +2197,18 @@ def _render_central(
             o2.metric("Capability", str(selected_capability.get("capability_id") or "UNKNOWN"))
             o3.metric("Verdade", str(truth_preview.get("status") or "UNKNOWN"))
             o4.metric("Decisão", str(decision_preview.get("state") or "BLOCKED"))
+            local_evidence = read_specialist_evidence(dispatch_preview.get("specialist"))
             st.caption(
                 f"Dispatch {dispatch_preview.get('state')} · risco "
                 f"{(core_preview.get('risk') or {}).get('level', 'UNKNOWN')} · "
                 "Builder → Critic → Validator · nenhuma ação é executada nesta prévia."
+            )
+            st.caption(
+                "Leitura local do especialista: "
+                + str(local_evidence.get("summary") or "sem leitura")
+                + " Verdade da resposta: "
+                + str(local_evidence.get("answer_truth") or "UNKNOWN")
+                + ". Esta leitura não responde à pergunta."
             )
             blockers = list(decision_preview.get("blockers") or [])
             if blockers:

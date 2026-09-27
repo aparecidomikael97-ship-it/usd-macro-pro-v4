@@ -16,6 +16,9 @@ class AionOrchestratorUiIntegrationTests(unittest.TestCase):
     def test_ui_does_not_claim_execution_or_cross_persona_memory(self):
         source = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("nenhuma ação é executada nesta prévia", source)
+        self.assertIn("read_specialist_evidence(", source)
+        self.assertIn("Leitura local do especialista", source)
+        self.assertIn("Esta leitura não responde à pergunta.", source)
         self.assertIn("acesso entre personas automático: NÃO", source)
         self.assertIn('cols[3].metric("Ordens reais", "BLOQUEADAS")', source)
 
