@@ -274,6 +274,7 @@ from atlasquant_aion_developer_implementation import (
     build_implementation_envelope as build_developer_implementation_envelope,
     prepare_implementation_readiness as prepare_developer_implementation_readiness,
 )
+from atlasquant_aion_developer_builder_sandbox import build_builder_sandbox_request as build_developer_builder_sandbox_request
 from atlasquant_aion_release_confidence import (
     DIMENSIONS as RELEASE_CONFIDENCE_DIMENSIONS,
     evidence_dimension,
@@ -5271,6 +5272,96 @@ def _render_developer_intelligence() -> None:
         "Implementation authorized não significa execution authorized. "
         "Este envelope não grava arquivo, não commita e não chama Tool Hub."
     )
+
+    if implementation.get("state") == "IMPLEMENTATION_AUTHORIZED_SESSION_ONLY":
+        impl_scope = implementation.get("scope") if isinstance(implementation.get("scope"), Mapping) else {}
+        editable_files = [str(x) for x in list(impl_scope.get("editable_files") or []) if str(x)]
+        plan_meta = package.get("plan") if isinstance(package.get("plan"), Mapping) else {}
+        with st.expander("Builder Sandbox Request · branch isolada", expanded=False):
+            sandbox_branch = st.text_input(
+                "Branch isolada",
+                key="aion_developer_builder_branch",
+                value=str(plan_meta.get("branch") or "cursor/aion-builder-sandbox"),
+                max_chars=240,
+            )
+            sandbox_baseline = st.text_input(
+                "Baseline ref",
+                key="aion_developer_builder_baseline",
+                value=str(plan_meta.get("baseline_ref") or "main@baseline"),
+                max_chars=240,
+            )
+            sandbox_candidate = st.text_input(
+                "Candidate ref",
+                key="aion_developer_builder_candidate",
+                value=f"{str(plan_meta.get('branch') or 'cursor/aion-builder-sandbox')}@candidate",
+                max_chars=240,
+            )
+            sandbox_files = st.multiselect(
+                "Arquivos solicitados ao Builder",
+                editable_files,
+                default=editable_files,
+                key="aion_developer_builder_files",
+            )
+            if st.button(
+                "Preparar Builder Sandbox Request",
+                key="aion_developer_builder_prepare",
+            ):
+                try:
+                    builder_request = build_developer_builder_sandbox_request(
+                        snapshot,
+                        implementation,
+                        branch=sandbox_branch,
+                        baseline_ref=sandbox_baseline,
+                        candidate_ref=sandbox_candidate,
+                        requested_files=sandbox_files,
+                    )
+                    st.session_state["aion_developer_builder_request"] = builder_request
+                except Exception as exc:
+                    st.error(f"Builder Sandbox Request recusado: {type(exc).__name__}")
+
+    builder_request = (
+        st.session_state.get("aion_developer_builder_request")
+        if isinstance(st.session_state.get("aion_developer_builder_request"), Mapping)
+        else None
+    )
+    if isinstance(builder_request, Mapping):
+        st.markdown("##### Builder Sandbox Request")
+        b1,b2,b3,b4 = st.columns(4)
+        b1.metric("Estado", str(builder_request.get("state") or "UNKNOWN"))
+        branch_contract = (
+            builder_request.get("branch_contract")
+            if isinstance(builder_request.get("branch_contract"), Mapping)
+            else {}
+        )
+        b2.metric("Branch", str(branch_contract.get("branch") or ""))
+        b3.metric("Executor", "LIGADO" if builder_request.get("executor_attached") else "NÃO LIGADO")
+        b4.metric("Execução", "AUTORIZADA" if builder_request.get("execution_authorized") else "BLOQUEADA")
+        st.caption(
+            f"{builder_request.get('request_id')} · main permitido: NÃO · "
+            "scope expansion: NÃO · force push: NÃO."
+        )
+        if builder_request.get("blockers"):
+            st.warning(
+                "Request bloqueado: "
+                + " · ".join(str(x) for x in list(builder_request.get("blockers") or []))
+            )
+        else:
+            st.success(
+                "Solicitação de sandbox preparada. Nenhum executor de escrita foi ligado."
+            )
+        request_scope = (
+            builder_request.get("scope")
+            if isinstance(builder_request.get("scope"), Mapping)
+            else {}
+        )
+        if request_scope.get("requested_files"):
+            st.markdown("**Escopo solicitado ao Builder:**")
+            for item in list(request_scope.get("requested_files") or []):
+                st.markdown(f"- `{item}`")
+        st.caption(
+            "Builder Sandbox Request é planejamento: patch_generated=False, writes_files=False, "
+            "automatic_commit=False, automatic_merge=False e automatic_deploy=False."
+        )
 
 def _render_development(
     access: Mapping[str, Any],

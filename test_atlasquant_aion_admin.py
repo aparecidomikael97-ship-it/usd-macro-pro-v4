@@ -112,6 +112,21 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         readiness_pos=src.index('"Registrar prontidão da implementação"')
         approval_pos=src.index('"Registrar autorização de implementação na sessão"')
         self.assertLess(readiness_pos,approval_pos)
+    def test_developer_builder_sandbox_request_is_bounded_and_non_executing(self):
+        src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Builder Sandbox Request · branch isolada",src)
+        self.assertIn('key="aion_developer_builder_prepare"',src)
+        self.assertIn("build_developer_builder_sandbox_request(",src)
+        self.assertIn("main permitido: NÃO",src)
+        self.assertIn("scope expansion: NÃO",src)
+        self.assertIn("force push: NÃO",src)
+        self.assertIn("Nenhum executor de escrita foi ligado",src)
+        self.assertIn("patch_generated=False",src)
+        self.assertIn("writes_files=False",src)
+        implementation_pos=src.index('"IMPLEMENTATION_AUTHORIZED_SESSION_ONLY"')
+        builder_pos=src.index('"Preparar Builder Sandbox Request"',implementation_pos)
+        self.assertGreater(builder_pos,implementation_pos)
+
 
     def test_developer_evidence_gate_never_auto_promotes_root_cause(self):
         src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
