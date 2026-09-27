@@ -264,6 +264,7 @@ from atlasquant_aion_developer_diagnostics import (
     diagnose_failure as diagnose_developer_failure,
     record_failure_attempt as record_developer_failure_attempt,
 )
+from atlasquant_aion_developer_correction import build_correction_plan as build_developer_correction_plan
 from atlasquant_aion_release_confidence import (
     DIMENSIONS as RELEASE_CONFIDENCE_DIMENSIONS,
     evidence_dimension,
@@ -4878,6 +4879,94 @@ def _render_developer_intelligence() -> None:
     st.caption(
         "Diagnóstico não executa teste, não confirma causa raiz, não cria patch, "
         "não commita, não faz merge e não faz deploy."
+    )
+
+    if diagnostic.get("state") == "FAILURE_EVIDENCE":
+        if st.button(
+            "Preparar plano de correção rastreável",
+            key="aion_developer_correction_plan",
+        ):
+            try:
+                correction = build_developer_correction_plan(
+                    snapshot,
+                    diagnostic,
+                    package,
+                )
+                st.session_state["aion_developer_correction_result"] = correction
+            except Exception as exc:
+                st.error(f"Plano de correção recusado: {type(exc).__name__}")
+
+    correction = (
+        st.session_state.get("aion_developer_correction_result")
+        if isinstance(st.session_state.get("aion_developer_correction_result"), Mapping)
+        else None
+    )
+    if not isinstance(correction, Mapping):
+        return
+
+    st.markdown("##### Plano de correção rastreável")
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("Estado", str(correction.get("state") or "UNKNOWN"))
+    c2.metric("Causa raiz", str(correction.get("root_cause_truth_status") or "UNKNOWN"))
+    c3.metric("Arquivos alvo", len(list(correction.get("target_files") or [])))
+    c4.metric("Testes candidatos", len(list(correction.get("test_candidates") or [])))
+    lineage = correction.get("lineage") if isinstance(correction.get("lineage"), Mapping) else {}
+    st.caption(
+        f"{correction.get('correction_id')} · snapshot {lineage.get('snapshot_digest')} · "
+        f"diagnóstico {lineage.get('diagnostic_id')} · pacote {lineage.get('package_id')}."
+    )
+    st.markdown(f"**Objetivo de correção:** {correction.get('objective')}")
+
+    if correction.get("target_files"):
+        st.markdown("**Escopo permitido:**")
+        for item in list(correction.get("target_files") or []):
+            st.markdown(f"- `{item}`")
+    if correction.get("hypotheses"):
+        st.markdown("**Hipóteses ainda UNKNOWN:**")
+        for item in list(correction.get("hypotheses") or []):
+            if isinstance(item, Mapping):
+                st.markdown(
+                    f"- {item.get('label')} · truth={item.get('truth_status')} · "
+                    f"{item.get('rationale')}"
+                )
+    if correction.get("evidence_required"):
+        st.markdown("**Evidências exigidas antes de concluir:**")
+        for item in list(correction.get("evidence_required") or []):
+            st.markdown(f"- {item}")
+
+    builder = correction.get("builder_packet") if isinstance(correction.get("builder_packet"), Mapping) else {}
+    reviewer = correction.get("reviewer_packet") if isinstance(correction.get("reviewer_packet"), Mapping) else {}
+    breaker = correction.get("breaker_packet") if isinstance(correction.get("breaker_packet"), Mapping) else {}
+    role_rows = [
+        {
+            "Papel": "Builder",
+            "Estado": builder.get("state"),
+            "Independência": "aguarda atribuição humana",
+            "Executa ação": builder.get("executes_action"),
+        },
+        {
+            "Papel": "Reviewer",
+            "Estado": reviewer.get("state"),
+            "Independência": "obrigatória vs Builder",
+            "Executa ação": reviewer.get("executes_action"),
+        },
+        {
+            "Papel": "Breaker",
+            "Estado": breaker.get("state"),
+            "Independência": "obrigatória vs Builder/Reviewer",
+            "Executa ação": breaker.get("executes_action"),
+        },
+    ]
+    st.dataframe(role_rows, width="stretch", hide_index=True)
+
+    if correction.get("gaps"):
+        st.warning(
+            "Gaps do plano: "
+            + " · ".join(str(x) for x in list(correction.get("gaps") or []))
+        )
+    st.caption(
+        "Este plano não gera patch, não altera arquivo, não executa teste e não confirma causa raiz. "
+        "A implementação continua aguardando decisão humana e evidência."
     )
 
 def _render_development(

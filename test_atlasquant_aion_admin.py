@@ -85,6 +85,22 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertFalse(summary["network_called"])
         self.assertFalse(summary["subprocess_called"])
 
+    def test_developer_correction_plan_is_traceable_and_non_executing(self):
+        src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Preparar plano de correção rastreável",src)
+        self.assertIn('key="aion_developer_correction_plan"',src)
+        self.assertIn("build_developer_correction_plan(",src)
+        self.assertIn("Plano de correção rastreável",src)
+        self.assertIn("Hipóteses ainda UNKNOWN",src)
+        self.assertIn("Evidências exigidas antes de concluir",src)
+        self.assertIn("obrigatória vs Builder",src)
+        self.assertIn("obrigatória vs Builder/Reviewer",src)
+        self.assertIn("não gera patch",src)
+        self.assertIn("não confirma causa raiz",src)
+        button_pos=src.index('"Preparar plano de correção rastreável"')
+        plan_pos=src.index("correction = build_developer_correction_plan(",button_pos)
+        self.assertGreater(plan_pos,button_pos)
+
     def test_developer_failure_diagnostic_separates_fact_from_hypothesis(self):
         src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("Diagnosticar falha de teste/log",src)
