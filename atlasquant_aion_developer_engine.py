@@ -190,6 +190,7 @@ def record_test_attempt(
     test_state = _clean(state, 20).upper()
     if test_state not in {"PASS", "FAIL"}:
         raise ValueError("test attempt must PASS or FAIL")
+    refs = _list(evidence_refs)
     attempt = {
         "attempt": len(attempts) + 1,
         "command_label": _clean(command_label, 240),
