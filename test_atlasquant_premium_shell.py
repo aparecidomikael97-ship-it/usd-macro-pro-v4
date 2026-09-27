@@ -37,6 +37,15 @@ class PremiumShellTests(unittest.TestCase):
             self.assertIn(item["page"], known)
             self.assertNotIn("real_orders_enabled\": True", item["summary"])
 
+    def test_fast_shell_targets_exist_in_the_fast_shell(self):
+        import ast
+        import re
+        src = Path("atlasquant_fast_startup.py").read_text(encoding="utf-8")
+        fast_pages = set(ast.literal_eval(re.search(r"_fast_pages=(\[[^\]]+\])", src).group(1)))
+        for item in PREMIUM_MODULES:
+            if item.get("fast_page"):
+                self.assertIn(item["fast_page"], fast_pages, item["id"])
+
     def test_cards_escape_text_and_announce_click_and_lock(self):
         sample = dict(PREMIUM_MODULES[0])
         sample["title"] = "<script>x</script>"
