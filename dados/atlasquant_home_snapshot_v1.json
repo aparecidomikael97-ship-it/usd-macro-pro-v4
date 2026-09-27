@@ -1,11 +1,11 @@
 {
   "schema": "ATLASQUANT_HOME_SNAPSHOT_V1",
-  "generated_at": "2026-09-27T00:51:19.866267+00:00",
-  "runtime_generated_at": "2026-09-27T00:51:43.989369+00:00",
+  "generated_at": "2026-09-27T01:19:45.826719+00:00",
+  "runtime_generated_at": "2026-09-27T01:20:09.535045+00:00",
   "engine_version": "V11.0.8 / AtlasQuant Runtime",
   "inputs": {
     "version": "V10.7_FAST_BOOT_1",
-    "generated_at": "2026-09-27T00:51:19.866267+00:00",
+    "generated_at": "2026-09-27T01:19:45.826719+00:00",
     "app_version": "11.0.8 — STRENGTH ATTRIBUTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2",
     "pairs": [
       {
@@ -32,7 +32,7 @@
         "Score final": 90.0,
         "Qualidade": 84.0,
         "Confluência": "ALTA",
-        "Dif. macro": 26.7,
+        "Dif. macro": 28.4,
         "Índice ranking": 87.2
       },
       {
@@ -59,7 +59,7 @@
         "Score final": 55.0,
         "Qualidade": 91.0,
         "Confluência": "BAIXA",
-        "Dif. macro": -18.7,
+        "Dif. macro": -19.5,
         "Índice ranking": 69.4
       },
       {
@@ -297,7 +297,7 @@
           "Federal Reserve official says inflation persistence led her to support interest rate hike - kare11.com",
           "Federal Reserve official says inflation persistence led her to support interest rate hike - Sun Sentinel",
           "Federal Reserve rate hike reflects new world of sticky inflation and faster growth - AP News",
-          "Fed’s Barr says future interest rate hikes ‘likely’ needed to tame inflation - The Hill",
+          "Fed’s Barr says future interest rate hikes ‘likely’ needed to tame inflation - thehill.com",
           "In the News: Tyler Schipper on the Federal Reserve’s Interest Rate Hike - news.stthomas.edu",
           "Treasury yields surge as Hardika Singh warns of Federal Reserve rate hike risks - Fox Business",
           "Federal Reserve hikes interest rates amid inflation concerns - Fox News",
@@ -348,9 +348,9 @@
             "explicacao": "Sinal mais restritivo: juros altos por mais tempo tendem a apoiar o dólar."
           },
           {
-            "titulo": "Fed’s Barr says future interest rate hikes ‘likely’ needed to tame inflation - The Hill",
+            "titulo": "Fed’s Barr says future interest rate hikes ‘likely’ needed to tame inflation - thehill.com",
             "corpo": "Fed’s Barr says future interest rate hikes ‘likely’ needed to tame inflation",
-            "fonte": "The Hill",
+            "fonte": "thehill.com",
             "relevancia_pontos": 9,
             "relevancia": "Alta",
             "impacto": 0.75,
@@ -455,7 +455,7 @@
           "juros": 1.45845,
           "inflacao": 2.8,
           "pib": 0.72665,
-          "sentimento": 75.0,
+          "sentimento": 66.66666666666666,
           "fonte": "FRED + transformação anual + fallback parcial"
         },
         "CHF": {
@@ -476,7 +476,7 @@
           "juros": 4.51,
           "inflacao": 2.7,
           "pib": 2.13764,
-          "sentimento": 68.75,
+          "sentimento": 64.70588235294117,
           "fonte": "FRED + transformação anual + fallback parcial"
         },
         "NZD": {
@@ -490,7 +490,7 @@
           "juros": 13.75,
           "inflacao": 4.22,
           "pib": 2.4,
-          "sentimento": 71.42857142857143,
+          "sentimento": 62.5,
           "fonte": "BCB + validação + fallback parcial"
         }
       },
@@ -500,19 +500,19 @@
           "juros": 13.8,
           "inflacao": 4.2,
           "pib": 2.4,
-          "sentimento": 71.4,
+          "sentimento": 62.5,
           "fonte": "BCB + validação + fallback parcial",
           "Moeda": "Real Brasileiro",
           "juros_reais": 9.5,
           "n_juros": 100.0,
           "n_inflacao": 100.0,
           "n_pib": 83.49591589284022,
-          "n_sentimento": 42.85714285714286,
+          "n_sentimento": 25.0,
           "n_emprego": 50.0,
           "n_atividade": 50.0,
-          "Pontuação_Macro": 71.8,
+          "Pontuação_Macro": 70.0,
           "Influência_Fed": -5.7,
-          "Pontuação_Final": 66.2,
+          "Pontuação_Final": 64.4,
           "strength_attribution": {
             "factors": {
               "Juros / Treasury": 20.0,
@@ -520,13 +520,13 @@
               "PIB": 12.524387383926031,
               "Emprego": 10.0,
               "Atividade": 10.0,
-              "Sentimento": 4.2857142857142865
+              "Sentimento": 2.5
             },
             "fed": -5.657383177570094,
             "other": {
               "Limite da escala 0–100": 1.4210854715202004e-14
             },
-            "unrounded_final": 66.15271849207024
+            "unrounded_final": 64.36700420635594
           },
           "Posição": 1
         },
@@ -602,41 +602,6 @@
           "Posição": 3
         },
         {
-          "Código": "AUD",
-          "juros": 4.5,
-          "inflacao": 2.7,
-          "pib": 2.1,
-          "sentimento": 68.8,
-          "fonte": "FRED + transformação anual + fallback parcial",
-          "Moeda": "Dólar Australiano",
-          "juros_reais": 1.8,
-          "n_juros": 28.98896661469615,
-          "n_inflacao": 49.66887417218545,
-          "n_pib": 70.40481809880697,
-          "n_sentimento": 37.5,
-          "n_emprego": 50.0,
-          "n_atividade": 50.0,
-          "Pontuação_Macro": 47.6,
-          "Influência_Fed": -4.2,
-          "Pontuação_Final": 43.3,
-          "strength_attribution": {
-            "factors": {
-              "Juros / Treasury": 5.79779332293923,
-              "Inflação": 7.450331125827817,
-              "PIB": 10.560722714821045,
-              "Emprego": 10.0,
-              "Atividade": 10.0,
-              "Sentimento": 3.75
-            },
-            "fed": -4.243037383177571,
-            "other": {
-              "Limite da escala 0–100": 0.0
-            },
-            "unrounded_final": 43.31580978041052
-          },
-          "Posição": 4
-        },
-        {
           "Código": "EUR",
           "juros": 2.5,
           "inflacao": 3.2,
@@ -668,6 +633,41 @@
               "Limite da escala 0–100": 0.0
             },
             "unrounded_final": 43.24184381426783
+          },
+          "Posição": 4
+        },
+        {
+          "Código": "AUD",
+          "juros": 4.5,
+          "inflacao": 2.7,
+          "pib": 2.1,
+          "sentimento": 64.7,
+          "fonte": "FRED + transformação anual + fallback parcial",
+          "Moeda": "Dólar Australiano",
+          "juros_reais": 1.8,
+          "n_juros": 28.98896661469615,
+          "n_inflacao": 49.66887417218545,
+          "n_pib": 70.40481809880697,
+          "n_sentimento": 29.411764705882348,
+          "n_emprego": 50.0,
+          "n_atividade": 50.0,
+          "Pontuação_Macro": 46.8,
+          "Influência_Fed": -4.2,
+          "Pontuação_Final": 42.5,
+          "strength_attribution": {
+            "factors": {
+              "Juros / Treasury": 5.79779332293923,
+              "Inflação": 7.450331125827817,
+              "PIB": 10.560722714821045,
+              "Emprego": 10.0,
+              "Atividade": 10.0,
+              "Sentimento": 2.941176470588235
+            },
+            "fed": -4.243037383177571,
+            "other": {
+              "Limite da escala 0–100": -7.105427357601002e-15
+            },
+            "unrounded_final": 42.50698625099875
           },
           "Posição": 5
         },
@@ -746,19 +746,19 @@
           "juros": 1.5,
           "inflacao": 2.8,
           "pib": 0.7,
-          "sentimento": 75.0,
+          "sentimento": 66.7,
           "fonte": "FRED + transformação anual + fallback parcial",
           "Moeda": "Iene Japonês",
           "juros_reais": -1.3,
           "n_juros": 0.0,
           "n_inflacao": 52.980132450331126,
           "n_pib": 0.0,
-          "n_sentimento": 50.0,
+          "n_sentimento": 33.333333333333314,
           "n_emprego": 50.0,
           "n_atividade": 50.0,
-          "Pontuação_Macro": 32.9,
+          "Pontuação_Macro": 31.3,
           "Influência_Fed": 2.4,
-          "Pontuação_Final": 35.3,
+          "Pontuação_Final": 33.6,
           "strength_attribution": {
             "factors": {
               "Juros / Treasury": 0.0,
@@ -766,13 +766,13 @@
               "PIB": 0.0,
               "Emprego": 10.0,
               "Atividade": 10.0,
-              "Sentimento": 5.0
+              "Sentimento": 3.3333333333333317
             },
             "fed": 2.357242990654206,
             "other": {
               "Limite da escala 0–100": 0.0
             },
-            "unrounded_final": 35.30426285820388
+            "unrounded_final": 33.637596191537206
           },
           "Posição": 8
         },
@@ -1224,7 +1224,7 @@
         "ADR14 indisponível",
         "Risco de evento desconhecido",
         "H1 está contra o viés",
-        "Técnica desatualizada (1712 min)"
+        "Técnica desatualizada (1740 min)"
       ],
       "soft_blocks": [
         "Gate ainda não liberou execução",
@@ -1235,7 +1235,7 @@
         "Score Mestre forte (91/100)"
       ],
       "executable": false,
-      "technical_age": 1711.8,
+      "technical_age": 1740.2,
       "data_ready": {
         "score": 35.0,
         "label": "🔴 DADOS INSUFICIENTES",
@@ -1243,21 +1243,21 @@
         "institutional_data_ready": false,
         "timeframes": {
           "m15": {
-            "age_minutes": 1711.8,
+            "age_minutes": 1740.2,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h1": {
-            "age_minutes": 1711.8,
+            "age_minutes": 1740.2,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h4": {
-            "age_minutes": 1772.6,
+            "age_minutes": 1801.1,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
@@ -1285,9 +1285,9 @@
         "M15: 🟢 GATILHO — histórico; não conta como confirmação atual"
       ],
       "sweep_state": {
-        "age_minutes": 1761.6624940833333,
+        "age_minutes": 1790.0910674,
         "current": false,
-        "label": "⏳ SWEEP ANTIGO · 1762 min — NÃO USAR COMO CONFIRMAÇÃO"
+        "label": "⏳ SWEEP ANTIGO · 1790 min — NÃO USAR COMO CONFIRMAÇÃO"
       },
       "strength": {
         "base": "EUR",
@@ -1383,7 +1383,7 @@
         "reference_at": "2026-09-25T20:19:51.158884+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "25/09/2026 20:19 UTC",
-        "age_minutes": 1711.8,
+        "age_minutes": 1740.3,
         "valid_until": "2026-09-25T21:19:51.158884+00:00",
         "valid_until_display": "25/09/2026 21:19 UTC",
         "remaining_minutes": 0.0,
@@ -1398,7 +1398,7 @@
         "observed_at": "2026-09-22T01:37:35.564300+00:00",
         "expired_at": "2026-09-25T21:21:12.905285+00:00",
         "blocked_at": "2026-09-25T20:21:13.814978+00:00",
-        "last_seen_at": "2026-09-27T00:51:40.368050+00:00"
+        "last_seen_at": "2026-09-27T01:20:05.972201+00:00"
       }
     },
     {
@@ -1748,7 +1748,7 @@
         "ADR14 indisponível",
         "Risco de evento desconhecido",
         "H1 está contra o viés",
-        "Técnica desatualizada (1712 min)"
+        "Técnica desatualizada (1740 min)"
       ],
       "soft_blocks": [
         "Gate ainda não liberou execução",
@@ -1758,7 +1758,7 @@
       ],
       "positives": [],
       "executable": false,
-      "technical_age": 1711.8,
+      "technical_age": 1740.2,
       "data_ready": {
         "score": 35.0,
         "label": "🔴 DADOS INSUFICIENTES",
@@ -1766,21 +1766,21 @@
         "institutional_data_ready": false,
         "timeframes": {
           "m15": {
-            "age_minutes": 1711.8,
+            "age_minutes": 1740.2,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h1": {
-            "age_minutes": 1772.6,
+            "age_minutes": 1801.0,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h4": {
-            "age_minutes": 1891.1,
+            "age_minutes": 1919.5,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
@@ -1807,9 +1807,9 @@
         "H4: 🟢 CONFIRMA — histórico; não conta como confirmação atual"
       ],
       "sweep_state": {
-        "age_minutes": 1956.6634361833335,
+        "age_minutes": 1985.0917757833333,
         "current": false,
-        "label": "⏳ SWEEP ANTIGO · 1957 min — NÃO USAR COMO CONFIRMAÇÃO"
+        "label": "⏳ SWEEP ANTIGO · 1985 min — NÃO USAR COMO CONFIRMAÇÃO"
       },
       "strength": {
         "base": "GBP",
@@ -1905,7 +1905,7 @@
         "reference_at": "2026-09-25T20:19:54.261713+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "25/09/2026 20:19 UTC",
-        "age_minutes": 1711.8,
+        "age_minutes": 1740.2,
         "valid_until": "2026-09-25T21:19:54.261713+00:00",
         "valid_until_display": "25/09/2026 21:19 UTC",
         "remaining_minutes": 0.0,
@@ -1920,7 +1920,7 @@
         "observed_at": "2026-09-25T04:49:39.671640+00:00",
         "expired_at": "2026-09-25T21:21:12.905285+00:00",
         "blocked_at": "2026-09-25T19:20:22.789459+00:00",
-        "last_seen_at": "2026-09-27T00:51:40.368050+00:00"
+        "last_seen_at": "2026-09-27T01:20:05.972201+00:00"
       }
     },
     {
@@ -1935,7 +1935,7 @@
       "base_score": 50.0,
       "quote_score": 50.0,
       "macro_diff": 0.0,
-      "matrix_diff": -18.7,
+      "matrix_diff": -19.5,
       "h4": "⚪ MACRO AGUARDAR",
       "h1": "⚪ MACRO AGUARDAR",
       "m15": "⚪ MACRO AGUARDAR",
@@ -2201,7 +2201,7 @@
         "Dados técnicos insuficientes (35/100)",
         "ADR14 indisponível",
         "Risco de evento desconhecido",
-        "Técnica desatualizada (1712 min)"
+        "Técnica desatualizada (1740 min)"
       ],
       "soft_blocks": [
         "Gate ainda não liberou execução",
@@ -2213,7 +2213,7 @@
         "Qualidade alta (91%)"
       ],
       "executable": false,
-      "technical_age": 1711.8,
+      "technical_age": 1740.2,
       "data_ready": {
         "score": 35.0,
         "label": "🔴 DADOS INSUFICIENTES",
@@ -2221,21 +2221,21 @@
         "institutional_data_ready": false,
         "timeframes": {
           "m15": {
-            "age_minutes": 1711.8,
+            "age_minutes": 1740.2,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h1": {
-            "age_minutes": 1711.8,
+            "age_minutes": 1740.2,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h4": {
-            "age_minutes": 1828.4,
+            "age_minutes": 1856.8,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
@@ -2358,7 +2358,7 @@
         "reference_at": "2026-09-25T20:19:52.713735+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "25/09/2026 20:19 UTC",
-        "age_minutes": 1711.8,
+        "age_minutes": 1740.2,
         "valid_until": "2026-09-25T21:19:52.713735+00:00",
         "valid_until_display": "25/09/2026 21:19 UTC",
         "remaining_minutes": 0.0,
@@ -2370,7 +2370,7 @@
         "automatic_execution": false,
         "real_orders_enabled": false,
         "generation": 0,
-        "last_seen_at": "2026-09-27T00:51:40.368050+00:00"
+        "last_seen_at": "2026-09-27T01:20:05.972201+00:00"
       }
     },
     {
@@ -2723,7 +2723,7 @@
         "Dados técnicos insuficientes (35/100)",
         "ADR14 indisponível",
         "Risco de evento desconhecido",
-        "Técnica desatualizada (1712 min)"
+        "Técnica desatualizada (1740 min)"
       ],
       "soft_blocks": [
         "Gate ainda não liberou execução",
@@ -2736,7 +2736,7 @@
         "Qualidade alta (91%)"
       ],
       "executable": false,
-      "technical_age": 1711.7,
+      "technical_age": 1740.2,
       "data_ready": {
         "score": 35.0,
         "label": "🔴 DADOS INSUFICIENTES",
@@ -2744,21 +2744,21 @@
         "institutional_data_ready": false,
         "timeframes": {
           "m15": {
-            "age_minutes": 1711.7,
+            "age_minutes": 1740.2,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h1": {
-            "age_minutes": 1772.6,
+            "age_minutes": 1801.0,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h4": {
-            "age_minutes": 1772.6,
+            "age_minutes": 1801.0,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
@@ -2785,9 +2785,9 @@
         "H4: 🟢 CONFIRMA — histórico; não conta como confirmação atual"
       ],
       "sweep_state": {
-        "age_minutes": 1761.6653113166665,
+        "age_minutes": 1790.09318355,
         "current": false,
-        "label": "⏳ SWEEP ANTIGO · 1762 min — NÃO USAR COMO CONFIRMAÇÃO"
+        "label": "⏳ SWEEP ANTIGO · 1790 min — NÃO USAR COMO CONFIRMAÇÃO"
       },
       "strength": {
         "base": "NZD",
@@ -2883,7 +2883,7 @@
         "reference_at": "2026-09-25T20:19:56.017006+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "25/09/2026 20:19 UTC",
-        "age_minutes": 1711.8,
+        "age_minutes": 1740.2,
         "valid_until": "2026-09-25T21:19:56.017006+00:00",
         "valid_until_display": "25/09/2026 21:19 UTC",
         "remaining_minutes": 0.0,
@@ -2898,7 +2898,7 @@
         "observed_at": "2026-09-22T01:37:35.564300+00:00",
         "expired_at": "2026-09-25T21:21:12.905285+00:00",
         "blocked_at": "2026-09-23T17:47:26.156795+00:00",
-        "last_seen_at": "2026-09-27T00:51:40.368050+00:00"
+        "last_seen_at": "2026-09-27T01:20:05.972201+00:00"
       }
     },
     {
@@ -2913,7 +2913,7 @@
       "base_score": 50.0,
       "quote_score": 50.0,
       "macro_diff": 0.0,
-      "matrix_diff": 26.7,
+      "matrix_diff": 28.4,
       "h4": "🔴 CONTRA",
       "h1": "🔴 CONTRA",
       "m15": "🔴 SEM GATILHO",
@@ -3247,7 +3247,7 @@
         "Risco de evento desconhecido",
         "H4 está contra o viés",
         "H1 está contra o viés",
-        "Técnica desatualizada (1711 min)"
+        "Técnica desatualizada (1739 min)"
       ],
       "soft_blocks": [
         "Gate ainda não liberou execução",
@@ -3260,7 +3260,7 @@
         "Qualidade alta (84%)"
       ],
       "executable": false,
-      "technical_age": 1710.8,
+      "technical_age": 1739.2,
       "data_ready": {
         "score": 35.0,
         "label": "🔴 DADOS INSUFICIENTES",
@@ -3268,21 +3268,21 @@
         "institutional_data_ready": false,
         "timeframes": {
           "m15": {
-            "age_minutes": 1710.8,
+            "age_minutes": 1739.2,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h1": {
-            "age_minutes": 1710.8,
+            "age_minutes": 1739.2,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h4": {
-            "age_minutes": 1771.6,
+            "age_minutes": 1800.0,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
@@ -3405,7 +3405,7 @@
         "reference_at": "2026-09-25T20:20:53.558841+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "25/09/2026 20:20 UTC",
-        "age_minutes": 1710.8,
+        "age_minutes": 1739.2,
         "valid_until": "2026-09-25T21:20:53.558841+00:00",
         "valid_until_display": "25/09/2026 21:20 UTC",
         "remaining_minutes": 0.0,
@@ -3420,7 +3420,7 @@
         "observed_at": "2026-09-22T01:37:35.564300+00:00",
         "expired_at": "2026-09-25T21:21:12.905285+00:00",
         "blocked_at": "2026-09-25T06:54:02.398432+00:00",
-        "last_seen_at": "2026-09-27T00:51:40.368050+00:00"
+        "last_seen_at": "2026-09-27T01:20:05.972201+00:00"
       }
     },
     {
@@ -3775,7 +3775,7 @@
         "Dados técnicos insuficientes (35/100)",
         "ADR14 indisponível",
         "Risco de evento desconhecido",
-        "Técnica desatualizada (1712 min)"
+        "Técnica desatualizada (1740 min)"
       ],
       "soft_blocks": [
         "Gate ainda não liberou execução",
@@ -3788,7 +3788,7 @@
         "Qualidade alta (91%)"
       ],
       "executable": false,
-      "technical_age": 1711.7,
+      "technical_age": 1740.1,
       "data_ready": {
         "score": 35.0,
         "label": "🔴 DADOS INSUFICIENTES",
@@ -3796,21 +3796,21 @@
         "institutional_data_ready": false,
         "timeframes": {
           "m15": {
-            "age_minutes": 1711.7,
+            "age_minutes": 1740.1,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h1": {
-            "age_minutes": 1711.7,
+            "age_minutes": 1740.1,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h4": {
-            "age_minutes": 1772.5,
+            "age_minutes": 1801.0,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
@@ -3837,9 +3837,9 @@
         "H4: 🟢 CONFIRMA — histórico; não conta como confirmação atual"
       ],
       "sweep_state": {
-        "age_minutes": 1956.6671936166667,
+        "age_minutes": 1985.09458345,
         "current": false,
-        "label": "⏳ SWEEP ANTIGO · 1957 min — NÃO USAR COMO CONFIRMAÇÃO"
+        "label": "⏳ SWEEP ANTIGO · 1985 min — NÃO USAR COMO CONFIRMAÇÃO"
       },
       "strength": {
         "base": "USD",
@@ -3935,7 +3935,7 @@
         "reference_at": "2026-09-25T20:19:58.917102+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "25/09/2026 20:19 UTC",
-        "age_minutes": 1711.7,
+        "age_minutes": 1740.1,
         "valid_until": "2026-09-25T21:19:58.917102+00:00",
         "valid_until_display": "25/09/2026 21:19 UTC",
         "remaining_minutes": 0.0,
@@ -3950,7 +3950,7 @@
         "observed_at": "2026-09-22T01:37:35.564300+00:00",
         "expired_at": "2026-09-25T21:21:12.905285+00:00",
         "blocked_at": "2026-09-25T00:52:11.876933+00:00",
-        "last_seen_at": "2026-09-27T00:51:40.368050+00:00"
+        "last_seen_at": "2026-09-27T01:20:05.972201+00:00"
       }
     },
     {
@@ -4302,7 +4302,7 @@
         "Dados técnicos insuficientes (35/100)",
         "ADR14 indisponível",
         "Risco de evento desconhecido",
-        "Técnica desatualizada (1712 min)"
+        "Técnica desatualizada (1740 min)"
       ],
       "soft_blocks": [
         "Gate ainda não liberou execução",
@@ -4315,7 +4315,7 @@
         "Qualidade alta (91%)"
       ],
       "executable": false,
-      "technical_age": 1711.7,
+      "technical_age": 1740.1,
       "data_ready": {
         "score": 35.0,
         "label": "🔴 DADOS INSUFICIENTES",
@@ -4323,21 +4323,21 @@
         "institutional_data_ready": false,
         "timeframes": {
           "m15": {
-            "age_minutes": 1711.7,
+            "age_minutes": 1740.1,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h1": {
-            "age_minutes": 1711.7,
+            "age_minutes": 1740.1,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h4": {
-            "age_minutes": 1772.5,
+            "age_minutes": 1801.0,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
@@ -4365,9 +4365,9 @@
         "H1: 🟢 PULLBACK OK — histórico; não conta como confirmação atual"
       ],
       "sweep_state": {
-        "age_minutes": 1821.6681345833335,
+        "age_minutes": 1850.0952901666667,
         "current": false,
-        "label": "⏳ SWEEP ANTIGO · 1822 min — NÃO USAR COMO CONFIRMAÇÃO"
+        "label": "⏳ SWEEP ANTIGO · 1850 min — NÃO USAR COMO CONFIRMAÇÃO"
       },
       "strength": {
         "base": "USD",
@@ -4463,7 +4463,7 @@
         "reference_at": "2026-09-25T20:19:57.391069+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "25/09/2026 20:19 UTC",
-        "age_minutes": 1711.7,
+        "age_minutes": 1740.2,
         "valid_until": "2026-09-25T21:19:57.391069+00:00",
         "valid_until_display": "25/09/2026 21:19 UTC",
         "remaining_minutes": 0.0,
@@ -4478,13 +4478,13 @@
         "observed_at": "2026-09-22T01:37:35.564300+00:00",
         "expired_at": "2026-09-25T21:21:12.905285+00:00",
         "blocked_at": "2026-09-25T00:52:11.876933+00:00",
-        "last_seen_at": "2026-09-27T00:51:40.368050+00:00"
+        "last_seen_at": "2026-09-27T01:20:05.972201+00:00"
       }
     }
   ],
   "signal_lifecycle": {
     "schema": "ATLASQUANT_SIGNAL_LIFECYCLE_V1",
-    "updated_at": "2026-09-27T00:51:40.368050+00:00",
+    "updated_at": "2026-09-27T01:20:05.972201+00:00",
     "pairs": {
       "EUR/USD": {
         "schema": "ATLASQUANT_SIGNAL_LIFECYCLE_V1",
@@ -4495,7 +4495,7 @@
         "reference_at": "2026-09-25T20:19:51.158884+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "25/09/2026 20:19 UTC",
-        "age_minutes": 1711.8,
+        "age_minutes": 1740.2,
         "valid_until": "2026-09-25T21:19:51.158884+00:00",
         "valid_until_display": "25/09/2026 21:19 UTC",
         "remaining_minutes": 0.0,
@@ -4512,7 +4512,7 @@
         "confirmed_at": "",
         "expired_at": "2026-09-25T21:21:12.905285+00:00",
         "blocked_at": "2026-09-25T20:21:13.814978+00:00",
-        "last_seen_at": "2026-09-27T00:51:40.368050+00:00",
+        "last_seen_at": "2026-09-27T01:20:05.972201+00:00",
         "previous_status_code": "EXPIRED",
         "previous_side": "SELL"
       },
@@ -4525,7 +4525,7 @@
         "reference_at": "2026-09-25T20:19:54.261713+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "25/09/2026 20:19 UTC",
-        "age_minutes": 1711.8,
+        "age_minutes": 1740.2,
         "valid_until": "2026-09-25T21:19:54.261713+00:00",
         "valid_until_display": "25/09/2026 21:19 UTC",
         "remaining_minutes": 0.0,
@@ -4542,7 +4542,7 @@
         "confirmed_at": "",
         "expired_at": "2026-09-25T21:21:12.905285+00:00",
         "blocked_at": "2026-09-25T19:20:22.789459+00:00",
-        "last_seen_at": "2026-09-27T00:51:40.368050+00:00",
+        "last_seen_at": "2026-09-27T01:20:05.972201+00:00",
         "previous_status_code": "EXPIRED",
         "previous_side": "SELL"
       },
@@ -4555,7 +4555,7 @@
         "reference_at": "2026-09-25T20:19:52.713735+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "25/09/2026 20:19 UTC",
-        "age_minutes": 1711.8,
+        "age_minutes": 1740.2,
         "valid_until": "2026-09-25T21:19:52.713735+00:00",
         "valid_until_display": "25/09/2026 21:19 UTC",
         "remaining_minutes": 0.0,
@@ -4572,7 +4572,7 @@
         "confirmed_at": "",
         "expired_at": "",
         "blocked_at": "",
-        "last_seen_at": "2026-09-27T00:51:40.368050+00:00",
+        "last_seen_at": "2026-09-27T01:20:05.972201+00:00",
         "previous_status_code": "NO_SIGNAL",
         "previous_side": "WAIT"
       },
@@ -4585,7 +4585,7 @@
         "reference_at": "2026-09-25T20:19:56.017006+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "25/09/2026 20:19 UTC",
-        "age_minutes": 1711.7,
+        "age_minutes": 1740.2,
         "valid_until": "2026-09-25T21:19:56.017006+00:00",
         "valid_until_display": "25/09/2026 21:19 UTC",
         "remaining_minutes": 0.0,
@@ -4602,7 +4602,7 @@
         "confirmed_at": "",
         "expired_at": "2026-09-25T21:21:12.905285+00:00",
         "blocked_at": "2026-09-23T17:47:26.156795+00:00",
-        "last_seen_at": "2026-09-27T00:51:40.368050+00:00",
+        "last_seen_at": "2026-09-27T01:20:05.972201+00:00",
         "previous_status_code": "EXPIRED",
         "previous_side": "SELL"
       },
@@ -4615,7 +4615,7 @@
         "reference_at": "2026-09-25T20:20:53.558841+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "25/09/2026 20:20 UTC",
-        "age_minutes": 1710.8,
+        "age_minutes": 1739.2,
         "valid_until": "2026-09-25T21:20:53.558841+00:00",
         "valid_until_display": "25/09/2026 21:20 UTC",
         "remaining_minutes": 0.0,
@@ -4632,7 +4632,7 @@
         "confirmed_at": "",
         "expired_at": "2026-09-25T21:21:12.905285+00:00",
         "blocked_at": "2026-09-25T06:54:02.398432+00:00",
-        "last_seen_at": "2026-09-27T00:51:40.368050+00:00",
+        "last_seen_at": "2026-09-27T01:20:05.972201+00:00",
         "previous_status_code": "EXPIRED",
         "previous_side": "BUY"
       },
@@ -4645,7 +4645,7 @@
         "reference_at": "2026-09-25T20:19:58.917102+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "25/09/2026 20:19 UTC",
-        "age_minutes": 1711.7,
+        "age_minutes": 1740.1,
         "valid_until": "2026-09-25T21:19:58.917102+00:00",
         "valid_until_display": "25/09/2026 21:19 UTC",
         "remaining_minutes": 0.0,
@@ -4662,7 +4662,7 @@
         "confirmed_at": "",
         "expired_at": "2026-09-25T21:21:12.905285+00:00",
         "blocked_at": "2026-09-25T00:52:11.876933+00:00",
-        "last_seen_at": "2026-09-27T00:51:40.368050+00:00",
+        "last_seen_at": "2026-09-27T01:20:05.972201+00:00",
         "previous_status_code": "EXPIRED",
         "previous_side": "BUY"
       },
@@ -4675,7 +4675,7 @@
         "reference_at": "2026-09-25T20:19:57.391069+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "25/09/2026 20:19 UTC",
-        "age_minutes": 1711.7,
+        "age_minutes": 1740.1,
         "valid_until": "2026-09-25T21:19:57.391069+00:00",
         "valid_until_display": "25/09/2026 21:19 UTC",
         "remaining_minutes": 0.0,
@@ -4692,7 +4692,7 @@
         "confirmed_at": "",
         "expired_at": "2026-09-25T21:21:12.905285+00:00",
         "blocked_at": "2026-09-25T00:52:11.876933+00:00",
-        "last_seen_at": "2026-09-27T00:51:40.368050+00:00",
+        "last_seen_at": "2026-09-27T01:20:05.972201+00:00",
         "previous_status_code": "EXPIRED",
         "previous_side": "BUY"
       }
