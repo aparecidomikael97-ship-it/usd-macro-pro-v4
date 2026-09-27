@@ -137,7 +137,7 @@
     "digest": "4f53cda18c2baa0c",
     "products": []
   },
-  "checkpoint_version": 17,
+  "checkpoint_version": 18,
   "continuity": {
     "digest": "f652dfa4d8649b5f",
     "handoffs": [],
@@ -340,6 +340,17 @@
     "events": [],
     "heartbeats": []
   },
+  "memory_layers": {
+    "automatic_cross_persona_access": false,
+    "digest": "4f53cda18c2baa0c0354bb5f",
+    "entries": [],
+    "recovery": {
+      "rejected": 0,
+      "state": "RECOVERED_EMPTY"
+    },
+    "schema": "ATLASQUANT_AION_MEMORY_LAYERS_V1",
+    "version": 1
+  },
   "memory_reliability": {
     "action_authorized": false,
     "decision_snapshots": [],
@@ -397,8 +408,8 @@
       }
     },
     "recovery": {
-      "reason": "payload is not a mapping",
-      "state": "RECOVERED_EMPTY"
+      "reason": "",
+      "state": "CLEAN"
     },
     "schema": "ATLASQUANT_AION_PERSONA_MEMORY_V1",
     "updated_at": "2026-09-27T03:54:01.375150+00:00",
