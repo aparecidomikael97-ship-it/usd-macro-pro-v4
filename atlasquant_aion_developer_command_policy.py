@@ -20,7 +20,16 @@ import re
 from typing import Any, Mapping
 
 from atlasquant_aion_developer_runner_contract import SCHEMA as RUNNER_SCHEMA
-from atlasquant_aion_observability import redact_text
+from atlasquant_aion_developer_sandbox_preflight import (
+    MAX_COMMANDS,
+    MAX_MEMORY_MB,
+    MAX_OUTPUT_BYTES,
+    MAX_RUNTIME_SECONDS,
+    MIN_COMMANDS,
+    MIN_MEMORY_MB,
+    MIN_OUTPUT_BYTES,
+    MIN_RUNTIME_SECONDS,
+)
 
 SCHEMA = "ATLASQUANT_AION_DEVELOPER_COMMAND_POLICY_V1"
 
@@ -49,10 +58,6 @@ _SECRET_ENV_RE = re.compile(
 )
 
 
-def _clean(value: Any, limit: int = 800) -> str:
-    return " ".join(redact_text(value).replace("\x00", "").split())[:limit]
-
-
 def _digest(value: Any, length: int = 18) -> str:
     raw = json.dumps(
         value,
@@ -64,23 +69,41 @@ def _digest(value: Any, length: int = 18) -> str:
     return sha256(raw.encode("utf-8")).hexdigest()[:length].upper()
 
 
+def _canonical_step(expected: tuple[str, str, tuple[str, ...]]) -> dict[str, Any]:
+    name, executable, argv = expected
+    return {
+        "step": name,
+        "executable": executable,
+        "argv": list(argv),
+        "shell": False,
+        "cwd": "<ISOLATED_WORKTREE>",
+        "network": False,
+        "writes_repo": False,
+    }
+
+
 def _validate_step(row: Mapping[str, Any], expected: tuple[str, str, tuple[str, ...]]) -> list[str]:
+    """Compare raw command fields with the canonical template.
+
+    Security fields are not stripped, case-folded or cleaned before comparison.
+    """
     blockers: list[str] = []
     expected_name, expected_exec, expected_argv = expected
-
-    name = _clean(row.get("step"), 120)
-    executable = _clean(row.get("executable"), 120)
-    argv = tuple(str(x) for x in list(row.get("argv") or []))
+    name = row.get("step")
+    executable = row.get("executable")
+    argv = row.get("argv")
 
     if name != expected_name:
         blockers.append(f"STEP_NAME_MISMATCH:{expected_name}")
     if executable != expected_exec:
         blockers.append(f"EXECUTABLE_MISMATCH:{expected_name}")
-    if executable not in _ALLOWED_EXECUTABLES:
+    if not isinstance(executable, str) or executable not in _ALLOWED_EXECUTABLES:
         blockers.append(f"EXECUTABLE_NOT_ALLOWLISTED:{expected_name}")
-    if argv != expected_argv:
+    if not isinstance(argv, list) or tuple(argv) != expected_argv:
         blockers.append(f"ARGV_TEMPLATE_MISMATCH:{expected_name}")
-    if any(_FORBIDDEN_ARG_PATTERN.search(arg or "") for arg in argv):
+    if isinstance(argv, list) and any(
+        not isinstance(arg, str) or _FORBIDDEN_ARG_PATTERN.search(arg) for arg in argv
+    ):
         blockers.append(f"FORBIDDEN_ARG_SYNTAX:{expected_name}")
     if row.get("shell") is not False:
         blockers.append(f"SHELL_MUST_BE_FALSE:{expected_name}")
@@ -88,9 +111,13 @@ def _validate_step(row: Mapping[str, Any], expected: tuple[str, str, tuple[str, 
         blockers.append(f"NETWORK_MUST_BE_FALSE:{expected_name}")
     if row.get("writes_repo") is not False:
         blockers.append(f"REPO_WRITE_MUST_BE_FALSE:{expected_name}")
-    if str(row.get("cwd") or "") != "<ISOLATED_WORKTREE>":
+    if row.get("cwd") != "<ISOLATED_WORKTREE>":
         blockers.append(f"CWD_MUST_BE_ISOLATED_WORKTREE:{expected_name}")
     return blockers
+
+
+def _budget_in_range(value: Any, low: int, high: int) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and low <= value <= high
 
 
 def build_command_policy_contract(
@@ -135,32 +162,42 @@ def build_command_policy_contract(
     if runner_contract.get("repo_write_allowed") is not False:
         raise ValueError("repository writes must remain forbidden")
 
-    rows = [
-        dict(item)
-        for item in list(runner_contract.get("command_plan") or [])
-        if isinstance(item, Mapping)
-    ]
+    raw_plan = list(runner_contract.get("command_plan") or [])
     blockers: list[str] = []
-    if len(rows) != len(_EXPECTED_STEPS):
+    if any(not isinstance(item, Mapping) for item in raw_plan):
+        blockers.append("COMMAND_PLAN_ENTRY_NOT_OBJECT")
+    rows = [item for item in raw_plan if isinstance(item, Mapping)]
+    if len(raw_plan) != len(_EXPECTED_STEPS):
         blockers.append("COMMAND_PLAN_LENGTH_MISMATCH")
 
-    names = tuple(_clean(row.get("step"), 120) for row in rows)
-    if names != _EXPECTED_STEP_NAMES:
+    names = tuple(row.get("step") for row in rows)
+    if len(rows) == len(_EXPECTED_STEPS) and names != _EXPECTED_STEP_NAMES:
+        blockers.append("COMMAND_PLAN_ORDER_OR_STEP_SET_MISMATCH")
+    elif len(rows) != len(_EXPECTED_STEPS):
         blockers.append("COMMAND_PLAN_ORDER_OR_STEP_SET_MISMATCH")
 
-    for idx, expected in enumerate(_EXPECTED_STEPS):
-        if idx >= len(rows):
-            blockers.append(f"MISSING_STEP:{expected[0]}")
-            continue
-        blockers.extend(_validate_step(rows[idx], expected))
+    if not any(not isinstance(item, Mapping) for item in raw_plan):
+        for idx, expected in enumerate(_EXPECTED_STEPS):
+            if idx >= len(rows):
+                blockers.append(f"MISSING_STEP:{expected[0]}")
+                continue
+            blockers.extend(_validate_step(rows[idx], expected))
 
     budget = (
         runner_contract.get("resource_budget")
         if isinstance(runner_contract.get("resource_budget"), Mapping)
         else {}
     )
-    max_commands = int(budget.get("max_commands") or 0)
-    if max_commands < len(rows):
+    if not _budget_in_range(budget.get("runtime_seconds"), MIN_RUNTIME_SECONDS, MAX_RUNTIME_SECONDS):
+        blockers.append("RUNTIME_BUDGET_OUT_OF_RANGE")
+    if not _budget_in_range(budget.get("memory_mb"), MIN_MEMORY_MB, MAX_MEMORY_MB):
+        blockers.append("MEMORY_BUDGET_OUT_OF_RANGE")
+    if not _budget_in_range(budget.get("output_bytes"), MIN_OUTPUT_BYTES, MAX_OUTPUT_BYTES):
+        blockers.append("OUTPUT_BUDGET_OUT_OF_RANGE")
+    command_budget = budget.get("max_commands")
+    if not _budget_in_range(command_budget, MIN_COMMANDS, MAX_COMMANDS):
+        blockers.append("COMMAND_BUDGET_OUT_OF_RANGE")
+    elif command_budget < len(_EXPECTED_STEPS):
         blockers.append("COMMAND_PLAN_EXCEEDS_RESOURCE_BUDGET")
 
     requested_env = dict(requested_environment or {})
@@ -200,7 +237,9 @@ def build_command_policy_contract(
             "network_allowed": False,
             "repo_write_allowed": False,
         },
-        "validated_command_plan": rows,
+        "validated_command_plan": [
+            _canonical_step(expected) for expected in _EXPECTED_STEPS
+        ] if not blockers else [],
         "blockers": blockers,
         "hazards": [
             "RUN_TARGETED_TESTS executes repository Python code.",
@@ -221,6 +260,8 @@ def build_command_policy_contract(
         "executable_pinning_verified": False,
         "os_sandbox_verified": False,
         "child_process_policy_verified": False,
+        "symlink_physical_boundary_verified": False,
+        "hardlink_physical_boundary_verified": False,
         "command_policy_is_data_only": True,
         "execution_authorized": False,
         "executor_attached": False,

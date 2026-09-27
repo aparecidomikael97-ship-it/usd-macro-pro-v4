@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from hashlib import sha256
 import json
-import re
+import unicodedata
 from typing import Any, Mapping, Sequence
 
 from atlasquant_aion_developer_builder_sandbox import SCHEMA as BUILDER_SCHEMA
@@ -23,13 +23,14 @@ from atlasquant_aion_developer_patch_validation import SCHEMA as PATCH_SCHEMA
 from atlasquant_aion_developer_sandbox_preflight import (
     ALLOWED_COMMAND_POLICY,
     SCHEMA as PREFLIGHT_SCHEMA,
+    canonical_repository_relative_path,
 )
 from atlasquant_aion_observability import redact_text
 
 SCHEMA = "ATLASQUANT_AION_DEVELOPER_RUNNER_CONTRACT_V1"
 MAX_TEST_TARGETS = 80
-
-_SAFE_TEST_RE = re.compile(r"^[A-Za-z0-9_./:-]+$")
+MAX_MANDATORY_GATES = 40
+MAX_REVIEW_REFS = 40
 
 
 def _clean(value: Any, limit: int = 1200) -> str:
@@ -58,8 +59,44 @@ def _digest(value: Any, length: int = 18) -> str:
     return sha256(raw.encode("utf-8")).hexdigest()[:length].upper()
 
 
-def _safe_test_target(value: str) -> bool:
-    return bool(value) and bool(_SAFE_TEST_RE.fullmatch(value)) and ".." not in value
+def _authorized_files(builder_request: Mapping[str, Any]) -> set[str]:
+    scope = (
+        builder_request.get("scope")
+        if isinstance(builder_request.get("scope"), Mapping)
+        else {}
+    )
+    authorized: set[str] = set()
+    for raw in list(scope.get("authorized_files") or []):
+        path = canonical_repository_relative_path(raw)
+        if path:
+            authorized.add(path)
+    return authorized
+
+
+def _classify_test_target(value: Any, authorized: set[str]) -> str:
+    """Return '' when the target is safe and bound to an authorized file.
+
+    Membership in authorized_files is the only existence evidence this contract
+    accepts. A syntactically valid name outside that set fails closed. This
+    function does not stat the filesystem.
+    """
+    if not isinstance(value, str) or not value or any(unicodedata.category(char) == "Cc" for char in value):
+        return "UNSAFE_TEST_TARGET"
+    file_part, separator, selector = value.partition("::")
+    if separator and (
+        not selector
+        or "\\" in selector
+        or "/" in selector
+        or ".." in selector
+        or any(unicodedata.category(char) == "Cc" for char in selector)
+    ):
+        return "UNSAFE_TEST_TARGET"
+    path = canonical_repository_relative_path(file_part)
+    if path is None:
+        return "UNSAFE_TEST_TARGET"
+    if path not in authorized:
+        return "TEST_TARGET_NOT_IN_AUTHORIZED_FILES"
+    return ""
 
 
 def build_runner_contract(
@@ -158,7 +195,12 @@ def build_runner_contract(
         blockers.append("CONTENT_BINDING_REF_REQUIRED")
 
     reviewer = _clean(human_patch_reviewer, 160)
-    review_refs = _unique(human_patch_review_refs, 40)
+    raw_review_refs = list(human_patch_review_refs or [])
+    if len(raw_review_refs) > MAX_REVIEW_REFS:
+        blockers.append("REVIEW_EVIDENCE_LIMIT_EXCEEDED")
+        review_refs: list[str] = []
+    else:
+        review_refs = _unique(raw_review_refs, MAX_REVIEW_REFS)
     if human_patch_reviewed is not True:
         blockers.append("HUMAN_PATCH_REVIEW_REQUIRED")
     if not reviewer:
@@ -171,14 +213,29 @@ def build_runner_contract(
         if isinstance(builder_request.get("test_contract"), Mapping)
         else {}
     )
-    tests = _unique(test_contract.get("candidate_tests"), MAX_TEST_TARGETS)
-    gates = _unique(test_contract.get("mandatory_gates"), 40)
-    if not tests:
-        blockers.append("TEST_TARGETS_REQUIRED")
-    if any(not _safe_test_target(item) for item in tests):
-        blockers.append("UNSAFE_TEST_TARGET")
-    if not gates:
-        blockers.append("MANDATORY_GATES_REQUIRED")
+    raw_tests = list(test_contract.get("candidate_tests") or [])
+    raw_gates = list(test_contract.get("mandatory_gates") or [])
+    authorized = _authorized_files(builder_request)
+    tests: list[str] = []
+    if len(raw_tests) > MAX_TEST_TARGETS:
+        blockers.append("TEST_TARGET_LIMIT_EXCEEDED")
+    else:
+        for item in raw_tests:
+            reason = _classify_test_target(item, authorized)
+            if reason:
+                blockers.append(reason)
+                continue
+            if item not in tests:
+                tests.append(item)
+        if not tests:
+            blockers.append("TEST_TARGETS_REQUIRED")
+    gates: list[str] = []
+    if len(raw_gates) > MAX_MANDATORY_GATES:
+        blockers.append("MANDATORY_GATE_LIMIT_EXCEEDED")
+    else:
+        gates = _unique(raw_gates, MAX_MANDATORY_GATES)
+        if not gates:
+            blockers.append("MANDATORY_GATES_REQUIRED")
 
     budget = (
         preflight.get("resource_budget")
@@ -264,6 +321,8 @@ def build_runner_contract(
         "repo_write_allowed": False,
         "blockers": blockers,
         "runner_design_review_required": True,
+        "symlink_physical_boundary_verified": False,
+        "hardlink_physical_boundary_verified": False,
         "execution_authorized": False,
         "executor_attached": False,
         "commands_executed": False,
@@ -283,5 +342,7 @@ def build_runner_contract(
 __all__ = [
     "SCHEMA",
     "MAX_TEST_TARGETS",
+    "MAX_MANDATORY_GATES",
+    "MAX_REVIEW_REFS",
     "build_runner_contract",
 ]

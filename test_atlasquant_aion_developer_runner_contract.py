@@ -18,6 +18,10 @@ def _builder():
             "baseline_ref": "main@aaa",
             "candidate_ref": "cursor/fix@bbb",
         },
+        "scope": {
+            "requested_files": ["test_module.py"],
+            "authorized_files": ["test_module.py"],
+        },
         "test_contract": {
             "candidate_tests": ["test_module.py"],
             "mandatory_gates": ["QUALITY_TESTS", "RELEASE_READINESS"],

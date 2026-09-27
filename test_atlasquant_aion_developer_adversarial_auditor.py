@@ -42,6 +42,24 @@ _HARDENED_INVARIANTS={
     "release.deployment_and_deploy_scripts",
     "tests.added_skip_or_expected_failure",
     "tests.recomputed_manifest_still_blocks_weakening",
+    "runner.external_test_path",
+    "runner.windows_absolute_test_path",
+    "runner.unauthorized_or_nonexistent_test",
+    "preflight.windows_drive_path",
+    "patch.diff_header_mismatch",
+    "patch.secret_beyond_prefix",
+    "patch.additive_test_neutralization",
+    "command.executable_nul",
+    "command.executable_newline",
+    "command.executable_whitespace",
+    "command.non_mapping_entry",
+    "command.runtime_budget_invalid",
+    "command.memory_budget_invalid",
+    "command.output_budget_invalid",
+    "command.command_budget_invalid",
+    "patch.missing_hunk",
+    "runner.excessive_test_targets",
+    "path.symlink_hardlink_physical_boundary_unverified",
 }
 
 
@@ -53,11 +71,13 @@ class AionDeveloperAdversarialAuditorTests(unittest.TestCase):
     def test_report_shape_is_deterministic_and_unscored(self):
         report=self.report
         self.assertEqual(report["schema"],SCHEMA)
-        self.assertEqual(report["cases_total"],62)
+        self.assertEqual(report["cases_total"],80)
         self.assertEqual(
             report["gap_count"]+report["blocked_by_design_count"]+report["pass_count"],
-            62,
+            80,
         )
+        self.assertFalse(report["symlink_physical_boundary_verified"])
+        self.assertFalse(report["hardlink_physical_boundary_verified"])
         self.assertNotIn("score",report)
         self.assertNotIn("security_score",report)
         for key in (

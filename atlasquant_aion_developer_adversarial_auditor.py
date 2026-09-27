@@ -38,8 +38,15 @@ from atlasquant_aion_developer_manifest import (
     implementation_readiness_manifest_id,
     release_sensitive_path,
 )
+from atlasquant_aion_developer_command_policy import build_command_policy_contract
 from atlasquant_aion_developer_package import build_developer_package
 from atlasquant_aion_developer_patch_validation import validate_patch
+from atlasquant_aion_developer_runner_contract import (
+    MAX_MANDATORY_GATES,
+    MAX_TEST_TARGETS,
+    build_runner_contract,
+)
+from atlasquant_aion_developer_sandbox_preflight import build_sandbox_preflight
 
 SCHEMA = "ATLASQUANT_AION_DEVELOPER_ADVERSARIAL_AUDIT_V1"
 CLASSIFICATIONS = ("PASS", "GAP", "BLOCKED_BY_DESIGN")
@@ -1239,6 +1246,444 @@ def _residual_surface(world: _World) -> list[dict[str, str]]:
     return findings
 
 
+def _runner_probe(tests, gates=None):
+    builder = {
+        "schema": "ATLASQUANT_AION_DEVELOPER_BUILDER_SANDBOX_REQUEST_V1",
+        "request_id": "DEVBUILD-1",
+        "state": "READY_FOR_BUILDER_SANDBOX",
+        "branch_contract": {
+            "baseline_ref": "main@aaa",
+            "candidate_ref": "cursor/fix@bbb",
+        },
+        "scope": {
+            "requested_files": ["test_module.py"],
+            "authorized_files": ["test_module.py"],
+        },
+        "test_contract": {
+            "candidate_tests": list(tests),
+            "mandatory_gates": list(gates or ["QUALITY_TESTS"]),
+        },
+        "blockers": [],
+        "execution_authorized": False,
+        "executor_attached": False,
+    }
+    preflight = {
+        "schema": "ATLASQUANT_AION_DEVELOPER_SANDBOX_PREFLIGHT_V1",
+        "preflight_id": "DEVPREF-1",
+        "state": "READY_FOR_EXECUTOR_DESIGN_REVIEW",
+        "builder_request_id": "DEVBUILD-1",
+        "preflight_passed": True,
+        "environment_contract": {
+            "isolated_worktree": True,
+            "repository_root_bound": True,
+            "network_disabled": True,
+            "secrets_mounted": False,
+            "command_policy": "ALLOWLIST_ONLY",
+        },
+        "resource_budget": {
+            "runtime_seconds": 900,
+            "memory_mb": 2048,
+            "output_bytes": 2_000_000,
+            "max_commands": 24,
+        },
+        "execution_authorized": False,
+        "executor_attached": False,
+    }
+    patch = {
+        "schema": "ATLASQUANT_AION_DEVELOPER_PATCH_VALIDATION_V1",
+        "validation_id": "DEVPATCHVAL-1",
+        "state": "READY_FOR_PATCH_REVIEW",
+        "builder_request_id": "DEVBUILD-1",
+        "preflight_id": "DEVPREF-1",
+        "patch_digest": "DEVPATCH-ABC",
+        "revision_binding": {
+            "baseline_ref": "main@aaa",
+            "candidate_ref": "cursor/fix@bbb",
+            "refs_match_approved_request": True,
+            "revision_content_verified": True,
+        },
+        "blockers": [],
+        "patch_applied": False,
+        "execution_authorized": False,
+        "executor_attached": False,
+    }
+    return build_runner_contract(
+        builder,
+        preflight,
+        patch,
+        content_binding_verified=True,
+        content_binding_ref="tree:123",
+        human_patch_reviewed=True,
+        human_patch_reviewer="reviewer-1",
+        human_patch_review_refs=["review:patch:1"],
+    )
+
+
+def _state_closed(result: Any, blocker: str) -> bool:
+    return (
+        isinstance(result, Mapping)
+        and result.get("state") == "BLOCKED"
+        and blocker in list(result.get("blockers") or [])
+        and result.get("execution_authorized") is False
+    )
+
+
+def _patch_probe(patch: str):
+    request = {
+        "schema": "ATLASQUANT_AION_DEVELOPER_BUILDER_SANDBOX_REQUEST_V1",
+        "request_id": "DEVBUILD-1",
+        "state": "READY_FOR_BUILDER_SANDBOX",
+        "branch_contract": {
+            "baseline_ref": "main@a",
+            "candidate_ref": "cursor/safe@b",
+        },
+        "scope": {
+            "requested_files": ["module.py", "test_module.py"],
+            "authorized_files": ["module.py", "test_module.py"],
+        },
+        "blockers": [],
+        "execution_authorized": False,
+        "executor_attached": False,
+    }
+    preflight = {
+        "schema": "ATLASQUANT_AION_DEVELOPER_SANDBOX_PREFLIGHT_V1",
+        "preflight_id": "DEVPREF-1",
+        "builder_request_id": "DEVBUILD-1",
+        "state": "READY_FOR_EXECUTOR_DESIGN_REVIEW",
+        "preflight_passed": True,
+        "execution_authorized": False,
+        "executor_attached": False,
+    }
+    return validate_patch(
+        request,
+        preflight,
+        patch,
+        baseline_ref="main@a",
+        candidate_ref="cursor/safe@b",
+    )
+
+
+def _command_probe(**overrides):
+    runner = {
+        "schema": "ATLASQUANT_AION_DEVELOPER_RUNNER_CONTRACT_V1",
+        "runner_contract_id": "DEVRUN-1",
+        "state": "READY_FOR_RUNNER_DESIGN_REVIEW",
+        "resource_budget": {
+            "runtime_seconds": 900,
+            "memory_mb": 2048,
+            "output_bytes": 2_000_000,
+            "max_commands": 24,
+        },
+        "command_plan": [
+            {
+                "step": "COMPILE_CHANGED_SCOPE",
+                "executable": "python",
+                "argv": ["-m", "compileall", "-q", "<AUTHORIZED_CHANGED_SCOPE>"],
+                "shell": False,
+                "cwd": "<ISOLATED_WORKTREE>",
+                "network": False,
+                "writes_repo": False,
+            },
+            {
+                "step": "RUN_TARGETED_TESTS",
+                "executable": "python",
+                "argv": ["-m", "unittest", "-q", "<APPROVED_TEST_TARGETS>"],
+                "shell": False,
+                "cwd": "<ISOLATED_WORKTREE>",
+                "network": False,
+                "writes_repo": False,
+            },
+            {
+                "step": "VERIFY_DIFF_CHECK",
+                "executable": "git",
+                "argv": ["diff", "--check"],
+                "shell": False,
+                "cwd": "<ISOLATED_WORKTREE>",
+                "network": False,
+                "writes_repo": False,
+            },
+        ],
+        "command_plan_is_data_only": True,
+        "shell_allowed": False,
+        "network_allowed": False,
+        "secrets_allowed": False,
+        "repo_write_allowed": False,
+        "blockers": [],
+        "execution_authorized": False,
+        "executor_attached": False,
+        "commands_executed": False,
+        "writes_files": False,
+        "runs_tests": False,
+        "network_called": False,
+        "subprocess_called": False,
+        "automatic_commit": False,
+        "automatic_merge": False,
+        "automatic_deploy": False,
+        "production_change_allowed": False,
+        "real_trading_enabled": False,
+        "tool_output_is_authority": False,
+    }
+    if "executable" in overrides:
+        runner["command_plan"] = [dict(row) for row in runner["command_plan"]]
+        runner["command_plan"][0]["executable"] = overrides["executable"]
+    if "extra" in overrides:
+        runner["command_plan"] = list(runner["command_plan"]) + [overrides["extra"]]
+    if "budget_key" in overrides:
+        runner["resource_budget"] = dict(runner["resource_budget"])
+        runner["resource_budget"][overrides["budget_key"]] = overrides["budget_value"]
+    return build_command_policy_contract(runner)
+
+
+def _contract_gap_surface(_world: _World) -> list[dict[str, str]]:
+    findings = []
+
+    def _targets(targets, blocker, invariant_id, severity, description):
+        accepted = []
+        for target in targets:
+            status, result = _invoke(lambda target=target: _runner_probe([target]))
+            closed = status == "ACCEPT" and _state_closed(result, blocker)
+            if not closed:
+                accepted.append(target)
+        findings.append(_finding(
+            invariant_id,
+            "atlasquant_aion_developer_runner_contract",
+            description if not accepted else description + " Aceitos: " + ", ".join(accepted) + ".",
+            "BLOCKED_BY_DESIGN" if not accepted else "GAP",
+            "" if not accepted else severity,
+        ))
+
+    _targets(
+        ("../outside.py", "/outside.py"),
+        "UNSAFE_TEST_TARGET",
+        "runner.external_test_path",
+        "HIGH",
+        "Caminho de teste externo ou absoluto POSIX fica BLOCKED.",
+    )
+    _targets(
+        ("C:/outside.py", "C:\\outside.py", "\\\\server\\share\\test.py", "//server/share/test.py"),
+        "UNSAFE_TEST_TARGET",
+        "runner.windows_absolute_test_path",
+        "HIGH",
+        "Caminho Windows absoluto ou UNC de teste fica BLOCKED.",
+    )
+    _targets(
+        ("missing_test.py", "other_authorized_looking.py"),
+        "TEST_TARGET_NOT_IN_AUTHORIZED_FILES",
+        "runner.unauthorized_or_nonexistent_test",
+        "HIGH",
+        "Teste fora dos arquivos autorizados nao e tratado como existente.",
+    )
+
+    dangerous_paths = (
+        "C:/outside.py",
+        "C:\\outside.py",
+        "\\\\server\\share\\test.py",
+        "//server/share/test.py",
+    )
+    accepted_paths = []
+    for path in dangerous_paths:
+        status, _result = _invoke(lambda path=path: build_sandbox_preflight(
+            {
+                "schema": "ATLASQUANT_AION_DEVELOPER_BUILDER_SANDBOX_REQUEST_V1",
+                "request_id": "DEVBUILD-ABC",
+                "state": "READY_FOR_BUILDER_SANDBOX",
+                "branch_contract": {
+                    "candidate_bound_to_branch": True,
+                    "main_branch_allowed": False,
+                    "force_push_allowed": False,
+                    "history_rewrite_allowed": False,
+                },
+                "scope": {
+                    "requested_files": [path],
+                    "authorized_files": [path],
+                    "scope_expansion_allowed": False,
+                    "new_file_allowed": False,
+                    "delete_file_allowed": False,
+                    "rename_file_allowed": False,
+                },
+                "test_contract": {
+                    "candidate_tests": ["test_module.py"],
+                    "mandatory_gates": ["QUALITY_TESTS"],
+                    "test_deletion_allowed": False,
+                    "test_weakening_allowed": False,
+                },
+                "blockers": [],
+                "execution_authorized": False,
+                "executor_attached": False,
+                "writes_files": False,
+            },
+            environment_kind="ISOLATED_WORKTREE",
+            environment_id="sandbox-001",
+            isolated_worktree=True,
+            repository_root_bound=True,
+            network_disabled=True,
+            secrets_mounted=False,
+            command_policy="ALLOWLIST_ONLY",
+        ))
+        if status == "ACCEPT":
+            accepted_paths.append(path)
+    findings.append(_finding(
+        "preflight.windows_drive_path",
+        "atlasquant_aion_developer_sandbox_preflight",
+        "Caminho de drive, UNC ou absoluto passa no preflight: " + ", ".join(accepted_paths) + "."
+        if accepted_paths else
+        "Caminhos de drive, UNC e absolutos sao rejeitados sem depender do SO hospedeiro.",
+        "GAP" if accepted_paths else "BLOCKED_BY_DESIGN",
+        "HIGH" if accepted_paths else "",
+    ))
+
+    status, result = _invoke(lambda: _patch_probe(
+        "diff --git a/module.py b/module.py\n--- a/other.py\n+++ b/other.py\n@@ -1 +1 @@\n-old\n+new\n"
+    ))
+    header_closed = status == "ACCEPT" and _state_closed(result, "DIFF_HEADER_PATH_MISMATCH")
+    findings.append(_finding(
+        "patch.diff_header_mismatch",
+        "atlasquant_aion_developer_patch_validation",
+        "Cabecalhos diff/--/+++ divergentes ficam BLOCKED."
+        if header_closed else
+        "Cabecalhos divergentes de diff ainda passam.",
+        "BLOCKED_BY_DESIGN" if header_closed else "GAP",
+        "" if header_closed else "HIGH",
+    ))
+
+    secret_marker = "password=" + "AUDITSECRETVALUE"
+    status, result = _invoke(lambda: _patch_probe(
+        "diff --git a/module.py b/module.py\n--- a/module.py\n+++ b/module.py\n@@ -1 +1 @@\n-old\n+"
+        + ("A" * 4000) + " " + secret_marker + "\n"
+    ))
+    secret_text = json.dumps(result, default=str) if status == "ACCEPT" else ""
+    secret_closed = (
+        status == "ACCEPT"
+        and _state_closed(result, "SECRET_LIKE_ADDITION_NOT_ALLOWED")
+        and secret_marker not in secret_text
+    )
+    findings.append(_finding(
+        "patch.secret_beyond_prefix",
+        "atlasquant_aion_developer_patch_validation",
+        "Segredo apos 4000 caracteres e bloqueado e nao volta no relatorio."
+        if secret_closed else
+        "Segredo apos o prefixo inspecionado ainda passa ou vaza no relatorio.",
+        "BLOCKED_BY_DESIGN" if secret_closed else "GAP",
+        "" if secret_closed else "HIGH",
+    ))
+
+    status, result = _invoke(lambda: _patch_probe(
+        "diff --git a/test_module.py b/test_module.py\n--- a/test_module.py\n+++ b/test_module.py\n"
+        "@@ -1,2 +1,4 @@\n def test_guard():\n     assert guard()\n+def test_guard():\n+    pass\n"
+    ))
+    additive_closed = (
+        status == "ACCEPT"
+        and _state_closed(result, "TEST_ADDITIVE_NEUTRALIZATION_REQUIRES_SEPARATE_REVIEW")
+    )
+    findings.append(_finding(
+        "patch.additive_test_neutralization",
+        "atlasquant_aion_developer_patch_validation",
+        "Redefinicao aditiva de teste com pass exige revisao separada e fica BLOCKED."
+        if additive_closed else
+        "Redefinicao aditiva de teste ainda fica pronta para revisao normal.",
+        "BLOCKED_BY_DESIGN" if additive_closed else "GAP",
+        "" if additive_closed else "HIGH",
+    ))
+
+    for invariant_id, executable, description in (
+        ("command.executable_nul", "python\x00", "Executavel com NUL nao e normalizado para python."),
+        ("command.executable_newline", "python\n", "Executavel com quebra de linha nao e normalizado para python."),
+        ("command.executable_whitespace", "python ", "Executavel com espaco nao e normalizado para python."),
+    ):
+        status, result = _invoke(lambda executable=executable: _command_probe(executable=executable))
+        rendered = json.dumps((result or {}).get("validated_command_plan") if isinstance(result, Mapping) else [], default=str)
+        closed = status == "ACCEPT" and _state_closed(result, "EXECUTABLE_MISMATCH:COMPILE_CHANGED_SCOPE") and executable not in rendered
+        findings.append(_finding(
+            invariant_id,
+            "atlasquant_aion_developer_command_policy",
+            description if closed else description + " O plano validado conservou o valor cru.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "MEDIUM",
+        ))
+
+    status, result = _invoke(lambda: _command_probe(extra=None))
+    entry_closed = status == "ACCEPT" and _state_closed(result, "COMMAND_PLAN_ENTRY_NOT_OBJECT")
+    findings.append(_finding(
+        "command.non_mapping_entry",
+        "atlasquant_aion_developer_command_policy",
+        "Item nao-objeto no command plan bloqueia o plano inteiro."
+        if entry_closed else
+        "Item nao-objeto no command plan e descartado em silencio.",
+        "BLOCKED_BY_DESIGN" if entry_closed else "GAP",
+        "" if entry_closed else "MEDIUM",
+    ))
+
+    for invariant_id, key, value, blocker in (
+        ("command.runtime_budget_invalid", "runtime_seconds", 0, "RUNTIME_BUDGET_OUT_OF_RANGE"),
+        ("command.memory_budget_invalid", "memory_mb", 0, "MEMORY_BUDGET_OUT_OF_RANGE"),
+        ("command.output_budget_invalid", "output_bytes", 0, "OUTPUT_BUDGET_OUT_OF_RANGE"),
+        ("command.command_budget_invalid", "max_commands", 0, "COMMAND_BUDGET_OUT_OF_RANGE"),
+    ):
+        status, result = _invoke(lambda key=key, value=value: _command_probe(budget_key=key, budget_value=value))
+        closed = status == "ACCEPT" and _state_closed(result, blocker)
+        findings.append(_finding(
+            invariant_id,
+            "atlasquant_aion_developer_command_policy",
+            "Orcamento adulterado fica BLOCKED." if closed else "Orcamento adulterado ainda passa.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "MEDIUM",
+        ))
+
+    status, result = _invoke(lambda: _patch_probe(
+        "diff --git a/module.py b/module.py\n--- a/module.py\n+++ b/module.py\n"
+    ))
+    hunk_count = -1
+    if isinstance(result, Mapping):
+        files = list(result.get("files") or [])
+        if files and isinstance(files[0], Mapping):
+            hunk_count = int(files[0].get("hunk_count") or 0)
+    hunk_closed = status == "ACCEPT" and _state_closed(result, "DIFF_HUNK_REQUIRED") and hunk_count == 0
+    findings.append(_finding(
+        "patch.missing_hunk",
+        "atlasquant_aion_developer_patch_validation",
+        "Diff somente com cabecalhos fica BLOCKED e hunk_count permanece 0."
+        if hunk_closed else
+        "Diff sem hunk ainda fica pronto para revisao.",
+        "BLOCKED_BY_DESIGN" if hunk_closed else "GAP",
+        "" if hunk_closed else "MEDIUM",
+    ))
+
+    status, result = _invoke(lambda: _runner_probe(["test_module.py"] * (MAX_TEST_TARGETS + 1)))
+    gate_status, gate_result = _invoke(lambda: _runner_probe(
+        ["test_module.py"],
+        [f"GATE_{index}" for index in range(MAX_MANDATORY_GATES + 1)],
+    ))
+    excess_closed = status == "ACCEPT" and _state_closed(result, "TEST_TARGET_LIMIT_EXCEEDED")
+    gate_closed = gate_status == "ACCEPT" and _state_closed(gate_result, "MANDATORY_GATE_LIMIT_EXCEEDED")
+    findings.append(_finding(
+        "runner.excessive_test_targets",
+        "atlasquant_aion_developer_runner_contract",
+        "Excesso de testes ou gates bloqueia sem truncar o plano."
+        if excess_closed and gate_closed else
+        "Excesso de testes ou gates ainda e truncado e permanece pronto.",
+        "BLOCKED_BY_DESIGN" if excess_closed and gate_closed else "GAP",
+        "" if excess_closed and gate_closed else "MEDIUM",
+    ))
+
+    status, verified = _invoke(lambda: _runner_probe(["test_module.py"]))
+    claimed = (
+        status != "ACCEPT"
+        or not isinstance(verified, Mapping)
+        or verified.get("symlink_physical_boundary_verified") is not False
+        or verified.get("hardlink_physical_boundary_verified") is not False
+    )
+    findings.append(_finding(
+        "path.symlink_hardlink_physical_boundary_unverified",
+        "atlasquant_aion_developer_runner_contract",
+        "Fronteira fisica de symlink e hardlink nao foi comprovada e permanece falsa."
+        if not claimed else
+        "O contrato afirmou verificacao fisica de symlink ou hardlink sem prova.",
+        "BLOCKED_BY_DESIGN" if not claimed else "GAP",
+        "" if not claimed else "MEDIUM",
+    ))
+    return findings
+
+
 def audit_developer_chain() -> dict[str, Any]:
     """Inspect the local Developer contracts and return a deterministic report."""
     world = _World()
@@ -1254,6 +1699,7 @@ def audit_developer_chain() -> dict[str, Any]:
         findings.extend(_workflow_release_authority(world))
         findings.extend(_secrets_and_limits(world))
         findings.extend(_residual_surface(world))
+        findings.extend(_contract_gap_surface(world))
     finally:
         world.close()
 
@@ -1293,6 +1739,8 @@ def audit_developer_chain() -> dict[str, Any]:
         "automatic_deploy": False,
         "real_trading_enabled": False,
         "tool_output_is_authority": False,
+        "symlink_physical_boundary_verified": False,
+        "hardlink_physical_boundary_verified": False,
         "report_digest": sha256(
             json.dumps(findings, ensure_ascii=False, sort_keys=True).encode("utf-8")
         ).hexdigest()[:20],

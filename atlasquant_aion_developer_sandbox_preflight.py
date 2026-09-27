@@ -12,7 +12,8 @@ from __future__ import annotations
 
 from hashlib import sha256
 import json
-from pathlib import PurePosixPath
+import re
+import unicodedata
 from typing import Any, Mapping
 
 from atlasquant_aion_developer_builder_sandbox import SCHEMA as BUILDER_REQUEST_SCHEMA
@@ -20,12 +21,17 @@ from atlasquant_aion_observability import redact_text
 
 SCHEMA = "ATLASQUANT_AION_DEVELOPER_SANDBOX_PREFLIGHT_V1"
 
+MIN_RUNTIME_SECONDS = 1
 MAX_RUNTIME_SECONDS = 900
+MIN_MEMORY_MB = 128
 MAX_MEMORY_MB = 2048
+MIN_OUTPUT_BYTES = 1024
 MAX_OUTPUT_BYTES = 2_000_000
+MIN_COMMANDS = 1
 MAX_COMMANDS = 24
 ALLOWED_COMMAND_POLICY = "ALLOWLIST_ONLY"
 ALLOWED_ENVIRONMENT_KINDS = frozenset({"LOCAL_EPHEMERAL", "ISOLATED_WORKTREE"})
+_DRIVE_PREFIX_RE = re.compile(r"^[A-Za-z]:")
 
 
 def _clean(value: Any, limit: int = 800) -> str:
@@ -43,14 +49,51 @@ def _digest(value: Any, length: int = 18) -> str:
     return sha256(raw.encode("utf-8")).hexdigest()[:length].upper()
 
 
+def canonical_repository_relative_path(value: Any) -> str | None:
+    """Return a safe relative repository path, or None.
+
+    Absolute, drive-letter, UNC, tilde and traversal forms are rejected on the
+    raw text before separators are normalized. This does not stat the
+    filesystem and does not depend on the host operating system.
+    """
+    if not isinstance(value, str) or not value or value != value.strip():
+        return None
+    if any(unicodedata.category(char) == "Cc" for char in value):
+        return None
+    if (
+        value.startswith("/")
+        or value.startswith("\\")
+        or value.startswith("~")
+        or _DRIVE_PREFIX_RE.match(value) is not None
+    ):
+        return None
+    normalized = value.replace("\\", "/")
+    if (
+        not normalized
+        or normalized.startswith("/")
+        or normalized.startswith("~")
+        or _DRIVE_PREFIX_RE.match(normalized) is not None
+    ):
+        return None
+    parts = normalized.split("/")
+    if any(part in {"", ".", ".."} or ":" in part for part in parts):
+        return None
+    return normalized
+
+
 def _safe_relative_path(value: Any) -> bool:
-    raw = _clean(value, 500).replace("\\", "/")
-    if not raw or raw.startswith("/") or raw.startswith("~"):
-        return False
-    path = PurePosixPath(raw)
-    if path.is_absolute():
-        return False
-    return all(part not in {"", ".", ".."} for part in path.parts)
+    return canonical_repository_relative_path(value) is not None
+
+
+def _canonical_scope_paths(values: Any, *, label: str) -> list[str]:
+    out: list[str] = []
+    for raw in list(values or []):
+        path = canonical_repository_relative_path(raw)
+        if path is None:
+            raise ValueError(f"unsafe {label} repository path")
+        if path not in out:
+            out.append(path)
+    return out
 
 
 def build_sandbox_preflight(
@@ -101,14 +144,12 @@ def build_sandbox_preflight(
         if isinstance(builder_request.get("scope"), Mapping)
         else {}
     )
-    requested = [str(x) for x in list(scope.get("requested_files") or [])]
-    authorized = {str(x) for x in list(scope.get("authorized_files") or [])}
+    requested = _canonical_scope_paths(scope.get("requested_files"), label="requested")
+    authorized = set(_canonical_scope_paths(scope.get("authorized_files"), label="authorized"))
     if not requested:
         raise ValueError("requested file scope is empty")
     if any(path not in authorized for path in requested):
         raise ValueError("requested files exceed authorized scope")
-    if any(not _safe_relative_path(path) for path in requested):
-        raise ValueError("unsafe requested repository path")
     if scope.get("scope_expansion_allowed") is not False:
         raise ValueError("scope expansion must remain blocked")
     for flag in ("new_file_allowed", "delete_file_allowed", "rename_file_allowed"):
@@ -155,13 +196,13 @@ def build_sandbox_preflight(
         "output_bytes": int(output_bytes),
         "max_commands": int(max_commands),
     }
-    if budgets["runtime_seconds"] < 1 or budgets["runtime_seconds"] > MAX_RUNTIME_SECONDS:
+    if budgets["runtime_seconds"] < MIN_RUNTIME_SECONDS or budgets["runtime_seconds"] > MAX_RUNTIME_SECONDS:
         blockers.append("RUNTIME_BUDGET_OUT_OF_RANGE")
-    if budgets["memory_mb"] < 128 or budgets["memory_mb"] > MAX_MEMORY_MB:
+    if budgets["memory_mb"] < MIN_MEMORY_MB or budgets["memory_mb"] > MAX_MEMORY_MB:
         blockers.append("MEMORY_BUDGET_OUT_OF_RANGE")
-    if budgets["output_bytes"] < 1024 or budgets["output_bytes"] > MAX_OUTPUT_BYTES:
+    if budgets["output_bytes"] < MIN_OUTPUT_BYTES or budgets["output_bytes"] > MAX_OUTPUT_BYTES:
         blockers.append("OUTPUT_BUDGET_OUT_OF_RANGE")
-    if budgets["max_commands"] < 1 or budgets["max_commands"] > MAX_COMMANDS:
+    if budgets["max_commands"] < MIN_COMMANDS or budgets["max_commands"] > MAX_COMMANDS:
         blockers.append("COMMAND_BUDGET_OUT_OF_RANGE")
 
     blockers = list(dict.fromkeys(blockers))
@@ -206,7 +247,10 @@ def build_sandbox_preflight(
             "Every command/result must emit bounded audit evidence.",
             "Budget exhaustion must fail closed.",
             "Executor design review is separate from execution authorization.",
+            "Physical symlink and hardlink boundaries are not verified by this contract.",
         ],
+        "symlink_physical_boundary_verified": False,
+        "hardlink_physical_boundary_verified": False,
         "preflight_passed": not blockers,
         "executor_design_review_required": True,
         "execution_authorized": False,
@@ -227,11 +271,16 @@ def build_sandbox_preflight(
 
 __all__ = [
     "SCHEMA",
+    "MIN_RUNTIME_SECONDS",
     "MAX_RUNTIME_SECONDS",
+    "MIN_MEMORY_MB",
     "MAX_MEMORY_MB",
+    "MIN_OUTPUT_BYTES",
     "MAX_OUTPUT_BYTES",
+    "MIN_COMMANDS",
     "MAX_COMMANDS",
     "ALLOWED_COMMAND_POLICY",
     "ALLOWED_ENVIRONMENT_KINDS",
+    "canonical_repository_relative_path",
     "build_sandbox_preflight",
 ]

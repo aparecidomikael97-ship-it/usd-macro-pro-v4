@@ -56,6 +56,9 @@ _TEST_DISABLE_RE = re.compile(
     r"\bxfail\b"
     r")"
 )
+_TEST_DEF_RE = re.compile(r"(?i)^\s*(?:async\s+)?def\s+(test_[A-Za-z0-9_]*)\b")
+_TEST_NEUTRAL_RE = re.compile(r"(?i)^\s*(?:pass|return)\b")
+_HUNK_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@")
 
 
 def _clean(value: Any, limit: int = 1200) -> str:
@@ -100,8 +103,30 @@ def _is_secret_path(path: str) -> bool:
 
 
 def _line_has_secret(line: str) -> bool:
-    sample = line[:4000]
-    return any(pattern.search(sample) for pattern in _SECRET_PATTERNS)
+    """Scan the entire accepted line. A prefix window must not hide a secret."""
+    return any(pattern.search(line) for pattern in _SECRET_PATTERNS)
+
+
+def _header_path(line: str) -> str:
+    return line[4:].split("\t", 1)[0]
+
+
+def _finalize_patch_section(section: dict[str, Any]) -> None:
+    if int(section.get("minus_seen") or 0) > 1 or int(section.get("plus_seen") or 0) > 1:
+        section["blockers"].append("DIFF_HEADER_DUPLICATE")
+    minus = section.get("minus_header")
+    plus = section.get("plus_header")
+    if not minus or not plus:
+        section["blockers"].append("DIFF_HEADER_MISSING")
+    elif section.get("operation") == "MODIFY":
+        expected_minus = "a/" + str(section.get("old_path") or "")
+        expected_plus = "b/" + str(section.get("path") or "")
+        if minus != expected_minus or plus != expected_plus:
+            section["blockers"].append("DIFF_HEADER_PATH_MISMATCH")
+        if int(section.get("hunk_count") or 0) < 1:
+            section["blockers"].append("DIFF_HUNK_REQUIRED")
+    if section.get("header_order_error"):
+        section["blockers"].append("DIFF_HEADER_OUT_OF_ORDER")
 
 
 def validate_patch(
@@ -185,6 +210,8 @@ def validate_patch(
                 raise ValueError("quoted git paths are not supported by patch validator v1")
             old_path = _safe_relative_path(old_raw)
             new_path = _safe_relative_path(new_raw)
+            if current is not None:
+                _finalize_patch_section(current)
             current = {
                 "old_path": old_path,
                 "path": new_path,
@@ -192,6 +219,13 @@ def validate_patch(
                 "added_lines": 0,
                 "deleted_lines": 0,
                 "secret_additions": 0,
+                "hunk_count": 0,
+                "minus_seen": 0,
+                "plus_seen": 0,
+                "minus_header": None,
+                "plus_header": None,
+                "header_order_error": False,
+                "added_test_names": [],
                 "blockers": [],
             }
             if old_path != new_path:
@@ -219,22 +253,61 @@ def validate_patch(
             current["blockers"].append("FILE_MODE_CHANGE_NOT_ALLOWED")
         elif line.startswith("GIT binary patch") or lowered.startswith("binary files "):
             current["blockers"].append("BINARY_PATCH_NOT_ALLOWED")
-        elif line.startswith("--- ") and line.endswith("/dev/null"):
-            current["operation"] = "CREATE"
-            current["blockers"].append("NEW_FILE_NOT_ALLOWED")
-        elif line.startswith("+++ ") and line.endswith("/dev/null"):
-            current["operation"] = "DELETE"
-            current["blockers"].append("DELETE_FILE_NOT_ALLOWED")
+        elif line.startswith("--- "):
+            header = _header_path(line)
+            if current.get("hunk_count") or current.get("plus_header") is not None:
+                current["header_order_error"] = True
+            current["minus_seen"] = int(current.get("minus_seen") or 0) + 1
+            current["minus_header"] = header
+            if header == "/dev/null":
+                current["operation"] = "CREATE"
+                current["blockers"].append("NEW_FILE_NOT_ALLOWED")
+        elif line.startswith("+++ "):
+            header = _header_path(line)
+            if current.get("hunk_count") or current.get("minus_header") is None:
+                current["header_order_error"] = True
+            current["plus_seen"] = int(current.get("plus_seen") or 0) + 1
+            current["plus_header"] = header
+            if header == "/dev/null":
+                current["operation"] = "DELETE"
+                current["blockers"].append("DELETE_FILE_NOT_ALLOWED")
+        elif _HUNK_RE.match(line):
+            if current.get("minus_header") is None or current.get("plus_header") is None:
+                current["header_order_error"] = True
+            current["hunk_count"] = int(current.get("hunk_count") or 0) + 1
+        elif line.startswith("@@"):
+            current["blockers"].append("DIFF_HUNK_INVALID")
         elif line.startswith("+") and not line.startswith("+++"):
             current["added_lines"] += 1
-            if _line_has_secret(line[1:]):
+            added = line[1:]
+            if _line_has_secret(added):
                 current["secret_additions"] += 1
                 added_secret_count += 1
-            if _is_test_path(str(current["path"])) and _TEST_DISABLE_RE.search(line[1:]):
-                current["blockers"].append("TEST_DELETION_OR_WEAKENING_NOT_ALLOWED")
+            if _is_test_path(str(current["path"])):
+                if _TEST_DISABLE_RE.search(added):
+                    current["blockers"].append("TEST_DELETION_OR_WEAKENING_NOT_ALLOWED")
+                definition = _TEST_DEF_RE.match(added)
+                if definition:
+                    # Without the baseline file this contract cannot prove an added
+                    # test function is new rather than a shadow of an existing one.
+                    current["blockers"].append(
+                        "TEST_ADDITIVE_NEUTRALIZATION_REQUIRES_SEPARATE_REVIEW"
+                    )
+                    name = definition.group(1)
+                    if name in current["added_test_names"]:
+                        current["blockers"].append(
+                            "TEST_ADDITIVE_NEUTRALIZATION_REQUIRES_SEPARATE_REVIEW"
+                        )
+                    current["added_test_names"].append(name)
+                elif _TEST_NEUTRAL_RE.match(added):
+                    current["blockers"].append(
+                        "TEST_ADDITIVE_NEUTRALIZATION_REQUIRES_SEPARATE_REVIEW"
+                    )
         elif line.startswith("-") and not line.startswith("---"):
             current["deleted_lines"] += 1
 
+    if current is not None:
+        _finalize_patch_section(current)
     if not sections:
         raise ValueError("no unified diff file sections found")
     if len(sections) > MAX_PATCH_FILES:
@@ -275,6 +348,7 @@ def validate_patch(
             "operation": str(section["operation"]),
             "added_lines": int(section["added_lines"]),
             "deleted_lines": int(section["deleted_lines"]),
+            "hunk_count": int(section.get("hunk_count") or 0),
             "secret_additions": int(section["secret_additions"]),
             "blockers": blockers,
         })
@@ -322,6 +396,8 @@ def validate_patch(
         "automatic_deploy": False,
         "production_change_allowed": False,
         "real_trading_enabled": False,
+        "symlink_physical_boundary_verified": False,
+        "hardlink_physical_boundary_verified": False,
         "tool_output_is_authority": False,
     }
 

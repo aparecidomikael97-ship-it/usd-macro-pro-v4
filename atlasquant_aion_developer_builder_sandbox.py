@@ -251,8 +251,14 @@ def build_builder_sandbox_request(
     )
     if test_contract.get("test_deletion_allowed") is not False or test_contract.get("test_weakening_allowed") is not False:
         raise ValueError("test deletion or weakening must remain forbidden")
-    candidate_tests = _unique(test_contract.get("candidate_tests"), 120)
-    mandatory_gates = _unique(test_contract.get("mandatory_gates"), 40)
+    raw_candidate_tests = list(test_contract.get("candidate_tests") or [])
+    raw_gates = list(test_contract.get("mandatory_gates") or [])
+    if len(raw_candidate_tests) > 120:
+        raise ValueError("candidate tests exceed builder limit")
+    if len(raw_gates) > 40:
+        raise ValueError("mandatory gates exceed builder limit")
+    candidate_tests = _unique(raw_candidate_tests, 120)
+    mandatory_gates = _unique(raw_gates, 40)
     if not candidate_tests:
         blockers.append("TEST_CANDIDATES_MISSING")
     if not mandatory_gates:
