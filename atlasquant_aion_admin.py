@@ -28,6 +28,12 @@ from atlasquant_aion_core import (
     route_context,
 )
 from atlasquant_aion_gateway import local_answer, provider_status
+from atlasquant_aion_workspaces import (
+    AION_PERSONAS,
+    admin_brief_lines,
+    admin_greeting,
+    developer_trust_policy,
+)
 from atlasquant_aion_memory import (
     canonical_memory_summary,
     checkpoint_digest,
@@ -435,7 +441,8 @@ def _display_name(access: Mapping[str, Any]) -> str:
     configured = _secret("AION_ADMIN_DISPLAY_NAME")
     if configured:
         return configured[:64]
-    username = str(access.get("username") or "").strip()
+    session = access.get("session") if isinstance(access.get("session"), Mapping) else {}
+    username = str(access.get("username") or session.get("username") or "").strip()
     return username[:64] if username else "Administrador"
 
 
@@ -489,6 +496,18 @@ def _render_header(
         '<div class="aion-truth"><strong>Regra da Verdade:</strong> '
         'se a fonte não estiver confirmada, o AION declara que não sabe ou que precisa verificar. '
         'Nenhum estado externo é inventado.</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _render_admin_brief(access: Mapping[str, Any], executive_snapshot: Mapping[str, Any]) -> None:
+    greeting = admin_greeting(access, _display_name(access))
+    if not greeting:
+        return
+    items = "".join(f"<li>{escape(line)}</li>" for line in admin_brief_lines(executive_snapshot))
+    st.markdown(
+        f'<div class="aion-truth" id="aion-admin-brief"><strong>{escape(greeting)}</strong>'
+        f'<ul style="margin:6px 0 0 18px;padding:0">{items}</ul></div>',
         unsafe_allow_html=True,
     )
 
@@ -2001,6 +2020,14 @@ def _render_central(
     cols[1].metric("Tarefas ativas", summary["active"])
     cols[2].metric("Aguardando aprovação", summary["waiting_approval"])
     cols[3].metric("Ordens reais", "BLOQUEADAS")
+
+    with st.expander("Personas AION e onde cada uma trabalha"):
+        for item in AION_PERSONAS:
+            st.markdown(f"- **{item['title']}** → área `{item['workspace']}`: {item['purpose']}")
+        st.caption(
+            "Cada persona tem contexto e escopo próprios. O escopo só restringe o Guardian; "
+            "nenhuma persona amplia as próprias permissões."
+        )
 
     view_mode = st.selectbox(
         "Visualização da Central",
@@ -3904,6 +3931,16 @@ def _render_development(
         ),
         key="aion_development_voice",
     )
+    with st.expander("Política de confiança e rollback do AION Desenvolvedor"):
+        policy = developer_trust_policy()
+        for row in policy["levels"]:
+            st.markdown(f"- **Nível {row['level']} · {row['name']}:** {row['may']} Portão humano: {row['human_gate']}.")
+        st.markdown("**Nunca, em nenhum nível:**")
+        for item in policy["forbidden"]:
+            st.markdown(f"- {item}")
+        st.markdown("**Rollback:**")
+        for item in policy["rollback"]:
+            st.markdown(f"- {item}")
     objective = st.text_area(
         "Missão de desenvolvimento",
         key="aion_dev_mission",
@@ -5584,6 +5621,7 @@ def render_aion_admin_console(
         str(provider.get("state") or "UNKNOWN"),
         system,
     )
+    _render_admin_brief(access_map, executive_snapshot)
     _render_executive_grid(memory_summary, runtime_result, provider, market)
 
     if foundation_diagnostics:
