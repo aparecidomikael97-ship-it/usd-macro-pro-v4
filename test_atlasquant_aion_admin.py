@@ -7,6 +7,7 @@ from atlasquant_aion_admin import (
     _attention_queue,
     _critical_surface_rows,
     _aion_memory_hits,
+    _local_contract_snapshot,
 )
 from atlasquant_aion_wisdom import new_wisdom_entry
 
@@ -59,6 +60,34 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("O mapa é somente leitura", src)
         self.assertIn("não aprova, publica, cobra, provisiona acesso nem envia ordens", src)
         self.assertIn('state": "REAL BLOQUEADO"', src)
+
+    def test_local_contract_snapshot_is_passive_and_closed(self):
+        snapshot=_local_contract_snapshot()
+        self.assertEqual(snapshot["schema"],"ATLASQUANT_AION_LOCAL_CONTRACT_SNAPSHOT_V1")
+        self.assertEqual(snapshot["state"],"PASS")
+        self.assertEqual(snapshot["registry_tools"],12)
+        self.assertEqual(snapshot["local_tools"],11)
+        self.assertEqual(snapshot["trace_sources"],11)
+        self.assertFalse(snapshot["write_in_allowlist"])
+        self.assertFalse(snapshot["full_audit_executed"])
+        self.assertFalse(snapshot["executes_action"])
+        self.assertFalse(snapshot["external_action_executed"])
+        self.assertFalse(snapshot["real_orders_enabled"])
+        self.assertFalse(snapshot["tool_output_is_authority"])
+
+    def test_central_contract_health_runs_full_audit_only_after_button(self):
+        src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Saúde dos contratos locais",src)
+        self.assertIn("Rodar auditor local",src)
+        self.assertIn('key="aion_run_contract_audit"',src)
+        self.assertIn("Auditoria completa ainda não foi rodada nesta sessão",src)
+        self.assertIn("from atlasquant_aion_contract_auditor import audit_aion_local_contracts",src)
+        self.assertIn("Resultado diagnóstico somente leitura",src)
+        self.assertIn("PASS não concede autoridade",src)
+        button_pos=src.index('if st.button(\n        "Rodar auditor local"')
+        audit_pos=src.index("report = audit_aion_local_contracts()",button_pos)
+        self.assertGreater(audit_pos,button_pos)
+        self.assertIn("_render_local_contract_health()",src)
 
     def test_central_operations_map_has_mobile_layout(self):
         self.assertIn(".aion-workspace-grid", AION_ADMIN_CSS)

@@ -217,11 +217,13 @@ from atlasquant_aion_portable import (
 )
 from atlasquant_aion_vault import vault_summary
 from atlasquant_aion_tool_hub import (
+    default_tool_hub,
     normalize_tool_hub,
     plan_tool_call,
     tool_hub_summary,
 )
 from atlasquant_aion_local_executor import local_allowlist
+from atlasquant_aion_local_traceability import SOURCE_CATALOG
 from atlasquant_aion_durable_tasks import (
     durable_tasks_summary,
     new_durable_task,
@@ -791,6 +793,193 @@ def _render_workspace_overview(
     st.markdown(
         '<div class="aion-workspace-grid">' + "".join(cards) + "</div>",
         unsafe_allow_html=True,
+    )
+
+
+def _local_contract_snapshot() -> dict[str, Any]:
+    """Cheap/passive contract posture. It does not run handlers or the full auditor."""
+    allow = [dict(item) for item in local_allowlist() if isinstance(item, Mapping)]
+    hub = default_tool_hub()
+    tools = [
+        dict(item)
+        for item in list((hub.get("tools") if isinstance(hub, Mapping) else []) or [])
+        if isinstance(item, Mapping)
+    ]
+    local_ids = [str(item.get("tool_id") or "") for item in allow if str(item.get("tool_id") or "")]
+    trace_ids = set(str(item) for item in SOURCE_CATALOG)
+    write_id = "aion.checkpoint.prepare_save"
+    safe_kinds = {"READ", "SEARCH", "DRAFT"}
+    issues = []
+
+    if len(local_ids) != 11 or len(set(local_ids)) != 11:
+        issues.append("LOCAL_ALLOWLIST_COUNT")
+    if write_id in local_ids:
+        issues.append("WRITE_IN_LOCAL_ALLOWLIST")
+    if any(str(item.get("kind") or "") not in safe_kinds for item in allow):
+        issues.append("FORBIDDEN_KIND_IN_ALLOWLIST")
+    if set(local_ids) != trace_ids:
+        issues.append("TRACEABILITY_COVERAGE_MISMATCH")
+
+    hub_index = {str(item.get("tool_id") or ""): item for item in tools}
+    for tool_id in local_ids:
+        item = hub_index.get(tool_id)
+        if not item:
+            issues.append("LOCAL_TOOL_MISSING_FROM_HUB")
+            break
+        if (
+            str(item.get("state") or "") != "LOCAL_READY"
+            or bool(item.get("connector_id"))
+            or bool(item.get("external_side_effects"))
+        ):
+            issues.append("LOCAL_TOOL_HUB_FLAGS")
+            break
+
+    write = hub_index.get(write_id) or {}
+    if str(write.get("kind") or "") != "WRITE":
+        issues.append("WRITE_CONTRACT_MISSING")
+
+    kind_counts = {"READ": 0, "SEARCH": 0, "DRAFT": 0}
+    for item in allow:
+        kind = str(item.get("kind") or "")
+        if kind in kind_counts:
+            kind_counts[kind] += 1
+
+    return {
+        "schema": "ATLASQUANT_AION_LOCAL_CONTRACT_SNAPSHOT_V1",
+        "state": "FAIL" if issues else "PASS",
+        "issues": sorted(set(issues)),
+        "registry_tools": len(tools),
+        "local_tools": len(local_ids),
+        "trace_sources": len(trace_ids),
+        "kind_counts": kind_counts,
+        "write_in_allowlist": write_id in local_ids,
+        "full_audit_executed": False,
+        "executes_action": False,
+        "external_action_executed": False,
+        "real_orders_enabled": False,
+        "tool_output_is_authority": False,
+    }
+
+
+def _render_local_contract_health() -> None:
+    snapshot = _local_contract_snapshot()
+    st.markdown("#### Saúde dos contratos locais")
+    st.caption(
+        "Postura passiva e auditoria offline do caminho local do AION. "
+        "Abrir este painel não executa handler, não chama rede, não publica, não faz deploy "
+        "e não envia ordens."
+    )
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Contrato estático", str(snapshot.get("state") or "UNKNOWN"))
+    c2.metric("Tools locais", int(snapshot.get("local_tools") or 0))
+    c3.metric("Fontes rastreáveis", int(snapshot.get("trace_sources") or 0))
+    c4.metric("WRITE na allowlist", "NÃO" if not snapshot.get("write_in_allowlist") else "SIM")
+
+    kinds = snapshot.get("kind_counts") if isinstance(snapshot.get("kind_counts"), Mapping) else {}
+    st.caption(
+        "Allowlist: "
+        f"READ {int(kinds.get('READ') or 0)} · "
+        f"SEARCH {int(kinds.get('SEARCH') or 0)} · "
+        f"DRAFT {int(kinds.get('DRAFT') or 0)} · "
+        f"registry total {int(snapshot.get('registry_tools') or 0)}."
+    )
+    if snapshot.get("state") == "PASS":
+        st.success(
+            "Contrato estático local coerente nesta renderização. "
+            "Isso não substitui a auditoria completa nem autoriza ação."
+        )
+    else:
+        st.error(
+            "Drift detectado no contrato estático local: "
+            + " · ".join(str(x) for x in list(snapshot.get("issues") or []))
+        )
+
+    report = (
+        st.session_state.get("aion_contract_audit_report")
+        if isinstance(st.session_state.get("aion_contract_audit_report"), Mapping)
+        else None
+    )
+    if st.button(
+        "Rodar auditor local",
+        key="aion_run_contract_audit",
+        help=(
+            "Executa somente o auditor offline/local. "
+            "Não usa rede, connector, deploy, publicação, pagamento ou trading real."
+        ),
+    ):
+        try:
+            from atlasquant_aion_contract_auditor import audit_aion_local_contracts
+
+            report = audit_aion_local_contracts()
+        except Exception as exc:
+            report = {
+                "schema": "ATLASQUANT_AION_CONTRACT_AUDIT_V1",
+                "state": "ERROR",
+                "checks_total": 0,
+                "passed": 0,
+                "failed": 1,
+                "warnings": [],
+                "findings": [{
+                    "invariant_id": "audit.runtime",
+                    "module": "atlasquant_aion_contract_auditor",
+                    "description": "Falha isolada do auditor: " + type(exc).__name__,
+                    "severity": "FAIL",
+                }],
+                "executes_action": False,
+                "external_action_executed": False,
+                "real_orders_enabled": False,
+                "tool_output_is_authority": False,
+            }
+        st.session_state["aion_contract_audit_report"] = report
+
+    if not isinstance(report, Mapping):
+        st.info(
+            "Auditoria completa ainda não foi rodada nesta sessão. "
+            "Clique no botão apenas quando quiser executar os checks offline."
+        )
+        return
+
+    state = str(report.get("state") or "UNKNOWN").upper()
+    warnings = [
+        item for item in list(report.get("warnings") or [])
+        if isinstance(item, Mapping)
+    ]
+    findings = [
+        item for item in list(report.get("findings") or [])
+        if isinstance(item, Mapping)
+    ]
+    a1, a2, a3, a4 = st.columns(4)
+    a1.metric("Auditoria completa", state)
+    a2.metric("Checks", int(report.get("checks_total") or 0))
+    a3.metric("Falhas", int(report.get("failed") or 0))
+    a4.metric("Avisos", len(warnings))
+
+    if state == "PASS" and not findings:
+        st.success(
+            f"Auditor local PASS · {int(report.get('passed') or 0)}/"
+            f"{int(report.get('checks_total') or 0)} grupos sem drift confirmado."
+        )
+    else:
+        st.error(
+            "Auditoria local encontrou falha ou não pôde confirmar o contrato. "
+            "Nenhuma correção é executada automaticamente."
+        )
+
+    rows = []
+    for item in (findings + warnings)[:20]:
+        rows.append({
+            "Tipo": str(item.get("severity") or "FAIL"),
+            "Invariante": str(item.get("invariant_id") or ""),
+            "Módulo": str(item.get("module") or ""),
+            "Descrição": str(item.get("description") or ""),
+        })
+    if rows:
+        st.dataframe(rows, width="stretch", hide_index=True)
+
+    st.caption(
+        "Resultado diagnóstico somente leitura. PASS não concede autoridade; "
+        "FAIL não dispara reparo, merge, deploy, publicação, cobrança ou trading."
     )
 
 
@@ -2105,6 +2294,7 @@ def _render_central(
             (system_context.get("release_gate") if isinstance(system_context, Mapping) else None),
         )
         _render_memory_security_posture(access, checkpoint, runtime_result, flags)
+        _render_local_contract_health()
         _render_security_incident_center(incident_snapshot)
         _render_continuity_center(checkpoint)
     else:
