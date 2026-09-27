@@ -1,6 +1,7 @@
 # AION — Checkpoint do Ecossistema e UX
 
-Data: 2026-09-27  
+Data: 2026-09-27
+
 Estado: **DECISÕES APROVADAS · OBRIGATÓRIAS · NÃO ALTERAM A ORDEM DO CHECKPOINT MESTRE**
 
 ## Regra de continuidade
