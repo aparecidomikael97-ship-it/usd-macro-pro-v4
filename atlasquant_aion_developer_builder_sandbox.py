@@ -20,8 +20,21 @@ from atlasquant_aion_developer_implementation import (
     REQUESTED_TRUST_LEVEL,
     SCHEMA as IMPLEMENTATION_SCHEMA,
 )
-from atlasquant_aion_developer_intelligence import SCHEMA as INTELLIGENCE_SCHEMA
+from atlasquant_aion_developer_intelligence import (
+    SCHEMA as INTELLIGENCE_SCHEMA,
+    validate_snapshot_integrity,
+)
 from atlasquant_aion_observability import redact_text
+from atlasquant_aion_developer_manifest import (
+    authorization_manifest_id,
+    canonical_identity,
+    implementation_base_manifest_id,
+    implementation_readiness_manifest_id,
+    normalize_ref,
+    release_sensitive_path,
+    validate_candidate_ref,
+    validate_isolated_branch,
+)
 
 SCHEMA = "ATLASQUANT_AION_DEVELOPER_BUILDER_SANDBOX_REQUEST_V1"
 MAX_FILES = 80
@@ -38,12 +51,11 @@ def _clean(value: Any, limit: int = 1200) -> str:
 
 
 def _identity_key(value: Any) -> str:
-    normalized = unicodedata.normalize("NFKC", _clean(value, 160))
-    return " ".join(normalized.split()).casefold()
+    return canonical_identity(value)
 
 
 def _normalize_ref(value: Any, limit: int = 240) -> str:
-    return unicodedata.normalize("NFKC", _clean(value, limit))
+    return normalize_ref(value, limit)
 
 
 def _unique(values: Sequence[Any] | None, limit: int = MAX_FILES) -> list[str]:
@@ -69,35 +81,11 @@ def _digest(value: Any, length: int = 18) -> str:
 
 
 def _validate_branch(value: Any) -> str:
-    branch = _normalize_ref(value, 240)
-    lower = branch.casefold()
-    if not branch or lower in _FORBIDDEN_BRANCHES:
-        raise ValueError("isolated non-main branch required")
-    if branch.startswith("/") or branch.endswith("/") or "//" in branch:
-        raise ValueError("invalid isolated branch")
-    if ".." in branch or not _BRANCH_RE.fullmatch(branch):
-        raise ValueError("invalid isolated branch")
-    return branch
+    return validate_isolated_branch(value)
 
 
 def _validate_candidate_ref(value: Any, branch: str) -> str:
-    candidate = _normalize_ref(value, 240)
-    if not candidate:
-        raise ValueError("candidate_ref required")
-    normalized_branch = _normalize_ref(branch, 240)
-    allowed_roots = [
-        normalized_branch,
-        f"refs/heads/{normalized_branch}",
-    ]
-    candidate_key = candidate.casefold()
-    if not any(
-        candidate_key == root.casefold()
-        or candidate_key.startswith((root + "@").casefold())
-        for root in allowed_roots
-    ):
-        raise ValueError("candidate_ref must be bound to isolated branch")
-    return candidate
-
+    return validate_candidate_ref(value, branch)
 
 def build_builder_sandbox_request(
     snapshot: Mapping[str, Any],
@@ -114,6 +102,9 @@ def build_builder_sandbox_request(
     snapshot_digest = str(snapshot.get("snapshot_digest") or "")
     if not snapshot_digest:
         raise ValueError("snapshot digest required")
+    validate_snapshot_integrity(snapshot)
+    if bool(snapshot.get("truncated")):
+        raise ValueError("truncated snapshot cannot enter builder sandbox")
     if any(bool(snapshot.get(key)) for key in (
         "content_included",
         "executes_repository_code",
@@ -162,6 +153,15 @@ def build_builder_sandbox_request(
         raise ValueError("implementation authorization widened external authority")
     if auth.get("rollback_recorded") is not True:
         raise ValueError("rollback must be recorded before builder request")
+    if str(implementation.get("envelope_manifest_id") or "") != implementation_base_manifest_id(implementation):
+        raise ValueError("implementation envelope manifest mismatch")
+    current_readiness_manifest = implementation_readiness_manifest_id(implementation)
+    if str(implementation.get("readiness_manifest_id") or "") != current_readiness_manifest:
+        raise ValueError("implementation readiness manifest mismatch")
+    if str(auth.get("authorized_readiness_manifest_id") or "") != current_readiness_manifest:
+        raise ValueError("authorization is not bound to current readiness manifest")
+    if str(auth.get("authorization_id") or "") != authorization_manifest_id(implementation, auth):
+        raise ValueError("implementation authorization integrity mismatch")
 
     readiness = (
         implementation.get("readiness")
@@ -195,6 +195,13 @@ def build_builder_sandbox_request(
     candidate = _validate_candidate_ref(candidate_ref, branch_name)
     if not baseline or baseline.casefold() == candidate.casefold():
         raise ValueError("distinct baseline_ref and candidate_ref are required")
+    revision = implementation.get("revision_contract") if isinstance(implementation.get("revision_contract"), Mapping) else {}
+    if branch_name != str(revision.get("branch") or ""):
+        raise ValueError("builder branch differs from approved revision contract")
+    if baseline != str(revision.get("baseline_ref") or ""):
+        raise ValueError("builder baseline differs from approved revision contract")
+    if candidate != str(revision.get("candidate_ref") or ""):
+        raise ValueError("builder candidate differs from approved revision contract")
 
     known = {
         str(row.get("path") or ""): dict(row)
@@ -206,15 +213,19 @@ def build_builder_sandbox_request(
         if isinstance(implementation.get("scope"), Mapping)
         else {}
     )
-    editable = _unique(scope.get("editable_files"), MAX_FILES)
-    source_files = set(_unique(scope.get("source_files"), MAX_FILES))
+    raw_editable = list(scope.get("editable_files") or [])
+    raw_source = list(scope.get("source_files") or [])
+    if len(raw_editable) > MAX_FILES or len(raw_source) > MAX_FILES:
+        raise ValueError("authorized file scope exceeds builder limit")
+    editable = _unique(raw_editable, MAX_FILES)
+    source_files = set(_unique(raw_source, MAX_FILES))
     if not editable or not source_files:
         raise ValueError("authorized editable scope is empty")
 
-    requested = _unique(
-        requested_files if requested_files is not None else editable,
-        MAX_FILES,
-    )
+    raw_requested = list(requested_files) if requested_files is not None else list(editable)
+    if len(raw_requested) > MAX_FILES:
+        raise ValueError("builder request exceeds file limit")
+    requested = _unique(raw_requested, MAX_FILES)
     if not requested:
         raise ValueError("builder request files are empty")
     if any(path not in editable for path in requested):
@@ -225,12 +236,13 @@ def build_builder_sandbox_request(
         raise ValueError("builder request must include at least one source file")
 
     blockers: list[str] = []
-    workflow_files = [
+    release_files = [
         path for path in requested
         if str(known[path].get("category") or "") == "WORKFLOW"
+        or release_sensitive_path(path)
     ]
-    if workflow_files:
-        blockers.append("WORKFLOW_CHANGE_REQUIRES_SEPARATE_RELEASE_REVIEW")
+    if release_files:
+        blockers.append("RELEASE_SURFACE_REQUIRES_SEPARATE_RELEASE_REVIEW")
 
     test_contract = (
         implementation.get("test_contract")

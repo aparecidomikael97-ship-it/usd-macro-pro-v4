@@ -263,6 +263,51 @@ class AionDeveloperImplementationEnvelopeTests(unittest.TestCase):
         self.assertFalse(approved["automatic_deploy"])
         self.assertFalse(approved["writes_files"])
 
+    def test_readiness_manifest_blocks_scope_or_test_mutation(self):
+        tmp, snapshot, package, correction, confirmed = self._fixture()
+        try:
+            envelope = build_implementation_envelope(snapshot, package, confirmed)
+            ready = prepare_implementation_readiness(
+                envelope,rollback_plan="Reverter mudança.",
+                builder_actor="builder",reviewer_actor="reviewer",breaker_actor="breaker",
+                readiness_refs=["ready:1"],
+            )
+            changed = dict(ready)
+            changed["scope"] = dict(ready["scope"])
+            changed["scope"]["editable_files"] = list(ready["scope"]["editable_files"]) + ["other.py"]
+            with self.assertRaises(ValueError):
+                approve_implementation_session(
+                    changed,approved=True,approver_actor="human-approver",
+                    approval_refs=["approval:1"],
+                )
+            changed2 = dict(ready)
+            changed2["test_contract"] = dict(ready["test_contract"])
+            changed2["test_contract"]["test_deletion_allowed"] = True
+            with self.assertRaises(ValueError):
+                approve_implementation_session(
+                    changed2,approved=True,approver_actor="human-approver",
+                    approval_refs=["approval:1"],
+                )
+        finally:
+            tmp.cleanup()
+
+    def test_approver_must_be_independent_from_developer_roles(self):
+        tmp, snapshot, package, correction, confirmed = self._fixture()
+        try:
+            envelope = build_implementation_envelope(snapshot, package, confirmed)
+            ready = prepare_implementation_readiness(
+                envelope,rollback_plan="Reverter mudança.",
+                builder_actor="builder",reviewer_actor="reviewer",breaker_actor="breaker",
+                readiness_refs=["ready:1"],
+            )
+            with self.assertRaises(ValueError):
+                approve_implementation_session(
+                    ready,approved=True,approver_actor=" BUILDER ",
+                    approval_refs=["approval:1"],
+                )
+        finally:
+            tmp.cleanup()
+
     def test_lineage_mismatch_fails_closed(self):
         tmp, snapshot, package, correction, confirmed = self._fixture()
         try:

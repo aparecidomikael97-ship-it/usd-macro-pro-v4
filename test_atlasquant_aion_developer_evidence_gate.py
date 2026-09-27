@@ -146,6 +146,20 @@ class AionDeveloperEvidenceGateTests(unittest.TestCase):
         self.assertEqual(gate["state"], "INSUFFICIENT_EVIDENCE")
         self.assertIn("CHANGED_FILE_OUTSIDE_ALLOWED_SCOPE", gate["blockers"])
 
+    def test_gate_is_bound_to_exact_correction_manifest(self):
+        tmp, snapshot, diagnostic, correction, hypothesis, test_id = self._fixture()
+        try:
+            gate = self._ready_gate(correction, hypothesis, test_id, snapshot, diagnostic)
+            changed = dict(correction)
+            changed["target_files"] = list(correction["target_files"]) + ["other.py"]
+            with self.assertRaises(ValueError):
+                confirm_root_cause_human_review(
+                    changed,gate,approved=True,reviewer_actor="human-reviewer",
+                    review_evidence_refs=["review:1"],
+                )
+        finally:
+            tmp.cleanup()
+
     def test_human_confirmation_requires_explicit_approval(self):
         tmp, snapshot, diagnostic, correction, hypothesis, test_id = self._fixture()
         try:

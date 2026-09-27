@@ -101,7 +101,7 @@ class AionDeveloperBuilderSandboxTests(unittest.TestCase):
                 implementation,
                 branch="cursor/admin-fix",
                 baseline_ref="main@a",
-                candidate_ref="cursor/admin-fix@c",
+                candidate_ref="cursor/admin-fix@b",
             )
         finally:
             tmp.cleanup()
@@ -161,7 +161,7 @@ class AionDeveloperBuilderSandboxTests(unittest.TestCase):
                 implementation,
                 branch="cursor/admin-fix",
                 baseline_ref="main@a",
-                candidate_ref="refs/heads/cursor/admin-fix@c",
+                candidate_ref="refs/heads/cursor/admin-fix@b",
             )
         finally:
             tmp.cleanup()
@@ -179,7 +179,82 @@ class AionDeveloperBuilderSandboxTests(unittest.TestCase):
                     changed,
                     branch="cursor/admin-fix",
                     baseline_ref="main@a",
-                    candidate_ref="cursor/admin-fix@c",
+                    candidate_ref="cursor/admin-fix@b",
+                )
+        finally:
+            tmp.cleanup()
+
+    def test_approved_revision_contract_blocks_ref_replay(self):
+        tmp, snapshot, implementation = self._fixture()
+        try:
+            with self.assertRaises(ValueError):
+                build_builder_sandbox_request(
+                    snapshot,implementation,branch="cursor/admin-fix",
+                    baseline_ref="other@a",candidate_ref="cursor/admin-fix@b",
+                )
+            with self.assertRaises(ValueError):
+                build_builder_sandbox_request(
+                    snapshot,implementation,branch="cursor/admin-fix",
+                    baseline_ref="main@a",candidate_ref="cursor/admin-fix@other",
+                )
+        finally:
+            tmp.cleanup()
+
+    def test_authorization_manifest_blocks_post_approval_scope_expansion(self):
+        tmp, snapshot, implementation = self._fixture()
+        try:
+            changed = dict(implementation)
+            changed["scope"] = dict(implementation["scope"])
+            changed["scope"]["editable_files"] = list(implementation["scope"]["editable_files"]) + ["other.py"]
+            with self.assertRaises(ValueError):
+                build_builder_sandbox_request(
+                    snapshot,changed,branch="cursor/admin-fix",
+                    baseline_ref="main@a",candidate_ref="cursor/admin-fix@b",
+                )
+        finally:
+            tmp.cleanup()
+
+    def test_authorization_id_tampering_is_rejected(self):
+        tmp, snapshot, implementation = self._fixture()
+        try:
+            changed = dict(implementation)
+            changed["authorization"] = dict(implementation["authorization"])
+            changed["authorization"]["authorization_id"] = "DEVAUTH-STOLEN"
+            with self.assertRaises(ValueError):
+                build_builder_sandbox_request(
+                    snapshot,changed,branch="cursor/admin-fix",
+                    baseline_ref="main@a",candidate_ref="cursor/admin-fix@b",
+                )
+        finally:
+            tmp.cleanup()
+
+    def test_equivalent_production_branch_families_are_rejected(self):
+        tmp, snapshot, implementation = self._fixture()
+        try:
+            for bad in (
+                "refs/heads/production","refs/heads/prod","refs/heads/live",
+                "origin/main","main/hotfix","production/hotfix",
+            ):
+                with self.assertRaises(ValueError):
+                    build_builder_sandbox_request(
+                        snapshot,implementation,branch=bad,
+                        baseline_ref="main@a",candidate_ref=f"{bad}@x",
+                    )
+        finally:
+            tmp.cleanup()
+
+    def test_excess_files_are_rejected_not_truncated(self):
+        tmp, snapshot, implementation = self._fixture()
+        try:
+            changed = dict(implementation)
+            changed["scope"] = dict(implementation["scope"])
+            changed["scope"]["editable_files"] = [f"f{i}.py" for i in range(120)]
+            changed["scope"]["source_files"] = [f"f{i}.py" for i in range(120)]
+            with self.assertRaises(ValueError):
+                build_builder_sandbox_request(
+                    snapshot,changed,branch="cursor/admin-fix",
+                    baseline_ref="main@a",candidate_ref="cursor/admin-fix@b",
+                    requested_files=[f"f{i}.py" for i in range(120)],
                 )
         finally:
             tmp.cleanup()
@@ -193,7 +268,7 @@ class AionDeveloperBuilderSandboxTests(unittest.TestCase):
                     implementation,
                     branch="cursor/admin-fix",
                     baseline_ref="main@a",
-                    candidate_ref="cursor/admin-fix@c",
+                    candidate_ref="cursor/admin-fix@b",
                     requested_files=[
                         "atlasquant_aion_admin.py",
                         "not-authorized.py",
@@ -214,7 +289,7 @@ class AionDeveloperBuilderSandboxTests(unittest.TestCase):
                     changed,
                     branch="cursor/admin-fix",
                     baseline_ref="main@a",
-                    candidate_ref="cursor/admin-fix@c",
+                    candidate_ref="cursor/admin-fix@b",
                 )
         finally:
             tmp.cleanup()
@@ -227,7 +302,7 @@ class AionDeveloperBuilderSandboxTests(unittest.TestCase):
                 implementation,
                 branch="cursor/admin-fix",
                 baseline_ref="main@a",
-                candidate_ref="cursor/admin-fix@c",
+                candidate_ref="cursor/admin-fix@b",
             )
         finally:
             tmp.cleanup()
