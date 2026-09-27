@@ -2528,6 +2528,11 @@ def _render_central(
                 if isinstance(local_synthesis.get("truth"), Mapping)
                 else {}
             )
+            local_executive = (
+                local_tool_call.get("executive_response")
+                if isinstance(local_tool_call.get("executive_response"), Mapping)
+                else {}
+            )
             local_ids = list(local_tool_call.get("tool_ids") or [])
             if not local_ids and local_tool_call.get("tool_id"):
                 local_ids = [str(local_tool_call.get("tool_id"))]
@@ -2554,9 +2559,44 @@ def _render_central(
                 st.caption(
                     "Síntese local: "
                     + str(local_synthesis.get("summary") or "")
-                    + " Próximo passo: "
-                    + str(local_synthesis.get("next_step") or "")
                 )
+            if local_executive:
+                if bool(local_executive.get("safe_to_display", False)):
+                    st.markdown("##### Resposta executiva local")
+                    st.write(str(local_executive.get("headline") or "Leitura local consolidada."))
+                    sections = (
+                        local_executive.get("sections")
+                        if isinstance(local_executive.get("sections"), Mapping)
+                        else {}
+                    )
+                    known_rows = [str(x) for x in list(sections.get("known") or []) if str(x).strip()]
+                    unknown_rows = [str(x) for x in list(sections.get("unknown") or []) if str(x).strip()]
+                    conflict_rows = [str(x) for x in list(sections.get("conflicts") or []) if str(x).strip()]
+                    st.markdown("**O que sabemos**")
+                    if known_rows:
+                        for item in known_rows[:8]:
+                            st.markdown("- " + item)
+                    else:
+                        st.caption("Nenhum conteúdo local foi confirmado.")
+                    st.markdown("**O que não sabemos**")
+                    if unknown_rows:
+                        for item in unknown_rows[:8]:
+                            st.markdown("- " + item)
+                    else:
+                        st.caption("Nenhum ponto pendente identificado nesta síntese.")
+                    st.markdown("**Conflitos**")
+                    if conflict_rows:
+                        for item in conflict_rows[:8]:
+                            st.markdown("- " + item)
+                    else:
+                        st.caption("Nenhum conflito explícito identificado.")
+                    st.markdown("**Próximo passo**")
+                    st.info(str(sections.get("next_step") or "Nenhum próximo passo confirmado."))
+                else:
+                    st.error(
+                        "A resposta executiva local foi bloqueada por uma invariante de segurança. "
+                        "O conteúdo não é apresentado como leitura normal."
+                    )
         cognitive_answer = answer.get("cognitive_orchestrator")
         if isinstance(cognitive_answer, Mapping):
             routing = (
