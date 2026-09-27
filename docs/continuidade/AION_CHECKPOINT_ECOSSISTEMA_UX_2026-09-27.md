@@ -11,6 +11,20 @@ As decisões abaixo **não criam um cronograma novo** e **não autorizam desviar
 
 A execução continua obedecendo às regras existentes de segurança: sem autoelevação de permissão, sem ordem real, sem gasto, sem publicação externa, sem merge/deploy/alteração de produção ou secrets sem autorização apropriada.
 
+## Ordem de prioridade operacional — obrigatória
+
+A sequência estratégica aprovada deve ser preservada:
+
+1. **AION primeiro** — consolidar o núcleo inteligente, memória/checkpoints, administração, desenvolvimento, vídeo/conteúdo, orquestração, segurança, ferramentas e capacidade de apoiar os demais domínios.
+2. **AtlasQuant / sistema depois** — usar o AION já mais maduro para acelerar, revisar, testar e evoluir o AtlasQuant Trade e a Central do Ecossistema.
+3. **Monetização e demais núcleos na sequência** — estruturar e amadurecer Negócios/Vendas, Afiliados, Dropshipping, Conteúdo/Clipagem e Investimentos/Renda Fixa de forma separada e segura.
+
+Racional aprovado: colocar o AION em condição forte primeiro para que ele ajude a construir e melhorar o próprio ecossistema. Depois, levar o sistema comercial a um nível que permita gerar receita legítima e sustentável, reinvestindo recursos na evolução contínua do AION e do ecossistema.
+
+Essa lógica **não autoriza promessa de lucro, automação financeira, gasto, anúncio, publicação externa, ordem real ou investimento automático**. Monetização continua sujeita a produto real, validação, dados, controles, aprovação e risco explícito.
+
+Novas ideias devem ser encaixadas na etapa correta dessa ordem; não devem criar uma fila paralela que faça o projeto abandonar o cronograma.
+
 ## AION como pilar do ecossistema
 
 O **AION é o núcleo principal e independente**.
@@ -127,7 +141,10 @@ Permanece a estratégia aprovada:
 - **Codex** como referência forte de execução de desenvolvimento;
 - **Cursor** como acelerador principalmente de trabalho visual/interativo e implementação assistida;
 - **Claude Code** como referência de revisão/crítica quando aplicável;
+- outros modelos/ferramentas podem ser usados como apoio quando trouxerem ganho real de velocidade ou qualidade e estiverem disponíveis;
 - AION como orquestrador, sem conceder soberania a nenhuma ferramenta externa.
+
+O uso de Cursor, GPT, Codex, Claude Code ou outra IA disponível serve para **acelerar a etapa atual do cronograma**, nunca para trocar a prioridade, abrir projeto paralelo ou conceder permissão adicional.
 
 O uso dessas ferramentas não altera as regras de aprovação, não autoriza merge/deploy e não muda o cronograma por conta própria.
 
