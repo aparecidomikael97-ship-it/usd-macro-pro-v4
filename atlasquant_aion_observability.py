@@ -25,7 +25,18 @@ _SECRET_PATTERNS=(
     re.compile(r"(?i)\b(password|passwd|token|api[_-]?key|authorization|secret|cookie|credential|bearer)[\"']?\s*[:=]\s*(?:\"[^\"]*\"|'[^']*'|[^\s,;}]+)"),
 )
 
-_SECRET_KEY=re.compile(r"password|passwd|token|apikey|authorization|secret|cookie|credential|bearer",re.I)
+# Substring families after letters-only normalization. Compound names such as
+# client_secret and session_token match; bare "key" does not, so primary_key stays.
+_SECRET_KEY=re.compile(
+    r"password|passwd|token|apikey|privatekey|accesskey|authorization|secret|cookie|credential|bearer",
+    re.I,
+)
+
+
+def is_secret_key(key:Any)->bool:
+    """True when a field name belongs to a sensitive family, including compounds."""
+    name=re.sub(r"[^a-z]","",str(key).lower())
+    return bool(name) and _SECRET_KEY.search(name) is not None
 
 
 def sanitize_metadata(value:Any, *, _depth:int=0)->Any:
@@ -35,7 +46,7 @@ def sanitize_metadata(value:Any, *, _depth:int=0)->Any:
     if isinstance(value,Mapping):
         return {
             redact_text(key)[:80]: (
-                "[REDACTED]" if _SECRET_KEY.search(re.sub(r"[^a-z]","",str(key).lower()))
+                "[REDACTED]" if is_secret_key(key)
                 else sanitize_metadata(item,_depth=_depth+1)
             )
             for key,item in list(value.items())[:100]

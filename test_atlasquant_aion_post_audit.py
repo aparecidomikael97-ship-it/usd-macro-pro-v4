@@ -27,7 +27,13 @@ from atlasquant_aion_memory import (
     update_operating_checkpoint,
 )
 from atlasquant_aion_memory_layers import recall, remember
-from atlasquant_aion_observability import events_digest, new_event, normalize_event
+from atlasquant_aion_observability import (
+    events_digest,
+    is_secret_key,
+    new_event,
+    normalize_event,
+    sanitize_metadata,
+)
 from atlasquant_aion_orchestrator import (
     build_aion_result,
     classify_external_action_claim,
@@ -59,6 +65,16 @@ SECRET_VALUES = {
     "access_token": "ACCESS_TOKEN_VALUE_9f3a",
     "refresh_token": "REFRESH_TOKEN_VALUE_9f3a",
     "github_token": "GITHUB_TOKEN_VALUE_9f3a",
+}
+COMPOUND_SECRET_VALUES = {
+    "client_secret": "CLIENT_SECRET_VALUE_9f3a",
+    "private_key": "PRIVATE_KEY_VALUE_9f3a",
+    "secret_key": "SECRET_KEY_VALUE_9f3a",
+    "session_token": "SESSION_TOKEN_VALUE_9f3a",
+    "auth_token": "AUTH_TOKEN_VALUE_9f3a",
+    "x_api_key": "X_API_KEY_VALUE_9f3a",
+    "access_key": "ACCESS_KEY_VALUE_9f3a",
+    "client_token": "CLIENT_TOKEN_VALUE_9f3a",
 }
 
 
@@ -161,6 +177,67 @@ class StructuredSnapshotSecretTests(unittest.TestCase):
         self.assertNotIn("password", scanner["payload"]["nested"])
         self.assertNotIn("cookie", cleaned)
         self.assertNotIn("github_token", cleaned["slices"]["radar"])
+
+    def test_compound_secret_names_are_removed_at_every_depth(self):
+        raw = {
+            "schema": SNAPSHOT_SCHEMA,
+            "origin": "SESSION",
+            "observed_at": FRESH_AT,
+            "ttl_seconds": 3600,
+            "secrets_included": False,
+            "primary_key": "EURUSD",
+            "session_id": "public-session",
+            **COMPOUND_SECRET_VALUES,
+            "slices": {
+                "scanner": {
+                    "present": True,
+                    "origin": "PERSISTED_SCANNER",
+                    "observed_at": FRESH_AT,
+                    "ttl_seconds": 3600,
+                    "payload": {
+                        "pair": "EUR/USD",
+                        "primary_key": "EURUSD",
+                        "session_id": "public-session",
+                        "nested": {
+                            **COMPOUND_SECRET_VALUES,
+                            "rows": [{
+                                "pair": "GBP/USD",
+                                "primary_key": "GBPUSD",
+                                **COMPOUND_SECRET_VALUES,
+                            }],
+                        },
+                    },
+                },
+            },
+        }
+        cleaned = build_specialist_session_snapshot(raw, now=NOW)
+        blob = json.dumps(cleaned, ensure_ascii=False)
+        for value in COMPOUND_SECRET_VALUES.values():
+            self.assertNotIn(value, blob)
+        for key in COMPOUND_SECRET_VALUES:
+            self.assertNotIn(key, blob)
+            self.assertTrue(is_secret_key(key))
+        self.assertEqual(cleaned["primary_key"], "EURUSD")
+        self.assertEqual(cleaned["session_id"], "public-session")
+        payload = cleaned["slices"]["scanner"]["payload"]
+        self.assertEqual(payload["pair"], "EUR/USD")
+        self.assertEqual(payload["primary_key"], "EURUSD")
+        self.assertEqual(payload["nested"]["rows"][0]["pair"], "GBP/USD")
+        self.assertEqual(payload["nested"]["rows"][0]["primary_key"], "GBPUSD")
+        redacted = sanitize_metadata({
+            "primary_key": "EURUSD",
+            "session_id": "public-session",
+            "nested": {"rows": [dict(COMPOUND_SECRET_VALUES)]},
+            **COMPOUND_SECRET_VALUES,
+        })
+        redacted_blob = json.dumps(redacted, ensure_ascii=False)
+        for value in COMPOUND_SECRET_VALUES.values():
+            self.assertNotIn(value, redacted_blob)
+        self.assertEqual(redacted["primary_key"], "EURUSD")
+        self.assertEqual(redacted["session_id"], "public-session")
+        self.assertFalse(is_secret_key("primary_key"))
+        self.assertFalse(is_secret_key("session_id"))
+        self.assertFalse(is_secret_key("pair"))
 
 
 class TemporalValidityTests(unittest.TestCase):

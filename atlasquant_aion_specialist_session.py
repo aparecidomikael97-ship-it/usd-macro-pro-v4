@@ -13,7 +13,7 @@ from atlasquant_aion_approval_inbox import collect_approval_inbox
 from atlasquant_aion_business import business_summary
 from atlasquant_aion_core import guardian_decision
 from atlasquant_aion_developer_engine import definition_of_done
-from atlasquant_aion_observability import redact_text
+from atlasquant_aion_observability import is_secret_key, redact_text
 from atlasquant_aion_specialists import SPECIALIST_MODULES
 from atlasquant_aion_truth import assess_truth
 from atlasquant_content_pipeline import provider_readiness
@@ -48,11 +48,6 @@ _SLICE_ORIGIN = {
     "business": "LOCAL_STATE",
     "invest": "LOCAL_STATE",
 }
-_SECRET_KEYS = {
-    "token", "password", "passwd", "secret", "authorization", "apikey",
-    "githubtoken", "githubtokenhistorico", "accesstoken", "refreshtoken",
-    "bearer", "cookie", "credential",
-}
 _PRICE_KEYS = {"price", "preco", "bid", "ask", "close", "open", "mid"}
 _PROVIDER_FLAGS = (
     "transcription", "video_render", "image", "aion_voice",
@@ -82,8 +77,8 @@ def _ttl(value: Any) -> float | None:
 
 
 def _is_secret_key(key: Any) -> bool:
-    name = "".join(ch for ch in str(key).strip().lower() if ch.isalnum())
-    return name in _SECRET_KEYS
+    """Same family rule as observability. Exact names and compounds both match."""
+    return is_secret_key(key)
 
 
 def _strip_secrets(value: Any, depth: int = 0) -> Any:
