@@ -488,8 +488,46 @@ def render_contextual_voice_assistant(
     }
 
 
+def render_top_voice_access(session_state, *, pages, fast: bool = False) -> None:
+    """Keep AION and voice reachable without scrolling to the bottom of the page.
+
+    Buttons only store a navigation target. They do not change auth or orders.
+    """
+    available = [str(item) for item in list(pages or [])]
+    st.markdown(
+        """
+<style>
+.aq-voice-dock{position:sticky;top:0;z-index:40;display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+margin:0 0 10px;padding:10px 12px;border:1px solid rgba(215,181,109,.45);border-radius:14px;
+background:#102338;color:#f5f8fc;box-shadow:0 10px 24px rgba(0,0,0,.28)}
+.aq-voice-dock strong{color:#f5f8fc;font-size:.95rem}
+.aq-voice-dock span{color:#d7e4f2;font-size:.82rem;font-weight:700;line-height:1.35}
+</style>
+<div class="aq-voice-dock" role="region" aria-label="Acesso rápido à voz">
+<strong>AION e voz</strong>
+<span>A leitura falada fica no topo do Radar. Não é preciso rolar até o fim da página.</span>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+    columns = st.columns(2)
+    if "🎯 Radar" in available:
+        with columns[0]:
+            if st.button("Abrir voz no Radar", key="aq_voice_dock_radar", width="stretch"):
+                session_state["atlasquant_premium_nav_target"] = "🎯 Radar"
+                st.rerun()
+    if "🧠 AION" in available:
+        with columns[1]:
+            if st.button("Abrir central AION", key="aq_voice_dock_aion", width="stretch"):
+                # AION lives in the advanced workspace; the bridge switches mode
+                # before the experience radio is created on the next run.
+                from atlasquant_navigation_bridge import request_return_to_aion
+                request_return_to_aion(session_state)
+                st.rerun()
+
+
 __all__=[
     "SCHEMA","QUESTION_CATEGORIES","assistant_context","beginner_script","advanced_script",
     "classify_question","answer_question","browser_speech_html","browser_mic_assistant_html",
-    "render_contextual_voice_assistant",
+    "render_contextual_voice_assistant","render_top_voice_access",
 ]

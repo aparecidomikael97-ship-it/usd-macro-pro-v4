@@ -131,7 +131,7 @@ def render_sales_center(access:Mapping[str,Any]|None)->dict[str,Any]:
     st.markdown(
         f"""<div style="padding:11px 13px;border:1px solid rgba(137,170,210,.18);border-radius:12px;margin:4px 0 13px">
         <strong>COMERCIAL · {visual['label']}</strong><br>
-        <span style="opacity:.74;font-size:.78rem">{visual['detail']}</span>
+        <span style="opacity:1;color:#e7eef8;font-size:.78rem">{visual['detail']}</span>
         </div>""", unsafe_allow_html=True,
     )
     st.caption(

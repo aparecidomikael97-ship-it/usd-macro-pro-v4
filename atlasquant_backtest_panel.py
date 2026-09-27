@@ -304,8 +304,8 @@ def _render_result_block(
     status=backtest_result_status(metrics)
     st.markdown(
         f"""<div style="padding:11px 13px;border:1px solid rgba(137,170,210,.18);border-radius:12px;margin:3px 0 12px">
-        <strong>{status['label']}</strong> · <span style="opacity:.75">{status['detail']}</span>
-        <span style="float:right;opacity:.68;font-size:.75rem">Pesquisa histórica · não autoriza execução</span></div>""",
+        <strong>{status['label']}</strong> · <span style="opacity:1;color:#e7eef8">{status['detail']}</span>
+        <span style="float:right;opacity:1;color:#d7e4f2;font-size:.75rem">Pesquisa histórica · não autoriza execução</span></div>""",
         unsafe_allow_html=True,
     )
     st.markdown("#### Resultado")

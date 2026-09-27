@@ -290,8 +290,8 @@ def render_flight_recorder(
     st.markdown(
         f"""<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:11px 13px;
         border:1px solid rgba(137,170,210,.18);border-radius:12px;margin:4px 0 13px;background:rgba(11,27,47,.52)">
-        <strong>{visual['label']}</strong><span style="opacity:.74;font-size:.78rem">{visual['detail']}</span>
-        <span style="margin-left:auto;opacity:.68;font-size:.72rem">Auditoria somente · não cria resultado de trade</span></div>""",
+        <strong>{visual['label']}</strong><span style="opacity:1;color:#e7eef8;font-size:.78rem">{visual['detail']}</span>
+        <span style="margin-left:auto;opacity:1;color:#d7e4f2;font-size:.72rem">Auditoria somente · não cria resultado de trade</span></div>""",
         unsafe_allow_html=True,
     )
     st.caption(

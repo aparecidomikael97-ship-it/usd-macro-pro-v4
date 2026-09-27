@@ -89,9 +89,9 @@ def render_central_brief(
 background:linear-gradient(110deg,rgba(14,31,52,.92),rgba(10,24,41,.86));margin:4px 0 14px}
 .aq-brief.green{border-left:4px solid #42d392}.aq-brief.yellow{border-left:4px solid #f2c14e}
 .aq-brief.red{border-left:4px solid #ff6b7a}
-.aq-brief-title{font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;color:#9fb0c6;font-weight:800}
-.aq-brief-state{font-size:1.35rem;font-weight:850;margin-top:4px;color:#edf4ff}
-.aq-brief-text{font-size:.82rem;color:#b7c6d9;margin-top:5px}
+.aq-brief-title{font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;color:#d7e4f2;font-weight:800}
+.aq-brief-state{font-size:1.35rem;font-weight:850;margin-top:4px;color:#f5f8fc}
+.aq-brief-text{font-size:.82rem;color:#e7eef8;margin-top:5px}
 </style>
 """,
         unsafe_allow_html=True,

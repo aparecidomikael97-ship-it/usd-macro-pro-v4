@@ -62,8 +62,8 @@ def _render_status_strip(status: dict[str,Any]) -> None:
         border:1px solid rgba(137,170,210,.18);border-radius:13px;background:rgba(11,27,47,.62);margin:4px 0 14px">
         <strong style="font-size:.82rem">AUTOPILOT</strong>
         <span style="font-weight:850">{s['label']}</span>
-        <span style="opacity:.72;font-size:.78rem">{s['detail']}</span>
-        <span style="margin-left:auto;font-size:.72rem;opacity:.72">Safety Core ativo · execução real desativada</span>
+        <span style="opacity:1;color:#e7eef8;font-size:.78rem">{s['detail']}</span>
+        <span style="margin-left:auto;font-size:.72rem;opacity:1;color:#d7e4f2">Safety Core ativo · execução real desativada</span>
         </div>""", unsafe_allow_html=True,
     )
 

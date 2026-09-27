@@ -52,7 +52,11 @@ class ExperienceV103Tests(unittest.TestCase):
 
     def test_theme_preferences_fail_safe_to_known_values(self):
         out=experience_theme_summary("INVALID","gigante",1)
-        self.assertEqual(out["theme"],"Claro")
+        self.assertEqual(out["theme"],"Escuro")
+        self.assertEqual(experience_theme_summary("Claro","Normal",False)["theme"],"Escuro")
+        import experience_v103 as ux
+        self.assertNotIn("Claro",ux.THEME_CHOICES)
+        self.assertNotIn('"Claro"',inspect.getsource(ux.render_experience_controls))
         self.assertEqual(out["font_scale"],"Normal")
         self.assertTrue(out["reduced_motion"])
         self.assertTrue(out["responsive"])

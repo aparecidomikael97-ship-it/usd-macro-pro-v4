@@ -313,11 +313,18 @@ HOME_CSS="""
 .aq-home-time{margin-top:3px;color:#eef4fb;font-size:.70rem;font-weight:700;line-height:1.35}
 .aq-home-detail{border:1px solid rgba(137,170,210,.18);border-radius:15px;padding:14px 16px;background:rgba(10,26,44,.68);margin-top:8px}
 .aq-rank-board{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;margin:8px 0 14px}
-.aq-rank-card{border:1px solid rgba(163,190,222,.34);border-radius:12px;padding:11px 12px;background:#10233a;color:#f7fbff;min-height:108px}
-.aq-rank-card strong{display:block;color:#ffffff;font-size:.98rem}
-.aq-rank-card em{display:block;margin-top:2px;color:#d7e6f6;font-style:normal;font-size:.75rem;font-weight:750}
-.aq-rank-card span{display:block;margin-top:6px;color:#eef4fb;font-size:.78rem;font-weight:700;line-height:1.35}
-@media(max-width:760px){.aq-home-hero{padding:14px 15px}.aq-home-hero h2{font-size:1.3rem}.aq-home-card{min-height:0}.aq-home-grid{grid-template-columns:1fr}.aq-home-top{align-items:flex-start}.aq-rank-board{grid-template-columns:1fr}}
+.aq-rank-card{border:1px solid rgba(163,190,222,.34);border-radius:12px;padding:11px 12px;background:#10233a;color:#f7fbff !important;min-height:108px}
+.aq-rank-card strong{display:block;color:#ffffff !important;font-size:.98rem}
+.aq-rank-card em{display:block;margin-top:2px;color:#e7eef8 !important;font-style:normal;font-size:.78rem;font-weight:750}
+.aq-rank-card span{display:block;margin-top:6px;color:#f4f8fd !important;font-size:.8rem;font-weight:750;line-height:1.4}
+.aq-home-hero h2,.aq-home-hero p{color:#f7fbff !important}
+.aq-home-card{transition:border-color .2s ease, transform .2s ease}
+.aq-home-card:hover{border-color:rgba(215,181,109,.55)}
+.aq-radar-live{display:flex;align-items:center;gap:8px;margin-top:10px;color:#d7e4f2;font-size:.75rem;font-weight:800}
+.aq-radar-dot{width:8px;height:8px;border-radius:50%;background:#8fd0c4;animation:aq-ping 2.8s ease-out infinite}
+@keyframes aq-ping{0%{box-shadow:0 0 0 0 rgba(143,208,196,.55)}100%{box-shadow:0 0 0 10px rgba(143,208,196,0)}}
+@media(max-width:760px){.aq-home-hero{padding:14px 15px}.aq-home-hero h2{font-size:1.3rem}.aq-home-card{min-height:0}.aq-home-grid{grid-template-columns:1fr}.aq-home-top{align-items:flex-start}.aq-rank-board{grid-template-columns:1fr}.aq-home-card:hover{transform:none}}
+@media (prefers-reduced-motion:reduce){.aq-radar-dot,.aq-home-card{animation:none !important}}
 </style>
 """
 
@@ -371,12 +378,30 @@ def render_home_radar(
         """<div class="aq-home-hero"><small>TELA PRINCIPAL</small>
         <h2>🎯 Radar de Oportunidades</h2>
         <p>Bata o olho, veja onde há contexto e abra o ativo para entender o porquê. 
-        Compra/Venda é viés de análise; dados insuficientes ou gates bloqueados viram NÃO OPERAR.</p></div>""",
+        Compra/Venda é viés de análise; dados insuficientes ou gates bloqueados viram NÃO OPERAR.</p>
+        <div class="aq-radar-live"><span class="aq-radar-dot"></span><span>Observação ativa do snapshot · sem nova coleta</span></div></div>""",
         unsafe_allow_html=True,
     )
     if not rows:
         st.warning("Radar aguardando a Matriz dos pares e dados persistidos.")
         return {"schema":SCHEMA,"rows":0,"mode":mode,"real_orders_enabled":False}
+
+    options=[r["pair"] for r in rows]
+    pending=st.session_state.pop("aq_home_pair_pending", None)
+    if pending in options:
+        st.session_state["aq_home_pair"]=pending
+    stored=st.session_state.get("aq_home_pair")
+    if stored not in options:
+        st.session_state["aq_home_pair"]=options[0]
+    selected=st.selectbox("Ativo para análise detalhada",options,key="aq_home_pair")
+    row=next(r for r in rows if r["pair"]==selected)
+    st.caption("A voz do ativo fica aqui no topo. O ranking continua abaixo, sem esconder alertas.")
+    render_contextual_voice_assistant(
+        row,
+        mode=mode,
+        macro_context=macro_context,
+        key_prefix="aq_home_voice",
+    )
 
     st.markdown("### 🕒 Meu horário disponível")
     profile_options=list(SESSION_FILTER_OPTIONS)
@@ -432,6 +457,13 @@ def render_home_radar(
 
     top_n=min(RADAR_VISIBLE_LIMIT,len(rows))
     top=highlight_top_fx(rows, top_n)
+    if mode=="Iniciante" and top:
+        try:
+            from atlasquant_premium_shell import PREMIUM_CSS, beginner_attention_html
+            st.markdown(PREMIUM_CSS, unsafe_allow_html=True)
+            st.markdown(beginner_attention_html(top[0]), unsafe_allow_html=True)
+        except Exception:
+            pass
     st.markdown("### Top 10 em observação")
     st.caption(
         "O Radar mostra até 10 ativos Forex que merecem atenção no snapshot atual. "
@@ -442,7 +474,9 @@ def render_home_radar(
         with cols[idx%len(cols)]:
             st.markdown(_card_html(row),unsafe_allow_html=True)
             if st.button(f"Ver por que · {row['pair']}",key=f"aq_home_open_{row['pair'].replace('/','_')}",width="stretch"):
-                st.session_state["aq_home_pair"]=row["pair"]
+                st.session_state["aq_home_pair_pending"]=row["pair"]
+                st.rerun()
+    row=next(item for item in rows if item["pair"]==selected)
 
     st.markdown("### Rankings separados")
     st.caption(
@@ -473,13 +507,6 @@ def render_home_radar(
             width="stretch",
             hide_index=True,
         )
-
-    options=[r["pair"] for r in rows]
-    stored=st.session_state.get("aq_home_pair")
-    if stored not in options:
-        st.session_state["aq_home_pair"]=options[0]
-    selected=st.selectbox("Ativo para análise detalhada",options,key="aq_home_pair")
-    row=next(r for r in rows if r["pair"]==selected)
 
     _operational_model=radar_operational_model(row)
     st.markdown(
@@ -516,13 +543,6 @@ def render_home_radar(
         f"H1 {row['h1']} · M15 {row['m15']} · Gate {row['gate']} · {row['movement']}"
     )
     st.markdown('</div>',unsafe_allow_html=True)
-
-    render_contextual_voice_assistant(
-        row,
-        mode=mode,
-        macro_context=macro_context,
-        key_prefix="aq_home_voice",
-    )
 
     if mode=="Avançado":
         st.markdown("### Diagnóstico avançado")

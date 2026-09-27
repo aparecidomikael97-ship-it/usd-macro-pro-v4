@@ -297,17 +297,19 @@ def _brief_events(snapshot:Mapping[str,Any])->list[dict[str,Any]]:
     }]
 
 
-def _render_beginner_chrome(app_version:str, environment:str)->None:
+def _render_beginner_chrome(app_version:str, environment:str, access:Mapping[str,Any]|None=None)->None:
     """Show the shared AtlasQuant surface before the fast shell stops the script."""
     try:
         from atlasquant_ui_v1 import (
             apply_atlasquant_theme,
             experience_mode_overview_html,
             mobile_navigation_hint_html,
+            render_account_identity,
             render_atlasquant_header,
         )
         apply_atlasquant_theme()
         render_atlasquant_header(app_version or "AtlasQuant", environment or "LOCAL")
+        render_account_identity(dict(access) if isinstance(access,Mapping) else None)
         st.markdown(experience_mode_overview_html("Iniciante"), unsafe_allow_html=True)
         st.markdown(mobile_navigation_hint_html(), unsafe_allow_html=True)
     except Exception:
@@ -340,7 +342,7 @@ def render_beginner_shell(
                 "errors":check["errors"],"real_orders_enabled":False,
                 "automatic_execution":False,
             }
-        _render_beginner_chrome(app_version, environment)
+        _render_beginner_chrome(app_version, environment, access)
         st.markdown("## 🧭 AtlasQuant")
         st.warning("Radar temporariamente aguardando dados válidos.")
         st.caption("O snapshot não passou na validação de frescor/segurança. Nenhuma oportunidade é exibida até a próxima atualização válida.")
@@ -379,6 +381,18 @@ def render_beginner_shell(
             "automatic_execution":False,
         }
 
+    _fast_pages=["🎯 Radar","🎙️ Macro","🎓 Aprender","👤 Conta","📱 Instalar","💰 Investir","🛟 Suporte"]
+    try:
+        from atlasquant_premium_shell import consume_premium_navigation, render_premium_catalog
+        consume_premium_navigation(
+            st.session_state,
+            mode="Iniciante",
+            available_pages=_fast_pages,
+            fast=True,
+        )
+    except Exception:
+        render_premium_catalog = None
+
     age=float(check["age_minutes"] or 0.0)
     _obs=dict(snapshot.get("_fast_boot_observability",{}) or {})
     st.session_state["atlasquant_fast_boot_observability"]={
@@ -389,11 +403,19 @@ def render_beginner_shell(
         "snapshot_valid":True,
         "mode":"Iniciante",
     }
-    _render_beginner_chrome(app_version, environment)
+    _render_beginner_chrome(app_version, environment, access)
+    _dock_pages=list(_fast_pages)
+    if str(dict(access or {}).get("role") or "").upper()=="ADMIN":
+        _dock_pages.append("🧠 AION")
+    try:
+        from atlasquant_voice_assistant import render_top_voice_access
+        render_top_voice_access(st.session_state, pages=_dock_pages, fast=True)
+    except Exception:
+        pass
     st.markdown(
         """<div style="border:1px solid rgba(137,170,210,.18);border-radius:16px;padding:13px 16px;
         background:linear-gradient(120deg,rgba(17,43,72,.96),rgba(8,25,43,.94));margin:2px 0 10px">
-        <strong style="font-size:1.15rem">🧭 AtlasQuant</strong><br>
+        <strong style="font-size:1.15rem;color:#f5f8fc">🧭 AtlasQuant</strong><br>
         <span style="color:#e7eef8;font-size:.82rem;font-weight:700">Modo Iniciante · carregamento rápido por snapshot validado</span>
         </div>""",
         unsafe_allow_html=True,
@@ -410,7 +432,14 @@ def render_beginner_shell(
             load_home_snapshot.clear()
             st.rerun()
 
-    pages=["🎯 Radar","🎙️ Macro","🎓 Aprender","👤 Conta","📱 Instalar","💰 Investir","🛟 Suporte"]
+    pages=_fast_pages
+    if render_premium_catalog is not None:
+        render_premium_catalog(
+            mode="Iniciante",
+            available_pages=pages,
+            fast=True,
+            active_page=str(st.session_state.get("aq_beginner_page") or "🎯 Radar"),
+        )
     page=st.radio("Área",pages,horizontal=True,key="aq_beginner_page",label_visibility="collapsed")
     if experience_compass_html is not None:
         st.markdown(

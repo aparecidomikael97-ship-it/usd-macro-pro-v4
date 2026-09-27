@@ -302,11 +302,11 @@ def _css():
       div[data-testid="stMetric"]{border:1px solid rgba(100,116,139,.18);padding:10px;border-radius:14px}
       .v108-focus{padding:16px 17px;border:1px solid rgba(100,116,139,.24);border-radius:16px;background:linear-gradient(135deg,rgba(15,23,42,.92),rgba(20,55,86,.72));margin:5px 0 13px}
       .v108-focus-kicker{font-size:.66rem;font-weight:800;letter-spacing:.11em;color:#7dd3fc;margin-bottom:6px}
-      .v108-focus-main{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}.v108-focus-main strong{font-size:1.42rem}.v108-focus-main span{font-size:.76rem;opacity:.75}.v108-focus-main b{margin-left:auto;font-size:1.05rem}
-      .v108-focus-state{font-size:.82rem;font-weight:800;margin-top:6px}.v108-focus-reason{font-size:.78rem;opacity:.8;margin-top:5px}
-      .v108-focus-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.v108-focus-meta span{font-size:.67rem;padding:4px 7px;border:1px solid rgba(148,163,184,.18);border-radius:999px;opacity:.8}
+      .v108-focus-main{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}.v108-focus-main strong{font-size:1.42rem}.v108-focus-main span{font-size:.76rem;opacity:1;color:#e7eef8}.v108-focus-main b{margin-left:auto;font-size:1.05rem}
+      .v108-focus-state{font-size:.82rem;font-weight:800;margin-top:6px}.v108-focus-reason{font-size:.78rem;opacity:1;color:#e7eef8;margin-top:5px}
+      .v108-focus-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.v108-focus-meta span{font-size:.67rem;padding:4px 7px;border:1px solid rgba(148,163,184,.18);border-radius:999px;opacity:1;color:#e7eef8}
       .v108-status{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:11px 13px;border:1px solid rgba(100,116,139,.22);border-radius:13px;background:rgba(15,23,42,.58);margin:5px 0 14px}
-      .v108-status strong{font-size:.82rem}.v108-status span{font-size:.76rem;opacity:.76}.v108-status .guard{margin-left:auto;font-size:.7rem}
+      .v108-status strong{font-size:.82rem}.v108-status span{font-size:.76rem;opacity:1;color:#e7eef8}.v108-status .guard{margin-left:auto;font-size:.7rem}
     </style>
     """,unsafe_allow_html=True)
 

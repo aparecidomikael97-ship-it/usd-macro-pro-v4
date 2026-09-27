@@ -395,6 +395,15 @@ except Exception as _atlasquant_ui_exc:
     context_strip_html = None
     _ATLASQUANT_UI_IMPORT_ERROR = f"{type(_atlasquant_ui_exc).__name__}: {_atlasquant_ui_exc}"
 
+try:
+    from atlasquant_premium_shell import (
+        consume_premium_navigation,
+        render_premium_catalog,
+    )
+except Exception:
+    consume_premium_navigation = None
+    render_premium_catalog = None
+
 
 try:
     from atlasquant_macro_briefing_panel import render_macro_briefing_panel
@@ -2096,6 +2105,7 @@ if _aq_early_pages:
     except Exception:
         pass
 st.session_state["_aq_experience_switch_mounted"] = False
+_fast_snapshot = {}
 if os.getenv("USD_MACRO_AUTOPILOT", "") != "1" and not _ATLASQUANT_OFFLINE_SMOKE:
     try:
         from atlasquant_fast_startup import load_home_snapshot, render_beginner_shell
@@ -2132,20 +2142,174 @@ if os.getenv("USD_MACRO_AUTOPILOT", "") != "1" and not _ATLASQUANT_OFFLINE_SMOKE
 # EXECUÇÃO PRINCIPAL
 # =========================================================
 
-macro_eua = carregar_macro_eua()
-fed = carregar_narrativa_fed()
-dados_moedas = carregar_dados_moedas()
-ranking = calcular_ranking(dados_moedas, macro_eua, fed)
-usd_detalhado = score_usd_detalhado(macro_eua, fed)
+# Advanced opens from the validated snapshot already read above. Live providers
+# stay on the else path so a missing or stale snapshot never paints invented data.
+# Headless autopilot and offline smoke always take the live loaders.
+_aq_cached_open_allowed = os.getenv("USD_MACRO_AUTOPILOT", "") != "1" and not _ATLASQUANT_OFFLINE_SMOKE
+try:
+    from atlasquant_advanced_boot import (
+        peek_live_refresh,
+        provenance_banner_html,
+        publish_live_refresh,
+        resolve_advanced_open,
+        start_live_refresh,
+    )
+    _aq_boot = resolve_advanced_open(_fast_snapshot) if _aq_cached_open_allowed else {
+        "use_cache": False,
+        "state": "LIVE_REQUIRED",
+        "real_orders_enabled": False,
+        "automatic_execution": False,
+    }
+except Exception as _aq_boot_exc:
+    peek_live_refresh = None
+    provenance_banner_html = None
+    publish_live_refresh = None
+    start_live_refresh = None
+    _aq_boot = {
+        "use_cache": False,
+        "state": "LIVE_REQUIRED",
+        "real_orders_enabled": False,
+        "automatic_execution": False,
+        "errors": [f"{type(_aq_boot_exc).__name__}: {_aq_boot_exc}"],
+    }
+_aq_warm = peek_live_refresh() if peek_live_refresh is not None else {"status": "idle", "result": None}
+_aq_force_live = bool(st.session_state.pop("atlasquant_advanced_force_live", False))
+_aq_warm_result = _aq_warm.get("result") if isinstance(_aq_warm, dict) else None
+_aq_warm_status = str(_aq_warm.get("status") or "") if isinstance(_aq_warm, dict) else ""
+_aq_use_live_memory = (
+    _aq_cached_open_allowed
+    and not _aq_force_live
+    and isinstance(_aq_warm, dict)
+    and _aq_warm_status in {"ready", "retained"}
+    and isinstance(_aq_warm_result, dict)
+    and _aq_warm_result.get("macro_eua")
+    and _aq_warm_result.get("fed")
+    and _aq_warm_result.get("dados_moedas")
+)
+if _aq_use_live_memory:
+    macro_eua = dict(_aq_warm_result["macro_eua"])
+    fed = dict(_aq_warm_result["fed"])
+    dados_moedas = dict(_aq_warm_result["dados_moedas"])
+    ranking = calcular_ranking(dados_moedas, macro_eua, fed)
+    usd_detalhado = score_usd_detalhado(macro_eua, fed)
+    _aq_live_status = _aq_warm_result.get("status_fonte")
+    if isinstance(_aq_live_status, dict) and _aq_live_status:
+        STATUS_FONTE.update(_aq_live_status)
+    else:
+        STATUS_FONTE["Fontes"] = "⚠️ estado de cada fonte não confirmado nesta atualização"
+    if _aq_warm_status == "retained":
+        _aq_refresh_note = "pacote anterior mantido; " + str(_aq_warm.get("error") or "fonte sem detalhe")
+    else:
+        _aq_refresh_note = "concluída"
+    _aq_boot = {
+        "use_cache": False,
+        "state": "LIVE_REFRESH",
+        "generated_at": str(_aq_warm.get("finished_at") or ""),
+        "refresh_status": _aq_refresh_note,
+        "degraded_sources": [k for k, v in STATUS_FONTE.items() if str(v).startswith("⚠️")],
+        "real_orders_enabled": False,
+        "automatic_execution": False,
+    }
+elif bool(_aq_boot.get("use_cache")) and not _aq_force_live:
+    macro_eua = dict(_aq_boot["macro_eua"])
+    fed = dict(_aq_boot["fed"])
+    dados_moedas = dict(_aq_boot["dados_moedas"])
+    ranking = _aq_boot["ranking"]
+    usd_detalhado = dict(_aq_boot["usd_detalhado"])
+    _aq_status = _aq_boot.get("status_fonte")
+    if isinstance(_aq_status, dict) and _aq_status:
+        STATUS_FONTE.update(_aq_status)
+    if start_live_refresh is not None and _aq_warm_status == "idle":
+        st.session_state["_aq_refresh_noted"] = False
+        _aq_started = start_live_refresh({
+            "macro_eua": carregar_macro_eua,
+            "fed": carregar_narrativa_fed,
+            "dados_moedas": carregar_dados_moedas,
+        }, timeouts={"macro_eua": 25.0, "fed": 25.0, "dados_moedas": 50.0},
+            status_snapshot=lambda _status=STATUS_FONTE: dict(_status))
+        _aq_boot["refresh_status"] = "em andamento" if _aq_started == "running" else str(_aq_started)
+    elif _aq_warm_status == "failed":
+        _aq_boot["refresh_status"] = (
+            "falhou sem substituir o snapshot: "
+            + str(_aq_warm.get("error") or "fonte sem detalhe")
+        )
+    elif _aq_warm_status == "running":
+        _aq_boot["refresh_status"] = "em andamento"
+else:
+    if str(_aq_boot.get("state") or "") == "CACHED_SNAPSHOT":
+        _aq_boot["state"] = "LIVE_REQUIRED"
+    macro_eua = carregar_macro_eua()
+    fed = carregar_narrativa_fed()
+    dados_moedas = carregar_dados_moedas()
+    ranking = calcular_ranking(dados_moedas, macro_eua, fed)
+    usd_detalhado = score_usd_detalhado(macro_eua, fed)
+    if publish_live_refresh is not None and _aq_cached_open_allowed:
+        publish_live_refresh({
+            "macro_eua": macro_eua,
+            "fed": fed,
+            "dados_moedas": dados_moedas,
+        }, status_fonte=dict(STATUS_FONTE))
 qualidade_usd, qualidade_rotulo = qualidade_dados_usd()
+st.session_state["atlasquant_advanced_boot"] = {
+    "state": str(_aq_boot.get("state") or ""),
+    "generated_at": str(_aq_boot.get("generated_at") or ""),
+    "runtime_generated_at": str(_aq_boot.get("runtime_generated_at") or ""),
+    "age_minutes": _aq_boot.get("age_minutes"),
+    "refresh_status": str(_aq_boot.get("refresh_status") or ""),
+    "degraded_sources": list(_aq_boot.get("degraded_sources") or []),
+    "real_orders_enabled": False,
+    "automatic_execution": False,
+}
 
 if render_atlasquant_header is not None:
     render_atlasquant_header(APP_VERSION, environment=ATLASQUANT_ENVIRONMENT)
+    try:
+        from atlasquant_ui_v1 import render_account_identity
+        render_account_identity(_ATLASQUANT_ACCESS)
+    except Exception:
+        pass
 else:
     st.title("🧭 AtlasQuant")
     st.caption(f"Market Intelligence Platform · {ATLASQUANT_ENVIRONMENT}")
     if _ATLASQUANT_UI_IMPORT_ERROR:
         st.caption(f"UI profissional em modo compatível: {_ATLASQUANT_UI_IMPORT_ERROR}")
+
+if provenance_banner_html is not None:
+    _aq_banner = provenance_banner_html(st.session_state.get("atlasquant_advanced_boot"))
+    if _aq_banner:
+        st.markdown(_aq_banner, unsafe_allow_html=True)
+        _aq_shown = st.session_state.get("atlasquant_advanced_boot", {})
+        _aq_shown_state = str(_aq_shown.get("state") or "")
+        _aq_shown_refresh = str(_aq_shown.get("refresh_status") or "")
+        if _aq_shown_state == "CACHED_SNAPSHOT" or _aq_shown_refresh.startswith("pacote anterior"):
+            if st.button("Atualizar fontes agora", key="aq_advanced_refresh_sources", width="content"):
+                st.session_state["atlasquant_advanced_force_live"] = True
+                st.rerun()
+
+def _aq_watch_live_refresh() -> None:
+    if peek_live_refresh is None:
+        return
+    warm = peek_live_refresh()
+    status = str(warm.get("status") or "")
+    boot_state = str(st.session_state.get("atlasquant_advanced_boot", {}).get("state") or "")
+    if boot_state != "CACHED_SNAPSHOT":
+        return
+    if status == "running":
+        st.session_state["_aq_refresh_noted"] = False
+        return
+    if status == "ready":
+        st.rerun()
+        return
+    if status in {"failed", "retained"} and not st.session_state.get("_aq_refresh_noted"):
+        st.session_state["_aq_refresh_noted"] = True
+        st.rerun()
+
+if str(st.session_state.get("atlasquant_advanced_boot", {}).get("state") or "") == "CACHED_SNAPSHOT":
+    try:
+        _aq_boot_fragment = st.fragment(run_every=8)(_aq_watch_live_refresh)
+        _aq_boot_fragment()
+    except Exception:
+        pass
 
 if context_strip_html is not None:
     st.markdown(
@@ -4259,6 +4423,11 @@ _aq_experience_mode = (
     if render_experience_mode_switch is not None
     else "Iniciante"
 )
+try:
+    from atlasquant_voice_assistant import render_top_voice_access
+    render_top_voice_access(st.session_state, pages=_nav_items, fast=False)
+except Exception:
+    pass
 if experience_mode_overview_html is not None:
     st.markdown(
         experience_mode_overview_html(_aq_experience_mode),
@@ -4278,6 +4447,26 @@ if navigation_groups_html is not None:
     st.markdown(navigation_groups_html(), unsafe_allow_html=True)
 if mobile_navigation_hint_html is not None:
     st.markdown(mobile_navigation_hint_html(), unsafe_allow_html=True)
+
+if consume_premium_navigation is not None:
+    consume_premium_navigation(
+        st.session_state,
+        mode=_aq_experience_mode,
+        available_pages=_nav_items,
+        fast=False,
+    )
+if render_premium_catalog is not None:
+    _aq_nav_key = (
+        "atlasquant_advanced_area"
+        if str(_aq_experience_mode).casefold().startswith("avan")
+        else "atlasquant_beginner_area_full"
+    )
+    render_premium_catalog(
+        mode=_aq_experience_mode,
+        available_pages=_nav_items,
+        fast=False,
+        active_page=str(st.session_state.get(_aq_nav_key) or "🎯 Radar"),
+    )
 
 if render_stable_navigation is not None:
     _aq_active_page = render_stable_navigation(

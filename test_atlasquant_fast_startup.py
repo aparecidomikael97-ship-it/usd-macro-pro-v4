@@ -165,7 +165,7 @@ class FastStartupTests(unittest.TestCase):
         self.assertIn('"💰 Investir"',src)
         self.assertIn('render_investment_center("Iniciante")',src)
         self.assertIn('experience_compass_html("Iniciante", page)',src)
-        pages=src.index('pages=["🎯 Radar"')
+        pages=src.index('_fast_pages=["🎯 Radar"')
         compass=src.index('experience_compass_html("Iniciante", page)',pages)
         radar=src.index('if page=="🎯 Radar":',compass)
         self.assertLess(pages,compass)
