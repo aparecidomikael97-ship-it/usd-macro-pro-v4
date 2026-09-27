@@ -2175,11 +2175,12 @@ except Exception as _aq_boot_exc:
 _aq_warm = peek_live_refresh() if peek_live_refresh is not None else {"status": "idle", "result": None}
 _aq_force_live = bool(st.session_state.pop("atlasquant_advanced_force_live", False))
 _aq_warm_result = _aq_warm.get("result") if isinstance(_aq_warm, dict) else None
+_aq_warm_status = str(_aq_warm.get("status") or "") if isinstance(_aq_warm, dict) else ""
 _aq_use_live_memory = (
     _aq_cached_open_allowed
     and not _aq_force_live
     and isinstance(_aq_warm, dict)
-    and _aq_warm.get("status") == "ready"
+    and _aq_warm_status in {"ready", "retained"}
     and isinstance(_aq_warm_result, dict)
     and _aq_warm_result.get("macro_eua")
     and _aq_warm_result.get("fed")
@@ -2191,11 +2192,15 @@ if _aq_use_live_memory:
     dados_moedas = dict(_aq_warm_result["dados_moedas"])
     ranking = calcular_ranking(dados_moedas, macro_eua, fed)
     usd_detalhado = score_usd_detalhado(macro_eua, fed)
+    if _aq_warm_status == "retained":
+        _aq_refresh_note = "pacote anterior mantido; " + str(_aq_warm.get("error") or "fonte sem detalhe")
+    else:
+        _aq_refresh_note = "concluída"
     _aq_boot = {
         "use_cache": False,
         "state": "LIVE_REFRESH",
         "generated_at": str(_aq_warm.get("finished_at") or ""),
-        "refresh_status": "concluída",
+        "refresh_status": _aq_refresh_note,
         "real_orders_enabled": False,
         "automatic_execution": False,
     }
@@ -2208,12 +2213,21 @@ elif bool(_aq_boot.get("use_cache")) and not _aq_force_live:
     _aq_status = _aq_boot.get("status_fonte")
     if isinstance(_aq_status, dict) and _aq_status:
         STATUS_FONTE.update(_aq_status)
-    if start_live_refresh is not None and str(_aq_warm.get("status") or "") in {"idle", "failed"}:
-        _aq_boot["refresh_status"] = start_live_refresh({
+    if start_live_refresh is not None and _aq_warm_status == "idle":
+        st.session_state["_aq_refresh_noted"] = False
+        _aq_started = start_live_refresh({
             "macro_eua": carregar_macro_eua,
             "fed": carregar_narrativa_fed,
             "dados_moedas": carregar_dados_moedas,
-        })
+        }, timeouts={"macro_eua": 25.0, "fed": 25.0, "dados_moedas": 50.0})
+        _aq_boot["refresh_status"] = "em andamento" if _aq_started == "running" else str(_aq_started)
+    elif _aq_warm_status == "failed":
+        _aq_boot["refresh_status"] = (
+            "falhou sem substituir o snapshot: "
+            + str(_aq_warm.get("error") or "fonte sem detalhe")
+        )
+    elif _aq_warm_status == "running":
+        _aq_boot["refresh_status"] = "em andamento"
 else:
     if str(_aq_boot.get("state") or "") == "CACHED_SNAPSHOT":
         _aq_boot["state"] = "LIVE_REQUIRED"
@@ -2251,7 +2265,10 @@ if provenance_banner_html is not None:
     _aq_banner = provenance_banner_html(st.session_state.get("atlasquant_advanced_boot"))
     if _aq_banner:
         st.markdown(_aq_banner, unsafe_allow_html=True)
-        if str(st.session_state.get("atlasquant_advanced_boot", {}).get("state") or "") == "CACHED_SNAPSHOT":
+        _aq_shown = st.session_state.get("atlasquant_advanced_boot", {})
+        _aq_shown_state = str(_aq_shown.get("state") or "")
+        _aq_shown_refresh = str(_aq_shown.get("refresh_status") or "")
+        if _aq_shown_state == "CACHED_SNAPSHOT" or _aq_shown_refresh.startswith("pacote anterior"):
             if st.button("Atualizar fontes agora", key="aq_advanced_refresh_sources", width="content"):
                 st.session_state["atlasquant_advanced_force_live"] = True
                 st.rerun()
@@ -2260,7 +2277,18 @@ def _aq_watch_live_refresh() -> None:
     if peek_live_refresh is None:
         return
     warm = peek_live_refresh()
-    if warm.get("status") == "ready" and str(st.session_state.get("atlasquant_advanced_boot", {}).get("state") or "") == "CACHED_SNAPSHOT":
+    status = str(warm.get("status") or "")
+    boot_state = str(st.session_state.get("atlasquant_advanced_boot", {}).get("state") or "")
+    if boot_state != "CACHED_SNAPSHOT":
+        return
+    if status == "running":
+        st.session_state["_aq_refresh_noted"] = False
+        return
+    if status == "ready":
+        st.rerun()
+        return
+    if status in {"failed", "retained"} and not st.session_state.get("_aq_refresh_noted"):
+        st.session_state["_aq_refresh_noted"] = True
         st.rerun()
 
 if str(st.session_state.get("atlasquant_advanced_boot", {}).get("state") or "") == "CACHED_SNAPSHOT":
