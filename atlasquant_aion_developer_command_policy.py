@@ -244,16 +244,36 @@ def _assert_policy_semantics(policy: Mapping[str, Any]) -> None:
     _assert_policy_budget(policy)
     if policy.get("validated_command_plan") != _canonical_command_plan():
         raise ValueError("validated command plan is not the canonical template")
+    _assert_policy_state(policy)
+
+
+def _assert_policy_state(policy: Mapping[str, Any]) -> None:
+    blockers = policy.get("blockers")
+    if not isinstance(blockers, list):
+        raise ValueError("command policy blockers must be a list")
+    if policy.get("state") == "READY_FOR_EXECUTABLE_PINNING_REVIEW":
+        if blockers:
+            raise ValueError("ready command policy cannot carry blockers")
+    elif not blockers:
+        raise ValueError("blocked command policy must name blockers")
 
 
 def command_policy_manifest(policy: Mapping[str, Any]) -> dict[str, Any]:
-    """Fields that define the accepted command-policy decision. Ids are not inputs."""
+    """Fields that define the accepted command-policy decision. Ids are not inputs.
+
+    ``hazards`` and ``required_before_future_execution`` are informational.
+    They are not authority fields and are intentionally outside this digest.
+    ``state`` and ``blockers`` are authority fields: a blocked policy cannot
+    be relabeled ready while keeping the same id.
+    """
     if not isinstance(policy, Mapping):
         raise ValueError("command policy must be an object")
     allowlist = policy.get("allowlist_policy") if isinstance(policy.get("allowlist_policy"), Mapping) else {}
     budget = policy.get("resource_budget") if isinstance(policy.get("resource_budget"), Mapping) else {}
+    blockers = policy.get("blockers")
     return {
         "state": policy.get("state"),
+        "blockers": list(blockers) if isinstance(blockers, (list, tuple)) else blockers,
         "runner_contract_id": policy.get("runner_contract_id"),
         "runner_contract_manifest_id": policy.get("runner_contract_manifest_id"),
         "validated_command_plan": policy.get("validated_command_plan"),
@@ -372,6 +392,82 @@ def _bind_command_policy_ids(policy: dict[str, Any]) -> dict[str, Any]:
     return policy
 
 
+def _classify_command_policy(
+    runner_contract: Mapping[str, Any],
+    *,
+    requested_environment: Mapping[str, Any] | None = None,
+    path_lookup_allowed: bool = False,
+    parent_environment_inheritance: bool = False,
+    absolute_executable_required: bool = True,
+    executable_digest_required: bool = True,
+) -> tuple[list[str], dict[str, int]]:
+    """Blockers the constructor would record for this runner. Ids are not inputs."""
+    raw_plan = list(runner_contract.get("command_plan") or [])
+    blockers: list[str] = []
+    if any(not isinstance(item, Mapping) for item in raw_plan):
+        blockers.append("COMMAND_PLAN_ENTRY_NOT_OBJECT")
+    rows = [item for item in raw_plan if isinstance(item, Mapping)]
+    if len(raw_plan) != len(_EXPECTED_STEPS):
+        blockers.append("COMMAND_PLAN_LENGTH_MISMATCH")
+    names = tuple(row.get("step") for row in rows)
+    if len(rows) == len(_EXPECTED_STEPS) and names != _EXPECTED_STEP_NAMES:
+        blockers.append("COMMAND_PLAN_ORDER_OR_STEP_SET_MISMATCH")
+    elif len(rows) != len(_EXPECTED_STEPS):
+        blockers.append("COMMAND_PLAN_ORDER_OR_STEP_SET_MISMATCH")
+    if not any(not isinstance(item, Mapping) for item in raw_plan):
+        for idx, expected in enumerate(_EXPECTED_STEPS):
+            if idx >= len(rows):
+                blockers.append(f"MISSING_STEP:{expected[0]}")
+                continue
+            blockers.extend(_validate_step(rows[idx], expected))
+    budget = (
+        runner_contract.get("resource_budget")
+        if isinstance(runner_contract.get("resource_budget"), Mapping)
+        else None
+    )
+    validated_budget, budget_blockers = validate_resource_budget(budget)
+    blockers.extend(budget_blockers)
+    if (
+        "COMMAND_BUDGET_OUT_OF_RANGE" not in budget_blockers
+        and validated_budget["max_commands"] < len(_EXPECTED_STEPS)
+    ):
+        blockers.append("COMMAND_PLAN_EXCEEDS_RESOURCE_BUDGET")
+    if path_lookup_allowed is not False or runner_contract.get("path_lookup_allowed") is True:
+        blockers.append("PATH_LOOKUP_NOT_ALLOWED")
+    if (
+        parent_environment_inheritance is not False
+        or runner_contract.get("parent_environment_inheritance") is True
+    ):
+        blockers.append("PARENT_ENVIRONMENT_INHERITANCE_NOT_ALLOWED")
+    if absolute_executable_required is not True:
+        blockers.append("ABSOLUTE_EXECUTABLE_REQUIRED")
+    if executable_digest_required is not True:
+        blockers.append("EXECUTABLE_DIGEST_REQUIRED")
+    requested_env = dict(requested_environment or {})
+    if requested_env or runner_contract.get("caller_environment_overrides_allowed") is True:
+        blockers.append("CALLER_ENVIRONMENT_OVERRIDES_NOT_ALLOWED")
+    if any(_SECRET_ENV_RE.search(str(key)) for key in requested_env):
+        blockers.append("SECRET_LIKE_ENVIRONMENT_KEY_NOT_ALLOWED")
+    if any(str(key).casefold() in FORBIDDEN_INHERITED_ENVIRONMENT for key in requested_env):
+        blockers.append("INHERITED_ENVIRONMENT_KEY_NOT_ALLOWED")
+    return list(dict.fromkeys(blockers)), validated_budget
+
+
+def expected_command_policy_state_and_blockers(
+    runner_contract: Mapping[str, Any],
+) -> tuple[str, list[str]]:
+    """State the constructor would seal. The supplied policy id is not an input."""
+    blockers, _validated = _classify_command_policy(runner_contract)
+    if (
+        runner_contract.get("state") != "READY_FOR_RUNNER_DESIGN_REVIEW"
+        or list(runner_contract.get("blockers") or [])
+    ):
+        blockers = ["RUNNER_CONTRACT_NOT_READY", *blockers]
+        blockers = list(dict.fromkeys(blockers))
+    state = "READY_FOR_EXECUTABLE_PINNING_REVIEW" if not blockers else "BLOCKED"
+    return state, blockers
+
+
 def expected_command_policy_payload(runner_contract: Mapping[str, Any]) -> dict[str, Any]:
     """Security fields a constructor would seal for this runner.
 
@@ -385,11 +481,14 @@ def expected_command_policy_payload(runner_contract: Mapping[str, Any]) -> dict[
     )
     if blockers or not isinstance(budget, Mapping) or dict(budget) != validated:
         raise ValueError("runner resource budget is not canonical")
-    if validated["max_commands"] < len(_EXPECTED_STEPS):
-        raise ValueError("resource budget does not cover the canonical command plan")
+    state, policy_blockers = expected_command_policy_state_and_blockers(runner_contract)
     return {
+        "state": state,
+        "blockers": policy_blockers,
         "resource_budget": validated,
-        "validated_command_plan": _canonical_command_plan(),
+        "validated_command_plan": (
+            _canonical_command_plan() if not policy_blockers else []
+        ),
         "runner_contract_id": runner_contract.get("runner_contract_id"),
         "runner_contract_manifest_id": runner_contract.get("runner_contract_manifest_id"),
         "allowlist_policy": _canonical_allowlist(),
@@ -423,6 +522,8 @@ def expected_command_policy_payload(runner_contract: Mapping[str, Any]) -> dict[
 
 
 _BOUNDARY_FIELDS = (
+    "state",
+    "blockers",
     "resource_budget",
     "validated_command_plan",
     "runner_contract_id",
@@ -494,64 +595,15 @@ def build_command_policy_contract(
     if list(runner_contract.get("blockers") or []):
         raise ValueError("runner contract still has blockers")
     runner_manifest_id = _assert_runner_digest(runner_contract)
-
-    raw_plan = list(runner_contract.get("command_plan") or [])
-    blockers: list[str] = []
-    if any(not isinstance(item, Mapping) for item in raw_plan):
-        blockers.append("COMMAND_PLAN_ENTRY_NOT_OBJECT")
-    rows = [item for item in raw_plan if isinstance(item, Mapping)]
-    if len(raw_plan) != len(_EXPECTED_STEPS):
-        blockers.append("COMMAND_PLAN_LENGTH_MISMATCH")
-
-    names = tuple(row.get("step") for row in rows)
-    if len(rows) == len(_EXPECTED_STEPS) and names != _EXPECTED_STEP_NAMES:
-        blockers.append("COMMAND_PLAN_ORDER_OR_STEP_SET_MISMATCH")
-    elif len(rows) != len(_EXPECTED_STEPS):
-        blockers.append("COMMAND_PLAN_ORDER_OR_STEP_SET_MISMATCH")
-
-    if not any(not isinstance(item, Mapping) for item in raw_plan):
-        for idx, expected in enumerate(_EXPECTED_STEPS):
-            if idx >= len(rows):
-                blockers.append(f"MISSING_STEP:{expected[0]}")
-                continue
-            blockers.extend(_validate_step(rows[idx], expected))
-
-    budget = (
-        runner_contract.get("resource_budget")
-        if isinstance(runner_contract.get("resource_budget"), Mapping)
-        else None
+    blockers, validated_budget = _classify_command_policy(
+        runner_contract,
+        requested_environment=requested_environment,
+        path_lookup_allowed=path_lookup_allowed,
+        parent_environment_inheritance=parent_environment_inheritance,
+        absolute_executable_required=absolute_executable_required,
+        executable_digest_required=executable_digest_required,
     )
-    validated_budget, budget_blockers = validate_resource_budget(budget)
-    blockers.extend(budget_blockers)
-    if (
-        "COMMAND_BUDGET_OUT_OF_RANGE" not in budget_blockers
-        and validated_budget["max_commands"] < len(_EXPECTED_STEPS)
-    ):
-        blockers.append("COMMAND_PLAN_EXCEEDS_RESOURCE_BUDGET")
-
-    if path_lookup_allowed is not False or runner_contract.get("path_lookup_allowed") is True:
-        blockers.append("PATH_LOOKUP_NOT_ALLOWED")
-    if (
-        parent_environment_inheritance is not False
-        or runner_contract.get("parent_environment_inheritance") is True
-    ):
-        blockers.append("PARENT_ENVIRONMENT_INHERITANCE_NOT_ALLOWED")
-    if absolute_executable_required is not True:
-        blockers.append("ABSOLUTE_EXECUTABLE_REQUIRED")
-    if executable_digest_required is not True:
-        blockers.append("EXECUTABLE_DIGEST_REQUIRED")
-
-    requested_env = dict(requested_environment or {})
-    if requested_env or runner_contract.get("caller_environment_overrides_allowed") is True:
-        blockers.append("CALLER_ENVIRONMENT_OVERRIDES_NOT_ALLOWED")
-    if any(_SECRET_ENV_RE.search(str(key)) for key in requested_env):
-        blockers.append("SECRET_LIKE_ENVIRONMENT_KEY_NOT_ALLOWED")
-    if any(str(key).casefold() in FORBIDDEN_INHERITED_ENVIRONMENT for key in requested_env):
-        blockers.append("INHERITED_ENVIRONMENT_KEY_NOT_ALLOWED")
-
     fixed_environment = dict(FIXED_ENVIRONMENT)
-
-    blockers = list(dict.fromkeys(blockers))
     state = "READY_FOR_EXECUTABLE_PINNING_REVIEW" if not blockers else "BLOCKED"
 
     return _bind_command_policy_ids({
@@ -630,6 +682,7 @@ __all__ = [
     "command_policy_manifest_id",
     "expected_command_policy_id",
     "assert_command_policy_integrity",
+    "expected_command_policy_state_and_blockers",
     "expected_command_policy_payload",
     "assert_runner_policy_boundary",
     "build_command_policy_contract",

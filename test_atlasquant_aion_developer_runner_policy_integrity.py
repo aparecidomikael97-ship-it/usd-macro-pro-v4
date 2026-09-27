@@ -62,6 +62,9 @@ class RunnerPolicyIntegrityTests(unittest.TestCase):
         preflight = _preflight(builder)
         patch = _patch(builder, preflight)
         attestation = attestation_for_documents(builder, preflight, patch)
+        self.builder = builder
+        self.preflight = preflight
+        self.patch = patch
         self.runner = build_runner_contract(
             builder,
             preflight,
@@ -119,7 +122,9 @@ class RunnerPolicyIntegrityTests(unittest.TestCase):
                 self._stale(mutate)
 
     def test_reviewer_change_keeps_old_id_and_is_rejected(self):
-        self._stale(lambda runner: runner["review"].__setitem__("human_patch_reviewer", "other-reviewer"))
+        self._stale(lambda runner: runner["review"].__setitem__(
+            "human_patch_reviewer_principal_id", "prn_otherrev1",
+        ))
 
     def test_review_ref_change_keeps_old_id_and_is_rejected(self):
         self._stale(lambda runner: runner["review"]["human_patch_review_refs"].append("review:other"))
@@ -249,6 +254,9 @@ class RunnerPolicyIntegrityTests(unittest.TestCase):
             self.attestation,
             environment,
             runner_contract=self.runner,
+            builder_request=self.builder,
+            preflight=self.preflight,
+            patch_validation=self.patch,
         )
         self.assertEqual(fresh["state"], "READY_FOR_OS_SANDBOX_DESIGN_REVIEW")
         self.assertFalse(fresh["execution_authorized"])
@@ -263,6 +271,9 @@ class RunnerPolicyIntegrityTests(unittest.TestCase):
                 self.attestation,
                 environment,
                 runner_contract=stale_runner,
+                builder_request=self.builder,
+                preflight=self.preflight,
+                patch_validation=self.patch,
             )
         with self.assertRaises(ValueError):
             build_os_sandbox_design_review(
@@ -271,6 +282,9 @@ class RunnerPolicyIntegrityTests(unittest.TestCase):
                 self.attestation,
                 environment,
                 runner_contract=stale_runner,
+                builder_request=self.builder,
+                preflight=self.preflight,
+                patch_validation=self.patch,
             )
         with self.assertRaises(ValueError):
             build_os_sandbox_design_review(
@@ -279,6 +293,9 @@ class RunnerPolicyIntegrityTests(unittest.TestCase):
                 self.attestation,
                 environment,
                 runner_contract=self.runner,
+                builder_request=self.builder,
+                preflight=self.preflight,
+                patch_validation=self.patch,
             )
 
 

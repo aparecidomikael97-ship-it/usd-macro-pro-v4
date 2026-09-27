@@ -190,6 +190,28 @@ _HARDENED_INVARIANTS={
     "self_reseal.security_flag_relaxed",
     "self_reseal.extra_environment_key",
     "self_reseal.legitimate_constructor",
+    "upstream_provenance.builder_request_id",
+    "upstream_provenance.preflight_id",
+    "upstream_provenance.patch_validation_id",
+    "upstream_provenance.patch_digest",
+    "upstream_provenance.attestation_id",
+    "upstream_provenance.joint_reseal",
+    "upstream_provenance.legitimate",
+    "blocked_to_ready.review_false_same_id",
+    "blocked_to_ready.review_false_resealed",
+    "blocked_to_ready.missing_refs",
+    "blocked_to_ready.revision_unverified",
+    "blocked_to_ready.missing_targets",
+    "blocked_to_ready.policy_promoted",
+    "blocked_to_ready.policy_ready_with_blockers",
+    "review_principal.mismatch",
+    "review_principal.reviewed_false",
+    "review_principal.refs_removed",
+    "review_principal.display_is_label",
+    "test_target_origin.replaced",
+    "test_target_origin.removed",
+    "test_target_origin.unapproved",
+    "test_target_origin.gates",
 }
 
 
@@ -201,10 +223,10 @@ class AionDeveloperAdversarialAuditorTests(unittest.TestCase):
     def test_report_shape_is_deterministic_and_unscored(self):
         report=self.report
         self.assertEqual(report["schema"],SCHEMA)
-        self.assertEqual(report["cases_total"],210)
+        self.assertEqual(report["cases_total"],232)
         self.assertEqual(
             report["gap_count"]+report["blocked_by_design_count"]+report["pass_count"],
-            210,
+            232,
         )
         self.assertFalse(report["symlink_physical_boundary_verified"])
         self.assertFalse(report["hardlink_physical_boundary_verified"])

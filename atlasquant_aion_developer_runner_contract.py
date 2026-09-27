@@ -31,6 +31,7 @@ from atlasquant_aion_developer_manifest import (
     require_string_sequence,
     stable_digest,
 )
+from atlasquant_aion_developer_principal_identity import require_principal_id
 from atlasquant_aion_developer_sandbox_preflight import (
     ALLOWED_COMMAND_POLICY,
     SCHEMA as PREFLIGHT_SCHEMA,
@@ -120,7 +121,13 @@ def _step_manifest(step: Any) -> Any:
 
 
 def runner_contract_manifest(contract: Mapping[str, Any]) -> dict[str, Any]:
-    """Canonical security and semantic fields. Ids are not inputs."""
+    """Canonical security and semantic fields. Ids are not inputs.
+
+    ``human_patch_reviewer`` is a display label and is not an authority field.
+    The reviewer principal id is the identity that enters this digest.
+    ``state`` and ``blockers`` enter the digest so a blocked contract cannot
+    be relabeled ready while keeping the same id.
+    """
     if not isinstance(contract, Mapping):
         raise ValueError("runner contract must be an object")
     lineage = contract.get("lineage") if isinstance(contract.get("lineage"), Mapping) else {}
@@ -130,7 +137,10 @@ def runner_contract_manifest(contract: Mapping[str, Any]) -> dict[str, Any]:
     review_refs = review.get("human_patch_review_refs")
     targets = tests.get("targets")
     gates = tests.get("mandatory_gates")
+    blockers = contract.get("blockers")
     return {
+        "state": contract.get("state"),
+        "blockers": list(blockers) if isinstance(blockers, (list, tuple)) else blockers,
         "lineage": {
             "builder_request_id": lineage.get("builder_request_id"),
             "preflight_id": lineage.get("preflight_id"),
@@ -142,7 +152,7 @@ def runner_contract_manifest(contract: Mapping[str, Any]) -> dict[str, Any]:
         },
         "review": {
             "human_patch_reviewed": review.get("human_patch_reviewed"),
-            "human_patch_reviewer": review.get("human_patch_reviewer"),
+            "human_patch_reviewer_principal_id": review.get("human_patch_reviewer_principal_id"),
             "human_patch_review_refs": list(review_refs) if isinstance(review_refs, (list, tuple)) else review_refs,
         },
         "tests": {
@@ -273,11 +283,75 @@ def _assert_runner_digest(contract: Mapping[str, Any]) -> str:
     return manifest_id
 
 
+def _local_runner_blockers(contract: Mapping[str, Any]) -> list[str]:
+    """Blockers that can be recomputed from the runner document alone.
+
+    Upstream reasons such as an unverified patch revision are not visible
+    here. ``assert_runner_provenance`` recomputes those from the source
+    documents.
+    """
+    blockers: list[str] = []
+    review = contract.get("review") if isinstance(contract.get("review"), Mapping) else {}
+    if review.get("human_patch_reviewed") is not True:
+        blockers.append("HUMAN_PATCH_REVIEW_REQUIRED")
+    if not isinstance(review.get("human_patch_reviewer"), str) or not review.get("human_patch_reviewer"):
+        blockers.append("HUMAN_PATCH_REVIEWER_REQUIRED")
+    refs = review.get("human_patch_review_refs")
+    if not isinstance(refs, list) or not refs:
+        blockers.append("HUMAN_PATCH_REVIEW_EVIDENCE_REQUIRED")
+    elif len(refs) > MAX_REVIEW_REFS:
+        blockers.append("REVIEW_EVIDENCE_LIMIT_EXCEEDED")
+    try:
+        require_principal_id(
+            review.get("human_patch_reviewer_principal_id"),
+            "human_patch_reviewer_principal_id",
+        )
+    except ValueError:
+        blockers.append("HUMAN_PATCH_REVIEWER_PRINCIPAL_REQUIRED")
+    if contract.get("content_binding_structurally_bound") is not True:
+        blockers.append("CONTENT_ATTESTATION_REQUIRED")
+    tests = contract.get("tests") if isinstance(contract.get("tests"), Mapping) else {}
+    targets = tests.get("targets")
+    if not isinstance(targets, list) or not targets:
+        blockers.append("TEST_TARGETS_REQUIRED")
+    gates = tests.get("mandatory_gates")
+    if not isinstance(gates, list) or not gates:
+        blockers.append("MANDATORY_GATES_REQUIRED")
+    else:
+        try:
+            assert_required_mandatory_gates(
+                require_string_sequence(gates, "mandatory_gates")
+            )
+        except ValueError:
+            blockers.append("MANDATORY_GATES_INCOMPLETE")
+    return blockers
+
+
+def _assert_runner_state(contract: Mapping[str, Any]) -> None:
+    """READY is allowed only when no locally visible blocker remains."""
+    documented = contract.get("blockers")
+    if not isinstance(documented, list):
+        raise ValueError("runner blockers must be a list")
+    local = _local_runner_blockers(contract)
+    state = contract.get("state")
+    if state == "READY_FOR_RUNNER_DESIGN_REVIEW":
+        if local or documented:
+            raise ValueError("runner state READY is not consistent with blockers")
+    elif state == "BLOCKED":
+        if not documented:
+            raise ValueError("blocked runner must name blockers")
+        if any(item not in documented for item in local):
+            raise ValueError("runner blockers omit a locally required blocker")
+    else:
+        raise ValueError("runner state is not an accepted design state")
+
+
 def _assert_runner_semantics(contract: Mapping[str, Any]) -> None:
     """Reject a resealed document whose local security payload is not canonical.
 
     A freshly computed digest is not evidence that the constructor produced
-    the document.
+    the document. Clearing blockers and rewriting the state does not make a
+    blocked runner ready.
     """
     budget = contract.get("resource_budget")
     validated, blockers = validate_resource_budget(budget if isinstance(budget, Mapping) else None)
@@ -287,14 +361,7 @@ def _assert_runner_semantics(contract: Mapping[str, Any]) -> None:
         raise ValueError("resource budget has non-canonical fields")
     if contract.get("command_plan") != _canonical_command_plan():
         raise ValueError("runner command plan is not the canonical template")
-    if (
-        contract.get("state") == "READY_FOR_RUNNER_DESIGN_REVIEW"
-        and not list(contract.get("blockers") or [])
-    ):
-        tests = contract.get("tests") if isinstance(contract.get("tests"), Mapping) else {}
-        assert_required_mandatory_gates(
-            require_string_sequence(tests.get("mandatory_gates"), "mandatory_gates")
-        )
+    _assert_runner_state(contract)
 
 
 def assert_runner_contract_integrity(contract: Mapping[str, Any]) -> str:
@@ -356,17 +423,16 @@ def _classify_test_target(value: Any, authorized: set[str]) -> str:
     return ""
 
 
-def build_runner_contract(
+def _assert_upstream_documents(
     builder_request: Mapping[str, Any],
     preflight: Mapping[str, Any],
     patch_validation: Mapping[str, Any],
-    *,
-    content_attestation: Mapping[str, Any] | None = None,
-    human_patch_reviewed: bool,
-    human_patch_reviewer: Any,
-    human_patch_review_refs: Sequence[Any] | None,
-) -> dict[str, Any]:
-    """Build a non-executing isolated runner design contract."""
+) -> str:
+    """Raise when an upstream document is not the sealed ready contract.
+
+    These checks are the same ones the constructor uses. A stored id on the
+    runner is not a substitute for them.
+    """
     if builder_request.get("schema") != BUILDER_SCHEMA:
         raise ValueError("invalid Builder Sandbox Request")
     if str(builder_request.get("state") or "") != "READY_FOR_BUILDER_SANDBOX":
@@ -445,24 +511,20 @@ def build_runner_contract(
         raise ValueError("patch baseline differs from builder request")
     if str(revision.get("candidate_ref") or "") != str(branch_contract.get("candidate_ref") or ""):
         raise ValueError("patch candidate differs from builder request")
+    return manifest_id
 
+
+def _reviewer_principal_id(builder_request: Mapping[str, Any]) -> str:
+    roles = builder_request.get("roles") if isinstance(builder_request.get("roles"), Mapping) else {}
+    return require_principal_id(roles.get("reviewer_principal_id"), "reviewer_principal_id")
+
+
+def _derived_review(
+    human_patch_reviewed: bool,
+    human_patch_reviewer: Any,
+    human_patch_review_refs: Sequence[Any] | None,
+) -> tuple[list[str], str, list[str]]:
     blockers: list[str] = []
-    attestation_id = ""
-    structurally_bound = False
-    if content_attestation is None:
-        blockers.append("CONTENT_ATTESTATION_REQUIRED")
-    else:
-        assert_content_attestation_matches(
-            content_attestation,
-            builder_request,
-            preflight,
-            patch_validation,
-        )
-        structurally_bound = True
-        attestation_id = str(content_attestation.get("content_attestation_id") or "")
-    if revision.get("revision_content_verified") is not True:
-        blockers.append("PATCH_VALIDATOR_CONTENT_BINDING_NOT_VERIFIED")
-
     reviewer = _clean(human_patch_reviewer, 160)
     raw_review_refs = require_string_sequence(human_patch_review_refs, "human_patch_review_refs")
     if len(raw_review_refs) > MAX_REVIEW_REFS:
@@ -476,7 +538,12 @@ def build_runner_contract(
         blockers.append("HUMAN_PATCH_REVIEWER_REQUIRED")
     if not review_refs:
         blockers.append("HUMAN_PATCH_REVIEW_EVIDENCE_REQUIRED")
+    return blockers, reviewer, review_refs
 
+
+def _derived_tests(builder_request: Mapping[str, Any]) -> tuple[list[str], list[str], list[str]]:
+    """Rebuild targets and gates from the builder test contract."""
+    blockers: list[str] = []
     test_contract = (
         builder_request.get("test_contract")
         if isinstance(builder_request.get("test_contract"), Mapping)
@@ -506,7 +573,54 @@ def build_runner_contract(
         gates = _unique(raw_gates, MAX_MANDATORY_GATES)
         if not gates:
             blockers.append("MANDATORY_GATES_REQUIRED")
+    return tests, gates, blockers
 
+
+def _runner_decision(
+    builder_request: Mapping[str, Any],
+    preflight: Mapping[str, Any],
+    patch_validation: Mapping[str, Any],
+    content_attestation: Mapping[str, Any] | None,
+    *,
+    human_patch_reviewed: bool,
+    human_patch_reviewer: Any,
+    human_patch_review_refs: Sequence[Any] | None,
+) -> dict[str, Any]:
+    """Recompute the runner decision from upstream documents and the review declaration.
+
+    The caller-supplied runner id is not an input. Review refs are declared
+    evidence, not a cryptographic proof.
+    """
+    _assert_upstream_documents(builder_request, preflight, patch_validation)
+    blockers: list[str] = []
+    attestation_id = ""
+    structurally_bound = False
+    if content_attestation is None:
+        blockers.append("CONTENT_ATTESTATION_REQUIRED")
+    else:
+        assert_content_attestation_matches(
+            content_attestation,
+            builder_request,
+            preflight,
+            patch_validation,
+        )
+        structurally_bound = True
+        attestation_id = str(content_attestation.get("content_attestation_id") or "")
+    revision = (
+        patch_validation.get("revision_binding")
+        if isinstance(patch_validation.get("revision_binding"), Mapping)
+        else {}
+    )
+    if revision.get("revision_content_verified") is not True:
+        blockers.append("PATCH_VALIDATOR_CONTENT_BINDING_NOT_VERIFIED")
+    review_blockers, reviewer, review_refs = _derived_review(
+        human_patch_reviewed,
+        human_patch_reviewer,
+        human_patch_review_refs,
+    )
+    blockers.extend(review_blockers)
+    tests, gates, test_blockers = _derived_tests(builder_request)
+    blockers.extend(test_blockers)
     budget = (
         preflight.get("resource_budget")
         if isinstance(preflight.get("resource_budget"), Mapping)
@@ -514,13 +628,19 @@ def build_runner_contract(
     )
     validated_budget, budget_blockers = validate_resource_budget(budget)
     blockers.extend(budget_blockers)
-
     blockers = list(dict.fromkeys(blockers))
     state = "READY_FOR_RUNNER_DESIGN_REVIEW" if not blockers else "BLOCKED"
-
-    return _bind_runner_contract_ids({
-        "schema": SCHEMA,
+    return {
         "state": state,
+        "blockers": blockers,
+        "reviewer": reviewer,
+        "review_refs": review_refs,
+        "reviewer_principal_id": _reviewer_principal_id(builder_request),
+        "targets": tests,
+        "gates": gates,
+        "resource_budget": validated_budget,
+        "structurally_bound": structurally_bound,
+        "attestation_id": attestation_id,
         "lineage": {
             "builder_request_id": str(builder_request.get("request_id") or ""),
             "preflight_id": str(preflight.get("preflight_id") or ""),
@@ -530,24 +650,131 @@ def build_runner_contract(
             "content_binding_structurally_bound": structurally_bound,
             "content_binding_independently_verified": False,
         },
+    }
+
+
+def expected_runner_state_and_blockers(
+    builder_request: Mapping[str, Any],
+    preflight: Mapping[str, Any],
+    patch_validation: Mapping[str, Any],
+    content_attestation: Mapping[str, Any] | None,
+    *,
+    human_patch_reviewed: bool,
+    human_patch_reviewer: Any,
+    human_patch_review_refs: Sequence[Any] | None,
+) -> tuple[str, list[str]]:
+    """State the constructor would seal for this upstream chain and review declaration."""
+    decision = _runner_decision(
+        builder_request,
+        preflight,
+        patch_validation,
+        content_attestation,
+        human_patch_reviewed=human_patch_reviewed,
+        human_patch_reviewer=human_patch_reviewer,
+        human_patch_review_refs=human_patch_review_refs,
+    )
+    return decision["state"], list(decision["blockers"])
+
+
+def assert_runner_provenance(
+    runner_contract: Mapping[str, Any],
+    builder_request: Mapping[str, Any],
+    preflight: Mapping[str, Any],
+    patch_validation: Mapping[str, Any],
+    content_attestation: Mapping[str, Any] | None,
+) -> None:
+    """Reject a runner whose lineage, tests or state were not derived from upstream.
+
+    A recomputed runner id is not proof that the builder request, preflight,
+    patch validation or content attestation produced the document.
+    """
+    assert_runner_contract_integrity(runner_contract)
+    review = runner_contract.get("review") if isinstance(runner_contract.get("review"), Mapping) else {}
+    reviewed = review.get("human_patch_reviewed") is True
+    decision = _runner_decision(
+        builder_request,
+        preflight,
+        patch_validation,
+        content_attestation,
+        human_patch_reviewed=reviewed,
+        human_patch_reviewer=review.get("human_patch_reviewer"),
+        human_patch_review_refs=review.get("human_patch_review_refs"),
+    )
+    if review.get("human_patch_reviewer_principal_id") != decision["reviewer_principal_id"]:
+        raise ValueError("reviewer principal does not match the builder request")
+    lineage = runner_contract.get("lineage") if isinstance(runner_contract.get("lineage"), Mapping) else {}
+    for field, expected in decision["lineage"].items():
+        if lineage.get(field) != expected:
+            raise ValueError(f"runner lineage {field} was not derived from upstream")
+    tests = runner_contract.get("tests") if isinstance(runner_contract.get("tests"), Mapping) else {}
+    if list(tests.get("targets") or []) != decision["targets"]:
+        raise ValueError("runner test targets were not derived from the builder request")
+    if list(tests.get("mandatory_gates") or []) != decision["gates"]:
+        raise ValueError("runner mandatory gates were not derived from the builder request")
+    if runner_contract.get("resource_budget") != decision["resource_budget"]:
+        raise ValueError("runner resource budget was not derived from the preflight")
+    if list(review.get("human_patch_review_refs") or []) != decision["review_refs"]:
+        raise ValueError("runner review refs are not the canonical review declaration")
+    if runner_contract.get("state") != decision["state"]:
+        raise ValueError("runner state was not derived from upstream provenance")
+    if list(runner_contract.get("blockers") or []) != decision["blockers"]:
+        raise ValueError("runner blockers were not derived from upstream provenance")
+    if decision["state"] == "READY_FOR_RUNNER_DESIGN_REVIEW" and decision["blockers"]:
+        raise ValueError("ready runner cannot carry blockers")
+    if runner_contract.get("content_binding_structurally_bound") is not decision["structurally_bound"]:
+        raise ValueError("runner content binding was not derived from the attestation")
+    if runner_contract.get("content_binding_independently_verified") is not False:
+        raise ValueError("independent content verification cannot be claimed")
+
+
+def build_runner_contract(
+    builder_request: Mapping[str, Any],
+    preflight: Mapping[str, Any],
+    patch_validation: Mapping[str, Any],
+    *,
+    content_attestation: Mapping[str, Any] | None = None,
+    human_patch_reviewed: bool,
+    human_patch_reviewer: Any,
+    human_patch_review_refs: Sequence[Any] | None,
+) -> dict[str, Any]:
+    """Build a non-executing isolated runner design contract.
+
+    The reviewer principal is copied from the builder request. The display
+    name is stored as a label and does not enter the contract id.
+    """
+    decision = _runner_decision(
+        builder_request,
+        preflight,
+        patch_validation,
+        content_attestation,
+        human_patch_reviewed=human_patch_reviewed is True,
+        human_patch_reviewer=human_patch_reviewer,
+        human_patch_review_refs=human_patch_review_refs,
+    )
+    structurally_bound = decision["structurally_bound"]
+    return _bind_runner_contract_ids({
+        "schema": SCHEMA,
+        "state": decision["state"],
+        "lineage": decision["lineage"],
         "review": {
-            "human_patch_reviewed": bool(human_patch_reviewed),
-            "human_patch_reviewer": reviewer,
-            "human_patch_review_refs": review_refs,
+            "human_patch_reviewed": human_patch_reviewed is True,
+            "human_patch_reviewer": decision["reviewer"],
+            "human_patch_reviewer_principal_id": decision["reviewer_principal_id"],
+            "human_patch_review_refs": decision["review_refs"],
         },
         "tests": {
-            "targets": tests,
-            "mandatory_gates": gates,
+            "targets": decision["targets"],
+            "mandatory_gates": decision["gates"],
             "tests_executed": False,
         },
-        "resource_budget": validated_budget,
+        "resource_budget": decision["resource_budget"],
         "command_plan": _canonical_command_plan(),
         "command_plan_is_data_only": True,
         "shell_allowed": False,
         "network_allowed": False,
         "secrets_allowed": False,
         "repo_write_allowed": False,
-        "blockers": blockers,
+        "blockers": decision["blockers"],
         "runner_design_review_required": True,
         "content_binding_structurally_bound": structurally_bound,
         "content_binding_independently_verified": False,
@@ -575,6 +802,7 @@ def build_runner_contract(
     })
 
 
+
 __all__ = [
     "SCHEMA",
     "MAX_TEST_TARGETS",
@@ -584,5 +812,7 @@ __all__ = [
     "runner_contract_manifest_id",
     "expected_runner_contract_id",
     "assert_runner_contract_integrity",
+    "expected_runner_state_and_blockers",
+    "assert_runner_provenance",
     "build_runner_contract",
 ]

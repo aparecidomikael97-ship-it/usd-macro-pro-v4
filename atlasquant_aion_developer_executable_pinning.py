@@ -233,16 +233,36 @@ def build_os_sandbox_design_review(
     environment_contract: Mapping[str, Any],
     *,
     runner_contract: Mapping[str, Any],
+    builder_request: Mapping[str, Any],
+    preflight: Mapping[str, Any],
+    patch_validation: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Bundle the contracts for design review. This does not authorize execution.
 
-    The runner and the command policy are revalidated here. A stale id, a
-    mutated runner, or a recycled policy fails closed before this bundle can
-    report design review.
+    The runner is checked against the upstream documents, then the command
+    policy is checked against that runner. A ready label with blockers, or a
+    digest that was recomputed after a mutation, fails closed. This does not
+    create an operating-system sandbox.
     """
     from atlasquant_aion_developer_command_policy import assert_runner_policy_boundary
+    from atlasquant_aion_developer_runner_contract import assert_runner_provenance
 
+    assert_runner_provenance(
+        runner_contract,
+        builder_request,
+        preflight,
+        patch_validation,
+        attestation,
+    )
     assert_runner_policy_boundary(runner_contract, command_policy)
+    if runner_contract.get("state") != "READY_FOR_RUNNER_DESIGN_REVIEW":
+        raise ValueError("runner is not ready for design review")
+    if list(runner_contract.get("blockers") or []) != []:
+        raise ValueError("runner blockers must be empty")
+    if command_policy.get("state") != "READY_FOR_EXECUTABLE_PINNING_REVIEW":
+        raise ValueError("command policy is not ready for design review")
+    if list(command_policy.get("blockers") or []) != []:
+        raise ValueError("command policy blockers must be empty")
     for label, document in (
         ("command policy", command_policy),
         ("pinning spec", pinning_spec),

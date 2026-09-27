@@ -575,7 +575,7 @@ class AttestationPinningContractTests(unittest.TestCase):
             )
 
     def test_design_review_bundle_never_authorizes_execution(self):
-        runner = _policy_runner()
+        runner = self._run(self.attestation)
         policy = build_command_policy_contract(runner)
         pinning = build_executable_pinning_spec(_pins())
         environment = build_environment_contract()
@@ -585,6 +585,9 @@ class AttestationPinningContractTests(unittest.TestCase):
             self.attestation,
             environment,
             runner_contract=runner,
+            builder_request=self.builder,
+            preflight=self.preflight,
+            patch_validation=self.patch,
         )
         self.assertEqual(review["state"], "READY_FOR_OS_SANDBOX_DESIGN_REVIEW")
         self.assertTrue(review["content_binding_structurally_bound"])
@@ -599,6 +602,9 @@ class AttestationPinningContractTests(unittest.TestCase):
                 self.attestation,
                 environment,
                 runner_contract=runner,
+                builder_request=self.builder,
+                preflight=self.preflight,
+                patch_validation=self.patch,
             )
 
 

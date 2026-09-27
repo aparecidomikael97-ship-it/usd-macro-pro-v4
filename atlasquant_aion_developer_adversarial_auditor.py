@@ -73,7 +73,10 @@ from atlasquant_aion_developer_runner_contract import (
     MAX_MANDATORY_GATES,
     MAX_TEST_TARGETS,
     _bind_runner_contract_ids,
+    assert_runner_contract_integrity,
+    assert_runner_provenance,
     build_runner_contract,
+    expected_runner_contract_id,
 )
 from atlasquant_aion_developer_sandbox_preflight import (
     build_sandbox_preflight,
@@ -2668,8 +2671,10 @@ def _runner_policy_integrity_surface(_world: _World) -> list[dict[str, str]]:
     )
     _reject(
         "runner_policy.reviewer_stale_id",
-        "Reviewer alterado com o id antigo e rejeitado.",
-        _stale_runner(lambda cloned: cloned["review"].__setitem__("human_patch_reviewer", "other-reviewer")),
+        "Reviewer principal alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["review"].__setitem__(
+            "human_patch_reviewer_principal_id", "prn_otherrev1",
+        )),
     )
     _reject(
         "runner_policy.review_ref_stale_id",
@@ -2894,6 +2899,9 @@ def _runner_policy_integrity_surface(_world: _World) -> list[dict[str, str]]:
             attestation,
             environment,
             runner_contract=runner,
+            builder_request=builder,
+            preflight=preflight,
+            patch_validation=patch,
         )
         if fresh.get("state") != "READY_FOR_OS_SANDBOX_DESIGN_REVIEW" or fresh.get("execution_authorized") is not False:
             return fresh
@@ -2907,6 +2915,9 @@ def _runner_policy_integrity_surface(_world: _World) -> list[dict[str, str]]:
             attestation,
             environment,
             runner_contract=stale_runner,
+            builder_request=builder,
+            preflight=preflight,
+            patch_validation=patch,
         )
 
     _reject(
@@ -3581,6 +3592,397 @@ def _self_reseal_surface(_world: _World) -> list[dict[str, str]]:
     return findings
 
 
+def _upstream_provenance_surface(_world: _World) -> list[dict[str, str]]:
+    """A matching digest does not prove upstream origin or a ready state.
+
+    UPSTREAM_PROVENANCE_RESEAL recomputes ids after a lineage or target edit.
+    BLOCKED_TO_READY_PROMOTION rewrites state and blockers.
+    REVIEW_PRINCIPAL_MISMATCH changes the reviewer principal.
+    TEST_TARGET_ORIGIN_MISMATCH leaves the builder test contract behind.
+    READY counts only when provenance and state are reconstructed.
+    """
+    findings: list[dict[str, str]] = []
+    builder = _sealed_runner_request(["test_module.py"])
+    preflight = _sealed_preflight(builder)
+    patch = {
+        "schema": "ATLASQUANT_AION_DEVELOPER_PATCH_VALIDATION_V1",
+        "validation_id": "DEVPATCHVAL-1",
+        "state": "READY_FOR_PATCH_REVIEW",
+        "builder_request_id": builder["request_id"],
+        "preflight_id": preflight["preflight_id"],
+        "patch_digest": "DEVPATCH-ABC",
+        "revision_binding": {
+            "baseline_ref": "main@aaa",
+            "candidate_ref": "cursor/fix@bbb",
+            "refs_match_approved_request": True,
+            "revision_content_verified": True,
+        },
+        "blockers": [],
+        "patch_applied": False,
+        "execution_authorized": False,
+        "executor_attached": False,
+    }
+    attestation = attestation_for_documents(builder, preflight, patch)
+    runner = build_runner_contract(
+        builder,
+        preflight,
+        patch,
+        content_attestation=attestation,
+        human_patch_reviewed=True,
+        human_patch_reviewer="reviewer-1",
+        human_patch_review_refs=["review:patch:1"],
+    )
+    policy = build_command_policy_contract(runner)
+
+    def _closed(invariant_id: str, description: str, fn: Callable[[], Any]) -> None:
+        status, _result = _invoke(fn)
+        closed = status == "REJECT"
+        findings.append(_finding(
+            invariant_id,
+            "atlasquant_aion_developer_runner_contract",
+            description if closed else description + " O documento resealed foi aceito.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    def _provenance(document: Mapping[str, Any], patch_doc=patch, attestation_doc=attestation) -> None:
+        assert_runner_provenance(document, builder, preflight, patch_doc, attestation_doc)
+
+    def _lineage(field: str, value: str) -> Callable[[], Any]:
+        def run() -> Any:
+            mutated = deepcopy(runner)
+            mutated["lineage"][field] = value
+            _bind_runner_contract_ids(mutated)
+            if mutated.get("runner_contract_id") == runner.get("runner_contract_id"):
+                return {"state": "NOT_RESEALED"}
+            return _provenance(mutated)
+        return run
+
+    _closed(
+        "upstream_provenance.builder_request_id",
+        "UPSTREAM_PROVENANCE_RESEAL: builder_request_id com id novo e rejeitado.",
+        _lineage("builder_request_id", "DEVBUILD-OTHERREQUEST1"),
+    )
+    _closed(
+        "upstream_provenance.preflight_id",
+        "UPSTREAM_PROVENANCE_RESEAL: preflight_id com id novo e rejeitado.",
+        _lineage("preflight_id", "DEVPREF-OTHERREQUEST01"),
+    )
+    _closed(
+        "upstream_provenance.patch_validation_id",
+        "UPSTREAM_PROVENANCE_RESEAL: patch_validation_id com id novo e rejeitado.",
+        _lineage("patch_validation_id", "DEVPATCHVAL-OTHER"),
+    )
+    _closed(
+        "upstream_provenance.patch_digest",
+        "UPSTREAM_PROVENANCE_RESEAL: patch_digest com id novo e rejeitado.",
+        _lineage("patch_digest", "DEVPATCH-OTHER"),
+    )
+    _closed(
+        "upstream_provenance.attestation_id",
+        "UPSTREAM_PROVENANCE_RESEAL: content_attestation_id com id novo e rejeitado.",
+        _lineage("content_attestation_id", "DEVATT-" + ("A" * 18)),
+    )
+
+    def _promote_review() -> Any:
+        blocked = build_runner_contract(
+            builder,
+            preflight,
+            patch,
+            content_attestation=attestation,
+            human_patch_reviewed=False,
+            human_patch_reviewer="reviewer-1",
+            human_patch_review_refs=["review:patch:1"],
+        )
+        if "HUMAN_PATCH_REVIEW_REQUIRED" not in list(blocked.get("blockers") or []):
+            return {"state": "NOT_BLOCKED"}
+        promoted = deepcopy(blocked)
+        promoted["state"] = "READY_FOR_RUNNER_DESIGN_REVIEW"
+        promoted["blockers"] = []
+        if promoted.get("runner_contract_id") != blocked.get("runner_contract_id"):
+            return {"state": "ID_CHANGED"}
+        return assert_runner_contract_integrity(promoted)
+
+    _closed(
+        "blocked_to_ready.review_false_same_id",
+        "BLOCKED_TO_READY_PROMOTION: review false com state READY e o id antigo e rejeitado.",
+        _promote_review,
+    )
+
+    def _promote_review_reseal() -> Any:
+        blocked = build_runner_contract(
+            builder,
+            preflight,
+            patch,
+            content_attestation=attestation,
+            human_patch_reviewed=False,
+            human_patch_reviewer="reviewer-1",
+            human_patch_review_refs=["review:patch:1"],
+        )
+        promoted = deepcopy(blocked)
+        promoted["state"] = "READY_FOR_RUNNER_DESIGN_REVIEW"
+        promoted["blockers"] = []
+        _bind_runner_contract_ids(promoted)
+        if promoted.get("runner_contract_id") == blocked.get("runner_contract_id"):
+            return {"state": "NOT_RESEALED"}
+        return _provenance(promoted)
+
+    _closed(
+        "blocked_to_ready.review_false_resealed",
+        "BLOCKED_TO_READY_PROMOTION: review false com id recalculado e rejeitado.",
+        _promote_review_reseal,
+    )
+
+    def _missing_refs() -> Any:
+        mutated = deepcopy(runner)
+        mutated["review"]["human_patch_review_refs"] = []
+        mutated["state"] = "READY_FOR_RUNNER_DESIGN_REVIEW"
+        mutated["blockers"] = []
+        _bind_runner_contract_ids(mutated)
+        return _provenance(mutated)
+
+    _closed(
+        "blocked_to_ready.missing_refs",
+        "BLOCKED_TO_READY_PROMOTION: review refs ausentes com state READY e rejeitado.",
+        _missing_refs,
+    )
+
+    def _revision() -> Any:
+        unverified = deepcopy(patch)
+        unverified["revision_binding"] = dict(unverified["revision_binding"])
+        unverified["revision_binding"]["revision_content_verified"] = False
+        attestation_doc = attestation_for_documents(builder, preflight, unverified)
+        blocked = build_runner_contract(
+            builder,
+            preflight,
+            unverified,
+            content_attestation=attestation_doc,
+            human_patch_reviewed=True,
+            human_patch_reviewer="reviewer-1",
+            human_patch_review_refs=["review:patch:1"],
+        )
+        if "PATCH_VALIDATOR_CONTENT_BINDING_NOT_VERIFIED" not in list(blocked.get("blockers") or []):
+            return {"state": "NOT_BLOCKED"}
+        promoted = deepcopy(blocked)
+        promoted["state"] = "READY_FOR_RUNNER_DESIGN_REVIEW"
+        promoted["blockers"] = []
+        _bind_runner_contract_ids(promoted)
+        return assert_runner_provenance(promoted, builder, preflight, unverified, attestation_doc)
+
+    _closed(
+        "blocked_to_ready.revision_unverified",
+        "BLOCKED_TO_READY_PROMOTION: revision_content_verified false promovido a READY e rejeitado.",
+        _revision,
+    )
+
+    def _missing_targets() -> Any:
+        mutated = deepcopy(runner)
+        mutated["tests"]["targets"] = []
+        mutated["state"] = "READY_FOR_RUNNER_DESIGN_REVIEW"
+        mutated["blockers"] = []
+        _bind_runner_contract_ids(mutated)
+        return _provenance(mutated)
+
+    _closed(
+        "blocked_to_ready.missing_targets",
+        "BLOCKED_TO_READY_PROMOTION: targets vazios com state READY e rejeitado.",
+        _missing_targets,
+    )
+
+    def _policy_promoted() -> Any:
+        bad = deepcopy(runner)
+        bad["command_plan"] = [dict(row) for row in bad["command_plan"]]
+        bad["command_plan"][0] = dict(bad["command_plan"][0])
+        bad["command_plan"][0]["argv"] = ["-c", "ARBITRARY"]
+        _bind_runner_contract_ids(bad)
+        blocked = build_command_policy_contract(bad)
+        if blocked.get("state") != "BLOCKED" or not list(blocked.get("blockers") or []):
+            return {"state": "NOT_BLOCKED"}
+        promoted = deepcopy(blocked)
+        promoted["state"] = "READY_FOR_EXECUTABLE_PINNING_REVIEW"
+        promoted["blockers"] = []
+        promoted["validated_command_plan"] = deepcopy(policy["validated_command_plan"])
+        _bind_command_policy_ids(promoted)
+        if promoted.get("command_policy_id") == blocked.get("command_policy_id"):
+            return {"state": "NOT_RESEALED"}
+        return assert_runner_policy_boundary(bad, promoted)
+
+    _closed(
+        "blocked_to_ready.policy_promoted",
+        "BLOCKED_TO_READY_PROMOTION: policy BLOCKED canonizada para READY e rejeitada.",
+        _policy_promoted,
+    )
+
+    def _policy_blockers() -> Any:
+        mutated = deepcopy(policy)
+        mutated["blockers"] = ["PATH_LOOKUP_NOT_ALLOWED"]
+        _bind_command_policy_ids(mutated)
+        if mutated.get("state") != "READY_FOR_EXECUTABLE_PINNING_REVIEW":
+            return {"state": "NOT_READY"}
+        if mutated.get("command_policy_id") == policy.get("command_policy_id"):
+            return {"state": "NOT_RESEALED"}
+        return assert_command_policy_integrity(mutated)
+
+    _closed(
+        "blocked_to_ready.policy_ready_with_blockers",
+        "BLOCKED_TO_READY_PROMOTION: policy READY com blockers nao vazios e rejeitada.",
+        _policy_blockers,
+    )
+
+    def _principal() -> Any:
+        mutated = deepcopy(runner)
+        mutated["review"]["human_patch_reviewer_principal_id"] = "prn_otherrev1"
+        _bind_runner_contract_ids(mutated)
+        if mutated.get("runner_contract_id") == runner.get("runner_contract_id"):
+            return {"state": "NOT_RESEALED"}
+        try:
+            assert_runner_contract_integrity(mutated)
+        except (TypeError, ValueError):
+            return {"state": "LOCAL_INTEGRITY_REJECTED"}
+        return _provenance(mutated)
+
+    _closed(
+        "review_principal.mismatch",
+        "REVIEW_PRINCIPAL_MISMATCH: principal diferente com id novo e rejeitado.",
+        _principal,
+    )
+
+    def _reviewed_false() -> Any:
+        mutated = deepcopy(runner)
+        mutated["review"]["human_patch_reviewed"] = False
+        mutated["state"] = "READY_FOR_RUNNER_DESIGN_REVIEW"
+        mutated["blockers"] = []
+        _bind_runner_contract_ids(mutated)
+        return _provenance(mutated)
+
+    _closed(
+        "review_principal.reviewed_false",
+        "REVIEW_PRINCIPAL_MISMATCH: human_patch_reviewed false com id novo e rejeitado.",
+        _reviewed_false,
+    )
+
+    def _refs_removed() -> Any:
+        mutated = deepcopy(runner)
+        mutated["review"]["human_patch_review_refs"] = []
+        mutated["state"] = "READY_FOR_RUNNER_DESIGN_REVIEW"
+        mutated["blockers"] = []
+        _bind_runner_contract_ids(mutated)
+        return _provenance(mutated)
+
+    _closed(
+        "review_principal.refs_removed",
+        "REVIEW_PRINCIPAL_MISMATCH: review refs removidas com state READY e rejeitadas.",
+        _refs_removed,
+    )
+
+    display = deepcopy(runner)
+    display["review"]["human_patch_reviewer"] = "other-reviewer"
+    display_same = expected_runner_contract_id(display) == runner.get("runner_contract_id")
+    display_status, _display_result = _invoke(lambda: _provenance(display))
+    display_ok = (
+        display_same
+        and display_status == "ACCEPT"
+        and display["review"].get("human_patch_reviewer_principal_id") == "prn_reviewer1"
+    )
+    findings.append(_finding(
+        "review_principal.display_is_label",
+        "atlasquant_aion_developer_runner_contract",
+        "REVIEW_PRINCIPAL_MISMATCH: o display do revisor nao muda a identidade."
+        if display_ok else
+        "O display do revisor alterou a identidade ou a proveniencia.",
+        "PASS" if display_ok else "GAP",
+        "" if display_ok else "HIGH",
+    ))
+
+    def _targets(values: list[str]) -> Callable[[], Any]:
+        def run() -> Any:
+            mutated = deepcopy(runner)
+            mutated["tests"]["targets"] = values
+            mutated["state"] = "READY_FOR_RUNNER_DESIGN_REVIEW"
+            mutated["blockers"] = []
+            _bind_runner_contract_ids(mutated)
+            if mutated.get("runner_contract_id") == runner.get("runner_contract_id"):
+                return {"state": "NOT_RESEALED"}
+            return _provenance(mutated)
+        return run
+
+    _closed(
+        "test_target_origin.replaced",
+        "TEST_TARGET_ORIGIN_MISMATCH: lista valida diferente da origem e rejeitada.",
+        _targets(["test_module.py::extra"]),
+    )
+    _closed(
+        "test_target_origin.removed",
+        "TEST_TARGET_ORIGIN_MISMATCH: target aprovado removido e rejeitado.",
+        _targets([]),
+    )
+    _closed(
+        "test_target_origin.unapproved",
+        "TEST_TARGET_ORIGIN_MISMATCH: target nao aprovado e rejeitado.",
+        _targets(list(runner["tests"]["targets"]) + ["test_other.py"]),
+    )
+
+    def _gates() -> Any:
+        mutated = deepcopy(runner)
+        mutated["tests"]["mandatory_gates"] = list(REQUIRED_MANDATORY_GATES) + ["EXTRA_GATE"]
+        _bind_runner_contract_ids(mutated)
+        if mutated.get("runner_contract_id") == runner.get("runner_contract_id"):
+            return {"state": "NOT_RESEALED"}
+        return _provenance(mutated)
+
+    _closed(
+        "test_target_origin.gates",
+        "TEST_TARGET_ORIGIN_MISMATCH: mandatory gates diferentes da origem e rejeitadas.",
+        _gates,
+    )
+
+    def _joint() -> Any:
+        mutated = deepcopy(runner)
+        mutated["tests"]["targets"] = ["test_other.py"]
+        _bind_runner_contract_ids(mutated)
+        followed = deepcopy(policy)
+        followed["runner_contract_id"] = mutated["runner_contract_id"]
+        followed["runner_contract_manifest_id"] = mutated["runner_contract_manifest_id"]
+        _bind_command_policy_ids(followed)
+        if (
+            mutated.get("runner_contract_id") == runner.get("runner_contract_id")
+            or followed.get("command_policy_id") == policy.get("command_policy_id")
+        ):
+            return {"state": "NOT_RESEALED"}
+        return _provenance(mutated)
+
+    _closed(
+        "upstream_provenance.joint_reseal",
+        "UPSTREAM_PROVENANCE_RESEAL: runner e policy resealed juntos contra o upstream original sao rejeitados.",
+        _joint,
+    )
+
+    status, _result = _invoke(lambda: _provenance(runner))
+    boundary_status, _boundary = _invoke(lambda: assert_runner_policy_boundary(runner, policy))
+    legitimate = (
+        status == "ACCEPT"
+        and boundary_status == "ACCEPT"
+        and runner.get("state") == "READY_FOR_RUNNER_DESIGN_REVIEW"
+        and list(runner.get("blockers") or []) == []
+        and policy.get("state") == "READY_FOR_EXECUTABLE_PINNING_REVIEW"
+        and list(policy.get("blockers") or []) == []
+        and runner.get("execution_authorized") is False
+        and policy.get("execution_authorized") is False
+        and runner.get("tests", {}).get("targets") == ["test_module.py"]
+        and runner.get("review", {}).get("human_patch_reviewer_principal_id") == "prn_reviewer1"
+    )
+    findings.append(_finding(
+        "upstream_provenance.legitimate",
+        "atlasquant_aion_developer_runner_contract",
+        "Cadeia legitima upstream para runner e policy passa com state e blockers reconstruidos."
+        if legitimate else
+        "Cadeia legitima nao passou na reconstrucao de proveniencia.",
+        "PASS" if legitimate else "GAP",
+        "" if legitimate else "HIGH",
+    ))
+    return findings
+
+
 def audit_developer_chain() -> dict[str, Any]:
     """Inspect the local Developer contracts and return a deterministic report."""
     world = _World()
@@ -3603,6 +4005,7 @@ def audit_developer_chain() -> dict[str, Any]:
         findings.extend(_runner_policy_integrity_surface(world))
         findings.extend(_principal_provenance_surface(world))
         findings.extend(_self_reseal_surface(world))
+        findings.extend(_upstream_provenance_surface(world))
     finally:
         world.close()
 
