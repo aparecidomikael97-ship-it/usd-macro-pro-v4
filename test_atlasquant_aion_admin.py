@@ -127,7 +127,7 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("EXACT_ARGV_TEMPLATES",src)
         self.assertIn("command_policy_is_data_only=True",src)
         self.assertIn("execution_authorized=False",src)
-        runner_pos=src.index('"Runner Contract Simulator · não executável"')
+        runner_pos=src.index('"##### Runner Contract Simulator · não executável"')
         policy_pos=src.index('"Validar Command Allowlist Contract"',runner_pos)
         self.assertGreater(policy_pos,runner_pos)
 
