@@ -85,6 +85,18 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertFalse(summary["network_called"])
         self.assertFalse(summary["subprocess_called"])
 
+    def test_developer_failure_diagnostic_separates_fact_from_hypothesis(self):
+        src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Diagnosticar falha de teste/log",src)
+        self.assertIn('key="aion_developer_failure_diagnose"',src)
+        self.assertIn("diagnose_developer_failure(snapshot, failure_text)",src)
+        self.assertIn("Fatos confirmados pelo log",src)
+        self.assertIn("HIPÓTESE — não confirmada",src)
+        self.assertIn("Registrar falha no Developer Workflow da sessão",src)
+        self.assertIn("record_developer_failure_attempt(",src)
+        self.assertIn("nenhum patch foi aplicado",src)
+        self.assertIn("não confirma causa raiz",src)
+
     def test_developer_package_is_human_gated_and_session_only(self):
         src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("Preparar pacote Developer Engine + Dev Fusion",src)

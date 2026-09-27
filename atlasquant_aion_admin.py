@@ -260,6 +260,10 @@ from atlasquant_aion_developer_intelligence import (
     scan_repository as scan_developer_repository,
 )
 from atlasquant_aion_developer_package import build_developer_package
+from atlasquant_aion_developer_diagnostics import (
+    diagnose_failure as diagnose_developer_failure,
+    record_failure_attempt as record_developer_failure_attempt,
+)
 from atlasquant_aion_release_confidence import (
     DIMENSIONS as RELEASE_CONFIDENCE_DIMENSIONS,
     evidence_dimension,
@@ -4776,6 +4780,104 @@ def _render_developer_intelligence() -> None:
     st.caption(
         "O pacote fica apenas na sessão: não persiste Checkpoint, não executa testes, "
         "não edita arquivos e não aprova PLAN/BUILD/REVIEW/RELEASE automaticamente."
+    )
+
+    with st.expander("Diagnosticar falha de teste/log", expanded=False):
+        failure_text = st.text_area(
+            "Trecho de falha",
+            key="aion_developer_failure_text",
+            max_chars=120000,
+            placeholder="Cole traceback, FAILED test_... ou exceção. O diagnóstico é sanitizado.",
+        )
+        if st.button("Diagnosticar falha", key="aion_developer_failure_diagnose"):
+            try:
+                diagnostic = diagnose_developer_failure(snapshot, failure_text)
+                st.session_state["aion_developer_failure_diagnostic"] = diagnostic
+            except Exception as exc:
+                st.error(f"Diagnóstico recusado: {type(exc).__name__}")
+
+    diagnostic = (
+        st.session_state.get("aion_developer_failure_diagnostic")
+        if isinstance(st.session_state.get("aion_developer_failure_diagnostic"), Mapping)
+        else None
+    )
+    if not isinstance(diagnostic, Mapping):
+        return
+
+    st.markdown("##### Diagnóstico de falha · fatos vs hipótese")
+    y1,y2,y3 = st.columns(3)
+    y1.metric("Evidência", str(diagnostic.get("state") or "UNKNOWN"))
+    y2.metric("Exceção", str(diagnostic.get("exception_type") or "UNKNOWN_FAILURE"))
+    y3.metric("Causa", "UNKNOWN" if not diagnostic.get("cause_confirmed") else "CONFIRMED")
+    st.caption(
+        f"{diagnostic.get('diagnostic_id')} · log digest {diagnostic.get('log_digest')} · "
+        "log bruto não é armazenado no diagnóstico."
+    )
+
+    facts = [
+        dict(item)
+        for item in list(diagnostic.get("confirmed_facts") or [])
+        if isinstance(item, Mapping)
+    ]
+    if facts:
+        st.markdown("**Fatos confirmados pelo log:**")
+        st.dataframe(
+            [{
+                "Tipo": item.get("kind"),
+                "Valor": item.get("value"),
+                "Verdade": item.get("truth_status"),
+            } for item in facts],
+            width="stretch",
+            hide_index=True,
+        )
+
+    hypotheses = [
+        dict(item)
+        for item in list(diagnostic.get("hypotheses") or [])
+        if isinstance(item, Mapping)
+    ]
+    if hypotheses:
+        st.markdown("**HIPÓTESE — não confirmada:**")
+        for item in hypotheses:
+            st.markdown(
+                f"- {item.get('label')} · {item.get('rationale')} "
+                f"· truth={item.get('truth_status')}"
+            )
+
+    if diagnostic.get("recommended_tests"):
+        st.markdown("**Testes candidatos para reprodução:**")
+        for item in list(diagnostic.get("recommended_tests") or [])[:40]:
+            st.markdown(f"- `{item}`")
+
+    if diagnostic.get("state") == "FAILURE_EVIDENCE":
+        if st.button(
+            "Registrar falha no Developer Workflow da sessão",
+            key="aion_developer_failure_record",
+        ):
+            try:
+                current_package = deepcopy(dict(package))
+                current_workflow = (
+                    current_package.get("developer_workflow")
+                    if isinstance(current_package.get("developer_workflow"), Mapping)
+                    else {}
+                )
+                current_package["developer_workflow"] = record_developer_failure_attempt(
+                    current_workflow,
+                    diagnostic,
+                    command_label="evidência de falha informada ao AION",
+                )
+                current_package["last_diagnostic_id"] = diagnostic.get("diagnostic_id")
+                st.session_state["aion_developer_package_result"] = current_package
+                package = current_package
+                st.success(
+                    "Falha registrada somente no workflow da sessão; nenhum patch foi aplicado."
+                )
+            except Exception as exc:
+                st.error(f"Registro da falha recusado: {type(exc).__name__}")
+
+    st.caption(
+        "Diagnóstico não executa teste, não confirma causa raiz, não cria patch, "
+        "não commita, não faz merge e não faz deploy."
     )
 
 def _render_development(
