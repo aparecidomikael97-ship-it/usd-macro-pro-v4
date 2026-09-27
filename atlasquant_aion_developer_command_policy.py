@@ -25,6 +25,7 @@ from atlasquant_aion_developer_executable_pinning import (
 from atlasquant_aion_developer_manifest import stable_digest
 from atlasquant_aion_developer_runner_contract import (
     SCHEMA as RUNNER_SCHEMA,
+    _assert_runner_digest,
     assert_runner_contract_integrity,
 )
 from atlasquant_aion_developer_sandbox_preflight import validate_resource_budget
@@ -170,6 +171,81 @@ def _validate_step(row: Mapping[str, Any], expected: tuple[str, str, tuple[str, 
     return blockers
 
 
+def _canonical_command_plan() -> list[dict[str, Any]]:
+    return [_canonical_step(expected) for expected in _EXPECTED_STEPS]
+
+
+def _canonical_allowlist() -> dict[str, Any]:
+    return {
+        "mode": "EXACT_ARGV_TEMPLATES",
+        "step_names": list(_EXPECTED_STEP_NAMES),
+        "executables": sorted(_ALLOWED_EXECUTABLES),
+        "caller_environment_overrides_allowed": False,
+        "fixed_environment": dict(FIXED_ENVIRONMENT),
+        "shell_allowed": False,
+        "network_allowed": False,
+        "repo_write_allowed": False,
+        "PATH_LOOKUP_ALLOWED": False,
+        "ABSOLUTE_EXECUTABLE_REQUIRED": True,
+        "EXECUTABLE_DIGEST_REQUIRED": True,
+        "PARENT_ENV_INHERITANCE": False,
+    }
+
+
+def _assert_environment_exact(value: Any, label: str) -> None:
+    """Both environment copies must be the canonical fixed environment.
+
+    Dict equality rejects an injected key, a changed value and a missing key.
+    Forbidden inherited names are rejected even when the rest of the mapping
+    matches.
+    """
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{label} must be an object")
+    for key in value:
+        folded = str(key).casefold()
+        if folded in FORBIDDEN_INHERITED_ENVIRONMENT or folded.startswith("git_config"):
+            raise ValueError(f"{label} contains a forbidden environment key")
+    if dict(value) != dict(FIXED_ENVIRONMENT):
+        raise ValueError(f"{label} is not the canonical fixed environment")
+
+
+def _assert_policy_budget(policy: Mapping[str, Any]) -> dict[str, int]:
+    budget = policy.get("resource_budget")
+    validated, blockers = validate_resource_budget(
+        budget if isinstance(budget, Mapping) else None
+    )
+    if blockers:
+        raise ValueError("resource budget is outside the allowed range")
+    if not isinstance(budget, Mapping) or dict(budget) != validated:
+        raise ValueError("resource budget has non-canonical fields")
+    if validated["max_commands"] < len(_EXPECTED_STEPS):
+        raise ValueError("resource budget does not cover the canonical command plan")
+    return validated
+
+
+def _assert_policy_semantics(policy: Mapping[str, Any]) -> None:
+    """Reject a resealed policy whose security payload is not canonical.
+
+    A freshly computed command_policy_id proves only that the id matches the
+    current bytes. It does not prove the constructor produced them.
+    """
+    _assert_environment_exact(policy.get("fixed_environment"), "fixed_environment")
+    allowlist = policy.get("allowlist_policy")
+    if not isinstance(allowlist, Mapping):
+        raise ValueError("allowlist policy required")
+    _assert_environment_exact(
+        allowlist.get("fixed_environment"),
+        "allowlist fixed_environment",
+    )
+    if dict(policy["fixed_environment"]) != dict(allowlist["fixed_environment"]):
+        raise ValueError("fixed environment copies diverge")
+    if dict(allowlist) != _canonical_allowlist():
+        raise ValueError("allowlist policy is not the canonical allowlist")
+    _assert_policy_budget(policy)
+    if policy.get("validated_command_plan") != _canonical_command_plan():
+        raise ValueError("validated command plan is not the canonical template")
+
+
 def command_policy_manifest(policy: Mapping[str, Any]) -> dict[str, Any]:
     """Fields that define the accepted command-policy decision. Ids are not inputs."""
     if not isinstance(policy, Mapping):
@@ -244,7 +320,13 @@ def expected_command_policy_id(policy: Mapping[str, Any]) -> str:
 
 
 def assert_command_policy_integrity(policy: Mapping[str, Any]) -> str:
-    """Revalidate closed flags and reject a stale command_policy_id."""
+    """Revalidate the policy. A matching id is not legitimacy.
+
+    Schema, authority flags, the resource budget, both fixed-environment
+    copies and the command plan are checked against the local canonical
+    contract. The digest is checked after that, so a resealed document still
+    fails when the payload is not the one the constructor would emit.
+    """
     if not isinstance(policy, Mapping):
         raise ValueError("command policy must be an object")
     if policy.get("schema") != SCHEMA:
@@ -274,6 +356,7 @@ def assert_command_policy_integrity(policy: Mapping[str, Any]) -> str:
         raise ValueError("shell and network must remain forbidden")
     if allowlist.get("repo_write_allowed") is not False:
         raise ValueError("repository writes must remain forbidden")
+    _assert_policy_semantics(policy)
     manifest_id = command_policy_manifest_id(policy)
     if policy.get("command_policy_manifest_id") != manifest_id:
         raise ValueError("command policy manifest mismatch")
@@ -282,23 +365,116 @@ def assert_command_policy_integrity(policy: Mapping[str, Any]) -> str:
     return manifest_id
 
 
-def bind_command_policy_ids(policy: dict[str, Any]) -> dict[str, Any]:
+def _bind_command_policy_ids(policy: dict[str, Any]) -> dict[str, Any]:
+    """Constructor helper. Recomputing these ids does not authorize the payload."""
     policy["command_policy_manifest_id"] = command_policy_manifest_id(policy)
     policy["command_policy_id"] = expected_command_policy_id(policy)
     return policy
+
+
+def expected_command_policy_payload(runner_contract: Mapping[str, Any]) -> dict[str, Any]:
+    """Security fields a constructor would seal for this runner.
+
+    The supplied command_policy_id is not an input. The command plan is the
+    local canonical template, not the plan carried by the runner document.
+    """
+    assert_runner_contract_integrity(runner_contract)
+    budget = runner_contract.get("resource_budget")
+    validated, blockers = validate_resource_budget(
+        budget if isinstance(budget, Mapping) else None
+    )
+    if blockers or not isinstance(budget, Mapping) or dict(budget) != validated:
+        raise ValueError("runner resource budget is not canonical")
+    if validated["max_commands"] < len(_EXPECTED_STEPS):
+        raise ValueError("resource budget does not cover the canonical command plan")
+    return {
+        "resource_budget": validated,
+        "validated_command_plan": _canonical_command_plan(),
+        "runner_contract_id": runner_contract.get("runner_contract_id"),
+        "runner_contract_manifest_id": runner_contract.get("runner_contract_manifest_id"),
+        "allowlist_policy": _canonical_allowlist(),
+        "fixed_environment": dict(FIXED_ENVIRONMENT),
+        "path_lookup_allowed": False,
+        "absolute_executable_required": True,
+        "executable_digest_required": True,
+        "parent_environment_inheritance": False,
+        "caller_environment_overrides_allowed": False,
+        "compile_step_executable": False,
+        "command_policy_is_data_only": True,
+        "executable_pinning_verified": False,
+        "os_sandbox_verified": False,
+        "child_process_policy_verified": False,
+        "symlink_physical_boundary_verified": False,
+        "hardlink_physical_boundary_verified": False,
+        "execution_authorized": False,
+        "executor_attached": False,
+        "commands_executed": False,
+        "writes_files": False,
+        "runs_tests": False,
+        "network_called": False,
+        "subprocess_called": False,
+        "automatic_commit": False,
+        "automatic_merge": False,
+        "automatic_deploy": False,
+        "production_change_allowed": False,
+        "real_trading_enabled": False,
+        "tool_output_is_authority": False,
+    }
+
+
+_BOUNDARY_FIELDS = (
+    "resource_budget",
+    "validated_command_plan",
+    "runner_contract_id",
+    "runner_contract_manifest_id",
+    "allowlist_policy",
+    "fixed_environment",
+    "path_lookup_allowed",
+    "absolute_executable_required",
+    "executable_digest_required",
+    "parent_environment_inheritance",
+    "caller_environment_overrides_allowed",
+    "compile_step_executable",
+    "command_policy_is_data_only",
+    "executable_pinning_verified",
+    "os_sandbox_verified",
+    "child_process_policy_verified",
+    "symlink_physical_boundary_verified",
+    "hardlink_physical_boundary_verified",
+    "execution_authorized",
+    "executor_attached",
+    "commands_executed",
+    "writes_files",
+    "runs_tests",
+    "network_called",
+    "subprocess_called",
+    "automatic_commit",
+    "automatic_merge",
+    "automatic_deploy",
+    "production_change_allowed",
+    "real_trading_enabled",
+    "tool_output_is_authority",
+)
 
 
 def assert_runner_policy_boundary(
     runner_contract: Mapping[str, Any],
     command_policy: Mapping[str, Any],
 ) -> None:
-    """Reject a mutated runner or a recycled policy before the next boundary."""
+    """Reject a pair that is only internally consistent.
+
+    The runner is revalidated, the policy is revalidated, and the policy's
+    security fields are compared with the payload derived from the runner.
+    A recomputed digest on either document is not authority.
+    """
     assert_runner_contract_integrity(runner_contract)
     assert_command_policy_integrity(command_policy)
-    if command_policy.get("runner_contract_id") != runner_contract.get("runner_contract_id"):
-        raise ValueError("command policy is not bound to this runner contract")
-    if command_policy.get("runner_contract_manifest_id") != runner_contract.get("runner_contract_manifest_id"):
-        raise ValueError("command policy manifest is not bound to this runner contract")
+    expected = expected_command_policy_payload(runner_contract)
+    for field in _BOUNDARY_FIELDS:
+        if command_policy.get(field) != expected[field]:
+            raise ValueError(
+                f"command policy {field} was not derived from the runner contract"
+            )
 
 
 def build_command_policy_contract(
@@ -317,7 +493,7 @@ def build_command_policy_contract(
         raise ValueError("runner contract is not ready for command policy review")
     if list(runner_contract.get("blockers") or []):
         raise ValueError("runner contract still has blockers")
-    runner_manifest_id = assert_runner_contract_integrity(runner_contract)
+    runner_manifest_id = _assert_runner_digest(runner_contract)
 
     raw_plan = list(runner_contract.get("command_plan") or [])
     blockers: list[str] = []
@@ -378,7 +554,7 @@ def build_command_policy_contract(
     blockers = list(dict.fromkeys(blockers))
     state = "READY_FOR_EXECUTABLE_PINNING_REVIEW" if not blockers else "BLOCKED"
 
-    return bind_command_policy_ids({
+    return _bind_command_policy_ids({
         "schema": SCHEMA,
         "state": state,
         "runner_contract_id": str(runner_contract.get("runner_contract_id") or ""),
@@ -454,7 +630,7 @@ __all__ = [
     "command_policy_manifest_id",
     "expected_command_policy_id",
     "assert_command_policy_integrity",
-    "bind_command_policy_ids",
+    "expected_command_policy_payload",
     "assert_runner_policy_boundary",
     "build_command_policy_contract",
 ]

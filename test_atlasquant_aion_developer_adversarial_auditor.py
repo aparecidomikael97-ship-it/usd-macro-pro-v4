@@ -169,6 +169,27 @@ _HARDENED_INVARIANTS={
     "provenance.missing_source",
     "provenance.legacy_without_source",
     "principal.integration_attestor_collides",
+    "self_reseal.stale_id_contrast",
+    "self_reseal.policy_argv",
+    "self_reseal.policy_executable",
+    "self_reseal.policy_cwd",
+    "self_reseal.policy_runtime_out_of_range",
+    "self_reseal.policy_runtime_string",
+    "self_reseal.policy_memory_invalid",
+    "self_reseal.policy_pythonpath",
+    "self_reseal.policy_pythonhashseed",
+    "self_reseal.policy_env_copies_diverge",
+    "self_reseal.policy_shell_allowed",
+    "self_reseal.runner_argv_boundary",
+    "self_reseal.runner_budget_old_policy",
+    "self_reseal.joint_documents",
+    "self_reseal.budget_mismatch_both_valid",
+    "self_reseal.plan_not_canonical",
+    "self_reseal.nested_mutation",
+    "self_reseal.authority_flag",
+    "self_reseal.security_flag_relaxed",
+    "self_reseal.extra_environment_key",
+    "self_reseal.legitimate_constructor",
 }
 
 
@@ -180,10 +201,10 @@ class AionDeveloperAdversarialAuditorTests(unittest.TestCase):
     def test_report_shape_is_deterministic_and_unscored(self):
         report=self.report
         self.assertEqual(report["schema"],SCHEMA)
-        self.assertEqual(report["cases_total"],189)
+        self.assertEqual(report["cases_total"],210)
         self.assertEqual(
             report["gap_count"]+report["blocked_by_design_count"]+report["pass_count"],
-            189,
+            210,
         )
         self.assertFalse(report["symlink_physical_boundary_verified"])
         self.assertFalse(report["hardlink_physical_boundary_verified"])

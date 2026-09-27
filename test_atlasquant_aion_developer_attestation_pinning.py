@@ -31,7 +31,7 @@ from atlasquant_aion_developer_principal_identity import (
     require_principal_id,
 )
 from atlasquant_aion_developer_runner_contract import (
-    bind_runner_contract_ids,
+    _bind_runner_contract_ids,
     build_runner_contract,
 )
 from atlasquant_aion_developer_sandbox_preflight import (
@@ -203,7 +203,7 @@ def _policy_runner():
         },
         "tests": {
             "targets": ["test_module.py"],
-            "mandatory_gates": ["TARGETED_TESTS"],
+            "mandatory_gates": list(REQUIRED_MANDATORY_GATES),
             "tests_executed": False,
         },
         "command_plan_is_data_only": True,
@@ -236,7 +236,7 @@ def _policy_runner():
         "real_trading_enabled": False,
         "tool_output_is_authority": False,
     }
-    return bind_runner_contract_ids(runner)
+    return _bind_runner_contract_ids(runner)
 
 
 def _closed(test, document):
@@ -481,7 +481,7 @@ class AttestationPinningContractTests(unittest.TestCase):
         runner = _policy_runner()
         runner["command_plan"] = deepcopy(runner["command_plan"])
         runner["command_plan"][0]["pycache_prefix"] = "<ISOLATED_WORKTREE>/__pycache__"
-        bind_runner_contract_ids(runner)
+        _bind_runner_contract_ids(runner)
         out = build_command_policy_contract(runner)
         self.assertEqual(out["state"], "BLOCKED")
         self.assertIn("PYCACHE_INSIDE_WORKTREE", out["blockers"])
@@ -491,7 +491,7 @@ class AttestationPinningContractTests(unittest.TestCase):
         runner = _policy_runner()
         runner["command_plan"] = deepcopy(runner["command_plan"])
         runner["command_plan"][0]["pycache_prefix"] = "<REPOSITORY_ROOT>/__pycache__"
-        bind_runner_contract_ids(runner)
+        _bind_runner_contract_ids(runner)
         out = build_command_policy_contract(runner)
         self.assertEqual(out["state"], "BLOCKED")
         self.assertIn("PYCACHE_INSIDE_REPOSITORY", out["blockers"])
@@ -534,7 +534,7 @@ class AttestationPinningContractTests(unittest.TestCase):
         runner["command_plan"][0].pop("may_write_ephemeral_cache")
         runner["command_plan"][0].pop("pycache_prefix")
         self.assertFalse(runner["command_plan"][0]["writes_repo"])
-        bind_runner_contract_ids(runner)
+        _bind_runner_contract_ids(runner)
         out = build_command_policy_contract(runner)
         self.assertEqual(out["state"], "BLOCKED")
         self.assertIn("COMPILEALL_CACHE_POLICY_REQUIRED", out["blockers"])

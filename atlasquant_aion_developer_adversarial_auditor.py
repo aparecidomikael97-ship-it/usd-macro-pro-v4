@@ -43,10 +43,14 @@ from atlasquant_aion_developer_manifest import (
     structural_request_roles,
 )
 from atlasquant_aion_developer_command_policy import (
+    _bind_command_policy_ids,
     assert_command_policy_integrity,
+    assert_runner_policy_boundary,
     build_command_policy_contract,
+    expected_command_policy_payload,
 )
 from atlasquant_aion_developer_executable_pinning import (
+    FIXED_ENVIRONMENT,
     build_environment_contract,
     build_executable_pinning_spec,
     build_os_sandbox_design_review,
@@ -68,7 +72,7 @@ from atlasquant_aion_developer_patch_validation import validate_patch
 from atlasquant_aion_developer_runner_contract import (
     MAX_MANDATORY_GATES,
     MAX_TEST_TARGETS,
-    bind_runner_contract_ids,
+    _bind_runner_contract_ids,
     build_runner_contract,
 )
 from atlasquant_aion_developer_sandbox_preflight import (
@@ -1559,7 +1563,7 @@ def _command_probe(**overrides):
             runner["command_plan"][0].pop("pycache_prefix", None)
         else:
             runner["command_plan"][0]["pycache_prefix"] = pycache_prefix
-    bind_runner_contract_ids(runner)
+    _bind_runner_contract_ids(runner)
     return build_command_policy_contract(runner, **policy_kwargs)
 
 
@@ -3276,6 +3280,307 @@ def _principal_provenance_surface(world: _World) -> list[dict[str, str]]:
     return findings
 
 
+def _self_reseal_surface(_world: _World) -> list[dict[str, str]]:
+    """STALE_ID keeps the previous digest. SELF_RESEAL recomputes it.
+
+    A recomputed id proves only that the id matches the current bytes. The
+    consumer still rejects the document unless the payload is the canonical
+    contract the constructor would emit.
+    """
+    findings: list[dict[str, str]] = []
+    runner = _runner_probe(["test_module.py"])
+    policy = build_command_policy_contract(runner)
+
+    def _closed(invariant_id: str, description: str, fn: Callable[[], Any]) -> None:
+        status, _result = _invoke(fn)
+        closed = status == "REJECT"
+        findings.append(_finding(
+            invariant_id,
+            "atlasquant_aion_developer_command_policy",
+            description if closed else description + " O digest recalculado foi aceito.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    def _policy_attack(mutate: Callable[[dict[str, Any]], None]) -> Callable[[], Any]:
+        def run() -> Any:
+            mutated = deepcopy(policy)
+            mutate(mutated)
+            _bind_command_policy_ids(mutated)
+            if mutated.get("command_policy_id") == policy.get("command_policy_id"):
+                return {"state": "NOT_RESEALED"}
+            return assert_command_policy_integrity(mutated)
+        return run
+
+    def _separate_environments(mutated: dict[str, Any]) -> None:
+        mutated["fixed_environment"] = dict(mutated["fixed_environment"])
+        mutated["allowlist_policy"] = dict(mutated["allowlist_policy"])
+        mutated["allowlist_policy"]["fixed_environment"] = dict(
+            mutated["allowlist_policy"]["fixed_environment"]
+        )
+
+    def _stale_contrast() -> Any:
+        mutated = deepcopy(policy)
+        mutated["validated_command_plan"][0]["argv"] = ["-c", "ARBITRARY"]
+        if mutated.get("command_policy_id") != policy.get("command_policy_id"):
+            return {"state": "RESEALED"}
+        return assert_command_policy_integrity(mutated)
+
+    _closed(
+        "self_reseal.stale_id_contrast",
+        "STALE_ID: argv alterado com o id antigo continua rejeitado.",
+        _stale_contrast,
+    )
+    _closed(
+        "self_reseal.policy_argv",
+        "SELF_RESEAL: argv arbitrario com id novo e rejeitado.",
+        _policy_attack(lambda mutated: mutated["validated_command_plan"][0].__setitem__(
+            "argv", ["-c", "ARBITRARY"],
+        )),
+    )
+    _closed(
+        "self_reseal.policy_executable",
+        "SELF_RESEAL: executable alterado com id novo e rejeitado.",
+        _policy_attack(lambda mutated: mutated["validated_command_plan"][0].__setitem__(
+            "executable", "/tmp/python",
+        )),
+    )
+    _closed(
+        "self_reseal.policy_cwd",
+        "SELF_RESEAL: cwd alterado com id novo e rejeitado.",
+        _policy_attack(lambda mutated: mutated["validated_command_plan"][2].__setitem__(
+            "cwd", "/tmp",
+        )),
+    )
+    _closed(
+        "self_reseal.policy_runtime_out_of_range",
+        "SELF_RESEAL: runtime_seconds 999999 com id novo e rejeitado.",
+        _policy_attack(lambda mutated: mutated["resource_budget"].__setitem__(
+            "runtime_seconds", 999999,
+        )),
+    )
+    _closed(
+        "self_reseal.policy_runtime_string",
+        "SELF_RESEAL: runtime_seconds string com id novo e rejeitado.",
+        _policy_attack(lambda mutated: mutated["resource_budget"].__setitem__(
+            "runtime_seconds", "900",
+        )),
+    )
+    _closed(
+        "self_reseal.policy_memory_invalid",
+        "SELF_RESEAL: memory_mb fora da faixa com id novo e rejeitado.",
+        _policy_attack(lambda mutated: mutated["resource_budget"].__setitem__(
+            "memory_mb", 999999,
+        )),
+    )
+
+    def _pythonpath(mutated: dict[str, Any]) -> None:
+        _separate_environments(mutated)
+        mutated["fixed_environment"]["PYTHONPATH"] = "/evil"
+        mutated["allowlist_policy"]["fixed_environment"]["PYTHONPATH"] = "/evil"
+
+    _closed(
+        "self_reseal.policy_pythonpath",
+        "SELF_RESEAL: PYTHONPATH injetado com id novo e rejeitado.",
+        _policy_attack(_pythonpath),
+    )
+
+    def _pythonhashseed(mutated: dict[str, Any]) -> None:
+        _separate_environments(mutated)
+        mutated["fixed_environment"]["PYTHONHASHSEED"] = "123"
+        mutated["allowlist_policy"]["fixed_environment"]["PYTHONHASHSEED"] = "123"
+
+    _closed(
+        "self_reseal.policy_pythonhashseed",
+        "SELF_RESEAL: PYTHONHASHSEED alterado com id novo e rejeitado.",
+        _policy_attack(_pythonhashseed),
+    )
+
+    def _diverge(mutated: dict[str, Any]) -> None:
+        _separate_environments(mutated)
+        mutated["allowlist_policy"]["fixed_environment"]["PYTHONHASHSEED"] = "123"
+
+    _closed(
+        "self_reseal.policy_env_copies_diverge",
+        "SELF_RESEAL: as duas copias de fixed_environment divergentes sao rejeitadas.",
+        _policy_attack(_diverge),
+    )
+
+    def _shell(mutated: dict[str, Any]) -> None:
+        mutated["allowlist_policy"] = dict(mutated["allowlist_policy"])
+        mutated["allowlist_policy"]["shell_allowed"] = True
+
+    _closed(
+        "self_reseal.policy_shell_allowed",
+        "SELF_RESEAL: shell_allowed true com id novo e rejeitado.",
+        _policy_attack(_shell),
+    )
+
+    def _runner_argv() -> Any:
+        mutated_runner = deepcopy(runner)
+        mutated_runner["command_plan"] = [dict(row) for row in mutated_runner["command_plan"]]
+        mutated_runner["command_plan"][0] = dict(mutated_runner["command_plan"][0])
+        mutated_runner["command_plan"][0]["argv"] = ["-c", "ARBITRARY"]
+        _bind_runner_contract_ids(mutated_runner)
+        if mutated_runner.get("runner_contract_id") == runner.get("runner_contract_id"):
+            return {"state": "NOT_RESEALED"}
+        try:
+            assert_runner_policy_boundary(mutated_runner, policy)
+        except (TypeError, ValueError):
+            pass
+        else:
+            return {"state": "ORIGINAL_POLICY_ACCEPTED"}
+        followed = deepcopy(policy)
+        followed["runner_contract_id"] = mutated_runner["runner_contract_id"]
+        followed["runner_contract_manifest_id"] = mutated_runner["runner_contract_manifest_id"]
+        followed["resource_budget"] = dict(mutated_runner["resource_budget"])
+        followed["validated_command_plan"] = deepcopy(mutated_runner["command_plan"])
+        _bind_command_policy_ids(followed)
+        return assert_runner_policy_boundary(mutated_runner, followed)
+
+    _closed(
+        "self_reseal.runner_argv_boundary",
+        "SELF_RESEAL: runner com argv adulterado nao atravessa a fronteira.",
+        _runner_argv,
+    )
+
+    def _budget_old_policy() -> Any:
+        mutated_runner = deepcopy(runner)
+        mutated_runner["resource_budget"] = dict(mutated_runner["resource_budget"])
+        mutated_runner["resource_budget"]["runtime_seconds"] = 600
+        _bind_runner_contract_ids(mutated_runner)
+        rebuilt = build_command_policy_contract(mutated_runner)
+        legitimate = (
+            mutated_runner.get("runner_contract_id") != runner.get("runner_contract_id")
+            and rebuilt.get("state") == "READY_FOR_EXECUTABLE_PINNING_REVIEW"
+            and rebuilt.get("resource_budget", {}).get("runtime_seconds") == 600
+            and rebuilt.get("execution_authorized") is False
+        )
+        if not legitimate:
+            return {"state": "LEGITIMATE_REBUILD_FAILED"}
+        assert_runner_policy_boundary(mutated_runner, rebuilt)
+        return assert_runner_policy_boundary(mutated_runner, policy)
+
+    _closed(
+        "self_reseal.runner_budget_old_policy",
+        "SELF_RESEAL: budget 600 legitimo gera policy nova e a policy antiga e rejeitada.",
+        _budget_old_policy,
+    )
+
+    def _joint() -> Any:
+        mutated_runner = deepcopy(runner)
+        mutated_runner["command_plan"] = [dict(row) for row in mutated_runner["command_plan"]]
+        mutated_runner["command_plan"][1] = dict(mutated_runner["command_plan"][1])
+        mutated_runner["command_plan"][1]["argv"] = ["-c", "ARBITRARY"]
+        _bind_runner_contract_ids(mutated_runner)
+        followed = deepcopy(policy)
+        followed["runner_contract_id"] = mutated_runner["runner_contract_id"]
+        followed["runner_contract_manifest_id"] = mutated_runner["runner_contract_manifest_id"]
+        followed["resource_budget"] = dict(mutated_runner["resource_budget"])
+        followed["validated_command_plan"] = deepcopy(mutated_runner["command_plan"])
+        _bind_command_policy_ids(followed)
+        if (
+            mutated_runner.get("runner_contract_id") == runner.get("runner_contract_id")
+            or followed.get("command_policy_id") == policy.get("command_policy_id")
+        ):
+            return {"state": "NOT_RESEALED"}
+        return assert_runner_policy_boundary(mutated_runner, followed)
+
+    _closed(
+        "self_reseal.joint_documents",
+        "SELF_RESEAL: runner e policy adulterados juntos, com ids novos, sao rejeitados.",
+        _joint,
+    )
+
+    def _budget_mismatch() -> Any:
+        mutated = deepcopy(policy)
+        mutated["resource_budget"] = dict(mutated["resource_budget"])
+        mutated["resource_budget"]["runtime_seconds"] = 600
+        _bind_command_policy_ids(mutated)
+        if mutated.get("command_policy_id") == policy.get("command_policy_id"):
+            return {"state": "NOT_RESEALED"}
+        try:
+            assert_command_policy_integrity(mutated)
+        except (TypeError, ValueError):
+            return {"state": "INDIVIDUAL_POLICY_REJECTED"}
+        return assert_runner_policy_boundary(runner, mutated)
+
+    _closed(
+        "self_reseal.budget_mismatch_both_valid",
+        "SELF_RESEAL: budgets validos e diferentes entre runner e policy sao rejeitados.",
+        _budget_mismatch,
+    )
+    _closed(
+        "self_reseal.plan_not_canonical",
+        "SELF_RESEAL: plano diferente do template canonico com id novo e rejeitado.",
+        _policy_attack(lambda mutated: mutated["validated_command_plan"][2].__setitem__(
+            "argv", ["diff", "--check", "--exit-code"],
+        )),
+    )
+
+    def _nested(mutated: dict[str, Any]) -> None:
+        _separate_environments(mutated)
+        mutated["validated_command_plan"] = deepcopy(mutated["validated_command_plan"])
+        mutated["validated_command_plan"][0]["argv"] = list(
+            mutated["validated_command_plan"][0]["argv"]
+        )
+        mutated["validated_command_plan"][0]["argv"][-1] = "<MUTATED_SCOPE>"
+        mutated["fixed_environment"]["PYTHONHASHSEED"] = "123"
+
+    _closed(
+        "self_reseal.nested_mutation",
+        "SELF_RESEAL: deep-copy com mutacao aninhada e id novo e rejeitado.",
+        _policy_attack(_nested),
+    )
+    _closed(
+        "self_reseal.authority_flag",
+        "SELF_RESEAL: execution_authorized true com id novo e rejeitado.",
+        _policy_attack(lambda mutated: mutated.__setitem__("execution_authorized", True)),
+    )
+    _closed(
+        "self_reseal.security_flag_relaxed",
+        "SELF_RESEAL: path_lookup_allowed true com id novo e rejeitado.",
+        _policy_attack(lambda mutated: mutated.__setitem__("path_lookup_allowed", True)),
+    )
+
+    def _extra_key(mutated: dict[str, Any]) -> None:
+        _separate_environments(mutated)
+        mutated["fixed_environment"]["LC_ALL"] = "C"
+        mutated["allowlist_policy"]["fixed_environment"]["LC_ALL"] = "C"
+
+    _closed(
+        "self_reseal.extra_environment_key",
+        "SELF_RESEAL: chave extra de ambiente com id novo e rejeitada.",
+        _policy_attack(_extra_key),
+    )
+
+    status, _result = _invoke(lambda: assert_runner_policy_boundary(runner, policy))
+    expected = expected_command_policy_payload(runner)
+    semantic = (
+        status == "ACCEPT"
+        and policy.get("state") == "READY_FOR_EXECUTABLE_PINNING_REVIEW"
+        and policy.get("execution_authorized") is False
+        and policy.get("os_sandbox_verified") is False
+        and policy.get("executable_pinning_verified") is False
+        and policy.get("resource_budget") == runner.get("resource_budget")
+        and policy.get("validated_command_plan") == expected.get("validated_command_plan")
+        and policy.get("fixed_environment") == dict(FIXED_ENVIRONMENT)
+        and (policy.get("allowlist_policy") or {}).get("fixed_environment") == dict(FIXED_ENVIRONMENT)
+        and policy.get("runner_contract_id") == runner.get("runner_contract_id")
+        and policy.get("runner_contract_manifest_id") == runner.get("runner_contract_manifest_id")
+    )
+    findings.append(_finding(
+        "self_reseal.legitimate_constructor",
+        "atlasquant_aion_developer_command_policy",
+        "Documento produzido pelo constructor atravessa a fronteira com o plano canonico."
+        if semantic else
+        "Documento produzido pelo constructor nao passou na revalidacao semantica.",
+        "PASS" if semantic else "GAP",
+        "" if semantic else "HIGH",
+    ))
+    return findings
+
+
 def audit_developer_chain() -> dict[str, Any]:
     """Inspect the local Developer contracts and return a deterministic report."""
     world = _World()
@@ -3297,6 +3602,7 @@ def audit_developer_chain() -> dict[str, Any]:
         findings.extend(_attestation_pinning_surface(world))
         findings.extend(_runner_policy_integrity_surface(world))
         findings.extend(_principal_provenance_surface(world))
+        findings.extend(_self_reseal_surface(world))
     finally:
         world.close()
 

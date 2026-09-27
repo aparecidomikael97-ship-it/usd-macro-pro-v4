@@ -198,19 +198,57 @@ def expected_runner_contract_id(contract: Mapping[str, Any]) -> str:
     )
 
 
+def _canonical_command_plan() -> list[dict[str, Any]]:
+    """The only command plan the constructor emits. Callers cannot supply another."""
+    return [
+        {
+            "step": "COMPILE_CHANGED_SCOPE",
+            "executable": "python",
+            "argv": ["-m", "compileall", "-q", "<AUTHORIZED_CHANGED_SCOPE>"],
+            "shell": False,
+            "cwd": "<ISOLATED_WORKTREE>",
+            "network": False,
+            "writes_repo": False,
+            "writes_repository": False,
+            "may_write_ephemeral_cache": True,
+            "pycache_prefix": SANDBOX_EPHEMERAL_PYCACHE,
+        },
+        {
+            "step": "RUN_TARGETED_TESTS",
+            "executable": "python",
+            "argv": ["-m", "unittest", "-q", "<APPROVED_TEST_TARGETS>"],
+            "shell": False,
+            "cwd": "<ISOLATED_WORKTREE>",
+            "network": False,
+            "writes_repo": False,
+        },
+        {
+            "step": "VERIFY_DIFF_CHECK",
+            "executable": "git",
+            "argv": ["diff", "--check"],
+            "shell": False,
+            "cwd": "<ISOLATED_WORKTREE>",
+            "network": False,
+            "writes_repo": False,
+        },
+    ]
+
+
 def _require_exact(document: Mapping[str, Any], field: str, expected: Any) -> None:
     if document.get(field) is not expected:
         raise ValueError(f"runner flag {field} is not {expected}")
 
 
-def assert_runner_contract_integrity(contract: Mapping[str, Any]) -> str:
-    """Revalidate authority flags and reject a stale runner id.
+def _assert_runner_digest(contract: Mapping[str, Any]) -> str:
+    """Reject a stale id and any true authority flag.
 
-    Flag checks run even when the stored id was recomputed after the mutation.
-    A true authority flag is not made acceptable by a fresh digest.
+    This check does not decide that the payload is a legitimate contract.
+    Consumers call assert_runner_contract_integrity for that.
     """
     if not isinstance(contract, Mapping):
         raise ValueError("runner contract must be an object")
+    if contract.get("schema") != SCHEMA:
+        raise ValueError("invalid runner contract")
     if contract.get("command_plan_is_data_only") is not True:
         raise ValueError("command plan must remain data only")
     if contract.get("content_binding_structurally_bound") is not True:
@@ -235,8 +273,44 @@ def assert_runner_contract_integrity(contract: Mapping[str, Any]) -> str:
     return manifest_id
 
 
-def bind_runner_contract_ids(contract: dict[str, Any]) -> dict[str, Any]:
-    """Set the manifest id and runner id from the current document."""
+def _assert_runner_semantics(contract: Mapping[str, Any]) -> None:
+    """Reject a resealed document whose local security payload is not canonical.
+
+    A freshly computed digest is not evidence that the constructor produced
+    the document.
+    """
+    budget = contract.get("resource_budget")
+    validated, blockers = validate_resource_budget(budget if isinstance(budget, Mapping) else None)
+    if blockers:
+        raise ValueError("resource budget is outside the allowed range")
+    if dict(budget) != validated:
+        raise ValueError("resource budget has non-canonical fields")
+    if contract.get("command_plan") != _canonical_command_plan():
+        raise ValueError("runner command plan is not the canonical template")
+    if (
+        contract.get("state") == "READY_FOR_RUNNER_DESIGN_REVIEW"
+        and not list(contract.get("blockers") or [])
+    ):
+        tests = contract.get("tests") if isinstance(contract.get("tests"), Mapping) else {}
+        assert_required_mandatory_gates(
+            require_string_sequence(tests.get("mandatory_gates"), "mandatory_gates")
+        )
+
+
+def assert_runner_contract_integrity(contract: Mapping[str, Any]) -> str:
+    """Revalidate the runner. A matching id is not legitimacy.
+
+    Authority flags are rejected even after the id is recomputed. The command
+    plan, budget and required gates are checked against the local canonical
+    contract, not against the caller-supplied digest.
+    """
+    manifest_id = _assert_runner_digest(contract)
+    _assert_runner_semantics(contract)
+    return manifest_id
+
+
+def _bind_runner_contract_ids(contract: dict[str, Any]) -> dict[str, Any]:
+    """Constructor helper. Recomputing these ids does not authorize the payload."""
     contract["runner_contract_manifest_id"] = runner_contract_manifest_id(contract)
     contract["runner_contract_id"] = expected_runner_contract_id(contract)
     return contract
@@ -444,40 +518,7 @@ def build_runner_contract(
     blockers = list(dict.fromkeys(blockers))
     state = "READY_FOR_RUNNER_DESIGN_REVIEW" if not blockers else "BLOCKED"
 
-    command_plan = [
-        {
-            "step": "COMPILE_CHANGED_SCOPE",
-            "executable": "python",
-            "argv": ["-m", "compileall", "-q", "<AUTHORIZED_CHANGED_SCOPE>"],
-            "shell": False,
-            "cwd": "<ISOLATED_WORKTREE>",
-            "network": False,
-            "writes_repo": False,
-            "writes_repository": False,
-            "may_write_ephemeral_cache": True,
-            "pycache_prefix": SANDBOX_EPHEMERAL_PYCACHE,
-        },
-        {
-            "step": "RUN_TARGETED_TESTS",
-            "executable": "python",
-            "argv": ["-m", "unittest", "-q", "<APPROVED_TEST_TARGETS>"],
-            "shell": False,
-            "cwd": "<ISOLATED_WORKTREE>",
-            "network": False,
-            "writes_repo": False,
-        },
-        {
-            "step": "VERIFY_DIFF_CHECK",
-            "executable": "git",
-            "argv": ["diff", "--check"],
-            "shell": False,
-            "cwd": "<ISOLATED_WORKTREE>",
-            "network": False,
-            "writes_repo": False,
-        },
-    ]
-
-    return bind_runner_contract_ids({
+    return _bind_runner_contract_ids({
         "schema": SCHEMA,
         "state": state,
         "lineage": {
@@ -500,7 +541,7 @@ def build_runner_contract(
             "tests_executed": False,
         },
         "resource_budget": validated_budget,
-        "command_plan": command_plan,
+        "command_plan": _canonical_command_plan(),
         "command_plan_is_data_only": True,
         "shell_allowed": False,
         "network_allowed": False,
@@ -543,6 +584,5 @@ __all__ = [
     "runner_contract_manifest_id",
     "expected_runner_contract_id",
     "assert_runner_contract_integrity",
-    "bind_runner_contract_ids",
     "build_runner_contract",
 ]

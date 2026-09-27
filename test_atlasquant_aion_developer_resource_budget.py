@@ -12,7 +12,7 @@ from atlasquant_aion_developer_manifest import (
     structural_request_roles,
 )
 from atlasquant_aion_developer_runner_contract import (
-    bind_runner_contract_ids,
+    _bind_runner_contract_ids,
     build_runner_contract,
 )
 from atlasquant_aion_developer_sandbox_preflight import (
@@ -286,7 +286,7 @@ class ResourceBudgetTypeTests(unittest.TestCase):
                     mutated_runner = deepcopy(runner)
                     mutated_runner["resource_budget"] = dict(mutated_runner["resource_budget"])
                     mutated_runner["resource_budget"][field] = spec[label]
-                    bind_runner_contract_ids(mutated_runner)
+                    _bind_runner_contract_ids(mutated_runner)
                     out = build_command_policy_contract(mutated_runner)
                     self.assertEqual(out["state"], "BLOCKED")
                     self.assertIn(spec["blocker"], out["blockers"])

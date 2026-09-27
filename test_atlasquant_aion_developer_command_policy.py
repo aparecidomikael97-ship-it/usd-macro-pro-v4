@@ -7,7 +7,7 @@ from atlasquant_aion_developer_command_policy import (
     SCHEMA,
     build_command_policy_contract,
 )
-from atlasquant_aion_developer_runner_contract import bind_runner_contract_ids
+from atlasquant_aion_developer_runner_contract import _bind_runner_contract_ids
 
 
 def _runner():
@@ -102,7 +102,7 @@ def _runner():
         "real_trading_enabled": False,
         "tool_output_is_authority": False,
     }
-    return bind_runner_contract_ids(runner)
+    return _bind_runner_contract_ids(runner)
 
 
 class AionDeveloperCommandPolicyTests(unittest.TestCase):
@@ -131,7 +131,7 @@ class AionDeveloperCommandPolicyTests(unittest.TestCase):
         runner = _runner()
         runner["command_plan"] = deepcopy(runner["command_plan"])
         runner["command_plan"][0]["executable"] = "/tmp/python"
-        bind_runner_contract_ids(runner)
+        _bind_runner_contract_ids(runner)
         out = build_command_policy_contract(runner)
         self.assertEqual(out["state"], "BLOCKED")
         self.assertIn("EXECUTABLE_MISMATCH:COMPILE_CHANGED_SCOPE", out["blockers"])
@@ -142,7 +142,7 @@ class AionDeveloperCommandPolicyTests(unittest.TestCase):
         runner["command_plan"][1]["argv"] = [
             "-m", "unittest", "-q", "<APPROVED_TEST_TARGETS>", ";", "touch", "x"
         ]
-        bind_runner_contract_ids(runner)
+        _bind_runner_contract_ids(runner)
         out = build_command_policy_contract(runner)
         self.assertEqual(out["state"], "BLOCKED")
         self.assertIn("ARGV_TEMPLATE_MISMATCH:RUN_TARGETED_TESTS", out["blockers"])
@@ -155,7 +155,7 @@ class AionDeveloperCommandPolicyTests(unittest.TestCase):
         runner["command_plan"][2]["network"] = True
         runner["command_plan"][2]["writes_repo"] = True
         runner["command_plan"][2]["cwd"] = "/tmp"
-        bind_runner_contract_ids(runner)
+        _bind_runner_contract_ids(runner)
         out = build_command_policy_contract(runner)
         self.assertEqual(out["state"], "BLOCKED")
         self.assertIn("SHELL_MUST_BE_FALSE:VERIFY_DIFF_CHECK", out["blockers"])
@@ -175,7 +175,7 @@ class AionDeveloperCommandPolicyTests(unittest.TestCase):
             "network": False,
             "writes_repo": False,
         })
-        bind_runner_contract_ids(runner)
+        _bind_runner_contract_ids(runner)
         out = build_command_policy_contract(runner)
         self.assertEqual(out["state"], "BLOCKED")
         self.assertIn("COMMAND_PLAN_LENGTH_MISMATCH", out["blockers"])
@@ -201,7 +201,7 @@ class AionDeveloperCommandPolicyTests(unittest.TestCase):
         runner = _runner()
         runner["resource_budget"] = deepcopy(runner["resource_budget"])
         runner["resource_budget"]["max_commands"] = 2
-        bind_runner_contract_ids(runner)
+        _bind_runner_contract_ids(runner)
         out = build_command_policy_contract(runner)
         self.assertEqual(out["state"], "BLOCKED")
         self.assertIn("COMMAND_PLAN_EXCEEDS_RESOURCE_BUDGET", out["blockers"])

@@ -21,7 +21,7 @@ from atlasquant_aion_developer_executable_pinning import (
 )
 from atlasquant_aion_developer_manifest import REQUIRED_MANDATORY_GATES
 from atlasquant_aion_developer_runner_contract import (
-    bind_runner_contract_ids,
+    _bind_runner_contract_ids,
     build_runner_contract,
 )
 from test_atlasquant_aion_developer_attestation_pinning import (
@@ -91,7 +91,7 @@ class RunnerPolicyIntegrityTests(unittest.TestCase):
         self._stale(mutate)
         resealed = deepcopy(self.runner)
         resealed["resource_budget"]["runtime_seconds"] = 600
-        bind_runner_contract_ids(resealed)
+        _bind_runner_contract_ids(resealed)
         accepted = build_command_policy_contract(resealed)
         self.assertEqual(accepted["state"], "READY_FOR_EXECUTABLE_PINNING_REVIEW")
         self.assertEqual(accepted["resource_budget"]["runtime_seconds"], 600)
@@ -146,7 +146,7 @@ class RunnerPolicyIntegrityTests(unittest.TestCase):
         self._stale(mutate)
         resealed = deepcopy(self.runner)
         mutate(resealed)
-        bind_runner_contract_ids(resealed)
+        _bind_runner_contract_ids(resealed)
         with self.assertRaises(ValueError):
             build_command_policy_contract(resealed)
 
@@ -180,7 +180,7 @@ class RunnerPolicyIntegrityTests(unittest.TestCase):
         self._stale(lambda runner: runner.__setitem__("path_lookup_allowed", True))
         resealed = deepcopy(self.runner)
         resealed["path_lookup_allowed"] = True
-        bind_runner_contract_ids(resealed)
+        _bind_runner_contract_ids(resealed)
         with self.assertRaises(ValueError):
             build_command_policy_contract(resealed)
 
@@ -188,7 +188,7 @@ class RunnerPolicyIntegrityTests(unittest.TestCase):
         self._stale(lambda runner: runner.__setitem__("parent_environment_inheritance", True))
         resealed = deepcopy(self.runner)
         resealed["parent_environment_inheritance"] = True
-        bind_runner_contract_ids(resealed)
+        _bind_runner_contract_ids(resealed)
         with self.assertRaises(ValueError):
             build_command_policy_contract(resealed)
 
@@ -196,7 +196,7 @@ class RunnerPolicyIntegrityTests(unittest.TestCase):
         self._stale(lambda runner: runner.__setitem__("caller_environment_overrides_allowed", True))
         resealed = deepcopy(self.runner)
         resealed["caller_environment_overrides_allowed"] = True
-        bind_runner_contract_ids(resealed)
+        _bind_runner_contract_ids(resealed)
         with self.assertRaises(ValueError):
             build_command_policy_contract(resealed)
 
@@ -206,7 +206,7 @@ class RunnerPolicyIntegrityTests(unittest.TestCase):
                 self._stale(lambda runner, flag=flag: runner.__setitem__(flag, True))
                 resealed = deepcopy(self.runner)
                 resealed[flag] = True
-                bind_runner_contract_ids(resealed)
+                _bind_runner_contract_ids(resealed)
                 with self.assertRaises(ValueError):
                     build_command_policy_contract(resealed)
 

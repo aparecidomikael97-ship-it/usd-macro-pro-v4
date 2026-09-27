@@ -16,7 +16,7 @@ from atlasquant_aion_developer_patch_validation import validate_patch
 from atlasquant_aion_developer_runner_contract import (
     MAX_MANDATORY_GATES,
     MAX_TEST_TARGETS,
-    bind_runner_contract_ids,
+    _bind_runner_contract_ids,
     build_runner_contract,
 )
 from atlasquant_aion_developer_sandbox_preflight import (
@@ -318,7 +318,7 @@ def _command_runner():
         "real_trading_enabled": False,
         "tool_output_is_authority": False,
     }
-    return bind_runner_contract_ids(runner)
+    return _bind_runner_contract_ids(runner)
 
 
 def _closed(out):
@@ -437,7 +437,7 @@ class IndependentAuditContractGapTests(unittest.TestCase):
         runner = _command_runner()
         runner["command_plan"] = deepcopy(runner["command_plan"])
         runner["command_plan"][0]["executable"] = executable
-        bind_runner_contract_ids(runner)
+        _bind_runner_contract_ids(runner)
         out = build_command_policy_contract(runner)
         self.assertEqual(out["state"], "BLOCKED")
         self.assertIn("EXECUTABLE_MISMATCH:COMPILE_CHANGED_SCOPE", out["blockers"])
@@ -460,7 +460,7 @@ class IndependentAuditContractGapTests(unittest.TestCase):
             with self.subTest(bad=bad):
                 runner = _command_runner()
                 runner["command_plan"] = list(runner["command_plan"]) + [bad]
-                bind_runner_contract_ids(runner)
+                _bind_runner_contract_ids(runner)
                 out = build_command_policy_contract(runner)
                 self.assertEqual(out["state"], "BLOCKED")
                 self.assertIn("COMMAND_PLAN_ENTRY_NOT_OBJECT", out["blockers"])
@@ -473,7 +473,7 @@ class IndependentAuditContractGapTests(unittest.TestCase):
                 runner = _command_runner()
                 runner["resource_budget"] = dict(runner["resource_budget"])
                 runner["resource_budget"]["runtime_seconds"] = value
-                bind_runner_contract_ids(runner)
+                _bind_runner_contract_ids(runner)
                 out = build_command_policy_contract(runner)
                 self.assertEqual(out["state"], "BLOCKED")
                 self.assertIn("RUNTIME_BUDGET_OUT_OF_RANGE", out["blockers"])
@@ -485,7 +485,7 @@ class IndependentAuditContractGapTests(unittest.TestCase):
                 runner = _command_runner()
                 runner["resource_budget"] = dict(runner["resource_budget"])
                 runner["resource_budget"]["memory_mb"] = value
-                bind_runner_contract_ids(runner)
+                _bind_runner_contract_ids(runner)
                 out = build_command_policy_contract(runner)
                 self.assertEqual(out["state"], "BLOCKED")
                 self.assertIn("MEMORY_BUDGET_OUT_OF_RANGE", out["blockers"])
@@ -497,7 +497,7 @@ class IndependentAuditContractGapTests(unittest.TestCase):
                 runner = _command_runner()
                 runner["resource_budget"] = dict(runner["resource_budget"])
                 runner["resource_budget"]["output_bytes"] = value
-                bind_runner_contract_ids(runner)
+                _bind_runner_contract_ids(runner)
                 out = build_command_policy_contract(runner)
                 self.assertEqual(out["state"], "BLOCKED")
                 self.assertIn("OUTPUT_BUDGET_OUT_OF_RANGE", out["blockers"])
@@ -509,7 +509,7 @@ class IndependentAuditContractGapTests(unittest.TestCase):
                 runner = _command_runner()
                 runner["resource_budget"] = dict(runner["resource_budget"])
                 runner["resource_budget"]["max_commands"] = value
-                bind_runner_contract_ids(runner)
+                _bind_runner_contract_ids(runner)
                 out = build_command_policy_contract(runner)
                 self.assertEqual(out["state"], "BLOCKED")
                 self.assertIn("COMMAND_BUDGET_OUT_OF_RANGE", out["blockers"])
