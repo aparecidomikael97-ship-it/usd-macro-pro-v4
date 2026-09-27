@@ -29,7 +29,10 @@ from atlasquant_aion_developer_principal_identity import (
     classify_actor_pair,
     require_principal_id,
 )
-from atlasquant_aion_developer_runner_contract import build_runner_contract
+from atlasquant_aion_developer_runner_contract import (
+    bind_runner_contract_ids,
+    build_runner_contract,
+)
 from atlasquant_aion_developer_sandbox_preflight import (
     ALLOWED_COMMAND_POLICY,
     build_sandbox_preflight,
@@ -140,7 +143,7 @@ def _pins():
 
 
 def _policy_runner():
-    return {
+    runner = {
         "schema": "ATLASQUANT_AION_DEVELOPER_RUNNER_CONTRACT_V1",
         "runner_contract_id": "DEVRUN-1",
         "state": "READY_FOR_RUNNER_DESIGN_REVIEW",
@@ -182,11 +185,40 @@ def _policy_runner():
                 "writes_repo": False,
             },
         ],
+        "lineage": {
+            "builder_request_id": "DEVBUILD-FIXTURE",
+            "preflight_id": "DEVPREF-FIXTURE",
+            "patch_validation_id": "DEVPATCHVAL-1",
+            "patch_digest": "DEVPATCH-ABC",
+            "content_attestation_id": "DEVATT-FIXTURE000000",
+            "content_binding_structurally_bound": True,
+            "content_binding_independently_verified": False,
+        },
+        "review": {
+            "human_patch_reviewed": True,
+            "human_patch_reviewer": "reviewer-1",
+            "human_patch_review_refs": ["review:patch:1"],
+        },
+        "tests": {
+            "targets": ["test_module.py"],
+            "mandatory_gates": ["TARGETED_TESTS"],
+            "tests_executed": False,
+        },
         "command_plan_is_data_only": True,
         "shell_allowed": False,
         "network_allowed": False,
         "secrets_allowed": False,
         "repo_write_allowed": False,
+        "path_lookup_allowed": False,
+        "parent_environment_inheritance": False,
+        "caller_environment_overrides_allowed": False,
+        "content_binding_structurally_bound": True,
+        "content_binding_independently_verified": False,
+        "executable_pinning_verified": False,
+        "os_sandbox_verified": False,
+        "child_process_policy_verified": False,
+        "symlink_physical_boundary_verified": False,
+        "hardlink_physical_boundary_verified": False,
         "blockers": [],
         "execution_authorized": False,
         "executor_attached": False,
@@ -202,6 +234,7 @@ def _policy_runner():
         "real_trading_enabled": False,
         "tool_output_is_authority": False,
     }
+    return bind_runner_contract_ids(runner)
 
 
 def _closed(test, document):
@@ -446,6 +479,7 @@ class AttestationPinningContractTests(unittest.TestCase):
         runner = _policy_runner()
         runner["command_plan"] = deepcopy(runner["command_plan"])
         runner["command_plan"][0]["pycache_prefix"] = "<ISOLATED_WORKTREE>/__pycache__"
+        bind_runner_contract_ids(runner)
         out = build_command_policy_contract(runner)
         self.assertEqual(out["state"], "BLOCKED")
         self.assertIn("PYCACHE_INSIDE_WORKTREE", out["blockers"])
@@ -455,6 +489,7 @@ class AttestationPinningContractTests(unittest.TestCase):
         runner = _policy_runner()
         runner["command_plan"] = deepcopy(runner["command_plan"])
         runner["command_plan"][0]["pycache_prefix"] = "<REPOSITORY_ROOT>/__pycache__"
+        bind_runner_contract_ids(runner)
         out = build_command_policy_contract(runner)
         self.assertEqual(out["state"], "BLOCKED")
         self.assertIn("PYCACHE_INSIDE_REPOSITORY", out["blockers"])
@@ -497,6 +532,7 @@ class AttestationPinningContractTests(unittest.TestCase):
         runner["command_plan"][0].pop("may_write_ephemeral_cache")
         runner["command_plan"][0].pop("pycache_prefix")
         self.assertFalse(runner["command_plan"][0]["writes_repo"])
+        bind_runner_contract_ids(runner)
         out = build_command_policy_contract(runner)
         self.assertEqual(out["state"], "BLOCKED")
         self.assertIn("COMPILEALL_CACHE_POLICY_REQUIRED", out["blockers"])
@@ -537,7 +573,8 @@ class AttestationPinningContractTests(unittest.TestCase):
             )
 
     def test_design_review_bundle_never_authorizes_execution(self):
-        policy = build_command_policy_contract(_policy_runner())
+        runner = _policy_runner()
+        policy = build_command_policy_contract(runner)
         pinning = build_executable_pinning_spec(_pins())
         environment = build_environment_contract()
         review = build_os_sandbox_design_review(
@@ -545,6 +582,7 @@ class AttestationPinningContractTests(unittest.TestCase):
             pinning,
             self.attestation,
             environment,
+            runner_contract=runner,
         )
         self.assertEqual(review["state"], "READY_FOR_OS_SANDBOX_DESIGN_REVIEW")
         self.assertTrue(review["content_binding_structurally_bound"])
@@ -553,7 +591,13 @@ class AttestationPinningContractTests(unittest.TestCase):
         claimed = dict(pinning)
         claimed["executable_pinning_verified"] = True
         with self.assertRaises(ValueError):
-            build_os_sandbox_design_review(policy, claimed, self.attestation, environment)
+            build_os_sandbox_design_review(
+                policy,
+                claimed,
+                self.attestation,
+                environment,
+                runner_contract=runner,
+            )
 
 
 if __name__ == "__main__":

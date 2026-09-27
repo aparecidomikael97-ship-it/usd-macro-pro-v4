@@ -16,8 +16,6 @@ commit, merge, deploy, publication, production change or real trading occurs.
 """
 from __future__ import annotations
 
-from hashlib import sha256
-import json
 import unicodedata
 from typing import Any, Mapping, Sequence
 
@@ -31,6 +29,7 @@ from atlasquant_aion_developer_manifest import (
     assert_builder_request_lineage,
     assert_required_mandatory_gates,
     require_string_sequence,
+    stable_digest,
 )
 from atlasquant_aion_developer_sandbox_preflight import (
     ALLOWED_COMMAND_POLICY,
@@ -62,15 +61,185 @@ def _unique(values: Sequence[Any] | None, limit: int) -> list[str]:
     return out
 
 
-def _digest(value: Any, length: int = 18) -> str:
-    raw = json.dumps(
-        value,
-        ensure_ascii=False,
-        sort_keys=True,
-        default=str,
-        separators=(",", ":"),
+_COMMAND_STEP_FIELDS = (
+    "step",
+    "executable",
+    "argv",
+    "shell",
+    "cwd",
+    "network",
+    "writes_repo",
+)
+_OPTIONAL_STEP_FIELDS = (
+    "writes_repository",
+    "may_write_ephemeral_cache",
+    "pycache_prefix",
+)
+_BUDGET_FIELDS = ("runtime_seconds", "memory_mb", "output_bytes", "max_commands")
+_RUNNER_FALSE_FLAGS = (
+    "shell_allowed",
+    "network_allowed",
+    "secrets_allowed",
+    "repo_write_allowed",
+    "path_lookup_allowed",
+    "parent_environment_inheritance",
+    "caller_environment_overrides_allowed",
+    "content_binding_independently_verified",
+    "executable_pinning_verified",
+    "os_sandbox_verified",
+    "child_process_policy_verified",
+    "symlink_physical_boundary_verified",
+    "hardlink_physical_boundary_verified",
+    "execution_authorized",
+    "executor_attached",
+    "commands_executed",
+    "writes_files",
+    "runs_tests",
+    "network_called",
+    "subprocess_called",
+    "automatic_commit",
+    "automatic_merge",
+    "automatic_deploy",
+    "production_change_allowed",
+    "real_trading_enabled",
+    "tool_output_is_authority",
+)
+
+
+def _step_manifest(step: Any) -> Any:
+    if not isinstance(step, Mapping):
+        return {"non_mapping": True}
+    row = {field: step.get(field) for field in _COMMAND_STEP_FIELDS}
+    argv = row.get("argv")
+    if isinstance(argv, (list, tuple)):
+        row["argv"] = list(argv)
+    for field in _OPTIONAL_STEP_FIELDS:
+        if field in step:
+            row[field] = step.get(field)
+    return row
+
+
+def runner_contract_manifest(contract: Mapping[str, Any]) -> dict[str, Any]:
+    """Canonical security and semantic fields. Ids are not inputs."""
+    if not isinstance(contract, Mapping):
+        raise ValueError("runner contract must be an object")
+    lineage = contract.get("lineage") if isinstance(contract.get("lineage"), Mapping) else {}
+    review = contract.get("review") if isinstance(contract.get("review"), Mapping) else {}
+    tests = contract.get("tests") if isinstance(contract.get("tests"), Mapping) else {}
+    budget = contract.get("resource_budget") if isinstance(contract.get("resource_budget"), Mapping) else {}
+    review_refs = review.get("human_patch_review_refs")
+    targets = tests.get("targets")
+    gates = tests.get("mandatory_gates")
+    return {
+        "lineage": {
+            "builder_request_id": lineage.get("builder_request_id"),
+            "preflight_id": lineage.get("preflight_id"),
+            "patch_validation_id": lineage.get("patch_validation_id"),
+            "patch_digest": lineage.get("patch_digest"),
+            "content_attestation_id": lineage.get("content_attestation_id"),
+            "content_binding_structurally_bound": lineage.get("content_binding_structurally_bound"),
+            "content_binding_independently_verified": lineage.get("content_binding_independently_verified"),
+        },
+        "review": {
+            "human_patch_reviewed": review.get("human_patch_reviewed"),
+            "human_patch_reviewer": review.get("human_patch_reviewer"),
+            "human_patch_review_refs": list(review_refs) if isinstance(review_refs, (list, tuple)) else review_refs,
+        },
+        "tests": {
+            "targets": list(targets) if isinstance(targets, (list, tuple)) else targets,
+            "mandatory_gates": list(gates) if isinstance(gates, (list, tuple)) else gates,
+            "tests_executed": tests.get("tests_executed"),
+        },
+        "resource_budget": {field: budget.get(field) for field in _BUDGET_FIELDS},
+        "command_plan": [
+            _step_manifest(step) for step in list(contract.get("command_plan") or [])
+        ],
+        "command_plan_is_data_only": contract.get("command_plan_is_data_only"),
+        "shell_allowed": contract.get("shell_allowed"),
+        "network_allowed": contract.get("network_allowed"),
+        "secrets_allowed": contract.get("secrets_allowed"),
+        "repo_write_allowed": contract.get("repo_write_allowed"),
+        "path_lookup_allowed": contract.get("path_lookup_allowed"),
+        "parent_environment_inheritance": contract.get("parent_environment_inheritance"),
+        "caller_environment_overrides_allowed": contract.get("caller_environment_overrides_allowed"),
+        "content_binding_structurally_bound": contract.get("content_binding_structurally_bound"),
+        "content_binding_independently_verified": contract.get("content_binding_independently_verified"),
+        "executable_pinning_verified": contract.get("executable_pinning_verified"),
+        "os_sandbox_verified": contract.get("os_sandbox_verified"),
+        "child_process_policy_verified": contract.get("child_process_policy_verified"),
+        "symlink_physical_boundary_verified": contract.get("symlink_physical_boundary_verified"),
+        "hardlink_physical_boundary_verified": contract.get("hardlink_physical_boundary_verified"),
+        "execution_authorized": contract.get("execution_authorized"),
+        "executor_attached": contract.get("executor_attached"),
+        "commands_executed": contract.get("commands_executed"),
+        "writes_files": contract.get("writes_files"),
+        "runs_tests": contract.get("runs_tests"),
+        "network_called": contract.get("network_called"),
+        "subprocess_called": contract.get("subprocess_called"),
+        "automatic_commit": contract.get("automatic_commit"),
+        "automatic_merge": contract.get("automatic_merge"),
+        "automatic_deploy": contract.get("automatic_deploy"),
+        "production_change_allowed": contract.get("production_change_allowed"),
+        "real_trading_enabled": contract.get("real_trading_enabled"),
+        "tool_output_is_authority": contract.get("tool_output_is_authority"),
+    }
+
+
+def runner_contract_manifest_id(contract: Mapping[str, Any]) -> str:
+    return stable_digest(runner_contract_manifest(contract), prefix="DEVRMAN-", length=18)
+
+
+def expected_runner_contract_id(contract: Mapping[str, Any]) -> str:
+    """Digest the manifest id. A caller-supplied runner id is not an input."""
+    return stable_digest(
+        {"runner_contract_manifest_id": runner_contract_manifest_id(contract)},
+        prefix="DEVRUN-",
+        length=18,
     )
-    return sha256(raw.encode("utf-8")).hexdigest()[:length].upper()
+
+
+def _require_exact(document: Mapping[str, Any], field: str, expected: Any) -> None:
+    if document.get(field) is not expected:
+        raise ValueError(f"runner flag {field} is not {expected}")
+
+
+def assert_runner_contract_integrity(contract: Mapping[str, Any]) -> str:
+    """Revalidate authority flags and reject a stale runner id.
+
+    Flag checks run even when the stored id was recomputed after the mutation.
+    A true authority flag is not made acceptable by a fresh digest.
+    """
+    if not isinstance(contract, Mapping):
+        raise ValueError("runner contract must be an object")
+    if contract.get("command_plan_is_data_only") is not True:
+        raise ValueError("command plan must remain data only")
+    if contract.get("content_binding_structurally_bound") is not True:
+        raise ValueError("runner content binding is not structural")
+    for field in _RUNNER_FALSE_FLAGS:
+        _require_exact(contract, field, False)
+    lineage = contract.get("lineage")
+    if not isinstance(lineage, Mapping):
+        raise ValueError("runner lineage required")
+    if lineage.get("content_binding_structurally_bound") is not True:
+        raise ValueError("runner lineage content binding is not structural")
+    if lineage.get("content_binding_independently_verified") is not False:
+        raise ValueError("independent content verification cannot be claimed")
+    tests = contract.get("tests")
+    if not isinstance(tests, Mapping) or tests.get("tests_executed") is not False:
+        raise ValueError("tests_executed must remain false")
+    manifest_id = runner_contract_manifest_id(contract)
+    if contract.get("runner_contract_manifest_id") != manifest_id:
+        raise ValueError("runner contract manifest mismatch")
+    if contract.get("runner_contract_id") != expected_runner_contract_id(contract):
+        raise ValueError("runner contract id mismatch")
+    return manifest_id
+
+
+def bind_runner_contract_ids(contract: dict[str, Any]) -> dict[str, Any]:
+    """Set the manifest id and runner id from the current document."""
+    contract["runner_contract_manifest_id"] = runner_contract_manifest_id(contract)
+    contract["runner_contract_id"] = expected_runner_contract_id(contract)
+    return contract
 
 
 def _authorized_files(builder_request: Mapping[str, Any]) -> set[str]:
@@ -308,20 +477,8 @@ def build_runner_contract(
         },
     ]
 
-    seed = {
-        "request_id": builder_request.get("request_id"),
-        "preflight_id": preflight.get("preflight_id"),
-        "patch_validation_id": patch_validation.get("validation_id"),
-        "patch_digest": patch_validation.get("patch_digest"),
-        "content_attestation_id": attestation_id,
-        "reviewer": reviewer,
-        "review_refs": review_refs,
-        "tests": tests,
-        "gates": gates,
-    }
-    return {
+    return bind_runner_contract_ids({
         "schema": SCHEMA,
-        "runner_contract_id": "DEVRUN-" + _digest(seed),
         "state": state,
         "lineage": {
             "builder_request_id": str(builder_request.get("request_id") or ""),
@@ -374,7 +531,7 @@ def build_runner_contract(
         "production_change_allowed": False,
         "real_trading_enabled": False,
         "tool_output_is_authority": False,
-    }
+    })
 
 
 __all__ = [
@@ -382,5 +539,10 @@ __all__ = [
     "MAX_TEST_TARGETS",
     "MAX_MANDATORY_GATES",
     "MAX_REVIEW_REFS",
+    "runner_contract_manifest",
+    "runner_contract_manifest_id",
+    "expected_runner_contract_id",
+    "assert_runner_contract_integrity",
+    "bind_runner_contract_ids",
     "build_runner_contract",
 ]

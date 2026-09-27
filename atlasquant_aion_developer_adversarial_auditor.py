@@ -40,7 +40,15 @@ from atlasquant_aion_developer_manifest import (
     implementation_readiness_manifest_id,
     release_sensitive_path,
 )
-from atlasquant_aion_developer_command_policy import build_command_policy_contract
+from atlasquant_aion_developer_command_policy import (
+    assert_command_policy_integrity,
+    build_command_policy_contract,
+)
+from atlasquant_aion_developer_executable_pinning import (
+    build_environment_contract,
+    build_executable_pinning_spec,
+    build_os_sandbox_design_review,
+)
 from atlasquant_aion_developer_content_attestation import attestation_for_documents
 from atlasquant_aion_developer_executable_pinning import build_executable_pinning_spec
 from atlasquant_aion_developer_principal_identity import (
@@ -53,6 +61,7 @@ from atlasquant_aion_developer_patch_validation import validate_patch
 from atlasquant_aion_developer_runner_contract import (
     MAX_MANDATORY_GATES,
     MAX_TEST_TARGETS,
+    bind_runner_contract_ids,
     build_runner_contract,
 )
 from atlasquant_aion_developer_sandbox_preflight import (
@@ -1456,11 +1465,40 @@ def _command_probe(**overrides):
                 "writes_repo": False,
             },
         ],
+        "lineage": {
+            "builder_request_id": "DEVBUILD-FIXTURE",
+            "preflight_id": "DEVPREF-FIXTURE",
+            "patch_validation_id": "DEVPATCHVAL-1",
+            "patch_digest": "DEVPATCH-ABC",
+            "content_attestation_id": "DEVATT-FIXTURE000000",
+            "content_binding_structurally_bound": True,
+            "content_binding_independently_verified": False,
+        },
+        "review": {
+            "human_patch_reviewed": True,
+            "human_patch_reviewer": "reviewer-1",
+            "human_patch_review_refs": ["review:patch:1"],
+        },
+        "tests": {
+            "targets": ["test_module.py"],
+            "mandatory_gates": ["TARGETED_TESTS"],
+            "tests_executed": False,
+        },
         "command_plan_is_data_only": True,
         "shell_allowed": False,
         "network_allowed": False,
         "secrets_allowed": False,
         "repo_write_allowed": False,
+        "path_lookup_allowed": False,
+        "parent_environment_inheritance": False,
+        "caller_environment_overrides_allowed": False,
+        "content_binding_structurally_bound": True,
+        "content_binding_independently_verified": False,
+        "executable_pinning_verified": False,
+        "os_sandbox_verified": False,
+        "child_process_policy_verified": False,
+        "symlink_physical_boundary_verified": False,
+        "hardlink_physical_boundary_verified": False,
         "blockers": [],
         "execution_authorized": False,
         "executor_attached": False,
@@ -1492,6 +1530,7 @@ def _command_probe(**overrides):
             runner["command_plan"][0].pop("pycache_prefix", None)
         else:
             runner["command_plan"][0]["pycache_prefix"] = pycache_prefix
+    bind_runner_contract_ids(runner)
     return build_command_policy_contract(runner, **policy_kwargs)
 
 
@@ -2517,6 +2556,333 @@ def _attestation_pinning_surface(_world: _World) -> list[dict[str, str]]:
     return findings
 
 
+def _runner_policy_integrity_surface(_world: _World) -> list[dict[str, str]]:
+    """A sealed runner or command policy must not survive with a stale id."""
+    findings: list[dict[str, str]] = []
+    runner = _runner_probe(["test_module.py"])
+    policy = build_command_policy_contract(runner)
+    ready = (
+        runner.get("state") == "READY_FOR_RUNNER_DESIGN_REVIEW"
+        and policy.get("state") == "READY_FOR_EXECUTABLE_PINNING_REVIEW"
+        and runner.get("execution_authorized") is False
+        and policy.get("execution_authorized") is False
+    )
+
+    def _reject(invariant_id: str, description: str, fn: Callable[[], Any]) -> None:
+        status, _result = _invoke(fn)
+        closed = ready and status == "REJECT"
+        findings.append(_finding(
+            invariant_id,
+            "atlasquant_aion_developer_command_policy",
+            description if closed else description + " O id antigo ainda foi aceito.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    def _stale_runner(mutate: Callable[[dict[str, Any]], None]) -> Callable[[], Any]:
+        def run() -> Any:
+            cloned = deepcopy(runner)
+            mutate(cloned)
+            if cloned.get("runner_contract_id") != runner.get("runner_contract_id"):
+                return {"state": "RESEALED"}
+            return build_command_policy_contract(cloned)
+        return run
+
+    _reject(
+        "runner_policy.runtime_stale_id",
+        "runtime_seconds 900 para 600 com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["resource_budget"].__setitem__("runtime_seconds", 600)),
+    )
+    _reject(
+        "runner_policy.memory_stale_id",
+        "memory_mb alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["resource_budget"].__setitem__("memory_mb", 256)),
+    )
+    _reject(
+        "runner_policy.output_stale_id",
+        "output_bytes alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["resource_budget"].__setitem__("output_bytes", 4096)),
+    )
+    _reject(
+        "runner_policy.max_commands_stale_id",
+        "max_commands alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["resource_budget"].__setitem__("max_commands", 8)),
+    )
+    _reject(
+        "runner_policy.targets_stale_id",
+        "tests.targets alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["tests"]["targets"].append("test_module.py::extra")),
+    )
+
+    def _drop_gate(cloned: dict[str, Any]) -> Any:
+        for gate in REQUIRED_MANDATORY_GATES:
+            trial = deepcopy(cloned)
+            trial["tests"]["mandatory_gates"] = [
+                item for item in trial["tests"]["mandatory_gates"] if item != gate
+            ]
+            if trial.get("runner_contract_id") != runner.get("runner_contract_id"):
+                return {"state": "RESEALED", "gate": gate}
+            status, _result = _invoke(lambda trial=trial: build_command_policy_contract(trial))
+            if status != "REJECT":
+                return {"state": "ACCEPTED", "gate": gate}
+        raise ValueError("every removed mandatory gate kept a stale id")
+
+    _reject(
+        "runner_policy.mandatory_gate_stale_id",
+        "Cada mandatory gate removido com o id antigo e rejeitado.",
+        lambda: _drop_gate(runner),
+    )
+    _reject(
+        "runner_policy.reviewer_stale_id",
+        "Reviewer alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["review"].__setitem__("human_patch_reviewer", "other-reviewer")),
+    )
+    _reject(
+        "runner_policy.review_ref_stale_id",
+        "Review ref alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["review"]["human_patch_review_refs"].append("review:other")),
+    )
+    _reject(
+        "runner_policy.builder_request_id_stale",
+        "builder_request_id alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["lineage"].__setitem__("builder_request_id", "DEVBUILD-OTHERREQUEST1")),
+    )
+    _reject(
+        "runner_policy.preflight_id_stale",
+        "preflight_id alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["lineage"].__setitem__("preflight_id", "DEVPREF-OTHERREQUEST01")),
+    )
+    _reject(
+        "runner_policy.patch_validation_id_stale",
+        "patch_validation_id alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["lineage"].__setitem__("patch_validation_id", "DEVPATCHVAL-OTHER")),
+    )
+    _reject(
+        "runner_policy.patch_digest_stale",
+        "patch_digest alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["lineage"].__setitem__("patch_digest", "DEVPATCH-OTHER")),
+    )
+    _reject(
+        "runner_policy.attestation_id_stale",
+        "content_attestation_id alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["lineage"].__setitem__("content_attestation_id", "DEVATT-" + ("A" * 18))),
+    )
+    _reject(
+        "runner_policy.structurally_bound_stale",
+        "content_binding_structurally_bound alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned.__setitem__("content_binding_structurally_bound", False)),
+    )
+    _reject(
+        "runner_policy.argv_stale",
+        "argv alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["command_plan"][1]["argv"].append("--verbose")),
+    )
+    _reject(
+        "runner_policy.executable_stale",
+        "executable alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["command_plan"][0].__setitem__("executable", "/tmp/python")),
+    )
+    _reject(
+        "runner_policy.cwd_stale",
+        "cwd alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["command_plan"][2].__setitem__("cwd", "/tmp")),
+    )
+    _reject(
+        "runner_policy.shell_stale",
+        "shell false para true com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["command_plan"][2].__setitem__("shell", True)),
+    )
+    _reject(
+        "runner_policy.network_stale",
+        "network false para true com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["command_plan"][2].__setitem__("network", True)),
+    )
+    _reject(
+        "runner_policy.writes_repo_stale",
+        "writes_repo false para true com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["command_plan"][2].__setitem__("writes_repo", True)),
+    )
+    _reject(
+        "runner_policy.pycache_prefix_stale",
+        "pycache_prefix alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["command_plan"][0].__setitem__(
+            "pycache_prefix", "<ISOLATED_WORKTREE>/__pycache__",
+        )),
+    )
+    _reject(
+        "runner_policy.ephemeral_cache_stale",
+        "may_write_ephemeral_cache alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["command_plan"][0].__setitem__("may_write_ephemeral_cache", False)),
+    )
+    _reject(
+        "runner_policy.path_lookup_stale",
+        "path_lookup_allowed false para true com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned.__setitem__("path_lookup_allowed", True)),
+    )
+    _reject(
+        "runner_policy.parent_env_stale",
+        "parent_environment_inheritance false para true com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned.__setitem__("parent_environment_inheritance", True)),
+    )
+    _reject(
+        "runner_policy.caller_env_flag_stale",
+        "caller_environment_overrides_allowed false para true com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned.__setitem__("caller_environment_overrides_allowed", True)),
+    )
+
+    def _authority(cloned: dict[str, Any]) -> Any:
+        for flag in (
+            "execution_authorized",
+            "executor_attached",
+            "commands_executed",
+            "writes_files",
+            "runs_tests",
+            "network_called",
+            "subprocess_called",
+            "automatic_commit",
+            "automatic_merge",
+            "automatic_deploy",
+            "production_change_allowed",
+            "real_trading_enabled",
+            "tool_output_is_authority",
+        ):
+            trial = deepcopy(cloned)
+            trial[flag] = True
+            if trial.get("runner_contract_id") != runner.get("runner_contract_id"):
+                return {"state": "RESEALED", "flag": flag}
+            status, _result = _invoke(lambda trial=trial: build_command_policy_contract(trial))
+            if status != "REJECT":
+                return {"state": "ACCEPTED", "flag": flag}
+        raise ValueError("every authority flag kept a stale id")
+
+    _reject(
+        "runner_policy.authority_flag_stale",
+        "Authority flag false para true com o id antigo e rejeitada.",
+        lambda: _authority(runner),
+    )
+
+    def _nested(cloned: dict[str, Any]) -> None:
+        cloned["tests"]["targets"] = list(cloned["tests"]["targets"]) + ["test_other.py"]
+        cloned["review"]["human_patch_review_refs"] = list(cloned["review"]["human_patch_review_refs"])
+        cloned["review"]["human_patch_review_refs"][0] = "review:copied"
+        cloned["command_plan"][0]["argv"] = list(cloned["command_plan"][0]["argv"])
+        cloned["command_plan"][0]["argv"][-1] = "<MUTATED_SCOPE>"
+
+    _reject(
+        "runner_policy.deepcopy_nested_stale",
+        "Deep-copy com mutacao aninhada e id antigo e rejeitado.",
+        _stale_runner(_nested),
+    )
+
+    def _policy_budget() -> None:
+        mutated = deepcopy(policy)
+        mutated["resource_budget"]["runtime_seconds"] = 600
+        if mutated.get("command_policy_id") != policy.get("command_policy_id"):
+            return {"state": "RESEALED"}
+        return assert_command_policy_integrity(mutated)
+
+    _reject(
+        "command_policy.mutated_keeps_id",
+        "Command policy alterada com o id antigo e rejeitada.",
+        _policy_budget,
+    )
+
+    def _policy_env() -> None:
+        mutated = deepcopy(policy)
+        mutated["fixed_environment"]["PYTHONHASHSEED"] = "1"
+        if mutated.get("command_policy_id") != policy.get("command_policy_id"):
+            return {"state": "RESEALED"}
+        return assert_command_policy_integrity(mutated)
+
+    _reject(
+        "command_policy.fixed_environment_stale",
+        "fixed_environment alterado com o id antigo e rejeitado.",
+        _policy_env,
+    )
+
+    def _policy_plan() -> None:
+        mutated = deepcopy(policy)
+        mutated["validated_command_plan"][0]["argv"] = ["-m", "compileall", "-q", "<MUTATED>"]
+        if mutated.get("command_policy_id") != policy.get("command_policy_id"):
+            return {"state": "RESEALED"}
+        return assert_command_policy_integrity(mutated)
+
+    _reject(
+        "command_policy.validated_plan_stale",
+        "validated_command_plan alterado com o id antigo e rejeitado.",
+        _policy_plan,
+    )
+
+    def _chain() -> None:
+        builder = _sealed_runner_request(["test_module.py"])
+        preflight = _sealed_preflight(builder)
+        patch = {
+            "schema": "ATLASQUANT_AION_DEVELOPER_PATCH_VALIDATION_V1",
+            "validation_id": "DEVPATCHVAL-1",
+            "state": "READY_FOR_PATCH_REVIEW",
+            "builder_request_id": builder["request_id"],
+            "preflight_id": preflight["preflight_id"],
+            "patch_digest": "DEVPATCH-ABC",
+            "revision_binding": {
+                "baseline_ref": "main@aaa",
+                "candidate_ref": "cursor/fix@bbb",
+                "refs_match_approved_request": True,
+                "revision_content_verified": True,
+            },
+            "blockers": [],
+            "patch_applied": False,
+            "execution_authorized": False,
+            "executor_attached": False,
+        }
+        attestation = attestation_for_documents(builder, preflight, patch)
+        environment = build_environment_contract()
+        pinning = build_executable_pinning_spec([
+            {
+                "logical_name": "python",
+                "absolute_path": "/usr/bin/python3",
+                "sha256": "ab" * 32,
+                "file_size_bytes": 128,
+                "version_claim": "claim-only",
+                "verification_evidence_refs": ["evidence:pin:python"],
+            },
+            {
+                "logical_name": "git",
+                "absolute_path": "/usr/bin/git",
+                "sha256": "cd" * 32,
+                "file_size_bytes": 128,
+                "version_claim": "claim-only",
+                "verification_evidence_refs": ["evidence:pin:git"],
+            },
+        ])
+        fresh = build_os_sandbox_design_review(
+            policy,
+            pinning,
+            attestation,
+            environment,
+            runner_contract=runner,
+        )
+        if fresh.get("state") != "READY_FOR_OS_SANDBOX_DESIGN_REVIEW" or fresh.get("execution_authorized") is not False:
+            return fresh
+        stale_runner = deepcopy(runner)
+        stale_runner["resource_budget"]["runtime_seconds"] = 600
+        stale_policy = deepcopy(policy)
+        stale_policy["fixed_environment"]["PYTHONHASHSEED"] = "1"
+        build_os_sandbox_design_review(
+            stale_policy,
+            pinning,
+            attestation,
+            environment,
+            runner_contract=stale_runner,
+        )
+
+    _reject(
+        "runner_policy.chained_boundary_stale",
+        "Runner e policy adulterados sao rejeitados na fronteira seguinte.",
+        _chain,
+    )
+    return findings
+
+
 def audit_developer_chain() -> dict[str, Any]:
     """Inspect the local Developer contracts and return a deterministic report."""
     world = _World()
@@ -2536,6 +2902,7 @@ def audit_developer_chain() -> dict[str, Any]:
         findings.extend(_test_contract_integrity_surface(world))
         findings.extend(_resource_budget_surface(world))
         findings.extend(_attestation_pinning_surface(world))
+        findings.extend(_runner_policy_integrity_surface(world))
     finally:
         world.close()
 

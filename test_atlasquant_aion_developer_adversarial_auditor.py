@@ -111,6 +111,37 @@ _HARDENED_INVARIANTS={
     "runner.boolean_binding_without_attestation",
     "command.compileall_without_cache_policy",
     "attestation.mutated_after_seal",
+    "runner_policy.runtime_stale_id",
+    "runner_policy.memory_stale_id",
+    "runner_policy.output_stale_id",
+    "runner_policy.max_commands_stale_id",
+    "runner_policy.targets_stale_id",
+    "runner_policy.mandatory_gate_stale_id",
+    "runner_policy.reviewer_stale_id",
+    "runner_policy.review_ref_stale_id",
+    "runner_policy.builder_request_id_stale",
+    "runner_policy.preflight_id_stale",
+    "runner_policy.patch_validation_id_stale",
+    "runner_policy.patch_digest_stale",
+    "runner_policy.attestation_id_stale",
+    "runner_policy.structurally_bound_stale",
+    "runner_policy.argv_stale",
+    "runner_policy.executable_stale",
+    "runner_policy.cwd_stale",
+    "runner_policy.shell_stale",
+    "runner_policy.network_stale",
+    "runner_policy.writes_repo_stale",
+    "runner_policy.pycache_prefix_stale",
+    "runner_policy.ephemeral_cache_stale",
+    "runner_policy.path_lookup_stale",
+    "runner_policy.parent_env_stale",
+    "runner_policy.caller_env_flag_stale",
+    "runner_policy.authority_flag_stale",
+    "runner_policy.deepcopy_nested_stale",
+    "command_policy.mutated_keeps_id",
+    "command_policy.fixed_environment_stale",
+    "command_policy.validated_plan_stale",
+    "runner_policy.chained_boundary_stale",
 }
 
 
@@ -122,10 +153,10 @@ class AionDeveloperAdversarialAuditorTests(unittest.TestCase):
     def test_report_shape_is_deterministic_and_unscored(self):
         report=self.report
         self.assertEqual(report["schema"],SCHEMA)
-        self.assertEqual(report["cases_total"],131)
+        self.assertEqual(report["cases_total"],162)
         self.assertEqual(
             report["gap_count"]+report["blocked_by_design_count"]+report["pass_count"],
-            131,
+            162,
         )
         self.assertFalse(report["symlink_physical_boundary_verified"])
         self.assertFalse(report["hardlink_physical_boundary_verified"])

@@ -231,8 +231,18 @@ def build_os_sandbox_design_review(
     pinning_spec: Mapping[str, Any],
     attestation: Mapping[str, Any],
     environment_contract: Mapping[str, Any],
+    *,
+    runner_contract: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """Bundle the contracts for design review. This does not authorize execution."""
+    """Bundle the contracts for design review. This does not authorize execution.
+
+    The runner and the command policy are revalidated here. A stale id, a
+    mutated runner, or a recycled policy fails closed before this bundle can
+    report design review.
+    """
+    from atlasquant_aion_developer_command_policy import assert_runner_policy_boundary
+
+    assert_runner_policy_boundary(runner_contract, command_policy)
     for label, document in (
         ("command policy", command_policy),
         ("pinning spec", pinning_spec),

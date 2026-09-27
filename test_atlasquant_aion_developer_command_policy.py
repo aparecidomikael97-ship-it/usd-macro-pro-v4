@@ -7,10 +7,11 @@ from atlasquant_aion_developer_command_policy import (
     SCHEMA,
     build_command_policy_contract,
 )
+from atlasquant_aion_developer_runner_contract import bind_runner_contract_ids
 
 
 def _runner():
-    return {
+    runner = {
         "schema": "ATLASQUANT_AION_DEVELOPER_RUNNER_CONTRACT_V1",
         "runner_contract_id": "DEVRUN-1",
         "state": "READY_FOR_RUNNER_DESIGN_REVIEW",
@@ -52,11 +53,40 @@ def _runner():
                 "writes_repo": False,
             },
         ],
+        "lineage": {
+            "builder_request_id": "DEVBUILD-FIXTURE",
+            "preflight_id": "DEVPREF-FIXTURE",
+            "patch_validation_id": "DEVPATCHVAL-1",
+            "patch_digest": "DEVPATCH-ABC",
+            "content_attestation_id": "DEVATT-FIXTURE000000",
+            "content_binding_structurally_bound": True,
+            "content_binding_independently_verified": False,
+        },
+        "review": {
+            "human_patch_reviewed": True,
+            "human_patch_reviewer": "reviewer-1",
+            "human_patch_review_refs": ["review:patch:1"],
+        },
+        "tests": {
+            "targets": ["test_module.py"],
+            "mandatory_gates": ["TARGETED_TESTS"],
+            "tests_executed": False,
+        },
         "command_plan_is_data_only": True,
         "shell_allowed": False,
         "network_allowed": False,
         "secrets_allowed": False,
         "repo_write_allowed": False,
+        "path_lookup_allowed": False,
+        "parent_environment_inheritance": False,
+        "caller_environment_overrides_allowed": False,
+        "content_binding_structurally_bound": True,
+        "content_binding_independently_verified": False,
+        "executable_pinning_verified": False,
+        "os_sandbox_verified": False,
+        "child_process_policy_verified": False,
+        "symlink_physical_boundary_verified": False,
+        "hardlink_physical_boundary_verified": False,
         "blockers": [],
         "execution_authorized": False,
         "executor_attached": False,
@@ -72,6 +102,7 @@ def _runner():
         "real_trading_enabled": False,
         "tool_output_is_authority": False,
     }
+    return bind_runner_contract_ids(runner)
 
 
 class AionDeveloperCommandPolicyTests(unittest.TestCase):
@@ -100,6 +131,7 @@ class AionDeveloperCommandPolicyTests(unittest.TestCase):
         runner = _runner()
         runner["command_plan"] = deepcopy(runner["command_plan"])
         runner["command_plan"][0]["executable"] = "/tmp/python"
+        bind_runner_contract_ids(runner)
         out = build_command_policy_contract(runner)
         self.assertEqual(out["state"], "BLOCKED")
         self.assertIn("EXECUTABLE_MISMATCH:COMPILE_CHANGED_SCOPE", out["blockers"])
@@ -110,6 +142,7 @@ class AionDeveloperCommandPolicyTests(unittest.TestCase):
         runner["command_plan"][1]["argv"] = [
             "-m", "unittest", "-q", "<APPROVED_TEST_TARGETS>", ";", "touch", "x"
         ]
+        bind_runner_contract_ids(runner)
         out = build_command_policy_contract(runner)
         self.assertEqual(out["state"], "BLOCKED")
         self.assertIn("ARGV_TEMPLATE_MISMATCH:RUN_TARGETED_TESTS", out["blockers"])
@@ -122,6 +155,7 @@ class AionDeveloperCommandPolicyTests(unittest.TestCase):
         runner["command_plan"][2]["network"] = True
         runner["command_plan"][2]["writes_repo"] = True
         runner["command_plan"][2]["cwd"] = "/tmp"
+        bind_runner_contract_ids(runner)
         out = build_command_policy_contract(runner)
         self.assertEqual(out["state"], "BLOCKED")
         self.assertIn("SHELL_MUST_BE_FALSE:VERIFY_DIFF_CHECK", out["blockers"])
@@ -141,6 +175,7 @@ class AionDeveloperCommandPolicyTests(unittest.TestCase):
             "network": False,
             "writes_repo": False,
         })
+        bind_runner_contract_ids(runner)
         out = build_command_policy_contract(runner)
         self.assertEqual(out["state"], "BLOCKED")
         self.assertIn("COMMAND_PLAN_LENGTH_MISMATCH", out["blockers"])
@@ -166,6 +201,7 @@ class AionDeveloperCommandPolicyTests(unittest.TestCase):
         runner = _runner()
         runner["resource_budget"] = deepcopy(runner["resource_budget"])
         runner["resource_budget"]["max_commands"] = 2
+        bind_runner_contract_ids(runner)
         out = build_command_policy_contract(runner)
         self.assertEqual(out["state"], "BLOCKED")
         self.assertIn("COMMAND_PLAN_EXCEEDS_RESOURCE_BUDGET", out["blockers"])
