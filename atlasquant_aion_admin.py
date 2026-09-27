@@ -281,6 +281,7 @@ from atlasquant_aion_developer_sandbox_preflight import (
 )
 from atlasquant_aion_developer_patch_validation import validate_patch as validate_developer_patch
 from atlasquant_aion_developer_runner_contract import build_runner_contract as build_developer_runner_contract
+from atlasquant_aion_developer_command_policy import build_command_policy_contract as build_developer_command_policy_contract
 from atlasquant_aion_release_confidence import (
     DIMENSIONS as RELEASE_CONFIDENCE_DIMENSIONS,
     evidence_dimension,
@@ -5610,6 +5611,59 @@ def _render_developer_intelligence() -> None:
         st.info(
             "Enquanto revision_content_verified continuar falso no Patch Validator, "
             "o runner permanece bloqueado por desenho. Isso é intencional."
+        )
+
+        if runner_contract.get("state") == "READY_FOR_RUNNER_DESIGN_REVIEW":
+            if st.button(
+                "Validar Command Allowlist Contract",
+                key="aion_developer_command_policy_prepare",
+            ):
+                try:
+                    command_policy = build_developer_command_policy_contract(
+                        runner_contract,
+                    )
+                    st.session_state["aion_developer_command_policy"] = command_policy
+                except Exception as exc:
+                    st.error(f"Command Allowlist recusada: {type(exc).__name__}")
+
+    command_policy = (
+        st.session_state.get("aion_developer_command_policy")
+        if isinstance(st.session_state.get("aion_developer_command_policy"), Mapping)
+        else None
+    )
+    if isinstance(command_policy, Mapping):
+        st.markdown("##### Command Allowlist Contract · somente dados")
+        cp1,cp2,cp3,cp4 = st.columns(4)
+        cp1.metric("Estado", str(command_policy.get("state") or "UNKNOWN"))
+        cp2.metric("Exec pinning", "OK" if command_policy.get("executable_pinning_verified") else "PENDENTE")
+        cp3.metric("OS sandbox", "OK" if command_policy.get("os_sandbox_verified") else "PENDENTE")
+        cp4.metric("Execução", "AUTORIZADA" if command_policy.get("execution_authorized") else "BLOQUEADA")
+
+        if command_policy.get("blockers"):
+            st.warning(
+                "Allowlist bloqueada: "
+                + " · ".join(str(x) for x in list(command_policy.get("blockers") or []))
+            )
+        else:
+            st.success(
+                "Templates argv exatos conferem. Ainda falta pinning dos executáveis "
+                "e prova do isolamento de sistema operacional."
+            )
+
+        if command_policy.get("hazards"):
+            st.markdown("**Riscos que continuam explícitos:**")
+            for item in list(command_policy.get("hazards") or []):
+                st.markdown(f"- {item}")
+
+        if command_policy.get("required_before_future_execution"):
+            st.markdown("**Obrigatório antes de qualquer execução futura:**")
+            for item in list(command_policy.get("required_before_future_execution") or []):
+                st.markdown(f"- {item}")
+
+        st.caption(
+            f"{command_policy.get('command_policy_id')} · EXACT_ARGV_TEMPLATES · "
+            "command_policy_is_data_only=True · execution_authorized=False · "
+            "executor_attached=False · commands_executed=False."
         )
 
 def _render_development(
