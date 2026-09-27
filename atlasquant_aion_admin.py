@@ -28,6 +28,7 @@ from atlasquant_aion_core import (
     route_context,
 )
 from atlasquant_aion_gateway import local_answer, provider_status
+from atlasquant_aion_command_orchestrator import orchestrate_local_command
 from atlasquant_aion_workspaces import (
     AION_PERSONAS,
     admin_brief_lines,
@@ -2267,6 +2268,30 @@ def _render_central(
         memory_hits=hits_preview,
         system_context=system_context,
     ) if question.strip() else ""
+    local_command_preview = orchestrate_local_command(
+        question,
+        execute=False,
+    ) if question.strip() else {}
+    if local_command_preview:
+        preview_state = str(local_command_preview.get("state") or "")
+        preview_plan = (
+            local_command_preview.get("plan")
+            if isinstance(local_command_preview.get("plan"), Mapping)
+            else {}
+        )
+        if preview_state == "PLANNED":
+            st.caption(
+                "Tool Hub local · prévia: "
+                + str(preview_plan.get("tool_id") or "nenhum")
+                + " · "
+                + str(preview_plan.get("kind") or "UNKNOWN")
+                + ". O handler só roda após clicar em Analisar com AION e passar pelo preflight."
+            )
+        elif preview_state == "BLOCKED_INTENT":
+            st.warning(
+                "O comando contém intenção sensível/externa. O orquestrador local não tentará "
+                "converter esse pedido em READ/SEARCH/DRAFT nem executar um handler."
+            )
     estimate = estimate_request_cost(
         prompt_preview,
         config=provider_config(provider_env),
@@ -2385,6 +2410,36 @@ def _render_central(
                 )
 
         if answer is None:
+            local_tool_call = orchestrate_local_command(
+                question,
+                execute=True,
+                runtime_context={
+                    "checkpoint": checkpoint,
+                    "memory_layers": (
+                        checkpoint.get("memory_layers")
+                        if isinstance(checkpoint.get("memory_layers"), Mapping)
+                        else {}
+                    ),
+                    "session": specialist_snapshot if isinstance(specialist_snapshot, Mapping) else None,
+                    "system_context": dict(system_context),
+                    "persona": "admin",
+                },
+                hub=(
+                    checkpoint.get("tool_hub")
+                    if isinstance(checkpoint.get("tool_hub"), Mapping)
+                    else None
+                ),
+                portable_core=(
+                    checkpoint.get("portable_core")
+                    if isinstance(checkpoint.get("portable_core"), Mapping)
+                    else None
+                ),
+                access=access,
+                feature_flags=flags,
+                source_kind="ADMIN",
+                authenticated_admin=is_admin(access),
+                request_id="aion-admin-local-command",
+            )
             answer = local_answer(
                 question,
                 checkpoint=checkpoint,
@@ -2392,6 +2447,19 @@ def _render_central(
                 system_context=dict(system_context),
                 feature_flags=flags,
             )
+            if isinstance(answer, Mapping):
+                answer = dict(answer)
+                local_state = str(local_tool_call.get("state") or "")
+                if local_state not in {"", "NO_MATCH", "NO_COMMAND"}:
+                    answer["local_tool_call"] = local_tool_call
+                    local_summary = str(local_tool_call.get("summary") or "").strip()
+                    if local_summary:
+                        answer["answer"] = (
+                            str(answer.get("answer") or "").rstrip()
+                            + " Tool Hub local: "
+                            + local_summary
+                        ).strip()
+            st.session_state["aion_last_local_tool_call"] = local_tool_call
         unified_result = build_aion_result(
             core_orchestration,
             answer=answer.get("answer", ""),
@@ -2435,6 +2503,27 @@ def _render_central(
             f"verdade {presentation['truth_status']} · "
             f"{evidence_count} evidência(s)"
         )
+        local_tool_call = answer.get("local_tool_call")
+        if isinstance(local_tool_call, Mapping):
+            local_result = (
+                local_tool_call.get("tool_result")
+                if isinstance(local_tool_call.get("tool_result"), Mapping)
+                else {}
+            )
+            local_truth = (
+                local_result.get("truth")
+                if isinstance(local_result.get("truth"), Mapping)
+                else {}
+            )
+            st.caption(
+                "Tool Hub local: "
+                + str(local_tool_call.get("tool_id") or "nenhum")
+                + " · estado "
+                + str(local_tool_call.get("state") or "UNKNOWN")
+                + " · verdade "
+                + str(local_truth.get("status") or "UNKNOWN")
+                + " · efeitos externos: nenhum."
+            )
         cognitive_answer = answer.get("cognitive_orchestrator")
         if isinstance(cognitive_answer, Mapping):
             routing = (
