@@ -500,7 +500,7 @@ def render_premium_catalog(
             target = _destination(module, fast=fast)
             available = bool(target) and target in pages
             open_pages = set(BEGINNER_OPEN_AREAS) | {"🎙️ Macro"}
-            locked = beginner and available and target not in open_pages
+            locked = beginner and available and target not in open_pages and target != "🧠 AION"
             # Full-app beginner still routes locked pages into the existing preview.
             # The fast shell has no preview workspace, so those cards stay inactive.
             can_open = available and not (fast and locked)
@@ -510,6 +510,10 @@ def render_premium_catalog(
             )
             label = f"Abrir {module['title']}" if can_open else f"{module['title']} · aguardar modo Avançado"
             if st.button(label, key=f"aq_premium_{module['id']}_{'fast' if fast else 'full'}", disabled=not can_open, width="stretch"):
-                st.session_state[_PENDING_KEY] = target
+                if target == "🧠 AION":
+                    from atlasquant_navigation_bridge import request_return_to_aion
+                    request_return_to_aion(st.session_state)
+                else:
+                    st.session_state[_PENDING_KEY] = target
                 st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)

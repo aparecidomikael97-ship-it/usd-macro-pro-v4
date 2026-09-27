@@ -519,7 +519,10 @@ background:#102338;color:#f5f8fc;box-shadow:0 10px 24px rgba(0,0,0,.28)}
     if "🧠 AION" in available:
         with columns[1]:
             if st.button("Abrir central AION", key="aq_voice_dock_aion", width="stretch"):
-                session_state["atlasquant_premium_nav_target"] = "🧠 AION"
+                # AION lives in the advanced workspace; the bridge switches mode
+                # before the experience radio is created on the next run.
+                from atlasquant_navigation_bridge import request_return_to_aion
+                request_return_to_aion(session_state)
                 st.rerun()
 
 

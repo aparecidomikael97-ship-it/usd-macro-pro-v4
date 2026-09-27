@@ -2255,6 +2255,11 @@ st.session_state["atlasquant_advanced_boot"] = {
 
 if render_atlasquant_header is not None:
     render_atlasquant_header(APP_VERSION, environment=ATLASQUANT_ENVIRONMENT)
+    try:
+        from atlasquant_ui_v1 import render_account_identity
+        render_account_identity(_ATLASQUANT_ACCESS)
+    except Exception:
+        pass
 else:
     st.title("🧭 AtlasQuant")
     st.caption(f"Market Intelligence Platform · {ATLASQUANT_ENVIRONMENT}")

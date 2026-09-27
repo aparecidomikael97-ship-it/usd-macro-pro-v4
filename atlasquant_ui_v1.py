@@ -446,6 +446,14 @@ html { scroll-behavior: smooth; }
   background: #16324f !important;
   border-color: rgba(163,190,222,.45) !important;
 }
+.stApp [data-testid="stButton"] button[kind="primary"],
+.stApp [data-testid="stFormSubmitButton"] button,
+.stApp [data-testid="stFormSubmitButton"] button * {
+  color: #f8fbff !important;
+  -webkit-text-fill-color: #f8fbff !important;
+  background: #1d4e89 !important;
+  border-color: #8eb7e8 !important;
+}
 /* Experience chips: Streamlit renders each option as label[data-testid="stRadioOption"].
    These rules outrank the light canvas text so Iniciante/Avançado stay dark on a light chip
    (>= 4.5:1) in normal, hover, focus and selected states. */
@@ -522,8 +530,13 @@ html { scroll-behavior: smooth; }
   box-shadow: none !important;
   outline: none !important;
 }
-.stApp [data-testid="stExpander"] {
+.stApp [data-testid="stExpander"],
+.stApp [data-testid="stExpander"] details,
+.stApp [data-testid="stExpander"] details > summary {
   background: #102338 !important;
+  border-color: rgba(198,214,232,.4) !important;
+}
+.stApp [data-testid="stExpander"] {
   border: 1px solid rgba(198,214,232,.4) !important;
 }
 .stApp [data-testid="stExpander"] details > summary,
@@ -990,6 +1003,61 @@ def decision_strip_html(pair: str, direction: str, decision: str, timing: str, q
       <div><span>TIMING</span><strong>{t}</strong></div>
       <div><span>QUALIDADE</span><strong>{q_text}</strong></div>
     </div>"""
+
+
+def account_identity(access: object) -> dict[str, object]:
+    """Who is signed in, taken only from an authenticated session.
+
+    The role must match on the access decision and on the session itself, so a
+    stale or partial mapping never displays ADMIN.
+    """
+    empty = {"visible": False, "username": "", "role": "", "is_admin": False, "label": ""}
+    if not isinstance(access, dict) or str(access.get("mode") or "") != "AUTHENTICATED":
+        return empty
+    session = access.get("session")
+    if not isinstance(session, dict):
+        return empty
+    username = str(session.get("username") or "").strip()
+    role = str(session.get("role") or "").strip().upper()
+    if not username or role not in {"USER", "SALES", "ADMIN"}:
+        return empty
+    if str(access.get("role") or "").strip().upper() != role:
+        return empty
+    return {
+        "visible": True,
+        "username": username,
+        "role": role,
+        "is_admin": role == "ADMIN",
+        "label": f"{username} · {role}",
+    }
+
+
+def account_identity_html(access: object) -> str:
+    ident = account_identity(access)
+    if not ident["visible"]:
+        return ""
+    label = escape(str(ident["label"]))
+    role = escape(str(ident["role"]))
+    if ident["is_admin"]:
+        note = "Sessão administrativa · AION liberado nesta conta"
+        badge = "background:#d7b56d;color:#1a1408;border:1px solid #f3deaa"
+    else:
+        note = "Sessão autenticada"
+        badge = "background:#24384f;color:#f5f8fc;border:1px solid #d7e4f2"
+    return (
+        f'<div id="aq-account-identity" class="aq-account-identity" data-role="{role}" role="status" '
+        'style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:-6px 0 12px;padding:8px 12px;'
+        'border-radius:12px;background:#102338;border:1px solid rgba(198,214,232,.4);color:#f5f8fc">'
+        f'<span style="{badge};border-radius:999px;padding:3px 10px;font-weight:850;font-size:.82rem">{label}</span>'
+        f'<span style="color:#d7e4f2;font-weight:700;font-size:.8rem">{escape(note)}</span>'
+        '</div>'
+    )
+
+
+def render_account_identity(access: object) -> None:
+    html = account_identity_html(access)
+    if html:
+        st.markdown(html, unsafe_allow_html=True)
 
 
 def apply_atlasquant_theme() -> None:
