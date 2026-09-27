@@ -400,6 +400,7 @@ def build_development_plan(
         "risk_tags": risks,
         "recommended_tests": coverage["recommended_tests"],
         "unmatched_code": coverage["unmatched_code"],
+        "rejected_unknown_paths": list(coverage.get("rejected_unknown_paths") or []),
         "warnings": warnings,
         "phases": list(PHASES),
         "developer_engine_seed": {

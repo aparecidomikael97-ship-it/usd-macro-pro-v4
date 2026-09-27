@@ -213,6 +213,11 @@ def build_developer_package(
     gaps = []
     if plan.get("unmatched_code"):
         gaps.append("PYTHON_WITHOUT_LIKELY_TEST")
+    rejected_unknown = [str(x) for x in list(plan.get("rejected_unknown_paths") or [])]
+    if rejected_unknown:
+        gaps.append("CHANGED_PATH_OUTSIDE_SNAPSHOT")
+        if any(path.lower().endswith(".py") for path in rejected_unknown):
+            gaps.append("PYTHON_WITHOUT_LIKELY_TEST")
     if bool(snapshot.get("truncated")):
         gaps.append("REPOSITORY_SNAPSHOT_TRUNCATED")
     if int(snapshot.get("syntax_errors") or 0):

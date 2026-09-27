@@ -66,12 +66,12 @@ def validate_candidate_ref(value: Any, branch: Any) -> str:
     logical_branch=validate_isolated_branch(branch)
     if not candidate:
         raise ValueError("candidate_ref required")
-    candidate_branch=candidate.split("@",1)[0]
+    candidate_branch, sep, candidate_suffix = candidate.partition("@")
     if candidate_branch.startswith("refs/heads/"):
         candidate_branch=candidate_branch[len("refs/heads/"):]
     if candidate_branch != logical_branch:
         raise ValueError("candidate_ref must be bound to the exact isolated branch")
-    return candidate
+    return logical_branch + (("@" + candidate_suffix) if sep else "")
 
 
 def snapshot_digest_from_rows(root_name: Any, rows: Sequence[Mapping[str,Any]]) -> str:
