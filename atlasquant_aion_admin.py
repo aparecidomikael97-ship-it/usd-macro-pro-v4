@@ -262,6 +262,7 @@ from atlasquant_aion_orchestrator import (
 from atlasquant_aion_specialists import plan_specialist_dispatch
 from atlasquant_aion_specialist_evidence import read_specialist_evidence
 from atlasquant_aion_specialist_session import loaded_session_from_checkpoint
+from atlasquant_aion_session_memory import evidence_scope_label
 from atlasquant_aion_memory_layers import memory_layer_summary
 from atlasquant_aion_event_journal import (
     continuity_summary as live_event_continuity_summary,
@@ -2033,6 +2034,7 @@ def _render_central(
     approval_inbox: Mapping[str, Any],
     incident_snapshot: Mapping[str, Any],
     executive_snapshot: Mapping[str, Any],
+    specialist_snapshot: Mapping[str, Any] | None = None,
 ) -> None:
     st.markdown("### 🧠 Central AION")
     pending = checkpoint.get("pending") if isinstance(checkpoint.get("pending"), list) else []
@@ -2198,9 +2200,13 @@ def _render_central(
             o2.metric("Capability", str(selected_capability.get("capability_id") or "UNKNOWN"))
             o3.metric("Verdade", str(truth_preview.get("status") or "UNKNOWN"))
             o4.metric("Decisão", str(decision_preview.get("state") or "BLOCKED"))
+            if specialist_snapshot is None:
+                specialist_session = loaded_session_from_checkpoint(checkpoint)
+            else:
+                specialist_session = specialist_snapshot
             local_evidence = read_specialist_evidence(
                 dispatch_preview.get("specialist"),
-                session=loaded_session_from_checkpoint(checkpoint),
+                session=specialist_session,
             )
             evidence_conflicts = [
                 str(item.get("claim") or "conflito")
@@ -2228,10 +2234,14 @@ def _render_central(
                 + str(local_evidence.get("freshness") or "UNVERIFIED")
                 + " · truth_state "
                 + str(local_evidence.get("truth_state") or "UNKNOWN")
+                + " · input_state "
+                + str(local_evidence.get("input_state") or "ABSENT")
                 + " · conflicts "
                 + ("nenhum" if not evidence_conflicts else " · ".join(evidence_conflicts))
+                + " · evidência observada "
+                + evidence_scope_label(local_evidence)
                 + " · answers_user_question "
-                + ("SIM" if local_evidence.get("answers_user_question") else "NÃO")
+                + ("NÃO" if not local_evidence.get("answers_user_question") else "SIM")
                 + "."
             )
             blockers = list(decision_preview.get("blockers") or [])
@@ -5562,6 +5572,7 @@ def render_aion_admin_console(
     *,
     market_context: Mapping[str, Any] | None = None,
     system_context: Mapping[str, Any] | None = None,
+    specialist_snapshot: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     access_map = dict(access or {})
     market = dict(market_context or {})
@@ -5903,6 +5914,7 @@ def render_aion_admin_console(
                 access_map, checkpoint, runtime_result, memory_summary, flags,
                 system, status_board, approval_inbox, incident_snapshot,
                 executive_snapshot,
+                specialist_snapshot=specialist_snapshot,
             )
         elif selected_workspace == "🗂️ Secretaria":
             _render_secretary(access_map, checkpoint, flags, system, market, status_board, approval_inbox)
