@@ -9763,6 +9763,7 @@ if _aq_active_index == 1:
                         0 if _aq_master_uses_runtime_fallback
                         else _scan_wait_master_v1022
                     ),
+                    source_status=STATUS_FONTE,
                 )
                 mark_surface_ok(
                     st.session_state,
