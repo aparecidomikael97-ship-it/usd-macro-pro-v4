@@ -17,6 +17,11 @@ import unicodedata
 from typing import Any, Mapping
 
 from atlasquant_aion_developer_builder_sandbox import SCHEMA as BUILDER_REQUEST_SCHEMA
+from atlasquant_aion_developer_manifest import (
+    assert_builder_request_lineage,
+    assert_required_mandatory_gates,
+    require_string_sequence,
+)
 from atlasquant_aion_observability import redact_text
 
 SCHEMA = "ATLASQUANT_AION_DEVELOPER_SANDBOX_PREFLIGHT_V1"
@@ -85,6 +90,36 @@ def _safe_relative_path(value: Any) -> bool:
     return canonical_repository_relative_path(value) is not None
 
 
+def expected_preflight_id(preflight: Mapping[str, Any]) -> str:
+    """Recompute the preflight id, including the bound test-contract manifest."""
+    env = (
+        preflight.get("environment_contract")
+        if isinstance(preflight.get("environment_contract"), Mapping)
+        else {}
+    )
+    budget = (
+        preflight.get("resource_budget")
+        if isinstance(preflight.get("resource_budget"), Mapping)
+        else {}
+    )
+    scope = preflight.get("scope") if isinstance(preflight.get("scope"), Mapping) else {}
+    seed = {
+        "request_id": str(preflight.get("builder_request_id") or ""),
+        "environment": str(env.get("environment_kind") or ""),
+        "environment_id": str(env.get("environment_id") or ""),
+        "files": require_string_sequence(scope.get("requested_files"), "requested_files"),
+        "policy": str(env.get("command_policy") or ""),
+        "budgets": {
+            "runtime_seconds": int(budget.get("runtime_seconds")),
+            "memory_mb": int(budget.get("memory_mb")),
+            "output_bytes": int(budget.get("output_bytes")),
+            "max_commands": int(budget.get("max_commands")),
+        },
+        "test_contract_manifest_id": str(preflight.get("test_contract_manifest_id") or ""),
+    }
+    return "DEVPREF-" + _digest(seed)
+
+
 def _canonical_scope_paths(values: Any, *, label: str) -> list[str]:
     out: list[str] = []
     for raw in list(values or []):
@@ -144,8 +179,14 @@ def build_sandbox_preflight(
         if isinstance(builder_request.get("scope"), Mapping)
         else {}
     )
-    requested = _canonical_scope_paths(scope.get("requested_files"), label="requested")
-    authorized = set(_canonical_scope_paths(scope.get("authorized_files"), label="authorized"))
+    requested = _canonical_scope_paths(
+        require_string_sequence(scope.get("requested_files"), "requested_files"),
+        label="requested",
+    )
+    authorized = set(_canonical_scope_paths(
+        require_string_sequence(scope.get("authorized_files"), "authorized_files"),
+        label="authorized",
+    ))
     if not requested:
         raise ValueError("requested file scope is empty")
     if any(path not in authorized for path in requested):
@@ -156,15 +197,17 @@ def build_sandbox_preflight(
         if scope.get(flag) is not False:
             raise ValueError(f"{flag} must remain false")
 
+    manifest_id = assert_builder_request_lineage(builder_request)
     tests = (
         builder_request.get("test_contract")
         if isinstance(builder_request.get("test_contract"), Mapping)
         else {}
     )
-    if not list(tests.get("candidate_tests") or []):
+    candidate_tests = require_string_sequence(tests.get("candidate_tests"), "candidate_tests")
+    mandatory_gates = require_string_sequence(tests.get("mandatory_gates"), "mandatory_gates")
+    if not candidate_tests:
         raise ValueError("candidate tests are required")
-    if not list(tests.get("mandatory_gates") or []):
-        raise ValueError("mandatory gates are required")
+    assert_required_mandatory_gates(mandatory_gates)
     if tests.get("test_deletion_allowed") is not False:
         raise ValueError("test deletion must remain blocked")
     if tests.get("test_weakening_allowed") is not False:
@@ -208,19 +251,12 @@ def build_sandbox_preflight(
     blockers = list(dict.fromkeys(blockers))
     state = "READY_FOR_EXECUTOR_DESIGN_REVIEW" if not blockers else "BLOCKED"
 
-    seed = {
-        "request_id": builder_request.get("request_id"),
-        "environment": environment,
-        "environment_id": env_id,
-        "files": requested,
-        "policy": policy,
-        "budgets": budgets,
-    }
-    return {
+    out = {
         "schema": SCHEMA,
-        "preflight_id": "DEVPREF-" + _digest(seed),
+        "preflight_id": "",
         "state": state,
         "builder_request_id": str(builder_request.get("request_id") or ""),
+        "test_contract_manifest_id": manifest_id,
         "environment_contract": {
             "environment_kind": environment,
             "environment_id": env_id,
@@ -267,6 +303,8 @@ def build_sandbox_preflight(
         "real_trading_enabled": False,
         "tool_output_is_authority": False,
     }
+    out["preflight_id"] = expected_preflight_id(out)
+    return out
 
 
 __all__ = [
@@ -282,5 +320,6 @@ __all__ = [
     "ALLOWED_COMMAND_POLICY",
     "ALLOWED_ENVIRONMENT_KINDS",
     "canonical_repository_relative_path",
+    "expected_preflight_id",
     "build_sandbox_preflight",
 ]

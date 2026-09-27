@@ -60,6 +60,14 @@ _HARDENED_INVARIANTS={
     "patch.missing_hunk",
     "runner.excessive_test_targets",
     "path.symlink_hardlink_physical_boundary_unverified",
+    "test_contract.candidate_tests_mutated_after_request_id",
+    "test_contract.mandatory_gates_mutated_after_request_id",
+    "test_contract.required_gate_removed",
+    "test_contract.arbitrary_gate",
+    "test_contract.candidate_tests_string",
+    "test_contract.mandatory_gates_string",
+    "test_contract.review_refs_string",
+    "test_contract.non_string_elements",
 }
 
 
@@ -71,10 +79,10 @@ class AionDeveloperAdversarialAuditorTests(unittest.TestCase):
     def test_report_shape_is_deterministic_and_unscored(self):
         report=self.report
         self.assertEqual(report["schema"],SCHEMA)
-        self.assertEqual(report["cases_total"],80)
+        self.assertEqual(report["cases_total"],88)
         self.assertEqual(
             report["gap_count"]+report["blocked_by_design_count"]+report["pass_count"],
-            80,
+            88,
         )
         self.assertFalse(report["symlink_physical_boundary_verified"])
         self.assertFalse(report["hardlink_physical_boundary_verified"])

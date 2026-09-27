@@ -9,8 +9,6 @@ trading. Main/production branches and scope expansion fail closed.
 """
 from __future__ import annotations
 
-from hashlib import sha256
-import json
 import re
 import unicodedata
 from typing import Any, Mapping, Sequence
@@ -26,12 +24,16 @@ from atlasquant_aion_developer_intelligence import (
 )
 from atlasquant_aion_observability import redact_text
 from atlasquant_aion_developer_manifest import (
+    assert_required_mandatory_gates,
     authorization_manifest_id,
     canonical_identity,
+    expected_builder_request_id,
     implementation_base_manifest_id,
     implementation_readiness_manifest_id,
     normalize_ref,
     release_sensitive_path,
+    require_string_sequence,
+    test_contract_manifest_id,
     validate_candidate_ref,
     validate_isolated_branch,
 )
@@ -67,17 +69,6 @@ def _unique(values: Sequence[Any] | None, limit: int = MAX_FILES) -> list[str]:
         if len(out) >= limit:
             break
     return out
-
-
-def _digest(value: Any, length: int = 18) -> str:
-    raw = json.dumps(
-        value,
-        ensure_ascii=False,
-        sort_keys=True,
-        default=str,
-        separators=(",", ":"),
-    )
-    return sha256(raw.encode("utf-8")).hexdigest()[:length].upper()
 
 
 def _validate_branch(value: Any) -> str:
@@ -213,8 +204,8 @@ def build_builder_sandbox_request(
         if isinstance(implementation.get("scope"), Mapping)
         else {}
     )
-    raw_editable = list(scope.get("editable_files") or [])
-    raw_source = list(scope.get("source_files") or [])
+    raw_editable = require_string_sequence(scope.get("editable_files"), "authorized_files")
+    raw_source = require_string_sequence(scope.get("source_files"), "source_files")
     if len(raw_editable) > MAX_FILES or len(raw_source) > MAX_FILES:
         raise ValueError("authorized file scope exceeds builder limit")
     editable = _unique(raw_editable, MAX_FILES)
@@ -222,7 +213,10 @@ def build_builder_sandbox_request(
     if not editable or not source_files:
         raise ValueError("authorized editable scope is empty")
 
-    raw_requested = list(requested_files) if requested_files is not None else list(editable)
+    if requested_files is None:
+        raw_requested = list(editable)
+    else:
+        raw_requested = require_string_sequence(requested_files, "requested_files")
     if len(raw_requested) > MAX_FILES:
         raise ValueError("builder request exceeds file limit")
     requested = _unique(raw_requested, MAX_FILES)
@@ -251,8 +245,8 @@ def build_builder_sandbox_request(
     )
     if test_contract.get("test_deletion_allowed") is not False or test_contract.get("test_weakening_allowed") is not False:
         raise ValueError("test deletion or weakening must remain forbidden")
-    raw_candidate_tests = list(test_contract.get("candidate_tests") or [])
-    raw_gates = list(test_contract.get("mandatory_gates") or [])
+    raw_candidate_tests = require_string_sequence(test_contract.get("candidate_tests"), "candidate_tests")
+    raw_gates = require_string_sequence(test_contract.get("mandatory_gates"), "mandatory_gates")
     if len(raw_candidate_tests) > 120:
         raise ValueError("candidate tests exceed builder limit")
     if len(raw_gates) > 40:
@@ -261,23 +255,12 @@ def build_builder_sandbox_request(
     mandatory_gates = _unique(raw_gates, 40)
     if not candidate_tests:
         blockers.append("TEST_CANDIDATES_MISSING")
-    if not mandatory_gates:
-        blockers.append("MANDATORY_GATES_MISSING")
-
-    request_seed = {
-        "snapshot_digest": snapshot_digest,
-        "envelope_id": implementation.get("envelope_id"),
-        "authorization_id": auth.get("authorization_id"),
-        "branch": branch_name,
-        "baseline": baseline,
-        "candidate": candidate,
-        "files": requested,
-    }
+    assert_required_mandatory_gates(mandatory_gates)
     state = "READY_FOR_BUILDER_SANDBOX" if not blockers else "BLOCKED"
 
-    return {
+    out = {
         "schema": SCHEMA,
-        "request_id": "DEVBUILD-" + _digest(request_seed),
+        "request_id": "",
         "state": state,
         "lineage": {
             "snapshot_digest": snapshot_digest,
@@ -338,6 +321,9 @@ def build_builder_sandbox_request(
         "real_trading_enabled": False,
         "tool_output_is_authority": False,
     }
+    out["test_contract_manifest_id"] = test_contract_manifest_id(out["test_contract"])
+    out["request_id"] = expected_builder_request_id(out)
+    return out
 
 
 __all__ = [

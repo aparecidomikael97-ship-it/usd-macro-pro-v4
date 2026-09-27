@@ -25,11 +25,14 @@ from atlasquant_aion_developer_intelligence import (
 from atlasquant_aion_developer_package import SCHEMA as PACKAGE_SCHEMA
 from atlasquant_aion_observability import redact_text
 from atlasquant_aion_developer_manifest import (
+    REQUIRED_MANDATORY_GATES,
+    assert_required_mandatory_gates,
     authorization_manifest_id,
     canonical_identity,
     correction_manifest_id,
     implementation_base_manifest_id,
     implementation_readiness_manifest_id,
+    require_string_sequence,
 )
 from atlasquant_aion_workspaces import developer_step_allowed, developer_trust_policy
 
@@ -184,15 +187,7 @@ def build_implementation_envelope(
         if str(tag)
     })
 
-    mandatory_gates = [
-        "TARGETED_TESTS",
-        "RISK_REGRESSION_TESTS",
-        "QUALITY_TESTS",
-        "RELEASE_READINESS",
-        "INDEPENDENT_REVIEW",
-        "INDEPENDENT_BREAKER",
-        "ROLLBACK_REVIEW",
-    ]
+    mandatory_gates = list(REQUIRED_MANDATORY_GATES)
     if _ui_sensitive(editable_scope, risk_tags):
         mandatory_gates.extend(["UI_SMOKE", "MOBILE_DOM"])
 
@@ -336,25 +331,15 @@ def prepare_implementation_readiness(
 
     scope = envelope.get("scope") if isinstance(envelope.get("scope"), Mapping) else {}
     test_contract = envelope.get("test_contract") if isinstance(envelope.get("test_contract"), Mapping) else {}
-    if not list(scope.get("source_files") or []):
+    if not require_string_sequence(scope.get("source_files"), "source_files"):
         raise ValueError("implementation source scope is empty")
-    if not list(test_contract.get("candidate_tests") or []):
+    candidate_tests = require_string_sequence(test_contract.get("candidate_tests"), "candidate_tests")
+    mandatory_gates = require_string_sequence(test_contract.get("mandatory_gates"), "mandatory_gates")
+    if not candidate_tests:
         raise ValueError("implementation test candidates are required")
     if test_contract.get("test_deletion_allowed") is not False or test_contract.get("test_weakening_allowed") is not False:
         raise ValueError("test deletion or weakening must remain forbidden")
-
-    mandatory = {str(x) for x in list(test_contract.get("mandatory_gates") or [])}
-    required = {
-        "TARGETED_TESTS",
-        "RISK_REGRESSION_TESTS",
-        "QUALITY_TESTS",
-        "RELEASE_READINESS",
-        "INDEPENDENT_REVIEW",
-        "INDEPENDENT_BREAKER",
-        "ROLLBACK_REVIEW",
-    }
-    if not required.issubset(mandatory):
-        raise ValueError("mandatory implementation gates are incomplete")
+    assert_required_mandatory_gates(mandatory_gates)
 
     out = deepcopy(dict(envelope))
     out["readiness"] = {
@@ -446,10 +431,13 @@ def approve_implementation_session(
         raise ValueError("readiness evidence required before approval")
 
     test_contract = envelope.get("test_contract") if isinstance(envelope.get("test_contract"), Mapping) else {}
-    if not list(test_contract.get("candidate_tests") or []):
+    candidate_tests = require_string_sequence(test_contract.get("candidate_tests"), "candidate_tests")
+    mandatory_gates = require_string_sequence(test_contract.get("mandatory_gates"), "mandatory_gates")
+    if not candidate_tests:
         raise ValueError("implementation test candidates are required")
     if test_contract.get("test_deletion_allowed") is not False or test_contract.get("test_weakening_allowed") is not False:
         raise ValueError("test deletion or weakening must remain forbidden")
+    assert_required_mandatory_gates(mandatory_gates)
 
     if approved is not True:
         raise ValueError("explicit human implementation approval required")

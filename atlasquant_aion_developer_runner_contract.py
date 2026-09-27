@@ -20,10 +20,16 @@ from typing import Any, Mapping, Sequence
 
 from atlasquant_aion_developer_builder_sandbox import SCHEMA as BUILDER_SCHEMA
 from atlasquant_aion_developer_patch_validation import SCHEMA as PATCH_SCHEMA
+from atlasquant_aion_developer_manifest import (
+    assert_builder_request_lineage,
+    assert_required_mandatory_gates,
+    require_string_sequence,
+)
 from atlasquant_aion_developer_sandbox_preflight import (
     ALLOWED_COMMAND_POLICY,
     SCHEMA as PREFLIGHT_SCHEMA,
     canonical_repository_relative_path,
+    expected_preflight_id,
 )
 from atlasquant_aion_observability import redact_text
 
@@ -121,6 +127,7 @@ def build_runner_contract(
         raise ValueError("builder request unexpectedly authorizes execution")
     if builder_request.get("executor_attached") is not False:
         raise ValueError("builder request unexpectedly has executor")
+    manifest_id = assert_builder_request_lineage(builder_request)
 
     if preflight.get("schema") != PREFLIGHT_SCHEMA:
         raise ValueError("invalid Sandbox Preflight")
@@ -134,6 +141,10 @@ def build_runner_contract(
         raise ValueError("preflight unexpectedly attaches executor")
     if str(preflight.get("builder_request_id") or "") != str(builder_request.get("request_id") or ""):
         raise ValueError("preflight lineage mismatch")
+    if str(preflight.get("test_contract_manifest_id") or "") != manifest_id:
+        raise ValueError("preflight test contract mismatch")
+    if str(preflight.get("preflight_id") or "") != expected_preflight_id(preflight):
+        raise ValueError("preflight id mismatch")
 
     env = (
         preflight.get("environment_contract")
@@ -195,7 +206,7 @@ def build_runner_contract(
         blockers.append("CONTENT_BINDING_REF_REQUIRED")
 
     reviewer = _clean(human_patch_reviewer, 160)
-    raw_review_refs = list(human_patch_review_refs or [])
+    raw_review_refs = require_string_sequence(human_patch_review_refs, "human_patch_review_refs")
     if len(raw_review_refs) > MAX_REVIEW_REFS:
         blockers.append("REVIEW_EVIDENCE_LIMIT_EXCEEDED")
         review_refs: list[str] = []
@@ -213,8 +224,8 @@ def build_runner_contract(
         if isinstance(builder_request.get("test_contract"), Mapping)
         else {}
     )
-    raw_tests = list(test_contract.get("candidate_tests") or [])
-    raw_gates = list(test_contract.get("mandatory_gates") or [])
+    raw_tests = require_string_sequence(test_contract.get("candidate_tests"), "candidate_tests")
+    raw_gates = require_string_sequence(test_contract.get("mandatory_gates"), "mandatory_gates")
     authorized = _authorized_files(builder_request)
     tests: list[str] = []
     if len(raw_tests) > MAX_TEST_TARGETS:
@@ -233,6 +244,7 @@ def build_runner_contract(
     if len(raw_gates) > MAX_MANDATORY_GATES:
         blockers.append("MANDATORY_GATE_LIMIT_EXCEEDED")
     else:
+        assert_required_mandatory_gates(raw_gates)
         gates = _unique(raw_gates, MAX_MANDATORY_GATES)
         if not gates:
             blockers.append("MANDATORY_GATES_REQUIRED")

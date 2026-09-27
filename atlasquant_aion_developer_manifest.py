@@ -190,6 +190,97 @@ def authorization_manifest_id(envelope: Mapping[str,Any], authorization: Mapping
     },prefix="DEVAUTH-",length=18)
 
 
+REQUIRED_MANDATORY_GATES = (
+    "TARGETED_TESTS",
+    "RISK_REGRESSION_TESTS",
+    "QUALITY_TESTS",
+    "RELEASE_READINESS",
+    "INDEPENDENT_REVIEW",
+    "INDEPENDENT_BREAKER",
+    "ROLLBACK_REVIEW",
+)
+
+
+def require_string_sequence(value: Any, field: str) -> list[str]:
+    """Require an explicit list or tuple of strings.
+
+    A bare string is a sequence of characters and must not be accepted as
+    evidence, a gate list, or a file list. Mappings and scalars are rejected
+    as well, including when the field is required and the value is missing.
+    """
+    if isinstance(value, (str, bytes, bytearray)) or not isinstance(value, (list, tuple)):
+        raise ValueError(f"{field} must be an explicit list or tuple of strings")
+    out: list[str] = []
+    for item in value:
+        if not isinstance(item, str) or isinstance(item, (bytes, bytearray)):
+            raise ValueError(f"{field} contains a non-string element")
+        if not item or item != item.strip() or any(unicodedata.category(char) == "Cc" for char in item):
+            raise ValueError(f"{field} contains an invalid string element")
+        out.append(item)
+    return out
+
+
+def assert_required_mandatory_gates(gates: Sequence[str]) -> None:
+    present = set(gates)
+    if any(gate not in present for gate in REQUIRED_MANDATORY_GATES):
+        raise ValueError("mandatory gates are incomplete")
+
+
+def test_contract_manifest_id(contract: Mapping[str, Any]) -> str:
+    """Digest the test contract fields that authorize later runner targets."""
+    if not isinstance(contract, Mapping):
+        raise ValueError("test contract must be an object")
+    if contract.get("test_deletion_allowed") is not False or contract.get("test_weakening_allowed") is not False:
+        raise ValueError("test deletion or weakening must remain forbidden")
+    binding = {
+        "candidate_tests": require_string_sequence(contract.get("candidate_tests"), "candidate_tests"),
+        "mandatory_gates": require_string_sequence(contract.get("mandatory_gates"), "mandatory_gates"),
+        "test_deletion_allowed": False,
+        "test_weakening_allowed": False,
+    }
+    return stable_digest(binding, prefix="DEVTEST-", length=18)
+
+
+def expected_builder_request_id(request: Mapping[str, Any]) -> str:
+    """Recompute the builder request id from lineage, scope and test contract."""
+    lineage = request.get("lineage") if isinstance(request.get("lineage"), Mapping) else {}
+    branch = request.get("branch_contract") if isinstance(request.get("branch_contract"), Mapping) else {}
+    scope = request.get("scope") if isinstance(request.get("scope"), Mapping) else {}
+    contract = request.get("test_contract") if isinstance(request.get("test_contract"), Mapping) else {}
+    seed = {
+        "snapshot_digest": str(lineage.get("snapshot_digest") or ""),
+        "envelope_id": str(lineage.get("implementation_envelope_id") or ""),
+        "authorization_id": str(lineage.get("implementation_authorization_id") or ""),
+        "branch": str(branch.get("branch") or ""),
+        "baseline": str(branch.get("baseline_ref") or ""),
+        "candidate": str(branch.get("candidate_ref") or ""),
+        "files": require_string_sequence(scope.get("requested_files"), "requested_files"),
+        "authorized_files": require_string_sequence(scope.get("authorized_files"), "authorized_files"),
+        "test_contract_manifest_id": test_contract_manifest_id(contract),
+    }
+    return "DEVBUILD-" + stable_digest(seed, length=18)
+
+
+def assert_builder_request_lineage(request: Mapping[str, Any]) -> str:
+    """Fail closed when the stored ids no longer match the test contract."""
+    contract = request.get("test_contract") if isinstance(request.get("test_contract"), Mapping) else {}
+    manifest = test_contract_manifest_id(contract)
+    if str(request.get("test_contract_manifest_id") or "") != manifest:
+        raise ValueError("test contract manifest mismatch")
+    if str(request.get("request_id") or "") != expected_builder_request_id(request):
+        raise ValueError("builder request lineage mismatch")
+    return manifest
+
+
+def bind_builder_request_lineage(request: Mapping[str, Any]) -> dict[str, Any]:
+    """Return a copy whose manifest and request id match the current contract."""
+    out = dict(request)
+    contract = out.get("test_contract") if isinstance(out.get("test_contract"), Mapping) else {}
+    out["test_contract_manifest_id"] = test_contract_manifest_id(contract)
+    out["request_id"] = expected_builder_request_id(out)
+    return out
+
+
 def release_sensitive_path(path: Any) -> bool:
     value=clean(path,500).replace("\\","/").lower()
     parts=[part for part in value.split("/") if part]
@@ -212,5 +303,9 @@ __all__=[
     "validate_candidate_ref","snapshot_digest_from_rows",
     "validate_snapshot_integrity","correction_manifest_id",
     "implementation_base_manifest_id","implementation_readiness_manifest_id",
-    "authorization_manifest_id","release_sensitive_path",
+    "authorization_manifest_id","REQUIRED_MANDATORY_GATES",
+    "require_string_sequence","assert_required_mandatory_gates",
+    "test_contract_manifest_id","expected_builder_request_id",
+    "assert_builder_request_lineage","bind_builder_request_lineage",
+    "release_sensitive_path",
 ]

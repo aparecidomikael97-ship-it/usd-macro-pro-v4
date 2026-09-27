@@ -3,6 +3,10 @@ from __future__ import annotations
 from copy import deepcopy
 import unittest
 
+from atlasquant_aion_developer_manifest import (
+    REQUIRED_MANDATORY_GATES,
+    bind_builder_request_lineage,
+)
 from atlasquant_aion_developer_sandbox_preflight import (
     ALLOWED_COMMAND_POLICY,
     SCHEMA,
@@ -11,10 +15,14 @@ from atlasquant_aion_developer_sandbox_preflight import (
 
 
 def _request():
-    return {
+    return bind_builder_request_lineage({
         "schema": "ATLASQUANT_AION_DEVELOPER_BUILDER_SANDBOX_REQUEST_V1",
-        "request_id": "DEVBUILD-ABC",
         "state": "READY_FOR_BUILDER_SANDBOX",
+        "lineage": {
+            "snapshot_digest": "REPO-FIXTURE",
+            "implementation_envelope_id": "DEVIMPL-FIXTURE",
+            "implementation_authorization_id": "DEVAUTH-FIXTURE",
+        },
         "branch_contract": {
             "branch": "cursor/sandbox",
             "baseline_ref": "main@a",
@@ -34,7 +42,7 @@ def _request():
         },
         "test_contract": {
             "candidate_tests": ["test_module.py"],
-            "mandatory_gates": ["QUALITY_TESTS", "RELEASE_READINESS"],
+            "mandatory_gates": list(REQUIRED_MANDATORY_GATES),
             "test_deletion_allowed": False,
             "test_weakening_allowed": False,
             "tests_executed": False,
@@ -43,7 +51,7 @@ def _request():
         "execution_authorized": False,
         "executor_attached": False,
         "writes_files": False,
-    }
+    })
 
 
 def _preflight(request=None, **overrides):

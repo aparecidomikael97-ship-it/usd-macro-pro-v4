@@ -6,46 +6,71 @@ import json
 import unittest
 
 from atlasquant_aion_developer_command_policy import build_command_policy_contract
+from atlasquant_aion_developer_manifest import (
+    REQUIRED_MANDATORY_GATES,
+    bind_builder_request_lineage,
+)
 from atlasquant_aion_developer_patch_validation import validate_patch
 from atlasquant_aion_developer_runner_contract import (
     MAX_MANDATORY_GATES,
     MAX_TEST_TARGETS,
     build_runner_contract,
 )
-from atlasquant_aion_developer_sandbox_preflight import build_sandbox_preflight
+from atlasquant_aion_developer_sandbox_preflight import (
+    build_sandbox_preflight,
+    expected_preflight_id,
+)
 
 
 def _builder(tests, gates=None):
-    return {
+    return bind_builder_request_lineage({
         "schema": "ATLASQUANT_AION_DEVELOPER_BUILDER_SANDBOX_REQUEST_V1",
-        "request_id": "DEVBUILD-1",
         "state": "READY_FOR_BUILDER_SANDBOX",
+        "lineage": {
+            "snapshot_digest": "REPO-FIXTURE",
+            "implementation_envelope_id": "DEVIMPL-FIXTURE",
+            "implementation_authorization_id": "DEVAUTH-FIXTURE",
+        },
         "branch_contract": {
+            "branch": "cursor/fix",
             "baseline_ref": "main@aaa",
             "candidate_ref": "cursor/fix@bbb",
+            "candidate_bound_to_branch": True,
+            "main_branch_allowed": False,
+            "force_push_allowed": False,
+            "history_rewrite_allowed": False,
         },
         "scope": {
             "requested_files": ["test_module.py"],
             "authorized_files": ["test_module.py"],
+            "scope_expansion_allowed": False,
+            "new_file_allowed": False,
+            "delete_file_allowed": False,
+            "rename_file_allowed": False,
         },
         "test_contract": {
             "candidate_tests": list(tests),
-            "mandatory_gates": list(gates or ["QUALITY_TESTS", "RELEASE_READINESS"]),
+            "mandatory_gates": list(gates) if gates is not None else list(REQUIRED_MANDATORY_GATES),
+            "test_deletion_allowed": False,
+            "test_weakening_allowed": False,
         },
         "blockers": [],
         "execution_authorized": False,
         "executor_attached": False,
-    }
+        "writes_files": False,
+    })
 
 
-def _preflight_doc():
-    return {
+def _preflight_doc(builder):
+    preflight = {
         "schema": "ATLASQUANT_AION_DEVELOPER_SANDBOX_PREFLIGHT_V1",
-        "preflight_id": "DEVPREF-1",
         "state": "READY_FOR_EXECUTOR_DESIGN_REVIEW",
-        "builder_request_id": "DEVBUILD-1",
+        "builder_request_id": builder["request_id"],
+        "test_contract_manifest_id": builder["test_contract_manifest_id"],
         "preflight_passed": True,
         "environment_contract": {
+            "environment_kind": "ISOLATED_WORKTREE",
+            "environment_id": "sandbox-001",
             "isolated_worktree": True,
             "repository_root_bound": True,
             "network_disabled": True,
@@ -58,18 +83,21 @@ def _preflight_doc():
             "output_bytes": 2_000_000,
             "max_commands": 24,
         },
+        "scope": {"requested_files": ["test_module.py"]},
         "execution_authorized": False,
         "executor_attached": False,
     }
+    preflight["preflight_id"] = expected_preflight_id(preflight)
+    return preflight
 
 
-def _patch_doc():
+def _patch_doc(builder, preflight):
     return {
         "schema": "ATLASQUANT_AION_DEVELOPER_PATCH_VALIDATION_V1",
         "validation_id": "DEVPATCHVAL-1",
         "state": "READY_FOR_PATCH_REVIEW",
-        "builder_request_id": "DEVBUILD-1",
-        "preflight_id": "DEVPREF-1",
+        "builder_request_id": builder["request_id"],
+        "preflight_id": preflight["preflight_id"],
         "patch_digest": "DEVPATCH-ABC",
         "revision_binding": {
             "baseline_ref": "main@aaa",
@@ -85,10 +113,12 @@ def _patch_doc():
 
 
 def _runner(tests, gates=None):
+    builder = _builder(tests, gates)
+    preflight = _preflight_doc(builder)
     return build_runner_contract(
-        _builder(tests, gates),
-        _preflight_doc(),
-        _patch_doc(),
+        builder,
+        preflight,
+        _patch_doc(builder, preflight),
         content_binding_verified=True,
         content_binding_ref="tree:123",
         human_patch_reviewed=True,
@@ -98,10 +128,14 @@ def _runner(tests, gates=None):
 
 
 def _preflight_request(path):
-    return {
+    return bind_builder_request_lineage({
         "schema": "ATLASQUANT_AION_DEVELOPER_BUILDER_SANDBOX_REQUEST_V1",
-        "request_id": "DEVBUILD-ABC",
         "state": "READY_FOR_BUILDER_SANDBOX",
+        "lineage": {
+            "snapshot_digest": "REPO-FIXTURE",
+            "implementation_envelope_id": "DEVIMPL-FIXTURE",
+            "implementation_authorization_id": "DEVAUTH-FIXTURE",
+        },
         "branch_contract": {
             "branch": "cursor/sandbox",
             "baseline_ref": "main@a",
@@ -121,7 +155,7 @@ def _preflight_request(path):
         },
         "test_contract": {
             "candidate_tests": ["test_module.py"],
-            "mandatory_gates": ["QUALITY_TESTS"],
+            "mandatory_gates": list(REQUIRED_MANDATORY_GATES),
             "test_deletion_allowed": False,
             "test_weakening_allowed": False,
         },
@@ -129,7 +163,7 @@ def _preflight_request(path):
         "execution_authorized": False,
         "executor_attached": False,
         "writes_files": False,
-    }
+    })
 
 
 def _call_preflight(path):

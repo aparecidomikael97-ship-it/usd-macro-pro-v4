@@ -33,6 +33,8 @@ from atlasquant_aion_developer_intelligence import (
     scan_repository,
 )
 from atlasquant_aion_developer_manifest import (
+    REQUIRED_MANDATORY_GATES,
+    bind_builder_request_lineage,
     canonical_identity,
     implementation_base_manifest_id,
     implementation_readiness_manifest_id,
@@ -46,7 +48,10 @@ from atlasquant_aion_developer_runner_contract import (
     MAX_TEST_TARGETS,
     build_runner_contract,
 )
-from atlasquant_aion_developer_sandbox_preflight import build_sandbox_preflight
+from atlasquant_aion_developer_sandbox_preflight import (
+    build_sandbox_preflight,
+    expected_preflight_id,
+)
 
 SCHEMA = "ATLASQUANT_AION_DEVELOPER_ADVERSARIAL_AUDIT_V1"
 CLASSIFICATIONS = ("PASS", "GAP", "BLOCKED_BY_DESIGN")
@@ -1246,34 +1251,55 @@ def _residual_surface(world: _World) -> list[dict[str, str]]:
     return findings
 
 
-def _runner_probe(tests, gates=None):
-    builder = {
+def _sealed_runner_request(tests, gates=None):
+    return bind_builder_request_lineage({
         "schema": "ATLASQUANT_AION_DEVELOPER_BUILDER_SANDBOX_REQUEST_V1",
-        "request_id": "DEVBUILD-1",
         "state": "READY_FOR_BUILDER_SANDBOX",
+        "lineage": {
+            "snapshot_digest": "REPO-FIXTURE",
+            "implementation_envelope_id": "DEVIMPL-FIXTURE",
+            "implementation_authorization_id": "DEVAUTH-FIXTURE",
+        },
         "branch_contract": {
+            "branch": "cursor/fix",
             "baseline_ref": "main@aaa",
             "candidate_ref": "cursor/fix@bbb",
+            "candidate_bound_to_branch": True,
+            "main_branch_allowed": False,
+            "force_push_allowed": False,
+            "history_rewrite_allowed": False,
         },
         "scope": {
             "requested_files": ["test_module.py"],
             "authorized_files": ["test_module.py"],
+            "scope_expansion_allowed": False,
+            "new_file_allowed": False,
+            "delete_file_allowed": False,
+            "rename_file_allowed": False,
         },
         "test_contract": {
             "candidate_tests": list(tests),
-            "mandatory_gates": list(gates or ["QUALITY_TESTS"]),
+            "mandatory_gates": list(gates) if gates is not None else list(REQUIRED_MANDATORY_GATES),
+            "test_deletion_allowed": False,
+            "test_weakening_allowed": False,
         },
         "blockers": [],
         "execution_authorized": False,
         "executor_attached": False,
-    }
+        "writes_files": False,
+    })
+
+
+def _sealed_preflight(builder):
     preflight = {
         "schema": "ATLASQUANT_AION_DEVELOPER_SANDBOX_PREFLIGHT_V1",
-        "preflight_id": "DEVPREF-1",
         "state": "READY_FOR_EXECUTOR_DESIGN_REVIEW",
-        "builder_request_id": "DEVBUILD-1",
+        "builder_request_id": builder["request_id"],
+        "test_contract_manifest_id": builder["test_contract_manifest_id"],
         "preflight_passed": True,
         "environment_contract": {
+            "environment_kind": "ISOLATED_WORKTREE",
+            "environment_id": "sandbox-001",
             "isolated_worktree": True,
             "repository_root_bound": True,
             "network_disabled": True,
@@ -1286,15 +1312,23 @@ def _runner_probe(tests, gates=None):
             "output_bytes": 2_000_000,
             "max_commands": 24,
         },
+        "scope": {"requested_files": list(builder.get("scope", {}).get("requested_files") or [])},
         "execution_authorized": False,
         "executor_attached": False,
     }
+    preflight["preflight_id"] = expected_preflight_id(preflight)
+    return preflight
+
+
+def _runner_probe(tests, gates=None):
+    builder = _sealed_runner_request(tests, gates)
+    preflight = _sealed_preflight(builder)
     patch = {
         "schema": "ATLASQUANT_AION_DEVELOPER_PATCH_VALIDATION_V1",
         "validation_id": "DEVPATCHVAL-1",
         "state": "READY_FOR_PATCH_REVIEW",
-        "builder_request_id": "DEVBUILD-1",
-        "preflight_id": "DEVPREF-1",
+        "builder_request_id": builder["request_id"],
+        "preflight_id": preflight["preflight_id"],
         "patch_digest": "DEVPATCH-ABC",
         "revision_binding": {
             "baseline_ref": "main@aaa",
@@ -1483,11 +1517,18 @@ def _contract_gap_surface(_world: _World) -> list[dict[str, str]]:
     accepted_paths = []
     for path in dangerous_paths:
         status, _result = _invoke(lambda path=path: build_sandbox_preflight(
-            {
+            bind_builder_request_lineage({
                 "schema": "ATLASQUANT_AION_DEVELOPER_BUILDER_SANDBOX_REQUEST_V1",
-                "request_id": "DEVBUILD-ABC",
                 "state": "READY_FOR_BUILDER_SANDBOX",
+                "lineage": {
+                    "snapshot_digest": "REPO-FIXTURE",
+                    "implementation_envelope_id": "DEVIMPL-FIXTURE",
+                    "implementation_authorization_id": "DEVAUTH-FIXTURE",
+                },
                 "branch_contract": {
+                    "branch": "cursor/sandbox",
+                    "baseline_ref": "main@a",
+                    "candidate_ref": "cursor/sandbox@b",
                     "candidate_bound_to_branch": True,
                     "main_branch_allowed": False,
                     "force_push_allowed": False,
@@ -1503,7 +1544,7 @@ def _contract_gap_surface(_world: _World) -> list[dict[str, str]]:
                 },
                 "test_contract": {
                     "candidate_tests": ["test_module.py"],
-                    "mandatory_gates": ["QUALITY_TESTS"],
+                    "mandatory_gates": list(REQUIRED_MANDATORY_GATES),
                     "test_deletion_allowed": False,
                     "test_weakening_allowed": False,
                 },
@@ -1511,7 +1552,7 @@ def _contract_gap_surface(_world: _World) -> list[dict[str, str]]:
                 "execution_authorized": False,
                 "executor_attached": False,
                 "writes_files": False,
-            },
+            }),
             environment_kind="ISOLATED_WORKTREE",
             environment_id="sandbox-001",
             isolated_worktree=True,
@@ -1684,6 +1725,223 @@ def _contract_gap_surface(_world: _World) -> list[dict[str, str]]:
     return findings
 
 
+def _preflight_call(request: Mapping[str, Any]) -> dict[str, Any]:
+    return build_sandbox_preflight(
+        request,
+        environment_kind="ISOLATED_WORKTREE",
+        environment_id="sandbox-001",
+        isolated_worktree=True,
+        repository_root_bound=True,
+        network_disabled=True,
+        secrets_mounted=False,
+        command_policy="ALLOWLIST_ONLY",
+    )
+
+
+def _runner_from_pair(request: Mapping[str, Any], preflight: Mapping[str, Any], **overrides: Any) -> dict[str, Any]:
+    branch = request.get("branch_contract") if isinstance(request.get("branch_contract"), Mapping) else {}
+    patch = {
+        "schema": "ATLASQUANT_AION_DEVELOPER_PATCH_VALIDATION_V1",
+        "validation_id": "DEVPATCHVAL-1",
+        "state": "READY_FOR_PATCH_REVIEW",
+        "builder_request_id": request.get("request_id"),
+        "preflight_id": preflight.get("preflight_id"),
+        "patch_digest": "DEVPATCH-ABC",
+        "revision_binding": {
+            "baseline_ref": branch.get("baseline_ref"),
+            "candidate_ref": branch.get("candidate_ref"),
+            "refs_match_approved_request": True,
+            "revision_content_verified": True,
+        },
+        "blockers": [],
+        "patch_applied": False,
+        "execution_authorized": False,
+        "executor_attached": False,
+    }
+    args = {
+        "content_binding_verified": True,
+        "content_binding_ref": "tree:123",
+        "human_patch_reviewed": True,
+        "human_patch_reviewer": "reviewer-independent",
+        "human_patch_review_refs": ["review:patch:1"],
+    }
+    args.update(overrides)
+    return build_runner_contract(request, preflight, patch, **args)
+
+
+def _test_contract_integrity_surface(world: _World) -> list[dict[str, str]]:
+    """Bind candidate tests and mandatory gates to request_id and preflight_id."""
+    findings: list[dict[str, str]] = []
+    try:
+        request = build_builder_sandbox_request(
+            world.snapshot,
+            world.approved,
+            branch="cursor/admin-fix",
+            baseline_ref="base@a",
+            candidate_ref="cursor/admin-fix@b",
+        )
+        preflight = _preflight_call(request)
+        runner = _runner_from_pair(request, preflight)
+        ready = (
+            request.get("state") == "READY_FOR_BUILDER_SANDBOX"
+            and preflight.get("state") == "READY_FOR_EXECUTOR_DESIGN_REVIEW"
+            and runner.get("state") == "READY_FOR_RUNNER_DESIGN_REVIEW"
+            and bool(request.get("test_contract_manifest_id"))
+            and request.get("execution_authorized") is False
+            and preflight.get("execution_authorized") is False
+            and runner.get("execution_authorized") is False
+            and runner.get("commands_executed") is False
+            and runner.get("runs_tests") is False
+            and runner.get("subprocess_called") is False
+            and runner.get("network_called") is False
+        )
+    except (TypeError, ValueError):
+        request = {}
+        preflight = {}
+        ready = False
+
+    def _both_reject(candidate: Mapping[str, Any], baseline: Mapping[str, Any]) -> bool:
+        pre_status, _pre_result = _invoke(lambda: _preflight_call(candidate))
+        run_status, _run_result = _invoke(lambda: _runner_from_pair(candidate, baseline))
+        return pre_status == "REJECT" and run_status == "REJECT"
+
+    def _record(invariant_id: str, module: str, description: str, closed: bool) -> None:
+        findings.append(_finding(
+            invariant_id,
+            module,
+            description if closed else description + " A cadeia aceitou o contrato adulterado.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    mutated_tests = deepcopy(request) if ready else {}
+    if ready:
+        contract = deepcopy(mutated_tests["test_contract"])
+        contract["candidate_tests"] = list(contract["candidate_tests"]) + [
+            str(contract["candidate_tests"][0]) + "::lineage_probe"
+        ]
+        mutated_tests["test_contract"] = contract
+    _record(
+        "test_contract.candidate_tests_mutated_after_request_id",
+        "atlasquant_aion_developer_sandbox_preflight",
+        "Trocar candidate_tests e manter request_id faz Preflight e Runner rejeitarem.",
+        ready and _both_reject(mutated_tests, preflight),
+    )
+
+    mutated_gates = deepcopy(request) if ready else {}
+    if ready:
+        contract = deepcopy(mutated_gates["test_contract"])
+        contract["mandatory_gates"] = list(contract["mandatory_gates"]) + ["UI_SMOKE"]
+        mutated_gates["test_contract"] = contract
+    _record(
+        "test_contract.mandatory_gates_mutated_after_request_id",
+        "atlasquant_aion_developer_sandbox_preflight",
+        "Trocar mandatory_gates e manter request_id faz Preflight e Runner rejeitarem.",
+        ready and _both_reject(mutated_gates, preflight),
+    )
+
+    removed = deepcopy(request) if ready else {}
+    if ready:
+        contract = deepcopy(removed["test_contract"])
+        contract["mandatory_gates"] = [
+            gate for gate in contract["mandatory_gates"] if gate != "ROLLBACK_REVIEW"
+        ]
+        removed["test_contract"] = contract
+        removed = bind_builder_request_lineage(removed)
+    removed_preflight = _sealed_preflight(removed) if ready else {}
+    _record(
+        "test_contract.required_gate_removed",
+        "atlasquant_aion_developer_sandbox_preflight",
+        "Remover um gate obrigatorio depois da autorizacao falha fechado.",
+        ready and _both_reject(removed, removed_preflight),
+    )
+
+    arbitrary = deepcopy(request) if ready else {}
+    if ready:
+        contract = deepcopy(arbitrary["test_contract"])
+        contract["mandatory_gates"] = ["ANYTHING"]
+        arbitrary["test_contract"] = contract
+        arbitrary = bind_builder_request_lineage(arbitrary)
+    arbitrary_preflight = _sealed_preflight(arbitrary) if ready else {}
+    _record(
+        "test_contract.arbitrary_gate",
+        "atlasquant_aion_developer_sandbox_preflight",
+        "Um gate arbitrario nao satisfaz o conjunto obrigatorio.",
+        ready and _both_reject(arbitrary, arbitrary_preflight),
+    )
+
+    as_string = deepcopy(request) if ready else {}
+    if ready:
+        contract = deepcopy(as_string["test_contract"])
+        contract["candidate_tests"] = "test_module.py"
+        as_string["test_contract"] = contract
+    _record(
+        "test_contract.candidate_tests_string",
+        "atlasquant_aion_developer_builder_sandbox",
+        "candidate_tests string nao vira lista de caracteres.",
+        ready and _both_reject(as_string, preflight),
+    )
+
+    gates_string = deepcopy(request) if ready else {}
+    if ready:
+        contract = deepcopy(gates_string["test_contract"])
+        contract["mandatory_gates"] = "QUALITY_TESTS"
+        gates_string["test_contract"] = contract
+    _record(
+        "test_contract.mandatory_gates_string",
+        "atlasquant_aion_developer_builder_sandbox",
+        "mandatory_gates string nao vira lista de caracteres.",
+        ready and _both_reject(gates_string, preflight),
+    )
+
+    review_status = "REJECT"
+    if ready:
+        review_status, _review_result = _invoke(
+            lambda: _runner_from_pair(request, preflight, human_patch_review_refs="review:1")
+        )
+    _record(
+        "test_contract.review_refs_string",
+        "atlasquant_aion_developer_runner_contract",
+        "human_patch_review_refs string nao conta como evidencia.",
+        ready and review_status == "REJECT",
+    )
+
+    element_closed = False
+    if ready:
+        samples = []
+        tests_bad = deepcopy(request)
+        tests_bad["test_contract"] = deepcopy(tests_bad["test_contract"])
+        tests_bad["test_contract"]["candidate_tests"] = list(tests_bad["test_contract"]["candidate_tests"]) + [1]
+        samples.append(tests_bad)
+        gates_bad = deepcopy(request)
+        gates_bad["test_contract"] = deepcopy(gates_bad["test_contract"])
+        gates_bad["test_contract"]["mandatory_gates"] = list(gates_bad["test_contract"]["mandatory_gates"]) + [None]
+        samples.append(gates_bad)
+        files_bad = deepcopy(request)
+        files_bad["scope"] = deepcopy(files_bad["scope"])
+        files_bad["scope"]["requested_files"] = list(files_bad["scope"]["requested_files"]) + [True]
+        samples.append(files_bad)
+        authorized_bad = deepcopy(request)
+        authorized_bad["scope"] = deepcopy(authorized_bad["scope"])
+        authorized_bad["scope"]["authorized_files"] = list(authorized_bad["scope"]["authorized_files"]) + [1.5]
+        samples.append(authorized_bad)
+        review_elements, _ignored = _invoke(
+            lambda: _runner_from_pair(
+                request,
+                preflight,
+                human_patch_review_refs=["review:patch:1", {"ref": 1}],
+            )
+        )
+        element_closed = all(_both_reject(sample, preflight) for sample in samples) and review_elements == "REJECT"
+    _record(
+        "test_contract.non_string_elements",
+        "atlasquant_aion_developer_runner_contract",
+        "Elemento nao-string dentro das colecoes de seguranca e rejeitado.",
+        element_closed,
+    )
+    return findings
+
+
 def audit_developer_chain() -> dict[str, Any]:
     """Inspect the local Developer contracts and return a deterministic report."""
     world = _World()
@@ -1700,6 +1958,7 @@ def audit_developer_chain() -> dict[str, Any]:
         findings.extend(_secrets_and_limits(world))
         findings.extend(_residual_surface(world))
         findings.extend(_contract_gap_surface(world))
+        findings.extend(_test_contract_integrity_surface(world))
     finally:
         world.close()
 
