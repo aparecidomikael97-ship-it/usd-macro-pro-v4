@@ -262,6 +262,91 @@ def build_implementation_envelope(
     }
 
 
+def prepare_implementation_readiness(
+    envelope: Mapping[str, Any],
+    *,
+    rollback_plan: Any,
+    builder_actor: Any,
+    reviewer_actor: Any,
+    breaker_actor: Any,
+    readiness_refs: Sequence[Any] | None,
+) -> dict[str, Any]:
+    """Record readiness prerequisites in-session; never execute implementation."""
+    if envelope.get("schema") != SCHEMA:
+        raise ValueError("invalid implementation envelope")
+    if str(envelope.get("state") or "") != "WAITING_HUMAN_IMPLEMENTATION_APPROVAL":
+        raise ValueError("implementation envelope is not awaiting readiness")
+
+    rollback = _clean(rollback_plan, 2400)
+    builder = _clean(builder_actor, 160)
+    reviewer = _clean(reviewer_actor, 160)
+    breaker = _clean(breaker_actor, 160)
+    refs = _list(readiness_refs, 40)
+
+    if not rollback:
+        raise ValueError("change-specific rollback plan required")
+    if not builder or not reviewer or not breaker:
+        raise ValueError("builder, reviewer and breaker identities are required")
+    if len({builder, reviewer, breaker}) != 3:
+        raise ValueError("builder, reviewer and breaker must be independent actors")
+    if not refs:
+        raise ValueError("implementation readiness evidence required")
+
+    scope = envelope.get("scope") if isinstance(envelope.get("scope"), Mapping) else {}
+    test_contract = envelope.get("test_contract") if isinstance(envelope.get("test_contract"), Mapping) else {}
+    if not list(scope.get("source_files") or []):
+        raise ValueError("implementation source scope is empty")
+    if not list(test_contract.get("candidate_tests") or []):
+        raise ValueError("implementation test candidates are required")
+
+    mandatory = {str(x) for x in list(test_contract.get("mandatory_gates") or [])}
+    required = {
+        "TARGETED_TESTS",
+        "RISK_REGRESSION_TESTS",
+        "QUALITY_TESTS",
+        "RELEASE_READINESS",
+        "INDEPENDENT_REVIEW",
+        "INDEPENDENT_BREAKER",
+        "ROLLBACK_REVIEW",
+    }
+    if not required.issubset(mandatory):
+        raise ValueError("mandatory implementation gates are incomplete")
+
+    out = deepcopy(dict(envelope))
+    out["readiness"] = {
+        "builder_actor": builder,
+        "reviewer_actor": reviewer,
+        "breaker_actor": breaker,
+        "roles_independent": True,
+        "readiness_refs": refs,
+        "scope_reviewed": True,
+        "tests_selected": True,
+        "rollback_recorded": True,
+    }
+    rollback_contract = deepcopy(dict(out.get("rollback_contract") or {}))
+    rollback_contract["recorded_for_this_change"] = True
+    rollback_contract["change_specific_plan"] = rollback
+    out["rollback_contract"] = rollback_contract
+    out["state"] = "READY_FOR_HUMAN_IMPLEMENTATION_APPROVAL"
+    out["implementation_authorized"] = False
+    out["execution_authorized"] = False
+    out["analysis_only"] = True
+    out["persists_checkpoint"] = False
+    out["executes_repository_code"] = False
+    out["runs_tests"] = False
+    out["writes_files"] = False
+    out["network_called"] = False
+    out["subprocess_called"] = False
+    out["automatic_edit"] = False
+    out["automatic_commit"] = False
+    out["automatic_merge"] = False
+    out["automatic_deploy"] = False
+    out["production_change_allowed"] = False
+    out["real_trading_enabled"] = False
+    out["tool_output_is_authority"] = False
+    return out
+
+
 def approve_implementation_session(
     envelope: Mapping[str, Any],
     *,
@@ -272,10 +357,28 @@ def approve_implementation_session(
     """Record session-only level-2 approval; still do not execute implementation."""
     if envelope.get("schema") != SCHEMA:
         raise ValueError("invalid implementation envelope")
-    if str(envelope.get("state") or "") != "WAITING_HUMAN_IMPLEMENTATION_APPROVAL":
-        raise ValueError("implementation envelope is not awaiting approval")
+    if str(envelope.get("state") or "") != "READY_FOR_HUMAN_IMPLEMENTATION_APPROVAL":
+        raise ValueError("implementation envelope is not ready for approval")
     if int(envelope.get("requested_trust_level") or -1) != REQUESTED_TRUST_LEVEL:
         raise ValueError("unexpected requested developer trust level")
+    readiness = envelope.get("readiness") if isinstance(envelope.get("readiness"), Mapping) else {}
+    rollback_contract = envelope.get("rollback_contract") if isinstance(envelope.get("rollback_contract"), Mapping) else {}
+    actors = [
+        str(readiness.get("builder_actor") or ""),
+        str(readiness.get("reviewer_actor") or ""),
+        str(readiness.get("breaker_actor") or ""),
+    ]
+    if readiness.get("roles_independent") is not True:
+        raise ValueError("independent developer roles required")
+    if any(not actor_name for actor_name in actors) or len(set(actors)) != 3:
+        raise ValueError("builder, reviewer and breaker are not independent")
+    if rollback_contract.get("recorded_for_this_change") is not True:
+        raise ValueError("change-specific rollback must be recorded")
+    if not str(rollback_contract.get("change_specific_plan") or ""):
+        raise ValueError("change-specific rollback plan is empty")
+    if not list(readiness.get("readiness_refs") or []):
+        raise ValueError("readiness evidence required before approval")
+
     if approved is not True:
         raise ValueError("explicit human implementation approval required")
 
@@ -306,6 +409,10 @@ def approve_implementation_session(
         "deploy_allowed": False,
         "production_allowed": False,
         "real_trading_allowed": False,
+        "builder_actor": actors[0],
+        "reviewer_actor": actors[1],
+        "breaker_actor": actors[2],
+        "rollback_recorded": True,
     }
     out["state"] = "IMPLEMENTATION_AUTHORIZED_SESSION_ONLY"
     out["implementation_authorized"] = True
@@ -332,5 +439,6 @@ __all__ = [
     "AUTH_SCHEMA",
     "REQUESTED_TRUST_LEVEL",
     "build_implementation_envelope",
+    "prepare_implementation_readiness",
     "approve_implementation_session",
 ]

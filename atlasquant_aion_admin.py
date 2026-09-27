@@ -272,6 +272,7 @@ from atlasquant_aion_developer_evidence_gate import (
 from atlasquant_aion_developer_implementation import (
     approve_implementation_session as approve_developer_implementation,
     build_implementation_envelope as build_developer_implementation_envelope,
+    prepare_implementation_readiness as prepare_developer_implementation_readiness,
 )
 from atlasquant_aion_release_confidence import (
     DIMENSIONS as RELEASE_CONFIDENCE_DIMENSIONS,
@@ -5182,6 +5183,48 @@ def _render_developer_intelligence() -> None:
             st.markdown(f"- {item}")
 
     if implementation.get("state") == "WAITING_HUMAN_IMPLEMENTATION_APPROVAL":
+        with st.expander("Prontidão da implementação · rollback e papéis", expanded=False):
+            rollback_plan = st.text_area(
+                "Rollback específico desta mudança",
+                key="aion_developer_implementation_rollback",
+                max_chars=2400,
+            )
+            r1,r2,r3 = st.columns(3)
+            with r1:
+                builder_actor = st.text_input("Builder", key="aion_developer_implementation_builder", max_chars=160)
+            with r2:
+                reviewer_actor = st.text_input("Reviewer independente", key="aion_developer_implementation_reviewer", max_chars=160)
+            with r3:
+                breaker_actor = st.text_input("Breaker independente", key="aion_developer_implementation_breaker", max_chars=160)
+            readiness_refs_text = st.text_area(
+                "Evidências de prontidão — uma por linha",
+                key="aion_developer_implementation_readiness_refs",
+                max_chars=4000,
+            )
+            if st.button("Registrar prontidão da implementação", key="aion_developer_implementation_readiness"):
+                try:
+                    ready = prepare_developer_implementation_readiness(
+                        implementation,
+                        rollback_plan=rollback_plan,
+                        builder_actor=builder_actor,
+                        reviewer_actor=reviewer_actor,
+                        breaker_actor=breaker_actor,
+                        readiness_refs=[line.strip() for line in readiness_refs_text.splitlines() if line.strip()],
+                    )
+                    st.session_state["aion_developer_implementation_result"] = ready
+                    implementation = ready
+                    st.success("Prontidão registrada somente na sessão. Execução continua não autorizada.")
+                except Exception as exc:
+                    st.error(f"Prontidão recusada: {type(exc).__name__}")
+
+    if implementation.get("state") == "READY_FOR_HUMAN_IMPLEMENTATION_APPROVAL":
+        readiness = implementation.get("readiness") if isinstance(implementation.get("readiness"), Mapping) else {}
+        rollback_contract = implementation.get("rollback_contract") if isinstance(implementation.get("rollback_contract"), Mapping) else {}
+        st.caption(
+            f"Builder={readiness.get('builder_actor')} · Reviewer={readiness.get('reviewer_actor')} · "
+            f"Breaker={readiness.get('breaker_actor')} · rollback específico: "
+            f"{'SIM' if rollback_contract.get('recorded_for_this_change') else 'NÃO'}."
+        )
         with st.expander("Aprovação humana · branch isolada", expanded=False):
             impl_actor = st.text_input(
                 "Identificação do aprovador humano",
@@ -5207,11 +5250,7 @@ def _render_developer_intelligence() -> None:
                         implementation,
                         approved=impl_approved,
                         approver_actor=impl_actor,
-                        approval_refs=[
-                            line.strip()
-                            for line in impl_refs_text.splitlines()
-                            if line.strip()
-                        ],
+                        approval_refs=[line.strip() for line in impl_refs_text.splitlines() if line.strip()],
                     )
                     st.session_state["aion_developer_implementation_result"] = authorized
                     implementation = authorized

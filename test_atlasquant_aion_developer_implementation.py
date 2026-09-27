@@ -15,6 +15,7 @@ from atlasquant_aion_developer_implementation import (
     SCHEMA,
     approve_implementation_session,
     build_implementation_envelope,
+    prepare_implementation_readiness,
 )
 from atlasquant_aion_developer_intelligence import scan_repository
 from atlasquant_aion_developer_package import build_developer_package
@@ -130,22 +131,69 @@ class AionDeveloperImplementationEnvelopeTests(unittest.TestCase):
         self.assertIn("INDEPENDENT_REVIEW", gates)
         self.assertIn("INDEPENDENT_BREAKER", gates)
 
-    def test_implementation_approval_requires_explicit_human_evidence(self):
+    def test_readiness_requires_rollback_and_independent_roles(self):
         tmp, snapshot, package, correction, confirmed = self._fixture()
         try:
             envelope = build_implementation_envelope(snapshot, package, confirmed)
             with self.assertRaises(ValueError):
-                approve_implementation_session(
+                prepare_implementation_readiness(
                     envelope,
-                    approved=False,
-                    approver_actor="admin",
-                    approval_refs=["approval:1"],
+                    rollback_plan="",
+                    builder_actor="builder",
+                    reviewer_actor="reviewer",
+                    breaker_actor="breaker",
+                    readiness_refs=["ready:1"],
                 )
             with self.assertRaises(ValueError):
-                approve_implementation_session(
+                prepare_implementation_readiness(
                     envelope,
-                    approved=True,
-                    approver_actor="",
+                    rollback_plan="Reverter a mudança lógica.",
+                    builder_actor="same",
+                    reviewer_actor="same",
+                    breaker_actor="breaker",
+                    readiness_refs=["ready:1"],
+                )
+        finally:
+            tmp.cleanup()
+
+    def test_readiness_still_does_not_execute(self):
+        tmp, snapshot, package, correction, confirmed = self._fixture()
+        try:
+            envelope = build_implementation_envelope(snapshot, package, confirmed)
+            ready = prepare_implementation_readiness(
+                envelope,
+                rollback_plan="Reverter a mudança lógica e restaurar o baseline.",
+                builder_actor="builder",
+                reviewer_actor="reviewer",
+                breaker_actor="breaker",
+                readiness_refs=["ready:scope", "ready:rollback"],
+            )
+        finally:
+            tmp.cleanup()
+        self.assertEqual(ready["state"], "READY_FOR_HUMAN_IMPLEMENTATION_APPROVAL")
+        self.assertTrue(ready["readiness"]["roles_independent"])
+        self.assertTrue(ready["rollback_contract"]["recorded_for_this_change"])
+        self.assertFalse(ready["implementation_authorized"])
+        self.assertFalse(ready["execution_authorized"])
+        self.assertFalse(ready["writes_files"])
+
+    def test_implementation_approval_requires_explicit_human_evidence(self):
+        tmp, snapshot, package, correction, confirmed = self._fixture()
+        try:
+            envelope = build_implementation_envelope(snapshot, package, confirmed)
+            ready = prepare_implementation_readiness(
+                envelope,
+                rollback_plan="Reverter a mudança lógica.",
+                builder_actor="builder",
+                reviewer_actor="reviewer",
+                breaker_actor="breaker",
+                readiness_refs=["ready:1"],
+            )
+            with self.assertRaises(ValueError):
+                approve_implementation_session(
+                    ready,
+                    approved=False,
+                    approver_actor="admin",
                     approval_refs=["approval:1"],
                 )
         finally:
@@ -155,8 +203,16 @@ class AionDeveloperImplementationEnvelopeTests(unittest.TestCase):
         tmp, snapshot, package, correction, confirmed = self._fixture()
         try:
             envelope = build_implementation_envelope(snapshot, package, confirmed)
-            approved = approve_implementation_session(
+            ready = prepare_implementation_readiness(
                 envelope,
+                rollback_plan="Reverter a mudança lógica.",
+                builder_actor="builder",
+                reviewer_actor="reviewer",
+                breaker_actor="breaker",
+                readiness_refs=["ready:1"],
+            )
+            approved = approve_implementation_session(
+                ready,
                 approved=True,
                 approver_actor="human-approver",
                 approval_refs=["approval:1"],
@@ -167,7 +223,10 @@ class AionDeveloperImplementationEnvelopeTests(unittest.TestCase):
         self.assertTrue(approved["implementation_authorized"])
         self.assertFalse(approved["execution_authorized"])
         self.assertEqual(approved["authorization"]["schema"], AUTH_SCHEMA)
-        self.assertEqual(approved["authorization"]["trust_level"], 2)
+        self.assertEqual(approved["authorization"]["builder_actor"], "builder")
+        self.assertEqual(approved["authorization"]["reviewer_actor"], "reviewer")
+        self.assertEqual(approved["authorization"]["breaker_actor"], "breaker")
+        self.assertTrue(approved["authorization"]["rollback_recorded"])
         self.assertFalse(approved["authorization"]["merge_main_allowed"])
         self.assertFalse(approved["authorization"]["deploy_allowed"])
         self.assertFalse(approved["automatic_edit"])
