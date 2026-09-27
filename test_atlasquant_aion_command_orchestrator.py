@@ -4,9 +4,12 @@ from unittest.mock import Mock
 
 import atlasquant_aion_command_orchestrator as command
 from atlasquant_aion_command_orchestrator import (
+    BUNDLE_SAFE_KINDS,
+    MAX_BUNDLE_TOOLS,
     SAFE_KINDS,
     command_catalog,
     orchestrate_local_command,
+    plan_local_bundle,
     plan_local_command,
 )
 from atlasquant_aion_memory import default_checkpoint
@@ -47,6 +50,20 @@ class PlanningTests(unittest.TestCase):
         self.assertEqual(status["tool_id"], "aion.status.read")
         self.assertEqual(studio["tool_id"], "aion.specialists.snapshot")
 
+    def test_compound_read_question_builds_bounded_bundle(self):
+        out = plan_local_bundle("AION, onde paramos e o que falta?")
+        self.assertEqual(out["state"], "READY_MULTI")
+        self.assertEqual(out["selected_count"], 2)
+        self.assertEqual(out["tool_ids"], ["aion.memory.search", "aion.tasks.summary"])
+        self.assertLessEqual(out["selected_count"], MAX_BUNDLE_TOOLS)
+        self.assertTrue(all(kind in BUNDLE_SAFE_KINDS for kind in out["kinds"]))
+        self.assertFalse(out["executes_tools"])
+
+    def test_bundle_never_includes_draft(self):
+        out = plan_local_bundle("briefing executivo e resumo de tarefas")
+        self.assertNotIn("DRAFT", out.get("kinds", []))
+        self.assertTrue(out["excluded_draft_from_bundle"])
+
     def test_sensitive_action_is_blocked_before_executor(self):
         for question in (
             "faça o deploy agora",
@@ -67,7 +84,7 @@ class PlanningTests(unittest.TestCase):
 
 
 class ExecutionTests(unittest.TestCase):
-    def test_preview_never_invokes_executor(self):
+    def test_single_preview_never_invokes_executor(self):
         spy = Mock()
         original = command.execute_local_tool
         command.execute_local_tool = spy
@@ -76,8 +93,23 @@ class ExecutionTests(unittest.TestCase):
         finally:
             command.execute_local_tool = original
         self.assertEqual(out["state"], "PLANNED")
+        self.assertEqual(out["mode"], "SINGLE")
         self.assertFalse(out["executor_invoked"])
         self.assertFalse(out["handler_executed"])
+        spy.assert_not_called()
+
+    def test_multi_preview_never_invokes_executor(self):
+        spy = Mock()
+        original = command.execute_local_tool
+        command.execute_local_tool = spy
+        try:
+            out = orchestrate_local_command("onde paramos e o que falta?", execute=False)
+        finally:
+            command.execute_local_tool = original
+        self.assertEqual(out["state"], "PLANNED_MULTI")
+        self.assertEqual(out["mode"], "MULTI_READ")
+        self.assertEqual(out["tool_ids"], ["aion.memory.search", "aion.tasks.summary"])
+        self.assertFalse(out["executor_invoked"])
         spy.assert_not_called()
 
     def test_sensitive_intent_never_invokes_executor_even_when_execute_true(self):
@@ -93,7 +125,7 @@ class ExecutionTests(unittest.TestCase):
         self.assertFalse(out["external_action_executed"])
         spy.assert_not_called()
 
-    def test_safe_command_delegates_with_approval_false(self):
+    def test_safe_single_command_delegates_with_approval_false(self):
         spy = Mock(return_value={
             "state": "SUCCESS",
             "result": {"total": 3, "active": 2, "waiting_approval": 1, "blocked": 0},
@@ -115,14 +147,81 @@ class ExecutionTests(unittest.TestCase):
         finally:
             command.execute_local_tool = original
         self.assertEqual(out["state"], "SUCCESS")
+        self.assertEqual(out["mode"], "SINGLE")
         self.assertTrue(out["executor_invoked"])
         self.assertTrue(out["handler_executed"])
-        self.assertIn("Tarefas locais", out["summary"])
+        self.assertEqual(out["handlers_executed"], 1)
         kwargs = spy.call_args.kwargs
         self.assertFalse(kwargs["approved"])
         self.assertTrue(kwargs["authenticated_admin"])
         self.assertFalse(out["external_action_executed"])
         self.assertFalse(out["real_orders_enabled"])
+
+    def test_multi_read_executes_sequentially_with_individual_preflights(self):
+        def ok(tool_id, **kwargs):
+            return {
+                "state": "SUCCESS",
+                "tool_id": tool_id,
+                "result": {"canonical_count": 1} if tool_id == "aion.memory.search" else {
+                    "total": 2, "active": 1, "waiting_approval": 0, "blocked": 0
+                },
+                "truth": {"status": "UNKNOWN"},
+                "preflight": {"state": "READY_FOR_EXECUTOR", "blockers": []},
+                "security": {"network_called": False, "connector_called": False},
+                "external_action_executed": False,
+                "real_orders_enabled": False,
+            }
+        spy = Mock(side_effect=ok)
+        original = command.execute_local_tool
+        command.execute_local_tool = spy
+        try:
+            out = orchestrate_local_command(
+                "onde paramos e o que falta?",
+                execute=True,
+                runtime_context={"checkpoint": default_checkpoint()},
+                access=ADMIN,
+                authenticated_admin=True,
+            )
+        finally:
+            command.execute_local_tool = original
+        self.assertEqual(out["state"], "SUCCESS")
+        self.assertEqual(out["mode"], "MULTI_READ")
+        self.assertEqual(out["handlers_executed"], 2)
+        self.assertEqual(spy.call_count, 2)
+        self.assertEqual(
+            [call.args[0] for call in spy.call_args_list],
+            ["aion.memory.search", "aion.tasks.summary"],
+        )
+        self.assertTrue(all(call.kwargs["approved"] is False for call in spy.call_args_list))
+        self.assertFalse(out["stopped_early"])
+
+    def test_multi_read_stops_on_first_blocked_preflight(self):
+        blocked = {
+            "state": "BLOCKED",
+            "result": None,
+            "preflight": {"state": "BLOCK", "blockers": ["GUARDIAN_DENIED"]},
+            "security": {"network_called": False, "connector_called": False},
+            "external_action_executed": False,
+            "real_orders_enabled": False,
+        }
+        spy = Mock(return_value=blocked)
+        original = command.execute_local_tool
+        command.execute_local_tool = spy
+        try:
+            out = orchestrate_local_command(
+                "resumo de tarefas e aprovações pendentes",
+                execute=True,
+                runtime_context={"checkpoint": default_checkpoint()},
+                access=ADMIN,
+                authenticated_admin=True,
+            )
+        finally:
+            command.execute_local_tool = original
+        self.assertEqual(out["state"], "BLOCKED")
+        self.assertEqual(out["mode"], "MULTI_READ")
+        self.assertEqual(spy.call_count, 1)
+        self.assertEqual(out["handlers_executed"], 0)
+        self.assertTrue(out["stopped_early"])
 
     def test_real_executor_still_uses_tool_hub_preflight(self):
         out = orchestrate_local_command(

@@ -2279,13 +2279,16 @@ def _render_central(
             if isinstance(local_command_preview.get("plan"), Mapping)
             else {}
         )
-        if preview_state == "PLANNED":
+        if preview_state in {"PLANNED", "PLANNED_MULTI"}:
+            preview_ids = list(local_command_preview.get("tool_ids") or [])
+            if not preview_ids and preview_plan.get("tool_id"):
+                preview_ids = [str(preview_plan.get("tool_id"))]
             st.caption(
                 "Tool Hub local · prévia: "
-                + str(preview_plan.get("tool_id") or "nenhum")
-                + " · "
-                + str(preview_plan.get("kind") or "UNKNOWN")
-                + ". O handler só roda após clicar em Analisar com AION e passar pelo preflight."
+                + (" · ".join(preview_ids) if preview_ids else "nenhum")
+                + " · modo "
+                + str(local_command_preview.get("mode") or "SINGLE")
+                + ". Handler(s) só rodam após clicar em Analisar com AION e cada chamada passar pelo preflight."
             )
         elif preview_state == "BLOCKED_INTENT":
             st.warning(
@@ -2515,12 +2518,19 @@ def _render_central(
                 if isinstance(local_result.get("truth"), Mapping)
                 else {}
             )
+            local_ids = list(local_tool_call.get("tool_ids") or [])
+            if not local_ids and local_tool_call.get("tool_id"):
+                local_ids = [str(local_tool_call.get("tool_id"))]
             st.caption(
                 "Tool Hub local: "
-                + str(local_tool_call.get("tool_id") or "nenhum")
+                + (" · ".join(local_ids) if local_ids else "nenhum")
+                + " · modo "
+                + str(local_tool_call.get("mode") or "SINGLE")
                 + " · estado "
                 + str(local_tool_call.get("state") or "UNKNOWN")
-                + " · verdade "
+                + " · handlers executados "
+                + str(int(local_tool_call.get("handlers_executed") or 0))
+                + " · verdade final "
                 + str(local_truth.get("status") or "UNKNOWN")
                 + " · efeitos externos: nenhum."
             )
