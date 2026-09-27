@@ -136,6 +136,22 @@ class CentralOrchestratorTests(unittest.TestCase):
         self.assertIn("REAL_TRADING_BLOCKED", out["decision"]["blockers"])
         self.assertFalse(out["real_orders_enabled"])
 
+    def test_capability_flags_control_specialists_but_never_enable_external_or_real_trade(self):
+        out = orchestrate(
+            "inspecione código",
+            context={"role": "ADMIN"},
+            requested_capability="development.inspect",
+            feature_flags={
+                "AION_DEV_ENABLED": False,
+                "AION_EXTERNAL_ACTIONS_ENABLED": True,
+                "REAL_TRADING_ENABLED": True,
+            },
+        )
+        self.assertEqual(out["decision"]["state"], "BLOCKED")
+        self.assertIn("CAPABILITY_FLAG_DISABLED", out["decision"]["blockers"])
+        self.assertFalse(out["feature_flags"]["AION_EXTERNAL_ACTIONS_ENABLED"])
+        self.assertFalse(out["feature_flags"]["REAL_TRADING_ENABLED"])
+
     def test_beginner_and_advanced_share_logic_but_change_presentation(self):
         beginner = orchestrate("Explique o mercado", context={"role": "USER", "experience_mode": "BEGINNER"})
         advanced = orchestrate("Explique o mercado", context={"role": "USER", "experience_mode": "ADVANCED"})

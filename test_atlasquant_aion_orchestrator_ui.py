@@ -1,0 +1,22 @@
+import unittest
+from pathlib import Path
+
+
+class AionOrchestratorUiIntegrationTests(unittest.TestCase):
+    def test_central_exposes_core_status_plan_truth_and_gates(self):
+        source = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("AION ONLINE · ORQUESTRAÇÃO SEGURA", source)
+        self.assertIn("orchestrate_aion_core(", source)
+        self.assertIn("plan_specialist_dispatch(core_preview)", source)
+        self.assertIn("Capability Registry + Truth Gate + Guardian + Critic", source)
+        self.assertIn("Builder → Critic → Validator", source)
+
+    def test_ui_does_not_claim_execution_or_cross_persona_memory(self):
+        source = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("nenhuma ação é executada nesta prévia", source)
+        self.assertIn("acesso entre personas automático: NÃO", source)
+        self.assertIn('cols[3].metric("Ordens reais", "BLOQUEADAS")', source)
+
+
+if __name__ == "__main__":
+    unittest.main()

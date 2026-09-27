@@ -255,6 +255,9 @@ from atlasquant_aion_release_confidence import (
     release_confidence_summary,
 )
 from atlasquant_aion_cognitive_orchestrator import orchestrator_snapshot
+from atlasquant_aion_orchestrator import orchestrate as orchestrate_aion_core
+from atlasquant_aion_specialists import plan_specialist_dispatch
+from atlasquant_aion_memory_layers import memory_layer_summary
 from atlasquant_aion_event_journal import (
     continuity_summary as live_event_continuity_summary,
     merge_events as merge_live_event_journal_events,
@@ -2036,6 +2039,24 @@ def _render_central(
     cols[1].metric("Tarefas ativas", summary["active"])
     cols[2].metric("Aguardando aprovação", summary["waiting_approval"])
     cols[3].metric("Ordens reais", "BLOQUEADAS")
+    layered_memory = memory_layer_summary(
+        checkpoint.get("memory_layers")
+        if isinstance(checkpoint.get("memory_layers"), Mapping)
+        else None
+    )
+    st.markdown(
+        """<div style="padding:12px 14px;border:1px solid rgba(79,163,255,.35);
+        border-radius:12px;background:linear-gradient(135deg,rgba(12,31,54,.94),rgba(8,20,36,.96));
+        margin:4px 0 14px"><strong style="color:#f8fbff">AION ONLINE · ORQUESTRAÇÃO SEGURA</strong>
+        <span style="display:block;color:#d7e6f6;font-size:.8rem;margin-top:4px">
+        Capability Registry + Truth Gate + Guardian + Critic ativos · execução externa e ordens reais bloqueadas
+        </span></div>""",
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        f"Memória em camadas: {layered_memory['active']} entrada(s) ativa(s) · "
+        f"digest {layered_memory['digest']} · acesso entre personas automático: NÃO."
+    )
 
     with st.expander("Personas AION e onde cada uma trabalha"):
         for item in AION_PERSONAS:
@@ -2150,6 +2171,46 @@ def _render_central(
                 "O AION não mostra raciocínio privado/chain-of-thought. Ele mostra conclusão, evidências, "
                 "conflitos, lacunas e justificativa verificável."
             )
+    access_session = access.get("session") if isinstance(access.get("session"), Mapping) else {}
+    access_role = str(access.get("role") or access_session.get("role") or "USER").upper()
+    core_preview = orchestrate_aion_core(
+        question,
+        context={
+            "role": access_role,
+            "persona": "admin",
+            "experience_mode": "ADVANCED" if view_mode == "Completo" else "BEGINNER",
+            "domain_hint": domain_preview,
+        },
+    ) if question.strip() else {}
+    if core_preview:
+        dispatch_preview = plan_specialist_dispatch(core_preview)
+        selected_capability = dict(core_preview.get("selected_capability") or {})
+        truth_preview = dict(core_preview.get("truth") or {})
+        decision_preview = dict(core_preview.get("decision") or {})
+        with st.expander("⚙️ Orquestração AION · plano e gates", expanded=False):
+            o1, o2, o3, o4 = st.columns(4)
+            o1.metric("Especialista", str(selected_capability.get("specialist") or "core").upper())
+            o2.metric("Capability", str(selected_capability.get("capability_id") or "UNKNOWN"))
+            o3.metric("Verdade", str(truth_preview.get("status") or "UNKNOWN"))
+            o4.metric("Decisão", str(decision_preview.get("state") or "BLOCKED"))
+            st.caption(
+                f"Dispatch {dispatch_preview.get('state')} · risco "
+                f"{(core_preview.get('risk') or {}).get('level', 'UNKNOWN')} · "
+                "Builder → Critic → Validator · nenhuma ação é executada nesta prévia."
+            )
+            blockers = list(decision_preview.get("blockers") or [])
+            if blockers:
+                st.warning("Bloqueios: " + " · ".join(str(x) for x in blockers))
+            if view_mode == "Completo":
+                st.dataframe([
+                    {
+                        "Etapa": row.get("stage"),
+                        "Estado": row.get("status"),
+                        "Executa ação": row.get("executes_action"),
+                    }
+                    for row in list((core_preview.get("plan") or {}).get("steps", []) or [])
+                    if isinstance(row, Mapping)
+                ], hide_index=True, width="stretch")
     prompt_preview = build_provider_prompt(
         question,
         domain=domain_preview,
@@ -2202,6 +2263,15 @@ def _render_central(
     if st.button("Analisar com AION", key="aion_admin_ask", type="primary", width="stretch"):
         hits = _aion_memory_hits(question, checkpoint)
         estimated_cost = float(estimate.get("estimated_max_cost_usd") or 0.0)
+        st.session_state["aion_last_core_orchestration"] = orchestrate_aion_core(
+            question,
+            context={
+                "role": access_role,
+                "persona": "admin",
+                "experience_mode": "ADVANCED" if view_mode == "Completo" else "BEGINNER",
+                "domain_hint": domain_preview,
+            },
+        )
         route = route_intelligence(
             question,
             provider_state=provider.get("state"),

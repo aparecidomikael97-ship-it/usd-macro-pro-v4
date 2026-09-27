@@ -11,7 +11,12 @@ from hashlib import sha256
 from typing import Any, Mapping, Sequence
 import json
 
-from atlasquant_aion_capabilities import CapabilityRegistry, default_registry
+from atlasquant_aion_capabilities import (
+    SPECIALIST_FEATURE_FLAGS,
+    CapabilityRegistry,
+    capability_feature_flags,
+    default_registry,
+)
 from atlasquant_aion_core import cost_guard, guardian_decision
 from atlasquant_aion_truth import assess_truth
 
@@ -179,6 +184,8 @@ def orchestrate(
         "allowed": False, "role": ctx.role, "allowed_roles": [], "reason": "CAPABILITY_NOT_FOUND", "backend_enforced": True,
     }
     availability = str(selected.get("availability") or "UNAVAILABLE")
+    capability_flags = capability_feature_flags(feature_flags)
+    specialist_flag = SPECIALIST_FEATURE_FLAGS.get(str(selected.get("specialist") or ""))
     risk = classify_risk(capability=selected, requested_action=requested_action)
     guardian_action = str(requested_action or selected.get("guardian_action") or "read").lower()
     guardian = guardian_decision(
@@ -196,6 +203,10 @@ def orchestrate(
         blockers.append("PERMISSION_DENIED")
     if availability not in {"AVAILABLE", "DEGRADED"}:
         blockers.append("CAPABILITY_UNAVAILABLE")
+    if not capability_flags["AION_CORE_ENABLED"]:
+        blockers.append("AION_CORE_DISABLED")
+    if specialist_flag and not capability_flags.get(specialist_flag, False):
+        blockers.append("CAPABILITY_FLAG_DISABLED")
     if not cost["allowed"]:
         blockers.append("COST_NOT_APPROVED")
     if risk["level"] in {"HIGH", "CRITICAL"} and not approved:
@@ -232,6 +243,7 @@ def orchestrate(
         "risk": risk,
         "permission": permission,
         "guardian": guardian,
+        "feature_flags": capability_flags,
         "cost_guard": cost,
         "decision": {
             "state": state,

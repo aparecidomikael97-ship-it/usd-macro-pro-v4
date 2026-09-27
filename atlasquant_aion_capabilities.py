@@ -16,6 +16,23 @@ RISK_LEVELS = ("LOW", "MEDIUM", "HIGH", "CRITICAL")
 AVAILABILITY = ("AVAILABLE", "DEGRADED", "UNAVAILABLE", "EXPERIMENTAL")
 ROLES = ("USER", "SALES", "ADMIN")
 EXECUTION_MODES = ("READ_ONLY", "DRAFT_ONLY", "SANDBOX", "EXTERNAL")
+AION_FEATURE_FLAGS = {
+    "AION_CORE_ENABLED": True,
+    "AION_DEV_ENABLED": True,
+    "AION_RESEARCH_ENABLED": True,
+    "AION_STUDIO_ENABLED": True,
+    "AION_BUSINESS_ENABLED": True,
+    "AION_INVEST_ENABLED": True,
+    "AION_EXTERNAL_ACTIONS_ENABLED": False,
+    "REAL_TRADING_ENABLED": False,
+}
+SPECIALIST_FEATURE_FLAGS = {
+    "dev": "AION_DEV_ENABLED",
+    "research": "AION_RESEARCH_ENABLED",
+    "studio": "AION_STUDIO_ENABLED",
+    "business": "AION_BUSINESS_ENABLED",
+    "invest": "AION_INVEST_ENABLED",
+}
 
 
 def _norm(value: Any) -> str:
@@ -255,8 +272,20 @@ def default_registry() -> CapabilityRegistry:
     return CapabilityRegistry()
 
 
+def capability_feature_flags(overrides: Mapping[str, Any] | None = None) -> dict[str, bool]:
+    flags = dict(AION_FEATURE_FLAGS)
+    for key in flags:
+        if isinstance(overrides, Mapping) and key in overrides:
+            flags[key] = bool(overrides[key])
+    # These two flags are immutable-off in this release.
+    flags["AION_EXTERNAL_ACTIONS_ENABLED"] = False
+    flags["REAL_TRADING_ENABLED"] = False
+    return flags
+
+
 __all__ = [
     "SCHEMA", "RISK_LEVELS", "AVAILABILITY", "ROLES", "EXECUTION_MODES",
+    "AION_FEATURE_FLAGS", "SPECIALIST_FEATURE_FLAGS",
     "Capability", "CapabilityRegistry", "DEFAULT_CAPABILITIES",
-    "normalize_capability", "default_registry",
+    "normalize_capability", "default_registry", "capability_feature_flags",
 ]
