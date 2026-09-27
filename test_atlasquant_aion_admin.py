@@ -85,6 +85,26 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertFalse(summary["network_called"])
         self.assertFalse(summary["subprocess_called"])
 
+    def test_developer_evidence_gate_never_auto_promotes_root_cause(self):
+        src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Evidence Promotion Gate · causa raiz",src)
+        self.assertIn('key="aion_developer_gate_evaluate"',src)
+        self.assertIn("evaluate_developer_evidence_promotion(",src)
+        self.assertIn("promoção automática: NÃO",src)
+        self.assertIn("A causa ainda continua UNKNOWN",src)
+        self.assertIn("Revisão humana da causa",src)
+        self.assertIn('key="aion_developer_cause_review_approved"',src)
+        self.assertIn("Confirmar causa após revisão humana",src)
+        self.assertIn("confirm_developer_root_cause(",src)
+        self.assertIn("session-only",src)
+        self.assertIn("não autoriza IMPLEMENT, merge ou deploy",src)
+        gate_pos=src.index('"Avaliar evidência para revisão humana"')
+        evaluate_pos=src.index("gate = evaluate_developer_evidence_promotion(",gate_pos)
+        self.assertGreater(evaluate_pos,gate_pos)
+        confirm_pos=src.index('"Confirmar causa após revisão humana"')
+        apply_pos=src.index("confirmed = confirm_developer_root_cause(",confirm_pos)
+        self.assertGreater(apply_pos,confirm_pos)
+
     def test_developer_correction_plan_is_traceable_and_non_executing(self):
         src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("Preparar plano de correção rastreável",src)

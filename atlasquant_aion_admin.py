@@ -265,6 +265,10 @@ from atlasquant_aion_developer_diagnostics import (
     record_failure_attempt as record_developer_failure_attempt,
 )
 from atlasquant_aion_developer_correction import build_correction_plan as build_developer_correction_plan
+from atlasquant_aion_developer_evidence_gate import (
+    confirm_root_cause_human_review as confirm_developer_root_cause,
+    evaluate_evidence_promotion as evaluate_developer_evidence_promotion,
+)
 from atlasquant_aion_release_confidence import (
     DIMENSIONS as RELEASE_CONFIDENCE_DIMENSIONS,
     evidence_dimension,
@@ -4967,6 +4971,156 @@ def _render_developer_intelligence() -> None:
     st.caption(
         "Este plano não gera patch, não altera arquivo, não executa teste e não confirma causa raiz. "
         "A implementação continua aguardando decisão humana e evidência."
+    )
+
+    with st.expander("Evidence Promotion Gate · causa raiz", expanded=False):
+        hypothesis_labels = [
+            str(item.get("label") or "")
+            for item in list(correction.get("hypotheses") or [])
+            if isinstance(item, Mapping) and str(item.get("label") or "")
+        ]
+        test_candidates = [str(x) for x in list(correction.get("test_candidates") or []) if str(x)]
+        target_files = [str(x) for x in list(correction.get("target_files") or []) if str(x)]
+
+        gate_hypothesis = st.selectbox(
+            "Hipótese avaliada",
+            hypothesis_labels or ["CAUSE_NOT_YET_CONFIRMED"],
+            key="aion_developer_gate_hypothesis",
+        )
+        gate_test = st.selectbox(
+            "Teste de reprodução",
+            test_candidates or ["NO_TEST_CANDIDATE"],
+            key="aion_developer_gate_test",
+        )
+        g1,g2 = st.columns(2)
+        with g1:
+            before_state = st.selectbox(
+                "Estado antes",
+                ["FAIL","UNKNOWN","PASS"],
+                key="aion_developer_gate_before",
+            )
+        with g2:
+            after_state = st.selectbox(
+                "Estado depois",
+                ["PASS","UNKNOWN","FAIL"],
+                key="aion_developer_gate_after",
+            )
+        changed_scope = st.multiselect(
+            "Arquivos alterados na tentativa",
+            target_files,
+            default=target_files,
+            key="aion_developer_gate_changed_files",
+        )
+        intervention_summary = st.text_area(
+            "Resumo da intervenção observada",
+            key="aion_developer_gate_intervention",
+            max_chars=1600,
+            placeholder="Descreva o que mudou entre a evidência FAIL e PASS sem declarar causa além do que foi observado.",
+        )
+        gate_refs_text = st.text_area(
+            "Referências de evidência — uma por linha",
+            key="aion_developer_gate_refs",
+            max_chars=5000,
+            placeholder="run:before\nrun:after",
+        )
+        scope_preserved = st.checkbox(
+            "Confirmo que a tentativa permaneceu dentro do escopo permitido",
+            key="aion_developer_gate_scope_preserved",
+            value=False,
+        )
+        if st.button(
+            "Avaliar evidência para revisão humana",
+            key="aion_developer_gate_evaluate",
+        ):
+            try:
+                lineage = correction.get("lineage") if isinstance(correction.get("lineage"), Mapping) else {}
+                gate = evaluate_developer_evidence_promotion(
+                    correction,
+                    hypothesis_label=gate_hypothesis,
+                    test_id=gate_test,
+                    before_state=before_state,
+                    after_state=after_state,
+                    changed_files=changed_scope,
+                    evidence_refs=[line.strip() for line in gate_refs_text.splitlines() if line.strip()],
+                    intervention_summary=intervention_summary,
+                    scope_preserved=scope_preserved,
+                    snapshot_digest=lineage.get("snapshot_digest"),
+                    diagnostic_id=lineage.get("diagnostic_id"),
+                )
+                st.session_state["aion_developer_evidence_gate_result"] = gate
+            except Exception as exc:
+                st.error(f"Evidence gate recusado: {type(exc).__name__}")
+
+    gate = (
+        st.session_state.get("aion_developer_evidence_gate_result")
+        if isinstance(st.session_state.get("aion_developer_evidence_gate_result"), Mapping)
+        else None
+    )
+    if not isinstance(gate, Mapping):
+        return
+
+    st.markdown("##### Evidence Promotion Gate")
+    e1,e2,e3 = st.columns(3)
+    e1.metric("Gate", str(gate.get("state") or "UNKNOWN"))
+    gate_hyp = gate.get("hypothesis") if isinstance(gate.get("hypothesis"), Mapping) else {}
+    e2.metric("Verdade atual", str(gate_hyp.get("current_truth_status") or "UNKNOWN"))
+    e3.metric("Promoção aplicada", "SIM" if gate_hyp.get("promotion_applied") else "NÃO")
+    st.caption(
+        f"{gate.get('gate_id')} · promoção automática: NÃO · revisão humana obrigatória."
+    )
+    if gate.get("blockers"):
+        st.warning(
+            "Evidência insuficiente: "
+            + " · ".join(str(x) for x in list(gate.get("blockers") or []))
+        )
+    elif gate.get("state") == "READY_FOR_HUMAN_CAUSE_REVIEW":
+        st.success(
+            "Evidência suficiente para revisão humana. A causa ainda continua UNKNOWN até confirmação explícita."
+        )
+
+        with st.expander("Revisão humana da causa", expanded=False):
+            reviewer_actor = st.text_input(
+                "Identificação do revisor humano",
+                key="aion_developer_cause_reviewer",
+                max_chars=160,
+            )
+            review_refs_text = st.text_area(
+                "Referências da revisão humana — uma por linha",
+                key="aion_developer_cause_review_refs",
+                max_chars=4000,
+            )
+            reviewed = st.checkbox(
+                "Revisei a evidência e aprovo a promoção desta hipótese de causa",
+                key="aion_developer_cause_review_approved",
+                value=False,
+            )
+            if st.button(
+                "Confirmar causa após revisão humana",
+                key="aion_developer_cause_confirm",
+            ):
+                try:
+                    confirmed = confirm_developer_root_cause(
+                        correction,
+                        gate,
+                        approved=reviewed,
+                        reviewer_actor=reviewer_actor,
+                        review_evidence_refs=[
+                            line.strip()
+                            for line in review_refs_text.splitlines()
+                            if line.strip()
+                        ],
+                    )
+                    st.session_state["aion_developer_correction_result"] = confirmed
+                    correction = confirmed
+                    st.success(
+                        "Causa promovida somente no registro da sessão após revisão humana explícita."
+                    )
+                except Exception as exc:
+                    st.error(f"Confirmação recusada: {type(exc).__name__}")
+
+    st.caption(
+        "O Evidence Promotion Gate não executa testes nem aplica patch. "
+        "Mesmo a confirmação humana permanece session-only e não autoriza IMPLEMENT, merge ou deploy."
     )
 
 def _render_development(
