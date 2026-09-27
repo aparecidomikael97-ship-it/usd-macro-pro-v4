@@ -16,7 +16,10 @@ from typing import Any, Mapping
 
 from atlasquant_aion_developer_diagnostics import SCHEMA as DIAGNOSTIC_SCHEMA
 from atlasquant_aion_developer_engine import ADVERSARIAL_CHECKS
-from atlasquant_aion_developer_intelligence import SCHEMA as INTELLIGENCE_SCHEMA
+from atlasquant_aion_developer_intelligence import (
+    SCHEMA as INTELLIGENCE_SCHEMA,
+    validate_snapshot_integrity,
+)
 from atlasquant_aion_developer_package import SCHEMA as PACKAGE_SCHEMA
 from atlasquant_aion_observability import redact_text
 
@@ -90,6 +93,7 @@ def _validate_inputs(
     snapshot_digest = str(snapshot.get("snapshot_digest") or "")
     if not snapshot_digest:
         raise ValueError("snapshot digest required")
+    validate_snapshot_integrity(snapshot)
 
     unsafe_snapshot = (
         bool(snapshot.get("content_included"))

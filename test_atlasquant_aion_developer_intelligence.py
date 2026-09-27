@@ -11,6 +11,7 @@ from atlasquant_aion_developer_intelligence import (
     build_development_plan,
     build_test_coverage_map,
     scan_repository,
+    validate_snapshot_integrity,
 )
 
 
@@ -63,6 +64,51 @@ class AionDeveloperIntelligenceTests(unittest.TestCase):
         self.assertFalse(out["writes_files"])
         self.assertFalse(out["network_called"])
         self.assertFalse(out["subprocess_called"])
+
+    def test_snapshot_digest_changes_when_same_size_behavior_changes(self):
+        tmp, root = self._repo()
+        try:
+            first = scan_repository(root)
+            (root / "app.py").write_text(
+                "import json\nfrom atlasquant_aion_guardian import guard\n\ndef run():\n    return 0\n",
+                encoding="utf-8",
+            )
+            second = scan_repository(root)
+        finally:
+            tmp.cleanup()
+        self.assertNotEqual(first["snapshot_digest"], second["snapshot_digest"])
+        self.assertEqual(validate_snapshot_integrity(second), second["snapshot_digest"])
+        app = next(row for row in second["files"] if row["path"] == "app.py")
+        self.assertRegex(app["content_sha256"], r"^[0-9a-f]{64}$")
+
+    def test_snapshot_integrity_rejects_mutated_file_inventory(self):
+        tmp, root = self._repo()
+        try:
+            snapshot = scan_repository(root)
+            changed = dict(snapshot)
+            changed["files"] = list(snapshot["files"]) + [{
+                "path":"injected.py","category":"MODULE","size_bytes":1,
+                "imports":[],"syntax_state":"OK","content_sha256":"0"*64,
+            }]
+            changed["file_count"] = len(changed["files"])
+            with self.assertRaises(ValueError):
+                validate_snapshot_integrity(changed)
+        finally:
+            tmp.cleanup()
+
+    def test_plan_rejects_unknown_changed_paths_and_main_branch(self):
+        tmp, root = self._repo()
+        try:
+            snapshot = scan_repository(root)
+            coverage = build_test_coverage_map(snapshot, ["app.py","../etc/passwd","missing.py"])
+            self.assertEqual(coverage["rejected_unknown_paths"], ["../etc/passwd","missing.py"])
+            with self.assertRaises(ValueError):
+                build_development_plan(
+                    "unsafe",snapshot,branch="main/hotfix",
+                    baseline_ref="abc",changed_paths=["app.py"],
+                )
+        finally:
+            tmp.cleanup()
 
     def test_python_scan_extracts_imports_without_importing_modules(self):
         tmp, root = self._repo()

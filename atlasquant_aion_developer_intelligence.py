@@ -20,6 +20,12 @@ from typing import Any, Mapping, Sequence
 
 from atlasquant_aion_developer_engine import PHASES
 from atlasquant_aion_observability import redact_text
+from atlasquant_aion_developer_manifest import (
+    SNAPSHOT_MANIFEST_VERSION,
+    snapshot_digest_from_rows,
+    validate_isolated_branch,
+    validate_snapshot_integrity,
+)
 
 SCHEMA = "ATLASQUANT_AION_DEVELOPER_INTELLIGENCE_V1"
 PLAN_SCHEMA = "ATLASQUANT_AION_DEVELOPMENT_PLAN_V1"
@@ -196,6 +202,16 @@ def scan_repository(
                 skipped_oversized += 1
                 continue
 
+            try:
+                raw_bytes = resolved.read_bytes()
+            except OSError:
+                continue
+            if len(raw_bytes) > max_file_bytes:
+                skipped_oversized += 1
+                continue
+            size = len(raw_bytes)
+            content_sha256 = sha256(raw_bytes).hexdigest()
+
             facts = {
                 "syntax_state": "NOT_APPLICABLE",
                 "imports": [],
@@ -204,10 +220,7 @@ def scan_repository(
                 "test_functions": 0,
             }
             if suffix == ".py":
-                try:
-                    text = resolved.read_text(encoding="utf-8", errors="replace")
-                except OSError:
-                    text = ""
+                text = raw_bytes.decode("utf-8", errors="replace")
                 facts = _python_facts(text)
                 if facts["syntax_state"] == "ERROR":
                     syntax_errors += 1
@@ -217,6 +230,7 @@ def scan_repository(
                 "category": _category(relative),
                 "suffix": suffix,
                 "size_bytes": int(size),
+                "content_sha256": content_sha256,
                 "risk_tags": _risk_tags(relative),
                 **facts,
             })
@@ -231,17 +245,13 @@ def scan_repository(
         for tag in row["risk_tags"]:
             risk_counts[tag] = risk_counts.get(tag, 0) + 1
 
-    digest_payload = [{
-        "path": row["path"],
-        "category": row["category"],
-        "size_bytes": row["size_bytes"],
-        "imports": row["imports"],
-        "syntax_state": row["syntax_state"],
-    } for row in rows]
+    snapshot_digest = snapshot_digest_from_rows(root_path.name, rows)
     return {
         "schema": SCHEMA,
         "root_name": root_path.name,
-        "snapshot_digest": "REPO-" + _digest(digest_payload, 24),
+        "snapshot_manifest_version": SNAPSHOT_MANIFEST_VERSION,
+        "snapshot_digest": snapshot_digest,
+        "integrity_verifiable": True,
         "files": rows,
         "file_count": len(rows),
         "category_counts": dict(sorted(category_counts.items())),
@@ -273,12 +283,17 @@ def build_test_coverage_map(
     tests = [row for row in rows if row.get("category") == "TEST"]
     changes = []
     unmatched_code = []
+    rejected_unknown_paths = []
 
+    validate_snapshot_integrity(snapshot)
     for raw in list(changed_paths or [])[:200]:
         path = _clean(raw, 400).replace("\\", "/")
         if not path or path in {row["path"] for row in changes}:
             continue
-        source = by_path.get(path, {})
+        source = by_path.get(path)
+        if source is None:
+            rejected_unknown_paths.append(path)
+            continue
         category = str(source.get("category") or _category(path))
         suffix = Path(path).suffix.lower()
         matched = []
@@ -326,6 +341,7 @@ def build_test_coverage_map(
         "changed_count": len(changes),
         "recommended_tests": recommended_tests,
         "unmatched_code": sorted(set(unmatched_code)),
+        "rejected_unknown_paths": sorted(set(rejected_unknown_paths)),
         "coverage_is_proof": False,
         "writes_files": False,
         "executes_tests": False,
@@ -342,8 +358,9 @@ def build_development_plan(
     changed_paths: Sequence[Any] | None = None,
 ) -> dict[str, Any]:
     """Produce a bounded, non-executing plan compatible with Developer Engine phases."""
+    validate_snapshot_integrity(snapshot)
     request_text = _clean(request, 1200)
-    branch_text = _clean(branch, 240)
+    branch_text = validate_isolated_branch(branch)
     baseline = _clean(baseline_ref, 240)
     if not request_text or not branch_text or not baseline:
         raise ValueError("request, branch and baseline_ref are required")
@@ -358,6 +375,8 @@ def build_development_plan(
     warnings = []
     if coverage["unmatched_code"]:
         warnings.append("CHANGED_PYTHON_WITHOUT_LIKELY_TEST")
+    if coverage.get("rejected_unknown_paths"):
+        warnings.append("CHANGED_PATH_OUTSIDE_SNAPSHOT_REJECTED")
     if bool(snapshot.get("truncated")):
         warnings.append("REPOSITORY_SNAPSHOT_TRUNCATED")
     if int(snapshot.get("syntax_errors") or 0):
@@ -411,6 +430,7 @@ __all__ = [
     "MAX_FILE_BYTES",
     "SAFE_SUFFIXES",
     "scan_repository",
+    "validate_snapshot_integrity",
     "build_test_coverage_map",
     "build_development_plan",
 ]

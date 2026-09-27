@@ -16,6 +16,7 @@ from atlasquant_aion_developer_engine import record_test_attempt
 from atlasquant_aion_developer_intelligence import (
     SCHEMA as INTELLIGENCE_SCHEMA,
     build_test_coverage_map,
+    validate_snapshot_integrity,
 )
 from atlasquant_aion_observability import redact_text
 
@@ -99,6 +100,7 @@ def diagnose_failure(
     """Extract sanitized facts from failure evidence without executing anything."""
     if snapshot.get("schema") != INTELLIGENCE_SCHEMA:
         raise ValueError("valid Developer Intelligence snapshot required")
+    validate_snapshot_integrity(snapshot)
     unsafe_snapshot = (
         bool(snapshot.get("content_included"))
         or bool(snapshot.get("executes_repository_code"))

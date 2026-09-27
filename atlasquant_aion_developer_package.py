@@ -21,7 +21,9 @@ from atlasquant_aion_developer_engine import (
 from atlasquant_aion_developer_intelligence import (
     SCHEMA as INTELLIGENCE_SCHEMA,
     build_development_plan,
+    validate_snapshot_integrity,
 )
+from atlasquant_aion_developer_manifest import validate_candidate_ref
 from atlasquant_aion_digital_twin import new_digital_twin
 from atlasquant_aion_dev_fusion import new_dev_fusion_pipeline
 from atlasquant_aion_observability import redact_text
@@ -83,6 +85,7 @@ def _validate_snapshot(snapshot: Mapping[str, Any]) -> None:
         raise ValueError("invalid Developer Intelligence snapshot")
     if not str(item.get("snapshot_digest") or ""):
         raise ValueError("snapshot digest required")
+    validate_snapshot_integrity(item)
     unsafe = (
         bool(item.get("content_included"))
         or bool(item.get("executes_repository_code"))
@@ -139,8 +142,9 @@ def build_developer_package(
     requester = _clean(requested_by, 120) or "AION_ANALYSIS"
     if not request_text or not branch_text or not baseline or not candidate:
         raise ValueError("request, branch, baseline_ref and candidate_ref are required")
-    if baseline == candidate:
+    if baseline.casefold() == candidate.casefold():
         raise ValueError("candidate_ref must differ from baseline_ref")
+    candidate = validate_candidate_ref(candidate, branch_text)
 
     plan = build_development_plan(
         request_text,
@@ -257,12 +261,20 @@ def build_developer_package(
         "twin_id": twin.get("twin_id"),
         "pipeline_id": fusion.get("pipeline_id"),
         "snapshot_digest": plan.get("snapshot_digest"),
+        "branch": branch_text,
+        "baseline_ref": baseline,
+        "candidate_ref": candidate,
     }
     return {
         "schema": SCHEMA,
         "package_id": "DEVPACK-" + _digest(package_seed),
         "state": "WAITING_HUMAN",
         "plan": plan,
+        "revision_contract": {
+            "branch": branch_text,
+            "baseline_ref": baseline,
+            "candidate_ref": candidate,
+        },
         "developer_workflow": workflow,
         "digital_twin": twin,
         "dev_fusion": fusion,
