@@ -280,6 +280,7 @@ from atlasquant_aion_developer_sandbox_preflight import (
     build_sandbox_preflight as build_developer_sandbox_preflight,
 )
 from atlasquant_aion_developer_patch_validation import validate_patch as validate_developer_patch
+from atlasquant_aion_developer_runner_contract import build_runner_contract as build_developer_runner_contract
 from atlasquant_aion_release_confidence import (
     DIMENSIONS as RELEASE_CONFIDENCE_DIMENSIONS,
     evidence_dimension,
@@ -5502,6 +5503,113 @@ def _render_developer_intelligence() -> None:
         st.caption(
             f"{patch_validation.get('patch_digest')} · patch_text_included=False · "
             "execution_authorized=False · writes_files=False."
+        )
+
+        if patch_validation.get("state") == "READY_FOR_PATCH_REVIEW":
+            with st.expander("Runner Contract Simulator · somente desenho", expanded=False):
+                st.caption(
+                    "Este formulário não executa comandos. Ele apenas verifica se existe informação "
+                    "suficiente para descrever um runner isolado e revisável."
+                )
+                content_binding_verified = st.checkbox(
+                    "Existe verificação externa do conteúdo exato da revisão",
+                    key="aion_developer_runner_content_binding_verified",
+                    value=False,
+                )
+                content_binding_ref = st.text_input(
+                    "Referência do content binding",
+                    key="aion_developer_runner_content_binding_ref",
+                    max_chars=240,
+                    placeholder="Ex.: tree:<sha256> ou artifact:<id>.",
+                )
+                human_patch_reviewed = st.checkbox(
+                    "O patch exato foi revisado por uma pessoa independente",
+                    key="aion_developer_runner_patch_reviewed",
+                    value=False,
+                )
+                human_patch_reviewer = st.text_input(
+                    "Revisor humano do patch",
+                    key="aion_developer_runner_patch_reviewer",
+                    max_chars=160,
+                )
+                runner_review_refs = st.text_area(
+                    "Referências da revisão do patch — uma por linha",
+                    key="aion_developer_runner_patch_review_refs",
+                    max_chars=4000,
+                )
+                if st.button(
+                    "Preparar Runner Contract Simulator",
+                    key="aion_developer_runner_prepare",
+                ):
+                    try:
+                        runner_contract = build_developer_runner_contract(
+                            builder_request,
+                            preflight,
+                            patch_validation,
+                            content_binding_verified=content_binding_verified,
+                            content_binding_ref=content_binding_ref,
+                            human_patch_reviewed=human_patch_reviewed,
+                            human_patch_reviewer=human_patch_reviewer,
+                            human_patch_review_refs=[
+                                line.strip()
+                                for line in runner_review_refs.splitlines()
+                                if line.strip()
+                            ],
+                        )
+                        st.session_state["aion_developer_runner_contract"] = runner_contract
+                    except Exception as exc:
+                        st.error(f"Runner Contract recusado: {type(exc).__name__}")
+
+    runner_contract = (
+        st.session_state.get("aion_developer_runner_contract")
+        if isinstance(st.session_state.get("aion_developer_runner_contract"), Mapping)
+        else None
+    )
+    if isinstance(runner_contract, Mapping):
+        st.markdown("##### Runner Contract Simulator · não executável")
+        rc1,rc2,rc3,rc4 = st.columns(4)
+        rc1.metric("Estado", str(runner_contract.get("state") or "UNKNOWN"))
+        rc2.metric("Executor", "LIGADO" if runner_contract.get("executor_attached") else "NÃO LIGADO")
+        rc3.metric("Execução", "AUTORIZADA" if runner_contract.get("execution_authorized") else "BLOQUEADA")
+        rc4.metric("Comandos executados", "SIM" if runner_contract.get("commands_executed") else "NÃO")
+
+        if runner_contract.get("blockers"):
+            st.warning(
+                "Runner design bloqueado: "
+                + " · ".join(str(x) for x in list(runner_contract.get("blockers") or []))
+            )
+        else:
+            st.success(
+                "Contrato suficiente apenas para revisão do desenho do runner. "
+                "Nenhum executor foi conectado."
+            )
+
+        if runner_contract.get("command_plan"):
+            st.markdown("**Plano de comandos — somente dados:**")
+            st.dataframe(
+                [
+                    {
+                        "Etapa": row.get("step"),
+                        "Executável": row.get("executable"),
+                        "ARGV": " ".join(str(x) for x in list(row.get("argv") or [])),
+                        "Shell": row.get("shell"),
+                        "Rede": row.get("network"),
+                        "Escreve repo": row.get("writes_repo"),
+                    }
+                    for row in list(runner_contract.get("command_plan") or [])
+                    if isinstance(row, Mapping)
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+        st.caption(
+            f"{runner_contract.get('runner_contract_id')} · command_plan_is_data_only=True · "
+            "shell_allowed=False · network_allowed=False · secrets_allowed=False · "
+            "repo_write_allowed=False · execution_authorized=False."
+        )
+        st.info(
+            "Enquanto revision_content_verified continuar falso no Patch Validator, "
+            "o runner permanece bloqueado por desenho. Isso é intencional."
         )
 
 def _render_development(
