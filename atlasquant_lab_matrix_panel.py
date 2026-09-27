@@ -16,6 +16,7 @@ from atlasquant_lab_matrix import (
 )
 from atlasquant_research_evidence_capture import SESSION_KEY
 from atlasquant_setup_validation import SETUP_CATALOG
+from atlasquant_premium_shell import PREMIUM_CSS, cockpit_header_html
 
 
 def _display(value: Any, suffix: str = "") -> str:
@@ -71,10 +72,21 @@ def render_lab_matrix_panel(
     evidence_rows = evidence_rows_from_research_records(records)
     matrix = lab_matrix(evidence_rows)
 
-    st.markdown("### 🧬 Laboratório · Matriz de Pesquisa")
-    st.caption(
-        "M15, M30, H1, H4, D1 e Semanal separados por classe e setup. "
-        "A matriz lê somente evidências registradas nesta sessão/runtime; célula vazia continua SEM EVIDÊNCIA."
+    st.markdown(PREMIUM_CSS, unsafe_allow_html=True)
+    st.markdown(
+        cockpit_header_html(
+            "Laboratório · Matriz de Pesquisa",
+            "Timeframes, classes e regras congeladas em uma superfície de evidência. "
+            "Célula vazia continua vazia; nenhum número é estimado.",
+            eyebrow="RESEARCH CONTROL · FAIL-CLOSED",
+            telemetry={
+                "TIMEFRAMES": len(matrix["timeframes"]),
+                "SETUPS": len(matrix["setups"]),
+                "EVIDÊNCIAS": matrix["counts"]["EVIDENCIA_REGISTRADA"],
+                "ORDENS": "BLOQUEADAS",
+            },
+        ),
+        unsafe_allow_html=True,
     )
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Combinações", len(matrix["cells"]))

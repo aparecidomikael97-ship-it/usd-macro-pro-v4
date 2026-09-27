@@ -35,6 +35,12 @@ TOKENS = {
 
 PREMIUM_CSS = """
 <style>
+.stApp{
+  background:
+    radial-gradient(circle at 84% -10%,rgba(31,91,143,.13),transparent 34rem),
+    radial-gradient(circle at -8% 32%,rgba(39,126,113,.08),transparent 30rem),
+    #07111f;
+}
 .aq-premium{max-width:100%;overflow-x:hidden;color:#f5f8fc}
 .aq-premium-hero{position:relative;overflow:hidden;border:1px solid rgba(198,214,232,.22);border-radius:22px;padding:22px 22px 18px;margin:4px 0 16px;background:
   radial-gradient(circle at 100% 0%, rgba(215,181,109,.16), transparent 34%),
@@ -78,12 +84,26 @@ PREMIUM_CSS = """
 .aq-master-rail{display:grid;grid-template-columns:1fr;gap:8px;margin:8px 0 12px}
 .aq-master-rail div{border-radius:12px;padding:8px 10px;background:#102338;border:1px solid rgba(198,214,232,.2);color:#f5f8fc;font-size:.78rem;font-weight:750}
 .aq-master-rail strong{display:block;color:#d7b56d;font-size:.68rem;letter-spacing:.06em;text-transform:uppercase}
+.aq-cockpit-head{position:relative;overflow:hidden;border:1px solid rgba(143,208,196,.25);border-radius:18px;padding:18px 20px;margin:4px 0 16px;background:
+  linear-gradient(105deg,rgba(14,39,64,.98),rgba(8,25,43,.98) 62%,rgba(8,43,46,.9));box-shadow:0 18px 46px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.04)}
+.aq-cockpit-head:after{content:"";position:absolute;right:-34px;top:-62px;width:170px;height:170px;border-radius:50%;border:1px solid rgba(143,208,196,.16);box-shadow:0 0 0 28px rgba(142,183,232,.04),0 0 0 56px rgba(215,181,109,.025);pointer-events:none}
+.aq-cockpit-kicker{color:#8fd0c4;font-size:.66rem;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+.aq-cockpit-head h2{color:#fff;margin:.3rem 0 .35rem;font-size:clamp(1.35rem,2.4vw,2rem);letter-spacing:-.025em}
+.aq-cockpit-head p{color:#d7e4f2;margin:0;max-width:72ch;font-size:.88rem;font-weight:650}
+.aq-cockpit-telemetry{display:flex;flex-wrap:wrap;gap:7px;margin-top:13px;position:relative;z-index:1}
+.aq-cockpit-telemetry span{display:inline-flex;gap:5px;align-items:center;border:1px solid rgba(142,183,232,.24);background:rgba(7,17,31,.48);border-radius:999px;padding:5px 9px;color:#eaf2fb;font-size:.68rem;font-weight:800}
+.aq-cockpit-telemetry b{color:#d7b56d;font-weight:900}
+.stApp [data-testid="stMetric"]{border:1px solid rgba(142,183,232,.2);border-radius:14px;padding:10px 12px;background:linear-gradient(180deg,rgba(19,43,69,.82),rgba(11,29,49,.82));box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}
+.stApp [data-testid="stDataFrame"]{border:1px solid rgba(142,183,232,.18);border-radius:13px;overflow:hidden;background:#0c1a2c}
+.stApp [data-testid="stSelectbox"] [role="combobox"]:focus-visible{outline:2px solid #d7b56d;outline-offset:2px}
+.stApp [data-testid="stButton"] button{transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
+.stApp [data-testid="stButton"] button:hover:not(:disabled){transform:translateY(-1px);border-color:#8fd0c4 !important;box-shadow:0 8px 20px rgba(0,0,0,.18)}
 .stApp a{color:#d6e8ff;text-decoration:underline;text-underline-offset:2px;font-weight:750}
 .stApp button:focus-visible,.stApp [role="tab"]:focus-visible,.stApp a:focus-visible{outline:2px solid #d7b56d;outline-offset:2px}
 .stApp [data-testid="stButton"] button:disabled{color:#d7e4f2 !important;-webkit-text-fill-color:#d7e4f2 !important;background:#1c3048 !important;opacity:1 !important;border-color:rgba(215,181,109,.4) !important}
 @media (min-width:760px){.aq-premium-grid{grid-template-columns:1fr 1fr}.aq-master-rail{grid-template-columns:1fr 1fr 1fr}}
 @media (min-width:1200px){.aq-premium-grid{grid-template-columns:1fr 1fr 1fr}}
-@media (max-width:760px){.aq-premium-hero{padding:16px}.aq-premium-hero h2{font-size:1.35rem}.aq-premium-card:hover{transform:none}}
+@media (max-width:760px){.aq-premium-hero,.aq-cockpit-head{padding:15px 16px}.aq-premium-hero h2{font-size:1.35rem}.aq-premium-card:hover,.stApp [data-testid="stButton"] button:hover{transform:none}.aq-cockpit-head:after{opacity:.55}}
 @keyframes aq-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes aq-ping{0%{box-shadow:0 0 0 0 rgba(143,208,196,.55)}100%{box-shadow:0 0 0 10px rgba(143,208,196,0)}}
 @media (prefers-reduced-motion:reduce){
@@ -92,6 +112,27 @@ PREMIUM_CSS = """
 }
 </style>
 """
+
+
+def cockpit_header_html(
+    title: object,
+    summary: object,
+    *,
+    eyebrow: object = "ATLASQUANT · COMMAND SURFACE",
+    telemetry: Mapping[str, object] | None = None,
+) -> str:
+    chips = "".join(
+        f"<span>{escape(str(label))} <b>{escape(str(value))}</b></span>"
+        for label, value in dict(telemetry or {}).items()
+    )
+    return (
+        '<section class="aq-cockpit-head">'
+        f'<div class="aq-cockpit-kicker">{escape(str(eyebrow))}</div>'
+        f"<h2>{escape(str(title))}</h2>"
+        f"<p>{escape(str(summary))}</p>"
+        f'<div class="aq-cockpit-telemetry">{chips}</div>'
+        "</section>"
+    )
 
 
 def _svg(kind: str) -> str:

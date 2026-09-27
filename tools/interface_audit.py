@@ -77,6 +77,8 @@ def _combobox(page, label):
 
 def _select_area(page, label, option):
     box = _combobox(page, label)
+    if box.input_value().strip() == option:
+        return
     box.click()
     box.fill(option)
     page.get_by_role("option", name=option, exact=True).first.click(timeout=15000)

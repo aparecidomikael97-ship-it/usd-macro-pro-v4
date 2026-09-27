@@ -563,9 +563,24 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
     st.markdown(OPERATIONAL_SPINE_CSS,unsafe_allow_html=True)
     st.subheader("🧠 Painel Mestre de Oportunidades — V10.7.4")
     try:
-        from atlasquant_premium_shell import PREMIUM_CSS, master_command_html
+        from atlasquant_premium_shell import PREMIUM_CSS, cockpit_header_html, master_command_html
         st.markdown(PREMIUM_CSS, unsafe_allow_html=True)
         _universe_n = 0 if matrix is None or getattr(matrix, "empty", True) else min(7, len(matrix))
+        st.markdown(
+            cockpit_header_html(
+                "Painel Mestre · Visão Executiva",
+                "Alinhamento, divergência, risco e cobertura em uma leitura única. "
+                "Informação ausente permanece indisponível e nenhuma faixa executa ordens.",
+                eyebrow="MARKET COMMAND · EXECUTIVE VIEW",
+                telemetry={
+                    "UNIVERSO": _universe_n,
+                    "MARKET MAP": "PERSISTIDO",
+                    "SAFETY CORE": "ATIVO",
+                    "EXECUÇÃO": "BLOQUEADA",
+                },
+            ),
+            unsafe_allow_html=True,
+        )
         st.markdown(master_command_html(operational_count=_universe_n), unsafe_allow_html=True)
     except Exception:
         pass
