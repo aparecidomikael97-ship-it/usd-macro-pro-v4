@@ -269,6 +269,10 @@ from atlasquant_aion_developer_evidence_gate import (
     confirm_root_cause_human_review as confirm_developer_root_cause,
     evaluate_evidence_promotion as evaluate_developer_evidence_promotion,
 )
+from atlasquant_aion_developer_implementation import (
+    approve_implementation_session as approve_developer_implementation,
+    build_implementation_envelope as build_developer_implementation_envelope,
+)
 from atlasquant_aion_release_confidence import (
     DIMENSIONS as RELEASE_CONFIDENCE_DIMENSIONS,
     evidence_dimension,
@@ -5121,6 +5125,112 @@ def _render_developer_intelligence() -> None:
     st.caption(
         "O Evidence Promotion Gate não executa testes nem aplica patch. "
         "Mesmo a confirmação humana permanece session-only e não autoriza IMPLEMENT, merge ou deploy."
+    )
+
+    if correction.get("root_cause_confirmed") is True:
+        if st.button(
+            "Preparar envelope de implementação · nível 2",
+            key="aion_developer_implementation_envelope",
+        ):
+            try:
+                implementation = build_developer_implementation_envelope(
+                    snapshot,
+                    package,
+                    correction,
+                )
+                st.session_state["aion_developer_implementation_result"] = implementation
+            except Exception as exc:
+                st.error(f"Envelope de implementação recusado: {type(exc).__name__}")
+
+    implementation = (
+        st.session_state.get("aion_developer_implementation_result")
+        if isinstance(st.session_state.get("aion_developer_implementation_result"), Mapping)
+        else None
+    )
+    if not isinstance(implementation, Mapping):
+        return
+
+    st.markdown("##### Implementation Readiness Envelope")
+    i1,i2,i3,i4 = st.columns(4)
+    i1.metric("Estado", str(implementation.get("state") or "UNKNOWN"))
+    i2.metric("Nível pedido", int(implementation.get("requested_trust_level") or 0))
+    trust = implementation.get("trust_policy") if isinstance(implementation.get("trust_policy"), Mapping) else {}
+    i3.metric("Máx. autônomo", int(trust.get("max_autonomous_level") or 0))
+    i4.metric("Execução autorizada", "SIM" if implementation.get("execution_authorized") else "NÃO")
+    st.caption(
+        f"{implementation.get('envelope_id')} · nível 2 = branch isolada · "
+        "aprovação humana obrigatória."
+    )
+
+    impl_scope = implementation.get("scope") if isinstance(implementation.get("scope"), Mapping) else {}
+    if impl_scope.get("editable_files"):
+        st.markdown("**Escopo editável máximo proposto:**")
+        for item in list(impl_scope.get("editable_files") or []):
+            st.markdown(f"- `{item}`")
+    test_contract = (
+        implementation.get("test_contract")
+        if isinstance(implementation.get("test_contract"), Mapping)
+        else {}
+    )
+    if test_contract.get("mandatory_gates"):
+        st.markdown("**Gates obrigatórios depois de qualquer implementação:**")
+        for item in list(test_contract.get("mandatory_gates") or []):
+            st.markdown(f"- {item}")
+    if implementation.get("forbidden_changes"):
+        st.markdown("**Mudanças proibidas pelo envelope:**")
+        for item in list(implementation.get("forbidden_changes") or []):
+            st.markdown(f"- {item}")
+
+    if implementation.get("state") == "WAITING_HUMAN_IMPLEMENTATION_APPROVAL":
+        with st.expander("Aprovação humana · branch isolada", expanded=False):
+            impl_actor = st.text_input(
+                "Identificação do aprovador humano",
+                key="aion_developer_implementation_approver",
+                max_chars=160,
+            )
+            impl_refs_text = st.text_area(
+                "Referências da aprovação — uma por linha",
+                key="aion_developer_implementation_refs",
+                max_chars=4000,
+            )
+            impl_approved = st.checkbox(
+                "Autorizo apenas a implementação em branch isolada dentro deste escopo",
+                key="aion_developer_implementation_approved",
+                value=False,
+            )
+            if st.button(
+                "Registrar autorização de implementação na sessão",
+                key="aion_developer_implementation_confirm",
+            ):
+                try:
+                    authorized = approve_developer_implementation(
+                        implementation,
+                        approved=impl_approved,
+                        approver_actor=impl_actor,
+                        approval_refs=[
+                            line.strip()
+                            for line in impl_refs_text.splitlines()
+                            if line.strip()
+                        ],
+                    )
+                    st.session_state["aion_developer_implementation_result"] = authorized
+                    implementation = authorized
+                    st.success(
+                        "Autorização de nível 2 registrada somente na sessão. "
+                        "Nenhum arquivo foi editado e execution_authorized continua False."
+                    )
+                except Exception as exc:
+                    st.error(f"Autorização recusada: {type(exc).__name__}")
+
+    if implementation.get("state") == "IMPLEMENTATION_AUTHORIZED_SESSION_ONLY":
+        st.info(
+            "Implementação em branch está autorizada no registro da sessão, mas não existe executor ligado a este envelope. "
+            "Merge em main, deploy e produção continuam bloqueados."
+        )
+
+    st.caption(
+        "Implementation authorized não significa execution authorized. "
+        "Este envelope não grava arquivo, não commita e não chama Tool Hub."
     )
 
 def _render_development(

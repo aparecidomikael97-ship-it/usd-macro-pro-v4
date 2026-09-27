@@ -85,6 +85,23 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertFalse(summary["network_called"])
         self.assertFalse(summary["subprocess_called"])
 
+    def test_developer_implementation_envelope_uses_level_two_human_gate(self):
+        src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Preparar envelope de implementação · nível 2",src)
+        self.assertIn('key="aion_developer_implementation_envelope"',src)
+        self.assertIn("build_developer_implementation_envelope(",src)
+        self.assertIn("Implementation Readiness Envelope",src)
+        self.assertIn("nível 2 = branch isolada",src)
+        self.assertIn("Máx. autônomo",src)
+        self.assertIn("Execução autorizada",src)
+        self.assertIn("Aprovação humana · branch isolada",src)
+        self.assertIn('key="aion_developer_implementation_approved"',src)
+        self.assertIn("Registrar autorização de implementação na sessão",src)
+        self.assertIn("approve_developer_implementation(",src)
+        self.assertIn("execution_authorized continua False",src)
+        self.assertIn("não existe executor ligado a este envelope",src)
+        self.assertIn("Implementation authorized não significa execution authorized",src)
+
     def test_developer_evidence_gate_never_auto_promotes_root_cause(self):
         src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("Evidence Promotion Gate · causa raiz",src)
