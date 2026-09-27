@@ -456,7 +456,8 @@ def render_home_radar(
     st.caption(
         f"{board['monitored']} pares Forex monitorados · "
         f"leitura institucional {board['institutional']} · radar macro {board['macro_only']} · "
-        f"sem leitura {board['missing']}. Índices e criptos ficam em rankings separados."
+        f"sem leitura {board['missing']}. O pipeline avalia os 28 sem exigir seleção individual; "
+        "pares sem técnica/proveniência ficam bloqueados. Índices e criptos ficam em rankings separados."
     )
 
     top_n=min(RADAR_VISIBLE_LIMIT,len(rows))
