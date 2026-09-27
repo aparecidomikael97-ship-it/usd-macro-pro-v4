@@ -56,6 +56,17 @@ def new_event(
     truth_state:Any="CONFIRMED",
     evidence:Mapping[str,Any]|None=None,
     created_at:str|None=None,
+    request_id:Any="",
+    task_id:Any="",
+    domain:Any="",
+    capability:Any="",
+    tool:Any="",
+    duration_ms:Any=None,
+    result:Any="",
+    risk:Any="",
+    approval:Any="",
+    fallback:Any="",
+    confidence:Any=None,
 )->dict[str,Any]:
     created=str(created_at or _now())
     event_type_clean=redact_text(event_type).strip()[:120] or "event"
@@ -65,9 +76,17 @@ def new_event(
         for key,value in list(evidence.items())[:20]:
             evidence_clean[redact_text(key)[:80]]=redact_text(value)[:700]
     seed=json.dumps(
-        [event_type_clean,message_clean,created,evidence_clean],
+        [event_type_clean,message_clean,created,evidence_clean,redact_text(request_id),redact_text(task_id)],
         ensure_ascii=False,sort_keys=True,default=str,
     )
+    try:
+        duration=max(0.0,float(duration_ms)) if duration_ms is not None else None
+    except Exception:
+        duration=None
+    try:
+        confidence_value=max(0.0,min(100.0,float(confidence))) if confidence is not None else None
+    except Exception:
+        confidence_value=None
     return {
         "schema":SCHEMA,
         "event_id":"EV-"+hashlib.sha256(seed.encode("utf-8")).hexdigest()[:14].upper(),
@@ -78,6 +97,17 @@ def new_event(
         "truth_state":_truth(truth_state),
         "evidence":evidence_clean,
         "created_at":created,
+        "request_id":redact_text(request_id).strip()[:120],
+        "task_id":redact_text(task_id).strip()[:120],
+        "domain":redact_text(domain).strip()[:80],
+        "capability":redact_text(capability).strip()[:120],
+        "tool":redact_text(tool).strip()[:120],
+        "duration_ms":duration,
+        "result":redact_text(result).strip()[:120],
+        "risk":redact_text(risk).strip()[:40],
+        "approval":redact_text(approval).strip()[:80],
+        "fallback":redact_text(fallback).strip()[:120],
+        "confidence":confidence_value,
     }
 
 
@@ -92,6 +122,17 @@ def normalize_event(raw:Mapping[str,Any])->dict[str,Any]:
         truth_state=raw.get("truth_state"),
         evidence=raw.get("evidence") if isinstance(raw.get("evidence"),Mapping) else {},
         created_at=str(raw.get("created_at") or _now()),
+        request_id=raw.get("request_id"),
+        task_id=raw.get("task_id"),
+        domain=raw.get("domain"),
+        capability=raw.get("capability"),
+        tool=raw.get("tool"),
+        duration_ms=raw.get("duration_ms"),
+        result=raw.get("result"),
+        risk=raw.get("risk"),
+        approval=raw.get("approval"),
+        fallback=raw.get("fallback"),
+        confidence=raw.get("confidence"),
     )
     supplied=redact_text(raw.get("event_id")).strip()[:64]
     if supplied:
@@ -152,3 +193,42 @@ def observability_summary(
 def events_digest(events:Sequence[Mapping[str,Any]]|None)->str:
     raw=json.dumps(normalize_events(events),ensure_ascii=False,sort_keys=True,default=str)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+
+def execution_event(
+    *,
+    request_id:Any,
+    task_id:Any,
+    domain:Any,
+    capability:Any,
+    status:Any,
+    message:Any,
+    tool:Any="",
+    duration_ms:Any=None,
+    risk:Any="",
+    approved:bool=False,
+    fallback:Any="",
+    confidence:Any=None,
+    error:Any="",
+)->dict[str,Any]:
+    """Create one correlated event without logging request/tool payloads."""
+    evidence = {"error_type": redact_text(error).split(":", 1)[0][:120]} if error else {}
+    severity = "ERROR" if error else "WARNING" if str(status).upper() in {"BLOCKED", "DEGRADED"} else "INFO"
+    return new_event(
+        "aion_execution",
+        message,
+        severity=severity,
+        truth_state="CONFIRMED",
+        evidence=evidence,
+        request_id=request_id,
+        task_id=task_id,
+        domain=domain,
+        capability=capability,
+        tool=tool,
+        duration_ms=duration_ms,
+        result=status,
+        risk=risk,
+        approval="APPROVED" if approved else "NOT_APPROVED",
+        fallback=fallback,
+        confidence=confidence,
+    )
