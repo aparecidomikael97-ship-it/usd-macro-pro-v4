@@ -172,7 +172,7 @@ class AionDeveloperBuilderSandboxTests(unittest.TestCase):
         try:
             changed = dict(implementation)
             changed["readiness"] = dict(implementation["readiness"])
-            changed["readiness"]["reviewer_actor"] = " REVIEWER-B "
+            changed["readiness"]["reviewer_actor"] = "reviewer-z"
             with self.assertRaises(ValueError):
                 build_builder_sandbox_request(
                     snapshot,
