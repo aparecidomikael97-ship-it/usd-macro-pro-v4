@@ -117,6 +117,17 @@ class AtlasQuantRadarBoardTests(unittest.TestCase):
         self.assertEqual(night[1]["action"], "COMPRA")
         self.assertEqual(len(night), 2)
 
+    def test_unreadable_priority_sorts_last_without_crashing(self):
+        rows = [
+            {"pair": "EUR/USD", "action": "COMPRA", "priority": "n/d", "data_score": None, "session_bucket": "ASIA"},
+            {"pair": "GBP/USD", "action": "COMPRA", "priority": float("nan"), "data_score": "x", "session_bucket": "ASIA"},
+            {"pair": "AUD/USD", "action": "COMPRA", "priority": 12, "data_score": 5, "session_bucket": "ASIA"},
+        ]
+        out = prioritize_rows_for_session(rows, profile_for_filter("Ambos"))
+        self.assertEqual(out[0]["pair"], "AUD/USD")
+        self.assertEqual(len(out), 3)
+        self.assertEqual(out[1]["priority"], "n/d")
+
     def test_macro_only_pair_cannot_become_an_authorized_trade(self):
         board = compose_fx_board([], _ranking())
         macro = next(row for row in board["rows"] if row["coverage"] == "macro")

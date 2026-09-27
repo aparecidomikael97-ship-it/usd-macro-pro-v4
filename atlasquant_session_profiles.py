@@ -176,11 +176,20 @@ def prioritize_rows_for_session(
         key=lambda x:(
             rank.get(str(x.get("session_match")),1),
             0 if str(x.get("action"))!="NÃO OPERAR" else 1,
-            -float(x.get("priority",0) or 0),
-            -float(x.get("data_score",0) or 0),
+            -_sort_number(x.get("priority")),
+            -_sort_number(x.get("data_score")),
         )
     )
     return out
+
+
+def _sort_number(value:Any)->float:
+    """Ordering only: unreadable or non-finite values sort last, never raise."""
+    try:
+        number=float(value or 0)
+    except (TypeError,ValueError):
+        return 0.0
+    return number if number==number and abs(number)!=float("inf") else 0.0
 
 
 def session_profile_summary(
