@@ -77,7 +77,11 @@ class AtlasQuantAionContinuityTests(unittest.TestCase):
             created_at="2026-09-24T19:00:00+00:00",
         )
         done=transition_mission(
-            [done],done["mission_id"],"DONE",
+            [done],done["mission_id"],"IN_PROGRESS",
+            changed_at="2026-09-24T19:10:00+00:00",
+        )
+        done=transition_mission(
+            done,done[0]["mission_id"],"DONE",
             outcome="Guardian fechado.",
             changed_at="2026-09-24T19:30:00+00:00",
         )[0]

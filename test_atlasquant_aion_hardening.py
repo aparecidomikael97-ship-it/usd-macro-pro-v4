@@ -1,4 +1,4 @@
-"""Offline regressions for durable state, safety and V17 round trips."""
+"""Offline regressions for durable state, safety and Checkpoint Mestre V18 round trips."""
 from copy import deepcopy
 import json
 import unittest
@@ -150,7 +150,7 @@ class AionHardeningTests(unittest.TestCase):
         task=record_resume(self.task(),checkpoint_digest="cp-a")
         cp=update_durable_tasks_checkpoint(default_checkpoint(),records=[task])
         restored=ensure_operating_checkpoint(json.loads(json.dumps(cp)))
-        self.assertEqual(restored["checkpoint_version"],17)
+        self.assertEqual(restored["checkpoint_version"],18)
         self.assertEqual(restored["durable_tasks"]["records"][0],task)
         self.assertEqual(checkpoint_integrity_report(restored)["state"],"CONFIRMED")
         self.assertEqual(task["correlation_id"],task["steps"][0]["correlation_id"])

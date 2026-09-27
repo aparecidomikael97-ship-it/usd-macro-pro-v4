@@ -111,7 +111,21 @@ def new_event(
         confidence_value=max(0.0,min(100.0,float(confidence))) if confidence is not None else None
     except Exception:
         confidence_value=None
-    return {
+    # Empty correlation fields stay off the event. Checkpoints written before
+    # the orchestration fields existed keep their digests; supplied correlation
+    # is still stored and redacted.
+    correlation={
+        "request_id":redact_text(request_id).strip()[:120],
+        "task_id":redact_text(task_id).strip()[:120],
+        "domain":redact_text(domain).strip()[:80],
+        "capability":redact_text(capability).strip()[:120],
+        "tool":redact_text(tool).strip()[:120],
+        "result":redact_text(result).strip()[:120],
+        "risk":redact_text(risk).strip()[:40],
+        "approval":redact_text(approval).strip()[:80],
+        "fallback":redact_text(fallback).strip()[:120],
+    }
+    event={
         "schema":SCHEMA,
         "event_id":"EV-"+hashlib.sha256(seed.encode("utf-8")).hexdigest()[:14].upper(),
         "event_type":event_type_clean,
@@ -121,18 +135,15 @@ def new_event(
         "truth_state":_truth(truth_state),
         "evidence":evidence_clean,
         "created_at":created,
-        "request_id":redact_text(request_id).strip()[:120],
-        "task_id":redact_text(task_id).strip()[:120],
-        "domain":redact_text(domain).strip()[:80],
-        "capability":redact_text(capability).strip()[:120],
-        "tool":redact_text(tool).strip()[:120],
-        "duration_ms":duration,
-        "result":redact_text(result).strip()[:120],
-        "risk":redact_text(risk).strip()[:40],
-        "approval":redact_text(approval).strip()[:80],
-        "fallback":redact_text(fallback).strip()[:120],
-        "confidence":confidence_value,
     }
+    for key,value in correlation.items():
+        if value:
+            event[key]=value
+    if duration is not None:
+        event["duration_ms"]=duration
+    if confidence_value is not None:
+        event["confidence"]=confidence_value
+    return event
 
 
 def normalize_event(raw:Mapping[str,Any])->dict[str,Any]:
