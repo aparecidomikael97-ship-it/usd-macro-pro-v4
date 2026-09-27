@@ -45,6 +45,7 @@ def compose_local_executive_response(
     synthesis: Mapping[str, Any] | None,
     *,
     summaries: Sequence[str] | None = None,
+    traceability: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Create a four-part executive response without changing truth state."""
     syn = _mapping(synthesis)
@@ -52,6 +53,17 @@ def compose_local_executive_response(
     security = _mapping(syn.get("security"))
     items = [dict(row) for row in list(syn.get("items") or [])[:MAX_LINES] if isinstance(row, Mapping)]
     by_tool = _summary_map(syn, summaries)
+    trace = _mapping(traceability)
+    trace_records = [
+        dict(row)
+        for row in list(trace.get("records") or [])[:MAX_LINES]
+        if isinstance(row, Mapping)
+    ]
+    trace_by_tool = {
+        _clean(row.get("tool_id"), 96): row
+        for row in trace_records
+        if _clean(row.get("tool_id"), 96)
+    }
 
     known: list[str] = []
     unknown: list[str] = []
@@ -67,8 +79,12 @@ def compose_local_executive_response(
     for item in items:
         tool_id = _clean(item.get("tool_id"), 96)
         line = by_tool.get(tool_id) or tool_id
+        trace_row = trace_by_tool.get(tool_id, {})
+        trace_id = _clean(trace_row.get("trace_id"), 40)
+        source_label = _clean(trace_row.get("source_label"), 100)
+        reference = f" [Fonte {trace_id} · {source_label}]" if trace_id else ""
         if bool(item.get("content_confirmed")):
-            known.append(line)
+            known.append(line + reference)
             continue
         reason = "conteúdo não confirmado"
         state = _clean(item.get("state"), 40).upper()
@@ -83,7 +99,7 @@ def compose_local_executive_response(
             reason = f"frescor {freshness or 'UNVERIFIED'}"
         if blockers:
             reason += " · " + " · ".join(blockers)
-        unknown.append(f"{line} [{reason}]")
+        unknown.append(f"{line} [{reason}]{reference}")
 
     security_state = _clean(security.get("state") or "UNKNOWN", 40).upper()
     if security_state == "BLOCK":
@@ -119,6 +135,12 @@ def compose_local_executive_response(
         "conflicts": conflicts,
         "next_step": next_step,
     }
+    evidence_refs = {
+        "known": [_clean(x, 40) for x in list(trace.get("confirmed_content_refs") or [])[:MAX_LINES] if _clean(x, 40)],
+        "unknown": [_clean(x, 40) for x in list(trace.get("unknown_refs") or [])[:MAX_LINES] if _clean(x, 40)],
+        "conflicts": [_clean(x, 40) for x in list(trace.get("conflict_refs") or [])[:MAX_LINES] if _clean(x, 40)],
+        "execution": [_clean(x, 40) for x in list(trace.get("execution_refs") or [])[:MAX_LINES] if _clean(x, 40)],
+    }
 
     text_parts = [headline]
     text_parts.append("O que sabemos: " + (" | ".join(known) if known else "nenhum conteúdo confirmado."))
@@ -131,6 +153,8 @@ def compose_local_executive_response(
         "posture": posture,
         "headline": headline,
         "sections": sections,
+        "evidence_refs": evidence_refs,
+        "traceability_state": _clean(trace.get("state") or "NO_EVIDENCE", 40).upper(),
         "truth": {
             "status": aggregate_truth,
             "freshness": aggregate_freshness,

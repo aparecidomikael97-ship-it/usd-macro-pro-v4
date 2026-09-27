@@ -2533,6 +2533,11 @@ def _render_central(
                 if isinstance(local_tool_call.get("executive_response"), Mapping)
                 else {}
             )
+            local_traceability = (
+                local_tool_call.get("traceability")
+                if isinstance(local_tool_call.get("traceability"), Mapping)
+                else {}
+            )
             local_ids = list(local_tool_call.get("tool_ids") or [])
             if not local_ids and local_tool_call.get("tool_id"):
                 local_ids = [str(local_tool_call.get("tool_id"))]
@@ -2592,6 +2597,28 @@ def _render_central(
                         st.caption("Nenhum conflito explícito identificado.")
                     st.markdown("**Próximo passo**")
                     st.info(str(sections.get("next_step") or "Nenhum próximo passo confirmado."))
+                    trace_rows = [
+                        row for row in list(local_traceability.get("records") or [])
+                        if isinstance(row, Mapping)
+                    ]
+                    if trace_rows:
+                        with st.expander("Rastreabilidade local · fonte por evidência", expanded=False):
+                            st.caption(
+                                "Metadados sanitizados de proveniência. Payload bruto e raciocínio interno não são exibidos."
+                            )
+                            st.dataframe([
+                                {
+                                    "Evidência": row.get("trace_id"),
+                                    "Tool": row.get("tool_id"),
+                                    "Origem": row.get("source_label"),
+                                    "Execução": row.get("execution_state"),
+                                    "Truth": row.get("truth_status"),
+                                    "Frescor": row.get("freshness"),
+                                    "Confirmado": bool(row.get("content_confirmed", False)),
+                                    "Conflito": "SIM" if list(row.get("conflicts") or []) else "NÃO",
+                                }
+                                for row in trace_rows[:8]
+                            ], width="stretch", hide_index=True)
                 else:
                     st.error(
                         "A resposta executiva local foi bloqueada por uma invariante de segurança. "

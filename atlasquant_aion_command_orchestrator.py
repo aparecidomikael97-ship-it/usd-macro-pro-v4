@@ -19,6 +19,7 @@ from typing import Any, Mapping
 from atlasquant_aion_local_executor import execute_local_tool, local_allowlist
 from atlasquant_aion_local_synthesis import synthesize_local_tool_results
 from atlasquant_aion_local_response import compose_local_executive_response
+from atlasquant_aion_local_traceability import build_local_traceability
 from atlasquant_aion_portable import default_portable_core
 from atlasquant_aion_tool_hub import default_tool_hub
 
@@ -484,9 +485,12 @@ def orchestrate_local_command(
         base["tool_result"] = execution
         base["tool_results"] = [execution]
         base["synthesis"] = synthesis
+        traceability = build_local_traceability([execution], synthesis=synthesis)
+        base["traceability"] = traceability
         base["executive_response"] = compose_local_executive_response(
             synthesis,
             summaries=[_result_summary(plan["tool_id"], execution)],
+            traceability=traceability,
         )
         return base
 
@@ -553,9 +557,12 @@ def orchestrate_local_command(
     base["tool_result"] = results[-1] if results else None
     base["tool_results"] = results
     base["synthesis"] = synthesis
+    traceability = build_local_traceability(results, synthesis=synthesis)
+    base["traceability"] = traceability
     base["executive_response"] = compose_local_executive_response(
         synthesis,
         summaries=summaries,
+        traceability=traceability,
     )
     base["stopped_early"] = len(results) < len(selected)
     return base
