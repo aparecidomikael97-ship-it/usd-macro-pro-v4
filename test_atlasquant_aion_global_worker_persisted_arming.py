@@ -451,6 +451,58 @@ class PersistedGlobalWorkerArmingTests(unittest.TestCase):
             "runtime-sha-1",
         )
 
+    def test_post_write_armed_state_mismatch_triggers_rollback(self):
+        approval = self.persistence_approval()
+        calls = []
+        mismatched = deepcopy(self.working)
+        mismatched["aion_global_worker_v1"]["arm_digest"] = "different-arm"
+        raw = mismatched["aion_global_worker_v1"]
+        candidate = dict(raw)
+        candidate.pop("digest", None)
+        from atlasquant_aion_core_intelligence.evidence import digest as evidence_digest
+        raw["digest"] = evidence_digest(candidate)
+
+        def fake_save(checkpoint, config, **kwargs):
+            calls.append((deepcopy(checkpoint), dict(kwargs)))
+            if len(calls) == 1:
+                return {
+                    "status": "CONFIRMED",
+                    "saved": True,
+                    "verified": True,
+                    "sha": "armed-sha-2",
+                    "checkpoint": mismatched,
+                }
+            return {
+                "status": "CONFIRMED",
+                "saved": True,
+                "verified": True,
+                "sha": "rollback-sha-3",
+                "checkpoint": deepcopy(self.source),
+            }
+
+        with patch(
+            "atlasquant_aion_global_worker_persisted_arming.save_runtime_checkpoint",
+            side_effect=fake_save,
+        ):
+            result = persist_staged_global_arming(
+                self.access,
+                self.working,
+                self.runtime,
+                approval,
+                _config(),
+                confirmation=True,
+                flag_reader=lambda *args, **kwargs: _safe_flag("UNSET"),
+                now=NOW,
+            )
+
+        self.assertEqual(result["status"], "ROLLED_BACK")
+        self.assertEqual(
+            result["reason"],
+            "PERSISTED_ARMED_STATE_DID_NOT_MATCH_STAGED_STATE",
+        )
+        self.assertTrue(result["rollback_performed"])
+        self.assertEqual(len(calls), 2)
+
     def test_post_write_enabled_flag_triggers_automatic_cas_rollback(self):
         approval = self.persistence_approval()
         flag_reads = iter([
