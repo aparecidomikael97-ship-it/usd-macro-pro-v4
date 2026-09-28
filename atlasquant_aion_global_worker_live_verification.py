@@ -212,7 +212,19 @@ def verify_global_worker_live_activation(
         and last_runtime_id.startswith("gha-")
     )
 
-    receipts, receipt_state = load_executor_receipts(context, checkpoint)
+    try:
+        receipts, receipt_state = load_executor_receipts(context, checkpoint)
+    except Exception:
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "reason": "EXECUTOR_RECEIPT_CONTEXT_OR_INTEGRITY_INVALID",
+            "read_only": True,
+            "runtime_modified": False,
+            "feature_flag_modified": False,
+            "real_trading_enabled": False,
+        }
+
     live_receipts = []
     unsafe_receipts = []
     for row in receipts:
