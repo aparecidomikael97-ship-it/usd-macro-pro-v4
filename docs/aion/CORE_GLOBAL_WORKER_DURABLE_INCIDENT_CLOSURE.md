@@ -225,3 +225,11 @@ action is part of this development block.
 The Draft PR may be temporarily retargeted to `main` solely to trigger the
 repository's standard pull-request workflows. It must be returned to its stacked
 base after audit.
+
+
+## Audit trigger note
+
+When the stacked Draft PR is temporarily retargeted to `main`, a
+documentation-only synchronize commit may be used to trigger the standard
+pull-request workflows. This changes no runtime behavior and does not authorize
+a durable closure write, activation, reactivation, deploy, merge, or trading.
