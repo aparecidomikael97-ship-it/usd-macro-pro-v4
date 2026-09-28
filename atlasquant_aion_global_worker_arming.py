@@ -82,8 +82,6 @@ def _payload_digest(value: Mapping[str, Any], digest_field: str) -> str:
 def _budget_contract(max_jobs: int) -> dict[str, Any]:
     return {
         "max_jobs_per_tick": max_jobs,
-        "max_scheduled_ticks_per_utc_day": MAX_SCHEDULED_TICKS_PER_DAY,
-        "max_jobs_per_utc_day": max_jobs * MAX_SCHEDULED_TICKS_PER_DAY,
         "max_runtime_checkpoint_writes_per_tick": MAX_RUNTIME_WRITES_PER_TICK,
         "provider_calls_per_tick": 0,
         "paid_service_calls_per_tick": 0,
@@ -180,6 +178,11 @@ def prepare_global_worker_arming_plan(
         "allowed_capabilities": sorted(GLOBAL_WORKER_CAPABILITIES),
         "lease_seconds": lease,
         "budgets": _budget_contract(jobs),
+        "schedule_assumptions": {
+            "existing_pulses_per_hour": 2,
+            "estimated_scheduled_ticks_per_utc_day": MAX_SCHEDULED_TICKS_PER_DAY,
+            "hard_daily_limit_claimed": False,
+        },
         "activation_flag_required": True,
         "activation_flag_name": "ATLASQUANT_AION_GLOBAL_WORKER_ENABLED",
         "activation_flag_changed_by_ceremony": False,
