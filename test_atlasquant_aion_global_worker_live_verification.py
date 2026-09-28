@@ -363,6 +363,14 @@ class GlobalWorkerLiveVerificationTests(unittest.TestCase):
             "EXECUTOR_RECEIPT_CONTEXT_OR_INTEGRITY_INVALID",
         )
 
+    def test_admin_ui_never_equates_enabled_with_live(self):
+        source = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("ENABLED não significa LIVE", source)
+        self.assertIn("Verificar Worker Global ao vivo", source)
+        self.assertIn("LIVE_CONFIRMED_IDLE", source)
+        self.assertIn("LIVE_EVIDENCE_TIMEOUT", source)
+        self.assertIn("Worker Global LIVE confirmado por evidência compartilhada", source)
+
     def test_verifier_is_read_only_and_has_no_mutation_api(self):
         source = Path(
             "atlasquant_aion_global_worker_live_verification.py"
