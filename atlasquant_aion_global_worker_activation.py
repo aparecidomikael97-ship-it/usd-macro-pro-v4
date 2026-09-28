@@ -31,7 +31,11 @@ from atlasquant_aion_global_worker_persisted_arming import (
     SAFE_FLAG_STATES,
     read_repository_feature_flag,
 )
-from atlasquant_aion_memory import RuntimeConfig, checkpoint_source_digest
+from atlasquant_aion_memory import (
+    RuntimeConfig,
+    checkpoint_source_digest,
+    load_runtime_checkpoint,
+)
 
 
 SCHEMA = "ATLASQUANT_AION_GLOBAL_WORKER_ACTIVATION_CEREMONY_V1"
@@ -541,6 +545,7 @@ def activate_global_worker_feature_flag(
     flag_reader: Callable[..., Mapping[str, Any]] = read_repository_feature_flag,
     flag_writer: Callable[..., Mapping[str, Any]] = write_repository_feature_flag_enabled,
     flag_disabler: Callable[..., Mapping[str, Any]] = force_disable_repository_feature_flag,
+    runtime_reader: Callable[..., Mapping[str, Any]] = load_runtime_checkpoint,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     """Enable the wake-up flag after final confirmation; never runs a worker tick."""
@@ -552,9 +557,12 @@ def activate_global_worker_feature_flag(
             "feature_flag_modified": False,
             "global_worker_executed": False,
         }
+    fresh_runtime = dict(
+        runtime_reader(config, timeout=min(timeout, 10.0)) or {}
+    )
     validation = validate_global_worker_activation_approval(
         access,
-        runtime_result,
+        fresh_runtime,
         approval,
         now=now,
     )
@@ -594,6 +602,37 @@ def activate_global_worker_feature_flag(
 
     write = dict(flag_writer(config, pre_state, timeout=timeout) or {})
     if write.get("status") != "WRITE_ACCEPTED" or write.get("modified") is not True:
+        observed_after_failed_write = dict(
+            flag_reader(config, timeout=timeout) or {}
+        )
+        observed_state = str(
+            observed_after_failed_write.get("state") or ""
+        ).upper()
+        if observed_state == "ENABLED":
+            rollback = dict(flag_disabler(config, timeout=timeout) or {})
+            rollback_confirm = dict(flag_reader(config, timeout=timeout) or {})
+            rollback_safe = bool(
+                str(rollback_confirm.get("status") or "").upper() == "CONFIRMED"
+                and str(rollback_confirm.get("state") or "").upper()
+                in SAFE_FLAG_STATES
+            )
+            return {
+                "schema": SCHEMA,
+                "status": (
+                    "ACTIVATION_ROLLED_BACK"
+                    if rollback_safe
+                    else "CRITICAL_ACTIVATION_ROLLBACK_FAILED"
+                ),
+                "reason": "FEATURE_FLAG_WRITE_OUTCOME_UNCERTAIN_AND_ENABLED",
+                "feature_flag_modified": not rollback_safe,
+                "global_worker_executed": False,
+                "live_heartbeat_confirmed": False,
+                "runtime_checkpoint_modified": False,
+                "real_trading_enabled": False,
+                "flag_write": write,
+                "rollback": rollback,
+                "rollback_verified_safe": rollback_safe,
+            }
         return {
             "schema": SCHEMA,
             "status": "ERROR",
@@ -601,12 +640,23 @@ def activate_global_worker_feature_flag(
             "feature_flag_modified": False,
             "global_worker_executed": False,
             "flag_write": write,
+            "observed_feature_flag_state": observed_state or "UNKNOWN",
         }
 
     post_flag = dict(flag_reader(config, timeout=timeout) or {})
+    post_runtime = dict(
+        runtime_reader(config, timeout=min(timeout, 10.0)) or {}
+    )
+    post_runtime_validation = validate_global_worker_activation_approval(
+        access,
+        post_runtime,
+        approval,
+        now=now,
+    )
     if (
         str(post_flag.get("status") or "").upper() == "CONFIRMED"
         and str(post_flag.get("state") or "").upper() == "ENABLED"
+        and post_runtime_validation.get("state") == "APPROVED"
     ):
         return {
             "schema": SCHEMA,
@@ -619,6 +669,7 @@ def activate_global_worker_feature_flag(
             "runtime_checkpoint_modified": False,
             "real_trading_enabled": False,
             "activation_approval_digest": str((approval or {}).get("approval_digest") or ""),
+            "runtime_sha_verified_after_write": str(post_runtime.get("sha") or ""),
             "next_required_evidence": "GLOBAL_WORKER_LIVE_HEARTBEAT_AND_RECEIPT",
         }
 
@@ -635,7 +686,11 @@ def activate_global_worker_feature_flag(
             if rollback_safe
             else "CRITICAL_ACTIVATION_ROLLBACK_FAILED"
         ),
-        "reason": "FEATURE_FLAG_ENABLE_NOT_CONFIRMED_AFTER_WRITE",
+        "reason": (
+            "RUNTIME_CHANGED_DURING_ACTIVATION"
+            if post_runtime_validation.get("state") != "APPROVED"
+            else "FEATURE_FLAG_ENABLE_NOT_CONFIRMED_AFTER_WRITE"
+        ),
         "feature_flag_modified": not rollback_safe,
         "global_worker_executed": False,
         "live_heartbeat_confirmed": False,
