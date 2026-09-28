@@ -165,3 +165,15 @@ feature-activation ceremonies are explicitly executed in the future.
 
 A green PR means the verification mechanism is ready, not that the worker is
 currently live.
+
+
+## CI audit procedure
+
+Because the repository's traditional pull-request quality workflows target
+`main`, this stacked draft may be temporarily retargeted to `main` only for
+CI audit. A documentation-only synchronize commit may be used to trigger those
+workflows. After validation, the base is restored to
+`cursor/aion-global-worker-activation-ceremony-v1`.
+
+This procedure does not merge, deploy, persist ARMED, enable the feature flag,
+run a worker tick, or change the runtime Checkpoint.
