@@ -20,7 +20,7 @@ from zoneinfo import ZoneInfo
 from atlasquant_aion_clock import DEFAULT_TIMEZONE, application_timezone
 from atlasquant_aion_core_intelligence.context import Context
 from atlasquant_aion_core_intelligence.evidence import digest, safe_text, utc
-from atlasquant_neural_tts import transcript_cache_key, validate_transcript
+from atlasquant_neural_tts import validate_transcript
 
 
 SCHEMA = "ATLASQUANT_AION_CORE_VOICE_SCHEDULER_V1"
@@ -459,7 +459,13 @@ class AtlasQuantVoiceAdapter:
             "status": "READY_TO_GENERATE_ON_EXPLICIT_CLICK",
             "reason": "NO_PROVIDER_CALL_IN_CORE",
             "transcript": text,
-            "cache_digest": transcript_cache_key(text),
+            "transcript_digest": digest({
+                "text": text,
+                "profile_id": snapshot["profile_id"],
+                "provider": snapshot["provider"],
+                "model": snapshot["model"],
+                "voice": snapshot["voice"],
+            }),
         }
 
 
