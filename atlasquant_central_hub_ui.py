@@ -9,6 +9,10 @@ from __future__ import annotations
 from html import escape
 from typing import Any, Mapping
 
+from atlasquant_navigation_bridge import (
+    request_return_to_aion,
+    request_surface_revalidation,
+)
 from atlasquant_ui_v1 import hero_html, section_title_html, state_badge_html
 
 _AREA_ORDER = ("aion", "negocios", "trader", "investimentos")
@@ -177,6 +181,22 @@ def assert_area_access(access: Mapping[str, Any] | None, area: Any) -> str:
     if area_id not in visible:
         raise ValueError("central area access denied")
     return area_id
+
+
+def request_central_destination(session_state, access: Mapping[str, Any] | None, area: Any):
+    """Hand a central area to the existing navigation bridge.
+
+    Trader opens the current Radar page. AION opens the existing AION page.
+    Negócios and Investimentos are shells and do not change the page.
+    """
+    area_id = assert_area_access(access, area)
+    if area_id == "aion":
+        return request_return_to_aion(session_state)
+    if area_id == "trader":
+        mode = str(session_state.get("atlasquant_experience_mode") or "")
+        surface = "advanced_radar" if mode.casefold().startswith("avan") else "home_radar"
+        return request_surface_revalidation(session_state, surface)
+    return None
 
 
 def resolve_central_area(access: Mapping[str, Any] | None, requested: Any = None) -> dict[str, Any]:
@@ -393,5 +413,6 @@ __all__ = [
     "central_card_html",
     "aion_home_html",
     "central_surface_html",
+    "request_central_destination",
     "render_central_hub",
 ]

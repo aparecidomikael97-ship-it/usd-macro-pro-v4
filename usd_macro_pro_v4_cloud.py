@@ -425,9 +425,10 @@ except Exception:
     render_premium_catalog = None
 
 try:
-    from atlasquant_central_hub_ui import render_central_hub
+    from atlasquant_central_hub_ui import render_central_hub, request_central_destination
 except Exception:
     render_central_hub = None
+    request_central_destination = None
 
 
 def _render_atlasquant_central_hub(*, active_index=None, stop_for_shell=False):
@@ -451,6 +452,21 @@ def _render_atlasquant_central_hub(*, active_index=None, stop_for_shell=False):
     ):
         st.stop()
     return resolved
+
+
+def _apply_central_trader_navigation():
+    """Leave AION for the existing Radar page when the rail asks for Trader."""
+    if request_central_destination is None:
+        return None
+    try:
+        requested = st.query_params.get("central", "")
+        if isinstance(requested, (list, tuple)):
+            requested = requested[0] if requested else ""
+        if str(requested or "").strip().casefold() != "trader":
+            return None
+        return request_central_destination(st.session_state, _ATLASQUANT_ACCESS, "trader")
+    except Exception:
+        return None
 
 
 try:
@@ -2151,6 +2167,7 @@ if (
                 st.session_state["_aion_direct_link_consumed"] = True
     except Exception:
         pass
+_apply_central_trader_navigation()
 _aq_early_pages = list(navigation_labels()) if navigation_labels is not None else []
 if str(_ATLASQUANT_ACCESS.get("role") or "").upper() == "ADMIN" and "🧠 AION" not in _aq_early_pages:
     _aq_early_pages.append("🧠 AION")
@@ -4447,6 +4464,7 @@ if (
         # affect authentication, Guardian or the regular AtlasQuant navigation.
         pass
 
+_apply_central_trader_navigation()
 # Guided AION navigation is consumed before the Streamlit navigation widgets
 # are instantiated. This avoids mutating widget-backed session state after
 # creation in the same rerun.

@@ -11,7 +11,11 @@ from atlasquant_central_hub_ui import (
     central_surface_html,
     central_visibility_model,
     ecosystem_rail_html,
+    request_central_destination,
+    resolve_central_area,
 )
+from atlasquant_navigation_bridge import consume_navigation_request
+from atlasquant_ui_v1 import navigation_labels
 from atlasquant_ui_v1 import ATLASQUANT_CSS
 
 
@@ -154,6 +158,57 @@ class CentralHubUiTests(unittest.TestCase):
         surface = central_surface_html(_access("ADMIN"), "aion")
         self.assertIn("AION IA", surface)
         self.assertEqual(surface.count('class="aq-aion-module"'), 9)
+
+    def test_trader_central_leaves_aion_and_shells_stay_shells(self):
+        pages = list(navigation_labels())
+        pages.append("🧠 AION")
+        self.assertEqual(pages[0], "🎯 Radar")
+        self.assertEqual(pages.index("🧠 AION"), 21)
+        admin = _access("ADMIN")
+        state = {
+            "atlasquant_experience_mode": "Avançado",
+            "atlasquant_advanced_area": "🧠 AION",
+            "atlasquant_stable_nav_fallback": "🧠 AION",
+        }
+        request_central_destination(state, admin, "trader")
+        self.assertIsNotNone(consume_navigation_request(state, available_pages=pages))
+        self.assertEqual(state["atlasquant_advanced_area"], "🎯 Radar")
+        self.assertEqual(state["atlasquant_stable_nav_fallback"], "🎯 Radar")
+        self.assertNotEqual(pages.index(state["atlasquant_advanced_area"]), 21)
+
+        again = {"atlasquant_experience_mode": "Avançado"}
+        request_central_destination(again, admin, "aion")
+        consume_navigation_request(again, available_pages=pages)
+        self.assertEqual(again["atlasquant_advanced_area"], "🧠 AION")
+        self.assertEqual(pages.index(again["atlasquant_advanced_area"]), 21)
+
+        student = {
+            "atlasquant_experience_mode": "Avançado",
+            "atlasquant_advanced_area": "🎯 Radar",
+        }
+        for area in ("aion", "negocios", "investimentos"):
+            with self.assertRaisesRegex(ValueError, "central area access denied"):
+                request_central_destination(student, _access("USER"), area)
+        self.assertEqual(student["atlasquant_advanced_area"], "🎯 Radar")
+
+        parked = {
+            "atlasquant_experience_mode": "Avançado",
+            "atlasquant_advanced_area": "🧠 AION",
+        }
+        self.assertIsNone(request_central_destination(parked, admin, "negocios"))
+        self.assertIsNone(request_central_destination(parked, admin, "Renda Fixa"))
+        self.assertEqual(parked["atlasquant_advanced_area"], "🧠 AION")
+        self.assertTrue(resolve_central_area(admin, "negocios")["shell"])
+        self.assertTrue(resolve_central_area(admin, "investimentos")["shell"])
+        self.assertFalse(resolve_central_area(admin, "trader")["shell"])
+
+        src = Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        early = src.index("_apply_central_trader_navigation()\n_aq_early_pages")
+        self.assertLess(early, src.index("consume_navigation_request(", early))
+        late = src.index("_apply_central_trader_navigation()\n# Guided AION")
+        self.assertLess(late, src.index("consume_navigation_request(", late))
+        self.assertIn('if _aq_active_index == 21:', src)
+        self.assertIn('resolved.get("shell")', src)
 
     def test_entry_point_keeps_the_existing_aion_console(self):
         src = Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
