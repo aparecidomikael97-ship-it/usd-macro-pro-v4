@@ -129,28 +129,72 @@ def pulse_health(
         row for row in completed
         if str(row.get("conclusion") or "") == "success"
     ]
-    newest = _parse_iso(recent[0].get("created_at")) if recent else None
-    age_seconds = (
-        max(0, int((current - newest).total_seconds()))
-        if newest is not None
+
+    latest = recent[0] if recent else {}
+    latest_created = _parse_iso(latest.get("created_at")) if latest else None
+    latest_age_seconds = (
+        max(0, int((current - latest_created).total_seconds()))
+        if latest_created is not None
         else None
+    )
+    latest_status = str(latest.get("status") or "")
+    latest_conclusion = str(latest.get("conclusion") or "")
+    latest_is_active = latest_status in {"queued", "in_progress"}
+
+    latest_completed = completed[0] if completed else {}
+    completed_created = (
+        _parse_iso(latest_completed.get("created_at"))
+        if latest_completed
+        else None
+    )
+    completed_age_seconds = (
+        max(0, int((current - completed_created).total_seconds()))
+        if completed_created is not None
+        else None
+    )
+    completed_conclusion = str(
+        latest_completed.get("conclusion") or ""
+    )
+
+    latest_observation_ok = bool(
+        latest_created is not None
+        and latest_age_seconds is not None
+        and latest_age_seconds <= MAX_PULSE_AGE_SECONDS
+        and (
+            latest_is_active
+            or (
+                latest_status == "completed"
+                and latest_conclusion == "success"
+            )
+        )
+    )
+    latest_completed_ok = bool(
+        completed_created is not None
+        and completed_age_seconds is not None
+        and completed_age_seconds <= MAX_PULSE_AGE_SECONDS
+        and completed_conclusion == "success"
     )
     healthy = bool(
         len(successes) >= MIN_SUCCESSFUL_PULSES
-        and newest is not None
-        and age_seconds is not None
-        and age_seconds <= MAX_PULSE_AGE_SECONDS
-        and str(recent[0].get("conclusion") or "") == "success"
+        and latest_observation_ok
+        and latest_completed_ok
     )
     return {
         "state": "PASS" if healthy else "BLOCKED",
         "observed": len(recent),
         "successful": len(successes),
         "minimum_successful": MIN_SUCCESSFUL_PULSES,
-        "latest_created_at": newest.isoformat() if newest else "",
-        "latest_age_seconds": age_seconds,
+        "latest_created_at": latest_created.isoformat() if latest_created else "",
+        "latest_age_seconds": latest_age_seconds,
+        "latest_status": latest_status,
+        "latest_conclusion": latest_conclusion,
+        "latest_is_active": latest_is_active,
+        "latest_completed_created_at": (
+            completed_created.isoformat() if completed_created else ""
+        ),
+        "latest_completed_age_seconds": completed_age_seconds,
+        "latest_completed_conclusion": completed_conclusion,
         "max_age_seconds": MAX_PULSE_AGE_SECONDS,
-        "latest_conclusion": str(recent[0].get("conclusion") or "") if recent else "",
     }
 
 
