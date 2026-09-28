@@ -527,6 +527,15 @@ except Exception:
     global_worker_closed_incident_rows = None
     reconcile_global_worker_incident_center = None
 
+try:
+    from atlasquant_aion_global_worker_reactivation_gate import (
+        assess_post_incident_reactivation_gate,
+        reactivation_gate_requirement,
+    )
+except Exception:
+    assess_post_incident_reactivation_gate = None
+    reactivation_gate_requirement = None
+
 SCHEMA = "ATLASQUANT_AION_ADMIN_V1"
 AION_WORKSPACES = (
     "🧠 Central",
@@ -554,6 +563,7 @@ _AION_GLOBAL_ACTIVATION_READINESS_KEY = "aion_global_activation_readiness_v1"
 _AION_GLOBAL_ACTIVATION_PLAN_KEY = "aion_global_activation_plan_v1"
 _AION_GLOBAL_ACTIVATION_APPROVAL_KEY = "aion_global_activation_approval_v1"
 _AION_GLOBAL_ACTIVATION_RESULT_KEY = "aion_global_activation_result_v1"
+_AION_GLOBAL_REACTIVATION_GATE_KEY = "aion_global_reactivation_gate_v1"
 _AION_GLOBAL_LIVE_VERIFICATION_KEY = "aion_global_live_verification_v1"
 _AION_GLOBAL_SUPERVISION_KEY = "aion_global_supervision_v1"
 _AION_GLOBAL_SUPERVISION_HISTORY_KEY = "aion_global_supervision_history_v1"
@@ -6697,6 +6707,70 @@ def _render_development(
                 )
                 st.session_state.pop(_AION_GLOBAL_ACTIVATION_PLAN_KEY, None)
                 st.session_state.pop(_AION_GLOBAL_ACTIVATION_APPROVAL_KEY, None)
+
+                gate_flag_evidence = (
+                    live_readiness.get("flag_evidence")
+                    if isinstance(
+                        live_readiness.get("flag_evidence"),
+                        Mapping,
+                    )
+                    else {}
+                )
+                if (
+                    assess_post_incident_reactivation_gate is not None
+                    and reconcile_global_worker_incident_center is not None
+                    and verify_global_worker_live_activation is not None
+                    and supervise_global_worker is not None
+                ):
+                    try:
+                        gate_live_report = verify_global_worker_live_activation(
+                            access,
+                            runtime_result,
+                            gate_flag_evidence,
+                            activation_result=None,
+                        )
+                        gate_supervision = supervise_global_worker(
+                            gate_live_report,
+                            gate_flag_evidence,
+                        )
+                        gate_incident_snapshot = (
+                            reconcile_global_worker_incident_center(
+                                {},
+                                gate_supervision,
+                                runtime_result,
+                            )
+                        )
+                        st.session_state[
+                            _AION_GLOBAL_REACTIVATION_GATE_KEY
+                        ] = assess_post_incident_reactivation_gate(
+                            runtime_result,
+                            gate_incident_snapshot,
+                            live_readiness,
+                            gate_flag_evidence,
+                        )
+                    except Exception as gate_exc:
+                        st.session_state[
+                            _AION_GLOBAL_REACTIVATION_GATE_KEY
+                        ] = {
+                            "status": "REACTIVATION_GATE_BLOCKED",
+                            "gate_required": True,
+                            "gate_ready": False,
+                            "activation_plan_allowed": False,
+                            "reason": type(gate_exc).__name__,
+                            "reactivation_authorized": False,
+                        }
+                else:
+                    st.session_state[
+                        _AION_GLOBAL_REACTIVATION_GATE_KEY
+                    ] = {
+                        "status": "REACTIVATION_GATE_BLOCKED",
+                        "gate_required": True,
+                        "gate_ready": False,
+                        "activation_plan_allowed": False,
+                        "reason": "POST_INCIDENT_GATE_UNAVAILABLE",
+                        "reactivation_authorized": False,
+                    }
+
                 if (
                     live_readiness.get("status") == "PASS"
                     and live_readiness.get("activation_stage")
@@ -6726,12 +6800,21 @@ def _render_development(
         activation_readiness = st.session_state.get(
             _AION_GLOBAL_ACTIVATION_READINESS_KEY
         )
+        reactivation_gate = st.session_state.get(
+            _AION_GLOBAL_REACTIVATION_GATE_KEY
+        )
+        reactivation_gate_allows_plan = bool(
+            isinstance(reactivation_gate, Mapping)
+            and reactivation_gate.get("activation_plan_allowed") is True
+            and reactivation_gate.get("gate_ready") is True
+        )
         activation_ready = bool(
             isinstance(activation_readiness, Mapping)
             and activation_readiness.get("status") == "PASS"
             and activation_readiness.get("activation_stage")
             == "READY_FOR_FLAG_ENABLE"
             and not list(activation_readiness.get("blockers") or [])
+            and reactivation_gate_allows_plan
         )
         activation_flag_evidence = (
             activation_readiness.get("flag_evidence")
@@ -6788,6 +6871,44 @@ def _render_development(
                 ),
             )
 
+        if isinstance(reactivation_gate, Mapping):
+            rg1, rg2, rg3 = st.columns(3)
+            rg1.metric(
+                "Post-incident gate",
+                str(reactivation_gate.get("status") or "UNKNOWN"),
+            )
+            rg2.metric(
+                "Histórico durável",
+                str(reactivation_gate.get("durable_closure_records") or 0),
+            )
+            rg3.metric(
+                "Plano permitido",
+                "SIM"
+                if reactivation_gate.get("activation_plan_allowed")
+                else "NÃO",
+            )
+            if reactivation_gate.get("gate_required"):
+                if reactivation_gate.get("gate_ready"):
+                    st.success(
+                        "Gate pós-incidente verde para geração do plano. "
+                        "Isso NÃO autoriza reativação; a cerimônia de ativação "
+                        "continua separada."
+                    )
+                else:
+                    st.error(
+                        "Reativação bloqueada pelo gate pós-incidente: "
+                        + str(
+                            reactivation_gate.get("reason")
+                            or "evidência não reconciliada"
+                        )
+                        + "."
+                    )
+            else:
+                st.caption(
+                    "Nenhum histórico durável de incidente exige gate pós-incidente "
+                    "neste runtime."
+                )
+
         activation_ttl = int(st.number_input(
             "TTL da autorização de ativação (segundos)",
             min_value=300,
@@ -6811,6 +6932,7 @@ def _render_development(
                     runtime_result,
                     activation_readiness,
                     activation_flag_evidence,
+                    reactivation_gate=reactivation_gate,
                     ttl_seconds=activation_ttl,
                 )
                 if (
@@ -6952,57 +7074,118 @@ def _render_development(
             ),
             width="stretch",
         ):
-            decision = guardian_decision(
-                "write_runtime",
-                access,
-                approved=True,
-                feature_flags=flags,
-            )
-            if not decision["allowed"]:
-                st.error(decision["reason"])
-            else:
+            fresh_reactivation_gate = reactivation_gate
+            final_gate_ready = True
+            if bool(
+                (activation_approval or {}).get(
+                    "post_incident_gate_required"
+                )
+            ):
+                final_gate_ready = False
                 try:
-                    activation_result = activate_global_worker_feature_flag(
+                    final_gate_runtime = load_runtime_checkpoint(cfg)
+                    final_gate_flag = read_repository_feature_flag(cfg)
+                    final_gate_live = verify_global_worker_live_activation(
                         access,
-                        runtime_result,
-                        activation_approval,
-                        cfg,
-                        confirmation=True,
+                        final_gate_runtime,
+                        final_gate_flag,
+                        activation_result=None,
                     )
-                    st.session_state[
-                        _AION_GLOBAL_ACTIVATION_RESULT_KEY
-                    ] = activation_result
-                    status = str(
-                        activation_result.get("status") or "UNKNOWN"
+                    final_gate_supervision = supervise_global_worker(
+                        final_gate_live,
+                        final_gate_flag,
                     )
-                    if status == "ACTIVATED_PENDING_LIVE_EVIDENCE":
-                        st.success(
-                            "Feature flag habilitada e relida. "
-                            "Estado: ACTIVATED_PENDING_LIVE_EVIDENCE. "
-                            "Ainda não há prova de heartbeat/receipt do Worker."
+                    final_gate_snapshot = (
+                        reconcile_global_worker_incident_center(
+                            {},
+                            final_gate_supervision,
+                            final_gate_runtime,
                         )
-                    elif status == "ACTIVATION_ROLLED_BACK":
-                        st.error(
-                            "A ativação foi revertida automaticamente por "
-                            "divergência de runtime ou verificação da flag."
+                    )
+                    fresh_reactivation_gate = (
+                        assess_post_incident_reactivation_gate(
+                            final_gate_runtime,
+                            final_gate_snapshot,
+                            activation_readiness,
+                            final_gate_flag,
                         )
-                    else:
-                        st.error(
-                            "Ativação não confirmada. Estado: "
-                            + status
-                            + " · motivo: "
-                            + str(
-                                activation_result.get("reason")
-                                or "não informado"
+                    )
+                    final_gate_ready = bool(
+                        fresh_reactivation_gate.get("status")
+                        == "REACTIVATION_GATE_READY"
+                        and fresh_reactivation_gate.get("gate_ready") is True
+                        and fresh_reactivation_gate.get(
+                            "activation_plan_allowed"
+                        )
+                        is True
+                    )
+                except Exception as gate_exc:
+                    fresh_reactivation_gate = {
+                        "status": "REACTIVATION_GATE_BLOCKED",
+                        "reason": type(gate_exc).__name__,
+                        "gate_ready": False,
+                        "activation_plan_allowed": False,
+                    }
+                    final_gate_ready = False
+
+            if not final_gate_ready:
+                st.error(
+                    "Ativação bloqueada: o gate pós-incidente fresco não está "
+                    "verde. Nenhuma feature flag foi alterada."
+                )
+            else:
+                decision = guardian_decision(
+                    "write_runtime",
+                    access,
+                    approved=True,
+                    feature_flags=flags,
+                )
+                if not decision["allowed"]:
+                    st.error(decision["reason"])
+                else:
+                    try:
+                        activation_result = activate_global_worker_feature_flag(
+                            access,
+                            runtime_result,
+                            activation_approval,
+                            cfg,
+                            confirmation=True,
+                            reactivation_gate=fresh_reactivation_gate,
+                        )
+                        st.session_state[
+                            _AION_GLOBAL_ACTIVATION_RESULT_KEY
+                        ] = activation_result
+                        status = str(
+                            activation_result.get("status") or "UNKNOWN"
+                        )
+                        if status == "ACTIVATED_PENDING_LIVE_EVIDENCE":
+                            st.success(
+                                "Feature flag habilitada e relida. "
+                                "Estado: ACTIVATED_PENDING_LIVE_EVIDENCE. "
+                                "Ainda não há prova de heartbeat/receipt do Worker."
                             )
+                        elif status == "ACTIVATION_ROLLED_BACK":
+                            st.error(
+                                "A ativação foi revertida automaticamente por "
+                                "divergência de runtime ou verificação da flag."
+                            )
+                        else:
+                            st.error(
+                                "Ativação não confirmada. Estado: "
+                                + status
+                                + " · motivo: "
+                                + str(
+                                    activation_result.get("reason")
+                                    or "não informado"
+                                )
+                                + "."
+                            )
+                    except Exception as exc:
+                        st.error(
+                            "Ativação bloqueada em modo seguro: "
+                            + type(exc).__name__
                             + "."
                         )
-                except Exception as exc:
-                    st.error(
-                        "Ativação bloqueada em modo seguro: "
-                        + type(exc).__name__
-                        + "."
-                    )
 
         last_activation = st.session_state.get(
             _AION_GLOBAL_ACTIVATION_RESULT_KEY
