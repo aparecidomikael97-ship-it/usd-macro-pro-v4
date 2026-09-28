@@ -202,6 +202,19 @@ class PremiumShellTests(unittest.TestCase):
         from atlasquant_navigation_bridge import consume_navigation_request
         consume_navigation_request(aion_state, available_pages=pages)
         self.assertEqual(aion_state["atlasquant_advanced_area"], "🧠 AION")
+
+        business_state = {}
+        self.assertEqual(
+            request_premium_card(business_state, "business", mode="Avançado", available_pages=pages, fast=False),
+            "🧠 AION",
+        )
+        self.assertEqual(business_state["aion_admin_workspace_jump"], "💼 Negócios")
+        consume_navigation_request(business_state, available_pages=pages)
+        self.assertEqual(business_state["atlasquant_advanced_area"], "🧠 AION")
+        business_module=next(item for item in PREMIUM_MODULES if item["id"]=="business")
+        self.assertEqual(business_module["page"], "🧠 AION")
+        self.assertNotEqual(business_module["page"], "💼 Vendas")
+        self.assertIn("Portal Comercial", business_module["summary"])
         shell = Path("atlasquant_premium_shell.py").read_text(encoding="utf-8")
         self.assertNotIn("real_orders_enabled = True", shell)
         self.assertNotIn("automatic_execution = True", shell)

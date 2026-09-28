@@ -319,7 +319,7 @@ PREMIUM_MODULES: tuple[dict[str, str], ...] = (
     {"id":"academy","sector":"Ecossistema","title":"Academia","motif":"academy","page":"🎓 Aprender","fast_page":"🎓 Aprender","summary":"Material de estudo já publicado na área Aprender."},
     {"id":"journal","sector":"Ecossistema","title":"Diário","motif":"journal","page":"🗂️ Histórico","fast_page":"","summary":"Abre Histórico, o registro das leituras anteriores. Não grava um diário novo."},
     {"id":"invest","sector":"Ecossistema","title":"Investimentos","motif":"invest","page":"💰 Investir","fast_page":"💰 Investir","summary":"Abre a central de investimentos já existente, sem executar aplicação."},
-    {"id":"business","sector":"Ecossistema","title":"Negócios","motif":"business","page":"💼 Vendas","fast_page":"","summary":"Abre Vendas. Onboarding comercial continua separado de qualquer ordem de mercado."},
+    {"id":"business","sector":"Ecossistema","title":"Negócios","motif":"business","page":"🧠 AION","fast_page":"","summary":"Abre o cockpit Business existente no AION. O Portal Comercial 💼 Vendas continua separado."},
     {"id":"video","sector":"Ecossistema","title":"Vídeo / Conteúdo","motif":"video","page":"🎓 Aprender","fast_page":"🎓 Aprender","summary":"O conteúdo em vídeo permanece dentro de Aprender. Nenhum player externo é carregado na home."},
     {"id":"aion","sector":"Ecossistema","title":"AION / Central Administrativa","motif":"aion","page":"🧠 AION","fast_page":"","summary":"Abre a Central AION quando esta sessão já tem essa área. Não amplia permissão nem autenticação."},
     {"id":"profile","sector":"Ecossistema","title":"Perfil / Configurações","motif":"profile","page":"👤 Conta","fast_page":"👤 Conta","summary":"Abre Conta. Credenciais, Render e variáveis de ambiente não são editados aqui."},
@@ -575,8 +575,12 @@ def request_premium_card(
     if not target:
         return ""
     if target == "🧠 AION":
-        from atlasquant_navigation_bridge import request_return_to_aion
-        request_return_to_aion(session_state)
+        if str(card_id or "").strip() == "business":
+            from atlasquant_navigation_bridge import request_business_workspace
+            request_business_workspace(session_state)
+        else:
+            from atlasquant_navigation_bridge import request_return_to_aion
+            request_return_to_aion(session_state)
         return target
     session_state[_PENDING_KEY] = target
     return target

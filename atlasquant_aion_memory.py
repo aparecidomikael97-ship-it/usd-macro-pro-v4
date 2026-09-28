@@ -28,7 +28,12 @@ from atlasquant_aion_operations import normalize_queue, queue_digest
 from atlasquant_aion_observability import normalize_events, events_digest
 from atlasquant_aion_model_router import normalize_budget
 from atlasquant_aion_studio import normalize_projects, studio_digest
-from atlasquant_aion_business import normalize_products, business_digest
+from atlasquant_aion_business import (
+    normalize_products,
+    business_digest,
+    normalize_business_metrics,
+    business_metrics_digest,
+)
 from atlasquant_aion_promotions import normalize_campaigns, promotion_digest
 from atlasquant_aion_entitlements import normalize_entitlements, entitlement_digest
 from atlasquant_aion_continuity import (
@@ -452,6 +457,8 @@ def default_checkpoint() -> dict[str, Any]:
         },
         "business": {
             "products": [],
+            "metrics": normalize_business_metrics({}),
+            "metrics_digest": business_metrics_digest({}),
             "digest": business_digest([]),
         },
         "promotions": {
@@ -576,8 +583,13 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
     business_products = normalize_products(
         business.get("products") if isinstance(business, Mapping) else []
     )
+    business_metrics = normalize_business_metrics(
+        business.get("metrics") if isinstance(business, Mapping) else {}
+    )
     payload["business"] = {
         "products": business_products,
+        "metrics": business_metrics,
+        "metrics_digest": business_metrics_digest(business_metrics),
         "digest": business_digest(business_products),
     }
 
@@ -850,13 +862,22 @@ def update_studio_checkpoint(
 def update_business_checkpoint(
     checkpoint: Mapping[str, Any] | None,
     *,
-    products: Any,
+    products: Any = None,
+    metrics: Mapping[str, Any] | None = None,
     dirty: bool = True,
 ) -> dict[str, Any]:
     payload = ensure_operating_checkpoint(checkpoint)
-    rows = normalize_products(products)
+    current = payload.get("business") if isinstance(payload.get("business"), Mapping) else {}
+    rows = normalize_products(
+        current.get("products", []) if products is None else products
+    )
+    normalized_metrics = normalize_business_metrics(
+        current.get("metrics", {}) if metrics is None else metrics
+    )
     payload["business"] = {
         "products": rows,
+        "metrics": normalized_metrics,
+        "metrics_digest": business_metrics_digest(normalized_metrics),
         "digest": business_digest(rows),
     }
     payload["operating"]["dirty"] = bool(dirty)
@@ -1695,6 +1716,15 @@ def checkpoint_integrity_report(
     business = raw.get("business") if isinstance(raw.get("business"), Mapping) else {}
     products = normalize_products(business.get("products") if isinstance(business, Mapping) else [])
     add_check("business", business.get("digest"), business_digest(products))
+    if business.get("metrics") is not None or business.get("metrics_digest"):
+        metrics = normalize_business_metrics(
+            business.get("metrics") if isinstance(business, Mapping) else {}
+        )
+        add_check(
+            "business.metrics",
+            business.get("metrics_digest"),
+            business_metrics_digest(metrics),
+        )
 
     promotions = raw.get("promotions") if isinstance(raw.get("promotions"), Mapping) else {}
     campaigns = normalize_campaigns(promotions.get("campaigns") if isinstance(promotions, Mapping) else [])

@@ -769,6 +769,36 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertEqual(len(business["business"]["products"]),1)
         self.assertTrue(business["studio"]["digest"])
         self.assertTrue(business["business"]["digest"])
+        business=update_business_checkpoint(
+            business,
+            metrics={
+                "source":"admin confirmed export",
+                "truth_state":"CONFIRMED",
+                "visits":100,
+                "leads":20,
+                "checkouts":10,
+                "orders":5,
+                "revenue":1000,
+                "costs":600,
+                "gross_profit":400,
+                "net_profit":250,
+                "available_cash":150,
+            },
+            dirty=True,
+        )
+        self.assertEqual(business["business"]["metrics"]["revenue"],1000.0)
+        self.assertEqual(business["business"]["metrics"]["net_profit"],250.0)
+        self.assertEqual(business["business"]["metrics"]["available_cash"],150.0)
+        self.assertTrue(business["business"]["metrics_digest"])
+        self.assertEqual(checkpoint_integrity_report(business)["state"],"CONFIRMED")
+
+        tampered=dict(business)
+        tampered["business"]=dict(business["business"])
+        tampered["business"]["metrics"]=dict(business["business"]["metrics"])
+        tampered["business"]["metrics"]["net_profit"]=999.0
+        report=checkpoint_integrity_report(tampered)
+        self.assertEqual(report["state"],"MISMATCH")
+        self.assertIn("business.metrics",report["mismatches"])
 
     def test_promotions_update_marks_checkpoint_dirty_without_plaintext_code(self):
         cp=default_checkpoint()

@@ -195,6 +195,26 @@ def request_return_to_aion(
     return dict(request)
 
 
+_AION_WORKSPACE_JUMP_KEY = "aion_admin_workspace_jump"
+
+
+def request_business_workspace(
+    session_state: MutableMapping[str, Any],
+) -> dict[str, Any]:
+    """Open the existing AION Business workspace in the current session.
+
+    This is navigation only. It does not create a second Business engine,
+    persist data, publish listings, spend money, or widen permissions.
+    """
+    session_state[_AION_WORKSPACE_JUMP_KEY] = "💼 Negócios"
+    request = request_return_to_aion(session_state)
+    return {
+        **request,
+        "workspace": "💼 Negócios",
+        "state": "BUSINESS_WORKSPACE_REQUESTED",
+    }
+
+
 def consume_navigation_request(
     session_state: MutableMapping[str, Any],
     *,
@@ -226,4 +246,5 @@ __all__ = [
     "complete_surface_revalidation",
     "revalidation_result",
     "request_return_to_aion",
+    "request_business_workspace",
 ]

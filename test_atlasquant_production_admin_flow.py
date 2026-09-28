@@ -186,16 +186,20 @@ class ProductionAdminFlowTests(unittest.TestCase):
             assert_session_preserved()
 
         assert_session_preserved()
-        for area_id in (
-            "trader",
-            "central",
-            "negocios",
-            "central",
-            "investimentos",
-            "central",
-            "trader",
-        ):
-            go(area_id)
+        go("trader")
+        go("central")
+
+        go("negocios")
+        self.assertEqual(at.session_state["atlasquant_experience_mode"], "Avançado")
+        self.assertEqual(at.session_state["atlasquant_advanced_area"], "🧠 AION")
+        self.assertEqual(at.session_state["aion_admin_workspace_jump"], "💼 Negócios")
+        self.assertNotEqual(at.session_state["atlasquant_advanced_area"], "💼 Vendas")
+        self.assertIn("AION_CONSOLE_RENDERED", self._html(at))
+
+        go("central")
+        go("investimentos")
+        go("central")
+        go("trader")
 
 
     def test_admin_advanced_click_paints_from_the_runtime_snapshot(self):

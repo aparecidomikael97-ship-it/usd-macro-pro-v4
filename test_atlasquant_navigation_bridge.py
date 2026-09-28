@@ -5,6 +5,7 @@ from atlasquant_navigation_bridge import (
     complete_surface_revalidation,
     consume_navigation_request,
     consume_revalidation_request,
+    request_business_workspace,
     request_return_to_aion,
     request_surface_revalidation,
     revalidation_result,
@@ -117,6 +118,23 @@ class AtlasQuantNavigationBridgeTests(unittest.TestCase):
         self.assertEqual(state["atlasquant_advanced_area"], "🧠 AION")
         self.assertEqual(state["atlasquant_stable_nav_fallback"], "🧠 AION")
 
+
+    def test_business_workspace_reuses_aion_navigation_without_execution(self):
+        state={}
+        request=request_business_workspace(state)
+        self.assertEqual(request["workspace"],"💼 Negócios")
+        self.assertEqual(request["state"],"BUSINESS_WORKSPACE_REQUESTED")
+        self.assertEqual(state["aion_admin_workspace_jump"],"💼 Negócios")
+        self.assertFalse(request["executes_action"])
+        self.assertFalse(request["real_orders_enabled"])
+        consumed=consume_navigation_request(
+            state,
+            available_pages=["🎯 Radar","🧠 AION","💼 Vendas"],
+        )
+        self.assertEqual(consumed["page"],"🧠 AION")
+        self.assertEqual(state["atlasquant_advanced_area"],"🧠 AION")
+        self.assertEqual(state["aion_admin_workspace_jump"],"💼 Negócios")
+        self.assertNotEqual(state["atlasquant_advanced_area"],"💼 Vendas")
 
     def test_main_app_consumes_request_before_navigation_widgets_and_reports_result(self):
         from pathlib import Path
