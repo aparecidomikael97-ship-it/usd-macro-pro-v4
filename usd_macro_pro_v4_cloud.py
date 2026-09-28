@@ -430,11 +430,15 @@ except Exception:
 
 try:
     from atlasquant_central_hub_ui import (
+        consume_aion_module_jump,
+        render_aion_home_viewer,
         render_central_hub,
         request_central_destination,
         sync_central_choice,
     )
 except Exception:
+    consume_aion_module_jump = None
+    render_aion_home_viewer = None
     render_central_hub = None
     request_central_destination = None
     sync_central_choice = None
@@ -492,7 +496,7 @@ def _render_atlasquant_central_hub(*, active_index=None, stop_for_shell=False):
         return None
     try:
         requested = _central_request_for_render(active_index=active_index)
-        resolved = render_central_hub(_ATLASQUANT_ACCESS, requested)
+        resolved = render_central_hub(_ATLASQUANT_ACCESS, requested, defer_aion_home=(active_index == 21))
     except Exception:
         return None
     if (
@@ -10485,6 +10489,26 @@ if _aq_active_index == 21:
             "release_gate": _aion_release_gate,
             "guided_revalidation": revalidation_result(st.session_state) or {},
         }
+        if render_aion_home_viewer is not None:
+            render_aion_home_viewer(_ATLASQUANT_ACCESS, _aion_system_context)
+        if consume_aion_module_jump is not None:
+            try:
+                _aion_module_raw = st.query_params.get("module", "")
+                if isinstance(_aion_module_raw, (list, tuple)):
+                    _aion_module_raw = _aion_module_raw[0] if _aion_module_raw else ""
+                _aion_module_id = str(_aion_module_raw or "").strip()
+                if _aion_module_id:
+                    try:
+                        del st.query_params["module"]
+                    except Exception:
+                        pass
+                consume_aion_module_jump(
+                    st.session_state,
+                    _ATLASQUANT_ACCESS,
+                    _aion_module_id,
+                )
+            except Exception:
+                pass
         _aion_specialist_snapshot = None
         if (
             adapt_loaded_memory_to_specialist_snapshot is not None
