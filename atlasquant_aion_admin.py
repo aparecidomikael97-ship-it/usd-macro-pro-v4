@@ -2529,7 +2529,11 @@ def _render_central(
                         "Estado": str(row.get("state") or ""),
                         "Próxima": str(row.get("next_run_at") or ""),
                         "Devida": "SIM" if row.get("due") else "NÃO",
-                        "Executor": "BLOQUEADO",
+                        "Executor": (
+                            "LOCAL MANUAL"
+                            if str(row.get("capability") or "").strip()
+                            else "BLOQUEADO"
+                        ),
                     }
                     for row in schedule_rows[-50:]
                 ],
