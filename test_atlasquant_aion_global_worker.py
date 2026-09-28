@@ -495,7 +495,11 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
     def test_admin_ui_stages_global_control_but_does_not_auto_save(self):
         source = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("Worker Global/Durable V1 · control plane", source)
-        self.assertIn("Armar Global (staged)", source)
+        self.assertIn("Cerimônia de Arming", source)
+        self.assertIn("Gerar plano de Arming", source)
+        self.assertIn("Criar autorização temporária", source)
+        self.assertIn("Preparar ARMED (staged, sem salvar)", source)
+        self.assertNotIn('"🌐 Armar Global (staged)"', source)
         self.assertIn("Pausar Global (staged)", source)
         self.assertIn("Kill Global (staged)", source)
         self.assertIn("Ainda NÃO está persistido", source)
