@@ -340,6 +340,8 @@ def stage_schedule(
     if cadence_clean == "ONCE":
         if not isinstance(run_at, datetime) or run_at.tzinfo is None:
             raise ValueError("aware run_at required for ONCE")
+        if run_at.astimezone(timezone.utc) <= current:
+            raise ValueError("future run_at required for ONCE")
         run_at_text = run_at.isoformat()
     schedule = _normalize_schedule({
         "schedule_id": "SCH-" + uuid4().hex[:16].upper(),
