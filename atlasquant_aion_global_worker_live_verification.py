@@ -225,6 +225,19 @@ def verify_global_worker_live_activation(
             "real_trading_enabled": False,
         }
 
+    receipt_store_state = str(receipt_state.get("state") or "")
+    if receipt_store_state not in {"EMPTY", "CONNECTED"}:
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "reason": "EXECUTOR_RECEIPT_CONTEXT_OR_INTEGRITY_INVALID",
+            "receipt_store_state": receipt_store_state or "UNKNOWN",
+            "read_only": True,
+            "runtime_modified": False,
+            "feature_flag_modified": False,
+            "real_trading_enabled": False,
+        }
+
     live_receipts = []
     unsafe_receipts = []
     for row in receipts:
