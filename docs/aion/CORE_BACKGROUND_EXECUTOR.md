@@ -171,3 +171,10 @@ Until then:
 `manual_invocation_only = true`
 
 `autonomous_worker_connected = false`
+
+## CI audit procedure
+
+Because the repository's pull-request quality workflows target `main`, this
+stacked draft may be temporarily retargeted to `main` only to trigger CI. After
+the checks complete, its base is restored to the preceding stacked AION branch.
+This audit procedure does not merge or deploy the change.
