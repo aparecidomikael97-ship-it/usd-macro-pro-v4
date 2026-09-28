@@ -666,6 +666,7 @@ def activate_global_worker_feature_flag(
             "feature_flag_modified": False,
             "global_worker_executed": False,
         }
+    current = utc(now or _now())
     fresh_runtime = dict(
         runtime_reader(config, timeout=min(timeout, 10.0)) or {}
     )
@@ -778,6 +779,7 @@ def activate_global_worker_feature_flag(
             "runtime_checkpoint_modified": False,
             "real_trading_enabled": False,
             "activation_approval_digest": str((approval or {}).get("approval_digest") or ""),
+            "activated_at": current.isoformat(),
             "runtime_sha_verified_after_write": str(post_runtime.get("sha") or ""),
             "next_required_evidence": "GLOBAL_WORKER_LIVE_HEARTBEAT_AND_RECEIPT",
         }
