@@ -95,6 +95,15 @@ from atlasquant_aion_developer_patch_validation import (
     patch_validation_manifest_id,
     validate_patch,
 )
+from atlasquant_aion_developer_physical_transition_gate import (
+    EXTERNAL_PROVENANCE_MISSING,
+    PHYSICAL_TRANSITION_BLOCKED,
+    SOURCE_BOUND_READY,
+    STRUCTURAL_READY,
+    assert_physical_transition_record,
+    evaluate_physical_transition_gate,
+    expected_physical_transition_id,
+)
 from atlasquant_aion_developer_source_bound_consumption_gate import (
     assert_source_bound_consumption_gate,
 )
@@ -5708,6 +5717,290 @@ def _source_bound_consumption_gate_surface(_world: _World) -> list[dict[str, str
     return findings
 
 
+def _physical_pin(name: str, path: str, digest: str) -> dict[str, Any]:
+    return {
+        "logical_name": name,
+        "absolute_path": path,
+        "sha256": digest,
+        "file_size_bytes": 128,
+        "version_claim": "claim-only",
+        "verification_evidence_refs": ["evidence:pin:" + name],
+    }
+
+
+def _physical_transition_chain(
+    *,
+    branch: str = "cursor/safe",
+    baseline_ref: str = "main@a",
+    candidate_ref: str = "cursor/safe@b",
+    raw: str | None = None,
+) -> dict[str, Any]:
+    builder = structural_builder_sandbox_request(
+        branch=branch,
+        baseline_ref=baseline_ref,
+        candidate_ref=candidate_ref,
+        requested_files=("module.py", "test_module.py"),
+        candidate_tests=("test_module.py",),
+    )
+    preflight = _sealed_preflight(builder)
+    patch_text = raw if raw is not None else (
+        "diff --git a/module.py b/module.py\n"
+        "--- a/module.py\n+++ b/module.py\n"
+        "@@ -1 +1 @@\n-x=1\n+x=2\n"
+    )
+    sealed = validate_patch(
+        builder,
+        preflight,
+        patch_text,
+        baseline_ref=baseline_ref,
+        candidate_ref=candidate_ref,
+    )
+    attestation = attestation_for_documents(builder, preflight, sealed)
+    runner = build_runner_contract(
+        builder,
+        preflight,
+        sealed,
+        content_attestation=attestation,
+        human_patch_reviewed=True,
+        human_patch_reviewer="reviewer-1",
+        human_patch_review_refs=["review:patch:1"],
+    )
+    policy = build_command_policy_contract(
+        runner,
+        builder_request=builder,
+        preflight=preflight,
+        patch_validation=sealed,
+        content_attestation=attestation,
+    )
+    pinning = build_executable_pinning_spec([
+        _physical_pin("python", "/usr/bin/python3", "ab" * 32),
+        _physical_pin("git", "/usr/bin/git", "cd" * 32),
+    ])
+    environment = build_environment_contract()
+    sandbox = build_os_sandbox_contract(
+        policy,
+        runner,
+        builder,
+        preflight,
+        sealed,
+        attestation,
+        pinning,
+        environment,
+    )
+    probe = build_probe_result_contract(
+        sandbox,
+        policy,
+        runner,
+        builder,
+        preflight,
+        sealed,
+        attestation,
+        pinning,
+        environment,
+    )
+    return {
+        "builder_request": builder,
+        "preflight": preflight,
+        "patch_validation": sealed,
+        "runner_contract": runner,
+        "command_policy": policy,
+        "pinning_spec": pinning,
+        "environment_contract": environment,
+        "os_sandbox_contract": sandbox,
+        "probe_result": probe,
+        "patch_text": patch_text,
+        "baseline_ref": baseline_ref,
+        "candidate_ref": candidate_ref,
+        "content_attestation": attestation,
+    }
+
+
+def _physical_transition_gate_surface(_world: _World) -> list[dict[str, str]]:
+    """Physical transition stays blocked without external provenance.
+
+    PHYSICAL_TRANSITION_GATE: design READY, a stored proof, and a fresh
+    consumption replay do not authorize physical operation. Caller input
+    cannot promote the blocked decision.
+    """
+    findings: list[dict[str, str]] = []
+    module = "atlasquant_aion_developer_physical_transition_gate"
+    chain = _physical_transition_chain()
+
+    def _reject(invariant_id: str, description: str, fn: Callable[[], Any]) -> None:
+        status, _ignored = _invoke(fn)
+        closed = status == "REJECT"
+        findings.append(_finding(
+            invariant_id,
+            module,
+            description if closed else description + " O gate aceitou.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    def _evaluate(**overrides: Any) -> dict[str, Any]:
+        payload = dict(chain)
+        payload.update(overrides)
+        return evaluate_physical_transition_gate(**payload)
+
+    _reject(
+        "physical_transition.design_ready_without_receipt",
+        "PHYSICAL_TRANSITION_DESIGN_READY: documentos de design READY sem replay source-bound nao liberam transicao fisica.",
+        lambda: _evaluate(patch_text=None),
+    )
+    proof = verify_source_bound_patch(
+        chain["builder_request"],
+        chain["preflight"],
+        chain["patch_validation"],
+        chain["patch_text"],
+        baseline_ref=chain["baseline_ref"],
+        candidate_ref=chain["candidate_ref"],
+    )
+    _reject(
+        "physical_transition.stored_proof_as_receipt",
+        "PHYSICAL_TRANSITION_STORED_PROOF: o proof armazenado nao e um receipt de consumo.",
+        lambda: _evaluate(consumption_receipt=proof),
+    )
+    receipt = assert_source_bound_consumption_gate(
+        chain["builder_request"],
+        chain["preflight"],
+        chain["patch_validation"],
+        chain["patch_text"],
+        baseline_ref=chain["baseline_ref"],
+        candidate_ref=chain["candidate_ref"],
+    )
+    stale = deepcopy(receipt)
+    stale["consumption_id"] = "DEVSRCGATE-STALE"
+    _reject(
+        "physical_transition.stale_receipt",
+        "PHYSICAL_TRANSITION_STALE_RECEIPT: o receipt com consumption id trocado nao libera.",
+        lambda: _evaluate(consumption_receipt=stale),
+    )
+    other_raw = (
+        "diff --git a/module.py b/module.py\n"
+        "--- a/module.py\n+++ b/module.py\n"
+        "@@ -1 +1 @@\n-x=1\n+x=3\n"
+    )
+    other_sealed = validate_patch(
+        chain["builder_request"],
+        chain["preflight"],
+        other_raw,
+        baseline_ref=chain["baseline_ref"],
+        candidate_ref=chain["candidate_ref"],
+    )
+    other_receipt = assert_source_bound_consumption_gate(
+        chain["builder_request"],
+        chain["preflight"],
+        other_sealed,
+        other_raw,
+        baseline_ref=chain["baseline_ref"],
+        candidate_ref=chain["candidate_ref"],
+    )
+    _reject(
+        "physical_transition.other_patch_receipt",
+        "PHYSICAL_TRANSITION_OTHER_PATCH: o receipt de outro patch nao corresponde ao patch transitorio.",
+        lambda: _evaluate(consumption_receipt=other_receipt),
+    )
+    lineage = deepcopy(chain["patch_validation"])
+    lineage["builder_request_id"] = "DEVBUILD-OTHERLINEAGE"
+    lineage["validation_id"] = expected_patch_validation_id(lineage)
+    _reject(
+        "physical_transition.lineage",
+        "PHYSICAL_TRANSITION_LINEAGE: a lineage trocada e rejeitada.",
+        lambda: _evaluate(patch_validation=lineage),
+    )
+    _reject(
+        "physical_transition.refs",
+        "PHYSICAL_TRANSITION_REFS: as refs trocadas sao rejeitadas.",
+        lambda: _evaluate(candidate_ref="cursor/other@b"),
+    )
+    digested = deepcopy(chain["patch_validation"])
+    digested["patch_digest"] = "DEVPATCH-SWAPPEDDIGEST"
+    digested["validation_id"] = expected_patch_validation_id(digested)
+    _reject(
+        "physical_transition.patch_digest",
+        "PHYSICAL_TRANSITION_PATCH_DIGEST: o digest trocado nao acompanha o runner da cadeia.",
+        lambda: _evaluate(patch_validation=digested),
+    )
+    other_chain = _physical_transition_chain(
+        branch="cursor/other",
+        baseline_ref="main@c",
+        candidate_ref="cursor/other@d",
+    )
+    _reject(
+        "physical_transition.other_chain",
+        "PHYSICAL_TRANSITION_OTHER_CHAIN: Runner, Policy e OS de outra cadeia nao fecham o gate.",
+        lambda: _evaluate(
+            runner_contract=other_chain["runner_contract"],
+            command_policy=other_chain["command_policy"],
+            os_sandbox_contract=other_chain["os_sandbox_contract"],
+        ),
+    )
+    _reject(
+        "physical_transition.false_independent",
+        "PHYSICAL_TRANSITION_FALSE_INDEPENDENT: o caller nao torna a verificacao independente verdadeira.",
+        lambda: _evaluate(independent_external_verification=True),
+    )
+    _reject(
+        "physical_transition.false_execution_authorized",
+        "PHYSICAL_TRANSITION_FALSE_EXECUTION: physical_execution_authorized nao pode ser promovido.",
+        lambda: _evaluate(physical_execution_authorized=True),
+    )
+
+    def _recomputed() -> None:
+        decision = _evaluate()
+        forged = deepcopy(decision)
+        forged["state"] = "PHYSICAL_TRANSITION_READY"
+        forged["transition_id"] = expected_physical_transition_id(forged)
+        assert_physical_transition_record(forged)
+
+    _reject(
+        "physical_transition.recomputed_ids",
+        "PHYSICAL_TRANSITION_RECOMPUTED_ID: recalcular o transition id nao promove BLOCKED.",
+        _recomputed,
+    )
+    _reject(
+        "physical_transition.unknown_authority",
+        "PHYSICAL_TRANSITION_UNKNOWN_AUTHORITY: git_object_verified nao autoriza a transicao fisica.",
+        lambda: _evaluate(git_object_verified=True),
+    )
+    _reject(
+        "physical_transition.missing_dependency",
+        "PHYSICAL_TRANSITION_MISSING_DEPENDENCY: dependencia ausente fecha o gate.",
+        lambda: _evaluate(runner_contract=None),
+    )
+    _reject(
+        "physical_transition.caller_promotion",
+        "PHYSICAL_TRANSITION_CALLER_PROMOTION: o caller nao promove BLOCKED para READY.",
+        lambda: _evaluate(state="PHYSICAL_TRANSITION_READY"),
+    )
+    decision = _evaluate()
+    rendered = json.dumps(decision)
+    legitimate = (
+        decision.get("state") == PHYSICAL_TRANSITION_BLOCKED
+        and decision.get("structural_readiness") == STRUCTURAL_READY
+        and decision.get("source_bound_readiness") == SOURCE_BOUND_READY
+        and decision.get("external_provenance") == EXTERNAL_PROVENANCE_MISSING
+        and decision.get("independent_external_verification") is False
+        and decision.get("physical_execution_authorized") is False
+        and decision.get("physical_transition_remains_blocked") is True
+        and decision.get("execution_authorized") is False
+        and decision.get("patch_applied") is False
+        and decision.get("subprocess_called") is False
+        and decision.get("patch_text_included") is False
+        and "diff --git" not in rendered
+    )
+    findings.append(_finding(
+        "physical_transition.legitimate",
+        module,
+        "PHYSICAL_TRANSITION_GATE: a cadeia consistente permanece PHYSICAL_TRANSITION_BLOCKED."
+        if legitimate else
+        "PHYSICAL_TRANSITION_GATE: a cadeia consistente liberou transicao fisica.",
+        "PASS" if legitimate else "GAP",
+        "" if legitimate else "HIGH",
+    ))
+    return findings
+
+
 def _reseal_independent(policy: Mapping[str, Any]) -> dict[str, Any]:
     mutated = deepcopy(policy)
     mutated["upstream_provenance_independently_verified"] = True
@@ -5743,6 +6036,7 @@ def audit_developer_chain() -> dict[str, Any]:
         findings.extend(_upstream_semantic_surface(world))
         findings.extend(_source_bound_patch_surface(world))
         findings.extend(_source_bound_consumption_gate_surface(world))
+        findings.extend(_physical_transition_gate_surface(world))
     finally:
         world.close()
 

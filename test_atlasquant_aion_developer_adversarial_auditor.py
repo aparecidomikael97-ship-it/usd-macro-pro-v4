@@ -313,6 +313,21 @@ _HARDENED_INVARIANTS={
     "consumption.unknown_authority",
     "consumption.match_state_not_physical_release",
     "consumption.legitimate",
+    "physical_transition.design_ready_without_receipt",
+    "physical_transition.stored_proof_as_receipt",
+    "physical_transition.stale_receipt",
+    "physical_transition.other_patch_receipt",
+    "physical_transition.lineage",
+    "physical_transition.refs",
+    "physical_transition.patch_digest",
+    "physical_transition.other_chain",
+    "physical_transition.false_independent",
+    "physical_transition.false_execution_authorized",
+    "physical_transition.recomputed_ids",
+    "physical_transition.unknown_authority",
+    "physical_transition.missing_dependency",
+    "physical_transition.caller_promotion",
+    "physical_transition.legitimate",
 }
 
 
@@ -324,10 +339,10 @@ class AionDeveloperAdversarialAuditorTests(unittest.TestCase):
     def test_report_shape_is_deterministic_and_unscored(self):
         report=self.report
         self.assertEqual(report["schema"],SCHEMA)
-        self.assertEqual(report["cases_total"],333)
+        self.assertEqual(report["cases_total"],348)
         self.assertEqual(
             report["gap_count"]+report["blocked_by_design_count"]+report["pass_count"],
-            333,
+            348,
         )
         self.assertFalse(report["symlink_physical_boundary_verified"])
         self.assertFalse(report["hardlink_physical_boundary_verified"])
