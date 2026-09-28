@@ -137,8 +137,14 @@ def supervise_global_worker(
     flag_state = str(flag.get("state") or "UNKNOWN").upper()
     flag_confirmed = str(flag.get("status") or "").upper() == "CONFIRMED"
 
-    # A disabled/unset authoritative flag always wins over stale UI live data.
-    if flag_confirmed and flag_state in {"UNSET", "DISABLED"}:
+    # A disabled/unset authoritative flag wins over stale healthy/pending UI
+    # data, but it must never erase an already observed incident.
+    if (
+        flag_confirmed
+        and flag_state in {"UNSET", "DISABLED"}
+        and status not in SAFETY_STOP_RECOMMENDED_STATES
+        and status != "BLOCKED"
+    ):
         status = "NOT_ENABLED"
 
     severity = _severity(status)
