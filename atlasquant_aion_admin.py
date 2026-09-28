@@ -306,6 +306,15 @@ try:
 except Exception:
     handle_runtime_intent = None
 
+try:
+    from atlasquant_aion_core_checkpoint_bridge import (
+        checkpoint_memory_snapshot,
+        stage_user_approved_memory,
+    )
+except Exception:
+    checkpoint_memory_snapshot = None
+    stage_user_approved_memory = None
+
 SCHEMA = "ATLASQUANT_AION_ADMIN_V1"
 AION_WORKSPACES = (
     "🧠 Central",
@@ -2178,6 +2187,7 @@ def _render_central(
                     access,
                     question,
                     system_context=system_context,
+                    legacy_checkpoint=checkpoint,
                 )
             except Exception as exc:
                 core_runtime_result = {
@@ -2286,6 +2296,120 @@ def _render_central(
                 st.caption(
                     "Gate físico: BLOQUEADO · execução autorizada NÃO · ações externas NÃO."
                 )
+
+    st.markdown("#### 🧠 Memória persistente do AION Core")
+    if checkpoint_memory_snapshot is None or stage_user_approved_memory is None:
+        st.caption(
+            "Bridge de memória do Core indisponível nesta execução. "
+            "Nenhum registro será criado por fallback."
+        )
+    else:
+        try:
+            core_memory = checkpoint_memory_snapshot(access, checkpoint)
+        except Exception as exc:
+            core_memory = {
+                "state": "UNKNOWN",
+                "records": [],
+                "approved_decisions": [],
+                "version": 0,
+                "error_type": type(exc).__name__,
+            }
+        cm1, cm2, cm3 = st.columns(3)
+        cm1.metric("Estado", str(core_memory.get("state") or "UNKNOWN"))
+        cm2.metric("Registros", len(list(core_memory.get("records") or [])))
+        cm3.metric("Versão", int(core_memory.get("version") or 0))
+        st.caption(
+            "A memória do Core fica dentro do Checkpoint Mestre. Registrar aqui altera somente "
+            "a cópia de trabalho; persistência externa continua dependendo de "
+            "“Salvar Checkpoint Mestre no runtime” e do Guardian."
+        )
+        approved_rows = [
+            row for row in list(core_memory.get("approved_decisions") or [])
+            if isinstance(row, Mapping)
+        ]
+        if approved_rows:
+            with st.expander("Decisões humanas aprovadas no Core", expanded=False):
+                st.dataframe(
+                    [
+                        {
+                            "Decisão": str(row.get("text") or ""),
+                            "Versão": int(row.get("version") or 0),
+                            "Origem": str(row.get("origin") or ""),
+                            "Registrada em": str(row.get("created_at") or ""),
+                        }
+                        for row in approved_rows[-20:]
+                    ],
+                    hide_index=True,
+                    width="stretch",
+                )
+
+        with st.expander("Registrar memória com aprovação humana", expanded=False):
+            memory_kind = st.selectbox(
+                "Tipo de memória",
+                ("DECISION", "REQUIREMENT", "PRIORITY", "PENDING_TASK"),
+                key="aion_core_memory_kind",
+                format_func=lambda value: {
+                    "DECISION": "Decisão",
+                    "REQUIREMENT": "Requisito",
+                    "PRIORITY": "Prioridade",
+                    "PENDING_TASK": "Pendência",
+                }.get(value, value),
+            )
+            memory_text = st.text_area(
+                "Conteúdo",
+                key="aion_core_memory_text",
+                max_chars=2400,
+                placeholder="Ex.: Manter a Central AION como porta administrativa principal.",
+            )
+            memory_confirm = st.checkbox(
+                "Confirmo que revisei este texto e quero registrá-lo como memória aprovada por mim.",
+                value=False,
+                key="aion_core_memory_confirm",
+            )
+            if st.button(
+                "✅ Aprovar e registrar no Checkpoint de trabalho",
+                key="aion_core_memory_stage",
+                disabled=not bool(memory_confirm and memory_text.strip()),
+                width="stretch",
+            ):
+                try:
+                    staged_memory = stage_user_approved_memory(
+                        access,
+                        checkpoint,
+                        kind=memory_kind,
+                        text=memory_text,
+                        confirmation=True,
+                    )
+                    if staged_memory.get("status") == "STAGED":
+                        _set_working_checkpoint(
+                            staged_memory.get("checkpoint") or checkpoint,
+                            dirty=True,
+                        )
+                        st.session_state["aion_core_memory_last_stage"] = {
+                            "status": "STAGED",
+                            "record_id": (
+                                (staged_memory.get("record") or {}).get("record_id")
+                                if isinstance(staged_memory.get("record"), Mapping)
+                                else ""
+                            ),
+                            "external_persisted": False,
+                        }
+                        st.success(
+                            "Memória aprovada e colocada no Checkpoint de trabalho. "
+                            "Ela ainda NÃO foi gravada externamente."
+                        )
+                        st.rerun()
+                    else:
+                        st.warning(
+                            "Memória não foi registrada: "
+                            + str(staged_memory.get("reason") or staged_memory.get("status") or "UNKNOWN")
+                        )
+                except Exception as exc:
+                    st.error(
+                        "Registro bloqueado em modo seguro: "
+                        + type(exc).__name__
+                        + ". Nenhuma memória foi gravada por fallback."
+                    )
 
     provider_env = _provider_env()
     provider = provider_status(feature_flags=flags, env=provider_env)
