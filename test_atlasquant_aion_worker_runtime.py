@@ -141,6 +141,26 @@ class AionWorkerRuntimeTests(unittest.TestCase):
         self.assertTrue(receipt["authorization_digest"])
         self.assertFalse(receipt["execution_authorized"])
 
+    def test_executor_snapshot_reports_observed_armed_worker_mode_truthfully(self):
+        from atlasquant_aion_background_executor import executor_snapshot
+
+        result = worker_tick(
+            self.access,
+            self.armed_due_checkpoint(),
+            runtime_id=self.runtime_a,
+            now=TICK,
+        )
+        snapshot = executor_snapshot(
+            self.access,
+            result["checkpoint"],
+            now=TICK,
+        )
+        self.assertIn("ARMED_WORKER", snapshot["authorization_modes_observed"])
+        self.assertTrue(snapshot["armed_worker_execution_observed"])
+        self.assertFalse(snapshot["manual_invocation_only"])
+        self.assertTrue(snapshot["manual_run_available"])
+        self.assertFalse(snapshot["autonomous_worker_connected"])
+
     def test_same_occurrence_remains_idempotent_under_worker_ticks(self):
         first = worker_tick(
             self.access,
