@@ -327,7 +327,7 @@ def executor_snapshot(
         "manual_run_available": True,
         "armed_worker_execution_observed": armed_worker_observed,
         "global_worker_execution_observed": global_worker_observed,
-        "autonomous_worker_connected": armed_worker_observed or global_worker_observed,
+        "autonomous_worker_connected": False,
         "physical_action_adapter": "UNAVAILABLE",
         "external_action_executed": False,
         "real_trading_enabled": False,
