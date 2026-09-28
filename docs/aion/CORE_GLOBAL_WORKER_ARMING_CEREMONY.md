@@ -216,3 +216,14 @@ After a future explicit decision to persist the staged ARMED state:
 5. keep the feature flag disabled until a separate activation decision.
 
 Arming and activation remain separate approvals.
+
+## CI audit procedure
+
+Because the repository's traditional pull-request quality workflows target
+`main`, this stacked draft may be temporarily retargeted to `main` only for
+CI audit. A documentation-only synchronize commit may be used to trigger those
+workflows. After validation, the base is restored to
+`cursor/aion-global-worker-activation-readiness-v1`.
+
+This audit procedure does not merge, deploy, persist ARMED, modify the runtime
+Checkpoint, modify the repository feature flag, or execute the Global Worker.
