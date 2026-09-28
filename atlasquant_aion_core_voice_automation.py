@@ -253,7 +253,9 @@ def scheduler_bundle(
         "scope": _scope_payload(context),
         "exported_at": utc(exported_at).isoformat(),
         "schedules": rows,
-        "execution_adapter": "UNAVAILABLE",
+        "execution_adapter": "LOCAL_MANUAL_V1",
+        "local_manual_executor": "AVAILABLE",
+        "autonomous_worker_connected": False,
         "automatic_execution": False,
     }
     out["digest"] = _bundle_digest(out)
