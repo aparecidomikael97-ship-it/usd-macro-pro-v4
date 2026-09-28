@@ -163,6 +163,21 @@ def prepare_global_worker_arming_plan(
         maximum=MAX_APPROVAL_TTL_SECONDS,
         name="arming approval ttl",
     )
+    raw_worker = (
+        checkpoint.get("aion_global_worker_v1")
+        if isinstance(checkpoint, Mapping)
+        else None
+    )
+    if isinstance(raw_worker, Mapping) and str(raw_worker.get("state") or "").upper() == "ARMED":
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "reason": "GLOBAL_WORKER_ALREADY_ARMED",
+            "checkpoint_modified": False,
+            "runtime_modified": False,
+            "feature_flag_modified": False,
+        }
+
     source_digest = checkpoint_source_digest(checkpoint)
     expires = current + timedelta(seconds=ttl)
     plan = {
