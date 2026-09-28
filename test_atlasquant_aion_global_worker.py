@@ -100,7 +100,6 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
             max_jobs=max_jobs,
             lease_seconds=lease_seconds,
             approval_ttl_seconds=900,
-            readiness_stage="READY_FOR_ADMIN_ARMING",
             now=now,
         )
         self.assertEqual(plan["status"], "PLAN_READY")
