@@ -16,7 +16,7 @@ from typing import Any, Mapping
 
 from atlasquant_aion_core import guardian_decision
 from atlasquant_aion_core_intelligence.context import Domain
-from atlasquant_aion_core_intelligence.evidence import digest, utc
+from atlasquant_aion_core_intelligence.evidence import digest, safe_text, utc
 from atlasquant_aion_core_intelligence.router import words
 from atlasquant_aion_core_intelligence.service import SENSITIVE_INTENTS
 from atlasquant_aion_core_runtime_bridge import (
