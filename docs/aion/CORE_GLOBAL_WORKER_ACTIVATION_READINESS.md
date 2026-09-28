@@ -176,3 +176,14 @@ The later activation sequence remains separate:
 
 Real trading, payment, publication, deploy and merge remain outside this
 activation path.
+
+## CI audit procedure
+
+Because the repository's main quality workflows target pull requests whose base
+is `main`, this stacked draft may be temporarily retargeted to `main` only
+for CI audit. A documentation-only synchronize commit may be used to trigger
+those workflows after retargeting. When validation completes, the PR base is
+restored to `cursor/aion-global-durable-worker-v1`.
+
+This procedure does not merge, deploy, persist global arming, modify the
+repository feature flag, or execute the Global Worker.
