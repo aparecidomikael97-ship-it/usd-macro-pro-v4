@@ -486,6 +486,21 @@ except Exception:
     closure_review_record = None
     prepare_remediation_evidence = None
 
+try:
+    from atlasquant_aion_global_worker_human_incident_closure import (
+        CONFIRMATION_PHRASE as GLOBAL_HUMAN_CLOSURE_CONFIRMATION_PHRASE,
+        human_closure_summary,
+        prepare_human_incident_closure,
+        record_human_incident_closure,
+    )
+except Exception:
+    GLOBAL_HUMAN_CLOSURE_CONFIRMATION_PHRASE = (
+        "ENCERRAR INCIDENTE WORKER GLOBAL"
+    )
+    human_closure_summary = None
+    prepare_human_incident_closure = None
+    record_human_incident_closure = None
+
 SCHEMA = "ATLASQUANT_AION_ADMIN_V1"
 AION_WORKSPACES = (
     "🧠 Central",
@@ -519,6 +534,7 @@ _AION_GLOBAL_SUPERVISION_HISTORY_KEY = "aion_global_supervision_history_v1"
 _AION_GLOBAL_RECOVERY_DRILL_KEY = "aion_global_recovery_drill_v1"
 _AION_GLOBAL_REMEDIATION_EVIDENCE_KEY = "aion_global_remediation_evidence_v1"
 _AION_GLOBAL_CLOSURE_ASSESSMENT_KEY = "aion_global_closure_assessment_v1"
+_AION_GLOBAL_HUMAN_CLOSURE_RECORD_KEY = "aion_global_human_closure_record_v1"
 
 AION_ADMIN_CSS = r"""
 <style>
@@ -7351,6 +7367,126 @@ def _render_development(
                             "Closure package digest: "
                             + str(closure_record.get("closure_package_digest"))
                         )
+
+                    with st.expander(
+                        "✅ Cerimônia humana de fechamento do incidente"
+                    ):
+                        ceremony_plan = (
+                            prepare_human_incident_closure(closure_assessment)
+                            if prepare_human_incident_closure is not None
+                            else {}
+                        )
+                        ceremony_ready = (
+                            str(ceremony_plan.get("status") or "")
+                            == "CEREMONY_READY"
+                        )
+                        st.caption(
+                            "A cerimônia registra somente a decisão humana nesta "
+                            "sessão. fechamento autoritativo persistido: NÃO · "
+                            "reativação autorizada: NÃO."
+                        )
+                        if ceremony_ready:
+                            closure_evidence_ack = st.checkbox(
+                                "Confirmo que revisei o pacote de evidências "
+                                "vinculado a este incidente.",
+                                value=False,
+                                key="aion_global_human_closure_evidence_ack",
+                            )
+                            closure_human_confirm = st.checkbox(
+                                "Confirmo a decisão humana de encerrar este "
+                                "incidente com base nas evidências apresentadas.",
+                                value=False,
+                                key="aion_global_human_closure_confirm",
+                            )
+                            closure_reactivation_ack = st.checkbox(
+                                "Confirmo que qualquer reativação do Worker Global "
+                                "exige uma cerimônia separada e futura.",
+                                value=False,
+                                key="aion_global_human_closure_reactivation_ack",
+                            )
+                            closure_note = st.text_area(
+                                "Nota do operador (opcional)",
+                                value="",
+                                key="aion_global_human_closure_note",
+                                height=80,
+                            )
+                            closure_phrase = st.text_input(
+                                'Digite exatamente "ENCERRAR INCIDENTE WORKER GLOBAL"',
+                                value="",
+                                key="aion_global_human_closure_phrase",
+                            )
+                            if st.button(
+                                "✅ Registrar decisão humana de fechamento",
+                                key="aion_global_human_closure_execute",
+                                disabled=record_human_incident_closure is None,
+                                width="stretch",
+                            ):
+                                st.session_state[
+                                    _AION_GLOBAL_HUMAN_CLOSURE_RECORD_KEY
+                                ] = record_human_incident_closure(
+                                    closure_assessment,
+                                    human_confirmation=closure_human_confirm,
+                                    evidence_acknowledged=closure_evidence_ack,
+                                    reactivation_separation_acknowledged=(
+                                        closure_reactivation_ack
+                                    ),
+                                    confirmation_phrase=closure_phrase,
+                                    operator_note=closure_note,
+                                )
+                        else:
+                            st.caption(
+                                "Cerimônia bloqueada até existir "
+                                "CLOSURE_REVIEW_READY com evidência vinculada."
+                            )
+
+                        human_closure_record = st.session_state.get(
+                            _AION_GLOBAL_HUMAN_CLOSURE_RECORD_KEY
+                        )
+                        if isinstance(human_closure_record, Mapping):
+                            human_closure_view = (
+                                human_closure_summary(human_closure_record)
+                                if human_closure_summary is not None
+                                else human_closure_record
+                            )
+                            if human_closure_record.get(
+                                "human_closure_decision_recorded"
+                            ):
+                                st.success(
+                                    "decisão humana registrada: SIM. "
+                                    "O registro é session-only."
+                                )
+                            elif str(
+                                human_closure_record.get("status") or ""
+                            ) == "CONFIRMATION_REQUIRED":
+                                st.warning(
+                                    "Cerimônia incompleta: "
+                                    + str(
+                                        human_closure_record.get("reason")
+                                        or "confirmações obrigatórias ausentes"
+                                    )
+                                    + "."
+                                )
+                            st.caption(
+                                "Status: "
+                                + str(
+                                    human_closure_view.get("status")
+                                    or "UNKNOWN"
+                                )
+                                + " · fechamento autoritativo persistido: NÃO"
+                                + " · reativação autorizada: NÃO"
+                                + " · flag alterada: NÃO"
+                                + " · runtime alterado: NÃO"
+                                + " · trading real: NÃO."
+                            )
+                            if human_closure_view.get("closure_record_id"):
+                                st.caption(
+                                    "Closure record: "
+                                    + str(
+                                        human_closure_view.get(
+                                            "closure_record_id"
+                                        )
+                                    )
+                                )
 
         with st.expander("🛑 Desativação de segurança da feature flag"):
             st.caption(
