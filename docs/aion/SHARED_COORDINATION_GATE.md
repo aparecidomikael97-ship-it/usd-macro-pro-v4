@@ -206,3 +206,10 @@ must connect:
 
 Until then AtlasQuant must not claim global multi-instance safety or 24/7
 autonomous operation.
+
+## CI audit procedure
+
+Because the repository's pull-request quality workflows target `main`, this
+stacked draft may be temporarily retargeted to `main` only to trigger CI. After
+the checks complete, its base is restored to the preceding stacked AION branch.
+This audit procedure does not merge or deploy the change.
