@@ -111,9 +111,11 @@ class GlobalWorkerArmingCeremonyTests(unittest.TestCase):
         plan = self.plan(max_jobs=4, lease_seconds=600)
         budgets = plan["budgets"]
         self.assertEqual(budgets["max_jobs_per_tick"], 4)
-        self.assertEqual(budgets["max_scheduled_ticks_per_utc_day"], 48)
-        self.assertEqual(budgets["max_jobs_per_utc_day"], 192)
         self.assertEqual(budgets["max_runtime_checkpoint_writes_per_tick"], 2)
+        assumptions = plan["schedule_assumptions"]
+        self.assertEqual(assumptions["existing_pulses_per_hour"], 2)
+        self.assertEqual(assumptions["estimated_scheduled_ticks_per_utc_day"], 48)
+        self.assertFalse(assumptions["hard_daily_limit_claimed"])
         for key in (
             "provider_calls_per_tick",
             "paid_service_calls_per_tick",
