@@ -4,6 +4,11 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from atlasquant_aion_global_worker import stage_arm_global_worker
+from atlasquant_aion_global_worker_arming import (
+    CONFIRMATION_PHRASE,
+    approve_global_worker_arming_plan,
+    prepare_global_worker_arming_plan,
+)
 from atlasquant_aion_global_worker_readiness import (
     activation_readiness_snapshot,
     feature_flag_state,
@@ -182,10 +187,29 @@ class GlobalWorkerActivationReadinessTests(unittest.TestCase):
         )
 
     def test_persisted_armed_state_with_disabled_flag_is_ready_for_flag_enable(self):
-        staged = stage_arm_global_worker(
-            _access(),
-            {},
+        access = _access()
+        checkpoint = {}
+        plan = prepare_global_worker_arming_plan(
+            access,
+            checkpoint,
+            max_jobs=5,
+            lease_seconds=600,
+            approval_ttl_seconds=900,
+            readiness_stage="READY_FOR_ADMIN_ARMING",
+            now=NOW,
+        )
+        approved = approve_global_worker_arming_plan(
+            access,
+            plan["plan"],
             confirmation=True,
+            confirmation_phrase=CONFIRMATION_PHRASE,
+            now=NOW,
+        )
+        staged = stage_arm_global_worker(
+            access,
+            checkpoint,
+            confirmation=True,
+            arming_approval=approved["approval"],
             max_jobs=5,
             lease_seconds=600,
             now=NOW,
