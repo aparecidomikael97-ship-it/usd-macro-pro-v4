@@ -167,12 +167,15 @@ A green readiness gate does not authorize activation.
 
 The later activation sequence remains separate:
 
-1. review readiness evidence;
-2. deliberately arm and persist the Global Worker;
-3. rerun readiness and require READY_FOR_FLAG_ENABLE;
-4. separately decide whether to enable the repository feature flag;
-5. observe real global heartbeat/receipt evidence;
-6. preserve immediate kill-switch and rollback paths.
+1. review readiness evidence and require READY_FOR_ADMIN_ARMING;
+2. generate the Arming Ceremony plan;
+3. create the short-lived checkpoint-bound approval;
+4. stage ARMED without saving;
+5. make a separate explicit decision to persist that staged Checkpoint;
+6. rerun readiness and require READY_FOR_FLAG_ENABLE;
+7. separately decide whether to enable the repository feature flag;
+8. observe real global heartbeat/receipt evidence;
+9. preserve immediate kill-switch and rollback paths.
 
 Real trading, payment, publication, deploy and merge remain outside this
 activation path.
