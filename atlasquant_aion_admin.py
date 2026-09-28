@@ -3716,6 +3716,17 @@ def _render_central(
         "O estado global só passa a valer depois do salvamento explícito do Checkpoint Mestre. "
         "Mesmo armado, publicação, pagamento, deploy, merge, provider e trading continuam bloqueados."
     )
+    from atlasquant_aion_coordination_adapter_readiness import (
+        coordination_adapter_readiness,
+        format_coordination_adapter_caption,
+    )
+    st.markdown("##### Shared Coordination Adapter · readiness futuro")
+    st.caption(format_coordination_adapter_caption(coordination_adapter_readiness(None)))
+    st.caption(
+        "Diagnóstico futuro e somente leitura. "
+        "Nenhum provider foi conectado, nenhum probe foi executado, "
+        "nenhuma feature flag foi alterada e o Worker Global não foi iniciado."
+    )
 
     global_max_jobs = int(st.number_input(
         "Máximo de trabalhos por tick global",
