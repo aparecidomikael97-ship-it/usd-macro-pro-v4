@@ -1491,6 +1491,16 @@ def save_runtime_checkpoint(
     payload["schema"] = SCHEMA
     payload["updated_at"] = _now()
     payload["operating"]["dirty"] = False
+    core_integrity = _aion_core_checkpoint_integrity(payload)
+    if core_integrity["state"] == "MISMATCH":
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "saved": False,
+            "verified": False,
+            "reason": "AION Core checkpoint integrity mismatch.",
+            "checked_at": _now(),
+        }
     expected_digest = checkpoint_source_digest(payload)
     raw = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True, default=str).encode("utf-8")
     if len(raw) > MAX_RUNTIME_BYTES:
@@ -1608,6 +1618,39 @@ def merged_checkpoint(
     }
 
 
+AION_CORE_CHECKPOINT_NAMESPACE = "aion_core_intelligence_v1"
+
+
+def _aion_core_checkpoint_integrity(
+    checkpoint: Mapping[str, Any] | None,
+) -> dict[str, str]:
+    payload = checkpoint if isinstance(checkpoint, Mapping) else {}
+    if AION_CORE_CHECKPOINT_NAMESPACE not in payload:
+        return {"state": "ABSENT", "stored": "", "expected": ""}
+    raw = payload.get(AION_CORE_CHECKPOINT_NAMESPACE)
+    if not isinstance(raw, Mapping):
+        return {"state": "MISMATCH", "stored": "", "expected": "MAPPING_REQUIRED"}
+    supplied = str(raw.get("digest") or "").strip()
+    candidate = dict(raw)
+    candidate.pop("digest", None)
+    try:
+        encoded = json.dumps(
+            candidate,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+        expected = hashlib.sha256(encoded).hexdigest()
+    except Exception:
+        return {"state": "MISMATCH", "stored": supplied, "expected": "INVALID_BUNDLE"}
+    return {
+        "state": "MATCH" if supplied and supplied == expected else "MISMATCH",
+        "stored": supplied,
+        "expected": expected,
+    }
+
+
 def checkpoint_integrity_report(
     checkpoint: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
@@ -1687,6 +1730,17 @@ def checkpoint_integrity_report(
         memory_layers_raw.get("digest"),
         memory_layers_state.get("digest"),
     )
+
+    core_integrity = _aion_core_checkpoint_integrity(raw)
+    if core_integrity["state"] != "ABSENT":
+        checks.append({
+            "component": "aion_core_intelligence",
+            "state": core_integrity["state"],
+            "stored": core_integrity["stored"],
+            "expected": core_integrity["expected"],
+        })
+        if core_integrity["state"] != "MATCH":
+            mismatches.append("aion_core_intelligence")
 
     studio = raw.get("studio") if isinstance(raw.get("studio"), Mapping) else {}
     projects = normalize_projects(studio.get("projects") if isinstance(studio, Mapping) else [])
