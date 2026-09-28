@@ -415,6 +415,27 @@ except Exception:
     read_repository_feature_flag = None
     validate_persisted_arming_approval = None
 
+try:
+    from atlasquant_aion_global_worker_activation import (
+        CONFIRMATION_PHRASE as GLOBAL_ACTIVATION_CONFIRMATION_PHRASE,
+        DEACTIVATION_PHRASE as GLOBAL_DEACTIVATION_CONFIRMATION_PHRASE,
+        activate_global_worker_feature_flag,
+        approve_global_worker_activation_plan,
+        collect_activation_readiness_evidence,
+        deactivate_global_worker_feature_flag,
+        prepare_global_worker_activation_plan,
+        validate_global_worker_activation_approval,
+    )
+except Exception:
+    GLOBAL_ACTIVATION_CONFIRMATION_PHRASE = "ATIVAR WORKER GLOBAL"
+    GLOBAL_DEACTIVATION_CONFIRMATION_PHRASE = "DESATIVAR WORKER GLOBAL"
+    activate_global_worker_feature_flag = None
+    approve_global_worker_activation_plan = None
+    collect_activation_readiness_evidence = None
+    deactivate_global_worker_feature_flag = None
+    prepare_global_worker_activation_plan = None
+    validate_global_worker_activation_approval = None
+
 SCHEMA = "ATLASQUANT_AION_ADMIN_V1"
 AION_WORKSPACES = (
     "🧠 Central",
@@ -438,6 +459,10 @@ _AION_GLOBAL_ARMING_APPROVAL_KEY = "aion_global_arming_approval_v1"
 _AION_GLOBAL_PERSIST_FLAG_EVIDENCE_KEY = "aion_global_persist_flag_evidence_v1"
 _AION_GLOBAL_PERSIST_PLAN_KEY = "aion_global_persist_plan_v1"
 _AION_GLOBAL_PERSIST_APPROVAL_KEY = "aion_global_persist_approval_v1"
+_AION_GLOBAL_ACTIVATION_READINESS_KEY = "aion_global_activation_readiness_v1"
+_AION_GLOBAL_ACTIVATION_PLAN_KEY = "aion_global_activation_plan_v1"
+_AION_GLOBAL_ACTIVATION_APPROVAL_KEY = "aion_global_activation_approval_v1"
+_AION_GLOBAL_ACTIVATION_RESULT_KEY = "aion_global_activation_result_v1"
 
 AION_ADMIN_CSS = r"""
 <style>
@@ -6470,6 +6495,445 @@ def _render_development(
                         + type(exc).__name__
                         + "."
                     )
+
+    persisted_runtime_checkpoint = (
+        runtime_result.get("checkpoint")
+        if isinstance(runtime_result.get("checkpoint"), Mapping)
+        else {}
+    )
+    persisted_global_worker = (
+        persisted_runtime_checkpoint.get("aion_global_worker_v1")
+        if isinstance(persisted_runtime_checkpoint, Mapping)
+        and isinstance(
+            persisted_runtime_checkpoint.get("aion_global_worker_v1"),
+            Mapping,
+        )
+        else {}
+    )
+    persisted_global_armed = bool(
+        str(persisted_global_worker.get("state") or "").upper() == "ARMED"
+        and persisted_global_worker.get("kill_switch") is False
+    )
+
+    if persisted_global_armed and not persisted_arm_required:
+        st.markdown("##### ⚡ Global Worker Activation Ceremony")
+        st.warning(
+            "Ativar a feature flag permite que o pulso GitHub Actions já existente "
+            "acorde o Worker Global. Isso NÃO prova heartbeat, receipt ou autonomia "
+            "operacional. O primeiro resultado válido será somente "
+            "ACTIVATED_PENDING_LIVE_EVIDENCE."
+        )
+
+        if st.button(
+            "🔎 Verificar readiness atual para ativação",
+            key="aion_global_activation_check_readiness",
+            disabled=collect_activation_readiness_evidence is None,
+            width="stretch",
+        ):
+            try:
+                live_readiness = collect_activation_readiness_evidence(
+                    cfg,
+                    runtime_result,
+                )
+                st.session_state[_AION_GLOBAL_ACTIVATION_READINESS_KEY] = (
+                    live_readiness
+                )
+                st.session_state.pop(_AION_GLOBAL_ACTIVATION_PLAN_KEY, None)
+                st.session_state.pop(_AION_GLOBAL_ACTIVATION_APPROVAL_KEY, None)
+                if (
+                    live_readiness.get("status") == "PASS"
+                    and live_readiness.get("activation_stage")
+                    == "READY_FOR_FLAG_ENABLE"
+                ):
+                    st.success(
+                        "Readiness atual: READY_FOR_FLAG_ENABLE. "
+                        "Nenhuma variável foi alterada."
+                    )
+                else:
+                    st.error(
+                        "Ativação continua bloqueada: "
+                        + str(
+                            live_readiness.get("activation_stage")
+                            or live_readiness.get("status")
+                            or "UNKNOWN"
+                        )
+                        + "."
+                    )
+            except Exception as exc:
+                st.error(
+                    "Readiness de ativação falhou em modo seguro: "
+                    + type(exc).__name__
+                    + "."
+                )
+
+        activation_readiness = st.session_state.get(
+            _AION_GLOBAL_ACTIVATION_READINESS_KEY
+        )
+        activation_ready = bool(
+            isinstance(activation_readiness, Mapping)
+            and activation_readiness.get("status") == "PASS"
+            and activation_readiness.get("activation_stage")
+            == "READY_FOR_FLAG_ENABLE"
+            and not list(activation_readiness.get("blockers") or [])
+        )
+        activation_flag_evidence = (
+            activation_readiness.get("flag_evidence")
+            if isinstance(activation_readiness, Mapping)
+            and isinstance(activation_readiness.get("flag_evidence"), Mapping)
+            else {}
+        )
+        if isinstance(activation_readiness, Mapping):
+            ar1, ar2, ar3, ar4 = st.columns(4)
+            ar1.metric(
+                "Activation stage",
+                str(
+                    activation_readiness.get("activation_stage")
+                    or "UNKNOWN"
+                ),
+            )
+            ar2.metric(
+                "Feature flag",
+                str(
+                    (
+                        activation_readiness.get("feature_flag")
+                        if isinstance(
+                            activation_readiness.get("feature_flag"),
+                            Mapping,
+                        )
+                        else {}
+                    ).get("state")
+                    or "UNKNOWN"
+                ),
+            )
+            ar3.metric(
+                "Pulse",
+                str(
+                    (
+                        activation_readiness.get("pulse")
+                        if isinstance(activation_readiness.get("pulse"), Mapping)
+                        else {}
+                    ).get("state")
+                    or "UNKNOWN"
+                ),
+            )
+            ar4.metric(
+                "Shadow",
+                str(
+                    (
+                        activation_readiness.get("shadow_protocol")
+                        if isinstance(
+                            activation_readiness.get("shadow_protocol"),
+                            Mapping,
+                        )
+                        else {}
+                    ).get("state")
+                    or "UNKNOWN"
+                ),
+            )
+
+        activation_ttl = int(st.number_input(
+            "TTL da autorização de ativação (segundos)",
+            min_value=300,
+            max_value=1800,
+            value=600,
+            step=300,
+            key="aion_global_activation_ttl",
+        ))
+        if st.button(
+            "🧾 Gerar plano de ativação",
+            key="aion_global_activation_plan",
+            disabled=not bool(
+                activation_ready
+                and prepare_global_worker_activation_plan is not None
+            ),
+            width="stretch",
+        ):
+            try:
+                activation_plan_result = prepare_global_worker_activation_plan(
+                    access,
+                    runtime_result,
+                    activation_readiness,
+                    activation_flag_evidence,
+                    ttl_seconds=activation_ttl,
+                )
+                if (
+                    activation_plan_result.get("status")
+                    == "ACTIVATION_PLAN_READY"
+                ):
+                    st.session_state[_AION_GLOBAL_ACTIVATION_PLAN_KEY] = (
+                        activation_plan_result.get("plan")
+                    )
+                    st.session_state.pop(
+                        _AION_GLOBAL_ACTIVATION_APPROVAL_KEY,
+                        None,
+                    )
+                    st.success(
+                        "Plano de ativação criado somente na sessão. "
+                        "A feature flag continua inalterada."
+                    )
+                else:
+                    st.warning(
+                        "Plano de ativação bloqueado: "
+                        + str(
+                            activation_plan_result.get("reason")
+                            or activation_plan_result.get("status")
+                            or "UNKNOWN"
+                        )
+                    )
+            except Exception as exc:
+                st.error(
+                    "Plano de ativação bloqueado: "
+                    + type(exc).__name__
+                    + "."
+                )
+
+        activation_plan = st.session_state.get(
+            _AION_GLOBAL_ACTIVATION_PLAN_KEY
+        )
+        if isinstance(activation_plan, Mapping):
+            st.caption(
+                "Activation plan: "
+                + str(activation_plan.get("plan_digest") or "")[:24]
+                + "… · runtime SHA "
+                + str(activation_plan.get("runtime_sha") or "")[:12]
+                + "… · expira em "
+                + str(activation_plan.get("expires_at") or "UNKNOWN")
+            )
+            st.caption(
+                "A ativação não executa tick diretamente. "
+                "Após a flag, heartbeat + receipt reais ainda serão exigidos."
+            )
+            activation_phrase = st.text_input(
+                'Digite exatamente "ATIVAR WORKER GLOBAL"',
+                value="",
+                key="aion_global_activation_confirmation_phrase",
+            )
+            activation_confirm = st.checkbox(
+                "Confirmo que revisei runtime ARMED, readiness, TTL e budgets "
+                "e quero autorizar somente a habilitação da feature flag.",
+                value=False,
+                key="aion_global_activation_confirm",
+            )
+            if st.button(
+                "✅ Criar autorização de ativação",
+                key="aion_global_activation_approve",
+                disabled=not bool(
+                    activation_confirm
+                    and approve_global_worker_activation_plan is not None
+                ),
+                width="stretch",
+            ):
+                try:
+                    approved_activation = approve_global_worker_activation_plan(
+                        access,
+                        activation_plan,
+                        confirmation=True,
+                        confirmation_phrase=activation_phrase,
+                    )
+                    if (
+                        approved_activation.get("status")
+                        == "APPROVED_FOR_ACTIVATION"
+                    ):
+                        st.session_state[
+                            _AION_GLOBAL_ACTIVATION_APPROVAL_KEY
+                        ] = approved_activation.get("approval")
+                        st.success(
+                            "Autorização temporária criada. "
+                            "A feature flag ainda NÃO foi alterada."
+                        )
+                    else:
+                        st.warning(
+                            "Autorização de ativação bloqueada: "
+                            + str(
+                                approved_activation.get("reason")
+                                or approved_activation.get("status")
+                                or "UNKNOWN"
+                            )
+                        )
+                except Exception as exc:
+                    st.error(
+                        "Autorização de ativação bloqueada: "
+                        + type(exc).__name__
+                        + "."
+                    )
+
+        activation_approval = st.session_state.get(
+            _AION_GLOBAL_ACTIVATION_APPROVAL_KEY
+        )
+        activation_approval_valid = False
+        if (
+            isinstance(activation_approval, Mapping)
+            and validate_global_worker_activation_approval is not None
+        ):
+            try:
+                activation_check = validate_global_worker_activation_approval(
+                    access,
+                    runtime_result,
+                    activation_approval,
+                )
+                activation_approval_valid = (
+                    activation_check.get("state") == "APPROVED"
+                )
+            except Exception:
+                activation_approval_valid = False
+
+        final_activation_confirm = st.checkbox(
+            "CONFIRMAÇÃO FINAL: autorizo habilitar agora a feature flag do "
+            "Worker Global. Isso não autoriza trading, pagamentos, publicação, "
+            "deploy ou merge.",
+            value=False,
+            key="aion_global_activation_final_confirm",
+        )
+        if st.button(
+            "⚡ Habilitar Worker Global (feature flag)",
+            key="aion_global_activation_execute",
+            disabled=not bool(
+                activation_approval_valid
+                and final_activation_confirm
+                and activate_global_worker_feature_flag is not None
+                and not conflict
+            ),
+            width="stretch",
+        ):
+            decision = guardian_decision(
+                "write_runtime",
+                access,
+                approved=True,
+                feature_flags=flags,
+            )
+            if not decision["allowed"]:
+                st.error(decision["reason"])
+            else:
+                try:
+                    activation_result = activate_global_worker_feature_flag(
+                        access,
+                        runtime_result,
+                        activation_approval,
+                        cfg,
+                        confirmation=True,
+                    )
+                    st.session_state[
+                        _AION_GLOBAL_ACTIVATION_RESULT_KEY
+                    ] = activation_result
+                    status = str(
+                        activation_result.get("status") or "UNKNOWN"
+                    )
+                    if status == "ACTIVATED_PENDING_LIVE_EVIDENCE":
+                        st.success(
+                            "Feature flag habilitada e relida. "
+                            "Estado: ACTIVATED_PENDING_LIVE_EVIDENCE. "
+                            "Ainda não há prova de heartbeat/receipt do Worker."
+                        )
+                    elif status == "ACTIVATION_ROLLED_BACK":
+                        st.error(
+                            "A ativação foi revertida automaticamente por "
+                            "divergência de runtime ou verificação da flag."
+                        )
+                    else:
+                        st.error(
+                            "Ativação não confirmada. Estado: "
+                            + status
+                            + " · motivo: "
+                            + str(
+                                activation_result.get("reason")
+                                or "não informado"
+                            )
+                            + "."
+                        )
+                except Exception as exc:
+                    st.error(
+                        "Ativação bloqueada em modo seguro: "
+                        + type(exc).__name__
+                        + "."
+                    )
+
+        last_activation = st.session_state.get(
+            _AION_GLOBAL_ACTIVATION_RESULT_KEY
+        )
+        if isinstance(last_activation, Mapping):
+            st.caption(
+                "Última tentativa de ativação: "
+                + str(last_activation.get("status") or "UNKNOWN")
+                + " · heartbeat confirmado: "
+                + (
+                    "SIM"
+                    if last_activation.get("live_heartbeat_confirmed")
+                    else "NÃO"
+                )
+                + " · trading real: NÃO."
+            )
+
+        with st.expander("🛑 Desativação de segurança da feature flag"):
+            st.caption(
+                "Desativar a flag impede novos wake-ups do Worker Global pelo "
+                "pulso agendado. Não altera o Checkpoint nem executa tick."
+            )
+            deactivate_phrase = st.text_input(
+                'Digite exatamente "DESATIVAR WORKER GLOBAL"',
+                value="",
+                key="aion_global_deactivation_phrase",
+            )
+            deactivate_confirm = st.checkbox(
+                "Confirmo a desativação da feature flag do Worker Global.",
+                value=False,
+                key="aion_global_deactivation_confirm",
+            )
+            if st.button(
+                "🛑 Desativar feature flag do Worker Global",
+                key="aion_global_deactivation_execute",
+                disabled=not bool(
+                    deactivate_confirm
+                    and deactivate_global_worker_feature_flag is not None
+                ),
+                width="stretch",
+            ):
+                decision = guardian_decision(
+                    "write_runtime",
+                    access,
+                    approved=True,
+                    feature_flags=flags,
+                )
+                if not decision["allowed"]:
+                    st.error(decision["reason"])
+                else:
+                    try:
+                        deactivate_result = (
+                            deactivate_global_worker_feature_flag(
+                                access,
+                                cfg,
+                                confirmation=True,
+                                confirmation_phrase=deactivate_phrase,
+                            )
+                        )
+                        if deactivate_result.get("status") in {
+                            "DISABLED",
+                            "ALREADY_DISABLED",
+                        }:
+                            st.success(
+                                "Feature flag do Worker Global confirmada como "
+                                + str(
+                                    deactivate_result.get(
+                                        "feature_flag_state"
+                                    )
+                                    or "DISABLED"
+                                )
+                                + "."
+                            )
+                        else:
+                            st.error(
+                                "Desativação não confirmada. Estado: "
+                                + str(
+                                    deactivate_result.get("status")
+                                    or "UNKNOWN"
+                                )
+                                + "."
+                            )
+                    except Exception as exc:
+                        st.error(
+                            "Desativação bloqueada em modo seguro: "
+                            + type(exc).__name__
+                            + "."
+                        )
 
     if st.button(
         "💾 Salvar Checkpoint Mestre no runtime",
