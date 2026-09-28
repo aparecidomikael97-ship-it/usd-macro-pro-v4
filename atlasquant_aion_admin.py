@@ -445,12 +445,16 @@ except Exception:
 
 try:
     from atlasquant_aion_global_worker_supervision import (
+        append_supervision_history,
         operational_incident as global_worker_operational_incident,
         supervise_global_worker,
+        supervision_history_summary,
     )
 except Exception:
+    append_supervision_history = None
     global_worker_operational_incident = None
     supervise_global_worker = None
+    supervision_history_summary = None
 
 SCHEMA = "ATLASQUANT_AION_ADMIN_V1"
 AION_WORKSPACES = (
@@ -481,6 +485,7 @@ _AION_GLOBAL_ACTIVATION_APPROVAL_KEY = "aion_global_activation_approval_v1"
 _AION_GLOBAL_ACTIVATION_RESULT_KEY = "aion_global_activation_result_v1"
 _AION_GLOBAL_LIVE_VERIFICATION_KEY = "aion_global_live_verification_v1"
 _AION_GLOBAL_SUPERVISION_KEY = "aion_global_supervision_v1"
+_AION_GLOBAL_SUPERVISION_HISTORY_KEY = "aion_global_supervision_history_v1"
 
 AION_ADMIN_CSS = r"""
 <style>
@@ -6921,6 +6926,18 @@ def _render_development(
                     st.session_state[_AION_GLOBAL_SUPERVISION_KEY] = (
                         supervision_report
                     )
+                    if append_supervision_history is not None:
+                        existing_supervision_history = st.session_state.get(
+                            _AION_GLOBAL_SUPERVISION_HISTORY_KEY,
+                            [],
+                        )
+                        st.session_state[
+                            _AION_GLOBAL_SUPERVISION_HISTORY_KEY
+                        ] = append_supervision_history(
+                            existing_supervision_history,
+                            supervision_report,
+                            max_entries=50,
+                        )
             except Exception as exc:
                 st.session_state[_AION_GLOBAL_LIVE_VERIFICATION_KEY] = {
                     "status": "BLOCKED",
@@ -7020,6 +7037,39 @@ def _render_development(
                 "Supervisão: somente leitura · contenção automática: NÃO · "
                 "alteração automática da feature flag: NÃO · trading real: NÃO."
             )
+            supervision_history = st.session_state.get(
+                _AION_GLOBAL_SUPERVISION_HISTORY_KEY,
+                [],
+            )
+            if supervision_history:
+                with st.expander("Histórico de supervisão do Worker Global"):
+                    history_summary = (
+                        supervision_history_summary(supervision_history)
+                        if supervision_history_summary is not None
+                        else {}
+                    )
+                    st.caption(
+                        "Observações na sessão: "
+                        + str(history_summary.get("observations") or len(supervision_history))
+                        + " · incidentes: "
+                        + str(history_summary.get("incidents") or 0)
+                        + " · críticos: "
+                        + str(history_summary.get("critical_incidents") or 0)
+                        + " · persistência externa: NÃO."
+                    )
+                    for event in list(supervision_history)[-5:][::-1]:
+                        if not isinstance(event, Mapping):
+                            continue
+                        st.markdown(
+                            "- **"
+                            + str(event.get("severity") or "UNKNOWN")
+                            + "** · "
+                            + str(event.get("posture") or "UNKNOWN")
+                            + " · "
+                            + str(event.get("live_status") or "UNKNOWN")
+                            + " · "
+                            + str(event.get("observed_at") or "sem horário")
+                        )
 
         with st.expander("🛑 Desativação de segurança da feature flag"):
             st.caption(
