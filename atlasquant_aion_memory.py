@@ -1511,6 +1511,16 @@ def save_runtime_checkpoint(
             "reason": "AION Core scheduler integrity mismatch.",
             "checked_at": _now(),
         }
+    executor_integrity = _aion_core_executor_integrity(payload)
+    if executor_integrity["state"] == "MISMATCH":
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "saved": False,
+            "verified": False,
+            "reason": "AION Core executor integrity mismatch.",
+            "checked_at": _now(),
+        }
     expected_digest = checkpoint_source_digest(payload)
     raw = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True, default=str).encode("utf-8")
     if len(raw) > MAX_RUNTIME_BYTES:
@@ -1630,6 +1640,7 @@ def merged_checkpoint(
 
 AION_CORE_CHECKPOINT_NAMESPACE = "aion_core_intelligence_v1"
 AION_CORE_SCHEDULER_NAMESPACE = "aion_core_scheduler_v1"
+AION_CORE_EXECUTOR_NAMESPACE = "aion_core_executor_v1"
 
 
 def _aion_core_checkpoint_integrity(
@@ -1669,6 +1680,36 @@ def _aion_core_scheduler_integrity(
     if AION_CORE_SCHEDULER_NAMESPACE not in payload:
         return {"state": "ABSENT", "stored": "", "expected": ""}
     raw = payload.get(AION_CORE_SCHEDULER_NAMESPACE)
+    if not isinstance(raw, Mapping):
+        return {"state": "MISMATCH", "stored": "", "expected": "MAPPING_REQUIRED"}
+    supplied = str(raw.get("digest") or "").strip()
+    candidate = dict(raw)
+    candidate.pop("digest", None)
+    try:
+        encoded = json.dumps(
+            candidate,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+        expected = hashlib.sha256(encoded).hexdigest()
+    except Exception:
+        return {"state": "MISMATCH", "stored": supplied, "expected": "INVALID_BUNDLE"}
+    return {
+        "state": "MATCH" if supplied and supplied == expected else "MISMATCH",
+        "stored": supplied,
+        "expected": expected,
+    }
+
+
+def _aion_core_executor_integrity(
+    checkpoint: Mapping[str, Any] | None,
+) -> dict[str, str]:
+    payload = checkpoint if isinstance(checkpoint, Mapping) else {}
+    if AION_CORE_EXECUTOR_NAMESPACE not in payload:
+        return {"state": "ABSENT", "stored": "", "expected": ""}
+    raw = payload.get(AION_CORE_EXECUTOR_NAMESPACE)
     if not isinstance(raw, Mapping):
         return {"state": "MISMATCH", "stored": "", "expected": "MAPPING_REQUIRED"}
     supplied = str(raw.get("digest") or "").strip()
@@ -1793,6 +1834,17 @@ def checkpoint_integrity_report(
         })
         if scheduler_integrity["state"] != "MATCH":
             mismatches.append("aion_core_scheduler")
+
+    executor_integrity = _aion_core_executor_integrity(raw)
+    if executor_integrity["state"] != "ABSENT":
+        checks.append({
+            "component": "aion_core_executor",
+            "state": executor_integrity["state"],
+            "stored": executor_integrity["stored"],
+            "expected": executor_integrity["expected"],
+        })
+        if executor_integrity["state"] != "MATCH":
+            mismatches.append("aion_core_executor")
 
     studio = raw.get("studio") if isinstance(raw.get("studio"), Mapping) else {}
     projects = normalize_projects(studio.get("projects") if isinstance(studio, Mapping) else [])
