@@ -183,6 +183,7 @@ def attach_executor_receipts(
         if isinstance(row, Mapping)
     })
     armed_worker_observed = "ARMED_WORKER" in authorization_modes
+    global_worker_observed = "GLOBAL_WORKER" in authorization_modes
     bundle = {
         "schema": EXECUTOR_SCHEMA,
         "scope": _scope_payload(context),
@@ -241,6 +242,7 @@ def _receipt(
     retry_after: datetime | None = None,
     approval_digest: str,
     authorization_mode: str = "HUMAN_CLICK",
+    execution_principal: str = "",
 ) -> dict[str, Any]:
     if state not in RECEIPT_STATES:
         raise ValueError("invalid receipt state")
@@ -266,7 +268,13 @@ def _receipt(
         "human_confirmation_digest": approval_digest if authorization_mode == "HUMAN_CLICK" else "",
         "authorization_digest": approval_digest,
         "authorization_mode": authorization_mode,
-        "human_principal": context.actor_id,
+        "human_principal": context.actor_id if authorization_mode == "HUMAN_CLICK" else "",
+        "delegated_actor": context.actor_id,
+        "execution_principal": (
+            safe_text(execution_principal, 160)
+            if execution_principal
+            else context.actor_id
+        ),
         "started_at": utc(now).isoformat(),
         "completed_at": utc(now).isoformat(),
         "reason": str(reason or ""),
@@ -315,10 +323,11 @@ def executor_snapshot(
         "by_state": counts,
         "due_count": int(scheduler.get("due_count") or 0),
         "authorization_modes_observed": authorization_modes,
-        "manual_invocation_only": not armed_worker_observed,
+        "manual_invocation_only": not (armed_worker_observed or global_worker_observed),
         "manual_run_available": True,
         "armed_worker_execution_observed": armed_worker_observed,
-        "autonomous_worker_connected": False,
+        "global_worker_execution_observed": global_worker_observed,
+        "autonomous_worker_connected": armed_worker_observed or global_worker_observed,
         "physical_action_adapter": "UNAVAILABLE",
         "external_action_executed": False,
         "real_trading_enabled": False,
@@ -333,11 +342,13 @@ def _execute_due_local_work_authorized(
     voice_status: Mapping[str, Any] | None = None,
     authorization_mode: str,
     authorization_digest: str,
+    execution_principal: str = "",
+    capability_allowlist: frozenset[str] | set[str] | tuple[str, ...] | list[str] | None = None,
     max_jobs: int = 5,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     """Internal kernel after an authenticated authorization boundary."""
-    if authorization_mode not in {"HUMAN_CLICK", "ARMED_WORKER"}:
+    if authorization_mode not in {"HUMAN_CLICK", "ARMED_WORKER", "GLOBAL_WORKER"}:
         raise ValueError("invalid executor authorization mode")
     if not isinstance(authorization_digest, str) or not authorization_digest.strip():
         raise ValueError("executor authorization digest required")
@@ -359,6 +370,13 @@ def _execute_due_local_work_authorized(
     due.sort(key=lambda x: (str(x.get("due_at") or ""), str(x.get("schedule_id") or "")))
 
     approval_digest = authorization_digest
+    allowed_capabilities = (
+        frozenset(str(x).strip().upper() for x in capability_allowlist)
+        if capability_allowlist is not None
+        else ALLOWLISTED_CAPABILITIES
+    )
+    if not allowed_capabilities or not allowed_capabilities.issubset(ALLOWLISTED_CAPABILITIES):
+        raise ValueError("invalid executor capability allowlist")
     outcomes = []
     added = 0
 
@@ -409,7 +427,7 @@ def _execute_due_local_work_authorized(
         terminal_result = None
         receipt_state_name = "BLOCKED"
 
-        if capability not in ALLOWLISTED_CAPABILITIES:
+        if capability not in allowed_capabilities:
             reason = "CAPABILITY_NOT_BACKGROUND_ALLOWLISTED"
         elif not bool(guardian.get("allowed")):
             reason = "GUARDIAN_BLOCKED:" + str(guardian.get("reason") or "")
@@ -469,6 +487,7 @@ def _execute_due_local_work_authorized(
             retry_after=retry_after,
             approval_digest=approval_digest,
             authorization_mode=authorization_mode,
+            execution_principal=execution_principal,
         )
         receipts.append(receipt)
         added += 1
@@ -509,8 +528,8 @@ def _execute_due_local_work_authorized(
         "external_persisted": False,
         "manual_invocation_only": authorization_mode == "HUMAN_CLICK",
         "authorization_mode": authorization_mode,
-        "autonomous_worker_started": authorization_mode == "ARMED_WORKER",
-        "background_worker_connected": authorization_mode == "ARMED_WORKER",
+        "autonomous_worker_started": authorization_mode in {"ARMED_WORKER", "GLOBAL_WORKER"},
+        "background_worker_connected": authorization_mode in {"ARMED_WORKER", "GLOBAL_WORKER"},
         "provider_called": False,
         "external_action_executed": False,
         "real_trading_enabled": False,
