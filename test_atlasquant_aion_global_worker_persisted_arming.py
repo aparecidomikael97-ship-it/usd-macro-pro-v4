@@ -1,6 +1,7 @@
 import unittest
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 from atlasquant_aion_global_worker import stage_arm_global_worker
@@ -512,6 +513,40 @@ class PersistedGlobalWorkerArmingTests(unittest.TestCase):
         self.assertEqual(result["status"], "CRITICAL_ROLLBACK_FAILED")
         self.assertFalse(result["rollback_performed"])
         self.assertTrue(result["saved"])
+
+    def test_admin_ui_blocks_generic_save_and_exposes_second_ceremony(self):
+        source = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Persisted Arming Ceremony", source)
+        self.assertIn("Verificar feature flag antes da persistência", source)
+        self.assertIn("Gerar plano de persistência ARMED", source)
+        self.assertIn("Criar autorização de persistência", source)
+        self.assertIn("PERSISTIR WORKER GLOBAL ARMADO", source)
+        self.assertIn("SEGUNDA CONFIRMAÇÃO", source)
+        self.assertIn("Persistir ARMED no Checkpoint Mestre", source)
+        self.assertIn(
+            "O save genérico está BLOQUEADO",
+            source,
+        )
+        self.assertIn(
+            "or persisted_arm_required",
+            source,
+        )
+
+    def test_persisted_arming_module_never_mutates_repository_variable(self):
+        source = Path(
+            "atlasquant_aion_global_worker_persisted_arming.py"
+        ).read_text(encoding="utf-8")
+        for banned in (
+            "requests.put(",
+            "requests.post(",
+            "requests.patch(",
+            "requests.delete(",
+            "/actions/variables/",
+            "set_repository_variable",
+            "update_repository_variable",
+        ):
+            self.assertNotIn(banned, source)
+        self.assertIn("requests.get(", source)
 
     def test_other_admin_cannot_use_persistence_ticket(self):
         approval = self.persistence_approval()
