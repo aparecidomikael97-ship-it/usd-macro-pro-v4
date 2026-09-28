@@ -201,9 +201,16 @@ def _context_for_intent(
     access: Mapping[str, Any],
     intent: str,
     core: AionCore,
+    *,
+    capability: str | None = None,
 ) -> tuple[Context, dict[str, Any]]:
     admin_context = authenticated_context(access, Domain.ADMIN)
-    selection = route(intent, admin_context, core.registry)
+    selection = route(
+        intent,
+        admin_context,
+        core.registry,
+        capability=capability,
+    )
     domain = Domain.ADMIN
     if selection.required_context:
         try:
@@ -251,6 +258,7 @@ def handle_runtime_intent(
     system_context: Mapping[str, Any] | None = None,
     legacy_checkpoint: Mapping[str, Any] | None = None,
     voice_status: Mapping[str, Any] | None = None,
+    capability: str | None = None,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     """Run the data-only Core against the current authenticated runtime context."""
@@ -286,7 +294,12 @@ def handle_runtime_intent(
         automation_adapter=automation_adapter,
         clock=lambda: current,
     )
-    context, preliminary = _context_for_intent(access, intent, bootstrap_core)
+    context, preliminary = _context_for_intent(
+        access,
+        intent,
+        bootstrap_core,
+        capability=capability,
+    )
     store = None
     checkpoint_state = {"state": "UNAVAILABLE"}
     if isinstance(legacy_checkpoint, Mapping):
@@ -303,7 +316,12 @@ def handle_runtime_intent(
     scoped, ingress = scoped_runtime_evidence(context, system_context)
     evidence_truth = assess(scoped.records, current)
     try:
-        result = core.handle(intent, context, evidence=scoped)
+        result = core.handle(
+            intent,
+            context,
+            evidence=scoped,
+            capability=capability,
+        )
     finally:
         if store is not None:
             store.close()
