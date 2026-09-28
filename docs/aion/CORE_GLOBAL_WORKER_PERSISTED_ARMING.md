@@ -206,3 +206,14 @@ explicitly authorizes the write.
 
 A normal conversational continuation such as "vamos lá" is not interpreted as
 authorization to persist ARMED.
+
+## CI audit procedure
+
+Because the repository's traditional pull-request quality workflows target
+`main`, this stacked draft may be temporarily retargeted to `main` only for
+CI audit. A documentation-only synchronize commit may be used to trigger those
+workflows. After validation, the base is restored to
+`cursor/aion-global-worker-arming-ceremony-v1`.
+
+This audit process does not persist ARMED, modify the runtime Checkpoint,
+change the repository feature flag, execute the Global Worker, merge or deploy.
