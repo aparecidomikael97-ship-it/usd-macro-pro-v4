@@ -194,3 +194,15 @@ restored to `cursor/aion-global-durable-worker-v1`.
 
 This procedure does not merge, deploy, persist global arming, modify the
 repository feature flag, or execute the Global Worker.
+
+
+## Activation Ceremony boundary
+
+`READY_FOR_FLAG_ENABLE` is permission evidence for a separate guarded
+Activation Ceremony; it does not itself enable the flag.
+
+After a future explicit activation, the immediate truthful state is
+`ACTIVATED_PENDING_LIVE_EVIDENCE`, not "worker operational".
+
+Operational status requires later heartbeat/receipt evidence from the shared
+runtime after the activation timestamp.
