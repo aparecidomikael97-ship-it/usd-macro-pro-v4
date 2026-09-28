@@ -171,11 +171,15 @@ The later activation sequence remains separate:
 2. generate the Arming Ceremony plan;
 3. create the short-lived checkpoint-bound approval;
 4. stage ARMED without saving;
-5. make a separate explicit decision to persist that staged Checkpoint;
-6. rerun readiness and require READY_FOR_FLAG_ENABLE;
-7. separately decide whether to enable the repository feature flag;
-8. observe real global heartbeat/receipt evidence;
-9. preserve immediate kill-switch and rollback paths.
+5. enter the Persisted Arming Ceremony;
+6. prove the repository feature flag is UNSET/DISABLED;
+7. create the second checkpoint/SHA-bound persistence approval;
+8. make a separate explicit decision to execute the real ARMED persistence;
+9. require read-after-write plus post-write flag proof/rollback safety;
+10. rerun readiness and require READY_FOR_FLAG_ENABLE;
+11. separately decide whether to enable the repository feature flag;
+12. observe real global heartbeat/receipt evidence;
+13. preserve immediate kill-switch and rollback paths.
 
 Real trading, payment, publication, deploy and merge remain outside this
 activation path.
