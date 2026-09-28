@@ -599,8 +599,14 @@ class AionHomeViewerTests(unittest.TestCase):
                 self.assertEqual(consume_aion_module_jump(state, admin, module_id), workspace)
                 self.assertEqual(state[AION_MODULE_JUMP_KEY], workspace)
                 self.assertNotIn("aion_admin_workspace", state)
-                self.assertIn(f"module={module_id}", self._article(html, module_id))
-                self.assertIn(">Abrir<", self._article(html, module_id))
+                article = self._article(html, module_id)
+                self.assertNotIn("href=", article)
+                self.assertNotIn(f"module={module_id}", article)
+                self.assertIn("Abrir pelo controle de módulo abaixo.", article)
+
+        source = Path("atlasquant_central_hub_ui.py").read_text(encoding="utf-8")
+        self.assertIn("aq_aion_module_stateful_", source)
+        self.assertIn("consume_aion_module_jump(st.session_state, access, spec[\"id\"])", source)
 
     def test_same_execution_context_feeds_the_home_without_a_second_fetch(self):
         observation = {
