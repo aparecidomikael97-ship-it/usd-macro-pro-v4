@@ -301,6 +301,11 @@ try:
 except Exception:
     render_neural_voice_player = None
 
+try:
+    from atlasquant_aion_core_runtime_bridge import handle_runtime_intent
+except Exception:
+    handle_runtime_intent = None
+
 SCHEMA = "ATLASQUANT_AION_ADMIN_V1"
 AION_WORKSPACES = (
     "🧠 Central",
@@ -2142,6 +2147,145 @@ def _render_central(
         key="aion_admin_question",
         placeholder="Ex.: AION, onde paramos no sistema? / como está o Studio? / o que falta validar?",
     )
+
+    core_runtime_result = {}
+    if question.strip():
+        if handle_runtime_intent is None:
+            core_runtime_result = {
+                "status": "UNAVAILABLE",
+                "reason": "CORE_RUNTIME_BRIDGE_UNAVAILABLE",
+                "route": {},
+                "payload": None,
+                "truth_state": "UNKNOWN",
+                "evidence": {"status": "UNKNOWN", "records": []},
+                "evidence_ingress": {
+                    "input_rows": 0,
+                    "accepted_records": 0,
+                    "rejected_records": 0,
+                },
+                "persistence": {
+                    "state": "UNAVAILABLE",
+                    "reason": "BRIDGE_IMPORT_UNAVAILABLE",
+                },
+                "execution_authorized": False,
+                "external_action_executed": False,
+                "real_trading_enabled": False,
+                "provider_called": False,
+            }
+        else:
+            try:
+                core_runtime_result = handle_runtime_intent(
+                    access,
+                    question,
+                    system_context=system_context,
+                )
+            except Exception as exc:
+                core_runtime_result = {
+                    "status": "UNKNOWN",
+                    "reason": type(exc).__name__,
+                    "route": {},
+                    "payload": None,
+                    "truth_state": "UNKNOWN",
+                    "evidence": {"status": "UNKNOWN", "records": []},
+                    "evidence_ingress": {
+                        "input_rows": 0,
+                        "accepted_records": 0,
+                        "rejected_records": 0,
+                    },
+                    "persistence": {
+                        "state": "UNAVAILABLE",
+                        "reason": "CORE_RUNTIME_ERROR",
+                    },
+                    "execution_authorized": False,
+                    "external_action_executed": False,
+                    "real_trading_enabled": False,
+                    "provider_called": False,
+                }
+
+    if core_runtime_result:
+        core_route = (
+            core_runtime_result.get("route")
+            if isinstance(core_runtime_result.get("route"), Mapping)
+            else {}
+        )
+        core_evidence = (
+            core_runtime_result.get("evidence")
+            if isinstance(core_runtime_result.get("evidence"), Mapping)
+            else {}
+        )
+        core_ingress = (
+            core_runtime_result.get("evidence_ingress")
+            if isinstance(core_runtime_result.get("evidence_ingress"), Mapping)
+            else {}
+        )
+        core_persistence = (
+            core_runtime_result.get("persistence")
+            if isinstance(core_runtime_result.get("persistence"), Mapping)
+            else {}
+        )
+        with st.expander("🧠 AION Core Intelligence · leitura local", expanded=False):
+            ci1, ci2, ci3, ci4 = st.columns(4)
+            ci1.metric("Capability", str(core_route.get("capability") or "UNKNOWN"))
+            ci2.metric("Status", str(core_runtime_result.get("status") or "UNKNOWN"))
+            ci3.metric("Verdade", str(core_runtime_result.get("truth_state") or "UNKNOWN"))
+            ci4.metric("Persistência", str(core_persistence.get("state") or "UNAVAILABLE"))
+            st.caption(
+                "Contexto autenticado e evidência da mesma execução. "
+                "Sem provider, rede, subprocess, deploy, publicação, pagamento ou trading."
+            )
+            st.caption(
+                "Evidências do runtime: "
+                + str(int(core_ingress.get("accepted_records") or 0))
+                + " aceita(s) de "
+                + str(int(core_ingress.get("input_rows") or 0))
+                + " · freshness "
+                + str(core_evidence.get("freshness") or "UNVERIFIED")
+                + " · conflitos "
+                + str(len(list(core_evidence.get("conflict_claims") or [])))
+                + "."
+            )
+            if str(core_evidence.get("conflict_state") or "") == "CONFLICT":
+                st.warning(
+                    "Há fontes confirmadas em conflito. O Core não escolheu uma versão arbitrariamente."
+                )
+            core_payload = core_runtime_result.get("payload")
+            core_system = (
+                core_payload.get("system")
+                if isinstance(core_payload, Mapping)
+                and isinstance(core_payload.get("system"), Mapping)
+                else None
+            )
+            if isinstance(core_system, Mapping):
+                st.dataframe(
+                    [
+                        {
+                            "Item": name,
+                            "Estado": str(
+                                (row if isinstance(row, Mapping) else {}).get("state")
+                                or "UNKNOWN"
+                            ),
+                            "Valor": str(
+                                (row if isinstance(row, Mapping) else {}).get("value")
+                                or ""
+                            ),
+                            "Motivo": str(
+                                (row if isinstance(row, Mapping) else {}).get("reason")
+                                or ""
+                            ),
+                        }
+                        for name, row in core_system.items()
+                    ],
+                    hide_index=True,
+                    width="stretch",
+                )
+            elif isinstance(core_payload, Mapping):
+                st.json(dict(core_payload))
+            if core_runtime_result.get("execution_authorized") is not False:
+                st.error("Gate inconsistente: execução não pode ser autorizada neste bridge.")
+            else:
+                st.caption(
+                    "Gate físico: BLOQUEADO · execução autorizada NÃO · ações externas NÃO."
+                )
 
     provider_env = _provider_env()
     provider = provider_status(feature_flags=flags, env=provider_env)
