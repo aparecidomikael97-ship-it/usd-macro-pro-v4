@@ -303,9 +303,9 @@ class GlobalWorkerActivationReadinessTests(unittest.TestCase):
         get.assert_called_once()
         _, kwargs = get.call_args
         self.assertTrue(str(kwargs["url"]).endswith("/actions/runs"))
-        self.assertEqual(kwargs["params"]["event"], "schedule")
+        self.assertNotIn("event", kwargs["params"])
         self.assertEqual(kwargs["params"]["branch"], "main")
-        self.assertGreaterEqual(kwargs["params"]["per_page"], 20)
+        self.assertGreaterEqual(kwargs["params"]["per_page"], 50)
         self.assertEqual(result["status"], "CONFIRMED")
         self.assertEqual(len(result["runs"]), 1)
         self.assertEqual(result["runs"][0]["id"], 11)
