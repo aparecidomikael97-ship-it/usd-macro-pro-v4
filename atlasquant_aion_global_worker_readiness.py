@@ -156,10 +156,24 @@ def pulse_health(
         latest_completed.get("conclusion") or ""
     )
 
+    stale_active = []
+    for row in recent:
+        if str(row.get("status") or "") not in {"queued", "in_progress"}:
+            continue
+        row_created = _parse_iso(row.get("created_at"))
+        row_age = (
+            max(0, int((current - row_created).total_seconds()))
+            if row_created is not None
+            else None
+        )
+        if row_age is None or row_age > MAX_PULSE_AGE_SECONDS:
+            stale_active.append(row)
+
     latest_observation_ok = bool(
         latest_created is not None
         and latest_age_seconds is not None
         and latest_age_seconds <= MAX_PULSE_AGE_SECONDS
+        and not stale_active
         and (
             latest_is_active
             or (
@@ -189,6 +203,7 @@ def pulse_health(
         "latest_status": latest_status,
         "latest_conclusion": latest_conclusion,
         "latest_is_active": latest_is_active,
+        "stale_active_count": len(stale_active),
         "latest_completed_created_at": (
             completed_created.isoformat() if completed_created else ""
         ),
