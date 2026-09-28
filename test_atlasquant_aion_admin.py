@@ -7,6 +7,8 @@ from atlasquant_aion_admin import (
     _attention_queue,
     _critical_surface_rows,
     _aion_memory_hits,
+    _local_contract_snapshot,
+    _developer_intelligence_summary,
 )
 from atlasquant_aion_wisdom import new_wisdom_entry
 
@@ -59,6 +61,232 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("O mapa é somente leitura", src)
         self.assertIn("não aprova, publica, cobra, provisiona acesso nem envia ordens", src)
         self.assertIn('state": "REAL BLOQUEADO"', src)
+
+    def test_developer_intelligence_summary_is_passive(self):
+        summary=_developer_intelligence_summary({
+            "snapshot_digest":"REPO-ABC",
+            "file_count":20,
+            "category_counts":{"MODULE":7,"TEST":9,"WORKFLOW":2},
+            "risk_counts":{"AUTHORITY":2,"RELEASE":1},
+            "syntax_errors":1,
+            "truncated":False,
+            "content_included":False,
+            "writes_files":False,
+            "network_called":False,
+            "subprocess_called":False,
+        })
+        self.assertEqual(summary["state"],"READY")
+        self.assertEqual(summary["modules"],7)
+        self.assertEqual(summary["tests"],9)
+        self.assertEqual(summary["workflows"],2)
+        self.assertEqual(summary["risk_surfaces"],3)
+        self.assertFalse(summary["content_included"])
+        self.assertFalse(summary["writes_files"])
+        self.assertFalse(summary["network_called"])
+        self.assertFalse(summary["subprocess_called"])
+
+    def test_developer_implementation_envelope_uses_level_two_human_gate(self):
+        src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Preparar envelope de implementação · nível 2",src)
+        self.assertIn('key="aion_developer_implementation_envelope"',src)
+        self.assertIn("build_developer_implementation_envelope(",src)
+        self.assertIn("Implementation Readiness Envelope",src)
+        self.assertIn("nível 2 = branch isolada",src)
+        self.assertIn("Máx. autônomo",src)
+        self.assertIn("Execução autorizada",src)
+        self.assertIn("Prontidão da implementação · rollback e papéis",src)
+        self.assertIn("Rollback específico desta mudança",src)
+        self.assertIn("Reviewer independente",src)
+        self.assertIn("Breaker independente",src)
+        self.assertIn("Registrar prontidão da implementação",src)
+        self.assertIn("prepare_developer_implementation_readiness(",src)
+        self.assertIn("builder_principal_id=builder_principal_id",src)
+        self.assertIn("reviewer_principal_id=reviewer_principal_id",src)
+        self.assertIn("breaker_principal_id=breaker_principal_id",src)
+        self.assertIn("approver_principal_id=impl_principal",src)
+        self.assertIn("Builder principal id",src)
+        self.assertIn("Approver principal id",src)
+        self.assertIn("READY_FOR_HUMAN_IMPLEMENTATION_APPROVAL",src)
+        self.assertIn("Execução continua não autorizada",src)
+        self.assertIn("Aprovação humana · branch isolada",src)
+        self.assertIn('key="aion_developer_implementation_approved"',src)
+        self.assertIn("Registrar autorização de implementação na sessão",src)
+        self.assertIn("approve_developer_implementation(",src)
+        self.assertIn("execution_authorized continua False",src)
+        self.assertIn("não existe executor ligado a este envelope",src)
+        self.assertIn("Implementation authorized não significa execution authorized",src)
+        readiness_pos=src.index('"Registrar prontidão da implementação"')
+        approval_pos=src.index('"Registrar autorização de implementação na sessão"')
+        self.assertLess(readiness_pos,approval_pos)
+    def test_developer_command_policy_ui_never_authorizes_execution(self):
+        src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Validar Command Allowlist Contract",src)
+        self.assertIn('key="aion_developer_command_policy_prepare"',src)
+        self.assertIn("build_developer_command_policy_contract(",src)
+        self.assertIn("Command Allowlist Contract · somente dados",src)
+        self.assertIn("Exec pinning",src)
+        self.assertIn("OS sandbox",src)
+        self.assertIn("Templates argv exatos conferem",src)
+        self.assertIn("Ainda falta pinning dos executáveis",src)
+        self.assertIn("Riscos que continuam explícitos",src)
+        self.assertIn("Obrigatório antes de qualquer execução futura",src)
+        self.assertIn("EXACT_ARGV_TEMPLATES",src)
+        self.assertIn("command_policy_is_data_only=True",src)
+        self.assertIn("execution_authorized=False",src)
+        runner_pos=src.index('"##### Runner Contract Simulator · não executável"')
+        policy_pos=src.index('"Validar Command Allowlist Contract"',runner_pos)
+        self.assertGreater(policy_pos,runner_pos)
+
+    def test_developer_runner_contract_ui_is_non_executing_and_fail_closed(self):
+        src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Runner Contract Simulator · somente desenho",src)
+        self.assertIn('key="aion_developer_runner_prepare"',src)
+        self.assertIn("build_developer_runner_contract(",src)
+        self.assertIn("Runner Contract Simulator · não executável",src)
+        self.assertIn("Plano de comandos — somente dados",src)
+        self.assertIn("command_plan_is_data_only=True",src)
+        self.assertIn("shell_allowed=False",src)
+        self.assertIn("network_allowed=False",src)
+        self.assertIn("secrets_allowed=False",src)
+        self.assertIn("repo_write_allowed=False",src)
+        self.assertIn("execution_authorized=False",src)
+        self.assertIn("revision_content_verified continuar falso",src)
+        self.assertIn("Isso é intencional",src)
+        patch_pos=src.index('"Patch Validator · diff read-only"')
+        runner_pos=src.index('"Runner Contract Simulator · somente desenho"',patch_pos)
+        self.assertGreater(runner_pos,patch_pos)
+
+    def test_developer_patch_validation_ui_is_read_only_and_clears_raw_diff(self):
+        src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Sandbox Preflight · contrato declarativo",src)
+        self.assertIn("não prova que um ambiente real já foi criado",src)
+        self.assertIn("build_developer_sandbox_preflight(",src)
+        self.assertIn("Patch Validator · diff read-only",src)
+        self.assertIn("clear_on_submit=True",src)
+        self.assertIn("Validar patch sem aplicar",src)
+        self.assertIn("validate_developer_patch(",src)
+        self.assertIn("Patch Validation · somente leitura",src)
+        self.assertIn("Isto não autoriza aplicar, testar, commitar, mergear ou publicar",src)
+        self.assertIn("patch_text_included=False",src)
+        self.assertIn("execution_authorized=False",src)
+        self.assertIn("writes_files=False",src)
+
+    def test_developer_builder_sandbox_request_is_bounded_and_non_executing(self):
+        src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Builder Sandbox Request · branch isolada",src)
+        self.assertIn("revision_contract",src)
+        self.assertIn('key="aion_developer_builder_prepare"',src)
+        self.assertIn("build_developer_builder_sandbox_request(",src)
+        self.assertIn("main permitido: NÃO",src)
+        self.assertIn("scope expansion: NÃO",src)
+        self.assertIn("force push: NÃO",src)
+        self.assertIn("Nenhum executor de escrita foi ligado",src)
+        self.assertIn("patch_generated=False",src)
+        self.assertIn("writes_files=False",src)
+        implementation_pos=src.index('"IMPLEMENTATION_AUTHORIZED_SESSION_ONLY"')
+        builder_pos=src.index('"Preparar Builder Sandbox Request"',implementation_pos)
+        self.assertGreater(builder_pos,implementation_pos)
+
+
+    def test_developer_evidence_gate_never_auto_promotes_root_cause(self):
+        src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Evidence Promotion Gate · causa raiz",src)
+        self.assertIn('key="aion_developer_gate_evaluate"',src)
+        self.assertIn("evaluate_developer_evidence_promotion(",src)
+        self.assertIn("promoção automática: NÃO",src)
+        self.assertIn("A causa ainda continua UNKNOWN",src)
+        self.assertIn("Revisão humana da causa",src)
+        self.assertIn('key="aion_developer_cause_review_approved"',src)
+        self.assertIn("Confirmar causa após revisão humana",src)
+        self.assertIn("confirm_developer_root_cause(",src)
+        self.assertIn("session-only",src)
+        self.assertIn("não autoriza IMPLEMENT, merge ou deploy",src)
+        gate_pos=src.index('"Avaliar evidência para revisão humana"')
+        evaluate_pos=src.index("gate = evaluate_developer_evidence_promotion(",gate_pos)
+        self.assertGreater(evaluate_pos,gate_pos)
+        confirm_pos=src.index('"Confirmar causa após revisão humana"')
+        apply_pos=src.index("confirmed = confirm_developer_root_cause(",confirm_pos)
+        self.assertGreater(apply_pos,confirm_pos)
+
+    def test_developer_correction_plan_is_traceable_and_non_executing(self):
+        src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Preparar plano de correção rastreável",src)
+        self.assertIn('key="aion_developer_correction_plan"',src)
+        self.assertIn("build_developer_correction_plan(",src)
+        self.assertIn("Plano de correção rastreável",src)
+        self.assertIn("Hipóteses ainda UNKNOWN",src)
+        self.assertIn("Evidências exigidas antes de concluir",src)
+        self.assertIn("obrigatória vs Builder",src)
+        self.assertIn("obrigatória vs Builder/Reviewer",src)
+        self.assertIn("não gera patch",src)
+        self.assertIn("não confirma causa raiz",src)
+        button_pos=src.index('"Preparar plano de correção rastreável"')
+        plan_pos=src.index("correction = build_developer_correction_plan(",button_pos)
+        self.assertGreater(plan_pos,button_pos)
+
+    def test_developer_failure_diagnostic_separates_fact_from_hypothesis(self):
+        src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Diagnosticar falha de teste/log",src)
+        self.assertIn('key="aion_developer_failure_diagnose"',src)
+        self.assertIn("diagnose_developer_failure(snapshot, failure_text)",src)
+        self.assertIn("Fatos confirmados pelo log",src)
+        self.assertIn("HIPÓTESE — não confirmada",src)
+        self.assertIn("Registrar falha no Developer Workflow da sessão",src)
+        self.assertIn("record_developer_failure_attempt(",src)
+        self.assertIn("nenhum patch foi aplicado",src)
+        self.assertIn("não confirma causa raiz",src)
+
+    def test_developer_package_is_human_gated_and_session_only(self):
+        src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Preparar pacote Developer Engine + Dev Fusion",src)
+        self.assertIn('key="aion_developer_intelligence_package"',src)
+        self.assertIn("build_developer_package(",src)
+        self.assertIn("Pacote Developer Engine + Dev Fusion",src)
+        self.assertIn("não persiste Checkpoint",src)
+        self.assertIn("não aprova PLAN/BUILD/REVIEW/RELEASE automaticamente",src)
+        button_pos=src.index('"Preparar pacote Developer Engine + Dev Fusion"')
+        package_pos=src.index("package = build_developer_package(",button_pos)
+        self.assertGreater(package_pos,button_pos)
+
+    def test_developer_intelligence_scan_is_opt_in(self):
+        src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Developer Intelligence · mapa estrutural",src)
+        self.assertIn("Mapear repositório local",src)
+        self.assertIn('key="aion_developer_intelligence_scan"',src)
+        button_pos=src.index('if st.button(\n        "Mapear repositório local"')
+        scan_pos=src.index("snapshot = scan_developer_repository(project_root)",button_pos)
+        self.assertGreater(scan_pos,button_pos)
+        self.assertIn("coverage é heurística, não prova de correção",src)
+        self.assertIn("não edita, não commita, não faz merge, não faz deploy",src)
+
+    def test_local_contract_snapshot_is_passive_and_closed(self):
+        snapshot=_local_contract_snapshot()
+        self.assertEqual(snapshot["schema"],"ATLASQUANT_AION_LOCAL_CONTRACT_SNAPSHOT_V1")
+        self.assertEqual(snapshot["state"],"PASS")
+        self.assertEqual(snapshot["registry_tools"],12)
+        self.assertEqual(snapshot["local_tools"],11)
+        self.assertEqual(snapshot["trace_sources"],11)
+        self.assertRegex(snapshot["contract_fingerprint"],r"^AION-LCL-[0-9A-F]{16}$")
+        self.assertFalse(snapshot["write_in_allowlist"])
+        self.assertFalse(snapshot["full_audit_executed"])
+        self.assertFalse(snapshot["executes_action"])
+        self.assertFalse(snapshot["external_action_executed"])
+        self.assertFalse(snapshot["real_orders_enabled"])
+        self.assertFalse(snapshot["tool_output_is_authority"])
+
+    def test_central_contract_health_runs_full_audit_only_after_button(self):
+        src=Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Saúde dos contratos locais",src)
+        self.assertIn("Rodar auditor local",src)
+        self.assertIn('key="aion_run_contract_audit"',src)
+        self.assertIn("Auditoria completa ainda não foi rodada nesta sessão",src)
+        self.assertIn("from atlasquant_aion_contract_auditor import audit_aion_local_contracts",src)
+        self.assertIn("Resultado diagnóstico somente leitura",src)
+        self.assertIn("PASS não concede autoridade",src)
+        button_pos=src.index('if st.button(\n        "Rodar auditor local"')
+        audit_pos=src.index("report = audit_aion_local_contracts()",button_pos)
+        self.assertGreater(audit_pos,button_pos)
+        self.assertIn("_render_local_contract_health()",src)
 
     def test_central_operations_map_has_mobile_layout(self):
         self.assertIn(".aion-workspace-grid", AION_ADMIN_CSS)
