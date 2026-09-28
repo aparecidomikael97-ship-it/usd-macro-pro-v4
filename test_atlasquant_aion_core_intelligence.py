@@ -446,8 +446,11 @@ class ObservabilityTests(CoreCase):
 
     def test_memory_writes_redact_credentials(self):
         row = self.remember(text="password=abc", source="https://user:pass@example.test/path")
-        self.assertNotIn("abc", json.dumps(row))
-        self.assertNotIn("user:pass", json.dumps(row))
+        encoded = json.dumps(row)
+        self.assertEqual(row["text"], "[REDACTED]")
+        self.assertEqual(row["source"], "https://[REDACTED]@example.test/path")
+        self.assertNotIn("password=abc", encoded)
+        self.assertNotIn("user:pass", encoded)
 
     def test_multiline_private_key_redacted(self):
         secret = "-----BEGIN " + "PRIVATE KEY-----\nvery-sensitive-key\n-----END " + "PRIVATE KEY-----"
