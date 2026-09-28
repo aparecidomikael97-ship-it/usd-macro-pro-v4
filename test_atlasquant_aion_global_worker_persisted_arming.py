@@ -151,6 +151,15 @@ class PersistedGlobalWorkerArmingTests(unittest.TestCase):
             persisted_arming_transition_required(nonarmed, self.source)
         )
 
+    def test_transition_required_when_armed_contract_changes(self):
+        persisted = deepcopy(self.working)
+        changed = deepcopy(self.working)
+        changed["aion_global_worker_v1"]["max_jobs"] = 4
+        changed["aion_global_worker_v1"]["resource_budgets"]["max_jobs_per_tick"] = 4
+        self.assertTrue(
+            persisted_arming_transition_required(changed, persisted)
+        )
+
     def test_feature_flag_reader_requires_authoritative_token(self):
         result = read_repository_feature_flag(_config(token=""))
         self.assertEqual(result["status"], "UNAVAILABLE")
@@ -321,6 +330,34 @@ class PersistedGlobalWorkerArmingTests(unittest.TestCase):
                 _config(),
                 approved=True,
                 expected_sha="runtime-sha-1",
+            )
+        put.assert_not_called()
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertIn("Persisted Arming Ceremony", result["reason"])
+
+    def test_generic_save_blocks_mutated_armed_contract_even_if_already_armed(self):
+        persisted = deepcopy(self.working)
+        changed = deepcopy(self.working)
+        changed["aion_global_worker_v1"]["max_jobs"] = 4
+        changed["aion_global_worker_v1"]["resource_budgets"]["max_jobs_per_tick"] = 4
+        raw = changed["aion_global_worker_v1"]
+        candidate = dict(raw)
+        candidate.pop("digest", None)
+        from atlasquant_aion_core_intelligence.evidence import digest as evidence_digest
+        raw["digest"] = evidence_digest(candidate)
+
+        runtime = _runtime(persisted)
+        with patch(
+            "atlasquant_aion_memory.load_runtime_checkpoint",
+            return_value=runtime,
+        ), patch(
+            "atlasquant_aion_memory.requests.put"
+        ) as put:
+            result = save_runtime_checkpoint(
+                changed,
+                _config(),
+                approved=True,
+                expected_sha=runtime["sha"],
             )
         put.assert_not_called()
         self.assertEqual(result["status"], "BLOCKED")
