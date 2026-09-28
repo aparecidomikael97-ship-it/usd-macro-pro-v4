@@ -150,10 +150,15 @@ V1 does not:
 All such actions remain outside this executor and require separate, explicit,
 auditable adapters and approvals.
 
-## Future autonomous worker gate
+## Worker Runtime stack
 
-A future autonomous worker may call this kernel only after a separate design
-adds, at minimum:
+A later stacked block now adds **Worker Runtime V1**, which can call this kernel
+periodically after explicit ADMIN arming inside an active Streamlit session.
+
+That worker is deliberately session-scoped and does not claim global
+multi-instance coordination or continuous 24/7 availability.
+
+For global/24x7 autonomy, a later infrastructure gate still must add:
 
 - authenticated worker principal;
 - durable lease/claim semantics;
@@ -166,11 +171,13 @@ adds, at minimum:
 - cost controls;
 - no real trading/payment/publication authority by default.
 
-Until then:
+The manual executor path remains available independently.
 
-`manual_invocation_only = true`
+When Worker Runtime V1 is armed, receipts explicitly record
+`authorization_mode = ARMED_WORKER`; otherwise manual receipts record
+`authorization_mode = HUMAN_CLICK`.
 
-`autonomous_worker_connected = false`
+External/physical actions remain unavailable in both modes.
 
 ## CI audit procedure
 
