@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime, timezone
+from uuid import uuid4
 from atlasquant_aion_clock import application_timezone
 from atlasquant_aion_core_intelligence.context import Domain
 from html import escape
@@ -356,6 +357,21 @@ except Exception:
     execute_due_local_work = None
     executor_snapshot = None
 
+try:
+    from atlasquant_aion_worker_runtime import (
+        arm_worker,
+        kill_worker,
+        pause_worker,
+        worker_snapshot,
+        worker_tick,
+    )
+except Exception:
+    arm_worker = None
+    kill_worker = None
+    pause_worker = None
+    worker_snapshot = None
+    worker_tick = None
+
 SCHEMA = "ATLASQUANT_AION_ADMIN_V1"
 AION_WORKSPACES = (
     "🧠 Central",
@@ -373,6 +389,7 @@ _WORKING_SOURCE_KEY = "aion_working_checkpoint_source_digest"
 _WORKING_DIRTY_KEY = "aion_working_checkpoint_dirty"
 _WORKING_CONFLICT_KEY = "aion_working_checkpoint_conflict"
 _AION_WORKSPACE_JUMP_KEY = "aion_admin_workspace_jump"
+_AION_WORKER_RUNTIME_ID_KEY = "aion_worker_runtime_id_v1"
 
 AION_ADMIN_CSS = r"""
 <style>
@@ -2826,6 +2843,234 @@ def _render_central(
                 "Executor bloqueado em modo seguro: "
                 + type(exc).__name__
                 + ". Nenhuma ação externa foi autorizada."
+            )
+
+    st.markdown("#### 🤖 Worker Runtime V1 · autonomia da sessão")
+    worker_runtime_id = str(
+        st.session_state.get(_AION_WORKER_RUNTIME_ID_KEY) or ""
+    ).strip()
+    if not worker_runtime_id:
+        worker_runtime_id = "AION-WRK-" + uuid4().hex[:16].upper()
+        st.session_state[_AION_WORKER_RUNTIME_ID_KEY] = worker_runtime_id
+
+    worker_state = {
+        "status": "UNAVAILABLE",
+        "state": "DISABLED",
+        "kill_switch": True,
+        "retry_queue_count": 0,
+        "lease_active": False,
+        "lease_owned_by_this_runtime": False,
+        "continuous_24x7_confirmed": False,
+        "multi_instance_safe": False,
+        "stats": {},
+    }
+    if worker_snapshot is not None:
+        try:
+            worker_state = worker_snapshot(
+                access,
+                checkpoint,
+                runtime_id=worker_runtime_id,
+            )
+        except Exception as exc:
+            worker_state = {
+                "status": "UNKNOWN",
+                "state": "DISABLED",
+                "kill_switch": True,
+                "retry_queue_count": 0,
+                "lease_active": False,
+                "lease_owned_by_this_runtime": False,
+                "continuous_24x7_confirmed": False,
+                "multi_instance_safe": False,
+                "stats": {},
+                "error_type": type(exc).__name__,
+            }
+
+    ws1, ws2, ws3, ws4 = st.columns(4)
+    ws1.metric("Worker", str(worker_state.get("state") or "UNKNOWN"))
+    ws2.metric(
+        "Lease",
+        "ATIVO" if worker_state.get("lease_active") else "LIVRE",
+    )
+    ws3.metric("Retry queue", int(worker_state.get("retry_queue_count") or 0))
+    ws4.metric(
+        "24/7 confirmado",
+        "SIM" if worker_state.get("continuous_24x7_confirmed") else "NÃO",
+    )
+    st.caption(
+        "Autonomia V1: somente durante esta sessão Streamlit ativa. "
+        "Lease e heartbeat ficam no Checkpoint de trabalho. "
+        "Multi-instância global: NÃO confirmada. Persistência externa automática: NÃO."
+    )
+
+    worker_interval = int(st.number_input(
+        "Intervalo do worker (segundos)",
+        min_value=60,
+        max_value=900,
+        value=int(worker_state.get("interval_seconds") or 60),
+        step=30,
+        key="aion_worker_interval_seconds",
+    ))
+    worker_lease_seconds = max(90, min(1800, worker_interval * 2 + 30))
+
+    arm_confirm = st.checkbox(
+        "Confirmo que quero armar a autonomia local da sessão. "
+        "Somente capabilities allowlisted e sem efeitos externos.",
+        value=False,
+        key="aion_worker_arm_confirm",
+    )
+    wc1, wc2, wc3 = st.columns(3)
+    if wc1.button(
+        "🟢 Armar Worker",
+        key="aion_worker_arm",
+        disabled=not bool(arm_confirm and arm_worker is not None),
+        width="stretch",
+    ):
+        try:
+            armed = arm_worker(
+                access,
+                checkpoint,
+                runtime_id=worker_runtime_id,
+                confirmation=True,
+                interval_seconds=worker_interval,
+                lease_seconds=worker_lease_seconds,
+            )
+            if armed.get("status") == "ARMED":
+                _set_working_checkpoint(
+                    armed.get("checkpoint") or checkpoint,
+                    dirty=True,
+                )
+                st.success(
+                    "Worker armado para esta sessão. Nenhuma ação externa foi autorizada."
+                )
+                st.rerun()
+        except Exception as exc:
+            st.error(
+                "Arming bloqueado em modo seguro: "
+                + type(exc).__name__
+                + "."
+            )
+
+    if wc2.button(
+        "⏸️ Pausar Worker",
+        key="aion_worker_pause",
+        disabled=not bool(
+            pause_worker is not None
+            and str(worker_state.get("state") or "") == "ARMED"
+        ),
+        width="stretch",
+    ):
+        try:
+            paused = pause_worker(
+                access,
+                checkpoint,
+                confirmation=True,
+            )
+            _set_working_checkpoint(
+                paused.get("checkpoint") or checkpoint,
+                dirty=True,
+            )
+            st.info("Worker pausado. Lease liberado.")
+            st.rerun()
+        except Exception as exc:
+            st.error("Pausa bloqueada: " + type(exc).__name__ + ".")
+
+    if wc3.button(
+        "🛑 Kill switch",
+        key="aion_worker_kill",
+        disabled=not bool(kill_worker is not None),
+        width="stretch",
+    ):
+        try:
+            killed = kill_worker(
+                access,
+                checkpoint,
+                confirmation=True,
+            )
+            _set_working_checkpoint(
+                killed.get("checkpoint") or checkpoint,
+                dirty=True,
+            )
+            st.warning(
+                "Kill switch acionado. O worker não executará novos ticks "
+                "até novo arming explícito."
+            )
+            st.rerun()
+        except Exception as exc:
+            st.error("Kill switch bloqueado: " + type(exc).__name__ + ".")
+
+    stats = (
+        worker_state.get("stats")
+        if isinstance(worker_state.get("stats"), Mapping)
+        else {}
+    )
+    st.caption(
+        "Ticks "
+        + str(int(stats.get("ticks") or 0))
+        + " · processados "
+        + str(int(stats.get("processed") or 0))
+        + " · sucesso "
+        + str(int(stats.get("succeeded") or 0))
+        + " · falhas "
+        + str(int(stats.get("failed") or 0))
+        + " · bloqueados "
+        + str(int(stats.get("blocked") or 0))
+        + " · crash recoveries "
+        + str(int(stats.get("crash_recoveries") or 0))
+        + "."
+    )
+
+    if (
+        worker_tick is not None
+        and str(worker_state.get("state") or "") == "ARMED"
+        and not bool(worker_state.get("kill_switch"))
+    ):
+        try:
+            @st.fragment(run_every=max(60, int(worker_state.get("interval_seconds") or 60)))
+            def _aion_worker_fragment():
+                live_checkpoint = ensure_operating_checkpoint(
+                    st.session_state.get(_WORKING_CHECKPOINT_KEY)
+                    if isinstance(st.session_state.get(_WORKING_CHECKPOINT_KEY), Mapping)
+                    else checkpoint
+                )
+                try:
+                    tick = worker_tick(
+                        access,
+                        live_checkpoint,
+                        runtime_id=worker_runtime_id,
+                        system_context=system_context,
+                        voice_status=core_voice_status,
+                        max_jobs=min(5, executor_batch_size),
+                    )
+                    updated_checkpoint = tick.get("checkpoint")
+                    if isinstance(updated_checkpoint, Mapping):
+                        before_digest = checkpoint_source_digest(live_checkpoint)
+                        after_digest = checkpoint_source_digest(updated_checkpoint)
+                        if after_digest != before_digest:
+                            _set_working_checkpoint(
+                                updated_checkpoint,
+                                dirty=True,
+                            )
+                    st.caption(
+                        "Worker tick · "
+                        + str(tick.get("status") or "UNKNOWN")
+                        + " · processados "
+                        + str(int(tick.get("processed") or 0))
+                        + " · retry queue "
+                        + str(int(tick.get("retry_queue_count") or 0))
+                        + " · efeitos externos NÃO."
+                    )
+                except Exception as exc:
+                    st.caption(
+                        "Worker tick bloqueado em modo seguro: "
+                        + type(exc).__name__
+                        + "."
+                    )
+            _aion_worker_fragment()
+        except Exception as exc:
+            st.caption(
+                "Fragmento autônomo indisponível nesta execução: "
+                + type(exc).__name__
+                + ". Worker permanece fail-closed."
             )
 
     provider_env = _provider_env()
