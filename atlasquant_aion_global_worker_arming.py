@@ -341,6 +341,12 @@ def validate_global_worker_arming_approval(
             "reason": "ARMING_APPROVAL_CHECKPOINT_CHANGED",
         }
 
+    if str(ticket.get("confirmation_phrase_digest") or "") != digest(CONFIRMATION_PHRASE):
+        return {
+            "state": "BLOCKED",
+            "reason": "ARMING_APPROVAL_CONFIRMATION_PROOF_MISMATCH",
+        }
+
     budgets = ticket.get("budgets")
     if not isinstance(budgets, Mapping):
         return {"state": "BLOCKED", "reason": "ARMING_APPROVAL_BUDGETS_MISSING"}
@@ -352,9 +358,11 @@ def validate_global_worker_arming_approval(
         maximum=MAX_LEASE_SECONDS,
         name="arming lease",
     )
-    if int(budgets.get("max_jobs_per_tick") or 0) != jobs:
+    budget_jobs = budgets.get("max_jobs_per_tick")
+    if type(budget_jobs) is not int or budget_jobs != jobs:
         return {"state": "BLOCKED", "reason": "ARMING_APPROVAL_JOB_BUDGET_MISMATCH"}
-    if int(ticket.get("lease_seconds") or 0) != lease:
+    ticket_lease = ticket.get("lease_seconds")
+    if type(ticket_lease) is not int or ticket_lease != lease:
         return {"state": "BLOCKED", "reason": "ARMING_APPROVAL_LEASE_MISMATCH"}
 
     expected_caps = (
@@ -382,7 +390,7 @@ def validate_global_worker_arming_approval(
         "subprocess_calls_per_tick",
         "market_orders_per_tick",
     )
-    if any(int(budgets.get(key, -1)) != 0 for key in zero_budget_fields):
+    if any(type(budgets.get(key)) is not int or budgets.get(key) != 0 for key in zero_budget_fields):
         return {
             "state": "BLOCKED",
             "reason": "ARMING_APPROVAL_EXTERNAL_BUDGET_NONZERO",
@@ -392,7 +400,10 @@ def validate_global_worker_arming_approval(
             "state": "BLOCKED",
             "reason": "ARMING_APPROVAL_REAL_TRADING_NOT_FALSE",
         }
-    if int(budgets.get("max_runtime_checkpoint_writes_per_tick") or 0) != 2:
+    if (
+        type(budgets.get("max_runtime_checkpoint_writes_per_tick")) is not int
+        or budgets.get("max_runtime_checkpoint_writes_per_tick") != 2
+    ):
         return {
             "state": "BLOCKED",
             "reason": "ARMING_APPROVAL_RUNTIME_WRITE_BUDGET_MISMATCH",
