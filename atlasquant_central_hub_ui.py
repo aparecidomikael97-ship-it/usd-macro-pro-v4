@@ -104,7 +104,7 @@ _CENTRAL_CSS = """
 .aq-central-rail-fold{display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid var(--aq-line);border-radius:18px;background:linear-gradient(180deg,rgba(12,18,36,.94),rgba(7,17,31,.92));box-shadow:0 16px 40px rgba(0,0,0,.22)}
 .aq-central-rail-fold>summary{display:none;cursor:pointer;color:var(--aq-text);font-size:.78rem;font-weight:800;letter-spacing:.08em;list-style:none}
 .aq-central-kicker{color:var(--aq-warn);font-size:.62rem;font-weight:800;letter-spacing:.14em;margin:0 2px 2px}
-.aq-central-link{display:flex;flex-direction:column;gap:2px;text-decoration:none;color:var(--aq-text);border:1px solid transparent;border-radius:14px;padding:10px 12px;background:rgba(8,16,32,.55)}
+.aq-central-link{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-decoration:none;color:var(--aq-text);border:1px solid transparent;border-radius:14px;padding:10px 12px;background:rgba(8,16,32,.55)}
 .aq-central-link small{color:var(--aq-muted);font-size:.68rem;font-weight:650}
 .aq-central-link strong{font-size:.92rem}
 .aq-central-priority{border-color:var(--aq-aion,#b48cff);box-shadow:inset 0 0 0 1px rgba(180,140,255,.28)}
@@ -114,7 +114,10 @@ _CENTRAL_CSS = """
 .aq-central-card h2,.aq-aion-module h3{margin:.35rem 0 .2rem;color:var(--aq-text);font-size:1rem}
 .aq-central-card p,.aq-aion-module p{margin:0;color:var(--aq-muted);font-size:.8rem;line-height:1.35}
 .aq-central-art{display:block;width:72px;height:48px}
+.aq-central-rail .aq-central-art{width:44px;height:30px}
 .aq-aion-module .aq-central-art{width:42px;height:42px}
+.aq-aion-home{border:1px solid var(--aq-aion,#b48cff);border-radius:18px;padding:12px 14px;background:linear-gradient(180deg,rgba(180,140,255,.18),rgba(7,17,31,.55));transition:border-color .2s ease}
+.aq-aion-priority{margin:0 0 8px;color:var(--aq-aion,#b48cff);font-size:.62rem;font-weight:800;letter-spacing:.14em}
 .aq-aion-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:12px}
 .aq-central-denied{margin:0;color:var(--aq-warn);font-size:.82rem;font-weight:750}
 .aq-aion-home .aq-hero{margin-bottom:8px}
@@ -124,6 +127,9 @@ _CENTRAL_CSS = """
   .aq-central-rail-fold>summary{display:flex;align-items:center;min-height:36px}
   .aq-central-link{padding:8px 10px}
   .aq-aion-grid{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion: reduce){
+  .aq-aion-home,.aq-central-link,.aq-central-art{animation:none;transition:none}
 }
 </style>
 """
@@ -306,6 +312,7 @@ def ecosystem_rail_html(access: Mapping[str, Any] | None, active_area: Any = Non
         label = escape(area["label"])
         links.append(
             f'<a class="aq-central-link{priority}" href="?central={area_id}"{current_attr}>'
+            f"{_ART[area_id]()}"
             f"<strong>{label}</strong></a>"
         )
     body = "".join(links)
@@ -367,6 +374,7 @@ def aion_home_html(*_ignored: Any, **_claims: Any) -> str:
         )
     return (
         '<section class="aq-aion-home" data-truth="UNKNOWN">'
+        + '<p class="aq-aion-priority">PRIORIDADE ATUAL</p>'
         + hero_html("AION", "LOCAL")
         + section_title_html("AION IA")
         + '<div class="aq-aion-grid">'

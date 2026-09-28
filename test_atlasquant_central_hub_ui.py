@@ -102,6 +102,15 @@ class CentralHubUiTests(unittest.TestCase):
         self.assertIn("aq-hero", html)
         self.assertIn("aq-section-title", html)
         self.assertIn("aq-state", html)
+        self.assertIn("PRIORIDADE ATUAL", html)
+        self.assertIn('data-truth="UNKNOWN"', html)
+        surface = central_surface_html(_access("ADMIN"), "aion")
+        self.assertIn("PRIORIDADE ATUAL", surface)
+        self.assertIn("border:1px solid var(--aq-aion,#b48cff)", surface)
+        self.assertIn("rgba(180,140,255,.18)", surface)
+        self.assertIn("@media (prefers-reduced-motion: reduce)", surface)
+        self.assertNotIn("DISPONÍVEL", surface)
+        self.assertNotIn("PRONTO", surface)
 
     def test_rail_is_vertical_and_collapses_at_760(self):
         html = ecosystem_rail_html(_access("ADMIN"), "aion")
@@ -113,6 +122,11 @@ class CentralHubUiTests(unittest.TestCase):
         self.assertLess(html.index("AION IA"), html.index("Negócios"))
         self.assertLess(html.index("Negócios"), html.index("Trader"))
         self.assertLess(html.index(">Trader<"), html.index("Renda Fixa"))
+        self.assertEqual(html.count('<svg class="aq-central-art"'), 4)
+        self.assertIn(".aq-central-rail .aq-central-art{width:44px;height:30px}", html)
+        student = ecosystem_rail_html(_access("USER"))
+        self.assertEqual(student.count('<svg class="aq-central-art"'), 1)
+        self.assertNotIn("AION IA", student)
 
     def test_existing_tokens_remain_and_aion_token_is_additive(self):
         self.assertIn("--aq-bg: #07111f;", ATLASQUANT_CSS)
