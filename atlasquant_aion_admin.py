@@ -396,6 +396,25 @@ except Exception:
     approve_global_worker_arming_plan = None
     prepare_global_worker_arming_plan = None
 
+try:
+    from atlasquant_aion_global_worker_persisted_arming import (
+        CONFIRMATION_PHRASE as PERSIST_ARMING_CONFIRMATION_PHRASE,
+        approve_persisted_arming_plan,
+        persist_staged_global_arming,
+        persisted_arming_transition_required,
+        prepare_persisted_arming_plan,
+        read_repository_feature_flag,
+        validate_persisted_arming_approval,
+    )
+except Exception:
+    PERSIST_ARMING_CONFIRMATION_PHRASE = "PERSISTIR WORKER GLOBAL ARMADO"
+    approve_persisted_arming_plan = None
+    persist_staged_global_arming = None
+    persisted_arming_transition_required = None
+    prepare_persisted_arming_plan = None
+    read_repository_feature_flag = None
+    validate_persisted_arming_approval = None
+
 SCHEMA = "ATLASQUANT_AION_ADMIN_V1"
 AION_WORKSPACES = (
     "🧠 Central",
@@ -416,6 +435,9 @@ _AION_WORKSPACE_JUMP_KEY = "aion_admin_workspace_jump"
 _AION_WORKER_RUNTIME_ID_KEY = "aion_worker_runtime_id_v1"
 _AION_GLOBAL_ARMING_PLAN_KEY = "aion_global_arming_plan_v1"
 _AION_GLOBAL_ARMING_APPROVAL_KEY = "aion_global_arming_approval_v1"
+_AION_GLOBAL_PERSIST_FLAG_EVIDENCE_KEY = "aion_global_persist_flag_evidence_v1"
+_AION_GLOBAL_PERSIST_PLAN_KEY = "aion_global_persist_plan_v1"
+_AION_GLOBAL_PERSIST_APPROVAL_KEY = "aion_global_persist_approval_v1"
 
 AION_ADMIN_CSS = r"""
 <style>
@@ -6140,19 +6162,323 @@ def _render_development(
             st.rerun()
 
     persistence_preflight = runtime_write_preflight(runtime_result)
-    persistence_blocked = bool(conflict or not persistence_preflight.get("allowed"))
+    persisted_arm_required = False
+    if persisted_arming_transition_required is not None:
+        try:
+            persisted_arm_required = bool(
+                persisted_arming_transition_required(
+                    checkpoint,
+                    source_checkpoint,
+                )
+            )
+        except Exception:
+            persisted_arm_required = True
+
+    persistence_blocked = bool(
+        conflict
+        or not persistence_preflight.get("allowed")
+        or persisted_arm_required
+    )
     if not persistence_preflight.get("allowed"):
         st.caption(
             "Persistência bloqueada em modo seguro: "
             f"{persistence_preflight.get('reason','estado runtime não confirmado')}."
         )
+
+    if persisted_arm_required:
+        st.warning(
+            "Este Checkpoint contém uma nova transição para Global Worker ARMED. "
+            "O save genérico está BLOQUEADO. Use a Persisted Arming Ceremony abaixo."
+        )
+        st.markdown("##### 🔐 Persisted Arming Ceremony")
+
+        if st.button(
+            "🔎 Verificar feature flag antes da persistência",
+            key="aion_global_persist_check_flag",
+            disabled=read_repository_feature_flag is None,
+            width="stretch",
+        ):
+            try:
+                evidence = read_repository_feature_flag(cfg)
+                st.session_state[_AION_GLOBAL_PERSIST_FLAG_EVIDENCE_KEY] = evidence
+                if (
+                    evidence.get("status") == "CONFIRMED"
+                    and evidence.get("safe_for_arming_persistence") is True
+                ):
+                    st.success(
+                        "Feature flag comprovada como "
+                        + str(evidence.get("state") or "UNKNOWN")
+                        + ". Nenhuma variável foi alterada."
+                    )
+                else:
+                    st.error(
+                        "Persistência continua bloqueada: não foi possível provar "
+                        "que a feature flag está desligada."
+                    )
+            except Exception as exc:
+                st.error(
+                    "Leitura da feature flag falhou em modo seguro: "
+                    + type(exc).__name__
+                    + "."
+                )
+
+        persist_flag_evidence = st.session_state.get(
+            _AION_GLOBAL_PERSIST_FLAG_EVIDENCE_KEY
+        )
+        flag_safe = bool(
+            isinstance(persist_flag_evidence, Mapping)
+            and persist_flag_evidence.get("status") == "CONFIRMED"
+            and persist_flag_evidence.get("safe_for_arming_persistence") is True
+        )
+        if isinstance(persist_flag_evidence, Mapping):
+            pf1, pf2 = st.columns(2)
+            pf1.metric(
+                "Feature flag",
+                str(persist_flag_evidence.get("state") or "UNKNOWN"),
+            )
+            pf2.metric(
+                "Seguro para persistir",
+                "SIM" if flag_safe else "NÃO",
+            )
+
+        persist_ttl = int(st.number_input(
+            "TTL da autorização de persistência (segundos)",
+            min_value=300,
+            max_value=1800,
+            value=600,
+            step=300,
+            key="aion_global_persist_ttl",
+        ))
+
+        if st.button(
+            "🧾 Gerar plano de persistência ARMED",
+            key="aion_global_persist_plan",
+            disabled=not bool(
+                flag_safe and prepare_persisted_arming_plan is not None
+            ),
+            width="stretch",
+        ):
+            try:
+                planned_persistence = prepare_persisted_arming_plan(
+                    access,
+                    checkpoint,
+                    runtime_result,
+                    persist_flag_evidence,
+                    ttl_seconds=persist_ttl,
+                )
+                if planned_persistence.get("status") == "PERSISTENCE_PLAN_READY":
+                    st.session_state[_AION_GLOBAL_PERSIST_PLAN_KEY] = (
+                        planned_persistence.get("plan")
+                    )
+                    st.session_state.pop(
+                        _AION_GLOBAL_PERSIST_APPROVAL_KEY,
+                        None,
+                    )
+                    st.success(
+                        "Plano de persistência criado somente na sessão. "
+                        "Nenhuma escrita foi feita."
+                    )
+                else:
+                    st.warning(
+                        "Plano de persistência bloqueado: "
+                        + str(
+                            planned_persistence.get("reason")
+                            or planned_persistence.get("status")
+                            or "UNKNOWN"
+                        )
+                    )
+            except Exception as exc:
+                st.error(
+                    "Plano de persistência bloqueado: "
+                    + type(exc).__name__
+                    + "."
+                )
+
+        persist_plan = st.session_state.get(_AION_GLOBAL_PERSIST_PLAN_KEY)
+        if isinstance(persist_plan, Mapping):
+            st.caption(
+                "Persistence plan: "
+                + str(persist_plan.get("plan_digest") or "")[:24]
+                + "… · runtime SHA "
+                + str(persist_plan.get("source_runtime_sha") or "")[:12]
+                + "… · expira em "
+                + str(persist_plan.get("expires_at") or "UNKNOWN")
+            )
+            st.caption(
+                "Rollback source digest: "
+                + str(
+                    (
+                        persist_plan.get("rollback")
+                        if isinstance(persist_plan.get("rollback"), Mapping)
+                        else {}
+                    ).get("source_runtime_checkpoint_digest")
+                    or ""
+                )[:24]
+                + "…"
+            )
+
+            persist_phrase = st.text_input(
+                'Digite exatamente "PERSISTIR WORKER GLOBAL ARMADO"',
+                value="",
+                key="aion_global_persist_confirmation_phrase",
+            )
+            persist_confirm = st.checkbox(
+                "Confirmo que revisei o STAGED_ARMED, SHA do runtime, rollback "
+                "e quero autorizar a persistência real do estado ARMED.",
+                value=False,
+                key="aion_global_persist_confirm",
+            )
+            if st.button(
+                "✅ Criar autorização de persistência",
+                key="aion_global_persist_approve",
+                disabled=not bool(
+                    persist_confirm and approve_persisted_arming_plan is not None
+                ),
+                width="stretch",
+            ):
+                try:
+                    approved_persistence = approve_persisted_arming_plan(
+                        access,
+                        persist_plan,
+                        confirmation=True,
+                        confirmation_phrase=persist_phrase,
+                    )
+                    if approved_persistence.get("status") == "APPROVED_FOR_PERSISTENCE":
+                        st.session_state[_AION_GLOBAL_PERSIST_APPROVAL_KEY] = (
+                            approved_persistence.get("approval")
+                        )
+                        st.success(
+                            "Autorização de persistência criada na sessão. "
+                            "Ainda nenhuma escrita foi executada."
+                        )
+                    else:
+                        st.warning(
+                            "Autorização de persistência bloqueada: "
+                            + str(
+                                approved_persistence.get("reason")
+                                or approved_persistence.get("status")
+                                or "UNKNOWN"
+                            )
+                        )
+                except Exception as exc:
+                    st.error(
+                        "Autorização de persistência bloqueada: "
+                        + type(exc).__name__
+                        + "."
+                    )
+
+        persist_approval = st.session_state.get(
+            _AION_GLOBAL_PERSIST_APPROVAL_KEY
+        )
+        persist_approval_valid = False
+        if (
+            isinstance(persist_approval, Mapping)
+            and validate_persisted_arming_approval is not None
+        ):
+            try:
+                approval_check = validate_persisted_arming_approval(
+                    access,
+                    checkpoint,
+                    runtime_result,
+                    persist_approval,
+                )
+                persist_approval_valid = approval_check.get("state") == "APPROVED"
+            except Exception:
+                persist_approval_valid = False
+
+        final_persist_confirm = st.checkbox(
+            "SEGUNDA CONFIRMAÇÃO: autorizo agora a escrita real do ARMED "
+            "no Checkpoint Mestre. A feature flag deve continuar desligada.",
+            value=False,
+            key="aion_global_persist_final_confirm",
+        )
+        if st.button(
+            "🚨 Persistir ARMED no Checkpoint Mestre",
+            key="aion_global_persist_execute",
+            disabled=not bool(
+                persist_approval_valid
+                and final_persist_confirm
+                and persist_staged_global_arming is not None
+                and not conflict
+            ),
+            width="stretch",
+        ):
+            decision = guardian_decision(
+                "save_checkpoint",
+                access,
+                approved=True,
+                feature_flags=flags,
+            )
+            if not decision["allowed"]:
+                st.error(decision["reason"])
+            else:
+                try:
+                    persist_result = persist_staged_global_arming(
+                        access,
+                        checkpoint,
+                        runtime_result,
+                        persist_approval,
+                        cfg,
+                        confirmation=True,
+                    )
+                    if (
+                        persist_result.get("status") == "CONFIRMED"
+                        and persist_result.get("saved")
+                        and persist_result.get("verified")
+                    ):
+                        saved_checkpoint = ensure_operating_checkpoint(
+                            persist_result.get("checkpoint")
+                        )
+                        saved_checkpoint["operating"]["dirty"] = False
+                        _set_working_checkpoint(saved_checkpoint, dirty=False)
+                        st.session_state[_WORKING_SOURCE_KEY] = (
+                            checkpoint_source_digest(saved_checkpoint)
+                        )
+                        for key in (
+                            _AION_GLOBAL_PERSIST_FLAG_EVIDENCE_KEY,
+                            _AION_GLOBAL_PERSIST_PLAN_KEY,
+                            _AION_GLOBAL_PERSIST_APPROVAL_KEY,
+                        ):
+                            st.session_state.pop(key, None)
+                        st.success(
+                            "Global Worker ARMED persistido, relido e confirmado. "
+                            "Feature flag permanece separada e não foi alterada."
+                        )
+                        st.session_state["aion_checkpoint_save_result"] = persist_result
+                        st.rerun()
+                    elif persist_result.get("status") == "ROLLED_BACK":
+                        st.error(
+                            "A persistência foi revertida automaticamente porque a "
+                            "feature flag deixou de estar comprovadamente desligada."
+                        )
+                        _set_working_checkpoint(source_checkpoint, dirty=False)
+                        st.session_state[_WORKING_SOURCE_KEY] = (
+                            checkpoint_source_digest(source_checkpoint)
+                        )
+                        st.rerun()
+                    else:
+                        st.error(
+                            "Persistência ARMED não foi concluída. Estado: "
+                            + str(persist_result.get("status") or "UNKNOWN")
+                            + " · motivo: "
+                            + str(persist_result.get("reason") or "não informado")
+                            + "."
+                        )
+                except Exception as exc:
+                    st.error(
+                        "Persistência ARMED bloqueada em modo seguro: "
+                        + type(exc).__name__
+                        + "."
+                    )
+
     if st.button(
         "💾 Salvar Checkpoint Mestre no runtime",
         key="aion_save_checkpoint",
         disabled=persistence_blocked,
         help=(
             "A escrita ocorre apenas no branch de runtime, exige estado seguro do runtime "
-            "e este clique conta como aprovação explícita."
+            "e este clique conta como aprovação explícita. "
+            "Transições novas para Global Worker ARMED usam uma cerimônia separada."
         ),
     ):
         decision = guardian_decision(
