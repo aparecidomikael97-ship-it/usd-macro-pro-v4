@@ -390,6 +390,12 @@ def incident_response_plan(incident:Mapping[str,Any]|None)->dict[str,Any]:
             "Revisar consumo estimado, quota e teto aprovado antes de nova solicitação paga.",
             "Preferir rota gratuita/local quando ela puder cumprir a tarefa com segurança.",
         ],
+        "global_worker":[
+            "Preservar a evidência atual e qualquer closure record durável anterior.",
+            "Tratar REOPENED ou novo incidente após fechamento como incidente ativo; não reutilizar o fechamento anterior como autorização.",
+            "Executar a cadeia Supervisão → Remediação → Closure Review novamente antes de qualquer novo fechamento.",
+            "Manter reativação, feature flag e trading separados do fechamento do incidente.",
+        ],
         "generic":[
             "Classificar o componente afetado e reunir evidências adicionais.",
             "Aplicar contenção manual apenas se houver causa/evidência suficiente.",
