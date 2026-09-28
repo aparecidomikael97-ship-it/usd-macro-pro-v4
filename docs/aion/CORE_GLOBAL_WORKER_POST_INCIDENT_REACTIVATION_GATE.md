@@ -223,3 +223,11 @@ the existing explicit activation ceremony.
 
 The stacked Draft PR may be temporarily retargeted to `main` only to run the
 repository's standard pull-request workflows, then restored to its stacked base.
+
+
+## Audit trigger note
+
+When this stacked Draft PR is temporarily retargeted to `main`, a
+documentation-only synchronize commit may be used to trigger the standard
+pull-request workflows. This changes no runtime behavior and grants no
+activation, reactivation, deploy, merge, feature-flag, or trading authority.
