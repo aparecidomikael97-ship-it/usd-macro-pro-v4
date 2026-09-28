@@ -315,6 +315,7 @@ def executor_snapshot(
         if isinstance(row, Mapping)
     })
     armed_worker_observed = "ARMED_WORKER" in authorization_modes
+    global_worker_observed = "GLOBAL_WORKER" in authorization_modes
     return {
         "schema": SCHEMA,
         "status": state["state"],
