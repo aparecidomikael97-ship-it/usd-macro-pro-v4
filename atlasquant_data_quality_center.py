@@ -2,6 +2,7 @@
 
 Presentation-only health summary built from already-computed institutional
 readiness and Autopilot status. It does not create signals or relax any gate.
+A green state additionally requires explicit, current temporal evidence.
 """
 from __future__ import annotations
 
@@ -10,10 +11,12 @@ from typing import Any, Mapping, Sequence
 import math
 import streamlit as st
 
+from atlasquant_data_freshness import CURRENT, STALE, assess_freshness, summarize_freshness
+
 
 def _finite(value: Any) -> float | None:
     try:
-        out=float(value)
+        out = float(value)
         return out if math.isfinite(out) else None
     except Exception:
         return None
@@ -22,72 +25,103 @@ def _finite(value: Any) -> float | None:
 def build_data_confidence(
     packs: Sequence[Mapping[str, Any]] | None,
     autopilot: Mapping[str, Any] | None = None,
+    *,
+    evaluated_at: Any = None,
 ) -> dict[str, Any]:
-    rows=[dict(p or {}) for p in (packs or [])]
-    auto=dict(autopilot or {})
+    rows = [dict(p or {}) for p in (packs or [])]
+    auto = dict(autopilot or {})
 
-    data_scores=[]
-    model_quality=[]
-    ages=[]
-    ready=0
-    stale=0
-    missing_age=0
-    event_risk=0
+    data_scores = []
+    model_quality = []
+    ages = []
+    freshness_reports = []
+    ready = 0
+    stale = 0
+    missing_age = 0
+    event_risk = 0
+    freshness_conflicts = 0
 
     for p in rows:
-        dr=dict(p.get("data_ready", {}) or {})
+        dr = dict(p.get("data_ready", {}) or {})
         if bool(dr.get("sufficient", False)):
             ready += 1
-        ds=_finite(dr.get("score"))
+        ds = _finite(dr.get("score"))
         if ds is not None:
             data_scores.append(ds)
-        q=_finite(p.get("quality"))
+        q = _finite(p.get("quality"))
         if q is not None:
             model_quality.append(q)
-        age=_finite(p.get("technical_age"))
+        age = _finite(p.get("technical_age"))
         if age is None:
             missing_age += 1
         else:
             ages.append(age)
-        if bool(p.get("stale_technical", False)):
+
+        stale_technical = bool(p.get("stale_technical", False))
+        if stale_technical:
             stale += 1
-        event=str(p.get("event", "") or "").upper()
+
+        freshness = assess_freshness(
+            p.get("freshness") if isinstance(p.get("freshness"), Mapping) else None,
+            evaluated_at=evaluated_at,
+        )
+        freshness_reports.append(freshness)
+        if (
+            (freshness.get("state") == CURRENT and stale_technical)
+            or (freshness.get("state") == STALE and not stale_technical)
+        ):
+            freshness_conflicts += 1
+
+        event = str(p.get("event", "") or "").upper()
         if any(x in event for x in ("ALTO", "MÁX", "MAX", "HIGH", "FOMC", "CPI", "NFP")):
             event_risk += 1
 
-    total=len(rows)
-    avg_data=mean(data_scores) if data_scores else 0.0
-    avg_quality=mean(model_quality) if model_quality else 0.0
-    ready_ratio=(ready/total) if total else 0.0
-    process_ok=bool(auto.get("app_headless_ok", False))
-    source_blocked=bool(auto.get("twelve_daily_blocked", False))
-    news_nowcast=dict(auto.get("news_nowcast_v1", {}) or {})
-    news_runtime_state=str(news_nowcast.get("runtime_state", "") or "").upper()
-    news_provider_status=dict(news_nowcast.get("provider_status", {}) or {})
-    news_provider_reason=str(
+    total = len(rows)
+    avg_data = mean(data_scores) if data_scores else 0.0
+    avg_quality = mean(model_quality) if model_quality else 0.0
+    ready_ratio = (ready / total) if total else 0.0
+    process_ok = bool(auto.get("app_headless_ok", False))
+    source_blocked = bool(auto.get("twelve_daily_blocked", False))
+    freshness_summary = summarize_freshness(freshness_reports)
+
+    news_nowcast = dict(auto.get("news_nowcast_v1", {}) or {})
+    news_runtime_state = str(news_nowcast.get("runtime_state", "") or "").upper()
+    news_provider_status = dict(news_nowcast.get("provider_status", {}) or {})
+    news_provider_reason = str(
         news_nowcast.get("provider_retry_reason")
         or news_provider_status.get("reason")
         or ""
     ).upper()
-    news_retry_after=max(0,int(news_nowcast.get("provider_retry_after_min",0) or 0))
-    news_auth_issue=(
-        news_runtime_state in {"AUTH_ERROR","AUTH_COOLDOWN"}
-        or news_provider_reason=="AUTH_ERROR"
+    news_retry_after = max(0, int(news_nowcast.get("provider_retry_after_min", 0) or 0))
+    news_auth_issue = (
+        news_runtime_state in {"AUTH_ERROR", "AUTH_COOLDOWN"}
+        or news_provider_reason == "AUTH_ERROR"
     )
 
     if total == 0 or ready == 0:
-        status="RED"; label="DADOS INSUFICIENTES"
-    elif ready_ratio >= .80 and avg_data >= 85 and process_ok and not source_blocked and stale == 0:
-        status="GREEN"; label="DADOS OPERACIONAIS"
+        status = "RED"
+        label = "DADOS INSUFICIENTES"
+    elif (
+        ready_ratio >= .80
+        and avg_data >= 85
+        and process_ok
+        and not source_blocked
+        and stale == 0
+        and freshness_summary["state"] == CURRENT
+        and freshness_conflicts == 0
+    ):
+        status = "GREEN"
+        label = "DADOS OPERACIONAIS"
     else:
-        status="YELLOW"; label="DADOS PARCIAIS / ATENÇÃO"
+        status = "YELLOW"
+        label = "DADOS PARCIAIS / ATENÇÃO"
 
     return {
         "status": status,
         "label": label,
         "total_pairs": total,
         "ready_pairs": ready,
-        "ready_ratio": round(ready_ratio*100, 1),
+        "ready_ratio": round(ready_ratio * 100, 1),
         "average_data_score": round(avg_data, 1),
         "average_model_quality": round(avg_quality, 1),
         "freshest_age_min": round(min(ages), 1) if ages else None,
@@ -99,35 +133,57 @@ def build_data_confidence(
         "source_blocked": source_blocked,
         "source_block_type": str(auto.get("twelve_block_type", "") or ""),
         "budget": dict(auto.get("twelve_budget", {}) or {}),
-        "news_nowcast_state":news_runtime_state,
-        "news_provider_reason":news_provider_reason,
-        "news_retry_after_min":news_retry_after,
-        "news_auth_issue":bool(news_auth_issue),
+        "news_nowcast_state": news_runtime_state,
+        "news_provider_reason": news_provider_reason,
+        "news_retry_after_min": news_retry_after,
+        "news_auth_issue": bool(news_auth_issue),
+        "freshness_state": freshness_summary["state"],
+        "freshness_current_pairs": freshness_summary["current"],
+        "freshness_stale_pairs": freshness_summary["stale"],
+        "freshness_unknown_pairs": freshness_summary["unknown"],
+        "freshness_invalid_pairs": freshness_summary["invalid"],
+        "freshness_conflict_pairs": freshness_conflicts,
+        "freshness_reasons": list(freshness_summary["reasons"]),
+        "freshness_oldest_age_min": freshness_summary["oldest_age_min"],
+        "freshness_freshest_age_min": freshness_summary["freshest_age_min"],
+        "freshness_summary": freshness_summary,
+        "freshness_reports": freshness_reports,
+        "freshness_execution_authorized": False,
     }
 
 
-
-def data_confidence_visual_state(summary: Mapping[str,Any] | None)->dict[str,str]:
-    s=dict(summary or {})
-    status=str(s.get("status","") or "").upper()
-    if status=="GREEN":
-        return {"label":"DADOS OPERACIONAIS","detail":"Cobertura e frescor mínimos atendidos; ainda não é autorização de trade"}
-    if status=="YELLOW":
-        return {"label":"ATENÇÃO NOS DADOS","detail":"Há cobertura parcial, stale, processo ou orçamento exigindo revisão"}
-    if status=="RED":
-        return {"label":"DADOS INSUFICIENTES","detail":"Leitura operacional deve permanecer bloqueada"}
-    return {"label":"REVISAR","detail":"Estado de dados inválido ou indisponível"}
+def data_confidence_visual_state(summary: Mapping[str, Any] | None) -> dict[str, str]:
+    s = dict(summary or {})
+    status = str(s.get("status", "") or "").upper()
+    if status == "GREEN":
+        return {
+            "label": "DADOS OPERACIONAIS",
+            "detail": "Cobertura e validade temporal explícita atendidas; ainda não é autorização de trade",
+        }
+    if status == "YELLOW":
+        return {
+            "label": "ATENÇÃO NOS DADOS",
+            "detail": "Cobertura, origem, validade temporal, processo ou orçamento exigem revisão",
+        }
+    if status == "RED":
+        return {
+            "label": "DADOS INSUFICIENTES",
+            "detail": "Leitura operacional deve permanecer bloqueada",
+        }
+    return {"label": "REVISAR", "detail": "Estado de dados inválido ou indisponível"}
 
 
 def render_data_confidence(
     packs: Sequence[Mapping[str, Any]] | None,
     autopilot: Mapping[str, Any] | None = None,
+    *,
+    evaluated_at: Any = None,
 ) -> dict[str, Any]:
-    s=build_data_confidence(packs, autopilot)
-    icon={"GREEN":"🟢","YELLOW":"🟡","RED":"🔴"}.get(s["status"],"⚪")
+    s = build_data_confidence(packs, autopilot, evaluated_at=evaluated_at)
+    icon = {"GREEN": "🟢", "YELLOW": "🟡", "RED": "🔴"}.get(s["status"], "⚪")
 
     st.markdown("### 🛡️ Data Confidence Center")
-    visual=data_confidence_visual_state(s)
+    visual = data_confidence_visual_state(s)
     st.markdown(
         f"""<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:11px 13px;
         border:1px solid rgba(137,170,210,.18);border-radius:12px;margin:4px 0 13px;background:rgba(11,27,47,.52)">
@@ -136,15 +192,16 @@ def render_data_confidence(
         unsafe_allow_html=True,
     )
     st.caption(
-        "Saúde dos dados separada do direcional. Este painel não aumenta score e não libera operação."
+        "Saúde dos dados separada do direcional. Atualidade não prova concordância, "
+        "não aumenta score e não libera operação."
     )
-    c1,c2,c3,c4=st.columns(4)
+    c1, c2, c3, c4 = st.columns(4)
     c1.metric("Estado dos dados", f"{icon} {s['label']}")
     c2.metric("Pares prontos", f"{s['ready_pairs']}/{s['total_pairs']}")
     c3.metric("Data Score médio", f"{s['average_data_score']:.0f}/100")
     c4.metric("Qualidade média", f"{s['average_model_quality']:.0f}/100")
 
-    details=[]
+    details = []
     if s["oldest_age_min"] is not None:
         details.append(f"maior idade técnica {s['oldest_age_min']:.0f} min")
     if s["stale_pairs"]:
@@ -156,41 +213,65 @@ def render_data_confidence(
     if details:
         st.caption(" · ".join(details))
 
-    p1,p2,p3=st.columns(3)
+    temporal = (
+        f"Validade temporal: {s['freshness_state']} · "
+        f"atuais {s['freshness_current_pairs']}/{s['total_pairs']} · "
+        f"stale {s['freshness_stale_pairs']} · "
+        f"desconhecidos {s['freshness_unknown_pairs']} · "
+        f"inválidos {s['freshness_invalid_pairs']}"
+    )
+    st.caption(temporal)
+    if s["freshness_conflict_pairs"]:
+        st.caption(
+            f"⚠️ {s['freshness_conflict_pairs']} conflito(s) entre o contrato temporal "
+            "e stale_technical; o selo verde permanece bloqueado."
+        )
+    if s["freshness_reasons"] and s["freshness_state"] != CURRENT:
+        st.caption("Motivos temporais: " + " · ".join(s["freshness_reasons"][:6]))
+
+    p1, p2, p3 = st.columns(3)
     p1.write("**Autopilot:** " + ("🟢 saudável" if s["process_ok"] else "🔴 sem confirmação saudável"))
     if s["source_blocked"]:
         p2.write("**Twelve Data:** 🟠 bloqueio/orçamento registrado")
     else:
         p2.write("**Twelve Data:** 🟢 sem bloqueio registrado")
 
-    news_state=str(s.get("news_nowcast_state") or "")
-    news_reason=str(s.get("news_provider_reason") or "")
-    retry=int(s.get("news_retry_after_min",0) or 0)
+    news_state = str(s.get("news_nowcast_state") or "")
+    news_reason = str(s.get("news_provider_reason") or "")
+    retry = int(s.get("news_retry_after_min", 0) or 0)
     if s.get("news_auth_issue"):
-        retry_txt=f" · retry ~{retry} min" if retry>0 else ""
-        p3.write("**Nowcast EODHD:** 🔴 credencial não autorizada"+retry_txt)
-    elif news_state in {"RATE_LIMITED","RATE_LIMIT_COOLDOWN"} or news_reason=="RATE_LIMITED":
-        retry_txt=f" · retry ~{retry} min" if retry>0 else ""
-        p3.write("**Nowcast EODHD:** 🟠 limite temporário"+retry_txt)
-    elif news_state in {"CAPTURED","THROTTLED"}:
+        retry_txt = f" · retry ~{retry} min" if retry > 0 else ""
+        p3.write("**Nowcast EODHD:** 🔴 credencial não autorizada" + retry_txt)
+    elif news_state in {"RATE_LIMITED", "RATE_LIMIT_COOLDOWN"} or news_reason == "RATE_LIMITED":
+        retry_txt = f" · retry ~{retry} min" if retry > 0 else ""
+        p3.write("**Nowcast EODHD:** 🟠 limite temporário" + retry_txt)
+    elif news_state in {"CAPTURED", "THROTTLED"}:
         p3.write("**Nowcast EODHD:** 🟢 disponível/cacheado")
-    elif news_state=="NOT_CONFIGURED":
+    elif news_state == "NOT_CONFIGURED":
         p3.write("**Nowcast EODHD:** ⚪ não configurado")
     elif news_state:
-        p3.write("**Nowcast EODHD:** 🟡 "+news_state)
+        p3.write("**Nowcast EODHD:** 🟡 " + news_state)
     else:
         p3.write("**Nowcast EODHD:** ⚪ sem status")
 
-    if s.get("news_auth_issue") or news_state in {"RATE_LIMITED","RATE_LIMIT_COOLDOWN","PROVIDER_ERROR","PROVIDER_COOLDOWN"}:
+    if s.get("news_auth_issue") or news_state in {
+        "RATE_LIMITED",
+        "RATE_LIMIT_COOLDOWN",
+        "PROVIDER_ERROR",
+        "PROVIDER_COOLDOWN",
+    }:
         st.caption(
             "Nowcast econômico está fail-closed: erro de provider não cria previsão, "
             "não altera peso e não libera execução."
         )
 
-    budget=s["budget"]
+    budget = s["budget"]
     if budget and not budget.get("error"):
-        used=int(budget.get("used",0) or 0)
-        limit=int(budget.get("limit",480) or 480)
-        remaining=int(budget.get("remaining",max(0,limit-used)) or 0)
-        st.caption(f"Orçamento técnico: {used}/{limit} créditos contabilizados · saldo protegido {remaining}.")
+        used = int(budget.get("used", 0) or 0)
+        limit = int(budget.get("limit", 480) or 480)
+        remaining = int(budget.get("remaining", max(0, limit - used)) or 0)
+        st.caption(
+            f"Orçamento técnico: {used}/{limit} créditos contabilizados · "
+            f"saldo protegido {remaining}."
+        )
     return s
