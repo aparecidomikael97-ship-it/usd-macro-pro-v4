@@ -385,6 +385,17 @@ except Exception:
     stage_kill_global_worker = None
     stage_pause_global_worker = None
 
+try:
+    from atlasquant_aion_global_worker_arming import (
+        CONFIRMATION_PHRASE,
+        approve_global_worker_arming_plan,
+        prepare_global_worker_arming_plan,
+    )
+except Exception:
+    CONFIRMATION_PHRASE = "ARMAR WORKER GLOBAL"
+    approve_global_worker_arming_plan = None
+    prepare_global_worker_arming_plan = None
+
 SCHEMA = "ATLASQUANT_AION_ADMIN_V1"
 AION_WORKSPACES = (
     "🧠 Central",
@@ -403,6 +414,8 @@ _WORKING_DIRTY_KEY = "aion_working_checkpoint_dirty"
 _WORKING_CONFLICT_KEY = "aion_working_checkpoint_conflict"
 _AION_WORKSPACE_JUMP_KEY = "aion_admin_workspace_jump"
 _AION_WORKER_RUNTIME_ID_KEY = "aion_worker_runtime_id_v1"
+_AION_GLOBAL_ARMING_PLAN_KEY = "aion_global_arming_plan_v1"
+_AION_GLOBAL_ARMING_APPROVAL_KEY = "aion_global_arming_approval_v1"
 
 AION_ADMIN_CSS = r"""
 <style>
@@ -3153,44 +3166,183 @@ def _render_central(
         step=60,
         key="aion_global_worker_lease_seconds",
     ))
-    global_arm_confirm = st.checkbox(
-        "Confirmo a delegação global deste escopo ADMIN para tarefas locais allowlisted. "
-        "A ativação do runner ainda exige a feature flag separada.",
-        value=False,
-        key="aion_global_worker_arm_confirm",
+    global_approval_ttl = int(st.number_input(
+        "TTL da autorização de arming (segundos)",
+        min_value=300,
+        max_value=3600,
+        value=900,
+        step=300,
+        key="aion_global_worker_approval_ttl",
+    ))
+
+    st.markdown("##### 🧾 Cerimônia de Arming")
+    st.caption(
+        "Etapa 1: gerar um plano preso ao contexto ADMIN e ao digest atual do Checkpoint. "
+        "Gerar o plano NÃO altera o Checkpoint e NÃO ativa o runner."
     )
-    gc1, gc2, gc3 = st.columns(3)
-    if gc1.button(
-        "🌐 Armar Global (staged)",
-        key="aion_global_worker_arm",
-        disabled=not bool(global_arm_confirm and stage_arm_global_worker is not None),
+    if st.button(
+        "🧾 Gerar plano de Arming",
+        key="aion_global_worker_plan",
+        disabled=prepare_global_worker_arming_plan is None,
         width="stretch",
     ):
         try:
-            armed_global = stage_arm_global_worker(
+            planned = prepare_global_worker_arming_plan(
                 access,
                 checkpoint,
-                confirmation=True,
                 max_jobs=global_max_jobs,
                 lease_seconds=global_lease_seconds,
+                approval_ttl_seconds=global_approval_ttl,
             )
-            if armed_global.get("status") == "STAGED_ARMED":
-                _set_working_checkpoint(
-                    armed_global.get("checkpoint") or checkpoint,
-                    dirty=True,
-                )
+            if planned.get("status") == "PLAN_READY":
+                st.session_state[_AION_GLOBAL_ARMING_PLAN_KEY] = planned.get("plan")
+                st.session_state.pop(_AION_GLOBAL_ARMING_APPROVAL_KEY, None)
                 st.success(
-                    "Worker Global armado no Checkpoint de trabalho. "
-                    "Ainda NÃO está persistido e o runner permanece dependente da feature flag."
+                    "Plano criado somente em memória da sessão. "
+                    "Readiness real continua sendo evidência separada do gate #288."
                 )
-                st.rerun()
+            else:
+                st.warning(
+                    "Plano não foi criado: "
+                    + str(planned.get("reason") or planned.get("status") or "UNKNOWN")
+                )
         except Exception as exc:
-            st.error(
-                "Arming global bloqueado em modo seguro: "
-                + type(exc).__name__
-                + "."
-            )
+            st.error("Plano de arming bloqueado: " + type(exc).__name__ + ".")
 
+    arming_plan = st.session_state.get(_AION_GLOBAL_ARMING_PLAN_KEY)
+    if isinstance(arming_plan, Mapping):
+        plan_budgets = (
+            arming_plan.get("budgets")
+            if isinstance(arming_plan.get("budgets"), Mapping)
+            else {}
+        )
+        st.caption(
+            "Plan digest: "
+            + str(arming_plan.get("plan_digest") or "")[:24]
+            + "… · expira em "
+            + str(arming_plan.get("expires_at") or "UNKNOWN")
+        )
+        pb1, pb2, pb3, pb4 = st.columns(4)
+        pb1.metric("Jobs/tick", int(plan_budgets.get("max_jobs_per_tick") or 0))
+        pb2.metric(
+            "Writes runtime/tick",
+            int(plan_budgets.get("max_runtime_checkpoint_writes_per_tick") or 0),
+        )
+        pb3.metric(
+            "Provider calls",
+            int(plan_budgets.get("provider_calls_per_tick") or 0),
+        )
+        pb4.metric(
+            "Ordens reais",
+            int(plan_budgets.get("market_orders_per_tick") or 0),
+        )
+        st.caption(
+            "Pré-requisito registrado no plano: READY_FOR_ADMIN_ARMING. "
+            "O plano não declara que esse readiness foi verificado; essa prova vem do gate read-only."
+        )
+
+        global_phrase = st.text_input(
+            'Digite exatamente "ARMAR WORKER GLOBAL" para autorizar este plano',
+            value="",
+            key="aion_global_worker_confirmation_phrase",
+        )
+        global_plan_confirm = st.checkbox(
+            "Confirmo este plano, escopo, TTL e budgets para apenas preparar o estado ARMED staged.",
+            value=False,
+            key="aion_global_worker_plan_confirm",
+        )
+        if st.button(
+            "✅ Criar autorização temporária",
+            key="aion_global_worker_approve_plan",
+            disabled=not bool(
+                global_plan_confirm
+                and approve_global_worker_arming_plan is not None
+            ),
+            width="stretch",
+        ):
+            try:
+                approved_plan = approve_global_worker_arming_plan(
+                    access,
+                    arming_plan,
+                    confirmation=True,
+                    confirmation_phrase=global_phrase,
+                )
+                if approved_plan.get("status") == "APPROVED_FOR_STAGING":
+                    st.session_state[_AION_GLOBAL_ARMING_APPROVAL_KEY] = (
+                        approved_plan.get("approval")
+                    )
+                    st.success(
+                        "Autorização temporária criada somente na sessão. "
+                        "Ainda não houve alteração do Checkpoint nem do runtime."
+                    )
+                else:
+                    st.warning(
+                        "Autorização bloqueada: "
+                        + str(
+                            approved_plan.get("reason")
+                            or approved_plan.get("status")
+                            or "UNKNOWN"
+                        )
+                    )
+            except Exception as exc:
+                st.error(
+                    "Autorização temporária bloqueada: "
+                    + type(exc).__name__
+                    + "."
+                )
+
+    arming_approval = st.session_state.get(_AION_GLOBAL_ARMING_APPROVAL_KEY)
+    if isinstance(arming_approval, Mapping):
+        st.caption(
+            "Approval digest: "
+            + str(arming_approval.get("approval_digest") or "")[:24]
+            + "… · expira em "
+            + str(arming_approval.get("expires_at") or "UNKNOWN")
+        )
+        if st.button(
+            "🌐 Preparar ARMED (staged, sem salvar)",
+            key="aion_global_worker_stage_armed",
+            disabled=stage_arm_global_worker is None,
+            width="stretch",
+        ):
+            try:
+                armed_global = stage_arm_global_worker(
+                    access,
+                    checkpoint,
+                    confirmation=True,
+                    arming_approval=arming_approval,
+                    max_jobs=global_max_jobs,
+                    lease_seconds=global_lease_seconds,
+                )
+                if armed_global.get("status") == "STAGED_ARMED":
+                    _set_working_checkpoint(
+                        armed_global.get("checkpoint") or checkpoint,
+                        dirty=True,
+                    )
+                    st.session_state.pop(_AION_GLOBAL_ARMING_PLAN_KEY, None)
+                    st.session_state.pop(_AION_GLOBAL_ARMING_APPROVAL_KEY, None)
+                    st.success(
+                        "Estado ARMED preparado somente no Checkpoint de trabalho. "
+                        "NÃO foi salvo no runtime e a feature flag continua separada."
+                    )
+                    st.rerun()
+                else:
+                    st.warning(
+                        "Staging bloqueado: "
+                        + str(
+                            armed_global.get("reason")
+                            or armed_global.get("status")
+                            or "UNKNOWN"
+                        )
+                    )
+            except Exception as exc:
+                st.error(
+                    "Staging ARMED bloqueado em modo seguro: "
+                    + type(exc).__name__
+                    + "."
+                )
+
+    gc2, gc3 = st.columns(2)
     if gc2.button(
         "⏸️ Pausar Global (staged)",
         key="aion_global_worker_pause",
