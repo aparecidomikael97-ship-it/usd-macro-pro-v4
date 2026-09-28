@@ -14,8 +14,9 @@ from atlasquant_aion_core_checkpoint_bridge import (
 from atlasquant_aion_core_intelligence.adapters import CHECKPOINT_NAMESPACE
 from atlasquant_aion_core_intelligence.context import Domain
 from atlasquant_aion_core_intelligence.evidence import Origin
-from atlasquant_aion_core_runtime_bridge import authenticated_context
+from atlasquant_aion_core_runtime_bridge import authenticated_context, handle_runtime_intent
 from atlasquant_aion_memory import (
+    checkpoint_integrity_report,
     checkpoint_source_digest,
     ensure_operating_checkpoint,
 )
@@ -82,6 +83,45 @@ class CheckpointCoreStoreTests(unittest.TestCase):
         ctx = authenticated_context(_access(), Domain.ADMIN)
         with self.assertRaisesRegex(ValueError, "DIGEST_MISMATCH"):
             load_checkpoint_store(ctx, tampered)
+
+    def test_legacy_integrity_report_rejects_tampered_core_namespace(self):
+        result = stage_user_approved_memory(
+            _access(), {}, kind="DECISION", text="Registro íntegro.", confirmation=True, now=NOW
+        )
+        good = checkpoint_integrity_report(result["checkpoint"])
+        self.assertNotIn("aion_core_intelligence", good["mismatches"])
+        tampered = deepcopy(result["checkpoint"])
+        tampered[CHECKPOINT_NAMESPACE]["records"][0]["text"] = "adulterado"
+        report = checkpoint_integrity_report(tampered)
+        self.assertEqual(report["state"], "MISMATCH")
+        self.assertIn("aion_core_intelligence", report["mismatches"])
+
+    def test_runtime_memory_query_reads_checkpoint_without_auto_persisting(self):
+        staged = stage_user_approved_memory(
+            _access(),
+            {},
+            kind="DECISION",
+            text="Usar o Checkpoint Mestre como memória durável do Core.",
+            confirmation=True,
+            now=NOW,
+        )
+        result = handle_runtime_intent(
+            _access(),
+            "O que decidimos sobre memoria?",
+            system_context={},
+            legacy_checkpoint=staged["checkpoint"],
+            now=NOW,
+        )
+        self.assertEqual(result["status"], "COMPLETED")
+        self.assertEqual(result["route"]["capability"], "MEMORY")
+        self.assertEqual(len(result["payload"]["approved_decisions"]), 1)
+        self.assertEqual(result["persistence"]["state"], "STAGED_CHECKPOINT")
+        self.assertEqual(
+            result["persistence"]["remote_persistence"],
+            "REQUIRES_EXPLICIT_CHECKPOINT_SAVE",
+        )
+        self.assertFalse(result["memory_auto_written"])
+        self.assertFalse(result["external_action_executed"])
 
     def test_cross_actor_context_does_not_leak_memory(self):
         result = stage_user_approved_memory(
@@ -211,6 +251,13 @@ class CheckpointCoreStoreTests(unittest.TestCase):
         self.assertEqual(len(snap["records"]), 2)
         self.assertEqual(len(snap["approved_decisions"]), 1)
         self.assertEqual(snap["approved_decisions"][0]["text"], "Decisão A.")
+
+    def test_admin_ui_keeps_memory_stage_and_external_save_separate(self):
+        source = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Aprovar e registrar no Checkpoint de trabalho", source)
+        self.assertIn("Salvar Checkpoint Mestre no runtime", source)
+        self.assertIn("legacy_checkpoint=checkpoint", source)
+        self.assertIn("Ela ainda NÃO foi gravada externamente", source)
 
     def test_no_network_or_automatic_checkpoint_save_in_bridge(self):
         source = Path("atlasquant_aion_core_checkpoint_bridge.py").read_text(encoding="utf-8")
