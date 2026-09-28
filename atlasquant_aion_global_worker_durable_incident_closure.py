@@ -137,6 +137,37 @@ def _closure_contract(
             "reason": "VALID_SESSION_HUMAN_CLOSURE_RECORD_REQUIRED",
         }
 
+    acknowledgements = (
+        dict(record.get("acknowledgements") or {})
+        if isinstance(record.get("acknowledgements"), Mapping)
+        else {}
+    )
+    digest_payload = {
+        "closure_package_digest": closure_package_digest,
+        "incident_evidence_digest": incident_evidence_digest,
+        "remediation_digest": remediation_digest,
+        "ceremony_digest": str(record.get("ceremony_digest") or ""),
+        "recorded_at": recorded_at.isoformat(),
+        "operator_note": str(record.get("operator_note") or "").strip(),
+        "human_confirmation": acknowledgements.get("human_confirmation") is True,
+        "evidence_acknowledged": acknowledgements.get("evidence_acknowledged") is True,
+        "reactivation_separation_acknowledged": (
+            acknowledgements.get("reactivation_separation_acknowledged") is True
+        ),
+    }
+    expected_record_digest = digest(digest_payload)
+    expected_record_id = (
+        "GW-CLOSE-" + expected_record_digest[:16].upper()
+    )
+    if (
+        closure_record_digest != expected_record_digest
+        or closure_record_id != expected_record_id
+    ):
+        return {
+            "state": "BLOCKED",
+            "reason": "HUMAN_CLOSURE_RECORD_INTEGRITY_MISMATCH",
+        }
+
     return {
         "state": "READY",
         "reason": "",
