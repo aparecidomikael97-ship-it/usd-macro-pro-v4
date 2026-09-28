@@ -245,8 +245,6 @@ def _default_state() -> dict[str, Any]:
         "allowed_capabilities": sorted(GLOBAL_WORKER_CAPABILITIES),
         "resource_budgets": {
             "max_jobs_per_tick": DEFAULT_MAX_JOBS,
-            "max_scheduled_ticks_per_utc_day": 48,
-            "max_jobs_per_utc_day": DEFAULT_MAX_JOBS * 48,
             "max_runtime_checkpoint_writes_per_tick": 2,
             "provider_calls_per_tick": 0,
             "paid_service_calls_per_tick": 0,
@@ -352,8 +350,6 @@ def _normalize_state(raw: Mapping[str, Any]) -> dict[str, Any]:
         "allowed_capabilities": sorted(allowed),
         "resource_budgets": deepcopy(dict(raw.get("resource_budgets") or {
             "max_jobs_per_tick": max_jobs,
-            "max_scheduled_ticks_per_utc_day": 48,
-            "max_jobs_per_utc_day": max_jobs * 48,
             "max_runtime_checkpoint_writes_per_tick": 2,
             "provider_calls_per_tick": 0,
             "paid_service_calls_per_tick": 0,
