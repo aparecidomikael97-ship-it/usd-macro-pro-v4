@@ -10479,6 +10479,18 @@ if _aq_active_index == 21:
             "source_build": _ATLASQUANT_SOURCE_BUILD,
             "environment": ATLASQUANT_ENVIRONMENT,
             "app_version": APP_VERSION,
+            "core_evidence": (
+                [{
+                    "claim": "build",
+                    "value": str(_ATLASQUANT_SOURCE_BUILD),
+                    "truth_state": "CONFIRMED",
+                    "source": "AtlasQuant runtime identity",
+                    "source_ref": "runtime-build:" + str(_ATLASQUANT_SOURCE_BUILD),
+                    "time_sensitive": False,
+                }]
+                if str(_ATLASQUANT_SOURCE_BUILD or "").strip()
+                else []
+            ),
             "market_status": _aion_market_context["summary"],
             "source_mesh": _aion_source_mesh,
             "source_observations": list(_aion_source_mesh.get("observations", []) or []),
