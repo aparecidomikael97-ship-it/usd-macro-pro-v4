@@ -232,6 +232,7 @@ def _receipt(
     result: Mapping[str, Any] | None = None,
     retry_after: datetime | None = None,
     approval_digest: str,
+    authorization_mode: str = "HUMAN_CLICK",
 ) -> dict[str, Any]:
     if state not in RECEIPT_STATES:
         raise ValueError("invalid receipt state")
@@ -254,7 +255,9 @@ def _receipt(
         "guardian_allowed": bool(guardian.get("allowed")),
         "guardian_risk": str(guardian.get("risk") or "UNKNOWN"),
         "guardian_reason": str(guardian.get("reason") or ""),
-        "human_confirmation_digest": approval_digest,
+        "human_confirmation_digest": approval_digest if authorization_mode == "HUMAN_CLICK" else "",
+        "authorization_digest": approval_digest,
+        "authorization_mode": authorization_mode,
         "human_principal": context.actor_id,
         "started_at": utc(now).isoformat(),
         "completed_at": utc(now).isoformat(),
@@ -306,27 +309,22 @@ def executor_snapshot(
     }
 
 
-def execute_due_local_work(
+def _execute_due_local_work_authorized(
     access: Mapping[str, Any] | None,
     checkpoint: Mapping[str, Any],
     *,
     system_context: Mapping[str, Any] | None = None,
     voice_status: Mapping[str, Any] | None = None,
-    confirmation: bool,
+    authorization_mode: str,
+    authorization_digest: str,
     max_jobs: int = 5,
     now: datetime | None = None,
 ) -> dict[str, Any]:
-    """Execute due safe-local Core jobs after one explicit authenticated click."""
-    if confirmation is not True:
-        return {
-            "schema": SCHEMA,
-            "status": "BLOCKED",
-            "reason": "EXPLICIT_HUMAN_CONFIRMATION_REQUIRED",
-            "checkpoint": dict(checkpoint or {}),
-            "processed": 0,
-            "autonomous_worker_started": False,
-            "external_action_executed": False,
-        }
+    """Internal kernel after an authenticated authorization boundary."""
+    if authorization_mode not in {"HUMAN_CLICK", "ARMED_WORKER"}:
+        raise ValueError("invalid executor authorization mode")
+    if not isinstance(authorization_digest, str) or not authorization_digest.strip():
+        raise ValueError("executor authorization digest required")
     if type(max_jobs) is not int or not 1 <= max_jobs <= MAX_JOBS_PER_RUN:
         raise ValueError("invalid executor batch size")
     current = utc(now or datetime.now(timezone.utc))
@@ -344,19 +342,7 @@ def execute_due_local_work(
     ]
     due.sort(key=lambda x: (str(x.get("due_at") or ""), str(x.get("schedule_id") or "")))
 
-    approval_digest = digest({
-        "actor": context.actor_id,
-        "scope": context.key,
-        "confirmed_at": current.isoformat(),
-        "occurrences": [
-            {
-                "schedule_id": str(x.get("schedule_id") or ""),
-                "due_at": str(x.get("due_at") or ""),
-                "capability": str(x.get("capability") or ""),
-            }
-            for x in due[:max_jobs]
-        ],
-    })
+    approval_digest = authorization_digest
     outcomes = []
     added = 0
 
@@ -466,6 +452,7 @@ def execute_due_local_work(
             result=terminal_result,
             retry_after=retry_after,
             approval_digest=approval_digest,
+            authorization_mode=authorization_mode,
         )
         receipts.append(receipt)
         added += 1
@@ -504,9 +491,10 @@ def execute_due_local_work(
         "outcomes": outcomes,
         "requires_checkpoint_save": added > 0,
         "external_persisted": False,
-        "manual_invocation_only": True,
-        "autonomous_worker_started": False,
-        "background_worker_connected": False,
+        "manual_invocation_only": authorization_mode == "HUMAN_CLICK",
+        "authorization_mode": authorization_mode,
+        "autonomous_worker_started": authorization_mode == "ARMED_WORKER",
+        "background_worker_connected": authorization_mode == "ARMED_WORKER",
         "provider_called": False,
         "external_action_executed": False,
         "real_trading_enabled": False,
@@ -514,6 +502,49 @@ def execute_due_local_work(
         "publication_executed": False,
         "deploy_executed": False,
     }
+
+
+
+def execute_due_local_work(
+    access: Mapping[str, Any] | None,
+    checkpoint: Mapping[str, Any],
+    *,
+    system_context: Mapping[str, Any] | None = None,
+    voice_status: Mapping[str, Any] | None = None,
+    confirmation: bool,
+    max_jobs: int = 5,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Execute due safe-local Core jobs after one explicit authenticated click."""
+    if confirmation is not True:
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "reason": "EXPLICIT_HUMAN_CONFIRMATION_REQUIRED",
+            "checkpoint": dict(checkpoint or {}),
+            "processed": 0,
+            "authorization_mode": "HUMAN_CLICK",
+            "autonomous_worker_started": False,
+            "external_action_executed": False,
+        }
+    current = utc(now or datetime.now(timezone.utc))
+    context = authenticated_context(access, Domain.ADMIN)
+    approval_digest = digest({
+        "actor": context.actor_id,
+        "scope": context.key,
+        "confirmed_at": current.isoformat(),
+        "authorization_mode": "HUMAN_CLICK",
+    })
+    return _execute_due_local_work_authorized(
+        access,
+        checkpoint,
+        system_context=system_context,
+        voice_status=voice_status,
+        authorization_mode="HUMAN_CLICK",
+        authorization_digest=approval_digest,
+        max_jobs=max_jobs,
+        now=current,
+    )
 
 
 __all__ = [
