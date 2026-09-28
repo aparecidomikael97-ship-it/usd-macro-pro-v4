@@ -50,6 +50,18 @@ _AREAS = {
     },
 }
 
+# Seven home cards open an existing workspace. Pesquisa and Voz stay unlinkable.
+AION_MODULE_WORKSPACES = {
+    "administracao": "🧠 Central",
+    "memoria": "🧠 Central",
+    "desenvolvedor": "🛠️ Desenvolvimento",
+    "conteudo": "🎬 Studio",
+    "automacao": "🧠 Central",
+    "seguranca": "🧠 Central",
+    "observabilidade": "🧠 Central",
+}
+AION_MODULE_JUMP_KEY = "aion_admin_workspace_jump"
+
 _AION_MODULES = (
     {
         "id": "administracao",
@@ -423,27 +435,98 @@ def central_card_html(area: Any) -> str:
     )
 
 
-def aion_home_html(*_ignored: Any, **_claims: Any) -> str:
-    """Nine AION modules. Caller status claims are not a source of truth."""
-    del _ignored, _claims
+def normalize_home_claim(raw: Any) -> dict[str, str]:
+    """CONFIRMED only when truth, source and summary are already complete."""
+    unknown = {"truth_state": "UNKNOWN", "summary": "", "source": ""}
+    if not isinstance(raw, Mapping):
+        return unknown
+    truth = str(raw.get("truth_state") or "").strip().upper()
+    source = " ".join(str(raw.get("source") or "").split())
+    summary = " ".join(str(raw.get("summary") or "").split())
+    if truth != "CONFIRMED" or not source or not summary:
+        return unknown
+    return {"truth_state": "CONFIRMED", "summary": summary[:180], "source": source[:120]}
+
+
+def aion_home_claims(system_context: Mapping[str, Any] | None) -> dict[str, dict[str, str]]:
+    """Read claims already present. Missing or partial records stay UNKNOWN.
+
+    A confirmed source observation may fill Observabilidade, using its own
+    source and detail. No other module is inferred from file presence or from
+    the wrapper truth_state.
+    """
+    claims = {spec["id"]: normalize_home_claim(None) for spec in _AION_MODULES}
+    if not isinstance(system_context, Mapping):
+        return claims
+    supplied = system_context.get("home_claims")
+    if isinstance(supplied, Mapping):
+        for spec in _AION_MODULES:
+            claims[spec["id"]] = normalize_home_claim(supplied.get(spec["id"]))
+    if claims["observabilidade"]["truth_state"] == "CONFIRMED":
+        return claims
+    observations = system_context.get("source_observations")
+    if not isinstance(observations, (list, tuple)):
+        return claims
+    for row in observations:
+        if not isinstance(row, Mapping):
+            continue
+        claim = normalize_home_claim({
+            "truth_state": row.get("truth_state"),
+            "source": row.get("source"),
+            "summary": row.get("summary") or row.get("detail"),
+        })
+        if claim["truth_state"] == "CONFIRMED":
+            claims["observabilidade"] = claim
+            break
+    return claims
+
+
+def aion_home_html(claims: Mapping[str, Any] | None = None, **_ignored: Any) -> str:
+    """Nine read-only modules. Incomplete claims stay UNKNOWN."""
+    del _ignored
+    supplied = claims if isinstance(claims, Mapping) else {}
     modules = []
     for spec in _AION_MODULES:
+        claim = normalize_home_claim(supplied.get(spec["id"]))
+        confirmed = claim["truth_state"] == "CONFIRMED"
         dependency = ""
         if spec["dependency"]:
             dependency = "<p>Depende de " + escape(spec["dependency"]) + ".</p>"
+        summary = ""
+        source = ""
+        if confirmed:
+            summary = "<p>" + escape(claim["summary"]) + "</p>"
+            source = "<p>Fonte: " + escape(claim["source"]) + "</p>"
+            badge = state_badge_html("CONFIRMADO", "good")
+        else:
+            badge = state_badge_html("EM CONSTRUÇÃO", "warn")
+        workspace = AION_MODULE_WORKSPACES.get(spec["id"], "")
+        action = ""
+        if workspace:
+            action = (
+                '<p><a class="aq-central-back" href="?central=aion&amp;module='
+                + escape(spec["id"])
+                + '">Abrir</a></p>'
+            )
         modules.append(
             '<article class="aq-aion-module" data-module="'
             + escape(spec["id"])
-            + '" data-truth="UNKNOWN">'
+            + '" data-truth="'
+            + claim["truth_state"]
+            + '">'
             + _svg_module(spec["id"])
             + "<h3>"
             + escape(spec["title"])
             + "</h3><p>"
             + escape(spec["sentence"])
-            + "</p><p>"
-            + state_badge_html("EM CONSTRUÇÃO", "warn")
             + "</p>"
+            + summary
+            + "<p>"
+            + badge
+            + "</p>"
+            + source
             + dependency
+            + action
             + "</article>"
         )
     return (
@@ -455,6 +538,31 @@ def aion_home_html(*_ignored: Any, **_claims: Any) -> str:
         + "".join(modules)
         + "</div></section>"
     )
+
+
+def aion_home_viewer_html(
+    access: Mapping[str, Any] | None,
+    system_context: Mapping[str, Any] | None = None,
+) -> str:
+    """Admin-only home. Non-admin sessions receive no private module markup."""
+    if not _admin(access):
+        return ""
+    return aion_home_html(aion_home_claims(system_context))
+
+
+def consume_aion_module_jump(session_state, access: Mapping[str, Any] | None, module_id: Any) -> str:
+    """Store one existing workspace jump. Unknown ids and non-admins do nothing."""
+    if not _admin(access):
+        return ""
+    module = str(module_id or "").strip()
+    workspace = AION_MODULE_WORKSPACES.get(module, "")
+    if not workspace:
+        return ""
+    try:
+        session_state[AION_MODULE_JUMP_KEY] = workspace
+    except Exception:
+        return ""
+    return workspace
 
 
 def _session_map(access: Mapping[str, Any] | None) -> Mapping[str, Any]:
@@ -677,6 +785,8 @@ def central_surface_html(
     now: datetime | None = None,
     confirmed_status: Mapping[str, Any] | None = None,
     timezone_name: str | None = None,
+    home_claims: Mapping[str, Any] | None = None,
+    defer_aion_home: bool = False,
 ) -> str:
     """Rail plus the allowed stage. A denial does not leak private labels."""
     resolved = resolve_central_area(access, requested)
@@ -691,8 +801,10 @@ def central_surface_html(
             confirmed_status=confirmed_status,
             timezone_name=timezone_name,
         )
+    elif resolved["area"] == "aion" and defer_aion_home:
+        stage = ""
     elif resolved["area"] == "aion":
-        stage = aion_home_html()
+        stage = aion_home_html(home_claims)
     else:
         stage = central_card_html(resolved["area"])
     back = ""
@@ -708,6 +820,19 @@ def central_surface_html(
     )
 
 
+def render_aion_home_viewer(
+    access: Mapping[str, Any] | None,
+    system_context: Mapping[str, Any] | None = None,
+) -> str:
+    """Paint the home once. This reads the context it is given and does not fetch."""
+    import streamlit as st
+
+    html = aion_home_viewer_html(access, system_context)
+    if html:
+        st.markdown(html, unsafe_allow_html=True)
+    return html
+
+
 def render_central_hub(
     access: Mapping[str, Any] | None,
     requested: Any = None,
@@ -715,6 +840,8 @@ def render_central_hub(
     now: datetime | None = None,
     confirmed_status: Mapping[str, Any] | None = None,
     timezone_name: str | None = None,
+    home_claims: Mapping[str, Any] | None = None,
+    defer_aion_home: bool = False,
 ) -> dict[str, Any]:
     """Streamlit edge. Import stays local so pure tests need no server."""
     import streamlit as st
@@ -727,6 +854,8 @@ def render_central_hub(
             now=now,
             confirmed_status=confirmed_status,
             timezone_name=timezone_name,
+            home_claims=home_claims,
+            defer_aion_home=defer_aion_home,
         ),
         unsafe_allow_html=True,
     )
@@ -753,6 +882,13 @@ __all__ = [
     "ecosystem_rail_html",
     "central_card_html",
     "aion_home_html",
+    "aion_home_claims",
+    "aion_home_viewer_html",
+    "normalize_home_claim",
+    "consume_aion_module_jump",
+    "render_aion_home_viewer",
+    "AION_MODULE_WORKSPACES",
+    "AION_MODULE_JUMP_KEY",
     "central_selector_html",
     "central_surface_html",
     "aion_login_presence_html",
