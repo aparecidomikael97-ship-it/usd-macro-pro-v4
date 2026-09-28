@@ -1452,6 +1452,7 @@ def save_runtime_checkpoint(
     *,
     approved: bool = False,
     expected_sha: str = "",
+    allow_global_arming_transition: bool = False,
     timeout: float = 15.0,
 ) -> dict[str, Any]:
     """Persist only after approval and confirm persistence with read-after-write."""
@@ -1488,6 +1489,68 @@ def save_runtime_checkpoint(
 
     payload = ensure_operating_checkpoint(checkpoint)
     payload = deepcopy(payload)
+
+    proposed_global = (
+        payload.get(AION_GLOBAL_WORKER_NAMESPACE)
+        if isinstance(payload.get(AION_GLOBAL_WORKER_NAMESPACE), Mapping)
+        else None
+    )
+    proposed_armed = bool(
+        isinstance(proposed_global, Mapping)
+        and str(proposed_global.get("state") or "").upper() == "ARMED"
+    )
+    if proposed_armed:
+        current_runtime = load_runtime_checkpoint(cfg, timeout=timeout)
+        current_checkpoint = (
+            current_runtime.get("checkpoint")
+            if isinstance(current_runtime.get("checkpoint"), Mapping)
+            else {}
+        )
+        current_global = (
+            current_checkpoint.get(AION_GLOBAL_WORKER_NAMESPACE)
+            if isinstance(current_checkpoint, Mapping)
+            and isinstance(current_checkpoint.get(AION_GLOBAL_WORKER_NAMESPACE), Mapping)
+            else None
+        )
+        same_armed = bool(
+            isinstance(current_global, Mapping)
+            and str(current_global.get("state") or "").upper() == "ARMED"
+            and str(current_global.get("arm_digest") or "")
+                == str(proposed_global.get("arm_digest") or "")
+            and str(current_global.get("arming_approval_digest") or "")
+                == str(proposed_global.get("arming_approval_digest") or "")
+        )
+        transition = not same_armed
+        if transition and not allow_global_arming_transition:
+            return {
+                "schema": SCHEMA,
+                "status": "BLOCKED",
+                "saved": False,
+                "verified": False,
+                "reason": "Global Worker ARMED transition requires Persisted Arming Ceremony.",
+                "checked_at": _now(),
+            }
+        if transition:
+            if current_runtime.get("status") != "CONFIRMED":
+                return {
+                    "schema": SCHEMA,
+                    "status": "BLOCKED",
+                    "saved": False,
+                    "verified": False,
+                    "reason": "Confirmed source runtime required for Global Worker ARMED transition.",
+                    "checked_at": _now(),
+                }
+            current_sha = str(current_runtime.get("sha") or "").strip()
+            if not current_sha or current_sha != str(expected_sha or "").strip():
+                return {
+                    "schema": SCHEMA,
+                    "status": "CONFLICT",
+                    "saved": False,
+                    "verified": False,
+                    "reason": "Global Worker ARMED transition source SHA changed.",
+                    "checked_at": _now(),
+                }
+
     payload["schema"] = SCHEMA
     payload["updated_at"] = _now()
     payload["operating"]["dirty"] = False
