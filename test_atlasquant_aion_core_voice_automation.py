@@ -146,7 +146,7 @@ class SchedulerAdapterTests(unittest.TestCase):
         self.assertFalse(result["automatic_execution"])
         self.assertFalse(result["execution_authorized"])
         self.assertFalse(result["external_action_executed"])
-        self.assertEqual(result["execution_adapter"], "UNAVAILABLE")
+        self.assertEqual(result["execution_adapter"], "LOCAL_MANUAL_V1")
         self.assertTrue(result["next_run_at"])
 
     def test_new_schedule_after_today_slot_is_not_immediately_due(self):
@@ -266,7 +266,9 @@ class SchedulerAdapterTests(unittest.TestCase):
         self.assertEqual(result["status"], "COMPLETED")
         self.assertEqual(result["route"]["capability"], "AUTOMATION")
         self.assertEqual(result["payload"]["count"], 1)
-        self.assertEqual(result["payload"]["execution_adapter"], "UNAVAILABLE")
+        self.assertEqual(result["payload"]["execution_adapter"], "LOCAL_MANUAL_V1")
+        self.assertEqual(result["payload"]["local_manual_executor"], "AVAILABLE")
+        self.assertFalse(result["payload"]["autonomous_worker_connected"])
         self.assertFalse(result["payload"]["automatic_execution"])
         self.assertFalse(result["external_action_executed"])
 
