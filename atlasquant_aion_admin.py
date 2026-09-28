@@ -2988,9 +2988,9 @@ def _render_business(
         "suppliers": True,
         "economics": True,
         "fees": True,
-        "cac": False,
-        "ltv": False,
-        "funnel": False,
+        "cac": True,
+        "ltv": True,
+        "funnel": True,
         "tracking": False,
         "reports": True,
     })
@@ -3029,6 +3029,10 @@ def _render_business(
         "Receita, lucro bruto, lucro líquido e caixa disponível são métricas diferentes e nunca são intercambiadas."
     )
 
+    def _metric_input_value(name):
+        value=metrics.get(name)
+        return None if value is None else float(value)
+
     with st.expander("Registrar métricas com proveniência"):
         with st.form("aion_business_metrics"):
             source=st.text_input("Fonte / referência das métricas",value=str(metrics.get("source") or ""))
@@ -3039,21 +3043,21 @@ def _render_business(
                 if str(metrics.get("truth_state") or "UNKNOWN") in BUSINESS_TRUTH_STATES else 3,
             )
             f1,f2,f3,f4=st.columns(4)
-            visits=f1.number_input("Visitas",min_value=0.0,value=float(metrics.get("visits") or 0.0),step=1.0)
-            leads=f2.number_input("Leads",min_value=0.0,value=float(metrics.get("leads") or 0.0),step=1.0)
-            checkouts=f3.number_input("Checkouts",min_value=0.0,value=float(metrics.get("checkouts") or 0.0),step=1.0)
-            orders=f4.number_input("Pedidos",min_value=0.0,value=float(metrics.get("orders") or 0.0),step=1.0)
+            visits=f1.number_input("Visitas",min_value=0.0,value=_metric_input_value("visits"),step=1.0)
+            leads=f2.number_input("Leads",min_value=0.0,value=_metric_input_value("leads"),step=1.0)
+            checkouts=f3.number_input("Checkouts",min_value=0.0,value=_metric_input_value("checkouts"),step=1.0)
+            orders=f4.number_input("Pedidos",min_value=0.0,value=_metric_input_value("orders"),step=1.0)
             e1,e2,e3,e4=st.columns(4)
-            marketing_cost=e1.number_input("Custo de marketing",min_value=0.0,value=float(metrics.get("marketing_cost") or 0.0),step=1.0)
-            acquired_customers=e2.number_input("Clientes adquiridos",min_value=0.0,value=float(metrics.get("acquired_customers") or 0.0),step=1.0)
-            gross_profit_per_order=e3.number_input("Lucro bruto / pedido",min_value=0.0,value=float(metrics.get("gross_profit_per_order") or 0.0),step=1.0)
-            average_orders_per_customer=e4.number_input("Pedidos médios / cliente",min_value=0.0,value=float(metrics.get("average_orders_per_customer") or 0.0),step=0.1)
+            marketing_cost=e1.number_input("Custo de marketing",min_value=0.0,value=_metric_input_value("marketing_cost"),step=1.0)
+            acquired_customers=e2.number_input("Clientes adquiridos",min_value=0.0,value=_metric_input_value("acquired_customers"),step=1.0)
+            gross_profit_per_order=e3.number_input("Lucro bruto / pedido",min_value=0.0,value=_metric_input_value("gross_profit_per_order"),step=1.0)
+            average_orders_per_customer=e4.number_input("Pedidos médios / cliente",min_value=0.0,value=_metric_input_value("average_orders_per_customer"),step=0.1)
             r1,r2,r3,r4,r5=st.columns(5)
-            revenue=r1.number_input("Receita / faturamento",min_value=0.0,value=float(metrics.get("revenue") or 0.0),step=10.0)
-            total_costs=r2.number_input("Custos totais",min_value=0.0,value=float(metrics.get("costs") or 0.0),step=10.0)
-            gross_profit=r3.number_input("Lucro bruto",min_value=0.0,value=float(metrics.get("gross_profit") or 0.0),step=10.0)
-            net_profit=r4.number_input("Lucro líquido",min_value=0.0,value=float(metrics.get("net_profit") or 0.0),step=10.0)
-            available_cash=r5.number_input("Caixa disponível",min_value=0.0,value=float(metrics.get("available_cash") or 0.0),step=10.0)
+            revenue=r1.number_input("Receita / faturamento",min_value=0.0,value=_metric_input_value("revenue"),step=10.0)
+            total_costs=r2.number_input("Custos totais",min_value=0.0,value=_metric_input_value("costs"),step=10.0)
+            gross_profit=r3.number_input("Lucro bruto",min_value=0.0,value=_metric_input_value("gross_profit"),step=10.0)
+            net_profit=r4.number_input("Lucro líquido",min_value=0.0,value=_metric_input_value("net_profit"),step=10.0)
+            available_cash=r5.number_input("Caixa disponível",min_value=0.0,value=_metric_input_value("available_cash"),step=10.0)
             save_metrics=st.form_submit_button("Salvar métricas na sessão",type="primary")
         if save_metrics:
             record=new_business_metrics(
