@@ -161,3 +161,10 @@ pull-request workflows. After audit it must return to its stacked base.
 
 No merge, deploy, arming, persistence, activation, reactivation or real incident
 closure is authorized by this block.
+
+
+## Audit trigger note
+
+When a stacked Draft PR is temporarily retargeted to `main`, a documentation-only
+synchronize commit may be used to trigger the standard pull-request workflows.
+This does not change runtime behavior and grants no new operational authority.
