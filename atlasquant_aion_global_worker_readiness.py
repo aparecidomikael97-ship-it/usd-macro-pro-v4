@@ -24,6 +24,11 @@ from atlasquant_aion_global_worker import (
     stage_arm_global_worker,
     stage_kill_global_worker,
 )
+from atlasquant_aion_global_worker_arming import (
+    CONFIRMATION_PHRASE,
+    approve_global_worker_arming_plan,
+    prepare_global_worker_arming_plan,
+)
 from atlasquant_aion_memory import (
     RuntimeConfig,
     checkpoint_integrity_report,
@@ -167,10 +172,27 @@ def protocol_shadow_probe(*, now: datetime) -> dict[str, Any]:
     """Exercise lease/fence/kill semantics entirely in memory."""
     current = _utc(now)
     access = _shadow_access()
+    plan_result = prepare_global_worker_arming_plan(
+        access,
+        {},
+        max_jobs=3,
+        lease_seconds=600,
+        approval_ttl_seconds=900,
+        readiness_stage="READY_FOR_ADMIN_ARMING",
+        now=current,
+    )
+    approval_result = approve_global_worker_arming_plan(
+        access,
+        plan_result["plan"],
+        confirmation=True,
+        confirmation_phrase=CONFIRMATION_PHRASE,
+        now=current,
+    )
     armed_result = stage_arm_global_worker(
         access,
         {},
         confirmation=True,
+        arming_approval=approval_result["approval"],
         max_jobs=3,
         lease_seconds=600,
         now=current,
@@ -200,6 +222,14 @@ def protocol_shadow_probe(*, now: datetime) -> dict[str, Any]:
     killed_state, _ = load_global_worker_state(killed["checkpoint"])
 
     checks = {
+        "plan_ready_in_memory_only": (
+            plan_result.get("status") == "PLAN_READY"
+            and plan_result.get("runtime_modified") is False
+        ),
+        "approval_ticket_in_memory_only": (
+            approval_result.get("status") == "APPROVED_FOR_STAGING"
+            and approval_result.get("runtime_modified") is False
+        ),
         "armed_in_memory_only": (
             armed_result.get("status") == "STAGED_ARMED"
             and armed_result.get("external_persisted") is False
