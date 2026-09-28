@@ -195,7 +195,6 @@ class GlobalWorkerActivationReadinessTests(unittest.TestCase):
             max_jobs=5,
             lease_seconds=600,
             approval_ttl_seconds=900,
-            readiness_stage="READY_FOR_ADMIN_ARMING",
             now=NOW,
         )
         approved = approve_global_worker_arming_plan(
