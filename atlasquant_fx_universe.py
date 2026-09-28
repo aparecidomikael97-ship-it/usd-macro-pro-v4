@@ -8,20 +8,13 @@ profit.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from atlasquant_instrument_registry import FX_CURRENCIES, FX_28
 from typing import Mapping, Iterable
 import math
 
-CURRENCIES = ("USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD")
-
-# Conventional market orientation. Every unordered G8 currency pair appears once.
-OFFICIAL_PAIRS = (
-    "EUR/USD", "GBP/USD", "AUD/USD", "NZD/USD", "USD/JPY", "USD/CHF", "USD/CAD",
-    "EUR/GBP", "EUR/JPY", "EUR/CHF", "EUR/CAD", "EUR/AUD", "EUR/NZD",
-    "GBP/JPY", "GBP/CHF", "GBP/CAD", "GBP/AUD", "GBP/NZD",
-    "AUD/JPY", "AUD/CHF", "AUD/CAD", "AUD/NZD",
-    "NZD/JPY", "NZD/CHF", "NZD/CAD",
-    "CAD/JPY", "CAD/CHF", "CHF/JPY",
-)
+# Backward-compatible display aliases. Canonical membership lives in the registry.
+CURRENCIES = FX_CURRENCIES
+OFFICIAL_PAIRS = tuple(f"{s[:3]}/{s[3:]}" for s in FX_28)
 
 
 @dataclass(frozen=True)
