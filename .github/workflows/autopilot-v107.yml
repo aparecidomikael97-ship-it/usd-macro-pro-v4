@@ -23,6 +23,8 @@ on:
       - "paper_trading_v112.py"
       - "paper_friction_v116.py"
       - "decision_integrity_v110.py"
+      - "atlasquant_aion_global_worker.py"
+      - "atlasquant_aion_background_executor.py"
   schedule:
     - cron: "7,37 * * * *"
 
@@ -88,3 +90,10 @@ jobs:
 
       - name: Run full background autopilot + paper + setup audit
         run: python autopilot_setup_audit_v114.py
+
+      - name: AION Global Worker tick
+        if: ${{ vars.ATLASQUANT_AION_GLOBAL_WORKER_ENABLED == '1' }}
+        env:
+          ATLASQUANT_AION_GLOBAL_WORKER_ENABLED: "1"
+          AION_GLOBAL_WORKER_RUNTIME_ID: "gha-${{ github.run_id }}-${{ github.run_attempt }}"
+        run: python atlasquant_aion_global_worker.py --tick
