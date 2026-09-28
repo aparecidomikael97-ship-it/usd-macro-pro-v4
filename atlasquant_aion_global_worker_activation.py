@@ -42,6 +42,11 @@ from atlasquant_aion_global_worker_readiness import (
     activation_readiness_snapshot,
     fetch_recent_autopilot_pulses,
 )
+from atlasquant_aion_global_worker_reactivation_gate import (
+    reactivation_gate_requirement,
+    validate_reactivation_gate_for_execution,
+    validate_reactivation_gate_for_plan,
+)
 
 
 SCHEMA = "ATLASQUANT_AION_GLOBAL_WORKER_ACTIVATION_CEREMONY_V1"
@@ -348,6 +353,7 @@ def prepare_global_worker_activation_plan(
     readiness: Mapping[str, Any],
     flag_evidence: Mapping[str, Any],
     *,
+    reactivation_gate: Mapping[str, Any] | None = None,
     ttl_seconds: int = DEFAULT_TTL_SECONDS,
     now: datetime | None = None,
 ) -> dict[str, Any]:
@@ -407,6 +413,28 @@ def prepare_global_worker_activation_plan(
             "global_worker_executed": False,
         }
 
+    gate_validation = validate_reactivation_gate_for_plan(
+        runtime_result,
+        readiness,
+        flag_evidence,
+        reactivation_gate,
+        now=current,
+    )
+    if gate_validation.get("state") != "READY":
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "reason": str(
+                gate_validation.get("reason")
+                or "POST_INCIDENT_REACTIVATION_GATE_REQUIRED"
+            ),
+            "post_incident_gate_required": bool(
+                reactivation_gate_requirement(runtime_result).get("required")
+            ),
+            "feature_flag_modified": False,
+            "global_worker_executed": False,
+        }
+
     expires = current + timedelta(seconds=ttl)
     plan = {
         "schema": PLAN_SCHEMA,
@@ -427,6 +455,18 @@ def prepare_global_worker_activation_plan(
         "feature_flag_state": flag_state,
         "feature_flag_target_state": "ENABLED",
         "feature_flag_name": FEATURE_FLAG_NAME,
+        "post_incident_gate_required": bool(
+            gate_validation.get("gate_required")
+        ),
+        "post_incident_gate_digest_at_plan": str(
+            gate_validation.get("gate_digest") or ""
+        ),
+        "post_incident_closure_ledger_digest": str(
+            gate_validation.get("closure_ledger_digest") or ""
+        ),
+        "post_incident_latest_closure_record_id": str(
+            gate_validation.get("latest_closure_record_id") or ""
+        ),
         "created_at": current.isoformat(),
         "expires_at": expires.isoformat(),
         "ttl_seconds": ttl,
@@ -483,6 +523,18 @@ def approve_global_worker_activation_plan(
         "arming_approval_digest": str(plan.get("arming_approval_digest") or ""),
         "feature_flag_state_at_plan": str(plan.get("feature_flag_state") or ""),
         "feature_flag_target_state": "ENABLED",
+        "post_incident_gate_required": bool(
+            plan.get("post_incident_gate_required")
+        ),
+        "post_incident_gate_digest_at_plan": str(
+            plan.get("post_incident_gate_digest_at_plan") or ""
+        ),
+        "post_incident_closure_ledger_digest": str(
+            plan.get("post_incident_closure_ledger_digest") or ""
+        ),
+        "post_incident_latest_closure_record_id": str(
+            plan.get("post_incident_latest_closure_record_id") or ""
+        ),
         "issued_at": current.isoformat(),
         "expires_at": str(plan.get("expires_at") or ""),
         "confirmation_phrase_digest": digest(CONFIRMATION_PHRASE),
@@ -650,6 +702,7 @@ def activate_global_worker_feature_flag(
     config: RuntimeConfig,
     *,
     confirmation: bool,
+    reactivation_gate: Mapping[str, Any] | None = None,
     timeout: float = 10.0,
     flag_reader: Callable[..., Mapping[str, Any]] = read_repository_feature_flag,
     flag_writer: Callable[..., Mapping[str, Any]] = write_repository_feature_flag_enabled,
@@ -708,6 +761,27 @@ def activate_global_worker_feature_flag(
             "feature_flag_state": pre_state,
             "feature_flag_modified": False,
             "global_worker_executed": False,
+        }
+
+    gate_execution = validate_reactivation_gate_for_execution(
+        fresh_runtime,
+        pre_flag,
+        approval,
+        reactivation_gate,
+        now=current,
+    )
+    if gate_execution.get("state") != "READY":
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "reason": str(
+                gate_execution.get("reason")
+                or "FRESH_POST_INCIDENT_REACTIVATION_GATE_REQUIRED"
+            ),
+            "feature_flag_state": pre_state,
+            "feature_flag_modified": False,
+            "global_worker_executed": False,
+            "reactivation_gate_checked": True,
         }
 
     write = dict(flag_writer(config, pre_state, timeout=timeout) or {})
@@ -779,6 +853,11 @@ def activate_global_worker_feature_flag(
             "runtime_checkpoint_modified": False,
             "real_trading_enabled": False,
             "activation_approval_digest": str((approval or {}).get("approval_digest") or ""),
+            "post_incident_gate_required": bool(
+                (approval or {}).get("post_incident_gate_required")
+            ),
+            "post_incident_gate_verified_before_write": True,
+            "reactivation_authorized_by_gate": False,
             "activated_at": current.isoformat(),
             "runtime_sha_verified_after_write": str(post_runtime.get("sha") or ""),
             "next_required_evidence": "GLOBAL_WORKER_LIVE_HEARTBEAT_AND_RECEIPT",
