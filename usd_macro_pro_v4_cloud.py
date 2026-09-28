@@ -430,6 +430,8 @@ except Exception:
 
 try:
     from atlasquant_central_hub_ui import (
+        CENTRAL_CHOICE_KEY,
+        CENTRAL_ROOT,
         consume_aion_module_jump,
         render_aion_home_viewer,
         render_central_hub,
@@ -437,6 +439,8 @@ try:
         sync_central_choice,
     )
 except Exception:
+    CENTRAL_CHOICE_KEY = "atlasquant_central_choice"
+    CENTRAL_ROOT = "central_root"
     consume_aion_module_jump = None
     render_aion_home_viewer = None
     render_central_hub = None
@@ -445,18 +449,32 @@ except Exception:
 
 
 def _central_query_value() -> str:
+    """Read the central deep-link once, then remove it from the URL state."""
     try:
         requested = st.query_params.get("central", "")
     except Exception:
         return ""
     if isinstance(requested, (list, tuple)):
         requested = requested[0] if requested else ""
-    return str(requested or "").strip()
+    token = str(requested or "").strip()
+    if not token:
+        return ""
+    try:
+        del st.query_params["central"]
+    except Exception:
+        pass
+    return token
 
 
 def _central_request_for_render(*, active_index=None) -> str:
-    """Query wins. A stored choice is revalidated and never promotes a role."""
+    """Consume a deep-link once; validated session state owns later reruns."""
     requested = _central_query_value()
+    if not requested:
+        try:
+            if str(st.session_state.get(CENTRAL_CHOICE_KEY) or "") == CENTRAL_ROOT:
+                requested = "central"
+        except Exception:
+            pass
     if active_index == 21 and not requested:
         requested = "aion"
     elif (
@@ -510,13 +528,18 @@ def _render_atlasquant_central_hub(*, active_index=None, stop_for_shell=False):
 
 
 def _apply_central_trader_navigation():
-    """Leave AION for the existing Radar page when the rail asks for Trader."""
+    """A fresh Trader deep-link is consumed once; stored state never retriggers it."""
     if request_central_destination is None:
         return None
     try:
-        requested = st.query_params.get("central", "")
-        if isinstance(requested, (list, tuple)):
-            requested = requested[0] if requested else ""
+        requested = _central_query_value()
+        if not requested:
+            return None
+        if sync_central_choice is not None:
+            resolved = sync_central_choice(st.session_state, _ATLASQUANT_ACCESS, requested)
+            if resolved.get("denied") or resolved.get("root"):
+                return None
+            requested = str(resolved.get("area") or requested)
         if str(requested or "").strip().casefold() != "trader":
             return None
         return request_central_destination(st.session_state, _ATLASQUANT_ACCESS, "trader")
@@ -4454,6 +4477,18 @@ def _autopilot_save_inputs_v107():
             "version": "V10.7_FAST_BOOT_1",
             "generated_at": pd.Timestamp.now(tz="UTC").isoformat(),
             "app_version": APP_VERSION,
+            "core_evidence": (
+                [{
+                    "claim": "build",
+                    "value": str(_ATLASQUANT_SOURCE_BUILD),
+                    "truth_state": "CONFIRMED",
+                    "source": "AtlasQuant runtime identity",
+                    "source_ref": "runtime-build:" + str(_ATLASQUANT_SOURCE_BUILD),
+                    "time_sensitive": False,
+                }]
+                if str(_ATLASQUANT_SOURCE_BUILD or "").strip()
+                else []
+            ),
             "pairs": pairs,
             "macro_context": _macro,
             "fast_boot": _fast_boot,
@@ -10479,18 +10514,6 @@ if _aq_active_index == 21:
             "source_build": _ATLASQUANT_SOURCE_BUILD,
             "environment": ATLASQUANT_ENVIRONMENT,
             "app_version": APP_VERSION,
-            "core_evidence": (
-                [{
-                    "claim": "build",
-                    "value": str(_ATLASQUANT_SOURCE_BUILD),
-                    "truth_state": "CONFIRMED",
-                    "source": "AtlasQuant runtime identity",
-                    "source_ref": "runtime-build:" + str(_ATLASQUANT_SOURCE_BUILD),
-                    "time_sensitive": False,
-                }]
-                if str(_ATLASQUANT_SOURCE_BUILD or "").strip()
-                else []
-            ),
             "market_status": _aion_market_context["summary"],
             "source_mesh": _aion_source_mesh,
             "source_observations": list(_aion_source_mesh.get("observations", []) or []),
