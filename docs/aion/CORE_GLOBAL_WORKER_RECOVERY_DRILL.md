@@ -150,3 +150,11 @@ stack is reviewed.
 
 No merge, deploy, arming, persistence, activation or real containment is part
 of this implementation.
+
+
+## CI audit invariant
+
+CI validation may temporarily retarget the Draft PR to `main` only to execute
+the repository's standard pull-request workflows. After audit, the PR must be
+returned to its stacked base. This audit operation does not authorize merge,
+deploy, arming, persistence, activation or containment.
