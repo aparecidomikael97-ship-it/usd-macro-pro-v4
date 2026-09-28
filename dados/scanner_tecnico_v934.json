@@ -1,7 +1,7 @@
 {
   "versao": "V11.0_INSTITUTIONAL_AUTOPILOT",
   "lote": 3,
-  "ultimo_processamento_ts": 1790624878.3661335,
+  "ultimo_processamento_ts": 1790625008.490616,
   "resultados": {
     "USD/CHF": {
       "tecnico": {
@@ -18,9 +18,9 @@
           "texto": "H1 pullback confirmado."
         },
         "m15": {
-          "status": "🟢 GATILHO",
-          "score": 100,
-          "texto": "M15 gatilho confirmado."
+          "status": "🟡 AGUARDAR GATILHO",
+          "score": 65,
+          "texto": "M15 momentum alinhado."
         },
         "ict": {
           "amd": {
@@ -38,7 +38,7 @@
             "score": 65,
             "zone_low": 0.83173,
             "zone_high": 0.83178,
-            "price": 0.83222,
+            "price": 0.83211,
             "text": "Há FVG M15 ainda válido no lado macro; aguarde retorno/continuação conforme o plano."
           },
           "crt": {
@@ -67,15 +67,15 @@
           "readiness": 39.5,
           "label": "⚪ ICT AINDA INCOMPLETO",
           "side": "BUY",
-          "updated_at": "2026-09-28T19:47:56.840861+00:00",
+          "updated_at": "2026-09-28T19:49:59.724598+00:00",
           "setup_candidates": {
             "schema": "ATLASQUANT_SETUP_CANDIDATES_V1",
             "pair": "USD/CHF",
             "side": "BUY",
-            "captured_at": "2026-09-28T19:47:56.840861+00:00",
+            "captured_at": "2026-09-28T19:49:59.724598+00:00",
             "models": [
               {
-                "candidate_id": "23459e450b3b78c064819a16",
+                "candidate_id": "6b077b98184af1ef3897f8d9",
                 "episode_id": "4b0f8940b45542b7aef80166",
                 "setup_id": "crt",
                 "setup_label": "CRT",
@@ -83,7 +83,7 @@
                 "source_timeframe": "H1",
                 "pair": "USD/CHF",
                 "side": "BUY",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "⚪ SEM CRT",
                 "score": 30.0,
                 "research_candidate": false,
@@ -103,7 +103,7 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "d47f13d39c7ee9193d58a8a6",
+                "candidate_id": "bbb57c5b20a0c838eaffd722",
                 "episode_id": "b6bea477b08b4651894b84f4",
                 "setup_id": "ote",
                 "setup_label": "OTE / Fibonacci",
@@ -111,7 +111,7 @@
                 "source_timeframe": "H1",
                 "pair": "USD/CHF",
                 "side": "BUY",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "⚪ FORA DO OTE",
                 "score": 35.0,
                 "research_candidate": false,
@@ -133,7 +133,7 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "c2b3cd7d57804760049f165b",
+                "candidate_id": "eb21846c8015b82039d5fc94",
                 "episode_id": "c27584e5679aab464e435ee7",
                 "setup_id": "amd-po3",
                 "setup_label": "AMD / PO3",
@@ -141,7 +141,7 @@
                 "source_timeframe": "M15",
                 "pair": "USD/CHF",
                 "side": "BUY",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "⚪ AMD EM ACUMULAÇÃO",
                 "score": 40.0,
                 "research_candidate": false,
@@ -161,7 +161,7 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "fd40d3cc2bd33f8fddfa5740",
+                "candidate_id": "f26d37a350dd9d6c411e1281",
                 "episode_id": "500ba0871aba096fccc5216e",
                 "setup_id": "fvg",
                 "setup_label": "FVG / desequilíbrio",
@@ -169,7 +169,7 @@
                 "source_timeframe": "M15",
                 "pair": "USD/CHF",
                 "side": "BUY",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "🟡 FVG PRESENTE",
                 "score": 65.0,
                 "research_candidate": false,
@@ -179,7 +179,7 @@
                   "score": 65.0,
                   "zone_low": 0.83173,
                   "zone_high": 0.83178,
-                  "price": 0.83222
+                  "price": 0.83211
                 },
                 "paper_trade_created": false,
                 "automatic_execution": false,
@@ -187,7 +187,7 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "b685bee40e220c9bc555788d",
+                "candidate_id": "b61d813251e088bff74055b9",
                 "episode_id": "da2b12aec7049da36f041c3f",
                 "setup_id": "bos-choch-ob",
                 "setup_label": "BOS/CHOCH + Order Block",
@@ -195,13 +195,13 @@
                 "source_timeframe": "M15",
                 "pair": "USD/CHF",
                 "side": "BUY",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "MSS + 🔴 ESTRUTURA MAIS RECENTE CONTRÁRIA — SEM ORDER BLOCK",
                 "score": 10.0,
                 "research_candidate": false,
                 "setup_attribution": "SOURCE_MODEL_EXPLICIT",
                 "evidence": {
-                  "structure_status": "🔴 MSS CONTRÁRIO AO MACRO",
+                  "structure_status": "⚪ QUEBRA ANTIGA — AGUARDAR NOVA ESTRUTURA",
                   "structure_event": "MSS",
                   "structure_side": "SELL",
                   "structure_level": 0.83157,
@@ -226,21 +226,21 @@
         "institutional": {
           "pair": "USD/CHF",
           "side": "BUY",
-          "readiness": 50.3,
+          "readiness": 49.8,
           "label": "⚪ FLUXO INCOMPLETO",
           "displacement": {
             "status": "⚪ IMPULSO FRACO",
-            "score": 54.3,
-            "body_atr": 0.49,
-            "range_atr": 1.05,
-            "candle_time": "2026-09-28T17:15:00+00:00",
-            "close": 0.83133,
-            "text": "Candle de expansão com corpo 0.49×ATR e range 1.05×ATR no lado macro."
+            "score": 51.2,
+            "body_atr": 0.43,
+            "range_atr": 0.54,
+            "candle_time": "2026-09-28T18:15:00+00:00",
+            "close": 0.83168,
+            "text": "Candle de expansão com corpo 0.43×ATR e range 0.54×ATR no lado macro."
           },
           "mss": {
             "status": "🟡 MSS PENDENTE",
             "score": 45,
-            "level": 0.83238,
+            "level": 0.83229,
             "text": "Ainda falta fechamento acima do último swing high confirmado."
           },
           "smt": {
@@ -265,12 +265,12 @@
             "score": 60,
             "target_type": "BSL",
             "target_price": 0.83269,
-            "distance_atr": 0.41,
+            "distance_atr": 0.5,
             "eqh_count": 17,
             "eql_count": 6,
             "external_high": 0.83269,
             "external_low": 0.82732,
-            "text": "Próximo draw BSL a 0.41×ATR."
+            "text": "Próximo draw BSL a 0.50×ATR."
           },
           "session": {
             "status": "🟡 SEM JUDAS CONFIRMADO",
@@ -289,13 +289,13 @@
             "text": "Zona de origem segue válida; aguarde retorno/reação se fizer parte do plano."
           },
           "structure": {
-            "status": "🔴 MSS CONTRÁRIO AO MACRO",
-            "score": 20,
+            "status": "⚪ QUEBRA ANTIGA — AGUARDAR NOVA ESTRUTURA",
+            "score": 35,
             "event": "MSS",
             "event_side": "SELL",
             "prior_bias": "MIXED",
             "level": 0.83157,
-            "bars_ago": 11,
+            "bars_ago": 13,
             "break_margin": 0.0011400000000000299,
             "noise_tolerance": 3.139285714285662e-05,
             "break_time": "2026-09-28T16:15:00+00:00",
@@ -306,29 +306,15 @@
             "score": 10,
             "structure_event": "MSS",
             "event_side": "SELL",
-            "structure_index": 116,
-            "bars_ago": 11,
+            "structure_index": 114,
+            "bars_ago": 13,
             "text": "A quebra estrutural mais recente está contra o lado macro; um Order Block anterior não pode ser reaproveitado."
           },
-          "updated_at": "2026-09-28T19:47:58.153012+00:00",
+          "updated_at": "2026-09-28T19:50:08.291591+00:00",
           "algorithm_note": "Score de prontidão observacional; não é probabilidade de lucro. BOS/CHOCH e Order Block são observacionais e ainda não alteram o readiness institucional."
         },
         "cache_v110": {
           "m15": [
-            {
-              "datetime": "2026-09-27 11:15:00+00:00",
-              "open": 0.8284,
-              "high": 0.82845,
-              "low": 0.82839,
-              "close": 0.82841
-            },
-            {
-              "datetime": "2026-09-27 11:30:00+00:00",
-              "open": 0.82841,
-              "high": 0.82852,
-              "low": 0.8284,
-              "close": 0.82851
-            },
             {
               "datetime": "2026-09-27 11:45:00+00:00",
               "open": 0.82849,
@@ -1210,6 +1196,20 @@
               "high": 0.83229,
               "low": 0.83187,
               "close": 0.83222
+            },
+            {
+              "datetime": "2026-09-28 19:15:00+00:00",
+              "open": 0.8322,
+              "high": 0.83225,
+              "low": 0.83196,
+              "close": 0.83196
+            },
+            {
+              "datetime": "2026-09-28 19:30:00+00:00",
+              "open": 0.83197,
+              "high": 0.83224,
+              "low": 0.83183,
+              "close": 0.83211
             }
           ],
           "h1": [
@@ -2295,20 +2295,20 @@
             }
           ]
         },
-        "preco_m15": 0.83222,
-        "ultima_atualizacao": "2026-09-28T19:00:00+00:00",
+        "preco_m15": 0.83211,
+        "ultima_atualizacao": "2026-09-28T19:30:00+00:00",
         "motivo": "",
         "erro": "",
         "diagnostico": ""
       },
-      "decisao": "🟢 CONFIGURAÇÃO COMPLETA",
-      "texto": "Macro + H4 + H1 + M15 alinhados.",
-      "processado_em": 1790623275.3140821,
+      "decisao": "🟡 AGUARDAR GATILHO",
+      "texto": "H4/H1 alinhados; aguardar M15.",
+      "processado_em": 1790625004.3890026,
       "tentativa_v1022": true,
       "versao_tentativa": "V11.0_INSTITUTIONAL_AUTOPILOT",
       "macro_direction": "🟢 COMPRA USD/CHF",
       "tentativa_v107": true,
-      "m15_fetched_at": "2026-09-28T19:21:15.097404+00:00",
+      "m15_fetched_at": "2026-09-28T19:50:04.332187+00:00",
       "h1_fetched_at": "2026-09-28T19:21:15.097404+00:00",
       "h4_fetched_at": "2026-09-28T17:22:29.876474+00:00"
     },
@@ -2327,9 +2327,9 @@
           "texto": "H1 pullback confirmado."
         },
         "m15": {
-          "status": "🟡 AGUARDAR GATILHO",
-          "score": 65,
-          "texto": "M15 momentum alinhado."
+          "status": "🟢 GATILHO",
+          "score": 100,
+          "texto": "M15 gatilho confirmado."
         },
         "ict": {
           "amd": {
@@ -2347,7 +2347,7 @@
             "score": 65,
             "zone_low": 1.41683,
             "zone_high": 1.41692,
-            "price": 1.41722,
+            "price": 1.41752,
             "text": "Há FVG M15 ainda válido no lado macro; aguarde retorno/continuação conforme o plano."
           },
           "crt": {
@@ -2376,15 +2376,15 @@
           "readiness": 39.5,
           "label": "⚪ ICT AINDA INCOMPLETO",
           "side": "BUY",
-          "updated_at": "2026-09-28T19:47:56.840861+00:00",
+          "updated_at": "2026-09-28T19:49:59.724598+00:00",
           "setup_candidates": {
             "schema": "ATLASQUANT_SETUP_CANDIDATES_V1",
             "pair": "USD/CAD",
             "side": "BUY",
-            "captured_at": "2026-09-28T19:47:56.840861+00:00",
+            "captured_at": "2026-09-28T19:49:59.724598+00:00",
             "models": [
               {
-                "candidate_id": "6826c47b15b289c0204002ce",
+                "candidate_id": "0df553f1f35ca8519f374057",
                 "episode_id": "c37118274840abccbf869396",
                 "setup_id": "crt",
                 "setup_label": "CRT",
@@ -2392,7 +2392,7 @@
                 "source_timeframe": "H1",
                 "pair": "USD/CAD",
                 "side": "BUY",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "⚪ SEM CRT",
                 "score": 30.0,
                 "research_candidate": false,
@@ -2412,7 +2412,7 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "933b15c6d09e50457f1d38dd",
+                "candidate_id": "977cecad329d67e45013c3e9",
                 "episode_id": "65890165dcb89d91c9ecfd90",
                 "setup_id": "ote",
                 "setup_label": "OTE / Fibonacci",
@@ -2420,7 +2420,7 @@
                 "source_timeframe": "H1",
                 "pair": "USD/CAD",
                 "side": "BUY",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "⚪ FORA DO OTE",
                 "score": 35.0,
                 "research_candidate": false,
@@ -2442,7 +2442,7 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "dce48e87e77aab556e281332",
+                "candidate_id": "5c6f32cafd2e5212f0e22757",
                 "episode_id": "9f86134ae3a28069237e751f",
                 "setup_id": "amd-po3",
                 "setup_label": "AMD / PO3",
@@ -2450,7 +2450,7 @@
                 "source_timeframe": "M15",
                 "pair": "USD/CAD",
                 "side": "BUY",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "⚪ AMD EM ACUMULAÇÃO",
                 "score": 40.0,
                 "research_candidate": false,
@@ -2470,7 +2470,7 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "4596c031578c9de83cb2b227",
+                "candidate_id": "ecf0167e4b3cd0b32a4cc84c",
                 "episode_id": "c4949d8228dbb2d5d5c348e0",
                 "setup_id": "fvg",
                 "setup_label": "FVG / desequilíbrio",
@@ -2478,7 +2478,7 @@
                 "source_timeframe": "M15",
                 "pair": "USD/CAD",
                 "side": "BUY",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "🟡 FVG PRESENTE",
                 "score": 65.0,
                 "research_candidate": false,
@@ -2488,7 +2488,7 @@
                   "score": 65.0,
                   "zone_low": 1.41683,
                   "zone_high": 1.41692,
-                  "price": 1.41722
+                  "price": 1.41752
                 },
                 "paper_trade_created": false,
                 "automatic_execution": false,
@@ -2496,25 +2496,25 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "d0477cfa50abfa8d1e257085",
-                "episode_id": "b41eb9e499281e9c2c6342db",
+                "candidate_id": "60de80874334ec2d7429ca10",
+                "episode_id": "ab6aa2826236e7d5ea9782ae",
                 "setup_id": "bos-choch-ob",
                 "setup_label": "BOS/CHOCH + Order Block",
                 "source_model": "BOS_CHOCH_OB",
                 "source_timeframe": "M15",
                 "pair": "USD/CAD",
                 "side": "BUY",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
-                "status": "CHOCH + ⚪ SEM ORDER BLOCK VALIDADO",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
+                "status": "BOS + ⚪ SEM ORDER BLOCK VALIDADO",
                 "score": 35.0,
                 "research_candidate": false,
                 "setup_attribution": "SOURCE_MODEL_EXPLICIT",
                 "evidence": {
-                  "structure_status": "🟢 CHOCH CONFIRMADO",
-                  "structure_event": "CHOCH",
+                  "structure_status": "🟢 BOS CONFIRMADO",
+                  "structure_event": "BOS",
                   "structure_side": "BUY",
-                  "structure_level": 1.41702,
-                  "break_time": "2026-09-28T18:30:00+00:00",
+                  "structure_level": 1.41747,
+                  "break_time": "2026-09-28T19:30:00+00:00",
                   "order_block_status": "⚪ SEM ORDER BLOCK VALIDADO"
                 },
                 "paper_trade_created": false,
@@ -2535,22 +2535,24 @@
         "institutional": {
           "pair": "USD/CAD",
           "side": "BUY",
-          "readiness": 49.4,
-          "label": "⚪ FLUXO INCOMPLETO",
+          "readiness": 58.4,
+          "label": "🟡 CONTEXTO INSTITUCIONAL PARCIAL",
           "displacement": {
             "status": "⚪ IMPULSO FRACO",
-            "score": 45.3,
-            "body_atr": 0.27,
-            "range_atr": 0.44,
-            "candle_time": "2026-09-28T17:45:00+00:00",
-            "close": 1.4168,
-            "text": "Candle de expansão com corpo 0.27×ATR e range 0.44×ATR no lado macro."
+            "score": 54.7,
+            "body_atr": 0.52,
+            "range_atr": 0.63,
+            "candle_time": "2026-09-28T19:30:00+00:00",
+            "close": 1.41752,
+            "text": "Candle de expansão com corpo 0.52×ATR e range 0.63×ATR no lado macro."
           },
           "mss": {
-            "status": "🟡 MSS PENDENTE",
-            "score": 45,
+            "status": "🟢 MSS CONFIRMADO",
+            "score": 78,
             "level": 1.41747,
-            "text": "Ainda falta fechamento acima do último swing high confirmado."
+            "break_time": "2026-09-28T19:30:00+00:00",
+            "displacement_confirmed": false,
+            "text": "Estrutura rompeu o swing de referência (1.41747) com fechamento no lado macro."
           },
           "smt": {
             "status": "⚪ SEM PAR SMT",
@@ -2573,13 +2575,13 @@
             "status": "🟡 LIQUIDEZ PARCIAL",
             "score": 60,
             "target_type": "BSL",
-            "target_price": 1.41743,
-            "distance_atr": 0.23,
+            "target_price": 1.41755,
+            "distance_atr": 0.03,
             "eqh_count": 5,
             "eql_count": 11,
             "external_high": 1.41755,
             "external_low": 1.4134,
-            "text": "Próximo draw BSL a 0.23×ATR."
+            "text": "Próximo draw BSL a 0.03×ATR."
           },
           "session": {
             "status": "🟡 SEM JUDAS CONFIRMADO",
@@ -2598,45 +2600,31 @@
             "text": "Zona de origem segue válida; aguarde retorno/reação se fizer parte do plano."
           },
           "structure": {
-            "status": "🟢 CHOCH CONFIRMADO",
-            "score": 92,
-            "event": "CHOCH",
+            "status": "🟢 BOS CONFIRMADO",
+            "score": 100,
+            "event": "BOS",
             "event_side": "BUY",
-            "prior_bias": "BEARISH",
-            "level": 1.41702,
-            "bars_ago": 2,
-            "break_margin": 5.0000000000105516e-05,
-            "noise_tolerance": 3.0499999999998383e-05,
-            "break_time": "2026-09-28T18:30:00+00:00",
-            "text": "CHOCH BUY por fechamento além do swing confirmado (1.41702); estrutura anterior BEARISH."
+            "prior_bias": "BULLISH",
+            "level": 1.41747,
+            "bars_ago": 0,
+            "break_margin": 4.999999999988347e-05,
+            "noise_tolerance": 2.8142857142855153e-05,
+            "break_time": "2026-09-28T19:30:00+00:00",
+            "text": "BOS BUY por fechamento além do swing confirmado (1.41747); estrutura anterior BULLISH."
           },
           "order_block": {
             "status": "⚪ SEM ORDER BLOCK VALIDADO",
             "score": 35,
-            "structure_event": "CHOCH",
-            "body_atr": 0.07,
-            "range_atr": 0.78,
+            "structure_event": "BOS",
+            "body_atr": 0.52,
+            "range_atr": 0.63,
             "text": "Há quebra de estrutura, mas falta displacement suficiente para validar a zona de origem."
           },
-          "updated_at": "2026-09-28T19:47:58.365771+00:00",
+          "updated_at": "2026-09-28T19:50:08.490164+00:00",
           "algorithm_note": "Score de prontidão observacional; não é probabilidade de lucro. BOS/CHOCH e Order Block são observacionais e ainda não alteram o readiness institucional."
         },
         "cache_v110": {
           "m15": [
-            {
-              "datetime": "2026-09-27 11:15:00+00:00",
-              "open": 1.41433,
-              "high": 1.41435,
-              "low": 1.41407,
-              "close": 1.41417
-            },
-            {
-              "datetime": "2026-09-27 11:30:00+00:00",
-              "open": 1.41415,
-              "high": 1.41431,
-              "low": 1.41378,
-              "close": 1.41395
-            },
             {
               "datetime": "2026-09-27 11:45:00+00:00",
               "open": 1.41392,
@@ -3518,6 +3506,20 @@
               "high": 1.41739,
               "low": 1.41696,
               "close": 1.41722
+            },
+            {
+              "datetime": "2026-09-28 19:15:00+00:00",
+              "open": 1.4172,
+              "high": 1.41739,
+              "low": 1.41715,
+              "close": 1.41717
+            },
+            {
+              "datetime": "2026-09-28 19:30:00+00:00",
+              "open": 1.41724,
+              "high": 1.41758,
+              "low": 1.41724,
+              "close": 1.41752
             }
           ],
           "h1": [
@@ -4603,20 +4605,20 @@
             }
           ]
         },
-        "preco_m15": 1.41722,
-        "ultima_atualizacao": "2026-09-28T19:00:00+00:00",
+        "preco_m15": 1.41752,
+        "ultima_atualizacao": "2026-09-28T19:30:00+00:00",
         "motivo": "",
         "erro": "",
         "diagnostico": ""
       },
-      "decisao": "🟡 AGUARDAR GATILHO",
-      "texto": "H4/H1 alinhados; aguardar M15.",
-      "processado_em": 1790623273.0503063,
+      "decisao": "🟢 CONFIGURAÇÃO COMPLETA",
+      "texto": "Macro + H4 + H1 + M15 alinhados.",
+      "processado_em": 1790625002.0767453,
       "tentativa_v1022": true,
       "versao_tentativa": "V11.0_INSTITUTIONAL_AUTOPILOT",
       "macro_direction": "🟢 COMPRA USD/CAD",
       "tentativa_v107": true,
-      "m15_fetched_at": "2026-09-28T19:21:12.833513+00:00",
+      "m15_fetched_at": "2026-09-28T19:50:02.018653+00:00",
       "h1_fetched_at": "2026-09-28T19:21:12.833513+00:00",
       "h4_fetched_at": "2026-09-28T17:22:27.169724+00:00"
     },
@@ -4684,15 +4686,15 @@
           "readiness": 55.8,
           "label": "⚪ ICT AINDA INCOMPLETO",
           "side": "SELL",
-          "updated_at": "2026-09-28T19:47:56.840861+00:00",
+          "updated_at": "2026-09-28T19:49:59.724598+00:00",
           "setup_candidates": {
             "schema": "ATLASQUANT_SETUP_CANDIDATES_V1",
             "pair": "NZD/USD",
             "side": "SELL",
-            "captured_at": "2026-09-28T19:47:56.840861+00:00",
+            "captured_at": "2026-09-28T19:49:59.724598+00:00",
             "models": [
               {
-                "candidate_id": "3704e3bdf104948b27696b53",
+                "candidate_id": "c5a4e86ba753788bb467e224",
                 "episode_id": "198e16c7588ceebe69b61731",
                 "setup_id": "crt",
                 "setup_label": "CRT",
@@ -4700,7 +4702,7 @@
                 "source_timeframe": "H1",
                 "pair": "NZD/USD",
                 "side": "SELL",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "⚪ SEM CRT",
                 "score": 30.0,
                 "research_candidate": false,
@@ -4720,7 +4722,7 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "107e799f0671f126146e4a9d",
+                "candidate_id": "f60c4817f5413a60bbb30a59",
                 "episode_id": "9975106b81a11266135a7385",
                 "setup_id": "ote",
                 "setup_label": "OTE / Fibonacci",
@@ -4728,7 +4730,7 @@
                 "source_timeframe": "H1",
                 "pair": "NZD/USD",
                 "side": "SELL",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "🟢 DENTRO DO OTE",
                 "score": 100.0,
                 "research_candidate": true,
@@ -4750,7 +4752,7 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "a3617cc233655776761b3119",
+                "candidate_id": "e18b7c9032c327668a92209e",
                 "episode_id": "f0e5ddb38e500604121c0f47",
                 "setup_id": "amd-po3",
                 "setup_label": "AMD / PO3",
@@ -4758,7 +4760,7 @@
                 "source_timeframe": "M15",
                 "pair": "NZD/USD",
                 "side": "SELL",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "⚪ AMD EM ACUMULAÇÃO",
                 "score": 40.0,
                 "research_candidate": false,
@@ -4778,7 +4780,7 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "29769b95505cac88715d77fe",
+                "candidate_id": "7eeac9d9467889b36c30a347",
                 "episode_id": "e38c6741a175d7ac618c7d1a",
                 "setup_id": "fvg",
                 "setup_label": "FVG / desequilíbrio",
@@ -4786,7 +4788,7 @@
                 "source_timeframe": "M15",
                 "pair": "NZD/USD",
                 "side": "SELL",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "🟡 FVG PRESENTE",
                 "score": 65.0,
                 "research_candidate": false,
@@ -4804,7 +4806,7 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "a7c34727f724f3c37b5195af",
+                "candidate_id": "13df1110a896ee1d9763b18e",
                 "episode_id": "c09307ac1b4e303dd393e8ea",
                 "setup_id": "bos-choch-ob",
                 "setup_label": "BOS/CHOCH + Order Block",
@@ -4812,7 +4814,7 @@
                 "source_timeframe": "M15",
                 "pair": "NZD/USD",
                 "side": "SELL",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "MSS + ⚪ SEM ORDER BLOCK VALIDADO",
                 "score": 35.0,
                 "research_candidate": false,
@@ -4833,7 +4835,7 @@
             ],
             "candidates": [
               {
-                "candidate_id": "107e799f0671f126146e4a9d",
+                "candidate_id": "f60c4817f5413a60bbb30a59",
                 "episode_id": "9975106b81a11266135a7385",
                 "setup_id": "ote",
                 "setup_label": "OTE / Fibonacci",
@@ -4841,7 +4843,7 @@
                 "source_timeframe": "H1",
                 "pair": "NZD/USD",
                 "side": "SELL",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "🟢 DENTRO DO OTE",
                 "score": 100.0,
                 "research_candidate": true,
@@ -4961,7 +4963,7 @@
             "range_atr": 0.63,
             "text": "Há quebra de estrutura, mas falta displacement suficiente para validar a zona de origem."
           },
-          "updated_at": "2026-09-28T19:47:57.669723+00:00",
+          "updated_at": "2026-09-28T19:50:07.852250+00:00",
           "algorithm_note": "Score de prontidão observacional; não é probabilidade de lucro. BOS/CHOCH e Order Block são observacionais e ainda não alteram o readiness institucional."
         },
         "cache_v110": {
@@ -6987,18 +6989,18 @@
             "status": "⚪ AMD EM ACUMULAÇÃO",
             "score": 40,
             "phase": "ACUMULAÇÃO",
-            "acc_high": 157.50169,
+            "acc_high": 157.46422,
             "acc_low": 157.00888,
-            "target": 157.50169,
+            "target": 157.46422,
             "manipulation_side": "SSL",
             "text": "Range de acumulação identificado; manipulação ainda não confirmou."
           },
           "fvg": {
             "status": "🟡 FVG PRESENTE",
             "score": 65,
-            "zone_low": 157.34359,
-            "zone_high": 157.3686,
-            "price": 157.44258,
+            "zone_low": 157.27517,
+            "zone_high": 157.33013,
+            "price": 157.40663,
             "text": "Há FVG M15 ainda válido no lado macro; aguarde retorno/continuação conforme o plano."
           },
           "crt": {
@@ -7006,44 +7008,44 @@
             "score": 30,
             "phase": "ACUMULAÇÃO / ESPERA",
             "raid_side": "",
-            "anchor_high": 157.57879,
-            "anchor_low": 157.37263,
-            "target": 157.57879,
+            "anchor_high": 157.4541,
+            "anchor_low": 157.00888,
+            "target": 157.4541,
             "invalidation": 157.00888,
             "text": "Ainda não ocorreu a varredura válida do candle-range contra o lado macro."
           },
           "ote": {
-            "status": "🟡 PRÓXIMO DO OTE",
-            "score": 65,
-            "retracement_pct": 79.3120630323426,
-            "zone_low": 157.27041409999998,
-            "zone_high": 157.3795898,
-            "sweet_705": 157.32500195,
+            "status": "⚪ FORA DO OTE",
+            "score": 35,
+            "retracement_pct": 47.0985266277062,
+            "zone_low": 157.2376016,
+            "zone_high": 157.3202148,
+            "sweet_705": 157.2789082,
             "swing_low": 157.13555,
-            "swing_high": 157.77776,
-            "price": 157.26841,
-            "text": "Retração em 79.3%; OTE está próximo, mas o preço ainda não entrou na zona."
+            "swing_high": 157.62151,
+            "price": 157.39263,
+            "text": "Retração atual 47.1% está fora da zona OTE 62–79%."
           },
-          "readiness": 47.0,
+          "readiness": 39.5,
           "label": "⚪ ICT AINDA INCOMPLETO",
           "side": "BUY",
-          "updated_at": "2026-09-28T19:47:56.840861+00:00",
+          "updated_at": "2026-09-28T19:49:59.724598+00:00",
           "setup_candidates": {
             "schema": "ATLASQUANT_SETUP_CANDIDATES_V1",
             "pair": "USD/JPY",
             "side": "BUY",
-            "captured_at": "2026-09-28T19:47:56.840861+00:00",
+            "captured_at": "2026-09-28T19:49:59.724598+00:00",
             "models": [
               {
-                "candidate_id": "671797fa09541e12016d16f1",
-                "episode_id": "a9c2793de33485469680ed07",
+                "candidate_id": "b07cfc75cd24d5938c35a3a3",
+                "episode_id": "f7abe08f55d6da6917361574",
                 "setup_id": "crt",
                 "setup_label": "CRT",
                 "source_model": "CRT",
                 "source_timeframe": "H1",
                 "pair": "USD/JPY",
                 "side": "BUY",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "⚪ SEM CRT",
                 "score": 30.0,
                 "research_candidate": false,
@@ -7052,9 +7054,9 @@
                   "status": "⚪ SEM CRT",
                   "score": 30.0,
                   "phase": "ACUMULAÇÃO / ESPERA",
-                  "anchor_high": 157.57879,
-                  "anchor_low": 157.37263,
-                  "target": 157.57879,
+                  "anchor_high": 157.4541,
+                  "anchor_low": 157.00888,
+                  "target": 157.4541,
                   "invalidation": 157.00888
                 },
                 "paper_trade_created": false,
@@ -7063,29 +7065,29 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "e7d3d964b0b3464e94427ae8",
-                "episode_id": "6361a5743a4fb6ce80ce1980",
+                "candidate_id": "ba16de06355efe61d9549baa",
+                "episode_id": "eb1d0f5488eb63fbb2ceea43",
                 "setup_id": "ote",
                 "setup_label": "OTE / Fibonacci",
                 "source_model": "OTE",
                 "source_timeframe": "H1",
                 "pair": "USD/JPY",
                 "side": "BUY",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
-                "status": "🟡 PRÓXIMO DO OTE",
-                "score": 65.0,
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
+                "status": "⚪ FORA DO OTE",
+                "score": 35.0,
                 "research_candidate": false,
                 "setup_attribution": "SOURCE_MODEL_EXPLICIT",
                 "evidence": {
-                  "status": "🟡 PRÓXIMO DO OTE",
-                  "score": 65.0,
-                  "retracement_pct": 79.3120630323426,
-                  "zone_low": 157.27041409999998,
-                  "zone_high": 157.3795898,
-                  "sweet_705": 157.32500195,
+                  "status": "⚪ FORA DO OTE",
+                  "score": 35.0,
+                  "retracement_pct": 47.0985266277062,
+                  "zone_low": 157.2376016,
+                  "zone_high": 157.3202148,
+                  "sweet_705": 157.2789082,
                   "swing_low": 157.13555,
-                  "swing_high": 157.77776,
-                  "price": 157.26841
+                  "swing_high": 157.62151,
+                  "price": 157.39263
                 },
                 "paper_trade_created": false,
                 "automatic_execution": false,
@@ -7093,15 +7095,15 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "cbf7ba98e13c1ecefb68ccd4",
-                "episode_id": "0c30a8741a2cf0d0e5cc9f8d",
+                "candidate_id": "5cb9b2bee2dbf8d2c51ec1f9",
+                "episode_id": "02a87f569e29f28cf7c3b9a5",
                 "setup_id": "amd-po3",
                 "setup_label": "AMD / PO3",
                 "source_model": "AMD",
                 "source_timeframe": "M15",
                 "pair": "USD/JPY",
                 "side": "BUY",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "⚪ AMD EM ACUMULAÇÃO",
                 "score": 40.0,
                 "research_candidate": false,
@@ -7110,9 +7112,9 @@
                   "status": "⚪ AMD EM ACUMULAÇÃO",
                   "score": 40.0,
                   "phase": "ACUMULAÇÃO",
-                  "acc_high": 157.50169,
+                  "acc_high": 157.46422,
                   "acc_low": 157.00888,
-                  "target": 157.50169,
+                  "target": 157.46422,
                   "manipulation_side": "SSL"
                 },
                 "paper_trade_created": false,
@@ -7121,15 +7123,15 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "9b101f6f4e19b2662c9317e4",
-                "episode_id": "f10b9cf78fd0c16609ef3357",
+                "candidate_id": "c51bdda35f11966801967abe",
+                "episode_id": "154bc424a432da83f1d60adf",
                 "setup_id": "fvg",
                 "setup_label": "FVG / desequilíbrio",
                 "source_model": "FVG",
                 "source_timeframe": "M15",
                 "pair": "USD/JPY",
                 "side": "BUY",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "🟡 FVG PRESENTE",
                 "score": 65.0,
                 "research_candidate": false,
@@ -7137,9 +7139,9 @@
                 "evidence": {
                   "status": "🟡 FVG PRESENTE",
                   "score": 65.0,
-                  "zone_low": 157.34359,
-                  "zone_high": 157.3686,
-                  "price": 157.44258
+                  "zone_low": 157.27517,
+                  "zone_high": 157.33013,
+                  "price": 157.40663
                 },
                 "paper_trade_created": false,
                 "automatic_execution": false,
@@ -7147,7 +7149,7 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "95071e5a6b27b863d9b29b79",
+                "candidate_id": "24b83a235df5d04aafb214b7",
                 "episode_id": "0586eb0aba3c3b4b3ed38938",
                 "setup_id": "bos-choch-ob",
                 "setup_label": "BOS/CHOCH + Order Block",
@@ -7155,13 +7157,13 @@
                 "source_timeframe": "M15",
                 "pair": "USD/JPY",
                 "side": "BUY",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "CHOCH + 🔴 ESTRUTURA MAIS RECENTE CONTRÁRIA — SEM ORDER BLOCK",
                 "score": 10.0,
                 "research_candidate": false,
                 "setup_attribution": "SOURCE_MODEL_EXPLICIT",
                 "evidence": {
-                  "structure_status": "🔴 CHOCH CONTRÁRIO AO MACRO",
+                  "structure_status": "⚪ QUEBRA ANTIGA — AGUARDAR NOVA ESTRUTURA",
                   "structure_event": "CHOCH",
                   "structure_side": "SELL",
                   "structure_level": 157.05121,
@@ -7186,7 +7188,7 @@
         "institutional": {
           "pair": "USD/JPY",
           "side": "BUY",
-          "readiness": 62.2,
+          "readiness": 55.0,
           "label": "🟡 CONTEXTO INSTITUCIONAL PARCIAL",
           "displacement": {
             "status": "⚪ IMPULSO FRACO",
@@ -7198,12 +7200,10 @@
             "text": "Candle de expansão com corpo 0.58×ATR e range 0.71×ATR no lado macro."
           },
           "mss": {
-            "status": "🟢 MSS CONFIRMADO",
-            "score": 78,
-            "level": 157.43854,
-            "break_time": "2026-09-28T19:00:00+00:00",
-            "displacement_confirmed": false,
-            "text": "Estrutura rompeu o swing de referência (157.439) com fechamento no lado macro."
+            "status": "🟡 MSS PENDENTE",
+            "score": 45,
+            "level": 157.48507,
+            "text": "Ainda falta fechamento acima do último swing high confirmado."
           },
           "smt": {
             "status": "⚪ SEM SMT",
@@ -7215,24 +7215,24 @@
             "status": "🔴 LOCALIZAÇÃO CARA",
             "score": 35,
             "zone": "PRÊMIO",
-            "position_pct": 57.0,
-            "range_low": 156.85729,
+            "position_pct": 67.3,
+            "range_low": 157.00888,
             "range_high": 157.57879,
-            "equilibrium": 157.21804,
-            "price": 157.26841,
-            "text": "Preço em prêmio (57.0% do dealing range H1)."
+            "equilibrium": 157.293835,
+            "price": 157.39263,
+            "text": "Preço em prêmio (67.3% do dealing range H1)."
           },
           "liquidity": {
             "status": "🟡 LIQUIDEZ PARCIAL",
             "score": 60,
             "target_type": "BSL",
             "target_price": 157.45635,
-            "distance_atr": 0.04,
+            "distance_atr": 0.15,
             "eqh_count": 16,
-            "eql_count": 16,
+            "eql_count": 12,
             "external_high": 157.85153,
             "external_low": 156.47901,
-            "text": "Próximo draw BSL a 0.04×ATR."
+            "text": "Próximo draw BSL a 0.15×ATR."
           },
           "session": {
             "status": "🟢 JUDAS / MANIPULAÇÃO COERENTE",
@@ -7248,18 +7248,18 @@
             "score": 68,
             "zone_low": 157.05121,
             "zone_high": 157.25327,
-            "price": 157.26841,
+            "price": 157.39263,
             "invalidated": false,
             "text": "Zona de origem segue válida; aguarde retorno/reação se fizer parte do plano."
           },
           "structure": {
-            "status": "🔴 CHOCH CONTRÁRIO AO MACRO",
-            "score": 20,
+            "status": "⚪ QUEBRA ANTIGA — AGUARDAR NOVA ESTRUTURA",
+            "score": 35,
             "event": "CHOCH",
             "event_side": "SELL",
             "prior_bias": "BULLISH",
             "level": 157.05121,
-            "bars_ago": 11,
+            "bars_ago": 13,
             "break_margin": 0.036689999999993006,
             "noise_tolerance": 0.00647653571428555,
             "break_time": "2026-09-28T16:15:00+00:00",
@@ -7270,29 +7270,15 @@
             "score": 10,
             "structure_event": "CHOCH",
             "event_side": "SELL",
-            "structure_index": 116,
-            "bars_ago": 11,
+            "structure_index": 114,
+            "bars_ago": 13,
             "text": "A quebra estrutural mais recente está contra o lado macro; um Order Block anterior não pode ser reaproveitado."
           },
-          "updated_at": "2026-09-28T19:47:57.914513+00:00",
+          "updated_at": "2026-09-28T19:50:08.072751+00:00",
           "algorithm_note": "Score de prontidão observacional; não é probabilidade de lucro. BOS/CHOCH e Order Block são observacionais e ainda não alteram o readiness institucional."
         },
         "cache_v110": {
           "m15": [
-            {
-              "datetime": "2026-09-27 11:15:00+00:00",
-              "open": 157.278,
-              "high": 157.28131,
-              "low": 157.26822,
-              "close": 157.27085
-            },
-            {
-              "datetime": "2026-09-27 11:30:00+00:00",
-              "open": 157.2714,
-              "high": 157.28451,
-              "low": 157.23581,
-              "close": 157.25004
-            },
             {
               "datetime": "2026-09-27 11:45:00+00:00",
               "open": 157.24741,
@@ -8174,16 +8160,23 @@
               "high": 157.48507,
               "low": 157.39062,
               "close": 157.44258
+            },
+            {
+              "datetime": "2026-09-28 19:15:00+00:00",
+              "open": 157.43849,
+              "high": 157.46604,
+              "low": 157.37643,
+              "close": 157.38577
+            },
+            {
+              "datetime": "2026-09-28 19:30:00+00:00",
+              "open": 157.38755,
+              "high": 157.45183,
+              "low": 157.32426,
+              "close": 157.40663
             }
           ],
           "h1": [
-            {
-              "datetime": "2026-09-25 10:00:00+00:00",
-              "open": 158.05418,
-              "high": 158.06537,
-              "low": 157.72449,
-              "close": 157.81369
-            },
             {
               "datetime": "2026-09-25 11:00:00+00:00",
               "open": 157.81545,
@@ -8736,6 +8729,13 @@
               "high": 157.43854,
               "low": 157.09622,
               "close": 157.26841
+            },
+            {
+              "datetime": "2026-09-28 18:00:00+00:00",
+              "open": 157.25781,
+              "high": 157.46683,
+              "low": 157.22906,
+              "close": 157.39263
             }
           ],
           "h4": [
@@ -9259,21 +9259,21 @@
             }
           ]
         },
-        "preco_m15": 157.44258,
-        "ultima_atualizacao": "2026-09-28T19:00:00+00:00",
+        "preco_m15": 157.40663,
+        "ultima_atualizacao": "2026-09-28T19:30:00+00:00",
         "motivo": "",
         "erro": "",
         "diagnostico": ""
       },
       "decisao": "🔴 CONTRA",
       "texto": "H4/H1 contra o viés macro.",
-      "processado_em": 1790623325.806994,
+      "processado_em": 1790625007.11028,
       "tentativa_v1022": true,
       "versao_tentativa": "V11.0_INSTITUTIONAL_AUTOPILOT",
       "macro_direction": "🟢 COMPRA USD/JPY",
       "tentativa_v107": true,
-      "m15_fetched_at": "2026-09-28T19:22:05.769605+00:00",
-      "h1_fetched_at": "2026-09-28T18:26:33.975442+00:00",
+      "m15_fetched_at": "2026-09-28T19:50:06.790361+00:00",
+      "h1_fetched_at": "2026-09-28T19:50:06.790361+00:00",
       "h4_fetched_at": "2026-09-28T17:23:18.911673+00:00"
     },
     "EUR/USD": {
@@ -9340,15 +9340,15 @@
           "readiness": 39.5,
           "label": "⚪ ICT AINDA INCOMPLETO",
           "side": "SELL",
-          "updated_at": "2026-09-28T19:47:56.840861+00:00",
+          "updated_at": "2026-09-28T19:49:59.724598+00:00",
           "setup_candidates": {
             "schema": "ATLASQUANT_SETUP_CANDIDATES_V1",
             "pair": "EUR/USD",
             "side": "SELL",
-            "captured_at": "2026-09-28T19:47:56.840861+00:00",
+            "captured_at": "2026-09-28T19:49:59.724598+00:00",
             "models": [
               {
-                "candidate_id": "4ae9c92dd577237c5c8e308c",
+                "candidate_id": "29eb660dcb90373d3306a541",
                 "episode_id": "c4c11f9ed043afc24c121a3c",
                 "setup_id": "crt",
                 "setup_label": "CRT",
@@ -9356,7 +9356,7 @@
                 "source_timeframe": "H1",
                 "pair": "EUR/USD",
                 "side": "SELL",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "⚪ SEM CRT",
                 "score": 30.0,
                 "research_candidate": false,
@@ -9376,7 +9376,7 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "679cf457a841d9d3c5bdb2f9",
+                "candidate_id": "bd930fc683b43ead8cdcf15e",
                 "episode_id": "3fb82e05a5e85430eb7cb185",
                 "setup_id": "ote",
                 "setup_label": "OTE / Fibonacci",
@@ -9384,7 +9384,7 @@
                 "source_timeframe": "H1",
                 "pair": "EUR/USD",
                 "side": "SELL",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "⚪ FORA DO OTE",
                 "score": 35.0,
                 "research_candidate": false,
@@ -9406,7 +9406,7 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "b76356cb335e919900ca7359",
+                "candidate_id": "7ba3efb5f1640238f55d53fd",
                 "episode_id": "af571b6e27361c919a0dd81b",
                 "setup_id": "amd-po3",
                 "setup_label": "AMD / PO3",
@@ -9414,7 +9414,7 @@
                 "source_timeframe": "M15",
                 "pair": "EUR/USD",
                 "side": "SELL",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "⚪ AMD EM ACUMULAÇÃO",
                 "score": 40.0,
                 "research_candidate": false,
@@ -9434,7 +9434,7 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "ad141da3e60a3e49b2116c1b",
+                "candidate_id": "75801084abea341fd023d56c",
                 "episode_id": "44986e2ba733ebe1c422f209",
                 "setup_id": "fvg",
                 "setup_label": "FVG / desequilíbrio",
@@ -9442,7 +9442,7 @@
                 "source_timeframe": "M15",
                 "pair": "EUR/USD",
                 "side": "SELL",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "🟡 FVG PRESENTE",
                 "score": 65.0,
                 "research_candidate": false,
@@ -9460,7 +9460,7 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "2617ba4632c6584423ebd140",
+                "candidate_id": "6fdcc9cea62d6f3069cbd34e",
                 "episode_id": "b11e313943e548eb2d4ac207",
                 "setup_id": "bos-choch-ob",
                 "setup_label": "BOS/CHOCH + Order Block",
@@ -9468,7 +9468,7 @@
                 "source_timeframe": "M15",
                 "pair": "EUR/USD",
                 "side": "SELL",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "BOS + 🔴 ESTRUTURA MAIS RECENTE CONTRÁRIA — SEM ORDER BLOCK",
                 "score": 10.0,
                 "research_candidate": false,
@@ -9579,7 +9579,7 @@
             "bars_ago": 11,
             "text": "A quebra estrutural mais recente está contra o lado macro; um Order Block anterior não pode ser reaproveitado."
           },
-          "updated_at": "2026-09-28T19:47:57.115337+00:00",
+          "updated_at": "2026-09-28T19:50:07.330376+00:00",
           "algorithm_note": "Score de prontidão observacional; não é probabilidade de lucro. BOS/CHOCH e Order Block são observacionais e ainda não alteram o readiness institucional."
         },
         "cache_v110": {
@@ -11638,15 +11638,15 @@
           "readiness": 30.8,
           "label": "⚪ ICT AINDA INCOMPLETO",
           "side": "SELL",
-          "updated_at": "2026-09-28T19:47:56.840861+00:00",
+          "updated_at": "2026-09-28T19:49:59.724598+00:00",
           "setup_candidates": {
             "schema": "ATLASQUANT_SETUP_CANDIDATES_V1",
             "pair": "GBP/USD",
             "side": "SELL",
-            "captured_at": "2026-09-28T19:47:56.840861+00:00",
+            "captured_at": "2026-09-28T19:49:59.724598+00:00",
             "models": [
               {
-                "candidate_id": "6ba0a9a74269f0193fe275bc",
+                "candidate_id": "05938d1f75b38ea69e00f515",
                 "episode_id": "52ba1741a52e6891d362ae73",
                 "setup_id": "crt",
                 "setup_label": "CRT",
@@ -11654,7 +11654,7 @@
                 "source_timeframe": "H1",
                 "pair": "GBP/USD",
                 "side": "SELL",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "⚪ SEM CRT",
                 "score": 30.0,
                 "research_candidate": false,
@@ -11674,7 +11674,7 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "7b97f982d9e6b972cb1666a4",
+                "candidate_id": "faf2253b65279d15193d820a",
                 "episode_id": "da057834501bde566e8dd8d6",
                 "setup_id": "ote",
                 "setup_label": "OTE / Fibonacci",
@@ -11682,7 +11682,7 @@
                 "source_timeframe": "H1",
                 "pair": "GBP/USD",
                 "side": "SELL",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "⚪ SEM OTE",
                 "score": 0.0,
                 "research_candidate": false,
@@ -11697,7 +11697,7 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "901cf6a9c1d44dddf0f849df",
+                "candidate_id": "36c403d60212bb0f7bcb44f8",
                 "episode_id": "196a9541833af20ff5ce1ddd",
                 "setup_id": "amd-po3",
                 "setup_label": "AMD / PO3",
@@ -11705,7 +11705,7 @@
                 "source_timeframe": "M15",
                 "pair": "GBP/USD",
                 "side": "SELL",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "⚪ AMD EM ACUMULAÇÃO",
                 "score": 40.0,
                 "research_candidate": false,
@@ -11725,7 +11725,7 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "c1f64428f55467401b32e492",
+                "candidate_id": "93567fcf668c88da611d3a21",
                 "episode_id": "93c948062f6e4072cc698849",
                 "setup_id": "fvg",
                 "setup_label": "FVG / desequilíbrio",
@@ -11733,7 +11733,7 @@
                 "source_timeframe": "M15",
                 "pair": "GBP/USD",
                 "side": "SELL",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "🟡 FVG PRESENTE",
                 "score": 65.0,
                 "research_candidate": false,
@@ -11751,7 +11751,7 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "3238963f5a86fc15ae4de0ad",
+                "candidate_id": "f2dde266a17970a40c39a043",
                 "episode_id": "f26935598aca2690db794afd",
                 "setup_id": "bos-choch-ob",
                 "setup_label": "BOS/CHOCH + Order Block",
@@ -11759,7 +11759,7 @@
                 "source_timeframe": "M15",
                 "pair": "GBP/USD",
                 "side": "SELL",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "MSS + ⚪ SEM ORDER BLOCK VALIDADO",
                 "score": 35.0,
                 "research_candidate": false,
@@ -11875,7 +11875,7 @@
             "range_atr": 0.77,
             "text": "Há quebra de estrutura, mas falta displacement suficiente para validar a zona de origem."
           },
-          "updated_at": "2026-09-28T19:47:57.361904+00:00",
+          "updated_at": "2026-09-28T19:50:07.559490+00:00",
           "algorithm_note": "Score de prontidão observacional; não é probabilidade de lucro. BOS/CHOCH e Order Block são observacionais e ainda não alteram o readiness institucional."
         },
         "cache_v110": {
@@ -13923,10 +13923,10 @@
             "schema": "ATLASQUANT_SETUP_CANDIDATES_V1",
             "pair": "AUD/USD",
             "side": "WAIT",
-            "captured_at": "2026-09-28T19:47:56.840861+00:00",
+            "captured_at": "2026-09-28T19:49:59.724598+00:00",
             "models": [
               {
-                "candidate_id": "b3c32868fdc5797264490c14",
+                "candidate_id": "d0dfed0a11e1cca84caed0e6",
                 "episode_id": "da797a7d0b123cdcbf90045c",
                 "setup_id": "crt",
                 "setup_label": "CRT",
@@ -13934,7 +13934,7 @@
                 "source_timeframe": "H1",
                 "pair": "AUD/USD",
                 "side": "WAIT",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "⚪ AGUARDANDO",
                 "score": 0.0,
                 "research_candidate": false,
@@ -13950,7 +13950,7 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "06519ad7c238556f9d5dce32",
+                "candidate_id": "aae5c2c800e1f6d7a6d0f943",
                 "episode_id": "1c19c7d77296f8ab16978b2b",
                 "setup_id": "ote",
                 "setup_label": "OTE / Fibonacci",
@@ -13958,7 +13958,7 @@
                 "source_timeframe": "H1",
                 "pair": "AUD/USD",
                 "side": "WAIT",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "⚪ SEM OTE",
                 "score": 0.0,
                 "research_candidate": false,
@@ -13973,7 +13973,7 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "181bb1cb958f1004a6146d18",
+                "candidate_id": "0e0d97fef28f1bcd3d88a07f",
                 "episode_id": "ec0f52b2793625f9d4692a96",
                 "setup_id": "amd-po3",
                 "setup_label": "AMD / PO3",
@@ -13981,7 +13981,7 @@
                 "source_timeframe": "M15",
                 "pair": "AUD/USD",
                 "side": "WAIT",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "⚪ AGUARDANDO AMD",
                 "score": 0.0,
                 "research_candidate": false,
@@ -13997,7 +13997,7 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "04aa42de1b3d9ea387c6cb1b",
+                "candidate_id": "4fddcf89d604f4c21a8d8a1c",
                 "episode_id": "c17ed51684d76897dc139311",
                 "setup_id": "fvg",
                 "setup_label": "FVG / desequilíbrio",
@@ -14005,7 +14005,7 @@
                 "source_timeframe": "M15",
                 "pair": "AUD/USD",
                 "side": "WAIT",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "⚪ SEM FVG",
                 "score": 0.0,
                 "research_candidate": false,
@@ -14020,7 +14020,7 @@
                 "real_orders_enabled": false
               },
               {
-                "candidate_id": "2ca67d91e25e199242942ff1",
+                "candidate_id": "69b00b6bc77e8e67f7905027",
                 "episode_id": "5b1bacd8f8f4b401174d9335",
                 "setup_id": "bos-choch-ob",
                 "setup_label": "BOS/CHOCH + Order Block",
@@ -14028,7 +14028,7 @@
                 "source_timeframe": "M15",
                 "pair": "AUD/USD",
                 "side": "WAIT",
-                "captured_at": "2026-09-28T19:47:56.840861+00:00",
+                "captured_at": "2026-09-28T19:49:59.724598+00:00",
                 "status": "NONE + ⚪ SEM ORDER BLOCK",
                 "score": 0.0,
                 "research_candidate": false,
@@ -14106,7 +14106,7 @@
             "score": 0,
             "text": "Order Block aguarda M15 suficiente e direção macro."
           },
-          "updated_at": "2026-09-28T19:47:57.423768+00:00",
+          "updated_at": "2026-09-28T19:50:07.625035+00:00",
           "algorithm_note": "Score de prontidão observacional; não é probabilidade de lucro. BOS/CHOCH e Order Block são observacionais e ainda não alteram o readiness institucional."
         },
         "cache_v110": {
@@ -16110,7 +16110,7 @@
     }
   },
   "autopilot_v107": {
-    "last_run": "2026-09-28T19:47:56.840861+00:00",
+    "last_run": "2026-09-28T19:49:59.724598+00:00",
     "market_open": true,
     "last_fetches": {
       "EUR/USD": {
@@ -16134,25 +16134,25 @@
         "h4": "2026-09-28T17:22:24.387957+00:00"
       },
       "USD/JPY": {
-        "m15": "2026-09-28T19:22:05.769605+00:00",
-        "h1": "2026-09-28T18:26:33.975442+00:00",
+        "m15": "2026-09-28T19:50:06.790361+00:00",
+        "h1": "2026-09-28T19:50:06.790361+00:00",
         "h4": "2026-09-28T17:23:18.911673+00:00"
       },
       "USD/CHF": {
-        "m15": "2026-09-28T19:21:15.097404+00:00",
+        "m15": "2026-09-28T19:50:04.332187+00:00",
         "h1": "2026-09-28T19:21:15.097404+00:00",
         "h4": "2026-09-28T17:22:29.876474+00:00"
       },
       "USD/CAD": {
-        "m15": "2026-09-28T19:21:12.833513+00:00",
+        "m15": "2026-09-28T19:50:02.018653+00:00",
         "h1": "2026-09-28T19:21:12.833513+00:00",
         "h4": "2026-09-28T17:22:27.169724+00:00"
       }
     },
-    "twelve_calls_last_run": 0,
+    "twelve_calls_last_run": 3,
     "daily_budget": {
       "day": "2026-09-28",
-      "calls": 140,
+      "calls": 143,
       "limit": 480
     }
   }
