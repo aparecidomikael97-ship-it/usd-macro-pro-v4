@@ -616,6 +616,113 @@ def build_pair_intelligence_packs(matrix:pd.DataFrame, ranking:pd.DataFrame, *, 
     return packs
 
 
+_RENDER_PACK_REQUIRED_KEYS = frozenset({
+    "pair",
+    "direction",
+    "state",
+    "priority",
+    "score",
+    "quality",
+    "matrix_diff",
+    "h4",
+    "h1",
+    "m15",
+    "gate",
+    "gate_score",
+    "event",
+    "reason",
+    "next_action",
+    "target",
+    "hard_blocks",
+    "soft_blocks",
+    "up",
+    "down",
+    "ict_read",
+    "inst_read",
+    "data_ready",
+})
+
+
+def _render_pack_contract_ready(pack: Any) -> bool:
+    """Return True only for packs safe for the direct-indexing Pro renderer."""
+    if not isinstance(pack, Mapping):
+        return False
+    if not _RENDER_PACK_REQUIRED_KEYS.issubset(pack.keys()):
+        return False
+    pair = str(pack.get("pair") or "")
+    if pair not in PAIR_ORDER:
+        return False
+    for key in ("data_ready",):
+        if not isinstance(pack.get(key), Mapping):
+            return False
+    for key in ("hard_blocks", "soft_blocks", "up", "down"):
+        if not isinstance(pack.get(key), (list, tuple)):
+            return False
+    return True
+
+
+def resolve_render_packs(
+    matrix: pd.DataFrame,
+    ranking: pd.DataFrame,
+    runtime_snapshot: Mapping[str, Any] | None,
+    *,
+    fed: Mapping[str, Any] | None = None,
+    weights: Mapping[str, float] | None = None,
+) -> tuple[list[dict[str, Any]], str]:
+    """Resolve a complete render contract without network access.
+
+    This boundary exists specifically so the Advanced Radar never treats the
+    compact Fast Home serialization as if it were the full Pro render schema.
+
+    Fast-home snapshots intentionally allow compact packs. The Pro renderer
+    requires a richer contract and used to direct-index those compact rows,
+    causing KeyError. Reuse runtime packs only when every expected pair is
+    complete; otherwise rebuild deterministically from the already-loaded
+    matrix/ranking plus any persisted evidence embedded in the snapshot.
+    """
+    runtime = dict(runtime_snapshot) if isinstance(runtime_snapshot, Mapping) else {}
+    raw_packs = list(runtime.get("packs") or []) if isinstance(runtime.get("packs"), (list, tuple)) else []
+
+    expected_pairs = []
+    if isinstance(matrix, pd.DataFrame) and not matrix.empty and "Par" in matrix.columns:
+        expected_pairs = [
+            str(value)
+            for value in matrix["Par"].tolist()
+            if str(value) in PAIR_ORDER
+        ]
+    expected_set = set(expected_pairs)
+    runtime_pairs = {
+        str(pack.get("pair") or "")
+        for pack in raw_packs
+        if isinstance(pack, Mapping)
+    }
+    runtime_complete = bool(
+        raw_packs
+        and expected_set
+        and runtime_pairs == expected_set
+        and len(raw_packs) == len(expected_set)
+        and all(_render_pack_contract_ready(pack) for pack in raw_packs)
+    )
+    if runtime_complete:
+        return [dict(pack) for pack in raw_packs], "runtime_snapshot"
+
+    fed_tone = str((fed or {}).get("tom", (fed or {}).get("tone", "Neutro")))
+    scanner_state = runtime.get("scanner") if isinstance(runtime.get("scanner"), Mapping) else {}
+    map_state = runtime.get("market_map") if isinstance(runtime.get("market_map"), Mapping) else {}
+    news_state = runtime.get("news") if isinstance(runtime.get("news"), Mapping) else {}
+
+    rebuilt = build_pair_intelligence_packs(
+        matrix,
+        ranking,
+        scanner_state=scanner_state,
+        map_state=map_state,
+        news_state=news_state,
+        fed_tone=fed_tone,
+        weights=weights,
+    )
+    return rebuilt, "matrix_rebuild"
+
+
 def load_current_pair_intelligence(matrix:pd.DataFrame, ranking:pd.DataFrame, *, fed:Mapping[str,Any]|None=None, weights:Mapping[str,float]|None=None) -> dict[str,Any]:
     """Loads persisted runtime evidence only; never calls Twelve Data or creates orders."""
     token,repo,branch=_gh_cfg()
@@ -656,20 +763,46 @@ def render_pair_intelligence_v110(matrix:pd.DataFrame,ranking:pd.DataFrame,fed:M
     if matrix is None or matrix.empty:
         st.warning("A Matriz ainda não está disponível nesta execução."); return
 
-    _runtime=dict(runtime_snapshot or {})
-    if _runtime:
-        packs=list(_runtime.get("packs",[]) or [])
-        auto=dict(_runtime.get("auto",{}) or {})
-    else:
-        _runtime=load_current_pair_intelligence(matrix,ranking,fed=fed,weights=weights)
-        packs=list(_runtime.get("packs",[]) or [])
-        auto=dict(_runtime.get("auto",{}) or {})
-    if not packs: st.warning("Nenhum dos 7 pares foi encontrado na Matriz."); return
-    # Fast Home/runtime snapshots can contain packs serialized earlier. Recompute
-    # current expiry from the auditable technical timestamp before presenting them.
+    _runtime = (
+        dict(runtime_snapshot)
+        if isinstance(runtime_snapshot, Mapping)
+        else {}
+    )
+    if not _runtime:
+        _runtime=load_current_pair_intelligence(
+            matrix,
+            ranking,
+            fed=fed,
+            weights=weights,
+        )
+    packs, _pack_source = resolve_render_packs(
+        matrix,
+        ranking,
+        _runtime,
+        fed=fed,
+        weights=weights,
+    )
+    auto = (
+        dict(_runtime.get("auto"))
+        if isinstance(_runtime.get("auto"), Mapping)
+        else {}
+    )
+    if not packs:
+        st.warning("Nenhum dos 7 pares foi encontrado na Matriz.")
+        return
+    # Fast Home/runtime snapshots can contain compact packs serialized for the
+    # quick shell. The resolver above rebuilds the full Pro contract locally
+    # when needed; no provider/API call is made by that fallback.
+    if _pack_source == "matrix_rebuild" and runtime_snapshot:
+        st.caption(
+            "Diagnóstico avançado recomposto localmente a partir da Matriz/Ranking "
+            "porque o snapshot rápido não continha o contrato completo dos 7 pares."
+        )
     packs=annotate_packs_with_lifecycle(
         packs,
-        _runtime.get("signal_lifecycle",{}) if isinstance(_runtime,Mapping) else {},
+        _runtime.get("signal_lifecycle",{})
+        if isinstance(_runtime.get("signal_lifecycle"), Mapping)
+        else {},
         timezone="UTC",
     )
 

@@ -223,6 +223,15 @@ class ProductionAdminFlowTests(unittest.TestCase):
         self.assertIn("Leitura em cache", html)
         self.assertIn("não trata o cache como coleta ao vivo", html)
         self.assertIn("aparecidomikael · ADMIN", html)
+        self.assertNotIn("aq_radar_advanced_error", at.session_state)
+        advanced_surface = dict(
+            at.session_state.get("atlasquant_surface_health", {}) or {}
+        ).get("advanced_radar", {})
+        if isinstance(advanced_surface, dict):
+            self.assertNotEqual(
+                str(advanced_surface.get("state") or "").upper(),
+                "ERROR",
+            )
         self.assertIn("🧠 AION", at.selectbox(key="atlasquant_advanced_area").options)
         self.assertEqual(at.button(key="aq_voice_dock_aion").label, "Abrir central AION")
         # The whole Advanced script, including the Radar workspace, runs offline here.

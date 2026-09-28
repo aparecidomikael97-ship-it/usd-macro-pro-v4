@@ -1,6 +1,10 @@
 import unittest
 from pathlib import Path
 
+import pandas as pd
+
+from pair_intelligence_v110 import resolve_render_packs
+
 
 class PairIntelligenceSourceTests(unittest.TestCase):
     def test_central_has_all_required_layers(self):
@@ -34,6 +38,73 @@ class PairIntelligenceSourceTests(unittest.TestCase):
         self.assertNotIn('st.error("**Bloqueios duros:**',src)
         self.assertIn("não erro do sistema",src)
         self.assertIn("BLOQUEIO OPERACIONAL",src)
+
+
+    def test_compact_fast_snapshot_rebuilds_full_advanced_pack_contract(self):
+        pairs = (
+            "EUR/USD","GBP/USD","AUD/USD","NZD/USD",
+            "USD/JPY","USD/CHF","USD/CAD",
+        )
+        matrix = pd.DataFrame([
+            {
+                "Par": pair,
+                "Direção": "VENDA" if pair.endswith("/USD") else "COMPRA",
+                "Score final": 80 - idx,
+                "Qualidade": 85 - idx,
+                "Índice ranking": 90 - idx,
+            }
+            for idx, pair in enumerate(pairs)
+        ])
+        ranking = pd.DataFrame([
+            {"Código": "USD", "Pontuação_Final": 60},
+        ])
+        runtime = {
+            "packs": [{"pair": "EUR/USD", "direction": "VENDA"}],
+        }
+
+        packs, source = resolve_render_packs(
+            matrix,
+            ranking,
+            runtime,
+            fed={"tom": "Restritivo"},
+        )
+
+        self.assertEqual(source, "matrix_rebuild")
+        self.assertEqual(len(packs), 7)
+        self.assertEqual({row["pair"] for row in packs}, set(pairs))
+        for row in packs:
+            for key in (
+                "state","priority","score","quality","data_ready",
+                "hard_blocks","soft_blocks","next_action","target",
+            ):
+                self.assertIn(key, row)
+
+    def test_full_runtime_pack_contract_is_reused_without_rebuild(self):
+        pairs = (
+            "EUR/USD","GBP/USD","AUD/USD","NZD/USD",
+            "USD/JPY","USD/CHF","USD/CAD",
+        )
+        matrix = pd.DataFrame([
+            {
+                "Par": pair,
+                "Direção": "VENDA" if pair.endswith("/USD") else "COMPRA",
+                "Score final": 80 - idx,
+                "Qualidade": 85 - idx,
+                "Índice ranking": 90 - idx,
+            }
+            for idx, pair in enumerate(pairs)
+        ])
+        ranking = pd.DataFrame([
+            {"Código": "USD", "Pontuação_Final": 60},
+        ])
+        baseline, _ = resolve_render_packs(matrix, ranking, {})
+        reused, source = resolve_render_packs(
+            matrix,
+            ranking,
+            {"packs": baseline},
+        )
+        self.assertEqual(source, "runtime_snapshot")
+        self.assertEqual(len(reused), 7)
 
     def test_no_profit_probability_claim(self):
         src=Path("pair_intelligence_v110.py").read_text(encoding="utf-8")
