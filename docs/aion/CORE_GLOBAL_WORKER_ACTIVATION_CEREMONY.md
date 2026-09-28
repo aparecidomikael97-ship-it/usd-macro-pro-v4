@@ -217,3 +217,22 @@ Until then, the truthful state is:
 `ACTIVATED_PENDING_LIVE_EVIDENCE`
 
 not "global worker operational".
+
+
+## CI audit procedure
+
+Because the repository's traditional pull-request workflows target `main`,
+this stacked draft may be temporarily retargeted to `main` only for CI audit.
+A documentation-only synchronize commit may be used to trigger those workflows.
+
+After validation, the PR base must be restored to
+`cursor/aion-global-worker-persisted-arming-v1`.
+
+This audit procedure must not:
+
+- call the activation function;
+- change the repository variable;
+- persist ARMED;
+- dispatch the worker;
+- merge;
+- deploy.
