@@ -89,6 +89,26 @@ def _flag_state(value: Any) -> str:
     return "INVALID"
 
 
+def _arming_contract(raw: Mapping[str, Any] | None) -> dict[str, Any]:
+    item = dict(raw or {})
+    return {
+        "arm_digest": str(item.get("arm_digest") or ""),
+        "arming_plan_digest": str(item.get("arming_plan_digest") or ""),
+        "arming_approval_digest": str(item.get("arming_approval_digest") or ""),
+        "arming_approval_expires_at": str(item.get("arming_approval_expires_at") or ""),
+        "armed_at": str(item.get("armed_at") or ""),
+        "delegation": deepcopy(dict(item.get("delegation") or {})),
+        "allowed_capabilities": list(item.get("allowed_capabilities") or []),
+        "resource_budgets": deepcopy(dict(item.get("resource_budgets") or {})),
+        "max_jobs": item.get("max_jobs"),
+        "lease_seconds": item.get("lease_seconds"),
+    }
+
+
+def _arming_contract_digest(raw: Mapping[str, Any] | None) -> str:
+    return digest(_arming_contract(raw))
+
+
 def read_repository_feature_flag(
     config: RuntimeConfig,
     *,
@@ -174,12 +194,7 @@ def persisted_arming_transition_required(
     if str(persisted_raw.get("state") or "").upper() != "ARMED":
         return True
 
-    return (
-        str(persisted_raw.get("arming_approval_digest") or "")
-        != str(working_raw.get("arming_approval_digest") or "")
-        or str(persisted_raw.get("arm_digest") or "")
-        != str(working_raw.get("arm_digest") or "")
-    )
+    return _arming_contract_digest(persisted_raw) != _arming_contract_digest(working_raw)
 
 
 def plan_integrity(plan: Mapping[str, Any] | None) -> dict[str, str]:
