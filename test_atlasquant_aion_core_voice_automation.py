@@ -83,7 +83,7 @@ class VoiceAdapterTests(unittest.TestCase):
             "READY_TO_GENERATE_ON_EXPLICIT_CLICK",
         )
         self.assertEqual(result["payload"]["transcript"], "voz")
-        self.assertTrue(result["payload"]["cache_digest"])
+        self.assertTrue(result["payload"]["transcript_digest"])
         self.assertFalse(result["payload"]["provider_called"])
         self.assertFalse(result["provider_called"])
 
