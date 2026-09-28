@@ -4,10 +4,27 @@ on:
   workflow_dispatch:
   pull_request:
     branches: [main]
+    paths:
+      - "usd_macro_pro_v4_cloud.py"
+      - "atlasquant_central_hub_ui.py"
+      - "atlasquant_premium_shell.py"
+      - "atlasquant_access_panel.py"
+      - "test_atlasquant_central_hub_ui.py"
+      - "test_atlasquant_premium_shell.py"
+      - "test_atlasquant_access_panel.py"
+      - "test_atlasquant_production_admin_flow.py"
+      - ".github/workflows/mobile-dom-stability.yml"
   push:
     branches: [main, atlasquant-mobile-dom-stability]
     paths:
       - "usd_macro_pro_v4_cloud.py"
+      - "atlasquant_central_hub_ui.py"
+      - "atlasquant_premium_shell.py"
+      - "atlasquant_access_panel.py"
+      - "test_atlasquant_central_hub_ui.py"
+      - "test_atlasquant_premium_shell.py"
+      - "test_atlasquant_access_panel.py"
+      - "test_atlasquant_production_admin_flow.py"
       - "atlasquant_ui_v1.py"
       - "compact_ui_v1107.py"
       - "atlasquant_investment_panel.py"
@@ -346,6 +363,43 @@ jobs:
                   viewport_w=visual_page.evaluate("window.innerWidth")
                   document_w=visual_page.evaluate("document.documentElement.scrollWidth")
                   visual_overflow=max(0,int(document_w)-int(viewport_w))
+                  carousel={
+                      "present":False,
+                      "scroll_width":0,
+                      "client_width":0,
+                      "before":0,
+                      "after_right":0,
+                      "after_left":0,
+                      "essential_order_ok":False,
+                  }
+                  row=visual_page.locator(".aq-premium-row").first
+                  if row.count():
+                      carousel["present"]=True
+                      dims=row.evaluate("(el)=>({scrollWidth:el.scrollWidth,clientWidth:el.clientWidth,scrollLeft:el.scrollLeft})")
+                      carousel["scroll_width"]=int(dims["scrollWidth"])
+                      carousel["client_width"]=int(dims["clientWidth"])
+                      carousel["before"]=int(dims["scrollLeft"])
+                      row.focus()
+                      row.press("ArrowRight")
+                      visual_page.wait_for_timeout(250)
+                      carousel["after_right"]=int(row.evaluate("(el)=>el.scrollLeft"))
+                      row.press("ArrowLeft")
+                      visual_page.wait_for_timeout(250)
+                      carousel["after_left"]=int(row.evaluate("(el)=>el.scrollLeft"))
+                      essential_text=str(row.inner_text())
+                      positions=[essential_text.find(label) for label in ("Radar","Painel Mestre","Macroeconomia")]
+                      carousel["essential_order_ok"]=all(pos>=0 for pos in positions) and positions==sorted(positions)
+                      if carousel["scroll_width"]<=carousel["client_width"]:
+                          errors.append(f"visual-{width}: carrossel premium sem overflow interno")
+                      if carousel["after_right"]<=carousel["before"]:
+                          errors.append(f"visual-{width}: ArrowRight não moveu carrossel")
+                      if carousel["after_left"]>=carousel["after_right"]:
+                          errors.append(f"visual-{width}: ArrowLeft não retornou carrossel")
+                      if not carousel["essential_order_ok"]:
+                          errors.append(f"visual-{width}: ordem Radar/Painel Mestre/Macroeconomia regrediu")
+                  else:
+                      errors.append(f"visual-{width}: carrossel premium ausente")
+
                   metrics=visual_page.locator('[data-testid="stMetricValue"]')
                   metric_sample=""
                   if metrics.count():
@@ -364,6 +418,7 @@ jobs:
                       "viewport_width":viewport_w,
                       "document_width":document_w,
                       "horizontal_overflow_px":visual_overflow,
+                      "premium_carousel":carousel,
                       "metric_style":metric_sample,
                       "card_text_styles":card_samples,
                       "page_errors":visual_errors[-5:],
