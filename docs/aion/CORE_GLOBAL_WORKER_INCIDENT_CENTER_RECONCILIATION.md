@@ -200,3 +200,11 @@ the standard PR workflows, then returned to its stacked base.
 
 No reconciliation test or CI action authorizes real closure persistence,
 activation, reactivation, deploy, merge, or trading.
+
+
+## Audit trigger note
+
+When this stacked Draft PR is temporarily retargeted to `main`, a
+documentation-only synchronize commit may be used to trigger the standard
+pull-request workflows. This changes no runtime behavior and grants no closure,
+activation, reactivation, deploy, merge, or trading authority.
