@@ -443,6 +443,15 @@ try:
 except Exception:
     verify_global_worker_live_activation = None
 
+try:
+    from atlasquant_aion_global_worker_supervision import (
+        operational_incident as global_worker_operational_incident,
+        supervise_global_worker,
+    )
+except Exception:
+    global_worker_operational_incident = None
+    supervise_global_worker = None
+
 SCHEMA = "ATLASQUANT_AION_ADMIN_V1"
 AION_WORKSPACES = (
     "🧠 Central",
@@ -471,6 +480,7 @@ _AION_GLOBAL_ACTIVATION_PLAN_KEY = "aion_global_activation_plan_v1"
 _AION_GLOBAL_ACTIVATION_APPROVAL_KEY = "aion_global_activation_approval_v1"
 _AION_GLOBAL_ACTIVATION_RESULT_KEY = "aion_global_activation_result_v1"
 _AION_GLOBAL_LIVE_VERIFICATION_KEY = "aion_global_live_verification_v1"
+_AION_GLOBAL_SUPERVISION_KEY = "aion_global_supervision_v1"
 
 AION_ADMIN_CSS = r"""
 <style>
@@ -6903,12 +6913,21 @@ def _render_development(
                 st.session_state[_AION_GLOBAL_LIVE_VERIFICATION_KEY] = (
                     live_report
                 )
+                if supervise_global_worker is not None:
+                    supervision_report = supervise_global_worker(
+                        live_report,
+                        fresh_flag,
+                    )
+                    st.session_state[_AION_GLOBAL_SUPERVISION_KEY] = (
+                        supervision_report
+                    )
             except Exception as exc:
                 st.session_state[_AION_GLOBAL_LIVE_VERIFICATION_KEY] = {
                     "status": "BLOCKED",
                     "reason": type(exc).__name__,
                     "live_confirmed": False,
                 }
+                st.session_state.pop(_AION_GLOBAL_SUPERVISION_KEY, None)
 
         live_report = st.session_state.get(
             _AION_GLOBAL_LIVE_VERIFICATION_KEY
@@ -6960,6 +6979,47 @@ def _render_development(
                     "Ainda aguardando evidência live compartilhada. "
                     "A feature flag, por si só, não confirma operação."
                 )
+
+        supervision_report = st.session_state.get(
+            _AION_GLOBAL_SUPERVISION_KEY
+        )
+        if isinstance(supervision_report, Mapping):
+            st.markdown("##### 🛡️ Supervisão operacional")
+            sp1, sp2, sp3 = st.columns(3)
+            sp1.metric(
+                "Postura",
+                str(supervision_report.get("posture") or "UNKNOWN"),
+            )
+            sp2.metric(
+                "Severidade",
+                str(supervision_report.get("severity") or "UNKNOWN"),
+            )
+            sp3.metric(
+                "Safety-stop recomendado",
+                "SIM"
+                if supervision_report.get("safety_stop_recommended")
+                else "NÃO",
+            )
+            if supervision_report.get("incident_open"):
+                st.warning(
+                    "Incidente operacional aberto por evidência do Worker Global. "
+                    "A supervisão NÃO executa contenção automática."
+                )
+            else:
+                st.caption(
+                    "Nenhum incidente operacional aberto neste snapshot."
+                )
+            recovery_steps = list(
+                supervision_report.get("recovery_steps") or []
+            )
+            if recovery_steps:
+                with st.expander("Checklist de recuperação do Worker Global"):
+                    for step in recovery_steps:
+                        st.markdown("- " + str(step))
+            st.caption(
+                "Supervisão: somente leitura · contenção automática: NÃO · "
+                "alteração automática da feature flag: NÃO · trading real: NÃO."
+            )
 
         with st.expander("🛑 Desativação de segurança da feature flag"):
             st.caption(
