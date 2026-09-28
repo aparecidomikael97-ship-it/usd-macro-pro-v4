@@ -547,6 +547,37 @@ def global_worker_snapshot(
             )
         except Exception:
             delegated_scope_matches = False
+    if state["delegation"] and not delegated_scope_matches:
+        return {
+            "schema": SCHEMA,
+            "status": "CONTEXT_ISOLATED",
+            "state": "UNKNOWN",
+            "kill_switch": True,
+            "revision": 0,
+            "delegated_actor": "",
+            "delegated_scope_matches": False,
+            "allowed_capabilities": [],
+            "max_jobs": 0,
+            "lease_seconds": 0,
+            "fencing_counter": 0,
+            "lease_owner": "",
+            "lease_fencing_token": 0,
+            "lease_active": False,
+            "lease_expires_at": "",
+            "stats": {},
+            "runner_mode": "UNKNOWN",
+            "runner_feature_flag_required": True,
+            "feature_flag_observed_here": global_worker_feature_enabled(),
+            "additional_cron_created": False,
+            "automatic_runtime_checkpoint_persistence": False,
+            "automatic_external_business_actions": False,
+            "provider_calls_allowed": False,
+            "publication_allowed": False,
+            "payment_allowed": False,
+            "deploy_allowed": False,
+            "merge_allowed": False,
+            "real_trading_enabled": False,
+        }
     lease = state["lease"]
     expires = _parse_iso(lease.get("expires_at"))
     return {
