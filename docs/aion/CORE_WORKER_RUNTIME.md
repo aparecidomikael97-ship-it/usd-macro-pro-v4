@@ -190,3 +190,10 @@ To claim global/24x7 autonomy, a later block must provide:
 
 Until that exists, the product must not describe Worker Runtime V1 as globally
 multi-instance-safe or continuously available 24/7.
+
+## CI audit procedure
+
+Because the repository's pull-request quality workflows target `main`, this
+stacked draft may be temporarily retargeted to `main` only to trigger CI. After
+the checks complete, its base is restored to the preceding stacked AION branch.
+This audit procedure does not merge or deploy the change.
