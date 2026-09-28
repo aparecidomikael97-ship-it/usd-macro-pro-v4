@@ -216,6 +216,9 @@ def _schedule_due(schedule: Mapping[str, Any], now: datetime) -> bool:
     previous = _previous_due(item, now)
     if previous is None:
         return False
+    created = _parse_iso(item.get("created_at"))
+    if created is not None and previous < created.astimezone(timezone.utc):
+        return False
     last_due = _parse_iso(item.get("last_due_at"))
     return last_due is None or last_due < previous
 
