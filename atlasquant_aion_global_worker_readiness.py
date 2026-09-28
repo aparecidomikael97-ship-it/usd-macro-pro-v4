@@ -424,9 +424,8 @@ def fetch_recent_autopilot_pulses(
             url,
             headers=headers,
             params={
-                "event": "schedule",
                 "branch": "main",
-                "per_page": max(20, min(int(per_page) * 10, 100)),
+                "per_page": max(50, min(int(per_page) * 20, 100)),
             },
             timeout=timeout,
         )
