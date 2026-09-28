@@ -501,6 +501,23 @@ except Exception:
     prepare_human_incident_closure = None
     record_human_incident_closure = None
 
+try:
+    from atlasquant_aion_global_worker_durable_incident_closure import (
+        CONFIRMATION_PHRASE as GLOBAL_DURABLE_CLOSURE_CONFIRMATION_PHRASE,
+        approve_durable_closure_plan,
+        persist_human_incident_closure_record,
+        prepare_durable_closure_plan,
+        validate_durable_closure_approval,
+    )
+except Exception:
+    GLOBAL_DURABLE_CLOSURE_CONFIRMATION_PHRASE = (
+        "PERSISTIR FECHAMENTO INCIDENTE WORKER GLOBAL"
+    )
+    approve_durable_closure_plan = None
+    persist_human_incident_closure_record = None
+    prepare_durable_closure_plan = None
+    validate_durable_closure_approval = None
+
 SCHEMA = "ATLASQUANT_AION_ADMIN_V1"
 AION_WORKSPACES = (
     "🧠 Central",
@@ -535,6 +552,14 @@ _AION_GLOBAL_RECOVERY_DRILL_KEY = "aion_global_recovery_drill_v1"
 _AION_GLOBAL_REMEDIATION_EVIDENCE_KEY = "aion_global_remediation_evidence_v1"
 _AION_GLOBAL_CLOSURE_ASSESSMENT_KEY = "aion_global_closure_assessment_v1"
 _AION_GLOBAL_HUMAN_CLOSURE_RECORD_KEY = "aion_global_human_closure_record_v1"
+_AION_GLOBAL_DURABLE_CLOSURE_FLAG_EVIDENCE_KEY = (
+    "aion_global_durable_closure_flag_evidence_v1"
+)
+_AION_GLOBAL_DURABLE_CLOSURE_PLAN_KEY = "aion_global_durable_closure_plan_v1"
+_AION_GLOBAL_DURABLE_CLOSURE_APPROVAL_KEY = (
+    "aion_global_durable_closure_approval_v1"
+)
+_AION_GLOBAL_DURABLE_CLOSURE_RESULT_KEY = "aion_global_durable_closure_result_v1"
 
 AION_ADMIN_CSS = r"""
 <style>
@@ -7487,6 +7512,425 @@ def _render_development(
                                         )
                                     )
                                 )
+
+                    with st.expander("💾 Persistência durável do fechamento"):
+                        durable_human_record = st.session_state.get(
+                            _AION_GLOBAL_HUMAN_CLOSURE_RECORD_KEY
+                        )
+                        durable_human_ready = bool(
+                            isinstance(durable_human_record, Mapping)
+                            and durable_human_record.get(
+                                "human_closure_decision_recorded"
+                            )
+                            is True
+                        )
+                        st.caption(
+                            "Esta etapa persiste somente o registro humano de "
+                            "fechamento no Checkpoint compartilhado. Ela NÃO altera "
+                            "a feature flag, NÃO muda o estado do Worker e NÃO "
+                            "autoriza reativação."
+                        )
+
+                        if st.button(
+                            "🔎 Ler feature flag para persistência do fechamento",
+                            key="aion_global_durable_closure_check_flag",
+                            disabled=read_repository_feature_flag is None,
+                            width="stretch",
+                        ):
+                            try:
+                                durable_flag_evidence = (
+                                    read_repository_feature_flag(cfg)
+                                )
+                                st.session_state[
+                                    _AION_GLOBAL_DURABLE_CLOSURE_FLAG_EVIDENCE_KEY
+                                ] = durable_flag_evidence
+                                if (
+                                    durable_flag_evidence.get("status")
+                                    == "CONFIRMED"
+                                    and str(
+                                        durable_flag_evidence.get("state")
+                                        or ""
+                                    )
+                                    in {"UNSET", "DISABLED", "ENABLED"}
+                                ):
+                                    st.success(
+                                        "Feature flag lida como "
+                                        + str(
+                                            durable_flag_evidence.get(
+                                                "state"
+                                            )
+                                            or "UNKNOWN"
+                                        )
+                                        + ". Nenhuma variável foi alterada."
+                                    )
+                                else:
+                                    st.error(
+                                        "Persistência bloqueada: estado "
+                                        "autoritativo da feature flag não foi "
+                                        "confirmado."
+                                    )
+                            except Exception as exc:
+                                st.error(
+                                    "Leitura da feature flag falhou em modo "
+                                    "seguro: "
+                                    + type(exc).__name__
+                                    + "."
+                                )
+
+                        durable_flag_evidence = st.session_state.get(
+                            _AION_GLOBAL_DURABLE_CLOSURE_FLAG_EVIDENCE_KEY
+                        )
+                        durable_flag_ready = bool(
+                            isinstance(durable_flag_evidence, Mapping)
+                            and durable_flag_evidence.get("status")
+                            == "CONFIRMED"
+                            and str(
+                                durable_flag_evidence.get("state") or ""
+                            )
+                            in {"UNSET", "DISABLED", "ENABLED"}
+                        )
+                        if isinstance(durable_flag_evidence, Mapping):
+                            dc1, dc2 = st.columns(2)
+                            dc1.metric(
+                                "Feature flag",
+                                str(
+                                    durable_flag_evidence.get("state")
+                                    or "UNKNOWN"
+                                ),
+                            )
+                            dc2.metric(
+                                "Estado confirmado",
+                                "SIM" if durable_flag_ready else "NÃO",
+                            )
+
+                        durable_ttl = int(
+                            st.number_input(
+                                "TTL da autorização de persistência do "
+                                "fechamento (segundos)",
+                                min_value=300,
+                                max_value=1800,
+                                value=600,
+                                step=300,
+                                key="aion_global_durable_closure_ttl",
+                            )
+                        )
+
+                        if st.button(
+                            "🧾 Gerar plano de persistência do fechamento",
+                            key="aion_global_durable_closure_plan",
+                            disabled=not bool(
+                                durable_human_ready
+                                and durable_flag_ready
+                                and prepare_durable_closure_plan is not None
+                            ),
+                            width="stretch",
+                        ):
+                            try:
+                                durable_plan_result = (
+                                    prepare_durable_closure_plan(
+                                        access,
+                                        durable_human_record,
+                                        runtime_result,
+                                        durable_flag_evidence,
+                                        ttl_seconds=durable_ttl,
+                                    )
+                                )
+                                if (
+                                    durable_plan_result.get("status")
+                                    == "DURABLE_CLOSURE_PLAN_READY"
+                                ):
+                                    st.session_state[
+                                        _AION_GLOBAL_DURABLE_CLOSURE_PLAN_KEY
+                                    ] = durable_plan_result.get("plan")
+                                    st.session_state.pop(
+                                        _AION_GLOBAL_DURABLE_CLOSURE_APPROVAL_KEY,
+                                        None,
+                                    )
+                                    st.success(
+                                        "Plano criado somente na sessão. "
+                                        "Nenhuma escrita foi executada."
+                                    )
+                                elif (
+                                    durable_plan_result.get("status")
+                                    == "ALREADY_PERSISTED"
+                                ):
+                                    st.info(
+                                        "Este registro humano já está persistido "
+                                        "com o mesmo digest."
+                                    )
+                                else:
+                                    st.warning(
+                                        "Plano bloqueado: "
+                                        + str(
+                                            durable_plan_result.get("reason")
+                                            or durable_plan_result.get("status")
+                                            or "UNKNOWN"
+                                        )
+                                    )
+                            except Exception as exc:
+                                st.error(
+                                    "Plano bloqueado em modo seguro: "
+                                    + type(exc).__name__
+                                    + "."
+                                )
+
+                        durable_plan = st.session_state.get(
+                            _AION_GLOBAL_DURABLE_CLOSURE_PLAN_KEY
+                        )
+                        if isinstance(durable_plan, Mapping):
+                            st.caption(
+                                "Durable closure plan: "
+                                + str(
+                                    durable_plan.get("plan_digest") or ""
+                                )[:24]
+                                + "… · runtime SHA "
+                                + str(
+                                    durable_plan.get("source_runtime_sha") or ""
+                                )[:12]
+                                + "… · flag vinculada "
+                                + str(
+                                    durable_plan.get("feature_flag_state")
+                                    or "UNKNOWN"
+                                )
+                                + "."
+                            )
+                            durable_phrase = st.text_input(
+                                'Digite exatamente "PERSISTIR FECHAMENTO INCIDENTE WORKER GLOBAL"',
+                                value="",
+                                key="aion_global_durable_closure_phrase",
+                            )
+                            durable_confirm = st.checkbox(
+                                "Confirmo que revisei o closure record, runtime "
+                                "SHA, estado do Worker, feature flag e rollback.",
+                                value=False,
+                                key="aion_global_durable_closure_confirm",
+                            )
+                            if st.button(
+                                "✅ Criar autorização de persistência do fechamento",
+                                key="aion_global_durable_closure_approve",
+                                disabled=not bool(
+                                    durable_confirm
+                                    and approve_durable_closure_plan is not None
+                                ),
+                                width="stretch",
+                            ):
+                                try:
+                                    durable_approved = (
+                                        approve_durable_closure_plan(
+                                            access,
+                                            durable_plan,
+                                            confirmation=True,
+                                            confirmation_phrase=durable_phrase,
+                                        )
+                                    )
+                                    if (
+                                        durable_approved.get("status")
+                                        == "APPROVED_FOR_DURABLE_CLOSURE_PERSISTENCE"
+                                    ):
+                                        st.session_state[
+                                            _AION_GLOBAL_DURABLE_CLOSURE_APPROVAL_KEY
+                                        ] = durable_approved.get("approval")
+                                        st.success(
+                                            "Autorização curta criada na sessão. "
+                                            "Ainda nenhuma escrita foi executada."
+                                        )
+                                    else:
+                                        st.warning(
+                                            "Autorização bloqueada: "
+                                            + str(
+                                                durable_approved.get("reason")
+                                                or durable_approved.get("status")
+                                                or "UNKNOWN"
+                                            )
+                                        )
+                                except Exception as exc:
+                                    st.error(
+                                        "Autorização bloqueada: "
+                                        + type(exc).__name__
+                                        + "."
+                                    )
+
+                        durable_approval = st.session_state.get(
+                            _AION_GLOBAL_DURABLE_CLOSURE_APPROVAL_KEY
+                        )
+                        durable_approval_valid = False
+                        if (
+                            isinstance(durable_approval, Mapping)
+                            and isinstance(durable_human_record, Mapping)
+                            and validate_durable_closure_approval is not None
+                        ):
+                            try:
+                                durable_approval_check = (
+                                    validate_durable_closure_approval(
+                                        access,
+                                        durable_human_record,
+                                        runtime_result,
+                                        durable_approval,
+                                    )
+                                )
+                                durable_approval_valid = (
+                                    durable_approval_check.get("state")
+                                    == "APPROVED"
+                                )
+                            except Exception:
+                                durable_approval_valid = False
+
+                        durable_final_confirm = st.checkbox(
+                            "SEGUNDA CONFIRMAÇÃO: autorizo agora somente a "
+                            "persistência real do registro humano de fechamento. "
+                            "A feature flag e o estado do Worker devem permanecer "
+                            "inalterados.",
+                            value=False,
+                            key="aion_global_durable_closure_final_confirm",
+                        )
+                        if st.button(
+                            "🚨 Persistir registro humano de fechamento",
+                            key="aion_global_durable_closure_execute",
+                            disabled=not bool(
+                                durable_approval_valid
+                                and durable_final_confirm
+                                and persist_human_incident_closure_record
+                                is not None
+                                and not conflict
+                            ),
+                            width="stretch",
+                        ):
+                            decision = guardian_decision(
+                                "save_checkpoint",
+                                access,
+                                approved=True,
+                                feature_flags=flags,
+                            )
+                            if not decision["allowed"]:
+                                st.error(decision["reason"])
+                            else:
+                                try:
+                                    durable_result = (
+                                        persist_human_incident_closure_record(
+                                            access,
+                                            durable_human_record,
+                                            runtime_result,
+                                            durable_approval,
+                                            cfg,
+                                            confirmation=True,
+                                        )
+                                    )
+                                    st.session_state[
+                                        _AION_GLOBAL_DURABLE_CLOSURE_RESULT_KEY
+                                    ] = durable_result
+                                    if (
+                                        durable_result.get("status")
+                                        == "CONFIRMED"
+                                        and durable_result.get("saved")
+                                        and durable_result.get("verified")
+                                    ):
+                                        saved_checkpoint = (
+                                            ensure_operating_checkpoint(
+                                                durable_result.get("checkpoint")
+                                            )
+                                        )
+                                        saved_checkpoint["operating"][
+                                            "dirty"
+                                        ] = False
+                                        _set_working_checkpoint(
+                                            saved_checkpoint,
+                                            dirty=False,
+                                        )
+                                        st.session_state[
+                                            _WORKING_SOURCE_KEY
+                                        ] = checkpoint_source_digest(
+                                            saved_checkpoint
+                                        )
+                                        for key in (
+                                            _AION_GLOBAL_DURABLE_CLOSURE_FLAG_EVIDENCE_KEY,
+                                            _AION_GLOBAL_DURABLE_CLOSURE_PLAN_KEY,
+                                            _AION_GLOBAL_DURABLE_CLOSURE_APPROVAL_KEY,
+                                        ):
+                                            st.session_state.pop(key, None)
+                                        st.success(
+                                            "Registro humano de fechamento "
+                                            "persistido, relido e confirmado. "
+                                            "Feature flag e Worker permaneceram "
+                                            "separados."
+                                        )
+                                        st.rerun()
+                                    elif (
+                                        durable_result.get("status")
+                                        == "ROLLED_BACK"
+                                    ):
+                                        st.error(
+                                            "A persistência foi revertida "
+                                            "automaticamente porque uma invariante "
+                                            "pós-escrita mudou."
+                                        )
+                                        rollback_source = (
+                                            runtime_result.get("checkpoint")
+                                            if isinstance(
+                                                runtime_result.get(
+                                                    "checkpoint"
+                                                ),
+                                                Mapping,
+                                            )
+                                            else {}
+                                        )
+                                        restored = ensure_operating_checkpoint(
+                                            rollback_source
+                                        )
+                                        restored["operating"]["dirty"] = False
+                                        _set_working_checkpoint(
+                                            restored,
+                                            dirty=False,
+                                        )
+                                        st.session_state[
+                                            _WORKING_SOURCE_KEY
+                                        ] = checkpoint_source_digest(restored)
+                                        st.rerun()
+                                    else:
+                                        st.error(
+                                            "Persistência do fechamento não foi "
+                                            "concluída. Estado: "
+                                            + str(
+                                                durable_result.get("status")
+                                                or "UNKNOWN"
+                                            )
+                                            + " · motivo: "
+                                            + str(
+                                                durable_result.get("reason")
+                                                or "não informado"
+                                            )
+                                            + "."
+                                        )
+                                except Exception as exc:
+                                    st.error(
+                                        "Persistência do fechamento falhou em "
+                                        "modo seguro: "
+                                        + type(exc).__name__
+                                        + "."
+                                    )
+
+                        durable_result = st.session_state.get(
+                            _AION_GLOBAL_DURABLE_CLOSURE_RESULT_KEY
+                        )
+                        if isinstance(durable_result, Mapping):
+                            st.caption(
+                                "Persistência durável: "
+                                + str(
+                                    durable_result.get("status") or "UNKNOWN"
+                                )
+                                + " · registro compartilhado persistido: "
+                                + (
+                                    "SIM"
+                                    if durable_result.get(
+                                        "shared_closure_record_persisted"
+                                    )
+                                    else "NÃO"
+                                )
+                                + " · Incident Center alterado: NÃO"
+                                + " · feature flag alterada: NÃO"
+                                + " · Worker alterado: NÃO"
+                                + " · reativação autorizada: NÃO"
+                                + " · trading real: NÃO."
+                            )
 
         with st.expander("🛑 Desativação de segurança da feature flag"):
             st.caption(
