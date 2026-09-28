@@ -859,13 +859,22 @@ def _render_central_navigation_controls(st, access: Mapping[str, Any] | None, re
     targets = [("central", "Central Principal")] + [
         (str(area["id"]), str(area["label"])) for area in model["areas"]
     ]
-    st.caption("Navegação interna · mesma sessão autenticada")
+    st.markdown("#### Acessos da Central")
+    st.caption(
+        "Use estes botões para abrir um setor na mesma sessão autenticada. "
+        "Os cartões acima são um mapa visual; a navegação real acontece aqui."
+    )
     columns = st.columns(2)
     for index, (area_id, label) in enumerate(targets):
         disabled = (current == CENTRAL_ROOT and area_id == "central") or current == area_id
+        action_label = (
+            "Central Principal"
+            if area_id == "central"
+            else "Abrir " + label
+        )
         with columns[index % 2]:
             if st.button(
-                label,
+                action_label,
                 key=f"aq_central_stateful_{area_id}",
                 width="stretch",
                 disabled=disabled,
