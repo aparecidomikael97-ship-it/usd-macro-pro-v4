@@ -34,6 +34,7 @@ REQUIRED_CAPABILITIES = (
     "shared_across_instances",
     "atomic_compare_and_swap",
     "monotonic_versions",
+    "atomic_monotonic_fencing_token",
     "ttl_expiry",
     "atomic_delete",
     "durable_outside_browser",
@@ -73,6 +74,14 @@ class SharedCoordinationAdapter(Protocol):
         key: str,
         *,
         expected_version: int,
+    ) -> Mapping[str, Any]:
+        ...
+
+    def next_fencing_token(
+        self,
+        key: str,
+        *,
+        ttl_seconds: int | None,
     ) -> Mapping[str, Any]:
         ...
 
@@ -232,6 +241,29 @@ def _delete(
     }
 
 
+def _next_fencing_token(
+    adapter: SharedCoordinationAdapter,
+    key: str,
+    *,
+    ttl_seconds: int | None,
+) -> int:
+    if ttl_seconds is not None:
+        _exact_int(
+            ttl_seconds,
+            minimum=1,
+            maximum=MAX_LEASE_SECONDS,
+            name="fencing ttl",
+        )
+    raw = dict(adapter.next_fencing_token(
+        key,
+        ttl_seconds=ttl_seconds,
+    ) or {})
+    token = raw.get("token")
+    if type(token) is not int or token < 1:
+        raise ValueError("invalid fencing token")
+    return token
+
+
 def probe_integrity(receipt: Mapping[str, Any] | None) -> dict[str, str]:
     if not isinstance(receipt, Mapping):
         return {"state": "ABSENT", "stored": "", "expected": ""}
@@ -288,6 +320,7 @@ def validate_probe(
         "live_cas",
         "read_after_cas",
         "version_monotonic",
+        "fencing_token_monotonic",
         "cleanup",
     )
     if str(raw.get("status") or "") != "PASS" or not all(
@@ -359,14 +392,13 @@ def run_coordination_probe(
         }
 
     current = _now(now)
-    key = (
-        "atlasquant/aion/probe/"
-        + digest({
-            "scope": context.key,
-            "adapter": descriptor["identity"],
-            "nonce": secrets.token_urlsafe(18),
-        })[:32]
-    )
+    probe_suffix = digest({
+        "scope": context.key,
+        "adapter": descriptor["identity"],
+        "nonce": secrets.token_urlsafe(18),
+    })[:32]
+    key = "atlasquant/aion/probe/" + probe_suffix
+    fence_key = "atlasquant/aion/probe-fence/" + probe_suffix
     external_write = False
     first_version = None
     second_version = None
@@ -377,6 +409,7 @@ def run_coordination_probe(
         "live_cas": False,
         "read_after_cas": False,
         "version_monotonic": False,
+        "fencing_token_monotonic": False,
         "cleanup": False,
     }
     failure = ""
@@ -441,6 +474,17 @@ def run_coordination_probe(
             and int(reread["value"].get("phase") or 0) == 2
         )
         tests["version_monotonic"] = bool(second_version > first_version)
+        first_fence = _next_fencing_token(
+            adapter,
+            fence_key,
+            ttl_seconds=PROBE_TTL_SECONDS,
+        )
+        second_fence = _next_fencing_token(
+            adapter,
+            fence_key,
+            ttl_seconds=PROBE_TTL_SECONDS,
+        )
+        tests["fencing_token_monotonic"] = bool(second_fence > first_fence)
         deleted = _delete(
             adapter,
             key,
@@ -450,6 +494,7 @@ def run_coordination_probe(
         if not all((
             tests["read_after_cas"],
             tests["version_monotonic"],
+            tests["fencing_token_monotonic"],
             tests["cleanup"],
         )):
             raise RuntimeError("PROBE_SEMANTICS_FAILED")
@@ -482,6 +527,7 @@ def run_coordination_probe(
         tests["live_cas"],
         tests["read_after_cas"],
         tests["version_monotonic"],
+        tests["fencing_token_monotonic"],
         tests["cleanup"],
     ))
     receipt = {
@@ -781,18 +827,24 @@ class SharedLeaseManager:
                 "expires_at": expires.isoformat(),
                 "fencing_token": int(prior.get("fencing_token") or 0),
             }
-        previous_fence = int(prior.get("fencing_token") or 0)
-        next_fence = previous_fence + (
-            0
-            if row["exists"]
+        same_live_owner = bool(
+            row["exists"]
             and expires is not None
             and expires > current
             and str(prior.get("owner") or "") == owner_clean
-            else 1
+        )
+        next_fence = (
+            int(prior.get("fencing_token") or 0)
+            if same_live_owner
+            else _next_fencing_token(
+                self.adapter,
+                self._key("fencing-counter"),
+                ttl_seconds=None,
+            )
         )
         lease_token = (
             str(prior.get("lease_token") or "")
-            if next_fence == previous_fence and previous_fence > 0
+            if same_live_owner and str(prior.get("lease_token") or "")
             else secrets.token_urlsafe(24)
         )
         value = {
