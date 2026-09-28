@@ -792,6 +792,20 @@ def _render_workspace_overview(
         '<div class="aion-workspace-grid">' + "".join(cards) + "</div>",
         unsafe_allow_html=True,
     )
+    st.caption(
+        "Abrir área · navegação stateful na mesma sessão ADMIN; nenhum card executa "
+        "ação externa por conta própria."
+    )
+    buttons = st.columns(3)
+    for index, workspace in enumerate(AION_WORKSPACES):
+        with buttons[index % 3]:
+            if st.button(
+                "Abrir " + workspace,
+                key=f"aion_workspace_overview_open_{index}",
+                width="stretch",
+            ):
+                st.session_state[_AION_WORKSPACE_JUMP_KEY] = workspace
+                st.rerun()
 
 
 
@@ -1727,6 +1741,49 @@ def _render_learning_pulse(checkpoint: Mapping[str, Any]) -> None:
     )
 
 
+def _render_master_status_summary(board: Mapping[str, Any]) -> None:
+    """Compact Master Panel that remains visible in Essential mode."""
+    counts = board.get("counts") if isinstance(board.get("counts"), Mapping) else {}
+    attention = (
+        list(board.get("attention") or [])
+        if isinstance(board.get("attention"), list)
+        else []
+    )
+    st.markdown("#### Painel Mestre · resumo essencial")
+    st.caption(
+        "Estado mestre sempre visível. O modo Completo acrescenta a tabela técnica "
+        "sem esconder este resumo."
+    )
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("Confirmados", int(counts.get("CONFIRMED") or 0))
+    c2.metric("Bloqueados", int(counts.get("BLOCKED") or 0))
+    c3.metric(
+        "Dependência externa",
+        int(counts.get("EXTERNAL_DEPENDENCY") or 0),
+    )
+    c4.metric("Desconhecidos", int(counts.get("UNKNOWN") or 0))
+    if attention:
+        st.warning(
+            f"{len(attention)} item(ns) do Painel Mestre exigem atenção. "
+            "Os primeiros itens aparecem abaixo."
+        )
+        for item in attention[:3]:
+            if not isinstance(item, Mapping):
+                continue
+            st.markdown(
+                "- **"
+                + str(item.get("state") or "UNKNOWN")
+                + " · "
+                + str(item.get("label") or item.get("id") or "Item")
+                + "** — "
+                + str(item.get("detail") or "")
+            )
+    else:
+        st.success(
+            "Nenhuma pendência do Painel Mestre foi registrada nesta execução."
+        )
+
+
 def _render_master_status(board: Mapping[str, Any]) -> None:
     counts = board.get("counts") if isinstance(board.get("counts"), Mapping) else {}
     st.markdown("#### Painel Mestre de Estado")
@@ -2087,6 +2144,7 @@ def _render_central(
             "Completo mostra todos os painéis técnicos."
         ),
     )
+    _render_master_status_summary(status_board)
     _render_executive_pulse(executive_snapshot)
     _render_commander_intelligence(checkpoint, system_context, executive_snapshot)
     _render_live_event_intelligence(checkpoint, system_context, allow_memory_sync=True)
