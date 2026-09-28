@@ -6,15 +6,14 @@ it never grants anything the Guardian denies.
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from typing import Any, Mapping
 
+from atlasquant_aion_clock import greeting_period
 from atlasquant_aion_core import guardian_decision, is_admin
 from atlasquant_aion_ecosystem import persona_capability_map, persona_catalog
 
 SCHEMA = "ATLASQUANT_AION_WORKSPACES_V1"
-
-BRT = timezone(timedelta(hours=-3), "BRT")
 
 # Projected from the canonical ecosystem registry. Public keys stay id, title,
 # workspace, domain, purpose and actions.
@@ -125,20 +124,22 @@ def capability_snapshot(
     }
 
 
-def greeting_for(now: datetime | None = None) -> str:
-    moment = (now or datetime.now(timezone.utc)).astimezone(BRT)
-    if 5 <= moment.hour < 12:
-        return "Bom dia"
-    if 12 <= moment.hour < 18:
-        return "Boa tarde"
-    return "Boa noite"
+def greeting_for(now: datetime | None = None, *, timezone_name: str | None = None) -> str:
+    """Same period as the Central Principal. The hour rule lives in one clock."""
+    return greeting_period(now, timezone_name=timezone_name)
 
 
-def admin_greeting(access: Mapping[str, Any] | None, display_name: object, now: datetime | None = None) -> str:
+def admin_greeting(
+    access: Mapping[str, Any] | None,
+    display_name: object,
+    now: datetime | None = None,
+    *,
+    timezone_name: str | None = None,
+) -> str:
     if not is_admin(access):
         return ""
     name = str(display_name or "").strip()[:64] or "Administrador"
-    return f"{greeting_for(now)}, {name}."
+    return f"{greeting_for(now, timezone_name=timezone_name)}, {name}."
 
 
 def _count(snapshot: Mapping[str, Any], key: str) -> int | None:
@@ -226,7 +227,6 @@ def developer_step_allowed(level: object, *, human_approved: bool = False) -> bo
 
 __all__ = [
     "AION_PERSONAS",
-    "BRT",
     "DEVELOPER_FORBIDDEN",
     "DEVELOPER_ROLLBACK_STEPS",
     "DEVELOPER_TRUST_LEVELS",

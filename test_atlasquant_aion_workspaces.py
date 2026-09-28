@@ -1,7 +1,11 @@
+import os
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
+from atlasquant_aion_clock import greeting_period
 from atlasquant_aion_workspaces import (
     AION_PERSONAS,
     NEVER_FROM_WORKSPACE,
@@ -99,11 +103,38 @@ class AuthorizationTests(unittest.TestCase):
 
 
 class GreetingTests(unittest.TestCase):
-    def test_greeting_uses_brasilia_time(self):
-        self.assertEqual(greeting_for(datetime(2026, 9, 27, 11, 0, tzinfo=timezone.utc)), "Bom dia")
-        self.assertEqual(greeting_for(datetime(2026, 9, 27, 17, 0, tzinfo=timezone.utc)), "Boa tarde")
-        self.assertEqual(greeting_for(datetime(2026, 9, 27, 23, 30, tzinfo=timezone.utc)), "Boa noite")
-        self.assertEqual(greeting_for(datetime(2026, 9, 27, 4, 0, tzinfo=timezone.utc)), "Boa noite")
+    def test_workspace_and_central_share_one_clock(self):
+        cuiaba = ZoneInfo("America/Cuiaba")
+        samples = (
+            (datetime(2026, 9, 27, 11, 59, tzinfo=cuiaba), "Bom dia"),
+            (datetime(2026, 9, 27, 12, 0, tzinfo=cuiaba), "Boa tarde"),
+            (datetime(2026, 9, 27, 17, 59, tzinfo=cuiaba), "Boa tarde"),
+            (datetime(2026, 9, 27, 18, 0, tzinfo=cuiaba), "Boa noite"),
+            (datetime(2026, 9, 27, 11, 0, tzinfo=timezone.utc), "Bom dia"),
+            (datetime(2026, 9, 27, 17, 0, tzinfo=timezone.utc), "Boa tarde"),
+            (datetime(2026, 9, 27, 23, 30, tzinfo=timezone.utc), "Boa noite"),
+            (datetime(2026, 9, 27, 4, 0, tzinfo=timezone.utc), "Boa noite"),
+            (datetime(2026, 9, 27, 18, 0), "Boa noite"),
+        )
+        for moment, expected in samples:
+            with self.subTest(moment=moment.isoformat()):
+                self.assertEqual(greeting_for(moment, timezone_name="America/Cuiaba"), expected)
+                self.assertEqual(greeting_period(moment, timezone_name="America/Cuiaba"), expected)
+                self.assertEqual(
+                    greeting_for(moment, timezone_name="America/Cuiaba"),
+                    greeting_period(moment, timezone_name="America/Cuiaba"),
+                )
+        split = datetime(2026, 6, 15, 15, 30, tzinfo=timezone.utc)
+        self.assertEqual(greeting_for(split, timezone_name="Not/AZone"), "Bom dia")
+        self.assertEqual(greeting_period(split, timezone_name="Not/AZone"), "Bom dia")
+        with patch.dict(os.environ, {"ATLASQUANT_TIMEZONE": "Invalid/Zone"}):
+            self.assertEqual(greeting_for(split), greeting_period(split))
+            self.assertEqual(greeting_for(split), "Bom dia")
+        source = Path("atlasquant_aion_workspaces.py").read_text(encoding="utf-8")
+        self.assertNotIn("timedelta(hours=-3)", source)
+        self.assertIn("return greeting_period(now, timezone_name=timezone_name)", source)
+        self.assertNotIn("real_orders_enabled = True", source)
+        self.assertNotIn("save_checkpoint", source)
 
     def test_greeting_is_admin_only(self):
         now = datetime(2026, 9, 27, 12, 0, tzinfo=timezone.utc)

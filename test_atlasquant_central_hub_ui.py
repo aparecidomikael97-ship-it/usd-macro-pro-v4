@@ -394,8 +394,11 @@ class LoginGreetingTests(unittest.TestCase):
         self.assertEqual(aion_login_presence_html(user, now=wall(11, 59), timezone_name="America/Cuiaba"), "")
         admin = self._admin()
         self.assertIn("Mikael, bom dia. AION ativo.", aion_login_presence_html(admin, now=wall(11, 59), timezone_name="America/Cuiaba"))
-        source = Path("atlasquant_central_hub_ui.py").read_text(encoding="utf-8")
-        period = source[source.index("def greeting_period"):source.index("def confirmed_status_line")]
+        hub = Path("atlasquant_central_hub_ui.py").read_text(encoding="utf-8")
+        self.assertIn("from atlasquant_aion_clock import (", hub)
+        self.assertNotIn("if 5 <= moment.hour", hub)
+        clock = Path("atlasquant_aion_clock.py").read_text(encoding="utf-8")
+        period = clock[clock.index("def greeting_period"):]
         self.assertNotIn("greeting_for", period)
         self.assertIsNone(re.search(r"datetime\.now\(\s*\)", period))
         self.assertIn("datetime.now(timezone.utc)", period)

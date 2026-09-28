@@ -6,12 +6,15 @@ or a second admin source, and it does not execute anything.
 """
 from __future__ import annotations
 
-import os
-from datetime import datetime, timezone
+from datetime import datetime
 from html import escape
 from typing import Any, Mapping
-from zoneinfo import ZoneInfo
 
+from atlasquant_aion_clock import (
+    DEFAULT_TIMEZONE,
+    application_timezone,
+    greeting_period,
+)
 from atlasquant_navigation_bridge import (
     request_return_to_aion,
     request_surface_revalidation,
@@ -22,7 +25,6 @@ _AREA_ORDER = ("aion", "negocios", "trader", "investimentos")
 CENTRAL_ROOT = "central_root"
 CENTRAL_CHOICE_KEY = "atlasquant_central_choice"
 LOGIN_GREETING_KEY = "aion_login_greeting_shown"
-DEFAULT_TIMEZONE = "America/Cuiaba"
 _ROOT_TOKENS = {"central", "central root", "ecosystem root", "central principal"}
 
 _AREAS = {
@@ -485,43 +487,6 @@ def _login_mark(access: Mapping[str, Any]) -> str:
     user = str(session.get("username") or access.get("username") or "").strip()
     issued = session.get("authenticated_at", access.get("authenticated_at", ""))
     return f"{user}|{issued}"
-
-
-def application_timezone(configured: str | None = None) -> ZoneInfo:
-    """Configured application zone. An invalid name falls back to Cuiabá.
-
-    The server clock is not consulted. An empty value uses ATLASQUANT_TIMEZONE,
-    then America/Cuiaba.
-    """
-    if configured is None:
-        configured = os.environ.get("ATLASQUANT_TIMEZONE", DEFAULT_TIMEZONE)
-    name = " ".join(str(configured or "").split()) or DEFAULT_TIMEZONE
-    for candidate in (name, DEFAULT_TIMEZONE):
-        try:
-            return ZoneInfo(candidate)
-        except Exception:
-            continue
-    return ZoneInfo("UTC")
-
-
-def greeting_period(now: datetime | None = None, *, timezone_name: str | None = None) -> str:
-    """Bom dia 05:00–11:59, boa tarde 12:00–17:59, boa noite otherwise.
-
-    Aware values are converted into the configured zone. Naive values are read
-    as wall time in that zone, never as the Render server zone.
-    """
-    zone = application_timezone(timezone_name)
-    if now is None:
-        moment = datetime.now(timezone.utc).astimezone(zone)
-    elif now.tzinfo is None:
-        moment = now.replace(tzinfo=zone)
-    else:
-        moment = now.astimezone(zone)
-    if 5 <= moment.hour < 12:
-        return "Bom dia"
-    if 12 <= moment.hour < 18:
-        return "Boa tarde"
-    return "Boa noite"
 
 
 def confirmed_status_line(status: Mapping[str, Any] | None) -> str:
