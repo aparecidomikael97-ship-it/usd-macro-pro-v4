@@ -445,17 +445,25 @@ except Exception:
 
 
 def _central_query_value() -> str:
+    """Read the central deep-link once, then remove it from the URL state."""
     try:
         requested = st.query_params.get("central", "")
     except Exception:
         return ""
     if isinstance(requested, (list, tuple)):
         requested = requested[0] if requested else ""
-    return str(requested or "").strip()
+    token = str(requested or "").strip()
+    if not token:
+        return ""
+    try:
+        del st.query_params["central"]
+    except Exception:
+        pass
+    return token
 
 
 def _central_request_for_render(*, active_index=None) -> str:
-    """Query wins. A stored choice is revalidated and never promotes a role."""
+    """Consume a deep-link once; validated session state owns later reruns."""
     requested = _central_query_value()
     if active_index == 21 and not requested:
         requested = "aion"
@@ -510,13 +518,11 @@ def _render_atlasquant_central_hub(*, active_index=None, stop_for_shell=False):
 
 
 def _apply_central_trader_navigation():
-    """Leave AION for the existing Radar page when the rail asks for Trader."""
+    """Consume Central intent and hand Trader to the existing stateful bridge."""
     if request_central_destination is None:
         return None
     try:
-        requested = st.query_params.get("central", "")
-        if isinstance(requested, (list, tuple)):
-            requested = requested[0] if requested else ""
+        requested = _central_request_for_render()
         if str(requested or "").strip().casefold() != "trader":
             return None
         return request_central_destination(st.session_state, _ATLASQUANT_ACCESS, "trader")
