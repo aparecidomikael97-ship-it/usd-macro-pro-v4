@@ -153,6 +153,8 @@ def read_repository_feature_flag(
             "state": state,
             "safe_for_arming_persistence": state in SAFE_FLAG_STATES,
             "variable_present": found is not None,
+            "created_at": str((found or {}).get("created_at") or ""),
+            "updated_at": str((found or {}).get("updated_at") or ""),
             "checked_at": utc(_now()).isoformat(),
             "raw_value_exposed": False,
             "reason": "",
