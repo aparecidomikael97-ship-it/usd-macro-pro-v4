@@ -1,13 +1,13 @@
 {
   "version": "V11.0_INSTITUTIONAL_AUTOPILOT",
   "cursor": 2,
-  "last_batch_ts": 1790610686.8524585,
+  "last_batch_ts": 1790612824.04373,
   "contexts": {
     "USD/CHF": {
       "pair": "USD/CHF",
-      "updated_at": "2026-09-28T15:25:13.789123+00:00",
-      "candle_m15": "2026-09-28T15:00:00+00:00",
-      "price": 0.83219,
+      "updated_at": "2026-09-28T16:25:56.239498+00:00",
+      "candle_m15": "2026-09-28T16:00:00+00:00",
+      "price": 0.83208,
       "macro_direction": "🟢 COMPRA USD/CHF",
       "macro_score": 89.0,
       "quality": 91.0,
@@ -470,10 +470,10 @@
       },
       "premium_discount": {
         "zone": "ACIMA DO RANGE",
-        "position": 120.80419580419526,
+        "position": 119.84265734265729,
         "equilibrium": 0.82409,
         "inside_range": false,
-        "expansion_pct": 20.80419580419526
+        "expansion_pct": 19.84265734265729
       },
       "bsl": null,
       "ssl": [
@@ -482,12 +482,8 @@
       ],
       "latest_sweep": null,
       "killzone": {
-        "now_ny": "2026-09-28 11:26:19.566992-04:00",
-        "active": {
-          "name": "London Close",
-          "start": "2026-09-28 10:00:00-04:00",
-          "end": "2026-09-28 12:00:00-04:00"
-        },
+        "now_ny": "2026-09-28 12:27:03.391304-04:00",
+        "active": null,
         "next": {
           "name": "New York PM",
           "start": "2026-09-28 13:30:00-04:00",
@@ -611,7 +607,7 @@
         "quality": 91.0
       },
       "readiness": {
-        "score": 72.0,
+        "score": 65.0,
         "grade": "B",
         "action": "🟡 AGUARDAR MELHOR TIMING / CONFIRMAÇÃO",
         "checks": [
@@ -659,9 +655,9 @@
           },
           {
             "name": "Killzone ativa",
-            "ok": true,
+            "ok": false,
             "weight": 7.0,
-            "detail": "Ativa"
+            "detail": "Fora da janela"
           },
           {
             "name": "Risco de evento",
@@ -673,7 +669,7 @@
         "hard_conflict": false
       },
       "readiness_grade": "B",
-      "readiness_score": 72.0,
+      "readiness_score": 65.0,
       "event_risk": "ATENÇÃO",
       "adr": {
         "available": true,
@@ -686,7 +682,7 @@
       "adr_used_pct": 89.83114446529314,
       "intraday_opens": {
         "available": true,
-        "current": 0.83219,
+        "current": 0.83208,
         "day_open": 0.82953,
         "week_open": 0.82953,
         "above_day_open": true,
@@ -696,9 +692,9 @@
     },
     "NZD/USD": {
       "pair": "NZD/USD",
-      "updated_at": "2026-09-28T15:25:10.196554+00:00",
-      "candle_m15": "2026-09-28T15:00:00+00:00",
-      "price": 0.56641,
+      "updated_at": "2026-09-28T16:25:53.282201+00:00",
+      "candle_m15": "2026-09-28T16:00:00+00:00",
+      "price": 0.56656,
       "macro_direction": "🔴 VENDA NZD/USD",
       "macro_score": 84.0,
       "quality": 91.0,
@@ -1133,7 +1129,7 @@
       },
       "premium_discount": {
         "zone": "DESCONTO",
-        "position": 12.912087912088069,
+        "position": 14.285714285714285,
         "equilibrium": 0.57046,
         "inside_range": true,
         "expansion_pct": 0.0
@@ -1158,12 +1154,8 @@
         "rejection": "fechou de volta abaixo do nível"
       },
       "killzone": {
-        "now_ny": "2026-09-28 11:26:18.974415-04:00",
-        "active": {
-          "name": "London Close",
-          "start": "2026-09-28 10:00:00-04:00",
-          "end": "2026-09-28 12:00:00-04:00"
-        },
+        "now_ny": "2026-09-28 12:27:02.739223-04:00",
+        "active": null,
         "next": {
           "name": "New York PM",
           "start": "2026-09-28 13:30:00-04:00",
@@ -1287,9 +1279,9 @@
         "quality": 91.0
       },
       "readiness": {
-        "score": 65.0,
-        "grade": "B",
-        "action": "🟡 AGUARDAR MELHOR TIMING / CONFIRMAÇÃO",
+        "score": 58.0,
+        "grade": "WAIT",
+        "action": "🔴 NÃO FORÇAR ENTRADA",
         "checks": [
           {
             "name": "Macro forte",
@@ -1335,9 +1327,9 @@
           },
           {
             "name": "Killzone ativa",
-            "ok": true,
+            "ok": false,
             "weight": 7.0,
-            "detail": "Ativa"
+            "detail": "Fora da janela"
           },
           {
             "name": "Risco de evento",
@@ -1348,8 +1340,8 @@
         ],
         "hard_conflict": true
       },
-      "readiness_grade": "B",
-      "readiness_score": 65.0,
+      "readiness_grade": "WAIT",
+      "readiness_score": 58.0,
       "event_risk": "ATENÇÃO",
       "adr": {
         "available": true,
@@ -1362,7 +1354,7 @@
       "adr_used_pct": 49.207443142661255,
       "intraday_opens": {
         "available": true,
-        "current": 0.56641,
+        "current": 0.56656,
         "day_open": 0.56704,
         "week_open": 0.56704,
         "above_day_open": false,
@@ -1372,9 +1364,9 @@
     },
     "USD/JPY": {
       "pair": "USD/JPY",
-      "updated_at": "2026-09-28T15:26:07.111862+00:00",
-      "candle_m15": "2026-09-28T15:00:00+00:00",
-      "price": 157.49782,
+      "updated_at": "2026-09-28T16:26:51.463509+00:00",
+      "candle_m15": "2026-09-28T16:00:00+00:00",
+      "price": 157.35443,
       "macro_direction": "🟢 COMPRA USD/JPY",
       "macro_score": 90.0,
       "quality": 84.0,
@@ -1857,7 +1849,7 @@
       },
       "premium_discount": {
         "zone": "DESCONTO",
-        "position": 38.29373154054116,
+        "position": 32.516046885514626,
         "equilibrium": 157.788345,
         "inside_range": true,
         "expansion_pct": 0.0
@@ -1867,27 +1859,23 @@
         157.85153
       ],
       "ssl": [
-        "Asia Low",
-        157.40541
+        "PDL",
+        157.13555
       ],
       "latest_sweep": {
         "level": "Asia Low",
         "type": "SWEEP SSL",
-        "datetime": "2026-09-28 14:45:00+00:00",
+        "datetime": "2026-09-28 15:45:00+00:00",
         "price": 157.40541,
-        "high": 157.56034,
-        "low": 157.32837,
-        "close": 157.55718,
-        "excess_abs": 0.07703999999998246,
+        "high": 157.46422,
+        "low": 157.40431,
+        "close": 157.44457,
+        "excess_abs": 0.0010999999999796728,
         "rejection": "fechou de volta acima do nível"
       },
       "killzone": {
-        "now_ny": "2026-09-28 11:26:19.248030-04:00",
-        "active": {
-          "name": "London Close",
-          "start": "2026-09-28 10:00:00-04:00",
-          "end": "2026-09-28 12:00:00-04:00"
-        },
+        "now_ny": "2026-09-28 12:27:03.065263-04:00",
+        "active": null,
         "next": {
           "name": "New York PM",
           "start": "2026-09-28 13:30:00-04:00",
@@ -2011,7 +1999,7 @@
         "quality": 84.0
       },
       "readiness": {
-        "score": 69.0,
+        "score": 68.0,
         "grade": "B",
         "action": "🟡 AGUARDAR MELHOR TIMING / CONFIRMAÇÃO",
         "checks": [
@@ -2059,9 +2047,9 @@
           },
           {
             "name": "Killzone ativa",
-            "ok": true,
+            "ok": false,
             "weight": 7.0,
-            "detail": "Ativa"
+            "detail": "Fora da janela"
           },
           {
             "name": "Risco de evento",
@@ -2073,7 +2061,7 @@
         "hard_conflict": true
       },
       "readiness_grade": "B",
-      "readiness_score": 69.0,
+      "readiness_score": 68.0,
       "event_risk": "ATENÇÃO",
       "adr": {
         "available": true,
@@ -2086,7 +2074,7 @@
       "adr_used_pct": 128.6289247645522,
       "intraday_opens": {
         "available": true,
-        "current": 157.49782,
+        "current": 157.35443,
         "day_open": 157.80114,
         "week_open": 157.80114,
         "above_day_open": false,
@@ -2096,9 +2084,9 @@
     },
     "EUR/USD": {
       "pair": "EUR/USD",
-      "updated_at": "2026-09-28T15:25:04.797170+00:00",
-      "candle_m15": "2026-09-28T15:00:00+00:00",
-      "price": 1.13664,
+      "updated_at": "2026-09-28T16:25:49.218227+00:00",
+      "candle_m15": "2026-09-28T16:00:00+00:00",
+      "price": 1.13658,
       "macro_direction": "🔴 VENDA EUR/USD",
       "macro_score": 91.0,
       "quality": 70.0,
@@ -2553,7 +2541,7 @@
       },
       "premium_discount": {
         "zone": "DESCONTO",
-        "position": 4.690831556503936,
+        "position": 4.264392324093339,
         "equilibrium": 1.1430150000000001,
         "inside_range": true,
         "expansion_pct": 0.0
@@ -2578,12 +2566,8 @@
         "rejection": "fechou de volta acima do nível"
       },
       "killzone": {
-        "now_ny": "2026-09-28 11:26:18.154828-04:00",
-        "active": {
-          "name": "London Close",
-          "start": "2026-09-28 10:00:00-04:00",
-          "end": "2026-09-28 12:00:00-04:00"
-        },
+        "now_ny": "2026-09-28 12:27:01.724643-04:00",
+        "active": null,
         "next": {
           "name": "New York PM",
           "start": "2026-09-28 13:30:00-04:00",
@@ -2707,7 +2691,7 @@
         "quality": 70.0
       },
       "readiness": {
-        "score": 57.0,
+        "score": 50.0,
         "grade": "WAIT",
         "action": "🔴 NÃO FORÇAR ENTRADA",
         "checks": [
@@ -2755,9 +2739,9 @@
           },
           {
             "name": "Killzone ativa",
-            "ok": true,
+            "ok": false,
             "weight": 7.0,
-            "detail": "Ativa"
+            "detail": "Fora da janela"
           },
           {
             "name": "Risco de evento",
@@ -2769,7 +2753,7 @@
         "hard_conflict": false
       },
       "readiness_grade": "WAIT",
-      "readiness_score": 57.0,
+      "readiness_score": 50.0,
       "event_risk": "ATENÇÃO",
       "adr": {
         "available": true,
@@ -2782,7 +2766,7 @@
       "adr_used_pct": 87.32534930139542,
       "intraday_opens": {
         "available": true,
-        "current": 1.13664,
+        "current": 1.13658,
         "day_open": 1.13871,
         "week_open": 1.13871,
         "above_day_open": false,
@@ -2792,9 +2776,9 @@
     },
     "USD/CAD": {
       "pair": "USD/CAD",
-      "updated_at": "2026-09-28T15:25:12.050836+00:00",
-      "candle_m15": "2026-09-28T15:00:00+00:00",
-      "price": 1.41686,
+      "updated_at": "2026-09-28T16:25:54.637908+00:00",
+      "candle_m15": "2026-09-28T16:00:00+00:00",
+      "price": 1.41733,
       "macro_direction": "🟢 COMPRA USD/CAD",
       "macro_score": 89.0,
       "quality": 91.0,
@@ -3205,10 +3189,10 @@
       },
       "premium_discount": {
         "zone": "ACIMA DO RANGE",
-        "position": 107.8330474556895,
+        "position": 110.5202973127505,
         "equilibrium": 1.406745,
         "inside_range": false,
-        "expansion_pct": 7.833047455689496
+        "expansion_pct": 10.5202973127505
       },
       "bsl": null,
       "ssl": [
@@ -3227,12 +3211,8 @@
         "rejection": "fechou de volta abaixo do nível"
       },
       "killzone": {
-        "now_ny": "2026-09-28 11:26:19.842331-04:00",
-        "active": {
-          "name": "London Close",
-          "start": "2026-09-28 10:00:00-04:00",
-          "end": "2026-09-28 12:00:00-04:00"
-        },
+        "now_ny": "2026-09-28 12:27:03.718773-04:00",
+        "active": null,
         "next": {
           "name": "New York PM",
           "start": "2026-09-28 13:30:00-04:00",
@@ -3356,7 +3336,7 @@
         "quality": 91.0
       },
       "readiness": {
-        "score": 77.0,
+        "score": 75.0,
         "grade": "B",
         "action": "🟡 AGUARDAR MELHOR TIMING / CONFIRMAÇÃO",
         "checks": [
@@ -3404,9 +3384,9 @@
           },
           {
             "name": "Killzone ativa",
-            "ok": true,
+            "ok": false,
             "weight": 7.0,
-            "detail": "Ativa"
+            "detail": "Fora da janela"
           },
           {
             "name": "Risco de evento",
@@ -3418,7 +3398,7 @@
         "hard_conflict": false
       },
       "readiness_grade": "B",
-      "readiness_score": 77.0,
+      "readiness_score": 75.0,
       "event_risk": "ATENÇÃO",
       "adr": {
         "available": true,
@@ -3431,7 +3411,7 @@
       "adr_used_pct": 65.67962896895932,
       "intraday_opens": {
         "available": true,
-        "current": 1.41686,
+        "current": 1.41733,
         "day_open": 1.41516,
         "week_open": 1.41516,
         "above_day_open": true,
@@ -3441,9 +3421,9 @@
     },
     "GBP/USD": {
       "pair": "GBP/USD",
-      "updated_at": "2026-09-28T15:25:08.422837+00:00",
-      "candle_m15": "2026-09-28T15:00:00+00:00",
-      "price": 1.32515,
+      "updated_at": "2026-09-28T16:25:51.763045+00:00",
+      "candle_m15": "2026-09-28T16:00:00+00:00",
+      "price": 1.32544,
       "macro_direction": "🔴 VENDA GBP/USD",
       "macro_score": 68.0,
       "quality": 70.0,
@@ -3922,7 +3902,7 @@
       },
       "premium_discount": {
         "zone": "DESCONTO",
-        "position": 23.0162641695415,
+        "position": 24.445539674715985,
         "equilibrium": 1.330625,
         "inside_range": true,
         "expansion_pct": 0.0
@@ -3938,21 +3918,17 @@
       "latest_sweep": {
         "level": "PDH",
         "type": "SWEEP BSL",
-        "datetime": "2026-09-28 14:45:00+00:00",
+        "datetime": "2026-09-28 16:00:00+00:00",
         "price": 1.32559,
-        "high": 1.3258,
-        "low": 1.32434,
-        "close": 1.32497,
-        "excess_abs": 0.00021000000000004349,
+        "high": 1.32598,
+        "low": 1.32531,
+        "close": 1.32544,
+        "excess_abs": 0.00038999999999989043,
         "rejection": "fechou de volta abaixo do nível"
       },
       "killzone": {
-        "now_ny": "2026-09-28 11:26:18.427478-04:00",
-        "active": {
-          "name": "London Close",
-          "start": "2026-09-28 10:00:00-04:00",
-          "end": "2026-09-28 12:00:00-04:00"
-        },
+        "now_ny": "2026-09-28 12:27:02.062595-04:00",
+        "active": null,
         "next": {
           "name": "New York PM",
           "start": "2026-09-28 13:30:00-04:00",
@@ -4076,7 +4052,7 @@
         "quality": 70.0
       },
       "readiness": {
-        "score": 35.0,
+        "score": 28.0,
         "grade": "WAIT",
         "action": "🔴 NÃO FORÇAR ENTRADA",
         "checks": [
@@ -4124,9 +4100,9 @@
           },
           {
             "name": "Killzone ativa",
-            "ok": true,
+            "ok": false,
             "weight": 7.0,
-            "detail": "Ativa"
+            "detail": "Fora da janela"
           },
           {
             "name": "Risco de evento",
@@ -4138,7 +4114,7 @@
         "hard_conflict": true
       },
       "readiness_grade": "WAIT",
-      "readiness_score": 35.0,
+      "readiness_score": 28.0,
       "event_risk": "ATENÇÃO",
       "adr": {
         "available": true,
@@ -4151,7 +4127,7 @@
       "adr_used_pct": 76.46017699115251,
       "intraday_opens": {
         "available": true,
-        "current": 1.32515,
+        "current": 1.32544,
         "day_open": 1.32425,
         "week_open": 1.32425,
         "above_day_open": true,
@@ -4161,9 +4137,9 @@
     },
     "AUD/USD": {
       "pair": "AUD/USD",
-      "updated_at": "2026-09-28T15:25:06.682479+00:00",
-      "candle_m15": "2026-09-28T15:00:00+00:00",
-      "price": 0.70193,
+      "updated_at": "2026-09-28T16:25:50.544696+00:00",
+      "candle_m15": "2026-09-28T16:00:00+00:00",
+      "price": 0.70174,
       "macro_direction": "⚪ AGUARDAR",
       "macro_score": 55.0,
       "quality": 91.0,
@@ -4637,7 +4613,7 @@
       },
       "premium_discount": {
         "zone": "DESCONTO",
-        "position": 11.086637298091153,
+        "position": 9.691629955947072,
         "equilibrium": 0.70723,
         "inside_range": true,
         "expansion_pct": 0.0
@@ -4662,12 +4638,8 @@
         "rejection": "fechou de volta abaixo do nível"
       },
       "killzone": {
-        "now_ny": "2026-09-28 11:26:18.700548-04:00",
-        "active": {
-          "name": "London Close",
-          "start": "2026-09-28 10:00:00-04:00",
-          "end": "2026-09-28 12:00:00-04:00"
-        },
+        "now_ny": "2026-09-28 12:27:02.400608-04:00",
+        "active": null,
         "next": {
           "name": "New York PM",
           "start": "2026-09-28 13:30:00-04:00",
@@ -4839,9 +4811,9 @@
           },
           {
             "name": "Killzone ativa",
-            "ok": true,
+            "ok": false,
             "weight": 7.0,
-            "detail": "Ativa"
+            "detail": "Fora da janela"
           },
           {
             "name": "Risco de evento",
@@ -4866,7 +4838,7 @@
       "adr_used_pct": 56.365030674846274,
       "intraday_opens": {
         "available": true,
-        "current": 0.70193,
+        "current": 0.70174,
         "day_open": 0.70255,
         "week_open": 0.70255,
         "above_day_open": false,
@@ -4875,5 +4847,5 @@
       "autopilot_v107": true
     }
   },
-  "autopilot_updated_at": "2026-09-28T15:51:26.852470+00:00"
+  "autopilot_updated_at": "2026-09-28T16:27:04.043732+00:00"
 }
