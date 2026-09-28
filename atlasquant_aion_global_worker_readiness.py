@@ -178,7 +178,6 @@ def protocol_shadow_probe(*, now: datetime) -> dict[str, Any]:
         max_jobs=3,
         lease_seconds=600,
         approval_ttl_seconds=900,
-        readiness_stage="READY_FOR_ADMIN_ARMING",
         now=current,
     )
     approval_result = approve_global_worker_arming_plan(
