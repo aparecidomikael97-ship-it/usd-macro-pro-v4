@@ -515,32 +515,48 @@ def persist_staged_global_arming(
             "save_result": result,
         }
 
+    def _rollback_after_write(reason: str, *, flag_state: str = "UNKNOWN") -> dict[str, Any]:
+        rollback = save_runtime_checkpoint(
+            source_checkpoint,
+            config,
+            approved=True,
+            expected_sha=str(result.get("sha") or ""),
+            timeout=timeout,
+        )
+        rollback_ok = bool(rollback.get("saved") and rollback.get("verified"))
+        return {
+            "schema": SCHEMA,
+            "status": "ROLLED_BACK" if rollback_ok else "CRITICAL_ROLLBACK_FAILED",
+            "saved": False if rollback_ok else True,
+            "verified": rollback_ok,
+            "reason": reason,
+            "feature_flag_state": flag_state,
+            "feature_flag_modified": False,
+            "global_worker_executed": False,
+            "real_trading_enabled": False,
+            "rollback_performed": rollback_ok,
+            "rollback_result": rollback,
+        }
+
     persisted_checkpoint = result.get("checkpoint")
     if not isinstance(persisted_checkpoint, Mapping):
-        return {
-            "schema": SCHEMA,
-            "status": "CRITICAL_UNVERIFIED",
-            "saved": True,
-            "verified": False,
-            "reason": "READ_AFTER_WRITE_CHECKPOINT_MISSING",
-        }
-    persisted_state, persisted_status = load_global_worker_state(persisted_checkpoint)
-    working_state, _ = load_global_worker_state(working_checkpoint)
-    state_matches = bool(
-        persisted_status.get("state") == "CONNECTED"
-        and persisted_state.get("state") == "ARMED"
-        and persisted_state.get("arm_digest") == working_state.get("arm_digest")
-        and persisted_state.get("arming_approval_digest") == working_state.get("arming_approval_digest")
-    )
+        return _rollback_after_write("READ_AFTER_WRITE_CHECKPOINT_MISSING")
+
+    try:
+        persisted_state, persisted_status = load_global_worker_state(persisted_checkpoint)
+        working_state, _ = load_global_worker_state(working_checkpoint)
+        state_matches = bool(
+            persisted_status.get("state") == "CONNECTED"
+            and persisted_state.get("state") == "ARMED"
+            and persisted_state.get("arm_digest") == working_state.get("arm_digest")
+            and persisted_state.get("arming_approval_digest") == working_state.get("arming_approval_digest")
+            and _arming_contract_digest(persisted_checkpoint.get(GLOBAL_WORKER_NAMESPACE))
+                == _arming_contract_digest(working_checkpoint.get(GLOBAL_WORKER_NAMESPACE))
+        )
+    except Exception:
+        state_matches = False
     if not state_matches:
-        return {
-            "schema": SCHEMA,
-            "status": "CRITICAL_UNVERIFIED",
-            "saved": True,
-            "verified": False,
-            "sha": str(result.get("sha") or ""),
-            "reason": "PERSISTED_ARMED_STATE_DID_NOT_MATCH_STAGED_STATE",
-        }
+        return _rollback_after_write("PERSISTED_ARMED_STATE_DID_NOT_MATCH_STAGED_STATE")
 
     post_flag = flag_reader(config, timeout=min(timeout, 10.0))
     if (
@@ -563,27 +579,10 @@ def persist_staged_global_arming(
             "rollback_performed": False,
         }
 
-    rollback = save_runtime_checkpoint(
-        source_checkpoint,
-        config,
-        approved=True,
-        expected_sha=str(result.get("sha") or ""),
-        timeout=timeout,
+    return _rollback_after_write(
+        "FEATURE_FLAG_NOT_PROVEN_DISABLED_AFTER_WRITE",
+        flag_state=str(post_flag.get("state") or "UNKNOWN"),
     )
-    rollback_ok = bool(rollback.get("saved") and rollback.get("verified"))
-    return {
-        "schema": SCHEMA,
-        "status": "ROLLED_BACK" if rollback_ok else "CRITICAL_ROLLBACK_FAILED",
-        "saved": False if rollback_ok else True,
-        "verified": rollback_ok,
-        "reason": "FEATURE_FLAG_NOT_PROVEN_DISABLED_AFTER_WRITE",
-        "feature_flag_state": str(post_flag.get("state") or "UNKNOWN"),
-        "feature_flag_modified": False,
-        "global_worker_executed": False,
-        "real_trading_enabled": False,
-        "rollback_performed": rollback_ok,
-        "rollback_result": rollback,
-    }
 
 
 __all__ = [
