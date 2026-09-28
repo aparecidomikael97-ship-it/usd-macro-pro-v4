@@ -2,8 +2,10 @@ import unittest
 from pathlib import Path
 
 from atlasquant_aion_global_worker_supervision import (
+    append_supervision_history,
     operational_incident,
     supervise_global_worker,
+    supervision_history_summary,
 )
 
 
@@ -219,6 +221,55 @@ class GlobalWorkerOperationalSupervisionTests(unittest.TestCase):
         self.assertIn("Supervisão operacional", source)
         self.assertIn("Safety-stop recomendado", source)
         self.assertIn("Checklist de recuperação do Worker Global", source)
+        self.assertIn("contenção automática: NÃO", source)
+        self.assertIn("alteração automática da feature flag: NÃO", source)
+
+
+    def test_history_is_deduplicated_and_bounded(self):
+        first = supervise_global_worker(
+            _live("LIVE_EVIDENCE_TIMEOUT", reason="timeout", live_confirmed=False),
+            _flag(),
+        )
+        history = append_supervision_history([], first, max_entries=2)
+        history = append_supervision_history(history, first, max_entries=2)
+        self.assertEqual(len(history), 1)
+
+        second = supervise_global_worker(
+            _live("BLOCKED_STALE_LEASE", reason="stale", stale_lease=True),
+            _flag(),
+        )
+        third = supervise_global_worker(
+            _live(
+                "BLOCKED_UNSAFE_RECEIPT",
+                reason="unsafe",
+                unsafe_receipts_after_activation=1,
+                live_confirmed=False,
+            ),
+            _flag(),
+        )
+        history = append_supervision_history(history, second, max_entries=2)
+        history = append_supervision_history(history, third, max_entries=2)
+        self.assertEqual(len(history), 2)
+        self.assertEqual(history[-1]["severity"], "CRITICAL")
+        self.assertFalse(history[-1]["automatic_feature_flag_mutation"])
+
+    def test_history_summary_is_session_only(self):
+        report = supervise_global_worker(
+            _live("BLOCKED_UNSAFE_RECEIPT", reason="unsafe", live_confirmed=False),
+            _flag(),
+        )
+        history = append_supervision_history([], report)
+        summary = supervision_history_summary(history)
+        self.assertEqual(summary["observations"], 1)
+        self.assertEqual(summary["incidents"], 1)
+        self.assertEqual(summary["critical_incidents"], 1)
+        self.assertFalse(summary["persistent"])
+        self.assertFalse(summary["feature_flag_modified"])
+
+    def test_admin_ui_exposes_supervision_history_without_auto_containment(self):
+        source = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Histórico de supervisão do Worker Global", source)
+        self.assertIn("append_supervision_history", source)
         self.assertIn("contenção automática: NÃO", source)
         self.assertIn("alteração automática da feature flag: NÃO", source)
 
