@@ -87,6 +87,7 @@ ATLASQUANT_CSS = r"""
   --aq-good: #42d392;
   --aq-warn: #f2c14e;
   --aq-bad: #ff6b7a;
+  --aq-aion: #b48cff;
 }
 html { scroll-behavior: smooth; }
 .stApp {
