@@ -103,6 +103,11 @@ def current_session()->dict[str,Any]|None:
 
 def clear_session()->None:
     st.session_state.pop(SESSION_KEY,None)
+    try:
+        from atlasquant_central_hub_ui import clear_login_greeting
+        clear_login_greeting(st.session_state)
+    except Exception:
+        st.session_state.pop("aion_login_greeting_shown",None)
 
 def evaluate_access(
     *,

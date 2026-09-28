@@ -6,6 +6,7 @@ or a second admin source, and it does not execute anything.
 """
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from html import escape
 from typing import Any, Mapping
 
@@ -18,6 +19,8 @@ from atlasquant_ui_v1 import hero_html, section_title_html, state_badge_html
 _AREA_ORDER = ("aion", "negocios", "trader", "investimentos")
 CENTRAL_ROOT = "central_root"
 CENTRAL_CHOICE_KEY = "atlasquant_central_choice"
+LOGIN_GREETING_KEY = "aion_login_greeting_shown"
+_APP_CLOCK = timezone(timedelta(hours=-3), "BRT")
 _ROOT_TOKENS = {"central", "central root", "ecosystem root", "central principal"}
 
 _AREAS = {
@@ -123,6 +126,11 @@ _CENTRAL_CSS = """
 .aq-aion-priority{margin:0 0 8px;color:var(--aq-aion,#b48cff);font-size:.62rem;font-weight:800;letter-spacing:.14em}
 .aq-aion-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:12px}
 .aq-central-denied{margin:0;color:var(--aq-warn);font-size:.82rem;font-weight:750}
+.aq-aion-presence{border:1px solid var(--aq-aion,#b48cff);border-radius:18px;padding:12px 14px;margin:0 0 14px;background:linear-gradient(180deg,rgba(180,140,255,.18),rgba(7,17,31,.55))}
+.aq-aion-presence-kicker{margin:0;color:var(--aq-aion,#b48cff);font-size:.62rem;font-weight:800;letter-spacing:.14em}
+.aq-aion-presence-state{margin:.25rem 0 .4rem;color:var(--aq-text);font-size:.78rem;font-weight:800;letter-spacing:.08em}
+.aq-aion-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#8fd0c4;margin-right:6px}
+.aq-aion-presence-line{margin:.15rem 0;color:var(--aq-text);font-size:.92rem;line-height:1.4}
 .aq-central-root h2{margin:.2rem 0 .8rem;color:var(--aq-text);font-size:1.35rem}
 .aq-central-choices{display:grid;grid-template-columns:1fr;gap:12px}
 .aq-central-choice{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-decoration:none;color:var(--aq-text);border:1px solid var(--aq-line);border-radius:18px;padding:14px;background:linear-gradient(180deg,rgba(16,24,46,.92),rgba(7,17,31,.9))}
@@ -138,7 +146,7 @@ _CENTRAL_CSS = """
   .aq-aion-grid{grid-template-columns:1fr}
 }
 @media (prefers-reduced-motion: reduce){
-  .aq-aion-home,.aq-central-link,.aq-central-art{animation:none;transition:none}
+  .aq-aion-home,.aq-aion-presence,.aq-central-link,.aq-central-art{animation:none;transition:none}
 }
 </style>
 """
@@ -445,7 +453,184 @@ def aion_home_html(*_ignored: Any, **_claims: Any) -> str:
     )
 
 
-def central_selector_html(access: Mapping[str, Any] | None) -> str:
+def _session_map(access: Mapping[str, Any] | None) -> Mapping[str, Any]:
+    if not isinstance(access, Mapping):
+        return {}
+    session = access.get("session")
+    return session if isinstance(session, Mapping) else {}
+
+
+def _greeting_name(access: Mapping[str, Any]) -> str:
+    """Name already on the authenticated access mapping. Owner aliases stay Mikael."""
+    session = _session_map(access)
+    for raw in (
+        access.get("display_name"),
+        session.get("display_name"),
+        access.get("username"),
+        session.get("username"),
+    ):
+        name = " ".join(str(raw or "").split())
+        if not name:
+            continue
+        if name.casefold() in {"mikael", "aparecidomikael"}:
+            return "Mikael"
+        return name[:64]
+    return "Mikael"
+
+
+def _login_mark(access: Mapping[str, Any]) -> str:
+    session = _session_map(access)
+    user = str(session.get("username") or access.get("username") or "").strip()
+    issued = session.get("authenticated_at", access.get("authenticated_at", ""))
+    return f"{user}|{issued}"
+
+
+def greeting_period(now: datetime | None = None) -> str:
+    """Bom dia, boa tarde or boa noite on the application clock (Brasília)."""
+    try:
+        from atlasquant_aion_workspaces import greeting_for
+
+        return greeting_for(now)
+    except Exception:
+        moment = (now or datetime.now(timezone.utc)).astimezone(_APP_CLOCK)
+        if 5 <= moment.hour < 12:
+            return "Bom dia"
+        if 12 <= moment.hour < 18:
+            return "Boa tarde"
+        return "Boa noite"
+
+
+def confirmed_status_line(status: Mapping[str, Any] | None) -> str:
+    """A short line only when the caller already proved a confirmed source."""
+    if not isinstance(status, Mapping):
+        return ""
+    if str(status.get("truth_state") or "").strip().upper() != "CONFIRMED":
+        return ""
+    source = " ".join(str(status.get("source") or "").split())
+    summary = " ".join(str(status.get("summary") or "").split())
+    if not source or not summary:
+        return ""
+    return summary[:180]
+
+
+def login_greeting(access: Mapping[str, Any] | None, *, now: datetime | None = None, confirmed_status: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """Text for a valid ADMIN session. Missing facts stay out of the sentence."""
+    if not _admin(access):
+        return {"show": False, "text": "", "period": "", "name": "", "status": ""}
+    period = greeting_period(now).casefold()
+    name = _greeting_name(access)
+    text = (
+        f"{name}, {period}. AION ativo. "
+        "Bem-vindo ao AtlasQuant. O que você gostaria de saber ou fazer?"
+    )
+    return {
+        "show": True,
+        "text": text,
+        "period": period,
+        "name": name,
+        "status": confirmed_status_line(confirmed_status),
+    }
+
+
+def aion_login_presence_html(
+    access: Mapping[str, Any] | None,
+    *,
+    now: datetime | None = None,
+    confirmed_status: Mapping[str, Any] | None = None,
+) -> str:
+    """Active AION presence. The workspace stays closed until an explicit click."""
+    greeting = login_greeting(access, now=now, confirmed_status=confirmed_status)
+    if not greeting["show"]:
+        return ""
+    status = ""
+    if greeting["status"]:
+        source = ""
+        if isinstance(confirmed_status, Mapping):
+            source = escape(str(confirmed_status.get("source") or ""))
+        status = (
+            f'<p class="aq-aion-presence-line" data-confirmed="{source}">'
+            f"{escape(greeting['status'])}</p>"
+        )
+    return (
+        '<section class="aq-aion-presence" data-aion="active">'
+        '<p class="aq-aion-presence-kicker">AION</p>'
+        '<p class="aq-aion-presence-state"><span class="aq-aion-dot" aria-hidden="true"></span>ATIVO</p>'
+        f'<p class="aq-aion-presence-line">{escape(greeting["name"])}, {escape(greeting["period"])}. AION ativo.</p>'
+        '<p class="aq-aion-presence-line">Bem-vindo ao AtlasQuant. O que você gostaria de saber ou fazer?</p>'
+        + status
+        + '<p><a class="aq-central-back" href="?central=aion">Abrir AION</a></p>'
+        "</section>"
+    )
+
+
+def _voice_ready(provider_configured: bool) -> bool:
+    """Readiness only. This does not start a provider or a paid service."""
+    if not provider_configured:
+        return False
+    try:
+        from atlasquant_voice_readiness import voice_readiness
+
+        ready = voice_readiness(provider_configured=True)
+    except Exception:
+        return False
+    return bool(ready.get("voice_ready"))
+
+
+def acknowledge_login_greeting(
+    session_state,
+    access: Mapping[str, Any] | None,
+    *,
+    now: datetime | None = None,
+    confirmed_status: Mapping[str, Any] | None = None,
+    provider_configured: bool = False,
+    speak=None,
+) -> dict[str, Any]:
+    """Announce once per authentication. A later rerun keeps the same flag."""
+    greeting = login_greeting(access, now=now, confirmed_status=confirmed_status)
+    greeting["announced"] = False
+    greeting["spoken"] = False
+    greeting["voice_failed"] = False
+    greeting["voice_ready"] = False
+    if not greeting["show"]:
+        return greeting
+    mark = _login_mark(access)
+    try:
+        previous = session_state.get(LOGIN_GREETING_KEY)
+    except Exception:
+        previous = None
+    already = isinstance(previous, Mapping) and previous.get("mark") == mark and previous.get("shown") is True
+    if already:
+        return greeting
+    try:
+        session_state[LOGIN_GREETING_KEY] = {"mark": mark, "shown": True}
+    except Exception:
+        pass
+    greeting["announced"] = True
+    greeting["voice_ready"] = _voice_ready(provider_configured)
+    if greeting["voice_ready"] and callable(speak):
+        try:
+            speak(greeting["text"])
+            greeting["spoken"] = True
+        except Exception:
+            greeting["spoken"] = False
+            greeting["voice_failed"] = True
+    return greeting
+
+
+def clear_login_greeting(session_state) -> None:
+    """Logout drops the flag so the next ADMIN login can greet again."""
+    try:
+        session_state.pop(LOGIN_GREETING_KEY, None)
+    except Exception:
+        return
+
+
+def central_selector_html(
+    access: Mapping[str, Any] | None,
+    *,
+    now: datetime | None = None,
+    confirmed_status: Mapping[str, Any] | None = None,
+) -> str:
     """Four-sector door for an admin session. Non-admin sessions get no private cards."""
     model = central_visibility_model(access)
     if not model["admin"]:
@@ -460,9 +645,11 @@ def central_selector_html(access: Mapping[str, Any] | None) -> str:
             f"<strong>{escape(spec['label'])}</strong>"
             f"<small>{escape(spec['sentence'])}</small></a>"
         )
+    presence = aion_login_presence_html(access, now=now, confirmed_status=confirmed_status)
     return (
         '<section class="aq-central-root" data-root="central_root">'
-        '<p class="aq-central-kicker">CENTRAL PRINCIPAL</p>'
+        + presence
+        + '<p class="aq-central-kicker">CENTRAL PRINCIPAL</p>'
         "<h2>Escolha um setor</h2>"
         '<div class="aq-central-choices">'
         + "".join(choices)
@@ -470,7 +657,13 @@ def central_selector_html(access: Mapping[str, Any] | None) -> str:
     )
 
 
-def central_surface_html(access: Mapping[str, Any] | None, requested: Any = None) -> str:
+def central_surface_html(
+    access: Mapping[str, Any] | None,
+    requested: Any = None,
+    *,
+    now: datetime | None = None,
+    confirmed_status: Mapping[str, Any] | None = None,
+) -> str:
     """Rail plus the allowed stage. A denial does not leak private labels."""
     resolved = resolve_central_area(access, requested)
     at_root = bool(resolved.get("root"))
@@ -478,7 +671,7 @@ def central_surface_html(access: Mapping[str, Any] | None, requested: Any = None
     if resolved["denied"]:
         stage = '<p class="aq-central-denied">Área privada indisponível para esta sessão.</p>'
     elif at_root:
-        stage = central_selector_html(access)
+        stage = central_selector_html(access, now=now, confirmed_status=confirmed_status)
     elif resolved["area"] == "aion":
         stage = aion_home_html()
     else:
@@ -496,12 +689,31 @@ def central_surface_html(access: Mapping[str, Any] | None, requested: Any = None
     )
 
 
-def render_central_hub(access: Mapping[str, Any] | None, requested: Any = None) -> dict[str, Any]:
+def render_central_hub(
+    access: Mapping[str, Any] | None,
+    requested: Any = None,
+    *,
+    now: datetime | None = None,
+    confirmed_status: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     """Streamlit edge. Import stays local so pure tests need no server."""
     import streamlit as st
 
     resolved = resolve_central_area(access, requested)
-    st.markdown(central_surface_html(access, requested), unsafe_allow_html=True)
+    st.markdown(
+        central_surface_html(access, requested, now=now, confirmed_status=confirmed_status),
+        unsafe_allow_html=True,
+    )
+    if resolved.get("root"):
+        try:
+            acknowledge_login_greeting(
+                st.session_state,
+                access,
+                now=now,
+                confirmed_status=confirmed_status,
+            )
+        except Exception:
+            pass
     if resolved["denied"]:
         st.error("Área privada indisponível para esta sessão.")
     return resolved
@@ -516,9 +728,15 @@ __all__ = [
     "aion_home_html",
     "central_selector_html",
     "central_surface_html",
+    "aion_login_presence_html",
+    "login_greeting",
+    "greeting_period",
+    "acknowledge_login_greeting",
+    "clear_login_greeting",
     "request_central_destination",
     "sync_central_choice",
     "render_central_hub",
     "CENTRAL_ROOT",
     "CENTRAL_CHOICE_KEY",
+    "LOGIN_GREETING_KEY",
 ]

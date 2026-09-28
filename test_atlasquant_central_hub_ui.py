@@ -2,17 +2,23 @@
 from __future__ import annotations
 
 import ast
+from datetime import datetime, timezone
 from pathlib import Path
 import unittest
 
 from atlasquant_central_hub_ui import (
     CENTRAL_CHOICE_KEY,
     CENTRAL_ROOT,
+    LOGIN_GREETING_KEY,
+    acknowledge_login_greeting,
     aion_home_html,
+    aion_login_presence_html,
     assert_area_access,
     central_surface_html,
     central_visibility_model,
+    clear_login_greeting,
     ecosystem_rail_html,
+    login_greeting,
     request_central_destination,
     resolve_central_area,
     sync_central_choice,
@@ -303,6 +309,136 @@ class CentralHubUiTests(unittest.TestCase):
         self.assertEqual(forged[CENTRAL_CHOICE_KEY], "trader")
         with self.assertRaisesRegex(ValueError, "central area access denied"):
             request_central_destination({}, user, "central")
+        self.assertNotIn('<section class="aq-aion-presence"', html)
+        self.assertNotIn("AION ativo", html)
+
+
+class LoginGreetingTests(unittest.TestCase):
+    def _admin(self, **session):
+        payload = {"username": "mikael", "role": "ADMIN", "authenticated_at": 10}
+        payload.update(session)
+        return _access("ADMIN", session=payload)
+
+    def test_authenticated_admin_is_greeted_on_the_central_door(self):
+        now = datetime(2026, 9, 27, 23, 30, tzinfo=timezone.utc)
+        admin = self._admin()
+        html = central_surface_html(admin, now=now)
+        self.assertLess(html.index('<section class="aq-aion-presence"'), html.index('<div class="aq-central-choices">'))
+        self.assertEqual(html.count('<section class="aq-aion-presence"'), 1)
+        self.assertIn("AION", html)
+        self.assertIn("ATIVO", html)
+        self.assertIn("Mikael, boa noite. AION ativo.", html)
+        self.assertIn("Bem-vindo ao AtlasQuant. O que você gostaria de saber ou fazer?", html)
+        self.assertIn("Abrir AION", html)
+        for label in ("AION IA", "Negócios", "Trader", "Renda Fixa / Investimentos"):
+            self.assertIn(label, html)
+        self.assertIn('data-root="central_root"', html)
+        state = {}
+        before = dict(admin)
+        spoken = acknowledge_login_greeting(state, admin, now=now)
+        self.assertTrue(spoken["announced"])
+        self.assertFalse(spoken["spoken"])
+        self.assertEqual(admin, before)
+        self.assertNotIn("atlasquant_advanced_area", state)
+        self.assertNotIn(CENTRAL_CHOICE_KEY, state)
+        self.assertTrue(resolve_central_area(admin, None)["root"])
+        self.assertIn("@media (prefers-reduced-motion: reduce)", html)
+        self.assertIn(".aq-aion-presence", html)
+
+    def test_period_follows_the_application_clock(self):
+        admin = self._admin()
+        morning = login_greeting(admin, now=datetime(2026, 9, 27, 11, 0, tzinfo=timezone.utc))
+        afternoon = login_greeting(admin, now=datetime(2026, 9, 27, 17, 0, tzinfo=timezone.utc))
+        night = login_greeting(admin, now=datetime(2026, 9, 27, 23, 30, tzinfo=timezone.utc))
+        self.assertIn("bom dia", morning["text"])
+        self.assertIn("boa tarde", afternoon["text"])
+        self.assertIn("boa noite", night["text"])
+        self.assertIn("Mikael, bom dia. AION ativo.", aion_login_presence_html(admin, now=datetime(2026, 9, 27, 11, 0, tzinfo=timezone.utc)))
+
+    def test_user_and_unauthenticated_admin_get_no_greeting(self):
+        now = datetime(2026, 9, 27, 11, 0, tzinfo=timezone.utc)
+        for access in (
+            _access("USER", session={"username": "cliente", "role": "USER", "authenticated_at": 3}),
+            _access("ALUNO", session={"username": "aluno", "role": "ALUNO"}),
+            {"allowed": False, "role": "ADMIN", "session": {"username": "mikael", "authenticated_at": 3}},
+            {"role": "ADMIN"},
+        ):
+            with self.subTest(role=access.get("role"), allowed=access.get("allowed")):
+                self.assertFalse(login_greeting(access, now=now)["show"])
+                self.assertEqual(aion_login_presence_html(access, now=now), "")
+                state = {}
+                result = acknowledge_login_greeting(state, access, now=now)
+                self.assertFalse(result["announced"])
+                self.assertNotIn(LOGIN_GREETING_KEY, state)
+
+    def test_rerun_does_not_announce_twice_and_a_new_login_can(self):
+        now = datetime(2026, 9, 27, 17, 0, tzinfo=timezone.utc)
+        admin = self._admin()
+        calls = []
+        state = {}
+        first = acknowledge_login_greeting(state, admin, now=now, speak=calls.append)
+        second = acknowledge_login_greeting(state, admin, now=now, speak=calls.append)
+        self.assertTrue(first["announced"])
+        self.assertFalse(second["announced"])
+        self.assertEqual(calls, [])
+        self.assertEqual(state[LOGIN_GREETING_KEY]["mark"], "mikael|10")
+        fresh = self._admin(authenticated_at=99)
+        again = acknowledge_login_greeting(state, fresh, now=now, speak=calls.append)
+        self.assertTrue(again["announced"])
+        clear_login_greeting(state)
+        self.assertNotIn(LOGIN_GREETING_KEY, state)
+        after_logout = acknowledge_login_greeting(state, admin, now=now)
+        self.assertTrue(after_logout["announced"])
+
+    def test_unavailable_voice_does_not_block_the_greeting(self):
+        now = datetime(2026, 9, 27, 11, 0, tzinfo=timezone.utc)
+        admin = self._admin()
+
+        def boom(_text):
+            raise RuntimeError("tts indisponível")
+
+        quiet = acknowledge_login_greeting({}, admin, now=now, provider_configured=False, speak=boom)
+        self.assertTrue(quiet["announced"])
+        self.assertIn("AION ativo", quiet["text"])
+        self.assertFalse(quiet["spoken"])
+        self.assertFalse(quiet["voice_failed"])
+        failed = acknowledge_login_greeting({}, admin, now=now, provider_configured=True, speak=boom)
+        self.assertTrue(failed["announced"])
+        self.assertIn("Bem-vindo ao AtlasQuant", failed["text"])
+        self.assertTrue(failed["voice_ready"])
+        self.assertTrue(failed["voice_failed"])
+        self.assertFalse(failed["spoken"])
+
+    def test_unconfirmed_status_is_omitted(self):
+        now = datetime(2026, 9, 27, 23, 30, tzinfo=timezone.utc)
+        admin = self._admin()
+        html = aion_login_presence_html(
+            admin,
+            now=now,
+            confirmed_status={"health": "ótimo", "pending": 4, "summary": "Novidade inventada", "truth_state": "UNKNOWN"},
+        )
+        self.assertNotIn("ótimo", html)
+        self.assertNotIn("Novidade inventada", html)
+        self.assertNotIn("incidente", html.casefold())
+        self.assertNotIn("data-confirmed", html)
+        confirmed = aion_login_presence_html(
+            admin,
+            now=now,
+            confirmed_status={"truth_state": "CONFIRMED", "source": "sessao", "summary": "Sessão autenticada."},
+        )
+        self.assertIn("Sessão autenticada.", confirmed)
+        self.assertIn('data-confirmed="sessao"', confirmed)
+        self.assertIn("O que você gostaria de saber ou fazer?", confirmed)
+
+    def test_greeting_does_not_open_aion_or_write_memory(self):
+        source = Path("atlasquant_central_hub_ui.py").read_text(encoding="utf-8")
+        render = source[source.index("def render_central_hub"):]
+        self.assertNotIn("provider_configured=True", render)
+        self.assertNotIn("request_return_to_aion", render)
+        self.assertNotIn("save_checkpoint", source)
+        self.assertNotIn("openai", source)
+        panel = Path("atlasquant_access_panel.py").read_text(encoding="utf-8")
+        self.assertIn("clear_login_greeting", panel)
 
 
 if __name__ == "__main__":
