@@ -143,7 +143,7 @@ def _normalize_schedule(raw: Mapping[str, Any]) -> dict[str, Any]:
         "created_by": actor,
         "last_observed_at": str(item.get("last_observed_at") or ""),
         "last_due_at": str(item.get("last_due_at") or ""),
-        "execution_adapter": "UNAVAILABLE",
+        "execution_adapter": "LOCAL_MANUAL_V1",
         "automatic_execution": False,
         "execution_authorized": False,
         "external_action_executed": False,
@@ -384,7 +384,7 @@ def stage_schedule(
         "next_run_at": next_run.isoformat() if next_run else "",
         "external_persisted": False,
         "requires_checkpoint_save": True,
-        "execution_adapter": "UNAVAILABLE",
+        "execution_adapter": "LOCAL_MANUAL_V1",
         "automatic_execution": False,
         "execution_authorized": False,
         "external_action_executed": False,
@@ -424,12 +424,14 @@ class CheckpointAutomationAdapter:
             "schedules": details,
             "count": len(details),
             "due_count": due_count,
-            "execution_adapter": "UNAVAILABLE",
+            "execution_adapter": "LOCAL_MANUAL_V1",
+            "local_manual_executor": "AVAILABLE",
+            "autonomous_worker_connected": False,
             "automatic_execution": False,
             "execution_authorized": False,
             "external_action_executed": False,
             "reason": (
-                "SCHEDULES_ARE_PERSISTED_BUT_BACKGROUND_EXECUTOR_IS_NOT_CONNECTED"
+                "LOCAL_MANUAL_EXECUTOR_AVAILABLE_AUTONOMOUS_WORKER_NOT_CONNECTED"
             ),
         }
 
