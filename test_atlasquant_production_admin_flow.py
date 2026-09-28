@@ -130,6 +130,22 @@ class ProductionAdminFlowTests(unittest.TestCase):
         self.assertNotIn("AION_CONSOLE_RENDERED", door)
         self.assertNotIn('id="aq-account-identity"', door)
         self.assertNotIn("aq-premium-hero", door)
+        self.assertEqual(
+            at.button(key="aq_central_stateful_aion").label,
+            "Abrir AION IA",
+        )
+        self.assertEqual(
+            at.button(key="aq_central_stateful_negocios").label,
+            "Abrir Negócios",
+        )
+        self.assertEqual(
+            at.button(key="aq_central_stateful_trader").label,
+            "Abrir Trader",
+        )
+        self.assertEqual(
+            at.button(key="aq_central_stateful_investimentos").label,
+            "Abrir Renda Fixa / Investimentos",
+        )
         self.assertEqual([r for r in at.radio if r.key == "atlasquant_experience_mode"], [])
         self.assertEqual(self.snapshot_calls, [])
 
