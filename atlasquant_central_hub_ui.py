@@ -397,9 +397,9 @@ def ecosystem_rail_html(access: Mapping[str, Any] | None, active_area: Any = Non
         priority = " aq-central-priority" if area_id == model["priority_area"] else ""
         label = escape(area["label"])
         links.append(
-            f'<a class="aq-central-link{priority}" href="?central={area_id}"{current_attr}>'
+            f'<div class="aq-central-link{priority}" data-central-area="{area_id}"{current_attr}>'
             f"{_ART[area_id]()}"
-            f"<strong>{label}</strong></a>"
+            f"<strong>{label}</strong></div>"
         )
     body = "".join(links)
     return (
@@ -756,10 +756,10 @@ def central_selector_html(
         area_id = area["id"]
         spec = _AREAS[area_id]
         choices.append(
-            f'<a class="aq-central-choice" href="?central={area_id}">'
+            f'<article class="aq-central-choice" data-central-area="{area_id}">'
             f"{_ART[area_id]()}"
             f"<strong>{escape(spec['label'])}</strong>"
-            f"<small>{escape(spec['sentence'])}</small></a>"
+            f"<small>{escape(spec['sentence'])}</small></article>"
         )
     presence = aion_login_presence_html(
         access,
@@ -809,7 +809,7 @@ def central_surface_html(
         stage = central_card_html(resolved["area"])
     back = ""
     if _admin(access) and not at_root:
-        back = '<p><a class="aq-central-back" href="?central=central">Voltar à Central Principal</a></p>'
+        back = '<p class="aq-central-back">Use os controles abaixo para voltar à Central Principal.</p>'
     return (
         '<div class="aq-central-layout">'
         + rail
@@ -831,6 +831,36 @@ def render_aion_home_viewer(
     if html:
         st.markdown(html, unsafe_allow_html=True)
     return html
+
+
+def _render_central_navigation_controls(st, access: Mapping[str, Any] | None, resolved: Mapping[str, Any]) -> None:
+    """Authenticated navigation stays inside Streamlit session_state.
+
+    HTML cards/rail are presentation only. The existing access mapping remains
+    the authority and request_central_destination performs the validated state
+    transition before a rerun.
+    """
+    if not _admin(access):
+        return
+
+    current = CENTRAL_ROOT if resolved.get("root") else str(resolved.get("area") or "")
+    model = central_visibility_model(access)
+    targets = [("central", "Central Principal")] + [
+        (str(area["id"]), str(area["label"])) for area in model["areas"]
+    ]
+    st.caption("Navegação interna · mesma sessão autenticada")
+    columns = st.columns(2)
+    for index, (area_id, label) in enumerate(targets):
+        disabled = (current == CENTRAL_ROOT and area_id == "central") or current == area_id
+        with columns[index % 2]:
+            if st.button(
+                label,
+                key=f"aq_central_stateful_{area_id}",
+                width="stretch",
+                disabled=disabled,
+            ):
+                request_central_destination(st.session_state, access, area_id)
+                st.rerun()
 
 
 def render_central_hub(
@@ -872,6 +902,7 @@ def render_central_hub(
             pass
     if resolved["denied"]:
         st.error("Área privada indisponível para esta sessão.")
+    _render_central_navigation_controls(st, access, resolved)
     return resolved
 
 
