@@ -209,11 +209,16 @@ This block does not:
 
 After a future explicit decision to persist the staged ARMED state:
 
-1. use the existing guarded Checkpoint save;
-2. verify read-after-write;
-3. rerun Activation Readiness;
-4. require `READY_FOR_FLAG_ENABLE`;
-5. keep the feature flag disabled until a separate activation decision.
+1. enter the separate **Persisted Arming Ceremony**;
+2. prove the repository activation flag is UNSET/DISABLED;
+3. bind a second short-lived approval to working digest + runtime digest + runtime SHA;
+4. type the dedicated persistence phrase and provide a second explicit confirmation;
+5. persist only through the special guarded ARMED path;
+6. verify read-after-write and the exact persisted arming contract;
+7. re-check the feature flag and automatically roll back on safety violation;
+8. rerun Activation Readiness;
+9. require `READY_FOR_FLAG_ENABLE`;
+10. keep the feature flag disabled until a separate activation decision.
 
 Arming and activation remain separate approvals.
 
