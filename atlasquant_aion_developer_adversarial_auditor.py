@@ -95,7 +95,11 @@ from atlasquant_aion_developer_patch_validation import (
     patch_validation_manifest_id,
     validate_patch,
 )
+from atlasquant_aion_developer_source_bound_consumption_gate import (
+    assert_source_bound_consumption_gate,
+)
 from atlasquant_aion_developer_source_bound_patch_proof import (
+    READY_STATE as SOURCE_BOUND_PATCH_MATCH,
     assert_source_bound_patch_proof_record,
     expected_source_bound_patch_proof_id,
     verify_source_bound_patch,
@@ -5505,6 +5509,205 @@ def _source_bound_patch_surface(_world: _World) -> list[dict[str, str]]:
     return findings
 
 
+def _source_bound_consumption_gate_surface(_world: _World) -> list[dict[str, str]]:
+    """Future physical consumption must replay the transient patch.
+
+    SOURCE_BOUND_CONSUMPTION_GATE: a stored proof record, including one whose
+    proof id was recomputed to match an adulterated document, is not replay
+    proof and does not release physical consumption. Design-only readiness
+    does not call this gate.
+    """
+    findings: list[dict[str, str]] = []
+    module = "atlasquant_aion_developer_source_bound_consumption_gate"
+
+    def _reject(invariant_id: str, description: str, fn: Callable[[], Any]) -> None:
+        status, _ignored = _invoke(fn)
+        closed = status == "REJECT"
+        findings.append(_finding(
+            invariant_id,
+            module,
+            description if closed else description + " O gate aceitou.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    builder = structural_builder_sandbox_request(
+        branch="cursor/safe",
+        baseline_ref="main@a",
+        candidate_ref="cursor/safe@b",
+        requested_files=("module.py", "test_module.py"),
+        candidate_tests=("test_module.py",),
+    )
+    preflight = _sealed_preflight(builder)
+    refs = {"baseline_ref": "main@a", "candidate_ref": "cursor/safe@b"}
+    safe_raw = (
+        "diff --git a/module.py b/module.py\n"
+        "--- a/module.py\n+++ b/module.py\n"
+        "@@ -1 +1 @@\n-x=1\n+x=2\n"
+    )
+    mode_raw = (
+        "diff --git a/module.py b/module.py\n"
+        "old mode 100644\n"
+        "new mode 100755\n"
+        "--- a/module.py\n"
+        "+++ b/module.py\n"
+        "@@ -1 +1 @@\n-x=1\n+x=2\n"
+    )
+    safe = validate_patch(builder, preflight, safe_raw, **refs)
+    mode = validate_patch(builder, preflight, mode_raw, **refs)
+    proof = verify_source_bound_patch(builder, preflight, safe, safe_raw, **refs)
+
+    def _ready(document: Mapping[str, Any], edits: Mapping[str, Any]) -> dict[str, Any]:
+        forged = deepcopy(document)
+        summary = dict(forged["files"][0])
+        summary.update(dict(edits))
+        forged["files"] = [summary]
+        forged["blockers"] = list(summary.get("blockers") or [])
+        forged["secret_like_additions"] = summary.get("secret_additions")
+        forged["changed_lines"] = int(summary["added_lines"]) + int(summary["deleted_lines"])
+        forged["state"] = "READY_FOR_PATCH_REVIEW" if not forged["blockers"] else "BLOCKED"
+        forged["validation_id"] = expected_patch_validation_id(forged)
+        return forged
+
+    mode_summary = dict(mode["files"][0])
+    mode_summary["mode_changed"] = False
+    mode_summary["blockers"] = []
+    forged = _ready(mode, mode_summary)
+    resealed = deepcopy(proof)
+    resealed["validation_id"] = forged["validation_id"]
+    resealed["patch_digest"] = forged["patch_digest"]
+    resealed["patch_manifest_id"] = patch_validation_manifest_id(forged)
+    resealed["proof_id"] = expected_source_bound_patch_proof_id(resealed)
+
+    _reject(
+        "consumption.stored_record_without_patch",
+        "CONSUMPTION_STORED_RECORD_WITHOUT_PATCH: o registro armazenado sem o patch transitorio nao autoriza consumo.",
+        lambda: assert_source_bound_consumption_gate(
+            builder, preflight, safe, None, stored_proof=proof, **refs,
+        ),
+    )
+    record_status, _ignored = _invoke(
+        lambda: assert_source_bound_patch_proof_record(resealed, forged, builder, preflight)
+    )
+    gate_status, _ignored = _invoke(
+        lambda: assert_source_bound_consumption_gate(
+            builder, preflight, forged, mode_raw, stored_proof=resealed, **refs,
+        )
+    )
+    separated = record_status == "ACCEPT" and gate_status == "REJECT"
+    findings.append(_finding(
+        "consumption.resealed_record",
+        module,
+        "CONSUMPTION_RESEALED_RECORD: o registro resealado com o documento adulterado passa na integridade do registro e o gate de consumo rejeita."
+        if separated else
+        "CONSUMPTION_RESEALED_RECORD: o gate aceitou o registro resealado ou a limitacao de armazenamento deixou de ser explicita.",
+        "BLOCKED_BY_DESIGN" if separated else "GAP",
+        "" if separated else "HIGH",
+    ))
+    _reject(
+        "consumption.different_patch",
+        "CONSUMPTION_DIFFERENT_PATCH: o registro legitimo com outro patch nao autoriza consumo.",
+        lambda: assert_source_bound_consumption_gate(
+            builder, preflight, safe, mode_raw, stored_proof=proof, **refs,
+        ),
+    )
+    _reject(
+        "consumption.truncated_patch",
+        "CONSUMPTION_TRUNCATED_PATCH: o patch transitorio truncado nao passa o gate.",
+        lambda: assert_source_bound_consumption_gate(
+            builder, preflight, safe, safe_raw[:-8], stored_proof=proof, **refs,
+        ),
+    )
+    lineage = deepcopy(safe)
+    lineage["builder_request_id"] = "DEVBUILD-OTHERLINEAGE"
+    lineage["validation_id"] = expected_patch_validation_id(lineage)
+    _reject(
+        "consumption.lineage",
+        "CONSUMPTION_LINEAGE: o patch correto com lineage trocada e rejeitado.",
+        lambda: assert_source_bound_consumption_gate(
+            builder, preflight, lineage, safe_raw, stored_proof=proof, **refs,
+        ),
+    )
+    _reject(
+        "consumption.refs",
+        "CONSUMPTION_REFS: o patch correto com refs trocadas e rejeitado.",
+        lambda: assert_source_bound_consumption_gate(
+            builder, preflight, safe, safe_raw, stored_proof=proof,
+            baseline_ref="main@a", candidate_ref="cursor/other@b",
+        ),
+    )
+    absent, _ignored = _invoke(
+        lambda: assert_source_bound_consumption_gate(
+            builder, preflight, forged, None, stored_proof=resealed, **refs,
+        )
+    )
+    recomputed_closed = record_status == "ACCEPT" and absent == "REJECT"
+    findings.append(_finding(
+        "consumption.recomputed_proof_id",
+        module,
+        "CONSUMPTION_RECOMPUTED_PROOF_ID: o proof id recalculado nao substitui o replay do patch transitorio."
+        if recomputed_closed else
+        "CONSUMPTION_RECOMPUTED_PROOF_ID: o proof id recalculado foi aceito no lugar do replay.",
+        "BLOCKED_BY_DESIGN" if recomputed_closed else "GAP",
+        "" if recomputed_closed else "HIGH",
+    ))
+    _reject(
+        "consumption.false_independent_verification",
+        "CONSUMPTION_FALSE_INDEPENDENT_VERIFICATION: o caller nao torna a verificacao independente verdadeira.",
+        lambda: assert_source_bound_consumption_gate(
+            builder, preflight, safe, safe_raw,
+            independent_external_verification=True, **refs,
+        ),
+    )
+    unknown = deepcopy(proof)
+    unknown["git_object_verified"] = True
+    _reject(
+        "consumption.unknown_authority",
+        "CONSUMPTION_UNKNOWN_AUTHORITY: git_object_verified nao autoriza o gate de consumo.",
+        lambda: assert_source_bound_consumption_gate(
+            builder, preflight, safe, safe_raw, stored_proof=unknown, **refs,
+        ),
+    )
+    _reject(
+        "consumption.match_state_not_physical_release",
+        "CONSUMPTION_MATCH_STATE: SOURCE_BOUND_PATCH_MATCH sozinho nao libera o futuro gate fisico.",
+        lambda: assert_source_bound_consumption_gate(
+            builder, preflight, safe, None, stored_proof=SOURCE_BOUND_PATCH_MATCH, **refs,
+        ),
+    )
+    receipt = assert_source_bound_consumption_gate(
+        builder, preflight, safe, safe_raw, **refs,
+    )
+    rendered = json.dumps(receipt)
+    legitimate = (
+        receipt.get("state") == "SOURCE_BOUND_CONSUMPTION_REPLAY_MATCH"
+        and receipt.get("consumption_basis") == "TRANSIENT_REPLAY_NOT_STORED_RECORD"
+        and receipt.get("stored_proof_relation") == "STORED_PROOF_IS_NOT_REPLAY_PROOF"
+        and receipt.get("independent_external_verification") is False
+        and receipt.get("stored_proof_is_replay_proof") is False
+        and receipt.get("stored_proof_record_is_consumption_authorization") is False
+        and receipt.get("source_bound_patch_match_authorizes_physical_consumption") is False
+        and receipt.get("replay_performed") is True
+        and receipt.get("patch_text_included") is False
+        and receipt.get("execution_authorized") is False
+        and receipt.get("physical_execution_authorized") is False
+        and receipt.get("future_physical_patch_execution_requires_consumption_gate") is True
+        and receipt.get("design_only_readiness_requires_consumption_gate") is False
+        and receipt.get("replay_proof_id") == proof.get("proof_id")
+        and "diff --git" not in rendered
+    )
+    findings.append(_finding(
+        "consumption.legitimate",
+        module,
+        "SOURCE_BOUND_CONSUMPTION_GATE: o replay correspondente fecha o gate sem autorizar execucao fisica."
+        if legitimate else
+        "SOURCE_BOUND_CONSUMPTION_GATE: o replay legitimo guardou o patch ou autorizou execucao.",
+        "PASS" if legitimate else "GAP",
+        "" if legitimate else "HIGH",
+    ))
+    return findings
+
+
 def _reseal_independent(policy: Mapping[str, Any]) -> dict[str, Any]:
     mutated = deepcopy(policy)
     mutated["upstream_provenance_independently_verified"] = True
@@ -5539,6 +5742,7 @@ def audit_developer_chain() -> dict[str, Any]:
         findings.extend(_probe_result_design_surface(world))
         findings.extend(_upstream_semantic_surface(world))
         findings.extend(_source_bound_patch_surface(world))
+        findings.extend(_source_bound_consumption_gate_surface(world))
     finally:
         world.close()
 

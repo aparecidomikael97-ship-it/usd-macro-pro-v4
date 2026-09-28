@@ -15,6 +15,11 @@ false: no git object is read, no binary is hashed, and no probe runs.
 
 A stored proof record without the transient bytes is not a replay. Rebuilding
 the record to match a mutated document does not prove the original diff.
+That limitation is accepted for storage only. The stored record is not
+consumption authorization. Any future physical execution or probe that
+depends on the patch must pass the source-bound consumption gate with the
+transient diff. Design-only readiness does not call that gate and does not
+become physical execution.
 """
 from __future__ import annotations
 
