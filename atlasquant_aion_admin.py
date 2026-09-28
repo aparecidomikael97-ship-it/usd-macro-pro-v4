@@ -456,6 +456,21 @@ except Exception:
     supervise_global_worker = None
     supervision_history_summary = None
 
+try:
+    from atlasquant_aion_global_worker_recovery_drill import (
+        CONFIRMATION_PHRASE as GLOBAL_RECOVERY_DRILL_CONFIRMATION_PHRASE,
+        prepare_global_worker_recovery_drill,
+        recovery_drill_summary,
+        simulate_global_worker_recovery_drill,
+    )
+except Exception:
+    GLOBAL_RECOVERY_DRILL_CONFIRMATION_PHRASE = (
+        "SIMULAR RECUPERACAO WORKER GLOBAL"
+    )
+    prepare_global_worker_recovery_drill = None
+    recovery_drill_summary = None
+    simulate_global_worker_recovery_drill = None
+
 SCHEMA = "ATLASQUANT_AION_ADMIN_V1"
 AION_WORKSPACES = (
     "🧠 Central",
@@ -486,6 +501,7 @@ _AION_GLOBAL_ACTIVATION_RESULT_KEY = "aion_global_activation_result_v1"
 _AION_GLOBAL_LIVE_VERIFICATION_KEY = "aion_global_live_verification_v1"
 _AION_GLOBAL_SUPERVISION_KEY = "aion_global_supervision_v1"
 _AION_GLOBAL_SUPERVISION_HISTORY_KEY = "aion_global_supervision_history_v1"
+_AION_GLOBAL_RECOVERY_DRILL_KEY = "aion_global_recovery_drill_v1"
 
 AION_ADMIN_CSS = r"""
 <style>
@@ -7069,6 +7085,99 @@ def _render_development(
                             + str(event.get("live_status") or "UNKNOWN")
                             + " · "
                             + str(event.get("observed_at") or "sem horário")
+                        )
+
+            with st.expander("🧪 Drill de recuperação do Worker Global"):
+                st.caption(
+                    "SIMULAÇÃO SOMENTE. O drill ensaia resposta a incidente, mas "
+                    "não desativa flag, não altera Checkpoint, não executa tick e "
+                    "não confirma recuperação real."
+                )
+                drill_plan = (
+                    prepare_global_worker_recovery_drill(supervision_report)
+                    if prepare_global_worker_recovery_drill is not None
+                    else {}
+                )
+                drill_ready = str(drill_plan.get("status") or "") == "DRILL_READY"
+                if drill_ready:
+                    st.caption(
+                        "Cenário: "
+                        + str(drill_plan.get("scenario") or "UNKNOWN")
+                        + " · severidade: "
+                        + str(drill_plan.get("severity") or "UNKNOWN")
+                        + " · safety-stop recomendado: "
+                        + (
+                            "SIM"
+                            if drill_plan.get("safety_stop_recommended")
+                            else "NÃO"
+                        )
+                    )
+                    drill_phrase = st.text_input(
+                        'Digite exatamente "SIMULAR RECUPERACAO WORKER GLOBAL"',
+                        value="",
+                        key="aion_global_recovery_drill_phrase",
+                    )
+                    drill_confirm = st.checkbox(
+                        "Confirmo que este exercício é apenas uma simulação.",
+                        value=False,
+                        key="aion_global_recovery_drill_confirm",
+                    )
+                    if st.button(
+                        "🧪 Executar drill simulado de recuperação",
+                        key="aion_global_recovery_drill_execute",
+                        disabled=not bool(
+                            drill_confirm
+                            and simulate_global_worker_recovery_drill is not None
+                        ),
+                        width="stretch",
+                    ):
+                        st.session_state[_AION_GLOBAL_RECOVERY_DRILL_KEY] = (
+                            simulate_global_worker_recovery_drill(
+                                supervision_report,
+                                confirmation=drill_confirm,
+                                confirmation_phrase=drill_phrase,
+                            )
+                        )
+                else:
+                    st.caption(
+                        "Nenhum incidente suportado está aberto neste snapshot; "
+                        "o drill não é necessário."
+                    )
+
+                drill_result = st.session_state.get(
+                    _AION_GLOBAL_RECOVERY_DRILL_KEY
+                )
+                if isinstance(drill_result, Mapping):
+                    drill_view = (
+                        recovery_drill_summary(drill_result)
+                        if recovery_drill_summary is not None
+                        else drill_result
+                    )
+                    st.caption(
+                        "Drill: "
+                        + str(drill_view.get("status") or "UNKNOWN")
+                        + " · recuperação real: NÃO"
+                        + " · reativação autorizada: NÃO"
+                        + " · flag alterada: NÃO"
+                        + " · runtime alterado: NÃO."
+                    )
+                    if drill_result.get("drill_completed"):
+                        st.success(
+                            "Drill concluído em memória. Nenhuma ação real foi executada."
+                        )
+                        for stage in list(drill_result.get("stages") or []):
+                            if not isinstance(stage, Mapping):
+                                continue
+                            st.markdown(
+                                "- **"
+                                + str(stage.get("stage") or "UNKNOWN")
+                                + "** → "
+                                + str(stage.get("expected") or "")
+                                + " · execução real: NÃO"
+                            )
+                    elif str(drill_result.get("status") or "") == "CONFIRMATION_REQUIRED":
+                        st.warning(
+                            "A frase exata de confirmação da simulação é obrigatória."
                         )
 
         with st.expander("🛑 Desativação de segurança da feature flag"):
