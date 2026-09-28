@@ -1512,13 +1512,35 @@ def save_runtime_checkpoint(
             and isinstance(current_checkpoint.get(AION_GLOBAL_WORKER_NAMESPACE), Mapping)
             else None
         )
+        def _arming_contract_digest(raw: Mapping[str, Any] | None) -> str:
+            item = dict(raw or {})
+            contract = {
+                "arm_digest": str(item.get("arm_digest") or ""),
+                "arming_plan_digest": str(item.get("arming_plan_digest") or ""),
+                "arming_approval_digest": str(item.get("arming_approval_digest") or ""),
+                "arming_approval_expires_at": str(item.get("arming_approval_expires_at") or ""),
+                "armed_at": str(item.get("armed_at") or ""),
+                "delegation": deepcopy(dict(item.get("delegation") or {})),
+                "allowed_capabilities": list(item.get("allowed_capabilities") or []),
+                "resource_budgets": deepcopy(dict(item.get("resource_budgets") or {})),
+                "max_jobs": item.get("max_jobs"),
+                "lease_seconds": item.get("lease_seconds"),
+            }
+            encoded = json.dumps(
+                contract,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+                default=str,
+            ).encode("utf-8")
+            return hashlib.sha256(encoded).hexdigest()
+
         same_armed = bool(
             isinstance(current_global, Mapping)
             and str(current_global.get("state") or "").upper() == "ARMED"
-            and str(current_global.get("arm_digest") or "")
-                == str(proposed_global.get("arm_digest") or "")
-            and str(current_global.get("arming_approval_digest") or "")
-                == str(proposed_global.get("arming_approval_digest") or "")
+            and _arming_contract_digest(current_global)
+                == _arming_contract_digest(proposed_global)
         )
         transition = not same_armed
         if transition and not allow_global_arming_transition:
