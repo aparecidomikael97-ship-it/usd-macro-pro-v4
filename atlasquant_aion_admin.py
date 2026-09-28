@@ -372,6 +372,19 @@ except Exception:
     worker_snapshot = None
     worker_tick = None
 
+try:
+    from atlasquant_aion_global_worker import (
+        global_worker_snapshot,
+        stage_arm_global_worker,
+        stage_kill_global_worker,
+        stage_pause_global_worker,
+    )
+except Exception:
+    global_worker_snapshot = None
+    stage_arm_global_worker = None
+    stage_kill_global_worker = None
+    stage_pause_global_worker = None
+
 SCHEMA = "ATLASQUANT_AION_ADMIN_V1"
 AION_WORKSPACES = (
     "🧠 Central",
@@ -3072,6 +3085,181 @@ def _render_central(
                 + type(exc).__name__
                 + ". Worker permanece fail-closed."
             )
+
+    st.markdown("#### 🌐 Worker Global/Durable V1 · control plane")
+    global_state = {
+        "status": "UNAVAILABLE",
+        "state": "DISABLED",
+        "kill_switch": True,
+        "fencing_counter": 0,
+        "lease_active": False,
+        "lease_owner": "",
+        "delegated_scope_matches": False,
+        "feature_flag_observed_here": False,
+        "stats": {},
+    }
+    if global_worker_snapshot is not None:
+        try:
+            global_state = global_worker_snapshot(access, checkpoint)
+        except Exception as exc:
+            global_state = {
+                "status": "UNKNOWN",
+                "state": "DISABLED",
+                "kill_switch": True,
+                "fencing_counter": 0,
+                "lease_active": False,
+                "lease_owner": "",
+                "delegated_scope_matches": False,
+                "feature_flag_observed_here": False,
+                "stats": {},
+                "error_type": type(exc).__name__,
+            }
+
+    gw1, gw2, gw3, gw4 = st.columns(4)
+    gw1.metric("Global Worker", str(global_state.get("state") or "UNKNOWN"))
+    gw2.metric("Fencing", int(global_state.get("fencing_counter") or 0))
+    gw3.metric(
+        "Lease global",
+        "ATIVO" if global_state.get("lease_active") else "LIVRE",
+    )
+    gw4.metric(
+        "Runner flag local",
+        "ON" if global_state.get("feature_flag_observed_here") else "OFF/UNKNOWN",
+    )
+    st.caption(
+        "Control plane global usa o mesmo Checkpoint Mestre e CAS por SHA. "
+        "O runner reaproveita o pulso GitHub Actions já existente; nenhum cron novo foi criado. "
+        "A variável ATLASQUANT_AION_GLOBAL_WORKER_ENABLED continua OFF por padrão."
+    )
+    st.caption(
+        "Armar/Pausar/Kill abaixo altera somente o Checkpoint de trabalho. "
+        "O estado global só passa a valer depois do salvamento explícito do Checkpoint Mestre. "
+        "Mesmo armado, publicação, pagamento, deploy, merge, provider e trading continuam bloqueados."
+    )
+
+    global_max_jobs = int(st.number_input(
+        "Máximo de trabalhos por tick global",
+        min_value=1,
+        max_value=20,
+        value=int(global_state.get("max_jobs") or 5),
+        step=1,
+        key="aion_global_worker_max_jobs",
+    ))
+    global_lease_seconds = int(st.number_input(
+        "Lease global (segundos)",
+        min_value=300,
+        max_value=1800,
+        value=int(global_state.get("lease_seconds") or 1200),
+        step=60,
+        key="aion_global_worker_lease_seconds",
+    ))
+    global_arm_confirm = st.checkbox(
+        "Confirmo a delegação global deste escopo ADMIN para tarefas locais allowlisted. "
+        "A ativação do runner ainda exige a feature flag separada.",
+        value=False,
+        key="aion_global_worker_arm_confirm",
+    )
+    gc1, gc2, gc3 = st.columns(3)
+    if gc1.button(
+        "🌐 Armar Global (staged)",
+        key="aion_global_worker_arm",
+        disabled=not bool(global_arm_confirm and stage_arm_global_worker is not None),
+        width="stretch",
+    ):
+        try:
+            armed_global = stage_arm_global_worker(
+                access,
+                checkpoint,
+                confirmation=True,
+                max_jobs=global_max_jobs,
+                lease_seconds=global_lease_seconds,
+            )
+            if armed_global.get("status") == "STAGED_ARMED":
+                _set_working_checkpoint(
+                    armed_global.get("checkpoint") or checkpoint,
+                    dirty=True,
+                )
+                st.success(
+                    "Worker Global armado no Checkpoint de trabalho. "
+                    "Ainda NÃO está persistido e o runner permanece dependente da feature flag."
+                )
+                st.rerun()
+        except Exception as exc:
+            st.error(
+                "Arming global bloqueado em modo seguro: "
+                + type(exc).__name__
+                + "."
+            )
+
+    if gc2.button(
+        "⏸️ Pausar Global (staged)",
+        key="aion_global_worker_pause",
+        disabled=not bool(
+            stage_pause_global_worker is not None
+            and str(global_state.get("state") or "") == "ARMED"
+        ),
+        width="stretch",
+    ):
+        try:
+            paused_global = stage_pause_global_worker(
+                access,
+                checkpoint,
+                confirmation=True,
+            )
+            _set_working_checkpoint(
+                paused_global.get("checkpoint") or checkpoint,
+                dirty=True,
+            )
+            st.info(
+                "Pausa global colocada no Checkpoint de trabalho. "
+                "Salve o Checkpoint Mestre para torná-la global."
+            )
+            st.rerun()
+        except Exception as exc:
+            st.error("Pausa global bloqueada: " + type(exc).__name__ + ".")
+
+    if gc3.button(
+        "🛑 Kill Global (staged)",
+        key="aion_global_worker_kill",
+        disabled=not bool(stage_kill_global_worker is not None),
+        width="stretch",
+    ):
+        try:
+            killed_global = stage_kill_global_worker(
+                access,
+                checkpoint,
+                confirmation=True,
+            )
+            _set_working_checkpoint(
+                killed_global.get("checkpoint") or checkpoint,
+                dirty=True,
+            )
+            st.warning(
+                "Kill switch global colocado no Checkpoint de trabalho. "
+                "Use Salvar Checkpoint Mestre para persistir o bloqueio no runtime compartilhado."
+            )
+            st.rerun()
+        except Exception as exc:
+            st.error("Kill global bloqueado: " + type(exc).__name__ + ".")
+
+    global_stats = (
+        global_state.get("stats")
+        if isinstance(global_state.get("stats"), Mapping)
+        else {}
+    )
+    st.caption(
+        "Global ticks "
+        + str(int(global_stats.get("ticks") or 0))
+        + " · processados "
+        + str(int(global_stats.get("processed") or 0))
+        + " · conflitos lease "
+        + str(int(global_stats.get("lease_conflicts") or 0))
+        + " · conflitos checkpoint "
+        + str(int(global_stats.get("checkpoint_conflicts") or 0))
+        + " · crash recoveries "
+        + str(int(global_stats.get("crash_recoveries") or 0))
+        + "."
+    )
 
     provider_env = _provider_env()
     provider = provider_status(feature_flags=flags, env=provider_env)
