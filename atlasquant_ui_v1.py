@@ -268,7 +268,9 @@ html { scroll-behavior: smooth; }
 [data-testid="stSelectbox"] label,
 [data-testid="stSelectbox"] label *,
 [data-testid="stCheckbox"] label,
-[data-testid="stCheckbox"] label * {
+[data-testid="stCheckbox"] label *,
+[data-testid="stToggle"] label,
+[data-testid="stToggle"] label * {
   color: #182230 !important;
   -webkit-text-fill-color: #182230 !important;
   opacity: 1 !important;
@@ -281,7 +283,9 @@ html { scroll-behavior: smooth; }
 [data-testid="stSidebar"] [data-testid="stSelectbox"] label,
 [data-testid="stSidebar"] [data-testid="stSelectbox"] label *,
 [data-testid="stSidebar"] [data-testid="stCheckbox"] label,
-[data-testid="stSidebar"] [data-testid="stCheckbox"] label * {
+[data-testid="stSidebar"] [data-testid="stCheckbox"] label *,
+[data-testid="stSidebar"] [data-testid="stToggle"] label,
+[data-testid="stSidebar"] [data-testid="stToggle"] label * {
   color: var(--aq-muted-strong) !important;
   -webkit-text-fill-color: var(--aq-muted-strong) !important;
 }
@@ -421,7 +425,9 @@ html { scroll-behavior: smooth; }
 .stApp [data-testid="stSelectbox"] label,
 .stApp [data-testid="stSelectbox"] label *,
 .stApp [data-testid="stCheckbox"] label,
-.stApp [data-testid="stCheckbox"] label * {
+.stApp [data-testid="stCheckbox"] label *,
+.stApp [data-testid="stToggle"] label,
+.stApp [data-testid="stToggle"] label * {
   color: #e8eef7 !important;
   -webkit-text-fill-color: #e8eef7 !important;
 }

@@ -367,6 +367,42 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("color:#f0f6ff",ATLASQUANT_CSS)
         self.assertIn("font-weight:700",ATLASQUANT_CSS)
 
+    def test_toggle_inherits_current_checkbox_contrast_contract(self):
+        css=ATLASQUANT_CSS
+        main_rule=(
+            '[data-testid="stCheckbox"] label,\n'
+            '[data-testid="stCheckbox"] label *,\n'
+            '[data-testid="stToggle"] label,\n'
+            '[data-testid="stToggle"] label * {'
+        )
+        sidebar_rule=(
+            '[data-testid="stSidebar"] [data-testid="stCheckbox"] label,\n'
+            '[data-testid="stSidebar"] [data-testid="stCheckbox"] label *,\n'
+            '[data-testid="stSidebar"] [data-testid="stToggle"] label,\n'
+            '[data-testid="stSidebar"] [data-testid="stToggle"] label * {'
+        )
+        app_rule=(
+            '.stApp [data-testid="stCheckbox"] label,\n'
+            '.stApp [data-testid="stCheckbox"] label *,\n'
+            '.stApp [data-testid="stToggle"] label,\n'
+            '.stApp [data-testid="stToggle"] label * {'
+        )
+        self.assertIn(main_rule,css)
+        self.assertIn(sidebar_rule,css)
+        self.assertIn(app_rule,css)
+        self.assertIn('[data-testid="stToggle"] label',css)
+        self.assertIn('[data-testid="stToggle"] label *',css)
+        self.assertIn('[data-testid="stSidebar"] [data-testid="stToggle"] label',css)
+        self.assertIn('[data-testid="stSidebar"] [data-testid="stToggle"] label *',css)
+        self.assertIn('[data-testid="stCheckbox"] label',css)
+        self.assertIn('[data-testid="stCheckbox"] label *',css)
+        main_body=css[css.index(main_rule):css.index("}",css.index(main_rule))]
+        sidebar_body=css[css.index(sidebar_rule):css.index("}",css.index(sidebar_rule))]
+        app_body=css[css.index(app_rule):css.index("}",css.index(app_rule))]
+        self.assertIn("color: #182230 !important;",main_body)
+        self.assertIn("color: var(--aq-muted-strong) !important;",sidebar_body)
+        self.assertIn("color: #e8eef7 !important;",app_body)
+
     def test_caption_and_control_text_has_explicit_readable_contrast(self):
         self.assertIn("stCaptionContainer",ATLASQUANT_CSS)
         self.assertIn("opacity: 1 !important",ATLASQUANT_CSS)
