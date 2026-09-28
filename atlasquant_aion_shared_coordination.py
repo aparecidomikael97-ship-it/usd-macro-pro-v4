@@ -400,6 +400,7 @@ def run_coordination_probe(
     key = "atlasquant/aion/probe/" + probe_suffix
     fence_key = "atlasquant/aion/probe-fence/" + probe_suffix
     external_write = False
+    mutation_count = 0
     first_version = None
     second_version = None
     tests = {
@@ -431,6 +432,8 @@ def run_coordination_probe(
             ttl_seconds=PROBE_TTL_SECONDS,
         )
         external_write = external_write or created["swapped"]
+        if created["swapped"]:
+            mutation_count += 1
         tests["create_cas"] = created["swapped"]
         first_version = created["version"]
         if not created["swapped"] or first_version is None:
@@ -444,6 +447,8 @@ def run_coordination_probe(
             ttl_seconds=PROBE_TTL_SECONDS,
         )
         external_write = external_write or stale["swapped"]
+        if stale["swapped"]:
+            mutation_count += 1
         tests["stale_cas_rejected"] = not stale["swapped"]
         if stale["swapped"]:
             raise RuntimeError("STALE_CAS_ACCEPTED")
@@ -462,6 +467,8 @@ def run_coordination_probe(
             ttl_seconds=PROBE_TTL_SECONDS,
         )
         external_write = external_write or updated["swapped"]
+        if updated["swapped"]:
+            mutation_count += 1
         tests["live_cas"] = updated["swapped"]
         second_version = updated["version"]
         if not updated["swapped"] or second_version is None:
@@ -479,11 +486,15 @@ def run_coordination_probe(
             fence_key,
             ttl_seconds=PROBE_TTL_SECONDS,
         )
+        mutation_count += 1
+        external_write = True
         second_fence = _next_fencing_token(
             adapter,
             fence_key,
             ttl_seconds=PROBE_TTL_SECONDS,
         )
+        mutation_count += 1
+        external_write = True
         tests["fencing_token_monotonic"] = bool(second_fence > first_fence)
         deleted = _delete(
             adapter,
@@ -491,6 +502,9 @@ def run_coordination_probe(
             expected_version=second_version,
         )
         tests["cleanup"] = deleted["deleted"]
+        if deleted["deleted"]:
+            mutation_count += 1
+            external_write = True
         if not all((
             tests["read_after_cas"],
             tests["version_monotonic"],
@@ -508,6 +522,9 @@ def run_coordination_probe(
                     expected_version=second_version,
                 )
                 tests["cleanup"] = bool(cleanup["deleted"])
+                if cleanup["deleted"]:
+                    mutation_count += 1
+                    external_write = True
             except Exception:
                 pass
         elif first_version is not None:
@@ -518,6 +535,9 @@ def run_coordination_probe(
                     expected_version=first_version,
                 )
                 tests["cleanup"] = bool(cleanup["deleted"])
+                if cleanup["deleted"]:
+                    mutation_count += 1
+                    external_write = True
             except Exception:
                 pass
 
@@ -544,7 +564,7 @@ def run_coordination_probe(
         "first_version": first_version,
         "second_version": second_version,
         "failure_type": failure,
-        "probe_writes": 2 if tests["live_cas"] else 1 if tests["create_cas"] else 0,
+        "probe_writes": mutation_count,
         "cleanup_attempted": bool(first_version is not None),
         "paid_service_approved": bool(paid_service_approved),
         "external_write_executed": external_write,
@@ -731,6 +751,15 @@ def activation_gate(
             "status": "BLOCKED",
             "reason": budget["reason"],
             "probe": probe,
+        }
+    probe_writes = int((probe_receipt or {}).get("probe_writes") or 0)
+    if probe_writes > int(budget["budget"]["max_probe_writes"]):
+        return {
+            **base,
+            "status": "BLOCKED",
+            "reason": "PROBE_WRITE_BUDGET_EXCEEDED",
+            "probe": probe,
+            "budget": budget["budget"],
         }
     if confirmation is not True:
         return {
