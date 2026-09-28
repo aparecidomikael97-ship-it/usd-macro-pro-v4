@@ -2,12 +2,15 @@ import unittest
 
 from atlasquant_aion_business import (
     approve_product,
+    business_metrics_digest,
+    business_metrics_views,
     business_summary,
     coverage_snapshot,
     customer_economics,
     funnel_snapshot,
     marketplace_preflight,
     mark_listing_live_from_evidence,
+    new_business_metrics,
     new_product_candidate,
     trend_assessment,
     unit_economics,
@@ -68,6 +71,60 @@ class AtlasQuantAionBusinessTests(unittest.TestCase):
         self.assertEqual(result["ltv"],60.0)
         self.assertEqual(result["ltv_cac_ratio"],6.0)
         self.assertFalse(result["paid_action"])
+
+    def test_business_metrics_keep_financial_concepts_separate_and_provenance_bound(self):
+        empty=business_metrics_views({})
+        self.assertEqual(empty["metrics"]["state"],"NOT_CONFIGURED")
+        self.assertIsNone(empty["finance"]["revenue"])
+        self.assertEqual(empty["funnel"]["state"],"NOT_CONFIGURED")
+
+        record=new_business_metrics(
+            source="marketplace export 2026-09",
+            truth_state="CONFIRMED",
+            recorded_by="admin.test",
+            visits=1000,
+            leads=100,
+            checkouts=25,
+            orders=10,
+            marketing_cost=200,
+            acquired_customers=10,
+            gross_profit_per_order=40,
+            average_orders_per_customer=2,
+            revenue=5000,
+            costs=3200,
+            gross_profit=1800,
+            net_profit=1200,
+            available_cash=700,
+        )
+        views=business_metrics_views(record)
+        self.assertEqual(views["metrics"]["state"],"READY")
+        self.assertEqual(views["funnel"]["order_rate_pct"],1.0)
+        self.assertEqual(views["customers"]["cac"],20.0)
+        self.assertEqual(views["customers"]["ltv"],80.0)
+        self.assertEqual(views["finance"]["revenue"],5000.0)
+        self.assertEqual(views["finance"]["gross_profit"],1800.0)
+        self.assertEqual(views["finance"]["net_profit"],1200.0)
+        self.assertEqual(views["finance"]["available_cash"],700.0)
+        self.assertNotEqual(views["finance"]["revenue"],views["finance"]["net_profit"])
+        self.assertFalse(record["automatic_publish"])
+        self.assertFalse(record["automatic_payment"])
+        self.assertFalse(record["automatic_investment"])
+        self.assertEqual(
+            business_metrics_digest(record),
+            business_metrics_digest(record),
+        )
+
+        unconfirmed=new_business_metrics(
+            source="anotação manual",
+            truth_state="HYPOTHESIS",
+            visits=100,
+            leads=10,
+            checkouts=5,
+            orders=2,
+        )
+        unconfirmed_views=business_metrics_views(unconfirmed)
+        self.assertEqual(unconfirmed_views["metrics"]["state"],"UNCONFIRMED")
+        self.assertEqual(unconfirmed_views["funnel"]["state"],"NOT_CONFIGURED")
 
     def test_confirmed_source_can_support_trend_claim(self):
         product=new_product_candidate(
