@@ -448,6 +448,9 @@ except Exception:
     sync_central_choice = None
 
 
+_CENTRAL_RENDER_ERROR_KEY = "atlasquant_central_render_error_v1"
+
+
 def _central_query_value() -> str:
     """Read the central deep-link once, then remove it from the URL state."""
     try:
@@ -514,9 +517,66 @@ def _render_atlasquant_central_hub(*, active_index=None, stop_for_shell=False):
         return None
     try:
         requested = _central_request_for_render(active_index=active_index)
-        resolved = render_central_hub(_ATLASQUANT_ACCESS, requested, defer_aion_home=(active_index == 21))
-    except Exception:
-        return None
+        resolved = render_central_hub(
+            _ATLASQUANT_ACCESS,
+            requested,
+            defer_aion_home=(active_index == 21),
+        )
+        st.session_state.pop(_CENTRAL_RENDER_ERROR_KEY, None)
+    except Exception as exc:
+        error_type = type(exc).__name__
+        st.session_state[_CENTRAL_RENDER_ERROR_KEY] = {
+            "state": "DEGRADED_SAFE",
+            "error_type": error_type,
+            "executes_action": False,
+            "real_orders_enabled": False,
+        }
+        st.error(
+            "A Central Principal encontrou um erro isolado de interface. "
+            "A sessão continua autenticada e nenhuma ação externa foi executada."
+        )
+        st.caption(
+            "Diagnóstico seguro: "
+            + error_type
+            + ". Use os atalhos abaixo para recuperar a navegação."
+        )
+        if (
+            str(_ATLASQUANT_ACCESS.get("role") or "").upper() == "ADMIN"
+            and request_central_destination is not None
+        ):
+            c1,c2 = st.columns(2)
+            with c1:
+                if st.button(
+                    "Abrir Trader seguro",
+                    key="aq_central_recovery_trader",
+                    width="stretch",
+                ):
+                    request_central_destination(
+                        st.session_state,
+                        _ATLASQUANT_ACCESS,
+                        "trader",
+                    )
+                    st.rerun()
+            with c2:
+                if st.button(
+                    "Abrir AION seguro",
+                    key="aq_central_recovery_aion",
+                    width="stretch",
+                ):
+                    request_central_destination(
+                        st.session_state,
+                        _ATLASQUANT_ACCESS,
+                        "aion",
+                    )
+                    st.rerun()
+        return {
+            "area": "central_root",
+            "denied": False,
+            "shell": True,
+            "root": True,
+            "degraded": True,
+            "error_type": error_type,
+        }
     if (
         stop_for_shell
         and isinstance(resolved, dict)
