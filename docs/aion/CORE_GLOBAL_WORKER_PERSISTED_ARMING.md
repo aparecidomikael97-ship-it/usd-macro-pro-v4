@@ -217,3 +217,22 @@ workflows. After validation, the base is restored to
 
 This audit process does not persist ARMED, modify the runtime Checkpoint,
 change the repository feature flag, execute the Global Worker, merge or deploy.
+
+
+## Activation Ceremony V1
+
+Persisting `ARMED` does not enable the Global Worker.
+
+The next separate gate is the Global Worker Activation Ceremony V1:
+
+1. rerun read-only readiness and require `READY_FOR_FLAG_ENABLE`;
+2. bind an activation plan to the persisted runtime SHA/digest and arm contract;
+3. require the exact phrase `ATIVAR WORKER GLOBAL`;
+4. create a short-lived activation ticket;
+5. require a final explicit confirmation;
+6. re-read runtime and flag immediately before the write;
+7. enable only `ATLASQUANT_AION_GLOBAL_WORKER_ENABLED`;
+8. verify flag + runtime after the write.
+
+Even a confirmed flag write yields only
+`ACTIVATED_PENDING_LIVE_EVIDENCE`. Heartbeat/receipt remain a later proof gate.
