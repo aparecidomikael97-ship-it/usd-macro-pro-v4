@@ -27,6 +27,7 @@ from atlasquant_aion_background_executor import _execute_due_local_work_authoriz
 from atlasquant_aion_core_intelligence.context import Domain
 from atlasquant_aion_core_intelligence.evidence import digest, safe_text, utc
 from atlasquant_aion_core_runtime_bridge import authenticated_context
+from atlasquant_aion_global_worker_arming import validate_global_worker_arming_approval
 from atlasquant_aion_memory import (
     MAX_RUNTIME_BYTES,
     RuntimeConfig,
@@ -237,8 +238,26 @@ def _default_state() -> dict[str, Any]:
         "kill_switch": True,
         "delegation": {},
         "arm_digest": "",
+        "arming_plan_digest": "",
+        "arming_approval_digest": "",
+        "arming_approval_expires_at": "",
         "armed_at": "",
         "allowed_capabilities": sorted(GLOBAL_WORKER_CAPABILITIES),
+        "resource_budgets": {
+            "max_jobs_per_tick": DEFAULT_MAX_JOBS,
+            "max_scheduled_ticks_per_utc_day": 48,
+            "max_jobs_per_utc_day": DEFAULT_MAX_JOBS * 48,
+            "max_runtime_checkpoint_writes_per_tick": 2,
+            "provider_calls_per_tick": 0,
+            "paid_service_calls_per_tick": 0,
+            "publications_per_tick": 0,
+            "payments_per_tick": 0,
+            "deploys_per_tick": 0,
+            "merges_per_tick": 0,
+            "subprocess_calls_per_tick": 0,
+            "market_orders_per_tick": 0,
+            "real_trading_enabled": False,
+        },
         "max_jobs": DEFAULT_MAX_JOBS,
         "lease_seconds": DEFAULT_LEASE_SECONDS,
         "fencing_counter": 0,
@@ -326,8 +345,26 @@ def _normalize_state(raw: Mapping[str, Any]) -> dict[str, Any]:
         "kill_switch": bool(raw.get("kill_switch", True)),
         "delegation": delegation,
         "arm_digest": str(raw.get("arm_digest") or ""),
+        "arming_plan_digest": str(raw.get("arming_plan_digest") or ""),
+        "arming_approval_digest": str(raw.get("arming_approval_digest") or ""),
+        "arming_approval_expires_at": str(raw.get("arming_approval_expires_at") or ""),
         "armed_at": armed_at,
         "allowed_capabilities": sorted(allowed),
+        "resource_budgets": deepcopy(dict(raw.get("resource_budgets") or {
+            "max_jobs_per_tick": max_jobs,
+            "max_scheduled_ticks_per_utc_day": 48,
+            "max_jobs_per_utc_day": max_jobs * 48,
+            "max_runtime_checkpoint_writes_per_tick": 2,
+            "provider_calls_per_tick": 0,
+            "paid_service_calls_per_tick": 0,
+            "publications_per_tick": 0,
+            "payments_per_tick": 0,
+            "deploys_per_tick": 0,
+            "merges_per_tick": 0,
+            "subprocess_calls_per_tick": 0,
+            "market_orders_per_tick": 0,
+            "real_trading_enabled": False,
+        })),
         "max_jobs": max_jobs,
         "lease_seconds": lease_seconds,
         "fencing_counter": fence_counter,
@@ -348,7 +385,14 @@ def _normalize_state(raw: Mapping[str, Any]) -> dict[str, Any]:
         "real_trading_enabled": False,
     }
     if state_name == "ARMED":
-        if state["kill_switch"] or not state["arm_digest"] or not state["armed_at"]:
+        if (
+            state["kill_switch"]
+            or not state["arm_digest"]
+            or not state["armed_at"]
+            or not state["arming_plan_digest"]
+            or not state["arming_approval_digest"]
+            or _parse_iso(state["arming_approval_expires_at"]) is None
+        ):
             raise ValueError("invalid armed global worker state")
         access = _delegated_access(delegation)
         context = authenticated_context(access, Domain.ADMIN)
@@ -401,6 +445,7 @@ def stage_arm_global_worker(
     checkpoint: Mapping[str, Any],
     *,
     confirmation: bool,
+    arming_approval: Mapping[str, Any] | None = None,
     max_jobs: int = DEFAULT_MAX_JOBS,
     lease_seconds: int = DEFAULT_LEASE_SECONDS,
     now: datetime | None = None,
@@ -426,6 +471,26 @@ def stage_arm_global_worker(
         maximum=MAX_LEASE_SECONDS,
         name="global worker lease",
     )
+    approval = validate_global_worker_arming_approval(
+        access,
+        checkpoint,
+        arming_approval,
+        max_jobs=max_jobs,
+        lease_seconds=lease_seconds,
+        allowed_capabilities=GLOBAL_WORKER_CAPABILITIES,
+        now=current,
+    )
+    if approval.get("state") != "APPROVED":
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "reason": str(approval.get("reason") or "VALID_ARMING_APPROVAL_REQUIRED"),
+            "checkpoint": dict(checkpoint or {}),
+            "requires_checkpoint_save": False,
+            "external_persisted": False,
+            "runner_feature_flag_required": True,
+            "automatic_external_business_actions": False,
+        }
     state, _ = load_global_worker_state(checkpoint)
     delegation = _delegation_from_access(access, context)
     arm_digest = digest({
@@ -435,6 +500,8 @@ def stage_arm_global_worker(
         "max_jobs": max_jobs,
         "lease_seconds": lease_seconds,
         "allowed_capabilities": sorted(GLOBAL_WORKER_CAPABILITIES),
+        "arming_plan_digest": str(approval.get("plan_digest") or ""),
+        "arming_approval_digest": str(approval.get("approval_digest") or ""),
     })
     state = _mutated(
         state,
@@ -442,8 +509,12 @@ def stage_arm_global_worker(
         kill_switch=False,
         delegation=delegation,
         arm_digest=arm_digest,
+        arming_plan_digest=str(approval.get("plan_digest") or ""),
+        arming_approval_digest=str(approval.get("approval_digest") or ""),
+        arming_approval_expires_at=str(approval.get("expires_at") or ""),
         armed_at=current.isoformat(),
         allowed_capabilities=sorted(GLOBAL_WORKER_CAPABILITIES),
+        resource_budgets=deepcopy(dict(approval.get("budgets") or {})),
         max_jobs=max_jobs,
         lease_seconds=lease_seconds,
         lease=_empty_lease(),
@@ -456,6 +527,9 @@ def stage_arm_global_worker(
         "requires_checkpoint_save": True,
         "external_persisted": False,
         "runner_feature_flag_required": True,
+        "arming_plan_digest": str(approval.get("plan_digest") or ""),
+        "arming_approval_digest": str(approval.get("approval_digest") or ""),
+        "arming_approval_expires_at": str(approval.get("expires_at") or ""),
         "automatic_external_business_actions": False,
     }
 
