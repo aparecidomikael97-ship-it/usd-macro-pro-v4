@@ -502,7 +502,7 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
         self.assertNotIn('"🌐 Armar Global (staged)"', source)
         self.assertIn("Pausar Global (staged)", source)
         self.assertIn("Kill Global (staged)", source)
-        self.assertIn("Ainda NÃO está persistido", source)
+        self.assertIn("NÃO foi salvo no runtime", source)
         self.assertIn("Salvar Checkpoint Mestre", source)
 
     def test_global_worker_has_no_physical_or_business_action_apis(self):
