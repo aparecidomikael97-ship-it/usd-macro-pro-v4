@@ -162,3 +162,18 @@ This module contains no:
 
 Any future automatic containment would require a new explicit architecture and
 approval boundary; it is not part of V1.
+
+
+## Session-local supervision history
+
+The Central keeps a bounded operator-facing history in Streamlit session state.
+
+- evidence-derived event IDs deduplicate identical snapshots;
+- the UI keeps at most 50 observations;
+- the latest five are displayed;
+- incident and critical-incident counts are summarized;
+- history is not persisted to the runtime Checkpoint;
+- history does not write repository variables or any external observability service.
+
+This history is a convenience for the active ADMIN session. Shared runtime,
+feature-flag, lease and receipt evidence remain the source of truth.
