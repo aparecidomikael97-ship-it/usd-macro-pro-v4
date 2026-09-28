@@ -140,8 +140,8 @@ class GlobalWorkerLiveVerificationTests(unittest.TestCase):
             capability="ADMINISTRATION",
             cadence="DAILY",
             timezone_name="America/Cuiaba",
-            hour=8,
-            minute=0,
+            hour=10,
+            minute=30,
             confirmation=True,
             now=BASE,
         )["checkpoint"]
@@ -367,7 +367,8 @@ class GlobalWorkerLiveVerificationTests(unittest.TestCase):
         source = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("ENABLED não significa LIVE", source)
         self.assertIn("Verificar Worker Global ao vivo", source)
-        self.assertIn("LIVE_CONFIRMED_IDLE", source)
+        self.assertIn('"Live status"', source)
+        self.assertIn('live_report.get("status")', source)
         self.assertIn("LIVE_EVIDENCE_TIMEOUT", source)
         self.assertIn("Worker Global LIVE confirmado por evidência compartilhada", source)
 
