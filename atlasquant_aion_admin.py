@@ -518,6 +518,15 @@ except Exception:
     prepare_durable_closure_plan = None
     validate_durable_closure_approval = None
 
+try:
+    from atlasquant_aion_global_worker_incident_reconciliation import (
+        closed_incident_rows as global_worker_closed_incident_rows,
+        reconcile_global_worker_incident_center,
+    )
+except Exception:
+    global_worker_closed_incident_rows = None
+    reconcile_global_worker_incident_center = None
+
 SCHEMA = "ATLASQUANT_AION_ADMIN_V1"
 AION_WORKSPACES = (
     "🧠 Central",
@@ -1332,7 +1341,7 @@ def _render_security_incident_center(
     )
     counts = snapshot.get("counts") if isinstance(snapshot.get("counts"), Mapping) else {}
     c1,c2,c3,c4 = st.columns(4)
-    c1.metric("Incidentes", int(snapshot.get("total") or 0))
+    c1.metric("Incidentes ativos", int(snapshot.get("total") or 0))
     c2.metric("Críticos", int(counts.get("CRITICAL") or 0))
     c3.metric("Altos", int(counts.get("HIGH") or 0))
     c4.metric(
@@ -1340,12 +1349,53 @@ def _render_security_incident_center(
         "REVISAR" if snapshot.get("rollback_review_recommended") else "SEM SINAL CONFIRMADO",
     )
 
+    gw_reconciliation = (
+        snapshot.get("global_worker_reconciliation")
+        if isinstance(snapshot.get("global_worker_reconciliation"), Mapping)
+        else {}
+    )
+    closed_rows = (
+        global_worker_closed_incident_rows(snapshot)
+        if global_worker_closed_incident_rows is not None
+        else []
+    )
+    if gw_reconciliation:
+        st.caption(
+            "Reconciliação Worker Global: "
+            + str(gw_reconciliation.get("state") or "UNKNOWN")
+            + " · fechamentos duráveis: "
+            + str(gw_reconciliation.get("durable_closure_records") or 0)
+            + " · reativação autorizada: NÃO."
+        )
+        if gw_reconciliation.get("state") == "REOPENED":
+            st.error(
+                "REOPENED: surgiu novamente evidência do mesmo incidente após "
+                "o fechamento durável. O incidente permanece ativo."
+            )
+        elif gw_reconciliation.get("state") == "NEW_INCIDENT_AFTER_CLOSURE":
+            st.warning(
+                "Há um novo incidente do Worker Global após fechamento anterior. "
+                "O fechamento histórico não esconde a nova evidência."
+            )
+        elif gw_reconciliation.get("fail_open"):
+            st.warning(
+                "Reconciliação de fechamento indisponível/inválida; modo fail-open: "
+                "incidentes atuais permanecem abertos."
+            )
+
     rows = incident_center_rows(snapshot)
     if not rows:
         st.success(
-            "Nenhum incidente explícito foi consolidado nesta execução. "
+            "Nenhum incidente ativo foi consolidado nesta execução. "
             "Isso não prova que produção/infraestrutura externa estejam saudáveis."
         )
+        if closed_rows:
+            with st.expander("Histórico de incidentes fechados", expanded=False):
+                st.dataframe(closed_rows, width="stretch", hide_index=True)
+                st.caption(
+                    "Fechamento histórico não autoriza reativação do Worker e "
+                    "não suprime evidência nova ou recorrente."
+                )
         return
 
     st.dataframe(rows,width="stretch",hide_index=True)
@@ -1381,6 +1431,14 @@ def _render_security_incident_center(
             st.caption(
                 "Plano somente leitura · revisão humana obrigatória · rollback automático: NÃO · "
                 "rotação automática de segredo: NÃO · trading real: BLOQUEADO."
+            )
+
+    if closed_rows:
+        with st.expander("Histórico de incidentes fechados", expanded=False):
+            st.dataframe(closed_rows, width="stretch", hide_index=True)
+            st.caption(
+                "Histórico durável somente leitura · novos sinais permanecem ativos · "
+                "reativação autorizada: NÃO."
             )
 
     if snapshot.get("rollback_review_recommended"):
@@ -2358,8 +2416,10 @@ def _render_central(
             (system_context.get("release_gate") if isinstance(system_context, Mapping) else None),
         )
         _render_continuity_center(checkpoint)
-        if int(incident_snapshot.get("total") or 0) > 0 or bool(
-            incident_snapshot.get("rollback_review_recommended")
+        if (
+            int(incident_snapshot.get("total") or 0) > 0
+            or int(incident_snapshot.get("closed_total") or 0) > 0
+            or bool(incident_snapshot.get("rollback_review_recommended"))
         ):
             _render_security_incident_center(incident_snapshot)
 
@@ -8876,10 +8936,18 @@ def render_aion_admin_console(
             system_context=system,
             account_audit=account_entitlement_audit,
         )
+        if reconcile_global_worker_incident_center is not None:
+            incident_snapshot = reconcile_global_worker_incident_center(
+                incident_snapshot,
+                st.session_state.get(_AION_GLOBAL_SUPERVISION_KEY),
+                runtime_result,
+            )
     except Exception as exc:
         incident_snapshot = {
             "schema":"ATLASQUANT_AION_INCIDENT_CENTER_V1",
             "incidents":[],
+            "closed_incidents":[],
+            "closed_total":0,
             "total":0,
             "counts":{"INFO":0,"LOW":0,"MEDIUM":0,"HIGH":0,"CRITICAL":0},
             "highest_severity":"UNKNOWN",
