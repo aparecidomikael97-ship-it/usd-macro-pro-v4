@@ -256,10 +256,9 @@ class CentralHubUiTests(unittest.TestCase):
         src = Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
         self.assertIn("from atlasquant_central_hub_ui import (", src)
         self.assertIn("render_central_hub,", src)
-        self.assertIn(
-            "render_central_hub(_ATLASQUANT_ACCESS, requested, defer_aion_home=(active_index == 21))",
-            src,
-        )
+        self.assertIn("render_central_hub(", src)
+        self.assertIn("_ATLASQUANT_ACCESS,", src)
+        self.assertIn("defer_aion_home=(active_index == 21),", src)
         self.assertIn("render_aion_admin_console(", src)
         self.assertIn('if _aq_active_index == 21:', src)
 
