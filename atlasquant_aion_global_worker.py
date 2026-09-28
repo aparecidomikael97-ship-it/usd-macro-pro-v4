@@ -390,6 +390,30 @@ def _normalize_state(raw: Mapping[str, Any]) -> dict[str, Any]:
             or _parse_iso(state["arming_approval_expires_at"]) is None
         ):
             raise ValueError("invalid armed global worker state")
+        budgets = state["resource_budgets"]
+        zero_budget_fields = (
+            "provider_calls_per_tick",
+            "paid_service_calls_per_tick",
+            "publications_per_tick",
+            "payments_per_tick",
+            "deploys_per_tick",
+            "merges_per_tick",
+            "subprocess_calls_per_tick",
+            "market_orders_per_tick",
+        )
+        if (
+            not isinstance(budgets, Mapping)
+            or type(budgets.get("max_jobs_per_tick")) is not int
+            or budgets.get("max_jobs_per_tick") != max_jobs
+            or type(budgets.get("max_runtime_checkpoint_writes_per_tick")) is not int
+            or budgets.get("max_runtime_checkpoint_writes_per_tick") != 2
+            or any(
+                type(budgets.get(key)) is not int or budgets.get(key) != 0
+                for key in zero_budget_fields
+            )
+            or budgets.get("real_trading_enabled") is not False
+        ):
+            raise ValueError("invalid armed global worker resource budgets")
         access = _delegated_access(delegation)
         context = authenticated_context(access, Domain.ADMIN)
         if delegation.get("scope") != _scope_payload(context):
