@@ -372,6 +372,11 @@ except Exception:
     worker_snapshot = None
     worker_tick = None
 
+try:
+    from atlasquant_aion_shared_coordination import shared_coordination_snapshot
+except Exception:
+    shared_coordination_snapshot = None
+
 SCHEMA = "ATLASQUANT_AION_ADMIN_V1"
 AION_WORKSPACES = (
     "🧠 Central",
@@ -3072,6 +3077,65 @@ def _render_central(
                 + type(exc).__name__
                 + ". Worker permanece fail-closed."
             )
+
+    st.markdown("#### 🌐 Shared Coordination Gate V1 · autonomia global")
+    shared_state = {
+        "status": "UNAVAILABLE",
+        "reason": "NO_SHARED_ATOMIC_STORE_CONFIGURED",
+        "backend_kind": "NONE",
+        "configured": False,
+        "missing_capabilities": [],
+        "probe_state": "UNVERIFIED",
+        "coordination_ready": False,
+        "global_worker_started": False,
+        "global_24x7_confirmed": False,
+        "multi_instance_safe_confirmed": False,
+    }
+    if shared_coordination_snapshot is not None:
+        try:
+            shared_state = shared_coordination_snapshot(
+                access,
+                checkpoint,
+                adapter=None,
+            )
+        except Exception as exc:
+            shared_state = {
+                **shared_state,
+                "status": "UNKNOWN",
+                "reason": type(exc).__name__,
+            }
+
+    gc1, gc2, gc3, gc4 = st.columns(4)
+    gc1.metric("Backend compartilhado", str(shared_state.get("backend_kind") or "NONE"))
+    gc2.metric("Coordenação", str(shared_state.get("status") or "UNKNOWN"))
+    gc3.metric("Multi-instância", "SIM" if shared_state.get("multi_instance_safe_confirmed") else "NÃO")
+    gc4.metric("24/7 global", "SIM" if shared_state.get("global_24x7_confirmed") else "NÃO")
+
+    if shared_state.get("coordination_ready"):
+        st.success(
+            "Contrato atômico compartilhado confirmado por probe recente. "
+            "O worker global continua NÃO iniciado até um adapter de ativação separado."
+        )
+    else:
+        st.warning(
+            "Coordenação global permanece bloqueada: "
+            + str(shared_state.get("reason") or "SHARED_COORDINATION_NOT_READY")
+            + "."
+        )
+    missing_shared = [
+        str(x) for x in list(shared_state.get("missing_capabilities") or [])
+        if str(x).strip()
+    ]
+    if missing_shared:
+        st.caption(
+            "Capacidades ausentes: " + " · ".join(missing_shared) + "."
+        )
+    st.caption(
+        "Gate exigido para 24/7 global: backend compartilhado entre instâncias, "
+        "compare-and-swap atômico, versões monotônicas/fencing, TTL, delete atômico, "
+        "persistência fora do browser e namespace de kill switch global. "
+        "Nenhum serviço pago foi ativado e nenhum backend foi inventado."
+    )
 
     provider_env = _provider_env()
     provider = provider_status(feature_flags=flags, env=provider_env)
