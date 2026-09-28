@@ -216,7 +216,18 @@ def _context_for_intent(
     }
 
 
-def persistence_contract() -> dict[str, Any]:
+def persistence_contract(connected: bool = False) -> dict[str, Any]:
+    if connected:
+        return {
+            "state": "STAGED_CHECKPOINT",
+            "reason": "CHECKPOINT_MASTER_REQUIRES_EXPLICIT_SAVE",
+            "storage": "CHECKPOINT_MASTER_STAGED",
+            "automatic_directory_creation": False,
+            "automatic_database_creation": False,
+            "memory_auto_write": False,
+            "remote_persistence": "REQUIRES_EXPLICIT_CHECKPOINT_SAVE",
+            "backup_restore": "INHERITS_CHECKPOINT_MASTER_HISTORY",
+        }
     return {
         "state": "UNAVAILABLE",
         "reason": "PERSISTENCE_NOT_CONNECTED_IN_RUNTIME_BRIDGE_V1",
@@ -225,6 +236,7 @@ def persistence_contract() -> dict[str, Any]:
         "automatic_database_creation": False,
         "memory_auto_write": False,
         "remote_persistence": "UNAVAILABLE",
+        "backup_restore": "UNAVAILABLE",
     }
 
 
@@ -233,6 +245,7 @@ def handle_runtime_intent(
     intent: str,
     *,
     system_context: Mapping[str, Any] | None = None,
+    legacy_checkpoint: Mapping[str, Any] | None = None,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     """Run the data-only Core against the current authenticated runtime context."""
@@ -251,15 +264,25 @@ def handle_runtime_intent(
             "truth_state": "UNKNOWN",
             "evidence": {"status": "UNKNOWN", "records": []},
             "evidence_ingress": {"input_rows": 0, "accepted_records": 0, "rejected_records": 0},
-            "persistence": persistence_contract(),
+            "persistence": persistence_contract(False),
             **SAFETY_GATES,
         }
 
-    core = AionCore(store=None, clock=lambda: current)
-    context, preliminary = _context_for_intent(access, intent, core)
+    bootstrap_core = AionCore(store=None, clock=lambda: current)
+    context, preliminary = _context_for_intent(access, intent, bootstrap_core)
+    store = None
+    checkpoint_state = {"state": "UNAVAILABLE"}
+    if isinstance(legacy_checkpoint, Mapping):
+        from atlasquant_aion_core_checkpoint_bridge import load_checkpoint_store
+        store, checkpoint_state = load_checkpoint_store(context, legacy_checkpoint)
+    core = AionCore(store=store, clock=lambda: current)
     scoped, ingress = scoped_runtime_evidence(context, system_context)
     evidence_truth = assess(scoped.records, current)
-    result = core.handle(intent, context, evidence=scoped)
+    try:
+        result = core.handle(intent, context, evidence=scoped)
+    finally:
+        if store is not None:
+            store.close()
 
     route_result = result.get("route") if isinstance(result.get("route"), Mapping) else preliminary
     payload = result.get("payload")
@@ -277,7 +300,10 @@ def handle_runtime_intent(
         "truth_state": str(evidence_truth.get("status") or "UNKNOWN"),
         "evidence": evidence_truth,
         "evidence_ingress": ingress,
-        "persistence": persistence_contract(),
+        "persistence": {
+            **persistence_contract(isinstance(legacy_checkpoint, Mapping)),
+            "checkpoint_state": str(checkpoint_state.get("state") or "UNKNOWN"),
+        },
         "capabilities": core.registry.snapshot(),
         "memory_auto_written": False,
         **SAFETY_GATES,
