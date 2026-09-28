@@ -328,15 +328,33 @@ except Exception:
 try:
     from atlasquant_aion_core_voice_automation import (
         CADENCES as CORE_AUTOMATION_CADENCES,
+        SCHEDULE_CAPABILITIES as CORE_AUTOMATION_CAPABILITIES,
         AtlasQuantVoiceAdapter,
         CheckpointAutomationAdapter,
         stage_schedule,
     )
 except Exception:
     CORE_AUTOMATION_CADENCES = ("ONCE", "HOURLY", "DAILY", "WEEKLY")
+    CORE_AUTOMATION_CAPABILITIES = (
+        "ADMINISTRATION",
+        "MEMORY",
+        "RESEARCH",
+        "VOICE",
+        "CONTENT",
+        "OBSERVABILITY",
+    )
     AtlasQuantVoiceAdapter = None
     CheckpointAutomationAdapter = None
     stage_schedule = None
+
+try:
+    from atlasquant_aion_background_executor import (
+        execute_due_local_work,
+        executor_snapshot,
+    )
+except Exception:
+    execute_due_local_work = None
+    executor_snapshot = None
 
 SCHEMA = "ATLASQUANT_AION_ADMIN_V1"
 AION_WORKSPACES = (
@@ -2506,6 +2524,7 @@ def _render_central(
                 [
                     {
                         "Nome": str(row.get("title") or ""),
+                        "Capability": str(row.get("capability") or "NÃO VINCULADA"),
                         "Cadência": str(row.get("cadence") or ""),
                         "Estado": str(row.get("state") or ""),
                         "Próxima": str(row.get("next_run_at") or ""),
@@ -2530,6 +2549,19 @@ def _render_central(
             key="aion_core_schedule_prompt",
             max_chars=2400,
             placeholder="Ex.: Preparar um briefing macro com fatos confirmados e pendências.",
+        )
+        schedule_capability = st.selectbox(
+            "Capability local autorizada para esta agenda",
+            tuple(CORE_AUTOMATION_CAPABILITIES),
+            key="aion_core_schedule_capability",
+            format_func=lambda value: {
+                "ADMINISTRATION": "Administração · leitura",
+                "MEMORY": "Memória · leitura",
+                "RESEARCH": "Pesquisa · síntese local",
+                "VOICE": "Voz · preparação sem gerar áudio",
+                "CONTENT": "Conteúdo · rascunho",
+                "OBSERVABILITY": "Observabilidade · leitura",
+            }.get(value, value),
         )
         cadence = st.selectbox(
             "Cadência",
@@ -2626,6 +2658,7 @@ def _render_central(
                     title=schedule_title,
                     prompt=schedule_prompt,
                     cadence=cadence,
+                    capability=schedule_capability,
                     timezone_name=timezone_name,
                     hour=schedule_hour,
                     minute=schedule_minute,
@@ -2658,6 +2691,138 @@ def _render_central(
                     + type(exc).__name__
                     + ". Nenhuma execução foi autorizada."
                 )
+
+    st.markdown("#### ⚙️ Executor Local V1 · trabalhos devidos")
+    executor_state = {
+        "status": "UNAVAILABLE",
+        "receipts": [],
+        "receipt_count": 0,
+        "due_count": 0,
+        "autonomous_worker_connected": False,
+        "physical_action_adapter": "UNAVAILABLE",
+    }
+    if executor_snapshot is not None:
+        try:
+            executor_state = executor_snapshot(access, checkpoint)
+        except Exception as exc:
+            executor_state = {
+                "status": "UNKNOWN",
+                "receipts": [],
+                "receipt_count": 0,
+                "due_count": 0,
+                "autonomous_worker_connected": False,
+                "physical_action_adapter": "UNAVAILABLE",
+                "error_type": type(exc).__name__,
+            }
+
+    ex1, ex2, ex3, ex4 = st.columns(4)
+    ex1.metric("Trabalhos devidos", int(executor_state.get("due_count") or 0))
+    ex2.metric("Receipts", int(executor_state.get("receipt_count") or 0))
+    ex3.metric(
+        "Worker autônomo",
+        "ATIVO" if executor_state.get("autonomous_worker_connected") else "NÃO INSTALADO",
+    )
+    ex4.metric(
+        "Ação física",
+        str(executor_state.get("physical_action_adapter") or "UNAVAILABLE"),
+    )
+    st.caption(
+        "O Executor V1 só roda por clique ADMIN autenticado e somente em capabilities "
+        "locais allowlisted. Idempotência, Guardian e retry ficam registrados por ocorrência. "
+        "Publicação, pagamento, deploy, trading e ações externas permanecem bloqueados."
+    )
+
+    executor_receipts = [
+        row for row in list(executor_state.get("receipts") or [])
+        if isinstance(row, Mapping)
+    ]
+    if executor_receipts:
+        with st.expander("Receipts recentes do executor", expanded=False):
+            st.dataframe(
+                [
+                    {
+                        "Schedule": str(row.get("schedule_id") or ""),
+                        "Capability": str(row.get("capability") or ""),
+                        "Estado": str(row.get("state") or ""),
+                        "Tentativa": int(row.get("attempt") or 0),
+                        "Due": str(row.get("due_at") or ""),
+                        "Motivo": str(row.get("reason") or ""),
+                        "Retry": str(row.get("retry_after") or ""),
+                    }
+                    for row in executor_receipts[-50:]
+                ],
+                hide_index=True,
+                width="stretch",
+            )
+
+    executor_batch_size = int(st.number_input(
+        "Máximo de trabalhos locais por execução manual",
+        min_value=1,
+        max_value=20,
+        value=5,
+        step=1,
+        key="aion_core_executor_batch_size",
+    ))
+    executor_confirm = st.checkbox(
+        "Confirmo esta execução local dos trabalhos devidos. "
+        "Isto NÃO autoriza provider, publicação, pagamento, deploy ou trading.",
+        value=False,
+        key="aion_core_executor_confirm",
+    )
+    if st.button(
+        "▶️ Executar trabalhos locais devidos agora",
+        key="aion_core_executor_run",
+        disabled=not bool(
+            executor_confirm
+            and int(executor_state.get("due_count") or 0) > 0
+            and execute_due_local_work is not None
+        ),
+        width="stretch",
+    ):
+        try:
+            batch = execute_due_local_work(
+                access,
+                checkpoint,
+                system_context=system_context,
+                voice_status=core_voice_status,
+                confirmation=True,
+                max_jobs=executor_batch_size,
+            )
+            if int(batch.get("processed") or 0) > 0:
+                _set_working_checkpoint(
+                    batch.get("checkpoint") or checkpoint,
+                    dirty=True,
+                )
+                st.session_state["aion_core_executor_last_batch"] = {
+                    "status": str(batch.get("status") or "UNKNOWN"),
+                    "processed": int(batch.get("processed") or 0),
+                    "succeeded": int(batch.get("succeeded") or 0),
+                    "failed": int(batch.get("failed") or 0),
+                    "blocked": int(batch.get("blocked") or 0),
+                    "external_persisted": False,
+                }
+                if int(batch.get("failed") or 0) > 0:
+                    st.warning(
+                        "Lote local processado com falhas controladas. "
+                        "Os receipts registram retry/backoff; nenhuma ação externa foi executada."
+                    )
+                else:
+                    st.success(
+                        "Lote local processado e receipts colocados no Checkpoint de trabalho. "
+                        "Ainda NÃO foi persistido externamente."
+                    )
+                st.rerun()
+            else:
+                st.info(
+                    "Nenhum novo trabalho foi executado. Pode não haver tarefa devida "
+                    "ou a ocorrência já possuir receipt terminal/idempotente."
+                )
+        except Exception as exc:
+            st.error(
+                "Executor bloqueado em modo seguro: "
+                + type(exc).__name__
+                + ". Nenhuma ação externa foi autorizada."
+            )
 
     provider_env = _provider_env()
     provider = provider_status(feature_flags=flags, env=provider_env)
