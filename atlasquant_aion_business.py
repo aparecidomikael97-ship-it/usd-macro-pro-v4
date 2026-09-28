@@ -431,6 +431,120 @@ def customer_economics(
     }
 
 
+BUSINESS_METRIC_FIELDS=(
+    "visits","leads","checkouts","orders",
+    "marketing_cost","acquired_customers",
+    "gross_profit_per_order","average_orders_per_customer",
+    "revenue","costs","gross_profit","net_profit","available_cash",
+)
+
+
+def normalize_business_metrics(raw:Mapping[str,Any]|None)->dict[str,Any]:
+    data=dict(raw or {}) if isinstance(raw,Mapping) else {}
+    values={field:_optional_num(data.get(field)) for field in BUSINESS_METRIC_FIELDS}
+    source=_text(data.get("source"),220)
+    truth=_truth(data.get("truth_state"))
+    has_data=any(value is not None for value in values.values())
+    if not has_data or not source:
+        truth="UNKNOWN"
+    state=(
+        "READY"
+        if truth=="CONFIRMED" and source and has_data
+        else ("NOT_CONFIGURED" if not has_data else "UNCONFIRMED")
+    )
+    return {
+        **values,
+        "source":source,
+        "truth_state":truth,
+        "state":state,
+        "recorded_by":_text(data.get("recorded_by"),80),
+        "recorded_at":_text(data.get("recorded_at"),80),
+        "automatic_campaign":False,
+        "automatic_publish":False,
+        "automatic_payment":False,
+        "automatic_investment":False,
+    }
+
+
+def new_business_metrics(
+    *,
+    source:Any="",
+    truth_state:Any="UNKNOWN",
+    recorded_by:Any="",
+    visits:Any=None,
+    leads:Any=None,
+    checkouts:Any=None,
+    orders:Any=None,
+    marketing_cost:Any=None,
+    acquired_customers:Any=None,
+    gross_profit_per_order:Any=None,
+    average_orders_per_customer:Any=None,
+    revenue:Any=None,
+    costs:Any=None,
+    gross_profit:Any=None,
+    net_profit:Any=None,
+    available_cash:Any=None,
+)->dict[str,Any]:
+    return normalize_business_metrics({
+        "source":source,
+        "truth_state":truth_state,
+        "recorded_by":recorded_by,
+        "recorded_at":_now(),
+        "visits":visits,
+        "leads":leads,
+        "checkouts":checkouts,
+        "orders":orders,
+        "marketing_cost":marketing_cost,
+        "acquired_customers":acquired_customers,
+        "gross_profit_per_order":gross_profit_per_order,
+        "average_orders_per_customer":average_orders_per_customer,
+        "revenue":revenue,
+        "costs":costs,
+        "gross_profit":gross_profit,
+        "net_profit":net_profit,
+        "available_cash":available_cash,
+    })
+
+
+def business_metrics_views(raw:Mapping[str,Any]|None)->dict[str,Any]:
+    metrics=normalize_business_metrics(raw)
+    confirmed_source=metrics["source"] if metrics["truth_state"]=="CONFIRMED" else ""
+    funnel=funnel_snapshot(
+        visits=metrics["visits"],
+        leads=metrics["leads"],
+        checkouts=metrics["checkouts"],
+        orders=metrics["orders"],
+        source=confirmed_source,
+    )
+    customers=customer_economics(
+        marketing_cost=metrics["marketing_cost"],
+        acquired_customers=metrics["acquired_customers"],
+        gross_profit_per_order=metrics["gross_profit_per_order"],
+        average_orders_per_customer=metrics["average_orders_per_customer"],
+        source=confirmed_source,
+    )
+    finance={
+        key:metrics[key]
+        for key in ("revenue","costs","gross_profit","net_profit","available_cash")
+    }
+    finance.update({
+        "source":metrics["source"],
+        "truth_state":metrics["truth_state"],
+        "state":metrics["state"],
+    })
+    return {"metrics":metrics,"funnel":funnel,"customers":customers,"finance":finance}
+
+
+def business_metrics_digest(raw:Mapping[str,Any]|None)->str:
+    normalized=normalize_business_metrics(raw)
+    payload={key:normalized.get(key) for key in (
+        *BUSINESS_METRIC_FIELDS,
+        "source","truth_state","state","recorded_by","recorded_at",
+    )}
+    encoded=json.dumps(payload,ensure_ascii=False,sort_keys=True,default=str)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:16]
+
+
 def business_digest(rows:Sequence[Mapping[str,Any]]|None)->str:
     raw=json.dumps(normalize_products(rows),ensure_ascii=False,sort_keys=True,default=str)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
@@ -458,5 +572,7 @@ __all__=[
     "new_product_candidate","normalize_product","normalize_products","upsert_product",
     "trend_assessment","approve_product","marketplace_preflight",
     "mark_listing_live_from_evidence","coverage_snapshot","funnel_snapshot",
-    "customer_economics","business_digest","business_summary",
+    "customer_economics","normalize_business_metrics","new_business_metrics",
+    "business_metrics_views","business_metrics_digest","BUSINESS_METRIC_FIELDS",
+    "business_digest","business_summary",
 ]
