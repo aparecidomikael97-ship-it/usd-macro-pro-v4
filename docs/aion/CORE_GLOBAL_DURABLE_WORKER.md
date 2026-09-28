@@ -256,3 +256,10 @@ A Draft PR containing this code does not activate the worker.
 The runner cannot become active until the stack is merged to the code branch,
 the ARMED state is explicitly persisted, and the feature flag is explicitly
 enabled.
+
+## CI audit procedure
+
+Because the repository's pull-request quality workflows target `main`, this
+stacked draft may be temporarily retargeted to `main` only to trigger CI. After
+the checks complete, its base is restored to `cursor/aion-worker-runtime-v1`.
+This does not merge, deploy, enable the feature flag, or arm the global worker.
