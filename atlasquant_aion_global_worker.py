@@ -151,9 +151,8 @@ def _normalize_stats(raw: Mapping[str, Any] | None) -> dict[str, Any]:
     out["last_status"] = safe_text(
         str(source.get("last_status") or "NEVER"), 120
     )
-    out["last_runtime_id"] = safe_text(
-        str(source.get("last_runtime_id") or ""), 160
-    )
+    runtime_id = str(source.get("last_runtime_id") or "").strip()
+    out["last_runtime_id"] = safe_text(runtime_id, 160) if runtime_id else ""
     return out
 
 
