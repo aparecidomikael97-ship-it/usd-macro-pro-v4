@@ -412,11 +412,7 @@ def fetch_recent_autopilot_pulses(
     """Read recent scheduled workflow runs. Never dispatches or reruns anything."""
     if not config.repo:
         return {"status": "UNAVAILABLE", "runs": [], "reason": "repo missing"}
-    url = (
-        "https://api.github.com/repos/"
-        + config.repo
-        + "/actions/workflows/autopilot-v107.yml/runs"
-    )
+    url = "https://api.github.com/repos/" + config.repo + "/actions/runs"
     headers = {
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
@@ -427,7 +423,11 @@ def fetch_recent_autopilot_pulses(
         response = requests.get(
             url,
             headers=headers,
-            params={"event": "schedule", "per_page": max(3, min(int(per_page), 10))},
+            params={
+                "event": "schedule",
+                "branch": "main",
+                "per_page": max(20, min(int(per_page) * 10, 100)),
+            },
             timeout=timeout,
         )
         response.raise_for_status()
@@ -437,16 +437,31 @@ def fetch_recent_autopilot_pulses(
         for row in list(rows or []):
             if not isinstance(row, Mapping):
                 continue
+            name = str(row.get("name") or "")
+            path = str(row.get("path") or "")
+            event = str(row.get("event") or "")
+            is_autopilot = (
+                name == "AtlasQuant - Automatic Scanner + Autopilot"
+                or path.endswith("/autopilot-v107.yml")
+            )
+            if not is_autopilot or event != "schedule":
+                continue
             safe_rows.append({
                 "id": row.get("id"),
-                "event": str(row.get("event") or ""),
+                "event": event,
                 "status": str(row.get("status") or ""),
                 "conclusion": str(row.get("conclusion") or ""),
                 "created_at": str(row.get("created_at") or ""),
                 "updated_at": str(row.get("updated_at") or ""),
                 "head_sha": str(row.get("head_sha") or "")[:40],
             })
-        return {"status": "CONFIRMED", "runs": safe_rows}
+            if len(safe_rows) >= max(3, min(int(per_page), 10)):
+                break
+        return {
+            "status": "CONFIRMED" if safe_rows else "UNAVAILABLE",
+            "runs": safe_rows,
+            "reason": "" if safe_rows else "autopilot scheduled runs not found",
+        }
     except Exception as exc:
         return {
             "status": "ERROR",
