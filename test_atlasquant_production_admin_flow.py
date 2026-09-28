@@ -117,6 +117,20 @@ class ProductionAdminFlowTests(unittest.TestCase):
         at = self._app("aparecidomikael", _ADMIN_PASSWORD)
         at.run(timeout=180)
         self._assert_clean(at)
+        door = self._html(at)
+        self.assertIn("CENTRAL PRINCIPAL", door)
+        self.assertIn("Escolha um setor", door)
+        self.assertIn('data-root="central_root"', door)
+        for label in ("AION IA", "Negócios", "Trader", "Renda Fixa / Investimentos"):
+            self.assertIn(label, door)
+        self.assertNotIn('id="aq-account-identity"', door)
+        self.assertNotIn("aq-premium-hero", door)
+        self.assertEqual([r for r in at.radio if r.key == "atlasquant_experience_mode"], [])
+        self.assertEqual(self.snapshot_calls, [])
+
+        at.session_state["atlasquant_central_choice"] = "trader"
+        at.run(timeout=180)
+        self._assert_clean(at)
         html = self._html(at)
         self.assertIn('id="aq-account-identity"', html)
         self.assertIn('data-role="ADMIN"', html)
@@ -140,6 +154,7 @@ class ProductionAdminFlowTests(unittest.TestCase):
 
     def test_admin_advanced_click_paints_from_the_runtime_snapshot(self):
         at = self._app("aparecidomikael", _ADMIN_PASSWORD)
+        at.session_state["atlasquant_central_choice"] = "trader"
         at.run(timeout=180)
         self._assert_clean(at)
         radio = at.radio(key="atlasquant_experience_mode")
@@ -167,6 +182,7 @@ class ProductionAdminFlowTests(unittest.TestCase):
     def test_stale_runtime_snapshot_keeps_the_live_path(self):
         self.fixture = snapshot(generated_at=(datetime.now(timezone.utc) - timedelta(minutes=120)).isoformat())
         at = self._app("aparecidomikael", _ADMIN_PASSWORD)
+        at.session_state["atlasquant_central_choice"] = "trader"
         at.session_state["atlasquant_experience_mode"] = "Avançado"
         at.run(timeout=180)
         self._assert_clean(at)
@@ -184,6 +200,14 @@ class ProductionAdminFlowTests(unittest.TestCase):
         self.assertIn("cliente.teste · USER", html)
         self.assertIn('data-role="USER"', html)
         self.assertNotIn("· ADMIN", html)
+        self.assertNotIn("CENTRAL PRINCIPAL", html)
+        self.assertNotIn("Escolha um setor", html)
+        self.assertNotIn('data-root="central_root"', html)
+        self.assertNotIn("AION IA", html)
+        self.assertNotIn("Renda Fixa", html)
+        self.assertNotIn('href="?central=aion"', html)
+        self.assertNotIn('href="?central=negocios"', html)
+        self.assertNotIn('href="?central=investimentos"', html)
         self.assertNotIn("AION liberado", html)
         self.assertNotIn("AION_CONSOLE_RENDERED", html)
         self.assertNotIn("🧠 AION", at.selectbox(key="atlasquant_advanced_area").options)
@@ -245,7 +269,7 @@ class AccountIdentityRulesTests(unittest.TestCase):
         self.assertIn("request_return_to_aion(session_state)", dock)
         premium = Path("atlasquant_premium_shell.py").read_text(encoding="utf-8")
         self.assertIn('if target == "🧠 AION":', premium)
-        self.assertIn("request_return_to_aion(st.session_state)", premium)
+        self.assertIn("request_return_to_aion(session_state)", premium)
         fast = Path("atlasquant_fast_startup.py").read_text(encoding="utf-8")
         self.assertIn('if str(dict(access or {}).get("role") or "").upper()=="ADMIN":', fast)
         self.assertIn('_dock_pages.append("🧠 AION")', fast)

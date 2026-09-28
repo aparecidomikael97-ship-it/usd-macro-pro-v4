@@ -49,10 +49,13 @@ PREMIUM_CSS = """
 .aq-premium-hero small{display:block;color:#d7b56d;font-weight:800;letter-spacing:.14em;font-size:.68rem}
 .aq-premium-hero h2{margin:.35rem 0 .4rem;color:#f5f8fc;font-size:1.72rem;line-height:1.15;font-weight:760}
 .aq-premium-hero p{margin:0;max-width:68ch;color:#d7e4f2;font-size:.95rem;line-height:1.45;font-weight:650}
-.aq-premium-sector{margin:8px 0 18px}
+.aq-premium-sector{margin:8px 0 18px;min-width:0}
 .aq-premium-sector h3{margin:0 0 10px;color:#f5f8fc;font-size:1.02rem;font-weight:760}
+.aq-premium-row{display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;gap:12px;width:100%;max-width:100%;min-width:0;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:4px}
+.aq-premium-row::-webkit-scrollbar{display:none}
 .aq-premium-grid{display:grid;grid-template-columns:1fr;gap:12px}
-.aq-premium-card{min-width:0;border:1px solid rgba(198,214,232,.22);border-radius:18px;padding:14px 14px 12px;background:linear-gradient(180deg,rgba(23,48,74,.96),rgba(12,26,44,.94));box-shadow:0 10px 24px rgba(0,0,0,.18);animation:aq-rise .5s ease both}
+.aq-premium-card{flex:0 0 340px;scroll-snap-align:start;min-width:0;border:1px solid rgba(198,214,232,.22);border-radius:18px;padding:14px 14px 12px;background:linear-gradient(180deg,rgba(23,48,74,.96),rgba(12,26,44,.94));box-shadow:0 10px 24px rgba(0,0,0,.18);animation:aq-rise .5s ease both}
+a.aq-premium-card{display:block;color:inherit;text-decoration:none}
 .aq-premium-card:hover{border-color:rgba(215,181,109,.55);transform:translateY(-2px)}
 .aq-premium-card:focus-within{outline:2px solid #d7b56d;outline-offset:3px}
 .aq-premium-art{height:74px;border-radius:14px;margin-bottom:10px;background:#0c1a2c;overflow:hidden}
@@ -61,6 +64,7 @@ PREMIUM_CSS = """
 .aq-premium-card h4{margin:.2rem 0 .35rem;color:#f5f8fc;font-size:1.12rem;line-height:1.2}
 .aq-premium-card p{margin:0;color:#d7e4f2;font-size:.86rem;line-height:1.4;font-weight:650}
 .aq-premium-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.aq-premium-open{display:inline-flex;margin-top:10px;color:#f5f8fc;font-size:.78rem;font-weight:800}
 .aq-badge{display:inline-flex;align-items:center;border-radius:999px;padding:3px 8px;font-size:.72rem;font-weight:800;border:1px solid transparent}
 .aq-badge.info{color:#f5f8fc;background:#1d4e89;border-color:#8eb7e8}
 .aq-badge.good{color:#f5f8fc;background:#145c40;border-color:#3dbe8b}
@@ -103,10 +107,11 @@ PREMIUM_CSS = """
 .stApp [data-testid="stButton"] button:disabled{color:#d7e4f2 !important;-webkit-text-fill-color:#d7e4f2 !important;background:#1c3048 !important;opacity:1 !important;border-color:rgba(215,181,109,.4) !important}
 @media (min-width:760px){.aq-premium-grid{grid-template-columns:1fr 1fr}.aq-master-rail{grid-template-columns:1fr 1fr 1fr}}
 @media (min-width:1200px){.aq-premium-grid{grid-template-columns:1fr 1fr 1fr}}
-@media (max-width:760px){.aq-premium-hero,.aq-cockpit-head{padding:15px 16px}.aq-premium-hero h2{font-size:1.35rem}.aq-premium-card:hover,.stApp [data-testid="stButton"] button:hover{transform:none}.aq-cockpit-head:after{opacity:.55}}
+@media (max-width:760px){.aq-premium-hero,.aq-cockpit-head{padding:15px 16px}.aq-premium-hero h2{font-size:1.35rem}.aq-premium-row .aq-premium-card{flex-basis:86vw}.aq-premium-card:hover,.stApp [data-testid="stButton"] button:hover{transform:none}.aq-cockpit-head:after{opacity:.55}}
 @keyframes aq-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes aq-ping{0%{box-shadow:0 0 0 0 rgba(143,208,196,.55)}100%{box-shadow:0 0 0 10px rgba(143,208,196,0)}}
 @media (prefers-reduced-motion:reduce){
+  .aq-premium-row{scroll-behavior:auto}
   .aq-premium-card,.aq-radar-dot{animation:none !important}
   .aq-premium-card:hover{transform:none}
 }
@@ -323,23 +328,38 @@ def section_hero_html(kicker: str, title: str, text: str) -> str:
     )
 
 
-def premium_module_card_html(module: Mapping[str, str], *, locked: bool, available: bool) -> str:
+def premium_module_card_html(
+    module: Mapping[str, str],
+    *,
+    locked: bool,
+    available: bool,
+    href: str = "",
+) -> str:
+    title = str(module.get("title") or "Área")
     if not available:
         badge = status_badge_html("Fora desta sessão", "neutral")
+        action = ""
+    elif locked and not href:
+        badge = status_badge_html("Prévia no Iniciante", "warn")
+        action = f"{title} · aguardar modo Avançado"
     elif locked:
         badge = status_badge_html("Prévia no Iniciante", "warn")
+        action = f"Abrir {title}"
     else:
         badge = status_badge_html("Abrir área", "good")
-    return (
-        '<article class="aq-premium-card">'
+        action = f"Abrir {title}"
+    body = (
         f'<div class="aq-premium-art">{_svg(str(module.get("motif") or "radar"))}</div>'
         f'<p class="aq-premium-kicker">{escape(str(module.get("sector") or ""))}</p>'
         f'<h4>{escape(str(module.get("title") or ""))}</h4>'
         f'<p>{escape(str(module.get("summary") or ""))}</p>'
         f'<div class="aq-premium-meta">{badge}'
         f'{status_badge_html("Clicável", "info")}</div>'
-        "</article>"
+        + (f'<span class="aq-premium-open">{escape(action)}</span>' if action else "")
     )
+    if href:
+        return f'<a class="aq-premium-card" href="{escape(href, quote=True)}">{body}</a>'
+    return f'<article class="aq-premium-card">{body}</article>'
 
 
 def navigation_tile_html(title: str, detail: str) -> str:
@@ -479,6 +499,126 @@ def consume_premium_navigation(
     return page
 
 
+def allowed_premium_target(
+    module_id: Any,
+    *,
+    mode: str,
+    available_pages: Sequence[str],
+    fast: bool = False,
+) -> str:
+    """Map a catalog id to an existing page. The raw query value is not a page."""
+    wanted = str(module_id or "").strip()
+    module = next((item for item in PREMIUM_MODULES if item["id"] == wanted), None)
+    if module is None:
+        return ""
+    target = _destination(module, fast=fast)
+    pages = {str(item) for item in list(available_pages or [])}
+    if not target or target not in pages:
+        return ""
+    beginner = not str(mode or "").casefold().startswith("avan")
+    open_pages = set(BEGINNER_OPEN_AREAS) | {"🎙️ Macro"}
+    locked = beginner and target not in open_pages and target != "🧠 AION"
+    if fast and locked:
+        return ""
+    return target
+
+
+def pull_premium_card_id(query_params) -> str:
+    """Read and clear aq_card. Only a catalog id is returned."""
+    if query_params is None:
+        return ""
+    try:
+        raw = query_params.get("aq_card", "")
+    except Exception:
+        return ""
+    if isinstance(raw, (list, tuple)):
+        raw = raw[0] if raw else ""
+    card = str(raw or "").strip()
+    if not card:
+        return ""
+    try:
+        del query_params["aq_card"]
+    except Exception:
+        pass
+    return card
+
+
+def request_premium_card(
+    session_state,
+    card_id: Any,
+    *,
+    mode: str,
+    available_pages: Sequence[str],
+    fast: bool = False,
+) -> str:
+    """Store a validated catalog destination. Unknown ids do nothing."""
+    target = allowed_premium_target(
+        card_id,
+        mode=mode,
+        available_pages=available_pages,
+        fast=fast,
+    )
+    if not target:
+        return ""
+    if target == "🧠 AION":
+        from atlasquant_navigation_bridge import request_return_to_aion
+        request_return_to_aion(session_state)
+        return target
+    session_state[_PENDING_KEY] = target
+    return target
+
+
+def premium_catalog_html(
+    *,
+    mode: str,
+    available_pages: Sequence[str],
+    fast: bool = False,
+) -> str:
+    """One horizontal strip per sector. The action lives inside the card."""
+    beginner = not str(mode or "").casefold().startswith("avan")
+    if beginner:
+        hero = section_hero_html(
+            "ATLASQUANT",
+            "Central do ecossistema",
+            "Comece pelo que está acontecendo. Os setores avançados continuam visíveis, "
+            "mas no Iniciante abrem só a prévia já existente.",
+        )
+    else:
+        hero = section_hero_html(
+            "ATLASQUANT",
+            "Central do ecossistema",
+            "Escolha um setor pelo cartão. A área avançada continua a mesma; "
+            "mudou a apresentação, não o cálculo.",
+        )
+    rows = []
+    for sector in ("Essencial", "Leitura", "Operação", "Ecossistema"):
+        modules = [item for item in PREMIUM_MODULES if item["sector"] == sector]
+        if not modules:
+            continue
+        cards = []
+        known_pages = {str(item) for item in list(available_pages or [])}
+        open_pages = set(BEGINNER_OPEN_AREAS) | {"🎙️ Macro"}
+        for module in modules:
+            destination = _destination(module, fast=fast)
+            available = bool(destination) and destination in known_pages
+            locked = beginner and available and destination not in open_pages and destination != "🧠 AION"
+            href = f"?aq_card={module['id']}" if available and not (fast and locked) else ""
+            cards.append(premium_module_card_html(
+                module,
+                locked=locked,
+                available=available,
+                href=href,
+            ))
+        rows.append(
+            '<section class="aq-premium-sector">'
+            f"<h3>{escape(sector)}</h3>"
+            f'<div class="aq-premium-row" tabindex="0" aria-label="{escape(sector)}">'
+            + "".join(cards)
+            + "</div></section>"
+        )
+    return '<div class="aq-premium">' + hero + "".join(rows) + "</div>"
+
+
 def catalog_is_home(active_page: str) -> bool:
     """The full catalog is the Radar home. Other areas keep their own workspace."""
     return str(active_page or "🎯 Radar") in {"🎯 Radar"}
@@ -511,50 +651,8 @@ def render_premium_catalog(
             st.session_state[_PENDING_KEY] = home_target
             st.rerun()
         return
-    beginner = not str(mode or "").casefold().startswith("avan")
     st.markdown(PREMIUM_CSS, unsafe_allow_html=True)
-    st.markdown('<div class="aq-premium">', unsafe_allow_html=True)
-    if beginner:
-        hero = section_hero_html(
-            "ATLASQUANT",
-            "Central do ecossistema",
-            "Comece pelo que está acontecendo. Os setores avançados continuam visíveis, "
-            "mas no Iniciante abrem só a prévia já existente.",
-        )
-    else:
-        hero = section_hero_html(
-            "ATLASQUANT",
-            "Central do ecossistema",
-            "Escolha um setor pelo cartão. A área avançada continua a mesma; "
-            "mudou a apresentação, não o cálculo.",
-        )
-    st.markdown(hero, unsafe_allow_html=True)
-    current = ""
-    for sector in ("Essencial", "Leitura", "Operação", "Ecossistema"):
-        modules = [item for item in PREMIUM_MODULES if item["sector"] == sector]
-        if not modules:
-            continue
-        if sector != current:
-            st.markdown(f'<div class="aq-premium-sector"><h3>{escape(sector)}</h3></div>', unsafe_allow_html=True)
-            current = sector
-        for module in modules:
-            target = _destination(module, fast=fast)
-            available = bool(target) and target in pages
-            open_pages = set(BEGINNER_OPEN_AREAS) | {"🎙️ Macro"}
-            locked = beginner and available and target not in open_pages and target != "🧠 AION"
-            # Full-app beginner still routes locked pages into the existing preview.
-            # The fast shell has no preview workspace, so those cards stay inactive.
-            can_open = available and not (fast and locked)
-            st.markdown(
-                premium_module_card_html(module, locked=locked or not available, available=available),
-                unsafe_allow_html=True,
-            )
-            label = f"Abrir {module['title']}" if can_open else f"{module['title']} · aguardar modo Avançado"
-            if st.button(label, key=f"aq_premium_{module['id']}_{'fast' if fast else 'full'}", disabled=not can_open, width="stretch"):
-                if target == "🧠 AION":
-                    from atlasquant_navigation_bridge import request_return_to_aion
-                    request_return_to_aion(st.session_state)
-                else:
-                    st.session_state[_PENDING_KEY] = target
-                st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown(
+        premium_catalog_html(mode=mode, available_pages=list(pages), fast=fast),
+        unsafe_allow_html=True,
+    )

@@ -16,6 +16,9 @@ from atlasquant_navigation_bridge import (
 from atlasquant_ui_v1 import hero_html, section_title_html, state_badge_html
 
 _AREA_ORDER = ("aion", "negocios", "trader", "investimentos")
+CENTRAL_ROOT = "central_root"
+CENTRAL_CHOICE_KEY = "atlasquant_central_choice"
+_ROOT_TOKENS = {"central", "central root", "ecosystem root", "central principal"}
 
 _AREAS = {
     "aion": {
@@ -120,6 +123,12 @@ _CENTRAL_CSS = """
 .aq-aion-priority{margin:0 0 8px;color:var(--aq-aion,#b48cff);font-size:.62rem;font-weight:800;letter-spacing:.14em}
 .aq-aion-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:12px}
 .aq-central-denied{margin:0;color:var(--aq-warn);font-size:.82rem;font-weight:750}
+.aq-central-root h2{margin:.2rem 0 .8rem;color:var(--aq-text);font-size:1.35rem}
+.aq-central-choices{display:grid;grid-template-columns:1fr;gap:12px}
+.aq-central-choice{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-decoration:none;color:var(--aq-text);border:1px solid var(--aq-line);border-radius:18px;padding:14px;background:linear-gradient(180deg,rgba(16,24,46,.92),rgba(7,17,31,.9))}
+.aq-central-choice small{color:var(--aq-muted);font-size:.75rem;line-height:1.35}
+.aq-central-back{color:var(--aq-aion,#b48cff);font-weight:800;text-decoration:none}
+@media (min-width:900px){.aq-central-choices{grid-template-columns:1fr 1fr}}
 .aq-aion-home .aq-hero{margin-bottom:8px}
 @media (max-width:760px){
   .aq-central-layout{grid-template-columns:1fr;gap:10px}
@@ -146,9 +155,17 @@ def _admin(access: Mapping[str, Any] | None) -> bool:
     return isinstance(access, Mapping) and access.get("allowed") is True and _role(access) == "ADMIN"
 
 
-def _canon_area(value: Any) -> str:
+def _compact(value: Any) -> str:
     raw = str(value or "").strip().casefold()
-    compact = " ".join(raw.replace("-", " ").replace("_", " ").replace("/", " ").split())
+    return " ".join(raw.replace("-", " ").replace("_", " ").replace("/", " ").split())
+
+
+def _explicit_root(value: Any) -> bool:
+    return _compact(value) in _ROOT_TOKENS
+
+
+def _canon_area(value: Any) -> str:
+    compact = _compact(value)
     aliases = {
         "aion": "aion",
         "aion ia": "aion",
@@ -175,7 +192,8 @@ def central_visibility_model(access: Mapping[str, Any] | None) -> dict[str, Any]
         "admin": admin,
         "area_ids": area_ids,
         "areas": areas,
-        "default_area": "trader",
+        "default_area": CENTRAL_ROOT if admin else "trader",
+        "entry": CENTRAL_ROOT if admin else "trader",
         "priority_area": "aion" if admin else "trader",
     }
 
@@ -194,8 +212,15 @@ def request_central_destination(session_state, access: Mapping[str, Any] | None,
 
     Trader opens the current Radar page. AION opens the existing AION page.
     Negócios and Investimentos are shells and do not change the page.
+    The central root only records the selector. It does not open Trader.
     """
+    if _explicit_root(area):
+        if not _admin(access):
+            raise ValueError("central area access denied")
+        _remember_choice(session_state, CENTRAL_ROOT)
+        return None
     area_id = assert_area_access(access, area)
+    _remember_choice(session_state, area_id)
     if area_id == "aion":
         return request_return_to_aion(session_state)
     if area_id == "trader":
@@ -206,20 +231,53 @@ def request_central_destination(session_state, access: Mapping[str, Any] | None,
 
 
 def resolve_central_area(access: Mapping[str, Any] | None, requested: Any = None) -> dict[str, Any]:
-    """Resolve a request without copying private labels into the denial."""
+    """Resolve a request without copying private labels into the denial.
+
+    An empty request is the central root for ADMIN and Trader for everyone else.
+    """
     model = central_visibility_model(access)
     token = str(requested or "").strip()
-    if not token:
-        return {"area": model["default_area"], "denied": False, "shell": False}
+    if not token or _explicit_root(token):
+        if model["admin"]:
+            return {"area": CENTRAL_ROOT, "denied": False, "shell": False, "root": True}
+        return {"area": "trader", "denied": False, "shell": False, "root": False}
     try:
         area_id = assert_area_access(access, token)
     except ValueError:
-        return {"area": "trader", "denied": True, "shell": False}
+        return {"area": "trader", "denied": True, "shell": False, "root": False}
     return {
         "area": area_id,
         "denied": False,
         "shell": area_id in {"negocios", "investimentos"},
+        "root": False,
     }
+
+
+def _remember_choice(session_state, area_id: str) -> None:
+    try:
+        session_state[CENTRAL_CHOICE_KEY] = area_id
+    except Exception:
+        return
+
+
+def sync_central_choice(session_state, access: Mapping[str, Any] | None, requested: Any = None) -> dict[str, Any]:
+    """Remember a validated area. A stored id is rechecked and is not authority."""
+    explicit = str(requested or "").strip()
+    if not explicit:
+        try:
+            explicit = str(session_state.get(CENTRAL_CHOICE_KEY) or "").strip()
+        except Exception:
+            explicit = ""
+        if explicit == CENTRAL_ROOT:
+            explicit = "central"
+    resolved = resolve_central_area(access, explicit or None)
+    if resolved.get("root"):
+        _remember_choice(session_state, CENTRAL_ROOT)
+    elif resolved.get("denied"):
+        _remember_choice(session_state, "trader")
+    else:
+        _remember_choice(session_state, str(resolved.get("area") or "trader"))
+    return resolved
 
 
 def _svg_aion() -> str:
@@ -300,10 +358,14 @@ _ART = {
 def ecosystem_rail_html(access: Mapping[str, Any] | None, active_area: Any = None) -> str:
     """Vertical ecosystem rail. Hidden areas are omitted from the markup."""
     model = central_visibility_model(access)
-    try:
-        current = assert_area_access(access, active_area) if str(active_area or "").strip() else model["default_area"]
-    except ValueError:
-        current = model["default_area"]
+    current = ""
+    if str(active_area or "").strip() and not _explicit_root(active_area):
+        try:
+            current = assert_area_access(access, active_area)
+        except ValueError:
+            current = "" if model["admin"] else "trader"
+    elif not model["admin"]:
+        current = "trader"
     links = []
     for area in model["areas"]:
         area_id = area["id"]
@@ -383,21 +445,53 @@ def aion_home_html(*_ignored: Any, **_claims: Any) -> str:
     )
 
 
+def central_selector_html(access: Mapping[str, Any] | None) -> str:
+    """Four-sector door for an admin session. Non-admin sessions get no private cards."""
+    model = central_visibility_model(access)
+    if not model["admin"]:
+        return ""
+    choices = []
+    for area in model["areas"]:
+        area_id = area["id"]
+        spec = _AREAS[area_id]
+        choices.append(
+            f'<a class="aq-central-choice" href="?central={area_id}">'
+            f"{_ART[area_id]()}"
+            f"<strong>{escape(spec['label'])}</strong>"
+            f"<small>{escape(spec['sentence'])}</small></a>"
+        )
+    return (
+        '<section class="aq-central-root" data-root="central_root">'
+        '<p class="aq-central-kicker">CENTRAL PRINCIPAL</p>'
+        "<h2>Escolha um setor</h2>"
+        '<div class="aq-central-choices">'
+        + "".join(choices)
+        + "</div></section>"
+    )
+
+
 def central_surface_html(access: Mapping[str, Any] | None, requested: Any = None) -> str:
     """Rail plus the allowed stage. A denial does not leak private labels."""
     resolved = resolve_central_area(access, requested)
-    rail = ecosystem_rail_html(access, active_area=resolved["area"])
+    at_root = bool(resolved.get("root"))
+    rail = ecosystem_rail_html(access, active_area="" if at_root else resolved["area"])
     if resolved["denied"]:
         stage = '<p class="aq-central-denied">Área privada indisponível para esta sessão.</p>'
+    elif at_root:
+        stage = central_selector_html(access)
     elif resolved["area"] == "aion":
         stage = aion_home_html()
     else:
         stage = central_card_html(resolved["area"])
+    back = ""
+    if _admin(access) and not at_root:
+        back = '<p><a class="aq-central-back" href="?central=central">Voltar à Central Principal</a></p>'
     return (
         '<div class="aq-central-layout">'
         + rail
         + '<div class="aq-central-stage">'
         + stage
+        + back
         + "</div></div>"
     )
 
@@ -420,7 +514,11 @@ __all__ = [
     "ecosystem_rail_html",
     "central_card_html",
     "aion_home_html",
+    "central_selector_html",
     "central_surface_html",
     "request_central_destination",
+    "sync_central_choice",
     "render_central_hub",
+    "CENTRAL_ROOT",
+    "CENTRAL_CHOICE_KEY",
 ]

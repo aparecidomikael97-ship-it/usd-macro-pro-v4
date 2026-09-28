@@ -6,6 +6,8 @@ from pathlib import Path
 import unittest
 
 from atlasquant_central_hub_ui import (
+    CENTRAL_CHOICE_KEY,
+    CENTRAL_ROOT,
     aion_home_html,
     assert_area_access,
     central_surface_html,
@@ -13,6 +15,7 @@ from atlasquant_central_hub_ui import (
     ecosystem_rail_html,
     request_central_destination,
     resolve_central_area,
+    sync_central_choice,
 )
 from atlasquant_navigation_bridge import consume_navigation_request
 from atlasquant_ui_v1 import navigation_labels
@@ -48,6 +51,8 @@ class CentralHubUiTests(unittest.TestCase):
         )
         self.assertEqual(model["area_ids"], ("aion", "negocios", "trader", "investimentos"))
         self.assertEqual(model["priority_area"], "aion")
+        self.assertEqual(model["default_area"], CENTRAL_ROOT)
+        self.assertEqual(model["entry"], CENTRAL_ROOT)
         self.assertTrue(model["admin"])
 
     def test_non_admin_sees_only_trader(self):
@@ -223,13 +228,81 @@ class CentralHubUiTests(unittest.TestCase):
         self.assertLess(late, src.index("consume_navigation_request(", late))
         self.assertIn('if _aq_active_index == 21:', src)
         self.assertIn('resolved.get("shell")', src)
+        hold = src.index("\n_hold_admin_before_trader_shell()\n")
+        self.assertLess(hold, src.index("load_home_snapshot(", hold))
+        self.assertLess(early, hold)
 
     def test_entry_point_keeps_the_existing_aion_console(self):
         src = Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
-        self.assertIn("from atlasquant_central_hub_ui import render_central_hub", src)
+        self.assertIn("from atlasquant_central_hub_ui import (", src)
+        self.assertIn("render_central_hub,", src)
         self.assertIn("render_central_hub(_ATLASQUANT_ACCESS, requested)", src)
         self.assertIn("render_aion_admin_console(", src)
         self.assertIn('if _aq_active_index == 21:', src)
+
+    def test_admin_without_a_choice_stays_on_the_central_root(self):
+        admin = _access("ADMIN")
+        resolved = resolve_central_area(admin, None)
+        self.assertTrue(resolved["root"])
+        self.assertEqual(resolved["area"], CENTRAL_ROOT)
+        self.assertFalse(resolved["shell"])
+        html = central_surface_html(admin)
+        self.assertIn("CENTRAL PRINCIPAL", html)
+        self.assertIn("Escolha um setor", html)
+        for label in ("AION IA", "Negócios", "Trader", "Renda Fixa / Investimentos"):
+            self.assertIn(label, html)
+        self.assertIn("?central=aion", html)
+        self.assertIn("?central=trader", html)
+        self.assertIn("?central=negocios", html)
+        self.assertIn("?central=investimentos", html)
+        self.assertNotIn('aria-current="page">', html)
+        self.assertEqual(html.count('<svg class="aq-central-art"'), 8)
+        state = {}
+        self.assertIsNone(request_central_destination(state, admin, "central"))
+        self.assertEqual(state[CENTRAL_CHOICE_KEY], CENTRAL_ROOT)
+        self.assertNotIn("atlasquant_advanced_area", state)
+        synced = sync_central_choice({}, admin, None)
+        self.assertTrue(synced["root"])
+
+    def test_admin_choice_opens_trader_or_aion_and_can_return(self):
+        admin = _access("ADMIN")
+        trader = resolve_central_area(admin, "trader")
+        self.assertFalse(trader["root"])
+        self.assertFalse(trader["shell"])
+        self.assertEqual(trader["area"], "trader")
+        surface = central_surface_html(admin, "trader")
+        self.assertIn("Voltar à Central Principal", surface)
+        self.assertIn("?central=central", surface)
+        self.assertNotIn("Escolha um setor", surface)
+        aion = central_surface_html(admin, "aion")
+        self.assertIn("PRIORIDADE ATUAL", aion)
+        self.assertIn("Voltar à Central Principal", aion)
+        self.assertTrue(resolve_central_area(admin, "central")["root"])
+        self.assertTrue(resolve_central_area(admin, "central_root")["root"])
+
+    def test_student_still_enters_trader_and_cannot_open_the_selector(self):
+        user = _access("ALUNO")
+        resolved = resolve_central_area(user, None)
+        self.assertFalse(resolved["root"])
+        self.assertEqual(resolved["area"], "trader")
+        html = "\n".join([
+            central_surface_html(user),
+            central_surface_html(user, "central"),
+            central_surface_html(user, "central_root"),
+            ecosystem_rail_html(user),
+        ])
+        for label in _PRIVATE_LABELS:
+            self.assertNotIn(label, html)
+        self.assertNotIn("CENTRAL PRINCIPAL", html)
+        self.assertNotIn("Escolha um setor", html)
+        self.assertIn("Trader", html)
+        forged = {CENTRAL_CHOICE_KEY: "aion"}
+        synced = sync_central_choice(forged, _access("USER", grant_admin=True), None)
+        self.assertEqual(synced["area"], "trader")
+        self.assertTrue(synced["denied"])
+        self.assertEqual(forged[CENTRAL_CHOICE_KEY], "trader")
+        with self.assertRaisesRegex(ValueError, "central area access denied"):
+            request_central_destination({}, user, "central")
 
 
 if __name__ == "__main__":

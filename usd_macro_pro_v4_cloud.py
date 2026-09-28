@@ -418,17 +418,72 @@ except Exception as _atlasquant_ui_exc:
 try:
     from atlasquant_premium_shell import (
         consume_premium_navigation,
+        pull_premium_card_id,
         render_premium_catalog,
+        request_premium_card,
     )
 except Exception:
     consume_premium_navigation = None
+    pull_premium_card_id = None
     render_premium_catalog = None
+    request_premium_card = None
 
 try:
-    from atlasquant_central_hub_ui import render_central_hub, request_central_destination
+    from atlasquant_central_hub_ui import (
+        render_central_hub,
+        request_central_destination,
+        sync_central_choice,
+    )
 except Exception:
     render_central_hub = None
     request_central_destination = None
+    sync_central_choice = None
+
+
+def _central_query_value() -> str:
+    try:
+        requested = st.query_params.get("central", "")
+    except Exception:
+        return ""
+    if isinstance(requested, (list, tuple)):
+        requested = requested[0] if requested else ""
+    return str(requested or "").strip()
+
+
+def _central_request_for_render(*, active_index=None) -> str:
+    """Query wins. A stored choice is revalidated and never promotes a role."""
+    requested = _central_query_value()
+    if active_index == 21 and not requested:
+        requested = "aion"
+    elif (
+        not requested
+        and str(st.session_state.get("atlasquant_advanced_area") or "") == "🧠 AION"
+    ):
+        requested = "aion"
+    if sync_central_choice is None:
+        return requested
+    resolved = sync_central_choice(st.session_state, _ATLASQUANT_ACCESS, requested)
+    if resolved.get("denied"):
+        return requested
+    if resolved.get("root"):
+        return "central"
+    return str(resolved.get("area") or requested)
+
+
+def _hold_admin_before_trader_shell() -> None:
+    """ADMIN without a chosen sector sees only the central selector."""
+    if os.getenv("USD_MACRO_AUTOPILOT", "") == "1" or render_central_hub is None:
+        return
+    if str(_ATLASQUANT_ACCESS.get("role") or "").upper() != "ADMIN":
+        return
+    requested = _central_request_for_render()
+    if sync_central_choice is None:
+        return
+    resolved = sync_central_choice(st.session_state, _ATLASQUANT_ACCESS, requested)
+    if not (resolved.get("root") or resolved.get("shell")):
+        return
+    _render_atlasquant_central_hub(stop_for_shell=False)
+    st.stop()
 
 
 def _render_atlasquant_central_hub(*, active_index=None, stop_for_shell=False):
@@ -436,11 +491,7 @@ def _render_atlasquant_central_hub(*, active_index=None, stop_for_shell=False):
     if render_central_hub is None:
         return None
     try:
-        requested = st.query_params.get("central", "")
-        if isinstance(requested, (list, tuple)):
-            requested = requested[0] if requested else ""
-        if active_index == 21 and not str(requested or "").strip():
-            requested = "aion"
+        requested = _central_request_for_render(active_index=active_index)
         resolved = render_central_hub(_ATLASQUANT_ACCESS, requested)
     except Exception:
         return None
@@ -2171,11 +2222,25 @@ _apply_central_trader_navigation()
 _aq_early_pages = list(navigation_labels()) if navigation_labels is not None else []
 if str(_ATLASQUANT_ACCESS.get("role") or "").upper() == "ADMIN" and "🧠 AION" not in _aq_early_pages:
     _aq_early_pages.append("🧠 AION")
+if _aq_early_pages and request_premium_card is not None and pull_premium_card_id is not None:
+    try:
+        _aq_early_card = pull_premium_card_id(st.query_params)
+        if _aq_early_card:
+            request_premium_card(
+                st.session_state,
+                _aq_early_card,
+                mode=str(st.session_state.get("atlasquant_experience_mode") or "Iniciante"),
+                available_pages=_aq_early_pages,
+                fast=False,
+            )
+    except Exception:
+        pass
 if _aq_early_pages:
     try:
         consume_navigation_request(st.session_state, available_pages=_aq_early_pages)
     except Exception:
         pass
+_hold_admin_before_trader_shell()
 st.session_state["_aq_experience_switch_mounted"] = False
 _fast_snapshot = {}
 if os.getenv("USD_MACRO_AUTOPILOT", "") != "1" and not _ATLASQUANT_OFFLINE_SMOKE:

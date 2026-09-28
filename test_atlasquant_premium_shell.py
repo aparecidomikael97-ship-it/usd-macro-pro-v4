@@ -11,6 +11,8 @@ from atlasquant_premium_shell import (
     beginner_attention_html,
     consume_premium_navigation,
     empty_state_html,
+    premium_catalog_html,
+    request_premium_card,
     loading_state_html,
     master_command_html,
     metric_card_html,
@@ -133,6 +135,73 @@ class PremiumShellTests(unittest.TestCase):
         self.assertTrue(catalog_is_home("🎯 Radar"))
         self.assertTrue(catalog_is_home(""))
         self.assertFalse(catalog_is_home("🧭 Painel mestre"))
+        self.assertIn("flex-wrap:nowrap", PREMIUM_CSS)
+        self.assertIn("overflow-x:auto", PREMIUM_CSS)
+        self.assertIn("overflow-y:hidden", PREMIUM_CSS)
+        self.assertIn("scroll-snap-type:x mandatory", PREMIUM_CSS)
+        self.assertIn("scroll-snap-align:start", PREMIUM_CSS)
+        self.assertIn("86vw", PREMIUM_CSS)
+        self.assertIn("340px", PREMIUM_CSS)
+        row = PREMIUM_CSS.split(".aq-premium-row{")[1].split("}")[0]
+        self.assertNotIn("overflow-x:hidden", row)
+        self.assertIn("-webkit-overflow-scrolling:touch", PREMIUM_CSS)
+
+    def test_catalog_sectors_are_horizontal_strips_and_cards_carry_the_action(self):
+        pages = list(NAVIGATION_LABELS) + ["🧠 AION"]
+        html = premium_catalog_html(mode="Avançado", available_pages=pages, fast=False)
+        for sector in ("Essencial", "Leitura", "Operação", "Ecossistema"):
+            self.assertEqual(html.count(f'aria-label="{sector}"'), 1)
+            self.assertIn("aq-premium-row", html)
+        essencial = html.split('aria-label="Essencial"')[1].split('aria-label="Leitura"')[0]
+        self.assertLess(essencial.index(">Radar<"), essencial.index(">Painel Mestre<"))
+        self.assertLess(essencial.index(">Painel Mestre<"), essencial.index(">Macroeconomia<"))
+        self.assertIn('href="?aq_card=radar"', essencial)
+        self.assertIn("Abrir Radar", essencial)
+        self.assertIn('href="?aq_card=master"', essencial)
+        self.assertNotIn("st.button", html)
+        fast_pages = ["🎯 Radar", "🎙️ Macro", "🎓 Aprender", "👤 Conta", "📱 Instalar", "💰 Investir", "🛟 Suporte"]
+        fast_html = premium_catalog_html(mode="Iniciante", available_pages=fast_pages, fast=True)
+        self.assertIn('href="?aq_card=radar"', fast_html)
+        self.assertIn("flex-basis:86vw", PREMIUM_CSS)
+        self.assertNotIn('href="?aq_card=master"', fast_html)
+        self.assertIn("<article", fast_html)
+        beginner = premium_catalog_html(mode="Iniciante", available_pages=pages, fast=False)
+        self.assertIn('href="?aq_card=master"', beginner)
+        self.assertIn("Prévia no Iniciante", beginner)
+        state = {}
+        self.assertEqual(
+            request_premium_card(state, "master", mode="Avançado", available_pages=pages, fast=False),
+            "🧭 Painel mestre",
+        )
+        self.assertEqual(
+            consume_premium_navigation(state, mode="Avançado", available_pages=pages),
+            "🧭 Painel mestre",
+        )
+        self.assertEqual(
+            request_premium_card({}, "mesa secreta", mode="Avançado", available_pages=pages),
+            "",
+        )
+        self.assertEqual(
+            request_premium_card({}, "../radar", mode="Avançado", available_pages=pages),
+            "",
+        )
+        blocked = {}
+        self.assertEqual(
+            request_premium_card(blocked, "lab", mode="Iniciante", available_pages=fast_pages, fast=True),
+            "",
+        )
+        self.assertNotIn("atlasquant_premium_nav_target", blocked)
+        aion_state = {}
+        self.assertEqual(
+            request_premium_card(aion_state, "aion", mode="Avançado", available_pages=pages, fast=False),
+            "🧠 AION",
+        )
+        from atlasquant_navigation_bridge import consume_navigation_request
+        consume_navigation_request(aion_state, available_pages=pages)
+        self.assertEqual(aion_state["atlasquant_advanced_area"], "🧠 AION")
+        shell = Path("atlasquant_premium_shell.py").read_text(encoding="utf-8")
+        self.assertNotIn("real_orders_enabled = True", shell)
+        self.assertNotIn("automatic_execution = True", shell)
 
     def test_cockpit_header_escapes_copy_and_telemetry(self):
         html = cockpit_header_html("<Radar>", "x & y", telemetry={"ORDENS": "<BLOQUEADAS>"})
