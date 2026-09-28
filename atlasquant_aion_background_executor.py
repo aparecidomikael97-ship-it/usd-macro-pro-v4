@@ -88,8 +88,8 @@ def _result_preview(payload: Any) -> str:
         flags=re.S,
     )
     text = re.sub(
-        r"(https?://)[^\\s/@]+:[^\\s/@]+@",
-        r"\\1[REDACTED]@",
+        r"(https?://)[^\s/@]+:[^\s/@]+@",
+        r"\1[REDACTED]@",
         text,
     )
     return redact_text(text)[:4000]
