@@ -231,10 +231,13 @@ class CentralHubUiTests(unittest.TestCase):
             "atlasquant_experience_mode": "Avançado",
             "atlasquant_advanced_area": "🧠 AION",
         }
-        self.assertIsNone(request_central_destination(parked, admin, "negocios"))
+        business_request=request_central_destination(parked, admin, "negocios")
+        self.assertEqual(business_request["workspace"], "💼 Negócios")
+        self.assertEqual(business_request["state"], "BUSINESS_WORKSPACE_REQUESTED")
+        self.assertEqual(parked["aion_admin_workspace_jump"], "💼 Negócios")
         self.assertIsNone(request_central_destination(parked, admin, "Renda Fixa"))
         self.assertEqual(parked["atlasquant_advanced_area"], "🧠 AION")
-        self.assertTrue(resolve_central_area(admin, "negocios")["shell"])
+        self.assertFalse(resolve_central_area(admin, "negocios")["shell"])
         self.assertTrue(resolve_central_area(admin, "investimentos")["shell"])
         self.assertFalse(resolve_central_area(admin, "trader")["shell"])
 
