@@ -197,3 +197,10 @@ Because the repository's pull-request quality workflows target `main`, this
 stacked draft may be temporarily retargeted to `main` only to trigger CI. After
 the checks complete, its base is restored to the preceding stacked AION branch.
 This audit procedure does not merge or deploy the change.
+
+## Authorization-mode audit note
+
+The executor receipt bundle reports whether `HUMAN_CLICK` and/or
+`ARMED_WORKER` receipts have actually been observed. It does not claim
+`manual_invocation_only=true` after an armed-worker receipt exists. The worker
+still has no external or physical authority.
