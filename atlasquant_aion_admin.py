@@ -3124,7 +3124,8 @@ def _render_business(
     st.progress(0 if coverage["coverage_pct"] is None else min(100,int(round(coverage["coverage_pct"]))))
     st.caption(
         "Esta simulação usa entradas manuais da sessão e não representa faturamento, lucro ou caixa "
-        "confirmados de marketplace. Nenhuma movimentação financeira é executada."
+        "confirmados de marketplace. Esses valores não representam vendas confirmadas enquanto "
+        "integrações de pedidos não estiverem conectadas. Nenhuma movimentação financeira é executada."
     )
     with st.expander("Funil, CAC, LTV, afiliados e tracking"):
         funnel=metric_views["funnel"]
