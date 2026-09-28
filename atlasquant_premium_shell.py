@@ -51,15 +51,28 @@ PREMIUM_CSS = """
 .aq-premium-hero p{margin:0;max-width:68ch;color:#d7e4f2;font-size:.95rem;line-height:1.45;font-weight:650}
 .aq-premium-sector{margin:8px 0 18px;min-width:0}
 .aq-premium-sector h3{margin:0 0 10px;color:#f5f8fc;font-size:1.02rem;font-weight:760}
-.aq-premium-row{display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;gap:12px;width:100%;max-width:100%;min-width:0;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:4px}
-.aq-premium-row::-webkit-scrollbar{display:none}
+.aq-premium-row{display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;gap:12px;width:100%;max-width:100%;min-width:0;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:#8fd0c4 rgba(198,214,232,.12);padding-bottom:10px}
+.aq-premium-row::-webkit-scrollbar{height:8px}
+.aq-premium-row::-webkit-scrollbar-track{background:rgba(198,214,232,.08);border-radius:999px}
+.aq-premium-row::-webkit-scrollbar-thumb{background:linear-gradient(90deg,#8eb7e8,#8fd0c4);border-radius:999px}
+.aq-premium-scroll-hint{margin:-2px 0 8px;color:#9fb4c9;font-size:.72rem;font-weight:750;letter-spacing:.03em}
+.aq-premium-scroll-hint b{color:#8fd0c4}
+
 .aq-premium-grid{display:grid;grid-template-columns:1fr;gap:12px}
 .aq-premium-card{flex:0 0 340px;scroll-snap-align:start;min-width:0;border:1px solid rgba(198,214,232,.22);border-radius:18px;padding:14px 14px 12px;background:linear-gradient(180deg,rgba(23,48,74,.96),rgba(12,26,44,.94));box-shadow:0 10px 24px rgba(0,0,0,.18);animation:aq-rise .5s ease both}
 a.aq-premium-card{display:block;color:inherit;text-decoration:none}
 .aq-premium-card:hover{border-color:rgba(215,181,109,.55);transform:translateY(-2px)}
 .aq-premium-card:focus-within{outline:2px solid #d7b56d;outline-offset:3px}
-.aq-premium-art{height:74px;border-radius:14px;margin-bottom:10px;background:#0c1a2c;overflow:hidden}
-.aq-premium-art svg{width:100%;height:74px;display:block}
+.aq-premium-art{position:relative;height:74px;border-radius:14px;margin-bottom:10px;overflow:hidden;background:
+  radial-gradient(circle at 20% 18%,rgba(143,208,196,.12),transparent 30%),
+  radial-gradient(circle at 84% 20%,rgba(215,181,109,.10),transparent 28%),
+  linear-gradient(180deg,#10253d,#091522)}
+.aq-premium-art:after{content:"";position:absolute;inset:0;pointer-events:none;opacity:.16;background-image:
+  linear-gradient(rgba(142,183,232,.28) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(142,183,232,.24) 1px,transparent 1px);background-size:26px 18px}
+.aq-premium-art svg{position:relative;z-index:1;width:100%;height:74px;display:block}
+.aq-premium-art svg>rect:first-child{fill:rgba(12,26,44,.76)}
+.aq-radar-sweep{transform-origin:64px 37px;animation:aq-sweep 4.8s linear infinite}
 .aq-premium-kicker{margin:0;color:#d7b56d;font-size:.68rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
 .aq-premium-card h4{margin:.2rem 0 .35rem;color:#f5f8fc;font-size:1.12rem;line-height:1.2}
 .aq-premium-card p{margin:0;color:#d7e4f2;font-size:.86rem;line-height:1.4;font-weight:650}
@@ -110,9 +123,10 @@ a.aq-premium-card{display:block;color:inherit;text-decoration:none}
 @media (max-width:760px){.aq-premium-hero,.aq-cockpit-head{padding:15px 16px}.aq-premium-hero h2{font-size:1.35rem}.aq-premium-row .aq-premium-card{flex-basis:86vw}.aq-premium-card:hover,.stApp [data-testid="stButton"] button:hover{transform:none}.aq-cockpit-head:after{opacity:.55}}
 @keyframes aq-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes aq-ping{0%{box-shadow:0 0 0 0 rgba(143,208,196,.55)}100%{box-shadow:0 0 0 10px rgba(143,208,196,0)}}
+@keyframes aq-sweep{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){
   .aq-premium-row{scroll-behavior:auto}
-  .aq-premium-card,.aq-radar-dot{animation:none !important}
+  .aq-premium-card,.aq-radar-dot,.aq-radar-sweep{animation:none !important}
   .aq-premium-card:hover{transform:none}
 }
 </style>
@@ -148,7 +162,7 @@ def _svg(kind: str) -> str:
             '<rect width="320" height="74" fill="#0c1a2c"/>'
             '<circle cx="64" cy="37" r="22" fill="none" stroke="#8fd0c4" stroke-width="1.4"/>'
             '<circle cx="64" cy="37" r="12" fill="none" stroke="#d7b56d" stroke-width="1.2"/>'
-            '<path d="M64 37 L84 22" stroke="#f5f8fc" stroke-width="1.4"/>'
+            '<path class="aq-radar-sweep" d="M64 37 L84 22" stroke="#f5f8fc" stroke-width="1.4"/>'
             '<circle cx="150" cy="28" r="3" fill="#8fd0c4"/><circle cx="188" cy="46" r="3" fill="#d7b56d"/>'
             '<circle cx="230" cy="24" r="3" fill="#8eb7e8"/><path d="M120 52 H280" stroke="#d7e4f2" stroke-width="1" opacity=".7"/>'
             '</svg>'
@@ -305,7 +319,7 @@ PREMIUM_MODULES: tuple[dict[str, str], ...] = (
     {"id":"academy","sector":"Ecossistema","title":"Academia","motif":"academy","page":"🎓 Aprender","fast_page":"🎓 Aprender","summary":"Material de estudo já publicado na área Aprender."},
     {"id":"journal","sector":"Ecossistema","title":"Diário","motif":"journal","page":"🗂️ Histórico","fast_page":"","summary":"Abre Histórico, o registro das leituras anteriores. Não grava um diário novo."},
     {"id":"invest","sector":"Ecossistema","title":"Investimentos","motif":"invest","page":"💰 Investir","fast_page":"💰 Investir","summary":"Abre a central de investimentos já existente, sem executar aplicação."},
-    {"id":"business","sector":"Ecossistema","title":"Negócios","motif":"business","page":"💼 Vendas","fast_page":"","summary":"Abre Vendas. Onboarding comercial continua separado de qualquer ordem de mercado."},
+    {"id":"business","sector":"Ecossistema","title":"Negócios","motif":"business","page":"🧠 AION","fast_page":"","summary":"Abre o cockpit Business existente no AION. O Portal Comercial 💼 Vendas continua separado."},
     {"id":"video","sector":"Ecossistema","title":"Vídeo / Conteúdo","motif":"video","page":"🎓 Aprender","fast_page":"🎓 Aprender","summary":"O conteúdo em vídeo permanece dentro de Aprender. Nenhum player externo é carregado na home."},
     {"id":"aion","sector":"Ecossistema","title":"AION / Central Administrativa","motif":"aion","page":"🧠 AION","fast_page":"","summary":"Abre a Central AION quando esta sessão já tem essa área. Não amplia permissão nem autenticação."},
     {"id":"profile","sector":"Ecossistema","title":"Perfil / Configurações","motif":"profile","page":"👤 Conta","fast_page":"👤 Conta","summary":"Abre Conta. Credenciais, Render e variáveis de ambiente não são editados aqui."},
@@ -354,7 +368,7 @@ def premium_module_card_html(
         f'<h4>{escape(str(module.get("title") or ""))}</h4>'
         f'<p>{escape(str(module.get("summary") or ""))}</p>'
         f'<div class="aq-premium-meta">{badge}'
-        f'{status_badge_html("Clicável", "info")}</div>'
+        f'{status_badge_html("Navegação interna", "info")}</div>'
         + (f'<span class="aq-premium-open">{escape(action)}</span>' if action else "")
     )
     if href:
@@ -561,8 +575,12 @@ def request_premium_card(
     if not target:
         return ""
     if target == "🧠 AION":
-        from atlasquant_navigation_bridge import request_return_to_aion
-        request_return_to_aion(session_state)
+        if str(card_id or "").strip() == "business":
+            from atlasquant_navigation_bridge import request_business_workspace
+            request_business_workspace(session_state)
+        else:
+            from atlasquant_navigation_bridge import request_return_to_aion
+            request_return_to_aion(session_state)
         return target
     session_state[_PENDING_KEY] = target
     return target
@@ -602,16 +620,16 @@ def premium_catalog_html(
             destination = _destination(module, fast=fast)
             available = bool(destination) and destination in known_pages
             locked = beginner and available and destination not in open_pages and destination != "🧠 AION"
-            href = f"?aq_card={module['id']}" if available and not (fast and locked) else ""
             cards.append(premium_module_card_html(
                 module,
                 locked=locked,
                 available=available,
-                href=href,
+                href="",
             ))
         rows.append(
             '<section class="aq-premium-sector">'
             f"<h3>{escape(sector)}</h3>"
+            '<p class="aq-premium-scroll-hint"><b>←</b> deslize, role ou use as setas para explorar <b>→</b></p>'
             f'<div class="aq-premium-row" tabindex="0" aria-label="{escape(sector)}">'
             + "".join(cards)
             + "</div></section>"
@@ -622,6 +640,44 @@ def premium_catalog_html(
 def catalog_is_home(active_page: str) -> bool:
     """The full catalog is the Radar home. Other areas keep their own workspace."""
     return str(active_page or "🎯 Radar") in {"🎯 Radar"}
+
+
+def _render_premium_stateful_controls(
+    *,
+    mode: str,
+    available_pages: Sequence[str],
+    fast: bool,
+) -> None:
+    """Native controls keep authenticated navigation inside session_state."""
+    pages = [str(item) for item in list(available_pages or [])]
+    for sector in ("Essencial", "Leitura", "Operação", "Ecossistema"):
+        modules = [item for item in PREMIUM_MODULES if item["sector"] == sector]
+        if not modules:
+            continue
+        st.caption(f"{sector} · abrir módulo")
+        columns = st.columns(min(4, max(1, len(modules))))
+        for index, module in enumerate(modules):
+            target = allowed_premium_target(
+                module["id"],
+                mode=mode,
+                available_pages=pages,
+                fast=fast,
+            )
+            with columns[index % len(columns)]:
+                if st.button(
+                    str(module["title"]),
+                    key=f"aq_premium_stateful_{'fast' if fast else 'full'}_{module['id']}",
+                    width="stretch",
+                    disabled=not bool(target),
+                ):
+                    request_premium_card(
+                        st.session_state,
+                        module["id"],
+                        mode=mode,
+                        available_pages=pages,
+                        fast=fast,
+                    )
+                    st.rerun()
 
 
 def render_premium_catalog(
@@ -655,4 +711,9 @@ def render_premium_catalog(
     st.markdown(
         premium_catalog_html(mode=mode, available_pages=list(pages), fast=fast),
         unsafe_allow_html=True,
+    )
+    _render_premium_stateful_controls(
+        mode=mode,
+        available_pages=list(pages),
+        fast=fast,
     )
