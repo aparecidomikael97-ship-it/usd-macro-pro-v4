@@ -120,3 +120,10 @@ The voice adapter performs no provider call. Existing neural audio generation
 remains an explicit user action on the pre-existing voice surface.
 
 Real trading remains disabled.
+
+## CI audit note
+
+This stacked draft may be temporarily retargeted to `main` only to trigger the
+repository's pull-request quality workflows. After the checks complete, its
+base is restored to the preceding stacked AION branch. This does not merge or
+deploy the branch.
