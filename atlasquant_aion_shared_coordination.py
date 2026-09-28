@@ -118,6 +118,13 @@ def _exact_int(value: Any, *, minimum: int, maximum: int, name: str) -> int:
     return value
 
 
+def _optional_text(value: Any, limit: int) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    return safe_text(raw, limit)
+
+
 def _descriptor(adapter: SharedCoordinationAdapter | None) -> dict[str, Any]:
     if adapter is None:
         return {
@@ -153,7 +160,7 @@ def _descriptor(adapter: SharedCoordinationAdapter | None) -> dict[str, Any]:
         }
     caps_raw = raw.get("capabilities") if isinstance(raw.get("capabilities"), Mapping) else {}
     caps = {name: bool(caps_raw.get(name, False)) for name in REQUIRED_CAPABILITIES}
-    identity = safe_text(str(raw.get("identity") or ""), 200)
+    identity = _optional_text(raw.get("identity"), 200)
     backend_kind = safe_text(str(raw.get("backend_kind") or "UNKNOWN"), 80)
     configured = bool(raw.get("configured")) and bool(identity)
     return {
@@ -163,7 +170,7 @@ def _descriptor(adapter: SharedCoordinationAdapter | None) -> dict[str, Any]:
         "shared_across_instances": bool(caps["shared_across_instances"]),
         "external_paid_service": bool(raw.get("external_paid_service", False)),
         "capabilities": caps,
-        "reason": safe_text(str(raw.get("reason") or ""), 300),
+        "reason": _optional_text(raw.get("reason"), 300),
     }
 
 
@@ -218,7 +225,7 @@ def _cas(
     return {
         "swapped": swapped,
         "version": version,
-        "reason": safe_text(str(raw.get("reason") or ""), 200),
+        "reason": _optional_text(raw.get("reason"), 200),
     }
 
 
@@ -237,7 +244,7 @@ def _delete(
     raw = dict(adapter.delete(key, expected_version=version) or {})
     return {
         "deleted": bool(raw.get("deleted")),
-        "reason": safe_text(str(raw.get("reason") or ""), 200),
+        "reason": _optional_text(raw.get("reason"), 200),
     }
 
 
@@ -811,7 +818,7 @@ class SharedLeaseManager:
             "active": bool(value.get("active")),
             "version": row["version"],
             "epoch": int(value.get("epoch") or 0),
-            "reason": safe_text(str(value.get("reason") or ""), 300),
+            "reason": _optional_text(value.get("reason"), 300),
         }
 
     def claim(
@@ -1018,7 +1025,7 @@ class SharedLeaseManager:
         value = {
             "active": bool(active),
             "epoch": epoch,
-            "reason": safe_text(reason, 300),
+            "reason": _optional_text(reason, 300),
         }
         swapped = _cas(
             self.adapter,
