@@ -16,7 +16,7 @@
   "setup_attribution_inferred": false,
   "last_cycle": {
     "version": "V11.2_PAPER_TRADING",
-    "ran_at": "2026-09-28T07:50:51.644847+00:00",
+    "ran_at": "2026-09-28T08:27:41.918506+00:00",
     "pending_created": 0,
     "pending_cancelled_by_gain_lock": 0,
     "entries_opened": 0,
@@ -34,7 +34,7 @@
         "soft_blocks": [
           "Risco de evento elevado",
           "ICT incompleto (40/100)",
-          "Fluxo institucional incompleto (56/100)",
+          "Fluxo institucional incompleto (57/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -46,19 +46,24 @@
         "hard_blocks": [],
         "soft_blocks": [
           "Risco de evento elevado",
-          "ICT incompleto (60/100)"
+          "ICT incompleto (33/100)",
+          "Fluxo institucional incompleto (69/100)",
+          "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
       },
       "USD/JPY": {
         "side": "BUY",
         "passed": false,
-        "state": "⚪ EM OBSERVAÇÃO",
-        "hard_blocks": [],
+        "state": "🔴 BLOQUEADO",
+        "hard_blocks": [
+          "H1 está contra o viés",
+          "ADR14 muito esticado (118%)"
+        ],
         "soft_blocks": [
           "Risco de evento elevado",
-          "ICT incompleto (45/100)",
-          "Fluxo institucional incompleto (60/100)",
+          "ADR14 em 118%: evitar perseguir preço",
+          "ICT incompleto (56/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -68,13 +73,12 @@
         "passed": false,
         "state": "🔴 BLOQUEADO",
         "hard_blocks": [
-          "Dados técnicos insuficientes (0/100)",
-          "H1 está contra o viés",
-          "Técnica desatualizada (80 min)"
+          "H1 está contra o viés"
         ],
         "soft_blocks": [
           "Risco de evento elevado",
-          "ICT incompleto (58/100)",
+          "ICT incompleto (33/100)",
+          "Fluxo institucional incompleto (58/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -82,16 +86,13 @@
       "EUR/USD": {
         "side": "SELL",
         "passed": false,
-        "state": "🔴 BLOQUEADO",
-        "hard_blocks": [
-          "Dados técnicos insuficientes (0/100)",
-          "Técnica desatualizada (80 min)"
-        ],
+        "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
+        "hard_blocks": [],
         "soft_blocks": [
           "Gate ainda não liberou execução",
           "Risco de evento elevado",
-          "ICT incompleto (40/100)",
-          "Fluxo institucional incompleto (64/100)",
+          "ICT incompleto (33/100)",
+          "Fluxo institucional incompleto (48/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -100,10 +101,7 @@
         "side": "WAIT",
         "passed": false,
         "state": "⚪ AGUARDAR DIREÇÃO",
-        "hard_blocks": [
-          "Dados técnicos insuficientes (0/100)",
-          "Técnica desatualizada (80 min)"
-        ],
+        "hard_blocks": [],
         "soft_blocks": [
           "Risco de evento elevado",
           "ICT incompleto (0/100)",
@@ -115,15 +113,13 @@
       "GBP/USD": {
         "side": "SELL",
         "passed": false,
-        "state": "🔴 BLOQUEADO",
-        "hard_blocks": [
-          "Dados técnicos insuficientes (0/100)",
-          "Técnica desatualizada (80 min)"
-        ],
+        "state": "⚪ EM OBSERVAÇÃO",
+        "hard_blocks": [],
         "soft_blocks": [
           "Gate ainda não liberou execução",
           "Risco de evento elevado",
-          "ICT incompleto (65/100)"
+          "ICT incompleto (40/100)",
+          "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
       }
