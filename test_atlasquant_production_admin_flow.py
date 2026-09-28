@@ -157,6 +157,47 @@ class ProductionAdminFlowTests(unittest.TestCase):
         self.assertIn("🧠 AION", nav.options)
         self.assertEqual(nav.value, "🧠 AION")
 
+    def test_admin_stateful_sector_navigation_preserves_one_authenticated_session(self):
+        at = self._app("aparecidomikael", _ADMIN_PASSWORD)
+        at.run(timeout=180)
+        self._assert_clean(at)
+
+        initial = dict(at.session_state["atlasquant_access_session"])
+        initial_authenticated_at = initial["authenticated_at"]
+        initial_username = initial.get("username")
+        initial_role = initial.get("role")
+
+        def assert_session_preserved():
+            self._assert_clean(at)
+            session = dict(at.session_state["atlasquant_access_session"])
+            self.assertEqual(session.get("username"), initial_username)
+            self.assertEqual(session.get("role"), initial_role)
+            self.assertEqual(session["authenticated_at"], initial_authenticated_at)
+            self.assertGreaterEqual(session["last_seen"], initial["last_seen"])
+            password_fields = [
+                item for item in at.text_input
+                if "senha" in str(getattr(item, "label", "")).casefold()
+                or "password" in str(getattr(item, "label", "")).casefold()
+            ]
+            self.assertEqual(password_fields, [])
+
+        def go(area_id):
+            at.button(key=f"aq_central_stateful_{area_id}").click().run(timeout=180)
+            assert_session_preserved()
+
+        assert_session_preserved()
+        for area_id in (
+            "trader",
+            "central",
+            "negocios",
+            "central",
+            "investimentos",
+            "central",
+            "trader",
+        ):
+            go(area_id)
+
+
     def test_admin_advanced_click_paints_from_the_runtime_snapshot(self):
         at = self._app("aparecidomikael", _ADMIN_PASSWORD)
         at.session_state["atlasquant_central_choice"] = "trader"
