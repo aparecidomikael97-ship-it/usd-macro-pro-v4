@@ -1,13 +1,16 @@
 """Read-only readiness diagnostic for a future shared coordination adapter.
 
-The descriptor and the probe receipt are data. This module does not connect a
-provider, run a probe, persist a checkpoint, start the Global Worker, change a
-feature flag, or install a second kill switch. Lease ownership and fencing
-remain in the current Global Worker.
+The descriptor and the probe receipt are data. A complete descriptor means the
+adapter was declared. A digest-valid receipt is structural evidence only.
+Neither one verifies that a backend or provider exists or ran. This module
+does not connect a provider, fabricate a receipt, run a probe, persist a
+checkpoint, start the Global Worker, change a feature flag, or install a
+second kill switch. Lease ownership and fencing remain in the current Global
+Worker.
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from hashlib import sha256
 import json
 from typing import Any, Mapping
@@ -23,6 +26,7 @@ DESCRIPTOR_READY = "DESCRIPTOR_READY"
 PROBE_REQUIRED = "PROBE_REQUIRED"
 PROBE_EVIDENCE_READY = "PROBE_EVIDENCE_READY"
 BLOCKED = "BLOCKED"
+OPERATIONAL_VERIFICATION = "UNKNOWN"
 
 _DESCRIPTOR_KEYS = (
     "adapter_id",
@@ -192,46 +196,23 @@ def probe_receipt_digest(receipt: Mapping[str, Any]) -> str:
 
 
 def seal_probe_receipt(receipt: Mapping[str, Any]) -> dict[str, Any]:
-    """Attach the canonical digest. This does not call a provider or persist."""
+    """Attach the canonical digest to a receipt the caller already supplied."""
     sealed = {key: receipt.get(key) for key in _RECEIPT_KEYS if key != "receipt_digest"}
     sealed["receipt_digest"] = probe_receipt_digest(sealed)
     return sealed
 
 
-def build_probe_receipt_fixture(
-    descriptor: Mapping[str, Any],
-    *,
-    scope_digest: str,
-    now: datetime,
-    ttl_seconds: int = 300,
-    evidence_digest: str = "ab" * 32,
-) -> dict[str, Any]:
-    """Build an in-memory validation receipt for tests. Nothing is stored."""
-    normalized, blockers = normalize_coordination_adapter_descriptor(descriptor)
-    if normalized is None:
-        raise ValueError(blockers[0] if blockers else "DESCRIPTOR_INVALID")
-    if not isinstance(now, datetime) or now.tzinfo is None or now.utcoffset() is None:
-        raise ValueError("timezone-aware timestamp required")
-    if type(ttl_seconds) is not int or ttl_seconds < 1 or ttl_seconds > MAX_PROBE_TTL_SECONDS:
-        raise ValueError("probe ttl exceeds the allowed window")
-    scope = _text(scope_digest, 128)
-    evidence = _text(evidence_digest, 128)
-    if not scope or not evidence:
-        raise ValueError("scope_digest and evidence_digest are required")
-    issued = now.astimezone(timezone.utc)
-    expires = issued + timedelta(seconds=ttl_seconds)
-    return seal_probe_receipt({
-        "schema": RECEIPT_SCHEMA,
-        "receipt_version": RECEIPT_VERSION,
-        "adapter_identity_digest": adapter_identity_digest(normalized),
-        "scope_digest": scope,
-        "issued_at": issued.isoformat(),
-        "expires_at": expires.isoformat(),
-        "evidence_digest": evidence,
-        "observed_capabilities": _capability_view(normalized),
-        "mutation_count": 0,
-        "read_only_validation": True,
-    })
+def _evidence_boundary(*, declared: bool, structural_receipt: bool) -> dict[str, Any]:
+    """Separate a declaration and a structural receipt from operational proof."""
+    return {
+        "backend_declared": declared,
+        "adapter_declared": declared,
+        "probe_receipt_structurally_valid": structural_receipt,
+        "operational_verification": OPERATIONAL_VERIFICATION,
+        "backend_verified": False,
+        "adapter_verified": False,
+        "probe_operationally_verified": False,
+    }
 
 
 def _validate_receipt(
@@ -248,7 +229,8 @@ def _validate_receipt(
     closed = _closed(receipt, _RECEIPT_KEYS, "PROBE")
     if closed:
         return [closed]
-    if receipt.get("schema") != RECEIPT_SCHEMA or receipt.get("receipt_version") != RECEIPT_VERSION:
+    version = receipt.get("receipt_version")
+    if receipt.get("schema") != RECEIPT_SCHEMA or type(version) is not int or version != RECEIPT_VERSION:
         return ["PROBE_RECEIPT_INVALID"]
     if receipt.get("receipt_digest") != probe_receipt_digest(receipt):
         return ["PROBE_DIGEST_MISMATCH"]
@@ -278,7 +260,12 @@ def _validate_receipt(
     if not evidence:
         return ["PROBE_EVIDENCE_MISSING"]
     observed = receipt.get("observed_capabilities")
-    if not isinstance(observed, Mapping) or dict(observed) != _capability_view(descriptor):
+    expected = _capability_view(descriptor)
+    if not isinstance(observed, Mapping) or set(observed) != set(expected):
+        return ["PROBE_CAPABILITY_MISMATCH"]
+    if any(type(observed[key]) is not bool for key in expected):
+        return ["PROBE_CAPABILITY_MISMATCH"]
+    if {key: observed[key] for key in expected} != expected:
         return ["PROBE_CAPABILITY_MISMATCH"]
     return []
 
@@ -304,7 +291,7 @@ def coordination_adapter_readiness(
     expected_scope_digest: str = "",
     now: datetime | None = None,
 ) -> dict[str, Any]:
-    """Classify a future adapter. A matching receipt is evidence, not activation."""
+    """Classify a declaration. A matching receipt is structural, not operational proof."""
     if now is None:
         current = datetime.now(timezone.utc)
     elif not isinstance(now, datetime) or now.tzinfo is None or now.utcoffset() is None:
@@ -321,6 +308,7 @@ def coordination_adapter_readiness(
             "adapter_configured": False,
             "probe_evidence_accepted": False,
             "adapter_identity_digest": "",
+            **_evidence_boundary(declared=normalized is not None, structural_receipt=False),
             **_safety(normalized),
         }
     else:
@@ -340,6 +328,7 @@ def coordination_adapter_readiness(
             "adapter_configured": False,
             "probe_evidence_accepted": False,
             "adapter_identity_digest": "",
+            **_evidence_boundary(declared=False, structural_receipt=False),
             **_safety(None),
         }
     if normalized is None:
@@ -355,6 +344,7 @@ def coordination_adapter_readiness(
             "adapter_configured": False,
             "probe_evidence_accepted": False,
             "adapter_identity_digest": "",
+            **_evidence_boundary(declared=False, structural_receipt=False),
             **_safety(None),
         }
 
@@ -368,6 +358,7 @@ def coordination_adapter_readiness(
         "backend_configured": True,
         "adapter_configured": True,
         "adapter_identity_digest": identity,
+        **_evidence_boundary(declared=True, structural_receipt=False),
         **_safety(normalized),
     }
     if probe_receipt is None:
@@ -390,22 +381,33 @@ def coordination_adapter_readiness(
             "blockers": receipt_blockers,
             "probe_evidence_accepted": False,
         }
-    return {
+    accepted = {
         **base,
         "state": PROBE_EVIDENCE_READY,
         "blockers": [],
         "probe_evidence_accepted": True,
     }
+    accepted.update(_evidence_boundary(declared=True, structural_receipt=True))
+    return accepted
 
 
 def format_coordination_adapter_caption(report: Mapping[str, Any]) -> str:
-    """Compact admin lines. The worker and the feature flag stay unchanged."""
-    backend = "CONFIGURADO" if report.get("backend_configured") is True else "NÃO CONFIGURADO"
-    if report.get("adapter_configured") is True:
-        adapter = str(report.get("adapter_id") or "CONFIGURADO")
+    """Compact admin lines. Declaration is not live verification."""
+    declared = report.get("backend_declared") is True or report.get("backend_configured") is True
+    backend = "DECLARADO · NÃO VERIFICADO" if declared else "NÃO CONFIGURADO"
+    if report.get("adapter_declared") is True or report.get("adapter_configured") is True:
+        adapter_id = str(report.get("adapter_id") or "").strip()
+        adapter = f"{adapter_id} · DECLARADO · NÃO VERIFICADO" if adapter_id else "DECLARADO · NÃO VERIFICADO"
     else:
         adapter = "NÃO CONFIGURADO"
-    probe = "EVIDÊNCIA ACEITA" if report.get("state") == PROBE_EVIDENCE_READY else "NÃO EXECUTADO"
+    structural = (
+        report.get("probe_receipt_structurally_valid") is True
+        or report.get("state") == PROBE_EVIDENCE_READY
+    )
+    if structural:
+        probe = "RECIBO ESTRUTURAL VÁLIDO · verificação operacional DESCONHECIDA"
+    else:
+        probe = "NÃO EXECUTADO"
     return (
         "Backend compartilhado: " + backend + "\n"
         "Adapter: " + adapter + "\n"

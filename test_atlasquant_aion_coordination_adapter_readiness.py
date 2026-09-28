@@ -6,22 +6,78 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import unittest
 
+import atlasquant_aion_coordination_adapter_readiness as readiness
 from atlasquant_aion_coordination_adapter_readiness import (
     BLOCKED,
     DESCRIPTOR_INVALID,
     DESCRIPTOR_READY,
+    MAX_PROBE_TTL_SECONDS,
     NOT_CONFIGURED,
     PROBE_EVIDENCE_READY,
     PROBE_REQUIRED,
-    build_probe_receipt_fixture,
+    RECEIPT_SCHEMA,
+    RECEIPT_VERSION,
+    adapter_identity_digest,
     coordination_adapter_readiness,
     format_coordination_adapter_caption,
+    normalize_coordination_adapter_descriptor,
     seal_probe_receipt,
 )
 
 
 NOW = datetime(2026, 9, 28, 22, 0, tzinfo=timezone.utc)
 SCOPE = "scope-admin-context"
+_CAPABILITIES = (
+    "shared_across_instances",
+    "atomic_compare_and_swap",
+    "monotonic_versions",
+    "atomic_monotonic_fencing_token",
+    "ttl_expiry",
+    "atomic_delete",
+    "durable_outside_browser",
+)
+
+
+def build_probe_receipt_fixture(
+    descriptor,
+    *,
+    scope_digest,
+    now,
+    ttl_seconds=300,
+    evidence_digest="ab" * 32,
+):
+    """Test-only receipt. Production does not mint evidence from a declaration."""
+    normalized, blockers = normalize_coordination_adapter_descriptor(descriptor)
+    if normalized is None:
+        raise ValueError(blockers[0] if blockers else "DESCRIPTOR_INVALID")
+    if not isinstance(now, datetime) or now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError("timezone-aware timestamp required")
+    if type(ttl_seconds) is not int or ttl_seconds < 1 or ttl_seconds > MAX_PROBE_TTL_SECONDS:
+        raise ValueError("probe ttl exceeds the allowed window")
+    if not isinstance(scope_digest, str) or not scope_digest.strip():
+        raise ValueError("scope_digest and evidence_digest are required")
+    if not isinstance(evidence_digest, str) or not evidence_digest.strip():
+        raise ValueError("scope_digest and evidence_digest are required")
+    issued = now.astimezone(timezone.utc)
+    expires = issued + timedelta(seconds=ttl_seconds)
+    observed = {}
+    for key in _CAPABILITIES:
+        value = normalized[key]
+        if type(value) is not bool:
+            raise ValueError("observed capability must be an exact bool")
+        observed[key] = value
+    return seal_probe_receipt({
+        "schema": RECEIPT_SCHEMA,
+        "receipt_version": RECEIPT_VERSION,
+        "adapter_identity_digest": adapter_identity_digest(normalized),
+        "scope_digest": scope_digest.strip(),
+        "issued_at": issued.isoformat(),
+        "expires_at": expires.isoformat(),
+        "evidence_digest": evidence_digest.strip(),
+        "observed_capabilities": observed,
+        "mutation_count": 0,
+        "read_only_validation": True,
+    })
 
 
 def _descriptor(**overrides):
@@ -275,3 +331,121 @@ class CoordinationAdapterReadinessTests(unittest.TestCase):
             "Worker alterado: NÃO\n"
             "Feature flag alterada: NÃO",
         )
+
+    def test_valid_descriptor_is_declared_not_verified(self):
+        report = coordination_adapter_readiness(_descriptor(), now=NOW)
+        self.assertTrue(report["backend_declared"])
+        self.assertTrue(report["adapter_declared"])
+        self.assertFalse(report["backend_verified"])
+        self.assertFalse(report["adapter_verified"])
+        self.assertFalse(report["probe_operationally_verified"])
+        self.assertFalse(report["probe_receipt_structurally_valid"])
+        self.assertEqual(report["operational_verification"], "UNKNOWN")
+        caption = format_coordination_adapter_caption(report)
+        self.assertIn("Backend compartilhado: DECLARADO · NÃO VERIFICADO", caption)
+        self.assertNotIn("Backend compartilhado: CONFIGURADO", caption)
+        self.assertNotIn("verificado operacionalmente", caption.casefold())
+
+    def test_structural_receipt_is_not_operational_verification(self):
+        receipt = build_probe_receipt_fixture(_descriptor(), scope_digest=SCOPE, now=NOW)
+        report = coordination_adapter_readiness(
+            _descriptor(),
+            probe_receipt=receipt,
+            expected_scope_digest=SCOPE,
+            now=NOW,
+        )
+        self.assertEqual(report["state"], PROBE_EVIDENCE_READY)
+        self.assertTrue(report["probe_receipt_structurally_valid"])
+        self.assertEqual(report["operational_verification"], "UNKNOWN")
+        self.assertFalse(report["backend_verified"])
+        self.assertFalse(report["adapter_verified"])
+        self.assertFalse(report["probe_operationally_verified"])
+        self.assertFalse(report["probe_executed"])
+        caption = format_coordination_adapter_caption(report)
+        self.assertIn(
+            "Probe: RECIBO ESTRUTURAL VÁLIDO · verificação operacional DESCONHECIDA",
+            caption,
+        )
+        self.assertNotIn("EVIDÊNCIA ACEITA", caption)
+
+    def test_probe_receipt_fixture_is_not_a_production_api(self):
+        self.assertFalse(hasattr(readiness, "build_probe_receipt_fixture"))
+        source = Path("atlasquant_aion_coordination_adapter_readiness.py").read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        names = {
+            node.name
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        self.assertNotIn("build_probe_receipt_fixture", names)
+        self.assertNotIn("build_probe_receipt_fixture", source)
+
+    def test_receipt_version_rejects_bool_float_and_string(self):
+        receipt = build_probe_receipt_fixture(_descriptor(), scope_digest=SCOPE, now=NOW)
+        for value in (True, 1.0, "1"):
+            with self.subTest(value=value):
+                forged = seal_probe_receipt({**receipt, "receipt_version": value})
+                report = coordination_adapter_readiness(
+                    _descriptor(),
+                    probe_receipt=forged,
+                    expected_scope_digest=SCOPE,
+                    now=NOW,
+                )
+                self.assertEqual(report["state"], BLOCKED)
+                self.assertIn("PROBE_RECEIPT_INVALID", report["blockers"])
+                self.assertFalse(report["probe_receipt_structurally_valid"])
+                self.assertFalse(report["probe_operationally_verified"])
+
+    def test_capability_values_must_be_exact_bools(self):
+        receipt = build_probe_receipt_fixture(_descriptor(), scope_digest=SCOPE, now=NOW)
+        for value in (1, 0, "true", 1.0):
+            with self.subTest(value=value):
+                observed = dict(receipt["observed_capabilities"])
+                observed["shared_across_instances"] = value
+                forged = seal_probe_receipt({**receipt, "observed_capabilities": observed})
+                report = coordination_adapter_readiness(
+                    _descriptor(),
+                    probe_receipt=forged,
+                    expected_scope_digest=SCOPE,
+                    now=NOW,
+                )
+                self.assertEqual(report["state"], BLOCKED)
+                self.assertIn("PROBE_CAPABILITY_MISMATCH", report["blockers"])
+                self.assertFalse(report["probe_receipt_structurally_valid"])
+
+    def test_capability_keys_must_match_exactly(self):
+        receipt = build_probe_receipt_fixture(_descriptor(), scope_digest=SCOPE, now=NOW)
+        missing = dict(receipt["observed_capabilities"])
+        missing.pop("ttl_expiry")
+        extra = dict(receipt["observed_capabilities"])
+        extra["live_backend_confirmed"] = True
+        for observed in (missing, extra):
+            with self.subTest(keys=sorted(observed)):
+                forged = seal_probe_receipt({**receipt, "observed_capabilities": observed})
+                report = coordination_adapter_readiness(
+                    _descriptor(),
+                    probe_receipt=forged,
+                    expected_scope_digest=SCOPE,
+                    now=NOW,
+                )
+                self.assertEqual(report["state"], BLOCKED)
+                self.assertIn("PROBE_CAPABILITY_MISMATCH", report["blockers"])
+
+    def test_exact_bool_receipt_stays_structurally_valid_without_authority(self):
+        receipt = build_probe_receipt_fixture(_descriptor(paid_service=True), scope_digest=SCOPE, now=NOW)
+        self.assertTrue(all(type(value) is bool for value in receipt["observed_capabilities"].values()))
+        report = coordination_adapter_readiness(
+            _descriptor(paid_service=True),
+            probe_receipt=receipt,
+            expected_scope_digest=SCOPE,
+            now=NOW,
+        )
+        self.assertEqual(report["state"], PROBE_EVIDENCE_READY)
+        self.assertTrue(report["probe_receipt_structurally_valid"])
+        self.assertEqual(report["operational_verification"], "UNKNOWN")
+        self.assertFalse(report["execution_authorized"])
+        self.assertFalse(report["global_worker_started"])
+        self.assertFalse(report["worker_changed"])
+        self.assertFalse(report["real_trading_enabled"])
+        self.assertFalse(report["paid_service_approved"])
+        self.assertTrue(report["paid_service_declared"])
