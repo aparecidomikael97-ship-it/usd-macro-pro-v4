@@ -150,6 +150,20 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
         self.assertFalse(snap["automatic_external_business_actions"])
         self.assertFalse(snap["real_trading_enabled"])
 
+    def test_other_admin_context_cannot_read_global_control_details(self):
+        checkpoint = self.armed_checkpoint()
+        other = _access(
+            username="other-admin",
+            fingerprint="other-global-worker-fingerprint-999999",
+        )
+        snapshot = global_worker_snapshot(other, checkpoint, now=CREATED)
+        self.assertEqual(snapshot["status"], "CONTEXT_ISOLATED")
+        self.assertEqual(snapshot["state"], "UNKNOWN")
+        self.assertEqual(snapshot["delegated_actor"], "")
+        self.assertEqual(snapshot["lease_owner"], "")
+        self.assertEqual(snapshot["stats"], {})
+        self.assertEqual(snapshot["allowed_capabilities"], [])
+
     def test_feature_flag_off_makes_zero_network_calls(self):
         with patch("atlasquant_aion_global_worker.load_runtime_checkpoint") as load:
             result = run_global_worker_once(
