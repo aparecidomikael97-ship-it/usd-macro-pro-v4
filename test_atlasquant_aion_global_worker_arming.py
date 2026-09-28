@@ -3,6 +3,7 @@ from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from atlasquant_aion_core_intelligence.evidence import digest
 from atlasquant_aion_global_worker import (
     GLOBAL_WORKER_NAMESPACE,
     load_global_worker_state,
@@ -260,6 +261,52 @@ class GlobalWorkerArmingCeremonyTests(unittest.TestCase):
             0,
         )
         self.assertFalse(state["resource_budgets"]["real_trading_enabled"])
+
+    def test_already_armed_checkpoint_cannot_generate_second_plan(self):
+        approval = self.approval()
+        first = stage_arm_global_worker(
+            self.access,
+            self.checkpoint,
+            confirmation=True,
+            arming_approval=approval,
+            max_jobs=5,
+            lease_seconds=600,
+            now=NOW,
+        )
+        self.assertEqual(first["status"], "STAGED_ARMED")
+        second_plan = prepare_global_worker_arming_plan(
+            self.access,
+            first["checkpoint"],
+            max_jobs=5,
+            lease_seconds=600,
+            approval_ttl_seconds=900,
+            now=NOW + timedelta(seconds=1),
+        )
+        self.assertEqual(second_plan["status"], "BLOCKED")
+        self.assertEqual(second_plan["reason"], "GLOBAL_WORKER_ALREADY_ARMED")
+
+    def test_armed_state_with_recomputed_digest_but_nonzero_external_budget_fails_closed(self):
+        approval = self.approval()
+        first = stage_arm_global_worker(
+            self.access,
+            self.checkpoint,
+            confirmation=True,
+            arming_approval=approval,
+            max_jobs=5,
+            lease_seconds=600,
+            now=NOW,
+        )
+        tampered = deepcopy(first["checkpoint"])
+        raw = tampered[GLOBAL_WORKER_NAMESPACE]
+        raw["resource_budgets"]["payments_per_tick"] = 1
+        candidate = dict(raw)
+        candidate.pop("digest", None)
+        raw["digest"] = digest(candidate)
+        with self.assertRaisesRegex(
+            ValueError,
+            "invalid armed global worker resource budgets",
+        ):
+            load_global_worker_state(tampered)
 
     def test_ticket_is_bound_to_exact_checkpoint_digest(self):
         approval = self.approval()
