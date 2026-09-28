@@ -11,15 +11,15 @@ write files or execute the patch.
 
 ``validation_id`` binds the upstream ids, ``patch_digest`` and the semantic
 manifest of this document. That is structural consistency. It is not
-independent source proof. ``patch_digest`` is not re-derived from the
-original unified diff here, and the raw patch is not stored. An attacker who
-rewrites the whole document, recomputes every id and fabricates another
-coherent structural attestation still has only structural consistency.
-Coherent reseal without the original patch bytes is an EXPECTED STRUCTURAL
-LIMITATION. ``source_bound_proof_required_before_physical_execution`` stays
-true: a future source-bound assertion must receive the raw patch, check
-``patch_digest`` and compare ``parse_patch_semantics`` before any physical
-execution.
+source-bound verification and it is not independent external verification.
+This module does not re-read the original unified diff, and the raw patch is
+not stored. An attacker who rewrites the whole document and recomputes every
+id still has only structural consistency. That coherent reseal is an
+EXPECTED STRUCTURAL LIMITATION of this boundary. Source-bound verification
+is a separate module: it must receive the raw patch as transient input,
+re-derive ``patch_digest``, ``parse_patch_semantics``, the manifest and
+``validation_id``, and compare the entire representation. Caller bytes are
+not an independent root of trust.
 """
 from __future__ import annotations
 
@@ -161,6 +161,13 @@ def _clean(value: Any, limit: int = 1200) -> str:
 
 def _patch_digest(raw: str) -> str:
     return "DEVPATCH-" + sha256(raw.encode("utf-8")).hexdigest()[:24].upper()
+
+
+def patch_text_digest(raw: Any) -> str:
+    """Digest transient patch text. The text is not retained or rewritten."""
+    if not isinstance(raw, str):
+        raise ValueError("transient patch text must be a string")
+    return _patch_digest(raw)
 
 
 def _canonical_path_key(path: str) -> str:
@@ -905,6 +912,7 @@ __all__ = [
     "MAX_CHANGED_LINES_PER_FILE",
     "SOURCE_BOUND_PROOF_BLOCKER",
     "EXPECTED_STRUCTURAL_LIMITATION",
+    "patch_text_digest",
     "parse_patch_semantics",
     "patch_validation_manifest",
     "patch_validation_manifest_id",

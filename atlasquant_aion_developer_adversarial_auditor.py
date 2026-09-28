@@ -92,7 +92,13 @@ from atlasquant_aion_developer_patch_validation import (
     assert_patch_validation_integrity,
     canonical_patch_document,
     expected_patch_validation_id,
+    patch_validation_manifest_id,
     validate_patch,
+)
+from atlasquant_aion_developer_source_bound_patch_proof import (
+    assert_source_bound_patch_proof_record,
+    expected_source_bound_patch_proof_id,
+    verify_source_bound_patch,
 )
 from atlasquant_aion_developer_runner_contract import (
     MAX_MANDATORY_GATES,
@@ -5315,6 +5321,190 @@ def _upstream_semantic_surface(_world: _World) -> list[dict[str, str]]:
     return findings
 
 
+def _source_bound_patch_surface(_world: _World) -> list[dict[str, str]]:
+    """Replay the transient patch. A stored record is not that replay.
+
+    SOURCE_BOUND_PATCH_PROOF: structural integrity can still accept a coherent
+    reseal. Source-bound verification must reject it when the original bytes
+    are supplied. Caller claims are not independent authority.
+    """
+    findings: list[dict[str, str]] = []
+
+    def _reject(invariant_id: str, description: str, fn: Callable[[], Any]) -> None:
+        status, _ignored = _invoke(fn)
+        closed = status == "REJECT"
+        findings.append(_finding(
+            invariant_id,
+            "atlasquant_aion_developer_source_bound_patch_proof",
+            description if closed else description + " O documento foi aceito.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    builder = structural_builder_sandbox_request(
+        branch="cursor/safe",
+        baseline_ref="main@a",
+        candidate_ref="cursor/safe@b",
+        requested_files=("module.py", "test_module.py"),
+        candidate_tests=("test_module.py",),
+    )
+    preflight = _sealed_preflight(builder)
+    refs = {"baseline_ref": "main@a", "candidate_ref": "cursor/safe@b"}
+    safe_raw = (
+        "diff --git a/module.py b/module.py\n"
+        "--- a/module.py\n+++ b/module.py\n"
+        "@@ -1 +1 @@\n-x=1\n+x=2\n"
+    )
+    mode_raw = (
+        "diff --git a/module.py b/module.py\n"
+        "old mode 100644\n"
+        "new mode 100755\n"
+        "--- a/module.py\n"
+        "+++ b/module.py\n"
+        "@@ -1 +1 @@\n-x=1\n+x=2\n"
+    )
+    secret_raw = (
+        "diff --git a/module.py b/module.py\n"
+        "--- a/module.py\n+++ b/module.py\n"
+        "@@ -1 +1 @@\n-x=1\n+api_key=audit-source-bound\n"
+    )
+
+    def _ready(document: Mapping[str, Any], edits: Mapping[str, Any]) -> dict[str, Any]:
+        forged = deepcopy(document)
+        summary = dict(forged["files"][0])
+        summary.update(dict(edits))
+        forged["files"] = [summary]
+        forged["blockers"] = list(summary.get("blockers") or [])
+        forged["secret_like_additions"] = summary.get("secret_additions")
+        forged["changed_lines"] = int(summary["added_lines"]) + int(summary["deleted_lines"])
+        forged["state"] = "READY_FOR_PATCH_REVIEW" if not forged["blockers"] else "BLOCKED"
+        forged["validation_id"] = expected_patch_validation_id(forged)
+        return forged
+
+    safe = validate_patch(builder, preflight, safe_raw, **refs)
+    mode = validate_patch(builder, preflight, mode_raw, **refs)
+    secret = validate_patch(builder, preflight, secret_raw, **refs)
+    proof = verify_source_bound_patch(builder, preflight, safe, safe_raw, **refs)
+
+    mode_summary = dict(mode["files"][0])
+    mode_summary["mode_changed"] = False
+    mode_summary["blockers"] = []
+    resealed = _ready(mode, mode_summary)
+    structural, _ignored = _invoke(
+        lambda: assert_patch_validation_integrity(resealed, builder, preflight)
+    )
+    source, _ignored = _invoke(
+        lambda: verify_source_bound_patch(builder, preflight, resealed, mode_raw, **refs)
+    )
+    separated = structural == "ACCEPT" and source == "REJECT"
+    findings.append(_finding(
+        "source_bound.coherent_reseal",
+        "atlasquant_aion_developer_source_bound_patch_proof",
+        "SOURCE_BOUND_COHERENT_RESEAL: a integridade estrutural aceita o reseal e a prova source-bound rejeita o patch original."
+        if separated else
+        "SOURCE_BOUND_COHERENT_RESEAL: a separacao entre integridade estrutural e prova source-bound nao fechou.",
+        "BLOCKED_BY_DESIGN" if separated else "GAP",
+        "" if separated else "HIGH",
+    ))
+
+    _reject(
+        "source_bound.swapped_patch",
+        "SOURCE_BOUND_SWAPPED_PATCH: o patch de mode nao comprova o documento do patch seguro.",
+        lambda: verify_source_bound_patch(builder, preflight, safe, mode_raw, **refs),
+    )
+    _reject(
+        "source_bound.truncated_patch",
+        "SOURCE_BOUND_TRUNCATED_PATCH: o patch truncado nao comprova o documento selado.",
+        lambda: verify_source_bound_patch(builder, preflight, safe, safe_raw[:-8], **refs),
+    )
+    _reject(
+        "source_bound.mode_facts",
+        "SOURCE_BOUND_MODE_FACTS: limpar mode_changed e recalcular o id nao comprova o diff original.",
+        lambda: verify_source_bound_patch(builder, preflight, resealed, mode_raw, **refs),
+    )
+    secret_summary = dict(secret["files"][0])
+    secret_summary["secret_additions"] = 0
+    secret_summary["blockers"] = []
+    secret_resealed = _ready(secret, secret_summary)
+    _reject(
+        "source_bound.secret_counters",
+        "SOURCE_BOUND_SECRET_COUNTERS: zerar os contadores e recalcular o id nao comprova o diff original.",
+        lambda: verify_source_bound_patch(builder, preflight, secret_resealed, secret_raw, **refs),
+    )
+    negative_summary = dict(safe["files"][0])
+    negative_summary["added_lines"] = 1001
+    negative_summary["deleted_lines"] = -1001
+    negative_summary["blockers"] = []
+    negative = _ready(safe, negative_summary)
+    _reject(
+        "source_bound.negative_counter",
+        "SOURCE_BOUND_NEGATIVE_COUNTER: added 1001 e deleted -1001 continuam rejeitados.",
+        lambda: verify_source_bound_patch(builder, preflight, negative, safe_raw, **refs),
+    )
+    lineage = deepcopy(safe)
+    lineage["builder_request_id"] = "DEVBUILD-OTHERLINEAGE"
+    lineage["validation_id"] = expected_patch_validation_id(lineage)
+    _reject(
+        "source_bound.lineage",
+        "SOURCE_BOUND_LINEAGE: trocar o builder_request_id e recalcular o validation id e rejeitado.",
+        lambda: verify_source_bound_patch(builder, preflight, lineage, safe_raw, **refs),
+    )
+    _reject(
+        "source_bound.refs",
+        "SOURCE_BOUND_REFS: uma candidate_ref diferente da aprovada e rejeitada.",
+        lambda: verify_source_bound_patch(
+            builder, preflight, safe, safe_raw,
+            baseline_ref="main@a", candidate_ref="cursor/other@b",
+        ),
+    )
+    stale = deepcopy(proof)
+    stale["proof_id"] = "DEVSRCBIND-STALE"
+    _reject(
+        "source_bound.stale_id",
+        "SOURCE_BOUND_STALE_ID: o proof_id antigo depois de uma mutacao e rejeitado.",
+        lambda: assert_source_bound_patch_proof_record(stale, safe, builder, preflight),
+    )
+    unknown = deepcopy(proof)
+    unknown["git_object_verified"] = True
+    _reject(
+        "source_bound.unknown_authority",
+        "SOURCE_BOUND_UNKNOWN_AUTHORITY: git_object_verified e campo desconhecido.",
+        lambda: assert_source_bound_patch_proof_record(unknown, safe, builder, preflight),
+    )
+    claimed = deepcopy(proof)
+    claimed["independent_external_verification"] = True
+    claimed["proof_id"] = expected_source_bound_patch_proof_id(claimed)
+    _reject(
+        "source_bound.false_independent_verification",
+        "SOURCE_BOUND_FALSE_INDEPENDENT_VERIFICATION: independent_external_verification true e rejeitado mesmo com id recalculado.",
+        lambda: assert_source_bound_patch_proof_record(claimed, safe, builder, preflight),
+    )
+    rendered = json.dumps(proof)
+    legitimate = (
+        proof.get("structural_integrity") == "STRUCTURAL_INTEGRITY"
+        and proof.get("source_bound_verification") == "SOURCE_BOUND_VERIFICATION"
+        and proof.get("source_provenance") == "CALLER_SUPPLIED_TRANSIENT_PATCH"
+        and proof.get("independent_external_verification") is False
+        and proof.get("caller_input_is_independent_authority") is False
+        and proof.get("replay_requires_transient_patch") is True
+        and proof.get("patch_text_included") is False
+        and proof.get("execution_authorized") is False
+        and proof.get("patch_manifest_id") == patch_validation_manifest_id(safe)
+        and "diff --git" not in rendered
+        and "audit-source-bound" not in rendered
+    )
+    findings.append(_finding(
+        "source_bound.legitimate",
+        "atlasquant_aion_developer_source_bound_patch_proof",
+        "SOURCE_BOUND_PATCH_PROOF: o patch correspondente fica source-bound sem verificacao externa independente."
+        if legitimate else
+        "SOURCE_BOUND_PATCH_PROOF: a prova legitima alegou autoridade independente ou guardou o patch.",
+        "PASS" if legitimate else "GAP",
+        "" if legitimate else "HIGH",
+    ))
+    return findings
+
+
 def _reseal_independent(policy: Mapping[str, Any]) -> dict[str, Any]:
     mutated = deepcopy(policy)
     mutated["upstream_provenance_independently_verified"] = True
@@ -5348,6 +5538,7 @@ def audit_developer_chain() -> dict[str, Any]:
         findings.extend(_os_sandbox_design_surface(world))
         findings.extend(_probe_result_design_surface(world))
         findings.extend(_upstream_semantic_surface(world))
+        findings.extend(_source_bound_patch_surface(world))
     finally:
         world.close()
 
