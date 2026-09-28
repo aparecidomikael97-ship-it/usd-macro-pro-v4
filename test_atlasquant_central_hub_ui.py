@@ -271,10 +271,9 @@ class CentralHubUiTests(unittest.TestCase):
         self.assertIn("Escolha um setor", html)
         for label in ("AION IA", "Negócios", "Trader", "Renda Fixa / Investimentos"):
             self.assertIn(label, html)
-        self.assertIn("?central=aion", html)
-        self.assertIn("?central=trader", html)
-        self.assertIn("?central=negocios", html)
-        self.assertIn("?central=investimentos", html)
+        self.assertNotIn("?central=", html)
+        for area_id in ("aion", "trader", "negocios", "investimentos"):
+            self.assertIn(f'data-central-area="{area_id}"', html)
         self.assertNotIn('aria-current="page">', html)
         self.assertEqual(html.count('<svg class="aq-central-art"'), 8)
         state = {}
@@ -292,13 +291,25 @@ class CentralHubUiTests(unittest.TestCase):
         self.assertEqual(trader["area"], "trader")
         surface = central_surface_html(admin, "trader")
         self.assertIn("Voltar à Central Principal", surface)
-        self.assertIn("?central=central", surface)
+        self.assertNotIn("?central=", surface)
         self.assertNotIn("Escolha um setor", surface)
         aion = central_surface_html(admin, "aion")
         self.assertIn("PRIORIDADE ATUAL", aion)
         self.assertIn("Voltar à Central Principal", aion)
         self.assertTrue(resolve_central_area(admin, "central")["root"])
         self.assertTrue(resolve_central_area(admin, "central_root")["root"])
+
+    def test_streamlit_edge_uses_stateful_controls_not_query_anchors(self):
+        source = Path("atlasquant_central_hub_ui.py").read_text(encoding="utf-8")
+        self.assertIn("def _render_central_navigation_controls", source)
+        self.assertIn("request_central_destination(st.session_state, access, area_id)", source)
+        self.assertIn("st.rerun()", source)
+        self.assertNotIn('href="?central=', source)
+
+        cloud = Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        self.assertIn('del st.query_params["central"]', cloud)
+        self.assertIn("Consume a deep-link once", cloud)
+        self.assertNotIn('requested = st.query_params.get("central", "")\n        if isinstance(requested', cloud[cloud.index("def _apply_central_trader_navigation"):])
 
     def test_student_still_enters_trader_and_cannot_open_the_selector(self):
         user = _access("ALUNO")
@@ -588,8 +599,14 @@ class AionHomeViewerTests(unittest.TestCase):
                 self.assertEqual(consume_aion_module_jump(state, admin, module_id), workspace)
                 self.assertEqual(state[AION_MODULE_JUMP_KEY], workspace)
                 self.assertNotIn("aion_admin_workspace", state)
-                self.assertIn(f"module={module_id}", self._article(html, module_id))
-                self.assertIn(">Abrir<", self._article(html, module_id))
+                article = self._article(html, module_id)
+                self.assertNotIn("href=", article)
+                self.assertNotIn(f"module={module_id}", article)
+                self.assertIn("Abrir pelo controle de módulo abaixo.", article)
+
+        source = Path("atlasquant_central_hub_ui.py").read_text(encoding="utf-8")
+        self.assertIn("aq_aion_module_stateful_", source)
+        self.assertIn("consume_aion_module_jump(st.session_state, access, spec[\"id\"])", source)
 
     def test_same_execution_context_feeds_the_home_without_a_second_fetch(self):
         observation = {
