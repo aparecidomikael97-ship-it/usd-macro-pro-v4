@@ -16,6 +16,7 @@ from atlasquant_aion_clock import (
     greeting_period,
 )
 from atlasquant_navigation_bridge import (
+    request_business_workspace,
     request_return_to_aion,
     request_surface_revalidation,
 )
@@ -35,7 +36,7 @@ _AREAS = {
     },
     "negocios": {
         "label": "Negócios",
-        "sentence": "Casca visual de crescimento e receita.",
+        "sentence": "Cockpit operacional Business do AION, com pesquisa, economia unitária e aprovação humana.",
         "private": True,
     },
     "trader": {
@@ -235,8 +236,8 @@ def request_central_destination(session_state, access: Mapping[str, Any] | None,
     """Hand a central area to the existing navigation bridge.
 
     Trader opens the current Radar page. AION opens the existing AION page.
-    Negócios and Investimentos are shells and do not change the page.
-    The central root only records the selector. It does not open Trader.
+    Negócios opens the existing AION Business workspace in the same session.
+    Investimentos remains a shell. The central root only records the selector.
     """
     if _explicit_root(area):
         if not _admin(access):
@@ -247,6 +248,8 @@ def request_central_destination(session_state, access: Mapping[str, Any] | None,
     _remember_choice(session_state, area_id)
     if area_id == "aion":
         return request_return_to_aion(session_state)
+    if area_id == "negocios":
+        return request_business_workspace(session_state)
     if area_id == "trader":
         mode = str(session_state.get("atlasquant_experience_mode") or "")
         surface = "advanced_radar" if mode.casefold().startswith("avan") else "home_radar"
@@ -272,7 +275,7 @@ def resolve_central_area(access: Mapping[str, Any] | None, requested: Any = None
     return {
         "area": area_id,
         "denied": False,
-        "shell": area_id in {"negocios", "investimentos"},
+        "shell": area_id in {"investimentos"},
         "root": False,
     }
 
