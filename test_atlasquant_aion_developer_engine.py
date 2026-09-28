@@ -43,6 +43,23 @@ class AionDeveloperEngineTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.pass_phase(self.workflow(), "IMPLEMENT", "builder")
 
+    def test_non_pass_phase_cannot_start_out_of_order(self):
+        workflow=self.workflow()
+        for state in ("RUNNING","WAITING_HUMAN","BLOCKED","FAIL"):
+            with self.assertRaises(ValueError):
+                record_phase(
+                    workflow,"IMPLEMENT",state=state,actor="builder",
+                    summary="fora de ordem",evidence_refs=["evidence:1"],
+                )
+
+    def test_forbidden_production_branch_families_are_rejected(self):
+        for branch in ("main","MAIN","main/hotfix","production/fix","refs/heads/prod","origin/main"):
+            with self.assertRaises(ValueError):
+                new_development_workflow(
+                    "unsafe",branch=branch,baseline_ref="abc",
+                    requested_by="admin",
+                )
+
     def test_reviewer_and_critic_must_be_independent(self):
         workflow = self.pass_phase(self.workflow(), "PLAN", "architect")
         workflow = self.pass_phase(workflow, "IMPLEMENT", "builder")
@@ -54,6 +71,23 @@ class AionDeveloperEngineTests(unittest.TestCase):
                 critic_actor="builder",
                 findings=[],
                 evidence_refs=["review"],
+            )
+
+        workflow = self.pass_phase(workflow, "TEST", "test-runner")
+        workflow = self.pass_phase(workflow, "REVIEW", "Reviewer")
+        with self.assertRaises(ValueError):
+            record_adversarial_review(
+                workflow,
+                critic_actor=" reviewer ",
+                findings=[],
+                evidence_refs=["review:adv"],
+            )
+        with self.assertRaises(ValueError):
+            record_adversarial_review(
+                workflow,
+                critic_actor="critic",
+                findings=[],
+                evidence_refs=[],
             )
 
     def test_auto_correction_has_hard_attempt_limit(self):
@@ -73,6 +107,21 @@ class AionDeveloperEngineTests(unittest.TestCase):
         self.assertEqual(len(unchanged["test_attempts"]), MAX_CORRECTION_ATTEMPTS)
         self.assertEqual(unchanged["status"], "BLOCKED")
 
+    def test_test_attempt_never_confirms_root_cause_from_free_text(self):
+        workflow=record_test_attempt(
+            self.workflow(),
+            command_label="unit suite",
+            state="FAIL",
+            error_type="AssertionError",
+            hypothesis="maybe cache",
+            cause="definitely cache",
+            evidence_refs=["log:1"],
+        )
+        attempt=workflow["test_attempts"][-1]
+        self.assertEqual(attempt["cause"],"definitely cache")
+        self.assertEqual(attempt["cause_truth"],"UNKNOWN")
+        self.assertEqual(attempt["cause_source"],"UNVERIFIED_TEST_ATTEMPT")
+
     def test_logs_and_error_metadata_are_redacted(self):
         workflow = record_test_attempt(
             self.workflow(),
@@ -85,6 +134,19 @@ class AionDeveloperEngineTests(unittest.TestCase):
         self.assertIn("[REDACTED]", rendered)
         self.assertNotIn("super-secret-value", rendered)
         self.assertNotIn("another-secret-value", rendered)
+
+    def test_earlier_phase_cannot_change_after_downstream_progress(self):
+        workflow=self.pass_phase(self.workflow(),"PLAN","architect")
+        workflow=self.pass_phase(workflow,"IMPLEMENT","builder-a")
+        workflow=record_phase(
+            workflow,"TEST",state="RUNNING",actor="test-runner",
+            summary="running",evidence_refs=[],
+        )
+        with self.assertRaises(ValueError):
+            record_phase(
+                workflow,"IMPLEMENT",state="PASS",actor="builder-b",
+                summary="IMPLEMENT concluído",evidence_refs=["evidence:implement"],
+            )
 
     def test_high_adversarial_finding_blocks_definition_of_done(self):
         workflow = self.pass_phase(self.workflow(), "PLAN", "architect")
