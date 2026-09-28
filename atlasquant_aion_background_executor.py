@@ -11,6 +11,7 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import json
+import re
 from typing import Any, Mapping
 
 from atlasquant_aion_core import guardian_decision
@@ -80,7 +81,18 @@ def _result_preview(payload: Any) -> str:
         )
     except Exception:
         raw = str(payload or "")
-    return redact_text(raw)[:4000]
+    text = re.sub(
+        r"-----BEGIN [^-]*PRIVATE KEY-----.*?-----END [^-]*PRIVATE KEY-----",
+        "[REDACTED]",
+        raw,
+        flags=re.S,
+    )
+    text = re.sub(
+        r"(https?://)[^\\s/@]+:[^\\s/@]+@",
+        r"\\1[REDACTED]@",
+        text,
+    )
+    return redact_text(text)[:4000]
 
 
 def _schedule_fingerprint(schedule: Mapping[str, Any]) -> str:
