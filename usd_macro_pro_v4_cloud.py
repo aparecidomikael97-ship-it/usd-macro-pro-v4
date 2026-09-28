@@ -424,6 +424,50 @@ except Exception:
     consume_premium_navigation = None
     render_premium_catalog = None
 
+try:
+    from atlasquant_central_hub_ui import render_central_hub, request_central_destination
+except Exception:
+    render_central_hub = None
+    request_central_destination = None
+
+
+def _render_atlasquant_central_hub(*, active_index=None, stop_for_shell=False):
+    """Ecosystem rail around the current console. Private areas stay fail-closed."""
+    if render_central_hub is None:
+        return None
+    try:
+        requested = st.query_params.get("central", "")
+        if isinstance(requested, (list, tuple)):
+            requested = requested[0] if requested else ""
+        if active_index == 21 and not str(requested or "").strip():
+            requested = "aion"
+        resolved = render_central_hub(_ATLASQUANT_ACCESS, requested)
+    except Exception:
+        return None
+    if (
+        stop_for_shell
+        and isinstance(resolved, dict)
+        and resolved.get("shell")
+        and os.getenv("USD_MACRO_AUTOPILOT", "") != "1"
+    ):
+        st.stop()
+    return resolved
+
+
+def _apply_central_trader_navigation():
+    """Leave AION for the existing Radar page when the rail asks for Trader."""
+    if request_central_destination is None:
+        return None
+    try:
+        requested = st.query_params.get("central", "")
+        if isinstance(requested, (list, tuple)):
+            requested = requested[0] if requested else ""
+        if str(requested or "").strip().casefold() != "trader":
+            return None
+        return request_central_destination(st.session_state, _ATLASQUANT_ACCESS, "trader")
+    except Exception:
+        return None
+
 
 try:
     from atlasquant_macro_briefing_panel import render_macro_briefing_panel
@@ -2114,8 +2158,16 @@ if (
         if str(_aion_direct_raw or "").strip().casefold() in {"1", "true", "sim", "central"}:
             request_return_to_aion(st.session_state)
             st.session_state["_aion_direct_link_consumed"] = True
+        else:
+            _central_direct_raw = st.query_params.get("central", "")
+            if isinstance(_central_direct_raw, (list, tuple)):
+                _central_direct_raw = _central_direct_raw[0] if _central_direct_raw else ""
+            if str(_central_direct_raw or "").strip().casefold() == "aion":
+                request_return_to_aion(st.session_state)
+                st.session_state["_aion_direct_link_consumed"] = True
     except Exception:
         pass
+_apply_central_trader_navigation()
 _aq_early_pages = list(navigation_labels()) if navigation_labels is not None else []
 if str(_ATLASQUANT_ACCESS.get("role") or "").upper() == "ADMIN" and "🧠 AION" not in _aq_early_pages:
     _aq_early_pages.append("🧠 AION")
@@ -2151,6 +2203,7 @@ if os.getenv("USD_MACRO_AUTOPILOT", "") != "1" and not _ATLASQUANT_OFFLINE_SMOKE
             environment=ATLASQUANT_ENVIRONMENT,
         )
         if bool(_fast_result.get("handled",False)):
+            _render_atlasquant_central_hub(stop_for_shell=False)
             st.stop()
     except Exception as _fast_exc:
         # Falha do acelerador nunca amplia permissões nem derruba o app completo.
@@ -4399,11 +4452,19 @@ if (
         if str(_aion_direct_raw or "").strip().casefold() in {"1", "true", "sim", "central"}:
             request_return_to_aion(st.session_state)
             st.session_state["_aion_direct_link_consumed"] = True
+        else:
+            _central_direct_raw = st.query_params.get("central", "")
+            if isinstance(_central_direct_raw, (list, tuple)):
+                _central_direct_raw = _central_direct_raw[0] if _central_direct_raw else ""
+            if str(_central_direct_raw or "").strip().casefold() == "aion":
+                request_return_to_aion(st.session_state)
+                st.session_state["_aion_direct_link_consumed"] = True
     except Exception:
         # Query parameters are convenience routing only. Failure must never
         # affect authentication, Guardian or the regular AtlasQuant navigation.
         pass
 
+_apply_central_trader_navigation()
 # Guided AION navigation is consumed before the Streamlit navigation widgets
 # are instantiated. This avoids mutating widget-backed session state after
 # creation in the same rerun.
@@ -4534,6 +4595,7 @@ _aq_active_index = (
     if _aq_locked_preview
     else (_nav_items.index(_aq_active_page) if _aq_active_page in _nav_items else 0)
 )
+_render_atlasquant_central_hub(active_index=_aq_active_index, stop_for_shell=True)
 
 # =========================================================
 # MACRO BRIEFING — apresentação sobre o estado JÁ calculado
