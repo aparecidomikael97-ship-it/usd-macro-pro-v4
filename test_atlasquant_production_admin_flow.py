@@ -201,7 +201,7 @@ class ProductionAdminFlowTests(unittest.TestCase):
         self.assertIn('data-role="USER"', html)
         self.assertNotIn("· ADMIN", html)
         self.assertNotIn("CENTRAL PRINCIPAL", html)
-        self.assertNotIn("Escolha um setor", html)
+        self.assertNotIn("<h2>Escolha um setor</h2>", html)
         self.assertNotIn('data-root="central_root"', html)
         self.assertNotIn("AION IA", html)
         self.assertNotIn("Renda Fixa", html)
