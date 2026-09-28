@@ -436,6 +436,13 @@ except Exception:
     prepare_global_worker_activation_plan = None
     validate_global_worker_activation_approval = None
 
+try:
+    from atlasquant_aion_global_worker_live_verification import (
+        verify_global_worker_live_activation,
+    )
+except Exception:
+    verify_global_worker_live_activation = None
+
 SCHEMA = "ATLASQUANT_AION_ADMIN_V1"
 AION_WORKSPACES = (
     "🧠 Central",
@@ -463,6 +470,7 @@ _AION_GLOBAL_ACTIVATION_READINESS_KEY = "aion_global_activation_readiness_v1"
 _AION_GLOBAL_ACTIVATION_PLAN_KEY = "aion_global_activation_plan_v1"
 _AION_GLOBAL_ACTIVATION_APPROVAL_KEY = "aion_global_activation_approval_v1"
 _AION_GLOBAL_ACTIVATION_RESULT_KEY = "aion_global_activation_result_v1"
+_AION_GLOBAL_LIVE_VERIFICATION_KEY = "aion_global_live_verification_v1"
 
 AION_ADMIN_CSS = r"""
 <style>
@@ -6862,6 +6870,96 @@ def _render_development(
                 )
                 + " · trading real: NÃO."
             )
+
+        st.markdown("##### 📡 Verificação operacional ao vivo")
+        st.caption(
+            "ENABLED não significa LIVE. Esta verificação é somente leitura e exige "
+            "heartbeat/tick compartilhado posterior à ativação. Receipt GLOBAL_WORKER "
+            "é mostrado quando houve trabalho devido; um tick idle válido também prova "
+            "que o runner acordou."
+        )
+        if st.button(
+            "📡 Verificar Worker Global ao vivo",
+            key="aion_global_live_verify",
+            disabled=not bool(
+                verify_global_worker_live_activation is not None
+                and read_repository_feature_flag is not None
+            ),
+            width="stretch",
+        ):
+            try:
+                fresh_flag = read_repository_feature_flag(cfg)
+                fresh_runtime = load_runtime_checkpoint(cfg)
+                live_report = verify_global_worker_live_activation(
+                    access,
+                    fresh_runtime,
+                    fresh_flag,
+                    activation_result=(
+                        last_activation
+                        if isinstance(last_activation, Mapping)
+                        else None
+                    ),
+                )
+                st.session_state[_AION_GLOBAL_LIVE_VERIFICATION_KEY] = (
+                    live_report
+                )
+            except Exception as exc:
+                st.session_state[_AION_GLOBAL_LIVE_VERIFICATION_KEY] = {
+                    "status": "BLOCKED",
+                    "reason": type(exc).__name__,
+                    "live_confirmed": False,
+                }
+
+        live_report = st.session_state.get(
+            _AION_GLOBAL_LIVE_VERIFICATION_KEY
+        )
+        if isinstance(live_report, Mapping):
+            lv1, lv2, lv3, lv4 = st.columns(4)
+            lv1.metric(
+                "Live status",
+                str(live_report.get("status") or "UNKNOWN"),
+            )
+            lv2.metric(
+                "Heartbeat",
+                "SIM" if live_report.get("heartbeat_confirmed") else "NÃO",
+            )
+            lv3.metric(
+                "Tick",
+                "SIM" if live_report.get("tick_confirmed") else "NÃO",
+            )
+            lv4.metric(
+                "Receipt work",
+                "SIM" if live_report.get("work_receipt_confirmed") else "NÃO",
+            )
+            st.caption(
+                "Runtime: "
+                + str(live_report.get("last_runtime_id") or "não confirmado")
+                + " · último heartbeat: "
+                + str(live_report.get("last_heartbeat_at") or "não confirmado")
+                + " · último tick: "
+                + str(live_report.get("last_tick_at") or "não confirmado")
+                + " · efeitos externos/trading: NÃO."
+            )
+            if live_report.get("live_confirmed"):
+                st.success(
+                    "Worker Global LIVE confirmado por evidência compartilhada."
+                )
+            elif str(live_report.get("status") or "") == "LIVE_EVIDENCE_TIMEOUT":
+                st.error(
+                    "Timeout sem heartbeat compartilhado após ativação. "
+                    "Não considerar o Worker operacional; use o safety stop."
+                )
+            elif str(live_report.get("status") or "").startswith("BLOCKED"):
+                st.error(
+                    "Verificação live bloqueada: "
+                    + str(live_report.get("reason") or "evidência inválida")
+                    + "."
+                )
+            else:
+                st.info(
+                    "Ainda aguardando evidência live compartilhada. "
+                    "A feature flag, por si só, não confirma operação."
+                )
 
         with st.expander("🛑 Desativação de segurança da feature flag"):
             st.caption(
