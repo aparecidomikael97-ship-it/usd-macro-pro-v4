@@ -487,6 +487,7 @@ def persist_staged_global_arming(
         config,
         approved=True,
         expected_sha=source_sha,
+        allow_global_arming_transition=True,
         timeout=timeout,
     )
     if not (result.get("saved") and result.get("verified")):
