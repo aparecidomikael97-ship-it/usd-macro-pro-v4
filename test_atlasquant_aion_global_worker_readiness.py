@@ -133,6 +133,54 @@ class GlobalWorkerActivationReadinessTests(unittest.TestCase):
         )
         self.assertEqual(stale["state"], "BLOCKED")
 
+    def test_pulse_health_allows_fresh_active_run_after_recent_successes(self):
+        rows = _pulses()
+        rows.insert(
+            0,
+            {
+                "event": "schedule",
+                "status": "in_progress",
+                "conclusion": "",
+                "created_at": (NOW - timedelta(minutes=2)).isoformat(),
+            },
+        )
+        report = pulse_health(rows, now=NOW)
+        self.assertEqual(report["state"], "PASS")
+        self.assertTrue(report["latest_is_active"])
+        self.assertEqual(report["latest_status"], "in_progress")
+        self.assertEqual(report["latest_completed_conclusion"], "success")
+
+    def test_pulse_health_blocks_fresh_completed_failure(self):
+        rows = _pulses()
+        rows.insert(
+            0,
+            {
+                "event": "schedule",
+                "status": "completed",
+                "conclusion": "failure",
+                "created_at": (NOW - timedelta(minutes=2)).isoformat(),
+            },
+        )
+        report = pulse_health(rows, now=NOW)
+        self.assertEqual(report["state"], "BLOCKED")
+        self.assertFalse(report["latest_is_active"])
+        self.assertEqual(report["latest_conclusion"], "failure")
+
+    def test_pulse_health_blocks_stale_active_run(self):
+        rows = _pulses()
+        rows.insert(
+            0,
+            {
+                "event": "schedule",
+                "status": "in_progress",
+                "conclusion": "",
+                "created_at": (NOW - timedelta(hours=2)).isoformat(),
+            },
+        )
+        report = pulse_health(rows, now=NOW)
+        self.assertEqual(report["state"], "BLOCKED")
+        self.assertTrue(report["latest_is_active"])
+
     def test_protocol_shadow_probe_is_in_memory_and_passes(self):
         report = protocol_shadow_probe(now=NOW)
         self.assertEqual(report["state"], "PASS")
