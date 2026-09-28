@@ -140,7 +140,6 @@ def prepare_global_worker_arming_plan(
     max_jobs: int,
     lease_seconds: int,
     approval_ttl_seconds: int = DEFAULT_APPROVAL_TTL_SECONDS,
-    readiness_stage: str = "READY_FOR_ADMIN_ARMING",
     now: datetime | None = None,
 ) -> dict[str, Any]:
     """Build an immutable arming plan without changing the checkpoint."""
@@ -166,17 +165,6 @@ def prepare_global_worker_arming_plan(
         maximum=MAX_APPROVAL_TTL_SECONDS,
         name="arming approval ttl",
     )
-    stage = safe_text(str(readiness_stage or ""), 100).upper()
-    if stage != "READY_FOR_ADMIN_ARMING":
-        return {
-            "schema": SCHEMA,
-            "status": "BLOCKED",
-            "reason": "READINESS_STAGE_NOT_ARMABLE",
-            "checkpoint_modified": False,
-            "runtime_modified": False,
-            "feature_flag_modified": False,
-        }
-
     source_digest = checkpoint_source_digest(checkpoint)
     expires = current + timedelta(seconds=ttl)
     plan = {
@@ -184,7 +172,8 @@ def prepare_global_worker_arming_plan(
         "actor_id": context.actor_id,
         "scope": _scope_payload(context),
         "source_checkpoint_digest": source_digest,
-        "readiness_stage": stage,
+        "required_readiness_stage": "READY_FOR_ADMIN_ARMING",
+        "readiness_verified_by_plan": False,
         "created_at": current.isoformat(),
         "expires_at": expires.isoformat(),
         "approval_ttl_seconds": ttl,
