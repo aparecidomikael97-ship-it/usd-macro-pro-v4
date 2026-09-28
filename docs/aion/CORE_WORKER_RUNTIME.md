@@ -204,3 +204,5 @@ The executor receipt bundle reports whether `HUMAN_CLICK` and/or
 `ARMED_WORKER` receipts have actually been observed. It does not claim
 `manual_invocation_only=true` after an armed-worker receipt exists. The worker
 still has no external or physical authority.
+
+CI synchronization marker: authorization-mode metadata audit is included in this revision.
