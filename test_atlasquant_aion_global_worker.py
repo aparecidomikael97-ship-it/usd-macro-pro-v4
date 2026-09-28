@@ -1,0 +1,529 @@
+import unittest
+from copy import deepcopy
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from unittest.mock import patch
+
+from atlasquant_aion_background_executor import (
+    executor_snapshot,
+    load_executor_receipts,
+)
+from atlasquant_aion_core_intelligence.context import Domain
+from atlasquant_aion_core_runtime_bridge import authenticated_context
+from atlasquant_aion_core_voice_automation import stage_schedule
+from atlasquant_aion_global_worker import (
+    GLOBAL_WORKER_NAMESPACE,
+    SERVICE_PRINCIPAL,
+    _claim_state,
+    attach_global_worker_state,
+    global_worker_integrity,
+    global_worker_snapshot,
+    load_global_worker_state,
+    run_global_worker_once,
+    stage_arm_global_worker,
+    stage_kill_global_worker,
+    stage_pause_global_worker,
+)
+from atlasquant_aion_global_worker_arming import (
+    CONFIRMATION_PHRASE,
+    approve_global_worker_arming_plan,
+    prepare_global_worker_arming_plan,
+)
+from atlasquant_aion_memory import (
+    RuntimeConfig,
+    checkpoint_integrity_report,
+    checkpoint_source_digest,
+    ensure_operating_checkpoint,
+)
+
+
+CREATED = datetime(2026, 9, 28, 10, 0, tzinfo=timezone.utc)
+TICK = datetime(2026, 9, 28, 13, 0, tzinfo=timezone.utc)
+
+
+def _access(username="mikael", fingerprint="global-worker-admin-fingerprint-1234567890"):
+    return {
+        "allowed": True,
+        "mode": "AUTHENTICATED",
+        "role": "ADMIN",
+        "session": {
+            "username": username,
+            "role": "ADMIN",
+            "credential_fingerprint": fingerprint,
+            "permissions": ["app:read", "admin:read", "aion:admin"],
+            "authenticated_at": 10,
+            "last_seen": 10,
+        },
+    }
+
+
+def _config():
+    return RuntimeConfig(
+        token="test-token",
+        repo="owner/repo",
+        branch="atlasquant-runtime",
+    )
+
+
+class AionGlobalDurableWorkerTests(unittest.TestCase):
+    def setUp(self):
+        self.access = _access()
+        self.context = authenticated_context(self.access, Domain.ADMIN)
+
+    def schedule(
+        self,
+        *,
+        capability="ADMINISTRATION",
+        prompt="estado do sistema",
+        title="Global safe task",
+        checkpoint=None,
+    ):
+        result = stage_schedule(
+            checkpoint or {},
+            self.context,
+            title=title,
+            prompt=prompt,
+            capability=capability,
+            cadence="DAILY",
+            timezone_name="America/Cuiaba",
+            hour=8,
+            minute=0,
+            confirmation=True,
+            now=CREATED,
+        )
+        return result["checkpoint"]
+
+    def approval(self, checkpoint, *, max_jobs=5, lease_seconds=600, now=CREATED):
+        plan = prepare_global_worker_arming_plan(
+            self.access,
+            checkpoint,
+            max_jobs=max_jobs,
+            lease_seconds=lease_seconds,
+            approval_ttl_seconds=900,
+            now=now,
+        )
+        self.assertEqual(plan["status"], "PLAN_READY")
+        approved = approve_global_worker_arming_plan(
+            self.access,
+            plan["plan"],
+            confirmation=True,
+            confirmation_phrase=CONFIRMATION_PHRASE,
+            now=now,
+        )
+        self.assertEqual(approved["status"], "APPROVED_FOR_STAGING")
+        return approved["approval"]
+
+    def armed_checkpoint(self, *, capability="ADMINISTRATION", prompt="estado do sistema"):
+        scheduled = self.schedule(capability=capability, prompt=prompt)
+        result = stage_arm_global_worker(
+            self.access,
+            scheduled,
+            confirmation=True,
+            arming_approval=self.approval(scheduled),
+            max_jobs=5,
+            lease_seconds=600,
+            now=CREATED,
+        )
+        return result["checkpoint"]
+
+    def fake_persist(self, captures):
+        def _persist(checkpoint, config, *, expected_sha, operation, timeout=15.0):
+            captures.append({
+                "checkpoint": deepcopy(checkpoint),
+                "expected_sha": expected_sha,
+                "operation": operation,
+            })
+            return {
+                "status": "CONFIRMED",
+                "saved": True,
+                "verified": True,
+                "sha": "sha-" + str(len(captures)),
+                "checkpoint": deepcopy(checkpoint),
+                "integrity": checkpoint_integrity_report(checkpoint),
+            }
+        return _persist
+
+    def test_global_arming_requires_explicit_confirmation(self):
+        result = stage_arm_global_worker(
+            self.access,
+            {},
+            confirmation=False,
+            now=CREATED,
+        )
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertNotIn(GLOBAL_WORKER_NAMESPACE, result["checkpoint"])
+
+    def test_staged_arm_binds_exact_admin_scope_without_persisting(self):
+        checkpoint = {}
+        result = stage_arm_global_worker(
+            self.access,
+            checkpoint,
+            confirmation=True,
+            arming_approval=self.approval(
+                checkpoint,
+                max_jobs=4,
+                lease_seconds=600,
+            ),
+            max_jobs=4,
+            lease_seconds=600,
+            now=CREATED,
+        )
+        self.assertEqual(result["status"], "STAGED_ARMED")
+        self.assertTrue(result["requires_checkpoint_save"])
+        self.assertFalse(result["external_persisted"])
+        state, status = load_global_worker_state(result["checkpoint"])
+        self.assertEqual(status["state"], "CONNECTED")
+        self.assertEqual(state["state"], "ARMED")
+        self.assertFalse(state["kill_switch"])
+        self.assertEqual(state["max_jobs"], 4)
+        self.assertEqual(state["lease_seconds"], 600)
+        snap = global_worker_snapshot(self.access, result["checkpoint"], now=CREATED)
+        self.assertTrue(snap["delegated_scope_matches"])
+        self.assertFalse(snap["automatic_external_business_actions"])
+        self.assertFalse(snap["real_trading_enabled"])
+
+    def test_other_admin_context_cannot_read_global_control_details(self):
+        checkpoint = self.armed_checkpoint()
+        other = _access(
+            username="other-admin",
+            fingerprint="other-global-worker-fingerprint-999999",
+        )
+        snapshot = global_worker_snapshot(other, checkpoint, now=CREATED)
+        self.assertEqual(snapshot["status"], "CONTEXT_ISOLATED")
+        self.assertEqual(snapshot["state"], "UNKNOWN")
+        self.assertEqual(snapshot["delegated_actor"], "")
+        self.assertEqual(snapshot["lease_owner"], "")
+        self.assertEqual(snapshot["stats"], {})
+        self.assertEqual(snapshot["allowed_capabilities"], [])
+
+    def test_feature_flag_off_makes_zero_network_calls(self):
+        with patch("atlasquant_aion_global_worker.load_runtime_checkpoint") as load:
+            result = run_global_worker_once(
+                config=_config(),
+                runtime_id="gha-1-1",
+                feature_enabled=False,
+                now=TICK,
+            )
+        load.assert_not_called()
+        self.assertEqual(result["status"], "FEATURE_DISABLED")
+        self.assertFalse(result["network_called"])
+        self.assertEqual(result["processed"], 0)
+
+    def test_global_tick_claims_fence_executes_and_persists_receipt(self):
+        checkpoint = self.armed_checkpoint()
+        captures = []
+        with patch(
+            "atlasquant_aion_global_worker.load_runtime_checkpoint",
+            return_value={
+                "status": "CONFIRMED",
+                "checkpoint": checkpoint,
+                "sha": "sha-0",
+                "integrity": checkpoint_integrity_report(checkpoint),
+            },
+        ), patch(
+            "atlasquant_aion_global_worker._persist_runtime_checkpoint_cas",
+            side_effect=self.fake_persist(captures),
+        ):
+            result = run_global_worker_once(
+                config=_config(),
+                runtime_id="gha-100-1",
+                feature_enabled=True,
+                now=TICK,
+            )
+
+        self.assertEqual(result["status"], "CONFIRMED")
+        self.assertEqual(result["authorization_mode"], "GLOBAL_WORKER")
+        self.assertEqual(result["service_principal"], SERVICE_PRINCIPAL)
+        self.assertEqual(result["processed"], 1)
+        self.assertEqual(result["succeeded"], 1)
+        self.assertEqual(result["fencing_token"], 1)
+        self.assertTrue(result["automatic_runtime_checkpoint_persistence"])
+        self.assertFalse(result["automatic_external_business_actions"])
+        self.assertFalse(result["provider_called"])
+        self.assertFalse(result["external_action_executed"])
+        self.assertFalse(result["payment_executed"])
+        self.assertFalse(result["publication_executed"])
+        self.assertFalse(result["deploy_executed"])
+        self.assertFalse(result["merge_executed"])
+        self.assertFalse(result["real_trading_enabled"])
+        self.assertEqual(len(captures), 2)
+        self.assertEqual(captures[0]["expected_sha"], "sha-0")
+        self.assertEqual(captures[1]["expected_sha"], "sha-1")
+
+        final_checkpoint = captures[-1]["checkpoint"]
+        receipts, _ = load_executor_receipts(self.context, final_checkpoint)
+        self.assertEqual(len(receipts), 1)
+        receipt = receipts[0]
+        self.assertEqual(receipt["authorization_mode"], "GLOBAL_WORKER")
+        self.assertEqual(receipt["human_principal"], "")
+        self.assertEqual(receipt["delegated_actor"], "mikael")
+        self.assertTrue(receipt["execution_principal"].startswith(SERVICE_PRINCIPAL + ":"))
+        self.assertFalse(receipt["external_action_executed"])
+        state, _ = load_global_worker_state(final_checkpoint)
+        self.assertEqual(state["lease"]["owner"], "")
+        self.assertEqual(state["fencing_counter"], 1)
+        self.assertEqual(state["stats"]["ticks"], 1)
+        self.assertEqual(state["stats"]["processed"], 1)
+
+        executor = executor_snapshot(self.access, final_checkpoint, now=TICK)
+        self.assertTrue(executor["global_worker_execution_observed"])
+        self.assertFalse(executor["manual_invocation_only"])
+        self.assertFalse(executor["autonomous_worker_connected"])
+
+    def test_active_global_lease_blocks_other_runtime_without_write(self):
+        checkpoint = self.armed_checkpoint()
+        state, _ = load_global_worker_state(checkpoint)
+        claimed, lease = _claim_state(state, runtime_id="gha-a", now=TICK)
+        self.assertEqual(lease["state"], "CLAIMED")
+        with_lease = attach_global_worker_state(checkpoint, claimed)
+        with patch(
+            "atlasquant_aion_global_worker.load_runtime_checkpoint",
+            return_value={
+                "status": "CONFIRMED",
+                "checkpoint": with_lease,
+                "sha": "sha-lease",
+            },
+        ), patch(
+            "atlasquant_aion_global_worker._persist_runtime_checkpoint_cas"
+        ) as persist:
+            result = run_global_worker_once(
+                config=_config(),
+                runtime_id="gha-b",
+                feature_enabled=True,
+                now=TICK + timedelta(seconds=30),
+            )
+        persist.assert_not_called()
+        self.assertEqual(result["status"], "LEASE_HELD")
+        self.assertEqual(result["lease"]["owner"], "gha-a")
+        self.assertEqual(result["processed"], 0)
+
+    def test_expired_lease_reclaims_with_monotonic_fencing_token(self):
+        checkpoint = self.armed_checkpoint()
+        state, _ = load_global_worker_state(checkpoint)
+        first, lease1 = _claim_state(state, runtime_id="gha-a", now=TICK)
+        second, lease2 = _claim_state(
+            first,
+            runtime_id="gha-b",
+            now=TICK + timedelta(seconds=601),
+        )
+        self.assertEqual(lease1["fencing_token"], 1)
+        self.assertEqual(lease2["fencing_token"], 2)
+        self.assertTrue(lease2["reclaimed"])
+        self.assertEqual(second["fencing_counter"], 2)
+        self.assertEqual(second["stats"]["crash_recoveries"], 1)
+
+    def test_claim_cas_conflict_blocks_executor(self):
+        checkpoint = self.armed_checkpoint()
+        with patch(
+            "atlasquant_aion_global_worker.load_runtime_checkpoint",
+            return_value={
+                "status": "CONFIRMED",
+                "checkpoint": checkpoint,
+                "sha": "sha-0",
+            },
+        ), patch(
+            "atlasquant_aion_global_worker._persist_runtime_checkpoint_cas",
+            return_value={
+                "status": "CONFLICT",
+                "saved": False,
+                "verified": False,
+            },
+        ), patch(
+            "atlasquant_aion_global_worker._execute_due_local_work_authorized"
+        ) as executor:
+            result = run_global_worker_once(
+                config=_config(),
+                runtime_id="gha-conflict",
+                feature_enabled=True,
+                now=TICK,
+            )
+        executor.assert_not_called()
+        self.assertEqual(result["status"], "LEASE_CLAIM_CONFLICT")
+        self.assertEqual(result["processed"], 0)
+
+    def test_global_allowlist_blocks_voice_schedule_before_provider(self):
+        checkpoint = self.armed_checkpoint(
+            capability="VOICE",
+            prompt="voz preparar resumo",
+        )
+        captures = []
+        with patch(
+            "atlasquant_aion_global_worker.load_runtime_checkpoint",
+            return_value={"status": "CONFIRMED", "checkpoint": checkpoint, "sha": "sha-0"},
+        ), patch(
+            "atlasquant_aion_global_worker._persist_runtime_checkpoint_cas",
+            side_effect=self.fake_persist(captures),
+        ):
+            result = run_global_worker_once(
+                config=_config(),
+                runtime_id="gha-voice",
+                feature_enabled=True,
+                now=TICK,
+            )
+        self.assertEqual(result["status"], "CONFIRMED")
+        self.assertEqual(result["blocked"], 1)
+        final = captures[-1]["checkpoint"]
+        receipts, _ = load_executor_receipts(self.context, final)
+        self.assertEqual(receipts[0]["state"], "BLOCKED")
+        self.assertEqual(
+            receipts[0]["reason"],
+            "CAPABILITY_NOT_BACKGROUND_ALLOWLISTED",
+        )
+        self.assertFalse(receipts[0]["provider_called"])
+
+    def test_sensitive_publication_is_blocked_in_global_mode(self):
+        checkpoint = self.armed_checkpoint(
+            capability="CONTENT",
+            prompt="publique este conteúdo agora",
+        )
+        captures = []
+        with patch(
+            "atlasquant_aion_global_worker.load_runtime_checkpoint",
+            return_value={"status": "CONFIRMED", "checkpoint": checkpoint, "sha": "sha-0"},
+        ), patch(
+            "atlasquant_aion_global_worker._persist_runtime_checkpoint_cas",
+            side_effect=self.fake_persist(captures),
+        ):
+            result = run_global_worker_once(
+                config=_config(),
+                runtime_id="gha-content",
+                feature_enabled=True,
+                now=TICK,
+            )
+        self.assertEqual(result["blocked"], 1)
+        receipts, _ = load_executor_receipts(
+            self.context,
+            captures[-1]["checkpoint"],
+        )
+        self.assertIn(
+            "SENSITIVE_INTENT_REQUIRES_INTERACTIVE_APPROVAL",
+            receipts[0]["reason"],
+        )
+        self.assertFalse(receipts[0]["external_action_executed"])
+
+    def test_staged_pause_and_kill_require_checkpoint_save(self):
+        armed = self.armed_checkpoint()
+        paused = stage_pause_global_worker(
+            self.access,
+            armed,
+            confirmation=True,
+        )
+        self.assertEqual(paused["status"], "STAGED_PAUSED")
+        self.assertTrue(paused["requires_checkpoint_save"])
+        state, _ = load_global_worker_state(paused["checkpoint"])
+        self.assertEqual(state["state"], "PAUSED")
+
+        killed = stage_kill_global_worker(
+            self.access,
+            armed,
+            confirmation=True,
+        )
+        self.assertEqual(killed["status"], "STAGED_KILLED")
+        self.assertTrue(killed["requires_checkpoint_save"])
+        state, _ = load_global_worker_state(killed["checkpoint"])
+        self.assertEqual(state["state"], "KILLED")
+        self.assertTrue(state["kill_switch"])
+
+    def test_persisted_kill_switch_prevents_claim_and_execution(self):
+        checkpoint = stage_kill_global_worker(
+            self.access,
+            self.armed_checkpoint(),
+            confirmation=True,
+        )["checkpoint"]
+        with patch(
+            "atlasquant_aion_global_worker.load_runtime_checkpoint",
+            return_value={"status": "CONFIRMED", "checkpoint": checkpoint, "sha": "sha-kill"},
+        ), patch(
+            "atlasquant_aion_global_worker._persist_runtime_checkpoint_cas"
+        ) as persist:
+            result = run_global_worker_once(
+                config=_config(),
+                runtime_id="gha-kill",
+                feature_enabled=True,
+                now=TICK,
+            )
+        persist.assert_not_called()
+        self.assertEqual(result["status"], "KILLED")
+        self.assertEqual(result["processed"], 0)
+
+    def test_global_state_tamper_fails_master_integrity(self):
+        checkpoint = self.armed_checkpoint()
+        raw = checkpoint[GLOBAL_WORKER_NAMESPACE]
+        self.assertEqual(global_worker_integrity(raw)["state"], "MATCH")
+        tampered = deepcopy(checkpoint)
+        tampered[GLOBAL_WORKER_NAMESPACE]["max_jobs"] = 19
+        self.assertEqual(
+            global_worker_integrity(tampered[GLOBAL_WORKER_NAMESPACE])["state"],
+            "MISMATCH",
+        )
+        report = checkpoint_integrity_report(tampered)
+        self.assertEqual(report["state"], "MISMATCH")
+        self.assertIn("aion_global_worker", report["mismatches"])
+
+    def test_global_namespace_survives_normalization_and_conflict_digest(self):
+        base = ensure_operating_checkpoint(self.schedule())
+        before = checkpoint_source_digest(base)
+        armed = stage_arm_global_worker(
+            self.access,
+            base,
+            confirmation=True,
+            arming_approval=self.approval(
+                base,
+                max_jobs=5,
+                lease_seconds=600,
+            ),
+            lease_seconds=600,
+            now=CREATED,
+        )["checkpoint"]
+        normalized = ensure_operating_checkpoint(armed)
+        self.assertIn(GLOBAL_WORKER_NAMESPACE, normalized)
+        self.assertNotEqual(before, checkpoint_source_digest(normalized))
+
+    def test_existing_autopilot_pulse_is_reused_without_new_cron(self):
+        workflow = Path(".github/workflows/autopilot-v107.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(workflow.count("cron:"), 1)
+        self.assertIn('cron: "7,37 * * * *"', workflow)
+        self.assertIn("AION Global Worker tick", workflow)
+        self.assertIn(
+            "vars.ATLASQUANT_AION_GLOBAL_WORKER_ENABLED == '1'",
+            workflow,
+        )
+        self.assertIn("python atlasquant_aion_global_worker.py --tick", workflow)
+
+    def test_admin_ui_stages_global_control_but_does_not_auto_save(self):
+        source = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Worker Global/Durable V1 · control plane", source)
+        self.assertIn("Cerimônia de Arming", source)
+        self.assertIn("Gerar plano de Arming", source)
+        self.assertIn("Criar autorização temporária", source)
+        self.assertIn("Preparar ARMED (staged, sem salvar)", source)
+        self.assertNotIn('"🌐 Armar Global (staged)"', source)
+        self.assertIn("Pausar Global (staged)", source)
+        self.assertIn("Kill Global (staged)", source)
+        self.assertIn("NÃO foi salvo no runtime", source)
+        self.assertIn("Salvar Checkpoint Mestre", source)
+
+    def test_global_worker_has_no_physical_or_business_action_apis(self):
+        source = Path("atlasquant_aion_global_worker.py").read_text(
+            encoding="utf-8"
+        )
+        for banned in (
+            "import subprocess",
+            "from subprocess",
+            "subprocess.",
+            "os.system(",
+            "generate_neural_speech(",
+            "publish_social(",
+            "publish_marketplace(",
+            "charge_customer(",
+            "deploy_production(",
+            "merge_main(",
+            "real_trade(",
+        ):
+            self.assertNotIn(banned, source)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1473,6 +1473,7 @@ def save_runtime_checkpoint(
     *,
     approved: bool = False,
     expected_sha: str = "",
+    allow_global_arming_transition: bool = False,
     timeout: float = 15.0,
 ) -> dict[str, Any]:
     """Persist only after approval and confirm persistence with read-after-write."""
@@ -1509,9 +1510,143 @@ def save_runtime_checkpoint(
 
     payload = ensure_operating_checkpoint(checkpoint)
     payload = deepcopy(payload)
+
+    proposed_global = (
+        payload.get(AION_GLOBAL_WORKER_NAMESPACE)
+        if isinstance(payload.get(AION_GLOBAL_WORKER_NAMESPACE), Mapping)
+        else None
+    )
+    proposed_armed = bool(
+        isinstance(proposed_global, Mapping)
+        and str(proposed_global.get("state") or "").upper() == "ARMED"
+    )
+    if proposed_armed:
+        current_runtime = load_runtime_checkpoint(cfg, timeout=timeout)
+        current_checkpoint = (
+            current_runtime.get("checkpoint")
+            if isinstance(current_runtime.get("checkpoint"), Mapping)
+            else {}
+        )
+        current_global = (
+            current_checkpoint.get(AION_GLOBAL_WORKER_NAMESPACE)
+            if isinstance(current_checkpoint, Mapping)
+            and isinstance(current_checkpoint.get(AION_GLOBAL_WORKER_NAMESPACE), Mapping)
+            else None
+        )
+        def _arming_contract_digest(raw: Mapping[str, Any] | None) -> str:
+            item = dict(raw or {})
+            contract = {
+                "arm_digest": str(item.get("arm_digest") or ""),
+                "arming_plan_digest": str(item.get("arming_plan_digest") or ""),
+                "arming_approval_digest": str(item.get("arming_approval_digest") or ""),
+                "arming_approval_expires_at": str(item.get("arming_approval_expires_at") or ""),
+                "armed_at": str(item.get("armed_at") or ""),
+                "delegation": deepcopy(dict(item.get("delegation") or {})),
+                "allowed_capabilities": list(item.get("allowed_capabilities") or []),
+                "resource_budgets": deepcopy(dict(item.get("resource_budgets") or {})),
+                "max_jobs": item.get("max_jobs"),
+                "lease_seconds": item.get("lease_seconds"),
+            }
+            encoded = json.dumps(
+                contract,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+                default=str,
+            ).encode("utf-8")
+            return hashlib.sha256(encoded).hexdigest()
+
+        same_armed = bool(
+            isinstance(current_global, Mapping)
+            and str(current_global.get("state") or "").upper() == "ARMED"
+            and _arming_contract_digest(current_global)
+                == _arming_contract_digest(proposed_global)
+        )
+        transition = not same_armed
+        if transition and not allow_global_arming_transition:
+            return {
+                "schema": SCHEMA,
+                "status": "BLOCKED",
+                "saved": False,
+                "verified": False,
+                "reason": "Global Worker ARMED transition requires Persisted Arming Ceremony.",
+                "checked_at": _now(),
+            }
+        if transition:
+            if current_runtime.get("status") != "CONFIRMED":
+                return {
+                    "schema": SCHEMA,
+                    "status": "BLOCKED",
+                    "saved": False,
+                    "verified": False,
+                    "reason": "Confirmed source runtime required for Global Worker ARMED transition.",
+                    "checked_at": _now(),
+                }
+            current_sha = str(current_runtime.get("sha") or "").strip()
+            if not current_sha or current_sha != str(expected_sha or "").strip():
+                return {
+                    "schema": SCHEMA,
+                    "status": "CONFLICT",
+                    "saved": False,
+                    "verified": False,
+                    "reason": "Global Worker ARMED transition source SHA changed.",
+                    "checked_at": _now(),
+                }
+
     payload["schema"] = SCHEMA
     payload["updated_at"] = _now()
     payload["operating"]["dirty"] = False
+    core_integrity = _aion_core_checkpoint_integrity(payload)
+    if core_integrity["state"] == "MISMATCH":
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "saved": False,
+            "verified": False,
+            "reason": "AION Core checkpoint integrity mismatch.",
+            "checked_at": _now(),
+        }
+    scheduler_integrity = _aion_core_scheduler_integrity(payload)
+    if scheduler_integrity["state"] == "MISMATCH":
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "saved": False,
+            "verified": False,
+            "reason": "AION Core scheduler integrity mismatch.",
+            "checked_at": _now(),
+        }
+    executor_integrity = _aion_core_executor_integrity(payload)
+    if executor_integrity["state"] == "MISMATCH":
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "saved": False,
+            "verified": False,
+            "reason": "AION Core executor integrity mismatch.",
+            "checked_at": _now(),
+        }
+    worker_integrity = _aion_core_worker_integrity(payload)
+    if worker_integrity["state"] == "MISMATCH":
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "saved": False,
+            "verified": False,
+            "reason": "AION Core worker integrity mismatch.",
+            "checked_at": _now(),
+        }
+    global_worker_integrity = _aion_global_worker_integrity(payload)
+    if global_worker_integrity["state"] == "MISMATCH":
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "saved": False,
+            "verified": False,
+            "reason": "AION Global Worker integrity mismatch.",
+            "checked_at": _now(),
+        }
     expected_digest = checkpoint_source_digest(payload)
     raw = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True, default=str).encode("utf-8")
     if len(raw) > MAX_RUNTIME_BYTES:
@@ -1629,6 +1764,163 @@ def merged_checkpoint(
     }
 
 
+AION_CORE_CHECKPOINT_NAMESPACE = "aion_core_intelligence_v1"
+AION_CORE_SCHEDULER_NAMESPACE = "aion_core_scheduler_v1"
+AION_CORE_EXECUTOR_NAMESPACE = "aion_core_executor_v1"
+AION_CORE_WORKER_NAMESPACE = "aion_core_worker_v1"
+AION_GLOBAL_WORKER_NAMESPACE = "aion_global_worker_v1"
+
+
+def _aion_core_checkpoint_integrity(
+    checkpoint: Mapping[str, Any] | None,
+) -> dict[str, str]:
+    payload = checkpoint if isinstance(checkpoint, Mapping) else {}
+    if AION_CORE_CHECKPOINT_NAMESPACE not in payload:
+        return {"state": "ABSENT", "stored": "", "expected": ""}
+    raw = payload.get(AION_CORE_CHECKPOINT_NAMESPACE)
+    if not isinstance(raw, Mapping):
+        return {"state": "MISMATCH", "stored": "", "expected": "MAPPING_REQUIRED"}
+    supplied = str(raw.get("digest") or "").strip()
+    candidate = dict(raw)
+    candidate.pop("digest", None)
+    try:
+        encoded = json.dumps(
+            candidate,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+        expected = hashlib.sha256(encoded).hexdigest()
+    except Exception:
+        return {"state": "MISMATCH", "stored": supplied, "expected": "INVALID_BUNDLE"}
+    return {
+        "state": "MATCH" if supplied and supplied == expected else "MISMATCH",
+        "stored": supplied,
+        "expected": expected,
+    }
+
+
+def _aion_core_scheduler_integrity(
+    checkpoint: Mapping[str, Any] | None,
+) -> dict[str, str]:
+    payload = checkpoint if isinstance(checkpoint, Mapping) else {}
+    if AION_CORE_SCHEDULER_NAMESPACE not in payload:
+        return {"state": "ABSENT", "stored": "", "expected": ""}
+    raw = payload.get(AION_CORE_SCHEDULER_NAMESPACE)
+    if not isinstance(raw, Mapping):
+        return {"state": "MISMATCH", "stored": "", "expected": "MAPPING_REQUIRED"}
+    supplied = str(raw.get("digest") or "").strip()
+    candidate = dict(raw)
+    candidate.pop("digest", None)
+    try:
+        encoded = json.dumps(
+            candidate,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+        expected = hashlib.sha256(encoded).hexdigest()
+    except Exception:
+        return {"state": "MISMATCH", "stored": supplied, "expected": "INVALID_BUNDLE"}
+    return {
+        "state": "MATCH" if supplied and supplied == expected else "MISMATCH",
+        "stored": supplied,
+        "expected": expected,
+    }
+
+
+def _aion_core_executor_integrity(
+    checkpoint: Mapping[str, Any] | None,
+) -> dict[str, str]:
+    payload = checkpoint if isinstance(checkpoint, Mapping) else {}
+    if AION_CORE_EXECUTOR_NAMESPACE not in payload:
+        return {"state": "ABSENT", "stored": "", "expected": ""}
+    raw = payload.get(AION_CORE_EXECUTOR_NAMESPACE)
+    if not isinstance(raw, Mapping):
+        return {"state": "MISMATCH", "stored": "", "expected": "MAPPING_REQUIRED"}
+    supplied = str(raw.get("digest") or "").strip()
+    candidate = dict(raw)
+    candidate.pop("digest", None)
+    try:
+        encoded = json.dumps(
+            candidate,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+        expected = hashlib.sha256(encoded).hexdigest()
+    except Exception:
+        return {"state": "MISMATCH", "stored": supplied, "expected": "INVALID_BUNDLE"}
+    return {
+        "state": "MATCH" if supplied and supplied == expected else "MISMATCH",
+        "stored": supplied,
+        "expected": expected,
+    }
+
+
+def _aion_core_worker_integrity(
+    checkpoint: Mapping[str, Any] | None,
+) -> dict[str, str]:
+    payload = checkpoint if isinstance(checkpoint, Mapping) else {}
+    if AION_CORE_WORKER_NAMESPACE not in payload:
+        return {"state": "ABSENT", "stored": "", "expected": ""}
+    raw = payload.get(AION_CORE_WORKER_NAMESPACE)
+    if not isinstance(raw, Mapping):
+        return {"state": "MISMATCH", "stored": "", "expected": "MAPPING_REQUIRED"}
+    supplied = str(raw.get("digest") or "").strip()
+    candidate = dict(raw)
+    candidate.pop("digest", None)
+    try:
+        encoded = json.dumps(
+            candidate,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+        expected = hashlib.sha256(encoded).hexdigest()
+    except Exception:
+        return {"state": "MISMATCH", "stored": supplied, "expected": "INVALID_BUNDLE"}
+    return {
+        "state": "MATCH" if supplied and supplied == expected else "MISMATCH",
+        "stored": supplied,
+        "expected": expected,
+    }
+
+
+def _aion_global_worker_integrity(
+    checkpoint: Mapping[str, Any] | None,
+) -> dict[str, str]:
+    payload = checkpoint if isinstance(checkpoint, Mapping) else {}
+    if AION_GLOBAL_WORKER_NAMESPACE not in payload:
+        return {"state": "ABSENT", "stored": "", "expected": ""}
+    raw = payload.get(AION_GLOBAL_WORKER_NAMESPACE)
+    if not isinstance(raw, Mapping):
+        return {"state": "MISMATCH", "stored": "", "expected": "MAPPING_REQUIRED"}
+    supplied = str(raw.get("digest") or "").strip()
+    candidate = dict(raw)
+    candidate.pop("digest", None)
+    try:
+        encoded = json.dumps(
+            candidate,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+        expected = hashlib.sha256(encoded).hexdigest()
+    except Exception:
+        return {"state": "MISMATCH", "stored": supplied, "expected": "INVALID_BUNDLE"}
+    return {
+        "state": "MATCH" if supplied and supplied == expected else "MISMATCH",
+        "stored": supplied,
+        "expected": expected,
+    }
+
+
 def checkpoint_integrity_report(
     checkpoint: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
@@ -1708,6 +2000,61 @@ def checkpoint_integrity_report(
         memory_layers_raw.get("digest"),
         memory_layers_state.get("digest"),
     )
+
+    core_integrity = _aion_core_checkpoint_integrity(raw)
+    if core_integrity["state"] != "ABSENT":
+        checks.append({
+            "component": "aion_core_intelligence",
+            "state": core_integrity["state"],
+            "stored": core_integrity["stored"],
+            "expected": core_integrity["expected"],
+        })
+        if core_integrity["state"] != "MATCH":
+            mismatches.append("aion_core_intelligence")
+
+    scheduler_integrity = _aion_core_scheduler_integrity(raw)
+    if scheduler_integrity["state"] != "ABSENT":
+        checks.append({
+            "component": "aion_core_scheduler",
+            "state": scheduler_integrity["state"],
+            "stored": scheduler_integrity["stored"],
+            "expected": scheduler_integrity["expected"],
+        })
+        if scheduler_integrity["state"] != "MATCH":
+            mismatches.append("aion_core_scheduler")
+
+    executor_integrity = _aion_core_executor_integrity(raw)
+    if executor_integrity["state"] != "ABSENT":
+        checks.append({
+            "component": "aion_core_executor",
+            "state": executor_integrity["state"],
+            "stored": executor_integrity["stored"],
+            "expected": executor_integrity["expected"],
+        })
+        if executor_integrity["state"] != "MATCH":
+            mismatches.append("aion_core_executor")
+
+    worker_integrity = _aion_core_worker_integrity(raw)
+    if worker_integrity["state"] != "ABSENT":
+        checks.append({
+            "component": "aion_core_worker",
+            "state": worker_integrity["state"],
+            "stored": worker_integrity["stored"],
+            "expected": worker_integrity["expected"],
+        })
+        if worker_integrity["state"] != "MATCH":
+            mismatches.append("aion_core_worker")
+
+    global_worker_integrity = _aion_global_worker_integrity(raw)
+    if global_worker_integrity["state"] != "ABSENT":
+        checks.append({
+            "component": "aion_global_worker",
+            "state": global_worker_integrity["state"],
+            "stored": global_worker_integrity["stored"],
+            "expected": global_worker_integrity["expected"],
+        })
+        if global_worker_integrity["state"] != "MATCH":
+            mismatches.append("aion_global_worker")
 
     studio = raw.get("studio") if isinstance(raw.get("studio"), Mapping) else {}
     projects = normalize_projects(studio.get("projects") if isinstance(studio, Mapping) else [])

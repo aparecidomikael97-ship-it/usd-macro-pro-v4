@@ -1,0 +1,99 @@
+name: AION Global Worker Activation Readiness
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/aion-global-worker-readiness.yml"
+      - ".github/workflows/autopilot-v107.yml"
+      - "atlasquant_aion_global_worker.py"
+      - "atlasquant_aion_global_worker_readiness.py"
+      - "atlasquant_aion_memory.py"
+      - "test_atlasquant_aion_global_worker_readiness.py"
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: aion-global-worker-readiness-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      GITHUB_TOKEN_HISTORICO: ${{ github.token }}
+      GITHUB_REPO_HISTORICO: ${{ github.repository }}
+      GITHUB_DATA_BRANCH: "atlasquant-runtime"
+      GITHUB_BRANCH_HISTORICO: "atlasquant-runtime"
+      GLOBAL_WORKER_FLAG_STATE: ${{ vars.ATLASQUANT_AION_GLOBAL_WORKER_ENABLED }}
+    steps:
+      - name: Checkout activation candidate
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install readiness dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run read-only activation readiness
+        run: |
+          set -o pipefail
+          python atlasquant_aion_global_worker_readiness.py --check-runtime \
+            | tee /tmp/aion_global_worker_readiness.json
+
+      - name: Readiness summary
+        if: always()
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+          import os
+
+          path = Path("/tmp/aion_global_worker_readiness.json")
+          summary = ["## AION Global Worker Activation Readiness", ""]
+          if path.is_file():
+              try:
+                  data = json.loads(path.read_text(encoding="utf-8"))
+                  summary.extend([
+                      f"- Status: **{data.get('status', 'UNKNOWN')}**",
+                      f"- Activation stage: **{data.get('activation_stage', 'UNKNOWN')}**",
+                      f"- Runtime: **{(data.get('runtime') or {}).get('state', 'UNKNOWN')}**",
+                      f"- Global namespace: **{(data.get('runtime') or {}).get('global_worker_namespace', 'UNKNOWN')}**",
+                      f"- Global state: **{(data.get('runtime') or {}).get('global_worker_state', 'UNKNOWN')}**",
+                      f"- Feature flag posture: **{(data.get('feature_flag') or {}).get('state', 'UNKNOWN')}**",
+                      f"- Pulse: **{(data.get('pulse') or {}).get('state', 'UNKNOWN')}**",
+                      f"- Shadow protocol: **{(data.get('shadow_protocol') or {}).get('state', 'UNKNOWN')}**",
+                      "- Read-only: **true**",
+                      "- Runtime modified: **false**",
+                      "- Feature flag modified: **false**",
+                      "- Worker armed by this check: **false**",
+                  ])
+                  blockers = list(data.get("blockers") or [])
+                  if blockers:
+                      summary.append("- Blockers: " + ", ".join(str(x) for x in blockers))
+              except Exception as exc:
+                  summary.append("- Report parse: **ERROR** (" + type(exc).__name__ + ")")
+          else:
+              summary.append("- Report: **NOT GENERATED**")
+          Path(os.environ["GITHUB_STEP_SUMMARY"]).write_text(
+              "\n".join(summary) + "\n",
+              encoding="utf-8",
+          )
+
+      - name: Upload readiness evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: aion-global-worker-readiness-${{ github.sha }}
+          path: /tmp/aion_global_worker_readiness.json
+          if-no-files-found: warn
+          retention-days: 30

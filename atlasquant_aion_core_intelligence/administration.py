@@ -42,8 +42,24 @@ def status(context: Context, registry: Registry, store: CoreStore | None,
         "completed_tasks": [x for x in memory if x["kind"] == "COMPLETED_TASK"],
         "priorities": [x for x in memory if x["kind"] == "PRIORITY"],
         "pending_inventory_state": "SCOPED_RECORDS_ONLY" if store else "UNAVAILABLE",
-        "checkpoint": {"state": "AVAILABLE" if store else "UNAVAILABLE",
-                       "storage": "LOCAL_SQLITE" if store and store.persistent else "EPHEMERAL" if store else "NONE",
-                       "remote_persistence": "UNAVAILABLE"},
+        "checkpoint": {
+            "state": "AVAILABLE" if store else "UNAVAILABLE",
+            "storage": (
+                str(getattr(store, "storage_kind", "") or "")
+                if store
+                else "NONE"
+            ) or (
+                "LOCAL_SQLITE"
+                if store and store.persistent
+                else "EPHEMERAL"
+                if store
+                else "NONE"
+            ),
+            "remote_persistence": (
+                str(getattr(store, "remote_persistence", "") or "UNAVAILABLE")
+                if store
+                else "UNAVAILABLE"
+            ),
+        },
         "context_scope_only": True, "execution_authorized": False,
     }

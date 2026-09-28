@@ -9,6 +9,9 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime, timezone
+from uuid import uuid4
+from atlasquant_aion_clock import application_timezone
+from atlasquant_aion_core_intelligence.context import Domain
 from html import escape
 from typing import Any, Mapping
 import os
@@ -300,9 +303,241 @@ from atlasquant_aion_wisdom import (
 )
 
 try:
-    from atlasquant_neural_voice_ui import render_neural_voice_player
+    from atlasquant_neural_voice_ui import (
+        neural_voice_status,
+        render_neural_voice_player,
+    )
 except Exception:
+    neural_voice_status = None
     render_neural_voice_player = None
+
+try:
+    from atlasquant_aion_core_runtime_bridge import (
+        authenticated_context,
+        handle_runtime_intent,
+    )
+except Exception:
+    authenticated_context = None
+    handle_runtime_intent = None
+
+try:
+    from atlasquant_aion_core_checkpoint_bridge import (
+        checkpoint_memory_snapshot,
+        stage_user_approved_memory,
+    )
+except Exception:
+    checkpoint_memory_snapshot = None
+    stage_user_approved_memory = None
+
+try:
+    from atlasquant_aion_core_voice_automation import (
+        CADENCES as CORE_AUTOMATION_CADENCES,
+        SCHEDULE_CAPABILITIES as CORE_AUTOMATION_CAPABILITIES,
+        AtlasQuantVoiceAdapter,
+        CheckpointAutomationAdapter,
+        stage_schedule,
+    )
+except Exception:
+    CORE_AUTOMATION_CADENCES = ("ONCE", "HOURLY", "DAILY", "WEEKLY")
+    CORE_AUTOMATION_CAPABILITIES = (
+        "ADMINISTRATION",
+        "MEMORY",
+        "RESEARCH",
+        "VOICE",
+        "CONTENT",
+        "OBSERVABILITY",
+    )
+    AtlasQuantVoiceAdapter = None
+    CheckpointAutomationAdapter = None
+    stage_schedule = None
+
+try:
+    from atlasquant_aion_background_executor import (
+        execute_due_local_work,
+        executor_snapshot,
+    )
+except Exception:
+    execute_due_local_work = None
+    executor_snapshot = None
+
+try:
+    from atlasquant_aion_worker_runtime import (
+        arm_worker,
+        kill_worker,
+        pause_worker,
+        worker_snapshot,
+        worker_tick,
+    )
+except Exception:
+    arm_worker = None
+    kill_worker = None
+    pause_worker = None
+    worker_snapshot = None
+    worker_tick = None
+
+try:
+    from atlasquant_aion_global_worker import (
+        global_worker_snapshot,
+        stage_arm_global_worker,
+        stage_kill_global_worker,
+        stage_pause_global_worker,
+    )
+except Exception:
+    global_worker_snapshot = None
+    stage_arm_global_worker = None
+    stage_kill_global_worker = None
+    stage_pause_global_worker = None
+
+try:
+    from atlasquant_aion_global_worker_arming import (
+        CONFIRMATION_PHRASE,
+        approve_global_worker_arming_plan,
+        prepare_global_worker_arming_plan,
+    )
+except Exception:
+    CONFIRMATION_PHRASE = "ARMAR WORKER GLOBAL"
+    approve_global_worker_arming_plan = None
+    prepare_global_worker_arming_plan = None
+
+try:
+    from atlasquant_aion_global_worker_persisted_arming import (
+        CONFIRMATION_PHRASE as PERSIST_ARMING_CONFIRMATION_PHRASE,
+        approve_persisted_arming_plan,
+        persist_staged_global_arming,
+        persisted_arming_transition_required,
+        prepare_persisted_arming_plan,
+        read_repository_feature_flag,
+        validate_persisted_arming_approval,
+    )
+except Exception:
+    PERSIST_ARMING_CONFIRMATION_PHRASE = "PERSISTIR WORKER GLOBAL ARMADO"
+    approve_persisted_arming_plan = None
+    persist_staged_global_arming = None
+    persisted_arming_transition_required = None
+    prepare_persisted_arming_plan = None
+    read_repository_feature_flag = None
+    validate_persisted_arming_approval = None
+
+try:
+    from atlasquant_aion_global_worker_activation import (
+        CONFIRMATION_PHRASE as GLOBAL_ACTIVATION_CONFIRMATION_PHRASE,
+        DEACTIVATION_PHRASE as GLOBAL_DEACTIVATION_CONFIRMATION_PHRASE,
+        activate_global_worker_feature_flag,
+        approve_global_worker_activation_plan,
+        collect_activation_readiness_evidence,
+        deactivate_global_worker_feature_flag,
+        prepare_global_worker_activation_plan,
+        validate_global_worker_activation_approval,
+    )
+except Exception:
+    GLOBAL_ACTIVATION_CONFIRMATION_PHRASE = "ATIVAR WORKER GLOBAL"
+    GLOBAL_DEACTIVATION_CONFIRMATION_PHRASE = "DESATIVAR WORKER GLOBAL"
+    activate_global_worker_feature_flag = None
+    approve_global_worker_activation_plan = None
+    collect_activation_readiness_evidence = None
+    deactivate_global_worker_feature_flag = None
+    prepare_global_worker_activation_plan = None
+    validate_global_worker_activation_approval = None
+
+try:
+    from atlasquant_aion_global_worker_live_verification import (
+        verify_global_worker_live_activation,
+    )
+except Exception:
+    verify_global_worker_live_activation = None
+
+try:
+    from atlasquant_aion_global_worker_supervision import (
+        append_supervision_history,
+        operational_incident as global_worker_operational_incident,
+        supervise_global_worker,
+        supervision_history_summary,
+    )
+except Exception:
+    append_supervision_history = None
+    global_worker_operational_incident = None
+    supervise_global_worker = None
+    supervision_history_summary = None
+
+try:
+    from atlasquant_aion_global_worker_recovery_drill import (
+        CONFIRMATION_PHRASE as GLOBAL_RECOVERY_DRILL_CONFIRMATION_PHRASE,
+        prepare_global_worker_recovery_drill,
+        recovery_drill_summary,
+        simulate_global_worker_recovery_drill,
+    )
+except Exception:
+    GLOBAL_RECOVERY_DRILL_CONFIRMATION_PHRASE = (
+        "SIMULAR RECUPERACAO WORKER GLOBAL"
+    )
+    prepare_global_worker_recovery_drill = None
+    recovery_drill_summary = None
+    simulate_global_worker_recovery_drill = None
+
+try:
+    from atlasquant_aion_global_worker_recovery_closure import (
+        CONFIRMATION_PHRASE as GLOBAL_REMEDIATION_CONFIRMATION_PHRASE,
+        assess_incident_closure_readiness,
+        closure_review_record,
+        prepare_remediation_evidence,
+    )
+except Exception:
+    GLOBAL_REMEDIATION_CONFIRMATION_PHRASE = (
+        "CONFIRMAR EVIDENCIA DE REMEDIACAO WORKER GLOBAL"
+    )
+    assess_incident_closure_readiness = None
+    closure_review_record = None
+    prepare_remediation_evidence = None
+
+try:
+    from atlasquant_aion_global_worker_human_incident_closure import (
+        CONFIRMATION_PHRASE as GLOBAL_HUMAN_CLOSURE_CONFIRMATION_PHRASE,
+        human_closure_summary,
+        prepare_human_incident_closure,
+        record_human_incident_closure,
+    )
+except Exception:
+    GLOBAL_HUMAN_CLOSURE_CONFIRMATION_PHRASE = (
+        "ENCERRAR INCIDENTE WORKER GLOBAL"
+    )
+    human_closure_summary = None
+    prepare_human_incident_closure = None
+    record_human_incident_closure = None
+
+try:
+    from atlasquant_aion_global_worker_durable_incident_closure import (
+        CONFIRMATION_PHRASE as GLOBAL_DURABLE_CLOSURE_CONFIRMATION_PHRASE,
+        approve_durable_closure_plan,
+        persist_human_incident_closure_record,
+        prepare_durable_closure_plan,
+        validate_durable_closure_approval,
+    )
+except Exception:
+    GLOBAL_DURABLE_CLOSURE_CONFIRMATION_PHRASE = (
+        "PERSISTIR FECHAMENTO INCIDENTE WORKER GLOBAL"
+    )
+    approve_durable_closure_plan = None
+    persist_human_incident_closure_record = None
+    prepare_durable_closure_plan = None
+    validate_durable_closure_approval = None
+
+try:
+    from atlasquant_aion_global_worker_incident_reconciliation import (
+        closed_incident_rows as global_worker_closed_incident_rows,
+        reconcile_global_worker_incident_center,
+    )
+except Exception:
+    global_worker_closed_incident_rows = None
+    reconcile_global_worker_incident_center = None
+
+try:
+    from atlasquant_aion_global_worker_reactivation_gate import (
+        assess_post_incident_reactivation_gate,
+        reactivation_gate_requirement,
+    )
+except Exception:
+    assess_post_incident_reactivation_gate = None
+    reactivation_gate_requirement = None
 
 SCHEMA = "ATLASQUANT_AION_ADMIN_V1"
 AION_WORKSPACES = (
@@ -321,6 +556,32 @@ _WORKING_SOURCE_KEY = "aion_working_checkpoint_source_digest"
 _WORKING_DIRTY_KEY = "aion_working_checkpoint_dirty"
 _WORKING_CONFLICT_KEY = "aion_working_checkpoint_conflict"
 _AION_WORKSPACE_JUMP_KEY = "aion_admin_workspace_jump"
+_AION_WORKER_RUNTIME_ID_KEY = "aion_worker_runtime_id_v1"
+_AION_GLOBAL_ARMING_PLAN_KEY = "aion_global_arming_plan_v1"
+_AION_GLOBAL_ARMING_APPROVAL_KEY = "aion_global_arming_approval_v1"
+_AION_GLOBAL_PERSIST_FLAG_EVIDENCE_KEY = "aion_global_persist_flag_evidence_v1"
+_AION_GLOBAL_PERSIST_PLAN_KEY = "aion_global_persist_plan_v1"
+_AION_GLOBAL_PERSIST_APPROVAL_KEY = "aion_global_persist_approval_v1"
+_AION_GLOBAL_ACTIVATION_READINESS_KEY = "aion_global_activation_readiness_v1"
+_AION_GLOBAL_ACTIVATION_PLAN_KEY = "aion_global_activation_plan_v1"
+_AION_GLOBAL_ACTIVATION_APPROVAL_KEY = "aion_global_activation_approval_v1"
+_AION_GLOBAL_ACTIVATION_RESULT_KEY = "aion_global_activation_result_v1"
+_AION_GLOBAL_REACTIVATION_GATE_KEY = "aion_global_reactivation_gate_v1"
+_AION_GLOBAL_LIVE_VERIFICATION_KEY = "aion_global_live_verification_v1"
+_AION_GLOBAL_SUPERVISION_KEY = "aion_global_supervision_v1"
+_AION_GLOBAL_SUPERVISION_HISTORY_KEY = "aion_global_supervision_history_v1"
+_AION_GLOBAL_RECOVERY_DRILL_KEY = "aion_global_recovery_drill_v1"
+_AION_GLOBAL_REMEDIATION_EVIDENCE_KEY = "aion_global_remediation_evidence_v1"
+_AION_GLOBAL_CLOSURE_ASSESSMENT_KEY = "aion_global_closure_assessment_v1"
+_AION_GLOBAL_HUMAN_CLOSURE_RECORD_KEY = "aion_global_human_closure_record_v1"
+_AION_GLOBAL_DURABLE_CLOSURE_FLAG_EVIDENCE_KEY = (
+    "aion_global_durable_closure_flag_evidence_v1"
+)
+_AION_GLOBAL_DURABLE_CLOSURE_PLAN_KEY = "aion_global_durable_closure_plan_v1"
+_AION_GLOBAL_DURABLE_CLOSURE_APPROVAL_KEY = (
+    "aion_global_durable_closure_approval_v1"
+)
+_AION_GLOBAL_DURABLE_CLOSURE_RESULT_KEY = "aion_global_durable_closure_result_v1"
 
 AION_ADMIN_CSS = r"""
 <style>
@@ -1093,7 +1354,7 @@ def _render_security_incident_center(
     )
     counts = snapshot.get("counts") if isinstance(snapshot.get("counts"), Mapping) else {}
     c1,c2,c3,c4 = st.columns(4)
-    c1.metric("Incidentes", int(snapshot.get("total") or 0))
+    c1.metric("Incidentes ativos", int(snapshot.get("total") or 0))
     c2.metric("Críticos", int(counts.get("CRITICAL") or 0))
     c3.metric("Altos", int(counts.get("HIGH") or 0))
     c4.metric(
@@ -1101,12 +1362,53 @@ def _render_security_incident_center(
         "REVISAR" if snapshot.get("rollback_review_recommended") else "SEM SINAL CONFIRMADO",
     )
 
+    gw_reconciliation = (
+        snapshot.get("global_worker_reconciliation")
+        if isinstance(snapshot.get("global_worker_reconciliation"), Mapping)
+        else {}
+    )
+    closed_rows = (
+        global_worker_closed_incident_rows(snapshot)
+        if global_worker_closed_incident_rows is not None
+        else []
+    )
+    if gw_reconciliation:
+        st.caption(
+            "Reconciliação Worker Global: "
+            + str(gw_reconciliation.get("state") or "UNKNOWN")
+            + " · fechamentos duráveis: "
+            + str(gw_reconciliation.get("durable_closure_records") or 0)
+            + " · reativação autorizada: NÃO."
+        )
+        if gw_reconciliation.get("state") == "REOPENED":
+            st.error(
+                "REOPENED: surgiu novamente evidência do mesmo incidente após "
+                "o fechamento durável. O incidente permanece ativo."
+            )
+        elif gw_reconciliation.get("state") == "NEW_INCIDENT_AFTER_CLOSURE":
+            st.warning(
+                "Há um novo incidente do Worker Global após fechamento anterior. "
+                "O fechamento histórico não esconde a nova evidência."
+            )
+        elif gw_reconciliation.get("fail_open"):
+            st.warning(
+                "Reconciliação de fechamento indisponível/inválida; modo fail-open: "
+                "incidentes atuais permanecem abertos."
+            )
+
     rows = incident_center_rows(snapshot)
     if not rows:
         st.success(
-            "Nenhum incidente explícito foi consolidado nesta execução. "
+            "Nenhum incidente ativo foi consolidado nesta execução. "
             "Isso não prova que produção/infraestrutura externa estejam saudáveis."
         )
+        if closed_rows:
+            with st.expander("Histórico de incidentes fechados", expanded=False):
+                st.dataframe(closed_rows, width="stretch", hide_index=True)
+                st.caption(
+                    "Fechamento histórico não autoriza reativação do Worker e "
+                    "não suprime evidência nova ou recorrente."
+                )
         return
 
     st.dataframe(rows,width="stretch",hide_index=True)
@@ -1142,6 +1444,14 @@ def _render_security_incident_center(
             st.caption(
                 "Plano somente leitura · revisão humana obrigatória · rollback automático: NÃO · "
                 "rotação automática de segredo: NÃO · trading real: BLOQUEADO."
+            )
+
+    if closed_rows:
+        with st.expander("Histórico de incidentes fechados", expanded=False):
+            st.dataframe(closed_rows, width="stretch", hide_index=True)
+            st.caption(
+                "Histórico durável somente leitura · novos sinais permanecem ativos · "
+                "reativação autorizada: NÃO."
             )
 
     if snapshot.get("rollback_review_recommended"):
@@ -2119,8 +2429,10 @@ def _render_central(
             (system_context.get("release_gate") if isinstance(system_context, Mapping) else None),
         )
         _render_continuity_center(checkpoint)
-        if int(incident_snapshot.get("total") or 0) > 0 or bool(
-            incident_snapshot.get("rollback_review_recommended")
+        if (
+            int(incident_snapshot.get("total") or 0) > 0
+            or int(incident_snapshot.get("closed_total") or 0) > 0
+            or bool(incident_snapshot.get("rollback_review_recommended"))
         ):
             _render_security_incident_center(incident_snapshot)
 
@@ -2144,6 +2456,1178 @@ def _render_central(
         "Pergunta ou missão",
         key="aion_admin_question",
         placeholder="Ex.: AION, onde paramos no sistema? / como está o Studio? / o que falta validar?",
+    )
+
+    core_voice_status = {}
+    if neural_voice_status is not None:
+        try:
+            core_voice_status = neural_voice_status()
+        except Exception:
+            core_voice_status = {
+                "configured": False,
+                "provider": "UNKNOWN",
+                "model": "UNKNOWN",
+                "voice": "UNKNOWN",
+            }
+
+    core_runtime_result = {}
+    if question.strip():
+        if handle_runtime_intent is None:
+            core_runtime_result = {
+                "status": "UNAVAILABLE",
+                "reason": "CORE_RUNTIME_BRIDGE_UNAVAILABLE",
+                "route": {},
+                "payload": None,
+                "truth_state": "UNKNOWN",
+                "evidence": {"status": "UNKNOWN", "records": []},
+                "evidence_ingress": {
+                    "input_rows": 0,
+                    "accepted_records": 0,
+                    "rejected_records": 0,
+                },
+                "persistence": {
+                    "state": "UNAVAILABLE",
+                    "reason": "BRIDGE_IMPORT_UNAVAILABLE",
+                },
+                "execution_authorized": False,
+                "external_action_executed": False,
+                "real_trading_enabled": False,
+                "provider_called": False,
+            }
+        else:
+            try:
+                core_runtime_result = handle_runtime_intent(
+                    access,
+                    question,
+                    system_context=system_context,
+                    legacy_checkpoint=checkpoint,
+                    voice_status=core_voice_status,
+                )
+            except Exception as exc:
+                core_runtime_result = {
+                    "status": "UNKNOWN",
+                    "reason": type(exc).__name__,
+                    "route": {},
+                    "payload": None,
+                    "truth_state": "UNKNOWN",
+                    "evidence": {"status": "UNKNOWN", "records": []},
+                    "evidence_ingress": {
+                        "input_rows": 0,
+                        "accepted_records": 0,
+                        "rejected_records": 0,
+                    },
+                    "persistence": {
+                        "state": "UNAVAILABLE",
+                        "reason": "CORE_RUNTIME_ERROR",
+                    },
+                    "execution_authorized": False,
+                    "external_action_executed": False,
+                    "real_trading_enabled": False,
+                    "provider_called": False,
+                }
+
+    if core_runtime_result:
+        core_route = (
+            core_runtime_result.get("route")
+            if isinstance(core_runtime_result.get("route"), Mapping)
+            else {}
+        )
+        core_evidence = (
+            core_runtime_result.get("evidence")
+            if isinstance(core_runtime_result.get("evidence"), Mapping)
+            else {}
+        )
+        core_ingress = (
+            core_runtime_result.get("evidence_ingress")
+            if isinstance(core_runtime_result.get("evidence_ingress"), Mapping)
+            else {}
+        )
+        core_persistence = (
+            core_runtime_result.get("persistence")
+            if isinstance(core_runtime_result.get("persistence"), Mapping)
+            else {}
+        )
+        with st.expander("🧠 AION Core Intelligence · leitura local", expanded=False):
+            ci1, ci2, ci3, ci4 = st.columns(4)
+            ci1.metric("Capability", str(core_route.get("capability") or "UNKNOWN"))
+            ci2.metric("Status", str(core_runtime_result.get("status") or "UNKNOWN"))
+            ci3.metric("Verdade", str(core_runtime_result.get("truth_state") or "UNKNOWN"))
+            ci4.metric("Persistência", str(core_persistence.get("state") or "UNAVAILABLE"))
+            st.caption(
+                "Contexto autenticado e evidência da mesma execução. "
+                "Sem provider, rede, subprocess, deploy, publicação, pagamento ou trading."
+            )
+            st.caption(
+                "Evidências do runtime: "
+                + str(int(core_ingress.get("accepted_records") or 0))
+                + " aceita(s) de "
+                + str(int(core_ingress.get("input_rows") or 0))
+                + " · freshness "
+                + str(core_evidence.get("freshness") or "UNVERIFIED")
+                + " · conflitos "
+                + str(len(list(core_evidence.get("conflict_claims") or [])))
+                + "."
+            )
+            if str(core_evidence.get("conflict_state") or "") == "CONFLICT":
+                st.warning(
+                    "Há fontes confirmadas em conflito. O Core não escolheu uma versão arbitrariamente."
+                )
+            core_payload = core_runtime_result.get("payload")
+            core_system = (
+                core_payload.get("system")
+                if isinstance(core_payload, Mapping)
+                and isinstance(core_payload.get("system"), Mapping)
+                else None
+            )
+            if isinstance(core_system, Mapping):
+                st.dataframe(
+                    [
+                        {
+                            "Item": name,
+                            "Estado": str(
+                                (row if isinstance(row, Mapping) else {}).get("state")
+                                or "UNKNOWN"
+                            ),
+                            "Valor": str(
+                                (row if isinstance(row, Mapping) else {}).get("value")
+                                or ""
+                            ),
+                            "Motivo": str(
+                                (row if isinstance(row, Mapping) else {}).get("reason")
+                                or ""
+                            ),
+                        }
+                        for name, row in core_system.items()
+                    ],
+                    hide_index=True,
+                    width="stretch",
+                )
+            elif isinstance(core_payload, Mapping):
+                st.json(dict(core_payload))
+            if core_runtime_result.get("execution_authorized") is not False:
+                st.error("Gate inconsistente: execução não pode ser autorizada neste bridge.")
+            else:
+                st.caption(
+                    "Gate físico: BLOQUEADO · execução autorizada NÃO · ações externas NÃO."
+                )
+
+    st.markdown("#### 🧠 Memória persistente do AION Core")
+    if checkpoint_memory_snapshot is None or stage_user_approved_memory is None:
+        st.caption(
+            "Bridge de memória do Core indisponível nesta execução. "
+            "Nenhum registro será criado por fallback."
+        )
+    else:
+        try:
+            core_memory = checkpoint_memory_snapshot(access, checkpoint)
+        except Exception as exc:
+            core_memory = {
+                "state": "UNKNOWN",
+                "records": [],
+                "approved_decisions": [],
+                "version": 0,
+                "error_type": type(exc).__name__,
+            }
+        cm1, cm2, cm3 = st.columns(3)
+        cm1.metric("Estado", str(core_memory.get("state") or "UNKNOWN"))
+        cm2.metric("Registros", len(list(core_memory.get("records") or [])))
+        cm3.metric("Versão", int(core_memory.get("version") or 0))
+        st.caption(
+            "A memória do Core fica dentro do Checkpoint Mestre. Registrar aqui altera somente "
+            "a cópia de trabalho; persistência externa continua dependendo de "
+            "“Salvar Checkpoint Mestre no runtime” e do Guardian."
+        )
+        approved_rows = [
+            row for row in list(core_memory.get("approved_decisions") or [])
+            if isinstance(row, Mapping)
+        ]
+        if approved_rows:
+            with st.expander("Decisões humanas aprovadas no Core", expanded=False):
+                st.dataframe(
+                    [
+                        {
+                            "Decisão": str(row.get("text") or ""),
+                            "Versão": int(row.get("version") or 0),
+                            "Origem": str(row.get("origin") or ""),
+                            "Registrada em": str(row.get("created_at") or ""),
+                        }
+                        for row in approved_rows[-20:]
+                    ],
+                    hide_index=True,
+                    width="stretch",
+                )
+
+        with st.expander("Registrar memória com aprovação humana", expanded=False):
+            memory_kind = st.selectbox(
+                "Tipo de memória",
+                ("DECISION", "REQUIREMENT", "PRIORITY", "PENDING_TASK"),
+                key="aion_core_memory_kind",
+                format_func=lambda value: {
+                    "DECISION": "Decisão",
+                    "REQUIREMENT": "Requisito",
+                    "PRIORITY": "Prioridade",
+                    "PENDING_TASK": "Pendência",
+                }.get(value, value),
+            )
+            memory_text = st.text_area(
+                "Conteúdo",
+                key="aion_core_memory_text",
+                max_chars=2400,
+                placeholder="Ex.: Manter a Central AION como porta administrativa principal.",
+            )
+            memory_confirm = st.checkbox(
+                "Confirmo que revisei este texto e quero registrá-lo como memória aprovada por mim.",
+                value=False,
+                key="aion_core_memory_confirm",
+            )
+            if st.button(
+                "✅ Aprovar e registrar no Checkpoint de trabalho",
+                key="aion_core_memory_stage",
+                disabled=not bool(memory_confirm and memory_text.strip()),
+                width="stretch",
+            ):
+                try:
+                    staged_memory = stage_user_approved_memory(
+                        access,
+                        checkpoint,
+                        kind=memory_kind,
+                        text=memory_text,
+                        confirmation=True,
+                    )
+                    if staged_memory.get("status") == "STAGED":
+                        _set_working_checkpoint(
+                            staged_memory.get("checkpoint") or checkpoint,
+                            dirty=True,
+                        )
+                        st.session_state["aion_core_memory_last_stage"] = {
+                            "status": "STAGED",
+                            "record_id": (
+                                (staged_memory.get("record") or {}).get("record_id")
+                                if isinstance(staged_memory.get("record"), Mapping)
+                                else ""
+                            ),
+                            "external_persisted": False,
+                        }
+                        st.success(
+                            "Memória aprovada e colocada no Checkpoint de trabalho. "
+                            "Ela ainda NÃO foi gravada externamente."
+                        )
+                        st.rerun()
+                    else:
+                        st.warning(
+                            "Memória não foi registrada: "
+                            + str(staged_memory.get("reason") or staged_memory.get("status") or "UNKNOWN")
+                        )
+                except Exception as exc:
+                    st.error(
+                        "Registro bloqueado em modo seguro: "
+                        + type(exc).__name__
+                        + ". Nenhuma memória foi gravada por fallback."
+                    )
+
+    st.markdown("#### 🔊 Voz & ⏱️ Automação do AION Core")
+    voice_ready = bool(core_voice_status.get("configured"))
+    va1, va2, va3 = st.columns(3)
+    va1.metric("Voz neural", "PRONTA" if voice_ready else "NÃO CONFIGURADA")
+    va2.metric(
+        "Agenda",
+        "CONECTADA"
+        if CheckpointAutomationAdapter is not None and authenticated_context is not None
+        else "UNAVAILABLE",
+    )
+    va3.metric("Executor background", "BLOQUEADO")
+    st.caption(
+        "Voz: o Core prepara e valida o texto sem chamar o provedor; áudio só é gerado "
+        "no botão explícito da voz AtlasQuant. Automação: a agenda é persistida no "
+        "Checkpoint, mas nenhum job é executado em background neste bloco."
+    )
+
+    scheduler_context = None
+    scheduler_snapshot = {
+        "status": "UNAVAILABLE",
+        "schedules": [],
+        "count": 0,
+        "due_count": 0,
+        "execution_adapter": "UNAVAILABLE",
+    }
+    if authenticated_context is not None and CheckpointAutomationAdapter is not None:
+        try:
+            scheduler_context = authenticated_context(access, Domain.ADMIN)
+            scheduler_snapshot = CheckpointAutomationAdapter(
+                scheduler_context,
+                checkpoint,
+            ).snapshot(datetime.now(timezone.utc))
+        except Exception as exc:
+            scheduler_snapshot = {
+                "status": "UNKNOWN",
+                "schedules": [],
+                "count": 0,
+                "due_count": 0,
+                "execution_adapter": "UNAVAILABLE",
+                "error_type": type(exc).__name__,
+            }
+
+    sa1, sa2, sa3 = st.columns(3)
+    sa1.metric("Agendas", int(scheduler_snapshot.get("count") or 0))
+    sa2.metric("Devidas", int(scheduler_snapshot.get("due_count") or 0))
+    sa3.metric(
+        "Execução",
+        str(scheduler_snapshot.get("execution_adapter") or "UNAVAILABLE"),
+    )
+    schedule_rows = [
+        row for row in list(scheduler_snapshot.get("schedules") or [])
+        if isinstance(row, Mapping)
+    ]
+    if schedule_rows:
+        with st.expander("Agendas registradas", expanded=False):
+            st.dataframe(
+                [
+                    {
+                        "Nome": str(row.get("title") or ""),
+                        "Capability": str(row.get("capability") or "NÃO VINCULADA"),
+                        "Cadência": str(row.get("cadence") or ""),
+                        "Estado": str(row.get("state") or ""),
+                        "Próxima": str(row.get("next_run_at") or ""),
+                        "Devida": "SIM" if row.get("due") else "NÃO",
+                        "Executor": (
+                            "LOCAL MANUAL"
+                            if str(row.get("capability") or "").strip()
+                            else "BLOQUEADO"
+                        ),
+                    }
+                    for row in schedule_rows[-50:]
+                ],
+                hide_index=True,
+                width="stretch",
+            )
+
+    with st.expander("Criar agenda persistida", expanded=False):
+        schedule_title = st.text_input(
+            "Nome da agenda",
+            key="aion_core_schedule_title",
+            max_chars=240,
+            placeholder="Ex.: Briefing macro da manhã",
+        )
+        schedule_prompt = st.text_area(
+            "O que o AION deverá fazer quando houver executor aprovado",
+            key="aion_core_schedule_prompt",
+            max_chars=2400,
+            placeholder="Ex.: Preparar um briefing macro com fatos confirmados e pendências.",
+        )
+        schedule_capability = st.selectbox(
+            "Capability local autorizada para esta agenda",
+            tuple(CORE_AUTOMATION_CAPABILITIES),
+            key="aion_core_schedule_capability",
+            format_func=lambda value: {
+                "ADMINISTRATION": "Administração · leitura",
+                "MEMORY": "Memória · leitura",
+                "RESEARCH": "Pesquisa · síntese local",
+                "VOICE": "Voz · preparação sem gerar áudio",
+                "CONTENT": "Conteúdo · rascunho",
+                "OBSERVABILITY": "Observabilidade · leitura",
+            }.get(value, value),
+        )
+        cadence = st.selectbox(
+            "Cadência",
+            tuple(CORE_AUTOMATION_CADENCES),
+            key="aion_core_schedule_cadence",
+            format_func=lambda value: {
+                "ONCE": "Uma vez",
+                "HOURLY": "A cada hora",
+                "DAILY": "Diariamente",
+                "WEEKLY": "Semanalmente",
+            }.get(value, value),
+        )
+        zone = application_timezone()
+        timezone_name = st.text_input(
+            "Timezone",
+            value=str(getattr(zone, "key", "America/Cuiaba")),
+            key="aion_core_schedule_timezone",
+        )
+        sc1, sc2 = st.columns(2)
+        schedule_hour = int(sc1.number_input(
+            "Hora",
+            min_value=0,
+            max_value=23,
+            value=8,
+            step=1,
+            key="aion_core_schedule_hour",
+        ))
+        schedule_minute = int(sc2.number_input(
+            "Minuto",
+            min_value=0,
+            max_value=59,
+            value=0,
+            step=1,
+            key="aion_core_schedule_minute",
+        ))
+        schedule_weekday = None
+        if cadence == "WEEKLY":
+            weekday_labels = (
+                "Segunda",
+                "Terça",
+                "Quarta",
+                "Quinta",
+                "Sexta",
+                "Sábado",
+                "Domingo",
+            )
+            schedule_weekday = weekday_labels.index(
+                st.selectbox(
+                    "Dia da semana",
+                    weekday_labels,
+                    key="aion_core_schedule_weekday",
+                )
+            )
+        schedule_date = None
+        if cadence == "ONCE":
+            local_now = datetime.now(timezone.utc).astimezone(zone)
+            schedule_date = st.date_input(
+                "Data",
+                value=local_now.date(),
+                key="aion_core_schedule_date",
+            )
+        schedule_confirm = st.checkbox(
+            "Confirmo que quero registrar esta agenda. Isto NÃO autoriza execução automática.",
+            value=False,
+            key="aion_core_schedule_confirm",
+        )
+        if st.button(
+            "⏱️ Registrar agenda no Checkpoint de trabalho",
+            key="aion_core_schedule_stage",
+            disabled=not bool(
+                schedule_confirm
+                and schedule_title.strip()
+                and schedule_prompt.strip()
+                and scheduler_context is not None
+                and stage_schedule is not None
+            ),
+            width="stretch",
+        ):
+            try:
+                schedule_run_at = None
+                if cadence == "ONCE":
+                    selected_zone = application_timezone(timezone_name)
+                    schedule_run_at = datetime(
+                        schedule_date.year,
+                        schedule_date.month,
+                        schedule_date.day,
+                        schedule_hour,
+                        schedule_minute,
+                        tzinfo=selected_zone,
+                    )
+                staged_schedule = stage_schedule(
+                    checkpoint,
+                    scheduler_context,
+                    title=schedule_title,
+                    prompt=schedule_prompt,
+                    cadence=cadence,
+                    capability=schedule_capability,
+                    timezone_name=timezone_name,
+                    hour=schedule_hour,
+                    minute=schedule_minute,
+                    weekday=schedule_weekday,
+                    run_at=schedule_run_at,
+                    confirmation=True,
+                )
+                if staged_schedule.get("status") == "STAGED":
+                    _set_working_checkpoint(
+                        staged_schedule.get("checkpoint") or checkpoint,
+                        dirty=True,
+                    )
+                    st.success(
+                        "Agenda registrada no Checkpoint de trabalho. "
+                        "Ela ainda NÃO foi persistida externamente e NÃO será executada automaticamente."
+                    )
+                    st.rerun()
+                else:
+                    st.warning(
+                        "Agenda não registrada: "
+                        + str(
+                            staged_schedule.get("reason")
+                            or staged_schedule.get("status")
+                            or "UNKNOWN"
+                        )
+                    )
+            except Exception as exc:
+                st.error(
+                    "Agenda bloqueada em modo seguro: "
+                    + type(exc).__name__
+                    + ". Nenhuma execução foi autorizada."
+                )
+
+    st.markdown("#### ⚙️ Executor Local V1 · trabalhos devidos")
+    executor_state = {
+        "status": "UNAVAILABLE",
+        "receipts": [],
+        "receipt_count": 0,
+        "due_count": 0,
+        "autonomous_worker_connected": False,
+        "physical_action_adapter": "UNAVAILABLE",
+    }
+    if executor_snapshot is not None:
+        try:
+            executor_state = executor_snapshot(access, checkpoint)
+        except Exception as exc:
+            executor_state = {
+                "status": "UNKNOWN",
+                "receipts": [],
+                "receipt_count": 0,
+                "due_count": 0,
+                "autonomous_worker_connected": False,
+                "physical_action_adapter": "UNAVAILABLE",
+                "error_type": type(exc).__name__,
+            }
+
+    ex1, ex2, ex3, ex4 = st.columns(4)
+    ex1.metric("Trabalhos devidos", int(executor_state.get("due_count") or 0))
+    ex2.metric("Receipts", int(executor_state.get("receipt_count") or 0))
+    ex3.metric(
+        "Worker autônomo",
+        "VER RUNTIME V1",
+    )
+    ex4.metric(
+        "Ação física",
+        str(executor_state.get("physical_action_adapter") or "UNAVAILABLE"),
+    )
+    st.caption(
+        "O Executor V1 só roda por clique ADMIN autenticado e somente em capabilities "
+        "locais allowlisted. Idempotência, Guardian e retry ficam registrados por ocorrência. "
+        "Publicação, pagamento, deploy, trading e ações externas permanecem bloqueados."
+    )
+
+    executor_receipts = [
+        row for row in list(executor_state.get("receipts") or [])
+        if isinstance(row, Mapping)
+    ]
+    if executor_receipts:
+        with st.expander("Receipts recentes do executor", expanded=False):
+            st.dataframe(
+                [
+                    {
+                        "Schedule": str(row.get("schedule_id") or ""),
+                        "Capability": str(row.get("capability") or ""),
+                        "Estado": str(row.get("state") or ""),
+                        "Tentativa": int(row.get("attempt") or 0),
+                        "Due": str(row.get("due_at") or ""),
+                        "Motivo": str(row.get("reason") or ""),
+                        "Retry": str(row.get("retry_after") or ""),
+                    }
+                    for row in executor_receipts[-50:]
+                ],
+                hide_index=True,
+                width="stretch",
+            )
+
+    executor_batch_size = int(st.number_input(
+        "Máximo de trabalhos locais por execução manual",
+        min_value=1,
+        max_value=20,
+        value=5,
+        step=1,
+        key="aion_core_executor_batch_size",
+    ))
+    executor_confirm = st.checkbox(
+        "Confirmo esta execução local dos trabalhos devidos. "
+        "Isto NÃO autoriza provider, publicação, pagamento, deploy ou trading.",
+        value=False,
+        key="aion_core_executor_confirm",
+    )
+    if st.button(
+        "▶️ Executar trabalhos locais devidos agora",
+        key="aion_core_executor_run",
+        disabled=not bool(
+            executor_confirm
+            and int(executor_state.get("due_count") or 0) > 0
+            and execute_due_local_work is not None
+        ),
+        width="stretch",
+    ):
+        try:
+            batch = execute_due_local_work(
+                access,
+                checkpoint,
+                system_context=system_context,
+                voice_status=core_voice_status,
+                confirmation=True,
+                max_jobs=executor_batch_size,
+            )
+            if int(batch.get("processed") or 0) > 0:
+                _set_working_checkpoint(
+                    batch.get("checkpoint") or checkpoint,
+                    dirty=True,
+                )
+                st.session_state["aion_core_executor_last_batch"] = {
+                    "status": str(batch.get("status") or "UNKNOWN"),
+                    "processed": int(batch.get("processed") or 0),
+                    "succeeded": int(batch.get("succeeded") or 0),
+                    "failed": int(batch.get("failed") or 0),
+                    "blocked": int(batch.get("blocked") or 0),
+                    "external_persisted": False,
+                }
+                if int(batch.get("failed") or 0) > 0:
+                    st.warning(
+                        "Lote local processado com falhas controladas. "
+                        "Os receipts registram retry/backoff; nenhuma ação externa foi executada."
+                    )
+                else:
+                    st.success(
+                        "Lote local processado e receipts colocados no Checkpoint de trabalho. "
+                        "Ainda NÃO foi persistido externamente."
+                    )
+                st.rerun()
+            else:
+                st.info(
+                    "Nenhum novo trabalho foi executado. Pode não haver tarefa devida "
+                    "ou a ocorrência já possuir receipt terminal/idempotente."
+                )
+        except Exception as exc:
+            st.error(
+                "Executor bloqueado em modo seguro: "
+                + type(exc).__name__
+                + ". Nenhuma ação externa foi autorizada."
+            )
+
+    st.markdown("#### 🤖 Worker Runtime V1 · autonomia da sessão")
+    worker_runtime_id = str(
+        st.session_state.get(_AION_WORKER_RUNTIME_ID_KEY) or ""
+    ).strip()
+    if not worker_runtime_id:
+        worker_runtime_id = "AION-WRK-" + uuid4().hex[:16].upper()
+        st.session_state[_AION_WORKER_RUNTIME_ID_KEY] = worker_runtime_id
+
+    worker_state = {
+        "status": "UNAVAILABLE",
+        "state": "DISABLED",
+        "kill_switch": True,
+        "retry_queue_count": 0,
+        "lease_active": False,
+        "lease_owned_by_this_runtime": False,
+        "continuous_24x7_confirmed": False,
+        "multi_instance_safe": False,
+        "stats": {},
+    }
+    if worker_snapshot is not None:
+        try:
+            worker_state = worker_snapshot(
+                access,
+                checkpoint,
+                runtime_id=worker_runtime_id,
+            )
+        except Exception as exc:
+            worker_state = {
+                "status": "UNKNOWN",
+                "state": "DISABLED",
+                "kill_switch": True,
+                "retry_queue_count": 0,
+                "lease_active": False,
+                "lease_owned_by_this_runtime": False,
+                "continuous_24x7_confirmed": False,
+                "multi_instance_safe": False,
+                "stats": {},
+                "error_type": type(exc).__name__,
+            }
+
+    ws1, ws2, ws3, ws4 = st.columns(4)
+    ws1.metric("Worker", str(worker_state.get("state") or "UNKNOWN"))
+    ws2.metric(
+        "Lease",
+        "ATIVO" if worker_state.get("lease_active") else "LIVRE",
+    )
+    ws3.metric("Retry queue", int(worker_state.get("retry_queue_count") or 0))
+    ws4.metric(
+        "24/7 confirmado",
+        "SIM" if worker_state.get("continuous_24x7_confirmed") else "NÃO",
+    )
+    st.caption(
+        "Autonomia V1: somente durante esta sessão Streamlit ativa. "
+        "Lease e heartbeat ficam no Checkpoint de trabalho. "
+        "Multi-instância global: NÃO confirmada. Persistência externa automática: NÃO."
+    )
+
+    worker_interval = int(st.number_input(
+        "Intervalo do worker (segundos)",
+        min_value=60,
+        max_value=900,
+        value=int(worker_state.get("interval_seconds") or 60),
+        step=30,
+        key="aion_worker_interval_seconds",
+    ))
+    worker_lease_seconds = max(90, min(1800, worker_interval * 2 + 30))
+
+    arm_confirm = st.checkbox(
+        "Confirmo que quero armar a autonomia local da sessão. "
+        "Somente capabilities allowlisted e sem efeitos externos.",
+        value=False,
+        key="aion_worker_arm_confirm",
+    )
+    wc1, wc2, wc3 = st.columns(3)
+    if wc1.button(
+        "🟢 Armar Worker",
+        key="aion_worker_arm",
+        disabled=not bool(arm_confirm and arm_worker is not None),
+        width="stretch",
+    ):
+        try:
+            armed = arm_worker(
+                access,
+                checkpoint,
+                runtime_id=worker_runtime_id,
+                confirmation=True,
+                interval_seconds=worker_interval,
+                lease_seconds=worker_lease_seconds,
+            )
+            if armed.get("status") == "ARMED":
+                _set_working_checkpoint(
+                    armed.get("checkpoint") or checkpoint,
+                    dirty=True,
+                )
+                st.success(
+                    "Worker armado para esta sessão. Nenhuma ação externa foi autorizada."
+                )
+                st.rerun()
+        except Exception as exc:
+            st.error(
+                "Arming bloqueado em modo seguro: "
+                + type(exc).__name__
+                + "."
+            )
+
+    if wc2.button(
+        "⏸️ Pausar Worker",
+        key="aion_worker_pause",
+        disabled=not bool(
+            pause_worker is not None
+            and str(worker_state.get("state") or "") == "ARMED"
+        ),
+        width="stretch",
+    ):
+        try:
+            paused = pause_worker(
+                access,
+                checkpoint,
+                confirmation=True,
+            )
+            _set_working_checkpoint(
+                paused.get("checkpoint") or checkpoint,
+                dirty=True,
+            )
+            st.info("Worker pausado. Lease liberado.")
+            st.rerun()
+        except Exception as exc:
+            st.error("Pausa bloqueada: " + type(exc).__name__ + ".")
+
+    if wc3.button(
+        "🛑 Kill switch",
+        key="aion_worker_kill",
+        disabled=not bool(kill_worker is not None),
+        width="stretch",
+    ):
+        try:
+            killed = kill_worker(
+                access,
+                checkpoint,
+                confirmation=True,
+            )
+            _set_working_checkpoint(
+                killed.get("checkpoint") or checkpoint,
+                dirty=True,
+            )
+            st.warning(
+                "Kill switch acionado. O worker não executará novos ticks "
+                "até novo arming explícito."
+            )
+            st.rerun()
+        except Exception as exc:
+            st.error("Kill switch bloqueado: " + type(exc).__name__ + ".")
+
+    stats = (
+        worker_state.get("stats")
+        if isinstance(worker_state.get("stats"), Mapping)
+        else {}
+    )
+    st.caption(
+        "Ticks "
+        + str(int(stats.get("ticks") or 0))
+        + " · processados "
+        + str(int(stats.get("processed") or 0))
+        + " · sucesso "
+        + str(int(stats.get("succeeded") or 0))
+        + " · falhas "
+        + str(int(stats.get("failed") or 0))
+        + " · bloqueados "
+        + str(int(stats.get("blocked") or 0))
+        + " · crash recoveries "
+        + str(int(stats.get("crash_recoveries") or 0))
+        + "."
+    )
+
+    if (
+        worker_tick is not None
+        and str(worker_state.get("state") or "") == "ARMED"
+        and not bool(worker_state.get("kill_switch"))
+    ):
+        try:
+            @st.fragment(run_every=max(60, int(worker_state.get("interval_seconds") or 60)))
+            def _aion_worker_fragment():
+                live_checkpoint = ensure_operating_checkpoint(
+                    st.session_state.get(_WORKING_CHECKPOINT_KEY)
+                    if isinstance(st.session_state.get(_WORKING_CHECKPOINT_KEY), Mapping)
+                    else checkpoint
+                )
+                try:
+                    tick = worker_tick(
+                        access,
+                        live_checkpoint,
+                        runtime_id=worker_runtime_id,
+                        system_context=system_context,
+                        voice_status=core_voice_status,
+                        max_jobs=min(5, executor_batch_size),
+                    )
+                    updated_checkpoint = tick.get("checkpoint")
+                    if isinstance(updated_checkpoint, Mapping):
+                        before_digest = checkpoint_source_digest(live_checkpoint)
+                        after_digest = checkpoint_source_digest(updated_checkpoint)
+                        if after_digest != before_digest:
+                            _set_working_checkpoint(
+                                updated_checkpoint,
+                                dirty=True,
+                            )
+                    st.caption(
+                        "Worker tick · "
+                        + str(tick.get("status") or "UNKNOWN")
+                        + " · processados "
+                        + str(int(tick.get("processed") or 0))
+                        + " · retry queue "
+                        + str(int(tick.get("retry_queue_count") or 0))
+                        + " · efeitos externos NÃO."
+                    )
+                except Exception as exc:
+                    st.caption(
+                        "Worker tick bloqueado em modo seguro: "
+                        + type(exc).__name__
+                        + "."
+                    )
+            _aion_worker_fragment()
+        except Exception as exc:
+            st.caption(
+                "Fragmento autônomo indisponível nesta execução: "
+                + type(exc).__name__
+                + ". Worker permanece fail-closed."
+            )
+
+    st.markdown("#### 🌐 Worker Global/Durable V1 · control plane")
+    global_state = {
+        "status": "UNAVAILABLE",
+        "state": "DISABLED",
+        "kill_switch": True,
+        "fencing_counter": 0,
+        "lease_active": False,
+        "lease_owner": "",
+        "delegated_scope_matches": False,
+        "feature_flag_observed_here": False,
+        "stats": {},
+    }
+    if global_worker_snapshot is not None:
+        try:
+            global_state = global_worker_snapshot(access, checkpoint)
+        except Exception as exc:
+            global_state = {
+                "status": "UNKNOWN",
+                "state": "DISABLED",
+                "kill_switch": True,
+                "fencing_counter": 0,
+                "lease_active": False,
+                "lease_owner": "",
+                "delegated_scope_matches": False,
+                "feature_flag_observed_here": False,
+                "stats": {},
+                "error_type": type(exc).__name__,
+            }
+
+    gw1, gw2, gw3, gw4 = st.columns(4)
+    gw1.metric("Global Worker", str(global_state.get("state") or "UNKNOWN"))
+    gw2.metric("Fencing", int(global_state.get("fencing_counter") or 0))
+    gw3.metric(
+        "Lease global",
+        "ATIVO" if global_state.get("lease_active") else "LIVRE",
+    )
+    gw4.metric(
+        "Runner flag local",
+        "ON" if global_state.get("feature_flag_observed_here") else "OFF/UNKNOWN",
+    )
+    st.caption(
+        "Control plane global usa o mesmo Checkpoint Mestre e CAS por SHA. "
+        "O runner reaproveita o pulso GitHub Actions já existente; nenhum cron novo foi criado. "
+        "A variável ATLASQUANT_AION_GLOBAL_WORKER_ENABLED continua OFF por padrão."
+    )
+    st.caption(
+        "Armar/Pausar/Kill abaixo altera somente o Checkpoint de trabalho. "
+        "O estado global só passa a valer depois do salvamento explícito do Checkpoint Mestre. "
+        "Mesmo armado, publicação, pagamento, deploy, merge, provider e trading continuam bloqueados."
+    )
+
+    global_max_jobs = int(st.number_input(
+        "Máximo de trabalhos por tick global",
+        min_value=1,
+        max_value=20,
+        value=int(global_state.get("max_jobs") or 5),
+        step=1,
+        key="aion_global_worker_max_jobs",
+    ))
+    global_lease_seconds = int(st.number_input(
+        "Lease global (segundos)",
+        min_value=300,
+        max_value=1800,
+        value=int(global_state.get("lease_seconds") or 1200),
+        step=60,
+        key="aion_global_worker_lease_seconds",
+    ))
+    global_approval_ttl = int(st.number_input(
+        "TTL da autorização de arming (segundos)",
+        min_value=300,
+        max_value=3600,
+        value=900,
+        step=300,
+        key="aion_global_worker_approval_ttl",
+    ))
+
+    st.markdown("##### 🧾 Cerimônia de Arming")
+    st.caption(
+        "Etapa 1: gerar um plano preso ao contexto ADMIN e ao digest atual do Checkpoint. "
+        "Gerar o plano NÃO altera o Checkpoint e NÃO ativa o runner."
+    )
+    if st.button(
+        "🧾 Gerar plano de Arming",
+        key="aion_global_worker_plan",
+        disabled=prepare_global_worker_arming_plan is None,
+        width="stretch",
+    ):
+        try:
+            planned = prepare_global_worker_arming_plan(
+                access,
+                checkpoint,
+                max_jobs=global_max_jobs,
+                lease_seconds=global_lease_seconds,
+                approval_ttl_seconds=global_approval_ttl,
+            )
+            if planned.get("status") == "PLAN_READY":
+                st.session_state[_AION_GLOBAL_ARMING_PLAN_KEY] = planned.get("plan")
+                st.session_state.pop(_AION_GLOBAL_ARMING_APPROVAL_KEY, None)
+                st.success(
+                    "Plano criado somente em memória da sessão. "
+                    "Readiness real continua sendo evidência separada do gate #288."
+                )
+            else:
+                st.warning(
+                    "Plano não foi criado: "
+                    + str(planned.get("reason") or planned.get("status") or "UNKNOWN")
+                )
+        except Exception as exc:
+            st.error("Plano de arming bloqueado: " + type(exc).__name__ + ".")
+
+    arming_plan = st.session_state.get(_AION_GLOBAL_ARMING_PLAN_KEY)
+    if isinstance(arming_plan, Mapping):
+        plan_budgets = (
+            arming_plan.get("budgets")
+            if isinstance(arming_plan.get("budgets"), Mapping)
+            else {}
+        )
+        st.caption(
+            "Plan digest: "
+            + str(arming_plan.get("plan_digest") or "")[:24]
+            + "… · expira em "
+            + str(arming_plan.get("expires_at") or "UNKNOWN")
+        )
+        pb1, pb2, pb3, pb4 = st.columns(4)
+        pb1.metric("Jobs/tick", int(plan_budgets.get("max_jobs_per_tick") or 0))
+        pb2.metric(
+            "Writes runtime/tick",
+            int(plan_budgets.get("max_runtime_checkpoint_writes_per_tick") or 0),
+        )
+        pb3.metric(
+            "Provider calls",
+            int(plan_budgets.get("provider_calls_per_tick") or 0),
+        )
+        pb4.metric(
+            "Ordens reais",
+            int(plan_budgets.get("market_orders_per_tick") or 0),
+        )
+        st.caption(
+            "Pré-requisito registrado no plano: READY_FOR_ADMIN_ARMING. "
+            "O plano não declara que esse readiness foi verificado; essa prova vem do gate read-only."
+        )
+
+        global_phrase = st.text_input(
+            'Digite exatamente "ARMAR WORKER GLOBAL" para autorizar este plano',
+            value="",
+            key="aion_global_worker_confirmation_phrase",
+        )
+        global_plan_confirm = st.checkbox(
+            "Confirmo este plano, escopo, TTL e budgets para apenas preparar o estado ARMED staged.",
+            value=False,
+            key="aion_global_worker_plan_confirm",
+        )
+        if st.button(
+            "✅ Criar autorização temporária",
+            key="aion_global_worker_approve_plan",
+            disabled=not bool(
+                global_plan_confirm
+                and approve_global_worker_arming_plan is not None
+            ),
+            width="stretch",
+        ):
+            try:
+                approved_plan = approve_global_worker_arming_plan(
+                    access,
+                    arming_plan,
+                    confirmation=True,
+                    confirmation_phrase=global_phrase,
+                )
+                if approved_plan.get("status") == "APPROVED_FOR_STAGING":
+                    st.session_state[_AION_GLOBAL_ARMING_APPROVAL_KEY] = (
+                        approved_plan.get("approval")
+                    )
+                    st.success(
+                        "Autorização temporária criada somente na sessão. "
+                        "Ainda não houve alteração do Checkpoint nem do runtime."
+                    )
+                else:
+                    st.warning(
+                        "Autorização bloqueada: "
+                        + str(
+                            approved_plan.get("reason")
+                            or approved_plan.get("status")
+                            or "UNKNOWN"
+                        )
+                    )
+            except Exception as exc:
+                st.error(
+                    "Autorização temporária bloqueada: "
+                    + type(exc).__name__
+                    + "."
+                )
+
+    arming_approval = st.session_state.get(_AION_GLOBAL_ARMING_APPROVAL_KEY)
+    if isinstance(arming_approval, Mapping):
+        st.caption(
+            "Approval digest: "
+            + str(arming_approval.get("approval_digest") or "")[:24]
+            + "… · expira em "
+            + str(arming_approval.get("expires_at") or "UNKNOWN")
+        )
+        if st.button(
+            "🌐 Preparar ARMED (staged, sem salvar)",
+            key="aion_global_worker_stage_armed",
+            disabled=stage_arm_global_worker is None,
+            width="stretch",
+        ):
+            try:
+                armed_global = stage_arm_global_worker(
+                    access,
+                    checkpoint,
+                    confirmation=True,
+                    arming_approval=arming_approval,
+                    max_jobs=global_max_jobs,
+                    lease_seconds=global_lease_seconds,
+                )
+                if armed_global.get("status") == "STAGED_ARMED":
+                    _set_working_checkpoint(
+                        armed_global.get("checkpoint") or checkpoint,
+                        dirty=True,
+                    )
+                    st.session_state.pop(_AION_GLOBAL_ARMING_PLAN_KEY, None)
+                    st.session_state.pop(_AION_GLOBAL_ARMING_APPROVAL_KEY, None)
+                    st.success(
+                        "Estado ARMED preparado somente no Checkpoint de trabalho. "
+                        "NÃO foi salvo no runtime e a feature flag continua separada."
+                    )
+                    st.rerun()
+                else:
+                    st.warning(
+                        "Staging bloqueado: "
+                        + str(
+                            armed_global.get("reason")
+                            or armed_global.get("status")
+                            or "UNKNOWN"
+                        )
+                    )
+            except Exception as exc:
+                st.error(
+                    "Staging ARMED bloqueado em modo seguro: "
+                    + type(exc).__name__
+                    + "."
+                )
+
+    gc2, gc3 = st.columns(2)
+    if gc2.button(
+        "⏸️ Pausar Global (staged)",
+        key="aion_global_worker_pause",
+        disabled=not bool(
+            stage_pause_global_worker is not None
+            and str(global_state.get("state") or "") == "ARMED"
+        ),
+        width="stretch",
+    ):
+        try:
+            paused_global = stage_pause_global_worker(
+                access,
+                checkpoint,
+                confirmation=True,
+            )
+            _set_working_checkpoint(
+                paused_global.get("checkpoint") or checkpoint,
+                dirty=True,
+            )
+            st.info(
+                "Pausa global colocada no Checkpoint de trabalho. "
+                "Salve o Checkpoint Mestre para torná-la global."
+            )
+            st.rerun()
+        except Exception as exc:
+            st.error("Pausa global bloqueada: " + type(exc).__name__ + ".")
+
+    if gc3.button(
+        "🛑 Kill Global (staged)",
+        key="aion_global_worker_kill",
+        disabled=not bool(stage_kill_global_worker is not None),
+        width="stretch",
+    ):
+        try:
+            killed_global = stage_kill_global_worker(
+                access,
+                checkpoint,
+                confirmation=True,
+            )
+            _set_working_checkpoint(
+                killed_global.get("checkpoint") or checkpoint,
+                dirty=True,
+            )
+            st.warning(
+                "Kill switch global colocado no Checkpoint de trabalho. "
+                "Use Salvar Checkpoint Mestre para persistir o bloqueio no runtime compartilhado."
+            )
+            st.rerun()
+        except Exception as exc:
+            st.error("Kill global bloqueado: " + type(exc).__name__ + ".")
+
+    global_stats = (
+        global_state.get("stats")
+        if isinstance(global_state.get("stats"), Mapping)
+        else {}
+    )
+    st.caption(
+        "Global ticks "
+        + str(int(global_stats.get("ticks") or 0))
+        + " · processados "
+        + str(int(global_stats.get("processed") or 0))
+        + " · conflitos lease "
+        + str(int(global_stats.get("lease_conflicts") or 0))
+        + " · conflitos checkpoint "
+        + str(int(global_stats.get("checkpoint_conflicts") or 0))
+        + " · crash recoveries "
+        + str(int(global_stats.get("crash_recoveries") or 0))
+        + "."
     )
 
     provider_env = _provider_env()
@@ -4964,19 +6448,1907 @@ def _render_development(
             st.rerun()
 
     persistence_preflight = runtime_write_preflight(runtime_result)
-    persistence_blocked = bool(conflict or not persistence_preflight.get("allowed"))
+    persisted_arm_required = False
+    if persisted_arming_transition_required is not None:
+        try:
+            persisted_arm_required = bool(
+                persisted_arming_transition_required(
+                    checkpoint,
+                    source_checkpoint,
+                )
+            )
+        except Exception:
+            persisted_arm_required = True
+
+    persistence_blocked = bool(
+        conflict
+        or not persistence_preflight.get("allowed")
+        or persisted_arm_required
+    )
     if not persistence_preflight.get("allowed"):
         st.caption(
             "Persistência bloqueada em modo seguro: "
             f"{persistence_preflight.get('reason','estado runtime não confirmado')}."
         )
+
+    if persisted_arm_required:
+        st.warning(
+            "Este Checkpoint contém uma nova transição para Global Worker ARMED. "
+            "O save genérico está BLOQUEADO. Use a Persisted Arming Ceremony abaixo."
+        )
+        st.markdown("##### 🔐 Persisted Arming Ceremony")
+
+        if st.button(
+            "🔎 Verificar feature flag antes da persistência",
+            key="aion_global_persist_check_flag",
+            disabled=read_repository_feature_flag is None,
+            width="stretch",
+        ):
+            try:
+                evidence = read_repository_feature_flag(cfg)
+                st.session_state[_AION_GLOBAL_PERSIST_FLAG_EVIDENCE_KEY] = evidence
+                if (
+                    evidence.get("status") == "CONFIRMED"
+                    and evidence.get("safe_for_arming_persistence") is True
+                ):
+                    st.success(
+                        "Feature flag comprovada como "
+                        + str(evidence.get("state") or "UNKNOWN")
+                        + ". Nenhuma variável foi alterada."
+                    )
+                else:
+                    st.error(
+                        "Persistência continua bloqueada: não foi possível provar "
+                        "que a feature flag está desligada."
+                    )
+            except Exception as exc:
+                st.error(
+                    "Leitura da feature flag falhou em modo seguro: "
+                    + type(exc).__name__
+                    + "."
+                )
+
+        persist_flag_evidence = st.session_state.get(
+            _AION_GLOBAL_PERSIST_FLAG_EVIDENCE_KEY
+        )
+        flag_safe = bool(
+            isinstance(persist_flag_evidence, Mapping)
+            and persist_flag_evidence.get("status") == "CONFIRMED"
+            and persist_flag_evidence.get("safe_for_arming_persistence") is True
+        )
+        if isinstance(persist_flag_evidence, Mapping):
+            pf1, pf2 = st.columns(2)
+            pf1.metric(
+                "Feature flag",
+                str(persist_flag_evidence.get("state") or "UNKNOWN"),
+            )
+            pf2.metric(
+                "Seguro para persistir",
+                "SIM" if flag_safe else "NÃO",
+            )
+
+        persist_ttl = int(st.number_input(
+            "TTL da autorização de persistência (segundos)",
+            min_value=300,
+            max_value=1800,
+            value=600,
+            step=300,
+            key="aion_global_persist_ttl",
+        ))
+
+        if st.button(
+            "🧾 Gerar plano de persistência ARMED",
+            key="aion_global_persist_plan",
+            disabled=not bool(
+                flag_safe and prepare_persisted_arming_plan is not None
+            ),
+            width="stretch",
+        ):
+            try:
+                planned_persistence = prepare_persisted_arming_plan(
+                    access,
+                    checkpoint,
+                    runtime_result,
+                    persist_flag_evidence,
+                    ttl_seconds=persist_ttl,
+                )
+                if planned_persistence.get("status") == "PERSISTENCE_PLAN_READY":
+                    st.session_state[_AION_GLOBAL_PERSIST_PLAN_KEY] = (
+                        planned_persistence.get("plan")
+                    )
+                    st.session_state.pop(
+                        _AION_GLOBAL_PERSIST_APPROVAL_KEY,
+                        None,
+                    )
+                    st.success(
+                        "Plano de persistência criado somente na sessão. "
+                        "Nenhuma escrita foi feita."
+                    )
+                else:
+                    st.warning(
+                        "Plano de persistência bloqueado: "
+                        + str(
+                            planned_persistence.get("reason")
+                            or planned_persistence.get("status")
+                            or "UNKNOWN"
+                        )
+                    )
+            except Exception as exc:
+                st.error(
+                    "Plano de persistência bloqueado: "
+                    + type(exc).__name__
+                    + "."
+                )
+
+        persist_plan = st.session_state.get(_AION_GLOBAL_PERSIST_PLAN_KEY)
+        if isinstance(persist_plan, Mapping):
+            st.caption(
+                "Persistence plan: "
+                + str(persist_plan.get("plan_digest") or "")[:24]
+                + "… · runtime SHA "
+                + str(persist_plan.get("source_runtime_sha") or "")[:12]
+                + "… · expira em "
+                + str(persist_plan.get("expires_at") or "UNKNOWN")
+            )
+            st.caption(
+                "Rollback source digest: "
+                + str(
+                    (
+                        persist_plan.get("rollback")
+                        if isinstance(persist_plan.get("rollback"), Mapping)
+                        else {}
+                    ).get("source_runtime_checkpoint_digest")
+                    or ""
+                )[:24]
+                + "…"
+            )
+
+            persist_phrase = st.text_input(
+                'Digite exatamente "PERSISTIR WORKER GLOBAL ARMADO"',
+                value="",
+                key="aion_global_persist_confirmation_phrase",
+            )
+            persist_confirm = st.checkbox(
+                "Confirmo que revisei o STAGED_ARMED, SHA do runtime, rollback "
+                "e quero autorizar a persistência real do estado ARMED.",
+                value=False,
+                key="aion_global_persist_confirm",
+            )
+            if st.button(
+                "✅ Criar autorização de persistência",
+                key="aion_global_persist_approve",
+                disabled=not bool(
+                    persist_confirm and approve_persisted_arming_plan is not None
+                ),
+                width="stretch",
+            ):
+                try:
+                    approved_persistence = approve_persisted_arming_plan(
+                        access,
+                        persist_plan,
+                        confirmation=True,
+                        confirmation_phrase=persist_phrase,
+                    )
+                    if approved_persistence.get("status") == "APPROVED_FOR_PERSISTENCE":
+                        st.session_state[_AION_GLOBAL_PERSIST_APPROVAL_KEY] = (
+                            approved_persistence.get("approval")
+                        )
+                        st.success(
+                            "Autorização de persistência criada na sessão. "
+                            "Ainda nenhuma escrita foi executada."
+                        )
+                    else:
+                        st.warning(
+                            "Autorização de persistência bloqueada: "
+                            + str(
+                                approved_persistence.get("reason")
+                                or approved_persistence.get("status")
+                                or "UNKNOWN"
+                            )
+                        )
+                except Exception as exc:
+                    st.error(
+                        "Autorização de persistência bloqueada: "
+                        + type(exc).__name__
+                        + "."
+                    )
+
+        persist_approval = st.session_state.get(
+            _AION_GLOBAL_PERSIST_APPROVAL_KEY
+        )
+        persist_approval_valid = False
+        if (
+            isinstance(persist_approval, Mapping)
+            and validate_persisted_arming_approval is not None
+        ):
+            try:
+                approval_check = validate_persisted_arming_approval(
+                    access,
+                    checkpoint,
+                    runtime_result,
+                    persist_approval,
+                )
+                persist_approval_valid = approval_check.get("state") == "APPROVED"
+            except Exception:
+                persist_approval_valid = False
+
+        final_persist_confirm = st.checkbox(
+            "SEGUNDA CONFIRMAÇÃO: autorizo agora a escrita real do ARMED "
+            "no Checkpoint Mestre. A feature flag deve continuar desligada.",
+            value=False,
+            key="aion_global_persist_final_confirm",
+        )
+        if st.button(
+            "🚨 Persistir ARMED no Checkpoint Mestre",
+            key="aion_global_persist_execute",
+            disabled=not bool(
+                persist_approval_valid
+                and final_persist_confirm
+                and persist_staged_global_arming is not None
+                and not conflict
+            ),
+            width="stretch",
+        ):
+            decision = guardian_decision(
+                "save_checkpoint",
+                access,
+                approved=True,
+                feature_flags=flags,
+            )
+            if not decision["allowed"]:
+                st.error(decision["reason"])
+            else:
+                try:
+                    persist_result = persist_staged_global_arming(
+                        access,
+                        checkpoint,
+                        runtime_result,
+                        persist_approval,
+                        cfg,
+                        confirmation=True,
+                    )
+                    if (
+                        persist_result.get("status") == "CONFIRMED"
+                        and persist_result.get("saved")
+                        and persist_result.get("verified")
+                    ):
+                        saved_checkpoint = ensure_operating_checkpoint(
+                            persist_result.get("checkpoint")
+                        )
+                        saved_checkpoint["operating"]["dirty"] = False
+                        _set_working_checkpoint(saved_checkpoint, dirty=False)
+                        st.session_state[_WORKING_SOURCE_KEY] = (
+                            checkpoint_source_digest(saved_checkpoint)
+                        )
+                        for key in (
+                            _AION_GLOBAL_PERSIST_FLAG_EVIDENCE_KEY,
+                            _AION_GLOBAL_PERSIST_PLAN_KEY,
+                            _AION_GLOBAL_PERSIST_APPROVAL_KEY,
+                        ):
+                            st.session_state.pop(key, None)
+                        st.success(
+                            "Global Worker ARMED persistido, relido e confirmado. "
+                            "Feature flag permanece separada e não foi alterada."
+                        )
+                        st.session_state["aion_checkpoint_save_result"] = persist_result
+                        st.rerun()
+                    elif persist_result.get("status") == "ROLLED_BACK":
+                        st.error(
+                            "A persistência foi revertida automaticamente porque a "
+                            "feature flag deixou de estar comprovadamente desligada."
+                        )
+                        _set_working_checkpoint(source_checkpoint, dirty=False)
+                        st.session_state[_WORKING_SOURCE_KEY] = (
+                            checkpoint_source_digest(source_checkpoint)
+                        )
+                        st.rerun()
+                    else:
+                        st.error(
+                            "Persistência ARMED não foi concluída. Estado: "
+                            + str(persist_result.get("status") or "UNKNOWN")
+                            + " · motivo: "
+                            + str(persist_result.get("reason") or "não informado")
+                            + "."
+                        )
+                except Exception as exc:
+                    st.error(
+                        "Persistência ARMED bloqueada em modo seguro: "
+                        + type(exc).__name__
+                        + "."
+                    )
+
+    persisted_runtime_checkpoint = (
+        runtime_result.get("checkpoint")
+        if isinstance(runtime_result.get("checkpoint"), Mapping)
+        else {}
+    )
+    persisted_global_worker = (
+        persisted_runtime_checkpoint.get("aion_global_worker_v1")
+        if isinstance(persisted_runtime_checkpoint, Mapping)
+        and isinstance(
+            persisted_runtime_checkpoint.get("aion_global_worker_v1"),
+            Mapping,
+        )
+        else {}
+    )
+    persisted_global_armed = bool(
+        str(persisted_global_worker.get("state") or "").upper() == "ARMED"
+        and persisted_global_worker.get("kill_switch") is False
+    )
+
+    if persisted_global_armed and not persisted_arm_required:
+        st.markdown("##### ⚡ Global Worker Activation Ceremony")
+        st.warning(
+            "Ativar a feature flag permite que o pulso GitHub Actions já existente "
+            "acorde o Worker Global. Isso NÃO prova heartbeat, receipt ou autonomia "
+            "operacional. O primeiro resultado válido será somente "
+            "ACTIVATED_PENDING_LIVE_EVIDENCE."
+        )
+
+        if st.button(
+            "🔎 Verificar readiness atual para ativação",
+            key="aion_global_activation_check_readiness",
+            disabled=collect_activation_readiness_evidence is None,
+            width="stretch",
+        ):
+            try:
+                live_readiness = collect_activation_readiness_evidence(
+                    cfg,
+                    runtime_result,
+                )
+                st.session_state[_AION_GLOBAL_ACTIVATION_READINESS_KEY] = (
+                    live_readiness
+                )
+                st.session_state.pop(_AION_GLOBAL_ACTIVATION_PLAN_KEY, None)
+                st.session_state.pop(_AION_GLOBAL_ACTIVATION_APPROVAL_KEY, None)
+
+                gate_flag_evidence = (
+                    live_readiness.get("flag_evidence")
+                    if isinstance(
+                        live_readiness.get("flag_evidence"),
+                        Mapping,
+                    )
+                    else {}
+                )
+                if (
+                    assess_post_incident_reactivation_gate is not None
+                    and reconcile_global_worker_incident_center is not None
+                    and verify_global_worker_live_activation is not None
+                    and supervise_global_worker is not None
+                ):
+                    try:
+                        gate_live_report = verify_global_worker_live_activation(
+                            access,
+                            runtime_result,
+                            gate_flag_evidence,
+                            activation_result=None,
+                        )
+                        gate_supervision = supervise_global_worker(
+                            gate_live_report,
+                            gate_flag_evidence,
+                        )
+                        gate_incident_snapshot = (
+                            reconcile_global_worker_incident_center(
+                                {},
+                                gate_supervision,
+                                runtime_result,
+                            )
+                        )
+                        st.session_state[
+                            _AION_GLOBAL_REACTIVATION_GATE_KEY
+                        ] = assess_post_incident_reactivation_gate(
+                            runtime_result,
+                            gate_incident_snapshot,
+                            live_readiness,
+                            gate_flag_evidence,
+                        )
+                    except Exception as gate_exc:
+                        st.session_state[
+                            _AION_GLOBAL_REACTIVATION_GATE_KEY
+                        ] = {
+                            "status": "REACTIVATION_GATE_BLOCKED",
+                            "gate_required": True,
+                            "gate_ready": False,
+                            "activation_plan_allowed": False,
+                            "reason": type(gate_exc).__name__,
+                            "reactivation_authorized": False,
+                        }
+                else:
+                    st.session_state[
+                        _AION_GLOBAL_REACTIVATION_GATE_KEY
+                    ] = {
+                        "status": "REACTIVATION_GATE_BLOCKED",
+                        "gate_required": True,
+                        "gate_ready": False,
+                        "activation_plan_allowed": False,
+                        "reason": "POST_INCIDENT_GATE_UNAVAILABLE",
+                        "reactivation_authorized": False,
+                    }
+
+                if (
+                    live_readiness.get("status") == "PASS"
+                    and live_readiness.get("activation_stage")
+                    == "READY_FOR_FLAG_ENABLE"
+                ):
+                    st.success(
+                        "Readiness atual: READY_FOR_FLAG_ENABLE. "
+                        "Nenhuma variável foi alterada."
+                    )
+                else:
+                    st.error(
+                        "Ativação continua bloqueada: "
+                        + str(
+                            live_readiness.get("activation_stage")
+                            or live_readiness.get("status")
+                            or "UNKNOWN"
+                        )
+                        + "."
+                    )
+            except Exception as exc:
+                st.error(
+                    "Readiness de ativação falhou em modo seguro: "
+                    + type(exc).__name__
+                    + "."
+                )
+
+        activation_readiness = st.session_state.get(
+            _AION_GLOBAL_ACTIVATION_READINESS_KEY
+        )
+        reactivation_gate = st.session_state.get(
+            _AION_GLOBAL_REACTIVATION_GATE_KEY
+        )
+        reactivation_gate_allows_plan = bool(
+            isinstance(reactivation_gate, Mapping)
+            and reactivation_gate.get("activation_plan_allowed") is True
+            and reactivation_gate.get("gate_ready") is True
+        )
+        activation_ready = bool(
+            isinstance(activation_readiness, Mapping)
+            and activation_readiness.get("status") == "PASS"
+            and activation_readiness.get("activation_stage")
+            == "READY_FOR_FLAG_ENABLE"
+            and not list(activation_readiness.get("blockers") or [])
+            and reactivation_gate_allows_plan
+        )
+        activation_flag_evidence = (
+            activation_readiness.get("flag_evidence")
+            if isinstance(activation_readiness, Mapping)
+            and isinstance(activation_readiness.get("flag_evidence"), Mapping)
+            else {}
+        )
+        if isinstance(activation_readiness, Mapping):
+            ar1, ar2, ar3, ar4 = st.columns(4)
+            ar1.metric(
+                "Activation stage",
+                str(
+                    activation_readiness.get("activation_stage")
+                    or "UNKNOWN"
+                ),
+            )
+            ar2.metric(
+                "Feature flag",
+                str(
+                    (
+                        activation_readiness.get("feature_flag")
+                        if isinstance(
+                            activation_readiness.get("feature_flag"),
+                            Mapping,
+                        )
+                        else {}
+                    ).get("state")
+                    or "UNKNOWN"
+                ),
+            )
+            ar3.metric(
+                "Pulse",
+                str(
+                    (
+                        activation_readiness.get("pulse")
+                        if isinstance(activation_readiness.get("pulse"), Mapping)
+                        else {}
+                    ).get("state")
+                    or "UNKNOWN"
+                ),
+            )
+            ar4.metric(
+                "Shadow",
+                str(
+                    (
+                        activation_readiness.get("shadow_protocol")
+                        if isinstance(
+                            activation_readiness.get("shadow_protocol"),
+                            Mapping,
+                        )
+                        else {}
+                    ).get("state")
+                    or "UNKNOWN"
+                ),
+            )
+
+        if isinstance(reactivation_gate, Mapping):
+            rg1, rg2, rg3 = st.columns(3)
+            rg1.metric(
+                "Post-incident gate",
+                str(reactivation_gate.get("status") or "UNKNOWN"),
+            )
+            rg2.metric(
+                "Histórico durável",
+                str(reactivation_gate.get("durable_closure_records") or 0),
+            )
+            rg3.metric(
+                "Plano permitido",
+                "SIM"
+                if reactivation_gate.get("activation_plan_allowed")
+                else "NÃO",
+            )
+            if reactivation_gate.get("gate_required"):
+                if reactivation_gate.get("gate_ready"):
+                    st.success(
+                        "Gate pós-incidente verde para geração do plano. "
+                        "Isso NÃO autoriza reativação; a cerimônia de ativação "
+                        "continua separada."
+                    )
+                else:
+                    st.error(
+                        "Reativação bloqueada pelo gate pós-incidente: "
+                        + str(
+                            reactivation_gate.get("reason")
+                            or "evidência não reconciliada"
+                        )
+                        + "."
+                    )
+            else:
+                st.caption(
+                    "Nenhum histórico durável de incidente exige gate pós-incidente "
+                    "neste runtime."
+                )
+
+        activation_ttl = int(st.number_input(
+            "TTL da autorização de ativação (segundos)",
+            min_value=300,
+            max_value=1800,
+            value=600,
+            step=300,
+            key="aion_global_activation_ttl",
+        ))
+        if st.button(
+            "🧾 Gerar plano de ativação",
+            key="aion_global_activation_plan",
+            disabled=not bool(
+                activation_ready
+                and prepare_global_worker_activation_plan is not None
+            ),
+            width="stretch",
+        ):
+            try:
+                activation_plan_result = prepare_global_worker_activation_plan(
+                    access,
+                    runtime_result,
+                    activation_readiness,
+                    activation_flag_evidence,
+                    reactivation_gate=reactivation_gate,
+                    ttl_seconds=activation_ttl,
+                )
+                if (
+                    activation_plan_result.get("status")
+                    == "ACTIVATION_PLAN_READY"
+                ):
+                    st.session_state[_AION_GLOBAL_ACTIVATION_PLAN_KEY] = (
+                        activation_plan_result.get("plan")
+                    )
+                    st.session_state.pop(
+                        _AION_GLOBAL_ACTIVATION_APPROVAL_KEY,
+                        None,
+                    )
+                    st.success(
+                        "Plano de ativação criado somente na sessão. "
+                        "A feature flag continua inalterada."
+                    )
+                else:
+                    st.warning(
+                        "Plano de ativação bloqueado: "
+                        + str(
+                            activation_plan_result.get("reason")
+                            or activation_plan_result.get("status")
+                            or "UNKNOWN"
+                        )
+                    )
+            except Exception as exc:
+                st.error(
+                    "Plano de ativação bloqueado: "
+                    + type(exc).__name__
+                    + "."
+                )
+
+        activation_plan = st.session_state.get(
+            _AION_GLOBAL_ACTIVATION_PLAN_KEY
+        )
+        if isinstance(activation_plan, Mapping):
+            st.caption(
+                "Activation plan: "
+                + str(activation_plan.get("plan_digest") or "")[:24]
+                + "… · runtime SHA "
+                + str(activation_plan.get("runtime_sha") or "")[:12]
+                + "… · expira em "
+                + str(activation_plan.get("expires_at") or "UNKNOWN")
+            )
+            st.caption(
+                "A ativação não executa tick diretamente. "
+                "Após a flag, heartbeat + receipt reais ainda serão exigidos."
+            )
+            activation_phrase = st.text_input(
+                'Digite exatamente "ATIVAR WORKER GLOBAL"',
+                value="",
+                key="aion_global_activation_confirmation_phrase",
+            )
+            activation_confirm = st.checkbox(
+                "Confirmo que revisei runtime ARMED, readiness, TTL e budgets "
+                "e quero autorizar somente a habilitação da feature flag.",
+                value=False,
+                key="aion_global_activation_confirm",
+            )
+            if st.button(
+                "✅ Criar autorização de ativação",
+                key="aion_global_activation_approve",
+                disabled=not bool(
+                    activation_confirm
+                    and approve_global_worker_activation_plan is not None
+                ),
+                width="stretch",
+            ):
+                try:
+                    approved_activation = approve_global_worker_activation_plan(
+                        access,
+                        activation_plan,
+                        confirmation=True,
+                        confirmation_phrase=activation_phrase,
+                    )
+                    if (
+                        approved_activation.get("status")
+                        == "APPROVED_FOR_ACTIVATION"
+                    ):
+                        st.session_state[
+                            _AION_GLOBAL_ACTIVATION_APPROVAL_KEY
+                        ] = approved_activation.get("approval")
+                        st.success(
+                            "Autorização temporária criada. "
+                            "A feature flag ainda NÃO foi alterada."
+                        )
+                    else:
+                        st.warning(
+                            "Autorização de ativação bloqueada: "
+                            + str(
+                                approved_activation.get("reason")
+                                or approved_activation.get("status")
+                                or "UNKNOWN"
+                            )
+                        )
+                except Exception as exc:
+                    st.error(
+                        "Autorização de ativação bloqueada: "
+                        + type(exc).__name__
+                        + "."
+                    )
+
+        activation_approval = st.session_state.get(
+            _AION_GLOBAL_ACTIVATION_APPROVAL_KEY
+        )
+        activation_approval_valid = False
+        if (
+            isinstance(activation_approval, Mapping)
+            and validate_global_worker_activation_approval is not None
+        ):
+            try:
+                activation_check = validate_global_worker_activation_approval(
+                    access,
+                    runtime_result,
+                    activation_approval,
+                )
+                activation_approval_valid = (
+                    activation_check.get("state") == "APPROVED"
+                )
+            except Exception:
+                activation_approval_valid = False
+
+        final_activation_confirm = st.checkbox(
+            "CONFIRMAÇÃO FINAL: autorizo habilitar agora a feature flag do "
+            "Worker Global. Isso não autoriza trading, pagamentos, publicação, "
+            "deploy ou merge.",
+            value=False,
+            key="aion_global_activation_final_confirm",
+        )
+        if st.button(
+            "⚡ Habilitar Worker Global (feature flag)",
+            key="aion_global_activation_execute",
+            disabled=not bool(
+                activation_approval_valid
+                and final_activation_confirm
+                and activate_global_worker_feature_flag is not None
+                and not conflict
+            ),
+            width="stretch",
+        ):
+            fresh_reactivation_gate = reactivation_gate
+            final_gate_ready = True
+            if bool(
+                (activation_approval or {}).get(
+                    "post_incident_gate_required"
+                )
+            ):
+                final_gate_ready = False
+                try:
+                    final_gate_runtime = load_runtime_checkpoint(cfg)
+                    final_gate_flag = read_repository_feature_flag(cfg)
+                    final_gate_live = verify_global_worker_live_activation(
+                        access,
+                        final_gate_runtime,
+                        final_gate_flag,
+                        activation_result=None,
+                    )
+                    final_gate_supervision = supervise_global_worker(
+                        final_gate_live,
+                        final_gate_flag,
+                    )
+                    final_gate_snapshot = (
+                        reconcile_global_worker_incident_center(
+                            {},
+                            final_gate_supervision,
+                            final_gate_runtime,
+                        )
+                    )
+                    fresh_reactivation_gate = (
+                        assess_post_incident_reactivation_gate(
+                            final_gate_runtime,
+                            final_gate_snapshot,
+                            activation_readiness,
+                            final_gate_flag,
+                        )
+                    )
+                    final_gate_ready = bool(
+                        fresh_reactivation_gate.get("status")
+                        == "REACTIVATION_GATE_READY"
+                        and fresh_reactivation_gate.get("gate_ready") is True
+                        and fresh_reactivation_gate.get(
+                            "activation_plan_allowed"
+                        )
+                        is True
+                    )
+                except Exception as gate_exc:
+                    fresh_reactivation_gate = {
+                        "status": "REACTIVATION_GATE_BLOCKED",
+                        "reason": type(gate_exc).__name__,
+                        "gate_ready": False,
+                        "activation_plan_allowed": False,
+                    }
+                    final_gate_ready = False
+
+            if not final_gate_ready:
+                st.error(
+                    "Ativação bloqueada: o gate pós-incidente fresco não está "
+                    "verde. Nenhuma feature flag foi alterada."
+                )
+            else:
+                decision = guardian_decision(
+                "write_runtime",
+                access,
+                approved=True,
+                feature_flags=flags,
+                )
+                if not decision["allowed"]:
+                    st.error(decision["reason"])
+                else:
+                    try:
+                        activation_result = activate_global_worker_feature_flag(
+                            access,
+                            runtime_result,
+                            activation_approval,
+                            cfg,
+                            confirmation=True,
+                            reactivation_gate=fresh_reactivation_gate,
+                        )
+                        st.session_state[
+                            _AION_GLOBAL_ACTIVATION_RESULT_KEY
+                        ] = activation_result
+                        status = str(
+                            activation_result.get("status") or "UNKNOWN"
+                        )
+                        if status == "ACTIVATED_PENDING_LIVE_EVIDENCE":
+                            st.success(
+                                "Feature flag habilitada e relida. "
+                                "Estado: ACTIVATED_PENDING_LIVE_EVIDENCE. "
+                                "Ainda não há prova de heartbeat/receipt do Worker."
+                            )
+                        elif status == "ACTIVATION_ROLLED_BACK":
+                            st.error(
+                                "A ativação foi revertida automaticamente por "
+                                "divergência de runtime ou verificação da flag."
+                            )
+                        else:
+                            st.error(
+                                "Ativação não confirmada. Estado: "
+                                + status
+                                + " · motivo: "
+                                + str(
+                                    activation_result.get("reason")
+                                    or "não informado"
+                                )
+                                + "."
+                            )
+                    except Exception as exc:
+                        st.error(
+                            "Ativação bloqueada em modo seguro: "
+                            + type(exc).__name__
+                            + "."
+                        )
+
+        last_activation = st.session_state.get(
+            _AION_GLOBAL_ACTIVATION_RESULT_KEY
+        )
+        if isinstance(last_activation, Mapping):
+            st.caption(
+                "Última tentativa de ativação: "
+                + str(last_activation.get("status") or "UNKNOWN")
+                + " · heartbeat confirmado: "
+                + (
+                    "SIM"
+                    if last_activation.get("live_heartbeat_confirmed")
+                    else "NÃO"
+                )
+                + " · trading real: NÃO."
+            )
+
+        st.markdown("##### 📡 Verificação operacional ao vivo")
+        st.caption(
+            "ENABLED não significa LIVE. Esta verificação é somente leitura e exige "
+            "heartbeat/tick compartilhado posterior à ativação. Receipt GLOBAL_WORKER "
+            "é mostrado quando houve trabalho devido; um tick idle válido também prova "
+            "que o runner acordou."
+        )
+        if st.button(
+            "📡 Verificar Worker Global ao vivo",
+            key="aion_global_live_verify",
+            disabled=not bool(
+                verify_global_worker_live_activation is not None
+                and read_repository_feature_flag is not None
+            ),
+            width="stretch",
+        ):
+            try:
+                fresh_flag = read_repository_feature_flag(cfg)
+                fresh_runtime = load_runtime_checkpoint(cfg)
+                live_report = verify_global_worker_live_activation(
+                    access,
+                    fresh_runtime,
+                    fresh_flag,
+                    activation_result=(
+                        last_activation
+                        if isinstance(last_activation, Mapping)
+                        else None
+                    ),
+                )
+                st.session_state[_AION_GLOBAL_LIVE_VERIFICATION_KEY] = (
+                    live_report
+                )
+                if supervise_global_worker is not None:
+                    supervision_report = supervise_global_worker(
+                        live_report,
+                        fresh_flag,
+                    )
+                    st.session_state[_AION_GLOBAL_SUPERVISION_KEY] = (
+                        supervision_report
+                    )
+                    if append_supervision_history is not None:
+                        existing_supervision_history = st.session_state.get(
+                            _AION_GLOBAL_SUPERVISION_HISTORY_KEY,
+                            [],
+                        )
+                        st.session_state[
+                            _AION_GLOBAL_SUPERVISION_HISTORY_KEY
+                        ] = append_supervision_history(
+                            existing_supervision_history,
+                            supervision_report,
+                            max_entries=50,
+                        )
+            except Exception as exc:
+                st.session_state[_AION_GLOBAL_LIVE_VERIFICATION_KEY] = {
+                    "status": "BLOCKED",
+                    "reason": type(exc).__name__,
+                    "live_confirmed": False,
+                }
+                st.session_state.pop(_AION_GLOBAL_SUPERVISION_KEY, None)
+
+        live_report = st.session_state.get(
+            _AION_GLOBAL_LIVE_VERIFICATION_KEY
+        )
+        if isinstance(live_report, Mapping):
+            lv1, lv2, lv3, lv4 = st.columns(4)
+            lv1.metric(
+                "Live status",
+                str(live_report.get("status") or "UNKNOWN"),
+            )
+            lv2.metric(
+                "Heartbeat",
+                "SIM" if live_report.get("heartbeat_confirmed") else "NÃO",
+            )
+            lv3.metric(
+                "Tick",
+                "SIM" if live_report.get("tick_confirmed") else "NÃO",
+            )
+            lv4.metric(
+                "Receipt work",
+                "SIM" if live_report.get("work_receipt_confirmed") else "NÃO",
+            )
+            st.caption(
+                "Runtime: "
+                + str(live_report.get("last_runtime_id") or "não confirmado")
+                + " · último heartbeat: "
+                + str(live_report.get("last_heartbeat_at") or "não confirmado")
+                + " · último tick: "
+                + str(live_report.get("last_tick_at") or "não confirmado")
+                + " · efeitos externos/trading: NÃO."
+            )
+            if live_report.get("live_confirmed"):
+                st.success(
+                    "Worker Global LIVE confirmado por evidência compartilhada."
+                )
+            elif str(live_report.get("status") or "") == "LIVE_EVIDENCE_TIMEOUT":
+                st.error(
+                    "Timeout sem heartbeat compartilhado após ativação. "
+                    "Não considerar o Worker operacional; use o safety stop."
+                )
+            elif str(live_report.get("status") or "").startswith("BLOCKED"):
+                st.error(
+                    "Verificação live bloqueada: "
+                    + str(live_report.get("reason") or "evidência inválida")
+                    + "."
+                )
+            else:
+                st.info(
+                    "Ainda aguardando evidência live compartilhada. "
+                    "A feature flag, por si só, não confirma operação."
+                )
+
+        supervision_report = st.session_state.get(
+            _AION_GLOBAL_SUPERVISION_KEY
+        )
+        if isinstance(supervision_report, Mapping):
+            st.markdown("##### 🛡️ Supervisão operacional")
+            sp1, sp2, sp3 = st.columns(3)
+            sp1.metric(
+                "Postura",
+                str(supervision_report.get("posture") or "UNKNOWN"),
+            )
+            sp2.metric(
+                "Severidade",
+                str(supervision_report.get("severity") or "UNKNOWN"),
+            )
+            sp3.metric(
+                "Safety-stop recomendado",
+                "SIM"
+                if supervision_report.get("safety_stop_recommended")
+                else "NÃO",
+            )
+            if supervision_report.get("incident_open"):
+                st.warning(
+                    "Incidente operacional aberto por evidência do Worker Global. "
+                    "A supervisão NÃO executa contenção automática."
+                )
+            else:
+                st.caption(
+                    "Nenhum incidente operacional aberto neste snapshot."
+                )
+            recovery_steps = list(
+                supervision_report.get("recovery_steps") or []
+            )
+            if recovery_steps:
+                with st.expander("Checklist de recuperação do Worker Global"):
+                    for step in recovery_steps:
+                        st.markdown("- " + str(step))
+            st.caption(
+                "Supervisão: somente leitura · contenção automática: NÃO · "
+                "alteração automática da feature flag: NÃO · trading real: NÃO."
+            )
+            supervision_history = st.session_state.get(
+                _AION_GLOBAL_SUPERVISION_HISTORY_KEY,
+                [],
+            )
+            if supervision_history:
+                with st.expander("Histórico de supervisão do Worker Global"):
+                    history_summary = (
+                        supervision_history_summary(supervision_history)
+                        if supervision_history_summary is not None
+                        else {}
+                    )
+                    st.caption(
+                        "Observações na sessão: "
+                        + str(history_summary.get("observations") or len(supervision_history))
+                        + " · incidentes: "
+                        + str(history_summary.get("incidents") or 0)
+                        + " · críticos: "
+                        + str(history_summary.get("critical_incidents") or 0)
+                        + " · persistência externa: NÃO."
+                    )
+                    for event in list(supervision_history)[-5:][::-1]:
+                        if not isinstance(event, Mapping):
+                            continue
+                        st.markdown(
+                            "- **"
+                            + str(event.get("severity") or "UNKNOWN")
+                            + "** · "
+                            + str(event.get("posture") or "UNKNOWN")
+                            + " · "
+                            + str(event.get("live_status") or "UNKNOWN")
+                            + " · "
+                            + str(event.get("observed_at") or "sem horário")
+                        )
+
+            with st.expander("🧪 Drill de recuperação do Worker Global"):
+                st.caption(
+                    "SIMULAÇÃO SOMENTE. O drill ensaia resposta a incidente, mas "
+                    "não desativa flag, não altera Checkpoint, não executa tick e "
+                    "não confirma recuperação real."
+                )
+                drill_plan = (
+                    prepare_global_worker_recovery_drill(supervision_report)
+                    if prepare_global_worker_recovery_drill is not None
+                    else {}
+                )
+                drill_ready = str(drill_plan.get("status") or "") == "DRILL_READY"
+                if drill_ready:
+                    st.caption(
+                        "Cenário: "
+                        + str(drill_plan.get("scenario") or "UNKNOWN")
+                        + " · severidade: "
+                        + str(drill_plan.get("severity") or "UNKNOWN")
+                        + " · safety-stop recomendado: "
+                        + (
+                            "SIM"
+                            if drill_plan.get("safety_stop_recommended")
+                            else "NÃO"
+                        )
+                    )
+                    drill_phrase = st.text_input(
+                        'Digite exatamente "SIMULAR RECUPERACAO WORKER GLOBAL"',
+                        value="",
+                        key="aion_global_recovery_drill_phrase",
+                    )
+                    drill_confirm = st.checkbox(
+                        "Confirmo que este exercício é apenas uma simulação.",
+                        value=False,
+                        key="aion_global_recovery_drill_confirm",
+                    )
+                    if st.button(
+                        "🧪 Executar drill simulado de recuperação",
+                        key="aion_global_recovery_drill_execute",
+                        disabled=not bool(
+                            drill_confirm
+                            and simulate_global_worker_recovery_drill is not None
+                        ),
+                        width="stretch",
+                    ):
+                        st.session_state[_AION_GLOBAL_RECOVERY_DRILL_KEY] = (
+                            simulate_global_worker_recovery_drill(
+                                supervision_report,
+                                confirmation=drill_confirm,
+                                confirmation_phrase=drill_phrase,
+                            )
+                        )
+                else:
+                    st.caption(
+                        "Nenhum incidente suportado está aberto neste snapshot; "
+                        "o drill não é necessário."
+                    )
+
+                drill_result = st.session_state.get(
+                    _AION_GLOBAL_RECOVERY_DRILL_KEY
+                )
+                if isinstance(drill_result, Mapping):
+                    drill_view = (
+                        recovery_drill_summary(drill_result)
+                        if recovery_drill_summary is not None
+                        else drill_result
+                    )
+                    st.caption(
+                        "Drill: "
+                        + str(drill_view.get("status") or "UNKNOWN")
+                        + " · recuperação real: NÃO"
+                        + " · reativação autorizada: NÃO"
+                        + " · flag alterada: NÃO"
+                        + " · runtime alterado: NÃO."
+                    )
+                    if drill_result.get("drill_completed"):
+                        st.success(
+                            "Drill concluído em memória. Nenhuma ação real foi executada."
+                        )
+                        for stage in list(drill_result.get("stages") or []):
+                            if not isinstance(stage, Mapping):
+                                continue
+                            st.markdown(
+                                "- **"
+                                + str(stage.get("stage") or "UNKNOWN")
+                                + "** → "
+                                + str(stage.get("expected") or "")
+                                + " · execução real: NÃO"
+                            )
+                    elif str(drill_result.get("status") or "") == "CONFIRMATION_REQUIRED":
+                        st.warning(
+                            "A frase exata de confirmação da simulação é obrigatória."
+                        )
+
+            with st.expander("🧾 Evidência de recuperação / fechamento"):
+                st.caption(
+                    "Esta etapa nunca encerra o incidente automaticamente. Ela exige "
+                    "remediação confirmada + evidência atual fresca e, no máximo, "
+                    "marca o caso como pronto para revisão humana."
+                )
+                rem_root = st.checkbox(
+                    "Causa raiz identificada.",
+                    value=False,
+                    key="aion_global_remediation_root_cause",
+                )
+                rem_fix = st.checkbox(
+                    "Ação corretiva verificada.",
+                    value=False,
+                    key="aion_global_remediation_fix_verified",
+                )
+                rem_regression = st.checkbox(
+                    "Teste de regressão passou.",
+                    value=False,
+                    key="aion_global_remediation_regression",
+                )
+                rem_preserved = st.checkbox(
+                    "Evidência original do incidente foi preservada.",
+                    value=False,
+                    key="aion_global_remediation_evidence_preserved",
+                )
+                rem_reviewer = st.checkbox(
+                    "Revisor humano confirma a evidência de remediação.",
+                    value=False,
+                    key="aion_global_remediation_reviewer",
+                )
+                rem_phrase = st.text_input(
+                    'Digite exatamente "CONFIRMAR EVIDENCIA DE REMEDIACAO WORKER GLOBAL"',
+                    value="",
+                    key="aion_global_remediation_phrase",
+                )
+                if st.button(
+                    "🧾 Confirmar evidência de remediação",
+                    key="aion_global_remediation_confirm",
+                    disabled=prepare_remediation_evidence is None,
+                    width="stretch",
+                ):
+                    st.session_state[_AION_GLOBAL_REMEDIATION_EVIDENCE_KEY] = (
+                        prepare_remediation_evidence(
+                            supervision_report,
+                            root_cause_identified=rem_root,
+                            corrective_action_verified=rem_fix,
+                            regression_check_passed=rem_regression,
+                            evidence_preserved=rem_preserved,
+                            reviewer_confirmed=rem_reviewer,
+                            confirmation_phrase=rem_phrase,
+                        )
+                    )
+
+                remediation_evidence = st.session_state.get(
+                    _AION_GLOBAL_REMEDIATION_EVIDENCE_KEY
+                )
+                if isinstance(remediation_evidence, Mapping):
+                    st.caption(
+                        "Remediação: "
+                        + str(remediation_evidence.get("status") or "UNKNOWN")
+                        + " · incidente encerrado automaticamente: NÃO"
+                        + " · reativação autorizada: NÃO"
+                        + " · persistência externa: NÃO."
+                    )
+
+                    if st.button(
+                        "🔎 Avaliar prontidão para fechamento",
+                        key="aion_global_closure_assess",
+                        disabled=not bool(
+                            assess_incident_closure_readiness is not None
+                            and verify_global_worker_live_activation is not None
+                            and read_repository_feature_flag is not None
+                        ),
+                        width="stretch",
+                    ):
+                        try:
+                            closure_flag = read_repository_feature_flag(cfg)
+                            closure_runtime = load_runtime_checkpoint(cfg)
+                            closure_live = verify_global_worker_live_activation(
+                                access,
+                                closure_runtime,
+                                closure_flag,
+                                activation_result=(
+                                    last_activation
+                                    if isinstance(last_activation, Mapping)
+                                    else None
+                                ),
+                            )
+                            st.session_state[_AION_GLOBAL_CLOSURE_ASSESSMENT_KEY] = (
+                                assess_incident_closure_readiness(
+                                    supervision_report,
+                                    closure_live,
+                                    closure_flag,
+                                    remediation_evidence,
+                                )
+                            )
+                        except Exception as exc:
+                            st.session_state[
+                                _AION_GLOBAL_CLOSURE_ASSESSMENT_KEY
+                            ] = {
+                                "status": "CLOSURE_BLOCKED",
+                                "reason": type(exc).__name__,
+                                "closure_review_ready": False,
+                                "incident_closed": False,
+                                "automatic_closure": False,
+                            }
+
+                closure_assessment = st.session_state.get(
+                    _AION_GLOBAL_CLOSURE_ASSESSMENT_KEY
+                )
+                if isinstance(closure_assessment, Mapping):
+                    closure_record = (
+                        closure_review_record(closure_assessment)
+                        if closure_review_record is not None
+                        else {}
+                    )
+                    if closure_assessment.get("closure_review_ready"):
+                        st.success(
+                            "Evidência suficiente: caso pronto para revisão humana "
+                            "de fechamento. O incidente ainda NÃO foi encerrado."
+                        )
+                    else:
+                        st.warning(
+                            "Fechamento ainda bloqueado: "
+                            + str(
+                                closure_assessment.get("reason")
+                                or "evidência insuficiente"
+                            )
+                            + "."
+                        )
+                    st.caption(
+                        "Status: "
+                        + str(closure_assessment.get("status") or "UNKNOWN")
+                        + " · pronto para revisão humana: "
+                        + (
+                            "SIM"
+                            if closure_assessment.get("closure_review_ready")
+                            else "NÃO"
+                        )
+                        + " · incidente encerrado automaticamente: NÃO"
+                        + " · reativação autorizada: NÃO"
+                        + " · trading real: NÃO."
+                    )
+                    blockers = list(closure_assessment.get("blockers") or [])
+                    if blockers:
+                        st.caption(
+                            "Blockers: " + ", ".join(str(x) for x in blockers)
+                        )
+                    if closure_record.get("closure_package_digest"):
+                        st.caption(
+                            "Closure package digest: "
+                            + str(closure_record.get("closure_package_digest"))
+                        )
+
+                    with st.expander(
+                        "✅ Cerimônia humana de fechamento do incidente"
+                    ):
+                        ceremony_plan = (
+                            prepare_human_incident_closure(closure_assessment)
+                            if prepare_human_incident_closure is not None
+                            else {}
+                        )
+                        ceremony_ready = (
+                            str(ceremony_plan.get("status") or "")
+                            == "CEREMONY_READY"
+                        )
+                        st.caption(
+                            "A cerimônia registra somente a decisão humana nesta "
+                            "sessão. fechamento autoritativo persistido: NÃO · "
+                            "reativação autorizada: NÃO."
+                        )
+                        if ceremony_ready:
+                            closure_evidence_ack = st.checkbox(
+                                "Confirmo que revisei o pacote de evidências "
+                                "vinculado a este incidente.",
+                                value=False,
+                                key="aion_global_human_closure_evidence_ack",
+                            )
+                            closure_human_confirm = st.checkbox(
+                                "Confirmo a decisão humana de encerrar este "
+                                "incidente com base nas evidências apresentadas.",
+                                value=False,
+                                key="aion_global_human_closure_confirm",
+                            )
+                            closure_reactivation_ack = st.checkbox(
+                                "Confirmo que qualquer reativação do Worker Global "
+                                "exige uma cerimônia separada e futura.",
+                                value=False,
+                                key="aion_global_human_closure_reactivation_ack",
+                            )
+                            closure_note = st.text_area(
+                                "Nota do operador (opcional)",
+                                value="",
+                                key="aion_global_human_closure_note",
+                                height=80,
+                            )
+                            closure_phrase = st.text_input(
+                                'Digite exatamente "ENCERRAR INCIDENTE WORKER GLOBAL"',
+                                value="",
+                                key="aion_global_human_closure_phrase",
+                            )
+                            if st.button(
+                                "✅ Registrar decisão humana de fechamento",
+                                key="aion_global_human_closure_execute",
+                                disabled=record_human_incident_closure is None,
+                                width="stretch",
+                            ):
+                                st.session_state[
+                                    _AION_GLOBAL_HUMAN_CLOSURE_RECORD_KEY
+                                ] = record_human_incident_closure(
+                                    closure_assessment,
+                                    human_confirmation=closure_human_confirm,
+                                    evidence_acknowledged=closure_evidence_ack,
+                                    reactivation_separation_acknowledged=(
+                                        closure_reactivation_ack
+                                    ),
+                                    confirmation_phrase=closure_phrase,
+                                    operator_note=closure_note,
+                                )
+                        else:
+                            st.caption(
+                                "Cerimônia bloqueada até existir "
+                                "CLOSURE_REVIEW_READY com evidência vinculada."
+                            )
+
+                        human_closure_record = st.session_state.get(
+                            _AION_GLOBAL_HUMAN_CLOSURE_RECORD_KEY
+                        )
+                        if isinstance(human_closure_record, Mapping):
+                            human_closure_view = (
+                                human_closure_summary(human_closure_record)
+                                if human_closure_summary is not None
+                                else human_closure_record
+                            )
+                            if human_closure_record.get(
+                                "human_closure_decision_recorded"
+                            ):
+                                st.success(
+                                    "decisão humana registrada: SIM. "
+                                    "O registro é session-only."
+                                )
+                            elif str(
+                                human_closure_record.get("status") or ""
+                            ) == "CONFIRMATION_REQUIRED":
+                                st.warning(
+                                    "Cerimônia incompleta: "
+                                    + str(
+                                        human_closure_record.get("reason")
+                                        or "confirmações obrigatórias ausentes"
+                                    )
+                                    + "."
+                                )
+                            st.caption(
+                                "Status: "
+                                + str(
+                                    human_closure_view.get("status")
+                                    or "UNKNOWN"
+                                )
+                                + " · fechamento autoritativo persistido: NÃO"
+                                + " · reativação autorizada: NÃO"
+                                + " · flag alterada: NÃO"
+                                + " · runtime alterado: NÃO"
+                                + " · trading real: NÃO."
+                            )
+                            if human_closure_view.get("closure_record_id"):
+                                st.caption(
+                                    "Closure record: "
+                                    + str(
+                                        human_closure_view.get(
+                                            "closure_record_id"
+                                        )
+                                    )
+                                )
+
+                    with st.expander("💾 Persistência durável do fechamento"):
+                        durable_human_record = st.session_state.get(
+                            _AION_GLOBAL_HUMAN_CLOSURE_RECORD_KEY
+                        )
+                        durable_human_ready = bool(
+                            isinstance(durable_human_record, Mapping)
+                            and durable_human_record.get(
+                                "human_closure_decision_recorded"
+                            )
+                            is True
+                        )
+                        st.caption(
+                            "Esta etapa persiste somente o registro humano de "
+                            "fechamento no Checkpoint compartilhado. Ela NÃO altera "
+                            "a feature flag, NÃO muda o estado do Worker e NÃO "
+                            "autoriza reativação."
+                        )
+
+                        if st.button(
+                            "🔎 Ler feature flag para persistência do fechamento",
+                            key="aion_global_durable_closure_check_flag",
+                            disabled=read_repository_feature_flag is None,
+                            width="stretch",
+                        ):
+                            try:
+                                durable_flag_evidence = (
+                                    read_repository_feature_flag(cfg)
+                                )
+                                st.session_state[
+                                    _AION_GLOBAL_DURABLE_CLOSURE_FLAG_EVIDENCE_KEY
+                                ] = durable_flag_evidence
+                                if (
+                                    durable_flag_evidence.get("status")
+                                    == "CONFIRMED"
+                                    and str(
+                                        durable_flag_evidence.get("state")
+                                        or ""
+                                    )
+                                    in {"UNSET", "DISABLED", "ENABLED"}
+                                ):
+                                    st.success(
+                                        "Feature flag lida como "
+                                        + str(
+                                            durable_flag_evidence.get(
+                                                "state"
+                                            )
+                                            or "UNKNOWN"
+                                        )
+                                        + ". Nenhuma variável foi alterada."
+                                    )
+                                else:
+                                    st.error(
+                                        "Persistência bloqueada: estado "
+                                        "autoritativo da feature flag não foi "
+                                        "confirmado."
+                                    )
+                            except Exception as exc:
+                                st.error(
+                                    "Leitura da feature flag falhou em modo "
+                                    "seguro: "
+                                    + type(exc).__name__
+                                    + "."
+                                )
+
+                        durable_flag_evidence = st.session_state.get(
+                            _AION_GLOBAL_DURABLE_CLOSURE_FLAG_EVIDENCE_KEY
+                        )
+                        durable_flag_ready = bool(
+                            isinstance(durable_flag_evidence, Mapping)
+                            and durable_flag_evidence.get("status")
+                            == "CONFIRMED"
+                            and str(
+                                durable_flag_evidence.get("state") or ""
+                            )
+                            in {"UNSET", "DISABLED", "ENABLED"}
+                        )
+                        if isinstance(durable_flag_evidence, Mapping):
+                            dc1, dc2 = st.columns(2)
+                            dc1.metric(
+                                "Feature flag",
+                                str(
+                                    durable_flag_evidence.get("state")
+                                    or "UNKNOWN"
+                                ),
+                            )
+                            dc2.metric(
+                                "Estado confirmado",
+                                "SIM" if durable_flag_ready else "NÃO",
+                            )
+
+                        durable_ttl = int(
+                            st.number_input(
+                                "TTL da autorização de persistência do "
+                                "fechamento (segundos)",
+                                min_value=300,
+                                max_value=1800,
+                                value=600,
+                                step=300,
+                                key="aion_global_durable_closure_ttl",
+                            )
+                        )
+
+                        if st.button(
+                            "🧾 Gerar plano de persistência do fechamento",
+                            key="aion_global_durable_closure_plan",
+                            disabled=not bool(
+                                durable_human_ready
+                                and durable_flag_ready
+                                and prepare_durable_closure_plan is not None
+                            ),
+                            width="stretch",
+                        ):
+                            try:
+                                durable_plan_result = (
+                                    prepare_durable_closure_plan(
+                                        access,
+                                        durable_human_record,
+                                        runtime_result,
+                                        durable_flag_evidence,
+                                        ttl_seconds=durable_ttl,
+                                    )
+                                )
+                                if (
+                                    durable_plan_result.get("status")
+                                    == "DURABLE_CLOSURE_PLAN_READY"
+                                ):
+                                    st.session_state[
+                                        _AION_GLOBAL_DURABLE_CLOSURE_PLAN_KEY
+                                    ] = durable_plan_result.get("plan")
+                                    st.session_state.pop(
+                                        _AION_GLOBAL_DURABLE_CLOSURE_APPROVAL_KEY,
+                                        None,
+                                    )
+                                    st.success(
+                                        "Plano criado somente na sessão. "
+                                        "Nenhuma escrita foi executada."
+                                    )
+                                elif (
+                                    durable_plan_result.get("status")
+                                    == "ALREADY_PERSISTED"
+                                ):
+                                    st.info(
+                                        "Este registro humano já está persistido "
+                                        "com o mesmo digest."
+                                    )
+                                else:
+                                    st.warning(
+                                        "Plano bloqueado: "
+                                        + str(
+                                            durable_plan_result.get("reason")
+                                            or durable_plan_result.get("status")
+                                            or "UNKNOWN"
+                                        )
+                                    )
+                            except Exception as exc:
+                                st.error(
+                                    "Plano bloqueado em modo seguro: "
+                                    + type(exc).__name__
+                                    + "."
+                                )
+
+                        durable_plan = st.session_state.get(
+                            _AION_GLOBAL_DURABLE_CLOSURE_PLAN_KEY
+                        )
+                        if isinstance(durable_plan, Mapping):
+                            st.caption(
+                                "Durable closure plan: "
+                                + str(
+                                    durable_plan.get("plan_digest") or ""
+                                )[:24]
+                                + "… · runtime SHA "
+                                + str(
+                                    durable_plan.get("source_runtime_sha") or ""
+                                )[:12]
+                                + "… · flag vinculada "
+                                + str(
+                                    durable_plan.get("feature_flag_state")
+                                    or "UNKNOWN"
+                                )
+                                + "."
+                            )
+                            durable_phrase = st.text_input(
+                                'Digite exatamente "PERSISTIR FECHAMENTO INCIDENTE WORKER GLOBAL"',
+                                value="",
+                                key="aion_global_durable_closure_phrase",
+                            )
+                            durable_confirm = st.checkbox(
+                                "Confirmo que revisei o closure record, runtime "
+                                "SHA, estado do Worker, feature flag e rollback.",
+                                value=False,
+                                key="aion_global_durable_closure_confirm",
+                            )
+                            if st.button(
+                                "✅ Criar autorização de persistência do fechamento",
+                                key="aion_global_durable_closure_approve",
+                                disabled=not bool(
+                                    durable_confirm
+                                    and approve_durable_closure_plan is not None
+                                ),
+                                width="stretch",
+                            ):
+                                try:
+                                    durable_approved = (
+                                        approve_durable_closure_plan(
+                                            access,
+                                            durable_plan,
+                                            confirmation=True,
+                                            confirmation_phrase=durable_phrase,
+                                        )
+                                    )
+                                    if (
+                                        durable_approved.get("status")
+                                        == "APPROVED_FOR_DURABLE_CLOSURE_PERSISTENCE"
+                                    ):
+                                        st.session_state[
+                                            _AION_GLOBAL_DURABLE_CLOSURE_APPROVAL_KEY
+                                        ] = durable_approved.get("approval")
+                                        st.success(
+                                            "Autorização curta criada na sessão. "
+                                            "Ainda nenhuma escrita foi executada."
+                                        )
+                                    else:
+                                        st.warning(
+                                            "Autorização bloqueada: "
+                                            + str(
+                                                durable_approved.get("reason")
+                                                or durable_approved.get("status")
+                                                or "UNKNOWN"
+                                            )
+                                        )
+                                except Exception as exc:
+                                    st.error(
+                                        "Autorização bloqueada: "
+                                        + type(exc).__name__
+                                        + "."
+                                    )
+
+                        durable_approval = st.session_state.get(
+                            _AION_GLOBAL_DURABLE_CLOSURE_APPROVAL_KEY
+                        )
+                        durable_approval_valid = False
+                        if (
+                            isinstance(durable_approval, Mapping)
+                            and isinstance(durable_human_record, Mapping)
+                            and validate_durable_closure_approval is not None
+                        ):
+                            try:
+                                durable_approval_check = (
+                                    validate_durable_closure_approval(
+                                        access,
+                                        durable_human_record,
+                                        runtime_result,
+                                        durable_approval,
+                                    )
+                                )
+                                durable_approval_valid = (
+                                    durable_approval_check.get("state")
+                                    == "APPROVED"
+                                )
+                            except Exception:
+                                durable_approval_valid = False
+
+                        durable_final_confirm = st.checkbox(
+                            "SEGUNDA CONFIRMAÇÃO: autorizo agora somente a "
+                            "persistência real do registro humano de fechamento. "
+                            "A feature flag e o estado do Worker devem permanecer "
+                            "inalterados.",
+                            value=False,
+                            key="aion_global_durable_closure_final_confirm",
+                        )
+                        if st.button(
+                            "🚨 Persistir registro humano de fechamento",
+                            key="aion_global_durable_closure_execute",
+                            disabled=not bool(
+                                durable_approval_valid
+                                and durable_final_confirm
+                                and persist_human_incident_closure_record
+                                is not None
+                                and not conflict
+                            ),
+                            width="stretch",
+                        ):
+                            decision = guardian_decision(
+                                "save_checkpoint",
+                                access,
+                                approved=True,
+                                feature_flags=flags,
+                            )
+                            if not decision["allowed"]:
+                                st.error(decision["reason"])
+                            else:
+                                try:
+                                    durable_result = (
+                                        persist_human_incident_closure_record(
+                                            access,
+                                            durable_human_record,
+                                            runtime_result,
+                                            durable_approval,
+                                            cfg,
+                                            confirmation=True,
+                                        )
+                                    )
+                                    st.session_state[
+                                        _AION_GLOBAL_DURABLE_CLOSURE_RESULT_KEY
+                                    ] = durable_result
+                                    if (
+                                        durable_result.get("status")
+                                        == "CONFIRMED"
+                                        and durable_result.get("saved")
+                                        and durable_result.get("verified")
+                                    ):
+                                        saved_checkpoint = (
+                                            ensure_operating_checkpoint(
+                                                durable_result.get("checkpoint")
+                                            )
+                                        )
+                                        saved_checkpoint["operating"][
+                                            "dirty"
+                                        ] = False
+                                        _set_working_checkpoint(
+                                            saved_checkpoint,
+                                            dirty=False,
+                                        )
+                                        st.session_state[
+                                            _WORKING_SOURCE_KEY
+                                        ] = checkpoint_source_digest(
+                                            saved_checkpoint
+                                        )
+                                        for key in (
+                                            _AION_GLOBAL_DURABLE_CLOSURE_FLAG_EVIDENCE_KEY,
+                                            _AION_GLOBAL_DURABLE_CLOSURE_PLAN_KEY,
+                                            _AION_GLOBAL_DURABLE_CLOSURE_APPROVAL_KEY,
+                                        ):
+                                            st.session_state.pop(key, None)
+                                        st.success(
+                                            "Registro humano de fechamento "
+                                            "persistido, relido e confirmado. "
+                                            "Feature flag e Worker permaneceram "
+                                            "separados."
+                                        )
+                                        st.rerun()
+                                    elif (
+                                        durable_result.get("status")
+                                        == "ROLLED_BACK"
+                                    ):
+                                        st.error(
+                                            "A persistência foi revertida "
+                                            "automaticamente porque uma invariante "
+                                            "pós-escrita mudou."
+                                        )
+                                        rollback_source = (
+                                            runtime_result.get("checkpoint")
+                                            if isinstance(
+                                                runtime_result.get(
+                                                    "checkpoint"
+                                                ),
+                                                Mapping,
+                                            )
+                                            else {}
+                                        )
+                                        restored = ensure_operating_checkpoint(
+                                            rollback_source
+                                        )
+                                        restored["operating"]["dirty"] = False
+                                        _set_working_checkpoint(
+                                            restored,
+                                            dirty=False,
+                                        )
+                                        st.session_state[
+                                            _WORKING_SOURCE_KEY
+                                        ] = checkpoint_source_digest(restored)
+                                        st.rerun()
+                                    else:
+                                        st.error(
+                                            "Persistência do fechamento não foi "
+                                            "concluída. Estado: "
+                                            + str(
+                                                durable_result.get("status")
+                                                or "UNKNOWN"
+                                            )
+                                            + " · motivo: "
+                                            + str(
+                                                durable_result.get("reason")
+                                                or "não informado"
+                                            )
+                                            + "."
+                                        )
+                                except Exception as exc:
+                                    st.error(
+                                        "Persistência do fechamento falhou em "
+                                        "modo seguro: "
+                                        + type(exc).__name__
+                                        + "."
+                                    )
+
+                        durable_result = st.session_state.get(
+                            _AION_GLOBAL_DURABLE_CLOSURE_RESULT_KEY
+                        )
+                        if isinstance(durable_result, Mapping):
+                            st.caption(
+                                "Persistência durável: "
+                                + str(
+                                    durable_result.get("status") or "UNKNOWN"
+                                )
+                                + " · registro compartilhado persistido: "
+                                + (
+                                    "SIM"
+                                    if durable_result.get(
+                                        "shared_closure_record_persisted"
+                                    )
+                                    else "NÃO"
+                                )
+                                + " · Incident Center alterado: NÃO"
+                                + " · feature flag alterada: NÃO"
+                                + " · Worker alterado: NÃO"
+                                + " · reativação autorizada: NÃO"
+                                + " · trading real: NÃO."
+                            )
+
+        with st.expander("🛑 Desativação de segurança da feature flag"):
+            st.caption(
+                "Desativar a flag impede novos wake-ups do Worker Global pelo "
+                "pulso agendado. Não altera o Checkpoint nem executa tick."
+            )
+            deactivate_phrase = st.text_input(
+                'Digite exatamente "DESATIVAR WORKER GLOBAL"',
+                value="",
+                key="aion_global_deactivation_phrase",
+            )
+            deactivate_confirm = st.checkbox(
+                "Confirmo a desativação da feature flag do Worker Global.",
+                value=False,
+                key="aion_global_deactivation_confirm",
+            )
+            if st.button(
+                "🛑 Desativar feature flag do Worker Global",
+                key="aion_global_deactivation_execute",
+                disabled=not bool(
+                    deactivate_confirm
+                    and deactivate_global_worker_feature_flag is not None
+                ),
+                width="stretch",
+            ):
+                decision = guardian_decision(
+                    "write_runtime",
+                    access,
+                    approved=True,
+                    feature_flags=flags,
+                )
+                if not decision["allowed"]:
+                    st.error(decision["reason"])
+                else:
+                    try:
+                        deactivate_result = (
+                            deactivate_global_worker_feature_flag(
+                                access,
+                                cfg,
+                                confirmation=True,
+                                confirmation_phrase=deactivate_phrase,
+                            )
+                        )
+                        if deactivate_result.get("status") in {
+                            "DISABLED",
+                            "ALREADY_DISABLED",
+                        }:
+                            st.success(
+                                "Feature flag do Worker Global confirmada como "
+                                + str(
+                                    deactivate_result.get(
+                                        "feature_flag_state"
+                                    )
+                                    or "DISABLED"
+                                )
+                                + "."
+                            )
+                        else:
+                            st.error(
+                                "Desativação não confirmada. Estado: "
+                                + str(
+                                    deactivate_result.get("status")
+                                    or "UNKNOWN"
+                                )
+                                + "."
+                            )
+                    except Exception as exc:
+                        st.error(
+                            "Desativação bloqueada em modo seguro: "
+                            + type(exc).__name__
+                            + "."
+                        )
+
     if st.button(
         "💾 Salvar Checkpoint Mestre no runtime",
         key="aion_save_checkpoint",
         disabled=persistence_blocked,
         help=(
             "A escrita ocorre apenas no branch de runtime, exige estado seguro do runtime "
-            "e este clique conta como aprovação explícita."
+            "e este clique conta como aprovação explícita. "
+            "Transições novas para Global Worker ARMED usam uma cerimônia separada."
         ),
     ):
         decision = guardian_decision(
@@ -5841,10 +9213,18 @@ def render_aion_admin_console(
             system_context=system,
             account_audit=account_entitlement_audit,
         )
+        if reconcile_global_worker_incident_center is not None:
+            incident_snapshot = reconcile_global_worker_incident_center(
+                incident_snapshot,
+                st.session_state.get(_AION_GLOBAL_SUPERVISION_KEY),
+                runtime_result,
+            )
     except Exception as exc:
         incident_snapshot = {
             "schema":"ATLASQUANT_AION_INCIDENT_CENTER_V1",
             "incidents":[],
+            "closed_incidents":[],
+            "closed_total":0,
             "total":0,
             "counts":{"INFO":0,"LOW":0,"MEDIUM":0,"HIGH":0,"CRITICAL":0},
             "highest_severity":"UNKNOWN",

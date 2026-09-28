@@ -40,19 +40,40 @@ class ScopedEvidence:
 
 
 class AionCore:
-    def __init__(self, store: CoreStore | None = None, *,
-                 human_adapter: HumanApprovalAdapter | None = None,
-                 clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc)):
+    def __init__(
+        self,
+        store: CoreStore | None = None,
+        *,
+        human_adapter: HumanApprovalAdapter | None = None,
+        voice_adapter: object | None = None,
+        automation_adapter: object | None = None,
+        clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
+    ):
         self.store = store
         self.clock = clock
-        self.registry = Registry(checkpoint_connected=store is not None and not store.closed)
+        self.voice_adapter = voice_adapter
+        self.automation_adapter = automation_adapter
+        voice_connected = bool(
+            voice_adapter is not None and getattr(voice_adapter, "available", False)
+        )
+        automation_connected = bool(
+            automation_adapter is not None
+            and getattr(automation_adapter, "available", False)
+        )
+        self.registry = Registry(
+            checkpoint_connected=store is not None and not store.closed,
+            voice_connected=voice_connected,
+            automation_connected=automation_connected,
+        )
         self.approvals = ApprovalGate(store, human_adapter) if store else None
         self._handlers = {
             "ADMINISTRATION": self._administration,
             "MEMORY": self._memory,
             "DEVELOPER": self._developer,
             "RESEARCH": self._research,
+            "VOICE": self._voice,
             "CONTENT": self._content,
+            "AUTOMATION": self._automation,
             "OBSERVABILITY": self._observability,
         }
 
@@ -153,8 +174,18 @@ class AionCore:
     def _research(self, *, intent, records, now, **_):
         return research.synthesize(intent, records, now)
 
+    def _voice(self, *, intent, **_):
+        if self.voice_adapter is None:
+            return {"status": "UNAVAILABLE", "reason": "VOICE_ADAPTER_UNAVAILABLE"}
+        return self.voice_adapter.prepare(intent)
+
     def _content(self, *, intent, **_):
         return content.draft_outline(intent)
+
+    def _automation(self, *, now, **_):
+        if self.automation_adapter is None:
+            return {"status": "UNAVAILABLE", "reason": "AUTOMATION_ADAPTER_UNAVAILABLE"}
+        return self.automation_adapter.snapshot(now)
 
     def _observability(self, *, context, **_):
         return {"status": "LOCAL_SCOPED_EVENTS", "events": self.store.events(context)}

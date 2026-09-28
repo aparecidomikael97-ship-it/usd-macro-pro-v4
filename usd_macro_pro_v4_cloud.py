@@ -4477,6 +4477,18 @@ def _autopilot_save_inputs_v107():
             "version": "V10.7_FAST_BOOT_1",
             "generated_at": pd.Timestamp.now(tz="UTC").isoformat(),
             "app_version": APP_VERSION,
+            "core_evidence": (
+                [{
+                    "claim": "build",
+                    "value": str(_ATLASQUANT_SOURCE_BUILD),
+                    "truth_state": "CONFIRMED",
+                    "source": "AtlasQuant runtime identity",
+                    "source_ref": "runtime-build:" + str(_ATLASQUANT_SOURCE_BUILD),
+                    "time_sensitive": False,
+                }]
+                if str(_ATLASQUANT_SOURCE_BUILD or "").strip()
+                else []
+            ),
             "pairs": pairs,
             "macro_context": _macro,
             "fast_boot": _fast_boot,
