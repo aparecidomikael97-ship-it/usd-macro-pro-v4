@@ -55,7 +55,7 @@ class PremiumShellTests(unittest.TestCase):
         html = premium_module_card_html(sample, locked=True, available=True)
         self.assertNotIn("<script>", html)
         self.assertIn("&lt;script&gt;", html)
-        self.assertIn("Clicável", html)
+        self.assertIn("Navegação interna", html)
         self.assertIn("Prévia no Iniciante", html)
         self.assertIn("aq-premium-card", html)
         hero = section_hero_html("<b>", "Central", "texto")
@@ -145,6 +145,10 @@ class PremiumShellTests(unittest.TestCase):
         row = PREMIUM_CSS.split(".aq-premium-row{")[1].split("}")[0]
         self.assertNotIn("overflow-x:hidden", row)
         self.assertIn("-webkit-overflow-scrolling:touch", PREMIUM_CSS)
+        self.assertIn("scrollbar-width:thin", PREMIUM_CSS)
+        self.assertIn(".aq-premium-row::-webkit-scrollbar{height:8px}", PREMIUM_CSS)
+        self.assertIn("aq-premium-scroll-hint", PREMIUM_CSS)
+        self.assertIn("aq-radar-sweep", PREMIUM_CSS)
 
     def test_catalog_sectors_are_horizontal_strips_and_cards_carry_the_action(self):
         pages = list(NAVIGATION_LABELS) + ["🧠 AION"]
@@ -155,18 +159,17 @@ class PremiumShellTests(unittest.TestCase):
         essencial = html.split('aria-label="Essencial"')[1].split('aria-label="Leitura"')[0]
         self.assertLess(essencial.index(">Radar<"), essencial.index(">Painel Mestre<"))
         self.assertLess(essencial.index(">Painel Mestre<"), essencial.index(">Macroeconomia<"))
-        self.assertIn('href="?aq_card=radar"', essencial)
+        self.assertNotIn("?aq_card=", essencial)
         self.assertIn("Abrir Radar", essencial)
-        self.assertIn('href="?aq_card=master"', essencial)
-        self.assertNotIn("st.button", html)
+        self.assertNotIn('<a class="aq-premium-card"', essencial)
+        self.assertIn("deslize, role ou use as setas", html)
         fast_pages = ["🎯 Radar", "🎙️ Macro", "🎓 Aprender", "👤 Conta", "📱 Instalar", "💰 Investir", "🛟 Suporte"]
         fast_html = premium_catalog_html(mode="Iniciante", available_pages=fast_pages, fast=True)
-        self.assertIn('href="?aq_card=radar"', fast_html)
+        self.assertNotIn("?aq_card=", fast_html)
         self.assertIn("flex-basis:86vw", PREMIUM_CSS)
-        self.assertNotIn('href="?aq_card=master"', fast_html)
         self.assertIn("<article", fast_html)
         beginner = premium_catalog_html(mode="Iniciante", available_pages=pages, fast=False)
-        self.assertIn('href="?aq_card=master"', beginner)
+        self.assertNotIn("?aq_card=", beginner)
         self.assertIn("Prévia no Iniciante", beginner)
         state = {}
         self.assertEqual(
@@ -199,9 +202,30 @@ class PremiumShellTests(unittest.TestCase):
         from atlasquant_navigation_bridge import consume_navigation_request
         consume_navigation_request(aion_state, available_pages=pages)
         self.assertEqual(aion_state["atlasquant_advanced_area"], "🧠 AION")
+
+        business_state = {}
+        self.assertEqual(
+            request_premium_card(business_state, "business", mode="Avançado", available_pages=pages, fast=False),
+            "🧠 AION",
+        )
+        self.assertEqual(business_state["aion_admin_workspace_jump"], "💼 Negócios")
+        consume_navigation_request(business_state, available_pages=pages)
+        self.assertEqual(business_state["atlasquant_advanced_area"], "🧠 AION")
+        business_module=next(item for item in PREMIUM_MODULES if item["id"]=="business")
+        self.assertEqual(business_module["page"], "🧠 AION")
+        self.assertNotEqual(business_module["page"], "💼 Vendas")
+        self.assertIn("Portal Comercial", business_module["summary"])
         shell = Path("atlasquant_premium_shell.py").read_text(encoding="utf-8")
         self.assertNotIn("real_orders_enabled = True", shell)
         self.assertNotIn("automatic_execution = True", shell)
+
+    def test_catalog_renderer_uses_native_stateful_controls(self):
+        shell = Path("atlasquant_premium_shell.py").read_text(encoding="utf-8")
+        self.assertIn("def _render_premium_stateful_controls", shell)
+        self.assertIn("request_premium_card(", shell)
+        self.assertIn("st.rerun()", shell)
+        self.assertNotIn('href=f"?aq_card=', shell)
+        self.assertNotIn('href="?aq_card=', shell)
 
     def test_cockpit_header_escapes_copy_and_telemetry(self):
         html = cockpit_header_html("<Radar>", "x & y", telemetry={"ORDENS": "<BLOQUEADAS>"})
