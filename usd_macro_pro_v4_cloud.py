@@ -430,6 +430,8 @@ except Exception:
 
 try:
     from atlasquant_central_hub_ui import (
+        CENTRAL_CHOICE_KEY,
+        CENTRAL_ROOT,
         consume_aion_module_jump,
         render_aion_home_viewer,
         render_central_hub,
@@ -437,6 +439,8 @@ try:
         sync_central_choice,
     )
 except Exception:
+    CENTRAL_CHOICE_KEY = "atlasquant_central_choice"
+    CENTRAL_ROOT = "central_root"
     consume_aion_module_jump = None
     render_aion_home_viewer = None
     render_central_hub = None
@@ -465,6 +469,12 @@ def _central_query_value() -> str:
 def _central_request_for_render(*, active_index=None) -> str:
     """Consume a deep-link once; validated session state owns later reruns."""
     requested = _central_query_value()
+    if not requested:
+        try:
+            if str(st.session_state.get(CENTRAL_CHOICE_KEY) or "") == CENTRAL_ROOT:
+                requested = "central"
+        except Exception:
+            pass
     if active_index == 21 and not requested:
         requested = "aion"
     elif (
