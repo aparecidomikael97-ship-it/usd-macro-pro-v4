@@ -1,0 +1,6117 @@
+"""Read-only adversarial audit of the AION Developer chain.
+
+Calls the existing in-memory contracts and classifies each probe as
+PASS, GAP or BLOCKED_BY_DESIGN. It does not execute repository code, start a
+process, use the network, edit existing files, commit, merge or deploy.
+Temporary fixture files exist only for the structural scanner and are removed
+before the report is returned.
+"""
+from __future__ import annotations
+
+from copy import deepcopy
+from hashlib import sha256
+import json
+from pathlib import Path
+import tempfile
+from typing import Any, Callable, Mapping
+
+from atlasquant_aion_developer_builder_sandbox import (
+    assert_builder_sandbox_request_integrity,
+    build_builder_sandbox_request,
+    structural_builder_sandbox_request,
+)
+from atlasquant_aion_developer_correction import build_correction_plan
+from atlasquant_aion_developer_diagnostics import diagnose_failure
+from atlasquant_aion_developer_engine import new_development_workflow
+from atlasquant_aion_developer_evidence_gate import (
+    confirm_root_cause_human_review,
+    evaluate_evidence_promotion,
+)
+from atlasquant_aion_developer_implementation import (
+    approve_implementation_session,
+    build_implementation_envelope,
+    prepare_implementation_readiness,
+)
+from atlasquant_aion_developer_intelligence import (
+    build_development_plan,
+    scan_repository,
+)
+from atlasquant_aion_developer_manifest import (
+    REQUIRED_MANDATORY_GATES,
+    authorization_manifest_id,
+    bind_builder_request_lineage,
+    canonical_identity,
+    implementation_base_manifest_id,
+    implementation_readiness_manifest_id,
+    release_sensitive_path,
+    structural_request_roles,
+)
+from atlasquant_aion_developer_command_policy import (
+    _bind_command_policy_ids,
+    assert_command_policy_integrity,
+    assert_command_policy_provenance,
+    assert_runner_policy_boundary,
+    build_command_policy_contract,
+    expected_command_policy_payload,
+)
+from atlasquant_aion_developer_os_sandbox_contract import (
+    PHYSICAL_PROOF_BLOCKERS,
+    READY_STATE as OS_SANDBOX_READY_STATE,
+    _bind_os_sandbox_ids,
+    assert_os_sandbox_contract,
+    assert_os_sandbox_contract_integrity,
+    build_os_sandbox_contract,
+)
+from atlasquant_aion_developer_os_sandbox_probe_result import (
+    READY_STATE as PROBE_RESULT_READY_STATE,
+    _bind_probe_result_ids,
+    assert_probe_result,
+    assert_probe_result_integrity,
+    build_probe_result_contract,
+)
+from atlasquant_aion_developer_executable_pinning import (
+    FIXED_ENVIRONMENT,
+    build_environment_contract,
+    build_executable_pinning_spec,
+    build_os_sandbox_design_review,
+)
+from atlasquant_aion_developer_content_attestation import (
+    GIT_OBJECT_SOURCE_PROBE,
+    GIT_OBJECT_SOURCE_SYNTHETIC,
+    attestation_for_documents,
+    build_content_attestation,
+)
+from atlasquant_aion_developer_executable_pinning import build_executable_pinning_spec
+from atlasquant_aion_developer_principal_identity import (
+    assert_independent_principals,
+    classify_actor_pair,
+    require_principal_id,
+)
+from atlasquant_aion_developer_package import build_developer_package
+from atlasquant_aion_developer_patch_validation import (
+    assert_patch_validation_integrity,
+    canonical_patch_document,
+    expected_patch_validation_id,
+    patch_validation_manifest_id,
+    validate_patch,
+)
+from atlasquant_aion_developer_physical_transition_gate import (
+    EXTERNAL_PROVENANCE_MISSING,
+    PHYSICAL_TRANSITION_BLOCKED,
+    SOURCE_BOUND_READY,
+    STRUCTURAL_READY,
+    assert_physical_transition_record,
+    evaluate_physical_transition_gate,
+    expected_physical_transition_id,
+)
+from atlasquant_aion_developer_source_bound_consumption_gate import (
+    assert_source_bound_consumption_gate,
+)
+from atlasquant_aion_developer_source_bound_patch_proof import (
+    READY_STATE as SOURCE_BOUND_PATCH_MATCH,
+    assert_source_bound_patch_proof_record,
+    expected_source_bound_patch_proof_id,
+    verify_source_bound_patch,
+)
+from atlasquant_aion_developer_runner_contract import (
+    MAX_MANDATORY_GATES,
+    MAX_TEST_TARGETS,
+    _bind_runner_contract_ids,
+    assert_runner_contract_integrity,
+    assert_runner_provenance,
+    build_runner_contract,
+    expected_runner_contract_id,
+)
+from atlasquant_aion_developer_sandbox_preflight import (
+    assert_sandbox_preflight_integrity,
+    build_sandbox_preflight,
+    expected_preflight_id,
+)
+
+SCHEMA = "ATLASQUANT_AION_DEVELOPER_ADVERSARIAL_AUDIT_V1"
+CLASSIFICATIONS = ("PASS", "GAP", "BLOCKED_BY_DESIGN")
+SEVERITIES = ("CRITICAL", "HIGH", "MEDIUM", "LOW")
+_SECRET_SENTINEL = "supersecretvalue"
+_TOKEN_SENTINEL = "ghp_ADVERSARIALAUDITOR1234567890"
+_CREATED = "2026-09-27T12:00:00+00:00"
+
+
+def _finding(
+    invariant_id: str,
+    module: str,
+    description: str,
+    classification: str,
+    severity: str = "",
+) -> dict[str, str]:
+    if classification not in CLASSIFICATIONS:
+        raise ValueError("invalid adversarial classification")
+    if classification == "GAP" and severity not in SEVERITIES:
+        raise ValueError("gap finding requires severity")
+    if classification != "GAP":
+        severity = ""
+    return {
+        "invariant_id": invariant_id,
+        "module": module,
+        "description": description,
+        "classification": classification,
+        "severity": severity,
+    }
+
+
+def _invoke(fn: Callable[[], Any]) -> tuple[str, Any]:
+    try:
+        return "ACCEPT", fn()
+    except (TypeError, ValueError) as exc:
+        return "REJECT", exc
+
+
+def _blocked(invariant_id: str, module: str, description: str, fn: Callable[[], Any]) -> dict[str, str]:
+    status, result = _invoke(fn)
+    if status == "REJECT":
+        return _finding(invariant_id, module, description, "BLOCKED_BY_DESIGN")
+    state = ""
+    if isinstance(result, Mapping):
+        state = str(result.get("state") or "")
+    return _finding(
+        invariant_id,
+        module,
+        description + f" Aceito com estado {state or 'OK'}.",
+        "GAP",
+        "HIGH",
+    )
+
+
+class _World:
+    def __init__(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        root = Path(self._tmp.name)
+        (root / "atlasquant_aion_admin.py").write_text(
+            "def render():\n    return True\n",
+            encoding="utf-8",
+        )
+        (root / "other_mod.py").write_text("VALUE = 1\n", encoding="utf-8")
+        (root / "test_atlasquant_aion_admin.py").write_text(
+            "import atlasquant_aion_admin\n"
+            "def test_render():\n"
+            "    assert atlasquant_aion_admin.render()\n",
+            encoding="utf-8",
+        )
+        workflow = root / ".github" / "workflows"
+        workflow.mkdir(parents=True)
+        (workflow / "quality-tests.yml").write_text("name: quality\n", encoding="utf-8")
+        release = root / "docs" / "release"
+        release.mkdir(parents=True)
+        (release / "NOTES.md").write_text("release note\n", encoding="utf-8")
+        (root / ".env").write_text("TOKEN=not-a-real-secret\n", encoding="utf-8")
+        (root / "linked.py").symlink_to(root / "atlasquant_aion_admin.py")
+        self.root = root
+        self.snapshot = scan_repository(root)
+        self.package = self._package(changed=["atlasquant_aion_admin.py"])
+        self.diagnostic = self._diagnostic("atlasquant_aion_admin.py")
+        self.correction = build_correction_plan(self.snapshot, self.diagnostic, self.package)
+        self.hypothesis = str(self.correction["hypotheses"][0]["label"])
+        self.test_id = str(self.correction["test_candidates"][0])
+        self.gate = self._gate(self.correction, ["atlasquant_aion_admin.py"])
+        self.confirmed = confirm_root_cause_human_review(
+            self.correction,
+            self.gate,
+            approved=True,
+            reviewer_actor="root-cause-reviewer",
+            review_evidence_refs=["review:cause"],
+        )
+        self.envelope = build_implementation_envelope(
+            self.snapshot, self.package, self.confirmed,
+        )
+        self.ready = self._ready(self.envelope, "builder-a", "reviewer-b", "breaker-c", "Reverter a mudanca logica.")
+        self.approved = self._approve(self.ready, "human-approver", approver_principal_id="prn_approver1")
+
+    def close(self) -> None:
+        self._tmp.cleanup()
+
+    def _package(self, *, branch: str = "cursor/admin-fix", changed: list[str] | None = None) -> dict[str, Any]:
+        return build_developer_package(
+            "Corrigir admin",
+            self.snapshot,
+            branch=branch,
+            baseline_ref="base@a",
+            candidate_ref="cursor/admin-fix@b",
+            changed_paths=changed,
+            created_at=_CREATED,
+        )
+
+    def _diagnostic(self, relative: str, extra: str = "") -> dict[str, Any]:
+        log = (
+            f"AssertionError: password={_SECRET_SENTINEL} "
+            f"token={_TOKEN_SENTINEL}\n"
+            "FAILED test_atlasquant_aion_admin.py::test_render\n"
+            f'File "{self.root / relative}", line 1\n'
+            + extra
+        )
+        return diagnose_failure(self.snapshot, log)
+
+    def _gate(self, correction: Mapping[str, Any], changed: list[str]) -> dict[str, Any]:
+        return evaluate_evidence_promotion(
+            correction,
+            hypothesis_label=self.hypothesis,
+            test_id=self.test_id,
+            before_state="FAIL",
+            after_state="PASS",
+            changed_files=changed,
+            evidence_refs=["run:before", "run:after"],
+            intervention_summary="Mudanca minima reproduziu a falha e o teste.",
+            scope_preserved=True,
+            snapshot_digest=self.snapshot["snapshot_digest"],
+            diagnostic_id=self.diagnostic["diagnostic_id"],
+        )
+
+    def _ready(
+        self,
+        envelope: Mapping[str, Any],
+        builder: str,
+        reviewer: str,
+        breaker: str,
+        rollback: str,
+        *,
+        bind_principals: bool = True,
+    ) -> dict[str, Any]:
+        principals = {
+            "builder_principal_id": "prn_builder01",
+            "reviewer_principal_id": "prn_reviewer1",
+            "breaker_principal_id": "prn_breaker01",
+        } if bind_principals else {}
+        return prepare_implementation_readiness(
+            envelope,
+            rollback_plan=rollback,
+            builder_actor=builder,
+            reviewer_actor=reviewer,
+            breaker_actor=breaker,
+            readiness_refs=["ready:scope"],
+            builder_principal_id=principals.get("builder_principal_id"),
+            reviewer_principal_id=principals.get("reviewer_principal_id"),
+            breaker_principal_id=principals.get("breaker_principal_id"),
+        )
+
+    def _approve(
+        self,
+        ready: Mapping[str, Any],
+        approver: str,
+        approver_principal_id: Any = None,
+    ) -> dict[str, Any]:
+        return approve_implementation_session(
+            ready,
+            approved=True,
+            approver_actor=approver,
+            approval_refs=["approval:implementation"],
+            approver_principal_id=approver_principal_id,
+        )
+
+    def sandbox(self, implementation: Mapping[str, Any] | None = None, **kwargs: Any) -> dict[str, Any]:
+        selected = self.approved if implementation is None else implementation
+        revision = (
+            selected.get("revision_contract")
+            if isinstance(selected.get("revision_contract"), Mapping)
+            else {}
+        )
+        args = {
+            "branch": str(revision.get("branch") or "cursor/admin-fix"),
+            "baseline_ref": str(revision.get("baseline_ref") or "base@a"),
+            "candidate_ref": str(revision.get("candidate_ref") or "cursor/admin-fix@b"),
+        }
+        args.update(kwargs)
+        return build_builder_sandbox_request(
+            self.snapshot,
+            selected,
+            **args,
+        )
+
+    def chain_for(self, relative: str) -> dict[str, Any]:
+        diagnostic = self._diagnostic(relative)
+        package = self._package(changed=[relative])
+        correction = build_correction_plan(self.snapshot, diagnostic, package)
+        hypothesis = str(correction["hypotheses"][0]["label"])
+        test_id = str(correction["test_candidates"][0])
+        gate = evaluate_evidence_promotion(
+            correction,
+            hypothesis_label=hypothesis,
+            test_id=test_id,
+            before_state="FAIL",
+            after_state="PASS",
+            changed_files=[relative],
+            evidence_refs=["run:before", "run:after"],
+            intervention_summary="Mudanca minima no arquivo citado.",
+            scope_preserved=True,
+            snapshot_digest=self.snapshot["snapshot_digest"],
+            diagnostic_id=diagnostic["diagnostic_id"],
+        )
+        confirmed = confirm_root_cause_human_review(
+            correction,
+            gate,
+            approved=True,
+            reviewer_actor="root-cause-reviewer",
+            review_evidence_refs=["review:cause"],
+        )
+        envelope = build_implementation_envelope(self.snapshot, package, confirmed)
+        ready = self._ready(envelope, "builder-a", "reviewer-b", "breaker-c", "Reverter a mudanca logica.")
+        approved = self._approve(ready, "human-approver", approver_principal_id="prn_approver1")
+        request = build_builder_sandbox_request(
+            self.snapshot,
+            approved,
+            branch="cursor/admin-fix",
+            baseline_ref="base@a",
+            candidate_ref="cursor/admin-fix@b",
+        )
+        return {"envelope": envelope, "approved": approved, "request": request}
+
+
+def _lineage(world: _World) -> list[dict[str, str]]:
+    findings = []
+    other_snapshot = deepcopy(world.snapshot)
+    other_snapshot["snapshot_digest"] = "REPO-CROSSED-SNAPSHOT"
+    findings.append(_blocked(
+        "lineage.crossed_snapshot",
+        "atlasquant_aion_developer_correction",
+        "Diagnostico e pacote de outro snapshot nao formam plano de correcao.",
+        lambda: build_correction_plan(other_snapshot, world.diagnostic, world.package),
+    ))
+    findings.append(_blocked(
+        "lineage.evidence_snapshot_mismatch",
+        "atlasquant_aion_developer_evidence_gate",
+        "Evidence gate rejeita snapshot digest diferente da correcao.",
+        lambda: evaluate_evidence_promotion(
+            world.correction,
+            hypothesis_label=world.hypothesis,
+            test_id=world.test_id,
+            before_state="FAIL",
+            after_state="PASS",
+            changed_files=["atlasquant_aion_admin.py"],
+            evidence_refs=["run:before", "run:after"],
+            intervention_summary="Mudanca minima.",
+            scope_preserved=True,
+            snapshot_digest="REPO-STALE",
+            diagnostic_id=world.diagnostic["diagnostic_id"],
+        ),
+    ))
+    findings.append(_blocked(
+        "lineage.evidence_diagnostic_mismatch",
+        "atlasquant_aion_developer_evidence_gate",
+        "Evidence gate rejeita diagnostic_id de outro envelope.",
+        lambda: evaluate_evidence_promotion(
+            world.correction,
+            hypothesis_label=world.hypothesis,
+            test_id=world.test_id,
+            before_state="FAIL",
+            after_state="PASS",
+            changed_files=["atlasquant_aion_admin.py"],
+            evidence_refs=["run:before", "run:after"],
+            intervention_summary="Mudanca minima.",
+            scope_preserved=True,
+            snapshot_digest=world.snapshot["snapshot_digest"],
+            diagnostic_id="DEVFAIL-OTHER",
+        ),
+    ))
+    other_package = deepcopy(world.package)
+    other_package["package_id"] = "DEVPACK-OTHER"
+    findings.append(_blocked(
+        "lineage.implementation_package_mismatch",
+        "atlasquant_aion_developer_implementation",
+        "Envelope de implementacao rejeita correcao ligada a outro pacote.",
+        lambda: build_implementation_envelope(world.snapshot, other_package, world.confirmed),
+    ))
+    other_impl = deepcopy(world.approved)
+    other_impl["lineage"] = dict(other_impl["lineage"])
+    other_impl["lineage"]["snapshot_digest"] = "REPO-OTHER"
+    findings.append(_blocked(
+        "lineage.builder_digest_mismatch",
+        "atlasquant_aion_developer_builder_sandbox",
+        "Builder request rejeita snapshot digest diferente da autorizacao.",
+        lambda: build_builder_sandbox_request(
+            world.snapshot,
+            other_impl,
+            branch="cursor/admin-fix",
+            baseline_ref="base@a",
+            candidate_ref="cursor/admin-fix@c",
+        ),
+    ))
+    replay_correction = deepcopy(world.correction)
+    replay_correction["correction_id"] = "DEVCORR-OTHER"
+    findings.append(_blocked(
+        "replay.gate_other_correction",
+        "atlasquant_aion_developer_evidence_gate",
+        "Gate de uma correcao nao confirma outra correcao.",
+        lambda: confirm_root_cause_human_review(
+            replay_correction,
+            world.gate,
+            approved=True,
+            reviewer_actor="root-cause-reviewer",
+            review_evidence_refs=["review:cause"],
+        ),
+    ))
+
+    expanded = deepcopy(world.correction)
+    expanded["target_files"] = ["other_mod.py", "atlasquant_aion_admin.py"]
+    status, confirmed = _invoke(lambda: confirm_root_cause_human_review(
+        expanded,
+        world.gate,
+        approved=True,
+        reviewer_actor="root-cause-reviewer",
+        review_evidence_refs=["review:cause"],
+    ))
+    reached_ready = False
+    if status == "ACCEPT" and isinstance(confirmed, Mapping):
+        status2, envelope = _invoke(lambda: build_implementation_envelope(
+            world.snapshot, world.package, confirmed,
+        ))
+        if status2 == "ACCEPT" and isinstance(envelope, Mapping):
+            files = list((envelope.get("scope") or {}).get("source_files") or [])
+            reached_ready = "other_mod.py" in files
+    findings.append(_finding(
+        "replay.gate_not_bound_to_targets",
+        "atlasquant_aion_developer_evidence_gate",
+        "O gate nao amarra a lista de alvos. Uma copia da correcao com target_files ampliado reutiliza o mesmo gate e o envelope passa a incluir other_mod.py."
+        if reached_ready else
+        "O gate permanece amarrado aos alvos avaliados.",
+        "GAP" if reached_ready else "BLOCKED_BY_DESIGN",
+        "HIGH" if reached_ready else "",
+    ))
+
+    stale = deepcopy(world.snapshot)
+    stale["files"] = list(stale["files"]) + [{
+        "path": "injected.py",
+        "category": "MODULE",
+        "risk_tags": [],
+    }]
+    mutated = deepcopy(world.approved)
+    mutated["scope"] = deepcopy(mutated["scope"])
+    mutated["scope"]["editable_files"] = list(mutated["scope"]["editable_files"]) + ["injected.py"]
+    mutated["scope"]["source_files"] = list(mutated["scope"]["source_files"]) + ["injected.py"]
+    status, request = _invoke(lambda: build_builder_sandbox_request(
+        stale,
+        mutated,
+        branch="cursor/admin-fix",
+        baseline_ref="base@a",
+        candidate_ref="cursor/admin-fix@c",
+        requested_files=["atlasquant_aion_admin.py", "injected.py"],
+    ))
+    accepted = (
+        status == "ACCEPT"
+        and isinstance(request, Mapping)
+        and request.get("state") == "READY_FOR_BUILDER_SANDBOX"
+        and "injected.py" in list((request.get("scope") or {}).get("requested_files") or [])
+    )
+    findings.append(_finding(
+        "lineage.stale_snapshot_after_authorization",
+        "atlasquant_aion_developer_builder_sandbox",
+        "O digest do snapshot nao e recalculado. Arquivo injetado depois da autorizacao entra no request READY."
+        if accepted else
+        "Snapshot alterado depois da autorizacao nao entra no request.",
+        "GAP" if accepted else "BLOCKED_BY_DESIGN",
+        "HIGH" if accepted else "",
+    ))
+    return findings
+
+
+def _scope(world: _World) -> list[dict[str, str]]:
+    findings = [
+        _blocked(
+            "scope.outside_editable",
+            "atlasquant_aion_developer_builder_sandbox",
+            "Arquivo fora da lista editavel nao entra no builder request.",
+            lambda: world.sandbox(requested_files=["atlasquant_aion_admin.py", "other_mod.py"]),
+        ),
+        _blocked(
+            "scope.unknown_path",
+            "atlasquant_aion_developer_builder_sandbox",
+            "Arquivo inexistente no snapshot e rejeitado pelo builder.",
+            lambda: world.sandbox(requested_files=["atlasquant_aion_admin.py", "missing.py"]),
+        ),
+        _blocked(
+            "scope.traversal_path",
+            "atlasquant_aion_developer_builder_sandbox",
+            "Caminho com ../ e rejeitado pelo builder.",
+            lambda: world.sandbox(requested_files=["../etc/passwd"]),
+        ),
+        _blocked(
+            "scope.absolute_path",
+            "atlasquant_aion_developer_builder_sandbox",
+            "Caminho absoluto e rejeitado pelo builder.",
+            lambda: world.sandbox(requested_files=["/etc/passwd"]),
+        ),
+        _blocked(
+            "files.new_path",
+            "atlasquant_aion_developer_builder_sandbox",
+            "Arquivo novo fora do snapshot e rejeitado pelo builder.",
+            lambda: world.sandbox(requested_files=["brand_new.py"]),
+        ),
+    ]
+    plan = build_development_plan(
+        "ampliar",
+        world.snapshot,
+        branch="cursor/admin-fix",
+        baseline_ref="base@a",
+        changed_paths=["../etc/passwd", "missing.py", "/tmp/outside.py"],
+    )
+    leaked = [path for path in plan["impacted_files"] if path in {"../etc/passwd", "missing.py", "/tmp/outside.py"}]
+    findings.append(_finding(
+        "scope.plan_records_outside_snapshot",
+        "atlasquant_aion_developer_intelligence",
+        "O plano registra caminhos fora do snapshot: " + ", ".join(leaked) + "."
+        if leaked else
+        "O plano recusa caminhos fora do snapshot.",
+        "GAP" if leaked else "BLOCKED_BY_DESIGN",
+        "MEDIUM" if leaked else "",
+    ))
+    package = world._package(changed=["atlasquant_aion_admin.py", "../etc/passwd"])
+    diagnostic = world._diagnostic("atlasquant_aion_admin.py")
+    correction = build_correction_plan(world.snapshot, diagnostic, package)
+    kept = "../etc/passwd" in list(correction.get("target_files") or [])
+    findings.append(_finding(
+        "scope.correction_excludes_unknown",
+        "atlasquant_aion_developer_correction",
+        "O plano de correcao exclui caminho desconhecido do snapshot."
+        if not kept else
+        "O plano de correcao manteve caminho fora do snapshot.",
+        "GAP" if kept else "BLOCKED_BY_DESIGN",
+        "HIGH" if kept else "",
+    ))
+    mutated = deepcopy(world.approved)
+    mutated["scope"] = deepcopy(mutated["scope"])
+    mutated["scope"]["editable_files"] = list(mutated["scope"]["editable_files"]) + ["other_mod.py"]
+    mutated["scope"]["source_files"] = list(mutated["scope"]["source_files"]) + ["other_mod.py"]
+    status, request = _invoke(lambda: build_builder_sandbox_request(
+        world.snapshot,
+        mutated,
+        branch="cursor/admin-fix",
+        baseline_ref="base@a",
+        candidate_ref="cursor/admin-fix@c",
+        requested_files=["atlasquant_aion_admin.py", "other_mod.py"],
+    ))
+    expanded = (
+        status == "ACCEPT"
+        and isinstance(request, Mapping)
+        and request.get("state") == "READY_FOR_BUILDER_SANDBOX"
+        and "other_mod.py" in list((request.get("scope") or {}).get("requested_files") or [])
+    )
+    findings.append(_finding(
+        "scope.post_authorization_expansion",
+        "atlasquant_aion_developer_builder_sandbox",
+        "Depois da autorizacao, ampliar editable_files inclui other_mod.py em request READY."
+        if expanded else
+        "Ampliacao de escopo depois da autorizacao e rejeitada.",
+        "GAP" if expanded else "BLOCKED_BY_DESIGN",
+        "HIGH" if expanded else "",
+    ))
+    outside = evaluate_evidence_promotion(
+        world.correction,
+        hypothesis_label=world.hypothesis,
+        test_id=world.test_id,
+        before_state="FAIL",
+        after_state="PASS",
+        changed_files=["atlasquant_aion_admin.py", "not-in-scope.py"],
+        evidence_refs=["run:before", "run:after"],
+        intervention_summary="Tentativa de ampliar.",
+        scope_preserved=True,
+        snapshot_digest=world.snapshot["snapshot_digest"],
+        diagnostic_id=world.diagnostic["diagnostic_id"],
+    )
+    blocked_outside = outside.get("state") == "INSUFFICIENT_EVIDENCE"
+    findings.append(_finding(
+        "scope.evidence_outside_files",
+        "atlasquant_aion_developer_evidence_gate",
+        "Evidence gate nao promove causa quando ha arquivo fora do escopo."
+        if blocked_outside else
+        "Evidence gate promove causa com arquivo fora do escopo.",
+        "BLOCKED_BY_DESIGN" if blocked_outside else "GAP",
+        "" if blocked_outside else "HIGH",
+    ))
+    return findings
+
+
+def _branches(world: _World) -> list[dict[str, str]]:
+    findings = []
+    exact = [
+        "main", "MAIN", " main ", "master", "MASTER", "prod", "PROD",
+        "production", "Production", "live", "LIVE", "main\x00",
+    ]
+    accepted_exact = []
+    for branch in exact:
+        status, _result = _invoke(lambda branch=branch: world.sandbox(
+            branch=branch,
+            candidate_ref="cursor/admin-fix@c",
+        ))
+        if status == "ACCEPT":
+            accepted_exact.append(branch.replace("\x00", "\\x00"))
+    findings.append(_finding(
+        "branch.exact_forbidden",
+        "atlasquant_aion_developer_builder_sandbox",
+        "Variacoes exatas de main, master, prod, production e live sao rejeitadas."
+        if not accepted_exact else
+        "Branches proibidas aceitas: " + ", ".join(accepted_exact) + ".",
+        "BLOCKED_BY_DESIGN" if not accepted_exact else "GAP",
+        "" if not accepted_exact else "CRITICAL",
+    ))
+    refs = ["refs/heads/main", "refs/heads/MAIN", "refs/heads/master"]
+    accepted_refs = []
+    for branch in refs:
+        status, _result = _invoke(lambda branch=branch: world.sandbox(
+            branch=branch,
+            candidate_ref="cursor/admin-fix@c",
+        ))
+        if status == "ACCEPT":
+            accepted_refs.append(branch)
+    findings.append(_finding(
+        "branch.refs_heads_main_master",
+        "atlasquant_aion_developer_builder_sandbox",
+        "refs/heads/main e refs/heads/master sao rejeitados."
+        if not accepted_refs else
+        "Refs de main/master aceitas: " + ", ".join(accepted_refs) + ".",
+        "BLOCKED_BY_DESIGN" if not accepted_refs else "GAP",
+        "" if not accepted_refs else "CRITICAL",
+    ))
+    aliases = [
+        "refs/heads/production", "refs/heads/prod", "refs/heads/live", "origin/main",
+    ]
+    accepted_aliases = []
+    for branch in aliases:
+        status, result = _invoke(lambda branch=branch: world.sandbox(
+            branch=branch,
+            candidate_ref="cursor/admin-fix@c",
+        ))
+        if status == "ACCEPT" and isinstance(result, Mapping) and result.get("state") == "READY_FOR_BUILDER_SANDBOX":
+            accepted_aliases.append(branch)
+    findings.append(_finding(
+        "branch.equivalent_refs",
+        "atlasquant_aion_developer_builder_sandbox",
+        "Refs equivalentes de producao/main aceitas: " + ", ".join(accepted_aliases) + "."
+        if accepted_aliases else
+        "Refs equivalentes de producao/main sao rejeitadas.",
+        "GAP" if accepted_aliases else "BLOCKED_BY_DESIGN",
+        "HIGH" if accepted_aliases else "",
+    ))
+    prefixes = ["main/hotfix", "production/hotfix"]
+    accepted_prefixes = []
+    for branch in prefixes:
+        status, result = _invoke(lambda branch=branch: world.sandbox(
+            branch=branch,
+            candidate_ref="cursor/admin-fix@c",
+        ))
+        if status == "ACCEPT" and isinstance(result, Mapping) and result.get("state") == "READY_FOR_BUILDER_SANDBOX":
+            accepted_prefixes.append(branch)
+    findings.append(_finding(
+        "branch.prefix_bypass",
+        "atlasquant_aion_developer_builder_sandbox",
+        "Prefixos de branch protegida aceitos: " + ", ".join(accepted_prefixes) + "."
+        if accepted_prefixes else
+        "Prefixos main/ e production/ sao rejeitados.",
+        "GAP" if accepted_prefixes else "BLOCKED_BY_DESIGN",
+        "HIGH" if accepted_prefixes else "",
+    ))
+    status, _result = _invoke(lambda: world.sandbox(branch="ｍain", candidate_ref="cursor/admin-fix@c"))
+    findings.append(_finding(
+        "branch.fullwidth_rejected",
+        "atlasquant_aion_developer_builder_sandbox",
+        "Branch com caractere fullwidth nao passa na validacao."
+        if status == "REJECT" else
+        "Branch fullwidth foi aceita.",
+        "BLOCKED_BY_DESIGN" if status == "REJECT" else "GAP",
+        "" if status == "REJECT" else "HIGH",
+    ))
+    package_status, _package = _invoke(lambda: world._package(branch="main"))
+    engine_status, _engine = _invoke(lambda: new_development_workflow(
+        "pedido",
+        branch="MAIN",
+        baseline_ref="base@a",
+        requested_by="auditor",
+        created_at=_CREATED,
+    ))
+    early = package_status == "ACCEPT" or engine_status == "ACCEPT"
+    findings.append(_finding(
+        "branch.early_layers_accept_main",
+        "atlasquant_aion_developer_package",
+        "Pacote e engine aceitam branch main/MAIN. O builder rejeita a forma exata, mas o registro anterior nao."
+        if early else
+        "Pacote e engine rejeitam branch main.",
+        "GAP" if early else "BLOCKED_BY_DESIGN",
+        "MEDIUM" if early else "",
+    ))
+    return findings
+
+
+def _candidates(world: _World) -> list[dict[str, str]]:
+    findings = []
+    unbound = []
+    for candidate in ("main", "main@c", "cursor/other@c", "CURSOR/ADMIN-FIX@c"):
+        status, result = _invoke(lambda candidate=candidate: world.sandbox(candidate_ref=candidate))
+        if status == "ACCEPT" and isinstance(result, Mapping) and result.get("state") == "READY_FOR_BUILDER_SANDBOX":
+            unbound.append(candidate)
+    findings.append(_finding(
+        "candidate.unbound_ref",
+        "atlasquant_aion_developer_builder_sandbox",
+        "candidate_ref nao precisa pertencer a branch isolada. Aceitos: " + ", ".join(unbound) + "."
+        if unbound else
+        "candidate_ref fora da branch isolada e rejeitado.",
+        "GAP" if unbound else "BLOCKED_BY_DESIGN",
+        "HIGH" if unbound else "",
+    ))
+    findings.append(_blocked(
+        "candidate.baseline_equal",
+        "atlasquant_aion_developer_builder_sandbox",
+        "baseline_ref igual a candidate_ref e rejeitado.",
+        lambda: world.sandbox(baseline_ref="same-ref", candidate_ref="same-ref"),
+    ))
+    findings.append(_blocked(
+        "candidate.baseline_whitespace_equal",
+        "atlasquant_aion_developer_builder_sandbox",
+        "baseline e candidate iguais apos normalizar espacos sao rejeitados.",
+        lambda: world.sandbox(baseline_ref=" same-ref ", candidate_ref="same-ref"),
+    ))
+    status, result = _invoke(lambda: world.sandbox(baseline_ref="SameRef", candidate_ref="sameref"))
+    case_accepted = status == "ACCEPT" and isinstance(result, Mapping) and result.get("state") == "READY_FOR_BUILDER_SANDBOX"
+    findings.append(_finding(
+        "candidate.baseline_casefold_equal",
+        "atlasquant_aion_developer_builder_sandbox",
+        "baseline_ref e candidate_ref que so diferem na caixa sao aceitos como distintos."
+        if case_accepted else
+        "baseline e candidate iguais por caixa sao rejeitados.",
+        "GAP" if case_accepted else "BLOCKED_BY_DESIGN",
+        "HIGH" if case_accepted else "",
+    ))
+    return findings
+
+
+def _identities(world: _World) -> list[dict[str, str]]:
+    findings = []
+
+    def _reach(builder: str, reviewer: str, breaker: str) -> str:
+        status, ready = _invoke(lambda: world._ready(
+            world.envelope, builder, reviewer, breaker, "Reverter a mudanca logica.",
+            bind_principals=False,
+        ))
+        if status == "REJECT":
+            return "REJECT"
+        status, approved = _invoke(lambda: world._approve(ready, "human-approver"))
+        if status == "REJECT":
+            return "REJECT"
+        status, request = _invoke(lambda: world.sandbox(approved))
+        if status == "ACCEPT" and isinstance(request, Mapping) and request.get("state") == "READY_FOR_BUILDER_SANDBOX":
+            return "READY"
+        return "REJECT"
+
+    same = _reach("same-actor", "same-actor", "same-actor")
+    findings.append(_finding(
+        "identity.exact_duplicate",
+        "atlasquant_aion_developer_implementation",
+        "Builder, reviewer e breaker identicos sao rejeitados."
+        if same == "REJECT" else
+        "Atores identicos chegaram ao builder.",
+        "BLOCKED_BY_DESIGN" if same == "REJECT" else "GAP",
+        "" if same == "REJECT" else "CRITICAL",
+    ))
+    spaced = _reach("Alice", " Alice ", "Alice")
+    findings.append(_finding(
+        "identity.whitespace_duplicate",
+        "atlasquant_aion_developer_implementation",
+        "A mesma identidade com espacos extras e rejeitada."
+        if spaced == "REJECT" else
+        "Espacos extras contornam a independencia.",
+        "BLOCKED_BY_DESIGN" if spaced == "REJECT" else "GAP",
+        "" if spaced == "REJECT" else "HIGH",
+    ))
+    variants = (
+        ("identity.case_variants", "Alice", "alice", "ALICE", "Caixa diferente conta como tres atores."),
+        ("identity.unicode_nfkc", "ﬁle", "file", "other", "Ligatura NFKC conta como ator distinto de file."),
+        ("identity.fullwidth", "Ａlice", "Alice", "other", "Caractere fullwidth conta como ator distinto."),
+        ("identity.combining", "e\u0301", "é", "other", "Marca combinante conta como ator distinto da forma composta."),
+    )
+    for invariant_id, builder, reviewer, breaker, description in variants:
+        reached = _reach(builder, reviewer, breaker)
+        findings.append(_finding(
+            invariant_id,
+            "atlasquant_aion_developer_implementation",
+            description + " O request fica READY."
+            if reached == "READY" else
+            "A variacao de identidade foi rejeitada.",
+            "GAP" if reached == "READY" else "BLOCKED_BY_DESIGN",
+            "CRITICAL" if reached == "READY" else "",
+        ))
+    return findings
+
+
+def _authorization(world: _World) -> list[dict[str, str]]:
+    findings = [
+        _blocked(
+            "auth.approved_false",
+            "atlasquant_aion_developer_implementation",
+            "approved=False nao autoriza implementacao.",
+            lambda: approve_implementation_session(
+                world.ready, approved=False, approver_actor="human-approver", approval_refs=["approval:1"],
+            ),
+        ),
+        _blocked(
+            "auth.approved_string",
+            "atlasquant_aion_developer_implementation",
+            "approved='true' nao autoriza implementacao.",
+            lambda: approve_implementation_session(
+                world.ready, approved="true", approver_actor="human-approver", approval_refs=["approval:1"],
+            ),
+        ),
+        _blocked(
+            "auth.missing",
+            "atlasquant_aion_developer_builder_sandbox",
+            "Builder request sem bloco de autorizacao e rejeitado.",
+            lambda: world.sandbox({k: v for k, v in world.approved.items() if k != "authorization"}),
+        ),
+    ]
+    forged = deepcopy(world.approved)
+    forged["authorization"] = dict(forged["authorization"])
+    forged["authorization"]["human_approved"] = False
+    findings.append(_blocked(
+        "auth.human_flag_false",
+        "atlasquant_aion_developer_builder_sandbox",
+        "human_approved falso no bloco de autorizacao e rejeitado.",
+        lambda: world.sandbox(forged),
+    ))
+    replay = deepcopy(world.approved)
+    replay["envelope_id"] = "DEVIMPL-OTHERENVELOPE01"
+    replay["lineage"] = dict(replay["lineage"])
+    replay["lineage"]["correction_id"] = "DEVCORR-OTHER"
+    status, request = _invoke(lambda: world.sandbox(replay))
+    replayed = status == "ACCEPT" and isinstance(request, Mapping) and request.get("state") == "READY_FOR_BUILDER_SANDBOX"
+    findings.append(_finding(
+        "auth.replay_other_envelope",
+        "atlasquant_aion_developer_builder_sandbox",
+        "O bloco de autorizacao de um envelope e aceito em outro envelope com o mesmo snapshot."
+        if replayed else
+        "Autorizacao de outro envelope e rejeitada.",
+        "GAP" if replayed else "BLOCKED_BY_DESIGN",
+        "HIGH" if replayed else "",
+    ))
+    stolen = deepcopy(world.approved)
+    stolen["authorization"] = dict(stolen["authorization"])
+    stolen["authorization"]["authorization_id"] = "DEVAUTH-STOLENID012345"
+    stolen["envelope_id"] = "DEVIMPL-DIFFERENTENVELOPE"
+    status, request = _invoke(lambda: world.sandbox(stolen))
+    stolen_ok = (
+        status == "ACCEPT"
+        and isinstance(request, Mapping)
+        and request.get("state") == "READY_FOR_BUILDER_SANDBOX"
+        and str((request.get("lineage") or {}).get("implementation_authorization_id") or "") == "DEVAUTH-STOLENID012345"
+    )
+    findings.append(_finding(
+        "auth.stolen_authorization_id",
+        "atlasquant_aion_developer_builder_sandbox",
+        "authorization_id nao e recalculado. Um id substituido segue para o request READY."
+        if stolen_ok else
+        "authorization_id substituto e rejeitado.",
+        "GAP" if stolen_ok else "BLOCKED_BY_DESIGN",
+        "HIGH" if stolen_ok else "",
+    ))
+    status, approved = _invoke(lambda: world._approve(
+        world.ready, "builder-a", approver_principal_id="prn_builder01",
+    ))
+    self_approved = (
+        status == "ACCEPT"
+        and isinstance(approved, Mapping)
+        and approved.get("implementation_authorized") is True
+        and str((approved.get("authorization") or {}).get("approver_actor") or "") == "builder-a"
+    )
+    findings.append(_finding(
+        "auth.approver_is_builder",
+        "atlasquant_aion_developer_implementation",
+        "O aprovador humano pode ser o proprio builder."
+        if self_approved else
+        "O aprovador humano nao pode ser o builder.",
+        "GAP" if self_approved else "BLOCKED_BY_DESIGN",
+        "MEDIUM" if self_approved else "",
+    ))
+    return findings
+
+
+def _rollback_and_tests(world: _World) -> list[dict[str, str]]:
+    findings = [
+        _blocked(
+            "rollback.empty",
+            "atlasquant_aion_developer_implementation",
+            "Rollback vazio ou so com espaco e rejeitado.",
+            lambda: world._ready(world.envelope, "builder-a", "reviewer-b", "breaker-c", "   "),
+        ),
+    ]
+    first = "Reverter a mudanca logica."
+    status_a, _ready_a = _invoke(lambda: world._ready(
+        world.envelope, "builder-a", "reviewer-b", "breaker-c", first,
+    ))
+    other_envelope = deepcopy(world.envelope)
+    other_envelope["envelope_id"] = "DEVIMPL-SECOND"
+    status_b, _ready_b = _invoke(lambda: world._ready(
+        other_envelope, "builder-a", "reviewer-b", "breaker-c", first,
+    ))
+    reused = status_a == "ACCEPT" and status_b == "ACCEPT"
+    findings.append(_finding(
+        "rollback.reused_text",
+        "atlasquant_aion_developer_implementation",
+        "O mesmo texto de rollback e aceito em outro envelope, sem vinculo com o id da mudanca."
+        if reused else
+        "Rollback reutilizado em outro envelope e rejeitado.",
+        "GAP" if reused else "BLOCKED_BY_DESIGN",
+        "MEDIUM" if reused else "",
+    ))
+    weak = deepcopy(world.ready)
+    weak["test_contract"] = deepcopy(weak["test_contract"])
+    weak["test_contract"]["candidate_tests"] = []
+    weak["test_contract"]["test_deletion_allowed"] = True
+    weak["test_contract"]["test_weakening_allowed"] = True
+    status, approved = _invoke(lambda: world._approve(
+        weak, "human-approver", approver_principal_id="prn_approver1",
+    ))
+    weakened = (
+        status == "ACCEPT"
+        and isinstance(approved, Mapping)
+        and approved.get("implementation_authorized") is True
+        and not list((approved.get("test_contract") or {}).get("candidate_tests") or [])
+    )
+    findings.append(_finding(
+        "tests.approval_accepts_weakening",
+        "atlasquant_aion_developer_implementation",
+        "A aprovacao humana aceita envelope com testes removidos e test_deletion_allowed verdadeiro."
+        if weakened else
+        "A aprovacao rejeita remocao ou afrouxamento de testes.",
+        "GAP" if weakened else "BLOCKED_BY_DESIGN",
+        "HIGH" if weakened else "",
+    ))
+    if not weakened:
+        contained = True
+        builder_detail = "A aprovacao ja rejeita o envelope sem testes."
+    else:
+        status, request = _invoke(lambda: world.sandbox(approved))
+        contained = (
+            status == "ACCEPT"
+            and isinstance(request, Mapping)
+            and request.get("state") == "BLOCKED"
+            and request.get("test_contract", {}).get("test_deletion_allowed") is False
+        )
+        builder_detail = (
+            "O builder bloqueia request sem testes candidatos e forca test_deletion_allowed falso."
+            if contained else
+            "O builder nao contem a remocao de testes autorizada antes."
+        )
+    findings.append(_finding(
+        "tests.builder_blocks_deleted_tests",
+        "atlasquant_aion_developer_builder_sandbox",
+        builder_detail,
+        "BLOCKED_BY_DESIGN" if contained else "GAP",
+        "" if contained else "HIGH",
+    ))
+    return findings
+
+
+def _workflow_release_authority(world: _World) -> list[dict[str, str]]:
+    findings = []
+
+    workflow_status, workflow = _invoke(lambda: world.chain_for(".github/workflows/quality-tests.yml"))
+    workflow_in_envelope = False
+    workflow_request_blocked = workflow_status == "REJECT"
+    if workflow_status == "ACCEPT" and isinstance(workflow, Mapping):
+        editable = list((workflow["envelope"].get("scope") or {}).get("editable_files") or [])
+        workflow_in_envelope = ".github/workflows/quality-tests.yml" in editable
+        request = workflow["request"]
+        workflow_request_blocked = request.get("state") == "BLOCKED"
+
+    findings.append(_finding(
+        "workflow.envelope_includes_workflow",
+        "atlasquant_aion_developer_implementation",
+        "O envelope autorizado inclui o workflow antes de bloqueio posterior."
+        if workflow_in_envelope else
+        "Workflow e bloqueado antes de entrar em escopo editavel autorizado.",
+        "GAP" if workflow_in_envelope else "BLOCKED_BY_DESIGN",
+        "MEDIUM" if workflow_in_envelope else "",
+    ))
+    findings.append(_finding(
+        "workflow.builder_blocks_workflow",
+        "atlasquant_aion_developer_builder_sandbox",
+        "Workflow e contido pelo contrato antes ou durante o Builder request."
+        if workflow_request_blocked else
+        "Workflow chegou a request READY.",
+        "BLOCKED_BY_DESIGN" if workflow_request_blocked else "GAP",
+        "" if workflow_request_blocked else "HIGH",
+    ))
+
+    release_status, release = _invoke(lambda: world.chain_for("docs/release/NOTES.md"))
+    release_ready = False
+    if release_status == "ACCEPT" and isinstance(release, Mapping):
+        release_ready = (
+            release["request"].get("state") == "READY_FOR_BUILDER_SANDBOX"
+            and "docs/release/NOTES.md" in list((release["request"].get("scope") or {}).get("requested_files") or [])
+        )
+    findings.append(_finding(
+        "release.notes_ready",
+        "atlasquant_aion_developer_builder_sandbox",
+        "Arquivo docs/release entra em request READY."
+        if release_ready else
+        "Superficie docs/release e bloqueada antes de ficar READY.",
+        "GAP" if release_ready else "BLOCKED_BY_DESIGN",
+        "HIGH" if release_ready else "",
+    ))
+
+    legitimate = world.sandbox()
+    flags_closed = all(legitimate.get(key) is False for key in (
+        "execution_authorized",
+        "automatic_commit",
+        "automatic_merge",
+        "automatic_deploy",
+        "production_change_allowed",
+        "real_trading_enabled",
+        "tool_output_is_authority",
+        "writes_files",
+        "network_called",
+        "subprocess_called",
+    ))
+    branch_closed = all(legitimate["branch_contract"].get(key) is False for key in (
+        "main_branch_allowed", "force_push_allowed", "history_rewrite_allowed",
+    ))
+    file_closed = all(legitimate["scope"].get(key) is False for key in (
+        "new_file_allowed", "delete_file_allowed", "rename_file_allowed", "scope_expansion_allowed",
+    ))
+    findings.append(_finding(
+        "authority.legitimate_flags_closed",
+        "atlasquant_aion_developer_builder_sandbox",
+        "Request legitimo mantem execucao, merge, deploy, producao, trading, force-push e new/delete/rename fechados."
+        if flags_closed and branch_closed and file_closed else
+        "Request legitimo amplia alguma autoridade.",
+        "PASS" if flags_closed and branch_closed and file_closed else "GAP",
+        "" if flags_closed and branch_closed and file_closed else "CRITICAL",
+    ))
+    for invariant_id, key in (
+        ("authority.forged_merge", "merge_main_allowed"),
+        ("authority.forged_deploy", "deploy_allowed"),
+        ("authority.forged_trading", "real_trading_allowed"),
+    ):
+        forged = deepcopy(world.approved)
+        forged["authorization"] = dict(forged["authorization"])
+        forged["authorization"][key] = True
+        findings.append(_blocked(
+            invariant_id,
+            "atlasquant_aion_developer_builder_sandbox",
+            f"Autorizacao com {key}=True e rejeitada.",
+            lambda forged=forged: world.sandbox(forged),
+        ))
+    return findings
+
+
+def _secrets_and_limits(world: _World) -> list[dict[str, str]]:
+    findings = []
+    secret_package = build_developer_package(
+        f"password={_SECRET_SENTINEL} token={_TOKEN_SENTINEL}",
+        world.snapshot,
+        branch="cursor/admin-fix",
+        baseline_ref="base@a",
+        candidate_ref="cursor/admin-fix@b",
+        created_at=_CREATED,
+    )
+    package_text = json.dumps(secret_package, ensure_ascii=False, default=str)
+    diagnostic_text = json.dumps(world.diagnostic, ensure_ascii=False, default=str)
+    package_clean = _SECRET_SENTINEL not in package_text and _TOKEN_SENTINEL not in package_text
+    diagnostic_clean = (
+        _SECRET_SENTINEL not in diagnostic_text
+        and _TOKEN_SENTINEL not in diagnostic_text
+        and world.diagnostic.get("raw_log_included") is False
+    )
+    findings.append(_finding(
+        "secrets.package_redacts",
+        "atlasquant_aion_developer_package",
+        "Pedido do pacote nao conserva o sentinela de senha ou token."
+        if package_clean else
+        "Pedido do pacote conservou material sensivel.",
+        "PASS" if package_clean else "GAP",
+        "" if package_clean else "CRITICAL",
+    ))
+    findings.append(_finding(
+        "secrets.diagnostic_redacts",
+        "atlasquant_aion_developer_diagnostics",
+        "Diagnostico redige o log e nao devolve o texto bruto."
+        if diagnostic_clean else
+        "Diagnostico conservou material sensivel.",
+        "PASS" if diagnostic_clean else "GAP",
+        "" if diagnostic_clean else "CRITICAL",
+    ))
+    paths = {str(row.get("path") or "") for row in world.snapshot["files"]}
+    dotenv_hidden = ".env" not in paths and int(world.snapshot.get("skipped_sensitive") or 0) >= 1
+    findings.append(_finding(
+        "secrets.scan_skips_dotenv",
+        "atlasquant_aion_developer_intelligence",
+        "O scanner estrutural nao inclui .env no snapshot."
+        if dotenv_hidden else
+        "O scanner incluiu arquivo sensivel no snapshot.",
+        "BLOCKED_BY_DESIGN" if dotenv_hidden else "GAP",
+        "" if dotenv_hidden else "CRITICAL",
+    ))
+    symlink_hidden = "linked.py" not in paths and int(world.snapshot.get("skipped_symlink") or 0) >= 1
+    findings.append(_finding(
+        "path.symlink_skipped",
+        "atlasquant_aion_developer_intelligence",
+        "Symlink nao entra no snapshot."
+        if symlink_hidden else
+        "Symlink entrou no snapshot.",
+        "BLOCKED_BY_DESIGN" if symlink_hidden else "GAP",
+        "" if symlink_hidden else "HIGH",
+    ))
+    many = [f"bulk_{index}.py" for index in range(120)]
+    stale = deepcopy(world.snapshot)
+    stale["files"] = [{"path": path, "category": "MODULE", "risk_tags": []} for path in many]
+    mutated = deepcopy(world.approved)
+    mutated["scope"] = deepcopy(mutated["scope"])
+    mutated["scope"]["editable_files"] = list(many)
+    mutated["scope"]["source_files"] = list(many)
+    status, request = _invoke(lambda: build_builder_sandbox_request(
+        stale,
+        mutated,
+        branch="cursor/admin-fix",
+        baseline_ref="base@a",
+        candidate_ref="cursor/admin-fix@c",
+        requested_files=many,
+    ))
+    requested = list((request.get("scope") or {}).get("requested_files") or []) if isinstance(request, Mapping) else []
+    truncated_ready = (
+        status == "ACCEPT"
+        and isinstance(request, Mapping)
+        and request.get("state") == "READY_FOR_BUILDER_SANDBOX"
+        and len(requested) < len(many)
+    )
+    findings.append(_finding(
+        "payload.excess_files_not_rejected",
+        "atlasquant_aion_developer_builder_sandbox",
+        f"Pedido com {len(many)} arquivos fica READY com {len(requested)} arquivos, sem rejeitar o excesso."
+        if truncated_ready else
+        "Pedido com arquivos em excesso e rejeitado.",
+        "GAP" if truncated_ready else "BLOCKED_BY_DESIGN",
+        "MEDIUM" if truncated_ready else "",
+    ))
+    huge = "cursor/" + ("a" * 5000)
+    status, request = _invoke(lambda: world.sandbox(branch=huge, candidate_ref=huge + "@c"))
+    stored = ""
+    if isinstance(request, Mapping):
+        stored = str((request.get("branch_contract") or {}).get("branch") or "")
+    bounded = status == "REJECT" or (status == "ACCEPT" and len(stored) <= 240)
+    findings.append(_finding(
+        "payload.huge_branch_bounded",
+        "atlasquant_aion_developer_builder_sandbox",
+        "Branch enorme nao ultrapassa 240 caracteres e nao e executada."
+        if bounded else
+        "Branch enorme foi armazenada acima do limite.",
+        "BLOCKED_BY_DESIGN" if bounded else "GAP",
+        "" if bounded else "MEDIUM",
+    ))
+    return findings
+
+
+def _residual_surface(world: _World) -> list[dict[str, str]]:
+    findings = []
+    pairs = (
+        ("Alice", "Alice\u200b"),
+        ("Alice", "Alice\ufeff"),
+        ("Alice", "Al\u00adice"),
+        ("builder", "bui\u200clder"),
+    )
+    distinct = [right for left, right in pairs if canonical_identity(left) != canonical_identity(right)]
+    findings.append(_finding(
+        "identity.format_characters",
+        "atlasquant_aion_developer_manifest",
+        "Caracteres de formato invisivel ainda separam atores: " + ", ".join(repr(item) for item in distinct) + "."
+        if distinct else
+        "Zero-width, BOM, hifen suave e ZWNJ nao criam ator independente.",
+        "GAP" if distinct else "BLOCKED_BY_DESIGN",
+        "CRITICAL" if distinct else "",
+    ))
+
+    nested = (
+        "refs/heads/refs/heads/main",
+        "refs/heads/refs/heads/production",
+        "heads/main",
+        "main.git",
+        "production.git",
+    )
+    accepted_branches = []
+    for branch in nested:
+        status, _result = _invoke(lambda branch=branch: build_developer_package(
+            "pedido",
+            world.snapshot,
+            branch=branch,
+            baseline_ref="base@a",
+            candidate_ref=f"{branch}@c",
+            created_at=_CREATED,
+        ))
+        if status == "ACCEPT":
+            accepted_branches.append(branch)
+    findings.append(_finding(
+        "branch.nested_refs_and_aliases",
+        "atlasquant_aion_developer_manifest",
+        "Aliases aninhados aceitos: " + ", ".join(accepted_branches) + "."
+        if accepted_branches else
+        "refs/heads repetido, heads/main e sufixo .git da familia protegida sao rejeitados.",
+        "GAP" if accepted_branches else "BLOCKED_BY_DESIGN",
+        "HIGH" if accepted_branches else "",
+    ))
+
+    release_paths = ("deployment/app.yaml", "scripts/deploy/go.sh", "docs/deployment/notes.md")
+    exposed = [path for path in release_paths if not release_sensitive_path(path)]
+    findings.append(_finding(
+        "release.deployment_and_deploy_scripts",
+        "atlasquant_aion_developer_manifest",
+        "Superficies de deploy ainda fora da politica: " + ", ".join(exposed) + "."
+        if exposed else
+        "deployment/, scripts/deploy/ e docs/deployment/ exigem revisao de release.",
+        "GAP" if exposed else "BLOCKED_BY_DESIGN",
+        "HIGH" if exposed else "",
+    ))
+
+    skip_marker = "@" + "unittest." + "skip" + "('bypass')"
+    disable_marker = "@" + "unittest." + "expected" + "Failure"
+    patch = (
+        "diff --git a/test_module.py b/test_module.py\n"
+        "--- a/test_module.py\n+++ b/test_module.py\n"
+        "@@ -1,2 +1,3 @@\n def test_guard():\n"
+        "+    " + skip_marker + "\n"
+        "+    " + disable_marker + "\n"
+        "     assert guard()\n"
+    )
+    request = structural_builder_sandbox_request(
+        branch="cursor/safe",
+        baseline_ref="base@a",
+        candidate_ref="cursor/safe@c",
+        requested_files=("test_module.py",),
+        candidate_tests=("test_module.py",),
+    )
+    preflight = _sealed_preflight(request)
+    status, validated = _invoke(lambda: validate_patch(
+        request, preflight, patch, baseline_ref="base@a", candidate_ref="cursor/safe@c",
+    ))
+    skip_blocked = (
+        status == "ACCEPT"
+        and isinstance(validated, Mapping)
+        and validated.get("state") == "BLOCKED"
+        and "TEST_DELETION_OR_WEAKENING_NOT_ALLOWED" in list(validated.get("blockers") or [])
+    )
+    findings.append(_finding(
+        "tests.added_skip_or_expected_failure",
+        "atlasquant_aion_developer_patch_validation",
+        "Patch que so adiciona skip ou marcador de falha esperada em teste fica BLOCKED."
+        if skip_blocked else
+        "Patch que adiciona skip ou marcador de falha esperada em teste nao fica BLOCKED.",
+        "BLOCKED_BY_DESIGN" if skip_blocked else "GAP",
+        "" if skip_blocked else "HIGH",
+    ))
+
+    weakened = deepcopy(world.ready)
+    weakened["test_contract"] = deepcopy(weakened["test_contract"])
+    weakened["test_contract"]["candidate_tests"] = []
+    weakened["test_contract"]["test_deletion_allowed"] = True
+    weakened["test_contract"]["test_weakening_allowed"] = True
+    weakened["envelope_manifest_id"] = implementation_base_manifest_id(weakened)
+    weakened["readiness_manifest_id"] = implementation_readiness_manifest_id(weakened)
+    status, approved = _invoke(lambda: approve_implementation_session(
+        weakened,
+        approved=True,
+        approver_actor="human-approver",
+        approval_refs=["approval:1"],
+    ))
+    authorized = (
+        status == "ACCEPT"
+        and isinstance(approved, Mapping)
+        and approved.get("implementation_authorized") is True
+    )
+    findings.append(_finding(
+        "tests.recomputed_manifest_still_blocks_weakening",
+        "atlasquant_aion_developer_implementation",
+        "Recalcular o manifesto nao autoriza remocao de testes nem test_deletion_allowed."
+        if not authorized else
+        "Recalcular o manifesto autorizou um envelope sem testes.",
+        "BLOCKED_BY_DESIGN" if not authorized else "GAP",
+        "" if not authorized else "HIGH",
+    ))
+    return findings
+
+
+def _sealed_runner_request(tests, gates=None):
+    return structural_builder_sandbox_request(
+        candidate_tests=list(tests),
+        mandatory_gates=list(gates) if gates is not None else list(REQUIRED_MANDATORY_GATES),
+        requested_files=("test_module.py",),
+    )
+
+
+def _sealed_preflight(builder):
+    return build_sandbox_preflight(
+        builder,
+        environment_kind="ISOLATED_WORKTREE",
+        environment_id="sandbox-001",
+        isolated_worktree=True,
+        repository_root_bound=True,
+        network_disabled=True,
+        secrets_mounted=False,
+        command_policy="ALLOWLIST_ONLY",
+    )
+
+
+def _sealed_patch(builder, preflight):
+    return canonical_patch_document(builder, preflight)
+
+
+def _runner_bundle(tests, gates=None):
+    builder = _sealed_runner_request(tests, gates)
+    preflight = _sealed_preflight(builder)
+    patch = _sealed_patch(builder, preflight)
+    attestation = attestation_for_documents(builder, preflight, patch)
+    runner = build_runner_contract(
+        builder,
+        preflight,
+        patch,
+        content_attestation=attestation,
+        human_patch_reviewed=True,
+        human_patch_reviewer="reviewer-1",
+        human_patch_review_refs=["review:patch:1"],
+    )
+    return runner, builder, preflight, patch, attestation
+
+
+def _runner_probe(tests, gates=None):
+    runner, _builder, _preflight, _patch, _attestation = _runner_bundle(tests, gates)
+    return runner
+
+
+def _state_closed(result: Any, blocker: str) -> bool:
+    return (
+        isinstance(result, Mapping)
+        and result.get("state") == "BLOCKED"
+        and blocker in list(result.get("blockers") or [])
+        and result.get("execution_authorized") is False
+    )
+
+
+def _patch_probe(patch: str):
+    request = structural_builder_sandbox_request(
+        branch="cursor/safe",
+        baseline_ref="main@a",
+        candidate_ref="cursor/safe@b",
+        requested_files=("module.py", "test_module.py"),
+        candidate_tests=("test_module.py",),
+    )
+    preflight = _sealed_preflight(request)
+    return validate_patch(
+        request,
+        preflight,
+        patch,
+        baseline_ref="main@a",
+        candidate_ref="cursor/safe@b",
+    )
+
+
+def _command_probe(**overrides):
+    policy_keys = (
+        "requested_environment",
+        "path_lookup_allowed",
+        "parent_environment_inheritance",
+        "absolute_executable_required",
+        "executable_digest_required",
+    )
+    policy_kwargs = {key: overrides.pop(key) for key in policy_keys if key in overrides}
+    pycache_prefix = overrides.pop("pycache_prefix", None)
+    drop_cache_policy = overrides.pop("drop_cache_policy", False)
+    runner = {
+        "schema": "ATLASQUANT_AION_DEVELOPER_RUNNER_CONTRACT_V1",
+        "runner_contract_id": "DEVRUN-1",
+        "state": "READY_FOR_RUNNER_DESIGN_REVIEW",
+        "resource_budget": {
+            "runtime_seconds": 900,
+            "memory_mb": 2048,
+            "output_bytes": 2_000_000,
+            "max_commands": 24,
+        },
+        "command_plan": [
+            {
+                "step": "COMPILE_CHANGED_SCOPE",
+                "executable": "python",
+                "argv": ["-m", "compileall", "-q", "<AUTHORIZED_CHANGED_SCOPE>"],
+                "shell": False,
+                "cwd": "<ISOLATED_WORKTREE>",
+                "network": False,
+                "writes_repo": False,
+                "writes_repository": False,
+                "may_write_ephemeral_cache": True,
+                "pycache_prefix": "<SANDBOX_EPHEMERAL_PYCACHE>",
+            },
+            {
+                "step": "RUN_TARGETED_TESTS",
+                "executable": "python",
+                "argv": ["-m", "unittest", "-q", "<APPROVED_TEST_TARGETS>"],
+                "shell": False,
+                "cwd": "<ISOLATED_WORKTREE>",
+                "network": False,
+                "writes_repo": False,
+            },
+            {
+                "step": "VERIFY_DIFF_CHECK",
+                "executable": "git",
+                "argv": ["diff", "--check"],
+                "shell": False,
+                "cwd": "<ISOLATED_WORKTREE>",
+                "network": False,
+                "writes_repo": False,
+            },
+        ],
+        "lineage": {
+            "builder_request_id": "DEVBUILD-FIXTURE",
+            "preflight_id": "DEVPREF-FIXTURE",
+            "patch_validation_id": "DEVPATCHVAL-1",
+            "patch_digest": "DEVPATCH-ABC",
+            "content_attestation_id": "DEVATT-FIXTURE000000",
+            "content_binding_structurally_bound": True,
+            "content_binding_independently_verified": False,
+        },
+        "review": {
+            "human_patch_reviewed": True,
+            "human_patch_reviewer": "reviewer-1",
+            "human_patch_review_refs": ["review:patch:1"],
+        },
+        "tests": {
+            "targets": ["test_module.py"],
+            "mandatory_gates": ["TARGETED_TESTS"],
+            "tests_executed": False,
+        },
+        "command_plan_is_data_only": True,
+        "shell_allowed": False,
+        "network_allowed": False,
+        "secrets_allowed": False,
+        "repo_write_allowed": False,
+        "path_lookup_allowed": False,
+        "parent_environment_inheritance": False,
+        "caller_environment_overrides_allowed": False,
+        "content_binding_structurally_bound": True,
+        "content_binding_independently_verified": False,
+        "executable_pinning_verified": False,
+        "os_sandbox_verified": False,
+        "child_process_policy_verified": False,
+        "symlink_physical_boundary_verified": False,
+        "hardlink_physical_boundary_verified": False,
+        "blockers": [],
+        "execution_authorized": False,
+        "executor_attached": False,
+        "commands_executed": False,
+        "writes_files": False,
+        "runs_tests": False,
+        "network_called": False,
+        "subprocess_called": False,
+        "automatic_commit": False,
+        "automatic_merge": False,
+        "automatic_deploy": False,
+        "production_change_allowed": False,
+        "real_trading_enabled": False,
+        "tool_output_is_authority": False,
+    }
+    if "executable" in overrides:
+        runner["command_plan"] = [dict(row) for row in runner["command_plan"]]
+        runner["command_plan"][0]["executable"] = overrides["executable"]
+    if "extra" in overrides:
+        runner["command_plan"] = list(runner["command_plan"]) + [overrides["extra"]]
+    if "budget_key" in overrides:
+        runner["resource_budget"] = dict(runner["resource_budget"])
+        runner["resource_budget"][overrides["budget_key"]] = overrides["budget_value"]
+    if pycache_prefix is not None or drop_cache_policy:
+        runner["command_plan"] = [dict(row) for row in runner["command_plan"]]
+        if drop_cache_policy:
+            runner["command_plan"][0].pop("writes_repository", None)
+            runner["command_plan"][0].pop("may_write_ephemeral_cache", None)
+            runner["command_plan"][0].pop("pycache_prefix", None)
+        else:
+            runner["command_plan"][0]["pycache_prefix"] = pycache_prefix
+    _bind_runner_contract_ids(runner)
+    return build_command_policy_contract(runner, **policy_kwargs)
+
+
+def _contract_gap_surface(_world: _World) -> list[dict[str, str]]:
+    findings = []
+
+    def _targets(targets, blocker, invariant_id, severity, description):
+        accepted = []
+        for target in targets:
+            status, result = _invoke(lambda target=target: _runner_probe([target]))
+            closed = status == "ACCEPT" and _state_closed(result, blocker)
+            if not closed:
+                accepted.append(target)
+        findings.append(_finding(
+            invariant_id,
+            "atlasquant_aion_developer_runner_contract",
+            description if not accepted else description + " Aceitos: " + ", ".join(accepted) + ".",
+            "BLOCKED_BY_DESIGN" if not accepted else "GAP",
+            "" if not accepted else severity,
+        ))
+
+    _targets(
+        ("../outside.py", "/outside.py"),
+        "UNSAFE_TEST_TARGET",
+        "runner.external_test_path",
+        "HIGH",
+        "Caminho de teste externo ou absoluto POSIX fica BLOCKED.",
+    )
+    _targets(
+        ("C:/outside.py", "C:\\outside.py", "\\\\server\\share\\test.py", "//server/share/test.py"),
+        "UNSAFE_TEST_TARGET",
+        "runner.windows_absolute_test_path",
+        "HIGH",
+        "Caminho Windows absoluto ou UNC de teste fica BLOCKED.",
+    )
+    _targets(
+        ("missing_test.py", "other_authorized_looking.py"),
+        "TEST_TARGET_NOT_IN_AUTHORIZED_FILES",
+        "runner.unauthorized_or_nonexistent_test",
+        "HIGH",
+        "Teste fora dos arquivos autorizados nao e tratado como existente.",
+    )
+
+    dangerous_paths = (
+        "C:/outside.py",
+        "C:\\outside.py",
+        "\\\\server\\share\\test.py",
+        "//server/share/test.py",
+    )
+    accepted_paths = []
+    for path in dangerous_paths:
+        status, _result = _invoke(lambda path=path: build_sandbox_preflight(
+            structural_builder_sandbox_request(
+                branch="cursor/sandbox",
+                baseline_ref="main@a",
+                candidate_ref="cursor/sandbox@b",
+                requested_files=(path,),
+                candidate_tests=("test_module.py",),
+            ),
+            environment_kind="ISOLATED_WORKTREE",
+            environment_id="sandbox-001",
+            isolated_worktree=True,
+            repository_root_bound=True,
+            network_disabled=True,
+            secrets_mounted=False,
+            command_policy="ALLOWLIST_ONLY",
+        ))
+        if status == "ACCEPT":
+            accepted_paths.append(path)
+    findings.append(_finding(
+        "preflight.windows_drive_path",
+        "atlasquant_aion_developer_sandbox_preflight",
+        "Caminho de drive, UNC ou absoluto passa no preflight: " + ", ".join(accepted_paths) + "."
+        if accepted_paths else
+        "Caminhos de drive, UNC e absolutos sao rejeitados sem depender do SO hospedeiro.",
+        "GAP" if accepted_paths else "BLOCKED_BY_DESIGN",
+        "HIGH" if accepted_paths else "",
+    ))
+
+    status, result = _invoke(lambda: _patch_probe(
+        "diff --git a/module.py b/module.py\n--- a/other.py\n+++ b/other.py\n@@ -1 +1 @@\n-old\n+new\n"
+    ))
+    header_closed = status == "ACCEPT" and _state_closed(result, "DIFF_HEADER_PATH_MISMATCH")
+    findings.append(_finding(
+        "patch.diff_header_mismatch",
+        "atlasquant_aion_developer_patch_validation",
+        "Cabecalhos diff/--/+++ divergentes ficam BLOCKED."
+        if header_closed else
+        "Cabecalhos divergentes de diff ainda passam.",
+        "BLOCKED_BY_DESIGN" if header_closed else "GAP",
+        "" if header_closed else "HIGH",
+    ))
+
+    secret_marker = "password=" + "AUDITSECRETVALUE"
+    status, result = _invoke(lambda: _patch_probe(
+        "diff --git a/module.py b/module.py\n--- a/module.py\n+++ b/module.py\n@@ -1 +1 @@\n-old\n+"
+        + ("A" * 4000) + " " + secret_marker + "\n"
+    ))
+    secret_text = json.dumps(result, default=str) if status == "ACCEPT" else ""
+    secret_closed = (
+        status == "ACCEPT"
+        and _state_closed(result, "SECRET_LIKE_ADDITION_NOT_ALLOWED")
+        and secret_marker not in secret_text
+    )
+    findings.append(_finding(
+        "patch.secret_beyond_prefix",
+        "atlasquant_aion_developer_patch_validation",
+        "Segredo apos 4000 caracteres e bloqueado e nao volta no relatorio."
+        if secret_closed else
+        "Segredo apos o prefixo inspecionado ainda passa ou vaza no relatorio.",
+        "BLOCKED_BY_DESIGN" if secret_closed else "GAP",
+        "" if secret_closed else "HIGH",
+    ))
+
+    status, result = _invoke(lambda: _patch_probe(
+        "diff --git a/test_module.py b/test_module.py\n--- a/test_module.py\n+++ b/test_module.py\n"
+        "@@ -1,2 +1,4 @@\n def test_guard():\n     assert guard()\n+def test_guard():\n+    pass\n"
+    ))
+    additive_closed = (
+        status == "ACCEPT"
+        and _state_closed(result, "TEST_ADDITIVE_NEUTRALIZATION_REQUIRES_SEPARATE_REVIEW")
+    )
+    findings.append(_finding(
+        "patch.additive_test_neutralization",
+        "atlasquant_aion_developer_patch_validation",
+        "Redefinicao aditiva de teste com pass exige revisao separada e fica BLOCKED."
+        if additive_closed else
+        "Redefinicao aditiva de teste ainda fica pronta para revisao normal.",
+        "BLOCKED_BY_DESIGN" if additive_closed else "GAP",
+        "" if additive_closed else "HIGH",
+    ))
+
+    for invariant_id, executable, description in (
+        ("command.executable_nul", "python\x00", "Executavel com NUL nao e normalizado para python."),
+        ("command.executable_newline", "python\n", "Executavel com quebra de linha nao e normalizado para python."),
+        ("command.executable_whitespace", "python ", "Executavel com espaco nao e normalizado para python."),
+    ):
+        status, result = _invoke(lambda executable=executable: _command_probe(executable=executable))
+        rendered = json.dumps((result or {}).get("validated_command_plan") if isinstance(result, Mapping) else [], default=str)
+        closed = status == "ACCEPT" and _state_closed(result, "EXECUTABLE_MISMATCH:COMPILE_CHANGED_SCOPE") and executable not in rendered
+        findings.append(_finding(
+            invariant_id,
+            "atlasquant_aion_developer_command_policy",
+            description if closed else description + " O plano validado conservou o valor cru.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "MEDIUM",
+        ))
+
+    status, result = _invoke(lambda: _command_probe(extra=None))
+    entry_closed = status == "ACCEPT" and _state_closed(result, "COMMAND_PLAN_ENTRY_NOT_OBJECT")
+    findings.append(_finding(
+        "command.non_mapping_entry",
+        "atlasquant_aion_developer_command_policy",
+        "Item nao-objeto no command plan bloqueia o plano inteiro."
+        if entry_closed else
+        "Item nao-objeto no command plan e descartado em silencio.",
+        "BLOCKED_BY_DESIGN" if entry_closed else "GAP",
+        "" if entry_closed else "MEDIUM",
+    ))
+
+    for invariant_id, key, value, blocker in (
+        ("command.runtime_budget_invalid", "runtime_seconds", 0, "RUNTIME_BUDGET_OUT_OF_RANGE"),
+        ("command.memory_budget_invalid", "memory_mb", 0, "MEMORY_BUDGET_OUT_OF_RANGE"),
+        ("command.output_budget_invalid", "output_bytes", 0, "OUTPUT_BUDGET_OUT_OF_RANGE"),
+        ("command.command_budget_invalid", "max_commands", 0, "COMMAND_BUDGET_OUT_OF_RANGE"),
+    ):
+        status, result = _invoke(lambda key=key, value=value: _command_probe(budget_key=key, budget_value=value))
+        closed = status == "ACCEPT" and _state_closed(result, blocker)
+        findings.append(_finding(
+            invariant_id,
+            "atlasquant_aion_developer_command_policy",
+            "Orcamento adulterado fica BLOCKED." if closed else "Orcamento adulterado ainda passa.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "MEDIUM",
+        ))
+
+    status, result = _invoke(lambda: _patch_probe(
+        "diff --git a/module.py b/module.py\n--- a/module.py\n+++ b/module.py\n"
+    ))
+    hunk_count = -1
+    if isinstance(result, Mapping):
+        files = list(result.get("files") or [])
+        if files and isinstance(files[0], Mapping):
+            hunk_count = int(files[0].get("hunk_count") or 0)
+    hunk_closed = status == "ACCEPT" and _state_closed(result, "DIFF_HUNK_REQUIRED") and hunk_count == 0
+    findings.append(_finding(
+        "patch.missing_hunk",
+        "atlasquant_aion_developer_patch_validation",
+        "Diff somente com cabecalhos fica BLOCKED e hunk_count permanece 0."
+        if hunk_closed else
+        "Diff sem hunk ainda fica pronto para revisao.",
+        "BLOCKED_BY_DESIGN" if hunk_closed else "GAP",
+        "" if hunk_closed else "MEDIUM",
+    ))
+
+    status, result = _invoke(lambda: _runner_probe(["test_module.py"] * (MAX_TEST_TARGETS + 1)))
+    gate_status, gate_result = _invoke(lambda: _runner_probe(
+        ["test_module.py"],
+        list(REQUIRED_MANDATORY_GATES) + [
+            f"GATE_{index}" for index in range(MAX_MANDATORY_GATES - len(REQUIRED_MANDATORY_GATES) + 1)
+        ],
+    ))
+    excess_closed = status == "ACCEPT" and _state_closed(result, "TEST_TARGET_LIMIT_EXCEEDED")
+    gate_closed = gate_status == "REJECT" or (
+        gate_status == "ACCEPT" and _state_closed(gate_result, "MANDATORY_GATE_LIMIT_EXCEEDED")
+    )
+    findings.append(_finding(
+        "runner.excessive_test_targets",
+        "atlasquant_aion_developer_runner_contract",
+        "Excesso de testes ou gates bloqueia sem truncar o plano."
+        if excess_closed and gate_closed else
+        "Excesso de testes ou gates ainda e truncado e permanece pronto.",
+        "BLOCKED_BY_DESIGN" if excess_closed and gate_closed else "GAP",
+        "" if excess_closed and gate_closed else "MEDIUM",
+    ))
+
+    status, verified = _invoke(lambda: _runner_probe(["test_module.py"]))
+    claimed = (
+        status != "ACCEPT"
+        or not isinstance(verified, Mapping)
+        or verified.get("symlink_physical_boundary_verified") is not False
+        or verified.get("hardlink_physical_boundary_verified") is not False
+    )
+    findings.append(_finding(
+        "path.symlink_hardlink_physical_boundary_unverified",
+        "atlasquant_aion_developer_runner_contract",
+        "Fronteira fisica de symlink e hardlink nao foi comprovada e permanece falsa."
+        if not claimed else
+        "O contrato afirmou verificacao fisica de symlink ou hardlink sem prova.",
+        "BLOCKED_BY_DESIGN" if not claimed else "GAP",
+        "" if not claimed else "MEDIUM",
+    ))
+    return findings
+
+
+def _preflight_call(request: Mapping[str, Any]) -> dict[str, Any]:
+    return build_sandbox_preflight(
+        request,
+        environment_kind="ISOLATED_WORKTREE",
+        environment_id="sandbox-001",
+        isolated_worktree=True,
+        repository_root_bound=True,
+        network_disabled=True,
+        secrets_mounted=False,
+        command_policy="ALLOWLIST_ONLY",
+    )
+
+
+def _runner_from_pair(request: Mapping[str, Any], preflight: Mapping[str, Any], **overrides: Any) -> dict[str, Any]:
+    patch = canonical_patch_document(request, preflight)
+    args = {
+        "content_attestation": attestation_for_documents(request, preflight, patch),
+        "human_patch_reviewed": True,
+        "human_patch_reviewer": "reviewer-independent",
+        "human_patch_review_refs": ["review:patch:1"],
+    }
+    args.update(overrides)
+    return build_runner_contract(request, preflight, patch, **args)
+
+
+def _test_contract_integrity_surface(world: _World) -> list[dict[str, str]]:
+    """Bind candidate tests and mandatory gates to request_id and preflight_id."""
+    findings: list[dict[str, str]] = []
+    try:
+        request = build_builder_sandbox_request(
+            world.snapshot,
+            world.approved,
+            branch="cursor/admin-fix",
+            baseline_ref="base@a",
+            candidate_ref="cursor/admin-fix@b",
+        )
+        preflight = _preflight_call(request)
+        runner = _runner_from_pair(request, preflight)
+        ready = (
+            request.get("state") == "READY_FOR_BUILDER_SANDBOX"
+            and preflight.get("state") == "READY_FOR_EXECUTOR_DESIGN_REVIEW"
+            and runner.get("state") == "READY_FOR_RUNNER_DESIGN_REVIEW"
+            and bool(request.get("test_contract_manifest_id"))
+            and request.get("execution_authorized") is False
+            and preflight.get("execution_authorized") is False
+            and runner.get("execution_authorized") is False
+            and runner.get("commands_executed") is False
+            and runner.get("runs_tests") is False
+            and runner.get("subprocess_called") is False
+            and runner.get("network_called") is False
+        )
+    except (TypeError, ValueError):
+        request = {}
+        preflight = {}
+        ready = False
+
+    def _both_reject(candidate: Mapping[str, Any], baseline: Mapping[str, Any]) -> bool:
+        pre_status, _pre_result = _invoke(lambda: _preflight_call(candidate))
+        run_status, _run_result = _invoke(lambda: _runner_from_pair(candidate, baseline))
+        return pre_status == "REJECT" and run_status == "REJECT"
+
+    def _record(invariant_id: str, module: str, description: str, closed: bool) -> None:
+        findings.append(_finding(
+            invariant_id,
+            module,
+            description if closed else description + " A cadeia aceitou o contrato adulterado.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    mutated_tests = deepcopy(request) if ready else {}
+    if ready:
+        contract = deepcopy(mutated_tests["test_contract"])
+        contract["candidate_tests"] = list(contract["candidate_tests"]) + [
+            str(contract["candidate_tests"][0]) + "::lineage_probe"
+        ]
+        mutated_tests["test_contract"] = contract
+    _record(
+        "test_contract.candidate_tests_mutated_after_request_id",
+        "atlasquant_aion_developer_sandbox_preflight",
+        "Trocar candidate_tests e manter request_id faz Preflight e Runner rejeitarem.",
+        ready and _both_reject(mutated_tests, preflight),
+    )
+
+    mutated_gates = deepcopy(request) if ready else {}
+    if ready:
+        contract = deepcopy(mutated_gates["test_contract"])
+        contract["mandatory_gates"] = list(contract["mandatory_gates"]) + ["UI_SMOKE"]
+        mutated_gates["test_contract"] = contract
+    _record(
+        "test_contract.mandatory_gates_mutated_after_request_id",
+        "atlasquant_aion_developer_sandbox_preflight",
+        "Trocar mandatory_gates e manter request_id faz Preflight e Runner rejeitarem.",
+        ready and _both_reject(mutated_gates, preflight),
+    )
+
+    removed = deepcopy(request) if ready else {}
+    if ready:
+        contract = deepcopy(removed["test_contract"])
+        contract["mandatory_gates"] = [
+            gate for gate in contract["mandatory_gates"] if gate != "ROLLBACK_REVIEW"
+        ]
+        removed["test_contract"] = contract
+        removed = bind_builder_request_lineage(removed)
+    try:
+        removed_preflight = _sealed_preflight(removed) if ready else {}
+    except (TypeError, ValueError):
+        removed_preflight = preflight
+    _record(
+        "test_contract.required_gate_removed",
+        "atlasquant_aion_developer_sandbox_preflight",
+        "Remover um gate obrigatorio depois da autorizacao falha fechado.",
+        ready and _both_reject(removed, removed_preflight),
+    )
+
+    arbitrary = deepcopy(request) if ready else {}
+    if ready:
+        contract = deepcopy(arbitrary["test_contract"])
+        contract["mandatory_gates"] = ["ANYTHING"]
+        arbitrary["test_contract"] = contract
+        arbitrary = bind_builder_request_lineage(arbitrary)
+    try:
+        arbitrary_preflight = _sealed_preflight(arbitrary) if ready else {}
+    except (TypeError, ValueError):
+        arbitrary_preflight = preflight
+    _record(
+        "test_contract.arbitrary_gate",
+        "atlasquant_aion_developer_sandbox_preflight",
+        "Um gate arbitrario nao satisfaz o conjunto obrigatorio.",
+        ready and _both_reject(arbitrary, arbitrary_preflight),
+    )
+
+    as_string = deepcopy(request) if ready else {}
+    if ready:
+        contract = deepcopy(as_string["test_contract"])
+        contract["candidate_tests"] = "test_module.py"
+        as_string["test_contract"] = contract
+    _record(
+        "test_contract.candidate_tests_string",
+        "atlasquant_aion_developer_builder_sandbox",
+        "candidate_tests string nao vira lista de caracteres.",
+        ready and _both_reject(as_string, preflight),
+    )
+
+    gates_string = deepcopy(request) if ready else {}
+    if ready:
+        contract = deepcopy(gates_string["test_contract"])
+        contract["mandatory_gates"] = "QUALITY_TESTS"
+        gates_string["test_contract"] = contract
+    _record(
+        "test_contract.mandatory_gates_string",
+        "atlasquant_aion_developer_builder_sandbox",
+        "mandatory_gates string nao vira lista de caracteres.",
+        ready and _both_reject(gates_string, preflight),
+    )
+
+    review_status = "REJECT"
+    if ready:
+        review_status, _review_result = _invoke(
+            lambda: _runner_from_pair(request, preflight, human_patch_review_refs="review:1")
+        )
+    _record(
+        "test_contract.review_refs_string",
+        "atlasquant_aion_developer_runner_contract",
+        "human_patch_review_refs string nao conta como evidencia.",
+        ready and review_status == "REJECT",
+    )
+
+    element_closed = False
+    if ready:
+        samples = []
+        tests_bad = deepcopy(request)
+        tests_bad["test_contract"] = deepcopy(tests_bad["test_contract"])
+        tests_bad["test_contract"]["candidate_tests"] = list(tests_bad["test_contract"]["candidate_tests"]) + [1]
+        samples.append(tests_bad)
+        gates_bad = deepcopy(request)
+        gates_bad["test_contract"] = deepcopy(gates_bad["test_contract"])
+        gates_bad["test_contract"]["mandatory_gates"] = list(gates_bad["test_contract"]["mandatory_gates"]) + [None]
+        samples.append(gates_bad)
+        files_bad = deepcopy(request)
+        files_bad["scope"] = deepcopy(files_bad["scope"])
+        files_bad["scope"]["requested_files"] = list(files_bad["scope"]["requested_files"]) + [True]
+        samples.append(files_bad)
+        authorized_bad = deepcopy(request)
+        authorized_bad["scope"] = deepcopy(authorized_bad["scope"])
+        authorized_bad["scope"]["authorized_files"] = list(authorized_bad["scope"]["authorized_files"]) + [1.5]
+        samples.append(authorized_bad)
+        review_elements, _ignored = _invoke(
+            lambda: _runner_from_pair(
+                request,
+                preflight,
+                human_patch_review_refs=["review:patch:1", {"ref": 1}],
+            )
+        )
+        element_closed = all(_both_reject(sample, preflight) for sample in samples) and review_elements == "REJECT"
+    _record(
+        "test_contract.non_string_elements",
+        "atlasquant_aion_developer_runner_contract",
+        "Elemento nao-string dentro das colecoes de seguranca e rejeitado.",
+        element_closed,
+    )
+    return findings
+
+
+def _resource_budget_surface(_world: _World) -> list[dict[str, str]]:
+    """Reject bool, string and float budgets before they can share an int digest."""
+    findings: list[dict[str, str]] = []
+
+    def _preflight_for(request: Mapping[str, Any], **overrides: Any) -> dict[str, Any]:
+        kwargs = {
+            "environment_kind": "ISOLATED_WORKTREE",
+            "environment_id": "sandbox-001",
+            "isolated_worktree": True,
+            "repository_root_bound": True,
+            "network_disabled": True,
+            "secrets_mounted": False,
+            "command_policy": "ALLOWLIST_ONLY",
+            "runtime_seconds": 900,
+            "memory_mb": 2048,
+            "output_bytes": 2_000_000,
+            "max_commands": 24,
+        }
+        kwargs.update(overrides)
+        return build_sandbox_preflight(request, **kwargs)
+
+    def _record(invariant_id: str, module: str, description: str, closed: bool) -> None:
+        findings.append(_finding(
+            invariant_id,
+            module,
+            description if closed else description + " A coercao de tipo ainda foi aceita.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    def _initial(field: str, value: Any) -> bool:
+        status, result = _invoke(lambda: _preflight_for(_sealed_runner_request(["test_module.py"]), **{field: value}))
+        if status != "REJECT" or not isinstance(result, BaseException):
+            return False
+        if isinstance(result, Mapping):
+            budget = result.get("resource_budget")
+            if isinstance(budget, Mapping) and budget.get(field) == value:
+                return False
+        return True
+
+    for invariant_id, value, description in (
+        ("budget.runtime_true_initial", True, "runtime_seconds True nao vira 1 nem gera preflight pronto."),
+        ("budget.runtime_false_initial", False, "runtime_seconds False nao vira 0."),
+        ("budget.runtime_numeric_string", "900", "runtime_seconds string numerica nao vira inteiro."),
+        ("budget.runtime_integral_float", 1.0, "runtime_seconds 1.0 nao e intercambiavel com 1."),
+        ("budget.runtime_fractional_float", 1.9, "runtime_seconds 1.9 nao e truncado para 1."),
+        ("budget.runtime_none", None, "runtime_seconds ausente ou None e rejeitado."),
+    ):
+        _record(
+            invariant_id,
+            "atlasquant_aion_developer_sandbox_preflight",
+            description,
+            _initial("runtime_seconds", value),
+        )
+    _record(
+        "budget.max_commands_true_initial",
+        "atlasquant_aion_developer_sandbox_preflight",
+        "max_commands True nao gera preflight valido.",
+        _initial("max_commands", True),
+    )
+    _record(
+        "budget.runtime_list_and_dict",
+        "atlasquant_aion_developer_sandbox_preflight",
+        "Lista ou dict no budget e rejeitado.",
+        _initial("runtime_seconds", []) and _initial("runtime_seconds", {}),
+    )
+
+    try:
+        request = _sealed_runner_request(["test_module.py"])
+        preflight = _preflight_for(request, runtime_seconds=1, max_commands=1)
+        runner = _runner_from_pair(request, preflight)
+        ready = (
+            preflight.get("state") == "READY_FOR_EXECUTOR_DESIGN_REVIEW"
+            and runner.get("state") == "READY_FOR_RUNNER_DESIGN_REVIEW"
+            and preflight.get("execution_authorized") is False
+            and runner.get("execution_authorized") is False
+            and type(preflight["resource_budget"]["runtime_seconds"]) is int
+            and preflight["resource_budget"]["runtime_seconds"] == 1
+            and preflight["resource_budget"]["max_commands"] == 1
+        )
+    except (TypeError, ValueError):
+        request, preflight, runner = {}, {}, {}
+        ready = False
+
+    def _mutate(document: Mapping[str, Any], field: str, value: Any) -> dict[str, Any]:
+        mutated = deepcopy(dict(document))
+        mutated["resource_budget"] = dict(mutated.get("resource_budget") or {})
+        mutated["resource_budget"][field] = value
+        return mutated
+
+    runtime_mutated = _mutate(preflight, "runtime_seconds", True) if ready else {}
+    runtime_id_status, _runtime_id = _invoke(lambda: expected_preflight_id(runtime_mutated)) if ready else ("REJECT", None)
+    runtime_run_status, _runtime_run = (
+        _invoke(lambda: _runner_from_pair(request, runtime_mutated)) if ready else ("REJECT", None)
+    )
+    _record(
+        "budget.runtime_mutated_to_true_keeps_id",
+        "atlasquant_aion_developer_runner_contract",
+        "Mutar runtime_seconds para True e manter preflight_id falha na revalidacao.",
+        ready
+        and runtime_mutated.get("preflight_id") == preflight.get("preflight_id")
+        and runtime_id_status == "REJECT"
+        and runtime_run_status == "REJECT",
+    )
+
+    commands_mutated = _mutate(preflight, "max_commands", True) if ready else {}
+    commands_id_status, _commands_id = _invoke(lambda: expected_preflight_id(commands_mutated)) if ready else ("REJECT", None)
+    commands_run_status, _commands_run = (
+        _invoke(lambda: _runner_from_pair(request, commands_mutated)) if ready else ("REJECT", None)
+    )
+    _record(
+        "budget.max_commands_mutated_to_true_keeps_id",
+        "atlasquant_aion_developer_runner_contract",
+        "Mutar max_commands para True e manter preflight_id falha na revalidacao.",
+        ready
+        and commands_mutated.get("preflight_id") == preflight.get("preflight_id")
+        and commands_id_status == "REJECT"
+        and commands_run_status == "REJECT",
+    )
+
+    recompute_status, recompute_result = (
+        _invoke(lambda: expected_preflight_id(runtime_mutated)) if ready else ("REJECT", None)
+    )
+    _record(
+        "budget.recompute_rejects_true",
+        "atlasquant_aion_developer_sandbox_preflight",
+        "Recalcular preflight_id com runtime_seconds True continua rejeitado.",
+        ready and recompute_status == "REJECT" and not isinstance(recompute_result, str),
+    )
+
+    try:
+        wide_request = _sealed_runner_request(["test_module.py"])
+        wide = _preflight_for(wide_request)
+        wide_runner = _runner_from_pair(wide_request, wide)
+        wide_ready = (
+            wide.get("state") == "READY_FOR_EXECUTOR_DESIGN_REVIEW"
+            and wide_runner.get("state") == "READY_FOR_RUNNER_DESIGN_REVIEW"
+            and wide_runner.get("commands_executed") is False
+        )
+    except (TypeError, ValueError):
+        wide_request, wide, wide_runner = {}, {}, {}
+        wide_ready = False
+
+    runner_closed = False
+    if wide_ready:
+        runner_closed = True
+        for field, value in (("runtime_seconds", "900"), ("runtime_seconds", 1.9), ("max_commands", True)):
+            mutated = _mutate(wide, field, value)
+            status, _result = _invoke(lambda mutated=mutated: _runner_from_pair(wide_request, mutated))
+            if status != "REJECT":
+                runner_closed = False
+    _record(
+        "budget.runner_revalidates_exact_int",
+        "atlasquant_aion_developer_runner_contract",
+        "Runner revalida o budget e rejeita string, float e bool.",
+        runner_closed,
+    )
+
+    policy_closed = False
+    if wide_ready:
+        policy_closed = True
+        for field, value in (("runtime_seconds", True), ("max_commands", True), ("output_bytes", "2000000")):
+            mutated = _mutate(wide_runner, field, value)
+            status, _result = _invoke(lambda mutated=mutated: build_command_policy_contract(mutated))
+            if status != "REJECT":
+                policy_closed = False
+    _record(
+        "budget.command_policy_revalidates_exact_int",
+        "atlasquant_aion_developer_command_policy",
+        "Command policy revalida o budget e rejeita bool e string.",
+        policy_closed,
+    )
+    return findings
+
+
+def _distinct_roles() -> dict[str, str]:
+    return {
+        "builder_principal_id": "prn_builder01",
+        "reviewer_principal_id": "prn_reviewer1",
+        "breaker_principal_id": "prn_breaker01",
+        "approver_principal_id": "prn_approver1",
+        "attestor_principal_id": "prn_attestor1",
+    }
+
+
+def _pin_claim(name: str, path: str, digest: str) -> dict[str, Any]:
+    return {
+        "logical_name": name,
+        "absolute_path": path,
+        "sha256": digest,
+        "file_size_bytes": 128,
+        "version_claim": "claim-only",
+        "verification_evidence_refs": ["evidence:pin:" + name],
+    }
+
+
+def _attestation_pinning_surface(_world: _World) -> list[dict[str, str]]:
+    """Fail closed on forged attestation, principal collisions and unpinning."""
+    findings: list[dict[str, str]] = []
+    builder = _sealed_runner_request(["test_module.py"])
+    preflight = _sealed_preflight(builder)
+    patch = _sealed_patch(builder, preflight)
+    good = attestation_for_documents(builder, preflight, patch)
+    pins = [
+        _pin_claim("python", "/usr/bin/python3", "ab" * 32),
+        _pin_claim("git", "/usr/bin/git", "cd" * 32),
+    ]
+
+    def _run(attestation: Any, patch_doc: Mapping[str, Any] = patch) -> dict[str, Any]:
+        return build_runner_contract(
+            builder,
+            preflight,
+            patch_doc,
+            content_attestation=attestation,
+            human_patch_reviewed=True,
+            human_patch_reviewer="reviewer-1",
+            human_patch_review_refs=["review:patch:1"],
+        )
+
+    def _reject(invariant_id: str, module: str, description: str, fn: Callable[[], Any]) -> None:
+        status, _result = _invoke(fn)
+        closed = status == "REJECT"
+        findings.append(_finding(
+            invariant_id,
+            module,
+            description if closed else description + " Aceito.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    def _policy(invariant_id: str, description: str, fn: Callable[[], Any], blocker: str) -> None:
+        status, result = _invoke(fn)
+        closed = (
+            status == "ACCEPT"
+            and _state_closed(result, blocker)
+            and isinstance(result, Mapping)
+            and result.get("executable_pinning_verified") is False
+            and result.get("state") != "READY_FOR_EXECUTION"
+        )
+        findings.append(_finding(
+            invariant_id,
+            "atlasquant_aion_developer_command_policy",
+            description if closed else description + " A politica aceitou o desvio.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    forged = {
+        "schema": "ATLASQUANT_AION_DEVELOPER_CONTENT_ATTESTATION_V1",
+        "content_attestation_id": "DEVATT-" + ("F" * 18),
+        "content_binding_structurally_bound": True,
+        "content_binding_independently_verified": False,
+        "content_binding_verified": True,
+        "builder_request_id": builder["request_id"],
+        "test_contract_manifest_id": builder["test_contract_manifest_id"],
+        "preflight_id": preflight["preflight_id"],
+        "patch_validation_id": patch["validation_id"],
+        "patch_digest": patch["patch_digest"],
+        "baseline_ref": "main@aaa",
+        "candidate_ref": "cursor/fix@bbb",
+        "baseline_commit_sha": "a" * 40,
+        "candidate_commit_sha": "b" * 40,
+        "baseline_tree_sha": "c" * 40,
+        "candidate_tree_sha": "d" * 40,
+        "verification_method": "STRUCTURAL_MANIFEST_V1",
+        "verification_evidence_refs": ["evidence:forged:1"],
+        "attestor_principal_id": "prn_attestor1",
+    }
+    _reject(
+        "attestation.forged",
+        "atlasquant_aion_developer_content_attestation",
+        "Attestation forjada com content_binding_verified e id inventado e rejeitada.",
+        lambda: _run(forged),
+    )
+    other = attestation_for_documents(
+        builder,
+        preflight,
+        patch,
+        verification_evidence_refs=["evidence:other:1"],
+    )
+    stolen = dict(good)
+    stolen["content_attestation_id"] = other["content_attestation_id"]
+    _reject(
+        "attestation.stolen_id",
+        "atlasquant_aion_developer_content_attestation",
+        "content_attestation_id copiado de outra attestation e rejeitado.",
+        lambda: _run(stolen),
+    )
+
+    def _mutate(field: str, value: Any) -> dict[str, Any]:
+        mutated = dict(good)
+        mutated[field] = value
+        return mutated
+
+    _reject(
+        "attestation.patch_digest_mutated",
+        "atlasquant_aion_developer_runner_contract",
+        "patch_digest alterado depois da attestation e rejeitado.",
+        lambda: _run(_mutate("patch_digest", "DEVPATCH-MUTATED")),
+    )
+    _reject(
+        "attestation.candidate_sha_mutated",
+        "atlasquant_aion_developer_runner_contract",
+        "SHA do commit candidato alterado depois da attestation e rejeitado.",
+        lambda: _run(_mutate("candidate_commit_sha", "e" * 40)),
+    )
+    _reject(
+        "attestation.baseline_sha_mutated",
+        "atlasquant_aion_developer_runner_contract",
+        "SHA do commit baseline alterado depois da attestation e rejeitado.",
+        lambda: _run(_mutate("baseline_commit_sha", "f" * 40)),
+    )
+    _reject(
+        "attestation.tree_sha_mutated",
+        "atlasquant_aion_developer_runner_contract",
+        "SHA de tree alterado depois da attestation e rejeitado.",
+        lambda: _run(_mutate("candidate_tree_sha", "9" * 40)),
+    )
+    _reject(
+        "attestation.request_id_mismatch",
+        "atlasquant_aion_developer_runner_contract",
+        "Attestation de outro builder_request_id e rejeitada.",
+        lambda: _run(attestation_for_documents(
+            builder, preflight, patch, builder_request_id="DEVBUILD-OTHERREQUEST1",
+        )),
+    )
+    _reject(
+        "attestation.preflight_id_mismatch",
+        "atlasquant_aion_developer_runner_contract",
+        "Attestation de outro preflight_id e rejeitada.",
+        lambda: _run(attestation_for_documents(
+            builder, preflight, patch, preflight_id="DEVPREF-OTHERREQUEST01",
+        )),
+    )
+    _reject(
+        "attestation.validation_id_mismatch",
+        "atlasquant_aion_developer_runner_contract",
+        "Attestation de outro validation_id e rejeitada.",
+        lambda: _run(attestation_for_documents(
+            builder, preflight, patch, patch_validation_id="DEVPATCHVAL-OTHER",
+        )),
+    )
+    replay_patch = dict(patch)
+    replay_patch["patch_digest"] = "DEVPATCH-OTHER"
+    replay_patch["validation_id"] = "DEVPATCHVAL-2"
+    _reject(
+        "attestation.replay_other_patch",
+        "atlasquant_aion_developer_runner_contract",
+        "Attestation de um patch reapresentada em outro patch e rejeitada.",
+        lambda: _run(good, replay_patch),
+    )
+    collided = _distinct_roles()
+    collided["attestor_principal_id"] = collided["builder_principal_id"]
+    _reject(
+        "principal.duplicate_ids",
+        "atlasquant_aion_developer_principal_identity",
+        "O mesmo principal_id em dois papeis e rejeitado.",
+        lambda: assert_independent_principals(collided),
+    )
+    cyrillic_display = "\u0410lice"
+    same_principal = classify_actor_pair(
+        {"display_actor": "Alice", "principal_id": "prn_attestor1"},
+        {"display_actor": cyrillic_display, "principal_id": "prn_attestor1"},
+    ) == "SAME_PRINCIPAL"
+    distinct_labels = classify_actor_pair(
+        {"display_actor": "Alice", "principal_id": "prn_builder01"},
+        {"display_actor": "Alice", "principal_id": "prn_reviewer1"},
+    ) == "DISTINCT_PRINCIPALS"
+    role_status, _role_result = _invoke(lambda: assert_independent_principals({
+        **_distinct_roles(),
+        "builder_principal_id": "prn_attestor1",
+        "attestor_principal_id": "prn_attestor1",
+    }))
+    display_closed = same_principal and distinct_labels and role_status == "REJECT"
+    findings.append(_finding(
+        "principal.same_id_distinct_display",
+        "atlasquant_aion_developer_principal_identity",
+        "O mesmo principal_id com displays latino e cirilico e o mesmo ator e nao separa papeis."
+        if display_closed else
+        "Displays parecidos ainda separam papeis ou displays iguais foram fundidos.",
+        "BLOCKED_BY_DESIGN" if display_closed else "GAP",
+        "" if display_closed else "HIGH",
+    ))
+    _reject(
+        "principal.empty",
+        "atlasquant_aion_developer_principal_identity",
+        "principal_id vazio e rejeitado.",
+        lambda: require_principal_id(""),
+    )
+    _reject(
+        "principal.control_or_invisible",
+        "atlasquant_aion_developer_principal_identity",
+        "principal_id com controle ou caractere invisivel e rejeitado.",
+        lambda: require_principal_id("prn_builder01" + "\u200b"),
+    )
+    _reject(
+        "pinning.relative_path",
+        "atlasquant_aion_developer_executable_pinning",
+        "Caminho relativo de executavel e rejeitado.",
+        lambda: build_executable_pinning_spec([
+            _pin_claim("python", "usr/bin/python3", "ab" * 32),
+            pins[1],
+        ]),
+    )
+    _reject(
+        "pinning.malformed_sha256",
+        "atlasquant_aion_developer_executable_pinning",
+        "SHA-256 malformado e rejeitado.",
+        lambda: build_executable_pinning_spec([
+            _pin_claim("python", "/usr/bin/python3", "AB" * 32),
+            pins[1],
+        ]),
+    )
+    _reject(
+        "pinning.extra_executable",
+        "atlasquant_aion_developer_executable_pinning",
+        "Executavel extra fora de python e git e rejeitado.",
+        lambda: build_executable_pinning_spec(pins + [
+            _pin_claim("bash", "/usr/bin/bash", "ef" * 32),
+        ]),
+    )
+    _reject(
+        "pinning.python_without_git",
+        "atlasquant_aion_developer_executable_pinning",
+        "Pin somente de python, sem git, e rejeitado.",
+        lambda: build_executable_pinning_spec([pins[0]]),
+    )
+    _policy(
+        "command.path_lookup_enabled",
+        "PATH lookup habilitado fica BLOCKED.",
+        lambda: _command_probe(path_lookup_allowed=True),
+        "PATH_LOOKUP_NOT_ALLOWED",
+    )
+    _policy(
+        "command.caller_environment_override",
+        "Override de ambiente do caller fica BLOCKED.",
+        lambda: _command_probe(requested_environment={"CUSTOM": "1"}),
+        "CALLER_ENVIRONMENT_OVERRIDES_NOT_ALLOWED",
+    )
+    _policy(
+        "command.pythonpath_injection",
+        "PYTHONPATH injetado fica BLOCKED.",
+        lambda: _command_probe(requested_environment={"PYTHONPATH": "/tmp/injected"}),
+        "INHERITED_ENVIRONMENT_KEY_NOT_ALLOWED",
+    )
+    _policy(
+        "command.pythonstartup_injection",
+        "PYTHONSTARTUP injetado fica BLOCKED.",
+        lambda: _command_probe(requested_environment={"PYTHONSTARTUP": "/tmp/startup.py"}),
+        "INHERITED_ENVIRONMENT_KEY_NOT_ALLOWED",
+    )
+    _policy(
+        "command.home_injection",
+        "HOME injetado fica BLOCKED.",
+        lambda: _command_probe(requested_environment={"HOME": "/tmp/home"}),
+        "INHERITED_ENVIRONMENT_KEY_NOT_ALLOWED",
+    )
+    _policy(
+        "command.git_config_injection",
+        "GIT_CONFIG injetado fica BLOCKED.",
+        lambda: _command_probe(requested_environment={"GIT_CONFIG": "/tmp/gitconfig"}),
+        "INHERITED_ENVIRONMENT_KEY_NOT_ALLOWED",
+    )
+    _policy(
+        "command.pycache_inside_worktree",
+        "pycache dentro da worktree fica BLOCKED.",
+        lambda: _command_probe(pycache_prefix="<ISOLATED_WORKTREE>/__pycache__"),
+        "PYCACHE_INSIDE_WORKTREE",
+    )
+    _policy(
+        "command.pycache_inside_repository",
+        "pycache dentro do repositorio fica BLOCKED.",
+        lambda: _command_probe(pycache_prefix="<REPOSITORY_ROOT>/__pycache__"),
+        "PYCACHE_INSIDE_REPOSITORY",
+    )
+    _reject(
+        "pinning.fake_verified_true",
+        "atlasquant_aion_developer_executable_pinning",
+        "executable_pinning_verified=True sem probe e rejeitado.",
+        lambda: build_executable_pinning_spec(pins, executable_pinning_verified=True),
+    )
+    status, result = _invoke(lambda: build_runner_contract(
+        builder,
+        preflight,
+        patch,
+        content_attestation=None,
+        human_patch_reviewed=True,
+        human_patch_reviewer="reviewer-1",
+        human_patch_review_refs=["review:patch:1"],
+    ))
+    boolean_status, _boolean = _invoke(lambda: build_runner_contract(
+        builder,
+        preflight,
+        patch,
+        content_binding_verified=True,
+        content_binding_ref="tree:123",
+        human_patch_reviewed=True,
+        human_patch_reviewer="reviewer-1",
+        human_patch_review_refs=["review:patch:1"],
+    ))
+    boolean_closed = (
+        status == "ACCEPT"
+        and _state_closed(result, "CONTENT_ATTESTATION_REQUIRED")
+        and isinstance(result, Mapping)
+        and result.get("content_binding_structurally_bound") is False
+        and result.get("content_binding_independently_verified") is False
+        and boolean_status == "REJECT"
+    )
+    findings.append(_finding(
+        "runner.boolean_binding_without_attestation",
+        "atlasquant_aion_developer_runner_contract",
+        "content_binding_verified=True sem attestation nao promove o runner."
+        if boolean_closed else
+        "Um booleano de content binding ainda promove o runner.",
+        "BLOCKED_BY_DESIGN" if boolean_closed else "GAP",
+        "" if boolean_closed else "HIGH",
+    ))
+    _policy(
+        "command.compileall_without_cache_policy",
+        "compileall com writes_repo falso e sem politica de cache fica BLOCKED.",
+        lambda: _command_probe(drop_cache_policy=True),
+        "COMPILEALL_CACHE_POLICY_REQUIRED",
+    )
+    _reject(
+        "attestation.mutated_after_seal",
+        "atlasquant_aion_developer_content_attestation",
+        "Payload alterado depois da attestation, mantendo o id, e rejeitado.",
+        lambda: _run(_mutate("verification_evidence_refs", ["evidence:mutated:1"])),
+    )
+    return findings
+
+
+def _runner_policy_integrity_surface(_world: _World) -> list[dict[str, str]]:
+    """A sealed runner or command policy must not survive with a stale id."""
+    findings: list[dict[str, str]] = []
+    runner, builder, preflight, patch, attestation = _runner_bundle(["test_module.py"])
+    upstream = {
+        "builder_request": builder,
+        "preflight": preflight,
+        "patch_validation": patch,
+        "content_attestation": attestation,
+    }
+    policy = build_command_policy_contract(runner, **upstream)
+    ready = (
+        runner.get("state") == "READY_FOR_RUNNER_DESIGN_REVIEW"
+        and policy.get("state") == "READY_FOR_EXECUTABLE_PINNING_REVIEW"
+        and runner.get("execution_authorized") is False
+        and policy.get("execution_authorized") is False
+    )
+
+    def _reject(invariant_id: str, description: str, fn: Callable[[], Any]) -> None:
+        status, _result = _invoke(fn)
+        closed = ready and status == "REJECT"
+        findings.append(_finding(
+            invariant_id,
+            "atlasquant_aion_developer_command_policy",
+            description if closed else description + " O id antigo ainda foi aceito.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    def _stale_runner(mutate: Callable[[dict[str, Any]], None]) -> Callable[[], Any]:
+        def run() -> Any:
+            cloned = deepcopy(runner)
+            mutate(cloned)
+            if cloned.get("runner_contract_id") != runner.get("runner_contract_id"):
+                return {"state": "RESEALED"}
+            return build_command_policy_contract(cloned)
+        return run
+
+    _reject(
+        "runner_policy.runtime_stale_id",
+        "runtime_seconds 900 para 600 com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["resource_budget"].__setitem__("runtime_seconds", 600)),
+    )
+    _reject(
+        "runner_policy.memory_stale_id",
+        "memory_mb alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["resource_budget"].__setitem__("memory_mb", 256)),
+    )
+    _reject(
+        "runner_policy.output_stale_id",
+        "output_bytes alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["resource_budget"].__setitem__("output_bytes", 4096)),
+    )
+    _reject(
+        "runner_policy.max_commands_stale_id",
+        "max_commands alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["resource_budget"].__setitem__("max_commands", 8)),
+    )
+    _reject(
+        "runner_policy.targets_stale_id",
+        "tests.targets alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["tests"]["targets"].append("test_module.py::extra")),
+    )
+
+    def _drop_gate(cloned: dict[str, Any]) -> Any:
+        for gate in REQUIRED_MANDATORY_GATES:
+            trial = deepcopy(cloned)
+            trial["tests"]["mandatory_gates"] = [
+                item for item in trial["tests"]["mandatory_gates"] if item != gate
+            ]
+            if trial.get("runner_contract_id") != runner.get("runner_contract_id"):
+                return {"state": "RESEALED", "gate": gate}
+            status, _result = _invoke(lambda trial=trial: build_command_policy_contract(trial))
+            if status != "REJECT":
+                return {"state": "ACCEPTED", "gate": gate}
+        raise ValueError("every removed mandatory gate kept a stale id")
+
+    _reject(
+        "runner_policy.mandatory_gate_stale_id",
+        "Cada mandatory gate removido com o id antigo e rejeitado.",
+        lambda: _drop_gate(runner),
+    )
+    _reject(
+        "runner_policy.reviewer_stale_id",
+        "Reviewer principal alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["review"].__setitem__(
+            "human_patch_reviewer_principal_id", "prn_otherrev1",
+        )),
+    )
+    _reject(
+        "runner_policy.review_ref_stale_id",
+        "Review ref alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["review"]["human_patch_review_refs"].append("review:other")),
+    )
+    _reject(
+        "runner_policy.builder_request_id_stale",
+        "builder_request_id alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["lineage"].__setitem__("builder_request_id", "DEVBUILD-OTHERREQUEST1")),
+    )
+    _reject(
+        "runner_policy.preflight_id_stale",
+        "preflight_id alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["lineage"].__setitem__("preflight_id", "DEVPREF-OTHERREQUEST01")),
+    )
+    _reject(
+        "runner_policy.patch_validation_id_stale",
+        "patch_validation_id alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["lineage"].__setitem__("patch_validation_id", "DEVPATCHVAL-OTHER")),
+    )
+    _reject(
+        "runner_policy.patch_digest_stale",
+        "patch_digest alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["lineage"].__setitem__("patch_digest", "DEVPATCH-OTHER")),
+    )
+    _reject(
+        "runner_policy.attestation_id_stale",
+        "content_attestation_id alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["lineage"].__setitem__("content_attestation_id", "DEVATT-" + ("A" * 18))),
+    )
+    _reject(
+        "runner_policy.structurally_bound_stale",
+        "content_binding_structurally_bound alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned.__setitem__("content_binding_structurally_bound", False)),
+    )
+    _reject(
+        "runner_policy.argv_stale",
+        "argv alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["command_plan"][1]["argv"].append("--verbose")),
+    )
+    _reject(
+        "runner_policy.executable_stale",
+        "executable alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["command_plan"][0].__setitem__("executable", "/tmp/python")),
+    )
+    _reject(
+        "runner_policy.cwd_stale",
+        "cwd alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["command_plan"][2].__setitem__("cwd", "/tmp")),
+    )
+    _reject(
+        "runner_policy.shell_stale",
+        "shell false para true com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["command_plan"][2].__setitem__("shell", True)),
+    )
+    _reject(
+        "runner_policy.network_stale",
+        "network false para true com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["command_plan"][2].__setitem__("network", True)),
+    )
+    _reject(
+        "runner_policy.writes_repo_stale",
+        "writes_repo false para true com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["command_plan"][2].__setitem__("writes_repo", True)),
+    )
+    _reject(
+        "runner_policy.pycache_prefix_stale",
+        "pycache_prefix alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["command_plan"][0].__setitem__(
+            "pycache_prefix", "<ISOLATED_WORKTREE>/__pycache__",
+        )),
+    )
+    _reject(
+        "runner_policy.ephemeral_cache_stale",
+        "may_write_ephemeral_cache alterado com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned["command_plan"][0].__setitem__("may_write_ephemeral_cache", False)),
+    )
+    _reject(
+        "runner_policy.path_lookup_stale",
+        "path_lookup_allowed false para true com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned.__setitem__("path_lookup_allowed", True)),
+    )
+    _reject(
+        "runner_policy.parent_env_stale",
+        "parent_environment_inheritance false para true com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned.__setitem__("parent_environment_inheritance", True)),
+    )
+    _reject(
+        "runner_policy.caller_env_flag_stale",
+        "caller_environment_overrides_allowed false para true com o id antigo e rejeitado.",
+        _stale_runner(lambda cloned: cloned.__setitem__("caller_environment_overrides_allowed", True)),
+    )
+
+    def _authority(cloned: dict[str, Any]) -> Any:
+        for flag in (
+            "execution_authorized",
+            "executor_attached",
+            "commands_executed",
+            "writes_files",
+            "runs_tests",
+            "network_called",
+            "subprocess_called",
+            "automatic_commit",
+            "automatic_merge",
+            "automatic_deploy",
+            "production_change_allowed",
+            "real_trading_enabled",
+            "tool_output_is_authority",
+        ):
+            trial = deepcopy(cloned)
+            trial[flag] = True
+            if trial.get("runner_contract_id") != runner.get("runner_contract_id"):
+                return {"state": "RESEALED", "flag": flag}
+            status, _result = _invoke(lambda trial=trial: build_command_policy_contract(trial))
+            if status != "REJECT":
+                return {"state": "ACCEPTED", "flag": flag}
+        raise ValueError("every authority flag kept a stale id")
+
+    _reject(
+        "runner_policy.authority_flag_stale",
+        "Authority flag false para true com o id antigo e rejeitada.",
+        lambda: _authority(runner),
+    )
+
+    def _nested(cloned: dict[str, Any]) -> None:
+        cloned["tests"]["targets"] = list(cloned["tests"]["targets"]) + ["test_other.py"]
+        cloned["review"]["human_patch_review_refs"] = list(cloned["review"]["human_patch_review_refs"])
+        cloned["review"]["human_patch_review_refs"][0] = "review:copied"
+        cloned["command_plan"][0]["argv"] = list(cloned["command_plan"][0]["argv"])
+        cloned["command_plan"][0]["argv"][-1] = "<MUTATED_SCOPE>"
+
+    _reject(
+        "runner_policy.deepcopy_nested_stale",
+        "Deep-copy com mutacao aninhada e id antigo e rejeitado.",
+        _stale_runner(_nested),
+    )
+
+    def _policy_budget() -> None:
+        mutated = deepcopy(policy)
+        mutated["resource_budget"]["runtime_seconds"] = 600
+        if mutated.get("command_policy_id") != policy.get("command_policy_id"):
+            return {"state": "RESEALED"}
+        return assert_command_policy_integrity(mutated)
+
+    _reject(
+        "command_policy.mutated_keeps_id",
+        "Command policy alterada com o id antigo e rejeitada.",
+        _policy_budget,
+    )
+
+    def _policy_env() -> None:
+        mutated = deepcopy(policy)
+        mutated["fixed_environment"]["PYTHONHASHSEED"] = "1"
+        if mutated.get("command_policy_id") != policy.get("command_policy_id"):
+            return {"state": "RESEALED"}
+        return assert_command_policy_integrity(mutated)
+
+    _reject(
+        "command_policy.fixed_environment_stale",
+        "fixed_environment alterado com o id antigo e rejeitado.",
+        _policy_env,
+    )
+
+    def _policy_plan() -> None:
+        mutated = deepcopy(policy)
+        mutated["validated_command_plan"][0]["argv"] = ["-m", "compileall", "-q", "<MUTATED>"]
+        if mutated.get("command_policy_id") != policy.get("command_policy_id"):
+            return {"state": "RESEALED"}
+        return assert_command_policy_integrity(mutated)
+
+    _reject(
+        "command_policy.validated_plan_stale",
+        "validated_command_plan alterado com o id antigo e rejeitado.",
+        _policy_plan,
+    )
+
+    def _chain() -> None:
+        builder = _sealed_runner_request(["test_module.py"])
+        preflight = _sealed_preflight(builder)
+        patch = _sealed_patch(builder, preflight)
+        attestation = attestation_for_documents(builder, preflight, patch)
+        environment = build_environment_contract()
+        pinning = build_executable_pinning_spec([
+            {
+                "logical_name": "python",
+                "absolute_path": "/usr/bin/python3",
+                "sha256": "ab" * 32,
+                "file_size_bytes": 128,
+                "version_claim": "claim-only",
+                "verification_evidence_refs": ["evidence:pin:python"],
+            },
+            {
+                "logical_name": "git",
+                "absolute_path": "/usr/bin/git",
+                "sha256": "cd" * 32,
+                "file_size_bytes": 128,
+                "version_claim": "claim-only",
+                "verification_evidence_refs": ["evidence:pin:git"],
+            },
+        ])
+        fresh = build_os_sandbox_design_review(
+            policy,
+            pinning,
+            attestation,
+            environment,
+            runner_contract=runner,
+            builder_request=builder,
+            preflight=preflight,
+            patch_validation=patch,
+        )
+        if fresh.get("state") != "READY_FOR_OS_SANDBOX_DESIGN_REVIEW" or fresh.get("execution_authorized") is not False:
+            return fresh
+        stale_runner = deepcopy(runner)
+        stale_runner["resource_budget"]["runtime_seconds"] = 600
+        stale_policy = deepcopy(policy)
+        stale_policy["fixed_environment"]["PYTHONHASHSEED"] = "1"
+        build_os_sandbox_design_review(
+            stale_policy,
+            pinning,
+            attestation,
+            environment,
+            runner_contract=stale_runner,
+            builder_request=builder,
+            preflight=preflight,
+            patch_validation=patch,
+        )
+
+    _reject(
+        "runner_policy.chained_boundary_stale",
+        "Runner e policy adulterados sao rejeitados na fronteira seguinte.",
+        _chain,
+    )
+    return findings
+
+
+def _principal_provenance_surface(world: _World) -> list[dict[str, str]]:
+    """Principal ids authorize roles. Synthetic SHAs are not observations."""
+    findings: list[dict[str, str]] = []
+
+    def _prepare(**overrides: Any) -> dict[str, Any]:
+        params: dict[str, Any] = {
+            "rollback_plan": "Reverter a mudanca logica.",
+            "builder_actor": "Alice",
+            "reviewer_actor": "Bob",
+            "breaker_actor": "Cara",
+            "readiness_refs": ["ready:1"],
+            "builder_principal_id": "prn_builder01",
+            "reviewer_principal_id": "prn_reviewer1",
+            "breaker_principal_id": "prn_breaker01",
+        }
+        params.update(overrides)
+        return prepare_implementation_readiness(world.envelope, **params)
+
+    findings.append(_blocked(
+        "principal.integration_missing_builder",
+        "atlasquant_aion_developer_implementation",
+        "Readiness sem builder_principal_id e rejeitada.",
+        lambda: _prepare(builder_principal_id=None),
+    ))
+    findings.append(_blocked(
+        "principal.integration_missing_reviewer",
+        "atlasquant_aion_developer_implementation",
+        "Readiness sem reviewer_principal_id e rejeitada.",
+        lambda: _prepare(reviewer_principal_id=None),
+    ))
+    findings.append(_blocked(
+        "principal.integration_missing_breaker",
+        "atlasquant_aion_developer_implementation",
+        "Readiness sem breaker_principal_id e rejeitada.",
+        lambda: _prepare(breaker_principal_id=None),
+    ))
+    findings.append(_blocked(
+        "principal.integration_malformed",
+        "atlasquant_aion_developer_implementation",
+        "principal_id malformado e rejeitado na readiness.",
+        lambda: _prepare(builder_principal_id="not-a-principal"),
+    ))
+    findings.append(_blocked(
+        "principal.integration_same_id_different_display",
+        "atlasquant_aion_developer_implementation",
+        "O mesmo principal com displays diferentes nao separa builder e reviewer.",
+        lambda: _prepare(
+            builder_actor="Alice",
+            reviewer_actor="Bob",
+            builder_principal_id="prn_shared001",
+            reviewer_principal_id="prn_shared001",
+        ),
+    ))
+    findings.append(_blocked(
+        "principal.integration_cyrillic_same_id",
+        "atlasquant_aion_developer_implementation",
+        "Display latino e cirilico com o mesmo principal_id colidem.",
+        lambda: _prepare(
+            builder_actor="Alice",
+            reviewer_actor="\u0410lice",
+            builder_principal_id="prn_shared001",
+            reviewer_principal_id="prn_shared001",
+        ),
+    ))
+    status, distinct = _invoke(lambda: _prepare(
+        builder_actor="Alice",
+        reviewer_actor="Alice",
+        breaker_actor="Alice",
+    ))
+    distinct_closed = (
+        status == "ACCEPT"
+        and isinstance(distinct, Mapping)
+        and (distinct.get("readiness") or {}).get("roles_independent") is True
+        and (distinct.get("readiness") or {}).get("builder_principal_id")
+        != (distinct.get("readiness") or {}).get("reviewer_principal_id")
+    )
+    findings.append(_finding(
+        "principal.integration_same_display_distinct_ids",
+        "atlasquant_aion_developer_implementation",
+        "Displays identicos com principals diferentes permanecem atores distintos."
+        if distinct_closed else
+        "Displays identicos ainda decidem a identidade.",
+        "BLOCKED_BY_DESIGN" if distinct_closed else "GAP",
+        "" if distinct_closed else "HIGH",
+    ))
+    findings.append(_blocked(
+        "principal.integration_approver_is_builder",
+        "atlasquant_aion_developer_implementation",
+        "approver_principal_id igual ao builder e rejeitado.",
+        lambda: world._approve(world.ready, "other-label", approver_principal_id="prn_builder01"),
+    ))
+    findings.append(_blocked(
+        "principal.integration_approver_is_reviewer",
+        "atlasquant_aion_developer_implementation",
+        "approver_principal_id igual ao reviewer e rejeitado.",
+        lambda: world._approve(world.ready, "Alice", approver_principal_id="prn_reviewer1"),
+    ))
+    findings.append(_blocked(
+        "principal.integration_approver_is_breaker",
+        "atlasquant_aion_developer_implementation",
+        "approver_principal_id igual ao breaker e rejeitado.",
+        lambda: world._approve(world.ready, "human-approver", approver_principal_id="prn_breaker01"),
+    ))
+    mutated_ready = deepcopy(world.ready)
+    mutated_ready["readiness"] = dict(mutated_ready["readiness"])
+    mutated_ready["readiness"]["builder_principal_id"] = "prn_otherbld"
+    findings.append(_blocked(
+        "principal.integration_mutate_after_readiness",
+        "atlasquant_aion_developer_implementation",
+        "Mutar principal_id depois do readiness_manifest_id e rejeitado.",
+        lambda: world._approve(mutated_ready, "human-approver", approver_principal_id="prn_approver1"),
+    ))
+    mutated_auth = deepcopy(world.approved)
+    mutated_auth["authorization"] = dict(mutated_auth["authorization"])
+    mutated_auth["authorization"]["approver_principal_id"] = "prn_otherapp"
+    findings.append(_blocked(
+        "principal.integration_mutate_after_authorization",
+        "atlasquant_aion_developer_builder_sandbox",
+        "Mutar principal_id depois do authorization_id e rejeitado.",
+        lambda: world.sandbox(mutated_auth),
+    ))
+    rebound = deepcopy(world.approved)
+    rebound_auth = dict(rebound["authorization"])
+    rebound_auth["builder_principal_id"] = "prn_otherbld"
+    rebound_auth["authorization_id"] = authorization_manifest_id(rebound, rebound_auth)
+    rebound["authorization"] = rebound_auth
+    findings.append(_blocked(
+        "principal.integration_request_differs_from_authorization",
+        "atlasquant_aion_developer_builder_sandbox",
+        "Builder Request com principal diferente do autorizado e rejeitado.",
+        lambda: world.sandbox(rebound),
+    ))
+    legacy = deepcopy(world.approved)
+    legacy_auth = dict(legacy["authorization"])
+    legacy_auth["schema"] = "ATLASQUANT_AION_DEVELOPER_IMPLEMENTATION_AUTH_V1"
+    for field in (
+        "builder_principal_id",
+        "reviewer_principal_id",
+        "breaker_principal_id",
+        "approver_principal_id",
+    ):
+        legacy_auth.pop(field, None)
+    legacy["authorization"] = legacy_auth
+    findings.append(_blocked(
+        "principal.integration_legacy_authorization",
+        "atlasquant_aion_developer_builder_sandbox",
+        "Autorizacao antiga sem principal ids falha fechada.",
+        lambda: world.sandbox(legacy),
+    ))
+    relabeled = deepcopy(world.ready)
+    relabeled["readiness"] = dict(relabeled["readiness"])
+    relabeled["readiness"]["builder_actor"] = "Completely Different"
+    display_closed = (
+        implementation_readiness_manifest_id(relabeled) == world.ready["readiness_manifest_id"]
+    )
+    findings.append(_finding(
+        "principal.integration_display_does_not_change_id",
+        "atlasquant_aion_developer_manifest",
+        "Mudar somente o display mantendo os principal ids nao altera o manifesto."
+        if display_closed else
+        "O display ainda altera a identidade do manifesto.",
+        "BLOCKED_BY_DESIGN" if display_closed else "GAP",
+        "" if display_closed else "HIGH",
+    ))
+    rekeyed = deepcopy(world.ready)
+    rekeyed["readiness"] = dict(rekeyed["readiness"])
+    rekeyed["readiness"]["builder_principal_id"] = "prn_otherbld"
+    rekey_closed = (
+        implementation_readiness_manifest_id(rekeyed) != world.ready["readiness_manifest_id"]
+    )
+    findings.append(_finding(
+        "principal.integration_principal_changes_id",
+        "atlasquant_aion_developer_manifest",
+        "Mudar o principal_id mantendo o display altera o manifesto."
+        if rekey_closed else
+        "Mudar o principal_id nao altera o manifesto.",
+        "BLOCKED_BY_DESIGN" if rekey_closed else "GAP",
+        "" if rekey_closed else "HIGH",
+    ))
+
+    def _payload(**overrides: Any) -> dict[str, Any]:
+        payload = {
+            "builder_request_id": "DEVBUILD-AUDITPROVENANCE1",
+            "test_contract_manifest_id": "DEVTEST-AUDITPROVENANCE1",
+            "preflight_id": "DEVPREF-AUDITPROVENANCE1",
+            "patch_validation_id": "DEVPATCHVAL-1",
+            "patch_digest": "DEVPATCH-ABC",
+            "baseline_ref": "main@aaa",
+            "candidate_ref": "cursor/fix@bbb",
+            "baseline_commit_sha": "a" * 40,
+            "candidate_commit_sha": "b" * 40,
+            "baseline_tree_sha": "c" * 40,
+            "candidate_tree_sha": "d" * 40,
+            "verification_method": "STRUCTURAL_MANIFEST_V1",
+            "verification_evidence_refs": ["evidence:structural:1"],
+            "git_object_source": GIT_OBJECT_SOURCE_SYNTHETIC,
+            "attestor_principal_id": "prn_attestor1",
+        }
+        payload.update(overrides)
+        return payload
+
+    status, synthetic = _invoke(lambda: build_content_attestation(_payload()))
+    synthetic_closed = (
+        status == "ACCEPT"
+        and isinstance(synthetic, Mapping)
+        and synthetic.get("git_object_source") == GIT_OBJECT_SOURCE_SYNTHETIC
+        and synthetic.get("content_binding_structurally_bound") is True
+        and synthetic.get("content_binding_independently_verified") is False
+        and synthetic.get("state") != "READY_FOR_EXECUTION"
+    )
+    findings.append(_finding(
+        "provenance.placeholder_synthetic",
+        "atlasquant_aion_developer_content_attestation",
+        "Placeholder com SYNTHETIC_FIXTURE fica so estruturalmente ligado."
+        if synthetic_closed else
+        "Placeholder sintetico foi tratado como objeto Git observado.",
+        "BLOCKED_BY_DESIGN" if synthetic_closed else "GAP",
+        "" if synthetic_closed else "HIGH",
+    ))
+    findings.append(_blocked(
+        "provenance.placeholder_external_probe",
+        "atlasquant_aion_developer_content_attestation",
+        "Placeholder com EXTERNAL_PROBE e rejeitado.",
+        lambda: build_content_attestation(_payload(git_object_source=GIT_OBJECT_SOURCE_PROBE)),
+    ))
+    real_shas = {
+        "baseline_commit_sha": "ab" * 20,
+        "candidate_commit_sha": "cd" * 20,
+        "baseline_tree_sha": "ef" * 20,
+        "candidate_tree_sha": "12" * 20,
+    }
+    status, claimed = _invoke(lambda: build_content_attestation(_payload(**real_shas)))
+    claimed_closed = (
+        status == "ACCEPT"
+        and isinstance(claimed, Mapping)
+        and claimed.get("git_object_source") == GIT_OBJECT_SOURCE_SYNTHETIC
+        and claimed.get("content_binding_independently_verified") is False
+    )
+    findings.append(_finding(
+        "provenance.real_sha_stays_synthetic",
+        "atlasquant_aion_developer_content_attestation",
+        "SHA com formato real e SYNTHETIC_FIXTURE continua um claim sintetico."
+        if claimed_closed else
+        "SHA com formato real foi promovido a observacao.",
+        "BLOCKED_BY_DESIGN" if claimed_closed else "GAP",
+        "" if claimed_closed else "HIGH",
+    ))
+    findings.append(_blocked(
+        "provenance.external_probe_without_probe",
+        "atlasquant_aion_developer_content_attestation",
+        "EXTERNAL_PROBE sem probe real e rejeitado.",
+        lambda: build_content_attestation(_payload(
+            **real_shas,
+            git_object_source=GIT_OBJECT_SOURCE_PROBE,
+            verification_evidence_refs=["evidence:probe:claimed"],
+        )),
+    ))
+    sealed = build_content_attestation(_payload())
+    mutated_source = dict(sealed)
+    mutated_source["git_object_source"] = GIT_OBJECT_SOURCE_PROBE
+    findings.append(_blocked(
+        "provenance.source_mutated_after_id",
+        "atlasquant_aion_developer_content_attestation",
+        "Mutar git_object_source depois do attestation id e rejeitado.",
+        lambda: build_content_attestation(mutated_source),
+    ))
+    builder = _sealed_runner_request(["test_module.py"])
+    preflight = _sealed_preflight(builder)
+    patch = _sealed_patch(builder, preflight)
+    original = attestation_for_documents(builder, preflight, patch)
+    stolen = dict(original)
+    stolen["git_object_source"] = GIT_OBJECT_SOURCE_PROBE
+    findings.append(_blocked(
+        "provenance.stolen_source",
+        "atlasquant_aion_developer_runner_contract",
+        "Attestation com source alterado e id antigo e rejeitada.",
+        lambda: build_runner_contract(
+            builder,
+            preflight,
+            patch,
+            content_attestation=stolen,
+            human_patch_reviewed=True,
+            human_patch_reviewer="reviewer-1",
+            human_patch_review_refs=["review:patch:1"],
+        ),
+    ))
+    findings.append(_blocked(
+        "provenance.caller_verified_true",
+        "atlasquant_aion_developer_content_attestation",
+        "content_binding_independently_verified=True do caller e rejeitado.",
+        lambda: build_content_attestation(_payload(content_binding_independently_verified=True)),
+    ))
+    findings.append(_blocked(
+        "provenance.invalid_source",
+        "atlasquant_aion_developer_content_attestation",
+        "git_object_source arbitrario e rejeitado.",
+        lambda: build_content_attestation(_payload(git_object_source="OBSERVED")),
+    ))
+    missing = _payload()
+    missing.pop("git_object_source")
+    findings.append(_blocked(
+        "provenance.missing_source",
+        "atlasquant_aion_developer_content_attestation",
+        "git_object_source ausente e rejeitado.",
+        lambda: build_content_attestation(missing),
+    ))
+    legacy_attestation = dict(original)
+    legacy_attestation.pop("git_object_source")
+    legacy_attestation["schema"] = "ATLASQUANT_AION_DEVELOPER_CONTENT_ATTESTATION_V1"
+    findings.append(_blocked(
+        "provenance.legacy_without_source",
+        "atlasquant_aion_developer_runner_contract",
+        "Attestation legada sem proveniencia de SHA e rejeitada.",
+        lambda: build_runner_contract(
+            builder,
+            preflight,
+            patch,
+            content_attestation=legacy_attestation,
+            human_patch_reviewed=True,
+            human_patch_reviewer="reviewer-1",
+            human_patch_review_refs=["review:patch:1"],
+        ),
+    ))
+    collided = attestation_for_documents(
+        builder,
+        preflight,
+        patch,
+        attestor_principal_id=builder["roles"]["builder_principal_id"],
+    )
+    findings.append(_blocked(
+        "principal.integration_attestor_collides",
+        "atlasquant_aion_developer_content_attestation",
+        "attestor_principal_id igual a um papel anterior e rejeitado.",
+        lambda: build_runner_contract(
+            builder,
+            preflight,
+            patch,
+            content_attestation=collided,
+            human_patch_reviewed=True,
+            human_patch_reviewer="reviewer-1",
+            human_patch_review_refs=["review:patch:1"],
+        ),
+    ))
+    return findings
+
+
+def _self_reseal_surface(_world: _World) -> list[dict[str, str]]:
+    """STALE_ID keeps the previous digest. SELF_RESEAL recomputes it.
+
+    A recomputed id proves only that the id matches the current bytes. The
+    consumer still rejects the document unless the payload is the canonical
+    contract the constructor would emit.
+    """
+    findings: list[dict[str, str]] = []
+    runner, builder, preflight, patch, attestation = _runner_bundle(["test_module.py"])
+    upstream = {
+        "builder_request": builder,
+        "preflight": preflight,
+        "patch_validation": patch,
+        "content_attestation": attestation,
+    }
+    policy = build_command_policy_contract(runner, **upstream)
+
+    def _closed(invariant_id: str, description: str, fn: Callable[[], Any]) -> None:
+        status, _result = _invoke(fn)
+        closed = status == "REJECT"
+        findings.append(_finding(
+            invariant_id,
+            "atlasquant_aion_developer_command_policy",
+            description if closed else description + " O digest recalculado foi aceito.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    def _policy_attack(mutate: Callable[[dict[str, Any]], None]) -> Callable[[], Any]:
+        def run() -> Any:
+            mutated = deepcopy(policy)
+            mutate(mutated)
+            _bind_command_policy_ids(mutated)
+            if mutated.get("command_policy_id") == policy.get("command_policy_id"):
+                return {"state": "NOT_RESEALED"}
+            return assert_command_policy_integrity(mutated)
+        return run
+
+    def _separate_environments(mutated: dict[str, Any]) -> None:
+        mutated["fixed_environment"] = dict(mutated["fixed_environment"])
+        mutated["allowlist_policy"] = dict(mutated["allowlist_policy"])
+        mutated["allowlist_policy"]["fixed_environment"] = dict(
+            mutated["allowlist_policy"]["fixed_environment"]
+        )
+
+    def _stale_contrast() -> Any:
+        mutated = deepcopy(policy)
+        mutated["validated_command_plan"][0]["argv"] = ["-c", "ARBITRARY"]
+        if mutated.get("command_policy_id") != policy.get("command_policy_id"):
+            return {"state": "RESEALED"}
+        return assert_command_policy_integrity(mutated)
+
+    _closed(
+        "self_reseal.stale_id_contrast",
+        "STALE_ID: argv alterado com o id antigo continua rejeitado.",
+        _stale_contrast,
+    )
+    _closed(
+        "self_reseal.policy_argv",
+        "SELF_RESEAL: argv arbitrario com id novo e rejeitado.",
+        _policy_attack(lambda mutated: mutated["validated_command_plan"][0].__setitem__(
+            "argv", ["-c", "ARBITRARY"],
+        )),
+    )
+    _closed(
+        "self_reseal.policy_executable",
+        "SELF_RESEAL: executable alterado com id novo e rejeitado.",
+        _policy_attack(lambda mutated: mutated["validated_command_plan"][0].__setitem__(
+            "executable", "/tmp/python",
+        )),
+    )
+    _closed(
+        "self_reseal.policy_cwd",
+        "SELF_RESEAL: cwd alterado com id novo e rejeitado.",
+        _policy_attack(lambda mutated: mutated["validated_command_plan"][2].__setitem__(
+            "cwd", "/tmp",
+        )),
+    )
+    _closed(
+        "self_reseal.policy_runtime_out_of_range",
+        "SELF_RESEAL: runtime_seconds 999999 com id novo e rejeitado.",
+        _policy_attack(lambda mutated: mutated["resource_budget"].__setitem__(
+            "runtime_seconds", 999999,
+        )),
+    )
+    _closed(
+        "self_reseal.policy_runtime_string",
+        "SELF_RESEAL: runtime_seconds string com id novo e rejeitado.",
+        _policy_attack(lambda mutated: mutated["resource_budget"].__setitem__(
+            "runtime_seconds", "900",
+        )),
+    )
+    _closed(
+        "self_reseal.policy_memory_invalid",
+        "SELF_RESEAL: memory_mb fora da faixa com id novo e rejeitado.",
+        _policy_attack(lambda mutated: mutated["resource_budget"].__setitem__(
+            "memory_mb", 999999,
+        )),
+    )
+
+    def _pythonpath(mutated: dict[str, Any]) -> None:
+        _separate_environments(mutated)
+        mutated["fixed_environment"]["PYTHONPATH"] = "/evil"
+        mutated["allowlist_policy"]["fixed_environment"]["PYTHONPATH"] = "/evil"
+
+    _closed(
+        "self_reseal.policy_pythonpath",
+        "SELF_RESEAL: PYTHONPATH injetado com id novo e rejeitado.",
+        _policy_attack(_pythonpath),
+    )
+
+    def _pythonhashseed(mutated: dict[str, Any]) -> None:
+        _separate_environments(mutated)
+        mutated["fixed_environment"]["PYTHONHASHSEED"] = "123"
+        mutated["allowlist_policy"]["fixed_environment"]["PYTHONHASHSEED"] = "123"
+
+    _closed(
+        "self_reseal.policy_pythonhashseed",
+        "SELF_RESEAL: PYTHONHASHSEED alterado com id novo e rejeitado.",
+        _policy_attack(_pythonhashseed),
+    )
+
+    def _diverge(mutated: dict[str, Any]) -> None:
+        _separate_environments(mutated)
+        mutated["allowlist_policy"]["fixed_environment"]["PYTHONHASHSEED"] = "123"
+
+    _closed(
+        "self_reseal.policy_env_copies_diverge",
+        "SELF_RESEAL: as duas copias de fixed_environment divergentes sao rejeitadas.",
+        _policy_attack(_diverge),
+    )
+
+    def _shell(mutated: dict[str, Any]) -> None:
+        mutated["allowlist_policy"] = dict(mutated["allowlist_policy"])
+        mutated["allowlist_policy"]["shell_allowed"] = True
+
+    _closed(
+        "self_reseal.policy_shell_allowed",
+        "SELF_RESEAL: shell_allowed true com id novo e rejeitado.",
+        _policy_attack(_shell),
+    )
+
+    def _runner_argv() -> Any:
+        mutated_runner = deepcopy(runner)
+        mutated_runner["command_plan"] = [dict(row) for row in mutated_runner["command_plan"]]
+        mutated_runner["command_plan"][0] = dict(mutated_runner["command_plan"][0])
+        mutated_runner["command_plan"][0]["argv"] = ["-c", "ARBITRARY"]
+        _bind_runner_contract_ids(mutated_runner)
+        if mutated_runner.get("runner_contract_id") == runner.get("runner_contract_id"):
+            return {"state": "NOT_RESEALED"}
+        try:
+            assert_runner_policy_boundary(mutated_runner, policy)
+        except (TypeError, ValueError):
+            pass
+        else:
+            return {"state": "ORIGINAL_POLICY_ACCEPTED"}
+        followed = deepcopy(policy)
+        followed["runner_contract_id"] = mutated_runner["runner_contract_id"]
+        followed["runner_contract_manifest_id"] = mutated_runner["runner_contract_manifest_id"]
+        followed["resource_budget"] = dict(mutated_runner["resource_budget"])
+        followed["validated_command_plan"] = deepcopy(mutated_runner["command_plan"])
+        _bind_command_policy_ids(followed)
+        return assert_runner_policy_boundary(mutated_runner, followed)
+
+    _closed(
+        "self_reseal.runner_argv_boundary",
+        "SELF_RESEAL: runner com argv adulterado nao atravessa a fronteira.",
+        _runner_argv,
+    )
+
+    def _budget_old_policy() -> Any:
+        mutated_runner = deepcopy(runner)
+        mutated_runner["resource_budget"] = dict(mutated_runner["resource_budget"])
+        mutated_runner["resource_budget"]["runtime_seconds"] = 600
+        _bind_runner_contract_ids(mutated_runner)
+        if mutated_runner.get("runner_contract_id") == runner.get("runner_contract_id"):
+            return {"state": "NOT_RESEALED"}
+        withheld = build_command_policy_contract(mutated_runner)
+        if withheld.get("state") == "READY_FOR_EXECUTABLE_PINNING_REVIEW":
+            return {"state": "READY_WITHOUT_PROVENANCE"}
+        try:
+            build_command_policy_contract(mutated_runner, **upstream)
+        except (TypeError, ValueError):
+            pass
+        else:
+            return {"state": "ORIGINAL_UPSTREAM_ACCEPTED"}
+        return assert_runner_policy_boundary(mutated_runner, policy, **upstream)
+
+    _closed(
+        "self_reseal.runner_budget_old_policy",
+        "SELF_RESEAL: budget 600 resealed contra o upstream original nao fica READY e a policy antiga e rejeitada.",
+        _budget_old_policy,
+    )
+
+    def _joint() -> Any:
+        mutated_runner = deepcopy(runner)
+        mutated_runner["command_plan"] = [dict(row) for row in mutated_runner["command_plan"]]
+        mutated_runner["command_plan"][1] = dict(mutated_runner["command_plan"][1])
+        mutated_runner["command_plan"][1]["argv"] = ["-c", "ARBITRARY"]
+        _bind_runner_contract_ids(mutated_runner)
+        followed = deepcopy(policy)
+        followed["runner_contract_id"] = mutated_runner["runner_contract_id"]
+        followed["runner_contract_manifest_id"] = mutated_runner["runner_contract_manifest_id"]
+        followed["resource_budget"] = dict(mutated_runner["resource_budget"])
+        followed["validated_command_plan"] = deepcopy(mutated_runner["command_plan"])
+        _bind_command_policy_ids(followed)
+        if (
+            mutated_runner.get("runner_contract_id") == runner.get("runner_contract_id")
+            or followed.get("command_policy_id") == policy.get("command_policy_id")
+        ):
+            return {"state": "NOT_RESEALED"}
+        return assert_runner_policy_boundary(mutated_runner, followed)
+
+    _closed(
+        "self_reseal.joint_documents",
+        "SELF_RESEAL: runner e policy adulterados juntos, com ids novos, sao rejeitados.",
+        _joint,
+    )
+
+    def _budget_mismatch() -> Any:
+        mutated = deepcopy(policy)
+        mutated["resource_budget"] = dict(mutated["resource_budget"])
+        mutated["resource_budget"]["runtime_seconds"] = 600
+        _bind_command_policy_ids(mutated)
+        if mutated.get("command_policy_id") == policy.get("command_policy_id"):
+            return {"state": "NOT_RESEALED"}
+        try:
+            assert_command_policy_integrity(mutated)
+        except (TypeError, ValueError):
+            return {"state": "INDIVIDUAL_POLICY_REJECTED"}
+        return assert_runner_policy_boundary(runner, mutated)
+
+    _closed(
+        "self_reseal.budget_mismatch_both_valid",
+        "SELF_RESEAL: budgets validos e diferentes entre runner e policy sao rejeitados.",
+        _budget_mismatch,
+    )
+    _closed(
+        "self_reseal.plan_not_canonical",
+        "SELF_RESEAL: plano diferente do template canonico com id novo e rejeitado.",
+        _policy_attack(lambda mutated: mutated["validated_command_plan"][2].__setitem__(
+            "argv", ["diff", "--check", "--exit-code"],
+        )),
+    )
+
+    def _nested(mutated: dict[str, Any]) -> None:
+        _separate_environments(mutated)
+        mutated["validated_command_plan"] = deepcopy(mutated["validated_command_plan"])
+        mutated["validated_command_plan"][0]["argv"] = list(
+            mutated["validated_command_plan"][0]["argv"]
+        )
+        mutated["validated_command_plan"][0]["argv"][-1] = "<MUTATED_SCOPE>"
+        mutated["fixed_environment"]["PYTHONHASHSEED"] = "123"
+
+    _closed(
+        "self_reseal.nested_mutation",
+        "SELF_RESEAL: deep-copy com mutacao aninhada e id novo e rejeitado.",
+        _policy_attack(_nested),
+    )
+    _closed(
+        "self_reseal.authority_flag",
+        "SELF_RESEAL: execution_authorized true com id novo e rejeitado.",
+        _policy_attack(lambda mutated: mutated.__setitem__("execution_authorized", True)),
+    )
+    _closed(
+        "self_reseal.security_flag_relaxed",
+        "SELF_RESEAL: path_lookup_allowed true com id novo e rejeitado.",
+        _policy_attack(lambda mutated: mutated.__setitem__("path_lookup_allowed", True)),
+    )
+
+    def _extra_key(mutated: dict[str, Any]) -> None:
+        _separate_environments(mutated)
+        mutated["fixed_environment"]["LC_ALL"] = "C"
+        mutated["allowlist_policy"]["fixed_environment"]["LC_ALL"] = "C"
+
+    _closed(
+        "self_reseal.extra_environment_key",
+        "SELF_RESEAL: chave extra de ambiente com id novo e rejeitada.",
+        _policy_attack(_extra_key),
+    )
+
+    status, _result = _invoke(lambda: assert_runner_policy_boundary(runner, policy, **upstream))
+    expected = expected_command_policy_payload(runner, **upstream)
+    semantic = (
+        status == "ACCEPT"
+        and policy.get("state") == "READY_FOR_EXECUTABLE_PINNING_REVIEW"
+        and policy.get("execution_authorized") is False
+        and policy.get("os_sandbox_verified") is False
+        and policy.get("executable_pinning_verified") is False
+        and policy.get("resource_budget") == runner.get("resource_budget")
+        and policy.get("validated_command_plan") == expected.get("validated_command_plan")
+        and policy.get("fixed_environment") == dict(FIXED_ENVIRONMENT)
+        and (policy.get("allowlist_policy") or {}).get("fixed_environment") == dict(FIXED_ENVIRONMENT)
+        and policy.get("runner_contract_id") == runner.get("runner_contract_id")
+        and policy.get("runner_contract_manifest_id") == runner.get("runner_contract_manifest_id")
+    )
+    findings.append(_finding(
+        "self_reseal.legitimate_constructor",
+        "atlasquant_aion_developer_command_policy",
+        "Documento produzido pelo constructor atravessa a fronteira com o plano canonico."
+        if semantic else
+        "Documento produzido pelo constructor nao passou na revalidacao semantica.",
+        "PASS" if semantic else "GAP",
+        "" if semantic else "HIGH",
+    ))
+    return findings
+
+
+def _upstream_provenance_surface(_world: _World) -> list[dict[str, str]]:
+    """A matching digest does not prove upstream origin or a ready state.
+
+    UPSTREAM_PROVENANCE_RESEAL recomputes ids after a lineage or target edit.
+    BLOCKED_TO_READY_PROMOTION rewrites state and blockers.
+    REVIEW_PRINCIPAL_MISMATCH changes the reviewer principal.
+    TEST_TARGET_ORIGIN_MISMATCH leaves the builder test contract behind.
+    READY counts only when provenance and state are reconstructed.
+    """
+    findings: list[dict[str, str]] = []
+    builder = _sealed_runner_request(["test_module.py"])
+    preflight = _sealed_preflight(builder)
+    patch = _sealed_patch(builder, preflight)
+    attestation = attestation_for_documents(builder, preflight, patch)
+    runner = build_runner_contract(
+        builder,
+        preflight,
+        patch,
+        content_attestation=attestation,
+        human_patch_reviewed=True,
+        human_patch_reviewer="reviewer-1",
+        human_patch_review_refs=["review:patch:1"],
+    )
+    policy = build_command_policy_contract(
+        runner,
+        builder_request=builder,
+        preflight=preflight,
+        patch_validation=patch,
+        content_attestation=attestation,
+    )
+
+    def _closed(invariant_id: str, description: str, fn: Callable[[], Any]) -> None:
+        status, _result = _invoke(fn)
+        closed = status == "REJECT"
+        findings.append(_finding(
+            invariant_id,
+            "atlasquant_aion_developer_runner_contract",
+            description if closed else description + " O documento resealed foi aceito.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    def _provenance(document: Mapping[str, Any], patch_doc=patch, attestation_doc=attestation) -> None:
+        assert_runner_provenance(document, builder, preflight, patch_doc, attestation_doc)
+
+    def _lineage(field: str, value: str) -> Callable[[], Any]:
+        def run() -> Any:
+            mutated = deepcopy(runner)
+            mutated["lineage"][field] = value
+            _bind_runner_contract_ids(mutated)
+            if mutated.get("runner_contract_id") == runner.get("runner_contract_id"):
+                return {"state": "NOT_RESEALED"}
+            return _provenance(mutated)
+        return run
+
+    _closed(
+        "upstream_provenance.builder_request_id",
+        "UPSTREAM_PROVENANCE_RESEAL: builder_request_id com id novo e rejeitado.",
+        _lineage("builder_request_id", "DEVBUILD-OTHERREQUEST1"),
+    )
+    _closed(
+        "upstream_provenance.preflight_id",
+        "UPSTREAM_PROVENANCE_RESEAL: preflight_id com id novo e rejeitado.",
+        _lineage("preflight_id", "DEVPREF-OTHERREQUEST01"),
+    )
+    _closed(
+        "upstream_provenance.patch_validation_id",
+        "UPSTREAM_PROVENANCE_RESEAL: patch_validation_id com id novo e rejeitado.",
+        _lineage("patch_validation_id", "DEVPATCHVAL-OTHER"),
+    )
+    _closed(
+        "upstream_provenance.patch_digest",
+        "UPSTREAM_PROVENANCE_RESEAL: patch_digest com id novo e rejeitado.",
+        _lineage("patch_digest", "DEVPATCH-OTHER"),
+    )
+    _closed(
+        "upstream_provenance.attestation_id",
+        "UPSTREAM_PROVENANCE_RESEAL: content_attestation_id com id novo e rejeitado.",
+        _lineage("content_attestation_id", "DEVATT-" + ("A" * 18)),
+    )
+
+    def _promote_review() -> Any:
+        blocked = build_runner_contract(
+            builder,
+            preflight,
+            patch,
+            content_attestation=attestation,
+            human_patch_reviewed=False,
+            human_patch_reviewer="reviewer-1",
+            human_patch_review_refs=["review:patch:1"],
+        )
+        if "HUMAN_PATCH_REVIEW_REQUIRED" not in list(blocked.get("blockers") or []):
+            return {"state": "NOT_BLOCKED"}
+        promoted = deepcopy(blocked)
+        promoted["state"] = "READY_FOR_RUNNER_DESIGN_REVIEW"
+        promoted["blockers"] = []
+        if promoted.get("runner_contract_id") != blocked.get("runner_contract_id"):
+            return {"state": "ID_CHANGED"}
+        return assert_runner_contract_integrity(promoted)
+
+    _closed(
+        "blocked_to_ready.review_false_same_id",
+        "BLOCKED_TO_READY_PROMOTION: review false com state READY e o id antigo e rejeitado.",
+        _promote_review,
+    )
+
+    def _promote_review_reseal() -> Any:
+        blocked = build_runner_contract(
+            builder,
+            preflight,
+            patch,
+            content_attestation=attestation,
+            human_patch_reviewed=False,
+            human_patch_reviewer="reviewer-1",
+            human_patch_review_refs=["review:patch:1"],
+        )
+        promoted = deepcopy(blocked)
+        promoted["state"] = "READY_FOR_RUNNER_DESIGN_REVIEW"
+        promoted["blockers"] = []
+        _bind_runner_contract_ids(promoted)
+        if promoted.get("runner_contract_id") == blocked.get("runner_contract_id"):
+            return {"state": "NOT_RESEALED"}
+        return _provenance(promoted)
+
+    _closed(
+        "blocked_to_ready.review_false_resealed",
+        "BLOCKED_TO_READY_PROMOTION: review false com id recalculado e rejeitado.",
+        _promote_review_reseal,
+    )
+
+    def _missing_refs() -> Any:
+        mutated = deepcopy(runner)
+        mutated["review"]["human_patch_review_refs"] = []
+        mutated["state"] = "READY_FOR_RUNNER_DESIGN_REVIEW"
+        mutated["blockers"] = []
+        _bind_runner_contract_ids(mutated)
+        return _provenance(mutated)
+
+    _closed(
+        "blocked_to_ready.missing_refs",
+        "BLOCKED_TO_READY_PROMOTION: review refs ausentes com state READY e rejeitado.",
+        _missing_refs,
+    )
+
+    def _revision() -> Any:
+        forged = deepcopy(patch)
+        forged["revision_binding"] = dict(forged["revision_binding"])
+        forged["revision_binding"]["revision_content_verified"] = True
+        forged["state"] = "READY_FOR_PATCH_REVIEW"
+        forged["blockers"] = []
+        return build_runner_contract(
+            builder,
+            preflight,
+            forged,
+            content_attestation=attestation,
+            human_patch_reviewed=True,
+            human_patch_reviewer="reviewer-1",
+            human_patch_review_refs=["review:patch:1"],
+        )
+
+    _closed(
+        "blocked_to_ready.revision_unverified",
+        "BLOCKED_TO_READY_PROMOTION: revision_content_verified true e rejeitado; o valor canonico permanece false.",
+        _revision,
+    )
+
+    def _missing_targets() -> Any:
+        mutated = deepcopy(runner)
+        mutated["tests"]["targets"] = []
+        mutated["state"] = "READY_FOR_RUNNER_DESIGN_REVIEW"
+        mutated["blockers"] = []
+        _bind_runner_contract_ids(mutated)
+        return _provenance(mutated)
+
+    _closed(
+        "blocked_to_ready.missing_targets",
+        "BLOCKED_TO_READY_PROMOTION: targets vazios com state READY e rejeitado.",
+        _missing_targets,
+    )
+
+    def _policy_promoted() -> Any:
+        bad = deepcopy(runner)
+        bad["command_plan"] = [dict(row) for row in bad["command_plan"]]
+        bad["command_plan"][0] = dict(bad["command_plan"][0])
+        bad["command_plan"][0]["argv"] = ["-c", "ARBITRARY"]
+        _bind_runner_contract_ids(bad)
+        blocked = build_command_policy_contract(bad)
+        if blocked.get("state") != "BLOCKED" or not list(blocked.get("blockers") or []):
+            return {"state": "NOT_BLOCKED"}
+        promoted = deepcopy(blocked)
+        promoted["state"] = "READY_FOR_EXECUTABLE_PINNING_REVIEW"
+        promoted["blockers"] = []
+        promoted["validated_command_plan"] = deepcopy(policy["validated_command_plan"])
+        _bind_command_policy_ids(promoted)
+        if promoted.get("command_policy_id") == blocked.get("command_policy_id"):
+            return {"state": "NOT_RESEALED"}
+        return assert_runner_policy_boundary(bad, promoted)
+
+    _closed(
+        "blocked_to_ready.policy_promoted",
+        "BLOCKED_TO_READY_PROMOTION: policy BLOCKED canonizada para READY e rejeitada.",
+        _policy_promoted,
+    )
+
+    def _policy_blockers() -> Any:
+        mutated = deepcopy(policy)
+        mutated["blockers"] = ["PATH_LOOKUP_NOT_ALLOWED"]
+        _bind_command_policy_ids(mutated)
+        if mutated.get("state") != "READY_FOR_EXECUTABLE_PINNING_REVIEW":
+            return {"state": "NOT_READY"}
+        if mutated.get("command_policy_id") == policy.get("command_policy_id"):
+            return {"state": "NOT_RESEALED"}
+        return assert_command_policy_integrity(mutated)
+
+    _closed(
+        "blocked_to_ready.policy_ready_with_blockers",
+        "BLOCKED_TO_READY_PROMOTION: policy READY com blockers nao vazios e rejeitada.",
+        _policy_blockers,
+    )
+
+    def _principal() -> Any:
+        mutated = deepcopy(runner)
+        mutated["review"]["human_patch_reviewer_principal_id"] = "prn_otherrev1"
+        _bind_runner_contract_ids(mutated)
+        if mutated.get("runner_contract_id") == runner.get("runner_contract_id"):
+            return {"state": "NOT_RESEALED"}
+        try:
+            assert_runner_contract_integrity(mutated)
+        except (TypeError, ValueError):
+            return {"state": "LOCAL_INTEGRITY_REJECTED"}
+        return _provenance(mutated)
+
+    _closed(
+        "review_principal.mismatch",
+        "REVIEW_PRINCIPAL_MISMATCH: principal diferente com id novo e rejeitado.",
+        _principal,
+    )
+
+    def _reviewed_false() -> Any:
+        mutated = deepcopy(runner)
+        mutated["review"]["human_patch_reviewed"] = False
+        mutated["state"] = "READY_FOR_RUNNER_DESIGN_REVIEW"
+        mutated["blockers"] = []
+        _bind_runner_contract_ids(mutated)
+        return _provenance(mutated)
+
+    _closed(
+        "review_principal.reviewed_false",
+        "REVIEW_PRINCIPAL_MISMATCH: human_patch_reviewed false com id novo e rejeitado.",
+        _reviewed_false,
+    )
+
+    def _refs_removed() -> Any:
+        mutated = deepcopy(runner)
+        mutated["review"]["human_patch_review_refs"] = []
+        mutated["state"] = "READY_FOR_RUNNER_DESIGN_REVIEW"
+        mutated["blockers"] = []
+        _bind_runner_contract_ids(mutated)
+        return _provenance(mutated)
+
+    _closed(
+        "review_principal.refs_removed",
+        "REVIEW_PRINCIPAL_MISMATCH: review refs removidas com state READY e rejeitadas.",
+        _refs_removed,
+    )
+
+    display = deepcopy(runner)
+    display["review"]["human_patch_reviewer"] = "other-reviewer"
+    display_same = expected_runner_contract_id(display) == runner.get("runner_contract_id")
+    display_status, _display_result = _invoke(lambda: _provenance(display))
+    display_ok = (
+        display_same
+        and display_status == "ACCEPT"
+        and display["review"].get("human_patch_reviewer_principal_id") == "prn_reviewer1"
+    )
+    findings.append(_finding(
+        "review_principal.display_is_label",
+        "atlasquant_aion_developer_runner_contract",
+        "REVIEW_PRINCIPAL_MISMATCH: o display do revisor nao muda a identidade."
+        if display_ok else
+        "O display do revisor alterou a identidade ou a proveniencia.",
+        "PASS" if display_ok else "GAP",
+        "" if display_ok else "HIGH",
+    ))
+
+    def _targets(values: list[str]) -> Callable[[], Any]:
+        def run() -> Any:
+            mutated = deepcopy(runner)
+            mutated["tests"]["targets"] = values
+            mutated["state"] = "READY_FOR_RUNNER_DESIGN_REVIEW"
+            mutated["blockers"] = []
+            _bind_runner_contract_ids(mutated)
+            if mutated.get("runner_contract_id") == runner.get("runner_contract_id"):
+                return {"state": "NOT_RESEALED"}
+            return _provenance(mutated)
+        return run
+
+    _closed(
+        "test_target_origin.replaced",
+        "TEST_TARGET_ORIGIN_MISMATCH: lista valida diferente da origem e rejeitada.",
+        _targets(["test_module.py::extra"]),
+    )
+    _closed(
+        "test_target_origin.removed",
+        "TEST_TARGET_ORIGIN_MISMATCH: target aprovado removido e rejeitado.",
+        _targets([]),
+    )
+    _closed(
+        "test_target_origin.unapproved",
+        "TEST_TARGET_ORIGIN_MISMATCH: target nao aprovado e rejeitado.",
+        _targets(list(runner["tests"]["targets"]) + ["test_other.py"]),
+    )
+
+    def _gates() -> Any:
+        mutated = deepcopy(runner)
+        mutated["tests"]["mandatory_gates"] = list(REQUIRED_MANDATORY_GATES) + ["EXTRA_GATE"]
+        _bind_runner_contract_ids(mutated)
+        if mutated.get("runner_contract_id") == runner.get("runner_contract_id"):
+            return {"state": "NOT_RESEALED"}
+        return _provenance(mutated)
+
+    _closed(
+        "test_target_origin.gates",
+        "TEST_TARGET_ORIGIN_MISMATCH: mandatory gates diferentes da origem e rejeitadas.",
+        _gates,
+    )
+
+    def _joint() -> Any:
+        mutated = deepcopy(runner)
+        mutated["tests"]["targets"] = ["test_other.py"]
+        _bind_runner_contract_ids(mutated)
+        followed = deepcopy(policy)
+        followed["runner_contract_id"] = mutated["runner_contract_id"]
+        followed["runner_contract_manifest_id"] = mutated["runner_contract_manifest_id"]
+        _bind_command_policy_ids(followed)
+        if (
+            mutated.get("runner_contract_id") == runner.get("runner_contract_id")
+            or followed.get("command_policy_id") == policy.get("command_policy_id")
+        ):
+            return {"state": "NOT_RESEALED"}
+        return _provenance(mutated)
+
+    _closed(
+        "upstream_provenance.joint_reseal",
+        "UPSTREAM_PROVENANCE_RESEAL: runner e policy resealed juntos contra o upstream original sao rejeitados.",
+        _joint,
+    )
+
+    status, _result = _invoke(lambda: _provenance(runner))
+    boundary_status, _boundary = _invoke(lambda: assert_runner_policy_boundary(
+        runner,
+        policy,
+        builder_request=builder,
+        preflight=preflight,
+        patch_validation=patch,
+        content_attestation=attestation,
+    ))
+    legitimate = (
+        status == "ACCEPT"
+        and boundary_status == "ACCEPT"
+        and runner.get("state") == "READY_FOR_RUNNER_DESIGN_REVIEW"
+        and list(runner.get("blockers") or []) == []
+        and policy.get("state") == "READY_FOR_EXECUTABLE_PINNING_REVIEW"
+        and list(policy.get("blockers") or []) == []
+        and runner.get("execution_authorized") is False
+        and policy.get("execution_authorized") is False
+        and runner.get("tests", {}).get("targets") == ["test_module.py"]
+        and runner.get("review", {}).get("human_patch_reviewer_principal_id") == "prn_reviewer1"
+    )
+    findings.append(_finding(
+        "upstream_provenance.legitimate",
+        "atlasquant_aion_developer_runner_contract",
+        "Cadeia legitima upstream para runner e policy passa com state e blockers reconstruidos."
+        if legitimate else
+        "Cadeia legitima nao passou na reconstrucao de proveniencia.",
+        "PASS" if legitimate else "GAP",
+        "" if legitimate else "HIGH",
+    ))
+    return findings
+
+
+def _policy_provenance_surface(_world: _World) -> list[dict[str, str]]:
+    """A ready command policy must be derived from upstream documents.
+
+    STRUCTURAL PROVENANCE means those documents agree. It does not establish
+    an independent root of trust. A caller boolean is not an input.
+    """
+    findings: list[dict[str, str]] = []
+    runner, builder, preflight, patch, attestation = _runner_bundle(["test_module.py"])
+    upstream = {
+        "builder_request": builder,
+        "preflight": preflight,
+        "patch_validation": patch,
+        "content_attestation": attestation,
+    }
+    policy = build_command_policy_contract(runner, **upstream)
+
+    def _reject(invariant_id: str, description: str, fn: Callable[[], Any]) -> None:
+        status, _result = _invoke(fn)
+        closed = status == "REJECT"
+        findings.append(_finding(
+            invariant_id,
+            "atlasquant_aion_developer_command_policy",
+            description if closed else description + " A policy foi aceita.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    withheld = build_command_policy_contract(runner)
+    missing_closed = (
+        withheld.get("state") == "BLOCKED"
+        and "UPSTREAM_PROVENANCE_REQUIRED" in list(withheld.get("blockers") or [])
+        and withheld.get("upstream_provenance_structurally_verified") is False
+        and withheld.get("upstream_provenance_independently_verified") is False
+        and withheld.get("upstream_provenance_binding_id") == ""
+        and withheld.get("execution_authorized") is False
+    )
+    findings.append(_finding(
+        "policy_provenance.missing_upstream",
+        "atlasquant_aion_developer_command_policy",
+        "POLICY_PROVENANCE: runner canonico sem upstream nao emite policy READY."
+        if missing_closed else
+        "Runner canonico sem upstream ainda emite policy READY.",
+        "BLOCKED_BY_DESIGN" if missing_closed else "GAP",
+        "" if missing_closed else "HIGH",
+    ))
+    _reject(
+        "policy_provenance.caller_structural_true",
+        "POLICY_PROVENANCE: booleano structural do caller sem documentos e rejeitado.",
+        lambda: build_command_policy_contract(
+            runner,
+            upstream_provenance_structurally_verified=True,
+        ),
+    )
+    _reject(
+        "policy_provenance.independent_true",
+        "POLICY_PROVENANCE: independent verification true com id novo e rejeitado.",
+        lambda: assert_command_policy_integrity(_reseal_independent(policy)),
+    )
+
+    def _false_lineage() -> Any:
+        mutated = deepcopy(runner)
+        mutated["lineage"]["builder_request_id"] = "DEVBUILD-OTHERREQUEST1"
+        _bind_runner_contract_ids(mutated)
+        if mutated.get("runner_contract_id") == runner.get("runner_contract_id"):
+            return {"state": "NOT_RESEALED"}
+        return build_command_policy_contract(mutated, **upstream)
+
+    _reject(
+        "policy_provenance.false_lineage",
+        "POLICY_PROVENANCE: lineage falsa com upstream original e rejeitada.",
+        _false_lineage,
+    )
+
+    other = deepcopy(builder)
+    other["lineage"] = dict(other["lineage"])
+    other["lineage"]["snapshot_digest"] = "REPO-OTHER"
+    other = bind_builder_request_lineage(other)
+    other_preflight = _sealed_preflight(other)
+    other_patch = _sealed_patch(other, other_preflight)
+    other_attestation = attestation_for_documents(other, other_preflight, other_patch)
+    other_runner = build_runner_contract(
+        other,
+        other_preflight,
+        other_patch,
+        content_attestation=other_attestation,
+        human_patch_reviewed=True,
+        human_patch_reviewer="reviewer-1",
+        human_patch_review_refs=["review:patch:1"],
+    )
+    _reject(
+        "policy_provenance.different_upstream",
+        "POLICY_PROVENANCE: runner legitimo com upstream diferente e rejeitado.",
+        lambda: build_command_policy_contract(
+            runner,
+            builder_request=other,
+            preflight=other_preflight,
+            patch_validation=other_patch,
+            content_attestation=other_attestation,
+        ),
+    )
+    _reject(
+        "policy_provenance.bundle_swap",
+        "POLICY_PROVENANCE: policy do bundle A com runner e upstream B e rejeitada.",
+        lambda: assert_command_policy_provenance(
+            policy,
+            other_runner,
+            other,
+            other_preflight,
+            other_patch,
+            other_attestation,
+        ),
+    )
+
+    def _claim() -> Any:
+        mutated = deepcopy(policy)
+        mutated["upstream_provenance_binding_id"] = "DEVPROV-" + ("A" * 18)
+        _bind_command_policy_ids(mutated)
+        if mutated.get("command_policy_id") == policy.get("command_policy_id"):
+            return {"state": "NOT_RESEALED"}
+        return assert_command_policy_provenance(
+            mutated, runner, builder, preflight, patch, attestation,
+        )
+
+    _reject(
+        "policy_provenance.structural_claim_reseal",
+        "POLICY_PROVENANCE: claim estrutural resealed sem reconstrucao e rejeitado.",
+        _claim,
+    )
+
+    def _ready_blocker() -> Any:
+        mutated = deepcopy(withheld)
+        mutated["state"] = "READY_FOR_EXECUTABLE_PINNING_REVIEW"
+        mutated["validated_command_plan"] = deepcopy(policy["validated_command_plan"])
+        _bind_command_policy_ids(mutated)
+        return assert_command_policy_integrity(mutated)
+
+    _reject(
+        "policy_provenance.ready_with_provenance_blocker",
+        "POLICY_PROVENANCE: state READY com blocker de proveniencia e rejeitado.",
+        _ready_blocker,
+    )
+
+    def _removed() -> Any:
+        mutated = deepcopy(withheld)
+        mutated["state"] = "READY_FOR_EXECUTABLE_PINNING_REVIEW"
+        mutated["blockers"] = []
+        mutated["upstream_provenance_structurally_verified"] = True
+        mutated["upstream_provenance_binding_id"] = "DEVPROV-" + ("B" * 18)
+        mutated["validated_command_plan"] = deepcopy(policy["validated_command_plan"])
+        _bind_command_policy_ids(mutated)
+        return assert_command_policy_provenance(
+            mutated, runner, builder, preflight, patch, attestation,
+        )
+
+    _reject(
+        "policy_provenance.blocker_removed",
+        "POLICY_PROVENANCE: blocker de proveniencia removido e resealed e rejeitado.",
+        _removed,
+    )
+
+    def _structural_false() -> Any:
+        mutated = deepcopy(policy)
+        mutated["upstream_provenance_structurally_verified"] = False
+        mutated["upstream_provenance_binding_id"] = ""
+        _bind_command_policy_ids(mutated)
+        return assert_command_policy_integrity(mutated)
+
+    _reject(
+        "policy_provenance.structural_false_not_ready",
+        "POLICY_PROVENANCE: structural false nao permanece READY.",
+        _structural_false,
+    )
+
+    status, _result = _invoke(lambda: assert_command_policy_provenance(
+        policy, runner, builder, preflight, patch, attestation,
+    ))
+    environment = build_environment_contract()
+    pinning = build_executable_pinning_spec([
+        {
+            "logical_name": "python",
+            "absolute_path": "/usr/bin/python3",
+            "sha256": "ab" * 32,
+            "file_size_bytes": 128,
+            "version_claim": "claim-only",
+            "verification_evidence_refs": ["evidence:pin:python"],
+        },
+        {
+            "logical_name": "git",
+            "absolute_path": "/usr/bin/git",
+            "sha256": "cd" * 32,
+            "file_size_bytes": 128,
+            "version_claim": "claim-only",
+            "verification_evidence_refs": ["evidence:pin:git"],
+        },
+    ])
+    sandbox_status, sandbox = _invoke(lambda: build_os_sandbox_design_review(
+        policy,
+        pinning,
+        attestation,
+        environment,
+        runner_contract=runner,
+        builder_request=builder,
+        preflight=preflight,
+        patch_validation=patch,
+    ))
+    legitimate = (
+        status == "ACCEPT"
+        and sandbox_status == "ACCEPT"
+        and isinstance(sandbox, Mapping)
+        and sandbox.get("state") == "READY_FOR_OS_SANDBOX_DESIGN_REVIEW"
+        and policy.get("state") == "READY_FOR_EXECUTABLE_PINNING_REVIEW"
+        and list(policy.get("blockers") or []) == []
+        and policy.get("upstream_provenance_structurally_verified") is True
+        and policy.get("upstream_provenance_independently_verified") is False
+        and policy.get("execution_authorized") is False
+        and sandbox.get("execution_authorized") is False
+    )
+    findings.append(_finding(
+        "policy_provenance.legitimate",
+        "atlasquant_aion_developer_command_policy",
+        "POLICY_PROVENANCE: cadeia com documentos upstream concorda e fica estruturalmente ligada."
+        if legitimate else
+        "Cadeia com documentos upstream nao produziu a policy estrutural esperada.",
+        "PASS" if legitimate else "GAP",
+        "" if legitimate else "HIGH",
+    ))
+    cross_bound = (
+        legitimate
+        and policy.get("upstream_provenance_independently_verified") is False
+        and sandbox.get("content_binding_independently_verified") is False
+    )
+    findings.append(_finding(
+        "policy_provenance.cross_bound_not_independent",
+        "atlasquant_aion_developer_command_policy",
+        "POLICY_PROVENANCE: documentos consistentes ficam estruturalmente ligados e independent verification permanece false."
+        if cross_bound else
+        "Documentos consistentes alegaram root of trust independente.",
+        "PASS" if cross_bound else "GAP",
+        "" if cross_bound else "HIGH",
+    ))
+    return findings
+
+
+def _os_sandbox_design_surface(_world: _World) -> list[dict[str, str]]:
+    """OS sandbox design is a data contract. Physical proof is not a result.
+
+    READY_FOR_OS_SANDBOX_PROBE_DESIGN means the probe checklist is described.
+    It does not mean a process, filesystem, or network boundary exists.
+    """
+    findings: list[dict[str, str]] = []
+    runner, builder, preflight, patch, attestation = _runner_bundle(["test_module.py"])
+    policy = build_command_policy_contract(
+        runner,
+        builder_request=builder,
+        preflight=preflight,
+        patch_validation=patch,
+        content_attestation=attestation,
+    )
+
+    def _pins(python_digest: str = "ab" * 32) -> list[dict[str, Any]]:
+        return [
+            {
+                "logical_name": "python",
+                "absolute_path": "/usr/bin/python3",
+                "sha256": python_digest,
+                "file_size_bytes": 128,
+                "version_claim": "claim-only",
+                "verification_evidence_refs": ["evidence:pin:python"],
+            },
+            {
+                "logical_name": "git",
+                "absolute_path": "/usr/bin/git",
+                "sha256": "cd" * 32,
+                "file_size_bytes": 128,
+                "version_claim": "claim-only",
+                "verification_evidence_refs": ["evidence:pin:git"],
+            },
+        ]
+
+    environment = build_environment_contract()
+    pinning = build_executable_pinning_spec(_pins())
+    contract = build_os_sandbox_contract(
+        policy,
+        runner,
+        builder,
+        preflight,
+        patch,
+        attestation,
+        pinning,
+        environment,
+    )
+
+    def _reject(invariant_id: str, description: str, fn: Callable[[], Any]) -> None:
+        status, _result = _invoke(fn)
+        closed = status == "REJECT"
+        findings.append(_finding(
+            invariant_id,
+            "atlasquant_aion_developer_os_sandbox_contract",
+            description if closed else description + " O contrato foi aceito.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    def _closed_state(
+        invariant_id: str,
+        description: str,
+        fn: Callable[[], Any],
+        blocker: str,
+    ) -> None:
+        status, result = _invoke(fn)
+        closed = status == "ACCEPT" and _state_closed(result, blocker)
+        findings.append(_finding(
+            invariant_id,
+            "atlasquant_aion_developer_os_sandbox_contract",
+            description if closed else description + " O desenho nao ficou BLOCKED.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    withheld = build_command_policy_contract(runner)
+    _reject(
+        "os_sandbox.missing_provenance",
+        "SANDBOX_FAKE_VERIFICATION_CLAIM: policy sem proveniencia nao abre o contrato de sandbox.",
+        lambda: build_os_sandbox_contract(
+            withheld, runner, builder, preflight, patch, attestation, pinning, environment,
+        ),
+    )
+
+    def _structural_false() -> Any:
+        mutated = deepcopy(policy)
+        mutated["upstream_provenance_structurally_verified"] = False
+        mutated["upstream_provenance_binding_id"] = ""
+        mutated["state"] = "BLOCKED"
+        mutated["blockers"] = ["UPSTREAM_PROVENANCE_REQUIRED"]
+        _bind_command_policy_ids(mutated)
+        return build_os_sandbox_contract(
+            mutated, runner, builder, preflight, patch, attestation, pinning, environment,
+        )
+
+    _reject(
+        "os_sandbox.structural_false",
+        "SANDBOX_FAKE_VERIFICATION_CLAIM: proveniencia estrutural false nao abre o contrato.",
+        _structural_false,
+    )
+
+    def _independent() -> Any:
+        mutated = deepcopy(policy)
+        mutated["upstream_provenance_independently_verified"] = True
+        _bind_command_policy_ids(mutated)
+        return build_os_sandbox_contract(
+            mutated, runner, builder, preflight, patch, attestation, pinning, environment,
+        )
+
+    _reject(
+        "os_sandbox.independent_true",
+        "SANDBOX_FAKE_VERIFICATION_CLAIM: root of trust independente e rejeitado.",
+        _independent,
+    )
+    _reject(
+        "os_sandbox.fake_pinning_verified",
+        "SANDBOX_FAKE_VERIFICATION_CLAIM: executable_pinning_verified true e rejeitado.",
+        lambda: build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning, environment,
+            executable_pinning_verified=True,
+        ),
+    )
+    _closed_state(
+        "os_sandbox.path_lookup",
+        "SANDBOX_ENVIRONMENT_INHERITANCE: path lookup pedido fica BLOCKED e a flag permanece false.",
+        lambda: build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning,
+            build_environment_contract(path_lookup_allowed=True),
+        ),
+        "PATH_LOOKUP_NOT_ALLOWED",
+    )
+    _closed_state(
+        "os_sandbox.parent_environment",
+        "SANDBOX_ENVIRONMENT_INHERITANCE: heranca do ambiente pai fica BLOCKED.",
+        lambda: build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning,
+            build_environment_contract(inherit_parent_environment=True),
+        ),
+        "PARENT_ENVIRONMENT_INHERITANCE_NOT_ALLOWED",
+    )
+    _closed_state(
+        "os_sandbox.caller_environment",
+        "SANDBOX_ENVIRONMENT_INHERITANCE: override do caller fica BLOCKED.",
+        lambda: build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning,
+            build_environment_contract(caller_environment={"CUSTOM": "1"}),
+        ),
+        "CALLER_ENVIRONMENT_OVERRIDES_NOT_ALLOWED",
+    )
+
+    def _secrets() -> Any:
+        mutated = deepcopy(preflight)
+        mutated["environment_contract"] = dict(mutated["environment_contract"])
+        mutated["environment_contract"]["secrets_mounted"] = True
+        return build_os_sandbox_contract(
+            policy, runner, builder, mutated, patch, attestation, pinning, environment,
+        )
+
+    _reject(
+        "os_sandbox.secrets_mounted",
+        "SANDBOX_ENVIRONMENT_INHERITANCE: secrets montados sao rejeitados.",
+        _secrets,
+    )
+    _reject(
+        "os_sandbox.network_allowed",
+        "SANDBOX_NETWORK_ESCAPE: network_allowed true e rejeitado.",
+        lambda: build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning, environment,
+            network_allowed=True,
+        ),
+    )
+
+    def _network_claim() -> Any:
+        mutated = deepcopy(contract)
+        mutated["network_isolation_verified"] = True
+        _bind_os_sandbox_ids(mutated)
+        return assert_os_sandbox_contract_integrity(mutated)
+
+    _reject(
+        "os_sandbox.network_isolation_claim",
+        "SANDBOX_NETWORK_ESCAPE: network_isolation_verified true e rejeitado.",
+        _network_claim,
+    )
+    _reject(
+        "os_sandbox.shell_allowed",
+        "SANDBOX_CHILD_PROCESS_ESCAPE: shell_allowed true e rejeitado.",
+        lambda: build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning, environment,
+            shell_allowed=True,
+        ),
+    )
+
+    def _child_allow() -> Any:
+        mutated = deepcopy(contract)
+        mutated["child_process_policy"] = "ALLOW"
+        _bind_os_sandbox_ids(mutated)
+        return assert_os_sandbox_contract_integrity(mutated)
+
+    _reject(
+        "os_sandbox.child_process_allow",
+        "SANDBOX_CHILD_PROCESS_ESCAPE: child process ALLOW e rejeitado.",
+        _child_allow,
+    )
+    _reject(
+        "os_sandbox.repo_write",
+        "SANDBOX_FILESYSTEM_ESCAPE: escrita no repositorio e rejeitada.",
+        lambda: build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning, environment,
+            repo_write_allowed=True,
+        ),
+    )
+
+    def _filesystem_claim() -> Any:
+        mutated = deepcopy(contract)
+        mutated["filesystem_isolation_verified"] = True
+        _bind_os_sandbox_ids(mutated)
+        return assert_os_sandbox_contract_integrity(mutated)
+
+    _reject(
+        "os_sandbox.filesystem_isolation_claim",
+        "SANDBOX_FILESYSTEM_ESCAPE: filesystem_isolation_verified true e rejeitado.",
+        _filesystem_claim,
+    )
+
+    def _symlink_claim() -> Any:
+        mutated = deepcopy(contract)
+        mutated["symlink_physical_boundary_verified"] = True
+        _bind_os_sandbox_ids(mutated)
+        return assert_os_sandbox_contract_integrity(mutated)
+
+    _reject(
+        "os_sandbox.symlink_claim",
+        "SANDBOX_SYMLINK_ESCAPE: symlink_physical_boundary_verified true e rejeitado.",
+        _symlink_claim,
+    )
+
+    def _hardlink_claim() -> Any:
+        mutated = deepcopy(contract)
+        mutated["hardlink_physical_boundary_verified"] = True
+        _bind_os_sandbox_ids(mutated)
+        return assert_os_sandbox_contract_integrity(mutated)
+
+    _reject(
+        "os_sandbox.hardlink_claim",
+        "SANDBOX_HARDLINK_ESCAPE: hardlink_physical_boundary_verified true e rejeitado.",
+        _hardlink_claim,
+    )
+    _reject(
+        "os_sandbox.verified_claim",
+        "SANDBOX_FAKE_VERIFICATION_CLAIM: os_sandbox_verified true e rejeitado.",
+        lambda: build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning, environment,
+            os_sandbox_verified=True,
+        ),
+    )
+    _reject(
+        "os_sandbox.resource_limits_claim",
+        "SANDBOX_RESOURCE_BUDGET_ESCAPE: resource_limits_verified true e rejeitado.",
+        lambda: build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning, environment,
+            resource_limits_verified=True,
+        ),
+    )
+
+    def _budget_escape() -> Any:
+        mutated = deepcopy(policy)
+        mutated["resource_budget"] = dict(mutated["resource_budget"])
+        mutated["resource_budget"]["max_commands"] = 1
+        _bind_command_policy_ids(mutated)
+        return build_os_sandbox_contract(
+            mutated, runner, builder, preflight, patch, attestation, pinning, environment,
+        )
+
+    budget_status, budget_result = _invoke(_budget_escape)
+    budget_closed = budget_status == "REJECT" or (
+        budget_status == "ACCEPT" and _state_closed(budget_result, "RESOURCE_BUDGET_MISMATCH")
+    )
+    findings.append(_finding(
+        "os_sandbox.budget_escape",
+        "atlasquant_aion_developer_os_sandbox_contract",
+        "SANDBOX_RESOURCE_BUDGET_ESCAPE: orcamento divergente nao vira READY."
+        if budget_closed else
+        "Orcamento divergente abriu um contrato READY.",
+        "BLOCKED_BY_DESIGN" if budget_closed else "GAP",
+        "" if budget_closed else "HIGH",
+    ))
+    _reject(
+        "os_sandbox.platform_adapter_claim",
+        "SANDBOX_FAKE_VERIFICATION_CLAIM: platform_adapter_verified true e rejeitado.",
+        lambda: build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning, environment,
+            platform_adapter_verified=True,
+        ),
+    )
+
+    def _clear_physical() -> Any:
+        mutated = deepcopy(contract)
+        mutated["physical_proof_blockers"] = []
+        _bind_os_sandbox_ids(mutated)
+        return assert_os_sandbox_contract_integrity(mutated)
+
+    _reject(
+        "os_sandbox.cleared_physical_proof",
+        "SANDBOX_FAKE_VERIFICATION_CLAIM: limpar a lista de prova fisica nao e um probe passado.",
+        _clear_physical,
+    )
+
+    def _stale_ready() -> Any:
+        blocked = build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning,
+            build_environment_contract(path_lookup_allowed=True),
+        )
+        promoted = deepcopy(blocked)
+        promoted["state"] = OS_SANDBOX_READY_STATE
+        promoted["blockers"] = []
+        return assert_os_sandbox_contract_integrity(promoted)
+
+    _reject(
+        "os_sandbox.stale_ready_id",
+        "SANDBOX_STATE_PROMOTION: BLOCKED para READY com o mesmo id e rejeitado.",
+        _stale_ready,
+    )
+
+    def _reseal_promotion() -> Any:
+        bad_environment = build_environment_contract(path_lookup_allowed=True)
+        blocked = build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning, bad_environment,
+        )
+        promoted = deepcopy(blocked)
+        promoted["state"] = OS_SANDBOX_READY_STATE
+        promoted["blockers"] = []
+        _bind_os_sandbox_ids(promoted)
+        return assert_os_sandbox_contract(
+            promoted, policy, runner, builder, preflight, patch, attestation, pinning, bad_environment,
+        )
+
+    _reject(
+        "os_sandbox.reseal_promotion",
+        "SANDBOX_STATE_PROMOTION: reseal de BLOCKED para READY ainda reconstrui blockers.",
+        _reseal_promotion,
+    )
+    _reject(
+        "os_sandbox.swapped_environment",
+        "SANDBOX_ENVIRONMENT_INHERITANCE: environment contract trocado e rejeitado.",
+        lambda: assert_os_sandbox_contract(
+            contract, policy, runner, builder, preflight, patch, attestation, pinning,
+            build_environment_contract(path_lookup_allowed=True),
+        ),
+    )
+    _reject(
+        "os_sandbox.swapped_pinning",
+        "SANDBOX_FAKE_VERIFICATION_CLAIM: pinning spec trocado e rejeitado.",
+        lambda: assert_os_sandbox_contract(
+            contract, policy, runner, builder, preflight, patch, attestation,
+            build_executable_pinning_spec(_pins("ef" * 32)),
+            environment,
+        ),
+    )
+
+    other = deepcopy(builder)
+    other["lineage"] = dict(other["lineage"])
+    other["lineage"]["snapshot_digest"] = "REPO-OTHER"
+    other = bind_builder_request_lineage(other)
+    other_preflight = _sealed_preflight(other)
+    other_patch = _sealed_patch(other, other_preflight)
+    other_attestation = attestation_for_documents(other, other_preflight, other_patch)
+    other_runner = build_runner_contract(
+        other,
+        other_preflight,
+        other_patch,
+        content_attestation=other_attestation,
+        human_patch_reviewed=True,
+        human_patch_reviewer="reviewer-1",
+        human_patch_review_refs=["review:patch:1"],
+    )
+    other_policy = build_command_policy_contract(
+        other_runner,
+        builder_request=other,
+        preflight=other_preflight,
+        patch_validation=other_patch,
+        content_attestation=other_attestation,
+    )
+    _reject(
+        "os_sandbox.bundle_swap",
+        "SANDBOX_STATE_PROMOTION: contrato do bundle A com runner e policy B e rejeitado.",
+        lambda: assert_os_sandbox_contract(
+            contract,
+            other_policy,
+            other_runner,
+            other,
+            other_preflight,
+            other_patch,
+            other_attestation,
+            pinning,
+            environment,
+        ),
+    )
+
+    def _extra_authority() -> Any:
+        mutated = deepcopy(contract)
+        mutated["sandbox_escape_allowed"] = True
+        return assert_os_sandbox_contract_integrity(mutated)
+
+    _reject(
+        "os_sandbox.extra_authority",
+        "SANDBOX_STATE_PROMOTION: campo extra de autoridade true e rejeitado.",
+        _extra_authority,
+    )
+
+    physical_flags = (
+        "executable_pinning_verified",
+        "os_sandbox_verified",
+        "child_process_policy_verified",
+        "filesystem_isolation_verified",
+        "network_isolation_verified",
+        "resource_limits_verified",
+        "environment_isolation_verified",
+        "output_limits_verified",
+        "symlink_physical_boundary_verified",
+        "hardlink_physical_boundary_verified",
+        "platform_adapter_verified",
+        "content_binding_independently_verified",
+        "upstream_provenance_independently_verified",
+        "execution_authorized",
+        "subprocess_called",
+        "network_called",
+        "writes_files",
+        "runs_tests",
+    )
+    integrity_status, _integrity = _invoke(
+        lambda: assert_os_sandbox_contract(
+            contract, policy, runner, builder, preflight, patch, attestation, pinning, environment,
+        )
+    )
+    legitimate = (
+        integrity_status == "ACCEPT"
+        and contract.get("state") == OS_SANDBOX_READY_STATE
+        and list(contract.get("blockers") or []) == []
+        and list(contract.get("physical_proof_blockers") or []) == list(PHYSICAL_PROOF_BLOCKERS)
+        and contract.get("sandbox_contract_is_data_only") is True
+        and contract.get("child_process_policy") == "DENY_BY_DEFAULT"
+        and contract.get("network_default") == "DENY"
+        and contract.get("source_tree_mode") == "READ_ONLY"
+        and contract.get("platform_adapter") == "UNRESOLVED"
+        and all(contract.get(field) is False for field in physical_flags)
+    )
+    findings.append(_finding(
+        "os_sandbox.legitimate",
+        "atlasquant_aion_developer_os_sandbox_contract",
+        "OS_SANDBOX_DESIGN: cadeia data-only fecha READY_FOR_OS_SANDBOX_PROBE_DESIGN com toda verificacao fisica false."
+        if legitimate else
+        "A cadeia data-only alegou prova fisica ou nao fechou o desenho.",
+        "PASS" if legitimate else "GAP",
+        "" if legitimate else "HIGH",
+    ))
+    return findings
+
+
+def _probe_result_design_surface(_world: _World) -> list[dict[str, str]]:
+    """The probe result is a data contract. No physical measurement is a pass."""
+    findings: list[dict[str, str]] = []
+    runner, builder, preflight, patch, attestation = _runner_bundle(["test_module.py"])
+    policy = build_command_policy_contract(
+        runner,
+        builder_request=builder,
+        preflight=preflight,
+        patch_validation=patch,
+        content_attestation=attestation,
+    )
+    environment = build_environment_contract()
+    pinning = build_executable_pinning_spec([
+        {
+            "logical_name": "python",
+            "absolute_path": "/usr/bin/python3",
+            "sha256": "ab" * 32,
+            "file_size_bytes": 128,
+            "version_claim": "claim-only",
+            "verification_evidence_refs": ["evidence:pin:python"],
+        },
+        {
+            "logical_name": "git",
+            "absolute_path": "/usr/bin/git",
+            "sha256": "cd" * 32,
+            "file_size_bytes": 128,
+            "version_claim": "claim-only",
+            "verification_evidence_refs": ["evidence:pin:git"],
+        },
+    ])
+    sandbox = build_os_sandbox_contract(
+        policy, runner, builder, preflight, patch, attestation, pinning, environment,
+    )
+    result = build_probe_result_contract(
+        sandbox, policy, runner, builder, preflight, patch, attestation, pinning, environment,
+    )
+
+    def _reject(invariant_id: str, description: str, fn: Callable[[], Any]) -> None:
+        status, _ignored = _invoke(fn)
+        closed = status == "REJECT"
+        findings.append(_finding(
+            invariant_id,
+            "atlasquant_aion_developer_os_sandbox_probe_result",
+            description if closed else description + " O resultado foi aceito.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    def _verified() -> Any:
+        mutated = deepcopy(result)
+        mutated["measurements"][0]["verified"] = True
+        _bind_probe_result_ids(mutated)
+        return assert_probe_result_integrity(mutated)
+
+    _reject(
+        "probe_result.verified_true",
+        "PROBE_FALSE_VERIFICATION: measurement verified true e rejeitado.",
+        _verified,
+    )
+    _reject(
+        "probe_result.physical_probe_passed",
+        "PROBE_FALSE_VERIFICATION: physical_probe_passed true e rejeitado.",
+        lambda: build_probe_result_contract(
+            sandbox, policy, runner, builder, preflight, patch, attestation, pinning, environment,
+            physical_probe_passed=True,
+        ),
+    )
+    _reject(
+        "probe_result.execution_authorized",
+        "PROBE_FALSE_VERIFICATION: execution_authorized true e rejeitado.",
+        lambda: build_probe_result_contract(
+            sandbox, policy, runner, builder, preflight, patch, attestation, pinning, environment,
+            execution_authorized=True,
+        ),
+    )
+
+    def _execution_state() -> Any:
+        mutated = deepcopy(result)
+        mutated["state"] = "READY_FOR_EXECUTION"
+        _bind_probe_result_ids(mutated)
+        return assert_probe_result_integrity(mutated)
+
+    _reject(
+        "probe_result.ready_for_execution",
+        "PROBE_STATE_PROMOTION: READY_FOR_EXECUTION e rejeitado.",
+        _execution_state,
+    )
+
+    def _stale_promotion() -> Any:
+        bad_environment = build_environment_contract(path_lookup_allowed=True)
+        bad_sandbox = build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning, bad_environment,
+        )
+        blocked = build_probe_result_contract(
+            bad_sandbox, policy, runner, builder, preflight, patch, attestation, pinning, bad_environment,
+        )
+        promoted = deepcopy(blocked)
+        promoted["state"] = PROBE_RESULT_READY_STATE
+        promoted["blockers"] = []
+        return assert_probe_result_integrity(promoted)
+
+    _reject(
+        "probe_result.stale_promotion",
+        "PROBE_STATE_PROMOTION: BLOCKED para ready com o mesmo id e rejeitado.",
+        _stale_promotion,
+    )
+
+    def _reseal_promotion() -> Any:
+        bad_environment = build_environment_contract(path_lookup_allowed=True)
+        bad_sandbox = build_os_sandbox_contract(
+            policy, runner, builder, preflight, patch, attestation, pinning, bad_environment,
+        )
+        blocked = build_probe_result_contract(
+            bad_sandbox, policy, runner, builder, preflight, patch, attestation, pinning, bad_environment,
+        )
+        promoted = deepcopy(blocked)
+        promoted["state"] = PROBE_RESULT_READY_STATE
+        promoted["blockers"] = []
+        _bind_probe_result_ids(promoted)
+        return assert_probe_result(
+            promoted, bad_sandbox, policy, runner, builder, preflight, patch, attestation,
+            pinning, bad_environment,
+        )
+
+    _reject(
+        "probe_result.reseal_promotion",
+        "PROBE_STATE_PROMOTION: reseal de BLOCKED para ready ainda reconstrui o blocker.",
+        _reseal_promotion,
+    )
+
+    def _stale_binding() -> Any:
+        mutated = deepcopy(result)
+        mutated["os_sandbox_contract_id"] = "DEVOS-STALECONTRACT01"
+        return assert_probe_result_integrity(mutated)
+
+    _reject(
+        "probe_result.stale_binding",
+        "PROBE_STALE_BINDING: os_sandbox_contract_id alterado com o id antigo e rejeitado.",
+        _stale_binding,
+    )
+
+    other = deepcopy(builder)
+    other["lineage"] = dict(other["lineage"])
+    other["lineage"]["snapshot_digest"] = "REPO-OTHER"
+    other = bind_builder_request_lineage(other)
+    other_preflight = _sealed_preflight(other)
+    other_patch = _sealed_patch(other, other_preflight)
+    other_attestation = attestation_for_documents(other, other_preflight, other_patch)
+    other_runner = build_runner_contract(
+        other,
+        other_preflight,
+        other_patch,
+        content_attestation=other_attestation,
+        human_patch_reviewed=True,
+        human_patch_reviewer="reviewer-1",
+        human_patch_review_refs=["review:patch:1"],
+    )
+    other_policy = build_command_policy_contract(
+        other_runner,
+        builder_request=other,
+        preflight=other_preflight,
+        patch_validation=other_patch,
+        content_attestation=other_attestation,
+    )
+    other_sandbox = build_os_sandbox_contract(
+        other_policy, other_runner, other, other_preflight, other_patch, other_attestation,
+        pinning, environment,
+    )
+    _reject(
+        "probe_result.bundle_swap",
+        "PROBE_STALE_BINDING: resultado do bundle A com sandbox B e rejeitado.",
+        lambda: assert_probe_result(
+            result, other_sandbox, other_policy, other_runner, other, other_preflight,
+            other_patch, other_attestation, pinning, environment,
+        ),
+    )
+
+    def _forged_count() -> Any:
+        mutated = deepcopy(result)
+        mutated["coverage"]["required_verified"] = 1
+        _bind_probe_result_ids(mutated)
+        return assert_probe_result_integrity(mutated)
+
+    _reject(
+        "probe_result.forged_verified_count",
+        "PROBE_COVERAGE_FORGERY: required_verified maior que zero e rejeitado.",
+        _forged_count,
+    )
+
+    def _forged_satisfied() -> Any:
+        mutated = deepcopy(result)
+        mutated["physical_proof_satisfied"] = ["EXECUTABLE_PINNING_PROOF_REQUIRED"]
+        _bind_probe_result_ids(mutated)
+        return assert_probe_result_integrity(mutated)
+
+    _reject(
+        "probe_result.forged_satisfied",
+        "PROBE_COVERAGE_FORGERY: physical_proof_satisfied preenchido e rejeitado.",
+        _forged_satisfied,
+    )
+
+    def _cleared_missing() -> Any:
+        mutated = deepcopy(result)
+        mutated["coverage"]["missing"] = []
+        mutated["missing_requirements"] = []
+        _bind_probe_result_ids(mutated)
+        return assert_probe_result_integrity(mutated)
+
+    _reject(
+        "probe_result.cleared_missing",
+        "PROBE_COVERAGE_FORGERY: lista missing esvaziada e rejeitada.",
+        _cleared_missing,
+    )
+    _reject(
+        "probe_result.unknown_authority",
+        "PROBE_UNKNOWN_AUTHORITY: campo safe true e rejeitado.",
+        lambda: assert_probe_result_integrity({**deepcopy(result), "safe": True}),
+    )
+
+    def _unknown_measurement() -> Any:
+        mutated = deepcopy(result)
+        mutated["measurements"][0]["safe"] = True
+        _bind_probe_result_ids(mutated)
+        return assert_probe_result_integrity(mutated)
+
+    _reject(
+        "probe_result.unknown_measurement",
+        "PROBE_UNKNOWN_AUTHORITY: campo desconhecido no measurement e rejeitado.",
+        _unknown_measurement,
+    )
+
+    def _unknown_evidence() -> Any:
+        mutated = deepcopy(result)
+        mutated["measurements"][0]["evidence"]["trusted"] = True
+        _bind_probe_result_ids(mutated)
+        return assert_probe_result_integrity(mutated)
+
+    _reject(
+        "probe_result.unknown_evidence",
+        "PROBE_EVIDENCE_FORGERY: campo desconhecido na evidence e rejeitado.",
+        _unknown_evidence,
+    )
+    _reject(
+        "probe_result.independent_true",
+        "PROBE_ROOT_OF_TRUST_CLAIM: independently_verified true e rejeitado.",
+        lambda: build_probe_result_contract(
+            sandbox, policy, runner, builder, preflight, patch, attestation, pinning, environment,
+            independently_verified=True,
+        ),
+    )
+    _reject(
+        "probe_result.unsupported_platform",
+        "PROBE_PLATFORM_CONFUSION: plataforma UNSUPPORTED nao pode ser verificada.",
+        lambda: build_probe_result_contract(
+            sandbox, policy, runner, builder, preflight, patch, attestation, pinning, environment,
+            platform="UNSUPPORTED",
+        ),
+    )
+
+    def _ambiguous() -> Any:
+        mutated = deepcopy(result)
+        mutated["measurements"][0]["observed_value"] = "PASS"
+        _bind_probe_result_ids(mutated)
+        return assert_probe_result_integrity(mutated)
+
+    _reject(
+        "probe_result.ambiguous_observation",
+        "PROBE_FALSE_VERIFICATION: observacao ambigua nao pode ser PASS.",
+        _ambiguous,
+    )
+
+    status, _checked = _invoke(lambda: assert_probe_result(
+        result, sandbox, policy, runner, builder, preflight, patch, attestation, pinning, environment,
+    ))
+    physical_flags = (
+        "execution_authorized",
+        "physical_probe_passed",
+        "physical_proof_verified",
+        "platform_verified",
+        "independently_verified",
+        "os_sandbox_verified",
+        "executable_pinning_verified",
+    )
+    measurements_unverified = all(
+        item.get("verified") is False
+        and item.get("evidence", {}).get("evidence_is_physical") is False
+        for item in result.get("measurements") or []
+    )
+    legitimate = (
+        status == "ACCEPT"
+        and result.get("state") == PROBE_RESULT_READY_STATE
+        and list(result.get("blockers") or []) == []
+        and result.get("coverage", {}).get("required_verified") == 0
+        and result.get("probe_result_is_data_only") is True
+        and result.get("upstream_contract_independently_verified") is False
+        and measurements_unverified
+        and all(result.get(field) is False for field in physical_flags)
+    )
+    findings.append(_finding(
+        "probe_result.legitimate",
+        "atlasquant_aion_developer_os_sandbox_probe_result",
+        "OS_SANDBOX_PROBE_RESULT_DESIGN: contrato data-only fecha o formato com nenhuma medicao verificada."
+        if legitimate else
+        "O contrato de resultado alegou medicao fisica ou nao fechou o formato.",
+        "PASS" if legitimate else "GAP",
+        "" if legitimate else "HIGH",
+    ))
+    return findings
+
+
+def _pinning_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    environment = build_environment_contract()
+    pinning = build_executable_pinning_spec([
+        {
+            "logical_name": "python",
+            "absolute_path": "/usr/bin/python3",
+            "sha256": "ab" * 32,
+            "file_size_bytes": 128,
+            "version_claim": "claim-only",
+            "verification_evidence_refs": ["evidence:pin:python"],
+        },
+        {
+            "logical_name": "git",
+            "absolute_path": "/usr/bin/git",
+            "sha256": "cd" * 32,
+            "file_size_bytes": 128,
+            "version_claim": "claim-only",
+            "verification_evidence_refs": ["evidence:pin:git"],
+        },
+    ])
+    return pinning, environment
+
+
+def _upstream_semantic_surface(_world: _World) -> list[dict[str, str]]:
+    """Reapply builder, preflight and patch semantics after a reseal.
+
+    UPSTREAM_PATCH_SEMANTIC_INTEGRITY: a secret summary cannot be cleared by
+    rewriting state, blockers or revision_content_verified.
+    UPSTREAM_BUILDER_SEMANTIC_INTEGRITY: a recomputed request id does not admit
+    main or a production alias.
+    UPSTREAM_PREFLIGHT_SEMANTIC_INTEGRITY: an extra blocker or a swapped scope
+    stays rejected after the preflight id is recomputed.
+    UPSTREAM_AUTHORITY_CLAIM: a true or unknown authority field cannot reach
+    Runner, Policy, OS or Probe Result design READY.
+    A coherent artificial bundle remains structural provenance only.
+    """
+    findings: list[dict[str, str]] = []
+
+    def _reject(invariant_id: str, module: str, description: str, fn: Callable[[], Any]) -> None:
+        status, _ignored = _invoke(fn)
+        closed = status == "REJECT"
+        findings.append(_finding(
+            invariant_id,
+            module,
+            description if closed else description + " O documento foi aceito.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    secret = "api_key=" + "AUDITSECRETVALUE"
+    secret_request = structural_builder_sandbox_request(
+        branch="cursor/safe",
+        baseline_ref="main@a",
+        candidate_ref="cursor/safe@b",
+        requested_files=("module.py", "test_module.py"),
+        candidate_tests=("test_module.py",),
+    )
+    secret_preflight = _sealed_preflight(secret_request)
+    secret_patch = (
+        "diff --git a/module.py b/module.py\n"
+        "--- a/module.py\n+++ b/module.py\n"
+        "@@ -1 +1 @@\n-x=1\n+" + secret + "\n"
+    )
+    status, blocked_patch = _invoke(lambda: validate_patch(
+        secret_request,
+        secret_preflight,
+        secret_patch,
+        baseline_ref="main@a",
+        candidate_ref="cursor/safe@b",
+    ))
+    rendered = json.dumps(blocked_patch, default=str) if status == "ACCEPT" else ""
+    secret_closed = (
+        status == "ACCEPT"
+        and _state_closed(blocked_patch, "SECRET_LIKE_ADDITION_NOT_ALLOWED")
+        and secret not in rendered
+        and blocked_patch.get("revision_binding", {}).get("revision_content_verified") is False
+    )
+    findings.append(_finding(
+        "upstream_patch.secret_recorded",
+        "atlasquant_aion_developer_patch_validation",
+        "UPSTREAM_PATCH_SEMANTIC_INTEGRITY: adicao secreta fica BLOCKED e revision_content_verified permanece false."
+        if secret_closed else
+        "UPSTREAM_PATCH_SEMANTIC_INTEGRITY: adicao secreta nao ficou BLOCKED.",
+        "BLOCKED_BY_DESIGN" if secret_closed else "GAP",
+        "" if secret_closed else "HIGH",
+    ))
+
+    def _promote_secret(reseal: bool) -> Any:
+        if not secret_closed:
+            return {"state": "NOT_RECORDED"}
+        forged = deepcopy(blocked_patch)
+        forged["state"] = "READY_FOR_PATCH_REVIEW"
+        forged["blockers"] = []
+        forged["revision_binding"] = dict(forged["revision_binding"])
+        forged["revision_binding"]["revision_content_verified"] = True
+        if reseal:
+            forged["validation_id"] = "DEVPATCH-RESEALEDSECRET"
+        return assert_patch_validation_integrity(forged, secret_request, secret_preflight)
+
+    _reject(
+        "upstream_patch.secret_promotion_stale",
+        "atlasquant_aion_developer_patch_validation",
+        "UPSTREAM_PATCH_SEMANTIC_INTEGRITY: limpar blockers e marcar revision_content_verified true com o id antigo e rejeitado.",
+        lambda: _promote_secret(False),
+    )
+    _reject(
+        "upstream_patch.secret_promotion_reseal",
+        "atlasquant_aion_developer_patch_validation",
+        "UPSTREAM_PATCH_SEMANTIC_INTEGRITY: reseal do validation_id nao apaga o segredo no resumo.",
+        lambda: _promote_secret(True),
+    )
+
+    def _mode_document():
+        return validate_patch(
+            secret_request,
+            secret_preflight,
+            (
+                "diff --git a/module.py b/module.py\n"
+                "old mode 100644\n"
+                "new mode 100755\n"
+                "--- a/module.py\n"
+                "+++ b/module.py\n"
+                "@@ -1 +1 @@\n"
+                "-x=1\n"
+                "+x=2\n"
+            ),
+            baseline_ref="main@a",
+            candidate_ref="cursor/safe@b",
+        )
+
+    def _strip_mode() -> Any:
+        blocked = _mode_document()
+        if blocked.get("state") != "BLOCKED" or "FILE_MODE_CHANGE_NOT_ALLOWED" not in list(blocked.get("blockers") or []):
+            return {"state": "NOT_RECORDED"}
+        if blocked.get("revision_binding", {}).get("revision_content_verified") is not False:
+            return {"state": "VERIFIED"}
+        forged = deepcopy(blocked)
+        summary = dict(forged["files"][0])
+        summary["blockers"] = [
+            item for item in summary["blockers"] if item != "FILE_MODE_CHANGE_NOT_ALLOWED"
+        ]
+        forged["files"] = [summary]
+        forged["blockers"] = [
+            item for item in forged["blockers"] if item != "FILE_MODE_CHANGE_NOT_ALLOWED"
+        ]
+        forged["state"] = "READY_FOR_PATCH_REVIEW"
+        return assert_patch_validation_integrity(forged, secret_request, secret_preflight)
+
+    _reject(
+        "upstream_patch.mode_blocker_stripped",
+        "atlasquant_aion_developer_patch_validation",
+        "PATCH_MODE_BLOCKER_STRIPPED: mode 100644/100755 sem o blocker, com id antigo e revision_content_verified false, e rejeitado.",
+        _strip_mode,
+    )
+
+    def _zero_secret() -> Any:
+        if not secret_closed:
+            return {"state": "NOT_RECORDED"}
+        forged = deepcopy(blocked_patch)
+        summary = dict(forged["files"][0])
+        summary["secret_additions"] = 0
+        summary["blockers"] = [
+            item for item in summary["blockers"] if item != "SECRET_LIKE_ADDITION_NOT_ALLOWED"
+        ]
+        forged["files"] = [summary]
+        forged["secret_like_additions"] = 0
+        forged["blockers"] = [
+            item for item in forged["blockers"] if item != "SECRET_LIKE_ADDITION_NOT_ALLOWED"
+        ]
+        forged["state"] = "READY_FOR_PATCH_REVIEW"
+        return assert_patch_validation_integrity(forged, secret_request, secret_preflight)
+
+    _reject(
+        "upstream_patch.secret_facts_zeroed",
+        "atlasquant_aion_developer_patch_validation",
+        "PATCH_SECRET_FACTS_ZEROED: zerar secret_additions e secret_like_additions com id antigo e revision_content_verified false e rejeitado.",
+        _zero_secret,
+    )
+
+    def _negative_counter() -> Any:
+        forged = deepcopy(blocked_patch if secret_closed else _mode_document())
+        summary = dict(forged["files"][0])
+        summary["deleted_lines"] = -1
+        forged["files"] = [summary]
+        forged["validation_id"] = expected_patch_validation_id(forged)
+        return assert_patch_validation_integrity(forged, secret_request, secret_preflight)
+
+    _reject(
+        "upstream_patch.negative_counter",
+        "atlasquant_aion_developer_patch_validation",
+        "PATCH_NEGATIVE_COUNTER: deleted_lines negativo continua rejeitado depois do reseal do validation_id.",
+        _negative_counter,
+    )
+
+    def _cancel_counters() -> Any:
+        forged = deepcopy(blocked_patch if secret_closed else _mode_document())
+        summary = dict(forged["files"][0])
+        summary["added_lines"] = 1001
+        summary["deleted_lines"] = -1001
+        summary["secret_additions"] = 0
+        summary["blockers"] = []
+        forged["files"] = [summary]
+        forged["changed_lines"] = 0
+        forged["secret_like_additions"] = 0
+        forged["blockers"] = []
+        forged["state"] = "READY_FOR_PATCH_REVIEW"
+        forged["validation_id"] = expected_patch_validation_id(forged)
+        return assert_patch_validation_integrity(forged, secret_request, secret_preflight)
+
+    _reject(
+        "upstream_patch.counter_cancellation",
+        "atlasquant_aion_developer_patch_validation",
+        "PATCH_COUNTER_CANCELLATION: added_lines 1001 e deleted_lines -1001 com changed_lines 0 e rejeitado depois do reseal.",
+        _cancel_counters,
+    )
+
+    def _max_files() -> Any:
+        forged = deepcopy(secret_request)
+        names = [f"module_{index}.py" for index in range(81)]
+        forged["scope"] = dict(forged["scope"])
+        forged["scope"]["requested_files"] = names
+        forged["scope"]["authorized_files"] = names
+        forged = bind_builder_request_lineage(forged)
+        return assert_builder_sandbox_request_integrity(forged)
+
+    _reject(
+        "upstream_builder.max_files_resealed",
+        "atlasquant_aion_developer_builder_sandbox",
+        "BUILDER_MAX_FILES_RESEALED: 81 arquivos com request_id recalculado continuam rejeitados.",
+        _max_files,
+    )
+
+    builder = _sealed_runner_request(["test_module.py"])
+    preflight = _sealed_preflight(builder)
+
+    def _forbidden_branch() -> Any:
+        accepted = []
+        for name in (
+            "main", "master", "production", "prod", "live",
+            "refs/heads/main", "refs/heads/master",
+        ):
+            forged = deepcopy(builder)
+            forged["branch_contract"] = dict(forged["branch_contract"])
+            forged["branch_contract"]["branch"] = name
+            logical = name
+            while logical.startswith("refs/heads/"):
+                logical = logical[len("refs/heads/"):]
+            forged["branch_contract"]["candidate_ref"] = logical + "@bbb"
+            forged = bind_builder_request_lineage(forged)
+            status_code, _ignored = _invoke(lambda forged=forged: build_sandbox_preflight(
+                forged,
+                environment_kind="ISOLATED_WORKTREE",
+                environment_id="sandbox-001",
+                isolated_worktree=True,
+                repository_root_bound=True,
+                network_disabled=True,
+                secrets_mounted=False,
+                command_policy="ALLOWLIST_ONLY",
+            ))
+            if status_code != "REJECT":
+                accepted.append(name)
+        if accepted:
+            return {"state": "ACCEPTED", "branches": accepted}
+        raise ValueError("production/main branch family is forbidden")
+
+    _reject(
+        "upstream_builder.forbidden_branch_reseal",
+        "atlasquant_aion_developer_builder_sandbox",
+        "UPSTREAM_BUILDER_SEMANTIC_INTEGRITY: main e aliases com request_id recalculado continuam rejeitados.",
+        _forbidden_branch,
+    )
+
+    def _extra_blocker(reseal: bool) -> Any:
+        forged = deepcopy(preflight)
+        forged["blockers"] = list(forged.get("blockers") or []) + ["NETWORK_MUST_BE_DISABLED"]
+        forged["state"] = "BLOCKED"
+        forged["preflight_passed"] = False
+        if reseal:
+            forged["preflight_id"] = expected_preflight_id(forged)
+        return assert_sandbox_preflight_integrity(forged, builder)
+
+    _reject(
+        "upstream_preflight.extra_blocker_kept_id",
+        "atlasquant_aion_developer_sandbox_preflight",
+        "UPSTREAM_PREFLIGHT_SEMANTIC_INTEGRITY: blocker extra com o id antigo e rejeitado.",
+        lambda: _extra_blocker(False),
+    )
+    _reject(
+        "upstream_preflight.extra_blocker_resealed",
+        "atlasquant_aion_developer_sandbox_preflight",
+        "UPSTREAM_PREFLIGHT_SEMANTIC_INTEGRITY: blocker extra com id recalculado continua incoerente.",
+        lambda: _extra_blocker(True),
+    )
+
+    def _scope_swap() -> Any:
+        forged = deepcopy(preflight)
+        forged["scope"] = dict(forged["scope"])
+        forged["scope"]["requested_files"] = ["outside.py"]
+        forged["preflight_id"] = expected_preflight_id(forged)
+        assert_sandbox_preflight_integrity(forged, builder)
+        patch = canonical_patch_document(builder, forged)
+        return build_runner_contract(
+            builder,
+            forged,
+            patch,
+            content_attestation=attestation_for_documents(builder, forged, patch),
+            human_patch_reviewed=True,
+            human_patch_reviewer="reviewer-1",
+            human_patch_review_refs=["review:patch:1"],
+        )
+
+    _reject(
+        "upstream_preflight.scope_swap_reseal",
+        "atlasquant_aion_developer_sandbox_preflight",
+        "UPSTREAM_PREFLIGHT_SEMANTIC_INTEGRITY: outside.py com preflight_id recalculado diverge do builder.",
+        _scope_swap,
+    )
+
+    patch = _sealed_patch(builder, preflight)
+    attestation = attestation_for_documents(builder, preflight, patch)
+
+    def _claim(document: Mapping[str, Any], field: str, value: Any, checker: Callable[[Mapping[str, Any]], Any]) -> Any:
+        forged = deepcopy(document)
+        forged[field] = value
+        if field == "execution_authorized" and "request_id" in forged:
+            forged = bind_builder_request_lineage(forged)
+        return checker(forged)
+
+    _reject(
+        "upstream_authority.builder_closed_flag",
+        "atlasquant_aion_developer_builder_sandbox",
+        "UPSTREAM_AUTHORITY_CLAIM: execution_authorized true no builder e rejeitado.",
+        lambda: _claim(builder, "execution_authorized", True, assert_builder_sandbox_request_integrity),
+    )
+    _reject(
+        "upstream_authority.builder_unknown_field",
+        "atlasquant_aion_developer_builder_sandbox",
+        "UPSTREAM_AUTHORITY_CLAIM: physical_probe_passed no builder e campo desconhecido.",
+        lambda: _claim(builder, "physical_probe_passed", True, assert_builder_sandbox_request_integrity),
+    )
+    _reject(
+        "upstream_authority.preflight_closed_flag",
+        "atlasquant_aion_developer_sandbox_preflight",
+        "UPSTREAM_AUTHORITY_CLAIM: execution_authorized true no preflight e rejeitado.",
+        lambda: _claim(
+            preflight, "execution_authorized", True,
+            lambda forged: assert_sandbox_preflight_integrity(forged, builder),
+        ),
+    )
+    _reject(
+        "upstream_authority.preflight_unknown_field",
+        "atlasquant_aion_developer_sandbox_preflight",
+        "UPSTREAM_AUTHORITY_CLAIM: physical_probe_passed no preflight e campo desconhecido.",
+        lambda: _claim(
+            preflight, "physical_probe_passed", True,
+            lambda forged: assert_sandbox_preflight_integrity(forged, builder),
+        ),
+    )
+    _reject(
+        "upstream_authority.patch_closed_flag",
+        "atlasquant_aion_developer_patch_validation",
+        "UPSTREAM_AUTHORITY_CLAIM: execution_authorized true no patch e rejeitado.",
+        lambda: _claim(
+            patch, "execution_authorized", True,
+            lambda forged: assert_patch_validation_integrity(forged, builder, preflight),
+        ),
+    )
+    _reject(
+        "upstream_authority.patch_unknown_field",
+        "atlasquant_aion_developer_patch_validation",
+        "UPSTREAM_AUTHORITY_CLAIM: physical_probe_passed no patch e campo desconhecido.",
+        lambda: _claim(
+            patch, "physical_probe_passed", True,
+            lambda forged: assert_patch_validation_integrity(forged, builder, preflight),
+        ),
+    )
+
+    pinning, environment = _pinning_pair()
+    runner = build_runner_contract(
+        builder, preflight, patch,
+        content_attestation=attestation,
+        human_patch_reviewed=True,
+        human_patch_reviewer="reviewer-1",
+        human_patch_review_refs=["review:patch:1"],
+    )
+    policy = build_command_policy_contract(
+        runner,
+        builder_request=builder,
+        preflight=preflight,
+        patch_validation=patch,
+        content_attestation=attestation,
+    )
+    sandbox = build_os_sandbox_contract(
+        policy, runner, builder, preflight, patch, attestation, pinning, environment,
+    )
+
+    def _forged_upstream_chain() -> Any:
+        forged = deepcopy(builder)
+        forged["execution_authorized"] = True
+        forged = bind_builder_request_lineage(forged)
+        checks = (
+            lambda: build_runner_contract(
+                forged, preflight, patch,
+                content_attestation=attestation,
+                human_patch_reviewed=True,
+                human_patch_reviewer="reviewer-1",
+                human_patch_review_refs=["review:patch:1"],
+            ),
+            lambda: build_command_policy_contract(
+                runner,
+                builder_request=forged,
+                preflight=preflight,
+                patch_validation=patch,
+                content_attestation=attestation,
+            ),
+            lambda: build_os_sandbox_contract(
+                policy, runner, forged, preflight, patch, attestation, pinning, environment,
+            ),
+            lambda: build_probe_result_contract(
+                sandbox, policy, runner, forged, preflight, patch, attestation, pinning, environment,
+            ),
+        )
+        for check in checks:
+            status_code, result = _invoke(check)
+            if status_code != "REJECT":
+                return result
+        raise ValueError("upstream authority claim rejected")
+
+    _reject(
+        "upstream_authority.chain_rejected",
+        "atlasquant_aion_developer_runner_contract",
+        "UPSTREAM_AUTHORITY_CLAIM: builder forjado nao chega a Runner, Policy, OS ou Probe Result READY.",
+        _forged_upstream_chain,
+    )
+
+    result = build_probe_result_contract(
+        sandbox, policy, runner, builder, preflight, patch, attestation, pinning, environment,
+    )
+    flags = (
+        "execution_authorized",
+        "commands_executed",
+        "runs_tests",
+        "network_called",
+        "subprocess_called",
+        "physical_probe_passed",
+        "physical_proof_verified",
+    )
+    legitimate = (
+        builder.get("state") == "READY_FOR_BUILDER_SANDBOX"
+        and preflight.get("state") == "READY_FOR_EXECUTOR_DESIGN_REVIEW"
+        and patch.get("state") == "READY_FOR_PATCH_REVIEW"
+        and patch.get("revision_binding", {}).get("revision_content_verified") is False
+        and runner.get("state") == "READY_FOR_RUNNER_DESIGN_REVIEW"
+        and policy.get("state") == "READY_FOR_EXECUTABLE_PINNING_REVIEW"
+        and sandbox.get("state") == OS_SANDBOX_READY_STATE
+        and result.get("state") == PROBE_RESULT_READY_STATE
+        and all(item.get(field) is not True for item in (builder, preflight, patch, runner, policy, sandbox, result) for field in flags)
+    )
+    findings.append(_finding(
+        "upstream_semantic.legitimate",
+        "atlasquant_aion_developer_runner_contract",
+        "UPSTREAM_SEMANTIC_INTEGRITY: a cadeia legitima chega ao desenho do probe com flags fisicas falsas."
+        if legitimate else
+        "A cadeia legitima nao fechou os estados de desenho ou alegou prova fisica.",
+        "PASS" if legitimate else "GAP",
+        "" if legitimate else "HIGH",
+    ))
+    return findings
+
+
+def _source_bound_patch_surface(_world: _World) -> list[dict[str, str]]:
+    """Replay the transient patch. A stored record is not that replay.
+
+    SOURCE_BOUND_PATCH_PROOF: structural integrity can still accept a coherent
+    reseal. Source-bound verification must reject it when the original bytes
+    are supplied. Caller claims are not independent authority.
+    """
+    findings: list[dict[str, str]] = []
+
+    def _reject(invariant_id: str, description: str, fn: Callable[[], Any]) -> None:
+        status, _ignored = _invoke(fn)
+        closed = status == "REJECT"
+        findings.append(_finding(
+            invariant_id,
+            "atlasquant_aion_developer_source_bound_patch_proof",
+            description if closed else description + " O documento foi aceito.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    builder = structural_builder_sandbox_request(
+        branch="cursor/safe",
+        baseline_ref="main@a",
+        candidate_ref="cursor/safe@b",
+        requested_files=("module.py", "test_module.py"),
+        candidate_tests=("test_module.py",),
+    )
+    preflight = _sealed_preflight(builder)
+    refs = {"baseline_ref": "main@a", "candidate_ref": "cursor/safe@b"}
+    safe_raw = (
+        "diff --git a/module.py b/module.py\n"
+        "--- a/module.py\n+++ b/module.py\n"
+        "@@ -1 +1 @@\n-x=1\n+x=2\n"
+    )
+    mode_raw = (
+        "diff --git a/module.py b/module.py\n"
+        "old mode 100644\n"
+        "new mode 100755\n"
+        "--- a/module.py\n"
+        "+++ b/module.py\n"
+        "@@ -1 +1 @@\n-x=1\n+x=2\n"
+    )
+    secret_raw = (
+        "diff --git a/module.py b/module.py\n"
+        "--- a/module.py\n+++ b/module.py\n"
+        "@@ -1 +1 @@\n-x=1\n+api_key=audit-source-bound\n"
+    )
+
+    def _ready(document: Mapping[str, Any], edits: Mapping[str, Any]) -> dict[str, Any]:
+        forged = deepcopy(document)
+        summary = dict(forged["files"][0])
+        summary.update(dict(edits))
+        forged["files"] = [summary]
+        forged["blockers"] = list(summary.get("blockers") or [])
+        forged["secret_like_additions"] = summary.get("secret_additions")
+        forged["changed_lines"] = int(summary["added_lines"]) + int(summary["deleted_lines"])
+        forged["state"] = "READY_FOR_PATCH_REVIEW" if not forged["blockers"] else "BLOCKED"
+        forged["validation_id"] = expected_patch_validation_id(forged)
+        return forged
+
+    safe = validate_patch(builder, preflight, safe_raw, **refs)
+    mode = validate_patch(builder, preflight, mode_raw, **refs)
+    secret = validate_patch(builder, preflight, secret_raw, **refs)
+    proof = verify_source_bound_patch(builder, preflight, safe, safe_raw, **refs)
+
+    mode_summary = dict(mode["files"][0])
+    mode_summary["mode_changed"] = False
+    mode_summary["blockers"] = []
+    resealed = _ready(mode, mode_summary)
+    structural, _ignored = _invoke(
+        lambda: assert_patch_validation_integrity(resealed, builder, preflight)
+    )
+    source, _ignored = _invoke(
+        lambda: verify_source_bound_patch(builder, preflight, resealed, mode_raw, **refs)
+    )
+    separated = structural == "ACCEPT" and source == "REJECT"
+    findings.append(_finding(
+        "source_bound.coherent_reseal",
+        "atlasquant_aion_developer_source_bound_patch_proof",
+        "SOURCE_BOUND_COHERENT_RESEAL: a integridade estrutural aceita o reseal e a prova source-bound rejeita o patch original."
+        if separated else
+        "SOURCE_BOUND_COHERENT_RESEAL: a separacao entre integridade estrutural e prova source-bound nao fechou.",
+        "BLOCKED_BY_DESIGN" if separated else "GAP",
+        "" if separated else "HIGH",
+    ))
+
+    _reject(
+        "source_bound.swapped_patch",
+        "SOURCE_BOUND_SWAPPED_PATCH: o patch de mode nao comprova o documento do patch seguro.",
+        lambda: verify_source_bound_patch(builder, preflight, safe, mode_raw, **refs),
+    )
+    _reject(
+        "source_bound.truncated_patch",
+        "SOURCE_BOUND_TRUNCATED_PATCH: o patch truncado nao comprova o documento selado.",
+        lambda: verify_source_bound_patch(builder, preflight, safe, safe_raw[:-8], **refs),
+    )
+    _reject(
+        "source_bound.mode_facts",
+        "SOURCE_BOUND_MODE_FACTS: limpar mode_changed e recalcular o id nao comprova o diff original.",
+        lambda: verify_source_bound_patch(builder, preflight, resealed, mode_raw, **refs),
+    )
+    secret_summary = dict(secret["files"][0])
+    secret_summary["secret_additions"] = 0
+    secret_summary["blockers"] = []
+    secret_resealed = _ready(secret, secret_summary)
+    _reject(
+        "source_bound.secret_counters",
+        "SOURCE_BOUND_SECRET_COUNTERS: zerar os contadores e recalcular o id nao comprova o diff original.",
+        lambda: verify_source_bound_patch(builder, preflight, secret_resealed, secret_raw, **refs),
+    )
+    negative_summary = dict(safe["files"][0])
+    negative_summary["added_lines"] = 1001
+    negative_summary["deleted_lines"] = -1001
+    negative_summary["blockers"] = []
+    negative = _ready(safe, negative_summary)
+    _reject(
+        "source_bound.negative_counter",
+        "SOURCE_BOUND_NEGATIVE_COUNTER: added 1001 e deleted -1001 continuam rejeitados.",
+        lambda: verify_source_bound_patch(builder, preflight, negative, safe_raw, **refs),
+    )
+    lineage = deepcopy(safe)
+    lineage["builder_request_id"] = "DEVBUILD-OTHERLINEAGE"
+    lineage["validation_id"] = expected_patch_validation_id(lineage)
+    _reject(
+        "source_bound.lineage",
+        "SOURCE_BOUND_LINEAGE: trocar o builder_request_id e recalcular o validation id e rejeitado.",
+        lambda: verify_source_bound_patch(builder, preflight, lineage, safe_raw, **refs),
+    )
+    _reject(
+        "source_bound.refs",
+        "SOURCE_BOUND_REFS: uma candidate_ref diferente da aprovada e rejeitada.",
+        lambda: verify_source_bound_patch(
+            builder, preflight, safe, safe_raw,
+            baseline_ref="main@a", candidate_ref="cursor/other@b",
+        ),
+    )
+    stale = deepcopy(proof)
+    stale["proof_id"] = "DEVSRCBIND-STALE"
+    _reject(
+        "source_bound.stale_id",
+        "SOURCE_BOUND_STALE_ID: o proof_id antigo depois de uma mutacao e rejeitado.",
+        lambda: assert_source_bound_patch_proof_record(stale, safe, builder, preflight),
+    )
+    unknown = deepcopy(proof)
+    unknown["git_object_verified"] = True
+    _reject(
+        "source_bound.unknown_authority",
+        "SOURCE_BOUND_UNKNOWN_AUTHORITY: git_object_verified e campo desconhecido.",
+        lambda: assert_source_bound_patch_proof_record(unknown, safe, builder, preflight),
+    )
+    claimed = deepcopy(proof)
+    claimed["independent_external_verification"] = True
+    claimed["proof_id"] = expected_source_bound_patch_proof_id(claimed)
+    _reject(
+        "source_bound.false_independent_verification",
+        "SOURCE_BOUND_FALSE_INDEPENDENT_VERIFICATION: independent_external_verification true e rejeitado mesmo com id recalculado.",
+        lambda: assert_source_bound_patch_proof_record(claimed, safe, builder, preflight),
+    )
+    rendered = json.dumps(proof)
+    legitimate = (
+        proof.get("structural_integrity") == "STRUCTURAL_INTEGRITY"
+        and proof.get("source_bound_verification") == "SOURCE_BOUND_VERIFICATION"
+        and proof.get("source_provenance") == "CALLER_SUPPLIED_TRANSIENT_PATCH"
+        and proof.get("independent_external_verification") is False
+        and proof.get("caller_input_is_independent_authority") is False
+        and proof.get("replay_requires_transient_patch") is True
+        and proof.get("patch_text_included") is False
+        and proof.get("execution_authorized") is False
+        and proof.get("patch_manifest_id") == patch_validation_manifest_id(safe)
+        and "diff --git" not in rendered
+        and "audit-source-bound" not in rendered
+    )
+    findings.append(_finding(
+        "source_bound.legitimate",
+        "atlasquant_aion_developer_source_bound_patch_proof",
+        "SOURCE_BOUND_PATCH_PROOF: o patch correspondente fica source-bound sem verificacao externa independente."
+        if legitimate else
+        "SOURCE_BOUND_PATCH_PROOF: a prova legitima alegou autoridade independente ou guardou o patch.",
+        "PASS" if legitimate else "GAP",
+        "" if legitimate else "HIGH",
+    ))
+    return findings
+
+
+def _source_bound_consumption_gate_surface(_world: _World) -> list[dict[str, str]]:
+    """Future physical consumption must replay the transient patch.
+
+    SOURCE_BOUND_CONSUMPTION_GATE: a stored proof record, including one whose
+    proof id was recomputed to match an adulterated document, is not replay
+    proof and does not release physical consumption. Design-only readiness
+    does not call this gate.
+    """
+    findings: list[dict[str, str]] = []
+    module = "atlasquant_aion_developer_source_bound_consumption_gate"
+
+    def _reject(invariant_id: str, description: str, fn: Callable[[], Any]) -> None:
+        status, _ignored = _invoke(fn)
+        closed = status == "REJECT"
+        findings.append(_finding(
+            invariant_id,
+            module,
+            description if closed else description + " O gate aceitou.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    builder = structural_builder_sandbox_request(
+        branch="cursor/safe",
+        baseline_ref="main@a",
+        candidate_ref="cursor/safe@b",
+        requested_files=("module.py", "test_module.py"),
+        candidate_tests=("test_module.py",),
+    )
+    preflight = _sealed_preflight(builder)
+    refs = {"baseline_ref": "main@a", "candidate_ref": "cursor/safe@b"}
+    safe_raw = (
+        "diff --git a/module.py b/module.py\n"
+        "--- a/module.py\n+++ b/module.py\n"
+        "@@ -1 +1 @@\n-x=1\n+x=2\n"
+    )
+    mode_raw = (
+        "diff --git a/module.py b/module.py\n"
+        "old mode 100644\n"
+        "new mode 100755\n"
+        "--- a/module.py\n"
+        "+++ b/module.py\n"
+        "@@ -1 +1 @@\n-x=1\n+x=2\n"
+    )
+    safe = validate_patch(builder, preflight, safe_raw, **refs)
+    mode = validate_patch(builder, preflight, mode_raw, **refs)
+    proof = verify_source_bound_patch(builder, preflight, safe, safe_raw, **refs)
+
+    def _ready(document: Mapping[str, Any], edits: Mapping[str, Any]) -> dict[str, Any]:
+        forged = deepcopy(document)
+        summary = dict(forged["files"][0])
+        summary.update(dict(edits))
+        forged["files"] = [summary]
+        forged["blockers"] = list(summary.get("blockers") or [])
+        forged["secret_like_additions"] = summary.get("secret_additions")
+        forged["changed_lines"] = int(summary["added_lines"]) + int(summary["deleted_lines"])
+        forged["state"] = "READY_FOR_PATCH_REVIEW" if not forged["blockers"] else "BLOCKED"
+        forged["validation_id"] = expected_patch_validation_id(forged)
+        return forged
+
+    mode_summary = dict(mode["files"][0])
+    mode_summary["mode_changed"] = False
+    mode_summary["blockers"] = []
+    forged = _ready(mode, mode_summary)
+    resealed = deepcopy(proof)
+    resealed["validation_id"] = forged["validation_id"]
+    resealed["patch_digest"] = forged["patch_digest"]
+    resealed["patch_manifest_id"] = patch_validation_manifest_id(forged)
+    resealed["proof_id"] = expected_source_bound_patch_proof_id(resealed)
+
+    _reject(
+        "consumption.stored_record_without_patch",
+        "CONSUMPTION_STORED_RECORD_WITHOUT_PATCH: o registro armazenado sem o patch transitorio nao autoriza consumo.",
+        lambda: assert_source_bound_consumption_gate(
+            builder, preflight, safe, None, stored_proof=proof, **refs,
+        ),
+    )
+    record_status, _ignored = _invoke(
+        lambda: assert_source_bound_patch_proof_record(resealed, forged, builder, preflight)
+    )
+    gate_status, _ignored = _invoke(
+        lambda: assert_source_bound_consumption_gate(
+            builder, preflight, forged, mode_raw, stored_proof=resealed, **refs,
+        )
+    )
+    separated = record_status == "ACCEPT" and gate_status == "REJECT"
+    findings.append(_finding(
+        "consumption.resealed_record",
+        module,
+        "CONSUMPTION_RESEALED_RECORD: o registro resealado com o documento adulterado passa na integridade do registro e o gate de consumo rejeita."
+        if separated else
+        "CONSUMPTION_RESEALED_RECORD: o gate aceitou o registro resealado ou a limitacao de armazenamento deixou de ser explicita.",
+        "BLOCKED_BY_DESIGN" if separated else "GAP",
+        "" if separated else "HIGH",
+    ))
+    _reject(
+        "consumption.different_patch",
+        "CONSUMPTION_DIFFERENT_PATCH: o registro legitimo com outro patch nao autoriza consumo.",
+        lambda: assert_source_bound_consumption_gate(
+            builder, preflight, safe, mode_raw, stored_proof=proof, **refs,
+        ),
+    )
+    _reject(
+        "consumption.truncated_patch",
+        "CONSUMPTION_TRUNCATED_PATCH: o patch transitorio truncado nao passa o gate.",
+        lambda: assert_source_bound_consumption_gate(
+            builder, preflight, safe, safe_raw[:-8], stored_proof=proof, **refs,
+        ),
+    )
+    lineage = deepcopy(safe)
+    lineage["builder_request_id"] = "DEVBUILD-OTHERLINEAGE"
+    lineage["validation_id"] = expected_patch_validation_id(lineage)
+    _reject(
+        "consumption.lineage",
+        "CONSUMPTION_LINEAGE: o patch correto com lineage trocada e rejeitado.",
+        lambda: assert_source_bound_consumption_gate(
+            builder, preflight, lineage, safe_raw, stored_proof=proof, **refs,
+        ),
+    )
+    _reject(
+        "consumption.refs",
+        "CONSUMPTION_REFS: o patch correto com refs trocadas e rejeitado.",
+        lambda: assert_source_bound_consumption_gate(
+            builder, preflight, safe, safe_raw, stored_proof=proof,
+            baseline_ref="main@a", candidate_ref="cursor/other@b",
+        ),
+    )
+    absent, _ignored = _invoke(
+        lambda: assert_source_bound_consumption_gate(
+            builder, preflight, forged, None, stored_proof=resealed, **refs,
+        )
+    )
+    recomputed_closed = record_status == "ACCEPT" and absent == "REJECT"
+    findings.append(_finding(
+        "consumption.recomputed_proof_id",
+        module,
+        "CONSUMPTION_RECOMPUTED_PROOF_ID: o proof id recalculado nao substitui o replay do patch transitorio."
+        if recomputed_closed else
+        "CONSUMPTION_RECOMPUTED_PROOF_ID: o proof id recalculado foi aceito no lugar do replay.",
+        "BLOCKED_BY_DESIGN" if recomputed_closed else "GAP",
+        "" if recomputed_closed else "HIGH",
+    ))
+    _reject(
+        "consumption.false_independent_verification",
+        "CONSUMPTION_FALSE_INDEPENDENT_VERIFICATION: o caller nao torna a verificacao independente verdadeira.",
+        lambda: assert_source_bound_consumption_gate(
+            builder, preflight, safe, safe_raw,
+            independent_external_verification=True, **refs,
+        ),
+    )
+    unknown = deepcopy(proof)
+    unknown["git_object_verified"] = True
+    _reject(
+        "consumption.unknown_authority",
+        "CONSUMPTION_UNKNOWN_AUTHORITY: git_object_verified nao autoriza o gate de consumo.",
+        lambda: assert_source_bound_consumption_gate(
+            builder, preflight, safe, safe_raw, stored_proof=unknown, **refs,
+        ),
+    )
+    _reject(
+        "consumption.match_state_not_physical_release",
+        "CONSUMPTION_MATCH_STATE: SOURCE_BOUND_PATCH_MATCH sozinho nao libera o futuro gate fisico.",
+        lambda: assert_source_bound_consumption_gate(
+            builder, preflight, safe, None, stored_proof=SOURCE_BOUND_PATCH_MATCH, **refs,
+        ),
+    )
+    receipt = assert_source_bound_consumption_gate(
+        builder, preflight, safe, safe_raw, **refs,
+    )
+    rendered = json.dumps(receipt)
+    legitimate = (
+        receipt.get("state") == "SOURCE_BOUND_CONSUMPTION_REPLAY_MATCH"
+        and receipt.get("consumption_basis") == "TRANSIENT_REPLAY_NOT_STORED_RECORD"
+        and receipt.get("stored_proof_relation") == "STORED_PROOF_IS_NOT_REPLAY_PROOF"
+        and receipt.get("independent_external_verification") is False
+        and receipt.get("stored_proof_is_replay_proof") is False
+        and receipt.get("stored_proof_record_is_consumption_authorization") is False
+        and receipt.get("source_bound_patch_match_authorizes_physical_consumption") is False
+        and receipt.get("replay_performed") is True
+        and receipt.get("patch_text_included") is False
+        and receipt.get("execution_authorized") is False
+        and receipt.get("physical_execution_authorized") is False
+        and receipt.get("future_physical_patch_execution_requires_consumption_gate") is True
+        and receipt.get("design_only_readiness_requires_consumption_gate") is False
+        and receipt.get("replay_proof_id") == proof.get("proof_id")
+        and "diff --git" not in rendered
+    )
+    findings.append(_finding(
+        "consumption.legitimate",
+        module,
+        "SOURCE_BOUND_CONSUMPTION_GATE: o replay correspondente fecha o gate sem autorizar execucao fisica."
+        if legitimate else
+        "SOURCE_BOUND_CONSUMPTION_GATE: o replay legitimo guardou o patch ou autorizou execucao.",
+        "PASS" if legitimate else "GAP",
+        "" if legitimate else "HIGH",
+    ))
+    return findings
+
+
+def _physical_pin(name: str, path: str, digest: str) -> dict[str, Any]:
+    return {
+        "logical_name": name,
+        "absolute_path": path,
+        "sha256": digest,
+        "file_size_bytes": 128,
+        "version_claim": "claim-only",
+        "verification_evidence_refs": ["evidence:pin:" + name],
+    }
+
+
+def _physical_transition_chain(
+    *,
+    branch: str = "cursor/safe",
+    baseline_ref: str = "main@a",
+    candidate_ref: str = "cursor/safe@b",
+    raw: str | None = None,
+) -> dict[str, Any]:
+    builder = structural_builder_sandbox_request(
+        branch=branch,
+        baseline_ref=baseline_ref,
+        candidate_ref=candidate_ref,
+        requested_files=("module.py", "test_module.py"),
+        candidate_tests=("test_module.py",),
+    )
+    preflight = _sealed_preflight(builder)
+    patch_text = raw if raw is not None else (
+        "diff --git a/module.py b/module.py\n"
+        "--- a/module.py\n+++ b/module.py\n"
+        "@@ -1 +1 @@\n-x=1\n+x=2\n"
+    )
+    sealed = validate_patch(
+        builder,
+        preflight,
+        patch_text,
+        baseline_ref=baseline_ref,
+        candidate_ref=candidate_ref,
+    )
+    attestation = attestation_for_documents(builder, preflight, sealed)
+    runner = build_runner_contract(
+        builder,
+        preflight,
+        sealed,
+        content_attestation=attestation,
+        human_patch_reviewed=True,
+        human_patch_reviewer="reviewer-1",
+        human_patch_review_refs=["review:patch:1"],
+    )
+    policy = build_command_policy_contract(
+        runner,
+        builder_request=builder,
+        preflight=preflight,
+        patch_validation=sealed,
+        content_attestation=attestation,
+    )
+    pinning = build_executable_pinning_spec([
+        _physical_pin("python", "/usr/bin/python3", "ab" * 32),
+        _physical_pin("git", "/usr/bin/git", "cd" * 32),
+    ])
+    environment = build_environment_contract()
+    sandbox = build_os_sandbox_contract(
+        policy,
+        runner,
+        builder,
+        preflight,
+        sealed,
+        attestation,
+        pinning,
+        environment,
+    )
+    probe = build_probe_result_contract(
+        sandbox,
+        policy,
+        runner,
+        builder,
+        preflight,
+        sealed,
+        attestation,
+        pinning,
+        environment,
+    )
+    return {
+        "builder_request": builder,
+        "preflight": preflight,
+        "patch_validation": sealed,
+        "runner_contract": runner,
+        "command_policy": policy,
+        "pinning_spec": pinning,
+        "environment_contract": environment,
+        "os_sandbox_contract": sandbox,
+        "probe_result": probe,
+        "patch_text": patch_text,
+        "baseline_ref": baseline_ref,
+        "candidate_ref": candidate_ref,
+        "content_attestation": attestation,
+    }
+
+
+def _physical_transition_gate_surface(_world: _World) -> list[dict[str, str]]:
+    """Physical transition stays blocked without external provenance.
+
+    PHYSICAL_TRANSITION_GATE: design READY, a stored proof, and a fresh
+    consumption replay do not authorize physical operation. Caller input
+    cannot promote the blocked decision.
+    """
+    findings: list[dict[str, str]] = []
+    module = "atlasquant_aion_developer_physical_transition_gate"
+    chain = _physical_transition_chain()
+
+    def _reject(invariant_id: str, description: str, fn: Callable[[], Any]) -> None:
+        status, _ignored = _invoke(fn)
+        closed = status == "REJECT"
+        findings.append(_finding(
+            invariant_id,
+            module,
+            description if closed else description + " O gate aceitou.",
+            "BLOCKED_BY_DESIGN" if closed else "GAP",
+            "" if closed else "HIGH",
+        ))
+
+    def _evaluate(**overrides: Any) -> dict[str, Any]:
+        payload = dict(chain)
+        payload.update(overrides)
+        return evaluate_physical_transition_gate(**payload)
+
+    _reject(
+        "physical_transition.design_ready_without_receipt",
+        "PHYSICAL_TRANSITION_DESIGN_READY: documentos de design READY sem replay source-bound nao liberam transicao fisica.",
+        lambda: _evaluate(patch_text=None),
+    )
+    proof = verify_source_bound_patch(
+        chain["builder_request"],
+        chain["preflight"],
+        chain["patch_validation"],
+        chain["patch_text"],
+        baseline_ref=chain["baseline_ref"],
+        candidate_ref=chain["candidate_ref"],
+    )
+    _reject(
+        "physical_transition.stored_proof_as_receipt",
+        "PHYSICAL_TRANSITION_STORED_PROOF: o proof armazenado nao e um receipt de consumo.",
+        lambda: _evaluate(consumption_receipt=proof),
+    )
+    receipt = assert_source_bound_consumption_gate(
+        chain["builder_request"],
+        chain["preflight"],
+        chain["patch_validation"],
+        chain["patch_text"],
+        baseline_ref=chain["baseline_ref"],
+        candidate_ref=chain["candidate_ref"],
+    )
+    stale = deepcopy(receipt)
+    stale["consumption_id"] = "DEVSRCGATE-STALE"
+    _reject(
+        "physical_transition.stale_receipt",
+        "PHYSICAL_TRANSITION_STALE_RECEIPT: o receipt com consumption id trocado nao libera.",
+        lambda: _evaluate(consumption_receipt=stale),
+    )
+    other_raw = (
+        "diff --git a/module.py b/module.py\n"
+        "--- a/module.py\n+++ b/module.py\n"
+        "@@ -1 +1 @@\n-x=1\n+x=3\n"
+    )
+    other_sealed = validate_patch(
+        chain["builder_request"],
+        chain["preflight"],
+        other_raw,
+        baseline_ref=chain["baseline_ref"],
+        candidate_ref=chain["candidate_ref"],
+    )
+    other_receipt = assert_source_bound_consumption_gate(
+        chain["builder_request"],
+        chain["preflight"],
+        other_sealed,
+        other_raw,
+        baseline_ref=chain["baseline_ref"],
+        candidate_ref=chain["candidate_ref"],
+    )
+    _reject(
+        "physical_transition.other_patch_receipt",
+        "PHYSICAL_TRANSITION_OTHER_PATCH: o receipt de outro patch nao corresponde ao patch transitorio.",
+        lambda: _evaluate(consumption_receipt=other_receipt),
+    )
+    lineage = deepcopy(chain["patch_validation"])
+    lineage["builder_request_id"] = "DEVBUILD-OTHERLINEAGE"
+    lineage["validation_id"] = expected_patch_validation_id(lineage)
+    _reject(
+        "physical_transition.lineage",
+        "PHYSICAL_TRANSITION_LINEAGE: a lineage trocada e rejeitada.",
+        lambda: _evaluate(patch_validation=lineage),
+    )
+    _reject(
+        "physical_transition.refs",
+        "PHYSICAL_TRANSITION_REFS: as refs trocadas sao rejeitadas.",
+        lambda: _evaluate(candidate_ref="cursor/other@b"),
+    )
+    digested = deepcopy(chain["patch_validation"])
+    digested["patch_digest"] = "DEVPATCH-SWAPPEDDIGEST"
+    digested["validation_id"] = expected_patch_validation_id(digested)
+    _reject(
+        "physical_transition.patch_digest",
+        "PHYSICAL_TRANSITION_PATCH_DIGEST: o digest trocado nao acompanha o runner da cadeia.",
+        lambda: _evaluate(patch_validation=digested),
+    )
+    other_chain = _physical_transition_chain(
+        branch="cursor/other",
+        baseline_ref="main@c",
+        candidate_ref="cursor/other@d",
+    )
+    _reject(
+        "physical_transition.other_chain",
+        "PHYSICAL_TRANSITION_OTHER_CHAIN: Runner, Policy e OS de outra cadeia nao fecham o gate.",
+        lambda: _evaluate(
+            runner_contract=other_chain["runner_contract"],
+            command_policy=other_chain["command_policy"],
+            os_sandbox_contract=other_chain["os_sandbox_contract"],
+        ),
+    )
+    _reject(
+        "physical_transition.false_independent",
+        "PHYSICAL_TRANSITION_FALSE_INDEPENDENT: o caller nao torna a verificacao independente verdadeira.",
+        lambda: _evaluate(independent_external_verification=True),
+    )
+    _reject(
+        "physical_transition.false_execution_authorized",
+        "PHYSICAL_TRANSITION_FALSE_EXECUTION: physical_execution_authorized nao pode ser promovido.",
+        lambda: _evaluate(physical_execution_authorized=True),
+    )
+
+    def _recomputed() -> None:
+        decision = _evaluate()
+        forged = deepcopy(decision)
+        forged["state"] = "PHYSICAL_TRANSITION_READY"
+        forged["transition_id"] = expected_physical_transition_id(forged)
+        assert_physical_transition_record(forged)
+
+    _reject(
+        "physical_transition.recomputed_ids",
+        "PHYSICAL_TRANSITION_RECOMPUTED_ID: recalcular o transition id nao promove BLOCKED.",
+        _recomputed,
+    )
+    _reject(
+        "physical_transition.unknown_authority",
+        "PHYSICAL_TRANSITION_UNKNOWN_AUTHORITY: git_object_verified nao autoriza a transicao fisica.",
+        lambda: _evaluate(git_object_verified=True),
+    )
+    _reject(
+        "physical_transition.missing_dependency",
+        "PHYSICAL_TRANSITION_MISSING_DEPENDENCY: dependencia ausente fecha o gate.",
+        lambda: _evaluate(runner_contract=None),
+    )
+    _reject(
+        "physical_transition.caller_promotion",
+        "PHYSICAL_TRANSITION_CALLER_PROMOTION: o caller nao promove BLOCKED para READY.",
+        lambda: _evaluate(state="PHYSICAL_TRANSITION_READY"),
+    )
+    decision = _evaluate()
+    rendered = json.dumps(decision)
+    legitimate = (
+        decision.get("state") == PHYSICAL_TRANSITION_BLOCKED
+        and decision.get("structural_readiness") == STRUCTURAL_READY
+        and decision.get("source_bound_readiness") == SOURCE_BOUND_READY
+        and decision.get("external_provenance") == EXTERNAL_PROVENANCE_MISSING
+        and decision.get("independent_external_verification") is False
+        and decision.get("physical_execution_authorized") is False
+        and decision.get("physical_transition_remains_blocked") is True
+        and decision.get("execution_authorized") is False
+        and decision.get("patch_applied") is False
+        and decision.get("subprocess_called") is False
+        and decision.get("patch_text_included") is False
+        and "diff --git" not in rendered
+    )
+    findings.append(_finding(
+        "physical_transition.legitimate",
+        module,
+        "PHYSICAL_TRANSITION_GATE: a cadeia consistente permanece PHYSICAL_TRANSITION_BLOCKED."
+        if legitimate else
+        "PHYSICAL_TRANSITION_GATE: a cadeia consistente liberou transicao fisica.",
+        "PASS" if legitimate else "GAP",
+        "" if legitimate else "HIGH",
+    ))
+    return findings
+
+
+def _reseal_independent(policy: Mapping[str, Any]) -> dict[str, Any]:
+    mutated = deepcopy(policy)
+    mutated["upstream_provenance_independently_verified"] = True
+    return _bind_command_policy_ids(mutated)
+
+
+def audit_developer_chain() -> dict[str, Any]:
+    """Inspect the local Developer contracts and return a deterministic report."""
+    world = _World()
+    try:
+        findings = []
+        findings.extend(_lineage(world))
+        findings.extend(_scope(world))
+        findings.extend(_branches(world))
+        findings.extend(_candidates(world))
+        findings.extend(_identities(world))
+        findings.extend(_authorization(world))
+        findings.extend(_rollback_and_tests(world))
+        findings.extend(_workflow_release_authority(world))
+        findings.extend(_secrets_and_limits(world))
+        findings.extend(_residual_surface(world))
+        findings.extend(_contract_gap_surface(world))
+        findings.extend(_test_contract_integrity_surface(world))
+        findings.extend(_resource_budget_surface(world))
+        findings.extend(_attestation_pinning_surface(world))
+        findings.extend(_runner_policy_integrity_surface(world))
+        findings.extend(_principal_provenance_surface(world))
+        findings.extend(_self_reseal_surface(world))
+        findings.extend(_upstream_provenance_surface(world))
+        findings.extend(_policy_provenance_surface(world))
+        findings.extend(_os_sandbox_design_surface(world))
+        findings.extend(_probe_result_design_surface(world))
+        findings.extend(_upstream_semantic_surface(world))
+        findings.extend(_source_bound_patch_surface(world))
+        findings.extend(_source_bound_consumption_gate_surface(world))
+        findings.extend(_physical_transition_gate_surface(world))
+    finally:
+        world.close()
+
+    gaps = [item for item in findings if item["classification"] == "GAP"]
+    blocked = [item for item in findings if item["classification"] == "BLOCKED_BY_DESIGN"]
+    passed = [item for item in findings if item["classification"] == "PASS"]
+    by_severity = {
+        severity: [item["invariant_id"] for item in gaps if item["severity"] == severity]
+        for severity in SEVERITIES
+    }
+    return {
+        "schema": SCHEMA,
+        "state": "GAPS_PRESENT" if gaps else "NO_GAPS",
+        "cases_total": len(findings),
+        "gap_count": len(gaps),
+        "blocked_by_design_count": len(blocked),
+        "pass_count": len(passed),
+        "findings": findings,
+        "gaps": gaps,
+        "gaps_by_severity": by_severity,
+        "modules": [
+            "atlasquant_aion_developer_intelligence",
+            "atlasquant_aion_developer_package",
+            "atlasquant_aion_developer_diagnostics",
+            "atlasquant_aion_developer_correction",
+            "atlasquant_aion_developer_evidence_gate",
+            "atlasquant_aion_developer_implementation",
+            "atlasquant_aion_developer_builder_sandbox",
+            "atlasquant_aion_developer_engine",
+        ],
+        "executes_repository_code": False,
+        "writes_existing_files": False,
+        "network_called": False,
+        "subprocess_called": False,
+        "automatic_commit": False,
+        "automatic_merge": False,
+        "automatic_deploy": False,
+        "real_trading_enabled": False,
+        "tool_output_is_authority": False,
+        "symlink_physical_boundary_verified": False,
+        "hardlink_physical_boundary_verified": False,
+        "report_digest": sha256(
+            json.dumps(findings, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        ).hexdigest()[:20],
+    }
+
+
+def format_audit_report(report: Mapping[str, Any]) -> str:
+    lines = [
+        "AION Developer Adversarial Audit",
+        str(report.get("state") or ""),
+        f"{int(report.get('cases_total') or 0)} cases",
+        f"{int(report.get('gap_count') or 0)} gaps",
+        f"{int(report.get('blocked_by_design_count') or 0)} blocked",
+        f"{int(report.get('pass_count') or 0)} pass",
+    ]
+    for item in list(report.get("gaps") or []):
+        if not isinstance(item, Mapping):
+            continue
+        lines.append(
+            " | ".join([
+                str(item.get("invariant_id") or ""),
+                str(item.get("severity") or ""),
+                str(item.get("module") or ""),
+                str(item.get("description") or ""),
+            ])
+        )
+    return "\n".join(lines)
+
+
+def main() -> int:
+    report = audit_developer_chain()
+    print(format_audit_report(report))
+    return 1 if int(report.get("gap_count") or 0) else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
