@@ -518,11 +518,18 @@ def _render_atlasquant_central_hub(*, active_index=None, stop_for_shell=False):
 
 
 def _apply_central_trader_navigation():
-    """Consume Central intent and hand Trader to the existing stateful bridge."""
+    """A fresh Trader deep-link is consumed once; stored state never retriggers it."""
     if request_central_destination is None:
         return None
     try:
-        requested = _central_request_for_render()
+        requested = _central_query_value()
+        if not requested:
+            return None
+        if sync_central_choice is not None:
+            resolved = sync_central_choice(st.session_state, _ATLASQUANT_ACCESS, requested)
+            if resolved.get("denied") or resolved.get("root"):
+                return None
+            requested = str(resolved.get("area") or requested)
         if str(requested or "").strip().casefold() != "trader":
             return None
         return request_central_destination(st.session_state, _ATLASQUANT_ACCESS, "trader")
