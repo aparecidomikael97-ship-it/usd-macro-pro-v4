@@ -503,11 +503,7 @@ def aion_home_html(claims: Mapping[str, Any] | None = None, **_ignored: Any) -> 
         workspace = AION_MODULE_WORKSPACES.get(spec["id"], "")
         action = ""
         if workspace:
-            action = (
-                '<p><a class="aq-central-back" href="?central=aion&amp;module='
-                + escape(spec["id"])
-                + '">Abrir</a></p>'
-            )
+            action = '<p class="aq-central-back">Abrir pelo controle de módulo abaixo.</p>'
         modules.append(
             '<article class="aq-aion-module" data-module="'
             + escape(spec["id"])
@@ -667,7 +663,7 @@ def aion_login_presence_html(
         f'<p class="aq-aion-presence-line">{escape(greeting["name"])}, {escape(greeting["period"])}. AION ativo.</p>'
         '<p class="aq-aion-presence-line">Bem-vindo ao AtlasQuant. O que você gostaria de saber ou fazer?</p>'
         + status
-        + '<p><a class="aq-central-back" href="?central=aion">Abrir AION</a></p>'
+        + '<p class="aq-central-back">Abrir AION pelos controles de navegação abaixo.</p>'
         "</section>"
     )
 
@@ -830,6 +826,18 @@ def render_aion_home_viewer(
     html = aion_home_viewer_html(access, system_context)
     if html:
         st.markdown(html, unsafe_allow_html=True)
+        modules = [spec for spec in _AION_MODULES if spec["id"] in AION_MODULE_WORKSPACES]
+        st.caption("Módulos AION · navegação interna da mesma sessão")
+        columns = st.columns(2)
+        for index, spec in enumerate(modules):
+            with columns[index % 2]:
+                if st.button(
+                    str(spec["title"]),
+                    key=f"aq_aion_module_stateful_{spec['id']}",
+                    width="stretch",
+                ):
+                    consume_aion_module_jump(st.session_state, access, spec["id"])
+                    st.rerun()
     return html
 
 
