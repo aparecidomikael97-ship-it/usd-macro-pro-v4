@@ -28,7 +28,11 @@ from atlasquant_aion_global_worker_activation import (
     validate_global_worker_activation_approval,
     write_repository_feature_flag_enabled,
 )
-from atlasquant_aion_memory import RuntimeConfig, checkpoint_source_digest
+from atlasquant_aion_memory import (
+    RuntimeConfig,
+    checkpoint_source_digest,
+    ensure_operating_checkpoint,
+)
 
 
 NOW = datetime(2026, 9, 28, 16, 0, tzinfo=timezone.utc)
@@ -69,17 +73,7 @@ def _safe_flag(state="UNSET"):
 class GlobalWorkerActivationCeremonyTests(unittest.TestCase):
     def setUp(self):
         self.access = _access()
-        source = {
-            "schema": "ATLASQUANT_AION_MEMORY_V1",
-            "checkpoint_version": 18,
-            "operating": {
-                "tasks": [],
-                "events": [],
-                "task_digest": "",
-                "event_digest": "",
-                "dirty": False,
-            },
-        }
+        source = ensure_operating_checkpoint({})
         plan = prepare_global_worker_arming_plan(
             self.access,
             source,
@@ -740,6 +734,20 @@ jobs:
         self.assertFalse(result["runtime_modified"])
         self.assertFalse(result["feature_flag_modified"])
         self.assertFalse(result["global_worker_executed"])
+
+    def test_admin_ui_exposes_guarded_activation_and_safety_stop(self):
+        source = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Global Worker Activation Ceremony", source)
+        self.assertIn("Verificar readiness atual para ativação", source)
+        self.assertIn("Gerar plano de ativação", source)
+        self.assertIn("ATIVAR WORKER GLOBAL", source)
+        self.assertIn("Criar autorização de ativação", source)
+        self.assertIn("CONFIRMAÇÃO FINAL", source)
+        self.assertIn("Habilitar Worker Global (feature flag)", source)
+        self.assertIn("ACTIVATED_PENDING_LIVE_EVIDENCE", source)
+        self.assertIn("DESATIVAR WORKER GLOBAL", source)
+        self.assertIn("Desativar feature flag do Worker Global", source)
+        self.assertIn('guardian_decision(\n                "write_runtime"', source)
 
     def test_activation_module_does_not_touch_checkpoint_or_execute_worker(self):
         source = Path(
