@@ -177,7 +177,7 @@ class SchedulerAdapterTests(unittest.TestCase):
         )
         self.assertEqual(
             staged["next_run_at"],
-            "2026-09-28T14:15:00+00:00",
+            "2026-09-28T13:15:00+00:00",
         )
 
     def test_weekly_schedule_respects_timezone_and_weekday(self):
