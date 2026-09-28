@@ -517,11 +517,7 @@ def _render_atlasquant_central_hub(*, active_index=None, stop_for_shell=False):
         return None
     try:
         requested = _central_request_for_render(active_index=active_index)
-        resolved = render_central_hub(
-            _ATLASQUANT_ACCESS,
-            requested,
-            defer_aion_home=(active_index == 21),
-        )
+        resolved = render_central_hub(_ATLASQUANT_ACCESS, requested, defer_aion_home=(active_index == 21))
         st.session_state.pop(_CENTRAL_RENDER_ERROR_KEY, None)
     except Exception as exc:
         error_type = type(exc).__name__
