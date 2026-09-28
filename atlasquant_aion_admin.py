@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime, timezone
+from atlasquant_aion_clock import application_timezone
+from atlasquant_aion_core_intelligence.context import Domain
 from html import escape
 from typing import Any, Mapping
 import os
@@ -297,13 +299,21 @@ from atlasquant_aion_wisdom import (
 )
 
 try:
-    from atlasquant_neural_voice_ui import render_neural_voice_player
+    from atlasquant_neural_voice_ui import (
+        neural_voice_status,
+        render_neural_voice_player,
+    )
 except Exception:
+    neural_voice_status = None
     render_neural_voice_player = None
 
 try:
-    from atlasquant_aion_core_runtime_bridge import handle_runtime_intent
+    from atlasquant_aion_core_runtime_bridge import (
+        authenticated_context,
+        handle_runtime_intent,
+    )
 except Exception:
+    authenticated_context = None
     handle_runtime_intent = None
 
 try:
@@ -314,6 +324,19 @@ try:
 except Exception:
     checkpoint_memory_snapshot = None
     stage_user_approved_memory = None
+
+try:
+    from atlasquant_aion_core_voice_automation import (
+        CADENCES as CORE_AUTOMATION_CADENCES,
+        AtlasQuantVoiceAdapter,
+        CheckpointAutomationAdapter,
+        stage_schedule,
+    )
+except Exception:
+    CORE_AUTOMATION_CADENCES = ("ONCE", "HOURLY", "DAILY", "WEEKLY")
+    AtlasQuantVoiceAdapter = None
+    CheckpointAutomationAdapter = None
+    stage_schedule = None
 
 SCHEMA = "ATLASQUANT_AION_ADMIN_V1"
 AION_WORKSPACES = (
@@ -2157,6 +2180,18 @@ def _render_central(
         placeholder="Ex.: AION, onde paramos no sistema? / como está o Studio? / o que falta validar?",
     )
 
+    core_voice_status = {}
+    if neural_voice_status is not None:
+        try:
+            core_voice_status = neural_voice_status()
+        except Exception:
+            core_voice_status = {
+                "configured": False,
+                "provider": "UNKNOWN",
+                "model": "UNKNOWN",
+                "voice": "UNKNOWN",
+            }
+
     core_runtime_result = {}
     if question.strip():
         if handle_runtime_intent is None:
@@ -2188,6 +2223,7 @@ def _render_central(
                     question,
                     system_context=system_context,
                     legacy_checkpoint=checkpoint,
+                    voice_status=core_voice_status,
                 )
             except Exception as exc:
                 core_runtime_result = {
@@ -2410,6 +2446,218 @@ def _render_central(
                         + type(exc).__name__
                         + ". Nenhuma memória foi gravada por fallback."
                     )
+
+    st.markdown("#### 🔊 Voz & ⏱️ Automação do AION Core")
+    voice_ready = bool(core_voice_status.get("configured"))
+    va1, va2, va3 = st.columns(3)
+    va1.metric("Voz neural", "PRONTA" if voice_ready else "NÃO CONFIGURADA")
+    va2.metric(
+        "Agenda",
+        "CONECTADA"
+        if CheckpointAutomationAdapter is not None and authenticated_context is not None
+        else "UNAVAILABLE",
+    )
+    va3.metric("Executor background", "BLOQUEADO")
+    st.caption(
+        "Voz: o Core prepara e valida o texto sem chamar o provedor; áudio só é gerado "
+        "no botão explícito da voz AtlasQuant. Automação: a agenda é persistida no "
+        "Checkpoint, mas nenhum job é executado em background neste bloco."
+    )
+
+    scheduler_context = None
+    scheduler_snapshot = {
+        "status": "UNAVAILABLE",
+        "schedules": [],
+        "count": 0,
+        "due_count": 0,
+        "execution_adapter": "UNAVAILABLE",
+    }
+    if authenticated_context is not None and CheckpointAutomationAdapter is not None:
+        try:
+            scheduler_context = authenticated_context(access, Domain.ADMIN)
+            scheduler_snapshot = CheckpointAutomationAdapter(
+                scheduler_context,
+                checkpoint,
+            ).snapshot(datetime.now(timezone.utc))
+        except Exception as exc:
+            scheduler_snapshot = {
+                "status": "UNKNOWN",
+                "schedules": [],
+                "count": 0,
+                "due_count": 0,
+                "execution_adapter": "UNAVAILABLE",
+                "error_type": type(exc).__name__,
+            }
+
+    sa1, sa2, sa3 = st.columns(3)
+    sa1.metric("Agendas", int(scheduler_snapshot.get("count") or 0))
+    sa2.metric("Devidas", int(scheduler_snapshot.get("due_count") or 0))
+    sa3.metric(
+        "Execução",
+        str(scheduler_snapshot.get("execution_adapter") or "UNAVAILABLE"),
+    )
+    schedule_rows = [
+        row for row in list(scheduler_snapshot.get("schedules") or [])
+        if isinstance(row, Mapping)
+    ]
+    if schedule_rows:
+        with st.expander("Agendas registradas", expanded=False):
+            st.dataframe(
+                [
+                    {
+                        "Nome": str(row.get("title") or ""),
+                        "Cadência": str(row.get("cadence") or ""),
+                        "Estado": str(row.get("state") or ""),
+                        "Próxima": str(row.get("next_run_at") or ""),
+                        "Devida": "SIM" if row.get("due") else "NÃO",
+                        "Executor": "BLOQUEADO",
+                    }
+                    for row in schedule_rows[-50:]
+                ],
+                hide_index=True,
+                width="stretch",
+            )
+
+    with st.expander("Criar agenda persistida", expanded=False):
+        schedule_title = st.text_input(
+            "Nome da agenda",
+            key="aion_core_schedule_title",
+            max_chars=240,
+            placeholder="Ex.: Briefing macro da manhã",
+        )
+        schedule_prompt = st.text_area(
+            "O que o AION deverá fazer quando houver executor aprovado",
+            key="aion_core_schedule_prompt",
+            max_chars=2400,
+            placeholder="Ex.: Preparar um briefing macro com fatos confirmados e pendências.",
+        )
+        cadence = st.selectbox(
+            "Cadência",
+            tuple(CORE_AUTOMATION_CADENCES),
+            key="aion_core_schedule_cadence",
+            format_func=lambda value: {
+                "ONCE": "Uma vez",
+                "HOURLY": "A cada hora",
+                "DAILY": "Diariamente",
+                "WEEKLY": "Semanalmente",
+            }.get(value, value),
+        )
+        zone = application_timezone()
+        timezone_name = st.text_input(
+            "Timezone",
+            value=str(getattr(zone, "key", "America/Cuiaba")),
+            key="aion_core_schedule_timezone",
+        )
+        sc1, sc2 = st.columns(2)
+        schedule_hour = int(sc1.number_input(
+            "Hora",
+            min_value=0,
+            max_value=23,
+            value=8,
+            step=1,
+            key="aion_core_schedule_hour",
+        ))
+        schedule_minute = int(sc2.number_input(
+            "Minuto",
+            min_value=0,
+            max_value=59,
+            value=0,
+            step=1,
+            key="aion_core_schedule_minute",
+        ))
+        schedule_weekday = None
+        if cadence == "WEEKLY":
+            weekday_labels = (
+                "Segunda",
+                "Terça",
+                "Quarta",
+                "Quinta",
+                "Sexta",
+                "Sábado",
+                "Domingo",
+            )
+            schedule_weekday = weekday_labels.index(
+                st.selectbox(
+                    "Dia da semana",
+                    weekday_labels,
+                    key="aion_core_schedule_weekday",
+                )
+            )
+        schedule_date = None
+        if cadence == "ONCE":
+            local_now = datetime.now(timezone.utc).astimezone(zone)
+            schedule_date = st.date_input(
+                "Data",
+                value=local_now.date(),
+                key="aion_core_schedule_date",
+            )
+        schedule_confirm = st.checkbox(
+            "Confirmo que quero registrar esta agenda. Isto NÃO autoriza execução automática.",
+            value=False,
+            key="aion_core_schedule_confirm",
+        )
+        if st.button(
+            "⏱️ Registrar agenda no Checkpoint de trabalho",
+            key="aion_core_schedule_stage",
+            disabled=not bool(
+                schedule_confirm
+                and schedule_title.strip()
+                and schedule_prompt.strip()
+                and scheduler_context is not None
+                and stage_schedule is not None
+            ),
+            width="stretch",
+        ):
+            try:
+                schedule_run_at = None
+                if cadence == "ONCE":
+                    selected_zone = application_timezone(timezone_name)
+                    schedule_run_at = datetime(
+                        schedule_date.year,
+                        schedule_date.month,
+                        schedule_date.day,
+                        schedule_hour,
+                        schedule_minute,
+                        tzinfo=selected_zone,
+                    )
+                staged_schedule = stage_schedule(
+                    checkpoint,
+                    scheduler_context,
+                    title=schedule_title,
+                    prompt=schedule_prompt,
+                    cadence=cadence,
+                    timezone_name=timezone_name,
+                    hour=schedule_hour,
+                    minute=schedule_minute,
+                    weekday=schedule_weekday,
+                    run_at=schedule_run_at,
+                    confirmation=True,
+                )
+                if staged_schedule.get("status") == "STAGED":
+                    _set_working_checkpoint(
+                        staged_schedule.get("checkpoint") or checkpoint,
+                        dirty=True,
+                    )
+                    st.success(
+                        "Agenda registrada no Checkpoint de trabalho. "
+                        "Ela ainda NÃO foi persistida externamente e NÃO será executada automaticamente."
+                    )
+                    st.rerun()
+                else:
+                    st.warning(
+                        "Agenda não registrada: "
+                        + str(
+                            staged_schedule.get("reason")
+                            or staged_schedule.get("status")
+                            or "UNKNOWN"
+                        )
+                    )
+            except Exception as exc:
+                st.error(
+                    "Agenda bloqueada em modo seguro: "
+                    + type(exc).__name__
+                    + ". Nenhuma execução foi autorizada."
+                )
 
     provider_env = _provider_env()
     provider = provider_status(feature_flags=flags, env=provider_env)
