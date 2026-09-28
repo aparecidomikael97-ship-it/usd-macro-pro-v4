@@ -671,6 +671,9 @@ def resolve_render_packs(
 ) -> tuple[list[dict[str, Any]], str]:
     """Resolve a complete render contract without network access.
 
+    This boundary exists specifically so the Advanced Radar never treats the
+    compact Fast Home serialization as if it were the full Pro render schema.
+
     Fast-home snapshots intentionally allow compact packs. The Pro renderer
     requires a richer contract and used to direct-index those compact rows,
     causing KeyError. Reuse runtime packs only when every expected pair is
