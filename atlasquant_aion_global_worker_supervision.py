@@ -236,6 +236,71 @@ def operational_incident(
     }
 
 
+def supervision_history_event(
+    supervision: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Build a compact immutable observation suitable for session history."""
+    report = dict(supervision or {})
+    payload = {
+        "posture": str(report.get("posture") or "UNKNOWN_REVIEW_REQUIRED"),
+        "severity": str(report.get("severity") or "MEDIUM"),
+        "live_status": str(report.get("live_status") or "UNKNOWN"),
+        "reason": str(report.get("reason") or ""),
+        "evidence_digest": str(report.get("evidence_digest") or ""),
+        "incident_open": bool(report.get("incident_open")),
+        "safety_stop_recommended": bool(report.get("safety_stop_recommended")),
+    }
+    event_digest = digest(payload)
+    return {
+        "event_id": "GW-SUP-" + event_digest[:16].upper(),
+        "observed_at": str(report.get("generated_at") or ""),
+        **payload,
+        "automatic_containment": False,
+        "automatic_feature_flag_mutation": False,
+        "real_trading_enabled": False,
+    }
+
+
+def append_supervision_history(
+    history: list[Mapping[str, Any]] | tuple[Mapping[str, Any], ...] | None,
+    supervision: Mapping[str, Any] | None,
+    *,
+    max_entries: int = 50,
+) -> list[dict[str, Any]]:
+    """Append one observation, deduplicated by evidence, without persistence."""
+    if type(max_entries) is not int or not 1 <= max_entries <= 200:
+        raise ValueError("invalid supervision history limit")
+
+    rows = [dict(row) for row in (history or []) if isinstance(row, Mapping)]
+    event = supervision_history_event(supervision)
+    event_id = str(event.get("event_id") or "")
+    rows = [row for row in rows if str(row.get("event_id") or "") != event_id]
+    rows.append(event)
+    return rows[-max_entries:]
+
+
+def supervision_history_summary(
+    history: list[Mapping[str, Any]] | tuple[Mapping[str, Any], ...] | None,
+) -> dict[str, Any]:
+    """Summarize session-local supervision observations."""
+    rows = [dict(row) for row in (history or []) if isinstance(row, Mapping)]
+    incidents = [row for row in rows if row.get("incident_open") is True]
+    critical = [
+        row for row in incidents
+        if str(row.get("severity") or "").upper() == "CRITICAL"
+    ]
+    return {
+        "schema": SCHEMA,
+        "observations": len(rows),
+        "incidents": len(incidents),
+        "critical_incidents": len(critical),
+        "latest": rows[-1] if rows else None,
+        "persistent": False,
+        "runtime_modified": False,
+        "feature_flag_modified": False,
+    }
+
+
 __all__ = [
     "SCHEMA",
     "SEVERITIES",
@@ -244,4 +309,7 @@ __all__ = [
     "SAFETY_STOP_RECOMMENDED_STATES",
     "supervise_global_worker",
     "operational_incident",
+    "supervision_history_event",
+    "append_supervision_history",
+    "supervision_history_summary",
 ]
