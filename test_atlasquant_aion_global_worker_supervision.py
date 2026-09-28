@@ -214,6 +214,14 @@ class GlobalWorkerOperationalSupervisionTests(unittest.TestCase):
             second["evidence_digest"],
         )
 
+    def test_admin_ui_exposes_supervision_without_auto_containment(self):
+        source = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Supervisão operacional", source)
+        self.assertIn("Safety-stop recomendado", source)
+        self.assertIn("Checklist de recuperação do Worker Global", source)
+        self.assertIn("contenção automática: NÃO", source)
+        self.assertIn("alteração automática da feature flag: NÃO", source)
+
     def test_supervisor_has_no_mutation_apis(self):
         source = Path(
             "atlasquant_aion_global_worker_supervision.py"
