@@ -314,6 +314,28 @@ class CentralHubUiTests(unittest.TestCase):
         self.assertIn("Consume a deep-link once", cloud)
         self.assertNotIn('requested = st.query_params.get("central", "")\n        if isinstance(requested', cloud[cloud.index("def _apply_central_trader_navigation"):])
 
+
+    def test_central_controls_are_explicit_and_master_panel_stays_visible(self):
+        hub = Path("atlasquant_central_hub_ui.py").read_text(encoding="utf-8")
+        self.assertIn("#### Acessos da Central", hub)
+        self.assertIn('"Abrir " + label', hub)
+        self.assertIn('key=f"aq_central_stateful_{area_id}"', hub)
+
+        admin = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("def _render_master_status_summary", admin)
+        self.assertIn("Painel Mestre · resumo essencial", admin)
+        self.assertIn("_render_master_status_summary(status_board)", admin)
+        self.assertIn("aion_workspace_overview_open_", admin)
+        self.assertIn('st.session_state[_AION_WORKSPACE_JUMP_KEY] = workspace', admin)
+        self.assertIn('"Abrir " + workspace', admin)
+
+        cloud = Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        self.assertIn("_CENTRAL_RENDER_ERROR_KEY", cloud)
+        self.assertIn("A Central Principal encontrou um erro isolado de interface", cloud)
+        self.assertIn("Abrir Trader seguro", cloud)
+        self.assertIn("Abrir AION seguro", cloud)
+        self.assertIn("st.session_state[_CENTRAL_RENDER_ERROR_KEY]", cloud)
+
     def test_student_still_enters_trader_and_cannot_open_the_selector(self):
         user = _access("ALUNO")
         resolved = resolve_central_area(user, None)
