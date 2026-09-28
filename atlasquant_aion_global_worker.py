@@ -359,8 +359,8 @@ def _normalize_state(raw: Mapping[str, Any]) -> dict[str, Any]:
     return state
 
 
-def _mutated(state: Mapping[str, Any], **changes: Any) -> dict[str, Any]:
-    out = deepcopy(dict(state))
+def _mutated(current_state: Mapping[str, Any], **changes: Any) -> dict[str, Any]:
+    out = deepcopy(dict(current_state))
     out.update(changes)
     out["revision"] = int(out.get("revision") or 0) + 1
     out["digest"] = _bundle_digest(out)
