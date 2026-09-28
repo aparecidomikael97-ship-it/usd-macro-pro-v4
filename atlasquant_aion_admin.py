@@ -2741,7 +2741,7 @@ def _render_central(
     ex2.metric("Receipts", int(executor_state.get("receipt_count") or 0))
     ex3.metric(
         "Worker autônomo",
-        "ATIVO" if executor_state.get("autonomous_worker_connected") else "NÃO INSTALADO",
+        "VER RUNTIME V1",
     )
     ex4.metric(
         "Ação física",
