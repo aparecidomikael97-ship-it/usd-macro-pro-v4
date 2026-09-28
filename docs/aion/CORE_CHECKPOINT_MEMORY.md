@@ -83,3 +83,6 @@ This block does not:
 - automatically save the Checkpoint Mestre.
 
 Physical execution and external actions remain false/blocked.
+
+The checkpoint bridge itself remains network-free; only the pre-existing master
+checkpoint save flow may perform the separately approved external persistence.
