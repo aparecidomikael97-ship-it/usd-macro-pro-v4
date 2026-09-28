@@ -14,6 +14,7 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import json
+from pathlib import Path
 from typing import Any, Callable, Mapping
 from urllib.parse import quote
 
@@ -35,6 +36,11 @@ from atlasquant_aion_memory import (
     RuntimeConfig,
     checkpoint_source_digest,
     load_runtime_checkpoint,
+)
+from atlasquant_aion_global_worker_readiness import (
+    AUTOPILOT_WORKFLOW,
+    activation_readiness_snapshot,
+    fetch_recent_autopilot_pulses,
 )
 
 
@@ -195,6 +201,109 @@ def _readiness_contract(
             or ""
         ),
     }
+
+
+def collect_activation_readiness_evidence(
+    config: RuntimeConfig,
+    runtime_result: Mapping[str, Any],
+    *,
+    timeout: float = 12.0,
+    now: datetime | None = None,
+    flag_reader: Callable[..., Mapping[str, Any]] = read_repository_feature_flag,
+    pulse_reader: Callable[..., Mapping[str, Any]] = fetch_recent_autopilot_pulses,
+    workflow_path: str = AUTOPILOT_WORKFLOW,
+) -> dict[str, Any]:
+    """Collect current readiness with GET-only evidence and in-memory shadow checks."""
+    current = utc(now or _now())
+    flag = dict(flag_reader(config, timeout=min(timeout, 10.0)) or {})
+    flag_status = str(flag.get("status") or "").upper()
+    flag_state = str(flag.get("state") or "UNKNOWN").upper()
+    if flag_status != "CONFIRMED":
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "activation_stage": "BLOCKED",
+            "blockers": ["FEATURE_FLAG_EVIDENCE_UNAVAILABLE"],
+            "feature_flag": {
+                "name": FEATURE_FLAG_NAME,
+                "state": "UNKNOWN",
+                "value_exposed": False,
+            },
+            "flag_evidence": flag,
+            "read_only": True,
+            "runtime_modified": False,
+            "feature_flag_modified": False,
+            "global_worker_executed": False,
+        }
+
+    pulses = dict(
+        pulse_reader(
+            config,
+            token=config.token,
+            timeout=timeout,
+            per_page=5,
+        )
+        or {}
+    )
+    if str(pulses.get("status") or "").upper() != "CONFIRMED":
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "activation_stage": "BLOCKED",
+            "blockers": ["PULSE_EVIDENCE_UNAVAILABLE"],
+            "feature_flag": {
+                "name": FEATURE_FLAG_NAME,
+                "state": flag_state,
+                "value_exposed": False,
+            },
+            "flag_evidence": flag,
+            "pulse_source_status": str(pulses.get("status") or "UNKNOWN"),
+            "read_only": True,
+            "runtime_modified": False,
+            "feature_flag_modified": False,
+            "global_worker_executed": False,
+        }
+
+    try:
+        workflow_text = Path(workflow_path).read_text(encoding="utf-8")
+    except Exception as exc:
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "activation_stage": "BLOCKED",
+            "blockers": ["WORKFLOW_SOURCE_UNAVAILABLE"],
+            "feature_flag": {
+                "name": FEATURE_FLAG_NAME,
+                "state": flag_state,
+                "value_exposed": False,
+            },
+            "flag_evidence": flag,
+            "pulse_source_status": str(pulses.get("status") or "UNKNOWN"),
+            "read_only": True,
+            "runtime_modified": False,
+            "feature_flag_modified": False,
+            "global_worker_executed": False,
+            "error_type": type(exc).__name__,
+        }
+
+    raw_state = {
+        "UNSET": "",
+        "DISABLED": "0",
+        "ENABLED": "1",
+    }.get(flag_state, "INVALID")
+    report = activation_readiness_snapshot(
+        runtime_result=runtime_result,
+        config=config,
+        feature_flag_raw=raw_state,
+        workflow_text=workflow_text,
+        pulse_rows=pulses.get("runs"),
+        now=current,
+    )
+    report = dict(report)
+    report["flag_evidence"] = flag
+    report["pulse_source_status"] = str(pulses.get("status") or "UNKNOWN")
+    report["global_worker_executed"] = False
+    return report
 
 
 def plan_integrity(plan: Mapping[str, Any] | None) -> dict[str, str]:
@@ -761,6 +870,7 @@ __all__ = [
     "CONFIRMATION_PHRASE",
     "DEACTIVATION_PHRASE",
     "READY_STAGE",
+    "collect_activation_readiness_evidence",
     "plan_integrity",
     "approval_integrity",
     "prepare_global_worker_activation_plan",
