@@ -179,7 +179,7 @@ class GlobalWorkerActivationReadinessTests(unittest.TestCase):
         )
         report = pulse_health(rows, now=NOW)
         self.assertEqual(report["state"], "BLOCKED")
-        self.assertTrue(report["latest_is_active"])
+        self.assertGreater(report["stale_active_count"], 0)
 
     def test_protocol_shadow_probe_is_in_memory_and_passes(self):
         report = protocol_shadow_probe(now=NOW)
