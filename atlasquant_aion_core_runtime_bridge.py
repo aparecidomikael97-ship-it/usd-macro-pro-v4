@@ -15,6 +15,10 @@ from atlasquant_aion_core_intelligence.context import Context, Domain
 from atlasquant_aion_core_intelligence.evidence import Evidence, Origin, assess, utc
 from atlasquant_aion_core_intelligence.router import route
 from atlasquant_aion_core_intelligence.service import AionCore, ScopedEvidence
+from atlasquant_aion_core_voice_automation import (
+    AtlasQuantVoiceAdapter,
+    CheckpointAutomationAdapter,
+)
 
 
 SCHEMA = "ATLASQUANT_AION_CORE_RUNTIME_BRIDGE_V1"
@@ -246,6 +250,7 @@ def handle_runtime_intent(
     *,
     system_context: Mapping[str, Any] | None = None,
     legacy_checkpoint: Mapping[str, Any] | None = None,
+    voice_status: Mapping[str, Any] | None = None,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     """Run the data-only Core against the current authenticated runtime context."""
@@ -268,14 +273,33 @@ def handle_runtime_intent(
             **SAFETY_GATES,
         }
 
-    bootstrap_core = AionCore(store=None, clock=lambda: current)
+    admin_context = authenticated_context(access, Domain.ADMIN)
+    voice_adapter = AtlasQuantVoiceAdapter(voice_status)
+    automation_adapter = (
+        CheckpointAutomationAdapter(admin_context, legacy_checkpoint)
+        if isinstance(legacy_checkpoint, Mapping)
+        else None
+    )
+    bootstrap_core = AionCore(
+        store=None,
+        voice_adapter=voice_adapter,
+        automation_adapter=automation_adapter,
+        clock=lambda: current,
+    )
     context, preliminary = _context_for_intent(access, intent, bootstrap_core)
     store = None
     checkpoint_state = {"state": "UNAVAILABLE"}
     if isinstance(legacy_checkpoint, Mapping):
         from atlasquant_aion_core_checkpoint_bridge import load_checkpoint_store
         store, checkpoint_state = load_checkpoint_store(context, legacy_checkpoint)
-    core = AionCore(store=store, clock=lambda: current)
+    core = AionCore(
+        store=store,
+        voice_adapter=voice_adapter,
+        automation_adapter=(
+            automation_adapter if context.domain == Domain.ADMIN else None
+        ),
+        clock=lambda: current,
+    )
     scoped, ingress = scoped_runtime_evidence(context, system_context)
     evidence_truth = assess(scoped.records, current)
     try:
@@ -305,6 +329,18 @@ def handle_runtime_intent(
             "checkpoint_state": str(checkpoint_state.get("state") or "UNKNOWN"),
         },
         "capabilities": core.registry.snapshot(),
+        "adapters": {
+            "voice": voice_adapter.snapshot(),
+            "automation": (
+                automation_adapter.snapshot(current)
+                if automation_adapter is not None
+                else {
+                    "status": "UNAVAILABLE",
+                    "execution_adapter": "UNAVAILABLE",
+                    "automatic_execution": False,
+                }
+            ),
+        },
         "memory_auto_written": False,
         **SAFETY_GATES,
     }
