@@ -177,12 +177,20 @@ def attach_executor_receipts(
     previous = out.get(EXECUTOR_NAMESPACE)
     if isinstance(previous, Mapping) and previous.get("scope") != _scope_payload(context):
         raise ValueError("EXECUTOR_CONTEXT_MISMATCH")
+    authorization_modes = sorted({
+        str(row.get("authorization_mode") or "HUMAN_CLICK")
+        for row in rows
+        if isinstance(row, Mapping)
+    })
+    armed_worker_observed = "ARMED_WORKER" in authorization_modes
     bundle = {
         "schema": EXECUTOR_SCHEMA,
         "scope": _scope_payload(context),
         "updated_at": utc(now).isoformat(),
         "receipts": rows,
-        "manual_invocation_only": True,
+        "authorization_modes_observed": authorization_modes,
+        "manual_invocation_only": not armed_worker_observed,
+        "armed_worker_execution_observed": armed_worker_observed,
         "autonomous_worker_connected": False,
         "physical_action_adapter": "UNAVAILABLE",
     }
@@ -293,6 +301,12 @@ def executor_snapshot(
         state_name = str(row.get("state") or "")
         if state_name in counts:
             counts[state_name] += 1
+    authorization_modes = sorted({
+        str(row.get("authorization_mode") or "HUMAN_CLICK")
+        for row in receipts
+        if isinstance(row, Mapping)
+    })
+    armed_worker_observed = "ARMED_WORKER" in authorization_modes
     return {
         "schema": SCHEMA,
         "status": state["state"],
@@ -300,8 +314,10 @@ def executor_snapshot(
         "receipt_count": len(receipts),
         "by_state": counts,
         "due_count": int(scheduler.get("due_count") or 0),
-        "manual_invocation_only": True,
+        "authorization_modes_observed": authorization_modes,
+        "manual_invocation_only": not armed_worker_observed,
         "manual_run_available": True,
+        "armed_worker_execution_observed": armed_worker_observed,
         "autonomous_worker_connected": False,
         "physical_action_adapter": "UNAVAILABLE",
         "external_action_executed": False,
