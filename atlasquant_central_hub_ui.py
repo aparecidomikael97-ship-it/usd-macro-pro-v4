@@ -805,7 +805,7 @@ def central_surface_html(
         stage = central_card_html(resolved["area"])
     back = ""
     if _admin(access) and not at_root:
-        back = '<p class="aq-central-back">Use os controles abaixo para voltar à Central Principal.</p>'
+        back = '<p class="aq-central-back">Voltar à Central Principal pelos controles abaixo.</p>'
     return (
         '<div class="aq-central-layout">'
         + rail
