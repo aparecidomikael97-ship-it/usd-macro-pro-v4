@@ -24,6 +24,11 @@ from atlasquant_aion_global_worker import (
     stage_kill_global_worker,
     stage_pause_global_worker,
 )
+from atlasquant_aion_global_worker_arming import (
+    CONFIRMATION_PHRASE,
+    approve_global_worker_arming_plan,
+    prepare_global_worker_arming_plan,
+)
 from atlasquant_aion_memory import (
     RuntimeConfig,
     checkpoint_integrity_report,
@@ -88,12 +93,34 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
         )
         return result["checkpoint"]
 
+    def approval(self, checkpoint, *, max_jobs=5, lease_seconds=600, now=CREATED):
+        plan = prepare_global_worker_arming_plan(
+            self.access,
+            checkpoint,
+            max_jobs=max_jobs,
+            lease_seconds=lease_seconds,
+            approval_ttl_seconds=900,
+            readiness_stage="READY_FOR_ADMIN_ARMING",
+            now=now,
+        )
+        self.assertEqual(plan["status"], "PLAN_READY")
+        approved = approve_global_worker_arming_plan(
+            self.access,
+            plan["plan"],
+            confirmation=True,
+            confirmation_phrase=CONFIRMATION_PHRASE,
+            now=now,
+        )
+        self.assertEqual(approved["status"], "APPROVED_FOR_STAGING")
+        return approved["approval"]
+
     def armed_checkpoint(self, *, capability="ADMINISTRATION", prompt="estado do sistema"):
         scheduled = self.schedule(capability=capability, prompt=prompt)
         result = stage_arm_global_worker(
             self.access,
             scheduled,
             confirmation=True,
+            arming_approval=self.approval(scheduled),
             max_jobs=5,
             lease_seconds=600,
             now=CREATED,
@@ -128,10 +155,16 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
         self.assertNotIn(GLOBAL_WORKER_NAMESPACE, result["checkpoint"])
 
     def test_staged_arm_binds_exact_admin_scope_without_persisting(self):
+        checkpoint = {}
         result = stage_arm_global_worker(
             self.access,
-            {},
+            checkpoint,
             confirmation=True,
+            arming_approval=self.approval(
+                checkpoint,
+                max_jobs=4,
+                lease_seconds=600,
+            ),
             max_jobs=4,
             lease_seconds=600,
             now=CREATED,
@@ -435,6 +468,11 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
             self.access,
             base,
             confirmation=True,
+            arming_approval=self.approval(
+                base,
+                max_jobs=5,
+                lease_seconds=600,
+            ),
             lease_seconds=600,
             now=CREATED,
         )["checkpoint"]
