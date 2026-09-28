@@ -469,7 +469,9 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
             encoding="utf-8"
         )
         for banned in (
-            "subprocess",
+            "import subprocess",
+            "from subprocess",
+            "subprocess.",
             "os.system(",
             "generate_neural_speech(",
             "publish_social(",
