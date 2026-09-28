@@ -471,6 +471,21 @@ except Exception:
     recovery_drill_summary = None
     simulate_global_worker_recovery_drill = None
 
+try:
+    from atlasquant_aion_global_worker_recovery_closure import (
+        CONFIRMATION_PHRASE as GLOBAL_REMEDIATION_CONFIRMATION_PHRASE,
+        assess_incident_closure_readiness,
+        closure_review_record,
+        prepare_remediation_evidence,
+    )
+except Exception:
+    GLOBAL_REMEDIATION_CONFIRMATION_PHRASE = (
+        "CONFIRMAR EVIDENCIA DE REMEDIACAO WORKER GLOBAL"
+    )
+    assess_incident_closure_readiness = None
+    closure_review_record = None
+    prepare_remediation_evidence = None
+
 SCHEMA = "ATLASQUANT_AION_ADMIN_V1"
 AION_WORKSPACES = (
     "🧠 Central",
@@ -502,6 +517,8 @@ _AION_GLOBAL_LIVE_VERIFICATION_KEY = "aion_global_live_verification_v1"
 _AION_GLOBAL_SUPERVISION_KEY = "aion_global_supervision_v1"
 _AION_GLOBAL_SUPERVISION_HISTORY_KEY = "aion_global_supervision_history_v1"
 _AION_GLOBAL_RECOVERY_DRILL_KEY = "aion_global_recovery_drill_v1"
+_AION_GLOBAL_REMEDIATION_EVIDENCE_KEY = "aion_global_remediation_evidence_v1"
+_AION_GLOBAL_CLOSURE_ASSESSMENT_KEY = "aion_global_closure_assessment_v1"
 
 AION_ADMIN_CSS = r"""
 <style>
@@ -7178,6 +7195,161 @@ def _render_development(
                     elif str(drill_result.get("status") or "") == "CONFIRMATION_REQUIRED":
                         st.warning(
                             "A frase exata de confirmação da simulação é obrigatória."
+                        )
+
+            with st.expander("🧾 Evidência de recuperação / fechamento"):
+                st.caption(
+                    "Esta etapa nunca encerra o incidente automaticamente. Ela exige "
+                    "remediação confirmada + evidência atual fresca e, no máximo, "
+                    "marca o caso como pronto para revisão humana."
+                )
+                rem_root = st.checkbox(
+                    "Causa raiz identificada.",
+                    value=False,
+                    key="aion_global_remediation_root_cause",
+                )
+                rem_fix = st.checkbox(
+                    "Ação corretiva verificada.",
+                    value=False,
+                    key="aion_global_remediation_fix_verified",
+                )
+                rem_regression = st.checkbox(
+                    "Teste de regressão passou.",
+                    value=False,
+                    key="aion_global_remediation_regression",
+                )
+                rem_preserved = st.checkbox(
+                    "Evidência original do incidente foi preservada.",
+                    value=False,
+                    key="aion_global_remediation_evidence_preserved",
+                )
+                rem_reviewer = st.checkbox(
+                    "Revisor humano confirma a evidência de remediação.",
+                    value=False,
+                    key="aion_global_remediation_reviewer",
+                )
+                rem_phrase = st.text_input(
+                    'Digite exatamente "CONFIRMAR EVIDENCIA DE REMEDIACAO WORKER GLOBAL"',
+                    value="",
+                    key="aion_global_remediation_phrase",
+                )
+                if st.button(
+                    "🧾 Confirmar evidência de remediação",
+                    key="aion_global_remediation_confirm",
+                    disabled=prepare_remediation_evidence is None,
+                    width="stretch",
+                ):
+                    st.session_state[_AION_GLOBAL_REMEDIATION_EVIDENCE_KEY] = (
+                        prepare_remediation_evidence(
+                            supervision_report,
+                            root_cause_identified=rem_root,
+                            corrective_action_verified=rem_fix,
+                            regression_check_passed=rem_regression,
+                            evidence_preserved=rem_preserved,
+                            reviewer_confirmed=rem_reviewer,
+                            confirmation_phrase=rem_phrase,
+                        )
+                    )
+
+                remediation_evidence = st.session_state.get(
+                    _AION_GLOBAL_REMEDIATION_EVIDENCE_KEY
+                )
+                if isinstance(remediation_evidence, Mapping):
+                    st.caption(
+                        "Remediação: "
+                        + str(remediation_evidence.get("status") or "UNKNOWN")
+                        + " · incidente encerrado automaticamente: NÃO"
+                        + " · reativação autorizada: NÃO"
+                        + " · persistência externa: NÃO."
+                    )
+
+                    if st.button(
+                        "🔎 Avaliar prontidão para fechamento",
+                        key="aion_global_closure_assess",
+                        disabled=not bool(
+                            assess_incident_closure_readiness is not None
+                            and verify_global_worker_live_activation is not None
+                            and read_repository_feature_flag is not None
+                        ),
+                        width="stretch",
+                    ):
+                        try:
+                            closure_flag = read_repository_feature_flag(cfg)
+                            closure_runtime = load_runtime_checkpoint(cfg)
+                            closure_live = verify_global_worker_live_activation(
+                                access,
+                                closure_runtime,
+                                closure_flag,
+                                activation_result=(
+                                    last_activation
+                                    if isinstance(last_activation, Mapping)
+                                    else None
+                                ),
+                            )
+                            st.session_state[_AION_GLOBAL_CLOSURE_ASSESSMENT_KEY] = (
+                                assess_incident_closure_readiness(
+                                    supervision_report,
+                                    closure_live,
+                                    closure_flag,
+                                    remediation_evidence,
+                                )
+                            )
+                        except Exception as exc:
+                            st.session_state[
+                                _AION_GLOBAL_CLOSURE_ASSESSMENT_KEY
+                            ] = {
+                                "status": "CLOSURE_BLOCKED",
+                                "reason": type(exc).__name__,
+                                "closure_review_ready": False,
+                                "incident_closed": False,
+                                "automatic_closure": False,
+                            }
+
+                closure_assessment = st.session_state.get(
+                    _AION_GLOBAL_CLOSURE_ASSESSMENT_KEY
+                )
+                if isinstance(closure_assessment, Mapping):
+                    closure_record = (
+                        closure_review_record(closure_assessment)
+                        if closure_review_record is not None
+                        else {}
+                    )
+                    if closure_assessment.get("closure_review_ready"):
+                        st.success(
+                            "Evidência suficiente: caso pronto para revisão humana "
+                            "de fechamento. O incidente ainda NÃO foi encerrado."
+                        )
+                    else:
+                        st.warning(
+                            "Fechamento ainda bloqueado: "
+                            + str(
+                                closure_assessment.get("reason")
+                                or "evidência insuficiente"
+                            )
+                            + "."
+                        )
+                    st.caption(
+                        "Status: "
+                        + str(closure_assessment.get("status") or "UNKNOWN")
+                        + " · pronto para revisão humana: "
+                        + (
+                            "SIM"
+                            if closure_assessment.get("closure_review_ready")
+                            else "NÃO"
+                        )
+                        + " · incidente encerrado automaticamente: NÃO"
+                        + " · reativação autorizada: NÃO"
+                        + " · trading real: NÃO."
+                    )
+                    blockers = list(closure_assessment.get("blockers") or [])
+                    if blockers:
+                        st.caption(
+                            "Blockers: " + ", ".join(str(x) for x in blockers)
+                        )
+                    if closure_record.get("closure_package_digest"):
+                        st.caption(
+                            "Closure package digest: "
+                            + str(closure_record.get("closure_package_digest"))
                         )
 
         with st.expander("🛑 Desativação de segurança da feature flag"):
