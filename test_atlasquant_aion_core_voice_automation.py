@@ -167,7 +167,9 @@ class SchedulerAdapterTests(unittest.TestCase):
         self.assertEqual(snapshot["due_count"], 1)
         self.assertTrue(snapshot["schedules"][0]["due"])
         self.assertFalse(snapshot["automatic_execution"])
-        self.assertEqual(snapshot["execution_adapter"], "UNAVAILABLE")
+        self.assertEqual(snapshot["execution_adapter"], "LOCAL_MANUAL_V1")
+        self.assertEqual(snapshot["local_manual_executor"], "AVAILABLE")
+        self.assertFalse(snapshot["autonomous_worker_connected"])
 
     def test_hourly_schedule_has_deterministic_next_run(self):
         staged = self.stage(
