@@ -83,6 +83,10 @@ and record:
 
 The original ADMIN arming remains the authority source for the delegated scope.
 
+A later stacked Arming Ceremony V1 makes that authority short-lived and
+checkpoint-bound: a valid plan + exact confirmation phrase + approval ticket is
+required before `STAGED_ARMED` can be produced.
+
 ## CAS and fencing
 
 The lease is stored in the **same Checkpoint Mestre file** that stores schedules
@@ -203,9 +207,12 @@ flags.
 
 The Central AION can stage:
 
-- Arm Global
-- Pause Global
-- Kill Global
+- Global arming only through the three-step Arming Ceremony;
+- Pause Global;
+- Kill Global.
+
+The direct Arm Global button no longer exists. The ceremony generates a
+checkpoint-bound short-lived approval before `STAGED_ARMED` can be produced.
 
 These controls only modify the working Checkpoint first.
 
