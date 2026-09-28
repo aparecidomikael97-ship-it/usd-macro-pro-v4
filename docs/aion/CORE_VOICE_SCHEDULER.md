@@ -6,7 +6,9 @@ exist or are needed in the AtlasQuant runtime:
 1. the official AtlasQuant neural voice status/preparation path;
 2. a persisted schedule registry stored in the Checkpoint Mestre.
 
-The block intentionally does not connect a background executor.
+This scheduler block does not connect an autonomous background worker. A later
+stacked block adds a manual, authenticated local executor kernel while keeping
+autonomous background execution unavailable.
 
 ## Voice adapter
 
@@ -92,13 +94,16 @@ A tampered scheduler bundle changes the master checkpoint integrity to
 
 This block deliberately reports:
 
-- `execution_adapter = UNAVAILABLE`;
+- scheduler definitions can report `execution_adapter = LOCAL_MANUAL_V1` when
+  the stacked executor block is present;
+- `autonomous_worker_connected = false`;
 - `automatic_execution = false`;
 - `execution_authorized = false`;
 - `external_action_executed = false`.
 
 Therefore "scheduled" means the AION has a durable time definition and can tell
-when work is due. It does not mean a worker is running in the background.
+when work is due. Even with the local manual executor kernel, it does not mean
+an autonomous worker is running in the background.
 
 A future executor must be a separate adapter with:
 - authenticated authority;
