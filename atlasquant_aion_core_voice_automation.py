@@ -31,6 +31,14 @@ SCHEDULE_STATES = ("ACTIVE", "PAUSED", "CANCELED")
 MAX_SCHEDULES = 200
 MAX_PROMPT_CHARS = 2400
 MAX_TITLE_CHARS = 240
+SCHEDULE_CAPABILITIES = (
+    "ADMINISTRATION",
+    "MEMORY",
+    "RESEARCH",
+    "VOICE",
+    "CONTENT",
+    "OBSERVABILITY",
+)
 
 
 def _scope_payload(context: Context) -> list[str]:
@@ -82,6 +90,8 @@ def _normalize_schedule(raw: Mapping[str, Any]) -> dict[str, Any]:
     schedule_id = safe_text(item.get("schedule_id"), 100)
     title = safe_text(item.get("title"), MAX_TITLE_CHARS)
     prompt = safe_text(item.get("prompt"), MAX_PROMPT_CHARS)
+    capability_raw = str(item.get("capability") or "").strip().upper()
+    capability = capability_raw if capability_raw in SCHEDULE_CAPABILITIES else ""
     cadence = safe_text(item.get("cadence"), 20).upper()
     state = safe_text(item.get("state"), 20).upper()
     timezone_name = _clean_timezone(item.get("timezone"))
@@ -121,6 +131,7 @@ def _normalize_schedule(raw: Mapping[str, Any]) -> dict[str, Any]:
         "schedule_id": schedule_id,
         "title": title,
         "prompt": prompt,
+        "capability": capability,
         "cadence": cadence,
         "state": state,
         "timezone": timezone_name,
@@ -311,6 +322,7 @@ def stage_schedule(
     title: str,
     prompt: str,
     cadence: str,
+    capability: str | None = None,
     timezone_name: str | None,
     hour: int = 0,
     minute: int = 0,
@@ -350,6 +362,7 @@ def stage_schedule(
         "schedule_id": "SCH-" + uuid4().hex[:16].upper(),
         "title": title,
         "prompt": prompt,
+        "capability": str(capability or "").strip().upper(),
         "cadence": cadence_clean,
         "state": "ACTIVE",
         "timezone": zone_name,
@@ -396,10 +409,12 @@ class CheckpointAutomationAdapter:
             due = _schedule_due(row, current)
             if due:
                 due_count += 1
+            due_at = _previous_due(row, current) if due else None
             next_run = _next_run(row, current)
             details.append({
                 **deepcopy(row),
                 "due": due,
+                "due_at": due_at.isoformat() if due_at else "",
                 "next_run_at": next_run.isoformat() if next_run else "",
                 "executes_action": False,
             })
@@ -475,6 +490,7 @@ __all__ = [
     "SCHEDULE_SCHEMA",
     "CADENCES",
     "SCHEDULE_STATES",
+    "SCHEDULE_CAPABILITIES",
     "scheduler_integrity",
     "load_schedules",
     "attach_schedules",
