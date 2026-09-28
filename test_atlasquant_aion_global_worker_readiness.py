@@ -268,7 +268,20 @@ class GlobalWorkerActivationReadinessTests(unittest.TestCase):
         response.json.return_value = {
             "workflow_runs": [
                 {
+                    "id": 99,
+                    "name": "Other Scheduled Workflow",
+                    "path": ".github/workflows/other.yml",
+                    "event": "schedule",
+                    "status": "completed",
+                    "conclusion": "success",
+                    "created_at": "2026-09-28T13:05:00Z",
+                    "updated_at": "2026-09-28T13:06:00Z",
+                    "head_sha": "b" * 40,
+                },
+                {
                     "id": 11,
+                    "name": "AtlasQuant - Automatic Scanner + Autopilot",
+                    "path": ".github/workflows/autopilot-v107.yml",
                     "event": "schedule",
                     "status": "completed",
                     "conclusion": "success",
@@ -288,9 +301,44 @@ class GlobalWorkerActivationReadinessTests(unittest.TestCase):
                 token="token",
             )
         get.assert_called_once()
+        _, kwargs = get.call_args
+        self.assertTrue(str(kwargs["url"]).endswith("/actions/runs"))
+        self.assertEqual(kwargs["params"]["event"], "schedule")
+        self.assertEqual(kwargs["params"]["branch"], "main")
+        self.assertGreaterEqual(kwargs["params"]["per_page"], 20)
         self.assertEqual(result["status"], "CONFIRMED")
+        self.assertEqual(len(result["runs"]), 1)
+        self.assertEqual(result["runs"][0]["id"], 11)
         self.assertNotIn("secret_field", result["runs"][0])
         self.assertEqual(result["runs"][0]["head_sha"], "a" * 40)
+
+    def test_pulse_api_reader_fails_closed_when_autopilot_is_absent(self):
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {
+            "workflow_runs": [
+                {
+                    "id": 99,
+                    "name": "Other Scheduled Workflow",
+                    "path": ".github/workflows/other.yml",
+                    "event": "schedule",
+                    "status": "completed",
+                    "conclusion": "success",
+                    "created_at": "2026-09-28T13:05:00Z",
+                }
+            ]
+        }
+        with patch(
+            "atlasquant_aion_global_worker_readiness.requests.get",
+            return_value=response,
+        ):
+            result = fetch_recent_autopilot_pulses(
+                _config(),
+                token="token",
+            )
+        self.assertEqual(result["status"], "UNAVAILABLE")
+        self.assertEqual(result["runs"], [])
+        self.assertIn("not found", result["reason"])
 
     def test_readiness_module_has_no_write_or_activation_api(self):
         source = Path(
