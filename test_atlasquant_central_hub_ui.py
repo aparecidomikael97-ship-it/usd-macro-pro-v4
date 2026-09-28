@@ -3,14 +3,20 @@ from __future__ import annotations
 
 import ast
 from datetime import datetime, timezone
+import os
 from pathlib import Path
+import re
 import unittest
+from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 from atlasquant_central_hub_ui import (
     CENTRAL_CHOICE_KEY,
     CENTRAL_ROOT,
+    DEFAULT_TIMEZONE,
     LOGIN_GREETING_KEY,
     acknowledge_login_greeting,
+    application_timezone,
     aion_home_html,
     aion_login_presence_html,
     assert_area_access,
@@ -18,6 +24,7 @@ from atlasquant_central_hub_ui import (
     central_visibility_model,
     clear_login_greeting,
     ecosystem_rail_html,
+    greeting_period,
     login_greeting,
     request_central_destination,
     resolve_central_area,
@@ -354,6 +361,44 @@ class LoginGreetingTests(unittest.TestCase):
         self.assertIn("boa tarde", afternoon["text"])
         self.assertIn("boa noite", night["text"])
         self.assertIn("Mikael, bom dia. AION ativo.", aion_login_presence_html(admin, now=datetime(2026, 9, 27, 11, 0, tzinfo=timezone.utc)))
+
+    def test_greeting_clock_is_cuiaba_and_an_invalid_zone_falls_back(self):
+        cuiaba = ZoneInfo("America/Cuiaba")
+
+        def wall(hour, minute):
+            return datetime(2026, 9, 27, hour, minute, tzinfo=cuiaba)
+
+        self.assertEqual(greeting_period(wall(11, 59), timezone_name="America/Cuiaba"), "Bom dia")
+        self.assertEqual(greeting_period(wall(12, 0), timezone_name="America/Cuiaba"), "Boa tarde")
+        self.assertEqual(greeting_period(wall(17, 59), timezone_name="America/Cuiaba"), "Boa tarde")
+        self.assertEqual(greeting_period(wall(18, 0), timezone_name="America/Cuiaba"), "Boa noite")
+        self.assertEqual(greeting_period(wall(4, 59), timezone_name="America/Cuiaba"), "Boa noite")
+        self.assertEqual(greeting_period(wall(5, 0), timezone_name="America/Cuiaba"), "Bom dia")
+        self.assertEqual(greeting_period(datetime(2026, 9, 27, 18, 0), timezone_name="America/Cuiaba"), "Boa noite")
+        utc = datetime(2026, 6, 15, 15, 30, tzinfo=timezone.utc)
+        self.assertEqual(greeting_period(utc, timezone_name="America/Cuiaba"), "Bom dia")
+        self.assertEqual(greeting_period(utc, timezone_name="America/Sao_Paulo"), "Boa tarde")
+        self.assertEqual(greeting_period(utc, timezone_name="Not/AZone"), "Bom dia")
+        self.assertEqual(application_timezone("Not/AZone").key, "America/Cuiaba")
+        self.assertEqual(application_timezone("").key, DEFAULT_TIMEZONE)
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("ATLASQUANT_TIMEZONE", None)
+            self.assertEqual(application_timezone(None).key, "America/Cuiaba")
+            self.assertEqual(greeting_period(utc), "Bom dia")
+        with patch.dict(os.environ, {"ATLASQUANT_TIMEZONE": "Invalid/Zone"}):
+            self.assertEqual(greeting_period(utc), "Bom dia")
+        with patch.dict(os.environ, {"ATLASQUANT_TIMEZONE": "America/Sao_Paulo"}):
+            self.assertEqual(greeting_period(utc), "Boa tarde")
+        user = _access("USER", session={"username": "cliente", "role": "USER", "authenticated_at": 3})
+        self.assertFalse(login_greeting(user, now=wall(11, 59), timezone_name="America/Cuiaba")["show"])
+        self.assertEqual(aion_login_presence_html(user, now=wall(11, 59), timezone_name="America/Cuiaba"), "")
+        admin = self._admin()
+        self.assertIn("Mikael, bom dia. AION ativo.", aion_login_presence_html(admin, now=wall(11, 59), timezone_name="America/Cuiaba"))
+        source = Path("atlasquant_central_hub_ui.py").read_text(encoding="utf-8")
+        period = source[source.index("def greeting_period"):source.index("def confirmed_status_line")]
+        self.assertNotIn("greeting_for", period)
+        self.assertIsNone(re.search(r"datetime\.now\(\s*\)", period))
+        self.assertIn("datetime.now(timezone.utc)", period)
 
     def test_user_and_unauthenticated_admin_get_no_greeting(self):
         now = datetime(2026, 9, 27, 11, 0, tzinfo=timezone.utc)

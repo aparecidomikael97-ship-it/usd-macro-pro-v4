@@ -6,9 +6,11 @@ or a second admin source, and it does not execute anything.
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+import os
+from datetime import datetime, timezone
 from html import escape
 from typing import Any, Mapping
+from zoneinfo import ZoneInfo
 
 from atlasquant_navigation_bridge import (
     request_return_to_aion,
@@ -20,7 +22,7 @@ _AREA_ORDER = ("aion", "negocios", "trader", "investimentos")
 CENTRAL_ROOT = "central_root"
 CENTRAL_CHOICE_KEY = "atlasquant_central_choice"
 LOGIN_GREETING_KEY = "aion_login_greeting_shown"
-_APP_CLOCK = timezone(timedelta(hours=-3), "BRT")
+DEFAULT_TIMEZONE = "America/Cuiaba"
 _ROOT_TOKENS = {"central", "central root", "ecosystem root", "central principal"}
 
 _AREAS = {
@@ -485,19 +487,41 @@ def _login_mark(access: Mapping[str, Any]) -> str:
     return f"{user}|{issued}"
 
 
-def greeting_period(now: datetime | None = None) -> str:
-    """Bom dia, boa tarde or boa noite on the application clock (Brasília)."""
-    try:
-        from atlasquant_aion_workspaces import greeting_for
+def application_timezone(configured: str | None = None) -> ZoneInfo:
+    """Configured application zone. An invalid name falls back to Cuiabá.
 
-        return greeting_for(now)
-    except Exception:
-        moment = (now or datetime.now(timezone.utc)).astimezone(_APP_CLOCK)
-        if 5 <= moment.hour < 12:
-            return "Bom dia"
-        if 12 <= moment.hour < 18:
-            return "Boa tarde"
-        return "Boa noite"
+    The server clock is not consulted. An empty value uses ATLASQUANT_TIMEZONE,
+    then America/Cuiaba.
+    """
+    if configured is None:
+        configured = os.environ.get("ATLASQUANT_TIMEZONE", DEFAULT_TIMEZONE)
+    name = " ".join(str(configured or "").split()) or DEFAULT_TIMEZONE
+    for candidate in (name, DEFAULT_TIMEZONE):
+        try:
+            return ZoneInfo(candidate)
+        except Exception:
+            continue
+    return ZoneInfo("UTC")
+
+
+def greeting_period(now: datetime | None = None, *, timezone_name: str | None = None) -> str:
+    """Bom dia 05:00–11:59, boa tarde 12:00–17:59, boa noite otherwise.
+
+    Aware values are converted into the configured zone. Naive values are read
+    as wall time in that zone, never as the Render server zone.
+    """
+    zone = application_timezone(timezone_name)
+    if now is None:
+        moment = datetime.now(timezone.utc).astimezone(zone)
+    elif now.tzinfo is None:
+        moment = now.replace(tzinfo=zone)
+    else:
+        moment = now.astimezone(zone)
+    if 5 <= moment.hour < 12:
+        return "Bom dia"
+    if 12 <= moment.hour < 18:
+        return "Boa tarde"
+    return "Boa noite"
 
 
 def confirmed_status_line(status: Mapping[str, Any] | None) -> str:
@@ -513,11 +537,17 @@ def confirmed_status_line(status: Mapping[str, Any] | None) -> str:
     return summary[:180]
 
 
-def login_greeting(access: Mapping[str, Any] | None, *, now: datetime | None = None, confirmed_status: Mapping[str, Any] | None = None) -> dict[str, Any]:
+def login_greeting(
+    access: Mapping[str, Any] | None,
+    *,
+    now: datetime | None = None,
+    confirmed_status: Mapping[str, Any] | None = None,
+    timezone_name: str | None = None,
+) -> dict[str, Any]:
     """Text for a valid ADMIN session. Missing facts stay out of the sentence."""
     if not _admin(access):
         return {"show": False, "text": "", "period": "", "name": "", "status": ""}
-    period = greeting_period(now).casefold()
+    period = greeting_period(now, timezone_name=timezone_name).casefold()
     name = _greeting_name(access)
     text = (
         f"{name}, {period}. AION ativo. "
@@ -537,9 +567,15 @@ def aion_login_presence_html(
     *,
     now: datetime | None = None,
     confirmed_status: Mapping[str, Any] | None = None,
+    timezone_name: str | None = None,
 ) -> str:
     """Active AION presence. The workspace stays closed until an explicit click."""
-    greeting = login_greeting(access, now=now, confirmed_status=confirmed_status)
+    greeting = login_greeting(
+        access,
+        now=now,
+        confirmed_status=confirmed_status,
+        timezone_name=timezone_name,
+    )
     if not greeting["show"]:
         return ""
     status = ""
@@ -582,11 +618,17 @@ def acknowledge_login_greeting(
     *,
     now: datetime | None = None,
     confirmed_status: Mapping[str, Any] | None = None,
+    timezone_name: str | None = None,
     provider_configured: bool = False,
     speak=None,
 ) -> dict[str, Any]:
     """Announce once per authentication. A later rerun keeps the same flag."""
-    greeting = login_greeting(access, now=now, confirmed_status=confirmed_status)
+    greeting = login_greeting(
+        access,
+        now=now,
+        confirmed_status=confirmed_status,
+        timezone_name=timezone_name,
+    )
     greeting["announced"] = False
     greeting["spoken"] = False
     greeting["voice_failed"] = False
@@ -630,6 +672,7 @@ def central_selector_html(
     *,
     now: datetime | None = None,
     confirmed_status: Mapping[str, Any] | None = None,
+    timezone_name: str | None = None,
 ) -> str:
     """Four-sector door for an admin session. Non-admin sessions get no private cards."""
     model = central_visibility_model(access)
@@ -645,7 +688,12 @@ def central_selector_html(
             f"<strong>{escape(spec['label'])}</strong>"
             f"<small>{escape(spec['sentence'])}</small></a>"
         )
-    presence = aion_login_presence_html(access, now=now, confirmed_status=confirmed_status)
+    presence = aion_login_presence_html(
+        access,
+        now=now,
+        confirmed_status=confirmed_status,
+        timezone_name=timezone_name,
+    )
     return (
         '<section class="aq-central-root" data-root="central_root">'
         + presence
@@ -663,6 +711,7 @@ def central_surface_html(
     *,
     now: datetime | None = None,
     confirmed_status: Mapping[str, Any] | None = None,
+    timezone_name: str | None = None,
 ) -> str:
     """Rail plus the allowed stage. A denial does not leak private labels."""
     resolved = resolve_central_area(access, requested)
@@ -671,7 +720,12 @@ def central_surface_html(
     if resolved["denied"]:
         stage = '<p class="aq-central-denied">Área privada indisponível para esta sessão.</p>'
     elif at_root:
-        stage = central_selector_html(access, now=now, confirmed_status=confirmed_status)
+        stage = central_selector_html(
+            access,
+            now=now,
+            confirmed_status=confirmed_status,
+            timezone_name=timezone_name,
+        )
     elif resolved["area"] == "aion":
         stage = aion_home_html()
     else:
@@ -695,13 +749,20 @@ def render_central_hub(
     *,
     now: datetime | None = None,
     confirmed_status: Mapping[str, Any] | None = None,
+    timezone_name: str | None = None,
 ) -> dict[str, Any]:
     """Streamlit edge. Import stays local so pure tests need no server."""
     import streamlit as st
 
     resolved = resolve_central_area(access, requested)
     st.markdown(
-        central_surface_html(access, requested, now=now, confirmed_status=confirmed_status),
+        central_surface_html(
+            access,
+            requested,
+            now=now,
+            confirmed_status=confirmed_status,
+            timezone_name=timezone_name,
+        ),
         unsafe_allow_html=True,
     )
     if resolved.get("root"):
@@ -711,6 +772,7 @@ def render_central_hub(
                 access,
                 now=now,
                 confirmed_status=confirmed_status,
+                timezone_name=timezone_name,
             )
         except Exception:
             pass
@@ -730,7 +792,9 @@ __all__ = [
     "central_surface_html",
     "aion_login_presence_html",
     "login_greeting",
+    "application_timezone",
     "greeting_period",
+    "DEFAULT_TIMEZONE",
     "acknowledge_login_greeting",
     "clear_login_greeting",
     "request_central_destination",
