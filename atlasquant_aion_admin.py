@@ -13,6 +13,7 @@ from uuid import uuid4
 from atlasquant_aion_clock import application_timezone
 from atlasquant_aion_core_intelligence.context import Domain
 from html import escape
+from pathlib import Path
 from typing import Any, Mapping
 import os
 
@@ -31,6 +32,7 @@ from atlasquant_aion_core import (
     route_context,
 )
 from atlasquant_aion_gateway import local_answer, provider_status
+from atlasquant_aion_command_orchestrator import orchestrate_local_command
 from atlasquant_aion_workspaces import (
     AION_PERSONAS,
     admin_brief_lines,
@@ -222,9 +224,13 @@ from atlasquant_aion_portable import (
 )
 from atlasquant_aion_vault import vault_summary
 from atlasquant_aion_tool_hub import (
+    default_tool_hub,
+    normalize_tool_hub,
     plan_tool_call,
     tool_hub_summary,
 )
+from atlasquant_aion_local_executor import local_allowlist
+from atlasquant_aion_local_traceability import SOURCE_CATALOG, local_contract_fingerprint
 from atlasquant_aion_durable_tasks import (
     durable_tasks_summary,
     new_durable_task,
@@ -255,6 +261,33 @@ from atlasquant_aion_dev_fusion import (
     record_stage as record_dev_fusion_stage,
     upsert_pipeline,
 )
+from atlasquant_aion_developer_intelligence import (
+    build_development_plan as build_developer_intelligence_plan,
+    scan_repository as scan_developer_repository,
+)
+from atlasquant_aion_developer_package import build_developer_package
+from atlasquant_aion_developer_diagnostics import (
+    diagnose_failure as diagnose_developer_failure,
+    record_failure_attempt as record_developer_failure_attempt,
+)
+from atlasquant_aion_developer_correction import build_correction_plan as build_developer_correction_plan
+from atlasquant_aion_developer_evidence_gate import (
+    confirm_root_cause_human_review as confirm_developer_root_cause,
+    evaluate_evidence_promotion as evaluate_developer_evidence_promotion,
+)
+from atlasquant_aion_developer_implementation import (
+    approve_implementation_session as approve_developer_implementation,
+    build_implementation_envelope as build_developer_implementation_envelope,
+    prepare_implementation_readiness as prepare_developer_implementation_readiness,
+)
+from atlasquant_aion_developer_builder_sandbox import build_builder_sandbox_request as build_developer_builder_sandbox_request
+from atlasquant_aion_developer_sandbox_preflight import (
+    ALLOWED_COMMAND_POLICY as DEVELOPER_SANDBOX_COMMAND_POLICY,
+    build_sandbox_preflight as build_developer_sandbox_preflight,
+)
+from atlasquant_aion_developer_patch_validation import validate_patch as validate_developer_patch
+from atlasquant_aion_developer_runner_contract import build_runner_contract as build_developer_runner_contract
+from atlasquant_aion_developer_command_policy import build_command_policy_contract as build_developer_command_policy_contract
 from atlasquant_aion_release_confidence import (
     DIMENSIONS as RELEASE_CONFIDENCE_DIMENSIONS,
     evidence_dimension,
@@ -1067,6 +1100,195 @@ def _render_workspace_overview(
             ):
                 st.session_state[_AION_WORKSPACE_JUMP_KEY] = workspace
                 st.rerun()
+
+
+
+def _local_contract_snapshot() -> dict[str, Any]:
+    """Cheap/passive contract posture. It does not run handlers or the full auditor."""
+    allow = [dict(item) for item in local_allowlist() if isinstance(item, Mapping)]
+    hub = default_tool_hub()
+    tools = [
+        dict(item)
+        for item in list((hub.get("tools") if isinstance(hub, Mapping) else []) or [])
+        if isinstance(item, Mapping)
+    ]
+    local_ids = [str(item.get("tool_id") or "") for item in allow if str(item.get("tool_id") or "")]
+    trace_ids = set(str(item) for item in SOURCE_CATALOG)
+    write_id = "aion.checkpoint.prepare_save"
+    safe_kinds = {"READ", "SEARCH", "DRAFT"}
+    issues = []
+    if len(local_ids) != 11 or len(set(local_ids)) != 11:
+        issues.append("LOCAL_ALLOWLIST_COUNT")
+    if write_id in local_ids:
+        issues.append("WRITE_IN_LOCAL_ALLOWLIST")
+    if any(str(item.get("kind") or "") not in safe_kinds for item in allow):
+        issues.append("FORBIDDEN_KIND_IN_ALLOWLIST")
+    if set(local_ids) != trace_ids:
+        issues.append("TRACEABILITY_COVERAGE_MISMATCH")
+
+    hub_index = {str(item.get("tool_id") or ""): item for item in tools}
+    for tool_id in local_ids:
+        item = hub_index.get(tool_id)
+        if not item:
+            issues.append("LOCAL_TOOL_MISSING_FROM_HUB")
+            break
+        if (
+            str(item.get("state") or "") != "LOCAL_READY"
+            or bool(item.get("connector_id"))
+            or bool(item.get("external_side_effects"))
+        ):
+            issues.append("LOCAL_TOOL_HUB_FLAGS")
+            break
+
+    write = hub_index.get(write_id) or {}
+    if str(write.get("kind") or "") != "WRITE":
+        issues.append("WRITE_CONTRACT_MISSING")
+
+    kind_counts = {"READ": 0, "SEARCH": 0, "DRAFT": 0}
+    for item in allow:
+        kind = str(item.get("kind") or "")
+        if kind in kind_counts:
+            kind_counts[kind] += 1
+
+    return {
+        "schema": "ATLASQUANT_AION_LOCAL_CONTRACT_SNAPSHOT_V1",
+        "state": "FAIL" if issues else "PASS",
+        "issues": sorted(set(issues)),
+        "registry_tools": len(tools),
+        "local_tools": len(local_ids),
+        "trace_sources": len(trace_ids),
+        "contract_fingerprint": local_contract_fingerprint(hub),
+        "kind_counts": kind_counts,
+        "write_in_allowlist": write_id in local_ids,
+        "full_audit_executed": False,
+        "executes_action": False,
+        "external_action_executed": False,
+        "real_orders_enabled": False,
+        "tool_output_is_authority": False,
+    }
+
+
+def _render_local_contract_health() -> None:
+    snapshot = _local_contract_snapshot()
+    st.markdown("#### Saúde dos contratos locais")
+    st.caption(
+        "Postura passiva e auditoria offline do caminho local do AION. "
+        "Abrir este painel não executa handler, não chama rede, não publica, não faz deploy "
+        "e não envia ordens."
+    )
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Contrato estático", str(snapshot.get("state") or "UNKNOWN"))
+    c2.metric("Tools locais", int(snapshot.get("local_tools") or 0))
+    c3.metric("Fontes rastreáveis", int(snapshot.get("trace_sources") or 0))
+    c4.metric("WRITE na allowlist", "NÃO" if not snapshot.get("write_in_allowlist") else "SIM")
+
+    kinds = snapshot.get("kind_counts") if isinstance(snapshot.get("kind_counts"), Mapping) else {}
+    st.caption(
+        "Allowlist: "
+        f"READ {int(kinds.get('READ') or 0)} · "
+        f"SEARCH {int(kinds.get('SEARCH') or 0)} · "
+        f"DRAFT {int(kinds.get('DRAFT') or 0)} · "
+        f"registry total {int(snapshot.get('registry_tools') or 0)}. "
+        f"Selo: {str(snapshot.get('contract_fingerprint') or 'UNKNOWN')}."
+    )
+    if snapshot.get("state") == "PASS":
+        st.success(
+            "Contrato estático local coerente nesta renderização. "
+            "Isso não substitui a auditoria completa nem autoriza ação."
+        )
+    else:
+        st.error(
+            "Drift detectado no contrato estático local: "
+            + " · ".join(str(x) for x in list(snapshot.get("issues") or []))
+        )
+
+    report = (
+        st.session_state.get("aion_contract_audit_report")
+        if isinstance(st.session_state.get("aion_contract_audit_report"), Mapping)
+        else None
+    )
+    if st.button(
+        "Rodar auditor local",
+        key="aion_run_contract_audit",
+        help=(
+            "Executa somente o auditor offline/local. "
+            "Não usa rede, connector, deploy, publicação, pagamento ou trading real."
+        ),
+    ):
+        try:
+            from atlasquant_aion_contract_auditor import audit_aion_local_contracts
+
+            report = audit_aion_local_contracts()
+        except Exception as exc:
+            report = {
+                "schema": "ATLASQUANT_AION_CONTRACT_AUDIT_V1",
+                "state": "ERROR",
+                "checks_total": 0,
+                "passed": 0,
+                "failed": 1,
+                "warnings": [],
+                "findings": [{
+                    "invariant_id": "audit.runtime",
+                    "module": "atlasquant_aion_contract_auditor",
+                    "description": "Falha isolada do auditor: " + type(exc).__name__,
+                    "severity": "FAIL",
+                }],
+                "executes_action": False,
+                "external_action_executed": False,
+                "real_orders_enabled": False,
+                "tool_output_is_authority": False,
+            }
+        st.session_state["aion_contract_audit_report"] = report
+
+    if not isinstance(report, Mapping):
+        st.info(
+            "Auditoria completa ainda não foi rodada nesta sessão. "
+            "Clique no botão apenas quando quiser executar os checks offline."
+        )
+        return
+
+    state = str(report.get("state") or "UNKNOWN").upper()
+    warnings = [
+        item for item in list(report.get("warnings") or [])
+        if isinstance(item, Mapping)
+    ]
+    findings = [
+        item for item in list(report.get("findings") or [])
+        if isinstance(item, Mapping)
+    ]
+    a1, a2, a3, a4 = st.columns(4)
+    a1.metric("Auditoria completa", state)
+    a2.metric("Checks", int(report.get("checks_total") or 0))
+    a3.metric("Falhas", int(report.get("failed") or 0))
+    a4.metric("Avisos", len(warnings))
+
+    if state == "PASS" and not findings:
+        st.success(
+            f"Auditor local PASS · {int(report.get('passed') or 0)}/"
+            f"{int(report.get('checks_total') or 0)} grupos sem drift confirmado."
+        )
+    else:
+        st.error(
+            "Auditoria local encontrou falha ou não pôde confirmar o contrato. "
+            "Nenhuma correção é executada automaticamente."
+        )
+
+    rows = []
+    for item in (findings + warnings)[:20]:
+        rows.append({
+            "Tipo": str(item.get("severity") or "FAIL"),
+            "Invariante": str(item.get("invariant_id") or ""),
+            "Módulo": str(item.get("module") or ""),
+            "Descrição": str(item.get("description") or ""),
+        })
+    if rows:
+        st.dataframe(rows, width="stretch", hide_index=True)
+
+    st.caption(
+        "Resultado diagnóstico somente leitura. PASS não concede autoridade; "
+        "FAIL não dispara reparo, merge, deploy, publicação, cobrança ou trading."
+    )
 
 
 
@@ -2473,6 +2695,7 @@ def _render_central(
             (system_context.get("release_gate") if isinstance(system_context, Mapping) else None),
         )
         _render_memory_security_posture(access, checkpoint, runtime_result, flags)
+        _render_local_contract_health()
         _render_security_incident_center(incident_snapshot)
         _render_continuity_center(checkpoint)
     else:
@@ -3810,6 +4033,33 @@ def _render_central(
         memory_hits=hits_preview,
         system_context=system_context,
     ) if question.strip() else ""
+    local_command_preview = orchestrate_local_command(
+        question,
+        execute=False,
+    ) if question.strip() else {}
+    if local_command_preview:
+        preview_state = str(local_command_preview.get("state") or "")
+        preview_plan = (
+            local_command_preview.get("plan")
+            if isinstance(local_command_preview.get("plan"), Mapping)
+            else {}
+        )
+        if preview_state in {"PLANNED", "PLANNED_MULTI"}:
+            preview_ids = list(local_command_preview.get("tool_ids") or [])
+            if not preview_ids and preview_plan.get("tool_id"):
+                preview_ids = [str(preview_plan.get("tool_id"))]
+            st.caption(
+                "Tool Hub local · prévia: "
+                + (" · ".join(preview_ids) if preview_ids else "nenhum")
+                + " · modo "
+                + str(local_command_preview.get("mode") or "SINGLE")
+                + ". Handler(s) só rodam após clicar em Analisar com AION e cada chamada passar pelo preflight."
+            )
+        elif preview_state == "BLOCKED_INTENT":
+            st.warning(
+                "O comando contém intenção sensível/externa. O orquestrador local não tentará "
+                "converter esse pedido em READ/SEARCH/DRAFT nem executar um handler."
+            )
     estimate = estimate_request_cost(
         prompt_preview,
         config=provider_config(provider_env),
@@ -3928,6 +4178,36 @@ def _render_central(
                 )
 
         if answer is None:
+            local_tool_call = orchestrate_local_command(
+                question,
+                execute=True,
+                runtime_context={
+                    "checkpoint": checkpoint,
+                    "memory_layers": (
+                        checkpoint.get("memory_layers")
+                        if isinstance(checkpoint.get("memory_layers"), Mapping)
+                        else {}
+                    ),
+                    "session": specialist_snapshot if isinstance(specialist_snapshot, Mapping) else None,
+                    "system_context": dict(system_context),
+                    "persona": "admin",
+                },
+                hub=(
+                    checkpoint.get("tool_hub")
+                    if isinstance(checkpoint.get("tool_hub"), Mapping)
+                    else None
+                ),
+                portable_core=(
+                    checkpoint.get("portable_core")
+                    if isinstance(checkpoint.get("portable_core"), Mapping)
+                    else None
+                ),
+                access=access,
+                feature_flags=flags,
+                source_kind="ADMIN",
+                authenticated_admin=is_admin(access),
+                request_id="aion-admin-local-command",
+            )
             answer = local_answer(
                 question,
                 checkpoint=checkpoint,
@@ -3935,6 +4215,19 @@ def _render_central(
                 system_context=dict(system_context),
                 feature_flags=flags,
             )
+            if isinstance(answer, Mapping):
+                answer = dict(answer)
+                local_state = str(local_tool_call.get("state") or "")
+                if local_state not in {"", "NO_MATCH", "NO_COMMAND"}:
+                    answer["local_tool_call"] = local_tool_call
+                    local_summary = str(local_tool_call.get("summary") or "").strip()
+                    if local_summary:
+                        answer["answer"] = (
+                            str(answer.get("answer") or "").rstrip()
+                            + " Tool Hub local: "
+                            + local_summary
+                        ).strip()
+            st.session_state["aion_last_local_tool_call"] = local_tool_call
         unified_result = build_aion_result(
             core_orchestration,
             answer=answer.get("answer", ""),
@@ -3978,6 +4271,124 @@ def _render_central(
             f"verdade {presentation['truth_status']} · "
             f"{evidence_count} evidência(s)"
         )
+        local_tool_call = answer.get("local_tool_call")
+        if isinstance(local_tool_call, Mapping):
+            local_result = (
+                local_tool_call.get("tool_result")
+                if isinstance(local_tool_call.get("tool_result"), Mapping)
+                else {}
+            )
+            local_truth = (
+                local_result.get("truth")
+                if isinstance(local_result.get("truth"), Mapping)
+                else {}
+            )
+            local_synthesis = (
+                local_tool_call.get("synthesis")
+                if isinstance(local_tool_call.get("synthesis"), Mapping)
+                else {}
+            )
+            synthesis_truth = (
+                local_synthesis.get("truth")
+                if isinstance(local_synthesis.get("truth"), Mapping)
+                else {}
+            )
+            local_executive = (
+                local_tool_call.get("executive_response")
+                if isinstance(local_tool_call.get("executive_response"), Mapping)
+                else {}
+            )
+            local_traceability = (
+                local_tool_call.get("traceability")
+                if isinstance(local_tool_call.get("traceability"), Mapping)
+                else {}
+            )
+            local_ids = list(local_tool_call.get("tool_ids") or [])
+            if not local_ids and local_tool_call.get("tool_id"):
+                local_ids = [str(local_tool_call.get("tool_id"))]
+            st.caption(
+                "Tool Hub local: "
+                + (" · ".join(local_ids) if local_ids else "nenhum")
+                + " · modo "
+                + str(local_tool_call.get("mode") or "SINGLE")
+                + " · estado "
+                + str(local_tool_call.get("state") or "UNKNOWN")
+                + " · handlers executados "
+                + str(int(local_tool_call.get("handlers_executed") or 0))
+                + " · verdade agregada "
+                + str(synthesis_truth.get("status") or local_truth.get("status") or "UNKNOWN")
+                + " · conteúdo confirmado "
+                + str(int(local_synthesis.get("content_confirmed_count") or 0))
+                + "/"
+                + str(int(local_synthesis.get("tool_count") or len(local_ids)))
+                + " · conflitos "
+                + str(len(list(local_synthesis.get("conflicts") or [])))
+                + " · efeitos externos: nenhum."
+            )
+            if local_synthesis:
+                st.caption(
+                    "Síntese local: "
+                    + str(local_synthesis.get("summary") or "")
+                )
+            if local_executive:
+                if bool(local_executive.get("safe_to_display", False)):
+                    st.markdown("##### Resposta executiva local")
+                    st.write(str(local_executive.get("headline") or "Leitura local consolidada."))
+                    sections = (
+                        local_executive.get("sections")
+                        if isinstance(local_executive.get("sections"), Mapping)
+                        else {}
+                    )
+                    known_rows = [str(x) for x in list(sections.get("known") or []) if str(x).strip()]
+                    unknown_rows = [str(x) for x in list(sections.get("unknown") or []) if str(x).strip()]
+                    conflict_rows = [str(x) for x in list(sections.get("conflicts") or []) if str(x).strip()]
+                    st.markdown("**O que sabemos**")
+                    if known_rows:
+                        for item in known_rows[:8]:
+                            st.markdown("- " + item)
+                    else:
+                        st.caption("Nenhum conteúdo local foi confirmado.")
+                    st.markdown("**O que não sabemos**")
+                    if unknown_rows:
+                        for item in unknown_rows[:8]:
+                            st.markdown("- " + item)
+                    else:
+                        st.caption("Nenhum ponto pendente identificado nesta síntese.")
+                    st.markdown("**Conflitos**")
+                    if conflict_rows:
+                        for item in conflict_rows[:8]:
+                            st.markdown("- " + item)
+                    else:
+                        st.caption("Nenhum conflito explícito identificado.")
+                    st.markdown("**Próximo passo**")
+                    st.info(str(sections.get("next_step") or "Nenhum próximo passo confirmado."))
+                    trace_rows = [
+                        row for row in list(local_traceability.get("records") or [])
+                        if isinstance(row, Mapping)
+                    ]
+                    if trace_rows:
+                        with st.expander("Rastreabilidade local · fonte por evidência", expanded=False):
+                            st.caption(
+                                "Metadados sanitizados de proveniência. Payload bruto e raciocínio interno não são exibidos."
+                            )
+                            st.dataframe([
+                                {
+                                    "Evidência": row.get("trace_id"),
+                                    "Tool": row.get("tool_id"),
+                                    "Origem": row.get("source_label"),
+                                    "Execução": row.get("execution_state"),
+                                    "Truth": row.get("truth_status"),
+                                    "Frescor": row.get("freshness"),
+                                    "Confirmado": bool(row.get("content_confirmed", False)),
+                                    "Conflito": "SIM" if list(row.get("conflicts") or []) else "NÃO",
+                                }
+                                for row in trace_rows[:8]
+                            ], width="stretch", hide_index=True)
+                else:
+                    st.error(
+                        "A resposta executiva local foi bloqueada por uma invariante de segurança. "
+                        "O conteúdo não é apresentado como leitura normal."
+                    )
         cognitive_answer = answer.get("cognitive_orchestrator")
         if isinstance(cognitive_answer, Mapping):
             routing = (
@@ -5807,6 +6218,1114 @@ def _render_laboratory(
     )
 
 
+def _developer_intelligence_summary(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
+    item = dict(snapshot or {})
+    counts = item.get("category_counts") if isinstance(item.get("category_counts"), Mapping) else {}
+    risks = item.get("risk_counts") if isinstance(item.get("risk_counts"), Mapping) else {}
+    return {
+        "state": "READY" if str(item.get("snapshot_digest") or "") else "NOT_SCANNED",
+        "snapshot_digest": str(item.get("snapshot_digest") or ""),
+        "files": int(item.get("file_count") or 0),
+        "modules": int(counts.get("MODULE") or 0),
+        "tests": int(counts.get("TEST") or 0),
+        "workflows": int(counts.get("WORKFLOW") or 0),
+        "syntax_errors": int(item.get("syntax_errors") or 0),
+        "risk_surfaces": sum(int(value or 0) for value in risks.values()),
+        "truncated": bool(item.get("truncated", False)),
+        "content_included": bool(item.get("content_included", False)),
+        "writes_files": bool(item.get("writes_files", False)),
+        "network_called": bool(item.get("network_called", False)),
+        "subprocess_called": bool(item.get("subprocess_called", False)),
+    }
+
+
+def _render_developer_intelligence() -> None:
+    st.markdown("#### 🧭 Developer Intelligence · mapa estrutural")
+    st.caption(
+        "Diagnóstico local somente leitura. Abrir a aba não inicia scan. "
+        "O scanner não executa módulos, não segue symlink, não lê .env/secrets conhecidos, "
+        "não chama rede e não escreve arquivos."
+    )
+
+    snapshot = (
+        st.session_state.get("aion_developer_repo_snapshot")
+        if isinstance(st.session_state.get("aion_developer_repo_snapshot"), Mapping)
+        else None
+    )
+    if st.button(
+        "Mapear repositório local",
+        key="aion_developer_intelligence_scan",
+        help="Lê apenas metadados estruturais e AST de arquivos permitidos. Nenhum código do repositório é executado.",
+    ):
+        try:
+            project_root = Path(__file__).resolve().parent
+            snapshot = scan_developer_repository(project_root)
+            st.session_state["aion_developer_repo_snapshot"] = snapshot
+        except Exception as exc:
+            st.error(f"Scan estrutural falhou de forma isolada: {type(exc).__name__}")
+            snapshot = None
+
+    summary = _developer_intelligence_summary(snapshot)
+    d1,d2,d3,d4,d5 = st.columns(5)
+    d1.metric("Snapshot", summary["state"])
+    d2.metric("Módulos", summary["modules"])
+    d3.metric("Testes", summary["tests"])
+    d4.metric("Workflows", summary["workflows"])
+    d5.metric("Syntax errors", summary["syntax_errors"])
+
+    if summary["state"] != "READY":
+        st.info("Nenhum snapshot estrutural foi criado nesta sessão. O scan continua opt-in.")
+        return
+
+    st.caption(
+        f"Digest {summary['snapshot_digest']} · arquivos {summary['files']} · "
+        f"superfícies de risco {summary['risk_surfaces']} · "
+        f"truncado {'SIM' if summary['truncated'] else 'NÃO'}."
+    )
+    if (
+        summary["content_included"]
+        or summary["writes_files"]
+        or summary["network_called"]
+        or summary["subprocess_called"]
+    ):
+        st.error("Snapshot recusado: invariantes read-only não foram preservadas.")
+        return
+
+    risk_counts = snapshot.get("risk_counts") if isinstance(snapshot.get("risk_counts"), Mapping) else {}
+    if risk_counts:
+        st.dataframe(
+            [{"Superfície": key, "Arquivos": int(value or 0)} for key,value in sorted(risk_counts.items())],
+            width="stretch",
+            hide_index=True,
+        )
+
+    with st.expander("Planejar mudança com o mapa atual", expanded=False):
+        dev_request = st.text_area(
+            "Objetivo técnico",
+            key="aion_developer_intelligence_request",
+            max_chars=1200,
+            placeholder="Ex.: corrigir o painel sem alterar autoridade do Tool Hub.",
+        )
+        changed_text = st.text_area(
+            "Arquivos candidatos — um por linha",
+            key="aion_developer_intelligence_changed_paths",
+            max_chars=5000,
+            placeholder="atlasquant_aion_admin.py\ntest_atlasquant_aion_admin.py",
+        )
+        branch_label = st.text_input(
+            "Branch de trabalho (rótulo)",
+            key="aion_developer_intelligence_branch",
+            value="working-copy",
+        )
+        baseline_label = st.text_input(
+            "Baseline ref (rótulo)",
+            key="aion_developer_intelligence_baseline",
+            value=str(snapshot.get("snapshot_digest") or "snapshot-current"),
+        )
+        if st.button("Montar plano estrutural", key="aion_developer_intelligence_plan"):
+            try:
+                changed_paths = [line.strip() for line in changed_text.splitlines() if line.strip()]
+                plan = build_developer_intelligence_plan(
+                    dev_request,
+                    snapshot,
+                    branch=branch_label,
+                    baseline_ref=baseline_label,
+                    changed_paths=changed_paths,
+                )
+                st.session_state["aion_developer_intelligence_plan_result"] = plan
+            except Exception as exc:
+                st.error(f"Plano estrutural recusado: {type(exc).__name__}")
+
+    plan = (
+        st.session_state.get("aion_developer_intelligence_plan_result")
+        if isinstance(st.session_state.get("aion_developer_intelligence_plan_result"), Mapping)
+        else None
+    )
+    if not isinstance(plan, Mapping):
+        return
+
+    p1,p2,p3 = st.columns(3)
+    p1.metric("Arquivos impactados", len(list(plan.get("impacted_files") or [])))
+    p2.metric("Testes prováveis", len(list(plan.get("recommended_tests") or [])))
+    p3.metric("Sem teste provável", len(list(plan.get("unmatched_code") or [])))
+    st.caption(
+        f"Plano {plan.get('plan_id')} · análise somente leitura · "
+        "coverage é heurística, não prova de correção."
+    )
+    if plan.get("risk_tags"):
+        st.markdown("**Superfícies sensíveis:** " + " · ".join(str(x) for x in list(plan.get("risk_tags") or [])))
+    if plan.get("recommended_tests"):
+        st.markdown("**Testes sugeridos:**")
+        for item in list(plan.get("recommended_tests") or [])[:30]:
+            st.markdown(f"- {item}")
+    if plan.get("unmatched_code"):
+        st.warning(
+            "Arquivos Python sem teste provável: "
+            + ", ".join(str(x) for x in list(plan.get("unmatched_code") or [])[:20])
+        )
+    st.caption(
+        "Este plano não edita, não commita, não faz merge, não faz deploy e não habilita produção/trading."
+    )
+
+    if st.button(
+        "Preparar pacote Developer Engine + Dev Fusion",
+        key="aion_developer_intelligence_package",
+    ):
+        try:
+            package = build_developer_package(
+                plan.get("request"),
+                snapshot,
+                branch=plan.get("branch"),
+                baseline_ref=plan.get("baseline_ref"),
+                candidate_ref=plan.get("branch"),
+                changed_paths=list(plan.get("impacted_files") or []),
+                requested_by="AION_ADMIN_SESSION",
+            )
+            st.session_state["aion_developer_package_result"] = package
+        except Exception as exc:
+            st.error(f"Pacote de desenvolvimento recusado: {type(exc).__name__}")
+
+    package = (
+        st.session_state.get("aion_developer_package_result")
+        if isinstance(st.session_state.get("aion_developer_package_result"), Mapping)
+        else None
+    )
+    if not isinstance(package, Mapping):
+        return
+
+    workflow = package.get("developer_workflow") if isinstance(package.get("developer_workflow"), Mapping) else {}
+    twin = package.get("digital_twin") if isinstance(package.get("digital_twin"), Mapping) else {}
+    fusion = package.get("dev_fusion") if isinstance(package.get("dev_fusion"), Mapping) else {}
+    strategy = package.get("test_strategy") if isinstance(package.get("test_strategy"), Mapping) else {}
+
+    st.markdown("##### Pacote Developer Engine + Dev Fusion")
+    x1,x2,x3,x4 = st.columns(4)
+    x1.metric("Pacote", str(package.get("state") or "UNKNOWN"))
+    x2.metric("Workflow", str(workflow.get("status") or "UNKNOWN"))
+    x3.metric("Digital Twin", str(twin.get("state") or "UNKNOWN"))
+    x4.metric("Dev Fusion", str(fusion.get("state") or "UNKNOWN"))
+    st.caption(
+        f"{package.get('package_id')} · workflow {workflow.get('workflow_id')} · "
+        f"twin {twin.get('twin_id')} · pipeline {fusion.get('pipeline_id')}."
+    )
+
+    gates = [dict(item) for item in list(package.get("gates") or []) if isinstance(item, Mapping)]
+    if gates:
+        st.dataframe(
+            [{
+                "Gate": item.get("gate"),
+                "Estado": item.get("state"),
+                "Regra": item.get("detail"),
+            } for item in gates],
+            width="stretch",
+            hide_index=True,
+        )
+
+    required_tests = list(strategy.get("required_test_candidates") or [])
+    if required_tests:
+        st.markdown("**Candidatos de teste exigidos pelo pacote:**")
+        for item in required_tests[:40]:
+            st.markdown(f"- `{item}`")
+    if package.get("gaps"):
+        st.warning(
+            "Gaps para revisão: "
+            + " · ".join(str(x) for x in list(package.get("gaps") or []))
+        )
+    st.caption(
+        "O pacote fica apenas na sessão: não persiste Checkpoint, não executa testes, "
+        "não edita arquivos e não aprova PLAN/BUILD/REVIEW/RELEASE automaticamente."
+    )
+
+    with st.expander("Diagnosticar falha de teste/log", expanded=False):
+        failure_text = st.text_area(
+            "Trecho de falha",
+            key="aion_developer_failure_text",
+            max_chars=120000,
+            placeholder="Cole traceback, FAILED test_... ou exceção. O diagnóstico é sanitizado.",
+        )
+        if st.button("Diagnosticar falha", key="aion_developer_failure_diagnose"):
+            try:
+                diagnostic = diagnose_developer_failure(snapshot, failure_text)
+                st.session_state["aion_developer_failure_diagnostic"] = diagnostic
+            except Exception as exc:
+                st.error(f"Diagnóstico recusado: {type(exc).__name__}")
+
+    diagnostic = (
+        st.session_state.get("aion_developer_failure_diagnostic")
+        if isinstance(st.session_state.get("aion_developer_failure_diagnostic"), Mapping)
+        else None
+    )
+    if not isinstance(diagnostic, Mapping):
+        return
+
+    st.markdown("##### Diagnóstico de falha · fatos vs hipótese")
+    y1,y2,y3 = st.columns(3)
+    y1.metric("Evidência", str(diagnostic.get("state") or "UNKNOWN"))
+    y2.metric("Exceção", str(diagnostic.get("exception_type") or "UNKNOWN_FAILURE"))
+    y3.metric("Causa", "UNKNOWN" if not diagnostic.get("cause_confirmed") else "CONFIRMED")
+    st.caption(
+        f"{diagnostic.get('diagnostic_id')} · log digest {diagnostic.get('log_digest')} · "
+        "log bruto não é armazenado no diagnóstico."
+    )
+
+    facts = [
+        dict(item)
+        for item in list(diagnostic.get("confirmed_facts") or [])
+        if isinstance(item, Mapping)
+    ]
+    if facts:
+        st.markdown("**Fatos confirmados pelo log:**")
+        st.dataframe(
+            [{
+                "Tipo": item.get("kind"),
+                "Valor": item.get("value"),
+                "Verdade": item.get("truth_status"),
+            } for item in facts],
+            width="stretch",
+            hide_index=True,
+        )
+
+    hypotheses = [
+        dict(item)
+        for item in list(diagnostic.get("hypotheses") or [])
+        if isinstance(item, Mapping)
+    ]
+    if hypotheses:
+        st.markdown("**HIPÓTESE — não confirmada:**")
+        for item in hypotheses:
+            st.markdown(
+                f"- {item.get('label')} · {item.get('rationale')} "
+                f"· truth={item.get('truth_status')}"
+            )
+
+    if diagnostic.get("recommended_tests"):
+        st.markdown("**Testes candidatos para reprodução:**")
+        for item in list(diagnostic.get("recommended_tests") or [])[:40]:
+            st.markdown(f"- `{item}`")
+
+    if diagnostic.get("state") == "FAILURE_EVIDENCE":
+        if st.button(
+            "Registrar falha no Developer Workflow da sessão",
+            key="aion_developer_failure_record",
+        ):
+            try:
+                current_package = deepcopy(dict(package))
+                current_workflow = (
+                    current_package.get("developer_workflow")
+                    if isinstance(current_package.get("developer_workflow"), Mapping)
+                    else {}
+                )
+                current_package["developer_workflow"] = record_developer_failure_attempt(
+                    current_workflow,
+                    diagnostic,
+                    command_label="evidência de falha informada ao AION",
+                )
+                current_package["last_diagnostic_id"] = diagnostic.get("diagnostic_id")
+                st.session_state["aion_developer_package_result"] = current_package
+                package = current_package
+                st.success(
+                    "Falha registrada somente no workflow da sessão; nenhum patch foi aplicado."
+                )
+            except Exception as exc:
+                st.error(f"Registro da falha recusado: {type(exc).__name__}")
+
+    st.caption(
+        "Diagnóstico não executa teste, não confirma causa raiz, não cria patch, "
+        "não commita, não faz merge e não faz deploy."
+    )
+
+    if diagnostic.get("state") == "FAILURE_EVIDENCE":
+        if st.button(
+            "Preparar plano de correção rastreável",
+            key="aion_developer_correction_plan",
+        ):
+            try:
+                correction = build_developer_correction_plan(
+                    snapshot,
+                    diagnostic,
+                    package,
+                )
+                st.session_state["aion_developer_correction_result"] = correction
+            except Exception as exc:
+                st.error(f"Plano de correção recusado: {type(exc).__name__}")
+
+    correction = (
+        st.session_state.get("aion_developer_correction_result")
+        if isinstance(st.session_state.get("aion_developer_correction_result"), Mapping)
+        else None
+    )
+    if not isinstance(correction, Mapping):
+        return
+
+    st.markdown("##### Plano de correção rastreável")
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("Estado", str(correction.get("state") or "UNKNOWN"))
+    c2.metric("Causa raiz", str(correction.get("root_cause_truth_status") or "UNKNOWN"))
+    c3.metric("Arquivos alvo", len(list(correction.get("target_files") or [])))
+    c4.metric("Testes candidatos", len(list(correction.get("test_candidates") or [])))
+    lineage = correction.get("lineage") if isinstance(correction.get("lineage"), Mapping) else {}
+    st.caption(
+        f"{correction.get('correction_id')} · snapshot {lineage.get('snapshot_digest')} · "
+        f"diagnóstico {lineage.get('diagnostic_id')} · pacote {lineage.get('package_id')}."
+    )
+    st.markdown(f"**Objetivo de correção:** {correction.get('objective')}")
+
+    if correction.get("target_files"):
+        st.markdown("**Escopo permitido:**")
+        for item in list(correction.get("target_files") or []):
+            st.markdown(f"- `{item}`")
+    if correction.get("hypotheses"):
+        st.markdown("**Hipóteses ainda UNKNOWN:**")
+        for item in list(correction.get("hypotheses") or []):
+            if isinstance(item, Mapping):
+                st.markdown(
+                    f"- {item.get('label')} · truth={item.get('truth_status')} · "
+                    f"{item.get('rationale')}"
+                )
+    if correction.get("evidence_required"):
+        st.markdown("**Evidências exigidas antes de concluir:**")
+        for item in list(correction.get("evidence_required") or []):
+            st.markdown(f"- {item}")
+
+    builder = correction.get("builder_packet") if isinstance(correction.get("builder_packet"), Mapping) else {}
+    reviewer = correction.get("reviewer_packet") if isinstance(correction.get("reviewer_packet"), Mapping) else {}
+    breaker = correction.get("breaker_packet") if isinstance(correction.get("breaker_packet"), Mapping) else {}
+    role_rows = [
+        {
+            "Papel": "Builder",
+            "Estado": builder.get("state"),
+            "Independência": "aguarda atribuição humana",
+            "Executa ação": builder.get("executes_action"),
+        },
+        {
+            "Papel": "Reviewer",
+            "Estado": reviewer.get("state"),
+            "Independência": "obrigatória vs Builder",
+            "Executa ação": reviewer.get("executes_action"),
+        },
+        {
+            "Papel": "Breaker",
+            "Estado": breaker.get("state"),
+            "Independência": "obrigatória vs Builder/Reviewer",
+            "Executa ação": breaker.get("executes_action"),
+        },
+    ]
+    st.dataframe(role_rows, width="stretch", hide_index=True)
+
+    if correction.get("gaps"):
+        st.warning(
+            "Gaps do plano: "
+            + " · ".join(str(x) for x in list(correction.get("gaps") or []))
+        )
+    st.caption(
+        "Este plano não gera patch, não altera arquivo, não executa teste e não confirma causa raiz. "
+        "A implementação continua aguardando decisão humana e evidência."
+    )
+
+    with st.expander("Evidence Promotion Gate · causa raiz", expanded=False):
+        hypothesis_labels = [
+            str(item.get("label") or "")
+            for item in list(correction.get("hypotheses") or [])
+            if isinstance(item, Mapping) and str(item.get("label") or "")
+        ]
+        test_candidates = [str(x) for x in list(correction.get("test_candidates") or []) if str(x)]
+        target_files = [str(x) for x in list(correction.get("target_files") or []) if str(x)]
+
+        gate_hypothesis = st.selectbox(
+            "Hipótese avaliada",
+            hypothesis_labels or ["CAUSE_NOT_YET_CONFIRMED"],
+            key="aion_developer_gate_hypothesis",
+        )
+        gate_test = st.selectbox(
+            "Teste de reprodução",
+            test_candidates or ["NO_TEST_CANDIDATE"],
+            key="aion_developer_gate_test",
+        )
+        g1,g2 = st.columns(2)
+        with g1:
+            before_state = st.selectbox(
+                "Estado antes",
+                ["FAIL","UNKNOWN","PASS"],
+                key="aion_developer_gate_before",
+            )
+        with g2:
+            after_state = st.selectbox(
+                "Estado depois",
+                ["PASS","UNKNOWN","FAIL"],
+                key="aion_developer_gate_after",
+            )
+        changed_scope = st.multiselect(
+            "Arquivos alterados na tentativa",
+            target_files,
+            default=target_files,
+            key="aion_developer_gate_changed_files",
+        )
+        intervention_summary = st.text_area(
+            "Resumo da intervenção observada",
+            key="aion_developer_gate_intervention",
+            max_chars=1600,
+            placeholder="Descreva o que mudou entre a evidência FAIL e PASS sem declarar causa além do que foi observado.",
+        )
+        gate_refs_text = st.text_area(
+            "Referências de evidência — uma por linha",
+            key="aion_developer_gate_refs",
+            max_chars=5000,
+            placeholder="run:before\nrun:after",
+        )
+        scope_preserved = st.checkbox(
+            "Confirmo que a tentativa permaneceu dentro do escopo permitido",
+            key="aion_developer_gate_scope_preserved",
+            value=False,
+        )
+        if st.button(
+            "Avaliar evidência para revisão humana",
+            key="aion_developer_gate_evaluate",
+        ):
+            try:
+                lineage = correction.get("lineage") if isinstance(correction.get("lineage"), Mapping) else {}
+                gate = evaluate_developer_evidence_promotion(
+                    correction,
+                    hypothesis_label=gate_hypothesis,
+                    test_id=gate_test,
+                    before_state=before_state,
+                    after_state=after_state,
+                    changed_files=changed_scope,
+                    evidence_refs=[line.strip() for line in gate_refs_text.splitlines() if line.strip()],
+                    intervention_summary=intervention_summary,
+                    scope_preserved=scope_preserved,
+                    snapshot_digest=lineage.get("snapshot_digest"),
+                    diagnostic_id=lineage.get("diagnostic_id"),
+                )
+                st.session_state["aion_developer_evidence_gate_result"] = gate
+            except Exception as exc:
+                st.error(f"Evidence gate recusado: {type(exc).__name__}")
+
+    gate = (
+        st.session_state.get("aion_developer_evidence_gate_result")
+        if isinstance(st.session_state.get("aion_developer_evidence_gate_result"), Mapping)
+        else None
+    )
+    if not isinstance(gate, Mapping):
+        return
+
+    st.markdown("##### Evidence Promotion Gate")
+    e1,e2,e3 = st.columns(3)
+    e1.metric("Gate", str(gate.get("state") or "UNKNOWN"))
+    gate_hyp = gate.get("hypothesis") if isinstance(gate.get("hypothesis"), Mapping) else {}
+    e2.metric("Verdade atual", str(gate_hyp.get("current_truth_status") or "UNKNOWN"))
+    e3.metric("Promoção aplicada", "SIM" if gate_hyp.get("promotion_applied") else "NÃO")
+    st.caption(
+        f"{gate.get('gate_id')} · promoção automática: NÃO · revisão humana obrigatória."
+    )
+    if gate.get("blockers"):
+        st.warning(
+            "Evidência insuficiente: "
+            + " · ".join(str(x) for x in list(gate.get("blockers") or []))
+        )
+    elif gate.get("state") == "READY_FOR_HUMAN_CAUSE_REVIEW":
+        st.success(
+            "Evidência suficiente para revisão humana. A causa ainda continua UNKNOWN até confirmação explícita."
+        )
+
+        with st.expander("Revisão humana da causa", expanded=False):
+            reviewer_actor = st.text_input(
+                "Identificação do revisor humano",
+                key="aion_developer_cause_reviewer",
+                max_chars=160,
+            )
+            review_refs_text = st.text_area(
+                "Referências da revisão humana — uma por linha",
+                key="aion_developer_cause_review_refs",
+                max_chars=4000,
+            )
+            reviewed = st.checkbox(
+                "Revisei a evidência e aprovo a promoção desta hipótese de causa",
+                key="aion_developer_cause_review_approved",
+                value=False,
+            )
+            if st.button(
+                "Confirmar causa após revisão humana",
+                key="aion_developer_cause_confirm",
+            ):
+                try:
+                    confirmed = confirm_developer_root_cause(
+                        correction,
+                        gate,
+                        approved=reviewed,
+                        reviewer_actor=reviewer_actor,
+                        review_evidence_refs=[
+                            line.strip()
+                            for line in review_refs_text.splitlines()
+                            if line.strip()
+                        ],
+                    )
+                    st.session_state["aion_developer_correction_result"] = confirmed
+                    correction = confirmed
+                    st.success(
+                        "Causa promovida somente no registro da sessão após revisão humana explícita."
+                    )
+                except Exception as exc:
+                    st.error(f"Confirmação recusada: {type(exc).__name__}")
+
+    st.caption(
+        "O Evidence Promotion Gate não executa testes nem aplica patch. "
+        "Mesmo a confirmação humana permanece session-only e não autoriza IMPLEMENT, merge ou deploy."
+    )
+
+    if correction.get("root_cause_confirmed") is True:
+        if st.button(
+            "Preparar envelope de implementação · nível 2",
+            key="aion_developer_implementation_envelope",
+        ):
+            try:
+                implementation = build_developer_implementation_envelope(
+                    snapshot,
+                    package,
+                    correction,
+                )
+                st.session_state["aion_developer_implementation_result"] = implementation
+            except Exception as exc:
+                st.error(f"Envelope de implementação recusado: {type(exc).__name__}")
+
+    implementation = (
+        st.session_state.get("aion_developer_implementation_result")
+        if isinstance(st.session_state.get("aion_developer_implementation_result"), Mapping)
+        else None
+    )
+    if not isinstance(implementation, Mapping):
+        return
+
+    st.markdown("##### Implementation Readiness Envelope")
+    i1,i2,i3,i4 = st.columns(4)
+    i1.metric("Estado", str(implementation.get("state") or "UNKNOWN"))
+    i2.metric("Nível pedido", int(implementation.get("requested_trust_level") or 0))
+    trust = implementation.get("trust_policy") if isinstance(implementation.get("trust_policy"), Mapping) else {}
+    i3.metric("Máx. autônomo", int(trust.get("max_autonomous_level") or 0))
+    i4.metric("Execução autorizada", "SIM" if implementation.get("execution_authorized") else "NÃO")
+    st.caption(
+        f"{implementation.get('envelope_id')} · nível 2 = branch isolada · "
+        "aprovação humana obrigatória."
+    )
+
+    impl_scope = implementation.get("scope") if isinstance(implementation.get("scope"), Mapping) else {}
+    if impl_scope.get("editable_files"):
+        st.markdown("**Escopo editável máximo proposto:**")
+        for item in list(impl_scope.get("editable_files") or []):
+            st.markdown(f"- `{item}`")
+    test_contract = (
+        implementation.get("test_contract")
+        if isinstance(implementation.get("test_contract"), Mapping)
+        else {}
+    )
+    if test_contract.get("mandatory_gates"):
+        st.markdown("**Gates obrigatórios depois de qualquer implementação:**")
+        for item in list(test_contract.get("mandatory_gates") or []):
+            st.markdown(f"- {item}")
+    if implementation.get("forbidden_changes"):
+        st.markdown("**Mudanças proibidas pelo envelope:**")
+        for item in list(implementation.get("forbidden_changes") or []):
+            st.markdown(f"- {item}")
+
+    if implementation.get("state") == "WAITING_HUMAN_IMPLEMENTATION_APPROVAL":
+        with st.expander("Prontidão da implementação · rollback e papéis", expanded=False):
+            rollback_plan = st.text_area(
+                "Rollback específico desta mudança",
+                key="aion_developer_implementation_rollback",
+                max_chars=2400,
+            )
+            r1,r2,r3 = st.columns(3)
+            with r1:
+                builder_actor = st.text_input("Builder", key="aion_developer_implementation_builder", max_chars=160)
+                builder_principal_id = st.text_input(
+                    "Builder principal id",
+                    key="aion_developer_implementation_builder_principal",
+                    max_chars=80,
+                )
+            with r2:
+                reviewer_actor = st.text_input("Reviewer independente", key="aion_developer_implementation_reviewer", max_chars=160)
+                reviewer_principal_id = st.text_input(
+                    "Reviewer principal id",
+                    key="aion_developer_implementation_reviewer_principal",
+                    max_chars=80,
+                )
+            with r3:
+                breaker_actor = st.text_input("Breaker independente", key="aion_developer_implementation_breaker", max_chars=160)
+                breaker_principal_id = st.text_input(
+                    "Breaker principal id",
+                    key="aion_developer_implementation_breaker_principal",
+                    max_chars=80,
+                )
+            readiness_refs_text = st.text_area(
+                "Evidências de prontidão — uma por linha",
+                key="aion_developer_implementation_readiness_refs",
+                max_chars=4000,
+            )
+            if st.button("Registrar prontidão da implementação", key="aion_developer_implementation_readiness"):
+                try:
+                    ready = prepare_developer_implementation_readiness(
+                        implementation,
+                        rollback_plan=rollback_plan,
+                        builder_actor=builder_actor,
+                        reviewer_actor=reviewer_actor,
+                        breaker_actor=breaker_actor,
+                        builder_principal_id=builder_principal_id,
+                        reviewer_principal_id=reviewer_principal_id,
+                        breaker_principal_id=breaker_principal_id,
+                        readiness_refs=[line.strip() for line in readiness_refs_text.splitlines() if line.strip()],
+                    )
+                    st.session_state["aion_developer_implementation_result"] = ready
+                    implementation = ready
+                    st.success("Prontidão registrada somente na sessão. Execução continua não autorizada.")
+                except Exception as exc:
+                    st.error(f"Prontidão recusada: {type(exc).__name__}")
+
+    if implementation.get("state") == "READY_FOR_HUMAN_IMPLEMENTATION_APPROVAL":
+        readiness = implementation.get("readiness") if isinstance(implementation.get("readiness"), Mapping) else {}
+        rollback_contract = implementation.get("rollback_contract") if isinstance(implementation.get("rollback_contract"), Mapping) else {}
+        st.caption(
+            f"Builder={readiness.get('builder_actor')} ({readiness.get('builder_principal_id')}) · "
+            f"Reviewer={readiness.get('reviewer_actor')} ({readiness.get('reviewer_principal_id')}) · "
+            f"Breaker={readiness.get('breaker_actor')} ({readiness.get('breaker_principal_id')}) · rollback específico: "
+            f"{'SIM' if rollback_contract.get('recorded_for_this_change') else 'NÃO'}."
+        )
+        with st.expander("Aprovação humana · branch isolada", expanded=False):
+            impl_actor = st.text_input(
+                "Identificação do aprovador humano",
+                key="aion_developer_implementation_approver",
+                max_chars=160,
+            )
+            impl_principal = st.text_input(
+                "Approver principal id",
+                key="aion_developer_implementation_approver_principal",
+                max_chars=80,
+            )
+            impl_refs_text = st.text_area(
+                "Referências da aprovação — uma por linha",
+                key="aion_developer_implementation_refs",
+                max_chars=4000,
+            )
+            impl_approved = st.checkbox(
+                "Autorizo apenas a implementação em branch isolada dentro deste escopo",
+                key="aion_developer_implementation_approved",
+                value=False,
+            )
+            if st.button(
+                "Registrar autorização de implementação na sessão",
+                key="aion_developer_implementation_confirm",
+            ):
+                try:
+                    authorized = approve_developer_implementation(
+                        implementation,
+                        approved=impl_approved,
+                        approver_actor=impl_actor,
+                        approver_principal_id=impl_principal,
+                        approval_refs=[line.strip() for line in impl_refs_text.splitlines() if line.strip()],
+                    )
+                    st.session_state["aion_developer_implementation_result"] = authorized
+                    implementation = authorized
+                    st.success(
+                        "Autorização de nível 2 registrada somente na sessão. "
+                        "Nenhum arquivo foi editado e execution_authorized continua False."
+                    )
+                except Exception as exc:
+                    st.error(f"Autorização recusada: {type(exc).__name__}")
+
+    if implementation.get("state") == "IMPLEMENTATION_AUTHORIZED_SESSION_ONLY":
+        st.info(
+            "Implementação em branch está autorizada no registro da sessão, mas não existe executor ligado a este envelope. "
+            "Merge em main, deploy e produção continuam bloqueados."
+        )
+
+    st.caption(
+        "Implementation authorized não significa execution authorized. "
+        "Este envelope não grava arquivo, não commita e não chama Tool Hub."
+    )
+
+    if implementation.get("state") == "IMPLEMENTATION_AUTHORIZED_SESSION_ONLY":
+        impl_scope = implementation.get("scope") if isinstance(implementation.get("scope"), Mapping) else {}
+        editable_files = [str(x) for x in list(impl_scope.get("editable_files") or []) if str(x)]
+        plan_meta = package.get("plan") if isinstance(package.get("plan"), Mapping) else {}
+        with st.expander("Builder Sandbox Request · branch isolada", expanded=False):
+            sandbox_branch = st.text_input(
+                "Branch isolada",
+                key="aion_developer_builder_branch",
+                value=str(plan_meta.get("branch") or "cursor/aion-builder-sandbox"),
+                max_chars=240,
+            )
+            sandbox_baseline = st.text_input(
+                "Baseline ref",
+                key="aion_developer_builder_baseline",
+                value=str(plan_meta.get("baseline_ref") or "main@baseline"),
+                max_chars=240,
+            )
+            sandbox_candidate = st.text_input(
+                "Candidate ref",
+                key="aion_developer_builder_candidate",
+                value=str(
+                    (
+                        implementation.get("revision_contract")
+                        if isinstance(implementation.get("revision_contract"), Mapping)
+                        else {}
+                    ).get("candidate_ref")
+                    or f"{str(plan_meta.get('branch') or 'cursor/aion-builder-sandbox')}@candidate"
+                ),
+                max_chars=240,
+            )
+            sandbox_files = st.multiselect(
+                "Arquivos solicitados ao Builder",
+                editable_files,
+                default=editable_files,
+                key="aion_developer_builder_files",
+            )
+            if st.button(
+                "Preparar Builder Sandbox Request",
+                key="aion_developer_builder_prepare",
+            ):
+                try:
+                    builder_request = build_developer_builder_sandbox_request(
+                        snapshot,
+                        implementation,
+                        branch=sandbox_branch,
+                        baseline_ref=sandbox_baseline,
+                        candidate_ref=sandbox_candidate,
+                        requested_files=sandbox_files,
+                    )
+                    st.session_state["aion_developer_builder_request"] = builder_request
+                except Exception as exc:
+                    st.error(f"Builder Sandbox Request recusado: {type(exc).__name__}")
+
+    builder_request = (
+        st.session_state.get("aion_developer_builder_request")
+        if isinstance(st.session_state.get("aion_developer_builder_request"), Mapping)
+        else None
+    )
+    if isinstance(builder_request, Mapping):
+        st.markdown("##### Builder Sandbox Request")
+        b1,b2,b3,b4 = st.columns(4)
+        b1.metric("Estado", str(builder_request.get("state") or "UNKNOWN"))
+        branch_contract = (
+            builder_request.get("branch_contract")
+            if isinstance(builder_request.get("branch_contract"), Mapping)
+            else {}
+        )
+        b2.metric("Branch", str(branch_contract.get("branch") or ""))
+        b3.metric("Executor", "LIGADO" if builder_request.get("executor_attached") else "NÃO LIGADO")
+        b4.metric("Execução", "AUTORIZADA" if builder_request.get("execution_authorized") else "BLOQUEADA")
+        st.caption(
+            f"{builder_request.get('request_id')} · main permitido: NÃO · "
+            "scope expansion: NÃO · force push: NÃO."
+        )
+        if builder_request.get("blockers"):
+            st.warning(
+                "Request bloqueado: "
+                + " · ".join(str(x) for x in list(builder_request.get("blockers") or []))
+            )
+        else:
+            st.success(
+                "Solicitação de sandbox preparada. Nenhum executor de escrita foi ligado."
+            )
+        request_scope = (
+            builder_request.get("scope")
+            if isinstance(builder_request.get("scope"), Mapping)
+            else {}
+        )
+        if request_scope.get("requested_files"):
+            st.markdown("**Escopo solicitado ao Builder:**")
+            for item in list(request_scope.get("requested_files") or []):
+                st.markdown(f"- `{item}`")
+        st.caption(
+            "Builder Sandbox Request é planejamento: patch_generated=False, writes_files=False, "
+            "automatic_commit=False, automatic_merge=False e automatic_deploy=False."
+        )
+
+        if builder_request.get("state") == "READY_FOR_BUILDER_SANDBOX":
+            with st.expander("Sandbox Preflight · contrato declarativo", expanded=False):
+                st.caption(
+                    "Isto descreve as condições exigidas para um futuro sandbox; "
+                    "não prova que um ambiente real já foi criado."
+                )
+                preflight_environment_id = st.text_input(
+                    "ID lógico do ambiente isolado",
+                    value="aion-builder-design-only",
+                    key="aion_developer_sandbox_environment_id",
+                    max_chars=160,
+                )
+                if st.button(
+                    "Preparar contrato declarativo de sandbox",
+                    key="aion_developer_sandbox_preflight_prepare",
+                ):
+                    try:
+                        preflight = build_developer_sandbox_preflight(
+                            builder_request,
+                            environment_kind="ISOLATED_WORKTREE",
+                            environment_id=preflight_environment_id,
+                            isolated_worktree=True,
+                            repository_root_bound=True,
+                            network_disabled=True,
+                            secrets_mounted=False,
+                            command_policy=DEVELOPER_SANDBOX_COMMAND_POLICY,
+                        )
+                        st.session_state["aion_developer_sandbox_preflight"] = preflight
+                    except Exception as exc:
+                        st.error(f"Sandbox preflight recusado: {type(exc).__name__}")
+
+    preflight = (
+        st.session_state.get("aion_developer_sandbox_preflight")
+        if isinstance(st.session_state.get("aion_developer_sandbox_preflight"), Mapping)
+        else None
+    )
+    if isinstance(preflight, Mapping):
+        st.markdown("##### Sandbox Preflight · design only")
+        p1,p2,p3 = st.columns(3)
+        p1.metric("Estado", str(preflight.get("state") or "UNKNOWN"))
+        p2.metric("Executor", "LIGADO" if preflight.get("executor_attached") else "NÃO LIGADO")
+        p3.metric("Execução", "AUTORIZADA" if preflight.get("execution_authorized") else "BLOQUEADA")
+        st.caption(
+            "Preflight declarativo: não executa comandos, não cria worktree e não comprova isolamento real."
+        )
+
+    if (
+        isinstance(builder_request, Mapping)
+        and isinstance(preflight, Mapping)
+        and preflight.get("state") == "READY_FOR_EXECUTOR_DESIGN_REVIEW"
+    ):
+        with st.expander("Patch Validator · diff read-only", expanded=False):
+            st.caption(
+                "Cole somente um unified diff que você pretende revisar. "
+                "O formulário limpa o texto após envio; o resultado não armazena o patch bruto."
+            )
+            with st.form("aion_developer_patch_validation_form", clear_on_submit=True):
+                patch_text = st.text_area(
+                    "Unified diff não confiável",
+                    key="aion_developer_patch_text",
+                    max_chars=500000,
+                    height=220,
+                    placeholder="diff --git a/arquivo.py b/arquivo.py ...",
+                )
+                validate_patch_submit = st.form_submit_button(
+                    "Validar patch sem aplicar",
+                    type="primary",
+                )
+            if validate_patch_submit:
+                try:
+                    branch_contract = (
+                        builder_request.get("branch_contract")
+                        if isinstance(builder_request.get("branch_contract"), Mapping)
+                        else {}
+                    )
+                    patch_validation = validate_developer_patch(
+                        builder_request,
+                        preflight,
+                        patch_text,
+                        baseline_ref=branch_contract.get("baseline_ref"),
+                        candidate_ref=branch_contract.get("candidate_ref"),
+                    )
+                    st.session_state["aion_developer_patch_validation"] = patch_validation
+                except Exception as exc:
+                    st.error(f"Patch recusado: {type(exc).__name__}")
+
+    patch_validation = (
+        st.session_state.get("aion_developer_patch_validation")
+        if isinstance(st.session_state.get("aion_developer_patch_validation"), Mapping)
+        else None
+    )
+    if isinstance(patch_validation, Mapping):
+        st.markdown("##### Patch Validation · somente leitura")
+        v1,v2,v3,v4 = st.columns(4)
+        v1.metric("Estado", str(patch_validation.get("state") or "UNKNOWN"))
+        v2.metric("Arquivos", int(patch_validation.get("file_count") or 0))
+        v3.metric("Linhas alteradas", int(patch_validation.get("changed_lines") or 0))
+        v4.metric("Patch aplicado", "SIM" if patch_validation.get("patch_applied") else "NÃO")
+        if patch_validation.get("blockers"):
+            st.warning(
+                "Patch bloqueado: "
+                + " · ".join(str(x) for x in list(patch_validation.get("blockers") or []))
+            )
+        else:
+            st.success(
+                "Diff compatível com o escopo para revisão humana. "
+                "Isto não autoriza aplicar, testar, commitar, mergear ou publicar."
+            )
+        if patch_validation.get("files"):
+            st.dataframe(
+                [
+                    {
+                        "Arquivo": row.get("path"),
+                        "Operação": row.get("operation"),
+                        "+": row.get("added_lines"),
+                        "-": row.get("deleted_lines"),
+                        "Blockers": " · ".join(str(x) for x in list(row.get("blockers") or [])),
+                    }
+                    for row in list(patch_validation.get("files") or [])
+                    if isinstance(row, Mapping)
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+        st.caption(
+            f"{patch_validation.get('patch_digest')} · patch_text_included=False · "
+            "execution_authorized=False · writes_files=False."
+        )
+
+        if patch_validation.get("state") == "READY_FOR_PATCH_REVIEW":
+            with st.expander("Runner Contract Simulator · somente desenho", expanded=False):
+                st.caption(
+                    "Este formulário não executa comandos. Ele apenas verifica se existe informação "
+                    "suficiente para descrever um runner isolado e revisável."
+                )
+                st.caption(
+                    "content_binding_verified não é prova. O runner exige um Content "
+                    "Attestation Contract, e um checkbox não o substitui."
+                )
+                human_patch_reviewed = st.checkbox(
+                    "O patch exato foi revisado por uma pessoa independente",
+                    key="aion_developer_runner_patch_reviewed",
+                    value=False,
+                )
+                human_patch_reviewer = st.text_input(
+                    "Revisor humano do patch",
+                    key="aion_developer_runner_patch_reviewer",
+                    max_chars=160,
+                )
+                runner_review_refs = st.text_area(
+                    "Referências da revisão do patch — uma por linha",
+                    key="aion_developer_runner_patch_review_refs",
+                    max_chars=4000,
+                )
+                if st.button(
+                    "Preparar Runner Contract Simulator",
+                    key="aion_developer_runner_prepare",
+                ):
+                    try:
+                        runner_contract = build_developer_runner_contract(
+                            builder_request,
+                            preflight,
+                            patch_validation,
+                            content_attestation=None,
+                            human_patch_reviewed=human_patch_reviewed,
+                            human_patch_reviewer=human_patch_reviewer,
+                            human_patch_review_refs=[
+                                line.strip()
+                                for line in runner_review_refs.splitlines()
+                                if line.strip()
+                            ],
+                        )
+                        st.session_state["aion_developer_runner_contract"] = runner_contract
+                    except Exception as exc:
+                        st.error(f"Runner Contract recusado: {type(exc).__name__}")
+
+    runner_contract = (
+        st.session_state.get("aion_developer_runner_contract")
+        if isinstance(st.session_state.get("aion_developer_runner_contract"), Mapping)
+        else None
+    )
+    if isinstance(runner_contract, Mapping):
+        st.markdown("##### Runner Contract Simulator · não executável")
+        rc1,rc2,rc3,rc4 = st.columns(4)
+        rc1.metric("Estado", str(runner_contract.get("state") or "UNKNOWN"))
+        rc2.metric("Executor", "LIGADO" if runner_contract.get("executor_attached") else "NÃO LIGADO")
+        rc3.metric("Execução", "AUTORIZADA" if runner_contract.get("execution_authorized") else "BLOQUEADA")
+        rc4.metric("Comandos executados", "SIM" if runner_contract.get("commands_executed") else "NÃO")
+
+        if runner_contract.get("blockers"):
+            st.warning(
+                "Runner design bloqueado: "
+                + " · ".join(str(x) for x in list(runner_contract.get("blockers") or []))
+            )
+        else:
+            st.success(
+                "Contrato suficiente apenas para revisão do desenho do runner. "
+                "Nenhum executor foi conectado."
+            )
+
+        if runner_contract.get("command_plan"):
+            st.markdown("**Plano de comandos — somente dados:**")
+            st.dataframe(
+                [
+                    {
+                        "Etapa": row.get("step"),
+                        "Executável": row.get("executable"),
+                        "ARGV": " ".join(str(x) for x in list(row.get("argv") or [])),
+                        "Shell": row.get("shell"),
+                        "Rede": row.get("network"),
+                        "Escreve repo": row.get("writes_repo"),
+                    }
+                    for row in list(runner_contract.get("command_plan") or [])
+                    if isinstance(row, Mapping)
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+        st.caption(
+            f"{runner_contract.get('runner_contract_id')} · command_plan_is_data_only=True · "
+            "shell_allowed=False · network_allowed=False · secrets_allowed=False · "
+            "repo_write_allowed=False · execution_authorized=False."
+        )
+        st.info(
+            "Enquanto revision_content_verified continuar falso no Patch Validator, "
+            "o runner permanece bloqueado por desenho. Isso é intencional."
+        )
+
+        if runner_contract.get("state") == "READY_FOR_RUNNER_DESIGN_REVIEW":
+            if st.button(
+                "Validar Command Allowlist Contract",
+                key="aion_developer_command_policy_prepare",
+            ):
+                try:
+                    stored_attestation = st.session_state.get("aion_developer_content_attestation")
+                    command_policy = build_developer_command_policy_contract(
+                        runner_contract,
+                        builder_request=builder_request,
+                        preflight=preflight,
+                        patch_validation=patch_validation,
+                        content_attestation=(
+                            stored_attestation if isinstance(stored_attestation, Mapping) else None
+                        ),
+                    )
+                    st.session_state["aion_developer_command_policy"] = command_policy
+                except Exception as exc:
+                    st.error(f"Command Allowlist recusada: {type(exc).__name__}")
+
+    command_policy = (
+        st.session_state.get("aion_developer_command_policy")
+        if isinstance(st.session_state.get("aion_developer_command_policy"), Mapping)
+        else None
+    )
+    if isinstance(command_policy, Mapping):
+        st.markdown("##### Command Allowlist Contract · somente dados")
+        cp1,cp2,cp3,cp4 = st.columns(4)
+        cp1.metric("Estado", str(command_policy.get("state") or "UNKNOWN"))
+        cp2.metric("Exec pinning", "OK" if command_policy.get("executable_pinning_verified") else "PENDENTE")
+        cp3.metric("OS sandbox", "OK" if command_policy.get("os_sandbox_verified") else "PENDENTE")
+        cp4.metric("Execução", "AUTORIZADA" if command_policy.get("execution_authorized") else "BLOQUEADA")
+
+        if command_policy.get("blockers"):
+            st.warning(
+                "Allowlist bloqueada: "
+                + " · ".join(str(x) for x in list(command_policy.get("blockers") or []))
+            )
+        else:
+            st.success(
+                "Templates argv exatos conferem. Ainda falta pinning dos executáveis "
+                "e prova do isolamento de sistema operacional."
+            )
+
+        if command_policy.get("hazards"):
+            st.markdown("**Riscos que continuam explícitos:**")
+            for item in list(command_policy.get("hazards") or []):
+                st.markdown(f"- {item}")
+
+        if command_policy.get("required_before_future_execution"):
+            st.markdown("**Obrigatório antes de qualquer execução futura:**")
+            for item in list(command_policy.get("required_before_future_execution") or []):
+                st.markdown(f"- {item}")
+
+        st.caption(
+            f"{command_policy.get('command_policy_id')} · EXACT_ARGV_TEMPLATES · "
+            "command_policy_is_data_only=True · execution_authorized=False · "
+            "executor_attached=False · commands_executed=False."
+        )
+
 def _render_development(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
@@ -5831,6 +7350,7 @@ def _render_development(
         ),
         key="aion_development_voice",
     )
+    _render_developer_intelligence()
     with st.expander("Política de confiança e rollback do AION Desenvolvedor"):
         policy = developer_trust_policy()
         for row in policy["levels"]:
