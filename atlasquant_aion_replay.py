@@ -545,9 +545,14 @@ def submit_replay_decision(
 
     decision = _clean(choice, 500)
     stamp = _utc(submitted_at)
-    if not decision or stamp is None:
+    replay_cutoff = _utc(current.get("replay_at"))
+    if not decision or stamp is None or replay_cutoff is None:
         current["state"] = "BLOCKED"
         current["reason"] = "DECISION_OR_SUBMITTED_AT_INVALID"
+        return current
+    if stamp < replay_cutoff:
+        current["state"] = "BLOCKED"
+        current["reason"] = "DECISION_BEFORE_REPLAY_CUTOFF"
         return current
     if _contains_secret({"choice": choice, "rationale": rationale}):
         current["state"] = "BLOCKED"
