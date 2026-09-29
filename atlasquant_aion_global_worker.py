@@ -356,6 +356,29 @@ def _normalize_lease(raw: Mapping[str, Any] | None) -> dict[str, Any]:
     }
 
 
+def _public_lease_view(raw: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Return lease diagnostics without exposing the coordination token."""
+    item = dict(raw or {})
+    out: dict[str, Any] = {
+        "token_exposed": False,
+    }
+    state = safe_text(str(item.get("state") or ""), 80)
+    owner = safe_text(str(item.get("owner") or ""), 160)
+    expires_at = str(item.get("expires_at") or "")
+    fence = item.get("fencing_token")
+    if state:
+        out["state"] = state
+    if owner:
+        out["owner"] = owner
+    if expires_at:
+        out["expires_at"] = expires_at
+    if type(fence) is int and fence >= 0:
+        out["fencing_token"] = fence
+    if "reclaimed" in item:
+        out["reclaimed"] = item.get("reclaimed") is True
+    return out
+
+
 def _delegation_from_access(access: Mapping[str, Any], context) -> dict[str, Any]:
     session = access.get("session") if isinstance(access, Mapping) else None
     if not isinstance(session, Mapping):
@@ -1418,7 +1441,7 @@ def run_global_worker_once(
             "schema": SCHEMA,
             "status": "LEASE_HELD",
             "processed": 0,
-            "lease": lease,
+            "lease": _public_lease_view(lease),
             "network_called": True,
             "external_action_executed": False,
         }
@@ -1435,7 +1458,7 @@ def run_global_worker_once(
             "schema": SCHEMA,
             "status": "LEASE_CLAIM_" + str(claim_write.get("status") or "ERROR"),
             "processed": 0,
-            "lease": lease,
+            "lease": _public_lease_view(lease),
             "network_called": True,
             "checkpoint_write": claim_write,
             "reconciliation_required": bool(claim_write.get("reconciliation_required")),
@@ -1503,7 +1526,7 @@ def run_global_worker_once(
             "succeeded": int(batch.get("succeeded") or 0),
             "failed": int(batch.get("failed") or 0),
             "blocked": int(batch.get("blocked") or 0),
-            "lease": lease,
+            "lease": _public_lease_view(lease),
             "network_called": True,
             "automatic_runtime_checkpoint_persistence": False,
             "automatic_retry_allowed": False,
@@ -1529,7 +1552,7 @@ def run_global_worker_once(
             "succeeded": int(batch.get("succeeded") or 0),
             "failed": int(batch.get("failed") or 0),
             "blocked": int(batch.get("blocked") or 0),
-            "lease": lease,
+            "lease": _public_lease_view(lease),
             "network_called": True,
             "automatic_runtime_checkpoint_persistence": False,
             "checkpoint_write": final_write,
