@@ -12,9 +12,9 @@
   },
   "integrate": [
     {
-      "pr": 355,
-      "branch": "chatgpt/aion-memory-optional-product-adapters-v1",
-      "role": "consolidated_aion_nucleus_global_worker_resource_tenant_supply_chain_recovery_and_optional_product_isolation",
+      "pr": 359,
+      "branch": "chatgpt/aion-resource-bounds-residual-v2",
+      "role": "single_consolidated_aion_nucleus_tip",
       "contains_prs": [
         338,
         342,
@@ -26,18 +26,22 @@
         349,
         350,
         352,
-        354
+        354,
+        355
       ],
       "absorbs_semantics_from_prs": [
+        339,
         340,
         353
       ],
+      "supersedes_for_integration": [
+        339,
+        340,
+        353,
+        355,
+        356
+      ],
       "preserves_entitlements_as_tenant_core_dependency": true
-    },
-    {
-      "pr": 339,
-      "branch": "chatgpt/aion-worker-lease-hardening-v1",
-      "role": "session_worker_lease_hardening"
     }
   ],
   "autonomy": {
@@ -67,8 +71,7 @@
     "report": "aion-night-validation-report.json"
   },
   "next_hardening_order": [
-    "resource_bounds_residual_scan",
-    "recovery_partial_record_adversarial_tests",
+    "post_359_adversarial_scan",
     "ruleset_required_checks_human_decision"
   ],
   "stop_conditions": [
@@ -90,7 +93,10 @@
     "recovery_outcome_truth_revision_binding_and_strict_json": "pr_355_absorbs_pr_340_and_pr_353_semantics",
     "supply_chain_duplicate_pr_351": "superseded_by_pr_352",
     "rt19_business_studio_promotions_empty_core_independence": "pr_349_and_pr_355",
-    "entitlements_dependency": "retained_as_tenant_core_dependency"
+    "entitlements_dependency": "retained_as_tenant_core_dependency",
+    "resource_bounds_residual_scan": "pr_359",
+    "recovery_partial_record_adversarial_tests": "pr_359",
+    "session_worker_lease_hardening": "pr_359_absorbs_pr_339"
   },
   "superseded_prs": [
     {
@@ -107,6 +113,16 @@
       "pr": 356,
       "superseded_by": 355,
       "reason": "Optional product isolation consolidated while Entitlements remains a Tenant Core dependency."
+    },
+    {
+      "pr": 339,
+      "superseded_by": 359,
+      "reason": "Session worker hardening absorbed into single consolidated AION/Nucleus tip."
+    },
+    {
+      "pr": 355,
+      "superseded_by": 359,
+      "reason": "Previous consolidated tip extended by residual resource bounds and recovery adversarial hardening."
     }
   ]
 }
