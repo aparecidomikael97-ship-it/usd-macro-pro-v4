@@ -78,6 +78,14 @@ class AtlasQuantAionBusinessBrainTests(unittest.TestCase):
             ("aion", "nucleo", "interface", "infrastructure"),
         )
         self.assertTrue(strategy["activation_requires_human_approval"])
+        funding = strategy["funding_policy"]
+        self.assertEqual(funding["source_metric"], "confirmed_net_profit")
+        self.assertTrue(funding["never_use_gross_revenue_as_available_cash"])
+        self.assertTrue(funding["cover_costs_before_reinvestment"])
+        self.assertTrue(funding["cover_taxes_before_reinvestment"])
+        self.assertTrue(funding["preserve_operating_reserve_before_reinvestment"])
+        self.assertFalse(funding["automatic_transfer"])
+        self.assertFalse(funding["automatic_payment"])
 
     def test_external_actions_never_execute_inside_contract(self):
         blocked = external_action_preflight(
