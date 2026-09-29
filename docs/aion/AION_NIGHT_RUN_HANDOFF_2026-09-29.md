@@ -8,13 +8,39 @@ O operador deve conseguir iniciar o trabalho no Cursor uma vez e deixar a frente
 
 ## Prioridade absoluta
 
+### Validation-only #360 contra main — verde
+
+A Draft #360 foi aberta somente para acionar os workflows que exigem PR com base `main` e foi encerrada sem merge após a validação. No HEAD `a0fa2dff38d2de7e934f3897ecf06dd025552028`, todos os checks observados terminaram SUCCESS:
+
+- Quality tests: 3801 testes, OK;
+- AION Core Security Gate: adversarial contracts + supply-chain audit;
+- AION Global Worker Activation Readiness;
+- AtlasQuant Release Readiness;
+- AtlasQuant Integration UI Smoke;
+- AtlasQuant Mobile DOM Stability.
+
+#360 está **CLOSED / NOT MERGED** e permanece apenas como evidência. A #359 agora é a única Draft autoritativa e foi retargetada para `main`.
+
+
+Matriz reconciliada dos achados RT01–RT20:
+`docs/aion/AION_CORE_REDTEAM_CLOSURE_MATRIX_2026-09-29.md`
+
+Proposta administrativa read-only de required checks:
+`docs/aion/AION_REQUIRED_CHECKS_PROPOSAL_2026-09-29.md`
+
+Pacote read-only da cerimônia de ativação do Global Worker:
+`docs/aion/AION_GLOBAL_WORKER_ACTIVATION_DRY_RUN_2026-09-29.md`
+
+
 1. AION
 2. Núcleo
 3. Segurança, verdade, memória/checkpoint, recovery, workers e autonomia controlada
 4. Testes e integração da pilha
 5. Somente depois: outras áreas do AtlasQuant
 
-Não desviar para Interface, Radar, Trading, Studio, Academy ou features novas enquanto houver regressão ou hardening pendente no AION Core.
+Não desviar a trilha principal para Interface, Radar, Trading, Studio, Academy ou features novas enquanto houver regressão ou hardening pendente no AION Core.
+
+A interface está **PAUSADA por solicitação do usuário**. A Draft #358 (`chatgpt/atlasquant-cockpit-shell-v1`) deve permanecer intacta até novo pedido explícito. Não avançar UI, login, cockpit ou imagens durante o bloco AION/Núcleo. Ela nunca deve bloquear nem substituir a validação da ponta #359.
 
 ## Base conhecida
 
@@ -43,11 +69,58 @@ Frentes irmãs preparadas sobre a #337:
   - Empilhada sobre a #342 e é a ponta preferida da cadeia Global Worker.
   - Persiste `inflight_tick` no claim para impedir reexecução após persistência terminal ambígua.
   - Novo tick bloqueia antes do executor quando existe inflight não reconciliado.
-- #339 — `chatgpt/aion-worker-lease-hardening-v1`
-  - Worker de sessão: corrige NameError em arm_worker, valida runtime_id e max_jobs no boundary correto.
-  - Mantém multi_instance_safe=false.
-- #340 — `chatgpt/aion-recovery-outcome-hardening-v1`
-  - Recovery só declara restored_revision quando save+verify foram realmente confirmados.
+- #346 — `chatgpt/aion-global-inflight-reconciliation-assessor-v1`
+  - Empilhada sobre #345 e é a ponta preferida atual da cadeia Global Worker.
+  - Contém #338 + #342 + #343 + #345.
+  - Cruza inflight + work intent + receipts em diagnóstico read-only para a manhã.
+  - Nunca limpa, reexecuta ou autoriza retry automaticamente.
+- #347 — `chatgpt/aion-global-inflight-resolution-ceremony-v1`
+  - Empilhada sobre #346 e é a ponta preferida atual da cadeia Global Worker.
+  - Contém #338 + #342 + #343 + #345 + #346.
+  - Adiciona resolução staging-only para casos comprovadamente claros, sempre com aprovação explícita.
+  - Ambiguous/partial/inconsistent/unsafe continuam bloqueados.
+- #348 — `chatgpt/aion-core-resource-bounds-v1`
+  - Empilhada sobre #347 e é a ponta preferida atual do AION/Núcleo.
+  - Contém a cadeia Global Worker até #347.
+  - Fecha materialização não limitada em Durable Tasks / Observability / Knowledge Graph.
+  - Mantém os mesmos limites e preserva a semântica de dados recentes.
+- #349 — `chatgpt/aion-memory-optional-business-adapter-v1`
+  - Empilhada sobre #348 e é a ponta preferida atual do AION/Núcleo.
+  - Contém toda a cadeia anterior até #348.
+  - Memory/Recovery continuam operacionais com seção Business vazia mesmo sem o módulo Negócios.
+  - Business real sem adapter fica UNKNOWN/write_safe=false; nenhum dado é apagado silenciosamente.
+- #350 — `chatgpt/aion-tenant-write-gate-hardening-v1`
+  - Empilhada sobre #349 e é a ponta preferida atual do AION/Núcleo.
+  - Contém toda a cadeia anterior até #349.
+  - Tenant Store exige `approved is True` e rejeita memória de tenant estrangeiro mesmo com aprovação exata.
+  - O store permanece planning-only, sem network/write automático.
+- #351 — supersedida pela #352; NÃO integrar no turno noturno.
+- #352 — `chatgpt/aion-supply-chain-residual-hardening-v1`
+  - Empilhada sobre #350 e é a ponta preferida atual do AION/Núcleo.
+  - Contém toda a cadeia anterior até #350.
+  - Fecha installs Python soltos nos workflows residuais; Actions continuam pinadas por SHA.
+  - Adiciona contrato automático de pinning no Security Gate e Quality Suite.
+- #354 — `chatgpt/aion-recovery-history-hardening-v1`
+  - Empilhada sobre #352 e é a ponta preferida atual do AION/Núcleo.
+  - Contém toda a cadeia anterior até #352.
+  - Deduplica histórico de revisions e contabiliza registros parciais/invalidos.
+  - Load histórico valida tamanho/Base64 antes de JSON/integridade; restore continua explícito e condicional.
+- #355 — base consolidada anterior do AION/Núcleo; agora absorvida pela ponta #359.
+- #356 — SUPERSEDIDA pela #355/#359 para integração noturna; NÃO integrar.
+- #357 — SUPERSEDIDA pela #359; resource bounds de Studio/Promoções/Entitlements/Session Memory foram absorvidos.
+- #339 — SUPERSEDIDA pela #359; hardening do Worker Runtime foi absorvido na ponta consolidada.
+- #340 — semântica absorvida pela #355; não integrar separadamente.
+- #353 — SUPERSEDIDA pela #355; revision binding/strict historical parse foram absorvidos na ponta consolidada.
+- #359 — `chatgpt/aion-resource-bounds-residual-v2`
+  - Ponta preferida consolidada atual do AION/Núcleo.
+  - Contém toda a cadeia da #355.
+  - Absorve o Worker Runtime da #339.
+  - Fecha resíduos de resource bounds em Operations, Continuity e Controlled Learning.
+  - Absorve a #357: resource bounds adicionais em Studio, Promoções, Entitlements, Session Memory e Memory.
+  - Adiciona adversarial hardening de Recovery para SHA curto, content não-string e encoding histórico divergente.
+  - Post-359 adversarial resource sweep: Business, Tenant Memory, Promotions integrity, Live Event Journal, Wisdom, Digital Twin, Dev Fusion, Release Confidence, Evaluation Lab, Tool Hub e Model Registry.
+  - Critical Review agora também usa closed message schema, limites explícitos de reviews/refs e fail-closed para campos desconhecidos.
+  - Mantém fail-closed, no automatic retry, restore confirmado somente com save+verify CONFIRMED.
 
 Todas devem permanecer Draft até validação integral.
 
@@ -91,11 +164,11 @@ Criar uma branch temporária de integração a partir da #337, por exemplo:
 
 `cursor/aion-night-integration-2026-09-29`
 
-Integrar de forma não destrutiva as frentes:
+Integrar de forma não destrutiva:
 
-1. #343 (já contém #338 + #342; usar como ponta da cadeia Global Worker)
-2. #339
-3. #340
+1. #359 — ponta única consolidada do AION/Núcleo, base `main`, HEAD `a0fa2dff38d2de7e934f3897ecf06dd025552028`, manter Draft e não fazer merge sem aprovação explícita.
+
+Não integrar separadamente #339, #340, #353, #355, #356 ou #357: as garantias necessárias estão absorvidas/supersedidas pela #359.
 
 Não retargetar nem mergear em main.
 
@@ -111,24 +184,30 @@ Se houver conflito, resolver preservando:
 
 ## Bloco 2 — Validação obrigatória
 
-Rodar primeiro testes direcionados:
+Preferir o runner noturno único, local/offline e de custo zero:
 
 ```bash
-python -m unittest test_atlasquant_aion_memory.py
-python -m unittest test_atlasquant_aion_global_worker.py
-python -m unittest test_atlasquant_aion_worker_runtime.py
-python -m unittest test_atlasquant_aion_recovery.py
-python -m unittest test_atlasquant_aion_background_executor.py
+python tools/aion_night_validation.py --full --report aion-night-validation-report.json
 ```
 
-Depois:
+Ele executa, sem parar na primeira falha:
+
+- suíte crítica de Memory / Global Worker / Worker Runtime / Recovery / Background Executor;
+- suítes adversariais reais: Security Adversarial, Hardening, Post Audit, Chaos Recovery, Core Independence e Global Worker Readiness;
+- `python -m unittest discover`;
+- `python -m compileall -q .`;
+- `git diff --check`;
+- relatório JSON consolidado para diagnóstico/correção.
+
+O runner não instala dependências, não usa rede, não chama provider, não faz deploy, merge, publicação, runtime mutation ou trading.
+
+Para diagnóstico rápido durante uma correção, pode usar:
 
 ```bash
-python tools/aion_redteam_runner.py
-python -m unittest discover
-python -m compileall -q .
-git diff --check
+python tools/aion_night_validation.py --quick --report aion-night-validation-quick.json
 ```
+
+Antes de encerrar o turno, sempre voltar ao modo `--full`.
 
 Se existir falha:
 
@@ -227,4 +306,39 @@ Ao terminar ou atingir um stop condition, deixar um único relatório curto com:
 
 Copie somente o bloco abaixo:
 
-> Continue o AION/Núcleo a partir de `docs/aion/AION_NIGHT_RUN_HANDOFF_2026-09-29.md`. Execute o plano noturno inteiro por blocos grandes, sem me pedir confirmação entre etapas seguras. Prioridade absoluta AION + Núcleo. Integre as Drafts #343, #339 e #340 sobre a #337 numa branch temporária, valide, corrija regressões, rode red-team + suíte completa e continue os hardenings listados no handoff enquanto forem seguros. Custo zero por padrão. Não fazer merge em main, deploy, serviço pago, segredo real, publicação, ativação real de worker ou trading. Em caso de falha, diagnostique, corrija, teste e continue. Pare somente nos stop conditions descritos no handoff e deixe relatório final da manhã.
+> Continue o AION/Núcleo a partir de `docs/aion/AION_NIGHT_RUN_HANDOFF_2026-09-29.md`. Execute o plano noturno inteiro por blocos grandes, sem me pedir confirmação entre etapas seguras. Prioridade absoluta AION + Núcleo. Use a Draft #359 como ponta única consolidada e crie a branch temporária de validação a partir dela; não integre separadamente #339, #340, #353, #355 ou #356. Rode `python tools/aion_night_validation.py --full --report aion-night-validation-report.json`, corrija regressões e continue os hardenings listados no handoff enquanto forem seguros. Custo zero por padrão. Não fazer merge em main, deploy, serviço pago, segredo real, publicação, ativação real de worker ou trading. Em caso de falha, diagnostique, corrija, teste e continue. Pare somente nos stop conditions descritos no handoff e deixe relatório final da manhã.
+
+## Achados já revalidados antes do próximo hardening
+
+- RT04 review binding já coberto na ponta atual: tenant/workspace/task/plan divergentes bloqueiam com regressão específica.
+- Session Memory / Specialist Session são projeções por chamada e não mantêm cache global mutável de memória pessoal.
+- Tenant Store usa path credential-bound por tenant; a fronteira de aprovação textual foi endurecida na #350.
+- RT20 residual está consolidado na #352; a #351 foi supersedida e não deve ser integrada.
+- Recovery outcome + revision binding + strict historical parse estão preservados na #359; #340/#353 não precisam entrar separadamente.
+- RT19 do Núcleo vazio permanece em Business + Studio + Promoções; Entitlements continua ligado ao Tenant Core. A #356 segue supersedida.
+- Worker Runtime da #339 foi absorvido na #359.
+- Resource bounds residual, post-359 adversarial resource sweep e adversarial partial-record Recovery estão na #359.
+- A #357 também foi absorvida: Studio/Promoções/Entitlements/Session Memory não devem entrar separadamente.
+
+
+## PR hygiene cleanup
+
+Para reduzir risco de integração duplicada, as Drafts antigas ChatGPT **#337–#343 e #345–#357** foram encerradas sem merge como superseded/historical. A única ponta AION/Núcleo autoritativa é a **#359**.
+
+Permanecem abertas deliberadamente:
+- #359 — AION/Núcleo autoritativo, Draft contra `main`;
+- #344 — handoff/runner operacional;
+- #358 — interface pausada pelo usuário; não avançar até novo pedido;
+- #286 — frente Cursor antiga, fora da consolidação atual; não integrar automaticamente.
+
+Nota especial: #356 foi encerrada como superseded; Studio/Promoções válidos foram absorvidos, mas Entitlements continua ligado ao Tenant Core por ser fronteira de autorização.
+
+## Evidência preservada dos workflows verdes
+
+Os workflows finais também produziram artefatos de evidência:
+
+- Security Gate run `36587217794` → SBOM `aion-sbom-d900fe6729a6dd27deb9541ab1e1f8b6c6107e15`, retenção até 2026-10-29.
+- UI Smoke run `36587217908` → `atlasquant-integration-ui-smoke-d900fe6729a6dd27deb9541ab1e1f8b6c6107e15`, retenção até 2026-10-29.
+- Mobile DOM run `36587217972` → `atlasquant-mobile-dom-d900fe6729a6dd27deb9541ab1e1f8b6c6107e15`, retenção até 2026-10-29.
+
+O SHA nos nomes dos artefatos corresponde ao merge-ref efêmero da validação do PR; a validade do candidato continua vinculada ao par base/head congelado documentado.

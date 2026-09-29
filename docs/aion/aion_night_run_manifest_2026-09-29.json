@@ -12,23 +12,41 @@
   },
   "integrate": [
     {
-      "pr": 343,
-      "branch": "chatgpt/aion-global-inflight-idempotency-v1",
-      "role": "global_worker_reconciliation_fencing_and_inflight_idempotency",
+      "pr": 359,
+      "branch": "chatgpt/aion-resource-bounds-residual-v2",
+      "role": "single_consolidated_aion_nucleus_tip",
       "contains_prs": [
         338,
-        342
-      ]
-    },
-    {
-      "pr": 339,
-      "branch": "chatgpt/aion-worker-lease-hardening-v1",
-      "role": "session_worker_lease_hardening"
-    },
-    {
-      "pr": 340,
-      "branch": "chatgpt/aion-recovery-outcome-hardening-v1",
-      "role": "recovery_outcome_truth"
+        342,
+        343,
+        345,
+        346,
+        347,
+        348,
+        349,
+        350,
+        352,
+        354,
+        355
+      ],
+      "absorbs_semantics_from_prs": [
+        339,
+        340,
+        353,
+        357
+      ],
+      "supersedes_for_integration": [
+        339,
+        340,
+        353,
+        355,
+        356,
+        357
+      ],
+      "preserves_entitlements_as_tenant_core_dependency": true,
+      "head_sha": "a0fa2dff38d2de7e934f3897ecf06dd025552028",
+      "base": "main",
+      "state": "OPEN_DRAFT_DO_NOT_MERGE_WITHOUT_EXPLICIT_APPROVAL"
     }
   ],
   "autonomy": {
@@ -49,27 +67,19 @@
     "irreversible_runtime_mutation"
   ],
   "validation": {
-    "targeted": [
-      "python -m unittest test_atlasquant_aion_memory.py",
-      "python -m unittest test_atlasquant_aion_global_worker.py",
-      "python -m unittest test_atlasquant_aion_worker_runtime.py",
-      "python -m unittest test_atlasquant_aion_recovery.py",
-      "python -m unittest test_atlasquant_aion_background_executor.py"
-    ],
-    "full": [
-      "python tools/aion_redteam_runner.py",
-      "python -m unittest discover",
-      "python -m compileall -q .",
-      "git diff --check"
-    ]
+    "primary_command": "python tools/aion_night_validation.py --full --report aion-night-validation-report.json",
+    "quick_command": "python tools/aion_night_validation.py --quick --report aion-night-validation-quick.json",
+    "full_required_before_morning_report": true,
+    "zero_cost": true,
+    "network_allowed": false,
+    "dependency_install_allowed": false,
+    "report": "aion-night-validation-report.json"
   },
   "next_hardening_order": [
-    "operational_recovery_and_ambiguous_persistence",
-    "partial_checkpoint_write_reconciliation",
-    "resource_bounds",
-    "tenant_workspace_cache_isolation",
-    "rt19_optional_dependency_reduction",
-    "supply_chain_residual_gaps"
+    "no_code_change_while_candidate_frozen",
+    "revalidate_if_base_or_head_changes",
+    "human_decision_ruleset_required_checks",
+    "shared_coordination_only_if_real_multi_instance_requirement_appears"
   ],
   "stop_conditions": [
     "human_authorization_required",
@@ -80,5 +90,256 @@
     "irreversible_architecture_choice",
     "external_environment_blocks_safe_validation"
   ],
-  "morning_report_required": true
+  "morning_report_required": true,
+  "resolved_findings": {
+    "rt04_review_scope_binding": "covered_by_current_code_and_regression",
+    "session_memory_global_cache_leak": "not_observed_per_call_projection_only",
+    "tenant_store_exact_approval": "pr_350",
+    "rt20_runtime_pins_actions_sbom_and_residual_workflows": "pr_352",
+    "recovery_duplicate_partial_history_and_strict_decode": "pr_354_absorbed_in_pr_355",
+    "recovery_outcome_truth_revision_binding_and_strict_json": "pr_355_absorbs_pr_340_and_pr_353_semantics",
+    "supply_chain_duplicate_pr_351": "superseded_by_pr_352",
+    "rt19_business_studio_promotions_empty_core_independence": "pr_349_and_pr_355",
+    "entitlements_dependency": "retained_as_tenant_core_dependency",
+    "resource_bounds_residual_scan": "pr_359",
+    "recovery_partial_record_adversarial_tests": "pr_359",
+    "session_worker_lease_hardening": "pr_359_absorbs_pr_339",
+    "resource_bounds_optional_product_and_session_memory": "pr_359_absorbs_pr_357",
+    "post_359_adversarial_resource_sweep": "pr_359",
+    "rt01_rt20_closure_matrix": "docs/aion/AION_CORE_REDTEAM_CLOSURE_MATRIX_2026-09-29.md",
+    "critical_review_closed_schema": "pr_359",
+    "quality_workflow_root_test_coverage": "331_of_331_on_pr_359",
+    "security_gate_shell_continuations": "fixed_in_pr_359",
+    "required_checks_proposal": "docs/aion/AION_REQUIRED_CHECKS_PROPOSAL_2026-09-29.md"
+  },
+  "superseded_prs": [
+    {
+      "pr": 351,
+      "superseded_by": 352,
+      "reason": "Supply-chain work consolidated on the tenant-hardened chain."
+    },
+    {
+      "pr": 353,
+      "superseded_by": 355,
+      "reason": "Recovery outcome and revision-binding semantics absorbed into the consolidated tip."
+    },
+    {
+      "pr": 356,
+      "superseded_by": 355,
+      "reason": "Optional product isolation consolidated while Entitlements remains a Tenant Core dependency."
+    },
+    {
+      "pr": 339,
+      "superseded_by": 359,
+      "reason": "Session worker hardening absorbed into single consolidated AION/Nucleus tip."
+    },
+    {
+      "pr": 355,
+      "superseded_by": 359,
+      "reason": "Previous consolidated tip extended by residual resource bounds and recovery adversarial hardening."
+    },
+    {
+      "pr": 357,
+      "superseded_by": 359,
+      "reason": "Optional product/session-memory resource bounds absorbed into the single consolidated AION/Nucleus tip."
+    }
+  ],
+  "parallel_nonblocking": [
+    {
+      "pr": 358,
+      "branch": "chatgpt/atlasquant-cockpit-shell-v1",
+      "role": "isolated_cockpit_ui_track",
+      "may_advance": false,
+      "may_touch_core_authority": false,
+      "production_wiring_allowed": false,
+      "paused_by_user": true,
+      "resume_requires_explicit_user_request": true
+    }
+  ],
+  "pending_human_decisions": {
+    "ruleset_required_checks": {
+      "state": "NOT_APPLIED",
+      "repo_rulesets_visible_count": 0,
+      "branch_protection_read": "FORBIDDEN_BY_INTEGRATION",
+      "requires_explicit_admin_approval": true
+    }
+  },
+  "interface_state": "PAUSED_BY_USER",
+  "plugin_work_state": "DO_NOT_CREATE_UNTIL_EXPLICIT_USER_REQUEST",
+  "validation_evidence": {
+    "pr": 360,
+    "base": "main",
+    "purpose": "VALIDATION_ONLY_DO_NOT_MERGE",
+    "head_sha": "a0fa2dff38d2de7e934f3897ecf06dd025552028",
+    "results": {
+      "quality_tests": {
+        "conclusion": "SUCCESS",
+        "tests": 3801
+      },
+      "aion_core_security_gate": {
+        "conclusion": "SUCCESS"
+      },
+      "aion_adversarial_contracts": {
+        "conclusion": "SUCCESS"
+      },
+      "supply_chain_audit": {
+        "conclusion": "SUCCESS"
+      },
+      "global_worker_activation_readiness": {
+        "conclusion": "SUCCESS"
+      },
+      "release_readiness": {
+        "conclusion": "SUCCESS"
+      },
+      "integration_ui_smoke": {
+        "conclusion": "SUCCESS"
+      },
+      "mobile_dom_stability": {
+        "conclusion": "SUCCESS"
+      }
+    },
+    "state": "CLOSED_NOT_MERGED",
+    "authoritative_pr": 359,
+    "same_base_sha_as_authoritative_pr": "2c9dade6a87d6f618f05cbb628eb35cee2f3a8a1"
+  },
+  "authoritative_pr": {
+    "pr": 359,
+    "base": "main",
+    "base_sha": "2c9dade6a87d6f618f05cbb628eb35cee2f3a8a1",
+    "head_sha": "a0fa2dff38d2de7e934f3897ecf06dd025552028",
+    "draft": true,
+    "mergeable": true,
+    "merge_allowed": false,
+    "requires_explicit_human_approval": true
+  },
+  "main_integration_readiness": "docs/aion/AION_MAIN_INTEGRATION_READINESS_2026-09-29.md",
+  "candidate_freeze": {
+    "base_sha": "2c9dade6a87d6f618f05cbb628eb35cee2f3a8a1",
+    "head_sha": "a0fa2dff38d2de7e934f3897ecf06dd025552028",
+    "state": "FROZEN_VALIDATED_DO_NOT_MERGE_WITHOUT_EXPLICIT_APPROVAL",
+    "revalidate_if_base_or_head_changes": true
+  },
+  "pr_lineage_cleanup": "docs/aion/AION_PR_LINEAGE_CLEANUP_2026-09-29.md",
+  "archived_prs": {
+    "exact_ancestors": [
+      326,
+      327,
+      328,
+      329,
+      330,
+      331,
+      332,
+      334,
+      335,
+      336,
+      337,
+      338,
+      342,
+      343,
+      345,
+      346,
+      347,
+      348,
+      349,
+      350,
+      354,
+      355
+    ],
+    "semantic_absorbed": [
+      339,
+      340,
+      351,
+      352,
+      353,
+      356,
+      357
+    ],
+    "audit_evidence": [
+      333
+    ],
+    "old_handoff": [
+      341
+    ]
+  },
+  "active_prs": {
+    "authoritative_core": 359,
+    "handoff": 344,
+    "paused_interface": 358,
+    "untouched_legacy": [
+      286
+    ]
+  },
+  "pr_hygiene": {
+    "authoritative_pr": 359,
+    "closed_superseded_ranges": [
+      "337-343",
+      "345-357"
+    ],
+    "intentionally_open": [
+      {
+        "pr": 344,
+        "role": "operational_handoff_only_do_not_merge"
+      },
+      {
+        "pr": 358,
+        "role": "paused_interface",
+        "may_advance": false
+      }
+    ],
+    "closed_legacy": [
+      286
+    ]
+  },
+  "validation_artifacts": {
+    "security_gate_sbom": {
+      "run_id": 36587217794,
+      "artifact_id": 11042292352,
+      "name": "aion-sbom-d900fe6729a6dd27deb9541ab1e1f8b6c6107e15",
+      "expires_on": "2026-10-29"
+    },
+    "ui_smoke": {
+      "run_id": 36587217908,
+      "artifact_id": 11042516535,
+      "name": "atlasquant-integration-ui-smoke-d900fe6729a6dd27deb9541ab1e1f8b6c6107e15",
+      "expires_on": "2026-10-29"
+    },
+    "mobile_dom": {
+      "run_id": 36587217972,
+      "artifact_id": 11042232910,
+      "name": "atlasquant-mobile-dom-d900fe6729a6dd27deb9541ab1e1f8b6c6107e15",
+      "expires_on": "2026-10-29"
+    }
+  },
+  "global_worker_activation_dry_run": "docs/aion/AION_GLOBAL_WORKER_ACTIVATION_DRY_RUN_2026-09-29.md",
+  "global_worker_activation_state": {
+    "status": "NOT_EXECUTED",
+    "feature_flag_mutated": false,
+    "runtime_armed_real": false,
+    "live_worker_started": false,
+    "approval_required": true
+  },
+  "deferred_capabilities": {
+    "shared_coordination": {
+      "source_pr": 286,
+      "state": "DEFERRED_FUTURE_CAPABILITY",
+      "blocker_for_current_candidate": false,
+      "auto_integrate": false,
+      "requires_fresh_branch_from_current_tip": true,
+      "audit_doc": "docs/aion/AION_SHARED_COORDINATION_DEFERRED_AUDIT_2026-09-29.md"
+    }
+  },
+  "scope_freeze_audit": {
+    "doc": "docs/aion/AION_PR359_SCOPE_FREEZE_AUDIT_2026-09-29.md",
+    "pr": 359,
+    "changed_files": 137,
+    "status": "PASS",
+    "real_trading_enabled": false,
+    "deploy_enabled": false,
+    "merge_enabled": false,
+    "publication_enabled": false,
+    "payment_enabled": false,
+    "interface_changes_in_candidate": false,
+    "candidate_remains_frozen": true
+  },
+  "production_boundary_audit": "docs/aion/AION_PRODUCTION_BOUNDARY_AUDIT_2026-09-29.md"
 }
