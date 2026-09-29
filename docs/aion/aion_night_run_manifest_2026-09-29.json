@@ -12,9 +12,9 @@
   },
   "integrate": [
     {
-      "pr": 350,
-      "branch": "chatgpt/aion-tenant-write-gate-hardening-v1",
-      "role": "aion_nucleus_global_worker_resource_bounds_optional_dependency_and_tenant_write_isolation",
+      "pr": 352,
+      "branch": "chatgpt/aion-supply-chain-residual-hardening-v1",
+      "role": "aion_nucleus_global_worker_resource_dependency_tenant_and_supply_chain_hardening",
       "contains_prs": [
         338,
         342,
@@ -23,7 +23,8 @@
         346,
         347,
         348,
-        349
+        349,
+        350
       ]
     },
     {
@@ -64,7 +65,6 @@
     "report": "aion-night-validation-report.json"
   },
   "next_hardening_order": [
-    "supply_chain_residual_gaps",
     "recovery_adversarial_residuals",
     "remaining_optional_dependency_isolation",
     "resource_bounds_residual_scan"
@@ -82,6 +82,7 @@
   "resolved_findings": {
     "rt04_review_scope_binding": "covered_by_current_code_and_regression",
     "session_memory_global_cache_leak": "not_observed_per_call_projection_only",
-    "tenant_store_exact_approval": "pr_350"
+    "tenant_store_exact_approval": "pr_350",
+    "rt20_runtime_pins_actions_sbom_and_residual_workflows": "pr_352"
   }
 }
