@@ -14,10 +14,12 @@ Human review remains mandatory after the lab gate.
 """
 from __future__ import annotations
 
+from collections import deque
 from copy import deepcopy
 from datetime import datetime, timezone
 from hashlib import sha256
 from typing import Any, Mapping, Sequence
+from itertools import islice
 import json
 import math
 
@@ -48,7 +50,7 @@ def _finite(value:Any)->float|None:
 
 def _refs(values:Sequence[Any]|None,limit:int=80)->list[str]:
     out=[]
-    for raw in list(values or [])[:limit*2]:
+    for raw in islice(values or (),max(0,limit*2)):
         text=_clean(raw,280)
         if text and text not in out:
             out.append(text)
@@ -114,7 +116,7 @@ def new_metric_policy(
 def _normalize_cases(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for raw in list(rows or [])[:MAX_CASES]:
+    for raw in islice(rows or (),MAX_CASES):
         if not isinstance(raw,Mapping):
             continue
         try:
@@ -134,7 +136,7 @@ def _normalize_cases(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
 def _normalize_policies(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for raw in list(rows or [])[:100]:
+    for raw in islice(rows or (),100):
         if not isinstance(raw,Mapping):
             continue
         try:
@@ -233,7 +235,7 @@ def normalize_eval_suite(raw:Mapping[str,Any])->dict[str,Any]:
 def normalize_suites(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for raw in list(rows or [])[:MAX_SUITES*2]:
+    for raw in islice(rows or (),MAX_SUITES*2):
         if not isinstance(raw,Mapping):
             continue
         try:
@@ -270,7 +272,7 @@ def new_eval_run(
     results=[]
     valid_ids={x["case_id"] for x in normalized["cases"]}
     seen=set()
-    for raw in list(case_results or [])[:MAX_CASES]:
+    for raw in islice(case_results or (),MAX_CASES):
         if not isinstance(raw,Mapping):
             continue
         cid=_clean(raw.get("case_id"),100)
@@ -469,7 +471,7 @@ def normalize_run(raw:Mapping[str,Any])->dict[str,Any]:
         "suite_id":_clean(item.get("suite_id"),120),
         "baseline_version":_clean(item.get("baseline_version"),160),
         "candidate_version":_clean(item.get("candidate_version"),160),
-        "case_results":[dict(x) for x in list(item.get("case_results") or [])[:MAX_CASES] if isinstance(x,Mapping)],
+        "case_results":[dict(x) for x in islice(item.get("case_results") or (),MAX_CASES) if isinstance(x,Mapping)],
         "baseline_metrics":dict(item.get("baseline_metrics") or {}) if isinstance(item.get("baseline_metrics"),Mapping) else {},
         "candidate_metrics":dict(item.get("candidate_metrics") or {}) if isinstance(item.get("candidate_metrics"),Mapping) else {},
         "evidence_refs":_refs(item.get("evidence_refs") if isinstance(item.get("evidence_refs"),(list,tuple)) else []),
@@ -487,7 +489,12 @@ def normalize_run(raw:Mapping[str,Any])->dict[str,Any]:
 def normalize_runs(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for raw in list(rows or [])[-MAX_RUNS*2:]:
+    source=(
+        rows[-MAX_RUNS*2:]
+        if isinstance(rows,(list,tuple))
+        else deque(rows or (),maxlen=MAX_RUNS*2)
+    )
+    for raw in source:
         if not isinstance(raw,Mapping):
             continue
         item=normalize_run(raw)
