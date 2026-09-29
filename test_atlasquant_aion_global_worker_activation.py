@@ -33,6 +33,12 @@ from atlasquant_aion_coordination_mode_gate import (
     MULTI_INSTANCE_MODE,
     coordination_activation_gate,
 )
+from atlasquant_aion_coordination_operational_verification import (
+    RECEIPT_SCHEMA as OPERATIONAL_RECEIPT_SCHEMA,
+    RECEIPT_VERSION as OPERATIONAL_RECEIPT_VERSION,
+    seal_operational_receipt,
+    validate_coordination_operational_verification,
+)
 from atlasquant_aion_memory import (
     RuntimeConfig,
     checkpoint_source_digest,
@@ -235,6 +241,130 @@ class GlobalWorkerActivationCeremonyTests(unittest.TestCase):
         self.assertFalse(
             validated["multi_instance_operationally_verified"]
         )
+
+    @staticmethod
+    def _coordination_structural():
+        return {
+            "state": "PROBE_EVIDENCE_READY",
+            "probe_evidence_accepted": True,
+            "probe_receipt_structurally_valid": True,
+            "operational_verification": "UNKNOWN",
+            "adapter_id": "future-shared",
+            "adapter_identity_digest": "a" * 64,
+        }
+
+    @staticmethod
+    def _operational_receipt(*, issued_at=None, expires_at=None, adapter_digest=None):
+        issued = issued_at or (NOW - timedelta(seconds=60))
+        expires = expires_at or (NOW + timedelta(seconds=300))
+        return seal_operational_receipt({
+            "schema": OPERATIONAL_RECEIPT_SCHEMA,
+            "receipt_version": OPERATIONAL_RECEIPT_VERSION,
+            "adapter_identity_digest": adapter_digest or ("a" * 64),
+            "scope_digest": "scope-admin-context",
+            "issued_at": issued.isoformat(),
+            "expires_at": expires.isoformat(),
+            "probe_run_id": "probe-run-1",
+            "namespace": "atlasquant-coordination-probe/test-run-1",
+            "namespace_is_ephemeral": True,
+            "production_mutation_count": 0,
+            "isolated_mutation_count": 7,
+            "concurrent_probe_count": 2,
+            "observed_capabilities": {
+                "shared_across_instances": True,
+                "atomic_compare_and_swap": True,
+                "monotonic_versions": True,
+                "atomic_monotonic_fencing_token": True,
+                "ttl_expiry": True,
+                "atomic_delete": True,
+                "durable_outside_browser": True,
+            },
+            "evidence_refs": ["probe:coordination:run-1"],
+        })
+
+    @staticmethod
+    def _verified_evidence(refs):
+        return {"state": "VERIFIED", "bound_refs": list(refs)}
+
+    def test_operational_coordination_receipt_requires_external_verifier(self):
+        report = validate_coordination_operational_verification(
+            self._operational_receipt(),
+            expected_adapter_identity_digest="a" * 64,
+            expected_scope_digest="scope-admin-context",
+            now=NOW,
+        )
+        self.assertEqual(report["state"], "BLOCK")
+        self.assertIn("OPERATIONAL_EVIDENCE_UNVERIFIED", report["blockers"])
+        self.assertFalse(report["multi_instance_verified"])
+        self.assertFalse(report["worker_activated"])
+
+    def test_operational_coordination_receipt_binds_adapter_scope_and_time(self):
+        mismatch = validate_coordination_operational_verification(
+            self._operational_receipt(adapter_digest="b" * 64),
+            expected_adapter_identity_digest="a" * 64,
+            expected_scope_digest="scope-admin-context",
+            now=NOW,
+            evidence_verifier=self._verified_evidence,
+        )
+        self.assertIn("ADAPTER_IDENTITY_MISMATCH", mismatch["blockers"])
+
+        expired = validate_coordination_operational_verification(
+            self._operational_receipt(
+                issued_at=NOW - timedelta(minutes=20),
+                expires_at=NOW - timedelta(minutes=10),
+            ),
+            expected_adapter_identity_digest="a" * 64,
+            expected_scope_digest="scope-admin-context",
+            now=NOW,
+            evidence_verifier=self._verified_evidence,
+        )
+        self.assertIn("RECEIPT_EXPIRED", expired["blockers"])
+
+    def test_verified_operational_evidence_still_does_not_enable_multi_instance_runtime(self):
+        operational = validate_coordination_operational_verification(
+            self._operational_receipt(),
+            expected_adapter_identity_digest="a" * 64,
+            expected_scope_digest="scope-admin-context",
+            now=NOW,
+            evidence_verifier=self._verified_evidence,
+        )
+        self.assertEqual(operational["state"], "VERIFIED")
+        self.assertTrue(operational["multi_instance_verified"])
+        self.assertFalse(operational["activation_authorized"])
+        self.assertFalse(operational["probe_executed_by_this_module"])
+
+        gate = coordination_activation_gate(
+            MULTI_INSTANCE_MODE,
+            coordination_readiness=self._coordination_structural(),
+            operational_verification=operational,
+        )
+        self.assertEqual(gate["state"], "VERIFIED_NOT_ACTIVATABLE")
+        self.assertEqual(
+            gate["reason"],
+            "MULTI_INSTANCE_RUNTIME_INTEGRATION_REQUIRED",
+        )
+        self.assertTrue(gate["multi_instance_verified"])
+        self.assertFalse(gate["runtime_integration_ready"])
+        self.assertFalse(gate["allows_activation_plan"])
+
+        result = prepare_global_worker_activation_plan(
+            self.access,
+            self.runtime,
+            self.readiness,
+            _safe_flag("UNSET"),
+            coordination_mode=MULTI_INSTANCE_MODE,
+            coordination_readiness=self._coordination_structural(),
+            coordination_operational_verification=operational,
+            now=NOW,
+        )
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertEqual(
+            result["reason"],
+            "MULTI_INSTANCE_RUNTIME_INTEGRATION_REQUIRED",
+        )
+        self.assertTrue(result["coordination"]["multi_instance_verified"])
+        self.assertFalse(result["feature_flag_modified"])
+        self.assertFalse(result["global_worker_executed"])
 
     def test_multi_instance_mode_blocks_without_adapter_evidence(self):
         result = prepare_global_worker_activation_plan(
