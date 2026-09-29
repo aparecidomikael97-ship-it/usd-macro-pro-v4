@@ -20,6 +20,8 @@ from atlasquant_aion_memory import (
     runtime_write_preflight,
     reconcile_runtime_write,
     _fallback_business_normalizers,
+    _fallback_promotion_normalizers,
+    _fallback_studio_normalizers,
     _runtime_write_receipt,
     runtime_configuration_status,
     save_runtime_checkpoint,
@@ -200,6 +202,27 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertEqual(
             fallback_metrics_digest({}),
             business_metrics_digest({}),
+        )
+
+    def test_optional_product_fallbacks_match_real_empty_digests(self):
+        from atlasquant_aion_studio import (
+            normalize_projects as real_normalize_projects,
+            studio_digest as real_studio_digest,
+        )
+        from atlasquant_aion_promotions import (
+            normalize_campaigns as real_normalize_campaigns,
+            promotion_digest as real_promotion_digest,
+        )
+
+        fallback_projects, fallback_studio_digest = _fallback_studio_normalizers()
+        fallback_campaigns, fallback_promotion_digest = _fallback_promotion_normalizers()
+
+        self.assertEqual(fallback_projects([]), real_normalize_projects([]))
+        self.assertEqual(fallback_studio_digest([]), real_studio_digest([]))
+        self.assertEqual(fallback_campaigns([]), real_normalize_campaigns([]))
+        self.assertEqual(
+            fallback_promotion_digest([], []),
+            real_promotion_digest([], []),
         )
 
     def test_default_checkpoint_is_safe_and_has_no_real_trading(self):
