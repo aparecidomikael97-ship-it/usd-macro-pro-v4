@@ -2,6 +2,8 @@ from pathlib import Path
 import unittest
 
 import atlasquant_aion_action_receipt as action_receipt
+import atlasquant_aion_approval_inbox as approval_inbox
+import atlasquant_aion_background_executor as background_executor
 import atlasquant_aion_capabilities as capabilities
 import atlasquant_aion_continuity as continuity
 import atlasquant_aion_dev_fusion as dev_fusion
@@ -271,6 +273,39 @@ class AionResidualResourceBoundsTests(unittest.TestCase):
         self.assertNotIn("list(preferences.items())[:50]",tenant_src)
         self.assertNotIn("list(academy.items())[:200]",tenant_src)
         self.assertNotIn("list(redemptions_raw)[:2000]",memory_src)
+
+
+    def test_executor_due_selection_keeps_only_batch_in_memory_and_preserves_count(self):
+        source=GuardedIterable(
+            (
+                {
+                    "due":True,
+                    "due_at":f"2026-09-29T12:{59-(i%60):02d}:00+00:00",
+                    "schedule_id":f"schedule-{i:03d}",
+                }
+                for i in range(100)
+            ),
+            max_reads=100,
+        )
+        selected,total=background_executor._select_due_schedules(source,3)
+        self.assertEqual(total,100)
+        self.assertEqual(len(selected),3)
+        self.assertEqual(source.reads,100)
+        keys=[
+            (str(row.get("due_at") or ""),str(row.get("schedule_id") or ""))
+            for row in selected
+        ]
+        self.assertEqual(keys,sorted(keys))
+
+        source_text=Path("atlasquant_aion_background_executor.py").read_text(encoding="utf-8")
+        self.assertNotIn('list(scheduler.get("schedules") or [])',source_text)
+        self.assertIn("_select_due_schedules(",source_text)
+        self.assertNotIn("for schedule in due[:max_jobs]",source_text)
+
+    def test_approval_rows_do_not_duplicate_materialize_items(self):
+        source=Path("atlasquant_aion_approval_inbox.py").read_text(encoding="utf-8")
+        self.assertNotIn("for item in list(items or []):",source)
+        self.assertIn("for item in items or []:",source)
 
 
     def test_global_worker_claim_rejects_oversized_intent_without_full_materialization(self):
