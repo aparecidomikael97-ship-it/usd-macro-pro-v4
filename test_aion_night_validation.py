@@ -41,6 +41,10 @@ class AionNightValidationTests(unittest.TestCase):
         steps = night.build_steps(full=True)
         by_name = {x.name: x for x in steps}
         self.assertIn("full_unittest_discover", by_name)
+        critical = " ".join(by_name["critical_core"].command)
+        self.assertIn("test_atlasquant_aion_durable_tasks", critical)
+        self.assertIn("test_atlasquant_aion_observability", critical)
+        self.assertIn("test_atlasquant_aion_knowledge_graph", critical)
         adversarial = " ".join(by_name["adversarial_core"].command)
         self.assertIn("test_atlasquant_aion_security_adversarial", adversarial)
         self.assertIn("test_atlasquant_aion_hardening", adversarial)
