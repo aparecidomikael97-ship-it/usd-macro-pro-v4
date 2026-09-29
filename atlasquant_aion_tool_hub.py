@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from hashlib import sha256
 from typing import Any, Mapping, Sequence
+from itertools import islice
 import json
 import re
 
@@ -176,7 +177,7 @@ def _digest(payload:Any)->str:
 
 def _unique(values:Sequence[Any]|None,limit:int=40)->list[str]:
     out=[]
-    for raw in list(values or [])[:limit*2]:
+    for raw in islice(values or (),max(0,limit*2)):
         text=_clean(raw,120)
         if text and text not in out:
             out.append(text)
@@ -222,7 +223,7 @@ def normalize_tool(raw:Mapping[str,Any])->dict[str,Any]:
 def normalize_tools(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for raw in list(rows or [])[:500]:
+    for raw in islice(rows or (),500):
         if not isinstance(raw,Mapping):
             continue
         try:
@@ -357,7 +358,7 @@ def plan_tool_call(
     if not authority["can_issue_action"]:
         blockers.append("SOURCE_HAS_NO_COMMAND_AUTHORITY")
     if safety.get("state")=="BLOCK":
-        blockers.extend(str(x) for x in list(safety.get("blockers") or []))
+        blockers.extend(str(x) for x in islice(safety.get("blockers") or (),100))
     blockers=list(dict.fromkeys(blockers))
     state="BLOCK" if blockers else ("REVIEW" if safety.get("state")=="REVIEW" else "READY_FOR_EXECUTOR")
     return {
