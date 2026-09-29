@@ -12,12 +12,14 @@
   },
   "integrate": [
     {
-      "pr": 343,
-      "branch": "chatgpt/aion-global-inflight-idempotency-v1",
-      "role": "global_worker_reconciliation_fencing_and_inflight_idempotency",
+      "pr": 346,
+      "branch": "chatgpt/aion-global-inflight-reconciliation-assessor-v1",
+      "role": "global_worker_reconciliation_fencing_inflight_intent_and_assessment",
       "contains_prs": [
         338,
-        342
+        342,
+        343,
+        345
       ]
     },
     {
@@ -58,7 +60,7 @@
     "report": "aion-night-validation-report.json"
   },
   "next_hardening_order": [
-    "operational_recovery_and_ambiguous_persistence",
+    "explicit_inflight_reconciliation_ceremony",
     "partial_checkpoint_write_reconciliation",
     "resource_bounds",
     "tenant_workspace_cache_isolation",
