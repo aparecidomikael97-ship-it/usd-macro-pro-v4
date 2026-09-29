@@ -82,17 +82,23 @@ def normalize_cost_evidence(raw: Mapping[str, Any] | None) -> dict[str, Any]:
     if truth not in TRUTH_STATES:
         truth = "UNKNOWN"
 
-    currency = _text(item.get("currency") or SUPPORTED_CURRENCY, 12).upper()
-    period = _text(item.get("period") or SUPPORTED_PERIOD, 24).upper()
+    currency = _text(item.get("currency"), 12).upper()
+    period = _text(item.get("period"), 24).upper()
     amount = _money(item.get("amount"))
 
     reasons: list[str] = []
     usable = True
 
-    if currency != SUPPORTED_CURRENCY:
+    if not currency:
+        usable = False
+        reasons.append("CURRENCY_REQUIRED")
+    elif currency != SUPPORTED_CURRENCY:
         usable = False
         reasons.append("UNSUPPORTED_CURRENCY")
-    if period != SUPPORTED_PERIOD:
+    if not period:
+        usable = False
+        reasons.append("PERIOD_REQUIRED")
+    elif period != SUPPORTED_PERIOD:
         usable = False
         reasons.append("UNSUPPORTED_PERIOD")
     if amount is None:
