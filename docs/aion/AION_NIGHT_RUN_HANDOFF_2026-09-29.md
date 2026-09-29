@@ -80,25 +80,19 @@ Frentes irmãs preparadas sobre a #337:
   - Deduplica histórico de revisions e contabiliza registros parciais/invalidos.
   - Load histórico valida tamanho/Base64 antes de JSON/integridade; restore continua explícito e condicional.
 - #355 — `chatgpt/aion-memory-optional-product-adapters-v1`
-  - Empilhada sobre #354 e é a ponta preferida atual do AION/Núcleo.
+  - Empilhada sobre #354 e é a ponta preferida consolidada atual do AION/Núcleo.
   - Contém toda a cadeia anterior até #354.
+  - Absorve as garantias de outcome/revision binding da #340/#353 sem exigir integração separada.
+  - Recovery deduplica histórico, limita/valida Base64, rejeita duplicate JSON keys, relê o revision antes do writer e só declara restore com save+verify CONFIRMED.
   - Memory/Recovery vazio deixam de depender de Studio e Promoções.
   - Dados reais dessas superfícies sem adapter ficam UNKNOWN/write_safe=false, sem descarte silencioso.
-- #356 — `chatgpt/aion-memory-optional-domain-adapters-v1`
-  - Empilhada sobre #352 e é a ponta preferida atual do AION/Núcleo.
-  - Contém toda a cadeia da #352.
-  - Fecha RT19 residual para Business + Studio + Promoções + Entitlements.
-  - Seção vazia funciona sem domínio opcional; dado real sem adapter fica UNKNOWN/write_safe=false.
+  - Entitlements permanece dependência do Tenant Core para não enfraquecer autorização.
+- #356 — SUPERSEDIDA pela #355 para integração noturna; NÃO integrar.
 - #339 — `chatgpt/aion-worker-lease-hardening-v1`
   - Worker de sessão: corrige NameError em arm_worker, valida runtime_id e max_jobs no boundary correto.
   - Mantém multi_instance_safe=false.
-- #340 — `chatgpt/aion-recovery-outcome-hardening-v1`
-  - Recovery só declara restored_revision quando save+verify foram realmente confirmados.
-- #353 — `chatgpt/aion-recovery-revision-binding-v1`
-  - Empilhada sobre #340 e é a ponta preferida da cadeia Recovery.
-  - Contém a verdade de outcome da #340.
-  - Relê o revision histórico antes do writer, compara digest e usa somente os bytes revalidados.
-  - Base64/JSON históricos têm parse estrito; duplicate keys bloqueiam.
+- #340 — semântica absorvida pela #355; não integrar separadamente.
+- #353 — SUPERSEDIDA pela #355; revision binding/strict historical parse foram absorvidos na ponta consolidada.
 
 Todas devem permanecer Draft até validação integral.
 
@@ -144,9 +138,10 @@ Criar uma branch temporária de integração a partir da #337, por exemplo:
 
 Integrar de forma não destrutiva as frentes:
 
-1. #355 (já contém a cadeia até #354 e o isolamento opcional de Studio/Promoções; usar como ponta AION/Núcleo)
+1. #355 (ponta consolidada AION/Núcleo: cadeia até #354 + Recovery outcome/revision binding + isolamento opcional de Studio/Promoções)
 2. #339
-3. #340
+
+Não integrar separadamente #340, #353 ou #356: suas partes válidas necessárias ao turno estão absorvidas/supersedidas pela #355.
 
 Não retargetar nem mergear em main.
 
@@ -284,7 +279,7 @@ Ao terminar ou atingir um stop condition, deixar um único relatório curto com:
 
 Copie somente o bloco abaixo:
 
-> Continue o AION/Núcleo a partir de `docs/aion/AION_NIGHT_RUN_HANDOFF_2026-09-29.md`. Execute o plano noturno inteiro por blocos grandes, sem me pedir confirmação entre etapas seguras. Prioridade absoluta AION + Núcleo. Integre as Drafts #355, #339 e #340 sobre a #337 numa branch temporária, rode `python tools/aion_night_validation.py --full --report aion-night-validation-report.json`, corrija regressões e continue os hardenings listados no handoff enquanto forem seguros. Custo zero por padrão. Não fazer merge em main, deploy, serviço pago, segredo real, publicação, ativação real de worker ou trading. Em caso de falha, diagnostique, corrija, teste e continue. Pare somente nos stop conditions descritos no handoff e deixe relatório final da manhã.
+> Continue o AION/Núcleo a partir de `docs/aion/AION_NIGHT_RUN_HANDOFF_2026-09-29.md`. Execute o plano noturno inteiro por blocos grandes, sem me pedir confirmação entre etapas seguras. Prioridade absoluta AION + Núcleo. Integre as Drafts #355 e #339 sobre a #337 numa branch temporária; não integre separadamente #340, #353 ou #356 porque a ponta #355 consolidou as garantias necessárias. Rode `python tools/aion_night_validation.py --full --report aion-night-validation-report.json`, corrija regressões e continue os hardenings listados no handoff enquanto forem seguros. Custo zero por padrão. Não fazer merge em main, deploy, serviço pago, segredo real, publicação, ativação real de worker ou trading. Em caso de falha, diagnostique, corrija, teste e continue. Pare somente nos stop conditions descritos no handoff e deixe relatório final da manhã.
 
 ## Achados já revalidados antes do próximo hardening
 
@@ -292,5 +287,5 @@ Copie somente o bloco abaixo:
 - Session Memory / Specialist Session são projeções por chamada e não mantêm cache global mutável de memória pessoal.
 - Tenant Store usa path credential-bound por tenant; a fronteira de aprovação textual foi endurecida na #350.
 - RT20 residual está consolidado na #352; a #351 foi supersedida e não deve ser integrada.
-- Recovery revision binding/strict historical parse está na #353; ela substitui a #340 no turno noturno.
-- RT19 opcional foi ampliado na #356: Business, Studio, Promoções e Entitlements ficam desacoplados do Núcleo vazio com fail-closed para dados reais.
+- Recovery outcome + revision binding + strict historical parse foram consolidados na #355; #340 e #353 não precisam entrar separadamente.
+- RT19 do Núcleo vazio fica em Business + Studio + Promoções; Entitlements permanece ligado ao Tenant Core por ser parte da fronteira de autorização. A #356 foi supersedida para integração.
