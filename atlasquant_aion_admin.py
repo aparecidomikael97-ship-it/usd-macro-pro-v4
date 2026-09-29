@@ -2935,7 +2935,7 @@ def _render_central(
         ("Essencial", "Completo"),
         key="aion_central_view_mode",
         help=(
-            "Essencial prioriza o que exige atenção e reduz a rolagem no celular. "
+            "Essencial prioriza o que exige atenção para reduzir carga e rolagem no celular. "
             "Completo mostra todos os painéis técnicos."
         ),
     )
