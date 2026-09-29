@@ -44,7 +44,7 @@
         357
       ],
       "preserves_entitlements_as_tenant_core_dependency": true,
-      "head_sha": "801ac03afe9902b9f018c22693da0649cfe04e62"
+      "head_sha": "5b93222c841ed771ffafa81ac2f5e19807d585f3"
     }
   ],
   "autonomy": {
@@ -74,7 +74,7 @@
     "report": "aion-night-validation-report.json"
   },
   "next_hardening_order": [
-    "post_359_adversarial_scan",
+    "wait_for_latest_pr_359_readiness",
     "ruleset_required_checks_human_decision"
   ],
   "stop_conditions": [
@@ -100,7 +100,8 @@
     "resource_bounds_residual_scan": "pr_359",
     "recovery_partial_record_adversarial_tests": "pr_359",
     "session_worker_lease_hardening": "pr_359_absorbs_pr_339",
-    "resource_bounds_optional_product_and_session_memory": "pr_359_absorbs_pr_357"
+    "resource_bounds_optional_product_and_session_memory": "pr_359_absorbs_pr_357",
+    "post_359_adversarial_resource_sweep": "pr_359"
   },
   "superseded_prs": [
     {
