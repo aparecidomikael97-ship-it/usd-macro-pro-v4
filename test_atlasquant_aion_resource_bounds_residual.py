@@ -2,8 +2,12 @@ from pathlib import Path
 import unittest
 
 import atlasquant_aion_continuity as continuity
+import atlasquant_aion_dev_fusion as dev_fusion
+import atlasquant_aion_digital_twin as digital_twin
+import atlasquant_aion_event_journal as event_journal
 import atlasquant_aion_learning as learning
 import atlasquant_aion_operations as operations
+import atlasquant_aion_release_confidence as release_confidence
 
 
 class GuardedIterable:
@@ -138,10 +142,68 @@ class AionResidualResourceBoundsTests(unittest.TestCase):
             "challenger-5",
         )
 
+    def test_cross_core_prefix_helpers_stop_without_materializing_sources(self):
+        refs=GuardedIterable((f"ref-{i}" for i in range(20)),max_reads=6)
+        self.assertEqual(digital_twin._refs(refs,limit=3),["ref-0","ref-1","ref-2"])
+        self.assertEqual(refs.reads,6)
+
+        fusion_refs=GuardedIterable((f"e-{i}" for i in range(20)),max_reads=6)
+        self.assertEqual(dev_fusion._refs(fusion_refs,limit=3),["e-0","e-1","e-2"])
+        self.assertEqual(fusion_refs.reads,6)
+
+        evidence=GuardedIterable((f"e-{i}" for i in range(81)),max_reads=80)
+        row=release_confidence.evidence_dimension(
+            "QUALITY",
+            confirmed=False,
+            evidence_refs=evidence,
+        )
+        self.assertEqual(len(row["evidence_refs"]),80)
+        self.assertEqual(evidence.reads,80)
+
+        sources=GuardedIterable((f"source-{i}" for i in range(13)),max_reads=12)
+        currencies=GuardedIterable((f"C{i}" for i in range(13)),max_reads=12)
+        event=event_journal.compact_event({
+            "headline":"bounded event",
+            "sources":sources,
+            "currencies":currencies,
+        })
+        self.assertEqual(len(event["sources"]),12)
+        self.assertEqual(len(event["currencies"]),12)
+        self.assertEqual(sources.reads,12)
+        self.assertEqual(currencies.reads,12)
+
+    def test_cross_core_tail_buffers_are_memory_bounded(self):
+        sources={
+            "atlasquant_aion_event_journal.py":[
+                "deque(rows or (),maxlen=MAX_EVENTS*2)",
+                "deque(rows or (),maxlen=MAX_HEARTBEATS*2)",
+            ],
+            "atlasquant_aion_wisdom.py":[
+                "deque(rows or (), maxlen=MAX_ENTRIES * 2)",
+            ],
+            "atlasquant_aion_digital_twin.py":[
+                "deque(rows or (),maxlen=MAX_TWINS*2)",
+            ],
+            "atlasquant_aion_release_confidence.py":[
+                "deque(rows or (),maxlen=300)",
+            ],
+            "atlasquant_aion_dev_fusion.py":[
+                "deque(rows or (),maxlen=MAX_PIPELINES*2)",
+            ],
+        }
+        for filename,needles in sources.items():
+            with self.subTest(filename=filename):
+                source=Path(filename).read_text(encoding="utf-8")
+                for needle in needles:
+                    self.assertIn(needle,source)
+
     def test_known_unbounded_materialization_patterns_are_absent(self):
         operations_src=Path("atlasquant_aion_operations.py").read_text(encoding="utf-8")
         continuity_src=Path("atlasquant_aion_continuity.py").read_text(encoding="utf-8")
         learning_src=Path("atlasquant_aion_learning.py").read_text(encoding="utf-8")
+        business_src=Path("atlasquant_aion_business.py").read_text(encoding="utf-8")
+        tenant_src=Path("atlasquant_aion_tenant.py").read_text(encoding="utf-8")
+        memory_src=Path("atlasquant_aion_memory.py").read_text(encoding="utf-8")
 
         self.assertNotIn("list(tasks or [])[:MAX_TASKS",operations_src)
         self.assertNotIn("list(rows or [])[-MAX_MISSIONS",continuity_src)
@@ -151,6 +213,10 @@ class AionResidualResourceBoundsTests(unittest.TestCase):
         self.assertNotIn("list(rows or [])[-MAX_EPISODES",learning_src)
         self.assertNotIn("list(rows or [])[-MAX_RESEARCH_REFS",learning_src)
         self.assertNotIn("list(rows or [])[-MAX_EXPERIMENTS",learning_src)
+        self.assertNotIn("list(rows or [])[:MAX_PRODUCTS",business_src)
+        self.assertNotIn("list(preferences.items())[:50]",tenant_src)
+        self.assertNotIn("list(academy.items())[:200]",tenant_src)
+        self.assertNotIn("list(redemptions_raw)[:2000]",memory_src)
 
 
 if __name__=="__main__":
