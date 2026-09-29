@@ -100,18 +100,26 @@ class AionSupplyChainPinningTests(unittest.TestCase):
         source = (WORKFLOWS / "aion-core-security-gate.yml").read_text(
             encoding="utf-8"
         )
-        self.assertIn(
-            "test_atlasquant_aion_critical_review.py \\\n"
-            "            test_atlasquant_aion_resource_bounds_residual.py \\\n"
-            "            test_atlasquant_aion_supply_chain_pinning.py",
-            source,
-        )
-        self.assertIn(
-            "test_atlasquant_aion_durable_tasks.py \\\n"
-            "            test_atlasquant_aion_resource_bounds_residual.py \\\n"
-            "            test_atlasquant_aion_supply_chain_pinning.py",
-            source,
-        )
+        for name in (
+            "test_atlasquant_aion_critical_review.py",
+            "test_atlasquant_aion_global_worker_inflight_reconciliation.py",
+            "test_atlasquant_aion_global_worker_inflight_resolution.py",
+            "test_atlasquant_aion_resource_bounds.py",
+            "test_atlasquant_aion_resource_bounds_residual.py",
+            "test_atlasquant_aion_supply_chain_pinning.py",
+        ):
+            self.assertIn(name, source)
+        lines=source.splitlines()
+        for index,line in enumerate(lines):
+            stripped=line.strip()
+            if stripped in {
+                "test_atlasquant_aion_critical_review.py",
+                "test_atlasquant_aion_global_worker_inflight_reconciliation.py",
+                "test_atlasquant_aion_global_worker_inflight_resolution.py",
+                "test_atlasquant_aion_resource_bounds.py",
+                "test_atlasquant_aion_resource_bounds_residual.py",
+            }:
+                self.assertTrue(line.rstrip().endswith("\\"), line)
 
     def test_security_gate_keeps_pinned_audit_tooling_and_retained_sbom(self):
         source = (WORKFLOWS / "aion-core-security-gate.yml").read_text(
