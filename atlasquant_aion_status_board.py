@@ -14,6 +14,7 @@ States:
 from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
+import math
 
 from atlasquant_aion_operations import queue_summary
 from atlasquant_aion_durable_tasks import durable_tasks_summary
@@ -21,6 +22,18 @@ from atlasquant_aion_system_health_center import build_system_health_center
 
 SCHEMA="ATLASQUANT_AION_MASTER_STATUS_V1"
 STATES=("CONFIRMED","BLOCKED","EXTERNAL_DEPENDENCY","UNKNOWN")
+
+
+def _safe_nonnegative_int(value:Any)->int|None:
+    if isinstance(value,bool):
+        return None
+    try:
+        number=float(value)
+    except (TypeError,ValueError):
+        return None
+    if not math.isfinite(number) or number<0 or not number.is_integer():
+        return None
+    return int(number)
 
 
 def _system_health_snapshots(
@@ -39,14 +52,17 @@ def _system_health_snapshots(
         if isinstance(system.get("source_mesh"),Mapping)
         else {}
     )
-    fallback_count=int(source_mesh.get("fallback_or_unavailable") or 0) if source_mesh else 0
+    fallback_count=_safe_nonnegative_int(source_mesh.get("fallback_or_unavailable")) if source_mesh else 0
+    fallback_count=0 if fallback_count is None else fallback_count
     source_state=str(source_mesh.get("market_state") or "").upper()
     if source_mesh and bool(source_mesh.get("market_live_confirmed",False)) and fallback_count==0:
         sources={
             "state":"HEALTHY","confirmed":True,
             "detail":"Source Mesh confirmou mercado ao vivo sem fallback/indisponibilidade.",
-            "total":int(source_mesh.get("observation_count") or 0),
+            "total":_safe_nonnegative_int(source_mesh.get("observation_count")),
             "unresolved":0,
+            "freshness_attested":True,
+            "freshness_source":"source_mesh.market_live_rule",
         }
     elif source_mesh and (
         fallback_count>0
@@ -55,7 +71,7 @@ def _system_health_snapshots(
         sources={
             "state":"DEGRADED","confirmed":False,
             "detail":"Source Mesh tem fallback, indisponibilidade ou cobertura parcial.",
-            "total":int(source_mesh.get("observation_count") or 0),
+            "total":_safe_nonnegative_int(source_mesh.get("observation_count")),
             "unresolved":fallback_count,
         }
     elif source_mesh and source_state in {"BLOCKED","ERROR","FAILED","UNAVAILABLE","CRITICAL"}:
@@ -80,6 +96,8 @@ def _system_health_snapshots(
             "state":"HEALTHY","confirmed":True,
             "detail":"Build atual e Checkpoint Mestre foram confirmados nesta execução.",
             "unresolved":0,
+            "freshness_attested":True,
+            "freshness_source":"load_runtime_checkpoint.current_call",
         }
     elif runtime_status=="BLOCKED":
         runtime_health={
@@ -120,7 +138,7 @@ def _system_health_snapshots(
                 "state":"DEGRADED" if bool(live.get("continuous_runtime_confirmed",False)) else "UNKNOWN",
                 "confirmed":False,
                 "detail":"Motor interno de alertas foi observado, mas entrega externa não foi confirmada.",
-                "total":int(live.get("alert_count") or 0),
+                "total":_safe_nonnegative_int(live.get("alert_count")),
                 "unresolved":0 if bool(live.get("continuous_runtime_confirmed",False)) else None,
             }
         else:
@@ -159,6 +177,8 @@ def _system_health_snapshots(
             ),
             "total":len(tasks),
             "unresolved":blocked_tasks,
+            "freshness_attested":True,
+            "freshness_source":"runtime_checkpoint.current_call",
         }
     else:
         queues={
@@ -173,22 +193,28 @@ def _system_health_snapshots(
         else {}
     )
     counts=critical.get("counts") if isinstance(critical.get("counts"),Mapping) else {}
-    unavailable=int(counts.get("UNAVAILABLE") or 0)
-    degraded=int(counts.get("DEGRADED") or 0)
-    stale=int(counts.get("STALE_BUILD") or 0)
-    unknown=int(counts.get("UNKNOWN") or 0)
+    unavailable=_safe_nonnegative_int(counts.get("UNAVAILABLE"))
+    degraded=_safe_nonnegative_int(counts.get("DEGRADED"))
+    stale=_safe_nonnegative_int(counts.get("STALE_BUILD"))
+    unknown=_safe_nonnegative_int(counts.get("UNKNOWN"))
+    unavailable=0 if unavailable is None else unavailable
+    degraded=0 if degraded is None else degraded
+    stale=0 if stale is None else stale
+    unknown=0 if unknown is None else unknown
     if bool(critical.get("all_ok",False)) and not any((unavailable,degraded,stale,unknown)):
         screens={
             "state":"HEALTHY","confirmed":True,
             "detail":"Todas as telas críticas foram observadas como OK no build atual.",
-            "total":int(counts.get("OK") or len(list(critical.get("items") or []))),
+            "total":(_safe_nonnegative_int(counts.get("OK")) if _safe_nonnegative_int(counts.get("OK")) is not None else len(list(critical.get("items") or []))),
             "unresolved":0,
+            "freshness_attested":True,
+            "freshness_source":"critical_surfaces.current_build_session_observation",
         }
     elif unavailable:
         screens={
             "state":"BLOCKED","confirmed":False,
             "detail":"Há tela crítica indisponível no build atual.",
-            "total":sum(int(counts.get(k) or 0) for k in ("OK","DEGRADED","UNAVAILABLE","STALE_BUILD","UNKNOWN")),
+            "total":sum((_safe_nonnegative_int(counts.get(k)) or 0) for k in ("OK","DEGRADED","UNAVAILABLE","STALE_BUILD","UNKNOWN")),
             "unresolved":unavailable+degraded+stale+unknown,
         }
     elif degraded:
