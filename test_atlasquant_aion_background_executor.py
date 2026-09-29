@@ -376,5 +376,66 @@ class AionBackgroundExecutorTests(unittest.TestCase):
             self.assertNotIn(banned, source)
 
 
+    def test_executor_emits_action_envelope_referencing_child_receipt(self):
+        result = self.execute(self.schedule())
+        self.assertEqual(result["succeeded"], 1)
+        self.assertEqual(len(result["action_receipts"]), 1)
+        envelope = result["action_receipts"][0]
+        child = load_executor_receipts(
+            self.context,
+            result["checkpoint"],
+        )[0][0]
+        self.assertEqual(envelope["child_receipt_id"], child["receipt_id"])
+        self.assertEqual(
+            envelope["receipt"]["child_receipts"][0]["receipt_id"],
+            child["receipt_id"],
+        )
+        self.assertTrue(envelope["child_fingerprint"])
+        self.assertEqual(envelope["authorization"], "NONE")
+        self.assertFalse(envelope["executes_action"])
+        self.assertFalse(result["action_receipts_are_authority"])
+
+    def test_malformed_runtime_safety_flags_fail_closed(self):
+        checkpoint = self.schedule(capability="CONTENT", prompt="conteudo")
+        fake = {
+            "status": "COMPLETED",
+            "payload": {"draft": "safe"},
+            "provider_called": "false",
+            "external_action_executed": False,
+            "real_trading_enabled": False,
+            "execution_authorized": False,
+        }
+        with patch(
+            "atlasquant_aion_background_executor.handle_runtime_intent",
+            return_value=fake,
+        ):
+            result = self.execute(checkpoint)
+        self.assertEqual(result["blocked"], 1)
+        receipt = load_executor_receipts(
+            self.context,
+            result["checkpoint"],
+        )[0][0]
+        self.assertEqual(receipt["state"], "BLOCKED")
+        self.assertEqual(receipt["reason"], "RUNTIME_SAFETY_FLAG_VIOLATION")
+
+    def test_truthy_string_guardian_allow_does_not_authorize(self):
+        checkpoint = self.schedule()
+        with patch(
+            "atlasquant_aion_background_executor.guardian_decision",
+            return_value={"allowed": "yes", "risk": "READ", "reason": "malformed"},
+        ), patch(
+            "atlasquant_aion_background_executor.handle_runtime_intent"
+        ) as handler:
+            result = self.execute(checkpoint)
+        handler.assert_not_called()
+        self.assertEqual(result["blocked"], 1)
+        receipt = load_executor_receipts(
+            self.context,
+            result["checkpoint"],
+        )[0][0]
+        self.assertFalse(receipt["guardian_allowed"])
+        self.assertIn("GUARDIAN_BLOCKED", receipt["reason"])
+
+
 if __name__ == "__main__":
     unittest.main()
