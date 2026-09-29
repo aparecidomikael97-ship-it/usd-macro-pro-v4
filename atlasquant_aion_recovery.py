@@ -13,7 +13,6 @@ import base64
 import json
 import re
 
-import requests
 
 from atlasquant_runtime_store import require_runtime_branch
 from atlasquant_aion_memory import (
@@ -75,6 +74,7 @@ def list_checkpoint_revisions(
         }
     per_page=max(1,min(int(limit or 12),30))
     try:
+        import requests
         response=requests.get(
             _history_url(config),
             headers=_headers(config.token),
@@ -150,6 +150,7 @@ def load_checkpoint_revision(
             "executes_action":False,
         }
     try:
+        import requests
         response=requests.get(
             _contents_url(config),
             headers=_headers(config.token),

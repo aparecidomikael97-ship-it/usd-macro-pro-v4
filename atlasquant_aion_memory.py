@@ -21,7 +21,6 @@ import os
 import re
 import unicodedata
 
-import requests
 
 from atlasquant_runtime_store import resolve_runtime_branch, require_runtime_branch
 from atlasquant_aion_operations import normalize_queue, queue_digest
@@ -1398,6 +1397,7 @@ def load_runtime_checkpoint(
             "checked_at": _now(),
         }
     try:
+        import requests
         response = requests.get(
             _contents_url(cfg),
             headers=_headers(cfg.token),
@@ -1700,6 +1700,7 @@ def save_runtime_checkpoint(
         body["sha"] = str(expected_sha).strip()
 
     try:
+        import requests
         response = requests.put(
             _contents_url(cfg),
             headers=_headers(cfg.token),
