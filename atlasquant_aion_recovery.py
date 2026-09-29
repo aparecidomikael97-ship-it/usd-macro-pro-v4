@@ -343,9 +343,19 @@ def restore_checkpoint_revision(
         timeout=timeout,
     )
     output=dict(result)
+    confirmed=bool(
+        result.get("status")=="CONFIRMED"
+        and result.get("saved") is True
+        and result.get("verified") is True
+    )
+    requested_revision=preflight.get("candidate_revision")
     output["schema"]=SCHEMA
     output["recovery_preflight"]=preflight
-    output["restored_revision"]=preflight.get("candidate_revision")
+    output["requested_revision"]=requested_revision
+    output["restored_revision"]=requested_revision if confirmed else ""
+    output["restore_confirmed"]=confirmed
+    output["reconciliation_required"]=bool(result.get("reconciliation_required"))
+    output["automatic_retry_allowed"]=False
     output["automatic_restore"]=False
     return output
 
