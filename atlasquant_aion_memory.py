@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
+from itertools import islice
 import base64
 import hashlib
 import json
@@ -2626,7 +2627,7 @@ def checkpoint_integrity_report(
             redemptions_raw = []
         redemptions = [
             dict(x)
-            for x in list(redemptions_raw)[:2000]
+            for x in islice(redemptions_raw, 2000)
             if isinstance(x, Mapping)
         ]
         add_check(
