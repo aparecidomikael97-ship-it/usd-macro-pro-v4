@@ -46,6 +46,10 @@ STEP_TRANSITIONS={
 }
 
 
+def _exact_true(value:Any)->bool:
+    return value is True
+
+
 class DurableTaskError(ValueError):
     """Compatible ValueError carrying a structured, non-secret failure result."""
     def __init__(self, code:str, task:Mapping[str,Any]|None=None):
@@ -67,7 +71,7 @@ def validate_transition(previous:str, target:str, *, step:bool=False,
         raise DurableTaskError("INVALID_TRANSITION")
     if previous=="BLOCKED" and target!="CANCELED" and not _clean(unblock_reason):
         raise DurableTaskError("UNBLOCK_REQUIRED")
-    if previous=="WAITING_APPROVAL" and target in {"READY","RUNNING"} and not approved:
+    if previous=="WAITING_APPROVAL" and target in {"READY","RUNNING"} and not _exact_true(approved):
         raise DurableTaskError("APPROVAL_REQUIRED")
     if previous=="FAILED" and not retry:
         raise DurableTaskError("RETRY_REQUIRED")
@@ -93,10 +97,11 @@ def _audit(item:dict[str,Any], event_type:str, previous:str, changed:str, **meta
 
 
 def _guard_step(step:Mapping[str,Any], access:Mapping[str,Any]|None, approved:bool)->None:
-    decision=guardian_decision(step["guardian_action"],access,approved=approved)
+    approved_exact=_exact_true(approved)
+    decision=guardian_decision(step["guardian_action"],access,approved=approved_exact)
     if not decision["allowed"]:
         raise DurableTaskError("GUARDIAN_DENIED")
-    if (step["requires_approval"] or step["external_side_effects"]) and not approved:
+    if (step["requires_approval"] or step["external_side_effects"]) and not approved_exact:
         raise DurableTaskError("APPROVAL_REQUIRED")
 
 
@@ -370,7 +375,7 @@ def update_step(
                 raise DurableTaskError("STEP_OUT_OF_ORDER",item)
             if item["state"]=="BLOCKED" and not _clean(unblock_reason):
                 raise DurableTaskError("UNBLOCK_REQUIRED",item)
-            if item["state"]=="WAITING_APPROVAL" and not approved:
+            if item["state"]=="WAITING_APPROVAL" and not _exact_true(approved):
                 raise DurableTaskError("APPROVAL_REQUIRED",item)
             if next_state in {"RUNNING","DONE"}:
                 _guard_step(step,access,approved)

@@ -2,12 +2,15 @@ from __future__ import annotations
 import unittest
 
 from atlasquant_aion_durable_tasks import (
+    DurableTaskError,
+    cancel_durable_task,
     durable_tasks_digest,
     durable_tasks_summary,
     new_durable_task,
     pause_durable_task,
     prepare_resume,
     record_resume,
+    retry_step,
     update_step,
 )
 
@@ -115,6 +118,65 @@ class AtlasQuantAionDurableTasksTests(unittest.TestCase):
         self.assertEqual(summary["tasks"],1)
         self.assertEqual(summary["resumable"],1)
         self.assertFalse(summary["automatic_resume_executes"])
+
+    def test_terminal_done_and_canceled_tasks_do_not_run_again(self):
+        done=self._task()
+        done=self._finish(done,"spec")
+        done=self._finish(done,"test")
+        done=self._finish(done,"merge")
+        with self.assertRaises(DurableTaskError) as done_error:
+            retry_step(done,"spec",idempotency_key="again")
+        self.assertEqual(done_error.exception.result["error_code"],"TASK_TERMINAL")
+        self.assertFalse(done_error.exception.result["executes_action"])
+
+        canceled=cancel_durable_task(self._task())
+        with self.assertRaises(DurableTaskError) as canceled_error:
+            update_step(canceled,"spec","RUNNING",access={"role":"ADMIN"},approved=True)
+        self.assertEqual(canceled_error.exception.result["error_code"],"TASK_TERMINAL")
+
+    def test_retry_is_idempotent_for_same_key_and_rejects_conflict(self):
+        task=self._task()
+        task=update_step(task,"spec","RUNNING",access={"role":"ADMIN"},approved=True)
+        task=update_step(task,"spec","FAILED",blocker="timeout")
+        first=retry_step(task,"spec",access={"role":"ADMIN"},approved=True,idempotency_key="spec-1")
+        self.assertEqual(first["steps"][0]["state"],"RUNNING")
+        self.assertEqual(first["steps"][0]["attempts"],2)
+        again=retry_step(first,"spec",access={"role":"ADMIN"},approved=True,idempotency_key="spec-1")
+        self.assertEqual(again["revision"],first["revision"])
+        self.assertEqual(again["steps"][0]["attempts"],2)
+        with self.assertRaises(DurableTaskError) as conflict:
+            retry_step(first,"spec",access={"role":"ADMIN"},approved=True,idempotency_key="spec-2")
+        self.assertEqual(conflict.exception.result["error_code"],"IDEMPOTENCY_CONFLICT")
+
+    def test_unsafe_or_exhausted_retry_fails_closed(self):
+        task=new_durable_task(
+            "Unsafe retry",
+            steps=[{"step_id":"write","title":"Write","guardian_action":"save_checkpoint","external_side_effects":True}],
+            created_at="2026-09-25T16:00:00+00:00",
+        )
+        task=update_step(task,"write","RUNNING",access={"role":"ADMIN"},approved=True)
+        task=update_step(task,"write","FAILED",blocker="provider down")
+        with self.assertRaises(DurableTaskError) as unsafe:
+            retry_step(task,"write",access={"role":"ADMIN"},approved=True,idempotency_key="write-1")
+        self.assertEqual(unsafe.exception.result["error_code"],"RETRY_UNSAFE")
+
+    def test_string_approval_cannot_release_waiting_step(self):
+        task=self._finish(self._finish(self._task(),"spec"),"test")
+        task=update_step(task,"merge","WAITING_APPROVAL",blocker="Aprovação necessária.")
+        for flag in ("yes","true",1):
+            with self.subTest(flag=flag):
+                with self.assertRaises(DurableTaskError) as blocked:
+                    update_step(task,"merge","RUNNING",access={"role":"ADMIN"},approved=flag)
+                self.assertEqual(blocked.exception.result["error_code"],"APPROVAL_REQUIRED")
+
+    def test_out_of_order_and_stale_revision_fail_closed(self):
+        task=self._task()
+        with self.assertRaises(DurableTaskError) as order:
+            update_step(task,"test","RUNNING",access={"role":"ADMIN"},approved=True)
+        self.assertEqual(order.exception.result["error_code"],"STEP_OUT_OF_ORDER")
+        with self.assertRaises(DurableTaskError) as stale:
+            update_step(task,"spec","RUNNING",access={"role":"ADMIN"},approved=True,expected_revision=99)
+        self.assertEqual(stale.exception.result["error_code"],"REVISION_CONFLICT")
 
 
 if __name__=="__main__":
