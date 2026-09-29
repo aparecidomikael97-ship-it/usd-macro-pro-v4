@@ -414,6 +414,7 @@ class GlobalWorkerActivationReadinessTests(unittest.TestCase):
         self.assertIn("actions: read", source)
         self.assertNotIn("contents: write", source)
         self.assertIn("GLOBAL_WORKER_FLAG_STATE", source)
+        self.assertIn("name: AION global worker readiness", source)
         self.assertIn(
             "python atlasquant_aion_global_worker_readiness.py --check-runtime",
             source,
