@@ -20,6 +20,7 @@ PURE CORE, allowlist testada:
 - `atlasquant_aion_observability`
 - `atlasquant_aion_evaluation_lab`
 - `atlasquant_aion_model_router`
+- `atlasquant_aion_model_registry`
 
 O fecho de import desses módulos não inclui Trader, Radar, Investimentos, Negócios, Streamlit nem `requests`. O teste importa a allowlist num processo com esses módulos bloqueados e sem variáveis de segredo.
 
