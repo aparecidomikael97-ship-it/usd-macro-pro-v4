@@ -53,6 +53,7 @@ class AionNightValidationTests(unittest.TestCase):
         self.assertIn("test_atlasquant_aion_global_worker_recovery_closure", adversarial)
         self.assertIn("test_atlasquant_aion_global_worker_incident_reconciliation", adversarial)
         self.assertIn("test_atlasquant_aion_global_worker_inflight_reconciliation", adversarial)
+        self.assertIn("test_atlasquant_aion_global_worker_inflight_resolution", adversarial)
 
     def test_report_fails_closed_if_any_step_is_not_pass(self):
         report = night.build_report(
