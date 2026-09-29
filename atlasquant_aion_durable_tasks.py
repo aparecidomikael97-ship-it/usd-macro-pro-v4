@@ -9,6 +9,7 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import datetime, timezone
 from hashlib import sha256
+from itertools import islice
 from typing import Any, Mapping, Sequence
 import json
 
@@ -117,7 +118,7 @@ def _clean(value:Any,limit:int=1400)->str:
 
 def _refs(values:Sequence[Any]|None,limit:int=50)->list[str]:
     out=[]
-    for raw in list(values or [])[:limit*2]:
+    for raw in islice(values or (), max(0, limit*2)):
         text=_clean(raw,240)
         if text and text not in out:
             out.append(text)
@@ -156,9 +157,9 @@ def _consumed_keys(raw:Mapping[str,Any])->list[str]:
     rows=raw.get("consumed_idempotency_keys")
     out=[]
     if isinstance(rows,(list,tuple)):
-        source=list(rows)[:MAX_IDEMPOTENCY_KEYS]
+        source=islice(rows, MAX_IDEMPOTENCY_KEYS)
     else:
-        source=[]
+        source=()
     for item in source:
         text=" ".join(str(item or "").replace("\x00","").split())
         if text and len(text)<=MAX_IDEMPOTENCY_KEY_LENGTH and text not in out:
@@ -212,7 +213,7 @@ def normalize_step(raw:Mapping[str,Any],index:int)->dict[str,Any]:
 def normalize_steps(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for index,raw in enumerate(list(rows or [])[:MAX_STEPS]):
+    for index,raw in enumerate(islice(rows or (), MAX_STEPS)):
         if not isinstance(raw,Mapping):
             continue
         item=normalize_step(raw,index)
@@ -320,7 +321,12 @@ def normalize_durable_task(raw:Mapping[str,Any])->dict[str,Any]:
 def normalize_durable_tasks(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for raw in list(rows or [])[-MAX_TASKS*2:]:
+    source = (
+        rows[-MAX_TASKS*2:]
+        if isinstance(rows, (list, tuple))
+        else tuple(islice(rows or (), MAX_TASKS*2))
+    )
+    for raw in source:
         if not isinstance(raw,Mapping):
             continue
         try:
