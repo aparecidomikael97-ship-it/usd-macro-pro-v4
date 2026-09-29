@@ -12,15 +12,13 @@
   },
   "integrate": [
     {
-      "pr": 338,
-      "branch": "chatgpt/aion-global-worker-write-reconciliation-v1",
-      "role": "global_worker_write_reconciliation"
-    },
-    {
-      "pr": 342,
-      "branch": "chatgpt/aion-global-fencing-release-hardening-v1",
-      "role": "global_worker_fencing_release_hardening",
-      "depends_on_pr": 338
+      "pr": 343,
+      "branch": "chatgpt/aion-global-inflight-idempotency-v1",
+      "role": "global_worker_reconciliation_fencing_and_inflight_idempotency",
+      "contains_prs": [
+        338,
+        342
+      ]
     },
     {
       "pr": 339,
@@ -66,9 +64,7 @@
     ]
   },
   "next_hardening_order": [
-    "global_worker_concurrency_and_fencing",
     "operational_recovery_and_ambiguous_persistence",
-    "lease_receipt_retry_idempotency",
     "partial_checkpoint_write_reconciliation",
     "resource_bounds",
     "tenant_workspace_cache_isolation",
