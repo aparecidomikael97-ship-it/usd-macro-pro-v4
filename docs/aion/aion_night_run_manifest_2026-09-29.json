@@ -76,8 +76,10 @@
     "report": "aion-night-validation-report.json"
   },
   "next_hardening_order": [
+    "no_code_change_while_candidate_frozen",
+    "revalidate_if_base_or_head_changes",
     "human_decision_ruleset_required_checks",
-    "no_additional_core_changes_without_new_evidence_or_regression"
+    "shared_coordination_only_if_real_multi_instance_requirement_appears"
   ],
   "stop_conditions": [
     "human_authorization_required",
@@ -316,5 +318,15 @@
     "runtime_armed_real": false,
     "live_worker_started": false,
     "approval_required": true
+  },
+  "deferred_capabilities": {
+    "shared_coordination": {
+      "source_pr": 286,
+      "state": "DEFERRED_FUTURE_CAPABILITY",
+      "blocker_for_current_candidate": false,
+      "auto_integrate": false,
+      "requires_fresh_branch_from_current_tip": true,
+      "audit_doc": "docs/aion/AION_SHARED_COORDINATION_DEFERRED_AUDIT_2026-09-29.md"
+    }
   }
 }
