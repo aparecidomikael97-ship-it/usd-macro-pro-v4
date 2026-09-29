@@ -8,6 +8,10 @@ O operador deve conseguir iniciar o trabalho no Cursor uma vez e deixar a frente
 
 ## Prioridade absoluta
 
+Matriz reconciliada dos achados RT01–RT20:
+`docs/aion/AION_CORE_REDTEAM_CLOSURE_MATRIX_2026-09-29.md`
+
+
 1. AION
 2. Núcleo
 3. Segurança, verdade, memória/checkpoint, recovery, workers e autonomia controlada
@@ -95,6 +99,7 @@ Frentes irmãs preparadas sobre a #337:
   - Absorve a #357: resource bounds adicionais em Studio, Promoções, Entitlements, Session Memory e Memory.
   - Adiciona adversarial hardening de Recovery para SHA curto, content não-string e encoding histórico divergente.
   - Post-359 adversarial resource sweep: Business, Tenant Memory, Promotions integrity, Live Event Journal, Wisdom, Digital Twin, Dev Fusion, Release Confidence, Evaluation Lab, Tool Hub e Model Registry.
+  - Critical Review agora também usa closed message schema, limites explícitos de reviews/refs e fail-closed para campos desconhecidos.
   - Mantém fail-closed, no automatic retry, restore confirmado somente com save+verify CONFIRMED.
 
 Todas devem permanecer Draft até validação integral.
