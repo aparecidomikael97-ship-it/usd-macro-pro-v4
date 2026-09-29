@@ -34,6 +34,10 @@ from atlasquant_aion_business import (
     normalize_business_metrics,
     business_metrics_digest,
 )
+from atlasquant_aion_business_brain import (
+    normalize_opportunities,
+    business_brain_digest,
+)
 from atlasquant_aion_promotions import normalize_campaigns, promotion_digest
 from atlasquant_aion_entitlements import normalize_entitlements, entitlement_digest
 from atlasquant_aion_continuity import (
@@ -459,6 +463,8 @@ def default_checkpoint() -> dict[str, Any]:
             "products": [],
             "metrics": normalize_business_metrics({}),
             "metrics_digest": business_metrics_digest({}),
+            "opportunities": [],
+            "opportunities_digest": business_brain_digest([]),
             "digest": business_digest([]),
         },
         "promotions": {
@@ -586,10 +592,15 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
     business_metrics = normalize_business_metrics(
         business.get("metrics") if isinstance(business, Mapping) else {}
     )
+    business_opportunities = normalize_opportunities(
+        business.get("opportunities") if isinstance(business, Mapping) else []
+    )
     payload["business"] = {
         "products": business_products,
         "metrics": business_metrics,
         "metrics_digest": business_metrics_digest(business_metrics),
+        "opportunities": business_opportunities,
+        "opportunities_digest": business_brain_digest(business_opportunities),
         "digest": business_digest(business_products),
     }
 
@@ -864,6 +875,7 @@ def update_business_checkpoint(
     *,
     products: Any = None,
     metrics: Mapping[str, Any] | None = None,
+    opportunities: Any = None,
     dirty: bool = True,
 ) -> dict[str, Any]:
     payload = ensure_operating_checkpoint(checkpoint)
@@ -874,10 +886,15 @@ def update_business_checkpoint(
     normalized_metrics = normalize_business_metrics(
         current.get("metrics", {}) if metrics is None else metrics
     )
+    normalized_opportunities = normalize_opportunities(
+        current.get("opportunities", []) if opportunities is None else opportunities
+    )
     payload["business"] = {
         "products": rows,
         "metrics": normalized_metrics,
         "metrics_digest": business_metrics_digest(normalized_metrics),
+        "opportunities": normalized_opportunities,
+        "opportunities_digest": business_brain_digest(normalized_opportunities),
         "digest": business_digest(rows),
     }
     payload["operating"]["dirty"] = bool(dirty)
@@ -2071,6 +2088,15 @@ def checkpoint_integrity_report(
             "business.metrics",
             business.get("metrics_digest"),
             business_metrics_digest(metrics),
+        )
+    if business.get("opportunities") is not None or business.get("opportunities_digest"):
+        opportunities = normalize_opportunities(
+            business.get("opportunities") if isinstance(business, Mapping) else []
+        )
+        add_check(
+            "business.opportunities",
+            business.get("opportunities_digest"),
+            business_brain_digest(opportunities),
         )
 
     promotions = raw.get("promotions") if isinstance(raw.get("promotions"), Mapping) else {}
