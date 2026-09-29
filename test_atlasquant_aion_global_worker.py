@@ -297,8 +297,10 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
                 now=TICK + timedelta(seconds=30),
             )
         persist.assert_not_called()
-        self.assertEqual(result["status"], "LEASE_HELD")
-        self.assertEqual(result["lease"]["owner"], "gha-a")
+        self.assertEqual(result["status"], "INFLIGHT_RECONCILIATION_REQUIRED")
+        self.assertEqual(result["inflight_owner"], "gha-a")
+        self.assertTrue(result["reconciliation_required"])
+        self.assertFalse(result["automatic_retry_allowed"])
         self.assertEqual(result["processed"], 0)
 
     def test_release_requires_same_owner_token_and_fencing_token(self):
