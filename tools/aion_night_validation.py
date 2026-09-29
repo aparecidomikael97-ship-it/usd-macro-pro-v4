@@ -59,6 +59,7 @@ def build_steps(*, full: bool = True) -> list[Step]:
                 "test_atlasquant_aion_global_worker_supervision",
                 "test_atlasquant_aion_global_worker_recovery_closure",
                 "test_atlasquant_aion_global_worker_incident_reconciliation",
+                "test_atlasquant_aion_global_worker_inflight_reconciliation",
             ),
             2400,
         ),
