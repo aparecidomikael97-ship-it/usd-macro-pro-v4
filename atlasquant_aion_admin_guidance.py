@@ -14,7 +14,7 @@ from typing import Any, Mapping
 
 from atlasquant_access_control import normalize_role
 from atlasquant_aion_admin_copilot import build_admin_copilot
-from atlasquant_aion_onboarding import assess_onboarding
+from atlasquant_aion_onboarding import assess_onboarding, complete_onboarding_step
 
 
 SCHEMA = "ATLASQUANT_AION_ADMIN_GUIDANCE_V1"
@@ -96,6 +96,33 @@ def build_admin_onboarding_snapshot(
     return assess_onboarding(payload, progress, now=now)
 
 
+def complete_admin_onboarding_step(
+    access: Mapping[str, Any] | None,
+    progress: Mapping[str, Any] | None,
+    step_id: Any,
+    *,
+    experience_mode: Any,
+    started_at: Any,
+    feature_flags: Mapping[str, Any] | None = None,
+    system_context: Mapping[str, Any] | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Advance one explicit session-local step; no persistence is performed here."""
+    payload = build_admin_onboarding_payload(
+        access,
+        experience_mode=experience_mode,
+        started_at=started_at,
+        feature_flags=feature_flags,
+        system_context=system_context,
+    )
+    return complete_onboarding_step(
+        payload,
+        progress,
+        step_id,
+        now=now,
+    )
+
+
 def build_admin_copilot_snapshot(
     *,
     status_board: Mapping[str, Any] | None = None,
@@ -137,5 +164,6 @@ __all__ = [
     "admin_subject_ref",
     "build_admin_onboarding_payload",
     "build_admin_onboarding_snapshot",
+    "complete_admin_onboarding_step",
     "build_admin_copilot_snapshot",
 ]
