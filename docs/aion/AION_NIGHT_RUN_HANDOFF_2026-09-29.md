@@ -28,6 +28,9 @@ Matriz reconciliada dos achados RT01–RT20:
 Proposta administrativa read-only de required checks:
 `docs/aion/AION_REQUIRED_CHECKS_PROPOSAL_2026-09-29.md`
 
+Pacote read-only da cerimônia de ativação do Global Worker:
+`docs/aion/AION_GLOBAL_WORKER_ACTIVATION_DRY_RUN_2026-09-29.md`
+
 
 1. AION
 2. Núcleo
