@@ -26,6 +26,7 @@ def coordination_activation_gate(
     mode: Any = CURRENT_MODE,
     *,
     coordination_readiness: Mapping[str, Any] | None = None,
+    operational_verification: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     requested = _clean(mode, 80).upper()
     report = dict(coordination_readiness or {})
@@ -69,29 +70,43 @@ def coordination_activation_gate(
         and report.get("probe_evidence_accepted") is True
         and report.get("probe_receipt_structurally_valid") is True
     )
+    operational = dict(operational_verification or {})
+    adapter_digest = _clean(report.get("adapter_identity_digest"), 128)
+    operational_matches = (
+        operational.get("state") == "VERIFIED"
+        and operational.get("multi_instance_verified") is True
+        and _clean(operational.get("adapter_identity_digest"), 128) == adapter_digest
+        and adapter_digest
+    )
+
     if not report:
         reason = "COORDINATION_ADAPTER_EVIDENCE_REQUIRED"
     elif not structural:
         reason = "COORDINATION_STRUCTURAL_EVIDENCE_REQUIRED"
-    else:
+    elif not operational:
         reason = "COORDINATION_OPERATIONAL_VERIFICATION_REQUIRED"
+    elif not operational_matches:
+        reason = "COORDINATION_OPERATIONAL_VERIFICATION_INVALID"
+    else:
+        reason = "MULTI_INSTANCE_RUNTIME_INTEGRATION_REQUIRED"
 
     return {
         "schema": SCHEMA,
-        "state": "BLOCK",
+        "state": "VERIFIED_NOT_ACTIVATABLE" if operational_matches else "BLOCK",
         "reason": reason,
         "mode": MULTI_INSTANCE_MODE,
         "adapter_id": _clean(report.get("adapter_id"), 80),
-        "adapter_identity_digest": _clean(
-            report.get("adapter_identity_digest"),
-            128,
-        ),
+        "adapter_identity_digest": adapter_digest,
         "structural_evidence_present": structural,
-        "operational_verification": _clean(
-            report.get("operational_verification"),
-            40,
-        ) or "UNKNOWN",
-        "multi_instance_verified": False,
+        "operational_verification": (
+            "VERIFIED"
+            if operational_matches
+            else _clean(operational.get("operational_verification"), 40)
+            or _clean(report.get("operational_verification"), 40)
+            or "UNKNOWN"
+        ),
+        "multi_instance_verified": bool(operational_matches),
+        "runtime_integration_ready": False,
         "allows_activation_plan": False,
         "executes_action": False,
         "changes_worker": False,
