@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from hashlib import sha256
 from typing import Any, Mapping
+from itertools import islice
 import json
 import math
 import unicodedata
@@ -75,7 +76,7 @@ def _optional_number(value: Any) -> float | None:
 
 def _texts(values: Any, limit: int = 12) -> list[str]:
     out = []
-    for item in list(values or [])[:limit]:
+    for item in islice(values or (),max(0,limit)):
         text = _clean(item, 180)
         if text and text not in out:
             out.append(text)
@@ -315,7 +316,7 @@ def _same_model(row: Mapping[str, Any], decision: Mapping[str, Any]) -> bool:
 def admit_model(registry: Mapping[str, Any] | None, candidate: Mapping[str, Any] | None, **kwargs: Any) -> dict[str, Any]:
     current = empty_registry()
     raw_rows = registry.get("models") if isinstance(registry, Mapping) else None
-    rows = [dict(item) for item in list(raw_rows or []) if isinstance(item, Mapping)]
+    rows = [dict(item) for item in islice(raw_rows or (),MAX_MODELS) if isinstance(item, Mapping)]
     decision = assess_model_promotion(candidate, **kwargs)
     if not decision["persisted"]:
         current["models"] = rows[:MAX_MODELS]
@@ -352,7 +353,7 @@ def read_model(
     tenant = _clean(trusted.get("tenant_id"), 80)
     workspace = _clean(trusted.get("workspace_id"), 80)
     rows = registry.get("models") if isinstance(registry, Mapping) else None
-    for row in list(rows or []):
+    for row in islice(rows or (),MAX_MODELS):
         if not isinstance(row, Mapping):
             continue
         if (
