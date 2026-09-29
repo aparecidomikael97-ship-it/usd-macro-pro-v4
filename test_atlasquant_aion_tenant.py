@@ -148,9 +148,8 @@ class AtlasQuantAionTenantReadinessTests(unittest.TestCase):
             def __getitem__(self,key):
                 return "v"
 
-        class GuardedList(list):
-            def __init__(self,limit,total, factory):
-                super().__init__()
+        class GuardedSequence:
+            def __init__(self,limit,total,factory):
                 self.limit=limit
                 self.total=total
                 self.factory=factory
@@ -169,8 +168,8 @@ class AtlasQuantAionTenantReadinessTests(unittest.TestCase):
         seed=tenant_memory_seed(self.user)
         prefs=GuardedMapping(51,50)
         academy=GuardedMapping(201,200)
-        notes=GuardedList(200,201,lambda i:{"text":f"note {i}"})
-        watchlist=GuardedList(100,101,lambda i:f"SYM{i}")
+        notes=GuardedSequence(200,201,lambda i:{"text":f"note {i}"})
+        watchlist=GuardedSequence(100,101,lambda i:f"SYM{i}")
         ns_memory={
             "tenant_id":seed["tenant_id"],
             "profile":{"preferences":prefs},
