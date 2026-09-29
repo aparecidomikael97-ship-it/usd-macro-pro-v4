@@ -850,6 +850,25 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertEqual(report["state"],"MISMATCH")
         self.assertIn("business.metrics",report["mismatches"])
 
+    def test_promotions_integrity_does_not_overconsume_redemptions(self):
+        class GuardedList(list):
+            def __init__(self):
+                super().__init__()
+                self.reads=0
+            def __iter__(self):
+                for index in range(2001):
+                    if self.reads>=2000:
+                        raise AssertionError("redemptions consumed past bound")
+                    self.reads+=1
+                    yield {"redemption_id":f"R-{index}"}
+
+        cp=default_checkpoint()
+        guarded=GuardedList()
+        cp["promotions"]["redemptions"]=guarded
+        report=checkpoint_integrity_report(cp)
+        self.assertIn(report["state"],{"MISMATCH","CONFIRMED","MIGRATION_REQUIRED"})
+        self.assertEqual(guarded.reads,2000)
+
     def test_promotions_update_marks_checkpoint_dirty_without_plaintext_code(self):
         cp=default_checkpoint()
         changed=update_promotions_checkpoint(
