@@ -29,3 +29,33 @@ Lifecycle:
 governance layer. This module does not perform those transitions.
 
 CERTIFIED never means auto-execute.
+
+
+## Tool Hub bridge
+
+`atlasquant_aion_skill_tool_bridge.py` connects certification to the existing
+Tool Hub preflight without turning certification into authority.
+
+A skill may reach `plan_tool_call` only when:
+
+- the manifest state is exactly `CERTIFIED`;
+- the requested tool is declared by that exact certified manifest;
+- the tool belongs to one of the manifest workspaces;
+- connector-backed tools declare `network_required=true`;
+- capability/tool/scope/risk checks already passed certification.
+
+After that, Tool Hub still independently checks source authority, authenticated
+admin posture, Guardian, connector readiness, scope, tests, rollback,
+uncertainty, impact and side effects.
+
+A CERTIFIED skill therefore still cannot:
+
+- issue commands merely because it is certified;
+- activate a connector;
+- execute a tool;
+- widen permissions;
+- create entitlements;
+- enable billing, publication, deployment or real trading.
+
+External AI/tool output remains content, not authority, even when the manifest
+itself is certified.
