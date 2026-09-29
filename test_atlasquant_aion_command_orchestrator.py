@@ -397,5 +397,64 @@ class ExecutionTests(unittest.TestCase):
         self.assertFalse(result["real_orders_enabled"])
 
 
+    def test_string_false_execute_does_not_invoke_executor(self):
+        spy = Mock()
+        original = command.execute_local_tool
+        command.execute_local_tool = spy
+        try:
+            out = orchestrate_local_command("resumo de tarefas", execute="false")
+        finally:
+            command.execute_local_tool = original
+        self.assertEqual(out["state"], "PLANNED")
+        self.assertFalse(out["execution_requested"])
+        self.assertFalse(out["executor_invoked"])
+        spy.assert_not_called()
+
+    def test_string_false_authenticated_admin_is_not_forwarded_as_true(self):
+        spy = Mock(return_value={
+            "state": "BLOCKED",
+            "tool_id": "aion.tasks.summary",
+            "workspace_id": "administration",
+            "kind": "READ",
+            "contract_fingerprint": local_contract_fingerprint(),
+            "request_id": "exact-bool-admin",
+            "result": None,
+            "truth": {"status": "UNKNOWN", "freshness": "UNVERIFIED"},
+            "preflight": {"state": "BLOCK", "blockers": ["ADMIN_REQUIRED"]},
+            "provenance": {
+                "source_module": "atlasquant_aion_local_executor",
+                "source_function": "_test",
+                "input_scope": "local",
+                "local_only": True,
+            },
+            "security": {
+                "network_called": False,
+                "connector_called": False,
+                "external_side_effects": False,
+                "permissions_expanded": False,
+                "secrets_included": False,
+            },
+            "executes_action": False,
+            "external_action_executed": False,
+            "real_orders_enabled": False,
+            "tool_output_is_authority": False,
+        })
+        original = command.execute_local_tool
+        command.execute_local_tool = spy
+        try:
+            out = orchestrate_local_command(
+                "resumo de tarefas",
+                execute=True,
+                runtime_context={"checkpoint": default_checkpoint()},
+                access=ADMIN,
+                authenticated_admin="false",
+            )
+        finally:
+            command.execute_local_tool = original
+        self.assertTrue(out["executor_invoked"])
+        self.assertFalse(spy.call_args.kwargs["authenticated_admin"])
+
+
+
 if __name__ == "__main__":
     unittest.main()
