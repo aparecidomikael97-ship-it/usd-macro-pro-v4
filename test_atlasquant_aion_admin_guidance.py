@@ -6,6 +6,7 @@ from atlasquant_aion_admin_guidance import (
     build_admin_copilot_snapshot,
     build_admin_onboarding_payload,
     build_admin_onboarding_snapshot,
+    complete_admin_onboarding_step,
 )
 
 
@@ -86,6 +87,21 @@ class AionAdminGuidanceTests(unittest.TestCase):
         self.assertFalse(snapshot["executes_action"])
         self.assertFalse(snapshot["feature_flag_changed"])
         self.assertFalse(snapshot["runtime_written"])
+
+    def test_explicit_session_step_can_advance_without_runtime_side_effects(self):
+        report = complete_admin_onboarding_step(
+            self.access(),
+            None,
+            "role_confirmed",
+            experience_mode="ADVANCED",
+            started_at=STARTED,
+            feature_flags={"real_broker_execution": False},
+            now=NOW,
+        )
+        self.assertIn("role_confirmed", report["completed_step_ids"])
+        self.assertFalse(report["executes_action"])
+        self.assertFalse(report["runtime_written"])
+        self.assertFalse(report["real_trading_enabled"])
 
     def test_copilot_reuses_status_health_and_cost_evidence(self):
         copilot = build_admin_copilot_snapshot(
