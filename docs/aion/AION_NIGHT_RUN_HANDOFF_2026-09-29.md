@@ -68,6 +68,7 @@ Frentes irmãs preparadas sobre a #337:
   - Contém toda a cadeia anterior até #349.
   - Tenant Store exige `approved is True` e rejeita memória de tenant estrangeiro mesmo com aprovação exata.
   - O store permanece planning-only, sem network/write automático.
+- #351 — supersedida pela #352; NÃO integrar no turno noturno.
 - #352 — `chatgpt/aion-supply-chain-residual-hardening-v1`
   - Empilhada sobre #350 e é a ponta preferida atual do AION/Núcleo.
   - Contém toda a cadeia anterior até #350.
@@ -83,6 +84,11 @@ Frentes irmãs preparadas sobre a #337:
   - Mantém multi_instance_safe=false.
 - #340 — `chatgpt/aion-recovery-outcome-hardening-v1`
   - Recovery só declara restored_revision quando save+verify foram realmente confirmados.
+- #353 — `chatgpt/aion-recovery-revision-binding-v1`
+  - Empilhada sobre #340 e é a ponta preferida da cadeia Recovery.
+  - Contém a verdade de outcome da #340.
+  - Relê o revision histórico antes do writer, compara digest e usa somente os bytes revalidados.
+  - Base64/JSON históricos têm parse estrito; duplicate keys bloqueiam.
 
 Todas devem permanecer Draft até validação integral.
 
@@ -275,3 +281,5 @@ Copie somente o bloco abaixo:
 - RT04 review binding já coberto na ponta atual: tenant/workspace/task/plan divergentes bloqueiam com regressão específica.
 - Session Memory / Specialist Session são projeções por chamada e não mantêm cache global mutável de memória pessoal.
 - Tenant Store usa path credential-bound por tenant; a fronteira de aprovação textual foi endurecida na #350.
+- RT20 residual está consolidado na #352; a #351 foi supersedida e não deve ser integrada.
+- Recovery revision binding/strict historical parse está na #353; ela substitui a #340 no turno noturno.
