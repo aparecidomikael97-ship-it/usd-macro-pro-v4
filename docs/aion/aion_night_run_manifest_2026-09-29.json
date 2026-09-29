@@ -145,9 +145,11 @@
       "pr": 358,
       "branch": "chatgpt/atlasquant-cockpit-shell-v1",
       "role": "isolated_cockpit_ui_track",
-      "may_advance": true,
+      "may_advance": false,
       "may_touch_core_authority": false,
-      "production_wiring_allowed": false
+      "production_wiring_allowed": false,
+      "paused_by_user": true,
+      "resume_requires_explicit_user_request": true
     }
   ],
   "pending_human_decisions": {
@@ -157,5 +159,7 @@
       "branch_protection_read": "FORBIDDEN_BY_INTEGRATION",
       "requires_explicit_admin_approval": true
     }
-  }
+  },
+  "interface_state": "PAUSED_BY_USER",
+  "plugin_work_state": "DO_NOT_CREATE_UNTIL_EXPLICIT_USER_REQUEST"
 }
