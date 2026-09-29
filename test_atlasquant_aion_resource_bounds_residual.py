@@ -145,11 +145,11 @@ class AionResidualResourceBoundsTests(unittest.TestCase):
     def test_cross_core_prefix_helpers_stop_without_materializing_sources(self):
         refs=GuardedIterable((f"ref-{i}" for i in range(20)),max_reads=6)
         self.assertEqual(digital_twin._refs(refs,limit=3),["ref-0","ref-1","ref-2"])
-        self.assertEqual(refs.reads,6)
+        self.assertEqual(refs.reads,3)
 
         fusion_refs=GuardedIterable((f"e-{i}" for i in range(20)),max_reads=6)
         self.assertEqual(dev_fusion._refs(fusion_refs,limit=3),["e-0","e-1","e-2"])
-        self.assertEqual(fusion_refs.reads,6)
+        self.assertEqual(fusion_refs.reads,3)
 
         evidence=GuardedIterable((f"e-{i}" for i in range(81)),max_reads=80)
         row=release_confidence.evidence_dimension(
