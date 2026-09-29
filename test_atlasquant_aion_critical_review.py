@@ -33,6 +33,10 @@ class AtlasQuantAionCriticalReviewTests(unittest.TestCase):
             "agent_id": self.assignments()[role],
             "verdict": verdict,
             "evidence_refs": ["evidence-1"],
+            "tenant_id": "tenant-a",
+            "workspace_id": "central",
+            "task_ref": "task-1",
+            "plan_version": "1",
         }
         row.update(extra)
         return row
@@ -53,6 +57,8 @@ class AtlasQuantAionCriticalReviewTests(unittest.TestCase):
             "approval_refs": ["approval-1"],
             "evidence_verifier": _verify,
             "approval_verifier": _verify,
+            "task_ref": "task-1",
+            "plan_version": "1",
         }
         payload.update(extra)
         return payload
@@ -180,6 +186,67 @@ class AtlasQuantAionCriticalReviewTests(unittest.TestCase):
         ))
         self.assertEqual(out["state"], "BLOCK")
         self.assertIn("SPOOFED_ROLE:SENTINEL", out["blockers"])
+
+    def test_same_principal_cannot_fill_independent_roles(self):
+        shared = {role: "one-agent" for role in self.assignments()}
+        reviews = [
+            self.review(role, agent_id="one-agent")
+            for role in ("PRIME", "SHADOW", "SENTINEL")
+        ]
+        critical = adjudicate_critical_task(**self.base_kwargs(
+            trusted_assignments=shared,
+            reviews=reviews,
+        ))
+        self.assertEqual(critical["state"], "BLOCK")
+        self.assertIn("REVIEWER_INDEPENDENCE", critical["blockers"])
+        important = adjudicate_critical_task(**self.base_kwargs(
+            task_class="IMPORTANT",
+            trusted_assignments=shared,
+            reviews=reviews[:2],
+            sensitive=False,
+            approval_refs=[],
+        ))
+        self.assertEqual(important["state"], "BLOCK")
+        self.assertIn("REVIEWER_INDEPENDENCE", important["blockers"])
+
+    def test_foreign_review_scope_is_not_relabelled(self):
+        foreign = [
+            self.review(role, tenant_id="tenant-b", workspace_id="trader-b")
+            for role in ("PRIME", "SHADOW", "SENTINEL")
+        ]
+        out = adjudicate_critical_task(**self.base_kwargs(reviews=foreign))
+        self.assertEqual(out["state"], "BLOCK")
+        self.assertTrue(any(item.startswith("REVIEW_SCOPE:") for item in out["blockers"]))
+        self.assertFalse(out["eligible_for_guardian"])
+        wrong_task = adjudicate_critical_task(**self.base_kwargs(
+            reviews=[self.review(role, task_ref="other-task") for role in ("PRIME", "SHADOW", "SENTINEL")],
+        ))
+        self.assertTrue(any(item.startswith("REVIEW_TASK:") for item in wrong_task["blockers"]))
+        wrong_plan = adjudicate_critical_task(**self.base_kwargs(
+            reviews=[self.review(role, plan_version="9") for role in ("PRIME", "SHADOW", "SENTINEL")],
+        ))
+        self.assertTrue(any(item.startswith("REVIEW_PLAN:") for item in wrong_plan["blockers"]))
+        missing = adjudicate_critical_task(**self.base_kwargs(
+            reviews=[{
+                "role": "PRIME",
+                "agent_id": "prime-1",
+                "verdict": "AGREE",
+            }],
+            task_class="IMPORTANT",
+            sensitive=False,
+            approval_refs=[],
+        ))
+        self.assertEqual(missing["state"], "BLOCK")
+        self.assertTrue(any(item.startswith("REVIEW_SCOPE:") for item in missing["blockers"]))
+
+    def test_ambiguous_sensitive_type_blocks(self):
+        for value in ("true", "false", 1, 0, None, "yes"):
+            out = adjudicate_critical_task(**self.base_kwargs(
+                sensitive=value,
+                approval_refs=[],
+            ))
+            self.assertEqual(out["state"], "BLOCK", value)
+            self.assertIn("SENSITIVE_TYPE_INVALID", out["blockers"])
 
     def test_sensitive_plan_without_approval_is_blocked(self):
         out = adjudicate_critical_task(**self.base_kwargs(approval_refs=[]))
@@ -576,6 +643,57 @@ class AtlasQuantAionCriticalReviewTests(unittest.TestCase):
                 self.assertEqual(out["authorization"], "NONE")
                 self.assertEqual(out["truth_state"], "UNKNOWN")
                 self.assertFalse(out["executes_action"])
+
+    def test_unknown_version_empty_nonce_and_secrets_block(self):
+        sealed = seal_agent_message(self.message_body(), trusted_context=self.context())
+        unknown = self._retarget(sealed["message"], version="999", nonce="")
+        out = validate_agent_message(
+            unknown,
+            trusted_context=self.context(),
+            expected_workspace_id="central",
+            expected_tenant_id="tenant-a",
+            now=NOW,
+            evidence_verifier=_verify,
+        )
+        self.assertEqual(out["state"], "BLOCK")
+        self.assertIn("VERSION_UNSUPPORTED", out["blockers"])
+        self.assertIn("NONCE_MISSING", out["blockers"])
+        alien = dict(sealed["message"])
+        alien["schema"] = "OTHER_SCHEMA"
+        alien["authorization"] = "ADMIN"
+        schema = validate_agent_message(
+            alien,
+            trusted_context=self.context(),
+            expected_workspace_id="central",
+            expected_tenant_id="tenant-a",
+            now=NOW,
+            evidence_verifier=_verify,
+        )
+        self.assertIn("SCHEMA_UNSUPPORTED", schema["blockers"])
+        self.assertEqual(schema["authorization"], "NONE")
+        secret = "local-test-secret-value"
+        sealed_secret = seal_agent_message(
+            self.message_body(
+                content="token=" + secret,
+                evidence_refs=["api_key=" + secret],
+            ),
+            trusted_context=self.context(),
+        )
+        rendered = str(sealed_secret)
+        self.assertNotIn(secret, rendered)
+        self.assertIn("SECRET_DETECTED", sealed_secret["blockers"])
+        self.assertEqual(sealed_secret["state"], "BLOCKED")
+        smuggled = self._retarget(sealed["message"], content="password=" + secret)
+        checked = validate_agent_message(
+            smuggled,
+            trusted_context=self.context(),
+            expected_workspace_id="central",
+            expected_tenant_id="tenant-a",
+            now=NOW,
+            evidence_verifier=_verify,
+        )
+        self.assertIn("SECRET_PRESENT", checked["blockers"])
+        self.assertNotIn(secret, str(checked))
 
 
 if __name__ == "__main__":

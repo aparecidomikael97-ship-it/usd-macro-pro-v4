@@ -15,6 +15,8 @@ from typing import Any, Callable, Mapping, Sequence
 import json
 import unicodedata
 
+from atlasquant_aion_observability import redact_text
+
 SCHEMA = "ATLASQUANT_AION_CRITICAL_REVIEW_V1"
 PROTOCOL_VERSION = "1"
 ROLES = ("PRIME", "SHADOW", "SENTINEL")
@@ -120,6 +122,12 @@ _AUTHORITY_PHRASES = (
     "ignore the guardian",
     "ignore previous instructions",
 )
+
+
+def _secret_text(value: Any, limit: int) -> tuple[str, bool]:
+    text = _clean(value, limit)
+    redacted = _clean(redact_text(text), limit)
+    return redacted, redacted != text
 
 
 def _content_claims_authority(value: Any) -> bool:
@@ -240,6 +248,8 @@ def adjudicate_critical_task(
     evidence_refs: Sequence[Any] | None,
     sensitive: Any = False,
     approval_refs: Sequence[Any] | None = None,
+    task_ref: Any = "",
+    plan_version: Any = "",
     evidence_verifier: Callable[[Sequence[str]], Mapping[str, Any]] | None = None,
     approval_verifier: Callable[[Sequence[str]], Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
@@ -256,16 +266,32 @@ def adjudicate_critical_task(
     evidence = _refs(evidence_refs)
     approvals = _refs(approval_refs)
     evidence_status = _binding_status(evidence, evidence_verifier)
-    if approvals or _exact_true(sensitive):
+    blockers: list[str] = []
+    if sensitive is True:
+        sensitive_exact = True
+    elif sensitive is False:
+        sensitive_exact = False
+    else:
+        blockers.append("SENSITIVE_TYPE_INVALID")
+        sensitive_exact = True
+    if approvals or sensitive_exact:
         approval_status = _binding_status(approvals, approval_verifier)
     else:
         approval_status = "NOT_REQUIRED"
-    blockers: list[str] = []
     if kind not in TASK_CLASSES:
         blockers.append("TASK_CLASS_INVALID")
         required: tuple[str, ...] = ()
     else:
         required = REQUIRED_ROLES[kind]
+        principals = [assignments.get(role, "") for role in required if assignments.get(role, "")]
+        if len(principals) != len(set(principals)):
+            blockers.append("REVIEWER_INDEPENDENCE")
+    expected_task = _clean(task_ref, 160)
+    expected_plan = _clean(plan_version, 40)
+    task_tenant = _clean(tenant_id, 120)
+    task_workspace = _clean(workspace_id, 120)
+    if kind in {"IMPORTANT", "CRITICAL"} and (not expected_task or not expected_plan):
+        blockers.append("REVIEW_BINDING_MISSING")
     if not _clean(workspace_id, 120):
         blockers.append("WORKSPACE_MISSING")
     if not _clean(tenant_id, 120):
@@ -296,6 +322,34 @@ def adjudicate_critical_task(
         expected = assignments.get(role, "")
         if not expected or agent != expected:
             blockers.append(f"SPOOFED_ROLE:{role}")
+            continue
+        review_tenant = _clean(raw.get("tenant_id"), 120)
+        review_workspace = _clean(raw.get("workspace_id"), 120)
+        review_task = _clean(raw.get("task_ref"), 160)
+        review_plan = _clean(raw.get("plan_version"), 40)
+        strict_binding = kind in {"IMPORTANT", "CRITICAL"}
+        scope_mismatch = (
+            (strict_binding and (not review_tenant or review_tenant != task_tenant))
+            or (review_tenant and review_tenant != task_tenant)
+            or (strict_binding and (not review_workspace or review_workspace != task_workspace))
+            or (review_workspace and review_workspace != task_workspace)
+        )
+        task_mismatch = (
+            (strict_binding and (not review_task or review_task != expected_task))
+            or (review_task and expected_task and review_task != expected_task)
+        )
+        plan_mismatch = (
+            (strict_binding and (not review_plan or review_plan != expected_plan))
+            or (review_plan and expected_plan and review_plan != expected_plan)
+        )
+        if scope_mismatch:
+            blockers.append(f"REVIEW_SCOPE:{role}")
+            continue
+        if task_mismatch:
+            blockers.append(f"REVIEW_TASK:{role}")
+            continue
+        if plan_mismatch:
+            blockers.append(f"REVIEW_PLAN:{role}")
             continue
         if verdict not in VERDICTS:
             blockers.append(f"VERDICT_INVALID:{role}")
@@ -379,6 +433,20 @@ def seal_agent_message(
     nonce = _clean(incoming.get("nonce"), 120)
     if not nonce:
         blockers.append("NONCE_MISSING")
+    content, content_secret = _secret_text(incoming.get("content"), 1000)
+    evidence_refs: list[str] = []
+    approval_refs: list[str] = []
+    secret_in_refs = False
+    for ref in _refs(incoming.get("evidence_refs")):
+        redacted, found = _secret_text(ref, 180)
+        evidence_refs.append(redacted)
+        secret_in_refs = secret_in_refs or found
+    for ref in _refs(incoming.get("approval_refs")):
+        redacted, found = _secret_text(ref, 180)
+        approval_refs.append(redacted)
+        secret_in_refs = secret_in_refs or found
+    if content_secret or secret_in_refs:
+        blockers.append("SECRET_DETECTED")
 
     body = {
         "version": PROTOCOL_VERSION,
@@ -388,14 +456,14 @@ def seal_agent_message(
         "workspace_id": workspace_id,
         "tenant_id": tenant_id,
         "requested_action": _clean(incoming.get("requested_action"), 160),
-        "evidence_refs": _refs(incoming.get("evidence_refs")),
+        "evidence_refs": evidence_refs,
         "confidence": _upper(incoming.get("confidence"), 40) or "UNKNOWN",
         "risk_level": _upper(incoming.get("risk_level"), 40) if _upper(incoming.get("risk_level"), 40) in BLAST_LEVELS else "UNKNOWN",
         "permissions": [item for item in requested_permissions if _upper(item, 80) in allowed],
-        "approval_refs": _refs(incoming.get("approval_refs")),
+        "approval_refs": approval_refs,
         "issued_at": issued_at.isoformat() if issued_at else "",
         "nonce": nonce,
-        "content": _clean(incoming.get("content"), 1000),
+        "content": content,
     }
     digest = _digest(body)
     return {
@@ -473,6 +541,19 @@ def validate_agent_message(
     blockers: list[str] = []
     if presented != actual:
         blockers.append("DIGEST_INVALID")
+    if _clean(raw.get("version"), 20) != PROTOCOL_VERSION:
+        blockers.append("VERSION_UNSUPPORTED")
+    if not _clean(raw.get("nonce"), 120):
+        blockers.append("NONCE_MISSING")
+    presented_schema = raw.get("schema")
+    if presented_schema not in (None, "") and _clean(presented_schema, 80) != SCHEMA:
+        blockers.append("SCHEMA_UNSUPPORTED")
+    if (
+        _secret_text(raw.get("content"), 1000)[1]
+        or any(_secret_text(item, 180)[1] for item in list(raw.get("evidence_refs") or []))
+        or any(_secret_text(item, 180)[1] for item in list(raw.get("approval_refs") or []))
+    ):
+        blockers.append("SECRET_PRESENT")
     if _upper(raw.get("role"), 40) != _upper(context.get("role"), 40) or _upper(context.get("role"), 40) not in ROLES:
         blockers.append("SPOOFED_ROLE")
     if _clean(raw.get("agent_id"), 160) != _clean(context.get("agent_id"), 160) or not _clean(context.get("agent_id"), 160):

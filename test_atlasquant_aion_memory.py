@@ -982,6 +982,17 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertEqual(result["status"], "BLOCKED")
         self.assertFalse(result["saved"])
 
+    def test_textual_approval_never_reaches_checkpoint_transport(self):
+        cfg = RuntimeConfig(token="x", repo="owner/repo", branch="atlasquant-runtime")
+        for flag in ("false", "true", "yes", "no", 1, 0, [], {}, None):
+            with self.subTest(flag=flag):
+                with patch("atlasquant_aion_memory.requests.put") as put, patch("atlasquant_aion_memory.requests.get") as get:
+                    result = save_runtime_checkpoint(default_checkpoint(), cfg, approved=flag)
+                self.assertEqual(result["status"], "BLOCKED")
+                self.assertFalse(result["saved"])
+                put.assert_not_called()
+                get.assert_not_called()
+
     def test_runtime_writes_refuse_code_branch(self):
         cfg = RuntimeConfig(token="x", repo="owner/repo", branch="main")
         load = load_runtime_checkpoint(cfg)

@@ -59,7 +59,7 @@ def normalize_budget(raw:Mapping[str,Any]|None)->dict[str,Any]:
         spent=_num("spent_usd")
     return {
         "schema":SCHEMA,
-        "allow_paid":bool(data.get("allow_paid",False)),
+        "allow_paid":data.get("allow_paid") is True,
         "monthly_limit_usd":round(limit,4),
         "spent_usd":round(spent,4),
         "spent_usd_estimate":round(spent,4),
@@ -87,7 +87,7 @@ def budget_decision(
     elif not budget["allow_paid"]:
         allowed=False
         reason="Uso pago não foi habilitado pelo administrador."
-    elif not request_approved:
+    elif request_approved is not True:
         allowed=False
         reason="Solicitação paga exige aprovação explícita."
     elif budget["monthly_limit_usd"]<=0:
@@ -132,7 +132,7 @@ def route_intelligence(
     if sensitive:
         lane="LOCAL_DETERMINISTIC"
         reason="Conteúdo sensível permanece na rota local nesta fundação."
-    elif not external_feature_enabled:
+    elif external_feature_enabled is not True:
         lane="LOCAL_DETERMINISTIC"
         reason="Feature flag de modelo externo está desligada."
     elif state!="EXTERNAL_READY":
@@ -154,7 +154,7 @@ def route_intelligence(
         "complexity":complexity,
         "privacy_sensitive":sensitive,
         "provider_state":state,
-        "external_feature_enabled":bool(external_feature_enabled),
+        "external_feature_enabled":external_feature_enabled is True,
         "budget_decision":cost,
         "reason":reason,
         "executes_provider_call":False,
@@ -210,7 +210,7 @@ def set_budget_policy(
                 (aion.get("model_budget") or {}).get("spent_usd",0))
             if isinstance(aion.get("model_budget"),Mapping) else 0
         ),
-        "allow_paid":bool(allow_paid),
+        "allow_paid":allow_paid is True,
         "approved_by":str(approved_by or ""),
         "approved_at":str(approved_at or ""),
     })
