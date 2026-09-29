@@ -30,6 +30,7 @@ PURE_CORE = (
     "atlasquant_aion_evaluation_lab",
     "atlasquant_aion_model_router",
     "atlasquant_aion_model_registry",
+    "atlasquant_aion_loop_governor",
 )
 FORBIDDEN_ROOTS = frozenset({
     "streamlit",
