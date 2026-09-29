@@ -15,6 +15,7 @@ from typing import Any, Mapping
 
 from atlasquant_aion_background_executor import (
     MAX_ATTEMPTS,
+    MAX_JOBS_PER_RUN,
     _execute_due_local_work_authorized,
     load_executor_receipts,
 )
@@ -347,6 +348,8 @@ def arm_worker(
             "worker_armed": False,
             "external_persisted": False,
         }
+    if type(max_jobs) is not int or not 1 <= max_jobs <= MAX_JOBS_PER_RUN:
+        raise ValueError("invalid worker batch size")
     current = utc(now or datetime.now(timezone.utc))
     context = authenticated_context(access, Domain.ADMIN)
     runtime = safe_text(runtime_id, 160)
@@ -822,6 +825,8 @@ def worker_tick(
         "succeeded": int(batch.get("succeeded") or 0),
         "failed": int(batch.get("failed") or 0),
         "blocked": int(batch.get("blocked") or 0),
+        "action_receipts": list(batch.get("action_receipts") or []),
+        "action_receipts_are_authority": False,
         "retry_queue_count": len(retry_queue),
         "requires_checkpoint_save": True,
         "external_persisted": False,

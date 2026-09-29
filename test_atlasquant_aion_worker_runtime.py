@@ -447,5 +447,28 @@ class AionWorkerRuntimeTests(unittest.TestCase):
         self.assertFalse(result["loop_governor"]["grants_permission"])
 
 
+    def test_worker_returns_non_authoritative_action_receipts(self):
+        result = worker_tick(
+            self.access,
+            self.armed_due_checkpoint(),
+            runtime_id=self.runtime_a,
+            now=TICK,
+        )
+        self.assertEqual(len(result["action_receipts"]), 1)
+        self.assertFalse(result["action_receipts_are_authority"])
+        self.assertEqual(result["action_receipts"][0]["authorization"], "NONE")
+
+    def test_invalid_worker_batch_size_fails_before_governor(self):
+        for value in ("5", True, 0, 21):
+            with self.assertRaises(ValueError):
+                worker_tick(
+                    self.access,
+                    self.armed_due_checkpoint(),
+                    runtime_id=self.runtime_a,
+                    max_jobs=value,
+                    now=TICK,
+                )
+
+
 if __name__ == "__main__":
     unittest.main()
