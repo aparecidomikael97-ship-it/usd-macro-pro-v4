@@ -14,6 +14,8 @@ O bordão deve permanecer visível na experiência principal, não escondido em 
 
 Todos os grandes blocos do ecossistema aparecem como cards clicáveis e levam diretamente ao tema correspondente: Radar, Macroeconomia, Microeconomia, Geopolítica, Fundamentalista, ICT/SMC, Calendário Econômico, Pré-Notícia, Laboratório, Paper Trading, Guardião de Risco, Investimentos, Central AION, Administração, Studio/Vídeos, Negócios, Memória/Checkpoint, Segurança, Academy e Treasury & Growth.
 
+Cada card já possui um **contrato de rota direta**. Exemplo: Geopolítica → `/geopolitica`, Central AION → `/aion`, Vídeos → `/videos`. A primeira versão só declara essas rotas; a navegação real continua desligada até a integração segura com a aplicação.
+
 A navegação superior pode usar abas flutuantes contextuais. Para o fluxo editorial de mercado, ficam reservadas:
 
 - Visão Geral
@@ -21,6 +23,12 @@ A navegação superior pode usar abas flutuantes contextuais. Para o fluxo edito
 - Análise do Dia
 - Fechamento do Dia
 - Fechamento Semanal
+
+## Composição das duas referências visuais
+
+A composição final junta os elementos aprovados nos dois mockups: barra superior com identidade/bordão e status, ticker de mercado, abas flutuantes, faixa de vídeos em destaque, grade de módulos, núcleo holográfico central, painéis de inteligência (Mapa de Risco, Viés, Calendário e Notícias), AION em posição permanente e dock inferior de ações.
+
+As zonas oficiais do cockpit são: identidade/status → ticker → abas flutuantes → comando de vídeos → grade do ecossistema → núcleo holográfico → painéis de inteligência → dock inferior.
 
 ## Central de vídeos
 
