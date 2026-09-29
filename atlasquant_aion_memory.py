@@ -37,6 +37,8 @@ from atlasquant_aion_business import (
 from atlasquant_aion_business_brain import (
     normalize_opportunities,
     business_brain_digest,
+    business_strategy_checkpoint,
+    business_strategy_digest,
 )
 from atlasquant_aion_promotions import normalize_campaigns, promotion_digest
 from atlasquant_aion_entitlements import normalize_entitlements, entitlement_digest
@@ -465,6 +467,8 @@ def default_checkpoint() -> dict[str, Any]:
             "metrics_digest": business_metrics_digest({}),
             "opportunities": [],
             "opportunities_digest": business_brain_digest([]),
+            "strategy": business_strategy_checkpoint(),
+            "strategy_digest": business_strategy_digest(),
             "digest": business_digest([]),
         },
         "promotions": {
@@ -601,6 +605,8 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
         "metrics_digest": business_metrics_digest(business_metrics),
         "opportunities": business_opportunities,
         "opportunities_digest": business_brain_digest(business_opportunities),
+        "strategy": business_strategy_checkpoint(),
+        "strategy_digest": business_strategy_digest(),
         "digest": business_digest(business_products),
     }
 
@@ -895,6 +901,8 @@ def update_business_checkpoint(
         "metrics_digest": business_metrics_digest(normalized_metrics),
         "opportunities": normalized_opportunities,
         "opportunities_digest": business_brain_digest(normalized_opportunities),
+        "strategy": business_strategy_checkpoint(),
+        "strategy_digest": business_strategy_digest(),
         "digest": business_digest(rows),
     }
     payload["operating"]["dirty"] = bool(dirty)
@@ -2097,6 +2105,12 @@ def checkpoint_integrity_report(
             "business.opportunities",
             business.get("opportunities_digest"),
             business_brain_digest(opportunities),
+        )
+    if business.get("strategy") is not None or business.get("strategy_digest"):
+        add_check(
+            "business.strategy",
+            business.get("strategy_digest"),
+            business_strategy_digest(),
         )
 
     promotions = raw.get("promotions") if isinstance(raw.get("promotions"), Mapping) else {}
