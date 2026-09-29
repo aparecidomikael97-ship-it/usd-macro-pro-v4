@@ -1,6 +1,55 @@
 import unittest
 
 from atlasquant_aion_gateway import local_answer, provider_status, route_model
+from atlasquant_aion_model_registry import canonical_fingerprint
+
+
+TRUSTED = {"tenant_id": "tenant-a", "workspace_id": "administration", "role": "ADMIN"}
+EXTERNAL_ENV = {
+    "AION_MODEL_PROVIDER": "openai",
+    "OPENAI_API_KEY": "sk-test-secret-value",
+    "AION_OPENAI_FAST_MODEL": "fast-model",
+    "AION_OPENAI_REASONING_MODEL": "reasoning-model",
+    "AION_OPENAI_INPUT_USD_PER_MTOK": "1",
+    "AION_OPENAI_OUTPUT_USD_PER_MTOK": "2",
+}
+
+
+def approved_registry():
+    row = {
+        "schema": "ATLASQUANT_AION_MODEL_REGISTRY_V1",
+        "provider": "openai",
+        "model_id": "fast-model",
+        "version": "1",
+        "capability": "gateway routing",
+        "tenant_id": "tenant-a",
+        "workspace_id": "administration",
+        "benchmark_refs": ["ci:gateway"],
+        "evaluation_state": "HUMAN_REVIEW_CANDIDATE",
+        "evaluation_date": "2026-09-29T12:00:00+00:00",
+        "latency_ms": 100,
+        "reliability": 0.99,
+        "cost_class": "ZERO",
+        "estimated_cost_usd": 0.0,
+        "privacy_class": "PRIVATE",
+        "known_failures": [],
+        "modalities": ["text"],
+        "context_limit": 8192,
+        "approval_state": "APPROVED",
+        "rollback_target": "local",
+        "fallback": "",
+        "blockers": [],
+        "budget_decision": None,
+        "eligible_as_default": True,
+        "executes_provider_call": False,
+        "executes_billing": False,
+        "activates_paid_api": False,
+        "digest_kind": "CANONICAL_FINGERPRINT",
+        "digest_is_signature": False,
+        "notes": "approved offline",
+    }
+    row["fingerprint"] = canonical_fingerprint(row)
+    return {"schema": "ATLASQUANT_AION_MODEL_REGISTRY_V1", "models": [row]}
 
 
 class AtlasQuantAionGatewayTests(unittest.TestCase):
@@ -42,7 +91,70 @@ class AtlasQuantAionGatewayTests(unittest.TestCase):
     def test_route_model_does_not_execute(self):
         route = route_model("corrigir código da interface")
         self.assertEqual(route["domain"], "development")
+        self.assertEqual(route["lane"], "local_deterministic")
         self.assertFalse(route["executes_action"])
+        self.assertFalse(route["executes_provider_call"])
+        self.assertFalse(route["executes_billing"])
+
+    def test_ready_provider_without_registry_stays_local(self):
+        route = route_model(
+            "resuma este status",
+            feature_flags={"external_llm": True},
+            env=EXTERNAL_ENV,
+            trusted_context=TRUSTED,
+            model_id="fast-model",
+            model_version="1",
+        )
+        self.assertEqual(route["provider_state"], "EXTERNAL_READY")
+        self.assertEqual(route["lane"], "local_deterministic")
+        self.assertFalse(route["registry_approved"])
+        self.assertIn("NOT_FOUND", route["registry_blockers"])
+        self.assertFalse(route["external_lane_allowed"])
+
+    def test_approved_registry_can_expose_external_route_without_calling_provider(self):
+        route = route_model(
+            "resuma este status",
+            feature_flags={"external_llm": True},
+            env=EXTERNAL_ENV,
+            registry=approved_registry(),
+            trusted_context=TRUSTED,
+            model_id="fast-model",
+            model_version="1",
+        )
+        self.assertEqual(route["provider_state"], "EXTERNAL_READY")
+        self.assertEqual(route["lane"], "external_provider")
+        self.assertTrue(route["registry_approved"])
+        self.assertTrue(route["external_lane_allowed"])
+        self.assertEqual(route["routing_lane"], "EXTERNAL_FAST")
+        self.assertFalse(route["executes_provider_call"])
+        self.assertFalse(route["executes_billing"])
+
+    def test_tampered_or_cross_tenant_registry_falls_back_local(self):
+        registry = approved_registry()
+        registry["models"][0]["notes"] = "tampered"
+        tampered = route_model(
+            "resuma este status",
+            feature_flags={"external_llm": True},
+            env=EXTERNAL_ENV,
+            registry=registry,
+            trusted_context=TRUSTED,
+            model_id="fast-model",
+            model_version="1",
+        )
+        self.assertEqual(tampered["lane"], "local_deterministic")
+        self.assertIn("MODEL_RECORD_INTEGRITY_FAILED", tampered["registry_blockers"])
+
+        cross_tenant = route_model(
+            "resuma este status",
+            feature_flags={"external_llm": True},
+            env=EXTERNAL_ENV,
+            registry=approved_registry(),
+            trusted_context={"tenant_id": "tenant-b", "workspace_id": "administration", "role": "ADMIN"},
+            model_id="fast-model",
+            model_version="1",
+        )
+        self.assertEqual(cross_tenant["lane"], "local_deterministic")
+        self.assertIn("SCOPE_MISMATCH", cross_tenant["registry_blockers"])
 
     def test_local_answer_uses_checkpoint_continuity_for_where_we_stopped(self):
         result = local_answer(
