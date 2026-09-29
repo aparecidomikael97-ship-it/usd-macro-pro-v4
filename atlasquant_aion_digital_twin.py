@@ -9,9 +9,11 @@ trading.
 """
 from __future__ import annotations
 
+from collections import deque
 from datetime import datetime, timezone
 from hashlib import sha256
 from typing import Any, Mapping, Sequence
+from itertools import islice
 import json
 import math
 
@@ -31,7 +33,7 @@ def _clean(value:Any,limit:int=1200)->str:
 
 def _refs(values:Sequence[Any]|None,limit:int=80)->list[str]:
     out=[]
-    for raw in list(values or [])[:limit*2]:
+    for raw in islice(values or (), max(0,limit*2)):
         text=_clean(raw,280)
         if text and text not in out:
             out.append(text)
@@ -206,7 +208,7 @@ def normalize_digital_twin(raw:Mapping[str,Any],*,evaluate:bool=True)->dict[str,
         out["twin_id"]=supplied
     out["observations"]=[
         normalize_observation(x)
-        for x in list(item.get("observations") or [])[:500]
+        for x in islice(item.get("observations") or (),500)
         if isinstance(x,Mapping)
     ]
     out["updated_at"]=_clean(item.get("updated_at"),80) or created
@@ -218,7 +220,12 @@ def normalize_digital_twin(raw:Mapping[str,Any],*,evaluate:bool=True)->dict[str,
 def normalize_digital_twins(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for raw in list(rows or [])[-MAX_TWINS*2:]:
+    source=(
+        rows[-MAX_TWINS*2:]
+        if isinstance(rows,(list,tuple))
+        else deque(rows or (),maxlen=MAX_TWINS*2)
+    )
+    for raw in source:
         if not isinstance(raw,Mapping):
             continue
         try:
