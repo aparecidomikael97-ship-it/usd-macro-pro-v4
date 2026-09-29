@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from hashlib import sha256
+from itertools import islice
 from typing import Any, Mapping, Sequence
 import json
 import math
@@ -394,7 +395,7 @@ def cyber_immune_plan(
     rows: list[dict[str, Any]] = []
     critical_confirmed = 0
     high_or_critical = 0
-    for raw in list(signals or [])[:200]:
+    for raw in islice(signals or (), 200):
         if not isinstance(raw, Mapping):
             continue
         kind = _upper(raw.get("kind") or "UNKNOWN")
