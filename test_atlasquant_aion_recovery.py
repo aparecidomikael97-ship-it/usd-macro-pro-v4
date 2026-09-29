@@ -91,6 +91,29 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
         self.assertEqual(result["integrity"]["state"],"CONFIRMED")
         self.assertFalse(result["executes_action"])
 
+    def test_revision_load_rejects_invalid_base64(self):
+        response=MagicMock()
+        response.raise_for_status.return_value=None
+        response.json.return_value={"content":"%%%not-base64%%%"}
+        with patch("requests.get",return_value=response):
+            result=load_checkpoint_revision("a"*40,self.cfg())
+        self.assertEqual(result["status"],"ERROR")
+        self.assertIsNone(result["checkpoint"])
+        self.assertFalse(result["executes_action"])
+
+    def test_revision_load_rejects_duplicate_json_keys(self):
+        raw=b'{"project":"AtlasQuant","project":"Other"}'
+        response=MagicMock()
+        response.raise_for_status.return_value=None
+        response.json.return_value={
+            "content":base64.b64encode(raw).decode("ascii"),
+        }
+        with patch("requests.get",return_value=response):
+            result=load_checkpoint_revision("a"*40,self.cfg())
+        self.assertEqual(result["status"],"ERROR")
+        self.assertEqual(result["reason"],"ValueError")
+        self.assertIsNone(result["checkpoint"])
+
     def test_recovery_can_repair_current_mismatch_using_clean_candidate(self):
         preflight=recovery_preflight(
             self.current(mismatch=True),
@@ -167,13 +190,25 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
             }
 
         current=self.current(mismatch=True)
-        with patch("atlasquant_aion_recovery.save_runtime_checkpoint",side_effect=fake_save):
+        candidate=self.candidate()
+        with patch(
+            "atlasquant_aion_recovery.load_checkpoint_revision",
+            return_value=self.candidate(revision=candidate["revision"]),
+        ) as reload_revision, patch(
+            "atlasquant_aion_recovery.save_runtime_checkpoint",
+            side_effect=fake_save,
+        ):
             result=restore_checkpoint_revision(
-                self.candidate(),
+                candidate,
                 current,
                 self.cfg(),
                 approved=True,
             )
+        reload_revision.assert_called_once_with(
+            candidate["revision"],
+            self.cfg(),
+            timeout=12.0,
+        )
         self.assertTrue(result["saved"])
         self.assertTrue(result["verified"])
         self.assertTrue(result["restore_confirmed"])
@@ -187,10 +222,60 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
         self.assertTrue(any(x["severity"]=="WARNING" for x in events))
 
 
+    def test_restore_blocks_when_historical_revision_cannot_be_revalidated(self):
+        candidate=self.candidate()
+        current=self.current(mismatch=True)
+        with patch(
+            "atlasquant_aion_recovery.load_checkpoint_revision",
+            return_value={
+                "status":"ERROR",
+                "checkpoint":None,
+                "revision":candidate["revision"],
+                "reason":"Timeout",
+                "executes_action":False,
+            },
+        ), patch("atlasquant_aion_recovery.save_runtime_checkpoint") as save:
+            result=restore_checkpoint_revision(
+                candidate,
+                current,
+                self.cfg(),
+                approved=True,
+            )
+        self.assertEqual(result["status"],"BLOCKED")
+        self.assertFalse(result["restore_confirmed"])
+        self.assertEqual(result["restored_revision"],"")
+        self.assertFalse(result["automatic_retry_allowed"])
+        save.assert_not_called()
+
+    def test_restore_blocks_when_selected_bytes_do_not_match_revision_bytes(self):
+        candidate=self.candidate()
+        historical=self.candidate(revision=candidate["revision"])
+        historical["checkpoint"]["aion"]["priority"]="different historical bytes"
+        historical["integrity"]=checkpoint_integrity_report(historical["checkpoint"])
+        current=self.current(mismatch=True)
+        with patch(
+            "atlasquant_aion_recovery.load_checkpoint_revision",
+            return_value=historical,
+        ), patch("atlasquant_aion_recovery.save_runtime_checkpoint") as save:
+            result=restore_checkpoint_revision(
+                candidate,
+                current,
+                self.cfg(),
+                approved=True,
+            )
+        self.assertEqual(result["status"],"BLOCKED")
+        self.assertIn("does not match",result["reason"])
+        self.assertFalse(result["restore_confirmed"])
+        self.assertEqual(result["restored_revision"],"")
+        save.assert_not_called()
+
     def test_unverified_restore_never_claims_revision_restored(self):
         candidate=self.candidate()
         current=self.current(mismatch=True)
         with patch(
+            "atlasquant_aion_recovery.load_checkpoint_revision",
+            return_value=self.candidate(revision=candidate["revision"]),
+        ), patch(
             "atlasquant_aion_recovery.save_runtime_checkpoint",
             return_value={
                 "status":"UNVERIFIED",
@@ -223,6 +308,9 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
         candidate=self.candidate()
         current=self.current(mismatch=True)
         with patch(
+            "atlasquant_aion_recovery.load_checkpoint_revision",
+            return_value=self.candidate(revision=candidate["revision"]),
+        ), patch(
             "atlasquant_aion_recovery.save_runtime_checkpoint",
             return_value={
                 "status":"CONFLICT",
