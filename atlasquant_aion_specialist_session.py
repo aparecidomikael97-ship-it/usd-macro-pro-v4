@@ -66,6 +66,23 @@ _PROVIDER_FLAGS = (
     "transcription", "video_render", "image", "aion_voice",
     "mikael_voice", "mikael_consent",
 )
+_MAX_NORMALIZATION_DEPTH = 24
+_MAX_SEQUENCE_ITEMS = 300
+_NORMALIZATION_NODE_BUDGET = 300
+_READER_SLICES = {
+    "market": ("scanner", "radar"),
+    "macro": ("macro", "calendar"),
+    "ict": ("ict", "lab", "research"),
+    "research": ("research",),
+    "lab": ("lab", "research"),
+    "admin": ("admin", "checkpoint"),
+    "studio": ("studio",),
+    "business": ("business",),
+    "invest": ("invest",),
+    "risk": ("risk",),
+    "dev": ("dev",),
+    "core": (),
+}
 
 
 def _text(value: Any, limit: int = 240) -> str:
@@ -94,23 +111,108 @@ def _is_secret_key(key: Any) -> bool:
     return is_secret_key(key)
 
 
-def _strip_secrets(value: Any, depth: int = 0) -> Any:
-    if depth > 24:
+class _NormBudget:
+    """One shared node budget for a single normalization.
+
+    Child calls receive this same object. They do not receive a fresh limit.
+    """
+
+    __slots__ = ("remaining", "incomplete")
+
+    def __init__(self, limit: int = _NORMALIZATION_NODE_BUDGET) -> None:
+        self.remaining = limit
+        self.incomplete = False
+
+
+def _note_unconsumed(iterator: Any, budget: _NormBudget) -> None:
+    """Record that at least one sibling was left unread. Do not walk the rest."""
+    try:
+        next(iterator)
+    except StopIteration:
+        return
+    budget.incomplete = True
+
+
+def _strip_mapping(value: Mapping[Any, Any], depth: int, budget: _NormBudget) -> dict[str, Any]:
+    cleaned: dict[str, Any] = {}
+    iterator = iter(value.items())
+    while True:
+        if budget.remaining <= 0:
+            _note_unconsumed(iterator, budget)
+            break
+        try:
+            key, item = next(iterator)
+        except StopIteration:
+            break
+        budget.remaining -= 1
+        if _is_secret_key(key):
+            continue
+        cleaned[str(key)] = _strip_secrets(item, depth + 1, budget)
+    return cleaned
+
+
+def _strip_sequence(value: list[Any] | tuple[Any, ...], depth: int, budget: _NormBudget) -> list[Any]:
+    cleaned: list[Any] = []
+    limit = _MAX_SEQUENCE_ITEMS
+    try:
+        oversized = len(value) > limit
+    except TypeError:
+        oversized = False
+    if oversized:
+        budget.incomplete = True
+    iterator = iter(value)
+    index = 0
+    while index < limit:
+        if budget.remaining <= 0:
+            if not oversized:
+                _note_unconsumed(iterator, budget)
+            break
+        try:
+            item = next(iterator)
+        except StopIteration:
+            break
+        budget.remaining -= 1
+        cleaned.append(_strip_secrets(item, depth + 1, budget))
+        index += 1
+    else:
+        if not oversized:
+            _note_unconsumed(iterator, budget)
+    return cleaned
+
+
+def _strip_secrets(value: Any, depth: int = 0, budget: _NormBudget | None = None) -> Any:
+    """Redact one value under a shared normalization budget.
+
+    A missing budget starts a new normalization. Recursive calls must pass the
+    same budget so a child mapping cannot reset the limit.
+    """
+    if budget is None:
+        budget = _NormBudget()
+    if depth > _MAX_NORMALIZATION_DEPTH:
+        budget.incomplete = True
         return None
     if isinstance(value, Mapping):
-        cleaned = {}
-        for key, item in value.items():
-            if _is_secret_key(key):
-                continue
-            cleaned[str(key)] = _strip_secrets(item, depth + 1)
-        return cleaned
+        return _strip_mapping(value, depth, budget)
     if isinstance(value, (list, tuple)):
-        return [_strip_secrets(item, depth + 1) for item in value[:300]]
+        return _strip_sequence(value, depth, budget)
     if isinstance(value, str):
         return redact_text(value)
     if isinstance(value, (int, float, bool)) or value is None:
         return value
     return redact_text(_text(value, 200))
+
+
+def _bounded_strip(value: Any) -> tuple[Any, bool]:
+    budget = _NormBudget()
+    cleaned = _strip_secrets(value, 0, budget)
+    return cleaned, budget.incomplete
+
+
+def _mark_incomplete(view: dict[str, Any]) -> dict[str, Any]:
+    marked = {"normalization_state": "INCOMPLETE"}
+    marked.update(view)
+    marked["normalization_state"] = "INCOMPLETE"
+    return marked
 
 
 def _mapping(value: Any) -> dict[str, Any]:
@@ -156,7 +258,7 @@ def _slice_view(raw: Mapping[str, Any], key: str, parent_origin: str, parent_at:
             "ttl_seconds": None,
             "payload": None,
         }
-    payload = _strip_secrets(raw.get(key))
+    payload, incomplete = _bounded_strip(raw.get(key))
     body = _mapping(payload)
     origin = _origin(
         body.get("origin"),
@@ -166,13 +268,80 @@ def _slice_view(raw: Mapping[str, Any], key: str, parent_origin: str, parent_at:
     ttl = _ttl(body.get("ttl_seconds"))
     if ttl is None:
         ttl = parent_ttl
-    return {
+    view = {
         "present": True,
         "origin": origin,
         "observed_at": observed_at,
         "ttl_seconds": ttl,
         "payload": payload,
     }
+    if incomplete or body.get("normalization_state") == "INCOMPLETE":
+        return _mark_incomplete(view)
+    return view
+
+
+def _sanitize_slices(slices: Mapping[str, Any]) -> tuple[dict[str, Any], bool]:
+    """Re-sanitize each slice with its own budget. Slice width stays bounded."""
+    width = _NormBudget()
+    cleaned: dict[str, Any] = {}
+    iterator = iter(slices.items())
+    while True:
+        if width.remaining <= 0:
+            _note_unconsumed(iterator, width)
+            break
+        try:
+            key, view = next(iterator)
+        except StopIteration:
+            break
+        width.remaining -= 1
+        if _is_secret_key(key):
+            continue
+        name = str(key)
+        prior_incomplete = isinstance(view, Mapping) and view.get("normalization_state") == "INCOMPLETE"
+        stripped, incomplete = _bounded_strip(view)
+        if prior_incomplete or incomplete:
+            if isinstance(stripped, dict):
+                cleaned[name] = _mark_incomplete(stripped)
+            else:
+                cleaned[name] = _mark_incomplete({"payload": stripped})
+        else:
+            cleaned[name] = stripped
+    return cleaned, width.incomplete
+
+
+def _sanitize_loaded_snapshot(raw: Mapping[str, Any]) -> dict[str, Any]:
+    """Re-apply redaction to an already built snapshot without resetting slice budgets."""
+    shell = _NormBudget()
+    cleaned: dict[str, Any] = {}
+    iterator = iter(raw.items())
+    while True:
+        if shell.remaining <= 0:
+            _note_unconsumed(iterator, shell)
+            break
+        try:
+            key, item = next(iterator)
+        except StopIteration:
+            break
+        shell.remaining -= 1
+        if _is_secret_key(key):
+            continue
+        name = str(key)
+        if name == "slices" and isinstance(item, Mapping):
+            slices, width_truncated = _sanitize_slices(item)
+            cleaned["slices"] = slices
+            if width_truncated:
+                shell.incomplete = True
+            continue
+        cleaned[name] = _strip_secrets(item, 1, shell)
+    if raw.get("normalization_state") == "INCOMPLETE":
+        shell.incomplete = True
+    cleaned["schema"] = SCHEMA
+    cleaned["network_called"] = False
+    cleaned["provider_called"] = False
+    cleaned["secrets_included"] = False
+    if shell.incomplete:
+        cleaned["normalization_state"] = "INCOMPLETE"
+    return cleaned
 
 
 def build_specialist_session_snapshot(
@@ -190,13 +359,7 @@ def build_specialist_session_snapshot(
         raw = None
     if raw is None or raw.get("schema") == SCHEMA and isinstance(raw.get("slices"), Mapping):
         if isinstance(raw, Mapping) and raw.get("schema") == SCHEMA and isinstance(raw.get("slices"), Mapping):
-            sanitized = _strip_secrets(raw)
-            snapshot = dict(sanitized) if isinstance(sanitized, Mapping) else {}
-            snapshot["schema"] = SCHEMA
-            snapshot["network_called"] = False
-            snapshot["provider_called"] = False
-            snapshot["secrets_included"] = False
-            return snapshot
+            return _sanitize_loaded_snapshot(raw)
         return {
             "schema": SCHEMA,
             "present": False,
@@ -961,6 +1124,13 @@ def _admin(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, Any]:
     )
 
 
+def _strict_provider_flag(value: Any) -> bool | None:
+    """Only a real bool is a known provider configuration. Never coerce with bool()."""
+    if isinstance(value, bool):
+        return value
+    return None
+
+
 def _studio(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, Any]:
     view = _mapping(_mapping(snapshot.get("slices")).get("studio"))
     if not view.get("present"):
@@ -972,27 +1142,43 @@ def _studio(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, Any]
         )
     body = _mapping(view.get("payload"))
     providers = body.get("providers") if isinstance(body.get("providers"), Mapping) else {}
-    described = {}
-    if providers and set(_PROVIDER_FLAGS).issubset(set(providers)):
+    known_flags: dict[str, bool] = {}
+    unknown_provider = False
+    for name in _PROVIDER_FLAGS:
+        if name not in providers:
+            continue
+        flag = _strict_provider_flag(providers.get(name))
+        if flag is None:
+            unknown_provider = True
+            continue
+        known_flags[name] = flag
+    described: dict[str, Any] = {}
+    full_known = all(name in known_flags for name in _PROVIDER_FLAGS)
+    if unknown_provider:
+        for name, flag in known_flags.items():
+            described[name] = "CONFIGURED" if flag else "NOT_CONFIGURED"
+    elif full_known:
         ready = provider_readiness(
-            transcription=bool(providers.get("transcription")),
-            video_render=bool(providers.get("video_render")),
-            image=bool(providers.get("image")),
-            aion_voice=bool(providers.get("aion_voice")),
-            mikael_voice=bool(providers.get("mikael_voice")),
-            mikael_consent=bool(providers.get("mikael_consent")),
+            transcription=known_flags["transcription"],
+            video_render=known_flags["video_render"],
+            image=known_flags["image"],
+            aion_voice=known_flags["aion_voice"],
+            mikael_voice=known_flags["mikael_voice"],
+            mikael_consent=known_flags["mikael_consent"],
         )
         described = {name: row.get("state") for name, row in dict(ready.get("providers") or {}).items()}
     else:
-        for name in _PROVIDER_FLAGS:
-            if name in providers:
-                described[name] = "CONFIGURED" if bool(providers.get(name)) else "NOT_CONFIGURED"
+        for name, flag in known_flags.items():
+            described[name] = "CONFIGURED" if flag else "NOT_CONFIGURED"
     projects = body.get("projects") if isinstance(body.get("projects"), list) else None
     origin = str(view.get("origin") or "LOCAL_STATE")
     claim = _clock_claim(origin, str(view.get("observed_at") or ""), view.get("ttl_seconds"), described or projects)
     assessment = _assess([claim], now)
     input_state = _input_state(True, assessment, _explicit_conflicts(body))
-    usable = input_state == "VALID" and (described or projects is not None)
+    usable = input_state == "VALID" and (described or projects is not None) and not unknown_provider
+    if unknown_provider and input_state == "VALID":
+        input_state = "UNVERIFIED"
+        usable = False
     if input_state == "VALID" and not usable:
         input_state = "UNVERIFIED"
     return _envelope(
@@ -1320,6 +1506,52 @@ _READERS = {
 }
 
 
+def _slice_normalization_incomplete(view: Any) -> bool:
+    return isinstance(view, Mapping) and view.get("normalization_state") == "INCOMPLETE" and bool(view.get("present", True))
+
+
+def _normalization_blocks(snapshot: Mapping[str, Any], specialist: str) -> bool:
+    """Incomplete evidence cannot be promoted to a current fact."""
+    if specialist == "core":
+        return False
+    if snapshot.get("normalization_state") == "INCOMPLETE":
+        return True
+    slices = _mapping(snapshot.get("slices"))
+    keys = _READER_SLICES.get(specialist, ())
+    return any(_slice_normalization_incomplete(slices.get(key)) for key in keys)
+
+
+def _incomplete_evidence(specialist: str, snapshot: Mapping[str, Any]) -> dict[str, Any]:
+    parent = _mapping(snapshot)
+    assessment = {
+        "status": "UNKNOWN",
+        "freshness": "UNVERIFIED",
+        "conflict_state": "NONE",
+        "stale_count": 0,
+    }
+    return _envelope(
+        specialist,
+        state="UNVERIFIED",
+        summary=(
+            "A normalização do snapshot ficou incompleta. "
+            "O prefixo não foi usado como fato atual."
+        ),
+        observations={
+            "normalization_state": "INCOMPLETE",
+            "input_incomplete": True,
+            "publishing_executed": False,
+            "executes_external_call": False,
+            "providers_inferred": False,
+        },
+        claims=[],
+        origin=str(parent.get("origin") or ""),
+        observed_at=str(parent.get("observed_at") or ""),
+        assessment=assessment,
+        conflicts=[],
+        input_state="UNVERIFIED",
+    )
+
+
 def read_loaded_specialist_snapshot(
     specialist: Any,
     session: Mapping[str, Any] | None,
@@ -1337,7 +1569,10 @@ def read_loaded_specialist_snapshot(
     reader = _READERS.get(key)
     if reader is None:
         return _absent(key, "Especialista não registrado. Nenhuma evidência foi inventada.")
-    reading = reader(snapshot, now)
+    if _normalization_blocks(snapshot, key):
+        reading = _incomplete_evidence(key, snapshot)
+    else:
+        reading = reader(snapshot, now)
     reading["specialist"] = key
     return _seal(reading)
 
