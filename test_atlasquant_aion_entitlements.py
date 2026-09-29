@@ -2,6 +2,7 @@ import unittest
 from datetime import datetime, timezone
 
 from atlasquant_aion_entitlements import (
+    MAX_ENTITLEMENTS,
     approve_entitlement_request,
     entitlement_activation_preflight,
     entitlement_effective,
@@ -9,6 +10,7 @@ from atlasquant_aion_entitlements import (
     mark_entitlement_from_provider_evidence,
     new_entitlement_request,
     normalize_entitlement,
+    normalize_entitlements,
     upsert_entitlement,
 )
 from atlasquant_aion_tenant import (
@@ -184,6 +186,20 @@ class AtlasQuantAionEntitlementsTests(unittest.TestCase):
             result=entitlement_effective(forged)
             self.assertFalse(result["effective"], raw)
             self.assertIn("INVALID_EXPIRY", result["reasons"])
+
+    def test_entitlement_generator_is_not_consumed_past_normalization_bound(self):
+        consumed={"count":0}
+
+        def rows():
+            for index in range(MAX_ENTITLEMENTS*2+1):
+                if index>=MAX_ENTITLEMENTS*2:
+                    raise AssertionError("entitlement iterable consumed past bound")
+                consumed["count"]+=1
+                yield {}
+
+        normalized=normalize_entitlements(rows())
+        self.assertLessEqual(len(normalized),MAX_ENTITLEMENTS)
+        self.assertEqual(consumed["count"],MAX_ENTITLEMENTS*2)
 
     def test_summary_and_upsert(self):
         a=new_entitlement_request("cliente.01",created_at="2026-09-24T12:00:00Z")
