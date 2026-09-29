@@ -2,6 +2,8 @@ import unittest
 
 from atlasquant_cockpit_ui import (
     FLOATING_TABS,
+    FLOATING_PANELS,
+    LAYOUT_ZONES,
     MODULE_CARDS,
     MOTTO,
     VIDEO_SURFACES,
@@ -23,6 +25,37 @@ class AtlasQuantCockpitUiTests(unittest.TestCase):
             "aion","admin","videos","negocios","memoria","seguranca","academy","treasury",
         }
         self.assertTrue(required.issubset(ids))
+
+    def test_every_module_has_unique_direct_route(self):
+        routes=[row["route"] for row in MODULE_CARDS]
+        self.assertEqual(len(routes),len(set(routes)))
+        self.assertTrue(all(route.startswith("/") for route in routes))
+        by_id={row["id"]:row["route"] for row in MODULE_CARDS}
+        self.assertEqual(by_id["geopolitica"],"/geopolitica")
+        self.assertEqual(by_id["videos"],"/videos")
+        self.assertEqual(by_id["aion"],"/aion")
+
+    def test_combined_cockpit_layout_has_required_zones(self):
+        self.assertEqual(
+            tuple(LAYOUT_ZONES),
+            (
+                "identity_and_status",
+                "market_ticker",
+                "floating_context_tabs",
+                "video_command_deck",
+                "ecosystem_module_grid",
+                "holographic_global_core",
+                "intelligence_panels",
+                "bottom_action_dock",
+            ),
+        )
+        panel_ids={row["id"] for row in FLOATING_PANELS}
+        self.assertTrue(
+            {"risk_map","market_bias","economic_calendar","live_news","aion_voice"}.issubset(panel_ids)
+        )
+        html=cockpit_html()
+        self.assertIn("aq-video-deck",html)
+        self.assertIn('data-route="/geopolitica"',html)
 
     def test_video_cycle_preserves_transparent_weekly_protocol(self):
         by_id={row["id"]:row for row in VIDEO_SURFACES}
