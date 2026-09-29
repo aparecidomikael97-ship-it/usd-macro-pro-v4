@@ -13,6 +13,9 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 import math
+import re
+
+from atlasquant_data_freshness import CURRENT as FRESH_CURRENT, assess_freshness
 
 
 SCHEMA = "ATLASQUANT_AION_SYSTEM_HEALTH_CENTER_V1"
@@ -86,6 +89,20 @@ def _clean_text(value: Any, limit: int = 240) -> str:
     return cleaned[:limit]
 
 
+_SECRET_VALUE_PATTERNS = (
+    re.compile(r"(?i)\b(api[_-]?key|token|password|secret|credential)\s*[:=]\s*[^\s,;]+"),
+    re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+"),
+    re.compile(r"\bsk-[A-Za-z0-9_-]{8,}\b"),
+)
+
+
+def _redact_text(value: Any, limit: int = 240) -> str:
+    text = _clean_text(value, limit=max(limit * 2, 512))
+    for pattern in _SECRET_VALUE_PATTERNS:
+        text = pattern.sub("[REDACTED]", text)
+    return text[:limit]
+
+
 def _state_token(value: Any) -> str:
     token = _clean_text(value, 80).upper().replace("-", "_").replace(" ", "_")
     if token in _HEALTHY_TOKENS:
@@ -144,6 +161,38 @@ def normalize_health_domain(
         state = declared_state
         reasons = []
 
+    freshness_confirmed = False
+    freshness_reason = ""
+    if state == HEALTHY:
+        attested = (
+            raw.get("freshness_attested") is True
+            and bool(_clean_text(raw.get("freshness_source"), 120))
+        )
+        temporal_declared = (
+            raw.get("observed_at") not in (None, "")
+            or raw.get("ttl_minutes") not in (None, "")
+        )
+        if temporal_declared:
+            temporal = assess_freshness(
+                {
+                    "source": _clean_text(raw.get("freshness_source") or raw.get("source") or key, 120),
+                    "observed_at": raw.get("observed_at"),
+                    "available_at": raw.get("available_at"),
+                    "ttl_minutes": raw.get("ttl_minutes"),
+                },
+                evaluated_at=raw.get("evaluated_at"),
+            )
+            freshness_confirmed = temporal.get("state") == FRESH_CURRENT
+            freshness_reason = str(temporal.get("state") or "UNKNOWN")
+        elif attested:
+            freshness_confirmed = True
+            freshness_reason = "UPSTREAM_ATTESTED"
+        else:
+            state = UNKNOWN
+            confirmed = False
+            reasons.append("FRESHNESS_NOT_CONFIRMED")
+            freshness_reason = "UNKNOWN"
+
     unresolved = _safe_count(raw.get("unresolved"))
     total = _safe_count(raw.get("total"))
     affected = _safe_count(raw.get("affected"))
@@ -157,8 +206,10 @@ def normalize_health_domain(
         "label": DOMAIN_LABELS[key],
         "state": state,
         "declared_state": declared_state,
-        "confirmed": bool(confirmed and state == HEALTHY),
-        "detail": _clean_text(raw.get("detail")),
+        "confirmed": bool(confirmed and freshness_confirmed and state == HEALTHY),
+        "freshness_confirmed": bool(freshness_confirmed),
+        "freshness_reason": freshness_reason,
+        "detail": _redact_text(raw.get("detail")),
         "observed_at": _clean_text(raw.get("observed_at"), 96),
         "total": total,
         "unresolved": unresolved,
@@ -202,6 +253,18 @@ def build_system_health_center(
     unresolved_domains = [
         item["id"] for item in items if item["state"] != HEALTHY
     ]
+    consistency_warnings: list[str] = []
+    by_id = {item["id"]: item for item in items}
+    if (
+        by_id["workers"]["state"] == HEALTHY
+        and by_id["queues"]["state"] in {DEGRADED, BLOCKED}
+    ):
+        consistency_warnings.append("WORKER_HEALTHY_WITH_QUEUE_ISSUES")
+    if (
+        by_id["runtime"]["state"] == HEALTHY
+        and by_id["screens"]["state"] == BLOCKED
+    ):
+        consistency_warnings.append("RUNTIME_HEALTHY_WITH_BLOCKED_SCREEN")
 
     return {
         "schema": SCHEMA,
@@ -211,6 +274,7 @@ def build_system_health_center(
         "total_domains": len(items),
         "healthy_domains": counts[HEALTHY],
         "unresolved_domains": unresolved_domains,
+        "consistency_warnings": consistency_warnings,
         "all_confirmed_healthy": state == HEALTHY,
         "read_only": True,
         "executes_action": False,
