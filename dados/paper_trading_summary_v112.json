@@ -16,7 +16,7 @@
   "setup_attribution_inferred": false,
   "last_cycle": {
     "version": "V11.2_PAPER_TRADING",
-    "ran_at": "2026-09-29T05:49:15.966776+00:00",
+    "ran_at": "2026-09-29T06:29:23.941142+00:00",
     "pending_created": 0,
     "pending_cancelled_by_gain_lock": 0,
     "entries_opened": 0,
@@ -29,13 +29,12 @@
       "USD/CHF": {
         "side": "BUY",
         "passed": false,
-        "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
+        "state": "⚪ EM OBSERVAÇÃO",
         "hard_blocks": [],
         "soft_blocks": [
-          "Gate ainda não liberou execução",
           "Risco de evento elevado",
           "ICT incompleto (40/100)",
-          "Fluxo institucional incompleto (65/100)",
+          "Fluxo institucional incompleto (48/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -48,7 +47,7 @@
         "soft_blocks": [
           "Risco de evento elevado",
           "ICT incompleto (40/100)",
-          "Fluxo institucional incompleto (65/100)",
+          "Fluxo institucional incompleto (64/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -56,12 +55,15 @@
       "USD/JPY": {
         "side": "BUY",
         "passed": false,
-        "state": "⚪ EM OBSERVAÇÃO",
-        "hard_blocks": [],
+        "state": "🔴 BLOQUEADO",
+        "hard_blocks": [
+          "H1 está contra o viés"
+        ],
         "soft_blocks": [
           "Gate ainda não liberou execução",
           "Risco de evento elevado",
-          "Fluxo institucional incompleto (59/100)",
+          "ICT incompleto (33/100)",
+          "Fluxo institucional incompleto (63/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -74,8 +76,8 @@
         "soft_blocks": [
           "Gate ainda não liberou execução",
           "Risco de evento elevado",
-          "ICT incompleto (43/100)",
-          "Fluxo institucional incompleto (67/100)",
+          "ICT incompleto (40/100)",
+          "Fluxo institucional incompleto (55/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -88,8 +90,8 @@
         "soft_blocks": [
           "Gate ainda não liberou execução",
           "Risco de evento elevado",
-          "ICT incompleto (40/100)",
-          "Fluxo institucional incompleto (52/100)",
+          "ICT incompleto (33/100)",
+          "Fluxo institucional incompleto (58/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -98,10 +100,12 @@
         "side": "WAIT",
         "passed": false,
         "state": "⚪ AGUARDAR DIREÇÃO",
-        "hard_blocks": [],
+        "hard_blocks": [
+          "ADR14 muito esticado (142%)"
+        ],
         "soft_blocks": [
-          "Gate ainda não liberou execução",
           "Risco de evento elevado",
+          "ADR14 em 142%: evitar perseguir preço",
           "ICT incompleto (0/100)",
           "Fluxo institucional incompleto (0/100)",
           "M15 ainda não confirmou gatilho"
@@ -119,6 +123,7 @@
           "Gate ainda não liberou execução",
           "Risco de evento elevado",
           "ICT incompleto (43/100)",
+          "Fluxo institucional incompleto (66/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
