@@ -12,9 +12,9 @@
   },
   "integrate": [
     {
-      "pr": 352,
-      "branch": "chatgpt/aion-supply-chain-residual-hardening-v1",
-      "role": "aion_nucleus_global_worker_resource_dependency_tenant_and_supply_chain_hardening",
+      "pr": 354,
+      "branch": "chatgpt/aion-recovery-history-hardening-v1",
+      "role": "aion_nucleus_global_worker_resource_dependency_tenant_supply_chain_and_recovery_hardening",
       "contains_prs": [
         338,
         342,
@@ -24,7 +24,8 @@
         347,
         348,
         349,
-        350
+        350,
+        352
       ]
     },
     {
@@ -65,9 +66,9 @@
     "report": "aion-night-validation-report.json"
   },
   "next_hardening_order": [
-    "recovery_adversarial_residuals",
     "remaining_optional_dependency_isolation",
-    "resource_bounds_residual_scan"
+    "resource_bounds_residual_scan",
+    "consolidated_stack_validation"
   ],
   "stop_conditions": [
     "human_authorization_required",
@@ -83,6 +84,7 @@
     "rt04_review_scope_binding": "covered_by_current_code_and_regression",
     "session_memory_global_cache_leak": "not_observed_per_call_projection_only",
     "tenant_store_exact_approval": "pr_350",
-    "rt20_runtime_pins_actions_sbom_and_residual_workflows": "pr_352"
+    "rt20_runtime_pins_actions_sbom_and_residual_workflows": "pr_352",
+    "recovery_duplicate_partial_history_and_strict_decode": "pr_354"
   }
 }
