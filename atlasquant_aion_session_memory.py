@@ -7,6 +7,7 @@ missing clock, score, or incomplete matrix into a confirmed fact.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from itertools import islice
 import re
 from typing import Any, Mapping
 
@@ -97,7 +98,10 @@ def _strip(value: Any, depth: int = 0) -> Any:
             cleaned[str(key)] = _strip(item, depth + 1)
         return cleaned
     if isinstance(value, (list, tuple)):
-        return [_strip(item, depth + 1) for item in list(value)[:300]]
+        return [
+            _strip(item, depth + 1)
+            for item in islice(value, 300)
+        ]
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
     if isinstance(value, datetime):
@@ -226,7 +230,7 @@ def _project_runtime_snapshot(raw: Any) -> dict[str, Any] | None:
     fast = _mapping(inputs.get("fast_boot"))
     macro_ctx = _mapping(inputs.get("macro_context"))
     names: list[str] = []
-    for pack in list(body.get("packs") or [])[:40]:
+    for pack in islice(body.get("packs") or (), 40):
         if not isinstance(pack, Mapping):
             continue
         pair = _text(pack.get("pair"), 16).upper()
@@ -262,7 +266,9 @@ def _project_matrix(raw: Any) -> dict[str, Any] | None:
         "pairs_built": body.get("pairs_built"),
         "pairs_expected": body.get("pairs_expected"),
         "fallback_age_minutes": body.get("fallback_age_minutes"),
-        "missing_codes": list(missing)[:16] if isinstance(missing, (list, tuple)) else [],
+        "missing_codes": list(islice(missing, 16))
+        if isinstance(missing, (list, tuple))
+        else [],
     }
 
 
