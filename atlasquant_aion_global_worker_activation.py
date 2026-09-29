@@ -359,6 +359,7 @@ def prepare_global_worker_activation_plan(
     reactivation_gate: Mapping[str, Any] | None = None,
     coordination_mode: Any = CURRENT_COORDINATION_MODE,
     coordination_readiness: Mapping[str, Any] | None = None,
+    coordination_operational_verification: Mapping[str, Any] | None = None,
     ttl_seconds: int = DEFAULT_TTL_SECONDS,
     now: datetime | None = None,
 ) -> dict[str, Any]:
