@@ -15,6 +15,7 @@ import re
 
 
 from atlasquant_runtime_store import require_runtime_branch
+from atlasquant_aion_github_io import github_get
 from atlasquant_aion_memory import (
     MAX_RUNTIME_BYTES,
     RuntimeConfig,
@@ -83,8 +84,7 @@ def list_checkpoint_revisions(
         }
     per_page=max(1,min(int(limit or 12),30))
     try:
-        import requests
-        response=requests.get(
+        response=github_get(
             _history_url(config),
             headers=_headers(config.token),
             params={
@@ -170,8 +170,7 @@ def load_checkpoint_revision(
             "executes_action":False,
         }
     try:
-        import requests
-        response=requests.get(
+        response=github_get(
             _contents_url(config),
             headers=_headers(config.token),
             params={"ref":rev},
