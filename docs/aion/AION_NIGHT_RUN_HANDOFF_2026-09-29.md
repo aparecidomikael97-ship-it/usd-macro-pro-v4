@@ -68,6 +68,11 @@ Frentes irmãs preparadas sobre a #337:
   - Contém toda a cadeia anterior até #349.
   - Tenant Store exige `approved is True` e rejeita memória de tenant estrangeiro mesmo com aprovação exata.
   - O store permanece planning-only, sem network/write automático.
+- #352 — `chatgpt/aion-supply-chain-residual-hardening-v1`
+  - Empilhada sobre #350 e é a ponta preferida atual do AION/Núcleo.
+  - Contém toda a cadeia anterior até #350.
+  - Fecha installs Python soltos nos workflows residuais; Actions continuam pinadas por SHA.
+  - Adiciona contrato automático de pinning no Security Gate e Quality Suite.
 - #339 — `chatgpt/aion-worker-lease-hardening-v1`
   - Worker de sessão: corrige NameError em arm_worker, valida runtime_id e max_jobs no boundary correto.
   - Mantém multi_instance_safe=false.
@@ -118,7 +123,7 @@ Criar uma branch temporária de integração a partir da #337, por exemplo:
 
 Integrar de forma não destrutiva as frentes:
 
-1. #350 (já contém a cadeia #338 + #342 + #343 + #345 + #346 + #347 + #348 + #349; usar como ponta AION/Núcleo)
+1. #352 (já contém a cadeia até #350 e o hardening de supply chain; usar como ponta AION/Núcleo)
 2. #339
 3. #340
 
@@ -258,7 +263,7 @@ Ao terminar ou atingir um stop condition, deixar um único relatório curto com:
 
 Copie somente o bloco abaixo:
 
-> Continue o AION/Núcleo a partir de `docs/aion/AION_NIGHT_RUN_HANDOFF_2026-09-29.md`. Execute o plano noturno inteiro por blocos grandes, sem me pedir confirmação entre etapas seguras. Prioridade absoluta AION + Núcleo. Integre as Drafts #350, #339 e #340 sobre a #337 numa branch temporária, rode `python tools/aion_night_validation.py --full --report aion-night-validation-report.json`, corrija regressões e continue os hardenings listados no handoff enquanto forem seguros. Custo zero por padrão. Não fazer merge em main, deploy, serviço pago, segredo real, publicação, ativação real de worker ou trading. Em caso de falha, diagnostique, corrija, teste e continue. Pare somente nos stop conditions descritos no handoff e deixe relatório final da manhã.
+> Continue o AION/Núcleo a partir de `docs/aion/AION_NIGHT_RUN_HANDOFF_2026-09-29.md`. Execute o plano noturno inteiro por blocos grandes, sem me pedir confirmação entre etapas seguras. Prioridade absoluta AION + Núcleo. Integre as Drafts #352, #339 e #340 sobre a #337 numa branch temporária, rode `python tools/aion_night_validation.py --full --report aion-night-validation-report.json`, corrija regressões e continue os hardenings listados no handoff enquanto forem seguros. Custo zero por padrão. Não fazer merge em main, deploy, serviço pago, segredo real, publicação, ativação real de worker ou trading. Em caso de falha, diagnostique, corrija, teste e continue. Pare somente nos stop conditions descritos no handoff e deixe relatório final da manhã.
 
 ## Achados já revalidados antes do próximo hardening
 
