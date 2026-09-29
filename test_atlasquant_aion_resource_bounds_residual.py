@@ -2,16 +2,20 @@ from pathlib import Path
 import unittest
 
 import atlasquant_aion_action_receipt as action_receipt
+import atlasquant_aion_capabilities as capabilities
 import atlasquant_aion_continuity as continuity
 import atlasquant_aion_dev_fusion as dev_fusion
 import atlasquant_aion_digital_twin as digital_twin
 import atlasquant_aion_event_journal as event_journal
 import atlasquant_aion_evaluation_lab as evaluation_lab
+import atlasquant_aion_fortress as fortress
 import atlasquant_aion_learning as learning
 import atlasquant_aion_model_registry as model_registry
 import atlasquant_aion_operations as operations
+import atlasquant_aion_provider as provider
 import atlasquant_aion_release_confidence as release_confidence
 import atlasquant_aion_resilience as resilience
+import atlasquant_aion_specialist_session as specialist_session
 import atlasquant_aion_tool_hub as tool_hub
 
 
@@ -308,6 +312,72 @@ class AionResidualResourceBoundsTests(unittest.TestCase):
 
         self.assertNotIn("list(values or [])[:40]",receipt_src)
         self.assertIn("islice(values or (), 40)",receipt_src)
+
+
+    def test_additional_explicit_prefix_bounds_do_not_overread(self):
+        refs=GuardedIterable((f"ref-{i}" for i in range(100)),max_reads=6)
+        self.assertEqual(resilience._refs(refs,limit=3),["ref-0","ref-1","ref-2"])
+        self.assertLessEqual(refs.reads,6)
+
+        caps_source=GuardedIterable(
+            (resilience.CAPABILITIES[i % len(resilience.CAPABILITIES)] for i in range(200)),
+            max_reads=100,
+        )
+        caps=resilience._caps(caps_source)
+        self.assertTrue(caps)
+        self.assertEqual(caps_source.reads,100)
+
+        signals=GuardedIterable(
+            (
+                {
+                    "kind":f"signal-{i}",
+                    "severity":"LOW",
+                    "evidence_state":"CONFIRMED",
+                }
+                for i in range(300)
+            ),
+            max_reads=200,
+        )
+        plan=fortress.cyber_immune_plan(signals)
+        self.assertEqual(len(plan["signals"]),200)
+        self.assertEqual(signals.reads,200)
+
+        memory_hits=GuardedIterable(
+            (
+                {"path":f"memory/{i}","excerpt":f"excerpt-{i}"}
+                for i in range(20)
+            ),
+            max_reads=5,
+        )
+        lines=provider._evidence_lines(memory_hits)
+        self.assertEqual(len(lines),5)
+        self.assertEqual(memory_hits.reads,5)
+
+    def test_additional_known_prefix_materializations_are_absent(self):
+        resilience_src=Path("atlasquant_aion_resilience.py").read_text(encoding="utf-8")
+        capabilities_src=Path("atlasquant_aion_capabilities.py").read_text(encoding="utf-8")
+        fortress_src=Path("atlasquant_aion_fortress.py").read_text(encoding="utf-8")
+        provider_src=Path("atlasquant_aion_provider.py").read_text(encoding="utf-8")
+        specialist_src=Path("atlasquant_aion_specialist_session.py").read_text(encoding="utf-8")
+
+        self.assertNotIn("list(values or [])[:limit*2]",resilience_src)
+        self.assertNotIn("list(values or [])[:100]",resilience_src)
+        self.assertIn("islice(values or (), max(0, limit*2))",resilience_src)
+        self.assertIn("islice(values or (), 100)",resilience_src)
+
+        self.assertNotIn("list(items)[:limit]",capabilities_src)
+        self.assertIn("islice(items, max(0, limit))",capabilities_src)
+
+        self.assertNotIn("list(signals or [])[:200]",fortress_src)
+        self.assertIn("islice(signals or (), 200)",fortress_src)
+
+        self.assertNotIn("list(memory_hits or [])[:5]",provider_src)
+        self.assertIn("islice(memory_hits or (), 5)",provider_src)
+
+        self.assertNotIn("list(value)[:300]",specialist_src)
+        self.assertNotIn('list(conflict.get("values") or [])[:2]',specialist_src)
+        self.assertIn("value[:300]",specialist_src)
+        self.assertIn('islice(conflict.get("values") or (), 2)',specialist_src)
 
 
 if __name__=="__main__":
