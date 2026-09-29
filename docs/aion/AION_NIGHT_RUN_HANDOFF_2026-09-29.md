@@ -39,6 +39,10 @@ Frentes irmãs preparadas sobre a #337:
   - Empilhada sobre a #338.
   - Release do lease exige owner + lease token + fencing token.
   - runtime_id global estrito; fence release failure bloqueia persistência final.
+- #343 — `chatgpt/aion-global-inflight-idempotency-v1`
+  - Empilhada sobre a #342 e é a ponta preferida da cadeia Global Worker.
+  - Persiste `inflight_tick` no claim para impedir reexecução após persistência terminal ambígua.
+  - Novo tick bloqueia antes do executor quando existe inflight não reconciliado.
 - #339 — `chatgpt/aion-worker-lease-hardening-v1`
   - Worker de sessão: corrige NameError em arm_worker, valida runtime_id e max_jobs no boundary correto.
   - Mantém multi_instance_safe=false.
@@ -89,10 +93,9 @@ Criar uma branch temporária de integração a partir da #337, por exemplo:
 
 Integrar de forma não destrutiva as frentes:
 
-1. #338
-2. #342 (sobre #338; não aplicar #338 duas vezes)
-3. #339
-4. #340
+1. #343 (já contém #338 + #342; usar como ponta da cadeia Global Worker)
+2. #339
+3. #340
 
 Não retargetar nem mergear em main.
 
@@ -224,4 +227,4 @@ Ao terminar ou atingir um stop condition, deixar um único relatório curto com:
 
 Copie somente o bloco abaixo:
 
-> Continue o AION/Núcleo a partir de `docs/aion/AION_NIGHT_RUN_HANDOFF_2026-09-29.md`. Execute o plano noturno inteiro por blocos grandes, sem me pedir confirmação entre etapas seguras. Prioridade absoluta AION + Núcleo. Integre as Drafts #338 + #342, #339 e #340 sobre a #337 numa branch temporária, valide, corrija regressões, rode red-team + suíte completa e continue os hardenings listados no handoff enquanto forem seguros. Custo zero por padrão. Não fazer merge em main, deploy, serviço pago, segredo real, publicação, ativação real de worker ou trading. Em caso de falha, diagnostique, corrija, teste e continue. Pare somente nos stop conditions descritos no handoff e deixe relatório final da manhã.
+> Continue o AION/Núcleo a partir de `docs/aion/AION_NIGHT_RUN_HANDOFF_2026-09-29.md`. Execute o plano noturno inteiro por blocos grandes, sem me pedir confirmação entre etapas seguras. Prioridade absoluta AION + Núcleo. Integre as Drafts #343, #339 e #340 sobre a #337 numa branch temporária, valide, corrija regressões, rode red-team + suíte completa e continue os hardenings listados no handoff enquanto forem seguros. Custo zero por padrão. Não fazer merge em main, deploy, serviço pago, segredo real, publicação, ativação real de worker ou trading. Em caso de falha, diagnostique, corrija, teste e continue. Pare somente nos stop conditions descritos no handoff e deixe relatório final da manhã.
