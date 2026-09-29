@@ -51,10 +51,6 @@ FORBIDDEN_ROOTS = frozenset({
 KNOWN_AION_COUPLINGS = frozenset({
     ("atlasquant_aion_admin.py", "streamlit"),
     ("atlasquant_aion_admin.py", "atlasquant_aion_business"),
-    ("atlasquant_aion_global_worker.py", "requests"),
-    ("atlasquant_aion_global_worker_activation.py", "requests"),
-    ("atlasquant_aion_global_worker_persisted_arming.py", "requests"),
-    ("atlasquant_aion_global_worker_readiness.py", "requests"),
     ("atlasquant_aion_business_adapter.py", "atlasquant_aion_business"),
     ("atlasquant_aion_investment_adapter.py", "atlasquant_investment_ecosystem"),
     ("atlasquant_aion_github_io.py", "requests"),
@@ -274,6 +270,18 @@ class AtlasQuantAionCoreIndependenceTests(unittest.TestCase):
             result.stderr[-2000:] + result.stdout[-500:],
         )
         self.assertIn("OPERATIONAL", result.stdout)
+
+    def test_global_worker_family_uses_explicit_network_boundary(self):
+        for name in (
+            "atlasquant_aion_global_worker.py",
+            "atlasquant_aion_global_worker_activation.py",
+            "atlasquant_aion_global_worker_persisted_arming.py",
+            "atlasquant_aion_global_worker_readiness.py",
+        ):
+            imports = set(_imports(ROOT / name))
+            with self.subTest(module=name):
+                self.assertNotIn("requests", imports)
+                self.assertIn("atlasquant_aion_github_io", imports)
 
     def test_memory_and_recovery_use_explicit_network_boundary(self):
         memory_imports = set(_imports(ROOT / "atlasquant_aion_memory.py"))
