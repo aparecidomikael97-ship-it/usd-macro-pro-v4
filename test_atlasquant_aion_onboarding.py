@@ -329,6 +329,25 @@ class OnboardingContractTests(unittest.TestCase):
                 self.assertNotIn(SECRET, json.dumps(report))
                 self.assertEqual(report["steps"], [])
 
+
+    def test_secret_like_values_inside_normal_fields_are_rejected(self):
+        payloads = [
+            _context("ADMIN", "ADVANCED", subject_ref="token=abc123"),
+            _context("ADMIN", "ADVANCED", subject_ref="Bearer ZXhhbXBsZQ=="),
+            _context("ADMIN", "ADVANCED", subject_ref="sk-abcdefghijk"),
+            _context("ADMIN", "ADVANCED", note="password=hunter2"),
+        ]
+        for payload in payloads:
+            with self.subTest(payload=payload):
+                report = assess_onboarding(payload, now=NOW)
+                self.assertEqual(report["rejection"]["code"], "SECRET_FIELD")
+                blob = json.dumps(report)
+                self.assertNotIn("abc123", blob)
+                self.assertNotIn("ZXhhbXBsZQ==", blob)
+                self.assertNotIn("sk-abcdefghijk", blob)
+                self.assertNotIn("hunter2", blob)
+                self.assertEqual(report["steps"], [])
+
     def test_invalid_types_empty_values_and_large_payload_fail_closed(self):
         self.assertEqual(assess_onboarding(None, now=NOW)["rejection"]["code"], "PAYLOAD_INVALID")
         self.assertEqual(assess_onboarding(_context(role=1), now=NOW)["rejection"]["code"], "TYPE_INVALID")
