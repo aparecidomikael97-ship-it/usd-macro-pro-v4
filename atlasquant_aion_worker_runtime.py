@@ -67,6 +67,18 @@ def _exact_int(value: Any, *, minimum: int, maximum: int, name: str) -> int:
     return value
 
 
+def _validated_runtime_id(value: Any) -> str:
+    if type(value) is not str:
+        raise ValueError("invalid worker runtime id")
+    runtime = value.strip()
+    if not runtime or len(runtime) > 160:
+        raise ValueError("invalid worker runtime id")
+    normalized = safe_text(runtime, 160)
+    if not normalized or normalized != runtime:
+        raise ValueError("invalid worker runtime id")
+    return normalized
+
+
 def _empty_lease() -> dict[str, Any]:
     return {
         "owner": "",
@@ -200,6 +212,8 @@ def _default_state(context) -> dict[str, Any]:
         "stats": _empty_stats(),
         "session_autonomy": True,
         "multi_instance_safe": False,
+        "concurrency_scope": "CALLER_CHECKPOINT_ONLY",
+        "lease_external_persistence": False,
         "continuous_24x7_confirmed": False,
         "external_persistence": "EXPLICIT_CHECKPOINT_SAVE",
         "physical_action_adapter": "UNAVAILABLE",
@@ -258,6 +272,8 @@ def _normalize_state(context, raw: Mapping[str, Any]) -> dict[str, Any]:
         "stats": _normalize_stats(raw.get("stats") if isinstance(raw.get("stats"), Mapping) else {}),
         "session_autonomy": True,
         "multi_instance_safe": False,
+        "concurrency_scope": "CALLER_CHECKPOINT_ONLY",
+        "lease_external_persistence": False,
         "continuous_24x7_confirmed": False,
         "external_persistence": "EXPLICIT_CHECKPOINT_SAVE",
         "physical_action_adapter": "UNAVAILABLE",
@@ -348,11 +364,9 @@ def arm_worker(
             "worker_armed": False,
             "external_persisted": False,
         }
-    if type(max_jobs) is not int or not 1 <= max_jobs <= MAX_JOBS_PER_RUN:
-        raise ValueError("invalid worker batch size")
     current = utc(now or datetime.now(timezone.utc))
     context = authenticated_context(access, Domain.ADMIN)
-    runtime = safe_text(runtime_id, 160)
+    runtime = _validated_runtime_id(runtime_id)
     interval = _exact_int(
         interval_seconds,
         minimum=MIN_INTERVAL_SECONDS,
@@ -398,6 +412,8 @@ def arm_worker(
         "requires_checkpoint_save": True,
         "autonomy_scope": "ACTIVE_STREAMLIT_SESSION",
         "multi_instance_safe": False,
+        "concurrency_scope": "CALLER_CHECKPOINT_ONLY",
+        "lease_external_persistence": False,
         "continuous_24x7_confirmed": False,
         "external_action_executed": False,
         "real_trading_enabled": False,
@@ -482,7 +498,7 @@ def _claim_lease(
     now: datetime,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     current = utc(now)
-    runtime = safe_text(runtime_id, 160)
+    runtime = _validated_runtime_id(runtime_id)
     lease = _normalize_lease(
         state.get("lease") if isinstance(state.get("lease"), Mapping) else {}
     )
@@ -609,6 +625,8 @@ def worker_snapshot(
         "stats": deepcopy(state["stats"]),
         "session_autonomy": True,
         "multi_instance_safe": False,
+        "concurrency_scope": "CALLER_CHECKPOINT_ONLY",
+        "lease_external_persistence": False,
         "continuous_24x7_confirmed": False,
         "external_persistence": "EXPLICIT_CHECKPOINT_SAVE",
         "physical_action_adapter": "UNAVAILABLE",
@@ -711,6 +729,9 @@ def worker_tick(
     max_jobs: int = 5,
     now: datetime | None = None,
 ) -> dict[str, Any]:
+    runtime = _validated_runtime_id(runtime_id)
+    if type(max_jobs) is not int or not 1 <= max_jobs <= MAX_JOBS_PER_RUN:
+        raise ValueError("invalid worker batch size")
     current = utc(now or datetime.now(timezone.utc))
     context = authenticated_context(access, Domain.ADMIN)
     state, status = load_worker_state(context, checkpoint)
@@ -756,7 +777,7 @@ def worker_tick(
 
     claimed_state, lease_result = _claim_lease(
         state,
-        runtime_id=runtime_id,
+        runtime_id=runtime,
         now=current,
     )
     if lease_result["state"] == "LEASE_HELD":
@@ -775,7 +796,7 @@ def worker_tick(
         "actor": context.actor_id,
         "scope": context.key,
         "arm_digest": claimed_state["arm_digest"],
-        "runtime_id": runtime_id,
+        "runtime_id": runtime,
         "lease_token": lease_result["token"],
         "lease_expires_at": lease_result["expires_at"],
     })
@@ -832,6 +853,8 @@ def worker_tick(
         "external_persisted": False,
         "session_autonomy": True,
         "multi_instance_safe": False,
+        "concurrency_scope": "CALLER_CHECKPOINT_ONLY",
+        "lease_external_persistence": False,
         "continuous_24x7_confirmed": False,
         "provider_called": False,
         "external_action_executed": False,
