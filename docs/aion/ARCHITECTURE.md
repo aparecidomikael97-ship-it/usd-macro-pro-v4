@@ -215,3 +215,16 @@ conflicts e `answers_user_question`. O Guardian continua dono de `real_trade`.
 - memória runtime só pode ser declarada persistida após confirmação do store;
 - publicação, cobrança, merge, deploy, secrets e trading real permanecem fora
   da autonomia do AION.
+
+## Architecture Decision Records
+
+Decisões estruturais do Núcleo ficam em `docs/adr/`. O índice é
+`docs/adr/README.md`. ADR, nesse registry, significa Architecture Decision
+Record. Average Daily Range e American Depositary Receipts não são arquivos
+desse diretório. Um ADR substituído não é apagado.
+
+A reconciliação do Checkpoint Mestre de `2026-09-15` a `2026-09-29` está em
+`docs/continuidade/CHECKPOINT_MESTRE_RECONCILIACAO_2026-09-29.md`. Ela
+complementa `docs/continuidade/CHECKPOINT_MESTRE_ATLASQUANT_2026-09-22.md` e
+não o apaga. O gate documental é
+`CHECKPOINT_MESTRE_RECONCILIATION_2026_09_15_TO_2026_09_29`.
