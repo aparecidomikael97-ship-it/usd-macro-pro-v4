@@ -7,6 +7,7 @@ missing input into a market, macro, or production fact.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from itertools import islice
 from typing import Any, Mapping
 
 from atlasquant_aion_core import guardian_decision
@@ -104,7 +105,7 @@ def _strip_secrets(value: Any, depth: int = 0) -> Any:
             cleaned[str(key)] = _strip_secrets(item, depth + 1)
         return cleaned
     if isinstance(value, (list, tuple)):
-        return [_strip_secrets(item, depth + 1) for item in list(value)[:300]]
+        return [_strip_secrets(item, depth + 1) for item in value[:300]]
     if isinstance(value, str):
         return redact_text(value)
     if isinstance(value, (int, float, bool)) or value is None:
@@ -513,7 +514,7 @@ def _market(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, Any]
         ttl = clock.get("ttl_seconds")
         claims = []
         for conflict in conflicts[:4]:
-            for value in list(conflict.get("values") or [])[:2]:
+            for value in islice(conflict.get("values") or (), 2):
                 claims.append(_clock_claim(origin, observed_at, ttl, value))
                 claims[-1]["claim"] = conflict["claim"]
         if len(claims) < 2:
@@ -707,7 +708,7 @@ def _macro(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, Any]:
     if conflicts:
         claims = []
         for conflict in conflicts[:2]:
-            for value in list(conflict.get("values") or [])[:2]:
+            for value in islice(conflict.get("values") or (), 2):
                 claim = _clock_claim(origin, observed_at, ttl, value)
                 claim["claim"] = conflict["claim"]
                 claims.append(claim)
