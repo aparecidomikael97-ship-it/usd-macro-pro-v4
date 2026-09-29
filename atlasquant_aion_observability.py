@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Mapping, Sequence
 import hashlib
+from itertools import islice
 import json
 import re
 import unicodedata
@@ -52,7 +53,7 @@ def sanitize_metadata(value:Any, *, _depth:int=0)->Any:
                 "[REDACTED]" if is_secret_key(key)
                 else sanitize_metadata(item,_depth=_depth+1)
             )
-            for key,item in list(value.items())[:100]
+            for key,item in islice(value.items(), 100)
         }
     if isinstance(value,(list,tuple)):
         return [sanitize_metadata(item,_depth=_depth+1) for item in value[:100]]
@@ -110,7 +111,7 @@ def new_event(
     message_clean=redact_text(message).strip()[:1200]
     evidence_clean={}
     if isinstance(evidence,Mapping):
-        for key,value in list(sanitize_metadata(evidence).items())[:20]:
+        for key,value in islice(sanitize_metadata(evidence).items(), 20):
             # Preserve the historical scalar representation for V17 digests.
             evidence_clean[key]=value if isinstance(value,(dict,list)) else redact_text(value)[:700]
     seed=json.dumps(
@@ -192,7 +193,12 @@ def normalize_event(raw:Mapping[str,Any])->dict[str,Any]:
 def normalize_events(events:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for raw in list(events or [])[-MAX_EVENTS*2:]:
+    source = (
+        events[-MAX_EVENTS*2:]
+        if isinstance(events, (list, tuple))
+        else tuple(islice(events or (), MAX_EVENTS*2))
+    )
+    for raw in source:
         try:
             event=normalize_event(raw)
         except Exception:
