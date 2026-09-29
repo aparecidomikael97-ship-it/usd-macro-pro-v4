@@ -16,6 +16,8 @@ from atlasquant_aion_global_worker import (
     SERVICE_PRINCIPAL,
     _claim_state,
     _persist_runtime_checkpoint_cas,
+    _release_state,
+    _runtime_id,
     attach_global_worker_state,
     global_worker_integrity,
     global_worker_snapshot,
@@ -297,6 +299,106 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
         self.assertEqual(result["status"], "LEASE_HELD")
         self.assertEqual(result["lease"]["owner"], "gha-a")
         self.assertEqual(result["processed"], 0)
+
+    def test_release_requires_same_owner_token_and_fencing_token(self):
+        checkpoint = self.armed_checkpoint()
+        state, _ = load_global_worker_state(checkpoint)
+        claimed, lease = _claim_state(state, runtime_id="gha-a", now=TICK)
+        batch = {
+            "processed": 0,
+            "succeeded": 0,
+            "failed": 0,
+            "blocked": 0,
+        }
+        released = _release_state(
+            claimed,
+            runtime_id="gha-a",
+            expected_lease_token=lease["token"],
+            expected_fencing_token=lease["fencing_token"],
+            now=TICK,
+            batch=batch,
+            final_status="OK",
+        )
+        self.assertEqual(released["lease"]["owner"], "")
+
+        with self.assertRaisesRegex(ValueError, "GLOBAL_LEASE_TOKEN_MISMATCH"):
+            _release_state(
+                claimed,
+                runtime_id="gha-a",
+                expected_lease_token="wrong-token",
+                expected_fencing_token=lease["fencing_token"],
+                now=TICK,
+                batch=batch,
+                final_status="OK",
+            )
+        with self.assertRaisesRegex(ValueError, "GLOBAL_FENCING_TOKEN_MISMATCH"):
+            _release_state(
+                claimed,
+                runtime_id="gha-a",
+                expected_lease_token=lease["token"],
+                expected_fencing_token=lease["fencing_token"] + 1,
+                now=TICK,
+                batch=batch,
+                final_status="OK",
+            )
+
+    def test_global_runtime_id_fails_closed_for_ambiguous_values(self):
+        self.assertEqual(_runtime_id(""), "")
+        self.assertEqual(_runtime_id("   "), "")
+        self.assertEqual(_runtime_id(True), "")
+        self.assertEqual(_runtime_id("x" * 161), "")
+        self.assertEqual(_runtime_id("gha-valid-1"), "gha-valid-1")
+
+        with patch("atlasquant_aion_global_worker.load_runtime_checkpoint") as load:
+            result = run_global_worker_once(
+                config=_config(),
+                runtime_id=True,
+                feature_enabled=True,
+                now=TICK,
+            )
+        load.assert_not_called()
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertEqual(result["reason"], "GLOBAL_RUNTIME_ID_REQUIRED")
+
+    def test_release_fence_failure_blocks_final_persistence(self):
+        checkpoint = self.armed_checkpoint()
+        captures = []
+
+        def tampering_executor(*args, **kwargs):
+            staged = deepcopy(args[1])
+            state, _ = load_global_worker_state(staged)
+            state["lease"]["token"] = "tampered-token"
+            state["digest"] = global_worker_integrity(state)["expected"]
+            return {
+                "status": "COMPLETED",
+                "checkpoint": attach_global_worker_state(staged, state),
+                "processed": 0,
+                "succeeded": 0,
+                "failed": 0,
+                "blocked": 0,
+            }
+
+        with patch(
+            "atlasquant_aion_global_worker.load_runtime_checkpoint",
+            return_value={"status": "CONFIRMED", "checkpoint": checkpoint, "sha": "sha-0"},
+        ), patch(
+            "atlasquant_aion_global_worker._persist_runtime_checkpoint_cas",
+            side_effect=self.fake_persist(captures),
+        ) as persist, patch(
+            "atlasquant_aion_global_worker._execute_due_local_work_authorized",
+            side_effect=tampering_executor,
+        ):
+            result = run_global_worker_once(
+                config=_config(),
+                runtime_id="gha-fence-test",
+                feature_enabled=True,
+                now=TICK,
+            )
+
+        self.assertEqual(result["status"], "FENCE_RELEASE_FAILED")
+        self.assertEqual(result["reason"], "GLOBAL_LEASE_TOKEN_MISMATCH")
+        self.assertFalse(result["automatic_retry_allowed"])
+        self.assertEqual(persist.call_count, 1)
 
     def test_expired_lease_reclaims_with_monotonic_fencing_token(self):
         checkpoint = self.armed_checkpoint()
