@@ -142,6 +142,30 @@ class AtlasQuantAionEntitlementsTests(unittest.TestCase):
         self.assertFalse(after["effective"])
         self.assertIn("EXPIRED",after["reasons"])
 
+    def test_textual_approval_and_evidence_do_not_grant_eligibility(self):
+        now=datetime(2026,9,29,6,0,tzinfo=timezone.utc)
+        row=new_entitlement_request("tenant.a",scope=PERSONAL_SCOPE,created_at=now.isoformat())
+        row.update(
+            status="ACTIVE_CONFIRMED",
+            approval={"approved":"false"},
+            provider_evidence={"confirmed":"false","provider":"invented","external_id":"invented"},
+        )
+        normalized=normalize_entitlement(row)
+        self.assertFalse(normalized["approval"]["approved"])
+        self.assertFalse(normalized["provider_evidence"]["confirmed"])
+        self.assertNotEqual(normalized["status"],"ACTIVE_CONFIRMED")
+        access={"session":{"username":"tenant.a","role":"USER","credential_fingerprint":"a"*32}}
+        self.assertFalse(personal_aion_eligibility(access,[row],now=now)["eligible"])
+        for flag in ("yes", 1, "true"):
+            with self.assertRaises(ValueError):
+                mark_entitlement_from_provider_evidence(
+                    approve_entitlement_request(new_entitlement_request("tenant.a"),self.admin),
+                    {"confirmed":flag,"provider":"registry","external_id":"ext"},
+                )
+        preflight=entitlement_activation_preflight(row,self.admin,approved=True)
+        self.assertFalse(preflight["allowed"])
+        self.assertFalse(preflight["request_approved"])
+
     def test_summary_and_upsert(self):
         a=new_entitlement_request("cliente.01",created_at="2026-09-24T12:00:00Z")
         b=new_entitlement_request("cliente.02",created_at="2026-09-24T12:01:00Z")

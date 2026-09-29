@@ -368,7 +368,7 @@ def execute_openai_answer(
             "schema":SCHEMA,"state":"BLOCKED_PRIVACY","called":False,
             "reason":"Prompt contém sinal de dado sensível e permanece local.",
         }
-    if not external_feature_enabled:
+    if external_feature_enabled is not True:
         return {
             "schema":SCHEMA,"state":"BLOCKED_FEATURE_FLAG","called":False,
             "reason":"Feature flag de modelo externo está desligada.",
@@ -378,7 +378,7 @@ def execute_openai_answer(
             "schema":SCHEMA,"state":"BLOCKED_PROVIDER_CONFIG","called":False,
             "reason":status["state"],"provider_status":status,
         }
-    if not request_approved:
+    if request_approved is not True:
         return {
             "schema":SCHEMA,"state":"BLOCKED_APPROVAL","called":False,
             "reason":"Solicitação externa exige aprovação explícita.",
