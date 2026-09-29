@@ -97,8 +97,8 @@ class AionResidualResourceBoundsTests(unittest.TestCase):
             learning.new_learning_episode(
                 f"Subject {i}",
                 forecast_type="CATEGORICAL",
-                forecast_value="UP",
-                confidence=50,
+                prediction="UP",
+                confidence_pct=50,
                 created_at=f"2026-09-29T10:{i%60:02d}:00+00:00",
             )
             for i in range(episode_total)
@@ -111,7 +111,7 @@ class AionResidualResourceBoundsTests(unittest.TestCase):
         research_total=learning.MAX_RESEARCH_REFS+5
         refs=(
             learning.new_research_reference(
-                "WEB",
+                "BACKTEST",
                 f"ref-{i}",
                 created_at=f"2026-09-29T11:{i%60:02d}:00+00:00",
             )
