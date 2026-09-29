@@ -329,8 +329,6 @@ def _default_state() -> dict[str, Any]:
         "merge_allowed": False,
         "real_trading_enabled": False,
     }
-    if state_name != "ARMED" and state["inflight_tick"]:
-        raise ValueError("GLOBAL_INFLIGHT_REQUIRES_ARMED_STATE")
     state["digest"] = _bundle_digest(state)
     return state
 
@@ -485,6 +483,8 @@ def _normalize_state(raw: Mapping[str, Any]) -> dict[str, Any]:
         context = authenticated_context(access, Domain.ADMIN)
         if delegation.get("scope") != _scope_payload(context):
             raise ValueError("GLOBAL_DELEGATION_SCOPE_MISMATCH")
+    if state_name != "ARMED" and state["inflight_tick"]:
+        raise ValueError("GLOBAL_INFLIGHT_REQUIRES_ARMED_STATE")
     state["digest"] = _bundle_digest(state)
     return state
 
