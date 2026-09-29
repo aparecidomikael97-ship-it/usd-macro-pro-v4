@@ -53,6 +53,12 @@ def manifest_fingerprint(payload: Mapping[str, Any]) -> str:
     return sha256(_canonical(payload).encode("utf-8")).hexdigest()
 
 
+def certification_record_fingerprint(payload: Mapping[str, Any]) -> str:
+    body = dict(payload or {})
+    body.pop("record_fingerprint", None)
+    return sha256(_canonical(body).encode("utf-8")).hexdigest()
+
+
 def _contains_secret(value: Any) -> bool:
     raw = _clean(value, 4000)
     if not raw:
@@ -231,7 +237,7 @@ def assess_skill_manifest(
         "provenance_refs": provenance_refs,
         "secret_refs": secret_refs,
     }
-    return {
+    result = {
         "schema": SCHEMA,
         "state": state,
         "manifest": normalized,
@@ -250,6 +256,8 @@ def assess_skill_manifest(
         "real_trading_enabled": False,
         "tool_output_is_authority": False,
     }
+    result["record_fingerprint"] = certification_record_fingerprint(result)
+    return result
 
 
 def transition_skill_certification(
@@ -277,6 +285,11 @@ def transition_skill_certification(
     reason_text = _clean(reason, 500)
 
     blockers: list[str] = []
+    record_fingerprint = _clean(current.get("record_fingerprint"), 128)
+    if not record_fingerprint:
+        blockers.append("CERTIFICATION_RECORD_FINGERPRINT_REQUIRED")
+    elif certification_record_fingerprint(current) != record_fingerprint:
+        blockers.append("CERTIFICATION_RECORD_FINGERPRINT_MISMATCH")
     if current.get("schema") != SCHEMA:
         blockers.append("CERTIFICATION_SCHEMA_INVALID")
     if current_state not in STATES:
@@ -325,7 +338,7 @@ def transition_skill_certification(
     if not applied:
         next_state = current_state if current_state in STATES else "CANDIDATE"
 
-    return {
+    result = {
         "schema": SCHEMA,
         "state": next_state,
         "previous_state": current_state,
@@ -344,6 +357,8 @@ def transition_skill_certification(
         "real_trading_enabled": False,
         "tool_output_is_authority": False,
     }
+    result["record_fingerprint"] = certification_record_fingerprint(result)
+    return result
 
 
 __all__ = [
@@ -352,4 +367,5 @@ __all__ = [
     "assess_skill_manifest",
     "transition_skill_certification",
     "manifest_fingerprint",
+    "certification_record_fingerprint",
 ]
