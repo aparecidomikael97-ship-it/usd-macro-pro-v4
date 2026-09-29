@@ -8,6 +8,20 @@ O operador deve conseguir iniciar o trabalho no Cursor uma vez e deixar a frente
 
 ## Prioridade absoluta
 
+### Validation-only #360 contra main — verde
+
+A Draft #360 foi aberta somente para acionar os workflows que exigem PR com base `main`. No HEAD `a0fa2dff38d2de7e934f3897ecf06dd025552028`, todos os checks observados terminaram SUCCESS:
+
+- Quality tests: 3801 testes, OK;
+- AION Core Security Gate: adversarial contracts + supply-chain audit;
+- AION Global Worker Activation Readiness;
+- AtlasQuant Release Readiness;
+- AtlasQuant Integration UI Smoke;
+- AtlasQuant Mobile DOM Stability.
+
+#360 é **DO NOT MERGE**. A ponta de implementação continua #359.
+
+
 Matriz reconciliada dos achados RT01–RT20:
 `docs/aion/AION_CORE_REDTEAM_CLOSURE_MATRIX_2026-09-29.md`
 
@@ -149,7 +163,7 @@ Criar uma branch temporária de integração a partir da #337, por exemplo:
 
 Integrar de forma não destrutiva:
 
-1. #359 — usar como ponta única consolidada do AION/Núcleo.
+1. #359 — usar como ponta única consolidada do AION/Núcleo no HEAD `a0fa2dff38d2de7e934f3897ecf06dd025552028`.
 
 Não integrar separadamente #339, #340, #353, #355, #356 ou #357: as garantias necessárias estão absorvidas/supersedidas pela #359.
 
