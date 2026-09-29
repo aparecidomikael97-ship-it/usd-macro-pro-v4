@@ -174,7 +174,7 @@ class PersistedGlobalWorkerArmingTests(unittest.TestCase):
             "variables": [{"name": "OTHER_FLAG", "value": "secret-ish"}],
         }
         with patch(
-            "atlasquant_aion_global_worker_persisted_arming.requests.get",
+            "atlasquant_aion_global_worker_persisted_arming.github_get",
             return_value=response,
         ) as get:
             result = read_repository_feature_flag(_config())
@@ -203,7 +203,7 @@ class PersistedGlobalWorkerArmingTests(unittest.TestCase):
                 ]
             }
             with patch(
-                "atlasquant_aion_global_worker_persisted_arming.requests.get",
+                "atlasquant_aion_global_worker_persisted_arming.github_get",
                 return_value=response,
             ):
                 result = read_repository_feature_flag(_config())
@@ -635,7 +635,8 @@ class PersistedGlobalWorkerArmingTests(unittest.TestCase):
             "update_repository_variable",
         ):
             self.assertNotIn(banned, source)
-        self.assertIn("requests.get(", source)
+        self.assertNotIn("requests.get(", source)
+        self.assertIn("github_get(", source)
 
     def test_other_admin_cannot_use_persistence_ticket(self):
         approval = self.persistence_approval()

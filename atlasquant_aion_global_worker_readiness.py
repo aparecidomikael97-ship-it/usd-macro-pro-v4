@@ -14,8 +14,7 @@ import os
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-import requests
-
+from atlasquant_aion_github_io import github_get
 from atlasquant_aion_global_worker import (
     GLOBAL_WORKER_NAMESPACE,
     _claim_state,
@@ -479,7 +478,7 @@ def fetch_recent_autopilot_pulses(
     if token:
         headers["Authorization"] = "Bearer " + token
     try:
-        response = requests.get(
+        response = github_get(
             url,
             headers=headers,
             params={

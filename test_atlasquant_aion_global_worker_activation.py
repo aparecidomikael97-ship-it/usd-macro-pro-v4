@@ -358,7 +358,7 @@ class GlobalWorkerActivationCeremonyTests(unittest.TestCase):
         create = Mock()
         create.raise_for_status.return_value = None
         with patch(
-            "atlasquant_aion_global_worker_activation.requests.post",
+            "atlasquant_aion_global_worker_activation.github_post",
             return_value=create,
         ) as post:
             result = write_repository_feature_flag_enabled(
@@ -373,7 +373,7 @@ class GlobalWorkerActivationCeremonyTests(unittest.TestCase):
         update = Mock()
         update.raise_for_status.return_value = None
         with patch(
-            "atlasquant_aion_global_worker_activation.requests.patch",
+            "atlasquant_aion_global_worker_activation.github_patch",
             return_value=update,
         ) as patch_call:
             result = write_repository_feature_flag_enabled(
@@ -388,10 +388,10 @@ class GlobalWorkerActivationCeremonyTests(unittest.TestCase):
         created = Mock(status_code=201)
         created.raise_for_status.return_value = None
         with patch(
-            "atlasquant_aion_global_worker_activation.requests.patch",
+            "atlasquant_aion_global_worker_activation.github_patch",
             return_value=missing,
         ) as patch_call, patch(
-            "atlasquant_aion_global_worker_activation.requests.post",
+            "atlasquant_aion_global_worker_activation.github_post",
             return_value=created,
         ) as post:
             result = force_disable_repository_feature_flag(_config())
@@ -767,8 +767,10 @@ jobs:
             "publication_executed = True",
         ):
             self.assertNotIn(banned, source)
-        self.assertIn("requests.post(", source)
-        self.assertIn("requests.patch(", source)
+        self.assertNotIn("requests.post(", source)
+        self.assertNotIn("requests.patch(", source)
+        self.assertIn("github_post(", source)
+        self.assertIn("github_patch(", source)
 
 
 if __name__ == "__main__":

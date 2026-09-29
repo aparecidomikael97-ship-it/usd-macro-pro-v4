@@ -47,14 +47,10 @@ FORBIDDEN_ROOTS = frozenset({
     "atlasquant_post_trade_diagnosis",
     "paper_trading_v112",
 })
-# Direct imports observed on 2026-09-29. This is debt, not an approval to add more.
-KNOWN_AION_COUPLINGS = frozenset({
+# Intentional outer-layer boundaries observed on 2026-09-29. New entries fail until explicitly classified.
+EXPECTED_OUTER_BOUNDARY_COUPLINGS = frozenset({
     ("atlasquant_aion_admin.py", "streamlit"),
     ("atlasquant_aion_admin.py", "atlasquant_aion_business"),
-    ("atlasquant_aion_global_worker.py", "requests"),
-    ("atlasquant_aion_global_worker_activation.py", "requests"),
-    ("atlasquant_aion_global_worker_persisted_arming.py", "requests"),
-    ("atlasquant_aion_global_worker_readiness.py", "requests"),
     ("atlasquant_aion_business_adapter.py", "atlasquant_aion_business"),
     ("atlasquant_aion_investment_adapter.py", "atlasquant_investment_ecosystem"),
     ("atlasquant_aion_github_io.py", "requests"),
@@ -109,14 +105,14 @@ class AtlasQuantAionCoreIndependenceTests(unittest.TestCase):
                 forbidden = sorted(closure & FORBIDDEN_ROOTS)
                 self.assertEqual(forbidden, [], module)
 
-    def test_known_domain_couplings_stay_explicit(self):
+    def test_outer_layer_couplings_stay_explicit_and_classified(self):
         observed = set()
         for path in sorted(ROOT.glob("atlasquant_aion*.py")):
             for mod in _imports(path):
                 root = mod.split(".", 1)[0]
                 if root in FORBIDDEN_ROOTS:
                     observed.add((path.name, root))
-        self.assertEqual(observed, set(KNOWN_AION_COUPLINGS))
+        self.assertEqual(observed, set(EXPECTED_OUTER_BOUNDARY_COUPLINGS))
 
     def test_pure_core_imports_without_optional_runtime(self):
         blocker = (
@@ -274,6 +270,47 @@ class AtlasQuantAionCoreIndependenceTests(unittest.TestCase):
             result.stderr[-2000:] + result.stdout[-500:],
         )
         self.assertIn("OPERATIONAL", result.stdout)
+
+    def test_global_worker_family_uses_explicit_network_boundary(self):
+        for name in (
+            "atlasquant_aion_global_worker.py",
+            "atlasquant_aion_global_worker_activation.py",
+            "atlasquant_aion_global_worker_persisted_arming.py",
+            "atlasquant_aion_global_worker_readiness.py",
+        ):
+            imports = set(_imports(ROOT / name))
+            with self.subTest(module=name):
+                self.assertNotIn("requests", imports)
+                self.assertIn("atlasquant_aion_github_io", imports)
+
+    def test_github_io_boundary_imports_without_requests(self):
+        blocker = (
+            "import sys\n"
+            "class Finder:\n"
+            "    def find_spec(self, name, path, target=None):\n"
+            "        if name.split('.',1)[0]=='requests':\n"
+            "            raise ImportError('requests absent')\n"
+            "sys.meta_path.insert(0, Finder())\n"
+            "import atlasquant_aion_github_io\n"
+            "print('IMPORTED')\n"
+        )
+        env = {
+            "PATH": os.environ.get("PATH", ""),
+            "PYTHONPATH": str(ROOT),
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "PYTHONUNBUFFERED": "1",
+        }
+        result = subprocess.run(
+            [sys.executable, "-c", blocker],
+            cwd=ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            timeout=60,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr[-2000:] + result.stdout[-500:])
+        self.assertIn("IMPORTED", result.stdout)
 
     def test_memory_and_recovery_use_explicit_network_boundary(self):
         memory_imports = set(_imports(ROOT / "atlasquant_aion_memory.py"))

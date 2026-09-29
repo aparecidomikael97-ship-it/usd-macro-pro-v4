@@ -615,7 +615,7 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
         put.raise_for_status.return_value = None
         put.json.return_value = {"content": {"sha": "sha-new"}}
         with patch(
-            "atlasquant_aion_global_worker.requests.put",
+            "atlasquant_aion_global_worker.github_put",
             return_value=put,
         ) as put_call, patch(
             "atlasquant_aion_global_worker.load_runtime_checkpoint",
@@ -641,7 +641,7 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
     def test_global_cas_transport_exception_is_ambiguous_and_never_retryable(self):
         checkpoint = ensure_operating_checkpoint(self.armed_checkpoint())
         with patch(
-            "atlasquant_aion_global_worker.requests.put",
+            "atlasquant_aion_global_worker.github_put",
             side_effect=TimeoutError("synthetic timeout"),
         ) as put_call:
             result = _persist_runtime_checkpoint_cas(

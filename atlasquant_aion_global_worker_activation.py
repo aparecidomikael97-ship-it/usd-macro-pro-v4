@@ -18,10 +18,9 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 from urllib.parse import quote
 
-import requests
-
 from atlasquant_aion_core_intelligence.context import Domain
 from atlasquant_aion_core_intelligence.evidence import digest, utc
+from atlasquant_aion_github_io import github_patch, github_post
 from atlasquant_aion_core_runtime_bridge import authenticated_context
 from atlasquant_aion_global_worker import (
     GLOBAL_WORKER_NAMESPACE,
@@ -619,14 +618,14 @@ def write_repository_feature_flag_enabled(
     headers = _headers(config.token)
     try:
         if state == "UNSET":
-            response = requests.post(
+            response = github_post(
                 _variable_collection_url(config),
                 headers=headers,
                 json={"name": FEATURE_FLAG_NAME, "value": ENABLED_VALUE},
                 timeout=timeout,
             )
         else:
-            response = requests.patch(
+            response = github_patch(
                 _variable_url(config),
                 headers=headers,
                 json={"name": FEATURE_FLAG_NAME, "value": ENABLED_VALUE},
@@ -665,14 +664,14 @@ def force_disable_repository_feature_flag(
         }
     headers = _headers(config.token)
     try:
-        response = requests.patch(
+        response = github_patch(
             _variable_url(config),
             headers=headers,
             json={"name": FEATURE_FLAG_NAME, "value": DISABLED_VALUE},
             timeout=timeout,
         )
         if response.status_code == 404:
-            response = requests.post(
+            response = github_post(
                 _variable_collection_url(config),
                 headers=headers,
                 json={"name": FEATURE_FLAG_NAME, "value": DISABLED_VALUE},
