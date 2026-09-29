@@ -2695,6 +2695,190 @@ def _render_critical_surface_health(system_context: Mapping[str, Any] | None) ->
             )
 
 
+def _render_admin_guidance(
+    access: Mapping[str, Any],
+    flags: Mapping[str, bool],
+    system_context: Mapping[str, Any],
+    copilot_snapshot: Mapping[str, Any],
+) -> None:
+    """Compact progressive-disclosure guidance; onboarding stays session-local."""
+    copilot = dict(copilot_snapshot or {})
+    primary = (
+        copilot.get("primary")
+        if isinstance(copilot.get("primary"), Mapping)
+        else {}
+    )
+    st.markdown("#### AION · próximo passo")
+    if primary:
+        st.info(
+            f"{str(primary.get('priority') or 'P3')} · "
+            f"{str(primary.get('title') or 'Revisão necessária')} — "
+            f"{str(primary.get('next_action') or 'Revisar a evidência disponível.')}"
+        )
+    else:
+        st.caption(
+            "Copiloto sem prioridade confirmada nesta execução. "
+            "Ausência de item não é tratada como prova de que todo o sistema está pronto."
+        )
+
+    if _AION_ADMIN_ONBOARDING_STARTED_KEY not in st.session_state:
+        st.session_state[_AION_ADMIN_ONBOARDING_STARTED_KEY] = datetime.now(
+            timezone.utc
+        ).isoformat()
+    if _AION_ADMIN_ONBOARDING_MODE_KEY not in st.session_state:
+        st.session_state[_AION_ADMIN_ONBOARDING_MODE_KEY] = "BEGINNER"
+
+    with st.expander("Copiloto + Onboarding Inteligente", expanded=False):
+        selected_mode = st.selectbox(
+            "Experiência do onboarding",
+            ADMIN_ONBOARDING_MODES,
+            key=_AION_ADMIN_ONBOARDING_MODE_KEY,
+            help=(
+                "BEGINNER e ADVANCED alteram a trilha, nunca as permissões. "
+                "Trocar o modo invalida progresso incompatível em vez de promovê-lo."
+            ),
+        )
+        started_at = str(
+            st.session_state.get(_AION_ADMIN_ONBOARDING_STARTED_KEY) or ""
+        )
+        progress = st.session_state.get(_AION_ADMIN_ONBOARDING_PROGRESS_KEY)
+        progress_map = progress if isinstance(progress, Mapping) else None
+        now = datetime.now(timezone.utc)
+
+        try:
+            onboarding = build_admin_onboarding_snapshot(
+                access,
+                experience_mode=selected_mode,
+                started_at=started_at,
+                feature_flags=flags,
+                system_context=system_context,
+                progress=progress_map,
+                now=now,
+            )
+        except Exception:
+            onboarding = {
+                "state": "BLOCKED",
+                "rejection": {"code": "ONBOARDING_SAFE_FALLBACK"},
+                "completed_step_ids": [],
+                "blocked_step_ids": [],
+                "stale_step_ids": [],
+                "recommendations": [],
+                "steps": [],
+                "executes_action": False,
+                "runtime_written": False,
+                "real_trading_enabled": False,
+            }
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Copiloto", str(copilot.get("state") or "UNKNOWN"))
+        c2.metric("Onboarding", str(onboarding.get("state") or "UNKNOWN"))
+        c3.metric(
+            "Prioridades",
+            int(copilot.get("attention_count") or 0),
+        )
+
+        copilot_items = [
+            item for item in list(copilot.get("items") or [])[:3]
+            if isinstance(item, Mapping)
+        ]
+        if copilot_items:
+            st.markdown("**Prioridades do Copiloto**")
+            for item in copilot_items:
+                st.markdown(
+                    "- **"
+                    + str(item.get("priority") or "P3")
+                    + " · "
+                    + str(item.get("title") or "Item")
+                    + "** — "
+                    + str(item.get("next_action") or "Revisar evidência.")
+                )
+
+        recommendations = [
+            item for item in list(onboarding.get("recommendations") or [])[:3]
+            if isinstance(item, Mapping)
+        ]
+        steps = {
+            str(item.get("step_id") or ""): item
+            for item in list(onboarding.get("steps") or [])
+            if isinstance(item, Mapping)
+        }
+        if recommendations:
+            st.markdown("**Próximas etapas do Onboarding**")
+            for item in recommendations:
+                step_id = str(item.get("step_id") or "")
+                row = steps.get(step_id, {})
+                st.markdown(
+                    "- **"
+                    + step_id
+                    + " · "
+                    + str(item.get("status") or "UNKNOWN")
+                    + "** — "
+                    + str(item.get("next_safe_action") or "")
+                )
+                if row.get("completable") is True:
+                    if st.button(
+                        "Concluir etapa · " + step_id,
+                        key="aion_admin_onboarding_complete_" + step_id,
+                        width="stretch",
+                    ):
+                        try:
+                            updated = complete_admin_onboarding_step(
+                                access,
+                                progress_map,
+                                step_id,
+                                experience_mode=selected_mode,
+                                started_at=started_at,
+                                feature_flags=flags,
+                                system_context=system_context,
+                                now=now,
+                            )
+                            st.session_state[
+                                _AION_ADMIN_ONBOARDING_PROGRESS_KEY
+                            ] = updated
+                            st.rerun()
+                        except Exception:
+                            st.warning(
+                                "A etapa não pôde ser registrada nesta sessão. "
+                                "Nenhuma permissão ou runtime foi alterado."
+                            )
+        else:
+            st.caption(
+                "Nenhuma próxima etapa segura foi confirmada nesta execução."
+            )
+
+        rejection = (
+            onboarding.get("rejection")
+            if isinstance(onboarding.get("rejection"), Mapping)
+            else {}
+        )
+        if rejection:
+            st.caption(
+                "Diagnóstico do onboarding: "
+                + str(rejection.get("code") or "UNKNOWN")
+                + "."
+            )
+
+        if progress_map is not None:
+            if st.button(
+                "Reiniciar onboarding nesta sessão",
+                key="aion_admin_onboarding_reset",
+                width="stretch",
+            ):
+                st.session_state.pop(
+                    _AION_ADMIN_ONBOARDING_PROGRESS_KEY,
+                    None,
+                )
+                st.session_state[_AION_ADMIN_ONBOARDING_STARTED_KEY] = datetime.now(
+                    timezone.utc
+                ).isoformat()
+                st.rerun()
+
+        st.caption(
+            "Sessão local apenas · Checkpoint não é escrito · feature flags não são alteradas · "
+            "promoção automática: NÃO · trading real: BLOQUEADO."
+        )
+
+
 def _render_central(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
