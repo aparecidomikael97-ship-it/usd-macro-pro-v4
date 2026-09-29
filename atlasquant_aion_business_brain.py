@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Mapping, Sequence
 import hashlib
+import json
 
 from atlasquant_aion_core import is_admin
 
@@ -74,6 +75,14 @@ EXTERNAL_ACTIONS = (
     "collect_payment",
 )
 ALWAYS_HUMAN_APPROVAL = frozenset(EXTERNAL_ACTIONS)
+TREND_WINDOWS_DAYS = {
+    "automation_b2b": 30,
+    "micro_saas": 45,
+    "international_ai": 30,
+    "revenue_ops": 30,
+    "digital_products": 45,
+}
+EXPERIMENT_STATUSES = ("DRAFT", "READY_FOR_APPROVAL", "APPROVED", "RUNNING", "REVIEW", "STOPPED", "COMPLETED")
 
 
 def _now() -> str:
@@ -113,6 +122,9 @@ def parallel_brain_contract() -> dict[str, Any]:
         "per_engine_metrics": True,
         "prepares_internal_work": True,
         "external_actions_require_gate": True,
+        "trend_radar": True,
+        "trend_freshness_required": True,
+        "experiment_mode": True,
         "deprecated_primary_fronts": DEPRECATED_PRIMARY_FRONTS,
     }
 
@@ -152,8 +164,115 @@ def normalize_opportunity(raw: Mapping[str, Any]) -> dict[str, Any]:
         "next_action": _text(raw.get("next_action"), 500),
         "customer_ref": _text(raw.get("customer_ref"), 220),
         "external_action": _text(raw.get("external_action"), 80),
+        "evidence_observed_at": _text(raw.get("evidence_observed_at"), 80),
         "updated_at": _text(raw.get("updated_at"), 80) or _now(),
     }
+
+
+def _parse_time(value: Any) -> datetime | None:
+    raw = _text(value, 80)
+    if not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except Exception:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def trend_freshness(raw: Mapping[str, Any], *, now: datetime | None = None) -> dict[str, Any]:
+    item = normalize_opportunity(raw)
+    observed = _parse_time(item.get("evidence_observed_at"))
+    window_days = int(TREND_WINDOWS_DAYS.get(item["engine_id"], 30))
+    reference = now.astimezone(timezone.utc) if isinstance(now, datetime) and now.tzinfo else (
+        now.replace(tzinfo=timezone.utc) if isinstance(now, datetime) else datetime.now(timezone.utc)
+    )
+    if observed is None:
+        return {
+            "state": "UNKNOWN",
+            "fresh": False,
+            "age_days": None,
+            "window_days": window_days,
+            "reason": "Evidência sem data observada.",
+        }
+    age_days = max(0, int((reference - observed).total_seconds() // 86400))
+    fresh = bool(age_days <= window_days)
+    return {
+        "state": "FRESH" if fresh else "STALE",
+        "fresh": fresh,
+        "age_days": age_days,
+        "window_days": window_days,
+        "reason": "Evidência dentro da janela." if fresh else "Evidência venceu a janela de tendência.",
+    }
+
+
+def trend_radar(rows: Sequence[Mapping[str, Any]] | None, *, now: datetime | None = None) -> dict[str, Any]:
+    items = normalize_opportunities(rows)
+    fresh = []
+    stale = []
+    unknown = []
+    for item in items:
+        status = trend_freshness(item, now=now)
+        enriched = dict(item)
+        enriched["trend"] = status
+        if status["state"] == "FRESH":
+            fresh.append(enriched)
+        elif status["state"] == "STALE":
+            stale.append(enriched)
+        else:
+            unknown.append(enriched)
+    fresh.sort(key=lambda x: (-int(x["priority_score"]), str(x["opportunity_id"])))
+    return {
+        "schema": SCHEMA,
+        "fresh": fresh,
+        "stale": stale,
+        "unknown": unknown,
+        "fresh_count": len(fresh),
+        "stale_count": len(stale),
+        "unknown_count": len(unknown),
+    }
+
+
+def experiment_plan(
+    opportunity: Mapping[str, Any],
+    *,
+    hypothesis: Any = "",
+    success_metric: Any = "",
+    max_cost: Any = 0,
+    max_days: Any = 7,
+) -> dict[str, Any]:
+    item = normalize_opportunity(opportunity)
+    try:
+        cost = max(0.0, float(max_cost or 0))
+    except Exception:
+        cost = 0.0
+    try:
+        days = max(1, min(30, int(max_days or 7)))
+    except Exception:
+        days = 7
+    return {
+        "schema": SCHEMA,
+        "experiment_id": "EXP-" + hashlib.sha256(
+            f"{item['opportunity_id']}|{_text(hypothesis, 500)}".encode("utf-8")
+        ).hexdigest()[:12].upper(),
+        "opportunity_id": item["opportunity_id"],
+        "engine_id": item["engine_id"],
+        "status": "DRAFT",
+        "hypothesis": _text(hypothesis, 1000),
+        "success_metric": _text(success_metric, 500),
+        "max_cost": round(cost, 2),
+        "max_days": days,
+        "requires_approval": bool(cost > 0 or item.get("external_action") in EXTERNAL_ACTIONS),
+        "executes_experiment": False,
+    }
+
+
+def business_brain_digest(rows: Sequence[Mapping[str, Any]] | None) -> str:
+    normalized = normalize_opportunities(rows)
+    raw = json.dumps(normalized, ensure_ascii=False, sort_keys=True, default=str)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 
 
 def opportunity_priority(raw: Mapping[str, Any]) -> int:
@@ -269,11 +388,13 @@ def external_action_preflight(
 
 def brain_snapshot(rows: Sequence[Mapping[str, Any]] | None) -> dict[str, Any]:
     queue = unified_business_queue(rows)
+    radar = trend_radar(rows)
     return {
         "schema": SCHEMA,
         "contract": parallel_brain_contract(),
         "queue": queue,
         "cross_sell": cross_sell_suggestions(rows),
+        "trend_radar": radar,
         "active_engines": len(ENGINE_IDS),
         "external_execution": False,
     }
@@ -285,10 +406,15 @@ __all__ = [
     "ENGINE_IDS",
     "DEPRECATED_PRIMARY_FRONTS",
     "EXTERNAL_ACTIONS",
+    "TREND_WINDOWS_DAYS",
     "business_engine_catalog",
     "parallel_brain_contract",
     "normalize_opportunity",
     "normalize_opportunities",
+    "trend_freshness",
+    "trend_radar",
+    "experiment_plan",
+    "business_brain_digest",
     "opportunity_priority",
     "unified_business_queue",
     "cross_sell_suggestions",
