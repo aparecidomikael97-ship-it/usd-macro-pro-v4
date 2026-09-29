@@ -17,9 +17,201 @@ from typing import Any, Mapping, Sequence
 
 from atlasquant_aion_operations import queue_summary
 from atlasquant_aion_durable_tasks import durable_tasks_summary
+from atlasquant_aion_system_health_center import build_system_health_center
 
 SCHEMA="ATLASQUANT_AION_MASTER_STATUS_V1"
 STATES=("CONFIRMED","BLOCKED","EXTERNAL_DEPENDENCY","UNKNOWN")
+
+
+def _system_health_snapshots(
+    *,
+    checkpoint:Mapping[str,Any],
+    runtime_result:Mapping[str,Any],
+    system_context:Mapping[str,Any],
+)->dict[str,dict[str,Any]]:
+    """Adapt existing Admin evidence into the six read-only health domains."""
+    cp=dict(checkpoint or {})
+    runtime=dict(runtime_result or {})
+    system=dict(system_context or {})
+
+    source_mesh=(
+        system.get("source_mesh")
+        if isinstance(system.get("source_mesh"),Mapping)
+        else {}
+    )
+    fallback_count=int(source_mesh.get("fallback_or_unavailable") or 0) if source_mesh else 0
+    source_state=str(source_mesh.get("market_state") or "").upper()
+    if source_mesh and bool(source_mesh.get("market_live_confirmed",False)) and fallback_count==0:
+        sources={
+            "state":"HEALTHY","confirmed":True,
+            "detail":"Source Mesh confirmou mercado ao vivo sem fallback/indisponibilidade.",
+            "total":int(source_mesh.get("observation_count") or 0),
+            "unresolved":0,
+        }
+    elif source_mesh and (
+        fallback_count>0
+        or source_state in {"DEGRADED","PARTIAL","STALE","WARNING","LIMITED"}
+    ):
+        sources={
+            "state":"DEGRADED","confirmed":False,
+            "detail":"Source Mesh tem fallback, indisponibilidade ou cobertura parcial.",
+            "total":int(source_mesh.get("observation_count") or 0),
+            "unresolved":fallback_count,
+        }
+    elif source_mesh and source_state in {"BLOCKED","ERROR","FAILED","UNAVAILABLE","CRITICAL"}:
+        sources={
+            "state":"BLOCKED","confirmed":False,
+            "detail":"Source Mesh reportou bloqueio ou falha de fonte.",
+            "unresolved":max(1,fallback_count),
+        }
+    else:
+        sources={
+            "state":"UNKNOWN","confirmed":False,
+            "detail":"Source Mesh não forneceu confirmação suficiente nesta execução.",
+        }
+
+    app_confirmed=(
+        str(system.get("truth_state") or "").upper()=="CONFIRMED"
+        and bool(_text(system.get("source_build"),120))
+    )
+    runtime_status=str(runtime.get("status") or "UNKNOWN").upper()
+    if app_confirmed and runtime_status=="CONFIRMED":
+        runtime_health={
+            "state":"HEALTHY","confirmed":True,
+            "detail":"Build atual e Checkpoint Mestre foram confirmados nesta execução.",
+            "unresolved":0,
+        }
+    elif runtime_status=="BLOCKED":
+        runtime_health={
+            "state":"BLOCKED","confirmed":False,
+            "detail":"A política/runtime bloqueou a confirmação do Checkpoint Mestre.",
+            "unresolved":1,
+        }
+    else:
+        runtime_health={
+            "state":"UNKNOWN","confirmed":False,
+            "detail":"Build e persistência runtime ainda não têm confirmação conjunta.",
+        }
+
+    explicit_notifications=(
+        system.get("notification_health")
+        if isinstance(system.get("notification_health"),Mapping)
+        else system.get("notifications")
+        if isinstance(system.get("notifications"),Mapping)
+        else {}
+    )
+    if explicit_notifications:
+        notifications=dict(explicit_notifications)
+    else:
+        live=(
+            system.get("live_event_intelligence")
+            if isinstance(system.get("live_event_intelligence"),Mapping)
+            else {}
+        )
+        live_state=str(live.get("state") or "").upper()
+        if live_state in {"BLOCKED","ERROR","FAILED","UNAVAILABLE","CRITICAL"}:
+            notifications={
+                "state":"BLOCKED","confirmed":False,
+                "detail":"Motor interno de alertas reportou falha; entrega externa não é inferida.",
+                "unresolved":1,
+            }
+        elif live:
+            notifications={
+                "state":"DEGRADED" if bool(live.get("continuous_runtime_confirmed",False)) else "UNKNOWN",
+                "confirmed":False,
+                "detail":"Motor interno de alertas foi observado, mas entrega externa não foi confirmada.",
+                "total":int(live.get("alert_count") or 0),
+                "unresolved":0 if bool(live.get("continuous_runtime_confirmed",False)) else None,
+            }
+        else:
+            notifications={
+                "state":"UNKNOWN","confirmed":False,
+                "detail":"Nenhuma evidência explícita de saúde das notificações foi fornecida.",
+            }
+
+    explicit_worker=(
+        system.get("worker_health")
+        if isinstance(system.get("worker_health"),Mapping)
+        else system.get("global_worker_health")
+        if isinstance(system.get("global_worker_health"),Mapping)
+        else {}
+    )
+    if explicit_worker:
+        workers=dict(explicit_worker)
+    else:
+        workers={
+            "state":"UNKNOWN","confirmed":False,
+            "detail":"Worker não possui evidência operacional explícita no contexto desta tela.",
+        }
+
+    operating=cp.get("operating") if isinstance(cp.get("operating"),Mapping) else {}
+    tasks=operating.get("tasks") if isinstance(operating.get("tasks"),list) else []
+    qsum=queue_summary(tasks)
+    blocked_tasks=int(qsum.get("blocked") or 0)
+    if runtime_status=="CONFIRMED":
+        queues={
+            "state":"DEGRADED" if blocked_tasks else "HEALTHY",
+            "confirmed":blocked_tasks==0,
+            "detail":(
+                f"Fila confirmada com {blocked_tasks} tarefa(s) bloqueada(s)."
+                if blocked_tasks
+                else "Fila do Checkpoint Mestre carregada sem tarefas bloqueadas."
+            ),
+            "total":len(tasks),
+            "unresolved":blocked_tasks,
+        }
+    else:
+        queues={
+            "state":"UNKNOWN","confirmed":False,
+            "detail":"Fila pode vir do seed estático; runtime não confirmou persistência.",
+            "total":len(tasks),
+        }
+
+    critical=(
+        system.get("critical_surfaces")
+        if isinstance(system.get("critical_surfaces"),Mapping)
+        else {}
+    )
+    counts=critical.get("counts") if isinstance(critical.get("counts"),Mapping) else {}
+    unavailable=int(counts.get("UNAVAILABLE") or 0)
+    degraded=int(counts.get("DEGRADED") or 0)
+    stale=int(counts.get("STALE_BUILD") or 0)
+    unknown=int(counts.get("UNKNOWN") or 0)
+    if bool(critical.get("all_ok",False)) and not any((unavailable,degraded,stale,unknown)):
+        screens={
+            "state":"HEALTHY","confirmed":True,
+            "detail":"Todas as telas críticas foram observadas como OK no build atual.",
+            "total":int(counts.get("OK") or len(list(critical.get("items") or []))),
+            "unresolved":0,
+        }
+    elif unavailable:
+        screens={
+            "state":"BLOCKED","confirmed":False,
+            "detail":"Há tela crítica indisponível no build atual.",
+            "total":sum(int(counts.get(k) or 0) for k in ("OK","DEGRADED","UNAVAILABLE","STALE_BUILD","UNKNOWN")),
+            "unresolved":unavailable+degraded+stale+unknown,
+        }
+    elif degraded:
+        screens={
+            "state":"DEGRADED","confirmed":False,
+            "detail":"Há tela crítica degradada no build atual.",
+            "unresolved":degraded+stale+unknown,
+        }
+    else:
+        screens={
+            "state":"UNKNOWN","confirmed":False,
+            "detail":"Telas críticas ainda não foram todas confirmadas no build atual.",
+            "unresolved":stale+unknown if critical else None,
+        }
+
+    return {
+        "sources":sources,
+        "runtime":runtime_health,
+        "notifications":notifications,
+        "workers":workers,
+        "queues":queues,
+        "screens":screens,
+    }
 
 
 def _text(value:Any,limit:int=500)->str:
@@ -441,6 +633,43 @@ def build_master_status_board(
         next_action=commercial_next,
     ))
 
+    system_health_center=build_system_health_center(
+        _system_health_snapshots(
+            checkpoint=cp,
+            runtime_result=runtime,
+            system_context=system,
+        )
+    )
+    health_state=str(system_health_center.get("state") or "UNKNOWN").upper()
+    board_health_state=(
+        "CONFIRMED" if health_state=="HEALTHY"
+        else "BLOCKED" if health_state=="BLOCKED"
+        else "UNKNOWN"
+    )
+    unresolved_health=list(system_health_center.get("unresolved_domains") or [])
+    items.append(_item(
+        "system_health_center",
+        "Centro de Saúde do AtlasQuant",
+        area="system",
+        state=board_health_state,
+        detail=(
+            f"{int(system_health_center.get('healthy_domains') or 0)}/"
+            f"{int(system_health_center.get('total_domains') or 6)} domínios saudáveis confirmados"
+            + (
+                " · pendentes: "+", ".join(unresolved_health)
+                if unresolved_health else
+                " · todos os domínios confirmados"
+            )
+            + f" · estado interno {health_state}."
+        ),
+        source="AION System Health Center · evidência local já computada",
+        next_action=(
+            ""
+            if health_state=="HEALTHY"
+            else "Revisar apenas os domínios pendentes; o Centro de Saúde não executa reparos automaticamente."
+        ),
+    ))
+
     counts={state:0 for state in STATES}
     for item in items:
         counts[item["state"]]+=1
@@ -452,6 +681,7 @@ def build_master_status_board(
         "schema":SCHEMA,
         "states":list(STATES),
         "items":items,
+        "system_health_center":system_health_center,
         "counts":counts,
         "attention":attention,
         "has_unresolved":bool(attention),
