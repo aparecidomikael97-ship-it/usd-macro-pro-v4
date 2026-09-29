@@ -140,6 +140,8 @@ def build_cost_center(
 
     confirmed_total = 0.0
     estimated_total = 0.0
+    confirmed_items = 0
+    estimated_items = 0
     rejected = 0
     by_category: dict[str, dict[str, float | int]] = {
         category: {
@@ -161,11 +163,13 @@ def build_cost_center(
         amount = float(row["amount_usd_monthly"] or 0.0)
         bucket["usable_items"] = int(bucket["usable_items"]) + 1
         if row["truth_state"] == "CONFIRMED":
+            confirmed_items += 1
             confirmed_total += amount
             bucket["confirmed_usd"] = round(
                 float(bucket["confirmed_usd"]) + amount, 6
             )
         elif row["truth_state"] == "ESTIMATED":
+            estimated_items += 1
             estimated_total += amount
             bucket["estimated_usd"] = round(
                 float(bucket["estimated_usd"]) + amount, 6
@@ -187,7 +191,7 @@ def build_cost_center(
         state = "UNKNOWN"
     elif rejected == len(rows):
         state = "UNKNOWN"
-    elif estimated_total > 0 or rejected > 0:
+    elif estimated_items > 0 or rejected > 0:
         state = "PARTIAL"
     else:
         state = "CONFIRMED"
@@ -200,6 +204,8 @@ def build_cost_center(
         "items": rows,
         "items_total": len(rows),
         "usable_items": sum(1 for row in rows if row["usable"]),
+        "confirmed_items": confirmed_items,
+        "estimated_items": estimated_items,
         "rejected_items": rejected,
         "confirmed_monthly_usd": round(confirmed_total, 6),
         "estimated_monthly_usd": round(estimated_total, 6),
