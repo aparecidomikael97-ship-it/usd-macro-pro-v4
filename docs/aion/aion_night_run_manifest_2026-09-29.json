@@ -49,19 +49,13 @@
     "irreversible_runtime_mutation"
   ],
   "validation": {
-    "targeted": [
-      "python -m unittest test_atlasquant_aion_memory.py",
-      "python -m unittest test_atlasquant_aion_global_worker.py",
-      "python -m unittest test_atlasquant_aion_worker_runtime.py",
-      "python -m unittest test_atlasquant_aion_recovery.py",
-      "python -m unittest test_atlasquant_aion_background_executor.py"
-    ],
-    "full": [
-      "python tools/aion_redteam_runner.py",
-      "python -m unittest discover",
-      "python -m compileall -q .",
-      "git diff --check"
-    ]
+    "primary_command": "python tools/aion_night_validation.py --full --report aion-night-validation-report.json",
+    "quick_command": "python tools/aion_night_validation.py --quick --report aion-night-validation-quick.json",
+    "full_required_before_morning_report": true,
+    "zero_cost": true,
+    "network_allowed": false,
+    "dependency_install_allowed": false,
+    "report": "aion-night-validation-report.json"
   },
   "next_hardening_order": [
     "operational_recovery_and_ambiguous_persistence",
