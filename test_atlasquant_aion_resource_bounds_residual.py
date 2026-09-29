@@ -5,9 +5,12 @@ import atlasquant_aion_continuity as continuity
 import atlasquant_aion_dev_fusion as dev_fusion
 import atlasquant_aion_digital_twin as digital_twin
 import atlasquant_aion_event_journal as event_journal
+import atlasquant_aion_evaluation_lab as evaluation_lab
 import atlasquant_aion_learning as learning
+import atlasquant_aion_model_registry as model_registry
 import atlasquant_aion_operations as operations
 import atlasquant_aion_release_confidence as release_confidence
+import atlasquant_aion_tool_hub as tool_hub
 
 
 class GuardedIterable:
@@ -172,6 +175,27 @@ class AionResidualResourceBoundsTests(unittest.TestCase):
         self.assertEqual(sources.reads,12)
         self.assertEqual(currencies.reads,12)
 
+    def test_evaluation_toolhub_and_registry_prefix_bounds(self):
+        eval_refs=GuardedIterable((f"ref-{i}" for i in range(10)),max_reads=3)
+        self.assertEqual(evaluation_lab._refs(eval_refs,limit=3),["ref-0","ref-1","ref-2"])
+        self.assertEqual(eval_refs.reads,3)
+
+        tool_refs=GuardedIterable((f"scope-{i}" for i in range(10)),max_reads=3)
+        self.assertEqual(tool_hub._unique(tool_refs,limit=3),["scope-0","scope-1","scope-2"])
+        self.assertEqual(tool_refs.reads,3)
+
+        model_texts=GuardedIterable((f"model-{i}" for i in range(10)),max_reads=3)
+        self.assertEqual(model_registry._texts(model_texts,limit=3),["model-0","model-1","model-2"])
+        self.assertEqual(model_texts.reads,3)
+
+        models=GuardedIterable(
+            ({"model_id":f"m-{i}"} for i in range(model_registry.MAX_MODELS+1)),
+            max_reads=model_registry.MAX_MODELS,
+        )
+        bounded=model_registry._bounded_models(models)
+        self.assertEqual(len(bounded),model_registry.MAX_MODELS)
+        self.assertEqual(models.reads,model_registry.MAX_MODELS)
+
     def test_cross_core_tail_buffers_are_memory_bounded(self):
         sources={
             "atlasquant_aion_event_journal.py":[
@@ -189,6 +213,9 @@ class AionResidualResourceBoundsTests(unittest.TestCase):
             ],
             "atlasquant_aion_dev_fusion.py":[
                 "deque(rows or (),maxlen=MAX_PIPELINES*2)",
+            ],
+            "atlasquant_aion_evaluation_lab.py":[
+                "deque(rows or (),maxlen=MAX_RUNS*2)",
             ],
         }
         for filename,needles in sources.items():
