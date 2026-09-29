@@ -1,7 +1,6 @@
 import importlib.util
 from pathlib import Path
 import sys
-import tempfile
 import unittest
 
 
@@ -49,6 +48,10 @@ class AionNightValidationTests(unittest.TestCase):
         self.assertIn("test_atlasquant_aion_chaos_recovery", adversarial)
         self.assertIn("test_atlasquant_aion_core_independence", adversarial)
         self.assertIn("test_atlasquant_aion_global_worker_readiness", adversarial)
+        self.assertIn("test_atlasquant_aion_global_worker_live_verification", adversarial)
+        self.assertIn("test_atlasquant_aion_global_worker_supervision", adversarial)
+        self.assertIn("test_atlasquant_aion_global_worker_recovery_closure", adversarial)
+        self.assertIn("test_atlasquant_aion_global_worker_incident_reconciliation", adversarial)
 
     def test_report_fails_closed_if_any_step_is_not_pass(self):
         report = night.build_report(
@@ -75,13 +78,19 @@ class AionNightValidationTests(unittest.TestCase):
 
     def test_output_redaction_masks_common_secret_assignments(self):
         rendered = night._redact(
-            "token=abc123 api_key:xyz password=hunter2 secret=value"
+            "token=abc123 api_key:xyz password=hunter2 secret=value "
+            "GITHUB_TOKEN_HISTORICO=gh-secret AUTHORIZATION_HEADER=bearer-secret"
         )
-        self.assertNotIn("abc123", rendered)
-        self.assertNotIn("xyz", rendered)
-        self.assertNotIn("hunter2", rendered)
-        self.assertNotIn("value", rendered)
-        self.assertGreaterEqual(rendered.count("[REDACTED]"), 4)
+        for value in (
+            "abc123",
+            "xyz",
+            "hunter2",
+            "value",
+            "gh-secret",
+            "bearer-secret",
+        ):
+            self.assertNotIn(value, rendered)
+        self.assertGreaterEqual(rendered.count("[REDACTED]"), 6)
 
 
 if __name__ == "__main__":
