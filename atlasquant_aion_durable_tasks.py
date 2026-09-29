@@ -6,6 +6,7 @@ They never turn resumption into authorization: resuming restores state only.
 """
 from __future__ import annotations
 
+from collections import deque
 from copy import deepcopy
 from datetime import datetime, timezone
 from hashlib import sha256
@@ -324,7 +325,7 @@ def normalize_durable_tasks(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str
     source = (
         rows[-MAX_TASKS*2:]
         if isinstance(rows, (list, tuple))
-        else tuple(islice(rows or (), MAX_TASKS*2))
+        else deque(rows or (), maxlen=MAX_TASKS*2)
     )
     for raw in source:
         if not isinstance(raw,Mapping):
