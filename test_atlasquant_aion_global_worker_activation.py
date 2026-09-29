@@ -28,6 +28,11 @@ from atlasquant_aion_global_worker_activation import (
     validate_global_worker_activation_approval,
     write_repository_feature_flag_enabled,
 )
+from atlasquant_aion_coordination_mode_gate import (
+    CURRENT_MODE as CURRENT_COORDINATION_MODE,
+    MULTI_INSTANCE_MODE,
+    coordination_activation_gate,
+)
 from atlasquant_aion_memory import (
     RuntimeConfig,
     checkpoint_source_digest,
@@ -130,12 +135,23 @@ class GlobalWorkerActivationCeremonyTests(unittest.TestCase):
             "feature_flag_modified": False,
         }
 
-    def plan(self, *, runtime=None, readiness=None, flag=None, ttl=600):
+    def plan(
+        self,
+        *,
+        runtime=None,
+        readiness=None,
+        flag=None,
+        ttl=600,
+        coordination_mode=CURRENT_COORDINATION_MODE,
+        coordination_readiness=None,
+    ):
         result = prepare_global_worker_activation_plan(
             self.access,
             runtime or self.runtime,
             readiness or self.readiness,
             flag or _safe_flag("UNSET"),
+            coordination_mode=coordination_mode,
+            coordination_readiness=coordination_readiness,
             ttl_seconds=ttl,
             now=NOW,
         )
@@ -180,6 +196,129 @@ class GlobalWorkerActivationCeremonyTests(unittest.TestCase):
         self.assertTrue(plan["requires_live_evidence_after_activation"])
         self.assertTrue(plan["activation_does_not_execute_worker_tick"])
         self.assertFalse(plan["real_trading_enabled"])
+
+    def test_activation_plan_declares_current_coordination_posture(self):
+        plan = self.plan()
+        self.assertEqual(
+            plan["coordination_mode"],
+            CURRENT_COORDINATION_MODE,
+        )
+        self.assertEqual(
+            plan["coordination_gate_state"],
+            "READY_CURRENT_MODE",
+        )
+        self.assertFalse(plan["multi_instance_operationally_verified"])
+        self.assertEqual(plan["coordination_adapter_id"], "")
+        self.assertEqual(plan["coordination_adapter_identity_digest"], "")
+
+        ticket = self.approval(plan=plan)
+        self.assertEqual(
+            ticket["coordination_mode"],
+            CURRENT_COORDINATION_MODE,
+        )
+        self.assertEqual(
+            ticket["coordination_gate_state"],
+            "READY_CURRENT_MODE",
+        )
+        self.assertFalse(ticket["multi_instance_operationally_verified"])
+        validated = validate_global_worker_activation_approval(
+            self.access,
+            self.runtime,
+            ticket,
+            now=NOW,
+        )
+        self.assertEqual(validated["state"], "APPROVED")
+        self.assertEqual(
+            validated["coordination_mode"],
+            CURRENT_COORDINATION_MODE,
+        )
+        self.assertFalse(
+            validated["multi_instance_operationally_verified"]
+        )
+
+    def test_multi_instance_mode_blocks_without_adapter_evidence(self):
+        result = prepare_global_worker_activation_plan(
+            self.access,
+            self.runtime,
+            self.readiness,
+            _safe_flag("UNSET"),
+            coordination_mode=MULTI_INSTANCE_MODE,
+            now=NOW,
+        )
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertEqual(
+            result["reason"],
+            "COORDINATION_ADAPTER_EVIDENCE_REQUIRED",
+        )
+        self.assertEqual(result["coordination"]["mode"], MULTI_INSTANCE_MODE)
+        self.assertFalse(result["coordination"]["allows_activation_plan"])
+        self.assertFalse(result["coordination"]["multi_instance_verified"])
+
+    def test_structural_coordination_receipt_is_not_operational_proof(self):
+        structural = {
+            "state": "PROBE_EVIDENCE_READY",
+            "probe_evidence_accepted": True,
+            "probe_receipt_structurally_valid": True,
+            "operational_verification": "UNKNOWN",
+            "adapter_id": "future-shared",
+            "adapter_identity_digest": "a" * 64,
+        }
+        gate = coordination_activation_gate(
+            MULTI_INSTANCE_MODE,
+            coordination_readiness=structural,
+        )
+        self.assertEqual(gate["state"], "BLOCK")
+        self.assertTrue(gate["structural_evidence_present"])
+        self.assertEqual(
+            gate["reason"],
+            "COORDINATION_OPERATIONAL_VERIFICATION_REQUIRED",
+        )
+        self.assertFalse(gate["multi_instance_verified"])
+
+        result = prepare_global_worker_activation_plan(
+            self.access,
+            self.runtime,
+            self.readiness,
+            _safe_flag("UNSET"),
+            coordination_mode=MULTI_INSTANCE_MODE,
+            coordination_readiness=structural,
+            now=NOW,
+        )
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertEqual(
+            result["reason"],
+            "COORDINATION_OPERATIONAL_VERIFICATION_REQUIRED",
+        )
+        self.assertFalse(result["feature_flag_modified"])
+        self.assertFalse(result["global_worker_executed"])
+
+    def test_invalid_coordination_mode_is_fail_closed(self):
+        result = prepare_global_worker_activation_plan(
+            self.access,
+            self.runtime,
+            self.readiness,
+            _safe_flag("UNSET"),
+            coordination_mode="multi-ish",
+            now=NOW,
+        )
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertEqual(result["reason"], "COORDINATION_MODE_INVALID")
+
+    def test_coordination_mode_is_integrity_bound_into_activation_plan(self):
+        plan = self.plan()
+        plan["coordination_mode"] = MULTI_INSTANCE_MODE
+        result = approve_global_worker_activation_plan(
+            self.access,
+            plan,
+            confirmation=True,
+            confirmation_phrase=CONFIRMATION_PHRASE,
+            now=NOW,
+        )
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertEqual(
+            result["reason"],
+            "ACTIVATION_PLAN_INTEGRITY_MISMATCH",
+        )
 
     def test_plan_blocks_when_runtime_is_not_persisted_armed(self):
         runtime = {

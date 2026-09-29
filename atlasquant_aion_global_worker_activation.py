@@ -22,6 +22,10 @@ from atlasquant_aion_core_intelligence.context import Domain
 from atlasquant_aion_core_intelligence.evidence import digest, utc
 from atlasquant_aion_github_io import github_patch, github_post
 from atlasquant_aion_core_runtime_bridge import authenticated_context
+from atlasquant_aion_coordination_mode_gate import (
+    CURRENT_MODE as CURRENT_COORDINATION_MODE,
+    coordination_activation_gate,
+)
 from atlasquant_aion_global_worker import (
     GLOBAL_WORKER_NAMESPACE,
     load_global_worker_state,
@@ -353,6 +357,8 @@ def prepare_global_worker_activation_plan(
     flag_evidence: Mapping[str, Any],
     *,
     reactivation_gate: Mapping[str, Any] | None = None,
+    coordination_mode: Any = CURRENT_COORDINATION_MODE,
+    coordination_readiness: Mapping[str, Any] | None = None,
     ttl_seconds: int = DEFAULT_TTL_SECONDS,
     now: datetime | None = None,
 ) -> dict[str, Any]:
@@ -384,6 +390,23 @@ def prepare_global_worker_activation_plan(
             "schema": SCHEMA,
             "status": "BLOCKED",
             "reason": str(ready.get("reason") or "READINESS_NOT_READY"),
+            "feature_flag_modified": False,
+            "global_worker_executed": False,
+        }
+
+    coordination = coordination_activation_gate(
+        coordination_mode,
+        coordination_readiness=coordination_readiness,
+    )
+    if coordination.get("allows_activation_plan") is not True:
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "reason": str(
+                coordination.get("reason")
+                or "COORDINATION_MODE_NOT_READY"
+            ),
+            "coordination": coordination,
             "feature_flag_modified": False,
             "global_worker_executed": False,
         }
@@ -447,6 +470,15 @@ def prepare_global_worker_activation_plan(
         "resource_budgets": runtime["resource_budgets"],
         "max_jobs": runtime["max_jobs"],
         "lease_seconds": runtime["lease_seconds"],
+        "coordination_mode": str(coordination.get("mode") or ""),
+        "coordination_gate_state": str(coordination.get("state") or ""),
+        "coordination_adapter_id": str(coordination.get("adapter_id") or ""),
+        "coordination_adapter_identity_digest": str(
+            coordination.get("adapter_identity_digest") or ""
+        ),
+        "multi_instance_operationally_verified": (
+            coordination.get("multi_instance_verified") is True
+        ),
         "readiness_stage": READY_STAGE,
         "readiness_checked_at": ready["checked_at"],
         "readiness_pulse_state": ready["pulse_state"],
@@ -520,6 +552,15 @@ def approve_global_worker_activation_plan(
         "arm_digest": str(plan.get("arm_digest") or ""),
         "arming_plan_digest": str(plan.get("arming_plan_digest") or ""),
         "arming_approval_digest": str(plan.get("arming_approval_digest") or ""),
+        "coordination_mode": str(plan.get("coordination_mode") or ""),
+        "coordination_gate_state": str(plan.get("coordination_gate_state") or ""),
+        "coordination_adapter_id": str(plan.get("coordination_adapter_id") or ""),
+        "coordination_adapter_identity_digest": str(
+            plan.get("coordination_adapter_identity_digest") or ""
+        ),
+        "multi_instance_operationally_verified": (
+            plan.get("multi_instance_operationally_verified") is True
+        ),
         "feature_flag_state_at_plan": str(plan.get("feature_flag_state") or ""),
         "feature_flag_target_state": "ENABLED",
         "post_incident_gate_required": bool(
@@ -585,12 +626,29 @@ def validate_global_worker_activation_approval(
             return {"state": "BLOCKED", "reason": "ACTIVATION_APPROVAL_ARMING_STATE_CHANGED"}
     if str(ticket.get("confirmation_phrase_digest") or "") != digest(CONFIRMATION_PHRASE):
         return {"state": "BLOCKED", "reason": "ACTIVATION_APPROVAL_CONFIRMATION_PROOF_MISMATCH"}
+    if str(ticket.get("coordination_mode") or "") != CURRENT_COORDINATION_MODE:
+        return {
+            "state": "BLOCKED",
+            "reason": "MULTI_INSTANCE_EXECUTION_NOT_AVAILABLE",
+        }
+    if str(ticket.get("coordination_gate_state") or "") != "READY_CURRENT_MODE":
+        return {
+            "state": "BLOCKED",
+            "reason": "COORDINATION_GATE_STATE_INVALID",
+        }
+    if ticket.get("multi_instance_operationally_verified") is not False:
+        return {
+            "state": "BLOCKED",
+            "reason": "COORDINATION_EVIDENCE_INCONSISTENT",
+        }
 
     return {
         "state": "APPROVED",
         "reason": "",
         "approval_digest": str(ticket.get("approval_digest") or ""),
         "runtime_sha": runtime["runtime_sha"],
+        "coordination_mode": CURRENT_COORDINATION_MODE,
+        "multi_instance_operationally_verified": False,
     }
 
 
