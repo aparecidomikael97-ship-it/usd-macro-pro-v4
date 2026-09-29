@@ -278,17 +278,16 @@
     "intentionally_open": [
       {
         "pr": 344,
-        "role": "night_handoff_runner"
+        "role": "operational_handoff_only_do_not_merge"
       },
       {
         "pr": 358,
         "role": "paused_interface",
         "may_advance": false
-      },
-      {
-        "pr": 286,
-        "role": "legacy_cursor_front_do_not_auto_integrate"
       }
+    ],
+    "closed_legacy": [
+      286
     ]
   },
   "validation_artifacts": {
@@ -341,5 +340,6 @@
     "payment_enabled": false,
     "interface_changes_in_candidate": false,
     "candidate_remains_frozen": true
-  }
+  },
+  "production_boundary_audit": "docs/aion/AION_PRODUCTION_BOUNDARY_AUDIT_2026-09-29.md"
 }
