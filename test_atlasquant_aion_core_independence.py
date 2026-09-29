@@ -51,6 +51,13 @@ FORBIDDEN_ROOTS = frozenset({
 KNOWN_AION_COUPLINGS = frozenset({
     ("atlasquant_aion_admin.py", "streamlit"),
     ("atlasquant_aion_admin.py", "atlasquant_aion_business"),
+    ("atlasquant_aion_approval_inbox.py", "atlasquant_aion_business"),
+    ("atlasquant_aion_memory.py", "requests"),
+    ("atlasquant_aion_recovery.py", "requests"),
+    ("atlasquant_aion_specialist_evidence.py", "atlasquant_aion_business"),
+    ("atlasquant_aion_specialist_evidence.py", "atlasquant_investment_ecosystem"),
+    ("atlasquant_aion_specialist_session.py", "atlasquant_aion_business"),
+    ("atlasquant_aion_specialist_session.py", "atlasquant_investment_ecosystem"),
     ("atlasquant_aion_global_worker.py", "requests"),
     ("atlasquant_aion_global_worker_activation.py", "requests"),
     ("atlasquant_aion_global_worker_persisted_arming.py", "requests"),
