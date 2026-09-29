@@ -190,6 +190,31 @@ class AionReplayModeTests(unittest.TestCase):
         )
         self.assertEqual(session["state"], "BLOCKED")
 
+    def test_tampered_session_cannot_preserve_execution_flags_on_error(self):
+        session = {
+            "state": "REVEALED",
+            "training_only": False,
+            "live_data_used": True,
+            "future_evidence_exposed": True,
+            "automatic_promotion": True,
+            "execution_authorized": True,
+            "executes_action": True,
+            "real_trading_enabled": True,
+        }
+        out = submit_replay_decision(
+            session,
+            choice="WAIT",
+            submitted_at="2026-09-20T14:05:00+00:00",
+        )
+        self.assertEqual(out["state"], "BLOCKED")
+        self.assertFalse(out["live_data_used"])
+        self.assertFalse(out["future_evidence_exposed"])
+        self.assertFalse(out["automatic_promotion"])
+        self.assertFalse(out["execution_authorized"])
+        self.assertFalse(out["executes_action"])
+        self.assertFalse(out["real_trading_enabled"])
+        self.assertTrue(out["training_only"])
+
     def test_decision_requires_active_session(self):
         session = start_replay_session(
             scenario_id="S1",
@@ -266,6 +291,29 @@ class AionReplayModeTests(unittest.TestCase):
         )
         self.assertEqual(out["state"], "BLOCKED")
         self.assertEqual(out["reason"], "CONFIDENCE_INVALID")
+
+    def test_tampered_session_cannot_preserve_execution_flags_on_reveal_error(self):
+        session = {
+            "state": "ACTIVE",
+            "training_only": False,
+            "live_data_used": True,
+            "future_evidence_exposed": True,
+            "automatic_promotion": True,
+            "execution_authorized": True,
+            "executes_action": True,
+            "real_trading_enabled": True,
+        }
+        out = reveal_replay_outcome(
+            session,
+            outcome={"expected_decision": "WAIT"},
+            available_at="2026-09-20T15:00:00+00:00",
+            revealed_at="2026-09-20T15:00:00+00:00",
+        )
+        self.assertEqual(out["state"], "BLOCKED")
+        self.assertFalse(out["execution_authorized"])
+        self.assertFalse(out["executes_action"])
+        self.assertFalse(out["real_trading_enabled"])
+        self.assertTrue(out["training_only"])
 
     def test_outcome_cannot_be_revealed_before_decision(self):
         session = start_replay_session(
