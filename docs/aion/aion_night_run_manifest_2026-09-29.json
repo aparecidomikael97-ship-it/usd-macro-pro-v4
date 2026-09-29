@@ -12,9 +12,9 @@
   },
   "integrate": [
     {
-      "pr": 355,
-      "branch": "chatgpt/aion-memory-optional-product-adapters-v1",
-      "role": "aion_nucleus_global_worker_resource_dependency_tenant_supply_chain_recovery_and_optional_product_isolation",
+      "pr": 356,
+      "branch": "chatgpt/aion-memory-optional-domain-adapters-v1",
+      "role": "aion_nucleus_global_worker_resource_tenant_supply_chain_and_optional_domain_isolation",
       "contains_prs": [
         338,
         342,
@@ -25,8 +25,7 @@
         348,
         349,
         350,
-        352,
-        354
+        352
       ]
     },
     {
@@ -35,9 +34,12 @@
       "role": "session_worker_lease_hardening"
     },
     {
-      "pr": 340,
-      "branch": "chatgpt/aion-recovery-outcome-hardening-v1",
-      "role": "recovery_outcome_truth"
+      "pr": 353,
+      "branch": "chatgpt/aion-recovery-revision-binding-v1",
+      "role": "recovery_outcome_truth_and_revision_binding",
+      "contains_prs": [
+        340
+      ]
     }
   ],
   "autonomy": {
@@ -68,7 +70,8 @@
   },
   "next_hardening_order": [
     "resource_bounds_residual_scan",
-    "consolidated_stack_validation"
+    "recovery_partial_record_adversarial_tests",
+    "ruleset_required_checks_human_decision"
   ],
   "stop_conditions": [
     "human_authorization_required",
@@ -89,7 +92,8 @@
     "recovery_revision_binding_and_strict_history_parse": "pr_353",
     "supply_chain_duplicate_pr_351": "superseded_by_pr_352",
     "rt19_business_studio_promotions_empty_core_independence": "pr_349_and_pr_355",
-    "entitlements_dependency": "retained_as_tenant_core_dependency"
+    "entitlements_dependency": "retained_as_tenant_core_dependency",
+    "rt19_optional_product_domains": "pr_356"
   },
   "superseded_prs": [
     {
