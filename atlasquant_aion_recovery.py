@@ -219,12 +219,35 @@ def recovery_preflight(
             "executes_action":False,
         }
 
-    integrity=(
-        selected.get("integrity")
-        if isinstance(selected.get("integrity"),Mapping)
-        else checkpoint_integrity_report(checkpoint)
-    )
-    integrity_state=str(integrity.get("state") or "UNKNOWN").upper()
+    integrity=checkpoint_integrity_report(checkpoint)
+    claim=selected.get("integrity") if isinstance(selected.get("integrity"),Mapping) else None
+    actual_state=str(integrity.get("state") or "UNKNOWN").upper()
+    if claim is not None:
+        claim_state=str(claim.get("state") or "").strip().upper()
+        write_mismatch=(
+            "write_safe" in claim
+            and claim.get("write_safe") is not integrity.get("write_safe")
+        )
+        if claim_state!=actual_state or write_mismatch:
+            return {
+                "schema":SCHEMA,
+                "allowed":False,
+                "reason":"Recovery integrity claim does not match the recomputed checkpoint.",
+                "candidate_integrity":actual_state,
+                "executes_action":False,
+            }
+    claimed_digest=str(selected.get("digest") or "").strip()
+    actual_digest=checkpoint_source_digest(checkpoint)
+    if claimed_digest and claimed_digest!=actual_digest:
+        return {
+            "schema":SCHEMA,
+            "allowed":False,
+            "reason":"Recovery candidate digest does not match the checkpoint.",
+            "candidate_integrity":actual_state,
+            "candidate_digest":actual_digest,
+            "executes_action":False,
+        }
+    integrity_state=actual_state
     if integrity_state not in {"CONFIRMED","MIGRATION_REQUIRED"}:
         return {
             "schema":SCHEMA,

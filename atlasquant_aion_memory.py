@@ -1478,7 +1478,7 @@ def save_runtime_checkpoint(
 ) -> dict[str, Any]:
     """Persist only after approval and confirm persistence with read-after-write."""
     cfg = config or config_from_mapping()
-    if not approved:
+    if approved is not True:
         return {
             "schema": SCHEMA,
             "status": "BLOCKED",
@@ -1564,7 +1564,7 @@ def save_runtime_checkpoint(
                 == _arming_contract_digest(proposed_global)
         )
         transition = not same_armed
-        if transition and not allow_global_arming_transition:
+        if transition and allow_global_arming_transition is not True:
             return {
                 "schema": SCHEMA,
                 "status": "BLOCKED",
