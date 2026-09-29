@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
+import re
 from typing import Any, Mapping, Sequence
 
 from atlasquant_access_control import has_permission, normalize_role
@@ -59,6 +60,12 @@ _SECRET_EXACT = frozenset({
     "auth_token",
     "private_key",
 })
+
+_SECRET_VALUE_PATTERNS = (
+    re.compile(r"(?i)\b(api[_ -]?key|token|password|secret|credential)\s*[:=]\s*[^\s,;]+"),
+    re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]{6,}"),
+    re.compile(r"\bsk-[A-Za-z0-9_-]{8,}\b"),
+)
 _CONTEXT_KEYS = frozenset({
     "subject_ref",
     "role",
@@ -314,6 +321,8 @@ def _secret_key(name: object) -> bool:
 def _contains_secret(value: Any, depth: int = 0) -> bool:
     if depth > MAX_DEPTH:
         return False
+    if isinstance(value, str):
+        return any(pattern.search(value) for pattern in _SECRET_VALUE_PATTERNS)
     if isinstance(value, Mapping):
         for key, item in list(value.items())[:MAX_COLLECTION]:
             if _secret_key(key) or _contains_secret(item, depth + 1):
