@@ -18,6 +18,7 @@ feature flags or broker execution.
 """
 from __future__ import annotations
 
+from collections import deque
 from datetime import datetime, timezone
 from hashlib import sha256
 from typing import Any, Mapping, Sequence
@@ -241,7 +242,12 @@ def normalize_wisdom_entries(
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for raw in list(rows or [])[-MAX_ENTRIES * 2 :]:
+    source = (
+        rows[-MAX_ENTRIES * 2 :]
+        if isinstance(rows, (list, tuple))
+        else deque(rows or (), maxlen=MAX_ENTRIES * 2)
+    )
+    for raw in source:
         if not isinstance(raw, Mapping):
             continue
         try:
