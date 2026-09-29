@@ -11172,6 +11172,40 @@ def render_aion_admin_console(
         })
 
     try:
+        copilot_snapshot = build_admin_copilot_snapshot(
+            status_board=status_board,
+            incident_snapshot=incident_snapshot,
+            executive_snapshot=executive_snapshot,
+            reliability_snapshot=final_reliability,
+            system_context=system,
+            max_items=6,
+        )
+    except Exception as exc:
+        copilot_snapshot = {
+            "schema":"ATLASQUANT_AION_ADMIN_COPILOT_V1",
+            "state":"UNKNOWN",
+            "items":[],
+            "attention_count":0,
+            "primary":None,
+            "evidence_only":True,
+            "promotes_setup":False,
+            "automatic_setup_promotion":False,
+            "automatic_approval":False,
+            "automatic_feature_change":False,
+            "automatic_repair":False,
+            "automatic_deploy":False,
+            "automatic_publish":False,
+            "automatic_charge":False,
+            "real_trading_enabled":False,
+            "executes_action":False,
+        }
+        foundation_diagnostics.append({
+            "component":"admin_copilot",
+            "error_type":type(exc).__name__,
+        })
+    system["admin_copilot"] = copilot_snapshot
+
+    try:
         commander_snapshot = commander_briefing(
             checkpoint=checkpoint,
             system_context=system,
@@ -11248,7 +11282,7 @@ def render_aion_admin_console(
             _render_central(
                 access_map, checkpoint, runtime_result, memory_summary, flags,
                 system, status_board, approval_inbox, incident_snapshot,
-                executive_snapshot,
+                executive_snapshot, copilot_snapshot,
                 specialist_snapshot=specialist_snapshot,
             )
         elif selected_workspace == "🗂️ Secretaria":
@@ -11562,6 +11596,10 @@ def render_aion_admin_console(
             or "SEM_EVIDENCIA"
         ),
         "commander_executes_action": False,
+        "admin_copilot_state": str(copilot_snapshot.get("state") or "UNKNOWN"),
+        "admin_copilot_attention_count": int(copilot_snapshot.get("attention_count") or 0),
+        "admin_copilot_executes_action": False,
+        "admin_copilot_real_trading_enabled": False,
         "validation_center": validation_center_snapshot(
             system,
             runtime_status=runtime_result.get("status"),
