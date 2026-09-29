@@ -846,7 +846,7 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
     if not isinstance(raw_redemptions, (list, tuple)):
         raw_redemptions = []
     promo_redemptions = [
-        dict(x) for x in list(raw_redemptions)[:2000]
+        dict(x) for x in raw_redemptions[:2000]
         if isinstance(x, Mapping)
     ]
     payload["promotions"] = {
@@ -1141,7 +1141,7 @@ def update_promotions_checkpoint(
     if not isinstance(raw_redemptions, (list, tuple)):
         raw_redemptions = []
     redemption_rows = [
-        dict(x) for x in list(raw_redemptions)[:2000]
+        dict(x) for x in raw_redemptions[:2000]
         if isinstance(x, Mapping)
     ]
     payload["promotions"] = {
