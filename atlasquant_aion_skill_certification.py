@@ -176,7 +176,8 @@ def assess_skill_manifest(
         tool_workspace = _identifier(tool.get("workspace_id"))
         if not tool_workspace or tool_workspace not in workspace_ids:
             blockers.append("TOOL_WORKSPACE_OUT_OF_SCOPE:" + tool_id)
-        if str(tool.get("connector_id") or "").strip() and not network_required:
+        connector_id = _identifier(tool.get("connector_id")) if tool.get("connector_id") else ""
+        if connector_id and not network_required:
             blockers.append("NETWORK_UNDERDECLARED:" + tool_id)
         allowed_scopes.update(str(x) for x in list(tool.get("required_scopes") or []))
         if tool.get("external_side_effects") is True and not external_side_effects:
@@ -249,9 +250,100 @@ def assess_skill_manifest(
     }
 
 
+def transition_skill_certification(
+    record: Mapping[str, Any] | None,
+    *,
+    action: Any,
+    trusted_context: Mapping[str, Any] | None,
+    approved: Any = False,
+    reason: Any = "",
+) -> dict[str, Any]:
+    """Suspend or revoke a certification record without activating anything."""
+    current = dict(record or {})
+    trusted = dict(trusted_context or {})
+    current_state = _clean(current.get("state"), 40).upper()
+    action_norm = _clean(action, 40).upper()
+    manifest = (
+        dict(current.get("manifest"))
+        if isinstance(current.get("manifest"), Mapping)
+        else {}
+    )
+    fingerprint = _clean(current.get("fingerprint"), 128)
+    trusted_tenant = _clean(trusted.get("tenant_id"), 120)
+    trusted_workspace = _identifier(trusted.get("workspace_id"))
+    trusted_role = _clean(trusted.get("role"), 40).upper()
+    reason_text = _clean(reason, 500)
+
+    blockers: list[str] = []
+    if current.get("schema") != SCHEMA:
+        blockers.append("CERTIFICATION_SCHEMA_INVALID")
+    if current_state not in STATES:
+        blockers.append("CERTIFICATION_STATE_INVALID")
+    if not manifest or not fingerprint:
+        blockers.append("CERTIFICATION_RECORD_INCOMPLETE")
+    elif manifest_fingerprint(manifest) != fingerprint:
+        blockers.append("CERTIFICATION_FINGERPRINT_MISMATCH")
+    workspace_ids = [
+        _identifier(x)
+        for x in _unique(manifest.get("workspace_ids"))
+    ]
+    if (
+        not trusted_tenant
+        or not trusted_workspace
+        or trusted_workspace not in workspace_ids
+    ):
+        blockers.append("TRUSTED_SCOPE_MISMATCH")
+    if trusted_role != "ADMIN":
+        blockers.append("ADMIN_REQUIRED")
+    if approved is not True:
+        blockers.append("EXPLICIT_APPROVAL_REQUIRED")
+    if not reason_text:
+        blockers.append("TRANSITION_REASON_REQUIRED")
+
+    next_state = current_state if current_state in STATES else "CANDIDATE"
+    if action_norm == "SUSPEND":
+        if current_state != "CERTIFIED":
+            blockers.append("INVALID_SUSPEND_TRANSITION")
+        else:
+            next_state = "SUSPENDED"
+    elif action_norm == "REVOKE":
+        if current_state not in {"CERTIFIED", "SUSPENDED"}:
+            blockers.append("INVALID_REVOKE_TRANSITION")
+        else:
+            next_state = "REVOKED"
+    else:
+        blockers.append("TRANSITION_ACTION_INVALID")
+
+    blockers = list(dict.fromkeys(blockers))
+    applied = not blockers
+    if not applied:
+        next_state = current_state if current_state in STATES else "CANDIDATE"
+
+    return {
+        "schema": SCHEMA,
+        "state": next_state,
+        "previous_state": current_state,
+        "transition_action": action_norm,
+        "transition_reason": reason_text,
+        "transition_applied": applied,
+        "terminal": next_state == "REVOKED",
+        "manifest": manifest,
+        "fingerprint": fingerprint,
+        "blockers": blockers,
+        "activates_skill": False,
+        "activates_connector": False,
+        "executes_tool": False,
+        "expands_permissions": False,
+        "creates_entitlement": False,
+        "real_trading_enabled": False,
+        "tool_output_is_authority": False,
+    }
+
+
 __all__ = [
     "SCHEMA",
     "STATES",
     "assess_skill_manifest",
+    "transition_skill_certification",
     "manifest_fingerprint",
 ]
