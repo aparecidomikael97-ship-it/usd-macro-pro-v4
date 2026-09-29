@@ -42,6 +42,21 @@ class AtlasQuantAionCognitiveOrchestratorTests(unittest.TestCase):
         self.assertTrue(plan["blockers"])
         self.assertFalse(plan["web_research_executed"])
 
+    def test_textual_or_numeric_live_confirmation_stays_blocked(self):
+        for value in ("true", "false", 1, 0):
+            with self.subTest(value=value):
+                plan = build_research_plan(
+                    "O que está acontecendo no mercado agora?",
+                    specialists=route_specialists("mercado agora")["selected"],
+                    system_context={
+                        "source_mesh": {"market_live_confirmed": value},
+                        "reliability": {"degraded_mode": {"state": "DEGRADED_SAFE"}},
+                    },
+                )
+                self.assertTrue(plan["time_sensitive"])
+                self.assertFalse(plan["market_live_confirmed"])
+                self.assertTrue(plan["blockers"])
+
     def test_confirmed_claim_without_source_is_revised(self):
         out=verify_claims([
             {
