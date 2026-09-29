@@ -283,6 +283,38 @@ class AtlasQuantAionCoreIndependenceTests(unittest.TestCase):
                 self.assertNotIn("requests", imports)
                 self.assertIn("atlasquant_aion_github_io", imports)
 
+    def test_global_worker_family_imports_without_requests(self):
+        blocker = (
+            "import sys\n"
+            "class Finder:\n"
+            "    def find_spec(self, name, path, target=None):\n"
+            "        if name.split('.',1)[0]=='requests':\n"
+            "            raise ImportError('requests absent')\n"
+            "sys.meta_path.insert(0, Finder())\n"
+            "import atlasquant_aion_global_worker\n"
+            "import atlasquant_aion_global_worker_activation\n"
+            "import atlasquant_aion_global_worker_persisted_arming\n"
+            "import atlasquant_aion_global_worker_readiness\n"
+            "print('IMPORTED')\n"
+        )
+        env = {
+            "PATH": os.environ.get("PATH", ""),
+            "PYTHONPATH": str(ROOT),
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "PYTHONUNBUFFERED": "1",
+        }
+        result = subprocess.run(
+            [sys.executable, "-c", blocker],
+            cwd=ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            timeout=60,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr[-2000:] + result.stdout[-500:])
+        self.assertIn("IMPORTED", result.stdout)
+
     def test_memory_and_recovery_use_explicit_network_boundary(self):
         memory_imports = set(_imports(ROOT / "atlasquant_aion_memory.py"))
         recovery_imports = set(_imports(ROOT / "atlasquant_aion_recovery.py"))
