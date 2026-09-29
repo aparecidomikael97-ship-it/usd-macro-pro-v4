@@ -329,6 +329,8 @@ def _default_state() -> dict[str, Any]:
         "merge_allowed": False,
         "real_trading_enabled": False,
     }
+    if state_name != "ARMED" and state["inflight_tick"]:
+        raise ValueError("GLOBAL_INFLIGHT_REQUIRES_ARMED_STATE")
     state["digest"] = _bundle_digest(state)
     return state
 
@@ -446,6 +448,15 @@ def _normalize_state(raw: Mapping[str, Any]) -> dict[str, Any]:
             or _parse_iso(state["arming_approval_expires_at"]) is None
         ):
             raise ValueError("invalid armed global worker state")
+        inflight = state["inflight_tick"]
+        lease = state["lease"]
+        if inflight and (
+            not lease["owner"]
+            or inflight["owner"] != lease["owner"]
+            or inflight["lease_token"] != lease["token"]
+            or inflight["fencing_token"] != lease["fencing_token"]
+        ):
+            raise ValueError("GLOBAL_INFLIGHT_LEASE_MISMATCH")
         budgets = state["resource_budgets"]
         zero_budget_fields = (
             "provider_calls_per_tick",
