@@ -190,6 +190,12 @@ from atlasquant_aion_executive_pulse import (
     compact_attention_rows,
     executive_pulse,
 )
+from atlasquant_aion_admin_guidance import (
+    EXPERIENCE_MODES as ADMIN_ONBOARDING_MODES,
+    build_admin_copilot_snapshot,
+    build_admin_onboarding_snapshot,
+    complete_admin_onboarding_step,
+)
 from atlasquant_navigation_bridge import request_surface_revalidation
 from atlasquant_aion_validation_center import (
     validation_center_rows,
@@ -594,6 +600,9 @@ _WORKING_SOURCE_KEY = "aion_working_checkpoint_source_digest"
 _WORKING_DIRTY_KEY = "aion_working_checkpoint_dirty"
 _WORKING_CONFLICT_KEY = "aion_working_checkpoint_conflict"
 _AION_WORKSPACE_JUMP_KEY = "aion_admin_workspace_jump"
+_AION_ADMIN_ONBOARDING_PROGRESS_KEY = "aion_admin_onboarding_progress_v1"
+_AION_ADMIN_ONBOARDING_STARTED_KEY = "aion_admin_onboarding_started_v1"
+_AION_ADMIN_ONBOARDING_MODE_KEY = "aion_admin_onboarding_mode_v1"
 _AION_WORKER_RUNTIME_ID_KEY = "aion_worker_runtime_id_v1"
 _AION_GLOBAL_ARMING_PLAN_KEY = "aion_global_arming_plan_v1"
 _AION_GLOBAL_ARMING_APPROVAL_KEY = "aion_global_arming_approval_v1"
