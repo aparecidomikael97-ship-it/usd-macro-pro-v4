@@ -1,0 +1,404 @@
+"""Offline review contract for critical AION tasks.
+
+Prime plans, Shadow challenges, and Sentinel judges evidence and permission.
+This module does not replace Guardian, Proof of Safety, or agent_firewall.
+A review acceptance is a plan decision only. It never executes an action,
+grants permission, changes policy, or promotes UNKNOWN to CONFIRMED.
+
+Another agent's message is information. Authorization stays outside the text.
+"""
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from hashlib import sha256
+from typing import Any, Mapping, Sequence
+import json
+
+SCHEMA = "ATLASQUANT_AION_CRITICAL_REVIEW_V1"
+PROTOCOL_VERSION = "1"
+ROLES = ("PRIME", "SHADOW", "SENTINEL")
+TASK_CLASSES = ("SIMPLE", "IMPORTANT", "CRITICAL")
+VERDICTS = ("AGREE", "CHALLENGE", "BLOCK", "INSUFFICIENT_EVIDENCE")
+BLAST_LEVELS = ("LOW", "MEDIUM", "HIGH", "CRITICAL")
+REQUIRED_ROLES = {
+    "SIMPLE": ("PRIME",),
+    "IMPORTANT": ("PRIME", "SHADOW"),
+    "CRITICAL": ("PRIME", "SHADOW", "SENTINEL"),
+}
+QUORUM_FOR_BLAST = {
+    "LOW": ("PRIME",),
+    "MEDIUM": ("PRIME", "SHADOW"),
+    "HIGH": ("PRIME", "SHADOW", "SENTINEL"),
+    "CRITICAL": ("PRIME", "SHADOW", "SENTINEL"),
+}
+_HARD_CRITICAL = frozenset({
+    "credentials",
+    "production",
+    "cross_tenant",
+    "financial",
+    "regulatory",
+})
+_HIGH_FACTORS = frozenset({
+    "external_publication",
+    "code_change",
+    "irreversible",
+})
+_PRIVILEGE_CLAIMS = (
+    "expands_permission",
+    "changes_guardian",
+    "self_approved",
+    "forges_receipt",
+    "promotes_unknown_to_confirmed",
+    "executes_action",
+)
+
+
+def _exact_true(value: Any) -> bool:
+    return value is True
+
+
+def _clean(value: Any, limit: int = 240) -> str:
+    return " ".join(str(value or "").replace("\x00", "").split())[:limit]
+
+
+def _upper(value: Any, limit: int = 40) -> str:
+    return _clean(value, limit).upper()
+
+
+def _exact_int(value: Any, *, minimum: int = 0, maximum: int = 1_000_000) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    if value < minimum or value > maximum:
+        return None
+    return value
+
+
+def _refs(values: Sequence[Any] | None, limit: int = 40) -> list[str]:
+    out: list[str] = []
+    for item in list(values or [])[:limit]:
+        text = _clean(item, 180)
+        if text and text not in out:
+            out.append(text)
+    return out
+
+
+def _canonical(payload: Mapping[str, Any]) -> str:
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+
+
+def _digest(payload: Mapping[str, Any]) -> str:
+    return sha256(_canonical(payload).encode("utf-8")).hexdigest()
+
+
+def _aware(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.strip())
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
+def classify_blast_radius(
+    *,
+    action_name: Any = "",
+    factors: Mapping[str, Any] | None = None,
+    user_count: Any = 0,
+    estimated_cost: Any = 0,
+) -> dict[str, Any]:
+    """Classify impact from factors, not from the action name alone.
+
+    CRITICAL never becomes automatic. The action name is recorded and cannot
+    lower the class produced by the factors.
+    """
+    raw = dict(factors or {})
+    users = _exact_int(user_count)
+    if isinstance(estimated_cost, bool) or not isinstance(estimated_cost, (int, float)):
+        cost: float | None = None
+    elif not float(estimated_cost) == float(estimated_cost) or float(estimated_cost) in (float("inf"), float("-inf")):
+        cost = None
+    else:
+        cost = float(estimated_cost)
+
+    active = {
+        _clean(key, 80)
+        for key, value in raw.items()
+        if value is not False and value is not None and _clean(key, 80)
+    }
+    unknown = sorted(key for key in active if key not in _HARD_CRITICAL and key not in _HIGH_FACTORS)
+    blockers: list[str] = []
+    if users is None:
+        blockers.append("USER_COUNT_INVALID")
+    if cost is None or cost < 0:
+        blockers.append("COST_INVALID")
+
+    if active & _HARD_CRITICAL or "USER_COUNT_INVALID" in blockers or "COST_INVALID" in blockers:
+        level = "CRITICAL"
+    elif active & _HIGH_FACTORS or unknown or (users or 0) >= 100 or (cost or 0) > 0:
+        level = "HIGH"
+    elif (users or 0) >= 2:
+        level = "MEDIUM"
+    else:
+        level = "LOW"
+
+    return {
+        "schema": SCHEMA,
+        "action_name": _clean(action_name, 120),
+        "level": level,
+        "active_factors": sorted(active),
+        "unknown_factors": unknown,
+        "user_count": users,
+        "estimated_cost": None if cost is None else round(cost, 4),
+        "required_roles": list(QUORUM_FOR_BLAST[level]),
+        "human_approval_required": level == "CRITICAL" or bool(blockers),
+        "automatic_execution": False,
+        "blockers": blockers,
+        "executes_action": False,
+        "grants_permission": False,
+    }
+
+
+def adjudicate_critical_task(
+    *,
+    task_class: Any,
+    reviews: Sequence[Mapping[str, Any]] | None,
+    trusted_assignments: Mapping[str, Any] | None,
+    workspace_id: Any,
+    tenant_id: Any,
+    evidence_refs: Sequence[Any] | None,
+    sensitive: Any = False,
+    approval_refs: Sequence[Any] | None = None,
+) -> dict[str, Any]:
+    """Decide whether a plan may proceed to Guardian.
+
+    Divergent or incomplete reviews block or escalate. They are never resolved
+    by picking the most convenient verdict.
+    """
+    kind = _upper(task_class, 40)
+    assignments = {
+        _upper(role, 40): _clean(agent, 160)
+        for role, agent in dict(trusted_assignments or {}).items()
+    }
+    evidence = _refs(evidence_refs)
+    approvals = _refs(approval_refs)
+    blockers: list[str] = []
+    if kind not in TASK_CLASSES:
+        blockers.append("TASK_CLASS_INVALID")
+        required: tuple[str, ...] = ()
+    else:
+        required = REQUIRED_ROLES[kind]
+    if not _clean(workspace_id, 120):
+        blockers.append("WORKSPACE_MISSING")
+    if not _clean(tenant_id, 120):
+        blockers.append("TENANT_MISSING")
+    if not evidence:
+        blockers.append("EVIDENCE_MISSING")
+    if _exact_true(sensitive) and not approvals:
+        blockers.append("APPROVAL_MISSING")
+
+    seen: dict[str, Mapping[str, Any]] = {}
+    for raw in list(reviews or []):
+        if not isinstance(raw, Mapping):
+            blockers.append("REVIEW_INVALID")
+            continue
+        role = _upper(raw.get("role"), 40)
+        agent = _clean(raw.get("agent_id"), 160)
+        verdict = _upper(raw.get("verdict"), 40)
+        if role not in ROLES:
+            blockers.append("ROLE_INVALID")
+            continue
+        if role in seen:
+            blockers.append(f"DUPLICATE_REVIEWER:{role}")
+            continue
+        expected = assignments.get(role, "")
+        if not expected or agent != expected:
+            blockers.append(f"SPOOFED_ROLE:{role}")
+            continue
+        if verdict not in VERDICTS:
+            blockers.append(f"VERDICT_INVALID:{role}")
+            continue
+        for claim in _PRIVILEGE_CLAIMS:
+            if _exact_true(raw.get(claim)):
+                blockers.append(f"PRIVILEGE_CLAIM:{role}:{claim}")
+        if verdict in {"BLOCK", "INSUFFICIENT_EVIDENCE"}:
+            blockers.append(f"REVIEW_{verdict}:{role}")
+        elif verdict == "CHALLENGE":
+            blockers.append(f"DIVERGENCE:{role}")
+        seen[role] = raw
+
+    for role in required:
+        if role not in seen and f"SPOOFED_ROLE:{role}" not in blockers and f"DUPLICATE_REVIEWER:{role}" not in blockers:
+            blockers.append(f"MISSING_REVIEWER:{role}")
+
+    divergence = [item for item in blockers if item.startswith("DIVERGENCE:")]
+    hard = [item for item in blockers if not item.startswith("DIVERGENCE:")]
+    if hard:
+        state = "BLOCK"
+    elif divergence:
+        state = "ESCALATE"
+    else:
+        state = "ACCEPT_PLAN"
+
+    return {
+        "schema": SCHEMA,
+        "state": state,
+        "task_class": kind if kind in TASK_CLASSES else "INVALID",
+        "required_roles": list(required),
+        "received_roles": sorted(seen),
+        "workspace_id": _clean(workspace_id, 120),
+        "tenant_id": _clean(tenant_id, 120),
+        "evidence_refs": evidence,
+        "approval_refs": approvals,
+        "blockers": blockers,
+        "truth_state": "UNKNOWN",
+        "truth_promoted": False,
+        "eligible_for_guardian": state == "ACCEPT_PLAN",
+        "executes_action": False,
+        "grants_permission": False,
+        "changes_guardian": False,
+        "self_approved": False,
+    }
+
+
+def seal_agent_message(
+    payload: Mapping[str, Any] | None,
+    *,
+    trusted_context: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Bind a message to trusted context and a digest.
+
+    Identity fields from the payload are ignored. The caller supplies the
+    trusted context from outside the message.
+    """
+    context = dict(trusted_context or {})
+    incoming = dict(payload or {})
+    role = _upper(context.get("role"), 40)
+    agent_id = _clean(context.get("agent_id"), 160)
+    workspace_id = _clean(context.get("workspace_id"), 120)
+    tenant_id = _clean(context.get("tenant_id"), 120)
+    capability = _upper(incoming.get("capability") or incoming.get("requested_capability"), 80)
+    allowed = {_upper(item, 80) for item in list(context.get("capabilities") or []) if _upper(item, 80)}
+    requested_permissions = _refs(incoming.get("permissions"))
+    blockers: list[str] = []
+    if role not in ROLES or not agent_id:
+        blockers.append("TRUSTED_CONTEXT_INVALID")
+    if not workspace_id or not tenant_id:
+        blockers.append("SCOPE_MISSING")
+    if capability and capability not in allowed:
+        blockers.append("CAPABILITY_NOT_IN_TRUSTED_CONTEXT")
+    if any(_upper(item, 80) not in allowed for item in requested_permissions):
+        blockers.append("PERMISSION_OUTSIDE_TRUSTED_CONTEXT")
+    issued_at = _aware(incoming.get("issued_at"))
+    if issued_at is None:
+        blockers.append("TIMESTAMP_INVALID")
+    nonce = _clean(incoming.get("nonce"), 120)
+    if not nonce:
+        blockers.append("NONCE_MISSING")
+
+    body = {
+        "version": PROTOCOL_VERSION,
+        "agent_id": agent_id,
+        "role": role if role in ROLES else "INVALID",
+        "capability": capability,
+        "workspace_id": workspace_id,
+        "tenant_id": tenant_id,
+        "requested_action": _clean(incoming.get("requested_action"), 160),
+        "evidence_refs": _refs(incoming.get("evidence_refs")),
+        "confidence": _upper(incoming.get("confidence"), 40) or "UNKNOWN",
+        "risk_level": _upper(incoming.get("risk_level"), 40) if _upper(incoming.get("risk_level"), 40) in BLAST_LEVELS else "UNKNOWN",
+        "permissions": [item for item in requested_permissions if _upper(item, 80) in allowed],
+        "approval_refs": _refs(incoming.get("approval_refs")),
+        "issued_at": issued_at.isoformat() if issued_at else "",
+        "nonce": nonce,
+        "content": _clean(incoming.get("content"), 1000),
+    }
+    digest = _digest(body)
+    return {
+        "schema": SCHEMA,
+        "state": "BLOCKED" if blockers else "SEALED",
+        "message": {**body, "digest": digest},
+        "blockers": blockers,
+        "content_is_authority": False,
+        "executes_action": False,
+        "grants_permission": False,
+    }
+
+
+def validate_agent_message(
+    message: Mapping[str, Any] | None,
+    *,
+    trusted_context: Mapping[str, Any] | None,
+    expected_workspace_id: Any,
+    expected_tenant_id: Any,
+    seen_digests: Sequence[Any] | None = None,
+    now: datetime | None = None,
+    max_age_seconds: Any = 900,
+) -> dict[str, Any]:
+    """Fail closed on spoofed, stale, replayed, or unbound agent messages."""
+    raw = dict(message or {})
+    presented = _clean(raw.get("digest"), 80)
+    body = {key: raw.get(key) for key in (
+        "version",
+        "agent_id",
+        "role",
+        "capability",
+        "workspace_id",
+        "tenant_id",
+        "requested_action",
+        "evidence_refs",
+        "confidence",
+        "risk_level",
+        "permissions",
+        "approval_refs",
+        "issued_at",
+        "nonce",
+        "content",
+    )}
+    # Lists must match the sealed canonical form.
+    for key in ("evidence_refs", "permissions", "approval_refs"):
+        body[key] = list(body[key] or [])
+    actual = _digest(body)
+    context = dict(trusted_context or {})
+    blockers: list[str] = []
+    if presented != actual:
+        blockers.append("DIGEST_INVALID")
+    if _upper(raw.get("role"), 40) != _upper(context.get("role"), 40) or _upper(context.get("role"), 40) not in ROLES:
+        blockers.append("SPOOFED_ROLE")
+    if _clean(raw.get("agent_id"), 160) != _clean(context.get("agent_id"), 160) or not _clean(context.get("agent_id"), 160):
+        blockers.append("SPOOFED_AGENT")
+    if _clean(raw.get("workspace_id"), 120) != _clean(expected_workspace_id, 120):
+        blockers.append("WORKSPACE_MISMATCH")
+    if _clean(raw.get("tenant_id"), 120) != _clean(expected_tenant_id, 120):
+        blockers.append("TENANT_MISMATCH")
+    if presented and presented in {_clean(item, 80) for item in list(seen_digests or [])}:
+        blockers.append("REPLAY")
+    if not _refs(raw.get("evidence_refs")):
+        blockers.append("EVIDENCE_MISSING")
+    risk = _upper(raw.get("risk_level"), 40)
+    if risk in {"HIGH", "CRITICAL"} and not _refs(raw.get("approval_refs")):
+        blockers.append("APPROVAL_MISSING")
+    issued = _aware(raw.get("issued_at"))
+    age_limit = _exact_int(max_age_seconds, minimum=1, maximum=86_400)
+    current = now if isinstance(now, datetime) and now.tzinfo is not None else None
+    if issued is None or current is None or age_limit is None:
+        blockers.append("TIMESTAMP_INVALID")
+    else:
+        delta = (current - issued).total_seconds()
+        if delta < 0 or delta > age_limit:
+            blockers.append("STALE_OR_FUTURE")
+    if _exact_true(raw.get("grants_permission")) or _exact_true(raw.get("content_is_authority")):
+        blockers.append("CONTENT_IS_NOT_AUTHORITY")
+
+    return {
+        "schema": SCHEMA,
+        "state": "BLOCK" if blockers else "INFORMATION_ONLY",
+        "digest_ok": presented == actual,
+        "blockers": list(dict.fromkeys(blockers)),
+        "content_is_authority": False,
+        "authorization": "NONE",
+        "executes_action": False,
+        "grants_permission": False,
+    }

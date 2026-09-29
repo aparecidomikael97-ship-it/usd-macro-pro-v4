@@ -40,12 +40,15 @@ jobs:
             atlasquant_aion_digital_twin.py \
             atlasquant_aion_dev_fusion.py \
             test_atlasquant_aion_security_adversarial.py \
-            test_atlasquant_aion_chaos_recovery.py
+            test_atlasquant_aion_chaos_recovery.py \
+            atlasquant_aion_critical_review.py \
+            test_atlasquant_aion_critical_review.py
       - name: Run authority, injection, isolation and recovery tests
         run: |
           python -m unittest -q \
             test_atlasquant_aion_security_adversarial.py \
             test_atlasquant_aion_chaos_recovery.py \
+            test_atlasquant_aion_critical_review.py \
             test_atlasquant_aion_fortress.py \
             test_atlasquant_aion_resilience.py \
             test_atlasquant_aion_recovery.py \
