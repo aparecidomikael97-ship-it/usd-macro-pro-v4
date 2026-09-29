@@ -14,6 +14,8 @@ from atlasquant_aion_core import guardian_decision
 from atlasquant_aion_developer_engine import definition_of_done, new_development_workflow
 from atlasquant_aion_fortress import emergency_cutoff_posture
 from atlasquant_aion_specialists import SPECIALIST_MODULES
+from atlasquant_aion_business_adapter import business_summary as _business_summary
+from atlasquant_aion_investment_adapter import investment_product_comparison as _investment_comparison
 from atlasquant_content_pipeline import provider_readiness
 from atlasquant_fx_universe import universe_integrity
 from atlasquant_lab_matrix import lab_matrix
@@ -23,16 +25,6 @@ from atlasquant_scanner_queue import scanner_queue
 def _approval_inbox(checkpoint):
     from atlasquant_aion_approval_inbox import collect_approval_inbox
     return collect_approval_inbox(checkpoint)
-
-
-def _business_summary(products):
-    from atlasquant_aion_business import business_summary
-    return business_summary(products)
-
-
-def _investment_comparison(products):
-    from atlasquant_investment_ecosystem import investment_product_comparison
-    return investment_product_comparison(products)
 
 
 SCHEMA = "ATLASQUANT_AION_SPECIALIST_EVIDENCE_V1"

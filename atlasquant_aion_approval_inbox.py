@@ -12,11 +12,7 @@ from atlasquant_aion_operations import normalize_queue
 from atlasquant_aion_studio import normalize_projects
 from atlasquant_aion_promotions import normalize_campaigns
 from atlasquant_aion_entitlements import normalize_entitlements
-
-def _normalize_business_products(values:Any):
-    from atlasquant_aion_business import normalize_products
-    return normalize_products(values)
-
+from atlasquant_aion_business_adapter import normalize_business_products as _normalize_business_products
 
 SCHEMA="ATLASQUANT_AION_APPROVAL_INBOX_V1"
 KINDS=("TASK","STUDIO","BUSINESS","PROMOTION","ENTITLEMENT")

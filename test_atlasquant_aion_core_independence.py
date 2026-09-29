@@ -51,16 +51,12 @@ FORBIDDEN_ROOTS = frozenset({
 KNOWN_AION_COUPLINGS = frozenset({
     ("atlasquant_aion_admin.py", "streamlit"),
     ("atlasquant_aion_admin.py", "atlasquant_aion_business"),
-    ("atlasquant_aion_approval_inbox.py", "atlasquant_aion_business"),
-    ("atlasquant_aion_specialist_evidence.py", "atlasquant_aion_business"),
-    ("atlasquant_aion_specialist_evidence.py", "atlasquant_investment_ecosystem"),
-    ("atlasquant_aion_specialist_session.py", "atlasquant_aion_business"),
-    ("atlasquant_aion_specialist_session.py", "atlasquant_investment_ecosystem"),
     ("atlasquant_aion_global_worker.py", "requests"),
     ("atlasquant_aion_global_worker_activation.py", "requests"),
     ("atlasquant_aion_global_worker_persisted_arming.py", "requests"),
     ("atlasquant_aion_global_worker_readiness.py", "requests"),
     ("atlasquant_aion_business_adapter.py", "atlasquant_aion_business"),
+    ("atlasquant_aion_investment_adapter.py", "atlasquant_investment_ecosystem"),
     ("atlasquant_aion_github_io.py", "requests"),
     ("atlasquant_aion_provider.py", "requests"),
     ("atlasquant_aion_replay_panel.py", "streamlit"),
@@ -320,6 +316,19 @@ class AtlasQuantAionCoreIndependenceTests(unittest.TestCase):
         self.assertIn("IMPORTED", result.stdout)
 
 
+
+    def test_specialist_contracts_use_optional_domain_adapters(self):
+        evidence_imports = set(_imports(ROOT / "atlasquant_aion_specialist_evidence.py"))
+        session_imports = set(_imports(ROOT / "atlasquant_aion_specialist_session.py"))
+        inbox_imports = set(_imports(ROOT / "atlasquant_aion_approval_inbox.py"))
+        for imports in (evidence_imports, session_imports, inbox_imports):
+            self.assertNotIn("atlasquant_aion_business", imports)
+        for imports in (evidence_imports, session_imports):
+            self.assertNotIn("atlasquant_investment_ecosystem", imports)
+            self.assertIn("atlasquant_aion_investment_adapter", imports)
+        self.assertIn("atlasquant_aion_business_adapter", evidence_imports)
+        self.assertIn("atlasquant_aion_business_adapter", session_imports)
+        self.assertIn("atlasquant_aion_business_adapter", inbox_imports)
 
     def test_specialist_contracts_import_without_business_or_investments(self):
         blocker = (
