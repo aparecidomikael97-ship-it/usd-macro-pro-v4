@@ -144,17 +144,10 @@ class AtlasQuantAionSkillCertificationTests(unittest.TestCase):
             }]
         }
         from atlasquant_aion_capabilities import CapabilityRegistry, default_registry
-        base = default_registry()
-        registry = CapabilityRegistry(base.list())
-        existing = registry.get("research.synthesize")
-        registry._items["research.synthesize"] = type(existing)(
-            **{
-                **existing.as_dict(),
-                "allowed_tools": tuple(
-                    list(existing.allowed_tools) + ["external.research.read"]
-                ),
-            }
-        )
+        existing = default_registry().get("research.synthesize")
+        modified = existing.as_dict()
+        modified["allowed_tools"] = list(existing.allowed_tools) + ["external.research.read"]
+        registry = CapabilityRegistry([modified])
         out = assess_skill_manifest(
             raw,
             trusted_context=TRUSTED,
