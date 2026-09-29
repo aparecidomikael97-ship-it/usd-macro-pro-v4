@@ -714,6 +714,9 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
                 "sha": "sha-0",
             },
         ), patch(
+            "atlasquant_aion_global_worker.secrets.token_urlsafe",
+            return_value="lease-secret-test-value",
+        ), patch(
             "atlasquant_aion_global_worker._persist_runtime_checkpoint_cas",
             return_value={
                 "status": "UNVERIFIED",
@@ -737,6 +740,16 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
         self.assertTrue(result["reconciliation_required"])
         self.assertFalse(result["automatic_retry_allowed"])
         self.assertEqual(result["processed"], 0)
+        self.assertNotIn("lease-secret-test-value", str(result))
+        self.assertNotIn("token", result["lease"])
+        self.assertFalse(result["lease"]["token_exposed"])
+        self.assertEqual(result["lease"]["owner"], "gha-unverified")
+        self.assertEqual(result["lease"]["fencing_token"], 1)
+
+    def test_global_worker_diagnostics_never_return_raw_lease_object(self):
+        source = Path("atlasquant_aion_global_worker.py").read_text(encoding="utf-8")
+        self.assertNotIn('"lease": lease,', source)
+        self.assertIn('"lease": _public_lease_view(lease),', source)
 
     def test_claim_cas_conflict_blocks_executor(self):
         checkpoint = self.armed_checkpoint()
