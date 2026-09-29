@@ -27,6 +27,12 @@ This block hardens the AION Core change path and adversarial safety contracts wi
 8. Policy-integrity failure recommends emergency stop and does not self-destruct or bypass the independent controller.
 9. Checkpoint recovery requires a confirmed current runtime, an eligible historical candidate and explicit administrator approval.
 10. Security checks never claim that a tool action, deployment, merge, payment or real trade occurred.
+11. Approval, admin authentication, signed policy and risky feature flags accept only boolean `True`. Strings such as `"false"`, `"yes"` and numbers do not grant authority, close a circuit, or restore a checkpoint.
+12. A declared tenant id in a payload does not authorize another tenant. Cross-tenant access follows the credential-bound namespace.
+
+## Quality workflow
+
+`test_atlasquant_aion_security_adversarial.py` and `test_atlasquant_aion_chaos_recovery.py` are listed in `.github/workflows/quality-tests.yml`. The previous head `76f34e8c` failed Quality tests only because those files were omitted from that workflow. The security gate itself had already executed them.
 
 ## Still requires repository administration
 

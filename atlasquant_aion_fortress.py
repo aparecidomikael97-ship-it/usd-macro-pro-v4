@@ -62,6 +62,19 @@ CRITICAL_SIGNAL_KINDS = {
 }
 
 
+def _exact_true(value: Any) -> bool:
+    """Only boolean True grants a privilege or marks an instruction as authorized."""
+    return value is True
+
+
+def _restrictive_flag(value: Any) -> bool:
+    """Ambiguous values fail toward the restrictive reading.
+
+    Exact False is the only negative. Strings, numbers and None stay restrictive.
+    """
+    return value is not False
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -75,6 +88,8 @@ def _upper(value: Any, limit: int = 80) -> str:
 
 
 def _finite(value: Any, default: float = 0.0) -> float:
+    if isinstance(value, bool):
+        return float(default)
     try:
         out = float(value)
         return out if math.isfinite(out) else float(default)
@@ -103,11 +118,13 @@ def source_authority(
     Content sources can still be useful evidence, but never become controllers.
     """
     kind = normalize_source_kind(source_kind)
-    if kind == "SYSTEM_POLICY" and signed_system_policy:
+    policy_signed = _exact_true(signed_system_policy)
+    admin_authenticated = _exact_true(authenticated_admin)
+    if kind == "SYSTEM_POLICY" and policy_signed:
         authority = "POLICY"
         can_issue_action = True
         reason = "Política de sistema autenticada pode impor limites, nunca ampliar permissões do modelo."
-    elif kind == "ADMIN" and authenticated_admin:
+    elif kind == "ADMIN" and admin_authenticated:
         authority = "ADMIN"
         can_issue_action = True
         reason = "Intenção veio de sessão ADMIN autenticada; ações sensíveis ainda dependem do Guardian."
@@ -150,16 +167,17 @@ def instruction_boundary(
         authenticated_admin=authenticated_admin,
         signed_system_policy=signed_system_policy,
     )
-    instruction = bool(contains_action_instruction)
-    blocked = bool(instruction and not authority["can_issue_action"])
+    instruction_present = _restrictive_flag(contains_action_instruction)
+    instruction_authorized = _exact_true(contains_action_instruction) and bool(authority["can_issue_action"])
+    blocked = instruction_present and not authority["can_issue_action"]
     return {
         "schema": SCHEMA,
         "state": "BLOCK_INSTRUCTION" if blocked else "ALLOW_AS_CONTEXT",
-        "instruction_present": instruction,
-        "instruction_authorized": bool(instruction and authority["can_issue_action"]),
+        "instruction_present": instruction_present,
+        "instruction_authorized": instruction_authorized,
         "content_may_be_read": True,
         "content_may_be_evidence": True,
-        "content_may_control_tools": bool(instruction and authority["can_issue_action"]),
+        "content_may_control_tools": instruction_authorized,
         "source_authority": authority,
         "prompt_injection_resistant_by_source_boundary": True,
         "executes_action": False,
@@ -180,6 +198,8 @@ def autonomy_budget(
     if impact_norm not in IMPACT_LEVELS:
         impact_norm = "MEDIUM"
     uncertainty = max(0.0, min(100.0, _finite(uncertainty_pct, 100.0)))
+    reversible_exact = _exact_true(reversible)
+    side_effects = _restrictive_flag(external_side_effects)
 
     penalty = 0
     penalty += {
@@ -195,9 +215,9 @@ def autonomy_budget(
     }.get(risk, 100)
     penalty += {"LOW": 0, "MEDIUM": 10, "HIGH": 25, "CRITICAL": 50}[impact_norm]
     penalty += round(uncertainty * 0.35)
-    if external_side_effects:
+    if side_effects:
         penalty += 20
-    if reversible:
+    if reversible_exact:
         penalty -= 10
     score = max(0, min(100, 100 - penalty))
 
@@ -207,7 +227,7 @@ def autonomy_budget(
         mode = "READ_ONLY"
     elif risk == "DRAFT" and score >= 45:
         mode = "DRAFT_ONLY"
-    elif risk in {"WRITE"} and reversible and score >= 35:
+    elif risk in {"WRITE"} and reversible_exact and score >= 35:
         mode = "REVERSIBLE_WITH_APPROVAL"
     elif risk in SENSITIVE_RISKS:
         mode = "ADMIN_REQUIRED"
@@ -221,8 +241,8 @@ def autonomy_budget(
         "guardian_risk": risk,
         "uncertainty_pct": round(uncertainty, 2),
         "impact": impact_norm,
-        "reversible": bool(reversible),
-        "external_side_effects": bool(external_side_effects),
+        "reversible": reversible_exact,
+        "external_side_effects": side_effects,
         "grants_permission": False,
         "executes_action": False,
     }
@@ -252,10 +272,11 @@ def proof_of_safety(
     that execution occurred or that a tool call is automatically authorized.
     """
     action_key = _clean(action, 120).lower()
+    approved_exact = _exact_true(approved)
     guardian = guardian_decision(
         action_key,
         access,
-        approved=bool(approved),
+        approved=approved_exact,
         feature_flags=feature_flags,
     )
     authority = source_authority(
@@ -306,7 +327,7 @@ def proof_of_safety(
         blockers.append("TEST_EVIDENCE_MISSING")
     if sensitive and uncertainty > 30.0:
         blockers.append("UNCERTAINTY_TOO_HIGH_FOR_SENSITIVE_ACTION")
-    if sensitive and bool(external_side_effects) and not bool(approved):
+    if sensitive and bool(budget["external_side_effects"]) and not approved_exact:
         blockers.append("EXPLICIT_APPROVAL_REQUIRED")
 
     if not artifact_rows and risk in {"WRITE", "PRODUCTION", "SECRETS"}:
@@ -333,7 +354,7 @@ def proof_of_safety(
         "artifacts": artifact_rows,
         "tests": test_rows,
         "rollback_plan": rollback,
-        "approved": bool(approved),
+        "approved": approved_exact,
         "impact": budget["impact"],
         "uncertainty_pct": uncertainty,
         "external_side_effects": bool(external_side_effects),

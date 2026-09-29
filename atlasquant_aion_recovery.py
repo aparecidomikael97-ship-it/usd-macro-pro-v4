@@ -273,7 +273,7 @@ def restore_checkpoint_revision(
     timeout:float=15.0,
 )->dict[str,Any]:
     """Restore a verified historical revision after explicit administrator approval."""
-    if not approved:
+    if approved is not True:
         return {
             "schema":SCHEMA,"status":"BLOCKED","saved":False,"verified":False,
             "reason":"Explicit administrator approval required for recovery.",

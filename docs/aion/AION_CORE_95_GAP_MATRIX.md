@@ -1,0 +1,59 @@
+# AION Core 95+ — matriz de lacunas
+
+Data da leitura: 2026-09-29
+Issue: #325
+Base observada: `main` @ `2c9dade6a87d6f618f05cbb628eb35cee2f3a8a1`
+P0 em revisão: Draft PR #326, branch `cursor/aion-core-hardening-p0-v1`
+
+Status usados: EXISTENTE, PARCIAL, AUSENTE, NÃO VERIFICADO.
+Nenhuma linha abaixo afirma execução em produção. Teste de unidade não é runtime de produção. Workflow verde não é ruleset obrigatório.
+
+| Capacidade | Status | Arquivos existentes | Testes existentes | Evidência | Risco | Lacuna | Prioridade | Ação proposta |
+|---|---|---|---|---|---|---|---|---|
+| Guardian / Proof of Safety | EXISTENTE | `atlasquant_aion_core.py`, `atlasquant_aion_fortress.py` | `test_atlasquant_aion_core.py`, `test_atlasquant_aion_fortress.py`, `test_atlasquant_aion_security_adversarial.py` | `guardian_decision` nega ação desconhecida e trading real. `proof_of_safety` bloqueia fonte sem autoridade. | Aprovação sensível ainda é contrato puro, não um executor único de produção. | Caminho de execução sensível real de ponta a ponta permanece NÃO VERIFICADO. | P0 | Manter o contrato; não tratar PASS como execução. |
+| Flags booleanas exatas | PARCIAL | `atlasquant_aion_core.py`, `atlasquant_aion_fortress.py`, `atlasquant_aion_resilience.py`, `atlasquant_aion_recovery.py` | `test_atlasquant_aion_security_adversarial.py` | Correção neste bloco: `"false"`, `"yes"` e números não aprovam, não autenticam e não fecham circuito. | Outros módulos ainda podem usar `bool(valor)` fora deste caminho. | Varredura completa de flags privilegiadas no repositório não foi feita. | P0 | Estender o mesmo critério apenas onde a flag concede privilégio. |
+| Fronteira de conteúdo externo | EXISTENTE | `atlasquant_aion_fortress.py` | `test_atlasquant_aion_fortress.py`, `test_atlasquant_aion_security_adversarial.py` | WEB, DOCUMENT, EMAIL, TOOL_OUTPUT, EXTERNAL_AI e UNKNOWN não emitem ação. | Detecção de texto não é a fronteira; a classificação da origem é. | Conteúdo malicioso armazenado e depois relido como memória não tem quarentena própria. | P0 | Não promover conteúdo externo a política. |
+| Delegação e firewall de agente | EXISTENTE | `atlasquant_aion_resilience.py` | `test_atlasquant_aion_resilience.py`, `test_atlasquant_aion_security_adversarial.py` | Capacidades sensíveis são não delegáveis. Escopo e evidência ausentes bloqueiam. Workspace diferente bloqueia. | Mensagem livre entre agentes ainda não tem digest próprio. | Protocolo estruturado entre Prime, Shadow e Sentinel está AUSENTE. | P0/P1 | Reusar o firewall; não criar um segundo guardian. |
+| Isolamento de tenant | PARCIAL | `atlasquant_aion_tenant.py`, `atlasquant_aion_tenant_privacy.py` | `test_atlasquant_aion_tenant.py`, `test_atlasquant_aion_tenant_privacy.py`, teste cruzado no adversarial | Namespace depende de credencial. Acesso cruzado só retorna verdadeiro para o próprio namespace. | Papel de login não é entitlement. Runtime persistente de assinante não está confirmado pelo próprio resumo de readiness. | Provisionamento real e backend compartilhado continuam desligados. | P0 | Não habilitar shell de assinante nesta etapa. |
+| Isolamento de workspace | PARCIAL | `atlasquant_aion_resilience.py`, `atlasquant_aion_workspaces.py` | testes de delegação e workspaces | Delegação ACTIVE fica presa ao `workspace_id`. | Não foi reauditado cada autorizador de workspace nesta sessão. | Escalada entre workspaces fora da delegação permanece NÃO VERIFICADO como cobertura total. | P0 | Ampliar testes só sobre contratos já existentes. |
+| Resource governor / watchdog / circuit breaker | EXISTENTE | `atlasquant_aion_resilience.py` | `test_atlasquant_aion_resilience.py`, `test_atlasquant_aion_chaos_recovery.py` | Estouro de chamada, token, tempo ou memória interrompe trabalho sensível. Loop recomenda isolamento, sem auto-destruição. | Limites não cobrem profundidade de delegação nem explosão de subtarefas. | Governor de orçamento multiagente ainda é parcial. | P1 | Endurecer limites no contrato de orquestração, sem worker global real. |
+| Recovery / checkpoint | PARCIAL | `atlasquant_aion_recovery.py` | `test_atlasquant_aion_recovery.py`, `test_atlasquant_aion_chaos_recovery.py` | Preflight exige runtime confirmado e candidato confirmado. Restore sem `approved is True` retorna BLOCKED. | RPO/RTO reais e restore em ambiente operacional não foram exercidos. | Drill de backup/restore fora de harness local está NÃO VERIFICADO. | P0 | Não executar restore real nesta sessão. |
+| Durable tasks | PARCIAL | `atlasquant_aion_durable_tasks.py` | `test_atlasquant_aion_durable_tasks.py` | Transição, revisão, cancelamento e retry existem no módulo. | Esta sessão não reexecutou a suíte inteira de idempotência concorrente. | Retry de ação irreversível, worker concorrente e checkpoint parcial continuam NÃO VERIFICADOS contra o conjunto pedido na missão. | P1 | Adicionar testes sobre a API atual, sem segundo motor de tarefas. |
+| CODEOWNERS | EXISTENTE | `.github/CODEOWNERS` | revisão do arquivo na #326 | Arquivo cobre áreas AION, workflows e deploy. | O arquivo não obriga review. | Enforcement depende de ruleset administrativo. | P0 | Ação administrativa, não código. |
+| Dependabot | PARCIAL | `.github/dependabot.yml` | arquivo presente | Configuração semanal de Python e Actions. | Ativação no GitHub e PRs gerados não foram observados nesta sessão. | Efeito operacional NÃO VERIFICADO. | P0 | Confirmar no GitHub após merge. |
+| Security gate CI | EXISTENTE | `.github/workflows/aion-core-security-gate.yml` | jobs da #326 | No SHA `76f34e8c`, os dois jobs do gate terminaram SUCCESS. | O job ainda não é required check. | Sem ruleset, o gate pode ser ignorado no merge. | P0 | Documentar checklist; não alterar proteção da main nesta sessão. |
+| Quality workflow | PARCIAL | `.github/workflows/quality-tests.yml` | `test_quality_workflow_coverage.py` | SHA `76f34e8c` falhou porque os dois testes novos não estavam listados. Correção entra neste bloco. | Resultado do workflow após a correção ainda precisa de execução. | CI pós-correção NÃO VERIFICADO até o próximo run. | P0 | Registrar todo `test_*.py` novo. |
+| pip-audit | EXISTENTE | job `Supply-chain audit` | run `36517577045` SUCCESS no SHA anterior | O job executou `pip-audit -r requirements.txt`. | Sucesso anterior não cobre o diff novo até o próximo run. | Advisories futuros continuam dependentes do lock/ambiente. | P0 | Manter o job sem path filter. |
+| SAST | PARCIAL | Bandit no security gate | run anterior SUCCESS | Bandit em severidade alta nos módulos listados. | CodeQL/code scanning não foi habilitado. Licenciamento NÃO VERIFICADO. | SAST não cobre o repositório inteiro. | P0 | Não substituir Bandit por promessa de CodeQL. |
+| SBOM | PARCIAL | job CycloneDX do security gate | validação em memória no job | O job gera e valida CycloneDX do ambiente resolvido. | O SBOM não é publicado como artefato de release nem assinado. | Proveniência de build assinada está AUSENTE. | P0 | Manter geração no CI; assinatura fica fora desta sessão. |
+| Pinagem de Actions | PARCIAL | workflows usam tags major, por exemplo `actions/checkout@v7` | inspeção do workflow | Tag major não é digest imutável. | Troca da tag major pode alterar o gate. | Pin por SHA não foi aplicado neste bloco para não ampliar o diff de CI sem revisão própria. | P1 | Pinagem em bloco separado, com checagem de disponibilidade. |
+| Prime + Shadow + Sentinel | AUSENTE | existe `protocol_shadow_probe` em `atlasquant_aion_global_worker_readiness.py`, com outro significado | testes do global worker | O probe de readiness não é revisão independente de tarefa crítica. | Criar três chatbots duplicaria o Guardian. | Contrato de tríade para tarefa simples/importante/crítica não existe. | P1 | Contrato puro que consulta Fortress/Guardian e bloqueia divergência. |
+| Protocol firewall entre agentes | AUSENTE | `agent_firewall` cobre capacidade, não mensagem | testes de delegação | Não há digest de mensagem interagente. | Texto de outro agente pode ser confundido com autorização se um caller novo confiar no payload. | Contrato de mensagem com identidade, papel, tenant, evidência e digest está AUSENTE. | P1 | Mensagem é informação; autorização continua no Guardian. |
+| Blast radius / quorum | PARCIAL | `autonomy_budget` em Fortress | `test_atlasquant_aion_fortress.py` | Impacto LOW/MEDIUM/HIGH/CRITICAL altera o modo de autonomia e não concede permissão. | Não há quorum nem classificação por dados, usuários, custo e alcance entre tenants. | Ação CRITICAL automática precisa permanecer impossível. | P1 | Política offline que escala revisão e nunca executa CRITICAL. |
+| Action receipt / flight recorder único | PARCIAL | receipts em executor, worker e developer gates | testes desses módulos | Há recibos locais de execução/desenvolvimento. | Não há um recibo único de ação crítica do Core cobrindo quem pediu, quem revisou, política, evidência e digest. | Unificar sem copiar os recibos já existentes. | P1 | Estender metadados seguros só onde o recibo já existe, ou criar um envelope que referencie os existentes. |
+| Memory quarantine | AUSENTE | `atlasquant_aion_memory.py` guarda verdade e notas | `test_atlasquant_aion_memory.py` | Não há estado de candidato/quarentena encontrado neste módulo. | Conteúdo injetado pode ser relido como contexto. | Promoção governada para conhecimento permanente está AUSENTE. | P1 | Estado inicial candidato, sem escrever na Constituição/Guardian. |
+| Model registry / promotion | PARCIAL | `atlasquant_aion_model_router.py`, `atlasquant_aion_evaluation_lab.py` | testes correspondentes | Router e laboratório existem. | Não foi comprovado fluxo CANDIDATE → BENCHMARK → CANARY → APPROVED. | Promoção por evidência permanece NÃO VERIFICADO. | P1 | Não ativar API paga. Não promover modelo sem evidência. |
+| Independência do Core | NÃO VERIFICADO | módulos `atlasquant_aion_*` e domínios de trading/negócios | não há teste arquitetural dedicado encontrado nesta leitura | A direção esperada é Core → interfaces → módulos opcionais. | Imports de domínio dentro do núcleo podem já existir. | Prova automática de que o Core importa zero Trader/Investimentos/Negócios está AUSENTE. | P2 | Teste de import graph depois de nomear os módulos reais. |
+| Vault | PARCIAL | `atlasquant_aion_vault.py` | `test_atlasquant_aion_vault.py` | Módulo e teste existem. Backend real, rotação e ausência de plaintext operacional NÃO VERIFICADOS nesta sessão. | Segredo em log/receipt/PR continua proibido. | Hardening de backend real fica bloqueado sem serviço externo. | P2 | Só testes offline de rejeição/redação. |
+| Ruleset de `main` | AUSENTE no repositório | documentação do P0 | `gh` não altera proteção nesta sessão | O documento do P0 registra que `main` estava desprotegida na leitura anterior. | Merge pode ocorrer sem os gates. | Ação administrativa ainda necessária. | P0 | Checklist apenas. Não aplicar ruleset nesta sessão. |
+
+## Leitura desta sessão
+
+CONFIRMADO por arquivo ou log:
+
+- PR #326 está em draft contra `main`.
+- Head conhecido no início da continuação: `76f34e8cc333c851b909908f0be0dd5e0f49413f`.
+- Quality tests desse SHA falhou em `test_quality_workflow_coverage` porque omitiu os dois testes novos. A suíte reportou 3536 testes e 1 falha.
+- AION Core Security Gate e Release Readiness desse SHA terminaram SUCCESS.
+
+NÃO VERIFICADO:
+
+- se o próximo CI fica verde depois da correção;
+- proteção efetiva da `main`;
+- Dependabot gerando PRs;
+- CodeQL disponível para este repositório;
+- restore real, worker global, tenant persistente e qualquer API paga.
+
+BLOCKED nesta sessão:
+
+- merge, deploy, alteração de ruleset, gasto, segredo real, trading real e uso da PR #286 como dependência.
