@@ -150,7 +150,7 @@ class AtlasQuantAionCoreIndependenceTests(unittest.TestCase):
         self.assertIn("IMPORTED", result.stdout)
         self.assertNotIn("blocked", result.stderr)
 
-    def test_memory_and_recovery_import_without_business(self):
+    def test_memory_and_recovery_operate_empty_without_business(self):
         blocker = (
             "import sys\n"
             "class Finder:\n"
@@ -158,9 +158,27 @@ class AtlasQuantAionCoreIndependenceTests(unittest.TestCase):
             "        if name.split('.',1)[0]=='atlasquant_aion_business':\n"
             "            raise ImportError('business absent')\n"
             "sys.meta_path.insert(0, Finder())\n"
-            "import atlasquant_aion_memory\n"
+            "import atlasquant_aion_memory as memory\n"
             "import atlasquant_aion_recovery\n"
-            "print('IMPORTED')\n"
+            "checkpoint=memory.default_checkpoint()\n"
+            "normalized=memory.ensure_operating_checkpoint(checkpoint)\n"
+            "assert normalized['business']['products']==[]\n"
+            "report=memory.checkpoint_integrity_report(normalized)\n"
+            "assert report['state']=='CONFIRMED', report\n"
+            "assert report['write_safe'] is True\n"
+            "tampered=memory.default_checkpoint()\n"
+            "tampered['business']['metrics']['revenue']=1\n"
+            "blocked=memory.checkpoint_integrity_report(tampered)\n"
+            "assert blocked['state']=='UNKNOWN', blocked\n"
+            "assert blocked['write_safe'] is False\n"
+            "assert 'business.metrics' in blocked['unavailable_items']\n"
+            "try:\n"
+            "    memory.ensure_operating_checkpoint(tampered)\n"
+            "except memory.BusinessAdapterUnavailableError:\n"
+            "    pass\n"
+            "else:\n"
+            "    raise AssertionError('non-empty business data must fail closed')\n"
+            "print('OPERATIONAL')\n"
         )
         env = {
             "PATH": os.environ.get("PATH", ""),
@@ -178,7 +196,7 @@ class AtlasQuantAionCoreIndependenceTests(unittest.TestCase):
             check=False,
         )
         self.assertEqual(result.returncode, 0, result.stderr[-2000:] + result.stdout[-500:])
-        self.assertIn("IMPORTED", result.stdout)
+        self.assertIn("OPERATIONAL", result.stdout)
 
 
     def test_memory_and_recovery_import_without_requests(self):
