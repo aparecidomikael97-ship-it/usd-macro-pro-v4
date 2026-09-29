@@ -19,6 +19,7 @@ from atlasquant_aion_memory import (
     merged_checkpoint,
     runtime_write_preflight,
     reconcile_runtime_write,
+    _runtime_write_receipt,
     runtime_configuration_status,
     save_runtime_checkpoint,
     search_canonical_memory,
@@ -1048,17 +1049,16 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         cp = ensure_operating_checkpoint(default_checkpoint())
         cp["operating"]["dirty"] = False
         digest = checkpoint_source_digest(cp)
-        receipt = {
-            "schema": "ATLASQUANT_AION_RUNTIME_WRITE_RECEIPT_V1",
-            "intent_id": "intent",
-            "expected_sha": "oldsha",
-            "expected_digest": digest,
-            "write_sha": "newsha",
-            "write_accepted": True,
-        }
+        receipt = _runtime_write_receipt(
+            RuntimeConfig(token="", repo="owner/repo", branch="atlasquant-runtime"),
+            expected_sha="oldsha",
+            expected_digest=digest,
+            write_sha="newsha",
+            write_accepted=True,
+        )
         confirmed = reconcile_runtime_write(
             receipt,
-            {"status": "CONFIRMED", "sha": "newsha", "checkpoint": cp},
+            {"status": "CONFIRMED", "sha": "newsha", "checkpoint": cp, "source": "GitHub:atlasquant-runtime:dados/aion/checkpoint_master.json"},
         )
         self.assertEqual(confirmed["status"], "CONFIRMED")
         self.assertTrue(confirmed["verified"])
@@ -1066,7 +1066,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
 
         changed_sha = reconcile_runtime_write(
             receipt,
-            {"status": "CONFIRMED", "sha": "othersha", "checkpoint": cp},
+            {"status": "CONFIRMED", "sha": "othersha", "checkpoint": cp, "source": "GitHub:atlasquant-runtime:dados/aion/checkpoint_master.json"},
         )
         self.assertEqual(changed_sha["status"], "CONFLICT")
         self.assertFalse(changed_sha["verified"])
@@ -1075,7 +1075,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         changed_cp["aion"]["priority"] = "different"
         digest_conflict = reconcile_runtime_write(
             receipt,
-            {"status": "CONFIRMED", "sha": "newsha", "checkpoint": changed_cp},
+            {"status": "CONFIRMED", "sha": "newsha", "checkpoint": changed_cp, "source": "GitHub:atlasquant-runtime:dados/aion/checkpoint_master.json"},
         )
         self.assertEqual(digest_conflict["status"], "CONFLICT")
         self.assertFalse(digest_conflict["verified"])
@@ -1084,17 +1084,16 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         cp = ensure_operating_checkpoint(default_checkpoint())
         cp["operating"]["dirty"] = False
         digest = checkpoint_source_digest(cp)
-        receipt = {
-            "schema": "ATLASQUANT_AION_RUNTIME_WRITE_RECEIPT_V1",
-            "intent_id": "intent",
-            "expected_sha": "oldsha",
-            "expected_digest": digest,
-            "write_sha": "",
-            "write_accepted": None,
-        }
+        receipt = _runtime_write_receipt(
+            RuntimeConfig(token="", repo="owner/repo", branch="atlasquant-runtime"),
+            expected_sha="oldsha",
+            expected_digest=digest,
+            write_sha="",
+            write_accepted=None,
+        )
         result = reconcile_runtime_write(
             receipt,
-            {"status": "CONFIRMED", "sha": "observedsha", "checkpoint": cp},
+            {"status": "CONFIRMED", "sha": "observedsha", "checkpoint": cp, "source": "GitHub:atlasquant-runtime:dados/aion/checkpoint_master.json"},
         )
         self.assertEqual(result["status"], "CONTENT_CONFIRMED")
         self.assertTrue(result["verified"])
