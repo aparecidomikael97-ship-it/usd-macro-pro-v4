@@ -44,4 +44,38 @@ def github_put(
     )
 
 
-__all__ = ["github_get", "github_put"]
+def github_post(
+    url: str,
+    *,
+    headers: Mapping[str, str] | None = None,
+    json: Mapping[str, Any] | None = None,
+    timeout: float = 12.0,
+):
+    import requests
+
+    return requests.post(
+        url,
+        headers=dict(headers or {}),
+        json=dict(json or {}),
+        timeout=timeout,
+    )
+
+
+def github_patch(
+    url: str,
+    *,
+    headers: Mapping[str, str] | None = None,
+    json: Mapping[str, Any] | None = None,
+    timeout: float = 12.0,
+):
+    import requests
+
+    return requests.patch(
+        url,
+        headers=dict(headers or {}),
+        json=dict(json or {}),
+        timeout=timeout,
+    )
+
+
+__all__ = ["github_get", "github_put", "github_post", "github_patch"]
