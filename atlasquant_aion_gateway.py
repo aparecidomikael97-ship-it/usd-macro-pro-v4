@@ -12,6 +12,7 @@ import os
 from atlasquant_aion_core import feature_flag_snapshot, route_context
 from atlasquant_aion_continuity import continuity_briefing
 from atlasquant_aion_provider import provider_configuration_status
+from atlasquant_aion_model_routing_bridge import route_registered_model
 from atlasquant_aion_intelligence import evidence_audit, evidence_confidence
 from atlasquant_aion_cognitive_orchestrator import orchestrator_snapshot
 from atlasquant_aion_memory_reliability import assess_canonical_memory_hits
@@ -63,11 +64,41 @@ def route_model(
     complexity: str = "normal",
     feature_flags: Mapping[str, Any] | None = None,
     env: Mapping[str, Any] | None = None,
+    registry: Mapping[str, Any] | None = None,
+    model_id: object = "",
+    model_version: object = "",
+    trusted_context: Mapping[str, Any] | None = None,
+    budget: Mapping[str, Any] | None = None,
+    estimated_request_cost_usd: object = 0.0,
+    request_approved: object = False,
+    force_private: object = False,
 ) -> dict[str, Any]:
     status = provider_status(feature_flags=feature_flags, env=env)
     context = route_context(task)
     complexity_norm = str(complexity or "normal").strip().lower()
-    lane = "external_provider" if status["external_enabled"] else "local_deterministic"
+
+    routing = route_registered_model(
+        task,
+        registry=registry,
+        provider=status["provider"],
+        model_id=model_id,
+        version=model_version,
+        trusted_context=trusted_context,
+        provider_state=status["state"],
+        external_feature_enabled=(
+            status["feature_enabled"] is True
+            and status["external_enabled"] is True
+        ),
+        budget=budget,
+        estimated_request_cost_usd=estimated_request_cost_usd,
+        request_approved=request_approved is True,
+        force_private=force_private is True,
+    )
+    lane = (
+        "external_provider"
+        if routing.get("external_lane_allowed") is True
+        else "local_deterministic"
+    )
     return {
         "schema": SCHEMA,
         "lane": lane,
@@ -75,6 +106,14 @@ def route_model(
         "complexity": complexity_norm,
         "provider": status["provider"],
         "provider_state": status["state"],
+        "registry_approved": routing.get("registry_approved") is True,
+        "registry_integrity": routing.get("registry_integrity"),
+        "registry_blockers": list(routing.get("registry_blockers") or []),
+        "model_ref": dict(routing.get("model_ref") or {}),
+        "routing_lane": routing.get("lane"),
+        "external_lane_allowed": routing.get("external_lane_allowed") is True,
+        "executes_provider_call": False,
+        "executes_billing": False,
         "executes_action": False,
     }
 
