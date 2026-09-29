@@ -94,6 +94,7 @@ Frentes irmãs preparadas sobre a #337:
   - Fecha resíduos de resource bounds em Operations, Continuity e Controlled Learning.
   - Absorve a #357: resource bounds adicionais em Studio, Promoções, Entitlements, Session Memory e Memory.
   - Adiciona adversarial hardening de Recovery para SHA curto, content não-string e encoding histórico divergente.
+  - Post-359 adversarial resource sweep: Business, Tenant Memory, Promotions integrity, Live Event Journal, Wisdom, Digital Twin, Dev Fusion, Release Confidence, Evaluation Lab, Tool Hub e Model Registry.
   - Mantém fail-closed, no automatic retry, restore confirmado somente com save+verify CONFIRMED.
 
 Todas devem permanecer Draft até validação integral.
@@ -291,5 +292,5 @@ Copie somente o bloco abaixo:
 - Recovery outcome + revision binding + strict historical parse estão preservados na #359; #340/#353 não precisam entrar separadamente.
 - RT19 do Núcleo vazio permanece em Business + Studio + Promoções; Entitlements continua ligado ao Tenant Core. A #356 segue supersedida.
 - Worker Runtime da #339 foi absorvido na #359.
-- Resource bounds residual e adversarial partial-record Recovery estão na #359.
+- Resource bounds residual, post-359 adversarial resource sweep e adversarial partial-record Recovery estão na #359.
 - A #357 também foi absorvida: Studio/Promoções/Entitlements/Session Memory não devem entrar separadamente.
