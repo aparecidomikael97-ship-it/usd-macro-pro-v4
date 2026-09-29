@@ -7,8 +7,12 @@ from atlasquant_aion_durable_tasks import (
     cancel_durable_task,
     durable_tasks_digest,
     durable_tasks_summary,
+    MAX_STEPS,
+    MAX_TASKS,
     new_durable_task,
     normalize_durable_task,
+    normalize_durable_tasks,
+    normalize_steps,
     pause_durable_task,
     prepare_resume,
     record_resume,
@@ -274,6 +278,32 @@ class AtlasQuantAionDurableTasksTests(unittest.TestCase):
                 with self.assertRaises(DurableTaskError) as blocked:
                     update_step(task,"merge","RUNNING",access={"role":"ADMIN"},approved=flag)
                 self.assertEqual(blocked.exception.result["error_code"],"APPROVAL_REQUIRED")
+
+
+    def test_step_generator_is_not_consumed_past_step_limit(self):
+        consumed={"count":0}
+        def rows():
+            for index in range(MAX_STEPS+1):
+                if index>=MAX_STEPS:
+                    raise AssertionError("step iterable consumed past limit")
+                consumed["count"]+=1
+                yield {"step_id":f"s{index}","title":"Step","state":"PENDING"}
+        normalized=normalize_steps(rows())
+        self.assertEqual(len(normalized),MAX_STEPS)
+        self.assertEqual(consumed["count"],MAX_STEPS)
+
+    def test_task_generator_preserves_recent_tail_with_bounded_buffer(self):
+        total=MAX_TASKS+25
+        def rows():
+            for index in range(total):
+                yield new_durable_task(
+                    f"Task {index}",
+                    created_at=f"2026-09-25T16:{index%60:02d}:00+00:00",
+                )
+        normalized=normalize_durable_tasks(rows())
+        self.assertEqual(len(normalized),MAX_TASKS)
+        self.assertEqual(normalized[0]["title"],"Task 25")
+        self.assertEqual(normalized[-1]["title"],f"Task {total-1}")
 
 
 if __name__=="__main__":
