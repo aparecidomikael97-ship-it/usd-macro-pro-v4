@@ -9,6 +9,7 @@ from atlasquant_aion_background_executor import (
     load_executor_receipts,
 )
 from atlasquant_aion_core_intelligence.context import Domain
+from atlasquant_aion_core_intelligence.evidence import digest
 from atlasquant_aion_core_runtime_bridge import authenticated_context
 from atlasquant_aion_core_voice_automation import stage_schedule
 from atlasquant_aion_global_worker import (
@@ -368,6 +369,13 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
             staged = deepcopy(args[1])
             state, _ = load_global_worker_state(staged)
             state["lease"]["token"] = "tampered-token"
+            state["inflight_tick"]["lease_token"] = "tampered-token"
+            state["inflight_tick"]["intent_id"] = digest({
+                "owner": state["inflight_tick"]["owner"],
+                "lease_token": "tampered-token",
+                "fencing_token": state["inflight_tick"]["fencing_token"],
+                "claimed_at": state["inflight_tick"]["claimed_at"],
+            })
             state["digest"] = global_worker_integrity(state)["expected"]
             return {
                 "status": "COMPLETED",
