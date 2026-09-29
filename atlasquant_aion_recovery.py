@@ -27,7 +27,7 @@ from atlasquant_aion_memory import (
 from atlasquant_aion_observability import append_event, new_event
 
 SCHEMA="ATLASQUANT_AION_RECOVERY_V1"
-_REVISION_RE=re.compile(r"^[0-9a-fA-F]{7,40}$")
+_REVISION_RE=re.compile(r"^[0-9a-fA-F]{40}$")
 
 
 def _history_url(cfg:RuntimeConfig)->str:
@@ -181,7 +181,13 @@ def load_checkpoint_revision(
         obj=response.json()
         if not isinstance(obj,Mapping):
             raise ValueError("checkpoint response is not an object")
-        encoded="".join(str(obj.get("content") or "").split())
+        raw_content=obj.get("content")
+        if not isinstance(raw_content,str):
+            raise ValueError("runtime checkpoint content must be a base64 string")
+        encoding=str(obj.get("encoding") or "base64").strip().casefold()
+        if encoding!="base64":
+            raise ValueError("runtime checkpoint encoding must be base64")
+        encoded="".join(raw_content.split())
         if not encoded:
             raise ValueError("runtime checkpoint content missing")
         max_encoded_chars=4*((MAX_RUNTIME_BYTES+2)//3)
