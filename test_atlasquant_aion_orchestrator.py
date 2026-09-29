@@ -232,6 +232,22 @@ class ReviewedMissionGateTests(unittest.TestCase):
             "trusted_context": self.trusted,
             "evidence_refs": ["evidence-1"],
             "evidence_verifier": self.verified,
+            "feature_flags": {
+                "external_llm": True,
+                "production_deploy": True,
+                "social_publish": True,
+                "marketplace_publish": True,
+            },
+            "system_context": {
+                "provider": {"state": "EXTERNAL_READY"},
+                "runtime_checkpoint": {"status": "CONFIRMED"},
+                "integrations": {
+                    "production_connected": True,
+                    "social_connected": True,
+                    "marketplace_connected": True,
+                },
+                "source_mesh": {"market_live_confirmed": True},
+            },
         }
         params.update(kwargs)
         return prepare_reviewed_mission(objective, **params)
@@ -329,7 +345,13 @@ class ReviewedMissionGateTests(unittest.TestCase):
         self.assertIn("REVIEW_PLAN:PRIME", out["review"]["blockers"])
 
     def test_blocked_deploy_mission_never_reaches_review_or_guardian(self):
-        out = self.preview("Faça deploy em produção agora.")
+        out = self.preview(
+            "Faça deploy em produção agora.",
+            feature_flags={
+                "external_llm": True,
+                "production_deploy": False,
+            },
+        )
         self.assertEqual(out["state"], "BLOCK")
         self.assertEqual(out["reason"], "MISSION_NOT_READY")
         self.assertIsNone(out["review"])
