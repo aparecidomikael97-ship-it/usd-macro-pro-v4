@@ -111,24 +111,30 @@ Se houver conflito, resolver preservando:
 
 ## Bloco 2 — Validação obrigatória
 
-Rodar primeiro testes direcionados:
+Preferir o runner noturno único, local/offline e de custo zero:
 
 ```bash
-python -m unittest test_atlasquant_aion_memory.py
-python -m unittest test_atlasquant_aion_global_worker.py
-python -m unittest test_atlasquant_aion_worker_runtime.py
-python -m unittest test_atlasquant_aion_recovery.py
-python -m unittest test_atlasquant_aion_background_executor.py
+python tools/aion_night_validation.py --full --report aion-night-validation-report.json
 ```
 
-Depois:
+Ele executa, sem parar na primeira falha:
+
+- suíte crítica de Memory / Global Worker / Worker Runtime / Recovery / Background Executor;
+- suítes adversariais reais: Security Adversarial, Hardening, Post Audit, Chaos Recovery, Core Independence e Global Worker Readiness;
+- `python -m unittest discover`;
+- `python -m compileall -q .`;
+- `git diff --check`;
+- relatório JSON consolidado para diagnóstico/correção.
+
+O runner não instala dependências, não usa rede, não chama provider, não faz deploy, merge, publicação, runtime mutation ou trading.
+
+Para diagnóstico rápido durante uma correção, pode usar:
 
 ```bash
-python tools/aion_redteam_runner.py
-python -m unittest discover
-python -m compileall -q .
-git diff --check
+python tools/aion_night_validation.py --quick --report aion-night-validation-quick.json
 ```
+
+Antes de encerrar o turno, sempre voltar ao modo `--full`.
 
 Se existir falha:
 
@@ -227,4 +233,4 @@ Ao terminar ou atingir um stop condition, deixar um único relatório curto com:
 
 Copie somente o bloco abaixo:
 
-> Continue o AION/Núcleo a partir de `docs/aion/AION_NIGHT_RUN_HANDOFF_2026-09-29.md`. Execute o plano noturno inteiro por blocos grandes, sem me pedir confirmação entre etapas seguras. Prioridade absoluta AION + Núcleo. Integre as Drafts #343, #339 e #340 sobre a #337 numa branch temporária, valide, corrija regressões, rode red-team + suíte completa e continue os hardenings listados no handoff enquanto forem seguros. Custo zero por padrão. Não fazer merge em main, deploy, serviço pago, segredo real, publicação, ativação real de worker ou trading. Em caso de falha, diagnostique, corrija, teste e continue. Pare somente nos stop conditions descritos no handoff e deixe relatório final da manhã.
+> Continue o AION/Núcleo a partir de `docs/aion/AION_NIGHT_RUN_HANDOFF_2026-09-29.md`. Execute o plano noturno inteiro por blocos grandes, sem me pedir confirmação entre etapas seguras. Prioridade absoluta AION + Núcleo. Integre as Drafts #343, #339 e #340 sobre a #337 numa branch temporária, rode `python tools/aion_night_validation.py --full --report aion-night-validation-report.json`, corrija regressões e continue os hardenings listados no handoff enquanto forem seguros. Custo zero por padrão. Não fazer merge em main, deploy, serviço pago, segredo real, publicação, ativação real de worker ou trading. Em caso de falha, diagnostique, corrija, teste e continue. Pare somente nos stop conditions descritos no handoff e deixe relatório final da manhã.
