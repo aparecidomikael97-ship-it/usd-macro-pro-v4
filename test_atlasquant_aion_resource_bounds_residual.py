@@ -294,7 +294,7 @@ class AionResidualResourceBoundsTests(unittest.TestCase):
         values=GuardedList((f"scope-{i}" for i in range(100)),max_reads=6)
         normalized=skill_certification._unique(values,limit=3)
         self.assertEqual(normalized,["scope-0","scope-1","scope-2"])
-        self.assertEqual(values.reads,6)
+        self.assertEqual(values.reads,3)
 
         source=Path("atlasquant_aion_skill_certification.py").read_text(encoding="utf-8")
         self.assertNotIn("list(values)[:limit * 2]",source)
