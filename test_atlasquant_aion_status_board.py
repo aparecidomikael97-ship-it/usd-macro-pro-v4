@@ -268,5 +268,115 @@ class AtlasQuantAionMasterStatusBoardTests(unittest.TestCase):
         self.assertFalse(board["automatic_external_actions"])
 
 
+    def test_system_health_center_is_wired_and_fails_closed_without_six_domains(self):
+        board=self.base()
+        center=board["system_health_center"]
+        self.assertEqual(center["state"],"UNKNOWN")
+        self.assertIn("sources",center["unresolved_domains"])
+        self.assertIn("workers",center["unresolved_domains"])
+        item=self.by_id(board,"system_health_center")
+        self.assertEqual(item["state"],"UNKNOWN")
+        self.assertFalse(center["executes_action"])
+        self.assertFalse(center["real_trading_enabled"])
+
+    def test_system_health_center_confirms_only_with_explicit_six_domain_evidence(self):
+        system_context={
+            "truth_state":"CONFIRMED",
+            "source_build":"abc123",
+            "source_mesh":{
+                "market_state":"HEALTHY",
+                "market_live_confirmed":True,
+                "observation_count":8,
+                "fallback_or_unavailable":0,
+            },
+            "notification_health":{
+                "state":"HEALTHY",
+                "confirmed":True,
+                "detail":"Canal interno confirmado.",
+                "unresolved":0,
+            },
+            "worker_health":{
+                "state":"HEALTHY",
+                "confirmed":True,
+                "detail":"Worker verificado.",
+                "unresolved":0,
+            },
+            "critical_surfaces":{
+                "all_ok":True,
+                "counts":{
+                    "OK":3,
+                    "DEGRADED":0,
+                    "UNAVAILABLE":0,
+                    "STALE_BUILD":0,
+                    "UNKNOWN":0,
+                },
+                "items":[
+                    {"id":"home_radar","state":"OK"},
+                    {"id":"advanced_radar","state":"OK"},
+                    {"id":"master_panel","state":"OK"},
+                ],
+            },
+        }
+        board=self.base(system_context=system_context)
+        center=board["system_health_center"]
+        self.assertEqual(center["state"],"HEALTHY")
+        self.assertTrue(center["all_confirmed_healthy"])
+        self.assertEqual(center["healthy_domains"],6)
+        item=self.by_id(board,"system_health_center")
+        self.assertEqual(item["state"],"CONFIRMED")
+        self.assertIn("6/6",item["detail"])
+
+    def test_source_fallback_degrades_health_without_claiming_confirmation(self):
+        system_context={
+            "truth_state":"CONFIRMED",
+            "source_build":"abc123",
+            "source_mesh":{
+                "market_state":"DEGRADED",
+                "market_live_confirmed":False,
+                "observation_count":8,
+                "fallback_or_unavailable":2,
+            },
+            "notification_health":{"state":"HEALTHY","confirmed":True},
+            "worker_health":{"state":"HEALTHY","confirmed":True},
+            "critical_surfaces":{
+                "all_ok":True,
+                "counts":{"OK":3,"DEGRADED":0,"UNAVAILABLE":0,"STALE_BUILD":0,"UNKNOWN":0},
+                "items":[{"id":"a"},{"id":"b"},{"id":"c"}],
+            },
+        }
+        board=self.base(system_context=system_context)
+        center=board["system_health_center"]
+        source=next(x for x in center["items"] if x["id"]=="sources")
+        self.assertEqual(source["state"],"DEGRADED")
+        self.assertFalse(source["confirmed"])
+        self.assertEqual(center["state"],"DEGRADED")
+        self.assertEqual(self.by_id(board,"system_health_center")["state"],"UNKNOWN")
+
+    def test_queues_are_unknown_when_checkpoint_runtime_is_not_confirmed(self):
+        board=self.base(runtime_result={"status":"UNAVAILABLE"})
+        center=board["system_health_center"]
+        queue=next(x for x in center["items"] if x["id"]=="queues")
+        self.assertEqual(queue["state"],"UNKNOWN")
+        self.assertFalse(queue["confirmed"])
+
+    def test_notifications_do_not_become_healthy_from_live_event_engine_alone(self):
+        system_context={
+            "truth_state":"CONFIRMED",
+            "source_build":"abc123",
+            "live_event_intelligence":{
+                "state":"READY",
+                "continuous_runtime_confirmed":True,
+                "alert_count":4,
+            },
+        }
+        board=self.base(system_context=system_context)
+        center=board["system_health_center"]
+        notifications=next(x for x in center["items"] if x["id"]=="notifications")
+        self.assertEqual(notifications["state"],"DEGRADED")
+        self.assertFalse(notifications["confirmed"])
+        self.assertIn("entrega externa",notifications["detail"])
+
+
+
 if __name__=="__main__":
     unittest.main()
