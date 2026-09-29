@@ -8,6 +8,7 @@ from atlasquant_aion_entitlements import (
 )
 from atlasquant_aion_tenant import (
     PERSONAL_SCOPE,
+    sanitize_tenant_memory,
     tenant_policy_snapshot,
     tenant_readiness_summary,
 )
@@ -127,6 +128,65 @@ class AtlasQuantAionTenantReadinessTests(unittest.TestCase):
         self.assertFalse(policy["billing_enabled"])
         self.assertFalse(policy["real_trading_enabled"])
 
+
+    def test_tenant_memory_projection_does_not_overconsume_bounded_fields(self):
+        from collections.abc import Mapping
+
+        class GuardedMapping(Mapping):
+            def __init__(self,count,limit):
+                self.count=count
+                self.limit=limit
+                self.reads=0
+            def __len__(self):
+                return self.count
+            def __iter__(self):
+                for index in range(self.count):
+                    if self.reads>=self.limit:
+                        raise AssertionError("mapping consumed past bound")
+                    self.reads+=1
+                    yield f"k{index}"
+            def __getitem__(self,key):
+                return "v"
+
+        class GuardedList(list):
+            def __init__(self,limit,total, factory):
+                super().__init__()
+                self.limit=limit
+                self.total=total
+                self.factory=factory
+                self.reads=0
+            def __iter__(self):
+                for index in range(self.total):
+                    if self.reads>=self.limit:
+                        raise AssertionError("sequence consumed past bound")
+                    self.reads+=1
+                    yield self.factory(index)
+
+        ns_memory={
+            "tenant_id":"",
+        }
+        from atlasquant_aion_tenant import tenant_memory_seed
+        seed=tenant_memory_seed(self.user)
+        prefs=GuardedMapping(51,50)
+        academy=GuardedMapping(201,200)
+        notes=GuardedList(200,201,lambda i:{"text":f"note {i}"})
+        watchlist=GuardedList(100,101,lambda i:f"SYM{i}")
+        ns_memory={
+            "tenant_id":seed["tenant_id"],
+            "profile":{"preferences":prefs},
+            "conversation_notes":notes,
+            "academy_progress":academy,
+            "watchlist":watchlist,
+        }
+        cleaned=sanitize_tenant_memory(ns_memory,self.user)
+        self.assertEqual(len(cleaned["profile"]["preferences"]),50)
+        self.assertEqual(len(cleaned["conversation_notes"]),200)
+        self.assertEqual(len(cleaned["academy_progress"]),200)
+        self.assertEqual(len(cleaned["watchlist"]),100)
+        self.assertEqual(prefs.reads,50)
+        self.assertEqual(academy.reads,200)
+        self.assertEqual(notes.reads,200)
+        self.assertEqual(watchlist.reads,100)
 
     def test_tenant_write_requires_exact_boolean_true(self):
         entitlement=self._active("cliente.01")
