@@ -397,6 +397,7 @@ def prepare_global_worker_activation_plan(
     coordination = coordination_activation_gate(
         coordination_mode,
         coordination_readiness=coordination_readiness,
+        operational_verification=coordination_operational_verification,
     )
     if coordination.get("allows_activation_plan") is not True:
         return {
