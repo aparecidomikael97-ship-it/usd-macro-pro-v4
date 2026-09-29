@@ -375,6 +375,7 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
                 "lease_token": "tampered-token",
                 "fencing_token": state["inflight_tick"]["fencing_token"],
                 "claimed_at": state["inflight_tick"]["claimed_at"],
+                "work_intent_digest": state["inflight_tick"].get("work_intent_digest", ""),
             })
             state["digest"] = global_worker_integrity(state)["expected"]
             return {
@@ -428,6 +429,109 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
         )
         self.assertEqual(released["inflight_tick"], {})
         self.assertEqual(released["lease"]["owner"], "")
+
+    def test_global_claim_persists_bounded_safe_work_intent(self):
+        checkpoint = self.armed_checkpoint()
+        captures = []
+        with patch(
+            "atlasquant_aion_global_worker.load_runtime_checkpoint",
+            return_value={
+                "status": "CONFIRMED",
+                "checkpoint": checkpoint,
+                "sha": "sha-0",
+            },
+        ), patch(
+            "atlasquant_aion_global_worker._persist_runtime_checkpoint_cas",
+            side_effect=self.fake_persist(captures),
+        ):
+            result = run_global_worker_once(
+                config=_config(),
+                runtime_id="gha-intent",
+                feature_enabled=True,
+                now=TICK,
+            )
+
+        self.assertEqual(result["status"], "CONFIRMED")
+        self.assertEqual(result["work_intent_count"], 1)
+        self.assertTrue(result["work_intent_digest"])
+        claimed, _ = load_global_worker_state(captures[0]["checkpoint"])
+        inflight = claimed["inflight_tick"]
+        self.assertEqual(inflight["work_intent_count"], 1)
+        self.assertEqual(len(inflight["work_occurrences"]), 1)
+        row = inflight["work_occurrences"][0]
+        self.assertTrue(row["schedule_id"])
+        self.assertEqual(len(row["occurrence_key"]), 64)
+        self.assertTrue(row["due_at"])
+        self.assertEqual(row["capability"], "ADMINISTRATION")
+        self.assertNotIn("prompt", row)
+        self.assertNotIn("title", row)
+
+    def test_unresolved_inflight_reports_exact_safe_work_manifest(self):
+        checkpoint = self.armed_checkpoint()
+        state, _ = load_global_worker_state(checkpoint)
+        from atlasquant_aion_core_voice_automation import CheckpointAutomationAdapter
+        from atlasquant_aion_background_executor import _occurrence_key
+        snapshot = CheckpointAutomationAdapter(self.context, checkpoint).snapshot(TICK)
+        due = [x for x in snapshot["schedules"] if x.get("due") is True]
+        self.assertEqual(len(due), 1)
+        row = due[0]
+        work = {
+            "as_of": TICK.isoformat(),
+            "count": 1,
+            "occurrences": [{
+                "schedule_id": row["schedule_id"],
+                "occurrence_key": _occurrence_key(
+                    self.context,
+                    row,
+                    row["due_at"],
+                ),
+                "due_at": row["due_at"],
+                "capability": row["capability"],
+            }],
+        }
+        work["digest"] = digest({
+            "as_of": work["as_of"],
+            "count": work["count"],
+            "occurrences": work["occurrences"],
+        })
+        claimed, _ = _claim_state(
+            state,
+            runtime_id="gha-crashed-intent",
+            now=TICK,
+            work_intent=work,
+        )
+        persisted_claim = attach_global_worker_state(checkpoint, claimed)
+
+        with patch(
+            "atlasquant_aion_global_worker.load_runtime_checkpoint",
+            return_value={
+                "status": "CONFIRMED",
+                "checkpoint": persisted_claim,
+                "sha": "sha-claim",
+            },
+        ), patch(
+            "atlasquant_aion_global_worker._execute_due_local_work_authorized"
+        ) as executor:
+            result = run_global_worker_once(
+                config=_config(),
+                runtime_id="gha-next",
+                feature_enabled=True,
+                now=TICK + timedelta(seconds=601),
+            )
+
+        executor.assert_not_called()
+        self.assertEqual(result["status"], "INFLIGHT_RECONCILIATION_REQUIRED")
+        self.assertEqual(result["inflight_work_intent_count"], 1)
+        self.assertEqual(
+            result["inflight_work_intent_digest"],
+            work["digest"],
+        )
+        self.assertEqual(
+            result["inflight_work_occurrences"][0]["occurrence_key"],
+            work["occurrences"][0]["occurrence_key"],
+        )
+        self.assertNotIn("prompt", result["inflight_work_occurrences"][0])
+        self.assertNotIn("title", result["inflight_work_occurrences"][0])
 
     def test_unresolved_inflight_tick_blocks_reexecution_before_executor(self):
         checkpoint = self.armed_checkpoint()
