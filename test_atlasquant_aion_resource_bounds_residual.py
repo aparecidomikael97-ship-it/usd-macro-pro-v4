@@ -14,6 +14,7 @@ import atlasquant_aion_model_registry as model_registry
 import atlasquant_aion_operations as operations
 import atlasquant_aion_provider as provider
 import atlasquant_aion_release_confidence as release_confidence
+import atlasquant_aion_skill_certification as skill_certification
 import atlasquant_aion_resilience as resilience
 import atlasquant_aion_specialist_session as specialist_session
 import atlasquant_aion_tool_hub as tool_hub
@@ -34,6 +35,25 @@ class GuardedIterable:
         value=next(self._values)
         self.reads+=1
         return value
+
+
+class GuardedList(list):
+    def __init__(self, values, *, max_reads):
+        super().__init__(values)
+        self.max_reads=max_reads
+        self.reads=0
+
+    def __iter__(self):
+        parent=super().__iter__()
+        while True:
+            if self.reads>=self.max_reads:
+                raise AssertionError("list consumed beyond explicit prefix bound")
+            try:
+                value=next(parent)
+            except StopIteration:
+                return
+            self.reads+=1
+            yield value
 
 
 class AionResidualResourceBoundsTests(unittest.TestCase):
@@ -250,6 +270,18 @@ class AionResidualResourceBoundsTests(unittest.TestCase):
         self.assertNotIn("list(preferences.items())[:50]",tenant_src)
         self.assertNotIn("list(academy.items())[:200]",tenant_src)
         self.assertNotIn("list(redemptions_raw)[:2000]",memory_src)
+
+
+    def test_skill_certification_unique_does_not_duplicate_full_list(self):
+        values=GuardedList((f"scope-{i}" for i in range(100)),max_reads=6)
+        normalized=skill_certification._unique(values,limit=3)
+        self.assertEqual(normalized,["scope-0","scope-1","scope-2"])
+        self.assertEqual(values.reads,6)
+
+        source=Path("atlasquant_aion_skill_certification.py").read_text(encoding="utf-8")
+        self.assertNotIn("list(values)[:limit * 2]",source)
+        self.assertIn("islice(values, max(0, limit * 2))",source)
+        self.assertNotIn('list(tool.get("required_scopes") or [])',source)
 
 
     def test_action_receipt_prefix_helpers_stop_at_existing_limits(self):
