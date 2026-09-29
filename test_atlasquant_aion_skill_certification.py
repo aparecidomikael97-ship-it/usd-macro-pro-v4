@@ -44,6 +44,7 @@ class AtlasQuantAionSkillCertificationTests(unittest.TestCase):
         )
         self.assertEqual(out["state"], "CERTIFIED")
         self.assertEqual(out["blockers"], [])
+        self.assertTrue(out["record_fingerprint"])
         self.assertFalse(out["activates_skill"])
         self.assertFalse(out["activates_connector"])
         self.assertFalse(out["executes_tool"])
@@ -277,6 +278,29 @@ class AtlasQuantAionSkillCertificationTests(unittest.TestCase):
         )
         self.assertIn("ADMIN_REQUIRED", non_admin["blockers"])
         self.assertFalse(non_admin["transition_applied"])
+
+    def test_tampered_certification_state_is_detected_by_record_fingerprint(self):
+        tested = assess_skill_manifest(
+            self.safe_manifest(),
+            trusted_context=TRUSTED,
+            test_evidence={"state": "PASS", "passed": True},
+            provenance_verifier=verified,
+            review_approved=False,
+        )
+        self.assertEqual(tested["state"], "TESTED")
+        tested["state"] = "CERTIFIED"
+        out = transition_skill_certification(
+            tested,
+            action="SUSPEND",
+            trusted_context=TRUSTED,
+            approved=True,
+            reason="Forged state.",
+        )
+        self.assertIn(
+            "CERTIFICATION_RECORD_FINGERPRINT_MISMATCH",
+            out["blockers"],
+        )
+        self.assertFalse(out["transition_applied"])
 
     def test_certification_transition_is_bound_to_original_tenant_and_workspace(self):
         certified = assess_skill_manifest(
