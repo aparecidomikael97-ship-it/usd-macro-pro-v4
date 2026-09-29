@@ -15,6 +15,7 @@ confirmed fact merely because a provider generated it.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from itertools import islice
 from typing import Any, Mapping, Sequence
 import json
 import math
@@ -178,7 +179,7 @@ def estimate_request_cost(
 
 def _evidence_lines(memory_hits:Sequence[Mapping[str,Any]]|None)->list[str]:
     out=[]
-    for hit in list(memory_hits or [])[:5]:
+    for hit in islice(memory_hits or (), 5):
         if not isinstance(hit,Mapping):
             continue
         path=redact_text(hit.get("path"))[:180]
