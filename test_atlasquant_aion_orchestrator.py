@@ -2,6 +2,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 
 from atlasquant_aion_capabilities import CapabilityRegistry, default_registry
+from atlasquant_aion_critical_review import seal_agent_message
 from atlasquant_aion_orchestrator import (
     build_aion_result,
     orchestrate,
@@ -215,6 +216,18 @@ class ReviewedMissionGateTests(unittest.TestCase):
             "SENTINEL": "sentinel-1",
         }
 
+    def message_contexts(self):
+        return {
+            role: {
+                "role": role,
+                "agent_id": agent_id,
+                "workspace_id": "central",
+                "tenant_id": "tenant-a",
+                "capabilities": ["DRAFT"],
+            }
+            for role, agent_id in self.assignments().items()
+        }
+
     def review(self, role, binding, verdict="AGREE"):
         return {
             "role": role,
@@ -224,6 +237,43 @@ class ReviewedMissionGateTests(unittest.TestCase):
             "workspace_id": "central",
             "task_ref": binding["mission_id"],
             "plan_version": binding["plan_version"],
+        }
+
+    def protocol_messages(self, binding, *, requested_action=None):
+        contexts = self.message_contexts()
+        action = requested_action or (
+            f"review_mission:{binding['mission_id']}:{binding['plan_version']}"
+        )
+        risk = binding["blast_radius"]["level"]
+        approvals = ["approval-1"] if risk in {"HIGH", "CRITICAL"} else []
+        out = {}
+        for role in binding["required_roles"]:
+            sealed = seal_agent_message(
+                {
+                    "capability": "DRAFT",
+                    "requested_action": action,
+                    "evidence_refs": ["evidence-1"],
+                    "confidence": "HIGH",
+                    "risk_level": risk,
+                    "permissions": ["DRAFT"],
+                    "approval_refs": approvals,
+                    "issued_at": NOW.isoformat(),
+                    "nonce": f"{role.lower()}-{binding['plan_version']}",
+                    "content": "Independent review information only.",
+                },
+                trusted_context=contexts[role],
+            )
+            self.assertEqual(sealed["state"], "SEALED")
+            out[role] = sealed["message"]
+        return out
+
+    def critical_protocol(self, binding):
+        return {
+            "review_messages": self.protocol_messages(binding),
+            "trusted_message_contexts": self.message_contexts(),
+            "now": NOW,
+            "approval_refs": ["approval-1"],
+            "approval_verifier": self.verified,
         }
 
     def preview(self, objective="Explique o contexto com cuidado.", **kwargs):
@@ -268,13 +318,14 @@ class ReviewedMissionGateTests(unittest.TestCase):
             trusted_assignments=self.assignments(),
         )
         self.assertEqual(out["state"], "READY_FOR_GUARDIAN")
+        self.assertEqual(out["protocol"]["state"], "NOT_REQUIRED")
         self.assertEqual(out["review"]["state"], "ACCEPT_PLAN")
         self.assertTrue(out["eligible_for_guardian"])
         self.assertFalse(out["guardian_called"])
         self.assertFalse(out["executes_action"])
         self.assertFalse(out["grants_permission"])
 
-    def test_code_change_requires_prime_shadow_sentinel_and_approval_evidence(self):
+    def test_code_change_requires_protocol_and_three_independent_reviewers(self):
         preview = self.preview("Corrigir bug no código da interface.")
         self.assertEqual(preview["blast_radius"]["level"], "HIGH")
         self.assertEqual(preview["task_class"], "CRITICAL")
@@ -282,13 +333,34 @@ class ReviewedMissionGateTests(unittest.TestCase):
             preview["required_roles"],
             ["PRIME", "SHADOW", "SENTINEL"],
         )
+
+        no_protocol = self.preview(
+            "Corrigir bug no código da interface.",
+            reviews=[
+                self.review("PRIME", preview),
+                self.review("SHADOW", preview),
+                self.review("SENTINEL", preview),
+            ],
+            trusted_assignments=self.assignments(),
+            approval_refs=["approval-1"],
+            approval_verifier=self.verified,
+            now=NOW,
+        )
+        self.assertEqual(no_protocol["state"], "BLOCK")
+        self.assertEqual(no_protocol["reason"], "AGENT_PROTOCOL_BLOCKED")
+        self.assertIsNone(no_protocol["review"])
+        self.assertIn(
+            "PROTOCOL_MESSAGE_MISSING:PRIME",
+            no_protocol["protocol"]["blockers"],
+        )
+
         partial = self.preview(
             "Corrigir bug no código da interface.",
             reviews=[self.review("PRIME", preview)],
             trusted_assignments=self.assignments(),
-            approval_refs=["approval-1"],
-            approval_verifier=self.verified,
+            **self.critical_protocol(preview),
         )
+        self.assertEqual(partial["protocol"]["state"], "PASS")
         self.assertEqual(partial["state"], "BLOCK")
         self.assertIn("MISSING_REVIEWER:SHADOW", partial["review"]["blockers"])
         self.assertIn("MISSING_REVIEWER:SENTINEL", partial["review"]["blockers"])
@@ -301,13 +373,70 @@ class ReviewedMissionGateTests(unittest.TestCase):
                 self.review("SENTINEL", preview),
             ],
             trusted_assignments=self.assignments(),
-            approval_refs=["approval-1"],
-            approval_verifier=self.verified,
+            **self.critical_protocol(preview),
         )
+        self.assertEqual(full["protocol"]["state"], "PASS")
+        self.assertTrue(all(
+            row["authorization"] == "NONE"
+            for row in full["protocol"]["messages"]
+        ))
         self.assertEqual(full["state"], "READY_FOR_GUARDIAN")
         self.assertTrue(full["eligible_for_guardian"])
         self.assertFalse(full["guardian_called"])
         self.assertFalse(full["external_action_executed"])
+
+    def test_protocol_message_must_bind_to_exact_mission_plan(self):
+        preview = self.preview("Corrigir bug no código da interface.")
+        wrong = self.protocol_messages(
+            preview,
+            requested_action="review_mission:other:old-plan",
+        )
+        out = self.preview(
+            "Corrigir bug no código da interface.",
+            reviews=[
+                self.review("PRIME", preview),
+                self.review("SHADOW", preview),
+                self.review("SENTINEL", preview),
+            ],
+            trusted_assignments=self.assignments(),
+            review_messages=wrong,
+            trusted_message_contexts=self.message_contexts(),
+            now=NOW,
+            approval_refs=["approval-1"],
+            approval_verifier=self.verified,
+        )
+        self.assertEqual(out["state"], "BLOCK")
+        self.assertEqual(out["reason"], "AGENT_PROTOCOL_BLOCKED")
+        self.assertTrue(any(
+            item.endswith(":MISSION_BINDING_MISMATCH")
+            for item in out["protocol"]["blockers"]
+        ))
+        self.assertIsNone(out["review"])
+
+    def test_protocol_replay_is_blocked_before_adjudication(self):
+        preview = self.preview("Corrigir bug no código da interface.")
+        messages = self.protocol_messages(preview)
+        out = self.preview(
+            "Corrigir bug no código da interface.",
+            reviews=[
+                self.review("PRIME", preview),
+                self.review("SHADOW", preview),
+                self.review("SENTINEL", preview),
+            ],
+            trusted_assignments=self.assignments(),
+            review_messages=messages,
+            trusted_message_contexts=self.message_contexts(),
+            seen_message_digests=[messages["PRIME"]["digest"]],
+            now=NOW,
+            approval_refs=["approval-1"],
+            approval_verifier=self.verified,
+        )
+        self.assertEqual(out["state"], "BLOCK")
+        self.assertTrue(any(
+            item == "PROTOCOL:PRIME:REPLAY"
+            for item in out["protocol"]["blockers"]
+        ))
+        self.assertIsNone(out["review"])
 
     def test_shadow_challenge_escalates_instead_of_picking_a_side(self):
         preview = self.preview("Corrigir bug no código da interface.")
@@ -319,9 +448,9 @@ class ReviewedMissionGateTests(unittest.TestCase):
                 self.review("SENTINEL", preview),
             ],
             trusted_assignments=self.assignments(),
-            approval_refs=["approval-1"],
-            approval_verifier=self.verified,
+            **self.critical_protocol(preview),
         )
+        self.assertEqual(out["protocol"]["state"], "PASS")
         self.assertEqual(out["state"], "ESCALATE")
         self.assertIn("DIVERGENCE:SHADOW", out["review"]["blockers"])
         self.assertFalse(out["eligible_for_guardian"])
@@ -338,13 +467,13 @@ class ReviewedMissionGateTests(unittest.TestCase):
                 self.review("SENTINEL", preview),
             ],
             trusted_assignments=self.assignments(),
-            approval_refs=["approval-1"],
-            approval_verifier=self.verified,
+            **self.critical_protocol(preview),
         )
+        self.assertEqual(out["protocol"]["state"], "PASS")
         self.assertEqual(out["state"], "BLOCK")
         self.assertIn("REVIEW_PLAN:PRIME", out["review"]["blockers"])
 
-    def test_blocked_deploy_mission_never_reaches_review_or_guardian(self):
+    def test_blocked_deploy_mission_never_reaches_protocol_review_or_guardian(self):
         out = self.preview(
             "Faça deploy em produção agora.",
             feature_flags={
@@ -354,11 +483,11 @@ class ReviewedMissionGateTests(unittest.TestCase):
         )
         self.assertEqual(out["state"], "BLOCK")
         self.assertEqual(out["reason"], "MISSION_NOT_READY")
+        self.assertIsNone(out["protocol"])
         self.assertIsNone(out["review"])
         self.assertFalse(out["eligible_for_guardian"])
         self.assertFalse(out["guardian_called"])
         self.assertFalse(out["executes_action"])
-
 
 
 if __name__ == "__main__":
