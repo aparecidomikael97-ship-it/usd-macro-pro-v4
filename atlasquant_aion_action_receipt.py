@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from hashlib import sha256
+from itertools import islice
 from typing import Any, Callable, Mapping, Sequence
 import json
 import unicodedata
@@ -54,7 +55,7 @@ def _aware(value: Any) -> datetime | None:
 
 def _refs(values: Sequence[Any] | None) -> list[str]:
     out = []
-    for item in list(values or [])[:40]:
+    for item in islice(values or (), 40):
         text = _clean(item, 180)
         if text and text not in out:
             out.append(text)
@@ -81,7 +82,7 @@ def _bound(refs: Sequence[str], verifier: Any) -> str:
 
 def _child_refs(values: Sequence[Any] | None) -> list[dict[str, str]]:
     out = []
-    for raw in list(values or [])[:40]:
+    for raw in islice(values or (), 40):
         if not isinstance(raw, Mapping):
             continue
         receipt_id = _clean(raw.get("receipt_id"), 80)
