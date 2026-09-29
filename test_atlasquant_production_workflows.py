@@ -83,13 +83,16 @@ class AtlasQuantProductionWorkflowContractTests(unittest.TestCase):
         self.assertIn("marcador de build ausente/incorreto",text)
 
     def test_app_deploy_marker_has_explicit_environment_fallbacks(self):
-        src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
-        self.assertIn('os.getenv("RENDER_GIT_COMMIT","")',src)
-        self.assertIn('os.getenv("ATLASQUANT_DEPLOY_COMMIT","")',src)
-        self.assertIn('os.getenv("GIT_COMMIT","")',src)
-        self.assertIn('id="atlasquant-deploy-marker"',src)
-        self.assertIn('["git","rev-parse","HEAD"]',src)
-        self.assertIn('re.fullmatch(r"[0-9a-fA-F]{40}",candidate)',src)
+        src=Path("atlasquant_build_identity.py").read_text(encoding="utf-8")
+        app=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        self.assertIn('"RENDER_GIT_COMMIT"',src)
+        self.assertIn('"ATLASQUANT_DEPLOY_COMMIT"',src)
+        self.assertIn('"GIT_COMMIT"',src)
+        self.assertIn('id="atlasquant-deploy-marker"',app)
+        self.assertIn("identity_marker_html",app)
+        self.assertIn('id="atlasquant-runtime-identity"',src)
+        self.assertIn('["rev-parse","HEAD"]',src)
+        self.assertIn(r"[0-9a-fA-F]{40}",src)
 
     def test_browser_smoke_separates_deploy_identity_from_latency_failure(self):
         text=Path(".github/workflows/production-browser-smoke.yml").read_text(encoding="utf-8")
@@ -139,7 +142,8 @@ class AtlasQuantProductionWorkflowContractTests(unittest.TestCase):
         text=Path(".github/workflows/production-browser-smoke.yml").read_text(encoding="utf-8")
         self.assertIn('PYTHONPATH="$GITHUB_WORKSPACE',text)
         self.assertIn("python /tmp/atlasquant_browser_smoke.py",text)
-        self.assertIn("from atlasquant_build_identity import short_source_fingerprint",text)
+        self.assertIn("from atlasquant_build_identity import compare_deploy_identity, short_source_fingerprint",text)
+        self.assertIn("DEPLOY_IDENTITY_MISMATCH",text)
 
 
 
@@ -166,6 +170,8 @@ class AtlasQuantProductionWorkflowContractTests(unittest.TestCase):
         self.assertIn("gh workflow run production-build-identity.yml --ref main",text)
         self.assertIn("Production Browser Smoke + Production Build Identity",text)
         self.assertIn("fingerprint exato",text)
+        self.assertIn("NOT_CONFIGURED",text)
+        self.assertIn("A URL do hook não é registrada",text)
         self.assertNotIn("contents: write",text)
 
     def test_quality_runs_for_deploy_control_and_redeploy_request_changes(self):

@@ -55,5 +55,16 @@ Render. O Blueprint não deve conter API keys, passwords, tokens ou hashes de us
 ## Redeploy manual controlado
 
 O workflow `.github/workflows/render-deploy-control.yml` permite um redeploy manual sem expor a URL do Deploy Hook.
-Ele exige o secret GitHub `RENDER_DEPLOY_HOOK_URL`; se o secret estiver ausente, falha fechado e não tenta improvisar outra credencial.
-Após solicitar o deploy, verifica saúde e dispara o Production Browser Smoke, que continua sendo a validação final de identidade.
+Ele exige o secret GitHub `RENDER_DEPLOY_HOOK_URL`. Se o secret estiver ausente, o job termina `NOT_CONFIGURED` e não chama a rede. A presença do secret não autoriza sozinha um disparo feito por código de aplicação.
+
+`atlasquant_render_deploy_hook.deploy_hook_status` é o contrato offline:
+
+- URL só em `RENDER_DEPLOY_HOOK_URL`;
+- a URL não entra no resultado, no log da aplicação nem na interface;
+- ausência da variável é `NOT_CONFIGURED`, não um deploy falho;
+- `human_approved is True` é obrigatório para `APPROVED_NOT_SENT`;
+- este contrato não executa o POST.
+
+O marcador `#atlasquant-runtime-identity` publica SHA, branch, ambiente, timestamp e release somente quando o host os fornece. O que faltar fica `UNKNOWN`. O Browser Smoke de produção compara `EXPECTED_SHA` com `DEPLOYED_SHA` e falha com `DEPLOY_IDENTITY_MISMATCH` quando os dois existem e divergem. Localhost permanece `LOCAL_OBSERVATION` e não prova produção.
+
+O fingerprint `AQBUILD` continua sendo a identidade do bundle. Ele não substitui o SHA.
