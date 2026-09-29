@@ -26,8 +26,6 @@ from atlasquant_runtime_store import resolve_runtime_branch, require_runtime_bra
 from atlasquant_aion_operations import normalize_queue, queue_digest
 from atlasquant_aion_observability import normalize_events, events_digest
 from atlasquant_aion_model_router import normalize_budget
-from atlasquant_aion_studio import normalize_projects, studio_digest
-from atlasquant_aion_promotions import normalize_campaigns, promotion_digest
 from atlasquant_aion_entitlements import normalize_entitlements, entitlement_digest
 from atlasquant_aion_continuity import (
     normalize_missions,
@@ -400,6 +398,112 @@ def _business_normalizers():
         normalize_business_metrics,
         business_metrics_digest,
     )
+
+
+class OptionalProductAdapterUnavailableError(RuntimeError):
+    """Optional product adapter is unavailable for non-empty persisted data."""
+
+
+def _fallback_studio_normalizers():
+    def normalize_projects(rows):
+        if rows is None:
+            return []
+        if isinstance(rows, (list, tuple)) and not rows:
+            return []
+        raise OptionalProductAdapterUnavailableError(
+            "STUDIO_ADAPTER_REQUIRED_FOR_NONEMPTY_PROJECTS"
+        )
+
+    def studio_digest(rows):
+        normalized = normalize_projects(rows)
+        raw = json.dumps(
+            normalized,
+            ensure_ascii=False,
+            sort_keys=True,
+            default=str,
+        )
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+    return normalize_projects, studio_digest
+
+
+def _studio_normalizers():
+    """Load Studio lazily; an empty Core checkpoint does not require Studio."""
+    try:
+        from atlasquant_aion_studio import (
+            normalize_projects as studio_normalize_projects,
+            studio_digest as studio_digest_impl,
+        )
+    except ImportError:
+        return _fallback_studio_normalizers()
+    return studio_normalize_projects, studio_digest_impl
+
+
+def normalize_projects(rows):
+    normalizer, _ = _studio_normalizers()
+    return normalizer(rows)
+
+
+def studio_digest(rows):
+    _, digest_fn = _studio_normalizers()
+    return digest_fn(rows)
+
+
+def _fallback_promotion_normalizers():
+    def normalize_campaigns(rows):
+        if rows is None:
+            return []
+        if isinstance(rows, (list, tuple)) and not rows:
+            return []
+        raise OptionalProductAdapterUnavailableError(
+            "PROMOTIONS_ADAPTER_REQUIRED_FOR_NONEMPTY_CAMPAIGNS"
+        )
+
+    def promotion_digest(campaigns, redemptions=None):
+        normalized_campaigns = normalize_campaigns(campaigns)
+        if redemptions is None:
+            normalized_redemptions = []
+        elif isinstance(redemptions, (list, tuple)) and not redemptions:
+            normalized_redemptions = []
+        else:
+            raise OptionalProductAdapterUnavailableError(
+                "PROMOTIONS_ADAPTER_REQUIRED_FOR_NONEMPTY_REDEMPTIONS"
+            )
+        payload = {
+            "campaigns": normalized_campaigns,
+            "redemptions": normalized_redemptions,
+        }
+        raw = json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            default=str,
+        )
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+    return normalize_campaigns, promotion_digest
+
+
+def _promotion_normalizers():
+    """Load Promoções lazily; empty Core memory remains product-independent."""
+    try:
+        from atlasquant_aion_promotions import (
+            normalize_campaigns as promotions_normalize_campaigns,
+            promotion_digest as promotion_digest_impl,
+        )
+    except ImportError:
+        return _fallback_promotion_normalizers()
+    return promotions_normalize_campaigns, promotion_digest_impl
+
+
+def normalize_campaigns(rows):
+    normalizer, _ = _promotion_normalizers()
+    return normalizer(rows)
+
+
+def promotion_digest(campaigns, redemptions=None):
+    _, digest_fn = _promotion_normalizers()
+    return digest_fn(campaigns, redemptions)
 
 
 def _empty_business_section() -> dict[str, Any]:
@@ -2471,8 +2575,13 @@ def checkpoint_integrity_report(
             mismatches.append("aion_global_worker")
 
     studio = raw.get("studio") if isinstance(raw.get("studio"), Mapping) else {}
-    projects = normalize_projects(studio.get("projects") if isinstance(studio, Mapping) else [])
-    add_check("studio", studio.get("digest"), studio_digest(projects))
+    try:
+        projects = normalize_projects(
+            studio.get("projects") if isinstance(studio, Mapping) else []
+        )
+        add_check("studio", studio.get("digest"), studio_digest(projects))
+    except OptionalProductAdapterUnavailableError as exc:
+        add_unavailable("studio", studio.get("digest"), str(exc))
 
     business = raw.get("business") if isinstance(raw.get("business"), Mapping) else {}
     normalize_products, business_digest, normalize_business_metrics, business_metrics_digest = (
@@ -2504,16 +2613,29 @@ def checkpoint_integrity_report(
             )
 
     promotions = raw.get("promotions") if isinstance(raw.get("promotions"), Mapping) else {}
-    campaigns = normalize_campaigns(promotions.get("campaigns") if isinstance(promotions, Mapping) else [])
-    redemptions_raw = promotions.get("redemptions", []) if isinstance(promotions, Mapping) else []
-    if not isinstance(redemptions_raw, (list, tuple)):
-        redemptions_raw = []
-    redemptions = [dict(x) for x in list(redemptions_raw)[:2000] if isinstance(x, Mapping)]
-    add_check(
-        "promotions",
-        promotions.get("digest"),
-        promotion_digest(campaigns, redemptions),
-    )
+    try:
+        campaigns = normalize_campaigns(
+            promotions.get("campaigns") if isinstance(promotions, Mapping) else []
+        )
+        redemptions_raw = (
+            promotions.get("redemptions", [])
+            if isinstance(promotions, Mapping)
+            else []
+        )
+        if not isinstance(redemptions_raw, (list, tuple)):
+            redemptions_raw = []
+        redemptions = [
+            dict(x)
+            for x in list(redemptions_raw)[:2000]
+            if isinstance(x, Mapping)
+        ]
+        add_check(
+            "promotions",
+            promotions.get("digest"),
+            promotion_digest(campaigns, redemptions),
+        )
+    except OptionalProductAdapterUnavailableError as exc:
+        add_unavailable("promotions", promotions.get("digest"), str(exc))
 
     entitlements = raw.get("entitlements") if isinstance(raw.get("entitlements"), Mapping) else {}
     entitlement_rows = normalize_entitlements(
