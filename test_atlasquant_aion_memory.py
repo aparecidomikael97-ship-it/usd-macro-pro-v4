@@ -18,6 +18,7 @@ from atlasquant_aion_memory import (
     load_runtime_checkpoint,
     merged_checkpoint,
     runtime_write_preflight,
+    reconcile_runtime_write,
     runtime_configuration_status,
     save_runtime_checkpoint,
     search_canonical_memory,
@@ -889,7 +890,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
 
         verified=ensure_operating_checkpoint(cp)
         verified["operating"]["dirty"]=False
-        with patch("atlasquant_aion_memory.requests.put",return_value=put) as put_call, patch(
+        with patch("requests.put",return_value=put) as put_call, patch(
             "atlasquant_aion_memory.load_runtime_checkpoint",
             return_value={
                 "status":"CONFIRMED",
@@ -914,7 +915,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         cfg=RuntimeConfig(token="x",repo="owner/repo",branch="atlasquant-runtime")
         put=MagicMock()
         put.status_code=409
-        with patch("atlasquant_aion_memory.requests.put",return_value=put):
+        with patch("requests.put",return_value=put):
             result=save_runtime_checkpoint(default_checkpoint(),cfg,approved=True,expected_sha="stale")
         self.assertEqual(result["status"],"CONFLICT")
         self.assertFalse(result["saved"])
@@ -926,7 +927,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         put.status_code=200
         put.raise_for_status.return_value=None
         put.json.return_value={"content":{"sha":"newsha"}}
-        with patch("atlasquant_aion_memory.requests.put",return_value=put), patch(
+        with patch("requests.put",return_value=put), patch(
             "atlasquant_aion_memory.load_runtime_checkpoint",
             return_value={"status":"ERROR","sha":"","checkpoint":None},
         ):
@@ -958,7 +959,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         get.status_code=200
         get.raise_for_status.return_value=None
         get.json.return_value={"content":encoded,"sha":"publicsha"}
-        with patch("atlasquant_aion_memory.requests.get",return_value=get) as get_call:
+        with patch("requests.get",return_value=get) as get_call:
             result=load_runtime_checkpoint(cfg)
         self.assertEqual(result["status"],"CONFIRMED")
         self.assertEqual(result["sha"],"publicsha")
@@ -986,7 +987,7 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         cfg = RuntimeConfig(token="x", repo="owner/repo", branch="atlasquant-runtime")
         for flag in ("false", "true", "yes", "no", 1, 0, [], {}, None):
             with self.subTest(flag=flag):
-                with patch("atlasquant_aion_memory.requests.put") as put, patch("atlasquant_aion_memory.requests.get") as get:
+                with patch("requests.put") as put, patch("requests.get") as get:
                     result = save_runtime_checkpoint(default_checkpoint(), cfg, approved=flag)
                 self.assertEqual(result["status"], "BLOCKED")
                 self.assertFalse(result["saved"])
@@ -1013,6 +1014,92 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertNotIn(secret, rendered)
         self.assertIn("[REDACTED]", rendered)
         self.assertEqual(cfg.token, secret)
+
+
+    def test_unverified_save_returns_receipt_and_never_retries_automatically(self):
+        cfg = RuntimeConfig(token="x", repo="owner/repo", branch="atlasquant-runtime")
+        cp = default_checkpoint()
+        put = MagicMock()
+        put.status_code = 200
+        put.raise_for_status.return_value = None
+        put.json.return_value = {"content": {"sha": "newsha"}}
+
+        with patch("requests.put", return_value=put) as put_call, patch(
+            "atlasquant_aion_memory.load_runtime_checkpoint",
+            return_value={"status": "ERROR", "checkpoint": None, "sha": ""},
+        ):
+            result = save_runtime_checkpoint(
+                cp,
+                cfg,
+                approved=True,
+                expected_sha="oldsha",
+            )
+
+        self.assertEqual(result["status"], "UNVERIFIED")
+        self.assertFalse(result["saved"])
+        self.assertFalse(result["verified"])
+        self.assertTrue(result["reconciliation_required"])
+        self.assertFalse(result["write_receipt"]["automatic_retry"])
+        self.assertEqual(result["write_receipt"]["write_sha"], "newsha")
+        self.assertEqual(result["write_receipt"]["expected_sha"], "oldsha")
+        put_call.assert_called_once()
+
+    def test_reconcile_runtime_write_requires_exact_sha_and_digest(self):
+        cp = ensure_operating_checkpoint(default_checkpoint())
+        cp["operating"]["dirty"] = False
+        digest = checkpoint_source_digest(cp)
+        receipt = {
+            "schema": "ATLASQUANT_AION_RUNTIME_WRITE_RECEIPT_V1",
+            "intent_id": "intent",
+            "expected_sha": "oldsha",
+            "expected_digest": digest,
+            "write_sha": "newsha",
+            "write_accepted": True,
+        }
+        confirmed = reconcile_runtime_write(
+            receipt,
+            {"status": "CONFIRMED", "sha": "newsha", "checkpoint": cp},
+        )
+        self.assertEqual(confirmed["status"], "CONFIRMED")
+        self.assertTrue(confirmed["verified"])
+        self.assertTrue(confirmed["write_attributed"])
+
+        changed_sha = reconcile_runtime_write(
+            receipt,
+            {"status": "CONFIRMED", "sha": "othersha", "checkpoint": cp},
+        )
+        self.assertEqual(changed_sha["status"], "CONFLICT")
+        self.assertFalse(changed_sha["verified"])
+
+        changed_cp = ensure_operating_checkpoint(default_checkpoint())
+        changed_cp["aion"]["priority"] = "different"
+        digest_conflict = reconcile_runtime_write(
+            receipt,
+            {"status": "CONFIRMED", "sha": "newsha", "checkpoint": changed_cp},
+        )
+        self.assertEqual(digest_conflict["status"], "CONFLICT")
+        self.assertFalse(digest_conflict["verified"])
+
+    def test_reconcile_unknown_outcome_can_confirm_content_without_attributing_write(self):
+        cp = ensure_operating_checkpoint(default_checkpoint())
+        cp["operating"]["dirty"] = False
+        digest = checkpoint_source_digest(cp)
+        receipt = {
+            "schema": "ATLASQUANT_AION_RUNTIME_WRITE_RECEIPT_V1",
+            "intent_id": "intent",
+            "expected_sha": "oldsha",
+            "expected_digest": digest,
+            "write_sha": "",
+            "write_accepted": None,
+        }
+        result = reconcile_runtime_write(
+            receipt,
+            {"status": "CONFIRMED", "sha": "observedsha", "checkpoint": cp},
+        )
+        self.assertEqual(result["status"], "CONTENT_CONFIRMED")
+        self.assertTrue(result["verified"])
+        self.assertFalse(result["write_attributed"])
+        self.assertFalse(result["automatic_retry"])
 
 
 if __name__ == "__main__":
