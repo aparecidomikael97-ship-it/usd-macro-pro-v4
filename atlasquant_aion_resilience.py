@@ -80,7 +80,7 @@ def _int(value:Any,default:int=0,minimum:int=0,maximum:int=1_000_000)->int:
 
 def _refs(values:Sequence[Any]|None,limit:int=80)->list[str]:
     out=[]
-    for raw in list(values or [])[:limit*2]:
+    for raw in islice(values or (), max(0, limit*2)):
         text=_clean(raw,240)
         if text and text not in out:
             out.append(text)
@@ -91,7 +91,7 @@ def _refs(values:Sequence[Any]|None,limit:int=80)->list[str]:
 
 def _caps(values:Sequence[Any]|None)->list[str]:
     out=[]
-    for raw in list(values or [])[:100]:
+    for raw in islice(values or (), 100):
         cap=_upper(raw,80)
         if cap in CAPABILITIES and cap not in out:
             out.append(cap)
