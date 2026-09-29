@@ -113,6 +113,7 @@ from atlasquant_aion_memory_quarantine import (
     CHECKPOINT_NAMESPACE as AION_MEMORY_QUARANTINE_NAMESPACE,
     quarantine_checkpoint_integrity,
 )
+from atlasquant_aion_business_adapter import resolve_business_normalizers
 
 SCHEMA = "ATLASQUANT_AION_MEMORY_V1"
 FOUNDATION_REVISION = "2026-09-25-complete-v2"
@@ -383,22 +384,8 @@ def _fallback_business_normalizers():
 
 
 def _business_normalizers():
-    """Load Negócios lazily; empty Core memory remains operational without it."""
-    try:
-        from atlasquant_aion_business import (
-            business_digest,
-            business_metrics_digest,
-            normalize_business_metrics,
-            normalize_products,
-        )
-    except ImportError:
-        return _fallback_business_normalizers()
-    return (
-        normalize_products,
-        business_digest,
-        normalize_business_metrics,
-        business_metrics_digest,
-    )
+    """Resolve Negócios behind the explicit optional adapter boundary."""
+    return resolve_business_normalizers(_fallback_business_normalizers)
 
 
 class OptionalProductAdapterUnavailableError(RuntimeError):
