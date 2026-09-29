@@ -8,8 +8,10 @@ change credentials, deploy, publish, charge money or enable real trading.
 """
 from __future__ import annotations
 
+from collections import deque
 from datetime import datetime, timezone
 from hashlib import sha256
+from itertools import islice
 from typing import Any, Mapping, Sequence
 import json
 import math
@@ -505,7 +507,7 @@ def safe_mode_posture(
 def normalize_delegations(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for raw in list(rows or [])[-500:]:
+    for raw in deque(rows or (), maxlen=500):
         if not isinstance(raw,Mapping):
             continue
         did=_clean(raw.get("delegation_id"),120)
@@ -558,7 +560,7 @@ def normalize_resilience(raw:Mapping[str,Any]|None)->dict[str,Any]:
     item=dict(raw or {})
     delegations=normalize_delegations(item.get("delegations") if isinstance(item.get("delegations"),(list,tuple)) else [])
     watchdogs=[]
-    for raw in list(item.get("watchdogs") or [])[:500]:
+    for raw in islice(item.get("watchdogs") or (), 500):
         if not isinstance(raw,Mapping):
             continue
         watchdogs.append(watchdog(
@@ -571,7 +573,7 @@ def normalize_resilience(raw:Mapping[str,Any]|None)->dict[str,Any]:
             error_limit=raw.get("error_limit",3),
         ))
     breakers=[]
-    for raw in list(item.get("circuit_breakers") or [])[:500]:
+    for raw in islice(item.get("circuit_breakers") or (), 500):
         if not isinstance(raw,Mapping):
             continue
         breakers.append(circuit_breaker(
@@ -583,7 +585,7 @@ def normalize_resilience(raw:Mapping[str,Any]|None)->dict[str,Any]:
             recovery_probe_passed=bool(raw.get("recovery_probe_passed",False)),
         ))
     governors=[]
-    for raw in list(item.get("resource_governors") or [])[:500]:
+    for raw in islice(item.get("resource_governors") or (), 500):
         if not isinstance(raw,Mapping):
             continue
         limits=raw.get("limits") if isinstance(raw.get("limits"),Mapping) else {}
@@ -630,9 +632,9 @@ def resilience_digest(
 )->str:
     return _digest({
         "delegations":normalize_delegations(delegations),
-        "watchdogs":[dict(x) for x in list(watchdogs or []) if isinstance(x,Mapping)],
-        "circuit_breakers":[dict(x) for x in list(breakers or []) if isinstance(x,Mapping)],
-        "resource_governors":[dict(x) for x in list(governors or []) if isinstance(x,Mapping)],
+        "watchdogs":[dict(x) for x in islice(watchdogs or (),500) if isinstance(x,Mapping)],
+        "circuit_breakers":[dict(x) for x in islice(breakers or (),500) if isinstance(x,Mapping)],
+        "resource_governors":[dict(x) for x in islice(governors or (),500) if isinstance(x,Mapping)],
     })
 
 
