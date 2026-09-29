@@ -124,6 +124,37 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
         self.assertEqual(result["integrity"]["state"],"CONFIRMED")
         self.assertFalse(result["executes_action"])
 
+    def test_short_revision_is_rejected_before_network(self):
+        with patch("requests.get") as get:
+            result=load_checkpoint_revision("abcdef1",self.cfg())
+        self.assertEqual(result["status"],"BLOCKED")
+        self.assertIsNone(result["checkpoint"])
+        get.assert_not_called()
+
+    def test_revision_load_rejects_non_string_content(self):
+        response=MagicMock()
+        response.raise_for_status.return_value=None
+        response.json.return_value={"content":["not","base64"],"encoding":"base64"}
+        with patch("requests.get",return_value=response):
+            result=load_checkpoint_revision("a"*40,self.cfg())
+        self.assertEqual(result["status"],"ERROR")
+        self.assertEqual(result["reason"],"ValueError")
+        self.assertIsNone(result["checkpoint"])
+
+    def test_revision_load_rejects_unexpected_encoding(self):
+        cp=default_checkpoint()
+        response=MagicMock()
+        response.raise_for_status.return_value=None
+        response.json.return_value={
+            "content":base64.b64encode(json.dumps(cp).encode("utf-8")).decode("ascii"),
+            "encoding":"utf-8",
+        }
+        with patch("requests.get",return_value=response):
+            result=load_checkpoint_revision("a"*40,self.cfg())
+        self.assertEqual(result["status"],"ERROR")
+        self.assertEqual(result["reason"],"ValueError")
+        self.assertIsNone(result["checkpoint"])
+
     def test_revision_load_rejects_invalid_base64(self):
         response=MagicMock()
         response.raise_for_status.return_value=None
