@@ -113,6 +113,45 @@ def _validated_runtime_id(value: Any) -> str:
     return normalized
 
 
+def _empty_inflight_tick() -> dict[str, Any]:
+    return {}
+
+
+def _normalize_inflight_tick(raw: Mapping[str, Any] | None) -> dict[str, Any]:
+    item = dict(raw or {})
+    if not item:
+        return _empty_inflight_tick()
+    if str(item.get("state") or "") != "CLAIMED":
+        raise ValueError("invalid global inflight tick state")
+    owner = _validated_runtime_id(item.get("owner"))
+    token = safe_text(str(item.get("lease_token") or ""), 180)
+    fence = item.get("fencing_token")
+    claimed_at = str(item.get("claimed_at") or "")
+    intent_id = str(item.get("intent_id") or "").strip()
+    if not token:
+        raise ValueError("invalid global inflight lease token")
+    if type(fence) is not int or fence < 1:
+        raise ValueError("invalid global inflight fencing token")
+    if _parse_iso(claimed_at) is None:
+        raise ValueError("invalid global inflight timestamp")
+    expected_intent = digest({
+        "owner": owner,
+        "lease_token": token,
+        "fencing_token": fence,
+        "claimed_at": claimed_at,
+    })
+    if not intent_id or intent_id != expected_intent:
+        raise ValueError("invalid global inflight intent")
+    return {
+        "state": "CLAIMED",
+        "owner": owner,
+        "lease_token": token,
+        "fencing_token": fence,
+        "claimed_at": claimed_at,
+        "intent_id": intent_id,
+    }
+
+
 def _empty_lease() -> dict[str, Any]:
     return {
         "owner": "",
@@ -273,6 +312,7 @@ def _default_state() -> dict[str, Any]:
         "lease_seconds": DEFAULT_LEASE_SECONDS,
         "fencing_counter": 0,
         "lease": _empty_lease(),
+        "inflight_tick": _empty_inflight_tick(),
         "stats": _empty_stats(),
         "runner": {
             "mode": "GITHUB_ACTIONS_EXISTING_AUTOPILOT_PULSE",
@@ -379,6 +419,9 @@ def _normalize_state(raw: Mapping[str, Any]) -> dict[str, Any]:
         "fencing_counter": fence_counter,
         "lease": _normalize_lease(
             raw.get("lease") if isinstance(raw.get("lease"), Mapping) else {}
+        ),
+        "inflight_tick": _normalize_inflight_tick(
+            raw.get("inflight_tick") if isinstance(raw.get("inflight_tick"), Mapping) else {}
         ),
         "stats": _normalize_stats(
             raw.get("stats") if isinstance(raw.get("stats"), Mapping) else {}
@@ -551,6 +594,7 @@ def stage_arm_global_worker(
         max_jobs=max_jobs,
         lease_seconds=lease_seconds,
         lease=_empty_lease(),
+        inflight_tick=_empty_inflight_tick(),
     )
     return {
         "schema": SCHEMA,
@@ -591,6 +635,7 @@ def stage_pause_global_worker(
         state="PAUSED",
         kill_switch=False,
         lease=_empty_lease(),
+        inflight_tick=_empty_inflight_tick(),
     )
     return {
         "schema": SCHEMA,
@@ -625,6 +670,7 @@ def stage_kill_global_worker(
         state="KILLED",
         kill_switch=True,
         lease=_empty_lease(),
+        inflight_tick=_empty_inflight_tick(),
     )
     return {
         "schema": SCHEMA,
@@ -670,6 +716,10 @@ def global_worker_snapshot(
             "lease_fencing_token": 0,
             "lease_active": False,
             "lease_expires_at": "",
+            "inflight_reconciliation_required": False,
+            "inflight_owner": "",
+            "inflight_fencing_token": 0,
+            "inflight_since": "",
             "stats": {},
             "runner_mode": "UNKNOWN",
             "runner_feature_flag_required": True,
@@ -702,6 +752,10 @@ def global_worker_snapshot(
         "lease_fencing_token": lease["fencing_token"],
         "lease_active": bool(expires and expires > current),
         "lease_expires_at": lease["expires_at"],
+        "inflight_reconciliation_required": bool(state["inflight_tick"]),
+        "inflight_owner": str(state["inflight_tick"].get("owner") or ""),
+        "inflight_fencing_token": int(state["inflight_tick"].get("fencing_token") or 0),
+        "inflight_since": str(state["inflight_tick"].get("claimed_at") or ""),
         "stats": deepcopy(state["stats"]),
         "runner_mode": str(state["runner"].get("mode") or ""),
         "runner_feature_flag_required": True,
@@ -923,6 +977,20 @@ def _claim_state(
         token = secrets.token_urlsafe(24)
         acquired_at = current.isoformat()
     expires = current + timedelta(seconds=int(state["lease_seconds"]))
+    claimed_at = current.isoformat()
+    inflight_tick = {
+        "state": "CLAIMED",
+        "owner": runtime,
+        "lease_token": token,
+        "fencing_token": fence,
+        "claimed_at": claimed_at,
+    }
+    inflight_tick["intent_id"] = digest({
+        "owner": runtime,
+        "lease_token": token,
+        "fencing_token": fence,
+        "claimed_at": claimed_at,
+    })
     stats["last_heartbeat_at"] = current.isoformat()
     stats["last_runtime_id"] = runtime
     claimed = _mutated(
@@ -936,6 +1004,7 @@ def _claim_state(
             "heartbeat_at": current.isoformat(),
             "expires_at": expires.isoformat(),
         },
+        inflight_tick=inflight_tick,
         stats=stats,
     )
     return claimed, {
@@ -972,6 +1041,17 @@ def _release_state(
         raise ValueError("GLOBAL_LEASE_TOKEN_MISMATCH")
     if lease["fencing_token"] != expected_fencing_token:
         raise ValueError("GLOBAL_FENCING_TOKEN_MISMATCH")
+    inflight = _normalize_inflight_tick(
+        state.get("inflight_tick") if isinstance(state.get("inflight_tick"), Mapping) else {}
+    )
+    if not inflight:
+        raise ValueError("GLOBAL_INFLIGHT_TICK_REQUIRED")
+    if inflight["owner"] != runtime:
+        raise ValueError("GLOBAL_INFLIGHT_OWNER_MISMATCH")
+    if inflight["lease_token"] != str(expected_lease_token).strip():
+        raise ValueError("GLOBAL_INFLIGHT_TOKEN_MISMATCH")
+    if inflight["fencing_token"] != expected_fencing_token:
+        raise ValueError("GLOBAL_INFLIGHT_FENCE_MISMATCH")
     stats = _normalize_stats(
         state.get("stats") if isinstance(state.get("stats"), Mapping) else {}
     )
@@ -987,6 +1067,7 @@ def _release_state(
     return _mutated(
         state,
         lease=_empty_lease(),
+        inflight_tick=_empty_inflight_tick(),
         stats=stats,
     )
 
@@ -1109,6 +1190,22 @@ def run_global_worker_once(
             "processed": 0,
             "network_called": True,
             "external_action_executed": False,
+        }
+
+    if state["inflight_tick"]:
+        return {
+            "schema": SCHEMA,
+            "status": "INFLIGHT_RECONCILIATION_REQUIRED",
+            "reason": "Previous global tick has no confirmed terminal persistence.",
+            "processed": 0,
+            "inflight_owner": state["inflight_tick"]["owner"],
+            "inflight_fencing_token": state["inflight_tick"]["fencing_token"],
+            "inflight_since": state["inflight_tick"]["claimed_at"],
+            "network_called": True,
+            "reconciliation_required": True,
+            "automatic_retry_allowed": False,
+            "external_action_executed": False,
+            "real_trading_enabled": False,
         }
 
     claimed, lease = _claim_state(state, runtime_id=runtime, now=current)
@@ -1279,7 +1376,13 @@ def _cli() -> int:
     }
     print(json.dumps(safe, ensure_ascii=False, sort_keys=True))
     status = str(result.get("status") or "")
-    return 1 if status in {"ERROR", "BLOCKED", "FENCE_VERIFICATION_FAILED"} or status.startswith("FINAL_ERROR") else 0
+    return 1 if status in {
+        "ERROR",
+        "BLOCKED",
+        "FENCE_VERIFICATION_FAILED",
+        "FENCE_RELEASE_FAILED",
+        "INFLIGHT_RECONCILIATION_REQUIRED",
+    } or status.startswith("FINAL_ERROR") else 0
 
 
 if __name__ == "__main__":
