@@ -21,8 +21,11 @@ import base64
 import json
 import math
 import os
-import subprocess
-from atlasquant_build_identity import short_source_fingerprint
+from atlasquant_build_identity import (
+    identity_marker_html,
+    runtime_build_identity,
+    short_source_fingerprint,
+)
 import time
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -307,39 +310,25 @@ st.set_page_config(
 )
 
 # Deployment identity is non-secret observability. Prefer platform-provided
-# commit variables; when a host does not expose them, use the immutable git
-# checkout identity if repository metadata is available. Never invent a SHA.
-def _resolve_atlasquant_deploy_commit() -> str:
-    value=str(
-        os.getenv("RENDER_GIT_COMMIT","")
-        or os.getenv("ATLASQUANT_DEPLOY_COMMIT","")
-        or os.getenv("GIT_COMMIT","")
-        or ""
-    ).strip()
-    if value:
-        return value
-    try:
-        probe=subprocess.run(
-            ["git","rev-parse","HEAD"],
-            cwd=str(Path(__file__).resolve().parent),
-            capture_output=True,
-            text=True,
-            timeout=1.5,
-            check=False,
-        )
-        candidate=str(probe.stdout or "").strip()
-        if probe.returncode==0 and re.fullmatch(r"[0-9a-fA-F]{40}",candidate):
-            return candidate.lower()
-    except Exception:
-        pass
-    return ""
-
-_ATLASQUANT_DEPLOY_COMMIT=_resolve_atlasquant_deploy_commit()
+# commit variables RENDER_GIT_COMMIT, ATLASQUANT_DEPLOY_COMMIT and GIT_COMMIT.
+# When a host does not expose them, runtime_build_identity uses git rev-parse
+# HEAD only if it returns a 40-hex SHA. Never invent a SHA. Missing facts stay
+# UNKNOWN. The deploy hook URL is not read here.
+_ATLASQUANT_RUNTIME_IDENTITY=runtime_build_identity(
+    root=Path(__file__).resolve().parent,
+    release_id=APP_VERSION,
+)
+_ATLASQUANT_DEPLOY_COMMIT=(
+    _ATLASQUANT_RUNTIME_IDENTITY["commit_sha"]
+    if _ATLASQUANT_RUNTIME_IDENTITY["commit_sha"]!="UNKNOWN"
+    else ""
+)
 if _ATLASQUANT_DEPLOY_COMMIT:
     st.markdown(
         f'<span id="atlasquant-deploy-marker" data-commit="{_ATLASQUANT_DEPLOY_COMMIT}" style="display:none"></span>',
         unsafe_allow_html=True,
     )
+st.markdown(identity_marker_html(_ATLASQUANT_RUNTIME_IDENTITY), unsafe_allow_html=True)
 
 # The source-bundle fingerprint does not depend on Render exposing git metadata.
 # It lets the production smoke prove that the executable app bundle matches the
