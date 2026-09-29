@@ -41,7 +41,8 @@
         355,
         356
       ],
-      "preserves_entitlements_as_tenant_core_dependency": true
+      "preserves_entitlements_as_tenant_core_dependency": true,
+      "head_sha": "8e48e639fcd3b6f3900e67864a2bc31b1ac9a58a"
     }
   ],
   "autonomy": {
@@ -123,6 +124,16 @@
       "pr": 355,
       "superseded_by": 359,
       "reason": "Previous consolidated tip extended by residual resource bounds and recovery adversarial hardening."
+    }
+  ],
+  "parallel_nonblocking": [
+    {
+      "pr": 358,
+      "branch": "chatgpt/atlasquant-cockpit-shell-v1",
+      "role": "isolated_cockpit_ui_track",
+      "may_advance": true,
+      "may_touch_core_authority": false,
+      "production_wiring_allowed": false
     }
   ]
 }
