@@ -14,6 +14,9 @@ Contrato offline para revisão de tarefa e mensagem entre agentes.
 - Divergência relevante termina em `ESCALATE` ou `BLOCK`.
 - Nenhum veredito executa ação, altera Guardian, aprova a si mesmo, forja receipt ou promove `UNKNOWN` para `CONFIRMED`.
 - A identidade da mensagem vem do contexto confiável. O payload não escolhe o próprio papel.
+- O SHA-256 canônico é fingerprint de integridade. Não é assinatura, prova de identidade nem prova de autorização. Quem reescreve o payload consegue recalcular o digest.
+- Na leitura, capability e permissions são revalidadas contra o contexto confiável. Um seal anterior não permanece confiável.
+- `evidence_refs` e `approval_refs` não valem por serem strings. Sem verifier do caller que vincule exatamente essas refs, o estado é `UNVERIFIED` e a decisão bloqueia. O truth state permanece `UNKNOWN`.
 - Blast radius usa fatores de impacto. O nome da ação não reduz a classe. `CRITICAL` não é automático.
 
 ## O que este bloco não é

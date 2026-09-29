@@ -11,8 +11,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from hashlib import sha256
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 import json
+import unicodedata
 
 SCHEMA = "ATLASQUANT_AION_CRITICAL_REVIEW_V1"
 PROTOCOL_VERSION = "1"
@@ -86,8 +87,76 @@ def _canonical(payload: Mapping[str, Any]) -> str:
     return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
 
 
-def _digest(payload: Mapping[str, Any]) -> str:
+def canonical_fingerprint(payload: Mapping[str, Any]) -> str:
+    """SHA-256 of canonical JSON.
+
+    This is an integrity fingerprint only. It is not a signature, not an
+    identity proof, and not an authorization proof. Anyone who can rewrite
+    the payload can recompute it.
+    """
     return sha256(_canonical(payload).encode("utf-8")).hexdigest()
+
+
+def _digest(payload: Mapping[str, Any]) -> str:
+    return canonical_fingerprint(payload)
+
+
+def _fold(value: Any) -> str:
+    raw = unicodedata.normalize("NFKD", str(value or ""))
+    return "".join(ch for ch in raw if not unicodedata.combining(ch)).casefold()
+
+
+_AUTHORITY_PHRASES = (
+    "sou admin",
+    "i am admin",
+    "you are admin",
+    "agora voce e admin",
+    "guardian autorizou",
+    "guardian authorized",
+    "altere a constitution",
+    "alter the constitution",
+    "change the constitution",
+    "ignore o guardian",
+    "ignore the guardian",
+    "ignore previous instructions",
+)
+
+
+def _content_claims_authority(value: Any) -> bool:
+    folded = _fold(value)
+    return any(phrase in folded for phrase in _AUTHORITY_PHRASES)
+
+
+def _binding_status(refs: Sequence[str], verifier: Any) -> str:
+    """A non-empty string is not evidence or approval.
+
+    The caller must supply a verifier that binds exactly these refs.
+    Without that verifier the status stays UNVERIFIED.
+    """
+    rows = list(refs)
+    if not rows:
+        return "MISSING"
+    if not callable(verifier):
+        return "UNVERIFIED"
+    try:
+        result = verifier(rows)
+    except Exception:
+        return "UNVERIFIED"
+    if not isinstance(result, Mapping) or _upper(result.get("state"), 40) != "VERIFIED":
+        return "UNVERIFIED"
+    bound = _refs(result.get("bound_refs"))
+    if sorted(bound) != sorted(rows) or len(bound) != len(set(rows)):
+        return "UNVERIFIED"
+    return "VERIFIED"
+
+
+def _fingerprint_fields() -> dict[str, Any]:
+    return {
+        "digest_kind": "CANONICAL_FINGERPRINT",
+        "digest_is_signature": False,
+        "digest_is_identity_proof": False,
+        "digest_is_authorization_proof": False,
+    }
 
 
 def _aware(value: Any) -> datetime | None:
@@ -171,6 +240,8 @@ def adjudicate_critical_task(
     evidence_refs: Sequence[Any] | None,
     sensitive: Any = False,
     approval_refs: Sequence[Any] | None = None,
+    evidence_verifier: Callable[[Sequence[str]], Mapping[str, Any]] | None = None,
+    approval_verifier: Callable[[Sequence[str]], Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Decide whether a plan may proceed to Guardian.
 
@@ -184,6 +255,11 @@ def adjudicate_critical_task(
     }
     evidence = _refs(evidence_refs)
     approvals = _refs(approval_refs)
+    evidence_status = _binding_status(evidence, evidence_verifier)
+    if approvals or _exact_true(sensitive):
+        approval_status = _binding_status(approvals, approval_verifier)
+    else:
+        approval_status = "NOT_REQUIRED"
     blockers: list[str] = []
     if kind not in TASK_CLASSES:
         blockers.append("TASK_CLASS_INVALID")
@@ -194,10 +270,14 @@ def adjudicate_critical_task(
         blockers.append("WORKSPACE_MISSING")
     if not _clean(tenant_id, 120):
         blockers.append("TENANT_MISSING")
-    if not evidence:
+    if evidence_status == "MISSING":
         blockers.append("EVIDENCE_MISSING")
-    if _exact_true(sensitive) and not approvals:
+    elif evidence_status != "VERIFIED":
+        blockers.append("EVIDENCE_UNVERIFIED")
+    if approval_status == "MISSING":
         blockers.append("APPROVAL_MISSING")
+    elif approval_status == "UNVERIFIED":
+        blockers.append("APPROVAL_UNVERIFIED")
 
     seen: dict[str, Mapping[str, Any]] = {}
     for raw in list(reviews or []):
@@ -252,6 +332,8 @@ def adjudicate_critical_task(
         "tenant_id": _clean(tenant_id, 120),
         "evidence_refs": evidence,
         "approval_refs": approvals,
+        "evidence_status": evidence_status,
+        "approval_status": approval_status,
         "blockers": blockers,
         "truth_state": "UNKNOWN",
         "truth_promoted": False,
@@ -324,6 +406,8 @@ def seal_agent_message(
         "content_is_authority": False,
         "executes_action": False,
         "grants_permission": False,
+        "sealed_means_authenticated": False,
+        **_fingerprint_fields(),
     }
 
 
@@ -336,8 +420,16 @@ def validate_agent_message(
     seen_digests: Sequence[Any] | None = None,
     now: datetime | None = None,
     max_age_seconds: Any = 900,
+    evidence_verifier: Callable[[Sequence[str]], Mapping[str, Any]] | None = None,
+    approval_verifier: Callable[[Sequence[str]], Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Fail closed on spoofed, stale, replayed, or unbound agent messages."""
+    """Re-check a message at read time. A past seal is not ongoing trust.
+
+    The digest is a canonical fingerprint. A rewritten payload with a
+    recomputed digest still has to match the trusted context, and evidence
+    or approval strings stay UNVERIFIED until a caller-supplied verifier
+    binds them. The message remains information, never authorization.
+    """
     raw = dict(message or {})
     presented = _clean(raw.get("digest"), 80)
     body = {key: raw.get(key) for key in (
@@ -357,11 +449,27 @@ def validate_agent_message(
         "nonce",
         "content",
     )}
-    # Lists must match the sealed canonical form.
     for key in ("evidence_refs", "permissions", "approval_refs"):
         body[key] = list(body[key] or [])
     actual = _digest(body)
     context = dict(trusted_context or {})
+    allowed = {_upper(item, 80) for item in list(context.get("capabilities") or []) if _upper(item, 80)}
+    capability = _upper(raw.get("capability"), 80)
+    permissions = [_upper(item, 80) for item in list(raw.get("permissions") or []) if _upper(item, 80)]
+    evidence = _refs(raw.get("evidence_refs"))
+    approvals = _refs(raw.get("approval_refs"))
+    evidence_status = _binding_status(evidence, evidence_verifier)
+    risk = _upper(raw.get("risk_level"), 40)
+    if approvals or risk in {"HIGH", "CRITICAL"}:
+        approval_status = _binding_status(approvals, approval_verifier)
+    else:
+        approval_status = "NOT_REQUIRED"
+    trusted_workspace = _clean(context.get("workspace_id"), 120)
+    trusted_tenant = _clean(context.get("tenant_id"), 120)
+    message_workspace = _clean(raw.get("workspace_id"), 120)
+    message_tenant = _clean(raw.get("tenant_id"), 120)
+    expected_workspace = _clean(expected_workspace_id, 120)
+    expected_tenant = _clean(expected_tenant_id, 120)
     blockers: list[str] = []
     if presented != actual:
         blockers.append("DIGEST_INVALID")
@@ -369,17 +477,24 @@ def validate_agent_message(
         blockers.append("SPOOFED_ROLE")
     if _clean(raw.get("agent_id"), 160) != _clean(context.get("agent_id"), 160) or not _clean(context.get("agent_id"), 160):
         blockers.append("SPOOFED_AGENT")
-    if _clean(raw.get("workspace_id"), 120) != _clean(expected_workspace_id, 120):
+    if not message_workspace or len({message_workspace, expected_workspace, trusted_workspace}) != 1:
         blockers.append("WORKSPACE_MISMATCH")
-    if _clean(raw.get("tenant_id"), 120) != _clean(expected_tenant_id, 120):
+    if not message_tenant or len({message_tenant, expected_tenant, trusted_tenant}) != 1:
         blockers.append("TENANT_MISMATCH")
+    if not capability or capability not in allowed:
+        blockers.append("CAPABILITY_OUTSIDE_TRUSTED_CONTEXT")
+    if any(item not in allowed for item in permissions):
+        blockers.append("PERMISSION_OUTSIDE_TRUSTED_CONTEXT")
     if presented and presented in {_clean(item, 80) for item in list(seen_digests or [])}:
         blockers.append("REPLAY")
-    if not _refs(raw.get("evidence_refs")):
+    if evidence_status == "MISSING":
         blockers.append("EVIDENCE_MISSING")
-    risk = _upper(raw.get("risk_level"), 40)
-    if risk in {"HIGH", "CRITICAL"} and not _refs(raw.get("approval_refs")):
+    elif evidence_status != "VERIFIED":
+        blockers.append("EVIDENCE_UNVERIFIED")
+    if approval_status == "MISSING":
         blockers.append("APPROVAL_MISSING")
+    elif approval_status == "UNVERIFIED":
+        blockers.append("APPROVAL_UNVERIFIED")
     issued = _aware(raw.get("issued_at"))
     age_limit = _exact_int(max_age_seconds, minimum=1, maximum=86_400)
     current = now if isinstance(now, datetime) and now.tzinfo is not None else None
@@ -389,16 +504,24 @@ def validate_agent_message(
         delta = (current - issued).total_seconds()
         if delta < 0 or delta > age_limit:
             blockers.append("STALE_OR_FUTURE")
-    if _exact_true(raw.get("grants_permission")) or _exact_true(raw.get("content_is_authority")):
+    if (
+        _exact_true(raw.get("grants_permission"))
+        or _exact_true(raw.get("content_is_authority"))
+        or _content_claims_authority(raw.get("content"))
+    ):
         blockers.append("CONTENT_IS_NOT_AUTHORITY")
 
     return {
         "schema": SCHEMA,
         "state": "BLOCK" if blockers else "INFORMATION_ONLY",
         "digest_ok": presented == actual,
+        "evidence_status": evidence_status,
+        "approval_status": approval_status,
         "blockers": list(dict.fromkeys(blockers)),
         "content_is_authority": False,
         "authorization": "NONE",
+        "truth_state": "UNKNOWN",
         "executes_action": False,
         "grants_permission": False,
+        **_fingerprint_fields(),
     }
