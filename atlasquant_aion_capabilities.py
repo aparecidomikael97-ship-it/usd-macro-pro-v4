@@ -7,6 +7,7 @@ extensible through validated metadata.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from itertools import islice
 from typing import Any, Iterable, Mapping, Sequence
 import math
 import re
@@ -73,7 +74,7 @@ class Capability:
 def _tuple_text(value: Any, *, limit: int = 40) -> tuple[str, ...]:
     items = value if isinstance(value, (list, tuple, set)) else ()
     out: list[str] = []
-    for raw in list(items)[:limit]:
+    for raw in islice(items, max(0, limit)):
         text = " ".join(str(raw or "").split())[:160]
         if text and text not in out:
             out.append(text)
