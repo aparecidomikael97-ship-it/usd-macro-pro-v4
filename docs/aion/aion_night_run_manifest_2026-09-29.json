@@ -12,9 +12,9 @@
   },
   "integrate": [
     {
-      "pr": 352,
-      "branch": "chatgpt/aion-supply-chain-residual-hardening-v1",
-      "role": "aion_nucleus_global_worker_resource_dependency_tenant_and_supply_chain_hardening",
+      "pr": 355,
+      "branch": "chatgpt/aion-memory-optional-product-adapters-v1",
+      "role": "aion_nucleus_global_worker_resource_dependency_tenant_supply_chain_recovery_and_optional_product_isolation",
       "contains_prs": [
         338,
         342,
@@ -24,7 +24,9 @@
         347,
         348,
         349,
-        350
+        350,
+        352,
+        354
       ]
     },
     {
@@ -33,12 +35,9 @@
       "role": "session_worker_lease_hardening"
     },
     {
-      "pr": 353,
-      "branch": "chatgpt/aion-recovery-revision-binding-v1",
-      "role": "recovery_outcome_truth_and_revision_binding",
-      "contains_prs": [
-        340
-      ]
+      "pr": 340,
+      "branch": "chatgpt/aion-recovery-outcome-hardening-v1",
+      "role": "recovery_outcome_truth"
     }
   ],
   "autonomy": {
@@ -68,10 +67,8 @@
     "report": "aion-night-validation-report.json"
   },
   "next_hardening_order": [
-    "remaining_optional_dependency_isolation",
     "resource_bounds_residual_scan",
-    "recovery_partial_record_adversarial_tests",
-    "ruleset_required_checks_human_decision"
+    "consolidated_stack_validation"
   ],
   "stop_conditions": [
     "human_authorization_required",
@@ -90,7 +87,9 @@
     "rt20_runtime_pins_actions_sbom_and_residual_workflows": "pr_352",
     "recovery_duplicate_partial_history_and_strict_decode": "pr_354",
     "recovery_revision_binding_and_strict_history_parse": "pr_353",
-    "supply_chain_duplicate_pr_351": "superseded_by_pr_352"
+    "supply_chain_duplicate_pr_351": "superseded_by_pr_352",
+    "rt19_business_studio_promotions_empty_core_independence": "pr_349_and_pr_355",
+    "entitlements_dependency": "retained_as_tenant_core_dependency"
   },
   "superseded_prs": [
     {
