@@ -12,9 +12,9 @@
   },
   "integrate": [
     {
-      "pr": 349,
-      "branch": "chatgpt/aion-memory-optional-business-adapter-v1",
-      "role": "aion_nucleus_global_worker_resource_bounds_and_optional_dependency_isolation",
+      "pr": 350,
+      "branch": "chatgpt/aion-tenant-write-gate-hardening-v1",
+      "role": "aion_nucleus_global_worker_resource_bounds_optional_dependency_and_tenant_write_isolation",
       "contains_prs": [
         338,
         342,
@@ -22,7 +22,8 @@
         345,
         346,
         347,
-        348
+        348,
+        349
       ]
     },
     {
@@ -63,10 +64,10 @@
     "report": "aion-night-validation-report.json"
   },
   "next_hardening_order": [
-    "tenant_workspace_review_binding",
-    "tenant_workspace_cache_isolation",
     "supply_chain_residual_gaps",
-    "recovery_adversarial_residuals"
+    "recovery_adversarial_residuals",
+    "remaining_optional_dependency_isolation",
+    "resource_bounds_residual_scan"
   ],
   "stop_conditions": [
     "human_authorization_required",
@@ -77,5 +78,10 @@
     "irreversible_architecture_choice",
     "external_environment_blocks_safe_validation"
   ],
-  "morning_report_required": true
+  "morning_report_required": true,
+  "resolved_findings": {
+    "rt04_review_scope_binding": "covered_by_current_code_and_regression",
+    "session_memory_global_cache_leak": "not_observed_per_call_projection_only",
+    "tenant_store_exact_approval": "pr_350"
+  }
 }
