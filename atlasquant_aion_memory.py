@@ -280,17 +280,120 @@ class RuntimeConfig:
         return self.write_ready
 
 
-def _business_normalizers():
-    """Load Negócios only when a checkpoint section needs its normalizers.
+_BUSINESS_METRIC_FIELDS = (
+    "visits","leads","checkouts","orders",
+    "marketing_cost","acquired_customers",
+    "gross_profit_per_order","average_orders_per_customer",
+    "revenue","costs","gross_profit","net_profit","available_cash",
+)
 
-    Importing memory or recovery must not require the business module.
-    """
-    from atlasquant_aion_business import (
-        business_digest,
-        business_metrics_digest,
-        normalize_business_metrics,
+
+class BusinessAdapterUnavailableError(RuntimeError):
+    """Optional Negócios adapter is unavailable for non-empty business data."""
+
+
+def _fallback_empty_business_metrics() -> dict[str, Any]:
+    return {
+        **{field: None for field in _BUSINESS_METRIC_FIELDS},
+        "source": "",
+        "truth_state": "UNKNOWN",
+        "state": "NOT_CONFIGURED",
+        "recorded_by": "",
+        "recorded_at": "",
+        "automatic_campaign": False,
+        "automatic_publish": False,
+        "automatic_payment": False,
+        "automatic_investment": False,
+    }
+
+
+def _fallback_business_normalizers():
+    def normalize_products(rows):
+        if rows is None:
+            return []
+        if isinstance(rows, (list, tuple)) and not rows:
+            return []
+        raise BusinessAdapterUnavailableError(
+            "BUSINESS_ADAPTER_REQUIRED_FOR_NONEMPTY_PRODUCTS"
+        )
+
+    def normalize_business_metrics(raw):
+        data = dict(raw or {}) if isinstance(raw, Mapping) else {}
+        has_metric = any(
+            data.get(field) not in (None, "")
+            for field in _BUSINESS_METRIC_FIELDS
+        )
+        has_identity = any(
+            str(data.get(key) or "").strip()
+            for key in ("source", "recorded_by", "recorded_at")
+        )
+        truth = str(data.get("truth_state") or "").strip().upper()
+        state = str(data.get("state") or "").strip().upper()
+        has_nonempty_status = (
+            truth not in {"", "UNKNOWN"}
+            or state not in {"", "NOT_CONFIGURED"}
+        )
+        has_action_flag = any(
+            data.get(key) is True
+            for key in (
+                "automatic_campaign",
+                "automatic_publish",
+                "automatic_payment",
+                "automatic_investment",
+            )
+        )
+        if has_metric or has_identity or has_nonempty_status or has_action_flag:
+            raise BusinessAdapterUnavailableError(
+                "BUSINESS_ADAPTER_REQUIRED_FOR_NONEMPTY_METRICS"
+            )
+        return _fallback_empty_business_metrics()
+
+    def business_digest(rows):
+        normalized = normalize_products(rows)
+        raw = json.dumps(
+            normalized,
+            ensure_ascii=False,
+            sort_keys=True,
+            default=str,
+        )
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+    def business_metrics_digest(raw):
+        normalized = normalize_business_metrics(raw)
+        payload = {
+            key: normalized.get(key)
+            for key in (
+                *_BUSINESS_METRIC_FIELDS,
+                "source","truth_state","state","recorded_by","recorded_at",
+            )
+        }
+        encoded = json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            default=str,
+        )
+        return hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:16]
+
+    return (
         normalize_products,
+        business_digest,
+        normalize_business_metrics,
+        business_metrics_digest,
     )
+
+
+def _business_normalizers():
+    """Load Negócios lazily; empty Core memory remains operational without it."""
+    try:
+        from atlasquant_aion_business import (
+            business_digest,
+            business_metrics_digest,
+            normalize_business_metrics,
+            normalize_products,
+        )
+    except ImportError:
+        return _fallback_business_normalizers()
     return (
         normalize_products,
         business_digest,
@@ -2239,6 +2342,16 @@ def checkpoint_integrity_report(
     checks: list[dict[str, Any]] = []
     mismatches: list[str] = []
     migration_items: list[str] = []
+    unavailable_items: list[str] = []
+
+    def add_unavailable(name: str, stored: Any, reason: str) -> None:
+        checks.append({
+            "component": name,
+            "state": "UNAVAILABLE",
+            "stored": str(stored or "").strip(),
+            "expected": reason,
+        })
+        unavailable_items.append(name)
 
     def add_check(name: str, stored: Any, expected: str) -> None:
         stored_text = str(stored or "").strip()
@@ -2365,17 +2478,30 @@ def checkpoint_integrity_report(
     normalize_products, business_digest, normalize_business_metrics, business_metrics_digest = (
         _business_normalizers()
     )
-    products = normalize_products(business.get("products") if isinstance(business, Mapping) else [])
-    add_check("business", business.get("digest"), business_digest(products))
+    try:
+        products = normalize_products(
+            business.get("products") if isinstance(business, Mapping) else []
+        )
+        add_check("business", business.get("digest"), business_digest(products))
+    except BusinessAdapterUnavailableError as exc:
+        add_unavailable("business", business.get("digest"), str(exc))
+
     if business.get("metrics") is not None or business.get("metrics_digest"):
-        metrics = normalize_business_metrics(
-            business.get("metrics") if isinstance(business, Mapping) else {}
-        )
-        add_check(
-            "business.metrics",
-            business.get("metrics_digest"),
-            business_metrics_digest(metrics),
-        )
+        try:
+            metrics = normalize_business_metrics(
+                business.get("metrics") if isinstance(business, Mapping) else {}
+            )
+            add_check(
+                "business.metrics",
+                business.get("metrics_digest"),
+                business_metrics_digest(metrics),
+            )
+        except BusinessAdapterUnavailableError as exc:
+            add_unavailable(
+                "business.metrics",
+                business.get("metrics_digest"),
+                str(exc),
+            )
 
     promotions = raw.get("promotions") if isinstance(raw.get("promotions"), Mapping) else {}
     campaigns = normalize_campaigns(promotions.get("campaigns") if isinstance(promotions, Mapping) else [])
@@ -2647,6 +2773,8 @@ def checkpoint_integrity_report(
 
     if mismatches:
         state = "MISMATCH"
+    elif unavailable_items:
+        state = "UNKNOWN"
     elif migration_items:
         state = "MIGRATION_REQUIRED"
     else:
@@ -2661,6 +2789,7 @@ def checkpoint_integrity_report(
         "total": len(checks),
         "mismatches": mismatches,
         "migration_items": migration_items,
+        "unavailable_items": unavailable_items,
         "write_safe": state in {"CONFIRMED", "MIGRATION_REQUIRED"},
     }
 
