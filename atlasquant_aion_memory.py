@@ -1786,7 +1786,7 @@ def reconcile_runtime_write(
             "executes_action": False,
         }
     expected_digest = str(record.get("expected_digest") or "").strip().lower()
-    if re.fullmatch(r"[0-9a-f]{64}", expected_digest) is None:
+    if re.fullmatch(r"[0-9a-f]{16}", expected_digest) is None:
         return {
             "schema": WRITE_RECEIPT_SCHEMA,
             "status": "BLOCKED",
