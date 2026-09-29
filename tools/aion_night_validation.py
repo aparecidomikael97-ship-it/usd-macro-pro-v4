@@ -192,6 +192,17 @@ def build_report(
     }
 
 
+def _resolve_report_path(root: Path, value: str) -> Path:
+    candidate = Path(value)
+    if not candidate.is_absolute():
+        candidate = root / candidate
+    resolved_root = root.resolve()
+    resolved = candidate.resolve()
+    if resolved != resolved_root and resolved_root not in resolved.parents:
+        raise ValueError("report path must stay inside repository")
+    return resolved
+
+
 def _write_report(path: Path, report: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -216,9 +227,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     full = not args.quick
     root = Path(__file__).resolve().parents[1]
-    report_path = Path(args.report)
-    if not report_path.is_absolute():
-        report_path = root / report_path
+    try:
+        report_path = _resolve_report_path(root, args.report)
+    except ValueError as exc:
+        parser.error(str(exc))
 
     steps = build_steps(full=full)
     results = []
