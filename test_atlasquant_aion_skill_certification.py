@@ -109,6 +109,66 @@ class AtlasQuantAionSkillCertificationTests(unittest.TestCase):
         out = assess_skill_manifest(raw, trusted_context=TRUSTED)
         self.assertIn("BOOLEAN_FIELD_INVALID", out["blockers"])
 
+    def test_tool_workspace_must_stay_inside_manifest_scope(self):
+        raw = self.safe_manifest()
+        raw["workspace_ids"] = ["administration"]
+        out = assess_skill_manifest(
+            raw,
+            trusted_context={"tenant_id": "tenant-a", "workspace_id": "administration"},
+            test_evidence={"state": "PASS", "passed": True},
+            provenance_verifier=verified,
+            review_approved=True,
+        )
+        self.assertIn(
+            "TOOL_WORKSPACE_OUT_OF_SCOPE:aion.memory.search",
+            out["blockers"],
+        )
+        self.assertNotEqual(out["state"], "CERTIFIED")
+
+    def test_connector_tool_cannot_underdeclare_network_requirement(self):
+        raw = self.safe_manifest()
+        raw["capability_ids"] = ["research.synthesize"]
+        raw["tool_ids"] = ["external.research.read"]
+        raw["required_scopes"] = ["research:read"]
+        hub = {
+            "tools": [{
+                "tool_id": "external.research.read",
+                "label": "External research",
+                "workspace_id": "central",
+                "connector_id": "research-api",
+                "kind": "READ",
+                "guardian_action": "read",
+                "state": "CONFIGURED",
+                "required_scopes": ["research:read"],
+                "external_side_effects": False,
+            }]
+        }
+        from atlasquant_aion_capabilities import CapabilityRegistry, default_registry
+        base = default_registry()
+        registry = CapabilityRegistry(base.list())
+        existing = registry.get("research.synthesize")
+        registry._items["research.synthesize"] = type(existing)(
+            **{
+                **existing.as_dict(),
+                "allowed_tools": tuple(
+                    list(existing.allowed_tools) + ["external.research.read"]
+                ),
+            }
+        )
+        out = assess_skill_manifest(
+            raw,
+            trusted_context=TRUSTED,
+            capability_registry=registry,
+            tool_hub=hub,
+            test_evidence={"state": "PASS", "passed": True},
+            provenance_verifier=verified,
+            review_approved=True,
+        )
+        self.assertIn(
+            "NETWORK_UNDERDECLARED:external.research.read",
+            out["blockers"],
+        )
+
     def test_unverified_provenance_never_certifies(self):
         out = assess_skill_manifest(
             self.safe_manifest(),
