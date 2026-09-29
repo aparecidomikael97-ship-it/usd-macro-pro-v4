@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime, timezone
+from itertools import islice
 from typing import Any, Mapping, Sequence
 import hashlib
 import json
@@ -221,7 +222,7 @@ def normalize_entitlement(raw:Mapping[str,Any])->dict[str,Any]:
 def normalize_entitlements(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for raw in list(rows or [])[:MAX_ENTITLEMENTS*2]:
+    for raw in islice(rows or (), MAX_ENTITLEMENTS*2):
         try:
             item=normalize_entitlement(raw)
         except Exception:
