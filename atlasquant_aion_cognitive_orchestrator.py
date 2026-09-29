@@ -21,6 +21,7 @@ import re
 import unicodedata
 
 from atlasquant_aion_intelligence import evidence_audit, evidence_confidence
+from atlasquant_aion_specialist_collective import adjudicate_specialist_collective
 
 SCHEMA = "ATLASQUANT_AION_COGNITIVE_ORCHESTRATOR_V1"
 
@@ -374,6 +375,35 @@ def verify_claims(
     }
 
 
+def review_specialist_collective(
+    question: Any,
+    specialist_results: Sequence[Mapping[str, Any]] | None,
+    *,
+    domain_hint: Any = "",
+    max_specialists: int = 5,
+) -> dict[str, Any]:
+    """Review multiple specialist outputs without calling or ranking specialists."""
+    routing = route_specialists(
+        question,
+        domain_hint=domain_hint,
+        max_specialists=max_specialists,
+    )
+    expected = [
+        str(row.get("id") or "")
+        for row in list(routing.get("selected") or [])
+        if str(row.get("id") or "")
+    ]
+    collective = adjudicate_specialist_collective(
+        specialist_results,
+        expected_specialists=expected,
+        minimum_usable_specialists=2 if len(expected) > 1 else 1,
+        minimum_independent_sources=2 if len(expected) > 1 else 1,
+    )
+    collective["question"] = _clean(question, 1200)
+    collective["routing"] = routing
+    return collective
+
+
 def orchestrator_snapshot(
     question: Any,
     *,
@@ -408,6 +438,17 @@ def orchestrator_snapshot(
         "memory_evidence_count": len(hits),
         "memory_sources": memory_sources,
         "readiness": readiness,
+        "collective_contract": {
+            "required": routing["selected_count"] > 1,
+            "expected_specialists": [
+                row["id"] for row in routing["selected"]
+            ],
+            "minimum_independent_sources": (
+                2 if routing["selected_count"] > 1 else 1
+            ),
+            "automatic_resolution": False,
+            "winner_selection": False,
+        },
         "critic_gate": {
             "required": True,
             "must_check": [
@@ -441,5 +482,6 @@ __all__ = [
     "route_specialists",
     "build_research_plan",
     "verify_claims",
+    "review_specialist_collective",
     "orchestrator_snapshot",
 ]
