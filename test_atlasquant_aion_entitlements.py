@@ -166,6 +166,25 @@ class AtlasQuantAionEntitlementsTests(unittest.TestCase):
         self.assertFalse(preflight["allowed"])
         self.assertFalse(preflight["request_approved"])
 
+    def test_present_invalid_expiry_is_not_treated_as_open_ended(self):
+        with self.assertRaises(ValueError):
+            new_entitlement_request("cliente.01", expires_at="invalid-expiry")
+        with self.assertRaises(ValueError):
+            new_entitlement_request("cliente.01", expires_at="2026-12-01T00:00:00")
+        item=new_entitlement_request("cliente.01")
+        item=approve_entitlement_request(item,self.admin)
+        item=mark_entitlement_from_provider_evidence(
+            item,
+            {"confirmed":True,"provider":"registry","external_id":"x-1"},
+        )
+        self.assertTrue(entitlement_effective(item)["effective"])
+        for raw in ("invalid-expiry", "2026-12-01T00:00:00", "not-a-date"):
+            forged=dict(item)
+            forged["window"]={"starts_at":"","expires_at":raw}
+            result=entitlement_effective(forged)
+            self.assertFalse(result["effective"], raw)
+            self.assertIn("INVALID_EXPIRY", result["reasons"])
+
     def test_summary_and_upsert(self):
         a=new_entitlement_request("cliente.01",created_at="2026-09-24T12:00:00Z")
         b=new_entitlement_request("cliente.02",created_at="2026-09-24T12:01:00Z")

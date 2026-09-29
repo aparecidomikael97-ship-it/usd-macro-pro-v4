@@ -11,6 +11,8 @@ from typing import Any, Mapping
 import re
 import unicodedata
 
+from atlasquant_aion_core import explicit_nonnegative_amount
+
 SCHEMA="ATLASQUANT_AION_MODEL_ROUTER_V1"
 LANES=("LOCAL_DETERMINISTIC","EXTERNAL_FAST","EXTERNAL_REASONING")
 COMPLEXITIES=("LOW","NORMAL","HIGH")
@@ -46,17 +48,36 @@ def privacy_sensitive(task:Any)->bool:
     return any(pattern.search(text) for pattern in _SENSITIVE_PATTERNS)
 
 
+def _budget_number(data:Mapping[str,Any], key:str)->float|None:
+    """Missing or blank budget figures stay zero. Invalid figures stay unknown."""
+    if key not in data:
+        return 0.0
+    raw=data.get(key)
+    if raw is None or raw=="":
+        return 0.0
+    return explicit_nonnegative_amount(raw)
+
+
 def normalize_budget(raw:Mapping[str,Any]|None)->dict[str,Any]:
     data=dict(raw or {})
-    def _num(key:str)->float:
-        try:
-            return max(0.0,float(data.get(key,0) or 0))
-        except Exception:
-            return 0.0
-    limit=_num("monthly_limit_usd")
-    spent=_num("spent_usd_estimate")
-    if spent<=0:
-        spent=_num("spent_usd")
+    limit=_budget_number(data,"monthly_limit_usd")
+    spent_estimate=_budget_number(data,"spent_usd_estimate")
+    spent_alt=_budget_number(data,"spent_usd")
+    valid=limit is not None and spent_estimate is not None and spent_alt is not None
+    if not valid:
+        return {
+            "schema":SCHEMA,
+            "allow_paid":data.get("allow_paid") is True,
+            "monthly_limit_usd":None,
+            "spent_usd":None,
+            "spent_usd_estimate":None,
+            "remaining_usd":None,
+            "spend_is_estimate":True,
+            "budget_amounts_valid":False,
+            "approved_by":str(data.get("approved_by") or "")[:80],
+            "approved_at":str(data.get("approved_at") or "")[:80],
+        }
+    spent=spent_estimate if spent_estimate>0 else spent_alt
     return {
         "schema":SCHEMA,
         "allow_paid":data.get("allow_paid") is True,
@@ -65,6 +86,7 @@ def normalize_budget(raw:Mapping[str,Any]|None)->dict[str,Any]:
         "spent_usd_estimate":round(spent,4),
         "remaining_usd":round(max(0.0,limit-spent),4),
         "spend_is_estimate":True,
+        "budget_amounts_valid":True,
         "approved_by":str(data.get("approved_by") or "")[:80],
         "approved_at":str(data.get("approved_at") or "")[:80],
     }
@@ -77,13 +99,22 @@ def budget_decision(
     request_approved:bool=False,
 )->dict[str,Any]:
     budget=normalize_budget(raw_budget)
-    try:
-        cost=max(0.0,float(estimated_request_cost_usd or 0))
-    except Exception:
-        cost=0.0
+    cost=explicit_nonnegative_amount(estimated_request_cost_usd)
+    if cost is None:
+        return {
+            "schema":SCHEMA,
+            "allowed":False,
+            "estimated_request_cost_usd":None,
+            "budget":budget,
+            "reason":"Custo ausente ou inválido permanece bloqueado.",
+            "executes_billing":False,
+        }
     if cost<=0:
         allowed=True
         reason="Solicitação sem custo estimado positivo."
+    elif budget.get("budget_amounts_valid") is not True:
+        allowed=False
+        reason="Orçamento numérico inválido permanece bloqueado."
     elif not budget["allow_paid"]:
         allowed=False
         reason="Uso pago não foi habilitado pelo administrador."
@@ -175,10 +206,9 @@ def record_model_spend_estimate(
     current=normalize_budget(
         aion.get("model_budget") if isinstance(aion.get("model_budget"),Mapping) else {}
     )
-    try:
-        amount=max(0.0,float(amount_usd or 0))
-    except Exception:
-        amount=0.0
+    amount=explicit_nonnegative_amount(amount_usd)
+    if amount is None or current.get("budget_amounts_valid") is not True:
+        return payload
     current["spent_usd_estimate"]=round(current["spent_usd_estimate"]+amount,6)
     current["spent_usd"]=current["spent_usd_estimate"]
     current["remaining_usd"]=round(

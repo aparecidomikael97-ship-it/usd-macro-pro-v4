@@ -122,6 +122,36 @@ class AtlasQuantAionModelRouterTests(unittest.TestCase):
         self.assertFalse(route["external_feature_enabled"])
         self.assertFalse(route["executes_provider_call"])
 
+    def test_invalid_request_cost_is_not_treated_as_free(self):
+        samples=("unknown", float("nan"), float("inf"), float("-inf"), True, False, None, object())
+        for sample in samples:
+            decision=budget_decision({}, sample, request_approved=False)
+            self.assertFalse(decision["allowed"], sample)
+            self.assertIsNone(decision["estimated_request_cost_usd"])
+        explicit_zero=budget_decision({}, 0, request_approved=False)
+        self.assertTrue(explicit_zero["allowed"])
+        self.assertEqual(explicit_zero["estimated_request_cost_usd"], 0.0)
+        inflated=normalize_budget({"allow_paid":True,"monthly_limit_usd":True})
+        self.assertFalse(inflated["budget_amounts_valid"])
+        self.assertIsNone(inflated["monthly_limit_usd"])
+        denied=budget_decision(
+            {"allow_paid":True,"monthly_limit_usd":True},
+            0.5,
+            request_approved=True,
+        )
+        self.assertFalse(denied["allowed"])
+
+    def test_invalid_spend_amount_is_not_recorded_as_money(self):
+        cp={"aion":{"model_budget":{
+            "allow_paid":True,
+            "monthly_limit_usd":1,
+            "spent_usd_estimate":0.4,
+        }}}
+        changed=record_model_spend_estimate(cp, True)
+        self.assertEqual(changed["aion"]["model_budget"]["spent_usd_estimate"], 0.4)
+        unknown=record_model_spend_estimate(cp, "unknown")
+        self.assertEqual(unknown["aion"]["model_budget"]["spent_usd_estimate"], 0.4)
+
 
 if __name__=="__main__":
     unittest.main()

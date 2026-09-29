@@ -151,11 +151,17 @@ def truth_record(
     Precedence is conservative: confirmed > inference > hypothesis > unknown.
     A value alone never means confirmed.
     """
-    if confirmed:
+    if (
+        not isinstance(confirmed, bool)
+        or not isinstance(inference, bool)
+        or not isinstance(hypothesis, bool)
+    ):
+        kind = TruthKind.UNKNOWN
+    elif confirmed is True:
         kind = TruthKind.CONFIRMED
-    elif inference:
+    elif inference is True:
         kind = TruthKind.INFERENCE
-    elif hypothesis:
+    elif hypothesis is True:
         kind = TruthKind.HYPOTHESIS
     else:
         kind = TruthKind.UNKNOWN
@@ -233,35 +239,35 @@ def _exact_true(value: Any) -> bool:
     return value is True
 
 
+def explicit_nonnegative_amount(value: Any) -> float | None:
+    """Finite, non-negative int or float. Every other value is an unknown cost.
+
+    Absence, strings, booleans, objects, NaN and infinities are not zero.
+    Zero is accepted only when the caller passed a real numeric zero.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if not math.isfinite(value) or value < 0:
+        return None
+    return float(value)
+
+
 def cost_guard(
     estimated_monthly_cost_usd: Any,
     *,
     approved: bool = False,
 ) -> dict[str, Any]:
     approved_exact = _exact_true(approved)
-    if isinstance(estimated_monthly_cost_usd, bool):
+    cost = explicit_nonnegative_amount(estimated_monthly_cost_usd)
+    if cost is None:
         return {
             "schema": SCHEMA,
             "allowed": False,
             "estimated_monthly_cost_usd": None,
             "requires_explicit_approval": True,
             "approved": False,
-            "reason": "Custo booleano é inválido e permanece bloqueado.",
+            "reason": "Custo ausente ou inválido permanece bloqueado.",
         }
-    try:
-        cost = float(estimated_monthly_cost_usd)
-    except Exception:
-        cost = 0.0
-    if not math.isfinite(cost):
-        return {
-            "schema": SCHEMA,
-            "allowed": False,
-            "estimated_monthly_cost_usd": None,
-            "requires_explicit_approval": True,
-            "approved": False,
-            "reason": "Custo não finito é inválido e permanece bloqueado.",
-        }
-    cost = max(0.0, cost)
     if cost <= 0:
         allowed = True
         reason = "Custo estimado zero; política Custo Zero preservada."

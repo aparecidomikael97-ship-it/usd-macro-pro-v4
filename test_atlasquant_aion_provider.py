@@ -1,6 +1,7 @@
 import unittest
 
 from atlasquant_aion_provider import (
+    ProviderConfig,
     build_provider_prompt,
     estimate_request_cost,
     execute_openai_answer,
@@ -260,6 +261,23 @@ class AtlasQuantAionProviderTests(unittest.TestCase):
         self.assertFalse(result["called"])
         self.assertEqual(result["state"],"BLOCKED_BUDGET")
         self.assertEqual(session.calls,[])
+
+    def test_provider_config_repr_redacts_api_key(self):
+        secret="synthetic-redteam-value-not-a-real-credential"
+        cfg=ProviderConfig(
+            provider="openai",
+            api_key=secret,
+            fast_model="fast-model",
+            reasoning_model="reasoning-model",
+            input_usd_per_mtok=1.0,
+            output_usd_per_mtok=1.0,
+            max_output_tokens=16,
+            timeout_seconds=5.0,
+        )
+        rendered=repr(cfg)
+        self.assertNotIn(secret, rendered)
+        self.assertIn("[REDACTED]", rendered)
+        self.assertEqual(cfg.api_key, secret)
 
 
 if __name__=="__main__":

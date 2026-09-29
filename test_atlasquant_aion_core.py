@@ -38,8 +38,36 @@ class AtlasQuantAionCoreTests(unittest.TestCase):
 
     def test_zero_cost_guard_blocks_positive_cost_without_approval(self):
         self.assertTrue(cost_guard(0)["allowed"])
+        self.assertTrue(cost_guard(0.0)["allowed"])
         self.assertFalse(cost_guard(20)["allowed"])
         self.assertTrue(cost_guard(20, approved=True)["allowed"])
+
+    def test_invalid_cost_does_not_become_zero(self):
+        samples = (
+            "unknown",
+            float("nan"),
+            float("inf"),
+            float("-inf"),
+            True,
+            False,
+            None,
+            {"usd": 0},
+            -1,
+        )
+        for sample in samples:
+            guarded = cost_guard(sample, approved=True)
+            self.assertFalse(guarded["allowed"], sample)
+            self.assertIsNone(guarded["estimated_monthly_cost_usd"])
+            self.assertNotEqual(guarded["estimated_monthly_cost_usd"], 0)
+
+    def test_textual_confirmed_flag_cannot_create_truth(self):
+        textual = truth_record("invented", confirmed="false")
+        numeric = truth_record("invented", confirmed=1)
+        inferred = truth_record("invented", inference="false")
+        self.assertEqual(textual["kind"], "UNKNOWN")
+        self.assertEqual(numeric["kind"], "UNKNOWN")
+        self.assertEqual(inferred["kind"], "UNKNOWN")
+        self.assertNotEqual(textual["kind"], "CONFIRMED")
 
     def test_feature_flags_are_off_by_default(self):
         flags = feature_flag_snapshot()

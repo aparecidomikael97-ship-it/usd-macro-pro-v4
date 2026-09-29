@@ -157,6 +157,36 @@ class AtlasQuantAionCoreIndependenceTests(unittest.TestCase):
         self.assertIn("IMPORTED", result.stdout)
         self.assertNotIn("blocked", result.stderr)
 
+    def test_memory_and_recovery_import_without_business(self):
+        blocker = (
+            "import sys\n"
+            "class Finder:\n"
+            "    def find_spec(self, name, path, target=None):\n"
+            "        if name.split('.',1)[0]=='atlasquant_aion_business':\n"
+            "            raise ImportError('business absent')\n"
+            "sys.meta_path.insert(0, Finder())\n"
+            "import atlasquant_aion_memory\n"
+            "import atlasquant_aion_recovery\n"
+            "print('IMPORTED')\n"
+        )
+        env = {
+            "PATH": os.environ.get("PATH", ""),
+            "PYTHONPATH": str(ROOT),
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "PYTHONUNBUFFERED": "1",
+        }
+        result = subprocess.run(
+            [sys.executable, "-c", blocker],
+            cwd=ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            timeout=60,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr[-2000:] + result.stdout[-500:])
+        self.assertIn("IMPORTED", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

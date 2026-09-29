@@ -33,7 +33,9 @@ Nenhuma linha abaixo afirma execução em produção. Teste de unidade não é r
 | Action receipt / flight recorder único | PARCIAL | `atlasquant_aion_action_receipt.py` referencia receipts filhos por id e fingerprint; executor/worker/developer continuam com os recibos locais | `test_atlasquant_aion_action_receipt.py` | O envelope registra escopo, revisores, blast radius, policy, guardian, evidência, aprovação e fingerprint canônico. Não é assinatura. Segredo no resultado é redigido. Mutação invalida o fingerprint. | Os executores existentes ainda não emitem este envelope. | Ligação com o receipt de execução real está NÃO VERIFICADO. | P1 | Não copiar o receipt do executor. |
 | Memory quarantine | PARCIAL | `atlasquant_aion_memory_quarantine.py` na frente de `atlasquant_aion_memory_layers.py`; `cyber_immune_plan` continua sendo contenção, não admissão de memória | `test_atlasquant_aion_memory_quarantine.py` | Conteúdo novo fica QUARANTINED/REJECTED/STALE/CONFLICT/REVIEW_REQUIRED. Promoção grava na camada existente com truth UNKNOWN. Injeção relida não autoriza. Segredo redigido não é ecoado. | O gate só protege quem o chama. `atlasquant_aion_memory.py` ainda não passa por ele. | Integração com o checkpoint persistente está NÃO VERIFICADO. | P1 | Não criar um segundo arquivo de memória permanente. |
 | Model registry / promotion | PARCIAL | `atlasquant_aion_model_registry.py` consome `evaluate_run` e `budget_decision`; router e laboratório continuam donos da rota e da evidência | `test_atlasquant_aion_model_registry.py` | Sem benchmark o estado fica CANDIDATE. Benchmark pior rejeita. Falha de segurança rejeita ou exige rollback. Provider indisponível cai para a rota local. Custo booleano não vira 1 USD. Texto não aprova. O módulo não chama provedor. | O registro não está ligado ao router em runtime. Aprovação aqui não ativa modelo em produção. | Seleção automática do modelo padrão no caminho real permanece NÃO VERIFICADO. | P1 | Não cadastrar chave e não chamar API paga. |
-| Independência do Core | PARCIAL | allowlist em `test_atlasquant_aion_core_independence.py` e `docs/aion/AION_CORE_INDEPENDENCE_V1.md` | `test_atlasquant_aion_core_independence.py` | A allowlist pura importa sem Trader, Radar, Investimentos, Negócios, Streamlit ou requests. O inventário AST mostra acoplamento real em memory, specialist, admin, recovery, provider e global worker. | A allowlist não cobre todos os arquivos `atlasquant_aion_*.py`. | Desacoplar memory e specialist exige adapter; não foi feito nesta sessão. | P2 | Atualizar o inventário congelado quando um import de domínio sair. |
+| Independência do Core | PARCIAL | allowlist em `test_atlasquant_aion_core_independence.py` e `docs/aion/AION_CORE_INDEPENDENCE_V1.md` | `test_atlasquant_aion_core_independence.py` | A allowlist pura importa sem Trader, Radar, Investimentos, Negócios, Streamlit ou requests. Memória e recovery importam com Negócios bloqueado; o normalizador de negócio só é carregado ao tocar a seção. | O inventário AST ainda registra memory → business porque a seção continua usando o módulo. Recovery e memory ainda importam `requests`. Specialist e admin continuam acoplados. | Extração total do domínio de negócio e da rede não foi feita. | P2 | Não mover specialist nesta etapa. |
+| Custo desconhecido e verdade exata | PARCIAL | `cost_guard`, `budget_decision`, `truth_record`, `entitlement_effective`, `release_confidence` | testes de core, router, entitlements e release confidence | Custo inválido não vira zero. `confirmed` só é verdadeiro com bool exato. Expiry presente e inválida bloqueia. Release sem verifier não trata ref inventada como evidência. | `new_task` ainda pode clamp de custo negativo para zero antes do guard. Varredura de todo `bool()` do repositório não foi feita. | Caminho de cobrança real permanece desligado. | P1 | Não tratar diagnóstico de release como merge. |
+| Representação de credencial | PARCIAL | `RuntimeConfig`, `ProviderConfig`, `AccessUser` | testes de memory, provider e access control | `repr` desses objetos mostra `[REDACTED]` e não o valor. | Outros logs que imprimem o atributo diretamente não foram varridos. | Não há rotação nem cofre operacional nesta mudança. | P1 | Não imprimir o atributo em log novo. |
 | Vault | PARCIAL | `atlasquant_aion_vault.py` | `test_atlasquant_aion_vault.py` | Módulo e teste existem. Backend real, rotação e ausência de plaintext operacional NÃO VERIFICADOS nesta sessão. | Segredo em log/receipt/PR continua proibido. | Hardening de backend real fica bloqueado sem serviço externo. | P2 | Só testes offline de rejeição/redação. |
 | Ruleset de `main` | AUSENTE no repositório | documentação do P0 | `gh` não altera proteção nesta sessão | O documento do P0 registra que `main` estava desprotegida na leitura anterior. | Merge pode ocorrer sem os gates. | Ação administrativa ainda necessária. | P0 | Checklist apenas. Não aplicar ruleset nesta sessão. |
 
@@ -57,3 +59,20 @@ NÃO VERIFICADO:
 BLOCKED nesta sessão:
 
 - merge, deploy, alteração de ruleset, gasto, segredo real, trading real e uso da PR #286 como dependência.
+
+## Leitura do red team P1
+
+CONFIRMADO por teste local neste branch:
+
+- RT09: custo `"unknown"`, NaN, infinito, bool, objeto e ausência não autorizam como zero.
+- RT10: repr de `RuntimeConfig`, `ProviderConfig` e `AccessUser` não mostra o segredo.
+- RT11: `confirmed="false"` não produz `CONFIRMED`.
+- RT17: expiry presente e inválida, inclusive timestamp sem fuso, fica `INVALID_EXPIRY`.
+- RT18: dimensão sem `confirmed is True` ou sem verifier não vira evidência. Merge e deploy continuam falsos.
+- RT19: importar memória e recovery com Negócios bloqueado passa. O acoplamento AST permanece.
+
+NÃO VERIFICADO:
+
+- CI remoto desta PR empilhada, porque a base não é `main`.
+- Pinagem por SHA das Actions.
+- Certificação de skill/plugin.

@@ -10,7 +10,7 @@ truthful status with provenance.
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
@@ -28,12 +28,6 @@ from atlasquant_aion_operations import normalize_queue, queue_digest
 from atlasquant_aion_observability import normalize_events, events_digest
 from atlasquant_aion_model_router import normalize_budget
 from atlasquant_aion_studio import normalize_projects, studio_digest
-from atlasquant_aion_business import (
-    normalize_products,
-    business_digest,
-    normalize_business_metrics,
-    business_metrics_digest,
-)
 from atlasquant_aion_promotions import normalize_campaigns, promotion_digest
 from atlasquant_aion_entitlements import normalize_entitlements, entitlement_digest
 from atlasquant_aion_continuity import (
@@ -258,10 +252,16 @@ STOPWORDS = {
 
 @dataclass(frozen=True)
 class RuntimeConfig:
-    token: str
+    token: str = field(repr=False)
     repo: str
     branch: str
     path: str = RUNTIME_PATH
+
+    def __repr__(self) -> str:
+        return (
+            "RuntimeConfig(token='[REDACTED]', "
+            f"repo={self.repo!r}, branch={self.branch!r}, path={self.path!r})"
+        )
 
     @property
     def read_ready(self) -> bool:
@@ -275,6 +275,37 @@ class RuntimeConfig:
     def ready(self) -> bool:
         """Backward-compatible alias for write readiness."""
         return self.write_ready
+
+
+def _business_normalizers():
+    """Load Negócios only when a checkpoint section needs its normalizers.
+
+    Importing memory or recovery must not require the business module.
+    """
+    from atlasquant_aion_business import (
+        business_digest,
+        business_metrics_digest,
+        normalize_business_metrics,
+        normalize_products,
+    )
+    return (
+        normalize_products,
+        business_digest,
+        normalize_business_metrics,
+        business_metrics_digest,
+    )
+
+
+def _empty_business_section() -> dict[str, Any]:
+    normalize_products, business_digest, normalize_business_metrics, business_metrics_digest = (
+        _business_normalizers()
+    )
+    return {
+        "products": [],
+        "metrics": normalize_business_metrics({}),
+        "metrics_digest": business_metrics_digest({}),
+        "digest": business_digest([]),
+    }
 
 
 def _now() -> str:
@@ -455,12 +486,7 @@ def default_checkpoint() -> dict[str, Any]:
             "projects": [],
             "digest": studio_digest([]),
         },
-        "business": {
-            "products": [],
-            "metrics": normalize_business_metrics({}),
-            "metrics_digest": business_metrics_digest({}),
-            "digest": business_digest([]),
-        },
+        "business": _empty_business_section(),
         "promotions": {
             "campaigns": [],
             "redemptions": [],
@@ -580,6 +606,9 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
     business = payload.get("business")
     if not isinstance(business, Mapping):
         business = {}
+    normalize_products, business_digest, normalize_business_metrics, business_metrics_digest = (
+        _business_normalizers()
+    )
     business_products = normalize_products(
         business.get("products") if isinstance(business, Mapping) else []
     )
@@ -868,6 +897,9 @@ def update_business_checkpoint(
 ) -> dict[str, Any]:
     payload = ensure_operating_checkpoint(checkpoint)
     current = payload.get("business") if isinstance(payload.get("business"), Mapping) else {}
+    normalize_products, business_digest, normalize_business_metrics, business_metrics_digest = (
+        _business_normalizers()
+    )
     rows = normalize_products(
         current.get("products", []) if products is None else products
     )
@@ -2061,6 +2093,9 @@ def checkpoint_integrity_report(
     add_check("studio", studio.get("digest"), studio_digest(projects))
 
     business = raw.get("business") if isinstance(raw.get("business"), Mapping) else {}
+    normalize_products, business_digest, normalize_business_metrics, business_metrics_digest = (
+        _business_normalizers()
+    )
     products = normalize_products(business.get("products") if isinstance(business, Mapping) else [])
     add_check("business", business.get("digest"), business_digest(products))
     if business.get("metrics") is not None or business.get("metrics_digest"):
