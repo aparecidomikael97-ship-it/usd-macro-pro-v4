@@ -193,7 +193,7 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
         candidate=self.candidate()
         with patch(
             "atlasquant_aion_recovery.load_checkpoint_revision",
-            return_value=self.candidate(revision=candidate["revision"]),
+            return_value=candidate,
         ) as reload_revision, patch(
             "atlasquant_aion_recovery.save_runtime_checkpoint",
             side_effect=fake_save,
@@ -274,7 +274,7 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
         current=self.current(mismatch=True)
         with patch(
             "atlasquant_aion_recovery.load_checkpoint_revision",
-            return_value=self.candidate(revision=candidate["revision"]),
+            return_value=candidate,
         ), patch(
             "atlasquant_aion_recovery.save_runtime_checkpoint",
             return_value={
@@ -309,7 +309,7 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
         current=self.current(mismatch=True)
         with patch(
             "atlasquant_aion_recovery.load_checkpoint_revision",
-            return_value=self.candidate(revision=candidate["revision"]),
+            return_value=candidate,
         ), patch(
             "atlasquant_aion_recovery.save_runtime_checkpoint",
             return_value={
