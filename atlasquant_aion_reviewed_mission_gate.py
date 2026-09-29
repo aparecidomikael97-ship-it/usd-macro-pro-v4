@@ -8,6 +8,7 @@ Guardian/safety layer.
 from __future__ import annotations
 
 from typing import Any, Callable, Mapping, Sequence
+import unicodedata
 
 from atlasquant_aion_capability_planner import plan_agentic_mission
 from atlasquant_aion_critical_review import (
@@ -26,17 +27,22 @@ _BLAST_TO_TASK = {
     "CRITICAL": "CRITICAL",
 }
 _DERIVED_FACTORS = {
-    "production_deploy": "production",
-    "real_trade": "financial",
-    "social_publish": "external_publication",
-    "marketplace_publish": "external_publication",
-    "checkpoint_write": "code_change",
-    "code_change_plan": "code_change",
+    "production_deploy": ("production", ("deploy", "producao", "render", "publicar sistema")),
+    "real_trade": ("financial", ("trade real", "ordem real", "corretora", "execucao real")),
+    "social_publish": ("external_publication", ("publicar", "postar", "instagram", "youtube", "tiktok")),
+    "marketplace_publish": ("external_publication", ("marketplace", "mercado livre", "tiktok shop", "anuncio")),
+    "checkpoint_write": ("code_change", ("salvar checkpoint", "persistir checkpoint", "gravar checkpoint")),
+    "code_change_plan": ("code_change", ("codigo", "bug", "erro", "interface", "github", "implementar", "desenvolver", "ajustar")),
 }
 
 
 def _clean(value: Any, limit: int = 240) -> str:
     return " ".join(str(value or "").replace("\x00", "").split())[:limit]
+
+
+def _fold(value: Any) -> str:
+    raw = unicodedata.normalize("NFKD", str(value or ""))
+    return "".join(ch for ch in raw if not unicodedata.combining(ch)).casefold()
 
 
 def _mission_binding(mission: Mapping[str, Any]) -> dict[str, Any]:
@@ -97,8 +103,9 @@ def review_agentic_mission(
         for row in list(mission.get("stages") or [])
         if isinstance(row, Mapping)
     }
-    for capability_id, factor in _DERIVED_FACTORS.items():
-        if capability_id in selected_ids:
+    objective_norm = _fold(objective)
+    for capability_id, (factor, terms) in _DERIVED_FACTORS.items():
+        if capability_id in selected_ids and any(term in objective_norm for term in terms):
             factors[factor] = True
 
     blast = classify_blast_radius(
