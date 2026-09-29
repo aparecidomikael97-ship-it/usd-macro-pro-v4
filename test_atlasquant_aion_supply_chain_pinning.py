@@ -5,8 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 WORKFLOWS = ROOT / ".github" / "workflows"
-SHA40 = re.compile(r"@[0-9a-f]{40}(?:\\s|$)", re.I)
-REQUIREMENT = re.compile(r"^[A-Za-z0-9_.-]+==[^=\\s]+$")
+ACTION_SHA = re.compile(r"^.+@[0-9a-f]{40}$", re.I)
 
 
 class AionSupplyChainPinningTests(unittest.TestCase):
@@ -19,7 +18,14 @@ class AionSupplyChainPinningTests(unittest.TestCase):
         self.assertTrue(rows)
         for row in rows:
             with self.subTest(requirement=row):
-                self.assertRegex(row, REQUIREMENT)
+                self.assertIn("==", row)
+                name, version = row.split("==", 1)
+                self.assertTrue(name.strip())
+                self.assertTrue(version.strip())
+                self.assertNotIn(">=", row)
+                self.assertNotIn("<=", row)
+                self.assertNotIn("~=", row)
+                self.assertFalse(any(ch.isspace() for ch in row))
 
     def test_external_github_actions_are_pinned_to_commit_sha(self):
         for path in sorted(WORKFLOWS.glob("*.yml")):
@@ -31,19 +37,20 @@ class AionSupplyChainPinningTests(unittest.TestCase):
                 if value.startswith("./") or value.startswith("docker://"):
                     continue
                 with self.subTest(workflow=path.name, action=value):
-                    self.assertRegex(value, SHA40)
+                    self.assertRegex(value, ACTION_SHA)
 
-    def test_python_workflows_do_not_reintroduce_loose_pip_or_runtime_installs(self):
-        forbidden = (
-            re.compile(r"pip\\s+install\\s+--upgrade\\s+pip\\b"),
-            re.compile(r"pip\\s+install\\s+streamlit\\s+pandas\\s+numpy\\s+requests\\b"),
-            re.compile(r"pip\\s+install\\s+playwright(?:\\s|$)"),
-        )
+    def test_python_workflows_do_not_reintroduce_loose_installs(self):
         for path in sorted(WORKFLOWS.glob("*.yml")):
-            source = path.read_text(encoding="utf-8")
-            for pattern in forbidden:
-                with self.subTest(workflow=path.name, pattern=pattern.pattern):
-                    self.assertIsNone(pattern.search(source))
+            for line in path.read_text(encoding="utf-8").splitlines():
+                command = line.strip()
+                with self.subTest(workflow=path.name, command=command):
+                    self.assertNotIn("pip install --upgrade pip", command)
+                    self.assertNotIn(
+                        "pip install streamlit pandas numpy requests",
+                        command,
+                    )
+                    if "pip install playwright" in command:
+                        self.assertIn("playwright==1.63.0", command)
 
     def test_browser_workflows_pin_playwright_and_python_pip(self):
         browser_workflows = (
