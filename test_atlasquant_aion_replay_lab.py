@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from atlasquant_aion_replay_lab import (
     build_news_replay_package,
@@ -231,6 +232,44 @@ class AionReplayLabTests(unittest.TestCase):
         self.assertEqual(catalog["state"], "NO_ELIGIBLE_SCENARIOS")
         self.assertEqual(catalog["scenarios"], [])
         self.assertFalse(catalog["fabricated_scenarios"])
+
+    def test_panel_never_exposes_future_outcome_before_decision(self):
+        src = Path("atlasquant_aion_replay_panel.py").read_text(encoding="utf-8")
+        active = src.index('if state == "ACTIVE":')
+        recorded = src.index('elif state == "DECISION_RECORDED":')
+        active_block = src[active:recorded]
+        self.assertNotIn("later_event_count", active_block)
+        self.assertNotIn("outcome_available", active_block)
+        self.assertNotIn("Revelar o que aconteceu depois", active_block)
+        self.assertNotIn("later_events", active_block)
+
+    def test_panel_is_session_only_and_has_no_checkpoint_write_path(self):
+        src = Path("atlasquant_aion_replay_panel.py").read_text(encoding="utf-8")
+        for forbidden in (
+            "save_runtime_checkpoint(",
+            "update_live_event_journal_checkpoint(",
+            "update_learning_checkpoint(",
+            "update_operating_checkpoint(",
+            "update_continuity_checkpoint(",
+            "feature_flag_snapshot(",
+            "approve_entitlement_request(",
+            "execute_openai_answer(",
+        ):
+            self.assertNotIn(forbidden, src)
+        self.assertIn("Checkpoint escrito: NÃO", src)
+        self.assertIn("execução real: BLOQUEADA", src)
+
+    def test_laboratory_wires_replay_before_lab_matrix(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        start = src.index("def _render_laboratory(")
+        block = src[start:src.index("def _render_development(", start)]
+        replay = block.index("render_replay_lab_panel(checkpoint)")
+        matrix = block.index("render_lab_matrix_panel()")
+        self.assertLess(replay, matrix)
+        self.assertIn(
+            "Modo Replay indisponível; nenhum cenário histórico foi fabricado.",
+            block,
+        )
 
 
 if __name__ == "__main__":
