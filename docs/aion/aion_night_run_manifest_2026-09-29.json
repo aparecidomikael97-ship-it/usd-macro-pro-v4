@@ -12,15 +12,16 @@
   },
   "integrate": [
     {
-      "pr": 347,
-      "branch": "chatgpt/aion-global-inflight-resolution-ceremony-v1",
-      "role": "global_worker_reconciliation_fencing_inflight_intent_assessment_and_safe_resolution",
+      "pr": 348,
+      "branch": "chatgpt/aion-core-resource-bounds-v1",
+      "role": "aion_nucleus_global_worker_reconciliation_and_resource_bounds",
       "contains_prs": [
         338,
         342,
         343,
         345,
-        346
+        346,
+        347
       ]
     },
     {
@@ -61,11 +62,10 @@
     "report": "aion-night-validation-report.json"
   },
   "next_hardening_order": [
-    "partial_checkpoint_write_reconciliation",
-    "resource_bounds",
     "tenant_workspace_cache_isolation",
     "rt19_optional_dependency_reduction",
-    "supply_chain_residual_gaps"
+    "supply_chain_residual_gaps",
+    "recovery_adversarial_residuals"
   ],
   "stop_conditions": [
     "human_authorization_required",
