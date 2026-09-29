@@ -301,6 +301,9 @@ class AionResidualResourceBoundsTests(unittest.TestCase):
         self.assertIn('islice(item.get("watchdogs") or (), 500)',resilience_src)
         self.assertIn('islice(item.get("circuit_breakers") or (), 500)',resilience_src)
         self.assertIn('islice(item.get("resource_governors") or (), 500)',resilience_src)
+        self.assertIn("islice(watchdogs or (),500)",resilience_src)
+        self.assertIn("islice(breakers or (),500)",resilience_src)
+        self.assertIn("islice(governors or (),500)",resilience_src)
 
         self.assertNotIn("list(values or [])[:40]",receipt_src)
         self.assertIn("islice(values or (), 40)",receipt_src)
