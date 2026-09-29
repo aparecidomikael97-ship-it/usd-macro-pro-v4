@@ -460,8 +460,10 @@ class AionResidualResourceBoundsTests(unittest.TestCase):
         self.assertIn("islice(memory_hits or (), 5)",provider_src)
 
         self.assertNotIn("list(value)[:300]",specialist_src)
+        self.assertNotIn("value[:300]",specialist_src)
         self.assertNotIn('list(conflict.get("values") or [])[:2]',specialist_src)
-        self.assertIn("value[:300]",specialist_src)
+        self.assertIn("_MAX_SEQUENCE_ITEMS",specialist_src)
+        self.assertIn("budget.incomplete = True",specialist_src)
         self.assertIn('islice(conflict.get("values") or (), 2)',specialist_src)
 
 

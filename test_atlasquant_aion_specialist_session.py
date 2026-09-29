@@ -1,11 +1,17 @@
 import json
 import socket
 import unittest
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 
 from atlasquant_aion_specialist_evidence import read_specialist_evidence
-from atlasquant_aion_specialist_session import ORIGINS, build_specialist_session_snapshot
+from atlasquant_aion_specialist_session import (
+    ORIGINS,
+    _NORMALIZATION_NODE_BUDGET,
+    _PROVIDER_FLAGS,
+    build_specialist_session_snapshot,
+)
 from atlasquant_aion_specialists import SPECIALIST_MODULES
 from atlasquant_fx_universe import OFFICIAL_PAIRS
 
@@ -36,6 +42,50 @@ def fresh_session(**slices):
     }
     payload.update(slices)
     return payload
+
+
+class CountingMap(Mapping):
+    """Mapping whose iteration count is observable. Values are not pre-materialized."""
+
+    def __init__(self, count, value=1, first_key=None, first_value=None):
+        self.count = count
+        self.value = value
+        self.first_key = first_key
+        self.first_value = first_value
+        self.yielded = 0
+
+    def __iter__(self):
+        if self.first_key is not None:
+            self.yielded += 1
+            yield self.first_key
+            remaining = self.count - 1
+        else:
+            remaining = self.count
+        for index in range(remaining):
+            self.yielded += 1
+            yield f"k{index}"
+
+    def __getitem__(self, key):
+        if self.first_key is not None and key == self.first_key:
+            return self.first_value
+        return self.value
+
+    def __len__(self):
+        return self.count
+
+
+class BranchMap(Mapping):
+    def __init__(self, children):
+        self.children = children
+
+    def __iter__(self):
+        yield from self.children
+
+    def __getitem__(self, key):
+        return self.children[key]
+
+    def __len__(self):
+        return len(self.children)
 
 
 class SpecialistSessionSnapshotTests(unittest.TestCase):
@@ -343,6 +393,215 @@ class SpecialistSessionSnapshotTests(unittest.TestCase):
         self.assertTrue(built["present"])
         self.assertTrue(built["slices"]["checkpoint"]["present"])
         self.assertFalse(built["slices"]["scanner"]["present"])
+
+    def test_wide_mapping_stops_inside_budget_and_is_not_current_fact(self):
+        wide = CountingMap(
+            10_000,
+            value=complete_result(h4="BUY"),
+            first_key="EUR/USD",
+            first_value=complete_result(h4="BUY"),
+        )
+        session = fresh_session(
+            origin="PERSISTED_SCANNER",
+            scanner={"persisted_results": wide},
+        )
+        snapshot = build_specialist_session_snapshot(session)
+        scanner = snapshot["slices"]["scanner"]
+        stored = scanner["payload"]["persisted_results"]
+        self.assertEqual(scanner["normalization_state"], "INCOMPLETE")
+        self.assertLess(wide.yielded, wide.count)
+        self.assertLessEqual(wide.yielded, _NORMALIZATION_NODE_BUDGET + 1)
+        self.assertLess(len(stored), wide.count)
+        self.assertLessEqual(len(stored), _NORMALIZATION_NODE_BUDGET)
+        reading = read_specialist_evidence("market", session=snapshot, now=NOW)
+        self.assertEqual(reading["observations"]["normalization_state"], "INCOMPLETE")
+        self.assertEqual(reading["answer_truth"], "UNKNOWN")
+        self.assertEqual(reading["input_state"], "UNVERIFIED")
+        self.assertFalse(reading["used_as_current_fact"])
+        self.assertNotIn("BUY", reading["summary"])
+        self.assertEqual(reading["observations"].get("observed_pairs", []), [])
+        self.assertFalse(reading["network_called"])
+        self.assertFalse(reading["provider_called"])
+
+    def test_branched_mapping_shares_one_budget(self):
+        left = CountingMap(4_000, value=1)
+        right = CountingMap(4_000, value=1)
+        session = fresh_session(
+            origin="PERSISTED_SCANNER",
+            scanner={
+                "persisted_results": {
+                    "EUR/USD": complete_result(h4="BUY"),
+                    "overflow": BranchMap({"left": left, "right": right}),
+                }
+            },
+        )
+        snapshot = build_specialist_session_snapshot(session)
+        self.assertEqual(snapshot["slices"]["scanner"]["normalization_state"], "INCOMPLETE")
+        self.assertLess(left.yielded, left.count)
+        self.assertLess(right.yielded, right.count)
+        self.assertGreater(left.yielded, 0)
+        self.assertLessEqual(left.yielded + right.yielded, _NORMALIZATION_NODE_BUDGET + 3)
+        self.assertLess(left.yielded + right.yielded, _NORMALIZATION_NODE_BUDGET * 2)
+        reading = read_specialist_evidence("market", session=snapshot, now=NOW)
+        self.assertEqual(reading["answer_truth"], "UNKNOWN")
+        self.assertEqual(reading["input_state"], "UNVERIFIED")
+        self.assertFalse(reading["used_as_current_fact"])
+        self.assertNotIn("BUY", reading["summary"])
+        for conflict in reading["conflicts"]:
+            self.assertIsNone(conflict.get("chosen"))
+
+    def test_version_301_conflict_does_not_confirm_the_buy_prefix(self):
+        versions = [complete_result(h4="BUY") for _ in range(300)]
+        versions.append(complete_result(h4="SELL", source="other-feed"))
+        session = fresh_session(
+            origin="PERSISTED_SCANNER",
+            scanner={"persisted_results": {"EUR/USD": versions}},
+        )
+        snapshot = build_specialist_session_snapshot(session)
+        self.assertEqual(snapshot["slices"]["scanner"]["normalization_state"], "INCOMPLETE")
+        reading = read_specialist_evidence("market", session=session, now=NOW)
+        self.assertFalse(reading["used_as_current_fact"])
+        self.assertEqual(reading["answer_truth"], "UNKNOWN")
+        self.assertEqual(reading["input_state"], "UNVERIFIED")
+        self.assertNotEqual(reading["input_state"], "VALID")
+        self.assertNotIn("BUY", reading["summary"])
+        self.assertNotIn("SELL", reading["summary"])
+        self.assertEqual(reading["observations"].get("observed_pairs", []), [])
+        self.assertEqual(reading["observations"]["normalization_state"], "INCOMPLETE")
+        for conflict in reading["conflicts"]:
+            self.assertIsNone(conflict.get("chosen"))
+        blob = json.dumps(reading, ensure_ascii=False)
+        self.assertNotIn('"chosen": "BUY"', blob)
+        self.assertNotIn('"chosen": "SELL"', blob)
+        replayed = read_specialist_evidence("market", session=snapshot, now=NOW)
+        self.assertFalse(replayed["used_as_current_fact"])
+        self.assertEqual(replayed["answer_truth"], "UNKNOWN")
+        self.assertEqual(replayed["input_state"], "UNVERIFIED")
+        self.assertFalse(replayed["network_called"])
+        self.assertFalse(replayed["provider_called"])
+
+    def test_studio_provider_matrix_accepts_only_real_bools(self):
+        invalid_values = ("false", "UNKNOWN", "STALE", None, 0, 1, "")
+        for value in (True, False, *invalid_values):
+            reading = read_specialist_evidence(
+                "studio",
+                session=fresh_session(
+                    origin="LOCAL_STATE",
+                    studio={"origin": "LOCAL_STATE", "providers": {"transcription": value}},
+                ),
+                now=NOW,
+            )
+            providers = reading["observations"]["providers"]
+            self.assertFalse(reading["observations"]["publishing_executed"])
+            self.assertFalse(reading["observations"]["executes_external_call"])
+            self.assertFalse(reading["observations"]["providers_inferred"])
+            self.assertFalse(reading["network_called"])
+            self.assertFalse(reading["provider_called"])
+            if value is True:
+                self.assertEqual(providers.get("transcription"), "CONFIGURED")
+                self.assertTrue(reading["used_as_current_fact"])
+                self.assertEqual(reading["answer_truth"], "CONFIRMED")
+            elif value is False:
+                self.assertEqual(providers.get("transcription"), "NOT_CONFIGURED")
+                self.assertTrue(reading["used_as_current_fact"])
+                self.assertEqual(reading["answer_truth"], "CONFIRMED")
+            else:
+                self.assertNotIn("transcription", providers)
+                self.assertNotEqual(providers.get("transcription"), "CONFIGURED")
+                self.assertNotEqual(providers.get("transcription"), "NOT_CONFIGURED")
+                self.assertFalse(reading["used_as_current_fact"])
+                self.assertEqual(reading["answer_truth"], "UNKNOWN")
+                blob = json.dumps(reading, ensure_ascii=False)
+                self.assertNotIn("CONFIGURED", blob)
+                self.assertNotIn("NOT_CONFIGURED", blob)
+
+        partial = read_specialist_evidence(
+            "studio",
+            session=fresh_session(
+                origin="LOCAL_STATE",
+                studio={
+                    "origin": "LOCAL_STATE",
+                    "providers": {"transcription": True, "image": False},
+                },
+            ),
+            now=NOW,
+        )
+        partial_providers = partial["observations"]["providers"]
+        self.assertEqual(partial_providers.get("transcription"), "CONFIGURED")
+        self.assertEqual(partial_providers.get("image"), "NOT_CONFIGURED")
+        for name in _PROVIDER_FLAGS:
+            if name not in {"transcription", "image"}:
+                self.assertNotIn(name, partial_providers)
+        self.assertFalse(partial["observations"]["publishing_executed"])
+        self.assertFalse(partial["observations"]["executes_external_call"])
+        self.assertLess(len(partial_providers), len(_PROVIDER_FLAGS))
+
+        mixed = read_specialist_evidence(
+            "studio",
+            session=fresh_session(
+                origin="LOCAL_STATE",
+                studio={
+                    "origin": "LOCAL_STATE",
+                    "providers": {"transcription": True, "video_render": "false"},
+                },
+            ),
+            now=NOW,
+        )
+        self.assertNotIn("video_render", mixed["observations"]["providers"])
+        self.assertNotEqual(mixed["observations"]["providers"].get("video_render"), "CONFIGURED")
+        self.assertNotEqual(mixed["observations"]["providers"].get("video_render"), "NOT_CONFIGURED")
+        self.assertFalse(mixed["used_as_current_fact"])
+        self.assertEqual(mixed["answer_truth"], "UNKNOWN")
+        self.assertFalse(mixed["observations"]["publishing_executed"])
+        self.assertFalse(mixed["observations"]["executes_external_call"])
+
+        ready_flags = {name: True for name in _PROVIDER_FLAGS}
+        full = read_specialist_evidence(
+            "studio",
+            session=fresh_session(
+                origin="LOCAL_STATE",
+                studio={"origin": "LOCAL_STATE", "providers": ready_flags},
+            ),
+            now=NOW,
+        )
+        for name in ("transcription", "video_render", "image", "aion_voice", "mikael_voice"):
+            self.assertEqual(full["observations"]["providers"].get(name), "CONFIGURED")
+        self.assertTrue(full["used_as_current_fact"])
+        self.assertEqual(full["answer_truth"], "CONFIRMED")
+        self.assertFalse(full["observations"]["publishing_executed"])
+        self.assertFalse(full["observations"]["executes_external_call"])
+
+        consent_blocked = dict(ready_flags)
+        consent_blocked["mikael_consent"] = False
+        consented = read_specialist_evidence(
+            "studio",
+            session=fresh_session(
+                origin="LOCAL_STATE",
+                studio={"origin": "LOCAL_STATE", "providers": consent_blocked},
+            ),
+            now=NOW,
+        )
+        self.assertEqual(consented["observations"]["providers"].get("mikael_voice"), "NOT_CONFIGURED")
+        self.assertEqual(consented["observations"]["providers"].get("transcription"), "CONFIGURED")
+        self.assertFalse(consented["observations"]["publishing_executed"])
+
+        stale_flag = dict(ready_flags)
+        stale_flag["transcription"] = "STALE"
+        blocked = read_specialist_evidence(
+            "studio",
+            session=fresh_session(
+                origin="LOCAL_STATE",
+                studio={"origin": "LOCAL_STATE", "providers": stale_flag},
+            ),
+            now=NOW,
+        )
+        self.assertNotEqual(blocked["observations"]["providers"].get("transcription"), "CONFIGURED")
+        self.assertNotEqual(blocked["observations"]["providers"].get("transcription"), "NOT_CONFIGURED")
+        self.assertFalse(blocked["used_as_current_fact"])
+        self.assertEqual(blocked["answer_truth"], "UNKNOWN")
+        self.assertFalse(blocked["observations"]["publishing_executed"])
+        self.assertFalse(blocked["observations"]["executes_external_call"])
+        self.assertFalse(blocked["provider_called"])
 
 
 if __name__ == "__main__":
