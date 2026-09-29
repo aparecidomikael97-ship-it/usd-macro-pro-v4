@@ -1539,7 +1539,7 @@ def _runtime_write_receipt(
         "expected_sha": intent["expected_sha"],
         "expected_digest": intent["expected_digest"],
         "write_sha": str(write_sha or "").strip(),
-        "write_accepted": write_accepted if write_accepted in {True, False} else None,
+        "write_accepted": True if write_accepted is True else (False if write_accepted is False else None),
         "automatic_retry": False,
         "executes_action": False,
         "created_at": _now(),
@@ -1562,6 +1562,21 @@ def reconcile_runtime_write(
             "reason": "Invalid or missing checkpoint write receipt.",
             "executes_action": False,
         }
+    target = record.get("target") if isinstance(record.get("target"), Mapping) else {}
+    normalized_target = {
+        "repo": str(target.get("repo") or "").strip(),
+        "branch": str(target.get("branch") or "").strip(),
+        "path": str(target.get("path") or "").strip(),
+    }
+    if not all(normalized_target.values()):
+        return {
+            "schema": WRITE_RECEIPT_SCHEMA,
+            "status": "BLOCKED",
+            "verified": False,
+            "write_attributed": False,
+            "reason": "Write receipt target is incomplete.",
+            "executes_action": False,
+        }
     expected_digest = str(record.get("expected_digest") or "").strip().lower()
     if re.fullmatch(r"[0-9a-f]{64}", expected_digest) is None:
         return {
@@ -1570,6 +1585,41 @@ def reconcile_runtime_write(
             "verified": False,
             "write_attributed": False,
             "reason": "Write receipt digest is invalid.",
+            "executes_action": False,
+        }
+    intent_payload = {
+        "target": normalized_target,
+        "expected_sha": str(record.get("expected_sha") or "").strip(),
+        "expected_digest": expected_digest,
+    }
+    expected_intent_id = hashlib.sha256(
+        json.dumps(
+            intent_payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+    ).hexdigest()
+    if str(record.get("intent_id") or "").strip() != expected_intent_id:
+        return {
+            "schema": WRITE_RECEIPT_SCHEMA,
+            "status": "BLOCKED",
+            "verified": False,
+            "write_attributed": False,
+            "reason": "Write receipt intent digest is invalid.",
+            "executes_action": False,
+        }
+    runtime_source = str(runtime.get("source") or "").strip()
+    expected_source = f"GitHub:{normalized_target['branch']}:{normalized_target['path']}"
+    if runtime_source and runtime_source != expected_source:
+        return {
+            "schema": WRITE_RECEIPT_SCHEMA,
+            "status": "BLOCKED",
+            "verified": False,
+            "write_attributed": False,
+            "intent_id": expected_intent_id,
+            "reason": "Runtime source does not match the checkpoint write target.",
             "executes_action": False,
         }
     if record.get("write_accepted") is False:
