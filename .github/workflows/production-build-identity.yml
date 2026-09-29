@@ -33,7 +33,7 @@ jobs:
         shell: bash
         run: |
           python -m pip install pip==26.2.1
-          python -m python -m pip install playwright==1.63.0
+          python -m pip install playwright==1.63.0
           python -m playwright install --with-deps chromium
 
       - name: Warm production service
