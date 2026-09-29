@@ -889,6 +889,7 @@ def complete_onboarding_step(
         "subject_ref": current["subject_ref"],
         "updated_at": current["updated_at"],
     }
+    next_progress["digest"] = onboarding_digest(next_progress)
     return assess_onboarding(next_payload, next_progress, now=now, step_versions=step_versions)
 
 
@@ -899,20 +900,7 @@ def resume_onboarding(
     now: datetime | None = None,
     step_versions: Mapping[str, int] | None = None,
 ) -> dict[str, Any]:
-    """Resume a snapshot. Incompatible or replayed state does not stay COMPLETED."""
-    if isinstance(snapshot, Mapping) and isinstance(payload, Mapping):
-        left = _subject(snapshot.get("subject_ref")) if isinstance(snapshot.get("subject_ref"), str) else ""
-        right = _subject(payload.get("subject_ref")) if isinstance(payload.get("subject_ref"), str) else ""
-        if right and (not left or left != right):
-            report = assess_onboarding(payload, None, now=now, step_versions=step_versions)
-            if report.get("rejected") is True:
-                return report
-            report["rejection"] = {"code": "SUBJECT_MISMATCH"}
-            report["state"] = BLOCKED
-            report["completed_step_ids"] = []
-            report["completed_step_versions"] = {}
-            report["review_required"] = True
-            return _seal(report)
+    """Resume a sealed snapshot; all validation is centralized in assess_onboarding."""
     return assess_onboarding(payload, snapshot, now=now, step_versions=step_versions)
 
 
