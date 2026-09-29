@@ -412,6 +412,8 @@ def arm_worker(
         "requires_checkpoint_save": True,
         "autonomy_scope": "ACTIVE_STREAMLIT_SESSION",
         "multi_instance_safe": False,
+        "concurrency_scope": "CALLER_CHECKPOINT_ONLY",
+        "lease_external_persistence": False,
         "continuous_24x7_confirmed": False,
         "external_action_executed": False,
         "real_trading_enabled": False,
@@ -596,9 +598,6 @@ def worker_snapshot(
     runtime_id: str = "",
     now: datetime | None = None,
 ) -> dict[str, Any]:
-    runtime = _validated_runtime_id(runtime_id)
-    if type(max_jobs) is not int or not 1 <= max_jobs <= MAX_JOBS_PER_RUN:
-        raise ValueError("invalid worker batch size")
     current = utc(now or datetime.now(timezone.utc))
     context = authenticated_context(access, Domain.ADMIN)
     state, status = load_worker_state(context, checkpoint)
@@ -730,6 +729,9 @@ def worker_tick(
     max_jobs: int = 5,
     now: datetime | None = None,
 ) -> dict[str, Any]:
+    runtime = _validated_runtime_id(runtime_id)
+    if type(max_jobs) is not int or not 1 <= max_jobs <= MAX_JOBS_PER_RUN:
+        raise ValueError("invalid worker batch size")
     current = utc(now or datetime.now(timezone.utc))
     context = authenticated_context(access, Domain.ADMIN)
     state, status = load_worker_state(context, checkpoint)
