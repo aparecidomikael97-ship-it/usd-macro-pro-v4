@@ -11,11 +11,22 @@ from atlasquant_aion_tenant import (
     tenant_policy_snapshot,
     tenant_readiness_summary,
 )
+from atlasquant_aion_tenant_store import (
+    prepare_tenant_write,
+    tenant_store_target,
+)
 
 
 class AtlasQuantAionTenantReadinessTests(unittest.TestCase):
     def setUp(self):
         self.admin={"role":"ADMIN","username":"admin.01"}
+        self.user={
+            "session":{
+                "username":"cliente.01",
+                "role":"USER",
+                "credential_fingerprint":"a"*32,
+            },
+        }
         self.now=datetime(2026,9,24,12,0,0,tzinfo=timezone.utc)
 
     def _active(self,subject,*,scope=PERSONAL_SCOPE,external_id="aion-1",created_at="2026-09-24T10:00:00Z"):
@@ -115,6 +126,72 @@ class AtlasQuantAionTenantReadinessTests(unittest.TestCase):
         self.assertFalse(policy["external_provider_enabled_by_default"])
         self.assertFalse(policy["billing_enabled"])
         self.assertFalse(policy["real_trading_enabled"])
+
+
+    def test_tenant_write_requires_exact_boolean_true(self):
+        entitlement=self._active("cliente.01")
+        for flag in ("true","false","yes","1",1,1.0,False,0,None):
+            with self.subTest(flag=flag):
+                result=prepare_tenant_write(
+                    self.user,
+                    [entitlement],
+                    {},
+                    approved=flag,
+                    now=self.now,
+                )
+                self.assertFalse(result["allowed"])
+                self.assertEqual(
+                    result["reason"],
+                    "EXPLICIT_WRITE_APPROVAL_REQUIRED",
+                )
+                self.assertFalse(result["approved"])
+                self.assertFalse(result["executes_network"])
+                self.assertFalse(result["executes_write"])
+
+        confirmed=prepare_tenant_write(
+            self.user,
+            [entitlement],
+            {},
+            approved=True,
+            now=self.now,
+        )
+        self.assertTrue(confirmed["allowed"])
+        self.assertTrue(confirmed["approved"])
+        self.assertFalse(confirmed["executes_network"])
+        self.assertFalse(confirmed["executes_write"])
+        target=tenant_store_target(self.user)
+        self.assertTrue(target["ready"])
+        self.assertEqual(
+            confirmed["target"]["tenant_id"],
+            target["tenant_id"],
+        )
+        self.assertIn(
+            target["tenant_id"],
+            confirmed["target"]["path"],
+        )
+
+    def test_tenant_write_rejects_foreign_memory_even_with_exact_approval(self):
+        entitlement=self._active("cliente.01")
+        target=tenant_store_target(self.user)
+        result=prepare_tenant_write(
+            self.user,
+            [entitlement],
+            {
+                "tenant_id":"f"*32,
+                "profile":{"display_name":"foreign"},
+            },
+            approved=True,
+            now=self.now,
+        )
+        self.assertTrue(target["ready"])
+        self.assertFalse(result["allowed"])
+        self.assertEqual(
+            result["reason"],
+            "FOREIGN_TENANT_MEMORY_REJECTED",
+        )
+        self.assertTrue(result["approved"])
+        self.assertFalse(result["executes_write"])
+        self.assertFalse(result["executes_network"])
 
 
 if __name__=="__main__":
