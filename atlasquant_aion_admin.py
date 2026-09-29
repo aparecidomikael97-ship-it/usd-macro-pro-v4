@@ -196,6 +196,7 @@ from atlasquant_aion_admin_guidance import (
     build_admin_onboarding_snapshot,
     complete_admin_onboarding_step,
 )
+from atlasquant_aion_replay_panel import render_replay_lab_panel
 from atlasquant_navigation_bridge import request_surface_revalidation
 from atlasquant_aion_validation_center import (
     validation_center_rows,
@@ -5456,6 +5457,13 @@ def _render_laboratory(
         ),
         key="aion_laboratory_voice",
     )
+    try:
+        render_replay_lab_panel(checkpoint)
+    except Exception as exc:
+        st.warning("Modo Replay indisponível; nenhum cenário histórico foi fabricado.")
+        st.caption(
+            f"Diagnóstico seguro: {type(exc).__name__} · treinamento somente · execução real bloqueada."
+        )
     try:
         from atlasquant_lab_matrix_panel import render_lab_matrix_panel
         render_lab_matrix_panel()
