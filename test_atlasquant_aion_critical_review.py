@@ -644,6 +644,48 @@ class AtlasQuantAionCriticalReviewTests(unittest.TestCase):
                 self.assertEqual(out["truth_state"], "UNKNOWN")
                 self.assertFalse(out["executes_action"])
 
+    def test_unknown_message_fields_and_review_overflow_fail_closed(self):
+        sealed = seal_agent_message(self.message_body(), trusted_context=self.context())
+        alien = dict(sealed["message"])
+        alien["unexpected_control"] = "ADMIN"
+        checked = validate_agent_message(
+            alien,
+            trusted_context=self.context(),
+            expected_workspace_id="central",
+            expected_tenant_id="tenant-a",
+            now=NOW,
+            evidence_verifier=_verify,
+        )
+        self.assertEqual(checked["state"], "BLOCK")
+        self.assertIn("UNKNOWN_FIELDS", checked["blockers"])
+        self.assertEqual(checked["authorization"], "NONE")
+
+        reviews = [
+            self.review(("PRIME","SHADOW","SENTINEL")[i % 3])
+            for i in range(13)
+        ]
+        out = adjudicate_critical_task(**self.base_kwargs(reviews=reviews))
+        self.assertEqual(out["state"], "BLOCK")
+        self.assertIn("REVIEW_LIMIT_EXCEEDED", out["blockers"])
+        self.assertFalse(out["eligible_for_guardian"])
+
+    def test_refs_helper_does_not_materialize_unbounded_input(self):
+        class Guarded:
+            def __init__(self):
+                self.i=0
+            def __iter__(self):
+                return self
+            def __next__(self):
+                if self.i>=3:
+                    raise AssertionError("refs consumed past bound")
+                value=f"ref-{self.i}"
+                self.i+=1
+                return value
+        guarded=Guarded()
+        from atlasquant_aion_critical_review import _refs
+        self.assertEqual(_refs(guarded,limit=3),["ref-0","ref-1","ref-2"])
+        self.assertEqual(guarded.i,3)
+
     def test_unknown_version_empty_nonce_and_secrets_block(self):
         sealed = seal_agent_message(self.message_body(), trusted_context=self.context())
         unknown = self._retarget(sealed["message"], version="999", nonce="")
