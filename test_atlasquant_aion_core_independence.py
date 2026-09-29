@@ -47,8 +47,8 @@ FORBIDDEN_ROOTS = frozenset({
     "atlasquant_post_trade_diagnosis",
     "paper_trading_v112",
 })
-# Direct imports observed on 2026-09-29. This is debt, not an approval to add more.
-KNOWN_AION_COUPLINGS = frozenset({
+# Intentional outer-layer boundaries observed on 2026-09-29. New entries fail until explicitly classified.
+EXPECTED_OUTER_BOUNDARY_COUPLINGS = frozenset({
     ("atlasquant_aion_admin.py", "streamlit"),
     ("atlasquant_aion_admin.py", "atlasquant_aion_business"),
     ("atlasquant_aion_business_adapter.py", "atlasquant_aion_business"),
@@ -105,14 +105,14 @@ class AtlasQuantAionCoreIndependenceTests(unittest.TestCase):
                 forbidden = sorted(closure & FORBIDDEN_ROOTS)
                 self.assertEqual(forbidden, [], module)
 
-    def test_known_domain_couplings_stay_explicit(self):
+    def test_outer_layer_couplings_stay_explicit_and_classified(self):
         observed = set()
         for path in sorted(ROOT.glob("atlasquant_aion*.py")):
             for mod in _imports(path):
                 root = mod.split(".", 1)[0]
                 if root in FORBIDDEN_ROOTS:
                     observed.add((path.name, root))
-        self.assertEqual(observed, set(KNOWN_AION_COUPLINGS))
+        self.assertEqual(observed, set(EXPECTED_OUTER_BOUNDARY_COUPLINGS))
 
     def test_pure_core_imports_without_optional_runtime(self):
         blocker = (
