@@ -6,6 +6,7 @@ remote logging service.
 """
 from __future__ import annotations
 
+from collections import deque
 from datetime import datetime, timezone
 from typing import Any, Mapping, Sequence
 import hashlib
@@ -196,7 +197,7 @@ def normalize_events(events:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]
     source = (
         events[-MAX_EVENTS*2:]
         if isinstance(events, (list, tuple))
-        else tuple(islice(events or (), MAX_EVENTS*2))
+        else deque(events or (), maxlen=MAX_EVENTS*2)
     )
     for raw in source:
         try:
