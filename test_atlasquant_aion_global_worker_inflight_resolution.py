@@ -1,5 +1,6 @@
 import unittest
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from atlasquant_aion_background_executor import _execute_due_local_work_authorized
 from atlasquant_aion_core_intelligence.context import Domain
@@ -236,6 +237,26 @@ class GlobalInflightResolutionTests(unittest.TestCase):
         self.assertEqual(result["status"], "BLOCKED")
         self.assertEqual(result["reason"], "GLOBAL_WORKER_CONTEXT_MISMATCH")
         self.assertFalse(result["requires_checkpoint_save"])
+
+
+    def test_resolution_module_has_no_persistence_or_execution_apis(self):
+        source = Path(
+            "atlasquant_aion_global_worker_inflight_resolution.py"
+        ).read_text(encoding="utf-8")
+        for banned in (
+            "requests.put(",
+            "requests.post(",
+            "save_runtime_checkpoint(",
+            "_persist_runtime_checkpoint_cas(",
+            "run_global_worker_once(",
+            "_execute_due_local_work_authorized(",
+            "activate_global_worker_feature_flag(",
+            "workflow_dispatch",
+            "subprocess.",
+            "os.system(",
+            "real_trade(",
+        ):
+            self.assertNotIn(banned, source)
 
 
 if __name__ == "__main__":
