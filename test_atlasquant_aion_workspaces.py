@@ -172,6 +172,11 @@ class DeveloperPolicyTests(unittest.TestCase):
         self.assertTrue(developer_step_allowed(2, human_approved=True))
         self.assertFalse(developer_step_allowed(4, human_approved=True))
         self.assertFalse(developer_step_allowed("x", human_approved=True))
+        for flag in ("false", "true", "yes", "no", 1, 0, None):
+            self.assertFalse(developer_step_allowed(2, human_approved=flag))
+        self.assertFalse(developer_step_allowed(True))
+        self.assertFalse(developer_step_allowed(False, human_approved=True))
+        self.assertFalse(developer_step_allowed("2", human_approved=True))
 
 
 class ConsoleWiringTests(unittest.TestCase):
