@@ -316,3 +316,26 @@ Copie somente o bloco abaixo:
 - Worker Runtime da #339 foi absorvido na #359.
 - Resource bounds residual, post-359 adversarial resource sweep e adversarial partial-record Recovery estão na #359.
 - A #357 também foi absorvida: Studio/Promoções/Entitlements/Session Memory não devem entrar separadamente.
+
+
+## PR hygiene cleanup
+
+Para reduzir risco de integração duplicada, as Drafts antigas ChatGPT **#337–#343 e #345–#357** foram encerradas sem merge como superseded/historical. A única ponta AION/Núcleo autoritativa é a **#359**.
+
+Permanecem abertas deliberadamente:
+- #359 — AION/Núcleo autoritativo, Draft contra `main`;
+- #344 — handoff/runner operacional;
+- #358 — interface pausada pelo usuário; não avançar até novo pedido;
+- #286 — frente Cursor antiga, fora da consolidação atual; não integrar automaticamente.
+
+Nota especial: #356 foi encerrada como superseded; Studio/Promoções válidos foram absorvidos, mas Entitlements continua ligado ao Tenant Core por ser fronteira de autorização.
+
+## Evidência preservada dos workflows verdes
+
+Os workflows finais também produziram artefatos de evidência:
+
+- Security Gate run `36587217794` → SBOM `aion-sbom-d900fe6729a6dd27deb9541ab1e1f8b6c6107e15`, retenção até 2026-10-29.
+- UI Smoke run `36587217908` → `atlasquant-integration-ui-smoke-d900fe6729a6dd27deb9541ab1e1f8b6c6107e15`, retenção até 2026-10-29.
+- Mobile DOM run `36587217972` → `atlasquant-mobile-dom-d900fe6729a6dd27deb9541ab1e1f8b6c6107e15`, retenção até 2026-10-29.
+
+O SHA nos nomes dos artefatos corresponde ao merge-ref efêmero da validação do PR; a validade do candidato continua vinculada ao par base/head congelado documentado.
