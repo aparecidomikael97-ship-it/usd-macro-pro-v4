@@ -84,6 +84,11 @@ Frentes irmãs preparadas sobre a #337:
   - Contém toda a cadeia anterior até #354.
   - Memory/Recovery vazio deixam de depender de Studio e Promoções.
   - Dados reais dessas superfícies sem adapter ficam UNKNOWN/write_safe=false, sem descarte silencioso.
+- #356 — `chatgpt/aion-memory-optional-domain-adapters-v1`
+  - Empilhada sobre #352 e é a ponta preferida atual do AION/Núcleo.
+  - Contém toda a cadeia da #352.
+  - Fecha RT19 residual para Business + Studio + Promoções + Entitlements.
+  - Seção vazia funciona sem domínio opcional; dado real sem adapter fica UNKNOWN/write_safe=false.
 - #339 — `chatgpt/aion-worker-lease-hardening-v1`
   - Worker de sessão: corrige NameError em arm_worker, valida runtime_id e max_jobs no boundary correto.
   - Mantém multi_instance_safe=false.
@@ -288,3 +293,4 @@ Copie somente o bloco abaixo:
 - Tenant Store usa path credential-bound por tenant; a fronteira de aprovação textual foi endurecida na #350.
 - RT20 residual está consolidado na #352; a #351 foi supersedida e não deve ser integrada.
 - Recovery revision binding/strict historical parse está na #353; ela substitui a #340 no turno noturno.
+- RT19 opcional foi ampliado na #356: Business, Studio, Promoções e Entitlements ficam desacoplados do Núcleo vazio com fail-closed para dados reais.
