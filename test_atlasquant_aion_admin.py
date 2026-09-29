@@ -614,6 +614,58 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("_render_executive_pulse(executive_snapshot)",src)
         self.assertIn('"central_view_mode"',src)
 
+    def test_central_wires_compact_admin_copilot_and_session_onboarding(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("AION · próximo passo", src)
+        self.assertIn("Copiloto + Onboarding Inteligente", src)
+        self.assertIn("build_admin_copilot_snapshot(", src)
+        self.assertIn("build_admin_onboarding_snapshot(", src)
+        self.assertIn("complete_admin_onboarding_step(", src)
+        self.assertIn("_AION_ADMIN_ONBOARDING_PROGRESS_KEY", src)
+        self.assertIn("Sessão local apenas", src)
+        self.assertIn("Checkpoint não é escrito", src)
+        self.assertIn("trading real: BLOQUEADO", src)
+        self.assertIn('"admin_copilot_executes_action": False', src)
+        self.assertIn('"admin_copilot_real_trading_enabled": False', src)
+
+        start = src.index("def _render_admin_guidance(")
+        end = src.index("def _render_central(", start)
+        block = src[start:end]
+        self.assertNotIn("save_runtime_checkpoint(", block)
+        self.assertNotIn("update_continuity_checkpoint(", block)
+        self.assertNotIn("approve_entitlement_request(", block)
+        self.assertNotIn("publish_", block)
+
+    def test_essential_mode_keeps_technical_panels_behind_complete_view(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        start = src.index('view_mode = st.selectbox(', src.index("def _render_central("))
+        complete = src.index('if view_mode == "Completo":', start)
+        otherwise = src.index("else:", complete)
+        before_complete = src[start:complete]
+        complete_block = src[complete:otherwise]
+
+        self.assertIn("_render_admin_guidance(", before_complete)
+        self.assertIn("_render_master_status_summary(status_board)", before_complete)
+        self.assertIn("_render_executive_pulse(executive_snapshot)", before_complete)
+
+        for call in (
+            "_render_commander_intelligence(",
+            "_render_live_event_intelligence(",
+            "_render_learning_pulse(",
+            "_render_reliability_governance(",
+            "_render_release_gate(",
+            "_render_publication_truth(",
+            "_render_validation_center(",
+            "_render_critical_surface_health(",
+        ):
+            self.assertNotIn(call, before_complete)
+            self.assertIn(call, complete_block)
+
+        self.assertIn(
+            "Copiloto, Onboarding, Painel Mestre e Pulso Executivo ficam em primeiro plano",
+            src,
+        )
+
     def test_executive_pulse_can_jump_to_recommended_workspace_safely(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("Pulso Executivo AION",src)

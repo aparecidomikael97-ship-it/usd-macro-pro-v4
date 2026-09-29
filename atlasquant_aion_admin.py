@@ -190,6 +190,12 @@ from atlasquant_aion_executive_pulse import (
     compact_attention_rows,
     executive_pulse,
 )
+from atlasquant_aion_admin_guidance import (
+    EXPERIENCE_MODES as ADMIN_ONBOARDING_MODES,
+    build_admin_copilot_snapshot,
+    build_admin_onboarding_snapshot,
+    complete_admin_onboarding_step,
+)
 from atlasquant_navigation_bridge import request_surface_revalidation
 from atlasquant_aion_validation_center import (
     validation_center_rows,
@@ -594,6 +600,9 @@ _WORKING_SOURCE_KEY = "aion_working_checkpoint_source_digest"
 _WORKING_DIRTY_KEY = "aion_working_checkpoint_dirty"
 _WORKING_CONFLICT_KEY = "aion_working_checkpoint_conflict"
 _AION_WORKSPACE_JUMP_KEY = "aion_admin_workspace_jump"
+_AION_ADMIN_ONBOARDING_PROGRESS_KEY = "aion_admin_onboarding_progress_v1"
+_AION_ADMIN_ONBOARDING_STARTED_KEY = "aion_admin_onboarding_started_v1"
+_AION_ADMIN_ONBOARDING_MODE_KEY = "aion_admin_onboarding_mode_v1"
 _AION_WORKER_RUNTIME_ID_KEY = "aion_worker_runtime_id_v1"
 _AION_GLOBAL_ARMING_PLAN_KEY = "aion_global_arming_plan_v1"
 _AION_GLOBAL_ARMING_APPROVAL_KEY = "aion_global_arming_approval_v1"
@@ -2686,6 +2695,190 @@ def _render_critical_surface_health(system_context: Mapping[str, Any] | None) ->
             )
 
 
+def _render_admin_guidance(
+    access: Mapping[str, Any],
+    flags: Mapping[str, bool],
+    system_context: Mapping[str, Any],
+    copilot_snapshot: Mapping[str, Any],
+) -> None:
+    """Compact progressive-disclosure guidance; onboarding stays session-local."""
+    copilot = dict(copilot_snapshot or {})
+    primary = (
+        copilot.get("primary")
+        if isinstance(copilot.get("primary"), Mapping)
+        else {}
+    )
+    st.markdown("#### AION · próximo passo")
+    if primary:
+        st.info(
+            f"{str(primary.get('priority') or 'P3')} · "
+            f"{str(primary.get('title') or 'Revisão necessária')} — "
+            f"{str(primary.get('next_action') or 'Revisar a evidência disponível.')}"
+        )
+    else:
+        st.caption(
+            "Copiloto sem prioridade confirmada nesta execução. "
+            "Ausência de item não é tratada como prova de que todo o sistema está pronto."
+        )
+
+    if _AION_ADMIN_ONBOARDING_STARTED_KEY not in st.session_state:
+        st.session_state[_AION_ADMIN_ONBOARDING_STARTED_KEY] = datetime.now(
+            timezone.utc
+        ).isoformat()
+    if _AION_ADMIN_ONBOARDING_MODE_KEY not in st.session_state:
+        st.session_state[_AION_ADMIN_ONBOARDING_MODE_KEY] = "BEGINNER"
+
+    with st.expander("Copiloto + Onboarding Inteligente", expanded=False):
+        selected_mode = st.selectbox(
+            "Experiência do onboarding",
+            ADMIN_ONBOARDING_MODES,
+            key=_AION_ADMIN_ONBOARDING_MODE_KEY,
+            help=(
+                "BEGINNER e ADVANCED alteram a trilha, nunca as permissões. "
+                "Trocar o modo invalida progresso incompatível em vez de promovê-lo."
+            ),
+        )
+        started_at = str(
+            st.session_state.get(_AION_ADMIN_ONBOARDING_STARTED_KEY) or ""
+        )
+        progress = st.session_state.get(_AION_ADMIN_ONBOARDING_PROGRESS_KEY)
+        progress_map = progress if isinstance(progress, Mapping) else None
+        now = datetime.now(timezone.utc)
+
+        try:
+            onboarding = build_admin_onboarding_snapshot(
+                access,
+                experience_mode=selected_mode,
+                started_at=started_at,
+                feature_flags=flags,
+                system_context=system_context,
+                progress=progress_map,
+                now=now,
+            )
+        except Exception:
+            onboarding = {
+                "state": "BLOCKED",
+                "rejection": {"code": "ONBOARDING_SAFE_FALLBACK"},
+                "completed_step_ids": [],
+                "blocked_step_ids": [],
+                "stale_step_ids": [],
+                "recommendations": [],
+                "steps": [],
+                "executes_action": False,
+                "runtime_written": False,
+                "real_trading_enabled": False,
+            }
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Copiloto", str(copilot.get("state") or "UNKNOWN"))
+        c2.metric("Onboarding", str(onboarding.get("state") or "UNKNOWN"))
+        c3.metric(
+            "Prioridades",
+            int(copilot.get("attention_count") or 0),
+        )
+
+        copilot_items = [
+            item for item in list(copilot.get("items") or [])[:3]
+            if isinstance(item, Mapping)
+        ]
+        if copilot_items:
+            st.markdown("**Prioridades do Copiloto**")
+            for item in copilot_items:
+                st.markdown(
+                    "- **"
+                    + str(item.get("priority") or "P3")
+                    + " · "
+                    + str(item.get("title") or "Item")
+                    + "** — "
+                    + str(item.get("next_action") or "Revisar evidência.")
+                )
+
+        recommendations = [
+            item for item in list(onboarding.get("recommendations") or [])[:3]
+            if isinstance(item, Mapping)
+        ]
+        steps = {
+            str(item.get("step_id") or ""): item
+            for item in list(onboarding.get("steps") or [])
+            if isinstance(item, Mapping)
+        }
+        if recommendations:
+            st.markdown("**Próximas etapas do Onboarding**")
+            for item in recommendations:
+                step_id = str(item.get("step_id") or "")
+                row = steps.get(step_id, {})
+                st.markdown(
+                    "- **"
+                    + step_id
+                    + " · "
+                    + str(item.get("status") or "UNKNOWN")
+                    + "** — "
+                    + str(item.get("next_safe_action") or "")
+                )
+                if row.get("completable") is True:
+                    if st.button(
+                        "Concluir etapa · " + step_id,
+                        key="aion_admin_onboarding_complete_" + step_id,
+                        width="stretch",
+                    ):
+                        try:
+                            updated = complete_admin_onboarding_step(
+                                access,
+                                progress_map,
+                                step_id,
+                                experience_mode=selected_mode,
+                                started_at=started_at,
+                                feature_flags=flags,
+                                system_context=system_context,
+                                now=now,
+                            )
+                            st.session_state[
+                                _AION_ADMIN_ONBOARDING_PROGRESS_KEY
+                            ] = updated
+                            st.rerun()
+                        except Exception:
+                            st.warning(
+                                "A etapa não pôde ser registrada nesta sessão. "
+                                "Nenhuma permissão ou runtime foi alterado."
+                            )
+        else:
+            st.caption(
+                "Nenhuma próxima etapa segura foi confirmada nesta execução."
+            )
+
+        rejection = (
+            onboarding.get("rejection")
+            if isinstance(onboarding.get("rejection"), Mapping)
+            else {}
+        )
+        if rejection:
+            st.caption(
+                "Diagnóstico do onboarding: "
+                + str(rejection.get("code") or "UNKNOWN")
+                + "."
+            )
+
+        if progress_map is not None:
+            if st.button(
+                "Reiniciar onboarding nesta sessão",
+                key="aion_admin_onboarding_reset",
+                width="stretch",
+            ):
+                st.session_state.pop(
+                    _AION_ADMIN_ONBOARDING_PROGRESS_KEY,
+                    None,
+                )
+                st.session_state[_AION_ADMIN_ONBOARDING_STARTED_KEY] = datetime.now(
+                    timezone.utc
+                ).isoformat()
+                st.rerun()
+
+        st.caption(
+            "Sessão local apenas · Checkpoint não é escrito · feature flags não são alteradas · "
+            "promoção automática: NÃO · trading real: BLOQUEADO."
+        )
+
+
 def _render_central(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
@@ -2697,6 +2890,7 @@ def _render_central(
     approval_inbox: Mapping[str, Any],
     incident_snapshot: Mapping[str, Any],
     executive_snapshot: Mapping[str, Any],
+    copilot_snapshot: Mapping[str, Any],
     specialist_snapshot: Mapping[str, Any] | None = None,
 ) -> None:
     st.markdown("### 🧠 Central AION")
@@ -2741,22 +2935,28 @@ def _render_central(
         ("Essencial", "Completo"),
         key="aion_central_view_mode",
         help=(
-            "Essencial prioriza o que exige atenção e reduz a rolagem no celular. "
+            "Essencial prioriza o que exige atenção para reduzir carga e rolagem no celular. "
             "Completo mostra todos os painéis técnicos."
         ),
     )
+    _render_admin_guidance(
+        access,
+        flags,
+        system_context,
+        copilot_snapshot,
+    )
     _render_master_status_summary(status_board)
     _render_executive_pulse(executive_snapshot)
-    _render_commander_intelligence(checkpoint, system_context, executive_snapshot)
-    _render_live_event_intelligence(checkpoint, system_context, allow_memory_sync=True)
-    _render_learning_pulse(checkpoint)
-    _render_reliability_governance(system_context)
-    _render_release_gate(system_context)
-    _render_publication_truth(system_context)
-    _render_validation_center(system_context, runtime_result)
-    _render_critical_surface_health(system_context)
 
     if view_mode == "Completo":
+        _render_commander_intelligence(checkpoint, system_context, executive_snapshot)
+        _render_live_event_intelligence(checkpoint, system_context, allow_memory_sync=True)
+        _render_learning_pulse(checkpoint)
+        _render_reliability_governance(system_context)
+        _render_release_gate(system_context)
+        _render_publication_truth(system_context)
+        _render_validation_center(system_context, runtime_result)
+        _render_critical_surface_health(system_context)
         _render_workspace_overview(checkpoint, runtime_result)
         _render_attention_queue(
             status_board,
@@ -2769,8 +2969,8 @@ def _render_central(
         _render_continuity_center(checkpoint)
     else:
         st.caption(
-            "Modo Essencial ativo: detalhes técnicos ficam ocultos para reduzir carga e rolagem. "
-            "Nenhuma evidência ou proteção é desativada."
+            "Modo Essencial ativo: Copiloto, Onboarding, Painel Mestre e Pulso Executivo ficam em primeiro plano. "
+            "Painéis técnicos permanecem disponíveis no modo Completo; nenhuma permissão ou proteção é ampliada."
         )
         _render_attention_queue(
             status_board,
@@ -10972,6 +11172,40 @@ def render_aion_admin_console(
         })
 
     try:
+        copilot_snapshot = build_admin_copilot_snapshot(
+            status_board=status_board,
+            incident_snapshot=incident_snapshot,
+            executive_snapshot=executive_snapshot,
+            reliability_snapshot=final_reliability,
+            system_context=system,
+            max_items=6,
+        )
+    except Exception as exc:
+        copilot_snapshot = {
+            "schema":"ATLASQUANT_AION_ADMIN_COPILOT_V1",
+            "state":"UNKNOWN",
+            "items":[],
+            "attention_count":0,
+            "primary":None,
+            "evidence_only":True,
+            "promotes_setup":False,
+            "automatic_setup_promotion":False,
+            "automatic_approval":False,
+            "automatic_feature_change":False,
+            "automatic_repair":False,
+            "automatic_deploy":False,
+            "automatic_publish":False,
+            "automatic_charge":False,
+            "real_trading_enabled":False,
+            "executes_action":False,
+        }
+        foundation_diagnostics.append({
+            "component":"admin_copilot",
+            "error_type":type(exc).__name__,
+        })
+    system["admin_copilot"] = copilot_snapshot
+
+    try:
         commander_snapshot = commander_briefing(
             checkpoint=checkpoint,
             system_context=system,
@@ -11048,7 +11282,7 @@ def render_aion_admin_console(
             _render_central(
                 access_map, checkpoint, runtime_result, memory_summary, flags,
                 system, status_board, approval_inbox, incident_snapshot,
-                executive_snapshot,
+                executive_snapshot, copilot_snapshot,
                 specialist_snapshot=specialist_snapshot,
             )
         elif selected_workspace == "🗂️ Secretaria":
@@ -11362,6 +11596,10 @@ def render_aion_admin_console(
             or "SEM_EVIDENCIA"
         ),
         "commander_executes_action": False,
+        "admin_copilot_state": str(copilot_snapshot.get("state") or "UNKNOWN"),
+        "admin_copilot_attention_count": int(copilot_snapshot.get("attention_count") or 0),
+        "admin_copilot_executes_action": False,
+        "admin_copilot_real_trading_enabled": False,
         "validation_center": validation_center_snapshot(
             system,
             runtime_status=runtime_result.get("status"),
