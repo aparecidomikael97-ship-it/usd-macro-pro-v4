@@ -18,6 +18,8 @@ from atlasquant_aion_observability import append_event, new_event, normalize_eve
 SCHEMA="ATLASQUANT_AION_DURABLE_TASKS_V1"
 MAX_TASKS=300
 MAX_STEPS=80
+MAX_IDEMPOTENCY_KEYS=32
+MAX_IDEMPOTENCY_KEY_LENGTH=128
 TASK_STATES=(
     "PLANNED","RUNNING","PAUSED","WAITING_APPROVAL","BLOCKED","DONE","CANCELED",
 )
@@ -141,6 +143,32 @@ def _task_id(title:str,created_at:str)->str:
     return "DUR-"+_digest({"title":title,"created_at":created_at})[:14].upper()
 
 
+def _retry_key(value:Any)->str:
+    text=" ".join(str(value or "").replace("\x00","").split())
+    if not text:
+        return ""
+    if len(text)>MAX_IDEMPOTENCY_KEY_LENGTH:
+        raise DurableTaskError("IDEMPOTENCY_KEY_INVALID")
+    return text
+
+
+def _consumed_keys(raw:Mapping[str,Any])->list[str]:
+    rows=raw.get("consumed_idempotency_keys")
+    out=[]
+    if isinstance(rows,(list,tuple)):
+        source=list(rows)[:MAX_IDEMPOTENCY_KEYS]
+    else:
+        source=[]
+    for item in source:
+        text=" ".join(str(item or "").replace("\x00","").split())
+        if text and len(text)<=MAX_IDEMPOTENCY_KEY_LENGTH and text not in out:
+            out.append(text)
+    legacy=" ".join(str(raw.get("idempotency_key") or "").replace("\x00","").split())
+    if legacy and len(legacy)<=MAX_IDEMPOTENCY_KEY_LENGTH and legacy not in out and len(out)<MAX_IDEMPOTENCY_KEYS:
+        out.append(legacy)
+    return out
+
+
 def normalize_step(raw:Mapping[str,Any],index:int)->dict[str,Any]:
     item=dict(raw or {})
     sid=_clean(item.get("step_id"),80) or f"S{index+1:03d}"
@@ -170,8 +198,10 @@ def normalize_step(raw:Mapping[str,Any],index:int)->dict[str,Any]:
         "started_at":_clean(item.get("started_at"),80),
         "completed_at":_clean(item.get("completed_at"),80),
         "executes_action":False,
+        "consumed_idempotency_keys":_consumed_keys(item),
     }
-    for key in ("correlation_id","last_error","idempotency_key"):
+    result["idempotency_key"]=result["consumed_idempotency_keys"][-1] if result["consumed_idempotency_keys"] else ""
+    for key in ("correlation_id","last_error"):
         if key in item:
             result[key]=_clean(item[key])
     if "max_attempts" in item:
@@ -366,9 +396,26 @@ def update_step(
         previous=step["state"]
         validate_transition(previous,next_state,step=True,unblock_reason=unblock_reason,
                             approved=approved,retry=retry)
-        if previous==next_state:
-            if retry and (not step.get("idempotency_key") or step["idempotency_key"]!=_clean(idempotency_key)):
+        if retry:
+            key=_retry_key(idempotency_key)
+            consumed=list(step.get("consumed_idempotency_keys") or [])
+            if not key:
+                raise DurableTaskError("IDEMPOTENCY_KEY_REQUIRED",item)
+            if key in consumed:
+                return item
+            if previous==next_state:
                 raise DurableTaskError("IDEMPOTENCY_CONFLICT",item)
+            if previous!="FAILED" or next_state!="RUNNING":
+                raise DurableTaskError("RETRY_INVALID",item)
+            if step["external_side_effects"] or step["guardian_action"] not in {"read","search","summarize","draft"}:
+                raise DurableTaskError("RETRY_UNSAFE",item)
+            if step["attempts"]>=step.get("max_attempts",3):
+                raise DurableTaskError("RETRY_LIMIT",item)
+            if len(consumed)>=MAX_IDEMPOTENCY_KEYS:
+                raise DurableTaskError("IDEMPOTENCY_HISTORY_FULL",item)
+            step["consumed_idempotency_keys"]=consumed+[key]
+            step["idempotency_key"]=key
+        elif previous==next_state:
             return item
         if next_state in {"RUNNING","DONE","SKIPPED"}:
             if item["cursor"]>=len(item["steps"]) or step is not item["steps"][item["cursor"]]:
@@ -379,19 +426,6 @@ def update_step(
                 raise DurableTaskError("APPROVAL_REQUIRED",item)
             if next_state in {"RUNNING","DONE"}:
                 _guard_step(step,access,approved)
-        if retry:
-            if previous!="FAILED" or next_state!="RUNNING":
-                raise DurableTaskError("RETRY_INVALID",item)
-            # Retry is local-only and must name an idempotent operation.
-            if step["external_side_effects"] or step["guardian_action"] not in {"read","search","summarize","draft"}:
-                raise DurableTaskError("RETRY_UNSAFE",item)
-            if not _clean(idempotency_key):
-                raise DurableTaskError("IDEMPOTENCY_KEY_REQUIRED",item)
-            if step.get("idempotency_key") and step["idempotency_key"]!=_clean(idempotency_key):
-                raise DurableTaskError("IDEMPOTENCY_CONFLICT",item)
-            if step["attempts"]>=step.get("max_attempts",3):
-                raise DurableTaskError("RETRY_LIMIT",item)
-            step["idempotency_key"]=_clean(idempotency_key)
         step["state"]=next_state
         step["correlation_id"]=item.get("correlation_id") or item["mission_id"] or item["durable_task_id"]
         if next_state=="FAILED":

@@ -90,7 +90,10 @@ class AionHardeningTests(unittest.TestCase):
         self.assertEqual(retry_step(retried,"s",access=ADMIN,idempotency_key="inspect-1"),retried)
         self.assertBlocked("IDEMPOTENCY_CONFLICT",retry_step,retried,"s",access=ADMIN,idempotency_key="other")
         failed=update_step(retried,"s","FAILED",blocker="again")
-        self.assertBlocked("RETRY_LIMIT",retry_step,failed,"s",access=ADMIN,idempotency_key="inspect-1")
+        replay=retry_step(failed,"s",access=ADMIN,idempotency_key="inspect-1")
+        self.assertEqual(replay["steps"][0]["attempts"],failed["steps"][0]["attempts"])
+        self.assertEqual(replay["steps"][0]["state"],"FAILED")
+        self.assertBlocked("RETRY_LIMIT",retry_step,failed,"s",access=ADMIN,idempotency_key="inspect-2")
 
     def test_retry_requires_key_and_fresh_approval(self):
         task=self.task(requires_approval=True)

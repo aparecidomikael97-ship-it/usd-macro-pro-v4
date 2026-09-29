@@ -1,4 +1,5 @@
 from __future__ import annotations
+import json
 import unittest
 
 from atlasquant_aion_durable_tasks import (
@@ -7,6 +8,7 @@ from atlasquant_aion_durable_tasks import (
     durable_tasks_digest,
     durable_tasks_summary,
     new_durable_task,
+    normalize_durable_task,
     pause_durable_task,
     prepare_resume,
     record_resume,
@@ -177,6 +179,101 @@ class AtlasQuantAionDurableTasksTests(unittest.TestCase):
         with self.assertRaises(DurableTaskError) as stale:
             update_step(task,"spec","RUNNING",access={"role":"ADMIN"},approved=True,expected_revision=99)
         self.assertEqual(stale.exception.result["error_code"],"REVISION_CONFLICT")
+
+    def _fail(self,task,step_id="spec"):
+        task=update_step(task,step_id,"RUNNING",access={"role":"ADMIN"},approved=True)
+        return update_step(task,step_id,"FAILED",blocker="timeout")
+
+    def test_consumed_retry_key_does_not_start_another_attempt_after_later_failure(self):
+        task=self._fail(self._task())
+        started=retry_step(task,"spec",access={"role":"ADMIN"},approved=True,idempotency_key="k1")
+        failed=update_step(started,"spec","FAILED",blocker="timeout again")
+        attempts=failed["steps"][0]["attempts"]
+        revision=failed["revision"]
+        replay=retry_step(failed,"spec",access={"role":"ADMIN"},approved=True,idempotency_key="k1")
+        self.assertEqual(replay["steps"][0]["state"],"FAILED")
+        self.assertEqual(replay["steps"][0]["attempts"],attempts)
+        self.assertEqual(replay["revision"],revision)
+        self.assertIn("k1",replay["steps"][0]["consumed_idempotency_keys"])
+
+        second=retry_step(failed,"spec",access={"role":"ADMIN"},approved=True,idempotency_key="k2")
+        self.assertEqual(second["steps"][0]["state"],"RUNNING")
+        self.assertEqual(second["steps"][0]["attempts"],attempts+1)
+        failed_again=update_step(second,"spec","FAILED",blocker="third")
+        replay_k2=retry_step(failed_again,"spec",access={"role":"ADMIN"},approved=True,idempotency_key="k2")
+        self.assertEqual(replay_k2["steps"][0]["attempts"],second["steps"][0]["attempts"])
+        self.assertEqual(replay_k2["revision"],failed_again["revision"])
+
+    def test_consumed_key_survives_pause_resume_normalize_and_snapshot(self):
+        task=self._fail(self._task())
+        task=retry_step(task,"spec",access={"role":"ADMIN"},approved=True,idempotency_key="k1")
+        task=update_step(task,"spec","FAILED",blocker="again")
+        paused=pause_durable_task(task,checkpoint_digest="cp-a")
+        resumed=record_resume(paused,checkpoint_digest="cp-a")
+        replay=retry_step(resumed,"spec",access={"role":"ADMIN"},approved=True,idempotency_key="k1")
+        self.assertEqual(replay["steps"][0]["attempts"],task["steps"][0]["attempts"])
+        normalized=normalize_durable_task(replay)
+        self.assertEqual(normalized["steps"][0]["consumed_idempotency_keys"],["k1"])
+        snapshot=json.loads(json.dumps(normalized))
+        restored=normalize_durable_task(snapshot)
+        self.assertEqual(restored["steps"][0]["consumed_idempotency_keys"],["k1"])
+        again=retry_step(restored,"spec",access={"role":"ADMIN"},approved=True,idempotency_key="k1")
+        self.assertEqual(again["steps"][0]["attempts"],restored["steps"][0]["attempts"])
+
+    def test_retry_key_edges_and_history_limit_fail_closed(self):
+        task=self._fail(self._task())
+        for key in ("",None):
+            with self.subTest(key=key):
+                with self.assertRaises(DurableTaskError) as empty:
+                    retry_step(task,"spec",access={"role":"ADMIN"},approved=True,idempotency_key=key)
+                self.assertEqual(empty.exception.result["error_code"],"IDEMPOTENCY_KEY_REQUIRED")
+        with self.assertRaises(DurableTaskError) as huge:
+            retry_step(task,"spec",access={"role":"ADMIN"},approved=True,idempotency_key="k"*129)
+        self.assertEqual(huge.exception.result["error_code"],"IDEMPOTENCY_KEY_INVALID")
+
+        limited=new_durable_task(
+            "Limited",
+            steps=[{
+                "step_id":"spec",
+                "title":"Spec",
+                "state":"FAILED",
+                "attempts":2,
+                "max_attempts":2,
+                "guardian_action":"read",
+            }],
+            created_at="2026-09-25T16:00:00+00:00",
+        )
+        with self.assertRaises(DurableTaskError) as limit:
+            retry_step(limited,"spec",access={"role":"ADMIN"},approved=True,idempotency_key="k2")
+        self.assertEqual(limit.exception.result["error_code"],"RETRY_LIMIT")
+
+        full=new_durable_task(
+            "Full history",
+            steps=[{
+                "step_id":"spec",
+                "title":"Spec",
+                "state":"FAILED",
+                "attempts":1,
+                "max_attempts":100,
+                "guardian_action":"read",
+                "consumed_idempotency_keys":[f"k{i:02d}" for i in range(32)],
+            }],
+            created_at="2026-09-25T16:00:00+00:00",
+        )
+        replay=retry_step(full,"spec",access={"role":"ADMIN"},approved=True,idempotency_key="k00")
+        self.assertEqual(replay["steps"][0]["attempts"],1)
+        with self.assertRaises(DurableTaskError) as history:
+            retry_step(full,"spec",access={"role":"ADMIN"},approved=True,idempotency_key="new-key")
+        self.assertEqual(history.exception.result["error_code"],"IDEMPOTENCY_HISTORY_FULL")
+
+    def test_numeric_and_string_approval_flags_do_not_approve_retry_gate(self):
+        task=self._finish(self._finish(self._task(),"spec"),"test")
+        task=update_step(task,"merge","WAITING_APPROVAL",blocker="Aprovação necessária.")
+        for flag in ("true","yes",1,None):
+            with self.subTest(flag=flag):
+                with self.assertRaises(DurableTaskError) as blocked:
+                    update_step(task,"merge","RUNNING",access={"role":"ADMIN"},approved=flag)
+                self.assertEqual(blocked.exception.result["error_code"],"APPROVAL_REQUIRED")
 
 
 if __name__=="__main__":

@@ -14,6 +14,9 @@ Issue: #325
 - Passo com efeito externo ou ação fora de leitura/rascunho não é elegível a retry automático.
 - `"yes"`, `"true"` e `1` não contam como aprovação para sair de `WAITING_APPROVAL`.
 - Passo fora de ordem e revisão velha falham fechados.
+- Cada chave de retry entra em `consumed_idempotency_keys`, com limite de 32 chaves de até 128 caracteres.
+- Uma chave já consumida é no-op depois de nova falha, pause, resume, normalize ou snapshot. Não incrementa `attempts` nem `revision`.
+- Uma chave nova pode iniciar outra tentativa só se o passo estiver `FAILED`, a ação for retry-safe, a revisão for atual, `attempts` estiver abaixo de `max_attempts` e o histórico não estiver cheio.
 
 O update continua sendo registro de estado. Não executa a ação do passo.
 
