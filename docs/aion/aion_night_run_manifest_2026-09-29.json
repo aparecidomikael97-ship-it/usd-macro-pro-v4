@@ -1,0 +1,82 @@
+{
+  "schema": "AION_NIGHT_RUN_MANIFEST_V1",
+  "date": "2026-09-29",
+  "priority": [
+    "AION",
+    "CORE"
+  ],
+  "base": {
+    "branch": "chatgpt/aion-checkpoint-write-reconciliation-v1",
+    "sha": "4c135073ff59a05dcca07079fa109bd897a65dec",
+    "pr": 337
+  },
+  "integrate": [
+    {
+      "pr": 338,
+      "branch": "chatgpt/aion-global-worker-write-reconciliation-v1",
+      "role": "global_worker_write_reconciliation"
+    },
+    {
+      "pr": 339,
+      "branch": "chatgpt/aion-worker-lease-hardening-v1",
+      "role": "session_worker_lease_hardening"
+    },
+    {
+      "pr": 340,
+      "branch": "chatgpt/aion-recovery-outcome-hardening-v1",
+      "role": "recovery_outcome_truth"
+    }
+  ],
+  "autonomy": {
+    "continue_between_safe_blocks": true,
+    "ask_before_safe_steps": false,
+    "automatic_retry_after_ambiguous_runtime_write": false,
+    "cost_mode": "ZERO_COST_DEFAULT"
+  },
+  "forbidden_without_human_approval": [
+    "merge_main",
+    "deploy",
+    "ruleset_admin_change",
+    "real_secret",
+    "paid_service",
+    "external_publish",
+    "real_trading",
+    "global_worker_activation",
+    "irreversible_runtime_mutation"
+  ],
+  "validation": {
+    "targeted": [
+      "python -m unittest test_atlasquant_aion_memory.py",
+      "python -m unittest test_atlasquant_aion_global_worker.py",
+      "python -m unittest test_atlasquant_aion_worker_runtime.py",
+      "python -m unittest test_atlasquant_aion_recovery.py",
+      "python -m unittest test_atlasquant_aion_background_executor.py"
+    ],
+    "full": [
+      "python tools/aion_redteam_runner.py",
+      "python -m unittest discover",
+      "python -m compileall -q .",
+      "git diff --check"
+    ]
+  },
+  "next_hardening_order": [
+    "global_worker_concurrency_and_fencing",
+    "operational_recovery_and_ambiguous_persistence",
+    "lease_receipt_retry_idempotency",
+    "partial_checkpoint_write_reconciliation",
+    "resource_bounds",
+    "tenant_workspace_cache_isolation",
+    "rt19_optional_dependency_reduction",
+    "supply_chain_residual_gaps"
+  ],
+  "stop_conditions": [
+    "human_authorization_required",
+    "secret_required",
+    "paid_service_required",
+    "deploy_or_production_required",
+    "merge_main_required",
+    "irreversible_architecture_choice",
+    "external_environment_blocks_safe_validation"
+  ],
+  "morning_report_required": true
+}
