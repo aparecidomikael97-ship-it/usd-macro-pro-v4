@@ -715,7 +715,8 @@ def assess_onboarding(
         report["completed_step_ids"] = []
         report["completed_step_versions"] = {}
         report["review_required"] = progress_error in {"ROLE_CHANGED", "EXPERIENCE_CHANGED", "REPLAY_REJECTED", "SUBJECT_MISMATCH"}
-        report["state"] = STALE if report["review_required"] else BLOCKED
+        stale_errors = {"ROLE_CHANGED", "EXPERIENCE_CHANGED", "REPLAY_REJECTED"}
+        report["state"] = STALE if progress_error in stale_errors else BLOCKED
         return _seal(report)
 
     catalog_mismatch = stored_version != ONBOARDING_VERSION
