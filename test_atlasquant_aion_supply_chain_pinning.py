@@ -40,17 +40,47 @@ class AionSupplyChainPinningTests(unittest.TestCase):
                     self.assertRegex(value, ACTION_SHA)
 
     def test_python_workflows_do_not_reintroduce_loose_installs(self):
+        violations = []
         for path in sorted(WORKFLOWS.glob("*.yml")):
-            for line in path.read_text(encoding="utf-8").splitlines():
+            for line_number, line in enumerate(
+                path.read_text(encoding="utf-8").splitlines(),
+                start=1,
+            ):
                 command = line.strip()
-                with self.subTest(workflow=path.name, command=command):
-                    self.assertNotIn("pip install --upgrade pip", command)
-                    self.assertNotIn(
-                        "pip install streamlit pandas numpy requests",
-                        command,
+                if re.search(
+                    r"\b(?:python -m )?pip install (?:--upgrade|-U) pip\b",
+                    command,
+                ):
+                    violations.append(
+                        f"{path.name}:{line_number}:pip-upgrade"
                     )
-                    if "pip install playwright" in command:
-                        self.assertIn("playwright==1.63.0", command)
+                    continue
+                install = re.search(
+                    r"\b(?:python -m )?pip install\s+(.+?)(?:;|$)",
+                    command,
+                )
+                if not install:
+                    continue
+                args = install.group(1).strip()
+                if re.search(
+                    r"(?:^|\s)-r\s+requirements[^\s]*",
+                    args,
+                ):
+                    continue
+                tokens = [
+                    token
+                    for token in args.split()
+                    if not token.startswith("-")
+                ]
+                if any("==" not in token for token in tokens):
+                    violations.append(
+                        f"{path.name}:{line_number}:unpinned:{args}"
+                    )
+        self.assertEqual(
+            violations,
+            [],
+            f"Unpinned Python workflow installs: {violations}",
+        )
 
     def test_browser_workflows_pin_playwright_and_python_pip(self):
         browser_workflows = (
