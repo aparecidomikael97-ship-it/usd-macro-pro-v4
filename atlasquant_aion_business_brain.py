@@ -75,6 +75,22 @@ EXTERNAL_ACTIONS = (
     "collect_payment",
 )
 ALWAYS_HUMAN_APPROVAL = frozenset(EXTERNAL_ACTIONS)
+BUSINESS_PURPOSE = (
+    "Gerar receita recorrente e escalável para sustentar e reinvestir na evolução "
+    "do AION, Núcleo, interface e infraestrutura do ecossistema AtlasQuant."
+)
+ACTIVATION_SEQUENCE = (
+    "aion_core_stable",
+    "nucleo_stable",
+    "interface_stable",
+    "business_controlled_activation",
+)
+REINVESTMENT_TARGETS = (
+    "aion",
+    "nucleo",
+    "interface",
+    "infrastructure",
+)
 TREND_WINDOWS_DAYS = {
     "automation_b2b": 30,
     "micro_saas": 45,
@@ -109,6 +125,32 @@ def business_engine_catalog() -> tuple[dict[str, Any], ...]:
     return tuple(dict(item) for item in BUSINESS_ENGINES)
 
 
+def business_strategy_checkpoint() -> dict[str, Any]:
+    return {
+        "schema": SCHEMA,
+        "purpose": BUSINESS_PURPOSE,
+        "activation_sequence": ACTIVATION_SEQUENCE,
+        "reinvestment_targets": REINVESTMENT_TARGETS,
+        "parallel_engines": ENGINE_IDS,
+        "legacy_fronts_disabled": DEPRECATED_PRIMARY_FRONTS,
+        "activation_requires_human_approval": True,
+        "spend_requires_human_approval": True,
+        "publish_requires_human_approval": True,
+        "contract_requires_human_approval": True,
+        "payment_requires_human_approval": True,
+    }
+
+
+def business_strategy_digest() -> str:
+    raw = json.dumps(
+        business_strategy_checkpoint(),
+        ensure_ascii=False,
+        sort_keys=True,
+        default=str,
+    )
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+
 def parallel_brain_contract() -> dict[str, Any]:
     return {
         "schema": SCHEMA,
@@ -126,6 +168,7 @@ def parallel_brain_contract() -> dict[str, Any]:
         "trend_freshness_required": True,
         "experiment_mode": True,
         "deprecated_primary_fronts": DEPRECATED_PRIMARY_FRONTS,
+        "business_strategy": business_strategy_checkpoint(),
     }
 
 
@@ -407,7 +450,12 @@ __all__ = [
     "DEPRECATED_PRIMARY_FRONTS",
     "EXTERNAL_ACTIONS",
     "TREND_WINDOWS_DAYS",
+    "BUSINESS_PURPOSE",
+    "ACTIVATION_SEQUENCE",
+    "REINVESTMENT_TARGETS",
     "business_engine_catalog",
+    "business_strategy_checkpoint",
+    "business_strategy_digest",
     "parallel_brain_contract",
     "normalize_opportunity",
     "normalize_opportunities",
