@@ -1122,10 +1122,16 @@ def _claim_state(
     expires = current + timedelta(seconds=int(state["lease_seconds"]))
     claimed_at = current.isoformat()
     work = dict(work_intent or {})
+    raw_work_occurrences = list(
+        islice(work.get("occurrences") or (), MAX_JOBS + 1)
+    )
+    if len(raw_work_occurrences) > MAX_JOBS:
+        raise ValueError("invalid global work intent occurrences")
+    if any(not isinstance(row, Mapping) for row in raw_work_occurrences):
+        raise ValueError("invalid global work intent occurrence")
     work_occurrences = [
         deepcopy(dict(row))
-        for row in islice(work.get("occurrences") or (), MAX_JOBS + 1)
-        if isinstance(row, Mapping)
+        for row in raw_work_occurrences
     ]
     work_digest = str(work.get("digest") or "").strip()
     work_as_of = str(work.get("as_of") or "")
