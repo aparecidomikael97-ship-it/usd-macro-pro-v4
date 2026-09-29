@@ -2,8 +2,9 @@ from __future__ import annotations
 import unittest
 
 from atlasquant_aion_knowledge_graph import (
+    MAX_DERIVE_RECORDS_PER_SOURCE, MAX_EDGES, MAX_NODES,
     derive_graph, graph_neighborhood, knowledge_graph_summary, new_edge,
-    new_node, synchronize_knowledge_graph,
+    new_node, normalize_edges, normalize_nodes, synchronize_knowledge_graph,
 )
 
 
@@ -93,6 +94,58 @@ class AtlasQuantAionKnowledgeGraphTests(unittest.TestCase):
         synced=synchronize_knowledge_graph(manual,wisdom_entries=[])
         self.assertTrue(any(x["node_id"]=="component:guardian" for x in synced["nodes"]))
         self.assertEqual(synced["edges"],[])
+
+
+    def test_node_and_edge_iterables_stop_at_explicit_prefix_bounds(self):
+        node_consumed={"count":0}
+        def nodes():
+            for index in range(MAX_NODES*2+1):
+                if index>=MAX_NODES*2:
+                    raise AssertionError("node iterable consumed past bound")
+                node_consumed["count"]+=1
+                yield {}
+        self.assertEqual(normalize_nodes(nodes()),[])
+        self.assertEqual(node_consumed["count"],MAX_NODES*2)
+
+        edge_consumed={"count":0}
+        def edges():
+            for index in range(MAX_EDGES*2+1):
+                if index>=MAX_EDGES*2:
+                    raise AssertionError("edge iterable consumed past bound")
+                edge_consumed["count"]+=1
+                yield {}
+        self.assertEqual(normalize_edges(edges()),[])
+        self.assertEqual(edge_consumed["count"],MAX_EDGES*2)
+
+    def test_derive_source_generator_is_not_consumed_past_source_cap(self):
+        consumed={"count":0}
+        def wisdom():
+            for index in range(MAX_DERIVE_RECORDS_PER_SOURCE+1):
+                if index>=MAX_DERIVE_RECORDS_PER_SOURCE:
+                    raise AssertionError("derive source consumed past bound")
+                consumed["count"]+=1
+                yield {}
+        graph=derive_graph(wisdom_entries=wisdom())
+        self.assertEqual(graph["nodes"],[])
+        self.assertEqual(graph["edges"],[])
+        self.assertEqual(consumed["count"],MAX_DERIVE_RECORDS_PER_SOURCE)
+
+    def test_graph_output_never_exceeds_declared_resource_caps(self):
+        graph=derive_graph(
+            wisdom_entries=[
+                {
+                    "wisdom_id":f"WIS-{index}",
+                    "topic":"Bounded",
+                    "truth_state":"CONFIRMED",
+                    "evidence_refs":[f"ref:{index}:{j}" for j in range(3)],
+                    "source_episode_ids":[],
+                    "applies_to":[],
+                }
+                for index in range(MAX_NODES)
+            ],
+        )
+        self.assertLessEqual(len(graph["nodes"]),MAX_NODES)
+        self.assertLessEqual(len(graph["edges"]),MAX_EDGES)
 
 
 if __name__=="__main__":
