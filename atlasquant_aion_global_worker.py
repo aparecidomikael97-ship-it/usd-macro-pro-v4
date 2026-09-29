@@ -36,6 +36,7 @@ from atlasquant_aion_memory import (
     config_from_mapping,
     ensure_operating_checkpoint,
     load_runtime_checkpoint,
+    _runtime_write_receipt,
 )
 from atlasquant_runtime_store import require_runtime_branch
 
@@ -753,6 +754,11 @@ def _persist_runtime_checkpoint_cas(
             "integrity": integrity,
         }
     expected_digest = checkpoint_source_digest(payload)
+    write_receipt = _runtime_write_receipt(
+        config,
+        expected_sha=str(expected_sha or "").strip(),
+        expected_digest=expected_digest,
+    )
     raw = json.dumps(
         payload,
         ensure_ascii=False,
@@ -774,7 +780,9 @@ def _persist_runtime_checkpoint_cas(
         "branch": config.branch,
         "sha": str(expected_sha).strip(),
     }
+    write_attempted = False
     try:
+        write_attempted = True
         response = requests.put(
             _contents_url(config),
             headers=_headers(config.token),
@@ -782,16 +790,31 @@ def _persist_runtime_checkpoint_cas(
             timeout=timeout,
         )
         if response.status_code in {409, 422}:
+            write_receipt = _runtime_write_receipt(
+                config,
+                expected_sha=str(expected_sha or "").strip(),
+                expected_digest=expected_digest,
+                write_accepted=False,
+            )
             return {
                 "schema": SCHEMA,
                 "status": "CONFLICT",
                 "saved": False,
                 "verified": False,
+                "write_receipt": write_receipt,
+                "reconciliation_required": False,
                 "reason": "CAS conflict on runtime checkpoint.",
             }
         response.raise_for_status()
         obj = response.json()
         write_sha = str((obj.get("content") or {}).get("sha") or "").strip()
+        write_receipt = _runtime_write_receipt(
+            config,
+            expected_sha=str(expected_sha or "").strip(),
+            expected_digest=expected_digest,
+            write_sha=write_sha,
+            write_accepted=True,
+        )
         verification = load_runtime_checkpoint(config, timeout=timeout)
         if verification.get("status") != "CONFIRMED":
             return {
@@ -801,7 +824,9 @@ def _persist_runtime_checkpoint_cas(
                 "verified": False,
                 "write_accepted": True,
                 "sha": write_sha,
-                "reason": "CAS write accepted but read-after-write was not confirmed.",
+                "write_receipt": write_receipt,
+                "reconciliation_required": True,
+                "reason": "CAS write accepted but read-after-write was not confirmed. Reconcile before any retry.",
             }
         actual = checkpoint_source_digest(verification.get("checkpoint"))
         read_sha = str(verification.get("sha") or "").strip()
@@ -813,7 +838,11 @@ def _persist_runtime_checkpoint_cas(
                 "verified": False,
                 "write_accepted": True,
                 "sha": read_sha or write_sha,
-                "reason": "Global runtime read-after-write diverged.",
+                "write_receipt": write_receipt,
+                "reconciliation_required": True,
+                "expected_digest": expected_digest,
+                "actual_digest": actual,
+                "reason": "Global runtime read-after-write diverged. Reconcile before any retry.",
             }
         return {
             "schema": SCHEMA,
@@ -824,6 +853,8 @@ def _persist_runtime_checkpoint_cas(
             "checkpoint": verification.get("checkpoint"),
             "digest": actual,
             "integrity": verification.get("integrity"),
+            "write_receipt": write_receipt,
+            "reconciliation_required": False,
             "automatic_runtime_checkpoint_persistence": True,
             "automatic_external_business_actions": False,
         }
@@ -833,6 +864,9 @@ def _persist_runtime_checkpoint_cas(
             "status": "ERROR",
             "saved": False,
             "verified": False,
+            "write_outcome": "UNKNOWN" if write_attempted else "NOT_ATTEMPTED",
+            "write_receipt": write_receipt,
+            "reconciliation_required": bool(write_attempted),
             "reason": type(exc).__name__,
         }
 
@@ -1072,6 +1106,8 @@ def run_global_worker_once(
             "lease": lease,
             "network_called": True,
             "checkpoint_write": claim_write,
+            "reconciliation_required": bool(claim_write.get("reconciliation_required")),
+            "automatic_retry_allowed": False,
             "external_action_executed": False,
         }
 
@@ -1146,6 +1182,8 @@ def run_global_worker_once(
             "network_called": True,
             "automatic_runtime_checkpoint_persistence": False,
             "checkpoint_write": final_write,
+            "reconciliation_required": bool(final_write.get("reconciliation_required")),
+            "automatic_retry_allowed": False,
             "external_action_executed": False,
             "real_trading_enabled": False,
         }
