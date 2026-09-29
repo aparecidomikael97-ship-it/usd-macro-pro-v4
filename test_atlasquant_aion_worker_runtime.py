@@ -395,5 +395,57 @@ class AionWorkerRuntimeTests(unittest.TestCase):
             self.assertNotIn(banned, source)
 
 
+    def test_worker_consults_loop_governor_before_due_execution(self):
+        result = worker_tick(
+            self.access,
+            self.armed_due_checkpoint(),
+            runtime_id=self.runtime_a,
+            now=TICK,
+        )
+        self.assertEqual(result["loop_governor"]["state"], "WITHIN_LIMITS")
+        self.assertFalse(result["loop_governor"]["grants_permission"])
+        self.assertFalse(result["loop_governor"]["executes_action"])
+        self.assertEqual(result["loop_governor"]["selected_count"], 1)
+
+    def test_loop_governor_block_stops_before_lease_and_executor(self):
+        checkpoint = self.armed_due_checkpoint()
+        blocked = {
+            "state": "BLOCK",
+            "blockers": ["RESOURCE_BUDGET"],
+            "grants_permission": False,
+            "executes_action": False,
+            "starts_worker": False,
+        }
+        with patch(
+            "atlasquant_aion_worker_runtime.govern_agent_plan",
+            return_value=blocked,
+        ), patch(
+            "atlasquant_aion_worker_runtime._execute_due_local_work_authorized"
+        ) as executor:
+            result = worker_tick(
+                self.access,
+                checkpoint,
+                runtime_id=self.runtime_a,
+                now=TICK,
+            )
+        executor.assert_not_called()
+        self.assertEqual(result["status"], "LOOP_GOVERNOR_BLOCKED")
+        self.assertEqual(result["processed"], 0)
+        self.assertEqual(result["lease"]["state"], "NOT_CLAIMED")
+        self.assertEqual(result["loop_governor"]["blockers"], ["RESOURCE_BUDGET"])
+        self.assertEqual(result["checkpoint"], checkpoint)
+
+    def test_no_due_work_does_not_need_governor_permission(self):
+        armed = self.arm({})["checkpoint"]
+        result = worker_tick(
+            self.access,
+            armed,
+            runtime_id=self.runtime_a,
+            now=TICK,
+        )
+        self.assertEqual(result["loop_governor"]["state"], "NOT_REQUIRED")
+        self.assertFalse(result["loop_governor"]["grants_permission"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -21,6 +21,8 @@ from atlasquant_aion_background_executor import (
 from atlasquant_aion_core_intelligence.context import Domain
 from atlasquant_aion_core_intelligence.evidence import digest, safe_text, utc
 from atlasquant_aion_core_runtime_bridge import authenticated_context
+from atlasquant_aion_core_voice_automation import CheckpointAutomationAdapter
+from atlasquant_aion_loop_governor import govern_agent_plan
 
 
 SCHEMA = "ATLASQUANT_AION_WORKER_RUNTIME_V1"
@@ -615,6 +617,87 @@ def worker_snapshot(
     }
 
 
+def _govern_due_batch(
+    context,
+    checkpoint: Mapping[str, Any],
+    *,
+    current: datetime,
+    max_jobs: int,
+) -> dict[str, Any]:
+    scheduler = CheckpointAutomationAdapter(context, checkpoint).snapshot(current)
+    due = [
+        row for row in list(scheduler.get("schedules") or [])
+        if isinstance(row, Mapping) and row.get("due") is True
+    ]
+    due.sort(key=lambda row: (
+        str(row.get("due_at") or ""),
+        str(row.get("schedule_id") or ""),
+    ))
+    selected = due[:max_jobs]
+    if not selected:
+        return {
+            "state": "NOT_REQUIRED",
+            "blockers": [],
+            "due_count": 0,
+            "selected_count": 0,
+            "grants_permission": False,
+            "executes_action": False,
+            "starts_worker": False,
+        }
+
+    nodes = [{
+        "node_id": "worker-batch",
+        "parent_id": "",
+        "tenant_id": context.tenant_id,
+        "workspace_id": context.workspace_id,
+        "guardian_risk": "READ",
+        "impact": "LOW",
+        "uncertainty_pct": 0,
+        "reversible": False,
+        "external_side_effects": False,
+    }]
+    capabilities = sorted({
+        str(row.get("capability") or "").strip().upper()
+        for row in selected
+        if str(row.get("capability") or "").strip()
+    })
+    for capability in capabilities:
+        nodes.append({
+            "node_id": "cap-" + capability.lower().replace("_", "-"),
+            "parent_id": "worker-batch",
+            "tenant_id": context.tenant_id,
+            "workspace_id": context.workspace_id,
+            "guardian_risk": "DRAFT" if capability in {"VOICE", "CONTENT"} else "READ",
+            "impact": "LOW",
+            "uncertainty_pct": 0,
+            "reversible": False,
+            "external_side_effects": False,
+        })
+    decision = govern_agent_plan(
+        nodes,
+        trusted_context={
+            "tenant_id": context.tenant_id,
+            "workspace_id": context.workspace_id,
+        },
+        max_depth=2,
+        max_fanout=8,
+        max_nodes=16,
+        call_limit=max_jobs,
+        calls_used=0,
+        token_limit=100000,
+        tokens_used=0,
+        wall_seconds_limit=300,
+        wall_seconds_used=0,
+        memory_mb_limit=1024,
+        memory_mb_used=0,
+    )
+    decision = dict(decision)
+    decision["due_count"] = len(due)
+    decision["selected_count"] = len(selected)
+    decision["capabilities"] = capabilities
+    return decision
+
+
 def worker_tick(
     access: Mapping[str, Any] | None,
     checkpoint: Mapping[str, Any],
@@ -648,6 +731,24 @@ def worker_tick(
             "processed": 0,
             "lease": {"state": "NOT_CLAIMED"},
             "external_action_executed": False,
+        }
+
+    loop_governor = _govern_due_batch(
+        context,
+        checkpoint,
+        current=current,
+        max_jobs=max_jobs,
+    )
+    if loop_governor.get("state") == "BLOCK":
+        return {
+            "schema": SCHEMA,
+            "status": "LOOP_GOVERNOR_BLOCKED",
+            "checkpoint": dict(checkpoint or {}),
+            "processed": 0,
+            "lease": {"state": "NOT_CLAIMED"},
+            "loop_governor": loop_governor,
+            "external_action_executed": False,
+            "real_trading_enabled": False,
         }
 
     claimed_state, lease_result = _claim_lease(
@@ -715,6 +816,7 @@ def worker_tick(
         "checkpoint": final_checkpoint,
         "lease": lease_result,
         "worker": next_state,
+        "loop_governor": loop_governor,
         "batch_status": str(batch.get("status") or "UNKNOWN"),
         "processed": int(batch.get("processed") or 0),
         "succeeded": int(batch.get("succeeded") or 0),
