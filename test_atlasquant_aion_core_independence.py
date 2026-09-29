@@ -199,6 +199,73 @@ class AtlasQuantAionCoreIndependenceTests(unittest.TestCase):
         self.assertIn("OPERATIONAL", result.stdout)
 
 
+    def test_memory_and_recovery_operate_empty_without_studio_or_promotions(self):
+        blocker = (
+            "import sys\n"
+            "blocked={'atlasquant_aion_studio','atlasquant_aion_promotions'}\n"
+            "class Finder:\n"
+            "    def find_spec(self, name, path, target=None):\n"
+            "        if name.split('.',1)[0] in blocked:\n"
+            "            raise ImportError('optional product absent '+name)\n"
+            "sys.meta_path.insert(0, Finder())\n"
+            "import atlasquant_aion_memory as memory\n"
+            "import atlasquant_aion_recovery\n"
+            "checkpoint=memory.default_checkpoint()\n"
+            "normalized=memory.ensure_operating_checkpoint(checkpoint)\n"
+            "assert normalized['studio']['projects']==[]\n"
+            "assert normalized['promotions']['campaigns']==[]\n"
+            "assert normalized['promotions']['redemptions']==[]\n"
+            "report=memory.checkpoint_integrity_report(normalized)\n"
+            "assert report['state']=='CONFIRMED', report\n"
+            "assert report['write_safe'] is True\n"
+            "studio_cp=memory.default_checkpoint()\n"
+            "studio_cp['studio']['projects']=[{'content_id':'foreign-project'}]\n"
+            "studio_report=memory.checkpoint_integrity_report(studio_cp)\n"
+            "assert studio_report['state']=='UNKNOWN', studio_report\n"
+            "assert studio_report['write_safe'] is False\n"
+            "assert 'studio' in studio_report['unavailable_items']\n"
+            "promo_cp=memory.default_checkpoint()\n"
+            "promo_cp['promotions']['redemptions']=[{'redemption_id':'R-1'}]\n"
+            "promo_report=memory.checkpoint_integrity_report(promo_cp)\n"
+            "assert promo_report['state']=='UNKNOWN', promo_report\n"
+            "assert promo_report['write_safe'] is False\n"
+            "assert 'promotions' in promo_report['unavailable_items']\n"
+            "try:\n"
+            "    memory.ensure_operating_checkpoint(studio_cp)\n"
+            "except memory.OptionalProductAdapterUnavailableError:\n"
+            "    pass\n"
+            "else:\n"
+            "    raise AssertionError('non-empty Studio data must fail closed')\n"
+            "try:\n"
+            "    memory.ensure_operating_checkpoint(promo_cp)\n"
+            "except memory.OptionalProductAdapterUnavailableError:\n"
+            "    pass\n"
+            "else:\n"
+            "    raise AssertionError('non-empty Promotions data must fail closed')\n"
+            "print('OPERATIONAL')\n"
+        )
+        env = {
+            "PATH": os.environ.get("PATH", ""),
+            "PYTHONPATH": str(ROOT),
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "PYTHONUNBUFFERED": "1",
+        }
+        result = subprocess.run(
+            [sys.executable, "-c", blocker],
+            cwd=ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            timeout=60,
+            check=False,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            result.stderr[-2000:] + result.stdout[-500:],
+        )
+        self.assertIn("OPERATIONAL", result.stdout)
+
     def test_memory_and_recovery_import_without_requests(self):
         blocker = (
             "import sys\n"
