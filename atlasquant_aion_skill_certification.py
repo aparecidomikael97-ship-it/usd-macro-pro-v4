@@ -173,6 +173,11 @@ def assess_skill_manifest(
             continue
         if tool_id not in allowed_tools:
             blockers.append("TOOL_NOT_ALLOWED_BY_CAPABILITY:" + tool_id)
+        tool_workspace = _identifier(tool.get("workspace_id"))
+        if not tool_workspace or tool_workspace not in workspace_ids:
+            blockers.append("TOOL_WORKSPACE_OUT_OF_SCOPE:" + tool_id)
+        if str(tool.get("connector_id") or "").strip() and not network_required:
+            blockers.append("NETWORK_UNDERDECLARED:" + tool_id)
         allowed_scopes.update(str(x) for x in list(tool.get("required_scopes") or []))
         if tool.get("external_side_effects") is True and not external_side_effects:
             blockers.append("SIDE_EFFECT_UNDERDECLARED:" + tool_id)
