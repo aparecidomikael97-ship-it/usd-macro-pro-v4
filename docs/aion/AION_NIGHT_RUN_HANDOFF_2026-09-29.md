@@ -14,7 +14,9 @@ O operador deve conseguir iniciar o trabalho no Cursor uma vez e deixar a frente
 4. Testes e integração da pilha
 5. Somente depois: outras áreas do AtlasQuant
 
-Não desviar para Interface, Radar, Trading, Studio, Academy ou features novas enquanto houver regressão ou hardening pendente no AION Core.
+Não desviar a trilha principal para Interface, Radar, Trading, Studio, Academy ou features novas enquanto houver regressão ou hardening pendente no AION Core.
+
+Exceção controlada: a interface pode avançar em **branch/PR isolada e paralela**, sem tocar em Memory, Recovery, workers, autoridade ou produção. A frente visual atual é a Draft #358 (`chatgpt/atlasquant-cockpit-shell-v1`). Ela nunca deve bloquear nem substituir a validação da ponta #359.
 
 ## Base conhecida
 
