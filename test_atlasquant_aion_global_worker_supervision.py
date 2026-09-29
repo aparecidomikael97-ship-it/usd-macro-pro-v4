@@ -37,6 +37,10 @@ def _live(status, **extra):
         "work_receipt_confirmed": status == "LIVE_CONFIRMED_WITH_WORK",
         "unsafe_receipts_after_activation": 0,
         "stale_lease": False,
+        "inflight_reconciliation_required": False,
+        "inflight_owner": "",
+        "inflight_fencing_token": 0,
+        "inflight_since": "",
         "last_runtime_id": "gha-123-1",
         "last_heartbeat_at": "2026-09-28T16:30:00+00:00",
         "last_tick_at": "2026-09-28T16:30:00+00:00",
@@ -133,6 +137,30 @@ class GlobalWorkerOperationalSupervisionTests(unittest.TestCase):
         self.assertEqual(report["severity"], "HIGH")
         self.assertTrue(report["incident_open"])
         self.assertTrue(report["safety_stop_recommended"])
+
+    def test_inflight_reconciliation_is_high_incident_without_auto_retry(self):
+        report = supervise_global_worker(
+            _live(
+                "BLOCKED_INFLIGHT_RECONCILIATION",
+                reason="GLOBAL_WORKER_INFLIGHT_TICK_REQUIRES_RECONCILIATION",
+                live_confirmed=False,
+                inflight_reconciliation_required=True,
+                inflight_owner="gha-crashed",
+                inflight_fencing_token=7,
+                inflight_since="2026-09-28T16:25:00+00:00",
+            ),
+            _flag(),
+        )
+        self.assertEqual(report["posture"], "INCIDENT_INFLIGHT_RECONCILIATION")
+        self.assertEqual(report["severity"], "HIGH")
+        self.assertTrue(report["incident_open"])
+        self.assertTrue(report["safety_stop_recommended"])
+        self.assertFalse(report["safety_stop_automatic"])
+        self.assertTrue(report["evidence"]["inflight_reconciliation_required"])
+        self.assertEqual(report["evidence"]["inflight_owner"], "gha-crashed")
+        self.assertEqual(report["evidence"]["inflight_fencing_token"], 7)
+        self.assertTrue(any("retry automático" in x for x in report["recovery_steps"]))
+        self.assertFalse(report["automatic_containment"])
 
     def test_unsafe_receipt_is_critical(self):
         report = supervise_global_worker(
