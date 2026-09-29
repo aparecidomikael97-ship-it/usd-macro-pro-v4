@@ -5,6 +5,7 @@ from atlasquant_aion_knowledge_graph import (
     MAX_DERIVE_RECORDS_PER_SOURCE, MAX_EDGES, MAX_NODES,
     derive_graph, graph_neighborhood, knowledge_graph_summary, new_edge,
     new_node, normalize_edges, normalize_nodes, synchronize_knowledge_graph,
+    _append_edge, _upsert_node,
 )
 
 
@@ -130,22 +131,32 @@ class AtlasQuantAionKnowledgeGraphTests(unittest.TestCase):
         self.assertEqual(graph["edges"],[])
         self.assertEqual(consumed["count"],MAX_DERIVE_RECORDS_PER_SOURCE)
 
-    def test_graph_output_never_exceeds_declared_resource_caps(self):
-        graph=derive_graph(
-            wisdom_entries=[
-                {
-                    "wisdom_id":f"WIS-{index}",
-                    "topic":"Bounded",
-                    "truth_state":"CONFIRMED",
-                    "evidence_refs":[f"ref:{index}:{j}" for j in range(3)],
-                    "source_episode_ids":[],
-                    "applies_to":[],
-                }
-                for index in range(MAX_NODES)
-            ],
+    def test_graph_accumulators_refuse_growth_past_declared_caps(self):
+        nodes=[
+            {"node_id":f"component:n{index}"}
+            for index in range(MAX_NODES)
+        ]
+        _upsert_node(
+            nodes,
+            {"node_id":"component:overflow"},
         )
-        self.assertLessEqual(len(graph["nodes"]),MAX_NODES)
-        self.assertLessEqual(len(graph["edges"]),MAX_EDGES)
+        self.assertEqual(len(nodes),MAX_NODES)
+        self.assertFalse(
+            any(x["node_id"]=="component:overflow" for x in nodes)
+        )
+
+        edges=[
+            {"edge_id":f"edge:{index}"}
+            for index in range(MAX_EDGES)
+        ]
+        _append_edge(
+            edges,
+            {"edge_id":"edge:overflow"},
+        )
+        self.assertEqual(len(edges),MAX_EDGES)
+        self.assertFalse(
+            any(x["edge_id"]=="edge:overflow" for x in edges)
+        )
 
 
 if __name__=="__main__":
