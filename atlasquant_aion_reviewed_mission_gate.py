@@ -7,6 +7,7 @@ Guardian/safety layer.
 """
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Callable, Mapping, Sequence
 import unicodedata
 
@@ -17,6 +18,7 @@ from atlasquant_aion_critical_review import (
     canonical_fingerprint,
     classify_blast_radius,
 )
+from atlasquant_aion_agent_review_protocol import validate_mission_review_batch
 
 
 SCHEMA = "ATLASQUANT_AION_REVIEWED_MISSION_GATE_V1"
@@ -72,8 +74,11 @@ def review_agentic_mission(
     *,
     access: Mapping[str, Any] | None,
     trusted_context: Mapping[str, Any] | None,
-    reviews: Sequence[Mapping[str, Any]] | None = None,
-    trusted_assignments: Mapping[str, Any] | None = None,
+    review_messages: Sequence[Mapping[str, Any]] | None = None,
+    trusted_reviewer_contexts: Mapping[str, Mapping[str, Any]] | None = None,
+    seen_message_digests: Sequence[Any] | None = None,
+    now: datetime | None = None,
+    max_message_age_seconds: Any = 900,
     evidence_refs: Sequence[Any] | None = None,
     approval_refs: Sequence[Any] | None = None,
     evidence_verifier: Callable[[Sequence[str]], Mapping[str, Any]] | None = None,
@@ -131,6 +136,7 @@ def review_agentic_mission(
             "required_roles": required_roles,
             "blast_radius": blast,
             "review": None,
+            "review_protocol": None,
             "eligible_for_guardian": False,
             "guardian_called": False,
             "executes_action": False,
@@ -139,7 +145,7 @@ def review_agentic_mission(
             "real_trading_enabled": False,
         }
 
-    if not list(reviews or []):
+    if not list(review_messages or []):
         return {
             "schema": SCHEMA,
             "state": "REVIEW_REQUIRED",
@@ -152,6 +158,7 @@ def review_agentic_mission(
             "required_roles": required_roles,
             "blast_radius": blast,
             "review": None,
+            "review_protocol": None,
             "eligible_for_guardian": False,
             "guardian_called": False,
             "executes_action": False,
@@ -161,10 +168,45 @@ def review_agentic_mission(
         }
 
     sensitive = str(blast.get("level") or "") in {"HIGH", "CRITICAL"}
+    protocol = validate_mission_review_batch(
+        review_messages,
+        trusted_reviewer_contexts=trusted_reviewer_contexts,
+        expected_workspace_id=workspace_id,
+        expected_tenant_id=tenant_id,
+        expected_mission_id=binding["mission_id"],
+        expected_plan_version=plan_version,
+        seen_digests=seen_message_digests,
+        now=now,
+        max_age_seconds=max_message_age_seconds,
+        evidence_verifier=evidence_verifier,
+        approval_verifier=approval_verifier,
+    )
+    if protocol.get("state") != "PASS":
+        return {
+            "schema": SCHEMA,
+            "state": "BLOCK",
+            "reason": "PROTOCOL_FIREWALL_BLOCKED",
+            "mission": mission,
+            "mission_binding": binding,
+            "mission_id": binding["mission_id"],
+            "plan_version": plan_version,
+            "task_class": task_class,
+            "required_roles": required_roles,
+            "blast_radius": blast,
+            "review": None,
+            "review_protocol": protocol,
+            "eligible_for_guardian": False,
+            "guardian_called": False,
+            "executes_action": False,
+            "grants_permission": False,
+            "external_action_executed": False,
+            "real_trading_enabled": False,
+        }
+
     review = adjudicate_critical_task(
         task_class=task_class,
-        reviews=reviews,
-        trusted_assignments=trusted_assignments,
+        reviews=protocol.get("reviews"),
+        trusted_assignments=protocol.get("trusted_assignments"),
         workspace_id=workspace_id,
         tenant_id=tenant_id,
         evidence_refs=evidence_refs,
@@ -197,6 +239,7 @@ def review_agentic_mission(
         "required_roles": required_roles,
         "blast_radius": blast,
         "review": review,
+        "review_protocol": protocol,
         "eligible_for_guardian": state == "READY_FOR_GUARDIAN",
         "guardian_called": False,
         "executes_action": False,
