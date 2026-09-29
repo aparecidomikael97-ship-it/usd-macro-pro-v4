@@ -32,6 +32,7 @@ from atlasquant_aion_core_runtime_bridge import authenticated_context
 from atlasquant_aion_core_voice_automation import CheckpointAutomationAdapter
 from atlasquant_aion_github_io import github_put
 from atlasquant_aion_global_worker_arming import validate_global_worker_arming_approval
+from atlasquant_aion_loop_governor_bridge import govern_due_batch
 from atlasquant_aion_memory import (
     MAX_RUNTIME_BYTES,
     RuntimeConfig,
@@ -1382,6 +1383,24 @@ def run_global_worker_once(
             "real_trading_enabled": False,
         }
 
+    loop_governor = govern_due_batch(
+        delegated_context,
+        checkpoint,
+        current=current,
+        max_jobs=int(state["max_jobs"]),
+    )
+    if loop_governor.get("state") == "BLOCK":
+        return {
+            "schema": SCHEMA,
+            "status": "LOOP_GOVERNOR_BLOCKED",
+            "processed": 0,
+            "loop_governor": loop_governor,
+            "network_called": True,
+            "runtime_write_attempted": False,
+            "external_action_executed": False,
+            "real_trading_enabled": False,
+        }
+
     work_intent = _global_work_intent(
         delegated_context,
         checkpoint,
@@ -1535,6 +1554,7 @@ def run_global_worker_once(
         "lease_reclaimed": bool(lease.get("reclaimed")),
         "work_intent_digest": work_intent["digest"],
         "work_intent_count": work_intent["count"],
+        "loop_governor": loop_governor,
         "runtime_sha": str(final_write.get("sha") or ""),
         "network_called": True,
         "automatic_runtime_checkpoint_persistence": True,
