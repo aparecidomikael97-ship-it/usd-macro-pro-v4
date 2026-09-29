@@ -71,6 +71,7 @@ _AUTHORITY_PHRASES = (
 )
 MAX_CONTENT = 4000
 MAX_CANDIDATES = 500
+CHECKPOINT_NAMESPACE = "aion_memory_quarantine_v1"
 
 
 def _clean(value: Any, limit: int = 240) -> str:
@@ -413,3 +414,66 @@ def read_memory_candidate(
         "truth_state": "UNKNOWN",
         "executes_action": False,
     }
+
+def quarantine_checkpoint_bundle(store: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Serialize quarantine candidates for Checkpoint Mestre.
+
+    Layered memory remains in the canonical top-level memory_layers section;
+    the quarantine namespace stores candidates only, avoiding duplicate sources
+    of truth.
+    """
+    base = dict(store or empty_quarantine())
+    candidates = [
+        dict(row) for row in list(base.get("candidates") or [])[-MAX_CANDIDATES:]
+        if isinstance(row, Mapping)
+    ]
+    payload = {
+        "schema": SCHEMA,
+        "candidates": candidates,
+        "executes_action": False,
+        "writes_constitution": False,
+        "writes_guardian": False,
+        "authority": "NONE",
+    }
+    payload["digest"] = _digest(payload)
+    return payload
+
+
+def quarantine_checkpoint_integrity(raw: Mapping[str, Any] | None) -> dict[str, str]:
+    """Verify the namespace fingerprint. This is integrity, not authentication."""
+    if not isinstance(raw, Mapping):
+        return {"state": "MISMATCH", "stored": "", "expected": "MAPPING_REQUIRED"}
+    if str(raw.get("schema") or "") != SCHEMA:
+        return {
+            "state": "MISMATCH",
+            "stored": str(raw.get("digest") or "").strip(),
+            "expected": "SCHEMA_REQUIRED",
+        }
+    supplied = str(raw.get("digest") or "").strip()
+    candidate = dict(raw)
+    candidate.pop("digest", None)
+    try:
+        expected = _digest(candidate)
+    except Exception:
+        return {"state": "MISMATCH", "stored": supplied, "expected": "INVALID_BUNDLE"}
+    return {
+        "state": "MATCH" if supplied and supplied == expected else "MISMATCH",
+        "stored": supplied,
+        "expected": expected,
+    }
+
+
+__all__ = [
+    "SCHEMA",
+    "CHECKPOINT_NAMESPACE",
+    "SOURCE_TYPES",
+    "ADMISSION_STATES",
+    "PROTECTED_TARGETS",
+    "empty_quarantine",
+    "admit_memory_candidate",
+    "promote_memory_candidate",
+    "read_memory_candidate",
+    "quarantine_checkpoint_bundle",
+    "quarantine_checkpoint_integrity",
+]
+

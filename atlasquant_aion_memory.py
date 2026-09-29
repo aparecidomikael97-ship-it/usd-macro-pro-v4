@@ -110,6 +110,10 @@ from atlasquant_aion_memory_layers import (
     default_memory_layers,
     normalize_memory_layers,
 )
+from atlasquant_aion_memory_quarantine import (
+    CHECKPOINT_NAMESPACE as AION_MEMORY_QUARANTINE_NAMESPACE,
+    quarantine_checkpoint_integrity,
+)
 
 SCHEMA = "ATLASQUANT_AION_MEMORY_V1"
 FOUNDATION_REVISION = "2026-09-25-complete-v2"
@@ -1679,6 +1683,16 @@ def save_runtime_checkpoint(
             "reason": "AION Global Worker integrity mismatch.",
             "checked_at": _now(),
         }
+    quarantine_integrity = _aion_memory_quarantine_integrity(payload)
+    if quarantine_integrity["state"] == "MISMATCH":
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "saved": False,
+            "verified": False,
+            "reason": "AION Memory Quarantine integrity mismatch.",
+            "checked_at": _now(),
+        }
     expected_digest = checkpoint_source_digest(payload)
     raw = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True, default=str).encode("utf-8")
     if len(raw) > MAX_RUNTIME_BYTES:
@@ -1802,6 +1816,19 @@ AION_CORE_SCHEDULER_NAMESPACE = "aion_core_scheduler_v1"
 AION_CORE_EXECUTOR_NAMESPACE = "aion_core_executor_v1"
 AION_CORE_WORKER_NAMESPACE = "aion_core_worker_v1"
 AION_GLOBAL_WORKER_NAMESPACE = "aion_global_worker_v1"
+
+
+def _aion_memory_quarantine_integrity(
+    checkpoint: Mapping[str, Any] | None,
+) -> dict[str, str]:
+    payload = checkpoint if isinstance(checkpoint, Mapping) else {}
+    if AION_MEMORY_QUARANTINE_NAMESPACE not in payload:
+        return {"state": "ABSENT", "stored": "", "expected": ""}
+    return quarantine_checkpoint_integrity(
+        payload.get(AION_MEMORY_QUARANTINE_NAMESPACE)
+        if isinstance(payload.get(AION_MEMORY_QUARANTINE_NAMESPACE), Mapping)
+        else None
+    )
 
 
 def _aion_core_checkpoint_integrity(
@@ -2033,6 +2060,17 @@ def checkpoint_integrity_report(
         memory_layers_raw.get("digest"),
         memory_layers_state.get("digest"),
     )
+
+    quarantine_integrity = _aion_memory_quarantine_integrity(raw)
+    if quarantine_integrity["state"] != "ABSENT":
+        checks.append({
+            "component": "aion_memory_quarantine",
+            "state": quarantine_integrity["state"],
+            "stored": quarantine_integrity["stored"],
+            "expected": quarantine_integrity["expected"],
+        })
+        if quarantine_integrity["state"] != "MATCH":
+            mismatches.append("aion_memory_quarantine")
 
     core_integrity = _aion_core_checkpoint_integrity(raw)
     if core_integrity["state"] != "ABSENT":
