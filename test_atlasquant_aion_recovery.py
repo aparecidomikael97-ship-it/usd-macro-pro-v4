@@ -176,11 +176,71 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
             )
         self.assertTrue(result["saved"])
         self.assertTrue(result["verified"])
+        self.assertTrue(result["restore_confirmed"])
+        self.assertEqual(result["restored_revision"], result["requested_revision"])
+        self.assertFalse(result["reconciliation_required"])
+        self.assertFalse(result["automatic_retry_allowed"])
         self.assertFalse(result["automatic_restore"])
         self.assertEqual(captured["expected_sha"],current["sha"])
         events=captured["checkpoint"]["operating"]["events"]
         self.assertTrue(any(x["event_type"]=="checkpoint_recovery_restored" for x in events))
         self.assertTrue(any(x["severity"]=="WARNING" for x in events))
+
+
+    def test_unverified_restore_never_claims_revision_restored(self):
+        candidate=self.candidate()
+        current=self.current(mismatch=True)
+        with patch(
+            "atlasquant_aion_recovery.save_runtime_checkpoint",
+            return_value={
+                "status":"UNVERIFIED",
+                "saved":False,
+                "verified":False,
+                "reconciliation_required":True,
+                "write_receipt":{"automatic_retry":False},
+                "sha":"maybe-new",
+            },
+        ):
+            result=restore_checkpoint_revision(
+                candidate,
+                current,
+                self.cfg(),
+                approved=True,
+            )
+
+        self.assertEqual(result["status"],"UNVERIFIED")
+        self.assertFalse(result["restore_confirmed"])
+        self.assertEqual(result["restored_revision"],"")
+        self.assertEqual(
+            result["requested_revision"],
+            candidate["revision"],
+        )
+        self.assertTrue(result["reconciliation_required"])
+        self.assertFalse(result["automatic_retry_allowed"])
+        self.assertFalse(result["automatic_restore"])
+
+    def test_failed_restore_never_claims_revision_restored(self):
+        candidate=self.candidate()
+        current=self.current(mismatch=True)
+        with patch(
+            "atlasquant_aion_recovery.save_runtime_checkpoint",
+            return_value={
+                "status":"CONFLICT",
+                "saved":False,
+                "verified":False,
+                "reconciliation_required":False,
+            },
+        ):
+            result=restore_checkpoint_revision(
+                candidate,
+                current,
+                self.cfg(),
+                approved=True,
+            )
+
+        self.assertFalse(result["restore_confirmed"])
+        self.assertEqual(result["restored_revision"],"")
+        self.assertFalse(result["automatic_retry_allowed"])
 
 
 if __name__=="__main__":
