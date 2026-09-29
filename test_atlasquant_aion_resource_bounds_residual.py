@@ -11,6 +11,7 @@ import atlasquant_aion_learning as learning
 import atlasquant_aion_model_registry as model_registry
 import atlasquant_aion_operations as operations
 import atlasquant_aion_release_confidence as release_confidence
+import atlasquant_aion_resilience as resilience
 import atlasquant_aion_tool_hub as tool_hub
 
 
