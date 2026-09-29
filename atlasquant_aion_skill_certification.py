@@ -215,6 +215,8 @@ def assess_skill_manifest(
         "skill_id": skill_id,
         "version": version,
         "tenant_scope": tenant_scope,
+        "bound_tenant_id": trusted_tenant,
+        "bound_workspace_id": trusted_workspace,
         "workspace_ids": workspace_ids,
         "capability_ids": capability_ids,
         "tool_ids": tool_ids,
@@ -287,10 +289,14 @@ def transition_skill_certification(
         _identifier(x)
         for x in _unique(manifest.get("workspace_ids"))
     ]
+    bound_tenant = _clean(manifest.get("bound_tenant_id"), 120)
+    bound_workspace = _identifier(manifest.get("bound_workspace_id"))
     if (
         not trusted_tenant
         or not trusted_workspace
         or trusted_workspace not in workspace_ids
+        or bound_tenant != trusted_tenant
+        or bound_workspace != trusted_workspace
     ):
         blockers.append("TRUSTED_SCOPE_MISMATCH")
     if trusted_role != "ADMIN":
