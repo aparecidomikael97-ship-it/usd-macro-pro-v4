@@ -55,6 +55,10 @@ def build_steps(*, full: bool = True) -> list[Step]:
                 "test_atlasquant_aion_chaos_recovery",
                 "test_atlasquant_aion_core_independence",
                 "test_atlasquant_aion_global_worker_readiness",
+                "test_atlasquant_aion_global_worker_live_verification",
+                "test_atlasquant_aion_global_worker_supervision",
+                "test_atlasquant_aion_global_worker_recovery_closure",
+                "test_atlasquant_aion_global_worker_incident_reconciliation",
             ),
             2400,
         ),
@@ -83,7 +87,7 @@ def build_steps(*, full: bool = True) -> list[Step]:
 
 
 _SECRET_RE = re.compile(
-    r"(?i)\b(token|api[_-]?key|authorization|password|secret)\b"
+    r"(?i)([a-z0-9_]*(?:token|api[_-]?key|authorization|password|secret)[a-z0-9_]*)"
     r"(\s*[:=]\s*)([^\s,;]+)"
 )
 
