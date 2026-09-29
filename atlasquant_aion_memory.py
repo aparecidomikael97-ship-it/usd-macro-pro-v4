@@ -24,6 +24,7 @@ import unicodedata
 
 
 from atlasquant_runtime_store import resolve_runtime_branch, require_runtime_branch
+from atlasquant_aion_github_io import github_get, github_put
 from atlasquant_aion_operations import normalize_queue, queue_digest
 from atlasquant_aion_observability import normalize_events, events_digest
 from atlasquant_aion_model_router import normalize_budget
@@ -1596,8 +1597,7 @@ def load_runtime_checkpoint(
             "checked_at": _now(),
         }
     try:
-        import requests
-        response = requests.get(
+        response = github_get(
             _contents_url(cfg),
             headers=_headers(cfg.token),
             params={"ref": cfg.branch},
@@ -2114,9 +2114,8 @@ def save_runtime_checkpoint(
 
     write_attempted = False
     try:
-        import requests
         write_attempted = True
-        response = requests.put(
+        response = github_put(
             _contents_url(cfg),
             headers=_headers(cfg.token),
             json=body,
