@@ -105,9 +105,31 @@ class AionWorkerRuntimeTests(unittest.TestCase):
         self.assertTrue(result["worker_armed"])
         self.assertEqual(result["autonomy_scope"], "ACTIVE_STREAMLIT_SESSION")
         self.assertFalse(result["multi_instance_safe"])
+        self.assertEqual(result["concurrency_scope"], "CALLER_CHECKPOINT_ONLY")
+        self.assertFalse(result["lease_external_persistence"])
         self.assertFalse(result["continuous_24x7_confirmed"])
         self.assertFalse(result["external_action_executed"])
         self.assertFalse(result["real_trading_enabled"])
+
+    def test_arm_worker_does_not_depend_on_tick_batch_size_variable(self):
+        result = self.arm({})
+        self.assertEqual(result["status"], "ARMED")
+        self.assertTrue(result["worker_armed"])
+        self.assertFalse(result["multi_instance_safe"])
+        self.assertEqual(result["concurrency_scope"], "CALLER_CHECKPOINT_ONLY")
+        self.assertFalse(result["lease_external_persistence"])
+
+    def test_worker_rejects_empty_or_non_string_runtime_id_before_execution(self):
+        armed = self.arm({})["checkpoint"]
+        for runtime_id in ("", "   ", None, True, 123, "x" * 161):
+            with self.subTest(runtime_id=runtime_id):
+                with self.assertRaises(ValueError):
+                    worker_tick(
+                        self.access,
+                        armed,
+                        runtime_id=runtime_id,
+                        now=TICK,
+                    )
 
     def test_armed_worker_executes_due_local_work_without_external_authority(self):
         checkpoint = self.armed_due_checkpoint()
@@ -360,6 +382,8 @@ class AionWorkerRuntimeTests(unittest.TestCase):
         self.assertEqual(snap["state"], "ARMED")
         self.assertTrue(snap["session_autonomy"])
         self.assertFalse(snap["multi_instance_safe"])
+        self.assertEqual(snap["concurrency_scope"], "CALLER_CHECKPOINT_ONLY")
+        self.assertFalse(snap["lease_external_persistence"])
         self.assertFalse(snap["continuous_24x7_confirmed"])
         self.assertEqual(snap["physical_action_adapter"], "UNAVAILABLE")
         self.assertFalse(snap["provider_calls_allowed"])
