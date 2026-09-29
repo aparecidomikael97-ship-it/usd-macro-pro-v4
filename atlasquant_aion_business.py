@@ -9,6 +9,7 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any, Mapping, Sequence
+from itertools import islice
 import hashlib
 import json
 
@@ -226,7 +227,7 @@ def normalize_product(raw:Mapping[str,Any])->dict[str,Any]:
 def normalize_products(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for raw in list(rows or [])[:MAX_PRODUCTS*2]:
+    for raw in islice(rows or (), MAX_PRODUCTS*2):
         try:
             item=normalize_product(raw)
         except Exception:
