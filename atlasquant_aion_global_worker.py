@@ -101,6 +101,18 @@ def _exact_int(value: Any, *, minimum: int, maximum: int, name: str) -> int:
     return value
 
 
+def _validated_runtime_id(value: Any) -> str:
+    if type(value) is not str:
+        raise ValueError("GLOBAL_RUNTIME_ID_REQUIRED")
+    runtime = value.strip()
+    if not runtime or len(runtime) > 160:
+        raise ValueError("GLOBAL_RUNTIME_ID_REQUIRED")
+    normalized = safe_text(runtime, 160)
+    if not normalized or normalized != runtime:
+        raise ValueError("GLOBAL_RUNTIME_ID_REQUIRED")
+    return normalized
+
+
 def _empty_lease() -> dict[str, Any]:
     return {
         "owner": "",
@@ -883,9 +895,7 @@ def _claim_state(
     now: datetime,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     current = utc(now)
-    runtime = safe_text(runtime_id, 160)
-    if not runtime:
-        raise ValueError("GLOBAL_RUNTIME_ID_REQUIRED")
+    runtime = _validated_runtime_id(runtime_id)
     lease = _normalize_lease(
         state.get("lease") if isinstance(state.get("lease"), Mapping) else {}
     )
@@ -942,6 +952,8 @@ def _release_state(
     state: Mapping[str, Any],
     *,
     runtime_id: str,
+    expected_lease_token: str,
+    expected_fencing_token: int,
     now: datetime,
     batch: Mapping[str, Any],
     final_status: str,
@@ -949,8 +961,17 @@ def _release_state(
     lease = _normalize_lease(
         state.get("lease") if isinstance(state.get("lease"), Mapping) else {}
     )
-    if lease["owner"] != runtime_id:
+    runtime = _validated_runtime_id(runtime_id)
+    if lease["owner"] != runtime:
         raise ValueError("GLOBAL_LEASE_OWNER_MISMATCH")
+    if type(expected_fencing_token) is not int or expected_fencing_token < 1:
+        raise ValueError("GLOBAL_FENCE_TOKEN_REQUIRED")
+    if not str(expected_lease_token or "").strip():
+        raise ValueError("GLOBAL_LEASE_TOKEN_REQUIRED")
+    if lease["token"] != str(expected_lease_token).strip():
+        raise ValueError("GLOBAL_LEASE_TOKEN_MISMATCH")
+    if lease["fencing_token"] != expected_fencing_token:
+        raise ValueError("GLOBAL_FENCING_TOKEN_MISMATCH")
     stats = _normalize_stats(
         state.get("stats") if isinstance(state.get("stats"), Mapping) else {}
     )
@@ -962,7 +983,7 @@ def _release_state(
     stats["last_tick_at"] = utc(now).isoformat()
     stats["last_heartbeat_at"] = utc(now).isoformat()
     stats["last_status"] = safe_text(final_status, 120)
-    stats["last_runtime_id"] = safe_text(runtime_id, 160)
+    stats["last_runtime_id"] = runtime
     return _mutated(
         state,
         lease=_empty_lease(),
@@ -971,15 +992,25 @@ def _release_state(
 
 
 def _runtime_id(value: str | None = None) -> str:
-    if value:
-        return safe_text(value, 160)
+    if value is not None:
+        try:
+            return _validated_runtime_id(value)
+        except ValueError:
+            return ""
     configured = str(os.getenv("AION_GLOBAL_WORKER_RUNTIME_ID", "")).strip()
     if configured:
-        return safe_text(configured, 160)
+        try:
+            return _validated_runtime_id(configured)
+        except ValueError:
+            return ""
     run_id = str(os.getenv("GITHUB_RUN_ID", "")).strip()
     attempt = str(os.getenv("GITHUB_RUN_ATTEMPT", "")).strip()
     if run_id:
-        return safe_text("gha-" + run_id + "-" + (attempt or "1"), 160)
+        generated = "gha-" + run_id + "-" + (attempt or "1")
+        try:
+            return _validated_runtime_id(generated)
+        except ValueError:
+            return ""
     return ""
 
 
@@ -1152,13 +1183,32 @@ def run_global_worker_once(
         batch.get("checkpoint") or claimed_checkpoint
     )
     result_state, _ = load_global_worker_state(result_checkpoint)
-    final_state = _release_state(
-        result_state,
-        runtime_id=runtime,
-        now=current,
-        batch=batch,
-        final_status=str(batch.get("status") or "UNKNOWN"),
-    )
+    try:
+        final_state = _release_state(
+            result_state,
+            runtime_id=runtime,
+            expected_lease_token=active_lease["token"],
+            expected_fencing_token=active_lease["fencing_token"],
+            now=current,
+            batch=batch,
+            final_status=str(batch.get("status") or "UNKNOWN"),
+        )
+    except ValueError as exc:
+        return {
+            "schema": SCHEMA,
+            "status": "FENCE_RELEASE_FAILED",
+            "reason": str(exc),
+            "processed": int(batch.get("processed") or 0),
+            "succeeded": int(batch.get("succeeded") or 0),
+            "failed": int(batch.get("failed") or 0),
+            "blocked": int(batch.get("blocked") or 0),
+            "lease": lease,
+            "network_called": True,
+            "automatic_runtime_checkpoint_persistence": False,
+            "automatic_retry_allowed": False,
+            "external_action_executed": False,
+            "real_trading_enabled": False,
+        }
     final_checkpoint = attach_global_worker_state(
         result_checkpoint,
         final_state,
