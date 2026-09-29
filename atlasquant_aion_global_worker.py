@@ -22,8 +22,6 @@ import re
 import secrets
 from typing import Any, Mapping
 
-import requests
-
 from atlasquant_aion_background_executor import (
     _execute_due_local_work_authorized,
     _occurrence_key,
@@ -32,6 +30,7 @@ from atlasquant_aion_core_intelligence.context import Domain
 from atlasquant_aion_core_intelligence.evidence import digest, safe_text, utc
 from atlasquant_aion_core_runtime_bridge import authenticated_context
 from atlasquant_aion_core_voice_automation import CheckpointAutomationAdapter
+from atlasquant_aion_github_io import github_put
 from atlasquant_aion_global_worker_arming import validate_global_worker_arming_approval
 from atlasquant_aion_memory import (
     MAX_RUNTIME_BYTES,
@@ -985,7 +984,7 @@ def _persist_runtime_checkpoint_cas(
     write_attempted = False
     try:
         write_attempted = True
-        response = requests.put(
+        response = github_put(
             _contents_url(config),
             headers=_headers(config.token),
             json=body,
