@@ -1,5 +1,7 @@
 import importlib.util
 from pathlib import Path
+import sys
+import tempfile
 import unittest
 
 
@@ -8,6 +10,7 @@ MODULE_PATH = ROOT / "tools" / "aion_night_validation.py"
 SPEC = importlib.util.spec_from_file_location("aion_night_validation", MODULE_PATH)
 night = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader
+sys.modules[SPEC.name] = night
 SPEC.loader.exec_module(night)
 
 
@@ -63,6 +66,12 @@ class AionNightValidationTests(unittest.TestCase):
         self.assertFalse(report["network_actions_performed"])
         self.assertFalse(report["deploy_performed"])
         self.assertFalse(report["real_trading_performed"])
+
+    def test_report_path_cannot_escape_repository(self):
+        with self.assertRaises(ValueError):
+            night._resolve_report_path(ROOT, str(ROOT.parent / "outside.json"))
+        inside = night._resolve_report_path(ROOT, "aion-night-validation-report.json")
+        self.assertEqual(inside.parent, ROOT.resolve())
 
     def test_output_redaction_masks_common_secret_assignments(self):
         rendered = night._redact(
