@@ -228,7 +228,7 @@ def build_research_plan(
         else {}
     )
 
-    market_live = bool(source_mesh.get("market_live_confirmed", False))
+    market_live = source_mesh.get("market_live_confirmed") is True
     degraded_state = _clean(degraded.get("state") or "UNKNOWN", 60).upper()
     q = _norm(question)
     time_sensitive = any(term in q for term in (
