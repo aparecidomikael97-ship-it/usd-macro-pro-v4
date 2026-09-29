@@ -211,7 +211,7 @@ def normalize_tool(raw:Mapping[str,Any])->dict[str,Any]:
             if isinstance(item.get("required_scopes"),(list,tuple))
             else []
         ),
-        "external_side_effects":bool(item.get("external_side_effects",False)),
+        "external_side_effects": (item.get("external_side_effects") is True if isinstance(item.get("external_side_effects", False), bool) else True),
         "tool_output_is_authority":False,
         "may_expand_permissions":False,
         "auto_execute":False,
@@ -295,11 +295,13 @@ def _connector_readiness(
             "required":True,"configured":False,"activated":False,
             "reason":"CONNECTOR_NOT_REGISTERED",
         }
+    configured = connector.get("configuration_ready") is True
+    activated = connector.get("enabled") is True and connector.get("activation_approved") is True
     return {
         "required":True,
-        "configured":bool(connector.get("configuration_ready",False)),
-        "activated":bool(connector.get("enabled",False) and connector.get("activation_approved",False)),
-        "reason":"CONNECTOR_ACTIVE" if bool(connector.get("enabled",False)) else "CONNECTOR_NOT_ACTIVATED",
+        "configured":configured,
+        "activated":activated,
+        "reason":"CONNECTOR_ACTIVE" if activated else "CONNECTOR_NOT_ACTIVATED",
     }
 
 
@@ -329,22 +331,22 @@ def plan_tool_call(
             "tool_id":_clean(tool_id,96),"executes_action":False,
             "real_trading_enabled":False,
         }
-    authority=source_authority(source_kind,authenticated_admin=authenticated_admin)
+    authority=source_authority(source_kind,authenticated_admin=authenticated_admin is True)
     connector=_connector_readiness(tool["connector_id"],portable_core)
     safety=proof_of_safety(
         tool["guardian_action"],
         access,
-        approved=approved,
+        approved=approved is True,
         feature_flags=feature_flags,
         source_kind=source_kind,
-        authenticated_admin=authenticated_admin,
+        authenticated_admin=authenticated_admin is True,
         scope=scope,
         artifacts=artifacts,
         tests=tests,
         rollback_plan=rollback_plan,
         uncertainty_pct=uncertainty_pct,
         impact=impact,
-        reversible=reversible,
+        reversible=reversible is True,
         external_side_effects=tool["external_side_effects"],
     )
     blockers=[]
