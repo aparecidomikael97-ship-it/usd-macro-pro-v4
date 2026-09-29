@@ -38,6 +38,7 @@ def build_steps(*, full: bool = True) -> list[Step]:
             (
                 py, "-m", "unittest",
                 "test_atlasquant_aion_memory",
+                "test_atlasquant_aion_tenant",
                 "test_atlasquant_aion_global_worker",
                 "test_atlasquant_aion_worker_runtime",
                 "test_atlasquant_aion_recovery",
