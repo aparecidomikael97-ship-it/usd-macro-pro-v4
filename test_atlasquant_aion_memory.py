@@ -1006,6 +1006,14 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertEqual(merged["provenance"], "static-seed")
         self.assertIn("checkpoint", merged)
 
+    def test_runtime_config_repr_redacts_token(self):
+        secret = "synthetic-redteam-value-not-a-real-credential"
+        cfg = RuntimeConfig(token=secret, repo="owner/repo", branch="atlasquant-runtime")
+        rendered = repr(cfg)
+        self.assertNotIn(secret, rendered)
+        self.assertIn("[REDACTED]", rendered)
+        self.assertEqual(cfg.token, secret)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -74,5 +74,13 @@ CONFIRMADO por teste local neste branch:
 NÃO VERIFICADO:
 
 - CI remoto desta PR empilhada, porque a base não é `main`.
-- Pinagem por SHA das Actions.
-- Certificação de skill/plugin.
+- SHA oficial de `actions/checkout`, `actions/setup-python` e `actions/upload-artifact` nesta sessão. Não foi inventado pin.
+- Certificação de skill/plugin. Não há registry existente com os estados pedidos; o contrato novo fica para o próximo bloco.
+
+RT20, PARTIAL / BLOCKED para pinagem:
+
+- `requirements.txt` usa `>=` em streamlit, pandas, numpy, requests e pyarrow. Não houve bump cego.
+- Workflows usam `actions/checkout@v7`, `actions/setup-python@v7` e `actions/upload-artifact@v7`.
+- O security gate instala `pip-audit`, `bandit` e `cyclonedx-bom` sem pin.
+- O SBOM CycloneDX é gerado em `/tmp/aion-sbom.cdx.json` e validado no job. Não é artefato persistido nem assinado.
+- Nenhum ruleset foi alterado.
