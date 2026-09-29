@@ -267,6 +267,35 @@ class OnboardingContractTests(unittest.TestCase):
         self.assertEqual(resumed["digest"], done["digest"])
         self.assertEqual(resumed["state"], COMPLETED)
 
+
+    def test_resume_requires_digest(self):
+        done = _walk(_context("SALES", "ADVANCED"), [
+            "role_confirmed",
+            "experience_confirmed",
+            "read_access_confirmed",
+        ])
+        snapshot = dict(done)
+        snapshot.pop("digest", None)
+        resumed = resume_onboarding(_context("SALES", "ADVANCED"), snapshot, now=NOW)
+        self.assertEqual(resumed["rejection"]["code"], "DIGEST_REQUIRED")
+        self.assertEqual(resumed["completed_step_ids"], [])
+        self.assertEqual(resumed["state"], BLOCKED)
+
+    def test_resume_requires_matching_subject(self):
+        done = _walk(_context("SALES", "ADVANCED"), [
+            "role_confirmed",
+            "experience_confirmed",
+            "read_access_confirmed",
+        ])
+        snapshot = dict(done)
+        snapshot.pop("subject_ref", None)
+        snapshot["digest"] = onboarding_digest(snapshot)
+        resumed = resume_onboarding(_context("SALES", "ADVANCED"), snapshot, now=NOW)
+        self.assertEqual(resumed["rejection"]["code"], "SUBJECT_MISMATCH")
+        self.assertEqual(resumed["completed_step_ids"], [])
+        self.assertEqual(resumed["state"], BLOCKED)
+        self.assertTrue(resumed["review_required"])
+
     def test_changed_version_becomes_stale(self):
         done = complete_onboarding_step(_context("SALES", "ADVANCED"), None, "role_confirmed", now=NOW)
         resumed = resume_onboarding(
