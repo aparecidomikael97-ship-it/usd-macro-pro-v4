@@ -31,6 +31,7 @@ jobs:
             atlasquant_aion_core.py \
             atlasquant_aion_fortress.py \
             atlasquant_aion_resilience.py \
+            atlasquant_aion_recovery.py \
             atlasquant_aion_memory.py \
             atlasquant_aion_vault.py \
             atlasquant_aion_tenant.py \
@@ -38,13 +39,16 @@ jobs:
             atlasquant_aion_durable_tasks.py \
             atlasquant_aion_digital_twin.py \
             atlasquant_aion_dev_fusion.py \
-            test_atlasquant_aion_security_adversarial.py
-      - name: Run authority, injection and resilience tests
+            test_atlasquant_aion_security_adversarial.py \
+            test_atlasquant_aion_chaos_recovery.py
+      - name: Run authority, injection, isolation and recovery tests
         run: |
           python -m unittest -q \
             test_atlasquant_aion_security_adversarial.py \
+            test_atlasquant_aion_chaos_recovery.py \
             test_atlasquant_aion_fortress.py \
             test_atlasquant_aion_resilience.py \
+            test_atlasquant_aion_recovery.py \
             test_atlasquant_aion_tenant.py \
             test_atlasquant_aion_tenant_privacy.py \
             test_atlasquant_aion_vault.py \
@@ -72,6 +76,7 @@ jobs:
             atlasquant_aion_core.py \
             atlasquant_aion_fortress.py \
             atlasquant_aion_resilience.py \
+            atlasquant_aion_recovery.py \
             atlasquant_aion_memory.py \
             atlasquant_aion_vault.py \
             atlasquant_aion_tenant.py \
