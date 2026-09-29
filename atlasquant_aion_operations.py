@@ -8,6 +8,7 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any, Mapping, Sequence
+from itertools import islice
 import hashlib
 import json
 
@@ -153,7 +154,7 @@ def normalize_task(task:Mapping[str,Any])->dict[str,Any]:
 def normalize_queue(tasks:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for raw in list(tasks or [])[:MAX_TASKS*2]:
+    for raw in islice(tasks or (), MAX_TASKS*2):
         try:
             task=normalize_task(raw)
         except Exception:
