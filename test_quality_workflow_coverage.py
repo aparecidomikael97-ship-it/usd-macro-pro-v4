@@ -33,7 +33,7 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
             text=path.read_text(encoding="utf-8")
             for line_number,line in enumerate(text.splitlines(),start=1):
                 stripped=line.strip()
-                action=re.search(r"^uses:\s*([^\s#]+)$",stripped)
+                action=re.search(r"^uses:\s*([^\s#]+)(?:\s+#.*)?$",stripped)
                 if action:
                     spec=action.group(1)
                     if not spec.startswith("./") and not spec.startswith("docker://"):
@@ -41,7 +41,7 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
                             violations.append(f"{path.name}:{line_number}:action:{spec}")
                 if re.search(r"\bpython -m pip install (?:--upgrade|-U) pip\b",stripped):
                     violations.append(f"{path.name}:{line_number}:pip-upgrade")
-                install=re.search(r"^(?:python -m )?pip install\s+(.+)$",stripped)
+                install=re.search(r"\b(?:python -m )?pip install\s+(.+?)(?:;|$)",stripped)
                 if install:
                     args=install.group(1).strip()
                     if re.search(r"(?:^|\s)-r\s+requirements[^\s]*",args):
