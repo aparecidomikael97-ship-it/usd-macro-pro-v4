@@ -115,7 +115,7 @@ class AtlasQuantProductionWorkflowContractTests(unittest.TestCase):
         self.assertIn("atlasquant-source-build-marker",text)
         self.assertIn("deploy_seen_builds",text)
         self.assertIn("source_build != expected_build",text)
-        self.assertIn("uses: actions/checkout@v7",text)
+        self.assertIn("uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",text)
 
     def test_app_exposes_source_bundle_marker_before_fast_home_can_stop(self):
         src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
