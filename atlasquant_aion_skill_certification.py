@@ -7,6 +7,7 @@ Certification is metadata only and never grants runtime authority.
 from __future__ import annotations
 
 from hashlib import sha256
+from itertools import islice
 from typing import Any, Callable, Mapping, Sequence
 import json
 import re
@@ -36,7 +37,7 @@ def _unique(values: Any, limit: int = MAX_ITEMS) -> list[str]:
     if not isinstance(values, (list, tuple, set)):
         return []
     out: list[str] = []
-    for raw in list(values)[:limit * 2]:
+    for raw in islice(values, max(0, limit * 2)):
         text = _clean(raw, 160)
         if text and text not in out:
             out.append(text)
@@ -173,7 +174,7 @@ def assess_skill_manifest(
             continue
         if tool_id not in allowed_tools:
             blockers.append("TOOL_NOT_ALLOWED_BY_CAPABILITY:" + tool_id)
-        allowed_scopes.update(str(x) for x in list(tool.get("required_scopes") or []))
+        allowed_scopes.update(str(x) for x in islice(tool.get("required_scopes") or (), MAX_ITEMS))
         if tool.get("external_side_effects") is True and not external_side_effects:
             blockers.append("SIDE_EFFECT_UNDERDECLARED:" + tool_id)
 

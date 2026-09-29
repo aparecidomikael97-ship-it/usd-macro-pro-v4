@@ -14,6 +14,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+from heapq import nsmallest
+from itertools import islice
 import argparse
 import base64
 import json
@@ -133,16 +135,20 @@ def _global_work_intent(
     )
     current = utc(now)
     scheduler = CheckpointAutomationAdapter(context, checkpoint).snapshot(current)
-    due = [
-        row for row in list(scheduler.get("schedules") or [])
-        if isinstance(row, Mapping) and row.get("due") is True
-    ]
-    due.sort(key=lambda row: (
-        str(row.get("due_at") or ""),
-        str(row.get("schedule_id") or ""),
-    ))
+    due = nsmallest(
+        jobs,
+        (
+            row
+            for row in (scheduler.get("schedules") or ())
+            if isinstance(row, Mapping) and row.get("due") is True
+        ),
+        key=lambda row: (
+            str(row.get("due_at") or ""),
+            str(row.get("schedule_id") or ""),
+        ),
+    )
     occurrences = []
-    for row in due[:jobs]:
+    for row in due:
         due_at = str(row.get("due_at") or "")
         schedule_id = safe_text(str(row.get("schedule_id") or ""), 120)
         capability = safe_text(
@@ -1116,10 +1122,16 @@ def _claim_state(
     expires = current + timedelta(seconds=int(state["lease_seconds"]))
     claimed_at = current.isoformat()
     work = dict(work_intent or {})
+    raw_work_occurrences = list(
+        islice(work.get("occurrences") or (), MAX_JOBS + 1)
+    )
+    if len(raw_work_occurrences) > MAX_JOBS:
+        raise ValueError("invalid global work intent occurrences")
+    if any(not isinstance(row, Mapping) for row in raw_work_occurrences):
+        raise ValueError("invalid global work intent occurrence")
     work_occurrences = [
         deepcopy(dict(row))
-        for row in list(work.get("occurrences") or [])
-        if isinstance(row, Mapping)
+        for row in raw_work_occurrences
     ]
     work_digest = str(work.get("digest") or "").strip()
     work_as_of = str(work.get("as_of") or "")

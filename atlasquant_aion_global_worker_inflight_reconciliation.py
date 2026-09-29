@@ -8,6 +8,7 @@ receipts so an operator can review a compact evidence package.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from itertools import islice
 from typing import Any, Mapping
 
 from atlasquant_aion_background_executor import load_executor_receipts
@@ -15,6 +16,7 @@ from atlasquant_aion_core_intelligence.context import Domain
 from atlasquant_aion_core_intelligence.evidence import digest, utc
 from atlasquant_aion_core_runtime_bridge import authenticated_context
 from atlasquant_aion_global_worker import (
+    MAX_JOBS,
     _delegated_access,
     load_global_worker_state,
 )
@@ -166,7 +168,7 @@ def assess_global_inflight_reconciliation(
 
     occurrences = [
         dict(row)
-        for row in list(inflight.get("work_occurrences") or [])
+        for row in islice(inflight.get("work_occurrences") or (), MAX_JOBS)
         if isinstance(row, Mapping)
     ]
     evidence_rows = []
