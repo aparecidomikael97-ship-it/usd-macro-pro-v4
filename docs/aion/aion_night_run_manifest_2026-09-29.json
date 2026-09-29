@@ -44,7 +44,7 @@
         357
       ],
       "preserves_entitlements_as_tenant_core_dependency": true,
-      "head_sha": "cf9bc11a19aef8ce5a7aad50e0ec4244aa10bc29"
+      "head_sha": "a0fa2dff38d2de7e934f3897ecf06dd025552028"
     }
   ],
   "autonomy": {
@@ -74,8 +74,8 @@
     "report": "aion-night-validation-report.json"
   },
   "next_hardening_order": [
-    "wait_for_latest_pr_359_readiness",
-    "human_decision_ruleset_required_checks"
+    "human_decision_ruleset_required_checks",
+    "no_additional_core_changes_without_new_evidence_or_regression"
   ],
   "stop_conditions": [
     "human_authorization_required",
@@ -161,5 +161,38 @@
     }
   },
   "interface_state": "PAUSED_BY_USER",
-  "plugin_work_state": "DO_NOT_CREATE_UNTIL_EXPLICIT_USER_REQUEST"
+  "plugin_work_state": "DO_NOT_CREATE_UNTIL_EXPLICIT_USER_REQUEST",
+  "validation_evidence": {
+    "pr": 360,
+    "base": "main",
+    "purpose": "VALIDATION_ONLY_DO_NOT_MERGE",
+    "head_sha": "a0fa2dff38d2de7e934f3897ecf06dd025552028",
+    "results": {
+      "quality_tests": {
+        "conclusion": "SUCCESS",
+        "tests": 3801
+      },
+      "aion_core_security_gate": {
+        "conclusion": "SUCCESS"
+      },
+      "aion_adversarial_contracts": {
+        "conclusion": "SUCCESS"
+      },
+      "supply_chain_audit": {
+        "conclusion": "SUCCESS"
+      },
+      "global_worker_activation_readiness": {
+        "conclusion": "SUCCESS"
+      },
+      "release_readiness": {
+        "conclusion": "SUCCESS"
+      },
+      "integration_ui_smoke": {
+        "conclusion": "SUCCESS"
+      },
+      "mobile_dom_stability": {
+        "conclusion": "SUCCESS"
+      }
+    }
+  }
 }
