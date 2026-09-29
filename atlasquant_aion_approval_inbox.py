@@ -196,7 +196,7 @@ def collect_approval_inbox(
 def approval_rows(inbox:Mapping[str,Any]|None)->list[dict[str,Any]]:
     items=(inbox or {}).get("items") if isinstance(inbox,Mapping) else []
     rows=[]
-    for item in list(items or []):
+    for item in items or []:
         if not isinstance(item,Mapping):
             continue
         rows.append({

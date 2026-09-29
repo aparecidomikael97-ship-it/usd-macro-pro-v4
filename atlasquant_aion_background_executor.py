@@ -8,6 +8,7 @@ performs physical/external actions.
 """
 from __future__ import annotations
 
+from bisect import insort
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import json
@@ -47,6 +48,28 @@ MAX_RECEIPTS = 1000
 MAX_JOBS_PER_RUN = 20
 MAX_ATTEMPTS = 3
 RETRY_BACKOFF_SECONDS = (60, 300, 900)
+
+
+def _select_due_schedules(values: Any, limit: int) -> tuple[list[Mapping[str, Any]], int]:
+    """Select the earliest due rows with O(limit) memory while preserving total due count."""
+    selected: list[tuple[str, str, int, Mapping[str, Any]]] = []
+    due_count = 0
+    sequence = 0
+    for row in values or ():
+        if not isinstance(row, Mapping) or row.get("due") is not True:
+            continue
+        due_count += 1
+        entry = (
+            str(row.get("due_at") or ""),
+            str(row.get("schedule_id") or ""),
+            sequence,
+            row,
+        )
+        sequence += 1
+        insort(selected, entry)
+        if len(selected) > limit:
+            selected.pop()
+    return [entry[3] for entry in selected], due_count
 
 
 def _scope_payload(context) -> list[str]:
@@ -361,11 +384,10 @@ def _execute_due_local_work_authorized(
     if receipt_state["state"] == "CONTEXT_ISOLATED":
         raise ValueError("EXECUTOR_CONTEXT_MISMATCH")
     scheduler = CheckpointAutomationAdapter(context, checkpoint).snapshot(current)
-    due = [
-        row for row in list(scheduler.get("schedules") or [])
-        if isinstance(row, Mapping) and row.get("due") is True
-    ]
-    due.sort(key=lambda x: (str(x.get("due_at") or ""), str(x.get("schedule_id") or "")))
+    due, due_count = _select_due_schedules(
+        scheduler.get("schedules"),
+        max_jobs,
+    )
 
     approval_digest = authorization_digest
     allowed_capabilities = (
@@ -379,7 +401,7 @@ def _execute_due_local_work_authorized(
     action_receipts = []
     added = 0
 
-    for schedule in due[:max_jobs]:
+    for schedule in due:
         due_at = str(schedule.get("due_at") or "")
         capability = str(schedule.get("capability") or "").strip().upper()
         occurrence_key = _occurrence_key(context, schedule, due_at)
@@ -527,7 +549,7 @@ def _execute_due_local_work_authorized(
             else "PARTIAL"
         ),
         "checkpoint": staged,
-        "due_count": len(due),
+        "due_count": due_count,
         "processed": added,
         "succeeded": succeeded,
         "failed": failed,

@@ -209,7 +209,7 @@ jobs:
           import time
           from pathlib import Path
           from playwright.sync_api import sync_playwright
-          from atlasquant_build_identity import short_source_fingerprint
+          from atlasquant_build_identity import compare_deploy_identity, short_source_fingerprint
 
           url="http://127.0.0.1:8501"
           expected_build=short_source_fingerprint(Path.cwd(),16)
@@ -388,6 +388,15 @@ jobs:
                           build_marker.first.get_attribute("data-build") or ""
                       ).strip().lower()
                   build_identity_ok=bool(source_build and source_build==expected_build)
+                  runtime_identity=page.locator("#atlasquant-runtime-identity")
+                  observed_sha=""
+                  if runtime_identity.count():
+                      observed_sha=str(runtime_identity.first.get_attribute("data-commit") or "").strip()
+                  sha_verdict=compare_deploy_identity(
+                      "",
+                      observed_sha,
+                      target_url=url,
+                  )
 
                   contrast_checks={}
                   for label,selector in {
@@ -583,6 +592,9 @@ jobs:
                       "stable_nav_count":stable_nav_count,
                       "source_build":source_build,
                       "build_identity_ok":build_identity_ok,
+                      "observed_sha":observed_sha,
+                      "sha_verdict":sha_verdict["state"],
+                      "proves_production_sha":sha_verdict["proves_production"],
                       "contrast_checks":contrast_checks,
                       "light_surface_checks":light_surface_checks,
                       "metric_contrast":metric_contrast,
@@ -611,6 +623,13 @@ jobs:
                       failures.append(
                           f"{name}: marcador de build ausente/incorreto "
                           f"(atual={source_build or 'AUSENTE'}, esperado={expected_build})"
+                      )
+                  if runtime_identity.count()<1:
+                      failures.append(f"{name}: marcador de identidade de runtime ausente")
+                  if sha_verdict["proves_production"] or sha_verdict["state"]!="LOCAL_OBSERVATION":
+                      failures.append(
+                          f"{name}: localhost não pode ser tratado como produção validada "
+                          f"({sha_verdict['state']})"
                       )
                   bad_contrast=[key for key,value in contrast_checks.items() if not bool(value.get("readable"))]
                   if bad_contrast:
