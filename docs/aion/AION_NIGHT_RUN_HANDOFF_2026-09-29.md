@@ -82,7 +82,8 @@ Frentes irmãs preparadas sobre a #337:
   - Deduplica histórico de revisions e contabiliza registros parciais/invalidos.
   - Load histórico valida tamanho/Base64 antes de JSON/integridade; restore continua explícito e condicional.
 - #355 — base consolidada anterior do AION/Núcleo; agora absorvida pela ponta #359.
-- #356 — SUPERSEDIDA pela #355 para integração noturna; NÃO integrar.
+- #356 — SUPERSEDIDA pela #355/#359 para integração noturna; NÃO integrar.
+- #357 — SUPERSEDIDA pela #359; resource bounds de Studio/Promoções/Entitlements/Session Memory foram absorvidos.
 - #339 — SUPERSEDIDA pela #359; hardening do Worker Runtime foi absorvido na ponta consolidada.
 - #340 — semântica absorvida pela #355; não integrar separadamente.
 - #353 — SUPERSEDIDA pela #355; revision binding/strict historical parse foram absorvidos na ponta consolidada.
@@ -91,6 +92,7 @@ Frentes irmãs preparadas sobre a #337:
   - Contém toda a cadeia da #355.
   - Absorve o Worker Runtime da #339.
   - Fecha resíduos de resource bounds em Operations, Continuity e Controlled Learning.
+  - Absorve a #357: resource bounds adicionais em Studio, Promoções, Entitlements, Session Memory e Memory.
   - Adiciona adversarial hardening de Recovery para SHA curto, content não-string e encoding histórico divergente.
   - Mantém fail-closed, no automatic retry, restore confirmado somente com save+verify CONFIRMED.
 
@@ -140,7 +142,7 @@ Integrar de forma não destrutiva:
 
 1. #359 — usar como ponta única consolidada do AION/Núcleo.
 
-Não integrar separadamente #339, #340, #353, #355 ou #356: as garantias necessárias estão absorvidas/supersedidas pela #359.
+Não integrar separadamente #339, #340, #353, #355, #356 ou #357: as garantias necessárias estão absorvidas/supersedidas pela #359.
 
 Não retargetar nem mergear em main.
 
@@ -290,3 +292,4 @@ Copie somente o bloco abaixo:
 - RT19 do Núcleo vazio permanece em Business + Studio + Promoções; Entitlements continua ligado ao Tenant Core. A #356 segue supersedida.
 - Worker Runtime da #339 foi absorvido na #359.
 - Resource bounds residual e adversarial partial-record Recovery estão na #359.
+- A #357 também foi absorvida: Studio/Promoções/Entitlements/Session Memory não devem entrar separadamente.
