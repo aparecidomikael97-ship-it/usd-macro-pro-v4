@@ -213,6 +213,48 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
         self.assertFalse(result["network_called"])
         self.assertEqual(result["processed"], 0)
 
+    def test_loop_governor_block_stops_before_global_lease_write_and_executor(self):
+        checkpoint = self.armed_checkpoint()
+        blocked = {
+            "state": "BLOCK",
+            "blockers": ["RESOURCE_BUDGET"],
+            "grants_permission": False,
+            "executes_action": False,
+            "starts_worker": False,
+        }
+        with patch(
+            "atlasquant_aion_global_worker.load_runtime_checkpoint",
+            return_value={
+                "status": "CONFIRMED",
+                "checkpoint": checkpoint,
+                "sha": "sha-0",
+                "integrity": checkpoint_integrity_report(checkpoint),
+            },
+        ), patch(
+            "atlasquant_aion_global_worker.govern_due_batch",
+            return_value=blocked,
+        ) as governor, patch(
+            "atlasquant_aion_global_worker._persist_runtime_checkpoint_cas"
+        ) as persist, patch(
+            "atlasquant_aion_global_worker._execute_due_local_work_authorized"
+        ) as executor:
+            result = run_global_worker_once(
+                config=_config(),
+                runtime_id="gha-governor-block",
+                feature_enabled=True,
+                now=TICK,
+            )
+
+        governor.assert_called_once()
+        persist.assert_not_called()
+        executor.assert_not_called()
+        self.assertEqual(result["status"], "LOOP_GOVERNOR_BLOCKED")
+        self.assertEqual(result["processed"], 0)
+        self.assertEqual(result["loop_governor"]["blockers"], ["RESOURCE_BUDGET"])
+        self.assertFalse(result["runtime_write_attempted"])
+        self.assertTrue(result["network_called"])
+        self.assertFalse(result["external_action_executed"])
+
     def test_global_tick_claims_fence_executes_and_persists_receipt(self):
         checkpoint = self.armed_checkpoint()
         captures = []
@@ -240,6 +282,10 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
         self.assertEqual(result["service_principal"], SERVICE_PRINCIPAL)
         self.assertEqual(result["processed"], 1)
         self.assertEqual(result["succeeded"], 1)
+        self.assertEqual(result["loop_governor"]["state"], "WITHIN_LIMITS")
+        self.assertEqual(result["loop_governor"]["selected_count"], 1)
+        self.assertFalse(result["loop_governor"]["grants_permission"])
+        self.assertFalse(result["loop_governor"]["executes_action"])
         self.assertEqual(result["fencing_token"], 1)
         self.assertTrue(result["automatic_runtime_checkpoint_persistence"])
         self.assertFalse(result["automatic_external_business_actions"])
