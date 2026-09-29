@@ -201,12 +201,16 @@ def normalize_edges(
 def _upsert_node(nodes:list[dict[str,Any]],node:dict[str,Any])->None:
     idx=next((i for i,x in enumerate(nodes) if x["node_id"]==node["node_id"]),None)
     if idx is None:
+        if len(nodes)>=MAX_NODES:
+            return
         nodes.append(node)
     else:
         nodes[idx]=node
 
 
 def _append_edge(edges:list[dict[str,Any]],edge:dict[str,Any])->None:
+    if len(edges)>=MAX_EDGES:
+        return
     if all(x["edge_id"]!=edge["edge_id"] for x in edges):
         edges.append(edge)
 
