@@ -78,6 +78,20 @@ class AionCostCenterTests(unittest.TestCase):
                 self.assertFalse(row["usable"])
                 self.assertIn("INVALID_AMOUNT", row["reasons"])
 
+
+    def test_missing_currency_or_period_is_rejected_instead_of_assumed(self):
+        missing_currency = self.item()
+        missing_currency.pop("currency")
+        row = normalize_cost_evidence(missing_currency)
+        self.assertFalse(row["usable"])
+        self.assertIn("CURRENCY_REQUIRED", row["reasons"])
+
+        missing_period = self.item()
+        missing_period.pop("period")
+        row = normalize_cost_evidence(missing_period)
+        self.assertFalse(row["usable"])
+        self.assertIn("PERIOD_REQUIRED", row["reasons"])
+
     def test_unsupported_currency_is_not_silently_converted(self):
         row = normalize_cost_evidence(self.item(currency="BRL"))
         self.assertFalse(row["usable"])
