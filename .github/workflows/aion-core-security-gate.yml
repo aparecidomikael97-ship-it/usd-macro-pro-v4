@@ -43,6 +43,7 @@ jobs:
             test_atlasquant_aion_chaos_recovery.py \
             atlasquant_aion_critical_review.py \
             test_atlasquant_aion_critical_review.py
+            test_atlasquant_aion_supply_chain_pinning.py
       - name: Run authority, injection, isolation and recovery tests
         run: |
           python -m unittest -q \
@@ -56,6 +57,7 @@ jobs:
             test_atlasquant_aion_tenant_privacy.py \
             test_atlasquant_aion_vault.py \
             test_atlasquant_aion_durable_tasks.py
+            test_atlasquant_aion_supply_chain_pinning.py
 
   supply-chain-audit:
     name: Supply-chain audit
