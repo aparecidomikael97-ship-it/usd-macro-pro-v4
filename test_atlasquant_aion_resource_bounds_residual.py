@@ -9,6 +9,7 @@ import atlasquant_aion_digital_twin as digital_twin
 import atlasquant_aion_event_journal as event_journal
 import atlasquant_aion_evaluation_lab as evaluation_lab
 import atlasquant_aion_fortress as fortress
+import atlasquant_aion_global_worker as global_worker
 import atlasquant_aion_learning as learning
 import atlasquant_aion_model_registry as model_registry
 import atlasquant_aion_operations as operations
@@ -270,6 +271,23 @@ class AionResidualResourceBoundsTests(unittest.TestCase):
         self.assertNotIn("list(preferences.items())[:50]",tenant_src)
         self.assertNotIn("list(academy.items())[:200]",tenant_src)
         self.assertNotIn("list(redemptions_raw)[:2000]",memory_src)
+
+
+    def test_global_worker_claim_rejects_oversized_intent_without_full_materialization(self):
+        source=GuardedIterable(({} for _ in range(100)),max_reads=global_worker.MAX_JOBS+1)
+        with self.assertRaises(ValueError):
+            global_worker._claim_state(
+                global_worker._default_state(),
+                runtime_id="resource-bound-test",
+                now=global_worker._now(),
+                work_intent={"occurrences":source},
+            )
+        self.assertEqual(source.reads,global_worker.MAX_JOBS+1)
+
+        source_text=Path("atlasquant_aion_global_worker.py").read_text(encoding="utf-8")
+        self.assertNotIn('list(scheduler.get("schedules") or [])',source_text)
+        self.assertIn("nsmallest(",source_text)
+        self.assertIn('islice(work.get("occurrences") or (), MAX_JOBS + 1)',source_text)
 
 
     def test_skill_certification_unique_does_not_duplicate_full_list(self):
