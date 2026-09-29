@@ -1,6 +1,6 @@
 {
   "version": "V10.7_FAST_BOOT_1",
-  "generated_at": "2026-09-29T11:22:09.364805+00:00",
+  "generated_at": "2026-09-29T11:49:35.608901+00:00",
   "app_version": "11.0.8 — STRENGTH ATTRIBUTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2",
   "core_evidence": [
     {
@@ -73,7 +73,7 @@
       "Score final": 68.0,
       "Qualidade": 70.0,
       "Confluência": "MODERADA",
-      "Dif. macro": -25.8,
+      "Dif. macro": -20.8,
       "Índice ranking": 69.1
     }
   ],
@@ -453,7 +453,7 @@
         "juros": 4.0,
         "inflacao": 3.2,
         "pib": 1.1,
-        "sentimento": 0.0,
+        "sentimento": 50.0,
         "fonte": "FRED + transformação anual + fallback parcial"
       },
       "JPY": {
@@ -677,6 +677,41 @@
         "Posição": 5
       },
       {
+        "Código": "GBP",
+        "juros": 4.0,
+        "inflacao": 3.2,
+        "pib": 1.1,
+        "sentimento": 50.0,
+        "fonte": "FRED + transformação anual + fallback parcial",
+        "Moeda": "Libra Esterlina",
+        "juros_reais": 0.8,
+        "n_juros": 19.698663024131786,
+        "n_inflacao": 66.22516556291392,
+        "n_pib": 18.629216959148952,
+        "n_sentimento": 50.0,
+        "n_emprego": 50.0,
+        "n_atividade": 50.0,
+        "Pontuação_Macro": 41.7,
+        "Influência_Fed": -0.5,
+        "Pontuação_Final": 41.2,
+        "strength_attribution": {
+          "factors": {
+            "Juros / Treasury": 3.9397326048263572,
+            "Inflação": 9.933774834437086,
+            "PIB": 2.794382543872343,
+            "Emprego": 10.0,
+            "Atividade": 10.0,
+            "Sentimento": 5.0
+          },
+          "fed": -0.4724999999999999,
+          "other": {
+            "Limite da escala 0–100": 0.0
+          },
+          "unrounded_final": 41.19538998313579
+        },
+        "Posição": 6
+      },
+      {
         "Código": "CAD",
         "juros": 2.3,
         "inflacao": 2.3,
@@ -709,7 +744,7 @@
           },
           "unrounded_final": 38.06298763732649
         },
-        "Posição": 6
+        "Posição": 7
       },
       {
         "Código": "NZD",
@@ -743,41 +778,6 @@
             "Limite da escala 0–100": 0.0
           },
           "unrounded_final": 37.09218584020098
-        },
-        "Posição": 7
-      },
-      {
-        "Código": "GBP",
-        "juros": 4.0,
-        "inflacao": 3.2,
-        "pib": 1.1,
-        "sentimento": 0.0,
-        "fonte": "FRED + transformação anual + fallback parcial",
-        "Moeda": "Libra Esterlina",
-        "juros_reais": 0.8,
-        "n_juros": 19.698663024131786,
-        "n_inflacao": 66.22516556291392,
-        "n_pib": 18.629216959148952,
-        "n_sentimento": 0.0,
-        "n_emprego": 50.0,
-        "n_atividade": 50.0,
-        "Pontuação_Macro": 36.7,
-        "Influência_Fed": -0.5,
-        "Pontuação_Final": 36.2,
-        "strength_attribution": {
-          "factors": {
-            "Juros / Treasury": 3.9397326048263572,
-            "Inflação": 9.933774834437086,
-            "PIB": 2.794382543872343,
-            "Emprego": 10.0,
-            "Atividade": 10.0,
-            "Sentimento": 0.0
-          },
-          "fed": -0.4724999999999999,
-          "other": {
-            "Limite da escala 0–100": 0.0
-          },
-          "unrounded_final": 36.19538998313579
         },
         "Posição": 8
       },
