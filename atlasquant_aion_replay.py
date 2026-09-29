@@ -161,6 +161,18 @@ def _stable_digest(payload: Any, *, length: int = 24) -> str:
     return sha256(raw.encode("utf-8")).hexdigest()[:length]
 
 
+def _force_training_safety(payload: Mapping[str, Any] | None) -> dict[str, Any]:
+    out = deepcopy(dict(payload or {}))
+    out["training_only"] = True
+    out["live_data_used"] = False
+    out["future_evidence_exposed"] = False
+    out["automatic_promotion"] = False
+    out["execution_authorized"] = False
+    out["executes_action"] = False
+    out["real_trading_enabled"] = False
+    return out
+
+
 def _safe_record_metadata(
     *,
     record_id: str,
@@ -537,7 +549,7 @@ def submit_replay_decision(
     confidence_pct: Any = None,
     submitted_at: Any,
 ) -> dict[str, Any]:
-    current = deepcopy(dict(session or {}))
+    current = _force_training_safety(session)
     if current.get("state") != "ACTIVE":
         current["state"] = "BLOCKED"
         current["reason"] = "SESSION_NOT_ACTIVE"
@@ -605,7 +617,7 @@ def reveal_replay_outcome(
     available_at: Any,
     revealed_at: Any,
 ) -> dict[str, Any]:
-    current = deepcopy(dict(session or {}))
+    current = _force_training_safety(session)
     if current.get("state") != "DECISION_RECORDED":
         current["state"] = "BLOCKED"
         current["reason"] = "DECISION_REQUIRED_BEFORE_REVEAL"
