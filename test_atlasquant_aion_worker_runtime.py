@@ -441,7 +441,7 @@ class AionWorkerRuntimeTests(unittest.TestCase):
             "starts_worker": False,
         }
         with patch(
-            "atlasquant_aion_worker_runtime.govern_agent_plan",
+            "atlasquant_aion_worker_runtime.govern_due_batch",
             return_value=blocked,
         ), patch(
             "atlasquant_aion_worker_runtime._execute_due_local_work_authorized"
