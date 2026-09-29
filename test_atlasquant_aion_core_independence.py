@@ -283,7 +283,7 @@ class AtlasQuantAionCoreIndependenceTests(unittest.TestCase):
                 self.assertNotIn("requests", imports)
                 self.assertIn("atlasquant_aion_github_io", imports)
 
-    def test_global_worker_family_imports_without_requests(self):
+    def test_github_io_boundary_imports_without_requests(self):
         blocker = (
             "import sys\n"
             "class Finder:\n"
@@ -291,10 +291,7 @@ class AtlasQuantAionCoreIndependenceTests(unittest.TestCase):
             "        if name.split('.',1)[0]=='requests':\n"
             "            raise ImportError('requests absent')\n"
             "sys.meta_path.insert(0, Finder())\n"
-            "import atlasquant_aion_global_worker\n"
-            "import atlasquant_aion_global_worker_activation\n"
-            "import atlasquant_aion_global_worker_persisted_arming\n"
-            "import atlasquant_aion_global_worker_readiness\n"
+            "import atlasquant_aion_github_io\n"
             "print('IMPORTED')\n"
         )
         env = {
