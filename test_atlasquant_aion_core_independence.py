@@ -62,7 +62,7 @@ KNOWN_AION_COUPLINGS = frozenset({
     ("atlasquant_aion_global_worker_activation.py", "requests"),
     ("atlasquant_aion_global_worker_persisted_arming.py", "requests"),
     ("atlasquant_aion_global_worker_readiness.py", "requests"),
-    ("atlasquant_aion_memory.py", "atlasquant_aion_business"),
+    ("atlasquant_aion_business_adapter.py", "atlasquant_aion_business"),
     ("atlasquant_aion_provider.py", "requests"),
     ("atlasquant_aion_replay_panel.py", "streamlit"),
 })
@@ -156,6 +156,13 @@ class AtlasQuantAionCoreIndependenceTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr[-2000:] + result.stdout[-500:])
         self.assertIn("IMPORTED", result.stdout)
         self.assertNotIn("blocked", result.stderr)
+
+    def test_memory_uses_explicit_business_adapter_boundary(self):
+        memory_imports = set(_imports(ROOT / "atlasquant_aion_memory.py"))
+        adapter_imports = set(_imports(ROOT / "atlasquant_aion_business_adapter.py"))
+        self.assertNotIn("atlasquant_aion_business", memory_imports)
+        self.assertIn("atlasquant_aion_business_adapter", memory_imports)
+        self.assertIn("atlasquant_aion_business", adapter_imports)
 
     def test_memory_and_recovery_operate_empty_without_business(self):
         blocker = (
