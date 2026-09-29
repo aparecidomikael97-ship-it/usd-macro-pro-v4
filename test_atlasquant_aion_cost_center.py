@@ -48,6 +48,15 @@ class AionCostCenterTests(unittest.TestCase):
         self.assertEqual(center["projected_monthly_usd"], 25.0)
         self.assertTrue(center["estimate_is_not_spend"])
 
+
+    def test_zero_valued_estimate_still_keeps_state_partial(self):
+        center = build_cost_center([
+            self.item(amount=0, truth_state="ESTIMATED", source="pricing-page"),
+        ])
+        self.assertEqual(center["state"], "PARTIAL")
+        self.assertEqual(center["estimated_items"], 1)
+        self.assertEqual(center["estimated_monthly_usd"], 0.0)
+
     def test_all_confirmed_usd_monthly_evidence_can_be_confirmed(self):
         center = build_cost_center([
             self.item(category="infrastructure", amount=12),
