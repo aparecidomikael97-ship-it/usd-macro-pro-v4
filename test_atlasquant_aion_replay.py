@@ -208,6 +208,23 @@ class AionReplayModeTests(unittest.TestCase):
         self.assertEqual(out["state"], "BLOCKED")
         self.assertEqual(out["reason"], "SESSION_NOT_ACTIVE")
 
+    def test_decision_before_replay_cutoff_is_blocked(self):
+        session = start_replay_session(
+            scenario_id="S1",
+            title="Replay",
+            domain="admin",
+            mode="GENERAL",
+            replay_at=CUT,
+            records=[],
+        )
+        out = submit_replay_decision(
+            session,
+            choice="WAIT",
+            submitted_at="2026-09-20T13:59:00+00:00",
+        )
+        self.assertEqual(out["state"], "BLOCKED")
+        self.assertEqual(out["reason"], "DECISION_BEFORE_REPLAY_CUTOFF")
+
     def test_decision_confidence_is_descriptive_not_profit_probability(self):
         session = start_replay_session(
             scenario_id="S1",
