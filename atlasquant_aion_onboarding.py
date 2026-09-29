@@ -688,6 +688,12 @@ def assess_onboarding(
                 progress_error = "REPLAY_REJECTED"
             if not progress_error:
                 progress_error, completed_ids, completed_versions, last_seen = _parse_completed(progress)
+            if not progress_error and "digest" not in progress:
+                progress_error = "DIGEST_REQUIRED"
+            if not progress_error:
+                stored_subject = _subject(progress.get("subject_ref"))
+                if not stored_subject or stored_subject != subject:
+                    progress_error = "SUBJECT_MISMATCH"
             if not progress_error:
                 if "onboarding_version" not in progress and completed_ids:
                     stored_version = None
@@ -701,13 +707,14 @@ def assess_onboarding(
         report["rejection"] = {"code": progress_error}
         report["rejected"] = progress_error in {
             "DIGEST_MISMATCH",
+            "DIGEST_REQUIRED",
             "MALFORMED_PROGRESS",
             "DUPLICATE_STEP_ID",
             "INVALID_TIMESTAMP",
         }
         report["completed_step_ids"] = []
         report["completed_step_versions"] = {}
-        report["review_required"] = progress_error in {"ROLE_CHANGED", "EXPERIENCE_CHANGED", "REPLAY_REJECTED"}
+        report["review_required"] = progress_error in {"ROLE_CHANGED", "EXPERIENCE_CHANGED", "REPLAY_REJECTED", "SUBJECT_MISMATCH"}
         report["state"] = STALE if report["review_required"] else BLOCKED
         return _seal(report)
 
@@ -896,7 +903,7 @@ def resume_onboarding(
     if isinstance(snapshot, Mapping) and isinstance(payload, Mapping):
         left = _subject(snapshot.get("subject_ref")) if isinstance(snapshot.get("subject_ref"), str) else ""
         right = _subject(payload.get("subject_ref")) if isinstance(payload.get("subject_ref"), str) else ""
-        if left and right and left != right:
+        if right and (not left or left != right):
             report = assess_onboarding(payload, None, now=now, step_versions=step_versions)
             if report.get("rejected") is True:
                 return report
