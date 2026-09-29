@@ -12,16 +12,17 @@
   },
   "integrate": [
     {
-      "pr": 348,
-      "branch": "chatgpt/aion-core-resource-bounds-v1",
-      "role": "aion_nucleus_global_worker_reconciliation_and_resource_bounds",
+      "pr": 349,
+      "branch": "chatgpt/aion-memory-optional-business-adapter-v1",
+      "role": "aion_nucleus_global_worker_resource_bounds_and_optional_dependency_isolation",
       "contains_prs": [
         338,
         342,
         343,
         345,
         346,
-        347
+        347,
+        348
       ]
     },
     {
@@ -62,8 +63,8 @@
     "report": "aion-night-validation-report.json"
   },
   "next_hardening_order": [
+    "tenant_workspace_review_binding",
     "tenant_workspace_cache_isolation",
-    "rt19_optional_dependency_reduction",
     "supply_chain_residual_gaps",
     "recovery_adversarial_residuals"
   ],
