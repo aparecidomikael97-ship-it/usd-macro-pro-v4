@@ -129,20 +129,13 @@ from atlasquant_aion_studio import (
     upsert_project,
 )
 from atlasquant_aion_business import (
-    CHANNELS as BUSINESS_CHANNELS,
-    TRUTH_STATES as BUSINESS_TRUTH_STATES,
-    approve_product,
     business_metrics_views,
-    business_summary,
-    coverage_snapshot,
-    customer_economics,
-    funnel_snapshot,
-    new_business_metrics,
     normalize_business_metrics,
-    marketplace_preflight,
-    new_product_candidate,
-    trend_assessment,
-    upsert_product,
+)
+from atlasquant_aion_business_brain import (
+    brain_snapshot,
+    business_engine_catalog,
+    parallel_brain_contract,
 )
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
@@ -5139,295 +5132,120 @@ def _render_business(
     checkpoint: Mapping[str, Any],
     flags: Mapping[str, bool],
 ) -> None:
-    st.markdown("### 💼 AION Negócios")
-    _render_persona_capabilities("business", {
-        "catalog": True,
-        "suppliers": True,
-        "economics": True,
-        "fees": True,
-        "cac": True,
-        "ltv": True,
-        "funnel": True,
-        "tracking": False,
-        "reports": True,
-    })
+    del flags
+    st.markdown("### 💼 AION Negócios · Cérebro de Receita")
     st.write(
-        "Área separada do trading para pesquisa de produtos, tendências, fornecedores, margem, "
-        "estoque, anúncios e acompanhamento de receita."
+        "O AION coordena cinco motores de receita em paralelo, compartilha contexto entre eles "
+        "e organiza tudo em uma fila única. Frentes antigas de marketplace, dropshipping, afiliados "
+        "e e-commerce genérico não fazem parte deste cockpit."
     )
     _context_voice(
         "Negócios",
         (
-            "Bem-vindo ao AION Negócios. Aqui pesquisamos candidatos de produto, registramos evidências "
-            "e calculamos margem. Nenhum produto é chamado de tendência ou mais vendido sem fonte confirmada."
+            "Bem-vindo ao AION Negócios. Eu acompanho as cinco frentes em paralelo, priorizo oportunidades, "
+            "detecto tendências e preparo próximos passos. Ações externas sensíveis continuam sujeitas "
+            "à aprovação humana e aos conectores autorizados."
         ),
         key="aion_business_voice",
     )
 
     business = checkpoint.get("business") if isinstance(checkpoint.get("business"), Mapping) else {}
-    products = list(business.get("products", []) or [])
+    opportunities = list(business.get("opportunities", []) or [])
     metrics = normalize_business_metrics(
         business.get("metrics") if isinstance(business, Mapping) else {}
     )
-    metric_views = business_metrics_views(metrics)
-    summary = business_summary(products)
+    finance = business_metrics_views(metrics)["finance"]
+    snapshot = brain_snapshot(opportunities)
+    contract = parallel_brain_contract()
 
-    st.markdown("#### Métricas Business")
-    finance = metric_views["finance"]
-    m1,m2,m3,m4,m5=st.columns(5)
-    m1.metric("Receita / faturamento", "N/D" if finance["revenue"] is None else f"R$ {finance['revenue']:.2f}")
-    m2.metric("Custos", "N/D" if finance["costs"] is None else f"R$ {finance['costs']:.2f}")
-    m3.metric("Lucro bruto", "N/D" if finance["gross_profit"] is None else f"R$ {finance['gross_profit']:.2f}")
-    m4.metric("Lucro líquido", "N/D" if finance["net_profit"] is None else f"R$ {finance['net_profit']:.2f}")
-    m5.metric("Caixa disponível", "N/D" if finance["available_cash"] is None else f"R$ {finance['available_cash']:.2f}")
+    st.markdown("#### 5 motores oficiais · execução paralela")
+    engine_cols = st.columns(5)
+    for idx, engine in enumerate(business_engine_catalog()):
+        with engine_cols[idx]:
+            st.markdown(f"**{engine['rank']}º · {engine['title']}**")
+            st.caption(engine["model"])
+            st.write(engine["aion_role"])
+
+    q1,q2,q3,q4 = st.columns(4)
+    q1.metric("Motores ativos", snapshot["active_engines"])
+    q2.metric("Oportunidades", snapshot["queue"]["total"])
+    q3.metric("Aguardando cliente", snapshot["queue"]["waiting_customer"])
+    q4.metric("Ações externas pendentes", snapshot["queue"]["external_pending"])
+
+    st.markdown("#### Radar de Tendências")
+    radar = snapshot["trend_radar"]
+    r1,r2,r3 = st.columns(3)
+    r1.metric("Evidência fresca", radar["fresh_count"])
+    r2.metric("Evidência vencida", radar["stale_count"])
+    r3.metric("Sem data confirmada", radar["unknown_count"])
     st.caption(
-        f"Estado: {metrics['state']} · verdade: {metrics['truth_state']} · "
-        f"fonte: {metrics['source'] or 'N/D'}. "
-        "Receita, lucro bruto, lucro líquido e caixa disponível são métricas diferentes e nunca são intercambiadas."
+        "O AION não deve perseguir uma tendência com evidência vencida. Cada frente possui janela "
+        "de frescor própria; oportunidades antigas voltam para pesquisa antes de escalar."
     )
 
-    def _metric_input_value(name):
-        value=metrics.get(name)
-        return None if value is None else float(value)
-
-    with st.expander("Registrar métricas com proveniência"):
-        with st.form("aion_business_metrics"):
-            source=st.text_input("Fonte / referência das métricas",value=str(metrics.get("source") or ""))
-            truth_state=st.selectbox(
-                "Estado de verdade",
-                list(BUSINESS_TRUTH_STATES),
-                index=list(BUSINESS_TRUTH_STATES).index(str(metrics.get("truth_state") or "UNKNOWN"))
-                if str(metrics.get("truth_state") or "UNKNOWN") in BUSINESS_TRUTH_STATES else 3,
-            )
-            f1,f2,f3,f4=st.columns(4)
-            visits=f1.number_input("Visitas",min_value=0.0,value=_metric_input_value("visits"),step=1.0)
-            leads=f2.number_input("Leads",min_value=0.0,value=_metric_input_value("leads"),step=1.0)
-            checkouts=f3.number_input("Checkouts",min_value=0.0,value=_metric_input_value("checkouts"),step=1.0)
-            orders=f4.number_input("Pedidos",min_value=0.0,value=_metric_input_value("orders"),step=1.0)
-            e1,e2,e3,e4=st.columns(4)
-            marketing_cost=e1.number_input("Custo de marketing",min_value=0.0,value=_metric_input_value("marketing_cost"),step=1.0)
-            acquired_customers=e2.number_input("Clientes adquiridos",min_value=0.0,value=_metric_input_value("acquired_customers"),step=1.0)
-            gross_profit_per_order=e3.number_input("Lucro bruto / pedido",min_value=0.0,value=_metric_input_value("gross_profit_per_order"),step=1.0)
-            average_orders_per_customer=e4.number_input("Pedidos médios / cliente",min_value=0.0,value=_metric_input_value("average_orders_per_customer"),step=0.1)
-            r1,r2,r3,r4,r5=st.columns(5)
-            revenue=r1.number_input("Receita / faturamento",min_value=0.0,value=_metric_input_value("revenue"),step=10.0)
-            total_costs=r2.number_input("Custos totais",min_value=0.0,value=_metric_input_value("costs"),step=10.0)
-            gross_profit=r3.number_input("Lucro bruto",min_value=0.0,value=_metric_input_value("gross_profit"),step=10.0)
-            net_profit=r4.number_input("Lucro líquido",min_value=0.0,value=_metric_input_value("net_profit"),step=10.0)
-            available_cash=r5.number_input("Caixa disponível",min_value=0.0,value=_metric_input_value("available_cash"),step=10.0)
-            save_metrics=st.form_submit_button("Salvar métricas na sessão",type="primary")
-        if save_metrics:
-            record=new_business_metrics(
-                source=source,
-                truth_state=truth_state,
-                recorded_by=str(access.get("username") or "ADMIN"),
-                visits=visits,
-                leads=leads,
-                checkouts=checkouts,
-                orders=orders,
-                marketing_cost=marketing_cost,
-                acquired_customers=acquired_customers,
-                gross_profit_per_order=gross_profit_per_order,
-                average_orders_per_customer=average_orders_per_customer,
-                revenue=revenue,
-                costs=total_costs,
-                gross_profit=gross_profit,
-                net_profit=net_profit,
-                available_cash=available_cash,
-            )
-            updated=update_business_checkpoint(
-                checkpoint,
-                products=products,
-                metrics=record,
-                dirty=True,
-            )
-            updated=_record_working_event(
-                updated,
-                "business_metrics_updated",
-                "Métricas Business atualizadas na memória de trabalho.",
-                evidence={
-                    "truth_state":record["truth_state"],
-                    "source":record["source"],
-                },
-            )
-            _set_working_checkpoint(updated,dirty=True)
-            st.success(
-                "Métricas salvas na sessão. Alterações pendentes até o ADMIN salvar "
-                "e confirmar o Checkpoint Mestre."
-            )
-            st.rerun()
-
-    st.markdown("#### Sustentabilidade do AtlasQuant · simulação não persistida")
-    system_cost = st.number_input(
-        "Custo mensal alvo do ecossistema (USD)",
-        min_value=0.0,
-        value=0.0,
-        step=10.0,
-        key="aion_business_cost",
-    )
-    net_profit_sim = st.number_input(
-        "Lucro líquido de vendas usado na simulação (USD)",
-        min_value=0.0,
-        value=0.0,
-        step=10.0,
-        key="aion_business_revenue",
-    )
-    coverage=coverage_snapshot(system_cost,net_profit_sim)
-    c1,c2,c3,c4=st.columns(4)
-    c1.metric("Produtos pesquisados",summary["total"])
-    c2.metric("Margem positiva",summary["positive_margin_candidates"])
-    c3.metric("Tendências confirmadas",summary["confirmed_trends"])
-    c4.metric("Cobertura", "N/D" if coverage["coverage_pct"] is None else f"{coverage['coverage_pct']:.1f}%")
-    st.progress(0 if coverage["coverage_pct"] is None else min(100,int(round(coverage["coverage_pct"]))))
-    st.caption(
-        "Esta simulação usa entradas manuais da sessão e não representa faturamento, lucro ou caixa "
-        "confirmados de marketplace. Esses valores não representam vendas confirmadas enquanto "
-        "integrações de pedidos não estiverem conectadas. Nenhuma movimentação financeira é executada."
-    )
-    with st.expander("Funil, CAC, LTV, afiliados e tracking"):
-        funnel=metric_views["funnel"]
-        customers=metric_views["customers"]
-        order_rate="N/D" if funnel["order_rate_pct"] is None else f"{funnel['order_rate_pct']:.2f}%"
-        st.dataframe([
-            {"Indicador":"Visitas → pedidos","Valor":order_rate,"Estado":funnel["state"]},
-            {"Indicador":"CAC","Valor":"N/D" if customers["cac"] is None else customers["cac"],"Estado":customers["state"]},
-            {"Indicador":"LTV","Valor":"N/D" if customers["ltv"] is None else customers["ltv"],"Estado":customers["state"]},
-            {"Indicador":"Afiliados/comissões","Valor":"N/D","Estado":"NOT_CONFIGURED"},
-            {"Indicador":"Tracking de campanha","Valor":"N/D","Estado":"NOT_CONFIGURED"},
-        ],width="stretch",hide_index=True)
-        st.caption(
-            "Funil, CAC e LTV só ficam READY com dados completos e fonte confirmada. "
-            "Nenhuma campanha, gasto, comissão ou publicação é executada."
+    st.markdown("#### Fila única de oportunidades")
+    if snapshot["queue"]["top"]:
+        st.dataframe(
+            [
+                {
+                    "Prioridade": row["priority_score"],
+                    "Frente": row["engine_id"],
+                    "Oportunidade": row["title"],
+                    "Estado": row["status"],
+                    "Verdade": row["truth_state"],
+                    "Próximo passo AION": row["next_action"] or "Pesquisar e preparar recomendação.",
+                }
+                for row in snapshot["queue"]["top"]
+            ],
+            width="stretch",
+            hide_index=True,
         )
-
-    st.markdown("#### Candidato de produto")
-    with st.form("aion_business_new_product", clear_on_submit=True):
-        name=st.text_input("Produto")
-        channel=st.selectbox("Canal",list(BUSINESS_CHANNELS))
-        supplier=st.text_input("Fornecedor / referência")
-        ev1,ev2=st.columns(2)
-        evidence_source=ev1.text_input("Fonte da pesquisa")
-        evidence_truth=ev2.selectbox("Estado da evidência",list(BUSINESS_TRUTH_STATES),index=3)
-        evidence_url=st.text_input("URL / referência da fonte")
-        trend_note=st.text_area(
-            "O que a fonte mostra sobre tendência/demanda",
-            max_chars=1200,
-            help="Se a fonte não confirmar, use UNKNOWN/INFERENCE/HYPOTHESIS.",
-        )
-        cprice,ccost=st.columns(2)
-        sale_price=cprice.number_input("Preço de venda estimado (R$)",min_value=0.0,value=0.0,step=1.0)
-        unit_cost=ccost.number_input("Custo unitário (R$)",min_value=0.0,value=0.0,step=1.0)
-        cfee,cship,ctax=st.columns(3)
-        fee=cfee.number_input("Taxa plataforma (%)",min_value=0.0,max_value=100.0,value=0.0,step=0.5)
-        shipping=cship.number_input("Frete/custo logístico (R$)",min_value=0.0,value=0.0,step=1.0)
-        tax=ctax.number_input("Impostos estimados (%)",min_value=0.0,max_value=100.0,value=0.0,step=0.5)
-        other=st.number_input("Outros custos por unidade (R$)",min_value=0.0,value=0.0,step=1.0)
-        create_product=st.form_submit_button("Adicionar à pesquisa de produtos",type="primary")
-    if create_product:
-        try:
-            product=new_product_candidate(
-                name,
-                channel=channel,
-                evidence_source=evidence_source,
-                evidence_url=evidence_url,
-                evidence_truth=evidence_truth,
-                trend_note=trend_note,
-                supplier=supplier,
-                sale_price=sale_price,
-                unit_cost=unit_cost,
-                platform_fee_pct=fee,
-                shipping_cost=shipping,
-                tax_pct=tax,
-                other_cost=other,
-                source=str(access.get("username") or "ADMIN"),
-            )
-            products=upsert_product(products,product)
-            updated=update_business_checkpoint(checkpoint,products=products,dirty=True)
-            updated=_record_working_event(
-                updated,
-                "business_product_added",
-                f"Produto adicionado à pesquisa: {product['name']}",
-                evidence={
-                    "product_id":product["product_id"],
-                    "channel":product["channel"],
-                    "truth_state":product["research"]["truth_state"],
-                },
-            )
-            _set_working_checkpoint(updated,dirty=True)
-            st.success("Produto salvo na memória de trabalho de Negócios.")
-            st.rerun()
-        except Exception as exc:
-            st.error(f"Não foi possível salvar o produto: {type(exc).__name__}")
-
-    if products:
-        rows=[]
-        for product in products:
-            econ=product.get("economics") or {}
-            trend=trend_assessment(product)
-            rows.append({
-                "ID":product.get("product_id"),
-                "Status":product.get("status"),
-                "Produto":product.get("name"),
-                "Canal":product.get("channel"),
-                "Evidência":(product.get("research") or {}).get("truth_state"),
-                "Tendência confirmada":trend.get("can_call_trending"),
-                "Lucro/unid. R$":econ.get("net_profit"),
-                "Margem %":econ.get("net_margin_pct"),
-            })
-        st.dataframe(rows,width="stretch",hide_index=True)
-        selected_id=st.selectbox(
-            "Produto selecionado",
-            [str(p.get("product_id")) for p in products],
-            key="aion_business_selected_product",
-        )
-        selected=next((p for p in products if str(p.get("product_id"))==selected_id),None)
-        if isinstance(selected,Mapping):
-            trend=trend_assessment(selected)
-            econ=selected.get("economics") or {}
-            st.write(
-                f"**Economia unitária:** lucro R$ {float(econ.get('net_profit') or 0):.2f} · "
-                f"margem {float(econ.get('net_margin_pct') or 0):.2f}% · "
-                f"ROI sobre custo {float(econ.get('roi_on_unit_cost_pct') or 0):.2f}%."
-            )
-            if trend["can_call_trending"]:
-                st.success(f"Tendência confirmada pela fonte registrada: {trend['message']}")
-            else:
-                st.warning(trend["message"])
-
-            if st.button("✅ Aprovar produto para próxima etapa",key="aion_business_approve"):
-                try:
-                    approved=approve_product(selected,access)
-                    products=upsert_product(products,approved)
-                    updated=update_business_checkpoint(checkpoint,products=products,dirty=True)
-                    updated=_record_working_event(
-                        updated,
-                        "business_product_approved",
-                        f"Produto aprovado para próxima etapa: {approved['product_id']}",
-                        evidence={"product_id":approved["product_id"]},
-                    )
-                    _set_working_checkpoint(updated,dirty=True)
-                    st.rerun()
-                except Exception as exc:
-                    st.error(f"Aprovação não registrada: {type(exc).__name__}")
-
-            preflight=marketplace_preflight(
-                selected,
-                access,
-                feature_flags=flags,
-                approved=False,
-            )
-            st.caption(
-                f"Marketplace: {'PRONTO PARA CONECTOR' if preflight['allowed'] else 'BLOQUEADO'} · "
-                f"{preflight['reason']}"
-            )
     else:
-        st.info("Nenhum candidato de produto registrado.")
+        st.info(
+            "Fila vazia neste checkpoint. O contrato do AION está pronto para receber oportunidades "
+            "das cinco frentes sem reativar as frentes antigas."
+        )
+
+    st.markdown("#### Cross-sell entre frentes")
+    if snapshot["cross_sell"]:
+        st.dataframe(snapshot["cross_sell"], width="stretch", hide_index=True)
+    else:
+        st.caption(
+            "Quando um mesmo cliente gerar oportunidade em outra frente, o AION conecta os contextos "
+            "e sugere a expansão sem duplicar cadastro."
+        )
+
+    with st.expander("Modo Experimento · validar pequeno antes de escalar"):
+        st.write(
+            "Toda oportunidade pode nascer como experimento limitado, com hipótese, métrica de sucesso, "
+            "prazo e teto de custo. O plano é preparado pelo AION; gasto ou ação externa continua bloqueado "
+            "até aprovação explícita."
+        )
+
+    with st.expander("Placar financeiro consolidado"):
+        f1,f2,f3,f4,f5 = st.columns(5)
+        f1.metric("Receita", "N/D" if finance["revenue"] is None else f"R$ {finance['revenue']:.2f}")
+        f2.metric("Custos", "N/D" if finance["costs"] is None else f"R$ {finance['costs']:.2f}")
+        f3.metric("Lucro bruto", "N/D" if finance["gross_profit"] is None else f"R$ {finance['gross_profit']:.2f}")
+        f4.metric("Lucro líquido", "N/D" if finance["net_profit"] is None else f"R$ {finance['net_profit']:.2f}")
+        f5.metric("Caixa", "N/D" if finance["available_cash"] is None else f"R$ {finance['available_cash']:.2f}")
+        st.caption(
+            f"Estado: {metrics['state']} · verdade: {metrics['truth_state']} · fonte: {metrics['source'] or 'N/D'}."
+        )
 
     st.warning(
-        "Publicação em marketplace está "
-        + ("HABILITADA POR FLAG, mas ainda exige Guardian e conector real." if flags.get("marketplace_publish") else "DESLIGADA por feature flag.")
+        "Cérebro em modo seguro: pesquisa, classificação, deduplicação, cross-sell e preparação podem ocorrer "
+        "internamente. Mensagem ao cliente, publicação, gasto, contratação e cobrança exigem aprovação humana "
+        "e conector autorizado. Este painel não executa ação externa por conta própria."
     )
-
+    st.caption(
+        "Contrato: modo PARALLEL · fila única: "
+        + ("sim" if contract["unified_inbox"] else "não")
+        + " · Radar de Tendências: "
+        + ("sim" if contract["trend_radar"] else "não")
+        + " · Modo Experimento: "
+        + ("sim" if contract["experiment_mode"] else "não")
+    )
 
 def _render_laboratory(
     access: Mapping[str, Any],
