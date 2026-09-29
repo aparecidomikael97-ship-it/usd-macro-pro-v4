@@ -1,9 +1,11 @@
 import unittest
 
 from atlasquant_aion_studio import (
+    MAX_PROJECTS,
     approve_project,
     mark_published_from_evidence,
     new_content_project,
+    normalize_projects,
     publication_preflight,
     script_blueprint,
     studio_summary,
@@ -82,6 +84,21 @@ class AtlasQuantAionStudioTests(unittest.TestCase):
         summary=studio_summary(rows)
         self.assertEqual(summary["total"],2)
         self.assertEqual(summary["approved"],1)
+
+
+    def test_project_generator_is_not_consumed_past_normalization_bound(self):
+        consumed={"count":0}
+
+        def rows():
+            for index in range(MAX_PROJECTS*2+1):
+                if index>=MAX_PROJECTS*2:
+                    raise AssertionError("project iterable consumed past bound")
+                consumed["count"]+=1
+                yield {}
+
+        normalized=normalize_projects(rows())
+        self.assertEqual(normalized,[])
+        self.assertEqual(consumed["count"],MAX_PROJECTS*2)
 
 
 if __name__=="__main__":

@@ -11,6 +11,7 @@ from atlasquant_aion_business import new_product_candidate
 from atlasquant_aion_operations import new_task
 from atlasquant_aion_session_memory import (
     SESSION_WHITELIST,
+    _strip,
     adapt_loaded_memory_to_specialist_snapshot,
     collect_resident_specialist_inputs,
     evidence_scope_label,
@@ -95,6 +96,19 @@ class ResidentMemoryAdapterTests(unittest.TestCase):
         self.assertNotIn(COOKIE, blob)
         self.assertNotIn(HEADER, blob)
         self.assertNotIn("1.2345", blob)
+
+    def test_resident_list_sanitizer_stops_at_300_items(self):
+        class GuardedList(list):
+            def __iter__(self):
+                for index in range(301):
+                    if index>=300:
+                        raise AssertionError("resident list consumed past bound")
+                    yield {"index":index}
+
+        cleaned=_strip(GuardedList())
+        self.assertEqual(len(cleaned),300)
+        self.assertEqual(cleaned[0]["index"],0)
+        self.assertEqual(cleaned[-1]["index"],299)
 
     def test_absence_stays_unknown(self):
         for loaded in (None, {}):

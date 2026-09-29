@@ -15,7 +15,7 @@ feature flags or deployment state.
 """
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, deque
 from copy import deepcopy
 from datetime import datetime, timezone
 from hashlib import sha256
@@ -249,7 +249,12 @@ def normalize_learning_episodes(
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for raw in list(rows or [])[-MAX_EPISODES * 2 :]:
+    source = (
+        rows[-MAX_EPISODES * 2 :]
+        if isinstance(rows, (list, tuple))
+        else deque(rows or (), maxlen=MAX_EPISODES * 2)
+    )
+    for raw in source:
         if not isinstance(raw, Mapping):
             continue
         try:
@@ -474,7 +479,12 @@ def normalize_research_references(
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for raw in list(rows or [])[-MAX_RESEARCH_REFS * 2 :]:
+    source = (
+        rows[-MAX_RESEARCH_REFS * 2 :]
+        if isinstance(rows, (list, tuple))
+        else deque(rows or (), maxlen=MAX_RESEARCH_REFS * 2)
+    )
+    for raw in source:
         if not isinstance(raw, Mapping):
             continue
         try:
@@ -558,7 +568,12 @@ def normalize_learning_experiments(
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for raw in list(rows or [])[-MAX_EXPERIMENTS * 2 :]:
+    source = (
+        rows[-MAX_EXPERIMENTS * 2 :]
+        if isinstance(rows, (list, tuple))
+        else deque(rows or (), maxlen=MAX_EXPERIMENTS * 2)
+    )
+    for raw in source:
         if not isinstance(raw, Mapping):
             continue
         try:

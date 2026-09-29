@@ -7,7 +7,9 @@ extensible through validated metadata.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from itertools import islice
 from typing import Any, Iterable, Mapping, Sequence
+import math
 import re
 import unicodedata
 
@@ -72,7 +74,7 @@ class Capability:
 def _tuple_text(value: Any, *, limit: int = 40) -> tuple[str, ...]:
     items = value if isinstance(value, (list, tuple, set)) else ()
     out: list[str] = []
-    for raw in list(items)[:limit]:
+    for raw in islice(items, max(0, limit)):
         text = " ".join(str(raw or "").split())[:160]
         if text and text not in out:
             out.append(text)
@@ -103,10 +105,15 @@ def normalize_capability(raw: Capability | Mapping[str, Any]) -> Capability:
         mode = "READ_ONLY"
     roles = tuple(x for x in _tuple_text(item.get("allowed_roles")) if x.upper() in ROLES)
     roles = tuple(x.upper() for x in roles) or ("ADMIN",)
-    try:
-        cost = max(0.0, float(item.get("estimated_cost_usd") or 0.0))
-    except Exception:
+    raw_cost = item.get("estimated_cost_usd", 0.0)
+    if raw_cost in (None, ""):
         cost = 0.0
+    elif isinstance(raw_cost, bool) or not isinstance(raw_cost, (int, float)):
+        raise ValueError("invalid estimated cost")
+    elif not math.isfinite(raw_cost) or raw_cost < 0:
+        raise ValueError("invalid estimated cost")
+    else:
+        cost = float(raw_cost)
     return Capability(
         capability_id=capability_id,
         specialist=specialist,
@@ -117,7 +124,7 @@ def normalize_capability(raw: Capability | Mapping[str, Any]) -> Capability:
         risk=risk,
         allowed_tools=_tuple_text(item.get("allowed_tools")),
         allowed_roles=roles,
-        requires_confirmation=bool(item.get("requires_confirmation", False)),
+        requires_confirmation=item.get("requires_confirmation") is True,
         estimated_cost_usd=round(cost, 6),
         availability=availability,
         execution_mode=mode,
@@ -276,7 +283,7 @@ def capability_feature_flags(overrides: Mapping[str, Any] | None = None) -> dict
     flags = dict(AION_FEATURE_FLAGS)
     for key in flags:
         if isinstance(overrides, Mapping) and key in overrides:
-            flags[key] = bool(overrides[key])
+            flags[key] = overrides[key] is True
     # These two flags are immutable-off in this release.
     flags["AION_EXTERNAL_ACTIONS_ENABLED"] = False
     flags["REAL_TRADING_ENABLED"] = False

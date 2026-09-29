@@ -2,19 +2,23 @@ import unittest
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from atlasquant_aion_background_executor import (
     executor_snapshot,
     load_executor_receipts,
 )
 from atlasquant_aion_core_intelligence.context import Domain
+from atlasquant_aion_core_intelligence.evidence import digest
 from atlasquant_aion_core_runtime_bridge import authenticated_context
 from atlasquant_aion_core_voice_automation import stage_schedule
 from atlasquant_aion_global_worker import (
     GLOBAL_WORKER_NAMESPACE,
     SERVICE_PRINCIPAL,
     _claim_state,
+    _persist_runtime_checkpoint_cas,
+    _release_state,
+    _runtime_id,
     attach_global_worker_state,
     global_worker_integrity,
     global_worker_snapshot,
@@ -293,9 +297,300 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
                 now=TICK + timedelta(seconds=30),
             )
         persist.assert_not_called()
-        self.assertEqual(result["status"], "LEASE_HELD")
-        self.assertEqual(result["lease"]["owner"], "gha-a")
+        self.assertEqual(result["status"], "INFLIGHT_RECONCILIATION_REQUIRED")
+        self.assertEqual(result["inflight_owner"], "gha-a")
+        self.assertTrue(result["reconciliation_required"])
+        self.assertFalse(result["automatic_retry_allowed"])
         self.assertEqual(result["processed"], 0)
+
+    def test_release_requires_same_owner_token_and_fencing_token(self):
+        checkpoint = self.armed_checkpoint()
+        state, _ = load_global_worker_state(checkpoint)
+        claimed, lease = _claim_state(state, runtime_id="gha-a", now=TICK)
+        batch = {
+            "processed": 0,
+            "succeeded": 0,
+            "failed": 0,
+            "blocked": 0,
+        }
+        released = _release_state(
+            claimed,
+            runtime_id="gha-a",
+            expected_lease_token=lease["token"],
+            expected_fencing_token=lease["fencing_token"],
+            now=TICK,
+            batch=batch,
+            final_status="OK",
+        )
+        self.assertEqual(released["lease"]["owner"], "")
+
+        with self.assertRaisesRegex(ValueError, "GLOBAL_LEASE_TOKEN_MISMATCH"):
+            _release_state(
+                claimed,
+                runtime_id="gha-a",
+                expected_lease_token="wrong-token",
+                expected_fencing_token=lease["fencing_token"],
+                now=TICK,
+                batch=batch,
+                final_status="OK",
+            )
+        with self.assertRaisesRegex(ValueError, "GLOBAL_FENCING_TOKEN_MISMATCH"):
+            _release_state(
+                claimed,
+                runtime_id="gha-a",
+                expected_lease_token=lease["token"],
+                expected_fencing_token=lease["fencing_token"] + 1,
+                now=TICK,
+                batch=batch,
+                final_status="OK",
+            )
+
+    def test_global_runtime_id_fails_closed_for_ambiguous_values(self):
+        self.assertEqual(_runtime_id(""), "")
+        self.assertEqual(_runtime_id("   "), "")
+        self.assertEqual(_runtime_id(True), "")
+        self.assertEqual(_runtime_id("x" * 161), "")
+        self.assertEqual(_runtime_id("gha-valid-1"), "gha-valid-1")
+
+        with patch("atlasquant_aion_global_worker.load_runtime_checkpoint") as load:
+            result = run_global_worker_once(
+                config=_config(),
+                runtime_id=True,
+                feature_enabled=True,
+                now=TICK,
+            )
+        load.assert_not_called()
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertEqual(result["reason"], "GLOBAL_RUNTIME_ID_REQUIRED")
+
+    def test_release_fence_failure_blocks_final_persistence(self):
+        checkpoint = self.armed_checkpoint()
+        captures = []
+
+        def tampering_executor(*args, **kwargs):
+            staged = deepcopy(args[1])
+            state, _ = load_global_worker_state(staged)
+            state["lease"]["token"] = "tampered-token"
+            state["inflight_tick"]["lease_token"] = "tampered-token"
+            state["inflight_tick"]["intent_id"] = digest({
+                "owner": state["inflight_tick"]["owner"],
+                "lease_token": "tampered-token",
+                "fencing_token": state["inflight_tick"]["fencing_token"],
+                "claimed_at": state["inflight_tick"]["claimed_at"],
+                "work_intent_digest": state["inflight_tick"].get("work_intent_digest", ""),
+            })
+            state["digest"] = global_worker_integrity(state)["expected"]
+            return {
+                "status": "COMPLETED",
+                "checkpoint": attach_global_worker_state(staged, state),
+                "processed": 0,
+                "succeeded": 0,
+                "failed": 0,
+                "blocked": 0,
+            }
+
+        with patch(
+            "atlasquant_aion_global_worker.load_runtime_checkpoint",
+            return_value={"status": "CONFIRMED", "checkpoint": checkpoint, "sha": "sha-0"},
+        ), patch(
+            "atlasquant_aion_global_worker._persist_runtime_checkpoint_cas",
+            side_effect=self.fake_persist(captures),
+        ) as persist, patch(
+            "atlasquant_aion_global_worker._execute_due_local_work_authorized",
+            side_effect=tampering_executor,
+        ):
+            result = run_global_worker_once(
+                config=_config(),
+                runtime_id="gha-fence-test",
+                feature_enabled=True,
+                now=TICK,
+            )
+
+        self.assertEqual(result["status"], "FENCE_RELEASE_FAILED")
+        self.assertEqual(result["reason"], "GLOBAL_LEASE_TOKEN_MISMATCH")
+        self.assertFalse(result["automatic_retry_allowed"])
+        self.assertEqual(persist.call_count, 1)
+
+    def test_claim_persists_inflight_guard_and_release_clears_it(self):
+        checkpoint = self.armed_checkpoint()
+        state, _ = load_global_worker_state(checkpoint)
+        claimed, lease = _claim_state(state, runtime_id="gha-inflight", now=TICK)
+        self.assertTrue(claimed["inflight_tick"])
+        self.assertEqual(claimed["inflight_tick"]["owner"], "gha-inflight")
+        self.assertEqual(claimed["inflight_tick"]["lease_token"], lease["token"])
+        self.assertEqual(claimed["inflight_tick"]["fencing_token"], lease["fencing_token"])
+
+        released = _release_state(
+            claimed,
+            runtime_id="gha-inflight",
+            expected_lease_token=lease["token"],
+            expected_fencing_token=lease["fencing_token"],
+            now=TICK,
+            batch={"processed":0,"succeeded":0,"failed":0,"blocked":0},
+            final_status="NO_DUE_WORK",
+        )
+        self.assertEqual(released["inflight_tick"], {})
+        self.assertEqual(released["lease"]["owner"], "")
+
+    def test_global_claim_persists_bounded_safe_work_intent(self):
+        checkpoint = self.armed_checkpoint()
+        captures = []
+        with patch(
+            "atlasquant_aion_global_worker.load_runtime_checkpoint",
+            return_value={
+                "status": "CONFIRMED",
+                "checkpoint": checkpoint,
+                "sha": "sha-0",
+            },
+        ), patch(
+            "atlasquant_aion_global_worker._persist_runtime_checkpoint_cas",
+            side_effect=self.fake_persist(captures),
+        ):
+            result = run_global_worker_once(
+                config=_config(),
+                runtime_id="gha-intent",
+                feature_enabled=True,
+                now=TICK,
+            )
+
+        self.assertEqual(result["status"], "CONFIRMED")
+        self.assertEqual(result["work_intent_count"], 1)
+        self.assertTrue(result["work_intent_digest"])
+        claimed, _ = load_global_worker_state(captures[0]["checkpoint"])
+        inflight = claimed["inflight_tick"]
+        self.assertEqual(inflight["work_intent_count"], 1)
+        self.assertEqual(len(inflight["work_occurrences"]), 1)
+        row = inflight["work_occurrences"][0]
+        self.assertTrue(row["schedule_id"])
+        self.assertEqual(len(row["occurrence_key"]), 64)
+        self.assertTrue(row["due_at"])
+        self.assertEqual(row["capability"], "ADMINISTRATION")
+        self.assertNotIn("prompt", row)
+        self.assertNotIn("title", row)
+
+    def test_unresolved_inflight_reports_exact_safe_work_manifest(self):
+        checkpoint = self.armed_checkpoint()
+        state, _ = load_global_worker_state(checkpoint)
+        from atlasquant_aion_core_voice_automation import CheckpointAutomationAdapter
+        from atlasquant_aion_background_executor import _occurrence_key
+        snapshot = CheckpointAutomationAdapter(self.context, checkpoint).snapshot(TICK)
+        due = [x for x in snapshot["schedules"] if x.get("due") is True]
+        self.assertEqual(len(due), 1)
+        row = due[0]
+        work = {
+            "as_of": TICK.isoformat(),
+            "count": 1,
+            "occurrences": [{
+                "schedule_id": row["schedule_id"],
+                "occurrence_key": _occurrence_key(
+                    self.context,
+                    row,
+                    row["due_at"],
+                ),
+                "due_at": row["due_at"],
+                "capability": row["capability"],
+            }],
+        }
+        work["digest"] = digest({
+            "as_of": work["as_of"],
+            "count": work["count"],
+            "occurrences": work["occurrences"],
+        })
+        claimed, _ = _claim_state(
+            state,
+            runtime_id="gha-crashed-intent",
+            now=TICK,
+            work_intent=work,
+        )
+        persisted_claim = attach_global_worker_state(checkpoint, claimed)
+
+        with patch(
+            "atlasquant_aion_global_worker.load_runtime_checkpoint",
+            return_value={
+                "status": "CONFIRMED",
+                "checkpoint": persisted_claim,
+                "sha": "sha-claim",
+            },
+        ), patch(
+            "atlasquant_aion_global_worker._execute_due_local_work_authorized"
+        ) as executor:
+            result = run_global_worker_once(
+                config=_config(),
+                runtime_id="gha-next",
+                feature_enabled=True,
+                now=TICK + timedelta(seconds=601),
+            )
+
+        executor.assert_not_called()
+        self.assertEqual(result["status"], "INFLIGHT_RECONCILIATION_REQUIRED")
+        self.assertEqual(result["inflight_work_intent_count"], 1)
+        self.assertEqual(
+            result["inflight_work_intent_digest"],
+            work["digest"],
+        )
+        self.assertEqual(
+            result["inflight_work_occurrences"][0]["occurrence_key"],
+            work["occurrences"][0]["occurrence_key"],
+        )
+        self.assertNotIn("prompt", result["inflight_work_occurrences"][0])
+        self.assertNotIn("title", result["inflight_work_occurrences"][0])
+
+    def test_unresolved_inflight_tick_blocks_reexecution_before_executor(self):
+        checkpoint = self.armed_checkpoint()
+        state, _ = load_global_worker_state(checkpoint)
+        claimed, lease = _claim_state(state, runtime_id="gha-crashed", now=TICK)
+        persisted_claim = attach_global_worker_state(checkpoint, claimed)
+
+        with patch(
+            "atlasquant_aion_global_worker.load_runtime_checkpoint",
+            return_value={
+                "status":"CONFIRMED",
+                "checkpoint":persisted_claim,
+                "sha":"sha-claim",
+            },
+        ), patch(
+            "atlasquant_aion_global_worker._persist_runtime_checkpoint_cas"
+        ) as persist, patch(
+            "atlasquant_aion_global_worker._execute_due_local_work_authorized"
+        ) as executor:
+            result = run_global_worker_once(
+                config=_config(),
+                runtime_id="gha-next",
+                feature_enabled=True,
+                now=TICK + timedelta(seconds=601),
+            )
+
+        persist.assert_not_called()
+        executor.assert_not_called()
+        self.assertEqual(result["status"], "INFLIGHT_RECONCILIATION_REQUIRED")
+        self.assertTrue(result["reconciliation_required"])
+        self.assertFalse(result["automatic_retry_allowed"])
+        self.assertEqual(result["inflight_owner"], "gha-crashed")
+        self.assertEqual(result["inflight_fencing_token"], lease["fencing_token"])
+
+    def test_successful_global_tick_clears_inflight_guard_in_final_checkpoint(self):
+        checkpoint = self.armed_checkpoint()
+        captures=[]
+        with patch(
+            "atlasquant_aion_global_worker.load_runtime_checkpoint",
+            return_value={"status":"CONFIRMED","checkpoint":checkpoint,"sha":"sha-0"},
+        ), patch(
+            "atlasquant_aion_global_worker._persist_runtime_checkpoint_cas",
+            side_effect=self.fake_persist(captures),
+        ):
+            result = run_global_worker_once(
+                config=_config(),
+                runtime_id="gha-success",
+                feature_enabled=True,
+                now=TICK,
+            )
+
+        self.assertEqual(result["status"], "CONFIRMED")
+        self.assertEqual(len(captures), 2)
+        claimed_state, _ = load_global_worker_state(captures[0]["checkpoint"])
+        final_state, _ = load_global_worker_state(captures[1]["checkpoint"])
+        self.assertTrue(claimed_state["inflight_tick"])
+        self.assertEqual(final_state["inflight_tick"], {})
 
     def test_expired_lease_reclaims_with_monotonic_fencing_token(self):
         checkpoint = self.armed_checkpoint()
@@ -311,6 +606,91 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
         self.assertTrue(lease2["reclaimed"])
         self.assertEqual(second["fencing_counter"], 2)
         self.assertEqual(second["stats"]["crash_recoveries"], 1)
+
+
+    def test_global_cas_unverified_write_returns_reconciliation_receipt(self):
+        checkpoint = ensure_operating_checkpoint(self.armed_checkpoint())
+        put = MagicMock()
+        put.status_code = 200
+        put.raise_for_status.return_value = None
+        put.json.return_value = {"content": {"sha": "sha-new"}}
+        with patch(
+            "atlasquant_aion_global_worker.requests.put",
+            return_value=put,
+        ) as put_call, patch(
+            "atlasquant_aion_global_worker.load_runtime_checkpoint",
+            return_value={"status": "ERROR", "checkpoint": None, "sha": ""},
+        ):
+            result = _persist_runtime_checkpoint_cas(
+                checkpoint,
+                _config(),
+                expected_sha="sha-old",
+                operation="claim global lease",
+            )
+
+        self.assertEqual(result["status"], "UNVERIFIED")
+        self.assertFalse(result["saved"])
+        self.assertFalse(result["verified"])
+        self.assertTrue(result["reconciliation_required"])
+        self.assertFalse(result["write_receipt"]["automatic_retry"])
+        self.assertTrue(result["write_receipt"]["write_accepted"])
+        self.assertEqual(result["write_receipt"]["write_sha"], "sha-new")
+        self.assertEqual(result["write_receipt"]["expected_sha"], "sha-old")
+        put_call.assert_called_once()
+
+    def test_global_cas_transport_exception_is_ambiguous_and_never_retryable(self):
+        checkpoint = ensure_operating_checkpoint(self.armed_checkpoint())
+        with patch(
+            "atlasquant_aion_global_worker.requests.put",
+            side_effect=TimeoutError("synthetic timeout"),
+        ) as put_call:
+            result = _persist_runtime_checkpoint_cas(
+                checkpoint,
+                _config(),
+                expected_sha="sha-old",
+                operation="persist global worker tick",
+            )
+
+        self.assertEqual(result["status"], "ERROR")
+        self.assertEqual(result["write_outcome"], "UNKNOWN")
+        self.assertTrue(result["reconciliation_required"])
+        self.assertFalse(result["write_receipt"]["automatic_retry"])
+        self.assertIsNone(result["write_receipt"]["write_accepted"])
+        put_call.assert_called_once()
+
+    def test_unverified_lease_claim_blocks_executor_and_surfaces_no_retry(self):
+        checkpoint = self.armed_checkpoint()
+        with patch(
+            "atlasquant_aion_global_worker.load_runtime_checkpoint",
+            return_value={
+                "status": "CONFIRMED",
+                "checkpoint": checkpoint,
+                "sha": "sha-0",
+            },
+        ), patch(
+            "atlasquant_aion_global_worker._persist_runtime_checkpoint_cas",
+            return_value={
+                "status": "UNVERIFIED",
+                "saved": False,
+                "verified": False,
+                "reconciliation_required": True,
+                "write_receipt": {"automatic_retry": False},
+            },
+        ), patch(
+            "atlasquant_aion_global_worker._execute_due_local_work_authorized"
+        ) as executor:
+            result = run_global_worker_once(
+                config=_config(),
+                runtime_id="gha-unverified",
+                feature_enabled=True,
+                now=TICK,
+            )
+
+        executor.assert_not_called()
+        self.assertEqual(result["status"], "LEASE_CLAIM_UNVERIFIED")
+        self.assertTrue(result["reconciliation_required"])
+        self.assertFalse(result["automatic_retry_allowed"])
+        self.assertEqual(result["processed"], 0)
 
     def test_claim_cas_conflict_blocks_executor(self):
         checkpoint = self.armed_checkpoint()

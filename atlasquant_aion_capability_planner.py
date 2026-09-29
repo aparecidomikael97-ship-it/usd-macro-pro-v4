@@ -197,13 +197,13 @@ def _system_dependencies(system_context: Mapping[str, Any] | None) -> dict[str, 
     runtime = system.get("runtime_checkpoint") if isinstance(system.get("runtime_checkpoint"), Mapping) else {}
     integrations = system.get("integrations") if isinstance(system.get("integrations"), Mapping) else {}
     return {
-        "market_live": bool(source_mesh.get("market_live_confirmed", False)),
+        "market_live": source_mesh.get("market_live_confirmed") is True,
         "checkpoint_runtime": str(runtime.get("status") or "").upper() == "CONFIRMED",
         "external_model": str(provider.get("state") or "").upper() == "EXTERNAL_READY",
-        "social_connector": bool(integrations.get("social_connected", False)),
-        "marketplace_connector": bool(integrations.get("marketplace_connected", False)),
-        "production_connector": bool(integrations.get("production_connected", False)),
-        "broker_connector": bool(integrations.get("broker_connected", False)),
+        "social_connector": integrations.get("social_connected") is True,
+        "marketplace_connector": integrations.get("marketplace_connected") is True,
+        "production_connector": integrations.get("production_connected") is True,
+        "broker_connector": integrations.get("broker_connected") is True,
     }
 
 
@@ -221,17 +221,17 @@ def capability_state(
     feature = _clean(spec.get("feature_flag"), 100)
     dependency = _clean(spec.get("dependency"), 100)
     action = _clean(spec.get("action"), 100)
-    local = bool(spec.get("local", False))
+    local = spec.get("local") is True
 
     if cid == "real_trade":
         state = "BLOCKED"
         reason = "Execução real permanece bloqueada por desenho nesta versão."
         requires_approval = True
-    elif feature and not bool(flags.get(feature, False)):
+    elif feature and flags.get(feature) is not True:
         state = "FEATURE_DISABLED"
         reason = f"Feature flag {feature} está desligada."
         requires_approval = True
-    elif dependency and not bool(deps.get(dependency, False)):
+    elif dependency and deps.get(dependency) is not True:
         if cid == "market_snapshot":
             state = "EVIDENCE_REQUIRED"
             reason = "Mercado ao vivo não está confirmado; dado fresco é obrigatório."
@@ -250,11 +250,11 @@ def capability_state(
             approved=False,
             feature_flags=flags,
         )
-        if bool(decision.get("allowed", False)):
+        if decision.get("allowed") is True:
             state = "AVAILABLE_LOCAL"
             reason = str(decision.get("reason") or "")
-            requires_approval = bool(decision.get("requires_explicit_approval", False))
-        elif bool(decision.get("requires_explicit_approval", False)) and str(decision.get("risk") or "") != "REAL_TRADING":
+            requires_approval = decision.get("requires_explicit_approval") is True
+        elif decision.get("requires_explicit_approval") is True and str(decision.get("risk") or "") != "REAL_TRADING":
             state = "APPROVAL_REQUIRED"
             reason = str(decision.get("reason") or "Aprovação explícita necessária.")
             requires_approval = True

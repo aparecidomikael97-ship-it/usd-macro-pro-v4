@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime, timezone
+from itertools import islice
 from typing import Any, Mapping, Sequence
 import hashlib
 import json
@@ -36,10 +37,12 @@ def _project_id(title:str,created_at:str)->str:
 
 def _platforms(values:Sequence[Any]|None)->list[str]:
     out=[]
-    for raw in list(values or []):
+    for raw in values or ():
         value=str(raw or "").strip()
         if value in PLATFORMS and value not in out:
             out.append(value)
+            if len(out) >= len(PLATFORMS):
+                break
     return out or ["Instagram"]
 
 
@@ -146,7 +149,7 @@ def normalize_project(raw:Mapping[str,Any])->dict[str,Any]:
 def normalize_projects(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for raw in list(rows or [])[:MAX_PROJECTS*2]:
+    for raw in islice(rows or (), MAX_PROJECTS*2):
         try:
             project=normalize_project(raw)
         except Exception:

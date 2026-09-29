@@ -13,7 +13,6 @@ import base64
 import json
 import re
 
-import requests
 
 from atlasquant_runtime_store import require_runtime_branch
 from atlasquant_aion_memory import (
@@ -28,7 +27,7 @@ from atlasquant_aion_memory import (
 from atlasquant_aion_observability import append_event, new_event
 
 SCHEMA="ATLASQUANT_AION_RECOVERY_V1"
-_REVISION_RE=re.compile(r"^[0-9a-fA-F]{7,40}$")
+_REVISION_RE=re.compile(r"^[0-9a-fA-F]{40}$")
 
 
 def _history_url(cfg:RuntimeConfig)->str:
@@ -50,6 +49,15 @@ def _headers(token:str)->dict[str,str]:
 def _safe_revision(value:Any)->str:
     revision=str(value or "").strip()
     return revision if _REVISION_RE.fullmatch(revision) else ""
+
+
+def _strict_json_object(pairs:list[tuple[str,Any]])->dict[str,Any]:
+    out={}
+    for key,value in pairs:
+        if key in out:
+            raise ValueError("duplicate JSON key")
+        out[key]=value
+    return out
 
 
 def list_checkpoint_revisions(
@@ -75,6 +83,7 @@ def list_checkpoint_revisions(
         }
     per_page=max(1,min(int(limit or 12),30))
     try:
+        import requests
         response=requests.get(
             _history_url(config),
             headers=_headers(config.token),
@@ -90,12 +99,21 @@ def list_checkpoint_revisions(
         if not isinstance(raw,list):
             raise ValueError("history response is not a list")
         items=[]
+        seen_revisions=set()
+        invalid_rows_dropped=0
+        duplicates_dropped=0
         for row in raw[:per_page]:
             if not isinstance(row,Mapping):
+                invalid_rows_dropped+=1
                 continue
             sha=_safe_revision(row.get("sha"))
             if not sha:
+                invalid_rows_dropped+=1
                 continue
+            if sha in seen_revisions:
+                duplicates_dropped+=1
+                continue
+            seen_revisions.add(sha)
             commit=row.get("commit") if isinstance(row.get("commit"),Mapping) else {}
             author=commit.get("author") if isinstance(commit.get("author"),Mapping) else {}
             message=" ".join(str(commit.get("message") or "").split())[:240]
@@ -111,6 +129,8 @@ def list_checkpoint_revisions(
             "source":f"GitHub:{config.branch}:{config.path}",
             "items":items,
             "count":len(items),
+            "invalid_rows_dropped":invalid_rows_dropped,
+            "duplicates_dropped":duplicates_dropped,
             "executes_action":False,
         }
     except Exception as exc:
@@ -150,6 +170,7 @@ def load_checkpoint_revision(
             "executes_action":False,
         }
     try:
+        import requests
         response=requests.get(
             _contents_url(config),
             headers=_headers(config.token),
@@ -158,10 +179,25 @@ def load_checkpoint_revision(
         )
         response.raise_for_status()
         obj=response.json()
-        raw=base64.b64decode(str(obj.get("content") or "")).decode("utf-8")
-        if len(raw.encode("utf-8"))>MAX_RUNTIME_BYTES:
+        if not isinstance(obj,Mapping):
+            raise ValueError("checkpoint response is not an object")
+        raw_content=obj.get("content")
+        if not isinstance(raw_content,str):
+            raise ValueError("runtime checkpoint content must be a base64 string")
+        encoding=str(obj.get("encoding") or "base64").strip().casefold()
+        if encoding!="base64":
+            raise ValueError("runtime checkpoint encoding must be base64")
+        encoded="".join(raw_content.split())
+        if not encoded:
+            raise ValueError("runtime checkpoint content missing")
+        max_encoded_chars=4*((MAX_RUNTIME_BYTES+2)//3)
+        if len(encoded)>max_encoded_chars:
+            raise ValueError("runtime checkpoint encoded content too large")
+        raw_bytes=base64.b64decode(encoded,validate=True)
+        if len(raw_bytes)>MAX_RUNTIME_BYTES:
             raise ValueError("runtime checkpoint too large")
-        checkpoint=json.loads(raw)
+        raw=raw_bytes.decode("utf-8")
+        checkpoint=json.loads(raw,object_pairs_hook=_strict_json_object)
         if not isinstance(checkpoint,dict):
             raise ValueError("checkpoint is not an object")
         integrity=checkpoint_integrity_report(checkpoint)
@@ -219,12 +255,35 @@ def recovery_preflight(
             "executes_action":False,
         }
 
-    integrity=(
-        selected.get("integrity")
-        if isinstance(selected.get("integrity"),Mapping)
-        else checkpoint_integrity_report(checkpoint)
-    )
-    integrity_state=str(integrity.get("state") or "UNKNOWN").upper()
+    integrity=checkpoint_integrity_report(checkpoint)
+    claim=selected.get("integrity") if isinstance(selected.get("integrity"),Mapping) else None
+    actual_state=str(integrity.get("state") or "UNKNOWN").upper()
+    if claim is not None:
+        claim_state=str(claim.get("state") or "").strip().upper()
+        write_mismatch=(
+            "write_safe" in claim
+            and claim.get("write_safe") is not integrity.get("write_safe")
+        )
+        if claim_state!=actual_state or write_mismatch:
+            return {
+                "schema":SCHEMA,
+                "allowed":False,
+                "reason":"Recovery integrity claim does not match the recomputed checkpoint.",
+                "candidate_integrity":actual_state,
+                "executes_action":False,
+            }
+    claimed_digest=str(selected.get("digest") or "").strip()
+    actual_digest=checkpoint_source_digest(checkpoint)
+    if claimed_digest and claimed_digest!=actual_digest:
+        return {
+            "schema":SCHEMA,
+            "allowed":False,
+            "reason":"Recovery candidate digest does not match the checkpoint.",
+            "candidate_integrity":actual_state,
+            "candidate_digest":actual_digest,
+            "executes_action":False,
+        }
+    integrity_state=actual_state
     if integrity_state not in {"CONFIRMED","MIGRATION_REQUIRED"}:
         return {
             "schema":SCHEMA,
@@ -273,7 +332,7 @@ def restore_checkpoint_revision(
     timeout:float=15.0,
 )->dict[str,Any]:
     """Restore a verified historical revision after explicit administrator approval."""
-    if not approved:
+    if approved is not True:
         return {
             "schema":SCHEMA,"status":"BLOCKED","saved":False,"verified":False,
             "reason":"Explicit administrator approval required for recovery.",
@@ -286,7 +345,71 @@ def restore_checkpoint_revision(
             "preflight":preflight,
         }
 
-    checkpoint=ensure_operating_checkpoint(candidate.get("checkpoint"))
+    revision=str(preflight.get("candidate_revision") or "")
+    rebound_candidate=load_checkpoint_revision(
+        revision,
+        config,
+        timeout=min(float(timeout),12.0),
+    )
+    if str(rebound_candidate.get("status") or "").upper()!="CONFIRMED":
+        return {
+            "schema":SCHEMA,
+            "status":"BLOCKED",
+            "saved":False,
+            "verified":False,
+            "reason":"Historical recovery revision could not be revalidated.",
+            "preflight":preflight,
+            "revision_revalidation":{
+                "status":str(rebound_candidate.get("status") or "UNKNOWN"),
+                "reason":str(rebound_candidate.get("reason") or ""),
+            },
+            "requested_revision":revision,
+            "restored_revision":"",
+            "restore_confirmed":False,
+            "reconciliation_required":False,
+            "automatic_retry_allowed":False,
+            "automatic_restore":False,
+        }
+
+    rebound_preflight=recovery_preflight(current_runtime,rebound_candidate)
+    if not rebound_preflight.get("allowed"):
+        return {
+            "schema":SCHEMA,
+            "status":"BLOCKED",
+            "saved":False,
+            "verified":False,
+            "reason":"Revalidated historical revision failed recovery preflight.",
+            "preflight":preflight,
+            "revision_revalidation":rebound_preflight,
+            "requested_revision":revision,
+            "restored_revision":"",
+            "restore_confirmed":False,
+            "reconciliation_required":False,
+            "automatic_retry_allowed":False,
+            "automatic_restore":False,
+        }
+
+    selected_digest=str(preflight.get("candidate_digest") or "")
+    rebound_digest=str(rebound_preflight.get("candidate_digest") or "")
+    if not selected_digest or selected_digest!=rebound_digest:
+        return {
+            "schema":SCHEMA,
+            "status":"BLOCKED",
+            "saved":False,
+            "verified":False,
+            "reason":"Selected recovery candidate does not match the historical revision.",
+            "preflight":preflight,
+            "revision_revalidation":rebound_preflight,
+            "requested_revision":revision,
+            "restored_revision":"",
+            "restore_confirmed":False,
+            "reconciliation_required":False,
+            "automatic_retry_allowed":False,
+            "automatic_restore":False,
+        }
+
+    preflight=rebound_preflight
+    checkpoint=ensure_operating_checkpoint(rebound_candidate.get("checkpoint"))
     checkpoint=deepcopy(checkpoint)
     operating=checkpoint.get("operating") if isinstance(checkpoint.get("operating"),Mapping) else {}
     events=append_event(
@@ -319,9 +442,19 @@ def restore_checkpoint_revision(
         timeout=timeout,
     )
     output=dict(result)
+    confirmed=bool(
+        result.get("status")=="CONFIRMED"
+        and result.get("saved") is True
+        and result.get("verified") is True
+    )
+    requested_revision=preflight.get("candidate_revision")
     output["schema"]=SCHEMA
     output["recovery_preflight"]=preflight
-    output["restored_revision"]=preflight.get("candidate_revision")
+    output["requested_revision"]=requested_revision
+    output["restored_revision"]=requested_revision if confirmed else ""
+    output["restore_confirmed"]=confirmed
+    output["reconciliation_required"]=bool(result.get("reconciliation_required"))
+    output["automatic_retry_allowed"]=False
     output["automatic_restore"]=False
     return output
 

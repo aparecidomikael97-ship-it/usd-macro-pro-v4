@@ -14,19 +14,26 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+from heapq import nsmallest
+from itertools import islice
 import argparse
 import base64
 import json
 import os
+import re
 import secrets
 from typing import Any, Mapping
 
 import requests
 
-from atlasquant_aion_background_executor import _execute_due_local_work_authorized
+from atlasquant_aion_background_executor import (
+    _execute_due_local_work_authorized,
+    _occurrence_key,
+)
 from atlasquant_aion_core_intelligence.context import Domain
 from atlasquant_aion_core_intelligence.evidence import digest, safe_text, utc
 from atlasquant_aion_core_runtime_bridge import authenticated_context
+from atlasquant_aion_core_voice_automation import CheckpointAutomationAdapter
 from atlasquant_aion_global_worker_arming import validate_global_worker_arming_approval
 from atlasquant_aion_memory import (
     MAX_RUNTIME_BYTES,
@@ -36,6 +43,7 @@ from atlasquant_aion_memory import (
     config_from_mapping,
     ensure_operating_checkpoint,
     load_runtime_checkpoint,
+    _runtime_write_receipt,
 )
 from atlasquant_runtime_store import require_runtime_branch
 
@@ -98,6 +106,175 @@ def _exact_int(value: Any, *, minimum: int, maximum: int, name: str) -> int:
     if type(value) is not int or not minimum <= value <= maximum:
         raise ValueError("invalid " + name)
     return value
+
+
+def _validated_runtime_id(value: Any) -> str:
+    if type(value) is not str:
+        raise ValueError("GLOBAL_RUNTIME_ID_REQUIRED")
+    runtime = value.strip()
+    if not runtime or len(runtime) > 160:
+        raise ValueError("GLOBAL_RUNTIME_ID_REQUIRED")
+    normalized = safe_text(runtime, 160)
+    if not normalized or normalized != runtime:
+        raise ValueError("GLOBAL_RUNTIME_ID_REQUIRED")
+    return normalized
+
+
+def _global_work_intent(
+    context,
+    checkpoint: Mapping[str, Any],
+    *,
+    max_jobs: int,
+    now: datetime,
+) -> dict[str, Any]:
+    jobs = _exact_int(
+        max_jobs,
+        minimum=1,
+        maximum=MAX_JOBS,
+        name="global worker work intent max jobs",
+    )
+    current = utc(now)
+    scheduler = CheckpointAutomationAdapter(context, checkpoint).snapshot(current)
+    due = nsmallest(
+        jobs,
+        (
+            row
+            for row in (scheduler.get("schedules") or ())
+            if isinstance(row, Mapping) and row.get("due") is True
+        ),
+        key=lambda row: (
+            str(row.get("due_at") or ""),
+            str(row.get("schedule_id") or ""),
+        ),
+    )
+    occurrences = []
+    for row in due:
+        due_at = str(row.get("due_at") or "")
+        schedule_id = safe_text(str(row.get("schedule_id") or ""), 120)
+        capability = safe_text(
+            str(row.get("capability") or "").strip().upper(),
+            80,
+        )
+        if not schedule_id or _parse_iso(due_at) is None:
+            raise ValueError("invalid global work intent occurrence")
+        occurrences.append({
+            "schedule_id": schedule_id,
+            "occurrence_key": _occurrence_key(context, row, due_at),
+            "due_at": due_at,
+            "capability": capability,
+        })
+    payload = {
+        "as_of": current.isoformat(),
+        "count": len(occurrences),
+        "occurrences": occurrences,
+    }
+    return {
+        **payload,
+        "digest": digest(payload),
+        "executes_action": False,
+    }
+
+
+def _empty_inflight_tick() -> dict[str, Any]:
+    return {}
+
+
+def _normalize_inflight_tick(raw: Mapping[str, Any] | None) -> dict[str, Any]:
+    item = dict(raw or {})
+    if not item:
+        return _empty_inflight_tick()
+    if str(item.get("state") or "") != "CLAIMED":
+        raise ValueError("invalid global inflight tick state")
+    owner = _validated_runtime_id(item.get("owner"))
+    token = safe_text(str(item.get("lease_token") or ""), 180)
+    fence = item.get("fencing_token")
+    claimed_at = str(item.get("claimed_at") or "")
+    intent_id = str(item.get("intent_id") or "").strip()
+    if not token:
+        raise ValueError("invalid global inflight lease token")
+    if type(fence) is not int or fence < 1:
+        raise ValueError("invalid global inflight fencing token")
+    if _parse_iso(claimed_at) is None:
+        raise ValueError("invalid global inflight timestamp")
+
+    raw_occurrences = item.get("work_occurrences", [])
+    if not isinstance(raw_occurrences, list) or len(raw_occurrences) > MAX_JOBS:
+        raise ValueError("invalid global inflight work occurrences")
+    occurrences = []
+    seen = set()
+    for raw_row in raw_occurrences:
+        if not isinstance(raw_row, Mapping):
+            raise ValueError("invalid global inflight work occurrence")
+        row = dict(raw_row)
+        schedule_id = safe_text(str(row.get("schedule_id") or ""), 120)
+        occurrence_key = str(row.get("occurrence_key") or "").strip().lower()
+        due_at = str(row.get("due_at") or "")
+        capability = safe_text(
+            str(row.get("capability") or "").strip().upper(),
+            80,
+        )
+        if (
+            not schedule_id
+            or re.fullmatch(r"[0-9a-f]{64}", occurrence_key) is None
+            or _parse_iso(due_at) is None
+            or occurrence_key in seen
+        ):
+            raise ValueError("invalid global inflight work occurrence")
+        seen.add(occurrence_key)
+        occurrences.append({
+            "schedule_id": schedule_id,
+            "occurrence_key": occurrence_key,
+            "due_at": due_at,
+            "capability": capability,
+        })
+
+    work_count = item.get("work_intent_count", len(occurrences))
+    work_digest = str(item.get("work_intent_digest") or "").strip().lower()
+    work_as_of = str(item.get("work_intent_as_of") or "")
+    if type(work_count) is not int or work_count != len(occurrences):
+        raise ValueError("invalid global inflight work count")
+    if work_count:
+        if _parse_iso(work_as_of) is None:
+            raise ValueError("invalid global inflight work timestamp")
+        expected_work_digest = digest({
+            "as_of": work_as_of,
+            "count": work_count,
+            "occurrences": occurrences,
+        })
+        if work_digest != expected_work_digest:
+            raise ValueError("invalid global inflight work digest")
+    elif work_digest or work_as_of:
+        if not work_digest or _parse_iso(work_as_of) is None:
+            raise ValueError("invalid empty global inflight work intent")
+        expected_work_digest = digest({
+            "as_of": work_as_of,
+            "count": 0,
+            "occurrences": [],
+        })
+        if work_digest != expected_work_digest:
+            raise ValueError("invalid global inflight work digest")
+
+    expected_intent = digest({
+        "owner": owner,
+        "lease_token": token,
+        "fencing_token": fence,
+        "claimed_at": claimed_at,
+        "work_intent_digest": work_digest,
+    })
+    if not intent_id or intent_id != expected_intent:
+        raise ValueError("invalid global inflight intent")
+    return {
+        "state": "CLAIMED",
+        "owner": owner,
+        "lease_token": token,
+        "fencing_token": fence,
+        "claimed_at": claimed_at,
+        "intent_id": intent_id,
+        "work_intent_digest": work_digest,
+        "work_intent_count": work_count,
+        "work_intent_as_of": work_as_of,
+        "work_occurrences": occurrences,
+    }
 
 
 def _empty_lease() -> dict[str, Any]:
@@ -260,6 +437,7 @@ def _default_state() -> dict[str, Any]:
         "lease_seconds": DEFAULT_LEASE_SECONDS,
         "fencing_counter": 0,
         "lease": _empty_lease(),
+        "inflight_tick": _empty_inflight_tick(),
         "stats": _empty_stats(),
         "runner": {
             "mode": "GITHUB_ACTIONS_EXISTING_AUTOPILOT_PULSE",
@@ -367,6 +545,9 @@ def _normalize_state(raw: Mapping[str, Any]) -> dict[str, Any]:
         "lease": _normalize_lease(
             raw.get("lease") if isinstance(raw.get("lease"), Mapping) else {}
         ),
+        "inflight_tick": _normalize_inflight_tick(
+            raw.get("inflight_tick") if isinstance(raw.get("inflight_tick"), Mapping) else {}
+        ),
         "stats": _normalize_stats(
             raw.get("stats") if isinstance(raw.get("stats"), Mapping) else {}
         ),
@@ -390,6 +571,15 @@ def _normalize_state(raw: Mapping[str, Any]) -> dict[str, Any]:
             or _parse_iso(state["arming_approval_expires_at"]) is None
         ):
             raise ValueError("invalid armed global worker state")
+        inflight = state["inflight_tick"]
+        lease = state["lease"]
+        if inflight and (
+            not lease["owner"]
+            or inflight["owner"] != lease["owner"]
+            or inflight["lease_token"] != lease["token"]
+            or inflight["fencing_token"] != lease["fencing_token"]
+        ):
+            raise ValueError("GLOBAL_INFLIGHT_LEASE_MISMATCH")
         budgets = state["resource_budgets"]
         zero_budget_fields = (
             "provider_calls_per_tick",
@@ -418,6 +608,8 @@ def _normalize_state(raw: Mapping[str, Any]) -> dict[str, Any]:
         context = authenticated_context(access, Domain.ADMIN)
         if delegation.get("scope") != _scope_payload(context):
             raise ValueError("GLOBAL_DELEGATION_SCOPE_MISMATCH")
+    if state_name != "ARMED" and state["inflight_tick"]:
+        raise ValueError("GLOBAL_INFLIGHT_REQUIRES_ARMED_STATE")
     state["digest"] = _bundle_digest(state)
     return state
 
@@ -538,6 +730,7 @@ def stage_arm_global_worker(
         max_jobs=max_jobs,
         lease_seconds=lease_seconds,
         lease=_empty_lease(),
+        inflight_tick=_empty_inflight_tick(),
     )
     return {
         "schema": SCHEMA,
@@ -578,6 +771,7 @@ def stage_pause_global_worker(
         state="PAUSED",
         kill_switch=False,
         lease=_empty_lease(),
+        inflight_tick=_empty_inflight_tick(),
     )
     return {
         "schema": SCHEMA,
@@ -612,6 +806,7 @@ def stage_kill_global_worker(
         state="KILLED",
         kill_switch=True,
         lease=_empty_lease(),
+        inflight_tick=_empty_inflight_tick(),
     )
     return {
         "schema": SCHEMA,
@@ -657,6 +852,13 @@ def global_worker_snapshot(
             "lease_fencing_token": 0,
             "lease_active": False,
             "lease_expires_at": "",
+            "inflight_reconciliation_required": False,
+            "inflight_owner": "",
+            "inflight_fencing_token": 0,
+            "inflight_since": "",
+            "inflight_work_intent_digest": "",
+            "inflight_work_intent_count": 0,
+            "inflight_work_occurrences": [],
             "stats": {},
             "runner_mode": "UNKNOWN",
             "runner_feature_flag_required": True,
@@ -689,6 +891,13 @@ def global_worker_snapshot(
         "lease_fencing_token": lease["fencing_token"],
         "lease_active": bool(expires and expires > current),
         "lease_expires_at": lease["expires_at"],
+        "inflight_reconciliation_required": bool(state["inflight_tick"]),
+        "inflight_owner": str(state["inflight_tick"].get("owner") or ""),
+        "inflight_fencing_token": int(state["inflight_tick"].get("fencing_token") or 0),
+        "inflight_since": str(state["inflight_tick"].get("claimed_at") or ""),
+        "inflight_work_intent_digest": str(state["inflight_tick"].get("work_intent_digest") or ""),
+        "inflight_work_intent_count": int(state["inflight_tick"].get("work_intent_count") or 0),
+        "inflight_work_occurrences": deepcopy(list(state["inflight_tick"].get("work_occurrences") or [])),
         "stats": deepcopy(state["stats"]),
         "runner_mode": str(state["runner"].get("mode") or ""),
         "runner_feature_flag_required": True,
@@ -753,6 +962,11 @@ def _persist_runtime_checkpoint_cas(
             "integrity": integrity,
         }
     expected_digest = checkpoint_source_digest(payload)
+    write_receipt = _runtime_write_receipt(
+        config,
+        expected_sha=str(expected_sha or "").strip(),
+        expected_digest=expected_digest,
+    )
     raw = json.dumps(
         payload,
         ensure_ascii=False,
@@ -774,7 +988,9 @@ def _persist_runtime_checkpoint_cas(
         "branch": config.branch,
         "sha": str(expected_sha).strip(),
     }
+    write_attempted = False
     try:
+        write_attempted = True
         response = requests.put(
             _contents_url(config),
             headers=_headers(config.token),
@@ -782,16 +998,31 @@ def _persist_runtime_checkpoint_cas(
             timeout=timeout,
         )
         if response.status_code in {409, 422}:
+            write_receipt = _runtime_write_receipt(
+                config,
+                expected_sha=str(expected_sha or "").strip(),
+                expected_digest=expected_digest,
+                write_accepted=False,
+            )
             return {
                 "schema": SCHEMA,
                 "status": "CONFLICT",
                 "saved": False,
                 "verified": False,
+                "write_receipt": write_receipt,
+                "reconciliation_required": False,
                 "reason": "CAS conflict on runtime checkpoint.",
             }
         response.raise_for_status()
         obj = response.json()
         write_sha = str((obj.get("content") or {}).get("sha") or "").strip()
+        write_receipt = _runtime_write_receipt(
+            config,
+            expected_sha=str(expected_sha or "").strip(),
+            expected_digest=expected_digest,
+            write_sha=write_sha,
+            write_accepted=True,
+        )
         verification = load_runtime_checkpoint(config, timeout=timeout)
         if verification.get("status") != "CONFIRMED":
             return {
@@ -801,7 +1032,9 @@ def _persist_runtime_checkpoint_cas(
                 "verified": False,
                 "write_accepted": True,
                 "sha": write_sha,
-                "reason": "CAS write accepted but read-after-write was not confirmed.",
+                "write_receipt": write_receipt,
+                "reconciliation_required": True,
+                "reason": "CAS write accepted but read-after-write was not confirmed. Reconcile before any retry.",
             }
         actual = checkpoint_source_digest(verification.get("checkpoint"))
         read_sha = str(verification.get("sha") or "").strip()
@@ -813,7 +1046,11 @@ def _persist_runtime_checkpoint_cas(
                 "verified": False,
                 "write_accepted": True,
                 "sha": read_sha or write_sha,
-                "reason": "Global runtime read-after-write diverged.",
+                "write_receipt": write_receipt,
+                "reconciliation_required": True,
+                "expected_digest": expected_digest,
+                "actual_digest": actual,
+                "reason": "Global runtime read-after-write diverged. Reconcile before any retry.",
             }
         return {
             "schema": SCHEMA,
@@ -824,6 +1061,8 @@ def _persist_runtime_checkpoint_cas(
             "checkpoint": verification.get("checkpoint"),
             "digest": actual,
             "integrity": verification.get("integrity"),
+            "write_receipt": write_receipt,
+            "reconciliation_required": False,
             "automatic_runtime_checkpoint_persistence": True,
             "automatic_external_business_actions": False,
         }
@@ -833,6 +1072,9 @@ def _persist_runtime_checkpoint_cas(
             "status": "ERROR",
             "saved": False,
             "verified": False,
+            "write_outcome": "UNKNOWN" if write_attempted else "NOT_ATTEMPTED",
+            "write_receipt": write_receipt,
+            "reconciliation_required": bool(write_attempted),
             "reason": type(exc).__name__,
         }
 
@@ -847,11 +1089,10 @@ def _claim_state(
     *,
     runtime_id: str,
     now: datetime,
+    work_intent: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     current = utc(now)
-    runtime = safe_text(runtime_id, 160)
-    if not runtime:
-        raise ValueError("GLOBAL_RUNTIME_ID_REQUIRED")
+    runtime = _validated_runtime_id(runtime_id)
     lease = _normalize_lease(
         state.get("lease") if isinstance(state.get("lease"), Mapping) else {}
     )
@@ -879,6 +1120,61 @@ def _claim_state(
         token = secrets.token_urlsafe(24)
         acquired_at = current.isoformat()
     expires = current + timedelta(seconds=int(state["lease_seconds"]))
+    claimed_at = current.isoformat()
+    work = dict(work_intent or {})
+    raw_work_occurrences = list(
+        islice(work.get("occurrences") or (), MAX_JOBS + 1)
+    )
+    if len(raw_work_occurrences) > MAX_JOBS:
+        raise ValueError("invalid global work intent occurrences")
+    if any(not isinstance(row, Mapping) for row in raw_work_occurrences):
+        raise ValueError("invalid global work intent occurrence")
+    work_occurrences = [
+        deepcopy(dict(row))
+        for row in raw_work_occurrences
+    ]
+    work_digest = str(work.get("digest") or "").strip()
+    work_as_of = str(work.get("as_of") or "")
+    work_count = work.get("count", len(work_occurrences))
+    if work:
+        normalized_work = _normalize_inflight_tick({
+            "state": "CLAIMED",
+            "owner": runtime,
+            "lease_token": token,
+            "fencing_token": fence,
+            "claimed_at": claimed_at,
+            "work_intent_digest": work_digest,
+            "work_intent_count": work_count,
+            "work_intent_as_of": work_as_of,
+            "work_occurrences": work_occurrences,
+            "intent_id": digest({
+                "owner": runtime,
+                "lease_token": token,
+                "fencing_token": fence,
+                "claimed_at": claimed_at,
+                "work_intent_digest": work_digest,
+            }),
+        })
+        inflight_tick = normalized_work
+    else:
+        inflight_tick = {
+            "state": "CLAIMED",
+            "owner": runtime,
+            "lease_token": token,
+            "fencing_token": fence,
+            "claimed_at": claimed_at,
+            "work_intent_digest": "",
+            "work_intent_count": 0,
+            "work_intent_as_of": "",
+            "work_occurrences": [],
+        }
+        inflight_tick["intent_id"] = digest({
+            "owner": runtime,
+            "lease_token": token,
+            "fencing_token": fence,
+            "claimed_at": claimed_at,
+            "work_intent_digest": "",
+        })
     stats["last_heartbeat_at"] = current.isoformat()
     stats["last_runtime_id"] = runtime
     claimed = _mutated(
@@ -892,6 +1188,7 @@ def _claim_state(
             "heartbeat_at": current.isoformat(),
             "expires_at": expires.isoformat(),
         },
+        inflight_tick=inflight_tick,
         stats=stats,
     )
     return claimed, {
@@ -908,6 +1205,8 @@ def _release_state(
     state: Mapping[str, Any],
     *,
     runtime_id: str,
+    expected_lease_token: str,
+    expected_fencing_token: int,
     now: datetime,
     batch: Mapping[str, Any],
     final_status: str,
@@ -915,8 +1214,28 @@ def _release_state(
     lease = _normalize_lease(
         state.get("lease") if isinstance(state.get("lease"), Mapping) else {}
     )
-    if lease["owner"] != runtime_id:
+    runtime = _validated_runtime_id(runtime_id)
+    if lease["owner"] != runtime:
         raise ValueError("GLOBAL_LEASE_OWNER_MISMATCH")
+    if type(expected_fencing_token) is not int or expected_fencing_token < 1:
+        raise ValueError("GLOBAL_FENCE_TOKEN_REQUIRED")
+    if not str(expected_lease_token or "").strip():
+        raise ValueError("GLOBAL_LEASE_TOKEN_REQUIRED")
+    if lease["token"] != str(expected_lease_token).strip():
+        raise ValueError("GLOBAL_LEASE_TOKEN_MISMATCH")
+    if lease["fencing_token"] != expected_fencing_token:
+        raise ValueError("GLOBAL_FENCING_TOKEN_MISMATCH")
+    inflight = _normalize_inflight_tick(
+        state.get("inflight_tick") if isinstance(state.get("inflight_tick"), Mapping) else {}
+    )
+    if not inflight:
+        raise ValueError("GLOBAL_INFLIGHT_TICK_REQUIRED")
+    if inflight["owner"] != runtime:
+        raise ValueError("GLOBAL_INFLIGHT_OWNER_MISMATCH")
+    if inflight["lease_token"] != str(expected_lease_token).strip():
+        raise ValueError("GLOBAL_INFLIGHT_TOKEN_MISMATCH")
+    if inflight["fencing_token"] != expected_fencing_token:
+        raise ValueError("GLOBAL_INFLIGHT_FENCE_MISMATCH")
     stats = _normalize_stats(
         state.get("stats") if isinstance(state.get("stats"), Mapping) else {}
     )
@@ -928,24 +1247,35 @@ def _release_state(
     stats["last_tick_at"] = utc(now).isoformat()
     stats["last_heartbeat_at"] = utc(now).isoformat()
     stats["last_status"] = safe_text(final_status, 120)
-    stats["last_runtime_id"] = safe_text(runtime_id, 160)
+    stats["last_runtime_id"] = runtime
     return _mutated(
         state,
         lease=_empty_lease(),
+        inflight_tick=_empty_inflight_tick(),
         stats=stats,
     )
 
 
 def _runtime_id(value: str | None = None) -> str:
-    if value:
-        return safe_text(value, 160)
+    if value is not None:
+        try:
+            return _validated_runtime_id(value)
+        except ValueError:
+            return ""
     configured = str(os.getenv("AION_GLOBAL_WORKER_RUNTIME_ID", "")).strip()
     if configured:
-        return safe_text(configured, 160)
+        try:
+            return _validated_runtime_id(configured)
+        except ValueError:
+            return ""
     run_id = str(os.getenv("GITHUB_RUN_ID", "")).strip()
     attempt = str(os.getenv("GITHUB_RUN_ATTEMPT", "")).strip()
     if run_id:
-        return safe_text("gha-" + run_id + "-" + (attempt or "1"), 160)
+        generated = "gha-" + run_id + "-" + (attempt or "1")
+        try:
+            return _validated_runtime_id(generated)
+        except ValueError:
+            return ""
     return ""
 
 
@@ -1046,7 +1376,37 @@ def run_global_worker_once(
             "external_action_executed": False,
         }
 
-    claimed, lease = _claim_state(state, runtime_id=runtime, now=current)
+    if state["inflight_tick"]:
+        return {
+            "schema": SCHEMA,
+            "status": "INFLIGHT_RECONCILIATION_REQUIRED",
+            "reason": "Previous global tick has no confirmed terminal persistence.",
+            "processed": 0,
+            "inflight_owner": state["inflight_tick"]["owner"],
+            "inflight_fencing_token": state["inflight_tick"]["fencing_token"],
+            "inflight_since": state["inflight_tick"]["claimed_at"],
+            "inflight_work_intent_digest": state["inflight_tick"]["work_intent_digest"],
+            "inflight_work_intent_count": state["inflight_tick"]["work_intent_count"],
+            "inflight_work_occurrences": deepcopy(state["inflight_tick"]["work_occurrences"]),
+            "network_called": True,
+            "reconciliation_required": True,
+            "automatic_retry_allowed": False,
+            "external_action_executed": False,
+            "real_trading_enabled": False,
+        }
+
+    work_intent = _global_work_intent(
+        delegated_context,
+        checkpoint,
+        max_jobs=int(state["max_jobs"]),
+        now=current,
+    )
+    claimed, lease = _claim_state(
+        state,
+        runtime_id=runtime,
+        now=current,
+        work_intent=work_intent,
+    )
     if lease["state"] == "LEASE_HELD":
         return {
             "schema": SCHEMA,
@@ -1072,6 +1432,8 @@ def run_global_worker_once(
             "lease": lease,
             "network_called": True,
             "checkpoint_write": claim_write,
+            "reconciliation_required": bool(claim_write.get("reconciliation_required")),
+            "automatic_retry_allowed": False,
             "external_action_executed": False,
         }
 
@@ -1116,13 +1478,32 @@ def run_global_worker_once(
         batch.get("checkpoint") or claimed_checkpoint
     )
     result_state, _ = load_global_worker_state(result_checkpoint)
-    final_state = _release_state(
-        result_state,
-        runtime_id=runtime,
-        now=current,
-        batch=batch,
-        final_status=str(batch.get("status") or "UNKNOWN"),
-    )
+    try:
+        final_state = _release_state(
+            result_state,
+            runtime_id=runtime,
+            expected_lease_token=active_lease["token"],
+            expected_fencing_token=active_lease["fencing_token"],
+            now=current,
+            batch=batch,
+            final_status=str(batch.get("status") or "UNKNOWN"),
+        )
+    except ValueError as exc:
+        return {
+            "schema": SCHEMA,
+            "status": "FENCE_RELEASE_FAILED",
+            "reason": str(exc),
+            "processed": int(batch.get("processed") or 0),
+            "succeeded": int(batch.get("succeeded") or 0),
+            "failed": int(batch.get("failed") or 0),
+            "blocked": int(batch.get("blocked") or 0),
+            "lease": lease,
+            "network_called": True,
+            "automatic_runtime_checkpoint_persistence": False,
+            "automatic_retry_allowed": False,
+            "external_action_executed": False,
+            "real_trading_enabled": False,
+        }
     final_checkpoint = attach_global_worker_state(
         result_checkpoint,
         final_state,
@@ -1146,6 +1527,8 @@ def run_global_worker_once(
             "network_called": True,
             "automatic_runtime_checkpoint_persistence": False,
             "checkpoint_write": final_write,
+            "reconciliation_required": bool(final_write.get("reconciliation_required")),
+            "automatic_retry_allowed": False,
             "external_action_executed": False,
             "real_trading_enabled": False,
         }
@@ -1163,6 +1546,8 @@ def run_global_worker_once(
         "delegated_actor": delegated_context.actor_id,
         "fencing_token": lease["fencing_token"],
         "lease_reclaimed": bool(lease.get("reclaimed")),
+        "work_intent_digest": work_intent["digest"],
+        "work_intent_count": work_intent["count"],
         "runtime_sha": str(final_write.get("sha") or ""),
         "network_called": True,
         "automatic_runtime_checkpoint_persistence": True,
@@ -1191,7 +1576,13 @@ def _cli() -> int:
     }
     print(json.dumps(safe, ensure_ascii=False, sort_keys=True))
     status = str(result.get("status") or "")
-    return 1 if status in {"ERROR", "BLOCKED", "FENCE_VERIFICATION_FAILED"} or status.startswith("FINAL_ERROR") else 0
+    return 1 if status in {
+        "ERROR",
+        "BLOCKED",
+        "FENCE_VERIFICATION_FAILED",
+        "FENCE_RELEASE_FAILED",
+        "INFLIGHT_RECONCILIATION_REQUIRED",
+    } or status.startswith("FINAL_ERROR") else 0
 
 
 if __name__ == "__main__":

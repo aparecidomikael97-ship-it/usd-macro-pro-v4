@@ -28,6 +28,7 @@ PENDING_STATES = {
 SAFETY_STOP_RECOMMENDED_STATES = {
     "LIVE_EVIDENCE_TIMEOUT",
     "BLOCKED_STALE_LEASE",
+    "BLOCKED_INFLIGHT_RECONCILIATION",
     "BLOCKED_UNSAFE_RECEIPT",
 }
 
@@ -45,6 +46,7 @@ def _severity(status: str) -> str:
         "LIVE_CONFIRMED_WITH_WORK": "INFO",
         "LIVE_EVIDENCE_TIMEOUT": "HIGH",
         "BLOCKED_STALE_LEASE": "HIGH",
+        "BLOCKED_INFLIGHT_RECONCILIATION": "HIGH",
         "BLOCKED_UNSAFE_RECEIPT": "CRITICAL",
         "BLOCKED": "HIGH",
     }.get(status, "MEDIUM")
@@ -63,6 +65,8 @@ def _posture(status: str) -> str:
         return "INCIDENT_LIVE_TIMEOUT"
     if status == "BLOCKED_STALE_LEASE":
         return "INCIDENT_STALE_LEASE"
+    if status == "BLOCKED_INFLIGHT_RECONCILIATION":
+        return "INCIDENT_INFLIGHT_RECONCILIATION"
     if status == "BLOCKED_UNSAFE_RECEIPT":
         return "INCIDENT_UNSAFE_RECEIPT"
     if status == "BLOCKED":
@@ -106,6 +110,11 @@ def _steps(status: str) -> list[str]:
             "Não forçar novo claim enquanto o lease stale não for explicado.",
             "Revisar owner, heartbeat, expires_at e fencing token.",
             "Considerar a desativação de segurança da feature flag por aprovação explícita.",
+        ],
+        "BLOCKED_INFLIGHT_RECONCILIATION": [
+            "Não executar retry automático nem novo claim enquanto o inflight permanecer pendente.",
+            "Revisar owner, fencing token, claimed_at e a persistência terminal do tick anterior.",
+            "Reconciliar a evidência do Checkpoint antes de liberar nova execução.",
         ],
         "BLOCKED_UNSAFE_RECEIPT": [
             "Preservar o receipt inseguro como evidência de incidente.",
@@ -165,6 +174,10 @@ def supervise_global_worker(
         "work_receipt_confirmed": bool(live.get("work_receipt_confirmed")),
         "unsafe_receipts": int(live.get("unsafe_receipts_after_activation") or 0),
         "stale_lease": bool(live.get("stale_lease")),
+        "inflight_reconciliation_required": bool(live.get("inflight_reconciliation_required")),
+        "inflight_owner": str(live.get("inflight_owner") or ""),
+        "inflight_fencing_token": int(live.get("inflight_fencing_token") or 0),
+        "inflight_since": str(live.get("inflight_since") or ""),
         "last_runtime_id": str(live.get("last_runtime_id") or ""),
         "last_heartbeat_at": str(live.get("last_heartbeat_at") or ""),
         "last_tick_at": str(live.get("last_tick_at") or ""),

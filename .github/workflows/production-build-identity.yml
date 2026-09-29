@@ -22,18 +22,18 @@ jobs:
       APP_URL: "https://atlasquant-private.onrender.com"
     steps:
       - name: Checkout expected source
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.11"
 
       - name: Install browser probe
         shell: bash
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install playwright
+          python -m pip install pip==26.2.1
+          python -m pip install playwright==1.63.0
           python -m playwright install --with-deps chromium
 
       - name: Warm production service
@@ -62,16 +62,17 @@ jobs:
           from pathlib import Path
 
           from playwright.sync_api import sync_playwright
-          from atlasquant_build_identity import short_source_fingerprint
+          from atlasquant_build_identity import compare_deploy_identity, short_source_fingerprint
 
           url=os.environ["APP_URL"]
           expected=short_source_fingerprint(Path.cwd(),16)
+          expected_sha=os.environ.get("GITHUB_SHA","")
           out=Path("production-build-identity")
           out.mkdir(exist_ok=True)
           report={
               "url":url,
               "expected_source_build":expected,
-              "github_sha":os.environ.get("GITHUB_SHA",""),
+              "github_sha":expected_sha,
               "attempts":0,
               "seen_builds":[],
               "matched":False,
@@ -108,7 +109,11 @@ jobs:
                   page.wait_for_timeout(2_000)
 
                   source_build=""
+                  observed_sha=""
                   try:
+                      identity=page.locator("#atlasquant-runtime-identity")
+                      if identity.count():
+                          observed_sha=str(identity.first.get_attribute("data-commit") or "").strip()
                       marker=page.locator("#atlasquant-source-build-marker")
                       if marker.count():
                           source_build=str(
@@ -126,6 +131,7 @@ jobs:
                       report["seen_builds"].append(source_build)
                   if source_build==expected:
                       report["matched"]=True
+                      report["observed_sha"]=observed_sha
                       break
                   if attempt<36:
                       page.wait_for_timeout(10_000)
@@ -143,6 +149,27 @@ jobs:
                   "Production source build did not match expected build "
                   f"{expected}; seen={report['seen_builds']}; "
                   f"app_container_seen={report['app_container_seen']}"
+              )
+          sha_verdict=compare_deploy_identity(
+              expected_sha,
+              report.get("observed_sha",""),
+              target_url=url,
+          )
+          report["sha_verdict"]=sha_verdict["state"]
+          report["proves_production_sha"]=sha_verdict["proves_production"]
+          (out/"report.json").write_text(
+              json.dumps(report,ensure_ascii=False,indent=2),
+              encoding="utf-8",
+          )
+          if sha_verdict["state"]=="DEPLOY_IDENTITY_MISMATCH":
+              raise SystemExit(
+                  "DEPLOY_IDENTITY_MISMATCH "
+                  f"expected={sha_verdict['expected_sha']} "
+                  f"observed={sha_verdict['observed_sha']}"
+              )
+          if not sha_verdict["proves_production"]:
+              raise SystemExit(
+                  f"{sha_verdict['state']}: production SHA was not proved"
               )
           PY
 
@@ -168,7 +195,7 @@ jobs:
 
       - name: Upload build identity evidence
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: atlasquant-production-build-identity
           path: production-build-identity/

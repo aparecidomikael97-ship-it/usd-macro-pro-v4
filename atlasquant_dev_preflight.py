@@ -240,7 +240,7 @@ def run_dev_preflight(
         and 'for render_attempt in range(1, 7)' in production_browser
         and 'page.reload(wait_until="domcontentloaded"' in production_browser
         and 'page.on("pageerror"' in production_browser
-        and "actions/upload-artifact@v7" in production_browser,
+        and "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a" in production_browser,
         "Health permanece main-scoped; browser smoke é pós-deploy/manual+agendado, read-only, resiliente a cold start e preserva evidência diagnóstica sem bloquear o deploy.",
     ))
 

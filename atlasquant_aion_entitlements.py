@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime, timezone
+from itertools import islice
 from typing import Any, Mapping, Sequence
 import hashlib
 import json
@@ -50,17 +51,30 @@ def _text(value:Any,limit:int)->str:
     return " ".join(str(value or "").replace("\x00","").split())[:limit]
 
 
-def _parse_iso(value:Any)->datetime|None:
-    raw=str(value or "").strip()
+class _InvalidInstant:
+    """Present expiry or start that cannot be trusted as an aware instant."""
+
+
+_INVALID_INSTANT=_InvalidInstant()
+
+
+def _parse_iso(value:Any)->datetime|_InvalidInstant|None:
+    """Empty means no deadline. A present value must be a timezone-aware instant.
+
+    Malformed text and naive timestamps are not treated as empty.
+    """
+    if value is None:
+        return None
+    raw=str(value).strip()
     if not raw:
         return None
     try:
         dt=datetime.fromisoformat(raw.replace("Z","+00:00"))
-        if dt.tzinfo is None:
-            dt=dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(timezone.utc)
     except Exception:
-        return None
+        return _INVALID_INSTANT
+    if dt.tzinfo is None or dt.tzinfo.utcoffset(dt) is None:
+        return _INVALID_INSTANT
+    return dt.astimezone(timezone.utc)
 
 
 def _scope(value:Any)->str:
@@ -97,6 +111,8 @@ def new_entitlement_request(
         raise ValueError("valid scope required")
     starts=_parse_iso(starts_at)
     expires=_parse_iso(expires_at)
+    if starts is _INVALID_INSTANT or expires is _INVALID_INSTANT:
+        raise ValueError("INVALID_EXPIRY")
     if starts and expires and expires<=starts:
         raise ValueError("entitlement expiry must be after start")
     created=str(created_at or _now())
@@ -169,12 +185,12 @@ def normalize_entitlement(raw:Mapping[str,Any])->dict[str,Any]:
         },
         "status":status,
         "approval":{
-            "approved":bool(approval.get("approved",False)),
+            "approved":approval.get("approved") is True,
             "approved_by":_text(approval.get("approved_by"),80),
             "approved_at":_text(approval.get("approved_at"),80),
         },
         "provider_evidence":{
-            "confirmed":bool(evidence.get("confirmed",False)),
+            "confirmed":evidence.get("confirmed") is True,
             "provider":_text(evidence.get("provider"),120),
             "external_id":_text(evidence.get("external_id"),220),
             "event_id":_text(evidence.get("event_id"),220),
@@ -206,7 +222,7 @@ def normalize_entitlement(raw:Mapping[str,Any])->dict[str,Any]:
 def normalize_entitlements(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for raw in list(rows or [])[:MAX_ENTITLEMENTS*2]:
+    for raw in islice(rows or (), MAX_ENTITLEMENTS*2):
         try:
             item=normalize_entitlement(raw)
         except Exception:
@@ -268,8 +284,8 @@ def entitlement_activation_preflight(
         approved=approved,
         feature_flags=feature_flags,
     )
-    request_approved=bool(item["approval"]["approved"])
-    allowed=bool(request_approved and guardian["allowed"])
+    request_approved=item["approval"]["approved"] is True
+    allowed=request_approved and guardian.get("allowed") is True
     if not request_approved:
         reason="Solicitação de entitlement ainda não foi aprovada pelo administrador."
     else:
@@ -302,7 +318,7 @@ def mark_entitlement_from_provider_evidence(
     data=dict(evidence or {})
     provider=_text(data.get("provider"),120)
     external_id=_text(data.get("external_id"),220)
-    confirmed=bool(data.get("confirmed",False))
+    confirmed=data.get("confirmed") is True
     if not confirmed or not provider or not external_id:
         raise ValueError("confirmed provider entitlement evidence required")
     item["provider_evidence"]={
@@ -331,10 +347,13 @@ def entitlement_effective(
         reasons.append("NOT_ACTIVE_CONFIRMED")
     if not item["provider_evidence"]["confirmed"]:
         reasons.append("PROVIDER_EVIDENCE_MISSING")
-    if starts and current<starts:
-        reasons.append("NOT_STARTED")
-    if expires and current>=expires:
-        reasons.append("EXPIRED")
+    if starts is _INVALID_INSTANT or expires is _INVALID_INSTANT:
+        reasons.append("INVALID_EXPIRY")
+    else:
+        if starts is not None and current<starts:
+            reasons.append("NOT_STARTED")
+        if expires is not None and current>=expires:
+            reasons.append("EXPIRED")
     return {
         "schema":SCHEMA,
         "entitlement_id":item["entitlement_id"],

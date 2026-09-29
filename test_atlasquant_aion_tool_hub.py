@@ -91,5 +91,41 @@ class AtlasQuantAionToolHubTests(unittest.TestCase):
         self.assertIn("GUARDIAN_DENIED",plan["blockers"])
 
 
+    def test_truthy_string_admin_flag_has_no_command_authority(self):
+        plan=plan_tool_call(
+            "aion.memory.search",
+            hub=default_tool_hub(),
+            portable_core=default_portable_core(),
+            access=self.admin,
+            source_kind="ADMIN",
+            authenticated_admin="false",
+            scope="Buscar memória.",
+            uncertainty_pct=0,
+            impact="LOW",
+        )
+        self.assertEqual(plan["state"],"BLOCK")
+        self.assertIn("SOURCE_HAS_NO_COMMAND_AUTHORITY",plan["blockers"])
+
+    def test_truthy_string_approval_does_not_approve_checkpoint_write(self):
+        plan=plan_tool_call(
+            "aion.checkpoint.prepare_save",
+            hub=default_tool_hub(),
+            portable_core=default_portable_core(),
+            access=self.admin,
+            source_kind="ADMIN",
+            authenticated_admin=True,
+            approved="true",
+            scope="Preparar checkpoint.",
+            tests=[{"state":"PASS"}],
+            rollback_plan="Restaurar versão anterior.",
+            uncertainty_pct=0,
+            impact="MEDIUM",
+            reversible=True,
+        )
+        self.assertEqual(plan["state"],"BLOCK")
+        self.assertIn("GUARDIAN_DENIED",plan["blockers"])
+
+
+
 if __name__=="__main__":
     unittest.main()

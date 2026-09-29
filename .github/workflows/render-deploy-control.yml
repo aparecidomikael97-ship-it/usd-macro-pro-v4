@@ -28,7 +28,7 @@ jobs:
     env:
       APP_URL: "https://atlasquant-private.onrender.com"
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Require Render deploy hook
         shell: bash
@@ -37,7 +37,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${RENDER_DEPLOY_HOOK_URL:-}" ]; then
-            echo "::error::RENDER_DEPLOY_HOOK_URL não está configurado nos GitHub Secrets."
+            echo "::error::NOT_CONFIGURED: RENDER_DEPLOY_HOOK_URL ausente. Nenhum deploy foi solicitado."
             echo "Crie um Deploy Hook do serviço atlasquant-private no Render e salve a URL somente como GitHub Secret."
             exit 1
           fi
@@ -48,7 +48,10 @@ jobs:
           RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: |
           set -euo pipefail
-          curl -fsS --connect-timeout 20 --max-time 60 -X POST "$RENDER_DEPLOY_HOOK_URL" >/tmp/render-deploy-response.txt
+          if ! curl -fsS --connect-timeout 20 --max-time 60 -X POST "$RENDER_DEPLOY_HOOK_URL" >/tmp/render-deploy-response.txt 2>/tmp/render-deploy-error.txt; then
+            echo "::error::Falha ao solicitar deploy. A URL do hook não é registrada."
+            exit 1
+          fi
           echo "Deploy solicitado ao Render."
 
       - name: Wait for healthy service

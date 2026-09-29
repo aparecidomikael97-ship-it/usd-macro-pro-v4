@@ -8,8 +8,10 @@ change credentials, deploy, publish, charge money or enable real trading.
 """
 from __future__ import annotations
 
+from collections import deque
 from datetime import datetime, timezone
 from hashlib import sha256
+from itertools import islice
 from typing import Any, Mapping, Sequence
 import json
 import math
@@ -36,6 +38,14 @@ WATCHDOG_STATES=("HEALTHY","DEGRADED","ISOLATE_RECOMMENDED")
 SAFE_MODES=("NORMAL","DEGRADED_READ_ONLY","EMERGENCY_STOP_RECOMMENDED")
 
 
+def _exact_true(value:Any)->bool:
+    return value is True
+
+
+def _restrictive_flag(value:Any)->bool:
+    return value is not False
+
+
 def _now()->str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -49,6 +59,8 @@ def _upper(value:Any,limit:int=100)->str:
 
 
 def _finite(value:Any,default:float=0.0)->float:
+    if isinstance(value,bool):
+        return float(default)
     try:
         x=float(value)
         return x if math.isfinite(x) else float(default)
@@ -57,6 +69,8 @@ def _finite(value:Any,default:float=0.0)->float:
 
 
 def _int(value:Any,default:int=0,minimum:int=0,maximum:int=1_000_000)->int:
+    if isinstance(value,bool):
+        return int(default)
     try:
         x=int(value)
     except Exception:
@@ -66,7 +80,7 @@ def _int(value:Any,default:int=0,minimum:int=0,maximum:int=1_000_000)->int:
 
 def _refs(values:Sequence[Any]|None,limit:int=80)->list[str]:
     out=[]
-    for raw in list(values or [])[:limit*2]:
+    for raw in islice(values or (), max(0, limit*2)):
         text=_clean(raw,240)
         if text and text not in out:
             out.append(text)
@@ -77,7 +91,7 @@ def _refs(values:Sequence[Any]|None,limit:int=80)->list[str]:
 
 def _caps(values:Sequence[Any]|None)->list[str]:
     out=[]
-    for raw in list(values or [])[:100]:
+    for raw in islice(values or (), 100):
         cap=_upper(raw,80)
         if cap in CAPABILITIES and cap not in out:
             out.append(cap)
@@ -139,7 +153,7 @@ def principal_authority(
         "root_authority":bool(base.get("can_issue_action",False)),
         "may_orchestrate_delegated_agents":kind in {"ADMIN","SYSTEM_POLICY"} and bool(base.get("can_issue_action",False)),
         "may_expand_own_permissions":False,
-        "may_change_policy":bool(kind=="SYSTEM_POLICY" and signed_system_policy),
+        "may_change_policy":bool(kind=="SYSTEM_POLICY" and _exact_true(signed_system_policy)),
         "reason":str(base.get("reason") or ""),
     }
 
@@ -297,7 +311,9 @@ def circuit_breaker(
     error_rate=max(0.0,min(100.0,_finite(error_rate_pct,0.0)))
     reasons=[]
 
-    if critical_signal:
+    critical=_restrictive_flag(critical_signal)
+    probe_passed=_exact_true(recovery_probe_passed)
+    if critical:
         state="OPEN"
         reasons.append("CRITICAL_SIGNAL")
     elif failures>=3:
@@ -306,10 +322,10 @@ def circuit_breaker(
     elif error_rate>=50.0:
         state="OPEN"
         reasons.append("ERROR_RATE_LIMIT")
-    elif prev=="OPEN" and recovery_probe_passed:
+    elif prev=="OPEN" and probe_passed:
         state="HALF_OPEN"
         reasons.append("RECOVERY_PROBE_PASSED")
-    elif prev=="HALF_OPEN" and recovery_probe_passed and failures==0 and error_rate<10:
+    elif prev=="HALF_OPEN" and probe_passed and failures==0 and error_rate<10:
         state="CLOSED"
         reasons.append("RECOVERY_CONFIRMED")
     elif prev in {"OPEN","HALF_OPEN"}:
@@ -325,8 +341,8 @@ def circuit_breaker(
         "previous_state":prev,
         "consecutive_failures":failures,
         "error_rate_pct":round(error_rate,2),
-        "critical_signal":bool(critical_signal),
-        "recovery_probe_passed":bool(recovery_probe_passed),
+        "critical_signal":critical,
+        "recovery_probe_passed":probe_passed,
         "reasons":reasons,
         "sensitive_calls_allowed":state=="CLOSED",
         "automatic_restart":False,
@@ -448,11 +464,14 @@ def safe_mode_posture(
     circuits=_int(open_circuits,0,0,100000)
     isolates=_int(isolate_recommendations,0,0,100000)
     reasons=[]
-    if not authority_integrity_ok:
+    authority_ok=_exact_true(authority_integrity_ok)
+    policy_ok=_exact_true(policy_integrity_ok)
+    secret=_restrictive_flag(secret_exposure)
+    if not authority_ok:
         reasons.append("AUTHORITY_INTEGRITY_FAILED")
-    if not policy_integrity_ok:
+    if not policy_ok:
         reasons.append("POLICY_INTEGRITY_FAILED")
-    if secret_exposure:
+    if secret:
         reasons.append("SECRET_EXPOSURE")
     if circuits:
         reasons.append("OPEN_CIRCUITS")
@@ -460,9 +479,9 @@ def safe_mode_posture(
         reasons.append("ISOLATION_RECOMMENDED")
 
     if (
-        not authority_integrity_ok
-        or not policy_integrity_ok
-        or secret_exposure
+        not authority_ok
+        or not policy_ok
+        or secret
     ):
         mode="EMERGENCY_STOP_RECOMMENDED"
     elif circuits or isolates:
@@ -488,7 +507,7 @@ def safe_mode_posture(
 def normalize_delegations(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for raw in list(rows or [])[-500:]:
+    for raw in deque(rows or (), maxlen=500):
         if not isinstance(raw,Mapping):
             continue
         did=_clean(raw.get("delegation_id"),120)
@@ -541,7 +560,7 @@ def normalize_resilience(raw:Mapping[str,Any]|None)->dict[str,Any]:
     item=dict(raw or {})
     delegations=normalize_delegations(item.get("delegations") if isinstance(item.get("delegations"),(list,tuple)) else [])
     watchdogs=[]
-    for raw in list(item.get("watchdogs") or [])[:500]:
+    for raw in islice(item.get("watchdogs") or (), 500):
         if not isinstance(raw,Mapping):
             continue
         watchdogs.append(watchdog(
@@ -554,7 +573,7 @@ def normalize_resilience(raw:Mapping[str,Any]|None)->dict[str,Any]:
             error_limit=raw.get("error_limit",3),
         ))
     breakers=[]
-    for raw in list(item.get("circuit_breakers") or [])[:500]:
+    for raw in islice(item.get("circuit_breakers") or (), 500):
         if not isinstance(raw,Mapping):
             continue
         breakers.append(circuit_breaker(
@@ -566,7 +585,7 @@ def normalize_resilience(raw:Mapping[str,Any]|None)->dict[str,Any]:
             recovery_probe_passed=bool(raw.get("recovery_probe_passed",False)),
         ))
     governors=[]
-    for raw in list(item.get("resource_governors") or [])[:500]:
+    for raw in islice(item.get("resource_governors") or (), 500):
         if not isinstance(raw,Mapping):
             continue
         limits=raw.get("limits") if isinstance(raw.get("limits"),Mapping) else {}
@@ -613,9 +632,9 @@ def resilience_digest(
 )->str:
     return _digest({
         "delegations":normalize_delegations(delegations),
-        "watchdogs":[dict(x) for x in list(watchdogs or []) if isinstance(x,Mapping)],
-        "circuit_breakers":[dict(x) for x in list(breakers or []) if isinstance(x,Mapping)],
-        "resource_governors":[dict(x) for x in list(governors or []) if isinstance(x,Mapping)],
+        "watchdogs":[dict(x) for x in islice(watchdogs or (),500) if isinstance(x,Mapping)],
+        "circuit_breakers":[dict(x) for x in islice(breakers or (),500) if isinstance(x,Mapping)],
+        "resource_governors":[dict(x) for x in islice(governors or (),500) if isinstance(x,Mapping)],
     })
 
 

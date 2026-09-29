@@ -20,18 +20,18 @@ jobs:
       APP_URL: "https://atlasquant-private.onrender.com"
       TARGET_SHA: ${{ github.sha }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ env.TARGET_SHA }}
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
 
       - name: Install Playwright Chromium
         run: |
-          python -m pip install --upgrade pip
-          pip install playwright
+          python -m pip install pip==26.2.1
+          python -m pip install playwright==1.63.0
           python -m playwright install --with-deps chromium
 
       - name: Warm production service
@@ -108,7 +108,7 @@ jobs:
           import time
           from pathlib import Path
           from playwright.sync_api import sync_playwright
-          from atlasquant_build_identity import short_source_fingerprint
+          from atlasquant_build_identity import compare_deploy_identity, short_source_fingerprint
 
           url = os.environ["APP_URL"]
           out = Path("browser-smoke")
@@ -258,9 +258,13 @@ jobs:
                       page.wait_for_timeout(5_000)
 
                   deploy_commit = ""
-                  marker = page.locator("#atlasquant-deploy-marker")
-                  if marker.count():
-                      deploy_commit = str(marker.first.get_attribute("data-commit") or "").strip()
+                  runtime_identity = page.locator("#atlasquant-runtime-identity")
+                  if runtime_identity.count():
+                      deploy_commit = str(runtime_identity.first.get_attribute("data-commit") or "").strip()
+                  if not deploy_commit or deploy_commit == "UNKNOWN":
+                      marker = page.locator("#atlasquant-deploy-marker")
+                      if marker.count():
+                          deploy_commit = str(marker.first.get_attribute("data-commit") or "").strip()
                   initial_body_text = body_text
                   initial_fast_snapshot_shell = "carregamento rápido por snapshot validado" in initial_body_text
                   initial_radar_visible = "Radar de Oportunidades" in initial_body_text
@@ -400,9 +404,27 @@ jobs:
                       failures.append(
                           f"{name}: source build {source_build or 'AUSENTE'} != esperado {expected_build}"
                       )
-                  # Git commit remains diagnostic only. The source bundle is the
-                  # authoritative production-code identity when host git metadata
-                  # is unavailable.
+                  sha_verdict = compare_deploy_identity(
+                      expected_commit,
+                      deploy_commit,
+                      target_url=url,
+                  )
+                  info["sha_verdict"] = sha_verdict["state"]
+                  info["proves_production_sha"] = sha_verdict["proves_production"]
+                  if sha_verdict["state"] == "DEPLOY_IDENTITY_MISMATCH":
+                      failures.append(
+                          f"{name}: DEPLOY_IDENTITY_MISMATCH "
+                          f"expected={sha_verdict['expected_sha']} "
+                          f"observed={sha_verdict['observed_sha']}"
+                      )
+                  elif not sha_verdict["proves_production"]:
+                      failures.append(
+                          f"{name}: {sha_verdict['state']} "
+                          "production SHA was not proved"
+                      )
+                  # A localhost target cannot prove production. A production target
+                  # must show the expected 40-hex SHA. A different SHA fails as
+                  # DEPLOY_IDENTITY_MISMATCH. The source bundle remains a second check.
                   if status is None or status >= 400:
                       failures.append(f"{name}: HTTP {status}")
                   if streamlit_container < 1:
@@ -466,7 +488,7 @@ jobs:
 
       - name: Upload browser evidence
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: atlasquant-production-browser-smoke
           path: browser-smoke/

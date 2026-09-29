@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime, timezone
+from itertools import islice
 from typing import Any, Mapping, Sequence
 import hashlib
 import json
@@ -229,7 +230,7 @@ def normalize_campaign(raw:Mapping[str,Any])->dict[str,Any]:
 def normalize_campaigns(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for raw in list(rows or [])[:MAX_CAMPAIGNS*2]:
+    for raw in islice(rows or (), MAX_CAMPAIGNS*2):
         try:
             item=normalize_campaign(raw)
         except Exception:
@@ -426,7 +427,11 @@ def promotion_digest(
 )->str:
     payload={
         "campaigns":normalize_campaigns(campaigns),
-        "redemptions":[dict(x) for x in list(redemptions or [])[:MAX_REDEMPTIONS] if isinstance(x,Mapping)],
+        "redemptions":[
+            dict(x)
+            for x in islice(redemptions or (), MAX_REDEMPTIONS)
+            if isinstance(x,Mapping)
+        ],
     }
     raw=json.dumps(payload,ensure_ascii=False,sort_keys=True,default=str)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
@@ -437,7 +442,11 @@ def promotions_summary(
     redemptions:Sequence[Mapping[str,Any]]|None=None,
 )->dict[str,Any]:
     rows=normalize_campaigns(campaigns)
-    reds=[dict(x) for x in list(redemptions or [])[:MAX_REDEMPTIONS] if isinstance(x,Mapping)]
+    reds=[
+        dict(x)
+        for x in islice(redemptions or (), MAX_REDEMPTIONS)
+        if isinstance(x,Mapping)
+    ]
     by_status={status:0 for status in STATUSES}
     for item in rows:
         by_status[item["status"]]+=1

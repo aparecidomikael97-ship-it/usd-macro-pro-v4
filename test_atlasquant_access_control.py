@@ -100,6 +100,14 @@ class AtlasQuantAccessControlTests(unittest.TestCase):
         self.assertFalse(verify_password(self.password,"plaintext"))
         self.assertEqual(load_users_config("not-json"),{})
 
+    def test_access_user_repr_redacts_password_hash(self):
+        user=AccessUser("user.01","USER",self.encoded,True)
+        rendered=repr(user)
+        self.assertNotIn(self.encoded, rendered)
+        self.assertNotIn(self.password, rendered)
+        self.assertIn("[REDACTED]", rendered)
+        self.assertEqual(user.password_hash, self.encoded)
+
 
     def test_normalized_username_collision_is_rejected_as_ambiguous(self):
         raw={"users":{

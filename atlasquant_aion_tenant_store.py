@@ -185,7 +185,7 @@ def prepare_tenant_write(
             "target":target,
             "executes_network":False,
             "executes_write":False,
-            "approved":bool(approved),
+            "approved":approved is True,
         }
     if not target["ready"]:
         return {
@@ -195,7 +195,7 @@ def prepare_tenant_write(
             "target":target,
             "executes_network":False,
             "executes_write":False,
-            "approved":bool(approved),
+            "approved":approved is True,
         }
     if _foreign_tenant_memory(memory,access):
         return {
@@ -205,9 +205,9 @@ def prepare_tenant_write(
             "target":target,
             "executes_network":False,
             "executes_write":False,
-            "approved":bool(approved),
+            "approved":approved is True,
         }
-    if not approved:
+    if approved is not True:
         return {
             "schema":SCHEMA,
             "allowed":False,

@@ -323,7 +323,7 @@ class PersistedGlobalWorkerArmingTests(unittest.TestCase):
             "atlasquant_aion_memory.load_runtime_checkpoint",
             return_value=self.runtime,
         ), patch(
-            "atlasquant_aion_memory.requests.put"
+            "requests.put"
         ) as put:
             result = save_runtime_checkpoint(
                 self.working,
@@ -351,7 +351,7 @@ class PersistedGlobalWorkerArmingTests(unittest.TestCase):
             "atlasquant_aion_memory.load_runtime_checkpoint",
             return_value=runtime,
         ), patch(
-            "atlasquant_aion_memory.requests.put"
+            "requests.put"
         ) as put:
             result = save_runtime_checkpoint(
                 changed,

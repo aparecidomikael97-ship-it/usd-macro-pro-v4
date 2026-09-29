@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from hashlib import sha256
 from typing import Any, Mapping, Sequence
+from itertools import islice
 import json
 import re
 
@@ -176,7 +177,7 @@ def _digest(payload:Any)->str:
 
 def _unique(values:Sequence[Any]|None,limit:int=40)->list[str]:
     out=[]
-    for raw in list(values or [])[:limit*2]:
+    for raw in islice(values or (),max(0,limit*2)):
         text=_clean(raw,120)
         if text and text not in out:
             out.append(text)
@@ -211,7 +212,7 @@ def normalize_tool(raw:Mapping[str,Any])->dict[str,Any]:
             if isinstance(item.get("required_scopes"),(list,tuple))
             else []
         ),
-        "external_side_effects":bool(item.get("external_side_effects",False)),
+        "external_side_effects": (item.get("external_side_effects") is True if isinstance(item.get("external_side_effects", False), bool) else True),
         "tool_output_is_authority":False,
         "may_expand_permissions":False,
         "auto_execute":False,
@@ -222,7 +223,7 @@ def normalize_tool(raw:Mapping[str,Any])->dict[str,Any]:
 def normalize_tools(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for raw in list(rows or [])[:500]:
+    for raw in islice(rows or (),500):
         if not isinstance(raw,Mapping):
             continue
         try:
@@ -295,11 +296,13 @@ def _connector_readiness(
             "required":True,"configured":False,"activated":False,
             "reason":"CONNECTOR_NOT_REGISTERED",
         }
+    configured = connector.get("configuration_ready") is True
+    activated = connector.get("enabled") is True and connector.get("activation_approved") is True
     return {
         "required":True,
-        "configured":bool(connector.get("configuration_ready",False)),
-        "activated":bool(connector.get("enabled",False) and connector.get("activation_approved",False)),
-        "reason":"CONNECTOR_ACTIVE" if bool(connector.get("enabled",False)) else "CONNECTOR_NOT_ACTIVATED",
+        "configured":configured,
+        "activated":activated,
+        "reason":"CONNECTOR_ACTIVE" if activated else "CONNECTOR_NOT_ACTIVATED",
     }
 
 
@@ -329,22 +332,22 @@ def plan_tool_call(
             "tool_id":_clean(tool_id,96),"executes_action":False,
             "real_trading_enabled":False,
         }
-    authority=source_authority(source_kind,authenticated_admin=authenticated_admin)
+    authority=source_authority(source_kind,authenticated_admin=authenticated_admin is True)
     connector=_connector_readiness(tool["connector_id"],portable_core)
     safety=proof_of_safety(
         tool["guardian_action"],
         access,
-        approved=approved,
+        approved=approved is True,
         feature_flags=feature_flags,
         source_kind=source_kind,
-        authenticated_admin=authenticated_admin,
+        authenticated_admin=authenticated_admin is True,
         scope=scope,
         artifacts=artifacts,
         tests=tests,
         rollback_plan=rollback_plan,
         uncertainty_pct=uncertainty_pct,
         impact=impact,
-        reversible=reversible,
+        reversible=reversible is True,
         external_side_effects=tool["external_side_effects"],
     )
     blockers=[]
@@ -355,7 +358,7 @@ def plan_tool_call(
     if not authority["can_issue_action"]:
         blockers.append("SOURCE_HAS_NO_COMMAND_AUTHORITY")
     if safety.get("state")=="BLOCK":
-        blockers.extend(str(x) for x in list(safety.get("blockers") or []))
+        blockers.extend(str(x) for x in islice(safety.get("blockers") or (),100))
     blockers=list(dict.fromkeys(blockers))
     state="BLOCK" if blockers else ("REVIEW" if safety.get("state")=="REVIEW" else "READY_FOR_EXECUTOR")
     return {

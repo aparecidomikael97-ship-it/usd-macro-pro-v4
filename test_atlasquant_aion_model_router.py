@@ -100,6 +100,58 @@ class AtlasQuantAionModelRouterTests(unittest.TestCase):
         self.assertEqual(changed["aion"]["model_budget"]["monthly_limit_usd"],20)
         self.assertFalse(changed["aion"]["real_trading"])
 
+    def test_textual_paid_flags_do_not_open_an_external_lane(self):
+        self.assertFalse(normalize_budget({"allow_paid":"false"})["allow_paid"])
+        self.assertFalse(normalize_budget({"allow_paid":"yes"})["allow_paid"])
+        self.assertFalse(normalize_budget({"allow_paid":1})["allow_paid"])
+        denied=budget_decision(
+            {"allow_paid":True,"monthly_limit_usd":10},
+            1,
+            request_approved="yes",
+        )
+        self.assertFalse(denied["allowed"])
+        route=route_intelligence(
+            "Summarize this text",
+            provider_state="EXTERNAL_READY",
+            external_feature_enabled="false",
+            request_approved="false",
+            budget={"allow_paid":"false","monthly_limit_usd":10},
+            estimated_request_cost_usd=1,
+        )
+        self.assertEqual(route["lane"],"LOCAL_DETERMINISTIC")
+        self.assertFalse(route["external_feature_enabled"])
+        self.assertFalse(route["executes_provider_call"])
+
+    def test_invalid_request_cost_is_not_treated_as_free(self):
+        samples=("unknown", float("nan"), float("inf"), float("-inf"), True, False, None, object())
+        for sample in samples:
+            decision=budget_decision({}, sample, request_approved=False)
+            self.assertFalse(decision["allowed"], sample)
+            self.assertIsNone(decision["estimated_request_cost_usd"])
+        explicit_zero=budget_decision({}, 0, request_approved=False)
+        self.assertTrue(explicit_zero["allowed"])
+        self.assertEqual(explicit_zero["estimated_request_cost_usd"], 0.0)
+        inflated=normalize_budget({"allow_paid":True,"monthly_limit_usd":True})
+        self.assertFalse(inflated["budget_amounts_valid"])
+        self.assertIsNone(inflated["monthly_limit_usd"])
+        denied=budget_decision(
+            {"allow_paid":True,"monthly_limit_usd":True},
+            0.5,
+            request_approved=True,
+        )
+        self.assertFalse(denied["allowed"])
+
+    def test_invalid_spend_amount_is_not_recorded_as_money(self):
+        cp={"aion":{"model_budget":{
+            "allow_paid":True,
+            "monthly_limit_usd":1,
+            "spent_usd_estimate":0.4,
+        }}}
+        changed=record_model_spend_estimate(cp, True)
+        self.assertEqual(changed["aion"]["model_budget"]["spent_usd_estimate"], 0.4)
+        unknown=record_model_spend_estimate(cp, "unknown")
+        self.assertEqual(unknown["aion"]["model_budget"]["spent_usd_estimate"], 0.4)
+
 
 if __name__=="__main__":
     unittest.main()

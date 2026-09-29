@@ -6,9 +6,11 @@ They never turn resumption into authorization: resuming restores state only.
 """
 from __future__ import annotations
 
+from collections import deque
 from copy import deepcopy
 from datetime import datetime, timezone
 from hashlib import sha256
+from itertools import islice
 from typing import Any, Mapping, Sequence
 import json
 
@@ -18,6 +20,8 @@ from atlasquant_aion_observability import append_event, new_event, normalize_eve
 SCHEMA="ATLASQUANT_AION_DURABLE_TASKS_V1"
 MAX_TASKS=300
 MAX_STEPS=80
+MAX_IDEMPOTENCY_KEYS=32
+MAX_IDEMPOTENCY_KEY_LENGTH=128
 TASK_STATES=(
     "PLANNED","RUNNING","PAUSED","WAITING_APPROVAL","BLOCKED","DONE","CANCELED",
 )
@@ -46,6 +50,10 @@ STEP_TRANSITIONS={
 }
 
 
+def _exact_true(value:Any)->bool:
+    return value is True
+
+
 class DurableTaskError(ValueError):
     """Compatible ValueError carrying a structured, non-secret failure result."""
     def __init__(self, code:str, task:Mapping[str,Any]|None=None):
@@ -67,7 +75,7 @@ def validate_transition(previous:str, target:str, *, step:bool=False,
         raise DurableTaskError("INVALID_TRANSITION")
     if previous=="BLOCKED" and target!="CANCELED" and not _clean(unblock_reason):
         raise DurableTaskError("UNBLOCK_REQUIRED")
-    if previous=="WAITING_APPROVAL" and target in {"READY","RUNNING"} and not approved:
+    if previous=="WAITING_APPROVAL" and target in {"READY","RUNNING"} and not _exact_true(approved):
         raise DurableTaskError("APPROVAL_REQUIRED")
     if previous=="FAILED" and not retry:
         raise DurableTaskError("RETRY_REQUIRED")
@@ -93,10 +101,11 @@ def _audit(item:dict[str,Any], event_type:str, previous:str, changed:str, **meta
 
 
 def _guard_step(step:Mapping[str,Any], access:Mapping[str,Any]|None, approved:bool)->None:
-    decision=guardian_decision(step["guardian_action"],access,approved=approved)
+    approved_exact=_exact_true(approved)
+    decision=guardian_decision(step["guardian_action"],access,approved=approved_exact)
     if not decision["allowed"]:
         raise DurableTaskError("GUARDIAN_DENIED")
-    if (step["requires_approval"] or step["external_side_effects"]) and not approved:
+    if (step["requires_approval"] or step["external_side_effects"]) and not approved_exact:
         raise DurableTaskError("APPROVAL_REQUIRED")
 
 
@@ -110,7 +119,7 @@ def _clean(value:Any,limit:int=1400)->str:
 
 def _refs(values:Sequence[Any]|None,limit:int=50)->list[str]:
     out=[]
-    for raw in list(values or [])[:limit*2]:
+    for raw in islice(values or (), max(0, limit*2)):
         text=_clean(raw,240)
         if text and text not in out:
             out.append(text)
@@ -134,6 +143,32 @@ def _digest(value:Any)->str:
 
 def _task_id(title:str,created_at:str)->str:
     return "DUR-"+_digest({"title":title,"created_at":created_at})[:14].upper()
+
+
+def _retry_key(value:Any)->str:
+    text=" ".join(str(value or "").replace("\x00","").split())
+    if not text:
+        return ""
+    if len(text)>MAX_IDEMPOTENCY_KEY_LENGTH:
+        raise DurableTaskError("IDEMPOTENCY_KEY_INVALID")
+    return text
+
+
+def _consumed_keys(raw:Mapping[str,Any])->list[str]:
+    rows=raw.get("consumed_idempotency_keys")
+    out=[]
+    if isinstance(rows,(list,tuple)):
+        source=islice(rows, MAX_IDEMPOTENCY_KEYS)
+    else:
+        source=()
+    for item in source:
+        text=" ".join(str(item or "").replace("\x00","").split())
+        if text and len(text)<=MAX_IDEMPOTENCY_KEY_LENGTH and text not in out:
+            out.append(text)
+    legacy=" ".join(str(raw.get("idempotency_key") or "").replace("\x00","").split())
+    if legacy and len(legacy)<=MAX_IDEMPOTENCY_KEY_LENGTH and legacy not in out and len(out)<MAX_IDEMPOTENCY_KEYS:
+        out.append(legacy)
+    return out
 
 
 def normalize_step(raw:Mapping[str,Any],index:int)->dict[str,Any]:
@@ -165,8 +200,10 @@ def normalize_step(raw:Mapping[str,Any],index:int)->dict[str,Any]:
         "started_at":_clean(item.get("started_at"),80),
         "completed_at":_clean(item.get("completed_at"),80),
         "executes_action":False,
+        "consumed_idempotency_keys":_consumed_keys(item),
     }
-    for key in ("correlation_id","last_error","idempotency_key"):
+    result["idempotency_key"]=result["consumed_idempotency_keys"][-1] if result["consumed_idempotency_keys"] else ""
+    for key in ("correlation_id","last_error"):
         if key in item:
             result[key]=_clean(item[key])
     if "max_attempts" in item:
@@ -177,7 +214,7 @@ def normalize_step(raw:Mapping[str,Any],index:int)->dict[str,Any]:
 def normalize_steps(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for index,raw in enumerate(list(rows or [])[:MAX_STEPS]):
+    for index,raw in enumerate(islice(rows or (), MAX_STEPS)):
         if not isinstance(raw,Mapping):
             continue
         item=normalize_step(raw,index)
@@ -285,7 +322,12 @@ def normalize_durable_task(raw:Mapping[str,Any])->dict[str,Any]:
 def normalize_durable_tasks(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for raw in list(rows or [])[-MAX_TASKS*2:]:
+    source = (
+        rows[-MAX_TASKS*2:]
+        if isinstance(rows, (list, tuple))
+        else deque(rows or (), maxlen=MAX_TASKS*2)
+    )
+    for raw in source:
         if not isinstance(raw,Mapping):
             continue
         try:
@@ -361,32 +403,36 @@ def update_step(
         previous=step["state"]
         validate_transition(previous,next_state,step=True,unblock_reason=unblock_reason,
                             approved=approved,retry=retry)
-        if previous==next_state:
-            if retry and (not step.get("idempotency_key") or step["idempotency_key"]!=_clean(idempotency_key)):
+        if retry:
+            key=_retry_key(idempotency_key)
+            consumed=list(step.get("consumed_idempotency_keys") or [])
+            if not key:
+                raise DurableTaskError("IDEMPOTENCY_KEY_REQUIRED",item)
+            if key in consumed:
+                return item
+            if previous==next_state:
                 raise DurableTaskError("IDEMPOTENCY_CONFLICT",item)
+            if previous!="FAILED" or next_state!="RUNNING":
+                raise DurableTaskError("RETRY_INVALID",item)
+            if step["external_side_effects"] or step["guardian_action"] not in {"read","search","summarize","draft"}:
+                raise DurableTaskError("RETRY_UNSAFE",item)
+            if step["attempts"]>=step.get("max_attempts",3):
+                raise DurableTaskError("RETRY_LIMIT",item)
+            if len(consumed)>=MAX_IDEMPOTENCY_KEYS:
+                raise DurableTaskError("IDEMPOTENCY_HISTORY_FULL",item)
+            step["consumed_idempotency_keys"]=consumed+[key]
+            step["idempotency_key"]=key
+        elif previous==next_state:
             return item
         if next_state in {"RUNNING","DONE","SKIPPED"}:
             if item["cursor"]>=len(item["steps"]) or step is not item["steps"][item["cursor"]]:
                 raise DurableTaskError("STEP_OUT_OF_ORDER",item)
             if item["state"]=="BLOCKED" and not _clean(unblock_reason):
                 raise DurableTaskError("UNBLOCK_REQUIRED",item)
-            if item["state"]=="WAITING_APPROVAL" and not approved:
+            if item["state"]=="WAITING_APPROVAL" and not _exact_true(approved):
                 raise DurableTaskError("APPROVAL_REQUIRED",item)
             if next_state in {"RUNNING","DONE"}:
                 _guard_step(step,access,approved)
-        if retry:
-            if previous!="FAILED" or next_state!="RUNNING":
-                raise DurableTaskError("RETRY_INVALID",item)
-            # Retry is local-only and must name an idempotent operation.
-            if step["external_side_effects"] or step["guardian_action"] not in {"read","search","summarize","draft"}:
-                raise DurableTaskError("RETRY_UNSAFE",item)
-            if not _clean(idempotency_key):
-                raise DurableTaskError("IDEMPOTENCY_KEY_REQUIRED",item)
-            if step.get("idempotency_key") and step["idempotency_key"]!=_clean(idempotency_key):
-                raise DurableTaskError("IDEMPOTENCY_CONFLICT",item)
-            if step["attempts"]>=step.get("max_attempts",3):
-                raise DurableTaskError("RETRY_LIMIT",item)
-            step["idempotency_key"]=_clean(idempotency_key)
         step["state"]=next_state
         step["correlation_id"]=item.get("correlation_id") or item["mission_id"] or item["durable_task_id"]
         if next_state=="FAILED":
