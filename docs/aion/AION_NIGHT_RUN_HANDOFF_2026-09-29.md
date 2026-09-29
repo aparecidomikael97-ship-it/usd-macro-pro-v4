@@ -23,7 +23,7 @@ Proposta administrativa read-only de required checks:
 
 Não desviar a trilha principal para Interface, Radar, Trading, Studio, Academy ou features novas enquanto houver regressão ou hardening pendente no AION Core.
 
-Exceção controlada: a interface pode avançar em **branch/PR isolada e paralela**, sem tocar em Memory, Recovery, workers, autoridade ou produção. A frente visual atual é a Draft #358 (`chatgpt/atlasquant-cockpit-shell-v1`). Ela nunca deve bloquear nem substituir a validação da ponta #359.
+A interface está **PAUSADA por solicitação do usuário**. A Draft #358 (`chatgpt/atlasquant-cockpit-shell-v1`) deve permanecer intacta até novo pedido explícito. Não avançar UI, login, cockpit ou imagens durante o bloco AION/Núcleo. Ela nunca deve bloquear nem substituir a validação da ponta #359.
 
 ## Base conhecida
 
