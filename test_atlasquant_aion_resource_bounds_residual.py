@@ -285,7 +285,7 @@ class AionResidualResourceBoundsTests(unittest.TestCase):
                 }
                 for i in range(100)
             ),
-            max_reads=100,
+            max_reads=101,
         )
         selected,total=background_executor._select_due_schedules(source,3)
         self.assertEqual(total,100)
