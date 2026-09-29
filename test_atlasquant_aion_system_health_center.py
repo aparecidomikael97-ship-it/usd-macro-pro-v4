@@ -23,6 +23,8 @@ class AionSystemHealthCenterTests(unittest.TestCase):
             "total": 3,
             "unresolved": 0,
             "affected": 0,
+            "freshness_attested": True,
+            "freshness_source": "test.fixture",
         }
         value.update(overrides)
         return value
@@ -49,6 +51,36 @@ class AionSystemHealthCenterTests(unittest.TestCase):
         self.assertEqual(out["healthy_domains"], 6)
         self.assertTrue(out["all_confirmed_healthy"])
         self.assertEqual(out["unresolved_domains"], [])
+
+
+    def test_confirmed_healthy_without_freshness_proof_stays_unknown(self):
+        item = normalize_health_domain(
+            "runtime",
+            {"state": "HEALTHY", "confirmed": True, "detail": "Runtime ok"},
+        )
+        self.assertEqual(item["state"], UNKNOWN)
+        self.assertFalse(item["confirmed"])
+        self.assertIn("FRESHNESS_NOT_CONFIRMED", item["reasons"])
+
+    def test_secret_like_value_inside_detail_is_redacted(self):
+        item = normalize_health_domain(
+            "notifications",
+            self.healthy(detail="token=abc123 bearer ZXhhbXBsZQ== sk-abcdefghijk"),
+        )
+        blob = json.dumps(item)
+        self.assertNotIn("abc123", blob)
+        self.assertNotIn("ZXhhbXBsZQ==", blob)
+        self.assertNotIn("sk-abcdefghijk", blob)
+        self.assertIn("[REDACTED]", blob)
+
+    def test_consistency_warning_surfaces_worker_queue_mismatch(self):
+        out = build_system_health_center(
+            self.full(
+                workers=self.healthy(),
+                queues={"state": "DEGRADED", "confirmed": False, "unresolved": 3},
+            )
+        )
+        self.assertIn("WORKER_HEALTHY_WITH_QUEUE_ISSUES", out["consistency_warnings"])
 
     def test_healthy_label_without_confirmation_stays_unknown(self):
         item = normalize_health_domain(
