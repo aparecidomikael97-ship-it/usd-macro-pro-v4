@@ -395,5 +395,105 @@ class AtlasQuantAionMasterStatusBoardTests(unittest.TestCase):
 
 
 
+    def test_cost_center_is_unknown_without_explicit_cost_evidence(self):
+        board=self.base()
+        center=board["cost_center"]
+        self.assertEqual(center["state"],"UNKNOWN")
+        self.assertEqual(self.by_id(board,"cost_center")["state"],"UNKNOWN")
+        self.assertFalse(center["automatic_charge"])
+        self.assertFalse(center["executes_action"])
+
+    def test_model_budget_usage_is_estimate_not_confirmed_spend(self):
+        checkpoint={
+            "operating":{"tasks":[]},
+            "entitlements":{"records":[]},
+            "continuity":{"missions":[],"handoffs":[]},
+            "durable_tasks":{"records":[]},
+            "aion":{
+                "model_budget":{
+                    "spent_usd_estimate":4.25,
+                    "monthly_limit_usd":20,
+                    "allow_paid":False,
+                }
+            },
+        }
+        board=self.base(checkpoint=checkpoint)
+        center=board["cost_center"]
+        self.assertEqual(center["state"],"PARTIAL")
+        self.assertEqual(center["confirmed_monthly_usd"],0.0)
+        self.assertEqual(center["estimated_monthly_usd"],4.25)
+        self.assertEqual(self.by_id(board,"cost_center")["state"],"UNKNOWN")
+        self.assertIn("estimado US$ 4.25",self.by_id(board,"cost_center")["detail"])
+
+    def test_explicit_confirmed_costs_can_confirm_compact_cost_row(self):
+        system_context={
+            "truth_state":"CONFIRMED",
+            "source_build":"abc123",
+            "cost_evidence":[
+                {
+                    "id":"server",
+                    "label":"Servidor",
+                    "category":"infrastructure",
+                    "truth_state":"CONFIRMED",
+                    "amount":12.0,
+                    "currency":"USD",
+                    "period":"MONTHLY",
+                    "source":"invoice:server",
+                },
+                {
+                    "id":"data",
+                    "label":"Dados",
+                    "category":"market_data",
+                    "truth_state":"CONFIRMED",
+                    "amount":8.0,
+                    "currency":"USD",
+                    "period":"MONTHLY",
+                    "source":"invoice:data",
+                },
+            ],
+        }
+        board=self.base(system_context=system_context)
+        center=board["cost_center"]
+        self.assertEqual(center["state"],"CONFIRMED")
+        self.assertEqual(center["confirmed_monthly_usd"],20.0)
+        self.assertEqual(center["confirmed_cost_per_user_usd"],10.0)
+        item=self.by_id(board,"cost_center")
+        self.assertEqual(item["state"],"CONFIRMED")
+        self.assertIn("US$ 20.00/mês",item["detail"])
+        self.assertIn("US$ 10.00",item["detail"])
+
+    def test_mixed_confirmed_and_estimated_costs_never_turn_compact_row_confirmed(self):
+        system_context={
+            "truth_state":"CONFIRMED",
+            "source_build":"abc123",
+            "cost_evidence":[
+                {
+                    "id":"server",
+                    "label":"Servidor",
+                    "category":"infrastructure",
+                    "truth_state":"CONFIRMED",
+                    "amount":10,
+                    "currency":"USD",
+                    "period":"MONTHLY",
+                    "source":"invoice",
+                },
+                {
+                    "id":"voice",
+                    "label":"Voz",
+                    "category":"voice_tts",
+                    "truth_state":"ESTIMATED",
+                    "amount":5,
+                    "currency":"USD",
+                    "period":"MONTHLY",
+                    "source":"pricing-page",
+                },
+            ],
+        }
+        board=self.base(system_context=system_context)
+        self.assertEqual(board["cost_center"]["state"],"PARTIAL")
+        self.assertEqual(self.by_id(board,"cost_center")["state"],"UNKNOWN")
+
+
+
 if __name__=="__main__":
     unittest.main()
