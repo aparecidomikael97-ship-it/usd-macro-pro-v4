@@ -1,6 +1,7 @@
 from pathlib import Path
 import unittest
 
+import atlasquant_aion_action_receipt as action_receipt
 import atlasquant_aion_continuity as continuity
 import atlasquant_aion_dev_fusion as dev_fusion
 import atlasquant_aion_digital_twin as digital_twin
@@ -244,6 +245,65 @@ class AionResidualResourceBoundsTests(unittest.TestCase):
         self.assertNotIn("list(preferences.items())[:50]",tenant_src)
         self.assertNotIn("list(academy.items())[:200]",tenant_src)
         self.assertNotIn("list(redemptions_raw)[:2000]",memory_src)
+
+
+    def test_action_receipt_prefix_helpers_stop_at_existing_limits(self):
+        refs=GuardedIterable((f"ref-{i}" for i in range(100)),max_reads=40)
+        normalized=action_receipt._refs(refs)
+        self.assertEqual(len(normalized),40)
+        self.assertEqual(refs.reads,40)
+
+        children=GuardedIterable(
+            (
+                {
+                    "receipt_id":f"receipt-{i}",
+                    "schema":"TEST",
+                    "fingerprint":f"fingerprint-{i}",
+                }
+                for i in range(100)
+            ),
+            max_reads=40,
+        )
+        normalized_children=action_receipt._child_refs(children)
+        self.assertEqual(len(normalized_children),40)
+        self.assertEqual(children.reads,40)
+
+    def test_resilience_iterables_respect_existing_500_record_bounds(self):
+        watchdogs=GuardedIterable(
+            (
+                {"component":f"component-{i}","heartbeat_age_seconds":0}
+                for i in range(700)
+            ),
+            max_reads=500,
+        )
+        state=resilience.normalize_resilience({"watchdogs":watchdogs})
+        self.assertEqual(len(state["watchdogs"]),500)
+        self.assertEqual(watchdogs.reads,500)
+
+        delegations=(
+            {"delegation_id":f"delegation-{i}","state":"BLOCKED"}
+            for i in range(505)
+        )
+        normalized=resilience.normalize_delegations(delegations)
+        self.assertEqual(len(normalized),500)
+        self.assertEqual(normalized[0]["delegation_id"],"delegation-5")
+        self.assertEqual(normalized[-1]["delegation_id"],"delegation-504")
+
+    def test_resilience_and_action_receipt_avoid_unbounded_list_before_slice(self):
+        resilience_src=Path("atlasquant_aion_resilience.py").read_text(encoding="utf-8")
+        receipt_src=Path("atlasquant_aion_action_receipt.py").read_text(encoding="utf-8")
+
+        self.assertNotIn("list(rows or [])[-500:]",resilience_src)
+        self.assertNotIn('list(item.get("watchdogs") or [])[:500]',resilience_src)
+        self.assertNotIn('list(item.get("circuit_breakers") or [])[:500]',resilience_src)
+        self.assertNotIn('list(item.get("resource_governors") or [])[:500]',resilience_src)
+        self.assertIn("deque(rows or (), maxlen=500)",resilience_src)
+        self.assertIn('islice(item.get("watchdogs") or (), 500)',resilience_src)
+        self.assertIn('islice(item.get("circuit_breakers") or (), 500)',resilience_src)
+        self.assertIn('islice(item.get("resource_governors") or (), 500)',resilience_src)
+
+        self.assertNotIn("list(values or [])[:40]",receipt_src)
+        self.assertIn("islice(values or (), 40)",receipt_src)
 
 
 if __name__=="__main__":
