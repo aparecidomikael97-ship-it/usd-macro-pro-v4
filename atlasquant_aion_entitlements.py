@@ -169,12 +169,12 @@ def normalize_entitlement(raw:Mapping[str,Any])->dict[str,Any]:
         },
         "status":status,
         "approval":{
-            "approved":bool(approval.get("approved",False)),
+            "approved":approval.get("approved") is True,
             "approved_by":_text(approval.get("approved_by"),80),
             "approved_at":_text(approval.get("approved_at"),80),
         },
         "provider_evidence":{
-            "confirmed":bool(evidence.get("confirmed",False)),
+            "confirmed":evidence.get("confirmed") is True,
             "provider":_text(evidence.get("provider"),120),
             "external_id":_text(evidence.get("external_id"),220),
             "event_id":_text(evidence.get("event_id"),220),
@@ -268,8 +268,8 @@ def entitlement_activation_preflight(
         approved=approved,
         feature_flags=feature_flags,
     )
-    request_approved=bool(item["approval"]["approved"])
-    allowed=bool(request_approved and guardian["allowed"])
+    request_approved=item["approval"]["approved"] is True
+    allowed=request_approved and guardian.get("allowed") is True
     if not request_approved:
         reason="Solicitação de entitlement ainda não foi aprovada pelo administrador."
     else:
@@ -302,7 +302,7 @@ def mark_entitlement_from_provider_evidence(
     data=dict(evidence or {})
     provider=_text(data.get("provider"),120)
     external_id=_text(data.get("external_id"),220)
-    confirmed=bool(data.get("confirmed",False))
+    confirmed=data.get("confirmed") is True
     if not confirmed or not provider or not external_id:
         raise ValueError("confirmed provider entitlement evidence required")
     item["provider_evidence"]={

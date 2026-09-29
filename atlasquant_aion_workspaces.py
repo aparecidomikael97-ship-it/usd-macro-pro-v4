@@ -214,15 +214,14 @@ def developer_trust_policy() -> dict[str, Any]:
 
 
 def developer_step_allowed(level: object, *, human_approved: bool = False) -> bool:
-    try:
-        value = int(level)
-    except (TypeError, ValueError):
+    # bool is a subclass of int. True/False must not become levels 1/0.
+    if isinstance(level, bool) or not isinstance(level, int):
         return False
-    if value < 0 or value > DEVELOPER_TRUST_LEVELS[-1]["level"]:
+    if level < 0 or level > DEVELOPER_TRUST_LEVELS[-1]["level"]:
         return False
-    if value <= 1:
+    if level <= 1:
         return True
-    return bool(human_approved)
+    return human_approved is True
 
 
 __all__ = [

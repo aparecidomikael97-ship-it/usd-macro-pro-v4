@@ -100,6 +100,28 @@ class AtlasQuantAionModelRouterTests(unittest.TestCase):
         self.assertEqual(changed["aion"]["model_budget"]["monthly_limit_usd"],20)
         self.assertFalse(changed["aion"]["real_trading"])
 
+    def test_textual_paid_flags_do_not_open_an_external_lane(self):
+        self.assertFalse(normalize_budget({"allow_paid":"false"})["allow_paid"])
+        self.assertFalse(normalize_budget({"allow_paid":"yes"})["allow_paid"])
+        self.assertFalse(normalize_budget({"allow_paid":1})["allow_paid"])
+        denied=budget_decision(
+            {"allow_paid":True,"monthly_limit_usd":10},
+            1,
+            request_approved="yes",
+        )
+        self.assertFalse(denied["allowed"])
+        route=route_intelligence(
+            "Summarize this text",
+            provider_state="EXTERNAL_READY",
+            external_feature_enabled="false",
+            request_approved="false",
+            budget={"allow_paid":"false","monthly_limit_usd":10},
+            estimated_request_cost_usd=1,
+        )
+        self.assertEqual(route["lane"],"LOCAL_DETERMINISTIC")
+        self.assertFalse(route["external_feature_enabled"])
+        self.assertFalse(route["executes_provider_call"])
+
 
 if __name__=="__main__":
     unittest.main()

@@ -100,6 +100,28 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
         self.assertEqual(preflight["candidate_integrity"],"CONFIRMED")
         self.assertTrue(preflight["expected_sha"])
 
+    def test_forged_integrity_claim_cannot_authorize_recovery(self):
+        candidate={
+            "status":"CONFIRMED",
+            "revision":"a"*40,
+            "checkpoint":{},
+            "integrity":{"state":"CONFIRMED","write_safe":True},
+        }
+        self.assertNotEqual(checkpoint_integrity_report({})["state"],"CONFIRMED")
+        preflight=recovery_preflight(
+            {"status":"CONFIRMED","sha":"b"*40},
+            candidate,
+        )
+        self.assertFalse(preflight["allowed"])
+        self.assertNotEqual(preflight["candidate_integrity"],"CONFIRMED")
+
+    def test_digest_claim_must_match_recomputed_checkpoint(self):
+        candidate=self.candidate()
+        candidate["digest"]="0"*64
+        preflight=recovery_preflight(self.current(),candidate)
+        self.assertFalse(preflight["allowed"])
+        self.assertIn("digest",preflight["reason"])
+
     def test_recovery_blocks_tampered_candidate(self):
         candidate=self.candidate()
         candidate["checkpoint"]["business"]["digest"]="wrong"

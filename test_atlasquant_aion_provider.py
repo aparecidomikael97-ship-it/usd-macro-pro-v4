@@ -160,6 +160,33 @@ class AtlasQuantAionProviderTests(unittest.TestCase):
         self.assertIn("Conflito deve ser exposto",prompt)
         self.assertIn("HUMAN_REVIEW_CANDIDATE não autoriza execução",prompt)
 
+    def test_textual_flags_never_reach_provider_transport(self):
+        session=_FakeSession(_FakeResponse())
+        result=execute_openai_answer(
+            "Summarize this text",
+            lane="EXTERNAL_FAST",
+            external_feature_enabled="false",
+            request_approved="false",
+            budget={"allow_paid":"false","monthly_limit_usd":10},
+            values=self._env(),
+            session=session,
+        )
+        self.assertFalse(result["called"])
+        self.assertEqual(session.calls,[])
+        session=_FakeSession(_FakeResponse())
+        result=execute_openai_answer(
+            "Summarize this text",
+            lane="EXTERNAL_FAST",
+            external_feature_enabled=True,
+            request_approved="false",
+            budget={"allow_paid":True,"monthly_limit_usd":10},
+            values=self._env(),
+            session=session,
+        )
+        self.assertFalse(result["called"])
+        self.assertEqual(result["state"],"BLOCKED_APPROVAL")
+        self.assertEqual(session.calls,[])
+
     def test_external_call_is_blocked_without_explicit_approval(self):
         session=_FakeSession(_FakeResponse())
         result=execute_openai_answer(
