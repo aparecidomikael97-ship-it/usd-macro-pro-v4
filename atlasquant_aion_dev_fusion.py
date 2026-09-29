@@ -8,9 +8,11 @@ real trading. Human approval remains mandatory after all gates.
 """
 from __future__ import annotations
 
+from collections import deque
 from datetime import datetime, timezone
 from hashlib import sha256
 from typing import Any, Mapping, Sequence
+from itertools import islice
 import json
 
 SCHEMA="ATLASQUANT_AION_DEV_FUSION_V1"
@@ -30,7 +32,7 @@ def _clean(value:Any,limit:int=1600)->str:
 
 def _refs(values:Sequence[Any]|None,limit:int=100)->list[str]:
     out=[]
-    for raw in list(values or [])[:limit*2]:
+    for raw in islice(values or (), max(0,limit*2)):
         text=_clean(raw,300)
         if text and text not in out:
             out.append(text)
@@ -117,7 +119,7 @@ def normalize_pipeline(raw:Mapping[str,Any])->dict[str,Any]:
     if supplied:
         out["pipeline_id"]=supplied
     stage_map={x["stage"]:x for x in out["stages"]}
-    for raw_stage in list(item.get("stages") or [])[:len(STAGES)*2]:
+    for raw_stage in islice(item.get("stages") or (),len(STAGES)*2):
         if not isinstance(raw_stage,Mapping):
             continue
         name=_clean(raw_stage.get("stage"),40).upper()
@@ -205,7 +207,7 @@ def record_stage(
 
 def evaluate_pipeline(pipeline:Mapping[str,Any])->dict[str,Any]:
     item=dict(pipeline or {})
-    stages=list(item.get("stages") or [])
+    stages=list(islice(item.get("stages") or (),len(STAGES)*2))
     if not stages:
         return item
     blockers=[]
@@ -260,7 +262,12 @@ def evaluate_pipeline(pipeline:Mapping[str,Any])->dict[str,Any]:
 def normalize_pipelines(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for raw in list(rows or [])[-MAX_PIPELINES*2:]:
+    source=(
+        rows[-MAX_PIPELINES*2:]
+        if isinstance(rows,(list,tuple))
+        else deque(rows or (),maxlen=MAX_PIPELINES*2)
+    )
+    for raw in source:
         if not isinstance(raw,Mapping):
             continue
         try:

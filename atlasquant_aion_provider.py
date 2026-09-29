@@ -14,7 +14,7 @@ confirmed fact merely because a provider generated it.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 import json
 import math
@@ -40,13 +40,24 @@ DEFAULT_TIMEOUT_SECONDS=45.0
 @dataclass(frozen=True)
 class ProviderConfig:
     provider:str
-    api_key:str
+    api_key:str = field(repr=False)
     fast_model:str
     reasoning_model:str
     input_usd_per_mtok:float
     output_usd_per_mtok:float
     max_output_tokens:int
     timeout_seconds:float
+
+    def __repr__(self)->str:
+        return (
+            "ProviderConfig("
+            f"provider={self.provider!r}, api_key='[REDACTED]', "
+            f"fast_model={self.fast_model!r}, reasoning_model={self.reasoning_model!r}, "
+            f"input_usd_per_mtok={self.input_usd_per_mtok!r}, "
+            f"output_usd_per_mtok={self.output_usd_per_mtok!r}, "
+            f"max_output_tokens={self.max_output_tokens!r}, "
+            f"timeout_seconds={self.timeout_seconds!r})"
+        )
 
     @property
     def key_present(self)->bool:
@@ -368,7 +379,7 @@ def execute_openai_answer(
             "schema":SCHEMA,"state":"BLOCKED_PRIVACY","called":False,
             "reason":"Prompt contém sinal de dado sensível e permanece local.",
         }
-    if not external_feature_enabled:
+    if external_feature_enabled is not True:
         return {
             "schema":SCHEMA,"state":"BLOCKED_FEATURE_FLAG","called":False,
             "reason":"Feature flag de modelo externo está desligada.",
@@ -378,7 +389,7 @@ def execute_openai_answer(
             "schema":SCHEMA,"state":"BLOCKED_PROVIDER_CONFIG","called":False,
             "reason":status["state"],"provider_status":status,
         }
-    if not request_approved:
+    if request_approved is not True:
         return {
             "schema":SCHEMA,"state":"BLOCKED_APPROVAL","called":False,
             "reason":"Solicitação externa exige aprovação explícita.",

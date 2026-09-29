@@ -9,19 +9,23 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
-from atlasquant_aion_approval_inbox import collect_approval_inbox
-from atlasquant_aion_business import business_summary
 from atlasquant_aion_core import guardian_decision
 from atlasquant_aion_developer_engine import definition_of_done
 from atlasquant_aion_observability import is_secret_key, redact_text
 from atlasquant_aion_specialists import SPECIALIST_MODULES
+from atlasquant_aion_business_adapter import business_summary as _business_summary
+from atlasquant_aion_investment_adapter import investment_product_comparison as _investment_comparison
 from atlasquant_aion_truth import assess_truth
 from atlasquant_content_pipeline import provider_readiness
 from atlasquant_fx_universe import OFFICIAL_PAIRS
-from atlasquant_investment_ecosystem import investment_product_comparison
 from atlasquant_lab_matrix import evidence_rows_from_research_records, lab_matrix
 from atlasquant_macro_briefing import build_macro_briefing
 from atlasquant_scanner_queue import scanner_queue
+
+def _approval_inbox(checkpoint):
+    from atlasquant_aion_approval_inbox import collect_approval_inbox
+    return collect_approval_inbox(checkpoint)
+
 
 SCHEMA = "ATLASQUANT_AION_SPECIALIST_SESSION_SNAPSHOT_V1"
 EVIDENCE_SCHEMA = "ATLASQUANT_AION_SPECIALIST_EVIDENCE_V1"
@@ -896,7 +900,7 @@ def _admin(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, Any]:
     if not view.get("present"):
         view = _mapping(slices.get("checkpoint"))
     if not view.get("present"):
-        inbox = collect_approval_inbox(None)
+        inbox = _approval_inbox(None)
         return _absent(
             "admin",
             "Nenhum checkpoint ou inbox foi fornecido à sessão. Isso não afirma que a produção está vazia.",
@@ -914,7 +918,7 @@ def _admin(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, Any]:
         inbox = body
     else:
         checkpoint = body.get("checkpoint") if isinstance(body.get("checkpoint"), Mapping) else body
-        inbox = collect_approval_inbox(checkpoint if isinstance(checkpoint, Mapping) else None)
+        inbox = _approval_inbox(checkpoint if isinstance(checkpoint, Mapping) else None)
     origin = str(view.get("origin") or "CHECKPOINT")
     claim = _clock_claim(origin, str(view.get("observed_at") or ""), view.get("ttl_seconds"), inbox.get("total"))
     assessment = _assess([claim], now)
@@ -1017,7 +1021,7 @@ def _business(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, An
         )
     body = _mapping(view.get("payload"))
     products = body.get("products") if "products" in body else body.get("rows")
-    summary = business_summary(products if isinstance(products, list) else None)
+    summary = _business_summary(products if isinstance(products, list) else None)
     origin = str(view.get("origin") or "LOCAL_STATE")
     claim = _clock_claim(origin, str(view.get("observed_at") or ""), view.get("ttl_seconds"), summary.get("total"))
     assessment = _assess([claim], now)
@@ -1063,7 +1067,7 @@ def _invest(snapshot: Mapping[str, Any], now: datetime | None) -> dict[str, Any]
         )
     body = _mapping(view.get("payload"))
     records = body.get("records", body.get("rows"))
-    comparison = investment_product_comparison(records if isinstance(records, list) else None)
+    comparison = _investment_comparison(records if isinstance(records, list) else None)
     origin = str(view.get("origin") or "LOCAL_STATE")
     claim = _clock_claim(origin, str(view.get("observed_at") or ""), view.get("ttl_seconds"), comparison.get("state"))
     assessment = _assess([claim], now)

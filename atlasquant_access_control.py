@@ -6,7 +6,7 @@ Passwords must be stored as PBKDF2-SHA256 hashes; plaintext credentials are reje
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Mapping
 import hashlib
 import hmac
@@ -38,8 +38,16 @@ ROLE_PERMISSIONS={
 class AccessUser:
     username:str
     role:str
-    password_hash:str
+    password_hash:str = field(repr=False)
     active:bool=True
+
+    def __repr__(self)->str:
+        return (
+            "AccessUser("
+            f"username={self.username!r}, role={self.role!r}, "
+            "password_hash='[REDACTED]', "
+            f"active={self.active!r})"
+        )
 
 def normalize_username(value:Any)->str:
     username=str(value or "").strip().lower()

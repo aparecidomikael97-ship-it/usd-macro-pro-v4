@@ -25,6 +25,7 @@ from atlasquant_aion_core_runtime_bridge import (
 )
 from atlasquant_aion_core_voice_automation import CheckpointAutomationAdapter
 from atlasquant_aion_observability import redact_text
+from atlasquant_aion_action_receipt_bridge import seal_executor_receipt_envelope
 
 
 SCHEMA = "ATLASQUANT_AION_BACKGROUND_EXECUTOR_V1"
@@ -262,7 +263,7 @@ def _receipt(
         "state": state,
         "capability": str(schedule.get("capability") or ""),
         "guardian_action": _guardian_action(str(schedule.get("capability") or "")),
-        "guardian_allowed": bool(guardian.get("allowed")),
+        "guardian_allowed": guardian.get("allowed") is True,
         "guardian_risk": str(guardian.get("risk") or "UNKNOWN"),
         "guardian_reason": str(guardian.get("reason") or ""),
         "human_confirmation_digest": approval_digest if authorization_mode == "HUMAN_CLICK" else "",
@@ -282,13 +283,9 @@ def _receipt(
         "result_digest": digest(result or {}),
         "result_preview": _result_preview(payload) if payload is not None else "",
         "retry_after": retry_after.isoformat() if retry_after else "",
-        "provider_called": bool((result or {}).get("provider_called", False)),
-        "external_action_executed": bool(
-            (result or {}).get("external_action_executed", False)
-        ),
-        "real_trading_enabled": bool(
-            (result or {}).get("real_trading_enabled", False)
-        ),
+        "provider_called": (result or {}).get("provider_called") is True,
+        "external_action_executed": (result or {}).get("external_action_executed") is True,
+        "real_trading_enabled": (result or {}).get("real_trading_enabled") is True,
         "execution_authorized": False,
         "external_persisted": False,
     }
@@ -379,6 +376,7 @@ def _execute_due_local_work_authorized(
     if not allowed_capabilities or not allowed_capabilities.issubset(ALLOWLISTED_CAPABILITIES):
         raise ValueError("invalid executor capability allowlist")
     outcomes = []
+    action_receipts = []
     added = 0
 
     for schedule in due[:max_jobs]:
@@ -430,7 +428,7 @@ def _execute_due_local_work_authorized(
 
         if capability not in allowed_capabilities:
             reason = "CAPABILITY_NOT_BACKGROUND_ALLOWLISTED"
-        elif not bool(guardian.get("allowed")):
+        elif guardian.get("allowed") is not True:
             reason = "GUARDIAN_BLOCKED:" + str(guardian.get("reason") or "")
         else:
             sensitive = _sensitive_marker(str(schedule.get("prompt") or ""))
@@ -447,12 +445,19 @@ def _execute_due_local_work_authorized(
                         capability=capability,
                         now=current,
                     )
-                    unsafe = any(bool(terminal_result.get(key)) for key in (
-                        "provider_called",
-                        "external_action_executed",
-                        "real_trading_enabled",
-                        "execution_authorized",
-                    ))
+                    safety_values = [
+                        terminal_result.get(key, False)
+                        for key in (
+                            "provider_called",
+                            "external_action_executed",
+                            "real_trading_enabled",
+                            "execution_authorized",
+                        )
+                    ]
+                    unsafe = any(
+                        value is True or not isinstance(value, bool)
+                        for value in safety_values
+                    )
                     if unsafe:
                         reason = "RUNTIME_SAFETY_FLAG_VIOLATION"
                     elif str(terminal_result.get("status") or "") == "COMPLETED":
@@ -491,6 +496,9 @@ def _execute_due_local_work_authorized(
             execution_principal=execution_principal,
         )
         receipts.append(receipt)
+        action_receipts.append(
+            seal_executor_receipt_envelope(receipt, context=context)
+        )
         added += 1
         outcomes.append({
             "schedule_id": schedule.get("schedule_id"),
@@ -525,6 +533,8 @@ def _execute_due_local_work_authorized(
         "failed": failed,
         "blocked": blocked,
         "outcomes": outcomes,
+        "action_receipts": action_receipts,
+        "action_receipts_are_authority": False,
         "requires_checkpoint_save": added > 0,
         "external_persisted": False,
         "manual_invocation_only": authorization_mode == "HUMAN_CLICK",

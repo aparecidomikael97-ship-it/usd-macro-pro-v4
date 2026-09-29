@@ -59,6 +59,7 @@ def _live(status="NOT_ENABLED", *, checked_at=CURRENT_AT, **extra):
             "LIVE_CONFIRMED_WITH_WORK",
         },
         "stale_lease": False,
+        "inflight_reconciliation_required": False,
         "unsafe_receipts_after_activation": 0,
     }
     base.update(extra)
@@ -178,6 +179,48 @@ class GlobalWorkerRecoveryClosureTests(unittest.TestCase):
         self.assertEqual(result["status"], "CLOSURE_BLOCKED")
         self.assertIn("STALE_LEASE_STILL_PRESENT", result["blockers"])
         self.assertFalse(result["closure_review_ready"])
+
+    def test_inflight_incident_requires_reconciliation_before_closure_review(self):
+        incident = _supervision("INCIDENT_INFLIGHT_RECONCILIATION")
+        remediation = _remediation(incident)
+        result = assess_incident_closure_readiness(
+            incident,
+            _live(
+                "BLOCKED_INFLIGHT_RECONCILIATION",
+                inflight_reconciliation_required=True,
+            ),
+            _flag("ENABLED"),
+            remediation,
+            now=CURRENT_AT,
+        )
+        self.assertEqual(result["status"], "CLOSURE_BLOCKED")
+        self.assertIn(
+            "INFLIGHT_RECONCILIATION_STILL_REQUIRED",
+            result["blockers"],
+        )
+        self.assertFalse(result["closure_review_ready"])
+        self.assertFalse(result["incident_closed"])
+        self.assertFalse(result["automatic_closure"])
+
+    def test_reconciled_inflight_incident_can_become_ready_for_human_review(self):
+        incident = _supervision("INCIDENT_INFLIGHT_RECONCILIATION")
+        remediation = _remediation(incident)
+        result = assess_incident_closure_readiness(
+            incident,
+            _live(
+                "LIVE_CONFIRMED_IDLE",
+                inflight_reconciliation_required=False,
+            ),
+            _flag("ENABLED"),
+            remediation,
+            now=CURRENT_AT,
+        )
+        self.assertEqual(result["status"], "CLOSURE_REVIEW_READY")
+        self.assertTrue(result["closure_review_ready"])
+        self.assertTrue(result["real_recovery_evidence_confirmed"])
+        self.assertFalse(result["real_recovery_confirmed"])
+        self.assertTrue(result["human_closure_required"])
+        self.assertFalse(result["reactivation_authorized"])
 
     def test_unsafe_receipt_still_present_blocks_closure(self):
         incident = _supervision("INCIDENT_UNSAFE_RECEIPT")

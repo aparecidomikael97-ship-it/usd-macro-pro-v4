@@ -12,6 +12,7 @@ from atlasquant_aion_core_runtime_bridge import authenticated_context
 from atlasquant_aion_core_voice_automation import stage_schedule
 from atlasquant_aion_global_worker import (
     GLOBAL_WORKER_NAMESPACE,
+    _claim_state,
     _mutated,
     attach_global_worker_state,
     load_global_worker_state,
@@ -296,6 +297,34 @@ class GlobalWorkerLiveVerificationTests(unittest.TestCase):
         self.assertEqual(report["status"], "BLOCKED_UNSAFE_RECEIPT")
         self.assertEqual(report["unsafe_receipts_after_activation"], 1)
         self.assertFalse(report["live_confirmed"])
+
+    def test_unresolved_inflight_blocks_live_before_stale_lease(self):
+        checkpoint = self.armed_checkpoint()
+        state, _ = load_global_worker_state(checkpoint)
+        claimed, lease = _claim_state(
+            state,
+            runtime_id="gha-inflight-live",
+            now=ACTIVATED + timedelta(minutes=5),
+        )
+        checkpoint = attach_global_worker_state(checkpoint, claimed)
+        report = verify_global_worker_live_activation(
+            self.access,
+            self.runtime(checkpoint),
+            _flag(),
+            activation_result=_activation_result(),
+            now=ACTIVATED + timedelta(minutes=6),
+        )
+        self.assertEqual(report["status"], "BLOCKED_INFLIGHT_RECONCILIATION")
+        self.assertEqual(
+            report["reason"],
+            "GLOBAL_WORKER_INFLIGHT_TICK_REQUIRES_RECONCILIATION",
+        )
+        self.assertTrue(report["inflight_reconciliation_required"])
+        self.assertEqual(report["inflight_owner"], "gha-inflight-live")
+        self.assertEqual(report["inflight_fencing_token"], lease["fencing_token"])
+        self.assertFalse(report["stale_lease"])
+        self.assertFalse(report["live_confirmed"])
+        self.assertNotIn(lease["token"], str(report))
 
     def test_stale_owned_lease_blocks_live_claim(self):
         checkpoint = self.with_stats(

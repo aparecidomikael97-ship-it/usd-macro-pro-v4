@@ -2,6 +2,7 @@ import unittest
 from datetime import datetime, timezone
 
 from atlasquant_aion_entitlements import (
+    MAX_ENTITLEMENTS,
     approve_entitlement_request,
     entitlement_activation_preflight,
     entitlement_effective,
@@ -9,6 +10,7 @@ from atlasquant_aion_entitlements import (
     mark_entitlement_from_provider_evidence,
     new_entitlement_request,
     normalize_entitlement,
+    normalize_entitlements,
     upsert_entitlement,
 )
 from atlasquant_aion_tenant import (
@@ -141,6 +143,63 @@ class AtlasQuantAionEntitlementsTests(unittest.TestCase):
         )
         self.assertFalse(after["effective"])
         self.assertIn("EXPIRED",after["reasons"])
+
+    def test_textual_approval_and_evidence_do_not_grant_eligibility(self):
+        now=datetime(2026,9,29,6,0,tzinfo=timezone.utc)
+        row=new_entitlement_request("tenant.a",scope=PERSONAL_SCOPE,created_at=now.isoformat())
+        row.update(
+            status="ACTIVE_CONFIRMED",
+            approval={"approved":"false"},
+            provider_evidence={"confirmed":"false","provider":"invented","external_id":"invented"},
+        )
+        normalized=normalize_entitlement(row)
+        self.assertFalse(normalized["approval"]["approved"])
+        self.assertFalse(normalized["provider_evidence"]["confirmed"])
+        self.assertNotEqual(normalized["status"],"ACTIVE_CONFIRMED")
+        access={"session":{"username":"tenant.a","role":"USER","credential_fingerprint":"a"*32}}
+        self.assertFalse(personal_aion_eligibility(access,[row],now=now)["eligible"])
+        for flag in ("yes", 1, "true"):
+            with self.assertRaises(ValueError):
+                mark_entitlement_from_provider_evidence(
+                    approve_entitlement_request(new_entitlement_request("tenant.a"),self.admin),
+                    {"confirmed":flag,"provider":"registry","external_id":"ext"},
+                )
+        preflight=entitlement_activation_preflight(row,self.admin,approved=True)
+        self.assertFalse(preflight["allowed"])
+        self.assertFalse(preflight["request_approved"])
+
+    def test_present_invalid_expiry_is_not_treated_as_open_ended(self):
+        with self.assertRaises(ValueError):
+            new_entitlement_request("cliente.01", expires_at="invalid-expiry")
+        with self.assertRaises(ValueError):
+            new_entitlement_request("cliente.01", expires_at="2026-12-01T00:00:00")
+        item=new_entitlement_request("cliente.01")
+        item=approve_entitlement_request(item,self.admin)
+        item=mark_entitlement_from_provider_evidence(
+            item,
+            {"confirmed":True,"provider":"registry","external_id":"x-1"},
+        )
+        self.assertTrue(entitlement_effective(item)["effective"])
+        for raw in ("invalid-expiry", "2026-12-01T00:00:00", "not-a-date"):
+            forged=dict(item)
+            forged["window"]={"starts_at":"","expires_at":raw}
+            result=entitlement_effective(forged)
+            self.assertFalse(result["effective"], raw)
+            self.assertIn("INVALID_EXPIRY", result["reasons"])
+
+    def test_entitlement_generator_is_not_consumed_past_normalization_bound(self):
+        consumed={"count":0}
+
+        def rows():
+            for index in range(MAX_ENTITLEMENTS*2+1):
+                if index>=MAX_ENTITLEMENTS*2:
+                    raise AssertionError("entitlement iterable consumed past bound")
+                consumed["count"]+=1
+                yield {}
+
+        normalized=normalize_entitlements(rows())
+        self.assertLessEqual(len(normalized),MAX_ENTITLEMENTS)
+        self.assertEqual(consumed["count"],MAX_ENTITLEMENTS*2)
 
     def test_summary_and_upsert(self):
         a=new_entitlement_request("cliente.01",created_at="2026-09-24T12:00:00Z")

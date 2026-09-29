@@ -20,6 +20,7 @@ from enum import Enum
 from typing import Any, Mapping, Sequence
 import hashlib
 import json
+import math
 import unicodedata
 
 SCHEMA = "ATLASQUANT_AION_CORE_V1"
@@ -150,11 +151,17 @@ def truth_record(
     Precedence is conservative: confirmed > inference > hypothesis > unknown.
     A value alone never means confirmed.
     """
-    if confirmed:
+    if (
+        not isinstance(confirmed, bool)
+        or not isinstance(inference, bool)
+        or not isinstance(hypothesis, bool)
+    ):
+        kind = TruthKind.UNKNOWN
+    elif confirmed is True:
         kind = TruthKind.CONFIRMED
-    elif inference:
+    elif inference is True:
         kind = TruthKind.INFERENCE
-    elif hypothesis:
+    elif hypothesis is True:
         kind = TruthKind.HYPOTHESIS
     else:
         kind = TruthKind.UNKNOWN
@@ -224,20 +231,47 @@ def route_context(text: object) -> dict[str, Any]:
     }
 
 
+def _exact_true(value: Any) -> bool:
+    """Privilege flags accept only the boolean True.
+
+    Strings such as "false", numbers, and other truthy values stay denied.
+    """
+    return value is True
+
+
+def explicit_nonnegative_amount(value: Any) -> float | None:
+    """Finite, non-negative int or float. Every other value is an unknown cost.
+
+    Absence, strings, booleans, objects, NaN and infinities are not zero.
+    Zero is accepted only when the caller passed a real numeric zero.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if not math.isfinite(value) or value < 0:
+        return None
+    return float(value)
+
+
 def cost_guard(
     estimated_monthly_cost_usd: Any,
     *,
     approved: bool = False,
 ) -> dict[str, Any]:
-    try:
-        cost = float(estimated_monthly_cost_usd)
-    except Exception:
-        cost = 0.0
-    cost = max(0.0, cost)
+    approved_exact = _exact_true(approved)
+    cost = explicit_nonnegative_amount(estimated_monthly_cost_usd)
+    if cost is None:
+        return {
+            "schema": SCHEMA,
+            "allowed": False,
+            "estimated_monthly_cost_usd": None,
+            "requires_explicit_approval": True,
+            "approved": False,
+            "reason": "Custo ausente ou inválido permanece bloqueado.",
+        }
     if cost <= 0:
         allowed = True
         reason = "Custo estimado zero; política Custo Zero preservada."
-    elif approved:
+    elif approved_exact:
         allowed = True
         reason = "Custo positivo explicitamente aprovado pelo administrador."
     else:
@@ -248,7 +282,7 @@ def cost_guard(
         "allowed": allowed,
         "estimated_monthly_cost_usd": round(cost, 4),
         "requires_explicit_approval": cost > 0,
-        "approved": bool(approved),
+        "approved": approved_exact,
         "reason": reason,
     }
 
@@ -302,7 +336,7 @@ def guardian_decision(
     if isinstance(feature_flags, Mapping):
         for key in flags:
             if key in feature_flags:
-                flags[key] = bool(feature_flags[key])
+                flags[key] = _exact_true(feature_flags[key])
 
     if risk is None:
         return GuardianDecision(
@@ -347,7 +381,7 @@ def guardian_decision(
         GuardianRisk.PRODUCTION,
         GuardianRisk.SECRETS,
     }
-    if requires and not approved:
+    if requires and not _exact_true(approved):
         return GuardianDecision(
             False,
             risk.value,
@@ -476,7 +510,7 @@ def feature_flag_snapshot(overrides: Mapping[str, Any] | None = None) -> dict[st
     if isinstance(overrides, Mapping):
         for key in flags:
             if key in overrides:
-                flags[key] = bool(overrides[key])
+                flags[key] = _exact_true(overrides[key])
     return flags
 
 

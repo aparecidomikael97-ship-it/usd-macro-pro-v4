@@ -36,6 +36,14 @@ WATCHDOG_STATES=("HEALTHY","DEGRADED","ISOLATE_RECOMMENDED")
 SAFE_MODES=("NORMAL","DEGRADED_READ_ONLY","EMERGENCY_STOP_RECOMMENDED")
 
 
+def _exact_true(value:Any)->bool:
+    return value is True
+
+
+def _restrictive_flag(value:Any)->bool:
+    return value is not False
+
+
 def _now()->str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -49,6 +57,8 @@ def _upper(value:Any,limit:int=100)->str:
 
 
 def _finite(value:Any,default:float=0.0)->float:
+    if isinstance(value,bool):
+        return float(default)
     try:
         x=float(value)
         return x if math.isfinite(x) else float(default)
@@ -57,6 +67,8 @@ def _finite(value:Any,default:float=0.0)->float:
 
 
 def _int(value:Any,default:int=0,minimum:int=0,maximum:int=1_000_000)->int:
+    if isinstance(value,bool):
+        return int(default)
     try:
         x=int(value)
     except Exception:
@@ -139,7 +151,7 @@ def principal_authority(
         "root_authority":bool(base.get("can_issue_action",False)),
         "may_orchestrate_delegated_agents":kind in {"ADMIN","SYSTEM_POLICY"} and bool(base.get("can_issue_action",False)),
         "may_expand_own_permissions":False,
-        "may_change_policy":bool(kind=="SYSTEM_POLICY" and signed_system_policy),
+        "may_change_policy":bool(kind=="SYSTEM_POLICY" and _exact_true(signed_system_policy)),
         "reason":str(base.get("reason") or ""),
     }
 
@@ -297,7 +309,9 @@ def circuit_breaker(
     error_rate=max(0.0,min(100.0,_finite(error_rate_pct,0.0)))
     reasons=[]
 
-    if critical_signal:
+    critical=_restrictive_flag(critical_signal)
+    probe_passed=_exact_true(recovery_probe_passed)
+    if critical:
         state="OPEN"
         reasons.append("CRITICAL_SIGNAL")
     elif failures>=3:
@@ -306,10 +320,10 @@ def circuit_breaker(
     elif error_rate>=50.0:
         state="OPEN"
         reasons.append("ERROR_RATE_LIMIT")
-    elif prev=="OPEN" and recovery_probe_passed:
+    elif prev=="OPEN" and probe_passed:
         state="HALF_OPEN"
         reasons.append("RECOVERY_PROBE_PASSED")
-    elif prev=="HALF_OPEN" and recovery_probe_passed and failures==0 and error_rate<10:
+    elif prev=="HALF_OPEN" and probe_passed and failures==0 and error_rate<10:
         state="CLOSED"
         reasons.append("RECOVERY_CONFIRMED")
     elif prev in {"OPEN","HALF_OPEN"}:
@@ -325,8 +339,8 @@ def circuit_breaker(
         "previous_state":prev,
         "consecutive_failures":failures,
         "error_rate_pct":round(error_rate,2),
-        "critical_signal":bool(critical_signal),
-        "recovery_probe_passed":bool(recovery_probe_passed),
+        "critical_signal":critical,
+        "recovery_probe_passed":probe_passed,
         "reasons":reasons,
         "sensitive_calls_allowed":state=="CLOSED",
         "automatic_restart":False,
@@ -448,11 +462,14 @@ def safe_mode_posture(
     circuits=_int(open_circuits,0,0,100000)
     isolates=_int(isolate_recommendations,0,0,100000)
     reasons=[]
-    if not authority_integrity_ok:
+    authority_ok=_exact_true(authority_integrity_ok)
+    policy_ok=_exact_true(policy_integrity_ok)
+    secret=_restrictive_flag(secret_exposure)
+    if not authority_ok:
         reasons.append("AUTHORITY_INTEGRITY_FAILED")
-    if not policy_integrity_ok:
+    if not policy_ok:
         reasons.append("POLICY_INTEGRITY_FAILED")
-    if secret_exposure:
+    if secret:
         reasons.append("SECRET_EXPOSURE")
     if circuits:
         reasons.append("OPEN_CIRCUITS")
@@ -460,9 +477,9 @@ def safe_mode_posture(
         reasons.append("ISOLATION_RECOMMENDED")
 
     if (
-        not authority_integrity_ok
-        or not policy_integrity_ok
-        or secret_exposure
+        not authority_ok
+        or not policy_ok
+        or secret
     ):
         mode="EMERGENCY_STOP_RECOMMENDED"
     elif circuits or isolates:

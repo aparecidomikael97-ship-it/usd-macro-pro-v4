@@ -5,9 +5,11 @@ from atlasquant_aion_capabilities import CapabilityRegistry, default_registry
 from atlasquant_aion_orchestrator import (
     build_aion_result,
     orchestrate,
+    prepare_reviewed_mission,
     validate_specialist_result,
 )
 from atlasquant_aion_truth import assess_truth
+from atlasquant_aion_agent_review_protocol import seal_mission_review_message
 
 
 NOW = datetime(2026, 9, 27, 5, 0, tzinfo=timezone.utc)
@@ -192,6 +194,285 @@ class CentralOrchestratorTests(unittest.TestCase):
         self.assertEqual(result["status"], "PASS")
         self.assertFalse(result["external_action_executed"])
         self.assertFalse(result["automatic_memory_write"])
+
+
+class ReviewedMissionGateTests(unittest.TestCase):
+    trusted = {
+        "tenant_id": "tenant-a",
+        "workspace_id": "central",
+        "role": "ADMIN",
+    }
+    access = {"role": "ADMIN"}
+
+    @staticmethod
+    def verified(refs):
+        return {"state": "VERIFIED", "bound_refs": list(refs)}
+
+    @staticmethod
+    def reviewer_contexts():
+        return {
+            "PRIME": {
+                "role": "PRIME",
+                "agent_id": "prime-1",
+                "tenant_id": "tenant-a",
+                "workspace_id": "central",
+                "capabilities": ["REVIEW"],
+            },
+            "SHADOW": {
+                "role": "SHADOW",
+                "agent_id": "shadow-1",
+                "tenant_id": "tenant-a",
+                "workspace_id": "central",
+                "capabilities": ["REVIEW"],
+            },
+            "SENTINEL": {
+                "role": "SENTINEL",
+                "agent_id": "sentinel-1",
+                "tenant_id": "tenant-a",
+                "workspace_id": "central",
+                "capabilities": ["REVIEW"],
+            },
+        }
+
+    def review_message(
+        self,
+        role,
+        binding,
+        verdict="AGREE",
+        *,
+        plan_version=None,
+        mission_id=None,
+        approval_refs=None,
+        nonce_suffix="",
+    ):
+        contexts = self.reviewer_contexts()
+        sealed = seal_mission_review_message(
+            verdict=verdict,
+            mission_id=binding["mission_id"] if mission_id is None else mission_id,
+            plan_version=binding["plan_version"] if plan_version is None else plan_version,
+            trusted_context=contexts[role],
+            evidence_refs=["evidence-1"],
+            approval_refs=list(approval_refs or []),
+            issued_at=NOW.isoformat(),
+            nonce=f"{role.lower()}-{binding['mission_id']}-{nonce_suffix or verdict.lower()}",
+            risk_level=binding["blast_radius"]["level"],
+            confidence="HIGH",
+        )
+        self.assertEqual(sealed["state"], "SEALED")
+        return sealed["message"]
+
+    def preview(self, objective="Explique o contexto com cuidado.", **kwargs):
+        params = {
+            "access": self.access,
+            "trusted_context": self.trusted,
+            "trusted_reviewer_contexts": self.reviewer_contexts(),
+            "evidence_refs": ["evidence-1"],
+            "evidence_verifier": self.verified,
+            "now": NOW,
+            "feature_flags": {
+                "external_llm": True,
+                "production_deploy": True,
+                "social_publish": True,
+                "marketplace_publish": True,
+            },
+            "system_context": {
+                "provider": {"state": "EXTERNAL_READY"},
+                "runtime_checkpoint": {"status": "CONFIRMED"},
+                "integrations": {
+                    "production_connected": True,
+                    "social_connected": True,
+                    "marketplace_connected": True,
+                },
+                "source_mesh": {"market_live_confirmed": True},
+            },
+        }
+        params.update(kwargs)
+        return prepare_reviewed_mission(objective, **params)
+
+    def test_simple_mission_requires_prime_before_guardian(self):
+        out = self.preview()
+        self.assertEqual(out["state"], "REVIEW_REQUIRED")
+        self.assertEqual(out["task_class"], "SIMPLE")
+        self.assertEqual(out["required_roles"], ["PRIME"])
+        self.assertFalse(out["eligible_for_guardian"])
+        self.assertFalse(out["guardian_called"])
+        self.assertFalse(out["executes_action"])
+
+    def test_prime_acceptance_only_makes_simple_plan_eligible_for_guardian(self):
+        preview = self.preview()
+        message = self.review_message("PRIME", preview)
+        out = self.preview(review_messages=[message])
+        self.assertEqual(out["state"], "READY_FOR_GUARDIAN")
+        self.assertEqual(out["review"]["state"], "ACCEPT_PLAN")
+        self.assertEqual(out["review_protocol"]["state"], "PASS")
+        self.assertEqual(
+            out["review_protocol"]["message_reports"][0]["authorization"],
+            "NONE",
+        )
+        self.assertTrue(out["eligible_for_guardian"])
+        self.assertFalse(out["guardian_called"])
+        self.assertFalse(out["executes_action"])
+        self.assertFalse(out["grants_permission"])
+
+    def test_code_change_requires_prime_shadow_sentinel_and_approval_evidence(self):
+        preview = self.preview("Corrigir bug no código da interface.")
+        self.assertEqual(preview["blast_radius"]["level"], "HIGH")
+        self.assertEqual(preview["task_class"], "CRITICAL")
+        self.assertEqual(
+            preview["required_roles"],
+            ["PRIME", "SHADOW", "SENTINEL"],
+        )
+        partial = self.preview(
+            "Corrigir bug no código da interface.",
+            review_messages=[
+                self.review_message(
+                    "PRIME",
+                    preview,
+                    approval_refs=["approval-1"],
+                )
+            ],
+            approval_refs=["approval-1"],
+            approval_verifier=self.verified,
+        )
+        self.assertEqual(partial["state"], "BLOCK")
+        self.assertEqual(partial["review_protocol"]["state"], "PASS")
+        self.assertIn("MISSING_REVIEWER:SHADOW", partial["review"]["blockers"])
+        self.assertIn("MISSING_REVIEWER:SENTINEL", partial["review"]["blockers"])
+
+        full = self.preview(
+            "Corrigir bug no código da interface.",
+            review_messages=[
+                self.review_message(
+                    "PRIME",
+                    preview,
+                    approval_refs=["approval-1"],
+                ),
+                self.review_message(
+                    "SHADOW",
+                    preview,
+                    approval_refs=["approval-1"],
+                ),
+                self.review_message(
+                    "SENTINEL",
+                    preview,
+                    approval_refs=["approval-1"],
+                ),
+            ],
+            approval_refs=["approval-1"],
+            approval_verifier=self.verified,
+        )
+        self.assertEqual(full["state"], "READY_FOR_GUARDIAN")
+        self.assertTrue(full["eligible_for_guardian"])
+        self.assertFalse(full["guardian_called"])
+        self.assertFalse(full["external_action_executed"])
+
+    def test_shadow_challenge_escalates_instead_of_picking_a_side(self):
+        preview = self.preview("Corrigir bug no código da interface.")
+        out = self.preview(
+            "Corrigir bug no código da interface.",
+            review_messages=[
+                self.review_message(
+                    "PRIME",
+                    preview,
+                    approval_refs=["approval-1"],
+                ),
+                self.review_message(
+                    "SHADOW",
+                    preview,
+                    verdict="CHALLENGE",
+                    approval_refs=["approval-1"],
+                ),
+                self.review_message(
+                    "SENTINEL",
+                    preview,
+                    approval_refs=["approval-1"],
+                ),
+            ],
+            approval_refs=["approval-1"],
+            approval_verifier=self.verified,
+        )
+        self.assertEqual(out["state"], "ESCALATE")
+        self.assertIn("DIVERGENCE:SHADOW", out["review"]["blockers"])
+        self.assertFalse(out["eligible_for_guardian"])
+
+    def test_review_bound_to_old_plan_version_is_blocked_by_protocol(self):
+        preview = self.preview("Corrigir bug no código da interface.")
+        stale = self.review_message(
+            "PRIME",
+            preview,
+            plan_version="old-plan",
+            approval_refs=["approval-1"],
+        )
+        out = self.preview(
+            "Corrigir bug no código da interface.",
+            review_messages=[stale],
+            approval_refs=["approval-1"],
+            approval_verifier=self.verified,
+        )
+        self.assertEqual(out["state"], "BLOCK")
+        self.assertEqual(out["reason"], "PROTOCOL_FIREWALL_BLOCKED")
+        self.assertIsNone(out["review"])
+        self.assertTrue(
+            any(
+                "REVIEW_PLAN_MISMATCH" in item
+                for item in out["review_protocol"]["blockers"]
+            )
+        )
+
+    def test_replayed_review_message_is_blocked_before_adjudication(self):
+        preview = self.preview()
+        message = self.review_message("PRIME", preview)
+        out = self.preview(
+            review_messages=[message],
+            seen_message_digests=[message["digest"]],
+        )
+        self.assertEqual(out["state"], "BLOCK")
+        self.assertEqual(out["reason"], "PROTOCOL_FIREWALL_BLOCKED")
+        self.assertIsNone(out["review"])
+        self.assertTrue(
+            any("REPLAY" in item for item in out["review_protocol"]["blockers"])
+        )
+
+    def test_spoofed_review_identity_is_blocked_before_adjudication(self):
+        preview = self.preview()
+        forged = dict(self.review_message("PRIME", preview))
+        forged["role"] = "SENTINEL"
+        out = self.preview(review_messages=[forged])
+        self.assertEqual(out["state"], "BLOCK")
+        self.assertEqual(out["reason"], "PROTOCOL_FIREWALL_BLOCKED")
+        self.assertIsNone(out["review"])
+        protocol_blockers = out["review_protocol"]["blockers"]
+        self.assertTrue(
+            any(
+                "DIGEST_INVALID" in item or "SPOOFED_AGENT" in item
+                for item in protocol_blockers
+            )
+        )
+
+    def test_raw_review_bypass_is_not_part_of_mission_gate_signature(self):
+        with self.assertRaises(TypeError):
+            self.preview(
+                reviews=[{
+                    "role": "PRIME",
+                    "agent_id": "prime-1",
+                    "verdict": "AGREE",
+                }],
+            )
+
+    def test_blocked_deploy_mission_never_reaches_review_or_guardian(self):
+        out = self.preview(
+            "Faça deploy em produção agora.",
+            feature_flags={
+                "external_llm": True,
+                "production_deploy": False,
+            },
+        )
+        self.assertEqual(out["state"], "BLOCK")
+        self.assertEqual(out["reason"], "MISSION_NOT_READY")
+        self.assertIsNone(out["review"])
+        self.assertFalse(out["eligible_for_guardian"])
+        self.assertFalse(out["guardian_called"])
+        self.assertFalse(out["executes_action"])
 
 
 if __name__ == "__main__":

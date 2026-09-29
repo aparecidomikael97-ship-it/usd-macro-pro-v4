@@ -19,6 +19,7 @@ from atlasquant_aion_capabilities import (
 )
 from atlasquant_aion_core import cost_guard, guardian_decision
 from atlasquant_aion_truth import assess_truth
+from atlasquant_aion_reviewed_mission_gate import review_agentic_mission
 
 SCHEMA = "ATLASQUANT_AION_ORCHESTRATOR_V1"
 
@@ -143,6 +144,14 @@ def _presentation(result: Mapping[str, Any], mode: str) -> dict[str, Any]:
         "decision": decision,
         "technical_details_hidden": False,
     }
+
+
+def prepare_reviewed_mission(
+    objective: Any,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Plan a mission and require independent review before Guardian eligibility."""
+    return review_agentic_mission(objective, **kwargs)
 
 
 def orchestrate(
@@ -496,6 +505,6 @@ def build_aion_result(
 
 __all__ = [
     "SCHEMA", "AionContext", "AionTask", "normalize_context", "classify_risk",
-    "orchestrate", "validate_specialist_result", "build_aion_result",
+    "orchestrate", "prepare_reviewed_mission", "validate_specialist_result", "build_aion_result",
     "classify_external_action_claim", "validation_truth_status", "present_validated_answer",
 ]

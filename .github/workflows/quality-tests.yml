@@ -31,14 +31,14 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
       - name: Install test dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install streamlit pandas numpy requests altair pyarrow
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
       - name: Compile Python sources
         run: |
           python -m compileall -q .
@@ -218,11 +218,27 @@ jobs:
             test_atlasquant_aion_global_worker_human_incident_closure.py \
             test_atlasquant_aion_global_worker_durable_incident_closure.py \
             test_atlasquant_aion_global_worker_incident_reconciliation.py \
+            test_atlasquant_aion_global_worker_inflight_reconciliation.py \
+            test_atlasquant_aion_global_worker_inflight_resolution.py \
             test_atlasquant_aion_global_worker_reactivation_gate.py \
             test_atlasquant_aion_fortress.py \
+            test_atlasquant_aion_security_adversarial.py \
+            test_atlasquant_aion_chaos_recovery.py \
+            test_atlasquant_aion_critical_review.py \
+            test_atlasquant_aion_memory_quarantine.py \
+            test_atlasquant_aion_memory_quarantine_bridge.py \
+            test_atlasquant_aion_core_independence.py \
+            test_atlasquant_aion_action_receipt.py \
+            test_atlasquant_aion_action_receipt_bridge.py \
+            test_atlasquant_aion_model_registry.py \
+            test_atlasquant_aion_model_routing_bridge.py \
+            test_atlasquant_aion_loop_governor.py \
             test_atlasquant_aion_portable.py \
             test_atlasquant_aion_vault.py \
             test_atlasquant_aion_tool_hub.py \
+            test_atlasquant_aion_capabilities.py \
+            test_atlasquant_aion_skill_certification.py \
+            test_atlasquant_aion_skill_tool_bridge.py \
             test_atlasquant_aion_local_executor.py \
             test_atlasquant_aion_command_orchestrator.py \
             test_atlasquant_aion_local_synthesis.py \
@@ -232,8 +248,11 @@ jobs:
             test_atlasquant_aion_contract_auditor.py \
             test_atlasquant_aion_durable_tasks.py \
             test_atlasquant_aion_hardening.py \
+            test_atlasquant_aion_resource_bounds.py \
+            test_atlasquant_aion_resource_bounds_residual.py \
             test_atlasquant_aion_convergence.py \
             test_atlasquant_aion_post_audit.py \
+            test_atlasquant_aion_supply_chain_pinning.py \
             test_atlasquant_aion_knowledge_graph.py \
             test_atlasquant_aion_evaluation_lab.py \
             test_atlasquant_aion_digital_twin.py \

@@ -12,6 +12,7 @@ from atlasquant_aion_business import (
     mark_listing_live_from_evidence,
     new_business_metrics,
     new_product_candidate,
+    normalize_products,
     trend_assessment,
     unit_economics,
     upsert_product,
@@ -179,6 +180,21 @@ class AtlasQuantAionBusinessTests(unittest.TestCase):
         self.assertEqual(snap["coverage_pct"],75.0)
         self.assertEqual(snap["remaining_to_cover_usd"],50.0)
         self.assertEqual(snap["source"],"ADMIN_INPUT")
+
+    def test_product_generator_is_not_consumed_past_normalization_bound(self):
+        from atlasquant_aion_business import MAX_PRODUCTS
+
+        consumed={"count":0}
+        def rows():
+            for index in range(MAX_PRODUCTS*2+1):
+                if index>=MAX_PRODUCTS*2:
+                    raise AssertionError("product iterable consumed past bound")
+                consumed["count"]+=1
+                yield {}
+
+        normalized=normalize_products(rows())
+        self.assertEqual(normalized,[])
+        self.assertEqual(consumed["count"],MAX_PRODUCTS*2)
 
     def test_summary_and_upsert(self):
         a=new_product_candidate("A",sale_price=100,unit_cost=50,created_at="2026-09-23T20:00:00Z")

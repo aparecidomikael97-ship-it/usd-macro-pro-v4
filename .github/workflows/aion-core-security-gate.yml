@@ -1,0 +1,129 @@
+name: AION Core Security Gate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aion-core-security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  adversarial-contracts:
+    name: AION adversarial contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install runtime dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+      - name: Compile security-critical modules
+        run: |
+          python -m py_compile \
+            atlasquant_aion_core.py \
+            atlasquant_aion_fortress.py \
+            atlasquant_aion_resilience.py \
+            atlasquant_aion_recovery.py \
+            atlasquant_aion_memory.py \
+            atlasquant_aion_vault.py \
+            atlasquant_aion_tenant.py \
+            atlasquant_aion_portable.py \
+            atlasquant_aion_durable_tasks.py \
+            atlasquant_aion_digital_twin.py \
+            atlasquant_aion_dev_fusion.py \
+            test_atlasquant_aion_security_adversarial.py \
+            test_atlasquant_aion_chaos_recovery.py \
+            atlasquant_aion_critical_review.py \
+            test_atlasquant_aion_critical_review.py \
+            test_atlasquant_aion_global_worker_inflight_reconciliation.py \
+            test_atlasquant_aion_global_worker_inflight_resolution.py \
+            test_atlasquant_aion_resource_bounds.py \
+            test_atlasquant_aion_resource_bounds_residual.py \
+            test_atlasquant_aion_supply_chain_pinning.py
+      - name: Run authority, injection, isolation and recovery tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_security_adversarial.py \
+            test_atlasquant_aion_chaos_recovery.py \
+            test_atlasquant_aion_critical_review.py \
+            test_atlasquant_aion_fortress.py \
+            test_atlasquant_aion_resilience.py \
+            test_atlasquant_aion_recovery.py \
+            test_atlasquant_aion_tenant.py \
+            test_atlasquant_aion_tenant_privacy.py \
+            test_atlasquant_aion_vault.py \
+            test_atlasquant_aion_durable_tasks.py \
+            test_atlasquant_aion_global_worker_inflight_reconciliation.py \
+            test_atlasquant_aion_global_worker_inflight_resolution.py \
+            test_atlasquant_aion_resource_bounds.py \
+            test_atlasquant_aion_resource_bounds_residual.py \
+            test_atlasquant_aion_supply_chain_pinning.py
+
+  supply-chain-audit:
+    name: Supply-chain audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install project and audit tooling
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+          pip install pip-audit==2.10.1 bandit==1.9.4 cyclonedx-bom==7.4.0
+          python -m pip check
+      - name: Audit Python dependencies
+        run: pip-audit -r requirements.txt
+      - name: Scan AION security-critical Python for high severity findings
+        run: |
+          bandit -q -lll \
+            atlasquant_aion_core.py \
+            atlasquant_aion_fortress.py \
+            atlasquant_aion_resilience.py \
+            atlasquant_aion_recovery.py \
+            atlasquant_aion_memory.py \
+            atlasquant_aion_vault.py \
+            atlasquant_aion_tenant.py \
+            atlasquant_aion_portable.py \
+            atlasquant_aion_durable_tasks.py \
+            atlasquant_aion_digital_twin.py \
+            atlasquant_aion_dev_fusion.py
+      - name: Generate and validate reproducible CycloneDX SBOM from resolved environment
+        run: |
+          python -m pip freeze --all > /tmp/aion-resolved-requirements.txt
+          cyclonedx-py requirements \
+            --output-reproducible \
+            --validate \
+            -o /tmp/aion-sbom.cdx.json \
+            /tmp/aion-resolved-requirements.txt
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          path = Path('/tmp/aion-sbom.cdx.json')
+          data = json.loads(path.read_text(encoding='utf-8'))
+          if data.get('bomFormat') != 'CycloneDX':
+              raise SystemExit('invalid CycloneDX SBOM')
+          components = data.get('components') or []
+          if not components:
+              raise SystemExit('empty CycloneDX SBOM')
+          digest = hashlib.sha256(path.read_bytes()).hexdigest()
+          print(f'CycloneDX components={len(components)} sha256={digest}')
+          PY
+      - name: Upload CycloneDX SBOM artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: aion-sbom-${{ github.sha }}
+          path: /tmp/aion-sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 30

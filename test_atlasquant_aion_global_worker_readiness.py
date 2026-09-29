@@ -341,7 +341,7 @@ class GlobalWorkerActivationReadinessTests(unittest.TestCase):
             ]
         }
         with patch(
-            "atlasquant_aion_global_worker_readiness.requests.get",
+            "atlasquant_aion_global_worker_readiness.github_get",
             return_value=response,
         ) as get:
             result = fetch_recent_autopilot_pulses(
@@ -377,7 +377,7 @@ class GlobalWorkerActivationReadinessTests(unittest.TestCase):
             ]
         }
         with patch(
-            "atlasquant_aion_global_worker_readiness.requests.get",
+            "atlasquant_aion_global_worker_readiness.github_get",
             return_value=response,
         ):
             result = fetch_recent_autopilot_pulses(
@@ -397,6 +397,7 @@ class GlobalWorkerActivationReadinessTests(unittest.TestCase):
             "requests.post(",
             "requests.patch(",
             "requests.delete(",
+            "requests.get(",
             "save_runtime_checkpoint(",
             "_persist_runtime_checkpoint_cas(",
             "run_global_worker_once(",
@@ -404,6 +405,7 @@ class GlobalWorkerActivationReadinessTests(unittest.TestCase):
             "subprocess.",
         ):
             self.assertNotIn(banned, source)
+        self.assertIn("github_get(", source)
 
     def test_readiness_workflow_is_read_only_and_unscheduled(self):
         source = Path(
@@ -414,6 +416,7 @@ class GlobalWorkerActivationReadinessTests(unittest.TestCase):
         self.assertIn("actions: read", source)
         self.assertNotIn("contents: write", source)
         self.assertIn("GLOBAL_WORKER_FLAG_STATE", source)
+        self.assertIn("name: AION global worker readiness", source)
         self.assertIn(
             "python atlasquant_aion_global_worker_readiness.py --check-runtime",
             source,

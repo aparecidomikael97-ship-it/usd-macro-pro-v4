@@ -15,12 +15,14 @@ from typing import Any, Mapping
 
 from atlasquant_aion_background_executor import (
     MAX_ATTEMPTS,
+    MAX_JOBS_PER_RUN,
     _execute_due_local_work_authorized,
     load_executor_receipts,
 )
 from atlasquant_aion_core_intelligence.context import Domain
 from atlasquant_aion_core_intelligence.evidence import digest, safe_text, utc
 from atlasquant_aion_core_runtime_bridge import authenticated_context
+from atlasquant_aion_loop_governor_bridge import govern_due_batch
 
 
 SCHEMA = "ATLASQUANT_AION_WORKER_RUNTIME_V1"
@@ -62,6 +64,18 @@ def _exact_int(value: Any, *, minimum: int, maximum: int, name: str) -> int:
     if type(value) is not int or not minimum <= value <= maximum:
         raise ValueError("invalid " + name)
     return value
+
+
+def _validated_runtime_id(value: Any) -> str:
+    if type(value) is not str:
+        raise ValueError("invalid worker runtime id")
+    runtime = value.strip()
+    if not runtime or len(runtime) > 160:
+        raise ValueError("invalid worker runtime id")
+    normalized = safe_text(runtime, 160)
+    if not normalized or normalized != runtime:
+        raise ValueError("invalid worker runtime id")
+    return normalized
 
 
 def _empty_lease() -> dict[str, Any]:
@@ -197,6 +211,8 @@ def _default_state(context) -> dict[str, Any]:
         "stats": _empty_stats(),
         "session_autonomy": True,
         "multi_instance_safe": False,
+        "concurrency_scope": "CALLER_CHECKPOINT_ONLY",
+        "lease_external_persistence": False,
         "continuous_24x7_confirmed": False,
         "external_persistence": "EXPLICIT_CHECKPOINT_SAVE",
         "physical_action_adapter": "UNAVAILABLE",
@@ -255,6 +271,8 @@ def _normalize_state(context, raw: Mapping[str, Any]) -> dict[str, Any]:
         "stats": _normalize_stats(raw.get("stats") if isinstance(raw.get("stats"), Mapping) else {}),
         "session_autonomy": True,
         "multi_instance_safe": False,
+        "concurrency_scope": "CALLER_CHECKPOINT_ONLY",
+        "lease_external_persistence": False,
         "continuous_24x7_confirmed": False,
         "external_persistence": "EXPLICIT_CHECKPOINT_SAVE",
         "physical_action_adapter": "UNAVAILABLE",
@@ -347,7 +365,7 @@ def arm_worker(
         }
     current = utc(now or datetime.now(timezone.utc))
     context = authenticated_context(access, Domain.ADMIN)
-    runtime = safe_text(runtime_id, 160)
+    runtime = _validated_runtime_id(runtime_id)
     interval = _exact_int(
         interval_seconds,
         minimum=MIN_INTERVAL_SECONDS,
@@ -393,6 +411,8 @@ def arm_worker(
         "requires_checkpoint_save": True,
         "autonomy_scope": "ACTIVE_STREAMLIT_SESSION",
         "multi_instance_safe": False,
+        "concurrency_scope": "CALLER_CHECKPOINT_ONLY",
+        "lease_external_persistence": False,
         "continuous_24x7_confirmed": False,
         "external_action_executed": False,
         "real_trading_enabled": False,
@@ -477,7 +497,7 @@ def _claim_lease(
     now: datetime,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     current = utc(now)
-    runtime = safe_text(runtime_id, 160)
+    runtime = _validated_runtime_id(runtime_id)
     lease = _normalize_lease(
         state.get("lease") if isinstance(state.get("lease"), Mapping) else {}
     )
@@ -604,6 +624,8 @@ def worker_snapshot(
         "stats": deepcopy(state["stats"]),
         "session_autonomy": True,
         "multi_instance_safe": False,
+        "concurrency_scope": "CALLER_CHECKPOINT_ONLY",
+        "lease_external_persistence": False,
         "continuous_24x7_confirmed": False,
         "external_persistence": "EXPLICIT_CHECKPOINT_SAVE",
         "physical_action_adapter": "UNAVAILABLE",
@@ -625,6 +647,9 @@ def worker_tick(
     max_jobs: int = 5,
     now: datetime | None = None,
 ) -> dict[str, Any]:
+    runtime = _validated_runtime_id(runtime_id)
+    if type(max_jobs) is not int or not 1 <= max_jobs <= MAX_JOBS_PER_RUN:
+        raise ValueError("invalid worker batch size")
     current = utc(now or datetime.now(timezone.utc))
     context = authenticated_context(access, Domain.ADMIN)
     state, status = load_worker_state(context, checkpoint)
@@ -650,9 +675,27 @@ def worker_tick(
             "external_action_executed": False,
         }
 
+    loop_governor = govern_due_batch(
+        context,
+        checkpoint,
+        current=current,
+        max_jobs=max_jobs,
+    )
+    if loop_governor.get("state") == "BLOCK":
+        return {
+            "schema": SCHEMA,
+            "status": "LOOP_GOVERNOR_BLOCKED",
+            "checkpoint": dict(checkpoint or {}),
+            "processed": 0,
+            "lease": {"state": "NOT_CLAIMED"},
+            "loop_governor": loop_governor,
+            "external_action_executed": False,
+            "real_trading_enabled": False,
+        }
+
     claimed_state, lease_result = _claim_lease(
         state,
-        runtime_id=runtime_id,
+        runtime_id=runtime,
         now=current,
     )
     if lease_result["state"] == "LEASE_HELD":
@@ -671,7 +714,7 @@ def worker_tick(
         "actor": context.actor_id,
         "scope": context.key,
         "arm_digest": claimed_state["arm_digest"],
-        "runtime_id": runtime_id,
+        "runtime_id": runtime,
         "lease_token": lease_result["token"],
         "lease_expires_at": lease_result["expires_at"],
     })
@@ -715,16 +758,21 @@ def worker_tick(
         "checkpoint": final_checkpoint,
         "lease": lease_result,
         "worker": next_state,
+        "loop_governor": loop_governor,
         "batch_status": str(batch.get("status") or "UNKNOWN"),
         "processed": int(batch.get("processed") or 0),
         "succeeded": int(batch.get("succeeded") or 0),
         "failed": int(batch.get("failed") or 0),
         "blocked": int(batch.get("blocked") or 0),
+        "action_receipts": list(batch.get("action_receipts") or []),
+        "action_receipts_are_authority": False,
         "retry_queue_count": len(retry_queue),
         "requires_checkpoint_save": True,
         "external_persisted": False,
         "session_autonomy": True,
         "multi_instance_safe": False,
+        "concurrency_scope": "CALLER_CHECKPOINT_ONLY",
+        "lease_external_persistence": False,
         "continuous_24x7_confirmed": False,
         "provider_called": False,
         "external_action_executed": False,

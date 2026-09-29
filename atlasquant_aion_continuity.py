@@ -6,9 +6,11 @@ external services, and never turns a recorded next step into authorization.
 """
 from __future__ import annotations
 
+from collections import deque
 from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any, Mapping, Sequence
+from itertools import islice
 import hashlib
 import json
 
@@ -109,7 +111,7 @@ def _handoff_id(created_at:str,digest:str)->str:
 
 def _refs(values:Sequence[Any]|None,*,limit:int=24)->list[str]:
     out=[]
-    for value in list(values or [])[:limit*2]:
+    for value in islice(values or (), max(0, limit*2)):
         item=_clean(value,180)
         if item and item not in out:
             out.append(item)
@@ -183,7 +185,12 @@ def normalize_mission(raw:Mapping[str,Any])->dict[str,Any]:
 def normalize_missions(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for raw in list(rows or [])[-MAX_MISSIONS*2:]:
+    source=(
+        rows[-MAX_MISSIONS*2:]
+        if isinstance(rows,(list,tuple))
+        else deque(rows or (),maxlen=MAX_MISSIONS*2)
+    )
+    for raw in source:
         try:
             item=normalize_mission(raw)
         except Exception:
@@ -355,7 +362,12 @@ def normalize_handoff(raw:Mapping[str,Any])->dict[str,Any]:
 def normalize_handoffs(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for raw in list(rows or [])[-MAX_HANDOFFS*2:]:
+    source=(
+        rows[-MAX_HANDOFFS*2:]
+        if isinstance(rows,(list,tuple))
+        else deque(rows or (),maxlen=MAX_HANDOFFS*2)
+    )
+    for raw in source:
         try:
             item=normalize_handoff(raw)
         except Exception:
@@ -406,7 +418,7 @@ def build_session_handoff(
 
     # Fall back to active task titles only when no mission next step exists.
     if not next_steps:
-        for task in list(tasks or [])[:50]:
+        for task in islice(tasks or (), 50):
             if not isinstance(task,Mapping):
                 continue
             if str(task.get("status") or "").upper() not in {"TODO","IN_PROGRESS","WAITING_APPROVAL","BLOCKED"}:
@@ -418,7 +430,12 @@ def build_session_handoff(
                 break
 
     evidence=[]
-    for event in list(events or [])[-30:]:
+    event_source=(
+        events[-30:]
+        if isinstance(events,(list,tuple))
+        else deque(events or (),maxlen=30)
+    )
+    for event in event_source:
         if not isinstance(event,Mapping):
             continue
         eid=_clean(event.get("event_id"),80)

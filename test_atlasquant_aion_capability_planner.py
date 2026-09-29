@@ -94,5 +94,36 @@ class AtlasQuantAionCapabilityPlannerTests(unittest.TestCase):
         self.assertTrue(write["requires_explicit_approval"])
 
 
+    def test_truthy_string_feature_flag_stays_disabled(self):
+        plan = plan_agentic_mission(
+            "corrigir a interface e fazer deploy no Render",
+            access=self.admin,
+            feature_flags={"production_deploy":"false"},
+            system_context={"integrations":{"production_connected":True}},
+        )
+        deploy = [x for x in plan["stages"] if x["capability_id"]=="production_deploy"][0]
+        self.assertEqual(deploy["state"], "FEATURE_DISABLED")
+        self.assertFalse(deploy["executes_action"])
+
+    def test_truthy_string_connector_does_not_confirm_dependency(self):
+        plan = plan_agentic_mission(
+            "criar e publicar vídeo no Instagram",
+            access=self.admin,
+            feature_flags={"social_publish":True},
+            system_context={"integrations":{"social_connected":"false"}},
+        )
+        publish = [x for x in plan["stages"] if x["capability_id"]=="social_publish"][0]
+        self.assertEqual(publish["state"], "EXTERNAL_DEPENDENCY")
+
+    def test_truthy_string_market_confirmation_stays_evidence_required(self):
+        plan = plan_agentic_mission(
+            "analise o forex agora",
+            access=self.admin,
+            system_context={"source_mesh":{"market_live_confirmed":"false"}},
+        )
+        market = [x for x in plan["stages"] if x["capability_id"]=="market_snapshot"][0]
+        self.assertEqual(market["state"], "EVIDENCE_REQUIRED")
+
+
 if __name__ == "__main__":
     unittest.main()

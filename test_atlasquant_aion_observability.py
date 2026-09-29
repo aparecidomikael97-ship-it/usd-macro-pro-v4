@@ -1,12 +1,15 @@
 import unittest
 
 from atlasquant_aion_observability import (
+    MAX_EVENTS,
     append_event,
     execution_event,
     is_secret_key,
     new_event,
+    normalize_events,
     observability_summary,
     redact_text,
+    sanitize_metadata,
 )
 
 
@@ -74,6 +77,38 @@ class AtlasQuantAionObservabilityTests(unittest.TestCase):
         self.assertEqual(event["approval"],"NOT_APPROVED")
         self.assertNotIn("supersecretvalue",str(event))
         self.assertNotIn("anothersecret",str(event))
+
+
+    def test_metadata_mapping_is_not_consumed_past_field_limit(self):
+        from collections.abc import Mapping
+
+        class LimitedMapping(Mapping):
+            def __getitem__(self,key):
+                return f"value-{key}"
+            def __len__(self):
+                return 101
+            def __iter__(self):
+                for index in range(101):
+                    if index>=100:
+                        raise AssertionError("metadata consumed past limit")
+                    yield f"field_{index}"
+
+        cleaned=sanitize_metadata(LimitedMapping())
+        self.assertEqual(len(cleaned),100)
+
+    def test_event_generator_preserves_recent_tail_with_bounded_buffer(self):
+        total=MAX_EVENTS+25
+        def rows():
+            for index in range(total):
+                yield new_event(
+                    f"event-{index}",
+                    f"message-{index}",
+                    created_at=f"2026-09-23T01:{index%60:02d}:00+00:00",
+                )
+        normalized=normalize_events(rows())
+        self.assertEqual(len(normalized),MAX_EVENTS)
+        self.assertEqual(normalized[0]["event_type"],"event-25")
+        self.assertEqual(normalized[-1]["event_type"],f"event-{total-1}")
 
 
 if __name__=="__main__":

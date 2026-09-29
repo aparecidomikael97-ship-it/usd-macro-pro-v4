@@ -381,7 +381,7 @@ def _execute_one(
         access=access,
         feature_flags=feature_flags,
         source_kind=source_kind,
-        authenticated_admin=bool(authenticated_admin),
+        authenticated_admin=authenticated_admin is True,
         approved=False,
         request_id=request_id,
     )
@@ -414,7 +414,7 @@ def orchestrate_local_command(
             "tool_id": "",
             "tool_ids": [],
             "kind": "",
-            "execution_requested": bool(execute),
+            "execution_requested": execute is True,
             "executor_invoked": False,
             "handler_executed": False,
             "handlers_executed": 0,
@@ -439,7 +439,7 @@ def orchestrate_local_command(
             "tool_id": str(plan.get("tool_id") or ""),
             "tool_ids": [str(plan.get("tool_id"))] if plan.get("tool_id") else [],
             "kind": str(plan.get("kind") or ""),
-            "execution_requested": bool(execute),
+            "execution_requested": execute is True,
             "executor_invoked": False,
             "handler_executed": False,
             "handlers_executed": 0,
@@ -455,7 +455,7 @@ def orchestrate_local_command(
             base["tool_results"] = []
             base["synthesis"] = synthesize_local_tool_results([])
             return base
-        if not execute:
+        if execute is not True:
             base["state"] = "PLANNED"
             base["summary"] = "Ferramenta local selecionada, mas o handler não foi executado nesta prévia."
             base["tool_result"] = None
@@ -507,7 +507,7 @@ def orchestrate_local_command(
         "tool_id": str(selected[0].get("tool_id") or "") if selected else "",
         "tool_ids": [str(row.get("tool_id") or "") for row in selected],
         "kind": "READ_BUNDLE",
-        "execution_requested": bool(execute),
+        "execution_requested": execute is True,
         "executor_invoked": False,
         "handler_executed": False,
         "handlers_executed": 0,
@@ -516,7 +516,7 @@ def orchestrate_local_command(
         "real_orders_enabled": False,
         "tool_output_is_authority": False,
     }
-    if not execute:
+    if execute is not True:
         base["state"] = "PLANNED_MULTI"
         base["summary"] = f"{len(selected)} ferramentas locais READ/SEARCH selecionadas; nenhuma executada nesta prévia."
         base["tool_result"] = None

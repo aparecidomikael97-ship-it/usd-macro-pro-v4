@@ -22,6 +22,7 @@ CONFIRMATION_PHRASE = "CONFIRMAR EVIDENCIA DE REMEDIACAO WORKER GLOBAL"
 SUPPORTED_POSTURES = {
     "INCIDENT_LIVE_TIMEOUT",
     "INCIDENT_STALE_LEASE",
+    "INCIDENT_INFLIGHT_RECONCILIATION",
     "INCIDENT_UNSAFE_RECEIPT",
     "INCIDENT_VERIFICATION_BLOCKED",
 }
@@ -171,6 +172,11 @@ def _current_evidence_state(
 
     if posture == "INCIDENT_STALE_LEASE" and live_report.get("stale_lease") is True:
         blockers.append("STALE_LEASE_STILL_PRESENT")
+    if (
+        posture == "INCIDENT_INFLIGHT_RECONCILIATION"
+        and live_report.get("inflight_reconciliation_required") is True
+    ):
+        blockers.append("INFLIGHT_RECONCILIATION_STILL_REQUIRED")
     if posture == "INCIDENT_UNSAFE_RECEIPT":
         if int(live_report.get("unsafe_receipts_after_activation") or 0) > 0:
             blockers.append("UNSAFE_RECEIPT_STILL_PRESENT")

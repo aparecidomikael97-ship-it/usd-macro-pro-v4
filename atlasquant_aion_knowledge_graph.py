@@ -8,6 +8,7 @@ It does not infer hidden causality, contradiction or semantic relationships.
 from __future__ import annotations
 
 from hashlib import sha256
+from itertools import islice
 from typing import Any, Mapping, Sequence
 import json
 import re
@@ -15,6 +16,7 @@ import re
 SCHEMA="ATLASQUANT_AION_KNOWLEDGE_GRAPH_V1"
 MAX_NODES=6000
 MAX_EDGES=12000
+MAX_DERIVE_RECORDS_PER_SOURCE=MAX_NODES
 
 NODE_TYPES=(
     "LESSON","EPISODE","EXPERIMENT","VERSION","EVIDENCE","SCOPE","CAUSE",
@@ -51,7 +53,7 @@ def _truth(value:Any)->str:
 
 def _refs(values:Sequence[Any]|None,limit:int=60)->list[str]:
     out=[]
-    for raw in list(values or [])[:limit*2]:
+    for raw in islice(values or (), max(0, limit*2)):
         text=_clean(raw,280)
         if text and text not in out:
             out.append(text)
@@ -138,7 +140,7 @@ def new_edge(
 def normalize_nodes(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for raw in list(rows or [])[:MAX_NODES*2]:
+    for raw in islice(rows or (), MAX_NODES*2):
         if not isinstance(raw,Mapping):
             continue
         try:
@@ -171,7 +173,7 @@ def normalize_edges(
     out=[]
     seen=set()
     allowed=set(node_ids or [])
-    for raw in list(rows or [])[:MAX_EDGES*2]:
+    for raw in islice(rows or (), MAX_EDGES*2):
         if not isinstance(raw,Mapping):
             continue
         try:
@@ -199,12 +201,16 @@ def normalize_edges(
 def _upsert_node(nodes:list[dict[str,Any]],node:dict[str,Any])->None:
     idx=next((i for i,x in enumerate(nodes) if x["node_id"]==node["node_id"]),None)
     if idx is None:
+        if len(nodes)>=MAX_NODES:
+            return
         nodes.append(node)
     else:
         nodes[idx]=node
 
 
 def _append_edge(edges:list[dict[str,Any]],edge:dict[str,Any])->None:
+    if len(edges)>=MAX_EDGES:
+        return
     if all(x["edge_id"]!=edge["edge_id"] for x in edges):
         edges.append(edge)
 
@@ -220,7 +226,7 @@ def derive_graph(
     nodes:list[dict[str,Any]]=[]
     edges:list[dict[str,Any]]=[]
 
-    for raw in list(wisdom_entries or []):
+    for raw in islice(wisdom_entries or (), MAX_DERIVE_RECORDS_PER_SOURCE):
         if not isinstance(raw,Mapping):
             continue
         wid=_clean(raw.get("wisdom_id"),100)
@@ -248,7 +254,7 @@ def derive_graph(
             _upsert_node(nodes,new_node(sid,node_type="SCOPE",label=scope,truth_state="UNKNOWN",source_ref=scope))
             _append_edge(edges,new_edge(nid,"APPLIES_TO",sid,truth_state="CONFIRMED",evidence_refs=[wid],source_ref=wid))
 
-    for raw in list(learning_episodes or []):
+    for raw in islice(learning_episodes or (), MAX_DERIVE_RECORDS_PER_SOURCE):
         if not isinstance(raw,Mapping):
             continue
         eid=_clean(raw.get("episode_id"),100)
@@ -275,7 +281,7 @@ def derive_graph(
             _upsert_node(nodes,new_node(cid,node_type="CAUSE",label=cause,truth_state="CONFIRMED",evidence_refs=refs,source_ref=eid))
             _append_edge(edges,new_edge(nid,"CAUSED_BY",cid,truth_state="CONFIRMED",evidence_refs=refs,source_ref=eid))
 
-    for raw in list(experiments or []):
+    for raw in islice(experiments or (), MAX_DERIVE_RECORDS_PER_SOURCE):
         if not isinstance(raw,Mapping):
             continue
         xid=_clean(raw.get("experiment_id"),100)
@@ -296,7 +302,7 @@ def derive_graph(
             _upsert_node(nodes,new_node(vid,node_type="VERSION",label=version,truth_state="UNKNOWN",source_ref=version))
             _append_edge(edges,new_edge(nid,"EVALUATES",vid,truth_state="CONFIRMED",evidence_refs=[xid],source_ref=xid))
 
-    for raw in list(research_refs or []):
+    for raw in islice(research_refs or (), MAX_DERIVE_RECORDS_PER_SOURCE):
         if not isinstance(raw,Mapping):
             continue
         ref=_clean(raw.get("ref_id"),280)
@@ -365,8 +371,8 @@ def synchronize_knowledge_graph(
     for edge in derived["edges"]:
         edge_map[edge["edge_id"]]=edge
     return normalize_knowledge_graph({
-        "nodes":list(node_map.values())[:MAX_NODES],
-        "edges":list(edge_map.values())[:MAX_EDGES],
+        "nodes":list(islice(node_map.values(), MAX_NODES)),
+        "edges":list(islice(edge_map.values(), MAX_EDGES)),
     })
 
 

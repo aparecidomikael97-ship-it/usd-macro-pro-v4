@@ -16,10 +16,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Mapping
 import json
 
-import requests
-
 from atlasquant_aion_core_intelligence.context import Domain
 from atlasquant_aion_core_intelligence.evidence import digest, safe_text, utc
+from atlasquant_aion_github_io import github_get
 from atlasquant_aion_core_runtime_bridge import authenticated_context
 from atlasquant_aion_global_worker import (
     GLOBAL_WORKER_NAMESPACE,
@@ -130,7 +129,7 @@ def read_repository_feature_flag(
         "Authorization": "Bearer " + config.token,
     }
     try:
-        response = requests.get(
+        response = github_get(
             url,
             headers=headers,
             params={"per_page": 100},

@@ -10,10 +10,11 @@ truthful status with provenance.
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
+from itertools import islice
 import base64
 import hashlib
 import json
@@ -21,20 +22,12 @@ import os
 import re
 import unicodedata
 
-import requests
 
 from atlasquant_runtime_store import resolve_runtime_branch, require_runtime_branch
+from atlasquant_aion_github_io import github_get, github_put
 from atlasquant_aion_operations import normalize_queue, queue_digest
 from atlasquant_aion_observability import normalize_events, events_digest
 from atlasquant_aion_model_router import normalize_budget
-from atlasquant_aion_studio import normalize_projects, studio_digest
-from atlasquant_aion_business import (
-    normalize_products,
-    business_digest,
-    normalize_business_metrics,
-    business_metrics_digest,
-)
-from atlasquant_aion_promotions import normalize_campaigns, promotion_digest
 from atlasquant_aion_entitlements import normalize_entitlements, entitlement_digest
 from atlasquant_aion_continuity import (
     normalize_missions,
@@ -117,6 +110,11 @@ from atlasquant_aion_memory_layers import (
     default_memory_layers,
     normalize_memory_layers,
 )
+from atlasquant_aion_memory_quarantine import (
+    CHECKPOINT_NAMESPACE as AION_MEMORY_QUARANTINE_NAMESPACE,
+    quarantine_checkpoint_integrity,
+)
+from atlasquant_aion_business_adapter import resolve_business_normalizers
 
 SCHEMA = "ATLASQUANT_AION_MEMORY_V1"
 FOUNDATION_REVISION = "2026-09-25-complete-v2"
@@ -258,10 +256,16 @@ STOPWORDS = {
 
 @dataclass(frozen=True)
 class RuntimeConfig:
-    token: str
+    token: str = field(repr=False)
     repo: str
     branch: str
     path: str = RUNTIME_PATH
+
+    def __repr__(self) -> str:
+        return (
+            "RuntimeConfig(token='[REDACTED]', "
+            f"repo={self.repo!r}, branch={self.branch!r}, path={self.path!r})"
+        )
 
     @property
     def read_ready(self) -> bool:
@@ -275,6 +279,232 @@ class RuntimeConfig:
     def ready(self) -> bool:
         """Backward-compatible alias for write readiness."""
         return self.write_ready
+
+
+_BUSINESS_METRIC_FIELDS = (
+    "visits","leads","checkouts","orders",
+    "marketing_cost","acquired_customers",
+    "gross_profit_per_order","average_orders_per_customer",
+    "revenue","costs","gross_profit","net_profit","available_cash",
+)
+
+
+class BusinessAdapterUnavailableError(RuntimeError):
+    """Optional Negócios adapter is unavailable for non-empty business data."""
+
+
+def _fallback_empty_business_metrics() -> dict[str, Any]:
+    return {
+        **{field: None for field in _BUSINESS_METRIC_FIELDS},
+        "source": "",
+        "truth_state": "UNKNOWN",
+        "state": "NOT_CONFIGURED",
+        "recorded_by": "",
+        "recorded_at": "",
+        "automatic_campaign": False,
+        "automatic_publish": False,
+        "automatic_payment": False,
+        "automatic_investment": False,
+    }
+
+
+def _fallback_business_normalizers():
+    def normalize_products(rows):
+        if rows is None:
+            return []
+        if isinstance(rows, (list, tuple)) and not rows:
+            return []
+        raise BusinessAdapterUnavailableError(
+            "BUSINESS_ADAPTER_REQUIRED_FOR_NONEMPTY_PRODUCTS"
+        )
+
+    def normalize_business_metrics(raw):
+        data = dict(raw or {}) if isinstance(raw, Mapping) else {}
+        has_metric = any(
+            data.get(field) not in (None, "")
+            for field in _BUSINESS_METRIC_FIELDS
+        )
+        has_identity = any(
+            str(data.get(key) or "").strip()
+            for key in ("source", "recorded_by", "recorded_at")
+        )
+        truth = str(data.get("truth_state") or "").strip().upper()
+        state = str(data.get("state") or "").strip().upper()
+        has_nonempty_status = (
+            truth not in {"", "UNKNOWN"}
+            or state not in {"", "NOT_CONFIGURED"}
+        )
+        has_action_flag = any(
+            data.get(key) is True
+            for key in (
+                "automatic_campaign",
+                "automatic_publish",
+                "automatic_payment",
+                "automatic_investment",
+            )
+        )
+        if has_metric or has_identity or has_nonempty_status or has_action_flag:
+            raise BusinessAdapterUnavailableError(
+                "BUSINESS_ADAPTER_REQUIRED_FOR_NONEMPTY_METRICS"
+            )
+        return _fallback_empty_business_metrics()
+
+    def business_digest(rows):
+        normalized = normalize_products(rows)
+        raw = json.dumps(
+            normalized,
+            ensure_ascii=False,
+            sort_keys=True,
+            default=str,
+        )
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+    def business_metrics_digest(raw):
+        normalized = normalize_business_metrics(raw)
+        payload = {
+            key: normalized.get(key)
+            for key in (
+                *_BUSINESS_METRIC_FIELDS,
+                "source","truth_state","state","recorded_by","recorded_at",
+            )
+        }
+        encoded = json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            default=str,
+        )
+        return hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:16]
+
+    return (
+        normalize_products,
+        business_digest,
+        normalize_business_metrics,
+        business_metrics_digest,
+    )
+
+
+def _business_normalizers():
+    """Resolve Negócios behind the explicit optional adapter boundary."""
+    return resolve_business_normalizers(_fallback_business_normalizers)
+
+
+class OptionalProductAdapterUnavailableError(RuntimeError):
+    """Optional product adapter is unavailable for non-empty persisted data."""
+
+
+def _fallback_studio_normalizers():
+    def normalize_projects(rows):
+        if rows is None:
+            return []
+        if isinstance(rows, (list, tuple)) and not rows:
+            return []
+        raise OptionalProductAdapterUnavailableError(
+            "STUDIO_ADAPTER_REQUIRED_FOR_NONEMPTY_PROJECTS"
+        )
+
+    def studio_digest(rows):
+        normalized = normalize_projects(rows)
+        raw = json.dumps(
+            normalized,
+            ensure_ascii=False,
+            sort_keys=True,
+            default=str,
+        )
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+    return normalize_projects, studio_digest
+
+
+def _studio_normalizers():
+    """Load Studio lazily; an empty Core checkpoint does not require Studio."""
+    try:
+        from atlasquant_aion_studio import (
+            normalize_projects as studio_normalize_projects,
+            studio_digest as studio_digest_impl,
+        )
+    except ImportError:
+        return _fallback_studio_normalizers()
+    return studio_normalize_projects, studio_digest_impl
+
+
+def normalize_projects(rows):
+    normalizer, _ = _studio_normalizers()
+    return normalizer(rows)
+
+
+def studio_digest(rows):
+    _, digest_fn = _studio_normalizers()
+    return digest_fn(rows)
+
+
+def _fallback_promotion_normalizers():
+    def normalize_campaigns(rows):
+        if rows is None:
+            return []
+        if isinstance(rows, (list, tuple)) and not rows:
+            return []
+        raise OptionalProductAdapterUnavailableError(
+            "PROMOTIONS_ADAPTER_REQUIRED_FOR_NONEMPTY_CAMPAIGNS"
+        )
+
+    def promotion_digest(campaigns, redemptions=None):
+        normalized_campaigns = normalize_campaigns(campaigns)
+        if redemptions is None:
+            normalized_redemptions = []
+        elif isinstance(redemptions, (list, tuple)) and not redemptions:
+            normalized_redemptions = []
+        else:
+            raise OptionalProductAdapterUnavailableError(
+                "PROMOTIONS_ADAPTER_REQUIRED_FOR_NONEMPTY_REDEMPTIONS"
+            )
+        payload = {
+            "campaigns": normalized_campaigns,
+            "redemptions": normalized_redemptions,
+        }
+        raw = json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            default=str,
+        )
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+    return normalize_campaigns, promotion_digest
+
+
+def _promotion_normalizers():
+    """Load Promoções lazily; empty Core memory remains product-independent."""
+    try:
+        from atlasquant_aion_promotions import (
+            normalize_campaigns as promotions_normalize_campaigns,
+            promotion_digest as promotion_digest_impl,
+        )
+    except ImportError:
+        return _fallback_promotion_normalizers()
+    return promotions_normalize_campaigns, promotion_digest_impl
+
+
+def normalize_campaigns(rows):
+    normalizer, _ = _promotion_normalizers()
+    return normalizer(rows)
+
+
+def promotion_digest(campaigns, redemptions=None):
+    _, digest_fn = _promotion_normalizers()
+    return digest_fn(campaigns, redemptions)
+
+
+def _empty_business_section() -> dict[str, Any]:
+    normalize_products, business_digest, normalize_business_metrics, business_metrics_digest = (
+        _business_normalizers()
+    )
+    return {
+        "products": [],
+        "metrics": normalize_business_metrics({}),
+        "metrics_digest": business_metrics_digest({}),
+        "digest": business_digest([]),
+    }
 
 
 def _now() -> str:
@@ -455,12 +685,7 @@ def default_checkpoint() -> dict[str, Any]:
             "projects": [],
             "digest": studio_digest([]),
         },
-        "business": {
-            "products": [],
-            "metrics": normalize_business_metrics({}),
-            "metrics_digest": business_metrics_digest({}),
-            "digest": business_digest([]),
-        },
+        "business": _empty_business_section(),
         "promotions": {
             "campaigns": [],
             "redemptions": [],
@@ -580,6 +805,9 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
     business = payload.get("business")
     if not isinstance(business, Mapping):
         business = {}
+    normalize_products, business_digest, normalize_business_metrics, business_metrics_digest = (
+        _business_normalizers()
+    )
     business_products = normalize_products(
         business.get("products") if isinstance(business, Mapping) else []
     )
@@ -607,7 +835,7 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
     if not isinstance(raw_redemptions, (list, tuple)):
         raw_redemptions = []
     promo_redemptions = [
-        dict(x) for x in list(raw_redemptions)[:2000]
+        dict(x) for x in raw_redemptions[:2000]
         if isinstance(x, Mapping)
     ]
     payload["promotions"] = {
@@ -868,6 +1096,9 @@ def update_business_checkpoint(
 ) -> dict[str, Any]:
     payload = ensure_operating_checkpoint(checkpoint)
     current = payload.get("business") if isinstance(payload.get("business"), Mapping) else {}
+    normalize_products, business_digest, normalize_business_metrics, business_metrics_digest = (
+        _business_normalizers()
+    )
     rows = normalize_products(
         current.get("products", []) if products is None else products
     )
@@ -899,7 +1130,7 @@ def update_promotions_checkpoint(
     if not isinstance(raw_redemptions, (list, tuple)):
         raw_redemptions = []
     redemption_rows = [
-        dict(x) for x in list(raw_redemptions)[:2000]
+        dict(x) for x in raw_redemptions[:2000]
         if isinstance(x, Mapping)
     ]
     payload["promotions"] = {
@@ -1366,7 +1597,7 @@ def load_runtime_checkpoint(
             "checked_at": _now(),
         }
     try:
-        response = requests.get(
+        response = github_get(
             _contents_url(cfg),
             headers=_headers(cfg.token),
             params={"ref": cfg.branch},
@@ -1467,6 +1698,205 @@ def runtime_write_preflight(runtime_result: Mapping[str, Any] | None) -> dict[st
     }
 
 
+WRITE_RECEIPT_SCHEMA = "ATLASQUANT_AION_RUNTIME_WRITE_RECEIPT_V1"
+
+
+def _runtime_write_receipt(
+    cfg: RuntimeConfig,
+    *,
+    expected_sha: str,
+    expected_digest: str,
+    write_sha: str = "",
+    write_accepted: bool | None = None,
+) -> dict[str, Any]:
+    """Create a deterministic write intent/receipt without performing I/O."""
+    target = {
+        "repo": str(cfg.repo or "").strip(),
+        "branch": str(cfg.branch or "").strip(),
+        "path": str(cfg.path or "").strip(),
+    }
+    intent = {
+        "target": target,
+        "expected_sha": str(expected_sha or "").strip(),
+        "expected_digest": str(expected_digest or "").strip(),
+    }
+    encoded = json.dumps(
+        intent,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return {
+        "schema": WRITE_RECEIPT_SCHEMA,
+        "intent_id": hashlib.sha256(encoded).hexdigest(),
+        "target": target,
+        "expected_sha": intent["expected_sha"],
+        "expected_digest": intent["expected_digest"],
+        "write_sha": str(write_sha or "").strip(),
+        "write_accepted": True if write_accepted is True else (False if write_accepted is False else None),
+        "automatic_retry": False,
+        "executes_action": False,
+        "created_at": _now(),
+    }
+
+
+def reconcile_runtime_write(
+    receipt: Mapping[str, Any] | None,
+    runtime_result: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Reconcile an ambiguous checkpoint write without retrying or mutating state."""
+    record = dict(receipt or {})
+    runtime = dict(runtime_result or {})
+    if record.get("schema") != WRITE_RECEIPT_SCHEMA:
+        return {
+            "schema": WRITE_RECEIPT_SCHEMA,
+            "status": "BLOCKED",
+            "verified": False,
+            "write_attributed": False,
+            "reason": "Invalid or missing checkpoint write receipt.",
+            "executes_action": False,
+        }
+    target = record.get("target") if isinstance(record.get("target"), Mapping) else {}
+    normalized_target = {
+        "repo": str(target.get("repo") or "").strip(),
+        "branch": str(target.get("branch") or "").strip(),
+        "path": str(target.get("path") or "").strip(),
+    }
+    if not all(normalized_target.values()):
+        return {
+            "schema": WRITE_RECEIPT_SCHEMA,
+            "status": "BLOCKED",
+            "verified": False,
+            "write_attributed": False,
+            "reason": "Write receipt target is incomplete.",
+            "executes_action": False,
+        }
+    expected_digest = str(record.get("expected_digest") or "").strip().lower()
+    if re.fullmatch(r"[0-9a-f]{16}", expected_digest) is None:
+        return {
+            "schema": WRITE_RECEIPT_SCHEMA,
+            "status": "BLOCKED",
+            "verified": False,
+            "write_attributed": False,
+            "reason": "Write receipt digest is invalid.",
+            "executes_action": False,
+        }
+    intent_payload = {
+        "target": normalized_target,
+        "expected_sha": str(record.get("expected_sha") or "").strip(),
+        "expected_digest": expected_digest,
+    }
+    expected_intent_id = hashlib.sha256(
+        json.dumps(
+            intent_payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+    ).hexdigest()
+    if str(record.get("intent_id") or "").strip() != expected_intent_id:
+        return {
+            "schema": WRITE_RECEIPT_SCHEMA,
+            "status": "BLOCKED",
+            "verified": False,
+            "write_attributed": False,
+            "reason": "Write receipt intent digest is invalid.",
+            "executes_action": False,
+        }
+    runtime_source = str(runtime.get("source") or "").strip()
+    expected_source = f"GitHub:{normalized_target['branch']}:{normalized_target['path']}"
+    if runtime_source and runtime_source != expected_source:
+        return {
+            "schema": WRITE_RECEIPT_SCHEMA,
+            "status": "BLOCKED",
+            "verified": False,
+            "write_attributed": False,
+            "intent_id": expected_intent_id,
+            "reason": "Runtime source does not match the checkpoint write target.",
+            "executes_action": False,
+        }
+    if record.get("write_accepted") is False:
+        return {
+            "schema": WRITE_RECEIPT_SCHEMA,
+            "status": "REJECTED",
+            "verified": False,
+            "write_attributed": False,
+            "reason": "The checkpoint transport rejected this write.",
+            "executes_action": False,
+        }
+    if str(runtime.get("status") or "").upper() != "CONFIRMED":
+        return {
+            "schema": WRITE_RECEIPT_SCHEMA,
+            "status": "WAITING",
+            "verified": False,
+            "write_attributed": False,
+            "reason": "Runtime is not confirmed; do not retry automatically.",
+            "intent_id": record.get("intent_id"),
+            "executes_action": False,
+        }
+    checkpoint = runtime.get("checkpoint")
+    if not isinstance(checkpoint, Mapping):
+        return {
+            "schema": WRITE_RECEIPT_SCHEMA,
+            "status": "BLOCKED",
+            "verified": False,
+            "write_attributed": False,
+            "reason": "Confirmed runtime has no checkpoint payload.",
+            "intent_id": record.get("intent_id"),
+            "executes_action": False,
+        }
+    actual_digest = checkpoint_source_digest(ensure_operating_checkpoint(checkpoint))
+    current_sha = str(runtime.get("sha") or "").strip()
+    write_sha = str(record.get("write_sha") or "").strip()
+    if actual_digest != expected_digest:
+        return {
+            "schema": WRITE_RECEIPT_SCHEMA,
+            "status": "CONFLICT",
+            "verified": False,
+            "write_attributed": False,
+            "intent_id": record.get("intent_id"),
+            "expected_digest": expected_digest,
+            "actual_digest": actual_digest,
+            "reason": "Runtime content does not match the write intent.",
+            "executes_action": False,
+        }
+    if write_sha and current_sha != write_sha:
+        return {
+            "schema": WRITE_RECEIPT_SCHEMA,
+            "status": "CONFLICT",
+            "verified": False,
+            "write_attributed": False,
+            "intent_id": record.get("intent_id"),
+            "expected_digest": expected_digest,
+            "actual_digest": actual_digest,
+            "write_sha": write_sha,
+            "current_sha": current_sha,
+            "reason": "Runtime SHA changed after the accepted write; attribution is blocked.",
+            "executes_action": False,
+        }
+    attributed = bool(record.get("write_accepted") is True and write_sha and current_sha == write_sha)
+    return {
+        "schema": WRITE_RECEIPT_SCHEMA,
+        "status": "CONFIRMED" if attributed else "CONTENT_CONFIRMED",
+        "verified": True,
+        "write_attributed": attributed,
+        "intent_id": record.get("intent_id"),
+        "expected_digest": expected_digest,
+        "actual_digest": actual_digest,
+        "write_sha": write_sha,
+        "current_sha": current_sha,
+        "reason": (
+            "Checkpoint write is confirmed by SHA and digest."
+            if attributed
+            else "Checkpoint content matches the write intent, but this write cannot be uniquely attributed."
+        ),
+        "automatic_retry": False,
+        "executes_action": False,
+    }
+
+
 def save_runtime_checkpoint(
     checkpoint: Mapping[str, Any],
     config: RuntimeConfig | None = None,
@@ -1478,7 +1908,7 @@ def save_runtime_checkpoint(
 ) -> dict[str, Any]:
     """Persist only after approval and confirm persistence with read-after-write."""
     cfg = config or config_from_mapping()
-    if not approved:
+    if approved is not True:
         return {
             "schema": SCHEMA,
             "status": "BLOCKED",
@@ -1564,7 +1994,7 @@ def save_runtime_checkpoint(
                 == _arming_contract_digest(proposed_global)
         )
         transition = not same_armed
-        if transition and not allow_global_arming_transition:
+        if transition and allow_global_arming_transition is not True:
             return {
                 "schema": SCHEMA,
                 "status": "BLOCKED",
@@ -1647,7 +2077,22 @@ def save_runtime_checkpoint(
             "reason": "AION Global Worker integrity mismatch.",
             "checked_at": _now(),
         }
+    quarantine_integrity = _aion_memory_quarantine_integrity(payload)
+    if quarantine_integrity["state"] == "MISMATCH":
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "saved": False,
+            "verified": False,
+            "reason": "AION Memory Quarantine integrity mismatch.",
+            "checked_at": _now(),
+        }
     expected_digest = checkpoint_source_digest(payload)
+    write_receipt = _runtime_write_receipt(
+        cfg,
+        expected_sha=str(expected_sha or "").strip(),
+        expected_digest=expected_digest,
+    )
     raw = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True, default=str).encode("utf-8")
     if len(raw) > MAX_RUNTIME_BYTES:
         return {
@@ -1667,19 +2112,29 @@ def save_runtime_checkpoint(
     if str(expected_sha or "").strip():
         body["sha"] = str(expected_sha).strip()
 
+    write_attempted = False
     try:
-        response = requests.put(
+        write_attempted = True
+        response = github_put(
             _contents_url(cfg),
             headers=_headers(cfg.token),
             json=body,
             timeout=timeout,
         )
         if response.status_code in {409, 422}:
+            write_receipt = _runtime_write_receipt(
+                cfg,
+                expected_sha=str(expected_sha or "").strip(),
+                expected_digest=expected_digest,
+                write_accepted=False,
+            )
             return {
                 "schema": SCHEMA,
                 "status": "CONFLICT",
                 "saved": False,
                 "verified": False,
+                "write_receipt": write_receipt,
+                "reconciliation_required": False,
                 "reason": "Runtime mudou ou a escrita condicional não corresponde ao SHA esperado.",
                 "checked_at": _now(),
             }
@@ -1687,6 +2142,13 @@ def save_runtime_checkpoint(
         obj = response.json()
         content = obj.get("content") if isinstance(obj, dict) else {}
         write_sha = str((content or {}).get("sha") or "").strip()
+        write_receipt = _runtime_write_receipt(
+            cfg,
+            expected_sha=str(expected_sha or "").strip(),
+            expected_digest=expected_digest,
+            write_sha=write_sha,
+            write_accepted=True,
+        )
 
         verification = load_runtime_checkpoint(cfg, timeout=timeout)
         if verification.get("status") != "CONFIRMED":
@@ -1697,7 +2159,9 @@ def save_runtime_checkpoint(
                 "verified": False,
                 "write_accepted": True,
                 "sha": write_sha,
-                "reason": "GitHub aceitou a escrita, mas a leitura de confirmação não foi concluída.",
+                "write_receipt": write_receipt,
+                "reconciliation_required": True,
+                "reason": "GitHub aceitou a escrita, mas a leitura de confirmação não foi concluída. Reconciliar antes de qualquer retry.",
                 "checked_at": _now(),
             }
 
@@ -1714,6 +2178,8 @@ def save_runtime_checkpoint(
                 "verified": False,
                 "write_accepted": True,
                 "sha": read_sha or write_sha,
+                "write_receipt": write_receipt,
+                "reconciliation_required": True,
                 "expected_digest": expected_digest,
                 "actual_digest": actual_digest,
                 "reason": "Leitura de confirmação divergiu do conteúdo gravado.",
@@ -1730,6 +2196,8 @@ def save_runtime_checkpoint(
             "checkpoint": verified_checkpoint,
             "digest": actual_digest,
             "integrity": checkpoint_integrity_report(verified_checkpoint),
+            "write_receipt": write_receipt,
+            "reconciliation_required": False,
             "checked_at": _now(),
         }
     except Exception as exc:
@@ -1738,6 +2206,9 @@ def save_runtime_checkpoint(
             "status": "ERROR",
             "saved": False,
             "verified": False,
+            "write_outcome": "UNKNOWN" if write_attempted else "NOT_ATTEMPTED",
+            "write_receipt": write_receipt,
+            "reconciliation_required": bool(write_attempted),
             "reason": type(exc).__name__,
             "checked_at": _now(),
         }
@@ -1769,6 +2240,19 @@ AION_CORE_SCHEDULER_NAMESPACE = "aion_core_scheduler_v1"
 AION_CORE_EXECUTOR_NAMESPACE = "aion_core_executor_v1"
 AION_CORE_WORKER_NAMESPACE = "aion_core_worker_v1"
 AION_GLOBAL_WORKER_NAMESPACE = "aion_global_worker_v1"
+
+
+def _aion_memory_quarantine_integrity(
+    checkpoint: Mapping[str, Any] | None,
+) -> dict[str, str]:
+    payload = checkpoint if isinstance(checkpoint, Mapping) else {}
+    if AION_MEMORY_QUARANTINE_NAMESPACE not in payload:
+        return {"state": "ABSENT", "stored": "", "expected": ""}
+    return quarantine_checkpoint_integrity(
+        payload.get(AION_MEMORY_QUARANTINE_NAMESPACE)
+        if isinstance(payload.get(AION_MEMORY_QUARANTINE_NAMESPACE), Mapping)
+        else None
+    )
 
 
 def _aion_core_checkpoint_integrity(
@@ -1949,6 +2433,16 @@ def checkpoint_integrity_report(
     checks: list[dict[str, Any]] = []
     mismatches: list[str] = []
     migration_items: list[str] = []
+    unavailable_items: list[str] = []
+
+    def add_unavailable(name: str, stored: Any, reason: str) -> None:
+        checks.append({
+            "component": name,
+            "state": "UNAVAILABLE",
+            "stored": str(stored or "").strip(),
+            "expected": reason,
+        })
+        unavailable_items.append(name)
 
     def add_check(name: str, stored: Any, expected: str) -> None:
         stored_text = str(stored or "").strip()
@@ -2000,6 +2494,17 @@ def checkpoint_integrity_report(
         memory_layers_raw.get("digest"),
         memory_layers_state.get("digest"),
     )
+
+    quarantine_integrity = _aion_memory_quarantine_integrity(raw)
+    if quarantine_integrity["state"] != "ABSENT":
+        checks.append({
+            "component": "aion_memory_quarantine",
+            "state": quarantine_integrity["state"],
+            "stored": quarantine_integrity["stored"],
+            "expected": quarantine_integrity["expected"],
+        })
+        if quarantine_integrity["state"] != "MATCH":
+            mismatches.append("aion_memory_quarantine")
 
     core_integrity = _aion_core_checkpoint_integrity(raw)
     if core_integrity["state"] != "ABSENT":
@@ -2057,33 +2562,67 @@ def checkpoint_integrity_report(
             mismatches.append("aion_global_worker")
 
     studio = raw.get("studio") if isinstance(raw.get("studio"), Mapping) else {}
-    projects = normalize_projects(studio.get("projects") if isinstance(studio, Mapping) else [])
-    add_check("studio", studio.get("digest"), studio_digest(projects))
+    try:
+        projects = normalize_projects(
+            studio.get("projects") if isinstance(studio, Mapping) else []
+        )
+        add_check("studio", studio.get("digest"), studio_digest(projects))
+    except OptionalProductAdapterUnavailableError as exc:
+        add_unavailable("studio", studio.get("digest"), str(exc))
 
     business = raw.get("business") if isinstance(raw.get("business"), Mapping) else {}
-    products = normalize_products(business.get("products") if isinstance(business, Mapping) else [])
-    add_check("business", business.get("digest"), business_digest(products))
+    normalize_products, business_digest, normalize_business_metrics, business_metrics_digest = (
+        _business_normalizers()
+    )
+    try:
+        products = normalize_products(
+            business.get("products") if isinstance(business, Mapping) else []
+        )
+        add_check("business", business.get("digest"), business_digest(products))
+    except BusinessAdapterUnavailableError as exc:
+        add_unavailable("business", business.get("digest"), str(exc))
+
     if business.get("metrics") is not None or business.get("metrics_digest"):
-        metrics = normalize_business_metrics(
-            business.get("metrics") if isinstance(business, Mapping) else {}
-        )
-        add_check(
-            "business.metrics",
-            business.get("metrics_digest"),
-            business_metrics_digest(metrics),
-        )
+        try:
+            metrics = normalize_business_metrics(
+                business.get("metrics") if isinstance(business, Mapping) else {}
+            )
+            add_check(
+                "business.metrics",
+                business.get("metrics_digest"),
+                business_metrics_digest(metrics),
+            )
+        except BusinessAdapterUnavailableError as exc:
+            add_unavailable(
+                "business.metrics",
+                business.get("metrics_digest"),
+                str(exc),
+            )
 
     promotions = raw.get("promotions") if isinstance(raw.get("promotions"), Mapping) else {}
-    campaigns = normalize_campaigns(promotions.get("campaigns") if isinstance(promotions, Mapping) else [])
-    redemptions_raw = promotions.get("redemptions", []) if isinstance(promotions, Mapping) else []
-    if not isinstance(redemptions_raw, (list, tuple)):
-        redemptions_raw = []
-    redemptions = [dict(x) for x in list(redemptions_raw)[:2000] if isinstance(x, Mapping)]
-    add_check(
-        "promotions",
-        promotions.get("digest"),
-        promotion_digest(campaigns, redemptions),
-    )
+    try:
+        campaigns = normalize_campaigns(
+            promotions.get("campaigns") if isinstance(promotions, Mapping) else []
+        )
+        redemptions_raw = (
+            promotions.get("redemptions", [])
+            if isinstance(promotions, Mapping)
+            else []
+        )
+        if not isinstance(redemptions_raw, (list, tuple)):
+            redemptions_raw = []
+        redemptions = [
+            dict(x)
+            for x in islice(redemptions_raw, 2000)
+            if isinstance(x, Mapping)
+        ]
+        add_check(
+            "promotions",
+            promotions.get("digest"),
+            promotion_digest(campaigns, redemptions),
+        )
+    except OptionalProductAdapterUnavailableError as exc:
+        add_unavailable("promotions", promotions.get("digest"), str(exc))
 
     entitlements = raw.get("entitlements") if isinstance(raw.get("entitlements"), Mapping) else {}
     entitlement_rows = normalize_entitlements(
@@ -2343,6 +2882,8 @@ def checkpoint_integrity_report(
 
     if mismatches:
         state = "MISMATCH"
+    elif unavailable_items:
+        state = "UNKNOWN"
     elif migration_items:
         state = "MIGRATION_REQUIRED"
     else:
@@ -2357,6 +2898,7 @@ def checkpoint_integrity_report(
         "total": len(checks),
         "mismatches": mismatches,
         "migration_items": migration_items,
+        "unavailable_items": unavailable_items,
         "write_safe": state in {"CONFIRMED", "MIGRATION_REQUIRED"},
     }
 

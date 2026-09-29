@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any, Mapping, Sequence
+from itertools import islice
 import hashlib
 import re
 
@@ -270,7 +271,7 @@ def sanitize_tenant_memory(raw:Mapping[str,Any]|None, access:Mapping[str,Any]|No
     profile=data.get("profile") if isinstance(data.get("profile"),Mapping) else {}
     preferences=profile.get("preferences") if isinstance(profile.get("preferences"),Mapping) else {}
     safe_preferences={}
-    for key,value in list(preferences.items())[:50]:
+    for key,value in islice(preferences.items(), 50):
         k=str(key or "").strip()[:64]
         if not k:
             continue
@@ -278,7 +279,7 @@ def sanitize_tenant_memory(raw:Mapping[str,Any]|None, access:Mapping[str,Any]|No
             safe_preferences[k]=value
 
     notes=[]
-    for row in list(data.get("conversation_notes") or [])[:200]:
+    for row in islice(data.get("conversation_notes") or (), 200):
         if not isinstance(row,Mapping):
             continue
         text=" ".join(str(row.get("text") or "").replace("\x00","").split())[:1000]
@@ -293,7 +294,7 @@ def sanitize_tenant_memory(raw:Mapping[str,Any]|None, access:Mapping[str,Any]|No
 
     academy=data.get("academy_progress") if isinstance(data.get("academy_progress"),Mapping) else {}
     watchlist=[]
-    for item in list(data.get("watchlist") or [])[:100]:
+    for item in islice(data.get("watchlist") or (), 100):
         symbol="".join(ch for ch in str(item or "").upper() if ch.isalnum() or ch in "._-/")[:24]
         if symbol and symbol not in watchlist:
             watchlist.append(symbol)
@@ -305,7 +306,7 @@ def sanitize_tenant_memory(raw:Mapping[str,Any]|None, access:Mapping[str,Any]|No
     }
     seed["conversation_notes"]=notes
     seed["academy_progress"]={
-        str(k)[:80]:v for k,v in list(academy.items())[:200]
+        str(k)[:80]:v for k,v in islice(academy.items(), 200)
         if isinstance(v,(str,int,float,bool)) or v is None
     }
     seed["watchlist"]=watchlist

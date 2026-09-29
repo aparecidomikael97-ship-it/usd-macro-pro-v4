@@ -9,9 +9,11 @@ heartbeats covering roughly one day with no large gap.
 """
 from __future__ import annotations
 
+from collections import deque
 from datetime import datetime, timezone
 from hashlib import sha256
 from typing import Any, Mapping, Sequence
+from itertools import islice
 import json
 import math
 
@@ -69,8 +71,8 @@ def compact_event(raw:Mapping[str,Any],*,observed_at:Any="")->dict[str,Any]:
     truth=_clean(item.get("truth_state"),40).upper() or "UNKNOWN"
     if truth not in {"CONFIRMED","INFERENCE","HYPOTHESIS","UNKNOWN"}:
         truth="UNKNOWN"
-    sources=[_clean(x,180) for x in list(item.get("sources") or [])[:12] if _clean(x,180)]
-    currencies=[_clean(x,20).upper() for x in list(item.get("currencies") or [])[:12] if _clean(x,20)]
+    sources=[_clean(x,180) for x in islice(item.get("sources") or (),12) if _clean(x,180)]
+    currencies=[_clean(x,20).upper() for x in islice(item.get("currencies") or (),12) if _clean(x,20)]
     urgency=max(0,min(100,int(_finite(item.get("urgency_score")) or 0)))
     return {
         "schema":SCHEMA,
@@ -102,7 +104,12 @@ def compact_event(raw:Mapping[str,Any],*,observed_at:Any="")->dict[str,Any]:
 def normalize_events(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for raw in list(rows or [])[-MAX_EVENTS*2:]:
+    source=(
+        rows[-MAX_EVENTS*2:]
+        if isinstance(rows,(list,tuple))
+        else deque(rows or (),maxlen=MAX_EVENTS*2)
+    )
+    for raw in source:
         if not isinstance(raw,Mapping):
             continue
         item=compact_event(raw,observed_at=raw.get("last_seen_at") or raw.get("first_seen_at"))
@@ -132,7 +139,7 @@ def merge_events(
 )->list[dict[str,Any]]:
     stamp=_clean(observed_at,120)
     current={x["event_id"]:x for x in normalize_events(existing)}
-    for raw in list(incoming or []):
+    for raw in incoming or ():
         if not isinstance(raw,Mapping):
             continue
         item=compact_event(raw,observed_at=stamp)
@@ -174,7 +181,12 @@ def compact_heartbeat(
 def normalize_heartbeats(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for raw in list(rows or [])[-MAX_HEARTBEATS*2:]:
+    source=(
+        rows[-MAX_HEARTBEATS*2:]
+        if isinstance(rows,(list,tuple))
+        else deque(rows or (),maxlen=MAX_HEARTBEATS*2)
+    )
+    for raw in source:
         if not isinstance(raw,Mapping):
             continue
         stamp=_clean(raw.get("observed_at"),120)

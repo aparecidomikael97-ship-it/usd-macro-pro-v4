@@ -187,6 +187,11 @@ def verify_global_worker_live_activation(
 
     stats = worker.get("stats") if isinstance(worker.get("stats"), Mapping) else {}
     lease = worker.get("lease") if isinstance(worker.get("lease"), Mapping) else {}
+    inflight = (
+        worker.get("inflight_tick")
+        if isinstance(worker.get("inflight_tick"), Mapping)
+        else {}
+    )
 
     last_heartbeat_at = _parse_iso(stats.get("last_heartbeat_at"))
     last_tick_at = _parse_iso(stats.get("last_tick_at"))
@@ -262,6 +267,9 @@ def verify_global_worker_live_activation(
     if unsafe_receipts:
         status = "BLOCKED_UNSAFE_RECEIPT"
         reason = "GLOBAL_WORKER_RECEIPT_REPORTED_EXTERNAL_OR_TRADING_EFFECT"
+    elif inflight:
+        status = "BLOCKED_INFLIGHT_RECONCILIATION"
+        reason = "GLOBAL_WORKER_INFLIGHT_TICK_REQUIRES_RECONCILIATION"
     elif stale_lease:
         status = "BLOCKED_STALE_LEASE"
         reason = "GLOBAL_WORKER_LEASE_EXPIRED_WITH_OWNER"
@@ -308,6 +316,10 @@ def verify_global_worker_live_activation(
         "lease_owner": lease_owner,
         "lease_expires_at": lease_expires.isoformat() if lease_expires else "",
         "stale_lease": stale_lease,
+        "inflight_reconciliation_required": bool(inflight),
+        "inflight_owner": str(inflight.get("owner") or ""),
+        "inflight_fencing_token": int(inflight.get("fencing_token") or 0),
+        "inflight_since": str(inflight.get("claimed_at") or ""),
         "receipt_store_state": str(receipt_state.get("state") or ""),
         "read_only": True,
         "runtime_modified": False,
