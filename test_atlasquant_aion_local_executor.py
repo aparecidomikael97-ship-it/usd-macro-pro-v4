@@ -179,6 +179,43 @@ class PreflightTests(unittest.TestCase):
             self.assertFalse(out["real_orders_enabled"])
 
 
+    def test_privilege_flags_require_exact_boolean_true(self):
+        blocked_plan = {
+            "state": "BLOCK",
+            "reason": "synthetic",
+            "blockers": ["SYNTHETIC_BLOCK"],
+            "tool": {},
+        }
+        with patch(
+            "atlasquant_aion_local_executor.plan_tool_call",
+            return_value=blocked_plan,
+        ) as preflight:
+            execute_local_tool(
+                "aion.memory.search",
+                access=ADMIN,
+                source_kind="ADMIN",
+                authenticated_admin="false",
+                approved=1,
+            )
+            kwargs = preflight.call_args.kwargs
+            self.assertFalse(kwargs["authenticated_admin"])
+            self.assertFalse(kwargs["approved"])
+
+            execute_local_tool(
+                "aion.memory.search",
+                access=ADMIN,
+                source_kind="ADMIN",
+                authenticated_admin=True,
+                approved=True,
+            )
+            kwargs = preflight.call_args.kwargs
+            self.assertTrue(kwargs["authenticated_admin"])
+            self.assertTrue(kwargs["approved"])
+
+        source = (ROOT / "atlasquant_aion_local_executor.py").read_text(encoding="utf-8")
+        self.assertNotIn("authenticated_admin=bool(authenticated_admin)", source)
+        self.assertNotIn("approved=bool(approved)", source)
+
 class ExecutionTests(unittest.TestCase):
     def test_search_and_recall_stay_separate_and_do_not_promote_truth(self):
         fresh = _memory("Radar local sem ordem.")
