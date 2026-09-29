@@ -44,7 +44,7 @@
         357
       ],
       "preserves_entitlements_as_tenant_core_dependency": true,
-      "head_sha": "08b0f33d97e5eb0d6edca353f9c42bf0d1b672dd"
+      "head_sha": "cf9bc11a19aef8ce5a7aad50e0ec4244aa10bc29"
     }
   ],
   "autonomy": {
@@ -75,7 +75,7 @@
   },
   "next_hardening_order": [
     "wait_for_latest_pr_359_readiness",
-    "ruleset_required_checks_human_decision"
+    "human_decision_ruleset_required_checks"
   ],
   "stop_conditions": [
     "human_authorization_required",
@@ -103,7 +103,10 @@
     "resource_bounds_optional_product_and_session_memory": "pr_359_absorbs_pr_357",
     "post_359_adversarial_resource_sweep": "pr_359",
     "rt01_rt20_closure_matrix": "docs/aion/AION_CORE_REDTEAM_CLOSURE_MATRIX_2026-09-29.md",
-    "critical_review_closed_schema": "pr_359"
+    "critical_review_closed_schema": "pr_359",
+    "quality_workflow_root_test_coverage": "331_of_331_on_pr_359",
+    "security_gate_shell_continuations": "fixed_in_pr_359",
+    "required_checks_proposal": "docs/aion/AION_REQUIRED_CHECKS_PROPOSAL_2026-09-29.md"
   },
   "superseded_prs": [
     {
@@ -146,5 +149,13 @@
       "may_touch_core_authority": false,
       "production_wiring_allowed": false
     }
-  ]
+  ],
+  "pending_human_decisions": {
+    "ruleset_required_checks": {
+      "state": "NOT_APPLIED",
+      "repo_rulesets_visible_count": 0,
+      "branch_protection_read": "FORBIDDEN_BY_INTEGRATION",
+      "requires_explicit_admin_approval": true
+    }
+  }
 }
