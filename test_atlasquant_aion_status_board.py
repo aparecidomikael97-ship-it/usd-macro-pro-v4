@@ -294,12 +294,16 @@ class AtlasQuantAionMasterStatusBoardTests(unittest.TestCase):
                 "confirmed":True,
                 "detail":"Canal interno confirmado.",
                 "unresolved":0,
+                "freshness_attested":True,
+                "freshness_source":"notification_probe",
             },
             "worker_health":{
                 "state":"HEALTHY",
                 "confirmed":True,
                 "detail":"Worker verificado.",
                 "unresolved":0,
+                "freshness_attested":True,
+                "freshness_source":"worker_probe",
             },
             "critical_surfaces":{
                 "all_ok":True,
@@ -336,8 +340,8 @@ class AtlasQuantAionMasterStatusBoardTests(unittest.TestCase):
                 "observation_count":8,
                 "fallback_or_unavailable":2,
             },
-            "notification_health":{"state":"HEALTHY","confirmed":True},
-            "worker_health":{"state":"HEALTHY","confirmed":True},
+            "notification_health":{"state":"HEALTHY","confirmed":True,"freshness_attested":True,"freshness_source":"notification_probe"},
+            "worker_health":{"state":"HEALTHY","confirmed":True,"freshness_attested":True,"freshness_source":"worker_probe"},
             "critical_surfaces":{
                 "all_ok":True,
                 "counts":{"OK":3,"DEGRADED":0,"UNAVAILABLE":0,"STALE_BUILD":0,"UNKNOWN":0},
@@ -351,6 +355,19 @@ class AtlasQuantAionMasterStatusBoardTests(unittest.TestCase):
         self.assertFalse(source["confirmed"])
         self.assertEqual(center["state"],"DEGRADED")
         self.assertEqual(self.by_id(board,"system_health_center")["state"],"UNKNOWN")
+
+    def test_explicit_worker_health_without_freshness_proof_stays_unknown(self):
+        board=self.base(system_context={
+            "truth_state":"CONFIRMED",
+            "source_build":"abc123",
+            "worker_health":{"state":"HEALTHY","confirmed":True},
+        })
+        center=board["system_health_center"]
+        worker=next(x for x in center["items"] if x["id"]=="workers")
+        self.assertEqual(worker["state"],"UNKNOWN")
+        self.assertIn("FRESHNESS_NOT_CONFIRMED",worker["reasons"])
+
+
 
     def test_queues_are_unknown_when_checkpoint_runtime_is_not_confirmed(self):
         board=self.base(runtime_result={"status":"UNAVAILABLE"})
