@@ -83,6 +83,17 @@ def _texts(values: Any, limit: int = 12) -> list[str]:
     return out
 
 
+def _bounded_models(values: Any) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for item in values or ():
+        if not isinstance(item, Mapping):
+            continue
+        out.append(dict(item))
+        if len(out) >= MAX_MODELS:
+            break
+    return out
+
+
 def _canonical(payload: Mapping[str, Any]) -> str:
     return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
 
@@ -316,7 +327,7 @@ def _same_model(row: Mapping[str, Any], decision: Mapping[str, Any]) -> bool:
 def admit_model(registry: Mapping[str, Any] | None, candidate: Mapping[str, Any] | None, **kwargs: Any) -> dict[str, Any]:
     current = empty_registry()
     raw_rows = registry.get("models") if isinstance(registry, Mapping) else None
-    rows = [dict(item) for item in islice(raw_rows or (),MAX_MODELS) if isinstance(item, Mapping)]
+    rows = _bounded_models(raw_rows)
     decision = assess_model_promotion(candidate, **kwargs)
     if not decision["persisted"]:
         current["models"] = rows[:MAX_MODELS]
@@ -353,7 +364,7 @@ def read_model(
     tenant = _clean(trusted.get("tenant_id"), 80)
     workspace = _clean(trusted.get("workspace_id"), 80)
     rows = registry.get("models") if isinstance(registry, Mapping) else None
-    for row in islice(rows or (),MAX_MODELS):
+    for row in _bounded_models(rows):
         if not isinstance(row, Mapping):
             continue
         if (
