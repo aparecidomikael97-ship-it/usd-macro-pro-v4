@@ -19,6 +19,7 @@ from atlasquant_aion_memory import (
     merged_checkpoint,
     runtime_write_preflight,
     reconcile_runtime_write,
+    _fallback_business_normalizers,
     _runtime_write_receipt,
     runtime_configuration_status,
     save_runtime_checkpoint,
@@ -176,6 +177,30 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         self.assertNotIn("Validar persistência runtime do Checkpoint Mestre.",upgraded["pending"])
         self.assertIn("Pendência customizada preservada.",upgraded["pending"])
         self.assertNotIn("Validar persistência runtime do Checkpoint Mestre.",default_checkpoint()["pending"])
+
+    def test_optional_business_fallback_matches_real_empty_digests(self):
+        from atlasquant_aion_business import (
+            business_digest,
+            business_metrics_digest,
+            normalize_business_metrics,
+        )
+        (
+            fallback_products,
+            fallback_digest,
+            fallback_metrics,
+            fallback_metrics_digest,
+        ) = _fallback_business_normalizers()
+
+        self.assertEqual(fallback_products([]), [])
+        self.assertEqual(fallback_digest([]), business_digest([]))
+        self.assertEqual(
+            fallback_metrics({}),
+            normalize_business_metrics({}),
+        )
+        self.assertEqual(
+            fallback_metrics_digest({}),
+            business_metrics_digest({}),
+        )
 
     def test_default_checkpoint_is_safe_and_has_no_real_trading(self):
         cp = default_checkpoint()
