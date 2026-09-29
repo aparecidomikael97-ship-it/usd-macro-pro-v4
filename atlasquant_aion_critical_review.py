@@ -12,6 +12,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from hashlib import sha256
 from typing import Any, Callable, Mapping, Sequence
+from itertools import islice
 import json
 import unicodedata
 
@@ -46,6 +47,13 @@ _HIGH_FACTORS = frozenset({
     "code_change",
     "irreversible",
 })
+MAX_REVIEW_ROWS = 12
+_MESSAGE_FIELDS = frozenset({
+    "version","agent_id","role","capability","workspace_id","tenant_id",
+    "requested_action","evidence_refs","confidence","risk_level","permissions",
+    "approval_refs","issued_at","nonce","content","digest","schema",
+})
+
 _PRIVILEGE_CLAIMS = (
     "expands_permission",
     "changes_guardian",
@@ -78,7 +86,7 @@ def _exact_int(value: Any, *, minimum: int = 0, maximum: int = 1_000_000) -> int
 
 def _refs(values: Sequence[Any] | None, limit: int = 40) -> list[str]:
     out: list[str] = []
-    for item in list(values or [])[:limit]:
+    for item in islice(values or (), max(0,limit)):
         text = _clean(item, 180)
         if text and text not in out:
             out.append(text)
@@ -306,7 +314,11 @@ def adjudicate_critical_task(
         blockers.append("APPROVAL_UNVERIFIED")
 
     seen: dict[str, Mapping[str, Any]] = {}
-    for raw in list(reviews or []):
+    review_rows = list(islice(reviews or (), MAX_REVIEW_ROWS + 1))
+    if len(review_rows) > MAX_REVIEW_ROWS:
+        blockers.append("REVIEW_LIMIT_EXCEEDED")
+        review_rows = review_rows[:MAX_REVIEW_ROWS]
+    for raw in review_rows:
         if not isinstance(raw, Mapping):
             blockers.append("REVIEW_INVALID")
             continue
@@ -539,6 +551,9 @@ def validate_agent_message(
     expected_workspace = _clean(expected_workspace_id, 120)
     expected_tenant = _clean(expected_tenant_id, 120)
     blockers: list[str] = []
+    unknown_fields=sorted(str(key) for key in raw.keys() if key not in _MESSAGE_FIELDS)
+    if unknown_fields:
+        blockers.append("UNKNOWN_FIELDS")
     if presented != actual:
         blockers.append("DIGEST_INVALID")
     if _clean(raw.get("version"), 20) != PROTOCOL_VERSION:
