@@ -51,6 +51,15 @@ def _safe_revision(value:Any)->str:
     return revision if _REVISION_RE.fullmatch(revision) else ""
 
 
+def _strict_json_object(pairs:list[tuple[str,Any]])->dict[str,Any]:
+    out={}
+    for key,value in pairs:
+        if key in out:
+            raise ValueError("duplicate JSON key")
+        out[key]=value
+    return out
+
+
 def list_checkpoint_revisions(
     config:RuntimeConfig,
     *,
@@ -159,10 +168,14 @@ def load_checkpoint_revision(
         )
         response.raise_for_status()
         obj=response.json()
-        raw=base64.b64decode(str(obj.get("content") or "")).decode("utf-8")
-        if len(raw.encode("utf-8"))>MAX_RUNTIME_BYTES:
+        encoded="".join(str(obj.get("content") or "").split())
+        if not encoded:
+            raise ValueError("runtime checkpoint content missing")
+        raw_bytes=base64.b64decode(encoded,validate=True)
+        if len(raw_bytes)>MAX_RUNTIME_BYTES:
             raise ValueError("runtime checkpoint too large")
-        checkpoint=json.loads(raw)
+        raw=raw_bytes.decode("utf-8")
+        checkpoint=json.loads(raw,object_pairs_hook=_strict_json_object)
         if not isinstance(checkpoint,dict):
             raise ValueError("checkpoint is not an object")
         integrity=checkpoint_integrity_report(checkpoint)
@@ -310,7 +323,71 @@ def restore_checkpoint_revision(
             "preflight":preflight,
         }
 
-    checkpoint=ensure_operating_checkpoint(candidate.get("checkpoint"))
+    revision=str(preflight.get("candidate_revision") or "")
+    rebound_candidate=load_checkpoint_revision(
+        revision,
+        config,
+        timeout=min(float(timeout),12.0),
+    )
+    if str(rebound_candidate.get("status") or "").upper()!="CONFIRMED":
+        return {
+            "schema":SCHEMA,
+            "status":"BLOCKED",
+            "saved":False,
+            "verified":False,
+            "reason":"Historical recovery revision could not be revalidated.",
+            "preflight":preflight,
+            "revision_revalidation":{
+                "status":str(rebound_candidate.get("status") or "UNKNOWN"),
+                "reason":str(rebound_candidate.get("reason") or ""),
+            },
+            "requested_revision":revision,
+            "restored_revision":"",
+            "restore_confirmed":False,
+            "reconciliation_required":False,
+            "automatic_retry_allowed":False,
+            "automatic_restore":False,
+        }
+
+    rebound_preflight=recovery_preflight(current_runtime,rebound_candidate)
+    if not rebound_preflight.get("allowed"):
+        return {
+            "schema":SCHEMA,
+            "status":"BLOCKED",
+            "saved":False,
+            "verified":False,
+            "reason":"Revalidated historical revision failed recovery preflight.",
+            "preflight":preflight,
+            "revision_revalidation":rebound_preflight,
+            "requested_revision":revision,
+            "restored_revision":"",
+            "restore_confirmed":False,
+            "reconciliation_required":False,
+            "automatic_retry_allowed":False,
+            "automatic_restore":False,
+        }
+
+    selected_digest=str(preflight.get("candidate_digest") or "")
+    rebound_digest=str(rebound_preflight.get("candidate_digest") or "")
+    if not selected_digest or selected_digest!=rebound_digest:
+        return {
+            "schema":SCHEMA,
+            "status":"BLOCKED",
+            "saved":False,
+            "verified":False,
+            "reason":"Selected recovery candidate does not match the historical revision.",
+            "preflight":preflight,
+            "revision_revalidation":rebound_preflight,
+            "requested_revision":revision,
+            "restored_revision":"",
+            "restore_confirmed":False,
+            "reconciliation_required":False,
+            "automatic_retry_allowed":False,
+            "automatic_restore":False,
+        }
+
+    preflight=rebound_preflight
+    checkpoint=ensure_operating_checkpoint(rebound_candidate.get("checkpoint"))
     checkpoint=deepcopy(checkpoint)
     operating=checkpoint.get("operating") if isinstance(checkpoint.get("operating"),Mapping) else {}
     events=append_event(
