@@ -11,7 +11,7 @@ class AtlasQuantSourceBackupWorkflowTests(unittest.TestCase):
         self.assertIn('ATLASQUANT_REAL_EXECUTION: "0"',text)
         self.assertIn("BACKUP_MANIFEST.txt",text)
         self.assertIn("sha256sum",text)
-        self.assertIn("actions/upload-artifact@v7",text)
+        self.assertIn("actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",text)
         self.assertIn("retention-days: 30",text)
         self.assertNotIn('ATLASQUANT_REAL_EXECUTION: "1"',text)
         self.assertNotIn("atlasquant-runtime",text)
