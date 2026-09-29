@@ -21,9 +21,35 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
         self.assertNotIn("actions/checkout@v4",joined)
         self.assertNotIn("actions/setup-python@v5",joined)
         self.assertNotIn("actions/upload-artifact@v4",joined)
-        self.assertIn("actions/checkout@v7",joined)
-        self.assertIn("actions/setup-python@v7",joined)
-        self.assertIn("actions/upload-artifact@v7",joined)
+        self.assertIn("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",joined)
+        self.assertIn("actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",joined)
+        self.assertIn("actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",joined)
+
+
+    def test_all_workflow_actions_and_python_installs_are_pinned(self):
+        workflow_dir=ROOT/".github"/"workflows"
+        violations=[]
+        for path in sorted(workflow_dir.glob("*.y*ml")):
+            text=path.read_text(encoding="utf-8")
+            for line_number,line in enumerate(text.splitlines(),start=1):
+                stripped=line.strip()
+                action=re.search(r"^uses:\s*([^\s#]+)$",stripped)
+                if action:
+                    spec=action.group(1)
+                    if not spec.startswith("./") and not spec.startswith("docker://"):
+                        if "@" not in spec or re.fullmatch(r"[^@]+@[0-9a-f]{40}",spec) is None:
+                            violations.append(f"{path.name}:{line_number}:action:{spec}")
+                if re.search(r"\bpython -m pip install (?:--upgrade|-U) pip\b",stripped):
+                    violations.append(f"{path.name}:{line_number}:pip-upgrade")
+                install=re.search(r"^(?:python -m )?pip install\s+(.+)$",stripped)
+                if install:
+                    args=install.group(1).strip()
+                    if re.search(r"(?:^|\s)-r\s+requirements[^\s]*",args):
+                        continue
+                    tokens=[x for x in args.split() if not x.startswith("-")]
+                    if any("==" not in token for token in tokens):
+                        violations.append(f"{path.name}:{line_number}:unpinned:{args}")
+        self.assertEqual(violations,[],f"Unpinned workflow dependencies/actions: {violations}")
 
 
     def test_production_observability_workflows_are_read_only_and_candidate_safe(self):
@@ -42,8 +68,8 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
         self.assertNotIn("\n  push:",trigger)
         self.assertIn("schedule:",trigger)
         self.assertNotIn("workflow_run:",trigger)
-        self.assertIn("actions/setup-python@v7",browser)
-        self.assertIn("actions/upload-artifact@v7",browser)
+        self.assertIn("actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",browser)
+        self.assertIn("actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",browser)
         self.assertIn("Warm production service",browser)
         self.assertIn("$APP_URL/_stcore/health",browser)
         self.assertIn("for attempt in range(1, 6)",browser)
@@ -83,9 +109,9 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
         self.assertIn("#atlasquant-source-build-marker",src)
         self.assertIn("AQBUILD:",src)
         self.assertIn("source_build==expected",src)
-        self.assertIn("actions/checkout@v7",src)
-        self.assertIn("actions/setup-python@v7",src)
-        self.assertIn("actions/upload-artifact@v7",src)
+        self.assertIn("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",src)
+        self.assertIn("actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",src)
+        self.assertIn("actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",src)
 
     def test_quality_push_paths_cover_render_deploy_reconciliation(self):
         src=WORKFLOW.read_text(encoding="utf-8")
@@ -112,7 +138,7 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
         self.assertIn('"width":1440',src)
         self.assertIn("horizontal_overflow_px",src)
         self.assertIn("stException",src)
-        self.assertIn("actions/upload-artifact@v7",src)
+        self.assertIn("actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",src)
         self.assertNotIn("secrets.",src)
 
 
@@ -125,9 +151,9 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
         self.assertIn("merge-base",src)
         self.assertIn("origin/main...HEAD",src)
         self.assertIn("evaluate_integration_candidate",src)
-        self.assertIn("actions/checkout@v7",src)
-        self.assertIn("actions/setup-python@v7",src)
-        self.assertIn("actions/upload-artifact@v7",src)
+        self.assertIn("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",src)
+        self.assertIn("actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",src)
+        self.assertIn("actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",src)
         self.assertNotIn("contents: write",src)
         self.assertNotIn("git merge",src)
         self.assertNotIn("git push",src)
@@ -142,9 +168,9 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
         self.assertIn('branch=="atlasquant-integration"',src)
         self.assertIn('branch=="atlasquant-runtime"',src)
         self.assertIn("compare_source_trees",src)
-        self.assertIn("actions/checkout@v7",src)
-        self.assertIn("actions/setup-python@v7",src)
-        self.assertIn("actions/upload-artifact@v7",src)
+        self.assertIn("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",src)
+        self.assertIn("actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",src)
+        self.assertIn("actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",src)
         self.assertNotIn("contents: write",src)
         self.assertNotIn("git push",src)
         self.assertNotIn("update-ref",src)
