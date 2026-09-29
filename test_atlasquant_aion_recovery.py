@@ -60,7 +60,7 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
             },
             {"sha":"not-a-sha","commit":{"message":"invalid"}},
         ]
-        with patch("atlasquant_aion_recovery.requests.get",return_value=response) as get:
+        with patch("requests.get",return_value=response) as get:
             result=list_checkpoint_revisions(self.cfg(),limit=12)
         self.assertEqual(result["status"],"CONFIRMED")
         self.assertEqual(result["count"],1)
@@ -73,7 +73,7 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
 
     def test_history_refuses_code_branch_before_network(self):
         cfg=RuntimeConfig(token="x",repo="owner/repo",branch="main")
-        with patch("atlasquant_aion_recovery.requests.get") as get:
+        with patch("requests.get") as get:
             result=list_checkpoint_revisions(cfg)
         self.assertEqual(result["status"],"BLOCKED")
         get.assert_not_called()
@@ -85,7 +85,7 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
         response.raise_for_status.return_value=None
         response.json.return_value={"content":base64.b64encode(raw).decode("ascii")}
         revision="abcdef1234567890abcdef1234567890abcdef12"
-        with patch("atlasquant_aion_recovery.requests.get",return_value=response):
+        with patch("requests.get",return_value=response):
             result=load_checkpoint_revision(revision,self.cfg())
         self.assertEqual(result["status"],"CONFIRMED")
         self.assertEqual(result["integrity"]["state"],"CONFIRMED")
