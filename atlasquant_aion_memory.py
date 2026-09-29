@@ -26,9 +26,6 @@ from atlasquant_runtime_store import resolve_runtime_branch, require_runtime_bra
 from atlasquant_aion_operations import normalize_queue, queue_digest
 from atlasquant_aion_observability import normalize_events, events_digest
 from atlasquant_aion_model_router import normalize_budget
-from atlasquant_aion_studio import normalize_projects, studio_digest
-from atlasquant_aion_promotions import normalize_campaigns, promotion_digest
-from atlasquant_aion_entitlements import normalize_entitlements, entitlement_digest
 from atlasquant_aion_continuity import (
     normalize_missions,
     normalize_handoffs,
@@ -414,6 +411,113 @@ def _empty_business_section() -> dict[str, Any]:
     }
 
 
+class OptionalDomainAdapterUnavailableError(RuntimeError):
+    """Optional product-domain adapter is unavailable for persisted non-empty data."""
+
+
+def _empty_optional_rows(rows: Any, *, code: str) -> list[Any]:
+    if rows is None:
+        return []
+    if isinstance(rows, (list, tuple)) and not rows:
+        return []
+    raise OptionalDomainAdapterUnavailableError(code)
+
+
+def _fallback_studio_normalizers():
+    def normalize_projects(rows):
+        return _empty_optional_rows(
+            rows,
+            code="STUDIO_ADAPTER_REQUIRED_FOR_NONEMPTY_PROJECTS",
+        )
+
+    def studio_digest(rows):
+        normalized=normalize_projects(rows)
+        raw=json.dumps(
+            normalized,
+            ensure_ascii=False,
+            sort_keys=True,
+            default=str,
+        )
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+    return normalize_projects, studio_digest
+
+
+def _studio_normalizers():
+    try:
+        from atlasquant_aion_studio import normalize_projects, studio_digest
+    except ImportError:
+        return _fallback_studio_normalizers()
+    return normalize_projects, studio_digest
+
+
+def _fallback_promotion_normalizers():
+    def normalize_campaigns(rows):
+        return _empty_optional_rows(
+            rows,
+            code="PROMOTIONS_ADAPTER_REQUIRED_FOR_NONEMPTY_CAMPAIGNS",
+        )
+
+    def promotion_digest(campaigns, redemptions=None):
+        normalized_campaigns=normalize_campaigns(campaigns)
+        normalized_redemptions=_empty_optional_rows(
+            redemptions,
+            code="PROMOTIONS_ADAPTER_REQUIRED_FOR_NONEMPTY_REDEMPTIONS",
+        )
+        payload={
+            "campaigns":normalized_campaigns,
+            "redemptions":normalized_redemptions,
+        }
+        raw=json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            default=str,
+        )
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+    return normalize_campaigns, promotion_digest
+
+
+def _promotion_normalizers():
+    try:
+        from atlasquant_aion_promotions import normalize_campaigns, promotion_digest
+    except ImportError:
+        return _fallback_promotion_normalizers()
+    return normalize_campaigns, promotion_digest
+
+
+def _fallback_entitlement_normalizers():
+    def normalize_entitlements(rows):
+        return _empty_optional_rows(
+            rows,
+            code="ENTITLEMENTS_ADAPTER_REQUIRED_FOR_NONEMPTY_RECORDS",
+        )
+
+    def entitlement_digest(rows):
+        normalized=normalize_entitlements(rows)
+        raw=json.dumps(
+            normalized,
+            ensure_ascii=False,
+            sort_keys=True,
+            default=str,
+        )
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+    return normalize_entitlements, entitlement_digest
+
+
+def _entitlement_normalizers():
+    try:
+        from atlasquant_aion_entitlements import (
+            entitlement_digest,
+            normalize_entitlements,
+        )
+    except ImportError:
+        return _fallback_entitlement_normalizers()
+    return normalize_entitlements, entitlement_digest
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -553,6 +657,9 @@ def search_canonical_memory(
 
 
 def default_checkpoint() -> dict[str, Any]:
+    normalize_projects, studio_digest = _studio_normalizers()
+    normalize_campaigns, promotion_digest = _promotion_normalizers()
+    normalize_entitlements, entitlement_digest = _entitlement_normalizers()
     return {
         "schema": SCHEMA,
         "checkpoint_version": 18,
@@ -659,6 +766,9 @@ def default_checkpoint() -> dict[str, Any]:
 
 def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[str, Any]:
     """Upgrade older checkpoints in memory without inventing persisted state."""
+    normalize_projects, studio_digest = _studio_normalizers()
+    normalize_campaigns, promotion_digest = _promotion_normalizers()
+    normalize_entitlements, entitlement_digest = _entitlement_normalizers()
     payload = dict(checkpoint or {})
     if not payload:
         payload = default_checkpoint()
@@ -984,6 +1094,7 @@ def update_studio_checkpoint(
     dirty: bool = True,
 ) -> dict[str, Any]:
     payload = ensure_operating_checkpoint(checkpoint)
+    normalize_projects, studio_digest = _studio_normalizers()
     rows = normalize_projects(projects)
     payload["studio"] = {
         "projects": rows,
@@ -1031,6 +1142,7 @@ def update_promotions_checkpoint(
     dirty: bool = True,
 ) -> dict[str, Any]:
     payload = ensure_operating_checkpoint(checkpoint)
+    normalize_campaigns, promotion_digest = _promotion_normalizers()
     rows = normalize_campaigns(campaigns)
     current = payload.get("promotions") if isinstance(payload.get("promotions"), Mapping) else {}
     raw_redemptions = current.get("redemptions", []) if redemptions is None else redemptions
@@ -1057,6 +1169,7 @@ def update_entitlements_checkpoint(
     dirty: bool = True,
 ) -> dict[str, Any]:
     payload = ensure_operating_checkpoint(checkpoint)
+    normalize_entitlements, entitlement_digest = _entitlement_normalizers()
     rows = normalize_entitlements(records)
     payload["entitlements"] = {
         "records": rows,
@@ -2471,8 +2584,14 @@ def checkpoint_integrity_report(
             mismatches.append("aion_global_worker")
 
     studio = raw.get("studio") if isinstance(raw.get("studio"), Mapping) else {}
-    projects = normalize_projects(studio.get("projects") if isinstance(studio, Mapping) else [])
-    add_check("studio", studio.get("digest"), studio_digest(projects))
+    normalize_projects, studio_digest = _studio_normalizers()
+    try:
+        projects = normalize_projects(
+            studio.get("projects") if isinstance(studio, Mapping) else []
+        )
+        add_check("studio", studio.get("digest"), studio_digest(projects))
+    except OptionalDomainAdapterUnavailableError as exc:
+        add_unavailable("studio", studio.get("digest"), str(exc))
 
     business = raw.get("business") if isinstance(raw.get("business"), Mapping) else {}
     normalize_products, business_digest, normalize_business_metrics, business_metrics_digest = (
@@ -2504,26 +2623,42 @@ def checkpoint_integrity_report(
             )
 
     promotions = raw.get("promotions") if isinstance(raw.get("promotions"), Mapping) else {}
-    campaigns = normalize_campaigns(promotions.get("campaigns") if isinstance(promotions, Mapping) else [])
+    normalize_campaigns, promotion_digest = _promotion_normalizers()
+    raw_campaigns = promotions.get("campaigns") if isinstance(promotions, Mapping) else []
     redemptions_raw = promotions.get("redemptions", []) if isinstance(promotions, Mapping) else []
-    if not isinstance(redemptions_raw, (list, tuple)):
-        redemptions_raw = []
-    redemptions = [dict(x) for x in list(redemptions_raw)[:2000] if isinstance(x, Mapping)]
-    add_check(
-        "promotions",
-        promotions.get("digest"),
-        promotion_digest(campaigns, redemptions),
-    )
+    try:
+        campaigns = normalize_campaigns(raw_campaigns)
+        if not isinstance(redemptions_raw, (list, tuple)):
+            if redemptions_raw:
+                raise OptionalDomainAdapterUnavailableError(
+                    "PROMOTIONS_ADAPTER_REQUIRED_FOR_NONEMPTY_REDEMPTIONS"
+                )
+            redemptions_raw = []
+        redemptions = [
+            dict(x) for x in list(redemptions_raw)[:2000]
+            if isinstance(x, Mapping)
+        ]
+        add_check(
+            "promotions",
+            promotions.get("digest"),
+            promotion_digest(campaigns, redemptions),
+        )
+    except OptionalDomainAdapterUnavailableError as exc:
+        add_unavailable("promotions", promotions.get("digest"), str(exc))
 
     entitlements = raw.get("entitlements") if isinstance(raw.get("entitlements"), Mapping) else {}
-    entitlement_rows = normalize_entitlements(
-        entitlements.get("records") if isinstance(entitlements, Mapping) else []
-    )
-    add_check(
-        "entitlements",
-        entitlements.get("digest"),
-        entitlement_digest(entitlement_rows),
-    )
+    normalize_entitlements, entitlement_digest = _entitlement_normalizers()
+    try:
+        entitlement_rows = normalize_entitlements(
+            entitlements.get("records") if isinstance(entitlements, Mapping) else []
+        )
+        add_check(
+            "entitlements",
+            entitlements.get("digest"),
+            entitlement_digest(entitlement_rows),
+        )
+    except OptionalDomainAdapterUnavailableError as exc:
+        add_unavailable("entitlements", entitlements.get("digest"), str(exc))
 
     continuity = raw.get("continuity") if isinstance(raw.get("continuity"), Mapping) else {}
     mission_rows = normalize_missions(
