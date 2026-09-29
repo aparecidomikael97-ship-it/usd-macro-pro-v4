@@ -1503,6 +1503,155 @@ def runtime_write_preflight(runtime_result: Mapping[str, Any] | None) -> dict[st
     }
 
 
+WRITE_RECEIPT_SCHEMA = "ATLASQUANT_AION_RUNTIME_WRITE_RECEIPT_V1"
+
+
+def _runtime_write_receipt(
+    cfg: RuntimeConfig,
+    *,
+    expected_sha: str,
+    expected_digest: str,
+    write_sha: str = "",
+    write_accepted: bool | None = None,
+) -> dict[str, Any]:
+    """Create a deterministic write intent/receipt without performing I/O."""
+    target = {
+        "repo": str(cfg.repo or "").strip(),
+        "branch": str(cfg.branch or "").strip(),
+        "path": str(cfg.path or "").strip(),
+    }
+    intent = {
+        "target": target,
+        "expected_sha": str(expected_sha or "").strip(),
+        "expected_digest": str(expected_digest or "").strip(),
+    }
+    encoded = json.dumps(
+        intent,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return {
+        "schema": WRITE_RECEIPT_SCHEMA,
+        "intent_id": hashlib.sha256(encoded).hexdigest(),
+        "target": target,
+        "expected_sha": intent["expected_sha"],
+        "expected_digest": intent["expected_digest"],
+        "write_sha": str(write_sha or "").strip(),
+        "write_accepted": write_accepted if write_accepted in {True, False} else None,
+        "automatic_retry": False,
+        "executes_action": False,
+        "created_at": _now(),
+    }
+
+
+def reconcile_runtime_write(
+    receipt: Mapping[str, Any] | None,
+    runtime_result: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Reconcile an ambiguous checkpoint write without retrying or mutating state."""
+    record = dict(receipt or {})
+    runtime = dict(runtime_result or {})
+    if record.get("schema") != WRITE_RECEIPT_SCHEMA:
+        return {
+            "schema": WRITE_RECEIPT_SCHEMA,
+            "status": "BLOCKED",
+            "verified": False,
+            "write_attributed": False,
+            "reason": "Invalid or missing checkpoint write receipt.",
+            "executes_action": False,
+        }
+    expected_digest = str(record.get("expected_digest") or "").strip().lower()
+    if re.fullmatch(r"[0-9a-f]{64}", expected_digest) is None:
+        return {
+            "schema": WRITE_RECEIPT_SCHEMA,
+            "status": "BLOCKED",
+            "verified": False,
+            "write_attributed": False,
+            "reason": "Write receipt digest is invalid.",
+            "executes_action": False,
+        }
+    if record.get("write_accepted") is False:
+        return {
+            "schema": WRITE_RECEIPT_SCHEMA,
+            "status": "REJECTED",
+            "verified": False,
+            "write_attributed": False,
+            "reason": "The checkpoint transport rejected this write.",
+            "executes_action": False,
+        }
+    if str(runtime.get("status") or "").upper() != "CONFIRMED":
+        return {
+            "schema": WRITE_RECEIPT_SCHEMA,
+            "status": "WAITING",
+            "verified": False,
+            "write_attributed": False,
+            "reason": "Runtime is not confirmed; do not retry automatically.",
+            "intent_id": record.get("intent_id"),
+            "executes_action": False,
+        }
+    checkpoint = runtime.get("checkpoint")
+    if not isinstance(checkpoint, Mapping):
+        return {
+            "schema": WRITE_RECEIPT_SCHEMA,
+            "status": "BLOCKED",
+            "verified": False,
+            "write_attributed": False,
+            "reason": "Confirmed runtime has no checkpoint payload.",
+            "intent_id": record.get("intent_id"),
+            "executes_action": False,
+        }
+    actual_digest = checkpoint_source_digest(ensure_operating_checkpoint(checkpoint))
+    current_sha = str(runtime.get("sha") or "").strip()
+    write_sha = str(record.get("write_sha") or "").strip()
+    if actual_digest != expected_digest:
+        return {
+            "schema": WRITE_RECEIPT_SCHEMA,
+            "status": "CONFLICT",
+            "verified": False,
+            "write_attributed": False,
+            "intent_id": record.get("intent_id"),
+            "expected_digest": expected_digest,
+            "actual_digest": actual_digest,
+            "reason": "Runtime content does not match the write intent.",
+            "executes_action": False,
+        }
+    if write_sha and current_sha != write_sha:
+        return {
+            "schema": WRITE_RECEIPT_SCHEMA,
+            "status": "CONFLICT",
+            "verified": False,
+            "write_attributed": False,
+            "intent_id": record.get("intent_id"),
+            "expected_digest": expected_digest,
+            "actual_digest": actual_digest,
+            "write_sha": write_sha,
+            "current_sha": current_sha,
+            "reason": "Runtime SHA changed after the accepted write; attribution is blocked.",
+            "executes_action": False,
+        }
+    attributed = bool(record.get("write_accepted") is True and write_sha and current_sha == write_sha)
+    return {
+        "schema": WRITE_RECEIPT_SCHEMA,
+        "status": "CONFIRMED" if attributed else "CONTENT_CONFIRMED",
+        "verified": True,
+        "write_attributed": attributed,
+        "intent_id": record.get("intent_id"),
+        "expected_digest": expected_digest,
+        "actual_digest": actual_digest,
+        "write_sha": write_sha,
+        "current_sha": current_sha,
+        "reason": (
+            "Checkpoint write is confirmed by SHA and digest."
+            if attributed
+            else "Checkpoint content matches the write intent, but this write cannot be uniquely attributed."
+        ),
+        "automatic_retry": False,
+        "executes_action": False,
+    }
+
+
 def save_runtime_checkpoint(
     checkpoint: Mapping[str, Any],
     config: RuntimeConfig | None = None,
@@ -1694,6 +1843,11 @@ def save_runtime_checkpoint(
             "checked_at": _now(),
         }
     expected_digest = checkpoint_source_digest(payload)
+    write_receipt = _runtime_write_receipt(
+        cfg,
+        expected_sha=str(expected_sha or "").strip(),
+        expected_digest=expected_digest,
+    )
     raw = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True, default=str).encode("utf-8")
     if len(raw) > MAX_RUNTIME_BYTES:
         return {
@@ -1713,8 +1867,10 @@ def save_runtime_checkpoint(
     if str(expected_sha or "").strip():
         body["sha"] = str(expected_sha).strip()
 
+    write_attempted = False
     try:
         import requests
+        write_attempted = True
         response = requests.put(
             _contents_url(cfg),
             headers=_headers(cfg.token),
@@ -1722,11 +1878,19 @@ def save_runtime_checkpoint(
             timeout=timeout,
         )
         if response.status_code in {409, 422}:
+            write_receipt = _runtime_write_receipt(
+                cfg,
+                expected_sha=str(expected_sha or "").strip(),
+                expected_digest=expected_digest,
+                write_accepted=False,
+            )
             return {
                 "schema": SCHEMA,
                 "status": "CONFLICT",
                 "saved": False,
                 "verified": False,
+                "write_receipt": write_receipt,
+                "reconciliation_required": False,
                 "reason": "Runtime mudou ou a escrita condicional não corresponde ao SHA esperado.",
                 "checked_at": _now(),
             }
@@ -1734,6 +1898,13 @@ def save_runtime_checkpoint(
         obj = response.json()
         content = obj.get("content") if isinstance(obj, dict) else {}
         write_sha = str((content or {}).get("sha") or "").strip()
+        write_receipt = _runtime_write_receipt(
+            cfg,
+            expected_sha=str(expected_sha or "").strip(),
+            expected_digest=expected_digest,
+            write_sha=write_sha,
+            write_accepted=True,
+        )
 
         verification = load_runtime_checkpoint(cfg, timeout=timeout)
         if verification.get("status") != "CONFIRMED":
@@ -1744,7 +1915,9 @@ def save_runtime_checkpoint(
                 "verified": False,
                 "write_accepted": True,
                 "sha": write_sha,
-                "reason": "GitHub aceitou a escrita, mas a leitura de confirmação não foi concluída.",
+                "write_receipt": write_receipt,
+                "reconciliation_required": True,
+                "reason": "GitHub aceitou a escrita, mas a leitura de confirmação não foi concluída. Reconciliar antes de qualquer retry.",
                 "checked_at": _now(),
             }
 
@@ -1761,6 +1934,8 @@ def save_runtime_checkpoint(
                 "verified": False,
                 "write_accepted": True,
                 "sha": read_sha or write_sha,
+                "write_receipt": write_receipt,
+                "reconciliation_required": True,
                 "expected_digest": expected_digest,
                 "actual_digest": actual_digest,
                 "reason": "Leitura de confirmação divergiu do conteúdo gravado.",
@@ -1777,6 +1952,8 @@ def save_runtime_checkpoint(
             "checkpoint": verified_checkpoint,
             "digest": actual_digest,
             "integrity": checkpoint_integrity_report(verified_checkpoint),
+            "write_receipt": write_receipt,
+            "reconciliation_required": False,
             "checked_at": _now(),
         }
     except Exception as exc:
@@ -1785,6 +1962,9 @@ def save_runtime_checkpoint(
             "status": "ERROR",
             "saved": False,
             "verified": False,
+            "write_outcome": "UNKNOWN" if write_attempted else "NOT_ATTEMPTED",
+            "write_receipt": write_receipt,
+            "reconciliation_required": bool(write_attempted),
             "reason": type(exc).__name__,
             "checked_at": _now(),
         }
