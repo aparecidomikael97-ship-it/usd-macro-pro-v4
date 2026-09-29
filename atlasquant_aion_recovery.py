@@ -90,12 +90,21 @@ def list_checkpoint_revisions(
         if not isinstance(raw,list):
             raise ValueError("history response is not a list")
         items=[]
+        seen_revisions=set()
+        invalid_rows_dropped=0
+        duplicates_dropped=0
         for row in raw[:per_page]:
             if not isinstance(row,Mapping):
+                invalid_rows_dropped+=1
                 continue
             sha=_safe_revision(row.get("sha"))
             if not sha:
+                invalid_rows_dropped+=1
                 continue
+            if sha in seen_revisions:
+                duplicates_dropped+=1
+                continue
+            seen_revisions.add(sha)
             commit=row.get("commit") if isinstance(row.get("commit"),Mapping) else {}
             author=commit.get("author") if isinstance(commit.get("author"),Mapping) else {}
             message=" ".join(str(commit.get("message") or "").split())[:240]
@@ -111,6 +120,8 @@ def list_checkpoint_revisions(
             "source":f"GitHub:{config.branch}:{config.path}",
             "items":items,
             "count":len(items),
+            "invalid_rows_dropped":invalid_rows_dropped,
+            "duplicates_dropped":duplicates_dropped,
             "executes_action":False,
         }
     except Exception as exc:
@@ -159,9 +170,18 @@ def load_checkpoint_revision(
         )
         response.raise_for_status()
         obj=response.json()
-        raw=base64.b64decode(str(obj.get("content") or "")).decode("utf-8")
-        if len(raw.encode("utf-8"))>MAX_RUNTIME_BYTES:
+        if not isinstance(obj,Mapping):
+            raise ValueError("checkpoint response is not an object")
+        encoded="".join(str(obj.get("content") or "").split())
+        if not encoded:
+            raise ValueError("checkpoint content is missing")
+        max_encoded_chars=4*((MAX_RUNTIME_BYTES+2)//3)
+        if len(encoded)>max_encoded_chars:
+            raise ValueError("runtime checkpoint encoded content too large")
+        decoded=base64.b64decode(encoded,validate=True)
+        if len(decoded)>MAX_RUNTIME_BYTES:
             raise ValueError("runtime checkpoint too large")
+        raw=decoded.decode("utf-8")
         checkpoint=json.loads(raw)
         if not isinstance(checkpoint,dict):
             raise ValueError("checkpoint is not an object")
