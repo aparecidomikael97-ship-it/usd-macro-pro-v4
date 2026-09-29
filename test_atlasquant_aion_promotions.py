@@ -2,6 +2,8 @@ import unittest
 from datetime import datetime, timezone
 
 from atlasquant_aion_promotions import (
+    MAX_CAMPAIGNS,
+    MAX_REDEMPTIONS,
     activation_preflight,
     approve_campaign,
     campaign_availability,
@@ -11,6 +13,8 @@ from atlasquant_aion_promotions import (
     mark_active_from_provider_evidence,
     new_campaign,
     new_redemption_request,
+    normalize_campaigns,
+    promotion_digest,
     promotions_summary,
     upsert_campaign,
 )
@@ -150,6 +154,35 @@ class AtlasQuantAionPromotionsTests(unittest.TestCase):
         self.assertEqual(summary["campaigns"],2)
         self.assertEqual(summary["approved"],1)
         self.assertEqual(summary["active"],0)
+
+
+    def test_campaign_generator_is_not_consumed_past_normalization_bound(self):
+        consumed={"count":0}
+
+        def rows():
+            for index in range(MAX_CAMPAIGNS*2+1):
+                if index>=MAX_CAMPAIGNS*2:
+                    raise AssertionError("campaign iterable consumed past bound")
+                consumed["count"]+=1
+                yield {}
+
+        normalized=normalize_campaigns(rows())
+        self.assertEqual(normalized,[])
+        self.assertEqual(consumed["count"],MAX_CAMPAIGNS*2)
+
+    def test_redemption_generator_is_not_consumed_past_digest_bound(self):
+        consumed={"count":0}
+
+        def rows():
+            for index in range(MAX_REDEMPTIONS+1):
+                if index>=MAX_REDEMPTIONS:
+                    raise AssertionError("redemption iterable consumed past bound")
+                consumed["count"]+=1
+                yield {"redemption_id":f"R-{index}"}
+
+        value=promotion_digest([],rows())
+        self.assertTrue(value)
+        self.assertEqual(consumed["count"],MAX_REDEMPTIONS)
 
 
 if __name__=="__main__":
