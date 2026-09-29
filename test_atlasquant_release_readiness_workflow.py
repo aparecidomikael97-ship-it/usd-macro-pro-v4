@@ -19,6 +19,7 @@ class AtlasQuantReleaseReadinessWorkflowTests(unittest.TestCase):
         self.assertIn("native_store_publication_verified",text)
         self.assertIn("pull_request:",text)
         self.assertIn("branches: [main]",text)
+        self.assertIn("name: AtlasQuant release readiness",text)
         self.assertNotIn('ATLASQUANT_REAL_EXECUTION: "1"',text)
         self.assertNotIn("automatic_merge",text)
 
