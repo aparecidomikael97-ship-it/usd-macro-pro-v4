@@ -278,6 +278,31 @@ class AtlasQuantAionSkillCertificationTests(unittest.TestCase):
         self.assertIn("ADMIN_REQUIRED", non_admin["blockers"])
         self.assertFalse(non_admin["transition_applied"])
 
+    def test_certification_transition_is_bound_to_original_tenant_and_workspace(self):
+        certified = assess_skill_manifest(
+            self.safe_manifest(),
+            trusted_context=TRUSTED,
+            test_evidence={"state": "PASS", "passed": True},
+            provenance_verifier=verified,
+            review_approved=True,
+        )
+        self.assertEqual(certified["manifest"]["bound_tenant_id"], "tenant-a")
+        self.assertEqual(certified["manifest"]["bound_workspace_id"], "central")
+        crossed = transition_skill_certification(
+            certified,
+            action="SUSPEND",
+            trusted_context={
+                "tenant_id": "tenant-b",
+                "workspace_id": "central",
+                "role": "ADMIN",
+            },
+            approved=True,
+            reason="Cross-tenant attempt.",
+        )
+        self.assertEqual(crossed["state"], "CERTIFIED")
+        self.assertIn("TRUSTED_SCOPE_MISMATCH", crossed["blockers"])
+        self.assertFalse(crossed["transition_applied"])
+
     def test_tampered_certification_record_cannot_transition(self):
         certified = assess_skill_manifest(
             self.safe_manifest(),
