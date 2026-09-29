@@ -353,7 +353,7 @@ def evaluate_run(
     cases={x["case_id"]:x for x in suite_state["cases"]}
     result_map={
         _clean(x.get("case_id"),100):dict(x)
-        for x in list(item.get("case_results") or [])
+        for x in islice(item.get("case_results") or (),MAX_CASES)
         if isinstance(x,Mapping)
     }
     evaluated=[]
