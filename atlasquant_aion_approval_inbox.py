@@ -10,9 +10,13 @@ from typing import Any, Mapping
 
 from atlasquant_aion_operations import normalize_queue
 from atlasquant_aion_studio import normalize_projects
-from atlasquant_aion_business import normalize_products
 from atlasquant_aion_promotions import normalize_campaigns
 from atlasquant_aion_entitlements import normalize_entitlements
+
+def _normalize_business_products(values:Any):
+    from atlasquant_aion_business import normalize_products
+    return normalize_products(values)
+
 
 SCHEMA="ATLASQUANT_AION_APPROVAL_INBOX_V1"
 KINDS=("TASK","STUDIO","BUSINESS","PROMOTION","ENTITLEMENT")
@@ -76,8 +80,8 @@ def collect_approval_inbox(
     for task in tasks:
         approval=task.get("approval") if isinstance(task.get("approval"),Mapping) else {}
         waiting=task.get("status")=="WAITING_APPROVAL"
-        required=bool(approval.get("required",False))
-        approved=bool(approval.get("approved",False))
+        required=approval.get("required") is True
+        approved=approval.get("approved") is True
         if not approved and (waiting or required):
             items.append(_row(
                 "TASK",
@@ -98,7 +102,7 @@ def collect_approval_inbox(
     studio=cp.get("studio") if isinstance(cp.get("studio"),Mapping) else {}
     for project in normalize_projects(studio.get("projects") if isinstance(studio,Mapping) else []):
         approval=project.get("approval") if isinstance(project.get("approval"),Mapping) else {}
-        if project.get("status")=="REVIEW" and not bool(approval.get("approved",False)):
+        if project.get("status")=="REVIEW" and approval.get("approved") is not True:
             items.append(_row(
                 "STUDIO",
                 project.get("content_id"),
@@ -112,9 +116,9 @@ def collect_approval_inbox(
             ))
 
     business=cp.get("business") if isinstance(cp.get("business"),Mapping) else {}
-    for product in normalize_products(business.get("products") if isinstance(business,Mapping) else []):
+    for product in _normalize_business_products(business.get("products") if isinstance(business,Mapping) else []):
         approval=product.get("approval") if isinstance(product.get("approval"),Mapping) else {}
-        if product.get("status")=="VALIDATE" and not bool(approval.get("approved",False)):
+        if product.get("status")=="VALIDATE" and approval.get("approved") is not True:
             items.append(_row(
                 "BUSINESS",
                 product.get("product_id"),
@@ -130,7 +134,7 @@ def collect_approval_inbox(
     promotions=cp.get("promotions") if isinstance(cp.get("promotions"),Mapping) else {}
     for campaign in normalize_campaigns(promotions.get("campaigns") if isinstance(promotions,Mapping) else []):
         approval=campaign.get("approval") if isinstance(campaign.get("approval"),Mapping) else {}
-        if campaign.get("status")=="DRAFT" and not bool(approval.get("approved",False)):
+        if campaign.get("status")=="DRAFT" and approval.get("approved") is not True:
             items.append(_row(
                 "PROMOTION",
                 campaign.get("campaign_id"),
@@ -146,7 +150,7 @@ def collect_approval_inbox(
     entitlements=cp.get("entitlements") if isinstance(cp.get("entitlements"),Mapping) else {}
     for entitlement in normalize_entitlements(entitlements.get("records") if isinstance(entitlements,Mapping) else []):
         approval=entitlement.get("approval") if isinstance(entitlement.get("approval"),Mapping) else {}
-        if entitlement.get("status")=="DRAFT" and not bool(approval.get("approved",False)):
+        if entitlement.get("status")=="DRAFT" and approval.get("approved") is not True:
             items.append(_row(
                 "ENTITLEMENT",
                 entitlement.get("entitlement_id"),

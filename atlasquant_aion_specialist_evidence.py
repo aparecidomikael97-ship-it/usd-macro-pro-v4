@@ -9,8 +9,6 @@ from __future__ import annotations
 import os
 from typing import Any, Mapping
 
-from atlasquant_aion_approval_inbox import collect_approval_inbox
-from atlasquant_aion_business import business_summary
 from atlasquant_aion_cognitive_orchestrator import build_research_plan
 from atlasquant_aion_core import guardian_decision
 from atlasquant_aion_developer_engine import definition_of_done, new_development_workflow
@@ -18,10 +16,24 @@ from atlasquant_aion_fortress import emergency_cutoff_posture
 from atlasquant_aion_specialists import SPECIALIST_MODULES
 from atlasquant_content_pipeline import provider_readiness
 from atlasquant_fx_universe import universe_integrity
-from atlasquant_investment_ecosystem import investment_product_comparison
 from atlasquant_lab_matrix import lab_matrix
 from atlasquant_macro_briefing import build_macro_briefing
 from atlasquant_scanner_queue import scanner_queue
+
+def _approval_inbox(checkpoint):
+    from atlasquant_aion_approval_inbox import collect_approval_inbox
+    return collect_approval_inbox(checkpoint)
+
+
+def _business_summary(products):
+    from atlasquant_aion_business import business_summary
+    return business_summary(products)
+
+
+def _investment_comparison(products):
+    from atlasquant_investment_ecosystem import investment_product_comparison
+    return investment_product_comparison(products)
+
 
 SCHEMA = "ATLASQUANT_AION_SPECIALIST_EVIDENCE_V1"
 _FIXED_AT = "2026-09-27T00:00:00+00:00"
@@ -250,7 +262,7 @@ def _lab() -> dict[str, Any]:
 
 
 def _invest() -> dict[str, Any]:
-    comparison = investment_product_comparison(None)
+    comparison = _investment_comparison(None)
     return _envelope(
         "invest",
         state="NO_OBSERVED_PRODUCTS",
@@ -277,7 +289,7 @@ def _invest() -> dict[str, Any]:
 
 
 def _business() -> dict[str, Any]:
-    summary = business_summary(None)
+    summary = _business_summary(None)
     return _envelope(
         "business",
         state="EMPTY_LOCAL_CATALOG",
@@ -397,7 +409,7 @@ def _research() -> dict[str, Any]:
 
 
 def _admin() -> dict[str, Any]:
-    inbox = collect_approval_inbox(None)
+    inbox = _approval_inbox(None)
     return _envelope(
         "admin",
         state="NO_CHECKPOINT",

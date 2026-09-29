@@ -51,7 +51,6 @@ FORBIDDEN_ROOTS = frozenset({
 KNOWN_AION_COUPLINGS = frozenset({
     ("atlasquant_aion_admin.py", "streamlit"),
     ("atlasquant_aion_admin.py", "atlasquant_aion_business"),
-    ("atlasquant_aion_approval_inbox.py", "atlasquant_aion_business"),
     ("atlasquant_aion_global_worker.py", "requests"),
     ("atlasquant_aion_global_worker_activation.py", "requests"),
     ("atlasquant_aion_global_worker_persisted_arming.py", "requests"),
@@ -59,10 +58,6 @@ KNOWN_AION_COUPLINGS = frozenset({
     ("atlasquant_aion_memory.py", "atlasquant_aion_business"),
     ("atlasquant_aion_provider.py", "requests"),
     ("atlasquant_aion_replay_panel.py", "streamlit"),
-    ("atlasquant_aion_specialist_evidence.py", "atlasquant_aion_business"),
-    ("atlasquant_aion_specialist_evidence.py", "atlasquant_investment_ecosystem"),
-    ("atlasquant_aion_specialist_session.py", "atlasquant_aion_business"),
-    ("atlasquant_aion_specialist_session.py", "atlasquant_investment_ecosystem"),
 })
 
 
@@ -216,6 +211,39 @@ class AtlasQuantAionCoreIndependenceTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr[-2000:] + result.stdout[-500:])
         self.assertIn("IMPORTED", result.stdout)
 
+
+
+    def test_specialist_contracts_import_without_business_or_investments(self):
+        blocker = (
+            "import sys\n"
+            "blocked={'atlasquant_aion_business','atlasquant_investment_ecosystem'}\n"
+            "class Finder:\n"
+            "    def find_spec(self, name, path, target=None):\n"
+            "        if name.split('.',1)[0] in blocked:\n"
+            "            raise ImportError('domain absent '+name)\n"
+            "sys.meta_path.insert(0, Finder())\n"
+            "import atlasquant_aion_approval_inbox\n"
+            "import atlasquant_aion_specialist_evidence\n"
+            "import atlasquant_aion_specialist_session\n"
+            "print('IMPORTED')\n"
+        )
+        env = {
+            "PATH": os.environ.get("PATH", ""),
+            "PYTHONPATH": str(ROOT),
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "PYTHONUNBUFFERED": "1",
+        }
+        result = subprocess.run(
+            [sys.executable, "-c", blocker],
+            cwd=ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            timeout=60,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr[-2000:] + result.stdout[-500:])
+        self.assertIn("IMPORTED", result.stdout)
 
 
 if __name__ == "__main__":
