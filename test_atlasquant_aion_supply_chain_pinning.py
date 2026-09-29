@@ -96,6 +96,23 @@ class AionSupplyChainPinningTests(unittest.TestCase):
                 self.assertIn("playwright==1.63.0", source)
                 self.assertIn("python -m playwright install", source)
 
+    def test_security_gate_commands_preserve_shell_continuations_and_residual_tests(self):
+        source = (WORKFLOWS / "aion-core-security-gate.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "test_atlasquant_aion_critical_review.py \\\n"
+            "            test_atlasquant_aion_resource_bounds_residual.py \\\n"
+            "            test_atlasquant_aion_supply_chain_pinning.py",
+            source,
+        )
+        self.assertIn(
+            "test_atlasquant_aion_durable_tasks.py \\\n"
+            "            test_atlasquant_aion_resource_bounds_residual.py \\\n"
+            "            test_atlasquant_aion_supply_chain_pinning.py",
+            source,
+        )
+
     def test_security_gate_keeps_pinned_audit_tooling_and_retained_sbom(self):
         source = (WORKFLOWS / "aion-core-security-gate.yml").read_text(
             encoding="utf-8"
