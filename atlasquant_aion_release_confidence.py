@@ -10,8 +10,10 @@ fails closed.
 """
 from __future__ import annotations
 
+from collections import deque
 from hashlib import sha256
 from typing import Any, Mapping, Sequence
+from itertools import islice
 import json
 
 SCHEMA="ATLASQUANT_AION_RELEASE_CONFIDENCE_V1"
@@ -61,7 +63,7 @@ def evidence_dimension(
     if dim not in DIMENSIONS:
         raise ValueError("invalid release confidence dimension")
     refs=[]
-    for raw in list(evidence_refs or [])[:80]:
+    for raw in islice(evidence_refs or (),80):
         text=_clean(raw,280)
         if text and text not in refs:
             refs.append(text)
@@ -91,7 +93,7 @@ def release_confidence(
         raise ValueError("candidate ref required")
     rows=[]
     seen=set()
-    for raw in list(dimensions or [])[:20]:
+    for raw in islice(dimensions or (),20):
         if not isinstance(raw,Mapping):
             continue
         try:
@@ -167,7 +169,12 @@ def normalize_release_confidence_records(
 )->list[dict[str,Any]]:
     out=[]
     seen=set()
-    for raw in list(rows or [])[-300:]:
+    source=(
+        rows[-300:]
+        if isinstance(rows,(list,tuple))
+        else deque(rows or (),maxlen=300)
+    )
+    for raw in source:
         if not isinstance(raw,Mapping):
             continue
         try:
