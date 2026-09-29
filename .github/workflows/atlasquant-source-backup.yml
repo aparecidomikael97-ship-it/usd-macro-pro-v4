@@ -16,7 +16,7 @@ jobs:
       ATLASQUANT_REAL_EXECUTION: "0"
     steps:
       - name: Checkout stable source
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Build source ZIP and manifest
         shell: bash
@@ -37,7 +37,7 @@ jobs:
           ls -lh backup-out/
 
       - name: Upload source backup
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: atlasquant-source-backup-${{ github.sha }}
           path: backup-out/
