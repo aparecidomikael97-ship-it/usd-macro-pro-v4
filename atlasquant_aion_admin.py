@@ -2890,6 +2890,7 @@ def _render_central(
     approval_inbox: Mapping[str, Any],
     incident_snapshot: Mapping[str, Any],
     executive_snapshot: Mapping[str, Any],
+    copilot_snapshot: Mapping[str, Any],
     specialist_snapshot: Mapping[str, Any] | None = None,
 ) -> None:
     st.markdown("### 🧠 Central AION")
@@ -2938,18 +2939,24 @@ def _render_central(
             "Completo mostra todos os painéis técnicos."
         ),
     )
+    _render_admin_guidance(
+        access,
+        flags,
+        system_context,
+        copilot_snapshot,
+    )
     _render_master_status_summary(status_board)
     _render_executive_pulse(executive_snapshot)
-    _render_commander_intelligence(checkpoint, system_context, executive_snapshot)
-    _render_live_event_intelligence(checkpoint, system_context, allow_memory_sync=True)
-    _render_learning_pulse(checkpoint)
-    _render_reliability_governance(system_context)
-    _render_release_gate(system_context)
-    _render_publication_truth(system_context)
-    _render_validation_center(system_context, runtime_result)
-    _render_critical_surface_health(system_context)
 
     if view_mode == "Completo":
+        _render_commander_intelligence(checkpoint, system_context, executive_snapshot)
+        _render_live_event_intelligence(checkpoint, system_context, allow_memory_sync=True)
+        _render_learning_pulse(checkpoint)
+        _render_reliability_governance(system_context)
+        _render_release_gate(system_context)
+        _render_publication_truth(system_context)
+        _render_validation_center(system_context, runtime_result)
+        _render_critical_surface_health(system_context)
         _render_workspace_overview(checkpoint, runtime_result)
         _render_attention_queue(
             status_board,
@@ -2962,8 +2969,8 @@ def _render_central(
         _render_continuity_center(checkpoint)
     else:
         st.caption(
-            "Modo Essencial ativo: detalhes técnicos ficam ocultos para reduzir carga e rolagem. "
-            "Nenhuma evidência ou proteção é desativada."
+            "Modo Essencial ativo: Copiloto, Onboarding, Painel Mestre e Pulso Executivo ficam em primeiro plano. "
+            "Painéis técnicos permanecem disponíveis no modo Completo; nenhuma permissão ou proteção é ampliada."
         )
         _render_attention_queue(
             status_board,
