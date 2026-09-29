@@ -71,6 +71,38 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
         )
         self.assertEqual(get.call_args.kwargs["params"]["path"],"dados/aion/checkpoint_master.json")
 
+    def test_history_deduplicates_revisions_and_counts_partial_rows(self):
+        sha="abcdef1234567890abcdef1234567890abcdef12"
+        response=MagicMock()
+        response.raise_for_status.return_value=None
+        response.json.return_value=[
+            {
+                "sha":sha,
+                "commit":{
+                    "message":"first",
+                    "author":{"date":"2026-09-24T22:00:00Z"},
+                },
+            },
+            {
+                "sha":sha,
+                "commit":{
+                    "message":"duplicate",
+                    "author":{"date":"2026-09-24T22:01:00Z"},
+                },
+            },
+            {"sha":"not-a-sha"},
+            "partial-row",
+        ]
+        with patch("requests.get",return_value=response):
+            result=list_checkpoint_revisions(self.cfg(),limit=12)
+        self.assertEqual(result["status"],"CONFIRMED")
+        self.assertEqual(result["count"],1)
+        self.assertEqual(result["duplicates_dropped"],1)
+        self.assertEqual(result["invalid_rows_dropped"],2)
+        self.assertEqual(result["items"][0]["revision"],sha)
+        self.assertEqual(result["items"][0]["message"],"first")
+        self.assertFalse(result["executes_action"])
+
     def test_history_refuses_code_branch_before_network(self):
         cfg=RuntimeConfig(token="x",repo="owner/repo",branch="main")
         with patch("requests.get") as get:
@@ -87,6 +119,46 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
         revision="abcdef1234567890abcdef1234567890abcdef12"
         with patch("requests.get",return_value=response):
             result=load_checkpoint_revision(revision,self.cfg())
+        self.assertEqual(result["status"],"CONFIRMED")
+        self.assertEqual(result["integrity"]["state"],"CONFIRMED")
+        self.assertFalse(result["executes_action"])
+
+    def test_revision_load_rejects_malformed_base64_before_json(self):
+        response=MagicMock()
+        response.raise_for_status.return_value=None
+        response.json.return_value={"content":"not@@base64"}
+        with patch("requests.get",return_value=response):
+            result=load_checkpoint_revision("a"*40,self.cfg())
+        self.assertEqual(result["status"],"ERROR")
+        self.assertEqual(result["reason"],"Error")
+        self.assertIsNone(result["checkpoint"])
+        self.assertFalse(result["executes_action"])
+
+    def test_revision_load_rejects_encoded_oversize_before_decode(self):
+        response=MagicMock()
+        response.raise_for_status.return_value=None
+        response.json.return_value={"content":"A"*48}
+        with patch("atlasquant_aion_recovery.MAX_RUNTIME_BYTES",32), patch(
+            "requests.get",return_value=response
+        ), patch("atlasquant_aion_recovery.base64.b64decode") as decode:
+            result=load_checkpoint_revision("b"*40,self.cfg())
+        self.assertEqual(result["status"],"ERROR")
+        self.assertEqual(result["reason"],"ValueError")
+        decode.assert_not_called()
+        self.assertFalse(result["executes_action"])
+
+    def test_revision_load_accepts_wrapped_valid_base64(self):
+        cp=default_checkpoint()
+        encoded=base64.b64encode(json.dumps(cp).encode("utf-8")).decode("ascii")
+        wrapped="\n".join(
+            encoded[index:index+60]
+            for index in range(0,len(encoded),60)
+        )
+        response=MagicMock()
+        response.raise_for_status.return_value=None
+        response.json.return_value={"content":wrapped}
+        with patch("requests.get",return_value=response):
+            result=load_checkpoint_revision("c"*40,self.cfg())
         self.assertEqual(result["status"],"CONFIRMED")
         self.assertEqual(result["integrity"]["state"],"CONFIRMED")
         self.assertFalse(result["executes_action"])
