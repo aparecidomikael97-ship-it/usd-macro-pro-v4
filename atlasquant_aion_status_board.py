@@ -19,6 +19,7 @@ import math
 from atlasquant_aion_operations import queue_summary
 from atlasquant_aion_durable_tasks import durable_tasks_summary
 from atlasquant_aion_system_health_center import build_system_health_center
+from atlasquant_aion_cost_center import build_cost_center
 
 SCHEMA="ATLASQUANT_AION_MASTER_STATUS_V1"
 STATES=("CONFIRMED","BLOCKED","EXTERNAL_DEPENDENCY","UNKNOWN")
@@ -696,6 +697,77 @@ def build_master_status_board(
         ),
     ))
 
+    explicit_cost_evidence=(
+        system.get("cost_evidence")
+        if isinstance(system.get("cost_evidence"),list)
+        else []
+    )
+    cost_evidence=[
+        dict(row) for row in explicit_cost_evidence
+        if isinstance(row,Mapping)
+    ]
+    aion_section=cp.get("aion") if isinstance(cp.get("aion"),Mapping) else {}
+    model_budget=(
+        aion_section.get("model_budget")
+        if isinstance(aion_section.get("model_budget"),Mapping)
+        else {}
+    )
+    if model_budget and (
+        "spent_usd_estimate" in model_budget
+        or "spent_usd" in model_budget
+    ):
+        cost_evidence.append({
+            "id":"aion-model-usage-estimate",
+            "label":"Uso estimado de IA externa",
+            "category":"ai_api",
+            "truth_state":"ESTIMATED",
+            "amount":(
+                model_budget.get("spent_usd_estimate")
+                if model_budget.get("spent_usd_estimate") is not None
+                else model_budget.get("spent_usd")
+            ),
+            "currency":"USD",
+            "period":"MONTHLY",
+            "source":"Checkpoint Mestre · aion.model_budget",
+        })
+
+    active_users=_safe_nonnegative_int(commercial_audit.get("active_user_accounts"))
+    active_users_confirmed=bool(
+        runtime_status=="CONFIRMED"
+        and active_users is not None
+        and active_users>0
+    )
+    cost_center=build_cost_center(
+        cost_evidence,
+        active_users=active_users,
+        active_users_confirmed=active_users_confirmed,
+    )
+    cost_state=str(cost_center.get("state") or "UNKNOWN").upper()
+    board_cost_state="CONFIRMED" if cost_state=="CONFIRMED" else "UNKNOWN"
+    items.append(_item(
+        "cost_center",
+        "Painel de Custos do AtlasQuant",
+        area="system",
+        state=board_cost_state,
+        detail=(
+            f"Confirmado US$ {float(cost_center.get('confirmed_monthly_usd') or 0):.2f}/mês"
+            f" · estimado US$ {float(cost_center.get('estimated_monthly_usd') or 0):.2f}/mês"
+            f" · projetado US$ {float(cost_center.get('projected_monthly_usd') or 0):.2f}/mês"
+            + (
+                f" · custo confirmado/usuário US$ {float(cost_center.get('confirmed_cost_per_user_usd')):.2f}"
+                if cost_center.get("confirmed_cost_per_user_usd") is not None
+                else " · custo/usuário ainda não confirmado"
+            )
+            + f" · estado interno {cost_state}."
+        ),
+        source="AION Cost Center · evidência explícita + estimativas separadas",
+        next_action=(
+            ""
+            if cost_state=="CONFIRMED"
+            else "Adicionar evidência de custo confirmada; estimativa não é tratada como gasto real."
+        ),
+    ))
+
     counts={state:0 for state in STATES}
     for item in items:
         counts[item["state"]]+=1
@@ -708,6 +780,7 @@ def build_master_status_board(
         "states":list(STATES),
         "items":items,
         "system_health_center":system_health_center,
+        "cost_center":cost_center,
         "counts":counts,
         "attention":attention,
         "has_unresolved":bool(attention),
