@@ -11,6 +11,9 @@ O operador deve conseguir iniciar o trabalho no Cursor uma vez e deixar a frente
 Matriz reconciliada dos achados RT01–RT20:
 `docs/aion/AION_CORE_REDTEAM_CLOSURE_MATRIX_2026-09-29.md`
 
+Proposta administrativa read-only de required checks:
+`docs/aion/AION_REQUIRED_CHECKS_PROPOSAL_2026-09-29.md`
+
 
 1. AION
 2. Núcleo
