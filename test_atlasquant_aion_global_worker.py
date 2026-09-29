@@ -2,7 +2,7 @@ import unittest
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from atlasquant_aion_background_executor import (
     executor_snapshot,
@@ -15,6 +15,7 @@ from atlasquant_aion_global_worker import (
     GLOBAL_WORKER_NAMESPACE,
     SERVICE_PRINCIPAL,
     _claim_state,
+    _persist_runtime_checkpoint_cas,
     attach_global_worker_state,
     global_worker_integrity,
     global_worker_snapshot,
@@ -311,6 +312,91 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
         self.assertTrue(lease2["reclaimed"])
         self.assertEqual(second["fencing_counter"], 2)
         self.assertEqual(second["stats"]["crash_recoveries"], 1)
+
+
+    def test_global_cas_unverified_write_returns_reconciliation_receipt(self):
+        checkpoint = ensure_operating_checkpoint(self.armed_checkpoint())
+        put = MagicMock()
+        put.status_code = 200
+        put.raise_for_status.return_value = None
+        put.json.return_value = {"content": {"sha": "sha-new"}}
+        with patch(
+            "atlasquant_aion_global_worker.requests.put",
+            return_value=put,
+        ) as put_call, patch(
+            "atlasquant_aion_global_worker.load_runtime_checkpoint",
+            return_value={"status": "ERROR", "checkpoint": None, "sha": ""},
+        ):
+            result = _persist_runtime_checkpoint_cas(
+                checkpoint,
+                _config(),
+                expected_sha="sha-old",
+                operation="claim global lease",
+            )
+
+        self.assertEqual(result["status"], "UNVERIFIED")
+        self.assertFalse(result["saved"])
+        self.assertFalse(result["verified"])
+        self.assertTrue(result["reconciliation_required"])
+        self.assertFalse(result["write_receipt"]["automatic_retry"])
+        self.assertTrue(result["write_receipt"]["write_accepted"])
+        self.assertEqual(result["write_receipt"]["write_sha"], "sha-new")
+        self.assertEqual(result["write_receipt"]["expected_sha"], "sha-old")
+        put_call.assert_called_once()
+
+    def test_global_cas_transport_exception_is_ambiguous_and_never_retryable(self):
+        checkpoint = ensure_operating_checkpoint(self.armed_checkpoint())
+        with patch(
+            "atlasquant_aion_global_worker.requests.put",
+            side_effect=TimeoutError("synthetic timeout"),
+        ) as put_call:
+            result = _persist_runtime_checkpoint_cas(
+                checkpoint,
+                _config(),
+                expected_sha="sha-old",
+                operation="persist global worker tick",
+            )
+
+        self.assertEqual(result["status"], "ERROR")
+        self.assertEqual(result["write_outcome"], "UNKNOWN")
+        self.assertTrue(result["reconciliation_required"])
+        self.assertFalse(result["write_receipt"]["automatic_retry"])
+        self.assertIsNone(result["write_receipt"]["write_accepted"])
+        put_call.assert_called_once()
+
+    def test_unverified_lease_claim_blocks_executor_and_surfaces_no_retry(self):
+        checkpoint = self.armed_checkpoint()
+        with patch(
+            "atlasquant_aion_global_worker.load_runtime_checkpoint",
+            return_value={
+                "status": "CONFIRMED",
+                "checkpoint": checkpoint,
+                "sha": "sha-0",
+            },
+        ), patch(
+            "atlasquant_aion_global_worker._persist_runtime_checkpoint_cas",
+            return_value={
+                "status": "UNVERIFIED",
+                "saved": False,
+                "verified": False,
+                "reconciliation_required": True,
+                "write_receipt": {"automatic_retry": False},
+            },
+        ), patch(
+            "atlasquant_aion_global_worker._execute_due_local_work_authorized"
+        ) as executor:
+            result = run_global_worker_once(
+                config=_config(),
+                runtime_id="gha-unverified",
+                feature_enabled=True,
+                now=TICK,
+            )
+
+        executor.assert_not_called()
+        self.assertEqual(result["status"], "LEASE_CLAIM_UNVERIFIED")
+        self.assertTrue(result["reconciliation_required"])
+        self.assertFalse(result["automatic_retry_allowed"])
+        self.assertEqual(result["processed"], 0)
 
     def test_claim_cas_conflict_blocks_executor(self):
         checkpoint = self.armed_checkpoint()
