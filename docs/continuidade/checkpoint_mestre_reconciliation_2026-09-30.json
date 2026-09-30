@@ -38,7 +38,7 @@
     "expansion_funded_by_revenue": true
   },
   "team_access": {
-    "status": "APROVADO / PENDENTE",
+    "status": "IMPLEMENTADO / EM VALIDAÇÃO",
     "individual_accounts": true,
     "invitation_flow": true,
     "rbac": true,
@@ -47,7 +47,12 @@
     "suspend_revoke": true,
     "audit_trail": true,
     "aion_must_obey_same_permissions": true,
-    "shared_admin_login_forbidden": true
+    "shared_admin_login_forbidden": true,
+    "current_layer": "RBAC_CONTRACT_AND_DECISION",
+    "production_provisioning": false,
+    "real_mfa_2fa": false,
+    "persisted_registry": false,
+    "physical_session_revocation": false
   },
   "capacity_scale": {
     "status": "APROVADO / PENDENTE",
@@ -110,13 +115,16 @@
       430,
       431,
       433,
-      434
+      434,
+      436
     ],
     "current_runtime_authorized": false,
     "merge_authorized_by_this_checkpoint": false,
     "deploy_authorized_by_this_checkpoint": false,
     "billing_authorized_by_this_checkpoint": false,
-    "quota_application_authorized_by_this_checkpoint": false
+    "quota_application_authorized_by_this_checkpoint": false,
+    "checkpoint_master_pr": 435,
+    "team_access_rbac_pr": 436
   },
   "decisions": [
     {
@@ -151,9 +159,15 @@
     },
     {
       "id": "D-2026-09-30-TEAM-RBAC",
-      "state": "APROVADO / PENDENTE",
-      "implemented": false,
-      "validated": false
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_business_team_access_rbac.py",
+        "test_atlasquant_aion_business_team_access_rbac.py",
+        "docs/aion/AION_BUSINESS_TEAM_ACCESS_RBAC_V1.md",
+        "docs/adr/ADR-0048-business-team-access-rbac.md"
+      ]
     },
     {
       "id": "D-2026-09-30-CAPACITY-SCALE-MANAGER",
@@ -192,7 +206,7 @@
     }
   ],
   "pending": [
-    "TEAM_RBAC_FULL",
+    "TEAM_RBAC_PRODUCTION_BINDING",
     "CAPACITY_SCALE_MANAGER",
     "BACKUP_RECOVERY_TESTABLE_POLICY",
     "BUDGET_GOVERNOR_200_BRL",
