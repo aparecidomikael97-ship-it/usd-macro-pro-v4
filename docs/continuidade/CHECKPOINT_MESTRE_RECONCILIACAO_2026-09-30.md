@@ -56,6 +56,12 @@ Estado do versionamento/reconciliação: **IMPLEMENTADO / EM VALIDAÇÃO** em
 testes associados. Versões do ledger formam uma cadeia de manifestos e faturas
 read-only podem ser reconciliadas contra o ledger sem autorizar pagamento.
 
+Estado do binding de capacidade com métricas reais: **IMPLEMENTADO / EM VALIDAÇÃO**
+em `atlasquant_aion_business_capacity_live_metrics_binding.py`, ADR-0061 e
+testes associados. FinOps, suporte, infraestrutura e incidentes entram somente
+como evidência read-only atestada e recente antes de alimentar o Capacity & Scale
+Manager existente.
+
 ## 2.1 Prioridade entre Negócios, Trader e Investimentos
 
 Direção aprovada:
@@ -280,7 +286,7 @@ expansão.
 
 PENDENTE / APROVADO:
 - binding de produção do Equipe & Acessos: provisionamento real, MFA/2FA, persistência do registry e revogação física;
-- binding do Gestor de Capacidade & Escala com métricas reais, custos de providers, incidentes e onboarding;
+- configurar connectors reais de suporte/infra/incidentes e validar métricas do primeiro ambiente piloto;
 - definir RPO/RTO, cópia secundária real e executar restore drill não produtivo da política Backup & Recovery;
 - configurar connectors reais de custo/fatura e writer físico do storage versionado com read-back verification;
 - segmento/candidato reais + custos reais + preço comercial real + revisão jurídica/comercial do primeiro piloto;
@@ -317,3 +323,4 @@ PENDENTE / APROVADO:
 | D-2026-09-30-FINOPS-LIVE-COST-LEDGER | IMPLEMENTADO / EM VALIDAÇÃO | Custos reais entram read-only e formam ledger hash-chained |
 | D-2026-09-30-FINOPS-PERSISTENCE-RECONCILIATION | IMPLEMENTADO / EM VALIDAÇÃO | Versões do ledger são encadeadas e faturas reconciliadas sem pagamento |
 | D-2026-09-30-REVENUE-OPPORTUNITY-ENGINE | IMPLEMENTADO / EM VALIDAÇÃO | Oportunidades de receita passam por gates econômicos antes do ranking |
+| D-2026-09-30-CAPACITY-LIVE-METRICS | IMPLEMENTADO / EM VALIDAÇÃO | Capacity Manager recebe FinOps, suporte, infra e incidentes atestados |
