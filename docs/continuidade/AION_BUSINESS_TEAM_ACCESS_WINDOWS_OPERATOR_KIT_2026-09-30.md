@@ -11,7 +11,7 @@ Implementado / em validação sobre a Draft PR #457.
 - zero impressão de secrets;
 - proteção contra overwrite acidental;
 - Get-TeamAccessSandboxReadiness.ps1;
-- relatório local sanitizado e gitignored;
+- relatório local sanitizado fora do repositório em %LOCALAPPDATA%;
 - Invoke-TeamAccessSandboxOperator.ps1;
 - PLAN ONLY por padrão;
 - -ApplyStart explícito;
