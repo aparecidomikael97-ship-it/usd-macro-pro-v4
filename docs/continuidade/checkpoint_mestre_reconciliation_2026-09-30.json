@@ -57,7 +57,10 @@
     "commercial_live_read_binding_status": "IMPLEMENTADO / EM VALIDAÇÃO",
     "commercial_live_write_enabled": false,
     "raw_contact_pii_in_binding": false,
-    "live_connector_configuration_authorized": false
+    "live_connector_configuration_authorized": false,
+    "revenue_opportunity_engine_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "revenue_opportunity_score_is_probability": false,
+    "automatic_sale_from_opportunity_engine": false
   },
   "team_access": {
     "status": "IMPLEMENTADO / EM VALIDAÇÃO",
@@ -418,9 +421,24 @@
         "docs/aion/AION_FINOPS_LEDGER_PERSISTENCE_RECONCILIATION_V1.md",
         "docs/adr/ADR-0059-finops-ledger-persistence-reconciliation.md"
       ]
+    },
+    {
+      "id": "D-2026-09-30-REVENUE-OPPORTUNITY-ENGINE",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_business_revenue_opportunity_engine.py",
+        "test_atlasquant_aion_business_revenue_opportunity_engine.py",
+        "docs/aion/AION_BUSINESS_REVENUE_OPPORTUNITY_ENGINE_V1.md",
+        "docs/adr/ADR-0060-business-revenue-opportunity-engine.md"
+      ]
     }
   ],
   "pending": [
+    "REVENUE_OPPORTUNITY_WEIGHT_CALIBRATION_AFTER_CLIENT_HISTORY",
+    "REVENUE_OPPORTUNITY_REAL_CAPACITY_BINDING",
+    "REVENUE_OPPORTUNITY_REAL_COST_BINDING",
     "FINOPS_PROVIDER_INVOICE_READ_CONNECTOR",
     "FINOPS_STORAGE_READBACK_VERIFICATION",
     "FINOPS_PHYSICAL_STORAGE_WRITER_REVIEW",
