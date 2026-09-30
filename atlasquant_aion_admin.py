@@ -354,6 +354,9 @@ from atlasquant_aion_business_revenue_opportunity_engine import (
     revenue_opportunity_policy as business_revenue_opportunity_policy,
     opportunity_template_catalog as business_revenue_opportunity_templates,
 )
+from atlasquant_aion_business_capacity_live_metrics_binding import (
+    live_capacity_policy as business_live_capacity_policy,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7291,6 +7294,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "32 · FinOps · Custos Reais & Ledger",
             "33 · FinOps · Persistencia & Reconciliacao",
             "34 · Oportunidades de Receita",
+            "35 · Capacidade · Metricas Reais",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7879,7 +7883,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "bloqueiam a revisão administrativa."
         )
 
-    else:
+    elif view == "34 · Oportunidades de Receita":
         policy = business_revenue_opportunity_policy()
         templates = business_revenue_opportunity_templates()
         st.write(f"Estado: **{policy.get('state')}**")
@@ -7894,6 +7898,23 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "Nenhum preço de mercado é embutido, dropshipping continua fora da prioridade "
             "e nenhuma venda ou gasto é executado por esta camada."
+        )
+
+    else:
+        live_capacity = business_live_capacity_policy()
+        st.write(f"Estado: **{live_capacity.get('state')}**")
+        st.metric("Máximo de tenants nesta fase", int(live_capacity.get("max_tenants") or 0))
+        st.metric("Frescor padrão", f"{float(live_capacity.get('default_max_age_hours') or 0):.0f} h")
+        st.markdown("**Fontes obrigatórias em leitura:**")
+        for source in list(live_capacity.get("sources") or []):
+            st.markdown(f"- {source}")
+        st.warning(
+            "O cálculo usa métricas atestadas de FinOps, suporte, infraestrutura e incidentes. "
+            "Métrica stale ou fonte incompleta bloqueia a avaliação."
+        )
+        st.caption(
+            "Mesmo quando há capacidade segura, nenhum cliente é admitido automaticamente, "
+            "nenhuma quota muda e o teto de orçamento não aumenta por esta camada."
         )
 
 
