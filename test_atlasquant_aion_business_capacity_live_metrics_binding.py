@@ -217,7 +217,7 @@ class BusinessCapacityLiveMetricsBindingTests(unittest.TestCase):
 
     def test_admin_exposes_live_capacity_view(self):
         source = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
-        self.assertIn("34 · Capacidade · Metricas Reais", source)
+        self.assertIn("35 · Capacidade · Metricas Reais", source)
         self.assertIn("business_live_capacity_policy", source)
 
     def test_module_has_no_network_or_executor_imports(self):
