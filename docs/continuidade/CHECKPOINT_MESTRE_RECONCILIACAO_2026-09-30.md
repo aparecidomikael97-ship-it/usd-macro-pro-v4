@@ -51,6 +51,11 @@ Estado do ledger de custos reais: **IMPLEMENTADO / EM VALIDAÇÃO** em
 Custos entram somente por fonte atestada read-only e formam uma hash-chain
 append-only verificável; persistência física e pagamento continuam separados.
 
+Estado do versionamento/reconciliação: **IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_finops_ledger_persistence_reconciliation.py`, ADR-0059 e
+testes associados. Versões do ledger formam uma cadeia de manifestos e faturas
+read-only podem ser reconciliadas contra o ledger sem autorizar pagamento.
+
 ## 2.1 Prioridade entre Negócios, Trader e Investimentos
 
 Direção aprovada:
@@ -257,7 +262,7 @@ PENDENTE / APROVADO:
 - binding de produção do Equipe & Acessos: provisionamento real, MFA/2FA, persistência do registry e revogação física;
 - binding do Gestor de Capacidade & Escala com métricas reais, custos de providers, incidentes e onboarding;
 - definir RPO/RTO, cópia secundária real e executar restore drill não produtivo da política Backup & Recovery;
-- configurar connectors reais de custo e persistência versionada do ledger FinOps;
+- configurar connectors reais de custo/fatura e writer físico do storage versionado com read-back verification;
 - segmento/candidato reais + custos reais + preço comercial real + revisão jurídica/comercial do primeiro piloto;
 - configuração física dos connectors read-only, OAuth/secret store e mapeamento de schema dos providers reais;
 - validação operacional do bootstrap do Checkpoint Mestre em ambientes empacotados/deployados;
@@ -290,3 +295,4 @@ PENDENTE / APROVADO:
 | D-2026-09-30-INDEPENDENCE-CLT-INDEX | IMPLEMENTADO / EM VALIDAÇÃO | Índice privado para revisão futura de independência do emprego |
 | D-2026-09-30-COMMERCIAL-LIVE-READ-BINDING | IMPLEMENTADO / EM VALIDAÇÃO | Pipeline comercial consome somente dados reais atestados em leitura |
 | D-2026-09-30-FINOPS-LIVE-COST-LEDGER | IMPLEMENTADO / EM VALIDAÇÃO | Custos reais entram read-only e formam ledger hash-chained |
+| D-2026-09-30-FINOPS-PERSISTENCE-RECONCILIATION | IMPLEMENTADO / EM VALIDAÇÃO | Versões do ledger são encadeadas e faturas reconciliadas sem pagamento |
