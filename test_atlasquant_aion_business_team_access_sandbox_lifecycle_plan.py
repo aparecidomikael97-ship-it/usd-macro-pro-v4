@@ -3,7 +3,15 @@ import unittest
 from pathlib import Path
 
 from atlasquant_aion_business_team_access_sandbox_evidence import SCHEMA as EVIDENCE_SCHEMA
-from atlasquant_aion_business_team_access_sandbox_baseline_acceptance import SCHEMA as ACCEPTANCE_SCHEMA
+from atlasquant_aion_business_team_access_sandbox_baseline_acceptance import (
+    DECISION_TOKEN as ACCEPTANCE_DECISION_TOKEN,
+    REQUIRED_ACKNOWLEDGEMENTS as ACCEPTANCE_ACKNOWLEDGEMENTS,
+    SCHEMA as ACCEPTANCE_SCHEMA,
+    validate_baseline_acceptance,
+)
+from atlasquant_aion_business_team_access_windows_operator_handoff import (
+    SCHEMA as HANDOFF_SCHEMA,
+)
 from atlasquant_aion_business_team_access_sandbox_lifecycle_plan import (
     REQUIRED_ACKNOWLEDGEMENTS,
     REQUIRED_DECISION_TOKEN,
@@ -23,20 +31,41 @@ def _baseline():
     }
 
 
-def _acceptance():
+def _handoff():
     return {
-        "schema": ACCEPTANCE_SCHEMA,
-        "state": "EXPLICIT_SANDBOX_BASELINE_ACCEPTANCE_VERIFIED",
-        "acceptance_record_verified": True,
-        "baseline_accepted": True,
-        "lifecycle_plan_input_authorized": True,
-        "baseline_evidence_digest": "a" * 64,
+        "schema": HANDOFF_SCHEMA,
+        "state": "READY_FOR_ADMIN_TEAM_ACCESS_REAL_BASELINE_ACCEPTANCE_REVIEW",
         "operator_session_id": "b" * 32,
-        "acceptance_record_digest": "c" * 64,
+        "readiness_digest": "d" * 64,
+        "baseline_evidence_digest": "a" * 64,
+        "reviewed_by": "admin.demo",
+        "handoff_digest": "e" * 64,
+        "baseline_accepted": False,
+        "lifecycle_plan_authorized": False,
         "lifecycle_execution_authorized": False,
         "production_authorized": False,
         "executes_action": False,
     }
+
+
+def _acceptance():
+    record = {
+        "schema": ACCEPTANCE_SCHEMA,
+        "decision": ACCEPTANCE_DECISION_TOKEN,
+        "handoff_digest": "e" * 64,
+        "baseline_evidence_digest": "a" * 64,
+        "readiness_digest": "d" * 64,
+        "operator_session_id": "b" * 32,
+        "approved_by": "admin.demo",
+        "approved_at": "2026-09-30T21:15:00+00:00",
+        "sandbox_only": True,
+        "production_targeted": False,
+        "secret_material_included": False,
+        "acknowledgements": {
+            name: True for name in ACCEPTANCE_ACKNOWLEDGEMENTS
+        },
+    }
+    return validate_baseline_acceptance(_handoff(), record)
 
 
 class TeamAccessSandboxLifecyclePlanTests(unittest.TestCase):
