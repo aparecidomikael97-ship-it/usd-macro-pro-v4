@@ -43,6 +43,30 @@ Prioridades dentro desse teto:
 R$200 é teto de planejamento inicial, não promessa de que qualquer volume de
 uso caberá nele.
 
+Estado do Budget Governor / FinOps: **IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_finops_budget_governor.py`, ADR-0050 e testes associados.
+
+## 2.1 Prioridade entre Negócios, Trader e Investimentos
+
+Direção aprovada:
+
+1. Núcleo + AION + interface continuam sendo concluídos sem interrupção.
+2. Depois desse fechamento estrutural, **Negócios recebe a maior prioridade** por
+   ser a principal frente de geração inicial de caixa.
+3. Trader e Investimentos continuam evoluindo em paralelo, com menor alocação
+   de esforço enquanto Negócios é profissionalizado.
+4. Trader permanece em backtest, testes, validação e gestão de risco enquanto o
+   capital é formado.
+5. Investimentos mantém função de construção e preservação patrimonial.
+
+Política financeira inicial:
+- receita líquida de Negócios pode financiar todo o ecossistema;
+- lucro líquido do Trader permanece no bucket Trader;
+- alocação inicial máxima ao Trader: 30% do capital total do ecossistema;
+- metas de lucro do Trader são **metas de planejamento**, nunca promessa,
+  garantia ou retorno esperado;
+- nenhuma movimentação de capital é automática.
+
 ## 3. Monetização Business
 
 A prioridade de geração de caixa passa a ser **serviço B2B de Atendimento &
@@ -167,7 +191,7 @@ PENDENTE / APROVADO:
 - binding de produção do Equipe & Acessos: provisionamento real, MFA/2FA, persistência do registry e revogação física;
 - binding do Gestor de Capacidade & Escala com métricas reais, custos de providers, incidentes e onboarding;
 - política de backup e recuperação testável;
-- budget governor de R$200;
+- binding do Budget Governor/FinOps com custos reais de providers, alertas e ledger financeiro persistente;
 - oferta comercial B2B pronta para vender;
 - pipeline proposta → onboarding → entrega → saúde → renovação;
 - integração do Checkpoint Mestre ao bootstrap do AION;
@@ -179,7 +203,7 @@ PENDENTE / APROVADO:
 | ID | Estado | Título |
 | --- | --- | --- |
 | D-2026-09-30-PROACTIVE-GAPS | APROVADO / PENDENTE | Identificar proativamente lacunas necessárias |
-| D-2026-09-30-COST-CAP-200 | APROVADO / PENDENTE | Teto inicial de planejamento de R$200/mês |
+| D-2026-09-30-COST-CAP-200 | IMPLEMENTADO / EM VALIDAÇÃO | Teto inicial de planejamento de R$200/mês |
 | D-2026-09-30-DATA-INTEGRITY-FIRST | APROVADO / PENDENTE | Integridade e recuperação antes de potência |
 | D-2026-09-30-B2B-SERVICE-FIRST | APROVADO / PENDENTE | Monetização inicial por serviço B2B com AION |
 | D-2026-09-30-DROPSHIPPING-OUT | DESCARTADO | Dropshipping fora das prioridades atuais |
@@ -189,3 +213,7 @@ PENDENTE / APROVADO:
 | D-2026-09-30-CHATGPT-OPTIONAL-ARCHITECT | APROVADO / PENDENTE | ChatGPT como apoio externo opcional |
 | D-2026-09-30-EIGHT-LOGICAL-ROLES | APROVADO / PENDENTE | Oito papéis lógicos internos do AION |
 | D-2026-09-30-CHECKPOINT-LATEST-POINTER | IMPLEMENTADO / EM VALIDAÇÃO | Ponteiro explícito para checkpoint mais recente |
+| D-2026-09-30-ECOSYSTEM-PRIORITY-BUSINESS | APROVADO / PENDENTE | Negócios vira prioridade principal após Núcleo/AION/interface |
+| D-2026-09-30-TREASURY-BUCKETS | IMPLEMENTADO / EM VALIDAÇÃO | Tesouraria separada entre Negócios, Trader e Investimentos |
+| D-2026-09-30-TRADER-INITIAL-CAP-30 | IMPLEMENTADO / EM VALIDAÇÃO | Limite inicial de 30% do capital total para Trader |
+| D-2026-09-30-TRADE-TARGET-NOT-GUARANTEE | IMPLEMENTADO / EM VALIDAÇÃO | Meta de Trade não é promessa de retorno |
