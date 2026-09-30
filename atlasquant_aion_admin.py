@@ -360,6 +360,9 @@ from atlasquant_aion_business_capacity_live_metrics_binding import (
 from atlasquant_aion_business_revenue_live_economics_binding import (
     live_economics_policy as business_live_economics_policy,
 )
+from atlasquant_aion_business_team_access_production_binding import (
+    production_binding_policy as business_team_production_policy,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7299,6 +7302,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "34 · Oportunidades de Receita",
             "35 · Capacidade · Metricas Reais",
             "36 · Receita · Economia Real",
+            "37 · Equipe & Acessos · Producao",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7921,7 +7925,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "nenhuma quota muda e o teto de orçamento não aumenta por esta camada."
         )
 
-    else:
+    elif view == "36 · Receita · Economia Real":
         economics = business_live_economics_policy()
         st.write(f"Estado: **{economics.get('state')}**")
         st.markdown("**Custo mensal:** derivado do ledger FinOps verificado.")
@@ -7934,6 +7938,26 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "Nenhuma oportunidade é vendida, nenhum preço muda, nenhum gasto ocorre "
             "e nenhum cliente é admitido automaticamente por esta camada."
+        )
+
+    else:
+        team_prod = business_team_production_policy()
+        st.write(f"Estado: **{team_prod.get('state')}**")
+        st.markdown("**Produção exige evidência de:**")
+        for item in (
+            "conta individual",
+            "MFA forte validado",
+            "registry persistido com read-back",
+            "revogação de sessões verificável",
+        ):
+            st.markdown(f"- {item}")
+        st.warning(
+            "Esta camada não cria conta, não envia convite, não habilita MFA, "
+            "não grava registry e não revoga sessão automaticamente."
+        )
+        st.caption(
+            "O máximo é READY_FOR_ADMIN_TEAM_ACCESS_ACTIVATION_REVIEW. "
+            "Ativação real continua em gate administrativo separado."
         )
 
 
