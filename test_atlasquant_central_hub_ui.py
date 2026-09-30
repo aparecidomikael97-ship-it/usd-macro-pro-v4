@@ -286,6 +286,25 @@ class CentralHubUiTests(unittest.TestCase):
         synced = sync_central_choice({}, admin, None)
         self.assertTrue(synced["root"])
 
+    def test_admin_business_surface_uses_new_demo_without_changing_navigation(self):
+        admin = _access("ADMIN")
+        html = central_surface_html(admin, "negocios")
+        self.assertIn("AION BUSINESS // DEMO SEGURA", html)
+        self.assertIn("Poderoso por dentro. Simples por fora.", html)
+        self.assertIn("BUSINESS CERTIFIED", html)
+        self.assertIn("RUNTIME OFF", html)
+        self.assertIn("dados fictícios", html)
+        self.assertIn("Voltar à Central Principal", html)
+        self.assertNotIn("EM CONSTRUÇÃO", html)
+        user_html = central_surface_html(_access("USER"), "negocios")
+        self.assertNotIn("AION BUSINESS // DEMO SEGURA", user_html)
+        self.assertIn("Área privada indisponível para esta sessão.", user_html)
+
+        state = {"atlasquant_experience_mode": "Avançado"}
+        request = request_central_destination(state, admin, "negocios")
+        self.assertEqual(request["workspace"], "💼 Negócios")
+        self.assertEqual(state["aion_admin_workspace_jump"], "💼 Negócios")
+
     def test_admin_choice_opens_trader_or_aion_and_can_return(self):
         admin = _access("ADMIN")
         trader = resolve_central_area(admin, "trader")

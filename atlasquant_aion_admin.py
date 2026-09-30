@@ -144,6 +144,160 @@ from atlasquant_aion_business import (
     trend_assessment,
     upsert_product,
 )
+from atlasquant_aion_business_demo import (
+    business_demo_html,
+    business_demo_snapshot,
+)
+from atlasquant_aion_business_training import (
+    delivery_walkthrough as business_delivery_walkthrough,
+    diagnostic_brief as business_diagnostic_brief,
+    objection_answer as business_objection_answer,
+    objection_catalog as business_objection_catalog,
+    package_fit as business_package_fit,
+    scenario_catalog as business_scenario_catalog,
+    simulated_sales_conversation as business_simulated_sales_conversation,
+    training_scorecard as business_training_scorecard,
+    training_session as business_training_session,
+)
+from atlasquant_aion_business_proposal_simulator import (
+    build_proposal_draft as business_build_proposal_draft,
+    client_radar as business_client_radar,
+    diagnose_business as business_diagnose_company,
+    proposal_text as business_proposal_text,
+    recommend_package as business_recommend_package,
+)
+from atlasquant_aion_business_client_portal_demo import (
+    SECTIONS as BUSINESS_CLIENT_PORTAL_SECTIONS,
+    build_client_portal_demo as business_build_client_portal_demo,
+    portal_attention_summary as business_portal_attention_summary,
+    portal_section as business_portal_section,
+)
+from atlasquant_aion_business_onboarding_demo import (
+    ACCESS_CATEGORIES as BUSINESS_ONBOARDING_ACCESS_CATEGORIES,
+    PHASES as BUSINESS_ONBOARDING_PHASES,
+    build_implementation_plan as business_build_implementation_plan,
+    go_live_review_packet as business_go_live_review_packet,
+    minimum_access_plan as business_minimum_access_plan,
+    onboarding_intake as business_onboarding_intake,
+    onboarding_status as business_onboarding_status,
+)
+from atlasquant_aion_business_customer_success_demo import (
+    customer_health as business_customer_health,
+    expansion_opportunity as business_expansion_opportunity,
+    renewal_readiness as business_renewal_readiness,
+    sla_ticket as business_sla_ticket,
+    success_plan as business_success_plan,
+)
+from atlasquant_aion_business_client_finance_demo import (
+    client_economics as business_client_economics,
+    portfolio_summary as business_finance_portfolio_summary,
+    pricing_review as business_pricing_review,
+)
+from atlasquant_aion_business_trend_intelligence import (
+    evaluate_opportunity as business_evaluate_opportunity,
+    improvement_review as business_improvement_review,
+    rank_opportunities as business_rank_opportunities,
+    trend_watch_posture as business_trend_watch_posture,
+)
+from atlasquant_aion_business_commercial_acquisition_demo import (
+    build_channel_plan as business_build_channel_plan,
+    build_content_plan as business_build_content_plan,
+    build_contract_handoff as business_build_contract_handoff,
+    build_landing_page_brief as business_build_landing_page_brief,
+    commercial_funnel_snapshot as business_commercial_funnel_snapshot,
+    outreach_draft as business_outreach_draft,
+    qualify_prospect as business_qualify_prospect,
+)
+from atlasquant_aion_business_integration_hub import (
+    INTEGRATIONS as BUSINESS_INTEGRATIONS,
+    connection_review_packet as business_integration_connection_review,
+    hub_snapshot as business_integration_hub_snapshot,
+    integration_health as business_integration_health,
+    integration_record as business_integration_record,
+    minimum_scope_plan as business_integration_scope_plan,
+    secret_handling_policy as business_integration_secret_policy,
+)
+from atlasquant_aion_business_privacy_audit import (
+    access_decision as business_privacy_access_decision,
+    audit_event as business_privacy_audit_event,
+    automation_version as business_privacy_automation_version,
+    consent_record as business_privacy_consent_record,
+    data_subject_request as business_privacy_subject_request,
+    governance_snapshot as business_privacy_governance_snapshot,
+    privacy_profile as business_privacy_profile,
+    retention_review as business_privacy_retention_review,
+    role_access_matrix as business_privacy_role_access_matrix,
+    rollback_plan as business_privacy_rollback_plan,
+)
+from atlasquant_aion_business_master_readiness import (
+    default_demo_evidence as business_default_demo_evidence,
+    master_readiness_snapshot as business_master_readiness_snapshot,
+    pilot_review_packet as business_pilot_review_packet,
+    status_rows as business_master_status_rows,
+)
+from atlasquant_aion_business_pilot_governance import (
+    STOP_REASONS as BUSINESS_PILOT_STOP_REASONS,
+    build_pilot_charter as business_build_pilot_charter,
+    define_stop_conditions as business_define_pilot_stop_conditions,
+    define_success_criteria as business_define_pilot_success_criteria,
+    pilot_gate_review as business_pilot_gate_review,
+    pilot_posture as business_pilot_posture,
+    pilot_review_packet as business_bounded_pilot_review_packet,
+)
+from atlasquant_aion_business_stack_consolidation_v2 import (
+    administrative_options as business_stack_admin_options,
+    consolidation_preview as business_stack_consolidation_preview,
+    frozen_green_evidence as business_stack_frozen_green_evidence,
+    release_bundle_manifest as business_stack_release_bundle,
+    rollback_integration_plan as business_stack_rollback_plan,
+    validate_stack as business_stack_validate,
+)
+from atlasquant_aion_business_consolidation_dry_run_v2 import (
+    build_consolidation_runbook as business_build_consolidation_dry_run_v2,
+    live_revalidation_snapshot as business_live_revalidation_snapshot_v2,
+)
+from atlasquant_aion_business_consolidation_decision_request import (
+    decision_request_template as business_consolidation_decision_request_template,
+)
+from atlasquant_aion_business_consolidation_authorization_record import (
+    authorization_record_requirements as business_consolidation_authorization_requirements,
+)
+from atlasquant_aion_business_consolidation_execution_preflight import (
+    execution_preflight_template as business_consolidation_execution_preflight_template,
+)
+from atlasquant_aion_business_consolidation_execution_review_packet import (
+    review_packet_template as business_execution_review_packet_template,
+)
+from atlasquant_aion_business_consolidation_post_merge_verification import (
+    post_merge_verification_template as business_post_merge_verification_template,
+)
+from atlasquant_aion_business_consolidation_progress_ledger import (
+    progress_ledger_template as business_consolidation_progress_ledger_template,
+)
+from atlasquant_aion_business_consolidation_completion_review import (
+    completion_review_template as business_consolidation_completion_review_template,
+    final_admin_decision_request as business_final_admin_decision_request,
+)
+from atlasquant_aion_business_release_boundary_handoff import (
+    deploy_decision_request as business_deploy_decision_request,
+    release_handoff_template as business_release_handoff_template,
+)
+from atlasquant_aion_business_deploy_verification_runtime_boundary import (
+    deploy_authorization_requirements as business_deploy_authorization_requirements,
+    deployment_verification_template as business_deployment_verification_template,
+)
+from atlasquant_aion_business_runtime_activation_readiness import (
+    activation_authorization_requirements as business_runtime_activation_requirements,
+    post_activation_verification_template as business_post_activation_verification_template,
+)
+from atlasquant_aion_business_post_activation_expansion_boundary import (
+    EXPANSION_ACKNOWLEDGEMENTS as BUSINESS_EXPANSION_ACKNOWLEDGEMENTS,
+    REQUIRED_EXPANSION_DECISION_TOKEN as BUSINESS_EXPANSION_DECISION_TOKEN,
+    post_activation_verification_requirements as business_post_activation_boundary_requirements,
+)
+from atlasquant_aion_business_expansion_readiness import (
+    expansion_authorization_requirements as business_expansion_authorization_requirements,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -5134,12 +5288,2265 @@ def _render_studio(
         st.info("Nenhum projeto de conteúdo registrado no Studio.")
 
 
+
+def _render_business_guided_training() -> None:
+    """Session-only training lab. Uses fictional fixtures and executes nothing."""
+    st.markdown("#### 🎓 Treinamento Guiado AION Business")
+    st.caption(
+        "Ambiente de prática com empresas fictícias. Nenhum dado real, contato, cobrança, "
+        "publicação ou runtime é usado aqui."
+    )
+    catalog = business_scenario_catalog()
+    labels = {row["label"]: row["id"] for row in catalog}
+    selected_label = st.selectbox(
+        "Empresa fictícia para treinar",
+        list(labels),
+        key="aion_business_training_scenario",
+    )
+    scenario_id = labels[selected_label]
+    session = business_training_session(scenario_id, step=1)
+    scenario = session["scenario"]
+
+    st.info(
+        f"**{scenario['company']} · {scenario['segment']}**\n\n{scenario['situation']}"
+    )
+
+    stages = (
+        "1 · Diagnóstico",
+        "2 · Radar & Pacote",
+        "3 · Entrega",
+        "4 · Objeções",
+        "5 · Venda simulada",
+        "6 · Minha preparação",
+    )
+    selected_stage = st.selectbox(
+        "Etapa do treinamento",
+        stages,
+        key="aion_business_training_stage",
+        help="Carrega uma etapa por vez para manter a navegação leve no celular.",
+    )
+
+    if selected_stage == stages[0]:
+        brief = business_diagnostic_brief(scenario_id)
+        st.markdown("**Como explicar o problema antes da tecnologia**")
+        st.write(brief["summary"])
+        st.markdown("**Gargalos do exercício**")
+        for gap in brief["priority_gaps"]:
+            st.markdown(f"- {gap}")
+        st.markdown("**Perguntas que precisam ser feitas numa empresa real**")
+        for question in brief["questions_to_confirm"]:
+            st.markdown(f"- {question}")
+        st.caption("Estado deste exercício: FICTIONAL_FIXTURE. Nada aqui é dado de cliente.")
+
+    elif selected_stage == stages[1]:
+        fit = business_package_fit(scenario_id)
+        fixture = scenario["fixture"]
+        r1,r2,r3,r4 = st.columns(4)
+        r1.metric("Leads abertos", fixture["leads_open"])
+        r2.metric("Resposta média", f"{fixture['avg_response_hours']:.1f}h")
+        r3.metric("Orçamentos parados", fixture["abandoned_quotes"])
+        r4.metric("Clientes retornando", f"{fixture['returning_customers_pct']:.0f}%")
+        st.caption("Dados fictícios usados apenas para aprender a ler o Radar.")
+        st.success(f"**Pacote de treino:** {fit['package_label']}")
+        for component in fit["components"]:
+            st.markdown(f"- {component}")
+        st.warning(
+            "Em empresa real o pacote e o preço só são fechados depois do diagnóstico. "
+            "Este encaixe é didático e não promete resultado."
+        )
+
+    elif selected_stage == stages[2]:
+        delivery = business_delivery_walkthrough(scenario_id)
+        st.markdown("**O que o cliente recebe**")
+        for item in delivery["what_client_receives"]:
+            st.markdown(f"- {item}")
+        st.markdown("**O que o cliente deve enxergar no painel**")
+        for item in delivery["what_client_sees"]:
+            st.markdown(f"- {item}")
+        st.markdown("**O que entra na manutenção mensal**")
+        for item in delivery["maintenance_covers"]:
+            st.markdown(f"- {item}")
+        st.info(
+            "Modelo comercial didático: implantação + manutenção mensal. "
+            "Preço não está definido automaticamente."
+        )
+
+    elif selected_stage == stages[3]:
+        objections = business_objection_catalog()
+        qmap = {row["question"]: row["id"] for row in objections}
+        question = st.selectbox(
+            "Escolha uma pergunta comum do cliente",
+            list(qmap),
+            key="aion_business_training_objection",
+        )
+        answer = business_objection_answer(qmap[question])
+        st.markdown("**Resposta segura para praticar**")
+        st.write(answer["answer"])
+        st.caption(
+            "Regra: se surgir uma dúvida que não sabemos responder, não inventar. "
+            "Registrar, conferir o escopo/evidência e responder depois."
+        )
+
+    elif selected_stage == stages[4]:
+        conversation = business_simulated_sales_conversation(scenario_id)
+        st.markdown("**Simulação de conversa**")
+        for row in conversation:
+            who = "Você / ADMIN" if row["speaker"] == "ADMIN" else "Cliente fictício"
+            st.markdown(f"**{who}:** {row['text']}")
+        st.caption(
+            "Treino somente. Nenhuma mensagem é enviada e nenhuma proposta comercial é criada."
+        )
+
+    else:
+        st.markdown("**Checklist antes de você divulgar ou conversar com cliente real**")
+        checks = {}
+        labels_checks = (
+            ("explained_problem_before_technology", "Consigo explicar o problema antes de falar de IA."),
+            ("separated_fact_from_assumption", "Separo fato confirmado de hipótese."),
+            ("explained_package_scope", "Sei explicar o que entra e o que não entra no pacote."),
+            ("explained_installation_and_maintenance", "Sei explicar implantação + manutenção mensal."),
+            ("avoided_financial_guarantee", "Sei explicar que não existe garantia de venda/lucro."),
+            ("explained_client_portal", "Consigo mostrar o Portal/Radar em linguagem simples."),
+            ("asked_for_next_step", "Sei conduzir para diagnóstico/proposta como próximo passo."),
+        )
+        for key, label in labels_checks:
+            checks[key] = st.checkbox(
+                label,
+                key=f"aion_business_training_check_{key}",
+            )
+        score = business_training_scorecard(**checks)
+        st.progress(int(round(score["progress_pct"])))
+        st.write(
+            f"Preparação neste checklist: **{score['completed']}/{score['total']} "
+            f"({score['progress_pct']:.0f}%)**"
+        )
+        if score["training_complete"]:
+            st.success(
+                "Checklist concluído nesta sessão. Continue praticando com outros cenários antes "
+                "de transformar o treino em atendimento real."
+            )
+        else:
+            st.info("Complete os itens restantes e pratique novamente.")
+        st.caption(
+            "Concluir o checklist não autoriza venda automática, runtime ou ação externa."
+        )
+
+
+
+def _render_business_diagnostic_proposal_simulator() -> None:
+    """Session-only diagnostic/proposal simulator. Draft-only, no external action."""
+    st.markdown("#### 🧭 Simulador de Diagnóstico + Proposta")
+    st.caption(
+        "Use dados fictícios para praticar o processo completo. Nada é enviado, cobrado, "
+        "assinado ou publicado. Preços permanecem A DEFINIR até existir escopo real validado."
+    )
+
+    with st.form("aion_business_diagnostic_simulator_form", clear_on_submit=False):
+        company_name = st.text_input(
+            "Empresa fictícia",
+            value="Clínica Horizonte Demo",
+            key="aion_business_sim_company",
+        )
+        segment = st.text_input(
+            "Segmento",
+            value="Clínica",
+            key="aion_business_sim_segment",
+        )
+        channels = st.multiselect(
+            "Canais usados",
+            ["WhatsApp", "Instagram", "Facebook", "Site", "Google", "Telefone", "E-mail"],
+            default=["WhatsApp", "Instagram"],
+            key="aion_business_sim_channels",
+        )
+        weekly_leads = st.number_input(
+            "Leads por semana",
+            min_value=0,
+            max_value=100000,
+            value=120,
+            step=1,
+            key="aion_business_sim_weekly_leads",
+        )
+        avg_response_hours = st.number_input(
+            "Tempo médio de resposta (horas)",
+            min_value=0.0,
+            max_value=720.0,
+            value=4.5,
+            step=0.5,
+            key="aion_business_sim_response",
+        )
+        abandoned_quotes = st.number_input(
+            "Orçamentos/leads abandonados por mês",
+            min_value=0,
+            max_value=100000,
+            value=18,
+            step=1,
+            key="aion_business_sim_abandoned",
+        )
+        returning_pct = st.number_input(
+            "Clientes retornando (%)",
+            min_value=0.0,
+            max_value=100.0,
+            value=14.0,
+            step=1.0,
+            key="aion_business_sim_returning",
+        )
+        content_posts = st.number_input(
+            "Publicações de conteúdo por mês",
+            min_value=0,
+            max_value=1000,
+            value=2,
+            step=1,
+            key="aion_business_sim_posts",
+        )
+        followup = st.radio(
+            "Existe processo de follow-up?",
+            ["Não", "Sim"],
+            horizontal=True,
+            key="aion_business_sim_followup",
+        )
+        crm = st.radio(
+            "Existe CRM/pipeline organizado?",
+            ["Não", "Sim"],
+            horizontal=True,
+            key="aion_business_sim_crm",
+        )
+        sla = st.radio(
+            "Existe SLA/tempo-alvo de atendimento?",
+            ["Não", "Sim"],
+            horizontal=True,
+            key="aion_business_sim_sla",
+        )
+        conversion = st.radio(
+            "A empresa mede conversão?",
+            ["Não", "Sim"],
+            horizontal=True,
+            key="aion_business_sim_conversion",
+        )
+        goals_text = st.text_input(
+            "Objetivos do exercício",
+            value="responder mais rápido; recuperar leads; organizar atendimento",
+            key="aion_business_sim_goals",
+        )
+        notes = st.text_area(
+            "Observações fictícias",
+            value="Treino interno do administrador.",
+            key="aion_business_sim_notes",
+        )
+        generate = st.form_submit_button("Gerar diagnóstico e rascunho")
+
+    if generate:
+        goals = [item.strip() for item in goals_text.split(";") if item.strip()]
+        intake = {
+            "company_name": company_name,
+            "segment": segment,
+            "channels": channels,
+            "goals": goals,
+            "weekly_leads": weekly_leads,
+            "avg_response_hours": avg_response_hours,
+            "abandoned_quotes_monthly": abandoned_quotes,
+            "returning_customers_pct": returning_pct,
+            "content_posts_monthly": content_posts,
+            "has_followup_process": followup == "Sim",
+            "has_crm": crm == "Sim",
+            "has_sla": sla == "Sim",
+            "tracks_conversion": conversion == "Sim",
+            "notes": notes,
+        }
+        diagnostic = business_diagnose_company(intake)
+        fit = business_recommend_package(diagnostic)
+        radar = business_client_radar(diagnostic)
+        proposal = business_build_proposal_draft(diagnostic, fit)
+        st.session_state["aion_business_simulator_result"] = {
+            "diagnostic": diagnostic,
+            "fit": fit,
+            "radar": radar,
+            "proposal": proposal,
+            "proposal_text": business_proposal_text(proposal),
+        }
+
+    result = st.session_state.get("aion_business_simulator_result")
+    if not isinstance(result, Mapping):
+        st.info("Preencha o exercício e toque em **Gerar diagnóstico e rascunho**.")
+        return
+
+    diagnostic = result.get("diagnostic") if isinstance(result.get("diagnostic"), Mapping) else {}
+    fit = result.get("fit") if isinstance(result.get("fit"), Mapping) else {}
+    radar = result.get("radar") if isinstance(result.get("radar"), Mapping) else {}
+    proposal = result.get("proposal") if isinstance(result.get("proposal"), Mapping) else {}
+
+    stages = (
+        "1 · Diagnóstico",
+        "2 · Radar",
+        "3 · Pacote",
+        "4 · Proposta",
+    )
+    selected = st.selectbox(
+        "Resultado para visualizar",
+        stages,
+        key="aion_business_simulator_result_stage",
+        help="Uma etapa por vez para manter a experiência leve no celular.",
+    )
+
+    if selected == stages[0]:
+        st.markdown("**Diagnóstico preliminar do exercício**")
+        st.caption(
+            f"Fonte: {diagnostic.get('truth_state') or 'UNKNOWN'} · "
+            "empresa real não verificada · sem execução externa."
+        )
+        issues = diagnostic.get("issues") if isinstance(diagnostic.get("issues"), list) else []
+        if not issues:
+            st.success("Nenhum alerta básico foi acionado pelos dados deste exercício.")
+        for issue in issues:
+            if not isinstance(issue, Mapping):
+                continue
+            st.markdown(
+                f"**{issue.get('pillar_label')} · {issue.get('severity')} — {issue.get('title')}**"
+            )
+            st.caption(str(issue.get("evidence") or ""))
+            st.write(str(issue.get("recommendation") or ""))
+
+    elif selected == stages[1]:
+        st.markdown("**Radar do Negócio · exercício fictício**")
+        cards = radar.get("cards") if isinstance(radar.get("cards"), list) else []
+        cols = st.columns(4)
+        for index, card in enumerate(cards[:4]):
+            if not isinstance(card, Mapping):
+                continue
+            cols[index].metric(
+                str(card.get("label") or ""),
+                f"{int(card.get('health_score') or 0)}/100",
+                str(card.get("state") or ""),
+            )
+        st.markdown("**Próximas ações sugeridas para revisão**")
+        actions = radar.get("next_actions") if isinstance(radar.get("next_actions"), list) else []
+        for item in actions:
+            if isinstance(item, Mapping):
+                st.markdown(
+                    f"- **{item.get('severity')} · {item.get('title')}** — "
+                    f"{item.get('recommendation')}"
+                )
+        st.caption("Radar didático; não representa dados reais nem garantia de resultado.")
+
+    elif selected == stages[2]:
+        st.success(f"**Pacote preliminar:** {fit.get('package_label') or 'A DEFINIR'}")
+        st.write(str(fit.get("reason") or ""))
+        st.markdown("**Entregas preliminares**")
+        for item in list(fit.get("deliverables") or []):
+            st.markdown(f"- {item}")
+        st.info(
+            "Preço de implantação e mensalidade continuam A DEFINIR. "
+            "Em cliente real, diagnóstico + escopo + integrações + volume vêm antes do preço."
+        )
+
+    else:
+        p = proposal.get("proposal") if isinstance(proposal.get("proposal"), Mapping) else {}
+        if proposal.get("state") != "DRAFT_READY":
+            st.warning("O diagnóstico ainda não tem dados suficientes para montar a proposta.")
+            return
+        st.markdown(f"**{p.get('title')}**")
+        st.caption("RASCUNHO INTERNO · NÃO ENVIADO · NÃO ASSINADO · SEM COBRANÇA")
+        st.markdown("**Objetivo**")
+        st.write(str(p.get("objective") or ""))
+        st.markdown("**Entregas previstas**")
+        for item in list(p.get("deliverables") or []):
+            st.markdown(f"- {item}")
+        st.markdown("**Implantação**")
+        for item in list(p.get("implementation_phases") or []):
+            st.markdown(f"- {item}")
+        st.markdown("**Manutenção mensal**")
+        for item in list(p.get("monthly_maintenance") or []):
+            st.markdown(f"- {item}")
+        terms = p.get("commercial_terms") if isinstance(p.get("commercial_terms"), Mapping) else {}
+        st.markdown("**Condições comerciais**")
+        st.write(f"Implantação: **{terms.get('implementation_price') or 'A DEFINIR'}**")
+        st.write(f"Mensalidade: **{terms.get('monthly_maintenance') or 'A DEFINIR'}**")
+        st.markdown("**Próximo passo**")
+        st.write(str(p.get("next_step") or ""))
+        with st.expander("Ver texto completo do rascunho", expanded=False):
+            st.code(str(result.get("proposal_text") or ""), language=None)
+        st.caption(
+            "Este simulador só produz rascunho. Não envia proposta, não assina contrato, "
+            "não cobra e não ativa runtime."
+        )
+
+
+
+def _render_business_client_portal_demo() -> None:
+    """Render the future client-facing experience from session-only demo data."""
+    st.markdown("#### 🖥️ Portal Executivo do Cliente · Demo")
+    st.caption(
+        "Esta é a visão que o cliente deverá receber: simples, objetiva e sem complexidade técnica. "
+        "Usa somente o último exercício fictício do simulador."
+    )
+    result = st.session_state.get("aion_business_simulator_result")
+    if not isinstance(result, Mapping):
+        st.info(
+            "Primeiro gere um exercício no **Simulador de Diagnóstico + Proposta**. "
+            "Depois o mesmo diagnóstico aparece aqui na visão do cliente."
+        )
+        return
+
+    diagnostic = result.get("diagnostic") if isinstance(result.get("diagnostic"), Mapping) else {}
+    fit = result.get("fit") if isinstance(result.get("fit"), Mapping) else {}
+    radar = result.get("radar") if isinstance(result.get("radar"), Mapping) else {}
+    proposal = result.get("proposal") if isinstance(result.get("proposal"), Mapping) else {}
+    portal = business_build_client_portal_demo(diagnostic, radar, fit, proposal)
+    attention = business_portal_attention_summary(portal)
+
+    st.markdown(f"### {portal.get('company') or 'Empresa Demo'}")
+    st.caption(
+        f"{portal.get('segment') or 'Segmento Demo'} · DEMO ONLY · RUNTIME OFF · "
+        "SEM AÇÃO EXTERNA"
+    )
+    st.write(str(portal.get("headline") or ""))
+    st.markdown(f"**{portal.get('tagline') or ''}**")
+
+    section = st.selectbox(
+        "Área do Portal",
+        list(BUSINESS_CLIENT_PORTAL_SECTIONS),
+        key="aion_business_client_portal_section",
+        help="O cliente navega por uma área de cada vez, inclusive no celular.",
+    )
+    selected = business_portal_section(portal, section)
+    payload = selected.get("payload")
+
+    if section == "VISÃO GERAL":
+        overview = payload if isinstance(payload, Mapping) else {}
+        package = overview.get("package") if isinstance(overview.get("package"), Mapping) else {}
+        st.info(str(attention.get("headline") or ""))
+        a1,a2,a3 = st.columns(3)
+        a1.metric("Prioridades", int(attention.get("pending_actions") or 0))
+        a2.metric("Críticas", int(attention.get("critical_count") or 0))
+        a3.metric("Importantes", int(attention.get("high_count") or 0))
+        st.markdown(f"**Pacote do exercício:** {package.get('label') or 'A DEFINIR'}")
+        st.caption("Preço e escopo final continuam pendentes de validação real.")
+
+    elif section == "RADAR":
+        row = payload if isinstance(payload, Mapping) else {}
+        cards = row.get("cards") if isinstance(row.get("cards"), list) else []
+        cols = st.columns(4)
+        for index, card in enumerate(cards[:4]):
+            if isinstance(card, Mapping):
+                cols[index].metric(
+                    str(card.get("label") or ""),
+                    f"{int(card.get('health_score') or 0)}/100",
+                    str(card.get("state") or ""),
+                )
+        st.caption("Fonte: DEMO_USER_INPUT. Nenhum dado real de empresa foi conectado.")
+
+    elif section == "PLANO DE AÇÃO":
+        items = payload if isinstance(payload, list) else []
+        if not items:
+            st.success("Nenhuma ação básica apareceu no exercício.")
+        for item in items:
+            if isinstance(item, Mapping):
+                st.markdown(
+                    f"**{item.get('severity')} · {item.get('title')}**  \n"
+                    f"{item.get('recommendation')}  \n"
+                    f"_Estado: {item.get('status')}_"
+                )
+
+    elif section == "RESULTADOS":
+        row = payload if isinstance(payload, Mapping) else {}
+        st.info(str(row.get("message") or ""))
+        st.metric("Resultados reais disponíveis", 0)
+        st.caption(
+            "O AION não preenche números de resultado sem fonte confiável e período de medição."
+        )
+
+    elif section == "SUPORTE":
+        row = payload if isinstance(payload, Mapping) else {}
+        s1,s2,s3 = st.columns(3)
+        s1.metric("Chamados abertos", int(row.get("open_tickets") or 0))
+        s2.metric("Incidentes críticos", int(row.get("critical_incidents") or 0))
+        s3.metric("SLA", str(row.get("sla_state") or "A DEFINIR"))
+        st.write(f"Canal de suporte: **{row.get('contact_channel') or 'A DEFINIR'}**")
+        st.caption("Valores demonstrativos; SLA real é definido no contrato/escopo.")
+
+    else:
+        items = payload if isinstance(payload, list) else []
+        st.markdown("**Histórico visível ao cliente**")
+        for item in items:
+            if isinstance(item, Mapping):
+                st.markdown(
+                    f"- **{item.get('label') or item.get('event')}** · "
+                    f"{item.get('timestamp') or 'DEMO'}"
+                )
+
+    with st.expander("O que fica escondido do cliente", expanded=False):
+        st.write(
+            "Filas, roteamento de especialistas, validações, auditoria, segurança, fingerprints, "
+            "gates de runtime e outras camadas técnicas ficam por dentro do AION. "
+            "O cliente recebe contexto, prioridade, resultado verificável e próximo passo."
+        )
+    st.caption(
+        "Portal de demonstração. Sem cliente real conectado, sem cobrança, sem publicação, "
+        "sem mensagem automática e com runtime OFF."
+    )
+
+
+
+def _render_business_onboarding_demo() -> None:
+    """Teach the post-sale onboarding path using session-only demo data."""
+    st.markdown("#### 🧩 Onboarding + Implantação · Demo")
+    st.caption(
+        "Mostra como o cliente sai da proposta e chega à implantação controlada. "
+        "Sem credenciais reais, sem conexão externa e sem runtime."
+    )
+    simulator = st.session_state.get("aion_business_simulator_result")
+    if not isinstance(simulator, Mapping):
+        st.info(
+            "Gere primeiro um exercício no simulador. O onboarding usa o pacote e o objetivo "
+            "da mesma empresa fictícia."
+        )
+        return
+
+    diagnostic = simulator.get("diagnostic") if isinstance(simulator.get("diagnostic"), Mapping) else {}
+    fit = simulator.get("fit") if isinstance(simulator.get("fit"), Mapping) else {}
+    intake_source = diagnostic.get("intake") if isinstance(diagnostic.get("intake"), Mapping) else {}
+    company = str(intake_source.get("company_name") or "Empresa Demo")
+    package = str(fit.get("package_label") or "A DEFINIR")
+
+    with st.form("aion_business_onboarding_demo_form", clear_on_submit=False):
+        owner = st.text_input(
+            "Responsável fictício da empresa",
+            value="Responsável Demo",
+            key="aion_business_onboarding_owner",
+        )
+        goal = st.text_area(
+            "Objetivo do onboarding",
+            value=str(intake_source.get("notes") or "Implantar o pacote com escopo e métricas claras."),
+            key="aion_business_onboarding_goal",
+        )
+        access_requested = st.multiselect(
+            "Integrações que o exercício diz precisar",
+            list(BUSINESS_ONBOARDING_ACCESS_CATEGORIES),
+            default=[],
+            key="aion_business_onboarding_access",
+        )
+        create_plan = st.form_submit_button("Montar plano de implantação")
+
+    if create_plan:
+        intake = business_onboarding_intake(
+            company_name=company,
+            package_label=package,
+            business_owner=owner,
+            business_goal=goal,
+            requested_channels=list(intake_source.get("channels") or []),
+            requested_integrations=access_requested,
+        )
+        access_flags = {name: name in access_requested for name in BUSINESS_ONBOARDING_ACCESS_CATEGORIES}
+        access = business_minimum_access_plan(intake, access_flags)
+        plan = business_build_implementation_plan(intake, access)
+        st.session_state["aion_business_onboarding_demo_result"] = {
+            "intake": intake,
+            "access": access,
+            "plan": plan,
+        }
+
+    result = st.session_state.get("aion_business_onboarding_demo_result")
+    if not isinstance(result, Mapping):
+        st.info("Monte o plano para visualizar as etapas.")
+        return
+
+    intake = result.get("intake") if isinstance(result.get("intake"), Mapping) else {}
+    access = result.get("access") if isinstance(result.get("access"), Mapping) else {}
+    plan = result.get("plan") if isinstance(result.get("plan"), Mapping) else {}
+
+    stage = st.selectbox(
+        "Etapa do onboarding",
+        (
+            "1 · Escopo",
+            "2 · Dados & acessos",
+            "3 · Integrações",
+            "4 · Sandbox",
+            "5 · Validação",
+            "6 · Entrega assistida",
+            "7 · Status",
+        ),
+        key="aion_business_onboarding_stage",
+        help="Uma etapa por vez para facilitar o uso pelo celular.",
+    )
+
+    if stage == "1 · Escopo":
+        st.markdown(f"**Empresa:** {intake.get('company_name') or 'Demo'}")
+        st.markdown(f"**Pacote:** {intake.get('package_label') or 'A DEFINIR'}")
+        st.markdown(f"**Responsável:** {intake.get('business_owner') or 'A DEFINIR'}")
+        st.markdown("**Objetivo**")
+        st.write(str(intake.get("business_goal") or ""))
+        st.caption("Nenhum preço, credencial ou ação externa é definido nesta etapa.")
+
+    elif stage == "2 · Dados & acessos":
+        st.markdown("**Princípio: acesso mínimo necessário**")
+        for item in list(access.get("items") or []):
+            if isinstance(item, Mapping) and item.get("needed"):
+                st.markdown(
+                    f"- **{item.get('category')}** — {item.get('access_level')} · "
+                    "aprovação necessária"
+                )
+        st.caption("Este demo não coleta nem armazena valor de senha/token/chave.")
+
+    elif stage == "3 · Integrações":
+        requested = list(intake.get("requested_integrations") or [])
+        if requested:
+            for item in requested:
+                st.markdown(f"- {item}: **PLANEJADA PARA SANDBOX**")
+        else:
+            st.info("Nenhuma integração selecionada neste exercício.")
+        st.caption("Conexão real não é feita neste demo.")
+
+    elif stage == "4 · Sandbox":
+        st.success("Primeiro ambiente: **SANDBOX / ISOLADO**")
+        st.write(
+            "Fluxos são montados e testados antes de qualquer futura ativação operacional."
+        )
+        st.caption("Runtime produtivo continua OFF.")
+
+    elif stage == "5 · Validação":
+        plan_body = plan.get("plan") if isinstance(plan.get("plan"), Mapping) else {}
+        for item in list(plan_body.get("validation_checklist") or []):
+            st.markdown(f"- [ ] {item}")
+        st.caption("Checklist visual do demo; não registra aprovação real.")
+
+    elif stage == "6 · Entrega assistida":
+        st.write(
+            "A entrega assistida só prepara a futura transição. Ela não liga runtime, "
+            "não envia mensagens e não autoriza cobrança."
+        )
+        st.warning(
+            "Qualquer go-live real exige gate separado, evidência e aprovação humana específica."
+        )
+
+    else:
+        demo_completed = st.multiselect(
+            "Marque as fases concluídas somente neste exercício",
+            list(BUSINESS_ONBOARDING_PHASES),
+            default=[],
+            key="aion_business_onboarding_completed",
+        )
+        status = business_onboarding_status(plan, demo_completed)
+        st.progress(int(round(status.get("progress_pct") or 0)))
+        st.write(
+            f"Progresso do exercício: **{status.get('completed_count')}/{status.get('total_phases')} "
+            f"({status.get('progress_pct'):.0f}%)**"
+        )
+        packet = business_go_live_review_packet(plan, status)
+        if packet.get("state") == "LIVE_REVIEW_REQUIRED":
+            st.success("Demo concluído: pode ser preparado um pedido separado de revisão de go-live.")
+        else:
+            st.info("Ainda existem fases do exercício a concluir.")
+        st.caption(
+            "Mesmo com 100% no demo: runtime não é autorizado automaticamente e permanece OFF."
+        )
+
+
+
+def _render_business_customer_success_demo() -> None:
+    """Session-only customer success, SLA, renewal and expansion demo."""
+    st.markdown("#### 🤝 Customer Success + SLA · Demo")
+    st.caption(
+        "Treina o acompanhamento depois da implantação: saúde do cliente, suporte, adoção, "
+        "renovação e oportunidades de expansão. Dados totalmente fictícios."
+    )
+    simulator = st.session_state.get("aion_business_simulator_result")
+    diagnostic = (
+        simulator.get("diagnostic")
+        if isinstance(simulator, Mapping) and isinstance(simulator.get("diagnostic"), Mapping)
+        else {}
+    )
+    intake = diagnostic.get("intake") if isinstance(diagnostic.get("intake"), Mapping) else {}
+    company = str(intake.get("company_name") or "Empresa Demo")
+
+    with st.form("aion_business_customer_success_demo_form", clear_on_submit=False):
+        usage = st.slider(
+            "Uso do serviço (%)",
+            min_value=0,
+            max_value=100,
+            value=72,
+            step=1,
+            key="aion_business_cs_usage",
+        )
+        goals = st.slider(
+            "Progresso dos objetivos (%)",
+            min_value=0,
+            max_value=100,
+            value=65,
+            step=1,
+            key="aion_business_cs_goals",
+        )
+        satisfaction = st.slider(
+            "Satisfação fictícia (1–5)",
+            min_value=1.0,
+            max_value=5.0,
+            value=4.0,
+            step=0.5,
+            key="aion_business_cs_satisfaction",
+        )
+        inactivity = st.number_input(
+            "Dias desde última atividade",
+            min_value=0,
+            max_value=3650,
+            value=3,
+            step=1,
+            key="aion_business_cs_inactivity",
+        )
+        open_tickets = st.number_input(
+            "Chamados abertos",
+            min_value=0,
+            max_value=10000,
+            value=1,
+            step=1,
+            key="aion_business_cs_tickets",
+        )
+        critical_incidents = st.number_input(
+            "Incidentes críticos",
+            min_value=0,
+            max_value=1000,
+            value=0,
+            step=1,
+            key="aion_business_cs_incidents",
+        )
+        onboarding_complete = st.checkbox(
+            "Onboarding concluído",
+            value=True,
+            key="aion_business_cs_onboarding_complete",
+        )
+        monthly_review = st.checkbox(
+            "Revisão mensal concluída",
+            value=True,
+            key="aion_business_cs_review_done",
+        )
+        renewal_days = st.number_input(
+            "Dias até renovação fictícia",
+            min_value=0,
+            max_value=3650,
+            value=45,
+            step=1,
+            key="aion_business_cs_renewal_days",
+        )
+        payment_state = st.selectbox(
+            "Estado comercial fictício",
+            ["CURRENT", "UNKNOWN", "OVERDUE_DEMO"],
+            key="aion_business_cs_payment_state",
+        )
+        evaluate = st.form_submit_button("Avaliar saúde do cliente demo")
+
+    if evaluate:
+        signals = {
+            "company_name": company,
+            "usage_pct": usage,
+            "goals_progress_pct": goals,
+            "satisfaction_score": satisfaction,
+            "days_since_last_activity": inactivity,
+            "open_tickets": open_tickets,
+            "critical_incidents": critical_incidents,
+            "onboarding_complete": onboarding_complete,
+            "monthly_review_done": monthly_review,
+            "payment_state": payment_state,
+            "renewal_days": renewal_days,
+        }
+        health = business_customer_health(signals)
+        success = business_success_plan(health)
+        expansion = business_expansion_opportunity(health)
+        renewal = business_renewal_readiness(health)
+        ticket = business_sla_ticket(
+            title="Chamado fictício de acompanhamento",
+            priority="P3" if critical_incidents == 0 else "P1",
+            age_hours=2,
+        )
+        st.session_state["aion_business_customer_success_demo_result"] = {
+            "health": health,
+            "success": success,
+            "expansion": expansion,
+            "renewal": renewal,
+            "ticket": ticket,
+        }
+
+    result = st.session_state.get("aion_business_customer_success_demo_result")
+    if not isinstance(result, Mapping):
+        st.info("Avalie o cliente fictício para abrir o painel de Customer Success.")
+        return
+
+    stage = st.selectbox(
+        "Visão de Customer Success",
+        (
+            "1 · Saúde",
+            "2 · SLA & Suporte",
+            "3 · Plano de Sucesso",
+            "4 · Renovação & Expansão",
+        ),
+        key="aion_business_customer_success_stage",
+        help="Uma visão por vez para manter o uso simples no celular.",
+    )
+    health = result.get("health") if isinstance(result.get("health"), Mapping) else {}
+    if stage == "1 · Saúde":
+        h1,h2,h3 = st.columns(3)
+        h1.metric("Health Score", f"{int(health.get('health_score') or 0)}/100")
+        h2.metric("Estado", str(health.get("state") or "UNKNOWN"))
+        h3.metric("Risco de churn", "SIM" if health.get("churn_risk") else "NÃO")
+        flags = health.get("flags") if isinstance(health.get("flags"), list) else []
+        if not flags:
+            st.success("Nenhum alerta básico foi acionado neste exercício.")
+        for flag in flags:
+            if isinstance(flag, Mapping):
+                st.markdown(
+                    f"- **{flag.get('severity')} · {flag.get('code')}** — {flag.get('message')}"
+                )
+        st.caption("Health Score didático, calculado somente pelos dados fictícios desta sessão.")
+
+    elif stage == "2 · SLA & Suporte":
+        ticket = result.get("ticket") if isinstance(result.get("ticket"), Mapping) else {}
+        s1,s2,s3 = st.columns(3)
+        s1.metric("Prioridade", str(ticket.get("priority") or "P3"))
+        s2.metric("Meta", f"{int(ticket.get('target_hours') or 0)}h")
+        s3.metric("SLA", str(ticket.get("sla_state") or "UNKNOWN"))
+        st.write(str(ticket.get("title") or ""))
+        st.caption(
+            "Chamado apenas demonstrativo. Não foi enviado a suporte e não produz escrita externa."
+        )
+
+    elif stage == "3 · Plano de Sucesso":
+        success = result.get("success") if isinstance(result.get("success"), Mapping) else {}
+        st.markdown("**Próximas ações para revisão humana**")
+        for item in list(success.get("actions") or []):
+            if isinstance(item, Mapping):
+                st.markdown(f"- {item.get('action')}  \n  _Fonte: {item.get('source')}_")
+        st.caption(
+            "O plano organiza o acompanhamento; não envia contato nem altera a conta do cliente."
+        )
+
+    else:
+        renewal = result.get("renewal") if isinstance(result.get("renewal"), Mapping) else {}
+        expansion = result.get("expansion") if isinstance(result.get("expansion"), Mapping) else {}
+        st.markdown("**Renovação**")
+        st.write(
+            f"Estado: **{renewal.get('state') or 'UNKNOWN'}** · "
+            f"{renewal.get('recommended_focus') or ''}"
+        )
+        st.markdown("**Expansão / Upsell**")
+        if expansion.get("state") == "EXPANSION_REVIEW_AVAILABLE":
+            st.success(str(expansion.get("reason") or "Pode avaliar expansão."))
+        else:
+            st.info(str(expansion.get("reason") or "Sem expansão agora."))
+        st.caption(
+            "Renovação e upsell nunca são automáticos. Saúde e necessidade real vêm antes da venda."
+        )
+
+
+
+def _render_business_client_finance_demo() -> None:
+    """Session-only client economics and capacity demo. Never moves money."""
+    st.markdown("#### 💰 Central Financeira por Cliente · Demo")
+    st.caption(
+        "Separa receita, custo, margem e capacidade por cliente. "
+        "Dados fictícios; não gera cobrança nem movimenta dinheiro."
+    )
+    simulator = st.session_state.get("aion_business_simulator_result")
+    diagnostic = (
+        simulator.get("diagnostic")
+        if isinstance(simulator, Mapping) and isinstance(simulator.get("diagnostic"), Mapping)
+        else {}
+    )
+    fit = (
+        simulator.get("fit")
+        if isinstance(simulator, Mapping) and isinstance(simulator.get("fit"), Mapping)
+        else {}
+    )
+    intake = diagnostic.get("intake") if isinstance(diagnostic.get("intake"), Mapping) else {}
+    company = str(intake.get("company_name") or "Empresa Demo")
+    package = str(fit.get("package_label") or "A DEFINIR")
+
+    with st.form("aion_business_client_finance_demo_form", clear_on_submit=False):
+        implementation_revenue = st.number_input(
+            "Receita de implantação fictícia (R$)",
+            min_value=0.0,
+            value=2500.0,
+            step=100.0,
+            key="aion_business_fin_implementation",
+        )
+        monthly_revenue = st.number_input(
+            "Receita mensal recorrente fictícia (R$)",
+            min_value=0.0,
+            value=1800.0,
+            step=100.0,
+            key="aion_business_fin_monthly_revenue",
+        )
+        f1,f2,f3 = st.columns(3)
+        ai_cost = f1.number_input(
+            "Custo IA (R$)", min_value=0.0, value=180.0, step=10.0,
+            key="aion_business_fin_ai",
+        )
+        integration_cost = f2.number_input(
+            "Integrações (R$)", min_value=0.0, value=120.0, step=10.0,
+            key="aion_business_fin_integrations",
+        )
+        support_cost = f3.number_input(
+            "Suporte (R$)", min_value=0.0, value=250.0, step=10.0,
+            key="aion_business_fin_support",
+        )
+        f4,f5,f6 = st.columns(3)
+        tool_cost = f4.number_input(
+            "Ferramentas (R$)", min_value=0.0, value=90.0, step=10.0,
+            key="aion_business_fin_tools",
+        )
+        tax_estimate = f5.number_input(
+            "Impostos estimados (R$)", min_value=0.0, value=180.0, step=10.0,
+            key="aion_business_fin_tax",
+        )
+        other_costs = f6.number_input(
+            "Outros custos (R$)", min_value=0.0, value=30.0, step=10.0,
+            key="aion_business_fin_other",
+        )
+        q1,q2 = st.columns(2)
+        monthly_requests = q1.number_input(
+            "Uso mensal / requisições",
+            min_value=0,
+            value=6000,
+            step=100,
+            key="aion_business_fin_requests",
+        )
+        request_quota = q2.number_input(
+            "Quota mensal / requisições",
+            min_value=1,
+            value=10000,
+            step=100,
+            key="aion_business_fin_request_quota",
+        )
+        q3,q4 = st.columns(2)
+        support_hours = q3.number_input(
+            "Horas de suporte usadas",
+            min_value=0.0,
+            value=4.0,
+            step=0.5,
+            key="aion_business_fin_support_hours",
+        )
+        support_hour_quota = q4.number_input(
+            "Quota de suporte (horas)",
+            min_value=0.5,
+            value=8.0,
+            step=0.5,
+            key="aion_business_fin_support_hour_quota",
+        )
+        payment_state = st.selectbox(
+            "Estado de pagamento fictício",
+            ["CURRENT", "DUE_SOON", "UNKNOWN", "OVERDUE_DEMO"],
+            key="aion_business_fin_payment_state",
+        )
+        calculate = st.form_submit_button("Calcular economia do cliente demo")
+
+    if calculate:
+        economics = business_client_economics({
+            "company_name": company,
+            "package_label": package,
+            "implementation_revenue": implementation_revenue,
+            "monthly_revenue": monthly_revenue,
+            "ai_cost": ai_cost,
+            "integration_cost": integration_cost,
+            "support_cost": support_cost,
+            "tool_cost": tool_cost,
+            "tax_estimate": tax_estimate,
+            "other_costs": other_costs,
+            "payment_state": payment_state,
+            "monthly_requests": monthly_requests,
+            "request_quota": request_quota,
+            "support_hours": support_hours,
+            "support_hour_quota": support_hour_quota,
+        })
+        review = business_pricing_review(economics)
+        portfolio = business_finance_portfolio_summary([economics])
+        st.session_state["aion_business_client_finance_demo_result"] = {
+            "economics": economics,
+            "review": review,
+            "portfolio": portfolio,
+        }
+
+    result = st.session_state.get("aion_business_client_finance_demo_result")
+    if not isinstance(result, Mapping):
+        st.info("Calcule o exercício para abrir a visão financeira.")
+        return
+
+    economics = result.get("economics") if isinstance(result.get("economics"), Mapping) else {}
+    eco = economics.get("economics") if isinstance(economics.get("economics"), Mapping) else {}
+    capacity = economics.get("capacity") if isinstance(economics.get("capacity"), Mapping) else {}
+    review = result.get("review") if isinstance(result.get("review"), Mapping) else {}
+
+    view = st.selectbox(
+        "Visão financeira",
+        ("1 · Receita & margem", "2 · Custos", "3 · Capacidade", "4 · Revisão comercial"),
+        key="aion_business_client_finance_view",
+        help="Uma visão por vez para manter a navegação leve no celular.",
+    )
+
+    if view == "1 · Receita & margem":
+        m1,m2,m3,m4 = st.columns(4)
+        m1.metric("Receita mensal", f"R$ {float(eco.get('monthly_revenue') or 0):,.2f}")
+        m2.metric("Custos mensais", f"R$ {float(eco.get('total_monthly_costs') or 0):,.2f}")
+        m3.metric("Contribuição", f"R$ {float(eco.get('monthly_contribution') or 0):,.2f}")
+        margin = eco.get("margin_pct")
+        m4.metric("Margem", "N/D" if margin is None else f"{float(margin):.1f}%")
+        st.caption(
+            "Receita não é lucro. A contribuição mensal é receita menos os custos informados no exercício."
+        )
+
+    elif view == "2 · Custos":
+        st.markdown("**Quebra de custos do cliente demo**")
+        for key,value in dict(eco.get("cost_breakdown") or {}).items():
+            st.write(f"{key}: **R$ {float(value or 0):,.2f}**")
+        st.caption(
+            "Custos de IA, integrações, suporte, ferramentas, impostos estimados e demais itens "
+            "devem ser acompanhados para proteger a margem."
+        )
+
+    elif view == "3 · Capacidade":
+        c1,c2,c3 = st.columns(3)
+        req_pct = capacity.get("request_utilization_pct")
+        support_pct = capacity.get("support_utilization_pct")
+        c1.metric("Uso de requisições", "N/D" if req_pct is None else f"{float(req_pct):.1f}%")
+        c2.metric("Uso de suporte", "N/D" if support_pct is None else f"{float(support_pct):.1f}%")
+        c3.metric("Estado", str(capacity.get("state") or "UNKNOWN"))
+        st.caption(
+            "Quota por cliente ajuda a evitar sobrecarga do AION e protege a margem da operação."
+        )
+
+    else:
+        st.markdown("**Revisão comercial**")
+        st.write(f"Estado: **{review.get('state') or 'UNKNOWN'}**")
+        for reason in list(review.get("reasons") or []):
+            st.markdown(f"- {reason}")
+        st.warning(
+            "Preço, cobrança e reajuste nunca mudam automaticamente. "
+            "Qualquer alteração comercial exige revisão humana e escopo atualizado."
+        )
+    st.caption(
+        "Demo financeiro. Não é contabilidade real, não emite cobrança e não movimenta dinheiro."
+    )
+
+
+
+def _render_business_trend_intelligence_demo() -> None:
+    """Evidence-first trend/opportunity demo with controlled improvement review."""
+    st.markdown("#### 📡 Radar de Tendências & Melhoria Contínua · Demo")
+    st.caption(
+        "O AION deve procurar oportunidades continuamente, mas só promove ideias com evidência. "
+        "Neste bloco usamos fixtures; o coletor web contínuo ainda permanece desligado."
+    )
+
+    now = datetime.now(timezone.utc)
+    demo_evidence = [
+        {
+            "source_kind": "DEMO_FIXTURE",
+            "source": "Pesquisa Demo A",
+            "claim": "Empresas locais relatam demora no atendimento e perda de leads.",
+            "segment": "Clínica",
+            "observed_at": now.isoformat(),
+            "confidence": 82,
+            "demo": True,
+        },
+        {
+            "source_kind": "DEMO_FIXTURE",
+            "source": "Pesquisa Demo B",
+            "claim": "Follow-up manual deixa oportunidades sem resposta.",
+            "segment": "Clínica",
+            "observed_at": now.isoformat(),
+            "confidence": 78,
+            "demo": True,
+        },
+    ]
+    opportunities = [
+        {
+            "name": "AION Recupera Vendas",
+            "segment": "Clínica",
+            "problem": "Leads e orçamentos ficam sem retorno.",
+            "offer": "Qualificação + follow-up + Radar de conversão.",
+            "demand_signal": 84,
+            "pain_intensity": 90,
+            "recurring_revenue_fit": 92,
+            "margin_potential": 78,
+            "implementation_complexity": 42,
+            "support_load": 32,
+            "strategic_fit": 95,
+        },
+        {
+            "name": "AION Atendimento & Agendamento",
+            "segment": "Clínica",
+            "problem": "Tempo de resposta alto e agendamentos perdidos.",
+            "offer": "FAQ + triagem + agendamento + acompanhamento.",
+            "demand_signal": 80,
+            "pain_intensity": 86,
+            "recurring_revenue_fit": 90,
+            "margin_potential": 74,
+            "implementation_complexity": 48,
+            "support_load": 38,
+            "strategic_fit": 93,
+        },
+        {
+            "name": "AION Conteúdo Local",
+            "segment": "Clínica",
+            "problem": "Divulgação irregular.",
+            "offer": "Calendário + criativos + relatório simples.",
+            "demand_signal": 68,
+            "pain_intensity": 60,
+            "recurring_revenue_fit": 76,
+            "margin_potential": 70,
+            "implementation_complexity": 35,
+            "support_load": 45,
+            "strategic_fit": 72,
+        },
+    ]
+    assessments = [
+        business_evaluate_opportunity(item, demo_evidence, now=now)
+        for item in opportunities
+    ]
+    ranked = business_rank_opportunities(assessments)
+    posture = business_trend_watch_posture(assessments)
+
+    view = st.selectbox(
+        "Visão do Radar de Tendências",
+        (
+            "1 · Oportunidades",
+            "2 · Evidências",
+            "3 · Melhoria contínua",
+            "4 · Monitoramento futuro",
+        ),
+        key="aion_business_trend_intelligence_view",
+        help="Uma visão por vez para manter a experiência leve no celular.",
+    )
+
+    if view == "1 · Oportunidades":
+        st.markdown("**Ranking didático de oportunidades**")
+        if not ranked:
+            st.info("Nenhuma oportunidade passou do nível mínimo de observação.")
+        for index,item in enumerate(ranked, start=1):
+            opp = item.get("opportunity") if isinstance(item.get("opportunity"), Mapping) else {}
+            st.markdown(
+                f"**{index}. {opp.get('name') or 'Oportunidade'}** · "
+                f"{item.get('state')} · score {float(item.get('score') or 0):.1f}/100"
+            )
+            st.write(str(item.get("recommendation") or ""))
+            st.caption(
+                f"Verdade: {item.get('truth_state')} · evidência: {item.get('evidence_quality')} · "
+                "nenhum lançamento automático."
+            )
+
+    elif view == "2 · Evidências":
+        st.markdown("**Por que uma tendência não pode ser só opinião**")
+        for row in demo_evidence:
+            st.markdown(
+                f"- **{row['source']}** · {row['segment']} · confiança {row['confidence']}%  \n"
+                f"  {row['claim']}"
+            )
+        st.warning(
+            "Estas fontes são fixtures de demonstração. No runtime futuro, evidência precisa ter "
+            "fonte, data, frescor e confiança verificáveis. Evidência velha ou incompleta não confirma tendência."
+        )
+
+    elif view == "3 · Melhoria contínua":
+        st.markdown("**Experimento controlado**")
+        before = st.number_input(
+            "Métrica antes",
+            min_value=0.0,
+            value=100.0,
+            step=1.0,
+            key="aion_business_improvement_before",
+        )
+        after = st.number_input(
+            "Métrica depois",
+            min_value=0.0,
+            value=112.0,
+            step=1.0,
+            key="aion_business_improvement_after",
+        )
+        sample = st.number_input(
+            "Tamanho da amostra",
+            min_value=0,
+            value=80,
+            step=1,
+            key="aion_business_improvement_sample",
+        )
+        review = business_improvement_review(
+            hypothesis="Follow-up mais rápido melhora a taxa de próximo passo.",
+            metric_name="proximos_passos",
+            before_value=before,
+            after_value=after,
+            sample_size=sample,
+            higher_is_better=True,
+        )
+        st.write(f"Estado: **{review.get('state')}**")
+        if review.get("change_pct") is not None:
+            st.metric("Mudança observada", f"{float(review.get('change_pct')):.2f}%")
+        if review.get("eligible_for_promotion_review"):
+            st.success(
+                "A evidência do exercício permite revisão humana para promover a melhoria."
+            )
+        else:
+            st.info(
+                "Ainda não há evidência suficiente para promover essa mudança."
+            )
+        st.caption(
+            "Melhoria apoiada por dados ainda não altera produção automaticamente. "
+            "Sem auto-deploy, auto-publicação ou auto-promoção."
+        )
+
+    else:
+        m1,m2,m3 = st.columns(3)
+        m1.metric("Candidatos fortes", int(posture.get("strong_candidates") or 0))
+        m2.metric("Candidatos", int(posture.get("candidates") or 0))
+        m3.metric("Em observação", int(posture.get("watch") or 0))
+        st.write(
+            "Objetivo futuro: coletar sinais autorizados de mercado e clientes, reavaliar "
+            "oportunidades e aprender com experimentos de forma contínua."
+        )
+        st.warning(
+            "Monitoramento contínuo real ainda está OFF. Para funcionar 24/7 será necessário "
+            "um coletor autorizado, limites, proveniência, quotas e os gates de runtime."
+        )
+        st.caption(
+            "Buscar tendências continuamente não significa lançar tudo que aparece. "
+            "O AION observa → valida → testa → mede → submete para revisão."
+        )
+
+
+
+def _render_business_commercial_acquisition_demo() -> None:
+    """Demo of acquisition, divulgação, outreach, contract handoff and content."""
+    st.markdown("#### 🚀 Captação, Divulgação & Contrato · Demo")
+    st.caption(
+        "Mostra como a empresa entra no funil, como o site/divulgação explicam a oferta, "
+        "como o lead é qualificado e como a proposta segue para contrato e onboarding. "
+        "Nada é enviado, publicado, assinado ou cobrado."
+    )
+
+    simulator = st.session_state.get("aion_business_simulator_result")
+    diagnostic = (
+        simulator.get("diagnostic")
+        if isinstance(simulator, Mapping) and isinstance(simulator.get("diagnostic"), Mapping)
+        else {}
+    )
+    fit = (
+        simulator.get("fit")
+        if isinstance(simulator, Mapping) and isinstance(simulator.get("fit"), Mapping)
+        else {}
+    )
+    intake = diagnostic.get("intake") if isinstance(diagnostic.get("intake"), Mapping) else {}
+    segment = str(intake.get("segment") or "Clínica")
+    company = str(intake.get("company_name") or "Empresa Demo")
+    package = str(fit.get("package_label") or "AION Business")
+
+    view = st.selectbox(
+        "Etapa comercial",
+        (
+            "1 · Onde buscar empresas",
+            "2 · Site / Landing Page",
+            "3 · Qualificação & abordagem",
+            "4 · Contrato & entrega",
+            "5 · Conteúdo & divulgação",
+            "6 · Funil",
+        ),
+        key="aion_business_commercial_acquisition_view",
+        help="Uma etapa por vez para manter a experiência leve no celular.",
+    )
+
+    if view == "1 · Onde buscar empresas":
+        plan = business_build_channel_plan(segment)
+        st.markdown(f"**Plano de captação para {segment}**")
+        for item in list(plan.get("channels") or []):
+            if isinstance(item, Mapping):
+                st.markdown(f"**{item.get('id')}**  \n{item.get('play')}")
+        st.caption(
+            "A lista organiza canais de prospecção. Não coleta dados, não raspa contatos e "
+            "não dispara mensagens automaticamente."
+        )
+
+    elif view == "2 · Site / Landing Page":
+        brief = business_build_landing_page_brief(
+            segment=segment,
+            offer_name=package,
+            primary_problem=(
+                "Atendimento, follow-up, divulgação e gestão ficam fragmentados e difíceis de acompanhar."
+            ),
+            package_summary=(
+                "Diagnóstico + implantação + Radar/Portal simples + manutenção mensal dentro do escopo."
+            ),
+        )
+        body = brief.get("brief") if isinstance(brief.get("brief"), Mapping) else {}
+        st.markdown(f"### {body.get('headline') or 'AION Business'}")
+        st.write(str(body.get("problem") or ""))
+        st.markdown("**Como o site deve ser organizado**")
+        for section in list(body.get("sections") or []):
+            st.markdown(f"- {section}")
+        st.success(f"CTA principal: **{body.get('cta') or 'Solicitar diagnóstico'}**")
+        st.caption(
+            "O site vende o próximo passo — diagnóstico — e não promete lucro ou vendas garantidas."
+        )
+
+    elif view == "3 · Qualificação & abordagem":
+        st.markdown("**Exercício de lead fictício**")
+        permission = st.selectbox(
+            "Estado de permissão do contato",
+            ["UNKNOWN", "PERMITTED_DEMO", "OPT_IN_DEMO", "DO_NOT_CONTACT"],
+            key="aion_business_commercial_permission",
+        )
+        pain = st.slider("Aderência do problema", 0, 100, 85, key="aion_business_commercial_pain")
+        urgency = st.slider("Urgência", 0, 100, 70, key="aion_business_commercial_urgency")
+        recurring = st.slider("Aderência a recorrência", 0, 100, 90, key="aion_business_commercial_recurring")
+        prospect = business_qualify_prospect({
+            "company_name": company,
+            "segment": segment,
+            "contact_permission_state": permission,
+            "pain_fit": pain,
+            "urgency": urgency,
+            "recurring_fit": recurring,
+            "decision_maker_access": 70,
+            "data_readiness": 70,
+        })
+        p1,p2 = st.columns(2)
+        p1.metric("Score", "N/D" if prospect.get("score") is None else f"{float(prospect.get('score')):.1f}/100")
+        p2.metric("Estado", str(prospect.get("state") or "UNKNOWN"))
+        draft = business_outreach_draft(prospect, sender_name="Mikael")
+        if draft.get("draft"):
+            st.markdown("**Rascunho de abordagem**")
+            st.write(str(draft.get("draft")))
+            st.caption("Rascunho somente; revisão humana obrigatória; não enviado.")
+        else:
+            st.warning(
+                f"Abordagem bloqueada neste exercício: {draft.get('state') or 'UNKNOWN'}."
+            )
+
+    elif view == "4 · Contrato & entrega":
+        st.markdown("**Trâmite depois da proposta**")
+        handoff = business_build_contract_handoff(
+            company_name=company,
+            proposal_ready=True,
+            scope_confirmed=True,
+            privacy_terms_reviewed=True,
+            sla_defined=True,
+            commercial_terms_defined=True,
+        )
+        for item in list(handoff.get("flow") or []):
+            if isinstance(item, Mapping):
+                st.markdown(f"- **{item.get('stage')}** — {item.get('status')}")
+        st.info(
+            "Depois da revisão comercial/jurídica e assinatura real, o fluxo segue para cobrança "
+            "e onboarding. Este demo para antes disso."
+        )
+        st.write(
+            f"Portal do cliente: **{handoff.get('client_portal_state') or 'A DEFINIR'}**"
+        )
+        st.caption(
+            "Nenhum contrato foi assinado, nenhuma fatura foi emitida e nenhum pagamento foi coletado."
+        )
+
+    elif view == "5 · Conteúdo & divulgação":
+        verified_case = st.checkbox(
+            "Existe caso real verificado disponível?",
+            value=False,
+            key="aion_business_commercial_verified_case",
+        )
+        plan = business_build_content_plan(
+            segment=segment,
+            weeks=6,
+            verified_case_available=verified_case,
+        )
+        st.markdown("**Plano editorial demonstrativo**")
+        for item in list(plan.get("items") or []):
+            if isinstance(item, Mapping):
+                st.markdown(
+                    f"- Semana {item.get('week')} · **{item.get('content_type')}** — {item.get('theme')}"
+                )
+        st.caption(
+            "Conteúdo nasce como DRAFT. Publicação exige aprovação. Caso real só entra se for verificável."
+        )
+
+    else:
+        snapshot = business_commercial_funnel_snapshot({
+            "PROSPECT": 30,
+            "QUALIFIED": 12,
+            "DIAGNOSTIC": 8,
+            "PROPOSAL_DRAFT": 4,
+            "CONTRACT_REVIEW": 2,
+            "ONBOARDING_READY": 1,
+        })
+        counts = snapshot.get("counts") if isinstance(snapshot.get("counts"), Mapping) else {}
+        f1,f2,f3,f4 = st.columns(4)
+        f1.metric("Prospects", int(counts.get("PROSPECT") or 0))
+        f2.metric("Qualificados", int(counts.get("QUALIFIED") or 0))
+        f3.metric("Diagnósticos", int(counts.get("DIAGNOSTIC") or 0))
+        f4.metric("Propostas", int(counts.get("PROPOSAL_DRAFT") or 0))
+        st.caption(
+            "Funil fictício. Contatos reais enviados, contratos assinados e pagamentos reais continuam em zero."
+        )
+
+
+
+def _render_business_integration_hub_demo() -> None:
+    """Render read-only readiness for future BUSINESS integrations."""
+    st.markdown("#### 🔌 Hub de Integrações · Readiness Demo")
+    st.caption(
+        "Mostra quais sistemas o AION Business poderá integrar e quais permissões mínimas seriam "
+        "necessárias. Nenhuma credencial real é pedida e nenhuma conexão externa acontece aqui."
+    )
+
+    demo_records = [
+        business_integration_record(
+            integration="WHATSAPP_BUSINESS",
+            display_name="WhatsApp Business Demo",
+            purpose="Atendimento e follow-up",
+            account_reference="demo-whatsapp",
+            config_complete=True,
+            auth_review_complete=True,
+            read_probe_ok=True,
+            last_check_at=datetime.now(timezone.utc).isoformat(),
+        ),
+        business_integration_record(
+            integration="EMAIL",
+            display_name="E-mail Demo",
+            purpose="Atendimento e propostas",
+            account_reference="demo-email",
+            config_complete=True,
+            auth_review_complete=False,
+        ),
+        business_integration_record(
+            integration="CRM",
+            display_name="CRM Demo",
+            purpose="Pipeline comercial",
+            account_reference="demo-crm",
+            config_complete=True,
+            auth_review_complete=False,
+        ),
+        business_integration_record(
+            integration="PAYMENTS",
+            display_name="Pagamentos Demo",
+            purpose="Leitura futura de cobrança",
+            account_reference="demo-payments",
+            config_complete=False,
+        ),
+    ]
+    snapshot = business_integration_hub_snapshot(demo_records)
+    secret_policy = business_integration_secret_policy()
+
+    view = st.selectbox(
+        "Visão do Hub de Integrações",
+        (
+            "1 · Estado geral",
+            "2 · Permissões mínimas",
+            "3 · Saúde das integrações",
+            "4 · Segurança de credenciais",
+            "5 · Pedido de conexão futuro",
+        ),
+        key="aion_business_integration_hub_view",
+        help="Uma visão por vez para manter a experiência leve no celular.",
+    )
+
+    if view == "1 · Estado geral":
+        h1,h2,h3 = st.columns(3)
+        h1.metric("Integrações mapeadas", int(snapshot.get("configured_count") or 0))
+        h2.metric("Saudáveis read-only", int(snapshot.get("healthy_read_only_count") or 0))
+        h3.metric("Conexões reais", int(snapshot.get("real_connections_active") or 0))
+        st.markdown("**Catálogo previsto**")
+        for name in BUSINESS_INTEGRATIONS:
+            status = next(
+                (
+                    row.get("state")
+                    for row in demo_records
+                    if isinstance(row, Mapping) and row.get("integration") == name
+                ),
+                "NOT_CONFIGURED",
+            )
+            st.markdown(f"- **{name}** — {status}")
+        st.caption(
+            "WhatsApp, e-mail, formulários, calendário, CRM, pagamentos, redes sociais e analytics "
+            "fazem parte do Hub previsto."
+        )
+
+    elif view == "2 · Permissões mínimas":
+        integration = st.selectbox(
+            "Integração para revisar",
+            list(BUSINESS_INTEGRATIONS),
+            key="aion_business_integration_scope_target",
+        )
+        plan = business_integration_scope_plan(
+            integration,
+            use_case="AION Business · operação do cliente",
+        )
+        st.markdown("**Princípio: LEAST PRIVILEGE**")
+        for scope,state in dict(plan.get("scopes") or {}).items():
+            st.markdown(f"- **{scope}** — {state}")
+        st.warning(
+            "Enviar mensagem, publicar conteúdo, emitir cobrança ou alterar dados externos nunca "
+            "é liberado só porque a integração existe."
+        )
+
+    elif view == "3 · Saúde das integrações":
+        for row in demo_records:
+            if not isinstance(row, Mapping):
+                continue
+            health = business_integration_health(row, now=datetime.now(timezone.utc))
+            st.markdown(
+                f"**{row.get('display_name')}** · {health.get('state')} · "
+                f"read-only={health.get('read_only')}"
+            )
+            age = health.get("last_check_age_hours")
+            st.caption(
+                "Última evidência: N/D"
+                if age is None else
+                f"Última evidência há {float(age):.1f}h"
+            )
+        st.caption(
+            "Saúde aqui é demonstrativa; nenhum probe real de fornecedor foi executado."
+        )
+
+    elif view == "4 · Segurança de credenciais":
+        st.markdown("**Política de segredo**")
+        st.write(f"Modo: **{secret_policy.get('policy')}**")
+        st.markdown("- Senha/token/chave real: **não inserir neste demo**")
+        st.markdown("- Segredo em log: **proibido**")
+        st.markdown("- Segredo em checkpoint/UI state: **proibido**")
+        st.markdown(
+            f"- Produção futura: **{secret_policy.get('future_secret_storage')}**"
+        )
+        st.caption(
+            "Quando integrações reais forem liberadas, credenciais precisarão de armazenamento "
+            "dedicado, rotação e menor privilégio possível."
+        )
+
+    else:
+        selected = st.selectbox(
+            "Sistema para preparar revisão",
+            ["EMAIL", "CRM", "WHATSAPP_BUSINESS"],
+            key="aion_business_integration_review_target",
+        )
+        record = next(
+            (
+                row for row in demo_records
+                if isinstance(row, Mapping) and row.get("integration") == selected
+            ),
+            {},
+        )
+        scope = business_integration_scope_plan(selected)
+        packet = business_integration_connection_review(
+            record,
+            scope,
+            requested_by="Mikael",
+        )
+        st.write(f"Estado: **{packet.get('state')}**")
+        st.write(f"Escopo de aprovação: **{packet.get('approval_scope')}**")
+        st.caption(
+            "O packet só prepara futura revisão. OAuth não é executado, credencial não é armazenada "
+            "e nenhum write scope é concedido."
+        )
+
+
+
+def _render_business_privacy_audit_demo() -> None:
+    """Render privacy/LGPD and audit governance with fictional metadata only."""
+    st.markdown("#### 🛡️ Privacidade, LGPD & Auditoria · Demo")
+    st.caption(
+        "Organiza finalidade, consentimento, retenção, acesso por perfil, solicitações de dados, "
+        "versionamento e rollback. Não contém dado pessoal real e não executa exclusão/exportação."
+    )
+
+    profile = business_privacy_profile(
+        client_name="Clínica Horizonte Demo",
+        purposes=["Atendimento", "Qualificação de leads", "Suporte"],
+        data_categories=["CONTACT", "LEAD", "SUPPORT", "USAGE_METRICS"],
+        legal_basis_label="Base jurídica a validar com responsável",
+        retention_days=90,
+        controller_contact="responsavel-demo",
+    )
+    matrix = business_privacy_role_access_matrix(profile)
+
+    view = st.selectbox(
+        "Visão de governança",
+        (
+            "1 · Finalidade & consentimento",
+            "2 · Acesso por perfil",
+            "3 · Retenção / exportação / exclusão",
+            "4 · Trilha de auditoria",
+            "5 · Versionamento & rollback",
+        ),
+        key="aion_business_privacy_audit_view",
+        help="Uma visão por vez para manter a experiência leve no celular.",
+    )
+
+    if view == "1 · Finalidade & consentimento":
+        st.markdown("**Perfil de privacidade fictício**")
+        st.write(f"Cliente: **{profile.get('client_name')}**")
+        st.markdown("**Finalidades**")
+        for purpose in list(profile.get("purposes") or []):
+            st.markdown(f"- {purpose}")
+        st.markdown("**Categorias previstas**")
+        for category in list(profile.get("data_categories") or []):
+            st.markdown(f"- {category}")
+        consent = business_privacy_consent_record(
+            subject_reference="subject-demo-001",
+            purpose="Atendimento",
+            granted=True,
+            recorded_at=datetime.now(timezone.utc).isoformat(),
+            source="form-demo",
+        )
+        st.info(
+            f"Consentimento de exercício: **{consent.get('state')}** · "
+            "sujeito real não verificado."
+        )
+        st.caption(
+            "O AION não decide sozinho a base jurídica. Finalidade e base aplicável precisam "
+            "ser revisadas para o caso real."
+        )
+
+    elif view == "2 · Acesso por perfil":
+        role = st.selectbox(
+            "Perfil",
+            ["CLIENT_ADMIN", "CLIENT_OPERATOR", "AION_SUPPORT", "AION_ADMIN", "AUDITOR"],
+            key="aion_business_privacy_role",
+        )
+        category = st.selectbox(
+            "Categoria de dado",
+            list(profile.get("data_categories") or []),
+            key="aion_business_privacy_category",
+        )
+        read = business_privacy_access_decision(
+            matrix,
+            role=role,
+            category=category,
+            requested_action="READ",
+        )
+        write = business_privacy_access_decision(
+            matrix,
+            role=role,
+            category=category,
+            requested_action="WRITE",
+        )
+        a1,a2 = st.columns(2)
+        a1.metric("Leitura", "PERMITIDA DEMO" if read.get("allowed") else "NEGADA")
+        a2.metric("Escrita", "PERMITIDA DEMO" if write.get("allowed") else "NEGADA")
+        st.caption(
+            "Default deny + least privilege. Permissão demonstrativa não executa leitura/escrita externa."
+        )
+
+    elif view == "3 · Retenção / exportação / exclusão":
+        retention = business_privacy_retention_review(
+            profile,
+            created_at="2026-06-01T00:00:00Z",
+            now=datetime.now(timezone.utc),
+        )
+        st.write(f"Retenção: **{retention.get('state')}**")
+        st.write(f"Prazo configurado: **{profile.get('retention_days')} dias**")
+        request_type = st.selectbox(
+            "Solicitação de titular fictícia",
+            ["EXPORT", "DELETE", "CORRECT", "RESTRICT"],
+            key="aion_business_privacy_request_type",
+        )
+        request = business_privacy_subject_request(
+            request_type=request_type,
+            subject_reference="subject-demo-001",
+            requested_at=datetime.now(timezone.utc).isoformat(),
+            reason="Exercício de governança",
+        )
+        st.info(f"Pedido: **{request.get('state')}**")
+        st.caption(
+            "Identidade e aprovação ainda não foram verificadas. O demo não exporta, não corrige "
+            "e não exclui nenhum dado."
+        )
+
+    elif view == "4 · Trilha de auditoria":
+        events = [
+            business_privacy_audit_event(
+                actor="Mikael",
+                action="VIEW",
+                target="Radar do Cliente Demo",
+            ),
+            business_privacy_audit_event(
+                actor="Mikael",
+                action="APPROVAL",
+                target="Proposta Demo",
+                approval_reference="approval-demo-001",
+            ),
+            business_privacy_audit_event(
+                actor="AION",
+                action="DRAFT",
+                target="Follow-up Demo",
+            ),
+        ]
+        snapshot = business_privacy_governance_snapshot(profile, events)
+        g1,g2 = st.columns(2)
+        g1.metric("Eventos auditáveis", int(snapshot.get("audit_event_count") or 0))
+        g2.metric("Dados pessoais reais", "NÃO")
+        for event in events:
+            st.markdown(
+                f"- **{event.get('action')}** · {event.get('actor')} → {event.get('target')} · "
+                f"digest {str(event.get('event_digest') or '')[:12]}…"
+            )
+        st.caption(
+            "Registro de auditoria documenta ação/aprovação, mas nunca concede autoridade por si só."
+        )
+
+    else:
+        v1 = business_privacy_automation_version(
+            automation_name="followup-business-demo",
+            version="1",
+            config={"mode": "manual_review", "send": False},
+            approved_by="Mikael",
+        )
+        v2 = business_privacy_automation_version(
+            automation_name="followup-business-demo",
+            version="2",
+            config={"mode": "draft_only", "send": False, "audit": True},
+            approved_by="Mikael",
+        )
+        rollback = business_privacy_rollback_plan(v2, v1)
+        st.markdown("**Versões do exercício**")
+        st.write(f"Atual: **v{v2.get('version')}** · anterior: **v{v1.get('version')}**")
+        st.write(f"Rollback: **{rollback.get('state')}**")
+        st.warning(
+            "Rollback real exige aprovação humana. Este bloco apenas prepara referência de versão; "
+            "nenhuma configuração de produção é alterada."
+        )
+
+
+
+def _render_business_master_readiness() -> None:
+    """Compact at-a-glance Business status that never grants operational authority."""
+    evidence = business_default_demo_evidence()
+    snapshot = business_master_readiness_snapshot(evidence)
+    rows = business_master_status_rows(snapshot)
+
+    st.markdown("#### 🧭 Painel Mestre Business")
+    st.caption(
+        "Leitura rápida: o que está pronto em DEMO, o que ainda falta para revisar um piloto e "
+        "por que o runtime continua desligado."
+    )
+    cols = st.columns(3)
+    for index,row in enumerate(rows):
+        cols[index].metric(
+            str(row.get("layer") or ""),
+            f"{float(row.get('progress_pct') or 0):.0f}%",
+            str(row.get("state") or "UNKNOWN"),
+        )
+    st.progress(int(round(float(snapshot.get("demo", {}).get("progress_pct") or 0))))
+    st.success(
+        "Camada DEMO consolidada. Isso não significa piloto autorizado nem operação real."
+        if snapshot.get("demo", {}).get("complete")
+        else
+        "Ainda existem gates de DEMO pendentes."
+    )
+    st.warning(
+        "PILOT: revisão humana ainda necessária · LIVE: RUNTIME OFF · "
+        "sem contato real, cobrança, publicação ou ação externa."
+    )
+
+    with st.expander("Ver gates do piloto que ainda faltam", expanded=False):
+        missing = list(snapshot.get("pilot", {}).get("missing") or [])
+        if missing:
+            for gate in missing:
+                st.markdown(f"- {gate}")
+        else:
+            packet = business_pilot_review_packet(
+                snapshot,
+                requested_by="Mikael",
+                pilot_scope="Piloto Business controlado",
+            )
+            st.write(f"Estado: **{packet.get('state')}**")
+            st.caption("Mesmo elegível, o packet não autoriza piloto automaticamente.")
+
+
+
+def _render_business_pilot_governance_demo() -> None:
+    """Bounded first-pilot planning; never authorizes or activates a real pilot."""
+    st.markdown("#### 🧪 Governança do Primeiro Piloto · Readiness")
+    st.caption(
+        "Define como seria o primeiro piloto real sem liberar nada: 1 cliente, 1 fluxo, poucos canais, "
+        "prazo curto, operador humano e critérios claros de parada."
+    )
+
+    evidence = business_default_demo_evidence()
+    master = business_master_readiness_snapshot(evidence)
+    charter = business_build_pilot_charter(
+        client_reference="CLIENTE_REAL_A_DEFINIR",
+        segment="Clínica",
+        package_label="Atendimento & Conversão",
+        workflow_name="Atendimento inicial + follow-up controlado",
+        channels=["WhatsApp Business"],
+        duration_days=14,
+        human_operators=["Mikael"],
+        support_owner="Mikael",
+        daily_external_action_cap=0,
+        allow_external_messages=False,
+        allow_publication=False,
+        allow_payments=False,
+    )
+    success = business_define_pilot_success_criteria(
+        metric_names=["tempo_resposta", "leads_qualificados", "proximos_passos"],
+        minimum_sample_size=30,
+        review_cadence_days=7,
+    )
+    stop = business_define_pilot_stop_conditions(
+        reasons=list(BUSINESS_PILOT_STOP_REASONS),
+        immediate_stop_on_unexpected_external_action=True,
+    )
+
+    gates = {
+        "business_specialist_certified": evidence.get("business_certified") is True,
+        "master_readiness_demo_complete": master.get("demo", {}).get("complete") is True,
+        "scope_confirmed": evidence.get("package_scope_reviewed") is True,
+        "privacy_profile_ready": evidence.get("privacy_profile_reviewed") is True,
+        "sla_defined": evidence.get("support_sla_reviewed") is True,
+        "margin_reviewed": evidence.get("client_finance_reviewed") is True,
+        "capacity_reviewed": evidence.get("capacity_reviewed") is True,
+        "integration_readiness_reviewed": evidence.get("integration_scope_reviewed") is True,
+        "rollback_ready": evidence.get("rollback_plan_reviewed") is True,
+        "human_operator_assigned": evidence.get("human_operator_assigned") is True,
+        "support_owner_assigned": evidence.get("human_operator_assigned") is True,
+    }
+    review = business_pilot_gate_review(charter, gates, success, stop)
+    packet = business_bounded_pilot_review_packet(
+        charter,
+        review,
+        requested_by="Mikael",
+    )
+    posture = business_pilot_posture(charter, review, packet)
+
+    view = st.selectbox(
+        "Visão do piloto",
+        (
+            "1 · Limites",
+            "2 · Gates obrigatórios",
+            "3 · Critérios de sucesso",
+            "4 · Condições de parada",
+            "5 · Estado de autorização",
+        ),
+        key="aion_business_pilot_governance_view",
+        help="Uma visão por vez para manter a experiência leve no celular.",
+    )
+
+    if view == "1 · Limites":
+        row = charter.get("charter") if isinstance(charter.get("charter"), Mapping) else {}
+        p1,p2,p3,p4 = st.columns(4)
+        p1.metric("Clientes", int(row.get("client_count") or 0))
+        p2.metric("Fluxos", int(row.get("workflow_count") or 0))
+        p3.metric("Canais", len(list(row.get("channels") or [])))
+        p4.metric("Prazo", f"{int(row.get('duration_days') or 0)} dias")
+        st.markdown(f"**Pacote:** {row.get('package_label') or 'A DEFINIR'}")
+        st.markdown(f"**Fluxo:** {row.get('workflow_name') or 'A DEFINIR'}")
+        st.caption(
+            "Nesta V1, mensagens externas, publicação, pagamentos e runtime continuam OFF. "
+            "O charter é somente planejamento."
+        )
+
+    elif view == "2 · Gates obrigatórios":
+        st.write(f"Estado: **{review.get('state')}**")
+        gate_rows = review.get("gates") if isinstance(review.get("gates"), Mapping) else {}
+        for name,passed in gate_rows.items():
+            icon = "✅" if passed else "⛔"
+            st.markdown(f"- {icon} **{name}**")
+        st.caption(
+            "Gate pendente bloqueia o piloto. DEMO completo, sozinho, não autoriza cliente real."
+        )
+
+    elif view == "3 · Critérios de sucesso":
+        st.markdown("**Métricas do exercício**")
+        for metric in list(success.get("metrics") or []):
+            st.markdown(f"- {metric}")
+        st.write(f"Amostra mínima: **{success.get('minimum_sample_size')}**")
+        st.write(f"Revisão a cada: **{success.get('review_cadence_days')} dias**")
+        st.caption(
+            "Critério de sucesso não inclui garantia de lucro ou venda. Resultado precisa de amostra e fonte."
+        )
+
+    elif view == "4 · Condições de parada":
+        st.markdown("**Parar e escalar para humano se ocorrer:**")
+        for reason in list(stop.get("reasons") or []):
+            st.markdown(f"- {reason}")
+        st.warning(
+            "A V1 ainda não possui desligamento automático de runtime porque runtime continua OFF. "
+            "O objetivo é definir o procedimento antes de qualquer piloto."
+        )
+
+    else:
+        a1,a2,a3 = st.columns(3)
+        a1.metric("Charter", str(charter.get("state") or "UNKNOWN"))
+        a2.metric("Gates", str(review.get("state") or "UNKNOWN"))
+        a3.metric("Piloto autorizado", "NÃO")
+        st.write(f"Postura: **{posture.get('state')}**")
+        if review.get("failed_gates"):
+            st.markdown("**Ainda falta revisar:**")
+            for gate in list(review.get("failed_gates") or []):
+                st.markdown(f"- {gate}")
+        st.caption(
+            "Mesmo quando todos os gates passarem, o máximo será HUMAN_PILOT_APPROVAL_REQUIRED. "
+            "Nenhuma aprovação real foi registrada e o runtime permanece OFF."
+        )
+
+
+
+def _render_business_stack_consolidation_v2() -> None:
+    """Frozen administrative view of the #394–#412 stack; never merges."""
+    evidence = business_stack_frozen_green_evidence()
+    validation = business_stack_validate(evidence)
+    preview = business_stack_consolidation_preview(validation)
+    bundle = business_stack_release_bundle(validation)
+    rollback = business_stack_rollback_plan(validation)
+    options = business_stack_admin_options(validation)
+
+    st.markdown("#### 🧱 Consolidação da Stack Business · V2")
+    st.caption(
+        "Snapshot congelado da sequência #394–#412. Serve para revisão administrativa; "
+        "não executa merge, deploy nem runtime."
+    )
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("PRs na stack", int(validation.get("pr_count") or 0))
+    c2.metric("Validadas", int(validation.get("passed_count") or 0))
+    c3.metric("Bloqueadas", int(validation.get("blocked_count") or 0))
+    c4.metric("Merge autorizado", "NÃO")
+
+    view = st.selectbox(
+        "Visão da consolidação",
+        (
+            "1 · Estado geral",
+            "2 · Ordem técnica",
+            "3 · Bundle congelado",
+            "4 · Rollback de integração",
+            "5 · Decisão administrativa",
+            "6 · Dry-run fail-closed",
+            "7 · Pedido de decisão vinculado",
+            "8 · Contrato de autorização explícita",
+            "9 · Preflight de execução",
+            "10 · Pacote de revisão de execução",
+            "11 · Verificação pós-merge",
+            "12 · Ledger sequencial",
+            "13 · Revisão final da consolidação",
+            "14 · Handoff para decisão de deploy",
+            "15 · Verificação de deploy & fronteira de runtime",
+            "16 · Prontidão para ativação controlada",
+            "17 · Pós-ativação & fronteira de expansão",
+            "18 · Prontidão para expansão controlada",
+        ),
+        key="aion_business_stack_consolidation_v2_view",
+        help="Uma visão por vez para manter a experiência leve no celular.",
+    )
+
+    if view == "1 · Estado geral":
+        st.write(f"Estado: **{validation.get('state')}**")
+        st.progress(int(round((float(validation.get("passed_count") or 0) / max(1, int(validation.get("pr_count") or 1))) * 100)))
+        st.success(
+            "Snapshot tecnicamente coerente para revisão administrativa."
+            if validation.get("state") == "READY_FOR_ADMIN_REVIEW"
+            else
+            "Existem bloqueios na stack."
+        )
+        st.warning(
+            "CI verde não autoriza merge. Merge não autoriza deploy. Deploy não autoriza runtime."
+        )
+        with st.expander("Ver PRs congeladas no snapshot", expanded=False):
+            for row in list(validation.get("rows") or []):
+                icon = "✅" if row.get("passed") else "⛔"
+                st.markdown(f"- {icon} **#{row.get('pr')}** · {row.get('title')}")
+
+    elif view == "2 · Ordem técnica":
+        st.write(f"Estratégia: **{preview.get('strategy') or 'BLOCKED'}**")
+        for row in list(preview.get("sequence") or []):
+            st.markdown(
+                f"{row.get('order')}. **#{row.get('pr')}** · {row.get('title')}  \\n"
+                f"   SHA: `{row.get('head_sha')}`"
+            )
+        st.caption(
+            "A ordem é somente preview técnico. Nenhuma PR é mergeada por esta tela."
+        )
+
+    elif view == "3 · Bundle congelado":
+        st.write(f"Estado: **{bundle.get('state')}**")
+        digest = str(bundle.get("bundle_digest") or "")
+        st.code(digest if digest else "BUNDLE BLOQUEADO", language=None)
+        st.caption(
+            "O digest congela a combinação esperada de SHAs/checks para revisão. "
+            "Antes de qualquer merge real, GitHub deve ser verificado novamente ao vivo."
+        )
+
+    elif view == "4 · Rollback de integração":
+        st.write(f"Estado: **{rollback.get('state')}**")
+        for item in list(rollback.get("steps") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "O plano não executa rollback. Ele define o procedimento para parar na primeira regressão "
+            "e preservar o SHA anterior da main."
+        )
+
+    elif view == "5 · Decisão administrativa":
+        st.markdown("**Opções disponíveis**")
+        for item in options:
+            if isinstance(item, Mapping):
+                st.markdown(f"- **{item.get('label')}**")
+        st.info(
+            "A próxima ação que altera repositório continua dependendo de autorização administrativa "
+            "explícita. Até lá, todas as PRs permanecem Draft."
+        )
+        st.caption(
+            "Runtime BUSINESS OFF · sem deploy · sem publicação · sem cobrança · sem piloto."
+        )
+
+    elif view == "6 · Dry-run fail-closed":
+        live = business_live_revalidation_snapshot_v2({})
+        dry_run = business_build_consolidation_dry_run_v2(validation, live)
+        st.write(f"Estado: **{dry_run.get('state')}**")
+        st.warning(
+            "Snapshot congelado não é evidência GitHub ao vivo. Antes de qualquer decisão futura, "
+            "todos os gates abaixo precisam ser revalidados externamente."
+        )
+        for gate in list(live.get("missing") or []):
+            st.markdown(f"- {gate}")
+        st.caption(
+            "Mesmo com revalidação completa, o máximo é READY_FOR_EXPLICIT_ADMIN_DECISION. "
+            "Merge, deploy, piloto e runtime continuam sem autorização."
+        )
+
+    elif view == "7 · Pedido de decisão vinculado":
+        request = business_consolidation_decision_request_template()
+        st.write(f"Estado: **{request.get('state')}**")
+        st.markdown("**Bindings obrigatórios para uma futura decisão explícita:**")
+        for item in list(request.get("required_bindings") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "Não existe autorização registrada. O pedido só poderá ser formado depois da "
+            "revalidação ao vivo e ficará vinculado a SHA, base, bundle e evidência exatos."
+        )
+        st.caption(
+            "Estado máximo do pedido: HUMAN_AUTHORIZATION_RECORD_REQUIRED. "
+            "Ele não executa merge, deploy, piloto ou runtime."
+        )
+
+    elif view == "8 · Contrato de autorização explícita":
+        contract = business_consolidation_authorization_requirements()
+        st.write(f"Estado: **{contract.get('state')}**")
+        st.markdown("**Token explícito obrigatório:**")
+        st.code(str(contract.get("required_decision_token") or ""), language=None)
+        st.markdown("**Acknowledgements obrigatórios:**")
+        for item in list(contract.get("required_acknowledgements") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "Mensagens genéricas como ok, vamos lá ou pode seguir não são autorização de consolidação."
+        )
+        st.caption(
+            "Mesmo um registro explícito validado não executa merge. "
+            "Deploy, piloto e runtime continuam fronteiras separadas."
+        )
+
+    elif view == "9 · Preflight de execução":
+        preflight = business_consolidation_execution_preflight_template()
+        st.write(f"Estado: **{preflight.get('state')}**")
+        st.markdown("**Gates da última barreira antes de qualquer merge físico:**")
+        for item in list(preflight.get("requirements") or []):
+            st.markdown(f"- {item}")
+        st.markdown("**Depois de cada etapa futura:**")
+        for item in list(preflight.get("post_step_requirements") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "O máximo deste preflight é MERGE_EXECUTION_REVIEW_REQUIRED. "
+            "Ele não executa nem autoriza fisicamente merge."
+        )
+        st.caption(
+            "Ordem sequencial obrigatória · stop-on-drift · BUSINESS runtime OFF · deploy separado."
+        )
+
+    elif view == "10 · Pacote de revisão de execução":
+        packet = business_execution_review_packet_template()
+        st.write(f"Estado: **{packet.get('state')}**")
+        st.markdown("**Seções obrigatórias do dossiê de revisão:**")
+        for item in list(packet.get("sections") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "O pacote só congela evidência para leitura humana. Ele não cria autorização."
+        )
+        st.caption(
+            "Estado máximo: READY_FOR_HUMAN_EXECUTION_REVIEW · "
+            "merge_execution_authorized=false · runtime OFF."
+        )
+
+    elif view == "11 · Verificação pós-merge":
+        post_merge = business_post_merge_verification_template()
+        st.write(f"Estado: **{post_merge.get('state')}**")
+        st.markdown("**Checks obrigatórios após qualquer merge futuro:**")
+        for item in list(post_merge.get("required_checks") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "Sem merge real e evidência real, o estado permanece POST_MERGE_EVIDENCE_REQUIRED."
+        )
+        st.caption(
+            "Etapa verde: STEP_VERIFIED_FOR_NEXT_PREFLIGHT · "
+            "regressão: ROLLBACK_REVIEW_REQUIRED · rollback automático proibido."
+        )
+
+    elif view == "12 · Ledger sequencial":
+        ledger = business_consolidation_progress_ledger_template()
+        st.write(f"Estado: **{ledger.get('state')}**")
+        st.write(
+            f"Progresso: **{ledger.get('completed_count', 0)}/{ledger.get('total_steps', 0)}** · "
+            f"próxima PR esperada: **#{ledger.get('next_expected_pr')}**"
+        )
+        st.markdown("**Requisitos da revisão final depois das 19 etapas:**")
+        for item in list(ledger.get("completion_requirements") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "O ledger aceita apenas recibos pós-merge verificados em ordem e com cadeia de rollback contínua."
+        )
+        st.caption(
+            "Mesmo completo: CONSOLIDATION_COMPLETE_REVIEW_REQUIRED · "
+            "deploy e runtime continuam separados."
+        )
+
+    elif view == "13 · Revisão final da consolidação":
+        review = business_consolidation_completion_review_template()
+        request = business_final_admin_decision_request(review)
+        st.write(f"Estado: **{review.get('state')}**")
+        st.markdown("**Evidências obrigatórias para fechar tecnicamente a consolidação:**")
+        for item in list(review.get("requirements") or []):
+            st.markdown(f"- {item}")
+        st.markdown("**Checks finais obrigatórios na main:**")
+        for item in list(review.get("required_checks") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "A consolidação só pode chegar a READY_FOR_FINAL_ADMIN_REVIEW depois de 19 etapas "
+            "verificadas, SHA final da main coerente, CI/UI/mobile verdes, runtime BUSINESS OFF "
+            "e decisão de deploy mantida separada."
+        )
+        st.markdown("**Acknowledgement final exigirá token explícito:**")
+        st.code(str(review.get("required_decision_token") or ""), language=None)
+        st.caption(
+            "Mensagens genéricas como 'vamos lá', 'ok' ou 'pode seguir' não encerram a consolidação. "
+            "Mesmo o acknowledgement técnico não autoriza deploy, produção, piloto ou runtime."
+        )
+
+    elif view == "14 · Handoff para decisão de deploy":
+        handoff = business_release_handoff_template()
+        request = business_deploy_decision_request(handoff)
+        st.write(f"Estado: **{handoff.get('state')}**")
+        st.markdown("**Itens obrigatórios antes de qualquer decisão futura de deploy:**")
+        for item in list(handoff.get("required_items") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "Consolidação técnica reconhecida não é deploy. Deploy, por sua vez, não liga o "
+            "runtime BUSINESS. Cada fronteira exige decisão separada."
+        )
+        st.markdown("**Token reservado para uma futura decisão explícita de deploy:**")
+        st.code(str(handoff.get("required_deploy_decision_token") or ""), language=None)
+        st.markdown("**Acknowledgements obrigatórios do deploy:**")
+        for item in list(handoff.get("deploy_acknowledgements") or []):
+            st.markdown(f"- {item}")
+        st.caption(
+            "Esta tela só prepara o handoff. Nenhum deploy é autorizado ou executado; "
+            "runtime, piloto e ações com cliente real permanecem OFF."
+        )
+
+    elif view == "15 · Verificação de deploy & fronteira de runtime":
+        deploy = business_deploy_authorization_requirements()
+        verification = business_deployment_verification_template()
+        st.write(f"Estado de autorização: **{deploy.get('state')}**")
+        st.markdown("**Token explícito reservado para deploy-only:**")
+        st.code(str(deploy.get("required_decision_token") or ""), language=None)
+        st.markdown("**Checks obrigatórios depois de um deploy futuro:**")
+        for item in list(verification.get("required_health_checks") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "Mesmo um deploy autorizado e executado precisa ser verificado com SHA, ambiente, "
+            "saúde, monitoramento e runtime ainda OFF antes de qualquer discussão de ativação."
+        )
+        st.markdown("**Próxima fronteira futura:**")
+        st.code("AUTHORIZE_BUSINESS_RUNTIME_ACTIVATION", language=None)
+        st.caption(
+            "Esta visão não registra autorização, não executa deploy e não ativa runtime. "
+            "Mensagem genérica como 'vamos lá' continua sem autoridade operacional."
+        )
+
+    elif view == "16 · Prontidão para ativação controlada":
+        readiness = business_runtime_activation_requirements()
+        post = business_post_activation_verification_template()
+        st.write(f"Estado: **{readiness.get('state')}**")
+        st.markdown("**Token explícito exigido para uma futura decisão de runtime:**")
+        st.code(str(readiness.get("required_decision_token") or ""), language=None)
+        st.markdown("**Escopos permitidos:**")
+        for item in list(readiness.get("allowed_activation_scopes") or []):
+            st.markdown(f"- {item}")
+        st.markdown("**Acknowledgements obrigatórios:**")
+        for item in list(readiness.get("required_acknowledgements") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "Autorização de runtime não é execução. Sandbox não aceita tenant real; "
+            "pilot e bounded_production ficam limitados a até 10 tenants explicitamente listados."
+        )
+        st.markdown("**Checks exigidos depois de qualquer futura ativação executada por caminho separado:**")
+        for item in list(post.get("required_checks") or []):
+            st.markdown(f"- {item}")
+        st.caption(
+            "Execução física, expansão automática, cobrança e ações com clientes continuam bloqueadas. "
+            "Mensagem genérica como 'vamos lá' não autoriza runtime."
+        )
+
+    elif view == "17 · Pós-ativação & fronteira de expansão":
+        boundary = business_post_activation_boundary_requirements()
+        st.write(f"Estado: **{boundary.get('state')}**")
+        st.markdown("**Checks obrigatórios para verificar uma futura ativação:**")
+        for item in list(boundary.get("required_checks") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "Escopo e conjunto de tenants observados precisam ser exatamente iguais ao que foi autorizado. "
+            "Qualquer drift bloqueia a verificação."
+        )
+        st.markdown("**Próxima fronteira, somente depois de ativação verificada:**")
+        st.code(BUSINESS_EXPANSION_DECISION_TOKEN, language=None)
+        st.markdown("**Acknowledgements de uma futura decisão de expansão:**")
+        for item in BUSINESS_EXPANSION_ACKNOWLEDGEMENTS:
+            st.markdown(f"- {item}")
+        st.caption(
+            "Ativação verificada congela o escopo. Expansão automática, cobrança e ações com clientes "
+            "continuam bloqueadas e exigem decisões separadas."
+        )
+
+    else:
+        expansion = business_expansion_authorization_requirements()
+        st.write(f"Estado: **{expansion.get('state')}**")
+        st.markdown("**Token explícito para uma futura decisão de expansão:**")
+        st.code(str(expansion.get("required_decision_token") or ""), language=None)
+        st.markdown("**Acknowledgements obrigatórios:**")
+        for item in list(expansion.get("required_acknowledgements") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "A expansão só pode ser gradual: sandbox → pilot → bounded_production, "
+            "ou aumento explícito de tenants dentro do estágio atual. "
+            "Saltos, downgrades e remoção silenciosa de tenants são bloqueados."
+        )
+        st.caption(
+            "Máximo de 10 tenants nesta versão. Privacidade, suporte, finanças, integrações, "
+            "capacidade, monitoramento e rollback precisam ser revalidados. "
+            "Autorização continua separada da execução."
+        )
+
+
 def _render_business(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
     flags: Mapping[str, bool],
 ) -> None:
     st.markdown("### 💼 AION Negócios")
+    demo_snapshot = business_demo_snapshot()
+    st.markdown(business_demo_html(), unsafe_allow_html=True)
+    _render_business_master_readiness()
+    _render_business_pilot_governance_demo()
+    _render_business_stack_consolidation_v2()
+    with st.expander("🎓 Treinamento do administrador · visão geral", expanded=False):
+        st.caption(
+            "Treinamento interno antes de divulgação. Entender primeiro, demonstrar depois e "
+            "vender somente o que estiver validado."
+        )
+        for index, instruction in enumerate(demo_snapshot["training_steps"], start=1):
+            st.markdown(f"**{index}.** {instruction}")
+    _render_business_guided_training()
+    _render_business_diagnostic_proposal_simulator()
+    _render_business_client_portal_demo()
+    _render_business_onboarding_demo()
+    _render_business_customer_success_demo()
+    _render_business_client_finance_demo()
+    _render_business_trend_intelligence_demo()
+    _render_business_commercial_acquisition_demo()
+    _render_business_integration_hub_demo()
+    _render_business_privacy_audit_demo()
     _render_persona_capabilities("business", {
         "catalog": True,
         "suppliers": True,
@@ -5152,14 +7559,16 @@ def _render_business(
         "reports": True,
     })
     st.write(
-        "Área separada do trading para pesquisa de produtos, tendências, fornecedores, margem, "
-        "estoque, anúncios e acompanhamento de receita."
+        "Central AION para soluções empresariais: Atrair → Atender → Converter → Reter. "
+        "O foco principal agora é diagnóstico, implantação, pacotes recorrentes, Radar do Negócio, "
+        "Portal do Cliente, resultados, suporte e expansão por módulos."
     )
     _context_voice(
         "Negócios",
         (
-            "Bem-vindo ao AION Negócios. Aqui pesquisamos candidatos de produto, registramos evidências "
-            "e calculamos margem. Nenhum produto é chamado de tendência ou mais vendido sem fonte confirmada."
+            "Bem-vindo ao AION Negócios. Aqui organizamos diagnóstico, atendimento, conversão, retenção, "
+            "pacotes e resultados de forma simples para o cliente. O que é complexo fica por dentro do AION. "
+            "Nenhuma automação externa é executada sem os gates e aprovações definidos."
         ),
         key="aion_business_voice",
     )
@@ -5300,6 +7709,13 @@ def _render_business(
             "Nenhuma campanha, gasto, comissão ou publicação é executada."
         )
 
+    st.markdown("#### Compatibilidade legada · Marketplace / pesquisa de produto")
+    st.caption(
+        "Este bloco histórico permanece temporariamente para compatibilidade e auditoria. "
+        "Dropshipping, afiliados, Shopee, Mercado Livre, TikTok Shop e e-commerce genérico "
+        "não são mais o foco principal da nova aba Negócios. "
+        "Nenhum produto é chamado de tendência ou mais vendido sem fonte confirmada."
+    )
     st.markdown("#### Candidato de produto")
     with st.form("aion_business_new_product", clear_on_submit=True):
         name=st.text_input("Produto")

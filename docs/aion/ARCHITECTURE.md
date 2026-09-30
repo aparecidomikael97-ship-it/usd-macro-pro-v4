@@ -234,7 +234,10 @@ publicação ou deploy.
 Memória com domínio não atravessa outro domínio sozinha. Leitura cruzada exige
 o perfil `AION_CORE` e o domínio de origem em `explicit_domains`, e não promove
 `UNKNOWN`, `STALE`, `CONFLICT` ou `INCOMPLETE`. Pai sem roles, tools ou scopes
-não concede a metadata do perfil. A certificação desses especialistas é
+não concede a metadata do perfil. Scope efetivo só existe na interseção de
+allowlist do perfil, autoridade do pai, guardião e runtime; `*` não abre
+acesso. A postura read-only de observabilidade, release, rollback e auditoria
+está em `atlasquant_aion_core_posture.py`. A certificação desses especialistas é
 `ATLASQUANT_AION_SPECIALIST_CERTIFICATION_V1`, descrita em
 `docs/aion/AION_SPECIALIST_CERTIFICATION_V1.md`. Ela é distinta da certificação
 de skill/plugin. `CERTIFIED` exige prova verificada, fingerprint do corpo e
@@ -256,3 +259,519 @@ A reconciliação do Checkpoint Mestre de `2026-09-15` a `2026-09-29` está em
 complementa `docs/continuidade/CHECKPOINT_MESTRE_ATLASQUANT_2026-09-22.md` e
 não o apaga. O gate documental é
 `CHECKPOINT_MESTRE_RECONCILIATION_2026_09_15_TO_2026_09_29`.
+
+
+## Validação do Núcleo e prontidão do BUSINESS
+
+`atlasquant_aion_core_validation.py` adiciona uma camada read-only entre
+hardening e certificação. Ela não consulta produção por conta própria e não
+transforma presença de código em prova de deploy.
+
+A identidade de produção só fica verificada quando o chamador fornece um SHA
+observado do ambiente e a comparação com o SHA esperado resulta em match em alvo
+não local. O Checkpoint Mestre só pode retornar `VALIDADO` quando integridade,
+digest, identidade de produção, drill de rollback em sandbox, referências de
+evidência e aprovação humana booleana exata estiverem presentes.
+
+O drill de rollback deste estágio restaura somente uma cópia em memória e
+confere digest canônico. Ele prova a mecânica do restore sem gravar o runtime.
+O BUSINESS pode chegar a `READY_FOR_CERTIFICATION_REVIEW` quando oferta,
+escopo, demo, treinamento, portal, LGPD, margem, suporte, aprovação humana e
+pacote de prova estiverem evidenciados. Esse estado permanece abaixo de
+`CERTIFIED`; runtime, pagamento, publicação e demais ações externas continuam
+desligados.
+
+ADR-0011 registra essa separação entre validação do Núcleo, prontidão de produto
+e certificação formal do especialista.
+
+
+## BUSINESS certification package
+
+`atlasquant_aion_business_certification_package.py` liga o escopo atual de
+Negócios ao Specialist Certification Gate sem ativar runtime. O escopo primário
+são Automação B2B/Agentes de IA, Micro-SaaS AION, Serviços de IA, Revenue Ops /
+Captação e Produtos Digitais próprios.
+
+A oferta inicial gerenciada pode usar o nome provisório AION Presença &
+Conversão. O modelo preferido é pacote fechado com implantação e recorrência,
+sem promessa de resultado. Diagnóstico, Radar do Negócio, Portal do Cliente,
+onboarding, SLA, Saúde do Cliente, margem, LGPD, auditoria, integrações,
+Demo/Sandbox, quotas e treinamento do administrador fazem parte do readiness.
+
+Código histórico de marketplace pode permanecer por compatibilidade, mas
+dropshipping, afiliados, Shopee, Mercado Livre, TikTok Shop como motor principal
+e e-commerce genérico não pertencem ao escopo primário atual.
+
+O fluxo é `NOT_READY → READY_FOR_CERTIFICATION_REVIEW → TESTED → CERTIFIED`.
+`TESTED` exige atestação de CI ligada por SHA, refs e fingerprint.
+`CERTIFIED` exige também revisão humana booleana exata. Nenhum estado ativa
+runtime, contato externo, contrato, pagamento, publicação, gasto, merge, deploy
+ou trading real. ADR-0012 registra essa decisão.
+
+
+## BUSINESS external attestation and formal review
+
+`atlasquant_aion_business_external_attestation.py` is the read-only bridge
+between the BUSINESS certification package and independently sourced GitHub
+Actions evidence. It requires the exact repository and SHA plus successful runs
+for Quality tests, AION Core Security Gate and AtlasQuant - Release Readiness.
+
+The certification package also requires a formal human-review record bound to
+the same SHA and technical fingerprint. A bare boolean approval no longer
+certifies BUSINESS. Both CI provenance and human-review provenance fail closed
+when the trusted verifier is absent, malformed or disagrees.
+
+These gates do not activate runtime and do not authorize contact, contracts,
+payments, publication, spend, merge, deploy or real trading. ADR-0013 records
+the decision.
+
+
+## BUSINESS runtime readiness
+
+`atlasquant_aion_business_runtime_readiness.py` separates certification from
+runtime authority. A certified BUSINESS specialist may become
+`SANDBOX_READY` only when SHA/fingerprint binding, isolation, external-network
+disablement, audit, rollback and kill-switch gates all pass.
+
+The sandbox plan is limited to `read`, `analyze` and `draft`. External
+contact, contracts, payment, publication, spend, deploy and real trading remain
+denied. A generated runtime approval packet remains
+`RUNTIME_APPROVAL_REQUIRED` with `runtime_activation_approved=false`.
+
+ADR-0014 records that certification can never implicitly activate runtime.
+
+
+## BUSINESS sandbox harness
+
+`atlasquant_aion_business_sandbox_harness.py` executes deterministic
+simulation-only BUSINESS cases after the runtime-readiness layer reports
+`SANDBOX_READY`.
+
+Initial cases are FAQ draft, lead qualification, follow-up draft and Business
+Radar. Sessions are bound to tenant/workspace/actor/session, batches are bounded
+and unknown or external actions fail closed.
+
+The harness has no provider/network path and never sends, charges, publishes,
+deploys or activates runtime. ADR-0015 records this simulation boundary.
+
+
+## BUSINESS demo experience
+
+`atlasquant_aion_business_demo.py` maps the approved Business scope into a
+read-only, mobile-responsive experience: Atrair, Atender, Converter, Reter,
+packages, commercial journey, client portal concepts, admin training and a
+fixture-only Business Radar.
+
+The Central Principal renders this demo for the ADMIN Business surface and the
+AION Business workspace renders the same demo before historical tools. Legacy
+marketplace tooling remains compatibility-only and is explicitly labeled.
+
+The demo does not activate runtime or execute external actions. ADR-0016 records
+the presentation boundary.
+
+
+## BUSINESS guided administrator training
+
+`atlasquant_aion_business_training.py` provides an offline, fixture-only
+training layer for the BUSINESS administrator. It teaches problem discovery,
+diagnosis, Radar reading, package fit, delivery explanation, objections and a
+simulated sales conversation.
+
+The AION Business workspace renders the training as a session-only lab. No
+training completion grants operational authority. Unknown objections fail safe
+by instructing the administrator not to invent an answer.
+
+ADR-0017 records that administrator training precedes real BUSINESS use.
+
+
+## BUSINESS diagnostic and proposal simulator
+
+`atlasquant_aion_business_proposal_simulator.py` converts explicit demo inputs
+into a four-pillar diagnostic, a simple client Radar, a preliminary package fit
+and a professional proposal draft.
+
+The simulator marks inputs as `DEMO_USER_INPUT`, never claims real client
+verification and keeps commercial pricing at `A DEFINIR APÓS ESCOPO`.
+
+The AION Business workspace renders one result stage at a time to preserve the
+mobile navigation contract. No generated proposal can be sent, signed, charged
+or used to activate runtime. ADR-0018 records this boundary.
+
+
+## BUSINESS client portal demo
+
+`atlasquant_aion_business_client_portal_demo.py` turns the diagnostic/proposal
+demo state into the future client-facing shell: overview, Radar, action plan,
+results, support and history.
+
+The portal is intentionally simple. Technical routing, security gates,
+fingerprints and runtime controls remain internal. The Results section begins in
+`NO_REAL_RESULTS` and cannot fabricate metrics before trusted post-implementation
+evidence exists.
+
+The AION Business workspace renders one portal section at a time to keep mobile
+navigation stable. ADR-0019 records this presentation and truth boundary.
+
+
+## BUSINESS onboarding and implementation demo
+
+`atlasquant_aion_business_onboarding_demo.py` models the post-proposal delivery
+path as Scope → Data/Access → Integrations → Sandbox → Validation → Assisted
+Delivery.
+
+The access plan is least-privilege and carries placeholders only; no secret or
+credential value is accepted or persisted. The flow can complete a demo and
+produce `LIVE_REVIEW_REQUIRED`, but never authorizes or activates runtime.
+
+The AION Business workspace renders one onboarding phase at a time for mobile
+stability. ADR-0020 records this sandbox-first boundary.
+
+
+## BUSINESS customer success and SLA demo
+
+`atlasquant_aion_business_customer_success_demo.py` models post-implementation
+client health, support/SLA, success planning, renewal readiness and expansion
+review using demo-only signals.
+
+Health and value delivery precede upsell. Expansion can only become
+`EXPANSION_REVIEW_AVAILABLE` for a healthy demo customer and remains subject to
+human review; automatic upsell is always disabled.
+
+Renewal is likewise review-only and tickets never leave the demo. ADR-0021
+records this retention-before-expansion boundary.
+
+
+## BUSINESS client finance and capacity demo
+
+`atlasquant_aion_business_client_finance_demo.py` separates per-client
+implementation revenue, recurring revenue, cost stack, monthly contribution,
+margin and capacity utilization.
+
+Revenue is never treated as profit. AI, integrations, support, tools, taxes,
+refunds and other costs are explicit. Request and support quotas surface
+capacity pressure before it harms margin or service quality.
+
+Commercial review is advisory only: no automatic repricing, charging or money
+movement is possible. ADR-0022 records this financial truth boundary.
+
+
+## BUSINESS trend and opportunity intelligence
+
+`atlasquant_aion_business_trend_intelligence.py` evaluates business
+opportunities from explicit evidence, using freshness, confidence, recurring
+revenue fit, margin potential, delivery complexity and support load.
+
+The same module provides a controlled improvement review using hypothesis,
+before/after metrics and minimum sample size. Improvement evidence can become
+eligible for human promotion review but never auto-deploys or changes runtime.
+
+Continuous monitoring is an explicit future goal, while the current collector
+runtime remains OFF. ADR-0023 records this evidence-first evolution boundary.
+
+
+## BUSINESS commercial acquisition and client journey
+
+`atlasquant_aion_business_commercial_acquisition_demo.py` models the
+pre-client commercial path: acquisition channels, landing-page messaging,
+prospect qualification, outreach draft, contract handoff, content plan and demo
+funnel.
+
+The site CTA is diagnosis-first. Outreach is never sent automatically and
+`DO_NOT_CONTACT` blocks it. Contracts, invoices, payments and client portal
+provisioning remain future reviewed actions.
+
+ADR-0024 records this diagnostic-first commercial boundary.
+
+
+## BUSINESS integration hub readiness
+
+`atlasquant_aion_business_integration_hub.py` models WhatsApp Business,
+email, forms, calendar, CRM, payments, social media and analytics before any
+real provider connection exists.
+
+Scopes are least-privilege and split into read-only, draft-only, future approval
+required and prohibited-in-demo. The Hub never stores raw secrets and cannot
+perform OAuth, send, publish, charge, refund or grant write authority.
+
+ADR-0025 records this secret-free readiness boundary.
+
+
+## BUSINESS privacy and audit governance
+
+`atlasquant_aion_business_privacy_audit.py` defines purpose limitation,
+retention, consent evidence, default-deny role access, data-subject request
+review, audit events, configuration versioning and rollback preparation.
+
+The module contains no real personal data and cannot execute export, deletion,
+external writes or production rollback. Audit records document actions and
+approvals but never grant authority.
+
+ADR-0026 records this privacy/audit boundary.
+
+
+## BUSINESS master readiness panel
+
+`atlasquant_aion_business_master_readiness.py` aggregates Business into three
+authority layers: DEMO, PILOT and LIVE.
+
+DEMO gates describe product readiness only. Pilot gates require separate
+operational review. Live gates require separate runtime/provider/credential
+evidence. No layer automatically grants the next layer and even complete Live
+gates remain review-only in this module.
+
+ADR-0027 records this authority separation.
+
+
+## BUSINESS bounded pilot governance
+
+`atlasquant_aion_business_pilot_governance.py` defines a readiness-only
+first-pilot charter with one client, one workflow, few channels, short duration,
+human operators, support ownership, mandatory gates, measurable success criteria
+and explicit stop conditions.
+
+Passing every gate can only produce `HUMAN_PILOT_APPROVAL_REQUIRED`. It never
+records pilot approval, activates runtime or enables external actions.
+
+ADR-0028 records this bounded first-pilot boundary.
+
+
+## BUSINESS full stack consolidation V2
+
+`atlasquant_aion_business_stack_consolidation_v2.py` freezes the complete
+AION Core + BUSINESS Draft stack from #394 through #412 and validates branch,
+SHA, draft/open posture, mergeability and required CI evidence.
+
+The module produces a review-only bundle digest, ordered consolidation preview
+and integration rollback plan. It has no GitHub/network execution path and
+cannot authorize merge, deploy, pilot or runtime.
+
+ADR-0029 records this administrative separation of technical readiness from
+merge authority.
+
+## BUSINESS full-stack consolidation dry-run V2
+
+`atlasquant_aion_business_consolidation_dry_run_v2.py` layers a fail-closed
+administrative runbook over the #394–#412 consolidation V2. Frozen evidence alone
+produces `AWAITING_LIVE_REVALIDATION`.
+
+A trusted caller must revalidate repository identity, open/Draft posture, SHAs,
+bases, mergeability, required/UI checks, BUSINESS runtime OFF and absence of
+merge authority. Even then, the maximum automatic state is
+`READY_FOR_EXPLICIT_ADMIN_DECISION`.
+
+Each hypothetical step requires pre-step revalidation and a separate explicit
+administrative authorization. Post-step CI, runtime posture recheck and previous
+main SHA preservation are mandatory before another PR can be considered. This
+module cannot merge, rebase, enable auto-merge, deploy, authorize a pilot or
+activate runtime.
+
+ADR-0030 records this live-revalidation and stop-condition boundary.
+
+## BUSINESS consolidation decision request V1
+
+`atlasquant_aion_business_consolidation_decision_request.py` creates a
+non-executing request envelope for a future human decision. It requires the
+dry-run to have reached `READY_FOR_EXPLICIT_ADMIN_DECISION` and binds the
+request to the exact repository, candidate SHA, base SHA, frozen bundle digest,
+live-evidence reference, reviewer and scope.
+
+The request has its own canonical digest. Any drift in repository, SHA, base,
+bundle, evidence reference or scope causes `BINDING_MISMATCH` and requires a
+new review. The highest state is `HUMAN_AUTHORIZATION_RECORD_REQUIRED`, which
+does not record authorization and cannot merge, deploy, authorize a pilot or
+activate runtime.
+
+ADR-0031 records this anti-replay and anti-ambiguity boundary.
+
+## BUSINESS explicit consolidation authorization record V1
+
+`atlasquant_aion_business_consolidation_authorization_record.py` defines the
+only accepted shape for a future explicit authorization record. Generic language
+such as "ok", "vamos lá" or "pode seguir" is never interpreted as consolidation
+authority.
+
+The record must carry the exact decision token
+`AUTHORIZE_STACK_CONSOLIDATION_394_412`, the exact request digest, matching
+reviewer and scope, an approval timestamp, and explicit acknowledgements that
+deploy, pilot and runtime remain separate and that CI/stop-on-drift remain
+mandatory.
+
+A valid record reaches `EXPLICIT_AUTHORIZATION_RECORD_VERIFIED`, but still
+keeps `merge_execution_authorized=false`. Physical merge execution is a
+separate boundary and is not implemented by this module.
+
+ADR-0032 records this explicit anti-ambiguity authorization contract.
+
+## BUSINESS consolidation execution preflight V1
+
+`atlasquant_aion_business_consolidation_execution_preflight.py` is the final
+read-only barrier before any physical merge can even be reviewed. It combines
+the ready dry-run, exact decision request, explicit authorization record, live
+revalidation, stack sequence position, observed/expected main SHA, BUSINESS
+runtime OFF and absence of deploy authority.
+
+Completed PRs must form an exact prefix of #394–#412 and the requested target
+must be the next PR. Any skipped/reordered PR, SHA drift, stale authorization,
+runtime posture change or deploy authority blocks the preflight.
+
+The maximum state is `MERGE_EXECUTION_REVIEW_REQUIRED`; the module keeps
+`merge_execution_authorized=false` and performs no GitHub action. After any
+future separately executed merge, full CI, UI/mobile validation when applicable,
+runtime posture recheck and rollback-SHA preservation are mandatory before the
+next preflight.
+
+ADR-0033 records this sequential fail-closed execution boundary.
+
+## BUSINESS execution review packet V1
+
+`atlasquant_aion_business_consolidation_execution_review_packet.py` freezes a
+successful execution preflight into a digest-bound dossier for human review. The
+packet includes repository identity, target PR/SHA, base SHA, pre-merge main SHA,
+rollback reference, request digest, evidence reference, reviewer, post-step
+requirements and stop-on-drift posture.
+
+The packet can reach `READY_FOR_HUMAN_EXECUTION_REVIEW` only when all bindings
+are coherent. Any target, rollback or packet digest drift produces a binding
+mismatch and requires the dossier to be rebuilt.
+
+This module creates no authorization and keeps
+`merge_execution_authorized=false`; it performs no GitHub action, deploy,
+pilot or runtime activation.
+
+ADR-0034 records this frozen human-review dossier boundary.
+
+## BUSINESS post-merge verification and rollback gate V1
+
+`atlasquant_aion_business_consolidation_post_merge_verification.py` closes the
+per-step consolidation safety loop after any future separately authorized merge.
+Without real merge evidence it remains `POST_MERGE_EVIDENCE_REQUIRED`.
+
+A completed step must prove the observed main SHA matches the expected merge
+result, differs from the pre-merge SHA, preserves the pre-merge SHA as rollback
+reference, passes Quality, Release Readiness, Core Security, UI Smoke and Mobile
+DOM, and keeps BUSINESS runtime OFF with deploy authority absent.
+
+Only then can it reach `STEP_VERIFIED_FOR_NEXT_PREFLIGHT`, which allows
+building the next preflight but does not authorize the next merge. Any drift or
+regression yields `ROLLBACK_REVIEW_REQUIRED`. Rollback remains human-reviewed,
+non-automatic and non-executing.
+
+ADR-0035 records this post-step verification boundary.
+
+## BUSINESS sequential consolidation progress ledger V1
+
+`atlasquant_aion_business_consolidation_progress_ledger.py` maintains the
+offline read-only progression state for verified future merge steps across
+#394–#412.
+
+Only `STEP_VERIFIED_FOR_NEXT_PREFLIGHT` receipts can enter the ledger. PRs must
+appear in exact canonical order; receipt digests and resulting main SHAs must be
+unique; and each step's rollback reference must equal the resulting main SHA of
+the previous verified step. The first step is anchored to an externally supplied
+root main SHA.
+
+A valid partial prefix yields `READY_FOR_NEXT_PREFLIGHT`. Any skip, duplicate
+or broken rollback chain yields `LEDGER_BLOCKED`. After all 19 verified steps,
+the maximum state is `CONSOLIDATION_COMPLETE_REVIEW_REQUIRED`; final CI,
+UI/mobile, final SHA and runtime posture still require human review and deploy
+remains a separate decision.
+
+ADR-0036 records this deterministic progression boundary.
+
+
+## BUSINESS consolidation completion review
+
+`atlasquant_aion_business_consolidation_completion_review.py` is the final
+read-only gate after a complete #394–#412 progress ledger. It revalidates the
+final main SHA, all final CI checks, UI/mobile success, BUSINESS runtime OFF and
+the requirement that deploy remain a separate decision.
+
+The highest automatic state is `READY_FOR_FINAL_ADMIN_REVIEW`. Technical
+closure requires the exact acknowledgement token
+`ACKNOWLEDGE_BUSINESS_CONSOLIDATION_COMPLETE`, but even a valid acknowledgement
+does not authorize deploy, production release, pilot or runtime.
+
+ADR-0037 records this final consolidation boundary.
+
+
+## BUSINESS release boundary handoff
+
+`atlasquant_aion_business_release_boundary_handoff.py` separates a technically
+acknowledged consolidation from any later deployment or runtime decision.
+
+The handoff binds the final main SHA, technical acknowledgement digest, target
+environment, deploy-plan reference, rollback SHA and monitoring-plan reference.
+BUSINESS runtime must remain OFF and runtime authority must stay separate.
+
+The highest automatic state is `READY_FOR_SEPARATE_DEPLOY_DECISION`. No deploy
+is authorized or executed. ADR-0038 records this boundary.
+
+
+## BUSINESS deploy verification and runtime boundary
+
+`atlasquant_aion_business_deploy_verification_runtime_boundary.py` defines a
+deploy-only authorization record, a non-executing preflight, post-deploy receipt
+verification and a separate runtime-decision packet.
+
+A verified deploy must match the authorized SHA and environment, keep BUSINESS
+runtime OFF, and pass application health, UI/mobile, observability and rollback
+checks. Only then can the state become
+`DEPLOY_VERIFIED_RUNTIME_DECISION_SEPARATE`.
+
+No function deploys or activates runtime. ADR-0039 records this boundary.
+
+## BUSINESS runtime activation readiness
+
+atlasquant_aion_business_runtime_activation_readiness.py consumes only the
+verified runtime boundary produced after a deploy has been checked. It validates
+a bounded scope before a human runtime decision can even be recorded.
+
+Sandbox allows no real tenant. Pilot and bounded production require an explicit
+tenant list capped at 10. Monitoring, rollback, privacy, support, finance
+guardrails and integration health are mandatory.
+
+The exact token is AUTHORIZE_BUSINESS_RUNTIME_ACTIVATION. Generic confirmations
+never authorize runtime. A valid authorization still keeps physical execution
+separate, forbids automatic expansion and leaves billing/client actions behind
+their own boundaries.
+
+The module performs no runtime activation, traffic switch, deploy or external
+action. ADR-0040 records this boundary.
+
+## BUSINESS post-activation verification and expansion boundary
+
+atlasquant_aion_business_post_activation_expansion_boundary.py verifies evidence
+from a future bounded runtime activation executed through a separate path. The
+observed scope and tenant set must match the authorized execution-review packet
+exactly.
+
+Application health, observability, tenant isolation, privacy guardrails,
+support readiness, billing guardrail and rollback readiness must all succeed.
+A verified receipt reaches RUNTIME_ACTIVATION_VERIFIED_SCOPE_FROZEN.
+
+Success does not authorize growth. Only a separate
+EXPLICIT_EXPANSION_DECISION_REQUIRED packet may be produced, with token
+AUTHORIZE_BUSINESS_SCOPE_EXPANSION. Automatic expansion, billing and client
+actions remain false.
+
+The module performs no activation, expansion, deploy, rollback or external
+action. ADR-0041 records this boundary.
+
+## BUSINESS controlled scope expansion readiness
+
+atlasquant_aion_business_expansion_readiness.py validates a proposed growth step
+against the scope frozen by ADR-0041. It permits only incremental transitions:
+sandbox to pilot, pilot growth, pilot to bounded production, or bounded
+production growth within the configured tenant cap.
+
+Existing tenants must be preserved, proposed tenants must be explicit, and the
+maximum bounded set is 10. Privacy, support, finance guardrails, integrations,
+capacity, monitoring and rollback are revalidated before a decision request can
+become ready.
+
+The exact decision token is AUTHORIZE_BUSINESS_SCOPE_EXPANSION. Generic
+confirmation never authorizes expansion. Even a valid authorization keeps
+physical execution, billing and client actions separate.
+
+The module performs no expansion, runtime change or external action. ADR-0042
+records this boundary.
