@@ -382,6 +382,24 @@ class TeamAccessStep1ExecutionEnvelopeTests(unittest.TestCase):
         )
         self.assertFalse(source["binding_match"])
 
+    def test_tampered_envelope_timing_breaks_integrity(self):
+        materialization = _materialization()
+        packet = _packet(materialization)
+        decision = _decision(packet)
+        result = build_step1_execution_envelope(
+            materialization,
+            packet,
+            decision,
+            _observation(),
+            prepared_at="2026-09-30T21:54:00+00:00",
+        )
+        result["decided_at"] = "2026-09-30T21:40:00+00:00"
+        binding = verify_step1_execution_envelope(result)
+        self.assertFalse(binding["binding_match"])
+        self.assertIn(
+            "decision_age_at_preparation_valid", binding["blockers"]
+        )
+
     def test_observation_must_be_after_decision(self):
         materialization = _materialization()
         packet = _packet(materialization)
