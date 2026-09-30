@@ -59,3 +59,10 @@ limpeza segura. Não fazem parte da certificação atual do Business Expert.
 Depois de CI verde deste bloco, registrar a atestação real do HEAD e levar o
 BUSINESS até `TESTED`. A promoção para `CERTIFIED` continua aguardando revisão
 humana explícita e não liga runtime.
+
+
+## CI e atestação
+
+A execução de CI desta branch valida o contrato e os testes, mas o resultado só
+vira atestação de certificação quando SHA, suíte, refs e fingerprint forem
+registrados de forma vinculada. CI verde genérico não certifica o BUSINESS.
