@@ -96,6 +96,10 @@ implantação + mensalidade recorrente. O AION calcula margem e piso sustentáve
 a partir de custos informados/validados e da margem mínima definida pelo
 administrador; preço de mercado não é inventado automaticamente.
 
+Estado da seleção/preço do primeiro piloto: **IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_business_first_pilot_pricing_review.py`, ADR-0054 e testes
+associados. O máximo automático é `READY_FOR_ADMIN_FIRST_PILOT_REVIEW`.
+
 ## 4. Equipe & Acessos
 
 Estado da primeira camada: **IMPLEMENTADO / EM VALIDAÇÃO** em
@@ -210,7 +214,7 @@ PENDENTE / APROVADO:
 - binding do Gestor de Capacidade & Escala com métricas reais, custos de providers, incidentes e onboarding;
 - política de backup e recuperação testável;
 - binding do Budget Governor/FinOps com custos reais de providers, alertas e ledger financeiro persistente;
-- primeiro preço comercial real + segmento piloto + revisão jurídica/comercial da oferta B2B;
+- segmento/candidato reais + custos reais + preço comercial real + revisão jurídica/comercial do primeiro piloto;
 - binding do pipeline comercial com CRM/contatos/contrato/cobrança reais após aprovação;
 - validação operacional do bootstrap do Checkpoint Mestre em ambientes empacotados/deployados;
 - validação do roteador dos oito papéis em runtime/deploy empacotado;
@@ -237,3 +241,4 @@ PENDENTE / APROVADO:
 | D-2026-09-30-TRADE-TARGET-NOT-GUARANTEE | IMPLEMENTADO / EM VALIDAÇÃO | Meta de Trade não é promessa de retorno |
 | D-2026-09-30-CORE-CHECKPOINT-BOOTSTRAP | IMPLEMENTADO / EM VALIDAÇÃO | Core carrega o Checkpoint Mestre validado no bootstrap |
 | D-2026-09-30-COMMERCIAL-PIPELINE-END-TO-END | IMPLEMENTADO / EM VALIDAÇÃO | Pipeline B2B sequencial até saúde e renovação |
+| D-2026-09-30-FIRST-PILOT-PRICING-REVIEW | IMPLEMENTADO / EM VALIDAÇÃO | Primeiro piloto exige fit, preço sustentável e Pilot Governance |
