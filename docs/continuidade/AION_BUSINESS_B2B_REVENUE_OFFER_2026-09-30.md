@@ -22,6 +22,8 @@ Empilhado sobre a Draft PR #440.
 
 ## Estado
 
+Draft PR #441 — AION BUSINESS: B2B recurring revenue offer V1.
+
 IMPLEMENTADO / EM VALIDAÇÃO.
 
 Ainda falta para venda real:
