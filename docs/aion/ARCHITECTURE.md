@@ -324,3 +324,18 @@ when the trusted verifier is absent, malformed or disagrees.
 These gates do not activate runtime and do not authorize contact, contracts,
 payments, publication, spend, merge, deploy or real trading. ADR-0013 records
 the decision.
+
+
+## BUSINESS runtime readiness
+
+`atlasquant_aion_business_runtime_readiness.py` separates certification from
+runtime authority. A certified BUSINESS specialist may become
+`SANDBOX_READY` only when SHA/fingerprint binding, isolation, external-network
+disablement, audit, rollback and kill-switch gates all pass.
+
+The sandbox plan is limited to `read`, `analyze` and `draft`. External
+contact, contracts, payment, publication, spend, deploy and real trading remain
+denied. A generated runtime approval packet remains
+`RUNTIME_APPROVAL_REQUIRED` with `runtime_activation_approved=false`.
+
+ADR-0014 records that certification can never implicitly activate runtime.
