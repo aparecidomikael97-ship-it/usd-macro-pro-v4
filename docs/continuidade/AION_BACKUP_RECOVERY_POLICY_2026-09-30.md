@@ -25,6 +25,8 @@ Empilhado sobre a Draft PR #442.
 
 ## Estado
 
+Draft PR #443 — AION Core: Backup & Recovery policy V1.
+
 IMPLEMENTADO / EM VALIDAÇÃO.
 
 Ainda pendente:
