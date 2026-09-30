@@ -18,10 +18,8 @@ function New-LocalSecret {
         $rng.Dispose()
     }
 
-    return [Convert]::ToBase64String($buffer).
-        TrimEnd("=").
-        Replace("+", "-").
-        Replace("/", "_")
+    $encoded = [Convert]::ToBase64String($buffer)
+    return $encoded.TrimEnd("=").Replace("+", "-").Replace("/", "_")
 }
 
 if ($EnvFile -match "(?i)prod") {
