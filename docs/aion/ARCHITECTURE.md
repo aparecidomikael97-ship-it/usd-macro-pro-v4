@@ -719,3 +719,21 @@ checks. Only then can the state become
 `DEPLOY_VERIFIED_RUNTIME_DECISION_SEPARATE`.
 
 No function deploys or activates runtime. ADR-0039 records this boundary.
+
+## BUSINESS runtime activation readiness
+
+atlasquant_aion_business_runtime_activation_readiness.py consumes only the
+verified runtime boundary produced after a deploy has been checked. It validates
+a bounded scope before a human runtime decision can even be recorded.
+
+Sandbox allows no real tenant. Pilot and bounded production require an explicit
+tenant list capped at 10. Monitoring, rollback, privacy, support, finance
+guardrails and integration health are mandatory.
+
+The exact token is AUTHORIZE_BUSINESS_RUNTIME_ACTIVATION. Generic confirmations
+never authorize runtime. A valid authorization still keeps physical execution
+separate, forbids automatic expansion and leaves billing/client actions behind
+their own boundaries.
+
+The module performs no runtime activation, traffic switch, deploy or external
+action. ADR-0040 records this boundary.
