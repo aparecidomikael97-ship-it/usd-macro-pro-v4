@@ -67,3 +67,7 @@ A execução de CI desta branch valida o contrato e os testes, mas o resultado s
 vira atestação de certificação quando SHA, suíte, refs e fingerprint forem
 registrados de forma vinculada e confirmados por verificador independente.
 CI verde genérico ou payload autodeclarado não certifica o BUSINESS.
+
+
+Estado de prova: fail-closed. Sem verificador independente, uma atestação
+estruturalmente válida continua insuficiente para promover BUSINESS a TESTED.
