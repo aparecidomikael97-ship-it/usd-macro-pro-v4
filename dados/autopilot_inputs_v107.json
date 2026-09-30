@@ -1,6 +1,6 @@
 {
   "version": "V10.7_FAST_BOOT_1",
-  "generated_at": "2026-09-30T11:50:06.773941+00:00",
+  "generated_at": "2026-09-30T12:33:14.210860+00:00",
   "app_version": "11.0.8 — STRENGTH ATTRIBUTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2",
   "core_evidence": [
     {
@@ -19,7 +19,7 @@
       "Score final": 89.0,
       "Qualidade": 91.0,
       "Confluência": "ALTA",
-      "Dif. macro": 16.0,
+      "Dif. macro": 15.8,
       "Índice ranking": 89.9
     },
     {
@@ -28,7 +28,7 @@
       "Score final": 89.0,
       "Qualidade": 91.0,
       "Confluência": "ALTA",
-      "Dif. macro": 26.3,
+      "Dif. macro": 26.1,
       "Índice ranking": 89.9
     },
     {
@@ -37,7 +37,7 @@
       "Score final": 90.0,
       "Qualidade": 84.0,
       "Confluência": "ALTA",
-      "Dif. macro": 32.7,
+      "Dif. macro": 32.5,
       "Índice ranking": 87.2
     },
     {
@@ -46,7 +46,7 @@
       "Score final": 84.0,
       "Qualidade": 91.0,
       "Confluência": "ALTA",
-      "Dif. macro": -27.6,
+      "Dif. macro": -27.4,
       "Índice ranking": 87.1
     },
     {
@@ -55,7 +55,7 @@
       "Score final": 91.0,
       "Qualidade": 70.0,
       "Confluência": "MODERADA",
-      "Dif. macro": -20.4,
+      "Dif. macro": -20.2,
       "Índice ranking": 82.5
     },
     {
@@ -64,7 +64,7 @@
       "Score final": 55.0,
       "Qualidade": 91.0,
       "Confluência": "BAIXA",
-      "Dif. macro": -19.8,
+      "Dif. macro": -19.3,
       "Índice ranking": 69.4
     },
     {
@@ -73,12 +73,12 @@
       "Score final": 68.0,
       "Qualidade": 70.0,
       "Confluência": "MODERADA",
-      "Dif. macro": -20.9,
+      "Dif. macro": -22.3,
       "Índice ranking": 69.1
     }
   ],
   "macro_context": {
-    "usd_score": 63.60362850243902,
+    "usd_score": 63.35899770243902,
     "usd_quality": 90.0,
     "fed_tone": "Restritivo",
     "fed_strength": 0.6640243902439025,
@@ -124,7 +124,7 @@
   "fast_boot": {
     "macro_eua": {
       "Juros do Fed": 3.63,
-      "IPC anual": 3.35302,
+      "IPC anual": 2.9,
       "IPC Núcleo anual": 2.44616,
       "PCE anual": 3.70117,
       "PCE Núcleo anual": 3.34414,
@@ -145,11 +145,11 @@
         },
         {
           "Indicador": "IPC anual",
-          "Valor": 3.353,
-          "Última observação": "01/08/2026",
-          "Idade (dias)": 60,
-          "Status": "🟡 Atenção",
-          "Fonte": "FRED · CPIAUCSL"
+          "Valor": 2.9,
+          "Última observação": "—",
+          "Idade (dias)": "—",
+          "Status": "⚠️ Fallback",
+          "Fonte": "Valor de segurança"
         },
         {
           "Indicador": "IPC Núcleo anual",
@@ -232,9 +232,9 @@
           "serie": "FEDFUNDS"
         },
         "IPC anual": {
-          "valor": 3.35302,
-          "data": "01/08/2026",
-          "idade_dias": 60,
+          "valor": null,
+          "data": null,
+          "idade_dias": null,
           "serie": "CPIAUCSL"
         },
         "IPC Núcleo anual": {
@@ -292,7 +292,7 @@
           "serie": "DTWEXBGS"
         }
       },
-      "_fallbacks": 0
+      "_fallbacks": 1
     },
     "fed": {
       "tom": "Restritivo",
@@ -300,15 +300,15 @@
       "titulos": [
         "Fed’s Barr says future interest rate hikes ‘likely’ needed to tame inflation - The Hill",
         "Expectations of further interest rate hikes by the Federal Reserve have intensified, pushing the U.S. Dollar Index to around 101.40 and positioning it for its largest monthly gain in 14 months. - Moomoo",
-        "Treasury yields surge as Hardika Singh warns of Federal Reserve rate hike risks - Fox Business",
+        "Treasury yields surge as Hardika Singh warns of Federal Reserve rate hike risks - foxbusiness.com",
         "Federal Reserve Watch for Sept. 28: Cook Expects More Upward Pressure on Inflation from AI, Labor Markets Able to Handle Rate Increase - Yahoo! Finance Canada",
         "Fed's Barr says more rate hikes are needed to bring down inflation - Yahoo Finance",
-        "Markets Brace For Two More Fed Rate Hikes In 2026 - forbes.com",
         "J.P. Morgan sees Fed rate hikes going out with a bang this year - Yahoo Finance",
+        "Markets Brace For Two More Fed Rate Hikes In 2026 - Forbes",
         "Fed’s Barr Says More Rate Hikes Likely Needed to Return Inflation to Target - WSJ",
         "How will Fed rate hikes impact markets? - UBS",
         "Fed's Barr says more rate hikes likely to be needed to curb inflation - Reuters",
-        "Bond yields surge as Federal Reserve signals rate hikes - Fox Business",
+        "Bond yields surge as Federal Reserve signals rate hikes - foxbusiness.com",
         "Fed's Barr says more rate hikes likely to be needed to curb inflation - Tacoma News Tribune"
       ],
       "analisadas": [
@@ -333,9 +333,9 @@
           "explicacao": "Sinal mais restritivo: juros altos por mais tempo tendem a apoiar o dólar."
         },
         {
-          "titulo": "Treasury yields surge as Hardika Singh warns of Federal Reserve rate hike risks - Fox Business",
+          "titulo": "Treasury yields surge as Hardika Singh warns of Federal Reserve rate hike risks - foxbusiness.com",
           "corpo": "Treasury yields surge as Hardika Singh warns of Federal Reserve rate hike risks",
-          "fonte": "Fox Business",
+          "fonte": "foxbusiness.com",
           "relevancia_pontos": 9,
           "relevancia": "Alta",
           "impacto": 0.55,
@@ -363,9 +363,9 @@
           "explicacao": "Sinal mais restritivo: juros altos por mais tempo tendem a apoiar o dólar."
         },
         {
-          "titulo": "Markets Brace For Two More Fed Rate Hikes In 2026 - forbes.com",
-          "corpo": "Markets Brace For Two More Fed Rate Hikes In 2026",
-          "fonte": "forbes.com",
+          "titulo": "J.P. Morgan sees Fed rate hikes going out with a bang this year - Yahoo Finance",
+          "corpo": "J.P. Morgan sees Fed rate hikes going out with a bang this year",
+          "fonte": "Yahoo Finance",
           "relevancia_pontos": 6,
           "relevancia": "Alta",
           "impacto": 0.75,
@@ -373,9 +373,9 @@
           "explicacao": "Sinal mais restritivo: juros altos por mais tempo tendem a apoiar o dólar."
         },
         {
-          "titulo": "J.P. Morgan sees Fed rate hikes going out with a bang this year - Yahoo Finance",
-          "corpo": "J.P. Morgan sees Fed rate hikes going out with a bang this year",
-          "fonte": "Yahoo Finance",
+          "titulo": "Markets Brace For Two More Fed Rate Hikes In 2026 - Forbes",
+          "corpo": "Markets Brace For Two More Fed Rate Hikes In 2026",
+          "fonte": "Forbes",
           "relevancia_pontos": 6,
           "relevancia": "Alta",
           "impacto": 0.75,
@@ -413,9 +413,9 @@
           "explicacao": "Sinal mais restritivo: juros altos por mais tempo tendem a apoiar o dólar."
         },
         {
-          "titulo": "Bond yields surge as Federal Reserve signals rate hikes - Fox Business",
+          "titulo": "Bond yields surge as Federal Reserve signals rate hikes - foxbusiness.com",
           "corpo": "Bond yields surge as Federal Reserve signals rate hikes",
-          "fonte": "Fox Business",
+          "fonte": "foxbusiness.com",
           "relevancia_pontos": 6,
           "relevancia": "Alta",
           "impacto": 0.75,
@@ -453,7 +453,7 @@
         "juros": 4.0,
         "inflacao": 3.2,
         "pib": 1.1,
-        "sentimento": 66.66666666666666,
+        "sentimento": 50.0,
         "fonte": "FRED + transformação anual + fallback parcial"
       },
       "JPY": {
@@ -481,7 +481,7 @@
         "juros": 4.51,
         "inflacao": 2.7,
         "pib": 2.13764,
-        "sentimento": 53.84615384615385,
+        "sentimento": 57.14285714285714,
         "fonte": "FRED + transformação anual + fallback parcial"
       },
       "NZD": {
@@ -545,18 +545,18 @@
         "Moeda": "Dólar Americano",
         "juros_reais": 0.3,
         "n_juros": 66.344,
-        "n_inflacao": 64.53347,
+        "n_inflacao": 63.174409999999995,
         "n_pib": 68.41041659389954,
         "n_sentimento": 63.63636363636363,
         "n_emprego": 55.400000000000006,
         "n_atividade": 45.0,
-        "Pontuação_Macro": 60.0,
+        "Pontuação_Macro": 59.6,
         "Influência_Fed": 33.2,
-        "Pontuação_Final": 63.6,
+        "Pontuação_Final": 63.4,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 15.922559999999997,
-            "Inflação": 11.6160246,
+            "Inflação": 11.371393799999998,
             "PIB": 0.0,
             "Emprego": 9.972000000000001,
             "Atividade": 5.3999999999999995,
@@ -567,7 +567,7 @@
             "Índice amplo USD": 4.0527999999999995,
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 63.60362850243902
+          "unrounded_final": 63.35899770243902
         },
         "Posição": 2
       },
@@ -611,19 +611,19 @@
         "juros": 4.5,
         "inflacao": 2.7,
         "pib": 2.1,
-        "sentimento": 53.8,
+        "sentimento": 57.1,
         "fonte": "FRED + transformação anual + fallback parcial",
         "Moeda": "Dólar Australiano",
         "juros_reais": 1.8,
         "n_juros": 28.98896661469615,
         "n_inflacao": 49.66887417218545,
         "n_pib": 70.40481809880697,
-        "n_sentimento": 53.84615384615385,
+        "n_sentimento": 57.14285714285714,
         "n_emprego": 50.0,
         "n_atividade": 50.0,
-        "Pontuação_Macro": 49.2,
+        "Pontuação_Macro": 49.5,
         "Influência_Fed": -5.4,
-        "Pontuação_Final": 43.8,
+        "Pontuação_Final": 44.1,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 5.79779332293923,
@@ -631,13 +631,13 @@
             "PIB": 10.560722714821045,
             "Emprego": 10.0,
             "Atividade": 10.0,
-            "Sentimento": 5.384615384615385
+            "Sentimento": 5.714285714285714
           },
           "fed": -5.37859756097561,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 43.814864987227864
+          "unrounded_final": 44.1445353168982
         },
         "Posição": 4
       },
@@ -681,19 +681,19 @@
         "juros": 4.0,
         "inflacao": 3.2,
         "pib": 1.1,
-        "sentimento": 66.7,
+        "sentimento": 50.0,
         "fonte": "FRED + transformação anual + fallback parcial",
         "Moeda": "Libra Esterlina",
         "juros_reais": 0.8,
         "n_juros": 19.698663024131786,
         "n_inflacao": 66.22516556291392,
         "n_pib": 18.629216959148952,
-        "n_sentimento": 66.66666666666666,
+        "n_sentimento": 50.0,
         "n_emprego": 50.0,
         "n_atividade": 50.0,
-        "Pontuação_Macro": 43.3,
+        "Pontuação_Macro": 41.7,
         "Influência_Fed": -0.6,
-        "Pontuação_Final": 42.7,
+        "Pontuação_Final": 41.1,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 3.9397326048263572,
@@ -701,13 +701,13 @@
             "PIB": 2.794382543872343,
             "Emprego": 10.0,
             "Atividade": 10.0,
-            "Sentimento": 6.666666666666666
+            "Sentimento": 5.0
           },
           "fed": -0.5976219512195122,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 42.73693469858294
+          "unrounded_final": 41.07026803191627
         },
         "Posição": 6
       },
@@ -818,9 +818,9 @@
       }
     ],
     "usd_detalhado": {
-      "score": 63.60362850243902,
+      "score": 63.35899770243902,
       "componentes": {
-        "Inflação": 64.53347,
+        "Inflação": 63.174409999999995,
         "Emprego": 55.400000000000006,
         "Atividade": 45.0,
         "Juros / Treasury 2Y": 66.344,
