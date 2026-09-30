@@ -25,6 +25,8 @@ Empilhado sobre a Draft PR #444.
 
 ## Estado
 
+Draft PR #445 — AION BUSINESS: commercial live read-only data binding V1.
+
 IMPLEMENTADO / EM VALIDAÇÃO.
 
 Ainda pendente:
