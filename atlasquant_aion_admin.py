@@ -363,6 +363,9 @@ from atlasquant_aion_business_revenue_live_economics_binding import (
 from atlasquant_aion_business_team_access_production_binding import (
     production_binding_policy as business_team_production_policy,
 )
+from atlasquant_aion_business_team_access_sandbox_e2e import (
+    selected_sandbox_stack as business_team_sandbox_stack,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7303,6 +7306,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "35 · Capacidade · Metricas Reais",
             "36 · Receita · Economia Real",
             "37 · Equipe & Acessos · Producao",
+            "38 · Equipe & Acessos · Sandbox E2E",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7940,7 +7944,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "e nenhum cliente é admitido automaticamente por esta camada."
         )
 
-    else:
+    elif view == "37 · Equipe & Acessos · Producao":
         team_prod = business_team_production_policy()
         st.write(f"Estado: **{team_prod.get('state')}**")
         st.markdown("**Produção exige evidência de:**")
@@ -7958,6 +7962,30 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "O máximo é READY_FOR_ADMIN_TEAM_ACCESS_ACTIVATION_REVIEW. "
             "Ativação real continua em gate administrativo separado."
+        )
+
+    else:
+        sandbox = business_team_sandbox_stack()
+        st.write(f"Estado: **{sandbox.get('state')}**")
+        identity = sandbox.get("identity_provider") or {}
+        storage = sandbox.get("registry_storage") or {}
+        revocation = sandbox.get("session_revocation") or {}
+        st.markdown(
+            f"**Identity provider:** {identity.get('provider')} · "
+            f"{identity.get('protocol')}"
+        )
+        st.markdown(f"**Registry:** {storage.get('provider')}")
+        st.markdown(f"**Revogação:** {revocation.get('connector')}")
+        st.markdown("**Escopo:** SANDBOX_VALIDATION_ONLY")
+        st.warning(
+            "A visão 38 apenas fixa a stack de referência e os gates E2E. "
+            "Nenhum secret é configurado, nenhuma conta é criada, nenhum registry real é gravado "
+            "e nenhuma sessão real é revogada por esta camada."
+        )
+        st.caption(
+            "Estado máximo futuro do teste completo: "
+            "READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_EXIT_REVIEW. "
+            "Produção, deploy e runtime permanecem separados."
         )
 
 
