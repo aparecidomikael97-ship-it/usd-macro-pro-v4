@@ -968,3 +968,19 @@ remain outside this layer.
 
 ADR-0054 records this boundary.
 
+## AION Backup & Recovery policy
+
+`atlasquant_aion_backup_recovery_policy.py` unifies source archive, checkpoint
+version history and a distinct secondary-copy requirement under one read-only
+governance layer.
+
+The source-backup workflow now verifies its SHA256, tests ZIP extraction and
+checks critical continuity files before upload. Runtime checkpoint history stays
+separate from source backup. RPO/RTO are administrator-defined planning targets,
+not invented SLAs.
+
+Restore remains human-reviewed and non-automatic. Production restore is outside
+this layer; recovery drills are limited to local/sandbox/staging planning.
+
+ADR-0055 records this boundary.
+
