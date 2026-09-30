@@ -339,3 +339,17 @@ denied. A generated runtime approval packet remains
 `RUNTIME_APPROVAL_REQUIRED` with `runtime_activation_approved=false`.
 
 ADR-0014 records that certification can never implicitly activate runtime.
+
+
+## BUSINESS sandbox harness
+
+`atlasquant_aion_business_sandbox_harness.py` executes deterministic
+simulation-only BUSINESS cases after the runtime-readiness layer reports
+`SANDBOX_READY`.
+
+Initial cases are FAQ draft, lead qualification, follow-up draft and Business
+Radar. Sessions are bound to tenant/workspace/actor/session, batches are bounded
+and unknown or external actions fail closed.
+
+The harness has no provider/network path and never sends, charges, publishes,
+deploys or activates runtime. ADR-0015 records this simulation boundary.
