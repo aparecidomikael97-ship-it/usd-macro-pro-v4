@@ -639,3 +639,21 @@ This module creates no authorization and keeps
 pilot or runtime activation.
 
 ADR-0034 records this frozen human-review dossier boundary.
+
+## BUSINESS post-merge verification and rollback gate V1
+
+`atlasquant_aion_business_consolidation_post_merge_verification.py` closes the
+per-step consolidation safety loop after any future separately authorized merge.
+Without real merge evidence it remains `POST_MERGE_EVIDENCE_REQUIRED`.
+
+A completed step must prove the observed main SHA matches the expected merge
+result, differs from the pre-merge SHA, preserves the pre-merge SHA as rollback
+reference, passes Quality, Release Readiness, Core Security, UI Smoke and Mobile
+DOM, and keeps BUSINESS runtime OFF with deploy authority absent.
+
+Only then can it reach `STEP_VERIFIED_FOR_NEXT_PREFLIGHT`, which allows
+building the next preflight but does not authorize the next merge. Any drift or
+regression yields `ROLLBACK_REVIEW_REQUIRED`. Rollback remains human-reviewed,
+non-automatic and non-executing.
+
+ADR-0035 records this post-step verification boundary.
