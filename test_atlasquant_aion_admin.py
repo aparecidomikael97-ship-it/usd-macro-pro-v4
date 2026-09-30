@@ -908,6 +908,19 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("Publicados confirmados", src)
         self.assertIn("execução ainda não ocorre nesta tela", src)
 
+    def test_business_customer_success_demo_prioritizes_health_before_upsell(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("def _render_business_customer_success_demo()", src)
+        self.assertIn("Customer Success + SLA · Demo", src)
+        self.assertIn("Health Score", src)
+        self.assertIn("SLA & Suporte", src)
+        self.assertIn("Plano de Sucesso", src)
+        self.assertIn("Renovação & Expansão", src)
+        self.assertIn("Saúde e necessidade real vêm antes da venda", src)
+        self.assertIn("Renovação e upsell nunca são automáticos", src)
+        self.assertIn("_render_business_customer_success_demo()", src)
+        self.assertNotIn("st.tabs(", src)
+
     def test_business_onboarding_demo_is_sandbox_first_and_never_collects_secrets(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("def _render_business_onboarding_demo()", src)

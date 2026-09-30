@@ -425,3 +425,17 @@ produce `LIVE_REVIEW_REQUIRED`, but never authorizes or activates runtime.
 
 The AION Business workspace renders one onboarding phase at a time for mobile
 stability. ADR-0020 records this sandbox-first boundary.
+
+
+## BUSINESS customer success and SLA demo
+
+`atlasquant_aion_business_customer_success_demo.py` models post-implementation
+client health, support/SLA, success planning, renewal readiness and expansion
+review using demo-only signals.
+
+Health and value delivery precede upsell. Expansion can only become
+`EXPANSION_REVIEW_AVAILABLE` for a healthy demo customer and remains subject to
+human review; automatic upsell is always disabled.
+
+Renewal is likewise review-only and tickets never leave the demo. ADR-0021
+records this retention-before-expansion boundary.

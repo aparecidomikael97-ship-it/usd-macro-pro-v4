@@ -181,6 +181,13 @@ from atlasquant_aion_business_onboarding_demo import (
     onboarding_intake as business_onboarding_intake,
     onboarding_status as business_onboarding_status,
 )
+from atlasquant_aion_business_customer_success_demo import (
+    customer_health as business_customer_health,
+    expansion_opportunity as business_expansion_opportunity,
+    renewal_readiness as business_renewal_readiness,
+    sla_ticket as business_sla_ticket,
+    success_plan as business_success_plan,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -5823,6 +5830,199 @@ def _render_business_onboarding_demo() -> None:
         )
 
 
+
+def _render_business_customer_success_demo() -> None:
+    """Session-only customer success, SLA, renewal and expansion demo."""
+    st.markdown("#### 🤝 Customer Success + SLA · Demo")
+    st.caption(
+        "Treina o acompanhamento depois da implantação: saúde do cliente, suporte, adoção, "
+        "renovação e oportunidades de expansão. Dados totalmente fictícios."
+    )
+    simulator = st.session_state.get("aion_business_simulator_result")
+    diagnostic = (
+        simulator.get("diagnostic")
+        if isinstance(simulator, Mapping) and isinstance(simulator.get("diagnostic"), Mapping)
+        else {}
+    )
+    intake = diagnostic.get("intake") if isinstance(diagnostic.get("intake"), Mapping) else {}
+    company = str(intake.get("company_name") or "Empresa Demo")
+
+    with st.form("aion_business_customer_success_demo_form", clear_on_submit=False):
+        usage = st.slider(
+            "Uso do serviço (%)",
+            min_value=0,
+            max_value=100,
+            value=72,
+            step=1,
+            key="aion_business_cs_usage",
+        )
+        goals = st.slider(
+            "Progresso dos objetivos (%)",
+            min_value=0,
+            max_value=100,
+            value=65,
+            step=1,
+            key="aion_business_cs_goals",
+        )
+        satisfaction = st.slider(
+            "Satisfação fictícia (1–5)",
+            min_value=1.0,
+            max_value=5.0,
+            value=4.0,
+            step=0.5,
+            key="aion_business_cs_satisfaction",
+        )
+        inactivity = st.number_input(
+            "Dias desde última atividade",
+            min_value=0,
+            max_value=3650,
+            value=3,
+            step=1,
+            key="aion_business_cs_inactivity",
+        )
+        open_tickets = st.number_input(
+            "Chamados abertos",
+            min_value=0,
+            max_value=10000,
+            value=1,
+            step=1,
+            key="aion_business_cs_tickets",
+        )
+        critical_incidents = st.number_input(
+            "Incidentes críticos",
+            min_value=0,
+            max_value=1000,
+            value=0,
+            step=1,
+            key="aion_business_cs_incidents",
+        )
+        onboarding_complete = st.checkbox(
+            "Onboarding concluído",
+            value=True,
+            key="aion_business_cs_onboarding_complete",
+        )
+        monthly_review = st.checkbox(
+            "Revisão mensal concluída",
+            value=True,
+            key="aion_business_cs_review_done",
+        )
+        renewal_days = st.number_input(
+            "Dias até renovação fictícia",
+            min_value=0,
+            max_value=3650,
+            value=45,
+            step=1,
+            key="aion_business_cs_renewal_days",
+        )
+        payment_state = st.selectbox(
+            "Estado comercial fictício",
+            ["CURRENT", "UNKNOWN", "OVERDUE_DEMO"],
+            key="aion_business_cs_payment_state",
+        )
+        evaluate = st.form_submit_button("Avaliar saúde do cliente demo")
+
+    if evaluate:
+        signals = {
+            "company_name": company,
+            "usage_pct": usage,
+            "goals_progress_pct": goals,
+            "satisfaction_score": satisfaction,
+            "days_since_last_activity": inactivity,
+            "open_tickets": open_tickets,
+            "critical_incidents": critical_incidents,
+            "onboarding_complete": onboarding_complete,
+            "monthly_review_done": monthly_review,
+            "payment_state": payment_state,
+            "renewal_days": renewal_days,
+        }
+        health = business_customer_health(signals)
+        success = business_success_plan(health)
+        expansion = business_expansion_opportunity(health)
+        renewal = business_renewal_readiness(health)
+        ticket = business_sla_ticket(
+            title="Chamado fictício de acompanhamento",
+            priority="P3" if critical_incidents == 0 else "P1",
+            age_hours=2,
+        )
+        st.session_state["aion_business_customer_success_demo_result"] = {
+            "health": health,
+            "success": success,
+            "expansion": expansion,
+            "renewal": renewal,
+            "ticket": ticket,
+        }
+
+    result = st.session_state.get("aion_business_customer_success_demo_result")
+    if not isinstance(result, Mapping):
+        st.info("Avalie o cliente fictício para abrir o painel de Customer Success.")
+        return
+
+    stage = st.selectbox(
+        "Visão de Customer Success",
+        (
+            "1 · Saúde",
+            "2 · SLA & Suporte",
+            "3 · Plano de Sucesso",
+            "4 · Renovação & Expansão",
+        ),
+        key="aion_business_customer_success_stage",
+        help="Uma visão por vez para manter o uso simples no celular.",
+    )
+    health = result.get("health") if isinstance(result.get("health"), Mapping) else {}
+    if stage == "1 · Saúde":
+        h1,h2,h3 = st.columns(3)
+        h1.metric("Health Score", f"{int(health.get('health_score') or 0)}/100")
+        h2.metric("Estado", str(health.get("state") or "UNKNOWN"))
+        h3.metric("Risco de churn", "SIM" if health.get("churn_risk") else "NÃO")
+        flags = health.get("flags") if isinstance(health.get("flags"), list) else []
+        if not flags:
+            st.success("Nenhum alerta básico foi acionado neste exercício.")
+        for flag in flags:
+            if isinstance(flag, Mapping):
+                st.markdown(
+                    f"- **{flag.get('severity')} · {flag.get('code')}** — {flag.get('message')}"
+                )
+        st.caption("Health Score didático, calculado somente pelos dados fictícios desta sessão.")
+
+    elif stage == "2 · SLA & Suporte":
+        ticket = result.get("ticket") if isinstance(result.get("ticket"), Mapping) else {}
+        s1,s2,s3 = st.columns(3)
+        s1.metric("Prioridade", str(ticket.get("priority") or "P3"))
+        s2.metric("Meta", f"{int(ticket.get('target_hours') or 0)}h")
+        s3.metric("SLA", str(ticket.get("sla_state") or "UNKNOWN"))
+        st.write(str(ticket.get("title") or ""))
+        st.caption(
+            "Chamado apenas demonstrativo. Não foi enviado a suporte e não produz escrita externa."
+        )
+
+    elif stage == "3 · Plano de Sucesso":
+        success = result.get("success") if isinstance(result.get("success"), Mapping) else {}
+        st.markdown("**Próximas ações para revisão humana**")
+        for item in list(success.get("actions") or []):
+            if isinstance(item, Mapping):
+                st.markdown(f"- {item.get('action')}  \n  _Fonte: {item.get('source')}_")
+        st.caption(
+            "O plano organiza o acompanhamento; não envia contato nem altera a conta do cliente."
+        )
+
+    else:
+        renewal = result.get("renewal") if isinstance(result.get("renewal"), Mapping) else {}
+        expansion = result.get("expansion") if isinstance(result.get("expansion"), Mapping) else {}
+        st.markdown("**Renovação**")
+        st.write(
+            f"Estado: **{renewal.get('state') or 'UNKNOWN'}** · "
+            f"{renewal.get('recommended_focus') or ''}"
+        )
+        st.markdown("**Expansão / Upsell**")
+        if expansion.get("state") == "EXPANSION_REVIEW_AVAILABLE":
+            st.success(str(expansion.get("reason") or "Pode avaliar expansão."))
+        else:
+            st.info(str(expansion.get("reason") or "Sem expansão agora."))
+        st.caption(
+            "Renovação e upsell nunca são automáticos. Saúde e necessidade real vêm antes da venda."
+        )
+
+
 def _render_business(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
@@ -5842,6 +6042,7 @@ def _render_business(
     _render_business_diagnostic_proposal_simulator()
     _render_business_client_portal_demo()
     _render_business_onboarding_demo()
+    _render_business_customer_success_demo()
     _render_persona_capabilities("business", {
         "catalog": True,
         "suppliers": True,
