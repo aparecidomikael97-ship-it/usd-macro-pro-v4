@@ -996,6 +996,17 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("não autoriza deploy, produção, piloto ou runtime", src)
         self.assertNotIn("st.tabs(", src)
 
+    def test_business_release_boundary_handoff_keeps_deploy_and_runtime_separate(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("14 · Handoff para decisão de deploy", src)
+        self.assertIn("Itens obrigatórios antes de qualquer decisão futura de deploy", src)
+        self.assertIn("Consolidação técnica reconhecida não é deploy", src)
+        self.assertIn("AUTHORIZE_BUSINESS_DEPLOY_ONLY", src)
+        self.assertIn("Acknowledgements obrigatórios do deploy", src)
+        self.assertIn("Nenhum deploy é autorizado ou executado", src)
+        self.assertIn("runtime, piloto e ações com cliente real permanecem OFF", src)
+        self.assertNotIn("st.tabs(", src)
+
     def test_business_pilot_governance_keeps_first_pilot_bounded_and_unapproved(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("def _render_business_pilot_governance_demo()", src)
