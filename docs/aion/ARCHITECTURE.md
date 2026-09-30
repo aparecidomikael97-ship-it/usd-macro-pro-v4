@@ -1093,3 +1093,21 @@ contacts, spends, changes price or admits a customer.
 
 ADR-0062 records this boundary.
 
+## BUSINESS team access production binding
+
+`atlasquant_aion_business_team_access_production_binding.py` binds the
+existing Business RBAC contract to externally verified identity/session
+evidence without becoming an identity provider or session executor.
+
+Production-readiness evidence requires an individual account matching the
+approved invitation, a strong factor (passkey, security key or TOTP), a
+versioned team registry with exact read-back digest, and verifiable account /
+session / registry evidence for revocation.
+
+The maximum automatic state is
+`READY_FOR_ADMIN_TEAM_ACCESS_ACTIVATION_REVIEW`. Account provisioning, MFA
+enrollment, registry writes, session revocation and access activation remain
+outside this module.
+
+ADR-0063 records this boundary.
+
