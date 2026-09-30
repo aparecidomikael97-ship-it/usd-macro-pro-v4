@@ -1,4 +1,6 @@
 import ast
+import hashlib
+import json
 import unittest
 from pathlib import Path
 
@@ -13,15 +15,33 @@ from atlasquant_aion_business_capacity_scale_manager import (
 def _capacity_review(tenants=None):
     if tenants is None:
         tenants = ["client-a", "client-b"]
+    quota_rows = [{"tenant_id": tenant} for tenant in tenants]
+    ledger_digest = "9" * 64
+    payload = {
+        "ledger_digest": ledger_digest,
+        "minimum_margin_pct": 20.0,
+        "reserve_capacity_pct": 10.0,
+        "quota_rows": sorted(quota_rows, key=lambda item: item["tenant_id"]),
+    }
+    digest = hashlib.sha256(
+        json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        ).encode("utf-8")
+    ).hexdigest()
     return {
         "schema": "ATLASQUANT_AION_BUSINESS_CAPACITY_QUOTA_GUARDRAIL_V1",
         "version": "1",
         "state": "CAPACITY_QUOTA_REVIEW_READY",
-        "review_digest": "a" * 64,
+        "review_digest": digest,
+        "ledger_digest": ledger_digest,
         "tenant_ids": tenants,
         "minimum_margin_pct": 20.0,
         "reserve_capacity_pct": 10.0,
-        "quota_rows": [],
+        "quota_rows": quota_rows,
         "quota_application_authorized": False,
         "billing_authorized": False,
         "automatic_expansion_allowed": False,
@@ -52,6 +72,7 @@ def _plan(**overrides):
         "usage_rows": _usage(),
         "measurement_ref": "metrics://2026-09-30",
         "approved_monthly_budget_cap_brl": 200.0,
+        "shared_platform_cost_brl": 25.0,
         "available_support_hours": 20.0,
         "support_hours_per_new_tenant": 2.0,
         "infra_headroom_pct": 60.0,
@@ -76,13 +97,34 @@ class BusinessCapacityScaleManagerTests(unittest.TestCase):
         row = _plan()
         self.assertEqual(row["state"], "CAPACITY_SCALE_ADMISSION_READY")
         self.assertEqual(row["current_tenant_count"], 2)
-        self.assertEqual(row["remaining_budget_brl"], 150.0)
-        self.assertEqual(row["budget_slots"], 6)
+        self.assertEqual(row["tenant_month_cost_brl"], 50.0)
+        self.assertEqual(row["shared_platform_cost_brl"], 25.0)
+        self.assertEqual(row["remaining_budget_brl"], 125.0)
+        self.assertEqual(row["budget_slots"], 5)
         self.assertEqual(row["support_slots"], 10)
         self.assertEqual(row["infra_slots"], 8)
         self.assertEqual(row["tenant_slots"], 8)
-        self.assertEqual(row["safe_additional_tenants"], 6)
+        self.assertEqual(row["safe_additional_tenants"], 5)
         self.assertFalse(row["automatic_customer_admission"])
+
+    def test_tampered_capacity_review_is_blocked(self):
+        review = _capacity_review()
+        review["minimum_margin_pct"] = 5.0
+        row = evaluate_capacity_scale(
+            review,
+            usage_rows=_usage(),
+            measurement_ref="metrics://2026-09-30",
+            approved_monthly_budget_cap_brl=200.0,
+            shared_platform_cost_brl=25.0,
+            available_support_hours=20.0,
+            support_hours_per_new_tenant=2.0,
+            infra_headroom_pct=60.0,
+            infra_load_pct_per_new_tenant=5.0,
+            estimated_new_tenant_cost_brl=25.0,
+            expected_new_tenant_revenue_brl=250.0,
+        )
+        self.assertEqual(row["state"], "CAPACITY_SCALE_ADMISSION_BLOCKED")
+        self.assertIn("capacity_review_valid", row["blockers"])
 
     def test_budget_above_current_200_cap_is_blocked(self):
         row = _plan(approved_monthly_budget_cap_brl=201.0)
