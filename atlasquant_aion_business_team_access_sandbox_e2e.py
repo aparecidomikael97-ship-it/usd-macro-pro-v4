@@ -269,14 +269,31 @@ def run_team_access_sandbox_e2e(
     provider_ready = (
         identity.get("schema") == SCHEMA
         and identity.get("state") == "IDENTITY_PROVIDER_SANDBOX_BINDING_READY"
+        and identity.get("provider") == REFERENCE_IDENTITY_PROVIDER
+        and identity.get("protocol") == REFERENCE_IDENTITY_PROTOCOL
+        and len(_clean(identity.get("binding_digest"), 80)) == 64
+        and identity.get("credentials_stored") is False
+        and identity.get("account_provisioned") is False
+        and identity.get("mfa_enrolled") is False
+        and identity.get("executes_action") is False
     )
     storage_ready = (
         storage.get("schema") == SCHEMA
         and storage.get("state") == "REGISTRY_STORAGE_SANDBOX_BINDING_READY"
+        and storage.get("provider") == REFERENCE_REGISTRY_STORAGE
+        and len(_clean(storage.get("binding_digest"), 80)) == 64
+        and storage.get("registry_written") is False
+        and storage.get("database_mutation_authorized") is False
+        and storage.get("executes_action") is False
     )
     revocation_ready = (
         rev_binding.get("schema") == SCHEMA
         and rev_binding.get("state") == "REVOCATION_CONNECTOR_SANDBOX_BINDING_READY"
+        and rev_binding.get("connector") == REFERENCE_REVOCATION_CONNECTOR
+        and len(_clean(rev_binding.get("binding_digest"), 80)) == 64
+        and rev_binding.get("session_revocation_executed") is False
+        and rev_binding.get("account_disable_executed") is False
+        and rev_binding.get("executes_action") is False
     )
 
     account = account_provisioning_attestation(
@@ -341,6 +358,10 @@ def run_team_access_sandbox_e2e(
         == "ACCOUNT_PROVISIONING_ATTESTATION_READY",
         "strong_auth_attestation_ready": auth.get("state")
         == "STRONG_AUTH_ATTESTATION_READY",
+        "strong_auth_bound_to_provider": bool(
+            auth.get("factor_type")
+            and auth.get("factor_type") in list(identity.get("strong_auth_factors") or [])
+        ),
         "registry_attestation_ready": registry.get("state")
         == "REGISTRY_PERSISTENCE_ATTESTATION_READY",
         "activation_review_ready": activation.get("state")
