@@ -311,6 +311,9 @@ from atlasquant_aion_business_capacity_quota_guardrail import (
 from atlasquant_aion_business_quota_application_authorization import (
     quota_application_authorization_requirements as business_quota_application_authorization_requirements,
 )
+from atlasquant_aion_business_team_access_rbac import (
+    TEAM_PROFILES as business_team_access_profiles,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7236,6 +7239,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "20 · Ledger auditável de ciclos de expansão",
             "21 · Capacidade & quotas por tenant",
             "22 · Autorização de aplicação de quotas",
+            "23 · Equipe & Acessos / RBAC",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7592,7 +7596,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "runtime, billing, expansão e ações com clientes continuam separados."
         )
 
-    else:
+    elif view == "22 · Autorização de aplicação de quotas":
         quota_auth = business_quota_application_authorization_requirements()
         st.write(f"Estado: **{quota_auth.get('state')}**")
         st.markdown("**Token explícito obrigatório:**")
@@ -7607,6 +7611,21 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "Mensagens genéricas como 'vamos lá' não autorizam aplicação de quotas. "
             "Billing, expansão, runtime e ações com clientes permanecem separados."
+        )
+
+    else:
+        st.write("Estado: **TEAM_ACCESS_RBAC_IMPLEMENTED_IN_VALIDATION**")
+        st.markdown("**Perfis Business previstos:**")
+        for profile in business_team_access_profiles:
+            st.markdown(f"- {profile}")
+        st.warning(
+            "Funcionário usa conta individual. O login ADMIN não é compartilhado. "
+            "Cada membership fica limitado aos tenants/clientes atribuídos e exige autenticação forte."
+        )
+        st.caption(
+            "O AION obedece à mesma decisão de permissão da interface. "
+            "Cross-tenant, elevação automática, billing, deploy, runtime e outras ações críticas "
+            "continuam bloqueados por gates separados."
         )
 
 
