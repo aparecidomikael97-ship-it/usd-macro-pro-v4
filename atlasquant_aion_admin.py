@@ -268,6 +268,9 @@ from atlasquant_aion_business_consolidation_execution_preflight import (
 from atlasquant_aion_business_consolidation_execution_review_packet import (
     review_packet_template as business_execution_review_packet_template,
 )
+from atlasquant_aion_business_consolidation_post_merge_verification import (
+    post_merge_verification_template as business_post_merge_verification_template,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7181,6 +7184,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "8 · Contrato de autorização explícita",
             "9 · Preflight de execução",
             "10 · Pacote de revisão de execução",
+            "11 · Verificação pós-merge",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7308,7 +7312,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "Ordem sequencial obrigatória · stop-on-drift · BUSINESS runtime OFF · deploy separado."
         )
 
-    else:
+    elif view == "10 · Pacote de revisão de execução":
         packet = business_execution_review_packet_template()
         st.write(f"Estado: **{packet.get('state')}**")
         st.markdown("**Seções obrigatórias do dossiê de revisão:**")
@@ -7320,6 +7324,20 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "Estado máximo: READY_FOR_HUMAN_EXECUTION_REVIEW · "
             "merge_execution_authorized=false · runtime OFF."
+        )
+
+    else:
+        post_merge = business_post_merge_verification_template()
+        st.write(f"Estado: **{post_merge.get('state')}**")
+        st.markdown("**Checks obrigatórios após qualquer merge futuro:**")
+        for item in list(post_merge.get("required_checks") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "Sem merge real e evidência real, o estado permanece POST_MERGE_EVIDENCE_REQUIRED."
+        )
+        st.caption(
+            "Etapa verde: STEP_VERIFIED_FOR_NEXT_PREFLIGHT · "
+            "regressão: ROLLBACK_REVIEW_REQUIRED · rollback automático proibido."
         )
 
 

@@ -966,6 +966,16 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("merge_execution_authorized=false", src)
         self.assertNotIn("st.tabs(", src)
 
+    def test_business_post_merge_verification_requires_real_evidence(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("11 · Verificação pós-merge", src)
+        self.assertIn("Checks obrigatórios após qualquer merge futuro", src)
+        self.assertIn("POST_MERGE_EVIDENCE_REQUIRED", src)
+        self.assertIn("STEP_VERIFIED_FOR_NEXT_PREFLIGHT", src)
+        self.assertIn("ROLLBACK_REVIEW_REQUIRED", src)
+        self.assertIn("rollback automático proibido", src)
+        self.assertNotIn("st.tabs(", src)
+
     def test_business_pilot_governance_keeps_first_pilot_bounded_and_unapproved(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("def _render_business_pilot_governance_demo()", src)
