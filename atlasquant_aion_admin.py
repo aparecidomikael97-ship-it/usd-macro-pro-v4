@@ -308,6 +308,9 @@ from atlasquant_aion_business_expansion_cycle_audit_ledger import (
 from atlasquant_aion_business_capacity_quota_guardrail import (
     capacity_policy_requirements as business_capacity_policy_requirements,
 )
+from atlasquant_aion_business_quota_application_authorization import (
+    quota_application_authorization_requirements as business_quota_application_authorization_requirements,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7232,6 +7235,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "19 · Pós-expansão & congelamento do ciclo",
             "20 · Ledger auditável de ciclos de expansão",
             "21 · Capacidade & quotas por tenant",
+            "22 · Autorização de aplicação de quotas",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7573,7 +7577,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "não cobra, não publica e não executa ações com clientes."
         )
 
-    else:
+    elif view == "21 · Capacidade & quotas por tenant":
         capacity = business_capacity_policy_requirements()
         st.write(f"Estado: **{capacity.get('state')}**")
         st.markdown("**Quotas obrigatórias por tenant:**")
@@ -7586,6 +7590,23 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "A análise não aplica quotas nem cobrança. Mesmo verde, o máximo é uma nova decisão de aplicação; "
             "runtime, billing, expansão e ações com clientes continuam separados."
+        )
+
+    else:
+        quota_auth = business_quota_application_authorization_requirements()
+        st.write(f"Estado: **{quota_auth.get('state')}**")
+        st.markdown("**Token explícito obrigatório:**")
+        st.code(str(quota_auth.get("required_decision_token") or ""), language=None)
+        st.markdown("**Acknowledgements obrigatórios:**")
+        for item in list(quota_auth.get("required_acknowledgements") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "Autorizar o plano não aplica quotas. Antes de qualquer execução futura ainda são exigidos "
+            "janela de mudança, monitoramento, rollback/restauração, dry-run, suporte e resposta a incidentes."
+        )
+        st.caption(
+            "Mensagens genéricas como 'vamos lá' não autorizam aplicação de quotas. "
+            "Billing, expansão, runtime e ações com clientes permanecem separados."
         )
 
 
