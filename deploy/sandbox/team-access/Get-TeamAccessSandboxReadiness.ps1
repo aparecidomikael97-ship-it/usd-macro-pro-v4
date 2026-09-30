@@ -1,9 +1,12 @@
 param(
-    [string]$EnvFile = "$PSScriptRoot\sandbox.env.local",
-    [string]$OutputDir = "$PSScriptRoot\.atlasquant_sandbox_operator"
+    [string]$EnvFile = (Join-Path $env:LOCALAPPDATA "AtlasQuant\team-access-sandbox\team-access-sandbox.env"),
+    [string]$OutputDir = (Join-Path $env:LOCALAPPDATA "AtlasQuant\team-access-sandbox\operator")
 )
 
 $ErrorActionPreference = "Stop"
+if (-not $env:LOCALAPPDATA) {
+    throw "LOCALAPPDATA is required for the default operator paths."
+}
 $ComposeFile = "$PSScriptRoot\compose.yml"
 
 $checks = [ordered]@{
@@ -67,7 +70,8 @@ $payload = [ordered]@{
     secrets_included = $false
     container_started = $false
     production_targeted = $false
-    executes_mutation = $false
+    external_side_effects_executed = $false
+    local_report_written = $true
 }
 
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
