@@ -1287,21 +1287,3 @@ The lifecycle plan builder fails closed without a matching baseline acceptance
 record.
 
 ADR-0073 records this boundary.
-
-
-## BUSINESS team access real sandbox baseline acceptance
-
-`atlasquant_aion_business_team_access_real_baseline_acceptance.py` separates
-technical handoff validity from administrative acceptance of the real sandbox
-baseline.
-
-Acceptance is bound to the handoff digest, baseline evidence digest and
-operator-session id. It requires an exact decision token and all safety
-acknowledgements.
-
-The maximum state is
-`REAL_SANDBOX_BASELINE_ACCEPTED_FOR_LIFECYCLE_PLANNING`. This only makes the
-frozen baseline eligible for planning; lifecycle execution and production stay
-unauthorized.
-
-ADR-0073 records this boundary.
