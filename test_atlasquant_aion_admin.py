@@ -908,6 +908,17 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("Publicados confirmados", src)
         self.assertIn("execução ainda não ocorre nesta tela", src)
 
+    def test_business_diagnostic_proposal_simulator_is_draft_only_and_mobile_stable(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("def _render_business_diagnostic_proposal_simulator()", src)
+        self.assertIn("Simulador de Diagnóstico + Proposta", src)
+        self.assertIn("Gerar diagnóstico e rascunho", src)
+        self.assertIn("RASCUNHO INTERNO · NÃO ENVIADO · NÃO ASSINADO · SEM COBRANÇA", src)
+        self.assertIn("Preço de implantação e mensalidade continuam A DEFINIR", src)
+        self.assertIn("não envia proposta, não assina contrato", src)
+        self.assertIn("Resultado para visualizar", src)
+        self.assertNotIn("tabs = st.tabs(", src)
+
     def test_business_guided_training_is_fixture_only_and_session_bound(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("def _render_business_guided_training()", src)
