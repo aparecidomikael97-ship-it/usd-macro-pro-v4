@@ -30,15 +30,25 @@ $BaselineResolved = (Resolve-Path -LiteralPath $BaselineFile).Path
 $LocalRoot = [System.IO.Path]::GetFullPath(
     (Join-Path $env:LOCALAPPDATA "AtlasQuant\team-access-sandbox")
 )
+$LocalPrefix = $LocalRoot.TrimEnd("\") + "\"
+$RepoPrefix = $RepoRoot.TrimEnd("\") + "\"
+$OutputResolved = [System.IO.Path]::GetFullPath($OutputDir)
 
-if ($EnvResolved.StartsWith($RepoRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
-    throw "Sandbox secrets must stay outside the repository tree."
+if (
+    $EnvResolved.StartsWith($RepoPrefix, [System.StringComparison]::OrdinalIgnoreCase) -or
+    $BaselineResolved.StartsWith($RepoPrefix, [System.StringComparison]::OrdinalIgnoreCase) -or
+    $OutputResolved.StartsWith($RepoPrefix, [System.StringComparison]::OrdinalIgnoreCase)
+) {
+    throw "Step 1 operator artifacts must stay outside the repository tree."
 }
-if (-not $EnvResolved.StartsWith($LocalRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+if (-not $EnvResolved.StartsWith($LocalPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
     throw "Sandbox env file must stay under the approved LOCALAPPDATA sandbox root."
 }
-if (-not $BaselineResolved.StartsWith($LocalRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+if (-not $BaselineResolved.StartsWith($LocalPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
     throw "Baseline evidence must stay under the approved LOCALAPPDATA sandbox root."
+}
+if (-not $OutputResolved.StartsWith($LocalPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "Step 1 observation output must stay under the approved LOCALAPPDATA sandbox root."
 }
 
 $baseline = Get-Content -LiteralPath $BaselineFile -Raw | ConvertFrom-Json
