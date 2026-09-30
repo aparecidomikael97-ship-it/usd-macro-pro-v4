@@ -78,7 +78,7 @@
     "audit_trail": true,
     "aion_must_obey_same_permissions": true,
     "shared_admin_login_forbidden": true,
-    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E_PLUS_PHYSICAL_SANDBOX",
+    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E_PLUS_PHYSICAL_SANDBOX_PLUS_BASELINE_EVIDENCE",
     "production_provisioning": false,
     "real_mfa_2fa": false,
     "persisted_registry": false,
@@ -106,7 +106,13 @@
     "physical_sandbox_manual_apply_required": true,
     "physical_sandbox_secret_env_gitignored": true,
     "physical_sandbox_registry_schema": true,
-    "physical_sandbox_registry_schema_readonly_verifier": true
+    "physical_sandbox_registry_schema_readonly_verifier": true,
+    "sandbox_baseline_evidence_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "sandbox_baseline_evidence_read_only": true,
+    "sandbox_baseline_evidence_gitignored": true,
+    "sandbox_baseline_evidence_secrets_allowed": false,
+    "sandbox_baseline_evidence_state_max": "READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_LIFECYCLE_TEST_REVIEW",
+    "sandbox_real_baseline_collected": false
   },
   "capacity_scale": {
     "status": "IMPLEMENTADO / EM VALIDAÇÃO",
@@ -544,9 +550,25 @@
         "docs/adr/ADR-0065-business-team-access-physical-sandbox.md",
         "deploy/sandbox/team-access/registry/init/001_registry_schema.sql"
       ]
+    },
+    {
+      "id": "D-2026-09-30-TEAM-ACCESS-SANDBOX-EVIDENCE",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_business_team_access_sandbox_evidence.py",
+        "test_atlasquant_aion_business_team_access_sandbox_evidence.py",
+        "validate_team_access_sandbox_evidence.py",
+        "deploy/sandbox/team-access/Collect-TeamAccessSandboxEvidence.ps1",
+        "docs/aion/AION_BUSINESS_TEAM_ACCESS_SANDBOX_EVIDENCE_V1.md",
+        "docs/adr/ADR-0066-business-team-access-sandbox-evidence.md"
+      ]
     }
   ],
   "pending": [
+    "TEAM_ACCESS_SANDBOX_MANUAL_LIFECYCLE_E2E",
+    "TEAM_ACCESS_SANDBOX_REAL_BASELINE_EVIDENCE_COLLECTION",
     "TEAM_ACCESS_PHYSICAL_SANDBOX_MANUAL_START_AND_HEALTHCHECK",
     "TEAM_ACCESS_PRODUCTION_PROVIDER_APPROVAL",
     "TEAM_ACCESS_SANDBOX_SECRET_STORE_AND_CONNECTOR_CONFIGURATION",
