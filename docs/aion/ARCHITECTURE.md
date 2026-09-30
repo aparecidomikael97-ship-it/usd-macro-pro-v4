@@ -621,3 +621,21 @@ runtime posture recheck and rollback-SHA preservation are mandatory before the
 next preflight.
 
 ADR-0033 records this sequential fail-closed execution boundary.
+
+## BUSINESS execution review packet V1
+
+`atlasquant_aion_business_consolidation_execution_review_packet.py` freezes a
+successful execution preflight into a digest-bound dossier for human review. The
+packet includes repository identity, target PR/SHA, base SHA, pre-merge main SHA,
+rollback reference, request digest, evidence reference, reviewer, post-step
+requirements and stop-on-drift posture.
+
+The packet can reach `READY_FOR_HUMAN_EXECUTION_REVIEW` only when all bindings
+are coherent. Any target, rollback or packet digest drift produces a binding
+mismatch and requires the dossier to be rebuilt.
+
+This module creates no authorization and keeps
+`merge_execution_authorized=false`; it performs no GitHub action, deploy,
+pilot or runtime activation.
+
+ADR-0034 records this frozen human-review dossier boundary.
