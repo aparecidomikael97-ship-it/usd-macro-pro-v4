@@ -120,7 +120,7 @@ class TeamAccessSandboxLifecycleEvidenceLedgerTests(unittest.TestCase):
     def test_complete_ten_step_chain_requires_review(self):
         receipts = []
         previous = GENESIS_DIGEST
-        seeds = list("defghijklm")
+        seeds = ["d", "e", "f", "a", "b", "c", "1", "2", "3", "4"]
         for order in range(1, 11):
             receipt = _receipt(order, previous, seeds[order - 1])
             self.assertEqual(
@@ -142,6 +142,15 @@ class TeamAccessSandboxLifecycleEvidenceLedgerTests(unittest.TestCase):
         self.assertTrue(ledger["ledger_digest"])
         self.assertFalse(ledger["production_authorized"])
         self.assertFalse(ledger["executes_action"])
+
+    def test_tampered_receipt_digest_blocks(self):
+        first = _receipt(1, GENESIS_DIGEST, "d")
+        first["evidence_digest"] = "e" * 64
+        ledger = build_lifecycle_evidence_ledger(_plan(), _auth(), [first])
+        self.assertEqual(
+            ledger["state"], "SANDBOX_LIFECYCLE_EVIDENCE_LEDGER_BLOCKED"
+        )
+        self.assertIn("receipt_integrity", ledger["entries"][0]["blockers"])
 
     def test_missing_verified_authorization_blocks(self):
         ledger = build_lifecycle_evidence_ledger(_plan(), {}, [])
