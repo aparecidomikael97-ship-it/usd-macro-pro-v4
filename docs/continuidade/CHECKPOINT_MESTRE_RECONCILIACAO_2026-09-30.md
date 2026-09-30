@@ -97,6 +97,20 @@ username sandbox, tenant explícito e MFA forte. O máximo é
 `READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_LIFECYCLE_EXECUTION_DECISION`; nenhuma
 mutação é executada ou autorizada automaticamente.
 
+Estado da autorização formal do lifecycle sandbox:
+**IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_business_team_access_sandbox_lifecycle_authorization.py`,
+ADR-0068 e testes associados. O registro futuro deve estar preso ao plan digest
+e baseline digest exatos, com token e acknowledgements completos. Nenhuma
+autorização real foi registrada neste bloco e o executor permanece OFF.
+
+Estado do ledger auditável do lifecycle sandbox:
+**IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_business_team_access_sandbox_lifecycle_evidence_ledger.py`,
+ADR-0069 e testes associados. O ledger aceita recibos sanitizados em cadeia
+SHA-256, exige ordem 1→10, recalcula a integridade de cada receipt e rejeita
+drift, duplicação ou quebra de cadeia. Nenhum step real foi executado.
+
 Estado do binding de oportunidades com economia real: **IMPLEMENTADO / EM VALIDAÇÃO**
 em `atlasquant_aion_business_revenue_live_economics_binding.py`, ADR-0062 e
 testes associados. Custo mensal passa a vir do ledger FinOps verificado e
@@ -371,3 +385,5 @@ PENDENTE / APROVADO:
 | D-2026-09-30-TEAM-ACCESS-PHYSICAL-SANDBOX | IMPLEMENTADO / EM VALIDAÇÃO | Sandbox local reproduzível, localhost-only e com partida manual explícita |
 | D-2026-09-30-TEAM-ACCESS-SANDBOX-EVIDENCE | IMPLEMENTADO / EM VALIDAÇÃO | Baseline local sanitizado prepara revisão antes do lifecycle manual |
 | D-2026-09-30-TEAM-ACCESS-SANDBOX-LIFECYCLE-PLAN | IMPLEMENTADO / EM VALIDAÇÃO | Lifecycle sandbox vira plano de dez etapas com decisão explícita separada |
+| D-2026-09-30-TEAM-ACCESS-SANDBOX-LIFECYCLE-AUTHORIZATION | IMPLEMENTADO / EM VALIDAÇÃO | Registro formal futuro fica preso ao plano/baseline e não habilita executor |
+| D-2026-09-30-TEAM-ACCESS-SANDBOX-LIFECYCLE-LEDGER | IMPLEMENTADO / EM VALIDAÇÃO | Evidências por step ficam em ledger hash-chain sanitizado e sequencial |

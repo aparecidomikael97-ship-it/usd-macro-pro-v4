@@ -78,7 +78,7 @@
     "audit_trail": true,
     "aion_must_obey_same_permissions": true,
     "shared_admin_login_forbidden": true,
-    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E_PLUS_PHYSICAL_SANDBOX_PLUS_BASELINE_EVIDENCE_PLUS_LIFECYCLE_PLAN",
+    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E_PLUS_PHYSICAL_SANDBOX_PLUS_BASELINE_EVIDENCE_PLUS_LIFECYCLE_PLAN_PLUS_AUTHORIZATION_CONTRACT_PLUS_EVIDENCE_LEDGER",
     "production_provisioning": false,
     "real_mfa_2fa": false,
     "persisted_registry": false,
@@ -118,7 +118,15 @@
     "sandbox_lifecycle_plan_requires_explicit_decision": true,
     "sandbox_lifecycle_plan_token": "AUTHORIZE_TEAM_ACCESS_SANDBOX_LIFECYCLE_TEST",
     "sandbox_lifecycle_automatic_apply": false,
-    "sandbox_lifecycle_real_execution_authorized": false
+    "sandbox_lifecycle_real_execution_authorized": false,
+    "sandbox_lifecycle_authorization_contract_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "sandbox_lifecycle_authorization_recorded": false,
+    "sandbox_lifecycle_generic_language_is_authorization": false,
+    "sandbox_lifecycle_executor_enabled": false,
+    "sandbox_lifecycle_ledger_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "sandbox_lifecycle_ledger_model": "APPEND_ONLY_HASH_CHAIN",
+    "sandbox_lifecycle_completed_steps": 0,
+    "sandbox_lifecycle_ledger_complete": false
   },
   "capacity_scale": {
     "status": "IMPLEMENTADO / EM VALIDAÇÃO",
@@ -220,7 +228,8 @@
       452,
       453,
       454,
-      455
+      455,
+      456
     ],
     "current_runtime_authorized": false,
     "merge_authorized_by_this_checkpoint": false,
@@ -247,7 +256,8 @@
     "team_access_sandbox_e2e_pr": 452,
     "team_access_physical_sandbox_pr": 453,
     "team_access_sandbox_evidence_pr": 454,
-    "team_access_sandbox_lifecycle_plan_pr": 455
+    "team_access_sandbox_lifecycle_plan_pr": 455,
+    "team_access_sandbox_lifecycle_auth_ledger_pr": 456
   },
   "decisions": [
     {
@@ -586,9 +596,35 @@
         "docs/aion/AION_BUSINESS_TEAM_ACCESS_SANDBOX_LIFECYCLE_PLAN_V1.md",
         "docs/adr/ADR-0067-business-team-access-sandbox-lifecycle-plan.md"
       ]
+    },
+    {
+      "id": "D-2026-09-30-TEAM-ACCESS-SANDBOX-LIFECYCLE-AUTHORIZATION",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_business_team_access_sandbox_lifecycle_authorization.py",
+        "test_atlasquant_aion_business_team_access_sandbox_lifecycle_authorization.py",
+        "deploy/sandbox/team-access/lifecycle-authorization-record.template.json",
+        "docs/adr/ADR-0068-business-team-access-sandbox-lifecycle-authorization.md"
+      ]
+    },
+    {
+      "id": "D-2026-09-30-TEAM-ACCESS-SANDBOX-LIFECYCLE-LEDGER",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_business_team_access_sandbox_lifecycle_evidence_ledger.py",
+        "test_atlasquant_aion_business_team_access_sandbox_lifecycle_evidence_ledger.py",
+        "deploy/sandbox/team-access/lifecycle-evidence-receipt.template.json",
+        "docs/adr/ADR-0069-business-team-access-sandbox-lifecycle-evidence-ledger.md"
+      ]
     }
   ],
   "pending": [
+    "TEAM_ACCESS_SANDBOX_LIFECYCLE_STEP_1_MANUAL_EXECUTION",
+    "TEAM_ACCESS_SANDBOX_LIFECYCLE_EXPLICIT_AUTHORIZATION_RECORD",
     "TEAM_ACCESS_SANDBOX_LIFECYCLE_EXPLICIT_ADMIN_DECISION",
     "TEAM_ACCESS_SANDBOX_MANUAL_LIFECYCLE_E2E",
     "TEAM_ACCESS_SANDBOX_REAL_BASELINE_EVIDENCE_COLLECTION",
