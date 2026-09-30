@@ -96,10 +96,11 @@ class ConsolidationProgressLedgerTests(unittest.TestCase):
     def test_all_19_verified_steps_require_final_human_review(self):
         rows = []
         previous = ROOT
-        alphabet = "123456789abcdefghi"
         for index, pr in enumerate(range(394, 413)):
             observed = f"{index + 1:040x}"
-            rows.append(_step(pr, previous, observed, alphabet[index]))
+            step = _step(pr, previous, observed, "a")
+            step["verification_receipt_digest"] = f"{index + 1:064x}"
+            rows.append(step)
             previous = observed
         row = build_progress_ledger(rows, root_main_sha=ROOT)
         self.assertEqual(row["state"], "CONSOLIDATION_COMPLETE_REVIEW_REQUIRED")
