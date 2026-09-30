@@ -235,6 +235,13 @@ from atlasquant_aion_business_master_readiness import (
     pilot_review_packet as business_pilot_review_packet,
     status_rows as business_master_status_rows,
 )
+from atlasquant_aion_business_stack_consolidation import (
+    administrative_options as business_stack_admin_options,
+    consolidation_preview as business_stack_consolidation_preview,
+    default_green_evidence as business_stack_default_green_evidence,
+    release_bundle_manifest as business_stack_release_bundle,
+    validate_stack as business_validate_stack,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -6986,6 +6993,64 @@ def _render_business_master_readiness() -> None:
             st.caption("Mesmo elegível, o packet não autoriza piloto automaticamente.")
 
 
+
+def _render_business_stack_consolidation() -> None:
+    """Show frozen Draft PR stack evidence without granting merge authority."""
+    validation = business_validate_stack(business_stack_default_green_evidence())
+    preview = business_stack_consolidation_preview(validation)
+    bundle = business_stack_release_bundle(validation)
+    options = business_stack_admin_options(validation)
+
+    st.markdown("#### 🧱 Consolidação da Stack Business · Revisão Administrativa")
+    st.caption(
+        "Snapshot congelado de 30/09/2026 para as Draft PRs #398–#411. "
+        "O app não consulta GitHub ao vivo neste painel; qualquer decisão de merge exige "
+        "revalidação externa dos SHAs/checks."
+    )
+    s1,s2,s3 = st.columns(3)
+    s1.metric("Draft PRs", int(validation.get("pr_count") or 0))
+    s2.metric("Validadas no snapshot", int(validation.get("passed_count") or 0))
+    s3.metric("Bloqueadas", int(validation.get("blocked_count") or 0))
+
+    if validation.get("state") == "READY_FOR_ADMIN_REVIEW":
+        st.success(
+            "Stack consistente no snapshot: ordem, bases, SHAs e checks obrigatórios estão coerentes."
+        )
+    else:
+        st.error("Existem bloqueios no snapshot. Não preparar consolidação.")
+
+    st.warning(
+        "READY_FOR_ADMIN_REVIEW ≠ merge autorizado. Nenhuma PR é mergeada por este painel, "
+        "nenhum deploy é disparado e o runtime Business continua OFF."
+    )
+
+    with st.expander("Ver ordem de consolidação", expanded=False):
+        sequence = list(preview.get("sequence") or [])
+        for item in sequence:
+            if isinstance(item, Mapping):
+                st.markdown(
+                    f"**{item.get('order')}. PR #{item.get('pr')}** · {item.get('title')}  \n"
+                    f"`{item.get('head_sha')}`"
+                )
+        if sequence:
+            st.caption(
+                "Estratégia técnica prevista: stacked order, da PR mais antiga para a mais nova. "
+                "Depois seria obrigatório revalidar CI na main e conferir o SHA final."
+            )
+
+    with st.expander("Ver opções administrativas", expanded=False):
+        for item in options:
+            if isinstance(item, Mapping):
+                st.markdown(f"- **{item.get('label')}**")
+        if bundle.get("bundle_digest"):
+            st.caption(
+                f"Bundle congelado para revisão: {str(bundle.get('bundle_digest'))[:16]}…"
+            )
+        st.caption(
+            "As opções acima são informativas. Este painel não executa merge, rebase ou deploy."
+        )
+
+
 def _render_business(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
@@ -6995,6 +7060,7 @@ def _render_business(
     demo_snapshot = business_demo_snapshot()
     st.markdown(business_demo_html(), unsafe_allow_html=True)
     _render_business_master_readiness()
+    _render_business_stack_consolidation()
     with st.expander("🎓 Treinamento do administrador · visão geral", expanded=False):
         st.caption(
             "Treinamento interno antes de divulgação. Entender primeiro, demonstrar depois e "
