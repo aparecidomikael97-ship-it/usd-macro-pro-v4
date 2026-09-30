@@ -86,3 +86,4 @@ Average Daily Range e American Depositary Receipts não têm arquivo aqui. Seu e
 | ADR-0055 | ACCEPTED | `docs/adr/ADR-0055-backup-recovery-policy.md` |
 | ADR-0056 | ACCEPTED | `docs/adr/ADR-0056-independence-clt-index.md` |
 | ADR-0057 | ACCEPTED | `docs/adr/ADR-0057-business-commercial-live-data-binding.md` |
+| ADR-0058 | ACCEPTED | `docs/adr/ADR-0058-finops-live-cost-ledger.md` |
