@@ -199,6 +199,15 @@ from atlasquant_aion_business_trend_intelligence import (
     rank_opportunities as business_rank_opportunities,
     trend_watch_posture as business_trend_watch_posture,
 )
+from atlasquant_aion_business_commercial_acquisition_demo import (
+    build_channel_plan as business_build_channel_plan,
+    build_content_plan as business_build_content_plan,
+    build_contract_handoff as business_build_contract_handoff,
+    build_landing_page_brief as business_build_landing_page_brief,
+    commercial_funnel_snapshot as business_commercial_funnel_snapshot,
+    outreach_draft as business_outreach_draft,
+    qualify_prospect as business_qualify_prospect,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -6407,6 +6416,177 @@ def _render_business_trend_intelligence_demo() -> None:
         )
 
 
+
+def _render_business_commercial_acquisition_demo() -> None:
+    """Demo of acquisition, divulgação, outreach, contract handoff and content."""
+    st.markdown("#### 🚀 Captação, Divulgação & Contrato · Demo")
+    st.caption(
+        "Mostra como a empresa entra no funil, como o site/divulgação explicam a oferta, "
+        "como o lead é qualificado e como a proposta segue para contrato e onboarding. "
+        "Nada é enviado, publicado, assinado ou cobrado."
+    )
+
+    simulator = st.session_state.get("aion_business_simulator_result")
+    diagnostic = (
+        simulator.get("diagnostic")
+        if isinstance(simulator, Mapping) and isinstance(simulator.get("diagnostic"), Mapping)
+        else {}
+    )
+    fit = (
+        simulator.get("fit")
+        if isinstance(simulator, Mapping) and isinstance(simulator.get("fit"), Mapping)
+        else {}
+    )
+    intake = diagnostic.get("intake") if isinstance(diagnostic.get("intake"), Mapping) else {}
+    segment = str(intake.get("segment") or "Clínica")
+    company = str(intake.get("company_name") or "Empresa Demo")
+    package = str(fit.get("package_label") or "AION Business")
+
+    view = st.selectbox(
+        "Etapa comercial",
+        (
+            "1 · Onde buscar empresas",
+            "2 · Site / Landing Page",
+            "3 · Qualificação & abordagem",
+            "4 · Contrato & entrega",
+            "5 · Conteúdo & divulgação",
+            "6 · Funil",
+        ),
+        key="aion_business_commercial_acquisition_view",
+        help="Uma etapa por vez para manter a experiência leve no celular.",
+    )
+
+    if view == "1 · Onde buscar empresas":
+        plan = business_build_channel_plan(segment)
+        st.markdown(f"**Plano de captação para {segment}**")
+        for item in list(plan.get("channels") or []):
+            if isinstance(item, Mapping):
+                st.markdown(f"**{item.get('id')}**  \n{item.get('play')}")
+        st.caption(
+            "A lista organiza canais de prospecção. Não coleta dados, não raspa contatos e "
+            "não dispara mensagens automaticamente."
+        )
+
+    elif view == "2 · Site / Landing Page":
+        brief = business_build_landing_page_brief(
+            segment=segment,
+            offer_name=package,
+            primary_problem=(
+                "Atendimento, follow-up, divulgação e gestão ficam fragmentados e difíceis de acompanhar."
+            ),
+            package_summary=(
+                "Diagnóstico + implantação + Radar/Portal simples + manutenção mensal dentro do escopo."
+            ),
+        )
+        body = brief.get("brief") if isinstance(brief.get("brief"), Mapping) else {}
+        st.markdown(f"### {body.get('headline') or 'AION Business'}")
+        st.write(str(body.get("problem") or ""))
+        st.markdown("**Como o site deve ser organizado**")
+        for section in list(body.get("sections") or []):
+            st.markdown(f"- {section}")
+        st.success(f"CTA principal: **{body.get('cta') or 'Solicitar diagnóstico'}**")
+        st.caption(
+            "O site vende o próximo passo — diagnóstico — e não promete lucro ou vendas garantidas."
+        )
+
+    elif view == "3 · Qualificação & abordagem":
+        st.markdown("**Exercício de lead fictício**")
+        permission = st.selectbox(
+            "Estado de permissão do contato",
+            ["UNKNOWN", "PERMITTED_DEMO", "OPT_IN_DEMO", "DO_NOT_CONTACT"],
+            key="aion_business_commercial_permission",
+        )
+        pain = st.slider("Aderência do problema", 0, 100, 85, key="aion_business_commercial_pain")
+        urgency = st.slider("Urgência", 0, 100, 70, key="aion_business_commercial_urgency")
+        recurring = st.slider("Aderência a recorrência", 0, 100, 90, key="aion_business_commercial_recurring")
+        prospect = business_qualify_prospect({
+            "company_name": company,
+            "segment": segment,
+            "contact_permission_state": permission,
+            "pain_fit": pain,
+            "urgency": urgency,
+            "recurring_fit": recurring,
+            "decision_maker_access": 70,
+            "data_readiness": 70,
+        })
+        p1,p2 = st.columns(2)
+        p1.metric("Score", "N/D" if prospect.get("score") is None else f"{float(prospect.get('score')):.1f}/100")
+        p2.metric("Estado", str(prospect.get("state") or "UNKNOWN"))
+        draft = business_outreach_draft(prospect, sender_name="Mikael")
+        if draft.get("draft"):
+            st.markdown("**Rascunho de abordagem**")
+            st.write(str(draft.get("draft")))
+            st.caption("Rascunho somente; revisão humana obrigatória; não enviado.")
+        else:
+            st.warning(
+                f"Abordagem bloqueada neste exercício: {draft.get('state') or 'UNKNOWN'}."
+            )
+
+    elif view == "4 · Contrato & entrega":
+        st.markdown("**Trâmite depois da proposta**")
+        handoff = business_build_contract_handoff(
+            company_name=company,
+            proposal_ready=True,
+            scope_confirmed=True,
+            privacy_terms_reviewed=True,
+            sla_defined=True,
+            commercial_terms_defined=True,
+        )
+        for item in list(handoff.get("flow") or []):
+            if isinstance(item, Mapping):
+                st.markdown(f"- **{item.get('stage')}** — {item.get('status')}")
+        st.info(
+            "Depois da revisão comercial/jurídica e assinatura real, o fluxo segue para cobrança "
+            "e onboarding. Este demo para antes disso."
+        )
+        st.write(
+            f"Portal do cliente: **{handoff.get('client_portal_state') or 'A DEFINIR'}**"
+        )
+        st.caption(
+            "Nenhum contrato foi assinado, nenhuma fatura foi emitida e nenhum pagamento foi coletado."
+        )
+
+    elif view == "5 · Conteúdo & divulgação":
+        verified_case = st.checkbox(
+            "Existe caso real verificado disponível?",
+            value=False,
+            key="aion_business_commercial_verified_case",
+        )
+        plan = business_build_content_plan(
+            segment=segment,
+            weeks=6,
+            verified_case_available=verified_case,
+        )
+        st.markdown("**Plano editorial demonstrativo**")
+        for item in list(plan.get("items") or []):
+            if isinstance(item, Mapping):
+                st.markdown(
+                    f"- Semana {item.get('week')} · **{item.get('content_type')}** — {item.get('theme')}"
+                )
+        st.caption(
+            "Conteúdo nasce como DRAFT. Publicação exige aprovação. Caso real só entra se for verificável."
+        )
+
+    else:
+        snapshot = business_commercial_funnel_snapshot({
+            "PROSPECT": 30,
+            "QUALIFIED": 12,
+            "DIAGNOSTIC": 8,
+            "PROPOSAL_DRAFT": 4,
+            "CONTRACT_REVIEW": 2,
+            "ONBOARDING_READY": 1,
+        })
+        counts = snapshot.get("counts") if isinstance(snapshot.get("counts"), Mapping) else {}
+        f1,f2,f3,f4 = st.columns(4)
+        f1.metric("Prospects", int(counts.get("PROSPECT") or 0))
+        f2.metric("Qualificados", int(counts.get("QUALIFIED") or 0))
+        f3.metric("Diagnósticos", int(counts.get("DIAGNOSTIC") or 0))
+        f4.metric("Propostas", int(counts.get("PROPOSAL_DRAFT") or 0))
+        st.caption(
+            "Funil fictício. Contatos reais enviados, contratos assinados e pagamentos reais continuam em zero."
+        )
+
+
 def _render_business(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
@@ -6429,6 +6609,7 @@ def _render_business(
     _render_business_customer_success_demo()
     _render_business_client_finance_demo()
     _render_business_trend_intelligence_demo()
+    _render_business_commercial_acquisition_demo()
     _render_persona_capabilities("business", {
         "catalog": True,
         "suppliers": True,
