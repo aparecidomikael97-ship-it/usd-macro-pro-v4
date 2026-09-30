@@ -328,3 +328,15 @@ The runner is restricted to localhost Keycloak sandbox, checks that the target
 username is absent immediately before the POST, requires HTTP 201, performs an
 exact readback, and writes a sanitized receipt under LOCALAPPDATA. It never
 appends the lifecycle ledger automatically.
+
+
+## Step 1 provider receipt review
+
+After a real guarded Step 1 apply produces a sanitized receipt, validate the
+entire causal chain before considering a lifecycle-ledger append:
+
+    python validate_team_access_step1_provider_receipt.py <materialization.json> <authorization-package.json> <step1-preflight.json> <execution-envelope.json> <apply-plan.json> <runner-preflight.json> <provider-receipt.json> --output "%LOCALAPPDATA%\AtlasQuant\team-access-sandbox\operator\step1-provider-receipt-review.json"
+
+The validator builds only an in-memory ledger preview. A valid preview must show
+Step 1 completed and Step 2 as next expected. It never appends the persisted
+ledger and never authorizes Step 2 automatically.
