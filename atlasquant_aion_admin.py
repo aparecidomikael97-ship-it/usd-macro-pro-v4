@@ -159,6 +159,13 @@ from atlasquant_aion_business_training import (
     training_scorecard as business_training_scorecard,
     training_session as business_training_session,
 )
+from atlasquant_aion_business_proposal_simulator import (
+    build_proposal_draft as business_build_proposal_draft,
+    client_radar as business_client_radar,
+    diagnose_business as business_diagnose_company,
+    proposal_text as business_proposal_text,
+    recommend_package as business_recommend_package,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -5293,6 +5300,244 @@ def _render_business_guided_training() -> None:
         )
 
 
+
+def _render_business_diagnostic_proposal_simulator() -> None:
+    """Session-only diagnostic/proposal simulator. Draft-only, no external action."""
+    st.markdown("#### 🧭 Simulador de Diagnóstico + Proposta")
+    st.caption(
+        "Use dados fictícios para praticar o processo completo. Nada é enviado, cobrado, "
+        "assinado ou publicado. Preços permanecem A DEFINIR até existir escopo real validado."
+    )
+
+    with st.form("aion_business_diagnostic_simulator_form", clear_on_submit=False):
+        company_name = st.text_input(
+            "Empresa fictícia",
+            value="Clínica Horizonte Demo",
+            key="aion_business_sim_company",
+        )
+        segment = st.text_input(
+            "Segmento",
+            value="Clínica",
+            key="aion_business_sim_segment",
+        )
+        channels = st.multiselect(
+            "Canais usados",
+            ["WhatsApp", "Instagram", "Facebook", "Site", "Google", "Telefone", "E-mail"],
+            default=["WhatsApp", "Instagram"],
+            key="aion_business_sim_channels",
+        )
+        weekly_leads = st.number_input(
+            "Leads por semana",
+            min_value=0,
+            max_value=100000,
+            value=120,
+            step=1,
+            key="aion_business_sim_weekly_leads",
+        )
+        avg_response_hours = st.number_input(
+            "Tempo médio de resposta (horas)",
+            min_value=0.0,
+            max_value=720.0,
+            value=4.5,
+            step=0.5,
+            key="aion_business_sim_response",
+        )
+        abandoned_quotes = st.number_input(
+            "Orçamentos/leads abandonados por mês",
+            min_value=0,
+            max_value=100000,
+            value=18,
+            step=1,
+            key="aion_business_sim_abandoned",
+        )
+        returning_pct = st.number_input(
+            "Clientes retornando (%)",
+            min_value=0.0,
+            max_value=100.0,
+            value=14.0,
+            step=1.0,
+            key="aion_business_sim_returning",
+        )
+        content_posts = st.number_input(
+            "Publicações de conteúdo por mês",
+            min_value=0,
+            max_value=1000,
+            value=2,
+            step=1,
+            key="aion_business_sim_posts",
+        )
+        followup = st.radio(
+            "Existe processo de follow-up?",
+            ["Não", "Sim"],
+            horizontal=True,
+            key="aion_business_sim_followup",
+        )
+        crm = st.radio(
+            "Existe CRM/pipeline organizado?",
+            ["Não", "Sim"],
+            horizontal=True,
+            key="aion_business_sim_crm",
+        )
+        sla = st.radio(
+            "Existe SLA/tempo-alvo de atendimento?",
+            ["Não", "Sim"],
+            horizontal=True,
+            key="aion_business_sim_sla",
+        )
+        conversion = st.radio(
+            "A empresa mede conversão?",
+            ["Não", "Sim"],
+            horizontal=True,
+            key="aion_business_sim_conversion",
+        )
+        goals_text = st.text_input(
+            "Objetivos do exercício",
+            value="responder mais rápido; recuperar leads; organizar atendimento",
+            key="aion_business_sim_goals",
+        )
+        notes = st.text_area(
+            "Observações fictícias",
+            value="Treino interno do administrador.",
+            key="aion_business_sim_notes",
+        )
+        generate = st.form_submit_button("Gerar diagnóstico e rascunho")
+
+    if generate:
+        goals = [item.strip() for item in goals_text.split(";") if item.strip()]
+        intake = {
+            "company_name": company_name,
+            "segment": segment,
+            "channels": channels,
+            "goals": goals,
+            "weekly_leads": weekly_leads,
+            "avg_response_hours": avg_response_hours,
+            "abandoned_quotes_monthly": abandoned_quotes,
+            "returning_customers_pct": returning_pct,
+            "content_posts_monthly": content_posts,
+            "has_followup_process": followup == "Sim",
+            "has_crm": crm == "Sim",
+            "has_sla": sla == "Sim",
+            "tracks_conversion": conversion == "Sim",
+            "notes": notes,
+        }
+        diagnostic = business_diagnose_company(intake)
+        fit = business_recommend_package(diagnostic)
+        radar = business_client_radar(diagnostic)
+        proposal = business_build_proposal_draft(diagnostic, fit)
+        st.session_state["aion_business_simulator_result"] = {
+            "diagnostic": diagnostic,
+            "fit": fit,
+            "radar": radar,
+            "proposal": proposal,
+            "proposal_text": business_proposal_text(proposal),
+        }
+
+    result = st.session_state.get("aion_business_simulator_result")
+    if not isinstance(result, Mapping):
+        st.info("Preencha o exercício e toque em **Gerar diagnóstico e rascunho**.")
+        return
+
+    diagnostic = result.get("diagnostic") if isinstance(result.get("diagnostic"), Mapping) else {}
+    fit = result.get("fit") if isinstance(result.get("fit"), Mapping) else {}
+    radar = result.get("radar") if isinstance(result.get("radar"), Mapping) else {}
+    proposal = result.get("proposal") if isinstance(result.get("proposal"), Mapping) else {}
+
+    stages = (
+        "1 · Diagnóstico",
+        "2 · Radar",
+        "3 · Pacote",
+        "4 · Proposta",
+    )
+    selected = st.selectbox(
+        "Resultado para visualizar",
+        stages,
+        key="aion_business_simulator_result_stage",
+        help="Uma etapa por vez para manter a experiência leve no celular.",
+    )
+
+    if selected == stages[0]:
+        st.markdown("**Diagnóstico preliminar do exercício**")
+        st.caption(
+            f"Fonte: {diagnostic.get('truth_state') or 'UNKNOWN'} · "
+            "empresa real não verificada · sem execução externa."
+        )
+        issues = diagnostic.get("issues") if isinstance(diagnostic.get("issues"), list) else []
+        if not issues:
+            st.success("Nenhum alerta básico foi acionado pelos dados deste exercício.")
+        for issue in issues:
+            if not isinstance(issue, Mapping):
+                continue
+            st.markdown(
+                f"**{issue.get('pillar_label')} · {issue.get('severity')} — {issue.get('title')}**"
+            )
+            st.caption(str(issue.get("evidence") or ""))
+            st.write(str(issue.get("recommendation") or ""))
+
+    elif selected == stages[1]:
+        st.markdown("**Radar do Negócio · exercício fictício**")
+        cards = radar.get("cards") if isinstance(radar.get("cards"), list) else []
+        cols = st.columns(4)
+        for index, card in enumerate(cards[:4]):
+            if not isinstance(card, Mapping):
+                continue
+            cols[index].metric(
+                str(card.get("label") or ""),
+                f"{int(card.get('health_score') or 0)}/100",
+                str(card.get("state") or ""),
+            )
+        st.markdown("**Próximas ações sugeridas para revisão**")
+        actions = radar.get("next_actions") if isinstance(radar.get("next_actions"), list) else []
+        for item in actions:
+            if isinstance(item, Mapping):
+                st.markdown(
+                    f"- **{item.get('severity')} · {item.get('title')}** — "
+                    f"{item.get('recommendation')}"
+                )
+        st.caption("Radar didático; não representa dados reais nem garantia de resultado.")
+
+    elif selected == stages[2]:
+        st.success(f"**Pacote preliminar:** {fit.get('package_label') or 'A DEFINIR'}")
+        st.write(str(fit.get("reason") or ""))
+        st.markdown("**Entregas preliminares**")
+        for item in list(fit.get("deliverables") or []):
+            st.markdown(f"- {item}")
+        st.info(
+            "Preço de implantação e mensalidade continuam A DEFINIR. "
+            "Em cliente real, diagnóstico + escopo + integrações + volume vêm antes do preço."
+        )
+
+    else:
+        p = proposal.get("proposal") if isinstance(proposal.get("proposal"), Mapping) else {}
+        if proposal.get("state") != "DRAFT_READY":
+            st.warning("O diagnóstico ainda não tem dados suficientes para montar a proposta.")
+            return
+        st.markdown(f"**{p.get('title')}**")
+        st.caption("RASCUNHO INTERNO · NÃO ENVIADO · NÃO ASSINADO · SEM COBRANÇA")
+        st.markdown("**Objetivo**")
+        st.write(str(p.get("objective") or ""))
+        st.markdown("**Entregas previstas**")
+        for item in list(p.get("deliverables") or []):
+            st.markdown(f"- {item}")
+        st.markdown("**Implantação**")
+        for item in list(p.get("implementation_phases") or []):
+            st.markdown(f"- {item}")
+        st.markdown("**Manutenção mensal**")
+        for item in list(p.get("monthly_maintenance") or []):
+            st.markdown(f"- {item}")
+        terms = p.get("commercial_terms") if isinstance(p.get("commercial_terms"), Mapping) else {}
+        st.markdown("**Condições comerciais**")
+        st.write(f"Implantação: **{terms.get('implementation_price') or 'A DEFINIR'}**")
+        st.write(f"Mensalidade: **{terms.get('monthly_maintenance') or 'A DEFINIR'}**")
+        st.markdown("**Próximo passo**")
+        st.write(str(p.get("next_step") or ""))
+        with st.expander("Ver texto completo do rascunho", expanded=False):
+            st.code(str(result.get("proposal_text") or ""), language=None)
+        st.caption(
+            "Este simulador só produz rascunho. Não envia proposta, não assina contrato, "
+            "não cobra e não ativa runtime."
+        )
+
+
 def _render_business(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
@@ -5309,6 +5554,7 @@ def _render_business(
         for index, instruction in enumerate(demo_snapshot["training_steps"], start=1):
             st.markdown(f"**{index}.** {instruction}")
     _render_business_guided_training()
+    _render_business_diagnostic_proposal_simulator()
     _render_persona_capabilities("business", {
         "catalog": True,
         "suppliers": True,
