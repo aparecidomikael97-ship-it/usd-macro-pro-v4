@@ -1,10 +1,14 @@
 param(
-    [string]$EnvFile = "$PSScriptRoot\sandbox.env.local",
+    [string]$EnvFile = (Join-Path $env:LOCALAPPDATA "AtlasQuant\team-access-sandbox\team-access-sandbox.env"),
     [switch]$Apply,
     [switch]$ReplaceExisting
 )
 
 $ErrorActionPreference = "Stop"
+
+if (-not $env:LOCALAPPDATA) {
+    throw "LOCALAPPDATA is required for the default local secret path."
+}
 
 function New-LocalSecret {
     param([int]$Bytes = 32)
