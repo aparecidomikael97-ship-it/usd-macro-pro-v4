@@ -947,6 +947,16 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("Mesmo um registro explícito validado não executa merge", src)
         self.assertNotIn("st.tabs(", src)
 
+    def test_business_execution_preflight_is_last_read_only_barrier(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("9 · Preflight de execução", src)
+        self.assertIn("Gates da última barreira antes de qualquer merge físico", src)
+        self.assertIn("Depois de cada etapa futura", src)
+        self.assertIn("MERGE_EXECUTION_REVIEW_REQUIRED", src)
+        self.assertIn("não executa nem autoriza fisicamente merge", src)
+        self.assertIn("stop-on-drift", src)
+        self.assertNotIn("st.tabs(", src)
+
     def test_business_pilot_governance_keeps_first_pilot_bounded_and_unapproved(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("def _render_business_pilot_governance_demo()", src)
