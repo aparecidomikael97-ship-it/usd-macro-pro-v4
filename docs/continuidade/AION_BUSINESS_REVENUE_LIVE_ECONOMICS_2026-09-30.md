@@ -22,6 +22,8 @@ Empilhado sobre a Draft PR #449.
 
 ## Estado
 
+Draft PR #450 — AION BUSINESS: revenue live economics binding V1.
+
 IMPLEMENTADO / EM VALIDAÇÃO.
 
 Ainda pendente:
