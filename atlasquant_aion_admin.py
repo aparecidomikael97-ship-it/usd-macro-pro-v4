@@ -338,6 +338,9 @@ from atlasquant_aion_backup_recovery_policy import (
     backup_recovery_policy as aion_backup_recovery_policy,
     audit_repository_backup_readiness as aion_audit_repository_backup_readiness,
 )
+from atlasquant_aion_independence_index import (
+    independence_policy as aion_independence_policy,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7270,6 +7273,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "27 · Oferta B2B & Receita",
             "28 · Primeiro Piloto & Preco",
             "29 · Backup & Recovery",
+            "30 · Indice de Independencia CLT",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7772,7 +7776,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "permanecem bloqueados até gates separados."
         )
 
-    else:
+    elif view == "29 · Backup & Recovery":
         policy = aion_backup_recovery_policy()
         readiness = aion_audit_repository_backup_readiness()
         st.write(f"Política: **{policy.get('state')}**")
@@ -7787,6 +7791,27 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "O backup de código valida SHA256, testa o ZIP e confere arquivos críticos. "
             "O checkpoint de runtime continua versionado separadamente."
+        )
+
+    else:
+        independence = aion_independence_policy()
+        st.write(f"Estado: **{independence.get('state')}**")
+        st.markdown("**O índice considera:**")
+        for item in (
+            "renda líquida não-Trade do ecossistema ao longo de vários meses",
+            "faixa de segurança definida pelo administrador",
+            "reserva financeira",
+            "percentual de receita recorrente",
+            "concentração no maior cliente",
+            "dependência ou não do Trade para despesas essenciais",
+        ):
+            st.markdown(f"- {item}")
+        st.warning(
+            "O índice não é probabilidade e não recomenda sair do emprego. "
+            "Ele apenas sinaliza quando existe evidência suficiente para uma revisão humana da transição."
+        )
+        st.caption(
+            "Valores pessoais são entradas privadas de runtime e não ficam hardcoded no repositório."
         )
 
 
