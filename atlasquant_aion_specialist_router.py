@@ -93,6 +93,13 @@ _DENIED_ACTIONS = {
     "INVESTMENTS": ("move_money", "buy_asset", "sell_asset", "portfolio_mutation", "payment"),
     "CORE": ("real_trade", "payment", "publication", "deploy", "portfolio_mutation", "external_contact"),
 }
+_PROFILE_SCOPES = {
+    "TRADER_EXPERT": ("market.read", "market.analyze"),
+    "BUSINESS_EXPERT": ("business.read", "business.analyze", "business.draft"),
+    "INVESTMENT_EXPERT": ("invest.read", "invest.analyze", "invest.compare"),
+    "AION_CORE": ("core.read", "core.coordinate"),
+}
+_SCOPE_LIMIT = 32
 _FORBIDDEN_TOOLS = frozenset({
     "real_trade", "payment", "publish", "deploy", "deploy_production",
     "external_contact", "sign_contract", "buy_asset", "sell_asset",
@@ -127,10 +134,38 @@ def _safety() -> dict[str, Any]:
 
 def _unique(values: Sequence[Any] | None, *, upper: bool = False) -> list[str]:
     out: list[str] = []
-    for raw in list(values or []):
+    for raw in list(values or [])[:_SCOPE_LIMIT * 4]:
         text = _fold(raw) if upper else _clean(raw, 120)
         if text and text not in out:
             out.append(text)
+        if len(out) >= _SCOPE_LIMIT * 2:
+            break
+    return out
+
+
+def _scope_token(value: Any) -> str:
+    text = _clean(value, 80).lower()
+    if not text or "*" in text or text in {"all", "any"}:
+        return ""
+    if not text[0].isalpha():
+        return ""
+    if any(char not in "abcdefghijklmnopqrstuvwxyz0123456789._-" for char in text):
+        return ""
+    return text
+
+
+def _scopes(values: Sequence[Any] | None, *, allowlist: Sequence[str] | None = None) -> list[str]:
+    allowed = set(allowlist) if allowlist is not None else None
+    out: list[str] = []
+    for raw in list(values or [])[:_SCOPE_LIMIT * 4]:
+        token = _scope_token(raw)
+        if not token or token in out:
+            continue
+        if allowed is not None and token not in allowed:
+            continue
+        out.append(token)
+        if len(out) >= _SCOPE_LIMIT:
+            break
     return out
 
 
@@ -220,7 +255,7 @@ def specialist_profiles() -> dict[str, Any]:
             "domain": domain,
             "domain_recognized": True,
             "profile_registered": True,
-            "runtime_capability_available": bool(legacy.get("available", False)) if legacy_name else False,
+            "runtime_capability_available": legacy.get("available") is True if legacy_name else False,
             "certification_state": "NOT_CERTIFIED",
             "specialist_certified": False,
             "legacy_spec": legacy_name or None,
@@ -238,6 +273,7 @@ def specialist_profiles() -> dict[str, Any]:
             "capability_ids": capability_ids,
             "allowed_tools": tools,
             "allowed_roles": roles,
+            "allowed_scopes": list(_PROFILE_SCOPES[profile_id]),
             "allowed_actions": list(_ALLOWED_ACTIONS[domain]),
             "denied_actions": list(_DENIED_ACTIONS[domain]),
             "memory_domain": domain,
@@ -267,35 +303,68 @@ def _authority(
     parent_scopes: Sequence[str],
     parent_tools: Sequence[str],
     parent_actions: Sequence[str],
+    guardian_scopes: Sequence[str] | None = None,
+    runtime_enabled: bool = False,
 ) -> dict[str, Any]:
-    """Declared profile metadata is not a grant. Empty parent authority grants nothing."""
+    """Grant only the intersection of allowlist, parent, guardian and runtime."""
     row = dict(profile or {})
+    profile_id = str(row.get("profile_id") or "")
+    official_scopes = _PROFILE_SCOPES.get(profile_id, ())
+    if "allowed_scopes" in row and not row.get("allowed_scopes"):
+        profile_scopes: list[str] = []
+    else:
+        declared_scopes = _scopes(row.get("allowed_scopes"))
+        profile_scopes = [scope for scope in declared_scopes if scope in official_scopes] or (
+            list(official_scopes) if "allowed_scopes" not in row else []
+        )
     profile_roles = _unique(row.get("allowed_roles"), upper=True)
     profile_tools = _unique(row.get("allowed_tools"))
     profile_actions = [item.lower() for item in _unique(row.get("allowed_actions"))]
     denied = {item.lower() for item in _unique(row.get("denied_actions"))} | {item.lower() for item in _FORBIDDEN_TOOLS}
-    role_ceiling = set(parent_roles)
-    tool_ceiling = set(parent_tools)
-    action_ceiling = {item.lower() for item in parent_actions}
-    granted_roles = [role for role in profile_roles if role in role_ceiling] if parent_roles else []
-    granted_tools = [tool for tool in profile_tools if tool in tool_ceiling and tool.lower() not in denied] if parent_tools else []
+    parent_scope_values = _scopes(parent_scopes)
+    guardian_scope_values = _scopes(guardian_scopes)
+    runtime_ok = runtime_enabled is True and row.get("runtime_capability_available") is True
+    layers_present = bool(profile_scopes) and bool(parent_scope_values) and bool(guardian_scope_values) and runtime_ok
+    if layers_present:
+        granted_scopes = [
+            scope for scope in profile_scopes
+            if scope in set(parent_scope_values) and scope in set(guardian_scope_values)
+        ]
+    else:
+        granted_scopes = []
+    granted_roles = [role for role in profile_roles if role in set(parent_roles)] if parent_roles else []
+    granted_tools = [
+        tool for tool in profile_tools if tool in set(parent_tools) and tool.lower() not in denied
+    ] if parent_tools else []
     granted_actions = [
         action for action in profile_actions
-        if action in action_ceiling and action not in denied
+        if action in {item.lower() for item in parent_actions} and action not in denied
     ] if parent_actions else []
-    authority_bound = bool(parent_roles) and bool(parent_tools) and bool(parent_scopes)
+    authority_bound = bool(parent_roles) and bool(parent_tools) and bool(parent_scope_values) and bool(guardian_scope_values) and runtime_ok
     if not authority_bound:
         granted_actions = []
+        granted_scopes = []
     return {
         "profile_allowed_roles": profile_roles,
         "profile_allowed_tools": profile_tools,
+        "profile_allowed_scopes": profile_scopes,
         "profile_allowed_actions": profile_actions,
+        "parent_allowed_roles": list(parent_roles)[:_SCOPE_LIMIT],
+        "parent_allowed_tools": list(parent_tools)[:_SCOPE_LIMIT],
+        "parent_allowed_scopes": parent_scope_values,
+        "parent_allowed_actions": list(parent_actions)[:_SCOPE_LIMIT],
+        "guardian_allowed_scopes": guardian_scope_values,
         "granted_roles": granted_roles,
         "granted_tools": granted_tools,
-        "granted_scopes": [],
+        "granted_scopes": granted_scopes,
         "granted_actions": granted_actions,
+        "effective_granted_roles": granted_roles,
+        "effective_granted_tools": granted_tools,
+        "effective_granted_scopes": granted_scopes,
+        "effective_granted_actions": granted_actions,
         "authority_bound": authority_bound,
-        "parent_scope_ceiling": list(parent_scopes),
+        "runtime_enabled": runtime_ok,
+        "parent_scope_ceiling": parent_scope_values,
     }
 
 
@@ -329,11 +398,20 @@ def _envelope(
         "memory_domain": row.get("memory_domain"),
         "profile_allowed_roles": authority["profile_allowed_roles"],
         "profile_allowed_tools": authority["profile_allowed_tools"],
+        "profile_allowed_scopes": authority["profile_allowed_scopes"],
         "profile_allowed_actions": authority["profile_allowed_actions"],
+        "parent_allowed_roles": authority["parent_allowed_roles"],
+        "parent_allowed_tools": authority["parent_allowed_tools"],
+        "parent_allowed_scopes": authority["parent_allowed_scopes"],
+        "parent_allowed_actions": authority["parent_allowed_actions"],
         "granted_roles": authority["granted_roles"],
         "granted_tools": authority["granted_tools"],
         "granted_scopes": authority["granted_scopes"],
         "granted_actions": authority["granted_actions"],
+        "effective_granted_roles": authority["effective_granted_roles"],
+        "effective_granted_tools": authority["effective_granted_tools"],
+        "effective_granted_scopes": authority["effective_granted_scopes"],
+        "effective_granted_actions": authority["effective_granted_actions"],
         "allowed_roles": list(authority["granted_roles"]),
         "allowed_tools": list(authority["granted_tools"]),
         "allowed_scopes": list(authority["granted_scopes"]),
@@ -364,7 +442,7 @@ def route_specialist(
 ) -> dict[str, Any]:
     """Select one registered specialist. Unknown, ambiguous and missing stay fail-closed."""
     roles = _unique(parent_roles, upper=True)
-    scopes = _unique(parent_scopes)
+    scopes = _scopes(parent_scopes)
     tools = _unique(parent_tools)
     actions = [item.lower() for item in _unique(parent_actions)]
     requested = _profile_id(requested_specialist) if _clean(requested_specialist) else ""
@@ -507,16 +585,25 @@ def evaluate_specialist_request(
     requested_tools: Sequence[Any] | None = None,
     requested_scopes: Sequence[Any] | None = None,
     requested_actions: Sequence[Any] | None = None,
+    guardian_scopes: Sequence[Any] | None = None,
+    runtime_enabled: Any = False,
 ) -> dict[str, Any]:
     """Refuse any role, scope, tool or action outside the selected profile and parent context."""
     selected = dict(route or {})
     profile = selected.get("profile") if isinstance(selected.get("profile"), Mapping) else {}
     parent_roles = _unique(selected.get("parent_roles"), upper=True)
     parent_tools = _unique(selected.get("parent_tools"))
-    parent_scopes = _unique(selected.get("parent_scopes"))
+    parent_scopes = _scopes(selected.get("parent_scopes"))
     parent_actions = [item.lower() for item in _unique(selected.get("parent_actions"))]
-    authority = _authority(profile, parent_roles, parent_scopes, parent_tools, parent_actions)
-    scope_ceiling = set(parent_scopes)
+    authority = _authority(
+        profile,
+        parent_roles,
+        parent_scopes,
+        parent_tools,
+        parent_actions,
+        guardian_scopes=_scopes(guardian_scopes),
+        runtime_enabled=runtime_enabled is True,
+    )
 
     def _split(requested: Sequence[Any] | None, allowed: set[str], *, upper: bool = False, lower: bool = False) -> tuple[list[str], list[str]]:
         asked = _unique(requested, upper=upper)
@@ -526,16 +613,35 @@ def evaluate_specialist_request(
         blocked = [item for item in asked if item not in granted]
         return granted, blocked
 
-    granted_roles, blocked_roles = _split(requested_roles, set(authority["granted_roles"]), upper=True)
-    granted_tools, blocked_tools = _split(requested_tools, set(authority["granted_tools"]))
-    granted_scopes, blocked_scopes = _split(requested_scopes, scope_ceiling if parent_scopes else set())
-    granted_actions, blocked_actions = _split(requested_actions, set(authority["granted_actions"]), lower=True)
+    def _split_scopes(requested: Sequence[Any] | None, allowed: set[str]) -> tuple[list[str], list[str]]:
+        granted: list[str] = []
+        blocked: list[str] = []
+        for raw in list(requested or [])[:_SCOPE_LIMIT * 2]:
+            token = _scope_token(raw)
+            if not token or token not in allowed:
+                label = token or _clean(raw, 80).lower()
+                if label and label not in blocked and label not in granted:
+                    blocked.append(label)
+                continue
+            if token not in granted:
+                granted.append(token)
+        return granted, blocked
+
+    granted_roles, blocked_roles = _split(requested_roles, set(authority["effective_granted_roles"]), upper=True)
+    granted_tools, blocked_tools = _split(requested_tools, set(authority["effective_granted_tools"]))
+    granted_scopes, blocked_scopes = _split_scopes(requested_scopes, set(authority["effective_granted_scopes"]))
+    granted_actions, blocked_actions = _split(requested_actions, set(authority["effective_granted_actions"]), lower=True)
     return {
         "schema": SCHEMA,
         "specialist": selected.get("specialist"),
         "profile_allowed_roles": authority["profile_allowed_roles"],
         "profile_allowed_tools": authority["profile_allowed_tools"],
+        "profile_allowed_scopes": authority["profile_allowed_scopes"],
         "profile_allowed_actions": authority["profile_allowed_actions"],
+        "parent_allowed_roles": authority["parent_allowed_roles"],
+        "parent_allowed_tools": authority["parent_allowed_tools"],
+        "parent_allowed_scopes": authority["parent_allowed_scopes"],
+        "parent_allowed_actions": authority["parent_allowed_actions"],
         "granted_roles": granted_roles,
         "blocked_roles": blocked_roles,
         "granted_tools": granted_tools,
@@ -544,7 +650,12 @@ def evaluate_specialist_request(
         "blocked_scopes": blocked_scopes,
         "granted_actions": granted_actions,
         "blocked_actions": blocked_actions,
+        "effective_granted_roles": granted_roles,
+        "effective_granted_tools": granted_tools,
+        "effective_granted_scopes": granted_scopes,
+        "effective_granted_actions": granted_actions,
         "authority_bound": authority["authority_bound"],
+        "runtime_enabled": authority["runtime_enabled"],
         "role_escalation_blocked": bool(blocked_roles),
         "tool_escalation_blocked": bool(blocked_tools),
         "scope_escalation_blocked": bool(blocked_scopes),

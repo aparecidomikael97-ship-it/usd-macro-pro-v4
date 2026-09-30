@@ -234,7 +234,10 @@ publicação ou deploy.
 Memória com domínio não atravessa outro domínio sozinha. Leitura cruzada exige
 o perfil `AION_CORE` e o domínio de origem em `explicit_domains`, e não promove
 `UNKNOWN`, `STALE`, `CONFLICT` ou `INCOMPLETE`. Pai sem roles, tools ou scopes
-não concede a metadata do perfil. A certificação desses especialistas é
+não concede a metadata do perfil. Scope efetivo só existe na interseção de
+allowlist do perfil, autoridade do pai, guardião e runtime; `*` não abre
+acesso. A postura read-only de observabilidade, release, rollback e auditoria
+está em `atlasquant_aion_core_posture.py`. A certificação desses especialistas é
 `ATLASQUANT_AION_SPECIALIST_CERTIFICATION_V1`, descrita em
 `docs/aion/AION_SPECIALIST_CERTIFICATION_V1.md`. Ela é distinta da certificação
 de skill/plugin. `CERTIFIED` exige prova verificada, fingerprint do corpo e

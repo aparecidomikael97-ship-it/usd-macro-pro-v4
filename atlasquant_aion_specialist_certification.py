@@ -68,6 +68,7 @@ def evidence_body(specialist: Any, evidence: Mapping[str, Any] | None = None) ->
             "version": _clean(tests.get("version") or version, 80),
             "sha": _clean(tests.get("sha"), 80).lower(),
             "refs": _refs(tests.get("refs")),
+            "evidence_id": _clean(tests.get("evidence_id") or payload.get("evidence_id"), 80),
         },
     }
 
@@ -190,6 +191,7 @@ def _verify_proof(
     sha_present = bool(details["sha"])
     sha_ok = (not sha_present) or bool(_SHA.fullmatch(details["sha"]))
     verifier_result: Mapping[str, Any] = {}
+    verifier_error = False
     if callable(verifier):
         try:
             raw = verifier({
@@ -204,8 +206,18 @@ def _verify_proof(
             })
         except Exception:
             raw = {}
+            verifier_error = True
         if isinstance(raw, Mapping):
             verifier_result = raw
+        else:
+            verifier_error = True
+    source_refs = _section(evidence, "tests").get("refs")
+    if isinstance(source_refs, (list, tuple)):
+        refs_overflow = len(source_refs) > 20 or any(len(str(item or "")) > 240 for item in source_refs[:40])
+    else:
+        refs_overflow = source_refs not in (None, "")
+    payload_version = _clean(evidence.get("version"), 80)
+    version_conflict = bool(payload_version and details["version"] and payload_version != details["version"])
     verifier_fingerprint = _clean(verifier_result.get("fingerprint"), 128).lower()
     verifier_sha = _clean(verifier_result.get("sha"), 80).lower()
     bound_refs = _refs(verifier_result.get("bound_refs"))
@@ -215,8 +227,16 @@ def _verify_proof(
     fingerprint_bound = verifier_fingerprint == calculated
     refs_ok = (not details["refs"]) or bound_refs == details["refs"]
     sha_bound = (not sha_present) or (sha_ok and verifier_sha == details["sha"])
+    echo_ok = (
+        _clean(verifier_result.get("specialist"), 40).upper() == body["specialist"]
+        and _clean(verifier_result.get("version"), 80) == body["version"]
+        and _clean(verifier_result.get("suite"), 180) == details["suite"]
+        and _clean(verifier_result.get("evidence_id"), 80) == body["tests"]["evidence_id"]
+    )
     verified = bool(
-        state_ok and provenance_ok and evidence_ok and fingerprint_bound and fingerprint_ok and refs_ok and sha_bound
+        state_ok and provenance_ok and evidence_ok and fingerprint_bound and fingerprint_ok
+        and refs_ok and sha_bound and echo_ok and not refs_overflow and not version_conflict
+        and sha_ok and not verifier_error
     )
     claimed = details["present"] and (
         details["state"] or details["suite"] or details["fingerprint"] or details["provenance"] or details["version"] or details["passed"]
@@ -229,6 +249,9 @@ def _verify_proof(
         and fingerprint_ok
         and verified
         and sha_ok
+        and not refs_overflow
+        and not version_conflict
+        and body["specialist"] == specialist
     )
     if not claimed:
         tests_state = "NOT_EVIDENCED"
@@ -249,6 +272,7 @@ def _verify_proof(
         "refs": details["refs"],
         "version": details["version"] or body["version"],
         "suite": details["suite"],
+        "verifier_error": verifier_error,
     }
 
 

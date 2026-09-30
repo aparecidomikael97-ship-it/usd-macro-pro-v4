@@ -83,11 +83,16 @@ def _verifier(accept=True, provenance=PROVENANCE, sha_override=None, refs_overri
     def verify(envelope):
         if not accept or envelope.get("provenance") != provenance:
             return {"state": "REJECTED", "provenance_verified": False, "evidence_verified": False}
+        tests = dict((envelope.get("body") or {}).get("tests") or {})
         result = {
             "state": "VERIFIED",
             "fingerprint": envelope["fingerprint"],
             "provenance_verified": True,
             "evidence_verified": evidence_verified,
+            "specialist": envelope.get("specialist"),
+            "version": envelope.get("version"),
+            "suite": tests.get("suite"),
+            "evidence_id": tests.get("evidence_id") or "",
             "bound_refs": list(envelope.get("refs") or []) if refs_override is None else list(refs_override),
         }
         if sha_override is not None:
@@ -394,7 +399,7 @@ class SpecialistCertificationTests(unittest.TestCase):
         self.assertFalse(certified["permissions_expanded"])
         self.assertFalse(certified["real_trading_enabled"])
         self.assertFalse(certified["sha"])
-        for lookalike in ("true", "yes", "approved", 1, None, "True"):
+        for lookalike in ("true", "yes", "approved", 1, None, "True", "TRUE"):
             with self.subTest(review=lookalike):
                 result = assess_specialist_certification(
                     "TRADER", _bound("TRADER"), human_review_approved=lookalike, evidence_verifier=_verifier(),
@@ -477,6 +482,112 @@ class SpecialistCertificationTests(unittest.TestCase):
         }, evidence_verifier=_verifier())
         self.assertEqual(complete["aggregate"], "READY")
         self.assertTrue(all(complete["specialists"][name]["state"] == "CERTIFIED" for name in ("TRADER", "BUSINESS", "INVESTMENTS")))
+
+    def test_proof_binding_rejects_replay_and_malformed_verifiers(self):
+        borrowed = _bound("BUSINESS")
+        replay = assess_specialist_certification(
+            "TRADER", borrowed, human_review_approved=True, evidence_verifier=_verifier(),
+        )
+        self.assertNotEqual(replay["state"], "CERTIFIED")
+        changed = _bound("TRADER")
+        changed["version"] = "2"
+        version_replay = assess_specialist_certification(
+            "TRADER", changed, human_review_approved=True, evidence_verifier=_verifier(),
+        )
+        self.assertNotEqual(version_replay["state"], "CERTIFIED")
+        self.assertFalse(version_replay["fingerprint_matches"])
+
+        def explode(_envelope):
+            raise RuntimeError("verifier failed")
+
+        exploded = assess_specialist_certification(
+            "TRADER", _bound("TRADER"), human_review_approved=True, evidence_verifier=explode,
+        )
+        self.assertNotEqual(exploded["state"], "CERTIFIED")
+        malformed = assess_specialist_certification(
+            "TRADER", _bound("TRADER"), human_review_approved=True, evidence_verifier=lambda _envelope: "VERIFIED",
+        )
+        self.assertNotEqual(malformed["state"], "CERTIFIED")
+        oversized = _proof()
+        oversized["tests"]["refs"] = [f"ref-{index}" for index in range(25)]
+        oversized["tests"]["fingerprint"] = evidence_fingerprint(oversized, specialist="TRADER")
+        overflow = assess_specialist_certification(
+            "TRADER", oversized, human_review_approved=True, evidence_verifier=_verifier(),
+        )
+        self.assertNotEqual(overflow["state"], "CERTIFIED")
+        revoked = _bound("TRADER")
+        revoked["record_state"] = "REVOKED"
+        self.assertEqual(assess_specialist_certification(
+            "TRADER", revoked, human_review_approved=True, evidence_verifier=_verifier(),
+        )["state"], "REVOKED")
+        suspended = _bound("TRADER")
+        suspended["record_state"] = "SUSPENDED"
+        self.assertEqual(assess_specialist_certification(
+            "TRADER", suspended, human_review_approved=True, evidence_verifier=_verifier(),
+        )["state"], "SUSPENDED")
+        partial = {"routing": {"correct_specialist_selected": True}}
+        self.assertEqual(assess_specialist_certification(
+            "TRADER", partial, human_review_approved=True, evidence_verifier=_verifier(),
+        )["state"], "CANDIDATE")
+
+
+class SpecialistScopeTests(unittest.TestCase):
+    def test_parent_scopes_alone_do_not_grant_and_wildcards_are_not_universal(self):
+        selected = route_specialist(domain="TRADER", parent_roles=["USER"], parent_tools=["aion.memory.search"], parent_scopes=["market.read", "*", "MARKET.READ"])
+        self.assertIn("market.read", selected["profile_allowed_scopes"])
+        self.assertEqual(selected["effective_granted_scopes"], [])
+        self.assertFalse(selected["authority_bound"])
+        self.assertNotIn("*", selected["parent_allowed_scopes"])
+        decision = evaluate_specialist_request(
+            selected,
+            requested_scopes=["market.read", "*", "payments.write", "MARKET.READ", "market.read"],
+            guardian_scopes=["market.read"],
+            runtime_enabled=True,
+        )
+        self.assertEqual(decision["granted_scopes"], [])
+        self.assertIn("*", decision["blocked_scopes"])
+        self.assertIn("payments.write", decision["blocked_scopes"])
+        self.assertFalse(decision["permissions_expanded"])
+        forged = dict(selected)
+        forged["profile"] = dict(selected["profile"])
+        forged["profile"]["runtime_capability_available"] = True
+        granted = evaluate_specialist_request(
+            forged,
+            requested_scopes=["Market.Read", "market.read", "*"],
+            guardian_scopes=["market.read", "payments.write"],
+            runtime_enabled=True,
+        )
+        self.assertEqual(granted["effective_granted_scopes"], ["market.read"])
+        self.assertNotIn("*", granted["effective_granted_scopes"])
+        empty_allowlist = dict(forged)
+        empty_allowlist["profile"] = dict(forged["profile"])
+        empty_allowlist["profile"]["allowed_scopes"] = []
+        blocked = evaluate_specialist_request(
+            empty_allowlist,
+            requested_scopes=["market.read"],
+            guardian_scopes=["market.read"],
+            runtime_enabled=True,
+        )
+        self.assertEqual(blocked["granted_scopes"], [])
+        self.assertEqual(blocked["profile_allowed_scopes"], [])
+
+    def test_role_tool_and_action_escalation_stay_blocked(self):
+        business = route_specialist(domain="BUSINESS")
+        roles = evaluate_specialist_request(business, requested_roles=["ADMIN", "sales"])
+        self.assertEqual(roles["granted_roles"], [])
+        trader = route_specialist(domain="TRADER", parent_tools=["aion.memory.search"])
+        tools = evaluate_specialist_request(trader, requested_tools=["real_trade"])
+        self.assertEqual(tools["granted_tools"], [])
+        investments = route_specialist(
+            domain="INVESTMENTS",
+            parent_roles=["ADMIN"],
+            parent_tools=["aion.memory.search"],
+            parent_scopes=["invest.read"],
+            parent_actions=["buy_asset", "read"],
+        )
+        actions = evaluate_specialist_request(investments, requested_actions=["buy_asset", "READ"])
+        self.assertEqual(actions["granted_actions"], [])
+        self.assertFalse(actions["authority_bound"])
 
 
 if __name__ == "__main__":
