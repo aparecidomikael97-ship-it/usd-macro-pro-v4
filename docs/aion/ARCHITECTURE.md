@@ -907,3 +907,15 @@ increase is executed.
 
 ADR-0050 records this boundary.
 
+## AION Core master-checkpoint bootstrap
+
+`atlasquant_aion_core_master_checkpoint_bootstrap.py` validates the canonical
+latest Checkpoint Mestre pointer before converting a bounded snapshot into
+stable AION Core evidence. The runtime bridge preserves existing runtime
+evidence and appends the validated master-checkpoint context.
+
+Invalid or tampered checkpoint state fails closed and contributes no evidence.
+No parallel memory store, network call or operational authority is introduced.
+
+ADR-0051 records this boundary.
+
