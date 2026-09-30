@@ -242,6 +242,10 @@ from atlasquant_aion_business_stack_consolidation import (
     release_bundle_manifest as business_stack_release_bundle,
     validate_stack as business_validate_stack,
 )
+from atlasquant_aion_business_consolidation_dry_run import (
+    build_consolidation_runbook as business_build_consolidation_runbook,
+    live_revalidation_snapshot as business_live_revalidation_snapshot,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7048,6 +7052,22 @@ def _render_business_stack_consolidation() -> None:
             )
         st.caption(
             "As opções acima são informativas. Este painel não executa merge, rebase ou deploy."
+        )
+
+    live_revalidation = business_live_revalidation_snapshot({})
+    dry_run = business_build_consolidation_runbook(validation, live_revalidation)
+    st.markdown("##### 🧪 Dry-run de consolidação · Fail-Closed")
+    st.info(
+        f"Estado: **{dry_run.get('state')}** · "
+        "a evidência congelada não substitui revalidação GitHub ao vivo."
+    )
+    with st.expander("Ver gates obrigatórios antes de qualquer decisão futura", expanded=False):
+        missing = list(live_revalidation.get("missing") or [])
+        for gate in missing:
+            st.markdown(f"- {gate}")
+        st.caption(
+            "Mesmo após revalidação completa, o estado máximo é "
+            "READY_FOR_EXPLICIT_ADMIN_DECISION. Merge, deploy e runtime continuam sem autorização."
         )
 
 
