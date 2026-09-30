@@ -192,6 +192,22 @@ account ainda ausente, lookup read-only no identity provider, mesma
 session/baseline e janela máxima de 120 segundos. Nenhum comando de provider é
 gerado e nenhuma execução física ocorre.
 
+Estado do Step 1 provider apply plan:
+**IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_business_team_access_step1_apply_plan.py`, ADR-0079 e testes
+associados. A operação Keycloak é congelada como dados estruturados
+(`POST /admin/realms/atlasquant-sandbox/users`, expected 201), sem
+Authorization header, token, password, credentials ou comando executável.
+
+Estado do Step 1 guarded provider runner:
+**IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_business_team_access_step1_provider_runner.py`, runner
+PowerShell local, ADR-0080 e testes associados. O padrão é PLAN ONLY; qualquer
+mutação exige `-Apply` e token físico exato derivado do
+`apply_plan_digest`. O execution envelope precisa ter no máximo 120 segundos,
+o provider fica preso a localhost/sandbox e há lookup exato antes e depois do
+POST. Nenhum APPLY real foi executado neste checkpoint.
+
 Estado do binding de oportunidades com economia real: **IMPLEMENTADO / EM VALIDAÇÃO**
 em `atlasquant_aion_business_revenue_live_economics_binding.py`, ADR-0062 e
 testes associados. Custo mensal passa a vir do ledger FinOps verificado e
@@ -477,3 +493,5 @@ PENDENTE / APROVADO:
 | D-2026-09-30-TEAM-ACCESS-ZERO-LEDGER-STEP1-PREFLIGHT | IMPLEMENTADO / EM VALIDAÇÃO | Empty ledger + observação fresca formam somente o pacote para decisão manual do Step 1 |
 | D-2026-09-30-TEAM-ACCESS-EXPLICIT-STEP1-DECISION | IMPLEMENTADO / EM VALIDAÇÃO | Step 1 exige token formal, packet íntegro e freshness; decisão continua separada da execução |
 | D-2026-09-30-TEAM-ACCESS-STEP1-EXECUTION-ENVELOPE | IMPLEMENTADO / EM VALIDAÇÃO | Nova observação pós-decisão prepara somente a fronteira read-only do apply manual |
+| D-2026-09-30-TEAM-ACCESS-STEP1-PROVIDER-APPLY-PLAN | IMPLEMENTADO / EM VALIDAÇÃO | Operação Keycloak é congelada sem segredo e sem comando executável |
+| D-2026-09-30-TEAM-ACCESS-STEP1-GUARDED-PROVIDER-RUNNER | IMPLEMENTADO / EM VALIDAÇÃO | Runner físico fica PLAN ONLY por padrão e exige -Apply + token exato + freshness + readback antes de qualquer ledger append |
