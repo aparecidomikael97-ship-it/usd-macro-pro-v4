@@ -214,3 +214,21 @@ Validate the filled record with:
 
 A verified record only authorizes the accepted baseline as lifecycle-plan input.
 It does not create a plan and does not authorize any lifecycle step.
+
+
+## Materialized lifecycle authorization
+
+After a real lifecycle plan has been materialized and reviewed, fill a copy of:
+
+    lifecycle-materialized-authorization-record.template.json
+
+The record must include the exact materialization digest plus the exact formal
+lifecycle authorization token and acknowledgements.
+
+Validate it locally from the repository root:
+
+    python validate_team_access_lifecycle_authorization_package.py <materialization.json> <authorization-record.json> --output <authorization-package.json>
+
+The resulting package still does not execute a lifecycle step. Ledger and Step
+Gate reject an authorization package if its materialization binding or package
+digest is not intact.
