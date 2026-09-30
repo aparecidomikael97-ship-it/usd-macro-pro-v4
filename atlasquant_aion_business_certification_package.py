@@ -27,6 +27,7 @@ from atlasquant_aion_specialist_router import (
 SCHEMA = "ATLASQUANT_AION_BUSINESS_CERTIFICATION_PACKAGE_V1"
 VERSION = "1"
 ATTESTATION_SCHEMA = "ATLASQUANT_AION_BUSINESS_TEST_ATTESTATION_V1"
+HUMAN_REVIEW_SCHEMA = "ATLASQUANT_AION_BUSINESS_HUMAN_REVIEW_V1"
 SUITE = "test_atlasquant_aion_business_certification_package.py"
 PROVENANCE = "github-actions:aion-business-certification-package-v1"
 EVIDENCE_ID = "AION-BUSINESS-CERTIFICATION-PACKAGE-V1"
@@ -309,6 +310,94 @@ def normalize_ci_attestation(raw: Mapping[str, Any] | None) -> dict[str, Any]:
     }
 
 
+def normalize_human_review(
+    raw: Mapping[str, Any] | None,
+    *,
+    expected_sha: str,
+    expected_fingerprint: str,
+) -> dict[str, Any]:
+    data = dict(raw or {}) if isinstance(raw, Mapping) else {}
+    reviewer = _clean(data.get("reviewer"), 120)
+    reviewed_at = _clean(data.get("reviewed_at"), 80)
+    reviewed_sha = _clean(data.get("reviewed_sha"), 80).lower()
+    evidence_fp = _clean(data.get("evidence_fingerprint"), 128).lower()
+    valid = bool(
+        data.get("schema") == HUMAN_REVIEW_SCHEMA
+        and data.get("state") == "APPROVED"
+        and _clean(data.get("specialist"), 40).upper() == "BUSINESS"
+        and _clean(data.get("version"), 80) == VERSION
+        and _clean(data.get("evidence_id"), 80) == EVIDENCE_ID
+        and _clean(data.get("approval_scope"), 80) == "CERTIFICATION_ONLY"
+        and data.get("runtime_activation_approved") is False
+        and reviewer
+        and reviewed_at
+        and reviewed_sha == _clean(expected_sha, 80).lower()
+        and evidence_fp == _clean(expected_fingerprint, 128).lower()
+        and bool(_SHA.fullmatch(reviewed_sha))
+        and len(evidence_fp) == 64
+    )
+    return {
+        "schema": HUMAN_REVIEW_SCHEMA,
+        "state": "APPROVED" if valid else "REJECTED",
+        "valid": valid,
+        "specialist": "BUSINESS",
+        "version": VERSION,
+        "evidence_id": EVIDENCE_ID,
+        "approval_scope": "CERTIFICATION_ONLY",
+        "reviewer": reviewer if valid else "",
+        "reviewed_at": reviewed_at if valid else "",
+        "reviewed_sha": reviewed_sha if valid else "",
+        "evidence_fingerprint": evidence_fp if valid else "",
+        "runtime_activation_approved": False,
+    }
+
+
+def verify_human_review(
+    review_record: Mapping[str, Any] | None,
+    *,
+    expected_sha: str,
+    expected_fingerprint: str,
+    trusted_human_review_verifier=None,
+) -> dict[str, Any]:
+    review = normalize_human_review(
+        review_record,
+        expected_sha=expected_sha,
+        expected_fingerprint=expected_fingerprint,
+    )
+    trusted: Mapping[str, Any] = {}
+    verifier_error = False
+    if review["valid"] and callable(trusted_human_review_verifier):
+        try:
+            raw = trusted_human_review_verifier(dict(review))
+        except Exception:
+            raw = {}
+            verifier_error = True
+        if isinstance(raw, Mapping):
+            trusted = raw
+        else:
+            verifier_error = True
+    verified = bool(
+        review["valid"]
+        and not verifier_error
+        and trusted.get("state") == "VERIFIED"
+        and _exact_true(trusted.get("review_verified"))
+        and _clean(trusted.get("specialist"), 40).upper() == "BUSINESS"
+        and _clean(trusted.get("version"), 80) == VERSION
+        and _clean(trusted.get("evidence_id"), 80) == EVIDENCE_ID
+        and _clean(trusted.get("approval_scope"), 80) == "CERTIFICATION_ONLY"
+        and _clean(trusted.get("reviewed_sha"), 80).lower() == review["reviewed_sha"]
+        and _clean(trusted.get("evidence_fingerprint"), 128).lower() == review["evidence_fingerprint"]
+        and _clean(trusted.get("reviewer"), 120) == review["reviewer"]
+        and trusted.get("runtime_activation_approved") is False
+    )
+    return {
+        **review,
+        "state": "VERIFIED" if verified else "REJECTED",
+        "review_verified": verified,
+        "verifier_error": verifier_error,
+    }
+
+
 def build_business_specialist_evidence(
     ci_attestation: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
@@ -446,7 +535,9 @@ def assess_business_certification_package(
     product_evidence: Mapping[str, Any] | None,
     ci_attestation: Mapping[str, Any] | None,
     human_review_approved: Any = False,
+    human_review_record: Mapping[str, Any] | None = None,
     trusted_ci_verifier=None,
+    trusted_human_review_verifier=None,
 ) -> dict[str, Any]:
     """Assess BUSINESS while preserving product, technical and human gates."""
     product = business_package_readiness(product_evidence)
@@ -463,10 +554,19 @@ def assess_business_certification_package(
             trusted_ci_verifier=trusted_ci_verifier,
         )
 
+    review_requested = _exact_true(human_review_approved)
+    review = verify_human_review(
+        human_review_record,
+        expected_sha=attestation["sha"],
+        expected_fingerprint=evidence["tests"]["fingerprint"],
+        trusted_human_review_verifier=trusted_human_review_verifier,
+    )
+    review_approved = review_requested and review["review_verified"]
+
     technical = assess_specialist_certification(
         "BUSINESS",
         evidence,
-        human_review_approved=human_review_approved,
+        human_review_approved=review_approved,
         evidence_verifier=verifier,
     )
     product_ready = product["ready_for_certification_review"]
@@ -488,7 +588,10 @@ def assess_business_certification_package(
         "technical": technical,
         "product_ready": product_ready,
         "technical_state": technical["state"],
+        "human_review_requested": review_requested,
         "human_review_approved": technical["human_review_approved"],
+        "human_review_verified": review["review_verified"],
+        "human_review": review,
         "certification_state": "CERTIFIED" if published_state == "CERTIFIED" else "NOT_CERTIFIED",
         "runtime_capability_available": False,
         "runtime_activated": False,
@@ -509,6 +612,7 @@ __all__ = [
     "SCHEMA",
     "VERSION",
     "ATTESTATION_SCHEMA",
+    "HUMAN_REVIEW_SCHEMA",
     "SUITE",
     "PROVENANCE",
     "EVIDENCE_ID",
@@ -519,6 +623,8 @@ __all__ = [
     "business_primary_scope",
     "business_technical_probe",
     "normalize_ci_attestation",
+    "normalize_human_review",
+    "verify_human_review",
     "build_business_specialist_evidence",
     "business_attestation_verifier",
     "business_package_readiness",
