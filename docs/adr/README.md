@@ -80,3 +80,4 @@ Average Daily Range e American Depositary Receipts não têm arquivo aqui. Seu e
 | ADR-0049 | ACCEPTED | `docs/adr/ADR-0049-business-capacity-scale-manager.md` |
 | ADR-0050 | ACCEPTED | `docs/adr/ADR-0050-finops-budget-treasury.md` |
 | ADR-0051 | ACCEPTED | `docs/adr/ADR-0051-aion-core-master-checkpoint-bootstrap.md` |
+| ADR-0052 | ACCEPTED | `docs/adr/ADR-0052-aion-eight-role-router.md` |
