@@ -307,3 +307,20 @@ O fluxo é `NOT_READY → READY_FOR_CERTIFICATION_REVIEW → TESTED → CERTIFIE
 `CERTIFIED` exige também revisão humana booleana exata. Nenhum estado ativa
 runtime, contato externo, contrato, pagamento, publicação, gasto, merge, deploy
 ou trading real. ADR-0012 registra essa decisão.
+
+
+## BUSINESS external attestation and formal review
+
+`atlasquant_aion_business_external_attestation.py` is the read-only bridge
+between the BUSINESS certification package and independently sourced GitHub
+Actions evidence. It requires the exact repository and SHA plus successful runs
+for Quality tests, AION Core Security Gate and AtlasQuant - Release Readiness.
+
+The certification package also requires a formal human-review record bound to
+the same SHA and technical fingerprint. A bare boolean approval no longer
+certifies BUSINESS. Both CI provenance and human-review provenance fail closed
+when the trusted verifier is absent, malformed or disagrees.
+
+These gates do not activate runtime and do not authorize contact, contracts,
+payments, publication, spend, merge, deploy or real trading. ADR-0013 records
+the decision.
