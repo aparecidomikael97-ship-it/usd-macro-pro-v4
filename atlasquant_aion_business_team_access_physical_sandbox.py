@@ -17,7 +17,7 @@ import re
 SCHEMA = "ATLASQUANT_AION_BUSINESS_TEAM_ACCESS_PHYSICAL_SANDBOX_V1"
 VERSION = "1"
 
-KEYCLOAK_IMAGE = "quay.io/keycloak/keycloak:26.7.4"
+KEYCLOAK_IMAGE = "quay.io/keycloak/keycloak:26.7.5"
 POSTGRES_IMAGE = "postgres:18.6"
 KEYCLOAK_HOST = "127.0.0.1"
 REGISTRY_HOST = "127.0.0.1"
