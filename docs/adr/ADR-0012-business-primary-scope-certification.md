@@ -46,7 +46,8 @@ Código legado pode permanecer temporariamente por compatibilidade, sem contar
 como readiness ou certificação do BUSINESS.
 
 A certificação exige separadamente readiness de produto, prova técnica atestada
-por CI e revisão humana exata. Certificação não ativa runtime.
+por CI, verificador independente da proveniência e revisão humana exata. Um payload
+que apenas se declara como CI não é prova. Certificação não ativa runtime.
 
 ## Consequências
 
