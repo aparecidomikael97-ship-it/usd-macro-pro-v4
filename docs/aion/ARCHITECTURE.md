@@ -1287,3 +1287,17 @@ The lifecycle plan builder fails closed without a matching baseline acceptance
 record.
 
 ADR-0073 records this boundary.
+
+
+## BUSINESS team access sandbox lifecycle plan materialization
+
+`atlasquant_aion_business_team_access_sandbox_lifecycle_materialization.py`
+revalidates the raw sandbox baseline, verifies the accepted-baseline binding and
+materializes the existing ten-step lifecycle plan.
+
+The resulting packet is traceable to operator session, baseline digest,
+acceptance-record digest and plan digest. It stops at
+`READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_LIFECYCLE_PLAN_REVIEW` and does not create
+the lifecycle authorization record or execute any step.
+
+ADR-0074 records this boundary.
