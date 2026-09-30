@@ -132,6 +132,32 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         )
         self.assertTrue(any(h["path"] == expected for h in hits))
 
+    def test_continuity_loader_preserves_mandatory_checkpoint_when_directory_grows(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            continuity = root / "docs" / "continuidade"
+            continuity.mkdir(parents=True)
+            expected = continuity / "PRIORIDADE_RENDER_AO_CHEGAR_EM_CASA_2026-09-24.md"
+            expected.write_text(
+                "Render Deploy Hook prioridade obrigatória",
+                encoding="utf-8",
+            )
+            for index in range(250):
+                (continuity / f"AION_SYNTHETIC_{index:03d}.md").write_text(
+                    f"documento {index}",
+                    encoding="utf-8",
+                )
+            docs = canonical_documents(root)
+            paths = {d["path"] for d in docs}
+            self.assertIn(
+                "docs/continuidade/PRIORIDADE_RENDER_AO_CHEGAR_EM_CASA_2026-09-24.md",
+                paths,
+            )
+            continuity_docs = [
+                path for path in paths if path.startswith("docs/continuidade/")
+            ]
+            self.assertLessEqual(len(continuity_docs), 200)
+
     def test_memory_search_returns_provenance(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
