@@ -1077,3 +1077,19 @@ bill, provision or activate runtime.
 
 ADR-0061 records this boundary.
 
+## BUSINESS revenue live economics binding
+
+`atlasquant_aion_business_revenue_live_economics_binding.py` binds the
+existing Revenue Opportunity Engine to verified FinOps ledger entries and to the
+live Capacity & Scale review.
+
+Monthly opportunity cost is derived from explicit administrator allocation
+percentages over verified recurring ledger entries. Capacity is accepted only
+from `LIVE_CAPACITY_REVIEW_READY`. Price, startup budget and qualitative
+planning inputs remain administrative.
+
+The binding reuses the existing opportunity evaluator/ranker and never sells,
+contacts, spends, changes price or admits a customer.
+
+ADR-0062 records this boundary.
+
