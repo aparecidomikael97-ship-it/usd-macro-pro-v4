@@ -252,6 +252,13 @@ def validate_baseline_acceptance(
         "operator_session_id": session_id if verified else "",
         "approved_by": approved_by if verified else "",
         "approved_at": approved_at if verified else "",
+        "sandbox_only": True if verified else False,
+        "production_targeted": False,
+        "secret_material_included": False,
+        "acknowledgements": {
+            name: acknowledgements.get(name) is True
+            for name in REQUIRED_ACKNOWLEDGEMENTS
+        } if verified else {},
         "acceptance_record_digest": _digest(payload) if verified else "",
         "baseline_accepted": verified,
         "lifecycle_plan_input_authorized": verified,
@@ -278,6 +285,35 @@ def verify_baseline_acceptance_binding(
         baseline.get("operator_session_id"), 64
     ).lower()
 
+    accepted_payload = {
+        "schema": SCHEMA,
+        "version": VERSION,
+        "decision": _clean(accepted.get("decision"), 160),
+        "handoff_digest": _clean(accepted.get("handoff_digest"), 80).lower(),
+        "baseline_evidence_digest": _clean(
+            accepted.get("baseline_evidence_digest"), 80
+        ).lower(),
+        "readiness_digest": _clean(
+            accepted.get("readiness_digest"), 80
+        ).lower(),
+        "operator_session_id": _clean(
+            accepted.get("operator_session_id"), 64
+        ).lower(),
+        "approved_by": _clean(accepted.get("approved_by"), 120),
+        "approved_at": _clean(accepted.get("approved_at"), 100),
+        "sandbox_only": accepted.get("sandbox_only") is True,
+        "production_targeted": accepted.get("production_targeted") is True,
+        "secret_material_included": accepted.get("secret_material_included") is True,
+        "acknowledgements": {
+            name: _mapping(accepted.get("acknowledgements")).get(name) is True
+            for name in REQUIRED_ACKNOWLEDGEMENTS
+        },
+    }
+    recomputed_digest = _digest(accepted_payload)
+    stored_digest = _clean(
+        accepted.get("acceptance_record_digest"), 80
+    ).lower()
+
     match = bool(
         _DIGEST64.fullmatch(baseline_digest)
         and _SESSION32.fullmatch(baseline_session)
@@ -291,9 +327,14 @@ def verify_baseline_acceptance_binding(
         == baseline_digest
         and _clean(accepted.get("operator_session_id"), 64).lower()
         == baseline_session
-        and _DIGEST64.fullmatch(
-            _clean(accepted.get("acceptance_record_digest"), 80).lower()
-        )
+        and _DIGEST64.fullmatch(stored_digest)
+        and stored_digest == recomputed_digest
+        and accepted_payload["decision"] == DECISION_TOKEN
+        and _valid_timestamp(accepted_payload["approved_at"])
+        and accepted_payload["sandbox_only"] is True
+        and accepted_payload["production_targeted"] is False
+        and accepted_payload["secret_material_included"] is False
+        and all(accepted_payload["acknowledgements"].values())
         and accepted.get("lifecycle_execution_authorized") is False
         and accepted.get("production_authorized") is False
         and accepted.get("executes_action") is False
