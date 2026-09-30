@@ -341,6 +341,9 @@ from atlasquant_aion_backup_recovery_policy import (
 from atlasquant_aion_independence_index import (
     independence_policy as aion_independence_policy,
 )
+from atlasquant_aion_business_commercial_live_data_binding import (
+    live_binding_policy as business_live_binding_policy,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7274,6 +7277,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "28 · Primeiro Piloto & Preco",
             "29 · Backup & Recovery",
             "30 · Indice de Independencia CLT",
+            "31 · Pipeline Comercial · Dados Reais",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7793,7 +7797,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "O checkpoint de runtime continua versionado separadamente."
         )
 
-    else:
+    elif view == "30 · Indice de Independencia CLT":
         independence = aion_independence_policy()
         st.write(f"Estado: **{independence.get('state')}**")
         st.markdown("**O índice considera:**")
@@ -7812,6 +7816,23 @@ def _render_business_stack_consolidation_v2() -> None:
         )
         st.caption(
             "Valores pessoais são entradas privadas de runtime e não ficam hardcoded no repositório."
+        )
+
+    else:
+        binding = business_live_binding_policy()
+        st.write(f"Estado: **{binding.get('state')}**")
+        st.metric("Máximo por snapshot", int(binding.get("max_records_per_snapshot") or 0))
+        st.metric("Idade padrão máxima", f"{float(binding.get('default_max_age_hours') or 0):.0f} h")
+        st.markdown("**Fontes previstas em leitura:**")
+        for source in list(binding.get("allowed_sources") or []):
+            st.markdown(f"- {source}")
+        st.warning(
+            "Dados reais entram somente com origem atestada, tenant, timestamp e escopo read-only. "
+            "PII bruta, credenciais e escrita externa são bloqueadas."
+        )
+        st.caption(
+            "O AION pode observar contagens e estado comercial, mas não avança o CRM, "
+            "não envia mensagem, não cobra e não inicia onboarding por esta camada."
         )
 
 
