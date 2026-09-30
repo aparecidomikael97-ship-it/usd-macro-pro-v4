@@ -298,6 +298,9 @@ from atlasquant_aion_business_post_activation_expansion_boundary import (
 from atlasquant_aion_business_expansion_readiness import (
     expansion_authorization_requirements as business_expansion_authorization_requirements,
 )
+from atlasquant_aion_business_post_expansion_cycle_freeze import (
+    post_expansion_verification_requirements as business_post_expansion_verification_requirements,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7219,6 +7222,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "16 · Prontidão para ativação controlada",
             "17 · Pós-ativação & fronteira de expansão",
             "18 · Prontidão para expansão controlada",
+            "19 · Pós-expansão & congelamento do ciclo",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7499,7 +7503,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "continuam bloqueadas e exigem decisões separadas."
         )
 
-    else:
+    elif view == "18 · Prontidão para expansão controlada":
         expansion = business_expansion_authorization_requirements()
         st.write(f"Estado: **{expansion.get('state')}**")
         st.markdown("**Token explícito para uma futura decisão de expansão:**")
@@ -7516,6 +7520,24 @@ def _render_business_stack_consolidation_v2() -> None:
             "Máximo de 10 tenants nesta versão. Privacidade, suporte, finanças, integrações, "
             "capacidade, monitoramento e rollback precisam ser revalidados. "
             "Autorização continua separada da execução."
+        )
+
+    else:
+        verification = business_post_expansion_verification_requirements()
+        st.write(f"Estado: **{verification.get('state')}**")
+        st.markdown("**Checks obrigatórios depois de uma futura expansão executada por caminho separado:**")
+        for item in list(verification.get("required_checks") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "O escopo e os tenants observados precisam coincidir exatamente com a proposta autorizada. "
+            "Qualquer drift, falha de saúde ou quebra de isolamento bloqueia o fechamento do ciclo."
+        )
+        st.markdown("**Estado verde esperado:**")
+        st.code("SCOPE_EXPANSION_VERIFIED_AND_FROZEN", language=None)
+        st.caption(
+            "Depois da verificação, o novo escopo volta a ficar congelado. "
+            "Uma nova expansão precisa recomeçar pelo boundary explícito; "
+            "não existe crescimento automático, cobrança automática ou ação automática com clientes."
         )
 
 
