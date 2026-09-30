@@ -16,6 +16,7 @@ def _report():
         "version": "1",
         "state": "READY_FOR_ADMIN_TEAM_ACCESS_WINDOWS_SANDBOX_START_DECISION",
         "captured_at": "2026-09-30T21:00:00+00:00",
+        "operator_session_id": "a" * 32,
         "checks": {
             "env_file_exists": True,
             "sandbox_marker": True,
