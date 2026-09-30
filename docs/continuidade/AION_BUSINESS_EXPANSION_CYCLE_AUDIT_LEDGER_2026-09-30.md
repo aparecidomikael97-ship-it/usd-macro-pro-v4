@@ -11,6 +11,7 @@ AION BUSINESS: post-expansion verification and cycle freeze V1.
 
 Criado ledger auditável para os ciclos de expansão:
 
+- boundary de gênese obrigatório antes do primeiro append;
 - cadeia por digest;
 - sequência estrita;
 - anti-replay;
