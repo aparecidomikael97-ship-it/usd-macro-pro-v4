@@ -60,7 +60,12 @@
     "live_connector_configuration_authorized": false,
     "revenue_opportunity_engine_status": "IMPLEMENTADO / EM VALIDAÇÃO",
     "revenue_opportunity_score_is_probability": false,
-    "automatic_sale_from_opportunity_engine": false
+    "automatic_sale_from_opportunity_engine": false,
+    "revenue_live_economics_binding_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "revenue_opportunity_real_cost_bound": true,
+    "revenue_opportunity_real_capacity_bound": true,
+    "live_economics_price_auto_selected": false,
+    "live_economics_sale_authorized": false
   },
   "team_access": {
     "status": "IMPLEMENTADO / EM VALIDAÇÃO",
@@ -173,7 +178,8 @@
       446,
       447,
       448,
-      449
+      449,
+      450
     ],
     "current_runtime_authorized": false,
     "merge_authorized_by_this_checkpoint": false,
@@ -194,7 +200,8 @@
     "finops_live_cost_ledger_pr": 446,
     "finops_persistence_reconciliation_pr": 447,
     "revenue_opportunity_engine_pr": 448,
-    "capacity_live_metrics_pr": 449
+    "capacity_live_metrics_pr": 449,
+    "revenue_live_economics_pr": 450
   },
   "decisions": [
     {
@@ -457,15 +464,27 @@
         "docs/aion/AION_BUSINESS_CAPACITY_LIVE_METRICS_V1.md",
         "docs/adr/ADR-0061-business-capacity-live-metrics.md"
       ]
+    },
+    {
+      "id": "D-2026-09-30-REVENUE-LIVE-ECONOMICS",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_business_revenue_live_economics_binding.py",
+        "test_atlasquant_aion_business_revenue_live_economics_binding.py",
+        "docs/aion/AION_BUSINESS_REVENUE_LIVE_ECONOMICS_V1.md",
+        "docs/adr/ADR-0062-business-revenue-live-economics.md"
+      ]
     }
   ],
   "pending": [
+    "REVENUE_LIVE_ECONOMICS_FIRST_PILOT_VALIDATION",
+    "REVENUE_LIVE_ECONOMICS_REAL_ALLOCATION_CALIBRATION",
     "CAPACITY_FIRST_PILOT_REAL_METRICS_VALIDATION",
     "CAPACITY_LIVE_SUPPORT_INFRA_INCIDENT_CONNECTORS",
     "GLOBAL_WORKER_SCHEDULED_PULSE_STALE",
     "REVENUE_OPPORTUNITY_WEIGHT_CALIBRATION_AFTER_CLIENT_HISTORY",
-    "REVENUE_OPPORTUNITY_REAL_CAPACITY_BINDING",
-    "REVENUE_OPPORTUNITY_REAL_COST_BINDING",
     "FINOPS_PROVIDER_INVOICE_READ_CONNECTOR",
     "FINOPS_STORAGE_READBACK_VERIFICATION",
     "FINOPS_PHYSICAL_STORAGE_WRITER_REVIEW",
