@@ -366,6 +366,10 @@ from atlasquant_aion_business_team_access_production_binding import (
 from atlasquant_aion_business_team_access_sandbox_e2e import (
     selected_sandbox_stack as business_team_sandbox_stack,
 )
+from atlasquant_aion_business_team_access_physical_sandbox import (
+    physical_sandbox_policy as business_team_physical_sandbox_policy,
+    sandbox_command_plan as business_team_physical_sandbox_command_plan,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7307,6 +7311,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "36 · Receita · Economia Real",
             "37 · Equipe & Acessos · Producao",
             "38 · Equipe & Acessos · Sandbox E2E",
+            "39 · Equipe & Acessos · Sandbox Fisico",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7964,7 +7969,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "Ativação real continua em gate administrativo separado."
         )
 
-    else:
+    elif view == "38 · Equipe & Acessos · Sandbox E2E":
         sandbox = business_team_sandbox_stack()
         st.write(f"Estado: **{sandbox.get('state')}**")
         identity = sandbox.get("identity_provider") or {}
@@ -7986,6 +7991,27 @@ def _render_business_stack_consolidation_v2() -> None:
             "Estado máximo futuro do teste completo: "
             "READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_EXIT_REVIEW. "
             "Produção, deploy e runtime permanecem separados."
+        )
+
+    else:
+        physical = business_team_physical_sandbox_policy()
+        commands = business_team_physical_sandbox_command_plan()
+        st.write(f"Estado: **{physical.get('state')}**")
+        st.markdown(f"**Keycloak:** {physical.get('keycloak_image')}")
+        st.markdown(f"**PostgreSQL:** {physical.get('postgres_image')}")
+        st.markdown("**Bind local:** 127.0.0.1 somente")
+        st.markdown("**Launcher:** PowerShell · PLAN ONLY por padrão")
+        st.warning(
+            "A visão 39 descreve o sandbox físico local, mas não inicia Docker. "
+            "Subir containers exige -Apply explícito fora desta interface e secrets locais "
+            "que nunca entram no repositório."
+        )
+        with st.expander("Plano de comandos", expanded=False):
+            for name, command in dict(commands.get("commands") or {}).items():
+                st.markdown(f"- **{name}:** {command}")
+        st.caption(
+            "Produção continua proibida nesta camada. O sandbox local precisa ser verificado "
+            "antes de gerar qualquer evidência E2E."
         )
 
 
