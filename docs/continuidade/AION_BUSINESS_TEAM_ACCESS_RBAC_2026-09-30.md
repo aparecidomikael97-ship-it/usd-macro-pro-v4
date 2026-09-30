@@ -25,6 +25,8 @@ Implementada a primeira camada de Equipe & Acessos:
 
 ## Estado
 
+Draft PR #436 — AION BUSINESS: team access and tenant-scoped RBAC V1.
+
 IMPLEMENTADO / EM VALIDAÇÃO.
 
 Ainda pendente para produção:
