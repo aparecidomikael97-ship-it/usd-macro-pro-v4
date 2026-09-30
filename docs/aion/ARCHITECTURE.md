@@ -809,3 +809,18 @@ digest mismatch blocks the append.
 
 The ledger performs no expansion, runtime change, deploy, rollback, billing,
 publication or external action. ADR-0044 records this boundary.
+
+## BUSINESS tenant capacity and quota guardrail
+
+atlasquant_aion_business_capacity_quota_guardrail.py binds per-tenant usage
+limits and cost budgets to the latest integrity-verified expansion ledger state.
+The quota tenant set must match the ledger tenant set exactly.
+
+The review requires explicit AI, integration, workflow and storage limits,
+explicit cost budgets, expected revenue, an administrator-defined minimum margin
+and an administrator-defined capacity reserve. Margin is recalculated after the
+reserve is applied.
+
+A green review reaches CAPACITY_QUOTA_REVIEW_READY only. Applying quotas,
+billing, runtime changes, expansion and client actions remain separate. ADR-0045
+records this boundary.
