@@ -397,6 +397,9 @@ from atlasquant_aion_business_team_access_sandbox_baseline_acceptance import (
 from atlasquant_aion_business_team_access_sandbox_lifecycle_materialization import (
     lifecycle_materialization_policy as business_team_lifecycle_materialization_policy,
 )
+from atlasquant_aion_business_team_access_lifecycle_authorization_package import (
+    authorization_package_requirements as business_team_lifecycle_authorization_package_requirements,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7348,6 +7351,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "46 · Equipe & Acessos · Operator Handoff",
             "47 · Equipe & Acessos · Baseline Acceptance",
             "48 · Equipe & Acessos · Lifecycle Plan",
+            "49 · Equipe & Acessos · Authorization Package",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -8213,7 +8217,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "Não cria plano automaticamente e não autoriza lifecycle/produção."
         )
 
-    else:
+    elif view == "48 · Equipe & Acessos · Lifecycle Plan":
         materialization = business_team_lifecycle_materialization_policy()
         st.write(f"Estado: **{materialization.get('state')}**")
         st.markdown("**Materialização do plano exige:**")
@@ -8231,6 +8235,27 @@ def _render_business_stack_consolidation_v2() -> None:
         )
         st.caption(
             "Estado máximo: READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_LIFECYCLE_PLAN_REVIEW."
+        )
+
+    else:
+        package = business_team_lifecycle_authorization_package_requirements()
+        st.write(f"Estado: **{package.get('state')}**")
+        st.markdown("**Binding obrigatório da autorização:**")
+        for item in (
+            "materialization digest íntegro",
+            "plan digest exato",
+            "baseline + acceptance digests exatos",
+            "operator session vinculada",
+            "authorization record explícito",
+            "authorization package digest íntegro",
+        ):
+            st.markdown(f"- {item}")
+        st.warning(
+            "O package valida a autorização contra o plano materializado, mas não executa nenhum step "
+            "e não liga o executor."
+        )
+        st.caption(
+            "Ledger e Step Gate rejeitam autorização sem esse binding materializado."
         )
 
 
