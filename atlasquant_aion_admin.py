@@ -7186,8 +7186,7 @@ def _render_business_stack_consolidation_v2() -> None:
         st.write(f"Estratégia: **{preview.get('strategy') or 'BLOCKED'}**")
         for row in list(preview.get("sequence") or []):
             st.markdown(
-                f"{row.get('order')}. **#{row.get('pr')}** · {row.get('title')}  
-"
+                f"{row.get('order')}. **#{row.get('pr')}** · {row.get('title')}  \\n"
                 f"   SHA: `{row.get('head_sha')}`"
             )
         st.caption(
