@@ -25,4 +25,8 @@ Entregas:
 
 IMPLEMENTADO / EM VALIDAÇÃO.
 
+O mesmo bloco incorpora o endurecimento do loader canônico de continuidade:
+checkpoints obrigatórios não podem ser expulsos apenas porque o diretório de
+documentação cresceu. A seleção continua bounded e testada.
+
 Nenhuma autoridade operacional nova foi criada.
