@@ -24,6 +24,7 @@ EXPECTED_SERVICES = ("keycloak", "keycloak-db", "registry-db")
 EXPECTED_REGISTRY_TABLES = ("registry_revisions", "team_memberships")
 
 _DIGEST64 = re.compile(r"^[0-9a-f]{64}$")
+_SESSION32 = re.compile(r"^[0-9a-f]{32}$")
 _LOCAL_ISSUER = re.compile(
     r"^http://(?:127\.0\.0\.1|localhost):\d+/realms/atlasquant-sandbox$"
 )
@@ -113,6 +114,7 @@ def validate_baseline_evidence(
     services = sorted({_clean(item, 80) for item in _list(row.get("running_services")) if _clean(item, 80)})
     tables = sorted({_clean(item, 80) for item in _list(row.get("registry_tables")) if _clean(item, 80)})
     captured_at = _parse_time(row.get("captured_at"))
+    operator_session_id = _clean(row.get("operator_session_id"), 64).lower()
 
     artifact_digests = [
         _clean(value, 80).lower()
@@ -146,6 +148,7 @@ def validate_baseline_evidence(
 
     canonical = {
         "captured_at": captured_at.isoformat() if captured_at else "",
+        "operator_session_id": operator_session_id,
         "keycloak_image": keycloak_image,
         "postgres_image": postgres_image,
         "running_services": services,
@@ -166,6 +169,7 @@ def validate_baseline_evidence(
         "blockers": blockers,
         "evidence_digest": _digest(canonical) if ready else "",
         "captured_at": captured_at.isoformat() if ready and captured_at else "",
+        "operator_session_id": operator_session_id if ready and _SESSION32.fullmatch(operator_session_id) else "",
         "issuer": issuer if ready else "",
         "running_services": services if ready else [],
         "registry_tables": tables if ready else [],
