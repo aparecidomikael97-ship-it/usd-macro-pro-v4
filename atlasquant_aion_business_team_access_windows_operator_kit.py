@@ -118,6 +118,7 @@ def validate_windows_operator_readiness(
         "gates": gates,
         "blockers": blockers,
         "readiness_digest": _digest(canonical) if ready else "",
+        "captured_at": _clean(row.get("captured_at"), 100) if ready else "",
         "secret_values_returned": False,
         "sandbox_start_authorized": False,
         "baseline_collection_authorized": False,
