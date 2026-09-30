@@ -140,6 +140,17 @@ class TeamAccessSandboxLifecycleEvidenceLedgerTests(unittest.TestCase):
         self.assertEqual(ledger["chain_head_digest"], first["receipt_digest"])
         self.assertFalse(ledger["automatic_next_step_authorized"])
 
+    def test_legacy_authorization_without_materialization_package_blocks(self):
+        auth = _auth()
+        auth.pop("authorization_package_digest")
+        auth.pop("materialization_digest")
+        auth.pop("materialization_binding_verified")
+        ledger = build_lifecycle_evidence_ledger(_plan(), auth, [])
+        self.assertEqual(
+            ledger["state"], "SANDBOX_LIFECYCLE_EVIDENCE_LEDGER_BLOCKED"
+        )
+        self.assertIn("authorization_binding", ledger["blockers"])
+
     def test_wrong_order_or_chain_blocks(self):
         first = _receipt(1, GENESIS_DIGEST, "d")
         second = _receipt(2, GENESIS_DIGEST, "e")
