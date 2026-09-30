@@ -53,6 +53,29 @@ def _attestation(fingerprint, **updates):
     return data
 
 
+def _trusted_ci_verifier(accept=True):
+    def verify(record):
+        if not accept:
+            return {
+                "state": "REJECTED",
+                "provenance_verified": False,
+                "evidence_verified": False,
+            }
+        return {
+            "state": "VERIFIED",
+            "provenance_verified": True,
+            "evidence_verified": True,
+            "specialist": record.get("specialist"),
+            "version": record.get("version"),
+            "suite": record.get("suite"),
+            "evidence_id": record.get("evidence_id"),
+            "sha": record.get("sha"),
+            "bound_refs": list(record.get("refs") or []),
+            "fingerprint": record.get("fingerprint"),
+        }
+    return verify
+
+
 class BusinessCertificationPackageTests(unittest.TestCase):
     def test_primary_scope_has_five_engines_and_excludes_legacy_marketplace_focus(self):
         scope = business_primary_scope()
@@ -152,10 +175,20 @@ class BusinessCertificationPackageTests(unittest.TestCase):
         # fingerprint excludes the claimed fingerprint and provenance, so the
         # exact bound attestation remains stable.
         self.assertEqual(evidence["tests"]["fingerprint"], fp)
+        self_declared = assess_business_certification_package(
+            product_evidence=_product_evidence(),
+            ci_attestation=attestation,
+            human_review_approved=False,
+        )
+        self.assertEqual(self_declared["state"], "READY_FOR_CERTIFICATION_REVIEW")
+        self.assertEqual(self_declared["technical_state"], "CANDIDATE")
+        self.assertFalse(self_declared["technical"]["evidence_verified"])
+
         result = assess_business_certification_package(
             product_evidence=_product_evidence(),
             ci_attestation=attestation,
             human_review_approved=False,
+            trusted_ci_verifier=_trusted_ci_verifier(),
         )
         self.assertEqual(result["state"], "TESTED")
         self.assertEqual(result["technical_state"], "TESTED")
@@ -187,6 +220,7 @@ class BusinessCertificationPackageTests(unittest.TestCase):
             product_evidence=_product_evidence(),
             ci_attestation=attestation,
             human_review_approved=True,
+            trusted_ci_verifier=_trusted_ci_verifier(),
         )
         self.assertEqual(certified["state"], "CERTIFIED")
         self.assertEqual(certified["certification_state"], "CERTIFIED")
@@ -208,6 +242,7 @@ class BusinessCertificationPackageTests(unittest.TestCase):
                     product_evidence=_product_evidence(),
                     ci_attestation=attestation,
                     human_review_approved=lookalike,
+                    trusted_ci_verifier=_trusted_ci_verifier(),
                 )
                 self.assertNotEqual(result["state"], "CERTIFIED")
                 self.assertFalse(result["human_review_approved"])
@@ -234,6 +269,7 @@ class BusinessCertificationPackageTests(unittest.TestCase):
             product_evidence=_product_evidence(lgpd_privacy_defined=False),
             ci_attestation=attestation,
             human_review_approved=True,
+            trusted_ci_verifier=_trusted_ci_verifier(),
         )
         self.assertEqual(result["state"], "NOT_READY")
         self.assertFalse(result["product_ready"])
