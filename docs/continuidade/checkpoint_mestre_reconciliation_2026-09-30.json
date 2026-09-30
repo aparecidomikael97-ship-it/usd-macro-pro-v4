@@ -48,7 +48,12 @@
     "result_guarantee": false,
     "pipeline_end_to_end_status": "IMPLEMENTADO / EM VALIDAÇÃO",
     "real_contact_authorized": false,
-    "real_billing_authorized": false
+    "real_billing_authorized": false,
+    "first_pilot_pricing_review_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "candidate_auto_selected": false,
+    "price_auto_selected": false,
+    "first_pilot_contact_authorized": false,
+    "first_pilot_billing_authorized": false
   },
   "team_access": {
     "status": "IMPLEMENTADO / EM VALIDAÇÃO",
@@ -145,7 +150,8 @@
       438,
       439,
       440,
-      441
+      441,
+      442
     ],
     "current_runtime_authorized": false,
     "merge_authorized_by_this_checkpoint": false,
@@ -158,7 +164,8 @@
     "finops_budget_treasury_pr": 438,
     "core_master_checkpoint_bootstrap_pr": 439,
     "eight_role_router_pr": 440,
-    "b2b_revenue_offer_pr": 441
+    "b2b_revenue_offer_pr": 441,
+    "first_pilot_pricing_review_pr": 442
   },
   "decisions": [
     {
@@ -323,11 +330,24 @@
         "test_atlasquant_aion_business_b2b_revenue_offer.py",
         "docs/aion/AION_BUSINESS_B2B_REVENUE_OFFER_V1.md"
       ]
+    },
+    {
+      "id": "D-2026-09-30-FIRST-PILOT-PRICING-REVIEW",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_business_first_pilot_pricing_review.py",
+        "test_atlasquant_aion_business_first_pilot_pricing_review.py",
+        "docs/aion/AION_BUSINESS_FIRST_PILOT_PRICING_REVIEW_V1.md",
+        "docs/adr/ADR-0054-business-first-pilot-pricing-review.md"
+      ]
     }
   ],
   "pending": [
+    "FIRST_PILOT_LEGAL_COMMERCIAL_REVIEW",
+    "FIRST_PILOT_REAL_SEGMENT_CANDIDATE_AND_PRICING",
     "COMMERCIAL_PIPELINE_LIVE_BINDING",
-    "B2B_FIRST_REAL_PRICING_PILOT_REVIEW",
     "EIGHT_ROLE_ROUTER_RUNTIME_VALIDATION",
     "AION_CHECKPOINT_BOOTSTRAP_DEPLOY_VALIDATION",
     "FINOPS_PERSISTENT_LEDGER",

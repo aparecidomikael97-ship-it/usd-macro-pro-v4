@@ -331,6 +331,9 @@ from atlasquant_aion_business_b2b_revenue_offer import (
     priority_offer_template as business_priority_offer_template,
     revenue_priority_snapshot as business_revenue_priority_snapshot,
 )
+from atlasquant_aion_business_first_pilot_pricing_review import (
+    first_pilot_policy as business_first_pilot_policy,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7261,6 +7264,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "25 · FinOps & Tesouraria",
             "26 · AION · Roteador dos 8 papéis",
             "27 · Oferta B2B & Receita",
+            "28 · Primeiro Piloto & Preco",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7717,7 +7721,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "com limite de custo e sem criar oito IAs independentes."
         )
 
-    else:
+    elif view == "27 · Oferta B2B & Receita":
         offer = business_priority_offer_template()
         priority = business_revenue_priority_snapshot()
         st.write(f"Estado: **{offer.get('state')}**")
@@ -7737,6 +7741,30 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "Negócios permanece como motor de receita de curto prazo; "
             "dropshipping fora da prioridade e Trade não é necessário para bancar o ecossistema."
+        )
+
+    else:
+        pilot = business_first_pilot_policy()
+        st.write(f"Estado: **{pilot.get('state')}**")
+        st.metric("Clientes no primeiro piloto", int(pilot.get("max_clients") or 0))
+        st.metric("Duração máxima do primeiro piloto", f"{int(pilot.get('max_duration_days') or 0)} dias")
+        st.markdown("**Antes da revisão administrativa do primeiro piloto:**")
+        for item in (
+            "candidato/segmento com fit mensurado",
+            "permissão de contato revisada",
+            "preço do piloto acima do piso sustentável",
+            "margem mínima preservada",
+            "oferta B2B pronta para revisão",
+            "Pilot Governance com todos os gates",
+        ):
+            st.markdown(f"- {item}")
+        st.warning(
+            "O AION não escolhe o cliente nem o preço sozinho. "
+            "O máximo desta camada é READY_FOR_ADMIN_FIRST_PILOT_REVIEW."
+        )
+        st.caption(
+            "Contato, proposta enviada, contrato, cobrança, admissão do cliente e runtime "
+            "permanecem bloqueados até gates separados."
         )
 
 

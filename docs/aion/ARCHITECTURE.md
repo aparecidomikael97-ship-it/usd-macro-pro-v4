@@ -951,3 +951,20 @@ No stage is physically advanced by this layer.
 
 ADR-0053 records this boundary.
 
+## BUSINESS first pilot & pricing review
+
+`atlasquant_aion_business_first_pilot_pricing_review.py` bridges the
+productized B2B offer and the existing Pilot Governance layer.
+
+It scores only explicit administrative fit inputs, requires an administrator
+fit floor, blocks DO_NOT_CONTACT candidates, and validates that the proposed
+pilot price stays above the offer's sustainable floor while preserving minimum
+margin and implementation contribution.
+
+The maximum automatic state is
+`READY_FOR_ADMIN_FIRST_PILOT_REVIEW`. Candidate selection, price approval,
+contact, proposal sending, contract, billing, tenant admission and runtime
+remain outside this layer.
+
+ADR-0054 records this boundary.
+
