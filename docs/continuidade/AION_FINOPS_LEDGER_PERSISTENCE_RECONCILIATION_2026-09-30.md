@@ -26,6 +26,10 @@ Draft PR #447 — AION FinOps: ledger persistence and invoice reconciliation V1.
 
 IMPLEMENTADO / EM VALIDAÇÃO.
 
+A validação final desta Draft PR deve executar a suíte completa no HEAD empilhado.
+CI verde continuará sendo evidência técnica e não autorização de persistência,
+pagamento, merge, deploy ou runtime.
+
 Ainda pendente:
 - escolher storage físico versionado;
 - integrar writer real com gate administrativo;
