@@ -290,6 +290,11 @@ from atlasquant_aion_business_runtime_activation_readiness import (
     activation_authorization_requirements as business_runtime_activation_requirements,
     post_activation_verification_template as business_post_activation_verification_template,
 )
+from atlasquant_aion_business_post_activation_expansion_boundary import (
+    EXPANSION_ACKNOWLEDGEMENTS as BUSINESS_EXPANSION_ACKNOWLEDGEMENTS,
+    REQUIRED_EXPANSION_DECISION_TOKEN as BUSINESS_EXPANSION_DECISION_TOKEN,
+    post_activation_verification_requirements as business_post_activation_boundary_requirements,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7209,6 +7214,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "14 · Handoff para decisão de deploy",
             "15 · Verificação de deploy & fronteira de runtime",
             "16 · Prontidão para ativação controlada",
+            "17 · Pós-ativação & fronteira de expansão",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7445,7 +7451,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "Mensagem genérica como 'vamos lá' continua sem autoridade operacional."
         )
 
-    else:
+    elif view == "16 · Prontidão para ativação controlada":
         readiness = business_runtime_activation_requirements()
         post = business_post_activation_verification_template()
         st.write(f"Estado: **{readiness.get('state')}**")
@@ -7467,6 +7473,26 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "Execução física, expansão automática, cobrança e ações com clientes continuam bloqueadas. "
             "Mensagem genérica como 'vamos lá' não autoriza runtime."
+        )
+
+    else:
+        boundary = business_post_activation_boundary_requirements()
+        st.write(f"Estado: **{boundary.get('state')}**")
+        st.markdown("**Checks obrigatórios para verificar uma futura ativação:**")
+        for item in list(boundary.get("required_checks") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "Escopo e conjunto de tenants observados precisam ser exatamente iguais ao que foi autorizado. "
+            "Qualquer drift bloqueia a verificação."
+        )
+        st.markdown("**Próxima fronteira, somente depois de ativação verificada:**")
+        st.code(BUSINESS_EXPANSION_DECISION_TOKEN, language=None)
+        st.markdown("**Acknowledgements de uma futura decisão de expansão:**")
+        for item in BUSINESS_EXPANSION_ACKNOWLEDGEMENTS:
+            st.markdown(f"- {item}")
+        st.caption(
+            "Ativação verificada congela o escopo. Expansão automática, cobrança e ações com clientes "
+            "continuam bloqueadas e exigem decisões separadas."
         )
 
 
