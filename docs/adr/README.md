@@ -37,6 +37,6 @@ Cada registro usa o identificador `ADR-NNNN` e as seções: Título, Data, Statu
 | ADR-0007 | ACCEPTED | `docs/adr/ADR-0007-checkpoint-mestre-persistencia-oficial.md` |
 | ADR-0008 | ACCEPTED | `docs/adr/ADR-0008-real-trading-fail-closed.md` |
 | ADR-0009 | ACCEPTED | `docs/adr/ADR-0009-release-deploy-merge-gate.md` |
-| ADR-0010 | ACCEPTED | `docs/adr/ADR-0010-quatro-fechamentos-do-aion.md` |\n| ADR-0011 | ACCEPTED | `docs/adr/ADR-0011-core-validation-business-readiness.md` |
+| ADR-0010 | ACCEPTED | `docs/adr/ADR-0010-quatro-fechamentos-do-aion.md` |\n| ADR-0011 | ACCEPTED | `docs/adr/ADR-0011-core-validation-business-readiness.md` |\n| ADR-0012 | ACCEPTED | `docs/adr/ADR-0012-business-primary-scope-certification.md` |
 
 Average Daily Range e American Depositary Receipts não têm arquivo aqui. Seu estado de produto está na reconciliação `CHECKPOINT_MESTRE_RECONCILIATION_2026_09_15_TO_2026_09_29`.

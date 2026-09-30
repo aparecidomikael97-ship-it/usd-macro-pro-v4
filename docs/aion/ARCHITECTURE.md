@@ -283,3 +283,27 @@ desligados.
 
 ADR-0011 registra essa separação entre validação do Núcleo, prontidão de produto
 e certificação formal do especialista.
+
+
+## BUSINESS certification package
+
+`atlasquant_aion_business_certification_package.py` liga o escopo atual de
+Negócios ao Specialist Certification Gate sem ativar runtime. O escopo primário
+são Automação B2B/Agentes de IA, Micro-SaaS AION, Serviços de IA, Revenue Ops /
+Captação e Produtos Digitais próprios.
+
+A oferta inicial gerenciada pode usar o nome provisório AION Presença &
+Conversão. O modelo preferido é pacote fechado com implantação e recorrência,
+sem promessa de resultado. Diagnóstico, Radar do Negócio, Portal do Cliente,
+onboarding, SLA, Saúde do Cliente, margem, LGPD, auditoria, integrações,
+Demo/Sandbox, quotas e treinamento do administrador fazem parte do readiness.
+
+Código histórico de marketplace pode permanecer por compatibilidade, mas
+dropshipping, afiliados, Shopee, Mercado Livre, TikTok Shop como motor principal
+e e-commerce genérico não pertencem ao escopo primário atual.
+
+O fluxo é `NOT_READY → READY_FOR_CERTIFICATION_REVIEW → TESTED → CERTIFIED`.
+`TESTED` exige atestação de CI ligada por SHA, refs e fingerprint.
+`CERTIFIED` exige também revisão humana booleana exata. Nenhum estado ativa
+runtime, contato externo, contrato, pagamento, publicação, gasto, merge, deploy
+ou trading real. ADR-0012 registra essa decisão.
