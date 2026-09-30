@@ -31,6 +31,11 @@ A ordem de atenção fica:
 
 IMPLEMENTADO / EM VALIDAÇÃO.
 
+A validação revelou crescimento do diretório de continuidade além do limite
+histórico do loader. O loader foi endurecido para manter seleção bounded e
+preservar explicitamente checkpoints obrigatórios, evitando perda silenciosa de
+continuidade conforme o projeto cresce.
+
 Pendente:
 - binding com custos reais de providers;
 - ledger financeiro persistente;
