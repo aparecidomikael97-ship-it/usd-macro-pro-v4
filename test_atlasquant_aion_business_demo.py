@@ -10,6 +10,7 @@ from atlasquant_aion_business_demo import (
     TRAINING_STEPS,
     admin_training_demo,
     business_demo_snapshot,
+    business_demo_html,
     client_portal_demo,
     demo_business_radar,
 )
@@ -93,6 +94,26 @@ class BusinessDemoTests(unittest.TestCase):
         self.assertEqual(invalid["current_step"], 1)
         self.assertFalse(first["completion_is_certification"])
         self.assertFalse(last["executes_action"])
+
+    def test_demo_html_is_mobile_responsive_and_explicitly_fake(self):
+        html = business_demo_html()
+        self.assertIn("AION BUSINESS // DEMO SEGURA", html)
+        self.assertIn("Poderoso por dentro. Simples por fora.", html)
+        self.assertIn("BUSINESS CERTIFIED", html)
+        self.assertIn("RUNTIME OFF", html)
+        self.assertIn("SEM AÇÃO EXTERNA", html)
+        self.assertIn("4 pilares", html)
+        self.assertIn("Pacotes para vender solução completa", html)
+        self.assertIn("Jornada comercial", html)
+        self.assertIn("dados fictícios", html)
+        self.assertIn("Marketplace/dropshipping", html)
+        self.assertIn("@media(max-width:760px)", html)
+        self.assertIn("@media(max-width:430px)", html)
+        self.assertEqual(html.count('class="aqb-card"'), 4)
+        self.assertEqual(html.count('class="aqb-package"'), 4)
+        self.assertEqual(html.count('class="aqb-step"'), len(CLIENT_JOURNEY))
+        self.assertNotIn("href=", html)
+        self.assertNotIn("<form", html)
 
     def test_module_has_no_network_process_or_external_sdk_imports(self):
         source = Path("atlasquant_aion_business_demo.py").read_text(encoding="utf-8")
