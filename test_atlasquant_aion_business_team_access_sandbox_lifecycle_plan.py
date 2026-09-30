@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 from atlasquant_aion_business_team_access_sandbox_evidence import SCHEMA as EVIDENCE_SCHEMA
+from atlasquant_aion_business_team_access_sandbox_baseline_acceptance import SCHEMA as ACCEPTANCE_SCHEMA
 from atlasquant_aion_business_team_access_sandbox_lifecycle_plan import (
     REQUIRED_ACKNOWLEDGEMENTS,
     REQUIRED_DECISION_TOKEN,
@@ -17,6 +18,23 @@ def _baseline():
         "version": "1",
         "state": "READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_LIFECYCLE_TEST_REVIEW",
         "evidence_digest": "a" * 64,
+        "operator_session_id": "b" * 32,
+        "executes_action": False,
+    }
+
+
+def _acceptance():
+    return {
+        "schema": ACCEPTANCE_SCHEMA,
+        "state": "EXPLICIT_SANDBOX_BASELINE_ACCEPTANCE_VERIFIED",
+        "acceptance_record_verified": True,
+        "baseline_accepted": True,
+        "lifecycle_plan_input_authorized": True,
+        "baseline_evidence_digest": "a" * 64,
+        "operator_session_id": "b" * 32,
+        "acceptance_record_digest": "c" * 64,
+        "lifecycle_execution_authorized": False,
+        "production_authorized": False,
         "executes_action": False,
     }
 
@@ -39,6 +57,7 @@ class TeamAccessSandboxLifecyclePlanTests(unittest.TestCase):
     def test_valid_baseline_builds_non_executing_ten_step_plan(self):
         plan = build_lifecycle_test_plan(
             _baseline(),
+            baseline_acceptance=_acceptance(),
             test_username="sandbox.operador.demo",
             tenant_ids=["tenant-a"],
             factor_type="PASSKEY",
@@ -57,9 +76,25 @@ class TeamAccessSandboxLifecyclePlanTests(unittest.TestCase):
         self.assertFalse(plan["production_authorized"])
         self.assertFalse(plan["executes_action"])
 
+    def test_valid_baseline_without_explicit_acceptance_blocks(self):
+        plan = build_lifecycle_test_plan(
+            _baseline(),
+            baseline_acceptance={},
+            test_username="sandbox.operador.demo",
+            tenant_ids=["tenant-a"],
+            factor_type="PASSKEY",
+            requested_by="admin.demo",
+        )
+        self.assertEqual(
+            plan["state"], "TEAM_ACCESS_SANDBOX_LIFECYCLE_PLAN_BLOCKED"
+        )
+        self.assertIn("baseline_acceptance_binding_match", plan["blockers"])
+        self.assertEqual(plan["plan_digest"], "")
+
     def test_non_sandbox_username_or_bad_factor_blocks(self):
         plan = build_lifecycle_test_plan(
             _baseline(),
+            baseline_acceptance=_acceptance(),
             test_username="operador.demo",
             tenant_ids=["tenant-a"],
             factor_type="SMS",
@@ -76,6 +111,7 @@ class TeamAccessSandboxLifecyclePlanTests(unittest.TestCase):
     def test_missing_baseline_or_tenant_blocks(self):
         plan = build_lifecycle_test_plan(
             {},
+            baseline_acceptance={},
             test_username="sandbox.operador.demo",
             tenant_ids=[],
             factor_type="TOTP",
