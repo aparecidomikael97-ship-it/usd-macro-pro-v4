@@ -8,13 +8,15 @@ specialist, call a tool, or widen authority.
 from __future__ import annotations
 
 from hashlib import sha256
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 import json
+import re
 
 SCHEMA = "ATLASQUANT_AION_SPECIALIST_CERTIFICATION_V1"
 STATES = ("CANDIDATE", "TESTED", "CERTIFIED", "SUSPENDED", "REVOKED")
 SPECIALISTS = ("TRADER", "BUSINESS", "INVESTMENTS")
 DIMENSIONS = ("routing", "isolation", "permissions", "truth", "safety", "tests")
+_SHA = re.compile(r"^[0-9a-f]{7,64}$")
 
 
 def _clean(value: Any, limit: int = 240) -> str:
@@ -37,8 +39,49 @@ def _canonical(payload: Mapping[str, Any]) -> str:
     return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
 
 
-def evidence_fingerprint(payload: Mapping[str, Any]) -> str:
-    return sha256(_canonical(payload).encode("utf-8")).hexdigest()
+def _refs(values: Any) -> list[str]:
+    found: list[str] = []
+    for raw in list(values or [])[:20]:
+        text = _clean(raw, 240)
+        if text and text not in found:
+            found.append(text)
+    return sorted(found)
+
+
+def evidence_body(specialist: Any, evidence: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """Canonical proof body. Claimed fingerprint, provenance and review stay outside it."""
+    payload = _mapping(evidence)
+    tests = _section(payload, "tests")
+    version = _clean(payload.get("version") or tests.get("version"), 80)
+    return {
+        "specialist": _clean(specialist or payload.get("specialist"), 40).upper(),
+        "version": version,
+        "routing": _section(payload, "routing"),
+        "isolation": _section(payload, "isolation"),
+        "permissions": _section(payload, "permissions"),
+        "truth": _section(payload, "truth"),
+        "safety": _section(payload, "safety"),
+        "tests": {
+            "state": _clean(tests.get("state"), 40).upper(),
+            "passed": tests.get("passed") is True,
+            "suite": _clean(tests.get("suite"), 180),
+            "version": _clean(tests.get("version") or version, 80),
+            "sha": _clean(tests.get("sha"), 80).lower(),
+            "refs": _refs(tests.get("refs")),
+        },
+    }
+
+
+def evidence_fingerprint(payload: Mapping[str, Any], *, specialist: str = "") -> str:
+    tests = _mapping(payload.get("tests"))
+    already_body = bool(
+        payload.get("specialist")
+        and "routing" in payload
+        and "fingerprint" not in tests
+        and "provenance" not in tests
+    )
+    body = payload if already_body else evidence_body(specialist or payload.get("specialist"), payload)
+    return sha256(_canonical(body).encode("utf-8")).hexdigest()
 
 
 def _status(proven: Any, *, failed: bool = False) -> str:
@@ -120,45 +163,103 @@ def _safety_status(evidence: Mapping[str, Any]) -> str:
     return "PASS"
 
 
-def _test_status(evidence: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
+def _test_details(evidence: Mapping[str, Any]) -> dict[str, Any]:
     section = _section(evidence, "tests")
-    if not section:
-        return "NOT_EVIDENCED", {}
-    state = _clean(section.get("state"), 40).upper()
-    suite = _clean(section.get("suite"), 180)
-    fingerprint = _clean(section.get("fingerprint"), 128)
-    provenance = _clean(section.get("provenance"), 240)
-    version = _clean(section.get("version"), 80)
-    sha = _clean(section.get("sha"), 80)
-    refs = [_clean(item, 240) for item in list(section.get("refs") or [])[:20] if _clean(item, 240)]
-    complete = (
-        state == "PASS"
-        and _exact_true(section.get("passed"))
-        and bool(suite and fingerprint and provenance and version)
-    )
-    details = {
-        "suite": suite,
-        "fingerprint": fingerprint,
-        "provenance": provenance,
-        "version": version,
-        "sha": sha,
-        "refs": refs,
+    return {
+        "state": _clean(section.get("state"), 40).upper(),
+        "suite": _clean(section.get("suite"), 180),
+        "fingerprint": _clean(section.get("fingerprint"), 128).lower(),
+        "provenance": _clean(section.get("provenance"), 240),
+        "version": _clean(section.get("version"), 80),
+        "sha": _clean(section.get("sha"), 80).lower(),
+        "refs": _refs(section.get("refs")),
         "passed": _exact_true(section.get("passed")),
+        "present": bool(section),
     }
-    if not any((state, suite, fingerprint, provenance, version, section.get("passed") is not None)):
-        return "NOT_EVIDENCED", details
-    return ("PASS" if complete else "FAIL"), details
 
 
-def _dimensions(evidence: Mapping[str, Any]) -> dict[str, str]:
-    tests, _details = _test_status(evidence)
+def _verify_proof(
+    specialist: str,
+    evidence: Mapping[str, Any],
+    verifier: Callable[[Mapping[str, Any]], Mapping[str, Any]] | None,
+) -> dict[str, Any]:
+    details = _test_details(evidence)
+    body = evidence_body(specialist, evidence)
+    calculated = evidence_fingerprint(body)
+    fingerprint_ok = bool(details["fingerprint"]) and details["fingerprint"] == calculated
+    sha_present = bool(details["sha"])
+    sha_ok = (not sha_present) or bool(_SHA.fullmatch(details["sha"]))
+    verifier_result: Mapping[str, Any] = {}
+    if callable(verifier):
+        try:
+            raw = verifier({
+                "specialist": body["specialist"],
+                "version": body["version"],
+                "fingerprint": calculated,
+                "claimed_fingerprint": details["fingerprint"],
+                "provenance": details["provenance"],
+                "sha": details["sha"],
+                "refs": details["refs"],
+                "body": body,
+            })
+        except Exception:
+            raw = {}
+        if isinstance(raw, Mapping):
+            verifier_result = raw
+    verifier_fingerprint = _clean(verifier_result.get("fingerprint"), 128).lower()
+    verifier_sha = _clean(verifier_result.get("sha"), 80).lower()
+    bound_refs = _refs(verifier_result.get("bound_refs"))
+    provenance_ok = _exact_true(verifier_result.get("provenance_verified"))
+    evidence_ok = _exact_true(verifier_result.get("evidence_verified"))
+    state_ok = verifier_result.get("state") == "VERIFIED"
+    fingerprint_bound = verifier_fingerprint == calculated
+    refs_ok = (not details["refs"]) or bound_refs == details["refs"]
+    sha_bound = (not sha_present) or (sha_ok and verifier_sha == details["sha"])
+    verified = bool(
+        state_ok and provenance_ok and evidence_ok and fingerprint_bound and fingerprint_ok and refs_ok and sha_bound
+    )
+    claimed = details["present"] and (
+        details["state"] or details["suite"] or details["fingerprint"] or details["provenance"] or details["version"] or details["passed"]
+    )
+    tests_pass = bool(
+        details["state"] == "PASS"
+        and details["passed"]
+        and details["suite"]
+        and details["version"]
+        and fingerprint_ok
+        and verified
+        and sha_ok
+    )
+    if not claimed:
+        tests_state = "NOT_EVIDENCED"
+    elif tests_pass:
+        tests_state = "PASS"
+    else:
+        tests_state = "FAIL"
+    return {
+        "tests_state": tests_state,
+        "tests_pass": tests_pass,
+        "evidence_verified": verified,
+        "fingerprint": calculated if fingerprint_ok else details["fingerprint"],
+        "calculated_fingerprint": calculated,
+        "fingerprint_matches": fingerprint_ok,
+        "provenance": details["provenance"],
+        "provenance_verified": provenance_ok and state_ok,
+        "sha": details["sha"],
+        "refs": details["refs"],
+        "version": details["version"] or body["version"],
+        "suite": details["suite"],
+    }
+
+
+def _dimensions(evidence: Mapping[str, Any], tests_state: str) -> dict[str, str]:
     return {
         "routing": _routing_status(evidence),
         "isolation": _isolation_status(evidence),
         "permissions": _permission_status(evidence),
         "truth": _truth_status(evidence),
         "safety": _safety_status(evidence),
-        "tests": tests,
+        "tests": tests_state,
     }
 
 
@@ -182,16 +283,16 @@ def assess_specialist_certification(
     evidence: Mapping[str, Any] | None = None,
     *,
     human_review_approved: Any = None,
+    evidence_verifier: Callable[[Mapping[str, Any]], Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Judge one specialist from explicit evidence. Missing proof stays uncertified."""
+    """Judge one specialist from bound evidence. A self-declared payload is not proof."""
     payload = _mapping(evidence)
     name = _clean(specialist, 40).upper()
     review_value = payload.get("human_review_approved", False) if human_review_approved is None else human_review_approved
     review_approved = _exact_true(review_value)
-    evidence_verified = _exact_true(payload.get("evidence_verified"))
-    dimensions = _dimensions(payload)
-    tests, test_details = _test_status(payload)
-    technical_pass = all(dimensions[key] == "PASS" for key in DIMENSIONS) and evidence_verified
+    proof = _verify_proof(name, payload, evidence_verifier)
+    dimensions = _dimensions(payload, proof["tests_state"])
+    technical_pass = all(dimensions[key] == "PASS" for key in DIMENSIONS) and proof["evidence_verified"] is True
     record_state = _clean(payload.get("record_state"), 40).upper()
     if name not in SPECIALISTS:
         state = "CANDIDATE"
@@ -209,17 +310,20 @@ def assess_specialist_certification(
     return {
         "schema": SCHEMA,
         "specialist": name,
-        "version": _clean(payload.get("version") or test_details.get("version"), 80),
+        "version": _clean(payload.get("version") or proof.get("version"), 80),
         "state": state,
         "dimensions": dimensions,
-        "tests_pass": tests == "PASS",
-        "evidence_verified": evidence_verified,
+        "tests_pass": proof["tests_pass"] is True,
+        "evidence_verified": proof["evidence_verified"] is True,
         "human_review_approved": review_approved,
         "human_review_input_accepted": review_approved,
-        "fingerprint": test_details.get("fingerprint", ""),
-        "provenance": test_details.get("provenance", ""),
-        "sha": test_details.get("sha", ""),
-        "refs": list(test_details.get("refs") or []),
+        "fingerprint": proof["calculated_fingerprint"],
+        "claimed_fingerprint": _test_details(payload)["fingerprint"],
+        "fingerprint_matches": proof["fingerprint_matches"] is True,
+        "provenance": proof["provenance"],
+        "provenance_verified": proof["provenance_verified"] is True,
+        "sha": proof["sha"],
+        "refs": list(proof["refs"]),
         "registered": name in SPECIALISTS,
         "runtime_activated": False,
         **_inactive_flags(),
@@ -242,8 +346,10 @@ def _blank_row(specialist: str) -> dict[str, Any]:
 
 def specialist_readiness_matrix(
     evidence_by_specialist: Mapping[str, Any] | None = None,
+    *,
+    evidence_verifier: Callable[[Mapping[str, Any]], Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Read-only matrix. PASS is copied from evidence, never invented from code presence."""
+    """Read-only matrix. PASS is copied from verified evidence, never from code presence."""
     supplied = _mapping(evidence_by_specialist)
     rows: dict[str, Any] = {}
     for specialist in SPECIALISTS:
@@ -251,15 +357,15 @@ def specialist_readiness_matrix(
         if not isinstance(raw, Mapping):
             rows[specialist] = _blank_row(specialist)
             continue
-        if raw.get("schema") == SCHEMA and isinstance(raw.get("dimensions"), Mapping):
-            assessment = dict(raw)
-            dimensions = {key: _clean(assessment["dimensions"].get(key), 40).upper() or "NOT_EVIDENCED" for key in DIMENSIONS}
-            state = _clean(assessment.get("state"), 40).upper()
-        else:
-            review = raw.get("human_review_approved", False)
-            assessment = assess_specialist_certification(specialist, raw, human_review_approved=review)
-            dimensions = dict(assessment["dimensions"])
-            state = assessment["state"]
+        review = raw.get("human_review_approved", False)
+        assessment = assess_specialist_certification(
+            specialist,
+            raw,
+            human_review_approved=review,
+            evidence_verifier=evidence_verifier,
+        )
+        dimensions = dict(assessment["dimensions"])
+        state = assessment["state"]
         if state not in {"TESTED", "CERTIFIED", "SUSPENDED", "REVOKED"}:
             published_state = "NOT_CERTIFIED"
         else:
@@ -294,6 +400,7 @@ __all__ = [
     "STATES",
     "SPECIALISTS",
     "DIMENSIONS",
+    "evidence_body",
     "evidence_fingerprint",
     "assess_specialist_certification",
     "specialist_readiness_matrix",

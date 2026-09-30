@@ -42,18 +42,24 @@ vende e não altera carteira real.
 
 AION Core coordena os especialistas e não herda a autoridade física de nenhum
 deles. O especialista não amplia role, scope ou ferramenta do contexto pai.
-Toda seleção reporta `permissions_expanded=false`. Quando aplicável, também
-reporta `external_action_executed=false`, `real_trading_enabled=false`,
-`payment_executed=false` e `publication_executed=false`.
+Papel, ferramenta, escopo ou ação do perfil são metadata
+(`profile_allowed_roles`, `profile_allowed_tools`, `profile_allowed_actions`).
+Eles só entram em `granted_roles`, `granted_tools`, `granted_scopes` ou
+`granted_actions` quando o contexto pai traz essa autoridade. Pai ausente ou
+vazio não concede nada: `authority_bound=false` e `permissions_expanded=false`.
+Quando aplicável, a seleção também reporta `external_action_executed=false`,
+`real_trading_enabled=false`, `payment_executed=false` e
+`publication_executed=false`.
 
 ## Memória e evidência
 
 `automatic_cross_domain_access=false`. Memória TRADER não aparece para
 BUSINESS. Memória BUSINESS não aparece para INVESTMENTS. O Core só lê outro
-domínio com perfil `AION_CORE` e domínio de origem explícito. Essa leitura não
-promove evidência: `UNKNOWN` continua `UNKNOWN`, `STALE` não vira fato atual,
-`CONFLICT` continua conflito e `INCOMPLETE` continua fechado. O isolamento por
-persona já existente permanece.
+domínio com perfil `AION_CORE` e o domínio de origem nomeado em
+`explicit_domains`. `AION_CORE` sozinho não abre evidência cruzada. Essa
+leitura não promove evidência: `UNKNOWN` continua `UNKNOWN`, `STALE` não vira
+fato atual, `CONFLICT` continua conflito e `INCOMPLETE` continua fechado. O
+isolamento por persona já existente permanece.
 
 ## Estados
 
@@ -66,10 +72,17 @@ persona já existente permanece.
 - ausência de escalada de scope, role e ferramenta não declarada;
 - verdade fail-closed para `UNKNOWN`, `STALE`, `CONFLICT` e `INCOMPLETE`;
 - trade real, pagamento, publicação, deploy e efeito externo desligados;
-- suíte explícita `PASS`, com fingerprint, proveniência, versão e SHA ou refs
-  quando existirem;
-- `tests_pass=true`, `evidence_verified=true` e `human_review_approved` igual
-  ao booleano `True`.
+- suíte explícita `PASS`, com versão e fingerprint igual ao hash do corpo da
+  prova;
+- proveniência confirmada por um `evidence_verifier` externo ao payload.
+  Texto autodeclarado, inclusive `local-specialist-suite`, não verifica;
+- SHA ausente continua opcional. SHA presente precisa ser hexadecimal de 7 a
+  64 caracteres e coincidir com a referência do verifier. Refs presentes entram
+  no corpo e na lista verificada;
+- `tests_pass=true`, `evidence_verified=true` vindo do verifier, e
+  `human_review_approved` igual ao booleano `True`. Revisão humana não substitui
+  a prova técnica. `evidence_verified=true` escrito no payload, sem verifier,
+  não certifica.
 
 As strings `"true"`, `"yes"` e `"approved"`, assim como `1` e `None`, não contam
 como aprovação. `TESTED` sem revisão humana não vira `CERTIFIED`.

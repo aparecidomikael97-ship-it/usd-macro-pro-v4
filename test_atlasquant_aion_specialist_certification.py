@@ -7,6 +7,7 @@ from atlasquant_aion_core_intelligence.router import route
 from atlasquant_aion_memory_layers import recall, remember
 from atlasquant_aion_specialist_certification import (
     assess_specialist_certification,
+    evidence_fingerprint,
     specialist_readiness_matrix,
 )
 from atlasquant_aion_specialist_router import (
@@ -20,10 +21,13 @@ def _context(domain):
     return Context("tenant-a", "workspace-a", "human-a", "task-a", domain, "ADMIN")
 
 
+PROVENANCE = "specialist-evidence-verifier-v1"
+REFS = ["docs/aion/AION_SPECIALIST_CERTIFICATION_V1.md"]
+
+
 def _proof(**updates):
     payload = {
         "version": "1",
-        "evidence_verified": True,
         "routing": {
             "correct_specialist_selected": True,
             "ambiguous_not_silently_selected": True,
@@ -55,15 +59,43 @@ def _proof(**updates):
             "state": "PASS",
             "passed": True,
             "suite": "test_atlasquant_aion_specialist_certification.py",
-            "fingerprint": "a" * 64,
-            "provenance": "local-specialist-suite",
+            "fingerprint": "",
+            "provenance": PROVENANCE,
             "version": "1",
-            "sha": "a7aa014deb5fb8c3c1732b71d0718a0f7e5f246f",
-            "refs": ["docs/aion/AION_SPECIALIST_CERTIFICATION_V1.md"],
+            "refs": list(REFS),
         },
     }
     payload.update(updates)
     return payload
+
+
+def _bound(specialist="TRADER", **updates):
+    payload = _proof(**updates)
+    tests = dict(payload["tests"])
+    tests.pop("fingerprint", None)
+    payload["tests"] = tests
+    tests["fingerprint"] = evidence_fingerprint(payload, specialist=specialist)
+    payload["tests"] = tests
+    return payload
+
+
+def _verifier(accept=True, provenance=PROVENANCE, sha_override=None, refs_override=None, evidence_verified=True):
+    def verify(envelope):
+        if not accept or envelope.get("provenance") != provenance:
+            return {"state": "REJECTED", "provenance_verified": False, "evidence_verified": False}
+        result = {
+            "state": "VERIFIED",
+            "fingerprint": envelope["fingerprint"],
+            "provenance_verified": True,
+            "evidence_verified": evidence_verified,
+            "bound_refs": list(envelope.get("refs") or []) if refs_override is None else list(refs_override),
+        }
+        if sha_override is not None:
+            result["sha"] = sha_override
+        elif envelope.get("sha"):
+            result["sha"] = envelope["sha"]
+        return result
+    return verify
 
 
 class SpecialistRouterTests(unittest.TestCase):
@@ -174,21 +206,87 @@ class DomainIsolationTests(unittest.TestCase):
         self.assertFalse(visible[0]["used_as_current_fact"])
         self.assertFalse(visible[0]["promoted"])
         self.assertFalse(visible[0]["automatic_cross_domain_access"])
-        foreign = present_domain_evidence(
+        hidden_core = present_domain_evidence(
             {"domain": "TRADER", "truth_state": "UNKNOWN", "claim": "quote"},
             target_domain="BUSINESS",
             accessor_profile="AION_CORE",
         )
+        self.assertFalse(hidden_core["visible"])
+        self.assertFalse(hidden_core["promoted"])
+        foreign = present_domain_evidence(
+            {"domain": "TRADER", "truth_state": "UNKNOWN", "claim": "quote"},
+            target_domain="BUSINESS",
+            accessor_profile="AION_CORE",
+            explicit_domains=["TRADER"],
+        )
+        self.assertTrue(foreign["visible"])
         self.assertTrue(foreign["explicit_cross_domain"])
         self.assertFalse(foreign["promoted"])
         self.assertFalse(foreign["used_as_current_fact"])
+        self.assertFalse(foreign["automatic_cross_domain_access"])
         self.assertEqual(foreign["truth_state"], "UNKNOWN")
         mismatched = present_domain_evidence(
             {"domain": "TRADER", "truth_state": "UNKNOWN"},
             target_domain="BUSINESS",
+            explicit_domains=["TRADER"],
         )
         self.assertFalse(mismatched["visible"])
         self.assertFalse(mismatched["promoted"])
+
+    def test_cross_domain_evidence_requires_explicit_source_binding(self):
+        pairs = (("TRADER", "BUSINESS"), ("BUSINESS", "INVESTMENTS"), ("INVESTMENTS", "TRADER"))
+        truths = ("UNKNOWN", "STALE", "CONFLICT", "INCOMPLETE")
+        for source, target in pairs:
+            for truth in truths:
+                with self.subTest(source=source, target=target, truth=truth):
+                    payload = {"domain": source, "truth_state": truth, "claim": source + " note"}
+                    self.assertFalse(present_domain_evidence(
+                        payload, target_domain=target, accessor_profile="AION_CORE",
+                    )["visible"])
+                    self.assertFalse(present_domain_evidence(
+                        payload, target_domain=target, accessor_profile="BUSINESS_EXPERT", explicit_domains=[source],
+                    )["visible"])
+                    shown = present_domain_evidence(
+                        payload,
+                        target_domain=target,
+                        accessor_profile="AION_CORE",
+                        explicit_domains=[source],
+                    )
+                    self.assertTrue(shown["visible"])
+                    self.assertEqual(shown["truth_state"], truth)
+                    self.assertFalse(shown["promoted"])
+                    self.assertFalse(shown["used_as_current_fact"])
+                    self.assertFalse(shown["automatic_cross_domain_access"])
+
+    def test_unbound_parent_authority_does_not_grant_profile_metadata(self):
+        business = route_specialist(domain="BUSINESS")
+        self.assertIn("SALES", business["profile_allowed_roles"])
+        self.assertIn("ADMIN", business["profile_allowed_roles"])
+        self.assertEqual(business["granted_roles"], [])
+        self.assertNotIn("SALES", business["allowed_roles"])
+        self.assertNotIn("ADMIN", business["allowed_roles"])
+        self.assertFalse(business["authority_bound"])
+        self.assertFalse(business["permissions_expanded"])
+        roles = evaluate_specialist_request(business, requested_roles=["SALES", "ADMIN"])
+        self.assertEqual(roles["granted_roles"], [])
+        self.assertFalse(roles["permissions_expanded"])
+
+        trader = route_specialist(domain="TRADER")
+        declared_tools = list(trader["profile_allowed_tools"])
+        self.assertEqual(trader["granted_tools"], [])
+        tools = evaluate_specialist_request(trader, requested_tools=declared_tools + ["aion.memory.search"])
+        self.assertEqual(tools["granted_tools"], [])
+        self.assertEqual(trader["profile_allowed_tools"], declared_tools)
+
+        investments = route_specialist(domain="INVESTMENTS")
+        self.assertTrue(investments["profile_allowed_actions"])
+        self.assertEqual(investments["granted_scopes"], [])
+        self.assertEqual(investments["granted_actions"], [])
+        scopes = evaluate_specialist_request(
+            investments, requested_scopes=["market.read", "portfolio.read"],
+        )
+        self.assertEqual(scopes["granted_scopes"], [])
+        self.assertFalse(scopes["authority_bound"])
 
     def test_persona_isolation_remains_intact(self):
         memory = remember(
@@ -242,34 +340,105 @@ class SpecialistCertificationTests(unittest.TestCase):
                 payload = _proof()
                 payload["truth"] = dict(payload["truth"])
                 payload["truth"][key] = True
-                result = assess_specialist_certification("TRADER", payload, human_review_approved=True)
+                payload["tests"]["fingerprint"] = evidence_fingerprint(payload, specialist="TRADER")
+                result = assess_specialist_certification(
+                    "TRADER", payload, human_review_approved=True, evidence_verifier=_verifier(),
+                )
                 self.assertEqual(result["dimensions"]["truth"], "FAIL")
                 self.assertNotEqual(result["state"], "CERTIFIED")
                 self.assertFalse(result["activates_specialist"])
 
-    def test_real_boolean_review_certifies_and_lookalikes_do_not(self):
-        certified = assess_specialist_certification("TRADER", _proof(), human_review_approved=True)
+    def test_self_declared_evidence_does_not_certify(self):
+        declared = _bound("TRADER")
+        declared["evidence_verified"] = True
+        declared["tests"]["provenance"] = "local-specialist-suite"
+        declared["tests"]["fingerprint"] = evidence_fingerprint(declared, specialist="TRADER")
+        without_verifier = assess_specialist_certification("TRADER", declared, human_review_approved=True)
+        self.assertNotEqual(without_verifier["state"], "CERTIFIED")
+        self.assertFalse(without_verifier["evidence_verified"])
+        false_fingerprint = _bound("TRADER")
+        false_fingerprint["tests"]["fingerprint"] = "b" * 64
+        mismatched = assess_specialist_certification(
+            "TRADER", false_fingerprint, human_review_approved=True, evidence_verifier=_verifier(),
+        )
+        self.assertFalse(mismatched["fingerprint_matches"])
+        self.assertEqual(mismatched["dimensions"]["tests"], "FAIL")
+        self.assertNotEqual(mismatched["state"], "CERTIFIED")
+        arbitrary = assess_specialist_certification(
+            "TRADER", declared, human_review_approved=True, evidence_verifier=_verifier(),
+        )
+        self.assertNotEqual(arbitrary["state"], "CERTIFIED")
+        self.assertFalse(arbitrary["provenance_verified"])
+        rejected = assess_specialist_certification(
+            "TRADER", _bound("TRADER"), human_review_approved=True, evidence_verifier=_verifier(accept=False),
+        )
+        self.assertNotEqual(rejected["state"], "CERTIFIED")
+        wrong_refs = assess_specialist_certification(
+            "TRADER",
+            _bound("TRADER"),
+            human_review_approved=True,
+            evidence_verifier=_verifier(refs_override=["unrelated-ref"]),
+        )
+        self.assertNotEqual(wrong_refs["state"], "CERTIFIED")
+
+    def test_verifier_and_real_review_certify_without_activating_runtime(self):
+        certified = assess_specialist_certification(
+            "TRADER", _bound("TRADER"), human_review_approved=True, evidence_verifier=_verifier(),
+        )
         self.assertEqual(certified["state"], "CERTIFIED")
         self.assertTrue(certified["human_review_approved"])
+        self.assertTrue(certified["evidence_verified"])
+        self.assertTrue(certified["fingerprint_matches"])
         self.assertFalse(certified["activates_specialist"])
         self.assertFalse(certified["tool_called"])
         self.assertFalse(certified["permissions_expanded"])
         self.assertFalse(certified["real_trading_enabled"])
+        self.assertFalse(certified["sha"])
         for lookalike in ("true", "yes", "approved", 1, None, "True"):
             with self.subTest(review=lookalike):
-                result = assess_specialist_certification("TRADER", _proof(), human_review_approved=lookalike)
+                result = assess_specialist_certification(
+                    "TRADER", _bound("TRADER"), human_review_approved=lookalike, evidence_verifier=_verifier(),
+                )
                 self.assertNotEqual(result["state"], "CERTIFIED")
                 self.assertFalse(result["human_review_approved"])
+        invalid_sha = _proof()
+        invalid_sha["tests"]["sha"] = "not-a-sha"
+        invalid_sha["tests"]["fingerprint"] = evidence_fingerprint(invalid_sha, specialist="BUSINESS")
+        invalid = assess_specialist_certification(
+            "BUSINESS", invalid_sha, human_review_approved=True, evidence_verifier=_verifier(),
+        )
+        self.assertNotEqual(invalid["state"], "CERTIFIED")
+        referenced = _proof()
+        referenced["tests"]["sha"] = "0123456789abcdef"
+        referenced["tests"]["fingerprint"] = evidence_fingerprint(referenced, specialist="BUSINESS")
+        accepted = assess_specialist_certification(
+            "BUSINESS",
+            referenced,
+            human_review_approved=True,
+            evidence_verifier=_verifier(sha_override="0123456789abcdef"),
+        )
+        self.assertEqual(accepted["state"], "CERTIFIED")
+        disagreed = assess_specialist_certification(
+            "BUSINESS",
+            referenced,
+            human_review_approved=True,
+            evidence_verifier=_verifier(sha_override="fedcba9876543210"),
+        )
+        self.assertNotEqual(disagreed["state"], "CERTIFIED")
 
     def test_tested_without_human_review_is_not_certified(self):
-        result = assess_specialist_certification("BUSINESS", _proof(), human_review_approved=False)
+        result = assess_specialist_certification(
+            "BUSINESS", _bound("BUSINESS"), human_review_approved=False, evidence_verifier=_verifier(),
+        )
         self.assertEqual(result["state"], "TESTED")
         self.assertFalse(result["human_review_approved"])
         self.assertFalse(result["activates_specialist"])
 
     def test_certified_result_does_not_enable_future_runtime(self):
         before = Registry(checkpoint_connected=False).get("INVESTMENTS_FUTURE")
-        result = assess_specialist_certification("INVESTMENTS", _proof(), human_review_approved=True)
+        result = assess_specialist_certification(
+            "INVESTMENTS", _bound("INVESTMENTS"), human_review_approved=True, evidence_verifier=_verifier(),
+        )
         after = Registry(checkpoint_connected=False).get("INVESTMENTS_FUTURE")
         self.assertEqual(result["state"], "CERTIFIED")
         self.assertFalse(before["available"])
@@ -285,20 +454,27 @@ class SpecialistCertificationTests(unittest.TestCase):
             self.assertEqual(row["state"], "NOT_CERTIFIED")
         self.assertEqual(empty["aggregate"], "NOT_READY")
         self.assertFalse(empty["masks_uncertified_specialist"])
-        partial = specialist_readiness_matrix({
-            "TRADER": {**_proof(), "human_review_approved": True},
-            "BUSINESS": {**_proof(), "human_review_approved": True},
+        injected = specialist_readiness_matrix({
+            "TRADER": {"schema": "ATLASQUANT_AION_SPECIALIST_CERTIFICATION_V1", "state": "CERTIFIED", "dimensions": {"routing": "PASS"}},
+            "BUSINESS": {"state": "CERTIFIED"},
+            "INVESTMENTS": {"state": "CERTIFIED"},
         })
+        self.assertEqual(injected["aggregate"], "NOT_READY")
+        self.assertTrue(all(injected["specialists"][name]["state"] == "NOT_CERTIFIED" for name in ("TRADER", "BUSINESS", "INVESTMENTS")))
+        partial = specialist_readiness_matrix({
+            "TRADER": {**_bound("TRADER"), "human_review_approved": True},
+            "BUSINESS": {**_bound("BUSINESS"), "human_review_approved": True},
+        }, evidence_verifier=_verifier())
         self.assertEqual(partial["specialists"]["TRADER"]["state"], "CERTIFIED")
         self.assertEqual(partial["specialists"]["BUSINESS"]["state"], "CERTIFIED")
         self.assertEqual(partial["specialists"]["INVESTMENTS"]["state"], "NOT_CERTIFIED")
         self.assertEqual(partial["specialists"]["INVESTMENTS"]["routing"], "NOT_EVIDENCED")
         self.assertEqual(partial["aggregate"], "NOT_READY")
         complete = specialist_readiness_matrix({
-            "TRADER": {**_proof(), "human_review_approved": True},
-            "BUSINESS": {**_proof(), "human_review_approved": True},
-            "INVESTMENTS": {**_proof(), "human_review_approved": True},
-        })
+            "TRADER": {**_bound("TRADER"), "human_review_approved": True},
+            "BUSINESS": {**_bound("BUSINESS"), "human_review_approved": True},
+            "INVESTMENTS": {**_bound("INVESTMENTS"), "human_review_approved": True},
+        }, evidence_verifier=_verifier())
         self.assertEqual(complete["aggregate"], "READY")
         self.assertTrue(all(complete["specialists"][name]["state"] == "CERTIFIED" for name in ("TRADER", "BUSINESS", "INVESTMENTS")))
 

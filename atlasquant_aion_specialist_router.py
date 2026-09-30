@@ -261,6 +261,44 @@ def _selected_profile(profile_id: str) -> dict[str, Any]:
     return {}
 
 
+def _authority(
+    profile: Mapping[str, Any] | None,
+    parent_roles: Sequence[str],
+    parent_scopes: Sequence[str],
+    parent_tools: Sequence[str],
+    parent_actions: Sequence[str],
+) -> dict[str, Any]:
+    """Declared profile metadata is not a grant. Empty parent authority grants nothing."""
+    row = dict(profile or {})
+    profile_roles = _unique(row.get("allowed_roles"), upper=True)
+    profile_tools = _unique(row.get("allowed_tools"))
+    profile_actions = [item.lower() for item in _unique(row.get("allowed_actions"))]
+    denied = {item.lower() for item in _unique(row.get("denied_actions"))} | {item.lower() for item in _FORBIDDEN_TOOLS}
+    role_ceiling = set(parent_roles)
+    tool_ceiling = set(parent_tools)
+    action_ceiling = {item.lower() for item in parent_actions}
+    granted_roles = [role for role in profile_roles if role in role_ceiling] if parent_roles else []
+    granted_tools = [tool for tool in profile_tools if tool in tool_ceiling and tool.lower() not in denied] if parent_tools else []
+    granted_actions = [
+        action for action in profile_actions
+        if action in action_ceiling and action not in denied
+    ] if parent_actions else []
+    authority_bound = bool(parent_roles) and bool(parent_tools) and bool(parent_scopes)
+    if not authority_bound:
+        granted_actions = []
+    return {
+        "profile_allowed_roles": profile_roles,
+        "profile_allowed_tools": profile_tools,
+        "profile_allowed_actions": profile_actions,
+        "granted_roles": granted_roles,
+        "granted_tools": granted_tools,
+        "granted_scopes": [],
+        "granted_actions": granted_actions,
+        "authority_bound": authority_bound,
+        "parent_scope_ceiling": list(parent_scopes),
+    }
+
+
 def _envelope(
     *,
     status: str,
@@ -269,14 +307,11 @@ def _envelope(
     parent_roles: Sequence[str],
     parent_scopes: Sequence[str],
     parent_tools: Sequence[str],
+    parent_actions: Sequence[str] = (),
     candidates: Sequence[str] = (),
 ) -> dict[str, Any]:
     row = dict(profile or {})
-    allowed_roles = list(row.get("allowed_roles") or [])
-    allowed_tools = list(row.get("allowed_tools") or [])
-    roles = [role for role in allowed_roles if not parent_roles or role in parent_roles]
-    tools = [tool for tool in allowed_tools if not parent_tools or tool in parent_tools]
-    scopes = [scope for scope in parent_scopes]
+    authority = _authority(row or None, parent_roles, parent_scopes, parent_tools, parent_actions)
     return {
         "schema": SCHEMA,
         "status": status,
@@ -292,15 +327,24 @@ def _envelope(
         "certification_state": row.get("certification_state", "NOT_CERTIFIED"),
         "capability_ids": list(row.get("capability_ids") or []),
         "memory_domain": row.get("memory_domain"),
-        "allowed_tools": tools,
-        "allowed_roles": roles,
-        "allowed_scopes": scopes,
-        "allowed_actions": list(row.get("allowed_actions") or []),
+        "profile_allowed_roles": authority["profile_allowed_roles"],
+        "profile_allowed_tools": authority["profile_allowed_tools"],
+        "profile_allowed_actions": authority["profile_allowed_actions"],
+        "granted_roles": authority["granted_roles"],
+        "granted_tools": authority["granted_tools"],
+        "granted_scopes": authority["granted_scopes"],
+        "granted_actions": authority["granted_actions"],
+        "allowed_roles": list(authority["granted_roles"]),
+        "allowed_tools": list(authority["granted_tools"]),
+        "allowed_scopes": list(authority["granted_scopes"]),
+        "allowed_actions": list(authority["granted_actions"]),
         "denied_actions": list(row.get("denied_actions") or []),
+        "authority_bound": authority["authority_bound"],
         "execution_mode": row.get("execution_mode"),
         "parent_roles": list(parent_roles),
         "parent_scopes": list(parent_scopes),
         "parent_tools": list(parent_tools),
+        "parent_actions": list(parent_actions),
         "inherits_physical_authority": False,
         "silent_fallback": False,
         **_safety(),
@@ -316,11 +360,13 @@ def route_specialist(
     parent_roles: Sequence[Any] | None = None,
     parent_scopes: Sequence[Any] | None = None,
     parent_tools: Sequence[Any] | None = None,
+    parent_actions: Sequence[Any] | None = None,
 ) -> dict[str, Any]:
     """Select one registered specialist. Unknown, ambiguous and missing stay fail-closed."""
     roles = _unique(parent_roles, upper=True)
     scopes = _unique(parent_scopes)
     tools = _unique(parent_tools)
+    actions = [item.lower() for item in _unique(parent_actions)]
     requested = _profile_id(requested_specialist) if _clean(requested_specialist) else ""
     if _clean(requested_specialist) and not requested:
         return _envelope(
@@ -330,6 +376,7 @@ def route_specialist(
             parent_roles=roles,
             parent_scopes=scopes,
             parent_tools=tools,
+            parent_actions=actions,
         )
 
     def _present(value: Any) -> bool:
@@ -347,6 +394,7 @@ def route_specialist(
             parent_roles=roles,
             parent_scopes=scopes,
             parent_tools=tools,
+            parent_actions=actions,
         )
     if _present(workspace) and workspace_tokens is None and not domain_tokens:
         return _envelope(
@@ -356,6 +404,7 @@ def route_specialist(
             parent_roles=roles,
             parent_scopes=scopes,
             parent_tools=tools,
+            parent_actions=actions,
         )
     if domain_tokens and workspace_tokens and set(domain_tokens) != set(workspace_tokens):
         return _envelope(
@@ -365,6 +414,7 @@ def route_specialist(
             parent_roles=roles,
             parent_scopes=scopes,
             parent_tools=tools,
+            parent_actions=actions,
             candidates=[_PROFILE_BY_DOMAIN[item] for item in domain_tokens],
         )
     explicit = list(domain_tokens or workspace_tokens or [])
@@ -376,6 +426,7 @@ def route_specialist(
             parent_roles=roles,
             parent_scopes=scopes,
             parent_tools=tools,
+            parent_actions=actions,
             candidates=[_PROFILE_BY_DOMAIN[item] for item in explicit],
         )
     hinted = _intent_domains(intent)
@@ -388,6 +439,7 @@ def route_specialist(
             parent_roles=roles,
             parent_scopes=scopes,
             parent_tools=tools,
+            parent_actions=actions,
             candidates=[_PROFILE_BY_DOMAIN[item] for item in dict.fromkeys([chosen, *hinted])],
         )
     if not chosen:
@@ -399,6 +451,7 @@ def route_specialist(
                 parent_roles=roles,
                 parent_scopes=scopes,
                 parent_tools=tools,
+            parent_actions=actions,
                 candidates=[_PROFILE_BY_DOMAIN[item] for item in hinted],
             )
         if len(hinted) == 1 and not requested:
@@ -411,6 +464,7 @@ def route_specialist(
                 parent_roles=roles,
                 parent_scopes=scopes,
                 parent_tools=tools,
+            parent_actions=actions,
             )
     profile_id = requested or _PROFILE_BY_DOMAIN.get(chosen, "")
     if requested and chosen and _PROFILE_BY_DOMAIN.get(chosen) != requested:
@@ -421,6 +475,7 @@ def route_specialist(
             parent_roles=roles,
             parent_scopes=scopes,
             parent_tools=tools,
+            parent_actions=actions,
             candidates=[requested, _PROFILE_BY_DOMAIN[chosen]],
         )
     profile = _selected_profile(profile_id)
@@ -432,6 +487,7 @@ def route_specialist(
             parent_roles=roles,
             parent_scopes=scopes,
             parent_tools=tools,
+            parent_actions=actions,
         )
     return _envelope(
         status="SELECTED",
@@ -440,6 +496,7 @@ def route_specialist(
         parent_roles=roles,
         parent_scopes=scopes,
         parent_tools=tools,
+        parent_actions=actions,
     )
 
 
@@ -454,35 +511,31 @@ def evaluate_specialist_request(
     """Refuse any role, scope, tool or action outside the selected profile and parent context."""
     selected = dict(route or {})
     profile = selected.get("profile") if isinstance(selected.get("profile"), Mapping) else {}
-    parent_roles = set(_unique(selected.get("parent_roles"), upper=True))
-    parent_tools = set(_unique(selected.get("parent_tools")))
-    parent_scopes = set(_unique(selected.get("parent_scopes")))
-    allowed_roles = set(_unique(profile.get("allowed_roles"), upper=True))
-    allowed_tools = set(_unique(profile.get("allowed_tools")))
-    allowed_actions = set(_unique(profile.get("allowed_actions")))
-    denied_actions = set(_unique(profile.get("denied_actions")))
-    if parent_roles:
-        allowed_roles &= parent_roles
-    if parent_tools:
-        allowed_tools &= parent_tools
-    if parent_scopes:
-        allowed_scopes = set(parent_scopes)
-    else:
-        allowed_scopes = set()
+    parent_roles = _unique(selected.get("parent_roles"), upper=True)
+    parent_tools = _unique(selected.get("parent_tools"))
+    parent_scopes = _unique(selected.get("parent_scopes"))
+    parent_actions = [item.lower() for item in _unique(selected.get("parent_actions"))]
+    authority = _authority(profile, parent_roles, parent_scopes, parent_tools, parent_actions)
+    scope_ceiling = set(parent_scopes)
 
-    def _split(requested: Sequence[Any] | None, allowed: set[str], *, upper: bool = False) -> tuple[list[str], list[str]]:
+    def _split(requested: Sequence[Any] | None, allowed: set[str], *, upper: bool = False, lower: bool = False) -> tuple[list[str], list[str]]:
         asked = _unique(requested, upper=upper)
-        granted = [item for item in asked if item in allowed and item not in _FORBIDDEN_TOOLS and item not in denied_actions]
+        if lower:
+            asked = [item.lower() for item in asked]
+        granted = [item for item in asked if item in allowed]
         blocked = [item for item in asked if item not in granted]
         return granted, blocked
 
-    granted_roles, blocked_roles = _split(requested_roles, allowed_roles, upper=True)
-    granted_tools, blocked_tools = _split(requested_tools, allowed_tools)
-    granted_scopes, blocked_scopes = _split(requested_scopes, allowed_scopes)
-    granted_actions, blocked_actions = _split(requested_actions, allowed_actions)
+    granted_roles, blocked_roles = _split(requested_roles, set(authority["granted_roles"]), upper=True)
+    granted_tools, blocked_tools = _split(requested_tools, set(authority["granted_tools"]))
+    granted_scopes, blocked_scopes = _split(requested_scopes, scope_ceiling if parent_scopes else set())
+    granted_actions, blocked_actions = _split(requested_actions, set(authority["granted_actions"]), lower=True)
     return {
         "schema": SCHEMA,
         "specialist": selected.get("specialist"),
+        "profile_allowed_roles": authority["profile_allowed_roles"],
+        "profile_allowed_tools": authority["profile_allowed_tools"],
+        "profile_allowed_actions": authority["profile_allowed_actions"],
         "granted_roles": granted_roles,
         "blocked_roles": blocked_roles,
         "granted_tools": granted_tools,
@@ -491,6 +544,7 @@ def evaluate_specialist_request(
         "blocked_scopes": blocked_scopes,
         "granted_actions": granted_actions,
         "blocked_actions": blocked_actions,
+        "authority_bound": authority["authority_bound"],
         "role_escalation_blocked": bool(blocked_roles),
         "tool_escalation_blocked": bool(blocked_tools),
         "scope_escalation_blocked": bool(blocked_scopes),
@@ -501,20 +555,43 @@ def evaluate_specialist_request(
     }
 
 
+def _domain_name(value: Any) -> str:
+    token = _fold(value)
+    if not token:
+        return ""
+    if token in _DOMAIN_ALIASES:
+        return _DOMAIN_ALIASES[token]
+    return token if token in DOMAINS else ""
+
+
 def present_domain_evidence(
     evidence: Mapping[str, Any] | None,
     *,
     target_domain: Any,
     accessor_profile: Any = "",
+    explicit_domains: Sequence[Any] | None = None,
 ) -> dict[str, Any]:
-    """Show foreign evidence only to AION Core, without promoting it to a current fact."""
+    """Show foreign evidence only when AION Core names that source domain."""
     payload = dict(evidence or {})
-    source = _fold(payload.get("domain") or payload.get("memory_domain") or "")
-    target = _fold(target_domain)
+    raw_source = _fold(payload.get("domain") or payload.get("memory_domain") or "")
+    source = _domain_name(raw_source)
+    if raw_source and not source:
+        source = "UNKNOWN"
+    target = _domain_name(target_domain)
     accessor = _fold(accessor_profile).replace(" ", "_")
+    authorized = []
+    for item in list(explicit_domains or []):
+        domain = _domain_name(item)
+        if domain and domain not in authorized:
+            authorized.append(domain)
     truth = _clean(payload.get("truth_state") or "UNKNOWN", 40).upper() or "UNKNOWN"
     same_domain = bool(source) and source == target
-    explicit = accessor == "AION_CORE" and bool(source) and source != target
+    explicit = (
+        accessor == "AION_CORE"
+        and bool(source)
+        and source != target
+        and source in authorized
+    )
     visible = same_domain or explicit or not source
     if source and not same_domain and not explicit:
         visible = False
@@ -523,11 +600,12 @@ def present_domain_evidence(
         "visible": visible,
         "source_domain": source,
         "target_domain": target,
+        "explicit_domains": authorized,
         "explicit_cross_domain": explicit,
         "automatic_cross_domain_access": False,
         "promoted": False,
         "used_as_current_fact": False,
-        "truth_state": truth if visible else "UNKNOWN",
+        "truth_state": truth,
         "evidence": payload if visible else None,
         "tool_called": False,
         "executes_action": False,

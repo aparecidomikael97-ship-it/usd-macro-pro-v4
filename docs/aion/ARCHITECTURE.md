@@ -232,12 +232,13 @@ autoridade de runtime não aumenta. O Core coordena e não herda trade, pagament
 publicação ou deploy.
 
 Memória com domínio não atravessa outro domínio sozinha. Leitura cruzada exige
-o perfil `AION_CORE` e o domínio de origem explícito, e não promove `UNKNOWN`,
-`STALE`, `CONFLICT` ou `INCOMPLETE`. A certificação desses especialistas é
+o perfil `AION_CORE` e o domínio de origem em `explicit_domains`, e não promove
+`UNKNOWN`, `STALE`, `CONFLICT` ou `INCOMPLETE`. Pai sem roles, tools ou scopes
+não concede a metadata do perfil. A certificação desses especialistas é
 `ATLASQUANT_AION_SPECIALIST_CERTIFICATION_V1`, descrita em
 `docs/aion/AION_SPECIALIST_CERTIFICATION_V1.md`. Ela é distinta da certificação
-de skill/plugin. `CERTIFIED` exige evidência explícita e `human_review_approved`
-com o booleano `True`. Certificar não ativa o especialista.
+de skill/plugin. `CERTIFIED` exige prova verificada, fingerprint do corpo e
+`human_review_approved` com o booleano `True`. Certificar não ativa o especialista.
 
 ADR-0001, ADR-0005 e ADR-0010 continuam sendo as decisões. Este bloco fecha o
 contrato que ADR-0010 deixou pendente de implementação; não substitui esses
