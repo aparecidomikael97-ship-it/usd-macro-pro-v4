@@ -300,6 +300,20 @@ def build_lifecycle_evidence_ledger(
         receipt = _clean(row.get("receipt_digest"), 80).lower()
         previous = _clean(row.get("previous_entry_digest"), 80).lower()
 
+        expected_receipt = build_evidence_receipt(
+            plan_row,
+            auth,
+            step_order=row.get("step_order"),
+            step_id=row.get("step_id"),
+            evidence_digest=row.get("evidence_digest"),
+            observed_at=row.get("observed_at"),
+            previous_entry_digest=row.get("previous_entry_digest"),
+            mutation_observed=row.get("mutation_observed"),
+            sandbox_only=row.get("sandbox_only"),
+            production_targeted=row.get("production_targeted"),
+            secret_material_included=row.get("secret_material_included"),
+        )
+
         row_blockers: list[str] = []
         if row.get("schema") != RECEIPT_SCHEMA:
             row_blockers.append("schema")
@@ -323,6 +337,13 @@ def build_lifecycle_evidence_ledger(
             row_blockers.append("duplicate_evidence")
         if not _DIGEST64.fullmatch(receipt):
             row_blockers.append("receipt_digest")
+        if (
+            expected_receipt.get("state")
+            != "SANDBOX_LIFECYCLE_STEP_EVIDENCE_RECEIPT_READY"
+            or _clean(expected_receipt.get("receipt_digest"), 80).lower()
+            != receipt
+        ):
+            row_blockers.append("receipt_integrity")
         if receipt in seen_receipts:
             row_blockers.append("duplicate_receipt")
         if previous != previous_digest:
