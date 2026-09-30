@@ -175,6 +175,17 @@ def _materialization_integrity(
             and row.get("runtime_authorized") is False
             and row.get("executes_action") is False
         ),
+        "plan_non_authorizing": bool(
+            plan.get("decision_recorded") is False
+            and plan.get("account_creation_authorized") is False
+            and plan.get("mfa_enrollment_authorized") is False
+            and plan.get("registry_write_authorized") is False
+            and plan.get("session_revocation_authorized") is False
+            and plan.get("production_authorized") is False
+            and plan.get("deploy_authorized") is False
+            and plan.get("runtime_authorized") is False
+            and plan.get("executes_action") is False
+        ),
     }
     return {
         "valid": all(gates.values()),
@@ -318,22 +329,38 @@ def build_step1_preflight_package(
         **observation_gates,
     }
 
-    preflight = build_step_execution_preflight(
-        plan,
-        auth,
-        ledger,
-        target_step_order=1,
-        baseline_evidence_digest_observed=observed_baseline,
-        sandbox_health_verified=observed.get("sandbox_health_verified"),
-        oidc_verified=observed.get("oidc_verified"),
-        registry_schema_verified=observed.get("registry_schema_verified"),
-        secrets_local=observed.get("secrets_local"),
-        production_targets_absent=observed.get(
-            "production_targets_absent"
-        ),
-        cleanup_path_ready=observed.get("cleanup_path_ready"),
-        requested_by=observed_by,
-    )
+    preliminary_ready = all(package_gates.values())
+    if preliminary_ready:
+        preflight = build_step_execution_preflight(
+            plan,
+            auth,
+            ledger,
+            target_step_order=1,
+            baseline_evidence_digest_observed=observed_baseline,
+            sandbox_health_verified=observed.get("sandbox_health_verified"),
+            oidc_verified=observed.get("oidc_verified"),
+            registry_schema_verified=observed.get("registry_schema_verified"),
+            secrets_local=observed.get("secrets_local"),
+            production_targets_absent=observed.get(
+                "production_targets_absent"
+            ),
+            cleanup_path_ready=observed.get("cleanup_path_ready"),
+            requested_by=observed_by,
+        )
+    else:
+        preflight = {
+            "state": "SANDBOX_LIFECYCLE_STEP_PREFLIGHT_NOT_EVALUATED",
+            "blockers": ["package_prerequisites"],
+            "required_step_decision_token": "",
+            "step_execution_authorized": False,
+            "automatic_execution_authorized": False,
+            "automatic_ledger_append": False,
+            "executor_enabled": False,
+            "production_authorized": False,
+            "deploy_authorized": False,
+            "runtime_authorized": False,
+            "executes_action": False,
+        }
 
     package_gates["step1_preflight_ready"] = bool(
         preflight.get("state")
