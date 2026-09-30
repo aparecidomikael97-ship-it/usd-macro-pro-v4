@@ -152,6 +152,8 @@ def build_provider_runner_preflight(
     supplied_token = _clean(authorization_token, 240)
     wants_apply = apply_requested is True
 
+    operation = _mapping(plan.get("provider_operation"))
+
     common_gates = {
         "execution_envelope_binding_match": envelope_binding.get(
             "binding_match"
@@ -177,10 +179,10 @@ def build_provider_runner_preflight(
         "production_not_targeted": production_targeted is False,
         "secrets_local": secrets_local is True,
         "provider_realm_exact": _clean(
-            plan.get("provider_operation", {}).get("realm"), 120
+            operation.get("realm"), 120
         ) == REALM,
         "provider_path_exact": _clean(
-            plan.get("provider_operation", {}).get("relative_path"), 240
+            operation.get("relative_path"), 240
         ) == RELATIVE_PATH,
         "target_step_exact": bool(
             plan.get("target_step_order") == 1
