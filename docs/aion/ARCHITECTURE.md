@@ -1061,3 +1061,19 @@ market prices are embedded and no sale, spend or contact is executed.
 
 ADR-0060 records this boundary.
 
+## BUSINESS capacity live metrics binding
+
+`atlasquant_aion_business_capacity_live_metrics_binding.py` converts
+externally attested read-only FinOps, support, infrastructure and incident
+evidence into the input shape already consumed by the Capacity & Scale Manager.
+
+The binding requires recent tenant metrics, a FinOps cost digest and platform
+capacity evidence. Stale or incomplete sources fail closed. It deliberately
+reuses `evaluate_capacity_scale()` rather than creating a second admission
+engine.
+
+A READY result still cannot admit a customer, increase budget, change quota,
+bill, provision or activate runtime.
+
+ADR-0061 records this boundary.
+
