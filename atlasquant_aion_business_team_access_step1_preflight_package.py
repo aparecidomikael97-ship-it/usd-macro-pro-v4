@@ -112,7 +112,7 @@ def readiness_observation_template() -> dict[str, Any]:
         "cleanup_path_ready": False,
         "secret_material_included": False,
         "production_targeted": False,
-        "external_side_effects_executed": False,
+        "external_mutations_executed": False,
     }
 
 
@@ -283,7 +283,7 @@ def build_step1_preflight_package(
             "production_targeted"
         ) is False,
         "observation_non_executing": observed.get(
-            "external_side_effects_executed"
+            "external_mutations_executed"
         ) is False,
     }
 
