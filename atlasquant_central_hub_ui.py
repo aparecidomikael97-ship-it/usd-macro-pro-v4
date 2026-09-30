@@ -20,6 +20,7 @@ from atlasquant_navigation_bridge import (
     request_return_to_aion,
     request_surface_revalidation,
 )
+from atlasquant_aion_business_demo import business_demo_html
 from atlasquant_ui_v1 import hero_html, section_title_html, state_badge_html
 
 _AREA_ORDER = ("aion", "negocios", "trader", "investimentos")
@@ -804,6 +805,8 @@ def central_surface_html(
         stage = ""
     elif resolved["area"] == "aion":
         stage = aion_home_html(home_claims)
+    elif resolved["area"] == "negocios":
+        stage = business_demo_html()
     else:
         stage = central_card_html(resolved["area"])
     back = ""

@@ -353,3 +353,18 @@ and unknown or external actions fail closed.
 
 The harness has no provider/network path and never sends, charges, publishes,
 deploys or activates runtime. ADR-0015 records this simulation boundary.
+
+
+## BUSINESS demo experience
+
+`atlasquant_aion_business_demo.py` maps the approved Business scope into a
+read-only, mobile-responsive experience: Atrair, Atender, Converter, Reter,
+packages, commercial journey, client portal concepts, admin training and a
+fixture-only Business Radar.
+
+The Central Principal renders this demo for the ADMIN Business surface and the
+AION Business workspace renders the same demo before historical tools. Legacy
+marketplace tooling remains compatibility-only and is explicitly labeled.
+
+The demo does not activate runtime or execute external actions. ADR-0016 records
+the presentation boundary.

@@ -908,6 +908,18 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("Publicados confirmados", src)
         self.assertIn("execução ainda não ocorre nesta tela", src)
 
+    def test_business_workspace_surfaces_new_demo_before_legacy_marketplace_tools(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("business_demo_html()", src)
+        self.assertIn("business_demo_snapshot()", src)
+        self.assertIn("🎓 Treinamento do administrador", src)
+        self.assertIn("Atrair → Atender → Converter → Reter", src)
+        self.assertIn("Compatibilidade legada · Marketplace / pesquisa de produto", src)
+        demo_pos = src.index("business_demo_html()")
+        legacy_pos = src.index("Compatibilidade legada · Marketplace / pesquisa de produto")
+        self.assertLess(demo_pos, legacy_pos)
+        self.assertIn("não são mais o foco principal da nova aba Negócios", src)
+
     def test_business_is_persistent_evidence_based_and_marketplace_guarded(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("new_product_candidate(", src)
