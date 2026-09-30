@@ -117,6 +117,12 @@ class TeamAccessSandboxBaselineAcceptanceTests(unittest.TestCase):
         self.assertIn("operator_session_id", result["blockers"])
         self.assertFalse(result["baseline_accepted"])
 
+    def test_tampered_verified_acceptance_breaks_integrity_binding(self):
+        result = validate_baseline_acceptance(_handoff(), _record())
+        result["approved_at"] = "2026-09-30T21:16:00+00:00"
+        binding = verify_baseline_acceptance_binding(_baseline(), result)
+        self.assertFalse(binding["binding_match"])
+
     def test_baseline_drift_breaks_binding(self):
         result = validate_baseline_acceptance(_handoff(), _record())
         baseline = _baseline()
