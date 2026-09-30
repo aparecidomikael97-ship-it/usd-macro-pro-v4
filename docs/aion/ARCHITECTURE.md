@@ -382,3 +382,17 @@ training completion grants operational authority. Unknown objections fail safe
 by instructing the administrator not to invent an answer.
 
 ADR-0017 records that administrator training precedes real BUSINESS use.
+
+
+## BUSINESS diagnostic and proposal simulator
+
+`atlasquant_aion_business_proposal_simulator.py` converts explicit demo inputs
+into a four-pillar diagnostic, a simple client Radar, a preliminary package fit
+and a professional proposal draft.
+
+The simulator marks inputs as `DEMO_USER_INPUT`, never claims real client
+verification and keeps commercial pricing at `A DEFINIR APÓS ESCOPO`.
+
+The AION Business workspace renders one result stage at a time to preserve the
+mobile navigation contract. No generated proposal can be sent, signed, charged
+or used to activate runtime. ADR-0018 records this boundary.
