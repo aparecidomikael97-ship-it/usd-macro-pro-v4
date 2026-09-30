@@ -242,6 +242,14 @@ def build_provider_runner_preflight(
             "gates": common_gates,
             "blockers": common_blockers,
             "execution_envelope_age_seconds": age_seconds,
+            "execution_envelope_digest": _clean(
+                envelope.get("execution_envelope_digest"), 80
+            ).lower() if common_ready else "",
+            "evaluated_at": (
+                evaluated.isoformat()
+                if common_ready and evaluated is not None
+                else ""
+            ),
             "base_url": _clean(base_url, 200) if common_ready else "",
             "local_port": port if common_ready else None,
             "apply_plan_digest": digest if common_ready else "",
@@ -298,6 +306,12 @@ def build_provider_runner_preflight(
         "gates": apply_gates,
         "blockers": blockers,
         "execution_envelope_age_seconds": age_seconds,
+        "execution_envelope_digest": _clean(
+            envelope.get("execution_envelope_digest"), 80
+        ).lower() if ready else "",
+        "evaluated_at": (
+            evaluated.isoformat() if ready and evaluated is not None else ""
+        ),
         "base_url": _clean(base_url, 200) if ready else "",
         "local_port": port if ready else None,
         "apply_plan_digest": digest if ready else "",
@@ -319,6 +333,148 @@ def build_provider_runner_preflight(
     }
 
 
+
+
+def verify_provider_runner_preflight(
+    execution_envelope: Mapping[str, Any] | None,
+    apply_plan: Mapping[str, Any] | None,
+    preflight: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    envelope = _mapping(execution_envelope)
+    plan = _mapping(apply_plan)
+    row = _mapping(preflight)
+
+    envelope_binding = verify_step1_execution_envelope(envelope)
+    plan_binding = verify_step1_apply_plan(plan)
+    source_binding = verify_step1_apply_plan_source_binding(
+        envelope, plan
+    )
+
+    evaluated = _parse_time(row.get("evaluated_at"))
+    prepared = _parse_time(envelope.get("prepared_at"))
+    age_seconds = (
+        (evaluated - prepared).total_seconds()
+        if evaluated is not None and prepared is not None
+        else None
+    )
+
+    apply_plan_digest = _clean(
+        plan.get("apply_plan_digest"), 80
+    ).lower()
+    envelope_digest = _clean(
+        envelope.get("execution_envelope_digest"), 80
+    ).lower()
+    base_url = _clean(row.get("base_url"), 200)
+    port = _local_port(base_url)
+    preflight_digest = _clean(
+        row.get("runner_preflight_digest"), 80
+    ).lower()
+    apply_requested = row.get("apply_requested") is True
+
+    payload = {
+        "apply_plan_digest": apply_plan_digest,
+        "execution_envelope_digest": envelope_digest,
+        "base_url": base_url,
+        "evaluated_at": (
+            evaluated.isoformat() if evaluated is not None else ""
+        ),
+        "apply_requested": apply_requested,
+    }
+
+    gates = {
+        "schema_valid": row.get("schema") == SCHEMA,
+        "state_valid": row.get("state") in {
+            "STEP1_PROVIDER_RUNNER_PLAN_ONLY",
+            "READY_FOR_EXPLICIT_MANUAL_STEP1_PROVIDER_APPLY",
+        },
+        "execution_envelope_binding_match": envelope_binding.get(
+            "binding_match"
+        ) is True,
+        "apply_plan_binding_match": plan_binding.get(
+            "binding_match"
+        ) is True,
+        "source_binding_match": source_binding.get(
+            "binding_match"
+        ) is True,
+        "apply_plan_digest_match": _clean(
+            row.get("apply_plan_digest"), 80
+        ).lower() == apply_plan_digest,
+        "execution_envelope_digest_match": _clean(
+            row.get("execution_envelope_digest"), 80
+        ).lower() == envelope_digest,
+        "evaluated_at_valid": evaluated is not None,
+        "execution_envelope_fresh": bool(
+            age_seconds is not None
+            and 0 <= age_seconds <= MAX_EXECUTION_ENVELOPE_AGE_SECONDS
+        ),
+        "localhost_base_url_valid": port is not None,
+        "local_port_matches": row.get("local_port") == port,
+        "preflight_digest_valid": bool(
+            _DIGEST64.fullmatch(preflight_digest)
+        ),
+        "preflight_digest_integrity": bool(
+            _DIGEST64.fullmatch(preflight_digest)
+            and preflight_digest == _digest(payload)
+        ),
+        "physical_execution_not_performed": row.get(
+            "physical_execution_performed"
+        ) is False,
+        "receipt_not_created": row.get("receipt_created") is False,
+        "ledger_append_not_authorized": row.get(
+            "ledger_append_authorized"
+        ) is False,
+        "automatic_execution_off": row.get(
+            "automatic_execution_authorized"
+        ) is False,
+        "automatic_ledger_append_off": row.get(
+            "automatic_ledger_append"
+        ) is False,
+        "executor_disabled": row.get("executor_enabled") is False,
+        "production_not_authorized": row.get(
+            "production_authorized"
+        ) is False,
+        "non_executing": row.get("executes_action") is False,
+    }
+
+    if apply_requested:
+        gates["apply_state_consistent"] = (
+            row.get("state")
+            == "READY_FOR_EXPLICIT_MANUAL_STEP1_PROVIDER_APPLY"
+            and row.get("physical_apply_authorized") is True
+        )
+    else:
+        gates["plan_only_state_consistent"] = (
+            row.get("state") == "STEP1_PROVIDER_RUNNER_PLAN_ONLY"
+            and row.get("physical_apply_authorized") is False
+        )
+
+    blockers = [name for name, passed in gates.items() if not passed]
+    match = not blockers
+
+    return {
+        "schema": (
+            "ATLASQUANT_AION_BUSINESS_TEAM_ACCESS_"
+            "STEP1_PROVIDER_RUNNER_PREFLIGHT_BINDING_V1"
+        ),
+        "version": VERSION,
+        "state": (
+            "STEP1_PROVIDER_RUNNER_PREFLIGHT_BINDING_MATCH"
+            if match
+            else "STEP1_PROVIDER_RUNNER_PREFLIGHT_BINDING_MISMATCH"
+        ),
+        "binding_match": match,
+        "gates": gates,
+        "blockers": blockers,
+        "runner_preflight_digest": preflight_digest if match else "",
+        "apply_requested": apply_requested,
+        "physical_execution_performed": False,
+        "ledger_append_authorized": False,
+        "automatic_execution_authorized": False,
+        "executor_enabled": False,
+        "production_authorized": False,
+        "executes_action": False,
+    }
+
 __all__ = [
     "SCHEMA",
     "VERSION",
@@ -326,4 +482,5 @@ __all__ = [
     "provider_runner_policy",
     "required_physical_apply_token",
     "build_provider_runner_preflight",
+    "verify_provider_runner_preflight",
 ]
