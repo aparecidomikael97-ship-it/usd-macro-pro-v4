@@ -82,3 +82,4 @@ Average Daily Range e American Depositary Receipts não têm arquivo aqui. Seu e
 | ADR-0051 | ACCEPTED | `docs/adr/ADR-0051-aion-core-master-checkpoint-bootstrap.md` |
 | ADR-0052 | ACCEPTED | `docs/adr/ADR-0052-aion-eight-role-router.md` |
 | ADR-0053 | ACCEPTED | `docs/adr/ADR-0053-business-b2b-revenue-offer.md` |
+| ADR-0054 | ACCEPTED | `docs/adr/ADR-0054-business-first-pilot-pricing-review.md` |
