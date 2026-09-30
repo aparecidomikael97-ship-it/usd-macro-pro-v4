@@ -7,6 +7,10 @@ Schema: ATLASQUANT_AION_BUSINESS_EXPANSION_CYCLE_AUDIT_LEDGER_V1
 Manter uma trilha encadeada, auditável e anti-replay de cada ciclo de expansão
 já verificado e novamente congelado.
 
+## Gênese
+
+Antes do primeiro append, o ledger precisa ser vinculado a um `EXPLICIT_EXPANSION_DECISION_REQUIRED` válido. O boundary fornece o digest de verificação, o escopo e os tenants que formam a raiz da cadeia. Um ledger sem gênese pode ser auditado como vazio, mas não aceita entradas.
+
 ## Estrutura da entrada
 
 Cada entrada contém:
