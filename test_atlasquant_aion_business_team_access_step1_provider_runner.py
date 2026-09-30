@@ -8,6 +8,7 @@ from atlasquant_aion_business_team_access_step1_provider_runner import (
     build_provider_runner_preflight,
     provider_runner_policy,
     required_physical_apply_token,
+    verify_provider_runner_preflight,
 )
 
 
@@ -113,6 +114,36 @@ class TeamAccessStep1ProviderRunnerTests(unittest.TestCase):
         self.assertFalse(result["physical_execution_performed"])
         self.assertFalse(result["receipt_created"])
 
+    def test_plan_only_preflight_has_recomputable_binding(self):
+        plan = _plan()
+        envelope = _envelope()
+        result = build_provider_runner_preflight(
+            envelope,
+            plan,
+            evaluated_at="2026-09-30T22:41:00+00:00",
+            base_url="http://127.0.0.1:18080",
+            sandbox_only=True,
+            production_targeted=False,
+            secrets_local=True,
+            apply_requested=False,
+            authorization_token="",
+        )
+        binding = verify_provider_runner_preflight(
+            envelope, plan, result
+        )
+        self.assertTrue(binding["binding_match"])
+        self.assertEqual(
+            binding["state"],
+            "STEP1_PROVIDER_RUNNER_PREFLIGHT_BINDING_MATCH",
+        )
+
+        result["base_url"] = "http://127.0.0.1:18081"
+        binding = verify_provider_runner_preflight(
+            envelope, plan, result
+        )
+        self.assertFalse(binding["binding_match"])
+        self.assertIn("preflight_digest_integrity", binding["blockers"])
+
     def test_apply_requires_exact_token(self):
         plan = _plan()
         expected = required_physical_apply_token(plan)
@@ -133,6 +164,11 @@ class TeamAccessStep1ProviderRunnerTests(unittest.TestCase):
         )
         self.assertTrue(result["physical_apply_authorized"])
         self.assertFalse(result["physical_execution_performed"])
+        binding = verify_provider_runner_preflight(
+            _envelope(), plan, result
+        )
+        self.assertTrue(binding["binding_match"])
+        self.assertTrue(binding["apply_requested"])
 
         result = build_provider_runner_preflight(
             _envelope(),
