@@ -259,6 +259,9 @@ from atlasquant_aion_business_consolidation_dry_run_v2 import (
 from atlasquant_aion_business_consolidation_decision_request import (
     decision_request_template as business_consolidation_decision_request_template,
 )
+from atlasquant_aion_business_consolidation_authorization_record import (
+    authorization_record_requirements as business_consolidation_authorization_requirements,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7169,6 +7172,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "5 · Decisão administrativa",
             "6 · Dry-run fail-closed",
             "7 · Pedido de decisão vinculado",
+            "8 · Contrato de autorização explícita",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7248,7 +7252,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "Merge, deploy, piloto e runtime continuam sem autorização."
         )
 
-    else:
+    elif view == "7 · Pedido de decisão vinculado":
         request = business_consolidation_decision_request_template()
         st.write(f"Estado: **{request.get('state')}**")
         st.markdown("**Bindings obrigatórios para uma futura decisão explícita:**")
@@ -7261,6 +7265,22 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "Estado máximo do pedido: HUMAN_AUTHORIZATION_RECORD_REQUIRED. "
             "Ele não executa merge, deploy, piloto ou runtime."
+        )
+
+    else:
+        contract = business_consolidation_authorization_requirements()
+        st.write(f"Estado: **{contract.get('state')}**")
+        st.markdown("**Token explícito obrigatório:**")
+        st.code(str(contract.get("required_decision_token") or ""), language=None)
+        st.markdown("**Acknowledgements obrigatórios:**")
+        for item in list(contract.get("required_acknowledgements") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "Mensagens genéricas como ok, vamos lá ou pode seguir não são autorização de consolidação."
+        )
+        st.caption(
+            "Mesmo um registro explícito validado não executa merge. "
+            "Deploy, piloto e runtime continuam fronteiras separadas."
         )
 
 
