@@ -4,6 +4,7 @@ from pathlib import Path
 
 from atlasquant_aion_business_certification_package import (
     ATTESTATION_SCHEMA,
+    HUMAN_REVIEW_SCHEMA,
     BUSINESS_REQUIRED_GATES,
     EVIDENCE_ID,
     PROVENANCE,
@@ -72,6 +73,43 @@ def _trusted_ci_verifier(accept=True):
             "sha": record.get("sha"),
             "bound_refs": list(record.get("refs") or []),
             "fingerprint": record.get("fingerprint"),
+        }
+    return verify
+
+
+def _review_record(fingerprint, **updates):
+    data = {
+        "schema": HUMAN_REVIEW_SCHEMA,
+        "state": "APPROVED",
+        "specialist": "BUSINESS",
+        "version": "1",
+        "evidence_id": EVIDENCE_ID,
+        "approval_scope": "CERTIFICATION_ONLY",
+        "reviewer": "human-reviewer-1",
+        "reviewed_at": "2026-09-30T09:35:00Z",
+        "reviewed_sha": SHA,
+        "evidence_fingerprint": fingerprint,
+        "runtime_activation_approved": False,
+    }
+    data.update(updates)
+    return data
+
+
+def _trusted_review_verifier(accept=True):
+    def verify(review):
+        if not accept:
+            return {"state": "REJECTED", "review_verified": False}
+        return {
+            "state": "VERIFIED",
+            "review_verified": True,
+            "specialist": review.get("specialist"),
+            "version": review.get("version"),
+            "evidence_id": review.get("evidence_id"),
+            "approval_scope": review.get("approval_scope"),
+            "reviewer": review.get("reviewer"),
+            "reviewed_sha": review.get("reviewed_sha"),
+            "evidence_fingerprint": review.get("evidence_fingerprint"),
+            "runtime_activation_approved": False,
         }
     return verify
 
@@ -216,14 +254,27 @@ class BusinessCertificationPackageTests(unittest.TestCase):
             "test_count": 1,
         })
         attestation = _attestation(seed["tests"]["fingerprint"])
-        certified = assess_business_certification_package(
+        unverified_review = assess_business_certification_package(
             product_evidence=_product_evidence(),
             ci_attestation=attestation,
             human_review_approved=True,
             trusted_ci_verifier=_trusted_ci_verifier(),
         )
+        self.assertEqual(unverified_review["state"], "TESTED")
+        self.assertFalse(unverified_review["human_review_verified"])
+
+        review = _review_record(attestation["fingerprint"])
+        certified = assess_business_certification_package(
+            product_evidence=_product_evidence(),
+            ci_attestation=attestation,
+            human_review_approved=True,
+            human_review_record=review,
+            trusted_ci_verifier=_trusted_ci_verifier(),
+            trusted_human_review_verifier=_trusted_review_verifier(),
+        )
         self.assertEqual(certified["state"], "CERTIFIED")
         self.assertEqual(certified["certification_state"], "CERTIFIED")
+        self.assertTrue(certified["human_review_verified"])
         self.assertFalse(certified["runtime_capability_available"])
         self.assertFalse(certified["runtime_activated"])
         self.assertFalse(certified["external_action_executed"])
@@ -242,7 +293,9 @@ class BusinessCertificationPackageTests(unittest.TestCase):
                     product_evidence=_product_evidence(),
                     ci_attestation=attestation,
                     human_review_approved=lookalike,
+                    human_review_record=review,
                     trusted_ci_verifier=_trusted_ci_verifier(),
+                    trusted_human_review_verifier=_trusted_review_verifier(),
                 )
                 self.assertNotEqual(result["state"], "CERTIFIED")
                 self.assertFalse(result["human_review_approved"])
@@ -269,12 +322,49 @@ class BusinessCertificationPackageTests(unittest.TestCase):
             product_evidence=_product_evidence(lgpd_privacy_defined=False),
             ci_attestation=attestation,
             human_review_approved=True,
+            human_review_record=_review_record(attestation["fingerprint"]),
             trusted_ci_verifier=_trusted_ci_verifier(),
+            trusted_human_review_verifier=_trusted_review_verifier(),
         )
         self.assertEqual(result["state"], "NOT_READY")
         self.assertFalse(result["product_ready"])
         self.assertEqual(result["certification_state"], "NOT_CERTIFIED")
         self.assertFalse(result["runtime_activated"])
+
+    def test_human_review_is_bound_to_sha_fingerprint_and_certification_only_scope(self):
+        seed = build_business_specialist_evidence(_attestation(""))
+        attestation = _attestation(seed["tests"]["fingerprint"])
+        cases = (
+            _review_record(attestation["fingerprint"], reviewed_sha="fedcba9876543210"),
+            _review_record("0" * 64),
+            _review_record(attestation["fingerprint"], approval_scope="RUNTIME_AND_CERTIFICATION"),
+            _review_record(attestation["fingerprint"], runtime_activation_approved=True),
+            _review_record(attestation["fingerprint"], reviewer=""),
+        )
+        for review in cases:
+            with self.subTest(review=review):
+                result = assess_business_certification_package(
+                    product_evidence=_product_evidence(),
+                    ci_attestation=attestation,
+                    human_review_approved=True,
+                    human_review_record=review,
+                    trusted_ci_verifier=_trusted_ci_verifier(),
+                    trusted_human_review_verifier=_trusted_review_verifier(),
+                )
+                self.assertEqual(result["state"], "TESTED")
+                self.assertFalse(result["human_review_verified"])
+                self.assertEqual(result["certification_state"], "NOT_CERTIFIED")
+
+        rejected = assess_business_certification_package(
+            product_evidence=_product_evidence(),
+            ci_attestation=attestation,
+            human_review_approved=True,
+            human_review_record=_review_record(attestation["fingerprint"]),
+            trusted_ci_verifier=_trusted_ci_verifier(),
+            trusted_human_review_verifier=_trusted_review_verifier(accept=False),
+        )
+        self.assertEqual(rejected["state"], "TESTED")
+        self.assertFalse(rejected["human_review_verified"])
 
     def test_module_has_no_network_process_or_external_sdk_imports(self):
         source = Path("atlasquant_aion_business_certification_package.py").read_text(encoding="utf-8")
