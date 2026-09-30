@@ -991,7 +991,7 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("Evidências obrigatórias para fechar tecnicamente a consolidação", src)
         self.assertIn("Checks finais obrigatórios na main", src)
         self.assertIn("READY_FOR_FINAL_ADMIN_REVIEW", src)
-        self.assertIn("ACKNOWLEDGE_BUSINESS_CONSOLIDATION_COMPLETE", src)
+        self.assertIn('review.get("required_decision_token")', src)
         self.assertIn("Mensagens genéricas como 'vamos lá'", src)
         self.assertIn("não autoriza deploy, produção, piloto ou runtime", src)
         self.assertNotIn("st.tabs(", src)
