@@ -839,3 +839,26 @@ QUOTA_APPLICATION_EXECUTION_REVIEW_REQUIRED.
 
 The module never applies quotas, changes billing or runtime, expands scope or
 calls external systems. ADR-0046 records this boundary.
+
+## AION eight logical roles
+
+The AION remains one central nucleus. ADR-0047 defines eight logical roles
+activated on demand rather than eight independent always-on AI systems:
+
+1. Core / Orchestrator.
+2. Architect / Strategist.
+3. Guardian / Auditor.
+4. Executor / Operator.
+5. Memory / Knowledge.
+6. FinOps.
+7. Observability / Reliability.
+8. Customer Success / Commercial.
+
+Roles may share models and infrastructure to reduce cost. Specialist roles do
+not receive independent authority for critical actions. RBAC, tenant isolation,
+human approval boundaries and fail-closed execution remain authoritative.
+
+The latest master-checkpoint reconciliation is discovered through
+`docs/continuidade/checkpoint_mestre_latest.json` and validated read-only by
+`atlasquant_aion_checkpoint_latest.py`.
+
