@@ -118,6 +118,11 @@ Estado da seleção/preço do primeiro piloto: **IMPLEMENTADO / EM VALIDAÇÃO**
 `atlasquant_aion_business_first_pilot_pricing_review.py`, ADR-0054 e testes
 associados. O máximo automático é `READY_FOR_ADMIN_FIRST_PILOT_REVIEW`.
 
+Estado do binding comercial read-only: **IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_business_commercial_live_data_binding.py`, ADR-0057 e testes
+associados. A camada aceita somente dados externos atestados e recentes, sem PII
+bruta/segredos, e produz estado observado sem escrever de volta no CRM ou canais.
+
 ## 4. Equipe & Acessos
 
 Estado da primeira camada: **IMPLEMENTADO / EM VALIDAÇÃO** em
@@ -249,7 +254,7 @@ PENDENTE / APROVADO:
 - definir RPO/RTO, cópia secundária real e executar restore drill não produtivo da política Backup & Recovery;
 - binding do Budget Governor/FinOps com custos reais de providers, alertas e ledger financeiro persistente;
 - segmento/candidato reais + custos reais + preço comercial real + revisão jurídica/comercial do primeiro piloto;
-- binding do pipeline comercial com CRM/contatos/contrato/cobrança reais após aprovação;
+- configuração física dos connectors read-only, OAuth/secret store e mapeamento de schema dos providers reais;
 - validação operacional do bootstrap do Checkpoint Mestre em ambientes empacotados/deployados;
 - validação do roteador dos oito papéis em runtime/deploy empacotado;
 - PDF atualizado da aba Negócios para visão do administrador.
@@ -278,3 +283,4 @@ PENDENTE / APROVADO:
 | D-2026-09-30-FIRST-PILOT-PRICING-REVIEW | IMPLEMENTADO / EM VALIDAÇÃO | Primeiro piloto exige fit, preço sustentável e Pilot Governance |
 | D-2026-09-30-BACKUP-RECOVERY-POLICY | IMPLEMENTADO / EM VALIDAÇÃO | Backup em camadas, integridade e restore não automático |
 | D-2026-09-30-INDEPENDENCE-CLT-INDEX | IMPLEMENTADO / EM VALIDAÇÃO | Índice privado para revisão futura de independência do emprego |
+| D-2026-09-30-COMMERCIAL-LIVE-READ-BINDING | IMPLEMENTADO / EM VALIDAÇÃO | Pipeline comercial consome somente dados reais atestados em leitura |

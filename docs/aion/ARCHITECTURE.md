@@ -998,3 +998,19 @@ transition-review gate.
 
 ADR-0056 records this boundary.
 
+## BUSINESS commercial live data binding
+
+`atlasquant_aion_business_commercial_live_data_binding.py` provides a
+read-only boundary for externally attested commercial records from CRM, forms,
+email, calendar, payments and analytics.
+
+Only pseudonymous references, canonical pipeline stage, permission state and
+fresh source evidence are accepted. Raw contact PII, credentials, stale records
+and duplicate source records are rejected. The resulting pipeline is an
+observed state only and cannot auto-advance or write back to external systems.
+
+The maximum automatic state is
+`READY_FOR_ADMIN_LIVE_READ_BINDING_REVIEW`.
+
+ADR-0057 records this boundary.
+
