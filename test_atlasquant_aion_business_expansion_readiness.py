@@ -166,6 +166,35 @@ class BusinessExpansionReadinessTests(unittest.TestCase):
         self.assertFalse(row["authorization_recorded"])
         self.assertFalse(row["scope_expansion_authorized"])
 
+    def test_forged_skip_preflight_cannot_record_authorization(self):
+        row = dict(_preflight())
+        row["state"] = "READY_FOR_EXPLICIT_EXPANSION_AUTHORIZATION"
+        row["preflight_digest"] = "b" * 64
+        row["current_scope"] = "sandbox"
+        row["current_tenant_ids"] = []
+        row["proposed_scope"] = "bounded_production"
+        row["proposed_tenant_ids"] = ["tenant-001"]
+        row["required_decision_token"] = REQUIRED_EXPANSION_DECISION_TOKEN
+        row["required_acknowledgements"] = list(EXPANSION_ACKNOWLEDGEMENTS)
+        row["generic_confirmation_is_authorization"] = False
+        row["scope_expansion_authorized"] = False
+        row["expansion_execution_authorized"] = False
+        row["automatic_expansion_allowed"] = False
+        row["executes_action"] = False
+
+        auth = record_expansion_authorization(
+            row,
+            decision_token=REQUIRED_EXPANSION_DECISION_TOKEN,
+            acknowledgements={
+                name: True for name in EXPANSION_ACKNOWLEDGEMENTS
+            },
+            actor="Mikael",
+        )
+        self.assertEqual(auth["state"], "BLOCKED")
+        self.assertFalse(auth["authorization_recorded"])
+        self.assertFalse(auth["scope_expansion_authorized"])
+        self.assertFalse(auth["executes_action"])
+
     def test_exact_token_records_authorization_but_not_execution(self):
         row = record_expansion_authorization(
             _preflight(),
