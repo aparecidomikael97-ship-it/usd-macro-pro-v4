@@ -756,3 +756,22 @@ actions remain false.
 
 The module performs no activation, expansion, deploy, rollback or external
 action. ADR-0041 records this boundary.
+
+## BUSINESS controlled scope expansion readiness
+
+atlasquant_aion_business_expansion_readiness.py validates a proposed growth step
+against the scope frozen by ADR-0041. It permits only incremental transitions:
+sandbox to pilot, pilot growth, pilot to bounded production, or bounded
+production growth within the configured tenant cap.
+
+Existing tenants must be preserved, proposed tenants must be explicit, and the
+maximum bounded set is 10. Privacy, support, finance guardrails, integrations,
+capacity, monitoring and rollback are revalidated before a decision request can
+become ready.
+
+The exact decision token is AUTHORIZE_BUSINESS_SCOPE_EXPANSION. Generic
+confirmation never authorizes expansion. Even a valid authorization keeps
+physical execution, billing and client actions separate.
+
+The module performs no expansion, runtime change or external action. ADR-0042
+records this boundary.
