@@ -121,6 +121,14 @@ DEFAULT_RUNTIME_REPO = "aparecidomikael97-ship-it/usd-macro-pro-v4"
 MAX_DOC_BYTES = 1_500_000
 MAX_RUNTIME_BYTES = 2_000_000
 MAX_SEARCH_RESULTS = 8
+MAX_CONTINUITY_DOCS = 200
+
+MANDATORY_CONTINUITY_FILES = (
+    "PRIORIDADE_RENDER_AO_CHEGAR_EM_CASA_2026-09-24.md",
+    "CHECKPOINT_MESTRE_ATLASQUANT_2026-09-22.md",
+    "CHECKPOINT_MESTRE_RECONCILIACAO_2026-09-29.md",
+    "CHECKPOINT_MESTRE_RECONCILIACAO_2026-09-30.md",
+)
 
 CANONICAL_FILES = (
     "CONTEXTO_DO_PROJETO.md",
@@ -578,7 +586,23 @@ def canonical_documents(base_dir: str | Path | None = None) -> list[dict[str, An
     candidates = [root / rel for rel in CANONICAL_FILES]
     continuity = root / "docs" / "continuidade"
     if continuity.is_dir():
-        candidates.extend(sorted(continuity.rglob("*.md"))[:80])
+        all_continuity = sorted(continuity.rglob("*.md"))
+        required = [
+            continuity / name
+            for name in MANDATORY_CONTINUITY_FILES
+            if (continuity / name).is_file()
+        ]
+        selected: list[Path] = []
+        selected_seen: set[str] = set()
+        for path in [*required, *all_continuity]:
+            key = str(path)
+            if key in selected_seen:
+                continue
+            selected_seen.add(key)
+            selected.append(path)
+            if len(selected) >= MAX_CONTINUITY_DOCS:
+                break
+        candidates.extend(selected)
 
     for path in candidates:
         try:
