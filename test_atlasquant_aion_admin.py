@@ -908,6 +908,17 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("Publicados confirmados", src)
         self.assertIn("execução ainda não ocorre nesta tela", src)
 
+    def test_business_integration_hub_demo_is_secret_free_and_readiness_only(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("def _render_business_integration_hub_demo()", src)
+        self.assertIn("Hub de Integrações · Readiness Demo", src)
+        self.assertIn("Princípio: LEAST PRIVILEGE", src)
+        self.assertIn("Senha/token/chave real: **não inserir neste demo**", src)
+        self.assertIn("OAuth não é executado", src)
+        self.assertIn("nenhum write scope é concedido", src)
+        self.assertIn("_render_business_integration_hub_demo()", src)
+        self.assertNotIn("st.tabs(", src)
+
     def test_business_commercial_acquisition_demo_covers_site_outreach_contract_and_content(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("def _render_business_commercial_acquisition_demo()", src)

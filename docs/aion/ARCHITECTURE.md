@@ -481,3 +481,16 @@ The site CTA is diagnosis-first. Outreach is never sent automatically and
 provisioning remain future reviewed actions.
 
 ADR-0024 records this diagnostic-first commercial boundary.
+
+
+## BUSINESS integration hub readiness
+
+`atlasquant_aion_business_integration_hub.py` models WhatsApp Business,
+email, forms, calendar, CRM, payments, social media and analytics before any
+real provider connection exists.
+
+Scopes are least-privilege and split into read-only, draft-only, future approval
+required and prohibited-in-demo. The Hub never stores raw secrets and cannot
+perform OAuth, send, publish, charge, refund or grant write authority.
+
+ADR-0025 records this secret-free readiness boundary.
