@@ -34,6 +34,7 @@ services:
       - "127.0.0.1:${REGISTRY_DB_PORT:-15432}:5432"
     volumes:
       - registry_db_data:/var/lib/postgresql
+      - ./registry/init:/docker-entrypoint-initdb.d:ro
     networks:
       - team_access_sandbox
 
