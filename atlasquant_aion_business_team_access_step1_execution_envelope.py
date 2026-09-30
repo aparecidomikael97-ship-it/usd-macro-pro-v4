@@ -462,6 +462,7 @@ def build_step1_execution_envelope(
             decision.get("decision_record_digest"), 80
         ).lower() if ready else "",
         "execution_observation_digest": observation_digest if ready else "",
+        "execution_observation": observation_payload if ready else {},
         "plan_digest": materialized["plan_digest"] if ready else "",
         "operator_session_id": materialized["operator_session_id"]
         if ready else "",
@@ -519,6 +520,7 @@ def verify_step1_execution_envelope(
     observation_digest = _clean(
         row.get("execution_observation_digest"), 80
     ).lower()
+    observation = _mapping(row.get("execution_observation"))
     plan_digest = _clean(row.get("plan_digest"), 80).lower()
     session_id = _clean(row.get("operator_session_id"), 64).lower()
     baseline_digest = _clean(
@@ -537,6 +539,57 @@ def verify_step1_execution_envelope(
     envelope_digest = _clean(
         row.get("execution_envelope_digest"), 80
     ).lower()
+
+    canonical_observation = {
+        "schema": _clean(observation.get("schema"), 180),
+        "version": _clean(observation.get("version"), 20),
+        "operator_session_id": _clean(
+            observation.get("operator_session_id"), 64
+        ).lower(),
+        "baseline_evidence_digest_observed": _clean(
+            observation.get("baseline_evidence_digest_observed"), 80
+        ).lower(),
+        "observed_at": (
+            _parse_time(observation.get("observed_at")).isoformat()
+            if _parse_time(observation.get("observed_at")) is not None
+            else ""
+        ),
+        "observed_by": _clean(observation.get("observed_by"), 120),
+        "target_username": _clean(
+            observation.get("target_username"), 160
+        ),
+        "target_account_absent_verified": observation.get(
+            "target_account_absent_verified"
+        ) is True,
+        "identity_provider_account_lookup_verified": observation.get(
+            "identity_provider_account_lookup_verified"
+        ) is True,
+        "tenant_scope_verified": observation.get(
+            "tenant_scope_verified"
+        ) is True,
+        "sandbox_health_verified": observation.get(
+            "sandbox_health_verified"
+        ) is True,
+        "oidc_verified": observation.get("oidc_verified") is True,
+        "registry_schema_verified": observation.get(
+            "registry_schema_verified"
+        ) is True,
+        "secrets_local": observation.get("secrets_local") is True,
+        "production_targets_absent": observation.get(
+            "production_targets_absent"
+        ) is True,
+        "cleanup_path_ready": observation.get("cleanup_path_ready") is True,
+        "secret_material_included": observation.get(
+            "secret_material_included"
+        ) is True,
+        "production_targeted": observation.get(
+            "production_targeted"
+        ) is True,
+        "external_mutations_executed": observation.get(
+            "external_mutations_executed"
+        ) is True,
+    }
+    recomputed_observation_digest = _digest(canonical_observation)
 
     payload = {
         "materialization_digest": materialization_digest,
@@ -573,6 +626,40 @@ def verify_step1_execution_envelope(
         ),
         "observation_digest_valid": bool(
             _DIGEST64.fullmatch(observation_digest)
+        ),
+        "observation_schema_valid": canonical_observation["schema"]
+        == OBSERVATION_SCHEMA,
+        "observation_version_valid": canonical_observation["version"]
+        == VERSION,
+        "observation_digest_integrity": bool(
+            _DIGEST64.fullmatch(observation_digest)
+            and observation_digest == recomputed_observation_digest
+        ),
+        "observation_safe_flags": bool(
+            canonical_observation["target_account_absent_verified"] is True
+            and canonical_observation[
+                "identity_provider_account_lookup_verified"
+            ] is True
+            and canonical_observation["tenant_scope_verified"] is True
+            and canonical_observation["sandbox_health_verified"] is True
+            and canonical_observation["oidc_verified"] is True
+            and canonical_observation["registry_schema_verified"] is True
+            and canonical_observation["secrets_local"] is True
+            and canonical_observation["production_targets_absent"] is True
+            and canonical_observation["cleanup_path_ready"] is True
+            and canonical_observation["secret_material_included"] is False
+            and canonical_observation["production_targeted"] is False
+            and canonical_observation["external_mutations_executed"] is False
+        ),
+        "observation_identity_matches_envelope": bool(
+            canonical_observation["operator_session_id"] == session_id
+            and canonical_observation[
+                "baseline_evidence_digest_observed"
+            ] == baseline_digest
+            and canonical_observation["observed_at"]
+            == (observed_at.isoformat() if observed_at is not None else "")
+            and canonical_observation["observed_by"] == observed_by
+            and canonical_observation["target_username"] == target_username
         ),
         "plan_digest_valid": bool(_DIGEST64.fullmatch(plan_digest)),
         "session_valid": bool(_SESSION32.fullmatch(session_id)),
