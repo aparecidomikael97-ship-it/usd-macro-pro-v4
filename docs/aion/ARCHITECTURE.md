@@ -1355,3 +1355,23 @@ A verified record only sets
 produce a receipt or authorize a ledger append.
 
 ADR-0077 records this boundary.
+
+
+## BUSINESS team access Step 1 manual execution envelope
+
+`atlasquant_aion_business_team_access_step1_execution_envelope.py` is the last
+read-only boundary before a possible manual apply of Step 1.
+
+It revalidates materialization, the Step 1 packet and the explicit Step 1
+decision record, then requires a new post-decision observation. The target
+sandbox account must still be absent and the observation must confirm a
+read-only identity-provider lookup.
+
+The envelope expires quickly: both decision and post-decision observation are
+limited to 120 seconds at preparation time.
+
+The maximum state is
+`READY_FOR_EXPLICIT_MANUAL_SANDBOX_STEP_1_APPLY`. No provider command is
+generated and no execution occurs.
+
+ADR-0078 records this boundary.
