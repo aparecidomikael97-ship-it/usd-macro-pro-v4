@@ -350,6 +350,10 @@ from atlasquant_aion_finops_live_cost_ledger import (
 from atlasquant_aion_finops_ledger_persistence_reconciliation import (
     persistence_policy as aion_finops_persistence_policy,
 )
+from atlasquant_aion_business_revenue_opportunity_engine import (
+    revenue_opportunity_policy as business_revenue_opportunity_policy,
+    opportunity_template_catalog as business_revenue_opportunity_templates,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7286,6 +7290,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "31 · Pipeline Comercial · Dados Reais",
             "32 · FinOps · Custos Reais & Ledger",
             "33 · FinOps · Persistencia & Reconciliacao",
+            "34 · Oportunidades de Receita",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7860,7 +7865,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "mas não muda preço, não paga fatura e não movimenta dinheiro."
         )
 
-    else:
+    elif view == "33 · FinOps · Persistencia & Reconciliacao":
         persistence = aion_finops_persistence_policy()
         st.write(f"Estado: **{persistence.get('state')}**")
         st.markdown("**Modelo:** manifesto imutável versionado + chain de digests.")
@@ -7872,6 +7877,23 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "Buraco de versão, replay, quebra de digest ou divergência de valor "
             "bloqueiam a revisão administrativa."
+        )
+
+    else:
+        policy = business_revenue_opportunity_policy()
+        templates = business_revenue_opportunity_templates()
+        st.write(f"Estado: **{policy.get('state')}**")
+        st.markdown("**Estratégia:** serviço B2B recorrente primeiro.")
+        st.markdown("**Templates iniciais:**")
+        for item in list(templates.get("templates") or []):
+            st.markdown(f"- {item.get('label')} · {item.get('opportunity_type')}")
+        st.warning(
+            "O score é planejamento, não probabilidade de venda. "
+            "Oportunidade que estoura orçamento, margem mínima ou capacidade é bloqueada antes do ranking."
+        )
+        st.caption(
+            "Nenhum preço de mercado é embutido, dropshipping continua fora da prioridade "
+            "e nenhuma venda ou gasto é executado por esta camada."
         )
 
 
