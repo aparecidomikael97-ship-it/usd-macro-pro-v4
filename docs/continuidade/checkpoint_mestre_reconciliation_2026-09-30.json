@@ -78,7 +78,7 @@
     "audit_trail": true,
     "aion_must_obey_same_permissions": true,
     "shared_admin_login_forbidden": true,
-    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E_PLUS_PHYSICAL_SANDBOX_PLUS_BASELINE_EVIDENCE_PLUS_LIFECYCLE_PLAN_PLUS_AUTHORIZATION_CONTRACT_PLUS_EVIDENCE_LEDGER_PLUS_STEP_GATE_PLUS_WINDOWS_OPERATOR_KIT_PLUS_OPERATOR_HANDOFF_PLUS_BASELINE_ACCEPTANCE_PLUS_LIFECYCLE_MATERIALIZATION_PLUS_MATERIALIZED_AUTHORIZATION_PACKAGE_PLUS_ZERO_LEDGER_STEP1_PREFLIGHT_PLUS_EXPLICIT_STEP1_DECISION_CONTRACT",
+    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E_PLUS_PHYSICAL_SANDBOX_PLUS_BASELINE_EVIDENCE_PLUS_LIFECYCLE_PLAN_PLUS_AUTHORIZATION_CONTRACT_PLUS_EVIDENCE_LEDGER_PLUS_STEP_GATE_PLUS_WINDOWS_OPERATOR_KIT_PLUS_OPERATOR_HANDOFF_PLUS_BASELINE_ACCEPTANCE_PLUS_LIFECYCLE_MATERIALIZATION_PLUS_MATERIALIZED_AUTHORIZATION_PACKAGE_PLUS_ZERO_LEDGER_STEP1_PREFLIGHT_PLUS_EXPLICIT_STEP1_DECISION_CONTRACT_PLUS_STEP1_EXECUTION_ENVELOPE",
     "production_provisioning": false,
     "real_mfa_2fa": false,
     "persisted_registry": false,
@@ -195,7 +195,16 @@
     "step1_decision_real_recorded": false,
     "step1_manual_execution_authorized": false,
     "step1_execution_performed": false,
-    "step1_ledger_append_authorized": false
+    "step1_ledger_append_authorized": false,
+    "step1_execution_envelope_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "step1_execution_post_decision_observation_required": true,
+    "step1_execution_target_account_absence_required": true,
+    "step1_execution_decision_max_age_seconds": 120,
+    "step1_execution_observation_max_age_seconds": 120,
+    "step1_execution_real_envelope_created": false,
+    "step1_provider_command_generated": false,
+    "step1_physical_execution_performed": false,
+    "step1_execution_receipt_present": false
   },
   "capacity_scale": {
     "status": "IMPLEMENTADO / EM VALIDAÇÃO",
@@ -804,9 +813,25 @@
         "validate_team_access_step1_decision.py",
         "docs/adr/ADR-0077-business-team-access-explicit-step1-decision.md"
       ]
+    },
+    {
+      "id": "D-2026-09-30-TEAM-ACCESS-STEP1-EXECUTION-ENVELOPE",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_business_team_access_step1_execution_envelope.py",
+        "test_atlasquant_aion_business_team_access_step1_execution_envelope.py",
+        "build_team_access_step1_execution_envelope.py",
+        "docs/adr/ADR-0078-business-team-access-step1-manual-execution-envelope.md"
+      ]
     }
   ],
   "pending": [
+    "TEAM_ACCESS_STEP1_POST_EXECUTION_RECEIPT",
+    "TEAM_ACCESS_STEP1_PHYSICAL_MANUAL_APPLY",
+    "TEAM_ACCESS_REAL_STEP1_EXECUTION_ENVELOPE",
+    "TEAM_ACCESS_REAL_STEP1_POST_DECISION_OBSERVATION",
     "TEAM_ACCESS_STEP1_PHYSICAL_EXECUTION",
     "TEAM_ACCESS_STEP1_MANUAL_EXECUTION_ENVELOPE",
     "TEAM_ACCESS_REAL_STEP1_EXPLICIT_DECISION_RECORD",
