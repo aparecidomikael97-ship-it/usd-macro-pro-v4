@@ -24,11 +24,13 @@ O script gera secrets localmente, não mostra os valores e não inicia Docker.
 
     .\Get-TeamAccessSandboxReadiness.ps1
 
-O resultado é gravado em:
+O resultado é gravado, por padrão, fora do repositório em:
 
-    .atlasquant_sandbox_operator\windows-operator-readiness.json
+    %LOCALAPPDATA%\AtlasQuant\team-access-sandbox\operator\windows-operator-readiness.json
 
-O arquivo contém apenas checks booleanos e timestamp.
+O secret env e o baseline também usam a árvore
+%LOCALAPPDATA%\AtlasQuant\team-access-sandbox por padrão. O relatório contém
+apenas checks booleanos e timestamp.
 
 ### 3. Revisar o operador
 
