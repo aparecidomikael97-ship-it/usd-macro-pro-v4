@@ -40,7 +40,7 @@ class TeamAccessPhysicalSandboxTests(unittest.TestCase):
         self.assertEqual(
             policy["state"], "TEAM_ACCESS_PHYSICAL_SANDBOX_POLICY_DEFINED"
         )
-        self.assertEqual(policy["keycloak_image"], "quay.io/keycloak/keycloak:26.7.4")
+        self.assertEqual(policy["keycloak_image"], "quay.io/keycloak/keycloak:26.7.5")
         self.assertEqual(policy["postgres_image"], "postgres:18.6")
         self.assertTrue(policy["sandbox_only"])
         self.assertFalse(policy["production_use_allowed"])
@@ -110,7 +110,7 @@ class TeamAccessPhysicalSandboxTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("127.0.0.1:", compose)
         self.assertNotIn("0.0.0.0:", compose)
-        self.assertIn("quay.io/keycloak/keycloak:26.7.4", example)
+        self.assertIn("quay.io/keycloak/keycloak:26.7.5", example)
         self.assertIn("postgres:18.6", example)
         self.assertNotIn("password=admin", compose.lower())
         self.assertIn("CHANGE_ME_", example)
