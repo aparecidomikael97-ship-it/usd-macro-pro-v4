@@ -62,3 +62,4 @@ Average Daily Range e American Depositary Receipts não têm arquivo aqui. Seu e
 | ADR-0031 | ACCEPTED | `docs/adr/ADR-0031-business-consolidation-decision-binding.md` |
 | ADR-0032 | ACCEPTED | `docs/adr/ADR-0032-business-explicit-consolidation-authorization-record.md` |
 | ADR-0033 | ACCEPTED | `docs/adr/ADR-0033-business-consolidation-execution-preflight.md` |
+| ADR-0034 | ACCEPTED | `docs/adr/ADR-0034-business-execution-review-packet.md` |
