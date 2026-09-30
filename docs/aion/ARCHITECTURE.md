@@ -919,3 +919,17 @@ No parallel memory store, network call or operational authority is introduced.
 
 ADR-0051 records this boundary.
 
+## AION deterministic eight-role router
+
+`atlasquant_aion_eight_role_router.py` sits above the existing domain routers.
+Domain routing decides where the task belongs; the logical-role router decides
+which internal AION roles should review it.
+
+The Orchestrator is always present and at most three additional roles are
+selected, keeping each task bounded to four logical roles. The router validates
+the eight official role IDs against the latest master-checkpoint snapshot before
+routing. Critical intents force strong review metadata but never grant physical
+execution or wider authority.
+
+ADR-0052 records this boundary.
+
