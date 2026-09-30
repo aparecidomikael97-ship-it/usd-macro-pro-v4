@@ -69,3 +69,4 @@ Average Daily Range e American Depositary Receipts não têm arquivo aqui. Seu e
 | ADR-0038 | ACCEPTED | `docs/adr/ADR-0038-business-deploy-runtime-separation.md` |
 | ADR-0039 | ACCEPTED | `docs/adr/ADR-0039-business-deploy-verification-before-runtime.md` |
 | ADR-0040 | ACCEPTED | `docs/adr/ADR-0040-business-runtime-activation-bounded-review.md` |
+| ADR-0041 | ACCEPTED | `docs/adr/ADR-0041-business-post-activation-scope-freeze.md` |
