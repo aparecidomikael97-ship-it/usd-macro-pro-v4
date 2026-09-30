@@ -31,6 +31,18 @@ REQUIRED_ACKNOWLEDGEMENTS = (
 )
 
 ALLOWED_FACTORS = ("PASSKEY", "SECURITY_KEY", "TOTP")
+LIFECYCLE_STEP_IDS = (
+    "CREATE_INDIVIDUAL_SANDBOX_ACCOUNT",
+    "ENROLL_STRONG_AUTH",
+    "VERIFY_STRONG_AUTH_CHALLENGE",
+    "WRITE_REGISTRY_REVISION",
+    "VERIFY_REGISTRY_EXACT_READBACK",
+    "DISABLE_SANDBOX_ACCOUNT",
+    "REVOKE_SANDBOX_SESSIONS",
+    "MARK_REGISTRY_MEMBERSHIP_INACTIVE",
+    "VERIFY_INACTIVE_REGISTRY_READBACK",
+    "ASSEMBLE_E2E_EVIDENCE_PACKET",
+)
 _DIGEST64 = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -236,6 +248,8 @@ def build_lifecycle_test_plan(
         "test_username": username if ready else "",
         "tenant_ids": tenants if ready else [],
         "factor_type": factor if ready else "",
+        "baseline_evidence_digest": baseline_digest if ready else "",
+        "requested_by": requester if ready else "",
         "steps": steps,
         "plan_digest": _digest(payload) if ready else "",
         "required_decision_token": REQUIRED_DECISION_TOKEN if ready else "",
@@ -260,6 +274,7 @@ __all__ = [
     "REQUIRED_DECISION_TOKEN",
     "REQUIRED_ACKNOWLEDGEMENTS",
     "ALLOWED_FACTORS",
+    "LIFECYCLE_STEP_IDS",
     "lifecycle_plan_policy",
     "build_lifecycle_test_plan",
 ]
