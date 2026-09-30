@@ -547,3 +547,22 @@ cannot authorize merge, deploy, pilot or runtime.
 
 ADR-0029 records this administrative separation of technical readiness from
 merge authority.
+
+## BUSINESS full-stack consolidation dry-run V2
+
+`atlasquant_aion_business_consolidation_dry_run_v2.py` layers a fail-closed
+administrative runbook over the #394–#412 consolidation V2. Frozen evidence alone
+produces `AWAITING_LIVE_REVALIDATION`.
+
+A trusted caller must revalidate repository identity, open/Draft posture, SHAs,
+bases, mergeability, required/UI checks, BUSINESS runtime OFF and absence of
+merge authority. Even then, the maximum automatic state is
+`READY_FOR_EXPLICIT_ADMIN_DECISION`.
+
+Each hypothetical step requires pre-step revalidation and a separate explicit
+administrative authorization. Post-step CI, runtime posture recheck and previous
+main SHA preservation are mandatory before another PR can be considered. This
+module cannot merge, rebase, enable auto-merge, deploy, authorize a pilot or
+activate runtime.
+
+ADR-0030 records this live-revalidation and stop-condition boundary.
