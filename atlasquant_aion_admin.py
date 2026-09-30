@@ -305,6 +305,9 @@ from atlasquant_aion_business_expansion_cycle_audit_ledger import (
     audit_expansion_cycle_ledger as business_audit_expansion_cycle_ledger,
     expansion_cycle_ledger_template as business_expansion_cycle_ledger_template,
 )
+from atlasquant_aion_business_capacity_quota_guardrail import (
+    capacity_policy_requirements as business_capacity_policy_requirements,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7228,6 +7231,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "18 · Prontidão para expansão controlada",
             "19 · Pós-expansão & congelamento do ciclo",
             "20 · Ledger auditável de ciclos de expansão",
+            "21 · Capacidade & quotas por tenant",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7545,7 +7549,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "não existe crescimento automático, cobrança automática ou ação automática com clientes."
         )
 
-    else:
+    elif view == "20 · Ledger auditável de ciclos de expansão":
         ledger = business_expansion_cycle_ledger_template()
         audit = business_audit_expansion_cycle_ledger(ledger)
         st.write(f"Estado do ledger: **{ledger.get('state')}**")
@@ -7567,6 +7571,21 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "O ledger é somente administrativo. Ele não expande tenants, não altera runtime, "
             "não cobra, não publica e não executa ações com clientes."
+        )
+
+    else:
+        capacity = business_capacity_policy_requirements()
+        st.write(f"Estado: **{capacity.get('state')}**")
+        st.markdown("**Quotas obrigatórias por tenant:**")
+        for item in list(capacity.get("required_quota_fields") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "O conjunto de tenants precisa coincidir exatamente com o último estado íntegro do ledger. "
+            "A margem mínima e a reserva de capacidade são políticas explícitas do administrador."
+        )
+        st.caption(
+            "A análise não aplica quotas nem cobrança. Mesmo verde, o máximo é uma nova decisão de aplicação; "
+            "runtime, billing, expansão e ações com clientes continuam separados."
         )
 
 
