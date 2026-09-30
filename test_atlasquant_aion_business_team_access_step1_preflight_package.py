@@ -239,6 +239,18 @@ class TeamAccessStep1PreflightPackageTests(unittest.TestCase):
         self.assertFalse(binding["binding_match"])
         self.assertIn("packet_digest_integrity", binding["blockers"])
 
+    def test_tampered_nested_preflight_breaks_binding(self):
+        result = build_step1_preflight_package(
+            _materialization(),
+            _authorization_package(),
+            _observation(),
+            evaluated_at="2026-09-30T21:50:00+00:00",
+        )
+        result["preflight"]["target_step_id"] = "SKIP_STEP_1"
+        binding = verify_step1_preflight_package(result)
+        self.assertFalse(binding["binding_match"])
+        self.assertIn("preflight_digest_integrity", binding["blockers"])
+
     def test_stale_observation_blocks(self):
         result = build_step1_preflight_package(
             _materialization(),
