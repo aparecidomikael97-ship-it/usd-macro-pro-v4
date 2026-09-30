@@ -411,3 +411,17 @@ evidence exists.
 
 The AION Business workspace renders one portal section at a time to keep mobile
 navigation stable. ADR-0019 records this presentation and truth boundary.
+
+
+## BUSINESS onboarding and implementation demo
+
+`atlasquant_aion_business_onboarding_demo.py` models the post-proposal delivery
+path as Scope → Data/Access → Integrations → Sandbox → Validation → Assisted
+Delivery.
+
+The access plan is least-privilege and carries placeholders only; no secret or
+credential value is accepted or persisted. The flow can complete a demo and
+produce `LIVE_REVIEW_REQUIRED`, but never authorizes or activates runtime.
+
+The AION Business workspace renders one onboarding phase at a time for mobile
+stability. ADR-0020 records this sandbox-first boundary.
