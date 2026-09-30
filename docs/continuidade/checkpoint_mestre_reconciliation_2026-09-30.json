@@ -57,7 +57,10 @@
     "commercial_live_read_binding_status": "IMPLEMENTADO / EM VALIDAÇÃO",
     "commercial_live_write_enabled": false,
     "raw_contact_pii_in_binding": false,
-    "live_connector_configuration_authorized": false
+    "live_connector_configuration_authorized": false,
+    "revenue_opportunity_engine_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "revenue_opportunity_score_is_probability": false,
+    "automatic_sale_from_opportunity_engine": false
   },
   "team_access": {
     "status": "IMPLEMENTADO / EM VALIDAÇÃO",
@@ -160,7 +163,8 @@
       444,
       445,
       446,
-      447
+      447,
+      448
     ],
     "current_runtime_authorized": false,
     "merge_authorized_by_this_checkpoint": false,
@@ -179,7 +183,8 @@
     "independence_index_pr": 444,
     "commercial_live_read_binding_pr": 445,
     "finops_live_cost_ledger_pr": 446,
-    "finops_persistence_reconciliation_pr": 447
+    "finops_persistence_reconciliation_pr": 447,
+    "revenue_opportunity_engine_pr": 448
   },
   "decisions": [
     {
@@ -418,9 +423,25 @@
         "docs/aion/AION_FINOPS_LEDGER_PERSISTENCE_RECONCILIATION_V1.md",
         "docs/adr/ADR-0059-finops-ledger-persistence-reconciliation.md"
       ]
+    },
+    {
+      "id": "D-2026-09-30-REVENUE-OPPORTUNITY-ENGINE",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_business_revenue_opportunity_engine.py",
+        "test_atlasquant_aion_business_revenue_opportunity_engine.py",
+        "docs/aion/AION_BUSINESS_REVENUE_OPPORTUNITY_ENGINE_V1.md",
+        "docs/adr/ADR-0060-business-revenue-opportunity-engine.md"
+      ]
     }
   ],
   "pending": [
+    "GLOBAL_WORKER_SCHEDULED_PULSE_STALE",
+    "REVENUE_OPPORTUNITY_WEIGHT_CALIBRATION_AFTER_CLIENT_HISTORY",
+    "REVENUE_OPPORTUNITY_REAL_CAPACITY_BINDING",
+    "REVENUE_OPPORTUNITY_REAL_COST_BINDING",
     "FINOPS_PROVIDER_INVOICE_READ_CONNECTOR",
     "FINOPS_STORAGE_READBACK_VERIFICATION",
     "FINOPS_PHYSICAL_STORAGE_WRITER_REVIEW",
@@ -508,5 +529,18 @@
     "employment_exit_recommended": false,
     "trade_dependency_blocks_transition_review": true,
     "real_financial_data_connected": false
+  },
+  "global_worker_operational_blocker": {
+    "status": "BLOCKED",
+    "blocker": "SCHEDULED_PULSE_NOT_HEALTHY",
+    "observed_at": "2026-09-30T17:55:06Z",
+    "latest_successful_pulse_at": "2026-09-29T10:22:38Z",
+    "max_age_seconds": 5400,
+    "code_failure_identified": false,
+    "feature_flag_modified": false,
+    "worker_armed": false,
+    "runtime_modified": false,
+    "gate_weakening_authorized": false,
+    "activation_authorized": false
   }
 }

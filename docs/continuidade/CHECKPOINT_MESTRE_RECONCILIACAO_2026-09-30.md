@@ -124,6 +124,11 @@ implantação + mensalidade recorrente. O AION calcula margem e piso sustentáve
 a partir de custos informados/validados e da margem mínima definida pelo
 administrador; preço de mercado não é inventado automaticamente.
 
+Estado do motor Oportunidades de Receita: **IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_business_revenue_opportunity_engine.py`, ADR-0060 e testes
+associados. O motor bloqueia oportunidades inviáveis antes do ranking e usa
+score comparativo que não é probabilidade nem previsão de venda.
+
 Estado da seleção/preço do primeiro piloto: **IMPLEMENTADO / EM VALIDAÇÃO** em
 `atlasquant_aion_business_first_pilot_pricing_review.py`, ADR-0054 e testes
 associados. O máximo automático é `READY_FOR_ADMIN_FIRST_PILOT_REVIEW`.
@@ -220,6 +225,21 @@ Regras:
 - restore automático proibido;
 - produção fora do restore drill desta camada.
 
+## 7.2 Global Worker · bloqueio operacional observado
+
+Em 2026-09-30, o gate `AION Global Worker Activation Readiness` bloqueou
+corretamente a stack porque o último scheduled pulse saudável observado era de
+2026-09-29T10:22:38Z, acima da janela máxima de 5400 segundos.
+
+Estado:
+- código/Quality não é a causa do bloqueio;
+- `SCHEDULED_PULSE_NOT_HEALTHY` permanece fail-closed;
+- feature flag continua sem alteração;
+- worker não foi armado;
+- runtime não foi modificado;
+- nenhum gate deve ser enfraquecido apenas para tornar o CI verde;
+- qualquer reativação/ação de runtime continua exigindo autorização separada.
+
 ## 8. Checkpoint Mestre como memória oficial
 
 O AION deve conhecer:
@@ -296,3 +316,4 @@ PENDENTE / APROVADO:
 | D-2026-09-30-COMMERCIAL-LIVE-READ-BINDING | IMPLEMENTADO / EM VALIDAÇÃO | Pipeline comercial consome somente dados reais atestados em leitura |
 | D-2026-09-30-FINOPS-LIVE-COST-LEDGER | IMPLEMENTADO / EM VALIDAÇÃO | Custos reais entram read-only e formam ledger hash-chained |
 | D-2026-09-30-FINOPS-PERSISTENCE-RECONCILIATION | IMPLEMENTADO / EM VALIDAÇÃO | Versões do ledger são encadeadas e faturas reconciliadas sem pagamento |
+| D-2026-09-30-REVENUE-OPPORTUNITY-ENGINE | IMPLEMENTADO / EM VALIDAÇÃO | Oportunidades de receita passam por gates econômicos antes do ranking |
