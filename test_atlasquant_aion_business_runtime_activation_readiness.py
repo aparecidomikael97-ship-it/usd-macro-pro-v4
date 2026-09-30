@@ -203,6 +203,25 @@ class BusinessRuntimeActivationReadinessTests(unittest.TestCase):
         self.assertFalse(packet["automatic_expansion_allowed"])
         self.assertFalse(packet["executes_action"])
 
+    def test_forged_unbounded_authorization_cannot_reach_execution_review(self):
+        authorization = record_runtime_activation_authorization(
+            _preflight(),
+            decision_token=REQUIRED_RUNTIME_DECISION_TOKEN,
+            acknowledgements={
+                name: True for name in ACTIVATION_ACKNOWLEDGEMENTS
+            },
+            actor="Mikael",
+        )
+        authorization["target_scope"] = "pilot"
+        authorization["target_tenant_ids"] = [
+            f"tenant-{i}" for i in range(MAX_BOUNDED_TENANTS + 1)
+        ]
+        packet = runtime_activation_execution_review_packet(authorization)
+        self.assertEqual(packet["state"], "NOT_READY")
+        self.assertFalse(packet["activation_execution_authorized"])
+        self.assertFalse(packet["runtime_activated"])
+        self.assertFalse(packet["executes_action"])
+
     def test_post_activation_template_requires_real_evidence(self):
         row = post_activation_verification_template()
         self.assertEqual(row["state"], "POST_ACTIVATION_EVIDENCE_REQUIRED")
