@@ -24,6 +24,8 @@ Empilhado sobre a Draft PR #447.
 
 ## Estado
 
+Draft PR #448 — AION BUSINESS: Revenue Opportunity Engine V1.
+
 IMPLEMENTADO / EM VALIDAÇÃO.
 
 Ainda pendente:
