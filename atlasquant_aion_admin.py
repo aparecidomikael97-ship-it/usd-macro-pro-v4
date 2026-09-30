@@ -286,6 +286,10 @@ from atlasquant_aion_business_deploy_verification_runtime_boundary import (
     deploy_authorization_requirements as business_deploy_authorization_requirements,
     deployment_verification_template as business_deployment_verification_template,
 )
+from atlasquant_aion_business_runtime_activation_readiness import (
+    activation_authorization_requirements as business_runtime_activation_requirements,
+    post_activation_verification_template as business_post_activation_verification_template,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7204,6 +7208,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "13 · Revisão final da consolidação",
             "14 · Handoff para decisão de deploy",
             "15 · Verificação de deploy & fronteira de runtime",
+            "16 · Prontidão para ativação controlada",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7420,7 +7425,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "runtime, piloto e ações com cliente real permanecem OFF."
         )
 
-    else:
+    elif view == "15 · Verificação de deploy & fronteira de runtime":
         deploy = business_deploy_authorization_requirements()
         verification = business_deployment_verification_template()
         st.write(f"Estado de autorização: **{deploy.get('state')}**")
@@ -7438,6 +7443,30 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "Esta visão não registra autorização, não executa deploy e não ativa runtime. "
             "Mensagem genérica como 'vamos lá' continua sem autoridade operacional."
+        )
+
+    else:
+        readiness = business_runtime_activation_requirements()
+        post = business_post_activation_verification_template()
+        st.write(f"Estado: **{readiness.get('state')}**")
+        st.markdown("**Token explícito exigido para uma futura decisão de runtime:**")
+        st.code(str(readiness.get("required_decision_token") or ""), language=None)
+        st.markdown("**Escopos permitidos:**")
+        for item in list(readiness.get("allowed_activation_scopes") or []):
+            st.markdown(f"- {item}")
+        st.markdown("**Acknowledgements obrigatórios:**")
+        for item in list(readiness.get("required_acknowledgements") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "Autorização de runtime não é execução. Sandbox não aceita tenant real; "
+            "pilot e bounded_production ficam limitados a até 10 tenants explicitamente listados."
+        )
+        st.markdown("**Checks exigidos depois de qualquer futura ativação executada por caminho separado:**")
+        for item in list(post.get("required_checks") or []):
+            st.markdown(f"- {item}")
+        st.caption(
+            "Execução física, expansão automática, cobrança e ações com clientes continuam bloqueadas. "
+            "Mensagem genérica como 'vamos lá' não autoriza runtime."
         )
 
 
