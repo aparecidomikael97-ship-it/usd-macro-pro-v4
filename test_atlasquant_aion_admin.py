@@ -908,6 +908,19 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("Publicados confirmados", src)
         self.assertIn("execução ainda não ocorre nesta tela", src)
 
+    def test_business_guided_training_is_fixture_only_and_session_bound(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("def _render_business_guided_training()", src)
+        self.assertIn("Treinamento Guiado AION Business", src)
+        self.assertIn("Empresa fictícia para treinar", src)
+        self.assertIn("Dados fictícios usados apenas para aprender a ler o Radar.", src)
+        self.assertIn("implantação + manutenção mensal", src)
+        self.assertIn("Resposta segura para praticar", src)
+        self.assertIn("Simulação de conversa", src)
+        self.assertIn("Checklist antes de você divulgar", src)
+        self.assertIn("não autoriza venda automática, runtime ou ação externa", src)
+        self.assertIn("business_training_scorecard(", src)
+
     def test_business_workspace_surfaces_new_demo_before_legacy_marketplace_tools(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("business_demo_html()", src)
