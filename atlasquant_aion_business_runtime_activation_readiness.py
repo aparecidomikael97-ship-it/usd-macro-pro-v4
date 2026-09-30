@@ -308,6 +308,13 @@ def runtime_activation_execution_review_packet(
     digest = _clean(row.get("authorization_digest"), 128).lower()
     scope = _clean(row.get("target_scope"), 80).lower()
     tenants = _tenant_ids(row.get("target_tenant_ids"))
+    tenant_scope_ok = bool(
+        (scope == "sandbox" and not tenants)
+        or (
+            scope in {"pilot", "bounded_production"}
+            and 1 <= len(tenants) <= MAX_BOUNDED_TENANTS
+        )
+    )
 
     ready = bool(
         row.get("schema")
@@ -320,6 +327,7 @@ def runtime_activation_execution_review_packet(
         and row.get("automatic_expansion_allowed") is False
         and _DIGEST64.fullmatch(digest)
         and scope in ALLOWED_ACTIVATION_SCOPES
+        and tenant_scope_ok
         and row.get("executes_action") is False
     )
     return {
