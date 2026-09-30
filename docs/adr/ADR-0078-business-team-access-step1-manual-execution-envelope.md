@@ -55,7 +55,7 @@ Mesmo no estado máximo:
 - executor_enabled = false;
 - production/deploy/runtime = false.
 
-O envelope não contém comando de criação e não acessa Keycloak.
+O envelope não contém comando de criação e não acessa Keycloak. O verifier recalcula a observação sanitizada, o envelope digest e as relações temporais decisão → observação → preparo.
 
 ## Compatibilidade
 
