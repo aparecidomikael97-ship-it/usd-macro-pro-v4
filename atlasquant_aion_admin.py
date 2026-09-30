@@ -357,6 +357,9 @@ from atlasquant_aion_business_revenue_opportunity_engine import (
 from atlasquant_aion_business_capacity_live_metrics_binding import (
     live_capacity_policy as business_live_capacity_policy,
 )
+from atlasquant_aion_business_revenue_live_economics_binding import (
+    live_economics_policy as business_live_economics_policy,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7295,6 +7298,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "33 · FinOps · Persistencia & Reconciliacao",
             "34 · Oportunidades de Receita",
             "35 · Capacidade · Metricas Reais",
+            "36 · Receita · Economia Real",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7900,7 +7904,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "e nenhuma venda ou gasto é executado por esta camada."
         )
 
-    else:
+    elif view == "35 · Capacidade · Metricas Reais":
         live_capacity = business_live_capacity_policy()
         st.write(f"Estado: **{live_capacity.get('state')}**")
         st.metric("Máximo de tenants nesta fase", int(live_capacity.get("max_tenants") or 0))
@@ -7915,6 +7919,21 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "Mesmo quando há capacidade segura, nenhum cliente é admitido automaticamente, "
             "nenhuma quota muda e o teto de orçamento não aumenta por esta camada."
+        )
+
+    else:
+        economics = business_live_economics_policy()
+        st.write(f"Estado: **{economics.get('state')}**")
+        st.markdown("**Custo mensal:** derivado do ledger FinOps verificado.")
+        st.markdown("**Capacidade:** derivada do Capacity Manager com métricas reais.")
+        st.markdown("**Preço e startup budget:** continuam inputs administrativos explícitos.")
+        st.warning(
+            "Percentuais de alocação de custos são hipóteses administrativas rastreáveis. "
+            "O ranking continua sendo planejamento, não previsão de venda."
+        )
+        st.caption(
+            "Nenhuma oportunidade é vendida, nenhum preço muda, nenhum gasto ocorre "
+            "e nenhum cliente é admitido automaticamente por esta camada."
         )
 
 
