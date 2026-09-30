@@ -221,6 +221,13 @@ class TeamAccessStep1PreflightPackageTests(unittest.TestCase):
             result["state"], "TEAM_ACCESS_STEP1_PREFLIGHT_PACKAGE_BLOCKED"
         )
         self.assertIn("observation_fresh", result["blockers"])
+        self.assertEqual(
+            result["preflight"]["state"],
+            "SANDBOX_LIFECYCLE_STEP_PREFLIGHT_NOT_EVALUATED",
+        )
+        self.assertEqual(
+            result["preflight"]["required_step_decision_token"], ""
+        )
         self.assertEqual(result["step1_packet_digest"], "")
         self.assertFalse(result["step_execution_authorized"])
 
