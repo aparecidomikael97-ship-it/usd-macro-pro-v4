@@ -193,6 +193,12 @@ from atlasquant_aion_business_client_finance_demo import (
     portfolio_summary as business_finance_portfolio_summary,
     pricing_review as business_pricing_review,
 )
+from atlasquant_aion_business_trend_intelligence import (
+    evaluate_opportunity as business_evaluate_opportunity,
+    improvement_review as business_improvement_review,
+    rank_opportunities as business_rank_opportunities,
+    trend_watch_posture as business_trend_watch_posture,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -6217,6 +6223,190 @@ def _render_business_client_finance_demo() -> None:
     )
 
 
+
+def _render_business_trend_intelligence_demo() -> None:
+    """Evidence-first trend/opportunity demo with controlled improvement review."""
+    st.markdown("#### 📡 Radar de Tendências & Melhoria Contínua · Demo")
+    st.caption(
+        "O AION deve procurar oportunidades continuamente, mas só promove ideias com evidência. "
+        "Neste bloco usamos fixtures; o coletor web contínuo ainda permanece desligado."
+    )
+
+    now = datetime.now(timezone.utc)
+    demo_evidence = [
+        {
+            "source_kind": "DEMO_FIXTURE",
+            "source": "Pesquisa Demo A",
+            "claim": "Empresas locais relatam demora no atendimento e perda de leads.",
+            "segment": "Clínica",
+            "observed_at": now.isoformat(),
+            "confidence": 82,
+            "demo": True,
+        },
+        {
+            "source_kind": "DEMO_FIXTURE",
+            "source": "Pesquisa Demo B",
+            "claim": "Follow-up manual deixa oportunidades sem resposta.",
+            "segment": "Clínica",
+            "observed_at": now.isoformat(),
+            "confidence": 78,
+            "demo": True,
+        },
+    ]
+    opportunities = [
+        {
+            "name": "AION Recupera Vendas",
+            "segment": "Clínica",
+            "problem": "Leads e orçamentos ficam sem retorno.",
+            "offer": "Qualificação + follow-up + Radar de conversão.",
+            "demand_signal": 84,
+            "pain_intensity": 90,
+            "recurring_revenue_fit": 92,
+            "margin_potential": 78,
+            "implementation_complexity": 42,
+            "support_load": 32,
+            "strategic_fit": 95,
+        },
+        {
+            "name": "AION Atendimento & Agendamento",
+            "segment": "Clínica",
+            "problem": "Tempo de resposta alto e agendamentos perdidos.",
+            "offer": "FAQ + triagem + agendamento + acompanhamento.",
+            "demand_signal": 80,
+            "pain_intensity": 86,
+            "recurring_revenue_fit": 90,
+            "margin_potential": 74,
+            "implementation_complexity": 48,
+            "support_load": 38,
+            "strategic_fit": 93,
+        },
+        {
+            "name": "AION Conteúdo Local",
+            "segment": "Clínica",
+            "problem": "Divulgação irregular.",
+            "offer": "Calendário + criativos + relatório simples.",
+            "demand_signal": 68,
+            "pain_intensity": 60,
+            "recurring_revenue_fit": 76,
+            "margin_potential": 70,
+            "implementation_complexity": 35,
+            "support_load": 45,
+            "strategic_fit": 72,
+        },
+    ]
+    assessments = [
+        business_evaluate_opportunity(item, demo_evidence, now=now)
+        for item in opportunities
+    ]
+    ranked = business_rank_opportunities(assessments)
+    posture = business_trend_watch_posture(assessments)
+
+    view = st.selectbox(
+        "Visão do Radar de Tendências",
+        (
+            "1 · Oportunidades",
+            "2 · Evidências",
+            "3 · Melhoria contínua",
+            "4 · Monitoramento futuro",
+        ),
+        key="aion_business_trend_intelligence_view",
+        help="Uma visão por vez para manter a experiência leve no celular.",
+    )
+
+    if view == "1 · Oportunidades":
+        st.markdown("**Ranking didático de oportunidades**")
+        if not ranked:
+            st.info("Nenhuma oportunidade passou do nível mínimo de observação.")
+        for index,item in enumerate(ranked, start=1):
+            opp = item.get("opportunity") if isinstance(item.get("opportunity"), Mapping) else {}
+            st.markdown(
+                f"**{index}. {opp.get('name') or 'Oportunidade'}** · "
+                f"{item.get('state')} · score {float(item.get('score') or 0):.1f}/100"
+            )
+            st.write(str(item.get("recommendation") or ""))
+            st.caption(
+                f"Verdade: {item.get('truth_state')} · evidência: {item.get('evidence_quality')} · "
+                "nenhum lançamento automático."
+            )
+
+    elif view == "2 · Evidências":
+        st.markdown("**Por que uma tendência não pode ser só opinião**")
+        for row in demo_evidence:
+            st.markdown(
+                f"- **{row['source']}** · {row['segment']} · confiança {row['confidence']}%  \n"
+                f"  {row['claim']}"
+            )
+        st.warning(
+            "Estas fontes são fixtures de demonstração. No runtime futuro, evidência precisa ter "
+            "fonte, data, frescor e confiança verificáveis. Evidência velha ou incompleta não confirma tendência."
+        )
+
+    elif view == "3 · Melhoria contínua":
+        st.markdown("**Experimento controlado**")
+        before = st.number_input(
+            "Métrica antes",
+            min_value=0.0,
+            value=100.0,
+            step=1.0,
+            key="aion_business_improvement_before",
+        )
+        after = st.number_input(
+            "Métrica depois",
+            min_value=0.0,
+            value=112.0,
+            step=1.0,
+            key="aion_business_improvement_after",
+        )
+        sample = st.number_input(
+            "Tamanho da amostra",
+            min_value=0,
+            value=80,
+            step=1,
+            key="aion_business_improvement_sample",
+        )
+        review = business_improvement_review(
+            hypothesis="Follow-up mais rápido melhora a taxa de próximo passo.",
+            metric_name="proximos_passos",
+            before_value=before,
+            after_value=after,
+            sample_size=sample,
+            higher_is_better=True,
+        )
+        st.write(f"Estado: **{review.get('state')}**")
+        if review.get("change_pct") is not None:
+            st.metric("Mudança observada", f"{float(review.get('change_pct')):.2f}%")
+        if review.get("eligible_for_promotion_review"):
+            st.success(
+                "A evidência do exercício permite revisão humana para promover a melhoria."
+            )
+        else:
+            st.info(
+                "Ainda não há evidência suficiente para promover essa mudança."
+            )
+        st.caption(
+            "Melhoria apoiada por dados ainda não altera produção automaticamente. "
+            "Sem auto-deploy, auto-publicação ou auto-promoção."
+        )
+
+    else:
+        m1,m2,m3 = st.columns(3)
+        m1.metric("Candidatos fortes", int(posture.get("strong_candidates") or 0))
+        m2.metric("Candidatos", int(posture.get("candidates") or 0))
+        m3.metric("Em observação", int(posture.get("watch") or 0))
+        st.write(
+            "Objetivo futuro: coletar sinais autorizados de mercado e clientes, reavaliar "
+            "oportunidades e aprender com experimentos de forma contínua."
+        )
+        st.warning(
+            "Monitoramento contínuo real ainda está OFF. Para funcionar 24/7 será necessário "
+            "um coletor autorizado, limites, proveniência, quotas e os gates de runtime."
+        )
+        st.caption(
+            "Buscar tendências continuamente não significa lançar tudo que aparece. "
+            "O AION observa → valida → testa → mede → submete para revisão."
+        )
+
+
 def _render_business(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
@@ -6238,6 +6428,7 @@ def _render_business(
     _render_business_onboarding_demo()
     _render_business_customer_success_demo()
     _render_business_client_finance_demo()
+    _render_business_trend_intelligence_demo()
     _render_persona_capabilities("business", {
         "catalog": True,
         "suppliers": True,
