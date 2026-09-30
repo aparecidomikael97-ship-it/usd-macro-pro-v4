@@ -256,6 +256,9 @@ from atlasquant_aion_business_consolidation_dry_run_v2 import (
     build_consolidation_runbook as business_build_consolidation_dry_run_v2,
     live_revalidation_snapshot as business_live_revalidation_snapshot_v2,
 )
+from atlasquant_aion_business_consolidation_decision_request import (
+    decision_request_template as business_consolidation_decision_request_template,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7165,6 +7168,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "4 · Rollback de integração",
             "5 · Decisão administrativa",
             "6 · Dry-run fail-closed",
+            "7 · Pedido de decisão vinculado",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7229,7 +7233,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "Runtime BUSINESS OFF · sem deploy · sem publicação · sem cobrança · sem piloto."
         )
 
-    else:
+    elif view == "6 · Dry-run fail-closed":
         live = business_live_revalidation_snapshot_v2({})
         dry_run = business_build_consolidation_dry_run_v2(validation, live)
         st.write(f"Estado: **{dry_run.get('state')}**")
@@ -7242,6 +7246,21 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "Mesmo com revalidação completa, o máximo é READY_FOR_EXPLICIT_ADMIN_DECISION. "
             "Merge, deploy, piloto e runtime continuam sem autorização."
+        )
+
+    else:
+        request = business_consolidation_decision_request_template()
+        st.write(f"Estado: **{request.get('state')}**")
+        st.markdown("**Bindings obrigatórios para uma futura decisão explícita:**")
+        for item in list(request.get("required_bindings") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "Não existe autorização registrada. O pedido só poderá ser formado depois da "
+            "revalidação ao vivo e ficará vinculado a SHA, base, bundle e evidência exatos."
+        )
+        st.caption(
+            "Estado máximo do pedido: HUMAN_AUTHORIZATION_RECORD_REQUIRED. "
+            "Ele não executa merge, deploy, piloto ou runtime."
         )
 
 

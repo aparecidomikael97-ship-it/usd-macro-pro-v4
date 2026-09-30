@@ -566,3 +566,19 @@ module cannot merge, rebase, enable auto-merge, deploy, authorize a pilot or
 activate runtime.
 
 ADR-0030 records this live-revalidation and stop-condition boundary.
+
+## BUSINESS consolidation decision request V1
+
+`atlasquant_aion_business_consolidation_decision_request.py` creates a
+non-executing request envelope for a future human decision. It requires the
+dry-run to have reached `READY_FOR_EXPLICIT_ADMIN_DECISION` and binds the
+request to the exact repository, candidate SHA, base SHA, frozen bundle digest,
+live-evidence reference, reviewer and scope.
+
+The request has its own canonical digest. Any drift in repository, SHA, base,
+bundle, evidence reference or scope causes `BINDING_MISMATCH` and requires a
+new review. The highest state is `HUMAN_AUTHORIZATION_RECORD_REQUIRED`, which
+does not record authorization and cannot merge, deploy, authorize a pilot or
+activate runtime.
+
+ADR-0031 records this anti-replay and anti-ambiguity boundary.

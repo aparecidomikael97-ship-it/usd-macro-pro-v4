@@ -929,6 +929,15 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("business_live_revalidation_snapshot_v2", src)
         self.assertNotIn("st.tabs(", src)
 
+    def test_business_consolidation_decision_request_is_bound_and_non_executing(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("7 · Pedido de decisão vinculado", src)
+        self.assertIn("Bindings obrigatórios para uma futura decisão explícita", src)
+        self.assertIn("Não existe autorização registrada", src)
+        self.assertIn("HUMAN_AUTHORIZATION_RECORD_REQUIRED", src)
+        self.assertIn("não executa merge, deploy, piloto ou runtime", src)
+        self.assertNotIn("st.tabs(", src)
+
     def test_business_pilot_governance_keeps_first_pilot_bounded_and_unapproved(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("def _render_business_pilot_governance_demo()", src)
