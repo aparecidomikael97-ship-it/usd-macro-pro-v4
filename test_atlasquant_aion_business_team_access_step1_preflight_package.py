@@ -24,6 +24,7 @@ from atlasquant_aion_business_team_access_step1_preflight_package import (
     build_step1_preflight_package,
     readiness_observation_template,
     step1_preflight_package_policy,
+    verify_step1_preflight_package,
 )
 
 
@@ -209,6 +210,34 @@ class TeamAccessStep1PreflightPackageTests(unittest.TestCase):
         self.assertFalse(result["executor_enabled"])
         self.assertFalse(result["production_authorized"])
         self.assertFalse(result["executes_action"])
+
+    def test_ready_packet_has_recomputable_integrity_binding(self):
+        result = build_step1_preflight_package(
+            _materialization(),
+            _authorization_package(),
+            _observation(),
+            evaluated_at="2026-09-30T21:50:00+00:00",
+        )
+        binding = verify_step1_preflight_package(result)
+        self.assertTrue(binding["binding_match"])
+        self.assertEqual(
+            binding["state"], "STEP1_PREFLIGHT_PACKAGE_BINDING_MATCH"
+        )
+        self.assertEqual(
+            binding["step1_packet_digest"], result["step1_packet_digest"]
+        )
+
+    def test_tampered_ready_packet_breaks_integrity_binding(self):
+        result = build_step1_preflight_package(
+            _materialization(),
+            _authorization_package(),
+            _observation(),
+            evaluated_at="2026-09-30T21:50:00+00:00",
+        )
+        result["ledger_digest"] = "f" * 64
+        binding = verify_step1_preflight_package(result)
+        self.assertFalse(binding["binding_match"])
+        self.assertIn("packet_digest_integrity", binding["blockers"])
 
     def test_stale_observation_blocks(self):
         result = build_step1_preflight_package(
