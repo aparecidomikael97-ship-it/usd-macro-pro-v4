@@ -40,7 +40,15 @@
     "recurring_revenue_first": true,
     "dropshipping_priority": false,
     "dropshipping_state": "DESCARTADO_ATUALMENTE",
-    "expansion_funded_by_revenue": true
+    "expansion_funded_by_revenue": true,
+    "offer_productization_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "priority_offer_id": "B2B_ATENDIMENTO_AUTOMACAO_COMERCIAL",
+    "commercial_model": "IMPLEMENTATION_PLUS_MONTHLY_RECURRING",
+    "automatic_price_setting": false,
+    "result_guarantee": false,
+    "pipeline_end_to_end_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "real_contact_authorized": false,
+    "real_billing_authorized": false
   },
   "team_access": {
     "status": "IMPLEMENTADO / EM VALIDAÇÃO",
@@ -177,9 +185,15 @@
     },
     {
       "id": "D-2026-09-30-B2B-SERVICE-FIRST",
-      "state": "APROVADO / PENDENTE",
-      "implemented": false,
-      "validated": false
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_business_b2b_revenue_offer.py",
+        "test_atlasquant_aion_business_b2b_revenue_offer.py",
+        "docs/aion/AION_BUSINESS_B2B_REVENUE_OFFER_V1.md",
+        "docs/adr/ADR-0053-business-b2b-revenue-offer.md"
+      ]
     },
     {
       "id": "D-2026-09-30-DROPSHIPPING-OUT",
@@ -296,9 +310,22 @@
         "docs/aion/AION_CORE_MASTER_CHECKPOINT_BOOTSTRAP_V1.md",
         "docs/adr/ADR-0051-aion-core-master-checkpoint-bootstrap.md"
       ]
+    },
+    {
+      "id": "D-2026-09-30-COMMERCIAL-PIPELINE-END-TO-END",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_business_b2b_revenue_offer.py",
+        "test_atlasquant_aion_business_b2b_revenue_offer.py",
+        "docs/aion/AION_BUSINESS_B2B_REVENUE_OFFER_V1.md"
+      ]
     }
   ],
   "pending": [
+    "COMMERCIAL_PIPELINE_LIVE_BINDING",
+    "B2B_FIRST_REAL_PRICING_PILOT_REVIEW",
     "EIGHT_ROLE_ROUTER_RUNTIME_VALIDATION",
     "AION_CHECKPOINT_BOOTSTRAP_DEPLOY_VALIDATION",
     "FINOPS_PERSISTENT_LEDGER",
@@ -306,8 +333,6 @@
     "CAPACITY_SCALE_LIVE_METRICS_BINDING",
     "TEAM_RBAC_PRODUCTION_BINDING",
     "BACKUP_RECOVERY_TESTABLE_POLICY",
-    "B2B_OFFER_READY_TO_SELL",
-    "COMMERCIAL_PIPELINE_END_TO_END",
     "BUSINESS_UPDATED_PDF"
   ],
   "ecosystem_priority": {
