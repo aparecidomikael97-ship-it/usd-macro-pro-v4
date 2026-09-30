@@ -144,6 +144,39 @@ class Step1LedgerAppendContractTests(unittest.TestCase):
         self.assertFalse(result["step2_execution_authorized"])
         self.assertFalse(result["production_authorized"])
 
+    def test_tampered_decision_request_digest_rejects_record(self):
+        request = build_ledger_append_decision_request(
+            _packet(), _review()
+        )
+        request["target_ledger_digest"] = "e" * 64
+        record = {
+            "decision": request["required_decision_token"],
+            "receipt_review_digest": request[
+                "receipt_review_digest"
+            ],
+            "canonical_receipt_digest": request[
+                "canonical_receipt_digest"
+            ],
+            "source_ledger_digest": request["source_ledger_digest"],
+            "target_ledger_digest": request["target_ledger_digest"],
+            "decided_by": "admin.demo",
+            "decided_at": "2026-09-30T23:00:00+00:00",
+            "sandbox_only": True,
+            "production_targeted": False,
+            "automatic_ledger_append_requested": False,
+            "step2_execution_requested": False,
+            "secret_material_included": False,
+            "acknowledgements": {
+                name: True for name in REQUIRED_ACKNOWLEDGEMENTS
+            },
+        }
+        result = validate_ledger_append_decision(request, record)
+        self.assertIn(
+            "decision_request_digest_integrity", result["blockers"]
+        )
+        self.assertIn("required_token_recomputed", result["blockers"])
+        self.assertFalse(result["ledger_append_authorized"])
+
     def test_generic_language_or_digest_drift_rejects(self):
         request = build_ledger_append_decision_request(
             _packet(), _review()
