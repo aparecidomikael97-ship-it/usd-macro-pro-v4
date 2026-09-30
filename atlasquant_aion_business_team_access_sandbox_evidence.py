@@ -31,6 +31,10 @@ _SENSITIVE_KEY = re.compile(
     r"(password|passwd|secret|token|authorization|credential|private[_-]?key)",
     re.I,
 )
+_SAFE_METADATA_KEYS = {
+    "secrets_included",
+    "secrets_returned",
+}
 
 
 def _clean(value: Any, limit: int = 500) -> str:
@@ -72,7 +76,8 @@ def _digest(value: Any) -> str:
 def _contains_sensitive_key(value: Any) -> bool:
     if isinstance(value, Mapping):
         for key, item in value.items():
-            if _SENSITIVE_KEY.search(str(key)):
+            key_text = str(key)
+            if key_text not in _SAFE_METADATA_KEYS and _SENSITIVE_KEY.search(key_text):
                 return True
             if _contains_sensitive_key(item):
                 return True
