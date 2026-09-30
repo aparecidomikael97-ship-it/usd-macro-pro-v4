@@ -171,6 +171,22 @@ Estado do roteador dos oito papéis: **IMPLEMENTADO / EM VALIDAÇÃO** em
 administrativa. O roteador mantém o Orquestrador e seleciona no máximo três
 papéis adicionais por tarefa; roteamento não concede autoridade operacional.
 
+## 7.1 Backup & Recovery
+
+Estado da política: **IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_backup_recovery_policy.py`, ADR-0055 e workflow de source
+backup endurecido.
+
+Regras:
+- source ZIP com SHA256 verificado;
+- teste de extração antes do upload;
+- arquivos críticos de continuidade conferidos;
+- checkpoint/runtime versionado separadamente;
+- cópia secundária distinta obrigatória para conjunto completo;
+- RPO/RTO definidos pelo administrador;
+- restore automático proibido;
+- produção fora do restore drill desta camada.
+
 ## 8. Checkpoint Mestre como memória oficial
 
 O AION deve conhecer:
@@ -212,7 +228,7 @@ expansão.
 PENDENTE / APROVADO:
 - binding de produção do Equipe & Acessos: provisionamento real, MFA/2FA, persistência do registry e revogação física;
 - binding do Gestor de Capacidade & Escala com métricas reais, custos de providers, incidentes e onboarding;
-- política de backup e recuperação testável;
+- definir RPO/RTO, cópia secundária real e executar restore drill não produtivo da política Backup & Recovery;
 - binding do Budget Governor/FinOps com custos reais de providers, alertas e ledger financeiro persistente;
 - segmento/candidato reais + custos reais + preço comercial real + revisão jurídica/comercial do primeiro piloto;
 - binding do pipeline comercial com CRM/contatos/contrato/cobrança reais após aprovação;
@@ -242,3 +258,4 @@ PENDENTE / APROVADO:
 | D-2026-09-30-CORE-CHECKPOINT-BOOTSTRAP | IMPLEMENTADO / EM VALIDAÇÃO | Core carrega o Checkpoint Mestre validado no bootstrap |
 | D-2026-09-30-COMMERCIAL-PIPELINE-END-TO-END | IMPLEMENTADO / EM VALIDAÇÃO | Pipeline B2B sequencial até saúde e renovação |
 | D-2026-09-30-FIRST-PILOT-PRICING-REVIEW | IMPLEMENTADO / EM VALIDAÇÃO | Primeiro piloto exige fit, preço sustentável e Pilot Governance |
+| D-2026-09-30-BACKUP-RECOVERY-POLICY | IMPLEMENTADO / EM VALIDAÇÃO | Backup em camadas, integridade e restore não automático |
