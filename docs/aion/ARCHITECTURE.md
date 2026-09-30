@@ -453,3 +453,17 @@ capacity pressure before it harms margin or service quality.
 
 Commercial review is advisory only: no automatic repricing, charging or money
 movement is possible. ADR-0022 records this financial truth boundary.
+
+
+## BUSINESS trend and opportunity intelligence
+
+`atlasquant_aion_business_trend_intelligence.py` evaluates business
+opportunities from explicit evidence, using freshness, confidence, recurring
+revenue fit, margin potential, delivery complexity and support load.
+
+The same module provides a controlled improvement review using hypothesis,
+before/after metrics and minimum sample size. Improvement evidence can become
+eligible for human promotion review but never auto-deploys or changes runtime.
+
+Continuous monitoring is an explicit future goal, while the current collector
+runtime remains OFF. ADR-0023 records this evidence-first evolution boundary.
