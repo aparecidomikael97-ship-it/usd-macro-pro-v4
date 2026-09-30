@@ -377,6 +377,43 @@ def build_step1_execution_envelope(
     blockers = [name for name, passed in gates.items() if not passed]
     ready = not blockers
 
+    observation_payload = {
+        "schema": OBSERVATION_SCHEMA,
+        "version": VERSION,
+        "operator_session_id": observed_session,
+        "baseline_evidence_digest_observed": observed_baseline,
+        "observed_at": (
+            observed_at.isoformat() if observed_at is not None else ""
+        ),
+        "observed_by": observed_by,
+        "target_username": observed_username,
+        "target_account_absent_verified": observed.get(
+            "target_account_absent_verified"
+        ) is True,
+        "identity_provider_account_lookup_verified": observed.get(
+            "identity_provider_account_lookup_verified"
+        ) is True,
+        "tenant_scope_verified": observed.get(
+            "tenant_scope_verified"
+        ) is True,
+        "sandbox_health_verified": observed.get(
+            "sandbox_health_verified"
+        ) is True,
+        "oidc_verified": observed.get("oidc_verified") is True,
+        "registry_schema_verified": observed.get(
+            "registry_schema_verified"
+        ) is True,
+        "secrets_local": observed.get("secrets_local") is True,
+        "production_targets_absent": observed.get(
+            "production_targets_absent"
+        ) is True,
+        "cleanup_path_ready": observed.get("cleanup_path_ready") is True,
+        "secret_material_included": False,
+        "production_targeted": False,
+        "external_mutations_executed": False,
+    } if ready else {}
+    observation_digest = _digest(observation_payload) if ready else ""
+
     payload = {
         "materialization_digest": materialized["materialization_digest"],
         "step1_packet_digest": _clean(
@@ -385,6 +422,7 @@ def build_step1_execution_envelope(
         "decision_record_digest": _clean(
             decision.get("decision_record_digest"), 80
         ).lower(),
+        "execution_observation_digest": observation_digest,
         "plan_digest": materialized["plan_digest"],
         "operator_session_id": materialized["operator_session_id"],
         "baseline_evidence_digest": materialized[
@@ -415,6 +453,32 @@ def build_step1_execution_envelope(
         "decision_age_seconds": decision_age,
         "execution_observation_age_seconds": observation_age,
         "execution_envelope_digest": _digest(payload) if ready else "",
+        "materialization_digest": materialized["materialization_digest"]
+        if ready else "",
+        "step1_packet_digest": _clean(
+            packet.get("step1_packet_digest"), 80
+        ).lower() if ready else "",
+        "decision_record_digest": _clean(
+            decision.get("decision_record_digest"), 80
+        ).lower() if ready else "",
+        "execution_observation_digest": observation_digest if ready else "",
+        "plan_digest": materialized["plan_digest"] if ready else "",
+        "operator_session_id": materialized["operator_session_id"]
+        if ready else "",
+        "baseline_evidence_digest": materialized[
+            "baseline_evidence_digest"
+        ] if ready else "",
+        "observed_at": (
+            observed_at.isoformat()
+            if ready and observed_at is not None
+            else ""
+        ),
+        "observed_by": observed_by if ready else "",
+        "prepared_at": (
+            prepared.isoformat()
+            if ready and prepared is not None
+            else ""
+        ),
         "target_step_order": 1 if ready else None,
         "target_step_id": LIFECYCLE_STEP_IDS[0] if ready else "",
         "target_username": materialized["test_username"] if ready else "",
@@ -436,6 +500,236 @@ def build_step1_execution_envelope(
     }
 
 
+
+
+def verify_step1_execution_envelope(
+    envelope: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    row = _mapping(envelope)
+
+    materialization_digest = _clean(
+        row.get("materialization_digest"), 80
+    ).lower()
+    packet_digest = _clean(
+        row.get("step1_packet_digest"), 80
+    ).lower()
+    decision_digest = _clean(
+        row.get("decision_record_digest"), 80
+    ).lower()
+    observation_digest = _clean(
+        row.get("execution_observation_digest"), 80
+    ).lower()
+    plan_digest = _clean(row.get("plan_digest"), 80).lower()
+    session_id = _clean(row.get("operator_session_id"), 64).lower()
+    baseline_digest = _clean(
+        row.get("baseline_evidence_digest"), 80
+    ).lower()
+    target_username = _clean(row.get("target_username"), 160)
+    tenants = [
+        _clean(item, 120)
+        for item in list(row.get("tenant_ids") or [])
+        if _clean(item, 120)
+    ]
+    factor = _clean(row.get("factor_type"), 60).upper()
+    observed_at = _parse_time(row.get("observed_at"))
+    observed_by = _clean(row.get("observed_by"), 120)
+    prepared_at = _parse_time(row.get("prepared_at"))
+    envelope_digest = _clean(
+        row.get("execution_envelope_digest"), 80
+    ).lower()
+
+    payload = {
+        "materialization_digest": materialization_digest,
+        "step1_packet_digest": packet_digest,
+        "decision_record_digest": decision_digest,
+        "execution_observation_digest": observation_digest,
+        "plan_digest": plan_digest,
+        "operator_session_id": session_id,
+        "baseline_evidence_digest": baseline_digest,
+        "target_step_order": 1,
+        "target_step_id": LIFECYCLE_STEP_IDS[0],
+        "target_username": target_username,
+        "tenant_ids": sorted(set(tenants)),
+        "factor_type": factor,
+        "observed_at": (
+            observed_at.isoformat() if observed_at is not None else ""
+        ),
+        "observed_by": observed_by,
+        "prepared_at": (
+            prepared_at.isoformat() if prepared_at is not None else ""
+        ),
+    }
+
+    gates = {
+        "schema_valid": row.get("schema") == SCHEMA,
+        "state_ready": row.get("state")
+        == "READY_FOR_EXPLICIT_MANUAL_SANDBOX_STEP_1_APPLY",
+        "materialization_digest_valid": bool(
+            _DIGEST64.fullmatch(materialization_digest)
+        ),
+        "packet_digest_valid": bool(_DIGEST64.fullmatch(packet_digest)),
+        "decision_digest_valid": bool(
+            _DIGEST64.fullmatch(decision_digest)
+        ),
+        "observation_digest_valid": bool(
+            _DIGEST64.fullmatch(observation_digest)
+        ),
+        "plan_digest_valid": bool(_DIGEST64.fullmatch(plan_digest)),
+        "session_valid": bool(_SESSION32.fullmatch(session_id)),
+        "baseline_digest_valid": bool(
+            _DIGEST64.fullmatch(baseline_digest)
+        ),
+        "target_step_exact": bool(
+            row.get("target_step_order") == 1
+            and _clean(row.get("target_step_id"), 120).upper()
+            == LIFECYCLE_STEP_IDS[0]
+        ),
+        "target_username_sandbox": bool(
+            target_username.startswith("sandbox.")
+        ),
+        "tenant_scope_present": bool(tenants),
+        "observed_at_valid": observed_at is not None,
+        "observer_present": bool(observed_by),
+        "prepared_at_valid": prepared_at is not None,
+        "observation_not_after_preparation": bool(
+            observed_at is not None
+            and prepared_at is not None
+            and observed_at <= prepared_at
+        ),
+        "envelope_digest_valid": bool(
+            _DIGEST64.fullmatch(envelope_digest)
+        ),
+        "envelope_digest_integrity": bool(
+            _DIGEST64.fullmatch(envelope_digest)
+            and envelope_digest == _digest(payload)
+        ),
+        "manual_apply_eligible": row.get(
+            "manual_apply_eligible"
+        ) is True,
+        "manual_apply_required": row.get(
+            "manual_apply_required"
+        ) is True,
+        "provider_command_not_generated": row.get(
+            "provider_command_generated"
+        ) is False,
+        "physical_execution_not_performed": row.get(
+            "physical_execution_performed"
+        ) is False,
+        "execution_receipt_absent": row.get(
+            "step_execution_receipt_present"
+        ) is False,
+        "ledger_append_not_authorized": row.get(
+            "ledger_append_authorized"
+        ) is False,
+        "automatic_execution_not_authorized": row.get(
+            "automatic_execution_authorized"
+        ) is False,
+        "automatic_ledger_append_off": row.get(
+            "automatic_ledger_append"
+        ) is False,
+        "executor_disabled": row.get("executor_enabled") is False,
+        "production_not_authorized": row.get(
+            "production_authorized"
+        ) is False,
+        "deploy_not_authorized": row.get("deploy_authorized") is False,
+        "runtime_not_authorized": row.get("runtime_authorized") is False,
+        "non_executing": row.get("executes_action") is False,
+    }
+    blockers = [name for name, passed in gates.items() if not passed]
+    match = not blockers
+
+    return {
+        "schema": (
+            "ATLASQUANT_AION_BUSINESS_TEAM_ACCESS_"
+            "STEP1_EXECUTION_ENVELOPE_BINDING_V1"
+        ),
+        "version": VERSION,
+        "state": (
+            "STEP1_EXECUTION_ENVELOPE_BINDING_MATCH"
+            if match
+            else "STEP1_EXECUTION_ENVELOPE_BINDING_MISMATCH"
+        ),
+        "binding_match": match,
+        "gates": gates,
+        "blockers": blockers,
+        "execution_envelope_digest": envelope_digest if match else "",
+        "execution_observation_digest": (
+            observation_digest if match else ""
+        ),
+        "manual_apply_eligible": match,
+        "provider_command_generated": False,
+        "physical_execution_performed": False,
+        "ledger_append_authorized": False,
+        "automatic_execution_authorized": False,
+        "executor_enabled": False,
+        "production_authorized": False,
+        "executes_action": False,
+    }
+
+
+def verify_step1_execution_envelope_source_binding(
+    materialization: Mapping[str, Any] | None,
+    preflight_packet: Mapping[str, Any] | None,
+    decision_record: Mapping[str, Any] | None,
+    envelope: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    materialized = _materialization_integrity(materialization)
+    packet = _mapping(preflight_packet)
+    decision = _mapping(decision_record)
+    row = _mapping(envelope)
+
+    envelope_binding = verify_step1_execution_envelope(row)
+    packet_binding = verify_step1_preflight_package(packet)
+    decision_binding = verify_step1_decision_binding(packet, decision)
+
+    match = bool(
+        materialized.get("valid") is True
+        and packet_binding.get("binding_match") is True
+        and decision_binding.get("binding_match") is True
+        and envelope_binding.get("binding_match") is True
+        and _clean(row.get("materialization_digest"), 80).lower()
+        == materialized["materialization_digest"]
+        and _clean(row.get("step1_packet_digest"), 80).lower()
+        == _clean(packet.get("step1_packet_digest"), 80).lower()
+        and _clean(row.get("decision_record_digest"), 80).lower()
+        == _clean(decision.get("decision_record_digest"), 80).lower()
+        and _clean(row.get("plan_digest"), 80).lower()
+        == materialized["plan_digest"]
+        and _clean(row.get("operator_session_id"), 64).lower()
+        == materialized["operator_session_id"]
+        and _clean(row.get("baseline_evidence_digest"), 80).lower()
+        == materialized["baseline_evidence_digest"]
+        and _clean(row.get("target_username"), 160)
+        == materialized["test_username"]
+        and sorted(set(row.get("tenant_ids") or []))
+        == materialized["tenant_ids"]
+        and _clean(row.get("factor_type"), 60).upper()
+        == materialized["factor_type"]
+    )
+
+    return {
+        "schema": (
+            "ATLASQUANT_AION_BUSINESS_TEAM_ACCESS_"
+            "STEP1_EXECUTION_ENVELOPE_SOURCE_BINDING_V1"
+        ),
+        "version": VERSION,
+        "state": (
+            "STEP1_EXECUTION_ENVELOPE_SOURCE_BINDING_MATCH"
+            if match
+            else "STEP1_EXECUTION_ENVELOPE_SOURCE_BINDING_MISMATCH"
+        ),
+        "binding_match": match,
+        "execution_envelope_digest": _clean(
+            row.get("execution_envelope_digest"), 80
+        ).lower() if match else "",
+        "provider_command_generated": False,
+        "physical_execution_performed": False,
+        "automatic_execution_authorized": False,
+        "executor_enabled": False,
+        "production_authorized": False,
+        "executes_action": False,
+    }
+
 __all__ = [
     "SCHEMA",
     "OBSERVATION_SCHEMA",
@@ -445,4 +739,6 @@ __all__ = [
     "step1_execution_envelope_policy",
     "execution_observation_template",
     "build_step1_execution_envelope",
+    "verify_step1_execution_envelope",
+    "verify_step1_execution_envelope_source_binding",
 ]
