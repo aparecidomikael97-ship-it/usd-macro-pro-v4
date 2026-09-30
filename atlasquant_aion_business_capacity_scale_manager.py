@@ -75,6 +75,7 @@ def evaluate_capacity_scale(
     usage_rows: Sequence[Mapping[str, Any]] | None,
     measurement_ref: Any,
     approved_monthly_budget_cap_brl: Any,
+    shared_platform_cost_brl: Any,
     available_support_hours: Any,
     support_hours_per_new_tenant: Any,
     infra_headroom_pct: Any,
@@ -94,11 +95,27 @@ def evaluate_capacity_scale(
     ]
     min_margin = _number(review.get("minimum_margin_pct"))
     reserve_pct = _number(review.get("reserve_capacity_pct"))
+    ledger_digest = _clean(review.get("ledger_digest"), 128).lower()
+    quota_rows = list(review.get("quota_rows") or [])
+    canonical_quota_rows = [
+        dict(item) for item in quota_rows if isinstance(item, Mapping)
+    ]
+    expected_review_digest = _digest({
+        "ledger_digest": ledger_digest,
+        "minimum_margin_pct": min_margin,
+        "reserve_capacity_pct": reserve_pct,
+        "quota_rows": sorted(
+            canonical_quota_rows,
+            key=lambda item: str(item.get("tenant_id") or ""),
+        ),
+    })
 
     review_ok = bool(
         review.get("schema") == CAPACITY_REVIEW_SCHEMA
         and review.get("state") == "CAPACITY_QUOTA_REVIEW_READY"
         and _DIGEST64.fullmatch(review_digest)
+        and review_digest == expected_review_digest
+        and _DIGEST64.fullmatch(ledger_digest)
         and 1 <= len(tenant_ids) <= MAX_BOUNDED_TENANTS
         and len(set(tenant_ids)) == len(tenant_ids)
         and min_margin is not None
@@ -113,6 +130,7 @@ def evaluate_capacity_scale(
     )
 
     budget_cap = _number(approved_monthly_budget_cap_brl)
+    shared_platform_cost = _number(shared_platform_cost_brl)
     support_available = _number(available_support_hours)
     support_per_new = _number(support_hours_per_new_tenant)
     infra_headroom = _number(infra_headroom_pct)
@@ -123,6 +141,8 @@ def evaluate_capacity_scale(
     policy_values_ok = bool(
         budget_cap is not None
         and 0 < budget_cap <= INITIAL_BUDGET_CAP_BRL
+        and shared_platform_cost is not None
+        and shared_platform_cost >= 0
         and support_available is not None
         and support_available >= 0
         and support_per_new is not None
@@ -182,8 +202,12 @@ def evaluate_capacity_scale(
         )
     )
 
-    current_cost = round(
+    tenant_cost = round(
         sum(row["current_month_cost_brl"] for row in normalized_usage),
+        2,
+    )
+    current_cost = round(
+        tenant_cost + (shared_platform_cost or 0.0),
         2,
     )
     remaining_budget = (
@@ -259,6 +283,8 @@ def evaluate_capacity_scale(
         "measurement_ref": measurement,
         "tenant_ids": sorted(tenant_ids),
         "current_month_cost_brl": current_cost,
+        "tenant_month_cost_brl": tenant_cost,
+        "shared_platform_cost_brl": shared_platform_cost,
         "approved_monthly_budget_cap_brl": budget_cap,
         "available_support_hours": support_available,
         "support_hours_per_new_tenant": support_per_new,
@@ -280,6 +306,8 @@ def evaluate_capacity_scale(
         "current_tenant_count": len(tenant_ids) if review_ok else 0,
         "tenant_slots": tenant_slots,
         "current_month_cost_brl": current_cost,
+        "tenant_month_cost_brl": tenant_cost,
+        "shared_platform_cost_brl": shared_platform_cost,
         "approved_monthly_budget_cap_brl": budget_cap,
         "remaining_budget_brl": remaining_budget,
         "budget_slots": budget_slots,
