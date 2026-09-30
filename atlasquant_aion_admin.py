@@ -403,6 +403,9 @@ from atlasquant_aion_business_team_access_lifecycle_authorization_package import
 from atlasquant_aion_business_team_access_step1_preflight_package import (
     step1_preflight_package_policy as business_team_step1_preflight_package_policy,
 )
+from atlasquant_aion_business_team_access_step1_decision_record import (
+    step1_decision_requirements as business_team_step1_decision_requirements,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7356,6 +7359,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "48 · Equipe & Acessos · Lifecycle Plan",
             "49 · Equipe & Acessos · Authorization Package",
             "50 · Equipe & Acessos · Step 1 Preflight",
+            "51 · Equipe & Acessos · Step 1 Decision",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -8262,7 +8266,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "Ledger e Step Gate rejeitam autorização sem esse binding materializado."
         )
 
-    else:
+    elif view == "50 · Equipe & Acessos · Step 1 Preflight":
         packet = business_team_step1_preflight_package_policy()
         st.write(f"Estado: **{packet.get('state')}**")
         st.markdown("**Pré-requisitos do Step 1:**")
@@ -8281,6 +8285,27 @@ def _render_business_stack_consolidation_v2() -> None:
         )
         st.caption(
             "Estado máximo: READY_FOR_EXPLICIT_MANUAL_SANDBOX_STEP_1_DECISION_PACKET."
+        )
+
+    else:
+        decision = business_team_step1_decision_requirements()
+        st.write(f"Estado: **{decision.get('state')}**")
+        st.markdown("**Token formal obrigatório:**")
+        st.code(str(decision.get("required_decision_token") or ""), language=None)
+        st.markdown("**Freshness na decisão:**")
+        st.markdown(
+            f"- packet: até {decision.get('max_packet_decision_age_seconds')} segundos"
+        )
+        st.markdown(
+            f"- observação: até {decision.get('max_observation_age_at_decision_seconds')} segundos"
+        )
+        st.warning(
+            "Mensagens genéricas como 'vamos lá', 'ok' ou 'pode seguir' não autorizam o Step 1. "
+            "Mesmo um record verificado só autoriza execução manual futura; ele não cria a conta."
+        )
+        st.caption(
+            "Estado máximo: EXPLICIT_SANDBOX_STEP_1_DECISION_RECORD_VERIFIED · "
+            "step_execution_performed=false · executor OFF."
         )
 
 
