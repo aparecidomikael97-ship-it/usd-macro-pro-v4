@@ -78,7 +78,7 @@
     "audit_trail": true,
     "aion_must_obey_same_permissions": true,
     "shared_admin_login_forbidden": true,
-    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_BINDING",
+    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E",
     "production_provisioning": false,
     "real_mfa_2fa": false,
     "persisted_registry": false,
@@ -88,7 +88,16 @@
     "individual_account_attestation": true,
     "strong_auth_attestation": true,
     "registry_readback_attestation": true,
-    "revocation_verification_attestation": true
+    "revocation_verification_attestation": true,
+    "sandbox_e2e_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "sandbox_reference_identity_provider": "KEYCLOAK",
+    "sandbox_reference_identity_protocol": "OIDC",
+    "sandbox_reference_registry_storage": "POSTGRESQL",
+    "sandbox_reference_revocation_connector": "KEYCLOAK_ADMIN_REST",
+    "sandbox_reference_selection_scope": "SANDBOX_VALIDATION_ONLY",
+    "sandbox_physical_environment_configured": false,
+    "sandbox_real_e2e_executed": false,
+    "production_provider_activation_authorized": false
   },
   "capacity_scale": {
     "status": "IMPLEMENTADO / EM VALIDAÇÃO",
@@ -186,7 +195,8 @@
       448,
       449,
       450,
-      451
+      451,
+      452
     ],
     "current_runtime_authorized": false,
     "merge_authorized_by_this_checkpoint": false,
@@ -209,7 +219,8 @@
     "revenue_opportunity_engine_pr": 448,
     "capacity_live_metrics_pr": 449,
     "revenue_live_economics_pr": 450,
-    "team_access_production_binding_pr": 451
+    "team_access_production_binding_pr": 451,
+    "team_access_sandbox_e2e_pr": 452
   },
   "decisions": [
     {
@@ -496,13 +507,24 @@
         "docs/aion/AION_BUSINESS_TEAM_ACCESS_PRODUCTION_BINDING_V1.md",
         "docs/adr/ADR-0063-business-team-access-production-binding.md"
       ]
+    },
+    {
+      "id": "D-2026-09-30-TEAM-ACCESS-SANDBOX-E2E",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_business_team_access_sandbox_e2e.py",
+        "test_atlasquant_aion_business_team_access_sandbox_e2e.py",
+        "docs/aion/AION_BUSINESS_TEAM_ACCESS_SANDBOX_E2E_V1.md",
+        "docs/adr/ADR-0064-business-team-access-sandbox-e2e.md"
+      ]
     }
   ],
   "pending": [
-    "TEAM_ACCESS_SANDBOX_E2E_VALIDATION",
-    "TEAM_ACCESS_SESSION_REVOCATION_CONNECTOR",
-    "TEAM_ACCESS_REGISTRY_STORAGE_BINDING",
-    "TEAM_ACCESS_IDENTITY_PROVIDER_SELECTION",
+    "TEAM_ACCESS_PRODUCTION_PROVIDER_APPROVAL",
+    "TEAM_ACCESS_SANDBOX_SECRET_STORE_AND_CONNECTOR_CONFIGURATION",
+    "TEAM_ACCESS_PHYSICAL_SANDBOX_E2E_EXECUTION",
     "REVENUE_LIVE_ECONOMICS_FIRST_PILOT_VALIDATION",
     "REVENUE_LIVE_ECONOMICS_REAL_ALLOCATION_CALIBRATION",
     "CAPACITY_FIRST_PILOT_REAL_METRICS_VALIDATION",

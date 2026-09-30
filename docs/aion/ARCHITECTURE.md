@@ -1111,3 +1111,24 @@ outside this module.
 
 ADR-0063 records this boundary.
 
+
+
+## BUSINESS team access sandbox E2E
+
+`atlasquant_aion_business_team_access_sandbox_e2e.py` defines the bounded
+non-production validation layer after the production evidence contract.
+
+The reference sandbox stack is Keycloak over OIDC for identity, PostgreSQL for
+the versioned team registry and a Keycloak Admin REST adapter contract for
+revocation. The module does not call those services; it validates only supplied
+sandbox evidence.
+
+The lifecycle must prove account identity, strong authentication, exact
+registry read-back, activation-review coherence and complete revocation
+evidence before it can reach
+`READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_EXIT_REVIEW`.
+
+Production activation, secrets, registry writes, session revocation, deploy and
+runtime remain outside this layer.
+
+ADR-0064 records this boundary.
