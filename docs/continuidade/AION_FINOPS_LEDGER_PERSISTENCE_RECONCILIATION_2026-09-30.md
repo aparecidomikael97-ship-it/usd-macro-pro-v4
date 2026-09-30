@@ -22,6 +22,8 @@ Empilhado sobre a Draft PR #446.
 
 ## Estado
 
+Draft PR #447 — AION FinOps: ledger persistence and invoice reconciliation V1.
+
 IMPLEMENTADO / EM VALIDAÇÃO.
 
 Ainda pendente:
