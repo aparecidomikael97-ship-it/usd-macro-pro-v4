@@ -34,6 +34,23 @@ jobs:
           } > backup-out/BACKUP_MANIFEST.txt
           zip -qr "backup-out/${name}.zip" .             -x ".git/*"                "backup-out/*"                "__pycache__/*"                "*.pyc"
           sha256sum "backup-out/${name}.zip" > "backup-out/${name}.sha256"
+
+          echo "Verifying source backup integrity..."
+          sha256sum -c "backup-out/${name}.sha256"
+          unzip -t "backup-out/${name}.zip" >/dev/null
+
+          for critical in \
+            "CONTEXTO_DO_PROJETO.md" \
+            "docs/continuidade/checkpoint_mestre_latest.json" \
+            "docs/continuidade/CHECKPOINT_MESTRE_RECONCILIACAO_2026-09-30.md" \
+            "docs/continuidade/checkpoint_mestre_reconciliation_2026-09-30.json" \
+            "atlasquant_aion_recovery.py" \
+            "atlasquant_aion_memory.py"
+          do
+            unzip -Z1 "backup-out/${name}.zip" | grep -Fx -- "$critical" >/dev/null
+          done
+
+          echo "verified=true" >> backup-out/BACKUP_MANIFEST.txt
           ls -lh backup-out/
 
       - name: Upload source backup
