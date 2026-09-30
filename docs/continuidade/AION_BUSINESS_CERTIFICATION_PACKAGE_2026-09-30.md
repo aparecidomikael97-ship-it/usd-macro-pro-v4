@@ -65,4 +65,5 @@ humana explícita e não liga runtime.
 
 A execução de CI desta branch valida o contrato e os testes, mas o resultado só
 vira atestação de certificação quando SHA, suíte, refs e fingerprint forem
-registrados de forma vinculada. CI verde genérico não certifica o BUSINESS.
+registrados de forma vinculada e confirmados por verificador independente.
+CI verde genérico ou payload autodeclarado não certifica o BUSINESS.
