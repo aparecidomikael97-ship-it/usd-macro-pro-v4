@@ -1375,3 +1375,21 @@ The maximum state is
 generated and no execution occurs.
 
 ADR-0078 records this boundary.
+
+
+## BUSINESS team access Step 1 provider apply plan
+
+`atlasquant_aion_business_team_access_step1_apply_plan.py` converts an
+integrity-verified Step 1 execution envelope into a non-executable provider
+operation plan.
+
+The plan freezes the Keycloak sandbox realm, HTTP method, relative endpoint,
+expected status and minimal non-secret UserRepresentation. It deliberately
+contains no Authorization header, access token, password, credentials or shell
+command.
+
+The maximum state is
+`READY_FOR_ADMIN_TEAM_ACCESS_STEP1_PROVIDER_APPLY_PLAN_REVIEW`. It does not
+call the provider or create the user.
+
+ADR-0079 records this boundary.
