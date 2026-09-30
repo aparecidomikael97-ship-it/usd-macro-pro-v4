@@ -278,6 +278,10 @@ from atlasquant_aion_business_consolidation_completion_review import (
     completion_review_template as business_consolidation_completion_review_template,
     final_admin_decision_request as business_final_admin_decision_request,
 )
+from atlasquant_aion_business_release_boundary_handoff import (
+    deploy_decision_request as business_deploy_decision_request,
+    release_handoff_template as business_release_handoff_template,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7194,6 +7198,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "11 · Verificação pós-merge",
             "12 · Ledger sequencial",
             "13 · Revisão final da consolidação",
+            "14 · Handoff para decisão de deploy",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7367,7 +7372,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "deploy e runtime continuam separados."
         )
 
-    else:
+    elif view == "13 · Revisão final da consolidação":
         review = business_consolidation_completion_review_template()
         request = business_final_admin_decision_request(review)
         st.write(f"Estado: **{review.get('state')}**")
@@ -7387,6 +7392,27 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "Mensagens genéricas como 'vamos lá', 'ok' ou 'pode seguir' não encerram a consolidação. "
             "Mesmo o acknowledgement técnico não autoriza deploy, produção, piloto ou runtime."
+        )
+
+    else:
+        handoff = business_release_handoff_template()
+        request = business_deploy_decision_request(handoff)
+        st.write(f"Estado: **{handoff.get('state')}**")
+        st.markdown("**Itens obrigatórios antes de qualquer decisão futura de deploy:**")
+        for item in list(handoff.get("required_items") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "Consolidação técnica reconhecida não é deploy. Deploy, por sua vez, não liga o "
+            "runtime BUSINESS. Cada fronteira exige decisão separada."
+        )
+        st.markdown("**Token reservado para uma futura decisão explícita de deploy:**")
+        st.code(str(handoff.get("required_deploy_decision_token") or ""), language=None)
+        st.markdown("**Acknowledgements obrigatórios do deploy:**")
+        for item in list(handoff.get("deploy_acknowledgements") or []):
+            st.markdown(f"- {item}")
+        st.caption(
+            "Esta tela só prepara o handoff. Nenhum deploy é autorizado ou executado; "
+            "runtime, piloto e ações com cliente real permanecem OFF."
         )
 
 
