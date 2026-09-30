@@ -169,6 +169,11 @@ O Checkpoint Mestre é a fonte oficial de continuidade. Não criar memória
 paralela conflitante. O ponteiro `checkpoint_mestre_latest.json` identifica a
 camada incremental mais nova sem apagar as anteriores.
 
+Estado da integração com o Core: **IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_core_master_checkpoint_bootstrap.py`. O runtime bridge
+incorpora o snapshot validado como evidência read-only; checkpoint inválido ou
+adulterado falha fechado e não injeta contexto.
+
 ## 9. Estado técnico da stack Business neste checkpoint
 
 A sequência recente de Draft PRs de governança Business foi construída com
@@ -194,7 +199,7 @@ PENDENTE / APROVADO:
 - binding do Budget Governor/FinOps com custos reais de providers, alertas e ledger financeiro persistente;
 - oferta comercial B2B pronta para vender;
 - pipeline proposta → onboarding → entrega → saúde → renovação;
-- integração do Checkpoint Mestre ao bootstrap do AION;
+- validação operacional do bootstrap do Checkpoint Mestre em ambientes empacotados/deployados;
 - arquitetura multiagente de oito papéis com roteamento barato;
 - PDF atualizado da aba Negócios para visão do administrador.
 
@@ -217,3 +222,4 @@ PENDENTE / APROVADO:
 | D-2026-09-30-TREASURY-BUCKETS | IMPLEMENTADO / EM VALIDAÇÃO | Tesouraria separada entre Negócios, Trader e Investimentos |
 | D-2026-09-30-TRADER-INITIAL-CAP-30 | IMPLEMENTADO / EM VALIDAÇÃO | Limite inicial de 30% do capital total para Trader |
 | D-2026-09-30-TRADE-TARGET-NOT-GUARANTEE | IMPLEMENTADO / EM VALIDAÇÃO | Meta de Trade não é promessa de retorno |
+| D-2026-09-30-CORE-CHECKPOINT-BOOTSTRAP | IMPLEMENTADO / EM VALIDAÇÃO | Core carrega o Checkpoint Mestre validado no bootstrap |
