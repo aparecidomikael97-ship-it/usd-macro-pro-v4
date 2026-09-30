@@ -18,8 +18,8 @@ from atlasquant_aion_business_team_access_sandbox_lifecycle_plan import (
     SCHEMA as PLAN_SCHEMA,
     LIFECYCLE_STEP_IDS,
 )
-from atlasquant_aion_business_team_access_sandbox_lifecycle_authorization import (
-    SCHEMA as AUTH_SCHEMA,
+from atlasquant_aion_business_team_access_lifecycle_authorization_package import (
+    verify_materialized_authorization_binding,
 )
 
 SCHEMA = "ATLASQUANT_AION_BUSINESS_TEAM_ACCESS_SANDBOX_LIFECYCLE_LEDGER_V1"
@@ -83,23 +83,11 @@ def _authorization_matches(
     plan: Mapping[str, Any],
     auth: Mapping[str, Any],
 ) -> bool:
-    plan_digest = _clean(plan.get("plan_digest"), 80).lower()
-    baseline_digest = _clean(plan.get("baseline_evidence_digest"), 80).lower()
+    binding = verify_materialized_authorization_binding(plan, auth)
     return bool(
-        plan.get("schema") == PLAN_SCHEMA
-        and plan.get("state")
-        == "READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_LIFECYCLE_EXECUTION_DECISION"
-        and _DIGEST64.fullmatch(plan_digest)
-        and _DIGEST64.fullmatch(baseline_digest)
-        and auth.get("schema") == AUTH_SCHEMA
-        and auth.get("state")
-        == "EXPLICIT_SANDBOX_LIFECYCLE_AUTHORIZATION_RECORD_VERIFIED"
-        and auth.get("authorization_record_verified") is True
+        binding.get("binding_match") is True
         and auth.get("sandbox_lifecycle_manual_execution_authorized") is True
-        and _clean(auth.get("plan_digest"), 80).lower() == plan_digest
-        and _clean(auth.get("baseline_evidence_digest"), 80).lower()
-        == baseline_digest
-        and _DIGEST64.fullmatch(_clean(auth.get("record_digest"), 80).lower())
+        and auth.get("automatic_execution_authorized") is False
         and auth.get("executor_enabled") is False
         and auth.get("production_authorized") is False
         and auth.get("executes_action") is False
@@ -138,6 +126,16 @@ def evidence_receipt_template(
         else "",
         "authorization_record_digest": _clean(
             auth.get("record_digest"), 80
+        ).lower()
+        if step_id
+        else "",
+        "authorization_package_digest": _clean(
+            auth.get("authorization_package_digest"), 80
+        ).lower()
+        if step_id
+        else "",
+        "materialization_digest": _clean(
+            auth.get("materialization_digest"), 80
         ).lower()
         if step_id
         else "",
@@ -226,6 +224,12 @@ def build_evidence_receipt(
         "authorization_record_digest": _clean(
             auth.get("record_digest"), 80
         ).lower(),
+        "authorization_package_digest": _clean(
+            auth.get("authorization_package_digest"), 80
+        ).lower(),
+        "materialization_digest": _clean(
+            auth.get("materialization_digest"), 80
+        ).lower(),
         "evidence_digest": evidence,
         "observed_at": _clean(observed_at, 100),
         "previous_entry_digest": previous,
@@ -262,6 +266,8 @@ def lifecycle_ledger_template() -> dict[str, Any]:
         "plan_digest": "",
         "baseline_evidence_digest": "",
         "authorization_record_digest": "",
+        "authorization_package_digest": "",
+        "materialization_digest": "",
         "step_ids": list(LIFECYCLE_STEP_IDS),
         "total_steps": len(LIFECYCLE_STEP_IDS),
         "completed_count": 0,
@@ -334,6 +340,14 @@ def build_lifecycle_evidence_ledger(
             auth.get("record_digest"), 80
         ).lower():
             row_blockers.append("authorization_record_digest")
+        if _clean(row.get("authorization_package_digest"), 80).lower() != _clean(
+            auth.get("authorization_package_digest"), 80
+        ).lower():
+            row_blockers.append("authorization_package_digest")
+        if _clean(row.get("materialization_digest"), 80).lower() != _clean(
+            auth.get("materialization_digest"), 80
+        ).lower():
+            row_blockers.append("materialization_digest")
         if not _DIGEST64.fullmatch(evidence):
             row_blockers.append("evidence_digest")
         if evidence in seen_evidence:
@@ -418,6 +432,12 @@ def build_lifecycle_evidence_ledger(
         "authorization_record_digest": _clean(
             auth.get("record_digest"), 80
         ).lower(),
+        "authorization_package_digest": _clean(
+            auth.get("authorization_package_digest"), 80
+        ).lower(),
+        "materialization_digest": _clean(
+            auth.get("materialization_digest"), 80
+        ).lower(),
         "entries": normalized[:completed_count],
         "completed_count": completed_count,
         "chain_head_digest": previous_digest,
@@ -437,6 +457,16 @@ def build_lifecycle_evidence_ledger(
         else "",
         "authorization_record_digest": _clean(
             auth.get("record_digest"), 80
+        ).lower()
+        if not blockers
+        else "",
+        "authorization_package_digest": _clean(
+            auth.get("authorization_package_digest"), 80
+        ).lower()
+        if not blockers
+        else "",
+        "materialization_digest": _clean(
+            auth.get("materialization_digest"), 80
         ).lower()
         if not blockers
         else "",
