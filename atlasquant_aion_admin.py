@@ -418,6 +418,9 @@ from atlasquant_aion_business_team_access_step1_provider_runner import (
 from atlasquant_aion_business_team_access_step1_provider_receipt_review import (
     provider_receipt_review_policy as business_team_step1_provider_receipt_review_policy,
 )
+from atlasquant_aion_business_team_access_step1_ledger_append_contract import (
+    ledger_append_contract_policy as business_team_step1_ledger_append_contract_policy,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7376,6 +7379,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "53 · Equipe & Acessos · Step 1 Apply Plan",
             "54 · Equipe & Acessos · Step 1 Provider Runner",
             "55 · Equipe & Acessos · Step 1 Receipt Review",
+            "56 · Equipe & Acessos · Step 1 Ledger Append",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -8388,7 +8392,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "Produção/deploy/runtime permanecem OFF."
         )
 
-    else:
+    elif view == "55 · Equipe & Acessos · Step 1 Receipt Review":
         review = business_team_step1_provider_receipt_review_policy()
         st.write(f"Estado: **{review.get('state')}**")
         st.markdown("**Review pós-execução:**")
@@ -8407,6 +8411,26 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "Estado máximo: READY_FOR_ADMIN_TEAM_ACCESS_STEP1_LEDGER_APPEND_REVIEW · "
             "Step 2 continua não autorizado."
+        )
+
+    else:
+        append = business_team_step1_ledger_append_contract_policy()
+        st.write(f"Estado: **{append.get('state')}**")
+        st.markdown("**Contrato de append do Step 1:**")
+        for item in (
+            "receipt_review_digest exato",
+            "source ledger GENESIS",
+            "canonical receipt do Step 1",
+            "target ledger preview 1/10",
+            "token de decisão derivado dos digests",
+            "Step 2 exige autorização separada",
+        ):
+            st.markdown(f"- {item}")
+        st.warning(
+            "A decisão de append não escreve o ledger. Writer persistente continua separado."
+        )
+        st.caption(
+            "Mensagens genéricas não autorizam append · Step 2 continua OFF."
         )
 
 
