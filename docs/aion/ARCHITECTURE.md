@@ -775,3 +775,21 @@ physical execution, billing and client actions separate.
 
 The module performs no expansion, runtime change or external action. ADR-0042
 records this boundary.
+
+## BUSINESS post-expansion verification and cycle freeze
+
+atlasquant_aion_business_post_expansion_cycle_freeze.py verifies evidence from a
+future scope expansion executed through a separate path. The observed scope and
+tenant set must match the authorized expansion review packet exactly.
+
+Application health, observability, tenant isolation, privacy, support, capacity,
+billing guardrail and rollback readiness must all succeed. A verified receipt
+reaches SCOPE_EXPANSION_VERIFIED_AND_FROZEN.
+
+A green cycle does not grant continuing growth. It may only recreate the same
+EXPLICIT_EXPANSION_DECISION_REQUIRED boundary consumed by the controlled
+preflight from ADR-0042. Automatic expansion, billing and client actions remain
+false at every cycle boundary.
+
+The module performs no expansion, runtime change, deploy, rollback or external
+action. ADR-0043 records this boundary.
