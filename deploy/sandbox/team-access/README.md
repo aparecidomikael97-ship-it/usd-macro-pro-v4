@@ -175,3 +175,21 @@ The Operator Kit stores its default secret file, readiness report and baseline a
 The operator kit never performs any lifecycle step. Account creation, MFA,
 registry writes, account disable and session revocation remain behind the
 separate lifecycle authorization and one-step gates.
+
+
+## Readiness-to-baseline handoff
+
+The guarded operator assigns a non-secret operator_session_id to each readiness
+run and propagates it into baseline collection. This prevents mixing artifacts
+from different local sessions.
+
+After an explicit -ApplyStart -CollectBaseline run, validate both artifacts
+from the repository root:
+
+    python validate_team_access_operator_handoff.py "%LOCALAPPDATA%\AtlasQuant\team-access-sandbox\operator\windows-operator-readiness.json" "%LOCALAPPDATA%\AtlasQuant\team-access-sandbox\evidence\team-access-baseline-evidence.json" --reviewed-by <admin>
+
+The maximum result is:
+
+    READY_FOR_ADMIN_TEAM_ACCESS_REAL_BASELINE_ACCEPTANCE_REVIEW
+
+That result still does not accept the baseline or authorize lifecycle steps.
