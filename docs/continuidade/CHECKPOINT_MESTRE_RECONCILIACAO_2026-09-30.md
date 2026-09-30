@@ -118,6 +118,14 @@ ADR-0070 e testes associados. Cada etapa exige preflight fresco, target igual ao
 next expected, baseline sem drift, saúde/OIDC/registry válidos, secrets locais,
 produção ausente e cleanup pronto. O gate não executa nem faz append automático.
 
+Estado do Windows Operator Kit de Equipe & Acessos:
+**IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_business_team_access_windows_operator_kit.py`, scripts
+PowerShell locais, ADR-0071 e testes associados. Geração de secrets e start são
+PLAN ONLY por padrão; gravação do env exige `-Apply`, start exige
+`-ApplyStart` e baseline exige `-CollectBaseline` adicional. Nenhuma ação
+real no PC foi executada por esta camada no GitHub.
+
 Estado do binding de oportunidades com economia real: **IMPLEMENTADO / EM VALIDAÇÃO**
 em `atlasquant_aion_business_revenue_live_economics_binding.py`, ADR-0062 e
 testes associados. Custo mensal passa a vir do ledger FinOps verificado e
@@ -395,3 +403,4 @@ PENDENTE / APROVADO:
 | D-2026-09-30-TEAM-ACCESS-SANDBOX-LIFECYCLE-AUTHORIZATION | IMPLEMENTADO / EM VALIDAÇÃO | Registro formal futuro fica preso ao plano/baseline e não habilita executor |
 | D-2026-09-30-TEAM-ACCESS-SANDBOX-LIFECYCLE-LEDGER | IMPLEMENTADO / EM VALIDAÇÃO | Evidências por step ficam em ledger hash-chain sanitizado e sequencial |
 | D-2026-09-30-TEAM-ACCESS-SANDBOX-LIFECYCLE-STEP-GATE | IMPLEMENTADO / EM VALIDAÇÃO | Cada step recebe preflight e pós-review próprios antes de qualquer avanço |
+| D-2026-09-30-TEAM-ACCESS-WINDOWS-OPERATOR-KIT | IMPLEMENTADO / EM VALIDAÇÃO | Fluxo Windows local ganha bootstrap, readiness, start e baseline com switches explícitos |
