@@ -225,6 +225,21 @@ Regras:
 - restore automático proibido;
 - produção fora do restore drill desta camada.
 
+## 7.2 Global Worker · bloqueio operacional observado
+
+Em 2026-09-30, o gate `AION Global Worker Activation Readiness` bloqueou
+corretamente a stack porque o último scheduled pulse saudável observado era de
+2026-09-29T10:22:38Z, acima da janela máxima de 5400 segundos.
+
+Estado:
+- código/Quality não é a causa do bloqueio;
+- `SCHEDULED_PULSE_NOT_HEALTHY` permanece fail-closed;
+- feature flag continua sem alteração;
+- worker não foi armado;
+- runtime não foi modificado;
+- nenhum gate deve ser enfraquecido apenas para tornar o CI verde;
+- qualquer reativação/ação de runtime continua exigindo autorização separada.
+
 ## 8. Checkpoint Mestre como memória oficial
 
 O AION deve conhecer:
