@@ -271,6 +271,9 @@ from atlasquant_aion_business_consolidation_execution_review_packet import (
 from atlasquant_aion_business_consolidation_post_merge_verification import (
     post_merge_verification_template as business_post_merge_verification_template,
 )
+from atlasquant_aion_business_consolidation_progress_ledger import (
+    progress_ledger_template as business_consolidation_progress_ledger_template,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7185,6 +7188,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "9 · Preflight de execução",
             "10 · Pacote de revisão de execução",
             "11 · Verificação pós-merge",
+            "12 · Ledger sequencial",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7326,7 +7330,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "merge_execution_authorized=false · runtime OFF."
         )
 
-    else:
+    elif view == "11 · Verificação pós-merge":
         post_merge = business_post_merge_verification_template()
         st.write(f"Estado: **{post_merge.get('state')}**")
         st.markdown("**Checks obrigatórios após qualquer merge futuro:**")
@@ -7338,6 +7342,24 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "Etapa verde: STEP_VERIFIED_FOR_NEXT_PREFLIGHT · "
             "regressão: ROLLBACK_REVIEW_REQUIRED · rollback automático proibido."
+        )
+
+    else:
+        ledger = business_consolidation_progress_ledger_template()
+        st.write(f"Estado: **{ledger.get('state')}**")
+        st.write(
+            f"Progresso: **{ledger.get('completed_count', 0)}/{ledger.get('total_steps', 0)}** · "
+            f"próxima PR esperada: **#{ledger.get('next_expected_pr')}**"
+        )
+        st.markdown("**Requisitos da revisão final depois das 19 etapas:**")
+        for item in list(ledger.get("completion_requirements") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "O ledger aceita apenas recibos pós-merge verificados em ordem e com cadeia de rollback contínua."
+        )
+        st.caption(
+            "Mesmo completo: CONSOLIDATION_COMPLETE_REVIEW_REQUIRED · "
+            "deploy e runtime continuam separados."
         )
 
 
