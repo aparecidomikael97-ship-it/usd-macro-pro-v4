@@ -88,9 +88,17 @@
     "protect_stability": true,
     "current_layer": "READ_ONLY_ADMISSION_CAPACITY_PLANNER",
     "initial_budget_cap_brl": 200,
-    "live_metrics_bound": false,
+    "live_metrics_bound": true,
     "provider_costs_bound": false,
-    "physical_customer_admission": false
+    "physical_customer_admission": false,
+    "live_metrics_binding_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "required_live_sources": [
+      "FINOPS",
+      "SUPPORT",
+      "INFRA",
+      "INCIDENTS"
+    ],
+    "external_probes_configured": false
   },
   "external_ai_relationship": {
     "aion_must_run_without_chatgpt_subscription": true,
@@ -164,7 +172,8 @@
       445,
       446,
       447,
-      448
+      448,
+      449
     ],
     "current_runtime_authorized": false,
     "merge_authorized_by_this_checkpoint": false,
@@ -184,7 +193,8 @@
     "commercial_live_read_binding_pr": 445,
     "finops_live_cost_ledger_pr": 446,
     "finops_persistence_reconciliation_pr": 447,
-    "revenue_opportunity_engine_pr": 448
+    "revenue_opportunity_engine_pr": 448,
+    "capacity_live_metrics_pr": 449
   },
   "decisions": [
     {
@@ -435,9 +445,23 @@
         "docs/aion/AION_BUSINESS_REVENUE_OPPORTUNITY_ENGINE_V1.md",
         "docs/adr/ADR-0060-business-revenue-opportunity-engine.md"
       ]
+    },
+    {
+      "id": "D-2026-09-30-CAPACITY-LIVE-METRICS",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_business_capacity_live_metrics_binding.py",
+        "test_atlasquant_aion_business_capacity_live_metrics_binding.py",
+        "docs/aion/AION_BUSINESS_CAPACITY_LIVE_METRICS_V1.md",
+        "docs/adr/ADR-0061-business-capacity-live-metrics.md"
+      ]
     }
   ],
   "pending": [
+    "CAPACITY_FIRST_PILOT_REAL_METRICS_VALIDATION",
+    "CAPACITY_LIVE_SUPPORT_INFRA_INCIDENT_CONNECTORS",
     "GLOBAL_WORKER_SCHEDULED_PULSE_STALE",
     "REVENUE_OPPORTUNITY_WEIGHT_CALIBRATION_AFTER_CLIENT_HISTORY",
     "REVENUE_OPPORTUNITY_REAL_CAPACITY_BINDING",
@@ -459,7 +483,6 @@
     "FIRST_PILOT_REAL_SEGMENT_CANDIDATE_AND_PRICING",
     "EIGHT_ROLE_ROUTER_RUNTIME_VALIDATION",
     "AION_CHECKPOINT_BOOTSTRAP_DEPLOY_VALIDATION",
-    "CAPACITY_SCALE_LIVE_METRICS_BINDING",
     "TEAM_RBAC_PRODUCTION_BINDING",
     "BUSINESS_UPDATED_PDF"
   ],
